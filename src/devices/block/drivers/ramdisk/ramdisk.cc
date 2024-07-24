@@ -35,7 +35,7 @@ static std::atomic<uint64_t> g_ramdisk_count = 0;
 }  // namespace
 
 Ramdisk::Ramdisk(zx_device_t* parent, uint64_t block_size, uint64_t block_count,
-                 const uint8_t* type_guid, fzl::ResizeableVmoMapper mapping)
+                 const uint8_t* type_guid, fzl::OwnedVmoMapper mapping)
     : RamdiskDeviceType(parent),
       block_size_(block_size),
       block_count_(block_count),
@@ -51,7 +51,7 @@ Ramdisk::Ramdisk(zx_device_t* parent, uint64_t block_size, uint64_t block_count,
 zx_status_t Ramdisk::Create(zx_device_t* parent, zx::vmo vmo, uint64_t block_size,
                             uint64_t block_count, const uint8_t* type_guid,
                             std::unique_ptr<Ramdisk>* out) {
-  fzl::ResizeableVmoMapper mapping;
+  fzl::OwnedVmoMapper mapping;
   zx_status_t status = mapping.Map(std::move(vmo), block_size * block_count);
   if (status != ZX_OK) {
     return status;
@@ -242,23 +242,7 @@ zx_status_t Ramdisk::BlockPartitionGetName(char* out_name, size_t capacity) {
 }
 
 void Ramdisk::Grow(GrowRequestView request, GrowCompleter::Sync& completer) {
-  std::lock_guard<std::mutex> lock(lock_);
-  if (request->new_size < block_size_ * block_count_) {
-    completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
-    return;
-  }
-
-  if (request->new_size % block_size_ != 0) {
-    completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
-    return;
-  }
-  if (zx::result<> result = zx::make_result(mapping_.Grow(request->new_size)); result.is_error()) {
-    completer.Reply(result);
-    return;
-  }
-
-  block_count_ = request->new_size / block_size_;
-  completer.Reply(zx::ok());
+  completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
 }
 
 void Ramdisk::ProcessRequests() {

@@ -42,8 +42,8 @@ struct GrowParams {
   bool validate_new_slices;
 };
 
-void GrowFvm(const fbl::unique_fd& devfs_root, const GrowParams& params, RamdiskRef* ramdisk,
-             FvmAdapter* fvm_adapter) {
+void GrowFvm(const fbl::unique_fd& devfs_root, const GrowParams& params,
+             std::unique_ptr<RamdiskRef>& ramdisk, std::unique_ptr<FvmAdapter>& fvm_adapter) {
   std::unique_ptr<VPartitionAdapter> vpartition = nullptr;
   ASSERT_OK(fvm_adapter->AddPartition(devfs_root, kPartitionName, Guid(kPartitionUniqueGuid),
                                       Guid(kPartitionTypeGuid), kPartitionSliceCount, &vpartition),
@@ -60,11 +60,23 @@ void GrowFvm(const fbl::unique_fd& devfs_root, const GrowParams& params, Ramdisk
   auto random_data = MakeRandomBuffer(kDataSize, &initial_seed);
   ASSERT_NO_FATAL_FAILURE(vpartition->WriteAt(random_data, 0));
 
-  // Grow the Device.
-  ASSERT_OK(ramdisk->Grow(params.target_size));
+  // Clone the device to a new ramdisk with the specified target size.
+  zx::result new_ramdisk = ramdisk->Clone(params.target_size);
+  ASSERT_EQ(new_ramdisk.status_value(), ZX_OK);
 
-  // Rebind FVM and get a new connection to the vpartitions when they become available.
-  ASSERT_OK(fvm_adapter->Rebind({vpartition.get()}));
+  // This will destroy the old ramdisk.
+  ramdisk = *std::move(new_ramdisk);
+
+  // Bind a new FVM to the new device.
+  fvm_adapter = FvmAdapter::Bind(devfs_root, ramdisk.get());
+  ASSERT_NE(fvm_adapter, nullptr);
+
+  // Find the partition on the new device.  This will try and destroy the old partition which no
+  // longer exists but that doesn't matter.
+  vpartition = VPartitionAdapter::Create(devfs_root, kPartitionName, Guid(kPartitionUniqueGuid),
+                                         Guid(kPartitionTypeGuid));
+  ASSERT_NE(vpartition, nullptr);
+  vpartition->WaitUntilVisible();
 
   // Get stats after growth.
   VolumeManagerInfo after_grow_info;
@@ -84,6 +96,8 @@ void GrowFvm(const fbl::unique_fd& devfs_root, const GrowParams& params, Ramdisk
     ASSERT_NO_FATAL_FAILURE(vpartition->WriteAt(random_data_2, offset));
     ASSERT_NO_FATAL_FAILURE(vpartition->CheckContentsAt(random_data_2, offset));
   }
+
+  ASSERT_OK(vpartition->Destroy());
 }
 
 using driver_integration_test::IsolatedDevmgr;
@@ -121,7 +135,7 @@ TEST_F(FvmResizeTest, PreallocatedMetadataGrowsCorrectly) {
       Header::FromDiskSize(fvm::kMaxUsablePartitions, kMaxBlockCount * kTestBlockSize, kSliceSize);
   params.seed = zxtest::Runner::GetInstance()->options().seed;
 
-  ASSERT_NO_FATAL_FAILURE(GrowFvm(devmgr_.devfs_root(), params, ramdisk.get(), fvm.get()));
+  ASSERT_NO_FATAL_FAILURE(GrowFvm(devmgr_.devfs_root(), params, ramdisk, fvm));
 }
 
 TEST_F(FvmResizeTest, PreallocatedMetadataGrowsAsMuchAsPossible) {
@@ -151,7 +165,7 @@ TEST_F(FvmResizeTest, PreallocatedMetadataGrowsAsMuchAsPossible) {
   params.format = expected;
   params.seed = zxtest::Runner::GetInstance()->options().seed;
 
-  ASSERT_NO_FATAL_FAILURE(GrowFvm(devmgr_.devfs_root(), params, ramdisk.get(), fvm.get()));
+  ASSERT_NO_FATAL_FAILURE(GrowFvm(devmgr_.devfs_root(), params, ramdisk, fvm));
 }
 
 TEST_F(FvmResizeTest, PreallocatedMetadataRemainsValidInPartialGrowths) {
@@ -176,13 +190,13 @@ TEST_F(FvmResizeTest, PreallocatedMetadataRemainsValidInPartialGrowths) {
                                    kMaxBlockCount * kTestBlockSize, kSliceSize);
   params.seed = zxtest::Runner::GetInstance()->options().seed;
 
-  ASSERT_NO_FATAL_FAILURE(GrowFvm(devmgr_.devfs_root(), params, ramdisk.get(), fvm.get()));
+  ASSERT_NO_FATAL_FAILURE(GrowFvm(devmgr_.devfs_root(), params, ramdisk, fvm));
 
   params.format =
       Header::FromGrowableDiskSize(kMaxUsablePartitions, kMaxBlockCount * kTestBlockSize,
                                    kMaxBlockCount * kTestBlockSize, kSliceSize);
   params.target_size = kMaxBlockCount * kTestBlockSize;
-  ASSERT_NO_FATAL_FAILURE(GrowFvm(devmgr_.devfs_root(), params, ramdisk.get(), fvm.get()));
+  ASSERT_NO_FATAL_FAILURE(GrowFvm(devmgr_.devfs_root(), params, ramdisk, fvm));
 }
 
 }  // namespace

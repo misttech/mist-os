@@ -2738,16 +2738,10 @@ TEST_F(FvmTest, TestAbortDriverLoadSmallDevice) {
   ASSERT_FALSE(resp->is_ok());
   ASSERT_EQ(resp->error_value(), ZX_ERR_INTERNAL);
 
-  CreateRamdisk(kBlockSize, kBlockCount);
+  CreateRamdisk(kBlockSize, kFvmPartitionSize / kBlockSize);
   fs_management::FvmInitWithSize(ramdisk_block_interface(), kFvmPartitionSize, kSliceSize);
-  // Grow the ramdisk to the appropiate size and bind should succeed.
-  ASSERT_OK(ramdisk_grow(ramdisk(), kFvmPartitionSize));
-  // Use Controller::Call::Rebind because the driver might still be
-  // when init fails. Driver removes the device and will eventually be
-  // unloaded but Controller::Bind above does not wait until
-  // the device is removed. Controller::Rebind ensures nothing is
-  // bound to the device, before it tries to bind the driver again.
-  auto resp2 = fidl::WireCall(ramdisk_controller_interface())->Rebind(kFvmDriverLib);
+
+  auto resp2 = fidl::WireCall(ramdisk_controller_interface())->Bind(kFvmDriverLib);
   ASSERT_OK(resp2.status());
   ASSERT_TRUE(resp2->is_ok());
   ASSERT_OK(device_watcher::RecursiveWaitForFile(devfs_root_fd().get(), fvm_path().c_str()));

@@ -81,7 +81,7 @@ TEST_F(FvmVPartitionLoadTest, LoadPartitionWithPlaceHolderGuidIsUpdated) {
 
   {
     // After rebind the instance guid should not be kPlaceHolderGUID.
-    ASSERT_OK(fvm->Rebind({}));
+    ASSERT_OK(fvm->Rebind());
 
     zx::result channel =
         device_watcher::RecursiveWaitForFile(devmgr_->devfs_root().get(), partition_path.c_str());
@@ -101,7 +101,7 @@ TEST_F(FvmVPartitionLoadTest, LoadPartitionWithPlaceHolderGuidIsUpdated) {
   }
   {
     // One more time to check that the UUID persisted, so it doesn't change between 'reboot'.
-    ASSERT_OK(fvm->Rebind({}));
+    ASSERT_OK(fvm->Rebind());
 
     zx::result channel =
         device_watcher::RecursiveWaitForFile(devmgr_->devfs_root().get(), partition_path.c_str());
