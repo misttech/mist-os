@@ -23,6 +23,7 @@ pub struct SwdConfig {
     #[schemars(schema_with = "crate::vec_path_schema")]
     pub tuf_config_paths: Vec<FileRelativePathBuf>,
     pub include_configurator: bool,
+    pub health_checks: HealthChecks,
 }
 
 /// The SWD Policies are laid out in
@@ -106,6 +107,15 @@ impl Default for PolicyConfig {
             retry_delay_seconds: 300,
         }
     }
+}
+
+/// Allows the product owner to choose which of the components that have implemented health checks
+/// to verify.
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
+#[serde(default, deny_unknown_fields)]
+pub struct HealthChecks {
+    pub blobfs: bool,
+    pub netstack: bool,
 }
 
 #[cfg(test)]

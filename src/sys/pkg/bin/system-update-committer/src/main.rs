@@ -67,6 +67,9 @@ async fn main_inner_async() -> Result<(), Error> {
     let health_node_ref = &mut health_node;
 
     let config = Config::load_from_config_data_or_default();
+    let _structured_config =
+        system_update_committer_structured_config::Config::take_from_startup_handle();
+
     let reboot_deadline = Instant::now() + MINIMUM_REBOOT_WAIT;
 
     let paver = connect_to_protocol::<PaverMarker>().context("while connecting to paver")?;
@@ -104,6 +107,7 @@ async fn main_inner_async() -> Result<(), Error> {
                 &[&blobfs_verifier, &netstack_verifier],
                 verification_node_ref,
                 &config,
+                &_structured_config,
             )
             .await
             {

@@ -100,7 +100,7 @@ fuchsia_test_package("pkg-cache-integration-tests") {
   deps = [
     ":pkg-cache-integration-test",
     "//src/sys/pkg/bin/pkg-cache:production-component-and-config",
-    "//src/sys/pkg/bin/system-update-committer:component",
+    "//src/sys/pkg/bin/system-update-committer:production-component-and-config",
   ]
 }
 

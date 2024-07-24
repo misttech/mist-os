@@ -56,7 +56,7 @@ fuchsia_test_package("system-update-checker-integration-tests") {
   test_components = [ ":system-update-checker-integration-test" ]
   deps = [
     "//src/sys/pkg/bin/system-update-checker:component",
-    "//src/sys/pkg/bin/system-update-committer:component",
+    "//src/sys/pkg/bin/system-update-committer:production-component-and-config",
   ]
 
   test_specs = {

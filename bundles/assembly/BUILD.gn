@@ -755,7 +755,7 @@ assembly_input_bundle("core_realm") {
   bootfs_packages = [ "//src/sys/pkg/bin/pkg-cache" ]
   base_packages = [
     # This is a required dependency of pkg-cache
-    "//src/sys/pkg/bin/system-update-committer",
+    "//src/sys/pkg/bin/system-update-committer:system-update-committer-without-config",
 
     # Build-Information
     "//src/developer/build_info:build-info-service",
