@@ -27,7 +27,7 @@ namespace virtio_display {
 // The events are represented by `CoordinatorEventsInterface`.
 //
 // This abstract base class also represents the
-// [`fuchsia.hardware.display.controller/DisplayControllerImpl`] Banjo
+// [`fuchsia.hardware.display.controller/DisplayEngine`] Banjo
 // interface.
 class DisplayEngineInterface {
  public:

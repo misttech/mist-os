@@ -164,7 +164,7 @@ bool DisplayEngine::IsNewDisplayTiming(const display::DisplayTiming& timing) {
   return current_display_timing_ != timing;
 }
 
-zx_status_t DisplayEngine::DisplayControllerImplSetMinimumRgb(uint8_t minimum_rgb) {
+zx_status_t DisplayEngine::DisplayEngineSetMinimumRgb(uint8_t minimum_rgb) {
   if (fully_initialized()) {
     video_input_unit_->SetMinimumRgb(minimum_rgb);
     return ZX_OK;
@@ -204,7 +204,7 @@ zx::result<> DisplayEngine::ResetDisplayEngine() {
   return zx::ok();
 }
 
-void DisplayEngine::DisplayControllerImplRegisterDisplayEngineListener(
+void DisplayEngine::DisplayEngineRegisterDisplayEngineListener(
     const display_engine_listener_protocol_t* engine_listener) {
   fbl::AutoLock display_lock(&display_mutex_);
   engine_listener_ = ddk::DisplayEngineListenerProtocolClient(engine_listener);
@@ -216,12 +216,12 @@ void DisplayEngine::DisplayControllerImplRegisterDisplayEngineListener(
   }
 }
 
-void DisplayEngine::DisplayControllerImplDeregisterDisplayEngineListener() {
+void DisplayEngine::DisplayEngineDeregisterDisplayEngineListener() {
   fbl::AutoLock lock(&display_mutex_);
   engine_listener_ = ddk::DisplayEngineListenerProtocolClient();
 }
 
-zx_status_t DisplayEngine::DisplayControllerImplImportBufferCollection(
+zx_status_t DisplayEngine::DisplayEngineImportBufferCollection(
     uint64_t banjo_driver_buffer_collection_id, zx::channel collection_token) {
   const display::DriverBufferCollectionId driver_buffer_collection_id =
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
@@ -259,7 +259,7 @@ zx_status_t DisplayEngine::DisplayControllerImplImportBufferCollection(
   return ZX_OK;
 }
 
-zx_status_t DisplayEngine::DisplayControllerImplReleaseBufferCollection(
+zx_status_t DisplayEngine::DisplayEngineReleaseBufferCollection(
     uint64_t banjo_driver_buffer_collection_id) {
   const display::DriverBufferCollectionId driver_buffer_collection_id =
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
@@ -272,9 +272,9 @@ zx_status_t DisplayEngine::DisplayControllerImplReleaseBufferCollection(
   return ZX_OK;
 }
 
-zx_status_t DisplayEngine::DisplayControllerImplImportImage(
-    const image_metadata_t* image_metadata, uint64_t banjo_driver_buffer_collection_id,
-    uint32_t index, uint64_t* out_image_handle) {
+zx_status_t DisplayEngine::DisplayEngineImportImage(const image_metadata_t* image_metadata,
+                                                    uint64_t banjo_driver_buffer_collection_id,
+                                                    uint32_t index, uint64_t* out_image_handle) {
   const display::DriverBufferCollectionId driver_buffer_collection_id =
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
   if (buffer_collections_.find(driver_buffer_collection_id) == buffer_collections_.end()) {
@@ -423,13 +423,13 @@ zx_status_t DisplayEngine::DisplayControllerImplImportImage(
   return status;
 }
 
-void DisplayEngine::DisplayControllerImplReleaseImage(uint64_t image_handle) {
+void DisplayEngine::DisplayEngineReleaseImage(uint64_t image_handle) {
   fbl::AutoLock lock(&image_mutex_);
   auto info = reinterpret_cast<ImageInfo*>(image_handle);
   imported_images_.erase(*info);
 }
 
-config_check_result_t DisplayEngine::DisplayControllerImplCheckConfiguration(
+config_check_result_t DisplayEngine::DisplayEngineCheckConfiguration(
     const display_config_t* display_configs, size_t display_count,
     client_composition_opcode_t* out_client_composition_opcodes_list,
     size_t client_composition_opcodes_count, size_t* out_client_composition_opcodes_actual) {
@@ -521,9 +521,9 @@ config_check_result_t DisplayEngine::DisplayControllerImplCheckConfiguration(
   return CONFIG_CHECK_RESULT_OK;
 }
 
-void DisplayEngine::DisplayControllerImplApplyConfiguration(
-    const display_config_t* display_configs, size_t display_count,
-    const config_stamp_t* banjo_config_stamp) {
+void DisplayEngine::DisplayEngineApplyConfiguration(const display_config_t* display_configs,
+                                                    size_t display_count,
+                                                    const config_stamp_t* banjo_config_stamp) {
   ZX_DEBUG_ASSERT(display_configs);
   ZX_DEBUG_ASSERT(banjo_config_stamp);
   const display::ConfigStamp config_stamp = display::ToConfigStamp(*banjo_config_stamp);
@@ -600,7 +600,7 @@ void DisplayEngine::Deinitialize() {
   hot_plug_detection_.reset();
 }
 
-zx_status_t DisplayEngine::DisplayControllerImplSetBufferCollectionConstraints(
+zx_status_t DisplayEngine::DisplayEngineSetBufferCollectionConstraints(
     const image_buffer_usage_t* usage, uint64_t banjo_driver_buffer_collection_id) {
   const display::DriverBufferCollectionId driver_buffer_collection_id =
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
@@ -729,8 +729,7 @@ zx_status_t DisplayEngine::DisplayControllerImplSetBufferCollectionConstraints(
   return ZX_OK;
 }
 
-zx_status_t DisplayEngine::DisplayControllerImplSetDisplayPower(uint64_t display_id,
-                                                                bool power_on) {
+zx_status_t DisplayEngine::DisplayEngineSetDisplayPower(uint64_t display_id, bool power_on) {
   fbl::AutoLock lock(&display_mutex_);
   if (display::ToDisplayId(display_id) != display_id_ || !display_attached_) {
     return ZX_ERR_NOT_FOUND;
@@ -775,9 +774,9 @@ zx_status_t DisplayEngine::DisplayControllerImplSetDisplayPower(uint64_t display
   return vout_->PowerOff().status_value();
 }
 
-bool DisplayEngine::DisplayControllerImplIsCaptureSupported() { return true; }
+bool DisplayEngine::DisplayEngineIsCaptureSupported() { return true; }
 
-zx_status_t DisplayEngine::DisplayControllerImplImportImageForCapture(
+zx_status_t DisplayEngine::DisplayEngineImportImageForCapture(
     uint64_t banjo_driver_buffer_collection_id, uint32_t index, uint64_t* out_capture_handle) {
   const display::DriverBufferCollectionId driver_buffer_collection_id =
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
@@ -913,7 +912,7 @@ zx_status_t DisplayEngine::DisplayControllerImplImportImageForCapture(
   return ZX_OK;
 }
 
-zx_status_t DisplayEngine::DisplayControllerImplStartCapture(uint64_t capture_handle) {
+zx_status_t DisplayEngine::DisplayEngineStartCapture(uint64_t capture_handle) {
   if (!fully_initialized()) {
     FDF_LOG(ERROR, "Failed to start capture before initializing the display");
     return ZX_ERR_SHOULD_WAIT;
@@ -959,7 +958,7 @@ zx_status_t DisplayEngine::DisplayControllerImplStartCapture(uint64_t capture_ha
   return ZX_OK;
 }
 
-zx_status_t DisplayEngine::DisplayControllerImplReleaseCapture(uint64_t capture_handle) {
+zx_status_t DisplayEngine::DisplayEngineReleaseCapture(uint64_t capture_handle) {
   fbl::AutoLock lock(&capture_mutex_);
   if (capture_handle == reinterpret_cast<uint64_t>(current_capture_target_image_)) {
     return ZX_ERR_SHOULD_WAIT;
@@ -979,7 +978,7 @@ zx_status_t DisplayEngine::DisplayControllerImplReleaseCapture(uint64_t capture_
   return ZX_OK;
 }
 
-bool DisplayEngine::DisplayControllerImplIsCaptureCompleted() {
+bool DisplayEngine::DisplayEngineIsCaptureCompleted() {
   fbl::AutoLock lock(&capture_mutex_);
   return (current_capture_target_image_ == nullptr);
 }

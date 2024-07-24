@@ -176,11 +176,10 @@ zx::result<> DisplayDriver::Start() {
 
   // Serves the [`fuchsia.hardware.display.controller/ControllerImpl`] protocol
   // over the compatibility server.
-  banjo_server_ =
-      compat::BanjoServer(ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL, /*ctx=*/display_engine_.get(),
-                          /*ops=*/display_engine_->display_controller_impl_protocol_ops());
+  banjo_server_ = compat::BanjoServer(ZX_PROTOCOL_DISPLAY_ENGINE, /*ctx=*/display_engine_.get(),
+                                      /*ops=*/display_engine_->display_engine_protocol_ops());
   compat::DeviceServer::BanjoConfig banjo_config;
-  banjo_config.callbacks[ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL] = banjo_server_->callback();
+  banjo_config.callbacks[ZX_PROTOCOL_DISPLAY_ENGINE] = banjo_server_->callback();
   zx::result<> compat_server_init_result =
       compat_server_.Initialize(incoming(), outgoing(), node_name(), name(),
                                 /*forward_metadata=*/compat::ForwardMetadata::None(),
@@ -190,8 +189,7 @@ zx::result<> DisplayDriver::Start() {
   }
 
   const std::vector<fuchsia_driver_framework::NodeProperty> node_properties = {
-      fdf::MakeProperty(bind_fuchsia::PROTOCOL,
-                        bind_fuchsia_display::BIND_PROTOCOL_CONTROLLER_IMPL),
+      fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_display::BIND_PROTOCOL_ENGINE),
   };
   const std::vector<fuchsia_driver_framework::Offer> node_offers = compat_server_.CreateOffers2();
   zx::result<fidl::ClientEnd<fuchsia_driver_framework::NodeController>> controller_client_result =

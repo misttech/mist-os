@@ -773,9 +773,9 @@ zx_status_t Controller::AddDisplay(std::unique_ptr<DisplayDevice> display) {
   return ZX_OK;
 }
 
-// DisplayControllerImpl methods
+// DisplayEngine methods
 
-void Controller::DisplayControllerImplRegisterDisplayEngineListener(
+void Controller::DisplayEngineRegisterDisplayEngineListener(
     const display_engine_listener_protocol_t* engine_listener) {
   fbl::AutoLock lock(&display_lock_);
   engine_listener_ = ddk::DisplayEngineListenerProtocolClient(engine_listener);
@@ -795,7 +795,7 @@ void Controller::DisplayControllerImplRegisterDisplayEngineListener(
   }
 }
 
-void Controller::DisplayControllerImplDeregisterDisplayEngineListener() {
+void Controller::DisplayEngineDeregisterDisplayEngineListener() {
   fbl::AutoLock lock(&display_lock_);
   engine_listener_ = ddk::DisplayEngineListenerProtocolClient();
 }
@@ -834,7 +834,7 @@ static bool ConvertPixelFormatToTilingType(
   }
 }
 
-zx_status_t Controller::DisplayControllerImplImportBufferCollection(
+zx_status_t Controller::DisplayEngineImportBufferCollection(
     uint64_t banjo_driver_buffer_collection_id, zx::channel collection_token) {
   display::DriverBufferCollectionId driver_buffer_collection_id =
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
@@ -867,7 +867,7 @@ zx_status_t Controller::DisplayControllerImplImportBufferCollection(
   return ZX_OK;
 }
 
-zx_status_t Controller::DisplayControllerImplReleaseBufferCollection(
+zx_status_t Controller::DisplayEngineReleaseBufferCollection(
     uint64_t banjo_driver_buffer_collection_id) {
   display::DriverBufferCollectionId driver_buffer_collection_id =
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
@@ -880,10 +880,9 @@ zx_status_t Controller::DisplayControllerImplReleaseBufferCollection(
   return ZX_OK;
 }
 
-zx_status_t Controller::DisplayControllerImplImportImage(const image_metadata_t* image_metadata,
-                                                         uint64_t banjo_driver_buffer_collection_id,
-                                                         uint32_t index,
-                                                         uint64_t* out_image_handle) {
+zx_status_t Controller::DisplayEngineImportImage(const image_metadata_t* image_metadata,
+                                                 uint64_t banjo_driver_buffer_collection_id,
+                                                 uint32_t index, uint64_t* out_image_handle) {
   display::DriverBufferCollectionId driver_buffer_collection_id =
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
   const auto it = buffer_collections_.find(driver_buffer_collection_id);
@@ -1049,7 +1048,7 @@ zx_status_t Controller::DisplayControllerImplImportImage(const image_metadata_t*
   return ZX_OK;
 }
 
-void Controller::DisplayControllerImplReleaseImage(uint64_t image_handle) {
+void Controller::DisplayEngineReleaseImage(uint64_t image_handle) {
   const uint64_t gtt_region_base = image_handle;
   const display::DriverImageId image_id(gtt_region_base);
 
@@ -1563,7 +1562,7 @@ bool Controller::CheckDisplayLimits(
   return true;
 }
 
-config_check_result_t Controller::DisplayControllerImplCheckConfiguration(
+config_check_result_t Controller::DisplayEngineCheckConfiguration(
     const display_config_t* banjo_display_configs, size_t display_config_count,
     client_composition_opcode_t* out_client_composition_opcodes_list,
     size_t client_composition_opcodes_count, size_t* out_client_composition_opcodes_actual) {
@@ -1827,9 +1826,9 @@ uint16_t Controller::DataBufferBlockCount() const {
   return is_tgl(device_id_) ? kTigerLakeDataBufferBlockCount : kKabyLakeDataBufferBlockCount;
 }
 
-void Controller::DisplayControllerImplApplyConfiguration(
-    const display_config_t* banjo_display_configs, size_t display_config_count,
-    const config_stamp_t* banjo_config_stamp) {
+void Controller::DisplayEngineApplyConfiguration(const display_config_t* banjo_display_configs,
+                                                 size_t display_config_count,
+                                                 const config_stamp_t* banjo_config_stamp) {
   fbl::AutoLock lock(&display_lock_);
   display::DisplayId fake_vsync_display_ids[display_devices_.size() + 1];
   size_t fake_vsync_size = 0;
@@ -1871,7 +1870,7 @@ void Controller::DisplayControllerImplApplyConfiguration(
   }
 }
 
-zx_status_t Controller::DisplayControllerImplSetBufferCollectionConstraints(
+zx_status_t Controller::DisplayEngineSetBufferCollectionConstraints(
     const image_buffer_usage_t* usage, uint64_t banjo_driver_buffer_collection_id) {
   display::DriverBufferCollectionId driver_buffer_collection_id =
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
@@ -2343,9 +2342,9 @@ zx::result<ddk::AnyProtocol> Controller::GetProtocol(uint32_t proto_id) {
           .ops = &intel_gpu_core_protocol_ops_,
           .ctx = this,
       });
-    case ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL:
+    case ZX_PROTOCOL_DISPLAY_ENGINE:
       return zx::ok(ddk::AnyProtocol{
-          .ops = &display_controller_impl_protocol_ops_,
+          .ops = &display_engine_protocol_ops_,
           .ctx = this,
       });
   }

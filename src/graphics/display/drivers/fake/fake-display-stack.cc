@@ -84,9 +84,8 @@ FakeDisplayStack::FakeDisplayStack(std::shared_ptr<zx_device> mock_root,
   }
   coordinator_client_dispatcher_ = std::move(create_dispatcher_result).value();
 
-  ddk::DisplayControllerImplProtocolClient display_controller_impl_client(
-      display_->display_controller_impl_banjo_protocol());
-  auto engine_driver_client = std::make_unique<EngineDriverClient>(display_controller_impl_client);
+  ddk::DisplayEngineProtocolClient display_engine_client(display_->display_engine_banjo_protocol());
+  auto engine_driver_client = std::make_unique<EngineDriverClient>(display_engine_client);
   zx::result<std::unique_ptr<Controller>> create_controller_result =
       Controller::Create(std::move(engine_driver_client), coordinator_client_dispatcher_.borrow());
   if (create_controller_result.is_error()) {

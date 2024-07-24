@@ -297,7 +297,7 @@ void GpuDeviceDriver::Start(fdf::StartCompleter completer) {
   // migrated to DFv2.
   // Allow DFV1 child (display coordinator) to bind.
   auto properties = std::vector{
-      fdf::MakeProperty(arena, BIND_PROTOCOL, bind_fuchsia_display::BIND_PROTOCOL_CONTROLLER_IMPL)};
+      fdf::MakeProperty(arena, BIND_PROTOCOL, bind_fuchsia_display::BIND_PROTOCOL_ENGINE)};
   auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
                   .name(arena, name())
                   .offers2(offers)

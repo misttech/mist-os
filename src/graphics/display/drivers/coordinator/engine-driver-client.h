@@ -33,7 +33,7 @@ class EngineDriverClient {
 
   // Production code must use the Create() factory method.
   // `dc` must be valid.
-  explicit EngineDriverClient(ddk::DisplayControllerImplProtocolClient dc);
+  explicit EngineDriverClient(ddk::DisplayEngineProtocolClient dc);
 
   // Production code must use the Create() factory method.
   // `engine` must be valid.
@@ -83,7 +83,7 @@ class EngineDriverClient {
   fdf::WireSyncClient<fuchsia_hardware_display_engine::Engine> engine_;
 
   // Banjo Client
-  ddk::DisplayControllerImplProtocolClient dc_;
+  ddk::DisplayEngineProtocolClient dc_;
 };
 
 }  // namespace display

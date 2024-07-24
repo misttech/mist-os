@@ -6,7 +6,7 @@ library fuchsia.display;
 
 extend uint fuchsia.BIND_PROTOCOL {
   CONTROLLER = 11,
-  CONTROLLER_IMPL = 12,
+  ENGINE = 12,
 };
 
 enum OUTPUT {

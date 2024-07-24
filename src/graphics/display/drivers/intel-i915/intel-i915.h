@@ -67,7 +67,7 @@ struct ControllerResources {
   zx::unowned_resource ioport;
 };
 
-class Controller : public ddk::DisplayControllerImplProtocol<Controller>,
+class Controller : public ddk::DisplayEngineProtocol<Controller>,
                    public ddk::IntelGpuCoreProtocol<Controller> {
  public:
   // Creates a `Controller` instance and performs short-running initialization
@@ -105,45 +105,37 @@ class Controller : public ddk::DisplayControllerImplProtocol<Controller>,
                                          fdf::PrepareStopCompleter completer);
 
   // display controller protocol ops
-  void DisplayControllerImplRegisterDisplayEngineListener(
+  void DisplayEngineRegisterDisplayEngineListener(
       const display_engine_listener_protocol* engine_listener);
-  void DisplayControllerImplDeregisterDisplayEngineListener();
-  zx_status_t DisplayControllerImplImportBufferCollection(
-      uint64_t banjo_driver_buffer_collection_id, zx::channel collection_token);
-  zx_status_t DisplayControllerImplReleaseBufferCollection(
-      uint64_t banjo_driver_buffer_collection_id);
-  zx_status_t DisplayControllerImplImportImage(const image_metadata_t* image_metadata,
-                                               uint64_t banjo_driver_buffer_collection_id,
-                                               uint32_t index, uint64_t* out_image_handle);
-  zx_status_t DisplayControllerImplImportImageForCapture(uint64_t banjo_driver_buffer_collection_id,
-                                                         uint32_t index,
-                                                         uint64_t* out_capture_handle) {
+  void DisplayEngineDeregisterDisplayEngineListener();
+  zx_status_t DisplayEngineImportBufferCollection(uint64_t banjo_driver_buffer_collection_id,
+                                                  zx::channel collection_token);
+  zx_status_t DisplayEngineReleaseBufferCollection(uint64_t banjo_driver_buffer_collection_id);
+  zx_status_t DisplayEngineImportImage(const image_metadata_t* image_metadata,
+                                       uint64_t banjo_driver_buffer_collection_id, uint32_t index,
+                                       uint64_t* out_image_handle);
+  zx_status_t DisplayEngineImportImageForCapture(uint64_t banjo_driver_buffer_collection_id,
+                                                 uint32_t index, uint64_t* out_capture_handle) {
     return ZX_ERR_NOT_SUPPORTED;
   }
-  void DisplayControllerImplReleaseImage(uint64_t image_handle);
-  config_check_result_t DisplayControllerImplCheckConfiguration(
+  void DisplayEngineReleaseImage(uint64_t image_handle);
+  config_check_result_t DisplayEngineCheckConfiguration(
       const display_config_t* display_configs, size_t display_count,
       client_composition_opcode_t* out_client_composition_opcodes_list,
       size_t client_composition_opcodes_count, size_t* out_client_composition_opcodes_actual);
-  void DisplayControllerImplApplyConfiguration(const display_config_t* banjo_display_configs,
-                                               size_t display_config_count,
-                                               const config_stamp_t* banjo_config_stamp);
-  zx_status_t DisplayControllerImplSetBufferCollectionConstraints(
+  void DisplayEngineApplyConfiguration(const display_config_t* banjo_display_configs,
+                                       size_t display_config_count,
+                                       const config_stamp_t* banjo_config_stamp);
+  zx_status_t DisplayEngineSetBufferCollectionConstraints(
       const image_buffer_usage_t* usage, uint64_t banjo_driver_buffer_collection_id);
-  zx_status_t DisplayControllerImplSetDisplayPower(uint64_t banjo_display_id, bool power_on) {
+  zx_status_t DisplayEngineSetDisplayPower(uint64_t banjo_display_id, bool power_on) {
     return ZX_ERR_NOT_SUPPORTED;
   }
-  bool DisplayControllerImplIsCaptureSupported() { return false; }
-  zx_status_t DisplayControllerImplStartCapture(uint64_t capture_handle) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-  zx_status_t DisplayControllerImplReleaseCapture(uint64_t capture_handle) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-  bool DisplayControllerImplIsCaptureCompleted() { return false; }
-  zx_status_t DisplayControllerImplSetMinimumRgb(uint8_t minimum_rgb) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
+  bool DisplayEngineIsCaptureSupported() { return false; }
+  zx_status_t DisplayEngineStartCapture(uint64_t capture_handle) { return ZX_ERR_NOT_SUPPORTED; }
+  zx_status_t DisplayEngineReleaseCapture(uint64_t capture_handle) { return ZX_ERR_NOT_SUPPORTED; }
+  bool DisplayEngineIsCaptureCompleted() { return false; }
+  zx_status_t DisplayEngineSetMinimumRgb(uint8_t minimum_rgb) { return ZX_ERR_NOT_SUPPORTED; }
 
   // gpu core ops
   zx_status_t IntelGpuCoreReadPciConfig16(uint16_t addr, uint16_t* value_out);

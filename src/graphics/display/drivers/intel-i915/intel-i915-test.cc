@@ -84,12 +84,12 @@ TEST_F(ControllerWithFakeSysmemTest, ImportBufferCollection) {
   constexpr display::DriverBufferCollectionId kValidBufferCollectionId(1);
   constexpr uint64_t kBanjoValidBufferCollectionId =
       display::ToBanjoDriverBufferCollectionId(kValidBufferCollectionId);
-  EXPECT_OK(display_.DisplayControllerImplImportBufferCollection(
-      kBanjoValidBufferCollectionId, token1_endpoints->client.TakeChannel()));
+  EXPECT_OK(display_.DisplayEngineImportBufferCollection(kBanjoValidBufferCollectionId,
+                                                         token1_endpoints->client.TakeChannel()));
 
   // `collection_id` must be unused.
-  EXPECT_EQ(display_.DisplayControllerImplImportBufferCollection(
-                kBanjoValidBufferCollectionId, token2_endpoints->client.TakeChannel()),
+  EXPECT_EQ(display_.DisplayEngineImportBufferCollection(kBanjoValidBufferCollectionId,
+                                                         token2_endpoints->client.TakeChannel()),
             ZX_ERR_ALREADY_EXISTS);
 
   loop_.RunUntilIdle();
@@ -120,10 +120,9 @@ TEST_F(ControllerWithFakeSysmemTest, ImportBufferCollection) {
   constexpr display::DriverBufferCollectionId kInvalidBufferCollectionId(2);
   constexpr uint64_t kBanjoInvalidBufferCollectionId =
       display::ToBanjoDriverBufferCollectionId(kInvalidBufferCollectionId);
-  EXPECT_STATUS(
-      display_.DisplayControllerImplReleaseBufferCollection(kBanjoInvalidBufferCollectionId),
-      ZX_ERR_NOT_FOUND);
-  EXPECT_OK(display_.DisplayControllerImplReleaseBufferCollection(kBanjoValidBufferCollectionId));
+  EXPECT_STATUS(display_.DisplayEngineReleaseBufferCollection(kBanjoInvalidBufferCollectionId),
+                ZX_ERR_NOT_FOUND);
+  EXPECT_OK(display_.DisplayEngineReleaseBufferCollection(kBanjoValidBufferCollectionId));
 
   loop_.RunUntilIdle();
 
@@ -204,14 +203,14 @@ TEST(IntelI915Display, ImportImage) {
       display::ToBanjoDriverBufferCollectionId(kBufferCollectionId);
   zx::result token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem2::BufferCollectionToken>();
   ASSERT_TRUE(token_endpoints.is_ok());
-  EXPECT_OK(display.DisplayControllerImplImportBufferCollection(
-      kBanjoBufferCollectionId, token_endpoints->client.TakeChannel()));
+  EXPECT_OK(display.DisplayEngineImportBufferCollection(kBanjoBufferCollectionId,
+                                                        token_endpoints->client.TakeChannel()));
 
   static constexpr image_buffer_usage_t kDisplayUsage = {
       .tiling_type = IMAGE_TILING_TYPE_LINEAR,
   };
-  EXPECT_OK(display.DisplayControllerImplSetBufferCollectionConstraints(&kDisplayUsage,
-                                                                        kBanjoBufferCollectionId));
+  EXPECT_OK(display.DisplayEngineSetBufferCollectionConstraints(&kDisplayUsage,
+                                                                kBanjoBufferCollectionId));
 
   // Invalid import: bad collection id
   static constexpr image_metadata_t kDisplayImageMetadata = {
@@ -221,15 +220,15 @@ TEST(IntelI915Display, ImportImage) {
   };
   static constexpr uint64_t kBanjoInvalidCollectionId = 100;
   uint64_t image_handle = 0;
-  EXPECT_EQ(display.DisplayControllerImplImportImage(&kDisplayImageMetadata,
-                                                     kBanjoInvalidCollectionId, 0, &image_handle),
+  EXPECT_EQ(display.DisplayEngineImportImage(&kDisplayImageMetadata, kBanjoInvalidCollectionId, 0,
+                                             &image_handle),
             ZX_ERR_NOT_FOUND);
 
   // Invalid import: bad index
   static constexpr uint32_t kInvalidIndex = 100;
   image_handle = 0;
-  EXPECT_EQ(display.DisplayControllerImplImportImage(
-                &kDisplayImageMetadata, kBanjoBufferCollectionId, kInvalidIndex, &image_handle),
+  EXPECT_EQ(display.DisplayEngineImportImage(&kDisplayImageMetadata, kBanjoBufferCollectionId,
+                                             kInvalidIndex, &image_handle),
             ZX_ERR_OUT_OF_RANGE);
 
   // Invalid import: bad type
@@ -238,21 +237,20 @@ TEST(IntelI915Display, ImportImage) {
       .height = 32,
       .tiling_type = IMAGE_TILING_TYPE_CAPTURE,
   };
-  EXPECT_EQ(display.DisplayControllerImplImportImage(&kInvalidTilingTypeMetadata,
-                                                     kBanjoBufferCollectionId,
-                                                     /*index=*/0, &image_handle),
+  EXPECT_EQ(display.DisplayEngineImportImage(&kInvalidTilingTypeMetadata, kBanjoBufferCollectionId,
+                                             /*index=*/0, &image_handle),
             ZX_ERR_INVALID_ARGS);
 
   // Valid import
   image_handle = 0;
-  EXPECT_OK(display.DisplayControllerImplImportImage(&kDisplayImageMetadata,
-                                                     kBanjoBufferCollectionId, 0, &image_handle));
+  EXPECT_OK(display.DisplayEngineImportImage(&kDisplayImageMetadata, kBanjoBufferCollectionId, 0,
+                                             &image_handle));
   EXPECT_NE(image_handle, 0u);
 
-  display.DisplayControllerImplReleaseImage(image_handle);
+  display.DisplayEngineReleaseImage(image_handle);
 
   // Release buffer collection.
-  EXPECT_OK(display.DisplayControllerImplReleaseBufferCollection(kBanjoBufferCollectionId));
+  EXPECT_OK(display.DisplayEngineReleaseBufferCollection(kBanjoBufferCollectionId));
 
   // Shutdown the loop before destroying the FakeSysmem and MockAllocator which
   // may still have pending callbacks.
@@ -266,16 +264,16 @@ TEST_F(ControllerWithFakeSysmemTest, SysmemRequirements) {
   constexpr display::DriverBufferCollectionId kBufferCollectionId(1);
   constexpr uint64_t kBanjoBufferCollectionId =
       display::ToBanjoDriverBufferCollectionId(kBufferCollectionId);
-  EXPECT_OK(display_.DisplayControllerImplImportBufferCollection(
-      kBanjoBufferCollectionId, token_endpoints->client.TakeChannel()));
+  EXPECT_OK(display_.DisplayEngineImportBufferCollection(kBanjoBufferCollectionId,
+                                                         token_endpoints->client.TakeChannel()));
 
   loop_.RunUntilIdle();
 
   static constexpr image_buffer_usage_t kDisplayUsage = {
       .tiling_type = IMAGE_TILING_TYPE_LINEAR,
   };
-  EXPECT_OK(display_.DisplayControllerImplSetBufferCollectionConstraints(&kDisplayUsage,
-                                                                         kBanjoBufferCollectionId));
+  EXPECT_OK(display_.DisplayEngineSetBufferCollectionConstraints(&kDisplayUsage,
+                                                                 kBanjoBufferCollectionId));
 
   loop_.RunUntilIdle();
 
@@ -292,15 +290,15 @@ TEST_F(ControllerWithFakeSysmemTest, SysmemInvalidType) {
   constexpr display::DriverBufferCollectionId kBufferCollectionId(1);
   constexpr uint64_t kBanjoBufferCollectionId =
       display::ToBanjoDriverBufferCollectionId(kBufferCollectionId);
-  EXPECT_OK(display_.DisplayControllerImplImportBufferCollection(
-      kBanjoBufferCollectionId, token_endpoints->client.TakeChannel()));
+  EXPECT_OK(display_.DisplayEngineImportBufferCollection(kBanjoBufferCollectionId,
+                                                         token_endpoints->client.TakeChannel()));
 
   loop_.RunUntilIdle();
 
   static constexpr image_buffer_usage_t kInvalidTilingUsage = {
       .tiling_type = 1000000,
   };
-  EXPECT_STATUS(ZX_ERR_INVALID_ARGS, display_.DisplayControllerImplSetBufferCollectionConstraints(
+  EXPECT_STATUS(ZX_ERR_INVALID_ARGS, display_.DisplayEngineSetBufferCollectionConstraints(
                                          &kInvalidTilingUsage, kBanjoBufferCollectionId));
 
   loop_.RunUntilIdle();

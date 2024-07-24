@@ -108,7 +108,7 @@ zx::result<> DisplayEngine::Initialize() {
   return zx::ok();
 }
 
-void DisplayEngine::DisplayControllerImplRegisterDisplayEngineListener(
+void DisplayEngine::DisplayEngineRegisterDisplayEngineListener(
     const display_engine_listener_protocol_t* engine_listener) {
   const int32_t width = primary_display_device_.width_px;
   const int32_t height = primary_display_device_.height_px;
@@ -155,7 +155,7 @@ void DisplayEngine::DisplayControllerImplRegisterDisplayEngineListener(
   }
 }
 
-void DisplayEngine::DisplayControllerImplDeregisterDisplayEngineListener() {
+void DisplayEngine::DisplayEngineDeregisterDisplayEngineListener() {
   fbl::AutoLock lock(&flush_lock_);
   engine_listener_ = ddk::DisplayEngineListenerProtocolClient();
 }
@@ -213,7 +213,7 @@ zx::result<display::DriverImageId> DisplayEngine::ImportVmoImage(
   return zx::ok(image_id);
 }
 
-zx_status_t DisplayEngine::DisplayControllerImplImportBufferCollection(
+zx_status_t DisplayEngine::DisplayEngineImportBufferCollection(
     uint64_t banjo_driver_buffer_collection_id, zx::channel collection_token) {
   const display::DriverBufferCollectionId driver_buffer_collection_id =
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
@@ -246,7 +246,7 @@ zx_status_t DisplayEngine::DisplayControllerImplImportBufferCollection(
   return ZX_OK;
 }
 
-zx_status_t DisplayEngine::DisplayControllerImplReleaseBufferCollection(
+zx_status_t DisplayEngine::DisplayEngineReleaseBufferCollection(
     uint64_t banjo_driver_buffer_collection_id) {
   const display::DriverBufferCollectionId driver_buffer_collection_id =
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
@@ -259,9 +259,9 @@ zx_status_t DisplayEngine::DisplayControllerImplReleaseBufferCollection(
   return ZX_OK;
 }
 
-zx_status_t DisplayEngine::DisplayControllerImplImportImage(
-    const image_metadata_t* image_metadata, uint64_t banjo_driver_buffer_collection_id,
-    uint32_t index, uint64_t* out_image_handle) {
+zx_status_t DisplayEngine::DisplayEngineImportImage(const image_metadata_t* image_metadata,
+                                                    uint64_t banjo_driver_buffer_collection_id,
+                                                    uint32_t index, uint64_t* out_image_handle) {
   const display::DriverBufferCollectionId driver_buffer_collection_id =
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
   const auto it = buffer_collections_.find(driver_buffer_collection_id);
@@ -342,7 +342,7 @@ zx_status_t DisplayEngine::DisplayControllerImplImportImage(
   return ZX_OK;
 }
 
-void DisplayEngine::DisplayControllerImplReleaseImage(uint64_t image_handle) {
+void DisplayEngine::DisplayEngineReleaseImage(uint64_t image_handle) {
   auto color_buffer = reinterpret_cast<ColorBuffer*>(image_handle);
 
   // Color buffer is owned by image in the linear case.
@@ -359,7 +359,7 @@ void DisplayEngine::DisplayControllerImplReleaseImage(uint64_t image_handle) {
   });
 }
 
-config_check_result_t DisplayEngine::DisplayControllerImplCheckConfiguration(
+config_check_result_t DisplayEngine::DisplayEngineCheckConfiguration(
     const display_config_t* display_configs, size_t display_count,
     client_composition_opcode_t* out_client_composition_opcodes_list,
     size_t client_composition_opcodes_count, size_t* out_client_composition_opcodes_actual) {
@@ -548,9 +548,9 @@ zx_status_t DisplayEngine::PresentPrimaryDisplayConfig(const DisplayConfig& disp
   return ZX_OK;
 }
 
-void DisplayEngine::DisplayControllerImplApplyConfiguration(
-    const display_config_t* display_configs, size_t display_count,
-    const config_stamp_t* banjo_config_stamp) {
+void DisplayEngine::DisplayEngineApplyConfiguration(const display_config_t* display_configs,
+                                                    size_t display_count,
+                                                    const config_stamp_t* banjo_config_stamp) {
   ZX_DEBUG_ASSERT(banjo_config_stamp != nullptr);
   display::ConfigStamp config_stamp = display::ToConfigStamp(*banjo_config_stamp);
   display::DriverImageId driver_image_id = display::kInvalidDriverImageId;
@@ -643,7 +643,7 @@ void DisplayEngine::DisplayControllerImplApplyConfiguration(
   });
 }
 
-zx_status_t DisplayEngine::DisplayControllerImplSetBufferCollectionConstraints(
+zx_status_t DisplayEngine::DisplayEngineSetBufferCollectionConstraints(
     const image_buffer_usage_t* usage, uint64_t banjo_driver_buffer_collection_id) {
   const display::DriverBufferCollectionId driver_buffer_collection_id =
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);

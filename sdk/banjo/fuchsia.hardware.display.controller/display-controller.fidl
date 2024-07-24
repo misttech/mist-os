@@ -146,7 +146,7 @@ type RawDisplayInfo = resource struct {
 /// A [`DisplayEngineListener`] may be registered to the engine through the
 /// [`DisplayCoordinatorImpl`] protocol before it receives any events.
 ///
-/// The client will not make any `ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL` calls into the device
+/// The client will not make any `ZX_PROTOCOL_DISPLAY_ENGINE` calls into the device
 /// during these callbacks.
 @transport("Banjo")
 @banjo_layout("ddk-interface")
@@ -193,10 +193,10 @@ closed protocol DisplayEngineListener {
     }) -> ();
 
     /// Called when the previous display capture triggered by
-    /// [`DisplayControllerImpl.StartCapture`] is completed.
+    /// [`DisplayEngine.StartCapture`] is completed.
     ///
     /// Each `OnCaptureComplete` call must be paired with a previous successful
-    /// call to [`DisplayControllerImpl.StartCapture`].
+    /// call to [`DisplayEngine.StartCapture`].
     strict OnCaptureComplete() -> ();
 };
 
@@ -411,7 +411,7 @@ type ClientCompositionOpcode = strict bits : uint32 {
 /// made from a single thread. The client makes no other threading guarantees.
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-closed protocol DisplayControllerImpl {
+closed protocol DisplayEngine {
     /// Registers a `DisplayEngineListener` that listens to display events
     /// on this display engine.
     ///

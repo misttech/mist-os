@@ -56,7 +56,7 @@ soon become a part of the Fuchsia System Interface, and will be covered by API
 stability guarantees.
 
 The Coordinator currently also uses the
-[`fuchsia.hardware.display.controller/DisplayControllerImpl`][display-controller-banjo]
+[`fuchsia.hardware.display.controller/DisplayEngine`][display-controller-banjo]
 Banjo interface to communicate with display engine drivers. This interface is
 associated with the `DISPLAY_CONTROLLER_IMPL` [protocol][dfv1-protocol]
 identifier. This Banjo interface will be removed when

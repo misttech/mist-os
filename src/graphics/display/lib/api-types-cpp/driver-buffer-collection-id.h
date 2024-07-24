@@ -19,7 +19,7 @@ namespace display {
 //
 // The Banjo API between the Display Coordinator and drivers currently
 // represents this concept as a `collection_id` argument on
-// `fuchsia.hardware.display.controller/DisplayControllerImpl` methods
+// `fuchsia.hardware.display.controller/DisplayEngine` methods
 // that import, use and release sysmem BufferCollections.
 //
 // See `BufferCollectionId` for the type used at the interface between the

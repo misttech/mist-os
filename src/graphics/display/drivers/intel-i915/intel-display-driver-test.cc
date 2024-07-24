@@ -316,7 +316,7 @@ struct DeviceNode {
   std::vector<fuchsia_driver_framework::NodeProperty> properties;
 };
 
-bool IsDisplayControllerImplBanjoNode(const DeviceNode& node) {
+bool IsDisplayEngineBanjoNode(const DeviceNode& node) {
   const std::vector<fuchsia_driver_framework::NodeProperty>& properties = node.properties;
   return properties.end() !=
          std::find_if(properties.begin(), properties.end(),
@@ -327,7 +327,7 @@ bool IsDisplayControllerImplBanjoNode(const DeviceNode& node) {
                           return false;
                         return property.key().string_value().value() == bind_fuchsia::PROTOCOL &&
                                property.value().int_value().value() ==
-                                   bind_fuchsia_display::BIND_PROTOCOL_CONTROLLER_IMPL;
+                                   bind_fuchsia_display::BIND_PROTOCOL_ENGINE;
                       });
 }
 
@@ -366,17 +366,16 @@ TEST_F(IntegrationTest, BindAndInit) {
   // and a child "intel-gpu-core" node.
   ASSERT_EQ(nodes.size(), 2u);
 
-  auto display_controller_impl_banjo_node_it =
-      std::find_if(nodes.begin(), nodes.end(), IsDisplayControllerImplBanjoNode);
-  ASSERT_NE(display_controller_impl_banjo_node_it, nodes.end());
-  FDF_LOG(INFO, "Display controller banjo node is: %s",
-          display_controller_impl_banjo_node_it->name.c_str());
+  auto display_engine_banjo_node_it =
+      std::find_if(nodes.begin(), nodes.end(), IsDisplayEngineBanjoNode);
+  ASSERT_NE(display_engine_banjo_node_it, nodes.end());
+  FDF_LOG(INFO, "Display controller banjo node is: %s", display_engine_banjo_node_it->name.c_str());
 
   auto intel_gpu_core_node_it = std::find_if(nodes.begin(), nodes.end(), IsIntelGpuCoreNode);
   ASSERT_NE(intel_gpu_core_node_it, nodes.end());
-  FDF_LOG(INFO, "Intel GPU node is: %s", display_controller_impl_banjo_node_it->name.c_str());
+  FDF_LOG(INFO, "Intel GPU node is: %s", display_engine_banjo_node_it->name.c_str());
 
-  ASSERT_NE(display_controller_impl_banjo_node_it, intel_gpu_core_node_it);
+  ASSERT_NE(display_engine_banjo_node_it, intel_gpu_core_node_it);
 
   zx::result<> stop_result = driver_runtime_.RunToCompletion(
       driver_.SyncCall(&fdf_testing::DriverUnderTest<IntelDisplayDriver>::PrepareStop));
@@ -473,12 +472,12 @@ TEST_F(IntegrationTest, SysmemImport) {
 
   zx::result<ddk::AnyProtocol> display_protocol_result =
       driver_.SyncCall([&](fdf_testing::DriverUnderTest<IntelDisplayDriver>* driver) {
-        return (*driver)->GetProtocol(ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL);
+        return (*driver)->GetProtocol(ZX_PROTOCOL_DISPLAY_ENGINE);
       });
   ASSERT_OK(display_protocol_result);
   ddk::AnyProtocol display_protocol = std::move(display_protocol_result).value();
-  ddk::DisplayControllerImplProtocolClient display(
-      reinterpret_cast<const display_controller_impl_protocol_t*>(&display_protocol));
+  ddk::DisplayEngineProtocolClient display(
+      reinterpret_cast<const display_engine_protocol_t*>(&display_protocol));
 
   // Import buffer collection.
   constexpr display::DriverBufferCollectionId kBufferCollectionId(1);
@@ -550,12 +549,12 @@ TEST_F(IntegrationTest, SysmemRotated) {
 
   zx::result<ddk::AnyProtocol> display_protocol_result =
       driver_.SyncCall([&](fdf_testing::DriverUnderTest<IntelDisplayDriver>* driver) {
-        return (*driver)->GetProtocol(ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL);
+        return (*driver)->GetProtocol(ZX_PROTOCOL_DISPLAY_ENGINE);
       });
   ASSERT_OK(display_protocol_result);
   ddk::AnyProtocol display_protocol = std::move(display_protocol_result).value();
-  ddk::DisplayControllerImplProtocolClient display(
-      reinterpret_cast<const display_controller_impl_protocol_t*>(&display_protocol));
+  ddk::DisplayEngineProtocolClient display(
+      reinterpret_cast<const display_engine_protocol_t*>(&display_protocol));
 
   // Import buffer collection.
   constexpr display::DriverBufferCollectionId kBufferCollectionId(1);

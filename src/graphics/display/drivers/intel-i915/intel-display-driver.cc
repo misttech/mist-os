@@ -214,14 +214,14 @@ zx::result<> IntelDisplayDriver::InitDisplayNode() {
   // Serves the [`fuchsia.hardware.display.controller/ControllerImpl`] protocol
   // over the compatibility server.
   zx::result<ddk::AnyProtocol> protocol_result =
-      controller_->GetProtocol(ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL);
+      controller_->GetProtocol(ZX_PROTOCOL_DISPLAY_ENGINE);
   ZX_DEBUG_ASSERT(protocol_result.is_ok());
   ddk::AnyProtocol protocol = std::move(protocol_result).value();
 
   display_banjo_server_ =
-      compat::BanjoServer(ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL, protocol.ctx, protocol.ops);
+      compat::BanjoServer(ZX_PROTOCOL_DISPLAY_ENGINE, protocol.ctx, protocol.ops);
   compat::DeviceServer::BanjoConfig banjo_config;
-  banjo_config.callbacks[ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL] = display_banjo_server_->callback();
+  banjo_config.callbacks[ZX_PROTOCOL_DISPLAY_ENGINE] = display_banjo_server_->callback();
 
   static constexpr std::string_view kDisplayChildNodeName = "intel-display-controller";
   zx::result<> compat_server_init_result =
@@ -235,8 +235,7 @@ zx::result<> IntelDisplayDriver::InitDisplayNode() {
   }
 
   const std::vector<fuchsia_driver_framework::NodeProperty> node_properties = {
-      fdf::MakeProperty(bind_fuchsia::PROTOCOL,
-                        bind_fuchsia_display::BIND_PROTOCOL_CONTROLLER_IMPL),
+      fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_display::BIND_PROTOCOL_ENGINE),
   };
   const std::vector<fuchsia_driver_framework::Offer> node_offers =
       display_compat_server_.CreateOffers2();

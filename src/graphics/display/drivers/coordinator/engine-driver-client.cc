@@ -70,12 +70,12 @@ zx::result<std::unique_ptr<EngineDriverClient>> CreateFidlEngineDriverClient(
 
 zx::result<std::unique_ptr<EngineDriverClient>> CreateBanjoEngineDriverClient(
     std::shared_ptr<fdf::Namespace> incoming) {
-  zx::result dc_result = compat::ConnectBanjo<ddk::DisplayControllerImplProtocolClient>(incoming);
+  zx::result dc_result = compat::ConnectBanjo<ddk::DisplayEngineProtocolClient>(incoming);
   if (dc_result.is_error()) {
     zxlogf(WARNING, "Failed to connect to Banjo server via the compat client: %s",
            dc_result.status_string());
   }
-  ddk::DisplayControllerImplProtocolClient dc = std::move(dc_result).value();
+  ddk::DisplayEngineProtocolClient dc = std::move(dc_result).value();
   if (!dc.is_valid()) {
     zxlogf(WARNING, "Failed to get Banjo display controller protocol");
     return zx::error(ZX_ERR_NOT_SUPPORTED);
@@ -119,7 +119,7 @@ zx::result<std::unique_ptr<EngineDriverClient>> EngineDriverClient::Create(
   return banjo_engine_driver_client_result;
 }
 
-EngineDriverClient::EngineDriverClient(ddk::DisplayControllerImplProtocolClient dc)
+EngineDriverClient::EngineDriverClient(ddk::DisplayEngineProtocolClient dc)
     : use_engine_(false), dc_(dc) {
   ZX_DEBUG_ASSERT(dc_.is_valid());
 }

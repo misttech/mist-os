@@ -21,7 +21,7 @@ namespace virtio_display {
 //
 // Instances are thread-safe, because Banjo does not make any threading
 // guarantees.
-class DisplayControllerBanjo : public ddk::DisplayControllerImplProtocol<DisplayControllerBanjo> {
+class DisplayControllerBanjo : public ddk::DisplayEngineProtocol<DisplayControllerBanjo> {
  public:
   // `engine` and `coordinator_events` must not be null, and must outlive the
   // newly created instance.
@@ -33,39 +33,37 @@ class DisplayControllerBanjo : public ddk::DisplayControllerImplProtocol<Display
 
   ~DisplayControllerBanjo();
 
-  // ddk::DisplayControllerImplProtocol
-  void DisplayControllerImplRegisterDisplayEngineListener(
+  // ddk::DisplayEngineProtocol
+  void DisplayEngineRegisterDisplayEngineListener(
       const display_engine_listener_protocol_t* display_engine_listener);
-  void DisplayControllerImplDeregisterDisplayEngineListener();
-  zx_status_t DisplayControllerImplImportBufferCollection(
-      uint64_t banjo_driver_buffer_collection_id, zx::channel buffer_collection_token);
-  zx_status_t DisplayControllerImplReleaseBufferCollection(
-      uint64_t banjo_driver_buffer_collection_id);
-  zx_status_t DisplayControllerImplImportImage(const image_metadata_t* banjo_image_metadata,
-                                               uint64_t banjo_driver_buffer_collection_id,
-                                               uint32_t index, uint64_t* out_image_handle);
-  zx_status_t DisplayControllerImplImportImageForCapture(uint64_t banjo_driver_buffer_collection_id,
-                                                         uint32_t index,
-                                                         uint64_t* out_capture_handle);
-  void DisplayControllerImplReleaseImage(uint64_t banjo_image_handle);
-  config_check_result_t DisplayControllerImplCheckConfiguration(
+  void DisplayEngineDeregisterDisplayEngineListener();
+  zx_status_t DisplayEngineImportBufferCollection(uint64_t banjo_driver_buffer_collection_id,
+                                                  zx::channel buffer_collection_token);
+  zx_status_t DisplayEngineReleaseBufferCollection(uint64_t banjo_driver_buffer_collection_id);
+  zx_status_t DisplayEngineImportImage(const image_metadata_t* banjo_image_metadata,
+                                       uint64_t banjo_driver_buffer_collection_id, uint32_t index,
+                                       uint64_t* out_image_handle);
+  zx_status_t DisplayEngineImportImageForCapture(uint64_t banjo_driver_buffer_collection_id,
+                                                 uint32_t index, uint64_t* out_capture_handle);
+  void DisplayEngineReleaseImage(uint64_t banjo_image_handle);
+  config_check_result_t DisplayEngineCheckConfiguration(
       const display_config_t* banjo_display_configs, size_t banjo_display_configs_count,
       client_composition_opcode_t* out_client_composition_opcodes_list,
       size_t out_client_composition_opcodes_size, size_t* out_client_composition_opcodes_actual);
-  void DisplayControllerImplApplyConfiguration(const display_config_t* banjo_display_configs,
-                                               size_t banjo_display_configs_count,
-                                               const config_stamp_t* banjo_config_stamp);
-  zx_status_t DisplayControllerImplSetBufferCollectionConstraints(
+  void DisplayEngineApplyConfiguration(const display_config_t* banjo_display_configs,
+                                       size_t banjo_display_configs_count,
+                                       const config_stamp_t* banjo_config_stamp);
+  zx_status_t DisplayEngineSetBufferCollectionConstraints(
       const image_buffer_usage_t* banjo_image_buffer_usage,
       uint64_t banjo_driver_buffer_collection_id);
-  zx_status_t DisplayControllerImplSetDisplayPower(uint64_t banjo_display_id, bool power_on);
-  bool DisplayControllerImplIsCaptureSupported();
-  zx_status_t DisplayControllerImplStartCapture(uint64_t capture_handle);
-  zx_status_t DisplayControllerImplReleaseCapture(uint64_t capture_handle);
-  bool DisplayControllerImplIsCaptureCompleted();
-  zx_status_t DisplayControllerImplSetMinimumRgb(uint8_t minimum_rgb);
+  zx_status_t DisplayEngineSetDisplayPower(uint64_t banjo_display_id, bool power_on);
+  bool DisplayEngineIsCaptureSupported();
+  zx_status_t DisplayEngineStartCapture(uint64_t capture_handle);
+  zx_status_t DisplayEngineReleaseCapture(uint64_t capture_handle);
+  bool DisplayEngineIsCaptureCompleted();
+  zx_status_t DisplayEngineSetMinimumRgb(uint8_t minimum_rgb);
 
-  display_controller_impl_protocol_t GetProtocol();
+  display_engine_protocol_t GetProtocol();
 
  private:
   // This data member is thread-safe because it is immutable.

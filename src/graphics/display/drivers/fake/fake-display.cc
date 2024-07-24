@@ -117,14 +117,14 @@ raw_display_info_t CreateRawDisplayInfo(const display_mode_t* banjo_display_mode
 FakeDisplay::FakeDisplay(FakeDisplayDeviceConfig device_config,
                          fidl::ClientEnd<fuchsia_sysmem2::Allocator> sysmem_allocator,
                          inspect::Inspector inspector)
-    : display_controller_impl_banjo_protocol_({&display_controller_impl_protocol_ops_, this}),
+    : display_engine_banjo_protocol_({&display_engine_protocol_ops_, this}),
       device_config_(device_config),
       sysmem_(std::move(sysmem_allocator)),
       inspector_(std::move(inspector)) {}
 
 FakeDisplay::~FakeDisplay() { Deinitialize(); }
 
-zx_status_t FakeDisplay::DisplayControllerImplSetMinimumRgb(uint8_t minimum_rgb) {
+zx_status_t FakeDisplay::DisplayEngineSetMinimumRgb(uint8_t minimum_rgb) {
   fbl::AutoLock lock(&capture_mutex_);
 
   clamp_rgb_value_ = minimum_rgb;
@@ -145,7 +145,7 @@ zx_status_t FakeDisplay::InitSysmemAllocatorClient() {
   return ZX_OK;
 }
 
-void FakeDisplay::DisplayControllerImplRegisterDisplayEngineListener(
+void FakeDisplay::DisplayEngineRegisterDisplayEngineListener(
     const display_engine_listener_protocol_t* engine_listener) {
   fbl::AutoLock engine_listener_lock(&engine_listener_mutex_);
   engine_listener_client_ = ddk::DisplayEngineListenerProtocolClient(engine_listener);
@@ -155,7 +155,7 @@ void FakeDisplay::DisplayControllerImplRegisterDisplayEngineListener(
   engine_listener_client_.OnDisplayAdded(&banjo_display_info);
 }
 
-void FakeDisplay::DisplayControllerImplDeregisterDisplayEngineListener() {
+void FakeDisplay::DisplayEngineDeregisterDisplayEngineListener() {
   fbl::AutoLock engine_listener_lock(&engine_listener_mutex_);
   engine_listener_client_ = ddk::DisplayEngineListenerProtocolClient();
 }
@@ -192,7 +192,7 @@ bool IsAcceptableImageTilingType(uint32_t image_tiling_type) {
 
 }  // namespace
 
-zx_status_t FakeDisplay::DisplayControllerImplImportBufferCollection(
+zx_status_t FakeDisplay::DisplayEngineImportBufferCollection(
     uint64_t banjo_driver_buffer_collection_id, zx::channel collection_token) {
   const display::DriverBufferCollectionId driver_buffer_collection_id =
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
@@ -220,7 +220,7 @@ zx_status_t FakeDisplay::DisplayControllerImplImportBufferCollection(
   return ZX_OK;
 }
 
-zx_status_t FakeDisplay::DisplayControllerImplReleaseBufferCollection(
+zx_status_t FakeDisplay::DisplayEngineReleaseBufferCollection(
     uint64_t banjo_driver_buffer_collection_id) {
   const display::DriverBufferCollectionId driver_buffer_collection_id =
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
@@ -233,9 +233,9 @@ zx_status_t FakeDisplay::DisplayControllerImplReleaseBufferCollection(
   return ZX_OK;
 }
 
-zx_status_t FakeDisplay::DisplayControllerImplImportImage(
-    const image_metadata_t* image_metadata, uint64_t banjo_driver_buffer_collection_id,
-    uint32_t index, uint64_t* out_image_handle) {
+zx_status_t FakeDisplay::DisplayEngineImportImage(const image_metadata_t* image_metadata,
+                                                  uint64_t banjo_driver_buffer_collection_id,
+                                                  uint32_t index, uint64_t* out_image_handle) {
   const display::DriverBufferCollectionId driver_buffer_collection_id =
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
   const auto it = buffer_collections_.find(driver_buffer_collection_id);
@@ -316,7 +316,7 @@ zx_status_t FakeDisplay::DisplayControllerImplImportImage(
   return ZX_OK;
 }
 
-void FakeDisplay::DisplayControllerImplReleaseImage(uint64_t image_handle) {
+void FakeDisplay::DisplayEngineReleaseImage(uint64_t image_handle) {
   fbl::AutoLock lock(&image_mutex_);
   display::DriverImageId driver_image_id = display::ToDriverImageId(image_handle);
   if (imported_images_.erase(driver_image_id) == nullptr) {
@@ -324,7 +324,7 @@ void FakeDisplay::DisplayControllerImplReleaseImage(uint64_t image_handle) {
   }
 }
 
-config_check_result_t FakeDisplay::DisplayControllerImplCheckConfiguration(
+config_check_result_t FakeDisplay::DisplayEngineCheckConfiguration(
     const display_config_t* display_configs, size_t display_count,
     client_composition_opcode_t* out_client_composition_opcodes_list,
     size_t client_composition_opcodes_count, size_t* out_client_composition_opcodes_actual) {
@@ -368,9 +368,9 @@ config_check_result_t FakeDisplay::DisplayControllerImplCheckConfiguration(
   return CONFIG_CHECK_RESULT_OK;
 }
 
-void FakeDisplay::DisplayControllerImplApplyConfiguration(
-    const display_config_t* display_configs, size_t display_count,
-    const config_stamp_t* banjo_config_stamp) {
+void FakeDisplay::DisplayEngineApplyConfiguration(const display_config_t* display_configs,
+                                                  size_t display_count,
+                                                  const config_stamp_t* banjo_config_stamp) {
   ZX_DEBUG_ASSERT(display_configs);
   ZX_DEBUG_ASSERT(banjo_config_stamp != nullptr);
   {
@@ -502,7 +502,7 @@ void FakeDisplay::SetLayerImageFormatConstraints(
   constraints.max_width_times_height() = std::numeric_limits<uint32_t>::max();
 }
 
-zx_status_t FakeDisplay::DisplayControllerImplSetBufferCollectionConstraints(
+zx_status_t FakeDisplay::DisplayEngineSetBufferCollectionConstraints(
     const image_buffer_usage_t* usage, uint64_t banjo_driver_buffer_collection_id) {
   const display::DriverBufferCollectionId driver_buffer_collection_id =
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
@@ -530,11 +530,11 @@ zx_status_t FakeDisplay::DisplayControllerImplSetBufferCollectionConstraints(
   return ZX_OK;
 }
 
-zx_status_t FakeDisplay::DisplayControllerImplSetDisplayPower(uint64_t display_id, bool power_on) {
+zx_status_t FakeDisplay::DisplayEngineSetDisplayPower(uint64_t display_id, bool power_on) {
   return ZX_ERR_NOT_SUPPORTED;
 }
 
-zx_status_t FakeDisplay::DisplayControllerImplImportImageForCapture(
+zx_status_t FakeDisplay::DisplayEngineImportImageForCapture(
     uint64_t banjo_driver_buffer_collection_id, uint32_t index, uint64_t* out_capture_handle) {
   if (!IsCaptureSupported()) {
     return ZX_ERR_NOT_SUPPORTED;
@@ -611,9 +611,9 @@ zx_status_t FakeDisplay::DisplayControllerImplImportImageForCapture(
   return ZX_OK;
 }
 
-bool FakeDisplay::DisplayControllerImplIsCaptureSupported() { return IsCaptureSupported(); }
+bool FakeDisplay::DisplayEngineIsCaptureSupported() { return IsCaptureSupported(); }
 
-zx_status_t FakeDisplay::DisplayControllerImplStartCapture(uint64_t capture_handle) {
+zx_status_t FakeDisplay::DisplayEngineStartCapture(uint64_t capture_handle) {
   if (!IsCaptureSupported()) {
     return ZX_ERR_NOT_SUPPORTED;
   }
@@ -636,7 +636,7 @@ zx_status_t FakeDisplay::DisplayControllerImplStartCapture(uint64_t capture_hand
   return ZX_OK;
 }
 
-zx_status_t FakeDisplay::DisplayControllerImplReleaseCapture(uint64_t capture_handle) {
+zx_status_t FakeDisplay::DisplayEngineReleaseCapture(uint64_t capture_handle) {
   if (!IsCaptureSupported()) {
     return ZX_ERR_NOT_SUPPORTED;
   }
@@ -655,7 +655,7 @@ zx_status_t FakeDisplay::DisplayControllerImplReleaseCapture(uint64_t capture_ha
   return ZX_OK;
 }
 
-bool FakeDisplay::DisplayControllerImplIsCaptureCompleted() {
+bool FakeDisplay::DisplayEngineIsCaptureCompleted() {
   fbl::AutoLock lock(&capture_mutex_);
   return current_capture_target_image_id_ == display::kInvalidDriverCaptureImageId;
 }
@@ -795,7 +795,7 @@ int FakeDisplay::VSyncThread() {
 void FakeDisplay::SendVsync() {
   fbl::AutoLock engine_listener_lock(&engine_listener_mutex_);
   if (engine_listener_client_.is_valid()) {
-    // See the discussion in `DisplayControllerImplApplyConfiguration()` about
+    // See the discussion in `DisplayEngineApplyConfiguration()` about
     // the reason we use relaxed memory order here.
     const display::ConfigStamp current_config_stamp =
         current_config_stamp_.load(std::memory_order_relaxed);

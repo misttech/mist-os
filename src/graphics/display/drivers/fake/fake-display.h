@@ -52,7 +52,7 @@ struct FakeDisplayDeviceConfig {
   bool no_buffer_access = false;
 };
 
-class FakeDisplay : public ddk::DisplayControllerImplProtocol<FakeDisplay> {
+class FakeDisplay : public ddk::DisplayEngineProtocol<FakeDisplay> {
  public:
   explicit FakeDisplay(FakeDisplayDeviceConfig device_config,
                        fidl::ClientEnd<fuchsia_sysmem2::Allocator> sysmem_allocator,
@@ -71,43 +71,39 @@ class FakeDisplay : public ddk::DisplayControllerImplProtocol<FakeDisplay> {
   // This method is idempotent.
   void Deinitialize();
 
-  // DisplayControllerImplProtocol implementation:
-  void DisplayControllerImplRegisterDisplayEngineListener(
+  // DisplayEngineProtocol implementation:
+  void DisplayEngineRegisterDisplayEngineListener(
       const display_engine_listener_protocol_t* engine_listener);
-  void DisplayControllerImplDeregisterDisplayEngineListener();
-  zx_status_t DisplayControllerImplImportBufferCollection(
-      uint64_t banjo_driver_buffer_collection_id, zx::channel collection_token);
-  zx_status_t DisplayControllerImplReleaseBufferCollection(
-      uint64_t banjo_driver_buffer_collection_id);
-  zx_status_t DisplayControllerImplImportImage(const image_metadata_t* image_metadata,
-                                               uint64_t banjo_driver_buffer_collection_id,
-                                               uint32_t index, uint64_t* out_image_handle);
-  void DisplayControllerImplReleaseImage(uint64_t image_handle);
-  config_check_result_t DisplayControllerImplCheckConfiguration(
+  void DisplayEngineDeregisterDisplayEngineListener();
+  zx_status_t DisplayEngineImportBufferCollection(uint64_t banjo_driver_buffer_collection_id,
+                                                  zx::channel collection_token);
+  zx_status_t DisplayEngineReleaseBufferCollection(uint64_t banjo_driver_buffer_collection_id);
+  zx_status_t DisplayEngineImportImage(const image_metadata_t* image_metadata,
+                                       uint64_t banjo_driver_buffer_collection_id, uint32_t index,
+                                       uint64_t* out_image_handle);
+  void DisplayEngineReleaseImage(uint64_t image_handle);
+  config_check_result_t DisplayEngineCheckConfiguration(
       const display_config_t* display_configs, size_t display_count,
       client_composition_opcode_t* out_client_composition_opcodes_list,
       size_t client_composition_opcodes_count, size_t* out_client_composition_opcodes_actual);
-  void DisplayControllerImplApplyConfiguration(const display_config_t* display_configs,
-                                               size_t display_count,
-                                               const config_stamp_t* banjo_config_stamp);
-  zx_status_t DisplayControllerImplSetBufferCollectionConstraints(
+  void DisplayEngineApplyConfiguration(const display_config_t* display_configs,
+                                       size_t display_count,
+                                       const config_stamp_t* banjo_config_stamp);
+  zx_status_t DisplayEngineSetBufferCollectionConstraints(
       const image_buffer_usage_t* usage, uint64_t banjo_driver_buffer_collection_id);
-  zx_status_t DisplayControllerImplSetDisplayPower(uint64_t display_id, bool power_on);
-  zx_status_t DisplayControllerImplImportImageForCapture(uint64_t banjo_driver_buffer_collection_id,
-                                                         uint32_t index,
-                                                         uint64_t* out_capture_handle)
+  zx_status_t DisplayEngineSetDisplayPower(uint64_t display_id, bool power_on);
+  zx_status_t DisplayEngineImportImageForCapture(uint64_t banjo_driver_buffer_collection_id,
+                                                 uint32_t index, uint64_t* out_capture_handle)
       __TA_EXCLUDES(capture_mutex_);
-  bool DisplayControllerImplIsCaptureSupported();
-  zx_status_t DisplayControllerImplStartCapture(uint64_t capture_handle)
-      __TA_EXCLUDES(capture_mutex_);
-  zx_status_t DisplayControllerImplReleaseCapture(uint64_t capture_handle)
-      __TA_EXCLUDES(capture_mutex_);
-  bool DisplayControllerImplIsCaptureCompleted() __TA_EXCLUDES(capture_mutex_);
+  bool DisplayEngineIsCaptureSupported();
+  zx_status_t DisplayEngineStartCapture(uint64_t capture_handle) __TA_EXCLUDES(capture_mutex_);
+  zx_status_t DisplayEngineReleaseCapture(uint64_t capture_handle) __TA_EXCLUDES(capture_mutex_);
+  bool DisplayEngineIsCaptureCompleted() __TA_EXCLUDES(capture_mutex_);
 
-  zx_status_t DisplayControllerImplSetMinimumRgb(uint8_t minimum_rgb);
+  zx_status_t DisplayEngineSetMinimumRgb(uint8_t minimum_rgb);
 
-  const display_controller_impl_protocol_t* display_controller_impl_banjo_protocol() const {
-    return &display_controller_impl_banjo_protocol_;
+  const display_engine_protocol_t* display_engine_banjo_protocol() const {
+    return &display_engine_banjo_protocol_;
   }
 
   bool IsCaptureSupported() const;
@@ -164,8 +160,8 @@ class FakeDisplay : public ddk::DisplayControllerImplProtocol<FakeDisplay> {
   // be already initialized.
   void RecordDisplayConfigToInspectRootNode();
 
-  // Banjo vtable for fuchsia.hardware.display.controller.DisplayControllerImpl.
-  const display_controller_impl_protocol_t display_controller_impl_banjo_protocol_;
+  // Banjo vtable for fuchsia.hardware.display.controller.DisplayEngine.
+  const display_engine_protocol_t display_engine_banjo_protocol_;
 
   FakeDisplayDeviceConfig device_config_;
 

@@ -39,7 +39,7 @@ DisplayControllerBanjo::DisplayControllerBanjo(DisplayEngine* engine,
 
 DisplayControllerBanjo::~DisplayControllerBanjo() = default;
 
-void DisplayControllerBanjo::DisplayControllerImplRegisterDisplayEngineListener(
+void DisplayControllerBanjo::DisplayEngineRegisterDisplayEngineListener(
     const display_engine_listener_protocol_t* display_engine_listener) {
   ZX_DEBUG_ASSERT(display_engine_listener);
   coordinator_events_.RegisterDisplayEngineListener(display_engine_listener);
@@ -48,11 +48,11 @@ void DisplayControllerBanjo::DisplayControllerImplRegisterDisplayEngineListener(
   }
 }
 
-void DisplayControllerBanjo::DisplayControllerImplDeregisterDisplayEngineListener() {
+void DisplayControllerBanjo::DisplayEngineDeregisterDisplayEngineListener() {
   coordinator_events_.RegisterDisplayEngineListener(nullptr);
 }
 
-zx_status_t DisplayControllerBanjo::DisplayControllerImplImportBufferCollection(
+zx_status_t DisplayControllerBanjo::DisplayEngineImportBufferCollection(
     uint64_t banjo_driver_buffer_collection_id, zx::channel banjo_buffer_collection_token) {
   const display::DriverBufferCollectionId driver_buffer_collection_id =
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
@@ -64,7 +64,7 @@ zx_status_t DisplayControllerBanjo::DisplayControllerImplImportBufferCollection(
   return result.status_value();
 }
 
-zx_status_t DisplayControllerBanjo::DisplayControllerImplReleaseBufferCollection(
+zx_status_t DisplayControllerBanjo::DisplayEngineReleaseBufferCollection(
     uint64_t banjo_driver_buffer_collection_id) {
   const display::DriverBufferCollectionId driver_buffer_collection_id =
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
@@ -72,7 +72,7 @@ zx_status_t DisplayControllerBanjo::DisplayControllerImplReleaseBufferCollection
   return result.status_value();
 }
 
-zx_status_t DisplayControllerBanjo::DisplayControllerImplImportImage(
+zx_status_t DisplayControllerBanjo::DisplayEngineImportImage(
     const image_metadata_t* banjo_image_metadata, uint64_t banjo_driver_buffer_collection_id,
     uint32_t index, uint64_t* out_image_handle) {
   const display::ImageMetadata image_metadata(*banjo_image_metadata);
@@ -87,7 +87,7 @@ zx_status_t DisplayControllerBanjo::DisplayControllerImplImportImage(
   return ZX_OK;
 }
 
-zx_status_t DisplayControllerBanjo::DisplayControllerImplImportImageForCapture(
+zx_status_t DisplayControllerBanjo::DisplayEngineImportImageForCapture(
     uint64_t banjo_driver_buffer_collection_id, uint32_t index, uint64_t* out_capture_handle) {
   const display::DriverBufferCollectionId driver_buffer_collection_id =
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
@@ -100,12 +100,12 @@ zx_status_t DisplayControllerBanjo::DisplayControllerImplImportImageForCapture(
   return ZX_OK;
 }
 
-void DisplayControllerBanjo::DisplayControllerImplReleaseImage(uint64_t banjo_image_handle) {
+void DisplayControllerBanjo::DisplayEngineReleaseImage(uint64_t banjo_image_handle) {
   const display::DriverImageId driver_image_id = display::ToDriverImageId(banjo_image_handle);
   engine_.ReleaseImage(driver_image_id);
 }
 
-config_check_result_t DisplayControllerBanjo::DisplayControllerImplCheckConfiguration(
+config_check_result_t DisplayControllerBanjo::DisplayEngineCheckConfiguration(
     const display_config_t* banjo_display_configs, size_t banjo_display_configs_count,
     client_composition_opcode_t* out_client_composition_opcodes_list,
     size_t out_client_composition_opcodes_size, size_t* out_client_composition_opcodes_actual) {
@@ -118,7 +118,7 @@ config_check_result_t DisplayControllerBanjo::DisplayControllerImplCheckConfigur
                                     out_client_composition_opcodes_actual);
 }
 
-void DisplayControllerBanjo::DisplayControllerImplApplyConfiguration(
+void DisplayControllerBanjo::DisplayEngineApplyConfiguration(
     const display_config_t* banjo_display_configs, size_t banjo_display_configs_count,
     const config_stamp_t* banjo_config_stamp) {
   cpp20::span<const display_config_t> display_configs(banjo_display_configs,
@@ -126,7 +126,7 @@ void DisplayControllerBanjo::DisplayControllerImplApplyConfiguration(
   return engine_.ApplyConfiguration(display_configs, banjo_config_stamp);
 }
 
-zx_status_t DisplayControllerBanjo::DisplayControllerImplSetBufferCollectionConstraints(
+zx_status_t DisplayControllerBanjo::DisplayEngineSetBufferCollectionConstraints(
     const image_buffer_usage_t* banjo_image_buffer_usage,
     uint64_t banjo_driver_buffer_collection_id) {
   display::ImageBufferUsage image_buffer_usage =
@@ -138,45 +138,43 @@ zx_status_t DisplayControllerBanjo::DisplayControllerImplSetBufferCollectionCons
   return result.status_value();
 }
 
-zx_status_t DisplayControllerBanjo::DisplayControllerImplSetDisplayPower(uint64_t banjo_display_id,
-                                                                         bool power_on) {
+zx_status_t DisplayControllerBanjo::DisplayEngineSetDisplayPower(uint64_t banjo_display_id,
+                                                                 bool power_on) {
   const display::DisplayId display_id = display::ToDisplayId(banjo_display_id);
   zx::result<> result = engine_.SetDisplayPower(display_id, power_on);
   return result.status_value();
 }
 
-bool DisplayControllerBanjo::DisplayControllerImplIsCaptureSupported() {
+bool DisplayControllerBanjo::DisplayEngineIsCaptureSupported() {
   return engine_.IsCaptureSupported();
 }
 
-zx_status_t DisplayControllerBanjo::DisplayControllerImplStartCapture(
-    uint64_t banjo_capture_handle) {
+zx_status_t DisplayControllerBanjo::DisplayEngineStartCapture(uint64_t banjo_capture_handle) {
   const display::DriverCaptureImageId capture_image_id =
       display::ToDriverCaptureImageId(banjo_capture_handle);
   zx::result<> result = engine_.StartCapture(capture_image_id);
   return result.status_value();
 }
 
-zx_status_t DisplayControllerBanjo::DisplayControllerImplReleaseCapture(
-    uint64_t banjo_capture_handle) {
+zx_status_t DisplayControllerBanjo::DisplayEngineReleaseCapture(uint64_t banjo_capture_handle) {
   const display::DriverCaptureImageId capture_image_id =
       display::ToDriverCaptureImageId(banjo_capture_handle);
   zx::result<> result = engine_.ReleaseCapture(capture_image_id);
   return result.status_value();
 }
 
-bool DisplayControllerBanjo::DisplayControllerImplIsCaptureCompleted() {
+bool DisplayControllerBanjo::DisplayEngineIsCaptureCompleted() {
   return engine_.IsCaptureCompleted();
 }
 
-zx_status_t DisplayControllerBanjo::DisplayControllerImplSetMinimumRgb(uint8_t minimum_rgb) {
+zx_status_t DisplayControllerBanjo::DisplayEngineSetMinimumRgb(uint8_t minimum_rgb) {
   zx::result<> result = engine_.SetMinimumRgb(minimum_rgb);
   return result.status_value();
 }
 
-display_controller_impl_protocol_t DisplayControllerBanjo::GetProtocol() {
+display_engine_protocol_t DisplayControllerBanjo::GetProtocol() {
   return {
-      .ops = &display_controller_impl_protocol_ops_,
+      .ops = &display_engine_protocol_ops_,
       .ctx = this,
   };
 }
