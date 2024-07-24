@@ -112,6 +112,11 @@ impl DefineSubsystemConfiguration<DriverFrameworkConfig> for DriverFrameworkSubs
             ),
         )?;
 
+        // Include bus-pci driver through a platform AIB.
+        if context.board_info.provides_feature("fuchsia::bus_pci") {
+            builder.platform_bundle("bus_pci_driver");
+        }
+
         Ok(())
     }
 }

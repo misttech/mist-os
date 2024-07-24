@@ -439,6 +439,10 @@ assembly_input_bundle("bt_transport_uart_driver") {
   ]
 }
 
+# AIB for the bus-pci driver
+assembly_input_bundle("bus_pci_driver") {
+}
+
 # The most minimal AIB that is included in eng assembled systems that are meant
 # to be standalone.
 #

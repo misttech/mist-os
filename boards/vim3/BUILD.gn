@@ -13,6 +13,7 @@ assert(current_cpu == "arm64",
 board_configuration("vim3") {
   provided_features = [
     "fuchsia::bt_transport_uart",
+    "fuchsia::bus_pci",
     "fuchsia::driver_framework_v2_support",
     "fuchsia::fan",
     "fuchsia::mali_gpu",
