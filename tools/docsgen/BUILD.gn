@@ -13,6 +13,9 @@ assert(!is_host, "These rules assume a non-host toolchain.")
 group("docsgen") {
   testonly = true
   deps = [ ":generated_docs" ]
+  if (current_toolchain == default_toolchain) {
+    deps += [ ":reference_doc_checker" ]
+  }
 }
 
 # Runs one time python assemblydoc generation script.
@@ -327,7 +330,6 @@ build_api_module("generated_docs") {
     ":invoke_helpdoc",
     "//build/bazel/bazel_sdk/docs:docs",
     "//bundles/drivers:create_all_drivers_doc",
-    "//sdk/lib/fdio:docs",
   ]
 }
 
@@ -349,10 +351,6 @@ sdk_docs = [
   {
     target = ":invoke_helpdoc"
     file = "helpdoc_out.tar.gz"
-  },
-  {
-    target = "//sdk/lib/fdio:docs"
-    file = "fdio.zip"
   },
   {
     target = ":invoke_clidoc"
@@ -381,6 +379,59 @@ sdk_documentation("ref_docs_sdk") {
 
   files = sdk_doc_files
   non_sdk_deps = sdk_doc_targets
+}
+
+if (current_toolchain == default_toolchain) {
+  action("reference_doc_checker") {
+    testonly = true
+    script = "reference_doc_checker_test.py"
+    depfile = "${target_out_dir}/${target_name}.d"
+    deps = [
+      ":create_syscall_docs",
+      ":generated_docs",
+      ":invoke_assemblydoc",
+      ":invoke_clidoc",
+      ":invoke_cmldoc",
+      ":invoke_fidldoc",
+      ":invoke_helpdoc",
+      "//build/bazel/bazel_sdk/docs:docs",
+      "//bundles/drivers:create_all_drivers_doc",
+      "//tools/doc_checker:doc_checker_host_tool($host_toolchain)",
+    ]
+    _doc_checker_dir = get_label_info(
+            "//tools/doc_checker::doc_checker_host_tool($host_toolchain)",
+            "target_out_dir")
+    _manifests = get_target_outputs(":generated_docs")
+    inputs = _manifests
+    inputs += [
+      "$target_out_dir/assemblydoc.tar.gz",
+      "$target_out_dir/syscalls.zip",
+      "$target_out_dir/fidldoc.zip",
+      "$target_out_dir/helpdoc_out.tar.gz",
+      "$target_out_dir/clidoc_out.tar.gz",
+      "${target_out_dir}/cmldoc_out/index.md",
+      "${root_build_dir}/gen/build/bazel/bazel_sdk/docs/docs.zip",
+      "${root_build_dir}/gen/bundles/drivers/_all_drivers_doc.yaml",
+      "$root_build_dir/host-tools/doc-checker",
+    ]
+    outputs = [ "${target_out_dir}/all_docs.zip" ]
+    args = [
+      "--output",
+      rebase_path(outputs[0], root_build_dir),
+      "--doc-checker",
+      rebase_path("$root_build_dir/host-tools/doc-checker", root_build_dir),
+      "--src-root",
+      rebase_path("//", root_build_dir),
+      "--depfile",
+      rebase_path(depfile, root_build_dir),
+    ]
+    foreach(i, _manifests) {
+      args += [
+        "--input",
+        rebase_path(i, root_build_dir),
+      ]
+    }
+  }
 }
 
 group("tests") {
