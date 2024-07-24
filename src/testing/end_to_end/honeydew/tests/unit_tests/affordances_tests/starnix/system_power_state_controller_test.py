@@ -105,6 +105,37 @@ _SAG_INSPECT_DATA_AFTER[0]["payload"]["root"]["suspend_stats"][
     "success_count"
 ] = 1
 
+_FSH_INSPECT_DATA_BEFORE: list[dict[str, Any]] = [
+    {
+        "data_source": "Inspect",
+        "metadata": {
+            "component_url": "fuchsia-boot:///aml-suspend#meta/aml-suspend.cm",
+            "timestamp": 372140515750,
+        },
+        "moniker": "'bootstrap/boot-drivers:dev.sys.platform.pt.suspend'",
+        "payload": {"root": {"suspend_events": {}}},
+        "version": 1,
+    }
+]
+
+_FSH_INSPECT_DATA_AFTER: list[dict[str, Any]] = deepcopy(
+    _FSH_INSPECT_DATA_BEFORE
+)
+_FSH_INSPECT_DATA_AFTER[0]["payload"]["root"]["suspend_events"] = {
+    "0": {"suspended": 73886828041},
+    "1": {"resumed": 75687395083},
+}
+
+SUSPEND_RESUME_EVENTS_AFTER_FAIL_2: dict[str, dict[str, int]] = {
+    "0": {"suspended": 75687395083},
+    "1": {"resumed": 73886828041},
+}
+
+SUSPEND_RESUME_EVENTS_AFTER_FAIL_3: dict[str, dict[str, int]] = {
+    "0": {"suspended": 73886828041},
+    "1": {"resumed": 79886828041},
+}
+
 
 def _custom_test_name_func(
     testcase_func: Callable[..., None], _: str, param_obj: param
@@ -204,7 +235,13 @@ class SystemPowerStateControllerStarnixTests(unittest.TestCase):
                 _SAG_INSPECT_DATA_BEFORE
             ),
             fuchsia_inspect.InspectDataCollection.from_list(
+                _FSH_INSPECT_DATA_BEFORE
+            ),
+            fuchsia_inspect.InspectDataCollection.from_list(
                 _SAG_INSPECT_DATA_AFTER
+            ),
+            fuchsia_inspect.InspectDataCollection.from_list(
+                _FSH_INSPECT_DATA_AFTER
             ),
         ]
         self.system_power_state_controller_obj.suspend_resume(
@@ -226,7 +263,7 @@ class SystemPowerStateControllerStarnixTests(unittest.TestCase):
         "_set_resume_mode",
         autospec=True,
     )
-    def test_suspend_resume_verify_using_inspect_fail(
+    def test_suspend_resume_verify_using_sag_inspect_fail(
         self,
         mock_set_resume_mode: mock.Mock,
         mock_suspend: mock.Mock,
@@ -237,12 +274,61 @@ class SystemPowerStateControllerStarnixTests(unittest.TestCase):
                 _SAG_INSPECT_DATA_BEFORE
             ),
             fuchsia_inspect.InspectDataCollection.from_list(
+                _FSH_INSPECT_DATA_BEFORE
+            ),
+            fuchsia_inspect.InspectDataCollection.from_list(
                 _SAG_INSPECT_DATA_BEFORE
+            ),
+            fuchsia_inspect.InspectDataCollection.from_list(
+                _FSH_INSPECT_DATA_AFTER
             ),
         ]
         with self.assertRaisesRegex(
             errors.SystemPowerStateControllerError,
             "Based on SAG inspect data",
+        ):
+            self.system_power_state_controller_obj.suspend_resume(
+                suspend_state=system_power_state_controller_interface.IdleSuspend(),
+                resume_mode=system_power_state_controller_interface.TimerResume(
+                    duration=3,
+                ),
+            )
+        mock_set_resume_mode.assert_called_once()
+        mock_suspend.assert_called_once()
+
+    @mock.patch.object(
+        starnix_system_power_state_controller.SystemPowerStateController,
+        "_suspend",
+        autospec=True,
+    )
+    @mock.patch.object(
+        starnix_system_power_state_controller.SystemPowerStateController,
+        "_set_resume_mode",
+        autospec=True,
+    )
+    def test_suspend_resume_verify_using_fsh_inspect_fail(
+        self,
+        mock_set_resume_mode: mock.Mock,
+        mock_suspend: mock.Mock,
+    ) -> None:
+        """Test case for SystemPowerStateController.suspend_resume()"""
+        self.mock_inspect.get_data.side_effect = [
+            fuchsia_inspect.InspectDataCollection.from_list(
+                _SAG_INSPECT_DATA_BEFORE
+            ),
+            fuchsia_inspect.InspectDataCollection.from_list(
+                _FSH_INSPECT_DATA_BEFORE
+            ),
+            fuchsia_inspect.InspectDataCollection.from_list(
+                _SAG_INSPECT_DATA_AFTER
+            ),
+            fuchsia_inspect.InspectDataCollection.from_list(
+                _FSH_INSPECT_DATA_BEFORE
+            ),
+        ]
+        with self.assertRaisesRegex(
+            errors.SystemPowerStateControllerError,
+            "Based on FSH inspect data",
         ):
             self.system_power_state_controller_obj.suspend_resume(
                 suspend_state=system_power_state_controller_interface.IdleSuspend(),
@@ -516,8 +602,11 @@ class SystemPowerStateControllerStarnixTests(unittest.TestCase):
         mock_openpty.assert_called_once()
         mock_os_read.assert_called_once()
 
-    def test_get_suspend_resume_count_fail(self) -> None:
-        """Test case for SystemPowerStateController._get_suspend_resume_count() raising exception."""
+    def test_get_suspend_resume_count_sag_inspect_data_fail(
+        self,
+    ) -> None:
+        """Test case for SystemPowerStateController._get_suspend_resume_count_sag_inspect_data()
+        raising exception as it fails to read SAG inspect data."""
         self.mock_inspect.get_data.side_effect = errors.InspectError(
             "Inspect operation failed"
         )
@@ -525,4 +614,66 @@ class SystemPowerStateControllerStarnixTests(unittest.TestCase):
             errors.SystemPowerStateControllerError,
             "Failed to read SAG inspect data",
         ):
-            self.system_power_state_controller_obj._get_suspend_resume_count()
+            self.system_power_state_controller_obj._get_suspend_resume_count_sag_inspect_data()
+
+    def test_get_suspend_events_from_fsh_inspect_data_fail(
+        self,
+    ) -> None:
+        """Test case for SystemPowerStateController._get_suspend_events_from_fsh_inspect_data()
+        raising exception as it fails to read FSH inspect data."""
+        self.mock_inspect.get_data.side_effect = errors.InspectError(
+            "Inspect operation failed"
+        )
+        with self.assertRaisesRegex(
+            errors.SystemPowerStateControllerError,
+            "Failed to read FSH inspect data",
+        ):
+            self.system_power_state_controller_obj._get_suspend_events_from_fsh_inspect_data()
+
+    def test_validate_using_fsh_inspect_data_fail_1(self) -> None:
+        """Test case for SystemPowerStateController._validate_using_fsh_inspect_data()
+        failure condition"""
+        with self.assertRaisesRegex(
+            errors.SystemPowerStateControllerError,
+            "Based on FSH inspect data,",
+        ):
+            self.system_power_state_controller_obj._validate_using_fsh_inspect_data(
+                suspend_state=system_power_state_controller_interface.IdleSuspend(),
+                resume_mode=system_power_state_controller_interface.TimerResume(
+                    duration=3
+                ),
+                suspend_events_before={},
+                suspend_events_after={},
+            )
+
+    def test_validate_using_fsh_inspect_data_fail_2(self) -> None:
+        """Test case for SystemPowerStateController._validate_using_fsh_inspect_data()
+        failure condition"""
+        with self.assertRaisesRegex(
+            errors.SystemPowerStateControllerError,
+            "Based on FSH inspect data,",
+        ):
+            self.system_power_state_controller_obj._validate_using_fsh_inspect_data(
+                suspend_state=system_power_state_controller_interface.IdleSuspend(),
+                resume_mode=system_power_state_controller_interface.TimerResume(
+                    duration=3
+                ),
+                suspend_events_before={},
+                suspend_events_after=SUSPEND_RESUME_EVENTS_AFTER_FAIL_2,
+            )
+
+    def test_validate_using_fsh_inspect_data_fail_3(self) -> None:
+        """Test case for SystemPowerStateController._validate_using_fsh_inspect_data()
+        failure condition"""
+        with self.assertRaisesRegex(
+            errors.SystemPowerStateControllerError,
+            "Expected it to not take more than",
+        ):
+            self.system_power_state_controller_obj._validate_using_fsh_inspect_data(
+                suspend_state=system_power_state_controller_interface.IdleSuspend(),
+                resume_mode=system_power_state_controller_interface.TimerResume(
+                    duration=3
+                ),
+                suspend_events_before={},
+                suspend_events_after=SUSPEND_RESUME_EVENTS_AFTER_FAIL_3,
+            )

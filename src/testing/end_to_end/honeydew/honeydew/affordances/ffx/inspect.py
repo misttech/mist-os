@@ -64,7 +64,12 @@ class Inspect(inspect.Inspect):
         ] + selectors_and_monikers
 
         try:
-            _LOGGER.info("Collecting the inspect data from %s...", self._name)
+            message: str = f"Collecting the inspect data from {self._name}"
+            if selectors:
+                message = f"{message}, with selectors={selectors}"
+            if monikers:
+                message = f"{message}, with monikers={monikers}"
+            _LOGGER.info(message)
             inspect_data_json_str: str = self._ffx.run(
                 cmd=cmd,
                 log_output=False,
