@@ -56,7 +56,7 @@ where
         &mut self,
         target: &mut T,
     ) {
-        self.core_ctx().with_ip_routing_table(|_core_ctx, table| {
+        self.core_ctx().with_main_ip_routing_table(|_core_ctx, table| {
             target.extend(table.iter_table().cloned().map(Into::into))
         })
     }
@@ -81,7 +81,7 @@ where
         &mut self,
         gateway: SpecifiedAddr<I::Addr>,
     ) -> Option<<C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId> {
-        self.core_ctx().with_ip_routing_table_mut(|core_ctx, table| {
+        self.core_ctx().with_main_ip_routing_table_mut(|core_ctx, table| {
             table.lookup(core_ctx, None, *gateway).and_then(
                 |Destination { next_hop: found_next_hop, device: found_device }| {
                     match found_next_hop {
@@ -109,7 +109,7 @@ where
         &mut self,
         inspector: &mut N,
     ) {
-        self.core_ctx().with_ip_routing_table(|_core_ctx, table| {
+        self.core_ctx().with_main_ip_routing_table(|_core_ctx, table| {
             for Entry { subnet, device, gateway, metric } in table.iter_table() {
                 inspector.record_unnamed_child(|inspector| {
                     inspector.record_display("Destination", subnet);
@@ -149,7 +149,7 @@ where
         entries.sort_unstable_by(|a, b| {
             OrderedEntry::<'_, _, _>::from(a).cmp(&OrderedEntry::<'_, _, _>::from(b))
         });
-        self.core_ctx().with_ip_routing_table_mut(|_core_ctx, table| {
+        self.core_ctx().with_main_ip_routing_table_mut(|_core_ctx, table| {
             table.table = entries;
         });
     }

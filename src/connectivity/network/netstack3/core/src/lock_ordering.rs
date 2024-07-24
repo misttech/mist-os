@@ -129,6 +129,8 @@ pub struct UdpBoundMap<I>(PhantomData<I>, Never);
 pub enum Ipv4StateNextPacketId {}
 // Provides unlocked access of IpCounters.
 pub struct IpStateCounters<I>(PhantomData<I>, Never);
+// Provides unlocked access to main route table ID.
+pub struct IpMainTableId<I>(PhantomData<I>, Never);
 // Provides unlocked access of IcmpTxCounters.
 pub struct IcmpTxCounters<I>(PhantomData<I>, Never);
 // Provides unlocked access of IcmpRxCounters.

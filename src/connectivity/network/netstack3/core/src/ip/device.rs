@@ -940,7 +940,7 @@ impl<BC: BindingsContext> Ipv6DiscoveredRoutesContext<BC>
         // check for whether the route already exists, use a routes-admin
         // RouteSet to track the NDP-added route.
         let already_exists =
-            self.with_ip_routing_table(|_core_ctx, table: &ip::ForwardingTable<Ipv6, _>| {
+            self.with_main_ip_routing_table(|_core_ctx, table: &ip::ForwardingTable<Ipv6, _>| {
                 table.iter_table().any(|table_entry: &ip::Entry<Ipv6Addr, _>| {
                     &ip::AddableEntry::from(table_entry.clone()) == &entry
                 })

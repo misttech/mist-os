@@ -1587,8 +1587,8 @@ fn test_receive_ip_packet_action() {
 
     // Receive packet destined to a host with no route when forwarding is
     // enabled both globally and on the inbound device.
-    *core_ctx.ipv4().inner.table().write() = Default::default();
-    *core_ctx.ipv6().inner.table().write() = Default::default();
+    *core_ctx.ipv4().inner.main_table_id().table().write() = Default::default();
+    *core_ctx.ipv6().inner.main_table_id().table().write() = Default::default();
     assert_eq!(
         ip::receive_ipv4_packet_action(
             &mut core_ctx.context(),

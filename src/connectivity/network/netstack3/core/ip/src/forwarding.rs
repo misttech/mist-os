@@ -326,7 +326,7 @@ pub(crate) mod testutil {
         CC::DeviceId: PartialOrd,
     {
         let AddableEntry { subnet, device, gateway, metric } = entry;
-        core_ctx.with_ip_routing_table_mut(|core_ctx, table| {
+        core_ctx.with_main_ip_routing_table_mut(|core_ctx, table| {
             let metric = observe_metric(core_ctx, &device, metric);
             let _entry = table.add_entry(EntryAndGeneration {
                 entry: Entry { subnet, device, gateway, metric },
@@ -353,7 +353,7 @@ pub(crate) mod testutil {
         _bindings_ctx: &mut BC,
         del_subnet: Subnet<I::Addr>,
     ) -> Result<(), NotFoundError> {
-        core_ctx.with_ip_routing_table_mut(|_core_ctx, table| {
+        core_ctx.with_main_ip_routing_table_mut(|_core_ctx, table| {
             let removed =
                 table.del_entries(|Entry { subnet, device: _, gateway: _, metric: _ }| {
                     subnet == &del_subnet
@@ -378,7 +378,7 @@ pub(crate) mod testutil {
     ) {
         debug!("deleting routes on device: {del_device:?}");
 
-        let _: Vec<_> = core_ctx.with_ip_routing_table_mut(|_core_ctx, table| {
+        let _: Vec<_> = core_ctx.with_main_ip_routing_table_mut(|_core_ctx, table| {
             table.del_entries(|Entry { subnet: _, device, gateway: _, metric: _ }| {
                 device == del_device
             })

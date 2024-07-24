@@ -30,10 +30,11 @@ use netstack3_ip::icmp::{
 use netstack3_ip::multicast_forwarding::MulticastForwardingState;
 use netstack3_ip::raw::RawIpSocketMap;
 use netstack3_ip::{
-    self as ip, ForwardingTable, FragmentContext, IpCounters, IpLayerBindingsContext,
-    IpLayerContext, IpLayerIpExt, IpPacketFragmentCache, IpStateContext, IpStateInner,
-    IpTransportContext, IpTransportDispatchContext, MulticastMembershipHandler, PmtuCache,
-    PmtuContext, ReceiveIpPacketMeta, ResolveRouteError, ResolvedRoute, TransportReceiveError,
+    self as ip, ForwardingTable, ForwardingTableId, FragmentContext, IpCounters,
+    IpLayerBindingsContext, IpLayerContext, IpLayerIpExt, IpPacketFragmentCache, IpStateContext,
+    IpStateInner, IpTransportContext, IpTransportDispatchContext, MulticastMembershipHandler,
+    PmtuCache, PmtuContext, ReceiveIpPacketMeta, ResolveRouteError, ResolvedRoute,
+    TransportReceiveError,
 };
 use netstack3_tcp::TcpIpTransportContext;
 use netstack3_udp::UdpIpTransportContext;
@@ -209,6 +210,17 @@ impl<BT: BindingsTypes, I: IpLayerIpExt> UnlockedAccess<crate::lock_ordering::Ip
     }
 }
 
+impl<BT: BindingsTypes, I: IpLayerIpExt> UnlockedAccess<crate::lock_ordering::IpMainTableId<I>>
+    for StackState<BT>
+{
+    type Data = ForwardingTableId<I, DeviceId<BT>>;
+    type Guard<'l> = &'l ForwardingTableId<I, DeviceId<BT>>;
+
+    fn access(&self) -> Self::Guard<'_> {
+        self.inner_ip_state::<I>().main_table_id()
+    }
+}
+
 #[netstack3_macros::instantiate_ip_impl_block(I)]
 impl<I, BC, L> IpStateContext<I, BC> for CoreCtx<'_, BC, L>
 where
@@ -219,16 +231,23 @@ where
     type IpDeviceIdCtx<'a> =
         CoreCtx<'a, BC, WrapLockLevel<crate::lock_ordering::IpStateRoutingTable<I>>>;
 
+    fn main_table_id(&self) -> ForwardingTableId<I, Self::DeviceId> {
+        self.unlocked_access::<crate::lock_ordering::IpMainTableId<I>>().clone()
+    }
+
     fn with_ip_routing_table<
         O,
         F: FnOnce(&mut Self::IpDeviceIdCtx<'_>, &ForwardingTable<I, Self::DeviceId>) -> O,
     >(
         &mut self,
+        table_id: &ForwardingTableId<I, Self::DeviceId>,
         cb: F,
     ) -> O {
-        let (cache, mut locked) =
-            self.read_lock_and::<crate::lock_ordering::IpStateRoutingTable<I>>();
-        cb(&mut locked, &cache)
+        let mut table = self.adopt(table_id);
+        let (table, mut restricted) = table
+            .read_lock_with_and::<crate::lock_ordering::IpStateRoutingTable<I>, _>(|c| c.right());
+        let mut restricted = restricted.cast_core_ctx();
+        cb(&mut restricted, &table)
     }
 
     fn with_ip_routing_table_mut<
@@ -236,11 +255,14 @@ where
         F: FnOnce(&mut Self::IpDeviceIdCtx<'_>, &mut ForwardingTable<I, Self::DeviceId>) -> O,
     >(
         &mut self,
+        table_id: &ForwardingTableId<I, Self::DeviceId>,
         cb: F,
     ) -> O {
-        let (mut cache, mut locked) =
-            self.write_lock_and::<crate::lock_ordering::IpStateRoutingTable<I>>();
-        cb(&mut locked, &mut cache)
+        let mut table = self.adopt(table_id);
+        let (mut table, mut restricted) = table
+            .write_lock_with_and::<crate::lock_ordering::IpStateRoutingTable<I>, _>(|c| c.right());
+        let mut restricted = restricted.cast_core_ctx();
+        cb(&mut restricted, &mut table)
     }
 }
 
@@ -658,16 +680,13 @@ impl<I: IpLayerIpExt, BT: BindingsTypes> LockLevelFor<StackState<BT>>
     type Data = PmtuCache<I, BT>;
 }
 
-impl<I: IpLayerIpExt, BT: BindingsTypes>
-    DelegatedOrderedLockAccess<ForwardingTable<I, DeviceId<BT>>> for StackState<BT>
+impl<I: IpLayerIpExt, BT: BindingsTypes> LockLevelFor<StackState<BT>>
+    for crate::lock_ordering::IpStateRoutingTable<I>
 {
-    type Inner = IpStateInner<I, DeviceId<BT>, BT>;
-    fn delegate_ordered_lock_access(&self) -> &Self::Inner {
-        self.inner_ip_state()
-    }
+    type Data = ForwardingTable<I, DeviceId<BT>>;
 }
 
-impl<I: IpLayerIpExt, BT: BindingsTypes> LockLevelFor<StackState<BT>>
+impl<I: IpLayerIpExt, BT: BindingsTypes> LockLevelFor<ForwardingTableId<I, DeviceId<BT>>>
     for crate::lock_ordering::IpStateRoutingTable<I>
 {
     type Data = ForwardingTable<I, DeviceId<BT>>;
