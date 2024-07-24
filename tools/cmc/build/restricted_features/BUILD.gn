@@ -11,6 +11,7 @@ group("structured_config") {
 group("dictionaries") {
   visibility = [
     "//examples/components/dictionaries/*",
+    "//examples/components/dynamic/*",
     "//src/session/bin/session_manager:*",
     "//src/sys/component_manager/tests/*",
     "//vendor/google/boards/*",
