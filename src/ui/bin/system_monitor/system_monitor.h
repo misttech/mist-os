@@ -20,13 +20,19 @@ class SystemMonitor {
   // This functions uses the iterator to access inspect diagnostic and turn
   // all the json format content into std::string and
   // returns a vector of strings.
-  std::vector<std::string> updateRecentDiagnostic();
+  void UpdateRecentDiagnostic();
+  void PrintRecentDiagnostic();
 
  private:
-  // a vector of strings initialized and returned by updateRecentDiagnostic()
-  std::vector<std::string> recentDiagnostic;
-  // a batchIterator pointer initialized in the class constructor.
-  fuchsia::diagnostics::BatchIteratorSyncPtr iterator;
+  // a vector of strings containing inspect data
+  std::vector<std::string> recent_diagnostics_;
+  // a batchIterator pointer initialized in the UpdateRecentDiagnostic() function.
+  fuchsia::diagnostics::BatchIteratorSyncPtr iterator_;
+  // archiveAccessor pointer initialized in the UpdateRecentDiagnostic() function to get a new batch
+  // of inspect data.
+  fuchsia::diagnostics::ArchiveAccessorSyncPtr accessor_;
+  // streamParameters initialized in the class constructor.
+  fuchsia::diagnostics::StreamParameters params_;
 };
 }  // namespace system_monitor
 
