@@ -5,8 +5,8 @@
 //! Type-safe bindings for Zircon vmar objects.
 
 use crate::{
-    object_get_info_single, ok, sys, AsHandleRef, Handle, HandleBased, HandleRef, Koid, Name,
-    ObjectQuery, Status, Topic, Vmo,
+    object_get_info_single, object_get_info_vec, ok, sys, AsHandleRef, Handle, HandleBased,
+    HandleRef, Koid, Name, ObjectQuery, Status, Topic, Vmo,
 };
 use bitflags::bitflags;
 
@@ -31,6 +31,12 @@ impl From<sys::zx_info_vmar_t> for VmarInfo {
 unsafe impl ObjectQuery for VmarInfo {
     const TOPIC: Topic = Topic::VMAR;
     type InfoTy = VmarInfo;
+}
+
+struct VmarMapsInfo;
+unsafe impl ObjectQuery for VmarMapsInfo {
+    const TOPIC: Topic = Topic::VMAR_MAPS;
+    type InfoTy = crate::sys::zx_info_maps_t;
 }
 
 /// Ergonomic wrapper around `zx_info_maps_t`.
@@ -226,6 +232,20 @@ impl Vmar {
     pub fn info(&self) -> Result<VmarInfo, Status> {
         Ok(object_get_info_single::<VmarInfo>(self.as_handle_ref())?)
     }
+
+    /// Wraps the
+    /// [zx_object_get_info](https://fuchsia.dev/fuchsia-src/reference/syscalls/object_get_info.md)
+    /// syscall for the ZX_INFO_VMAR_MAPS topic.
+    pub fn info_maps_vec(&self) -> Result<Vec<MapInfo>, Status> {
+        object_get_info_vec::<VmarMapsInfo>(self.as_handle_ref())?
+            .into_iter()
+            .map(|i| {
+                // SAFETY: these values were written by the kernel which is the requirement for this
+                // function.
+                unsafe { MapInfo::from_raw(i) }
+            })
+            .collect::<Result<Vec<_>, _>>()
+    }
 }
 
 // TODO(smklein): Ideally we would have two separate sets of bitflags,
@@ -334,5 +354,12 @@ mod tests {
         assert!(info.base > 0);
         assert!(info.len > 0);
         Ok(())
+    }
+
+    #[test]
+    fn root_vmar_maps() {
+        let root_vmar = fuchsia_runtime::vmar_root_self();
+        let info = root_vmar.info_maps_vec().unwrap();
+        assert!(!info.is_empty());
     }
 }
