@@ -12,6 +12,7 @@ use anyhow::{anyhow, Context};
 use async_utils::hanging_get::client::HangingGetStream;
 use fidl::endpoints::create_sync_proxy;
 use fuchsia_component::client::{connect_to_protocol, connect_to_protocol_sync};
+use fuchsia_inspect_contrib::nodes::BoundedListNode;
 use futures::StreamExt;
 use once_cell::sync::OnceCell;
 use rand::distributions::Alphanumeric;
@@ -23,7 +24,7 @@ use starnix_uapi::{errno, error};
 use {
     fidl_fuchsia_power_broker as fbroker, fidl_fuchsia_power_suspend as fsuspend,
     fidl_fuchsia_power_system as fsystem, fidl_fuchsia_session_power as fpower,
-    fuchsia_zircon as zx,
+    fuchsia_inspect as inspect, fuchsia_zircon as zx,
 };
 
 #[derive(Debug)]
@@ -32,6 +33,13 @@ struct PowerElement {
     lessor_proxy: fbroker::LessorSynchronousProxy,
     level_proxy: Option<fbroker::CurrentLevelSynchronousProxy>,
 }
+
+// String keys used for various suspend events.  We should try to keep these
+// keys in sync across binaries.
+const SUSPEND_FAILED_AT: &str = "failed_at_ns";
+const SUSPEND_ATTEMPTED_AT: &str = "attempted_at_ns";
+const SUSPEND_RESUMED_AT: &str = "resumed_at_ns";
+const SUSPEND_REQUESTED_STATE: &str = "requested_power_state";
 
 /// Manager for suspend and resume.
 #[derive(Default)]
@@ -56,6 +64,8 @@ pub struct SuspendResumeManager {
     /// | Suspend-to-RAM    | 1     |
     /// | Suspend-to-Disk   | 0     |
     power_mode: OnceCell<PowerElement>,
+
+    // The mutable state of [SuspendResumeManager].
     inner: Mutex<SuspendResumeManagerInner>,
 }
 pub(super) static STARNIX_POWER_ON_LEVEL: fbroker::PowerLevel = 4;
@@ -92,14 +102,33 @@ impl SuspendWaiter {
 }
 
 /// Manager for suspend and resume.
-#[derive(Default)]
 pub struct SuspendResumeManagerInner {
+    /// The suspend counters and gauges.
     suspend_stats: SuspendStats,
     sync_on_suspend_enabled: bool,
     /// Lease control channel to hold the system power state as active.
     lease_control_channel: Option<zx::Channel>,
 
     suspend_waiter: Option<Arc<SuspendWaiter>>,
+    inspect_node: BoundedListNode,
+}
+
+/// The inspect node ring buffer will keep at most this many entries.
+const INSPECT_RING_BUFFER_CAPACITY: usize = 128;
+
+impl Default for SuspendResumeManagerInner {
+    fn default() -> Self {
+        Self {
+            inspect_node: BoundedListNode::new(
+                inspect::component::inspector().root().create_child("suspend_events"),
+                INSPECT_RING_BUFFER_CAPACITY,
+            ),
+            suspend_stats: Default::default(),
+            sync_on_suspend_enabled: Default::default(),
+            lease_control_channel: Default::default(),
+            suspend_waiter: Default::default(),
+        }
+    }
 }
 
 pub type SuspendResumeManagerHandle = Arc<SuspendResumeManager>;
@@ -278,23 +307,31 @@ impl SuspendResumeManager {
         }
     }
 
+    /// Gets the suspend statistics.
     pub fn suspend_stats(&self) -> SuspendStats {
         self.lock().suspend_stats.clone()
     }
 
+    /// Get the contents of the power "sync_on_suspend" file in the power
+    /// filesystem.  True will cause `1` to be reported, and false will cause
+    /// `0` to be reported.
     pub fn sync_on_suspend_enabled(&self) -> bool {
         self.lock().sync_on_suspend_enabled.clone()
     }
 
+    /// Get the contents of the power "sync_on_suspend" file in the power
+    /// filesystem.  See also [sync_on_suspend_enabled].
     pub fn set_sync_on_suspend(&self, enable: bool) {
         self.lock().sync_on_suspend_enabled = enable;
     }
 
+    /// Returns the supported suspend states.
     pub fn suspend_states(&self) -> HashSet<SuspendState> {
         // TODO(b/326470421): Remove the hardcoded supported state.
         HashSet::from([SuspendState::Ram, SuspendState::Idle])
     }
 
+    /// Sets the power level to `level`.
     pub(super) fn update_power_level(&self, level: fbroker::PowerLevel) -> Result<(), Errno> {
         let power_mode = self.power_mode()?;
         // Before the old lease is dropped, a new lease must be created to transit to the
@@ -350,6 +387,7 @@ impl SuspendResumeManager {
         Ok(())
     }
 
+    /// Notify all waiters of the suspension `result`.
     pub(super) fn notify_suspension(&self, result: SuspendResult) {
         let waiters = std::mem::take(&mut self.lock().suspend_waiter);
         for waiter in waiters.into_iter() {
@@ -361,7 +399,13 @@ impl SuspendResumeManager {
         }
     }
 
+    /// Executed on suspend.
     pub fn suspend(&self, state: SuspendState) -> Result<(), Errno> {
+        self.lock().inspect_node.add_entry(|node| {
+            node.record_int(SUSPEND_ATTEMPTED_AT, zx::Time::get_monotonic().into_nanos());
+            node.record_string(SUSPEND_REQUESTED_STATE, state.to_str());
+        });
+
         let waiter = SuspendWaiter::new();
         let prev = self.lock().suspend_waiter.replace(Arc::clone(&waiter));
         debug_assert!(prev.is_none(), "Should not have concurrent suspend attempts");
@@ -370,6 +414,7 @@ impl SuspendResumeManager {
             self.lock().suspend_waiter.take();
         })?;
 
+        // Starnix will wait here on suspend.
         let suspend_result = waiter.wait();
 
         // Synchronously update the stats after performing suspend so that a later
@@ -381,10 +426,24 @@ impl SuspendResumeManager {
             Err(e) => log_warn!("failed to update stats after suspend: {e:?}"),
         }
 
+        // Use the same "now" for all subsequent stats.
+        let now = zx::Time::get_monotonic();
+
         match suspend_result {
-            SuspendResult::Success => self.wait_for_power_level(STARNIX_POWER_ON_LEVEL),
-            SuspendResult::Failure => error!(EINVAL, format!("failed to suspend")),
+            SuspendResult::Success => self.wait_for_power_level(STARNIX_POWER_ON_LEVEL)?,
+            SuspendResult::Failure => {
+                self.lock().inspect_node.add_entry(|node| {
+                    node.record_int(SUSPEND_FAILED_AT, now.into_nanos());
+                });
+                return error!(EINVAL, format!("failed to suspend at ns: {}", &now.into_nanos()));
+            }
         }
+
+        self.lock().inspect_node.add_entry(|node| {
+            node.record_int(SUSPEND_RESUMED_AT, now.into_nanos());
+        });
+
+        Ok(())
     }
 }
 

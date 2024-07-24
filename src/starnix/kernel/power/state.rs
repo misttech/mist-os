@@ -35,7 +35,7 @@ pub enum SuspendState {
 }
 
 impl SuspendState {
-    fn to_str(&self) -> &'static str {
+    pub fn to_str(&self) -> &'static str {
         match self {
             SuspendState::Disk => "disk",
             SuspendState::Ram => "mem",
