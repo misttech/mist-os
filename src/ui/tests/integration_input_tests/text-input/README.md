@@ -10,7 +10,7 @@ is as follows below:
 
 ```
 fx set core.x64 \
-  --goma --auto-dir \
+  --auto-dir \
   --with=//src/ui/tests/integration_input_tests \
   --with=//src/chromium:web_engine
 ```
