@@ -78,10 +78,6 @@ def generate_db(out_dir):
     db = subprocess.check_output(
         cmd, cwd=FUCHSIA_ROOT, universal_newlines=True)
 
-    # Strip away `gomacc` from the compile commands. This seems to fix problems
-    # with clang-tidy not being able to load system headers.
-    db = re.sub("\"/[\S]+/gomacc ", "\"", db)
-
     with open(os.path.join(out_dir, "compile_commands.json"), "w+") as db_file:
         db_file.write(db)
 
