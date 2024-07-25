@@ -189,13 +189,23 @@ const fha::PcmFormat FakeComposite::kDefaultRbFormat2{{
 // signalprocessing elements and topologies
 //
 // Individual elements
+const std::string FakeComposite::kSourceDaiElementDescription =
+    "DaiInterconnect source element description";
+const std::string FakeComposite::kDestDaiElementDescription =
+    "DaiInterconnect destination element description";
+const std::string FakeComposite::kSourceRbElementDescription =
+    "RingBuffer source element description";
+const std::string FakeComposite::kDestRbElementDescription =
+    "RingBuffer destination element description";
+const std::string FakeComposite::kMuteElementDescription = "Mute element description";
+
 const fhasp::Element FakeComposite::kSourceDaiElement{{
     .id = kSourceDaiElementId,
     .type = fhasp::ElementType::kDaiInterconnect,
     .type_specific = fhasp::TypeSpecificElement::WithDaiInterconnect({{
         .plug_detect_capabilities = fhasp::PlugDetectCapabilities::kCanAsyncNotify,
     }}),
-    .description = "DaiInterconnect source element description",
+    .description = kSourceDaiElementDescription,
     .can_stop = true,
     .can_bypass = false,
 }};
@@ -205,28 +215,28 @@ const fhasp::Element FakeComposite::kDestDaiElement{{
     .type_specific = fhasp::TypeSpecificElement::WithDaiInterconnect({{
         .plug_detect_capabilities = fhasp::PlugDetectCapabilities::kCanAsyncNotify,
     }}),
-    .description = "DaiInterconnect destination element description",
+    .description = kDestDaiElementDescription,
     .can_stop = true,
     .can_bypass = false,
 }};
 const fhasp::Element FakeComposite::kSourceRbElement{{
     .id = kSourceRbElementId,
     .type = fhasp::ElementType::kRingBuffer,
-    .description = "RingBuffer source element description",
+    .description = kSourceRbElementDescription,
     .can_stop = false,
     .can_bypass = false,
 }};
 const fhasp::Element FakeComposite::kDestRbElement{{
     .id = kDestRbElementId,
     .type = fhasp::ElementType::kRingBuffer,
-    .description = "RingBuffer destination element description",
+    .description = kDestRbElementDescription,
     .can_stop = false,
     .can_bypass = false,
 }};
 const fhasp::Element FakeComposite::kMuteElement{{
     .id = kMuteElementId,
     .type = fhasp::ElementType::kMute,
-    .description = "Mute element description",
+    .description = kMuteElementDescription,
     .can_stop = false,
     .can_bypass = true,
 }};

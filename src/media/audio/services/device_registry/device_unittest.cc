@@ -763,12 +763,61 @@ TEST_F(CompositeTest, DeviceInfo) {
 
   ASSERT_TRUE(info.clock_domain().has_value());
   EXPECT_EQ(*info.clock_domain(), FakeComposite::kDefaultClockDomain);
+}
+
+// Verify that a fake composite is initialized to the expected default signalprocessing elements.
+TEST_F(CompositeTest, DeviceInfoSignalProcessingElements) {
+  auto fake_driver = MakeFakeComposite();
+  auto device = InitializeDeviceForFakeComposite(fake_driver);
+  ASSERT_TRUE(device->is_operational());
+  ASSERT_EQ(device_presence_watcher()->ready_devices().size(), 1u);
+  ASSERT_EQ(device_presence_watcher()->on_ready_count(), 1u);
+
+  ASSERT_TRUE(device->info().has_value());
+  auto info = *device->info();
 
   ASSERT_TRUE(info.signal_processing_elements().has_value());
-  EXPECT_FALSE(info.signal_processing_elements()->empty());
+  ASSERT_FALSE(info.signal_processing_elements()->empty());
+  EXPECT_EQ(info.signal_processing_elements()->size(), FakeComposite::kElements.size());
+  ASSERT_TRUE(info.signal_processing_elements()->at(0).id().has_value());
+  EXPECT_EQ(*info.signal_processing_elements()->at(0).id(), FakeComposite::kSourceDaiElementId);
+  ASSERT_TRUE(info.signal_processing_elements()->at(0).type().has_value());
+  EXPECT_EQ(*info.signal_processing_elements()->at(0).type(), fhasp::ElementType::kDaiInterconnect);
+  ASSERT_TRUE(info.signal_processing_elements()->at(0).type_specific().has_value());
+  EXPECT_EQ(*info.signal_processing_elements()->at(0).type_specific(),
+            fhasp::TypeSpecificElement::WithDaiInterconnect({{
+                .plug_detect_capabilities = fhasp::PlugDetectCapabilities::kCanAsyncNotify,
+            }}));
+  ASSERT_TRUE(info.signal_processing_elements()->at(0).description().has_value());
+  EXPECT_EQ(*info.signal_processing_elements()->at(0).description(),
+            FakeComposite::kSourceDaiElementDescription);
+  ASSERT_TRUE(info.signal_processing_elements()->at(0).can_stop().has_value());
+  EXPECT_EQ(*info.signal_processing_elements()->at(0).can_stop(), true);
+  ASSERT_TRUE(info.signal_processing_elements()->at(0).can_bypass().has_value());
+  EXPECT_EQ(*info.signal_processing_elements()->at(0).can_bypass(), false);
+}
+
+// Verify that a fake composite is initialized to the expected default signalprocessing topologies.
+TEST_F(CompositeTest, DeviceInfoSignalProcessingTopologies) {
+  auto fake_driver = MakeFakeComposite();
+  auto device = InitializeDeviceForFakeComposite(fake_driver);
+  ASSERT_TRUE(device->is_operational());
+  ASSERT_EQ(device_presence_watcher()->ready_devices().size(), 1u);
+  ASSERT_EQ(device_presence_watcher()->on_ready_count(), 1u);
+
+  ASSERT_TRUE(device->info().has_value());
+  auto info = *device->info();
 
   ASSERT_TRUE(info.signal_processing_topologies().has_value());
-  EXPECT_FALSE(info.signal_processing_topologies()->empty());
+  ASSERT_FALSE(info.signal_processing_topologies()->empty());
+  EXPECT_EQ(info.signal_processing_topologies()->size(), FakeComposite::kTopologies.size());
+  ASSERT_TRUE(info.signal_processing_topologies()->at(0).id().has_value());
+  EXPECT_EQ(*info.signal_processing_topologies()->at(0).id(), FakeComposite::kInputOnlyTopologyId);
+  ASSERT_TRUE(
+      info.signal_processing_topologies()->at(0).processing_elements_edge_pairs().has_value());
+  EXPECT_THAT(*info.signal_processing_topologies()->at(0).processing_elements_edge_pairs(),
+              testing::ElementsAreArray(
+                  *FakeComposite::kInputOnlyTopology.processing_elements_edge_pairs()));
 }
 
 TEST_F(CompositeTest, DistinctTokenIds) {

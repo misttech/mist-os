@@ -139,8 +139,8 @@ class Device : public std::enable_shared_from_this<Device> {
   // Simple accessors
   // This is the const subset available to device observers.
   //
-  inline bool has_error() const { return (state_ == State::Error); }
-  inline bool is_operational() const { return (state_ == State::Initialized); }
+  bool has_error() const { return (state_ == State::Error); }
+  bool is_operational() const { return (state_ == State::Initialized); }
   fuchsia_audio_device::DeviceType device_type() const { return device_type_; }
   bool is_codec() const { return (device_type_ == fuchsia_audio_device::DeviceType::kCodec); }
   bool is_composite() const {
@@ -214,9 +214,9 @@ class Device : public std::enable_shared_from_this<Device> {
   void SetSignalProcessingSupported(bool is_supported);
 
   // Static object counts, for debugging purposes.
-  static inline uint64_t count() { return count_; }
-  static inline uint64_t initialized_count() { return initialized_count_; }
-  static inline uint64_t unhealthy_count() { return unhealthy_count_; }
+  static uint64_t count() { return count_; }
+  static uint64_t initialized_count() { return initialized_count_; }
+  static uint64_t unhealthy_count() { return unhealthy_count_; }
 
  private:
   friend class DeviceTestBase;
@@ -278,17 +278,19 @@ class Device : public std::enable_shared_from_this<Device> {
 
   void CreateDeviceClock();
 
-  void RetrieveSignalProcessingTopologies();
-  void RetrieveSignalProcessingElements();
-  void RetrieveCurrentTopology();
-  void RetrieveCurrentElementStates();
-  void RetrieveElementState(ElementId element_id);
-
   void SetHealthState(std::optional<bool> is_healthy);
 
   void SetPlugState(
       const fuchsia_hardware_audio::PlugState& plug_state,
       std::optional<fuchsia_hardware_audio::PlugDetectCapabilities> plug_detect_capabilities);
+
+  void RetrieveSignalProcessingTopologies();
+  void RetrieveSignalProcessingElements();
+  void OnSignalProcessingInitializationResponse();
+
+  void RetrieveSignalProcessingTopology();
+  void RetrieveSignalProcessingElementStates();
+  void RetrieveSignalProcessingElementState(ElementId element_id);
 
   // Device-type specific methods used during initialization
   void RetrieveCodecProperties();

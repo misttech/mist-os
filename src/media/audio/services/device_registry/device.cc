@@ -190,9 +190,9 @@ Device::~Device() {
 // If this is the first time this is called, then call `OnInitializationResponse` to unblock the
 // signalprocessing-related aspect of the "wait for multiple responses" state machine.
 void Device::SetSignalProcessingSupported(bool is_supported) {
-  ADR_LOG_METHOD(kLogSignalProcessingFidlResponses);
-  auto first_set_of_signalprocessing_support = !supports_signalprocessing_.has_value();
+  ADR_LOG_METHOD(kLogSignalProcessingState);
 
+  auto first_set_of_signalprocessing_support = !supports_signalprocessing_.has_value();
   supports_signalprocessing_ = is_supported;
 
   // Only poke the initialization state machine the FIRST time this is called.
@@ -847,86 +847,8 @@ void Device::SetHealthState(std::optional<bool> is_healthy) {
   }
 }
 
-void Device::RetrieveStreamRingBufferFormatSets() {
-  ADR_LOG_METHOD(kLogStreamConfigFidlCalls);
-
-  RetrieveRingBufferFormatSets(
-      fad::kDefaultRingBufferElementId,
-      [this](ElementId element_id,
-             const std::vector<fha::SupportedFormats>& ring_buffer_format_sets) {
-        if (has_error()) {
-          ADR_WARN_OBJECT() << "device has an error while retrieving initial RingBuffer formats";
-          return;
-        }
-
-        // Required for StreamConfig and Dai, absent for Codec and Composite.
-        auto translated_ring_buffer_format_sets =
-            TranslateRingBufferFormatSets(ring_buffer_format_sets);
-        if (translated_ring_buffer_format_sets.empty()) {
-          ADR_WARN_OBJECT() << "RingBuffer format sets could not be translated";
-          OnError(ZX_ERR_INVALID_ARGS);
-          return;
-        };
-        element_driver_ring_buffer_format_sets_ = {{
-            {
-                element_id,
-                ring_buffer_format_sets,
-            },
-        }};
-        element_ring_buffer_format_sets_ = {{
-            fad::ElementRingBufferFormatSet{{
-                .element_id = element_id,
-                .format_sets = translated_ring_buffer_format_sets,
-            }},
-        }};
-        ring_buffer_format_sets_retrieved_ = true;
-        OnInitializationResponse();
-      });
-}
-
-void Device::RetrieveRingBufferFormatSets(
-    ElementId element_id, fit::callback<void(ElementId, const std::vector<fha::SupportedFormats>&)>
-                              ring_buffer_format_sets_callback) {
-  if (has_error()) {
-    ADR_WARN_METHOD() << "device already has an error";
-    // We need not invoke ring_buffer_format_sets_callback: this device is in the process of being
-    // unwound. The client has already received a HasError notification for this device.
-    return;
-  }
-  ADR_LOG_METHOD(kLogStreamConfigFidlCalls || kLogRingBufferMethods);
-
-  // TODO(https://fxbug.dev/42064765): handle command timeouts
-
-  if (element_id != fad::kDefaultRingBufferElementId) {
-    OnError(ZX_ERR_INVALID_ARGS);
-    // We need not invoke the callback: this device is in the process of being unwound.
-    return;
-  }
-  ring_buffer_ids_.insert(fad::kDefaultRingBufferElementId);
-
-  (*stream_config_client_)
-      ->GetSupportedFormats()
-      .Then([this, element_id, rb_formats_callback = std::move(ring_buffer_format_sets_callback)](
-                fidl::Result<fha::StreamConfig::GetSupportedFormats>& result) mutable {
-        if (LogResultFrameworkError(result, "GetSupportedFormats response")) {
-          // We need not invoke the callback: this device is in the process of being unwound.
-          return;
-        }
-        ADR_LOG_OBJECT(kLogStreamConfigFidlResponses)
-            << "StreamConfig/GetSupportedFormats: success";
-
-        if (!ValidateRingBufferFormatSets(result->supported_formats())) {
-          OnError(ZX_ERR_INVALID_ARGS);
-          // We need not invoke the callback: this device is in the process of being unwound.
-          return;
-        }
-
-        rb_formats_callback(element_id, result->supported_formats());
-      });
-}
-
 void Device::RetrieveSignalProcessingState() {
-  ADR_LOG_METHOD(kLogDeviceMethods);
+  ADR_LOG_METHOD(kLogDeviceMethods || kLogSignalProcessingState);
 
   if (has_error()) {
     ADR_WARN_METHOD() << "device already has an error";
@@ -1003,16 +925,31 @@ void Device::RetrieveSignalProcessingState() {
   sig_proc_client_->Bind(std::move(sig_proc_client_end), dispatcher_, &sig_proc_handler_);
 
   RetrieveSignalProcessingElements();
+  RetrieveSignalProcessingTopologies();
 }
 
 void Device::RetrieveSignalProcessingElements() {
+  // Must be false -- THIS is what leads to supports_signalprocessing being set.
+  if (supports_signalprocessing()) {
+    ADR_WARN_METHOD() << "unexpected signalprocessing query (already supported)";
+    return;
+  }
+
   if (has_error()) {
     ADR_WARN_METHOD() << "device already has an error";
     return;
   }
-  FX_CHECK(!is_operational());  // This is part of the initialization process
+
+  // Another signalprocessing query (retrieve topologies) must have returned NOT_SUPPORTED.
+  if (checked_for_signalprocessing()) {
+    ADR_LOG_METHOD(kLogSignalProcessingState)
+        << "ignoring signalprocessing query (already checked)";
+    return;
+  }
+  FX_CHECK(!is_operational());  // This is part of initialization; we shouldn't be operational yet.
   ADR_LOG_METHOD(kLogSignalProcessingFidlCalls);
 
+  FX_CHECK(sig_proc_client_->is_valid());
   (*sig_proc_client_)
       ->GetElements()
       .Then([this](fidl::Result<fhasp::SignalProcessing::GetElements>& result) {
@@ -1044,9 +981,15 @@ void Device::RetrieveSignalProcessingElements() {
         for (const auto& [element_id, _] : sig_proc_element_map_) {
           element_ids_.insert(element_id);
         }
-        RetrieveSignalProcessingTopologies();
+        OnSignalProcessingInitializationResponse();
+
+        // Now that we know we support signalprocessing, query the current element states.
+        // These initial states are not required for our DeviceInfo struct; the queries can
+        // complete after we mark the device as operational and make it available to clients.
+        RetrieveSignalProcessingElementStates();
 
         if (is_composite()) {
+          // Now that we know our element IDs, we can query the DAI and RingBuffer elements.
           RetrieveCompositeDaiFormatSets();
           RetrieveCompositeRingBufferFormatSets();
         }
@@ -1054,14 +997,27 @@ void Device::RetrieveSignalProcessingElements() {
 }
 
 void Device::RetrieveSignalProcessingTopologies() {
-  if (has_error() || (checked_for_signalprocessing() && !supports_signalprocessing())) {
+  // Must be false -- THIS is what leads to supports_signalprocessing being set.
+  if (supports_signalprocessing()) {
+    ADR_WARN_METHOD() << "unexpected signalprocessing query (already supported)";
+    return;
+  }
+
+  if (has_error()) {
     ADR_WARN_METHOD() << "device already has an error";
     return;
   }
-  FX_CHECK(!is_operational());  // This is part of the initialization process
-  ADR_LOG_METHOD(kLogSignalProcessingFidlCalls);
-  FX_DCHECK(sig_proc_client_->is_valid());
 
+  // Another signalprocessing query (retrieve elements) must have returned NOT_SUPPORTED.
+  if (checked_for_signalprocessing()) {
+    ADR_LOG_METHOD(kLogSignalProcessingState)
+        << "ignoring signalprocessing query (already checked)";
+    return;
+  }
+  FX_CHECK(!is_operational());  // This is part of initialization; we shouldn't be operational yet.
+  ADR_LOG_METHOD(kLogSignalProcessingFidlCalls);
+
+  FX_CHECK(sig_proc_client_->is_valid());
   (*sig_proc_client_)
       ->GetTopologies()
       .Then([this](fidl::Result<fhasp::SignalProcessing::GetTopologies>& result) {
@@ -1091,23 +1047,186 @@ void Device::RetrieveSignalProcessingTopologies() {
         for (const auto& [topology_id, _] : sig_proc_topology_map_) {
           topology_ids_.insert(topology_id);
         }
+        OnSignalProcessingInitializationResponse();
 
-        SetSignalProcessingSupported(true);
-
-        // Now we know we support signalprocessing: query the current topology/element states.
-        RetrieveCurrentTopology();
-        RetrieveCurrentElementStates();
+        // Now that we know we support signalprocessing, query the current topology.
+        // The initial topology is not required for our DeviceInfo struct; the query can complete
+        // after we mark the device as operational and make it available to clients.
+        RetrieveSignalProcessingTopology();
       });
 }
 
-void Device::RetrieveCurrentTopology() {
+// An initial signalprocessing query returned successfully. Is initialization complete?
+void Device::OnSignalProcessingInitializationResponse() {
+  if (has_error()) {
+    ADR_WARN_METHOD() << "device has already encountered a problem; ignoring this";
+    return;
+  }
+
+  if (checked_for_signalprocessing()) {
+    ADR_WARN_METHOD() << "unexpected signalprocessing query response (already checked)";
+    return;
+  }
+
+  if (is_operational()) {
+    ADR_WARN_METHOD() << "unexpected signalprocessing query response (not Initializing)";
+  }
+  ADR_LOG_METHOD(kLogSignalProcessingState);
+
+  if (!sig_proc_element_map_.empty() && !sig_proc_topology_map_.empty()) {
+    SetSignalProcessingSupported(true);
+    OnInitializationResponse();
+  }
+}
+
+// We support signalprocessing; we know our element list. For each, retrieve its initial state.
+void Device::RetrieveSignalProcessingElementStates() {
+  // We know that `GetElements` completed successfully but `GetTopologies` might still be pending.
+  // Only fail/exit if it DID complete and told us that we do NOT support signalprocessing.
+  if (checked_for_signalprocessing() && !supports_signalprocessing()) {
+    ADR_WARN_METHOD() << "device does not support signalprocessing";
+    return;
+  }
+
   if (has_error()) {
     ADR_WARN_METHOD() << "device already has an error";
     return;
   }
-  ADR_LOG_METHOD(kLogSignalProcessingFidlCalls);
-  FX_DCHECK(sig_proc_client_->is_valid());
 
+  // Although this is one of the initial driver queries, it is not a prerequisite for transitioning
+  // the Device from Initializing to Initialized. So don't check is_operational() here.
+  ADR_LOG_METHOD(kLogSignalProcessingState);
+
+  // `RetrieveSignalProcessingElements` has completed successfully, so we have the info needed for
+  // the DeviceInfo struct. We need not wait for these WatchElementState calls complete: if a client
+  // retrieves ElementState, it will simply pend until this underlying Device retrieval completes.
+  for (auto& [element_id, _] : sig_proc_element_map_) {
+    RetrieveSignalProcessingElementState(element_id);
+  }
+}
+
+void Device::RetrieveSignalProcessingElementState(ElementId element_id) {
+  auto element_match = sig_proc_element_map_.find(element_id);
+  FX_CHECK(element_match != sig_proc_element_map_.end());
+  auto& element = element_match->second.element;
+
+  // Although this is one of the initial driver queries, it is not a prerequisite for transitioning
+  // the Device from Initializing to Initialized. Furthermore it can be called after initialization.
+  // So don't check is_operational() here.
+  ADR_LOG_METHOD(kLogSignalProcessingFidlCalls);
+
+  FX_CHECK(sig_proc_client_->is_valid());
+  (*sig_proc_client_)
+      ->WatchElementState({element_id})
+      .Then([this, element_id,
+             element](fidl::Result<fhasp::SignalProcessing::WatchElementState>& result) {
+        std::string context("signalprocessing::WatchElementState response: element_id ");
+        context.append(std::to_string(element_id));
+        if (LogResultFrameworkError(result, context.c_str())) {
+          return;
+        }
+        ADR_LOG_OBJECT(kLogSignalProcessingFidlResponses) << context;
+
+        auto element_state = result->state();
+        if (!ValidateElementState(element_state, element)) {
+          // Either (a) sig_proc_topology_map_.at(element_id).element is incorrect,
+          //     or (b) the driver is behaving incorrectly.
+          FX_LOGS(ERROR) << context << ": not found";
+          OnError(ZX_ERR_INVALID_ARGS);
+          return;
+        }
+
+        // Save the state and notify Observers, but only if this is a change in element state.
+        auto element_record = sig_proc_element_map_.find(*element.id());
+        if (element_record->second.state.has_value() &&
+            *element_record->second.state == element_state) {
+          ADR_LOG_OBJECT(kLogNotifyMethods)
+              << "Not sending ElementStateIsChanged: state is unchanged.";
+        } else {
+          element_record->second.state = element_state;
+          // Notify any Observers of this change in element state.
+          ADR_LOG_OBJECT(kLogNotifyMethods)
+              << "ForEachObserver => ElementStateIsChanged(" << element_id << ")";
+          ForEachObserver([element_id, element_state](auto obs) {
+            obs->ElementStateIsChanged(element_id, element_state);
+          });
+        }
+
+        // Register for any future change in element state, whether this was a change or not.
+        RetrieveSignalProcessingElementState(element_id);
+      });
+}
+
+// If the method does not return ZX_OK, then the driver was not called.
+zx_status_t Device::SetElementState(ElementId element_id,
+                                    const fhasp::SettableElementState& element_state) {
+  if (!GetControlNotify()) {
+    ADR_WARN_METHOD() << "Device must be controlled before this method can be called";
+    return ZX_ERR_ACCESS_DENIED;
+  }
+
+  if (!supports_signalprocessing()) {
+    ADR_WARN_METHOD() << "device does not support signalprocessing";
+    return ZX_ERR_NOT_SUPPORTED;
+  }
+
+  if (has_error()) {
+    ADR_WARN_METHOD() << "device already has an error";
+    return ZX_ERR_IO;
+  }
+  FX_CHECK(is_operational());
+
+  if (sig_proc_element_map_.find(element_id) == sig_proc_element_map_.end()) {
+    ADR_WARN_METHOD() << "invalid element_id " << element_id;
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  if (!ValidateSettableElementState(element_state, sig_proc_element_map_.at(element_id).element)) {
+    ADR_WARN_METHOD() << "invalid ElementState for element_id " << element_id;
+    return ZX_ERR_INVALID_ARGS;
+  }
+  ADR_LOG_METHOD(kLogSignalProcessingFidlCalls);
+
+  // We don't check/prevent "no-change" here, since sig_proc_element_map_ may not reflect in-flight
+  // updates. We update sig_proc_element_map_ and call ObserverNotify::ElementStateIsChanged (or
+  // not, if no change) at only one place: the WatchElementState response handler.
+
+  FX_CHECK(sig_proc_client_->is_valid());
+  (*sig_proc_client_)
+      ->SetElementState({element_id, element_state})
+      .Then([this, element_id](fidl::Result<fhasp::SignalProcessing::SetElementState>& result) {
+        std::string context("SigProc::SetElementState response: element_id ");
+        context.append(std::to_string(element_id));
+        if (LogResultError(result, context.c_str())) {
+          return;
+        }
+
+        ADR_LOG_OBJECT(kLogSignalProcessingFidlResponses) << context;
+        // Our hanging WatchElementState call will complete now, updating our cached state and
+        // calling ObserverNotify::ElementStateIsChanged (or not, if no change).
+      });
+
+  return ZX_OK;
+}
+
+void Device::RetrieveSignalProcessingTopology() {
+  // We know that `GetTopologies` completed successfully but `GetElements` might still be pending.
+  // Only fail/exit if it DID complete and told us that we do NOT support signalprocessing.
+  if (checked_for_signalprocessing() && !supports_signalprocessing()) {
+    ADR_WARN_METHOD() << "device does not support signalprocessing";
+    return;
+  }
+
+  if (has_error()) {
+    ADR_WARN_METHOD() << "device already has an error";
+    return;
+  }
+  // Although this is one of the initial driver queries, it is not a prerequisite for transitioning
+  // the Device from Initializing to Initialized. Furthermore it can be called after initialization.
+  // So don't check is_operational() here.
+  ADR_LOG_METHOD(kLogSignalProcessingFidlCalls);
+
+  FX_CHECK(sig_proc_client_->is_valid());
   (*sig_proc_client_)
       ->WatchTopology()
       .Then([this](fidl::Result<fhasp::SignalProcessing::WatchTopology>& result) {
@@ -1135,67 +1254,7 @@ void Device::RetrieveCurrentTopology() {
         }
 
         // Register for any future change in topology, whether this was a change or not.
-        RetrieveCurrentTopology();
-      });
-}
-
-void Device::RetrieveCurrentElementStates() {
-  if (has_error()) {
-    ADR_WARN_METHOD() << "device already has an error";
-    return;
-  }
-  FX_CHECK(!is_operational());  // This is part of the initialization process
-  ADR_LOG_METHOD(kLogSignalProcessingFidlCalls);
-  FX_DCHECK(sig_proc_client_->is_valid());
-
-  for (auto& [element_id, _] : sig_proc_element_map_) {
-    RetrieveElementState(element_id);
-  }
-}
-
-void Device::RetrieveElementState(ElementId element_id) {
-  auto element_match = sig_proc_element_map_.find(element_id);
-  FX_CHECK(element_match != sig_proc_element_map_.end());
-  auto& element = element_match->second.element;
-
-  (*sig_proc_client_)
-      ->WatchElementState({element_id})
-      .Then([this, element_id,
-             element](fidl::Result<fhasp::SignalProcessing::WatchElementState>& result) {
-        std::string context("signalprocessing::WatchElementState response: element_id ");
-        context.append(std::to_string(element_id));
-        if (LogResultFrameworkError(result, context.c_str())) {
-          return;
-        }
-        ADR_LOG_OBJECT(kLogSignalProcessingFidlResponses) << context;
-
-        // Either (a) sig_proc_topology_map_.at(element_id).element is incorrect, or (b) the driver
-        // is behaving incorrectly.
-        auto element_state = result->state();
-        if (!ValidateElementState(element_state, element)) {
-          FX_LOGS(ERROR) << context << ": not found";
-          OnError(ZX_ERR_INVALID_ARGS);
-          return;
-        }
-
-        // Save the state and notify Observers, but only if this is a change in element state.
-        auto element_record = sig_proc_element_map_.find(*element.id());
-        if (element_record->second.state.has_value() &&
-            *element_record->second.state == element_state) {
-          ADR_LOG_OBJECT(kLogNotifyMethods)
-              << "Not sending ElementStateIsChanged: state is unchanged.";
-        } else {
-          element_record->second.state = element_state;
-          // Notify any Observers of this change in element state.
-          ADR_LOG_OBJECT(kLogNotifyMethods)
-              << "ForEachObserver => ElementStateIsChanged(" << element_id << ")";
-          ForEachObserver([element_id, element_state](auto obs) {
-            obs->ElementStateIsChanged(element_id, element_state);
-          });
-        }
-
-        // Register for any future change in element state, whether this was a change or not.
-        RetrieveElementState(element_id);
+        RetrieveSignalProcessingTopology();
       });
 }
 
@@ -1222,12 +1281,12 @@ zx_status_t Device::SetTopology(uint64_t topology_id) {
     return ZX_ERR_INVALID_ARGS;
   }
   ADR_LOG_METHOD(kLogSignalProcessingFidlCalls);
-  FX_DCHECK(sig_proc_client_->is_valid());
 
   // We don't check/prevent "no-change" here, since current_topology_id_ may not reflect in-flight
   // updates. We update current_topology_id_ and call ObserverNotify::TopologyIsChanged (or
   // not, if no change) at only one place: the WatchTopology response handler.
 
+  FX_CHECK(sig_proc_client_->is_valid());
   (*sig_proc_client_)
       ->SetTopology(topology_id)
       .Then([this, topology_id](fidl::Result<fhasp::SignalProcessing::SetTopology>& result) {
@@ -1238,63 +1297,89 @@ zx_status_t Device::SetTopology(uint64_t topology_id) {
         }
 
         ADR_LOG_OBJECT(kLogSignalProcessingFidlResponses) << context;
-        // Our hanging WatchTopology call will complete now, updating topology_id_ and calling
-        // ObserverNotify::TopologyIsChanged (or not, if no change).
+        // Our hanging WatchTopology will complete, IF this changes the topology. That completer
+        // (not this one) updates topology_id_ and calls ObserverNotify::TopologyIsChanged.
       });
 
   return ZX_OK;
 }
 
-// If the method does not return ZX_OK, then the driver was not called.
-zx_status_t Device::SetElementState(ElementId element_id,
-                                    const fhasp::SettableElementState& element_state) {
-  if (!GetControlNotify()) {
-    ADR_WARN_METHOD() << "Device must be controlled before this method can be called";
-    return ZX_ERR_ACCESS_DENIED;
-  }
+void Device::RetrieveStreamRingBufferFormatSets() {
+  ADR_LOG_METHOD(kLogStreamConfigFidlCalls);
 
-  if (!supports_signalprocessing()) {
-    ADR_WARN_METHOD() << "device does not support signalprocessing";
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-
-  if (has_error()) {
-    ADR_WARN_METHOD() << "device already has an error";
-    return ZX_ERR_IO;
-  }
-  FX_CHECK(is_operational());
-
-  FX_DCHECK(sig_proc_client_->is_valid());
-  if (sig_proc_element_map_.find(element_id) == sig_proc_element_map_.end()) {
-    ADR_WARN_METHOD() << "invalid element_id " << element_id;
-    return ZX_ERR_INVALID_ARGS;
-  }
-
-  if (!ValidateSettableElementState(element_state, sig_proc_element_map_.at(element_id).element)) {
-    ADR_WARN_METHOD() << "invalid ElementState for element_id " << element_id;
-    return ZX_ERR_INVALID_ARGS;
-  }
-  ADR_LOG_METHOD(kLogSignalProcessingFidlCalls);
-
-  // We don't check/prevent "no-change" here, since sig_proc_element_map_ may not reflect in-flight
-  // updates. We update sig_proc_element_map_ and call ObserverNotify::ElementStateIsChanged (or
-  // not, if no change) at only one place: the WatchElementState response handler.
-
-  (*sig_proc_client_)
-      ->SetElementState({element_id, element_state})
-      .Then([this, element_id](fidl::Result<fhasp::SignalProcessing::SetElementState>& result) {
-        std::string context("SigProc::SetElementState response: element_id ");
-        context.append(std::to_string(element_id));
-        if (LogResultError(result, context.c_str())) {
+  RetrieveRingBufferFormatSets(
+      fad::kDefaultRingBufferElementId,
+      [this](ElementId element_id,
+             const std::vector<fha::SupportedFormats>& ring_buffer_format_sets) {
+        if (has_error()) {
+          ADR_WARN_OBJECT() << "device has an error while retrieving initial RingBuffer formats";
           return;
         }
 
-        ADR_LOG_OBJECT(kLogSignalProcessingFidlResponses) << context;
-        // Our hanging WatchElementState call will complete now, updating our cached state and
-        // calling ObserverNotify::ElementStateIsChanged (or not, if no change).
+        // Required for StreamConfig and Dai, absent for Codec and Composite.
+        auto translated_ring_buffer_format_sets =
+            TranslateRingBufferFormatSets(ring_buffer_format_sets);
+        if (translated_ring_buffer_format_sets.empty()) {
+          ADR_WARN_OBJECT() << "RingBuffer format sets could not be translated";
+          OnError(ZX_ERR_INVALID_ARGS);
+          return;
+        };
+        element_driver_ring_buffer_format_sets_ = {{
+            {
+                element_id,
+                ring_buffer_format_sets,
+            },
+        }};
+        element_ring_buffer_format_sets_ = {{
+            fad::ElementRingBufferFormatSet{{
+                .element_id = element_id,
+                .format_sets = translated_ring_buffer_format_sets,
+            }},
+        }};
+        ring_buffer_format_sets_retrieved_ = true;
+        OnInitializationResponse();
       });
+}
 
-  return ZX_OK;
+void Device::RetrieveRingBufferFormatSets(
+    ElementId element_id, fit::callback<void(ElementId, const std::vector<fha::SupportedFormats>&)>
+                              ring_buffer_format_sets_callback) {
+  if (has_error()) {
+    ADR_WARN_METHOD() << "device already has an error";
+    // We need not invoke ring_buffer_format_sets_callback: this device is in the process of being
+    // unwound. The client has already received a HasError notification for this device.
+    return;
+  }
+  ADR_LOG_METHOD(kLogStreamConfigFidlCalls || kLogRingBufferMethods);
+
+  // TODO(https://fxbug.dev/42064765): handle command timeouts
+
+  if (element_id != fad::kDefaultRingBufferElementId) {
+    OnError(ZX_ERR_INVALID_ARGS);
+    // We need not invoke the callback: this device is in the process of being unwound.
+    return;
+  }
+  ring_buffer_ids_.insert(fad::kDefaultRingBufferElementId);
+
+  (*stream_config_client_)
+      ->GetSupportedFormats()
+      .Then([this, element_id, rb_formats_callback = std::move(ring_buffer_format_sets_callback)](
+                fidl::Result<fha::StreamConfig::GetSupportedFormats>& result) mutable {
+        if (LogResultFrameworkError(result, "GetSupportedFormats response")) {
+          // We need not invoke the callback: this device is in the process of being unwound.
+          return;
+        }
+        ADR_LOG_OBJECT(kLogStreamConfigFidlResponses)
+            << "StreamConfig/GetSupportedFormats: success";
+
+        if (!ValidateRingBufferFormatSets(result->supported_formats())) {
+          OnError(ZX_ERR_INVALID_ARGS);
+          // We need not invoke the callback: this device is in the process of being unwound.
+          return;
+        }
+
+        rb_formats_callback(element_id, result->supported_formats());
+      });
 }
 
 void Device::RetrieveCodecDaiFormatSets() {

@@ -159,6 +159,12 @@ class FakeComposite
   static constexpr ElementId kMinElementId = kSourceDaiElementId;
   static constexpr ElementId kMaxElementId = kMuteElementId;
 
+  static const std::string kSourceDaiElementDescription;
+  static const std::string kDestDaiElementDescription;
+  static const std::string kSourceRbElementDescription;
+  static const std::string kDestRbElementDescription;
+  static const std::string kMuteElementDescription;
+
   static const fuchsia_hardware_audio_signalprocessing::Element kSourceDaiElement;
   static const fuchsia_hardware_audio_signalprocessing::Element kDestRbElement;
   static const fuchsia_hardware_audio_signalprocessing::Element kSourceRbElement;
