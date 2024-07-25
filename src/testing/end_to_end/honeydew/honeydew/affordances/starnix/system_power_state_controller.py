@@ -296,7 +296,7 @@ class SystemPowerStateController(
             self._run_starnix_console_shell_cmd(
                 cmd=_StarnixCmds.IDLE_SUSPEND,
             )
-        except Exception as err:  # pylint: disable=broad-except
+        except errors.HoneydewError as err:
             raise errors.SystemPowerStateControllerError(
                 f"Failed to put {self._device_name} into idle-suspend mode"
             ) from err
@@ -490,7 +490,7 @@ class SystemPowerStateController(
             try:
                 board = self._ffx.get_target_board()
                 product = self._ffx.get_target_product()
-            except Exception:  # pylint: disable=broad-except
+            except errors.HoneydewError:
                 pass
             error_msg: str
             if board and product:

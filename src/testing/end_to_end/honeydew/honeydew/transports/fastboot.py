@@ -164,8 +164,7 @@ class Fastboot(fastboot_interface.Fastboot):
             self.wait_for_fuchsia_mode()
             self._reboot_affordance.wait_for_online()
             self._reboot_affordance.on_device_boot()
-
-        except Exception as err:  # pylint: disable=broad-except
+        except errors.HoneydewError as err:
             raise errors.FuchsiaDeviceError(
                 f"Failed to reboot {self._device_name} to fuchsia mode from "
                 f"fastboot mode"
@@ -285,7 +284,7 @@ class Fastboot(fastboot_interface.Fastboot):
                 # self._fastboot_node_id need to be populated
                 self.boot_to_fuchsia_mode()
                 return
-        except Exception as err:  # pylint: disable=broad-except
+        except errors.HoneydewError as err:
             raise errors.FuchsiaDeviceError(
                 f"Failed to get the fastboot node id of '{self._device_name}'"
             ) from err

@@ -89,10 +89,11 @@ def _execute_test(
                 )
                 proc.terminate()
                 try:
-                    proc.wait(timeout=3)
+                    proc.wait(timeout=5)
                 except subprocess.TimeoutExpired:
                     print(
-                        "[Mobly Driver] - After terminating the mobly test, it timed out after 3 seconds"
+                        "[Mobly Driver] - After terminating the mobly test, "
+                        "it is still running even after waiting for 5 seconds"
                     )
                     pass
                 driver.teardown()

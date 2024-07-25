@@ -375,7 +375,7 @@ class SystemPowerStateControllerStarnixTests(unittest.TestCase):
     @mock.patch.object(
         starnix_system_power_state_controller.SystemPowerStateController,
         "_run_starnix_console_shell_cmd",
-        side_effect=RuntimeError("Error"),
+        side_effect=errors.StarnixError("Error"),
         autospec=True,
     )
     def test_perform_idle_suspend_failure(

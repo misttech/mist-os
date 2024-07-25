@@ -7,6 +7,7 @@
 import json
 import logging
 import time
+import urllib.error
 import urllib.request
 from collections.abc import Iterable
 from typing import Any
@@ -45,8 +46,8 @@ def send_http_request(
             default, timeout is not set.
         attempts: number of attempts to try in case of a failure.
         interval: wait time in sec before each retry in case of a failure.
-        exceptions_to_skip: Any non fatal exceptions for which retry will not be
-            attempted.
+        exceptions_to_skip: Any non fatal HTTP exceptions for which retry will
+            not be attempted.
     Returns:
         Returns the HTTP response received after converting into a dict.
 
@@ -83,8 +84,11 @@ def send_http_request(
             _LOGGER.debug(
                 "HTTP response received from url=%s is '%s'", url, response_body
             )
-            return json.loads(response_body)  # Revealed type is 'Any'
-        except Exception as err:  # pylint: disable=broad-except
+            return json.loads(response_body)
+        except (
+            ConnectionError,
+            urllib.error.URLError,
+        ) as err:
             for exception_to_skip in exceptions_to_skip:
                 if isinstance(err, exception_to_skip):
                     return {}

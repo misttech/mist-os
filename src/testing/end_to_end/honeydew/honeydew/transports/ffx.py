@@ -312,7 +312,7 @@ class FFX(ffx_interface.FFX):
         """
         try:
             self.wait_for_rcs_connection()
-        except Exception as err:  # pylint: disable=broad-except
+        except errors.HoneydewError as err:
             raise errors.FfxConnectionError(
                 f"FFX connection check failed for {self._target_name} with err: {err}"
             ) from err

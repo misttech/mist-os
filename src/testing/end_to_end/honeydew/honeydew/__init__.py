@@ -69,7 +69,7 @@ def create_device(
                 ffx_config,
                 device_ip_port,
             )
-    except Exception as err:
+    except errors.HoneydewError as err:
         raise errors.FuchsiaDeviceError(
             f"Failed to create device for '{device_name}': {err}"
         ) from err

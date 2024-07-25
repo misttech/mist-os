@@ -153,7 +153,7 @@ class HttpUtilsTests(unittest.TestCase):
     @mock.patch.object(
         urllib.request,
         "urlopen",
-        side_effect=RuntimeError("some run time error"),
+        side_effect=ConnectionError("some run time error"),
         autospec=True,
     )
     def test_send_http_request_fail_because_of_exception(
