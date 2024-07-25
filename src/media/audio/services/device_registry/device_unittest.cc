@@ -274,15 +274,15 @@ TEST_F(CodecTest, GetDaiFormats) {
 
   bool received_get_dai_formats_callback = false;
   std::vector<fha::DaiSupportedFormats> dai_formats;
-  device->RetrieveDaiFormatSets(
-      dai_id(), [&received_get_dai_formats_callback, &dai_formats](
-                    ElementId element_id, const std::vector<fha::DaiSupportedFormats>& formats) {
-        EXPECT_EQ(element_id, fad::kDefaultDaiInterconnectElementId);
-        received_get_dai_formats_callback = true;
-        for (auto& dai_format_set : formats) {
-          dai_formats.push_back(dai_format_set);
-        }
-      });
+  GetDaiFormatSets(device, dai_id(),
+                   [&received_get_dai_formats_callback, &dai_formats](
+                       ElementId element_id, const std::vector<fha::DaiSupportedFormats>& formats) {
+                     EXPECT_EQ(element_id, fad::kDefaultDaiInterconnectElementId);
+                     received_get_dai_formats_callback = true;
+                     for (auto& dai_format_set : formats) {
+                       dai_formats.push_back(dai_format_set);
+                     }
+                   });
 
   RunLoopUntilIdle();
   ASSERT_TRUE(received_get_dai_formats_callback);
@@ -305,15 +305,15 @@ TEST_F(CodecTest, SetDaiFormat) {
 
   bool received_get_dai_formats_callback = false;
   std::vector<fha::DaiSupportedFormats> dai_formats;
-  device->RetrieveDaiFormatSets(
-      dai_id(), [&received_get_dai_formats_callback, &dai_formats](
-                    ElementId element_id, const std::vector<fha::DaiSupportedFormats>& formats) {
-        EXPECT_EQ(element_id, fad::kDefaultDaiInterconnectElementId);
-        received_get_dai_formats_callback = true;
-        for (auto& dai_format_set : formats) {
-          dai_formats.push_back(dai_format_set);
-        }
-      });
+  GetDaiFormatSets(device, dai_id(),
+                   [&received_get_dai_formats_callback, &dai_formats](
+                       ElementId element_id, const std::vector<fha::DaiSupportedFormats>& formats) {
+                     EXPECT_EQ(element_id, fad::kDefaultDaiInterconnectElementId);
+                     received_get_dai_formats_callback = true;
+                     for (auto& dai_format_set : formats) {
+                       dai_formats.push_back(dai_format_set);
+                     }
+                   });
   RunLoopUntilIdle();
   ASSERT_TRUE(received_get_dai_formats_callback);
   ASSERT_FALSE(notify()->dai_format());
@@ -338,15 +338,15 @@ TEST_F(CodecTest, InitiallyStopped) {
 
   bool received_get_dai_formats_callback = false;
   std::vector<fha::DaiSupportedFormats> dai_formats;
-  device->RetrieveDaiFormatSets(
-      dai_id(), [&received_get_dai_formats_callback, &dai_formats](
-                    ElementId element_id, const std::vector<fha::DaiSupportedFormats>& formats) {
-        EXPECT_EQ(element_id, fad::kDefaultDaiInterconnectElementId);
-        received_get_dai_formats_callback = true;
-        for (auto& dai_format_set : formats) {
-          dai_formats.push_back(dai_format_set);
-        }
-      });
+  GetDaiFormatSets(device, dai_id(),
+                   [&received_get_dai_formats_callback, &dai_formats](
+                       ElementId element_id, const std::vector<fha::DaiSupportedFormats>& formats) {
+                     EXPECT_EQ(element_id, fad::kDefaultDaiInterconnectElementId);
+                     received_get_dai_formats_callback = true;
+                     for (auto& dai_format_set : formats) {
+                       dai_formats.push_back(dai_format_set);
+                     }
+                   });
 
   RunLoopUntilIdle();
   ASSERT_TRUE(received_get_dai_formats_callback);
@@ -371,8 +371,8 @@ TEST_F(CodecTest, Start) {
   ASSERT_TRUE(device->is_operational());
   ASSERT_TRUE(SetControl(device));
   std::vector<fha::DaiSupportedFormats> dai_formats;
-  device->RetrieveDaiFormatSets(
-      dai_id(),
+  GetDaiFormatSets(
+      device, dai_id(),
       [&dai_formats](ElementId element_id, const std::vector<fha::DaiSupportedFormats>& formats) {
         EXPECT_EQ(element_id, fad::kDefaultDaiInterconnectElementId);
         dai_formats.push_back(formats[0]);
@@ -399,8 +399,8 @@ TEST_F(CodecTest, SetDaiFormatChange) {
   ASSERT_TRUE(device->is_operational());
   ASSERT_TRUE(SetControl(device));
   std::vector<fha::DaiSupportedFormats> dai_formats;
-  device->RetrieveDaiFormatSets(
-      dai_id(),
+  GetDaiFormatSets(
+      device, dai_id(),
       [&dai_formats](ElementId element_id, const std::vector<fha::DaiSupportedFormats>& formats) {
         EXPECT_EQ(element_id, fad::kDefaultDaiInterconnectElementId);
         dai_formats.push_back(formats[0]);
@@ -436,8 +436,8 @@ TEST_F(CodecTest, SetDaiFormatNoChange) {
   ASSERT_TRUE(device->is_operational());
   ASSERT_TRUE(SetControl(device));
   std::vector<fha::DaiSupportedFormats> dai_formats;
-  device->RetrieveDaiFormatSets(
-      dai_id(),
+  GetDaiFormatSets(
+      device, dai_id(),
       [&dai_formats](ElementId element_id, const std::vector<fha::DaiSupportedFormats>& formats) {
         EXPECT_EQ(element_id, fad::kDefaultDaiInterconnectElementId);
         dai_formats.push_back(formats[0]);
@@ -473,8 +473,8 @@ TEST_F(CodecTest, StartStop) {
   ASSERT_TRUE(device->is_operational());
   ASSERT_TRUE(SetControl(device));
   std::vector<fha::DaiSupportedFormats> dai_formats;
-  device->RetrieveDaiFormatSets(
-      dai_id(),
+  GetDaiFormatSets(
+      device, dai_id(),
       [&dai_formats](ElementId element_id, const std::vector<fha::DaiSupportedFormats>& formats) {
         EXPECT_EQ(element_id, fad::kDefaultDaiInterconnectElementId);
         dai_formats.push_back(formats[0]);
@@ -505,8 +505,8 @@ TEST_F(CodecTest, StartStart) {
   ASSERT_TRUE(device->is_operational());
   ASSERT_TRUE(SetControl(device));
   std::vector<fha::DaiSupportedFormats> dai_formats;
-  device->RetrieveDaiFormatSets(
-      dai_id(),
+  GetDaiFormatSets(
+      device, dai_id(),
       [&dai_formats](ElementId element_id, const std::vector<fha::DaiSupportedFormats>& formats) {
         EXPECT_EQ(element_id, fad::kDefaultDaiInterconnectElementId);
         dai_formats.push_back(formats[0]);
@@ -538,8 +538,8 @@ TEST_F(CodecTest, StopStop) {
   ASSERT_TRUE(device->is_operational());
   ASSERT_TRUE(SetControl(device));
   std::vector<fha::DaiSupportedFormats> dai_formats;
-  device->RetrieveDaiFormatSets(
-      dai_id(),
+  GetDaiFormatSets(
+      device, dai_id(),
       [&dai_formats](ElementId element_id, const std::vector<fha::DaiSupportedFormats>& formats) {
         EXPECT_EQ(element_id, fad::kDefaultDaiInterconnectElementId);
         dai_formats.push_back(formats[0]);
@@ -578,8 +578,8 @@ TEST_F(CodecTest, Reset) {
   ASSERT_TRUE(device->is_operational());
   ASSERT_TRUE(SetControl(device));
   std::vector<fha::DaiSupportedFormats> dai_formats;
-  device->RetrieveDaiFormatSets(
-      dai_id(),
+  GetDaiFormatSets(
+      device, dai_id(),
       [&dai_formats](ElementId element_id, const std::vector<fha::DaiSupportedFormats>& formats) {
         EXPECT_EQ(element_id, fad::kDefaultDaiInterconnectElementId);
         dai_formats.push_back(formats[0]);
@@ -643,7 +643,7 @@ TEST_F(CompositeTest, Initialization) {
 }
 
 // Verify that a fake composite is initialized to the expected default values,
-// for the device info fields.
+// for the most basic device info fields.
 TEST_F(CompositeTest, DeviceInfo) {
   auto fake_driver = MakeFakeComposite();
   auto device = InitializeDeviceForFakeComposite(fake_driver);
@@ -672,44 +672,6 @@ TEST_F(CompositeTest, DeviceInfo) {
   EXPECT_EQ(*info.unique_instance_id(), FakeComposite::kDefaultUniqueInstanceId);
 
   EXPECT_FALSE(info.is_input().has_value());
-
-  ASSERT_TRUE(info.dai_format_sets().has_value());
-  ASSERT_FALSE(info.dai_format_sets()->empty());
-  ASSERT_EQ(info.dai_format_sets()->size(), 2u);
-
-  ASSERT_TRUE(info.dai_format_sets()->at(0).element_id().has_value());
-  EXPECT_EQ(*info.dai_format_sets()->at(0).element_id(), FakeComposite::kDestDaiElementId);
-  ASSERT_TRUE(info.dai_format_sets()->at(0).format_sets().has_value());
-  EXPECT_EQ(info.dai_format_sets()->at(0).format_sets()->size(), 1u);
-  EXPECT_THAT(info.dai_format_sets()->at(0).format_sets()->at(0).number_of_channels(),
-              testing::ElementsAreArray(FakeComposite::kDefaultDaiNumberOfChannelsSet2));
-  EXPECT_THAT(info.dai_format_sets()->at(0).format_sets()->at(0).frame_rates(),
-              testing::ElementsAreArray(FakeComposite::kDefaultDaiFrameRates2));
-  EXPECT_THAT(info.dai_format_sets()->at(0).format_sets()->at(0).bits_per_slot(),
-              testing::ElementsAreArray(FakeComposite::kDefaultDaiBitsPerSlotSet2));
-  EXPECT_THAT(info.dai_format_sets()->at(0).format_sets()->at(0).bits_per_sample(),
-              testing::ElementsAreArray(FakeComposite::kDefaultDaiBitsPerSampleSet2));
-  EXPECT_THAT(info.dai_format_sets()->at(0).format_sets()->at(0).frame_formats(),
-              testing::ElementsAreArray(FakeComposite::kDefaultDaiFrameFormatsSet2));
-  EXPECT_THAT(info.dai_format_sets()->at(0).format_sets()->at(0).sample_formats(),
-              testing::ElementsAreArray(FakeComposite::kDefaultDaiSampleFormatsSet2));
-
-  ASSERT_TRUE(info.dai_format_sets()->at(1).element_id().has_value());
-  EXPECT_EQ(*info.dai_format_sets()->at(1).element_id(), FakeComposite::kSourceDaiElementId);
-  ASSERT_TRUE(info.dai_format_sets()->at(1).format_sets().has_value());
-  EXPECT_EQ(info.dai_format_sets()->at(1).format_sets()->size(), 1u);
-  EXPECT_THAT(info.dai_format_sets()->at(1).format_sets()->at(0).number_of_channels(),
-              testing::ElementsAreArray(FakeComposite::kDefaultDaiNumberOfChannelsSet));
-  EXPECT_THAT(info.dai_format_sets()->at(1).format_sets()->at(0).frame_rates(),
-              testing::ElementsAreArray(FakeComposite::kDefaultDaiFrameRates));
-  EXPECT_THAT(info.dai_format_sets()->at(1).format_sets()->at(0).bits_per_slot(),
-              testing::ElementsAreArray(FakeComposite::kDefaultDaiBitsPerSlotSet));
-  EXPECT_THAT(info.dai_format_sets()->at(1).format_sets()->at(0).bits_per_sample(),
-              testing::ElementsAreArray(FakeComposite::kDefaultDaiBitsPerSampleSet));
-  EXPECT_THAT(info.dai_format_sets()->at(1).format_sets()->at(0).frame_formats(),
-              testing::ElementsAreArray(FakeComposite::kDefaultDaiFrameFormatsSet));
-  EXPECT_THAT(info.dai_format_sets()->at(1).format_sets()->at(0).sample_formats(),
-              testing::ElementsAreArray(FakeComposite::kDefaultDaiSampleFormatsSet));
 
   EXPECT_FALSE(info.gain_caps().has_value());
 
@@ -810,6 +772,67 @@ TEST_F(CompositeTest, DeviceInfoRingBufferFormats) {
                   .has_value());
   EXPECT_EQ(*dest_rb_format_sets->at(0).channel_sets()->at(0).attributes()->at(0).min_frequency(),
             FakeComposite::kDefaultRbChannelAttributeMinFrequency);
+}
+
+// Verify that a fake composite is initialized to the expected default Dai format sets.
+TEST_F(CompositeTest, DeviceInfoDaiFormats) {
+  auto fake_driver = MakeFakeComposite();
+  auto device = InitializeDeviceForFakeComposite(fake_driver);
+  ASSERT_TRUE(device->is_operational());
+  ASSERT_EQ(device_presence_watcher()->ready_devices().size(), 1u);
+  ASSERT_EQ(device_presence_watcher()->on_ready_count(), 1u);
+
+  ASSERT_TRUE(device->info().has_value());
+  auto info = *device->info();
+
+  // Validate DAI format sets
+  ASSERT_TRUE(info.dai_format_sets().has_value());
+  ASSERT_FALSE(info.dai_format_sets()->empty());
+  ASSERT_EQ(info.dai_format_sets()->size(), 2u);
+  ASSERT_TRUE(info.dai_format_sets()->at(0).element_id().has_value());
+  ASSERT_TRUE(info.dai_format_sets()->at(1).element_id().has_value());
+  ASSERT_TRUE(*info.dai_format_sets()->at(0).element_id() == FakeComposite::kSourceDaiElementId ||
+              *info.dai_format_sets()->at(0).element_id() == FakeComposite::kDestDaiElementId);
+  ASSERT_TRUE(*info.dai_format_sets()->at(1).element_id() == FakeComposite::kSourceDaiElementId ||
+              *info.dai_format_sets()->at(1).element_id() == FakeComposite::kDestDaiElementId);
+
+  auto& source_dai_format_sets =
+      *info.dai_format_sets()->at(0).element_id() == FakeComposite::kSourceDaiElementId
+          ? info.dai_format_sets()->at(0).format_sets()
+          : info.dai_format_sets()->at(1).format_sets();
+  ASSERT_TRUE(source_dai_format_sets.has_value());
+  ASSERT_EQ(source_dai_format_sets->size(), 1u);
+  EXPECT_THAT(source_dai_format_sets->at(0).number_of_channels(),
+              testing::ElementsAreArray(FakeComposite::kDefaultDaiNumberOfChannelsSet));
+  EXPECT_THAT(source_dai_format_sets->at(0).frame_rates(),
+              testing::ElementsAreArray(FakeComposite::kDefaultDaiFrameRates));
+  EXPECT_THAT(source_dai_format_sets->at(0).bits_per_slot(),
+              testing::ElementsAreArray(FakeComposite::kDefaultDaiBitsPerSlotSet));
+  EXPECT_THAT(source_dai_format_sets->at(0).bits_per_sample(),
+              testing::ElementsAreArray(FakeComposite::kDefaultDaiBitsPerSampleSet));
+  EXPECT_THAT(source_dai_format_sets->at(0).frame_formats(),
+              testing::ElementsAreArray(FakeComposite::kDefaultDaiFrameFormatsSet));
+  EXPECT_THAT(source_dai_format_sets->at(0).sample_formats(),
+              testing::ElementsAreArray(FakeComposite::kDefaultDaiSampleFormatsSet));
+
+  auto& dest_dai_format_sets =
+      *info.dai_format_sets()->at(1).element_id() == FakeComposite::kDestDaiElementId
+          ? info.dai_format_sets()->at(1).format_sets()
+          : info.dai_format_sets()->at(0).format_sets();
+  ASSERT_TRUE(dest_dai_format_sets.has_value());
+  ASSERT_EQ(dest_dai_format_sets->size(), 1u);
+  EXPECT_THAT(dest_dai_format_sets->at(0).number_of_channels(),
+              testing::ElementsAreArray(FakeComposite::kDefaultDaiNumberOfChannelsSet2));
+  EXPECT_THAT(dest_dai_format_sets->at(0).frame_rates(),
+              testing::ElementsAreArray(FakeComposite::kDefaultDaiFrameRates2));
+  EXPECT_THAT(dest_dai_format_sets->at(0).bits_per_slot(),
+              testing::ElementsAreArray(FakeComposite::kDefaultDaiBitsPerSlotSet2));
+  EXPECT_THAT(dest_dai_format_sets->at(0).bits_per_sample(),
+              testing::ElementsAreArray(FakeComposite::kDefaultDaiBitsPerSampleSet2));
+  EXPECT_THAT(dest_dai_format_sets->at(0).frame_formats(),
+              testing::ElementsAreArray(FakeComposite::kDefaultDaiFrameFormatsSet2));
+  EXPECT_THAT(dest_dai_format_sets->at(0).sample_formats(),
+              testing::ElementsAreArray(FakeComposite::kDefaultDaiSampleFormatsSet2));
 }
 
 // Verify that a fake composite is initialized to the expected default signalprocessing elements.

@@ -574,7 +574,7 @@ void Device::Initialize() {
     RetrieveDeviceProperties();
     RetrieveHealthState();
     RetrieveSignalProcessingState();
-    RetrieveCodecDaiFormatSets();
+    RetrieveDaiFormatSets();
     RetrievePlugState();
   } else if (is_composite()) {
     RetrieveDeviceProperties();
@@ -990,7 +990,7 @@ void Device::RetrieveSignalProcessingElements() {
 
         if (is_composite()) {
           // Now that we know our element IDs, we can query the DAI and RingBuffer elements.
-          RetrieveCompositeDaiFormatSets();
+          RetrieveDaiFormatSets();
           RetrieveRingBufferFormatSets();
         }
       });
@@ -1304,44 +1304,37 @@ zx_status_t Device::SetTopology(uint64_t topology_id) {
   return ZX_OK;
 }
 
-void Device::RetrieveCodecDaiFormatSets() {
-  ADR_LOG_METHOD(kLogCodecFidlCalls);
-  RetrieveDaiFormatSets(
-      fad::kDefaultDaiInterconnectElementId,
-      [this](ElementId element_id, const std::vector<fha::DaiSupportedFormats>& dai_format_sets) {
-        if (has_error()) {
-          ADR_WARN_OBJECT() << "device already has an error";
-          return;
-        }
-        element_dai_format_sets_.push_back({{element_id, dai_format_sets}});
+void Device::RetrieveDaiFormatSets() {
+  ADR_LOG_METHOD(kLogCodecFidlCalls || kLogCompositeFidlCalls);
+
+  dai_ids_.clear();
+  if (is_codec()) {
+    dai_ids_.insert(fad::kDefaultDaiInterconnectElementId);
+  } else if (is_composite()) {
+    dai_ids_ = dais(sig_proc_element_map_);
+  }
+  auto remaining_dai_ids = std::make_shared<std::unordered_set<ElementId>>(dai_ids_);
+  element_dai_format_sets_.clear();
+  for (auto element_id : *remaining_dai_ids) {
+    GetDaiFormatSets(element_id, [this, remaining_dai_ids](
+                                     ElementId element_id,
+                                     const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>&
+                                         dai_format_sets) mutable {
+      ADR_LOG_OBJECT(kLogCodecFidlCalls || kLogCompositeFidlCalls)
+          << "GetDaiFormats(id " << element_id << "): success";
+      element_dai_format_sets_.push_back({{element_id, dai_format_sets}});
+      remaining_dai_ids->erase(element_id);
+      if (remaining_dai_ids->empty()) {
         dai_format_sets_retrieved_ = true;
         OnInitializationResponse();
-      });
-}
-
-// We have our signalprocessing Elements now; GetDaiFormats on each DAI element.
-void Device::RetrieveCompositeDaiFormatSets() {
-  ADR_LOG_METHOD(kLogCompositeFidlCalls);
-  dai_ids_ = dais(sig_proc_element_map_);
-  temp_dai_ids_ = dai_ids_;
-  element_dai_format_sets_.clear();
-  for (auto element_id : temp_dai_ids_) {
-    RetrieveDaiFormatSets(
-        element_id,
-        [this](ElementId element_id, const std::vector<fha::DaiSupportedFormats>& dai_format_sets) {
-          element_dai_format_sets_.push_back({{element_id, dai_format_sets}});
-          temp_dai_ids_.erase(element_id);
-          if (temp_dai_ids_.empty()) {
-            dai_format_sets_retrieved_ = true;
-            OnInitializationResponse();
-          }
-        });
+      }
+    });
   }
 }
 
-void Device::RetrieveDaiFormatSets(
+void Device::GetDaiFormatSets(
     ElementId element_id,
-    fit::callback<void(ElementId, const std::vector<fha::DaiSupportedFormats>&)>
+    fit::callback<void(ElementId, const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>&)>
         dai_format_sets_callback) {
   if (has_error()) {
     ADR_WARN_METHOD() << "device already has an error";
@@ -1355,63 +1348,53 @@ void Device::RetrieveDaiFormatSets(
   // TODO(https://fxbug.dev/42064765): handle command timeouts
 
   if (is_codec()) {
-    if (element_id != fad::kDefaultDaiInterconnectElementId) {
-      OnError(ZX_ERR_INVALID_ARGS);
-      // We need not invoke the callback: this device is in the process of being unwound.
-      return;
-    }
+    FX_CHECK(element_id == fad::kDefaultDaiInterconnectElementId);
     ADR_LOG_METHOD(kLogCodecFidlCalls) << "element " << element_id;
 
     (*codec_client_)
         ->GetDaiFormats()
-        .Then([this, element_id, callback = std::move(dai_format_sets_callback)](
-                  fidl::Result<fha::Codec::GetDaiFormats>& result) mutable {
-          if (LogResultError(result, "GetDaiFormats response")) {
-            // We need not invoke the callback: this device is in the process of being unwound.
-            return;
-          }
-          if (has_error()) {
-            ADR_WARN_OBJECT() << "device already has an error";
-            // We need not invoke the callback: this device is in the process of being unwound.
-            return;
-          }
-
-          ADR_LOG_OBJECT(kLogCodecFidlResponses) << "Codec/GetDaiFormats: success";
-
-          if (!ValidateDaiFormatSets(result->formats())) {
-            OnError(ZX_ERR_INVALID_ARGS);
-            // We need not invoke the callback: this device is in the process of being unwound.
-            return;
-          }
-          callback(element_id, result->formats());
-        });
+        .Then(
+            [this, element_id, get_dai_format_sets_callback = std::move(dai_format_sets_callback)](
+                fidl::Result<fha::Codec::GetDaiFormats>& result) mutable {
+              if (LogResultError(result, "Codec/GetDaiFormats response")) {
+                // We need not invoke the callback: this device is being unwound.
+                return;
+              }
+              if (has_error()) {
+                ADR_WARN_OBJECT() << "device already has an error";
+                // We need not invoke the callback: this device is being unwound.
+                return;
+              }
+              if (!ValidateDaiFormatSets(result->formats())) {
+                OnError(ZX_ERR_INVALID_ARGS);
+                // We need not invoke the callback: this device is being unwound.
+                return;
+              }
+              get_dai_format_sets_callback(element_id, result->formats());
+            });
   } else if (is_composite()) {
     ADR_LOG_METHOD(kLogCompositeFidlCalls) << "element " << element_id;
     (*composite_client_)
         ->GetDaiFormats(element_id)
-        .Then([this, element_id, callback = std::move(dai_format_sets_callback)](
-                  fidl::Result<fha::Composite::GetDaiFormats>& result) mutable {
-          std::string str{"GetDaiFormats (element "};
-          str.append(std::to_string(element_id)).append(") response");
-          if (has_error()) {
-            ADR_WARN_OBJECT() << "device already has error during " << str;
-            // We need not invoke the callback: this device is in the process of being unwound. The
-            // client has already received a HasError notification for this device.
-            return;
-          }
-          if (LogResultError(result, str.c_str())) {
-            // We need not invoke the callback: this device is in the process of being unwound.
-            return;
-          }
-          if (!ValidateDaiFormatSets(result->dai_formats())) {
-            OnError(ZX_ERR_INVALID_ARGS);
-            // We need not invoke the callback: this device is in the process of being unwound.
-            return;
-          }
-          ADR_LOG_OBJECT(kLogCompositeFidlResponses) << str;
-
-          callback(element_id, result->dai_formats());
-        });
+        .Then(
+            [this, element_id, get_dai_format_sets_callback = std::move(dai_format_sets_callback)](
+                fidl::Result<fha::Composite::GetDaiFormats>& result) mutable {
+              if (LogResultError(result, "Composite/GetDaiFormats response")) {
+                // We need not invoke the callback: this device is  being unwound.
+                return;
+              }
+              if (has_error()) {
+                ADR_WARN_OBJECT() << "device already has an error";
+                // We need not invoke the callback: this device is  being unwound.
+                return;
+              }
+              if (!ValidateDaiFormatSets(result->dai_formats())) {
+                OnError(ZX_ERR_INVALID_ARGS);
+                // We need not invoke the callback: this device is  being unwound.
+                return;
+              }
+              get_dai_format_sets_callback(element_id, result->dai_formats());
+            });
   }
 }
 

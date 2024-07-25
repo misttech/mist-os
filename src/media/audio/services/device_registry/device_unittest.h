@@ -87,6 +87,13 @@ class DeviceTestBase : public gtest::TestLoopFixture {
     return (HasRingBuffer(device, element_id) &&
             match->second.ring_buffer_state == Device::RingBufferState::Started);
   }
+  static void GetDaiFormatSets(
+      const std::shared_ptr<Device>& device, ElementId element_id,
+      fit::callback<void(ElementId,
+                         const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>&)>
+          dai_format_sets_callback) {
+    device->GetDaiFormatSets(element_id, std::move(dai_format_sets_callback));
+  }
 
   // Accessor for a Device private member.
   static const std::optional<fuchsia_hardware_audio::DelayInfo>& DeviceDelayInfo(

@@ -190,8 +190,8 @@ TEST_F(CodecWarningTest, WithoutControlFailsCallsThatRequireControl) {
   ASSERT_FALSE(notify()->dai_format());
   ASSERT_FALSE(notify()->codec_is_started());
   std::vector<fha::DaiSupportedFormats> dai_formats;
-  device->RetrieveDaiFormatSets(
-      dai_id(),
+  GetDaiFormatSets(
+      device, dai_id(),
       [&dai_formats](ElementId element_id, const std::vector<fha::DaiSupportedFormats>& formats) {
         EXPECT_EQ(element_id, fad::kDefaultDaiInterconnectElementId);
         dai_formats.push_back(formats[0]);
@@ -217,8 +217,8 @@ TEST_F(CodecWarningTest, SetInvalidDaiFormat) {
   ASSERT_TRUE(device->is_operational());
   ASSERT_TRUE(SetControl(device));
   std::vector<fha::DaiSupportedFormats> dai_formats;
-  device->RetrieveDaiFormatSets(
-      dai_id(),
+  GetDaiFormatSets(
+      device, dai_id(),
       [&dai_formats](ElementId element_id, const std::vector<fha::DaiSupportedFormats>& formats) {
         EXPECT_EQ(element_id, fad::kDefaultDaiInterconnectElementId);
         dai_formats.push_back(formats[0]);
@@ -248,14 +248,14 @@ TEST_F(CodecWarningTest, SetUnsupportedDaiFormat) {
   ASSERT_TRUE(device->is_operational());
   ASSERT_TRUE(SetControl(device));
   std::vector<fha::DaiSupportedFormats> dai_formats;
-  device->RetrieveDaiFormatSets(
-      dai_id(), [&dai_formats](ElementId element_id,
-                               const std::vector<fha::DaiSupportedFormats>& format_sets) {
-        EXPECT_EQ(element_id, fad::kDefaultDaiInterconnectElementId);
-        for (const auto& format_set : format_sets) {
-          dai_formats.push_back(format_set);
-        }
-      });
+  GetDaiFormatSets(device, dai_id(),
+                   [&dai_formats](ElementId element_id,
+                                  const std::vector<fha::DaiSupportedFormats>& format_sets) {
+                     EXPECT_EQ(element_id, fad::kDefaultDaiInterconnectElementId);
+                     for (const auto& format_set : format_sets) {
+                       dai_formats.push_back(format_set);
+                     }
+                   });
 
   RunLoopUntilIdle();
 

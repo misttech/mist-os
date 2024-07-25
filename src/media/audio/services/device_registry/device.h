@@ -94,12 +94,6 @@ class Device : public std::enable_shared_from_this<Device> {
       const fuchsia_audio::Format& client_format);
   bool SetGain(fuchsia_hardware_audio::GainState& gain_state);
 
-  void RetrieveDaiFormatSets(
-      ElementId element_id,
-      fit::callback<void(ElementId,
-                         const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>&)>
-          dai_format_sets_callback);
-
   void SetDaiFormat(ElementId element_id, const fuchsia_hardware_audio::DaiFormat& dai_formats);
 
   bool Reset();
@@ -241,10 +235,7 @@ class Device : public std::enable_shared_from_this<Device> {
   void RetrieveDeviceProperties();
   void RetrieveHealthState();
   void RetrieveSignalProcessingState();
-
-  void RetrieveCodecDaiFormatSets();
-  void RetrieveCompositeDaiFormatSets();
-
+  void RetrieveDaiFormatSets();
   void RetrieveRingBufferFormatSets();
   void RetrievePlugState();
   void RetrieveGainState();
@@ -275,6 +266,9 @@ class Device : public std::enable_shared_from_this<Device> {
   void SetPlugState(
       const fuchsia_hardware_audio::PlugState& plug_state,
       std::optional<fuchsia_hardware_audio::PlugDetectCapabilities> plug_detect_capabilities);
+  void AddDaiFormatSet(
+      ElementId element_id,
+      const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>& dai_format_sets);
   void AddRingBufferFormatSet(
       ElementId id, std::shared_ptr<std::unordered_set<ElementId>>& remaining_ring_buffer_ids,
       const std::vector<fuchsia_hardware_audio::SupportedFormats>& format_set);
@@ -286,6 +280,12 @@ class Device : public std::enable_shared_from_this<Device> {
   void RetrieveSignalProcessingTopology();
   void RetrieveSignalProcessingElementStates();
   void RetrieveSignalProcessingElementState(ElementId element_id);
+
+  void GetDaiFormatSets(
+      ElementId element_id,
+      fit::callback<void(ElementId,
+                         const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>&)>
+          dai_format_sets_callback);
 
   // Device-type specific methods used during initialization
   void RetrieveCodecProperties();
@@ -414,7 +414,7 @@ class Device : public std::enable_shared_from_this<Device> {
   std::unordered_map<ElementId, ElementRecord> sig_proc_element_map_;
 
   std::unordered_set<ElementId> dai_ids_;
-  std::unordered_set<ElementId> temp_dai_ids_;
+  std::unordered_set<ElementId> volatile_dai_ids_for_iteration_;
   std::unordered_set<ElementId> ring_buffer_ids_;
   std::unordered_set<ElementId> element_ids_;
 
