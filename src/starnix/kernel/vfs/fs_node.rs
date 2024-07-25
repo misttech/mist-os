@@ -759,6 +759,8 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
     /// Update node attributes persistently.
     fn update_attributes(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _current_task: &CurrentTask,
         _info: &FsNodeInfo,
         _has: zxio_node_attr_has_t,
     ) -> Result<(), Errno> {
@@ -1608,10 +1610,10 @@ impl FsNode {
             send_standard_signal(current_task, SignalInfo::default(SIGXFSZ));
             return error!(EFBIG);
         }
-        self.clear_suid_and_sgid_bits(current_task)?;
+        let mut locked = locked.cast_locked::<M>();
+        self.clear_suid_and_sgid_bits(&mut locked, current_task)?;
         // We have to take the append lock since otherwise it would be possible to truncate and for
         // an append to continue using the old size.
-        let mut locked = locked.cast_locked::<M>();
         let (guard, mut locked) = strategy.lock(&mut locked, current_task, self)?;
         self.ops().truncate(&mut locked, &guard, self, current_task, length)?;
         self.update_ctime_mtime();
@@ -1661,8 +1663,8 @@ impl FsNode {
             return error!(EFBIG);
         }
 
-        self.clear_suid_and_sgid_bits(current_task)?;
         let mut locked = locked.cast_locked::<M>();
+        self.clear_suid_and_sgid_bits(&mut locked, current_task)?;
         let (guard, mut locked) = strategy.lock(&mut locked, current_task, self)?;
         self.ops().allocate(&mut locked, &guard, self, current_task, mode, offset, length)?;
         self.update_ctime_mtime();
@@ -1816,8 +1818,14 @@ impl FsNode {
         self.socket.get()
     }
 
-    fn update_attributes<F>(&self, mutator: F) -> Result<(), Errno>
+    pub fn update_attributes<L, F>(
+        &self,
+        locked: &mut Locked<'_, L>,
+        current_task: &CurrentTask,
+        mutator: F,
+    ) -> Result<(), Errno>
     where
+        L: LockEqualOrBefore<FileOpsCore>,
         F: FnOnce(&mut FsNodeInfo) -> Result<(), Errno>,
     {
         let mut info = self.info.write();
@@ -1832,7 +1840,8 @@ impl FsNode {
         has.rdev = info.rdev != new_info.rdev;
         // Call `update_attributes(..)` to persist the changes for the following fields.
         if has.modification_time || has.access_time || has.mode || has.uid || has.gid || has.rdev {
-            self.ops().update_attributes(&new_info, has)?;
+            let mut locked = locked.cast_locked::<FileOpsCore>();
+            self.ops().update_attributes(&mut locked, current_task, &new_info, has)?;
         }
         *info = new_info;
         Ok(())
@@ -1841,14 +1850,18 @@ impl FsNode {
     /// Set the permissions on this FsNode to the given values.
     ///
     /// Does not change the IFMT of the node.
-    pub fn chmod(
+    pub fn chmod<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         mount: &MountInfo,
         mut mode: FileMode,
-    ) -> Result<(), Errno> {
+    ) -> Result<(), Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         mount.check_readonly_filesystem()?;
-        self.update_attributes(|info| {
+        self.update_attributes(locked, current_task, |info| {
             let creds = current_task.creds();
             if !creds.has_capability(CAP_FOWNER) {
                 if info.uid != creds.euid {
@@ -1864,15 +1877,19 @@ impl FsNode {
     }
 
     /// Sets the owner and/or group on this FsNode.
-    pub fn chown(
+    pub fn chown<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         mount: &MountInfo,
         owner: Option<uid_t>,
         group: Option<gid_t>,
-    ) -> Result<(), Errno> {
+    ) -> Result<(), Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         mount.check_readonly_filesystem()?;
-        self.update_attributes(|info| {
+        self.update_attributes(locked, current_task, |info| {
             if !current_task.creds().has_capability(CAP_CHOWN) {
                 let creds = current_task.creds();
                 if info.uid != creds.euid {
@@ -2139,9 +2156,16 @@ impl FsNode {
     }
 
     /// Clear the SUID and SGID bits unless the `current_task` has `CAP_FSETID`
-    pub fn clear_suid_and_sgid_bits(&self, current_task: &CurrentTask) -> Result<(), Errno> {
+    pub fn clear_suid_and_sgid_bits<L>(
+        &self,
+        locked: &mut Locked<'_, L>,
+        current_task: &CurrentTask,
+    ) -> Result<(), Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         if !current_task.creds().has_capability(CAP_FSETID) {
-            self.update_attributes(|info| {
+            self.update_attributes(locked, current_task, |info| {
                 info.clear_suid_and_sgid_bits();
                 Ok(())
             })?;
@@ -2174,13 +2198,17 @@ impl FsNode {
 
     /// Update the atime and mtime if the `current_task` has write access, is the file owner, or
     /// holds either the CAP_DAC_OVERRIDE or CAP_FOWNER capability.
-    pub fn update_atime_mtime(
+    pub fn update_atime_mtime<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         mount: &MountInfo,
         atime: TimeUpdateType,
         mtime: TimeUpdateType,
-    ) -> Result<(), Errno> {
+    ) -> Result<(), Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         // If the filesystem is read-only, this always fail.
         mount.check_readonly_filesystem()?;
 
@@ -2209,7 +2237,7 @@ impl FsNode {
             // This function is called by `utimes(..)` which will update the access and
             // modification time. We need to call `update_attributes()` to update the mtime of
             // filesystems that manages file timestamps.
-            self.update_attributes(|info| {
+            self.update_attributes(locked, current_task, |info| {
                 let now = utc::utc_now();
                 info.time_status_change = now;
                 let get_time = |time: TimeUpdateType| match time {
