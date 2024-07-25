@@ -76,15 +76,13 @@ class Device : public std::enable_shared_from_this<Device> {
     Device* device_;
     std::string name_;
   };
-  bool AddObserver(const std::shared_ptr<ObserverNotify>& observer_to_add);
 
   void Initialize();
 
-  void ForEachObserver(fit::function<void(std::shared_ptr<ObserverNotify>)> action);
-
+  bool AddObserver(const std::shared_ptr<ObserverNotify>& observer_to_add);
   // This also calls AddObserver for the same Notify.
   bool SetControl(std::shared_ptr<ControlNotify> control_notify);
-  bool DropControl();
+
   void DropRingBuffer(ElementId element_id);
 
   // Translate from the specified client format to the fuchsia_hardware_audio format that the driver
@@ -111,8 +109,6 @@ class Device : public std::enable_shared_from_this<Device> {
   bool Reset();
   bool CodecStart();
   bool CodecStop();
-
-  bool CompositeReset();
 
   // These return error codes that can be directly returned to the FIDL client.
   zx_status_t SetTopology(TopologyId topology_id);
@@ -241,54 +237,71 @@ class Device : public std::enable_shared_from_this<Device> {
          fuchsia_audio_device::DriverClient driver_client);
 
   //
-  // Actions during the initialization process. We use 'Retrieve...' for internal methods, to avoid
-  // confusion with the methods on StreamConfig or RingBuffer, which are generally 'Get...'.
-  //
-  void RetrieveStreamProperties();
-  void RetrieveStreamHealthState();
-  void RetrieveStreamRingBufferFormatSets();
-  void RetrieveStreamPlugState();
-  void RetrieveGainState();
-
+  // Device initialization is essentially a "wait for multiple objects" operation.
+  // The following methods query/retrieve the required information during initialization.
+  // We use 'Retrieve...' for internal methods, to avoid confusion with the methods on StreamConfig
+  // or RingBuffer, which are generally 'Get...'.
   void RetrieveCodecProperties();
-  void RetrieveCodecHealthState();
-  void RetrieveCodecDaiFormatSets();
-  void RetrieveCodecPlugState();
-
   void RetrieveCompositeProperties();
+  void RetrieveStreamProperties();
+
+  void RetrieveCodecHealthState();
   void RetrieveCompositeHealthState();
-  void RetrieveCompositeDaiFormatSets();
-  void RetrieveCompositeRingBufferFormatSets();
+  void RetrieveStreamHealthState();
 
   void RetrieveSignalProcessingState();
-  void RetrieveSignalProcessingTopologies();
-  void RetrieveSignalProcessingElements();
-  void RetrieveCurrentTopology();
-  void RetrieveCurrentElementStates();
-  void RetrieveElementState(ElementId element_id);
 
+  void RetrieveCodecDaiFormatSets();
+  void RetrieveCompositeDaiFormatSets();
+
+  void RetrieveCompositeRingBufferFormatSets();
+  void RetrieveStreamRingBufferFormatSets();
+
+  void RetrieveCodecPlugState();
+  void RetrieveStreamPlugState();
+
+  void RetrieveGainState();
+
+  // Each of the above 'Retrieve...' methods update the related piece of device state, then call
+  // either `OnInitializationResponse` or `OnError`.
   void OnInitializationResponse();
-  bool IsInitializationComplete();
-  void OnInitializationComplete();
   void OnError(zx_status_t error);
-  void OnRemoval();  // Non-error departure of a device, such as USB device unplug-removal.
+  // Upon OnInitializationResponse, this method checks whether all prerequisites are now satisfied.
+  bool IsInitializationComplete();
+  // Called when a device can be moved into the list of active (successfully initialized) devices.
+  void OnInitializationComplete();
+  // Called when a device should be removed altogether -- from the list of active (successfully
+  // initialized) devices, or the list of unhealthy devices that previously encountered an error.
+  // A non-error removal could occur as a result of USB unplug, for example.
+  void OnRemoval();
 
   template <typename ResultT>
   bool LogResultError(const ResultT& result, const char* debug_context);
   template <typename ResultT>
   bool LogResultFrameworkError(const ResultT& result, const char* debug_context);
 
-  static void SanitizeStreamPropertiesStrings(
-      std::optional<fuchsia_hardware_audio::StreamProperties>& stream_properties);
-  static void SanitizeCodecPropertiesStrings(
-      std::optional<fuchsia_hardware_audio::CodecProperties>& codec_properties);
-  static void SanitizeCompositePropertiesStrings(
-      std::optional<fuchsia_hardware_audio::CompositeProperties>& composite_properties);
-
   fuchsia_audio_device::Info CreateDeviceInfo();
   void SetDeviceInfo();
 
   void CreateDeviceClock();
+
+  void RetrieveSignalProcessingTopologies();
+  void RetrieveSignalProcessingElements();
+  void RetrieveCurrentTopology();
+  void RetrieveCurrentElementStates();
+  void RetrieveElementState(ElementId element_id);
+
+  // Device-type specific methods used during initialization
+  static void SanitizeCodecPropertiesStrings(
+      std::optional<fuchsia_hardware_audio::CodecProperties>& codec_properties);
+  static void SanitizeCompositePropertiesStrings(
+      std::optional<fuchsia_hardware_audio::CompositeProperties>& composite_properties);
+  static void SanitizeStreamPropertiesStrings(
+      std::optional<fuchsia_hardware_audio::StreamProperties>& stream_properties);
+
+  std::shared_ptr<ControlNotify> GetControlNotify();
+  bool DropControl();
+  void ForEachObserver(fit::function<void(std::shared_ptr<ObserverNotify>)> action);
 
   //
   // # Device state and state machine
@@ -358,8 +371,6 @@ class Device : public std::enable_shared_from_this<Device> {
 
   void CalculateRequiredRingBufferSizes(ElementId element_id);
 
-  std::shared_ptr<ControlNotify> GetControlNotify();
-
   // Device notifies watcher when it completes initialization, encounters an error, or is removed.
   std::weak_ptr<DevicePresenceWatcher> presence_watcher_;
   async_dispatcher_t* dispatcher_;
@@ -369,18 +380,18 @@ class Device : public std::enable_shared_from_this<Device> {
   const fuchsia_audio_device::DeviceType device_type_;
   fuchsia_audio_device::DriverClient driver_client_;
 
-  std::optional<fidl::Client<fuchsia_hardware_audio::Codec>> codec_client_;
-  FidlErrorHandler<fuchsia_hardware_audio::Codec> codec_handler_;
-
-  std::optional<fidl::Client<fuchsia_hardware_audio::StreamConfig>> stream_config_client_;
-  FidlErrorHandler<fuchsia_hardware_audio::StreamConfig> stream_config_handler_;
-
   std::optional<fidl::Client<fuchsia_hardware_audio_signalprocessing::SignalProcessing>>
       sig_proc_client_;
   FidlErrorHandler<fuchsia_hardware_audio_signalprocessing::SignalProcessing> sig_proc_handler_;
 
+  std::optional<fidl::Client<fuchsia_hardware_audio::Codec>> codec_client_;
+  FidlErrorHandler<fuchsia_hardware_audio::Codec> codec_handler_;
+
   std::optional<fidl::Client<fuchsia_hardware_audio::Composite>> composite_client_;
   FidlErrorHandler<fuchsia_hardware_audio::Composite> composite_handler_;
+
+  std::optional<fidl::Client<fuchsia_hardware_audio::StreamConfig>> stream_config_client_;
+  FidlErrorHandler<fuchsia_hardware_audio::StreamConfig> stream_config_handler_;
 
   // Assigned by this service, guaranteed unique for this boot session, but not across reboots.
   const TokenId token_id_;
@@ -388,15 +399,13 @@ class Device : public std::enable_shared_from_this<Device> {
   State state_;
 
   // Initialization is complete (state becomes Initialized) when these optionals have values.
+  std::optional<fuchsia_hardware_audio::CodecProperties> codec_properties_;
+  std::optional<fuchsia_hardware_audio::CompositeProperties> composite_properties_;
   std::optional<fuchsia_hardware_audio::StreamProperties> stream_config_properties_;
   std::optional<std::vector<fuchsia_hardware_audio::SupportedFormats>> ring_buffer_format_sets_;
   std::optional<fuchsia_hardware_audio::GainState> gain_state_;
   std::optional<fuchsia_hardware_audio::PlugState> plug_state_;
   std::optional<bool> health_state_;
-
-  std::optional<fuchsia_hardware_audio::CodecProperties> codec_properties_;
-
-  std::optional<fuchsia_hardware_audio::CompositeProperties> composite_properties_;
 
   std::optional<bool> supports_signalprocessing_;
   std::vector<fuchsia_hardware_audio_signalprocessing::Element> sig_proc_elements_;
