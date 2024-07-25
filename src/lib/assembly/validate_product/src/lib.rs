@@ -124,7 +124,7 @@ pub fn validate_package(manifest: &PackageManifest) -> Result<(), PackageValidat
     let abi_revision = AbiRevision::try_from(raw_abi_revision.as_slice())
         .map_err(|e| PackageValidationError::InvalidAbiRevisionFile(e))?;
 
-    if let Err(err) = version_history::HISTORY.check_abi_revision_for_runtime(abi_revision) {
+    if let Err(err) = version_history_data::HISTORY.check_abi_revision_for_runtime(abi_revision) {
         return Err(PackageValidationError::UnsupportedAbiRevision(err));
     }
 

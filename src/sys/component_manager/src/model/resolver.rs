@@ -215,7 +215,9 @@ mod tests {
                 package: None,
                 config_values: None,
                 abi_revision: Some(
-                    version_history::HISTORY.get_example_supported_version_for_tests().abi_revision,
+                    version_history_data::HISTORY
+                        .get_example_supported_version_for_tests()
+                        .abi_revision,
                 ),
             })
         }
@@ -302,7 +304,9 @@ mod tests {
                 package: None,
                 config_values: None,
                 abi_revision: Some(
-                    version_history::HISTORY.get_example_supported_version_for_tests().abi_revision,
+                    version_history_data::HISTORY
+                        .get_example_supported_version_for_tests()
+                        .abi_revision,
                 ),
             })
         }

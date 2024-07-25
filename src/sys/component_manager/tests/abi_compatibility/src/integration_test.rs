@@ -55,7 +55,9 @@ impl ComponentResolver {
             // Assumes the platform does not support a u64::MAX ABI value.
             TargetAbi::Unsupported => Some(u64::MAX.into()),
             TargetAbi::Supported => Some(
-                version_history::HISTORY.get_example_supported_version_for_tests().abi_revision,
+                version_history_data::HISTORY
+                    .get_example_supported_version_for_tests()
+                    .abi_revision,
             ),
             TargetAbi::Absent => None,
         }
@@ -281,7 +283,7 @@ async fn resolve_regular_components() {
             test_channel_rx.next().await.expect("resolver failed to return an ABI component");
         assert_eq!(
             resolver_response.abi_revision.unwrap(),
-            version_history::HISTORY
+            version_history_data::HISTORY
                 .get_example_supported_version_for_tests()
                 .abi_revision
                 .as_u64()
@@ -346,7 +348,7 @@ async fn resolve_allowlisted_components() {
             test_channel_rx.next().await.expect("resolver failed to return an ABI component");
         assert_eq!(
             resolver_response.abi_revision.unwrap(),
-            version_history::HISTORY
+            version_history_data::HISTORY
                 .get_example_supported_version_for_tests()
                 .abi_revision
                 .as_u64()

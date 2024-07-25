@@ -91,7 +91,7 @@ async fn do_resolve(
     let policy = component.context.abi_revision_policy();
     policy
         .check_compatibility(
-            &version_history::HISTORY,
+            &version_history_data::HISTORY,
             &component.moniker,
             component_info.abi_revision,
         )

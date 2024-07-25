@@ -15,7 +15,8 @@ use std::os::fd::{FromRawFd, OwnedFd};
 use std::os::unix::io::AsRawFd;
 use std::pin::pin;
 use std::task::{ready, Poll};
-use version_history::{AbiRevision, HISTORY};
+use version_history::AbiRevision;
+use version_history_data::HISTORY;
 
 const BUFFER_SIZE: usize = 65536;
 

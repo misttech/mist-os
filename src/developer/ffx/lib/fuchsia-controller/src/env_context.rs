@@ -93,7 +93,7 @@ impl EnvContext {
         let injector = Box::new(Injection::new(
             context.clone(),
             DaemonVersionCheck::CheckApiLevel(
-                version_history::HISTORY.get_misleading_version_for_ffx().api_level,
+                version_history_data::HISTORY.get_misleading_version_for_ffx().api_level,
             ),
             node,
             target_spec,

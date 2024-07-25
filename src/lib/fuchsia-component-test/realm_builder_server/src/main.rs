@@ -4622,7 +4622,7 @@ mod tests {
         // Please see comment in `resolver::load_fragment_only_url()` for more information.
         let res = registry.resolve("realm-builder://0/a#meta/a.cm").await.unwrap();
         let abi_revision = res.abi_revision.expect("abi revision should be set in test package");
-        version_history::HISTORY
+        version_history_data::HISTORY
             .check_abi_revision_for_runtime(abi_revision.into())
             .expect("ABI revision should be supported");
 
@@ -4630,7 +4630,7 @@ mod tests {
         // load component 'b' identified by its absolute path
         let res = registry.resolve("realm-builder://1/b").await.unwrap();
         let abi_revision = res.abi_revision.expect("abi revision should be set in test package");
-        version_history::HISTORY
+        version_history_data::HISTORY
             .check_abi_revision_for_runtime(abi_revision.into())
             .expect("ABI revision should be supported");
     }

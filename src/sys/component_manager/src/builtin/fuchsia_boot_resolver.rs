@@ -98,7 +98,7 @@ impl FuchsiaBootResolver {
 
         // unpackaged components resolved from the zbi are assigned the platform
         // abi revision
-        let abi_revision = version_history::HISTORY.get_abi_revision_for_platform_components();
+        let abi_revision = version_history_data::HISTORY.get_abi_revision_for_platform_components();
 
         self.construct_component(path_proxy, boot_url, Some(abi_revision)).await
     }
@@ -455,7 +455,7 @@ mod tests {
         // the resolver returned the right package dir.
         let ResolvedComponent { resolved_url, decl, package, abi_revision, .. } = component;
         assert_eq!(url, resolved_url);
-        version_history::HISTORY
+        version_history_data::HISTORY
             .check_abi_revision_for_runtime(
                 abi_revision.expect("boot component should present ABI revision"),
             )

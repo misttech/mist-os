@@ -46,7 +46,7 @@ impl Resolver for BuiltinResolver {
 
         // Unpackaged components built into component_manager are assigned the
         // platform abi revision.
-        let abi_revision = version_history::HISTORY.get_abi_revision_for_platform_components();
+        let abi_revision = version_history_data::HISTORY.get_abi_revision_for_platform_components();
 
         Ok(ResolvedComponent {
             resolved_url: url.to_string(),

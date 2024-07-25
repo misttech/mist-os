@@ -53,7 +53,8 @@ impl SshConnector {
 }
 
 async fn start_ssh_command(target: SocketAddr, env_context: &EnvironmentContext) -> Result<Child> {
-    let rev: u64 = version_history::HISTORY.get_misleading_version_for_ffx().abi_revision.as_u64();
+    let rev: u64 =
+        version_history_data::HISTORY.get_misleading_version_for_ffx().abi_revision.as_u64();
     let abi_revision = format!("{}", rev);
     // Converting milliseconds since unix epoch should have enough bits for u64. As of writing
     // it takes up 43 of the 128 bits to represent the number.

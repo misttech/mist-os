@@ -1961,7 +1961,7 @@ async fn use_resolver_from_parent_environment() {
                                 // this test only resolves one component_url
                                 resolution_context: None,
                                 abi_revision: Some(
-                                    version_history::HISTORY
+                                    version_history_data::HISTORY
                                         .get_example_supported_version_for_tests()
                                         .abi_revision
                                         .into(),
@@ -2059,7 +2059,7 @@ async fn use_resolver_from_grandparent_environment() {
                                 // this test only resolves one component_url
                                 resolution_context: None,
                                 abi_revision: Some(
-                                    version_history::HISTORY
+                                    version_history_data::HISTORY
                                         .get_example_supported_version_for_tests()
                                         .abi_revision
                                         .into(),
@@ -2161,7 +2161,7 @@ async fn resolver_is_not_available() {
                                 // this test only resolves one component_url
                                 resolution_context: None,
                                 abi_revision: Some(
-                                    version_history::HISTORY
+                                    version_history_data::HISTORY
                                         .get_example_supported_version_for_tests()
                                         .abi_revision
                                         .into(),
@@ -2269,7 +2269,7 @@ async fn resolver_component_decl_is_validated() {
                                 // this test only resolves one component_url
                                 resolution_context: None,
                                 abi_revision: Some(
-                                    version_history::HISTORY
+                                    version_history_data::HISTORY
                                         .get_example_supported_version_for_tests()
                                         .abi_revision
                                         .into(),

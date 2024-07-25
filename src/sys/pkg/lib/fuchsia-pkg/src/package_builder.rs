@@ -89,7 +89,7 @@ impl PackageBuilder {
     pub fn new_platform_internal_package(name: impl AsRef<str>) -> Self {
         PackageBuilder::new(
             name,
-            version_history::HISTORY.get_abi_revision_for_platform_components(),
+            version_history_data::HISTORY.get_abi_revision_for_platform_components(),
         )
     }
 

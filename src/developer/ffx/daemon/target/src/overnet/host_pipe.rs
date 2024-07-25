@@ -212,7 +212,7 @@ impl HostPipeChild {
 
         // pass the abi revision as a base 10 number so it is easy to parse.
         let rev: u64 =
-            version_history::HISTORY.get_misleading_version_for_ffx().abi_revision.as_u64();
+            version_history_data::HISTORY.get_misleading_version_for_ffx().abi_revision.as_u64();
         let abi_revision = format!("{}", rev);
         let args =
             vec!["remote_control_runner", "--circuit", &id_string, "--abi-revision", &abi_revision];
