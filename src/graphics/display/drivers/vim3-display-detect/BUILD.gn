@@ -7,8 +7,8 @@ import("//build/components.gni")
 import("//build/drivers.gni")
 
 driver_bind_rules("vim3-display-detect-bind") {
-  rules = "vim3-display-detect.bind"
-  tests = "vim3-display-detect-bind-test.json"
+  rules = "meta/vim3-display-detect.bind"
+  tests = "meta/vim3-display-detect-bind-test.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_bindlib",
     "//src/devices/bind/fuchsia.gpio",
@@ -32,7 +32,7 @@ fuchsia_driver("vim3-display-detect-driver") {
 fuchsia_driver_component("vim3-display-detect") {
   component_name = "vim3-display-detect"
   deps = [ ":vim3-display-detect-driver" ]
-  info = "vim3-display-detect-info.json"
+  info = "meta/vim3-display-detect-info.json"
   manifest = "meta/vim3-display-detect.cml"
 }
 

@@ -67,9 +67,9 @@ import("//build/bind/bind.gni")
 import("//build/drivers.gni")
 
 driver_bind_rules("fancy-display-bind") {
-  rules = "fancy-display.bind"
+  rules = "meta/fancy-display.bind"
   bind_output = "fancy-display.bindbc"
-  tests = "bind_tests.json"
+  tests = "meta/bind_tests.json"
   deps = [
     "//src/devices/bind/board_maker_company.platform",
   ]
@@ -286,7 +286,7 @@ basic bootloader driver. In most cases, your roadmap will be:
 [ddk-tl]: /docs/development/drivers/concepts/driver_development/using-ddktl.md
 [display-coordinator]: /src/graphics/display/drivers/coordinator/
 [driver-binding]: /docs/development/drivers/concepts/device_driver_model/driver-binding.md
-[intel-bind]: /src/graphics/display/drivers/intel-i915/intel-i915.bind
+[intel-bind]: /src/graphics/display/drivers/intel-i915/meta/intel-i915.bind
 [license-policies]: /docs/contribute/governance/policy/open-source-licensing-policies.md
 [sysmem]: https://fuchsia.dev/reference/fidl/fuchsia.sysmem
 [tearing]: https://en.wikipedia.org/wiki/Screen_tearing

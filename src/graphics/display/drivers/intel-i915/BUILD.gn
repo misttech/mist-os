@@ -8,8 +8,8 @@ import("//build/drivers.gni")
 import("//build/test.gni")
 
 driver_bind_rules("intel-i915-bind") {
-  rules = "intel-i915.bind"
-  tests = "bind_tests.json"
+  rules = "meta/intel-i915.bind"
+  tests = "meta/bind_tests.json"
 
   deps = [
     "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_bindlib",
@@ -146,7 +146,7 @@ fuchsia_driver("intel-i915-driver") {
 fuchsia_driver_component("intel-i915") {
   component_name = "intel-i915"
   deps = [ ":intel-i915-driver" ]
-  info = "intel-i915-info.json"
+  info = "meta/intel-i915-info.json"
   manifest = "meta/intel-i915.cml"
 }
 

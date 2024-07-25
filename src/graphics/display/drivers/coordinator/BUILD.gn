@@ -6,9 +6,9 @@ import("//build/bind/bind.gni")
 import("//build/drivers.gni")
 
 driver_bind_rules("coordinator_bind") {
-  rules = "coordinator.bind"
+  rules = "meta/coordinator.bind"
   bind_output = "display-coordinator.bindbc"
-  tests = "bind_tests.json"
+  tests = "meta/bind_tests.json"
   deps = [ "//src/devices/bind/fuchsia.display" ]
 }
 
@@ -33,7 +33,7 @@ fuchsia_driver_component("coordinator") {
   visibility = [ ":*" ]
   component_name = "display-coordinator"
   deps = [ ":coordinator-driver" ]
-  info = "coordinator-info.json"
+  info = "meta/coordinator-info.json"
   manifest = "meta/display-coordinator.cml"
 }
 
