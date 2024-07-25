@@ -1235,22 +1235,28 @@ impl ObjectStore {
         let finished_tombstone_attribute =
             matches!(mode, TrimMode::Tombstone(TombstoneMode::Attribute))
                 && !matches!(result, TrimResult::Incomplete);
-        let mut mutation = self.txn_get_object_mutation(transaction, object_id).await?;
-        if let ObjectValue::Object { attributes: ObjectAttributes { project_id, .. }, .. } =
-            mutation.item.value
-        {
-            let nodes = if finished_tombstone_object { -1 } else { 0 };
-            if project_id != 0 && (deallocated != 0 || nodes != 0) {
-                transaction.add(
-                    self.store_object_id,
-                    Mutation::merge_object(
-                        ObjectKey::project_usage(self.root_directory_object_id(), project_id),
-                        ObjectValue::BytesAndNodes {
-                            bytes: -i64::try_from(deallocated).unwrap(),
-                            nodes,
-                        },
-                    ),
-                );
+        let mut object_mutation = None;
+        let nodes = if finished_tombstone_object { -1 } else { 0 };
+        if nodes != 0 || deallocated != 0 {
+            let mutation = self.txn_get_object_mutation(transaction, object_id).await?;
+            if let ObjectValue::Object { attributes: ObjectAttributes { project_id, .. }, .. } =
+                mutation.item.value
+            {
+                if project_id != 0 {
+                    transaction.add(
+                        self.store_object_id,
+                        Mutation::merge_object(
+                            ObjectKey::project_usage(self.root_directory_object_id(), project_id),
+                            ObjectValue::BytesAndNodes {
+                                bytes: -i64::try_from(deallocated).unwrap(),
+                                nodes,
+                            },
+                        ),
+                    );
+                }
+                object_mutation = Some(mutation);
+            } else {
+                panic!("Inconsistent object type.");
             }
         }
 
@@ -1272,6 +1278,10 @@ impl ObjectStore {
                 );
             }
             if deallocated > 0 {
+                let mut mutation = match object_mutation {
+                    Some(mutation) => mutation,
+                    None => self.txn_get_object_mutation(transaction, object_id).await?,
+                };
                 transaction.add(
                     self.store_object_id,
                     Mutation::merge_object(
