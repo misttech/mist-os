@@ -357,7 +357,7 @@ func constructStaticSpec(ctx context.Context, fx fxRunner, checkoutDir string, a
 
 	var (
 		// These variables eventually represent our final decisions of whether
-		// to use rbe/goma/ccache, since the logic is somewhat convoluted.
+		// to use a compiler prefix, since the logic is somewhat convoluted.
 		useCxxRbeFinal bool
 		useCcacheFinal bool
 	)
