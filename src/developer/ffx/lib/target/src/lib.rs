@@ -1,7 +1,6 @@
 // Copyright 2022 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-
 use addr::TargetAddr;
 use anyhow::{bail, Context as _, Result};
 use compat_info::CompatibilityInfo;
@@ -173,9 +172,12 @@ pub fn open_target_with_fut<'a, 'b: 'a>(
     Ok((target_proxy, fut))
 }
 
-pub async fn is_discovery_enabled(ctx: &EnvironmentContext) -> bool {
-    !ffx_config::is_usb_discovery_disabled(ctx).await
-        || !ffx_config::is_mdns_discovery_disabled(ctx).await
+pub async fn is_discovery_enabled(_ctx: &EnvironmentContext) -> bool {
+    // TODO (b/b/355292969): put back the discovery check after we've addressed the flakes associated
+    // with client-side discovery
+    true
+    // !ffx_config::is_usb_discovery_disabled(ctx).await
+    //     || !ffx_config::is_mdns_discovery_disabled(ctx).await
 }
 
 // Descriptions are used for matching against a TargetInfoQuery
