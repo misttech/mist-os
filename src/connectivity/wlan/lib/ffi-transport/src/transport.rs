@@ -267,13 +267,17 @@ impl EthernetTx {
         };
 
         // Box the closure so that EthernetTxEventSender can be object-safe.
-        let borrowed_operation: Completer<Box<dyn FnOnce(zx::sys::zx_status_t)>> =
+        let borrowed_operation: Completer<Box<dyn FnOnce(zx::sys::zx_status_t)>> = {
             // Safety: This call of `complete_borrowed_operation` uses the value
             // of the received `borrowed_operation` field as its first argument
             // and will only be called once.
-            Completer::new_unchecked(Box::new(move |status| unsafe {
+            let completer = Box::new(move |status| unsafe {
                 complete_borrowed_operation(borrowed_operation, status);
-            }));
+            });
+            // Safety: The borrowed_operation pointer and complete_borrowed_operation
+            // function are both thread-safe.
+            unsafe { Completer::new_unchecked(completer) }
+        };
 
         let async_id = match payload.async_id.with_name("async_id").try_unpack() {
             Ok(x) => x,
