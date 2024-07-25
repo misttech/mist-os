@@ -421,7 +421,8 @@ class X86PageTableImpl : public X86PageTableBase {
     {
       Guard<Mutex> a{AssertOrderedLock, &lock_, LockOrder()};
       DEBUG_ASSERT(virt_);
-      status = RemoveMapping(virt_, static_cast<T*>(this)->top_level(), enlarge, cursor, &cm);
+      status = RemoveMapping(virt_, static_cast<T*>(this)->top_level(), enlarge,
+                             CheckForEmptyPt::No, cursor, &cm);
       cm.Finish();
     }
     DEBUG_ASSERT(cursor.size() == 0 || status.is_error());
@@ -832,6 +833,11 @@ class X86PageTableImpl : public X86PageTableBase {
     return true;
   }
 
+  // Used by callers of RemoveMapping to indicate whether there might be empty page tables in the
+  // tree that need to be checked for. Empty page tables are normally not allowed, but might be
+  // there due to cleaning up a failed attempt at mapping.
+  enum class CheckForEmptyPt : bool { No, Yes };
+
   /**
    * @brief Creates mappings for the range specified by start_cursor
    *
@@ -871,7 +877,8 @@ class X86PageTableImpl : public X86PageTableBase {
         // Build an unmap cursor of what was already mapped.
         MappingCursor unmap_cursor = cursor.ProcessedRange();
         if (unmap_cursor.size() > 0) {
-          auto status = RemoveMapping(table, level, EnlargeOperation::No, unmap_cursor, cm);
+          auto status = RemoveMapping(table, level, EnlargeOperation::No, CheckForEmptyPt::Yes,
+                                      unmap_cursor, cm);
           // Removing the exact mappings we just added should never be able to fail.
           ASSERT(status.is_ok());
           DEBUG_ASSERT(unmap_cursor.size() == 0);
@@ -1028,17 +1035,18 @@ class X86PageTableImpl : public X86PageTableBase {
    * failure, free all pages in the |to_free| list and adjust the |pages_| count.
    *
    * @param table The top-level paging structure's virtual address.
-   * @param start_cursor A cursor describing the range of address space to
-   * unmap within table
-   * @param new_cursor A returned cursor describing how much work was not
-   * completed.  Must be non-null.
+   * @param enlarge Whether the caller can tolerate more being unmapped than was requested.
+   * @param pt_check Whether there might be empty page tables in the range being unmapped that must
+   *        be checked for.
+   * @param cursor A cursor describing the range of address space to unmap within table.
+   * @param cm Reference to a consistency manager to handle invalidations.
    *
    * @return true if the caller (i.e. the next level up page table) might need to
    * free this page table.
    */
   zx::result<bool> RemoveMapping(volatile pt_entry_t* table, PageTableLevel level,
-                                 EnlargeOperation enlarge, MappingCursor& cursor,
-                                 ConsistencyManager* cm) TA_REQ(lock_) {
+                                 EnlargeOperation enlarge, CheckForEmptyPt pt_check,
+                                 MappingCursor& cursor, ConsistencyManager* cm) TA_REQ(lock_) {
     DEBUG_ASSERT(table);
     DEBUG_ASSERT(static_cast<T*>(this)->check_vaddr(cursor.vaddr()));
     // Unified page tables should never be unmapping entries directly; rather, their constituent
@@ -1098,7 +1106,7 @@ class X86PageTableImpl : public X86PageTableBase {
       volatile pt_entry_t* next_table = get_next_table_from_entry(pt_val);
       // Remember where we are unmapping from in case we need to do a second pass to remove a PT.
       const vaddr_t unmap_vaddr = cursor.vaddr();
-      auto status = RemoveMapping(next_table, lower_level(level), enlarge, cursor, cm);
+      auto status = RemoveMapping(next_table, lower_level(level), enlarge, pt_check, cursor, cm);
       if (status.is_error()) {
         return status;
       }
@@ -1146,7 +1154,7 @@ class X86PageTableImpl : public X86PageTableBase {
       DEBUG_ASSERT(cursor.size() == 0 || page_aligned(level, cursor.vaddr()));
     }
 
-    return zx::ok(unmapped || !any_pages);
+    return zx::ok(unmapped || (!any_pages && pt_check == CheckForEmptyPt::Yes));
   }
   // Base case of RemoveMapping for smallest page size.
   bool RemoveMappingL0(volatile pt_entry_t* table, MappingCursor& cursor, ConsistencyManager* cm)
@@ -1331,8 +1339,8 @@ class X86PageTableImpl : public X86PageTableBase {
         lower_unmapped = HarvestMapping(next_table, non_terminal_action, terminal_action,
                                         lower_level(level), cursor, cm);
       } else if (non_terminal_action == NonTerminalAction::FreeUnaccessed) {
-        auto status =
-            RemoveMapping(next_table, lower_level(level), EnlargeOperation::No, cursor, cm);
+        auto status = RemoveMapping(next_table, lower_level(level), EnlargeOperation::No,
+                                    CheckForEmptyPt::No, cursor, cm);
         // Although we pass in EnlargeOperation::No, the unmap should never fail since we are
         // unmapping an entire block and never a sub part of a page.
         ASSERT(status.is_ok());
