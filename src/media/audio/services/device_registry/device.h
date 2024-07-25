@@ -256,9 +256,9 @@ class Device : public std::enable_shared_from_this<Device> {
   void OnRemoval();
 
   template <typename ResultT>
-  bool LogResultError(const ResultT& result, const char* debug_context);
+  bool SetDeviceErrorOnFidlError(const ResultT& result, const char* debug_context);
   template <typename ResultT>
-  bool LogResultFrameworkError(const ResultT& result, const char* debug_context);
+  bool SetDeviceErrorOnFidlFrameworkError(const ResultT& result, const char* debug_context);
 
   fuchsia_audio_device::Info CreateDeviceInfo();
   void CreateDeviceClock();
