@@ -10,7 +10,6 @@
     program: {
         binary: "bin/sink_validator",
         args: [
-            "--new-file-line-rules",
             "--test-stop-listener",
             "--test-invalid-unicode",
         ],

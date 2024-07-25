@@ -108,7 +108,7 @@ mod tests {
     use super::*;
     use crate::testing::TEST_IDENTITY;
     use diagnostics_data::{LogsField, Severity};
-    use diagnostics_log_encoding::encode::Encoder;
+    use diagnostics_log_encoding::encode::{Encoder, EncoderOpts};
     use diagnostics_log_encoding::{Argument, Record, Severity as StreamSeverity, Value};
     use diagnostics_message::{fx_log_packet_t, METADATA_SIZE};
     use fuchsia_zircon as zx;
@@ -165,7 +165,7 @@ mod tests {
             ],
         };
         let mut buffer = Cursor::new(vec![0u8; 1024]);
-        let mut encoder = Encoder::new(&mut buffer);
+        let mut encoder = Encoder::new(&mut buffer, EncoderOpts::default());
         encoder.write_record(&record).unwrap();
         let encoded = &buffer.get_ref()[..buffer.position() as usize];
 

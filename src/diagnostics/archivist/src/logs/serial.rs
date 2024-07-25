@@ -193,7 +193,7 @@ mod tests {
     use crate::identity::ComponentIdentity;
     use crate::logs::stored_message::{GenericStoredMessage, StructuredStoredMessage};
     use diagnostics_data::{BuilderArgs, LogsDataBuilder, LogsField, LogsProperty, Severity};
-    use diagnostics_log_encoding::encode::Encoder;
+    use diagnostics_log_encoding::encode::{Encoder, EncoderOpts};
     use diagnostics_log_encoding::{Argument, Record, Severity as StreamSeverity, Value};
     use fuchsia_async as fasync;
     use fuchsia_zircon::Time;
@@ -352,7 +352,7 @@ mod tests {
                 .push(Argument { name: "tag".to_string(), value: Value::Text(tag.to_string()) });
         }
         let mut buffer = Cursor::new(vec![0u8; 1024]);
-        let mut encoder = Encoder::new(&mut buffer);
+        let mut encoder = Encoder::new(&mut buffer, EncoderOpts::default());
         encoder.write_record(&record).unwrap();
         let encoded = &buffer.get_ref()[..buffer.position() as usize];
         StructuredStoredMessage::create(encoded.to_vec(), Default::default())

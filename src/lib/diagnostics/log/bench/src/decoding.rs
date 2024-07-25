@@ -3,7 +3,9 @@
 // found in the LICENSE file.
 
 use assert_matches::assert_matches;
-use diagnostics_log_encoding::encode::{Argument, Encoder, TracingEvent, Value, WriteEventParams};
+use diagnostics_log_encoding::encode::{
+    Argument, Encoder, EncoderOpts, TracingEvent, Value, WriteEventParams,
+};
 use diagnostics_log_encoding::parse::{parse_argument, parse_record};
 use fidl_fuchsia_logger::MAX_DATAGRAM_LEN_BYTES;
 use fuchsia_criterion::{criterion, FuchsiaCriterion};
@@ -22,7 +24,7 @@ fn bench_argument(
     move |b: &mut criterion::Bencher| {
         let arg = Argument { name: "foo", value: value.clone() };
         let buffer = [0u8; MAX_DATAGRAM_LEN_BYTES as usize];
-        let mut encoder = Encoder::new(Cursor::new(buffer));
+        let mut encoder = Encoder::new(Cursor::new(buffer), EncoderOpts::default());
         let _ = encoder.write_argument(&arg);
         b.iter(|| parse_argument(encoder.inner().get_ref()))
     }
@@ -39,7 +41,7 @@ fn write<const N: usize>(
     let value_set = metadata.fields().value_set(&value_set_entries);
     let event = Event::new(metadata, &value_set);
     let buffer = [0u8; ENCODE_SIZE];
-    let mut encoder = Encoder::new(Cursor::new(buffer));
+    let mut encoder = Encoder::new(Cursor::new(buffer), EncoderOpts::default());
     assert_matches!(
         encoder.write_event(WriteEventParams {
             event: TracingEvent::<Registry>::from_event(&event),

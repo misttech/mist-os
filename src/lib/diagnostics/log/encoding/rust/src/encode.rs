@@ -25,6 +25,17 @@ use {fidl_fuchsia_diagnostics_stream as fstream, fuchsia_zircon as zx};
 pub struct Encoder<B> {
     pub(crate) buf: B,
     found_error: Option<EncodingError>,
+    /// Encoder options
+    options: EncoderOpts,
+}
+
+/// Options for the encoder
+#[derive(Default)]
+pub struct EncoderOpts {
+    /// Whether or not to always log the line/file information
+    /// Defaults to false. If false, the line/file information
+    /// will only be logged for ERROR and above.
+    pub always_log_file_line: bool,
 }
 
 /// Parameters for `Encoder/write_event`.
@@ -48,8 +59,8 @@ where
     B: MutableBuffer,
 {
     /// Create a new `Encoder` from the provided buffer.
-    pub fn new(buf: B) -> Self {
-        Self { buf, found_error: None }
+    pub fn new(buf: B, options: EncoderOpts) -> Self {
+        Self { buf, found_error: None, options }
     }
 
     /// Returns a reference to the underlying buffer being used for encoding.
@@ -77,9 +88,8 @@ where
             if dropped > 0 {
                 this.write_argument(Argument { name: "num_dropped", value: dropped.into() })?;
             }
-
-            // If the severity is ERROR or higher, we add the file and line information.
-            if severity >= Severity::Error.into_primitive() {
+            if this.options.always_log_file_line || severity >= Severity::Error.into_primitive() {
+                // If the severity is ERROR or higher, we add the file and line information.
                 if let Some(mut file) = event.file() {
                     let split = file.split("../");
                     file = split.last().unwrap();
@@ -250,7 +260,8 @@ pub struct EncodedSpanArguments {
 impl EncodedSpanArguments {
     /// Encodes the given span attributes.
     pub fn new(attrs: &span::Attributes<'_>) -> Result<Self, EncodingError> {
-        let mut encoder = Encoder::new(Cursor::new(ResizableBuffer(Vec::new())));
+        let mut encoder =
+            Encoder::new(Cursor::new(ResizableBuffer(Vec::new())), EncoderOpts::default());
         attrs.record(&mut encoder);
         if let Some(err) = encoder.found_error {
             return Err(err);
@@ -261,7 +272,8 @@ impl EncodedSpanArguments {
     /// Encodes the given span attributes, replacing existing ones.
     // TODO(b/312805612): this should update rather than overwrite.
     pub fn from_record(record: &span::Record<'_>) -> Result<Self, EncodingError> {
-        let mut encoder = Encoder::new(Cursor::new(ResizableBuffer(Vec::new())));
+        let mut encoder =
+            Encoder::new(Cursor::new(ResizableBuffer(Vec::new())), EncoderOpts::default());
         record.record(&mut encoder);
         if let Some(err) = encoder.found_error {
             return Err(err);
@@ -942,7 +954,7 @@ mod tests {
 
     #[fuchsia::test]
     fn build_basic_record() {
-        let mut encoder = Encoder::new(Cursor::new([0u8; 1024]));
+        let mut encoder = Encoder::new(Cursor::new([0u8; 1024]), EncoderOpts::default());
         encoder
             .write_event(WriteEventParams::<_, &str, _> {
                 event: TestRecord {
@@ -981,7 +993,7 @@ mod tests {
 
     #[fuchsia::test]
     fn build_records_with_location() {
-        let mut encoder = Encoder::new(Cursor::new([0u8; 1024]));
+        let mut encoder = Encoder::new(Cursor::new([0u8; 1024]), EncoderOpts::default());
         encoder
             .write_event(WriteEventParams::<_, &str, _> {
                 event: TestRecord {
@@ -1028,7 +1040,7 @@ mod tests {
 
     #[fuchsia::test]
     fn build_record_with_dropped_count() {
-        let mut encoder = Encoder::new(Cursor::new([0u8; 1024]));
+        let mut encoder = Encoder::new(Cursor::new([0u8; 1024]), EncoderOpts::default());
         encoder
             .write_event(WriteEventParams::<_, &str, _> {
                 event: TestRecord {
@@ -1083,7 +1095,7 @@ mod tests {
         for<'lookup> S: Subscriber + LookupSpan<'lookup>,
     {
         fn on_event(&self, event: &Event<'_>, cx: Context<'_, S>) {
-            let mut encoder = Encoder::new(Cursor::new([0u8; 1024]));
+            let mut encoder = Encoder::new(Cursor::new([0u8; 1024]), EncoderOpts::default());
             encoder
                 .write_event(WriteEventParams {
                     event: TracingEvent::new(event, cx),

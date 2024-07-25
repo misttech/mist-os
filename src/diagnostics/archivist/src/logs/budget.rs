@@ -133,7 +133,7 @@ mod tests {
     use crate::logs::stored_message::{GenericStoredMessage, StructuredStoredMessage};
     use crate::testing::TEST_IDENTITY;
     use diagnostics_data::{LogsData, Severity};
-    use diagnostics_log_encoding::encode::Encoder;
+    use diagnostics_log_encoding::encode::{Encoder, EncoderOpts};
     use diagnostics_log_encoding::{Argument, Record, Severity as StreamSeverity, Value};
     use fidl_fuchsia_diagnostics::StreamMode;
     use fuchsia_trace as ftrace;
@@ -203,7 +203,7 @@ mod tests {
             ],
         };
         let mut buffer = Cursor::new(vec![0u8; 1024]);
-        let mut encoder = Encoder::new(&mut buffer);
+        let mut encoder = Encoder::new(&mut buffer, EncoderOpts::default());
         encoder.write_record(&record).unwrap();
         let encoded = &buffer.get_ref()[..buffer.position() as usize];
         StructuredStoredMessage::create(encoded.to_vec(), Default::default())

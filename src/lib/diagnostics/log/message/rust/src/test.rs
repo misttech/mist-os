@@ -7,7 +7,7 @@
 use super::*;
 use assert_matches::assert_matches;
 use diagnostics_data::*;
-use diagnostics_log_encoding::encode::Encoder;
+use diagnostics_log_encoding::encode::{Encoder, EncoderOpts};
 use diagnostics_log_encoding::Record;
 use fidl_fuchsia_diagnostics::Severity as StreamSeverity;
 use fidl_fuchsia_logger::{LogLevelFilter, LogMessage};
@@ -529,7 +529,7 @@ fn test_raw_severity_parsing_and_conversions() {
     };
 
     let mut buffer = Cursor::new(vec![0u8; MAX_DATAGRAM_LEN]);
-    let mut encoder = Encoder::new(&mut buffer);
+    let mut encoder = Encoder::new(&mut buffer, EncoderOpts::default());
     encoder.write_record(&record).unwrap();
     let encoded = &buffer.get_ref().as_slice()[..buffer.position() as usize];
     let mut parsed = crate::from_structured(get_test_identity(), encoded).unwrap();
@@ -593,7 +593,7 @@ fn test_from_structured() {
     };
 
     let mut buffer = Cursor::new(vec![0u8; MAX_DATAGRAM_LEN]);
-    let mut encoder = Encoder::new(&mut buffer);
+    let mut encoder = Encoder::new(&mut buffer, EncoderOpts::default());
     encoder.write_record(&record).unwrap();
     let encoded = &buffer.get_ref().as_slice()[..buffer.position() as usize];
     let parsed = crate::from_structured(get_test_identity(), encoded).unwrap();
@@ -642,7 +642,7 @@ fn test_from_structured() {
         ],
     };
     let mut buffer = Cursor::new(vec![0u8; MAX_DATAGRAM_LEN]);
-    let mut encoder = Encoder::new(&mut buffer);
+    let mut encoder = Encoder::new(&mut buffer, EncoderOpts::default());
     encoder.write_record(&record).unwrap();
     let encoded = &buffer.get_ref().as_slice()[..buffer.position() as usize];
     let parsed = crate::from_structured(get_test_identity(), encoded).unwrap();
@@ -667,7 +667,7 @@ fn test_from_structured() {
         arguments: vec![],
     };
     let mut buffer = Cursor::new(vec![0u8; MAX_DATAGRAM_LEN]);
-    let mut encoder = Encoder::new(&mut buffer);
+    let mut encoder = Encoder::new(&mut buffer, EncoderOpts::default());
     encoder.write_record(&record).unwrap();
     let encoded = &buffer.get_ref().as_slice()[..buffer.position() as usize];
     let parsed = crate::from_structured(get_test_identity(), encoded).unwrap();
@@ -698,7 +698,7 @@ fn basic_structured_info() {
         arguments: vec![],
     };
     let mut buffer = Cursor::new(vec![0u8; MAX_DATAGRAM_LEN]);
-    let mut encoder = Encoder::new(&mut buffer);
+    let mut encoder = Encoder::new(&mut buffer, EncoderOpts::default());
     encoder.write_record(&record).unwrap();
     let encoded = &buffer.get_ref().as_slice()[..buffer.position() as usize];
 

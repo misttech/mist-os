@@ -43,6 +43,10 @@ pub struct LoggingOptions<'a> {
 
     /// String to include in logged panic messages.
     pub panic_prefix: &'static str,
+
+    /// True to always log file/line information, false to only log
+    /// when severity is ERROR or above.
+    pub always_log_file_line: bool,
 }
 
 #[cfg(not(target_os = "fuchsia"))]
@@ -64,6 +68,9 @@ impl<'a> From<LoggingOptions<'a>> for diagnostics_log::PublishOptions<'a> {
         options = options.blocking(logging.blocking);
         if let Some(severity) = logging.interest.min_severity {
             options = options.minimum_severity(severity);
+        }
+        if logging.always_log_file_line {
+            options = options.always_log_file_line();
         }
         options = options.panic_prefix(logging.panic_prefix);
         options

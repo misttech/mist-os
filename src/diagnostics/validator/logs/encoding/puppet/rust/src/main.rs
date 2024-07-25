@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{format_err, Error};
-use diagnostics_log_encoding::encode::{Encoder, EncodingError};
+use diagnostics_log_encoding::encode::{Encoder, EncoderOpts, EncodingError};
 use fidl_fuchsia_mem::Buffer;
 use fidl_fuchsia_validate_logs::{EncodingPuppetRequest, EncodingPuppetRequestStream, PuppetError};
 use fuchsia_component::server::ServiceFs;
@@ -20,7 +20,7 @@ async fn run_encoding_service(mut stream: EncodingPuppetRequestStream) -> Result
         let EncodingPuppetRequest::Encode { record, responder } = request;
 
         let mut buffer = Cursor::new(vec![0u8; BUFFER_SIZE]);
-        let mut encoder = Encoder::new(&mut buffer);
+        let mut encoder = Encoder::new(&mut buffer, EncoderOpts::default());
         match encoder.write_record(&record) {
             Ok(()) => {
                 let encoded = &buffer.get_ref().as_slice()[..buffer.position() as usize];

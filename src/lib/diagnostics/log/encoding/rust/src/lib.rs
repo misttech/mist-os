@@ -216,7 +216,7 @@ impl FromSeverity for log::LevelFilter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::encode::{Encoder, EncodingError, MutableBuffer};
+    use crate::encode::{Encoder, EncoderOpts, EncodingError, MutableBuffer};
     use crate::parse::{parse_argument, try_parse_record, ParseResult};
     use fuchsia_zircon as zx;
     use std::fmt::Debug;
@@ -232,7 +232,7 @@ mod tests {
     ) where
         T: Debug + PartialEq,
     {
-        let mut encoder = Encoder::new(Cursor::new(vec![0; BUF_LEN]));
+        let mut encoder = Encoder::new(Cursor::new(vec![0; BUF_LEN]), EncoderOpts::default());
         encoder_method(&mut encoder, &val).unwrap();
 
         // next we'll parse the record out of a buf with padding after the record
@@ -384,7 +384,7 @@ mod tests {
     #[fuchsia::test]
     fn invalid_records() {
         // invalid word size
-        let mut encoder = Encoder::new(Cursor::new(vec![0; BUF_LEN]));
+        let mut encoder = Encoder::new(Cursor::new(vec![0; BUF_LEN]), EncoderOpts::default());
         let mut header = Header(0);
         header.set_type(TRACING_FORMAT_LOG_RECORD_TYPE);
         header.set_size_words(0); // invalid, should be at least 2 as header and time are included
