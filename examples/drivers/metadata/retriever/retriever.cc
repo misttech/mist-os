@@ -60,15 +60,15 @@ class Retriever final : public fdf::DriverBase,
       return connector.status_value();
     }
 
+    // [START add_child]
     fuchsia_driver_framework::DevfsAddArgs devfs_args{{.connector = std::move(connector.value())}};
-
     zx::result owned_child = AddOwnedChild("retriever", devfs_args);
     if (owned_child.is_error()) {
-      FDF_SLOG(ERROR, "Failed to add owned child.", KV("status", owned_child.status_string()));
       return owned_child.error_value();
     }
 
     child_node_.emplace(std::move(owned_child.value()));
+    // [END add_child]
 
     return ZX_OK;
   }

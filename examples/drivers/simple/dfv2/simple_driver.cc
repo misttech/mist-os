@@ -45,6 +45,7 @@ zx::result<> SimpleDriver::Start() {
     }
   }
 
+  // [START add_child]
   // Add a child node.
   auto properties = std::vector{fdf::MakeProperty(bind_fuchsia_test::TEST_CHILD, "simple")};
   zx::result child_result = AddChild(child_name, properties, compat_server_.CreateOffers2());
@@ -53,6 +54,7 @@ zx::result<> SimpleDriver::Start() {
   }
 
   child_controller_.Bind(std::move(child_result.value()));
+  // [END add_child]
   return zx::ok();
 }
 

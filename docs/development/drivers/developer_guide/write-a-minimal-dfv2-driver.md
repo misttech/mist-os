@@ -362,121 +362,78 @@ open protocol Node {
 };
 ```
 
-The driver can connect to the `Node` protocol using the `node()` value in the
-`DriverStartArgs` object or from the `DriverBase` class's `node()` function.
+To facilitate this, during startup the driver framework provides a client of
+the bound node's `Node` protocol to the DFv2 driver, through the `DriverBase`.
+The driver can access its node client at any time to create child nodes on it.
+However directly using this FIDL library requires a setup that includes
+creating FIDL channel pairs and constructing the `NodeAddArgs` table.
+Therefore the `DriverBase` class provides a set of helper functions to make
+adding child nodes easier. (To see these helpers, check out the
+[`driver_base.h`][driver-base-add-child] file.)
 
-In addition to using the `Node` protocol, you need to create `NodeController`
-endpoints. The `AddChild()` method requires the server end of the
-`fuchsia.driver.framework NodeController` protocol. On the other hand, the
-driver is responsible for storing and keeping the client end of the protocol. If
-this client end is deallocated, the driver framework removes the child node.
+There are two types of nodes a DFv2 driver can add: **unowned** and **owned**.
+The main difference between an unowned node and an owned node is whether they
+participate in the [driver match process][driver-matching] or not.
 
-To add a child node using the `Node` protocol, do the following:
+The driver framework tries to find a driver that matches the properties of
+unowned nodes so it can bind a driver to the node. Once a driver is matched and
+bound to a node, the bound driver becomes the owner of the node.
+On the other hand, owned nodes do not participate in matching since the driver
+that created the node is already the owner.
 
-1. In your DFv2 driver, create an `NodeAddArgs` object, which takes the
-   following arguments:
+#### DriverBase helper functions
 
-   ```none {:.devsite-disable-click-to-copy}
-   type NodeAddArgs = resource table {
-       /// Name of the node.
-       1: name NodeName;
-       2: offers vector<fuchsia.component.decl.Offer>:MAX_OFFER_COUNT;
-       3: symbols vector<NodeSymbol>:MAX_SYMBOL_COUNT;
-       4: properties NodePropertyVector;
-       5: devfs_args DevfsAddArgs;
-   };
-   ```
+The client to the node that your driver is currently bound to is stored in the
+`DriverBase` object. This allows the driver to use the `DriverBase` class's
+`AddChild()` and `AddOwnedChild()` functions to add a child node to this node.
 
-   (Source: [`topology.fidl`][topology-fidl])
+However, to use these `DriverBase` helper functions, the node must not have been
+moved out of the driver. If the node is moved out or your target node is not the
+node that the driver is currently bound to (ie. for a grand-child node),
+you need to use the namespace methods available in the
+[`add_child.h`][fdf-add-child] file instead. These methods are the same as the
+`DriverBase` helper functions except they can be used to add a child to a node
+beyond the reach of the `DriverBase` object, by providing the correct parent
+node client as a target.
 
-   - `name` is the name of the child node.
-   - `offers` is the capabilities the parent is offering to the child node.
-     You can create them with the `MakeOffer()` function in the
-     [`node_adds_args`][node-adds-args] library.
-   - `symbols` is the functions to be provided to the driver. It can be
-     ignored for DFv2 drivers.
-   - `properties` is the child node properties, which determines which
-     driver becomes bound to the child node (for more information, see
-     [Bind rules tutorial][bind-rules-tutorial]). You can create node
-     properties with the `MakeProperty()` function in the
-     [`node_adds_args`][node-adds-args] library.
-   - `devfs_args` is required if the child node needs access to `devfs`.
+Lastly, these helper functions take care of logging errors if they happen,
+so no logging is needed by the driver.
 
-   The example below creates an `NodeAddArgs` object:
+#### Create an unowned node
 
-   ```cpp
-   fidl::Arena arena;
-   auto properties = std::vector{fdf::MakeProperty(arena, bind_fuchsia_test::TEST_CHILD, "simple")};
-     auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
-                     .name(arena, "simple_child")
-                     .properties(arena, std::move(properties))
-                     .Build();
-   ```
+To create an unowned node, a driver can use the `DriverBase::AddChild()` helper
+functions. There are two types of these functions: one that allows providing
+`DevfsAddArgs` and the other that does not. These functions allow setting the
+properties on an unowned node, which the driver framework uses to find a matching
+driver. The return result of both is a client end to the `NodeController` protocol,
+which can either be kept by the driver or discarded safely.
 
-1. Update the driver's `DriverBase` class to add a FIDL client object.
+The example code below creates an unowned node under the driver's bound node:
 
-   The example below uses a `fidl::WireSyncClient` object:
+```cpp
+{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/drivers/simple/dfv2/simple_driver.cc" adjust_indentation="auto" region_tag="add_child" %}
+```
+(Source: [`simple_driver.cc`][simple-example])
 
-   ```cpp
-   class SimpleDriver : public fdf::DriverBase {
-   <...>
-   private:
-   <...>
-     fidl::WireSyncClient<fuchsia_driver_framework::NodeController> child_controller_;
-   };
-   ```
+#### Create an owned node
 
-   This setup allows you to store the client end in the driver.
+To create an owned node, a driver can use the `DriverBase::AddOwnedChild()` helper
+functions. There are again two types: one that allows `DevfsAddArgs` and the other
+that does not. These functions do not provide a properties argument since an owned
+node does not participate in driver matching. The return result of both is an
+`OwnedChildNode` object that contains a client end to the `NodeController` (which
+is safe to discard) and a client end to the `Node` protocol, which is
+**not safe to discard**. The driver must hold on to the `Node` client for as long as
+it wants the owned node to stay around. Dropping this client will cause the driver
+framework to remove the node.
 
-1. Create the server and client endpoints with the `fidl::CreateEndpoints`
-   function, for example:
+The example code below creates an owned node with `devfs` arguments:
 
-   ```cpp
-   zx::result controller_endpoints =
-       fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
-   ZX_ASSERT_MSG(controller_endpoints.is_ok(), "Failed to create endpoints: %s",
-                 controller_endpoints.status_string());
-   ```
+```cpp
+{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/drivers/metadata/retriever/retriever.cc" adjust_indentation="auto" region_tag="add_child" %}
+```
 
-1. Bind the client end to the FIDL client object, for example:
-
-   ```cpp
-   child_controller_.Bind(std::move(endpoints->client));
-   ```
-
-   You can now connect to the `Node` server using the `Node` object,
-
-1. Connect to the `Node` server and call the `AddChild()` method, for example:
-
-   ```cpp
-    fidl::WireResult result =
-         fidl::WireCall(node())->AddChild(args, std::move(controller_endpoints->server), {});
-   ```
-
-   Putting all the steps together looks like the following example:
-
-   ```cpp
-   void SimpleDriver::Start(fdf::StartCompleter completer) {
-     fidl::Arena arena;
-     auto properties = std::vector{fdf::MakeProperty(arena, bind_fuchsia_test::TEST_CHILD, "skeleton")};
-     auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
-                     .name(arena, "skeleton_child")
-                     .properties(arena, std::move(properties))
-                     .Build();
-
-     auto controller_endpoints = fidl::Endpoints<fuchsia_driver_framework::NodeController>::Create();
-     controller_.Bind(std::move(controller_endpoints.client));
-
-     fidl::WireResult result =
-         fidl::WireCall(node())->AddChild(args, std::move(controller_endpoints.server), {});
-     if (!result.ok()) {
-       FDF_LOG(ERROR, "Failed to add child %s", result.status_string());
-       return completer(result.status());
-     }
-
-     completer(zx::ok());
-   }
-   ```
+(Source: [`retriever.cc`][retriever-example])
 
 ### Clean up the driver {:#clean-up-the-driver}
 
@@ -531,3 +488,8 @@ guide.
 [node-adds-args]: https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/lib/driver/component/cpp/node_add_args.h
 [bind-rules-tutorial]: /docs/development/drivers/tutorials/bind-rules-tutorial.md
 [set-up-compat-device-server]: /docs/development/drivers/migration/set-up-compat-device-server.md
+[simple-example]: https://cs.opensource.google/fuchsia/fuchsia/+/main:examples/drivers/simple/dfv2/simple_driver.cc
+[retriever-example]: https://cs.opensource.google/fuchsia/fuchsia/+/main:examples/drivers/metadata/retriever/retriever.cc
+[driver-base-add-child]: https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/lib/driver/component/cpp/driver_base.h;l=225-258
+[fdf-add-child]: https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/lib/driver/node/cpp/add_child.h
+[driver-matching]: /docs/concepts/drivers/driver_binding.md
