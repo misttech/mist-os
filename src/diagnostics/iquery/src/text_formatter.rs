@@ -42,14 +42,12 @@ where
         writeln!(w, "    errors = {errors}")?;
     }
 
-    if let Some(name) = &name {
-        match name {
-            InspectHandleName::Filename(f) => {
-                writeln!(w, "    filename = {f}")?;
-            }
-            InspectHandleName::Name(n) => {
-                writeln!(w, "    name = {n}")?;
-            }
+    match &name {
+        InspectHandleName::Filename(f) => {
+            writeln!(w, "    filename = {f}")?;
+        }
+        InspectHandleName::Name(n) => {
+            writeln!(w, "    name = {n}")?;
         }
     }
 
@@ -837,6 +835,7 @@ mod tests {
         output_schema(&mut buf, &data).unwrap();
         let expected = r#"a/b/c/d:
   metadata:
+    name = root
     component_url = test-url
     timestamp = 123456
     escrowed = true

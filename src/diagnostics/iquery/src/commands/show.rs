@@ -9,7 +9,7 @@ use crate::types::Error;
 use argh::{ArgsInfo, FromArgs};
 use async_trait::async_trait;
 use derivative::Derivative;
-use diagnostics_data::{Inspect, InspectData, InspectHandleName};
+use diagnostics_data::{Inspect, InspectData};
 use serde::Serialize;
 use std::cmp::Ordering;
 use std::fmt;
@@ -36,8 +36,8 @@ impl PartialOrd for ShowResultItem {
 impl Ord for ShowResultItem {
     fn cmp(&self, other: &Self) -> Ordering {
         self.moniker.cmp(&other.moniker).then_with(|| {
-            let this_name = self.metadata.name.as_ref().map(InspectHandleName::as_ref);
-            let other_name = other.metadata.name.as_ref().map(InspectHandleName::as_ref);
+            let this_name = self.metadata.name.as_ref();
+            let other_name = other.metadata.name.as_ref();
             this_name.cmp(&other_name)
         })
     }

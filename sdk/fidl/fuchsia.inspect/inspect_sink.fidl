@@ -16,6 +16,9 @@ alias EscrowedVmo = zx.Handle:<VMO, zx.Rights.DUPLICATE | zx.Rights.READ | zx.Ri
 @available(added=16)
 const MAX_NAME_LENGTH uint64 = 4096;
 
+@available(added=NEXT)
+const DEFAULT_TREE_NAME string = "root";
+
 @discoverable(server="platform")
 @available(added=16, replaced=21)
 closed protocol InspectSink {
