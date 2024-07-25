@@ -118,6 +118,58 @@ closed protocol Misc {
 
     /// ## Summary
     ///
+    /// Read the number of high-precision timer ticks since boot, including any time spent in a
+    /// suspended state.
+    ///
+    /// ## Declaration
+    ///
+    /// ```c
+    /// #include <zircon/syscalls.h>
+    ///
+    /// zx_ticks_t zx_ticks_get_boot(void);
+    /// ```
+    ///
+    /// ## Description
+    ///
+    /// `zx_ticks_get_boot()` returns the number of high-precision timer ticks since boot,
+    /// including any time spent in a suspended state.
+    ///
+    /// These ticks may be processor cycles, high speed timer, profiling timer, etc.
+    ///
+    /// ## Rights
+    ///
+    /// None.
+    ///
+    /// ## Return value
+    ///
+    /// `zx_ticks_get_boot()` returns the number of high-precision timer ticks since boot.
+    ///
+    /// ## Errors
+    ///
+    /// `zx_ticks_get_boot()` does not report any error conditions.
+    ///
+    /// ## Notes
+    ///
+    /// The returned value may be highly variable. Factors that can affect it include:
+    ///
+    /// - Reset of the processor cycle counter
+    /// - Reordering of instructions (if required, use a memory barrier)
+    ///
+    /// All Fuchsia systems use an invariant-rate ticks clock, which means that the
+    /// number of ticks per second is constant regardless of changes in processor
+    /// speed or migration between processors.
+    ///
+    /// ## See also
+    ///
+    /// [ticks_per_second](ticks_per_second.md)
+    @next
+    @vdsocall
+    strict TicksGetBoot() -> (@wrapped_return struct {
+        ticks Ticks;
+    });
+
+    /// ## Summary
+    ///
     /// Read the number of high-precision timer ticks in a second.
     ///
     /// ## Declaration
@@ -393,6 +445,20 @@ closed protocol Misc {
     // accessible from user mode code (for whatever reason).
     @internal
     strict TicksGetViaKernel() -> (@wrapped_return struct {
+        ticks Ticks;
+    });
+
+    // Read the number of high-precision timer ticks since boot including any
+    // time spent suspended, but demand that the read be performed using a
+    // syscall, instead of a vdso call.
+    //
+    // Note that this is an internal syscall, not meant to be used by
+    // application code.  By default, the vdso version of this syscall will do
+    // the proper thing, either directly reading from the hardware register
+    // backing the tick counter, or by making a syscall if the register is not
+    // accessible from user mode code (for whatever reason).
+    @internal
+    strict TicksGetBootViaKernel() -> (@wrapped_return struct {
         ticks Ticks;
     });
 };

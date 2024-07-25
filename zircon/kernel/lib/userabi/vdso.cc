@@ -307,19 +307,22 @@ void PatchTimeSyscalls(VDsoMutator mutator) {
 
   if (need_syscall_for_ticks) {
     REDIRECT_SYSCALL(mutator, zx_ticks_get, SYSCALL_zx_ticks_get_via_kernel);
+    REDIRECT_SYSCALL(mutator, zx_ticks_get_boot, SYSCALL_zx_ticks_get_boot_via_kernel);
   }
 
   if (gBootOptions->vdso_clock_get_force_syscall) {
-    // Force a syscall for zx_clock_get_monotonic if instructed to do so by the
-    // kernel command line arguments.  Make sure to swap out the implementation
+    // Force a syscall for zx_clock_get_monotonic and zx_clock_get_boot if instructed to do so by
+    // the kernel command line arguments.  Make sure to swap out the implementation
     // of zx_deadline_after as well.
+    REDIRECT_SYSCALL(mutator, zx_clock_get_boot, SYSCALL_zx_clock_get_boot_via_kernel);
     REDIRECT_SYSCALL(mutator, zx_clock_get_monotonic, SYSCALL_zx_clock_get_monotonic_via_kernel);
     REDIRECT_SYSCALL(mutator, zx_deadline_after, deadline_after_via_kernel_mono);
   } else if (need_syscall_for_ticks) {
     // If ticks must be accessed via syscall, then choose the alternate form
-    // for clock_get_monotonic which performs the scaling in user mode, but
+    // for clock_get_monotonic and clock_get_boot which performs the scaling in user mode, but
     // thunks into the kernel to read the ticks register.
     REDIRECT_SYSCALL(mutator, zx_clock_get_monotonic, clock_get_monotonic_via_kernel_ticks);
+    REDIRECT_SYSCALL(mutator, zx_clock_get_boot, clock_get_boot_via_kernel_ticks);
     REDIRECT_SYSCALL(mutator, zx_deadline_after, deadline_after_via_kernel_ticks);
   }
 }

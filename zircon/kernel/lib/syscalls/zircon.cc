@@ -40,7 +40,9 @@
 #define LOCAL_TRACE 0
 
 KCOUNTER(syscalls_zx_ticks_get, "syscalls.zx_ticks_get")
+KCOUNTER(syscalls_zx_ticks_get_boot, "syscalls.zx_ticks_get_boot")
 KCOUNTER(syscalls_zx_clock_get_monotonic, "syscalls.zx_clock_get_monotonic")
+KCOUNTER(syscalls_zx_clock_get_boot, "syscalls.zx_clock_get_boot")
 KCOUNTER(syscalls_zx_nanosleep, "syscalls.zx_nanosleep")
 KCOUNTER(syscalls_zx_nanosleep_zero_duration, "syscalls.zx_nanosleep_zero_duration")
 
@@ -73,9 +75,19 @@ zx_time_t sys_clock_get_monotonic_via_kernel() {
   return current_time();
 }
 
+zx_time_t sys_clock_get_boot_via_kernel() {
+  kcounter_add(syscalls_zx_clock_get_boot, 1);
+  return current_boot_time();
+}
+
 zx_ticks_t sys_ticks_get_via_kernel() {
   kcounter_add(syscalls_zx_ticks_get, 1);
   return current_ticks();
+}
+
+zx_ticks_t sys_ticks_get_boot_via_kernel() {
+  kcounter_add(syscalls_zx_ticks_get_boot, 1);
+  return current_boot_ticks();
 }
 
 // zx_status_t zx_event_create
