@@ -114,8 +114,11 @@ struct vm_page {
       } __PACKED object_or_stack_owner;
       using object_or_stack_owner_t = decltype(object_or_stack_owner);
 
+      // TODO(fxbug.dev/354716628): Remove workaround for const/volatile qualified atomic_ref.
+      auto* self() const { return const_cast<ktl::remove_const_t<decltype(this)>>(this); }
+
       void* get_object() const {
-        uintptr_t value = object_or_stack_owner.get().load(ktl::memory_order_relaxed);
+        uintptr_t value = self()->object_or_stack_owner.get().load(ktl::memory_order_relaxed);
         if (unlikely(value & kObjectOrStackOwnerIsStackOwnerFlag)) {
           return nullptr;
         }
@@ -174,7 +177,7 @@ struct vm_page {
       }
 
       StackOwnedLoanedPagesInterval* maybe_stack_owner() const {
-        uintptr_t value = object_or_stack_owner.get().load(ktl::memory_order_relaxed);
+        uintptr_t value = self()->object_or_stack_owner.get().load(ktl::memory_order_relaxed);
         if (!(value & kObjectOrStackOwnerIsStackOwnerFlag)) {
           return nullptr;
         }
@@ -182,7 +185,7 @@ struct vm_page {
       }
 
       StackOwnedLoanedPagesInterval& stack_owner() const {
-        uintptr_t value = object_or_stack_owner.get().load(ktl::memory_order_relaxed);
+        uintptr_t value = self()->object_or_stack_owner.get().load(ktl::memory_order_relaxed);
         DEBUG_ASSERT(value & kObjectOrStackOwnerIsStackOwnerFlag);
         return *reinterpret_cast<StackOwnedLoanedPagesInterval*>(value & ~kObjectOrStackOwnerFlags);
       }
@@ -237,7 +240,7 @@ struct vm_page {
 
       bool is_stack_owned() const {
         // This can return true for a page that was loaned fairly recently but is no longer loaned.
-        return !!(object_or_stack_owner.get().load(ktl::memory_order_relaxed) &
+        return !!(self()->object_or_stack_owner.get().load(ktl::memory_order_relaxed) &
                   kObjectOrStackOwnerIsStackOwnerFlag);
       }
 
