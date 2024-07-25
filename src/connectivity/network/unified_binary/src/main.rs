@@ -38,6 +38,7 @@ fn main() -> std::process::ExitCode {
             stack_migration::main();
             std::process::ExitCode::SUCCESS
         }
+        "network_socket_proxy" => socket_proxy::main(),
         x => panic!("unknown binary {x}"),
     }
 }

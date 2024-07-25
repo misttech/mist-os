@@ -2940,6 +2940,68 @@ assembly_input_bundle("netstack3_packages_gub") {
   base_packages = [ "//src/connectivity/network:netstack3_gub" ]
 }
 
+# Enable netpol network-socket-proxy. Either this or
+# network-socket-proxy-disabled must be included.
+#
+# feature_set_levels: minimal
+# build-types: all
+#
+# To be used in conjunction with socket_proxy_packages or socket_proxy_packages_gub.
+#
+assembly_input_bundle("socket-proxy-enabled") {
+  compiled_packages = [
+    {
+      name = "network"
+      components = [
+        {
+          component_name = "network"
+          shards = [
+            "//src/connectivity/network/meta/socket-proxy-enabled.shard.cml",
+          ]
+        },
+      ]
+    },
+  ]
+}
+
+# Disable netpol network-socket-proxy. Either this or
+# network-socket-proxy-enabled must be included.
+#
+# feature_set_levels: minimal
+# build-types: all
+#
+assembly_input_bundle("socket-proxy-disabled") {
+  compiled_packages = [
+    {
+      name = "network"
+      components = [
+        {
+          component_name = "network"
+          shards = [
+            "//src/connectivity/network/meta/socket-proxy-disabled.shard.cml",
+          ]
+        },
+      ]
+    },
+  ]
+}
+
+# Netpol socket-proxy packages without unified binary.
+#
+# This AIB provides packages for the socket-proxy-enabled configuration. It is mutually
+# exclusive with socket_proxy_packages_gub.
+assembly_input_bundle("socket_proxy_packages") {
+  base_packages = [ "//src/connectivity/policy/socket-proxy:package" ]
+}
+
+# Netpol socket-proxy packages with unified binary.
+#
+# This AIB provides packages for the socket-proxy-enabled configuration. It is mutually
+# exclusive with socket_proxy_packages.
+assembly_input_bundle("socket_proxy_packages_gub") {
+  base_packages = [ "//src/connectivity/policy/socket-proxy:package_gub" ]
+}
+
 # Netstack-migration as the netstack for use by base networking.
 #
 # feature_set_levels: minimal

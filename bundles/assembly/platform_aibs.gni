@@ -193,6 +193,10 @@ user_platform_aib_names =
       "netstack_migration",
       "netstack_migration_packages",
       "netstack_migration_packages_gub",
+      "socket-proxy-enabled",
+      "socket-proxy-disabled",
+      "socket_proxy_packages",
+      "socket_proxy_packages_gub",
 
       # WLAN
       "wlan_legacy_privacy_support",

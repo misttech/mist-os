@@ -58,6 +58,7 @@ forensics
 ?netstack-migration
 ?netstack3
 ?network
+?network-socket-proxy
 ?network-tun
 ?omaha-client
 ?overnet-usb

@@ -10,6 +10,7 @@ group("tests") {
     "http-client:tests",
     "netcfg:tests",
     "reachability:tests",
+    "socket-proxy:tests",
     "tests/integration:tests",
   ]
 }

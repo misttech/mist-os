@@ -289,6 +289,13 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
             if connectivity_config.thread.include_lowpan {
                 builder.platform_bundle("thread_lowpan");
             }
+
+            if connectivity_config.netpol.include_socket_proxy {
+                builder.platform_bundle("socket-proxy-enabled");
+                builder.platform_bundle(maybe_gub_bundle("socket_proxy_packages").as_ref());
+            } else {
+                builder.platform_bundle("socket-proxy-disabled");
+            }
         }
 
         // Add the weave core shard if necessary.
