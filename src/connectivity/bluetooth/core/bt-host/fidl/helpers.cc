@@ -1993,6 +1993,17 @@ std::unique_ptr<bt::gatt::Characteristic> Gatt2CharacteristicFromFidl(
   return chrc;
 }
 
+const char* DataPathDirectionToString(pw::bluetooth::emboss::DataPathDirection direction) {
+  switch (direction) {
+    case pw::bluetooth::emboss::DataPathDirection::INPUT:
+      return "input";
+    case pw::bluetooth::emboss::DataPathDirection::OUTPUT:
+      return "output";
+    default:
+      return "invalid";
+  }
+}
+
 pw::bluetooth::emboss::DataPathDirection DataPathDirectionFromFidl(
     const fuchsia::bluetooth::DataDirection& fidl_direction) {
   switch (fidl_direction) {

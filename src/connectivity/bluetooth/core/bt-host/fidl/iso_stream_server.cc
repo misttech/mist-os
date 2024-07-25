@@ -45,7 +45,64 @@ void IsoStreamServer::OnStreamEstablishmentFailed(pw::bluetooth::emboss::StatusC
 void IsoStreamServer::SetupDataPath(
     fuchsia::bluetooth::le::IsochronousStreamSetupDataPathRequest parameters,
     SetupDataPathCallback callback) {
-  callback(fpromise::error(ZX_ERR_NOT_SUPPORTED));
+  pw::bluetooth::emboss::DataPathDirection direction =
+      fidl_helpers::DataPathDirectionFromFidl(parameters.data_direction());
+  const char* direction_as_str = fidl_helpers::DataPathDirectionToString(direction);
+  bt_log(INFO, "fidl", "Request received to set up data path (direction: %s)", direction_as_str);
+  if (direction != pw::bluetooth::emboss::DataPathDirection::OUTPUT) {
+    // We only support Controller => Host at the moment
+    bt_log(WARN, "fidl", "Attempt to set up data path with unsupported direction: %s",
+           direction_as_str);
+    callback(fpromise::error(ZX_ERR_NOT_SUPPORTED));
+    return;
+  }
+
+  bt::StaticPacket<pw::bluetooth::emboss::CodecIdWriter> codec_id =
+      fidl_helpers::CodecIdFromFidl(parameters.codec_attributes().codec_id());
+  std::optional<std::vector<uint8_t>> codec_configuration;
+  if (parameters.codec_attributes().has_codec_configuration()) {
+    codec_configuration = parameters.codec_attributes().codec_configuration();
+  }
+
+  zx::duration delay(parameters.controller_delay());
+  uint32_t delay_in_us = delay.to_usecs();
+  if (!iso_stream_.has_value()) {
+    bt_log(WARN, "fidl", "data path setup failed (CIS not established)");
+    callback(fpromise::error(ZX_ERR_BAD_STATE));
+    return;
+  }
+  if (!iso_stream_->is_alive()) {
+    bt_log(INFO, "fidl", "Attempt to set data path after CIS closed");
+    callback(fpromise::error(ZX_ERR_BAD_STATE));
+    return;
+  }
+
+  (*iso_stream_)
+      ->SetupDataPath(
+          direction, codec_id, codec_configuration, delay_in_us,
+          [callback = std::move(callback)](bt::iso::IsoStream::SetupDataPathError error) {
+            switch (error) {
+              case bt::iso::IsoStream::kSuccess:
+                bt_log(INFO, "fidl", "data path successfully setup");
+                callback(fpromise::ok());
+                break;
+              case bt::iso::IsoStream::kStreamAlreadyExists:
+                bt_log(WARN, "fidl", "data path setup failed (stream already setup)");
+                callback(fpromise::error(ZX_ERR_ALREADY_EXISTS));
+                break;
+              case bt::iso::IsoStream::kCisNotEstablished:
+                bt_log(WARN, "fidl", "data path setup failed (CIS not established)");
+                callback(fpromise::error(ZX_ERR_BAD_STATE));
+                break;
+              case bt::iso::IsoStream::kInvalidArgs:
+                bt_log(WARN, "fidl", "data path setup failed (invalid parameters)");
+                callback(fpromise::error(ZX_ERR_INVALID_ARGS));
+                break;
+              default:
+                BT_PANIC("Unsupported case in SetupDataPathError: %u",
+                         static_cast<unsigned>(error));
+            }
+          });
 }
 
 void IsoStreamServer::Read(ReadCallback callback) {}
