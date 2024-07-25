@@ -274,7 +274,7 @@ impl std::fmt::Display for RouteRequest {
 
 /// The data returned after successfully routing a capability to its source.
 #[derive(Debug)]
-pub struct RouteSource<C: ComponentInstanceInterface> {
+pub struct RouteSource<C: ComponentInstanceInterface + 'static> {
     pub source: CapabilitySource<C>,
     pub relative_path: RelativePath,
 }

@@ -9,6 +9,8 @@ mod tests {
     use cm_rust_testing::*;
     use component_id_index::InstanceId;
     use moniker::Moniker;
+    use routing::capability_source::{CapabilitySource, ComponentCapability};
+    use routing::component_instance::ComponentInstanceInterface;
     use routing::mapper::RouteSegment;
     use routing::RegistrationDecl;
     use routing_test_helpers::component_id_index::make_index_file;
@@ -284,6 +286,7 @@ mod tests {
         ];
         let test =
             RoutingTestBuilderForAnalyzer::new("directory_provider", components).build().await;
+        let root = test.look_up_instance(&Moniker::root()).await.expect("root instance");
         let storage_provider = test
             .look_up_instance(&Moniker::parse_str("/storage_provider").unwrap())
             .await
@@ -312,13 +315,20 @@ mod tests {
                     route: vec![
                         RouteSegment::OfferBy {
                             moniker: Moniker::parse_str("/storage_provider").unwrap(),
-                            capability: offer_storage_decl
+                            capability: offer_storage_decl,
                         },
                         RouteSegment::DeclareBy {
                             moniker: Moniker::parse_str("/storage_provider").unwrap(),
-                            capability: storage_decl
+                            capability: storage_decl.clone(),
                         }
-                    ]
+                    ],
+                    source: Some(CapabilitySource::Component {
+                        capability: ComponentCapability::Directory(match directory_decl.clone() {
+                            CapabilityDecl::Directory(decl) => decl,
+                            _ => panic!("unexpected capability variant"),
+                        }),
+                        component: root.as_weak(),
+                    }),
                 },
                 VerifyRouteResult {
                     using_node: Moniker::parse_str("/storage_provider").unwrap(),
@@ -331,13 +341,20 @@ mod tests {
                         },
                         RouteSegment::OfferBy {
                             moniker: Moniker::root(),
-                            capability: offer_directory_decl
+                            capability: offer_directory_decl,
                         },
                         RouteSegment::DeclareBy {
                             moniker: Moniker::root(),
-                            capability: directory_decl
+                            capability: directory_decl.clone(),
                         }
                     ],
+                    source: Some(CapabilitySource::Component {
+                        capability: ComponentCapability::Directory(match directory_decl {
+                            CapabilityDecl::Directory(decl) => decl,
+                            _ => panic!("unexpected capability variant"),
+                        }),
+                        component: root.as_weak(),
+                    }),
                 }
             ]
         );

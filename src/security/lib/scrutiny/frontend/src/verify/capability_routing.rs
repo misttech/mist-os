@@ -27,8 +27,8 @@ enum ResultBySeverity {
     Ok(OkResult),
 }
 
-impl From<VerifyRouteResult> for ResultBySeverity {
-    fn from(verify_route_result: VerifyRouteResult) -> Self {
+impl From<VerifyRouteResult<ComponentInstanceForAnalyzer>> for ResultBySeverity {
+    fn from(verify_route_result: VerifyRouteResult<ComponentInstanceForAnalyzer>) -> Self {
         match verify_route_result.error {
             None => OkResult {
                 using_node: verify_route_result.using_node,
@@ -136,7 +136,7 @@ impl FromArgValue for ResponseLevel {
 struct CapabilityRouteVisitor {
     model: Arc<ComponentModelForAnalyzer>,
     capability_types: HashSet<CapabilityTypeName>,
-    results: HashMap<CapabilityTypeName, Vec<VerifyRouteResult>>,
+    results: HashMap<CapabilityTypeName, Vec<VerifyRouteResult<ComponentInstanceForAnalyzer>>>,
 }
 
 impl CapabilityRouteVisitor {
@@ -152,16 +152,16 @@ impl CapabilityRouteVisitor {
     }
 
     fn split_ok_warn_error_results(
-        &self,
+        self,
     ) -> HashMap<CapabilityTypeName, (Vec<OkResult>, Vec<WarningResult>, Vec<ErrorResult>)> {
         let mut split_results = HashMap::new();
-        for (type_name, type_results) in self.results.iter() {
+        for (type_name, type_results) in self.results.into_iter() {
             let mut ok_results = vec![];
             let mut warning_results = vec![];
             let mut error_results = vec![];
 
-            for result in type_results.iter() {
-                match result.clone().into() {
+            for result in type_results.into_iter() {
+                match result.into() {
                     ResultBySeverity::Ok(ok_result) => ok_results.push(ok_result),
                     ResultBySeverity::Warning(warning_result) => {
                         warning_results.push(warning_result)
@@ -174,7 +174,7 @@ impl CapabilityRouteVisitor {
         split_results
     }
 
-    fn report_results(&self, level: &ResponseLevel) -> Vec<ResultsForCapabilityType> {
+    fn report_results(self, level: &ResponseLevel) -> Vec<ResultsForCapabilityType> {
         let mut filtered_results = Vec::new();
         let split_results = self.split_ok_warn_error_results();
         for (type_name, (ok, warnings, errors)) in split_results.into_iter() {

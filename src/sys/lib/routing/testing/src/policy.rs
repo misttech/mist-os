@@ -57,7 +57,7 @@ macro_rules! instantiate_global_policy_checker_tests {
 #[async_trait]
 pub trait GlobalPolicyCheckerTest<C>
 where
-    C: ComponentInstanceInterface,
+    C: ComponentInstanceInterface + 'static,
 {
     // Creates a `ComponentInstanceInterface` with the given `Moniker`.
     async fn make_component(&self, moniker: Moniker) -> Arc<C>;

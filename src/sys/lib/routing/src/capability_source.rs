@@ -68,8 +68,8 @@ impl fmt::Display for AggregateMember {
 
 /// Describes the source of a capability, as determined by `find_capability_source`
 #[derive(Debug, Derivative)]
-#[derivative(Clone(bound = ""))]
-pub enum CapabilitySource<C: ComponentInstanceInterface> {
+#[derivative(Clone(bound = ""), PartialEq)]
+pub enum CapabilitySource<C: ComponentInstanceInterface + 'static> {
     /// This capability originates from the component instance for the given Realm.
     /// point.
     Component { capability: ComponentCapability, component: WeakComponentInstanceInterface<C> },
@@ -79,11 +79,19 @@ pub enum CapabilitySource<C: ComponentInstanceInterface> {
     /// This capability originates from the parent of the root component, and is built in to
     /// component manager. `top_instance` is the instance at the top of the tree, i.e.  the
     /// instance representing component manager.
-    Builtin { capability: InternalCapability, top_instance: Weak<C::TopInstance> },
+    Builtin {
+        capability: InternalCapability,
+        #[derivative(PartialEq = "ignore")]
+        top_instance: Weak<C::TopInstance>,
+    },
     /// This capability originates from the parent of the root component, and is offered from
     /// component manager's namespace. `top_instance` is the instance at the top of the tree, i.e.
     /// the instance representing component manager.
-    Namespace { capability: ComponentCapability, top_instance: Weak<C::TopInstance> },
+    Namespace {
+        capability: ComponentCapability,
+        #[derivative(PartialEq = "ignore")]
+        top_instance: Weak<C::TopInstance>,
+    },
     /// This capability is provided by the framework based on some other capability.
     Capability {
         source_capability: ComponentCapability,
@@ -94,6 +102,7 @@ pub enum CapabilitySource<C: ComponentInstanceInterface> {
     AnonymizedAggregate {
         capability: AggregateCapability,
         component: WeakComponentInstanceInterface<C>,
+        #[derivative(PartialEq = "ignore")]
         aggregate_capability_provider: Box<dyn AnonymizedAggregateCapabilityProvider<C>>,
         members: Vec<AggregateMember>,
     },
@@ -101,6 +110,7 @@ pub enum CapabilitySource<C: ComponentInstanceInterface> {
     /// The instances in the aggregate service are the union of these filters.
     FilteredAggregate {
         capability: AggregateCapability,
+        #[derivative(PartialEq = "ignore")]
         capability_provider: Box<dyn FilteredAggregateCapabilityProvider<C>>,
         component: WeakComponentInstanceInterface<C>,
     },
@@ -494,7 +504,7 @@ impl<C> fmt::Debug for Box<dyn AnonymizedAggregateCapabilityProvider<C>> {
 #[derive(Debug)]
 pub struct FilteredAggregateCapabilityRouteData<C>
 where
-    C: ComponentInstanceInterface,
+    C: ComponentInstanceInterface + 'static,
 {
     /// The source of the capability.
     pub capability_source: CapabilitySource<C>,

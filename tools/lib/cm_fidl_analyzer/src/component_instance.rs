@@ -218,6 +218,12 @@ impl ComponentInstanceForAnalyzer {
     }
 }
 
+impl PartialEq for ComponentInstanceForAnalyzer {
+    fn eq(&self, other: &Self) -> bool {
+        self.moniker == other.moniker
+    }
+}
+
 #[async_trait]
 impl ComponentInstanceInterface for ComponentInstanceForAnalyzer {
     type TopInstance = TopInstanceForAnalyzer;

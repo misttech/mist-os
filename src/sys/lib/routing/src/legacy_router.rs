@@ -615,7 +615,7 @@ impl Sources {
 pub struct Use();
 
 /// The result of routing a Use declaration to the next phase.
-enum UseResult<C: ComponentInstanceInterface> {
+enum UseResult<C: ComponentInstanceInterface + 'static> {
     /// The source of the Use was found (Framework, AboveRoot, etc.)
     Source(CapabilitySource<C>),
     /// The Use led to a parent offer.
@@ -638,7 +638,7 @@ impl Use {
         mapper: &mut dyn DebugRouteMapper,
     ) -> Result<UseResult<C>, RoutingError>
     where
-        C: ComponentInstanceInterface,
+        C: ComponentInstanceInterface + 'static,
         V: CapabilityVisitor,
     {
         mapper.add_use(target.moniker().clone(), &use_);
@@ -754,7 +754,7 @@ impl Use {
 pub struct Registration<R>(PhantomData<R>);
 
 /// The result of routing a Registration declaration to the next phase.
-enum RegistrationResult<C: ComponentInstanceInterface, O: Clone + fmt::Debug> {
+enum RegistrationResult<C: ComponentInstanceInterface + 'static, O: Clone + fmt::Debug> {
     /// The source of the Registration was found (Framework, AboveRoot, etc.).
     Source(CapabilitySource<C>),
     /// The Registration led to a parent Offer declaration.
@@ -782,7 +782,7 @@ where
         mapper: &mut dyn DebugRouteMapper,
     ) -> Result<RegistrationResult<C, OfferDecl>, RoutingError>
     where
-        C: ComponentInstanceInterface,
+        C: ComponentInstanceInterface + 'static,
         V: CapabilityVisitor,
     {
         let registration_decl: RegistrationDecl = registration.clone().into();
@@ -890,7 +890,7 @@ where
 pub struct Offer();
 
 /// The result of routing an Offer declaration to the next phase.
-enum OfferResult<C: ComponentInstanceInterface> {
+enum OfferResult<C: ComponentInstanceInterface + 'static> {
     /// The source of the Offer was found (Framework, AboveRoot, Component, etc.).
     Source(CapabilitySource<C>),
     /// The Offer led to an Offer-from-child declaration.
@@ -902,7 +902,7 @@ enum OfferResult<C: ComponentInstanceInterface> {
     OfferFromAnonymizedAggregate(RouteBundle<OfferDecl>, Arc<C>),
 }
 
-enum OfferSegment<C: ComponentInstanceInterface> {
+enum OfferSegment<C: ComponentInstanceInterface + 'static> {
     Done(OfferResult<C>),
     Next(RouteBundle<OfferDecl>, Arc<C>),
 }
@@ -1173,7 +1173,7 @@ where
 pub struct Expose();
 
 /// The result of routing an Expose declaration to the next phase.
-enum ExposeResult<C: ComponentInstanceInterface> {
+enum ExposeResult<C: ComponentInstanceInterface + 'static> {
     /// The source of the Expose was found (Framework, Component, etc.).
     Source(CapabilitySource<C>),
     /// The source of the Expose comes from an aggregation of collections and/or static children
@@ -1337,7 +1337,7 @@ impl<'a, T> Iterator for RouteBundleIter<'a, T> {
 
 impl<'a, T> ExactSizeIterator for RouteBundleIter<'a, T> {}
 
-enum ExposeSegment<C: ComponentInstanceInterface> {
+enum ExposeSegment<C: ComponentInstanceInterface + 'static> {
     Done(ExposeResult<C>),
     Next(RouteBundle<ExposeDecl>, Arc<C>),
 }
@@ -1353,7 +1353,7 @@ impl Expose {
         mapper: &mut dyn DebugRouteMapper,
     ) -> Result<ExposeResult<C>, RoutingError>
     where
-        C: ComponentInstanceInterface,
+        C: ComponentInstanceInterface + 'static,
         V: ExposeVisitor,
         V: CapabilityVisitor,
     {
@@ -1408,7 +1408,7 @@ impl Expose {
         mapper: &mut dyn DebugRouteMapper,
     ) -> Result<ExposeSegment<C>, RoutingError>
     where
-        C: ComponentInstanceInterface,
+        C: ComponentInstanceInterface + 'static,
         V: ExposeVisitor,
         V: CapabilityVisitor,
     {

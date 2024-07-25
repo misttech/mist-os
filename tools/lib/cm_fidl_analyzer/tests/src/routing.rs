@@ -21,6 +21,7 @@ use cm_rust_testing::*;
 use cm_types::Url;
 use fidl::prelude::*;
 use moniker::Moniker;
+use routing::capability_source::{CapabilitySource, ComponentCapability};
 use routing::component_instance::ComponentInstanceInterface;
 use routing::environment::RunnerRegistry;
 use routing::error::RoutingError;
@@ -1976,6 +1977,7 @@ mod tests {
             RoutingTestBuilderForAnalyzer::new_with_custom_urls(a_url, components).build().await;
         let b_component =
             test.look_up_instance(&vec!["b"].try_into().unwrap()).await.expect("b instance");
+        let root_component = test.look_up_instance(&Moniker::root()).await.expect("root instance");
 
         let route_maps = test.model.check_routes_for_instance(
             &b_component,
@@ -2010,9 +2012,16 @@ mod tests {
                     },
                     RouteSegment::DeclareBy {
                         moniker: Moniker::root(),
-                        capability: directory_decl,
+                        capability: directory_decl.clone(),
                     }
-                ]
+                ],
+                source: Some(CapabilitySource::Component {
+                    capability: ComponentCapability::Directory(match directory_decl {
+                        CapabilityDecl::Directory(decl) => decl,
+                        _ => panic!("unexpected capability variant"),
+                    }),
+                    component: root_component.as_weak(),
+                }),
             }]
         );
 
@@ -2028,8 +2037,18 @@ mod tests {
                         moniker: Moniker::root(),
                         capability: RegistrationDecl::Runner(runner_registration_decl)
                     },
-                    RouteSegment::DeclareBy { moniker: Moniker::root(), capability: runner_decl }
-                ]
+                    RouteSegment::DeclareBy {
+                        moniker: Moniker::root(),
+                        capability: runner_decl.clone()
+                    }
+                ],
+                source: Some(CapabilitySource::Component {
+                    capability: ComponentCapability::Runner(match runner_decl {
+                        CapabilityDecl::Runner(decl) => decl,
+                        _ => panic!("unexpected capability variant"),
+                    }),
+                    component: root_component.as_weak(),
+                }),
             }]
         );
 
@@ -2046,8 +2065,18 @@ mod tests {
                         moniker: Moniker::root(),
                         capability: RegistrationDecl::Resolver(resolver_registration_decl)
                     },
-                    RouteSegment::DeclareBy { moniker: Moniker::root(), capability: resolver_decl }
-                ]
+                    RouteSegment::DeclareBy {
+                        moniker: Moniker::root(),
+                        capability: resolver_decl.clone()
+                    }
+                ],
+                source: Some(CapabilitySource::Component {
+                    capability: ComponentCapability::Resolver(match resolver_decl {
+                        CapabilityDecl::Resolver(decl) => decl,
+                        _ => panic!("unexpected capability variant"),
+                    }),
+                    component: root_component.as_weak(),
+                }),
             }]
         );
 
@@ -2068,7 +2097,8 @@ mod tests {
                 route: vec![RouteSegment::ExposeBy {
                     moniker: vec!["b"].try_into().unwrap(),
                     capability: expose_protocol_decl
-                }]
+                }],
+                source: None,
             }],
         );
     }
@@ -2180,7 +2210,8 @@ mod tests {
                 route: vec![RouteSegment::OfferBy {
                     moniker: Moniker::root(),
                     capability: offer_protocol_decl
-                }]
+                }],
+                source: None,
             }]
         );
     }
