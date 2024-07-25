@@ -7,9 +7,7 @@ load(
     "BUILD_TYPES",
     "fuchsia_board_configuration",
     "fuchsia_legacy_bundle",
-    "fuchsia_partitions_configuration",
     "fuchsia_product",
-    "fuchsia_product_bundle",
     "fuchsia_product_configuration",
 )
 
@@ -36,6 +34,7 @@ fuchsia_product_configuration(
             "feature_set_level": "utility",
             "storage": {
                 "filesystems": {
+                    "image_name": "fx_publish",
                     "volume": {
                         "fvm": {
                             "data": {
@@ -57,17 +56,4 @@ fuchsia_product(
     legacy_bundle = ":legacy_gn_aib",
     platform_artifacts = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
     product_config = ":product_assembly_config",
-)
-
-fuchsia_partitions_configuration(
-    name = "fake_partitions_config",
-)
-
-fuchsia_product_bundle(
-    name = "fake_bundle",
-    testonly = True,
-    board_name = "fake_board",
-    main = ":fake_product",
-    partitions_config = ":fake_partitions_config",
-    product_bundle_name = "fake_product",
 )
