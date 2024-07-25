@@ -17,6 +17,7 @@ bazel_product_bundle("microfuchsia_eng.${target_cpu}") {
   allow_eng_platform_bundle_use = true
   image_has_fxfs_blob = false
   image_has_fvm = false
+  product_bundle_name = target_name
   bazel_product_bundle_target =
       "//products/microfuchsia:product_bundle_eng.${target_cpu}"
   bazel_product_image_target =
@@ -43,6 +44,7 @@ if (target_cpu == "x64" || target_cpu == "arm64") {
     image_has_fxfs_blob = false
     image_has_fvm = false
     image_use_vbmeta = false
+    product_bundle_name = target_name
     bazel_product_bundle_target =
         "//products/microfuchsia:product_bundle_eng.${board}"
     bazel_product_image_target =
