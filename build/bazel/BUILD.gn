@@ -155,61 +155,6 @@ action("generate_fuchsia_sdk_repository") {
   hermetic_deps = false
 }
 
-# Generate a build_args.bzl file that contains Bazel-specific constant
-# declarations that match the current build configuration found in args.gn.
-#
-# NOTE: This is deprecated, use @fuchsia_build_info//:args.bzl to get the
-# same constants now. This GN targets will be removed once the last
-# //vendor/... references to it have been removed.
-#
-# Note that another way to pass configuration information is to add
-# specific lines to the project's auto-generated .bazelrc file, or even
-# to set specific options in the Bazel launcher script.
-#
-_build_args_bzl_output = "${target_out_dir}/build_args.bzl"
-_build_args_bzl_target = "build_args.bzl.generated"
-generated_file(_build_args_bzl_target) {
-  output_conversion = "list lines"
-  contents = [ "# Auto-generated - DO NOT EDIT" ]
-
-  # Export use_vbmeta boolean flag.
-  # Boolean values are capitalized differently in GN and Bazel ...
-  if (use_vbmeta) {
-    contents += [ "use_vbmeta = True" ]
-  } else {
-    contents += [ "use_vbmeta = False" ]
-  }
-
-  # Pass the authorized_ssh_keys_path GN arg to bazel, if it was set in args.gn
-  #
-  # This can't be directly specified within Bazel rules as it's really meant to
-  # be a configuration argument for the build.
-  if (authorized_ssh_keys_label != false) {
-    contents +=
-        [ "authorized_ssh_keys_label = \"${authorized_ssh_keys_label}\"" ]
-  } else {
-    contents += [ "authorized_ssh_keys_label = None" ]
-  }
-
-  # Pass the delegated_network_provisioning GN arg to bazel.
-  if (delegated_network_provisioning) {
-    contents += [ "delegated_network_provisioning = True" ]
-  } else {
-    contents += [ "delegated_network_provisioning = False" ]
-  }
-
-  # Pass the product name to Bazel.
-  contents += [ "build_info_product = \"${build_info_product}\"" ]
-
-  outputs = [ _build_args_bzl_output ]
-}
-
-bazel_input_resource("build_args_bazel_inputs") {
-  sources = [ _build_args_bzl_output ]
-  outputs = [ "build_args.bzl" ]
-  deps = [ ":${_build_args_bzl_target}" ]
-}
-
 # Generate content hash files for python and Clang toolchains.
 #
 # These will be used to trigger new runs of the bazel_sdk_test_xxx targets
