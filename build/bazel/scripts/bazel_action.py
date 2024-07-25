@@ -994,6 +994,13 @@ def main() -> int:
         if cpus:
             jobs = 10 * cpus
 
+    if jobs is None:
+        # If an explicit job count was passed to `fx build`, tell Bazel to respect it.
+        # See https://fxbug.dev/351623259
+        job_count = os.environ.get("FUCHSIA_BAZEL_JOB_COUNT")
+        if job_count:
+            jobs = int(job_count)
+
     def run_bazel_query(
         query_type: str, query_args: List[str], ignore_errors: bool
     ) -> "subprocess.CompletedProcess[str]":
