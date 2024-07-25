@@ -75,6 +75,15 @@ declare_args() {
   partitions_config_contents = []
 }
 
+declare_args() {
+  # Possibly use a different configuration for recovery than for the main
+  # product.  By default, use the same board.
+  #
+  # This is a separate declare_args() block so that it can default to the
+  # provided value for 'board_configuration_label'
+  recovery_board_configuration_label = board_configuration_label
+}
+
 # Ensure that partitions_config_label is default_toolchain-qualified.
 if (partitions_config_label != false) {
   if (partitions_config_label ==
