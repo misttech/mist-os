@@ -8,9 +8,9 @@ import("//build/drivers.gni")
 import("//build/test.gni")
 
 driver_bind_rules("usb_adb_bind") {
-  rules = "usb_adb.bind"
+  rules = "meta/usb_adb.bind"
   bind_output = "usb-adb-function.bindbc"
-  tests = "bind-tests.json"
+  tests = "meta/bind-tests.json"
   deps = [
     "//src/devices/bind/fuchsia.google.platform.usb",
     "//src/devices/bind/fuchsia.usb",
@@ -52,7 +52,7 @@ fuchsia_driver("usb-adb-function-driver") {
 fuchsia_driver_component("usb-adb-function") {
   component_name = "usb-adb-function"
   deps = [ ":usb-adb-function-driver" ]
-  info = "usb-adb-function-info.json"
+  info = "meta/usb-adb-function-info.json"
   manifest = "meta/usb-adb-function.cml"
 }
 

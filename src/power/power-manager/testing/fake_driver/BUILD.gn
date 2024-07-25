@@ -23,13 +23,13 @@ source_set("lib") {
 }
 
 driver_bind_rules("bind-to-platform") {
-  rules = "bind-to-platform.bind"
+  rules = "meta/bind-to-platform.bind"
   bind_output = "bind-to-platform.bindbc"
   deps = [ "../fuchsia.powermanager.driver.bind:powermanager_bindlib" ]
 }
 
 driver_bind_rules("bind-to-temp") {
-  rules = "bind-to-temp.bind"
+  rules = "meta/bind-to-temp.bind"
   bind_output = "bind-to-temp.bindbc"
   deps = [ "../fuchsia.powermanager.driver.bind:powermanager_bindlib" ]
 }
@@ -49,7 +49,7 @@ fuchsia_driver_component("component") {
   component_name = "fake-temperature"
   manifest = "meta/fake-temperature-driver.cml"
   deps = [ ":fake-temperature" ]
-  info = "power-manager-fake-driver.json"
+  info = "meta/power-manager-fake-driver.json"
 }
 
 # this binds to sys/temp
@@ -68,7 +68,7 @@ fuchsia_driver_component("component2") {
   component_name = "fake-temperature2"
   manifest = "meta/fake-temperature2-driver.cml"
   deps = [ ":fake-temperature2" ]
-  info = "power-manager-fake-driver.json"
+  info = "meta/power-manager-fake-driver.json"
 }
 
 fuchsia_driver("fake-cpu-ctrl") {
@@ -86,7 +86,7 @@ fuchsia_driver_component("fake-cpu-ctrl-component") {
   component_name = "fake-cpu-ctrl"
   manifest = "meta/fake-cpu-ctrl-driver.cml"
   deps = [ ":fake-cpu-ctrl" ]
-  info = "power-manager-fake-driver.json"
+  info = "meta/power-manager-fake-driver.json"
 }
 
 fuchsia_driver("nelson-fake-driver") {
@@ -104,5 +104,5 @@ fuchsia_driver_component("nelson-component") {
   component_name = "nelson-fake-driver"
   manifest = "meta/fake-nelson-driver.cml"
   deps = [ ":nelson-fake-driver" ]
-  info = "power-manager-fake-driver.json"
+  info = "meta/power-manager-fake-driver.json"
 }
