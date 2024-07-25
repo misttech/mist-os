@@ -9,6 +9,7 @@ import("//build/test.gni")
 
 driver_bind_rules("virtio-gpu-display-bind") {
   rules = "meta/virtio-gpu-display.bind"
+  bind_output = "virtio-gpu-display.bindbc"
   tests = "meta/bind-tests.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_bindlib",
