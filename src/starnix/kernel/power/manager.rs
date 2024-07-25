@@ -17,7 +17,7 @@ use futures::StreamExt;
 use once_cell::sync::OnceCell;
 use rand::distributions::Alphanumeric;
 use rand::Rng;
-use starnix_logging::{log_error, log_warn};
+use starnix_logging::{log_error, log_info, log_warn};
 use starnix_sync::{Mutex, MutexGuard};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{errno, error};
@@ -401,6 +401,7 @@ impl SuspendResumeManager {
 
     /// Executed on suspend.
     pub fn suspend(&self, state: SuspendState) -> Result<(), Errno> {
+        log_info!(target=?state, "Initiating suspend");
         self.lock().inspect_node.add_entry(|node| {
             node.record_int(SUSPEND_ATTEMPTED_AT, zx::Time::get_monotonic().into_nanos());
             node.record_string(SUSPEND_REQUESTED_STATE, state.to_str());

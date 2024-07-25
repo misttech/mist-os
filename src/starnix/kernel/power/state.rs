@@ -11,7 +11,7 @@ use starnix_uapi::errors::Errno;
 use starnix_uapi::{errno, error};
 use std::borrow::Cow;
 
-#[derive(Copy, Clone, Eq, PartialEq, Hash)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub enum SuspendState {
     /// Suspend-to-disk
     ///
