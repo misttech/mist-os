@@ -852,11 +852,6 @@ def main() -> int:
         if disk_cache:
             bazel_common_args += [f"--disk_cache={disk_cache}"]
 
-    # Pass explicit job count if needed. https://fxbug.dev/351623259
-    job_count = os.environ.get("FUCHSIA_BAZEL_JOB_COUNT")
-    if job_count:
-        bazel_common_args += [f"--jobs={job_count}"]
-
     bazel_config_args += build_metadata_flags()
 
     if args.bazel_build_events_log_json:

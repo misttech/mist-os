@@ -950,28 +950,12 @@ function fx-run-ninja {
 
   local args=()
   local full_cmdline
-  local cpu_load
-  local concurrency
   local have_load=false
   local have_jobs=false
   while [[ $# -gt 0 ]]; do
     case "$1" in
-    -l)
-      have_load=true
-      cpu_load="$2"
-      ;;
-    -j)
-      have_jobs=true
-      concurrency="$2"
-      ;;
-    -l*)
-      have_load=true
-      cpu_load="${1#-l}"
-      ;;
-    -j*)
-      have_jobs=true
-      concurrency="${1#-j}"
-      ;;
+    -l) have_load=true ;;
+    -j) have_jobs=true ;;
     esac
     args+=("$1")
     shift
@@ -986,15 +970,12 @@ function fx-run-ninja {
       # the build, can not lock the screen, etc).
       local cpus
       cpus="$(fx-cpu-count)"
-      cpu_load=$((cpus * 20))
-      args=("-l" "${cpu_load}" "${args[@]}")
+      args=("-l" $((cpus * 20)) "${args[@]}")
     fi
-  elif [[ -z "${cpu_load}" ]]; then
-    echo "ERROR: Missing cpu load (-l) argument."
-    exit 1
   fi
 
   if ! "$have_jobs"; then
+    local concurrency
     concurrency="$(fx-choose-build-concurrency)"
     # macOS in particular has a low default for number of open file descriptors
     # per process, which is prohibitive for higher job counts. Here we raise
@@ -1006,9 +987,6 @@ function fx-run-ninja {
       ulimit -n "${min_limit}"
     fi
     args=("-j" "${concurrency}" "${args[@]}")
-  elif [[ -z "${concurrency}" ]]; then
-    echo "ERROR: Missing job count (-j) argument."
-    exit 1
   fi
 
   # Check for a bad element in $PATH.
@@ -1090,13 +1068,6 @@ function fx-run-ninja {
     ${CLICOLOR_FORCE+"CLICOLOR_FORCE=$CLICOLOR_FORCE"}
     ${FX_BUILD_RBE_STATS+"FX_BUILD_RBE_STATS=$FX_BUILD_RBE_STATS"}
   )
-
-  if [[ "${have_jobs}" ]]; then
-    # Pass any _explicit_ job count provided by the user to the Bazel
-    # launcher script through an environment variable.
-    # See https://fxbug.dev/351623259
-    envs+=("FUCHSIA_BAZEL_JOB_COUNT=${concurrency}")
-  fi
 
   full_cmdline=(
     env -i "${envs[@]}"

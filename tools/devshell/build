@@ -41,9 +41,6 @@
 ##   --toolchain=TOOLCHAIN    Specify the current GN toolchain suffix to use for
 ##                            GN labels that appear after this option.
 ##
-##   -j <count>               Specify an explicit max job count for both Ninja
-##                            and Bazel.
-##
 ##   --host                   Alias for --toolchain=host
 ##   --default                Alias for --toolchain=default
 ##   --fuchsia                Alias for --toolchain=fuchsia
@@ -159,26 +156,14 @@ function main {
         ninja_switches+=("$1")
         ;;
 
-      # As a special case, recognize `-j<count>` and `-j <count>` as valid
-      # options. For now pass them directly to fx-run-ninja, which will eventually
-      # pass them to Bazel. See https://fxbug.dev/351623259
-      -j)
-        ninja_switches+=("$1" "$2")
-        shift
-        ;;
-
-      -j*)
-        ninja_switches+=("$1")
-        ;;
-
       # These Ninja options take an argument, with or without a space separator.
-      -[Cfkldw])
+      -[Cfjkldw])
         has_ninja_options=true
         ninja_switches+=("$1" "$2")
         shift
         ;;
 
-      -[Cfkldw]*)
+      -[Cfjkldw]*)
         has_ninja_options=true
         ninja_switches+=("$1")
         ;;
