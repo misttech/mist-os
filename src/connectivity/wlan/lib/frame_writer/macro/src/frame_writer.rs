@@ -5,12 +5,13 @@
 use crate::header::HeaderDefinition;
 use crate::ie::{Ie, IeDefinition};
 use proc_macro::TokenStream;
+use proc_macro2::Span;
 use quote::quote;
 use std::collections::HashMap;
 use syn::parse::{Parse, ParseStream};
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
-use syn::{braced, parse_macro_input, Error, Expr, Ident, Result, Token};
+use syn::{braced, parenthesized, parse_macro_input, Error, Expr, Ident, Result, Token};
 
 macro_rules! unwrap_or_bail {
     ($x:expr) => {
@@ -21,6 +22,7 @@ macro_rules! unwrap_or_bail {
     };
 }
 
+const GROUP_NAME_FILL_ZEROES: &str = "fill_zeroes";
 const GROUP_NAME_HEADERS: &str = "headers";
 const GROUP_NAME_BODY: &str = "body";
 const GROUP_NAME_IES: &str = "ies";
@@ -28,6 +30,7 @@ const GROUP_NAME_PAYLOAD: &str = "payload";
 
 /// A set of `BufferWrite` types which can be written into a buffer.
 enum Writeable {
+    FillZeroes,
     Header(HeaderDefinition),
     Body(Expr),
     Ie(IeDefinition),
@@ -43,6 +46,7 @@ pub trait BufferWrite {
 impl BufferWrite for Writeable {
     fn gen_frame_len_tokens(&self) -> Result<proc_macro2::TokenStream> {
         match self {
+            Writeable::FillZeroes => Ok(quote!()),
             Writeable::Header(x) => x.gen_frame_len_tokens(),
             Writeable::Body(_) => Ok(quote!(frame_len += body.len();)),
             Writeable::Ie(x) => x.gen_frame_len_tokens(),
@@ -51,6 +55,10 @@ impl BufferWrite for Writeable {
     }
     fn gen_write_to_buf_tokens(&self) -> Result<proc_macro2::TokenStream> {
         match self {
+            Writeable::FillZeroes => Ok(quote!(
+                offset = w.remaining() - frame_len;
+                w.append_bytes_zeroed(offset)?;
+            )),
             Writeable::Header(x) => x.gen_write_to_buf_tokens(),
             Writeable::Body(_) => Ok(quote!(w.append_value(&body[..])?;)),
             Writeable::Ie(x) => x.gen_write_to_buf_tokens(),
@@ -59,6 +67,7 @@ impl BufferWrite for Writeable {
     }
     fn gen_var_declaration_tokens(&self) -> Result<proc_macro2::TokenStream> {
         match self {
+            Writeable::FillZeroes => Ok(quote!()),
             Writeable::Header(x) => x.gen_var_declaration_tokens(),
             Writeable::Body(x) => Ok(quote!(let body = #x;)),
             Writeable::Ie(x) => x.gen_var_declaration_tokens(),
@@ -93,6 +102,7 @@ impl Parse for DefaultSourceMacroArgs {
 
 /// A parseable struct representing the macro's arguments.
 struct WriteDefinitions {
+    fill_zeroes: Option<Writeable>,
     hdrs: Vec<Writeable>,
     body: Option<Writeable>,
     fields: Vec<Writeable>,
@@ -105,12 +115,23 @@ impl Parse for WriteDefinitions {
         braced!(content in input);
         let groups = Punctuated::<GroupArgs, Token![,]>::parse_terminated(&content)?;
 
+        let mut fill_zeroes = None;
         let mut hdrs = vec![];
         let mut fields = vec![];
         let mut body = None;
         let mut payload = None;
         for group in groups {
             match group {
+                GroupArgs::FillZeroes(span) => {
+                    if !hdrs.is_empty() || !fields.is_empty() || body.is_some() || payload.is_some()
+                    {
+                        return Err(Error::new(span, "fill_zeroes must appear first"));
+                    }
+                    if fill_zeroes.is_some() {
+                        return Err(Error::new(span, "fill_zeroes must appear at most once"));
+                    }
+                    fill_zeroes.replace(Writeable::FillZeroes);
+                }
                 GroupArgs::Headers(data) => {
                     hdrs.extend(data.into_iter().map(|x| Writeable::Header(x)));
                 }
@@ -132,13 +153,14 @@ impl Parse for WriteDefinitions {
             }
         }
 
-        Ok(Self { hdrs, fields, body, payload })
+        Ok(Self { fill_zeroes, hdrs, fields, body, payload })
     }
 }
 
 /// A parseable struct representing an individual group of definitions such as headers, IEs or
 /// the buffer provider.
 enum GroupArgs {
+    FillZeroes(Span),
     Headers(Vec<HeaderDefinition>),
     Body(Expr),
     Fields(Vec<IeDefinition>),
@@ -151,6 +173,15 @@ impl Parse for GroupArgs {
         input.parse::<Token![:]>()?;
 
         match name.to_string().as_str() {
+            GROUP_NAME_FILL_ZEROES => {
+                let content;
+                parenthesized!(content in input);
+                if content.is_empty() {
+                    Ok(GroupArgs::FillZeroes(name.span()))
+                } else {
+                    Err(Error::new(name.span(), "fill_zeroes only supports the unit type: ()"))
+                }
+            }
             GROUP_NAME_HEADERS => {
                 let content;
                 braced!(content in input);
@@ -199,13 +230,20 @@ fn process_write_definitions(
     write_defs: WriteDefinitions,
     make_buf_tokens: proc_macro2::TokenStream,
     return_buf_tokens: proc_macro2::TokenStream,
+    allow_fill_zeroes: bool,
 ) -> TokenStream {
     let mut declare_var_tokens = quote!();
     let mut write_to_buf_tokens = quote!();
     let mut frame_len_tokens = quote!(let mut frame_len = 0;);
 
-    // Order writable pieces,=: Hdr + Body + Fields + Payload
+    // Order writable pieces: FillZeroes + Hdr + Body + Fields + Payload
     let mut writables = vec![];
+    if let Some(x) = write_defs.fill_zeroes {
+        if !allow_fill_zeroes {
+            panic!("fill_zeroes only allowed in write_frame_with_fixed_slice");
+        }
+        writables.push(x)
+    }
     writables.extend(write_defs.hdrs);
     if let Some(x) = write_defs.body {
         writables.push(x);
@@ -261,12 +299,12 @@ pub fn process_with_default_source(input: TokenStream) -> TokenStream {
         let mut w = BufferWriter::new(&mut buffer[..]);
     );
     let return_buf_tokens = quote!(
-        let written = w.written();
+        let written = w.bytes_written();
         assert_eq!(written, frame_len);
 
         Ok(arena.make_static(buffer))
     );
-    process_write_definitions(macro_args.write_defs, buf_tokens, return_buf_tokens)
+    process_write_definitions(macro_args.write_defs, buf_tokens, return_buf_tokens, false)
 }
 
 pub fn process_with_dynamic_buffer(input: TokenStream) -> TokenStream {
@@ -276,19 +314,26 @@ pub fn process_with_dynamic_buffer(input: TokenStream) -> TokenStream {
         let mut w = #buffer_source;
     );
     let return_buf_tokens = quote!(Ok(w));
-    process_write_definitions(macro_args.write_defs, buf_tokens, return_buf_tokens)
+    process_write_definitions(macro_args.write_defs, buf_tokens, return_buf_tokens, false)
 }
 
-pub fn process_with_fixed_buffer(input: TokenStream) -> TokenStream {
+pub fn process_with_fixed_slice(input: TokenStream) -> TokenStream {
     let macro_args = parse_macro_input!(input as MacroArgs);
     let buffer_source = macro_args.buffer_source;
     let buf_tokens = quote!(
-        let mut buffer = #buffer_source;
-        let mut w = BufferWriter::new(&mut buffer[..]);
+        let mut w = BufferWriter::new(#buffer_source);
+        let mut offset = 0;
     );
     let return_buf_tokens = quote!(
-        let written = w.bytes_written();
-        Ok((buffer, written))
+        // offset is the start of the frame because it is either the
+        // beginning of the buffer or the first byte of the frame
+        // after filling the front of the buffer with zeroes.
+        let frame_start = offset;
+        // w.bytes_written() is always the end of the frame because it
+        // already counts the zeroes that might be written before the
+        // offset.
+        let frame_end = w.bytes_written();
+        Ok((frame_start, frame_end))
     );
-    process_write_definitions(macro_args.write_defs, buf_tokens, return_buf_tokens)
+    process_write_definitions(macro_args.write_defs, buf_tokens, return_buf_tokens, true)
 }

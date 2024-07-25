@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 pub use wlan_frame_writer_macro::{
-    write_frame, write_frame_with_dynamic_buffer, write_frame_with_fixed_buffer,
+    write_frame, write_frame_with_dynamic_buffer, write_frame_with_fixed_slice,
 };
 
 pub use fdf::Arena as __Arena;
@@ -96,16 +96,6 @@ mod tests {
     }
 
     #[test]
-    fn write_buffer() {
-        let (buffer, written) = write_frame_with_fixed_buffer!(vec![0u8; 10], {
-            ies: { ssid: &b"foobar"[..] }
-        })
-        .expect("frame construction failed");
-        assert_eq!(written, 8);
-        assert_eq!(&[0, 6, 102, 111, 111, 98, 97, 114, 0, 0][..], &buffer[..]);
-    }
-
-    #[test]
     fn write_buf_empty_vec() {
         let buffer = write_frame_with_dynamic_buffer!(vec![], {
             ies: { ssid: &b"foobar"[..] }
@@ -117,12 +107,29 @@ mod tests {
 
     #[test]
     fn write_fixed_buffer() {
-        let (buffer, written) = write_frame_with_fixed_buffer!([0u8; 10], {
+        let mut buffer = [0u8; 10];
+        let (frame_start, frame_end) = write_frame_with_fixed_slice!(&mut buffer[..], {
             ies: { ssid: &b"foobar"[..] }
         })
         .expect("frame construction failed");
-        assert_eq!(written, 8);
-        assert_eq!(&[0, 6, 102, 111, 111, 98, 97, 114,][..], &buffer[..written]);
+        assert_eq!(frame_start, 0);
+        assert_eq!(frame_end, 8);
+        assert_eq!(&[0, 6, 102, 111, 111, 98, 97, 114,][..], &buffer[frame_start..frame_end]);
+    }
+
+    #[test]
+    fn write_fixed_buffer_with_fill_zeroes() {
+        let mut buffer = [0u8; 10];
+        let (frame_start, frame_end) = write_frame_with_fixed_slice!(&mut buffer[..], {
+            fill_zeroes: (),
+            ies: { ssid: &b"foobar"[..] },
+        })
+        .expect("frame construction failed");
+        assert_eq!(frame_start, 2);
+        assert_eq!(frame_end, 10);
+        assert_eq!(&[0, 6, 102, 111, 111, 98, 97, 114,][..], &buffer[frame_start..frame_end]);
+        // Also check the macro filled the beginning with zeroes.
+        assert_eq!(&[0, 0, 0, 6, 102, 111, 111, 98, 97, 114,][..], &buffer[..frame_end]);
     }
 
     #[test]

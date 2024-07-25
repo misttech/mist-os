@@ -35,7 +35,7 @@ use wlan_common::time::TimeUnit;
 use wlan_common::timer::{EventId, Timer};
 use wlan_common::{data_writer, mgmt_writer, wmm};
 use wlan_frame_writer::{
-    write_frame, write_frame_with_dynamic_buffer, write_frame_with_fixed_buffer,
+    write_frame, write_frame_with_dynamic_buffer, write_frame_with_fixed_slice,
 };
 use zerocopy::ByteSlice;
 use {
@@ -693,7 +693,8 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
     fn deliver_msdu<B: ByteSlice>(&mut self, msdu: mac::Msdu<B>) -> Result<(), Error> {
         let mac::Msdu { dst_addr, src_addr, llc_frame } = msdu;
 
-        let (buffer, written) = write_frame_with_fixed_buffer!([0u8; mac::MAX_ETH_FRAME_LEN], {
+        let mut packet = [0u8; mac::MAX_ETH_FRAME_LEN];
+        let (frame_start, frame_end) = write_frame_with_fixed_slice!(&mut packet[..], {
             headers: {
                 mac::EthernetIIHdr: &mac::EthernetIIHdr {
                     da: dst_addr,
@@ -703,10 +704,9 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
             },
             payload: &llc_frame.body,
         })?;
-        let (written, _remaining) = buffer.split_at(written);
         self.ctx
             .device
-            .deliver_eth_frame(written)
+            .deliver_eth_frame(&packet[frame_start..frame_end])
             .map_err(|s| Error::Status(format!("could not deliver Ethernet II frame"), s))
     }
 

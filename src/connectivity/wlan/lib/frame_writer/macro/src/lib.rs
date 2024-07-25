@@ -150,9 +150,36 @@ pub fn write_frame(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     frame_writer::process_with_default_source(input)
 }
 
+/// Writes a frame into a fixed sized slice.
+///
+/// This macro writes the frame into the fixed sized buffer in the
+/// first argument and returns a `Result<(usize, usize), Error>` where
+/// the values in the returned tuple are the beginning and ending indices
+/// of the frame, respectively.
+///
+/// The second argument of this macro is the specification of the
+/// frame defined in the documentation for `write_frame` with the
+/// addition of an optional `fill_zeroes` field.
+///
+/// # Fill with zeroes
+///
+/// The caller may optionally specify `fill_zeroes: ()` at the
+/// beginning of the frame specification. The effect is that the frame
+/// will be written so that the end of the frame ends at the end of
+/// the buffer. The beginning of the buffer will be filled with zeroes
+/// up to the start of the frame. For example,
+///
+/// ```
+/// let buffer = [0u8; 10];
+/// let (frame_start, frame_end) = write_frame_with_fixed_slice!(&mut buffer[..], {
+///     fill_zeroes: (),
+///     ies: { ssid: &b"foobar"[..] },
+/// });
+/// assert_eq!(&[0, 6, 102, 111, 111, 98, 97, 114, 0, 0][..], &buffer[frame_start..frame_end]);
+/// ```
 #[proc_macro]
-pub fn write_frame_with_fixed_buffer(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    frame_writer::process_with_fixed_buffer(input)
+pub fn write_frame_with_fixed_slice(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    frame_writer::process_with_fixed_slice(input)
 }
 
 /// Appends a frame to a dynamically sized buffer.

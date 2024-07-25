@@ -16,7 +16,7 @@ use wlan_common::mac::{self, Aid, AuthAlgorithmNumber, StatusCode};
 use wlan_common::sequence::SequenceManager;
 use wlan_common::timer::{EventId, Timer};
 use wlan_common::{data_writer, mgmt_writer, wmm, TimeUnit};
-use wlan_frame_writer::{write_frame, write_frame_with_fixed_buffer};
+use wlan_frame_writer::{write_frame, write_frame_with_fixed_slice};
 use {
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_mlme as fidl_mlme,
     fuchsia_zircon as zx,
@@ -490,7 +490,8 @@ impl<D: DeviceOps> Context<D> {
         protocol_id: u16,
         body: &[u8],
     ) -> Result<(), Error> {
-        let (buffer, written) = write_frame_with_fixed_buffer!([0u8; mac::MAX_ETH_FRAME_LEN], {
+        let mut packet = [0u8; mac::MAX_ETH_FRAME_LEN];
+        let (frame_start, frame_end) = write_frame_with_fixed_slice!(&mut packet[..], {
             headers: {
                 mac::EthernetIIHdr: &mac::EthernetIIHdr {
                     da: dst_addr,
@@ -500,9 +501,8 @@ impl<D: DeviceOps> Context<D> {
             },
             payload: body,
         })?;
-        let (written, _remaining) = buffer.split_at(written);
         self.device
-            .deliver_eth_frame(written)
+            .deliver_eth_frame(&packet[frame_start..frame_end])
             .map_err(|s| Error::Status(format!("could not deliver Ethernet II frame"), s))
     }
 }
