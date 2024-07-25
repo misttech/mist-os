@@ -13,7 +13,10 @@ rustc_library("data") {
 
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
 
-  deps = [ "//src/lib/versioning/version-history/rust" ]
+  deps = [
+    "//src/lib/versioning/version-history/rust",
+    "//src/lib/versioning/version-history/rust/proc-macro",
+  ]
 
   sources = [ "src/lib.rs" ]
 }
