@@ -309,6 +309,7 @@ mod tests {
 
     use alloc::vec;
 
+    use assert_matches::assert_matches;
     use net_declare::net_mac;
     use net_types::ethernet::Mac;
     use netstack3_base::testutil::{
@@ -492,7 +493,7 @@ mod tests {
         );
         let FakeTxQueueBindingsCtxState { woken_tx_tasks, delivered_to_sockets } =
             &bindings_ctx.state;
-        assert_eq!(woken_tx_tasks, &[]);
+        assert_matches!(&woken_tx_tasks[..], &[]);
         assert_eq!(
             delivered_to_sockets,
             &[Frame::Sent(fake_sent_ethernet_with_body(body.as_ref().into()))]
@@ -511,7 +512,7 @@ mod tests {
         );
 
         let CtxPair { core_ctx, bindings_ctx } = &mut ctx;
-        assert_eq!(bindings_ctx.state.woken_tx_tasks, []);
+        assert_matches!(&bindings_ctx.state.woken_tx_tasks[..], &[]);
         assert_eq!(core::mem::take(&mut core_ctx.state.transmitted_packets), []);
     }
 
@@ -600,7 +601,7 @@ mod tests {
             // empty.
             let FakeTxQueueBindingsCtxState { woken_tx_tasks, delivered_to_sockets } =
                 &mut bindings_ctx.state;
-            assert_eq!(core::mem::take(woken_tx_tasks), []);
+            assert_matches!(&core::mem::take(woken_tx_tasks)[..], &[]);
 
             // The queue should now be empty so the next iteration of queueing
             // `MAX_TX_QUEUED_FRAMES` packets should succeed.
@@ -648,7 +649,7 @@ mod tests {
         assert_eq!(core_ctx.state.transmitted_packets, []);
         let FakeTxQueueBindingsCtxState { woken_tx_tasks, delivered_to_sockets } =
             &bindings_ctx.state;
-        assert_eq!(woken_tx_tasks, &[]);
+        assert_matches!(&woken_tx_tasks[..], &[]);
         // Frames were delivered to packet sockets before the device was found
         // to not be ready.
         assert_eq!(
@@ -666,7 +667,7 @@ mod tests {
             Ok(WorkQueueReport::AllDone),
         );
         let CtxPair { core_ctx, bindings_ctx } = &mut ctx;
-        assert_eq!(bindings_ctx.state.woken_tx_tasks, []);
+        assert_matches!(&bindings_ctx.state.woken_tx_tasks[..], &[]);
         // The packet that failed to dequeue is dropped.
         assert_eq!(core::mem::take(&mut core_ctx.state.transmitted_packets), []);
     }
@@ -701,7 +702,7 @@ mod tests {
         let CtxPair { core_ctx, bindings_ctx } = &mut ctx;
         let FakeTxQueueBindingsCtxState { woken_tx_tasks, delivered_to_sockets } =
             &bindings_ctx.state;
-        assert_eq!(woken_tx_tasks, &[]);
+        assert_matches!(&woken_tx_tasks[..], &[]);
         assert_eq!(
             delivered_to_sockets,
             &[Frame::Sent(fake_sent_ethernet_with_body(body.as_ref().into()))]

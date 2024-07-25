@@ -141,4 +141,10 @@ pub(crate) mod testutil {
             true
         }
     }
+
+    impl PartialEq<FakeWeakDeviceId<FakeLinkDeviceId>> for FakeLinkDeviceId {
+        fn eq(&self, FakeWeakDeviceId(other): &FakeWeakDeviceId<FakeLinkDeviceId>) -> bool {
+            self == other
+        }
+    }
 }

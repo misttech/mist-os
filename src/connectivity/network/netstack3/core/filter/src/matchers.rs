@@ -255,6 +255,12 @@ pub(crate) mod testutil {
         }
     }
 
+    impl PartialEq<FakeWeakDeviceId<FakeDeviceId>> for FakeDeviceId {
+        fn eq(&self, FakeWeakDeviceId(other): &FakeWeakDeviceId<FakeDeviceId>) -> bool {
+            self == other
+        }
+    }
+
     impl InterfaceProperties<FakeDeviceClass> for FakeDeviceId {
         fn id_matches(&self, id: &NonZeroU64) -> bool {
             &self.id == id

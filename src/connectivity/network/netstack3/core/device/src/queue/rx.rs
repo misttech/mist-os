@@ -164,6 +164,7 @@ mod tests {
 
     use alloc::vec;
     use alloc::vec::Vec;
+    use assert_matches::assert_matches;
 
     use netstack3_base::testutil::{
         FakeBindingsCtx, FakeCoreCtx, FakeLinkDevice, FakeLinkDeviceId,
@@ -312,7 +313,7 @@ mod tests {
             );
             // Should not have woken up the RX task since the queue should be
             // empty.
-            assert_eq!(core::mem::take(&mut bindings_ctx.state.woken_rx_tasks), []);
+            assert_matches!(&core::mem::take(&mut bindings_ctx.state.woken_rx_tasks)[..], []);
 
             // The queue should now be empty so the next iteration of queueing
             // `MAX_RX_QUEUED_LEN` frames should succeed.

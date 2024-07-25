@@ -32,7 +32,7 @@ pub trait DeviceIdentifier: Clone + Debug + Eq + Hash + PartialEq + Send + Sync 
 ///
 /// [`StrongDeviceIdentifier`] indicates that the referenced device is alive
 /// while the instance exists.
-pub trait StrongDeviceIdentifier: DeviceIdentifier {
+pub trait StrongDeviceIdentifier: DeviceIdentifier + PartialEq<Self::Weak> {
     /// The weak version of this identifier.
     type Weak: WeakDeviceIdentifier<Strong = Self>;
 
@@ -237,6 +237,12 @@ pub(crate) mod testutil {
         }
     }
 
+    impl PartialEq<FakeWeakDeviceId<FakeDeviceId>> for FakeDeviceId {
+        fn eq(&self, FakeWeakDeviceId(other): &FakeWeakDeviceId<FakeDeviceId>) -> bool {
+            self == other
+        }
+    }
+
     /// A fake device ID for use in testing.
     ///
     /// [`FakeReferencyDeviceId`] behaves like a referency device ID, each
@@ -303,6 +309,12 @@ pub(crate) mod testutil {
         }
     }
 
+    impl PartialEq<FakeWeakDeviceId<FakeReferencyDeviceId>> for FakeReferencyDeviceId {
+        fn eq(&self, FakeWeakDeviceId(other): &FakeWeakDeviceId<FakeReferencyDeviceId>) -> bool {
+            self == other
+        }
+    }
+
     /// Marks a fake strong device id.
     pub trait FakeStrongDeviceId:
         StrongDeviceIdentifier<Weak = FakeWeakDeviceId<Self>> + 'static + Ord
@@ -354,5 +366,11 @@ pub(crate) mod testutil {
     impl<S, Meta, D: StrongDeviceIdentifier> DeviceIdContext<AnyDevice> for FakeCoreCtx<S, Meta, D> {
         type DeviceId = D;
         type WeakDeviceId = D::Weak;
+    }
+
+    impl PartialEq<FakeWeakDeviceId<MultipleDevicesId>> for MultipleDevicesId {
+        fn eq(&self, FakeWeakDeviceId(other): &FakeWeakDeviceId<MultipleDevicesId>) -> bool {
+            self == other
+        }
     }
 }
