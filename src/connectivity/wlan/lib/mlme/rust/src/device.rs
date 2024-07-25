@@ -10,6 +10,7 @@ use futures::channel::mpsc;
 use futures::Future;
 use ieee80211::MacAddr;
 use std::fmt::Display;
+use std::mem;
 use std::sync::Arc;
 use trace::Id as TraceId;
 use tracing::error;
@@ -376,7 +377,9 @@ impl DeviceOps for Device {
             }
             return Err(status);
         }
-        // Unwrap is safe since the byte slice is always the same size.
+        // Unwrap is safe because FrameControl is the correct size.
+        const _: () =
+            assert!(mem::size_of::<FrameControl>() == 2, "Size of FrameControl is not 2 bytes");
         let frame_control =
             zerocopy::Ref::<&[u8], FrameControl>::new(&buffer[0..=1]).unwrap().into_ref();
         if frame_control.protected() {
