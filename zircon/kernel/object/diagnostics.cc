@@ -32,8 +32,6 @@ namespace {
 
 using pretty::FormattedBytes;
 
-enum class PeerType { Channel, Socket };
-
 // Machinery to walk over a job tree and run a callback on each process.
 template <typename ProcessCallbackType>
 class ProcessWalker final : public JobEnumerator {
@@ -212,59 +210,67 @@ void DumpJobList() {
   GetRootJobDispatcher()->EnumerateChildrenRecursive(&walker);
 }
 
-void DumpProcessPeerDispatchers(PeerType type, fbl::RefPtr<ProcessDispatcher> process,
+void DumpChannelInfo(const ChannelDispatcher* chan) {
+  const uint64_t koid = chan->get_koid();
+  const uint64_t peer_koid = chan->get_related_koid();
+  const ChannelDispatcher::MessageCounts counts = chan->get_message_counts();
+
+  printf("    chan %7" PRIu64 " %7" PRIu64 " count %" PRIu64 " max %" PRIu64 "\n", koid, peer_koid,
+         counts.current, counts.max);
+}
+
+void DumpSocketInfo(const SocketDispatcher* sock) {
+  auto koid = sock->get_koid();
+  auto peer_koid = sock->get_related_koid();
+
+  zx_info_socket_t sock_info = {};
+  sock->GetInfo(&sock_info);
+  const uint32_t flags = sock_info.options;
+
+  const char* sock_type = (flags & ZX_SOCKET_STREAM) ? "stream\0" : "datagram\0";
+  printf("    sock %s %7" PRIu64 " %7" PRIu64 " buf_avail %" PRIu64 "\n", sock_type, koid,
+         peer_koid, sock_info.rx_buf_available);
+}
+
+typedef void (*dump_peer_info)(const Dispatcher*);
+
+void DumpProcessPeerDispatchers(zx_obj_type_t type, fbl::RefPtr<ProcessDispatcher> process,
                                 zx_koid_t koid_filter = ZX_KOID_INVALID) {
   char pname[ZX_MAX_NAME_LEN];
   bool printed_header = false;
 
   process->handle_table().ForEachHandle(
       [&](zx_handle_t handle, zx_rights_t rights, const Dispatcher* disp) {
-        switch (type) {
-          case PeerType::Channel: {
-            if (disp->get_type() == ZX_OBJ_TYPE_CHANNEL) {
-              auto chan = DownCastDispatcher<const ChannelDispatcher>(disp);
-              const uint64_t koid = chan->get_koid();
-              const uint64_t peer_koid = chan->get_related_koid();
-              const ChannelDispatcher::MessageCounts counts = chan->get_message_counts();
+        if (disp->get_type() == type) {
+          zx_koid_t koid = disp->get_koid();
+          zx_koid_t peer_koid = disp->get_related_koid();
 
-              if (koid_filter != ZX_KOID_INVALID && koid_filter != koid && koid_filter != peer_koid)
-                return ZX_OK;
-              if (!printed_header) {
-                [[maybe_unused]] zx_status_t status = process->get_name(pname);
-                DEBUG_ASSERT(status == ZX_OK);
-                printf("%7" PRIu64 " [%s]\n", process->get_koid(), pname);
-                printed_header = true;
-              }
-              printf("    chan %7" PRIu64 " %7" PRIu64 " count %" PRIu64 " max %" PRIu64 "\n", koid,
-                     peer_koid, counts.current, counts.max);
-            }
-            break;
+          if (koid_filter != ZX_KOID_INVALID && koid_filter != koid && koid_filter != peer_koid) {
+            return ZX_OK;
           }
 
-          case PeerType::Socket: {
-            if (disp->get_type() == ZX_OBJ_TYPE_SOCKET) {
+          if (!printed_header) {
+            [[maybe_unused]] zx_status_t status = process->get_name(pname);
+            DEBUG_ASSERT(status == ZX_OK);
+            printf("%7" PRIu64 " [%s]\n", process->get_koid(), pname);
+            printed_header = true;
+          }
+
+          switch (type) {
+            case ZX_OBJ_TYPE_SOCKET: {
               auto sock = DownCastDispatcher<const SocketDispatcher>(disp);
-              auto koid = sock->get_koid();
-              auto peer_koid = sock->get_related_koid();
-
-              zx_info_socket_t sock_info = {};
-              sock->GetInfo(&sock_info);
-              const uint32_t flags = sock_info.options;
-
-              if (koid_filter != ZX_KOID_INVALID && koid_filter != koid && koid_filter != peer_koid)
-                return ZX_OK;
-              if (!printed_header) {
-                [[maybe_unused]] zx_status_t status = process->get_name(pname);
-                DEBUG_ASSERT(status == ZX_OK);
-                printf("%7" PRIu64 " [%s]\n", process->get_koid(), pname);
-                printed_header = true;
-              }
-
-              const char* sock_type = (flags & ZX_SOCKET_STREAM) ? "stream\0" : "datagram\0";
-              printf("    sock %s %7" PRIu64 " %7" PRIu64 " buf_avail %" PRIu64 "\n", sock_type,
-                     koid, peer_koid, sock_info.rx_buf_available);
+              DumpSocketInfo(sock);
+              break;
             }
-            break;
+            case ZX_OBJ_TYPE_CHANNEL: {
+              auto chan = DownCastDispatcher<const ChannelDispatcher>(disp);
+              DumpChannelInfo(chan);
+              break;
+            }
+            default: {
+              printf("Unexpected error, peer type not supported.\n");
+              break;
+            }
           }
         }
 
@@ -272,7 +278,7 @@ void DumpProcessPeerDispatchers(PeerType type, fbl::RefPtr<ProcessDispatcher> pr
       });
 }
 
-void DumpPeerDispatchersByKoid(PeerType type, zx_koid_t id) {
+void DumpPeerDispatchersByKoid(zx_obj_type_t type, zx_koid_t id) {
   auto pd = ProcessDispatcher::LookupProcessById(id);
 
   if (pd) {
@@ -285,7 +291,7 @@ void DumpPeerDispatchersByKoid(PeerType type, zx_koid_t id) {
   }
 }
 
-void DumpAllPeerDispatchers(PeerType type) {
+void DumpAllPeerDispatchers(zx_obj_type_t type) {
   auto walker = MakeProcessWalker([type](ProcessDispatcher* process) {
     DumpProcessPeerDispatchers(type, fbl::RefPtr(process));
   });
@@ -1342,15 +1348,15 @@ int cmd_diagnostics(int argc, const cmd_args* argv, uint32_t flags) {
     DumpProcessHandles(argv[2].u);
   } else if (strcmp(argv[1].str, "ch") == 0) {
     if (argc == 3) {
-      DumpPeerDispatchersByKoid(PeerType::Channel, argv[2].u);
+      DumpPeerDispatchersByKoid(ZX_OBJ_TYPE_CHANNEL, argv[2].u);
     } else {
-      DumpAllPeerDispatchers(PeerType::Channel);
+      DumpAllPeerDispatchers(ZX_OBJ_TYPE_CHANNEL);
     }
   } else if (strcmp(argv[1].str, "sock") == 0) {
     if (argc == 3) {
-      DumpPeerDispatchersByKoid(PeerType::Socket, argv[2].u);
+      DumpPeerDispatchersByKoid(ZX_OBJ_TYPE_SOCKET, argv[2].u);
     } else {
-      DumpAllPeerDispatchers(PeerType::Socket);
+      DumpAllPeerDispatchers(ZX_OBJ_TYPE_SOCKET);
     }
   } else if (strcmp(argv[1].str, "vmos") == 0) {
     if (argc < 3)
