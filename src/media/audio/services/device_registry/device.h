@@ -241,10 +241,8 @@ class Device : public std::enable_shared_from_this<Device> {
   // The following methods query/retrieve the required information during initialization.
   // We use 'Retrieve...' for internal methods, to avoid confusion with the methods on StreamConfig
   // or RingBuffer, which are generally 'Get...'.
-  void RetrieveCodecProperties();
-  void RetrieveCompositeProperties();
-  void RetrieveStreamProperties();
-
+  //
+  void RetrieveDeviceProperties();
   void RetrieveHealthState();
   void RetrieveSignalProcessingState();
 
@@ -293,10 +291,15 @@ class Device : public std::enable_shared_from_this<Device> {
       std::optional<fuchsia_hardware_audio::PlugDetectCapabilities> plug_detect_capabilities);
 
   // Device-type specific methods used during initialization
+  void RetrieveCodecProperties();
   static void SanitizeCodecPropertiesStrings(
       std::optional<fuchsia_hardware_audio::CodecProperties>& codec_properties);
+
+  void RetrieveCompositeProperties();
   static void SanitizeCompositePropertiesStrings(
       std::optional<fuchsia_hardware_audio::CompositeProperties>& composite_properties);
+
+  void RetrieveStreamProperties();
   static void SanitizeStreamPropertiesStrings(
       std::optional<fuchsia_hardware_audio::StreamProperties>& stream_properties);
 

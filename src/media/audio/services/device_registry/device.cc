@@ -571,17 +571,17 @@ void Device::Initialize() {
   FX_CHECK(!is_operational());
 
   if (is_codec()) {
-    RetrieveCodecProperties();
+    RetrieveDeviceProperties();
     RetrieveHealthState();
     RetrieveSignalProcessingState();
     RetrieveCodecDaiFormatSets();
     RetrievePlugState();
   } else if (is_composite()) {
-    RetrieveCompositeProperties();
+    RetrieveDeviceProperties();
     RetrieveHealthState();
     RetrieveSignalProcessingState();  // On completion, this starts format-set-retrieval.
   } else if (is_stream_config()) {
-    RetrieveStreamProperties();
+    RetrieveDeviceProperties();
     RetrieveHealthState();
     RetrieveSignalProcessingState();
     RetrieveStreamRingBufferFormatSets();
@@ -641,68 +641,24 @@ bool Device::LogResultFrameworkError(const ResultT& result, const char* debug_co
   return result.is_error();
 }
 
-void Device::RetrieveStreamProperties() {
+void Device::RetrieveDeviceProperties() {
   if (has_error()) {
     ADR_WARN_METHOD() << "device already has an error";
     return;
   }
-  ADR_LOG_METHOD(kLogStreamConfigFidlCalls);
-
   // TODO(https://fxbug.dev/42064765): handle command timeouts
 
-  (*stream_config_client_)
-      ->GetProperties()
-      .Then([this](fidl::Result<fha::StreamConfig::GetProperties>& result) {
-        if (LogResultFrameworkError(result, "GetProperties response")) {
-          return;
-        }
-
-        ADR_LOG_OBJECT(kLogStreamConfigFidlResponses) << "StreamConfig/GetProperties: success";
-        if (!ValidateStreamProperties(result->properties())) {
-          OnError(ZX_ERR_INVALID_ARGS);
-          return;
-        }
-
-        FX_CHECK(!has_stream_config_properties())
-            << "StreamConfig/GetProperties response: stream_config_properties_ already set";
-        stream_config_properties_ = result->properties();
-        SanitizeStreamPropertiesStrings(stream_config_properties_);
-        // We have our clock domain now. Create the device clock.
-        CreateDeviceClock();
-
-        OnInitializationResponse();
-      });
-}
-
-// Some drivers return manufacturer or product strings with embedded '\0' characters. Trim them.
-void Device::SanitizeStreamPropertiesStrings(
-    std::optional<fha::StreamProperties>& stream_properties) {
-  if (!stream_properties.has_value()) {
-    FX_LOGS(ERROR) << __func__ << " called with unspecified StreamProperties";
-    return;
-  }
-
-  if (stream_properties->manufacturer().has_value()) {
-    stream_properties->manufacturer(stream_properties->manufacturer()->substr(
-        0, std::min<uint64_t>(stream_properties->manufacturer()->find('\0'),
-                              fha::kMaxUiStringSize - 1)));
-  }
-  if (stream_properties->product().has_value()) {
-    stream_properties->product(stream_properties->product()->substr(
-        0,
-        std::min<uint64_t>(stream_properties->product()->find('\0'), fha::kMaxUiStringSize - 1)));
+  if (is_codec()) {
+    RetrieveCodecProperties();
+  } else if (is_composite()) {
+    RetrieveCompositeProperties();
+  } else if (is_stream_config()) {
+    RetrieveStreamProperties();
   }
 }
 
 void Device::RetrieveCodecProperties() {
-  if (has_error()) {
-    ADR_WARN_METHOD() << "device already has an error";
-    return;
-  }
   ADR_LOG_METHOD(kLogCodecFidlCalls);
-
-  // TODO(https://fxbug.dev/42064765): handle command timeouts
-
   (*codec_client_)->GetProperties().Then([this](fidl::Result<fha::Codec::GetProperties>& result) {
     if (LogResultFrameworkError(result, "GetProperties response")) {
       return;
@@ -723,31 +679,8 @@ void Device::RetrieveCodecProperties() {
   });
 }
 
-void Device::SanitizeCodecPropertiesStrings(std::optional<fha::CodecProperties>& codec_properties) {
-  if (!codec_properties.has_value()) {
-    FX_LOGS(ERROR) << __func__ << " called with unspecified CodecProperties";
-    return;
-  }
-
-  if (codec_properties->manufacturer()) {
-    codec_properties->manufacturer(codec_properties->manufacturer()->substr(
-        0, std::min<uint64_t>(codec_properties->manufacturer()->find('\0'),
-                              fha::kMaxUiStringSize - 1)));
-  }
-  if (codec_properties->product()) {
-    codec_properties->product(codec_properties->product()->substr(
-        0, std::min<uint64_t>(codec_properties->product()->find('\0'), fha::kMaxUiStringSize - 1)));
-  }
-}
-
 void Device::RetrieveCompositeProperties() {
-  if (has_error()) {
-    ADR_WARN_METHOD() << "device already has an error; ignoring this";
-    return;
-  }
   ADR_LOG_METHOD(kLogCompositeFidlCalls);
-
-  // TODO(https://fxbug.dev/42064765): handle command timeouts
 
   (*composite_client_)
       ->GetProperties()
@@ -773,6 +706,49 @@ void Device::RetrieveCompositeProperties() {
       });
 }
 
+void Device::RetrieveStreamProperties() {
+  ADR_LOG_METHOD(kLogStreamConfigFidlCalls);
+  (*stream_config_client_)
+      ->GetProperties()
+      .Then([this](fidl::Result<fha::StreamConfig::GetProperties>& result) {
+        if (LogResultFrameworkError(result, "GetProperties response")) {
+          return;
+        }
+
+        ADR_LOG_OBJECT(kLogStreamConfigFidlResponses) << "StreamConfig/GetProperties: success";
+        if (!ValidateStreamProperties(result->properties())) {
+          OnError(ZX_ERR_INVALID_ARGS);
+          return;
+        }
+
+        FX_CHECK(!has_stream_config_properties())
+            << "StreamConfig/GetProperties response: stream_config_properties_ already set";
+        stream_config_properties_ = result->properties();
+        SanitizeStreamPropertiesStrings(stream_config_properties_);
+        // We have our clock domain now. Create the device clock.
+        CreateDeviceClock();
+
+        OnInitializationResponse();
+      });
+}
+
+void Device::SanitizeCodecPropertiesStrings(std::optional<fha::CodecProperties>& codec_properties) {
+  if (!codec_properties.has_value()) {
+    FX_LOGS(ERROR) << __func__ << " called with unspecified CodecProperties";
+    return;
+  }
+
+  if (codec_properties->manufacturer()) {
+    codec_properties->manufacturer(codec_properties->manufacturer()->substr(
+        0, std::min<uint64_t>(codec_properties->manufacturer()->find('\0'),
+                              fha::kMaxUiStringSize - 1)));
+  }
+  if (codec_properties->product()) {
+    codec_properties->product(codec_properties->product()->substr(
+        0, std::min<uint64_t>(codec_properties->product()->find('\0'), fha::kMaxUiStringSize - 1)));
+  }
+}
+
 void Device::SanitizeCompositePropertiesStrings(
     std::optional<fha::CompositeProperties>& composite_properties) {
   if (!composite_properties.has_value()) {
@@ -789,6 +765,26 @@ void Device::SanitizeCompositePropertiesStrings(
     composite_properties->product(composite_properties->product()->substr(
         0, std::min<uint64_t>(composite_properties->product()->find('\0'),
                               fha::kMaxUiStringSize - 1)));
+  }
+}
+
+// Some drivers return manufacturer or product strings with embedded '\0' characters. Trim them.
+void Device::SanitizeStreamPropertiesStrings(
+    std::optional<fha::StreamProperties>& stream_properties) {
+  if (!stream_properties.has_value()) {
+    FX_LOGS(ERROR) << __func__ << " called with unspecified StreamProperties";
+    return;
+  }
+
+  if (stream_properties->manufacturer().has_value()) {
+    stream_properties->manufacturer(stream_properties->manufacturer()->substr(
+        0, std::min<uint64_t>(stream_properties->manufacturer()->find('\0'),
+                              fha::kMaxUiStringSize - 1)));
+  }
+  if (stream_properties->product().has_value()) {
+    stream_properties->product(stream_properties->product()->substr(
+        0,
+        std::min<uint64_t>(stream_properties->product()->find('\0'), fha::kMaxUiStringSize - 1)));
   }
 }
 

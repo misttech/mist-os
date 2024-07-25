@@ -42,6 +42,7 @@ class FakeComposite
       0xF1, 0xD3, 0xB5, 0x97, 0x79, 0x5B, 0x3D, 0x1F,
       0x0E, 0x2C, 0x4A, 0x68, 0x86, 0xA4, 0xC2, 0xE0,
   };
+  static constexpr ClockDomain kDefaultClockDomain = fuchsia_hardware_audio::kClockDomainMonotonic;
 
   // DaiFormats and format sets
   //
@@ -333,7 +334,7 @@ class FakeComposite
   std::optional<std::string> manufacturer_ = kDefaultManufacturer;
   std::optional<std::string> product_ = kDefaultProduct;
   std::optional<UniqueId> uid_ = kDefaultUniqueInstanceId;
-  std::optional<ClockDomain> clock_domain_ = fuchsia_hardware_audio::kClockDomainMonotonic;
+  std::optional<ClockDomain> clock_domain_ = kDefaultClockDomain;
 
   bool supports_signalprocessing_ = true;
   std::optional<fidl::ServerBindingRef<fuchsia_hardware_audio_signalprocessing::SignalProcessing>>

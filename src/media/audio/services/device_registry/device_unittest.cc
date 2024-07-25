@@ -640,10 +640,10 @@ TEST_F(CompositeTest, Initialization) {
   EXPECT_TRUE(device->is_composite());
 
   ASSERT_TRUE(device->info().has_value());
-  EXPECT_FALSE(device->info()->is_input().has_value());
 }
 
-// Verify that a fake composite is initialized to the expected default values.
+// Verify that a fake composite is initialized to the expected default values,
+// for the device info fields.
 TEST_F(CompositeTest, DeviceInfo) {
   auto fake_driver = MakeFakeComposite();
   auto device = InitializeDeviceForFakeComposite(fake_driver);
@@ -761,7 +761,8 @@ TEST_F(CompositeTest, DeviceInfo) {
 
   EXPECT_FALSE(info.plug_detect_caps().has_value());
 
-  EXPECT_TRUE(info.clock_domain().has_value());
+  ASSERT_TRUE(info.clock_domain().has_value());
+  EXPECT_EQ(*info.clock_domain(), FakeComposite::kDefaultClockDomain);
 
   ASSERT_TRUE(info.signal_processing_elements().has_value());
   EXPECT_FALSE(info.signal_processing_elements()->empty());
