@@ -311,7 +311,9 @@ Evictor::EvictedPageCounts Evictor::EvictPageQueues(uint64_t target_pages,
   }
 
   DEBUG_ASSERT(page_queues_);
-  while (counts.pager_backed + counts.compressed < target_pages) {
+  // Evict until we've counted enough pages to hit the target_pages. Explicitly do not consider
+  // pager_backed_loaned towards our total, as loaned pages do not go to the free memory pool.
+  while (counts.pager_backed + counts.compressed + counts.discardable < target_pages) {
     // TODO(rashaeqbal): The sequence of actions in PeekPagerBacked() and RemovePageForEviction()
     // implicitly guarantee forward progress in this loop, so that we're not stuck trying to evict
     // the same page (i.e. PeekPagerBacked keeps returning the same page). It would be nice to have
