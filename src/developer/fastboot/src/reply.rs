@@ -41,8 +41,13 @@ pub enum ParseReplyError {
     )]
     ReplyTooLong { reply_len: usize },
 
-    #[error("DATA response packet size is {} expected {}", reply_len, DATA_SIZE_LENGTH)]
-    MismatchedDataPacketSize { reply_len: usize },
+    #[error(
+        "DATA response packet size is {} expected {}. Reply: {}",
+        reply_len,
+        DATA_SIZE_LENGTH,
+        reply
+    )]
+    MismatchedDataPacketSize { reply_len: usize, reply: String },
 
     #[error("Error parsing DATA reply size")]
     InvalidDataPacketSize(#[source] ParseIntError),
@@ -73,6 +78,7 @@ impl TryFrom<&[u8]> for Reply {
                 if reply_data_str.len() != DATA_SIZE_LENGTH {
                     return Err(ParseReplyError::MismatchedDataPacketSize {
                         reply_len: reply_data_str.len(),
+                        reply: reply_data_str.to_string(),
                     });
                 }
                 match u32::from_str_radix(&reply_data_str, 16) {
