@@ -8,8 +8,8 @@ import("//build/drivers.gni")
 import("//build/test.gni")
 
 driver_bind_rules("goldfish_address_space-bind") {
-  rules = "goldfish_address_space.bind"
-  tests = "tests.json"
+  rules = "meta/goldfish_address_space.bind"
+  tests = "meta/tests.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_bindlib",
     "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_bindlib",
@@ -53,7 +53,7 @@ fuchsia_driver("address_space_driver-driver") {
 fuchsia_driver_component("address_space_driver") {
   component_name = "goldfish_address_space"
   deps = [ ":address_space_driver-driver" ]
-  info = "address_space_driver-info.json"
+  info = "meta/address_space_driver-info.json"
   manifest = "meta/goldfish_address_space.cml"
 }
 

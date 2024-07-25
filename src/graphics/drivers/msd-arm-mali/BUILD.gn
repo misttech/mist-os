@@ -10,7 +10,7 @@ import("//build/packages/prebuilt_package.gni")
 import("//src/graphics/lib/magma/gnbuild/magma.gni")
 
 driver_bind_rules("msd_arm_bind") {
-  rules = "msd_arm.bind"
+  rules = "meta/msd_arm.bind"
   tests = "tests/bind_tests.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.gpu.mali:fuchsia.hardware.gpu.mali_bindlib",
@@ -106,7 +106,7 @@ fuchsia_driver_component("msd_arm") {
     ":msd_arm_bind",
     ":msd_arm_config_values",
   ]
-  info = "msd_arm-info.json"
+  info = "meta/msd_arm-info.json"
   manifest = "meta/msd_arm.cml"
 }
 
@@ -128,7 +128,7 @@ fuchsia_driver_component("msd_arm_test") {
     ":msd_arm_test-driver",
     ":msd_arm_test_config_values",
   ]
-  info = "msd_arm_test-info.json"
+  info = "meta/msd_arm_test-info.json"
   manifest = "meta/msd_arm_test.cml"
 }
 

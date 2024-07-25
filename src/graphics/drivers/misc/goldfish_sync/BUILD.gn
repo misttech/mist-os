@@ -8,8 +8,8 @@ import("//build/drivers.gni")
 import("//build/test.gni")
 
 driver_bind_rules("goldfish-sync-bind") {
-  rules = "goldfish_sync.bind"
-  tests = "tests.json"
+  rules = "meta/goldfish_sync.bind"
+  tests = "meta/tests.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.interrupt:fuchsia.hardware.interrupt_bindlib",
     "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_bindlib",
@@ -57,7 +57,7 @@ fuchsia_driver("goldfish_sync_driver-driver") {
 fuchsia_driver_component("goldfish_sync_driver") {
   component_name = "goldfish_sync"
   deps = [ ":goldfish_sync_driver-driver" ]
-  info = "goldfish_sync_driver-info.json"
+  info = "meta/goldfish_sync_driver-info.json"
   manifest = "meta/goldfish_sync.cml"
 }
 
