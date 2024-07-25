@@ -14,5 +14,4 @@
 //! routing table(s).
 
 pub(crate) mod api;
-pub(crate) mod route;
 pub(crate) mod state;
