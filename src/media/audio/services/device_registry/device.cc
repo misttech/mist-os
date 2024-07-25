@@ -575,7 +575,7 @@ void Device::Initialize() {
     RetrieveHealthState();
     RetrieveSignalProcessingState();
     RetrieveCodecDaiFormatSets();
-    RetrieveCodecPlugState();
+    RetrievePlugState();
   } else if (is_composite()) {
     RetrieveCompositeProperties();
     RetrieveHealthState();
@@ -585,7 +585,7 @@ void Device::Initialize() {
     RetrieveHealthState();
     RetrieveSignalProcessingState();
     RetrieveStreamRingBufferFormatSets();
-    RetrieveStreamPlugState();
+    RetrievePlugState();
     RetrieveGainState();
   } else {
     FX_LOGS(WARNING) << "Different device type: " << device_type_;
@@ -1457,6 +1457,75 @@ void Device::RetrieveCompositeRingBufferFormatSets() {
   }
 }
 
+void Device::RetrievePlugState() {
+  if (has_error()) {
+    ADR_WARN_METHOD() << "device already has an error";
+    return;
+  }
+  ADR_LOG_METHOD(kLogCodecFidlCalls || kLogStreamConfigFidlCalls);
+
+  if (!has_plug_state()) {
+    // TODO(https://fxbug.dev/42064765): handle command timeouts (but not on subsequent watches)
+  }
+
+  if (is_codec()) {
+    (*codec_client_)
+        ->WatchPlugState()
+        .Then([this](fidl::Result<fha::Codec::WatchPlugState>& result) {
+          if (LogResultFrameworkError(result, "Codec/PlugState response")) {
+            return;
+          }
+          ADR_LOG_OBJECT(kLogCodecFidlResponses) << "Codec/WatchPlugState response";
+
+          std::optional<fha::PlugDetectCapabilities> plug_detect_capabilities =
+              has_codec_properties() ? codec_properties_->plug_detect_capabilities() : std::nullopt;
+          SetPlugState(result->plug_state(), plug_detect_capabilities);
+        });
+  } else if (is_stream_config()) {
+    (*stream_config_client_)
+        ->WatchPlugState()
+        .Then([this](fidl::Result<fha::StreamConfig::WatchPlugState>& result) {
+          if (LogResultFrameworkError(result, "StreamConfig/PlugState response")) {
+            return;
+          }
+          ADR_LOG_OBJECT(kLogStreamConfigFidlResponses) << "StreamConfig/PlugState response";
+
+          std::optional<fha::PlugDetectCapabilities> plug_detect_capabilities =
+              has_stream_config_properties() ? stream_config_properties_->plug_detect_capabilities()
+                                             : std::nullopt;
+          SetPlugState(result->plug_state(), plug_detect_capabilities);
+        });
+  }
+}
+
+void Device::SetPlugState(const fuchsia_hardware_audio::PlugState& plug_state,
+                          std::optional<fha::PlugDetectCapabilities> plug_detect_capabilities) {
+  if (!ValidatePlugState(plug_state, plug_detect_capabilities)) {
+    OnError(ZX_ERR_INVALID_ARGS);
+    return;
+  }
+
+  auto preexisting_plug_state = plug_state_;
+  plug_state_ = plug_state;
+
+  if (!preexisting_plug_state.has_value()) {
+    ADR_LOG_OBJECT(kLogCodecFidlResponses || kLogStreamConfigFidlResponses)
+        << "WatchPlugState received initial value";
+    OnInitializationResponse();
+  } else {
+    ADR_LOG_OBJECT(kLogCodecFidlResponses || kLogStreamConfigFidlResponses)
+        << "WatchPlugState received update";
+    ADR_LOG_OBJECT(kLogNotifyMethods) << "ForEachObserver => PlugStateIsChanged";
+    ForEachObserver([plug_state = *plug_state_](auto obs) {
+      obs->PlugStateIsChanged(plug_state.plugged().value_or(true) ? fad::PlugState::kPlugged
+                                                                  : fad::PlugState::kUnplugged,
+                              zx::time(*plug_state.plug_state_time()));
+    });
+  }
+  // Kick off the next watch.
+  RetrievePlugState();
+}
+
 void Device::RetrieveGainState() {
   ADR_LOG_METHOD(kLogStreamConfigFidlCalls);
 
@@ -1503,101 +1572,6 @@ void Device::RetrieveGainState() {
         // Kick off the next watch.
         RetrieveGainState();
       });
-}
-
-void Device::RetrieveStreamPlugState() {
-  if (has_error()) {
-    ADR_WARN_METHOD() << "device already has an error";
-    return;
-  }
-  ADR_LOG_METHOD(kLogStreamConfigFidlCalls);
-
-  if (!has_plug_state()) {
-    // TODO(https://fxbug.dev/42064765): handle command timeouts (but not on subsequent watches)
-  }
-
-  (*stream_config_client_)
-      ->WatchPlugState()
-      .Then([this](fidl::Result<fha::StreamConfig::WatchPlugState>& result) {
-        if (LogResultFrameworkError(result, "PlugState response")) {
-          return;
-        }
-
-        ADR_LOG_OBJECT(kLogStreamConfigFidlResponses) << "WatchPlugState response";
-        std::optional<fha::PlugDetectCapabilities> plug_detect_capabilities;
-        if (has_stream_config_properties()) {
-          plug_detect_capabilities = stream_config_properties_->plug_detect_capabilities();
-        }
-        if (!ValidatePlugState(result->plug_state(), plug_detect_capabilities)) {
-          OnError(ZX_ERR_INVALID_ARGS);
-          return;
-        }
-
-        auto old_plug_state = plug_state_;
-        plug_state_ = result->plug_state();
-
-        if (!old_plug_state.has_value()) {
-          ADR_LOG_OBJECT(kLogStreamConfigFidlResponses) << "WatchPlugState received initial value";
-          OnInitializationResponse();
-        } else {
-          ADR_LOG_OBJECT(kLogStreamConfigFidlResponses) << "WatchPlugState received update";
-          ADR_LOG_OBJECT(kLogNotifyMethods) << "ForEachObserver => PlugStateIsChanged";
-          ForEachObserver([plug_state = *plug_state_](auto obs) {
-            obs->PlugStateIsChanged(plug_state.plugged().value_or(true)
-                                        ? fad::PlugState::kPlugged
-                                        : fad::PlugState::kUnplugged,
-                                    zx::time(*plug_state.plug_state_time()));
-          });
-        }
-        // Kick off the next watch.
-        RetrieveStreamPlugState();
-      });
-}
-
-void Device::RetrieveCodecPlugState() {
-  if (has_error()) {
-    ADR_WARN_METHOD() << "device already has an error";
-    return;
-  }
-  ADR_LOG_METHOD(kLogCodecFidlCalls);
-
-  if (!has_plug_state()) {
-    // TODO(https://fxbug.dev/42064765): handle command timeouts (but not on subsequent watches)
-  }
-
-  (*codec_client_)->WatchPlugState().Then([this](fidl::Result<fha::Codec::WatchPlugState>& result) {
-    if (LogResultFrameworkError(result, "Codec::PlugState response")) {
-      return;
-    }
-
-    ADR_LOG_OBJECT(kLogCodecFidlResponses) << "Codec::WatchPlugState response";
-    std::optional<fha::PlugDetectCapabilities> plug_detect_capabilities;
-    if (has_codec_properties()) {
-      plug_detect_capabilities = codec_properties_->plug_detect_capabilities();
-    }
-    if (!ValidatePlugState(result->plug_state(), plug_detect_capabilities)) {
-      OnError(ZX_ERR_INVALID_ARGS);
-      return;
-    }
-
-    auto old_plug_state = plug_state_;
-    plug_state_ = result->plug_state();
-
-    if (!old_plug_state.has_value()) {
-      ADR_LOG_OBJECT(kLogCodecFidlResponses) << "Codec::WatchPlugState received initial value";
-      OnInitializationResponse();
-    } else {
-      ADR_LOG_OBJECT(kLogCodecFidlResponses) << "Codec::WatchPlugState received update";
-      ADR_LOG_OBJECT(kLogNotifyMethods) << "ForEachObserver => PlugStateIsChanged";
-      ForEachObserver([plug_state = *plug_state_](auto obs) {
-        obs->PlugStateIsChanged(plug_state.plugged().value_or(true) ? fad::PlugState::kPlugged
-                                                                    : fad::PlugState::kUnplugged,
-                                zx::time(*plug_state.plug_state_time()));
-      });
-    }
-    // Kick off the next watch.
-    RetrieveCodecPlugState();
-  });
 }
 
 // Return a fuchsia_audio_device/Info object based on this device's member values.

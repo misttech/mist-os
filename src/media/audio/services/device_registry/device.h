@@ -254,9 +254,7 @@ class Device : public std::enable_shared_from_this<Device> {
   void RetrieveCompositeRingBufferFormatSets();
   void RetrieveStreamRingBufferFormatSets();
 
-  void RetrieveCodecPlugState();
-  void RetrieveStreamPlugState();
-
+  void RetrievePlugState();
   void RetrieveGainState();
 
   // Each of the above 'Retrieve...' methods update the related piece of device state, then call
@@ -289,6 +287,10 @@ class Device : public std::enable_shared_from_this<Device> {
   void RetrieveElementState(ElementId element_id);
 
   void SetHealthState(std::optional<bool> is_healthy);
+
+  void SetPlugState(
+      const fuchsia_hardware_audio::PlugState& plug_state,
+      std::optional<fuchsia_hardware_audio::PlugDetectCapabilities> plug_detect_capabilities);
 
   // Device-type specific methods used during initialization
   static void SanitizeCodecPropertiesStrings(
