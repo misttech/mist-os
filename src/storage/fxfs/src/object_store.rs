@@ -2212,7 +2212,7 @@ mod tests {
     use crate::errors::FxfsError;
     use crate::filesystem::{FxFilesystem, JournalingObject, OpenFxFilesystem, SyncOptions};
     use crate::fsck::fsck;
-    use crate::lsm_tree::types::{Item, ItemRef, LayerIterator};
+    use crate::lsm_tree::types::{ItemRef, LayerIterator};
     use crate::lsm_tree::Query;
     use crate::object_handle::{
         ObjectHandle, ReadObjectHandle, WriteObjectHandle, INVALID_OBJECT_ID,
@@ -2650,11 +2650,20 @@ mod tests {
         };
 
         root_store.tombstone_object(child_id, Options::default()).await.expect("tombstone failed");
-        assert_matches!(
-            root_store.tree.find(&ObjectKey::object(child_id)).await.expect("find failed"),
-            Some(Item { value: ObjectValue::None, .. })
-        );
-
+        {
+            let layers = root_store.tree.layer_set();
+            let mut merger = layers.merger();
+            let iter = merger
+                .query(Query::FullRange(&ObjectKey::object(child_id)))
+                .await
+                .expect("seek failed");
+            // Find at least one object still in the tree.
+            match iter.get() {
+                Some(ItemRef { key: ObjectKey { object_id, .. }, .. })
+                    if *object_id == child_id => {}
+                _ => panic!("Objects should still be in the tree."),
+            }
+        }
         root_store.flush().await.expect("flush failed");
 
         // There should be no records for the object.
