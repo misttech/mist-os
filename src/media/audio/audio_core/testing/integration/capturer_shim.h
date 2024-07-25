@@ -23,7 +23,7 @@ class CapturerShimImpl {
  public:
   static constexpr uint32_t kPacketMs = 10;
 
-  ~CapturerShimImpl() = default;
+  virtual ~CapturerShimImpl() = default;
 
   fuchsia::media::AudioCapturerPtr& fidl() { return fidl_; }
   VmoBackedBuffer& payload() { return payload_buffer_; }
