@@ -91,6 +91,11 @@
             type: "string",
             max_size: 8,
         },
+        {
+            config: "fuchsia.ui.SuspendEnabled",
+            key: "suspend_enabled",
+            type: "bool",
+        },
     ],
     expose: [
         {

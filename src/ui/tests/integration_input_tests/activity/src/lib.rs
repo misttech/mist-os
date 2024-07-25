@@ -5,6 +5,7 @@
 use async_utils::hanging_get::client::HangingGetStream;
 use fidl::endpoints::create_proxy;
 use fidl_fuchsia_input_interaction::{NotifierMarker, NotifierProxy, State};
+use fidl_fuchsia_input_interaction_observation::{AggregatorMarker, HandoffWakeError};
 use fidl_fuchsia_input_report::{ConsumerControlButton, KeyboardInputReport};
 use fidl_fuchsia_logger::LogSinkMarker;
 use fidl_fuchsia_math::Vec_;
@@ -22,14 +23,15 @@ use fuchsia_async::{Time, Timer};
 use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
 use fuchsia_zircon::Duration;
 use futures::{future, StreamExt};
+use test_case::test_case;
 
 const TEST_UI_STACK: &str = "ui";
-const TEST_UI_STACK_URL: &str = "flatland-scene-manager-test-ui-stack#meta/test-ui-stack.cm";
+const TEST_UI_STACK_URL: &str = "#meta/test-ui-stack.cm";
 
 // Set a maximum bound test timeout.
 const TEST_TIMEOUT: Duration = Duration::from_seconds(30);
 
-async fn assemble_realm() -> RealmInstance {
+async fn assemble_realm(suspend_enabled: bool) -> RealmInstance {
     let builder = RealmBuilder::new().await.expect("Failed to create RealmBuilder.");
 
     // Add test UI stack component.
@@ -37,6 +39,18 @@ async fn assemble_realm() -> RealmInstance {
         .add_child(TEST_UI_STACK, TEST_UI_STACK_URL, ChildOptions::new())
         .await
         .expect("Failed to add UI realm.");
+    builder
+        .init_mutable_config_from_package(TEST_UI_STACK)
+        .await
+        .expect("Failed to init mutable config");
+    builder
+        .set_config_value(
+            TEST_UI_STACK,
+            "suspend_enabled",
+            cm_rust::ConfigValue::Single(cm_rust::ConfigSingleValue::Bool(suspend_enabled)),
+        )
+        .await
+        .expect("Failed to set config on UI realm");
 
     // Route capabilities to the test UI realm.
     builder
@@ -58,6 +72,7 @@ async fn assemble_realm() -> RealmInstance {
     builder
         .add_route(
             Route::new()
+                .capability(Capability::protocol::<AggregatorMarker>())
                 .capability(Capability::protocol::<NotifierMarker>())
                 .capability(Capability::protocol::<InputRegistryMarker>())
                 .from(Ref::child(TEST_UI_STACK))
@@ -70,9 +85,11 @@ async fn assemble_realm() -> RealmInstance {
     builder.build().await.expect("Failed to create test realm.")
 }
 
+#[test_case(true; "Suspend enabled")]
+#[test_case(false; "Suspend disabled")]
 #[fuchsia::test]
-async fn enters_idle_state_without_activity() {
-    let realm = assemble_realm().await;
+async fn enters_idle_state_without_activity(suspend_enabled: bool) {
+    let realm = assemble_realm(suspend_enabled).await;
 
     // Subscribe to activity state, which serves "Active" initially.
     let notifier_proxy = realm
@@ -103,9 +120,11 @@ async fn enters_idle_state_without_activity() {
     realm.destroy().await.expect("Failed to shut down realm.");
 }
 
+#[test_case(true; "Suspend enabled")]
+#[test_case(false; "Suspend disabled")]
 #[fuchsia::test]
-async fn does_not_enter_active_state_with_keyboard() {
-    let realm = assemble_realm().await;
+async fn does_not_enter_active_state_with_keyboard(suspend_enabled: bool) {
+    let realm = assemble_realm(suspend_enabled).await;
 
     // Subscribe to activity state, which serves "Active" initially.
     let notifier_proxy = realm
@@ -170,9 +189,11 @@ async fn does_not_enter_active_state_with_keyboard() {
     realm.destroy().await.expect("Failed to shut down realm.");
 }
 
+#[test_case(true; "Suspend enabled")]
+#[test_case(false; "Suspend disabled")]
 #[fuchsia::test]
-async fn enters_active_state_with_mouse() {
-    let realm = assemble_realm().await;
+async fn enters_active_state_with_mouse(suspend_enabled: bool) {
+    let realm = assemble_realm(suspend_enabled).await;
 
     // Subscribe to activity state, which serves "Active" initially.
     let notifier_proxy = realm
@@ -236,9 +257,11 @@ async fn enters_active_state_with_mouse() {
     realm.destroy().await.expect("Failed to shut down realm.");
 }
 
+#[test_case(true; "Suspend enabled")]
+#[test_case(false; "Suspend disabled")]
 #[fuchsia::test]
-async fn enters_active_state_with_touchscreen() {
-    let realm = assemble_realm().await;
+async fn enters_active_state_with_touchscreen(suspend_enabled: bool) {
+    let realm = assemble_realm(suspend_enabled).await;
 
     // Subscribe to activity state, which serves "Active" initially.
     let notifier_proxy = realm
@@ -301,9 +324,11 @@ async fn enters_active_state_with_touchscreen() {
     realm.destroy().await.expect("Failed to shut down realm.");
 }
 
+#[test_case(true; "Suspend enabled")]
+#[test_case(false; "Suspend disabled")]
 #[fuchsia::test]
-async fn enters_active_state_with_media_buttons() {
-    let realm = assemble_realm().await;
+async fn enters_active_state_with_media_buttons(suspend_enabled: bool) {
+    let realm = assemble_realm(suspend_enabled).await;
 
     // Subscribe to activity state, which serves "Active" initially.
     let notifier_proxy = realm
@@ -360,6 +385,105 @@ async fn enters_active_state_with_media_buttons() {
             .unwrap(),
         State::Active
     );
+
+    // Shut down input pipeline before dropping mocks, so that input pipeline
+    // doesn't log errors about channels being closed.
+    realm.destroy().await.expect("Failed to shut down realm.");
+}
+
+#[fuchsia::test]
+async fn does_not_enter_active_state_with_handoff_wake_suspend_disabled() {
+    let realm = assemble_realm(/* suspend_enabled*/ false).await;
+
+    // Subscribe to activity state, which serves "Active" initially.
+    let notifier_proxy = realm
+        .root
+        .connect_to_protocol_at_exposed_dir::<NotifierMarker>()
+        .expect("Failed to connect to fuchsia.input.interaction.Notifier.");
+    let mut watch_state_stream = HangingGetStream::new(notifier_proxy, NotifierProxy::watch_state);
+    assert_eq!(
+        watch_state_stream
+            .next()
+            .await
+            .expect("Expected initial state from watch_state()")
+            .unwrap(),
+        State::Active
+    );
+
+    // Do nothing. Activity service transitions to idle state in one minute.
+    let activity_timeout_upper_bound = Timer::new(Time::after(TEST_TIMEOUT));
+    match future::select(watch_state_stream.next(), activity_timeout_upper_bound).await {
+        future::Either::Left((result, _)) => {
+            assert_eq!(result.unwrap().expect("Expected state transition."), State::Idle);
+        }
+        future::Either::Right(_) => panic!("Timer expired before state transitioned."),
+    }
+
+    // Call HandoffWake
+    let aggregator = realm
+        .root
+        .connect_to_protocol_at_exposed_dir::<AggregatorMarker>()
+        .expect("Failed to connect to fuchsia.input.interaction.observation.Aggregator.");
+    assert_eq!(
+        aggregator.handoff_wake().await.expect("Failed to call handoff wake."),
+        Err(HandoffWakeError::PowerNotAvailable)
+    );
+
+    // Activity service does not transition to active state.
+    let activity_timeout_upper_bound = Timer::new(Time::after(TEST_TIMEOUT));
+    match future::select(watch_state_stream.next(), activity_timeout_upper_bound).await {
+        future::Either::Left((result, _)) => {
+            panic!("Activity should not have changed, received new state: {:?}", result);
+        }
+        future::Either::Right(_) => {}
+    }
+
+    // Shut down input pipeline before dropping mocks, so that input pipeline
+    // doesn't log errors about channels being closed.
+    realm.destroy().await.expect("Failed to shut down realm.");
+}
+
+#[fuchsia::test]
+async fn enters_active_state_with_handoff_wake_suspend_enabled() {
+    let realm = assemble_realm(/* suspend_enabled*/ true).await;
+
+    // Subscribe to activity state, which serves "Active" initially.
+    let notifier_proxy = realm
+        .root
+        .connect_to_protocol_at_exposed_dir::<NotifierMarker>()
+        .expect("Failed to connect to fuchsia.input.interaction.Notifier.");
+    let mut watch_state_stream = HangingGetStream::new(notifier_proxy, NotifierProxy::watch_state);
+    assert_eq!(
+        watch_state_stream
+            .next()
+            .await
+            .expect("Expected initial state from watch_state()")
+            .unwrap(),
+        State::Active
+    );
+
+    // Do nothing. Activity service transitions to idle state in one minute.
+    let activity_timeout_upper_bound = Timer::new(Time::after(TEST_TIMEOUT));
+    match future::select(watch_state_stream.next(), activity_timeout_upper_bound).await {
+        future::Either::Left((result, _)) => {
+            assert_eq!(result.unwrap().expect("Expected state transition."), State::Idle);
+        }
+        future::Either::Right(_) => panic!("Timer expired before state transitioned."),
+    }
+
+    // Activity service should transition to active state as a result of the
+    // handoff_wake() request.
+    let aggregator = realm
+        .root
+        .connect_to_protocol_at_exposed_dir::<AggregatorMarker>()
+        .expect("Failed to connect to fuchsia.input.interaction.observation.Aggregator.");
+    let (watch_state_result, handoff_wake_result) =
+        future::join(watch_state_stream.next(), aggregator.handoff_wake()).await;
+    assert_eq!(
+        watch_state_result.expect("Expected updated state from watch_state()").unwrap(),
+        State::Active
+    );
+    assert_eq!(handoff_wake_result.expect("Failed to call handoff wake."), Ok(()));
 
     // Shut down input pipeline before dropping mocks, so that input pipeline
     // doesn't log errors about channels being closed.

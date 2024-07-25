@@ -179,6 +179,7 @@ async fn inner_main() -> Result<(), Error> {
         display_pixel_density,
         viewing_distance,
         idle_threshold_ms,
+        suspend_enabled,
     } = Config::take_from_startup_handle();
 
     let display_pixel_density = match display_pixel_density.trim().parse::<f32>() {
@@ -261,7 +262,6 @@ async fn inner_main() -> Result<(), Error> {
     };
 
     // Create Activity Manager.
-    let suspend_enabled = false;
     let activity_manager =
         ActivityManager::new(zx::Duration::from_millis(idle_threshold_ms as i64), suspend_enabled);
 

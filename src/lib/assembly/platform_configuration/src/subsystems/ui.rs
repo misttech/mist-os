@@ -209,6 +209,14 @@ impl DefineSubsystemConfiguration<PlatformUiConfig> for UiSubsystem {
             }),
         )?;
 
+        // TODO(https://fxbug.dev/343256679): Remove this and replace with
+        // complete routing for fuchsia.power.SuspendEnabled when we are ready
+        // to enable the feature.
+        builder.set_config_capability(
+            "fuchsia.ui.SuspendEnabled",
+            Config::new(ConfigValueType::Bool, false.into()),
+        )?;
+
         let config_dir = builder
             .add_domain_config(PackageSetDestination::Blob(PackageDestination::SensorConfig))
             .directory("sensor-config");

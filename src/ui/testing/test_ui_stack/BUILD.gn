@@ -15,6 +15,7 @@ executable("bin") {
     "//sdk/fidl/fuchsia.accessibility.semantics:fuchsia.accessibility.semantics_hlcpp",
     "//sdk/fidl/fuchsia.element:fuchsia.element_hlcpp",
     "//sdk/fidl/fuchsia.input.interaction:fuchsia.input.interaction_hlcpp",
+    "//sdk/fidl/fuchsia.input.interaction.observation:fuchsia.input.interaction.observation_cpp",
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
     "//sdk/fidl/fuchsia.ui.display.singleton:fuchsia.ui.display.singleton_hlcpp",
     "//sdk/fidl/fuchsia.ui.focus:fuchsia.ui.focus_hlcpp",
@@ -58,6 +59,7 @@ fuchsia_structured_config_values("flatland_scene_manager_config") {
   values = {
     display_rotation = 0
     device_pixel_ratio = "1.0"
+    suspend_enabled = false
   }
 }
 
