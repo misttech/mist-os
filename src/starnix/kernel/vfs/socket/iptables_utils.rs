@@ -1030,11 +1030,9 @@ impl IpTable {
 
         let rule_changes = self.rule_specs.into_iter().filter_map(|spec| match spec {
             RuleSpec::Unsupported(_) => None,
-            RuleSpec::Translated(rule) => match rule.action {
-                fnet_filter_ext::Action::TransparentProxy(_) => None,
-                fnet_filter_ext::Action::Redirect { dst_port: _ } => None,
-                _ => Some(fnet_filter_ext::Change::Create(fnet_filter_ext::Resource::Rule(rule))),
-            },
+            RuleSpec::Translated(rule) => {
+                Some(fnet_filter_ext::Change::Create(fnet_filter_ext::Resource::Rule(rule)))
+            }
         });
 
         namespace_changes.chain(routine_changes).chain(rule_changes)
