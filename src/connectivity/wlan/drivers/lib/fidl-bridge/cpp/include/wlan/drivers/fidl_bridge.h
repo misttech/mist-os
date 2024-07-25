@@ -4,6 +4,7 @@
 #ifndef SRC_CONNECTIVITY_WLAN_DRIVERS_LIB_FIDL_BRIDGE_CPP_INCLUDE_WLAN_DRIVERS_FIDL_BRIDGE_H_
 #define SRC_CONNECTIVITY_WLAN_DRIVERS_LIB_FIDL_BRIDGE_CPP_INCLUDE_WLAN_DRIVERS_FIDL_BRIDGE_H_
 
+#include <lib/fdf/cpp/arena.h>
 #include <lib/fidl/cpp/wire/internal/transport_channel.h>
 #include <lib/fidl_driver/cpp/transport.h>
 #include <lib/stdcompat/source_location.h>
@@ -72,6 +73,54 @@ auto ForwardResult(AsyncCompleter completer,
       } else {
         // completer.Reply() has no parameters only if FidlMethod does not return a value or error.
         completer.Reply();
+      }
+    }
+  };
+}
+
+template <typename FidlMethod, typename AsyncCompleter>
+auto ForwardWireResult(AsyncCompleter completer, fdf::Arena arena,
+                       cpp20::source_location loc = cpp20::source_location::current()) {
+  return [completer = std::move(completer), arena = std::move(arena), loc](auto& result) mutable {
+    ltrace(0, nullptr, "Forwarding result for %s", loc.function_name());
+    if (result.is_error()) {
+      lerror("Result not ok for %s: %s", loc.function_name(),
+             result.error_value().FormatDescription().c_str());
+    }
+
+    if constexpr (FidlMethod::kHasDomainError) {
+      // If we get a framework error that results in channel closure, then we close the channel.
+      if (result.is_error() && result.error_value().is_framework_error()) {
+        fidl::Status& framework_error = result.error_value().framework_error();
+        if (framework_error.is_peer_closed()) {
+          completer.Close(framework_error.status());
+          return;
+        }
+      }
+
+      // Framework errors that do not result in channel closure get sent up as a domain error
+      // instead.
+      completer.buffer(arena).Reply(
+          result.map_error([](auto error) { return FidlErrorToStatus(error); }));
+    } else {
+      // If we get an error that results in channel closure, then we close the channel.
+      if (result.is_error() && result.error_value().is_peer_closed()) {
+        completer.Close(result.error_value().status());
+        return;
+      }
+
+      if constexpr (FidlMethod::kHasNonEmptyUserFacingResponse) {
+        if (result.is_error()) {
+          // If the error did not result in channel closure, then reply with some
+          // default-initialized value.
+          // TODO(https://fxbug.dev/341756361) Remove this when API is cleaned up.
+          completer.buffer(arena).Reply({});
+        } else {
+          completer.buffer(arena).Reply(result.value());
+        }
+      } else {
+        // completer.Reply() has no parameters only if FidlMethod does not return a value or error.
+        completer.buffer(arena).Reply();
       }
     }
   };

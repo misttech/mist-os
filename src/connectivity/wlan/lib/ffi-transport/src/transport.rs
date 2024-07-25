@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use crate::completers::Completer;
+use fdf::{fdf_arena_t, Arena, ArenaStaticBox};
 use std::ffi::c_void;
 use std::marker::{PhantomData, PhantomPinned};
 use std::pin::Pin;
@@ -347,10 +348,11 @@ pub struct FfiWlanRx {
 pub struct WlanRx {
     ctx: Pin<Box<FfiWlanRxCtx>>,
 }
+
+/// Indicates receipt of a MAC frame.
 // TODO(https://fxbug.dev/42119762): We need to keep stats for these events and respond to StatsQueryRequest.
 pub struct WlanRxEvent {
-    // Indicates receipt of a MAC frame from a peer.
-    pub bytes: Vec<u8>,
+    pub bytes: ArenaStaticBox<[u8]>,
     pub rx_info: fidl_softmac::WlanRxInfo,
     pub async_id: trace::Id,
 }
@@ -420,6 +422,22 @@ impl WlanRx {
             }
         };
 
+        let arena = match payload.arena.with_name("arena").try_unpack() {
+            Ok(x) => {
+                if x == 0 {
+                    error!("Received arena is null");
+                    return;
+                }
+                // Safety: The received arena is assumed to be valid if it's not null.
+                unsafe { Arena::from_raw(NonNull::new_unchecked(x as *mut fdf_arena_t)) }
+            }
+            Err(e) => {
+                let e = e.context("Missing required field in WlanRxTransferRequest.");
+                error!("{}", e);
+                return;
+            }
+        };
+
         let (packet_address, packet_size, packet_info) = match (
             payload.packet_address.with_name("packet_address"),
             payload.packet_size.with_name("packet_size"),
@@ -436,7 +454,7 @@ impl WlanRx {
             }
         };
 
-        let packet_ptr = packet_address as *const u8;
+        let packet_ptr = packet_address as *mut u8;
         if packet_ptr.is_null() {
             let e = "WlanRx.Transfer request contained NULL packet_address";
             error!("{}", e);
@@ -446,14 +464,20 @@ impl WlanRx {
 
         // Safety: This call is safe because a `WlanRx` request is defined such that a slice
         // such as this one can be constructed from the `packet_address` and `packet_size` fields.
-        let packet_bytes: Vec<u8> =
-            unsafe { slice::from_raw_parts(packet_ptr, packet_size as usize) }.into();
+        // Also, the slice is allocated in `arena`.
+        let bytes = unsafe {
+            arena.assume_unchecked(NonNull::new_unchecked(slice::from_raw_parts_mut(
+                packet_ptr,
+                packet_size as usize,
+            )))
+        };
+        let bytes = arena.make_static(bytes);
 
         // Safety: This dereference is safe because the lifetime of this pointer was promised to
         // live as long as function could be called when `WlanRx::to_ffi` was called.
         let _: Result<(), ()> = unsafe {
             (*ctx).sender.unbounded_send(WlanRxEvent {
-                bytes: packet_bytes,
+                bytes,
                 rx_info: packet_info,
                 async_id: async_id.into(),
             })

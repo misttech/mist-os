@@ -417,6 +417,7 @@ closed protocol WlanRx {
         2: packet_size uint64;
         3: packet_info WlanRxInfo;
         4: async_id uint64;
+        5: arena uint64;
     }) -> ();
 };
 
