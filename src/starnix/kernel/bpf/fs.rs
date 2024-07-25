@@ -18,6 +18,7 @@ use crate::vfs::{
     FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo,
     FsNodeOps, FsStr, FsString, MemoryDirectoryFile, MemoryXattrStorage, NamespaceNode, XattrOp,
 };
+use linux_uapi::XATTR_NAME_SELINUX;
 use starnix_logging::track_stub;
 use starnix_sync::{FileOpsCore, Locked};
 use starnix_uapi::auth::FsCred;
@@ -200,7 +201,7 @@ impl BpfFsDir {
     fn new(selinux_context: &FsStr) -> Self {
         let xattrs = MemoryXattrStorage::default();
         xattrs
-            .set_xattr("security.selinux".into(), selinux_context, XattrOp::Create)
+            .set_xattr(XATTR_NAME_SELINUX.to_bytes().into(), selinux_context, XattrOp::Create)
             .expect("Failed to set selinux context.");
         Self { xattrs }
     }
@@ -311,7 +312,7 @@ impl BpfFsObject {
     fn new(handle: BpfHandle, selinux_context: &FsStr) -> Self {
         let xattrs = MemoryXattrStorage::default();
         xattrs
-            .set_xattr("security.selinux".as_ref(), selinux_context, XattrOp::Create)
+            .set_xattr(XATTR_NAME_SELINUX.to_bytes().into(), selinux_context, XattrOp::Create)
             .expect("Failed to set selinux context.");
         Self { handle, xattrs }
     }

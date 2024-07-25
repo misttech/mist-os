@@ -13,6 +13,7 @@ use crate::vfs::{
     FsString, WeakFsNodeHandle, XattrOp,
 };
 use linked_hash_map::LinkedHashMap;
+use linux_uapi::XATTR_NAME_SELINUX;
 use once_cell::sync::OnceCell;
 use ref_cast::RefCast;
 use smallvec::SmallVec;
@@ -210,7 +211,7 @@ impl FileSystem {
                 let _ = node.ops().set_xattr(
                     node,
                     current_task,
-                    "security.selinux".into(),
+                    XATTR_NAME_SELINUX.to_bytes().into(),
                     context,
                     XattrOp::Create,
                 );

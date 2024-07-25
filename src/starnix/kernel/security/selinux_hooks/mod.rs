@@ -9,6 +9,7 @@ use super::{FsNodeState, ProcAttr};
 use crate::task::CurrentTask;
 use crate::vfs::syscalls::LookupFlags;
 use crate::vfs::{FsNode, FsNodeHandle, FsStr, NamespaceNode, ValueOrSize};
+use linux_uapi::XATTR_NAME_SELINUX;
 use selinux::permission_check::PermissionCheck;
 use selinux::security_server::SecurityServer;
 use selinux::{InitialSid, SecurityId};
@@ -22,7 +23,7 @@ use starnix_uapi::signals::{Signal, SIGCHLD, SIGKILL, SIGSTOP};
 use starnix_uapi::{errno, error};
 use std::sync::Arc;
 
-/// Maximum supported size for the `security.selinux` value used to store SELinux security
+/// Maximum supported size for the extended attribute value used to store SELinux security
 /// contexts in a filesystem node extended attributes.
 const SECURITY_SELINUX_XATTR_VALUE_MAX_SIZE: usize = 4096;
 
@@ -377,13 +378,14 @@ fn compute_fs_node_security_id(
     current_task: &CurrentTask,
     fs_node: &FsNode,
 ) -> SecurityId {
-    let security_selinux_name: &FsStr = "security.selinux".into();
+    // TODO(b/334091674): Take into account "context" override here.
+
     // Use `fs_node.ops().get_xattr()` instead of `fs_node.get_xattr()` to bypass permission
     // checks performed on starnix userspace calls to get an extended attribute.
     match fs_node.ops().get_xattr(
         fs_node,
         current_task,
-        security_selinux_name,
+        XATTR_NAME_SELINUX.to_bytes().into(),
         SECURITY_SELINUX_XATTR_VALUE_MAX_SIZE,
     ) {
         Ok(ValueOrSize::Value(security_context)) => {
@@ -402,8 +404,8 @@ fn compute_fs_node_security_id(
             }
         }
         _ => {
-            // TODO(b/334091674): Complete the fallback implementation (e.g. using the file system's "context",
-            // "defcontext", etc, if specified).
+            // TODO(b/334091674): Complete the fallback implementation (e.g. using the file system's "defcontext",
+            // if specified).
             SecurityId::initial(InitialSid::File)
         }
     }
@@ -580,7 +582,7 @@ mod tests {
             .set_xattr(
                 fs_node,
                 current_task,
-                b"security.selinux".into(),
+                XATTR_NAME_SELINUX.to_bytes().into(),
                 security_context.into(),
                 XattrOp::Set,
             )
@@ -1161,7 +1163,13 @@ mod tests {
             create_kernel_task_and_unlocked_with_selinux(security_server.clone());
         let node = &create_test_file(&mut locked, &current_task).entry.node;
         node.ops()
-            .set_xattr(node, &current_task, "security.selinux".into(), "".into(), XattrOp::Set)
+            .set_xattr(
+                node,
+                &current_task,
+                XATTR_NAME_SELINUX.to_bytes().into(),
+                "invalid_context!".into(),
+                XattrOp::Set,
+            )
             .expect("setxattr");
         assert_eq!(None, get_cached_sid(node));
 
@@ -1183,7 +1191,7 @@ mod tests {
             .set_xattr(
                 node,
                 &current_task,
-                "security.selinux".into(),
+                XATTR_NAME_SELINUX.to_bytes().into(),
                 VALID_SECURITY_CONTEXT.into(),
                 XattrOp::Set,
             )
@@ -1205,7 +1213,7 @@ mod tests {
         node.set_xattr(
             current_task.as_ref(),
             &current_task.fs().root().mount,
-            "security.selinux".into(),
+            XATTR_NAME_SELINUX.to_bytes().into(),
             VALID_SECURITY_CONTEXT.into(),
             XattrOp::Set,
         )

@@ -7,6 +7,7 @@ use crate::task::{CurrentTask, Task};
 use crate::vfs::syscalls::LookupFlags;
 use crate::vfs::{FsNode, FsNodeHandle, FsStr, NamespaceNode};
 
+use linux_uapi::XATTR_NAME_SELINUX;
 use selinux::security_server::SecurityServer;
 use selinux::SecurityId;
 use selinux_common::ProcessPermission;
@@ -354,8 +355,7 @@ pub fn post_setxattr(current_task: &CurrentTask, fs_node: &FsNode, name: &FsStr,
     // `set(xattr|security)`-related hooks need to be explored more carefully to determine whether
     // the implementation of this function and its `selinux_hooks` delegate match the semantics
     // ascribed to the `inode_post_setxattr` hook.
-    let security_selinux_name: &FsStr = "security.selinux".into();
-    if name != security_selinux_name {
+    if name != XATTR_NAME_SELINUX.to_bytes() {
         return;
     }
 
@@ -872,7 +872,7 @@ mod tests {
         post_setxattr(
             current_task.as_ref(),
             node.as_ref(),
-            "security.selinux".into(),
+            XATTR_NAME_SELINUX.to_bytes().into(),
             VALID_SECURITY_CONTEXT.into(),
         );
 
@@ -890,7 +890,7 @@ mod tests {
         post_setxattr(
             current_task.as_ref(),
             node.as_ref(),
-            "security.selinux".into(),
+            XATTR_NAME_SELINUX.to_bytes().into(),
             VALID_SECURITY_CONTEXT.into(),
         );
 
@@ -908,7 +908,7 @@ mod tests {
         post_setxattr(
             current_task.as_ref(),
             node.as_ref(),
-            "security.selinux".into(),
+            XATTR_NAME_SELINUX.to_bytes().into(),
             VALID_SECURITY_CONTEXT.into(),
         );
 
@@ -927,7 +927,7 @@ mod tests {
         post_setxattr(
             current_task.as_ref(),
             node.as_ref(),
-            "security.selinux".into(),
+            XATTR_NAME_SELINUX.to_bytes().into(),
             VALID_SECURITY_CONTEXT.into(),
         );
 
@@ -963,7 +963,7 @@ mod tests {
         post_setxattr(
             current_task.as_ref(),
             node.as_ref(),
-            "security.selinux".into(),
+            XATTR_NAME_SELINUX.to_bytes().into(),
             VALID_SECURITY_CONTEXT.into(),
         );
         assert_ne!(None, get_cached_sid(node));
@@ -971,7 +971,7 @@ mod tests {
         post_setxattr(
             current_task.as_ref(),
             node.as_ref(),
-            "security.selinux".into(),
+            XATTR_NAME_SELINUX.to_bytes().into(),
             "!".into(), // Note: Not a valid security context.
         );
 
@@ -990,7 +990,7 @@ mod tests {
         post_setxattr(
             current_task.as_ref(),
             node.as_ref(),
-            "security.selinux".into(),
+            XATTR_NAME_SELINUX.to_bytes().into(),
             VALID_SECURITY_CONTEXT.into(),
         );
 
@@ -1009,7 +1009,7 @@ mod tests {
         post_setxattr(
             current_task.as_ref(),
             node.as_ref(),
-            "security.selinux".into(),
+            XATTR_NAME_SELINUX.to_bytes().into(),
             VALID_SECURITY_CONTEXT.into(),
         );
 
@@ -1019,7 +1019,7 @@ mod tests {
         post_setxattr(
             current_task.as_ref(),
             node.as_ref(),
-            "security.selinux".into(),
+            XATTR_NAME_SELINUX.to_bytes().into(),
             DIFFERENT_VALID_SECURITY_CONTEXT.into(),
         );
 
