@@ -696,7 +696,58 @@ zx_status_t VmCowPages::CreateChildSliceLocked(uint64_t offset, uint64_t size,
   return ZX_OK;
 }
 
-void VmCowPages::CloneParentIntoChildLocked(fbl::RefPtr<VmCowPages>& child) {
+VmCowPages::ParentAndRange VmCowPages::FindParentAndRangeForCloneLocked(
+    VmCowPages* parent, uint64_t offset, uint64_t size, bool parent_must_be_hidden) {
+  AssertHeld(parent->lock_ref());
+  DEBUG_ASSERT(!parent->is_hidden_locked());
+
+  // The clone's parent limit starts out equal to its size, but it can't exceed the parent's size.
+  // This ensures that any clone pages beyond the parent's range get initialized from zeroes.
+  uint64_t parent_limit = ClampedLimit(offset, size, parent->size_);
+
+  // Walk up the hierarchy until we find the last node which can correctly be the clone's parent.
+  while (VmCowPages* next_parent = parent->parent_.get()) {
+    AssertHeld(next_parent->lock_ref());
+
+    // `parent` will always satisfy `parent_must_be_hidden` at this point.
+    //
+    // If `next_parent` doesn't satisfy `parent_must_be_hidden` then we must use `parent` as the
+    // clone's parent, even if it doesn't have any pages for the clone to snapshot.
+    if (parent_must_be_hidden && !next_parent->is_hidden_locked()) {
+      break;
+    }
+
+    // If `parent` owns any pages in the clone's range then we muse use it as the clone's parent.
+    // If we continued iterating, the clone couldn't snapshot all ancestor pages that it would be
+    // able to if `this` had been the parent.
+    if (parent_limit > 0 &&
+        parent->page_list_.AnyPagesOrIntervalsInRange(offset, offset + parent_limit)) {
+      break;
+    }
+
+    // Before the loop the caller validated that the clone's offsets cannot overflow when projected
+    // onto the root. Verify this will remain true.
+    //
+    // Each iteration of this loop must leave the clone's ultimate `root_parent_offset_` unchanged.
+    // We will increase the clone's `offset` by the current parent's `parent_offset_` but the new
+    // parent's `root_parent_offset_` is smaller by the same amount.
+    DEBUG_ASSERT(CheckedAdd(next_parent->root_parent_offset_, parent->parent_offset_) ==
+                 parent->root_parent_offset_);
+
+    // To move to `next_parent` we need to translate the clone's window to be relative to it.
+    //
+    // The clone's last visible offset into `next_parent` cannot exceed `parent`'s parent limit, as
+    // it shouldn't be able to see more pages than it could see if `parent` had been the parent.
+    parent_limit = ClampedLimit(offset, parent_limit, parent->parent_limit_);
+    offset = CheckedAdd(parent->parent_offset_, offset);
+
+    parent = next_parent;
+  }
+
+  return ParentAndRange{parent, offset, parent_limit, size};
+}
+
+void VmCowPages::CloneParentIntoChildLocked(fbl::RefPtr<VmCowPages> child) {
   canary_.Assert();
 
   AssertHeld(child->lock_ref());
@@ -740,48 +791,69 @@ zx_status_t VmCowPages::CloneBidirectionalLocked(uint64_t offset, uint64_t size,
                                                  fbl::RefPtr<VmCowPages>* cow_child) {
   canary_.Assert();
 
+  // The parent must be `this` node.
+  // TODO(b/42058561): After switching to share counts, allow walking the hierarchy to select a
+  // parent further up.
   // The clone's parent limit starts out equal to its size, but it can't exceed the parent's size.
   // This ensures that any clone pages beyond the parent's range get initialized from zeroes.
   const uint64_t child_parent_limit = ClampedLimit(offset, size, size_);
+  ParentAndRange child_range = {this, offset, child_parent_limit, size};
+  VmCowPages* parent = child_range.parent;
+  AssertHeld(parent->lock_ref());
 
-  // We need two new VmCowPages for our two children.
   fbl::AllocChecker ac;
-  fbl::RefPtr<VmCowPages> left_child = fbl::AdoptRef<VmCowPages>(new (&ac) VmCowPages(
-      hierarchy_state_ptr_, VmCowPagesOptions::kNone, pmm_alloc_flags_, size_, nullptr, nullptr));
+  auto cow_clone = fbl::AdoptRef<VmCowPages>(
+      new (&ac) VmCowPages(hierarchy_state_ptr_, VmCowPagesOptions::kNone, pmm_alloc_flags_,
+                           child_range.size, nullptr, nullptr));
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
-  AssertHeld(left_child->lock_ref());
-  fbl::RefPtr<VmCowPages> right_child = fbl::AdoptRef<VmCowPages>(new (&ac) VmCowPages(
-      hierarchy_state_ptr_, VmCowPagesOptions::kNone, pmm_alloc_flags_, size, nullptr, nullptr));
-  if (!ac.check()) {
-    return ZX_ERR_NO_MEMORY;
+  AssertHeld(cow_clone->lock_ref());
+
+  // The parent must be `this` node, so it must always be visible.
+  // TODO(b/42058561): After switching to share counts, allow walking the hierarchy to select a
+  // parent further up. At that point the `if` below might be skipped allowing hidden nodes to have
+  // >2 children.
+  DEBUG_ASSERT(!parent->is_hidden_locked());
+
+  // If `parent` is to be the new child's parent then it must become hidden first.
+  // That requires cloning it into a new visible child of the (now) hidden parent.
+  fbl::RefPtr<VmCowPages> parent_clone;
+  if (!parent->is_hidden_locked()) {
+    DEBUG_ASSERT(parent == this);  // `parent` must either be hidden already, or be `this` node.
+    DEBUG_ASSERT(life_cycle_ == LifeCycle::Alive);
+
+    parent_clone = fbl::AdoptRef<VmCowPages>(new (&ac) VmCowPages(
+        hierarchy_state_ptr_, VmCowPagesOptions::kNone, pmm_alloc_flags_, size_, nullptr, nullptr));
+    if (!ac.check()) {
+      return ZX_ERR_NO_MEMORY;
+    }
+
+    // The child becomes a full clone of the parent: inheriting its children, paged backref, etc.
+    CloneParentIntoChildLocked(parent_clone);
+    DEBUG_ASSERT(children_list_len_ == 1);
+
+    // Transition into being the hidden node.
+    options_ |= VmCowPagesOptions::kHidden;
   }
-  AssertHeld(right_child->lock_ref());
 
-  // The left child becomes a full clone of us, inheriting our children, paged backref etc.
-  CloneParentIntoChildLocked(left_child);
-
-  // The right child is the, potential, subset view into the parent so has a variable offset.
-  AddChildLocked(right_child.get(), offset, child_parent_limit);
-
-  // Transition into being the hidden node.
-  options_ |= VmCowPagesOptions::kHidden;
-  DEBUG_ASSERT(life_cycle_ == LifeCycle::Alive);
-  DEBUG_ASSERT(children_list_len_ == 2);
+  // The COW clone's parent must be hidden because the clone must not see any future parent writes.
+  DEBUG_ASSERT(parent->is_hidden_locked());
+  parent->AddChildLocked(cow_clone.get(), child_range.parent_offset, child_range.parent_limit);
 
   // Checking this node's hierarchy will also check the parent's hierarchy.
   // It will not check either child's hierarchies, so check those independently.
   VMO_VALIDATION_ASSERT(DebugValidatePageSplitsHierarchyLocked());
-  VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
-  VMO_VALIDATION_ASSERT(right_child->DebugValidatePageSplitsLocked());
-  VMO_FRUGAL_VALIDATION_ASSERT(right_child->DebugValidateVmoPageBorrowingLocked());
-  if (left_child) {
-    VMO_VALIDATION_ASSERT(left_child->DebugValidatePageSplitsLocked());
-    VMO_FRUGAL_VALIDATION_ASSERT(left_child->DebugValidateVmoPageBorrowingLocked());
+  VMO_FRUGAL_VALIDATION_ASSERT(parent->DebugValidateVmoPageBorrowingLocked());
+  VMO_VALIDATION_ASSERT(cow_clone->DebugValidatePageSplitsLocked());
+  VMO_FRUGAL_VALIDATION_ASSERT(cow_clone->DebugValidateVmoPageBorrowingLocked());
+  if (parent_clone) {
+    AssertHeld(parent_clone->lock_ref());
+    VMO_VALIDATION_ASSERT(parent_clone->DebugValidatePageSplitsLocked());
+    VMO_FRUGAL_VALIDATION_ASSERT(parent_clone->DebugValidateVmoPageBorrowingLocked());
   }
 
-  *cow_child = ktl::move(right_child);
+  *cow_child = ktl::move(cow_clone);
 
   return ZX_OK;
 }
@@ -790,63 +862,31 @@ zx_status_t VmCowPages::CloneUnidirectionalLocked(uint64_t offset, uint64_t size
                                                   fbl::RefPtr<VmCowPages>* cow_child) {
   canary_.Assert();
 
+  ParentAndRange child_range = FindParentAndRangeForCloneLocked(this, offset, size, false);
+  VmCowPages* parent = child_range.parent;
+  AssertHeld(parent->lock_ref());
+
   fbl::AllocChecker ac;
-  auto cow_pages = fbl::AdoptRef<VmCowPages>(new (&ac) VmCowPages(
-      hierarchy_state_ptr_, VmCowPagesOptions::kNone, pmm_alloc_flags_, size, nullptr, nullptr));
+  auto cow_clone = fbl::AdoptRef<VmCowPages>(
+      new (&ac) VmCowPages(hierarchy_state_ptr_, VmCowPagesOptions::kNone, pmm_alloc_flags_,
+                           child_range.size, nullptr, nullptr));
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
+  AssertHeld(cow_clone->lock_ref());
 
-  // The clone's parent limit starts out equal to its size, but it can't exceed the parent's size.
-  // This ensures that any clone pages beyond the parent's range get initialized from zeroes.
-  uint64_t child_parent_limit = ClampedLimit(offset, size, size_);
-
-  // Walk up the parent chain until we find a good place to hang this new cow clone. A good
-  // place here means the first place that has committed pages that we actually need to
-  // snapshot. In doing so we need to ensure that the limits of the child we create do not end
-  // up seeing more of the final parent than it would have been able to see from here.
-  VmCowPages* cur = this;
-  AssertHeld(cur->lock_ref());
-  while (cur->parent_) {
-    // There's a parent, check if there are any pages in the current range. Unless we've moved
-    // outside the range of our parent, in which case we can just walk up.
-    if (child_parent_limit > 0 &&
-        cur->page_list_.AnyPagesOrIntervalsInRange(offset, offset + child_parent_limit)) {
-      break;
-    }
-
-    VmCowPages* parent = cur->parent_.get();
-    AssertHeld(parent->lock_ref());
-    // Before the loop the caller validated that the clone's offsets cannot overflow when projected
-    // onto the root. Verify this will remain true.
-    //
-    // Each iteration of this loop should leave the clone's ultimate `root_parent_offset_` unchanged
-    // - we will increase the clone's `offset` by the current parent's `parent_offset_` but the new
-    // parent node's `root_parent_offset_` is smaller by the same amount.
-    DEBUG_ASSERT(CheckedAdd(parent->root_parent_offset_, cur->parent_offset_) ==
-                 cur->root_parent_offset_);
-
-    // To move to `cur`'s parent we need to translate the clone's window to be relative to it.
-    //
-    // The clone's last visible offset into `cur` cannot exceed `cur`'s parent limit, as it should
-    // not be able to see more pages than it could see if `cur` had been the parent.
-    child_parent_limit = ClampedLimit(offset, child_parent_limit, cur->parent_limit_);
-    offset += cur->parent_offset_;
-
-    cur = parent;
-  }
-
-  cur->AddChildLocked(cow_pages.get(), offset, child_parent_limit);
+  // The COW clone's parent must not be hidden because the clone may see future parent writes.
+  DEBUG_ASSERT(!parent->is_hidden_locked());
+  parent->AddChildLocked(cow_clone.get(), child_range.parent_offset, child_range.parent_limit);
 
   // Checking this node's hierarchy will also check the parent's hierarchy.
   // It will not check the child's hierarchy, so check that independently.
   VMO_VALIDATION_ASSERT(DebugValidatePageSplitsHierarchyLocked());
-  VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
-  VMO_FRUGAL_VALIDATION_ASSERT(cur->DebugValidateVmoPageBorrowingLocked());
-  VMO_VALIDATION_ASSERT(cow_pages->DebugValidatePageSplitsLocked());
-  VMO_FRUGAL_VALIDATION_ASSERT(cow_pages->DebugValidateVmoPageBorrowingLocked());
+  VMO_FRUGAL_VALIDATION_ASSERT(parent->DebugValidateVmoPageBorrowingLocked());
+  VMO_VALIDATION_ASSERT(cow_clone->DebugValidatePageSplitsLocked());
+  VMO_FRUGAL_VALIDATION_ASSERT(cow_clone->DebugValidateVmoPageBorrowingLocked());
 
-  *cow_child = ktl::move(cow_pages);
+  *cow_child = ktl::move(cow_clone);
 
   return ZX_OK;
 }

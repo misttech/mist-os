@@ -972,6 +972,40 @@ class VmCowPages final : public VmHierarchyBase,
                                        uint64_t owner_offset, AnonymousPageRequest* page_request)
       TA_REQ(lock());
 
+  // Helper struct which encapsulates a parent node along with a range and limit relative to it.
+  struct ParentAndRange {
+    VmCowPages* parent;
+    uint64_t parent_offset;
+    uint64_t parent_limit;
+    uint64_t size;
+  };
+
+  // Helper function for |CloneUnidirectionalLocked| and |CloneBidirectionalLocked|.
+  //
+  // Walks the hierarchy from the `parent` node to the root and finds the most distant node which
+  // could correctly be the parent for a new clone of this node.
+  //
+  // Computes a range and limit for the clone, relative to the final parent, such that the clone
+  // can't see any more of that parent than it could if it was a direct clone of `this` node.
+  //
+  // For correctness the parent is either:
+  //  * The last node encountered which satisfies `parent_must_be_hidden` if its true. The initial
+  //    `parent` node satisfies `parent_must_be_hidden` even though its visible, because it may be
+  //    converted to a hidden node by the caller.
+  //  * The first node encountered that has pages in the clone's range for it to snapshot.
+  //  * The root.
+  //
+  // The caller provides:
+  //  * `parent`: Parent node to begin the search from. It must be a visible node.
+  //             The new clone is logically a clone of it.
+  //  * `offset`: Offset of the clone relative to the initial parent.
+  //  * `size`: Size of the clone.
+  //  * `parent_must_be_hidden`: true iff the final parent must satisfy this constraint.
+  //
+  // Returns the parent node along with the clones' range and limit relative to that parent.
+  static ParentAndRange FindParentAndRangeForCloneLocked(VmCowPages* parent, uint64_t offset,
+                                                         uint64_t size, bool parent_must_be_hidden);
+
   // Helper function for CreateCloneLocked. Performs bidirectional clone operation where this VMO
   // transitions into being a hidden node and two children are created. This VMO is cloned into the
   // left child and the right child becomes the snapshot.
@@ -1039,7 +1073,7 @@ class VmCowPages final : public VmHierarchyBase,
   // VmObjectPaged backlink can be moved from this to the child, keeping all page offsets, sizes and
   // other requirements (see VmObjectPaged::SetCowPagesReferenceLocked) are valid. This does also
   // move our paged_ref_ into child_ and update the VmObjectPaged backlinks.
-  void CloneParentIntoChildLocked(fbl::RefPtr<VmCowPages>& child) TA_REQ(lock());
+  void CloneParentIntoChildLocked(fbl::RefPtr<VmCowPages> child) TA_REQ(lock());
 
   // Removes the specified child from this objects |children_list_| and performs any hierarchy
   // updates that need to happen as a result. This does not modify the |parent_| member of the
