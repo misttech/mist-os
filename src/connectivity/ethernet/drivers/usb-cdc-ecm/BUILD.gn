@@ -9,9 +9,9 @@ import("//build/fuzz.gni")
 import("//build/test.gni")
 
 driver_bind_rules("ethernet_usb_cdc_ecm_bind") {
-  rules = "ethernet_usb_cdc_ecm.bind"
+  rules = "meta/ethernet_usb_cdc_ecm.bind"
   bind_output = "usb-cdc-ecm.bindbc"
-  tests = "bind-tests.json"
+  tests = "meta/bind-tests.json"
   deps = [
     "//src/devices/bind/fuchsia.usb",
     "//src/devices/bind/fuchsia.usb.comm",
@@ -48,7 +48,7 @@ fuchsia_driver_component("usb-cdc-ecm") {
   visibility = [ ":*" ]
   component_name = "usb-cdc-ecm"
   deps = [ ":usb-cdc-ecm-driver" ]
-  info = "usb-cdc-ecm-info.json"
+  info = "meta/usb-cdc-ecm-info.json"
   manifest = "meta/usb-cdc-ecm.cml"
 }
 

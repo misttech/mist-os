@@ -9,15 +9,15 @@ import("//build/fidl/fidl.gni")
 import("//build/test.gni")
 
 driver_bind_rules("ethernet_ax88179_bind") {
-  rules = "ethernet_ax88179.bind"
+  rules = "meta/ethernet_ax88179.bind"
   bind_output = "asix-88179.bindbc"
-  tests = "ethernet_ax88179-bind-tests.json"
+  tests = "meta/ethernet_ax88179-bind-tests.json"
   deps = [ "//src/devices/bind/fuchsia.usb" ]
 }
 
 driver_bind_rules("fake_usb_ax88179_bind") {
-  rules = "fake_usb_ax88179.bind"
-  tests = "fake_usb_ax88179-bind-tests.json"
+  rules = "meta/fake_usb_ax88179.bind"
+  tests = "meta/fake_usb_ax88179-bind-tests.json"
   deps = [
     "//src/devices/bind/fuchsia.usb",
     "//src/devices/bind/fuchsia.usb.comm",
@@ -53,7 +53,7 @@ fuchsia_driver_component("asix-88179") {
   visibility = [ ":*" ]
   component_name = "asix-88179"
   deps = [ ":asix-88179-driver" ]
-  info = "asix-88179-info.json"
+  info = "meta/asix-88179-info.json"
   manifest = "meta/asix-88179.cml"
 }
 
@@ -104,7 +104,7 @@ fuchsia_driver_component("fake-asix-88179") {
   testonly = true
   component_name = "fake-asix-88179"
   deps = [ ":fake-asix-88179-driver" ]
-  info = "fake-asix-88179-info.json"
+  info = "meta/fake-asix-88179-info.json"
   manifest = "meta/fake-asix-88179.cml"
 }
 

@@ -12,9 +12,9 @@ config("wlansoftmac_config") {
 }
 
 driver_bind_rules("wlansoftmac-bind") {
-  rules = "wlansoftmac.bind"
+  rules = "meta/wlansoftmac.bind"
   bind_output = "wlansoftmac.bindbc"
-  tests = "bind_tests.json"
+  tests = "meta/bind_tests.json"
   deps = [ "//sdk/fidl/fuchsia.wlan.softmac:fuchsia.wlan.softmac_bindlib" ]
 }
 
@@ -61,7 +61,7 @@ fuchsia_driver("wlansoftmac_driver-driver") {
 fuchsia_driver_component("wlansoftmac_driver") {
   component_name = "wlansoftmac"
   deps = [ ":wlansoftmac_driver-driver" ]
-  info = "wlansoftmac.json"
+  info = "meta/wlansoftmac.json"
   manifest = "meta/wlansoftmac.cml"
 }
 

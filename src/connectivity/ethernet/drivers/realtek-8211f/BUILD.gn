@@ -6,8 +6,8 @@ import("//build/bind/bind.gni")
 import("//build/drivers.gni")
 
 driver_bind_rules("rtl8211f_bind") {
-  rules = "rtl8211f.bind"
-  tests = "bind-tests.json"
+  rules = "meta/rtl8211f.bind"
+  tests = "meta/bind-tests.json"
   deps = [ "//src/devices/bind/fuchsia.ethernet" ]
 }
 
@@ -33,7 +33,7 @@ fuchsia_driver("realtek-8211f-driver") {
 fuchsia_driver_component("realtek-8211f") {
   component_name = "realtek-8211f"
   deps = [ ":realtek-8211f-driver" ]
-  info = "realtek-8211f-info.json"
+  info = "meta/realtek-8211f-info.json"
   manifest = "meta/realtek-8211f.cml"
 }
 

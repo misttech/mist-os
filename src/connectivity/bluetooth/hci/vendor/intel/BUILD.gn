@@ -10,8 +10,8 @@ import("//build/drivers.gni")
 import("//build_overrides/pigweed.gni")
 
 driver_bind_rules("bt_hci_intel_bind") {
-  rules = "bt_hci_intel.bind"
-  tests = "bind_tests.json"
+  rules = "meta/bt_hci_intel.bind"
+  tests = "meta/bind_tests.json"
   deps = [
     "//src/devices/bind/fuchsia.bluetooth",
     "//src/devices/bind/fuchsia.usb",
@@ -76,7 +76,7 @@ fuchsia_driver("fuchsia_driver") {
 fuchsia_driver_component("driver") {
   component_name = "bt-hci-intel"
   deps = [ ":fuchsia_driver" ]
-  info = "driver-info.json"
+  info = "meta/driver-info.json"
   manifest = "meta/driver.cml"
 }
 

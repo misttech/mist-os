@@ -67,7 +67,7 @@ source_set("lib_source_mlme_stub") {
 }
 
 driver_bind_rules("wlanif_bind") {
-  rules = "wlanif.bind"
+  rules = "meta/wlanif.bind"
   bind_output = "wlanif.bindbc"
   deps = [ "//sdk/fidl/fuchsia.wlan.fullmac:fuchsia.wlan.fullmac_bindlib" ]
 }
@@ -83,7 +83,7 @@ fuchsia_driver_component("wlanif_driver") {
   component_name = "wlanif"
   manifest = "meta/wlanif.cml"
   deps = [ ":wlanif_driver-driver" ]
-  info = "wlanif_driver-info.json"
+  info = "meta/wlanif_driver-info.json"
 }
 
 fuchsia_driver_package("wlanif") {

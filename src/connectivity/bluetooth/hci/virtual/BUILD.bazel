@@ -16,7 +16,7 @@ package(default_visibility = ["//visibility:public"])
 fuchsia_driver_bind_bytecode(
     name = "bt-hci-virtual-bind",
     output = "bt-hci-virtual.bindbc",
-    rules = "bt-hci-virtual.bind",
+    rules = "meta/bt-hci-virtual.bind",
     deps = [
         "@fuchsia_sdk//bind/fuchsia.platform",
     ],

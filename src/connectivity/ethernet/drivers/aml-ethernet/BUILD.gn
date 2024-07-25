@@ -6,8 +6,8 @@ import("//build/bind/bind.gni")
 import("//build/drivers.gni")
 
 driver_bind_rules("aml_eth_bind") {
-  rules = "aml_eth.bind"
-  tests = "bind-tests.json"
+  rules = "meta/aml_eth.bind"
+  tests = "meta/bind-tests.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_bindlib",
     "//src/devices/bind/fuchsia.amlogic.platform",
@@ -50,7 +50,7 @@ fuchsia_driver("aml-ethernet-driver") {
 fuchsia_driver_component("aml-ethernet") {
   component_name = "aml-ethernet"
   deps = [ ":aml-ethernet-driver" ]
-  info = "aml-ethernet-info.json"
+  info = "meta/aml-ethernet-info.json"
   manifest = "meta/aml-ethernet.cml"
 }
 

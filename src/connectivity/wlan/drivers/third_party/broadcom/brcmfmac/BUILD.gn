@@ -205,7 +205,7 @@ bind_library("fuchsia.brcmfmac") {
 }
 
 driver_bind_rules("brcmfmac_sdio_bind") {
-  rules = "brcmfmac_sdio.bind"
+  rules = "meta/brcmfmac_sdio.bind"
   bind_output = "brcmfmac_sdio.bindbc"
   deps = [
     "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_bindlib",
@@ -238,7 +238,7 @@ fuchsia_driver_component("fuchsia_driver") {
     "//bundles/drivers/pci",
     "//src/connectivity/wlan:drivers",
   ]
-  info = "fuchsia_driver-info.json"
+  info = "meta/fuchsia_driver-info.json"
 }
 
 # Driver module for the test version of the brcmfmac driver, which includes run_unit_tests() DDK
@@ -260,7 +260,7 @@ fuchsia_driver_component("test_fuchsia_driver") {
   component_name = "brcmfmac-test"
   deps = [ ":test_fuchsia_driver-driver" ]
   visibility += [ "//src/connectivity/wlan:drivers" ]
-  info = "test_fuchsia_driver-info.json"
+  info = "meta/test_fuchsia_driver-info.json"
   manifest = "meta/brcmfmac-test.cml"
 }
 

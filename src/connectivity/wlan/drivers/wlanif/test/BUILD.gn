@@ -6,8 +6,8 @@ import("//build/bind/bind.gni")
 import("//build/components.gni")
 
 bind_test("wlanif_bind_test") {
-  rules = "//src/connectivity/wlan/drivers/wlanif/wlanif.bind"
-  tests = "wlanif_bind_test.json"
+  rules = "//src/connectivity/wlan/drivers/wlanif/meta/wlanif.bind"
+  tests = "meta/wlanif_bind_test.json"
   deps = [ "//sdk/fidl/fuchsia.wlan.fullmac:fuchsia.wlan.fullmac_bindlib" ]
 }
 

@@ -7,8 +7,8 @@ import("//build/components.gni")
 import("//build/drivers.gni")
 
 driver_bind_rules("bt_hci_passthrough_bind") {
-  rules = "bt_hci_passthrough.bind"
-  tests = "bind-tests.json"
+  rules = "meta/bt_hci_passthrough.bind"
+  tests = "meta/bind-tests.json"
   deps = [ "//src/devices/bind/fuchsia.bluetooth" ]
 }
 
@@ -40,7 +40,7 @@ fuchsia_driver("fuchsia_driver") {
 fuchsia_driver_component("driver") {
   component_name = "bt-hci-passthrough"
   deps = [ ":fuchsia_driver" ]
-  info = "driver-info.json"
+  info = "meta/driver-info.json"
   manifest = "meta/driver.cml"
 }
 

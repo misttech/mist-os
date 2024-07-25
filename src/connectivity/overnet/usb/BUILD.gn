@@ -8,9 +8,9 @@ import("//build/drivers.gni")
 import("//build/test.gni")
 
 driver_bind_rules("overnet_usb_bind") {
-  rules = "overnet_usb.bind"
+  rules = "meta/overnet_usb.bind"
   bind_output = "overnet-usb.bindbc"
-  tests = "bind-tests.json"
+  tests = "meta/bind-tests.json"
   deps = [
     "//src/devices/bind/fuchsia.google.platform.usb",
     "//src/devices/bind/fuchsia.usb",
@@ -62,7 +62,7 @@ fuchsia_driver("overnet-usb-driver") {
 fuchsia_driver_component("overnet-usb") {
   component_name = "overnet-usb"
   deps = [ ":overnet-usb-driver" ]
-  info = "overnet-usb-info.json"
+  info = "meta/overnet-usb-info.json"
   manifest = "meta/overnet-usb.cml"
 }
 

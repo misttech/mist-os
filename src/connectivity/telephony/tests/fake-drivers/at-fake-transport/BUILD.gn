@@ -7,8 +7,8 @@ import("//build/components.gni")
 import("//build/drivers.gni")
 
 driver_bind_rules("at_fake_bind") {
-  rules = "at_fake.bind"
-  tests = "bind_tests.json"
+  rules = "meta/at_fake.bind"
+  tests = "meta/bind_tests.json"
   deps = [ "//src/devices/bind/fuchsia.test.platform" ]
 }
 
@@ -47,7 +47,7 @@ fuchsia_driver_component("fake_at_driver") {
   testonly = true
   component_name = "at-fake-transport"
   deps = [ ":fake_at_driver-driver" ]
-  info = "fake_at_driver-info.json"
+  info = "meta/fake_at_driver-info.json"
   manifest = "meta/fake_at_driver.cml"
 }
 
