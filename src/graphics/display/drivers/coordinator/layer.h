@@ -97,9 +97,10 @@ class Layer : public IdMappable<std::unique_ptr<Layer>, DriverLayerId> {
   // If no image is being displayed on this layer, returns nullopt.
   std::optional<ConfigStamp> GetCurrentClientConfigStamp() const;
 
-  // Adds the pending_layer_ to a display list, at z_index. Returns false if the pending_layer_ is
-  // currently in use.
-  bool AddToConfig(fbl::DoublyLinkedList<LayerNode*>* list, uint32_t z_index);
+  // Adds the pending_layer_ to the end of a display list.
+  //
+  // Returns false if the pending_layer_ is currently in use.
+  bool AppendToConfig(fbl::DoublyLinkedList<LayerNode*>* list);
 
   void SetPrimaryConfig(fuchsia_hardware_display_types::wire::ImageMetadata image_metadata);
   void SetPrimaryPosition(fuchsia_hardware_display_types::wire::Transform transform,

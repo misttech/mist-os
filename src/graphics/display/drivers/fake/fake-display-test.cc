@@ -298,7 +298,6 @@ fuchsia_sysmem2::wire::BufferCollectionConstraints CreateImageConstraints(
 layer_t CreatePrimaryLayerConfig(uint64_t image_handle, const image_metadata_t& image_metadata) {
   return layer_t{
       .type = LAYER_TYPE_PRIMARY,
-      .z_index = 0,
       .cfg =
           {
               .primary =

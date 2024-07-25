@@ -1098,18 +1098,19 @@ bool Controller::GetPlaneLayer(Pipe* pipe, uint32_t plane,
     }
     bool has_color_layer = banjo_display_config.layer_count &&
                            banjo_display_config.layer_list[0].type == LAYER_TYPE_COLOR;
-    for (unsigned j = 0; j < banjo_display_config.layer_count; j++) {
-      if (banjo_display_config.layer_list[j].type == LAYER_TYPE_PRIMARY) {
-        if (plane != (banjo_display_config.layer_list[j].z_index - has_color_layer)) {
+    for (unsigned layer_index = 0; layer_index < banjo_display_config.layer_count; ++layer_index) {
+      const layer_t& layer = banjo_display_config.layer_list[layer_index];
+      if (layer.type == LAYER_TYPE_PRIMARY) {
+        if (plane + (has_color_layer ? 1 : 0) != layer_index) {
           continue;
         }
-      } else if (banjo_display_config.layer_list[j].type == LAYER_TYPE_COLOR) {
+      } else if (layer.type == LAYER_TYPE_COLOR) {
         // color layers aren't a plane
         continue;
       } else {
         ZX_ASSERT(false);
       }
-      *layer_out = &banjo_display_config.layer_list[j];
+      *layer_out = &banjo_display_config.layer_list[layer_index];
       return true;
     }
   }

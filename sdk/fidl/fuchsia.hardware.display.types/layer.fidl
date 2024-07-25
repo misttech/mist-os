@@ -129,6 +129,5 @@ type Layer = struct {
     /// z_index of the layer. See
     /// [`fuchsia.hardware.display.engine/Engine.CheckConfiguration`] and
     /// [`fuchsia.hardware.display.engine/Engine.ApplyConfiguration`].
-    z_index uint32;
     cfg LayerConfig;
 };

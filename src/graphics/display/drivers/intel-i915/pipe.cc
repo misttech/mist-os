@@ -467,9 +467,9 @@ void Pipe::ApplyConfiguration(const display_config_t* banjo_display_config,
   bool scaler_1_claimed = false;
   for (unsigned plane = 0; plane < 3; plane++) {
     const primary_layer_t* primary = nullptr;
-    for (unsigned j = 0; j < banjo_display_config->layer_count; j++) {
-      const layer_t& layer = banjo_display_config->layer_list[j];
-      if (layer.type == LAYER_TYPE_PRIMARY && (layer.z_index - has_color_layer) == plane) {
+    for (unsigned layer_index = 0; layer_index < banjo_display_config->layer_count; ++layer_index) {
+      const layer_t& layer = banjo_display_config->layer_list[layer_index];
+      if (layer.type == LAYER_TYPE_PRIMARY && layer_index == plane + has_color_layer) {
         primary = &layer.cfg.primary;
         break;
       }

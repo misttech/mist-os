@@ -224,14 +224,13 @@ bool Layer::ActivateLatestReadyImage() {
   return true;
 }
 
-bool Layer::AddToConfig(fbl::DoublyLinkedList<LayerNode*>* list, uint32_t z_index) {
+bool Layer::AppendToConfig(fbl::DoublyLinkedList<LayerNode*>* list) {
   if (pending_node_.InContainer()) {
     return false;
-  } else {
-    pending_layer_.z_index = z_index;
-    list->push_front(&pending_node_);
-    return true;
   }
+
+  list->push_front(&pending_node_);
+  return true;
 }
 
 void Layer::SetPrimaryConfig(fhdt::wire::ImageMetadata image_metadata) {

@@ -491,10 +491,7 @@ void Client::SetDisplayLayers(SetDisplayLayersRequestView request,
       return;
     }
 
-    // The cast is lossless because FIDL vector size is capped at 2^32-1.
-    const uint32_t z_index = static_cast<uint32_t>(i);
-
-    if (!layer->AddToConfig(&config->pending_layers_, z_index)) {
+    if (!layer->AppendToConfig(&config->pending_layers_)) {
       zxlogf(ERROR, "Tried to reuse an in-use layer");
       TearDown();
       return;
@@ -748,7 +745,6 @@ void Client::ApplyConfig(ApplyConfigCompleter::Sync& /*_completer*/) {
           // unusual layer changes to trigger this unnecessary, but that's not wrong.
           layer->current_display_id_ = display_config.id;
         }
-        layer->current_layer_.z_index = layer->pending_layer_.z_index;
       }
       display_config.pending_layer_change_ = false;
       display_config.pending_layer_change_property_.Set(false);
