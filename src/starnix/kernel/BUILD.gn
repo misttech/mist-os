@@ -250,7 +250,6 @@ rustc_library("starnix_core") {
     "vfs/file_server.rs",
     "vfs/file_system/file_system.rs",
     "vfs/file_system/mod.rs",
-    "vfs/file_system/selinux_contexts.rs",
     "vfs/file_write_guard.rs",
     "vfs/fs_args.rs",
     "vfs/fs_context.rs",

@@ -6,14 +6,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::security;
 use crate::task::{CurrentTask, Kernel};
-use crate::vfs::file_system::SeLinuxContexts;
 use crate::vfs::{
     fs_args, DirEntry, DirEntryHandle, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr,
     FsString, WeakFsNodeHandle, XattrOp,
 };
 use linked_hash_map::LinkedHashMap;
-use linux_uapi::XATTR_NAME_SELINUX;
 use once_cell::sync::OnceCell;
 use ref_cast::RefCast;
 use smallvec::SmallVec;
@@ -73,9 +72,9 @@ pub struct FileSystem {
     /// maintained in an LRU cache.
     entries: Entries,
 
-    /// Hack meant to stand in for the fs_use_trans selinux feature. If set, this value will be set
-    /// as the selinux label on any newly created inodes in the filesystem.
-    pub selinux_context: OnceCell<SeLinuxContexts>,
+    /// Holds security state for this file system, which is created and used by the Linux Security
+    /// Modules subsystem hooks.
+    pub security_state: security::FileSystemState,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -140,7 +139,7 @@ impl FileSystem {
         options: FileSystemOptions,
     ) -> Result<FileSystemHandle, Errno> {
         let mount_options = fs_args::generic_parse_mount_options(options.params.as_ref())?;
-        let selinux_context = SeLinuxContexts::try_from_mount_options(&mount_options)?;
+        let security_state = security::file_system_init_security(ops.name(), &mount_options)?;
         Ok(Arc::new(FileSystem {
             kernel: Arc::downgrade(kernel),
             root: OnceCell::new(),
@@ -157,10 +156,7 @@ impl FileSystem {
                 }
                 CacheMode::Uncached => Entries::Uncached,
             },
-            selinux_context: match selinux_context {
-                Some(selinux_context) => OnceCell::with_value(selinux_context),
-                None => OnceCell::new(),
-            },
+            security_state,
         }))
     }
 
@@ -205,17 +201,17 @@ impl FileSystem {
         current_task: &CurrentTask,
         node: &FsNodeHandle,
     ) -> WeakFsNodeHandle {
-        if let Some(contexts) = self.selinux_context.get() {
-            let context = contexts.context().or(contexts.defcontext());
-            if let Some(context) = context {
-                let _ = node.ops().set_xattr(
-                    node,
-                    current_task,
-                    XATTR_NAME_SELINUX.to_bytes().into(),
-                    context,
-                    XattrOp::Create,
-                );
-            }
+        // TODO(b/355180447): Move this logic so the parent inode (if any) can be taken into account.
+        if let Some(xattr) =
+            security::fs_node_security_xattr(current_task, &node, None).unwrap_or(None)
+        {
+            let _ = node.ops().set_xattr(
+                node,
+                current_task,
+                xattr.name,
+                xattr.value.as_slice().into(),
+                XattrOp::Create,
+            );
         }
         Arc::downgrade(node)
     }

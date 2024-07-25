@@ -19,7 +19,6 @@ use crate::security::selinux_fs;
 use crate::task::{CurrentTask, EventHandler, Kernel, Task, WaitCanceler, Waiter};
 use crate::time::utc;
 use crate::vfs::buffers::InputBuffer;
-use crate::vfs::file_system::SeLinuxContexts;
 use crate::vfs::fuse::{new_fuse_fs, new_fusectl_fs};
 use crate::vfs::socket::{SocketAddress, SocketHandle, UnixSocket};
 use crate::vfs::{
@@ -709,18 +708,7 @@ impl FileSystemCreator for Arc<Kernel> {
                 fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
                 options,
             )?,
-            b"tmpfs" => {
-                let fs = TmpFs::new_fs_with_options(self, options)?;
-                // TODO(http://b/320436714): use hard-coded security context only for SELinux Fake
-                // mode once SELinux is implemented for the file subsystem.
-                if self.security_server.is_some() {
-                    let context = SeLinuxContexts::from_defcontext(b"u:object_r:tmpfs:s0".into());
-                    fs.selinux_context
-                        .set(context)
-                        .expect("initialize tmpfs selinux security context");
-                }
-                fs
-            }
+            b"tmpfs" => TmpFs::new_fs_with_options(self, options)?,
             _ => {
                 return error!(ENODEV, fs_type);
             }

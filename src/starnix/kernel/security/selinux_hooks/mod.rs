@@ -4,11 +4,11 @@
 
 pub(super) mod fs;
 
-use super::{FsNodeState, ProcAttr};
+use super::{FsNodeSecurityXattr, FsNodeState, ProcAttr};
 
 use crate::task::CurrentTask;
 use crate::vfs::syscalls::LookupFlags;
-use crate::vfs::{FsNode, FsNodeHandle, FsStr, NamespaceNode, ValueOrSize};
+use crate::vfs::{FsNode, FsNodeHandle, FsStr, FsString, NamespaceNode, ValueOrSize};
 use linux_uapi::XATTR_NAME_SELINUX;
 use selinux::permission_check::PermissionCheck;
 use selinux::security_server::SecurityServer;
@@ -21,6 +21,7 @@ use starnix_uapi::errors::Errno;
 use starnix_uapi::mount_flags::MountFlags;
 use starnix_uapi::signals::{Signal, SIGCHLD, SIGKILL, SIGSTOP};
 use starnix_uapi::{errno, error};
+use std::collections::HashMap;
 use std::sync::Arc;
 
 /// Maximum supported size for the extended attribute value used to store SELinux security
@@ -424,6 +425,50 @@ pub(super) fn check_permissions<P: ClassPermission + Into<Permission> + Clone + 
     }
 }
 
+/// Return security state to associate with a filesystem based on the supplied mount options.
+pub fn file_system_init_security(
+    fs_type: &FsStr,
+    options: &HashMap<FsString, FsString>,
+) -> Result<FileSystemState, Errno> {
+    let context = options.get(FsStr::new(b"context")).cloned();
+    let mut def_context = options.get(FsStr::new(b"defcontext")).cloned();
+    let fs_context = options.get(FsStr::new(b"fscontext")).cloned();
+    let root_context = options.get(FsStr::new(b"rootcontext")).cloned();
+
+    // TODO(http://b/320436714): Remove this once policy-defined default-contexts are implemented.
+    if **fs_type == *b"tmpfs" && def_context.is_none() && context.is_none() {
+        def_context = Some(b"u:object_r:tmpfs:s0".into());
+    }
+
+    // If a "context" is specified then it is used for all nodes in the filesystem, so none of the other
+    // security context options would be meaningful to combine with it.
+    if context.is_some()
+        && (def_context.is_some() || fs_context.is_some() || root_context.is_some())
+    {
+        return error!(EINVAL);
+    }
+
+    Ok(FileSystemState { context, def_context, fs_context, root_context })
+}
+
+/// Returns the security attribute to label a newly created inode with, if any.
+pub fn fs_node_security_xattr(
+    _security_server: &SecurityServer,
+    new_node: &FsNodeHandle,
+    _parent: Option<&FsNodeHandle>,
+) -> Result<Option<FsNodeSecurityXattr>, Errno> {
+    // TODO(b/334091674): If there is no `parent` then this is the "root" node; apply `root_context`, if set.
+    // TODO(b/334091674): Determine whether "context" (and "defcontext") should be returned here, or only set in
+    // the node's cached SID.
+    let fs = new_node.fs();
+    Ok(fs.security_state.0.context.as_ref().or(fs.security_state.0.def_context.as_ref()).map(
+        |context| FsNodeSecurityXattr {
+            name: XATTR_NAME_SELINUX.to_bytes().into(),
+            value: context.clone(),
+        },
+    ))
+}
+
 /// Returns `TaskState` for a new `Task`, based on the `parent` state, and the specified clone flags.
 pub(super) fn task_alloc(parent: &TaskState, _clone_flags: u64) -> TaskState {
     parent.clone()
@@ -476,6 +521,26 @@ impl TaskState {
             ptracer_sid: None,
         }
     }
+}
+
+/// SELinux security context-related filesystem mount options. These options are documented in the
+/// `context=context, fscontext=context, defcontext=context, and rootcontext=context` section of
+/// the `mount(8)` manpage.
+#[derive(Clone, Debug, PartialEq)]
+pub(super) struct FileSystemState {
+    /// Specifies the effective security context to use for all nodes in the filesystem, and the
+    /// filesystem itself. If the filesystem already contains security attributes then these are
+    /// ignored. May not be combined with any of the other options.
+    context: Option<FsString>,
+    /// Specifies an effective security context to use for un-labeled nodes in the filesystem,
+    /// rather than falling-back to the policy-defined "file" context.
+    def_context: Option<FsString>,
+    /// The value of the `fscontext=[security-context]` mount option. This option is used to
+    /// label the filesystem (superblock) itself.
+    fs_context: Option<FsString>,
+    /// The value of the `rootcontext=[security-context]` mount option. This option is used to
+    /// (re)label the inode located at the filesystem mountpoint.
+    root_context: Option<FsString>,
 }
 
 /// Returns the security id that should be used for SELinux access control checks against `fs_node`
@@ -1146,6 +1211,16 @@ mod tests {
         let (_kernel, current_task, mut locked) =
             create_kernel_task_and_unlocked_with_selinux(security_server.clone());
         let node = &create_test_file(&mut locked, &current_task).entry.node;
+
+        // Remove the "security.selinux" label, if any, from the test file.
+        let _ = node.ops().remove_xattr(node, &current_task, XATTR_NAME_SELINUX.to_bytes().into());
+
+        assert_eq!(
+            node.ops()
+                .get_xattr(node, &current_task, XATTR_NAME_SELINUX.to_bytes().into(), 4096)
+                .unwrap_err(),
+            errno!(ENODATA)
+        );
         assert_eq!(None, get_cached_sid(node));
 
         assert_eq!(

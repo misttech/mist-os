@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::{selinux_hooks, ResolvedElfState, TaskState};
+use super::{selinux_hooks, FileSystemState, ResolvedElfState, TaskState};
 use crate::task::{CurrentTask, Task};
 use crate::vfs::syscalls::LookupFlags;
-use crate::vfs::{FsNode, FsNodeHandle, FsStr, NamespaceNode};
+use crate::vfs::{FsNode, FsNodeHandle, FsStr, FsString, NamespaceNode};
 
 use linux_uapi::XATTR_NAME_SELINUX;
 use selinux::security_server::SecurityServer;
@@ -15,6 +15,7 @@ use starnix_uapi::error;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::mount_flags::MountFlags;
 use starnix_uapi::signals::Signal;
+use std::collections::HashMap;
 use std::sync::Arc;
 
 /// Executes the `hook` closure, dependent on the state of SELinux.
@@ -74,6 +75,34 @@ where
             default()
         }
     })
+}
+
+/// Return security state to associate with a filesystem based on the supplied mount options.
+/// This sits somewhere between `fs_context_parse_param()` and `sb_set_mnt_opts()` in function.
+pub fn file_system_init_security(
+    fs_type: &FsStr,
+    mount_options: &HashMap<FsString, FsString>,
+) -> Result<FileSystemState, Errno> {
+    Ok(FileSystemState(selinux_hooks::file_system_init_security(fs_type, mount_options)?))
+}
+
+/// Used to return an extended attribute name and value to apply to a [`crate::vfs::FsNode`].
+pub struct FsNodeSecurityXattr {
+    pub name: &'static FsStr,
+    pub value: FsString,
+}
+
+/// Returns the security attribute to label a newly created inode with.
+pub fn fs_node_security_xattr(
+    current_task: &CurrentTask,
+    new_node: &FsNodeHandle,
+    parent: Option<&FsNodeHandle>,
+) -> Result<Option<FsNodeSecurityXattr>, Errno> {
+    if let Some(security_server) = current_task.kernel().security_server.as_ref() {
+        selinux_hooks::fs_node_security_xattr(security_server, new_node, parent)
+    } else {
+        Ok(None)
+    }
 }
 
 /// Return the default initial `TaskState` for kernel tasks.
