@@ -9,7 +9,6 @@ use camino::{Utf8Path, Utf8PathBuf};
 use serde::Serialize;
 use std::collections::btree_map::Entry;
 use std::collections::{BTreeMap, BTreeSet};
-use tempfile::TempDir;
 
 use assembly_config_schema::platform_config::icu_config::{ICUMap, Revision, ICU_CONFIG_INFO};
 use assembly_config_schema::{BoardInformation, BuildType, ICUConfig};
@@ -764,17 +763,35 @@ impl ConfigurationContext<'_> {
     /// Subsystems can use this to generate files before adding them to the
     /// builder.
     pub fn get_gendir(&self) -> Result<Utf8PathBuf> {
-        let gendir =
-            TempDir::new_in(&self.gendir).map_err(|e| anyhow!("preparing new gendir: {}", e))?;
-        let gendir = Utf8PathBuf::from_path_buf(gendir.into_path())
-            .map_err(|_e| anyhow!("converting to utf8 path"))?;
-        Ok(gendir)
+        std::fs::create_dir_all(&self.gendir)
+            .map_err(|e| anyhow!("preparing new gendir: {}", e))?;
+        Ok(self.gendir.to_owned())
     }
 
     /// Retrieve the full path to a platform resource identified by a path into
     /// the resource directory.
     pub fn get_resource(&self, path: impl AsRef<Utf8Path>) -> Utf8PathBuf {
         self.resource_dir.join(path.as_ref())
+    }
+}
+
+/// This is the basis for the the context that's passed to each subsystem's configuration
+/// module.  These are the fields from the
+/// `assembly_config_schema::platform_config::PlatformConfig` struct that are
+/// available to all subsystems to use to derive their configuration from.  This is used to create
+/// the specific ConfigurationContext object that's used for each individual subsystem.
+#[derive(Debug)]
+pub(crate) struct ConfigurationContextBase<'a> {
+    pub base_context: ConfigurationContext<'a>,
+}
+
+impl<'a> ConfigurationContextBase<'a> {
+    pub fn for_subsystem(&self, subsystem: &str) -> ConfigurationContext<'a> {
+        ConfigurationContext {
+            gendir: self.base_context.gendir.join(subsystem),
+            resource_dir: self.base_context.resource_dir.to_owned(),
+            ..self.base_context
+        }
     }
 }
 
@@ -811,6 +828,7 @@ mod tests {
     use assembly_named_file_map::SourceMerklePair;
     use lazy_static::lazy_static;
     use std::io::Write;
+    use tempfile::TempDir;
     use utf8_path::path_relative_from_current_dir;
 
     lazy_static! {

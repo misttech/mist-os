@@ -8,7 +8,7 @@ use assembly_config_schema::product_config::ProductConfig;
 use assembly_config_schema::{BoardInformation, BuildType, ExampleConfig};
 use camino::Utf8Path;
 
-use crate::common::{CompletedConfiguration, ConfigurationBuilderImpl};
+use crate::common::{CompletedConfiguration, ConfigurationBuilderImpl, ConfigurationContextBase};
 
 pub(crate) mod prelude {
 
@@ -93,13 +93,15 @@ pub fn define_configuration(
 
         // Set up the context that's used by each subsystem to get the generally-
         // available platform information.
-        let context = ConfigurationContext {
-            feature_set_level,
-            build_type,
-            board_info,
-            ramdisk_image,
-            gendir,
-            resource_dir,
+        let context = ConfigurationContextBase {
+            base_context: ConfigurationContext {
+                feature_set_level,
+                build_type,
+                board_info,
+                ramdisk_image,
+                gendir,
+                resource_dir,
+            },
         };
 
         // Call the configuration functions for each subsystem.
@@ -218,19 +220,23 @@ impl DefineSubsystemConfiguration<()> for CommonBundles {
 }
 
 fn configure_subsystems(
-    context: &ConfigurationContext<'_>,
+    context_base: &ConfigurationContextBase<'_>,
     platform: &PlatformConfig,
     product: &ProductConfig,
     builder: &mut dyn ConfigurationBuilder,
 ) -> anyhow::Result<()> {
     // Define the common platform bundles for this platform configuration.
-    CommonBundles::define_configuration(context, &(), builder)
-        .context("Selecting the common platform assembly input bundles")?;
+    CommonBundles::define_configuration(
+        &context_base.for_subsystem("common_bundles"),
+        &(),
+        builder,
+    )
+    .context("Selecting the common platform assembly input bundles")?;
 
     // Configure the Product Assembly + Structured Config example, if enabled.
     if should_configure_example() {
         example::ExampleSubsystemConfig::define_configuration(
-            context,
+            &context_base.for_subsystem("example"),
             &platform.example_config,
             builder,
         )?;
@@ -240,155 +246,247 @@ fn configure_subsystems(
 
     // The real platform subsystems
 
-    battery::BatterySubsystemConfig::define_configuration(context, &platform.battery, builder)
-        .context("Configuring the 'battery' subsystem")?;
+    battery::BatterySubsystemConfig::define_configuration(
+        &context_base.for_subsystem("battery"),
+        &platform.battery,
+        builder,
+    )
+    .context("Configuring the 'battery' subsystem")?;
 
     bluetooth::BluetoothSubsystemConfig::define_configuration(
-        context,
+        &context_base.for_subsystem("bluetooth"),
         &platform.bluetooth,
         builder,
     )
     .context("Configuring the `bluetooth` subsystem")?;
 
-    build_info::BuildInfoSubsystem::define_configuration(context, &product.build_info, builder)
-        .context("Configuring the 'build_info' subsystem")?;
+    build_info::BuildInfoSubsystem::define_configuration(
+        &context_base.for_subsystem("build_info"),
+        &product.build_info,
+        builder,
+    )
+    .context("Configuring the 'build_info' subsystem")?;
 
     let component_config = component::ComponentConfig {
         policy: &product.component_policy,
         development_support: &platform.development_support,
         starnix: &platform.starnix,
     };
-    component::ComponentSubsystem::define_configuration(context, &component_config, builder)
-        .context("Configuring the 'component' subsystem")?;
+    component::ComponentSubsystem::define_configuration(
+        &context_base.for_subsystem("component"),
+        &component_config,
+        builder,
+    )
+    .context("Configuring the 'component' subsystem")?;
 
     connectivity::ConnectivitySubsystemConfig::define_configuration(
-        context,
+        &context_base.for_subsystem("connectivity"),
         &platform.connectivity,
         builder,
     )
     .context("Configuring the 'connectivity' subsystem")?;
 
     development::DevelopmentConfig::define_configuration(
-        context,
+        &context_base.for_subsystem("development"),
         &platform.development_support,
         builder,
     )
     .context("Configuring the 'development' subsystem")?;
 
     diagnostics::DiagnosticsSubsystem::define_configuration(
-        context,
+        &context_base.for_subsystem("diagnostics"),
         &platform.diagnostics,
         builder,
     )
     .context("Configuring the 'diagnostics' subsystem")?;
 
     driver_framework::DriverFrameworkSubsystemConfig::define_configuration(
-        context,
+        &context_base.for_subsystem("driver_framework"),
         &platform.driver_framework,
         builder,
     )
     .context("Configuring the 'driver_framework' subsystem")?;
 
-    graphics::GraphicsSubsystemConfig::define_configuration(context, &platform.graphics, builder)
-        .context("Configuring the 'graphics' subsystem")?;
+    graphics::GraphicsSubsystemConfig::define_configuration(
+        &context_base.for_subsystem("graphics"),
+        &platform.graphics,
+        builder,
+    )
+    .context("Configuring the 'graphics' subsystem")?;
 
-    hwinfo::HwinfoSubsystem::define_configuration(context, &product.info, builder)
-        .context("Configuring the 'hwinfo' subsystem")?;
+    hwinfo::HwinfoSubsystem::define_configuration(
+        &context_base.for_subsystem("hwinfo"),
+        &product.info,
+        builder,
+    )
+    .context("Configuring the 'hwinfo' subsystem")?;
 
-    icu::IcuSubsystem::define_configuration(context, &platform.icu, builder)
-        .context("Configuring the 'icu' subsystem")?;
+    icu::IcuSubsystem::define_configuration(
+        &context_base.for_subsystem("icu"),
+        &platform.icu,
+        builder,
+    )
+    .context("Configuring the 'icu' subsystem")?;
 
     input_groups::InputGroupsSubsystem::define_configuration(
-        context,
+        &context_base.for_subsystem("input_groups"),
         &platform.input_groups,
         builder,
     )
     .context("Configuring the 'input_groups' subsystem")?;
 
-    media::MediaSubsystem::define_configuration(context, &platform.media, builder)
-        .context("Configuring the 'media' subsystem")?;
+    media::MediaSubsystem::define_configuration(
+        &context_base.for_subsystem("media"),
+        &platform.media,
+        builder,
+    )
+    .context("Configuring the 'media' subsystem")?;
 
-    power::PowerManagementSubsystem::define_configuration(context, &platform.power, builder)
-        .context("Configuring the 'power' subsystem")?;
+    power::PowerManagementSubsystem::define_configuration(
+        &context_base.for_subsystem("power"),
+        &platform.power,
+        builder,
+    )
+    .context("Configuring the 'power' subsystem")?;
 
     paravirtualization::ParavirtualizationSubsystem::define_configuration(
-        context,
+        &context_base.for_subsystem("paravirtualization"),
         &platform.paravirtualization,
         builder,
     )
     .context("Configuring the 'paravirtualization' subsystem")?;
 
-    radar::RadarSubsystemConfig::define_configuration(context, &(), builder)
-        .context("Configuring the 'radar' subsystem")?;
+    radar::RadarSubsystemConfig::define_configuration(
+        &context_base.for_subsystem("radar"),
+        &(),
+        builder,
+    )
+    .context("Configuring the 'radar' subsystem")?;
 
-    recovery::RecoverySubsystem::define_configuration(context, &platform.recovery, builder)
-        .context("Configuring the 'recovery' subsystem")?;
+    recovery::RecoverySubsystem::define_configuration(
+        &context_base.for_subsystem("recovery"),
+        &platform.recovery,
+        builder,
+    )
+    .context("Configuring the 'recovery' subsystem")?;
 
-    rcs::RcsSubsystemConfig::define_configuration(context, &(), builder)
+    rcs::RcsSubsystemConfig::define_configuration(&context_base.for_subsystem("rcs"), &(), builder)
         .context("Configuring the 'rcs' subsystem")?;
 
-    sensors::SensorsSubsystemConfig::define_configuration(context, &platform.starnix, builder)
-        .context("Configuring the 'sensors' subsystem")?;
+    sensors::SensorsSubsystemConfig::define_configuration(
+        &context_base.for_subsystem("sensors"),
+        &platform.starnix,
+        builder,
+    )
+    .context("Configuring the 'sensors' subsystem")?;
 
     session::SessionConfig::define_configuration(
-        context,
+        &context_base.for_subsystem("session"),
         &(&platform.session, &product.session_url),
         builder,
     )
     .context("Configuring the 'session' subsystem")?;
 
-    starnix::StarnixSubsystem::define_configuration(context, &platform.starnix, builder)
-        .context("Configuring the starnix subsystem")?;
+    starnix::StarnixSubsystem::define_configuration(
+        &context_base.for_subsystem("starnix"),
+        &platform.starnix,
+        builder,
+    )
+    .context("Configuring the starnix subsystem")?;
 
-    storage::StorageSubsystemConfig::define_configuration(context, &platform.storage, builder)
-        .context("Configuring the 'storage' subsystem")?;
+    storage::StorageSubsystemConfig::define_configuration(
+        &context_base.for_subsystem("storage"),
+        &platform.storage,
+        builder,
+    )
+    .context("Configuring the 'storage' subsystem")?;
 
-    swd::SwdSubsystemConfig::define_configuration(context, &platform.software_delivery, builder)
-        .context("Configuring the 'software_delivery' subsystem")?;
+    swd::SwdSubsystemConfig::define_configuration(
+        &context_base.for_subsystem("swd"),
+        &platform.software_delivery,
+        builder,
+    )
+    .context("Configuring the 'software_delivery' subsystem")?;
 
-    sysmem::SysmemConfig::define_configuration(context, &platform.sysmem, builder)
-        .context("Configuring 'sysmem'")?;
+    sysmem::SysmemConfig::define_configuration(
+        &context_base.for_subsystem("sysmem"),
+        &platform.sysmem,
+        builder,
+    )
+    .context("Configuring 'sysmem'")?;
 
-    thermal::ThermalSubsystem::define_configuration(context, &(), builder)
-        .context("Configuring the 'thermal' subsystem")?;
+    thermal::ThermalSubsystem::define_configuration(
+        &context_base.for_subsystem("thermal"),
+        &(),
+        builder,
+    )
+    .context("Configuring the 'thermal' subsystem")?;
 
-    ui::UiSubsystem::define_configuration(context, &platform.ui, builder)
+    ui::UiSubsystem::define_configuration(&context_base.for_subsystem("ui"), &platform.ui, builder)
         .context("Configuring the 'ui' subsystem")?;
 
     virtualization::VirtualizationSubsystem::define_configuration(
-        context,
+        &context_base.for_subsystem("virtualization"),
         &platform.virtualization,
         builder,
     )
     .context("Configuring the 'virtualization' subsystem")?;
 
-    fonts::FontsSubsystem::define_configuration(context, &platform.fonts, builder)
-        .context("Configuring the 'fonts' subsystem")?;
+    fonts::FontsSubsystem::define_configuration(
+        &context_base.for_subsystem("fonts"),
+        &platform.fonts,
+        builder,
+    )
+    .context("Configuring the 'fonts' subsystem")?;
 
     intl::IntlSubsystem::define_configuration(
-        context,
+        &context_base.for_subsystem("intl"),
         &(&platform.intl, &platform.session),
         builder,
     )
     .context("Confguring the 'intl' subsystem")?;
 
-    setui::SetUiSubsystem::define_configuration(context, &platform.setui, builder)
-        .context("Confguring the 'SetUI' subsystem")?;
+    setui::SetUiSubsystem::define_configuration(
+        &context_base.for_subsystem("setui"),
+        &platform.setui,
+        builder,
+    )
+    .context("Confguring the 'SetUI' subsystem")?;
 
-    kernel::KernelSubsystem::define_configuration(context, &platform.kernel, builder)
-        .context("Configuring the 'kernel' subsystem")?;
+    kernel::KernelSubsystem::define_configuration(
+        &context_base.for_subsystem("kernel"),
+        &platform.kernel,
+        builder,
+    )
+    .context("Configuring the 'kernel' subsystem")?;
 
-    forensics::ForensicsSubsystem::define_configuration(context, &platform.forensics, builder)
-        .context("Configuring the 'Forensics' subsystem")?;
+    forensics::ForensicsSubsystem::define_configuration(
+        &context_base.for_subsystem("forensics"),
+        &platform.forensics,
+        builder,
+    )
+    .context("Configuring the 'Forensics' subsystem")?;
 
-    timekeeper::TimekeeperSubsystem::define_configuration(context, &platform.timekeeper, builder)
-        .context("Configuring the 'timekeeper' subsystem")?;
+    timekeeper::TimekeeperSubsystem::define_configuration(
+        &context_base.for_subsystem("timekeeper"),
+        &platform.timekeeper,
+        builder,
+    )
+    .context("Configuring the 'timekeeper' subsystem")?;
 
-    usb::UsbSubsystemConfig::define_configuration(context, &platform.usb, builder)
-        .context("Configuring the 'usb' subsystem")?;
+    usb::UsbSubsystemConfig::define_configuration(
+        &context_base.for_subsystem("usb"),
+        &platform.usb,
+        builder,
+    )
+    .context("Configuring the 'usb' subsystem")?;
 
-    trusted_apps::TrustedAppsConfig::define_configuration(context, &product.trusted_apps, builder)
-        .context("configuring the 'trusted_apps' subsystem")?;
+    trusted_apps::TrustedAppsConfig::define_configuration(
+        &context_base.for_subsystem("trusted_apps"),
+        &product.trusted_apps,
+        builder,
+    )
+    .context("configuring the 'trusted_apps' subsystem")?;
 
     Ok(())
 }
