@@ -104,7 +104,7 @@ ClockDispatcher::ClockDispatcher(uint64_t options, zx_time_t backstop_time)
     ZX_DEBUG_ASSERT(backstop_time <= current_time());  // This should have been checked by Create
     affine::Ratio ticks_to_time_ratio = timer_get_ticks_to_time_ratio();
 
-    zx_ticks_t now_ticks = current_ticks();
+    zx_ticks_t now_ticks = GetCurrentTicks();
     local_params.last_value_update_ticks = now_ticks;
     local_params.last_rate_adjust_update_ticks = now_ticks;
     local_ticks_to_synthetic = affine::Transform{
@@ -132,6 +132,10 @@ ClockDispatcher::ClockDispatcher(uint64_t options, zx_time_t backstop_time)
 
 ClockDispatcher::~ClockDispatcher() { kcounter_add(dispatcher_clock_destroy_count, 1); }
 
+zx_ticks_t ClockDispatcher::GetCurrentTicks() const {
+  return is_boot() ? current_boot_ticks() : current_ticks();
+}
+
 zx_status_t ClockDispatcher::Read(zx_time_t* out_now) {
   int64_t now_ticks;
   affine::Transform ticks_to_synthetic;
@@ -140,7 +144,7 @@ zx_status_t ClockDispatcher::Read(zx_time_t* out_now) {
   do {
     SeqLockGuard<SharedNoIrqSave> lock{&seq_lock_, transaction_success};
     ticks_to_synthetic_.Read(ticks_to_synthetic);
-    now_ticks = current_ticks();
+    now_ticks = GetCurrentTicks();
   } while (!transaction_success);
 
   *out_now = ticks_to_synthetic.Apply(now_ticks);
@@ -158,7 +162,7 @@ zx_status_t ClockDispatcher::GetDetails(zx_clock_details_v1_t* out_details) {
     SeqLockGuard<SharedNoIrqSave> lock{&seq_lock_, transaction_success};
     ticks_to_synthetic_.Read(ticks_to_synthetic);
     params_.Read(params);
-    now_ticks = current_ticks();
+    now_ticks = GetCurrentTicks();
   } while (!transaction_success);
 
   out_details->generation_counter = params.generation_counter_;
@@ -263,7 +267,7 @@ zx_status_t ClockDispatcher::Update(uint64_t options, const UpdateArgsType& _arg
     affine::Transform& m2s = local_params.mono_to_synthetic;
 
     // Mark the time at which this update will take place.
-    int64_t now_ticks = static_cast<int64_t>(current_ticks());
+    int64_t now_ticks = static_cast<int64_t>(GetCurrentTicks());
 
     // Don't bother updating the structures representing the transformation if:
     //
