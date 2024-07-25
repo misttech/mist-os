@@ -855,7 +855,6 @@ class X86PageTableImpl : public X86PageTableBase {
     DEBUG_ASSERT(table);
     DEBUG_ASSERT(static_cast<T*>(this)->check_vaddr(cursor.vaddr()));
     DEBUG_ASSERT(static_cast<T*>(this)->check_paddr(cursor.paddr()));
-    const vaddr_t start_vaddr = cursor.vaddr();
     // Unified page tables should never be mapping entries directly; rather, their constituent page
     // tables should be mapping entries on their behalf.
     DEBUG_ASSERT(!IsUnified());
@@ -869,9 +868,8 @@ class X86PageTableImpl : public X86PageTableBase {
     auto abort = fit::defer([&]() {
       AssertHeld(lock_);
       if (level == static_cast<T*>(this)->top_level()) {
-        // Build an unmap cursor. cursor.size should be how much is left to be mapped still.
-        MappingCursor unmap_cursor(/*vaddr=*/start_vaddr,
-                                   /*size=*/cursor.vaddr() - start_vaddr);
+        // Build an unmap cursor of what was already mapped.
+        MappingCursor unmap_cursor = cursor.ProcessedRange();
         if (unmap_cursor.size() > 0) {
           auto status = RemoveMapping(table, level, EnlargeOperation::No, unmap_cursor, cm);
           // Removing the exact mappings we just added should never be able to fail.
