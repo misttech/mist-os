@@ -32,6 +32,40 @@ uint32_t SysmemToMagmaFormat(fuchsia_images2::PixelFormat format) {
   return static_cast<uint32_t>(format);
 }
 
+magma_status_t SysmemToMagmaError(fuchsia_sysmem2::Error error) {
+  switch (error) {
+    case fuchsia_sysmem2::Error::kInvalid:
+      return MAGMA_STATUS_INTERNAL_ERROR;
+
+    case fuchsia_sysmem2::Error::kUnspecified:
+      return MAGMA_STATUS_INTERNAL_ERROR;
+
+    case fuchsia_sysmem2::Error::kProtocolDeviation:
+      return MAGMA_STATUS_INVALID_ARGS;
+
+    case fuchsia_sysmem2::Error::kNotFound:
+      return MAGMA_STATUS_INVALID_ARGS;
+
+    case fuchsia_sysmem2::Error::kHandleAccessDenied:
+      return MAGMA_STATUS_ACCESS_DENIED;
+
+    case fuchsia_sysmem2::Error::kNoMemory:
+      return MAGMA_STATUS_MEMORY_ERROR;
+
+    case fuchsia_sysmem2::Error::kConstraintsIntersectionEmpty:
+      return MAGMA_STATUS_CONSTRAINTS_INTERSECTION_EMPTY;
+
+    case fuchsia_sysmem2::Error::kPending:
+      return MAGMA_STATUS_BAD_STATE;
+
+    case fuchsia_sysmem2::Error::kTooManyGroupChildCombinations:
+      return MAGMA_STATUS_TOO_MANY_GROUP_CHILD_COMBINATIONS;
+
+    default:
+      return MAGMA_STATUS_INTERNAL_ERROR;
+  }
+}
+
 static_assert(MAGMA_FORMAT_MODIFIER_INTEL_X_TILED ==
               fidl::ToUnderlying(fuchsia_images2::PixelFormatModifier::kIntelI915XTiled));
 static_assert(MAGMA_FORMAT_MODIFIER_INTEL_Y_TILED ==
@@ -470,7 +504,7 @@ class ZirconPlatformSysmem2BufferCollection : public PlatformBufferCollection {
     bind_shared_request.buffer_collection_request() = std::move(endpoints->server);
     auto bind_shared_result = allocator->BindSharedCollection(std::move(bind_shared_request));
     if (bind_shared_result.is_error()) {
-      return DRET_MSG(MAGMA_STATUS_INTERNAL_ERROR, "Internal error: %s",
+      return DRET_MSG(MAGMA_STATUS_CONNECTION_LOST, "Internal error: %s",
                       bind_shared_result.error_value().FormatDescription().c_str());
     }
 
@@ -497,7 +531,7 @@ class ZirconPlatformSysmem2BufferCollection : public PlatformBufferCollection {
     set_name_request.name() = buffer_name;
     auto set_name_result = collection_->SetName(std::move(set_name_request));
     if (set_name_result.is_error()) {
-      return DRET_MSG(MAGMA_STATUS_INTERNAL_ERROR, "Error setting name: %s",
+      return DRET_MSG(MAGMA_STATUS_CONNECTION_LOST, "Error setting name: %s",
                       set_name_result.error_value().FormatDescription().c_str());
     }
 
@@ -505,7 +539,7 @@ class ZirconPlatformSysmem2BufferCollection : public PlatformBufferCollection {
     set_constrants_request.constraints() = std::move(llcpp_constraints);
     auto set_constraints_result = collection_->SetConstraints(std::move(set_constrants_request));
     if (set_constraints_result.is_error()) {
-      return DRET_MSG(MAGMA_STATUS_INTERNAL_ERROR, "Error setting constraints: %s",
+      return DRET_MSG(MAGMA_STATUS_CONNECTION_LOST, "Error setting constraints: %s",
                       set_constraints_result.error_value().FormatDescription().c_str());
     }
     return MAGMA_STATUS_OK;
@@ -516,10 +550,11 @@ class ZirconPlatformSysmem2BufferCollection : public PlatformBufferCollection {
     auto result = collection_->WaitForAllBuffersAllocated();
     if (result.is_error()) {
       if (result.error_value().is_framework_error()) {
-        return DRET_MSG(MAGMA_STATUS_INTERNAL_ERROR, "Failed wait for allocation: %s",
+        return DRET_MSG(MAGMA_STATUS_CONNECTION_LOST, "Failed wait for allocation: %s",
                         result.error_value().FormatDescription().c_str());
       } else {
-        return DRET_MSG(MAGMA_STATUS_INTERNAL_ERROR, "WaitForBuffersAllocated failed: %s",
+        return DRET_MSG(SysmemToMagmaError(result.error_value().domain_error()),
+                        "WaitForBuffersAllocated failed: %s",
                         result.error_value().FormatDescription().c_str());
       }
     }
@@ -539,10 +574,11 @@ class ZirconPlatformSysmem2BufferCollection : public PlatformBufferCollection {
     auto result = collection_->WaitForAllBuffersAllocated();
     if (result.is_error()) {
       if (result.error_value().is_framework_error()) {
-        return DRET_MSG(MAGMA_STATUS_INTERNAL_ERROR, "Failed wait for allocation: %s",
+        return DRET_MSG(MAGMA_STATUS_CONNECTION_LOST, "Failed wait for allocation: %s",
                         result.error_value().FormatDescription().c_str());
       } else {
-        return DRET_MSG(MAGMA_STATUS_INTERNAL_ERROR, "WaitForBuffersAllocated failed: %s",
+        return DRET_MSG(SysmemToMagmaError(result.error_value().domain_error()),
+                        "WaitForBuffersAllocated failed: %s",
                         result.error_value().FormatDescription().c_str());
       }
     }
@@ -646,7 +682,7 @@ class ZirconPlatformSysmem2Connection : public PlatformSysmemConnection {
     allocate_shared_request.token_request() = std::move(endpoints->server);
     auto result = sysmem_allocator_->AllocateSharedCollection(std::move(allocate_shared_request));
     if (result.is_error()) {
-      return DRET_MSG(MAGMA_STATUS_INTERNAL_ERROR, "AllocateSharedCollection failed: %s",
+      return DRET_MSG(MAGMA_STATUS_CONNECTION_LOST, "AllocateSharedCollection failed: %s",
                       result.error_value().FormatDescription().c_str());
     }
 
@@ -688,7 +724,7 @@ class ZirconPlatformSysmem2Connection : public PlatformSysmemConnection {
     auto allocate_non_shared_result =
         sysmem_allocator_->AllocateNonSharedCollection(std::move(allocate_non_shared_request));
     if (allocate_non_shared_result.is_error()) {
-      return DRET_MSG(MAGMA_STATUS_INTERNAL_ERROR, "Failed to allocate buffer: %s",
+      return DRET_MSG(MAGMA_STATUS_CONNECTION_LOST, "Failed to allocate buffer: %s",
                       allocate_non_shared_result.error_value().FormatDescription().c_str());
     }
 
@@ -705,7 +741,7 @@ class ZirconPlatformSysmem2Connection : public PlatformSysmemConnection {
     set_constraints_request.constraints() = std::move(constraints);
     auto set_constraints_result = collection->SetConstraints(std::move(set_constraints_request));
     if (set_constraints_result.is_error()) {
-      return DRET_MSG(MAGMA_STATUS_INTERNAL_ERROR, "Failed to set constraints: %s",
+      return DRET_MSG(MAGMA_STATUS_CONNECTION_LOST, "Failed to set constraints: %s",
                       set_constraints_result.error_value().FormatDescription().c_str());
     }
 
@@ -717,8 +753,14 @@ class ZirconPlatformSysmem2Connection : public PlatformSysmemConnection {
     }
 
     if (wait_result.is_error()) {
-      return DRET_MSG(MAGMA_STATUS_INTERNAL_ERROR, "Failed wait for allocation: %s",
-                      wait_result.error_value().FormatDescription().c_str());
+      if (wait_result.error_value().is_framework_error()) {
+        return DRET_MSG(MAGMA_STATUS_CONNECTION_LOST, "Failed wait for allocation: %s",
+                        wait_result.error_value().FormatDescription().c_str());
+      } else {
+        return DRET_MSG(SysmemToMagmaError(wait_result.error_value().domain_error()),
+                        "WaitForBuffersAllocated failed: %s",
+                        wait_result.error_value().FormatDescription().c_str());
+      }
     }
 
     *info_out = std::move(*wait_result->buffer_collection_info());

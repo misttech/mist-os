@@ -16,7 +16,7 @@ extern "C" {
 
 // LINT.IfChange(version)
 // This version should be incremented whenever the Magma API changes.
-#define MAGMA_API_VERSION 5
+#define MAGMA_API_VERSION 6
 // LINT.ThenChange()
 
 // LINT.IfChange
@@ -71,7 +71,11 @@ typedef int32_t magma_status_t;
 #define MAGMA_STATUS_UNIMPLEMENTED ((magma_status_t)(-8))
 // This error means that an object was not in the right state for an operation on it.
 #define MAGMA_STATUS_BAD_STATE ((magma_status_t)(-9))
-#define MAGMA_STATUS_ALIAS_FOR_LAST MAGMA_STATUS_BAD_STATE
+// Corresponds to fuchsia.sysmem2/Error.ConstraintsIntersectionEmpty
+#define MAGMA_STATUS_CONSTRAINTS_INTERSECTION_EMPTY ((magma_status_t)(-10))
+// Corresponds to fuchsia.sysmem2/Error.TooManyGroupChildCombinations
+#define MAGMA_STATUS_TOO_MANY_GROUP_CHILD_COMBINATIONS ((magma_status_t)(-11))
+#define MAGMA_STATUS_ALIAS_FOR_LAST MAGMA_STATUS_TOO_MANY_GROUP_CHILD_COMBINATIONS
 
 typedef uint32_t magma_cache_operation_t;
 // possible values for magma_cache_operation_t

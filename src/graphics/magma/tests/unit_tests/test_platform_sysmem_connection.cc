@@ -257,9 +257,9 @@ class TestPlatformSysmemConnection {
     EXPECT_EQ(MAGMA_STATUS_OK, collection->SetConstraints(constraints.get()).get());
     std::unique_ptr<magma_sysmem::PlatformBufferDescription> description;
     magma_status_t status = collection->GetBufferDescription(&description).get();
-    if (status == MAGMA_STATUS_INTERNAL_ERROR) {
+    if (status != MAGMA_STATUS_OK) {
       printf(
-          "GetBufferDescription returned internal error, possibly due to"
+          "GetBufferDescription returned error, possibly due to"
           "system not having protected memory. Skipping test\n");
       GTEST_SKIP();
       return;
@@ -294,7 +294,7 @@ class TestPlatformSysmemConnection {
     std::unique_ptr<magma_sysmem::PlatformBufferDescription> description;
     magma_status_t status = collection->GetBufferDescription(&description).get();
     // ram_domain_supported = true with secure_required isn't allowed.
-    EXPECT_EQ(MAGMA_STATUS_INTERNAL_ERROR, status);
+    EXPECT_EQ(MAGMA_STATUS_CONNECTION_LOST, status);
   }
 
   static void TestGetFormatIndex() {
@@ -475,7 +475,7 @@ class TestPlatformSysmemConnection {
     std::unique_ptr<magma_sysmem::PlatformBufferDescription> description;
     magma_status_t status = collection->GetBufferDescription(&description).get();
     // Buffer count 2 is larger than max_buffer_count.
-    EXPECT_EQ(MAGMA_STATUS_INTERNAL_ERROR, status);
+    EXPECT_EQ(MAGMA_STATUS_CONNECTION_LOST, status);
   }
 
   static void TestAdditionalFlagConstraints() {
@@ -507,7 +507,7 @@ class TestPlatformSysmemConnection {
     std::unique_ptr<magma_sysmem::PlatformBufferDescription> description;
     magma_status_t status = collection->GetBufferDescription(&description).get();
     // Buffer count 2 is larger than max_buffer_count.
-    EXPECT_EQ(MAGMA_STATUS_INTERNAL_ERROR, status);
+    EXPECT_EQ(MAGMA_STATUS_CONNECTION_LOST, status);
   }
 
  private:
