@@ -41,7 +41,7 @@ macro_rules! enumerable_enum {
 enumerable_enum! {
     /// A well-known class in SELinux policy that has a particular meaning in policy enforcement
     /// hooks.
-    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+    #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
     ObjectClass {
         /// The SELinux "process" object class.
         Process,

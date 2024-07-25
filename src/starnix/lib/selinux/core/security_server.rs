@@ -528,6 +528,22 @@ impl AccessVectorComputer for SecurityServer {
             None => Some(AccessVector::NONE),
         }
     }
+
+    fn is_permissive(&self, class: ObjectClass) -> bool {
+        match self.mode {
+            Mode::Fake => true,
+            _ => {
+                let state = self.state.lock();
+                if !state.enforcing {
+                    true
+                } else if let Some(policy) = &state.policy {
+                    policy.parsed.is_permissive(class)
+                } else {
+                    true
+                }
+            }
+        }
+    }
 }
 
 /// Header of the C-style struct exposed via the /sys/fs/selinux/status file,
@@ -573,9 +589,9 @@ mod tests {
     const TESTS_BINARY_POLICY: &[u8] =
         include_bytes!("../testdata/micro_policies/security_server_tests_policy.pp");
 
-    fn security_server_with_tests_policy() -> Arc<SecurityServer> {
+    fn security_server_with_tests_policy(mode: Mode) -> Arc<SecurityServer> {
         let policy_bytes = TESTS_BINARY_POLICY.to_vec();
-        let security_server = SecurityServer::new(Mode::Enable);
+        let security_server = SecurityServer::new(mode);
         assert_eq!(
             Ok(()),
             security_server.load_policy(policy_bytes).map_err(|e| format!("{:?}", e))
@@ -586,7 +602,7 @@ mod tests {
     #[fuchsia::test]
     fn sid_to_security_context() {
         let security_context = b"unconfined_u:unconfined_r:unconfined_t:s0";
-        let security_server = security_server_with_tests_policy();
+        let security_server = security_server_with_tests_policy(Mode::Enable);
         let sid = security_server
             .security_context_to_sid(security_context.into())
             .expect("creating SID from security context should succeed");
@@ -598,7 +614,7 @@ mod tests {
 
     #[fuchsia::test]
     fn sids_for_different_security_contexts_differ() {
-        let security_server = security_server_with_tests_policy();
+        let security_server = security_server_with_tests_policy(Mode::Enable);
         let sid1 = security_server
             .security_context_to_sid(b"user0:object_r:type0:s0".into())
             .expect("creating SID from security context should succeed");
@@ -611,7 +627,7 @@ mod tests {
     #[fuchsia::test]
     fn sids_for_same_security_context_are_equal() {
         let security_context = b"unconfined_u:unconfined_r:unconfined_t:s0";
-        let security_server = security_server_with_tests_policy();
+        let security_server = security_server_with_tests_policy(Mode::Enable);
         let sid_count_before = security_server.state.lock().sids.len();
         let sid1 = security_server
             .security_context_to_sid(security_context.into())
@@ -626,7 +642,7 @@ mod tests {
     #[fuchsia::test]
     fn sids_allocated_outside_initial_range() {
         let security_context = b"unconfined_u:unconfined_r:unconfined_t:s0";
-        let security_server = security_server_with_tests_policy();
+        let security_server = security_server_with_tests_policy(Mode::Enable);
         let sid_count_before = security_server.state.lock().sids.len();
         let sid = security_server
             .security_context_to_sid(security_context.into())
@@ -657,7 +673,7 @@ mod tests {
 
     #[fuchsia::test]
     fn loaded_policy_can_be_retrieved() {
-        let security_server = security_server_with_tests_policy();
+        let security_server = security_server_with_tests_policy(Mode::Enable);
         assert_eq!(TESTS_BINARY_POLICY, security_server.get_binary_policy().as_slice());
     }
 
@@ -1056,7 +1072,8 @@ mod tests {
 
     #[fuchsia::test]
     fn unknown_sids_are_effectively_unlabeled() {
-        let security_server = security_server_with_tests_policy();
+        let security_server = security_server_with_tests_policy(Mode::Enable);
+        security_server.set_enforcing(true);
 
         let valid_sid =
             security_server.security_context_to_sid(b"user1:object_r:type0:s0:c0".into()).unwrap();
@@ -1091,5 +1108,61 @@ mod tests {
             valid_sid,
             &[ProcessPermission::SetSched]
         ));
+    }
+
+    #[fuchsia::test]
+    fn permission_check_fake_mode_enforcing() {
+        let security_server = security_server_with_tests_policy(Mode::Fake);
+        security_server.set_enforcing(true);
+        assert!(security_server.is_fake());
+        assert!(security_server.is_enforcing());
+
+        let sid =
+            security_server.security_context_to_sid("user0:object_r:type0:s0".into()).unwrap();
+        let permission_check = security_server.as_permission_check();
+
+        // Test policy grants "type0" the process-fork permission to itself.
+        assert!(permission_check.has_permissions(sid, sid, &[ProcessPermission::Fork]));
+
+        // Test policy does not grant "type0" the process-getrlimit permission to itself, but
+        // the security server's "fake" mode makes the check permissive.
+        assert!(permission_check.has_permissions(sid, sid, &[ProcessPermission::GetRlimit]));
+    }
+
+    #[fuchsia::test]
+    fn permission_check_permissive() {
+        let security_server = security_server_with_tests_policy(Mode::Enable);
+        security_server.set_enforcing(false);
+        assert!(!security_server.is_fake());
+        assert!(!security_server.is_enforcing());
+
+        let sid =
+            security_server.security_context_to_sid("user0:object_r:type0:s0".into()).unwrap();
+        let permission_check = security_server.as_permission_check();
+
+        // Test policy grants "type0" the process-fork permission to itself.
+        assert!(permission_check.has_permissions(sid, sid, &[ProcessPermission::Fork]));
+
+        // Test policy does not grant "type0" the process-getrlimit permission to itself, but
+        // the security server is configured to be permissive.
+        assert!(permission_check.has_permissions(sid, sid, &[ProcessPermission::GetRlimit]));
+    }
+
+    #[fuchsia::test]
+    fn permission_check_enforcing() {
+        let security_server = security_server_with_tests_policy(Mode::Enable);
+        security_server.set_enforcing(true);
+        assert!(!security_server.is_fake());
+        assert!(security_server.is_enforcing());
+
+        let sid =
+            security_server.security_context_to_sid("user0:object_r:type0:s0".into()).unwrap();
+        let permission_check = security_server.as_permission_check();
+
+        // Test policy grants "type0" the process-fork permission to itself.
+        assert!(permission_check.has_permissions(sid, sid, &[ProcessPermission::Fork]));
+
+        // Test policy does not grant "type0" the process-getrlimit permission to itself.
+        assert!(!permission_check.has_permissions(sid, sid, &[ProcessPermission::GetRlimit]));
     }
 }

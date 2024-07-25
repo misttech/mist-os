@@ -29,18 +29,12 @@ fn check_if_selinux_else<H, R, D>(task: &Task, hook: H, not_enabled: D) -> Resul
 where
     H: FnOnce(&Arc<SecurityServer>) -> Result<R, Errno>,
     D: FnOnce() -> Result<R, Errno>,
-    R: Default,
 {
     if let Some(security_server) = &task.kernel().security_server {
         if !security_server.has_policy() {
             return not_enabled();
         }
-        let result = hook(security_server);
-        // TODO(b/331375792): Relocate "enforcing" check into the AVC.
-        if result.is_err() && (!security_server.is_enforcing() || security_server.is_fake()) {
-            return Ok(R::default());
-        }
-        result
+        hook(security_server)
     } else {
         not_enabled()
     }
@@ -567,40 +561,6 @@ mod tests {
         task_alloc(&current_task, 0);
     }
 
-    fn failing_hook(_: &Arc<SecurityServer>) -> Result<(), Errno> {
-        error!(EINVAL)
-    }
-
-    #[fuchsia::test]
-    async fn check_if_selinux_fake_mode_enforcing() {
-        let security_server = security_server_with_policy(Mode::Fake);
-        security_server.set_enforcing(true);
-        let (_kernel, task) = create_kernel_and_task_with_selinux(security_server);
-
-        let check_result = check_if_selinux(&task, failing_hook);
-        assert_eq!(check_result, Ok(()));
-    }
-
-    #[fuchsia::test]
-    async fn check_if_selinux_permissive() {
-        let security_server = security_server_with_policy(Mode::Enable);
-        security_server.set_enforcing(false);
-        let (_kernel, task) = create_kernel_and_task_with_selinux(security_server);
-
-        let check_result = check_if_selinux(&task, failing_hook);
-        assert_eq!(check_result, Ok(()));
-    }
-
-    #[fuchsia::test]
-    async fn check_if_selinux_enforcing() {
-        let security_server = security_server_with_policy(Mode::Enable);
-        security_server.set_enforcing(true);
-        let (_kernel, task) = create_kernel_and_task_with_selinux(security_server);
-
-        let check_result = check_if_selinux(&task, failing_hook);
-        assert_eq!(check_result, error!(EINVAL));
-    }
-
     #[fuchsia::test]
     async fn task_create_access_allowed_for_selinux_disabled() {
         let (kernel, task) = create_kernel_and_task();
@@ -1088,13 +1048,23 @@ mod tests {
         );
 
         assert_eq!(
-            // Test policy does not allow "kernel_t" tasks to set the "fscreate" context.
+            // Test policy does not allow "kernel_t" tasks to set the "sockcreate" context.
             set_procattr(
                 &current_task,
-                ProcAttr::FsCreate,
+                ProcAttr::SockCreate,
                 DIFFERENT_VALID_SECURITY_CONTEXT.into()
             ),
             error!(EACCES)
+        );
+
+        assert_eq!(
+            // It is never permitted to set the "previous" context.
+            set_procattr(
+                &current_task,
+                ProcAttr::Previous,
+                DIFFERENT_VALID_SECURITY_CONTEXT.into()
+            ),
+            error!(EINVAL)
         );
 
         assert_eq!(
@@ -1152,7 +1122,7 @@ mod tests {
     #[fuchsia::test]
     async fn set_get_procattr_clear_context() {
         let security_server = security_server_with_policy(Mode::Enable);
-        security_server.set_enforcing(false);
+        security_server.set_enforcing(true);
         let (_kernel, current_task) = create_kernel_and_task_with_selinux(security_server);
 
         // Set up the "exec" and "fscreate" Contexts with valid values.
@@ -1174,7 +1144,7 @@ mod tests {
         assert_eq!(current_task.read().security_state.0.exec_sid, None);
 
         // Clear the "fscreate" context with a write containing a single newline.
-        assert_eq!(set_procattr(&current_task, ProcAttr::Exec, b"\x0a"), Ok(()));
+        assert_eq!(set_procattr(&current_task, ProcAttr::FsCreate, b"\x0a"), Ok(()));
         assert_eq!(current_task.read().security_state.0.fscreate_sid, None);
     }
 
