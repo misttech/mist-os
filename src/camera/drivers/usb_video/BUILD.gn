@@ -16,8 +16,8 @@ group("tests") {
 }
 
 driver_bind_rules("usb_video_bind") {
-  rules = "usb_video.bind"
-  tests = "bind_tests.json"
+  rules = "meta/usb_video.bind"
+  tests = "meta/bind_tests.json"
   deps = [
     "//src/devices/bind/fuchsia.usb",
     "//src/devices/bind/fuchsia.usb.video",
@@ -68,7 +68,7 @@ fuchsia_driver("fuchsia_driver") {
 fuchsia_driver_component("driver") {
   component_name = "usb_video"
   deps = [ ":fuchsia_driver" ]
-  info = "driver-info.json"
+  info = "meta/driver-info.json"
   manifest = "meta/driver.cml"
 }
 

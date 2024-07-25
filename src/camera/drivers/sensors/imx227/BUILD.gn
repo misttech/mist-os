@@ -15,8 +15,8 @@ group("tests") {
 }
 
 driver_bind_rules("imx227_bind") {
-  rules = "imx227.bind"
-  tests = "bind_tests.json"
+  rules = "meta/imx227.bind"
+  tests = "meta/bind_tests.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_bindlib",
     "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_bindlib",
@@ -74,7 +74,7 @@ fuchsia_driver("fuchsia_driver") {
 fuchsia_driver_component("driver") {
   component_name = "imx227"
   deps = [ ":fuchsia_driver" ]
-  info = "driver-info.json"
+  info = "meta/driver-info.json"
   manifest = "meta/imx227.cml"
 }
 
