@@ -146,11 +146,8 @@ impl TestServerBuilder {
 
         let (tls_acceptor, use_https) = if let Some((cert_chain, private_key)) = self.https_certs {
             // build a server configuration using a test CA and cert chain
-            let tls_config = rustls::ServerConfig::builder()
-                .with_safe_defaults()
-                .with_no_client_auth()
-                .with_single_cert(cert_chain, private_key)
-                .unwrap();
+            let mut tls_config = rustls::ServerConfig::new(rustls::NoClientAuth::new());
+            tls_config.set_single_cert(cert_chain, private_key).unwrap();
             let tls_acceptor = tokio_rustls::TlsAcceptor::from(Arc::new(tls_config));
 
             (Some(tls_acceptor), true)
@@ -272,20 +269,14 @@ fn accept_stream<'a>(
 }
 
 fn parse_cert_chain(mut bytes: &[u8]) -> Vec<rustls::Certificate> {
-    rustls_pemfile::certs(&mut bytes)
-        .expect("certs to parse")
-        .into_iter()
-        .map(|cert| rustls::Certificate(cert))
-        .collect()
+    rustls::internal::pemfile::certs(&mut bytes).expect("certs to parse")
 }
 
 fn parse_private_key(mut bytes: &[u8]) -> rustls::PrivateKey {
-    let keys = rustls_pemfile::read_all(&mut bytes).expect("private keys to parse");
+    let keys =
+        rustls::internal::pemfile::rsa_private_keys(&mut bytes).expect("private keys to parse");
     assert_eq!(keys.len(), 1, "expecting a single private key");
-    match keys.into_iter().next().unwrap() {
-        rustls_pemfile::Item::RSAKey(key) => return rustls::PrivateKey(key),
-        _ => panic!("expected an RSA private key"),
-    }
+    keys.into_iter().next().unwrap()
 }
 
 trait AsyncReadWrite: tokio::io::AsyncRead + tokio::io::AsyncWrite + Send {}

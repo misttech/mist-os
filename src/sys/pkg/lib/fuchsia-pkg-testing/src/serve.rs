@@ -142,15 +142,10 @@ impl ServedRepositoryBuilder {
                     ),
                 ),
             };
-            let mut tls_config = rustls::ServerConfig::builder()
-                .with_safe_defaults()
-                .with_no_client_auth()
-                .with_single_cert(certs, key)
-                .unwrap();
-
+            let mut tls_config = rustls::ServerConfig::new(rustls::NoClientAuth::new());
             // Configure ALPN and prefer H2 over HTTP/1.1.
-            tls_config.alpn_protocols = vec![b"h2".to_vec(), b"http/1.1".to_vec()];
-
+            tls_config.set_protocols(&[b"h2".to_vec(), b"http/1.1".to_vec()]);
+            tls_config.set_single_cert(certs, key).unwrap();
             let tls_acceptor = tokio_rustls::TlsAcceptor::from(Arc::new(tls_config));
             let connection_attempts = Arc::clone(&connection_attempts);
 
@@ -235,20 +230,14 @@ impl ServedRepositoryBuilder {
 }
 
 fn parse_cert_chain(mut bytes: &[u8]) -> Vec<rustls::Certificate> {
-    rustls_pemfile::certs(&mut bytes)
-        .expect("certs to parse")
-        .into_iter()
-        .map(|cert| rustls::Certificate(cert))
-        .collect()
+    rustls::internal::pemfile::certs(&mut bytes).expect("certs to parse")
 }
 
 fn parse_private_key(mut bytes: &[u8]) -> rustls::PrivateKey {
-    let keys = rustls_pemfile::read_all(&mut bytes).expect("private keys to parse");
+    let keys =
+        rustls::internal::pemfile::rsa_private_keys(&mut bytes).expect("private keys to parse");
     assert_eq!(keys.len(), 1, "expecting a single private key");
-    match keys.into_iter().next().unwrap() {
-        rustls_pemfile::Item::RSAKey(key) => return rustls::PrivateKey(key),
-        _ => panic!("expected an RSA private key"),
-    }
+    keys.into_iter().next().unwrap()
 }
 
 /// A [`Repository`] being served over HTTP.

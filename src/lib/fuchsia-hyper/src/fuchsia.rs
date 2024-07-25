@@ -17,31 +17,13 @@ use futures::io;
 use futures::task::{Context, Poll};
 use http::uri::{Scheme, Uri};
 use hyper::service::Service;
-use rustls::RootCertStore;
+use rustls::ClientConfig;
 use std::convert::TryFrom as _;
 use std::net::SocketAddr;
 use std::num::TryFromIntError;
-use std::sync::{Arc, OnceLock};
 
-pub fn new_root_cert_store() -> Arc<RootCertStore> {
-    // It can be expensive to parse the certs, so cache them
-    static ROOT_STORE: OnceLock<Arc<RootCertStore>> = OnceLock::new();
-
-    let root_store = ROOT_STORE.get_or_init(|| {
-        let mut root_store = rustls::RootCertStore::empty();
-
-        root_store.add_trust_anchors(webpki_roots_fuchsia::TLS_SERVER_ROOTS.iter().map(|cert| {
-            rustls::OwnedTrustAnchor::from_subject_spki_name_constraints(
-                cert.subject,
-                cert.spki,
-                cert.name_constraints,
-            )
-        }));
-
-        Arc::new(root_store)
-    });
-
-    Arc::clone(&root_store)
+pub(crate) fn configure_cert_store(tls: &mut ClientConfig) {
+    tls.root_store.add_server_trust_anchors(&webpki_roots_fuchsia::TLS_SERVER_ROOTS);
 }
 
 /// A Fuchsia-compatible implementation of hyper's `Connect` trait which allows
