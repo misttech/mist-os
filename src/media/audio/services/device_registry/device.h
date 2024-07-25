@@ -245,10 +245,7 @@ class Device : public std::enable_shared_from_this<Device> {
   void RetrieveCompositeProperties();
   void RetrieveStreamProperties();
 
-  void RetrieveCodecHealthState();
-  void RetrieveCompositeHealthState();
-  void RetrieveStreamHealthState();
-
+  void RetrieveHealthState();
   void RetrieveSignalProcessingState();
 
   void RetrieveCodecDaiFormatSets();
@@ -290,6 +287,8 @@ class Device : public std::enable_shared_from_this<Device> {
   void RetrieveCurrentTopology();
   void RetrieveCurrentElementStates();
   void RetrieveElementState(ElementId element_id);
+
+  void SetHealthState(std::optional<bool> is_healthy);
 
   // Device-type specific methods used during initialization
   static void SanitizeCodecPropertiesStrings(

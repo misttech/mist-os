@@ -572,17 +572,17 @@ void Device::Initialize() {
 
   if (is_codec()) {
     RetrieveCodecProperties();
-    RetrieveCodecHealthState();
+    RetrieveHealthState();
     RetrieveSignalProcessingState();
     RetrieveCodecDaiFormatSets();
     RetrieveCodecPlugState();
   } else if (is_composite()) {
     RetrieveCompositeProperties();
-    RetrieveCompositeHealthState();
+    RetrieveHealthState();
     RetrieveSignalProcessingState();  // On completion, this starts format-set-retrieval.
   } else if (is_stream_config()) {
     RetrieveStreamProperties();
-    RetrieveStreamHealthState();
+    RetrieveHealthState();
     RetrieveSignalProcessingState();
     RetrieveStreamRingBufferFormatSets();
     RetrieveStreamPlugState();
@@ -789,6 +789,65 @@ void Device::SanitizeCompositePropertiesStrings(
     composite_properties->product(composite_properties->product()->substr(
         0, std::min<uint64_t>(composite_properties->product()->find('\0'),
                               fha::kMaxUiStringSize - 1)));
+  }
+}
+
+// TODO(https://fxbug.dev/42068381): Decide when we proactively call GetHealthState, if at all.
+void Device::RetrieveHealthState() {
+  if (has_error()) {
+    ADR_WARN_METHOD() << "device already has an error; ignoring this";
+    return;
+  }
+  ADR_LOG_METHOD(kLogCodecFidlCalls || kLogCompositeFidlCalls || kLogStreamConfigFidlCalls);
+
+  // TODO(https://fxbug.dev/42064765): handle command timeouts, because that's the most likely
+  // indicator of an unhealthy driver/device.
+
+  if (is_codec()) {
+    (*codec_client_)
+        ->GetHealthState()
+        .Then([this](fidl::Result<fha::Codec::GetHealthState>& result) {
+          if (LogResultFrameworkError(result, "HealthState response")) {
+            return;
+          }
+          SetHealthState(result->state().healthy());
+        });
+  } else if (is_composite()) {
+    (*composite_client_)
+        ->GetHealthState()
+        .Then([this](fidl::Result<fha::Composite::GetHealthState>& result) {
+          if (LogResultFrameworkError(result, "HealthState response")) {
+            return;
+          }
+          SetHealthState(result->state().healthy());
+        });
+  } else if (is_stream_config()) {
+    (*stream_config_client_)
+        ->GetHealthState()
+        .Then([this](fidl::Result<fha::StreamConfig::GetHealthState>& result) {
+          if (LogResultFrameworkError(result, "HealthState response")) {
+            return;
+          }
+          SetHealthState(result->state().healthy());
+        });
+  }
+}
+
+void Device::SetHealthState(std::optional<bool> is_healthy) {
+  auto preexisting_health_state = health_state_;
+
+  // An empty health state is permitted; it still indicates that the driver is responsive.
+  health_state_ = is_healthy.value_or(true);
+  // ...but if the driver actually self-reported as unhealthy, this is a problem.
+  if (!*health_state_) {
+    FX_LOGS(WARNING) << "RetrieveHealthState response: .healthy is FALSE (unhealthy)";
+    OnError(ZX_ERR_IO);
+    return;
+  }
+
+  ADR_LOG_OBJECT(kLogCompositeFidlResponses) << "RetrieveHealthState response: healthy";
+  if (!preexisting_health_state.has_value()) {
+    OnInitializationResponse();
   }
 }
 
@@ -1539,113 +1598,6 @@ void Device::RetrieveCodecPlugState() {
     // Kick off the next watch.
     RetrieveCodecPlugState();
   });
-}
-
-// TODO(https://fxbug.dev/42068381): Decide when we proactively call GetHealthState, if at all.
-void Device::RetrieveStreamHealthState() {
-  if (has_error()) {
-    ADR_WARN_METHOD() << "device already has an error; ignoring this";
-    return;
-  }
-  ADR_LOG_METHOD(kLogStreamConfigFidlCalls);
-
-  // TODO(https://fxbug.dev/42064765): handle command timeouts
-
-  (*stream_config_client_)
-      ->GetHealthState()
-      .Then([this](fidl::Result<fha::StreamConfig::GetHealthState>& result) {
-        if (LogResultFrameworkError(result, "HealthState response")) {
-          return;
-        }
-
-        auto old_health_state = health_state_;
-
-        // An empty health state is permitted; it still indicates that the driver is responsive.
-        health_state_ = result->state().healthy().value_or(true);
-        // ...but if the driver actually self-reported as unhealthy, this is a problem.
-        if (!*health_state_) {
-          FX_LOGS(WARNING)
-              << "RetrieveStreamConfigHealthState response: .healthy is FALSE (unhealthy)";
-          OnError(ZX_ERR_IO);
-          return;
-        }
-
-        ADR_LOG_OBJECT(kLogStreamConfigFidlResponses)
-            << "RetrieveStreamConfigHealthState response: healthy";
-        if (!old_health_state.has_value()) {
-          OnInitializationResponse();
-        }
-      });
-}
-
-void Device::RetrieveCodecHealthState() {
-  if (state_ == State::Error) {
-    ADR_WARN_METHOD() << "device already has an error";
-    return;
-  }
-  ADR_LOG_METHOD(kLogCodecFidlCalls);
-
-  // TODO(https://fxbug.dev/42064765): handle command timeouts, because that's the most likely
-  // indicator of an unhealthy driver/device.
-
-  (*codec_client_)->GetHealthState().Then([this](fidl::Result<fha::Codec::GetHealthState>& result) {
-    if (LogResultFrameworkError(result, "HealthState response")) {
-      return;
-    }
-
-    auto old_health_state = health_state_;
-
-    // An empty health state is permitted; it still indicates that the driver is responsive.
-    health_state_ = result->state().healthy().value_or(true);
-    // ...but if the driver actually self-reported as unhealthy, this is a problem.
-    if (!*health_state_) {
-      FX_LOGS(WARNING) << "RetrieveCodecHealthState response: .healthy is FALSE (unhealthy)";
-      OnError(ZX_ERR_IO);
-      return;
-    }
-
-    ADR_LOG_OBJECT(kLogCodecFidlResponses) << "RetrieveCodecHealthState response: healthy";
-    if (!old_health_state.has_value()) {
-      OnInitializationResponse();
-    }
-  });
-}
-
-void Device::RetrieveCompositeHealthState() {
-  if (has_error()) {
-    ADR_WARN_METHOD() << "device already has an error; ignoring this";
-    return;
-  }
-  ADR_LOG_METHOD(kLogCompositeFidlCalls);
-
-  // TODO(https://fxbug.dev/42064765): handle command timeouts, because that's the most likely
-  // indicator of an unhealthy driver/device.
-
-  (*composite_client_)
-      ->GetHealthState()
-      .Then([this](fidl::Result<fha::Composite::GetHealthState>& result) {
-        if (LogResultFrameworkError(result, "HealthState response")) {
-          return;
-        }
-
-        auto old_health_state = health_state_;
-
-        // An empty health state is permitted; it still indicates that the driver is responsive.
-        health_state_ = result->state().healthy().value_or(true);
-        // ...but if the driver actually self-reported as unhealthy, this is a problem.
-        if (!*health_state_) {
-          FX_LOGS(WARNING)
-              << "RetrieveCompositeHealthState response: .healthy is FALSE (unhealthy)";
-          OnError(ZX_ERR_IO);
-          return;
-        }
-
-        ADR_LOG_OBJECT(kLogCompositeFidlResponses)
-            << "RetrieveCompositeHealthState response: healthy";
-        if (!old_health_state.has_value()) {
-          OnInitializationResponse();
-        }
-      });
 }
 
 // Return a fuchsia_audio_device/Info object based on this device's member values.
