@@ -456,7 +456,7 @@ impl ResolvedInstanceState {
             &ResolvedInstanceState::make_program_outgoing_router,
         );
 
-        let (component_sandbox, child_inputs) = build_component_sandbox(
+        let component_sandbox = build_component_sandbox(
             &component,
             child_outgoing_dictionary_routers,
             &decl,
@@ -469,7 +469,7 @@ impl ResolvedInstanceState {
             declared_dictionaries,
         );
         state.sandbox = component_sandbox;
-        state.discover_static_children(child_inputs).await;
+        state.discover_static_children(&state.sandbox.child_inputs).await;
         Ok(state)
     }
 
@@ -814,7 +814,7 @@ impl ResolvedInstanceState {
     /// a result indicating if the new child instance has been successfully added.
     /// Like `add_child`, but doesn't register a `Discover` action, and therefore
     /// doesn't return a future to wait for.
-    pub async fn add_child_no_discover(
+    async fn add_child_no_discover(
         &mut self,
         component: &Arc<ComponentInstance>,
         child: &ChildDecl,
@@ -1041,14 +1041,14 @@ impl ResolvedInstanceState {
         Ok(())
     }
 
-    async fn discover_static_children(&self, child_inputs: StructuredDictMap<ComponentInput>) {
+    async fn discover_static_children(&self, child_inputs: &StructuredDictMap<ComponentInput>) {
         for (child_name, child_instance) in &self.children {
             if let Some(_) = child_name.collection {
                 continue;
             }
             let child_name =
                 Name::new(child_name.name.as_str()).expect("child is static so name is not long");
-            let child_input = child_inputs.remove(&child_name).expect("missing child dict");
+            let child_input = child_inputs.get(&child_name).expect("missing child dict");
             ActionsManager::register(child_instance.clone(), DiscoverAction::new(child_input))
                 .await
                 .expect("failed to discover child");

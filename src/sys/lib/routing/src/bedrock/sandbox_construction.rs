@@ -48,8 +48,13 @@ pub struct ComponentSandbox {
     /// capability. Currently this is only the storage admin protocol.
     pub capability_sourced_capabilities_dict: Dict,
 
-    /// This set holds a dictionary for each collection declared by a component. Each dictionary
+    /// This set holds a component input dictionary for each child of a component. Each dictionary
     /// contains all capabilities the component has made available to a specific collection.
+    pub child_inputs: StructuredDictMap<ComponentInput>,
+
+    /// This set holds a component input dictionary for each collection declared by a component.
+    /// Each dictionary contains all capabilities the component has made available to a specific
+    /// collection.
     pub collection_inputs: StructuredDictMap<ComponentInput>,
 }
 
@@ -66,6 +71,7 @@ impl ComponentSandbox {
             program_output_dict,
             framework_dict,
             capability_sourced_capabilities_dict,
+            child_inputs,
             collection_inputs,
         } = sandbox;
         for (copy_from, copy_to) in &[
@@ -83,15 +89,14 @@ impl ComponentSandbox {
                     .unwrap();
             }
         }
+        for (key, component_input) in child_inputs.enumerate() {
+            self.child_inputs.insert(key, component_input).unwrap();
+        }
         for (key, component_input) in collection_inputs.enumerate() {
             self.collection_inputs.insert(key, component_input).unwrap();
         }
     }
 }
-
-/// This set holds a dictionary for each child declared by a component. Each dictionary contains
-/// all capabilities the component has made available to that child.
-pub type ChildInputs = StructuredDictMap<ComponentInput>;
 
 /// Once a component has been resolved and its manifest becomes known, this function produces the
 /// various dicts the component needs based on the contents of its manifest.
@@ -106,7 +111,7 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
     framework_dict: Dict,
     capability_sourced_capabilities_dict: Dict,
     declared_dictionaries: Dict,
-) -> (ComponentSandbox, ChildInputs) {
+) -> ComponentSandbox {
     let component_output_dict = Dict::new();
     let program_input_dict = Dict::new();
     let environments: StructuredDictMap<ComponentEnvironment> = Default::default();
@@ -240,18 +245,16 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
         );
     }
 
-    (
-        ComponentSandbox {
-            component_input,
-            component_output_dict,
-            program_input_dict,
-            program_output_dict,
-            framework_dict,
-            capability_sourced_capabilities_dict,
-            collection_inputs,
-        },
+    ComponentSandbox {
+        component_input,
+        component_output_dict,
+        program_input_dict,
+        program_output_dict,
+        framework_dict,
+        capability_sourced_capabilities_dict,
         child_inputs,
-    )
+        collection_inputs,
+    }
 }
 
 fn build_environment(

@@ -17,7 +17,7 @@ use config_encoder::ConfigFields;
 use moniker::{ChildName, Moniker};
 use routing::bedrock::program_output_dict::build_program_output_dictionary;
 use routing::bedrock::sandbox_construction::{build_component_sandbox, ComponentSandbox};
-use routing::bedrock::structured_dict::{ComponentInput, StructuredDictMap};
+use routing::bedrock::structured_dict::ComponentInput;
 use routing::capability_source::{BuiltinCapabilities, NamespaceCapabilities};
 use routing::component_instance::{
     ComponentInstanceInterface, ExtendedInstanceInterface, ResolvedInstanceInterface,
@@ -44,7 +44,6 @@ pub struct ComponentInstanceForAnalyzer {
     policy_checker: GlobalPolicyChecker,
     component_id_index: Arc<component_id_index::Index>,
     pub(crate) sandbox: ComponentSandbox,
-    child_inputs: StructuredDictMap<ComponentInput>,
 }
 
 impl ComponentInstanceForAnalyzer {
@@ -102,9 +101,15 @@ impl ComponentInstanceForAnalyzer {
         .expect("child moniker is guaranteed to be valid");
         let url = child.url.clone();
         let input = if let Some(collection_name) = child.child_moniker.collection() {
-            parent.sandbox.collection_inputs.get(collection_name).expect("missing collection input")
+            let input = parent
+                .sandbox
+                .collection_inputs
+                .get(collection_name)
+                .expect("missing collection input");
+            input
         } else {
             parent
+                .sandbox
                 .child_inputs
                 .get(
                     &cm_types::Name::new(child.child_moniker.name().as_str())
@@ -150,7 +155,6 @@ impl ComponentInstanceForAnalyzer {
             policy_checker,
             component_id_index,
             sandbox: Default::default(),
-            child_inputs: Default::default(),
         });
         let children_component_output_dictionary_routers =
             static_children_component_output_dictionary_routers(&self_, &decl);
@@ -162,7 +166,7 @@ impl ComponentInstanceForAnalyzer {
             &new_program_router,
             &new_outgoing_dir_router,
         );
-        let (sandbox, child_inputs) = build_component_sandbox(
+        let sandbox = build_component_sandbox(
             &self_,
             children_component_output_dictionary_routers,
             &decl,
@@ -175,9 +179,6 @@ impl ComponentInstanceForAnalyzer {
             declared_dictionaries,
         );
         self_.sandbox.append(&sandbox);
-        for (key, child_input) in child_inputs.enumerate() {
-            self_.child_inputs.insert(key, child_input).unwrap();
-        }
         self_
     }
 
