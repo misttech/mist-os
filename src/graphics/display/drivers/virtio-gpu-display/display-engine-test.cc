@@ -232,6 +232,7 @@ class VirtioGpuTest : public testing::Test, public loop_fixture::RealLoop {
 
     banjo_controller_ =
         std::make_unique<DisplayControllerBanjo>(device_.get(), &coordinator_events_);
+    ASSERT_OK(device_->Init());
 
     RunLoopUntilIdle();
   }
