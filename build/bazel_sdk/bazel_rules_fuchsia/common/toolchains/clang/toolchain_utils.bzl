@@ -173,8 +173,15 @@ def define_clang_runtime_filegroups(clang_constants):
     # There is one arch-specific libc++ header file, access it through a select()
     # statement that resolves to the right location based on the build
     # configuration's target platform.
+    #
+    # There are also also multilib specific versions of that file
+    # under include/{clang_target_tuple}/<name>/c++/v1/__config_site.
+    #
     __config_site_sources = format_labels_list_to_target_tag_native_glob_select(
-        ["include/{clang_target_tuple}/c++/v1/__config_site"],
+        [
+            "include/{clang_target_tuple}/c++/v1/__config_site",
+            "include/{clang_target_tuple}/*/c++/v1/__config_site",
+        ],
     )
 
     native.filegroup(

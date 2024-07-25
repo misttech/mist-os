@@ -103,6 +103,7 @@ filegroup(
             "lib/clang/%{CLANG_VERSION}/include/**",
         ]) + glob([
             "include/%s-unknown-fuchsia/c++/v1/*" % cpu,
+            "include/%s-unknown-fuchsia/*/c++/v1/*" % cpu,
         ]),
     )
     for cpu in TARGET_CPUS
