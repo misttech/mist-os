@@ -17,10 +17,12 @@ use crate::error::Error;
 use crate::{akm_algorithm, ddk_converter};
 use anyhow::format_err;
 use channel_switch::ChannelState;
-use fdf::{Arena, ArenaStaticBox};
+use fdf::{Arena, ArenaBox, ArenaStaticBox};
 use ieee80211::{Bssid, MacAddr, MacAddrBytes, Ssid};
 use scanner::Scanner;
 use state::States;
+use std::mem;
+use std::ptr::NonNull;
 use tracing::{error, warn};
 use wlan_common::appendable::Appendable;
 use wlan_common::bss::BssDescription;
@@ -893,42 +895,75 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
         };
         let addr4 = if from_ds && to_ds { Some(src) } else { None };
 
-        let buffer = write_frame!({
-            headers: {
-                mac::FixedDataHdrFields: &mac::FixedDataHdrFields {
-                    frame_ctrl: mac::FrameControl(0)
-                        .with_frame_type(mac::FrameType::DATA)
-                        .with_data_subtype(mac::DataSubtype(0).with_qos(qos_ctrl.is_some()))
-                        .with_protected(is_protected)
-                        .with_to_ds(to_ds)
-                        .with_from_ds(from_ds),
-                    duration: 0,
-                    addr1,
-                    addr2,
-                    addr3,
-                    seq_ctrl: mac::SequenceControl(0).with_seq_num(
-                        match qos_ctrl.as_ref() {
-                            None => self.ctx.seq_mgr.next_sns1(&dst),
-                            Some(qos_ctrl) => self.ctx.seq_mgr.next_sns2(&dst, qos_ctrl.tid()),
-                        } as u16
-                    )
-                },
-                mac::Addr4?: addr4,
-                mac::QosControl?: qos_ctrl,
-                mac::LlcHdr: &data_writer::make_snap_llc_hdr(ether_type),
-            },
-            payload: payload,
-        })
-        .map_err(|e| {
-            if !async_id_provided {
-                wtrace::async_end_wlansoftmac_tx(async_id, zx::Status::INTERNAL);
-            }
-            e
-        })?;
         let tx_flags = match ether_type {
             mac::ETHER_TYPE_EAPOL => fidl_softmac::WlanTxInfoFlags::FAVOR_RELIABILITY,
             _ => fidl_softmac::WlanTxInfoFlags::empty(),
         };
+
+        // TODO(https://fxbug.dev/353987692): Replace `header_room` with actual amount of space
+        // for the header in a network device buffer. The MAX_HEADER_SIZE is arbitrarily extended
+        // to emulate the extra room the network device buffer will likely always provide.
+        const MAX_HEADER_SIZE: usize = mem::size_of::<mac::FixedDataHdrFields>()
+            + mem::size_of::<MacAddr>()
+            + mem::size_of::<mac::QosControl>()
+            + mem::size_of::<mac::LlcHdr>();
+        let header_room = MAX_HEADER_SIZE + 100;
+        let arena = Arena::new().map_err(|s| {
+            if !async_id_provided {
+                wtrace::async_end_wlansoftmac_tx(async_id, s);
+            }
+            Error::Status(format!("unable to create arena"), s)
+        })?;
+        let mut buffer = arena.insert_default_slice(header_room + payload.len());
+
+        // TODO(https://fxbug.dev/353987692): Remove this clone once we migrate to network device where
+        // the buffer can be reused.
+        let payload_start = buffer.len() - payload.len();
+        buffer[payload_start..].clone_from_slice(&payload[..]);
+
+        let (frame_start, _frame_end) =
+            write_frame_with_fixed_slice!(&mut buffer[..payload_start], {
+                fill_zeroes: (),
+                headers: {
+                    mac::FixedDataHdrFields: &mac::FixedDataHdrFields {
+                        frame_ctrl: mac::FrameControl(0)
+                            .with_frame_type(mac::FrameType::DATA)
+                            .with_data_subtype(mac::DataSubtype(0).with_qos(qos_ctrl.is_some()))
+                            .with_protected(is_protected)
+                            .with_to_ds(to_ds)
+                            .with_from_ds(from_ds),
+                        duration: 0,
+                        addr1,
+                        addr2,
+                        addr3,
+                        seq_ctrl: mac::SequenceControl(0).with_seq_num(
+                            match qos_ctrl.as_ref() {
+                                None => self.ctx.seq_mgr.next_sns1(&dst),
+                                Some(qos_ctrl) => self.ctx.seq_mgr.next_sns2(&dst, qos_ctrl.tid()),
+                            } as u16
+                        )
+                    },
+                    mac::Addr4?: addr4,
+                    mac::QosControl?: qos_ctrl,
+                    mac::LlcHdr: &data_writer::make_snap_llc_hdr(ether_type),
+                },
+            })
+            .map_err(|e| {
+                if !async_id_provided {
+                    wtrace::async_end_wlansoftmac_tx(async_id, zx::Status::INTERNAL);
+                }
+                e
+            })?;
+
+        // Adjust the start of the slice stored in the ArenaBox.
+        //
+        // Safety: buffer is a valid pointer to a slice allocated in arena.
+        let buffer = unsafe {
+            arena.assume_unchecked(NonNull::new_unchecked(
+                &mut ArenaBox::into_ptr(buffer).as_mut()[frame_start..],
+            ))
+        };
+        let buffer = arena.make_static(buffer);
         self.ctx.device.send_wlan_frame(buffer, tx_flags, Some(async_id)).map_err(|s| {
             if !async_id_provided {
                 wtrace::async_end_wlansoftmac_tx(async_id, s);

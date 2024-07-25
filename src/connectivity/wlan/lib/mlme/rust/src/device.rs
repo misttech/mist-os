@@ -113,8 +113,9 @@ pub trait DeviceOps {
         wlan_rx: WlanRx,
     ) -> impl Future<Output = Result<fidl::Channel, zx::Status>>;
     fn deliver_eth_frame(&mut self, packet: &[u8]) -> Result<(), zx::Status>;
-    /// Sends the given |buffer| as a frame over the air. If the caller does not pass an |async_id| to this
-    /// function, then this function will generate its own |async_id| and end the trace if an error occurs.
+    /// Sends the slice corresponding to |buffer| as a frame over the air. If the
+    /// caller does not pass an |async_id| to this function, then this function will
+    /// generate its own |async_id| and end the trace if an error occurs.
     fn send_wlan_frame(
         &mut self,
         buffer: ArenaStaticBox<[u8]>,
@@ -363,6 +364,11 @@ impl DeviceOps for Device {
         });
         wtrace::duration!(c"Device::send_data_frame");
 
+        let (arena, mut buffer) = ArenaStaticBox::into_raw(buffer);
+
+        // Safety: buffer points to a valid allocation of a slice, and arena remains
+        // is always in scope while buffer is in use.
+        let buffer = unsafe { buffer.as_mut() };
         if buffer.len() < REQUIRED_WLAN_HEADER_LEN {
             let status = zx::Status::BUFFER_TOO_SMALL;
             if !async_id_provided {
@@ -378,6 +384,7 @@ impl DeviceOps for Device {
         }
         let peer_addr: MacAddr = {
             let mut peer_addr = [0u8; 6];
+            // Safety: buffer is points to a slice of sufficient length
             peer_addr.copy_from_slice(&buffer[PEER_ADDR_OFFSET..PEER_ADDR_OFFSET + 6]);
             peer_addr.into()
         };
@@ -385,14 +392,14 @@ impl DeviceOps for Device {
 
         let tx_info = wlan_common::tx_vector::TxVector::from_idx(tx_vector_idx)
             .to_fidl_tx_info(tx_flags, self.minstrel.is_some());
-        let (arena, buffer) = ArenaStaticBox::into_raw(buffer);
+        let packet_address = Some(buffer.as_ptr() as *mut u8 as u64);
+        let packet_size = Some(buffer.len() as u64);
+
         self.wlan_tx
             .transfer(&fidl_softmac::WlanTxTransferRequest {
                 arena: Some(arena.as_ptr() as u64),
-                packet_size: Some(buffer.len() as u64),
-                // Safety: Cast through *mut u8 to discard the metadata that completes the
-                // wide *mut [u8] pointer and produce a thin pointer to the data part.
-                packet_address: Some(buffer.as_ptr() as *mut u8 as u64),
+                packet_size,
+                packet_address,
                 packet_info: Some(tx_info),
                 async_id: Some(async_id.into()),
                 ..Default::default()
@@ -848,7 +855,7 @@ pub mod test_utils {
         pub config: FakeDeviceConfig,
         pub minstrel: Option<crate::MinstrelWrapper>,
         pub eth_queue: Vec<Vec<u8>>,
-        pub wlan_queue: Vec<(Vec<u8>, u32)>,
+        pub wlan_queue: Vec<(Vec<u8>, usize)>,
         pub wlan_softmac_ifc_bridge_proxy: Option<fidl_softmac::WlanSoftmacIfcBridgeProxy>,
         pub mlme_event_stream: Option<mpsc::UnboundedReceiver<fidl_mlme::MlmeEvent>>,
         pub mlme_request_sink: mpsc::UnboundedSender<wlan_sme::MlmeRequest>,
