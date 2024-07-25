@@ -7,7 +7,7 @@
 #include <fidl/fuchsia.power.broker/cpp/fidl.h>
 #include <fidl/fuchsia.power.system/cpp/fidl.h>
 #include <lib/ddk/platform-defs.h>
-#include <lib/driver/testing/cpp/fixture/driver_test_fixture.h>
+#include <lib/driver/testing/cpp/driver_test.h>
 #include <lib/fake-bti/bti.h>
 #include <lib/fzl/vmo-mapper.h>
 
@@ -380,24 +380,24 @@ class FixtureConfig final {
   using EnvironmentType = TestEnvironment;
 };
 
-class DriverTest : public fdf_testing::BackgroundDriverTestFixture<FixtureConfig>,
-                   public ::testing::Test {
- protected:
+class DriverTest : public ::testing::Test {
+ public:
   void TearDown() override {
-    zx::result<> result = StopDriver();
+    zx::result<> result = driver_test().StopDriver();
     ASSERT_EQ(ZX_OK, result.status_value());
   }
 
   void SetUp() override {
-    zx::result<> result = StartDriver();
+    zx::result<> result = driver_test().StartDriver();
     ASSERT_EQ(ZX_OK, result.status_value());
-    zx::result device_result = ConnectThroughDevfs<fuchsia_hardware_hrtimer::Device>("aml-hrtimer");
+    zx::result device_result =
+        driver_test().ConnectThroughDevfs<fuchsia_hardware_hrtimer::Device>("aml-hrtimer");
     ASSERT_EQ(ZX_OK, device_result.status_value());
     client_.Bind(std::move(device_result.value()));
   }
 
   void CheckLeaseRequested(size_t timer_id) {
-    RunInEnvironmentTypeContext([](TestEnvironment& env) {
+    driver_test().RunInEnvironmentTypeContext([](TestEnvironment& env) {
       ASSERT_FALSE(env.power_broker().GetLeaseRequested());
       env.platform_device().TriggerAllIrqs();
     });
@@ -405,9 +405,13 @@ class DriverTest : public fdf_testing::BackgroundDriverTestFixture<FixtureConfig
         {timer_id, fuchsia_hardware_hrtimer::Resolution::WithDuration(1'000ULL), 0});
     ASSERT_FALSE(result_start.is_error());
     ASSERT_TRUE(result_start->keep_alive().is_valid());
-    RunInEnvironmentTypeContext(
+    driver_test().RunInEnvironmentTypeContext(
         [](TestEnvironment& env) { ASSERT_TRUE(env.power_broker().GetLeaseRequested()); });
   }
+
+  fdf_testing::BackgroundDriverTest<FixtureConfig>& driver_test() { return driver_test_; }
+
+  fdf_testing::BackgroundDriverTest<FixtureConfig> driver_test_;
 
   fidl::SyncClient<fuchsia_hardware_hrtimer::Device> client_;
 };
@@ -536,7 +540,7 @@ TEST_F(DriverTest, StartStop) {
     ASSERT_FALSE(result_start.is_error());
   }
   // Timers are started.
-  RunInEnvironmentTypeContext([](TestEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([](TestEnvironment& env) {
     ASSERT_EQ(env.platform_device().mmio()[0x3c50], 0x000f'0100UL);  // Timers A, B, C and D.
     // Timer E is always started.
     ASSERT_EQ(env.platform_device().mmio()[0x3c64], 0x000f'0000UL);  // Timers F, G, H and I.
@@ -547,7 +551,7 @@ TEST_F(DriverTest, StartStop) {
     ASSERT_FALSE(result_stop.is_error());
   }
   // Timers are stopped.
-  RunInEnvironmentTypeContext([](TestEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([](TestEnvironment& env) {
     ASSERT_EQ(env.platform_device().mmio()[0x3c50], 0x0000'0100UL);  // Timers A, B, C and D.
     // Timer E can't actually be stopped.
     ASSERT_EQ(env.platform_device().mmio()[0x3c64], 0x0000'0000UL);  // Timers F, G, H and I.
@@ -571,7 +575,8 @@ TEST_F(DriverTest, EventTriggering) {
     ASSERT_FALSE(result_start.is_error());
   }
 
-  RunInEnvironmentTypeContext([](TestEnvironment& env) { env.platform_device().TriggerAllIrqs(); });
+  driver_test().RunInEnvironmentTypeContext(
+      [](TestEnvironment& env) { env.platform_device().TriggerAllIrqs(); });
 
   for (uint64_t i = 0; i < 9; ++i) {
     if (i == 4) {
@@ -590,7 +595,7 @@ TEST_F(DriverTest, GetTicksTimers0123) {
   constexpr uint32_t kArbitraryCount16bits1 = 0x5678;
   constexpr uint32_t kArbitraryCount16bits2 = 0x90ab;
   constexpr uint32_t kArbitraryCount16bits3 = 0xcdef;
-  RunInEnvironmentTypeContext([](TestEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([](TestEnvironment& env) {
     env.platform_device().mmio()[0x3c51] = kArbitraryCount16bits0 << 16;  // Timer A.
     env.platform_device().mmio()[0x3c52] = kArbitraryCount16bits1 << 16;  // Timer B.
     env.platform_device().mmio()[0x3c53] = kArbitraryCount16bits2 << 16;  // Timer C.
@@ -635,7 +640,7 @@ TEST_F(DriverTest, GetTicksTimer4) {
   // We set the amount read after starting the timer since starting the timer writes to the register
   // we read upon GetTicksLeft.
   constexpr uint64_t kArbitraryCount64bits = 0x1234'5678'0000'0000;
-  RunInEnvironmentTypeContext([](TestEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([](TestEnvironment& env) {
     env.platform_device().mmio()[0x3c62] =
         static_cast<uint32_t>(kArbitraryCount64bits);  // Timer E.
     env.platform_device().mmio()[0x3c63] =
@@ -663,7 +668,7 @@ TEST_F(DriverTest, GetTicksTimers5678TicksStayAtRequested) {
 
   // The count starts at max for the register since the request goes beyond the register max.
   constexpr uint64_t kMaxCount = 0xffff;
-  RunInEnvironmentTypeContext([](TestEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([](TestEnvironment& env) {
     env.platform_device().mmio()[0x3c65] = kMaxCount << 16;  // Timer F.
     env.platform_device().mmio()[0x3c66] = kMaxCount << 16;  // Timer G.
     env.platform_device().mmio()[0x3c67] = kMaxCount << 16;  // Timer H.
@@ -686,7 +691,7 @@ TEST_F(DriverTest, GetTicksTimers5678TicksDownBy0xffff) {
   constexpr uint64_t kArbitraryTicksRequest = 0x1234'5678'90ab'cdef;
 
   // The count has decreased by 0xffff to 0.
-  RunInEnvironmentTypeContext([](TestEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([](TestEnvironment& env) {
     env.platform_device().mmio()[0x3c65] = 0 << 16;  // Timer F.
     env.platform_device().mmio()[0x3c66] = 0 << 16;  // Timer G.
     env.platform_device().mmio()[0x3c67] = 0 << 16;  // Timer H.
@@ -712,7 +717,7 @@ TEST_F(DriverTest, GetTicksTimers5678ArbitraryCount) {
   constexpr uint64_t kArbitraryCount6 = 0x5678;
   constexpr uint64_t kArbitraryCount7 = 0x90ab;
   constexpr uint64_t kArbitraryCount8 = 0xcdef;
-  RunInEnvironmentTypeContext([](TestEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([](TestEnvironment& env) {
     env.platform_device().mmio()[0x3c65] = kArbitraryCount5 << 16;  // Timer F.
     env.platform_device().mmio()[0x3c66] = kArbitraryCount6 << 16;  // Timer G.
     env.platform_device().mmio()[0x3c67] = kArbitraryCount7 << 16;  // Timer H.
@@ -752,7 +757,7 @@ TEST_F(DriverTest, GetTicksTimers5678ArbitraryCountWithIrq) {
   constexpr uint64_t kTicksRequestEnoughFor2Irqs = 0x1'1235;
 
   constexpr uint64_t kArbitraryCount = 0x1234;
-  RunInEnvironmentTypeContext([](TestEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([](TestEnvironment& env) {
     env.platform_device().mmio()[0x3c65] = kArbitraryCount << 16;  // Timer F.
     env.platform_device().mmio()[0x3c66] = kArbitraryCount << 16;  // Timer G.
     env.platform_device().mmio()[0x3c67] = kArbitraryCount << 16;  // Timer H.
@@ -772,13 +777,14 @@ TEST_F(DriverTest, GetTicksTimers5678ArbitraryCountWithIrq) {
   }
 
   // Trigger IRQs, indicates that the first 0xffff passed.
-  RunInEnvironmentTypeContext([](TestEnvironment& env) { env.platform_device().TriggerAllIrqs(); });
+  driver_test().RunInEnvironmentTypeContext(
+      [](TestEnvironment& env) { env.platform_device().TriggerAllIrqs(); });
 
   for (uint64_t i = 5; i < 9; ++i) {
     // Wait until after the IRQ is handled and start ticks left fit in the hardware capabilities.
     bool start_ticks_left_fit = false;
     while (!start_ticks_left_fit) {
-      RunInDriverContext([i, &start_ticks_left_fit](AmlHrtimer& driver) {
+      driver_test().RunInDriverContext([i, &start_ticks_left_fit](AmlHrtimer& driver) {
         start_ticks_left_fit = driver.StartTicksLeftFitInHardware(i);
       });
       zx::nanosleep(zx::deadline_after(zx::msec(1)));
@@ -795,13 +801,13 @@ TEST_F(DriverTest, GetTicksTimers5678ArbitraryCountWithIrq) {
 TEST_F(DriverTest, PowerLeaseControl) {
   // Element control server in the driver is the same as provided by the fake SAG.
   zx_info_handle_basic_t broker_element_control, driver_element_control;
-  RunInDriverContext([&](AmlHrtimer& driver) {
+  driver_test().RunInDriverContext([&](AmlHrtimer& driver) {
     zx_status_t status = driver.element_control()->channel().get_info(
         ZX_INFO_HANDLE_BASIC, &driver_element_control, sizeof(zx_info_handle_basic_t), nullptr,
         nullptr);
     ASSERT_EQ(status, ZX_OK);
   });
-  RunInEnvironmentTypeContext([&](TestEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([&](TestEnvironment& env) {
     zx_status_t status = env.power_broker().element_control_server().channel().get_info(
         ZX_INFO_HANDLE_BASIC, &broker_element_control, sizeof(zx_info_handle_basic_t), nullptr,
         nullptr);
@@ -811,7 +817,8 @@ TEST_F(DriverTest, PowerLeaseControl) {
 }
 
 TEST_F(DriverTest, WaitTriggering) {
-  RunInEnvironmentTypeContext([](TestEnvironment& env) { env.platform_device().TriggerAllIrqs(); });
+  driver_test().RunInEnvironmentTypeContext(
+      [](TestEnvironment& env) { env.platform_device().TriggerAllIrqs(); });
 
   // Timers id 0 to 8 inclusive but not 4 support wait (via IRQ notification).
   for (uint64_t i = 0; i < 9; ++i) {
@@ -827,45 +834,47 @@ TEST_F(DriverTest, WaitTriggering) {
 
 TEST_F(DriverTest, RunningPowerElement) {
   // Wait until we have received the Watch.
-  runtime().RunUntil([this]() {
-    return RunInEnvironmentTypeContext<bool>(
+  driver_test().runtime().RunUntil([this]() {
+    return driver_test().RunInEnvironmentTypeContext<bool>(
         [](TestEnvironment& env) { return env.power_broker().required_level().WatchReceived(); });
   });
 
   // The driver sets the CurrentLevel to the RequiredLevel kWakeHandlingLeaseOn.
-  RunInEnvironmentTypeContext([](TestEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([](TestEnvironment& env) {
     env.power_broker().required_level().SetRequiredLevel(AmlHrtimerServer::kWakeHandlingLeaseOn);
   });
-  runtime().RunUntil([this]() {
-    return RunInEnvironmentTypeContext<fuchsia_power_broker::PowerLevel>([](TestEnvironment& env) {
-             return env.power_broker().current_level().current_level();
-           }) == AmlHrtimerServer::kWakeHandlingLeaseOn;
+  driver_test().runtime().RunUntil([this]() {
+    return driver_test().RunInEnvironmentTypeContext<fuchsia_power_broker::PowerLevel>(
+               [](TestEnvironment& env) {
+                 return env.power_broker().current_level().current_level();
+               }) == AmlHrtimerServer::kWakeHandlingLeaseOn;
   });
 
   // Wait until we have received the Watch.
-  runtime().RunUntil([this]() {
-    return RunInEnvironmentTypeContext<bool>(
+  driver_test().runtime().RunUntil([this]() {
+    return driver_test().RunInEnvironmentTypeContext<bool>(
         [](TestEnvironment& env) { return env.power_broker().required_level().WatchReceived(); });
   });
 
   // The driver sets the CurrentLevel to the RequiredLevel 0.
-  RunInEnvironmentTypeContext(
+  driver_test().RunInEnvironmentTypeContext(
       [](TestEnvironment& env) { env.power_broker().required_level().SetRequiredLevel(0); });
-  runtime().RunUntil([this]() {
-    return RunInEnvironmentTypeContext<fuchsia_power_broker::PowerLevel>([](TestEnvironment& env) {
-             return env.power_broker().current_level().current_level();
-           }) == 0;
+  driver_test().runtime().RunUntil([this]() {
+    return driver_test().RunInEnvironmentTypeContext<fuchsia_power_broker::PowerLevel>(
+               [](TestEnvironment& env) {
+                 return env.power_broker().current_level().current_level();
+               }) == 0;
   });
 
   // Wait until we have received the Watch.
-  runtime().RunUntil([this]() {
-    return RunInEnvironmentTypeContext<bool>(
+  driver_test().runtime().RunUntil([this]() {
+    return driver_test().RunInEnvironmentTypeContext<bool>(
         [](TestEnvironment& env) { return env.power_broker().required_level().WatchReceived(); });
   });
 }
 
 TEST_F(DriverTest, LeaseError) {
-  RunInEnvironmentTypeContext([](TestEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([](TestEnvironment& env) {
     env.power_broker().SetLeaseError();
     env.platform_device().TriggerAllIrqs();
   });
@@ -901,7 +910,7 @@ TEST_F(DriverTest, WaitStop) {
     // Wait until the driver has acquired a wait completer such that we can cancel the timer.
     bool has_wait_completer = false;
     while (!has_wait_completer) {
-      RunInDriverContext([i, &has_wait_completer](AmlHrtimer& driver) {
+      driver_test().RunInDriverContext([i, &has_wait_completer](AmlHrtimer& driver) {
         has_wait_completer = driver.HasWaitCompleter(i);
       });
       zx::nanosleep(zx::deadline_after(zx::msec(1)));
@@ -913,19 +922,19 @@ TEST_F(DriverTest, WaitStop) {
   }
 }
 
-class DriverTestNoAutoStop : public fdf_testing::BackgroundDriverTestFixture<FixtureConfig>,
-                             public ::testing::Test {
- protected:
+class DriverTestNoAutoStop : public ::testing::Test {
+ public:
   void SetUp() override {
-    zx::result<> result = StartDriver();
+    zx::result<> result = driver_test().StartDriver();
     ASSERT_EQ(ZX_OK, result.status_value());
-    zx::result device_result = ConnectThroughDevfs<fuchsia_hardware_hrtimer::Device>("aml-hrtimer");
+    zx::result device_result =
+        driver_test().ConnectThroughDevfs<fuchsia_hardware_hrtimer::Device>("aml-hrtimer");
     ASSERT_EQ(ZX_OK, device_result.status_value());
     client_.Bind(std::move(device_result.value()));
   }
 
   void CheckLeaseRequested(size_t timer_id) {
-    RunInEnvironmentTypeContext([](TestEnvironment& env) {
+    driver_test().RunInEnvironmentTypeContext([](TestEnvironment& env) {
       ASSERT_FALSE(env.power_broker().GetLeaseRequested());
       env.platform_device().TriggerAllIrqs();
     });
@@ -933,9 +942,13 @@ class DriverTestNoAutoStop : public fdf_testing::BackgroundDriverTestFixture<Fix
         {timer_id, fuchsia_hardware_hrtimer::Resolution::WithDuration(1'000ULL), 0});
     ASSERT_FALSE(result_start.is_error());
     ASSERT_TRUE(result_start->keep_alive().is_valid());
-    RunInEnvironmentTypeContext(
+    driver_test().RunInEnvironmentTypeContext(
         [](TestEnvironment& env) { ASSERT_TRUE(env.power_broker().GetLeaseRequested()); });
   }
+
+  fdf_testing::BackgroundDriverTest<FixtureConfig>& driver_test() { return driver_test_; }
+
+  fdf_testing::BackgroundDriverTest<FixtureConfig> driver_test_;
 
   fidl::SyncClient<fuchsia_hardware_hrtimer::Device> client_;
 };
@@ -966,7 +979,7 @@ TEST_F(DriverTestNoAutoStop, CancelOnDriverStop) {
     // Wait until the driver has acquired a wait completer such that it can be canceled.
     bool has_wait_completer = false;
     while (!has_wait_completer) {
-      RunInDriverContext([i, &has_wait_completer](AmlHrtimer& driver) {
+      driver_test().RunInDriverContext([i, &has_wait_completer](AmlHrtimer& driver) {
         has_wait_completer = driver.HasWaitCompleter(i);
       });
       zx::nanosleep(zx::deadline_after(zx::msec(1)));
@@ -979,7 +992,7 @@ TEST_F(DriverTestNoAutoStop, CancelOnDriverStop) {
   ASSERT_FALSE(result_start.is_error());
 
   // Force driver stop.
-  auto result_stop_driver = StopDriver();
+  auto result_stop_driver = driver_test().StopDriver();
   ASSERT_FALSE(result_stop_driver.is_error());
 
   // Join the threads such that we check for timers canceled.
@@ -994,12 +1007,12 @@ TEST_F(DriverTest, LeaseRequested2) { CheckLeaseRequested(2); }
 TEST_F(DriverTest, LeaseRequested3) { CheckLeaseRequested(3); }
 
 TEST_F(DriverTest, LeaseNotRequested4) {
-  RunInEnvironmentTypeContext(
+  driver_test().RunInEnvironmentTypeContext(
       [](TestEnvironment& env) { ASSERT_FALSE(env.power_broker().GetLeaseRequested()); });
   auto result_start =
       client_->StartAndWait({4, fuchsia_hardware_hrtimer::Resolution::WithDuration(1'000ULL), 0});
   ASSERT_TRUE(result_start.is_error());
-  RunInEnvironmentTypeContext(
+  driver_test().RunInEnvironmentTypeContext(
       [](TestEnvironment& env) { ASSERT_FALSE(env.power_broker().GetLeaseRequested()); });
 }
 
@@ -1029,27 +1042,31 @@ class FixtureConfigNoPower final {
   using EnvironmentType = TestEnvironmentNoPower;
 };
 
-class DriverTestNoPower : public fdf_testing::BackgroundDriverTestFixture<FixtureConfigNoPower>,
-                          public ::testing::Test {
- protected:
+class DriverTestNoPower : public ::testing::Test {
+ public:
   void TearDown() override {
-    zx::result<> result = StopDriver();
+    zx::result<> result = driver_test().StopDriver();
     ASSERT_EQ(ZX_OK, result.status_value());
   }
 
   void SetUp() override {
-    zx::result<> result = StartDriver();
+    zx::result<> result = driver_test().StartDriver();
     ASSERT_EQ(ZX_OK, result.status_value());
-    zx::result device_result = ConnectThroughDevfs<fuchsia_hardware_hrtimer::Device>("aml-hrtimer");
+    zx::result device_result =
+        driver_test().ConnectThroughDevfs<fuchsia_hardware_hrtimer::Device>("aml-hrtimer");
     ASSERT_EQ(ZX_OK, device_result.status_value());
     client_.Bind(std::move(device_result.value()));
   }
+
+  fdf_testing::BackgroundDriverTest<FixtureConfigNoPower>& driver_test() { return driver_test_; }
+
+  fdf_testing::BackgroundDriverTest<FixtureConfigNoPower> driver_test_;
 
   fidl::SyncClient<fuchsia_hardware_hrtimer::Device> client_;
 };
 
 TEST_F(DriverTestNoPower, WaitTriggeringNoPower) {
-  RunInEnvironmentTypeContext(
+  driver_test().RunInEnvironmentTypeContext(
       [](TestEnvironmentNoPower& env) { env.platform_device().TriggerAllIrqs(); });
 
   // Timers id 0 to 8 inclusive but not 4 support wait (via IRQ notification).

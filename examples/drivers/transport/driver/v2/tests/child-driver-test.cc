@@ -4,7 +4,7 @@
 
 #include "examples/drivers/transport/driver/v2/child-driver.h"
 
-#include <lib/driver/testing/cpp/fixture/driver_test_fixture.h>
+#include <lib/driver/testing/cpp/driver_test.h>
 
 #include <gtest/gtest.h>
 
@@ -70,23 +70,27 @@ class FixtureConfig final {
   using EnvironmentType = DriverTransportTestEnvironment;
 };
 
-class ChildTransportDriverTest : public fdf_testing::ForegroundDriverTestFixture<FixtureConfig>,
-                                 public ::testing::Test {
+class ChildTransportDriverTest : public ::testing::Test {
+ public:
   void SetUp() override {
-    zx::result<> result = StartDriver();
+    zx::result<> result = driver_test().StartDriver();
     ASSERT_EQ(ZX_OK, result.status_value());
   }
   void TearDown() override {
-    zx::result<> result = StopDriver();
+    zx::result<> result = driver_test().StopDriver();
     ASSERT_EQ(ZX_OK, result.status_value());
   }
+  fdf_testing::ForegroundDriverTest<FixtureConfig>& driver_test() { return driver_test_; }
+
+ private:
+  fdf_testing::ForegroundDriverTest<FixtureConfig> driver_test_;
 };
 
 TEST_F(ChildTransportDriverTest, VerifyQueryValues) {
   // Verify that the queried values match the fake parent driver server.
-  EXPECT_EQ(kTestMaxTransferSize, driver()->max_transfer_size());
+  EXPECT_EQ(kTestMaxTransferSize, driver_test().driver()->max_transfer_size());
 
-  RunInEnvironmentTypeContext(
+  driver_test().RunInEnvironmentTypeContext(
       [&](DriverTransportTestEnvironment& env) { EXPECT_EQ(kTestBitrate, env.GetBitrate()); });
 }
 

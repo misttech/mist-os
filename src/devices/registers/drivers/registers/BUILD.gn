@@ -46,7 +46,7 @@ test("registers-test") {
   ]
   deps = [
     ":common",
-    "//sdk/lib/driver/testing/cpp/fixture:cpp_fixture",
+    "//sdk/lib/driver/testing/cpp:driver_testing_cpp",
     "//src/devices/lib/fidl-metadata",
     "//src/devices/testing/mock-mmio-reg",
     "//src/lib/fxl/test:gtest_main",

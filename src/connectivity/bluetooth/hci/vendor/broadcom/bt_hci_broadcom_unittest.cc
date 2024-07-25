@@ -14,7 +14,7 @@
 #include <lib/ddk/platform-defs.h>
 #include <lib/driver/compat/cpp/device_server.h>
 #include <lib/driver/outgoing/cpp/outgoing_directory.h>
-#include <lib/driver/testing/cpp/fixture/driver_test_fixture.h>
+#include <lib/driver/testing/cpp/driver_test.h>
 #include <lib/sync/cpp/completion.h>
 
 #include <gtest/gtest.h>
@@ -233,24 +233,26 @@ class FixtureConfig final {
   using EnvironmentType = TestEnvironment;
 };
 
-class BtHciBroadcomTest : public fdf_testing::BackgroundDriverTestFixture<FixtureConfig>,
-                          public ::testing::Test {
+class BtHciBroadcomTest : public ::testing::Test {
  public:
   BtHciBroadcomTest() = default;
 
   void TearDown() override {
-    zx::result<> result = StopDriver();
+    zx::result<> result = driver_test().StopDriver();
     ASSERT_EQ(ZX_OK, result.status_value());
   }
 
+  fdf_testing::BackgroundDriverTest<FixtureConfig>& driver_test() { return driver_test_; }
+
  protected:
   void SetFirmware(const std::vector<uint8_t> firmware = kFirmware) {
-    RunInEnvironmentTypeContext([&](TestEnvironment& env) { env.AddFirmwareFile(firmware); });
+    driver_test().RunInEnvironmentTypeContext(
+        [&](TestEnvironment& env) { env.AddFirmwareFile(firmware); });
   }
 
   void SetMetadata(uint32_t name = DEVICE_METADATA_MAC_ADDRESS,
                    const std::vector<uint8_t> data = kMacAddress, const size_t size = kMacAddrLen) {
-    ASSERT_EQ(ZX_OK, RunInEnvironmentTypeContext<zx_status_t>(
+    ASSERT_EQ(ZX_OK, driver_test().RunInEnvironmentTypeContext<zx_status_t>(
                          [&](TestEnvironment& env) { return env.SetMetadata(name, data, size); }));
   }
 
@@ -269,7 +271,7 @@ class BtHciBroadcomTest : public fdf_testing::BackgroundDriverTestFixture<Fixtur
 
     EventHandler event_handler;
     // Connect to Vendor protocol through devfs, get the channel handle from node server.
-    zx::result connect_result = ConnectThroughDevfs<fhbt::Vendor>("bt-hci-broadcom");
+    zx::result connect_result = driver_test().ConnectThroughDevfs<fhbt::Vendor>("bt-hci-broadcom");
     ASSERT_EQ(ZX_OK, connect_result.status_value());
 
     // Bind the channel to a Vendor client end.
@@ -280,12 +282,14 @@ class BtHciBroadcomTest : public fdf_testing::BackgroundDriverTestFixture<Fixtur
 
   void OpenVendorWithHciClient() {
     // Connect to Vendor protocol through devfs, get the channel handle from node server.
-    zx::result connect_result = ConnectThroughDevfs<fhbt::Vendor>("bt-hci-broadcom");
+    zx::result connect_result = driver_test().ConnectThroughDevfs<fhbt::Vendor>("bt-hci-broadcom");
     ASSERT_EQ(ZX_OK, connect_result.status_value());
 
     fidl::ClientEnd<fhbt::Hci> hci_end(connect_result.value().TakeChannel());
     hci_client_.Bind(std::move(hci_end));
   }
+
+  fdf_testing::BackgroundDriverTest<FixtureConfig> driver_test_;
 
   fidl::WireSyncClient<fhbt::Vendor> vendor_client_;
   fidl::WireSyncClient<fhbt::Hci> hci_client_;
@@ -297,7 +301,7 @@ class BtHciBroadcomInitializedTest : public BtHciBroadcomTest {
     BtHciBroadcomTest::SetUp();
     SetFirmware();
     SetMetadata();
-    ASSERT_TRUE(StartDriver().is_ok());
+    ASSERT_TRUE(driver_test().StartDriver().is_ok());
     OpenVendor();
   }
 };
@@ -320,7 +324,7 @@ TEST_F(BtHciBroadcomTest, ReportLoadFirmwareError) {
   SetMetadata();
 
   // No firmware has been set, so load_firmware() should fail during initialization.
-  ASSERT_EQ(StartDriver().status_value(), ZX_ERR_NOT_FOUND);
+  ASSERT_EQ(driver_test().StartDriver().status_value(), ZX_ERR_NOT_FOUND);
 }
 
 TEST_F(BtHciBroadcomTest, TooSmallFirmwareBuffer) {
@@ -328,29 +332,29 @@ TEST_F(BtHciBroadcomTest, TooSmallFirmwareBuffer) {
   SetMetadata();
 
   SetFirmware(std::vector<uint8_t>{0x00});
-  ASSERT_EQ(StartDriver().status_value(), ZX_ERR_INTERNAL);
+  ASSERT_EQ(driver_test().StartDriver().status_value(), ZX_ERR_INTERNAL);
 }
 
 TEST_F(BtHciBroadcomTest, ControllerReturnsEventSmallerThanEventHeader) {
-  RunInEnvironmentTypeContext([](TestEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([](TestEnvironment& env) {
     env.transport_device_.SetCustomizedReply(
         std::vector<uint8_t>(kCommandCompleteEvent.data(), kCommandCompleteEvent.data() + 1));
   });
 
   SetFirmware();
   SetMetadata();
-  ASSERT_NE(StartDriver().status_value(), ZX_OK);
+  ASSERT_NE(driver_test().StartDriver().status_value(), ZX_OK);
 }
 
 TEST_F(BtHciBroadcomTest, ControllerReturnsEventSmallerThanCommandComplete) {
-  RunInEnvironmentTypeContext([](TestEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([](TestEnvironment& env) {
     env.transport_device_.SetCustomizedReply(std::vector<uint8_t>(
         kCommandCompleteEvent.data(), kCommandCompleteEvent.data() + sizeof(HciEventHeader)));
   });
 
   SetFirmware();
   SetMetadata();
-  ASSERT_FALSE(StartDriver().is_ok());
+  ASSERT_FALSE(driver_test().StartDriver().is_ok());
 }
 
 TEST_F(BtHciBroadcomTest, ControllerReturnsBdaddrEventWithoutBdaddrParam) {
@@ -358,7 +362,7 @@ TEST_F(BtHciBroadcomTest, ControllerReturnsBdaddrEventWithoutBdaddrParam) {
   // fallback address.
   SetMetadata(DEVICE_METADATA_MAC_ADDRESS, kMacAddress, kMacAddress.size() - 1);
   //  Respond to ReadBdaddr command with a command complete (which doesn't include the bdaddr).
-  RunInEnvironmentTypeContext([](TestEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([](TestEnvironment& env) {
     env.transport_device_.SetCustomizedReply(std::vector<uint8_t>(
         kCommandCompleteEvent.data(), kCommandCompleteEvent.data() + kCommandCompleteEvent.size()));
   });
@@ -367,13 +371,13 @@ TEST_F(BtHciBroadcomTest, ControllerReturnsBdaddrEventWithoutBdaddrParam) {
   SetFirmware();
 
   // Initialization should still succeed (an error will be logged, but it's not fatal).
-  ASSERT_TRUE(StartDriver().is_ok());
+  ASSERT_TRUE(driver_test().StartDriver().is_ok());
 }
 
 TEST_F(BtHciBroadcomTest, VendorProtocolUnknownMethod) {
   SetFirmware();
   SetMetadata();
-  ASSERT_TRUE(StartDriver().is_ok());
+  ASSERT_TRUE(driver_test().StartDriver().is_ok());
 
   OpenVendorWithHciClient();
 

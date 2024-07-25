@@ -73,7 +73,7 @@ test("driver-test") {
     "device:test_util_driver",
     "mac:test_util_driver",
     "//sdk/lib/driver/compat/cpp:cpp",
-    "//sdk/lib/driver/testing/cpp/fixture:cpp_fixture",
+    "//sdk/lib/driver/testing/cpp:driver_testing_cpp",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/predicates",
     "//zircon/system/ulib/zx",

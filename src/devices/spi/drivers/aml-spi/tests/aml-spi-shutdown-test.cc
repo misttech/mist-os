@@ -12,12 +12,17 @@ class AmlSpiShutdownConfig final {
   using EnvironmentType = BaseTestEnvironment;
 };
 
-class AmlSpiShutdownTest : public fdf_testing::ForegroundDriverTestFixture<AmlSpiShutdownConfig>,
-                           public ::testing::Test {
+class AmlSpiShutdownTest : public ::testing::Test {
+ public:
   void SetUp() override {
-    zx::result<> result = StartDriver();
+    zx::result<> result = driver_test().StartDriver();
     ASSERT_EQ(ZX_OK, result.status_value());
   }
+
+  fdf_testing::ForegroundDriverTest<AmlSpiShutdownConfig>& driver_test() { return driver_test_; }
+
+ private:
+  fdf_testing::ForegroundDriverTest<AmlSpiShutdownConfig> driver_test_;
 };
 
 TEST_F(AmlSpiShutdownTest, Shutdown) {
@@ -25,13 +30,13 @@ TEST_F(AmlSpiShutdownTest, Shutdown) {
   bool dmareg_cleared = false;
   bool conreg_cleared = false;
 
-  auto spiimpl_client = Connect<fuchsia_hardware_spiimpl::Service::Device>();
+  auto spiimpl_client = driver_test().Connect<fuchsia_hardware_spiimpl::Service::Device>();
   ASSERT_TRUE(spiimpl_client.is_ok());
 
   fdf::WireClient<fuchsia_hardware_spiimpl::SpiImpl> spiimpl(*std::move(spiimpl_client),
                                                              fdf::Dispatcher::GetCurrent()->get());
 
-  RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
     env.ExpectGpioWrite(ZX_OK, 0);
     env.ExpectGpioWrite(ZX_OK, 1);
   });
@@ -42,25 +47,25 @@ TEST_F(AmlSpiShutdownTest, Shutdown) {
       ->ExchangeVector(0, fidl::VectorView<uint8_t>::FromExternal(buf, sizeof(buf)))
       .Then([&](auto& result) {
         ASSERT_TRUE(result.ok() && result->is_ok());
-        runtime().Quit();
+        driver_test().runtime().Quit();
       });
-  runtime().Run();
+  driver_test().runtime().Run();
 
-  driver()->mmio()[AML_SPI_DMAREG].SetWriteCallback(
+  driver_test().driver()->mmio()[AML_SPI_DMAREG].SetWriteCallback(
       [&dmareg_cleared](uint64_t value) { dmareg_cleared = value == 0; });
 
-  driver()->mmio()[AML_SPI_CONREG].SetWriteCallback(
+  driver_test().driver()->mmio()[AML_SPI_CONREG].SetWriteCallback(
       [&conreg_cleared](uint64_t value) { conreg_cleared = value == 0; });
 
-  EXPECT_TRUE(StopDriver().is_ok());
+  EXPECT_TRUE(driver_test().StopDriver().is_ok());
 
   // All SPI devices have been released at this point, so no further calls can be made.
-  RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
     EXPECT_FALSE(env.ControllerReset());
     ASSERT_NO_FATAL_FAILURE(env.VerifyGpioAndClear());
   });
 
-  ShutdownAndDestroyDriver();
+  driver_test().ShutdownAndDestroyDriver();
 
   EXPECT_TRUE(dmareg_cleared);
   EXPECT_TRUE(conreg_cleared);

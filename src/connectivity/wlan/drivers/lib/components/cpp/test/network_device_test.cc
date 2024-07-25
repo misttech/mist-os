@@ -1,7 +1,7 @@
 // Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be found in the LICENSE file.
 
-#include <lib/driver/testing/cpp/fixture/driver_test_fixture.h>
+#include <lib/driver/testing/cpp/driver_test.h>
 #include <lib/stdcompat/span.h>
 
 #include <gmock/gmock.h>
@@ -137,12 +137,11 @@ struct TestFixtureConfig {
   using EnvironmentType = TestFixtureEnvironment;
 };
 
-struct BasicNetworkDeviceTest : public fdf_testing::BackgroundDriverTestFixture<TestFixtureConfig>,
-                                public ::testing::Test {
+struct BasicNetworkDeviceTest : public ::testing::Test {
   void SetUp() override {
-    zx::result<> result = StartDriver();
+    zx::result<> result = driver_test().StartDriver();
     ASSERT_EQ(ZX_OK, result.status_value());
-    RunInDriverContext([&](TestDriver& driver) {
+    driver_test().RunInDriverContext([&](TestDriver& driver) {
       parent_.Bind(std::move(driver.node()), fdf::Dispatcher::GetCurrent()->async_dispatcher());
       ASSERT_TRUE(parent_.is_valid());
 
@@ -150,7 +149,8 @@ struct BasicNetworkDeviceTest : public fdf_testing::BackgroundDriverTestFixture<
       driver.AssignStopHandler(&test_network_device_);
     });
 
-    zx::result netdev_impl = Connect<fuchsia_hardware_network_driver::Service::NetworkDeviceImpl>();
+    zx::result netdev_impl =
+        driver_test().Connect<fuchsia_hardware_network_driver::Service::NetworkDeviceImpl>();
     ASSERT_OK(netdev_impl.status_value());
 
     network_device_client_.Bind(std::move(netdev_impl.value()),
@@ -159,14 +159,15 @@ struct BasicNetworkDeviceTest : public fdf_testing::BackgroundDriverTestFixture<
 
     test_network_device_.network_device_->WaitUntilServerConnected();
 
-    auto ifc_client_end = network_device_ifc_.Bind(runtime().StartBackgroundDispatcher()->get());
+    auto ifc_client_end =
+        network_device_ifc_.Bind(driver_test().runtime().StartBackgroundDispatcher()->get());
     ASSERT_OK(ifc_client_end.status_value());
     ifc_client_end_ = std::move(ifc_client_end.value());
   }
 
   void TearDown() override {
     CallStopDriver();
-    RunInDriverContext([&](TestDriver& driver) {
+    driver_test().RunInDriverContext([&](TestDriver& driver) {
       // Because parent_ was bound in the driver's context and therefore on the driver dispatcher it
       // has to be destroyed here, not on the dispatcher that the test's destructor will run on.
       parent_ = {};
@@ -175,10 +176,14 @@ struct BasicNetworkDeviceTest : public fdf_testing::BackgroundDriverTestFixture<
 
   void CallStopDriver() {
     if (!stop_driver_called_) {
-      ASSERT_OK(StopDriver().status_value());
+      ASSERT_OK(driver_test().StopDriver().status_value());
       stop_driver_called_ = true;
     }
   }
+
+  fdf_testing::BackgroundDriverTest<TestFixtureConfig>& driver_test() { return driver_test_; }
+
+  fdf_testing::BackgroundDriverTest<TestFixtureConfig> driver_test_;
 
   fdf::WireClient<fuchsia_hardware_network_driver::NetworkDeviceImpl> network_device_client_;
   TestNetworkDevice test_network_device_;
@@ -775,7 +780,7 @@ TEST_F(NetworkDeviceTestFixture, RemoveWhilePosting) {
 
   removed.Wait();
 
-  RunInDriverContext([&](TestDriver& driver) {
+  driver_test().RunInDriverContext([&](TestDriver& driver) {
     // Run on the driver dispatcher one more time to ensure that all posted tasks have completed.
     // Now we can verify the number of times released was called.
     EXPECT_EQ(num_release_calls, 1);

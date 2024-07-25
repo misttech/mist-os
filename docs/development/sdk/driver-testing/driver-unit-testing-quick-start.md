@@ -8,25 +8,21 @@ Follow this quick start to write a driver unit test based on the
 Include this library dependency, as well as the gtest dependency:
 
 ```cpp
-#include <lib/driver/testing/cpp/fixture/driver_test_fixture.h>
+#include <lib/driver/testing/cpp/driver_test.h>
 
 #include <gtest/gtest.h>
 ```
 
-The library provides two base classes that can be inherited by the test
-fixture. In the example we use `ForegroundDriverTestFixture`, but there is also
-a `BackgroundDriverTestFixture` available.
+The library provides two classes that can be used in tests.
+In the example we use `ForegroundDriverTest`, but there is also a
+`BackgroundDriverTest` available.
 See [Foreground vs. Background](#foreground-vs-background) below for details.
 
-Tests can also use the `ForegroundDriverTest` and `BackgroundDriverTest`
-classes in `lib/driver/testing/cpp/fixture/driver_test.h` if they prefer an
-encapsulation + RAII-style approach rather than inheritance.
+## Create configuration class
 
-## Create fixture configuration class
-
-Tests define a configuration class to pass into the fixture
+Tests define a configuration class to pass into the library
 through a template parameter.
-The fixture takes care of managing the individual parts of the unit test,
+The class takes care of managing the individual parts of the unit test,
 making sure they are run in the correct dispatcher context.
 
 This configuration class must define two types, one for the driver, the other
@@ -36,7 +32,7 @@ section.
 Here is an example of a configuration class from the example:
 
 ```cpp
-class FixtureConfig final {
+class TestConfig final {
  public:
   using DriverType = simple::SimpleDriver;
   using EnvironmentType = SimpleDriverTestEnvironment;
@@ -48,7 +44,7 @@ class FixtureConfig final {
 The `EnvironmentType` must be an isolated class
 that provides your driver’s custom dependencies.
 It does not need to provide framework dependencies (except for `compat::DeviceServer`),
-as the fixture does that already.
+as the library does that already.
 
 If no extra dependencies are needed, use `fdf_testing::MinimalCompatEnvironment`
 which provides a default `compat::DeviceServer` (note this is only available
@@ -67,26 +63,33 @@ class SimpleDriverTestEnvironment : public fdf_testing::Environment {
 };
 ```
 
-## Define the fixture and test
+## Define the test
 
 Now we can put it all together and make our test. Here is what that looks like
 in our example:
 
 ```cpp
-class SimpleDriverTest : public fdf_testing::ForegroundDriverTestFixture<FixtureConfig>,
-                         public ::testing::Test {
+class SimpleDriverTest : public ::testing::Test {
+ public:
   void SetUp() override {
-    zx::result<> result = StartDriver();
+    zx::result<> result = driver_test().StartDriver();
     ASSERT_EQ(ZX_OK, result.status_value());
   }
   void TearDown() override {
-    zx::result<> result = StopDriver();
+    zx::result<> result = driver_test().StopDriver();
     ASSERT_EQ(ZX_OK, result.status_value());
   }
+
+  fdf_testing::ForegroundDriverTest<TestConfig>& driver_test() {
+    return driver_test_;
+  }
+
+ private:
+  fdf_testing::ForegroundDriverTest<TestConfig> driver_test_;
 };
 
 TEST_F(SimpleDriverTest, VerifyChildNode) {
-  RunInNodeContext([](fdf_testing::TestNode& node) {
+  driver_test().RunInNodeContext([](fdf_testing::TestNode& node) {
     EXPECT_EQ(1u, node.children().size());
     EXPECT_TRUE(node.children().count("simple_child"));
   });
@@ -173,11 +176,21 @@ driver's exposed FIDL more often, then the background driver test should be chos
 When using the foreground version, the test can access the driver under test
 using a `driver()` method and directly make calls into it,
 but sync client tasks send to driver-provided FIDL must go through a
-`RunInBackground()`.
+`RunOnBackgroundDispatcherSync()`.
 
 When using the background version the test can make sync FIDL calls into
 driver-provided FIDL, but must go through a `RunInDriverContext()` when
 accessing the driver instance.
+
+## The driver_test()
+
+As seen in the example test above, there is a `driver_test()` getter that the
+test created to return a reference to the library class. This object provides
+all of the controls that a test can use to do various operations for their test,
+like starting the driver, connecting to it, and running tasks.
+There are some methods available under both foreground and background tests,
+and some that are specific to the threading mode. See below for the available
+methods.
 
 ## Methods available on foreground tests
 
@@ -187,7 +200,7 @@ This can be used to access the driver directly from the test.
 Since the driver is on the foreground it is safe to access this
 on the main test thread.
 
-### RunInBackground
+### RunOnBackgroundDispatcherSync
 
 Runs a task on a background dispatcher, separate from the driver.
 This is done to avoid deadlocking with the driver when making sync client calls
@@ -218,7 +231,7 @@ the driver as the library takes care of that.
 This can be used to start the driver under test. Waits for the start to
 complete before returning the result.
 
-### StartDriverCustomized
+### StartDriverWithCustomStartArgs
 
 Same as StartDriver but can modify the driver start arguments before sending
 it to the driver.
@@ -234,7 +247,7 @@ behavior of the driver host, it will be a no-op.
 
 Shuts down the driver dispatchers belonging to the driver-under-test, and then
 call the driver's destroy hook. This happens automatically on the destruction
-of the fixture, but can also be called manually by a test if it needs to happen
+of the test, but can also be called manually by a test if it needs to happen
 earlier for some validation or to
 [start the driver again](#starting-the-driver-multiple-times-in-a-single-test)
 
@@ -263,14 +276,14 @@ This can be used to validate the driver’s interactions with the driver framewo
 
 To start/stop the driver multiple times in a test without changing the
 environment, ensure to go through all 3 steps:
- - StartDriver/StartDriverCustomized
+ - StartDriver/StartDriverWithCustomStartArgs
  - StopDriver
  - ShutdownAndDestroyDriver
 
 ## Run* functions warning
 
 Be careful when using the Run* functions
-(`RunInDriverContext`, `RunInBackground`, `RunInEnvironmentTypeContext`, `RunInNodeContext`).
+(`RunInDriverContext`, `RunOnBackgroundDispatcherSync`, `RunInEnvironmentTypeContext`, `RunInNodeContext`).
 These tasks run on specific dispatchers, so it might be unsafe to:
 
 * Pass raw pointers into them from another context

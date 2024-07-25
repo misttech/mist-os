@@ -85,8 +85,7 @@ test("hid-input-report-test-bin") {
   deps = [
     ":driver-internals",
     ":hid_input_report_bind",
-    "//sdk/lib/driver/testing/cpp",
-    "//sdk/lib/driver/testing/cpp/fixture:cpp_fixture",
+    "//sdk/lib/driver/testing/cpp:driver_testing_cpp",
     "//sdk/lib/inspect/testing/cpp",
     "//src/lib/ddk:ddk-metadata-headers",
     "//src/lib/fxl/test:gtest_main",

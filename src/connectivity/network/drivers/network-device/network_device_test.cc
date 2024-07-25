@@ -4,7 +4,7 @@
 
 #include "network_device.h"
 
-#include <lib/driver/testing/cpp/fixture/driver_test_fixture.h>
+#include <lib/driver/testing/cpp/driver_test.h>
 
 #include <gtest/gtest.h>
 
@@ -45,14 +45,13 @@ struct TestFixtureConfig {
   using EnvironmentType = TestFixtureEnvironment;
 };
 
-class NetDeviceDriverTest : public fdf_testing::BackgroundDriverTestFixture<TestFixtureConfig>,
-                            public ::testing::Test {
+class NetDeviceDriverTest : public ::testing::Test {
  public:
   // Use a nonzero port identifier to avoid default value traps.
   static constexpr uint8_t kPortId = 11;
 
   void SetUp() override {
-    zx::result<> result = StartDriver();
+    zx::result<> result = driver_test().StartDriver();
     ASSERT_EQ(ZX_OK, result.status_value());
   }
 
@@ -65,7 +64,7 @@ class NetDeviceDriverTest : public fdf_testing::BackgroundDriverTestFixture<Test
     if (shutdown_) {
       return;
     }
-    EXPECT_OK(StopDriver().status_value());
+    EXPECT_OK(driver_test().StopDriver().status_value());
     shutdown_ = true;
   }
 
@@ -76,12 +75,12 @@ class NetDeviceDriverTest : public fdf_testing::BackgroundDriverTestFixture<Test
     port_impl_.SetStatus({.mtu = 2048, .flags = netdev::wire::StatusFlags::kOnline});
 
     fidl::WireSyncClient<netdev::Device> client;
-    RunInDriverContext([&](network::NetworkDevice& driver) {
+    driver_test().RunInDriverContext([&](network::NetworkDevice& driver) {
       auto [client_end, server_end] = fidl::Endpoints<netdev::Device>::Create();
       driver.GetInterface()->Bind(std::move(server_end));
       client.Bind(std::move(client_end));
     });
-    return RunInEnvironmentTypeContext<zx_status_t>([&](TestFixtureEnvironment& env) {
+    return driver_test().RunInEnvironmentTypeContext<zx_status_t>([&](TestFixtureEnvironment& env) {
       return port_impl_.AddPort(kPortId, port_dispatcher_, std::move(client),
                                 env.device_impl_.client());
     });
@@ -89,7 +88,7 @@ class NetDeviceDriverTest : public fdf_testing::BackgroundDriverTestFixture<Test
 
   zx::result<fidl::WireSyncClient<netdev::Device>> ConnectNetDevice() {
     auto [inst_client_end, inst_server_end] = fidl::Endpoints<netdev::DeviceInstance>::Create();
-    RunInDriverContext(
+    driver_test().RunInDriverContext(
         [this, server_end = std::move(inst_server_end)](network::NetworkDevice& driver) mutable {
           fidl::BindServer(fidl_dispatcher_, std::move(server_end), &driver);
         });
@@ -157,15 +156,19 @@ class NetDeviceDriverTest : public fdf_testing::BackgroundDriverTestFixture<Test
   zx_status_t WaitForEvent(zx_signals_t event, zx::duration timeout = kTestTimeout) {
     // Don't wait inside the environment context as that might be running on the dispatcher that
     // triggers the event. Waiting on it would then deadlock.
-    zx::unowned_event events = RunInEnvironmentTypeContext<zx::unowned_event>(
+    zx::unowned_event events = driver_test().RunInEnvironmentTypeContext<zx::unowned_event>(
         [&](TestFixtureEnvironment& env) { return env.device_impl_.events().borrow(); });
     return events->wait_one(event, zx::deadline_after(timeout), nullptr);
   }
 
+  fdf_testing::BackgroundDriverTest<TestFixtureConfig>& driver_test() { return driver_test_; }
+
  private:
+  fdf_testing::BackgroundDriverTest<TestFixtureConfig> driver_test_;
   bool shutdown_ = false;
-  async_dispatcher_t* fidl_dispatcher_ = runtime().StartBackgroundDispatcher()->async_dispatcher();
-  fdf_dispatcher_t* port_dispatcher_ = runtime().StartBackgroundDispatcher()->get();
+  async_dispatcher_t* fidl_dispatcher_ =
+      driver_test().runtime().StartBackgroundDispatcher()->async_dispatcher();
+  fdf_dispatcher_t* port_dispatcher_ = driver_test().runtime().StartBackgroundDispatcher()->get();
   FakeMacDeviceImpl mac_impl_;
   FakeNetworkPortImpl port_impl_;
 };

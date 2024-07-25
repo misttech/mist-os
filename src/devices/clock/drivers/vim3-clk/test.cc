@@ -6,11 +6,7 @@
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire_test_base.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/driver/compat/cpp/device_server.h>
-#include <lib/driver/testing/cpp/driver_lifecycle.h>
-#include <lib/driver/testing/cpp/driver_runtime.h>
-#include <lib/driver/testing/cpp/fixture/driver_test_fixture.h>
-#include <lib/driver/testing/cpp/test_environment.h>
-#include <lib/driver/testing/cpp/test_node.h>
+#include <lib/driver/testing/cpp/driver_test.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <lib/zx/vmo.h>
 
@@ -135,21 +131,22 @@ class FixtureConfig final {
   using EnvironmentType = TestEnvironment;
 };
 
-class DriverTest : public fdf_testing::BackgroundDriverTestFixture<FixtureConfig>,
-                   public ::testing::Test {
- protected:
+class DriverTest : public ::testing::Test {
+ public:
   void SetUp() override {
-    zx::result<> result = StartDriver();
+    zx::result<> result = driver_test().StartDriver();
     ASSERT_EQ(ZX_OK, result.status_value());
-    zx::result device_result = Connect<fuchsia_hardware_clockimpl::Service::Device>();
+    zx::result device_result = driver_test().Connect<fuchsia_hardware_clockimpl::Service::Device>();
     ASSERT_EQ(device_result.status_value(), ZX_OK);
     client_.Bind(std::move(device_result.value()));
   }
 
   void TearDown() override {
-    zx::result<> result = StopDriver();
+    zx::result<> result = driver_test().StopDriver();
     ASSERT_EQ(ZX_OK, result.status_value());
   }
+  fdf_testing::BackgroundDriverTest<FixtureConfig>& driver_test() { return driver_test_; }
+  fdf_testing::BackgroundDriverTest<FixtureConfig> driver_test_;
 
   fdf::WireSyncClient<fuchsia_hardware_clockimpl::ClockImpl> client_;
 };
@@ -252,7 +249,7 @@ TEST_F(DriverTest, ClkTestHiuRegRegion) {
   /// Make sure that HIU clocks are actually touching the HIU registers.
   fdf::Arena arena('TEST');
 
-  RunInEnvironmentTypeContext([](TestEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([](TestEnvironment& env) {
     env.PDev().ClearDos();
     env.PDev().ClearHiu();
   });
@@ -260,7 +257,7 @@ TEST_F(DriverTest, ClkTestHiuRegRegion) {
   auto enable_result = client_.buffer(arena)->Enable(g12b_clk::G12B_CLK_AUDIO);
   ASSERT_TRUE(enable_result.ok());
 
-  RunInEnvironmentTypeContext([](TestEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([](TestEnvironment& env) {
     ASSERT_TRUE(env.PDev().IsHiuDirty());
     ASSERT_FALSE(env.PDev().IsDosDirty());
   });
@@ -270,7 +267,7 @@ TEST_F(DriverTest, ClkTestDosRegRegion) {
   /// Make sure that DOS clocks are actually touching the DOS registers.
   fdf::Arena arena('TEST');
 
-  RunInEnvironmentTypeContext([](TestEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([](TestEnvironment& env) {
     env.PDev().ClearDos();
     env.PDev().ClearHiu();
   });
@@ -278,7 +275,7 @@ TEST_F(DriverTest, ClkTestDosRegRegion) {
   auto enable_result = client_.buffer(arena)->Enable(g12b_clk::G12B_CLK_DOS_GCLK_VDEC);
   ASSERT_TRUE(enable_result.ok());
 
-  RunInEnvironmentTypeContext([](TestEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([](TestEnvironment& env) {
     ASSERT_FALSE(env.PDev().IsHiuDirty());
     ASSERT_TRUE(env.PDev().IsDosDirty());
   });

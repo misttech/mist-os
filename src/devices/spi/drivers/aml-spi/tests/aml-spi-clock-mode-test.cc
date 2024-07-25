@@ -26,23 +26,28 @@ class AmlSpiNormalClockModeFixtureConfig final {
   using EnvironmentType = AmlSpiNormalClockModeTestEnvironment;
 };
 
-class AmlSpiNormalClockModeTest
-    : public fdf_testing::ForegroundDriverTestFixture<AmlSpiNormalClockModeFixtureConfig>,
-      public ::testing::Test {
+class AmlSpiNormalClockModeTest : public ::testing::Test {
+ public:
   void SetUp() override {
-    zx::result<> result = StartDriver();
+    zx::result<> result = driver_test().StartDriver();
     ASSERT_EQ(ZX_OK, result.status_value());
   }
   void TearDown() override {
-    zx::result<> result = StopDriver();
+    zx::result<> result = driver_test().StopDriver();
     ASSERT_EQ(ZX_OK, result.status_value());
   }
+  fdf_testing::ForegroundDriverTest<AmlSpiNormalClockModeFixtureConfig>& driver_test() {
+    return driver_test_;
+  }
+
+ private:
+  fdf_testing::ForegroundDriverTest<AmlSpiNormalClockModeFixtureConfig> driver_test_;
 };
 
 TEST_F(AmlSpiNormalClockModeTest, Test) {
-  auto conreg = ConReg::Get().FromValue(driver()->conreg());
-  auto enhanced_cntl = EnhanceCntl::Get().FromValue(driver()->enhance_cntl());
-  auto testreg = TestReg::Get().FromValue(driver()->testreg());
+  auto conreg = ConReg::Get().FromValue(driver_test().driver()->conreg());
+  auto enhanced_cntl = EnhanceCntl::Get().FromValue(driver_test().driver()->enhance_cntl());
+  auto testreg = TestReg::Get().FromValue(driver_test().driver()->testreg());
 
   EXPECT_EQ(conreg.data_rate(), 0x5u);
   EXPECT_EQ(conreg.drctl(), 0u);
@@ -79,23 +84,28 @@ class AmlSpiEnhancedClockModeFixtureConfig final {
   using EnvironmentType = AmlSpiEnhancedClockModeEnvironment;
 };
 
-class AmlSpiEnhancedClockModeTest
-    : public fdf_testing::ForegroundDriverTestFixture<AmlSpiEnhancedClockModeFixtureConfig>,
-      public ::testing::Test {
+class AmlSpiEnhancedClockModeTest : public ::testing::Test {
+ public:
   void SetUp() override {
-    zx::result<> result = StartDriver();
+    zx::result<> result = driver_test().StartDriver();
     ASSERT_EQ(ZX_OK, result.status_value());
   }
   void TearDown() override {
-    zx::result<> result = StopDriver();
+    zx::result<> result = driver_test().StopDriver();
     ASSERT_EQ(ZX_OK, result.status_value());
   }
+  fdf_testing::ForegroundDriverTest<AmlSpiEnhancedClockModeFixtureConfig>& driver_test() {
+    return driver_test_;
+  }
+
+ private:
+  fdf_testing::ForegroundDriverTest<AmlSpiEnhancedClockModeFixtureConfig> driver_test_;
 };
 
 TEST_F(AmlSpiEnhancedClockModeTest, Test) {
-  auto conreg = ConReg::Get().FromValue(driver()->conreg());
-  auto enhanced_cntl = EnhanceCntl::Get().FromValue(driver()->enhance_cntl());
-  auto testreg = TestReg::Get().FromValue(driver()->testreg());
+  auto conreg = ConReg::Get().FromValue(driver_test().driver()->conreg());
+  auto enhanced_cntl = EnhanceCntl::Get().FromValue(driver_test().driver()->enhance_cntl());
+  auto testreg = TestReg::Get().FromValue(driver_test().driver()->testreg());
 
   EXPECT_EQ(conreg.data_rate(), 0u);
   EXPECT_EQ(conreg.drctl(), 0u);
@@ -138,17 +148,24 @@ class AmlSpiNormalClockModeInvalidDividerFixtureConfig final {
   using EnvironmentType = AmlSpiNormalClockModeInvalidDividerEnvironment;
 };
 
-class AmlSpiNormalClockModeInvalidDividerTest
-    : public fdf_testing::ForegroundDriverTestFixture<
-          AmlSpiNormalClockModeInvalidDividerFixtureConfig>,
-      public ::testing::Test {
+class AmlSpiNormalClockModeInvalidDividerTest : public ::testing::Test {
+ public:
   void TearDown() override {
-    zx::result<> result = StopDriver();
+    zx::result<> result = driver_test().StopDriver();
     ASSERT_EQ(ZX_OK, result.status_value());
   }
+  fdf_testing::ForegroundDriverTest<AmlSpiNormalClockModeInvalidDividerFixtureConfig>&
+  driver_test() {
+    return driver_test_;
+  }
+
+ private:
+  fdf_testing::ForegroundDriverTest<AmlSpiNormalClockModeInvalidDividerFixtureConfig> driver_test_;
 };
 
-TEST_F(AmlSpiNormalClockModeInvalidDividerTest, Test) { EXPECT_TRUE(StartDriver().is_error()); }
+TEST_F(AmlSpiNormalClockModeInvalidDividerTest, Test) {
+  EXPECT_TRUE(driver_test().StartDriver().is_error());
+}
 
 class AmlSpiEnhancedClockModeInvalidDividerEnvironment : public BaseTestEnvironment {
  public:
@@ -171,16 +188,24 @@ class AmlSpiEnhancedClockModeInvalidDividerFixtureConfig final {
   using EnvironmentType = AmlSpiEnhancedClockModeInvalidDividerEnvironment;
 };
 
-class AmlSpiEnhancedClockModeInvalidDividerTest
-    : public fdf_testing::ForegroundDriverTestFixture<
-          AmlSpiEnhancedClockModeInvalidDividerFixtureConfig>,
-      public ::testing::Test {
+class AmlSpiEnhancedClockModeInvalidDividerTest : public ::testing::Test {
+ public:
   void TearDown() override {
-    zx::result<> result = StopDriver();
+    zx::result<> result = driver_test().StopDriver();
     ASSERT_EQ(ZX_OK, result.status_value());
   }
+  fdf_testing::ForegroundDriverTest<AmlSpiEnhancedClockModeInvalidDividerFixtureConfig>&
+  driver_test() {
+    return driver_test_;
+  }
+
+ private:
+  fdf_testing::ForegroundDriverTest<AmlSpiEnhancedClockModeInvalidDividerFixtureConfig>
+      driver_test_;
 };
 
-TEST_F(AmlSpiEnhancedClockModeInvalidDividerTest, Test) { EXPECT_TRUE(StartDriver().is_error()); }
+TEST_F(AmlSpiEnhancedClockModeInvalidDividerTest, Test) {
+  EXPECT_TRUE(driver_test().StartDriver().is_error());
+}
 
 }  // namespace spi

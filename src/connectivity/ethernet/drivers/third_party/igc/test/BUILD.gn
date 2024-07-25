@@ -18,7 +18,7 @@ executable("igc_interface_tests") {
   deps = [
     "//sdk/lib/async_patterns/testing/cpp:cpp",
     "//sdk/lib/component/outgoing/cpp",
-    "//sdk/lib/driver/testing/cpp/fixture:cpp_fixture",
+    "//sdk/lib/driver/testing/cpp:driver_testing_cpp",
     "//src/connectivity/ethernet/drivers/third_party/igc:igc_core",
     "//src/devices/pci/testing:pci-protocol-fake",
     "//src/lib/fxl/test:gtest_main",

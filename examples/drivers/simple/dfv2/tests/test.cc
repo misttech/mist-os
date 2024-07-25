@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <lib/driver/testing/cpp/fixture/driver_test_fixture.h>
+#include <lib/driver/testing/cpp/driver_test.h>
 
 #include <gtest/gtest.h>
 
@@ -19,26 +19,31 @@ class SimpleDriverTestEnvironment : public fdf_testing::Environment {
   }
 };
 
-class FixtureConfig final {
+class TestConfig final {
  public:
   using DriverType = simple::SimpleDriver;
   using EnvironmentType = SimpleDriverTestEnvironment;
 };
 
-class SimpleDriverTest : public fdf_testing::ForegroundDriverTestFixture<FixtureConfig>,
-                         public ::testing::Test {
+class SimpleDriverTest : public ::testing::Test {
+ public:
   void SetUp() override {
-    zx::result<> result = StartDriver();
+    zx::result<> result = driver_test().StartDriver();
     ASSERT_EQ(ZX_OK, result.status_value());
   }
   void TearDown() override {
-    zx::result<> result = StopDriver();
+    zx::result<> result = driver_test().StopDriver();
     ASSERT_EQ(ZX_OK, result.status_value());
   }
+
+  fdf_testing::ForegroundDriverTest<TestConfig>& driver_test() { return driver_test_; }
+
+ private:
+  fdf_testing::ForegroundDriverTest<TestConfig> driver_test_;
 };
 
 TEST_F(SimpleDriverTest, VerifyChildNode) {
-  RunInNodeContext([](fdf_testing::TestNode& node) {
+  driver_test().RunInNodeContext([](fdf_testing::TestNode& node) {
     EXPECT_EQ(1u, node.children().size());
     EXPECT_TRUE(node.children().count("simple_child"));
   });

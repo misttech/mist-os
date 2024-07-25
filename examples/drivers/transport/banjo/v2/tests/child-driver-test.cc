@@ -5,7 +5,7 @@
 #include "examples/drivers/transport/banjo/v2/child-driver.h"
 
 #include <lib/driver/compat/cpp/compat.h>
-#include <lib/driver/testing/cpp/fixture/driver_test_fixture.h>
+#include <lib/driver/testing/cpp/driver_test.h>
 
 #include <ddktl/device.h>
 #include <gtest/gtest.h>
@@ -62,24 +62,28 @@ class FixtureConfig final {
   using EnvironmentType = BanjoTestEnvironment;
 };
 
-class ChildBanjoTransportDriverTest
-    : public fdf_testing::ForegroundDriverTestFixture<FixtureConfig>,
-      public ::testing::Test {
+class ChildBanjoTransportDriverTest : public ::testing::Test {
+ public:
   void SetUp() override {
-    zx::result<> result = StartDriver();
+    zx::result<> result = driver_test().StartDriver();
     ASSERT_EQ(ZX_OK, result.status_value());
   }
   void TearDown() override {
-    zx::result<> result = StopDriver();
+    zx::result<> result = driver_test().StopDriver();
     ASSERT_EQ(ZX_OK, result.status_value());
   }
+
+  fdf_testing::ForegroundDriverTest<FixtureConfig>& driver_test() { return driver_test_; }
+
+ private:
+  fdf_testing::ForegroundDriverTest<FixtureConfig> driver_test_;
 };
 
 TEST_F(ChildBanjoTransportDriverTest, VerifyQueryValues) {
   // Verify that the queried values match the fake banjo server.
-  EXPECT_EQ(kTestHardwareId, driver()->hardware_id());
-  EXPECT_EQ(kTestMajorVersion, driver()->major_version());
-  EXPECT_EQ(kTestMinorVersion, driver()->minor_version());
+  EXPECT_EQ(kTestHardwareId, driver_test().driver()->hardware_id());
+  EXPECT_EQ(kTestMajorVersion, driver_test().driver()->major_version());
+  EXPECT_EQ(kTestMinorVersion, driver_test().driver()->minor_version());
 }
 
 }  // namespace testing

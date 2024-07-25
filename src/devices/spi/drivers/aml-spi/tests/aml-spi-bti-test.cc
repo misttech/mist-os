@@ -36,17 +36,22 @@ class AmlSpiBtiPaddrFixtureConfig final {
   using EnvironmentType = AmlSpiBtiPaddrEnvironment;
 };
 
-class AmlSpiBtiPaddrTest
-    : public fdf_testing::ForegroundDriverTestFixture<AmlSpiBtiPaddrFixtureConfig>,
-      public ::testing::Test {
+class AmlSpiBtiPaddrTest : public ::testing::Test {
+ public:
   void SetUp() override {
-    zx::result<> result = StartDriver();
+    zx::result<> result = driver_test().StartDriver();
     ASSERT_EQ(ZX_OK, result.status_value());
   }
   void TearDown() override {
-    zx::result<> result = StopDriver();
+    zx::result<> result = driver_test().StopDriver();
     ASSERT_EQ(ZX_OK, result.status_value());
   }
+  fdf_testing::ForegroundDriverTest<AmlSpiBtiPaddrFixtureConfig>& driver_test() {
+    return driver_test_;
+  }
+
+ private:
+  fdf_testing::ForegroundDriverTest<AmlSpiBtiPaddrFixtureConfig> driver_test_;
 };
 
 TEST_F(AmlSpiBtiPaddrTest, ExchangeDma) {
@@ -75,7 +80,7 @@ TEST_F(AmlSpiBtiPaddrTest, ExchangeDma) {
     memcpy(reversed_expected_rx_data + i, &tmp, sizeof(tmp));
   }
 
-  auto spiimpl_client = Connect<fuchsia_hardware_spiimpl::Service::Device>();
+  auto spiimpl_client = driver_test().Connect<fuchsia_hardware_spiimpl::Service::Device>();
   ASSERT_TRUE(spiimpl_client.is_ok());
 
   fdf::WireClient<fuchsia_hardware_spiimpl::SpiImpl> spiimpl(*std::move(spiimpl_client),
@@ -83,11 +88,12 @@ TEST_F(AmlSpiBtiPaddrTest, ExchangeDma) {
 
   fake_bti_pinned_vmo_info_t dma_vmos[2] = {};
   size_t actual_vmos = 0;
-  RunInEnvironmentTypeContext([&dma_vmos, &actual_vmos](AmlSpiBtiPaddrEnvironment& env) {
-    EXPECT_OK(fake_bti_get_pinned_vmos(env.GetBtiLocal()->get(), dma_vmos, std::size(dma_vmos),
-                                       &actual_vmos));
-    EXPECT_EQ(actual_vmos, std::size(dma_vmos));
-  });
+  driver_test().RunInEnvironmentTypeContext(
+      [&dma_vmos, &actual_vmos](AmlSpiBtiPaddrEnvironment& env) {
+        EXPECT_OK(fake_bti_get_pinned_vmos(env.GetBtiLocal()->get(), dma_vmos, std::size(dma_vmos),
+                                           &actual_vmos));
+        EXPECT_EQ(actual_vmos, std::size(dma_vmos));
+      });
 
   zx::vmo tx_dma_vmo(dma_vmos[0].vmo);
   zx::vmo rx_dma_vmo(dma_vmos[1].vmo);
@@ -99,12 +105,12 @@ TEST_F(AmlSpiBtiPaddrTest, ExchangeDma) {
   zx_paddr_t tx_paddr = 0;
   zx_paddr_t rx_paddr = 0;
 
-  driver()->mmio()[AML_SPI_DRADDR].SetWriteCallback(
+  driver_test().driver()->mmio()[AML_SPI_DRADDR].SetWriteCallback(
       [&tx_paddr](uint64_t value) { tx_paddr = value; });
-  driver()->mmio()[AML_SPI_DWADDR].SetWriteCallback(
+  driver_test().driver()->mmio()[AML_SPI_DWADDR].SetWriteCallback(
       [&rx_paddr](uint64_t value) { rx_paddr = value; });
 
-  RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
     env.ExpectGpioWrite(ZX_OK, 0);
     env.ExpectGpioWrite(ZX_OK, 1);
   });
@@ -120,9 +126,9 @@ TEST_F(AmlSpiBtiPaddrTest, ExchangeDma) {
         ASSERT_TRUE(result->is_ok());
         ASSERT_EQ(result->value()->rxdata.count(), sizeof(buf));
         EXPECT_TRUE(IsBytesEqual(kExpectedRxData, result->value()->rxdata.data(), sizeof(buf)));
-        runtime().Quit();
+        driver_test().runtime().Quit();
       });
-  runtime().Run();
+  driver_test().runtime().Run();
 
   // Verify that the driver wrote the TX data to the TX VMO.
   EXPECT_OK(tx_dma_vmo.read(buf, 0, sizeof(buf)));
@@ -131,7 +137,7 @@ TEST_F(AmlSpiBtiPaddrTest, ExchangeDma) {
   EXPECT_EQ(tx_paddr, AmlSpiBtiPaddrEnvironment::kDmaPaddrs[0]);
   EXPECT_EQ(rx_paddr, AmlSpiBtiPaddrEnvironment::kDmaPaddrs[1]);
 
-  RunInEnvironmentTypeContext(
+  driver_test().RunInEnvironmentTypeContext(
       [](BaseTestEnvironment& env) { EXPECT_FALSE(env.ControllerReset()); });
 }
 
@@ -158,17 +164,22 @@ class AmlSpiBtiEmptyFixtureConfig final {
   using EnvironmentType = AmlSpiBtiPaddrEnvironment;
 };
 
-class AmlSpiBtiEmptyTest
-    : public fdf_testing::ForegroundDriverTestFixture<AmlSpiBtiEmptyFixtureConfig>,
-      public ::testing::Test {
+class AmlSpiBtiEmptyTest : public ::testing::Test {
+ public:
   void SetUp() override {
-    zx::result<> result = StartDriver();
+    zx::result<> result = driver_test().StartDriver();
     ASSERT_EQ(ZX_OK, result.status_value());
   }
   void TearDown() override {
-    zx::result<> result = StopDriver();
+    zx::result<> result = driver_test().StopDriver();
     ASSERT_EQ(ZX_OK, result.status_value());
   }
+  fdf_testing::ForegroundDriverTest<AmlSpiBtiEmptyFixtureConfig>& driver_test() {
+    return driver_test_;
+  }
+
+ private:
+  fdf_testing::ForegroundDriverTest<AmlSpiBtiEmptyFixtureConfig> driver_test_;
 };
 
 TEST_F(AmlSpiBtiEmptyTest, ExchangeFallBackToPio) {
@@ -179,7 +190,7 @@ TEST_F(AmlSpiBtiEmptyTest, ExchangeFallBackToPio) {
       0xea, 0x2b, 0x8f, 0x8f, 0xea, 0x2b, 0x8f, 0x8f, 0x8f, 0x8f, 0x8f, 0x8f, 0x8f, 0x8f, 0x8f,
   };
 
-  auto spiimpl_client = Connect<fuchsia_hardware_spiimpl::Service::Device>();
+  auto spiimpl_client = driver_test().Connect<fuchsia_hardware_spiimpl::Service::Device>();
   ASSERT_TRUE(spiimpl_client.is_ok());
 
   fdf::WireClient<fuchsia_hardware_spiimpl::SpiImpl> spiimpl(*std::move(spiimpl_client),
@@ -187,27 +198,28 @@ TEST_F(AmlSpiBtiEmptyTest, ExchangeFallBackToPio) {
 
   fake_bti_pinned_vmo_info_t dma_vmos[2] = {};
   size_t actual_vmos = 0;
-  RunInEnvironmentTypeContext([&dma_vmos, &actual_vmos](AmlSpiBtiPaddrEnvironment& env) {
-    EXPECT_OK(fake_bti_get_pinned_vmos(env.GetBtiLocal()->get(), dma_vmos, std::size(dma_vmos),
-                                       &actual_vmos));
-    EXPECT_EQ(actual_vmos, std::size(dma_vmos));
-  });
+  driver_test().RunInEnvironmentTypeContext(
+      [&dma_vmos, &actual_vmos](AmlSpiBtiPaddrEnvironment& env) {
+        EXPECT_OK(fake_bti_get_pinned_vmos(env.GetBtiLocal()->get(), dma_vmos, std::size(dma_vmos),
+                                           &actual_vmos));
+        EXPECT_EQ(actual_vmos, std::size(dma_vmos));
+      });
 
   zx_paddr_t tx_paddr = 0;
   zx_paddr_t rx_paddr = 0;
 
-  driver()->mmio()[AML_SPI_DRADDR].SetWriteCallback(
+  driver_test().driver()->mmio()[AML_SPI_DRADDR].SetWriteCallback(
       [&tx_paddr](uint64_t value) { tx_paddr = value; });
-  driver()->mmio()[AML_SPI_DWADDR].SetWriteCallback(
+  driver_test().driver()->mmio()[AML_SPI_DWADDR].SetWriteCallback(
       [&rx_paddr](uint64_t value) { rx_paddr = value; });
 
-  driver()->mmio()[AML_SPI_RXDATA].SetReadCallback([]() { return 0xea2b'8f8f; });
+  driver_test().driver()->mmio()[AML_SPI_RXDATA].SetReadCallback([]() { return 0xea2b'8f8f; });
 
   uint64_t tx_data = 0;
-  driver()->mmio()[AML_SPI_TXDATA].SetWriteCallback(
+  driver_test().driver()->mmio()[AML_SPI_TXDATA].SetWriteCallback(
       [&tx_data](uint64_t value) { tx_data = value; });
 
-  RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
     env.ExpectGpioWrite(ZX_OK, 0);
     env.ExpectGpioWrite(ZX_OK, 1);
   });
@@ -223,9 +235,9 @@ TEST_F(AmlSpiBtiEmptyTest, ExchangeFallBackToPio) {
         ASSERT_TRUE(result->is_ok());
         ASSERT_EQ(result->value()->rxdata.count(), sizeof(buf));
         EXPECT_TRUE(IsBytesEqual(kExpectedRxData, result->value()->rxdata.data(), sizeof(buf)));
-        runtime().Quit();
+        driver_test().runtime().Quit();
       });
-  runtime().Run();
+  driver_test().runtime().Run();
 
   EXPECT_EQ(tx_data, kTxData[14]);
 
@@ -233,7 +245,7 @@ TEST_F(AmlSpiBtiEmptyTest, ExchangeFallBackToPio) {
   EXPECT_EQ(tx_paddr, 0u);
   EXPECT_EQ(rx_paddr, 0u);
 
-  RunInEnvironmentTypeContext(
+  driver_test().RunInEnvironmentTypeContext(
       [](BaseTestEnvironment& env) { EXPECT_FALSE(env.ControllerReset()); });
 }
 
@@ -259,17 +271,22 @@ class AmlSpiExchangeDmaClientReversesBufferConfig final {
   using EnvironmentType = AmlSpiExchangeDmaClientReversesBufferEnvironment;
 };
 
-class AmlSpiExchangeDmaClientReversesBufferTest
-    : public fdf_testing::ForegroundDriverTestFixture<AmlSpiExchangeDmaClientReversesBufferConfig>,
-      public ::testing::Test {
+class AmlSpiExchangeDmaClientReversesBufferTest : public ::testing::Test {
+ public:
   void SetUp() override {
-    zx::result<> result = StartDriver();
+    zx::result<> result = driver_test().StartDriver();
     ASSERT_EQ(ZX_OK, result.status_value());
   }
   void TearDown() override {
-    zx::result<> result = StopDriver();
+    zx::result<> result = driver_test().StopDriver();
     ASSERT_EQ(ZX_OK, result.status_value());
   }
+  fdf_testing::ForegroundDriverTest<AmlSpiExchangeDmaClientReversesBufferConfig>& driver_test() {
+    return driver_test_;
+  }
+
+ private:
+  fdf_testing::ForegroundDriverTest<AmlSpiExchangeDmaClientReversesBufferConfig> driver_test_;
 };
 
 TEST_F(AmlSpiExchangeDmaClientReversesBufferTest, Test) {
@@ -282,7 +299,7 @@ TEST_F(AmlSpiExchangeDmaClientReversesBufferTest, Test) {
       0xea, 0x2b, 0x8f, 0x8f, 0xea, 0x2b, 0x8f, 0x8f, 0xea, 0x2b, 0x8f, 0x8f,
   };
 
-  auto spiimpl_client = Connect<fuchsia_hardware_spiimpl::Service::Device>();
+  auto spiimpl_client = driver_test().Connect<fuchsia_hardware_spiimpl::Service::Device>();
   ASSERT_TRUE(spiimpl_client.is_ok());
 
   fdf::WireClient<fuchsia_hardware_spiimpl::SpiImpl> spiimpl(*std::move(spiimpl_client),
@@ -290,11 +307,12 @@ TEST_F(AmlSpiExchangeDmaClientReversesBufferTest, Test) {
 
   fake_bti_pinned_vmo_info_t dma_vmos[2] = {};
   size_t actual_vmos = 0;
-  RunInEnvironmentTypeContext([&dma_vmos, &actual_vmos](AmlSpiBtiPaddrEnvironment& env) {
-    EXPECT_OK(fake_bti_get_pinned_vmos(env.GetBtiLocal()->get(), dma_vmos, std::size(dma_vmos),
-                                       &actual_vmos));
-    EXPECT_EQ(actual_vmos, std::size(dma_vmos));
-  });
+  driver_test().RunInEnvironmentTypeContext(
+      [&dma_vmos, &actual_vmos](AmlSpiBtiPaddrEnvironment& env) {
+        EXPECT_OK(fake_bti_get_pinned_vmos(env.GetBtiLocal()->get(), dma_vmos, std::size(dma_vmos),
+                                           &actual_vmos));
+        EXPECT_EQ(actual_vmos, std::size(dma_vmos));
+      });
 
   zx::vmo tx_dma_vmo(dma_vmos[0].vmo);
   zx::vmo rx_dma_vmo(dma_vmos[1].vmo);
@@ -304,12 +322,12 @@ TEST_F(AmlSpiExchangeDmaClientReversesBufferTest, Test) {
   zx_paddr_t tx_paddr = 0;
   zx_paddr_t rx_paddr = 0;
 
-  driver()->mmio()[AML_SPI_DRADDR].SetWriteCallback(
+  driver_test().driver()->mmio()[AML_SPI_DRADDR].SetWriteCallback(
       [&tx_paddr](uint64_t value) { tx_paddr = value; });
-  driver()->mmio()[AML_SPI_DWADDR].SetWriteCallback(
+  driver_test().driver()->mmio()[AML_SPI_DWADDR].SetWriteCallback(
       [&rx_paddr](uint64_t value) { rx_paddr = value; });
 
-  RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
     env.ExpectGpioWrite(ZX_OK, 0);
     env.ExpectGpioWrite(ZX_OK, 1);
   });
@@ -325,9 +343,9 @@ TEST_F(AmlSpiExchangeDmaClientReversesBufferTest, Test) {
         ASSERT_TRUE(result->is_ok());
         ASSERT_EQ(result->value()->rxdata.count(), sizeof(buf));
         EXPECT_TRUE(IsBytesEqual(kExpectedRxData, result->value()->rxdata.data(), sizeof(buf)));
-        runtime().Quit();
+        driver_test().runtime().Quit();
       });
-  runtime().Run();
+  driver_test().runtime().Run();
 
   // Verify that the driver wrote the TX data to the TX VMO with the original byte order.
   EXPECT_OK(tx_dma_vmo.read(buf, 0, sizeof(buf)));
@@ -336,9 +354,10 @@ TEST_F(AmlSpiExchangeDmaClientReversesBufferTest, Test) {
   EXPECT_EQ(tx_paddr, AmlSpiBtiPaddrEnvironment::kDmaPaddrs[0]);
   EXPECT_EQ(rx_paddr, AmlSpiBtiPaddrEnvironment::kDmaPaddrs[1]);
 
-  RunInEnvironmentTypeContext([](AmlSpiExchangeDmaClientReversesBufferEnvironment& env) {
-    EXPECT_FALSE(env.ControllerReset());
-  });
+  driver_test().RunInEnvironmentTypeContext(
+      [](AmlSpiExchangeDmaClientReversesBufferEnvironment& env) {
+        EXPECT_FALSE(env.ControllerReset());
+      });
 }
 
 }  // namespace spi

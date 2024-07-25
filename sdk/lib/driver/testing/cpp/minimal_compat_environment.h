@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_DRIVER_TESTING_CPP_FIXTURE_MINIMAL_COMPAT_ENVIRONMENT_H_
-#define LIB_DRIVER_TESTING_CPP_FIXTURE_MINIMAL_COMPAT_ENVIRONMENT_H_
+#ifndef LIB_DRIVER_TESTING_CPP_MINIMAL_COMPAT_ENVIRONMENT_H_
+#define LIB_DRIVER_TESTING_CPP_MINIMAL_COMPAT_ENVIRONMENT_H_
 
 #include <lib/driver/compat/cpp/device_server.h>
 
@@ -28,4 +28,4 @@ class MinimalCompatEnvironment : public Environment {
 
 }  // namespace fdf_testing
 
-#endif  // LIB_DRIVER_TESTING_CPP_FIXTURE_MINIMAL_COMPAT_ENVIRONMENT_H_
+#endif  // LIB_DRIVER_TESTING_CPP_MINIMAL_COMPAT_ENVIRONMENT_H_

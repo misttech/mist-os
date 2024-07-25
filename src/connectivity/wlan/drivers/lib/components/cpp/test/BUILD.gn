@@ -35,8 +35,8 @@ test("components_test") {
   ]
   public_deps = [
     ":support",
-    "//sdk/lib/driver/testing/cpp/fixture:cpp_fixture",
-    "//sdk/lib/driver/testing/cpp/fixture:cpp_fixture_extensions",
+    "//sdk/lib/driver/testing/cpp:driver_testing_cpp",
+    "//sdk/lib/driver/testing/cpp:minimal_compat_environment",
     "//src/connectivity/wlan/drivers/lib/components:cpp",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/predicates",

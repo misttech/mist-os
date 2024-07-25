@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be found in the LICENSE file.
 
 #include <fidl/fuchsia.hardware.network.driver/cpp/fidl.h>
-#include <lib/driver/testing/cpp/fixture/driver_test_fixture.h>
+#include <lib/driver/testing/cpp/driver_test.h>
 
 #include <condition_variable>
 
@@ -293,17 +293,16 @@ struct TestFixtureConfig {
   using EnvironmentType = TestFixtureEnvironment;
 };
 
-class E1000Test : public fdf_testing::BackgroundDriverTestFixture<TestFixtureConfig>,
-                  public ::testing::Test {
+class E1000Test : public ::testing::Test {
  public:
   void SetUp() override {
-    zx::result<> start_result = StartDriver();
+    zx::result<> start_result = driver_test().StartDriver();
     ASSERT_EQ(ZX_OK, start_result.status_value());
-    zx::result netdev_impl = Connect<netdriver::Service::NetworkDeviceImpl>();
+    zx::result netdev_impl = driver_test().Connect<netdriver::Service::NetworkDeviceImpl>();
     ASSERT_OK(netdev_impl.status_value());
 
     netdev_client_.Bind(std::move(netdev_impl.value()),
-                        runtime().StartBackgroundDispatcher()->get());
+                        driver_test().runtime().StartBackgroundDispatcher()->get());
 
     // AddPort() will be called inside this function and will also be verified.
     auto result = netdev_client_.sync().buffer(arena_)->Init(netdev_ifc_.TakeIfcClientEnd());
@@ -323,10 +322,10 @@ class E1000Test : public fdf_testing::BackgroundDriverTestFixture<TestFixtureCon
     zx::vmo::create(info.rx_depth() * info.min_rx_buffer_length() + info.tx_depth() * kTxBufSize,
                     kVmoId, &test_vmo_);
 
-    RunInEnvironmentTypeContext(
+    driver_test().RunInEnvironmentTypeContext(
         [this](TestFixtureEnvironment& env) { fake_mmio_ = &env.fake_mmio_; });
 
-    RunInDriverContext([&](e1000::Driver& driver) {
+    driver_test().RunInDriverContext([&](e1000::Driver& driver) {
       adapter_ = driver.Adapter();
 
       // Create two rings that shadow the actual TX and RX descriptor rings. These rings will NOT
@@ -340,7 +339,7 @@ class E1000Test : public fdf_testing::BackgroundDriverTestFixture<TestFixtureCon
     });
   }
 
-  void TearDown() override { ASSERT_OK(StopDriver().status_value()); }
+  void TearDown() override { ASSERT_OK(driver_test().StopDriver().status_value()); }
 
   void WaitForTxTailUpdates(size_t num_updates_to_wait_for = 1) const {
     fake_mmio_->WaitForTxTailUpdates(num_updates_to_wait_for);
@@ -380,7 +379,7 @@ class E1000Test : public fdf_testing::BackgroundDriverTestFixture<TestFixtureCon
 
     FakePci* pci = nullptr;
     // Triggering the interrupt that should cause the link status to change.
-    RunInEnvironmentTypeContext([&](TestFixtureEnvironment& env) {
+    driver_test().RunInEnvironmentTypeContext([&](TestFixtureEnvironment& env) {
       // Set the link-up bit in the status register.
       E1000_WRITE_REG(&adapter_->hw, E1000_STATUS, link_online ? E1000_STATUS_LU : 0);
       // Set interrupt status to indicate a link status change.
@@ -400,7 +399,7 @@ class E1000Test : public fdf_testing::BackgroundDriverTestFixture<TestFixtureCon
       netdev_ifc_.WaitUntilPortStatusChangedCalled();
     }
 
-    RunInDriverContext([this, link_online](e1000::Driver&) {
+    driver_test().RunInDriverContext([this, link_online](e1000::Driver&) {
       // This runs on the driver dispatcher and it was scheduled after the interrupt was acked. This
       // means that this should have been scheduled after the driver scheduled its link status
       // handler. So by the time this runs, the link status handler should have completed. This
@@ -415,8 +414,12 @@ class E1000Test : public fdf_testing::BackgroundDriverTestFixture<TestFixtureCon
     });
   }
 
+  fdf_testing::BackgroundDriverTest<TestFixtureConfig>& driver_test() { return driver_test_; }
+
+  fdf_testing::BackgroundDriverTest<TestFixtureConfig> driver_test_;
+
   fdf::Arena arena_{'E1KT'};
-  NetworkDeviceIfc netdev_ifc_{runtime().StartBackgroundDispatcher()->get()};
+  NetworkDeviceIfc netdev_ifc_{driver_test().runtime().StartBackgroundDispatcher()->get()};
   fdf::WireSharedClient<netdriver::NetworkDeviceImpl> netdev_client_;
   fdf::WireSharedClient<netdriver::NetworkPort> port_client_;
 
@@ -574,7 +577,7 @@ TEST_F(E1000Test, NetworkDeviceImplQueueTxWhenStarted) {
   ASSERT_OK(netdev_client_.sync().buffer(arena_)->QueueTx(tx_buffers).status());
   WaitForTxTailUpdates(kTxBufferCount);
 
-  RunInDriverContext([&](e1000::Driver& driver) {
+  driver_test().RunInDriverContext([&](e1000::Driver& driver) {
     // Verify the data in tx descriptor ring.
     EXPECT_EQ(shadow_tx_ring_.Desc(0).lower.data,
               (E1000_TXD_CMD_EOP | E1000_TXD_CMD_IFCS | E1000_TXD_CMD_RS | kFirstRegionLength));
@@ -609,7 +612,7 @@ TEST_F(E1000Test, NetworkDeviceImplQueueTxWhenStarted) {
   ASSERT_OK(netdev_client_.sync().buffer(arena_)->QueueTx(tx_buffer_extra).status());
   WaitForTxTailUpdates(e1000::kTxDepth);
 
-  RunInDriverContext([&](e1000::Driver& driver) {
+  driver_test().RunInDriverContext([&](e1000::Driver& driver) {
     for (size_t i = 0; i < e1000::kTxDepth; ++i) {
       // Start looking at the first entry of the last queue call.
       size_t index = (i + kTxBufferCount) & (e1000::kTxDepth - 1);
@@ -642,7 +645,7 @@ TEST_F(E1000Test, NetworkDeviceImplQueueRxSpace) {
   ASSERT_OK(netdev_client_.sync().buffer(arena_)->QueueRxSpace(rx_space_buffer).status());
   WaitForRxTailUpdates(kRxBufferCount);
 
-  RunInDriverContext([&](e1000::Driver& driver) {
+  driver_test().RunInDriverContext([&](e1000::Driver& driver) {
     // Get the access to adapter structure in the driver.
     const e1000_rx_desc_extended& first_desc_entry = shadow_rx_ring_.Desc(0);
     EXPECT_NE(first_desc_entry.read.buffer_addr, 0u);
@@ -668,7 +671,7 @@ TEST_F(E1000Test, NetworkDeviceImplQueueRxSpace) {
   ASSERT_OK(netdev_client_.sync().buffer(arena_)->QueueRxSpace(rx_space_buffer_extra).status());
   WaitForRxTailUpdates(e1000::kRxDepth);
 
-  RunInDriverContext([&](e1000::Driver& driver) {
+  driver_test().RunInDriverContext([&](e1000::Driver& driver) {
     uint64_t base_addr = shadow_rx_ring_.Desc(kRxBufferCount).read.buffer_addr;
 
     for (size_t i = 0; i < e1000::kRxDepth; ++i) {
@@ -721,7 +724,7 @@ TEST_F(E1000Test, InterruptCompletesTx) {
   WaitForTxTailUpdates(kTxBufferCount);
 
   // First mark all buffers as completed.
-  RunInDriverContext([&](e1000::Driver& driver) {
+  driver_test().RunInDriverContext([&](e1000::Driver& driver) {
     // Indicate that all TX buffer descriptors are written back.
     for (size_t i = 0; i < tx_buffers.count(); ++i) {
       shadow_tx_ring_.Desc(i).upper.fields.status = E1000_TXD_STAT_DD;
@@ -729,7 +732,7 @@ TEST_F(E1000Test, InterruptCompletesTx) {
   });
 
   // Triggering the interrupt that should cause the bufers to be completed.
-  RunInEnvironmentTypeContext([this](TestFixtureEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([this](TestFixtureEnvironment& env) {
     // Set interrupt status to indicate TX descriptor write back.
     E1000_WRITE_REG(&adapter_->hw, E1000_ICR, E1000_ICR_TXDW);
     env.interrupt_->trigger(0, zx::time(zx_clock_get_monotonic()));
@@ -772,7 +775,7 @@ TEST_F(E1000Test, InterruptCompletesRx) {
 
   // Mark some buffers as received. Mark one more buffer than available as ready to make sure the
   // driver only returns buffers that it has RX space for.
-  RunInDriverContext([this](e1000::Driver& driver) {
+  driver_test().RunInDriverContext([this](e1000::Driver& driver) {
     struct e1000::adapter* adapter = driver.Adapter();
     std::lock_guard lock(adapter->rx_mutex);
 
@@ -784,7 +787,7 @@ TEST_F(E1000Test, InterruptCompletesRx) {
   });
 
   // Triggering the interrupt that should cause buffers to be completed.
-  RunInEnvironmentTypeContext([this](TestFixtureEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([this](TestFixtureEnvironment& env) {
     // Set interrupt status to indicate RX timer interrupt.
     E1000_WRITE_REG(&adapter_->hw, E1000_ICR, E1000_ICR_RXT0);
     env.interrupt_->trigger(0, zx::time(zx_clock_get_monotonic()));
@@ -923,7 +926,7 @@ TEST_F(E1000Test, NetworkDeviceImplStop) {
     EXPECT_EQ(tx_results[n].status(), ZX_ERR_UNAVAILABLE);
   }
 
-  RunInDriverContext([&](e1000::Driver& driver) {
+  driver_test().RunInDriverContext([&](e1000::Driver& driver) {
     // All RX descriptor data should be cleared out.
     auto rx_ring_data = reinterpret_cast<const uint8_t*>(&shadow_rx_ring_.Desc(0));
     const size_t rx_ring_size = e1000::kRxDepth * sizeof(e1000_rx_desc_extended);
@@ -983,7 +986,7 @@ TEST_F(E1000Test, NetworkPortGetMac) {
 TEST_F(E1000Test, MacAddrGetAddress) {
   constexpr uint8_t kFakeMacAddr[ETHER_ADDR_LEN] = {0x11, 0x22, 0x33, 0x44, 0x55, 0x66};
 
-  RunInDriverContext([&](e1000::Driver& driver) {
+  driver_test().RunInDriverContext([&](e1000::Driver& driver) {
     // Get the address of driver adapter.
     auto adapter = driver.Adapter();
     // Set the MAC address to the driver manually.

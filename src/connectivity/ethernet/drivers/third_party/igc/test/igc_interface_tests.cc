@@ -17,7 +17,7 @@
 #include <fidl/fuchsia.hardware.network.driver/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.network/cpp/wire.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
-#include <lib/driver/testing/cpp/fixture/driver_test_fixture.h>
+#include <lib/driver/testing/cpp/driver_test.h>
 
 #include <gtest/gtest.h>
 
@@ -164,17 +164,16 @@ struct TestFixtureConfig {
   using EnvironmentType = TestFixtureEnvironment;
 };
 
-class IgcInterfaceTest : public fdf_testing::BackgroundDriverTestFixture<TestFixtureConfig>,
-                         public ::testing::Test {
+class IgcInterfaceTest : public ::testing::Test {
  public:
   void SetUp() override {
-    zx::result<> start_result = StartDriver();
+    zx::result<> start_result = driver_test().StartDriver();
     ASSERT_EQ(ZX_OK, start_result.status_value());
-    zx::result netdev_impl = Connect<netdriver::Service::NetworkDeviceImpl>();
+    zx::result netdev_impl = driver_test().Connect<netdriver::Service::NetworkDeviceImpl>();
     ASSERT_OK(netdev_impl.status_value());
 
     netdev_client_.Bind(std::move(netdev_impl.value()),
-                        runtime().StartBackgroundDispatcher()->get());
+                        driver_test().runtime().StartBackgroundDispatcher()->get());
 
     // AddPort() will be called inside this function and will also be verified.
     auto result = netdev_client_.sync().buffer(arena_)->Init(netdev_ifc_.TakeIfcClientEnd());
@@ -210,7 +209,7 @@ class IgcInterfaceTest : public fdf_testing::BackgroundDriverTestFixture<TestFix
     };
 
     // Install the new operations in the MMIO buffer.
-    RunInDriverContext([&](ei::IgcDriver& driver) {
+    driver_test().RunInDriverContext([&](ei::IgcDriver& driver) {
       auto adapter = driver.Adapter();
       // Release and re-use the same mmio_buffer, the only thing that should change is the ops.
       mmio_buffer_t buffer = adapter->osdep.mmio_buffer->release();
@@ -218,7 +217,7 @@ class IgcInterfaceTest : public fdf_testing::BackgroundDriverTestFixture<TestFix
     });
   }
 
-  void TearDown() override { ASSERT_OK(StopDriver().status_value()); }
+  void TearDown() override { ASSERT_OK(driver_test().StopDriver().status_value()); }
 
   void WaitForTxTailUpdates(size_t num_updates_to_wait_for) {
     std::unique_lock lock(tx_tail_mutex_);
@@ -246,9 +245,12 @@ class IgcInterfaceTest : public fdf_testing::BackgroundDriverTestFixture<TestFix
     num_rx_tail_updates_ = 0;
   }
 
+  fdf_testing::BackgroundDriverTest<TestFixtureConfig>& driver_test() { return driver_test_; }
+  fdf_testing::BackgroundDriverTest<TestFixtureConfig> driver_test_;
+
   fdf::Arena arena_{'IGCT'};
 
-  NetworkDeviceIfc netdev_ifc_{runtime().StartBackgroundDispatcher()->get()};
+  NetworkDeviceIfc netdev_ifc_{driver_test().runtime().StartBackgroundDispatcher()->get()};
   fdf::WireSharedClient<netdriver::NetworkDeviceImpl> netdev_client_;
   fdf::WireSharedClient<netdriver::NetworkPort> port_client_;
 
@@ -381,7 +383,7 @@ TEST_F(IgcInterfaceTest, NetworkDeviceImplQueueTxStarted) {
   ASSERT_OK(netdev_client_.sync().buffer(arena_)->QueueTx(tx_buffers).status());
   WaitForTxTailUpdates(tx_buffers.count());
 
-  RunInDriverContext([&](ei::IgcDriver& driver) {
+  driver_test().RunInDriverContext([&](ei::IgcDriver& driver) {
     // Get the access to adapter structure in the IGC driver.
     auto adapter = driver.Adapter();
     auto driver_tx_buffer_info = driver.TxBuffer();
@@ -422,7 +424,7 @@ TEST_F(IgcInterfaceTest, NetworkDeviceImplQueueTxStarted) {
   ASSERT_OK(netdev_client_.sync().buffer(arena_)->QueueTx(tx_buffer_extra).status());
   WaitForTxTailUpdates(tx_buffer_extra.count());
 
-  RunInDriverContext([&](ei::IgcDriver& driver) {
+  driver_test().RunInDriverContext([&](ei::IgcDriver& driver) {
     // Get the access to adapter structure in the IGC driver.
     auto adapter = driver.Adapter();
     adapter->osdep.mmio_buffer->Write32(0, 0);
@@ -464,7 +466,7 @@ TEST_F(IgcInterfaceTest, NetworkDeviceImplQueueRxSpace) {
   ASSERT_OK(netdev_client_.sync().buffer(arena_)->QueueRxSpace(rx_space_buffer).status());
   WaitForRxTailUpdates(rx_space_buffer.count());
 
-  RunInDriverContext([&](ei::IgcDriver& driver) {
+  driver_test().RunInDriverContext([&](ei::IgcDriver& driver) {
     // Get the access to adapter structure in the IGC driver.
     auto adapter = driver.Adapter();
     auto driver_rx_buffer_info = driver.RxBuffer();
@@ -502,7 +504,7 @@ TEST_F(IgcInterfaceTest, NetworkDeviceImplQueueRxSpace) {
   ASSERT_OK(netdev_client_.sync().buffer(arena_)->QueueRxSpace(rx_space_buffer_extra).status());
   WaitForRxTailUpdates(rx_space_buffer_extra.count());
 
-  RunInDriverContext([&](ei::IgcDriver& driver) {
+  driver_test().RunInDriverContext([&](ei::IgcDriver& driver) {
     // Get the access to adapter structure in the IGC driver.
     auto adapter = driver.Adapter();
     auto driver_rx_buffer_info = driver.RxBuffer();
@@ -603,7 +605,7 @@ TEST_F(IgcInterfaceTest, NetworkDeviceImplStop) {
     EXPECT_EQ(tx_results[n].status(), ZX_ERR_UNAVAILABLE);
   }
 
-  RunInDriverContext([&](ei::IgcDriver& driver) {
+  driver_test().RunInDriverContext([&](ei::IgcDriver& driver) {
     auto adapter = driver.Adapter();
 
     // The rx head index should stopped at the tail index of the rx descriptor ring.
@@ -654,7 +656,7 @@ TEST_F(IgcInterfaceTest, NetworkPortGetMac) {
 constexpr uint8_t kFakeMacAddr[ei::kEtherAddrLen] = {7, 7, 8, 9, 3, 4};
 // MacAddr protocol tests
 TEST_F(IgcInterfaceTest, MacAddrGetAddress) {
-  RunInDriverContext([&](ei::IgcDriver& driver) {
+  driver_test().RunInDriverContext([&](ei::IgcDriver& driver) {
     // Get the address of driver adapter.
     auto adapter = driver.Adapter();
     // Set the MAC address to the driver manually.

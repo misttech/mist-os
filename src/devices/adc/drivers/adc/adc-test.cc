@@ -5,7 +5,7 @@
 #include "src/devices/adc/drivers/adc/adc.h"
 
 #include <lib/ddk/metadata.h>
-#include <lib/driver/testing/cpp/fixture/driver_test_fixture.h>
+#include <lib/driver/testing/cpp/driver_test.h>
 
 #include <gtest/gtest.h>
 
@@ -99,32 +99,37 @@ class AdcTestConfig final {
   using EnvironmentType = AdcTestEnvironment;
 };
 
-class AdcTest : public fdf_testing::BackgroundDriverTestFixture<AdcTestConfig>,
-                public ::testing::Test {
+class AdcTest : public ::testing::Test {
  public:
   void TearDown() override {
-    zx::result<> result = StopDriver();
+    zx::result<> result = driver_test().StopDriver();
     ASSERT_EQ(ZX_OK, result.status_value());
   }
 
   zx::result<> Init(const std::vector<fidl_metadata::adc::Channel>& kAdcChannels) {
-    RunInEnvironmentTypeContext(
+    driver_test().RunInEnvironmentTypeContext(
         [kAdcChannels](AdcTestEnvironment& env) { env.Init(kAdcChannels); });
-    return StartDriver();
+    return driver_test().StartDriver();
   }
   fidl::ClientEnd<fuchsia_hardware_adc::Device> GetClient(uint32_t channel) {
     // Connect to Adc.
-    auto result = Connect<fuchsia_hardware_adc::Service::Device>(std::to_string(channel));
+    auto result =
+        driver_test().Connect<fuchsia_hardware_adc::Service::Device>(std::to_string(channel));
     EXPECT_EQ(ZX_OK, result.status_value());
     return std::move(result.value());
   }
+
+  fdf_testing::BackgroundDriverTest<AdcTestConfig>& driver_test() { return driver_test_; }
+
+ private:
+  fdf_testing::BackgroundDriverTest<AdcTestConfig> driver_test_;
 };
 
 TEST_F(AdcTest, CreateDevicesTest) {
   auto result = Init({DECL_ADC_CHANNEL(1), DECL_ADC_CHANNEL(4)});
   ASSERT_TRUE(result.is_ok());
 
-  RunInNodeContext([](fdf_testing::TestNode& node) {
+  driver_test().RunInNodeContext([](fdf_testing::TestNode& node) {
     ASSERT_EQ(node.children().size(), 2ul);
     EXPECT_NE(node.children().find("1"), node.children().end());
     EXPECT_NE(node.children().find("4"), node.children().end());
@@ -138,7 +143,7 @@ TEST_F(AdcTest, OverlappingChannelsTest) {
 }
 
 TEST_F(AdcTest, GetResolutionTest) {
-  RunInEnvironmentTypeContext(
+  driver_test().RunInEnvironmentTypeContext(
       [](AdcTestEnvironment& env) { env.fake_adc_impl_server().set_resolution(12); });
   auto result = Init({DECL_ADC_CHANNEL(1), DECL_ADC_CHANNEL(4)});
   ASSERT_TRUE(result.is_ok());
@@ -153,7 +158,7 @@ TEST_F(AdcTest, GetSampleTest) {
   auto result = Init({DECL_ADC_CHANNEL(1), DECL_ADC_CHANNEL(4)});
   ASSERT_TRUE(result.is_ok());
 
-  RunInEnvironmentTypeContext(
+  driver_test().RunInEnvironmentTypeContext(
       [](AdcTestEnvironment& env) { env.fake_adc_impl_server().ExpectGetSample(1, 20); });
   auto sample = fidl::WireCall(GetClient(1))->GetSample();
   ASSERT_TRUE(sample.ok());
@@ -162,7 +167,7 @@ TEST_F(AdcTest, GetSampleTest) {
 }
 
 TEST_F(AdcTest, GetNormalizedSampleTest) {
-  RunInEnvironmentTypeContext([](AdcTestEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([](AdcTestEnvironment& env) {
     env.fake_adc_impl_server().set_resolution(2);
     env.fake_adc_impl_server().ExpectGetSample(4, 9);
   });
@@ -180,7 +185,7 @@ TEST_F(AdcTest, ChannelOutOfBoundsTest) {
   auto result = Init({DECL_ADC_CHANNEL(1), DECL_ADC_CHANNEL(4)});
   ASSERT_TRUE(result.is_ok());
 
-  RunInEnvironmentTypeContext(
+  driver_test().RunInEnvironmentTypeContext(
       [](AdcTestEnvironment& env) { env.fake_adc_impl_server().set_resolution(12); });
   auto resolution = fidl::WireCall(GetClient(3))->GetResolution();
   ASSERT_FALSE(resolution.ok());

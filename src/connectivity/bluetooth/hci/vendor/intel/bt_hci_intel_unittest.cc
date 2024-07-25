@@ -10,7 +10,7 @@
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/driver/compat/cpp/device_server.h>
 #include <lib/driver/outgoing/cpp/outgoing_directory.h>
-#include <lib/driver/testing/cpp/fixture/driver_test_fixture.h>
+#include <lib/driver/testing/cpp/driver_test.h>
 
 #include <gtest/gtest.h>
 
@@ -253,19 +253,23 @@ class FixtureConfig {
   using EnvironmentType = TestEnvironment;
 };
 
-class BtHciIntelTest : public fdf_testing::BackgroundDriverTestFixture<FixtureConfig>,
-                       public ::testing::Test {
+class BtHciIntelTest : public ::testing::Test {
  public:
   BtHciIntelTest() = default;
 
   void SetUp() override {
-    zx::result<> result = StartDriver();
+    zx::result<> result = driver_test().StartDriver();
     ASSERT_EQ(ZX_OK, result.status_value());
   }
   void TearDown() override {
-    zx::result<> result = StopDriver();
+    zx::result<> result = driver_test().StopDriver();
     ASSERT_EQ(ZX_OK, result.status_value());
   }
+
+  fdf_testing::BackgroundDriverTest<FixtureConfig>& driver_test() { return driver_test_; }
+
+ private:
+  fdf_testing::BackgroundDriverTest<FixtureConfig> driver_test_;
 };
 
 TEST_F(BtHciIntelTest, LifecycleTest) {}

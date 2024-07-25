@@ -7,7 +7,7 @@
 #include <fidl/fuchsia.hardware.suspend/cpp/markers.h>
 #include <fidl/fuchsia.kernel/cpp/wire.h>
 #include <lib/driver/compat/cpp/device_server.h>
-#include <lib/driver/testing/cpp/fixture/driver_test_fixture.h>
+#include <lib/driver/testing/cpp/driver_test.h>
 
 #include <gtest/gtest.h>
 #include <src/devices/bus/testing/fake-pdev/fake-pdev.h>
@@ -84,24 +84,28 @@ class AmlSuspendTestConfiguration {
   using EnvironmentType = TestEnvironmentWrapper;
 };
 
-class AmlSuspendTestFixture
-    : public fdf_testing::BackgroundDriverTestFixture<AmlSuspendTestConfiguration>,
-      public ::testing::Test {
- protected:
+class AmlSuspendTestFixture : public ::testing::Test {
+ public:
   void SetUp() override {
-    zx::result<> result = StartDriver();
+    zx::result<> result = driver_test().StartDriver();
     ASSERT_EQ(ZX_OK, result.status_value());
-    zx::result connect_result = Connect<fuchsia_hardware_suspend::SuspendService::Suspender>();
+    zx::result connect_result =
+        driver_test().Connect<fuchsia_hardware_suspend::SuspendService::Suspender>();
     EXPECT_EQ(ZX_OK, connect_result.status_value());
     client_.Bind(std::move(connect_result.value()));
   }
   void TearDown() override {
-    zx::result<> result = StopDriver();
+    zx::result<> result = driver_test().StopDriver();
     ASSERT_EQ(ZX_OK, result.status_value());
   }
   fidl::WireSyncClient<fuchsia_hardware_suspend::Suspender>& client() { return client_; }
 
+  fdf_testing::BackgroundDriverTest<AmlSuspendTestConfiguration>& driver_test() {
+    return driver_test_;
+  }
+
  private:
+  fdf_testing::BackgroundDriverTest<AmlSuspendTestConfiguration> driver_test_;
   fidl::WireSyncClient<fuchsia_hardware_suspend::Suspender> client_;
 };
 

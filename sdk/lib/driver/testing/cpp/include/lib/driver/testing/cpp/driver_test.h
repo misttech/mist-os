@@ -5,16 +5,13 @@
 #ifndef LIB_DRIVER_TESTING_CPP_DRIVER_TEST_H_
 #define LIB_DRIVER_TESTING_CPP_DRIVER_TEST_H_
 
-#include <lib/driver/testing/cpp/fixture/internal/internals.h>
-
-#include "lib/async/dispatcher.h"
-#include "lib/async_patterns/testing/cpp/dispatcher_bound.h"
+#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
+#include <lib/driver/testing/cpp/internal/internals.h>
 
 // This library provides RAII-style classes for writing driver unit tests. It contains two classes,
-// |ForegroundDriverTest| and |BackgroundDriverTest|. These classes can either be used directly in a
-// test, as a test fixture field, or as a local in a non-fixture based test method. We also provide
-// a layer on top of these classes to allow for an inheritance approach when writing a test fixture.
-// Those are provided in the |driver_test_fixture.h|.
+// |ForegroundDriverTest| and |BackgroundDriverTest| that contain all the logic for a driver test.
+// These classes can also be used directly in a test as a test fixture field, or as a local in a
+// non-fixture based test method. This should be the first field or local that is being created.
 //
 // The choice between foreground and background driver tests lies in how the test plans to
 // communicate with the driver-under-test. If the test will be calling public methods on the driver
@@ -192,7 +189,8 @@ class DriverTestCommon {
   // Start the driver with modified DriverStartArgs. This is done through the |args_modifier|
   // which is called with a reference to the start args that will be used to start the driver.
   // Modifications can happen in-place with this reference.
-  zx::result<> StartDriverCustomized(fit::callback<void(fdf::DriverStartArgs&)> args_modifier) {
+  zx::result<> StartDriverWithCustomStartArgs(
+      fit::callback<void(fdf::DriverStartArgs&)> args_modifier) {
     ZX_ASSERT_MSG(
         !start_result_.has_value(),
         "Cannot call |StartDriver| multiple times in a row. If multiple starts are needed, "
@@ -357,7 +355,7 @@ class BackgroundDriverTest : public DriverTestCommon<Configuration> {
 // rather than its exposed FIDL services.
 //
 // The test can access the driver under test using the |driver()| method and directly make calls
-// into it, but sync client tasks must go through |RunInBackground()|.
+// into it, but sync client tasks must go through |RunOnBackgroundDispatcherSync()|.
 template <typename Configuration>
 class ForegroundDriverTest : public DriverTestCommon<Configuration> {
   using DriverType = typename Configuration::DriverType;
@@ -370,7 +368,7 @@ class ForegroundDriverTest : public DriverTestCommon<Configuration> {
   //
   // Returns the result of the given task once it has completed.
   template <typename T>
-  zx::result<T> RunInBackground(fit::callback<T()> task) {
+  zx::result<T> RunOnBackgroundDispatcherSync(fit::callback<T()> task) {
     if (!bg_task_dispatcher_.has_value()) {
       bg_task_dispatcher_.emplace(this->runtime().StartBackgroundDispatcher());
     }
@@ -398,7 +396,7 @@ class ForegroundDriverTest : public DriverTestCommon<Configuration> {
   // if calling synchronously into the driver (eg. a fidl call through a SyncClient).
   //
   // Returns when the given task has completed.
-  zx::result<> RunInBackground(fit::callback<void()> task) {
+  zx::result<> RunOnBackgroundDispatcherSync(fit::callback<void()> task) {
     if (!bg_task_dispatcher_.has_value()) {
       bg_task_dispatcher_.emplace(this->runtime().StartBackgroundDispatcher());
     }
