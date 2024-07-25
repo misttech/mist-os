@@ -584,7 +584,7 @@ void Device::Initialize() {
     RetrieveDeviceProperties();
     RetrieveHealthState();
     RetrieveSignalProcessingState();
-    RetrieveStreamRingBufferFormatSets();
+    RetrieveRingBufferFormatSets();
     RetrievePlugState();
     RetrieveGainState();
   } else {
@@ -991,7 +991,7 @@ void Device::RetrieveSignalProcessingElements() {
         if (is_composite()) {
           // Now that we know our element IDs, we can query the DAI and RingBuffer elements.
           RetrieveCompositeDaiFormatSets();
-          RetrieveCompositeRingBufferFormatSets();
+          RetrieveRingBufferFormatSets();
         }
       });
 }
@@ -1304,84 +1304,6 @@ zx_status_t Device::SetTopology(uint64_t topology_id) {
   return ZX_OK;
 }
 
-void Device::RetrieveStreamRingBufferFormatSets() {
-  ADR_LOG_METHOD(kLogStreamConfigFidlCalls);
-
-  RetrieveRingBufferFormatSets(
-      fad::kDefaultRingBufferElementId,
-      [this](ElementId element_id,
-             const std::vector<fha::SupportedFormats>& ring_buffer_format_sets) {
-        if (has_error()) {
-          ADR_WARN_OBJECT() << "device has an error while retrieving initial RingBuffer formats";
-          return;
-        }
-
-        // Required for StreamConfig and Dai, absent for Codec and Composite.
-        auto translated_ring_buffer_format_sets =
-            TranslateRingBufferFormatSets(ring_buffer_format_sets);
-        if (translated_ring_buffer_format_sets.empty()) {
-          ADR_WARN_OBJECT() << "RingBuffer format sets could not be translated";
-          OnError(ZX_ERR_INVALID_ARGS);
-          return;
-        };
-        element_driver_ring_buffer_format_sets_ = {{
-            {
-                element_id,
-                ring_buffer_format_sets,
-            },
-        }};
-        element_ring_buffer_format_sets_ = {{
-            fad::ElementRingBufferFormatSet{{
-                .element_id = element_id,
-                .format_sets = translated_ring_buffer_format_sets,
-            }},
-        }};
-        ring_buffer_format_sets_retrieved_ = true;
-        OnInitializationResponse();
-      });
-}
-
-void Device::RetrieveRingBufferFormatSets(
-    ElementId element_id, fit::callback<void(ElementId, const std::vector<fha::SupportedFormats>&)>
-                              ring_buffer_format_sets_callback) {
-  if (has_error()) {
-    ADR_WARN_METHOD() << "device already has an error";
-    // We need not invoke ring_buffer_format_sets_callback: this device is in the process of being
-    // unwound. The client has already received a HasError notification for this device.
-    return;
-  }
-  ADR_LOG_METHOD(kLogStreamConfigFidlCalls || kLogRingBufferMethods);
-
-  // TODO(https://fxbug.dev/42064765): handle command timeouts
-
-  if (element_id != fad::kDefaultRingBufferElementId) {
-    OnError(ZX_ERR_INVALID_ARGS);
-    // We need not invoke the callback: this device is in the process of being unwound.
-    return;
-  }
-  ring_buffer_ids_.insert(fad::kDefaultRingBufferElementId);
-
-  (*stream_config_client_)
-      ->GetSupportedFormats()
-      .Then([this, element_id, rb_formats_callback = std::move(ring_buffer_format_sets_callback)](
-                fidl::Result<fha::StreamConfig::GetSupportedFormats>& result) mutable {
-        if (LogResultFrameworkError(result, "GetSupportedFormats response")) {
-          // We need not invoke the callback: this device is in the process of being unwound.
-          return;
-        }
-        ADR_LOG_OBJECT(kLogStreamConfigFidlResponses)
-            << "StreamConfig/GetSupportedFormats: success";
-
-        if (!ValidateRingBufferFormatSets(result->supported_formats())) {
-          OnError(ZX_ERR_INVALID_ARGS);
-          // We need not invoke the callback: this device is in the process of being unwound.
-          return;
-        }
-
-        rb_formats_callback(element_id, result->supported_formats());
-      });
-}
-
 void Device::RetrieveCodecDaiFormatSets() {
   ADR_LOG_METHOD(kLogCodecFidlCalls);
   RetrieveDaiFormatSets(
@@ -1493,48 +1415,82 @@ void Device::RetrieveDaiFormatSets(
   }
 }
 
-// We have our signalprocessing Elements now; GetDaiFormats on each RingBuffer element.
-void Device::RetrieveCompositeRingBufferFormatSets() {
-  ADR_LOG_METHOD(kLogCompositeFidlCalls);
-  ring_buffer_ids_ = ring_buffers(sig_proc_element_map_);
-  temp_ring_buffer_ids_ = ring_buffer_ids_;
+void Device::RetrieveRingBufferFormatSets() {
+  if (has_error()) {
+    ADR_WARN_METHOD() << "device already has an error";
+    return;
+  }
+  // TODO(https://fxbug.dev/42064765): handle command timeouts
 
+  if (is_composite()) {
+    ADR_LOG_METHOD(kLogCompositeFidlCalls);
+    ring_buffer_ids_ = ring_buffers(sig_proc_element_map_);
+  } else if (is_stream_config()) {
+    ADR_LOG_METHOD(kLogStreamConfigFidlCalls || kLogRingBufferMethods);
+    ring_buffer_ids_.insert(fad::kDefaultRingBufferElementId);
+  }
   element_ring_buffer_format_sets_.clear();
-  for (auto id : ring_buffer_ids_) {
-    ADR_LOG_METHOD(kLogCompositeFidlCalls) << " GetRingBufferFormats (element " << id << ")";
-    (*composite_client_)
-        ->GetRingBufferFormats(id)
-        .Then([this, id](fidl::Result<fha::Composite::GetRingBufferFormats>& result) {
-          std::string str{"GetRingBufferFormats (element "};
-          str.append(std::to_string(id)).append(") response");
-          ADR_LOG_OBJECT(kLogCompositeFidlResponses) << str;
-          if (has_error()) {
-            ADR_WARN_OBJECT() << "device already has error during " << str;
-            return;
-          }
-          if (LogResultError(result, str.c_str())) {
-            return;
-          }
-          if (!ValidateRingBufferFormatSets(result->ring_buffer_formats())) {
-            OnError(ZX_ERR_INVALID_ARGS);
-            return;
-          }
-          auto translated_ring_buffer_format_sets =
-              TranslateRingBufferFormatSets(result->ring_buffer_formats());
-          if (translated_ring_buffer_format_sets.empty()) {
-            ADR_WARN_OBJECT() << "Failed to translate " << str;
-            OnError(ZX_ERR_INVALID_ARGS);
-            return;
-          }
+  auto remaining_ring_buffer_ids =
+      std::make_shared<std::unordered_set<ElementId>>(ring_buffer_ids_);
 
-          element_driver_ring_buffer_format_sets_.emplace_back(id, result->ring_buffer_formats());
-          element_ring_buffer_format_sets_.push_back({{id, translated_ring_buffer_format_sets}});
-          temp_ring_buffer_ids_.erase(id);
-          if (temp_ring_buffer_ids_.empty()) {
-            ring_buffer_format_sets_retrieved_ = true;
-            OnInitializationResponse();
-          }
-        });
+  for (auto id : ring_buffer_ids_) {
+    if (is_composite()) {
+      ADR_LOG_METHOD(kLogCompositeFidlCalls) << " GetRingBufferFormats (element " << id << ")";
+      (*composite_client_)
+          ->GetRingBufferFormats(id)
+          .Then([this, id, remaining_ring_buffer_ids](
+                    fidl::Result<fha::Composite::GetRingBufferFormats>& result) mutable {
+            if (LogResultError(result, "Composite/GetRingBufferFormats response")) {
+              // We need not call AddRingBufferFormatSet: this device is in the process of being
+              // unwound. The client has already received a HasError notification for this device.
+              return;
+            }
+            AddRingBufferFormatSet(id, remaining_ring_buffer_ids, result->ring_buffer_formats());
+          });
+    } else if (is_stream_config()) {
+      (*stream_config_client_)
+          ->GetSupportedFormats()
+          .Then([this, id, remaining_ring_buffer_ids](
+                    fidl::Result<fha::StreamConfig::GetSupportedFormats>& result) mutable {
+            if (LogResultFrameworkError(result, "StreamConfig/GetSupportedFormats response")) {
+              // We need not call AddRingBufferFormatSet: this device is in the process of being
+              // unwound. The client has already received a HasError notification for this device.
+              return;
+            }
+            AddRingBufferFormatSet(id, remaining_ring_buffer_ids, result->supported_formats());
+          });
+    }
+  }
+}
+
+void Device::AddRingBufferFormatSet(
+    ElementId id, std::shared_ptr<std::unordered_set<ElementId>>& remaining_ring_buffer_ids,
+    const std::vector<fuchsia_hardware_audio::SupportedFormats>& format_set) {
+  std::string context{"GetRingBufferFormats (element "};
+  context.append(std::to_string(id)).append(") response");
+  if (has_error()) {
+    ADR_WARN_OBJECT() << "device already has error during " << context;
+    return;
+  }
+  if (!ValidateRingBufferFormatSets(format_set)) {
+    OnError(ZX_ERR_INVALID_ARGS);
+    return;
+  }
+  auto translated_ring_buffer_format_sets = TranslateRingBufferFormatSets(format_set);
+  if (translated_ring_buffer_format_sets.empty()) {
+    ADR_WARN_OBJECT() << "Failed to translate " << context;
+    OnError(ZX_ERR_INVALID_ARGS);
+    return;
+  }
+  ADR_LOG_METHOD(kLogCompositeFidlResponses || kLogStreamConfigFidlResponses) << context;
+
+  element_driver_ring_buffer_format_sets_.emplace_back(id, format_set);
+  element_ring_buffer_format_sets_.push_back({{id, translated_ring_buffer_format_sets}});
+  remaining_ring_buffer_ids->erase(id);
+  if (remaining_ring_buffer_ids->empty()) {
+    ADR_LOG_OBJECT(kLogCompositeFidlResponses) << context << ": success";
+    ring_buffer_format_sets_retrieved_ = true;
+    OnInitializationResponse();
   }
 }
 

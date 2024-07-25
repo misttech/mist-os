@@ -94,10 +94,6 @@ class Device : public std::enable_shared_from_this<Device> {
       const fuchsia_audio::Format& client_format);
   bool SetGain(fuchsia_hardware_audio::GainState& gain_state);
 
-  void RetrieveRingBufferFormatSets(
-      ElementId element_id,
-      fit::callback<void(ElementId, const std::vector<fuchsia_hardware_audio::SupportedFormats>&)>
-          ring_buffer_format_sets_callback);
   void RetrieveDaiFormatSets(
       ElementId element_id,
       fit::callback<void(ElementId,
@@ -249,20 +245,20 @@ class Device : public std::enable_shared_from_this<Device> {
   void RetrieveCodecDaiFormatSets();
   void RetrieveCompositeDaiFormatSets();
 
-  void RetrieveCompositeRingBufferFormatSets();
-  void RetrieveStreamRingBufferFormatSets();
-
+  void RetrieveRingBufferFormatSets();
   void RetrievePlugState();
   void RetrieveGainState();
 
   // Each of the above 'Retrieve...' methods update the related piece of device state, then call
   // either `OnInitializationResponse` or `OnError`.
   void OnInitializationResponse();
-  void OnError(zx_status_t error);
   // Upon OnInitializationResponse, this method checks whether all prerequisites are now satisfied.
   bool IsInitializationComplete();
   // Called when a device can be moved into the list of active (successfully initialized) devices.
   void OnInitializationComplete();
+  void SetDeviceInfo();
+
+  void OnError(zx_status_t error);
   // Called when a device should be removed altogether -- from the list of active (successfully
   // initialized) devices, or the list of unhealthy devices that previously encountered an error.
   // A non-error removal could occur as a result of USB unplug, for example.
@@ -274,15 +270,14 @@ class Device : public std::enable_shared_from_this<Device> {
   bool LogResultFrameworkError(const ResultT& result, const char* debug_context);
 
   fuchsia_audio_device::Info CreateDeviceInfo();
-  void SetDeviceInfo();
-
   void CreateDeviceClock();
-
   void SetHealthState(std::optional<bool> is_healthy);
-
   void SetPlugState(
       const fuchsia_hardware_audio::PlugState& plug_state,
       std::optional<fuchsia_hardware_audio::PlugDetectCapabilities> plug_detect_capabilities);
+  void AddRingBufferFormatSet(
+      ElementId id, std::shared_ptr<std::unordered_set<ElementId>>& remaining_ring_buffer_ids,
+      const std::vector<fuchsia_hardware_audio::SupportedFormats>& format_set);
 
   void RetrieveSignalProcessingTopologies();
   void RetrieveSignalProcessingElements();
@@ -421,7 +416,6 @@ class Device : public std::enable_shared_from_this<Device> {
   std::unordered_set<ElementId> dai_ids_;
   std::unordered_set<ElementId> temp_dai_ids_;
   std::unordered_set<ElementId> ring_buffer_ids_;
-  std::unordered_set<ElementId> temp_ring_buffer_ids_;
   std::unordered_set<ElementId> element_ids_;
 
   std::unordered_map<TopologyId, std::vector<fuchsia_hardware_audio_signalprocessing::EdgePair>>

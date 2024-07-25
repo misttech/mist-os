@@ -673,52 +673,6 @@ TEST_F(CompositeTest, DeviceInfo) {
 
   EXPECT_FALSE(info.is_input().has_value());
 
-  ASSERT_TRUE(info.ring_buffer_format_sets().has_value());
-  ASSERT_FALSE(info.ring_buffer_format_sets()->empty());
-  ASSERT_EQ(info.ring_buffer_format_sets()->size(), 2u);
-
-  ASSERT_TRUE(info.ring_buffer_format_sets()->at(0).element_id().has_value());
-  EXPECT_EQ(*info.ring_buffer_format_sets()->at(0).element_id(), FakeComposite::kSourceRbElementId);
-  ASSERT_TRUE(info.ring_buffer_format_sets()->at(0).format_sets().has_value());
-  ASSERT_FALSE(info.ring_buffer_format_sets()->at(0).format_sets()->empty());
-  EXPECT_EQ(info.ring_buffer_format_sets()->at(0).format_sets()->size(), 1u);
-  auto format_set0 = info.ring_buffer_format_sets()->at(0).format_sets()->at(0);
-  ASSERT_TRUE(format_set0.frame_rates().has_value());
-  EXPECT_THAT(*format_set0.frame_rates(),
-              testing::ElementsAreArray(FakeComposite::kDefaultRbFrameRates2));
-  ASSERT_TRUE(format_set0.channel_sets().has_value());
-  ASSERT_FALSE(format_set0.channel_sets()->empty());
-  EXPECT_EQ(format_set0.channel_sets()->size(), 1u);
-  ASSERT_TRUE(format_set0.channel_sets()->at(0).attributes().has_value());
-  ASSERT_FALSE(format_set0.channel_sets()->at(0).attributes()->empty());
-  EXPECT_EQ(format_set0.channel_sets()->at(0).attributes()->size(), 1u);
-  ASSERT_FALSE(format_set0.channel_sets()->at(0).attributes()->at(0).max_frequency().has_value());
-  ASSERT_TRUE(format_set0.channel_sets()->at(0).attributes()->at(0).min_frequency().has_value());
-  EXPECT_EQ(*format_set0.channel_sets()->at(0).attributes()->at(0).min_frequency(),
-            FakeComposite::kDefaultRbChannelAttributeMinFrequency2);
-
-  ASSERT_TRUE(info.ring_buffer_format_sets()->at(1).element_id().has_value());
-  EXPECT_EQ(*info.ring_buffer_format_sets()->at(1).element_id(), FakeComposite::kDestRbElementId);
-  ASSERT_TRUE(info.ring_buffer_format_sets()->at(1).format_sets().has_value());
-  ASSERT_FALSE(info.ring_buffer_format_sets()->at(1).format_sets()->empty());
-  EXPECT_EQ(info.ring_buffer_format_sets()->at(1).format_sets()->size(), 1u);
-  auto format_set1 = info.ring_buffer_format_sets()->at(1).format_sets()->at(0);
-  ASSERT_TRUE(format_set1.frame_rates().has_value());
-  EXPECT_THAT(*format_set1.frame_rates(),
-              testing::ElementsAreArray(FakeComposite::kDefaultRbFrameRates));
-  ASSERT_TRUE(format_set1.channel_sets().has_value());
-  ASSERT_FALSE(format_set1.channel_sets()->empty());
-  EXPECT_EQ(format_set1.channel_sets()->size(), 1u);
-  ASSERT_TRUE(format_set1.channel_sets()->at(0).attributes().has_value());
-  ASSERT_FALSE(format_set1.channel_sets()->at(0).attributes()->empty());
-  EXPECT_EQ(format_set1.channel_sets()->at(0).attributes()->size(), 1u);
-  ASSERT_TRUE(format_set1.channel_sets()->at(0).attributes()->at(0).max_frequency().has_value());
-  EXPECT_EQ(*format_set1.channel_sets()->at(0).attributes()->at(0).max_frequency(),
-            FakeComposite::kDefaultRbChannelAttributeMaxFrequency);
-  ASSERT_TRUE(format_set1.channel_sets()->at(0).attributes()->at(0).min_frequency().has_value());
-  EXPECT_EQ(*format_set1.channel_sets()->at(0).attributes()->at(0).min_frequency(),
-            FakeComposite::kDefaultRbChannelAttributeMinFrequency);
-
   ASSERT_TRUE(info.dai_format_sets().has_value());
   ASSERT_FALSE(info.dai_format_sets()->empty());
   ASSERT_EQ(info.dai_format_sets()->size(), 2u);
@@ -763,6 +717,99 @@ TEST_F(CompositeTest, DeviceInfo) {
 
   ASSERT_TRUE(info.clock_domain().has_value());
   EXPECT_EQ(*info.clock_domain(), FakeComposite::kDefaultClockDomain);
+}
+
+// Verify that a fake composite is initialized to the expected default RingBuffer format sets.
+TEST_F(CompositeTest, DeviceInfoRingBufferFormats) {
+  auto fake_driver = MakeFakeComposite();
+  auto device = InitializeDeviceForFakeComposite(fake_driver);
+  ASSERT_TRUE(device->is_operational());
+  ASSERT_EQ(device_presence_watcher()->ready_devices().size(), 1u);
+  ASSERT_EQ(device_presence_watcher()->on_ready_count(), 1u);
+
+  ASSERT_TRUE(device->info().has_value());
+  auto info = *device->info();
+
+  // Validate ring buffer format sets
+  ASSERT_TRUE(info.ring_buffer_format_sets().has_value());
+  ASSERT_FALSE(info.ring_buffer_format_sets()->empty());
+  ASSERT_EQ(info.ring_buffer_format_sets()->size(), 2u);
+  ASSERT_TRUE(info.ring_buffer_format_sets()->at(0).element_id().has_value());
+  ASSERT_TRUE(info.ring_buffer_format_sets()->at(1).element_id().has_value());
+  ASSERT_TRUE(
+      *info.ring_buffer_format_sets()->at(0).element_id() == FakeComposite::kSourceRbElementId ||
+      *info.ring_buffer_format_sets()->at(0).element_id() == FakeComposite::kDestRbElementId);
+  ASSERT_TRUE(
+      *info.ring_buffer_format_sets()->at(1).element_id() == FakeComposite::kSourceRbElementId ||
+      *info.ring_buffer_format_sets()->at(1).element_id() == FakeComposite::kDestRbElementId);
+
+  auto& source_rb_format_sets =
+      *info.ring_buffer_format_sets()->at(0).element_id() == FakeComposite::kSourceRbElementId
+          ? info.ring_buffer_format_sets()->at(0).format_sets()
+          : info.ring_buffer_format_sets()->at(1).format_sets();
+  ASSERT_TRUE(source_rb_format_sets.has_value());
+  ASSERT_FALSE(source_rb_format_sets->empty());
+  EXPECT_EQ(source_rb_format_sets->size(), 1u);
+  ASSERT_TRUE(source_rb_format_sets->at(0).frame_rates().has_value());
+  EXPECT_THAT(*source_rb_format_sets->at(0).frame_rates(),
+              testing::ElementsAreArray(FakeComposite::kDefaultRbFrameRates2));
+  ASSERT_TRUE(source_rb_format_sets->at(0).channel_sets().has_value());
+  ASSERT_FALSE(source_rb_format_sets->at(0).channel_sets()->empty());
+  EXPECT_EQ(source_rb_format_sets->at(0).channel_sets()->size(), 1u);
+  ASSERT_TRUE(source_rb_format_sets->at(0).channel_sets()->at(0).attributes().has_value());
+  ASSERT_FALSE(source_rb_format_sets->at(0).channel_sets()->at(0).attributes()->empty());
+  EXPECT_EQ(source_rb_format_sets->at(0).channel_sets()->at(0).attributes()->size(), 1u);
+  ASSERT_FALSE(source_rb_format_sets->at(0)
+                   .channel_sets()
+                   ->at(0)
+                   .attributes()
+                   ->at(0)
+                   .max_frequency()
+                   .has_value());
+  ASSERT_TRUE(source_rb_format_sets->at(0)
+                  .channel_sets()
+                  ->at(0)
+                  .attributes()
+                  ->at(0)
+                  .min_frequency()
+                  .has_value());
+  EXPECT_EQ(*source_rb_format_sets->at(0).channel_sets()->at(0).attributes()->at(0).min_frequency(),
+            FakeComposite::kDefaultRbChannelAttributeMinFrequency2);
+
+  auto& dest_rb_format_sets =
+      *info.ring_buffer_format_sets()->at(1).element_id() == FakeComposite::kDestRbElementId
+          ? info.ring_buffer_format_sets()->at(1).format_sets()
+          : info.ring_buffer_format_sets()->at(0).format_sets();
+  ASSERT_TRUE(dest_rb_format_sets.has_value());
+  ASSERT_FALSE(dest_rb_format_sets->empty());
+  EXPECT_EQ(dest_rb_format_sets->size(), 1u);
+  ASSERT_TRUE(dest_rb_format_sets->at(0).frame_rates().has_value());
+  EXPECT_THAT(*dest_rb_format_sets->at(0).frame_rates(),
+              testing::ElementsAreArray(FakeComposite::kDefaultRbFrameRates));
+  ASSERT_TRUE(dest_rb_format_sets->at(0).channel_sets().has_value());
+  ASSERT_FALSE(dest_rb_format_sets->at(0).channel_sets()->empty());
+  EXPECT_EQ(dest_rb_format_sets->at(0).channel_sets()->size(), 1u);
+  ASSERT_TRUE(dest_rb_format_sets->at(0).channel_sets()->at(0).attributes().has_value());
+  ASSERT_FALSE(dest_rb_format_sets->at(0).channel_sets()->at(0).attributes()->empty());
+  EXPECT_EQ(dest_rb_format_sets->at(0).channel_sets()->at(0).attributes()->size(), 1u);
+  ASSERT_TRUE(dest_rb_format_sets->at(0)
+                  .channel_sets()
+                  ->at(0)
+                  .attributes()
+                  ->at(0)
+                  .max_frequency()
+                  .has_value());
+  EXPECT_EQ(*dest_rb_format_sets->at(0).channel_sets()->at(0).attributes()->at(0).max_frequency(),
+            FakeComposite::kDefaultRbChannelAttributeMaxFrequency);
+  ASSERT_TRUE(dest_rb_format_sets->at(0)
+                  .channel_sets()
+                  ->at(0)
+                  .attributes()
+                  ->at(0)
+                  .min_frequency()
+                  .has_value());
+  EXPECT_EQ(*dest_rb_format_sets->at(0).channel_sets()->at(0).attributes()->at(0).min_frequency(),
+            FakeComposite::kDefaultRbChannelAttributeMinFrequency);
 }
 
 // Verify that a fake composite is initialized to the expected default signalprocessing elements.
