@@ -96,7 +96,7 @@ go/employee-privacy-policy
 ";
 
 pub const SHOW_NOTICE_TEMPLATE: &str = "
-Analytics collection status is currently {status} for Fuchsia developer
+Analytics collection status is currently set to {status} for Fuchsia developer
 tools, including
 
 fx, ffx (and all its subtools), foxtrot, zxdb, fidlcat, symbolizer, and the Fuchsia extension for VS Code

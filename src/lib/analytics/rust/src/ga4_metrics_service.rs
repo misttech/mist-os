@@ -54,10 +54,14 @@ impl GA4MetricsService {
 
     pub async fn show_status_message(&self) -> String {
         let optin_status = match self.state.status {
-            MetricsStatus::OptedIn => "enabled",
+            MetricsStatus::OptedIn
+            | MetricsStatus::GooglerOptedInAndNeedsNotice
+            | MetricsStatus::NewToTool => "enabled",
             MetricsStatus::OptedInEnhanced => "enable-enhanced",
-            MetricsStatus::OptedOut | MetricsStatus::Disabled => "disabled",
-            _ => &format!("{:?}", &self.state.status),
+            MetricsStatus::OptedOut
+            | MetricsStatus::Disabled
+            | MetricsStatus::NewUser
+            | MetricsStatus::GooglerNeedsNotice => "disabled",
         };
         let message = SHOW_NOTICE_TEMPLATE.replace("{status}", optin_status);
         message
