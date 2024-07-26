@@ -21,10 +21,10 @@ use {
 const MAX_CONCURRENT_CONNECTIONS: usize = 10_000;
 
 /// The name for the inspect node that tracks session restart timestamps.
-const DIANGNOSTICS_SESSION_STARTED_AT_NAME: &str = "session_started_at";
+const DIAGNOSTICS_SESSION_STARTED_AT_NAME: &str = "session_started_at";
 
 /// The max size for the session restart timestamps list.
-const DIANGNOSTICS_SESSION_STARTED_AT_SIZE: usize = 100;
+const DIAGNOSTICS_SESSION_STARTED_AT_SIZE: usize = 100;
 
 /// The name of the property for each entry in the `session_started_at` list for
 /// the start timestamp.
@@ -277,8 +277,8 @@ impl SessionManager {
         suspend_enabled: bool,
     ) -> Self {
         let session_started_at = BoundedListNode::new(
-            inspector.root().create_child(DIANGNOSTICS_SESSION_STARTED_AT_NAME),
-            DIANGNOSTICS_SESSION_STARTED_AT_SIZE,
+            inspector.root().create_child(DIAGNOSTICS_SESSION_STARTED_AT_NAME),
+            DIAGNOSTICS_SESSION_STARTED_AT_SIZE,
         );
         let diagnostics = Diagnostics { session_started_at };
         let (proxy, new_pending) = Session::new_pending();
