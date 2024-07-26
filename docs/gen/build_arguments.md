@@ -5676,6 +5676,14 @@ meta.fars and content-id'd blobs.
 
 From //build/product.gni:15
 
+### product_bundle_labels
+
+Labels for product bundles to assemble in addition to the main product bundle.
+
+**Current value (from the default):** `[]`
+
+From //BUILD.gn:146
+
 ### product_description
 
 A human readable product description.
