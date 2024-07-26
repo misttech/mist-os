@@ -831,6 +831,52 @@ class VmCowPages final : public VmHierarchyBase,
     return page_source_ && page_source_->properties().is_providing_specific_physical_pages;
   }
 
+  // See |ForEveryOwnedHierarchyPageInRange|. Each entry given to `T` is constant.
+  template <typename T>
+  zx_status_t ForEveryOwnedHierarchyPageInRangeLocked(T func, uint64_t offset, uint64_t size) const
+      TA_REQ(lock());
+
+  // See |ForEveryOwnedHierarchyPageInRange|. Each entry given to `T` is mutable and `T` may modify
+  // it or replace it with an empty entry.
+  template <typename T>
+  zx_status_t ForEveryOwnedMutableHierarchyPageInRangeLocked(T func, uint64_t offset, uint64_t size)
+      TA_REQ(lock());
+
+  // Iterates a range within a visible node, invoking a callback for every `VmPageListEntry` the
+  // node owns (fully or partially) in that range.
+  //
+  // The callback is invoked at most once per each offset within the range, as the node can own at
+  // most one entry at each offset. Either:
+  //  * The node directly contains the first visible entry at the offset and thus fully owns it.
+  //  * A hidden parent contains the first visible entry at the offset and thus the node partially
+  //    owns it.
+  //  * A visible parent contains the first visible entry at the offset and thus that parent fully
+  //    owns it. This method doesn't evaluate such parents and skips the offset.
+  //  * There is no visible entry at the offset. This method skips the offset.
+  //
+  // Prefer using the non-static methods above over invoking this function directly.
+  //
+  // The caller provides:
+  //  * `self`: Node to begin the iteration from. It must be a visible node.
+  //  * `func`: Callback function invoked for each non-empty entry.
+  //  * `offset`: Offset relative to `self` to being iterating at.
+  //  * `size`: Size of the range to iterate.
+  //
+  // The type `S` must be implicitly convertible to a `VmCowPages` or a `const VmCowPages`.
+  // The type `P` is `const VmPageOrMarker` if `S` is const, otherwise it is `VmPageOrMarker`.
+  // The type `T` must be:
+  // `zx_status_t(P* p, const VmCowPages* owner, uint64_t self_offset, uint64_t owner_offset)`
+  //  The return value controls whether iteration continues:
+  //   * `ZX_ERR_NEXT`: Continue iteration or stop with `ZX_OK` if no more entries to iterate.
+  //   * `ZX_ERR_STOP`: Stop iteration immediately with `ZX_OK`.
+  //   * Any other code: Stop iteration immediately with that error code.
+  //
+  // Returns `ZX_OK` if no `func` invocations returned any errors, otherwise returns the error code
+  // from the failing `func` invocation.
+  template <typename S, typename T>
+  static zx_status_t ForEveryOwnedHierarchyPageInRange(S* self, T func, uint64_t offset,
+                                                       uint64_t size) TA_REQ(self->lock());
+
   // Walks up the parent tree and returns the root, or |this| if there is no parent.
   const VmCowPages* GetRootLocked() const TA_REQ(lock());
 

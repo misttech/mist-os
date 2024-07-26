@@ -14,6 +14,7 @@
 
 #include <kernel/range_check.h>
 #include <ktl/move.h>
+#include <ktl/type_traits.h>
 #include <lk/init.h>
 #include <vm/compression.h>
 #include <vm/discardable_vmo_tracker.h>
@@ -489,6 +490,128 @@ VmCowPages::~VmCowPages() {
     discardable_tracker_->assert_cow_pages_locked();
     discardable_tracker_->RemoveFromDiscardableListLocked();
   }
+}
+
+template <typename T>
+zx_status_t VmCowPages::ForEveryOwnedHierarchyPageInRangeLocked(T func, uint64_t offset,
+                                                                uint64_t size) const {
+  return ForEveryOwnedHierarchyPageInRange(this, func, offset, size);
+}
+
+template <typename T>
+zx_status_t VmCowPages::ForEveryOwnedMutableHierarchyPageInRangeLocked(T func, uint64_t offset,
+                                                                       uint64_t size) {
+  return ForEveryOwnedHierarchyPageInRange(this, func, offset, size);
+}
+
+template <typename S, typename T>
+zx_status_t VmCowPages::ForEveryOwnedHierarchyPageInRange(S* self, T func, uint64_t offset,
+                                                          uint64_t size) {
+  constexpr bool MUTABLE = !ktl::is_const_v<S>;
+  static_assert((MUTABLE && ktl::is_same_v<S, VmCowPages>) ||
+                (!MUTABLE && ktl::is_same_v<S, const VmCowPages>));
+
+  DEBUG_ASSERT(IS_PAGE_ALIGNED(offset));
+  DEBUG_ASSERT(IS_PAGE_ALIGNED(size));
+  DEBUG_ASSERT(!self->is_hidden_locked());
+
+  const uint64_t end_offset = CheckedAdd(offset, size);
+  uint64_t cur_offset = offset;
+  uint64_t cur_end_offset = end_offset;
+  S* cur = self;
+  while (offset < end_offset) {
+    AssertHeld(cur->lock_ref());
+
+    // Treat an interval's "empty" entries as starting at the lower bound of iteration if iteration
+    // begins part-way through an interval. This allows us to skip these "partial" intervals.
+    uint64_t interval_start_offset = cur_offset;
+    zx_status_t user_status = ZX_ERR_NEXT;
+    auto page_callback = [&](auto p, uint64_t page_offset) {
+      if (p->IsIntervalStart()) {
+        // We should only find intervals in a pager-backed root node. This function won't traverse
+        // upwards from a gap into such a node, so if we find an interval then `cur` must be both
+        // pager-backed and the initial visible node we invoked this function on.
+        DEBUG_ASSERT(cur->is_source_preserving_page_content() && cur == self);
+
+        // The underlying `page_list_` iterator guarantees we weren't inside of an interval here.
+        //
+        // Set the offset to the entry after this IntervalStart, as the IntervalStart itself is
+        // accounted for in the additions at the end of this function.
+        interval_start_offset = CheckedAdd(page_offset, PAGE_SIZE);
+      } else if (p->IsIntervalEnd()) {
+        // We should only find intervals in a pager-backed root node. This function won't traverse
+        // upwards from a gap into such a node, so if we find an interval then `cur` must be both
+        // pager-backed and the initial visible node we invoked this function on.
+        DEBUG_ASSERT(cur->is_source_preserving_page_content() && cur == self);
+
+        // The underlying `page_list_` iterator guarantees we were inside of an interval here.
+        //
+        // Compute the length of the empty entries inside of the interval to "skip ahead" over it.
+        // The IntervalStart and IntervalEnd entries are accounted for in the additions after we
+        // invoke `func` below.
+        const uint64_t interval_length = page_offset - interval_start_offset;
+        DEBUG_ASSERT(interval_length <= page_offset);  // Shouldn't overflow.
+        offset += interval_length;
+        cur_offset += interval_length;
+      }
+      DEBUG_ASSERT(page_offset == cur_offset);
+
+      // Always provide a constant owner node to the callback - it should only ever be able to
+      // modify the passed in entry.
+      user_status = func(p, static_cast<const S*>(cur), offset, cur_offset);
+
+      offset += PAGE_SIZE;
+      cur_offset += PAGE_SIZE;
+      return user_status;
+    };
+    auto gap_callback = [&](uint64_t gap_start_offset, uint64_t gap_end_offset) {
+      AssertHeld(cur->lock_ref());
+      DEBUG_ASSERT(gap_start_offset == cur_offset);
+
+      // Stop iterating if parent is a visible node. Non-leaf visible nodes represent cases of
+      // unidirectional cloning, and in these cases the parent owns any pages in the gap.
+      if (cur->parent_ && cur_offset < cur->parent_limit_ &&
+          cur->parent_locked().is_hidden_locked()) {
+        // Trim the operating range to the parent and walk up.
+        cur_offset += cur->parent_offset_;
+        cur_end_offset = ktl::min(gap_end_offset, cur->parent_limit_) + cur->parent_offset_;
+        cur = cur->parent_.get();
+        return ZX_ERR_STOP;
+      }
+
+      offset += (gap_end_offset - gap_start_offset);
+      cur_offset = gap_end_offset;
+      return ZX_ERR_NEXT;
+    };
+
+    zx_status_t status;
+    if constexpr (MUTABLE) {
+      status = cur->page_list_.RemovePagesAndIterateGaps(page_callback, gap_callback, cur_offset,
+                                                         cur_end_offset);
+    } else {
+      status = cur->page_list_.ForEveryPageAndGapInRange(page_callback, gap_callback, cur_offset,
+                                                         cur_end_offset);
+    }
+
+    // If the callback wanted to stop or generate an error, then propagate that.
+    if (user_status != ZX_OK && user_status != ZX_ERR_NEXT) {
+      if (user_status == ZX_ERR_STOP) {
+        return ZX_OK;
+      }
+      return user_status;
+    }
+    DEBUG_ASSERT(status == ZX_OK);  // No other reason for there to be an error.
+
+    // If the operating range is empty, then no further progress can be made by walking up.
+    // Restart a new upward walk from the initial node to continue making progress.
+    if (cur_offset == cur_end_offset) {
+      cur = self;
+      cur_offset = offset;
+      cur_end_offset = end_offset;
+    }
+  }
+
+  return ZX_OK;
 }
 
 bool VmCowPages::DedupZeroPage(vm_page_t* page, uint64_t offset) {
