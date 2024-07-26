@@ -5,6 +5,14 @@ use std::fmt::Display;
 
 use super::Path;
 
+// Helper to find the common prefix of two strings and return the common prefix and the differing suffixes.
+fn common_prefix(a: &str, b: &str) -> (String, String, String) {
+    let common: String =
+        a.chars().zip(b.chars()).take_while(|(a, b)| a == b).map(|(a, _)| a).collect();
+    let common_length = common.chars().count();
+    (common, a.chars().skip(common_length).collect(), b.chars().skip(common_length).collect())
+}
+
 #[derive(PartialEq, PartialOrd, Eq, Ord, Debug, Clone, Copy)]
 pub enum CompatibilityDegree {
     Incompatible,
@@ -42,24 +50,26 @@ impl CompatibilityScope {
             CompatibilityScope::Type { sender, receiver } => (sender, receiver),
         }
     }
-    fn path(&self) -> String {
+    fn path_for_display(&self) -> String {
         let (a, b) = self.paths();
         let (a, b) = (a.string(), b.string());
         if a == b {
             a
         } else {
-            if a.is_empty() {
-                b
-            } else if b.is_empty() {
-                a
-            } else if a.starts_with(&b) {
-                a
-            } else if b.starts_with(&a) {
-                b
+            let (c, a_suffix, b_suffix) = common_prefix(&a, &b);
+            if a_suffix.is_empty() {
+                b.to_string()
+            } else if b_suffix.is_empty() {
+                a.to_string()
             } else {
-                todo!("Work out how to report different paths where neither is a prefix");
+                format!("{c}({a_suffix}|{b_suffix})")
             }
         }
+    }
+    fn path_for_comparison(&self) -> String {
+        let (a, b) = self.paths();
+        let (a, b) = (a.string(), b.string());
+        std::cmp::min(a, b)
     }
     fn levels(&self) -> (&str, &str) {
         match self {
@@ -78,14 +88,14 @@ impl CompatibilityScope {
 
 impl Display for CompatibilityScope {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.path())
+        write!(f, "{}", self.path_for_display())
     }
 }
 
 impl PartialOrd for CompatibilityScope {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        let a: String = self.path().into();
-        let b: String = other.path().into();
+        let a: String = self.path_for_comparison().into();
+        let b: String = other.path_for_comparison().into();
         Some(cmp_prefixes_later(&a, &b))
     }
 }
@@ -172,7 +182,7 @@ impl std::fmt::Debug for CompatibilityProblem {
         }
         let levels = self.scope.levels();
         write!(f, "({:?}, {:?})", levels.0, levels.1)?;
-        write!(f, "{{ path={:?}, message={:?} }}", self.scope.path(), self.message)?;
+        write!(f, "{{ path={:?}, message={:?} }}", self.scope.path_for_display(), self.message)?;
         Ok(())
     }
 }
@@ -411,7 +421,9 @@ impl<'a> ProblemPattern<'a> {
             }
         }
         if let Some(path) = &self.path {
-            if !path.matches(problem.scope.path()) {
+            if !path.matches(problem.scope.paths().0.string())
+                && !path.matches(problem.scope.paths().1.string())
+            {
                 return false;
             }
         }
