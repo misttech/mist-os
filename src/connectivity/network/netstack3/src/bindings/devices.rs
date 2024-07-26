@@ -114,7 +114,32 @@ impl Devices<DeviceId<BindingsCtx>> {
     }
 }
 
-/// Device specific iformation.
+/// Owned device specific information
+pub(crate) enum OwnedDeviceSpecificInfo {
+    Loopback(LoopbackInfo),
+    Ethernet(EthernetInfo),
+    PureIp(PureIpDeviceInfo),
+}
+
+impl From<LoopbackInfo> for OwnedDeviceSpecificInfo {
+    fn from(info: LoopbackInfo) -> Self {
+        Self::Loopback(info)
+    }
+}
+
+impl From<EthernetInfo> for OwnedDeviceSpecificInfo {
+    fn from(info: EthernetInfo) -> Self {
+        Self::Ethernet(info)
+    }
+}
+
+impl From<PureIpDeviceInfo> for OwnedDeviceSpecificInfo {
+    fn from(info: PureIpDeviceInfo) -> Self {
+        Self::PureIp(info)
+    }
+}
+
+/// Borrowed device specific information.
 #[derive(Debug)]
 pub(crate) enum DeviceSpecificInfo<'a> {
     Loopback(&'a LoopbackInfo),

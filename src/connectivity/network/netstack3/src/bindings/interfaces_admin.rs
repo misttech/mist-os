@@ -65,7 +65,10 @@ use {
     fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin, fuchsia_async as fasync,
 };
 
-use crate::bindings::devices::{self, EthernetInfo, StaticCommonInfo, TxTask, TxTaskError};
+use crate::bindings::devices::{
+    self, EthernetInfo, LoopbackInfo, OwnedDeviceSpecificInfo, PureIpDeviceInfo, StaticCommonInfo,
+    TxTask, TxTaskError,
+};
 use crate::bindings::routes::admin::RouteSet;
 use crate::bindings::routes::{self};
 use crate::bindings::util::{
@@ -717,11 +720,7 @@ async fn dispatch_control_request(
     .map(|()| ControlRequestResult::Continue)
 }
 
-/// Cleans up and removes the specified NetDevice interface.
-///
-/// # Panics
-///
-/// Panics if `id` points to a loopback device.
+/// Cleans up and removes the specified interface.
 async fn remove_interface(ctx: &mut Ctx, id: BindingId) {
     let (devices::StaticNetdeviceInfo { handler, tx_notifier: _ }, weak_id) = {
         let core_id = ctx
@@ -731,51 +730,34 @@ async fn remove_interface(ctx: &mut Ctx, id: BindingId) {
             .expect("device was not removed since retrieval");
         // Keep a weak ID around to debug pending destruction.
         let weak_id = core_id.downgrade();
-        match core_id {
-            DeviceId::Ethernet(core_id) => {
+
+        let info = netstack3_core::for_any_device_id!(
+            DeviceId,
+            core_id,
+            core_id => {
                 // We want to remove the routes on the device _after_ we mark
                 // the device for deletion (by calling `remove_device`) so
                 // that we don't race with any new routes being added through
                 // that device.
                 let result = ctx.api().device().remove_device(core_id);
                 ctx.bindings_ctx().remove_routes_on_device(&weak_id).await;
-                let EthernetInfo { netdevice, .. } = result
-                    .map_deferred(|d| d.into_future("ethernet device", &id))
-                    .into_future()
-                    .await;
-                (netdevice, weak_id)
+                result.map_deferred(|d| d.into_future("device", &id)).into_future().await.into()
             }
-            DeviceId::Loopback(core_id) => {
-                // We want to remove the routes on the device _after_ we mark
-                // the device for deletion (by calling `remove_device`) so
-                // that we don't race with any new routes being added through
-                // that device.
-                let result = ctx.api().device().remove_device(core_id);
-                ctx.bindings_ctx().remove_routes_on_device(&weak_id).await;
-                let devices::LoopbackInfo {
-                    static_common_info: _,
-                    dynamic_common_info: _,
-                    rx_notifier: _,
-                } = result
-                    .map_deferred(|d| d.into_future("loopback device", &id))
-                    .into_future()
-                    .await;
+        );
+
+        match info {
+            OwnedDeviceSpecificInfo::Loopback(LoopbackInfo {
+                static_common_info: _,
+                dynamic_common_info: _,
+                rx_notifier: _,
+            }) => {
                 // Allow the loopback interface to be removed as part of clean
                 // shutdown, but emit a warning about it.
                 warn!("loopback interface was removed");
                 return;
             }
-            DeviceId::PureIp(core_id) => {
-                // We want to remove the routes on the device _after_ we mark
-                // the device for deletion (by calling `remove_device`) so
-                // that we don't race with any new routes being added through
-                // that device.
-                let result = ctx.api().device().remove_device(core_id);
-                ctx.bindings_ctx().remove_routes_on_device(&weak_id).await;
-                let devices::PureIpDeviceInfo { netdevice, .. } = result
-                    .map_deferred(|d| d.into_future("pure ip device", &id))
-                    .into_future()
-                    .await;
+            OwnedDeviceSpecificInfo::Ethernet(EthernetInfo { netdevice, .. })
+            | OwnedDeviceSpecificInfo::PureIp(PureIpDeviceInfo { netdevice, .. }) => {
                 (netdevice, weak_id)
             }
         }
