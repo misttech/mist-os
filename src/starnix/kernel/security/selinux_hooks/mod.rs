@@ -875,13 +875,18 @@ mod tests {
     #[fuchsia::test]
     fn state_is_updated_on_exec() {
         let security_server = security_server_with_policy();
-        let initial_state = TaskState::for_kernel();
-        let mut security_state = initial_state.clone();
+
+        let mut initial_state = TaskState::for_kernel();
+        // Set previous SID to a different value from current, to allow verification
+        // of the pre-exec "current" being moved into "previous".
+        initial_state.previous_sid = SecurityId::initial(InitialSid::Unlabeled);
 
         let elf_sid = security_server
             .security_context_to_sid(b"u:object_r:test_valid_t:s0".into())
             .expect("invalid security context");
         assert_ne!(elf_sid, initial_state.current_sid);
+
+        let mut security_state = initial_state.clone();
         update_state_on_exec(&mut security_state, Some(elf_sid));
         assert_eq!(
             security_state,
@@ -890,7 +895,7 @@ mod tests {
                 exec_sid: initial_state.exec_sid,
                 fscreate_sid: initial_state.fscreate_sid,
                 keycreate_sid: initial_state.keycreate_sid,
-                previous_sid: initial_state.previous_sid,
+                previous_sid: initial_state.current_sid,
                 sockcreate_sid: initial_state.sockcreate_sid,
                 ptracer_sid: initial_state.ptracer_sid,
             }

@@ -1178,6 +1178,53 @@ mod tests {
     }
 
     #[fuchsia::test]
+    async fn set_get_procattr_setcurrent() {
+        let security_server = security_server_with_policy(Mode::Enable);
+        security_server.set_enforcing(true);
+        let (_kernel, current_task) = create_kernel_and_task_with_selinux(security_server);
+
+        // Stash the initial "previous" context.
+        let initial_previous =
+            get_procattr(&current_task, &current_task.temp_task(), ProcAttr::Previous).unwrap();
+
+        assert_eq!(
+            // Dynamically transition to a valid new context.
+            set_procattr(&current_task, ProcAttr::Current, VALID_SECURITY_CONTEXT.into()),
+            Ok(())
+        );
+
+        assert_eq!(
+            // "current" should report the new context.
+            get_procattr(&current_task, &current_task.temp_task(), ProcAttr::Current),
+            Ok(VALID_SECURITY_CONTEXT.into())
+        );
+
+        assert_eq!(
+            // "prev" should continue to report the original context.
+            get_procattr(&current_task, &current_task.temp_task(), ProcAttr::Previous),
+            Ok(initial_previous.clone())
+        );
+
+        assert_eq!(
+            // Dynamically transition to a different valid context.
+            set_procattr(&current_task, ProcAttr::Current, DIFFERENT_VALID_SECURITY_CONTEXT.into()),
+            Ok(())
+        );
+
+        assert_eq!(
+            // "current" should report the different new context.
+            get_procattr(&current_task, &current_task.temp_task(), ProcAttr::Current),
+            Ok(DIFFERENT_VALID_SECURITY_CONTEXT.into())
+        );
+
+        assert_eq!(
+            // "prev" should continue to report the original context.
+            get_procattr(&current_task, &current_task.temp_task(), ProcAttr::Previous),
+            Ok(initial_previous.clone())
+        );
+    }
+
+    #[fuchsia::test]
     async fn set_get_procattr_selinux_permissive() {
         let security_server = security_server_with_policy(Mode::Enable);
         security_server.set_enforcing(false);
@@ -1205,18 +1252,16 @@ mod tests {
             Ok(())
         );
 
-        // TODO(b/331375792): Validate Contexts even when permission checks are permissive,
-        //assert_eq!(
-        //    // Setting an invalid context should fail, even in permissive mode.
-        //    set_procattr(&current_task, ProcAttr::Exec, INVALID_SECURITY_CONTEXT.into()),
-        //    error!(EINVAL)
-        //);
+        assert_eq!(
+            // Setting an invalid context should fail, even in permissive mode.
+            set_procattr(&current_task, ProcAttr::Exec, INVALID_SECURITY_CONTEXT.into()),
+            error!(EINVAL)
+        );
 
-        // TODO(b/331375792): Allow permissive set-attr to succeed.
-        //assert_eq!(
-        //    get_procattr(&current_task, &current_task.temp_task(), ProcAttr::Exec),
-        //    Ok(DIFFERENT_VALID_SECURITY_CONTEXT.into())
-        //);
+        assert_eq!(
+            get_procattr(&current_task, &current_task.temp_task(), ProcAttr::Exec),
+            Ok(VALID_SECURITY_CONTEXT.into())
+        );
 
         assert!(get_procattr(&current_task, &current_task.temp_task(), ProcAttr::Current).is_ok());
     }
