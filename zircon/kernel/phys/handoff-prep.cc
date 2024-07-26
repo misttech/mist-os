@@ -20,6 +20,7 @@
 #include <zircon/assert.h>
 
 #include <ktl/algorithm.h>
+#include <ktl/tuple.h>
 #include <phys/allocation.h>
 #include <phys/elf-image.h>
 #include <phys/handoff.h>
@@ -226,6 +227,15 @@ void HandoffPrep::PublishLog(ktl::string_view name, Log&& log) {
   ktl::span copy = PublishVmo(name, content_size);
   ZX_ASSERT(copy.size_bytes() == content_size);
   memcpy(copy.data(), buffer.get(), content_size);
+
+  // TODO(https://fxbug.dev/347766366): While trampoline booting is in effect in
+  // the x86 codepath, care needs to be taken with `Allocation`s made before
+  // the fixed-address image recharacterization that TrampolineBoot does. In
+  // particular, we do not want to absent-mindedly free a region that was
+  // recharacterized as being a part of a fixed-address image. Until
+  // TrampolineBoot is removed from kernel boot, defensively leak the log buffer
+  // allocation.
+  ktl::ignore = buffer.release();
 }
 
 void HandoffPrep::UsePackageFiles(const KernelStorage::Bootfs& kernel_package) {
