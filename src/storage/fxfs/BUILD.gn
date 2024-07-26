@@ -328,6 +328,7 @@ group("tests") {
     ":lib_test($host_toolchain)",
     "//src/storage/fxfs/tools:tests",
     "//src/storage/fxfs/trace:tests",
+    "//src/storage/fxfs/unicode:tests",
   ]
 }
 
