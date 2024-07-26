@@ -868,6 +868,12 @@ function _metrics-service {
 # Init metrics service by redirecting file descriptor 10 to the process
 # substitution of metrics service.
 function metrics-init {
+  if [[ -z "${HOME}" ]]; then
+    METRICS_LEVEL=0
+    exec 10> /dev/null
+    return
+  fi
+
   local subcommand="$1"
   local hide_init_warning=0
   if [[ "$subcommand" == "metrics" ]]; then
