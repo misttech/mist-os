@@ -40,6 +40,9 @@ pub fn downcast_injector_error<T>(res: Result<T, anyhow::Error>) -> Result<T, Ff
 #[async_trait(?Send)]
 pub trait Injector {
     async fn daemon_factory(&self) -> Result<DaemonProxy, FfxInjectorError>;
+    /// Creates the daemon, ignoring autostart. This should generally not be used
+    /// unless you're running `ffx daemon start`.
+    async fn daemon_factory_force_autostart(&self) -> Result<DaemonProxy, FfxInjectorError>;
     /// Attempts to get a handle to the ffx daemon.
     async fn try_daemon(&self) -> Result<Option<DaemonProxy>>;
     async fn remote_factory(&self) -> Result<RemoteControlProxy>;

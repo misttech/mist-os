@@ -93,7 +93,7 @@ pub struct Injection {
     remote_once: ProxyState<RemoteControlProxy>,
 }
 
-const CONFIG_DAEMON_AUTOSTART: &str = "daemon.autostart";
+pub const CONFIG_DAEMON_AUTOSTART: &str = "daemon.autostart";
 
 impl std::fmt::Debug for Injection {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -174,19 +174,15 @@ impl Injection {
     fn daemon_timeout_error(&self) -> FfxError {
         FfxError::DaemonError { err: DaemonError::Timeout, target: self.target_spec.clone() }
     }
-}
 
-#[async_trait(?Send)]
-impl Injector for Injection {
-    // This could get called multiple times by the plugin system via multiple threads - so make sure
-    // the spawning only happens one thread at a time.
-    #[tracing::instrument]
-    async fn daemon_factory(&self) -> Result<DaemonProxy, FfxInjectorError> {
-        let autostart = self.env_context.query(CONFIG_DAEMON_AUTOSTART).get().unwrap_or(true);
+    async fn daemon_factory_impl(
+        &self,
+        should_autostart: bool,
+    ) -> Result<DaemonProxy, FfxInjectorError> {
         downcast_injector_error(
             self.daemon_once
                 .get_or_try_init(|first_connection| {
-                    let start_mode = if autostart {
+                    let start_mode = if should_autostart {
                         DaemonStart::AutoStart
                     } else {
                         DaemonStart::DoNotAutoStart
@@ -201,6 +197,22 @@ impl Injector for Injection {
                 })
                 .await,
         )
+    }
+}
+
+#[async_trait(?Send)]
+impl Injector for Injection {
+    async fn daemon_factory_force_autostart(&self) -> Result<DaemonProxy, FfxInjectorError> {
+        self.daemon_factory_impl(true).await
+    }
+
+    // This could get called multiple times by the plugin system via multiple threads - so make sure
+    // the spawning only happens one thread at a time.
+    #[tracing::instrument]
+    async fn daemon_factory(&self) -> Result<DaemonProxy, FfxInjectorError> {
+        let should_autostart =
+            self.env_context.query(CONFIG_DAEMON_AUTOSTART).get().unwrap_or(true);
+        self.daemon_factory_impl(should_autostart).await
     }
 
     #[tracing::instrument]
