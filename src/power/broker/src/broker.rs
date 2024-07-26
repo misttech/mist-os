@@ -492,7 +492,7 @@ impl Broker {
         self.update_opportunistic_leases(&assertive_claims);
         // Remove the lease information and then remove the underlying element.
         self.catalog.lease_status.remove(lease_id);
-        self.remove_element(&lease.element_id);
+        self.remove_element(&lease.synthetic_element_id);
         Ok(())
     }
 
@@ -623,13 +623,18 @@ impl Broker {
         };
         tracing::debug!("update_lease_status({lease_id}) to {status:?}, contingent: {contingent}");
         // The lease_status changed, update the required level of the leased element.
-        let element_id = match self.catalog.leases.get(lease_id) {
-            Some(lease) => lease.element_id.clone(),
+        let (synthetic_element_id, underlying_element_id) = match self.catalog.leases.get(lease_id)
+        {
+            Some(lease) => {
+                (lease.synthetic_element_id.clone(), lease.underlying_element_id.clone())
+            }
             None => unreachable!("The lease must be present when updating the status."),
         };
-        self.update_required_levels(&vec![&element_id]);
+        self.update_required_levels(&vec![&synthetic_element_id]);
         if prev_status.as_ref() != Some(&status) {
-            if let Some(elem_inspect) = self.catalog.topology.inspect_for_element(&element_id) {
+            if let Some(elem_inspect) =
+                self.catalog.topology.inspect_for_element(&underlying_element_id)
+            {
                 elem_inspect
                     .borrow_mut()
                     .meta()
@@ -1014,15 +1019,28 @@ pub type LeaseID = String;
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialOrd, PartialEq)]
 pub struct Lease {
     pub id: LeaseID,
-    pub element_id: ElementID,
+    // The ElementID of the synthetic element used to represent this lease.
+    pub synthetic_element_id: ElementID,
+    // The ElementID of the element this lease actually targets.
+    pub underlying_element_id: ElementID,
     pub level: IndexedPowerLevel,
 }
 
 impl Lease {
-    fn new(element_id: &ElementID, level: IndexedPowerLevel) -> Self {
+    fn new(
+        synthetic_element_id: &ElementID,
+        underlying_element_id: &ElementID,
+        level: IndexedPowerLevel,
+    ) -> Self {
         let uuid = LeaseID::from(Uuid::new_v4().as_simple().to_string());
-        let id = if ID_DEBUG_MODE { format!("{element_id}@{level}:{uuid:.6}") } else { uuid };
-        Lease { id: id.clone(), element_id: element_id.clone(), level: level.clone() }
+        let id =
+            if ID_DEBUG_MODE { format!("{synthetic_element_id}@{level}:{uuid:.6}") } else { uuid };
+        Lease {
+            id: id.clone(),
+            synthetic_element_id: synthetic_element_id.clone(),
+            underlying_element_id: underlying_element_id.clone(),
+            level: level.clone(),
+        }
     }
 }
 
@@ -1152,7 +1170,7 @@ impl Catalog {
         // TODO(336609941): Consider optimizing this.
         self.leases
             .values()
-            .filter(|l| l.element_id == *element_id)
+            .filter(|l| l.synthetic_element_id == *element_id)
             .filter(|l| self.get_lease_status(&l.id) == Some(LeaseStatus::Satisfied))
             .cloned()
             .collect()
@@ -1214,14 +1232,14 @@ impl Catalog {
 
     // Creates an element that represents the lease and adds it to the topology
     // with an active dependency on the actual element the lease is on.
-    fn create_internal_lease_element(
+    fn create_synthetic_lease_element(
         &mut self,
         element_id: &ElementID,
         level: IndexedPowerLevel,
     ) -> ElementID {
         let lease_element_id = self
             .topology
-            .add_element(
+            .add_synthetic_element(
                 format!("{}_{}_LEASE", element_id, Uuid::new_v4().as_simple().to_string()).as_str(),
                 vec![LeasePowerLevel::Pending as u8, LeasePowerLevel::Satisfied as u8],
             )
@@ -1250,14 +1268,15 @@ impl Catalog {
 
         // Create an intermediate "lease" element to lease against that has a single assertive
         // dependency on the element we actually want to lease against.
-        let lease_element_id = self.create_internal_lease_element(element_id, level);
+        let lease_element_id = self.create_synthetic_lease_element(element_id, level);
 
         // TODO: Add lease validation and control.
         let lease = Lease::new(
             &lease_element_id,
+            &element_id,
             IndexedPowerLevel { level: LeasePowerLevel::Satisfied as u8, index: 1 },
         );
-        if let Some(elem_inspect) = self.topology.inspect_for_element(&lease_element_id) {
+        if let Some(elem_inspect) = self.topology.inspect_for_element(&element_id) {
             let elem_readable_name = self.topology.element_name(&element_id);
             elem_inspect.borrow_mut().meta().set_and_track(
                 format!("lease_{}", lease.id),
@@ -1302,7 +1321,8 @@ impl Catalog {
         let lease = self.leases.remove(lease_id).ok_or(anyhow!("{lease_id} not found"))?;
         self.lease_status.remove(lease_id);
         self.lease_contingent.remove(lease_id);
-        if let Some(elem_inspect) = self.topology.inspect_for_element(&lease.element_id) {
+        if let Some(elem_inspect) = self.topology.inspect_for_element(&lease.underlying_element_id)
+        {
             elem_inspect
                 .borrow_mut()
                 .meta()
@@ -1989,6 +2009,7 @@ mod tests {
             test: {
                 leases: {},
                 topology: {
+                    "fuchsia.inspect.synthetic.Graph": contains {},
                     "fuchsia.inspect.Graph": {
                         topology: {
                             broker.get_unsatisfiable_element_id().to_string() => {
@@ -2074,6 +2095,7 @@ mod tests {
             test: {
                 leases: {},
                 topology: {
+                    "fuchsia.inspect.synthetic.Graph": contains {},
                     "fuchsia.inspect.Graph": {
                         topology: {
                             broker.get_unsatisfiable_element_id().to_string() => {
@@ -2171,6 +2193,7 @@ mod tests {
             test: {
                 leases: {},
                 topology: {
+                    "fuchsia.inspect.synthetic.Graph": contains {},
                     "fuchsia.inspect.Graph": {
                         topology: {
                             broker.get_unsatisfiable_element_id().to_string() => {
@@ -2237,6 +2260,7 @@ mod tests {
             test: {
                 leases: {},
                 topology: {
+                    "fuchsia.inspect.synthetic.Graph": contains {},
                     "fuchsia.inspect.Graph": {
                         topology: {
                             broker.get_unsatisfiable_element_id().to_string() => {
@@ -2323,6 +2347,7 @@ mod tests {
             test: {
                 leases: {},
                 topology: {
+                    "fuchsia.inspect.synthetic.Graph": contains {},
                     "fuchsia.inspect.Graph": {
                         topology: {
                             broker.get_unsatisfiable_element_id().to_string() => {
@@ -2387,6 +2412,7 @@ mod tests {
             test: {
                 leases: {},
                 topology: {
+                    "fuchsia.inspect.synthetic.Graph": contains {},
                     "fuchsia.inspect.Graph": {
                         topology: {
                             broker.get_unsatisfiable_element_id().to_string() => {
@@ -2596,6 +2622,7 @@ mod tests {
             test: {
                 leases: {},
                 topology: {
+                    "fuchsia.inspect.synthetic.Graph": contains {},
                     "fuchsia.inspect.Graph": {
                         topology: {
                             broker.get_unsatisfiable_element_id().to_string() => {
@@ -2681,6 +2708,7 @@ mod tests {
                     lease.id.clone() => "Satisfied",
                 },
                 topology: {
+                    "fuchsia.inspect.synthetic.Graph": contains {},
                     "fuchsia.inspect.Graph": {
                         topology: {
                             broker.get_unsatisfiable_element_id().to_string() => {
@@ -2716,6 +2744,8 @@ mod tests {
                                     valid_levels: v01.clone(),
                                     current_level: ON.level as u64,
                                     required_level: ON.level as u64,
+                                    format!("lease_{}", lease.id.clone()) => "level_1@C",
+                                    format!("lease_status_{}", lease.id.clone()) => "Satisfied",
                                 },
                                 relationships: {
                                     parent1.to_string() => {
@@ -2725,22 +2755,6 @@ mod tests {
                                     parent2.to_string() => {
                                         edge_id: AnyProperty,
                                         meta: { "1": "1" },
-                                    },
-                                },
-                            },
-                            lease.element_id.to_string() => {
-                                meta: {
-                                    name: AnyProperty,
-                                    valid_levels: AnyProperty,
-                                    current_level: AnyProperty,
-                                    required_level: AnyProperty,
-                                    format!("lease_{}", lease.id.clone()) => "level_1@C",
-                                    format!("lease_status_{}", lease.id.clone()) => "Satisfied",
-                                },
-                                relationships: {
-                                    child.to_string() => {
-                                        edge_id: AnyProperty,
-                                        meta: { "255": "1" }
                                     },
                                 },
                             },
@@ -3263,6 +3277,7 @@ mod tests {
                     lease_c.id.clone() => "Satisfied",
                 },
                 topology: {
+                    "fuchsia.inspect.synthetic.Graph": contains {},
                     "fuchsia.inspect.Graph": {
                         topology: {
                             broker.get_unsatisfiable_element_id().to_string() => {
@@ -3289,6 +3304,8 @@ mod tests {
                                     valid_levels: v01.clone(),
                                     current_level: ON.level as u64,
                                     required_level: ON.level as u64,
+                                    format!("lease_{}", lease_b.id) => "level_1@B",
+                                    format!("lease_status_{}", lease_b.id) => "Satisfied",
                                 },
                                 relationships: {
                                     element_a.to_string() => {
@@ -3303,43 +3320,13 @@ mod tests {
                                     valid_levels: v01.clone(),
                                     current_level: ON.level as u64,
                                     required_level: ON.level as u64,
+                                    format!("lease_{}", lease_c.id) => "level_1@C",
+                                    format!("lease_status_{}", lease_c.id) => "Satisfied",
                                 },
                                 relationships: {
                                     element_a.to_string() => {
                                         edge_id: AnyProperty,
                                         meta: { "1": "1p" },
-                                    },
-                                },
-                            },
-                            lease_b.element_id.to_string() => {
-                                meta: {
-                                    name: AnyProperty,
-                                    valid_levels: AnyProperty,
-                                    current_level: AnyProperty,
-                                    required_level: AnyProperty,
-                                    format!("lease_{}", lease_b.id) => "level_1@B",
-                                    format!("lease_status_{}", lease_b.id) => "Satisfied",
-                                },
-                                relationships: {
-                                    element_b.to_string() => {
-                                        edge_id: AnyProperty,
-                                        meta: { "255": "1" }
-                                    },
-                                },
-                            },
-                            lease_c.element_id.to_string() => {
-                                meta: {
-                                    name: AnyProperty,
-                                    valid_levels: AnyProperty,
-                                    current_level: AnyProperty,
-                                    required_level: AnyProperty,
-                                    format!("lease_{}", lease_c.id) => "level_1@C",
-                                    format!("lease_status_{}", lease_c.id) => "Satisfied",
-                                },
-                                relationships: {
-                                    element_c.to_string() => {
-                                        edge_id: AnyProperty,
-                                        meta: { "255": "1" }
                                     },
                                 },
                             },
@@ -3390,6 +3377,7 @@ mod tests {
             test: {
                 leases: {},
                 topology: {
+                    "fuchsia.inspect.synthetic.Graph": contains {},
                     "fuchsia.inspect.Graph": {
                         topology: {
                             broker.get_unsatisfiable_element_id().to_string() => {
@@ -6611,6 +6599,7 @@ mod tests {
             test: {
                 leases: {},
                 topology: {
+                    "fuchsia.inspect.synthetic.Graph": contains {},
                     "fuchsia.inspect.Graph": {
                         topology: {
                             broker.get_unsatisfiable_element_id().to_string() => {
