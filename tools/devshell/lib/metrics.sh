@@ -203,6 +203,9 @@ As a Googler, you can help us even more by opting in to enhanced analytics:
 
 ffx config analytics enable-enhanced
 
+You may need to first run `fx build` to get the latest ffx if the above
+does not work.
+
 Enabling enhanced analytics may collect the following additional information,
 in accordance with Google's employee privacy policy
 (go/employee-privacy-policy):
