@@ -18,9 +18,9 @@ bazel_driver_package("bazel_package") {
 }
 
 driver_bind_rules("adc-buttons-bind") {
-  rules = "adc-buttons.bind"
+  rules = "meta/adc-buttons.bind"
   bind_output = "adc-buttons.bindbc"
-  tests = "bind-tests.json"
+  tests = "meta/bind-tests.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.adc:fuchsia.hardware.adc_bindlib",
     "//src/devices/bind/fuchsia.adc",

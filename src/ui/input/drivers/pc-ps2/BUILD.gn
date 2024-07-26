@@ -8,8 +8,8 @@ import("//build/drivers.gni")
 import("//build/test.gni")
 
 driver_bind_rules("i8042_bind") {
-  rules = "i8042.bind"
-  tests = "bind_tests.json"
+  rules = "meta/i8042.bind"
+  tests = "meta/bind_tests.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.interrupt:fuchsia.hardware.interrupt_bindlib",
     "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_bindlib",
@@ -63,7 +63,7 @@ fuchsia_driver_component("pc-ps2") {
     ":i8042_bind",
     ":pc-ps2-driver",
   ]
-  info = "pc-ps2-info.json"
+  info = "meta/pc-ps2-info.json"
   manifest = "meta/pc-ps2.cml"
 }
 

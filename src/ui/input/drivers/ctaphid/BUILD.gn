@@ -8,9 +8,9 @@ import("//build/drivers.gni")
 import("//build/test.gni")
 
 driver_bind_rules("ctaphid_bind") {
-  rules = "ctaphid.bind"
+  rules = "meta/ctaphid.bind"
   bind_output = "ctaphid.bindbc"
-  tests = "tests.json"
+  tests = "meta/tests.json"
   deps = [ "//src/devices/bind/fuchsia.hid" ]
 }
 
@@ -50,7 +50,7 @@ fuchsia_driver("ctaphid-driver") {
 fuchsia_driver_component("ctaphid") {
   component_name = "ctaphid"
   deps = [ ":ctaphid-driver" ]
-  info = "ctaphid-info.json"
+  info = "meta/ctaphid-info.json"
   manifest = "meta/ctaphid.cml"
 }
 

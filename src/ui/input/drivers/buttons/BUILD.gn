@@ -8,9 +8,9 @@ import("//build/drivers.gni")
 import("//build/test.gni")
 
 driver_bind_rules("buttons-bind") {
-  rules = "buttons.bind"
+  rules = "meta/buttons.bind"
   bind_output = "buttons.bindbc"
-  tests = "bind-tests.json"
+  tests = "meta/bind-tests.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_bindlib",
     "//src/devices/bind/fuchsia.devicetree",
@@ -31,7 +31,7 @@ fuchsia_driver_component("buttons") {
   visibility = [ ":*" ]
   component_name = "buttons"
   deps = [ ":buttons-driver" ]
-  info = "buttons-info.json"
+  info = "meta/buttons-info.json"
   manifest = "meta/buttons.cml"
 }
 

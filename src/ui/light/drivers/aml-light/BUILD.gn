@@ -8,9 +8,9 @@ import("//build/drivers.gni")
 import("//build/test.gni")
 
 driver_bind_rules("aml_light_bind") {
-  rules = "aml_light.bind"
+  rules = "meta/aml_light.bind"
   bind_output = "aml-light.bindbc"
-  tests = "bind_tests.json"
+  tests = "meta/bind_tests.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_bindlib",
     "//sdk/fidl/fuchsia.hardware.pwm:fuchsia.hardware.pwm_bindlib",
@@ -49,7 +49,7 @@ fuchsia_driver("aml-light-driver") {
 fuchsia_driver_component("aml-light") {
   component_name = "aml-light"
   deps = [ ":aml-light-driver" ]
-  info = "aml-light-info.json"
+  info = "meta/aml-light-info.json"
   manifest = "meta/aml-light.cml"
 }
 

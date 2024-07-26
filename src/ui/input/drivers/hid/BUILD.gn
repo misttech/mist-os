@@ -8,9 +8,9 @@ import("//build/drivers.gni")
 import("//build/test.gni")
 
 driver_bind_rules("hid_bind") {
-  rules = "hid.bind"
+  rules = "meta/hid.bind"
   bind_output = "hid.bindbc"
-  tests = "tests.json"
+  tests = "meta/tests.json"
   deps = [ "//src/devices/bind/fuchsia.hid" ]
 }
 
@@ -55,7 +55,7 @@ fuchsia_driver_component("hid") {
   visibility = [ ":*" ]
   component_name = "hid"
   deps = [ ":hid-driver" ]
-  info = "hid-info.json"
+  info = "meta/hid-info.json"
   manifest = "meta/hid.cml"
 }
 

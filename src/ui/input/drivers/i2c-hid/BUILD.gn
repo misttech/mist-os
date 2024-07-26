@@ -12,8 +12,8 @@ group("drivers") {
 }
 
 driver_bind_rules("i2c_hid_bind") {
-  rules = "i2c_hid.bind"
-  tests = "tests.json"
+  rules = "meta/i2c_hid.bind"
+  tests = "meta/tests.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.interrupt:fuchsia.hardware.interrupt_bindlib",
     "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_bindlib",
@@ -51,7 +51,7 @@ fuchsia_driver_component("i2c-hid") {
     ":i2c-hid-driver",
     ":i2c_hid_bind",
   ]
-  info = "i2c-hid-info.json"
+  info = "meta/i2c-hid-info.json"
   manifest = "meta/i2c-hid.cml"
 }
 

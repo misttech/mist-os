@@ -9,8 +9,8 @@ import("//build/fuzz.gni")
 import("//build/test.gni")
 
 driver_bind_rules("goldfish_sensor-bind") {
-  rules = "goldfish_sensor.bind"
-  tests = "bind_tests.json"
+  rules = "meta/goldfish_sensor.bind"
+  tests = "meta/bind_tests.json"
 
   deps = [
     "//sdk/fidl/fuchsia.hardware.goldfish.pipe:fuchsia.hardware.goldfish.pipe_bindlib",
@@ -60,7 +60,7 @@ fuchsia_driver("sensor_fuchsia_driver") {
 fuchsia_driver_component("sensor_driver") {
   component_name = "goldfish_sensor"
   deps = [ ":sensor_fuchsia_driver" ]
-  info = "sensor_driver-info.json"
+  info = "meta/sensor_driver-info.json"
   manifest = "meta/sensor_driver.cml"
 }
 

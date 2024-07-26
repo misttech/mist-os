@@ -9,9 +9,9 @@ import("//build/drivers.gni")
 import("//build/test.gni")
 
 driver_bind_rules("focaltech_touch_bind") {
-  rules = "focaltech_touch.bind"
+  rules = "meta/focaltech_touch.bind"
   bind_output = "focaltech.bindbc"
-  tests = "bind_tests.json"
+  tests = "meta/bind_tests.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_bindlib",
     "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c_bindlib",
@@ -71,7 +71,7 @@ fuchsia_driver("focaltech-driver") {
 fuchsia_driver_component("focaltech") {
   component_name = "focaltech"
   deps = [ ":focaltech-driver" ]
-  info = "focaltech-info.json"
+  info = "meta/focaltech-info.json"
   manifest = "meta/focaltech.cml"
 }
 
@@ -102,7 +102,7 @@ fuchsia_driver("focaltech-sherlock-driver") {
 fuchsia_driver_component("focaltech-sherlock") {
   component_name = "focaltech-sherlock"
   deps = [ ":focaltech-sherlock-driver" ]
-  info = "focaltech-sherlock-info.json"
+  info = "meta/focaltech-sherlock-info.json"
   manifest = "meta/focaltech-sherlock.cml"
 }
 

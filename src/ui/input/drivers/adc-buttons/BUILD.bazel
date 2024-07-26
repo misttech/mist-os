@@ -40,7 +40,7 @@ _common_deps = [
 fuchsia_driver_bind_bytecode(
     name = "adc-buttons-bind",
     output = "adc-buttons.bindbc",
-    rules = "adc-buttons.bind",
+    rules = "meta/adc-buttons.bind",
     deps = [
         "@fuchsia_sdk//bind/fuchsia.adc",
         "@fuchsia_sdk//bind/fuchsia.devicetree",

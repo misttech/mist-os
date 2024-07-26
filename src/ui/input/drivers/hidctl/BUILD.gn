@@ -8,8 +8,8 @@ import("//build/drivers.gni")
 import("//build/test.gni")
 
 driver_bind_rules("hidctl_bind") {
-  rules = "hidctl.bind"
-  tests = "bind_tests.json"
+  rules = "meta/hidctl.bind"
+  tests = "meta/bind_tests.json"
   deps = [
     "//src/devices/bind/fuchsia.test",
     "//src/devices/bind/fuchsia.test.platform",
@@ -41,7 +41,7 @@ fuchsia_driver("hidctl-driver") {
 fuchsia_driver_component("hidctl") {
   component_name = "hidctl"
   deps = [ ":hidctl-driver" ]
-  info = "hidctl-info.json"
+  info = "meta/hidctl-info.json"
   manifest = "meta/hidctl.cml"
 }
 
