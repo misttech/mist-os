@@ -9,6 +9,7 @@
 #define ZIRCON_KERNEL_INCLUDE_KERNEL_TIMER_H_
 
 #include <lib/kconcurrent/chainlock.h>
+#include <string-file.h>
 #include <zircon/compiler.h>
 #include <zircon/types.h>
 
@@ -170,6 +171,23 @@ class TimerQueue {
 
   // Add |timer| to this TimerQueue, possibly coalescing deadlines as well.
   void Insert(Timer* timer, zx_time_t earliest_deadline, zx_time_t latest_deadline);
+
+  // A helper function for Insert that inserts the given timer into the given timer list.
+  static void InsertIntoTimerList(fbl::DoublyLinkedList<Timer*>& timer_list, Timer* timer,
+                                  zx_time_t earliest_deadline, zx_time_t latest_deadline);
+
+  // A helper function for TransitionOffCpu that moves all timers from the src_list to the
+  // dst_list. Returns the Timer at the head of the dst_list if it changed, otherwise returns
+  // nullopt.
+  static ktl::optional<Timer*> TransitionTimerList(fbl::DoublyLinkedList<Timer*>& src_list,
+                                                   fbl::DoublyLinkedList<Timer*>& dst_list);
+
+  // A helper function for PrintTimerQueues that prints all of the timers in the given timer_list
+  // into the given buffer. Also takes in the current time, which is either a zx_time_t or a
+  // zx_boot_time_t depending on the timeline the timer_list is operating on.
+  template <typename TimestampType>
+  static void PrintTimerList(TimestampType now, fbl::DoublyLinkedList<Timer*>& timer_list,
+                             StringFile& buffer);
 
   // The UpdatePlatformTimer* methods are used to update the platform's oneshot timer to the
   // minimum of the existing deadline (stored in next_timer_deadline_) and the given new_deadline.

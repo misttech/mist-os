@@ -36,6 +36,8 @@
 #include <zircon/time.h>
 #include <zircon/types.h>
 
+#include <cstdio>
+
 #include <kernel/align.h>
 #include <kernel/lockdep.h>
 #include <kernel/mp.h>
@@ -165,9 +167,16 @@ void TimerQueue::UpdatePlatformTimerMono(zx_time_t new_deadline) {
 
 void TimerQueue::Insert(Timer* timer, zx_time_t earliest_deadline, zx_time_t latest_deadline) {
   DEBUG_ASSERT(arch_ints_disabled());
-  cpu_num_t cpu = arch_curr_cpu_num();
-  LTRACEF("timer %p, cpu %u, scheduled %" PRIi64 "\n", timer, cpu, timer->scheduled_time_);
+  LTRACEF("timer %p, cpu %u, scheduled %" PRIi64 "\n", timer, arch_curr_cpu_num(),
+          timer->scheduled_time_);
+  fbl::DoublyLinkedList<Timer*>& timer_list = timer->timeline_ == Timer::ReferenceTimeline::kMono
+                                                  ? monotonic_timer_list_
+                                                  : boot_timer_list_;
+  InsertIntoTimerList(timer_list, timer, earliest_deadline, latest_deadline);
+}
 
+void TimerQueue::InsertIntoTimerList(fbl::DoublyLinkedList<Timer*>& timer_list, Timer* timer,
+                                     zx_time_t earliest_deadline, zx_time_t latest_deadline) {
   // For inserting the timer we consider several cases. In general we
   // want to coalesce with the current timer unless we can prove that
   // either that:
@@ -181,9 +190,6 @@ void TimerQueue::Insert(Timer* timer, zx_time_t earliest_deadline, zx_time_t lat
   // - Let |x| be the end of the list (not a timer)
   // - Let |(| and |)| the earliest_deadline and latest_deadline.
 
-  fbl::DoublyLinkedList<Timer*>& timer_list = timer->timeline_ == Timer::ReferenceTimeline::kMono
-                                                  ? monotonic_timer_list_
-                                                  : boot_timer_list_;
   for (Timer& entry : timer_list) {
     if (entry.scheduled_time_ > latest_deadline) {
       // New timer latest is earlier than the current timer.
@@ -558,54 +564,50 @@ zx_status_t Timer::TrylockOrCancel(ChainLock& lock) {
   return ZX_OK;
 }
 
+ktl::optional<Timer*> TimerQueue::TransitionTimerList(fbl::DoublyLinkedList<Timer*>& src_list,
+                                                      fbl::DoublyLinkedList<Timer*>& dst_list) {
+  // Keep track of what the first timer in the dst_list was.
+  Timer* old_head = nullptr;
+  if (!dst_list.is_empty()) {
+    old_head = &dst_list.front();
+  }
+
+  // Move all the timers from the src_list to the dst_list.
+  Timer* timer;
+  while ((timer = src_list.pop_front()) != nullptr) {
+    // We lost the original asymmetric slack information so when we combine them
+    // with the other timer queue they are not coalesced again.
+    // TODO(cpu): figure how important this case is.
+    InsertIntoTimerList(dst_list, timer, timer->scheduled_time_, timer->scheduled_time_);
+    // Note, we do not increment the "created" counter here because we are simply moving these
+    // timers from one queue to another and we already counted them when they were first
+    // created.
+  }
+  Timer* new_head = nullptr;
+  if (!dst_list.is_empty()) {
+    new_head = &dst_list.front();
+  }
+
+  // If the head of the timer list changed, then we need to return the new head.
+  if (new_head != nullptr && new_head != old_head) {
+    return ktl::optional<Timer*>(new_head);
+  }
+  return ktl::nullopt;
+}
+
 void TimerQueue::TransitionOffCpu(TimerQueue& source) {
   Guard<MonitoredSpinLock, IrqSave> guard{TimerLock::Get(), SOURCE_TAG};
 
-  // Move all monotonic timers from |source| to this TimerQueue.
-  Timer* old_mono_head = nullptr;
-  if (!monotonic_timer_list_.is_empty()) {
-    old_mono_head = &monotonic_timer_list_.front();
+  // Transition both timer lists. This may update the platform timer.
+  const ktl::optional<Timer*> new_mono_head =
+      TransitionTimerList(source.monotonic_timer_list_, monotonic_timer_list_);
+  if (new_mono_head) {
+    UpdatePlatformTimerMono(new_mono_head.value()->scheduled_time_);
   }
-  Timer* timer;
-  while ((timer = source.monotonic_timer_list_.pop_front()) != nullptr) {
-    // We lost the original asymmetric slack information so when we combine them
-    // with the other timer queue they are not coalesced again.
-    // TODO(cpu): figure how important this case is.
-    Insert(timer, timer->scheduled_time_, timer->scheduled_time_);
-    // Note, we do not increment the "created" counter here because we are simply moving these
-    // timers from one queue to another and we already counted them when they were first
-    // created.
-  }
-  Timer* new_mono_head = nullptr;
-  if (!monotonic_timer_list_.is_empty()) {
-    new_mono_head = &monotonic_timer_list_.front();
-  }
-
-  // Move all boottime timers from |source| to this TimerQueue.
-  Timer* old_boot_head = nullptr;
-  if (!boot_timer_list_.is_empty()) {
-    old_boot_head = &boot_timer_list_.front();
-  }
-  while ((timer = source.boot_timer_list_.pop_front()) != nullptr) {
-    // We lost the original asymmetric slack information so when we combine them
-    // with the other timer queue they are not coalesced again.
-    // TODO(cpu): figure how important this case is.
-    Insert(timer, timer->scheduled_time_, timer->scheduled_time_);
-    // Note, we do not increment the "created" counter here because we are simply moving these
-    // timers from one queue to another and we already counted them when they were first
-    // created.
-  }
-  Timer* new_boot_head = nullptr;
-  if (!boot_timer_list_.is_empty()) {
-    new_boot_head = &boot_timer_list_.front();
-  }
-
-  if (new_mono_head != nullptr && new_mono_head != old_mono_head) {
-    UpdatePlatformTimerMono(new_mono_head->scheduled_time_);
-  }
-
-  if (new_boot_head != nullptr && new_boot_head != old_boot_head) {
-    UpdatePlatformTimerBoot(new_boot_head->scheduled_time_);
+  const ktl::optional<Timer*> new_boot_head =
+      TransitionTimerList(source.boot_timer_list_, boot_timer_list_);
+  if (new_boot_head) {
+    UpdatePlatformTimerBoot(new_boot_head.value()->scheduled_time_);
   }
 
   // The old TimerQueue has no tasks left, so reset the deadlines.
@@ -613,52 +615,33 @@ void TimerQueue::TransitionOffCpu(TimerQueue& source) {
   source.next_timer_deadline_ = ZX_TIME_INFINITE;
 }
 
-void TimerQueue::PrintTimerQueues(char* buf, size_t len) {
-  size_t ptr = 0;
-  const zx_time_t mono_now = current_time();
-  const zx_boot_time_t boot_now = current_boot_time();
+template <typename TimestampType>
+void TimerQueue::PrintTimerList(TimestampType now, fbl::DoublyLinkedList<Timer*>& timer_list,
+                                StringFile& buffer) {
+  TimestampType last = now;
+  for (Timer& t : timer_list) {
+    zx_duration_t delta_now = zx_time_sub_time(t.scheduled_time_, now);
+    zx_duration_t delta_last = zx_time_sub_time(t.scheduled_time_, last);
+    fprintf(&buffer,
+            "\ttime %" PRIi64 " delta_now %" PRIi64 " delta_last %" PRIi64 " func %p arg %p\n",
+            t.scheduled_time_, delta_now, delta_last, t.callback_, t.arg_);
+    last = t.scheduled_time_;
+  }
+}
 
+void TimerQueue::PrintTimerQueues(char* buf, size_t len) {
+  StringFile buffer{ktl::span(buf, len)};
   Guard<MonitoredSpinLock, IrqSave> guard{TimerLock::Get(), SOURCE_TAG};
   for (cpu_num_t i = 0; i < percpu::processor_count(); i++) {
     if (mp_is_cpu_online(i)) {
-      ptr += snprintf(buf + ptr, len - ptr, "cpu %u:\n", i);
-      if (ptr >= len) {
-        return;
-      }
-
-      // Print out the monotonic timers.
-      zx_time_t last_mono = mono_now;
-      ptr += snprintf(buf + ptr, len - ptr, "monotonic timers:\n");
-      for (Timer& t : percpu::Get(i).timer_queue.monotonic_timer_list_) {
-        zx_duration_t delta_now = zx_time_sub_time(t.scheduled_time_, mono_now);
-        zx_duration_t delta_last = zx_time_sub_time(t.scheduled_time_, last_mono);
-        ptr += snprintf(buf + ptr, len - ptr,
-                        "\ttime %" PRIi64 " delta_now %" PRIi64 " delta_last %" PRIi64
-                        " func %p arg %p\n",
-                        t.scheduled_time_, delta_now, delta_last, t.callback_, t.arg_);
-        if (ptr >= len) {
-          return;
-        }
-        last_mono = t.scheduled_time_;
-      }
-
-      // Print out the boot timers.
-      zx_time_t last_boot = boot_now;
-      ptr += snprintf(buf + ptr, len - ptr, "boot timers:\n");
-      for (Timer& t : percpu::Get(i).timer_queue.boot_timer_list_) {
-        zx_duration_t delta_now = zx_time_sub_time(t.scheduled_time_, boot_now);
-        zx_duration_t delta_last = zx_time_sub_time(t.scheduled_time_, last_boot);
-        ptr += snprintf(buf + ptr, len - ptr,
-                        "\ttime %" PRIi64 " delta_now %" PRIi64 " delta_last %" PRIi64
-                        " func %p arg %p\n",
-                        t.scheduled_time_, delta_now, delta_last, t.callback_, t.arg_);
-        if (ptr >= len) {
-          return;
-        }
-        last_boot = t.scheduled_time_;
-      }
+      fprintf(&buffer, "cpu %u:\n", i);
+      PrintTimerList(current_time(), percpu::Get(i).timer_queue.monotonic_timer_list_, buffer);
+      fprintf(&buffer, "boot timers:\n");
+      PrintTimerList(current_boot_time(), percpu::Get(i).timer_queue.boot_timer_list_, buffer);
     }
   }
+  // Null terminate the buffer.
+  ktl::move(buffer).take();
 }
 
 #include <lib/console.h>
