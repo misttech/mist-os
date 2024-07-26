@@ -26,7 +26,6 @@ def _fuchsia_assemble_package_impl(ctx):
             package = package,
             configs = configs,
             files = files,
-            build_id_dirs = package.build_id_dirs,
         ),
     ]
 

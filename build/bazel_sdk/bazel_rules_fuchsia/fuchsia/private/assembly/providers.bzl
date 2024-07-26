@@ -12,7 +12,6 @@ FuchsiaAssembledPackageInfo = provider(
         "package": "The base package",
         "configs": "A list of configs that is attached to packages",
         "files": "Files needed by package and config files.",
-        "build_id_dirs": "Directories containing the debug symbols",
     },
 )
 
@@ -29,7 +28,6 @@ FuchsiaProductConfigInfo = provider(
     fields = {
         "product_config": "The JSON product configuration file.",
         "build_type": "The build type of the product.",
-        "build_id_dirs": "Directories containing the debug symbols",
     },
 )
 
@@ -98,7 +96,6 @@ FuchsiaProductImageInfo = provider(
         "product_assembly_out": "product assembly out directory",
         "platform_aibs": "platform aibs file listing path to platform AIBS",
         "build_type": "The build type of the product",
-        "build_id_dirs": "Directories containing the debug symbols",
     },
 )
 
@@ -115,7 +112,6 @@ FuchsiaProductAssemblyInfo = provider(
         "product_assembly_out": "product assembly out directory",
         "platform_aibs": "platform aibs file listing path to platform AIBS",
         "build_type": "The build type of the product",
-        "build_id_dirs": "Directories containing the debug symbols",
     },
 )
 

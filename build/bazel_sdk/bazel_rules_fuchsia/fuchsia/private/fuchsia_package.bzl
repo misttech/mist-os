@@ -549,7 +549,6 @@ def _build_fuchsia_package_impl(ctx):
             meta_far = meta_far,
             package_resources = package_resources,
             packaged_components = packaged_components,
-            build_id_dirs = fuchsia_debug_symbols_info.build_id_dirs.values(),
         ),
         fuchsia_debug_symbols_info,
         OutputGroupInfo(
