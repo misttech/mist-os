@@ -56,5 +56,25 @@
             from: "#vsock",
             to: "#vsock-sshd-host",
         },
+        {
+            protocol: [ "fuchsia.driver.development.Manager" ],
+            from: "#driver_manager",
+            to: "#vsock-sshd-host",
+        },
+        {
+            protocol: [ "fuchsia.hardware.power.statecontrol.Admin" ],
+            from: "#shutdown_shim",
+            to: "#vsock-sshd-host",
+        },
+        {
+            protocol: [
+                "fuchsia.kernel.RootJob",
+                "fuchsia.sys2.LifecycleController.root",
+                "fuchsia.sys2.RealmQuery.root",
+                "fuchsia.sys2.RouteValidator.root",
+            ],
+            from: "parent",
+            to: "#vsock-sshd-host",
+        },
     ],
 }

@@ -187,6 +187,7 @@
 
                     // TODO(https://fxbug.dev/42080863): Remove once the shell tools that use this
                     // capability no longer run in the sshd realm.
+                    "/bootstrap/vsock-sshd-host/shell:**",
                     "/core/sshd-host/shell:**",
                 ],
             },

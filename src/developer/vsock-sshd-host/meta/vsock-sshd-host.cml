@@ -66,8 +66,14 @@
         {
             protocol: [
                 "fuchsia.developer.remotecontrol.connector.Connector",
+                "fuchsia.driver.development.Manager",
+                "fuchsia.hardware.power.statecontrol.Admin",
                 "fuchsia.hardware.pty.Device",
+                "fuchsia.kernel.RootJob",
                 "fuchsia.process.Launcher",
+                "fuchsia.sys2.LifecycleController.root",
+                "fuchsia.sys2.RealmQuery.root",
+                "fuchsia.sys2.RouteValidator.root",
             ],
             from: "parent",
             to: "#shell",
