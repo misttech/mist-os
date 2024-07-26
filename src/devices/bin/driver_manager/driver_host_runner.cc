@@ -19,6 +19,7 @@
 #include <random>
 
 #include "src/devices/bin/driver_loader/loader.h"
+#include "src/devices/bin/driver_manager/pkg_utils.h"
 #include "src/devices/lib/log/log.h"
 
 namespace fio = fuchsia_io;
@@ -76,22 +77,6 @@ const char* GetErrorString(fcomponent::Error error) {
     default:
       return "UNKNOWN_ERROR";
   }
-}
-
-zx::result<fidl::ClientEnd<fio::File>> OpenPkgFile(
-    fidl::UnownedClientEnd<fuchsia_io::Directory> pkg, std::string_view relative_binary_path) {
-  // Open the driver's binary within the driver's package.
-  auto [client_end, server_end] = fidl::Endpoints<fio::File>::Create();
-  zx_status_t status = fdio_open_at(
-      pkg.channel()->get(), relative_binary_path.data(),
-      static_cast<uint32_t>(fio::OpenFlags::kRightReadable | fio::OpenFlags::kRightExecutable),
-      server_end.TakeChannel().release());
-  if (status != ZX_OK) {
-    LOGF(ERROR, "Failed to start driver host; could not open library: %s",
-         zx_status_get_string(status));
-    return zx::error(status);
-  }
-  return zx::ok(std::move(client_end));
 }
 
 // TODO(https://fxbug.dev/341358132): support retrieving different vdsos. For now we will
@@ -229,26 +214,14 @@ zx::result<> DriverHostRunner::LoadDriverHost(
     return pkg.take_error();
   }
 
-  auto driver_file = OpenPkgFile(*pkg, *binary);
+  auto driver_file = pkg_utils::OpenPkgFile(*pkg, *binary);
   if (driver_file.is_error()) {
     LOGF(ERROR, "Failed to open driver host '%s' file: %s", url.c_str(),
          driver_file.status_string());
     return driver_file.take_error();
   }
 
-  fidl::SyncClient file(std::move(*driver_file));
-  auto result = file->GetBackingMemory(fio::VmoFlags::kRead | fio::VmoFlags::kExecute |
-                                       fio::VmoFlags::kPrivateClone);
-
-  if (result.is_error()) {
-    zx_status_t status = result.error_value().is_domain_error()
-                             ? result.error_value().domain_error()
-                             : ZX_ERR_BAD_HANDLE;
-    LOGF(ERROR, "Failed to get driver host vmo: %s", zx_status_get_string(status));
-    return zx::error(status);
-  }
-
-  zx::vmo exec_vmo = std::move(result->vmo());
+  zx::vmo exec_vmo = std::move(*driver_file);
 
   auto vdso_result = GetVdsoVmo();
   if (vdso_result.is_error()) {
@@ -273,23 +246,14 @@ zx::result<> DriverHostRunner::LoadDriverHost(
     return zx::error(status);
   }
 
-  zx::result lib_endpoints = fidl::CreateEndpoints<fio::Directory>();
-  if (lib_endpoints.status_value() != ZX_OK) {
-    LOGF(ERROR, "Failed to create endpoints: %s", lib_endpoints.status_string());
-    return lib_endpoints.take_error();
-  }
-  status = fdio_open_at(pkg->channel()->get(), "lib",
-                        static_cast<uint32_t>(fuchsia_io::wire::OpenFlags::kDirectory |
-                                              fuchsia_io::wire::OpenFlags::kRightReadable |
-                                              fuchsia_io::wire::OpenFlags::kRightExecutable),
-                        lib_endpoints->server.TakeChannel().release());
-  if (status != ZX_OK) {
-    LOGF(ERROR, "Failed to open lib directory: %s", zx_status_get_string(status));
-    return zx::error(status);
+  auto lib_dir = pkg_utils::OpenLibDir(*pkg);
+  if (lib_dir.is_error()) {
+    LOGF(ERROR, "Failed to open lib directory %s", lib_dir.status_string());
+    return lib_dir.take_error();
   }
 
   status = loader->Start(std::move(process), std::move(thread), std::move(root_vmar),
-                         std::move(exec_vmo), std::move(vdso_vmo), std::move(lib_endpoints->client),
+                         std::move(exec_vmo), std::move(vdso_vmo), std::move(*lib_dir),
                          std::move(bootstrap_receiver));
   if (status != ZX_OK) {
     LOGF(ERROR, "Loader failed to start driver host: %lu", zx_status_get_string(status));
