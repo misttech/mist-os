@@ -13,7 +13,7 @@
 #include "zircon/syscalls/object.h"
 
 namespace power_lib_test {
-class PowerLibTest : public gtest::TestLoopFixture {};
+class ElementBuilderTests : public gtest::TestLoopFixture {};
 
 void check_channels_peered(zx_handle_t c1, zx_handle_t c2) {
   zx_info_handle_basic_t basic1;
@@ -31,7 +31,7 @@ void check_channels_peered(zx_handle_t c1, zx_handle_t c2) {
   ASSERT_EQ(basic1.koid, basic2.related_koid);
 }
 
-TEST_F(PowerLibTest, ElementBuilderFilledOut) {
+TEST_F(ElementBuilderTests, ElementBuilderFilledOut) {
   fuchsia_hardware_power::wire::PowerElementConfiguration config;
   fdf_power::TokenMap tokens;
 
@@ -80,7 +80,7 @@ TEST_F(PowerLibTest, ElementBuilderFilledOut) {
                         desc.element_control_server_.handle()->get());
 }
 
-TEST_F(PowerLibTest, ElementBuilderMissingCurrentLevel) {
+TEST_F(ElementBuilderTests, ElementBuilderMissingCurrentLevel) {
   fuchsia_hardware_power::wire::PowerElementConfiguration config;
   fdf_power::TokenMap tokens;
 
@@ -126,7 +126,7 @@ TEST_F(PowerLibTest, ElementBuilderMissingCurrentLevel) {
                         desc.element_control_server_.handle()->get());
 }
 
-TEST_F(PowerLibTest, ElementBuilderMin) {
+TEST_F(ElementBuilderTests, ElementBuilderMin) {
   fuchsia_hardware_power::wire::PowerElementConfiguration config;
   fdf_power::TokenMap tokens;
   fdf_power::ElementDesc desc = fdf_power::ElementDescBuilder(config, std::move(tokens)).Build();

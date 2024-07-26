@@ -201,6 +201,97 @@ std::optional<Error> GetTokensFromParents(ElementDependencyMap& dependencies, To
 
 }  // namespace
 
+void ElementRunner::RunPowerElement() {
+  // * First, we watch for a new required level.
+  // * Second, we report this level to |on_level_change_|.
+  // * Third, we report the level returned from |on_level_change_| which may or
+  //   may not be the same value passed into |on_level_change_|.
+  // If any errors occur we report this and then bail, otherwise method is
+  // called again.
+  required_level_client_->Watch().Then(
+      [&](fidl::Result<fuchsia_power_broker::RequiredLevel::Watch>& result) {
+        // The watch call result in an error, translate this to the error enum
+        // accepted by `on_error_`.
+        if (result.is_error()) {
+          auto err = result.error_value();
+          if (err.is_framework_error()) {
+            if (err.framework_error().is_peer_closed()) {
+              on_error_(ElementRunnerError::REQUIRED_LEVEL_TRANSPORT_PEER_CLOSED);
+            } else {
+              on_error_(ElementRunnerError::REQUIRED_LEVEL_TRANSPORT_OTHER);
+            }
+          } else {
+            switch (err.domain_error()) {
+              case fuchsia_power_broker::RequiredLevelError::kInternal:
+                on_error_(ElementRunnerError::REQUIRED_LEVEL_INTERNAL);
+                break;
+              case fuchsia_power_broker::RequiredLevelError::kNotAuthorized:
+                on_error_(ElementRunnerError::REQUIRED_LEVEL_NOT_AUTHORIZED);
+                break;
+              case fuchsia_power_broker::RequiredLevelError::kUnknown:
+                on_error_(ElementRunnerError::REQUIRED_LEVEL_UNKNOWN);
+                break;
+              default:
+                on_error_(ElementRunnerError::REQUIRED_LEVEL_UNEXPECTED);
+            }
+          }
+          return;
+        }
+
+        fit::result<zx_status_t, uint8_t> change_result =
+            on_level_change_(result->required_level());
+
+        // The callback returned an error, report and abort.
+        if (change_result.is_error()) {
+          on_error_(ElementRunnerError::LEVEL_CHANGE_CALLBACK);
+          return;
+        }
+
+        current_level_client_->Update({change_result.value()})
+            .Then([&](fidl::Result<fuchsia_power_broker::CurrentLevel::Update>& update_result) {
+              if (update_result.is_error()) {
+                auto err = update_result.error_value();
+                if (err.is_framework_error()) {
+                  if (err.framework_error().is_peer_closed()) {
+                    on_error_(ElementRunnerError::CURRENT_LEVEL_TRANSPORT_PEER_CLOSED);
+                  } else {
+                    on_error_(ElementRunnerError::CURRENT_LEVEL_TRANSPORT_OTHER);
+                  }
+                } else {
+                  switch (err.domain_error()) {
+                    case fuchsia_power_broker::CurrentLevelError::kNotAuthorized:
+                      on_error_(ElementRunnerError::CURRENT_LEVEL_NOT_AUTHORIZED);
+                      break;
+                    default:
+                      on_error_(ElementRunnerError::CURRENT_LEVEL_UNEXPECTED);
+                  }
+                }
+                return;
+              }
+
+              // Call ourself again to keep running the element.
+              RunPowerElement();
+            });
+      });
+}
+
+void ElementRunner::SetLevel(
+    uint8_t level,
+    fit::function<
+        void(fit::result<fidl::ErrorsIn<fuchsia_power_broker::CurrentLevel::Update>, zx_status_t>)>
+        callback) {
+  // Sets the level and reports the result to |callback|
+  current_level_client_->Update(level).Then(
+      [callback = std::move(callback)](
+          fidl::Result<fuchsia_power_broker::CurrentLevel::Update>& update_result) {
+        if (update_result.is_error()) {
+          callback(fit::error(update_result.error_value()));
+        } else {
+          callback(fit::ok(ZX_OK));
+        }
+      });
+}
+
 size_t ParentElementHasher::operator()(const fuchsia_hardware_power::ParentElement& element) const {
   switch (element.Which()) {
     case fuchsia_hardware_power::ParentElement::Tag::kSag: {

@@ -8,9 +8,11 @@
 #include <fidl/fuchsia.power.system/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/async/cpp/task.h>
 #include <lib/fidl/cpp/wire/arena.h>
 #include <lib/fidl/cpp/wire/channel.h>
 #include <lib/fidl/cpp/wire/internal/transport_channel.h>
+#include <lib/fidl/cpp/wire/status.h>
 #include <lib/fidl/cpp/wire/string_view.h>
 #include <lib/fidl/cpp/wire_natural_conversions.h>
 #include <lib/zx/event.h>
@@ -20,7 +22,7 @@
 
 #include <fbl/ref_ptr.h>
 #include <gtest/gtest.h>
-#include <src/lib/testing/loop_fixture/test_loop_fixture.h>
+#include <src/lib/testing/loop_fixture/real_loop_fixture.h>
 #include <src/storage/lib/vfs/cpp/pseudo_dir.h>
 #include <src/storage/lib/vfs/cpp/service.h>
 #include <src/storage/lib/vfs/cpp/synchronous_vfs.h>
@@ -28,7 +30,7 @@
 #include "sdk/lib/driver/power/cpp/power-support.h"
 
 namespace power_lib_test {
-class PowerLibTest : public gtest::TestLoopFixture {};
+class PowerLibTest : public gtest::RealLoopFixture {};
 
 class FakeTokenServer : public fidl::WireServer<fuchsia_hardware_power::PowerTokenProvider> {
  public:
@@ -119,6 +121,68 @@ class AddInstanceResult {
   std::shared_ptr<zx::event> token;
 };
 
+class RequiredLevelServer : public fidl::Server<fuchsia_power_broker::RequiredLevel> {
+ public:
+  // Return one from the set of values until all are consumed. Then close the
+  // channel and call |on_all_values_sent|
+  explicit RequiredLevelServer(std::vector<uint8_t> values,
+                               fit::function<void()> on_all_values_sent_)
+      : values_(std::move(values)), on_all_values_sent_(std::move(on_all_values_sent_)) {}
+
+  void Watch(WatchCompleter::Sync& completer) override {
+    if (values_.size() == 0) {
+      completer.Close(ZX_ERR_STOP);
+      return;
+    }
+
+    uint8_t v = values_.front();
+    values_.erase(values_.begin());
+
+    completer.Reply(fit::success<fuchsia_power_broker::RequiredLevelWatchResponse>(v));
+    if (values_.size() == 0) {
+      on_all_values_sent_();
+    }
+  }
+
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_broker::RequiredLevel> md,
+                             fidl::UnknownMethodCompleter::Sync& completer) override {}
+
+  std::vector<uint8_t> values_;
+  fit::function<void()> on_all_values_sent_;
+};
+
+class CurrentLevelServer : public fidl::Server<fuchsia_power_broker::CurrentLevel> {
+ public:
+  /// Set the number of requests to serve before call |all_requests_received_|.
+  /// Asserts if more requests than expected are received.
+  explicit CurrentLevelServer(std::vector<uint8_t> expected_values,
+                              fit::function<void()> all_requests_received_)
+      : expected_(std::move(expected_values)),
+        all_requests_received_(std::move(all_requests_received_)) {}
+  void Update(UpdateRequest& request, UpdateCompleter::Sync& completer) override {
+    request_count_++;
+    ASSERT_LE(request_count_, expected_.size()) << "Received more requests than expected";
+
+    ASSERT_EQ(request.current_level(), expected_.at(request_count_ - 1))
+        << "Unexpected reported level";
+
+    completer.Reply(fit::success());
+
+    if (request_count_ == expected_.size()) {
+      all_requests_received_();
+      return;
+    }
+  }
+
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_broker::CurrentLevel> md,
+                             fidl::UnknownMethodCompleter::Sync& completer) override {}
+
+ private:
+  uint32_t request_count_ = 0;
+  std::vector<uint8_t> expected_;
+  fit::function<void()> all_requests_received_;
+};
+
 AddInstanceResult AddServiceInstance(
     std::string parent_name, async_dispatcher_t* dispatcher,
     fidl::ServerBindingGroup<fuchsia_hardware_power::PowerTokenProvider>* bindings) {
@@ -149,6 +213,135 @@ AddInstanceResult AddServiceInstance(
       .token_handler = std::move(token_handler),
       .token = std::move(event),
   };
+}
+
+/// Tests the ElementRunner by sending it two required values and then expects
+/// those values to be reported as current levels.
+TEST_F(PowerLibTest, TestElementRunner) {
+  // Make the current and required levels channels
+  fidl::Endpoints<fuchsia_power_broker::RequiredLevel> required_level_channel =
+      fidl::CreateEndpoints<fuchsia_power_broker::RequiredLevel>().value();
+
+  fidl::Endpoints<fuchsia_power_broker::CurrentLevel> current_level_channel =
+      fidl::CreateEndpoints<fuchsia_power_broker::CurrentLevel>().value();
+
+  // Set up flags so we verify that all checks are done before we exit.
+  bool cls_done = false;
+  bool rls_done = false;
+  bool runner_done = false;
+
+  fit::function<void(fdf_power::ElementRunnerError)> completion_handler =
+      [run_done = &runner_done, cls_done = &cls_done, rls_done = &rls_done,
+       quit_loop = QuitLoopClosure()](fdf_power::ElementRunnerError err) {
+        *run_done = true;
+        if (*run_done && *cls_done && *rls_done) {
+          quit_loop();
+        }
+      };
+
+  std::unique_ptr<fdf_power::ElementRunner> runner = std::make_unique<fdf_power::ElementRunner>(
+      std::move(required_level_channel.client), std::move(current_level_channel.client),
+      fdf_power::default_level_changer, std::move(completion_handler), dispatcher());
+  runner->RunPowerElement();
+
+  const std::vector<uint8_t> level_values{2, 3};
+
+  std::unique_ptr<RequiredLevelServer> rls = std::make_unique<RequiredLevelServer>(
+      level_values, [run_done = &runner_done, cls_done = &cls_done, rls_done = &rls_done,
+                     quit_loop = QuitLoopClosure()]() {
+        *rls_done = true;
+        if (*run_done && *cls_done && *rls_done) {
+          quit_loop();
+        }
+      });
+  fidl::ServerBindingRef<fuchsia_power_broker::RequiredLevel> required_level_binding =
+      fidl::BindServer<fuchsia_power_broker::RequiredLevel>(
+          dispatcher(), std::move(required_level_channel.server), std::move(rls),
+          [](RequiredLevelServer* imp, fidl::UnbindInfo info,
+             fidl::ServerEnd<fuchsia_power_broker::RequiredLevel> channel) {});
+
+  std::unique_ptr<CurrentLevelServer> cls = std::make_unique<CurrentLevelServer>(
+      level_values, [run_done = &runner_done, cls_done = &cls_done, rls_done = &rls_done,
+                     quit_loop = QuitLoopClosure()]() {
+        *cls_done = true;
+        if (*run_done && *cls_done && *rls_done) {
+          quit_loop();
+        }
+      });
+  fidl::ServerBindingRef<fuchsia_power_broker::CurrentLevel> current_level_binding =
+      fidl::BindServer<fuchsia_power_broker::CurrentLevel>(
+          dispatcher(), std::move(current_level_channel.server), std::move(cls),
+          [](CurrentLevelServer* impl, fidl::UnbindInfo info,
+             fidl::ServerEnd<fuchsia_power_broker::CurrentLevel> channel) {});
+
+  RunLoop();
+}
+
+/// Test calling |ElementRunner.SetLevel| and expect the value to be received
+/// by the faked out |CurrentLevel| server and the result callback called on
+/// the client side.
+TEST_F(PowerLibTest, TestElementRunnerManualSet) {
+  fidl::Endpoints<fuchsia_power_broker::RequiredLevel> required_level_channel =
+      fidl::CreateEndpoints<fuchsia_power_broker::RequiredLevel>().value();
+
+  fidl::Endpoints<fuchsia_power_broker::CurrentLevel> current_level_channel =
+      fidl::CreateEndpoints<fuchsia_power_broker::CurrentLevel>().value();
+
+  // Set up the required level servers
+  // For this test we don't want to ask the client to change any levels
+  std::vector<uint8_t> requested_levels{};
+  std::unique_ptr<RequiredLevelServer> required_level_server =
+      std::make_unique<RequiredLevelServer>(std::move(requested_levels), []() {});
+
+  // Create flags to make sure both necessary test checks are run.
+  bool current_level_received = false;
+  bool set_response_received = false;
+
+  fidl::ServerBindingRef<fuchsia_power_broker::RequiredLevel> required_level_binding =
+      fidl::BindServer<fuchsia_power_broker::RequiredLevel>(
+          dispatcher(), std::move(required_level_channel.server), std::move(required_level_server),
+          [](RequiredLevelServer* impl, fidl::UnbindInfo unbind_info,
+             fidl::ServerEnd<fuchsia_power_broker::RequiredLevel> server_chan) {});
+
+  const uint8_t LEVEL_TO_SET = 6;
+
+  std::unique_ptr<CurrentLevelServer> current_level_server = std::make_unique<CurrentLevelServer>(
+      std::vector{LEVEL_TO_SET},
+      [set_response_received = &set_response_received,
+       current_level_received = &current_level_received, quit = QuitLoopClosure()]() {
+        *current_level_received = true;
+        if (*set_response_received && *current_level_received) {
+          quit();
+        }
+      });
+  fidl::ServerBindingRef<fuchsia_power_broker::CurrentLevel> current_level_binding =
+      fidl::BindServer<fuchsia_power_broker::CurrentLevel>(
+          dispatcher(), std::move(current_level_channel.server), std::move(current_level_server),
+          [](CurrentLevelServer* impl, fidl::UnbindInfo info,
+             fidl::ServerEnd<fuchsia_power_broker::CurrentLevel> current_level_channel) {});
+
+  std::unique_ptr<fdf_power::ElementRunner> runner = std::make_unique<fdf_power::ElementRunner>(
+      std::move(required_level_channel.client), std::move(current_level_channel.client),
+      fdf_power::default_level_changer, [](fdf_power::ElementRunnerError err) {}, dispatcher());
+  runner->RunPowerElement();
+
+  // Set the level manually
+  runner->SetLevel(
+      LEVEL_TO_SET,
+      [set_response_received = &set_response_received,
+       current_level_received = &current_level_received, quit = QuitLoopClosure()](
+          fit::result<fidl::ErrorsIn<fuchsia_power_broker::CurrentLevel::Update>, zx_status_t>
+              result) {
+        fit::result<fidl::ErrorsIn<fuchsia_power_broker::CurrentLevel::Update>, zx_status_t>
+            expected = fit::ok(ZX_OK);
+        ASSERT_EQ(result, expected) << result.error_value().FormatDescription();
+        *set_response_received = true;
+        if (*set_response_received && *current_level_received) {
+          quit();
+        }
+      });
+
+  RunLoop();
 }
 
 /// Add an element which has no dependencies
