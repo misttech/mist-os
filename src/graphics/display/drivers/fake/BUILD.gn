@@ -112,3 +112,11 @@ fuchsia_unittest_package("fake-display-unittests") {
   }
   deps = [ ":fake-display-unittests-bin" ]
 }
+
+source_set("sysmem-service-provider") {
+  sources = [ "sysmem-service-provider.h" ]
+  public_deps = [
+    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
+    "//zircon/system/ulib/zx",
+  ]
+}
