@@ -10,10 +10,10 @@ use ffx_metrics::{
 };
 use fuchsia_async::TimeoutExt;
 use itertools::Itertools;
-use once_cell::sync::Lazy;
 use regex::Regex;
 use std::io::Write;
 use std::process::ExitStatus;
+use std::sync::LazyLock;
 use std::time::{Duration, Instant};
 
 use crate::{FfxContext, Result};
@@ -143,7 +143,7 @@ async fn get_sdk_version(context: &EnvironmentContext) -> Option<String> {
 }
 
 pub fn analytics_command(command_str: &str) -> bool {
-    static ANALYTICS_COMMAND_RE: Lazy<Regex> =
-        Lazy::new(|| Regex::new(" config analytics ").unwrap());
+    static ANALYTICS_COMMAND_RE: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(" config analytics ").unwrap());
     ANALYTICS_COMMAND_RE.is_match(command_str)
 }
