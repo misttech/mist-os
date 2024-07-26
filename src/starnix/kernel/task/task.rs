@@ -894,7 +894,7 @@ pub struct Task {
     mm: Option<Arc<MemoryManager>>,
 
     /// The file system for this task.
-    fs: Option<Arc<FsContext>>,
+    fs: Option<RwLock<Arc<FsContext>>>,
 
     /// The namespace for abstract AF_UNIX sockets for this task.
     pub abstract_socket_namespace: Arc<AbstractUnixSocketNamespace>,
@@ -1071,7 +1071,7 @@ impl Task {
             thread: RwLock::new(thread),
             files,
             mm: Some(mm),
-            fs: Some(fs),
+            fs: Some(RwLock::new(fs)),
             abstract_socket_namespace,
             abstract_vsock_namespace,
             vfork_event,
@@ -1122,12 +1122,17 @@ impl Task {
         self.persistent_info.lock().exit_signal
     }
 
-    pub fn fs(&self) -> &Arc<FsContext> {
-        self.fs.as_ref().expect("fs must be set")
+    pub fn fs(&self) -> Arc<FsContext> {
+        self.fs.as_ref().expect("fs must be set").read().clone()
     }
 
     pub fn mm(&self) -> &Arc<MemoryManager> {
         self.mm.as_ref().expect("mm must be set")
+    }
+
+    pub fn unshare_fs(&self) {
+        let mut fs = self.fs.as_ref().expect("fs must be set").write();
+        *fs = fs.fork();
     }
 
     /// Overwrite the existing scheduler policy with a new one and update the task's thread's role.

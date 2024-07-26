@@ -1453,7 +1453,7 @@ impl CurrentTask {
             None,
             FdTable::default(),
             Arc::clone(system_task.mm()),
-            Arc::clone(system_task.fs()),
+            system_task.fs(),
             system_task.creds(),
             Arc::clone(&system_task.abstract_socket_namespace),
             Arc::clone(&system_task.abstract_vsock_namespace),
