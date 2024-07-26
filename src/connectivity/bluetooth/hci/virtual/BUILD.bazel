@@ -5,10 +5,12 @@
 load(
     "@fuchsia_sdk//fuchsia:defs.bzl",
     "fuchsia_cc_driver",
+    "fuchsia_cc_test",
     "fuchsia_component_manifest",
     "fuchsia_driver_bind_bytecode",
     "fuchsia_driver_component",
     "fuchsia_test_package",
+    "fuchsia_unittest_package",
 )
 
 package(default_visibility = ["//visibility:public"])
@@ -22,13 +24,11 @@ fuchsia_driver_bind_bytecode(
     ],
 )
 
-fuchsia_cc_driver(
-    name = "bt-hci-virtual",
+cc_library(
+    name = "common",
     testonly = True,
     srcs = [
         "bt-hci.h",
-        "controller.cc",
-        "controller.h",
         "emulated_peer.cc",
         "emulated_peer.h",
         "emulator.cc",
@@ -36,7 +36,6 @@ fuchsia_cc_driver(
         "loopback.cc",
         "loopback.h",
     ],
-    output_name = "bt-hci-virtual",
     deps = [
         "//src/connectivity/bluetooth/core/bt-host/common",
         "//src/connectivity/bluetooth/core/bt-host/fidl:helpers",
@@ -50,6 +49,19 @@ fuchsia_cc_driver(
         "@fuchsia_sdk//pkg/driver_devfs_cpp",
         "@fuchsia_sdk//pkg/driver_runtime",
         "@internal_sdk//fidl/fuchsia.hardware.bluetooth:fuchsia.hardware.bluetooth_cpp",
+    ],
+)
+
+fuchsia_cc_driver(
+    name = "bt-hci-virtual",
+    testonly = True,
+    srcs = [
+        "controller.cc",
+        "controller.h",
+    ],
+    output_name = "bt-hci-virtual",
+    deps = [
+        ":common",
     ],
 )
 
@@ -73,5 +85,28 @@ fuchsia_test_package(
     components = [":component"],
     fuchsia_api_level = "HEAD",
     package_repository_name = "fuchsia.com",
+    visibility = ["//visibility:public"],
+)
+
+fuchsia_cc_test(
+    name = "loopback_test",
+    testonly = True,
+    srcs = ["loopback_test.cc"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":common",
+        "//src/connectivity/bluetooth/core/bt-host/testing:gtest_main",
+        "@fuchsia_sdk//pkg/driver_testing_cpp",
+    ],
+)
+
+fuchsia_unittest_package(
+    name = "bt_hci_virtual_tests",
+    package_name = "bt_hci_virtual_tests",
+    testonly = True,
+    fuchsia_api_level = "HEAD",
+    unit_tests = [
+        "//src/connectivity/bluetooth/hci/virtual:loopback_test",
+    ],
     visibility = ["//visibility:public"],
 )

@@ -9,170 +9,148 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/driver/devfs/cpp/connector.h>
 
-#include "bt-hci.h"
+#include <queue>
+
+#include "lib/async/cpp/wait.h"
 
 namespace bt_hci_virtual {
 
 using AddChildCallback = fit::function<void(fuchsia_driver_framework::wire::NodeAddArgs)>;
 
-class LoopbackDevice : public fidl::WireServer<fuchsia_hardware_bluetooth::Hci>,
-                       public fidl::WireServer<fuchsia_hardware_bluetooth::Vendor> {
+class LoopbackDevice : public fidl::Server<fuchsia_hardware_bluetooth::Vendor> {
  public:
+  static constexpr size_t kMaxSnoopQueueSize = 20;
+  static constexpr size_t kMaxSnoopUnackedPackets = 10;
+  static constexpr size_t kMaxReceiveQueueSize = 40;
+  static constexpr size_t kMaxReceiveUnackedPackets = 10;
+
   explicit LoopbackDevice();
 
   // Methods to control the LoopbackDevice's lifecycle. These are used by the VirtualController.
-  zx_status_t Initialize(zx_handle_t channel, std::string_view name, AddChildCallback callback);
-  void Shutdown();
+  // `channel` speaks the HCI UART protocol.
+  // `name` is the name to be used for the driver framework node.
+  // `callback` will be called with the NodeAddArgs when LoopbackDevice should be added as a child
+  // node.
+  zx_status_t Initialize(zx::channel channel, std::string_view name, AddChildCallback callback);
 
- private:
-  // fuchsia_hardware_bluetooth::Vendor protocol interface implementations.
-  void EncodeCommand(EncodeCommandRequestView request,
-                     EncodeCommandCompleter::Sync& completer) override;
-  void OpenHci(OpenHciCompleter::Sync& completer) override;
-  void OpenHciTransport(OpenHciTransportCompleter::Sync& completer) override {}
-  void handle_unknown_method(
-      fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Vendor> metadata,
-      fidl::UnknownMethodCompleter::Sync& completer) override;
-
-  // fuchsia_hardware_bluetooth::Hci protocol interface implementations.
-  void OpenCommandChannel(OpenCommandChannelRequestView request,
-                          OpenCommandChannelCompleter::Sync& completer) override;
-  void OpenAclDataChannel(OpenAclDataChannelRequestView request,
-                          OpenAclDataChannelCompleter::Sync& completer) override;
-  void OpenScoDataChannel(OpenScoDataChannelRequestView request,
-                          OpenScoDataChannelCompleter::Sync& completer) override;
-  void ConfigureSco(ConfigureScoRequestView request,
-                    ConfigureScoCompleter::Sync& completer) override;
-  void ResetSco(ResetScoCompleter::Sync& completer) override;
-  void OpenIsoDataChannel(OpenIsoDataChannelRequestView request,
-                          OpenIsoDataChannelCompleter::Sync& completer) override;
-  void OpenSnoopChannel(OpenSnoopChannelRequestView request,
-                        OpenSnoopChannelCompleter::Sync& completer) override;
-  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Hci> metadata,
-                             fidl::UnknownMethodCompleter::Sync& completer) override;
-
+  // Called by driver_devfs::Connector.
   void Connect(fidl::ServerEnd<fuchsia_hardware_bluetooth::Vendor> request);
 
+ private:
   // HCI UART packet indicators
-  enum BtHciPacketIndicator : uint8_t {
+  enum class PacketIndicator : uint8_t {
     kHciNone = 0,
     kHciCommand = 1,
     kHciAclData = 2,
     kHciSco = 3,
     kHciEvent = 4,
+    kHciIso = 5,
   };
 
-  // This wrapper around async_wait enables us to get a LoopbackDevice* in the handler.
-  // We use this instead of async::WaitMethod because async::WaitBase isn't thread safe.
-  struct Wait : public async_wait {
-    explicit Wait(LoopbackDevice* uart, zx::channel* channel);
-    static void Handler(async_dispatcher_t* dispatcher, async_wait_t* async_wait,
-                        zx_status_t status, const zx_packet_signal_t* signal);
-    LoopbackDevice* uart;
-    // Indicates whether a wait has begun and not ended.
-    bool pending = false;
-    // The channel that this wait waits on.
-    zx::channel* channel;
+  class SnoopClient : public fidl::AsyncEventHandler<fuchsia_hardware_bluetooth::Snoop> {
+   public:
+    SnoopClient(fidl::ClientEnd<fuchsia_hardware_bluetooth::Snoop> client_end,
+                LoopbackDevice* device);
+
+    // `buffer` should NOT have an indicator byte.
+    void QueueSnoopPacket(uint8_t* buffer, size_t length, PacketIndicator indicator,
+                          fuchsia_hardware_bluetooth::PacketDirection direction);
+
+   private:
+    struct Packet {
+      std::vector<uint8_t> packet;
+      uint64_t sequence;
+      PacketIndicator indicator;
+      fuchsia_hardware_bluetooth::PacketDirection direction;
+    };
+
+    void SendSnoopPacket(uint8_t* buffer, size_t length, PacketIndicator indicator,
+                         fuchsia_hardware_bluetooth::PacketDirection direction, uint64_t sequence);
+
+    // fidl::AsyncEventHandler<fuchsia_hardware_bluetooth::Snoop> overrides:
+    void OnAcknowledgePackets(
+        fidl::Event<fuchsia_hardware_bluetooth::Snoop::OnAcknowledgePackets>& event) override;
+    void on_fidl_error(fidl::UnbindInfo error) override;
+    void handle_unknown_event(
+        fidl::UnknownEventMetadata<fuchsia_hardware_bluetooth::Snoop> metadata) override;
+
+    fidl::Client<fuchsia_hardware_bluetooth::Snoop> client_;
+    uint64_t next_sequence_ = 1u;
+    uint64_t acked_sequence_ = 0u;
+    uint32_t dropped_sent_ = 0u;
+    uint32_t dropped_received_ = 0u;
+    std::queue<Packet> queued_packets_;
+    LoopbackDevice* device_;
   };
 
-  // Returns length of current event packet being received.
-  // Must only be called in the read callback (HciHandleUartReadEvents).
-  size_t EventPacketLength();
+  class HciTransportServer : public fidl::Server<fuchsia_hardware_bluetooth::HciTransport> {
+   public:
+    HciTransportServer(LoopbackDevice* device, size_t binding_id,
+                       fidl::ServerEnd<fuchsia_hardware_bluetooth::HciTransport> server_end);
 
-  // Returns length of current ACL data packet being received.
-  // Must only be called in the read callback (HciHandleUartReadEvents).
-  size_t AclPacketLength();
+    // `buffer` must have an indicator byte.
+    void OnReceive(uint8_t* buffer, size_t length);
 
-  // Returns length of current SCO data packet being received.
-  // Must only be called in the read callback (HciHandleUartReadEvents).
-  size_t ScoPacketLength();
+    void OnUnbound(fidl::UnbindInfo info);
 
-  void ChannelCleanup(zx::channel* channel);
+   private:
+    void SendOnReceive(uint8_t* buffer, size_t length);
+    void MaybeSendQueuedReceivePackets();
 
-  void SnoopChannelWrite(uint8_t flags, uint8_t* bytes, size_t length);
+    // fuchsia_hardware_bluetooth::HciTransport overrides:
+    void Send(SendRequest& request, SendCompleter::Sync& completer) override;
+    void AckReceive(AckReceiveCompleter::Sync& completer) override;
+    void ConfigureSco(ConfigureScoRequest& request,
+                      ConfigureScoCompleter::Sync& completer) override;
+    void SetSnoop(SetSnoopRequest& request, SetSnoopCompleter::Sync& completer) override;
+    void handle_unknown_method(
+        fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::HciTransport> metadata,
+        fidl::UnknownMethodCompleter::Sync& completer) override;
 
-  void HciBeginShutdown();
+    LoopbackDevice* device_;
+    size_t binding_id_;
+    size_t receive_credits_ = kMaxReceiveUnackedPackets;
+    std::queue<std::vector<uint8_t>> receive_queue_;
+    fidl::ServerBinding<fuchsia_hardware_bluetooth::HciTransport> binding_;
+  };
 
-  void HciHandleIncomingChannel(zx::channel* chan, zx_signals_t pending);
+  void OnLoopbackChannelSignal(async_dispatcher_t* dispatcher, async::WaitBase* wait,
+                               zx_status_t status, const zx_packet_signal_t* signal);
 
-  void HciHandleClientChannel(zx::channel* chan, zx_signals_t pending);
+  void OnHciTransportUnbound(size_t binding_id, fidl::UnbindInfo info);
 
-  // Reads the next packet chunk from |uart_src| into |buffer| and increments |buffer_offset| and
-  // |uart_src| by the number of bytes read.
-  // If a complete packet is read, it will be written to |channel|.
-  using PacketLengthFunction = size_t (LoopbackDevice::*)();
-  void ProcessNextUartPacketFromReadBuffer(uint8_t* buffer, size_t buffer_size,
-                                           size_t* buffer_offset, const uint8_t** uart_src,
-                                           const uint8_t* uart_end,
-                                           PacketLengthFunction get_packet_length,
-                                           zx::channel* channel, bt_hci_snoop_type_t snoop_type);
+  void ReadLoopbackChannel();
+  void WriteLoopbackChannel(PacketIndicator indicator, uint8_t* buffer, size_t length);
 
-  void OnChannelSignal(Wait* wait, zx_status_t status, const zx_packet_signal_t* signal);
+  // fuchsia_hardware_bluetooth::Vendor overrides:
+  void EncodeCommand(EncodeCommandRequest& request,
+                     EncodeCommandCompleter::Sync& completer) override;
+  void OpenHci(OpenHciCompleter::Sync& completer) override;
+  void OpenHciTransport(OpenHciTransportCompleter::Sync& completer) override;
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Vendor> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override;
 
-  zx_status_t HciOpenChannel(zx::channel* in_channel, zx_handle_t in);
+  zx::channel loopback_chan_;
+  async::WaitMethod<LoopbackDevice, &LoopbackDevice::OnLoopbackChannelSignal> loopback_chan_wait_{
+      this};
 
-  // 1 byte packet indicator + 3 byte header + payload
-  static constexpr uint32_t kCmdBufSize = 255 + 4;
-
-  // The maximum HCI ACL frame size used for data transactions
-  // (1024 + 4 bytes for the ACL header + 1 byte packet indicator)
-  static constexpr uint32_t kAclMaxFrameSize = 1029;
-
-  // The maximum HCI SCO frame size used for data transactions.
-  // (255 byte payload + 3 bytes for the SCO header + 1 byte packet indicator)
-  static constexpr uint32_t kScoMaxFrameSize = 259;
-
-  // 1 byte packet indicator + 2 byte header + payload
-  static constexpr uint32_t kEventBufSize = 255 + 3;
-
-  // Backing channel for this device.
-  zx::channel in_channel_;
-  Wait in_channel_wait_{this, &in_channel_};
-
-  // Upper channels.
-  zx::channel cmd_channel_;
-  Wait cmd_channel_wait_{this, &cmd_channel_};
-
-  zx::channel acl_channel_;
-  Wait acl_channel_wait_{this, &acl_channel_};
-
-  zx::channel sco_channel_;
-  Wait sco_channel_wait_{this, &sco_channel_};
-
-  zx::channel snoop_channel_;
-
-  std::atomic_bool shutting_down_ = false;
-
-  // Type of current packet being read from the UART.
-  // Must only be used in the UART read callback (HciHandleUartReadEvents).
-  BtHciPacketIndicator cur_uart_packet_type_ = kHciNone;
-
-  // For accumulating HCI events.
-  // Must only be used in the UART read callback (HciHandleUartReadEvents).
-  uint8_t event_buffer_[kEventBufSize];
-  // Must only be used in the UART read callback (HciHandleUartReadEvents).
-  size_t event_buffer_offset_ = 0;
-
-  // For accumulating ACL data packets.
-  // Must only be used in the UART read callback (HciHandleUartReadEvents).
-  uint8_t acl_buffer_[kAclMaxFrameSize];
-  // Must only be used in the UART read callback (HciHandleUartReadEvents).
-  size_t acl_buffer_offset_ = 0;
-
-  // For accumulating SCO packets.
-  // Must only be used in the UART read callback (HciHandleUartReadEvents).
-  uint8_t sco_buffer_[kScoMaxFrameSize];
-  // Must only be used in the UART read callback (HciHandleUartReadEvents).
-  size_t sco_buffer_offset_ = 0;
-
-  // For sending outbound packets to the UART.
-  // |kAclMaxFrameSize| is the largest frame size sent.
-  uint8_t write_buffer_[kAclMaxFrameSize];
-
-  driver_devfs::Connector<fuchsia_hardware_bluetooth::Vendor> devfs_connector_;
   fidl::ServerBindingGroup<fuchsia_hardware_bluetooth::Vendor> vendor_binding_group_;
 
-  async_dispatcher_t* dispatcher_ = fdf::Dispatcher::GetCurrent()->async_dispatcher();
+  // Multiple HciTransport servers need to be supported: at least 1 for bt-host and 1 for
+  // bt-snoop.
+  std::unordered_map<size_t, HciTransportServer> hci_transport_servers_;
+  size_t next_hci_transport_server_id_ = 0u;
+
+  // Only support 1 Snoop binding at a time.
+  std::optional<SnoopClient> snoop_;
+
+  async_dispatcher_t* dispatcher_;
+
+  // +1 for packet indicator
+  std::array<uint8_t, fuchsia_hardware_bluetooth::kAclPacketMax + 1> read_buffer_;
+
+  driver_devfs::Connector<fuchsia_hardware_bluetooth::Vendor> devfs_connector_;
 };
 
 }  // namespace bt_hci_virtual
