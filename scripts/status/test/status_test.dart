@@ -143,20 +143,19 @@ void main() {
     });
     test('parses a json output', () async {
       var jsonText = '''{"child": [
-                {"type": "IDENTIFIER", "value": "use_goma"},
+                {"type": "IDENTIFIER", "value": "use_foo"},
                 {"type": "LITERAL", "value": "true"}
               ]}
       ''';
       ProcessResult pr = ProcessResult(123, 0, jsonText, '');
       List<Item> items = parser.parseGn(processResult: pr);
-      expect(items.length, 2);
-      expect(items[0].key, 'goma');
-      expect(items[1].key, 'release');
+      expect(items.length, 1);
+      expect(items[0].key, 'release');
     });
     test('handles variable assignments', () async {
       BasicGnParser parser =
-          await parseFxGn('use_goma = true\nis_debug = false');
-      expect(parser.assignedVariables['use_goma'], 'true');
+          await parseFxGn('use_foo = true\nis_debug = false');
+      expect(parser.assignedVariables['use_foo'], 'true');
       expect(parser.assignedVariables['is_debug'], 'false');
     });
     test('handles import statements', () async {
@@ -179,22 +178,19 @@ void main() {
     });
     test('correctly parses calculated variables', () async {
       BasicGnParser parser =
-          await parseFxGn('use_goma = true\nis_debug = false');
+          await parseFxGn('use_foo = true\nis_debug = false');
       var items = GNStatusParser().collectFromTreeParser(parser);
-      expect(items.length, 2);
-      expect(items[0].key, 'goma');
-      expect(items[0].title, 'Goma');
-      expect(items[0].value, 'enabled');
-      expect(items[1].key, 'release');
-      expect(items[1].title, 'Is release?');
-      expect(items[1].value, 'true');
-      expect(items[1].notes, '--release argument of `fx set`');
+      expect(items.length, 1);
+      expect(items[0].key, 'release');
+      expect(items[0].title, 'Is release?');
+      expect(items[0].value, 'true');
+      expect(items[0].notes, '--release argument of `fx set`');
     });
   });
 
   group('fx gn format', () {
     test('parses partial files (useful for other tests)', () async {
-      var data = await runFxGn('use_goma = true');
+      var data = await runFxGn('use_foo = true');
       expect(data, {
         'begin_token': '',
         'child': [
@@ -208,7 +204,7 @@ void main() {
                   'end_line': 1
                 },
                 'type': 'IDENTIFIER',
-                'value': 'use_goma'
+                'value': 'use_foo'
               },
               {
                 'location': {
@@ -244,8 +240,8 @@ void main() {
 
     test('parses well-formed gni file from stdin', () async {
       var data = await runFxGn('''import("//products/core.gni")
-use_goma = true
-goma_dir = "/Users/ldap/goma"
+use_foo = true
+foo_dir = "/Users/ldap/foo_cache"
 
 # See: fx args --list=base_package_labels
 base_package_labels += []
@@ -311,7 +307,7 @@ universe_package_labels += [
                   'end_line': 2
                 },
                 'type': 'IDENTIFIER',
-                'value': 'use_goma'
+                'value': 'use_foo'
               },
               {
                 'location': {
@@ -343,7 +339,7 @@ universe_package_labels += [
                   'end_line': 3
                 },
                 'type': 'IDENTIFIER',
-                'value': 'goma_dir'
+                'value': 'foo_dir'
               },
               {
                 'location': {
@@ -353,7 +349,7 @@ universe_package_labels += [
                   'end_line': 3
                 },
                 'type': 'LITERAL',
-                'value': '"/Users/ldap/goma"'
+                'value': '"/Users/ldap/foo_cache"'
               }
             ],
             'location': {
