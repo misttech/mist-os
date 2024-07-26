@@ -13,9 +13,9 @@
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/assert.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/host_error.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/log.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/macros.h"
 #include "src/connectivity/bluetooth/lib/cpp-string/string_printf.h"
 
-#pragma clang diagnostic ignored "-Wvariadic-macros"
 #pragma clang diagnostic ignored \
     "-Wgnu-statement-expression-from-macro-expansion"
 
@@ -72,7 +72,7 @@ struct IsError : std::false_type {};
 template <template <typename> class T, typename U>
 struct IsError<T<U>,
                std::void_t<decltype(std::declval<void (&)(Error<U>)>()(
-                   std::declval<T<U>>()))>> : std::true_type {};
+                   std::declval<T<U>>()))>> : std::true_type{};
 
 template <typename T>
 constexpr bool IsErrorV = IsError<T>::value;
@@ -86,7 +86,7 @@ template <typename ProtocolErrorCode>
 struct CanRepresentSuccess<
     ProtocolErrorCode,
     std::void_t<decltype(ProtocolErrorTraits<ProtocolErrorCode>::is_success(
-        std::declval<ProtocolErrorCode>()))>> : std::true_type {};
+        std::declval<ProtocolErrorCode>()))>> : std::true_type{};
 
 template <typename ProtocolErrorCode>
 constexpr bool CanRepresentSuccessV =
@@ -484,12 +484,12 @@ OStream& operator<<(
 //
 // It will log with the string prepended to the stringified result if result is
 // a failure. Evaluates to true if the result indicates failure.
-#define bt_is_error(result, level, tag, fmt, args...)          \
-  ({                                                           \
-    auto _result = result;                                     \
-    if (_result.is_error())                                    \
-      bt_log(level, tag, "%s: " fmt, bt_str(_result), ##args); \
-    _result.is_error();                                        \
+#define bt_is_error(result, level, tag, fmt, /*args*/...)             \
+  ({                                                                  \
+    auto _result = result;                                            \
+    if (_result.is_error())                                           \
+      bt_log(level, tag, "%s: " fmt, bt_str(_result), ##__VA_ARGS__); \
+    _result.is_error();                                               \
   })
 
 #endif  // SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_PUBLIC_PW_BLUETOOTH_SAPPHIRE_INTERNAL_HOST_COMMON_ERROR_H_

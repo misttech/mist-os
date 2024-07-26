@@ -133,7 +133,7 @@ class Packet<hci_spec::EventHeader>
 
 // Convenience macros to check and log any non-Success status of an event.
 // Evaluate to true if the event status is not success.
-#define hci_is_error(event, flag, tag, fmt...) \
-  bt_is_error(event.ToResult(), flag, tag, fmt)
+#define hci_is_error(event, flag, tag, /*fmt*/...) \
+  bt_is_error(event.ToResult(), flag, tag, __VA_ARGS__)
 
 #endif  // SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_PUBLIC_PW_BLUETOOTH_SAPPHIRE_INTERNAL_HOST_TRANSPORT_CONTROL_PACKETS_H_
