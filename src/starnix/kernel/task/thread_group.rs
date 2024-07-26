@@ -15,9 +15,8 @@ use crate::task::{
     ptrace_detach, AtomicStopState, ControllingTerminal, CurrentTask, ExitStatus, Kernel, PidTable,
     ProcessGroup, PtraceAllowedPtracers, PtraceEvent, PtraceOptions, PtraceStatus, Session,
     StopState, Task, TaskFlags, TaskMutableState, TaskPersistentInfo, TaskPersistentInfoState,
-    TimerId, TimerTable, WaitQueue, ZombiePtraces,
+    TimerTable, WaitQueue, ZombiePtraces,
 };
-use crate::timer::Timeline;
 use fuchsia_zircon as zx;
 use itertools::Itertools;
 use macro_rules_attribute::apply;
@@ -185,9 +184,6 @@ pub struct ThreadGroup {
     /// for the purposes of SECCOMP_FILTER_FLAG_TSYNC.  Inherited across clone because
     /// seccomp filters are also inherited across clone.
     pub next_seccomp_filter_id: AtomicU64Counter,
-
-    /// Timer id of ITIMER_REAL.
-    itimer_real_id: TimerId,
 
     /// Tasks ptraced by this process
     pub ptracees: Mutex<BTreeMap<pid_t, TaskContainer>>,
@@ -422,15 +418,12 @@ impl ThreadGroup {
         L: LockBefore<ProcessGroupState>,
     {
         OwnedRef::new_cyclic(|weak_thread_group| {
-            let timers = TimerTable::new();
-            let itimer_real_id = timers.create(Timeline::RealTime, None).unwrap();
             let mut thread_group = ThreadGroup {
                 weak_thread_group: weak_thread_group.clone(),
                 kernel,
                 process,
                 leader,
                 signal_actions,
-                itimer_real_id,
                 drop_notifier: Default::default(),
                 // A child process created via fork(2) inherits its parent's
                 // resource limits.  Resource limits are preserved across execve(2).
@@ -456,7 +449,7 @@ impl ThreadGroup {
                     child_status_waiters: WaitQueue::default(),
                     is_child_subreaper: false,
                     process_group: Arc::clone(&process_group),
-                    timers,
+                    timers: Default::default(),
                     did_exec: false,
                     stopped_waiters: WaitQueue::default(),
                     last_signal: None,
@@ -833,7 +826,7 @@ impl ThreadGroup {
     }
 
     fn itimer_real(&self) -> IntervalTimerHandle {
-        self.write().timers.get_timer(self.itimer_real_id).expect("no ITIMER_REAL exists")
+        self.write().timers.itimer_real()
     }
 
     pub fn set_itimer(&self, which: u32, value: itimerval) -> Result<itimerval, Errno> {

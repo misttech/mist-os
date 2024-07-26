@@ -20,21 +20,32 @@ pub struct TimerTable {
     state: Mutex<TimerTableMutableState>,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 struct TimerTableMutableState {
     /// The `TimerId` at which allocation should begin searching for an unused ID.
     next_timer_id: TimerId,
     timers: HashMap<TimerId, IntervalTimerHandle>,
+    itimer_real: IntervalTimerHandle,
+}
+
+impl Default for TimerTableMutableState {
+    fn default() -> Self {
+        let signal_event =
+            SignalEvent::new(SignalEventValue(0), SIGALRM, SignalEventNotify::Signal);
+        let itimer_real = IntervalTimer::new(0, Timeline::RealTime, signal_event)
+            .expect("Failed to create itimer_real");
+        TimerTableMutableState {
+            itimer_real,
+            timers: Default::default(),
+            next_timer_id: Default::default(),
+        }
+    }
 }
 
 pub type TimerId = __kernel_timer_t;
 pub type ClockId = uapi::__kernel_clockid_t;
 
 impl TimerTable {
-    pub fn new() -> TimerTable {
-        Default::default()
-    }
-
     /// Creates a new per-process interval timer.
     ///
     /// The new timer is initially disarmed.
@@ -78,6 +89,10 @@ impl TimerTable {
         );
 
         Ok(timer_id)
+    }
+
+    pub fn itimer_real(&self) -> IntervalTimerHandle {
+        self.state.lock().itimer_real.clone()
     }
 
     /// Disarms and deletes a timer.
