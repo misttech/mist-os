@@ -89,6 +89,7 @@ impl BytesFileOps for PowerStateFile {
         if !supported_states.contains(&state) {
             return error!(EINVAL);
         }
+        fuchsia_trace::duration!(c"power", c"starnix-sysfs:suspend");
         power_manager.suspend(state)?;
         Ok(())
     }
