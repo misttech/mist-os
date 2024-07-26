@@ -56,7 +56,7 @@ $ fx test //src/testing/end_to_end/examples/test_case_revive_example:run_wo_test
 $ fx test //src/testing/end_to_end/examples/test_case_revive_example:test_case_revive_with_idle_suspend_timer_resume_fc --e2e --output
 
 # To run the test class by reviving test cases with Soft-Reboot operation
-$ fx test //src/testing/end_to_end/examples/test_case_revive_example:test_case_revive_with_with_soft_reboot_fc --e2e --output
+$ fx test //src/testing/end_to_end/examples/test_case_revive_example:test_case_revive_with_soft_reboot_fc --e2e --output
 ```
 
 ### Soft Reboot Test
