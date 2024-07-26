@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{user_error, Error, FfxContext, MetricsSession, Result};
+use crate::{analytics_command, user_error, Error, FfxContext, MetricsSession, Result};
 use argh::{ArgsInfo, FromArgs};
 use camino::Utf8PathBuf;
 use ffx_command_error::bug;
@@ -98,7 +98,9 @@ impl FfxCommandLine {
         metrics: MetricsSession,
         suite: &T,
     ) -> Result<Error> {
-        metrics.print_notice(&mut std::io::stderr()).await?;
+        if !analytics_command(&self.unredacted_args_for_analytics().join(" ")) {
+            metrics.print_notice(&mut std::io::stderr()).await?;
+        }
 
         let subcmd_name = self.global.subcommand.first();
         let help_err = match subcmd_name {

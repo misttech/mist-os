@@ -5,8 +5,9 @@
 use argh::{ArgsInfo, FromArgs, SubCommands};
 use errors::ffx_error;
 use ffx_command::{
-    return_bug, return_user_error, send_enhanced_analytics, CliArgsInfo, Error, FfxCommandLine,
-    FfxContext, FfxToolInfo, MetricsSession, Optionality, Result, ToolRunner, ToolSuite,
+    analytics_command, return_bug, return_user_error, send_enhanced_analytics, CliArgsInfo, Error,
+    FfxCommandLine, FfxContext, FfxToolInfo, MetricsSession, Optionality, Result, ToolRunner,
+    ToolSuite,
 };
 use ffx_config::environment::ExecutableKind;
 use ffx_config::EnvironmentContext;
@@ -188,7 +189,9 @@ impl ToolRunner for FfxSubCommand {
         } else if self.app.global.schema && !self.app.global.machine.is_some() {
             Err(ffx_error!("The schema flag requires the machine flag").into())
         } else {
-            metrics.print_notice(&mut std::io::stderr()).await?;
+            if !analytics_command(&self.app.unredacted_args_for_analytics().join(" ")) {
+                metrics.print_notice(&mut std::io::stderr()).await?;
+            }
             let args_for_analytics = match send_enhanced_analytics().await {
                 false => ffx_lib_suite::ffx_plugin_redact_args(&self.app, &self.cmd),
                 true => self.app.unredacted_args_for_analytics(),

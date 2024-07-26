@@ -6,8 +6,8 @@ use crate::{FhoEnvironment, FhoToolMetadata, ToolIO, TryFromEnv};
 use argh::{ArgsInfo, CommandInfo, FromArgs, SubCommand, SubCommands};
 use async_trait::async_trait;
 use ffx_command::{
-    send_enhanced_analytics, user_error, Error, FfxCommandLine, FfxContext, MetricsSession, Result,
-    ToolRunner, ToolSuite,
+    analytics_command, send_enhanced_analytics, user_error, Error, FfxCommandLine, FfxContext,
+    MetricsSession, Result, ToolRunner, ToolSuite,
 };
 use ffx_config::environment::ExecutableKind;
 use ffx_config::EnvironmentContext;
@@ -121,7 +121,9 @@ impl ToolRunner for MetadataRunner {
 #[async_trait(?Send)]
 impl<T: FfxTool> ToolRunner for FhoTool<T> {
     async fn run(self: Box<Self>, metrics: MetricsSession) -> Result<ExitStatus> {
-        metrics.print_notice(&mut std::io::stderr()).await?;
+        if !analytics_command(&self.redacted_args.join(" ")) {
+            metrics.print_notice(&mut std::io::stderr()).await?;
+        }
         let writer = TryFromEnv::try_from_env(&self.env).await?;
         let res: Result<ExitStatus> = if self.env.ffx.global.schema {
             if self.main.has_schema() {
