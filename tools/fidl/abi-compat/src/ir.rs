@@ -99,6 +99,7 @@ pub enum Type {
 #[derive(Deserialize, Debug, Clone)]
 pub struct BitsMember {
     pub value: Constant,
+    pub name: String,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -112,6 +113,7 @@ pub struct BitsDeclaration {
 #[derive(Deserialize, Debug, Clone)]
 pub struct EnumMember {
     pub value: Constant,
+    pub name: String,
 }
 
 #[derive(Deserialize, Debug, Clone)]
