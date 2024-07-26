@@ -35,6 +35,7 @@ pub mod fs_args;
 pub mod fsverity;
 pub mod fuse;
 pub mod inotify;
+pub mod mount_record;
 pub mod path;
 pub mod pidfd;
 pub mod pipe;

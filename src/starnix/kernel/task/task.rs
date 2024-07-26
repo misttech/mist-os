@@ -13,6 +13,7 @@ use crate::task::{
     SeccompStateValue, ThreadGroup, ThreadState, UtsNamespaceHandle, WaitCanceler, Waiter,
     ZombieProcess,
 };
+use crate::vfs::mount_record::MountRecord;
 use crate::vfs::{FdFlags, FdNumber, FdTable, FileHandle, FsContext, FsNodeHandle, FsString};
 use bitflags::bitflags;
 use fuchsia_inspect_contrib::profile_duration;
@@ -896,6 +897,9 @@ pub struct Task {
     /// The file system for this task.
     fs: Option<Arc<FsContext>>,
 
+    /// Mounts that should be automatically unmounted when this task exits.
+    pub automounts: MountRecord,
+
     /// The namespace for abstract AF_UNIX sockets for this task.
     pub abstract_socket_namespace: Arc<AbstractUnixSocketNamespace>,
 
@@ -1072,6 +1076,7 @@ impl Task {
             files,
             mm: Some(mm),
             fs: Some(fs),
+            automounts: Default::default(),
             abstract_socket_namespace,
             abstract_vsock_namespace,
             vfork_event,
@@ -1486,13 +1491,14 @@ impl Releasable for Task {
         // Drop fields that can end up owning a FsNode to ensure no FsNode are owned by this task.
         self.fs = None;
         self.mm = None;
+        self.automounts.release(());
         // Rebuild a temporary CurrentTask to run the release actions that requires a CurrentState.
         let current_task = CurrentTask::new(OwnedRef::new(self), thread_state);
 
         // Apply any delayed releasers left.
         current_task.trigger_delayed_releaser();
 
-        // Drop the task now that is has been released. This requires to take it fro the OwnedRef
+        // Drop the task now that is has been released. This requires to take it from the OwnedRef
         // and from the resulting ReleaseGuard.
         let CurrentTask { mut task, .. } = current_task;
         let task = OwnedRef::take(&mut task).expect("task should not have been re-owned");

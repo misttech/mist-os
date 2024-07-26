@@ -21,13 +21,14 @@ use starnix_core::execution::{
 use starnix_core::fs::fuchsia::RemoteFs;
 use starnix_core::signals;
 use starnix_core::task::{CurrentTask, ExitStatus, Task};
-use starnix_core::vfs::{FileSystemOptions, FsString, LookupContext, NamespaceNode, WhatToMount};
+use starnix_core::vfs::mount_record::MountRecord;
+use starnix_core::vfs::{FileSystemOptions, FsString, LookupContext, WhatToMount};
 use starnix_logging::{log_error, log_info};
-use starnix_sync::{FileOpsCore, LockBefore, Locked, Mutex};
+use starnix_sync::{FileOpsCore, LockBefore, Locked};
 use starnix_uapi::auth::{Capabilities, Credentials};
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errno;
-use starnix_uapi::errors::{Errno, EEXIST, ENOTDIR};
+use starnix_uapi::errors::{EEXIST, ENOTDIR};
 use starnix_uapi::file_mode::mode;
 use starnix_uapi::mount_flags::MountFlags;
 use starnix_uapi::open_flags::OpenFlags;
@@ -37,7 +38,6 @@ use std::ffi::CString;
 use std::ops::DerefMut;
 use std::os::unix::ffi::OsStrExt;
 use std::path::Path;
-use std::sync::Arc;
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio, fuchsia_async as fasync,
     fuchsia_zircon as zx,
@@ -73,7 +73,7 @@ pub async fn start_component(
         system_task,
     )?;
 
-    let mount_record = Arc::new(Mutex::new(MountRecord::default()));
+    let automounts = MountRecord::default();
 
     let ns = start_info.ns.take().ok_or_else(|| anyhow!("Missing namespace"))?;
 
@@ -91,7 +91,8 @@ pub async fn start_component(
                     // Mount custom_artifacts and test_data directory at root of container
                     // We may want to transition to have these directories unique per component
                     let dir_proxy = fio::DirectorySynchronousProxy::new(dir_handle.into_channel());
-                    mount_record.lock().mount_remote(
+                    mount_remote(
+                        &automounts,
                         system_task.kernel().kthreads.unlocked_for_async().deref_mut(),
                         system_task,
                         &dir_proxy,
@@ -100,7 +101,8 @@ pub async fn start_component(
                 }
                 _ => {
                     let dir_proxy = fio::DirectorySynchronousProxy::new(dir_handle.into_channel());
-                    mount_record.lock().mount_remote(
+                    mount_remote(
+                        &automounts,
                         system_task.kernel().kthreads.unlocked_for_async().deref_mut(),
                         system_task,
                         &dir_proxy,
@@ -166,10 +168,11 @@ pub async fn start_component(
         &binary_path,
     )?;
 
+    current_task.automounts.adopt(automounts);
+
     let weak_task = execute_task_with_prerun_result(
         current_task,
         {
-            let mount_record = mount_record.clone();
             move |locked, current_task| {
                 let cwd_path =
                     FsString::from(get_program_string(&start_info, "cwd").unwrap_or(&pkg_path));
@@ -196,7 +199,7 @@ pub async fn start_component(
                                     errno!(EINVAL)
                                 })?;
                         let mount_point = current_task.lookup_path_from_root(mount_point)?;
-                        mount_record.lock().mount(
+                        current_task.automounts.mount(
                             mount_point,
                             WhatToMount::Fs(child_fs),
                             MountFlags::empty(),
@@ -231,8 +234,6 @@ pub async fn start_component(
             // If the component controller server has gone away, there is nobody for us to
             // report the result to.
             let _ = task_complete_sender.send(result);
-            // Unmount all the directories for this component.
-            std::mem::drop(mount_record);
         },
         None,
     )?;
@@ -344,97 +345,58 @@ where
     Ok(component_path)
 }
 
-/// A record of the mounts created when starting a component.
-///
-/// When the record is dropped, the mounts are unmounted.
-#[derive(Default)]
-struct MountRecord {
-    /// The namespace nodes at which we have crated mounts for this component.
-    mounts: Vec<NamespaceNode>,
-}
+fn mount_remote<L>(
+    automounts: &MountRecord,
+    locked: &mut Locked<'_, L>,
+    system_task: &CurrentTask,
+    directory: &fio::DirectorySynchronousProxy,
+    path: &str,
+) -> Result<(), Error>
+where
+    L: LockBefore<FileOpsCore>,
+{
+    // The incoming dir_path might not be top level, e.g. it could be /foo/bar.
+    // Iterate through each component directory starting from the parent and
+    // create it if it doesn't exist.
+    let mut current_node = system_task.lookup_path_from_root(".".into())?;
+    let mut context = LookupContext::default();
 
-impl MountRecord {
-    fn mount(
-        &mut self,
-        mount_point: NamespaceNode,
-        what: WhatToMount,
-        flags: MountFlags,
-    ) -> Result<(), Errno> {
-        mount_point.mount(what, flags)?;
-        self.mounts.push(mount_point);
-        Ok(())
+    // Extract each component using Path::new(path).components(). For example,
+    // Path::new("/foo/bar").components() will return [RootDir, Normal("foo"), Normal("bar")].
+    // We're not interested in the RootDir, so we drop the prefix "/" if it exists.
+    let path = if let Some(path) = path.strip_prefix('/') { path } else { path };
+
+    for sub_dir in Path::new(path).components() {
+        let sub_dir = sub_dir.as_os_str().as_bytes();
+
+        current_node = match current_node.create_node(
+            locked,
+            system_task,
+            sub_dir.into(),
+            mode!(IFDIR, 0o755),
+            DeviceType::NONE,
+        ) {
+            Ok(node) => node,
+            Err(errno) if errno == EEXIST || errno == ENOTDIR => {
+                current_node.lookup_child(system_task, &mut context, sub_dir.into())?
+            }
+            Err(e) => bail!(e),
+        };
     }
 
-    fn mount_remote<L>(
-        &mut self,
-        locked: &mut Locked<'_, L>,
-        system_task: &CurrentTask,
-        directory: &fio::DirectorySynchronousProxy,
-        path: &str,
-    ) -> Result<(), Error>
-    where
-        L: LockBefore<FileOpsCore>,
-    {
-        // The incoming dir_path might not be top level, e.g. it could be /foo/bar.
-        // Iterate through each component directory starting from the parent and
-        // create it if it doesn't exist.
-        let mut current_node = system_task.lookup_path_from_root(".".into())?;
-        let mut context = LookupContext::default();
+    let (status, rights) = directory.get_flags(zx::Time::INFINITE)?;
+    zx::Status::ok(status)?;
 
-        // Extract each component using Path::new(path).components(). For example,
-        // Path::new("/foo/bar").components() will return [RootDir, Normal("foo"), Normal("bar")].
-        // We're not interested in the RootDir, so we drop the prefix "/" if it exists.
-        let path = if let Some(path) = path.strip_prefix('/') { path } else { path };
+    let (client_end, server_end) = zx::Channel::create();
+    directory.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, ServerEnd::new(server_end))?;
 
-        for sub_dir in Path::new(path).components() {
-            let sub_dir = sub_dir.as_os_str().as_bytes();
+    let fs = RemoteFs::new_fs(
+        system_task.kernel(),
+        client_end,
+        FileSystemOptions { source: path.into(), ..Default::default() },
+        rights,
+    )?;
+    automounts.mount(current_node, WhatToMount::Fs(fs), MountFlags::empty())?;
 
-            current_node = match current_node.create_node(
-                locked,
-                system_task,
-                sub_dir.into(),
-                mode!(IFDIR, 0o755),
-                DeviceType::NONE,
-            ) {
-                Ok(node) => node,
-                Err(errno) if errno == EEXIST || errno == ENOTDIR => {
-                    current_node.lookup_child(system_task, &mut context, sub_dir.into())?
-                }
-                Err(e) => bail!(e),
-            };
-        }
-
-        let (status, rights) = directory.get_flags(zx::Time::INFINITE)?;
-        zx::Status::ok(status)?;
-
-        let (client_end, server_end) = zx::Channel::create();
-        directory.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, ServerEnd::new(server_end))?;
-
-        let fs = RemoteFs::new_fs(
-            system_task.kernel(),
-            client_end,
-            FileSystemOptions { source: path.into(), ..Default::default() },
-            rights,
-        )?;
-        current_node.mount(WhatToMount::Fs(fs), MountFlags::empty())?;
-        self.mounts.push(current_node);
-
-        Ok(())
-    }
-
-    fn unmount(&mut self) -> Result<(), Errno> {
-        while let Some(node) = self.mounts.pop() {
-            node.unmount()?;
-        }
-        Ok(())
-    }
-}
-
-impl Drop for MountRecord {
-    fn drop(&mut self) {
-        match self.unmount() {
-            Ok(()) => {}
-            Err(e) => log_error!("failed to unmount during component exit: {:?}", e),
-        }
-    }
+    Ok(())
 }
