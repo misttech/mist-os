@@ -180,11 +180,6 @@ impl Into<fpb::ModifyDependencyError> for ModifyDependencyError {
 }
 
 #[derive(Debug)]
-pub enum InspectError {
-    NotFound,
-}
-
-#[derive(Debug)]
 pub struct Topology {
     elements: HashMap<ElementID, Element>,
     assertive_dependencies: HashMap<ElementLevel, Vec<ElementLevel>>,
@@ -514,7 +509,7 @@ impl Topology {
             return Err(ModifyDependencyError::AlreadyExists);
         }
         required_levels.push(dep.requires.clone());
-        self.add_inspect_for_dependency(dep, true)?;
+        self.add_inspect_for_dependency(dep, true);
         Ok(())
     }
 
@@ -535,7 +530,7 @@ impl Topology {
             return Err(ModifyDependencyError::NotFound(dep.requires.element_id.clone()));
         }
         required_levels.retain(|el| el != &dep.requires);
-        self.remove_inspect_for_dependency(dep)?;
+        self.remove_inspect_for_dependency(dep);
         Ok(())
     }
 
@@ -556,7 +551,7 @@ impl Topology {
             return Err(ModifyDependencyError::AlreadyExists);
         }
         required_levels.push(dep.requires.clone());
-        self.add_inspect_for_dependency(dep, false)?;
+        self.add_inspect_for_dependency(dep, false);
         Ok(())
     }
 
@@ -577,19 +572,16 @@ impl Topology {
             return Err(ModifyDependencyError::NotFound(dep.requires.element_id.clone()));
         }
         required_levels.retain(|el| el != &dep.requires);
-        self.remove_inspect_for_dependency(dep)?;
+        self.remove_inspect_for_dependency(dep);
         Ok(())
     }
 
-    fn add_inspect_for_dependency(
-        &mut self,
-        dep: &Dependency,
-        is_assertive: bool,
-    ) -> Result<(), ModifyDependencyError> {
+    fn add_inspect_for_dependency(&mut self, dep: &Dependency, is_assertive: bool) {
         let (dp_id, rq_id) = (&dep.dependent.element_id, &dep.requires.element_id);
         let (Some(dp), Some(rq)) = (self.elements.get(dp_id), self.elements.get(rq_id)) else {
             // elements[dp_id] and elements[rq_id] guaranteed by prior validation
-            return Err(ModifyDependencyError::Invalid);
+            tracing::error!(?dep, "Failed to add inspect for dependency.");
+            return;
         };
         let (dp_level, rq_level) = (dep.dependent.level, dep.requires.level);
         dp.inspect_edges
@@ -608,27 +600,28 @@ impl Topology {
                 dp_level.to_string(),
                 format!("{}{}", rq_level, if is_assertive { "" } else { "p" }),
             );
-        Ok(())
     }
 
-    fn remove_inspect_for_dependency(
-        &mut self,
-        dep: &Dependency,
-    ) -> Result<(), ModifyDependencyError> {
+    fn remove_inspect_for_dependency(&mut self, dep: &Dependency) {
         // elements[dp_id] and elements[rq_id] guaranteed by prior validation
         let (dp_id, rq_id) = (&dep.dependent.element_id, &dep.requires.element_id);
-        let dp = self.elements.get(dp_id).ok_or(ModifyDependencyError::Invalid)?;
+        let Some(dp) = self.elements.get(dp_id) else {
+            tracing::error!(?dp_id, "Missing element for removal");
+            return;
+        };
         let mut dp_edges = dp.inspect_edges.borrow_mut();
-        let inspect = dp_edges.get_mut(rq_id).ok_or(ModifyDependencyError::Invalid)?;
+        let Some(inspect) = dp_edges.get_mut(rq_id) else {
+            tracing::error!(?rq_id, "Missing edge for removal");
+            return;
+        };
         inspect.meta().remove(&dep.dependent.level.to_string());
-        Ok(())
     }
 
     pub fn inspect_for_element<'a>(
         &self,
         element_id: &'a ElementID,
-    ) -> Result<Rc<RefCell<IGraphVertex<ElementID>>>, InspectError> {
-        Ok(Rc::clone(&self.elements.get(element_id).ok_or(InspectError::NotFound)?.inspect_vertex))
+    ) -> Option<Rc<RefCell<IGraphVertex<ElementID>>>> {
+        Some(Rc::clone(&self.elements.get(element_id)?.inspect_vertex))
     }
 }
 

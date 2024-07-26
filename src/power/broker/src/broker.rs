@@ -332,7 +332,7 @@ impl Broker {
             self.current.insert(element_id.clone(), level_admin);
         }
 
-        if let Ok(elem_inspect) = self.catalog.topology.inspect_for_element(element_id) {
+        if let Some(elem_inspect) = self.catalog.topology.inspect_for_element(element_id) {
             elem_inspect.borrow_mut().meta().set("current_level", level.level);
         }
         previous
@@ -371,7 +371,7 @@ impl Broker {
             self.required.insert(element_id.clone(), level_admin);
         }
 
-        if let Ok(elem_inspect) = self.catalog.topology.inspect_for_element(element_id) {
+        if let Some(elem_inspect) = self.catalog.topology.inspect_for_element(element_id) {
             elem_inspect.borrow_mut().meta().set("required_level", level.level);
         }
         previous
@@ -629,7 +629,7 @@ impl Broker {
         };
         self.update_required_levels(&vec![&element_id]);
         if prev_status.as_ref() != Some(&status) {
-            if let Ok(elem_inspect) = self.catalog.topology.inspect_for_element(&element_id) {
+            if let Some(elem_inspect) = self.catalog.topology.inspect_for_element(&element_id) {
                 elem_inspect
                     .borrow_mut()
                     .meta()
@@ -1257,7 +1257,7 @@ impl Catalog {
             &lease_element_id,
             IndexedPowerLevel { level: LeasePowerLevel::Satisfied as u8, index: 1 },
         );
-        if let Ok(elem_inspect) = self.topology.inspect_for_element(&lease_element_id) {
+        if let Some(elem_inspect) = self.topology.inspect_for_element(&lease_element_id) {
             let elem_readable_name = self.topology.element_name(&element_id);
             elem_inspect.borrow_mut().meta().set_and_track(
                 format!("lease_{}", lease.id),
@@ -1302,7 +1302,7 @@ impl Catalog {
         let lease = self.leases.remove(lease_id).ok_or(anyhow!("{lease_id} not found"))?;
         self.lease_status.remove(lease_id);
         self.lease_contingent.remove(lease_id);
-        if let Ok(elem_inspect) = self.topology.inspect_for_element(&lease.element_id) {
+        if let Some(elem_inspect) = self.topology.inspect_for_element(&lease.element_id) {
             elem_inspect
                 .borrow_mut()
                 .meta()
