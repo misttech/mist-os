@@ -17,7 +17,7 @@ use futures::future::FusedFuture as _;
 use futures::lock::Mutex;
 use futures::{FutureExt as _, StreamExt as _, TryStreamExt as _};
 use itertools::Itertools as _;
-use log::{debug, error, warn};
+use log::{error, info, warn};
 use thiserror::Error;
 use {
     fidl_fuchsia_net_filter as fnet_filter, fidl_fuchsia_net_filter_ext as fnet_filter_ext,
@@ -108,7 +108,7 @@ impl UpdateDispatcherInner {
         // order.
 
         let CommitResult { events, new_state, core_state_v4, core_state_v6 } = resources
-            .get_mut(controller_id)
+            .get(controller_id)
             .expect("controller should not be removed while serving")
             .validate_and_convert_changes(changes, idempotent)?;
 
@@ -153,7 +153,7 @@ impl UpdateDispatcherInner {
 
         // Notify all existing watchers of the update, if it was not a no-op.
         if !events.is_empty() {
-            debug!("updated filtering state for {controller_id:?}: {events:?}");
+            info!("updated filtering state for {controller_id:?}: {events:?}");
 
             let events = events
                 .into_iter()
