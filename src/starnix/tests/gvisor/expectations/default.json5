@@ -498,6 +498,7 @@
                 "MountTest.MountProc",
                 "MountTest.MountTmpfsMagicValIgnored",
                 "MountTest.MountWithStrictAtime",
+                "MountTest.OpenFileBusy",
                 "MountTest.PropagateChildUmountEvent",
                 "MountTest.ReuseGroupIDs",
                 "MountTest.SlaveMaster",

@@ -8,7 +8,6 @@ use starnix_sync::Mutex;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::mount_flags::MountFlags;
 use starnix_uapi::ownership::ReleasableByRef;
-use starnix_uapi::unmount_flags::UnmountFlags;
 
 /// A record of the mounts that should be unmounted.
 ///
@@ -44,7 +43,7 @@ impl ReleasableByRef for MountRecord {
     fn release(&self, _context: Self::Context<'_>) {
         let mut mounts = self.mounts.lock();
         while let Some(name) = mounts.pop() {
-            match name.unmount(UnmountFlags::DETACH) {
+            match name.unmount() {
                 Ok(()) => {}
                 Err(e) => {
                     log_error!("failed to unmount {}: {:?}", name.path_escaping_chroot(), e);
