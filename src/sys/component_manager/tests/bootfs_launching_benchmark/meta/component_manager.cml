@@ -1,0 +1,26 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [ "syslog/client.shard.cml" ],
+    program: {
+        runner: "elf",
+        binary: "bin/component_manager",
+        args: [
+            "--host_bootfs",
+            "--config",
+            "/boot/data/component_manager_config",
+            "fuchsia-boot:///root_package#meta/root_component.cm",
+        ],
+        job_policy_create_raw_processes: "true",
+    },
+    use: [
+        {
+            protocol: [
+                "fidl.examples.routing.echo.Echo",
+                "fuchsia.kernel.VmexResource",
+                "fuchsia.process.Launcher",
+            ],
+        },
+    ],
+}

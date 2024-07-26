@@ -91,6 +91,7 @@ group("non_hermetic_deps") {
     "//src/security/lib/scrutiny/tests/*",
     "//src/security/tests/pkg_test/tests/*",
     "//src/security/tests/scrutiny_ffx_integration/*",
+    "//src/sys/component_manager/tests/bootfs_launching_benchmark:*",
     "//src/sys/component_manager/tests/fuchsia_boot_resolver:*",
     "//src/tests/assembly/*",
     "//src/tests/kernel_cprng/*",
