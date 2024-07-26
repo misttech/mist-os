@@ -159,6 +159,7 @@ def _unpack_prebuilt_package_impl(ctx):
             far_file = far_archive,
             packaged_components = _make_component_info(ctx),
             files = output_files,
+            build_id_dirs = [],
         ),
         # TODO(https://fxbug.dev/338180287): Add debug symbols support.
         FuchsiaDebugSymbolInfo(build_id_dirs = {}),
@@ -234,6 +235,7 @@ def _pack_prebuilt_package_impl(ctx):
             far_file = far_file,
             packaged_components = _make_component_info(ctx),
             files = output_files + input_files,
+            build_id_dirs = [],
         ),
         # TODO(https://fxbug.dev/338180287): Add debug symbols support.
         FuchsiaDebugSymbolInfo(build_id_dirs = {}),
