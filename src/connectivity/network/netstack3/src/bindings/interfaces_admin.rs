@@ -741,6 +741,8 @@ async fn remove_interface(ctx: &mut Ctx, id: BindingId) {
                 // that device.
                 let result = ctx.api().device().remove_device(core_id);
                 ctx.bindings_ctx().remove_routes_on_device(&weak_id).await;
+                // TODO(https://fxbug.dev/353330225): Remove the multicast
+                // routes referencing the device.
                 result.map_deferred(|d| d.into_future("device", &id)).into_future().await.into()
             }
         );

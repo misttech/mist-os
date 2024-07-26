@@ -24,21 +24,15 @@ pub struct MulticastRouteKey<I: Ip> {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct MulticastRoute<D: StrongDeviceIdentifier> {
     /// The interface on which packets must arrive in order to use this route.
-    // TODO(https://fxbug.dev/353329136): Use this field when forwarding.
-    #[allow(unused)]
-    input_interface: D,
+    pub(crate) input_interface: D,
     /// The route's action.
-    // TODO(https://fxbug.dev/353329136): Use this field when forwarding.
-    #[allow(unused)]
-    action: Action<D>,
+    pub(crate) action: Action<D>,
 }
 
 /// The action to be taken for a packet that matches a route.
 #[derive(Clone, Debug, Eq, PartialEq)]
-enum Action<D: StrongDeviceIdentifier> {
+pub(crate) enum Action<D: StrongDeviceIdentifier> {
     /// Forward the packet out of each provided [`Target`].
-    // TODO(https://fxbug.dev/353329136): Use this field when forwarding.
-    #[allow(unused)]
     Forward(Targets<D>),
 }
 

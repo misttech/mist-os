@@ -7,7 +7,7 @@
 use net_types::ip::{Ip, IpVersionMarker};
 use netstack3_base::{AnyDevice, ContextPair, DeviceIdContext, IpExt};
 
-use crate::internal::multicast_forwarding::route::{MulticastRoute, MulticastRouteKey};
+use crate::internal::multicast_forwarding::route::{Action, MulticastRoute, MulticastRouteKey};
 use crate::internal::multicast_forwarding::state::{
     MulticastForwardingPendingPacketsContext as _, MulticastForwardingState,
     MulticastForwardingStateContext, MulticastRouteTableContext as _,
@@ -135,8 +135,43 @@ where
         })
     }
 
-    // TODO(https://fxbug.dev/353329136): Remove routes that reference a device
-    // when that device is removed.
+    /// Remove all references to the device from the multicast forwarding state.
+    ///
+    /// Typically, this is called as part of device removal to purge all strong
+    /// device references.
+    ///
+    /// Any routes that reference the device as an `input_interface` will be
+    /// removed. Any routes that reference the device as a
+    /// [`MulticastRouteTarget`] will have that target removed (and will
+    /// themselves be removed if it's the only target).
+    pub fn remove_references_to_device(
+        &mut self,
+        dev: &<C::CoreContext as DeviceIdContext<AnyDevice>>::WeakDeviceId,
+    ) {
+        self.core_ctx().with_state_mut(|state, ctx| {
+            let state = match state {
+                // There's no state to update if forwarding is disabled.
+                MulticastForwardingState::Disabled => return,
+                MulticastForwardingState::Enabled(state) => state,
+            };
+            ctx.with_route_table_mut(state, |route_table, _ctx| {
+                route_table.retain(|_route_key, MulticastRoute { action, input_interface }| {
+                    if dev == &*input_interface {
+                        return false;
+                    }
+                    match action {
+                        Action::Forward(ref mut targets) => {
+                            targets.retain(|target| dev != &target.output_interface);
+                            if targets.is_empty() {
+                                return false;
+                            }
+                        }
+                    }
+                    true
+                })
+            })
+        })
+    }
 }
 
 #[cfg(test)]
@@ -155,7 +190,7 @@ mod tests {
     use net_types::ip::{Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
     use net_types::{MulticastAddr, UnicastAddr};
     use netstack3_base::testutil::{FakeStrongDeviceId, MultipleDevicesId};
-    use netstack3_base::CtxPair;
+    use netstack3_base::{CtxPair, StrongDeviceIdentifier};
 
     use crate::multicast_forwarding::{
         MulticastForwardingEnabledState, MulticastForwardingPendingPackets,
@@ -350,5 +385,55 @@ mod tests {
         assert_eq!(api.add_multicast_route(key2.clone(), forward_to_c.clone()), Ok(None));
         assert_eq!(api.remove_multicast_route(&key1), Ok(Some(forward_to_b)));
         assert_eq!(api.remove_multicast_route(&key2), Ok(Some(forward_to_c)));
+    }
+
+    #[ip_test(I)]
+    fn remove_references_to_device<I: IpExt + ConstantsIpExt>() {
+        // NB: 4 arbitrary keys, that are unique from each other.
+        let key1 = MulticastRouteKey { src_addr: I::SRC1, dst_addr: I::DST1 };
+        let key2 = MulticastRouteKey { src_addr: I::SRC2, dst_addr: I::DST1 };
+        let key3 = MulticastRouteKey { src_addr: I::SRC1, dst_addr: I::DST2 };
+        let key4 = MulticastRouteKey { src_addr: I::SRC2, dst_addr: I::DST2 };
+
+        // Create 4 routes, each exercising a different edge case.
+        const GOOD_DEV1: MultipleDevicesId = MultipleDevicesId::A;
+        const GOOD_DEV2: MultipleDevicesId = MultipleDevicesId::B;
+        const BAD_DEV: MultipleDevicesId = MultipleDevicesId::C;
+        const GOOD_TARGET1: MulticastRouteTarget<MultipleDevicesId> =
+            MulticastRouteTarget { output_interface: GOOD_DEV1, min_ttl: 0 };
+        const GOOD_TARGET2: MulticastRouteTarget<MultipleDevicesId> =
+            MulticastRouteTarget { output_interface: GOOD_DEV2, min_ttl: 0 };
+        const BAD_TARGET: MulticastRouteTarget<MultipleDevicesId> =
+            MulticastRouteTarget { output_interface: BAD_DEV, min_ttl: 0 };
+        let dev_is_input = MulticastRoute::new_forward(BAD_DEV, vec![GOOD_TARGET1]).unwrap();
+        let dev_is_only_output = MulticastRoute::new_forward(GOOD_DEV1, vec![BAD_TARGET]).unwrap();
+        let dev_is_one_output =
+            MulticastRoute::new_forward(GOOD_DEV1, vec![GOOD_TARGET2, BAD_TARGET]).unwrap();
+        let no_ref_to_dev = MulticastRoute::new_forward(GOOD_DEV1, vec![GOOD_TARGET2]).unwrap();
+
+        // Verify that removing device references is a no-op when multicast
+        // forwarding is disabled.
+        let mut api = new_multicast_forwarding_api::<I>();
+        api.remove_references_to_device(&BAD_DEV.downgrade());
+        assert!(api.enable());
+
+        // Add the four routes, remove references to `Dev`, and verify that:
+        // * `dev_is_input` & `dev_is_only_output`, were both removed.
+        // * `dev_is_one_output` was updated to not list the dev in its
+        //    targets.
+        // * `no_ref_to_dev` was not updated.
+        assert_eq!(api.add_multicast_route(key1.clone(), dev_is_input), Ok(None));
+        assert_eq!(api.add_multicast_route(key2.clone(), dev_is_only_output), Ok(None));
+        assert_eq!(api.add_multicast_route(key3.clone(), dev_is_one_output), Ok(None));
+        assert_eq!(api.add_multicast_route(key4.clone(), no_ref_to_dev.clone()), Ok(None));
+        api.remove_references_to_device(&BAD_DEV.downgrade());
+        assert_eq!(api.remove_multicast_route(&key1), Ok(None));
+        assert_eq!(api.remove_multicast_route(&key2), Ok(None));
+        // NB: Equal to `dev_is_one_output`, but with `BAD_TARGET` removed.
+        assert_eq!(
+            api.remove_multicast_route(&key3),
+            Ok(Some(MulticastRoute::new_forward(GOOD_DEV1, vec![GOOD_TARGET2]).unwrap()))
+        );
+        assert_eq!(api.remove_multicast_route(&key4), Ok(Some(no_ref_to_dev)));
     }
 }
