@@ -6,10 +6,13 @@
 
 use core::marker::PhantomData;
 
+use alloc::collections::BTreeMap;
 use derivative::Derivative;
 use lock_order::lock::{OrderedLockAccess, OrderedLockRef};
 use netstack3_base::sync::{Mutex, RwLock};
 use netstack3_base::{AnyDevice, DeviceIdContext, IpExt, StrongDeviceIdentifier};
+
+use crate::internal::multicast_forwarding::route::{MulticastRoute, MulticastRouteKey};
 
 /// Multicast forwarding state for an IP version `I`.
 ///
@@ -53,10 +56,7 @@ impl<I: IpExt, D: StrongDeviceIdentifier> MulticastForwardingEnabledState<I, D> 
 }
 
 /// A table of multicast routes specifying how to forward multicast packets.
-// TODO(https://fxbug.dev/353329136): Use a real table.
-#[derive(Debug, Derivative)]
-#[derivative(Default(bound = ""))]
-pub struct MulticastRouteTable<I: IpExt, D>(PhantomData<(I, D)>);
+pub type MulticastRouteTable<I, D> = BTreeMap<MulticastRouteKey<I>, MulticastRoute<D>>;
 
 /// A table of pending multicast packets that have not yet been forwarded.
 ///
@@ -155,20 +155,4 @@ pub trait MulticastForwardingPendingPacketsContext<I: IpExt>: DeviceIdContext<An
         state: &MulticastForwardingEnabledState<I, Self::DeviceId>,
         cb: F,
     ) -> O;
-}
-
-// TODO(https://fxbug.dev/353329136): Delete this function once we're actually
-// accessing the route table / pending route table. For now it's a compile time
-// check that the context trait schema allows the tables to be locked.
-#[allow(unused)]
-fn prove_lock_schema<I: IpExt, CC: MulticastForwardingStateContext<I>>(ctx: &mut CC) {
-    ctx.with_state(|state, ctx| match state {
-        MulticastForwardingState::Enabled(state) => ctx.with_route_table_mut(
-            &state,
-            |_route_table, ctx: &mut <CC::Ctx<'_> as MulticastRouteTableContext<I>>::Ctx<'_>| {
-                ctx.with_pending_table_mut(&state, |_pending_table| {})
-            },
-        ),
-        MulticastForwardingState::Disabled => {}
-    })
 }

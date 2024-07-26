@@ -33,6 +33,7 @@ rustc_library_with_features("netstack3-ip") {
     "src/lib.rs",
     "src/multicast_forwarding.rs",
     "src/multicast_forwarding/api.rs",
+    "src/multicast_forwarding/route.rs",
     "src/multicast_forwarding/state.rs",
     "src/path_mtu.rs",
     "src/raw.rs",
