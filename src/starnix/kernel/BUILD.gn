@@ -259,7 +259,6 @@ rustc_library("starnix_core") {
     "vfs/inotify.rs",
     "vfs/memory_file.rs",
     "vfs/mod.rs",
-    "vfs/mount_record.rs",
     "vfs/namespace.rs",
     "vfs/path.rs",
     "vfs/pidfd.rs",
