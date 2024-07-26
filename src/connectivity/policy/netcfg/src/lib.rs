@@ -173,12 +173,10 @@ pub struct FilterConfig {
 #[serde(deny_unknown_fields, rename_all = "lowercase")]
 pub enum InterfaceType {
     Ethernet,
-    // TODO(https://fxbug.dev/42167793): Remove this alias when out-of-tree
-    // usages have been migrated to "wlanclient".
+    // NB: Serde alias provides backwards compatibility.
     #[serde(alias = "wlan")]
     WlanClient,
-    // TODO(https://fxbug.dev/42167793): Remove this alias when out-of-tree
-    // usages have been migrated to "wlanap".
+    // NB: Serde alias provides backwards compatibility.
     #[serde(alias = "ap")]
     WlanAp,
 }
@@ -221,8 +219,7 @@ pub struct InterfaceMetrics {
 pub enum DeviceClass {
     Virtual,
     Ethernet,
-    // TODO(https://fxbug.dev/42167793): Remove this alias when out-of-tree
-    // usages have been migrated to "wlanclient".
+    // NB: Serde alias provides backwards compatibility.
     #[serde(alias = "wlan")]
     WlanClient,
     Ppp,
@@ -5765,12 +5762,10 @@ mod tests {
         // Ensure the error is complaining about invalid glob.
         assert!(format!("{:?}", err).contains(err_text));
     }
-}
 
-// TODO(https://fxbug.dev/42167793): Delete this test.
-#[test]
-fn test_config_legacy_wlan_name() {
-    let config_str = r#"
+    #[test]
+    fn test_config_legacy_wlan_name() {
+        let config_str = r#"
 {
   "dns_config": { "servers": [] },
   "filter_config": {
@@ -5782,14 +5777,15 @@ fn test_config_legacy_wlan_name() {
   "allowed_upstream_device_classes": ["wlan"]
 }
 "#;
-    let Config { filter_enabled_interface_types, allowed_upstream_device_classes, .. } =
-        Config::load_str(config_str).unwrap();
-    assert_eq!(
-        HashSet::from([InterfaceType::WlanClient, InterfaceType::WlanAp]),
-        filter_enabled_interface_types
-    );
-    assert_eq!(
-        AllowedDeviceClasses(HashSet::from([DeviceClass::WlanClient])),
-        allowed_upstream_device_classes
-    );
+        let Config { filter_enabled_interface_types, allowed_upstream_device_classes, .. } =
+            Config::load_str(config_str).unwrap();
+        assert_eq!(
+            HashSet::from([InterfaceType::WlanClient, InterfaceType::WlanAp]),
+            filter_enabled_interface_types
+        );
+        assert_eq!(
+            AllowedDeviceClasses(HashSet::from([DeviceClass::WlanClient])),
+            allowed_upstream_device_classes
+        );
+    }
 }
