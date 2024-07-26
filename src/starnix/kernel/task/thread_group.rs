@@ -223,6 +223,14 @@ impl Releasable for ThreadGroup {
     }
 }
 
+#[cfg(any(test, debug_assertions))]
+impl Drop for ThreadGroup {
+    fn drop(&mut self) {
+        let state = self.mutable_state.get_mut();
+        assert!(state.children.is_empty());
+    }
+}
+
 /// A wrapper around a `WeakRef<ThreadGroup>` that expects the underlying `WeakRef` to always be
 /// valid. The wrapper will check this at runtime during creation and upgrade.
 pub struct ThreadGroupParent(WeakRef<ThreadGroup>);
@@ -529,7 +537,7 @@ impl ThreadGroup {
         Ok(())
     }
 
-    pub fn remove<L>(&self, locked: &mut Locked<'_, L>, task: &Task)
+    pub fn remove<L>(&self, locked: &mut Locked<'_, L>, task: &OwnedRef<Task>)
     where
         L: LockBefore<ProcessGroupState>,
     {

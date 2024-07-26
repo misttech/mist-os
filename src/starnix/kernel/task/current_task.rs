@@ -189,7 +189,7 @@ impl Releasable for CurrentTask {
         // We remove from the thread group here because the WeakRef in the pid
         // table to this task must be valid until this task is removed from the
         // thread group, but self.task.release() below invalidates it.
-        self.thread_group.remove(locked, &self);
+        self.thread_group.remove(locked, &self.task);
 
         let context = (self.thread_state, locked);
         self.task.release(context);
