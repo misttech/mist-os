@@ -28,6 +28,7 @@
 #include "src/graphics/display/lib/api-types-cpp/driver-layer-id.h"
 #include "src/graphics/display/lib/api-types-cpp/event-id.h"
 #include "src/graphics/display/lib/api-types-cpp/image-metadata.h"
+#include "src/graphics/display/lib/api-types-cpp/rectangle.h"
 #include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 
 namespace fhdt = fuchsia_hardware_display_types;
@@ -249,19 +250,11 @@ void Layer::SetPrimaryConfig(fhdt::wire::ImageMetadata image_metadata) {
 void Layer::SetPrimaryPosition(fhdt::wire::Transform transform,
                                fuchsia_math::wire::RectU image_source,
                                fuchsia_math::wire::RectU display_destination) {
-  primary_layer_t* primary_layer = &pending_layer_.cfg.primary;
+  primary_layer_t& primary_layer = pending_layer_.cfg.primary;
 
-  static_assert(sizeof(fuchsia_math::wire::RectU) == sizeof(rect_u_t), "Struct mismatch");
-  static_assert(offsetof(fuchsia_math::wire::RectU, x) == offsetof(rect_u_t, x), "Struct mismatch");
-  static_assert(offsetof(fuchsia_math::wire::RectU, y) == offsetof(rect_u_t, y), "Struct mismatch");
-  static_assert(offsetof(fuchsia_math::wire::RectU, width) == offsetof(rect_u_t, width),
-                "Struct mismatch");
-  static_assert(offsetof(fuchsia_math::wire::RectU, height) == offsetof(rect_u_t, height),
-                "Struct mismatch");
-
-  memcpy(&primary_layer->image_source, &image_source, sizeof(rect_u_t));
-  memcpy(&primary_layer->display_destination, &display_destination, sizeof(rect_u_t));
-  primary_layer->transform_mode = static_cast<uint8_t>(transform);
+  primary_layer.image_source = Rectangle::From(image_source).ToBanjo();
+  primary_layer.display_destination = Rectangle::From(display_destination).ToBanjo();
+  primary_layer.transform_mode = static_cast<uint8_t>(transform);
 
   config_change_ = true;
 }
