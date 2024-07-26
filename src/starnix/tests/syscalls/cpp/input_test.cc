@@ -57,6 +57,7 @@ fbl::unique_fd GetInputFile(const uint32_t kInputMinor) {
 }
 
 TEST(InputTest, DevicePropertiesMatchTouchProperties) {
+  // TODO(https://fxbug.dev/317285180) don't skip on baseline
   if (getuid() != 0) {
     GTEST_SKIP() << "Can only be run as root.";
   }
@@ -193,6 +194,7 @@ TEST(InputTest, DevicePropertiesMatchTouchProperties) {
 }
 
 TEST(InputTest, DevicePropertiesMatchKeyboardProperties) {
+  // TODO(https://fxbug.dev/317285180) don't skip on baseline
   if (getuid() != 0) {
     GTEST_SKIP() << "Can only be run as root.";
   }
@@ -318,6 +320,7 @@ TEST(InputTest, DevicePropertiesMatchKeyboardProperties) {
 }
 
 TEST(InputTest, DeviceCanBeRegisteredWithEpoll) {
+  // TODO(https://fxbug.dev/317285180) don't skip on baseline
   if (getuid() != 0) {
     GTEST_SKIP() << "Can only be run as root.";
   }

@@ -14,6 +14,7 @@ using testing::IsSupersetOf;
 class SysfsKernelTest : public ::testing::Test {
  public:
   void SetUp() override {
+    // TODO(https://fxbug.dev/317285180) don't skip on baseline
     // Assume starnix always has /sys/kernel.
     if (!test_helper::IsStarnix() && access("/sys/kernel", F_OK) == -1) {
       GTEST_SKIP() << "/sys/kernel not available, skipping...";

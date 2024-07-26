@@ -57,6 +57,7 @@ static bool skip_mount_tests = false;
 class MountTest : public ::testing::Test {
  public:
   static void SetUpTestSuite() {
+    // TODO(https://fxbug.dev/317285180) don't skip on baseline
     int rv = unshare(CLONE_NEWNS);
     if (rv == -1 && errno == EPERM) {
       // GTest does not support GTEST_SKIP() from a suite setup, so record that we want to skip
@@ -316,6 +317,7 @@ class ProcMountsTest : public ProcTestBase {
 
 TEST_F(ProcMountsTest, Basic) {
   // This test assumes the mounts are very specific, so is too brittle to run on Linux.
+  // TODO(https://fxbug.dev/317285180) don't skip on baseline
   if (!test_helper::IsStarnix()) {
     GTEST_SKIP() << "ProcMountsTest::Basic can not be run on Linux, skipping.";
   }
@@ -327,6 +329,7 @@ TEST_F(ProcMountsTest, Basic) {
 }
 
 TEST_F(ProcMountsTest, MountAdded) {
+  // TODO(https://fxbug.dev/317285180) don't skip on baseline
   if (!test_helper::HasSysAdmin()) {
     GTEST_SKIP() << "Not running with sysadmin capabilities, skipping.";
   }

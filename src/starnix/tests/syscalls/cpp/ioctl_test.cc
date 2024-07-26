@@ -51,9 +51,11 @@ TEST_P(IoctlInvalidTest, InvalidRequest) {
   if ((req == SIOCGIFADDR || req == SIOCSIFADDR) && !test_helper::IsStarnix()) {
     GTEST_SKIP() << "IoctlInvalidTests with SIOCGIFADDR/SIOCSIFADDR do not work on Linux yet";
   }
+  // TODO(https://fxbug.dev/317285180) don't skip on baseline
   if (req == SIOCSIFADDR && !test_helper::HasSysAdmin()) {
     GTEST_SKIP() << "SIOCSIFADDR requires root, skipping...";
   }
+  // TODO(https://fxbug.dev/317285180) don't skip on baseline
   if (req == SIOCSIFFLAGS && !test_helper::HasSysAdmin()) {
     GTEST_SKIP() << "SIOCSIFFLAGS requires root, skipping...";
   }
@@ -143,6 +145,7 @@ void SetIfAddr(fbl::unique_fd& fd, in_addr_t addr) {
 }
 
 TEST_F(IoctlTest, SIOCSIFADDR_Success) {
+  // TODO(https://fxbug.dev/317285180) don't skip on baseline
   if (!test_helper::HasSysAdmin()) {
     GTEST_SKIP() << "SIOCSIFADDR requires root, skipping...";
   }
@@ -185,6 +188,7 @@ void SetLoopbackIfFlags(fbl::unique_fd& fd, short flags) {
 }
 
 TEST_F(IoctlTest, SIOCSIFFLAGS_Success) {
+  // TODO(https://fxbug.dev/317285180) don't skip on baseline
   if (!test_helper::HasSysAdmin()) {
     GTEST_SKIP() << "SIOCSIFFLAGS requires root, skipping...";
   }

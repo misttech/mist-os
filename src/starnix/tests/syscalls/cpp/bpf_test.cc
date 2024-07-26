@@ -78,6 +78,7 @@ TEST(BpfTest, ArraySizeOverflow) {
                                        .max_entries = INT_MAX / 8,
                                    });
   EXPECT_EQ(result, -1);
+  // TODO(https://fxbug.dev/317285180) don't skip on baseline
   if (errno == EPERM) {
     GTEST_SKIP() << "Permission denied.";
   }

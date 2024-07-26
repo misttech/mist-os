@@ -241,6 +241,7 @@ TEST_F(UnixSocketTest, ImmediatePeercredCheck) {
 }
 
 TEST(NetlinkSocket, RecvMsg) {
+  // TODO(https://fxbug.dev/317285180) don't skip on baseline
   if (!test_helper::HasSysAdmin()) {
     GTEST_SKIP() << "Not running with sysadmin capabilities, skipping suite.";
   }
@@ -438,6 +439,7 @@ class SocketFault : public FaultTest, public testing::WithParamInterface<std::pa
   void SetUp() override {
     const auto [type, protocol] = GetParam();
 
+    // TODO(https://fxbug.dev/317285180) don't skip on baseline
     if (type == SOCK_DGRAM && protocol == IPPROTO_ICMP && getuid() != 0) {
       GTEST_SKIP() << "Ping sockets require root.";
     }

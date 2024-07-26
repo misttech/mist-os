@@ -14,6 +14,7 @@ namespace {
 class TouchStandbyTest : public ::testing::Test {
  public:
   void SetUp() override {
+    // TODO(https://fxbug.dev/317285180) don't skip on baseline
     if (getuid() != 0) {
       GTEST_SKIP() << "Can only be run as root.";
     }

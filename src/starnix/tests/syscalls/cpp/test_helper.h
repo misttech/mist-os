@@ -34,6 +34,7 @@
     retval;                                                                         \
   })
 
+// TODO(https://fxbug.dev/317285180) don't skip on baseline
 #define SAFE_SYSCALL_SKIP_ON_EPERM(X)                                          \
   ({                                                                           \
     auto retval = (X);                                                         \

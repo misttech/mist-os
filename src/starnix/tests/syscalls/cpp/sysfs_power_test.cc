@@ -40,6 +40,7 @@ void VerifyReadOutOfBound(const std::string& path) {
 class SysfsPowerTest : public ::testing::Test {
  public:
   void SetUp() override {
+    // TODO(https://fxbug.dev/317285180) don't skip on baseline
     // Assume starnix always has /sys/power and /sys/kernel/wakeup_reasons
     if (!test_helper::IsStarnix() && access("/sys/power", F_OK) == -1 &&
         access("/sys/kernel/wakeup_reasons", F_OK) == -1) {

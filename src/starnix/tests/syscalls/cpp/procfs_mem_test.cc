@@ -22,6 +22,7 @@ TEST_P(ProcSelfMemProts, CanWriteToPrivateAnonymousMappings) {
   if (access("/proc/self/mem", R_OK | W_OK) == -1) {
     // Host tests run with read-only /proc, so we can't run this test there.
     // See: https://fxbug.dev/328301908
+    // TODO(https://fxbug.dev/317285180) don't skip on baseline
     GTEST_SKIP() << "Cannot write to /proc/self/mem";
   }
 

@@ -22,6 +22,7 @@ const char kTestTunDeviceName[] = "tun_test_tunif0";
 const char kTestTapDeviceName[] = "tun_test_tapif0";
 
 TEST_P(TunTapTest, CreateTunTapDevice) {
+  // TODO(https://fxbug.dev/317285180) don't skip on baseline
   if (!test_helper::HasCapability(CAP_NET_ADMIN)) {
     GTEST_SKIP() << "Need CAP_NET_ADMIN to run TunTest";
   }

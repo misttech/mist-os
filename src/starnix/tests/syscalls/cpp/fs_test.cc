@@ -467,6 +467,7 @@ class FsMountTest
     : public testing::TestWithParam<std::optional<std::string> (*)(const std::string &)> {
  protected:
   void SetUp() override {
+    // TODO(https://fxbug.dev/317285180) don't skip on baseline
     if (!test_helper::HasSysAdmin()) {
       GTEST_SKIP() << "Not running with sysadmin capabilities, skipping suite.";
     }

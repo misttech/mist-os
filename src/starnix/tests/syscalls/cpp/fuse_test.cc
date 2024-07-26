@@ -47,6 +47,7 @@ constexpr char kOverlayFsPath[] = "OVERLAYFS_PATH";
 class FuseTest : public ::testing::Test {
  public:
   void SetUp() override {
+    // TODO(https://fxbug.dev/317285180) don't skip on baseline
     if (!test_helper::HasSysAdmin()) {
       GTEST_SKIP() << "Not running with sysadmin capabilities, skipping suite.";
     }
@@ -726,6 +727,7 @@ class FuseServer {
 class FuseServerTest : public ::testing::Test {
  public:
   void SetUp() override {
+    // TODO(https://fxbug.dev/317285180) don't skip on baseline
     if (!test_helper::HasSysAdmin()) {
       GTEST_SKIP() << "Not running with sysadmin capabilities, skipping suite.";
     }
@@ -1273,6 +1275,7 @@ class FuseServerPermissionCheck : public FuseServerTest,
 TEST_P(FuseServerPermissionCheck, PermissionCheck) {
   const PermissionCheckTestCase& test_case = GetParam();
 
+  // TODO(https://fxbug.dev/317285180) don't skip on baseline
   if (test_case.need_cap && !test_helper::HasCapability(test_case.need_cap.value())) {
     GTEST_SKIP() << "Need extra capability " << test_case.need_cap.value();
   }

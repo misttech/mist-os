@@ -87,6 +87,7 @@ TEST(UdevTest, Connect) {
 }
 
 TEST(UdevTest, AddDevMapper) {
+  // TODO(https://fxbug.dev/317285180) don't skip on baseline
   if (getuid() != 0) {
     GTEST_SKIP() << "Can only be run as root.";
   }
@@ -112,6 +113,7 @@ TEST(UdevTest, AddDevMapper) {
 }
 
 TEST(UdevTest, RemoveDevMapper) {
+  // TODO(https://fxbug.dev/317285180) don't skip on baseline
   if (getuid() != 0) {
     GTEST_SKIP() << "Can only be run as root.";
   }
@@ -137,6 +139,7 @@ TEST(UdevTest, RemoveDevMapper) {
 }
 
 TEST(UdevTest, AddInput) {
+  // TODO(https://fxbug.dev/317285180) don't skip on baseline
   if (getuid() != 0) {
     GTEST_SKIP() << "Can only be run as root.";
   }

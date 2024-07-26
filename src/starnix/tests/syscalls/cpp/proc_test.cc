@@ -123,6 +123,7 @@ class ProcSysNetTest : public ProcTestBase,
   void SetUp() override {
     ProcTestBase::SetUp();
     // Required to open the path below for writing.
+    // TODO(https://fxbug.dev/317285180) don't skip on baseline
     if (!test_helper::HasSysAdmin()) {
       GTEST_SKIP() << "Not running with sysadmin capabilities, skipping.";
     }
@@ -207,6 +208,7 @@ std::string ProcSelfDirName() {
 // This test ensures that the proc directories *are* set to be owned by the euid
 // of the task.
 TEST_F(ProcTaskDirTest, PidDirCorrectUidIsEuid) {
+  // TODO(https://fxbug.dev/317285180) don't skip on baseline
   if (!test_helper::HasSysAdmin() || !test_helper::IsStarnix()) {
     GTEST_SKIP() << "PidDirCorrectUid requires root access (to change euid), "
                  << "and currently only works on Starnix";
@@ -273,6 +275,7 @@ TEST_F(ProcTaskDirTest, PidDirCorrectUidIsEuid) {
 // setting the euid implicitly sets the fsuid. We want to check we're not
 // accidentally relying on the fsuid.
 TEST_F(ProcTaskDirTest, PidDirSetFsuidDoesntChangeOwnership) {
+  // TODO(https://fxbug.dev/317285180) don't skip on baseline
   if (!test_helper::HasSysAdmin() || !test_helper::IsStarnix()) {
     GTEST_SKIP() << "PidDirCorrectUid requires root access (to change euid), "
                  << "and currently only works on Starnix";

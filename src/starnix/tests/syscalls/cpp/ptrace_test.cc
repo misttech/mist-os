@@ -565,6 +565,7 @@ void DetectForkAndContinue(pid_t child_pid, bool is_seized, bool child_stops_on_
 }  // namespace
 
 TEST(PtraceTest, PtraceEventStopWithFork) {
+  // TODO(https://fxbug.dev/317285180) don't skip on baseline
   if (!test_helper::IsStarnix()) {
     GTEST_SKIP() << "This test does not work on Linux in CQ";
   }
@@ -583,6 +584,7 @@ TEST(PtraceTest, PtraceEventStopWithFork) {
 }
 
 TEST(PtraceTest, PtraceEventStopWithForkAndSeize) {
+  // TODO(https://fxbug.dev/317285180) don't skip on baseline
   if (!test_helper::IsStarnix()) {
     GTEST_SKIP() << "This test does not work on Linux in CQ";
   }
@@ -600,6 +602,7 @@ TEST(PtraceTest, PtraceEventStopWithForkAndSeize) {
 }
 
 TEST(PtraceTest, PtraceEventStopWithForkClonePtrace) {
+  // TODO(https://fxbug.dev/317285180) don't skip on baseline
   if (!test_helper::IsStarnix()) {
     GTEST_SKIP() << "This test does not work on Linux in CQ";
   }
@@ -615,6 +618,7 @@ TEST(PtraceTest, PtraceEventStopWithForkClonePtrace) {
 }
 
 TEST(PtraceTest, PtraceEventStopWithVForkClonePtrace) {
+  // TODO(https://fxbug.dev/317285180) don't skip on baseline
   if (!test_helper::IsStarnix()) {
     GTEST_SKIP() << "This test does not work on Linux in CQ";
   }
@@ -731,6 +735,7 @@ TEST(PtraceTest, ExecveWithSigtrap) {
 TEST(PtraceTest, PtraceEventStopWithExit) {
   // TODO(https://fxbug.dev/322238868): This test does not work on the LTO
   // builder in CQ.
+  // TODO(https://fxbug.dev/317285180) don't skip on baseline
   if (!test_helper::IsStarnix()) {
     GTEST_SKIP() << "This test does not work on Linux in CQ";
   }
@@ -779,6 +784,7 @@ TEST(PtraceTest, PtraceEventStopWithExit) {
 TEST(PtraceTest, PtraceEventStopWithExecve) {
   // TODO(https://fxbug.dev/322238868): This test does not work on the LTO
   // builder in CQ.
+  // TODO(https://fxbug.dev/317285180) don't skip on baseline
   if (!test_helper::IsStarnix()) {
     GTEST_SKIP() << "This test does not work on Linux in CQ";
   }
@@ -818,6 +824,7 @@ TEST(PtraceTest, PtraceEventStopWithExecve) {
 TEST(PtraceTest, PtraceEventStopWithSignalExit) {
   // TODO(https://fxbug.dev/322238868): This test does not work on the LTO
   // builder in CQ.
+  // TODO(https://fxbug.dev/317285180) don't skip on baseline
   if (!test_helper::IsStarnix()) {
     GTEST_SKIP() << "This test does not work on Linux in CQ";
   }
@@ -869,6 +876,7 @@ void GrandchildWithSigsuspendSigaction(int, siginfo_t *, void *) {
 // Test that traced child correctly resumes when signal needs to be delivered
 // because of a temporary mask.
 TEST(PtraceTest, GrandchildWithSigsuspend) {
+  // TODO(https://fxbug.dev/317285180) don't skip on baseline
   if (!test_helper::IsStarnix()) {
     GTEST_SKIP() << "This test does not work on Linux in CQ";
   }
