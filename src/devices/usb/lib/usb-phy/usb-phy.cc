@@ -4,11 +4,51 @@
 
 #include "src/devices/usb/lib/usb-phy/include/usb-phy/usb-phy.h"
 
-#include <lib/ddk/debug.h>
+#include <lib/driver/compat/cpp/compat.h>
+#ifdef DFV2_COMPAT_LOGGING
+#include <lib/driver/compat/cpp/logging.h>  // nogncheck
+#else
+#include <lib/ddk/debug.h>  // nogncheck
+#endif
 
 #include <ddktl/device.h>
 
 namespace usb_phy {
+
+zx::result<UsbPhyClient> UsbPhyClient::Create(const std::shared_ptr<fdf::Namespace>& incoming,
+                                              const std::string_view fragment_name) {
+  // Prefer Banjo over FIDL.
+  auto phy = compat::ConnectBanjo<ddk::UsbPhyProtocolClient>(incoming, fragment_name);
+  if (phy.is_ok()) {
+    return zx::ok(UsbPhyClient(std::move(*phy)));
+  }
+
+  // Try to get FIDL.
+  auto client_end = incoming->Connect<fuchsia_hardware_usb_phy::Service::Device>(fragment_name);
+  if (client_end.is_ok()) {
+    return zx::ok(UsbPhyClient(std::move(client_end.value())));
+  }
+
+  zxlogf(ERROR, "Could not get either Banjo or FIDL client");
+  return zx::error(ZX_ERR_NOT_FOUND);
+}
+
+zx::result<UsbPhyClient> UsbPhyClient::Create(const std::shared_ptr<fdf::Namespace>& incoming) {
+  // Prefer Banjo over FIDL.
+  auto phy = compat::ConnectBanjo<ddk::UsbPhyProtocolClient>(incoming);
+  if (phy.is_ok()) {
+    return zx::ok(UsbPhyClient(std::move(*phy)));
+  }
+
+  // Try to get FIDL.
+  auto client_end = incoming->Connect<fuchsia_hardware_usb_phy::Service::Device>();
+  if (client_end.is_ok()) {
+    return zx::ok(UsbPhyClient(std::move(client_end.value())));
+  }
+
+  zxlogf(ERROR, "Could not get either Banjo or FIDL client");
+  return zx::error(ZX_ERR_NOT_FOUND);
+}
 
 zx::result<UsbPhyClient> UsbPhyClient::Create(zx_device_t* parent,
                                               const std::string_view fragment_name) {
