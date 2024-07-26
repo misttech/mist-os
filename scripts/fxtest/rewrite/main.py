@@ -325,7 +325,9 @@ async def async_main(
         return 0
 
     # If enabled, try to build and update the selected tests.
-    if flags.build and not await do_build(selections, recorder, exec_env):
+    if flags.build and not await do_build(
+        selections, recorder, exec_env, flags.build_updates
+    ):
         recorder.emit_end("Failed to build.")
         return 1
 
@@ -608,6 +610,7 @@ async def do_build(
     tests: selection_types.TestSelections,
     recorder: event.EventRecorder,
     exec_env: environment.ExecutionEnvironment,
+    allow_build_updates: bool,
 ) -> bool:
     """Attempt to build the selected tests.
 
@@ -615,6 +618,7 @@ async def do_build(
         tests (selection.TestSelections): Tests to attempt to build.
         recorder (event.EventRecorder): Recorder for events.
         exec_env (environment.ExecutionEnvironment): Incoming execution environment.
+        allow_build_updates (bool): Whether to allow building updates. This is only used for e2e tests.
 
     Returns:
         bool: True only if the tests were built and published, False otherwise.
@@ -648,7 +652,7 @@ async def do_build(
             build_command_line.append(f"--toolchain={key}")
         build_command_line.extend(vals)
 
-    if tests.has_e2e_test():
+    if tests.has_e2e_test() and allow_build_updates:
         build_command_line.extend(["--default", "updates"])
 
     build_id = recorder.emit_build_start(targets=build_command_line)

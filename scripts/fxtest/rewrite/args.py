@@ -54,6 +54,7 @@ class Flags:
 
     build: bool
     updateifinbase: bool
+    build_updates: bool
 
     host: bool
     device: bool
@@ -257,6 +258,12 @@ def parse_args(
         "--updateifinbase",
         action=argparse.BooleanOptionalAction,
         help="Invoke `fx update-if-in-base` before running device tests (defaults to on)",
+        default=True,
+    )
+    build.add_argument(
+        "--build-updates",
+        action=argparse.BooleanOptionalAction,
+        help="Build the updates package if there are device tests (defaults to on)",
         default=True,
     )
 
