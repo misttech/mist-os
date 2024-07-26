@@ -55,6 +55,7 @@ use crate::internal::icmp::{
 };
 use crate::internal::ipv6;
 use crate::internal::ipv6::Ipv6PacketAction;
+use crate::internal::multicast_forwarding::route::MulticastRouteIpExt;
 use crate::internal::multicast_forwarding::state::MulticastForwardingState;
 use crate::internal::path_mtu::{PmtuBindingsTypes, PmtuCache, PmtuTimerId};
 use crate::internal::raw::counters::RawIpSocketCounters;
@@ -616,7 +617,7 @@ pub enum Ipv6PresentAddressStatus {
 }
 
 /// An extension trait providing IP layer properties.
-pub trait IpLayerIpExt: IpExt {
+pub trait IpLayerIpExt: IpExt + MulticastRouteIpExt {
     /// IP Address status.
     type AddressStatus;
     /// IP Address state.

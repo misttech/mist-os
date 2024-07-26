@@ -5,13 +5,14 @@
 //! Declares the API for configuring multicast forwarding within the netstack.
 
 use net_types::ip::{Ip, IpVersionMarker};
-use netstack3_base::{AnyDevice, ContextPair, DeviceIdContext, IpExt};
+use netstack3_base::{AnyDevice, ContextPair, DeviceIdContext};
 
 use crate::internal::multicast_forwarding::route::{Action, MulticastRoute, MulticastRouteKey};
 use crate::internal::multicast_forwarding::state::{
     MulticastForwardingPendingPacketsContext as _, MulticastForwardingState,
     MulticastForwardingStateContext, MulticastRouteTableContext as _,
 };
+use crate::IpLayerIpExt;
 
 /// The API action can not be performed while multicast forwarding is disabled.
 #[derive(Debug, Eq, PartialEq)]
@@ -30,7 +31,7 @@ impl<I: Ip, C> MulticastForwardingApi<I, C> {
     }
 }
 
-impl<I: IpExt, C> MulticastForwardingApi<I, C>
+impl<I: IpLayerIpExt, C> MulticastForwardingApi<I, C>
 where
     C: ContextPair,
     C::CoreContext: MulticastForwardingStateContext<I>,
@@ -188,7 +189,6 @@ mod tests {
     use ip_test_macro::ip_test;
     use net_declare::{net_ip_v4, net_ip_v6};
     use net_types::ip::{Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
-    use net_types::{MulticastAddr, UnicastAddr};
     use netstack3_base::testutil::{FakeStrongDeviceId, MultipleDevicesId};
     use netstack3_base::{CtxPair, StrongDeviceIdentifier};
 
@@ -200,7 +200,7 @@ mod tests {
 
     #[derive(Derivative)]
     #[derivative(Default(bound = ""))]
-    struct FakeCoreCtxState<I: IpExt, D: FakeStrongDeviceId> {
+    struct FakeCoreCtxState<I: IpLayerIpExt, D: FakeStrongDeviceId> {
         // NB: Hold in an `Rc<RefCell<...>>` to switch to runtime borrow
         // checking. This allows us to borrow the multicast forwarding state at
         // the same time as the outer `FakeCoreCtx` is mutably borrowed.
@@ -210,7 +210,9 @@ mod tests {
     type FakeBindingsCtx = netstack3_base::testutil::FakeBindingsCtx<(), (), (), ()>;
     type FakeCoreCtx<I, D> = netstack3_base::testutil::FakeCoreCtx<FakeCoreCtxState<I, D>, (), D>;
 
-    impl<I: IpExt, D: FakeStrongDeviceId> MulticastForwardingStateContext<I> for FakeCoreCtx<I, D> {
+    impl<I: IpLayerIpExt, D: FakeStrongDeviceId> MulticastForwardingStateContext<I>
+        for FakeCoreCtx<I, D>
+    {
         type Ctx<'a> = FakeCoreCtx<I, D>;
         fn with_state<
             O,
@@ -236,7 +238,7 @@ mod tests {
         }
     }
 
-    impl<I: IpExt, D: FakeStrongDeviceId> MulticastRouteTableContext<I> for FakeCoreCtx<I, D> {
+    impl<I: IpLayerIpExt, D: FakeStrongDeviceId> MulticastRouteTableContext<I> for FakeCoreCtx<I, D> {
         type Ctx<'a> = FakeCoreCtx<I, D>;
         fn with_route_table<
             O,
@@ -262,7 +264,7 @@ mod tests {
         }
     }
 
-    impl<I: IpExt, D: FakeStrongDeviceId> MulticastForwardingPendingPacketsContext<I>
+    impl<I: IpLayerIpExt, D: FakeStrongDeviceId> MulticastForwardingPendingPacketsContext<I>
         for FakeCoreCtx<I, D>
     {
         fn with_pending_table_mut<
@@ -278,7 +280,7 @@ mod tests {
         }
     }
 
-    fn new_multicast_forwarding_api<I: IpExt>(
+    fn new_multicast_forwarding_api<I: IpLayerIpExt>(
     ) -> MulticastForwardingApi<I, CtxPair<FakeCoreCtx<I, MultipleDevicesId>, FakeBindingsCtx>>
     {
         MulticastForwardingApi::new(CtxPair::with_core_ctx(FakeCoreCtx::with_state(
@@ -288,36 +290,28 @@ mod tests {
 
     /// An IP extension trait providing constants for various IP addresses.
     trait ConstantsIpExt: Ip {
-        const SRC1: UnicastAddr<Self::Addr>;
-        const SRC2: UnicastAddr<Self::Addr>;
-        const DST1: MulticastAddr<Self::Addr>;
-        const DST2: MulticastAddr<Self::Addr>;
+        const SRC1: Self::Addr;
+        const SRC2: Self::Addr;
+        const DST1: Self::Addr;
+        const DST2: Self::Addr;
     }
 
     impl ConstantsIpExt for Ipv4 {
-        const SRC1: UnicastAddr<Ipv4Addr> =
-            unsafe { UnicastAddr::new_unchecked(net_ip_v4!("192.0.2.1")) };
-        const SRC2: UnicastAddr<Ipv4Addr> =
-            unsafe { UnicastAddr::new_unchecked(net_ip_v4!("192.0.2.2")) };
-        const DST1: MulticastAddr<Ipv4Addr> =
-            unsafe { MulticastAddr::new_unchecked(net_ip_v4!("224.0.0.1")) };
-        const DST2: MulticastAddr<Ipv4Addr> =
-            unsafe { MulticastAddr::new_unchecked(net_ip_v4!("224.0.0.2")) };
+        const SRC1: Ipv4Addr = net_ip_v4!("192.0.2.1");
+        const SRC2: Ipv4Addr = net_ip_v4!("192.0.2.2");
+        const DST1: Ipv4Addr = net_ip_v4!("224.0.0.1");
+        const DST2: Ipv4Addr = net_ip_v4!("224.0.0.2");
     }
 
     impl ConstantsIpExt for Ipv6 {
-        const SRC1: UnicastAddr<Ipv6Addr> =
-            unsafe { UnicastAddr::new_unchecked(net_ip_v6!("2001:0DB8::1")) };
-        const SRC2: UnicastAddr<Ipv6Addr> =
-            unsafe { UnicastAddr::new_unchecked(net_ip_v6!("2001:0DB8::2")) };
-        const DST1: MulticastAddr<Ipv6Addr> =
-            unsafe { MulticastAddr::new_unchecked(net_ip_v6!("ff0e::1")) };
-        const DST2: MulticastAddr<Ipv6Addr> =
-            unsafe { MulticastAddr::new_unchecked(net_ip_v6!("ff0e::2")) };
+        const SRC1: Ipv6Addr = net_ip_v6!("2001:0DB8::1");
+        const SRC2: Ipv6Addr = net_ip_v6!("2001:0DB8::2");
+        const DST1: Ipv6Addr = net_ip_v6!("ff0e::1");
+        const DST2: Ipv6Addr = net_ip_v6!("ff0e::2");
     }
 
     #[ip_test(I)]
-    fn enable_disable<I: IpExt>() {
+    fn enable_disable<I: IpLayerIpExt>() {
         let mut api = new_multicast_forwarding_api::<I>();
 
         assert_matches!(
@@ -339,9 +333,9 @@ mod tests {
     }
 
     #[ip_test(I)]
-    fn add_remove_route<I: IpExt + ConstantsIpExt>() {
-        let key1 = MulticastRouteKey { src_addr: I::SRC1, dst_addr: I::DST1 };
-        let key2 = MulticastRouteKey { src_addr: I::SRC2, dst_addr: I::DST2 };
+    fn add_remove_route<I: IpLayerIpExt + ConstantsIpExt>() {
+        let key1 = MulticastRouteKey::new(I::SRC1, I::DST1).unwrap();
+        let key2 = MulticastRouteKey::new(I::SRC2, I::DST2).unwrap();
         let forward_to_b = MulticastRoute::new_forward(
             MultipleDevicesId::A,
             vec![MulticastRouteTarget { output_interface: MultipleDevicesId::B, min_ttl: 0 }],
@@ -388,12 +382,12 @@ mod tests {
     }
 
     #[ip_test(I)]
-    fn remove_references_to_device<I: IpExt + ConstantsIpExt>() {
+    fn remove_references_to_device<I: IpLayerIpExt + ConstantsIpExt>() {
         // NB: 4 arbitrary keys, that are unique from each other.
-        let key1 = MulticastRouteKey { src_addr: I::SRC1, dst_addr: I::DST1 };
-        let key2 = MulticastRouteKey { src_addr: I::SRC2, dst_addr: I::DST1 };
-        let key3 = MulticastRouteKey { src_addr: I::SRC1, dst_addr: I::DST2 };
-        let key4 = MulticastRouteKey { src_addr: I::SRC2, dst_addr: I::DST2 };
+        let key1 = MulticastRouteKey::new(I::SRC1, I::DST1).unwrap();
+        let key2 = MulticastRouteKey::new(I::SRC2, I::DST1).unwrap();
+        let key3 = MulticastRouteKey::new(I::SRC1, I::DST2).unwrap();
+        let key4 = MulticastRouteKey::new(I::SRC2, I::DST2).unwrap();
 
         // Create 4 routes, each exercising a different edge case.
         const GOOD_DEV1: MultipleDevicesId = MultipleDevicesId::A;

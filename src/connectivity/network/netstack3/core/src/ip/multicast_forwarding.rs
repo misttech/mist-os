@@ -8,7 +8,6 @@
 use lock_order::lock::LockLevelFor;
 use lock_order::relation::LockBefore;
 use lock_order::wrap::LockedWrapperApi;
-use netstack3_base::IpExt;
 use netstack3_device::DeviceId;
 use netstack3_ip::multicast_forwarding::{
     MulticastForwardingEnabledState, MulticastForwardingPendingPackets,
@@ -16,7 +15,7 @@ use netstack3_ip::multicast_forwarding::{
     MulticastForwardingStateContext, MulticastRouteTable, MulticastRouteTableContext,
 };
 
-use crate::{lock_ordering, BindingsContext, BindingsTypes, CoreCtx};
+use crate::{lock_ordering, BindingsContext, BindingsTypes, CoreCtx, IpExt};
 
 #[netstack3_macros::instantiate_ip_impl_block(I)]
 impl<
