@@ -290,10 +290,24 @@ impl VolumesDirectory {
 
     /// Stop all ongoing replays, and complete and persist ongoing recordings.
     pub async fn stop_profile_tasks(self: &Arc<Self>) {
-        let volumes = self.mounted_volumes.lock().await;
-        let mut state = self.profiling_state.lock().await;
-        for (_, (_, volume_and_root)) in &*volumes {
-            volume_and_root.volume().stop_profile_tasks().await;
+        let mut state;
+        let volumes;
+        // Take the mounted_volumes lock first to keep consistent lock ordering with other
+        // operations, but don't need to hold it for the entire operation. We need to take the
+        // profiling_state lock before the mounted_volumes lock is  dropped to ensure that another
+        // thread doesn't mount a volume and start a profile task on it in between.
+        {
+            volumes = self
+                .mounted_volumes
+                .lock()
+                .await
+                .values()
+                .map(|v| v.1.volume().clone()) // Clones of each FxVolume.
+                .collect::<Vec<Arc<FxVolume>>>();
+            state = self.profiling_state.lock().await;
+        }
+        for volume in volumes {
+            volume.stop_profile_tasks().await;
         }
         *state = None;
     }
