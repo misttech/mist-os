@@ -7,7 +7,6 @@ pub(super) mod fs;
 use super::{FsNodeSecurityXattr, FsNodeState, ProcAttr};
 
 use crate::task::CurrentTask;
-use crate::vfs::syscalls::LookupFlags;
 use crate::vfs::{FsNode, FsNodeHandle, FsStr, FsString, NamespaceNode, ValueOrSize};
 use linux_uapi::XATTR_NAME_SELINUX;
 use selinux::permission_check::PermissionCheck;
@@ -20,6 +19,7 @@ use starnix_logging::{log_debug, track_stub};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::mount_flags::MountFlags;
 use starnix_uapi::signals::{Signal, SIGCHLD, SIGKILL, SIGSTOP};
+use starnix_uapi::unmount_flags::UnmountFlags;
 use starnix_uapi::{errno, error};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -241,7 +241,7 @@ pub(super) fn sb_umount(
     _permission_check: &impl PermissionCheck,
     _source_sid: SecurityId,
     _node: &NamespaceNode,
-    _flags: LookupFlags,
+    _flags: UnmountFlags,
 ) -> Result<(), Errno> {
     track_stub!(TODO("https://fxbug.dev/353936182"), "sb_umount: validate permission");
     Ok(())

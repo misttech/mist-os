@@ -48,6 +48,7 @@ use starnix_uapi::signals::SigSet;
 use starnix_uapi::time::{
     duration_from_poll_timeout, duration_from_timespec, time_from_timespec, timespec_from_duration,
 };
+use starnix_uapi::unmount_flags::UnmountFlags;
 use starnix_uapi::user_address::{UserAddress, UserCString, UserRef};
 use starnix_uapi::user_buffer::UserBuffer;
 use starnix_uapi::user_value::UserValue;
@@ -67,8 +68,7 @@ use starnix_uapi::{
     POLLHUP, POLLIN, POLLOUT, POLLPRI, POLLRDBAND, POLLRDNORM, POLLWRBAND, POLLWRNORM,
     POSIX_FADV_DONTNEED, POSIX_FADV_NOREUSE, POSIX_FADV_NORMAL, POSIX_FADV_RANDOM,
     POSIX_FADV_SEQUENTIAL, POSIX_FADV_WILLNEED, RWF_SUPPORTED, TFD_CLOEXEC, TFD_NONBLOCK,
-    TFD_TIMER_ABSTIME, TFD_TIMER_CANCEL_ON_SET, UMOUNT_NOFOLLOW, XATTR_CREATE, XATTR_NAME_MAX,
-    XATTR_REPLACE,
+    TFD_TIMER_ABSTIME, TFD_TIMER_CANCEL_ON_SET, XATTR_CREATE, XATTR_NAME_MAX, XATTR_REPLACE,
 };
 use std::cmp::Ordering;
 use std::collections::VecDeque;
@@ -1797,16 +1797,25 @@ pub fn sys_umount2(
         return error!(EPERM);
     }
 
-    let flags = if flags & UMOUNT_NOFOLLOW != 0 {
+    let unmount_flags = UnmountFlags::from_bits(flags).ok_or_else(|| {
+        track_stub!(
+            TODO("https://fxbug.dev/322875327"),
+            "unmount unknown flags",
+            flags & !UnmountFlags::from_bits_truncate(flags).bits()
+        );
+        errno!(EINVAL)
+    })?;
+
+    let lookup_flags = if unmount_flags.contains(UnmountFlags::NOFOLLOW) {
         LookupFlags::no_follow()
     } else {
         LookupFlags::default()
     };
-    let target = lookup_at(current_task, FdNumber::AT_FDCWD, target_addr, flags)?;
+    let target = lookup_at(current_task, FdNumber::AT_FDCWD, target_addr, lookup_flags)?;
 
-    security::sb_umount(current_task, &target, flags)?;
+    security::sb_umount(current_task, &target, unmount_flags)?;
 
-    target.unmount()
+    target.unmount(unmount_flags)
 }
 
 pub fn sys_eventfd2(

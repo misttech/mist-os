@@ -43,6 +43,7 @@ use starnix_uapi::inotify_mask::InotifyMask;
 use starnix_uapi::mount_flags::MountFlags;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::ownership::WeakRef;
+use starnix_uapi::unmount_flags::UnmountFlags;
 use starnix_uapi::vfs::{FdEvents, ResolveFlags};
 use starnix_uapi::{errno, error, NAME_MAX};
 use std::borrow::Borrow;
@@ -131,6 +132,13 @@ impl FileOps for MountNamespaceFile {
     fileops_impl_noop_sync!();
 }
 
+/// An empty struct that we use to track the number of active clients for a mount.
+///
+/// Each active client takes a reference to this object. The unmount operation fails
+/// if there are any active clients of the mount.
+#[derive(Default, Debug)]
+struct MountClientMarker;
+
 /// An instance of a filesystem mounted in a namespace.
 ///
 /// At a mount, path traversal switches from one filesystem to another.
@@ -147,6 +155,9 @@ pub struct Mount {
     /// A unique identifier for this mount reported in /proc/pid/mountinfo.
     id: u64,
 
+    /// A count of the number of active clients.
+    active_client_counter: Arc<MountClientMarker>,
+
     // Lock ordering: mount -> submount
     state: RwLock<MountState>,
     // Mount used to contain a Weak<Namespace>. It no longer does because since the mount point
@@ -160,7 +171,9 @@ type MountHandle = Arc<Mount>;
 
 /// Public representation of the mount options.
 #[derive(Clone, Debug)]
-pub struct MountInfo(Option<MountHandle>);
+pub struct MountInfo {
+    handle: Option<MountHandle>,
+}
 
 impl MountInfo {
     /// `MountInfo` for a element that is not tied to a given mount. Mount flags will be considered
@@ -171,8 +184,8 @@ impl MountInfo {
 
     /// The mount flags of the represented mount.
     pub fn flags(&self) -> MountFlags {
-        if let Some(mount) = &self.0 {
-            mount.flags()
+        if let Some(handle) = &self.handle {
+            handle.flags()
         } else {
             // Consider not mounted node have the NOATIME flags.
             MountFlags::NOATIME
@@ -192,19 +205,19 @@ impl Deref for MountInfo {
     type Target = Option<MountHandle>;
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        &self.handle
     }
 }
 
 impl DerefMut for MountInfo {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
+        &mut self.handle
     }
 }
 
 impl std::cmp::PartialEq for MountInfo {
     fn eq(&self, other: &Self) -> bool {
-        self.0.as_ref().map(Arc::as_ptr) == other.0.as_ref().map(Arc::as_ptr)
+        self.handle.as_ref().map(Arc::as_ptr) == other.handle.as_ref().map(Arc::as_ptr)
     }
 }
 
@@ -212,7 +225,7 @@ impl std::cmp::Eq for MountInfo {}
 
 impl Into<MountInfo> for Option<MountHandle> {
     fn into(self) -> MountInfo {
-        MountInfo(self)
+        MountInfo { handle: self }
     }
 }
 
@@ -287,6 +300,7 @@ impl Mount {
             id: kernel.get_next_mount_id(),
             flags: Mutex::new(flags),
             root,
+            active_client_counter: Default::default(),
             fs,
             state: Default::default(),
         })
@@ -294,7 +308,7 @@ impl Mount {
 
     /// A namespace node referring to the root of the mount.
     pub fn root(self: &MountHandle) -> NamespaceNode {
-        NamespaceNode { mount: Some(Arc::clone(self)).into(), entry: Arc::clone(&self.root) }
+        NamespaceNode::new(Arc::clone(self), Arc::clone(&self.root))
     }
 
     /// Returns true if there is a submount on top of `dir_entry`.
@@ -306,7 +320,7 @@ impl Mount {
     fn mountpoint(&self) -> Option<NamespaceNode> {
         let state = self.state.read();
         let (ref mount, ref entry) = state.mountpoint.as_ref()?;
-        Some(NamespaceNode { mount: Some(mount.upgrade()?).into(), entry: entry.clone() })
+        Some(NamespaceNode::new(mount.upgrade()?, entry.clone()))
     }
 
     /// Create the specified mount as a child. Also propagate it to the mount's peer group.
@@ -462,7 +476,18 @@ impl Mount {
         *stored_flags = flags;
     }
 
-    pub fn unmount(&self, propagate: bool) -> Result<(), Errno> {
+    /// The number of active clients of this mount.
+    ///
+    /// The mount cannot be unmounted if there are any active clients.
+    fn active_clients(&self) -> usize {
+        // We need to subtract one for our own reference. We are not a real client.
+        Arc::strong_count(&self.active_client_counter) - 1
+    }
+
+    pub fn unmount(&self, flags: UnmountFlags, propagate: bool) -> Result<(), Errno> {
+        if !flags.contains(UnmountFlags::DETACH) && self.active_clients() > 1 {
+            return error!(EBUSY);
+        }
         let mountpoint = self.mountpoint().ok_or_else(|| errno!(EINVAL))?;
         let parent_mount = mountpoint.mount.as_ref().expect("a mountpoint must be part of a mount");
         parent_mount.remove_submount(mountpoint.mount_hash_key(), propagate)
@@ -1046,12 +1071,22 @@ pub struct NamespaceNode {
 
     /// The FsNode that corresponds to this namespace entry.
     pub entry: DirEntryHandle,
+
+    /// Adds a reference to the mount client marker to prevent the mount from
+    /// being removed while the NamespaceNode is active. Is None iff mount is
+    /// None.
+    _marker: Option<Arc<MountClientMarker>>,
 }
 
 impl NamespaceNode {
+    pub fn new(mount: MountHandle, entry: DirEntryHandle) -> Self {
+        let marker = mount.active_client_counter.clone();
+        Self { mount: Some(mount).into(), entry, _marker: Some(marker) }
+    }
+
     /// Create a namespace node that is not mounted in a namespace.
-    pub fn new_anonymous(dir_entry: DirEntryHandle) -> Self {
-        Self { mount: None.into(), entry: dir_entry }
+    pub fn new_anonymous(entry: DirEntryHandle) -> Self {
+        Self { mount: None.into(), entry, _marker: None }
     }
 
     /// Create a namespace node that is not mounted in a namespace and that refers to a node that
@@ -1494,11 +1529,12 @@ impl NamespaceNode {
     }
 
     /// If this is the root of a filesystem, unmount. Otherwise return EINVAL.
-    pub fn unmount(&self) -> Result<(), Errno> {
+    pub fn unmount(&self, flags: UnmountFlags) -> Result<(), Errno> {
         let propagate = self.mount_if_root().map_or(false, |mount| mount.read().is_shared());
-        let node = self.enter_mount();
-        let mount = node.mount_if_root()?;
-        mount.unmount(propagate)
+        // It's imporant not to hold any extra references to NamespaceNode objects here
+        // because those references could prevent this mount from being unmounted.
+        let mount = self.enter_mount().mount_if_root()?.clone();
+        mount.unmount(flags, propagate)
     }
 
     pub fn rename(
@@ -1522,7 +1558,7 @@ impl NamespaceNode {
     }
 
     fn with_new_entry(&self, entry: DirEntryHandle) -> NamespaceNode {
-        NamespaceNode { mount: self.mount.clone(), entry }
+        Self { mount: self.mount.clone(), entry, _marker: self._marker.clone() }
     }
 
     fn mount_hash_key(&self) -> &ArcKey<DirEntry> {
@@ -1655,7 +1691,7 @@ impl Mounts {
         if let Some(mounts) = mounts {
             for mount in mounts {
                 // Ignore errors.
-                let _ = mount.unmount(false);
+                let _ = mount.unmount(UnmountFlags::default(), false);
             }
         }
     }
