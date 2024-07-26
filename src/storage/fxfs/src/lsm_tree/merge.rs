@@ -833,6 +833,10 @@ mod tests {
     )]
     struct TestKey(Range<u64>);
 
+    impl Value for i32 {
+        const DELETED_MARKER: Self = 0;
+    }
+
     versioned_type! { 1.. => TestKey }
 
     impl SortByU64 for TestKey {
@@ -1359,9 +1363,9 @@ mod tests {
     // Checks that merging the given layers produces |expected| sequence of items starting from
     // |start|.
     async fn test_advance<K: Eq + Key + LayerKey + OrdLowerBound>(
-        layers: &[&[(K, i64)]],
+        layers: &[&[(K, i32)]],
         query: Query<'_, K>,
-        expected: &[(K, i64)],
+        expected: &[(K, i32)],
     ) {
         let mut skip_lists = Vec::new();
         for &layer in layers {
@@ -1457,15 +1461,15 @@ mod tests {
     async fn test_full_merge_consistent_advance_ordering() {
         let layer_set = [
             [
-                (TestKeyWithFullMerge(1..2), 1i64),
-                (TestKeyWithFullMerge(2..3), 2i64),
-                (TestKeyWithFullMerge(4..5), 3i64),
+                (TestKeyWithFullMerge(1..2), 1i32),
+                (TestKeyWithFullMerge(2..3), 2i32),
+                (TestKeyWithFullMerge(4..5), 3i32),
             ]
             .as_slice(),
             [
-                (TestKeyWithFullMerge(1..2), 4i64),
-                (TestKeyWithFullMerge(2..3), 5i64),
-                (TestKeyWithFullMerge(3..4), 6i64),
+                (TestKeyWithFullMerge(1..2), 4i32),
+                (TestKeyWithFullMerge(2..3), 5i32),
+                (TestKeyWithFullMerge(3..4), 6i32),
             ]
             .as_slice(),
         ];

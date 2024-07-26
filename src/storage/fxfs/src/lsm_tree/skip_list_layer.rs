@@ -10,7 +10,7 @@ use crate::log::*;
 use crate::lsm_tree::merge::{self, MergeFn};
 use crate::lsm_tree::types::{
     BoxedLayerIterator, Item, ItemCount, ItemRef, Key, Layer, LayerIterator, LayerIteratorMut,
-    OrdLowerBound, OrdUpperBound, Value,
+    LayerValue, OrdLowerBound, OrdUpperBound,
 };
 use crate::serialized_types::{Version, LATEST_VERSION};
 use anyhow::{bail, Error};
@@ -180,7 +180,7 @@ impl<K, V> SkipListLayer<K, V> {
     }
 }
 
-impl<K: Eq + Key + OrdLowerBound, V: Value> SkipListLayer<K, V> {
+impl<K: Eq + Key + OrdLowerBound, V: LayerValue> SkipListLayer<K, V> {
     // Erases the given item. Does nothing if the item doesn't exist.
     pub fn erase(&self, key: &K)
     where
@@ -243,7 +243,7 @@ impl<K, V> Drop for SkipListLayer<K, V> {
 }
 
 #[async_trait]
-impl<K: Key, V: Value> Layer<K, V> for SkipListLayer<K, V> {
+impl<K: Key, V: LayerValue> Layer<K, V> for SkipListLayer<K, V> {
     async fn seek<'a>(
         &'a self,
         bound: std::ops::Bound<&K>,
@@ -353,7 +353,7 @@ impl<K, V> Drop for SkipListLayerIter<'_, K, V> {
 }
 
 #[async_trait]
-impl<K: Key, V: Value> LayerIterator<K, V> for SkipListLayerIter<'_, K, V> {
+impl<K: Key, V: LayerValue> LayerIterator<K, V> for SkipListLayerIter<'_, K, V> {
     async fn advance(&mut self) -> Result<(), Error> {
         match self.node {
             None => {}
@@ -376,7 +376,7 @@ type PointerListRefArray<'a, K, V> = Box<[&'a PointerList<K, V>]>;
 // release memory for any nodes that might have been erased.  In the case that we are only erasing
 // elements, there will be no insertion chain, in which case we just atomically remove the elements
 // from the chain.
-pub struct SkipListLayerIterMut<'a, K: Key, V: Value> {
+pub struct SkipListLayerIterMut<'a, K: Key, V: LayerValue> {
     skip_list: &'a SkipListLayer<K, V>,
 
     // Since this is a mutable iterator, we need to keep pointers to all the nodes that precede the
@@ -400,7 +400,7 @@ pub struct SkipListLayerIterMut<'a, K: Key, V: Value> {
     item_delta: isize,
 }
 
-impl<'a, K: Key, V: Value> SkipListLayerIterMut<'a, K, V> {
+impl<'a, K: Key, V: LayerValue> SkipListLayerIterMut<'a, K, V> {
     pub fn new(skip_list: &'a SkipListLayer<K, V>, bound: std::ops::Bound<&K>) -> Self {
         let write_guard = skip_list.write_lock.lock().unwrap();
         let len = skip_list.pointers.len();
@@ -453,13 +453,13 @@ impl<'a, K: Key, V: Value> SkipListLayerIterMut<'a, K, V> {
     }
 }
 
-impl<K: Key, V: Value> Drop for SkipListLayerIterMut<'_, K, V> {
+impl<K: Key, V: LayerValue> Drop for SkipListLayerIterMut<'_, K, V> {
     fn drop(&mut self) {
         self.commit();
     }
 }
 
-impl<K: Key, V: Value> LayerIteratorMut<K, V> for SkipListLayerIterMut<'_, K, V> {
+impl<K: Key, V: LayerValue> LayerIteratorMut<K, V> for SkipListLayerIterMut<'_, K, V> {
     fn advance(&mut self) {
         if self.insertion_point.is_some() {
             if let Some(item) = self.get() {

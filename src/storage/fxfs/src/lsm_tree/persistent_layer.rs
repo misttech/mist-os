@@ -63,8 +63,8 @@ use crate::filesystem::MAX_BLOCK_SIZE;
 use crate::log::*;
 use crate::lsm_tree::bloom_filter::{BloomFilterReader, BloomFilterStats, BloomFilterWriter};
 use crate::lsm_tree::types::{
-    BoxedLayerIterator, FuzzyHash, Item, ItemCount, ItemRef, Key, Layer, LayerIterator,
-    LayerWriter, Value,
+    BoxedLayerIterator, FuzzyHash, Item, ItemCount, ItemRef, Key, Layer, LayerIterator, LayerValue,
+    LayerWriter,
 };
 use crate::object_handle::{ObjectHandle, ReadObjectHandle, WriteBytes};
 use crate::object_store::caching_object_handle::{CachedChunk, CachingObjectHandle, CHUNK_SIZE};
@@ -200,7 +200,7 @@ const PER_DATA_BLOCK_HEADER_SIZE: usize = 2;
 const PER_DATA_BLOCK_SEEK_ENTRY_SIZE: usize = 2;
 
 // A key-only iterator, used while seeking through the tree.
-struct KeyOnlyIterator<'iter, K: Key, V: Value> {
+struct KeyOnlyIterator<'iter, K: Key, V: LayerValue> {
     // Allocated out of |layer|.
     buffer: BufferCursor,
 
@@ -223,7 +223,7 @@ struct KeyOnlyIterator<'iter, K: Key, V: Value> {
     value_deserialized: bool,
 }
 
-impl<K: Key, V: Value> KeyOnlyIterator<'_, K, V> {
+impl<K: Key, V: LayerValue> KeyOnlyIterator<'_, K, V> {
     fn new<'iter>(layer: &'iter PersistentLayer<K, V>, pos: u64) -> KeyOnlyIterator<'iter, K, V> {
         assert!(pos % layer.block_size == 0);
         KeyOnlyIterator {
@@ -321,13 +321,13 @@ impl<K: Key, V: Value> KeyOnlyIterator<'_, K, V> {
     }
 }
 
-struct Iterator<'iter, K: Key, V: Value> {
+struct Iterator<'iter, K: Key, V: LayerValue> {
     inner: KeyOnlyIterator<'iter, K, V>,
     // The current item.
     item: Option<Item<K, V>>,
 }
 
-impl<'iter, K: Key, V: Value> Iterator<'iter, K, V> {
+impl<'iter, K: Key, V: LayerValue> Iterator<'iter, K, V> {
     fn new(mut seek_iterator: KeyOnlyIterator<'iter, K, V>) -> Result<Self, Error> {
         let key = std::mem::take(&mut seek_iterator.key);
         let item = if let Some(key) = key {
@@ -352,7 +352,7 @@ impl<'iter, K: Key, V: Value> Iterator<'iter, K, V> {
 }
 
 #[async_trait]
-impl<'iter, K: Key, V: Value> LayerIterator<K, V> for Iterator<'iter, K, V> {
+impl<'iter, K: Key, V: LayerValue> LayerIterator<K, V> for Iterator<'iter, K, V> {
     async fn advance(&mut self) -> Result<(), Error> {
         self.inner.advance().await?;
         let key = std::mem::take(&mut self.inner.key);
@@ -477,7 +477,7 @@ async fn load_bloom_filter<K: FuzzyHash>(
     )?))
 }
 
-impl<K: Key, V: Value> PersistentLayer<K, V> {
+impl<K: Key, V: LayerValue> PersistentLayer<K, V> {
     pub async fn open(handle: impl ReadObjectHandle + 'static) -> Result<Arc<Self>, Error> {
         let bs = handle.block_size();
         let mut buffer = handle.allocate_buffer(bs as usize).await;
@@ -638,7 +638,7 @@ impl<K: Key, V: Value> PersistentLayer<K, V> {
 }
 
 #[async_trait]
-impl<K: Key, V: Value> Layer<K, V> for PersistentLayer<K, V> {
+impl<K: Key, V: LayerValue> Layer<K, V> for PersistentLayer<K, V> {
     fn handle(&self) -> Option<&dyn ReadObjectHandle> {
         Some(&self.object_handle)
     }
@@ -815,7 +815,7 @@ const_assert!(MAX_BLOCK_SIZE <= u16::MAX as u64 + 1);
 
 // -- Writer support --
 
-pub struct PersistentLayerWriter<W: WriteBytes, K: Key, V: Value> {
+pub struct PersistentLayerWriter<W: WriteBytes, K: Key, V: LayerValue> {
     writer: W,
     block_size: u64,
     buf: Vec<u8>,
@@ -827,7 +827,7 @@ pub struct PersistentLayerWriter<W: WriteBytes, K: Key, V: Value> {
     _value: PhantomData<V>,
 }
 
-impl<W: WriteBytes, K: Key, V: Value> PersistentLayerWriter<W, K, V> {
+impl<W: WriteBytes, K: Key, V: LayerValue> PersistentLayerWriter<W, K, V> {
     /// Creates a new writer that will serialize items to the object accessible via |object_handle|
     /// (which provides a write interface to the object).
     /// `estimated_num_items` is an estimate for the number of items that we expect to write into
@@ -971,7 +971,9 @@ impl<W: WriteBytes, K: Key, V: Value> PersistentLayerWriter<W, K, V> {
     }
 }
 
-impl<W: WriteBytes + Send, K: Key, V: Value> LayerWriter<K, V> for PersistentLayerWriter<W, K, V> {
+impl<W: WriteBytes + Send, K: Key, V: LayerValue> LayerWriter<K, V>
+    for PersistentLayerWriter<W, K, V>
+{
     async fn write(&mut self, item: ItemRef<'_, K, V>) -> Result<(), Error> {
         // Note the length before we write this item.
         let len = self.buf.len();
@@ -1019,7 +1021,7 @@ impl<W: WriteBytes + Send, K: Key, V: Value> LayerWriter<K, V> for PersistentLay
     }
 }
 
-impl<W: WriteBytes, K: Key, V: Value> Drop for PersistentLayerWriter<W, K, V> {
+impl<W: WriteBytes, K: Key, V: LayerValue> Drop for PersistentLayerWriter<W, K, V> {
     fn drop(&mut self) {
         if self.buf_item_count > 0 {
             warn!("Dropping unwritten items; did you forget to flush?");
@@ -1035,8 +1037,8 @@ mod tests {
     };
     use crate::filesystem::MAX_BLOCK_SIZE;
     use crate::lsm_tree::types::{
-        DefaultOrdUpperBound, FuzzyHash, Item, ItemRef, Key, Layer, LayerKey, LayerWriter,
-        MergeType, SortByU64, Value,
+        DefaultOrdUpperBound, FuzzyHash, Item, ItemRef, Key, Layer, LayerKey, LayerValue,
+        LayerWriter, MergeType, SortByU64,
     };
     use crate::lsm_tree::LayerIterator;
     use crate::object_handle::WriteBytes;
@@ -1058,7 +1060,7 @@ mod tests {
     use std::sync::Arc;
 
     /// Exists for testing backwards compatibility.
-    struct OldPersistentLayerWriter<W: WriteBytes, K: Key, V: Value> {
+    struct OldPersistentLayerWriter<W: WriteBytes, K: Key, V: LayerValue> {
         writer: W,
         block_size: u64,
         buf: Vec<u8>,
@@ -1069,7 +1071,7 @@ mod tests {
         _value: PhantomData<V>,
     }
 
-    impl<W: WriteBytes, K: Key, V: Value> OldPersistentLayerWriter<W, K, V> {
+    impl<W: WriteBytes, K: Key, V: LayerValue> OldPersistentLayerWriter<W, K, V> {
         /// Creates a new writer that will serialize items to the object accessible via
         /// |object_handle| (which provides a write interface to the object).
         pub async fn new(version: Version, mut writer: W, block_size: u64) -> Result<Self, Error> {
@@ -1130,7 +1132,7 @@ mod tests {
         }
     }
 
-    impl<W: WriteBytes + Send, K: Key, V: Value> LayerWriter<K, V>
+    impl<W: WriteBytes + Send, K: Key, V: LayerValue> LayerWriter<K, V>
         for OldPersistentLayerWriter<W, K, V>
     {
         async fn write(&mut self, item: ItemRef<'_, K, V>) -> Result<(), Error> {

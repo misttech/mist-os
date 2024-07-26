@@ -211,7 +211,7 @@ impl<'tree, K: MergeableKey, V: Value> LSMTree<K, V> {
     /// Returns error if item already exists.
     pub fn insert(&self, item: Item<K, V>) -> Result<(), Error> {
         let key = item.key.clone();
-        let val = item.value.clone();
+        let val = if item.value == V::DELETED_MARKER { None } else { Some(item.value.clone()) };
         {
             // `seal` below relies on us holding a read lock whilst we do the mutation.
             let data = self.data.read().unwrap();
@@ -220,14 +220,14 @@ impl<'tree, K: MergeableKey, V: Value> LSMTree<K, V> {
             }
             data.mutable_layer.insert(item)?;
         }
-        self.cache.invalidate(key, Some(val));
+        self.cache.invalidate(key, val);
         Ok(())
     }
 
     /// Replaces or inserts an item into the mutable layer.
     pub fn replace_or_insert(&self, item: Item<K, V>) {
         let key = item.key.clone();
-        let val = item.value.clone();
+        let val = if item.value == V::DELETED_MARKER { None } else { Some(item.value.clone()) };
         {
             // `seal` below relies on us holding a read lock whilst we do the mutation.
             let data = self.data.read().unwrap();
@@ -236,7 +236,7 @@ impl<'tree, K: MergeableKey, V: Value> LSMTree<K, V> {
             }
             data.mutable_layer.replace_or_insert(item);
         }
-        self.cache.invalidate(key, Some(val));
+        self.cache.invalidate(key, val);
     }
 
     /// Merges the given item into the mutable layer.
@@ -253,7 +253,8 @@ impl<'tree, K: MergeableKey, V: Value> LSMTree<K, V> {
         self.cache.invalidate(key, None);
     }
 
-    /// Searches for an exact match for the given key.
+    /// Searches for an exact match for the given key. If the value is equal to
+    /// `Value::DELETED_MARKER` the item is considered missing and will not be returned.
     pub async fn find(&self, search_key: &K) -> Result<Option<Item<K, V>>, Error>
     where
         K: Eq,
@@ -263,7 +264,11 @@ impl<'tree, K: MergeableKey, V: Value> LSMTree<K, V> {
         // inserted later via that placeholder.
         let token = match self.cache.lookup_or_reserve(search_key) {
             ObjectCacheResult::Value(value) => {
-                return Ok(Some(Item::new(search_key.clone(), value)))
+                if value == V::DELETED_MARKER {
+                    return Ok(None);
+                } else {
+                    return Ok(Some(Item::new(search_key.clone(), value)));
+                }
             }
             ObjectCacheResult::Placeholder(token) => Some(token),
             ObjectCacheResult::NoCache => None,
@@ -272,7 +277,9 @@ impl<'tree, K: MergeableKey, V: Value> LSMTree<K, V> {
         let mut merger = layer_set.merger();
 
         Ok(match merger.query(Query::Point(search_key)).await?.get() {
-            Some(ItemRef { key, value, sequence }) if key == search_key => {
+            Some(ItemRef { key, value, sequence })
+                if key == search_key && *value != V::DELETED_MARKER =>
+            {
                 if let Some(token) = token {
                     token.complete(Some(value));
                 }
@@ -486,6 +493,10 @@ mod tests {
         MergeResult::EmitLeft
     }
 
+    impl Value for u64 {
+        const DELETED_MARKER: Self = 0;
+    }
+
     #[fuchsia::test]
     async fn test_iteration() {
         let tree = LSMTree::new(emit_left_merge_fn, Box::new(NullCache {}));
@@ -569,6 +580,18 @@ mod tests {
         let item = tree.find(&items[1].key).await.expect("find failed").expect("not found");
         assert_eq!(item, items[1]);
         assert!(tree.find(&TestKey(100..100)).await.expect("find failed").is_none());
+    }
+
+    #[fuchsia::test]
+    async fn test_find_no_return_deleted_values() {
+        let items = [Item::new(TestKey(1..1), 1), Item::new(TestKey(2..2), u64::DELETED_MARKER)];
+        let tree = LSMTree::new(emit_left_merge_fn, Box::new(NullCache {}));
+        tree.insert(items[0].clone()).expect("insert error");
+        tree.insert(items[1].clone()).expect("insert error");
+
+        let item = tree.find(&items[0].key).await.expect("find failed").expect("not found");
+        assert_eq!(item, items[0]);
+        assert!(tree.find(&items[1].key).await.expect("find failed").is_none());
     }
 
     #[fuchsia::test]
@@ -871,7 +894,7 @@ mod tests {
 #[cfg(fuzz)]
 mod fuzz {
     use crate::lsm_tree::types::{
-        FuzzyHash, Item, LayerKey, OrdLowerBound, OrdUpperBound, SortByU64,
+        FuzzyHash, Item, LayerKey, OrdLowerBound, OrdUpperBound, SortByU64, Value,
     };
     use crate::serialized_types::{
         versioned_type, Version, Versioned, VersionedLatest, LATEST_VERSION,
@@ -920,6 +943,10 @@ mod fuzz {
         fn cmp_lower_bound(&self, other: &Self) -> std::cmp::Ordering {
             self.0.start.cmp(&other.0.start)
         }
+    }
+
+    impl Value for u64 {
+        const DELETED_MARKER: Self = 0;
     }
 
     #[allow(dead_code)] // TODO(https://fxbug.dev/318827209)
