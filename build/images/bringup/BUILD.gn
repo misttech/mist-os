@@ -97,8 +97,6 @@ bringup_base = {
 
   cmdline_deps = [ "//build/input:bootfs" ]
 
-  base_packages = []
-
   bootfs_labels = [
     "//build/input:bootfs",
     "//:developer_base_packages",
