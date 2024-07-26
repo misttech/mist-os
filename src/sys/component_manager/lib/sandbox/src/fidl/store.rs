@@ -10,16 +10,18 @@ use fidl::AsHandleRef;
 use futures::{FutureExt, TryStreamExt};
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
+use std::sync::{self, Arc, Weak};
 use tracing::warn;
 use {fidl_fuchsia_component_sandbox as fsandbox, fuchsia_async as fasync};
 
-type Store = HashMap<u64, Capability>;
+type Store = sync::Mutex<HashMap<u64, Capability>>;
 
 pub async fn serve_capability_store(
     mut stream: fsandbox::CapabilityStoreRequestStream,
 ) -> Result<(), fidl::Error> {
-    let mut store: Store = Default::default();
+    let outer_store: Arc<Store> = Arc::new(Store::new(Default::default()));
     while let Some(request) = stream.try_next().await? {
+        let mut store = outer_store.lock().unwrap();
         match request {
             fsandbox::CapabilityStoreRequest::Duplicate { id, dest_id, responder } => {
                 let result = (|| {
@@ -133,7 +135,7 @@ pub async fn serve_capability_store(
                         Key::new(key).map_err(|_| fsandbox::CapabilityStoreError::InvalidKey)?;
                     // Check this before removing from the dictionary.
                     if let Some(dest_id) = dest_id.as_ref() {
-                        if store.contains_key(&dest_id.value) {
+                        if store.contains_key(&dest_id.id) {
                             return Err(fsandbox::CapabilityStoreError::IdAlreadyExists);
                         }
                     }
@@ -145,7 +147,7 @@ pub async fn serve_capability_store(
                         }
                     }?;
                     if let Some(dest_id) = dest_id.as_ref() {
-                        store.insert(dest_id.value, cap);
+                        store.insert(dest_id.id, cap);
                     }
                     Ok(())
                 })();
@@ -171,7 +173,49 @@ pub async fn serve_capability_store(
                     let keys = this.keys();
                     let stream = server_end.into_stream().unwrap();
                     let mut this = this.lock();
-                    this.tasks().spawn(crate::fidl::dict::serve_keys_iterator(keys, stream));
+                    this.tasks().spawn(serve_dictionary_keys_iterator(keys, stream));
+                    Ok(())
+                })();
+                responder.send(result)?
+            }
+            fsandbox::CapabilityStoreRequest::DictionaryEnumerate {
+                id,
+                iterator: server_end,
+                responder,
+            } => {
+                let result = (|| {
+                    let this = get_dictionary(&store, id)?;
+                    let items = this.enumerate();
+                    let stream = server_end.into_stream().unwrap();
+                    let mut this = this.lock();
+                    this.tasks().spawn(serve_dictionary_enumerate_iterator(
+                        Arc::downgrade(&outer_store),
+                        items,
+                        stream,
+                    ));
+                    Ok(())
+                })();
+                responder.send(result)?
+            }
+            fsandbox::CapabilityStoreRequest::DictionaryDrain {
+                id,
+                iterator: server_end,
+                responder,
+            } => {
+                let result = (|| {
+                    let this = get_dictionary(&store, id)?;
+                    // Take out entries, replacing with an empty BTreeMap.
+                    // They are dropped if the caller does not request an iterator.
+                    let items = this.drain();
+                    if let Some(server_end) = server_end {
+                        let stream = server_end.into_stream().unwrap();
+                        let mut this = this.lock();
+                        this.tasks().spawn(serve_dictionary_drain_iterator(
+                            Arc::downgrade(&outer_store),
+                            items,
+                            stream,
+                        ));
+                    }
                     Ok(())
                 })();
                 responder.send(result)?
@@ -184,7 +228,168 @@ pub async fn serve_capability_store(
     Ok(())
 }
 
-fn get_dictionary(store: &Store, id: u64) -> Result<&Dict, fsandbox::CapabilityStoreError> {
+async fn serve_dictionary_keys_iterator(
+    mut keys: impl Iterator<Item = Key>,
+    mut stream: fsandbox::DictionaryKeysIteratorRequestStream,
+) {
+    while let Ok(Some(request)) = stream.try_next().await {
+        match request {
+            fsandbox::DictionaryKeysIteratorRequest::GetNext { responder } => {
+                let mut chunk = vec![];
+                for _ in 0..fsandbox::MAX_DICTIONARY_ITERATOR_CHUNK {
+                    match keys.next() {
+                        Some(key) => {
+                            chunk.push(key.into());
+                        }
+                        None => break,
+                    }
+                }
+                let _ = responder.send(&chunk);
+            }
+            fsandbox::DictionaryKeysIteratorRequest::_UnknownMethod { ordinal, .. } => {
+                warn!(%ordinal, "Unknown DictionaryKeysIterator request");
+            }
+        }
+    }
+}
+
+async fn serve_dictionary_enumerate_iterator(
+    store: Weak<Store>,
+    mut items: impl Iterator<Item = (Key, Result<Capability, ()>)>,
+    mut stream: fsandbox::DictionaryEnumerateIteratorRequestStream,
+) {
+    while let Ok(Some(request)) = stream.try_next().await {
+        let Some(store) = store.upgrade() else {
+            return;
+        };
+        let mut store = store.lock().unwrap();
+        match request {
+            fsandbox::DictionaryEnumerateIteratorRequest::GetNext {
+                start_id,
+                limit,
+                responder,
+            } => {
+                let result = (|| {
+                    let mut next_id = start_id;
+                    let chunk = get_next_chunk(&*store, &mut items, &mut next_id, limit)?;
+                    let end_id = next_id;
+
+                    let chunk: Vec<_> = chunk
+                        .into_iter()
+                        .map(|(key, value)| {
+                            if let Some((capability, id)) = value {
+                                store.insert(id, capability);
+                                fsandbox::DictionaryOptionalItem {
+                                    key: key.into(),
+                                    value: Some(Box::new(fsandbox::WrappedCapabilityId { id })),
+                                }
+                            } else {
+                                fsandbox::DictionaryOptionalItem { key: key.into(), value: None }
+                            }
+                        })
+                        .collect();
+                    Ok((chunk, end_id))
+                })();
+                let err = result.is_err();
+                let _ = responder.send(result);
+                if err {
+                    return;
+                }
+            }
+            fsandbox::DictionaryEnumerateIteratorRequest::_UnknownMethod { ordinal, .. } => {
+                warn!(%ordinal, "Unknown DictionaryEnumerateIterator request");
+            }
+        }
+    }
+}
+
+async fn serve_dictionary_drain_iterator(
+    store: Weak<Store>,
+    items: impl Iterator<Item = (Key, Capability)>,
+    mut stream: fsandbox::DictionaryDrainIteratorRequestStream,
+) {
+    // Transform iterator to be compatible with get_next_chunk()
+    let mut items = items.map(|(key, capability)| (key, Ok(capability)));
+    while let Ok(Some(request)) = stream.try_next().await {
+        let Some(store) = store.upgrade() else {
+            return;
+        };
+        let mut store = store.lock().unwrap();
+        match request {
+            fsandbox::DictionaryDrainIteratorRequest::GetNext { start_id, limit, responder } => {
+                let result = (|| {
+                    let mut next_id = start_id;
+                    let chunk = get_next_chunk(&*store, &mut items, &mut next_id, limit)?;
+                    let end_id = next_id;
+
+                    let chunk: Vec<_> = chunk
+                        .into_iter()
+                        .map(|(key, value)| {
+                            let value = value.expect("unreachable: all values are present");
+                            let (capability, id) = value;
+                            store.insert(id, capability);
+                            fsandbox::DictionaryItem { key: key.into(), value: id }
+                        })
+                        .collect();
+                    Ok((chunk, end_id))
+                })();
+                match result {
+                    Ok((chunk, id)) => {
+                        let _ = responder.send(Ok((&chunk[..], id)));
+                    }
+                    Err(e) => {
+                        let _ = responder.send(Err(e));
+                        return;
+                    }
+                }
+            }
+            fsandbox::DictionaryDrainIteratorRequest::_UnknownMethod { ordinal, .. } => {
+                warn!(%ordinal, "Unknown DictionaryDrainIterator request");
+            }
+        }
+    }
+}
+
+fn get_next_chunk(
+    store: &HashMap<u64, Capability>,
+    items: &mut impl Iterator<Item = (Key, Result<Capability, ()>)>,
+    next_id: &mut u64,
+    limit: u32,
+) -> Result<Vec<(Key, Option<(Capability, fsandbox::CapabilityId)>)>, fsandbox::CapabilityStoreError>
+{
+    if limit == 0 || limit > fsandbox::MAX_DICTIONARY_ITERATOR_CHUNK {
+        return Err(fsandbox::CapabilityStoreError::InvalidArgs);
+    }
+
+    let mut chunk = vec![];
+    for _ in 0..limit {
+        match items.next() {
+            Some((key, value)) => {
+                let value = match value {
+                    Ok(value) => {
+                        let id = *next_id;
+                        // Pre-flight check: if an id is unavailable, return early
+                        // and don't make any changes to the store.
+                        if store.contains_key(&id) {
+                            return Err(fsandbox::CapabilityStoreError::IdAlreadyExists);
+                        }
+                        *next_id += 1;
+                        Some((value, id))
+                    }
+                    Err(_) => None,
+                };
+                chunk.push((key, value));
+            }
+            None => break,
+        }
+    }
+    Ok(chunk)
+}
+
+fn get_dictionary(
+    store: &HashMap<u64, Capability>,
+    id: u64,
+) -> Result<&Dict, fsandbox::CapabilityStoreError> {
     let dict = store.get(&id).ok_or_else(|| fsandbox::CapabilityStoreError::IdNotFound)?;
     if let Capability::Dictionary(dict) = dict {
         Ok(dict)
@@ -194,7 +399,7 @@ fn get_dictionary(store: &Store, id: u64) -> Result<&Dict, fsandbox::CapabilityS
 }
 
 fn insert_capability(
-    store: &mut Store,
+    store: &mut HashMap<u64, Capability>,
     id: u64,
     cap: Capability,
 ) -> Result<(), fsandbox::CapabilityStoreError> {

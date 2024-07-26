@@ -2,14 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::dict::Key;
 use crate::fidl::registry::{self, try_from_handle_in_registry};
 use crate::{Capability, ConversionError, Dict, RemotableCapability, RemoteError};
 use fidl::AsHandleRef;
 use fidl_fuchsia_component_sandbox as fsandbox;
-use futures::TryStreamExt;
 use std::sync::Arc;
-use tracing::warn;
 use vfs::directory::entry::DirectoryEntry;
 use vfs::directory::helper::{AlreadyExists, DirectlyMutable};
 use vfs::directory::immutable::simple as pfs;
@@ -81,30 +78,6 @@ impl RemotableCapability for Dict {
     }
 }
 
-pub(super) async fn serve_keys_iterator(
-    mut keys: impl Iterator<Item = Key>,
-    mut stream: fsandbox::DictionaryKeysIteratorRequestStream,
-) {
-    while let Ok(Some(request)) = stream.try_next().await {
-        match request {
-            fsandbox::DictionaryKeysIteratorRequest::GetNext { responder } => {
-                let mut chunk = vec![];
-                for _ in 0..fsandbox::MAX_DICTIONARY_ITERATOR_CHUNK {
-                    match keys.next() {
-                        Some(key) => {
-                            chunk.push(key.into());
-                        }
-                        None => break,
-                    }
-                }
-                let _ = responder.send(&chunk);
-            }
-            fsandbox::DictionaryKeysIteratorRequest::_UnknownMethod { ordinal, .. } => {
-                warn!(%ordinal, "Unknown DictionaryKeysIterator request");
-            }
-        }
-    }
-}
 // These tests only run on target because the vfs library is not generally available on host.
 #[cfg(test)]
 mod tests {
@@ -261,7 +234,7 @@ mod tests {
             .dictionary_remove(
                 dict_id,
                 CAP_KEY.as_str(),
-                Some(&fsandbox::WrappedNewCapabilityId { value: dest_id }),
+                Some(&fsandbox::WrappedNewCapabilityId { id: dest_id }),
             )
             .await
             .unwrap()
@@ -369,7 +342,7 @@ mod tests {
             .dictionary_remove(
                 dict_id,
                 CAP_KEY.as_str(),
-                Some(&fsandbox::WrappedCapabilityId { value: dest_id }),
+                Some(&fsandbox::WrappedCapabilityId { id: dest_id }),
             )
             .await
             .unwrap();
@@ -424,7 +397,7 @@ mod tests {
         Ok(())
     }
 
-    /// Tests basic functionality of Keys APIs.
+    /// Tests basic functionality of read APIs.
     #[fuchsia::test]
     async fn read() {
         let dict = Dict::new();
@@ -470,15 +443,160 @@ mod tests {
             .unwrap()
             .unwrap();
 
-        // Now read the entries back.
-        let (iterator, server_end) = create_proxy().unwrap();
-        store.dictionary_keys(dict_id, server_end).await.unwrap().unwrap();
-        let keys = iterator.get_next().await.unwrap();
-        assert!(iterator.get_next().await.unwrap().is_empty());
-        assert_eq!(keys, ["cap1", "cap2", "cap3"]);
+        // Keys
+        {
+            let (iterator, server_end) = create_proxy().unwrap();
+            store.dictionary_keys(dict_id, server_end).await.unwrap().unwrap();
+            let keys = iterator.get_next().await.unwrap();
+            assert!(iterator.get_next().await.unwrap().is_empty());
+            assert_eq!(keys, ["cap1", "cap2", "cap3"]);
+        }
+        // Enumerate
+        {
+            let (iterator, server_end) = create_proxy().unwrap();
+            store.dictionary_enumerate(dict_id, server_end).await.unwrap().unwrap();
+            let start_id = 100;
+            let limit = 4;
+            let (mut items, end_id) = iterator.get_next(start_id, limit).await.unwrap().unwrap();
+            assert_eq!(end_id, 102);
+            let (last, end_id) = iterator.get_next(end_id, limit).await.unwrap().unwrap();
+            assert!(last.is_empty());
+            assert_eq!(end_id, 102);
+
+            assert_matches!(
+                items.remove(0),
+                fsandbox::DictionaryOptionalItem {
+                    key,
+                    value: Some(value)
+                }
+                if key == "cap1" && value.id == 100
+            );
+            assert_matches!(
+                store.export(100).await.unwrap().unwrap(),
+                fsandbox::Capability::Data(fsandbox::Data::Int64(1))
+            );
+            assert_matches!(
+                items.remove(0),
+                fsandbox::DictionaryOptionalItem {
+                    key,
+                    value: Some(value)
+                }
+                if key == "cap2" && value.id == 101
+            );
+            assert_matches!(
+                store.export(101).await.unwrap().unwrap(),
+                fsandbox::Capability::Data(fsandbox::Data::Int64(2))
+            );
+            assert_matches!(
+                items.remove(0),
+                fsandbox::DictionaryOptionalItem {
+                    key,
+                    value: None
+                }
+                if key == "cap3"
+            );
+        }
     }
 
-    /// Tests batching for Keys iterator.
+    #[fuchsia::test]
+    async fn drain() {
+        let dict = Dict::new();
+
+        let (store, stream) = create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>().unwrap();
+        let _server = fasync::Task::spawn(serve_capability_store(stream));
+        let dict_ref = Capability::Dictionary(dict.clone()).into();
+        let dict_id = 1;
+        store.import(dict_id, dict_ref).await.unwrap().unwrap();
+
+        // Create two Data capabilities.
+        let mut data_caps = vec![];
+        for i in 1..3 {
+            let value = 10 + i;
+            store.import(value, Data::Int64(i.try_into().unwrap()).into()).await.unwrap().unwrap();
+            data_caps.push(value);
+        }
+
+        // Add the Data capabilities to the dict.
+        store
+            .dictionary_insert(
+                dict_id,
+                &fsandbox::DictionaryItem { key: "cap1".into(), value: data_caps.remove(0) },
+            )
+            .await
+            .unwrap()
+            .unwrap();
+        store
+            .dictionary_insert(
+                dict_id,
+                &fsandbox::DictionaryItem { key: "cap2".into(), value: data_caps.remove(0) },
+            )
+            .await
+            .unwrap()
+            .unwrap();
+        let (ch, _) = fidl::Channel::create();
+        let handle = ch.into_handle();
+        let handle_koid = handle.get_koid().unwrap();
+        let value = 20;
+        store.import(value, fsandbox::Capability::Handle(handle)).await.unwrap().unwrap();
+        store
+            .dictionary_insert(dict_id, &fsandbox::DictionaryItem { key: "cap3".into(), value })
+            .await
+            .unwrap()
+            .unwrap();
+
+        let (iterator, server_end) = create_proxy().unwrap();
+        store.dictionary_drain(dict_id, Some(server_end)).await.unwrap().unwrap();
+        let start_id = 100;
+        let limit = 4;
+        let (mut items, end_id) = iterator.get_next(start_id, limit).await.unwrap().unwrap();
+        assert_eq!(end_id, 103);
+        let (last, end_id) = iterator.get_next(end_id, limit).await.unwrap().unwrap();
+        assert!(last.is_empty());
+        assert_eq!(end_id, 103);
+
+        assert_matches!(
+            items.remove(0),
+            fsandbox::DictionaryItem {
+                key,
+                value: 100
+            }
+            if key == "cap1"
+        );
+        assert_matches!(
+            store.export(100).await.unwrap().unwrap(),
+            fsandbox::Capability::Data(fsandbox::Data::Int64(1))
+        );
+        assert_matches!(
+            items.remove(0),
+            fsandbox::DictionaryItem {
+                key,
+                value: 101
+            }
+            if key == "cap2"
+        );
+        assert_matches!(
+            store.export(101).await.unwrap().unwrap(),
+            fsandbox::Capability::Data(fsandbox::Data::Int64(2))
+        );
+        assert_matches!(
+            items.remove(0),
+            fsandbox::DictionaryItem {
+                key,
+                value: 102
+            }
+            if key == "cap3"
+        );
+        assert_matches!(
+            store.export(102).await.unwrap().unwrap(),
+            fsandbox::Capability::Handle(handle)
+            if handle.get_koid().unwrap() == handle_koid
+        );
+
+        // Dictionary should now be empty.
+        assert_eq!(dict.keys().count(), 0);
+    }
+
+    /// Tests batching for read APIs.
     #[fuchsia::test]
     async fn read_batches() {
         // Number of entries in the Dict that will be enumerated.
@@ -505,22 +623,84 @@ mod tests {
 
         let (key_iterator, server_end) = create_proxy().unwrap();
         store.dictionary_keys(dict_id, server_end).await.unwrap().unwrap();
+        let (item_iterator, server_end) = create_proxy().unwrap();
+        store.dictionary_enumerate(dict_id, server_end).await.unwrap().unwrap();
 
         // Get all the entries from the Dict with `GetNext`.
         let mut num_got_items: u32 = 0;
+        let mut start_id = 100;
+        let limit = fsandbox::MAX_DICTIONARY_ITERATOR_CHUNK;
         for expected_len in EXPECTED_CHUNK_LENGTHS {
             let keys = key_iterator.get_next().await.unwrap();
-            if keys.is_empty() {
+            let (items, end_id) = item_iterator.get_next(start_id, limit).await.unwrap().unwrap();
+            if keys.is_empty() && items.is_empty() {
                 break;
             }
             assert_eq!(*expected_len, keys.len() as u32);
-            num_got_items += keys.len() as u32;
+            assert_eq!(*expected_len, items.len() as u32);
+            assert_eq!(u64::from(*expected_len), end_id - start_id);
+            start_id = end_id;
+            num_got_items += *expected_len;
         }
 
         // GetNext should return no items once all items have been returned.
+        let (items, _) = item_iterator.get_next(start_id, limit).await.unwrap().unwrap();
+        assert!(items.is_empty());
         assert!(key_iterator.get_next().await.unwrap().is_empty());
 
         assert_eq!(num_got_items, NUM_ENTRIES);
+    }
+
+    #[fuchsia::test]
+    async fn drain_batches() {
+        // Number of entries in the Dict that will be enumerated.
+        //
+        // This value was chosen such that that GetNext returns multiple chunks of different sizes.
+        const NUM_ENTRIES: u32 = fsandbox::MAX_DICTIONARY_ITERATOR_CHUNK * 2 + 1;
+
+        // Number of items we expect in each chunk, for every chunk we expect to get.
+        const EXPECTED_CHUNK_LENGTHS: &[u32] =
+            &[fsandbox::MAX_DICTIONARY_ITERATOR_CHUNK, fsandbox::MAX_DICTIONARY_ITERATOR_CHUNK, 1];
+
+        // Create a Dict with [NUM_ENTRIES] entries that have Unit values.
+        let dict = Dict::new();
+        for i in 0..NUM_ENTRIES {
+            dict.insert(format!("{}", i).parse().unwrap(), Capability::Unit(Unit::default()))
+                .unwrap();
+        }
+
+        let (store, stream) = create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>().unwrap();
+        let _server = fasync::Task::spawn(serve_capability_store(stream));
+        let dict_ref = Capability::Dictionary(dict.clone()).into();
+        let dict_id = 1;
+        store.import(dict_id, dict_ref).await.unwrap().unwrap();
+
+        let (item_iterator, server_end) = create_proxy().unwrap();
+        store.dictionary_drain(dict_id, Some(server_end)).await.unwrap().unwrap();
+
+        // Get all the entries from the Dict with `GetNext`.
+        let mut num_got_items: u32 = 0;
+        let mut start_id = 100;
+        let limit = fsandbox::MAX_DICTIONARY_ITERATOR_CHUNK;
+        for expected_len in EXPECTED_CHUNK_LENGTHS {
+            let (items, end_id) = item_iterator.get_next(start_id, limit).await.unwrap().unwrap();
+            if items.is_empty() {
+                break;
+            }
+            assert_eq!(*expected_len, items.len() as u32);
+            assert_eq!(u64::from(*expected_len), end_id - start_id);
+            start_id = end_id;
+            num_got_items += *expected_len;
+        }
+
+        // GetNext should return no items once all items have been returned.
+        let (items, _) = item_iterator.get_next(start_id, limit).await.unwrap().unwrap();
+        assert!(items.is_empty());
+
+        assert_eq!(num_got_items, NUM_ENTRIES);
+
+        // Dictionary should now be empty.
+        assert_eq!(dict.keys().count(), 0);
     }
 
     #[fuchsia::test]

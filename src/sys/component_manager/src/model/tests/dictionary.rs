@@ -1497,7 +1497,7 @@ async fn extend_from_program() {
     // Now, remove "A" from the dictionary. Using "A" this time should fail.
     let dest_id = 100;
     store
-        .dictionary_remove(dict_id, "A", Some(&fsandbox::WrappedNewCapabilityId { value: dest_id }))
+        .dictionary_remove(dict_id, "A", Some(&fsandbox::WrappedNewCapabilityId { id: dest_id }))
         .await
         .unwrap()
         .unwrap();

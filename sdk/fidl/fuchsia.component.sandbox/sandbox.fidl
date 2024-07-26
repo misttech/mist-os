@@ -71,16 +71,13 @@ type DictionaryItem = struct {
     value CapabilityId;
 };
 
-/// A key-value pair in a [`DictionaryRef`], where the value may be an error.
-/// This is useful for APIs that wish to selectively report errors for
-/// particular items.
+/// A key-value pair in a [`DictionaryRef`], where the value may be elided.
+/// This is useful for APIs that may wish to omit the value, for example if it could not be
+/// duplicated.
 @available(added=HEAD)
-type DictionaryFallibleItem = resource struct {
+type DictionaryOptionalItem = resource struct {
     key DictionaryKey;
-    value @generated_name("DictionaryValueResult") strict resource union {
-        1: ok Capability;
-        2: error DictionaryError;
-    };
+    value box<WrappedCapabilityId>;
 };
 
 /// Error returned from [CapabilityStore/Dictionary*] methods.
@@ -129,7 +126,7 @@ alias NewCapabilityId = CapabilityId;
 /// which FIDL does not allow for pure integral types.
 @available(added=HEAD)
 type WrappedCapabilityId = struct {
-    value CapabilityId;
+    id CapabilityId;
 };
 
 @available(added=HEAD)
@@ -311,6 +308,32 @@ open protocol CapabilityStore {
         id CapabilityId;
         iterator server_end:DictionaryKeysIterator;
     }) -> () error CapabilityStoreError;
+
+    /// Enumerates the items (keys and values) in the dictionary with `id`.
+    ///
+    /// Creates a duplicate of each value (capability). If a value could not be duplicated,
+    /// the value will be null.
+    ///
+    /// Errors:
+    ///
+    /// - `ID_NOT_FOUND` if `id` was not a valid capability id in this store.
+    /// - `WRONG_TYPE` if `id` was not a dictionary.
+    flexible DictionaryEnumerate(resource struct {
+        id CapabilityId;
+        iterator server_end:DictionaryEnumerateIterator;
+    }) -> () error CapabilityStoreError;
+
+    /// Removes all the entries in this dictionary, returning them in `contents` if provided.
+    /// If `contents` is not provided, all the items are discarded without enumerating them.
+    ///
+    /// Errors:
+    ///
+    /// - `ID_NOT_FOUND` if `id` was not a valid capability id in this store.
+    /// - `WRONG_TYPE` if `id` was not a dictionary.
+    flexible DictionaryDrain(resource struct {
+        id CapabilityId;
+        iterator server_end:<DictionaryDrainIterator, optional>;
+    }) -> () error CapabilityStoreError;
 };
 
 /// Error returned from methods in [CapabilityStore].
@@ -342,6 +365,9 @@ type CapabilityStoreError = flexible enum {
     /// The key is invalid. The constraints for valid keys are documented at
     /// https://fuchsia.dev/reference/cml#names.
     INVALID_KEY = 8;
+
+    /// One or more arguments were invalid.
+    INVALID_ARGS = 9;
 };
 
 @available(added=HEAD)
@@ -349,6 +375,64 @@ open protocol DictionaryKeysIterator {
     flexible GetNext() -> (resource struct {
         keys vector<DictionaryKey>:MAX_DICTIONARY_ITERATOR_CHUNK;
     });
+};
+
+@available(added=HEAD)
+open protocol DictionaryEnumerateIterator {
+    /// Returns the next batch of results for a [Dictionary.Enumerate] call, returning up to
+    /// `limit` results. `limit` can be at most [MAX_DICTIONARY_ITERATOR_CHUNK].
+    ///
+    /// The value of each of `items` is a duplicate of the original capability
+    /// ([CapabilityStore.Duplicate]), unless it could not be duplicated, it which case it will
+    /// be null.
+    ///
+    /// Each returned capability will be assigned a monotonically increasing [CapabilityId] starting
+    /// from `start_id`.
+    ///
+    /// In addition to the `items`, returns `end_id`, which is one more than the highest id reserved
+    /// by [GetNext]. `end_id` can be used as the `start_id` for the next call to [GetNext].
+    ///
+    /// If [GetNext] returns an error, the server will also close the channel.
+    ///
+    /// Errors:
+    ///
+    /// - `ID_ALREADY_EXISTS` if some id in the range `[start_id, limit)` already exists in this
+    ///   store.
+    /// - `INVALID_ARGS` if `limit` was `0` or greater than `MAX_DICTIONARY_ITERATOR_CHUNK`.
+    flexible GetNext(struct {
+        start_id CapabilityId;
+        limit uint32;
+    }) -> (resource struct {
+        items vector<DictionaryOptionalItem>:MAX_DICTIONARY_ITERATOR_CHUNK;
+        end_id CapabilityId;
+    }) error CapabilityStoreError;
+};
+
+@available(added=HEAD)
+open protocol DictionaryDrainIterator {
+    /// Returns the next batch of results for a [Dictionary.Drain] call, returning up to
+    /// `limit` results. `limit` can be at most [MAX_DICTIONARY_ITERATOR_CHUNK].
+    ///
+    /// Each returned capability will be assigned a monotonically increasing [CapabilityId] starting
+    /// from `start_id`.
+    ///
+    /// In addition to the `items`, returns `end_id`, which is one more than the highest id reserved
+    /// by [GetNext]. `end_id` can be used as the `start_id` for the next call to [GetNext].
+    ///
+    /// If [GetNext] returns an error, the server will also close the channel.
+    ///
+    /// Errors:
+    ///
+    /// - `ID_ALREADY_EXISTS` if some id in the range `[start_id, limit)` already exists in this
+    ///   store.
+    /// - `INVALID_ARGS` if `limit` was `0` or greater than `MAX_DICTIONARY_ITERATOR_CHUNK`.
+    flexible GetNext(struct {
+        start_id CapabilityId;
+        limit uint32;
+    }) -> (resource struct {
+        items vector<DictionaryItem>:MAX_DICTIONARY_ITERATOR_CHUNK;
+        end_id CapabilityId;
+    }) error CapabilityStoreError;
 };
 
 /// Represents an instance in the component tree, either a component
