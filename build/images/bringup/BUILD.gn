@@ -60,12 +60,6 @@ product_assembly_configuration("product_assembly_config") {
       filesystems = {
         image_name = "bringup"
         image_mode = "no_image"
-        volume = {
-          fvm = {
-            blob = {
-            }
-          }
-        }
       }
     }
   }
