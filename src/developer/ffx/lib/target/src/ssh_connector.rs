@@ -112,7 +112,7 @@ impl OvernetConnector for SshConnector {
             // This function returns a PipeError on error, which is then ignored and followed by an
             // extraction of a actual SSH error parsing. All PipeError's require terminating the
             // ssh command.
-            match ffx_ssh::parse::parse_ssh_output(&mut stdout, &mut stderr, false).await {
+            match ffx_ssh::parse::parse_ssh_output(&mut stdout, &mut stderr, false, &self.env_context).await {
                 Ok(res) => res,
                 Err(e) => {
                     tracing::warn!("SSH pipe error encountered {e:?}");
@@ -120,9 +120,7 @@ impl OvernetConnector for SshConnector {
                         self.cmd.take().expect("ssh command must have started")
                     )
                     .await?;
-                    // TODO(b/341372082): This is _not_ logging to a file to avoid using the global env context.
-                    // This function should determine which file to log to from the env context.
-                    return Err(ffx_ssh::ssh::extract_ssh_error(&mut stderr, false).await.into());
+                    return Err(ffx_ssh::ssh::extract_ssh_error(&mut stderr, true, &self.env_context).await.into());
                 }
             };
         let stdin = cmd.stdin.take().expect("process should have stdin");

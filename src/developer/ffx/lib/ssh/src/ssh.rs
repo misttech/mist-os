@@ -80,6 +80,7 @@ impl From<&str> for SshError {
 pub async fn extract_ssh_error<R: AsyncRead + Unpin>(
     stderr_reader: &mut R,
     logtofile: bool,
+    ctx: &EnvironmentContext,
 ) -> SshError {
     // Flush any remaining lines, but let's not wait more than one second
     let mut lb = crate::parse::LineBuffer::new();
@@ -89,7 +90,7 @@ pub async fn extract_ssh_error<R: AsyncRead + Unpin>(
         .await
     {
         if logtofile {
-            crate::parse::write_ssh_log("E", &line).await;
+            crate::parse::write_ssh_log("E", &line, ctx).await;
         }
         tracing::error!("SSH stderr: {line}");
         last_line = line;

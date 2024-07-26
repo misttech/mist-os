@@ -5,6 +5,7 @@
 use anyhow::{Context as _, Result};
 use compat_info::{CompatibilityInfo, ConnectionInfo};
 use ffx_config::logging::LogDirHandling;
+use ffx_config::EnvironmentContext;
 use fuchsia_async::TimeoutExt;
 use std::fmt;
 use std::io::{self, Write};
@@ -176,6 +177,7 @@ fn parse_ssh_connection_legacy(
 async fn parse_ssh_connection<R: AsyncBufRead + Unpin>(
     stdout: &mut R,
     verbose: bool,
+    ctx: &EnvironmentContext,
 ) -> std::result::Result<(String, Option<CompatibilityInfo>), ParseSshConnectionError> {
     let line = read_ssh_line_with_timeouts(stdout).await?;
     if line.is_empty() {
@@ -183,7 +185,7 @@ async fn parse_ssh_connection<R: AsyncBufRead + Unpin>(
         return Err(std::io::Error::from(std::io::ErrorKind::UnexpectedEof).into());
     }
     if verbose {
-        write_ssh_log("O", &line).await;
+        write_ssh_log("O", &line, ctx).await;
     }
     if line.starts_with("{") {
         parse_ssh_connection_with_info(&line)
@@ -237,27 +239,34 @@ pub async fn parse_ssh_output(
     stdout: &mut BufReader<ChildStdout>,
     stderr: &mut BufReader<ChildStderr>,
     verbose_ssh: bool,
+    ctx: &EnvironmentContext,
 ) -> std::result::Result<(HostAddr, Option<CompatibilityInfo>), PipeError> {
-    let res =
-        match parse_ssh_connection(stdout, verbose_ssh).await.context("reading ssh connection") {
-            Ok((addr, compatibility_status)) => (Some(HostAddr(addr)), compatibility_status),
-            Err(e) => {
-                let error_message = format!("Failed to read ssh client address: {e:?}");
-                tracing::error!("{error_message}");
-                (None, None)
-            }
-        };
+    let res = match parse_ssh_connection(stdout, verbose_ssh, ctx)
+        .await
+        .context("reading ssh connection")
+    {
+        Ok((addr, compatibility_status)) => (Some(HostAddr(addr)), compatibility_status),
+        Err(e) => {
+            let error_message = format!("Failed to read ssh client address: {e:?}");
+            tracing::error!("{error_message}");
+            (None, None)
+        }
+    };
     // Check for early exit.
     if let (Some(addr), compat) = res {
         Ok((addr, compat))
     } else {
         // If we failed to parse the ssh connection, there might be information in stderr
-        Err(parse_ssh_error(stderr, verbose_ssh).await)
+        Err(parse_ssh_error(stderr, verbose_ssh, ctx).await)
     }
 }
 
 #[tracing::instrument(skip(stderr))]
-async fn parse_ssh_error<R: AsyncBufRead + Unpin>(stderr: &mut R, verbose: bool) -> PipeError {
+async fn parse_ssh_error<R: AsyncBufRead + Unpin>(
+    stderr: &mut R,
+    verbose: bool,
+    ctx: &EnvironmentContext,
+) -> PipeError {
     loop {
         let l = match read_ssh_line_with_timeouts(stderr).await {
             Err(e) => {
@@ -269,7 +278,7 @@ async fn parse_ssh_error<R: AsyncBufRead + Unpin>(stderr: &mut R, verbose: bool)
         // Sadly, this is just reading buffered data, so timestamps in the log will be
         // incorrect
         if verbose {
-            write_ssh_log("E", &l).await;
+            write_ssh_log("E", &l, ctx).await;
         }
         // If we are running with "ssh -v", the stderr will also contain the initial
         // "OpenSSH" line.
@@ -319,12 +328,11 @@ fn parse_ssh_connection_with_info(
     }
 }
 
-pub async fn write_ssh_log(prefix: &str, line: &String) {
+pub async fn write_ssh_log(prefix: &str, line: &String, ctx: &EnvironmentContext) {
     // Skip keepalives, which will show up in the steady-state
     if line.contains("keepalive") {
         return;
     }
-    let ctx = ffx_config::global_env_context().expect("Global env context uninitialized");
     let mut f = match ffx_config::logging::log_file_with_info(
         &ctx,
         &PathBuf::from("ssh.log"),
@@ -349,8 +357,9 @@ mod test {
     use super::*;
     use assert_matches::assert_matches;
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_parse_ssh_connection_works() {
+        let env = ffx_config::test_init().await.expect("test env init");
         for (line, expected) in [
             (&"++ 192.168.1.1 1234 10.0.0.1 22 ++\n"[..], ("192.168.1.1".to_string(), None)),
             (
@@ -362,7 +371,7 @@ mod test {
                 ("fe80::111:2222:3333:444%ethxc2".to_string(), None),
             ),
         ] {
-            match parse_ssh_connection(&mut line.as_bytes(), false).await {
+            match parse_ssh_connection(&mut line.as_bytes(), false, &env.context).await {
                 Ok(actual) => assert_eq!(expected, actual),
                 res => panic!(
                     "unexpected result for {:?}: expected {:?}, got {:?}",
@@ -372,8 +381,9 @@ mod test {
         }
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_parse_ssh_connection_errors() {
+        let env = ffx_config::test_init().await.expect("test env init");
         for line in [
             // Test for invalid anchors
             &"192.168.1.1 1234 10.0.0.1 22\n"[..],
@@ -383,7 +393,7 @@ mod test {
             &"++ ++\n"[..],
             &"## 192.168.1.1 1234 10.0.0.1 22 ##\n"[..],
         ] {
-            let res = parse_ssh_connection(&mut line.as_bytes(), false).await;
+            let res = parse_ssh_connection(&mut line.as_bytes(), false, &env.context).await;
             assert_matches!(res, Err(ParseSshConnectionError::Parse(_)));
         }
         for line in [
@@ -397,12 +407,12 @@ mod test {
             &"++ 192.168.1.1 1234 10.0.0.1 22 "[..],
             &"++ 192.168.1.1 1234 10.0.0.1 22 ++"[..],
         ] {
-            let res = parse_ssh_connection(&mut line.as_bytes(), false).await;
+            let res = parse_ssh_connection(&mut line.as_bytes(), false, &env.context).await;
             assert_matches!(res, Err(ParseSshConnectionError::UnexpectedEOF(_)));
         }
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_read_ssh_line() {
         let mut lb = LineBuffer::new();
         let input = &"++ 192.168.1.1 1234 10.0.0.1 22 ++\n"[..];
