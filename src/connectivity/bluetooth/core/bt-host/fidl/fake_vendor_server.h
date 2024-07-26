@@ -44,6 +44,10 @@ class FakeVendorServer final : public ::fidl::Server<fuchsia_hardware_bluetooth:
   // Not supported
   void OpenHci(OpenHciCompleter::Sync& completer) override { BT_PANIC("OpenHci not supported"); }
 
+  void OpenSnoop(OpenSnoopCompleter::Sync& completer) override {
+    BT_PANIC("OpenSnoop not supported");
+  }
+
   void OpenHciTransport(OpenHciTransportCompleter::Sync& completer) override {
     if (open_hci_error_) {
       completer.Reply(fit::error(ZX_ERR_INTERNAL));

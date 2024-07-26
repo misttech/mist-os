@@ -272,6 +272,10 @@ void LoopbackDevice::OpenHciTransport(OpenHciTransportCompleter::Sync& completer
   completer.Reply(fit::ok(std::move(endpoints->client)));
 }
 
+void LoopbackDevice::OpenSnoop(OpenSnoopCompleter::Sync& completer) {
+  completer.Reply(fit::error(ZX_ERR_NOT_SUPPORTED));
+}
+
 void LoopbackDevice::handle_unknown_method(
     fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Vendor> metadata,
     fidl::UnknownMethodCompleter::Sync& completer) {
