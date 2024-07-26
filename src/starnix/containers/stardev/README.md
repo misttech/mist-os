@@ -8,8 +8,15 @@ Currently, only very basic software development is possible in `stardev`.
 
 ## Getting started
 
-To create the `stardev` container, run the following commands from the root of your Fuchsia
-source tree:
+
+### Build Fuchia
+
+In order to get reasonable performance in `stardev`, you should build Fuchsia using `--release`:
+
+```sh
+$ fx set workbench_eng.x64 --release
+$ fx build
+```
 
 ### Create the image
 
@@ -45,8 +52,8 @@ $ ffx starnix console --moniker /core/starnix_runner/playground:stardev /bin/bas
 Inside the container, you can install Debian packages using `apt-get` as normal:
 
 ```sh
-$ apt-get update
-$ apt-get install -y vim git clang
+# apt-get update
+# apt-get install -y vim git clang
 ```
 
 Currently, these packages get installed to file system that is backed by memory, which means they
@@ -56,4 +63,32 @@ packages in the persistent image.
 
 ## Hello, world
 
-TODO: Build and run a "hello, world" program.
+We can build and run a simple C program. First, create a directory and a `main.c` file:
+
+```sh
+# mkdir /tmp/hello_world
+# cd /tmp/hello_world
+# vim main.c
+```
+
+For example, you can use the following program:
+
+```c
+#include <stdio.h>
+
+int main(int argc, char** argv) {
+  printf("hello, starnix\n");
+  return 0;
+}
+```
+
+Next, build and run the program:
+
+```sh
+# clang -fuse-ld=/usr/bin/ld main.c -Wall -Werror -o hello_world
+# ./hello_world
+hello, starnix
+```
+
+TODO: Figure out why `-fuse-ld=/usr/bin/ld` is required. For some reason `clang` cannot find `ld`
+on its own.
