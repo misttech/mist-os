@@ -30,7 +30,7 @@ import("//build/drivers.gni")
 
 
 driver_bind_rules("bind") {
-    rules = "driver.bind"
+    rules = "meta/driver.bind"
     bind_output = "my-driver.bindbc"
 }
 

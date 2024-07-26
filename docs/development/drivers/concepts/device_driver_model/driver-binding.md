@@ -313,9 +313,9 @@ would generate `example_bind_test`.
 
 ```
 driver_bind_rules("example_bind") {
-  rules = "gizmo.bind"
+  rules = "meta/gizmo.bind"
   bind_output = “gizmo.bindbc”
-  tests = "tests.json"
+  tests = "meta/tests.json"
   deps = [ "//src/devices/bind/fuchsia.usb" ]
 }
 ```

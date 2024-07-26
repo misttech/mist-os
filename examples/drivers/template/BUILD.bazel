@@ -28,7 +28,7 @@ exports_files(["README.fuchsia"])
 fuchsia_driver_bind_bytecode(
     name = "template-bind-bytecode",
     output = "template_driver.bindbc",
-    rules = "template_driver.bind",
+    rules = "meta/template_driver.bind",
     deps = [
         "//examples/drivers/bind/bindlib:gizmo.example",
         "@fuchsia_sdk//bind/fuchsia.platform",

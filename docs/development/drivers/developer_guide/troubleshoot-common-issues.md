@@ -543,7 +543,7 @@ in the build file, for example:
 
 ```none {:.devsite-disable-click-to-copy}
 driver_bind_rules("fake_battery_bind") {
-  rules = "fake-battery-driver.bind"
+  rules = "meta/fake-battery-driver.bind"
   bind_output = "fake-battery-driver.bindbc"
   deps = [ "//src/devices/bind/fuchsia.test" ]
   deps += [ "//src/devices/bind/fuchsia.platform" ]

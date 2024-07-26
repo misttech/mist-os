@@ -8,14 +8,14 @@ import("//build/drivers.gni")
 
 driver_bind_rules("use_bind") {
   testonly = true
-  rules = "use.bind"
+  rules = "meta/use.bind"
   bind_output = "metadata_retriever_sdk_test_driver_use.bindbc"
   deps = [ "//sdk/lib/driver/metadata/cpp/tests:fuchsia_driver_metadata_test_bind_library" ]
 }
 
 driver_bind_rules("no_use_bind") {
   testonly = true
-  rules = "no_use.bind"
+  rules = "meta/no_use.bind"
   bind_output = "metadata_retriever_sdk_test_driver_no_use.bindbc"
   deps = [ "//sdk/lib/driver/metadata/cpp/tests:fuchsia_driver_metadata_test_bind_library" ]
 }
@@ -49,7 +49,7 @@ fuchsia_driver_component("use_component") {
     ":driver",
     ":use_bind",
   ]
-  info = "use_info.json"
+  info = "meta/use_info.json"
 }
 
 fuchsia_driver_component("no_use_component") {
@@ -60,5 +60,5 @@ fuchsia_driver_component("no_use_component") {
     ":driver",
     ":no_use_bind",
   ]
-  info = "no_use_info.json"
+  info = "meta/no_use_info.json"
 }

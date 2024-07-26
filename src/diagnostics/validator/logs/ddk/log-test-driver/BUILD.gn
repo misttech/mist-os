@@ -10,7 +10,7 @@ import("//build/test.gni")
 
 driver_bind_rules("log-test-driver-bind") {
   testonly = true
-  rules = "log-test.bind"
+  rules = "meta/log-test.bind"
   deps = [
     "//src/devices/bind/fuchsia.test",
     "//src/devices/bind/fuchsia.test.platform",
@@ -41,7 +41,7 @@ fuchsia_driver("log-test-driver-driver") {
 
 fuchsia_driver_component("log-test-driver") {
   testonly = true
-  info = "log-test-driver-info.json"
+  info = "meta/log-test-driver-info.json"
   component_name = "log-test-driver"
   deps = [ ":log-test-driver-driver" ]
   manifest = "meta/log-test-driver.cml"

@@ -8,7 +8,7 @@ import("//build/drivers.gni")
 import("//build/test.gni")
 
 driver_bind_rules("bind") {
-  rules = "fake_driver.bind"
+  rules = "meta/fake_driver.bind"
   bind_output = "fake_driver.bindbc"
   deps = [ "//src/devices/bind/fuchsia.test" ]
 }
@@ -25,7 +25,7 @@ fuchsia_driver("driver") {
 fuchsia_driver_component("component") {
   component_name = "driver-test-realm-fake-driver"
   deps = [ ":driver" ]
-  info = "component-info.json"
+  info = "meta/component-info.json"
   manifest = "meta/component.cml"
 }
 

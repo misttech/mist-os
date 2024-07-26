@@ -13,7 +13,7 @@ group("banjo") {
 }
 
 driver_bind_rules("parent_bind") {
-  rules = "parent-driver.bind"
+  rules = "meta/parent-driver.bind"
   bind_output = "parent-driver.bindbc"
   deps = [ "//src/devices/bind/fuchsia.test" ]
 }
@@ -32,12 +32,12 @@ fuchsia_driver("parent_driver") {
 fuchsia_driver_component("parent_component") {
   component_name = "banjo_transport_parent"
   deps = [ ":parent_driver" ]
-  info = "component-info.json"
+  info = "meta/component-info.json"
   manifest = "meta/parent_component.cml"
 }
 
 driver_bind_rules("child_bind") {
-  rules = "child-driver.bind"
+  rules = "meta/child-driver.bind"
   bind_output = "child-driver.bindbc"
   deps = [ "//src/devices/bind/fuchsia.platform" ]
 }
@@ -56,6 +56,6 @@ fuchsia_driver("child_driver") {
 fuchsia_driver_component("child_component") {
   component_name = "banjo_transport_child"
   deps = [ ":child_driver" ]
-  info = "component-info.json"
+  info = "meta/component-info.json"
   manifest = "meta/child_component.cml"
 }

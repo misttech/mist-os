@@ -8,14 +8,14 @@ import("//build/drivers.gni")
 
 driver_bind_rules("expose_bind") {
   testonly = true
-  rules = "expose.bind"
+  rules = "meta/expose.bind"
   bind_output = "metadata_sender_sdk_test_driver_expose.bindbc"
   deps = [ "//sdk/lib/driver/metadata/cpp/tests:fuchsia_driver_metadata_test_bind_library" ]
 }
 
 driver_bind_rules("no_expose_bind") {
   testonly = true
-  rules = "no_expose.bind"
+  rules = "meta/no_expose.bind"
   bind_output = "metadata_sender_sdk_test_driver_no_expose.bindbc"
   deps = [ "//sdk/lib/driver/metadata/cpp/tests:fuchsia_driver_metadata_test_bind_library" ]
 }
@@ -48,7 +48,7 @@ fuchsia_driver_component("expose_component") {
     ":driver",
     ":expose_bind",
   ]
-  info = "expose_info.json"
+  info = "meta/expose_info.json"
 }
 
 fuchsia_driver_component("no_expose_component") {
@@ -59,5 +59,5 @@ fuchsia_driver_component("no_expose_component") {
     ":driver",
     ":no_expose_bind",
   ]
-  info = "no_expose_info.json"
+  info = "meta/no_expose_info.json"
 }

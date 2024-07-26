@@ -28,7 +28,7 @@ fidl("my_fidl_target") {  # The target_name
 
 # [START child_bind_rules]
 driver_bind_rules("bind") {
-  rules = "child_driver.bind"
+  rules = "meta/child_driver.bind"
   bind_output = "child_driver.bindbc"
   deps = [ ":my_fidl_target_bindlib" ]
 }
