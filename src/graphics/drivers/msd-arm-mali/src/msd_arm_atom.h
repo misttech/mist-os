@@ -91,6 +91,9 @@ class MsdArmAtom {
   std::chrono::time_point<std::chrono::steady_clock> tick_start_time() const {
     return tick_start_time_;
   }
+  std::chrono::time_point<std::chrono::steady_clock> creation_time() const {
+    return creation_time_;
+  }
 
   // These methods should only be called on the device thread.
   void set_address_slot_mapping(std::shared_ptr<AddressSlotMapping> address_slot_mapping);
@@ -137,6 +140,8 @@ class MsdArmAtom {
   // This data is mutable after construction from the device thread.
   ArmMaliResultCode result_code_ = kArmMaliResultRunning;
   std::shared_ptr<AddressSlotMapping> address_slot_mapping_;
+  std::chrono::time_point<std::chrono::steady_clock> creation_time_ =
+      std::chrono::steady_clock::now();
   std::chrono::time_point<std::chrono::steady_clock> execution_start_time_;
   std::chrono::time_point<std::chrono::steady_clock> tick_start_time_;
   bool hard_stopped_ = false;

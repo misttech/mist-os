@@ -202,6 +202,8 @@ class MsdArmConnection : public std::enable_shared_from_this<MsdArmConnection>,
   inspect::Node node_;
   inspect::Node jit_regions_;
   inspect::UintProperty client_id_property_;
+  inspect::UintProperty slow_atom_count_property_;
+  inspect::UintProperty slow_semaphore_set_atom_count_property_;
 
   std::mutex address_lock_;
   __THREAD_ANNOTATION(__pt_guarded_by__(address_lock_))
