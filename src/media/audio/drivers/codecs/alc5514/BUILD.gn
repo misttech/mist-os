@@ -6,8 +6,8 @@ import("//build/bind/bind.gni")
 import("//build/drivers.gni")
 
 driver_bind_rules("alc5514_bind") {
-  rules = "alc5514.bind"
-  tests = "tests.json"
+  rules = "meta/alc5514.bind"
+  tests = "meta/tests.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.interrupt:fuchsia.hardware.interrupt_bindlib",
     "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_bindlib",
@@ -37,7 +37,7 @@ fuchsia_driver("alc5514-driver") {
 fuchsia_driver_component("alc5514") {
   component_name = "alc5514"
   deps = [ ":alc5514-driver" ]
-  info = "alc5514-info.json"
+  info = "meta/alc5514-info.json"
   manifest = "meta/alc5514.cml"
 }
 

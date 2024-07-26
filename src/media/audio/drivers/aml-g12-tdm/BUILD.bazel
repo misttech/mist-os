@@ -20,7 +20,7 @@ load(
 fuchsia_driver_bind_bytecode(
     name = "aml-g12-composite-bind",
     output = "aml-g12-composite.bindbc",
-    rules = "aml_composite.bind",
+    rules = "meta/aml_composite.bind",
     deps = [
         "@fuchsia_sdk//bind/fuchsia.amlogic.platform",
         "@fuchsia_sdk//bind/fuchsia.amlogic.platform.a311d",

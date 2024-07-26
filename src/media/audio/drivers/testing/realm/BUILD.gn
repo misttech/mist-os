@@ -12,23 +12,23 @@ bind_library("fuchsia.test.audio") {
 }
 
 driver_bind_rules("codec_test-bind") {
-  rules = "test-codec.bind"
+  rules = "meta/test-codec.bind"
   bind_output = "codec_test.bindbc"
   deps = [ ":fuchsia.test.audio" ]
 }
 driver_bind_rules("codec_test2-bind") {
-  rules = "test-codec2.bind"
+  rules = "meta/test-codec2.bind"
   bind_output = "codec_test2.bindbc"
   deps = [ ":fuchsia.test.audio" ]
 }
 driver_bind_rules("dai_test-bind") {
-  rules = "test-dai.bind"
+  rules = "meta/test-dai.bind"
   bind_output = "dai_test.bindbc"
   deps = [ ":fuchsia.test.audio" ]
 }
 
 driver_bind_rules("root_test-bind") {
-  rules = "test-root.bind"
+  rules = "meta/test-root.bind"
   deps = [ ":fuchsia.test.audio" ]
 }
 
@@ -45,7 +45,7 @@ fuchsia_driver("audio-test-root-driver") {
 
 fuchsia_driver_component("audio-test-root") {
   deps = [ ":audio-test-root-driver" ]
-  info = "audio-test-root-info.json"
+  info = "meta/audio-test-root-info.json"
   manifest = "meta/audio-test-root.cml"
 }
 
@@ -98,20 +98,20 @@ fuchsia_driver("dai-test-driver") {
 fuchsia_driver_component("test-codec") {
   component_name = "test-codec"
   deps = [ ":codec-test-driver" ]
-  info = "test-codec-info.json"
+  info = "meta/test-codec-info.json"
   manifest = "meta/test-codec.cml"
 }
 
 fuchsia_driver_component("test-codec2") {
   component_name = "test-codec2"
   deps = [ ":codec-test-driver2" ]
-  info = "test-codec2-info.json"
+  info = "meta/test-codec2-info.json"
   manifest = "meta/test-codec2.cml"
 }
 
 fuchsia_driver_component("test-dai") {
   component_name = "test-dai"
   deps = [ ":dai-test-driver" ]
-  info = "test-dai-info.json"
+  info = "meta/test-dai-info.json"
   manifest = "meta/test-dai.cml"
 }

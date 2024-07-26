@@ -6,9 +6,9 @@ import("//build/bind/bind.gni")
 import("//build/drivers.gni")
 
 driver_bind_rules("ihda_codecs_realtek_bind") {
-  rules = "realtek_ihda_codec.bind"
+  rules = "meta/realtek_ihda_codec.bind"
   deps = [ "//src/devices/bind/fuchsia.audio.intelhda" ]
-  tests = "bind_test.json"
+  tests = "meta/bind_test.json"
 }
 
 group("realtek") {
@@ -44,7 +44,7 @@ fuchsia_driver("realtek-audio-codec-driver") {
 fuchsia_driver_component("realtek-audio-codec") {
   component_name = "realtek-audio-codec"
   deps = [ ":realtek-audio-codec-driver" ]
-  info = "realtek-audio-codec-info.json"
+  info = "meta/realtek-audio-codec-info.json"
   manifest = "meta/realtek-audio-codec.cml"
 }
 

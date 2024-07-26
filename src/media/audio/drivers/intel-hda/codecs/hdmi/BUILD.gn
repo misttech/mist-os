@@ -6,9 +6,9 @@ import("//build/bind/bind.gni")
 import("//build/drivers.gni")
 
 driver_bind_rules("ihda_codecs_hdmi_bind") {
-  rules = "hdmi_ihda_codec.bind"
+  rules = "meta/hdmi_ihda_codec.bind"
   deps = [ "//src/devices/bind/fuchsia.audio.intelhda" ]
-  tests = "bind_test.json"
+  tests = "meta/bind_test.json"
 }
 
 group("hdmi") {
@@ -47,7 +47,7 @@ fuchsia_driver("hdmi-audio-codec-driver") {
 fuchsia_driver_component("hdmi-audio-codec") {
   component_name = "hdmi-audio-codec"
   deps = [ ":hdmi-audio-codec-driver" ]
-  info = "hdmi-audio-codec-info.json"
+  info = "meta/hdmi-audio-codec-info.json"
   manifest = "meta/hdmi-audio-codec.cml"
 }
 

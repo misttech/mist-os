@@ -9,8 +9,8 @@ import("//build/components.gni")
 import("//build/drivers.gni")
 
 driver_bind_rules("aml_dsp_bind") {
-  rules = "aml_dsp.bind"
-  tests = "bind-tests.json"
+  rules = "meta/aml_dsp.bind"
+  tests = "meta/bind-tests.json"
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.platform",
@@ -49,6 +49,6 @@ fuchsia_driver("aml-dsp-driver") {
 fuchsia_driver_component("aml-dsp") {
   component_name = "aml-dsp"
   deps = [ ":aml-dsp-driver" ]
-  info = "aml-dsp-info.json"
+  info = "meta/aml-dsp-info.json"
   manifest = "meta/aml-dsp.cml"
 }

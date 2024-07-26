@@ -6,8 +6,8 @@ import("//build/bind/bind.gni")
 import("//build/drivers.gni")
 
 driver_bind_rules("alc5663_bind") {
-  rules = "alc5663.bind"
-  tests = "tests.json"
+  rules = "meta/alc5663.bind"
+  tests = "meta/tests.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.interrupt:fuchsia.hardware.interrupt_bindlib",
     "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_bindlib",
@@ -48,7 +48,7 @@ fuchsia_driver("alc5663-driver") {
 fuchsia_driver_component("alc5663") {
   component_name = "alc5663"
   deps = [ ":alc5663-driver" ]
-  info = "alc5663-info.json"
+  info = "meta/alc5663-info.json"
   manifest = "meta/alc5663.cml"
 }
 

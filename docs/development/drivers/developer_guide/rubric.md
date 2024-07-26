@@ -32,10 +32,10 @@ location where the driver is added.
 ## Driver Info
 
 When adding a driver to the Fuchsia tree, a driver info file must be created, and the
-`fuchsia_driver_component` target must include an `info = <some-driver-info.json>` entry. The JSON
+`fuchsia_driver_component` target must include an `info = meta/<some-driver-info.json>` entry. The JSON
 file listed in `info` must include at least a `short_description` text and an `areas` list with
 entries from [areas](/build/drivers/areas.txt). For example,
-[aml-g12-tdm-dai-info.json](/src/media/audio/drivers/aml-g12-tdm/aml-g12-tdm-dai-info.json)
+[aml-g12-tdm-dai-info.json](/src/media/audio/drivers/aml-g12-tdm/meta/aml-g12-tdm-dai-info.json)
 includes:
 
 ```json

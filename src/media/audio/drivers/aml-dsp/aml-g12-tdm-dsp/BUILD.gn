@@ -9,9 +9,9 @@ import("//build/bind/bind.gni")
 import("//build/drivers.gni")
 
 driver_bind_rules("aml-g12-tdm-dsp-bind") {
-  rules = "aml_tdm.bind"
+  rules = "meta/aml_tdm.bind"
   bind_output = "aml-g12-tdm-dsp.bindbc"
-  tests = "tests-stream.json"
+  tests = "meta/tests-stream.json"
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.platform",
@@ -57,6 +57,6 @@ fuchsia_driver("aml-g12-tdm-dsp-driver") {
 fuchsia_driver_component("aml-g12-tdm-dsp") {
   component_name = "aml-g12-tdm-dsp"
   deps = [ ":aml-g12-tdm-dsp-driver" ]
-  info = "aml-g12-tdm-info.json"
+  info = "meta/aml-g12-tdm-info.json"
   manifest = "meta/aml-g12-tdm-dsp.cml"
 }
