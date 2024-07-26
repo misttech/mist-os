@@ -164,7 +164,7 @@ fit::result<Error, TokenMap> GetDependencyTokens(
 ///     the call to power broker fails for any reason *other* than a closed
 ///     channel.
 fit::result<Error> AddElement(
-    fidl::ClientEnd<fuchsia_power_broker::Topology>& power_broker,
+    const fidl::ClientEnd<fuchsia_power_broker::Topology>& power_broker,
     fuchsia_hardware_power::wire::PowerElementConfiguration config, TokenMap tokens,
     const zx::unowned_event& assertive_token, const zx::unowned_event& opportunistic_token,
     std::optional<std::pair<fidl::ServerEnd<fuchsia_power_broker::CurrentLevel>,

@@ -424,7 +424,7 @@ fit::result<Error, TokenMap> GetDependencyTokens(
 }
 
 fit::result<Error> AddElement(
-    fidl::ClientEnd<fuchsia_power_broker::Topology>& power_broker,
+    const fidl::ClientEnd<fuchsia_power_broker::Topology>& power_broker,
     fuchsia_hardware_power::wire::PowerElementConfiguration config, TokenMap tokens,
     const zx::unowned_event& assertive_token, const zx::unowned_event& opportunistic_token,
     std::optional<std::pair<fidl::ServerEnd<fuchsia_power_broker::CurrentLevel>,
@@ -530,16 +530,9 @@ fit::result<Error> AddElement(
     schema.element_control() = std::move(element_control.value());
   }
 
-  // Steal the underlying channel
-  fidl::WireSyncClient<fuchsia_power_broker::Topology> pb(
-      fidl::ClientEnd<fuchsia_power_broker::Topology>(zx::channel(power_broker.TakeChannel())));
-
   // Add the element
-  auto add_result = pb->AddElement(fidl::ToWire(arena, std::move(schema)));
-
-  // Put the channel back where it belongs
-  power_broker.reset(pb.TakeClientEnd().TakeChannel().release());
-
+  auto add_result =
+      fidl::WireCall(power_broker)->AddElement(fidl::ToWire(arena, std::move(schema)));
   if (!add_result.ok()) {
     if (add_result.is_peer_closed()) {
       return fit::error(Error::IO);
