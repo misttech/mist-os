@@ -93,7 +93,9 @@ open protocol HasComposeMethod2 {
   EXPECT_EQ(protocol2->all_methods.size(), 1u);
 }
 
-TEST(MethodTests, GoodValidStrictMethod) {
+// TODO(https://fxbug.dev/348403275): The ability to name methods "strict" or "flexible"
+// is temporarily regressed. Re-enable after we implement explicit method kind syntax.
+TEST(MethodTests, DISABLED_GoodValidStrictMethod) {
   TestLibrary library(R"FIDL(
 library example;
 
@@ -160,7 +162,9 @@ open protocol HasStrictMethod6 {
   EXPECT_EQ(protocol6->all_methods.size(), 1u);
 }
 
-TEST(MethodTests, GoodValidFlexibleTwoWayMethod) {
+// TODO(https://fxbug.dev/348403275): The ability to name methods "strict" or "flexible"
+// is temporarily regressed. Re-enable after we implement explicit method kind syntax.
+TEST(MethodTests, DISABLED_GoodValidFlexibleTwoWayMethod) {
   TestLibrary library(R"FIDL(
 library example;
 

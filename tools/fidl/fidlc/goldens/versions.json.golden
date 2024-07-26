@@ -582,7 +582,7 @@
       "location": {
         "filename": "../../tools/fidl/fidlc/testdata/versions.test.fidl",
         "line": 43,
-        "column": 17,
+        "column": 67,
         "length": 8
       },
       "deprecated": true,
@@ -639,7 +639,7 @@
           }
         }
       ],
-      "openness": "closed",
+      "openness": "open",
       "composed_protocols": [
         {
           "name": "test.versions/OtherProtocol",
@@ -1072,7 +1072,7 @@
           }
         }
       ],
-      "resource": false,
+      "resource": true,
       "is_empty_success_struct": false,
       "type_shape_v2": {
         "inline_size": 4,
@@ -1232,7 +1232,7 @@
         }
       ],
       "strict": false,
-      "resource": false,
+      "resource": true,
       "type_shape_v2": {
         "inline_size": 16,
         "alignment": 8,
@@ -1390,7 +1390,7 @@
         }
       ],
       "strict": false,
-      "resource": false,
+      "resource": true,
       "is_result": false,
       "type_shape_v2": {
         "inline_size": 16,

@@ -279,7 +279,7 @@ void JSONGenerator::Generate(const Bits& value) {
     EmitObjectKey("mask");
     EmitNumeric(value.mask, kAsString);
     GenerateObjectMember("members", value.members);
-    GenerateObjectMember("strict", value.strictness);
+    GenerateObjectMember("strict", value.strictness.value());
   });
 }
 
@@ -319,8 +319,8 @@ void JSONGenerator::Generate(const Enum& value) {
     GenerateObjectMember("type", value.type->name);
     GenerateExperimentalMaybeFromAlias(value.subtype_ctor->resolved_params);
     GenerateObjectMember("members", value.members);
-    GenerateObjectMember("strict", value.strictness);
-    if (value.strictness == Strictness::kFlexible) {
+    GenerateObjectMember("strict", value.strictness.value());
+    if (value.strictness.value() == Strictness::kFlexible) {
       if (value.unknown_value_signed) {
         GenerateObjectMember("maybe_unknown_value", value.unknown_value_signed.value());
       } else {
@@ -348,7 +348,7 @@ void JSONGenerator::Generate(const Protocol& value) {
     GenerateObjectMember("deprecated", value.availability.is_deprecated());
     if (!value.attributes->Empty())
       GenerateObjectMember("maybe_attributes", value.attributes);
-    GenerateObjectMember("openness", value.openness);
+    GenerateObjectMember("openness", value.openness.value());
     GenerateObjectMember("composed_protocols", value.composed_protocols);
     GenerateObjectMember("methods", value.all_methods);
     GenerateProtocolImplementationLocations(value);
@@ -372,7 +372,7 @@ void JSONGenerator::Generate(const Protocol::MethodWithInfo& method_with_info) {
     GenerateObjectMember("kind", NameMethodKind(value.kind), Position::kFirst);
     GenerateObjectMember("ordinal", value.ordinal);
     GenerateObjectMember("name", value.name);
-    GenerateObjectMember("strict", value.strictness);
+    GenerateObjectMember("strict", value.strictness.value());
     GenerateObjectMember("location", NameSpan(value.name));
     GenerateObjectMember("deprecated", value.availability.is_deprecated());
     GenerateObjectMember("has_request", value.kind != Protocol::Method::Kind::kEvent);
@@ -594,7 +594,7 @@ void JSONGenerator::Generate(const Struct& value) {
     if (!value.attributes->Empty())
       GenerateObjectMember("maybe_attributes", value.attributes);
     GenerateObjectMember("members", value.members);
-    GenerateObjectMember("resource", value.resourceness == Resourceness::kResource);
+    GenerateObjectMember("resource", value.resourceness.value() == Resourceness::kResource);
     auto anon = value.name.as_anonymous();
     bool is_empty_success_struct =
         anon && anon->provenance == Name::Provenance::kGeneratedEmptySuccessStruct;
@@ -625,8 +625,8 @@ void JSONGenerator::Generate(const Table& value) {
     if (!value.attributes->Empty())
       GenerateObjectMember("maybe_attributes", value.attributes);
     GenerateObjectMember("members", value.members);
-    GenerateObjectMember("strict", value.strictness);
-    GenerateObjectMember("resource", value.resourceness == Resourceness::kResource);
+    GenerateObjectMember("strict", value.strictness.value());
+    GenerateObjectMember("resource", value.resourceness.value() == Resourceness::kResource);
     GenerateObjectMember("type_shape_v2", value.type_shape.value());
   });
 }
@@ -671,8 +671,8 @@ void JSONGenerator::Generate(const Union& value) {
     if (!value.attributes->Empty())
       GenerateObjectMember("maybe_attributes", value.attributes);
     GenerateObjectMember("members", value.members);
-    GenerateObjectMember("strict", value.strictness);
-    GenerateObjectMember("resource", value.resourceness == Resourceness::kResource);
+    GenerateObjectMember("strict", value.strictness.value());
+    GenerateObjectMember("resource", value.resourceness.value() == Resourceness::kResource);
     auto anon = value.name.as_anonymous();
     bool is_result = anon && anon->provenance == Name::Provenance::kGeneratedResultUnion;
     GenerateObjectMember("is_result", is_result);
@@ -701,10 +701,10 @@ void JSONGenerator::Generate(const Overlay& value) {
     if (!value.attributes->Empty())
       GenerateObjectMember("maybe_attributes", value.attributes);
     GenerateObjectMember("members", value.members);
-    ZX_ASSERT(value.strictness == Strictness::kStrict);
-    GenerateObjectMember("strict", value.strictness);
-    ZX_ASSERT(value.resourceness == Resourceness::kValue);
-    GenerateObjectMember("resource", value.resourceness == Resourceness::kResource);
+    ZX_ASSERT(value.strictness.value() == Strictness::kStrict);
+    GenerateObjectMember("strict", value.strictness.value());
+    ZX_ASSERT(value.resourceness.value() == Resourceness::kValue);
+    GenerateObjectMember("resource", value.resourceness.value() == Resourceness::kResource);
     GenerateObjectMember("type_shape_v2", value.type_shape.value());
   });
 }

@@ -364,16 +364,13 @@ Resourceness Type::Resourceness() const {
     case Decl::Kind::kProtocol:
       return Resourceness::kResource;
     case Decl::Kind::kStruct:
-      return static_cast<const Struct*>(decl)->resourceness;
+      return static_cast<const Struct*>(decl)->resourceness.value();
     case Decl::Kind::kTable:
-      return static_cast<const Table*>(decl)->resourceness;
+      return static_cast<const Table*>(decl)->resourceness.value();
     case Decl::Kind::kUnion:
-      ZX_ASSERT_MSG(
-          static_cast<const Union*>(decl)->resourceness.has_value(),
-          "a union with inferred resourceness (i.e. error result union) is in a recursive cycle");
       return static_cast<const Union*>(decl)->resourceness.value();
     case Decl::Kind::kOverlay:
-      return static_cast<const Overlay*>(decl)->resourceness;
+      return static_cast<const Overlay*>(decl)->resourceness.value();
     case Decl::Kind::kNewType:
       return static_cast<const NewType*>(decl)->type_ctor->type->Resourceness();
     case Decl::Kind::kBuiltin:

@@ -20,18 +20,32 @@ template <>
 struct fidl::ostream::Formatter<::test_versions::Enum> {
   static std::ostream& Format(std::ostream& os, const ::test_versions::Enum& value);
 };
+#ifdef __Fuchsia__
+
 template <>
 struct fidl::ostream::Formatter<::test_versions::Struct> {
   static std::ostream& Format(std::ostream& os, const ::test_versions::Struct& value);
 };
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
 template <>
 struct fidl::ostream::Formatter<::test_versions::Table> {
   static std::ostream& Format(std::ostream& os, const ::test_versions::Table& value);
 };
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
 template <>
 struct fidl::ostream::Formatter<::test_versions::Union> {
   static std::ostream& Format(std::ostream& os, const ::test_versions::Union& value);
 };
+
+#endif  // __Fuchsia__
 
 namespace test_versions {
 
@@ -39,11 +53,23 @@ std::ostream& operator<<(std::ostream& os, const ::test_versions::Bits& value);
 
 std::ostream& operator<<(std::ostream& os, const ::test_versions::Enum& value);
 
+#ifdef __Fuchsia__
+
 std::ostream& operator<<(std::ostream& os, const ::test_versions::Struct& value);
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
 
 std::ostream& operator<<(std::ostream& os, const ::test_versions::Table& value);
 
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
 std::ostream& operator<<(std::ostream& os, const ::test_versions::Union& value);
+
+#endif  // __Fuchsia__
 
 }  // namespace test_versions
 
@@ -52,27 +78,35 @@ std::ostream& operator<<(std::ostream& os, const ::test_versions::Union& value);
 template <>
 struct fidl::ostream::Formatter<::fidl::ClientEnd<::test_versions::OtherProtocol>> {
   static std::ostream& Format(std::ostream& os, const ::fidl::ClientEnd<::test_versions::OtherProtocol>& value) {
-    return os << "ClientEnd<" << "test_versions::OtherProtocol" << ">(" << value.channel().get() << ")";
+    return os << "ClientEnd<"
+              << "test_versions::OtherProtocol"
+              << ">(" << value.channel().get() << ")";
   }
 };
 
 template <>
 struct fidl::ostream::Formatter<::fidl::ServerEnd<::test_versions::OtherProtocol>> {
   static std::ostream& Format(std::ostream& os, const ::fidl::ServerEnd<::test_versions::OtherProtocol>& value) {
-    return os << "ServerEnd<" << "test_versions::OtherProtocol" << ">(" << value.channel().get() << ")";
+    return os << "ServerEnd<"
+              << "test_versions::OtherProtocol"
+              << ">(" << value.channel().get() << ")";
   }
 };
 template <>
 struct fidl::ostream::Formatter<::fidl::ClientEnd<::test_versions::Protocol>> {
   static std::ostream& Format(std::ostream& os, const ::fidl::ClientEnd<::test_versions::Protocol>& value) {
-    return os << "ClientEnd<" << "test_versions::Protocol" << ">(" << value.channel().get() << ")";
+    return os << "ClientEnd<"
+              << "test_versions::Protocol"
+              << ">(" << value.channel().get() << ")";
   }
 };
 
 template <>
 struct fidl::ostream::Formatter<::fidl::ServerEnd<::test_versions::Protocol>> {
   static std::ostream& Format(std::ostream& os, const ::fidl::ServerEnd<::test_versions::Protocol>& value) {
-    return os << "ServerEnd<" << "test_versions::Protocol" << ">(" << value.channel().get() << ")";
+    return os << "ServerEnd<"
+              << "test_versions::Protocol"
+              << ">(" << value.channel().get() << ")";
   }
 };
 

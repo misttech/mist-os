@@ -95,6 +95,23 @@ std::string name_layout_kind(const RawLayout& layout) {
   }
 }
 
+// Checks if the given modifier type is included. Note: this pays no attention
+// to availabilities. For example, if ModifierType = Strictness, then this
+// returns true for `strict(removed=2)`, even though that relies on the default
+// of flexible after 2, whereas `strict(removed=2) flexible(added=2)` is fully
+// explicit and does not rely on defaults. To enforce the latter, we'd need to
+// lint the compiled flat AST instead of the raw AST.
+template <typename ModifierType>
+bool HasModifier(const std::unique_ptr<RawModifierList>& modifiers) {
+  if (!modifiers)
+    return false;
+  for (auto& modifier : modifiers->modifiers) {
+    if (std::holds_alternative<ModifierType>(modifier->value))
+      return true;
+  }
+  return false;
+}
+
 }  // namespace
 
 std::string Linter::MakeCopyrightBlock() {
@@ -480,7 +497,8 @@ Linter::Linter()
             break;
           }
         }
-        if (element.modifiers == nullptr || !element.modifiers->maybe_openness.has_value()) {
+        // This does not always prevent reliance on default openness. See the HasModifier docs.
+        if (!HasModifier<Openness>(element.modifiers)) {
           std::string id = to_string(element.identifier);
           linter.AddFinding(
               element.identifier, explicit_openness_modifier_check,
@@ -499,7 +517,8 @@ Linter::Linter()
       (const RawProtocolMethod& element) {
         linter.CheckCase("methods", element.identifier, linter.invalid_case_for_decl_name(),
                          linter.upper_camel_);
-        if (element.modifiers == nullptr || !element.modifiers->maybe_strictness.has_value()) {
+        // This does not always prevent reliance on default stricntess. See the HasModifier docs.
+        if (!HasModifier<Strictness>(element.modifiers)) {
           std::string id = to_string(element.identifier);
           linter.AddFinding(
               element.identifier, explicit_flexible_method_modifier_check,
@@ -536,7 +555,8 @@ Linter::Linter()
                             },
                             "change '${IDENTIFIER}' to '${REPLACEMENT}'", "${REPLACEMENT}");
         }
-        if (element.modifiers == nullptr || !element.modifiers->maybe_strictness.has_value()) {
+        // This does not always prevent reliance on default strictness. See the HasModifier docs.
+        if (!HasModifier<Strictness>(element.modifiers)) {
           linter.AddFinding(
               element.identifier, explicit_flexible_method_modifier_check,
               {
@@ -603,10 +623,9 @@ Linter::Linter()
         std::string layout_kind = name_layout_kind(element);
         linter.EnterContext(layout_kind);
 
-        // All strictness-carrying declarations (bits, enums, unions) must specify the strictness
-        // explicitly.
+        // This does not always prevent reliance on default strictness. See the HasModifier docs.
         if (layout_kind != "table" && layout_kind != "struct" &&
-            (element.modifiers == nullptr || element.modifiers->maybe_strictness == std::nullopt)) {
+            !HasModifier<Strictness>(element.modifiers)) {
           linter.AddFinding(element, explicit_flexible_modifier_check,
                             {
                                 {"TYPE", layout_kind},
@@ -614,16 +633,27 @@ Linter::Linter()
                             "add 'flexible' modifier before ${TYPE} keyword", "");
         }
 
-        // Only union declarations can successfully parse with both modifiers attached.
-        if ((layout_kind == "bitfield" || layout_kind == "enum" || layout_kind == "union") &&
-            element.modifiers != nullptr && element.modifiers->maybe_strictness != std::nullopt &&
-            element.modifiers->resourceness_comes_first) {
+        std::optional<Token> misplaced_strictness_token;
+        if (element.modifiers) {
+          bool saw_resource = false;
+          for (auto& modifier : element.modifiers->modifiers) {
+            if (saw_resource) {
+              if (std::holds_alternative<Strictness>(modifier->value)) {
+                misplaced_strictness_token = modifier->token;
+                break;
+              }
+            } else if (std::holds_alternative<Resourceness>(modifier->value)) {
+              saw_resource = true;
+            }
+          }
+        }
+
+        if (misplaced_strictness_token) {
           linter.AddFinding(
               element, modifiers_order_check,
               {
                   {"TYPE", layout_kind},
-                  {"STRICTNESS",
-                   std::string(element.modifiers->maybe_strictness->token.span().data())},
+                  {"STRICTNESS", std::string(misplaced_strictness_token.value().span().data())},
               },
               "move '${STRICTNESS}' modifier before resource modifier for ${TYPE}", "");
         }

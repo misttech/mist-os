@@ -27,10 +27,18 @@ class CompileStep : public Compiler::Step {
  private:
   void RunImpl() override;
 
+  // Output parameters for compiling modifiers.
+  struct OutModifiers {
+    std::optional<Strictness>* strictness = nullptr;
+    std::optional<Resourceness>* resourceness = nullptr;
+    std::optional<Openness>* openness = nullptr;
+  };
+
   // Compile methods
   void CompileAlias(Alias* alias);
   void CompileAttribute(Attribute* attribute, bool early = false);
   void CompileAttributeList(AttributeList* attributes);
+  void CompileModifierList(ModifierList* modifiers, OutModifiers out);
   void CompileBits(Bits* bits_declaration);
   void CompileConst(Const* const_declaration);
   void CompileDecl(Decl* decl);
@@ -38,6 +46,7 @@ class CompileStep : public Compiler::Step {
   void CompileNewType(NewType* new_type);
   void CompileProtocol(Protocol* protocol_declaration);
   void CompileResource(Resource* resource_declaration);
+  void CompileResultUnion(Protocol::Method* method);
   void CompileService(Service* service_decl);
   void CompileStruct(Struct* struct_declaration);
   void CompileTable(Table* table_declaration);
@@ -90,8 +99,6 @@ class CompileStep : public Compiler::Step {
   void ValidateSelectorAndCalcOrdinal(const Name& protocol_name, Protocol::Method* method);
   void ValidatePayload(const TypeConstructor* type_ctor);
   void ValidateDomainError(const TypeConstructor* type_ctor);
-  template <typename DeclType>
-  void ValidateResourceness(const DeclType* decl, const typename DeclType::Member& member);
 
   // Decl for the HEAD constant, used in attribute_schema.cc.
   Decl* head_decl;

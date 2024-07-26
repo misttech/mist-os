@@ -29,6 +29,8 @@ class SpanSequenceTreeVisitor : public DeclarationOrderTreeVisitor {
   void OnAttributeArg(const std::unique_ptr<RawAttributeArg>& element) override;
   void OnAttribute(const std::unique_ptr<RawAttribute>& element) override;
   void OnAttributeList(const std::unique_ptr<RawAttributeList>& element) override;
+  void OnModifier(const std::unique_ptr<RawModifier>& element) override;
+  void OnModifierList(const std::unique_ptr<RawModifierList>& element) override;
   void OnBinaryOperatorConstant(const std::unique_ptr<RawBinaryOperatorConstant>& element) override;
   void OnCompoundIdentifier(const std::unique_ptr<RawCompoundIdentifier>& element) override;
   void OnConstant(const std::unique_ptr<RawConstant>& element) override;
@@ -86,6 +88,8 @@ class SpanSequenceTreeVisitor : public DeclarationOrderTreeVisitor {
     kLibraryDeclaration,
     kLiteral,
     kLiteralConstant,
+    kModifier,
+    kModifierList,
     kNamedLayoutReference,
     kOrdinal64,
     kOrdinaledLayout,

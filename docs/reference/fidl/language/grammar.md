@@ -79,16 +79,19 @@ compound-identifier = IDENTIFIER ( "." , IDENTIFIER )* ;
 declaration-list = ( declaration , ";" )* ;
 
 declaration = const-declaration | layout-declaration | protocol-declaration
-            | type-alias-declaration | resource-declaration | service-declaration ;
+    | type-alias-declaration | resource-declaration | service-declaration ;
 
-const-declaration = ( attribute-list ) , "const" , IDENTIFIER , type-constructor , "=" , constant ;
+const-declaration = ( attribute-list ) , "const" , IDENTIFIER ,
+    type-constructor , "=" , constant ;
 
-layout-declaration = ( attribute-list ) , "type" , IDENTIFIER , "=" , inline-layout ; [NOTE 1]
+layout-declaration = ( attribute-list ) , "type" , IDENTIFIER , "=" ,
+    inline-layout ; [NOTE 1]
 
-inline-layout = ( attribute-list ) , ( declaration-modifiers )* , layout-kind , ( layout-subtype ) ,
-                layout-body ;
+inline-layout = ( attribute-list ) , ( declaration-modifiers )* , layout-kind ,
+    ( layout-subtype ) , layout-body ;
 
-declaration-modifiers = "flexible" | "strict" | "resource" ; [NOTE 2]
+declaration-modifiers = "flexible" | "strict" | "resource",
+    ( modifier-availability ) ; [NOTE 2]
 
 layout-subtype = ":" , type-constructor ; [NOTE 3]
 
@@ -98,63 +101,77 @@ layout-body = value-layout | struct-layout | ordinal-layout ;
 
 value-layout = "{" , ( value-layout-member , ";" )+ , "}" ;
 
-value-layout-member = ( attribute-list ) , IDENTIFIER , "=" , constant ; [NOTE 4]
+value-layout-member = ( attribute-list ) , IDENTIFIER , "=" ,
+    constant ; [NOTE 4]
 
-struct-layout =  "{" , ( struct-layout-member, ";" )* , "}" ;
+struct-layout =  "{" , ( struct-layout-member , ";" )* , "}" ;
 
 struct-layout-member = ( attribute-list ) , member-field ;
 
 ordinal-layout =  "{" , ( ordinal-layout-member , ";" )* , "}" ; [NOTE 5]
 
-ordinal-layout-member = ( attribute-list ) , ordinal , ":" , member-field ; [NOTE 6]
+ordinal-layout-member = ( attribute-list ) , ordinal , ":" ,
+    member-field ;
 
-protocol-declaration = ( attribute-list ) , "protocol" , IDENTIFIER ,
-                       "{" , ( protocol-member , ";" )*  , "}" ;
+protocol-declaration = ( attribute-list ) , ( protocol-modifiers )* ,
+    "protocol" , IDENTIFIER , "{" , ( protocol-member , ";" )*  , "}" ;
+
+protocol-modifiers = "closed" | "ajar" | "closed" , ( modifier-availability ) ;
 
 protocol-member = protocol-method | protocol-event | protocol-compose ;
 
-protocol-method = ( attribute-list ) , IDENTIFIER , parameter-list,
-                  ( "->" , parameter-list , ( "error" type-constructor ) ) ; [NOTE 7]
+protocol-method = ( attribute-list ) , ( method-modifiers )* , IDENTIFIER ,
+    parameter-list , ( "->" , parameter-list ,
+    ( "error" type-constructor ) ) ; [NOTE 6]
 
-protocol-event = ( attribute-list ) , "->" , IDENTIFIER , parameter-list ;
+protocol-event = ( attribute-list ) , ( method-modifiers )* , "->" ,
+    IDENTIFIER , parameter-list ;
 
-parameter-list = "(" , ( type-constructor ) , ")" ; [NOTE 8]
+method-modifiers = "strict" | "flexible" , ( modifier-availability ) ;
 
-protocol-compose = "compose" , compound-identifier ;
+parameter-list = "(" , ( type-constructor ) , ")" ; [NOTE 7]
 
-type-alias-declaration = ( attribute-list ) , "alias" , IDENTIFIER ,  "=" , type-constructor ;
+protocol-compose = ( attribute-list ) , "compose" , compound-identifier ;
 
-resource-declaration = ( attribute-list ) , "resource_definition" , IDENTIFIER , ":",
-                       "uint32" , "{" , resource-properties ,  "}" ;
+type-alias-declaration = ( attribute-list ) , "alias" , IDENTIFIER ,  "=" ,
+    type-constructor ;
+
+resource-declaration = ( attribute-list ) , "resource_definition" , IDENTIFIER ,
+    ":" , "uint32" , "{" , resource-properties ,  "}" ;
 
 resource-properties = "properties" , "{" , ( member-field  , ";" )* , "}" , ";"
 
 service-declaration = ( attribute-list ) , "service" , IDENTIFIER , "{" ,
                       ( service-member , ";" )* , "}" ;
 
-service-member = ( attribute-list ) , member-field ; [NOTE 9]
+service-member = ( attribute-list ) , member-field ; [NOTE 8]
 
 member-field = IDENTIFIER , type-constructor ;
 
 attribute-list = ( attribute )* ;
 
-attribute = "@", IDENTIFIER , ( "(" , constant | attribute-args, ")" ) ;
+attribute = "@" , IDENTIFIER , ( "(" , constant | attribute-args , ")" ) ;
 
-attribute-args = attribute-arg | attribute-arg, "," attribute-args ;
+attribute-args = attribute-arg | attribute-arg , "," attribute-args ;
 
 attribute-arg = IDENTIFIER , "=" , constant ;
 
-type-constructor = layout , ( "<" , layout-parameters , ">" ) , ( ":" type-constraints ) ;
+modifier-availability = "(" , attribute-args , ")" ; [NOTE 9]
+
+type-constructor = layout , ( "<" , layout-parameters , ">" ) ,
+    ( ":" type-constraints ) ;
 
 layout = compound-identifier | inline-layout ;
 
-layout-parameters = layout-parameter | layout-parameter , "," , layout-parameters ;
+layout-parameters = layout-parameter | layout-parameter , "," ,
+    layout-parameters ;
 
 layout-parameter = type-constructor | constant ;
 
 type-constraints = type-constraint | "<" type-constraint-list ">" ;
 
-type-constraint-list = type-constraint | type-constraint , "," , type-constraint-list ;
+type-constraint-list = type-constraint | type-constraint , "," ,
+    type-constraint-list ;
 
 type-constraint = constant ;
 
@@ -227,27 +244,25 @@ specifically must have at least one member.
 
 ### NOTE 6
 
-Also, though ordinals can be any numeric literal, the compiler enforces that
-the specified ordinals for any union or table cover a contiguous range starting
-from 1.
-
-### NOTE 7
-
 The `protocol-method` error stanza allows the more liberal `type-constructor`
 in the grammar, but the compiler limits this to an `int32`, `uint32`, or
 an enum thereof.
 
-### NOTE 8
+### NOTE 7
 
 The `parameter-list` allows the more liberal `type-constructor` in the grammar,
 but the compiler only supports layouts that are structs, tables, or unions.
 
-### NOTE 9
+### NOTE 8
 
 The `service-member` allows the more liberal `type-constructor` in the grammar,
-but the compiler limits this to protocols.
+but the compiler limits this to `client_end` types.
 
-<!-- xrefs -->
+### NOTE 9
+
+The `modifier-availability` allows the more liberal `attribute-args` in the
+grammar, but the compiler limits this to `added` and `removed` arguments.
+
 [primitives]: /docs/reference/fidl/language/language.md#primitives
 [fidldoc]: /tools/fidl/fidldoc/
 [doc_reference]: /docs/reference/fidl/language/attributes.md#doc

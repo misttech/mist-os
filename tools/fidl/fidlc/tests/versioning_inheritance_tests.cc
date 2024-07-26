@@ -783,5 +783,31 @@ type Foo = struct {           // L6
   EXPECT_EQ(library.errors()[0]->span.position().line, 8);
 }
 
+TEST(VersioningInheritanceTests, BadModifierAddedBeforeParentAdded) {
+  TestLibrary library(R"FIDL(
+@available(added=2)
+library example;
+
+type Foo = resource(added=1) struct {};
+)FIDL");
+  library.SelectVersion("example", "HEAD");
+  library.ExpectFail(ErrAvailabilityConflictsWithParent, "added", "1", "added", "2",
+                     "example.fidl:2:12", "added", "before", "added");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
+TEST(VersioningInheritanceTests, BadModifierRemovedAfterParentRemoved) {
+  TestLibrary library(R"FIDL(
+@available(added=1, removed=2)
+library example;
+
+type Foo = resource(removed=3) struct {};
+)FIDL");
+  library.SelectVersion("example", "HEAD");
+  library.ExpectFail(ErrAvailabilityConflictsWithParent, "removed", "3", "removed", "2",
+                     "example.fidl:2:21", "removed", "after", "removed");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
 }  // namespace
 }  // namespace fidlc

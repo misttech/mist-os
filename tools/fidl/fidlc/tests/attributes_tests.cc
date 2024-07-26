@@ -804,12 +804,7 @@ library example;
 @foo(bar="abc", def)
 type MyStruct = struct {};
 )FIDL");
-  // TODO(https://fxbug.dev/42063565): If an unnamed identifier argument follows a named
-  // argument, it incorrectly produces ErrUnexpectedTokenOfKind and
-  // ErrUnexpectedToken instead of ErrAttributeArgsMustAllBeNamed.
-  library.ExpectFail(ErrUnexpectedTokenOfKind, Token::KindAndSubkind(Token::Kind::kRightParen),
-                     Token::KindAndSubkind(Token::Kind::kEqual));
-  library.ExpectFail(ErrUnexpectedToken);
+  library.ExpectFail(ErrAttributeArgsMustAllBeNamed);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 

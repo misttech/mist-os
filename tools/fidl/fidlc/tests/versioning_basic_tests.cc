@@ -226,6 +226,149 @@ type Foo = struct {
   }
 }
 
+TEST_P(VersioningBasicTest, GoodDeclStrictnessAddedAndRemoved) {
+  TestLibrary library(R"FIDL(
+@available(added=1)
+library example;
+
+type Foo = strict(added=2, removed=3) flexible(added=3) enum {
+    VALUE = 1;
+};
+)FIDL");
+  library.SelectVersions("example", GetParam());
+  ASSERT_COMPILED(library);
+  // Foo is flexible by default at V1, strict at V2, and explicitly flexible from V3 onwards.
+  EXPECT_EQ(library.LookupEnum("Foo")->strictness.value(),
+            GetParam().Any() == V2 && GetParam().All() <= V2 ? Strictness::kStrict
+                                                             : Strictness::kFlexible);
+}
+
+TEST_P(VersioningBasicTest, GoodDeclResourcenessAddedAndRemoved) {
+  TestLibrary library(R"FIDL(
+@available(added=1)
+library example;
+
+type Foo = resource(added=2, removed=3) struct {};
+)FIDL");
+  library.SelectVersions("example", GetParam());
+  ASSERT_COMPILED(library);
+  // Foo is a resource type at V2 only.
+  EXPECT_EQ(library.LookupStruct("Foo")->resourceness.value(),
+            GetParam().Any() == V2 && GetParam().All() <= V2 ? Resourceness::kResource
+                                                             : Resourceness::kValue);
+}
+
+TEST_P(VersioningBasicTest, GoodProtocolOpennessAddedAndRemoved) {
+  TestLibrary library(R"FIDL(
+@available(added=1)
+library example;
+
+closed(added=2, removed=3) open(added=3) protocol Foo {};
+)FIDL");
+  library.SelectVersions("example", GetParam());
+  ASSERT_COMPILED(library);
+  // Foo is open by default at V1, explicitly closed at V2, and explicitly open from V3 onwards.
+  EXPECT_EQ(library.LookupProtocol("Foo")->openness.value(),
+            GetParam().Any() == V2 && GetParam().All() <= V2 ? Openness::kClosed : Openness::kOpen);
+}
+
+TEST_P(VersioningBasicTest, GoodMethodStrictnessAddedAndRemoved) {
+  TestLibrary library(R"FIDL(
+@available(added=1)
+library example;
+
+open protocol Protocol {
+    strict(added=2, removed=3) flexible(added=3) Foo();
+};
+)FIDL");
+  library.SelectVersions("example", GetParam());
+  ASSERT_COMPILED(library);
+  // Foo is flexible by default at V1, strict at V2, and explicitly flexible from V3 onwards.
+  EXPECT_EQ(library.LookupProtocol("Protocol")->methods[0].strictness.value(),
+            GetParam().Any() == V2 && GetParam().All() <= V2 ? Strictness::kStrict
+                                                             : Strictness::kFlexible);
+}
+
+TEST_P(VersioningBasicTest, BadChangeInteractingModifiers) {
+  TestLibrary library(R"FIDL(
+@available(added=1)
+library example;
+
+closed(removed=2) ajar(added=2, removed=3) open(added=3) protocol Protocol {
+    OneWay();
+    -> Event();
+    TwoWay() -> () error uint32;
+};
+)FIDL");
+  library.SelectVersions("example", GetParam());
+  library.ExpectFail(ErrFlexibleOneWayMethodInClosedProtocol, Protocol::Method::Kind::kOneWay);
+  library.ExpectFail(ErrFlexibleOneWayMethodInClosedProtocol, Protocol::Method::Kind::kEvent);
+  library.ExpectFail(ErrFlexibleTwoWayMethodRequiresOpenProtocol, Openness::kClosed);
+  library.ExpectFail(ErrFlexibleTwoWayMethodRequiresOpenProtocol, Openness::kAjar);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
+TEST_P(VersioningBasicTest, GoodChangeInteractingModifiers) {
+  TestLibrary library(R"FIDL(
+@available(added=1)
+library example;
+
+closed(removed=2) ajar(added=2, removed=3) open(added=3) protocol Protocol {
+    strict(removed=2) flexible(added=2) OneWay();
+    strict(removed=2) flexible(added=2) -> Event();
+    strict(removed=3) flexible(added=3) TwoWay() -> () error uint32;
+};
+)FIDL");
+  library.SelectVersions("example", GetParam());
+  ASSERT_COMPILED(library);
+}
+
+TEST_P(VersioningBasicTest, GoodAddResourceModifierAndHandle) {
+  TestLibrary library(R"FIDL(
+@available(added=1)
+library example;
+
+using zx;
+
+type Foo = resource(added=2) table {
+    @available(added=2)
+    1: handle zx.Handle;
+};
+)FIDL");
+  library.SelectVersions("example", GetParam());
+  library.UseLibraryZx();
+  ASSERT_COMPILED(library);
+}
+
+// You remove the `resource` modifier and handle fields at the same time, but
+// that prevents you from targeting a set with versions both before and after.
+// In other words, you can't treat something as a value type if you still want
+// to support older versions where it had handle fields.
+TEST_P(VersioningBasicTest, RemoveResourceModifierAndHandle) {
+  TestLibrary library(R"FIDL(
+@available(added=1)
+library example;
+
+using zx;
+
+type Foo = resource(removed=2) table {
+    @available(removed=2)
+    1: handle zx.Handle;
+};
+)FIDL");
+  library.SelectVersions("example", GetParam());
+  library.UseLibraryZx();
+  bool has_handle = GetParam().Any() == V1;
+  bool is_resource = GetParam().All() == V1;
+  if (has_handle && !is_resource) {
+    library.ExpectFail(ErrTypeMustBeResource, Decl::Kind::kTable, "Foo", "handle",
+                       "example.fidl:9:8");
+    ASSERT_COMPILER_DIAGNOSTICS(library);
+  } else {
+    ASSERT_COMPILED(library);
+  }
+}
+
 // TODO(https://fxbug.dev/42052719): Generalize this with more comprehensive tests in
 // versioning_interleaving_tests.cc.
 TEST_P(VersioningBasicTest, GoodRegularDeprecatedReferencesVersionedDeprecated) {

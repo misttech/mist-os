@@ -37,6 +37,7 @@ Name Reference::Target::name() const {
       return maybe_parent_->name.WithMemberName(
           std::string(static_cast<Enum::Member*>(target_)->name.data()));
     case Element::Kind::kLibrary:
+    case Element::Kind::kModifier:
     case Element::Kind::kProtocolCompose:
     case Element::Kind::kProtocolMethod:
     case Element::Kind::kResourceProperty:

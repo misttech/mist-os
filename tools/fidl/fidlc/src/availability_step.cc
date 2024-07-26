@@ -16,16 +16,16 @@ namespace fidlc {
 
 void AvailabilityStep::RunImpl() {
   PopulateLexicalParents();
-  library()->TraverseElements([&](Element* element) { CompileAvailability(element); });
+  library()->ForEachElement([&](Element* element) { CompileAvailability(element); });
   ValidateAvailabilities();
 }
 
 void AvailabilityStep::PopulateLexicalParents() {
-  // First, map members to the Decl they occur in.
+  // First, map modifiers and members to their parents.
   for (const auto& entry : library()->declarations.all) {
     Decl* decl = entry.second;
-    decl->ForEachMember(
-        [this, decl](const Element* member) { lexical_parents_.emplace(member, decl); });
+    decl->ForEachEdge(
+        [&](Element* parent, Element* child) { lexical_parents_.emplace(child, parent); });
   }
 
   // Second, map anonymous layouts to the struct/table/union member or method
@@ -126,6 +126,7 @@ static bool CanBeRenamed(Element::Kind kind) {
     case Element::Kind::kConst:
     case Element::Kind::kEnum:
     case Element::Kind::kLibrary:
+    case Element::Kind::kModifier:
     case Element::Kind::kNewType:
     case Element::Kind::kOverlay:
     case Element::Kind::kProtocol:
@@ -204,6 +205,13 @@ void AvailabilityStep::CompileAvailabilityFromAttribute(Element* element, Attrib
       auto new_name = renamed->value->Value().AsString().value();
       if (new_name == element->GetName()) {
         ok &= reporter()->Fail(ErrRenamedToSameName, renamed->span, new_name);
+      }
+    }
+  }
+  if (element->kind == Element::Kind::kModifier) {
+    for (auto& arg : attribute->args) {
+      if (arg.get() != added && arg.get() != removed) {
+        ok &= reporter()->Fail(ErrInvalidModifierAvailableArgument, arg->span, arg.get());
       }
     }
   }
@@ -288,6 +296,10 @@ void AvailabilityStep::CompileAvailabilityFromAttribute(Element* element, Attrib
   }
 
   if (element->availability.state() != Availability::State::kInherited)
+    return;
+  // Modifiers are different from other elements because we don't combine them
+  // from all selected versions. We just use the latest modifiers.
+  if (element->kind == Element::Kind::kModifier)
     return;
   if (auto& platform = library()->platform.value();
       !platform.is_unversioned() && version_selection()->Contains(platform)) {
@@ -395,7 +407,6 @@ class NameValidator {
  public:
   NameValidator(Reporter* reporter, const Platform& platform)
       : reporter_(reporter), platform_(platform) {}
-  NameValidator(const NameValidator&) = delete;
 
   void Insert(const Element* element) {
     // Skip elements whose availabilities we failed to compile.
@@ -447,6 +458,43 @@ class NameValidator {
   std::map<std::string, std::set<const Element*, CmpAvailability>> by_canonical_name_;
 };
 
+// Helper that checks for modifier conflicts on overlapping elements.
+class ModifierValidator {
+ public:
+  explicit ModifierValidator(Reporter* reporter) : reporter_(reporter) {}
+
+  void Insert(const Modifier* modifier) {
+    // Skip elements whose availabilities we failed to compile.
+    if (modifier->availability.state() != Availability::State::kInherited) {
+      return;
+    }
+    auto set = modifier->availability.set();
+    auto kind = modifier->value.index();
+    auto& same_kind = by_kind_[kind];
+    for (auto other : same_kind) {
+      auto other_set = other->availability.set();
+      auto overlap = VersionSet::Intersect(set, other_set);
+      if (!overlap) {
+        continue;
+      }
+      // We could emit more complicated error messages with the overlap range
+      // like NameValidator does, but that's probably overkill for modifiers.
+      if (modifier->value == other->value) {
+        reporter_->Fail(ErrDuplicateModifier, modifier->name, modifier);
+      } else {
+        reporter_->Fail(ErrConflictingModifier, modifier->name, modifier, other);
+      }
+      // Report at most one error per modifier to avoid noisy redundant errors.
+      break;
+    }
+    same_kind.insert(modifier);
+  }
+
+ private:
+  Reporter* reporter_;
+  std::map<size_t, std::set<const Modifier*, CmpAvailability>> by_kind_;
+};
+
 }  // namespace
 
 void AvailabilityStep::ValidateAvailabilities() {
@@ -459,8 +507,13 @@ void AvailabilityStep::ValidateAvailabilities() {
   for (auto& [name, decl] : library()->declarations.all) {
     decl_validator.Insert(decl);
     NameValidator member_validator(reporter(), *platform);
-    decl->ForEachMember([&](const Element* member) { member_validator.Insert(member); });
+    decl->ForEachMember([&](Element* member) { member_validator.Insert(member); });
   }
+  library()->ForEachElement([&](Element* element) {
+    ModifierValidator modifier_validator(reporter());
+    element->ForEachModifier(
+        [&](const Modifier* modifier) { modifier_validator.Insert(modifier); });
+  });
 }
 
 }  // namespace fidlc

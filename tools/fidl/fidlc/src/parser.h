@@ -17,7 +17,6 @@
 #include "tools/fidl/fidlc/src/raw_ast.h"
 #include "tools/fidl/fidlc/src/reporter.h"
 #include "tools/fidl/fidlc/src/token.h"
-#include "tools/fidl/fidlc/src/utils.h"
 
 namespace fidlc {
 
@@ -161,7 +160,7 @@ class Parser {
   }
 
   // ConsumeTokenOrRecover consumes a token if-and-only-if it matches the given
-  // predicate |p|. If it doesn't match, it reports an error, then marks that
+  // Predicate |p|. If it doesn't match, it reports an error, then marks that
   // error as recovered, essentially continuing as if the token had been there.
   template <class Predicate>
   std::optional<Token> ConsumeTokenOrRecover(Predicate p) {
@@ -217,25 +216,7 @@ class Parser {
   // included in |Allowlist|. The |decl_token| should be "struct", "enum", etc.
   // Marks the error as recovered so that parsing will continue.
   template <typename... Allowlist>
-  void ValidateModifiers(const std::unique_ptr<RawModifiers>& modifiers, Token decl_token) {
-    const auto fail = [&](std::optional<Token> token) {
-      Fail(ErrCannotSpecifyModifier, token.value(), token.value().kind_and_subkind(),
-           decl_token.kind_and_subkind());
-      RecoverOneError();
-    };
-    if (!(std::is_same_v<Strictness, Allowlist> || ...) &&
-        modifiers->maybe_strictness != std::nullopt) {
-      fail(modifiers->maybe_strictness->token);
-    }
-    if (!(std::is_same_v<Resourceness, Allowlist> || ...) &&
-        modifiers->maybe_resourceness != std::nullopt) {
-      fail(modifiers->maybe_resourceness->token);
-    }
-    if (!(std::is_same_v<Openness, Allowlist> || ...) &&
-        modifiers->maybe_openness != std::nullopt) {
-      fail(modifiers->maybe_openness->token);
-    }
-  }
+  void ValidateModifiers(const std::unique_ptr<RawModifierList>& modifiers, Token decl_token);
 
   std::unique_ptr<RawIdentifier> ParseIdentifier();
   std::unique_ptr<RawCompoundIdentifier> ParseCompoundIdentifier();
@@ -259,10 +240,10 @@ class Parser {
 
   std::unique_ptr<RawParameterList> ParseParameterList();
   std::unique_ptr<RawProtocolMethod> ParseProtocolEvent(
-      std::unique_ptr<RawAttributeList> attributes, std::unique_ptr<RawModifiers> modifiers,
+      std::unique_ptr<RawAttributeList> attributes, std::unique_ptr<RawModifierList> modifiers,
       ASTScope& scope);
   std::unique_ptr<RawProtocolMethod> ParseProtocolMethod(
-      std::unique_ptr<RawAttributeList> attributes, std::unique_ptr<RawModifiers> modifiers,
+      std::unique_ptr<RawAttributeList> attributes, std::unique_ptr<RawModifierList> modifiers,
       std::unique_ptr<RawIdentifier> method_name, ASTScope& scope);
   std::unique_ptr<RawProtocolCompose> ParseProtocolCompose(
       std::unique_ptr<RawAttributeList> attributes, ASTScope& scope);
@@ -281,19 +262,22 @@ class Parser {
       std::unique_ptr<RawAttributeList>, ASTScope&);
   std::unique_ptr<RawServiceMember> ParseServiceMember();
   // This method may be used to parse the second attribute argument onward - the first argument in
-  // the list is handled separately in ParseAttributeNew().
+  // the list is handled separately in ParseAttribute().
   std::unique_ptr<RawAttributeArg> ParseSubsequentAttributeArg();
   std::unique_ptr<RawServiceDeclaration> ParseServiceDeclaration(std::unique_ptr<RawAttributeList>,
                                                                  ASTScope&);
   std::unique_ptr<RawAttribute> ParseAttribute();
+  void ParseAttributeArgs(std::vector<std::unique_ptr<RawAttributeArg>>* out_args);
   std::unique_ptr<RawAttribute> ParseDocComment();
   std::unique_ptr<RawAttributeList> ParseAttributeList(std::unique_ptr<RawAttribute> doc_comment,
                                                        ASTScope& scope);
   std::unique_ptr<RawAttributeList> MaybeParseAttributeList();
+  std::unique_ptr<RawModifierList> ParseModifierList(ASTScope& scope, Token first_token);
   std::unique_ptr<RawLayoutParameter> ParseLayoutParameter();
   std::unique_ptr<RawLayoutParameterList> MaybeParseLayoutParameterList();
   std::unique_ptr<RawLayoutMember> ParseLayoutMember(RawLayoutMember::Kind);
-  std::unique_ptr<RawLayout> ParseLayout(ASTScope& scope, std::unique_ptr<RawModifiers> modifiers,
+  std::unique_ptr<RawLayout> ParseLayout(ASTScope& scope,
+                                         std::unique_ptr<RawModifierList> modifiers,
                                          std::unique_ptr<RawCompoundIdentifier> compound_identifier,
                                          std::unique_ptr<RawTypeConstructor> subtype_ctor);
   std::unique_ptr<RawTypeConstraints> ParseTypeConstraints();
@@ -324,7 +308,7 @@ class Parser {
   //    parsing scope. For example, we just parsed a decl with an error, and
   //    recovered, but are now at the end of the file.
   //    A signal to `break` out of the current parsing loop.
-  RecoverResult RecoverToEndOfAttributeNew();
+  RecoverResult RecoverToEndOfAttribute();
   RecoverResult RecoverToEndOfDecl();
   RecoverResult RecoverToEndOfMember();
   template <Token::Kind ClosingToken>
@@ -334,7 +318,7 @@ class Parser {
   RecoverResult RecoverToEndOfParamList();
 
   // Utility function used by RecoverTo* methods
-  bool ConsumeTokensUntil(std::set<Token::Kind> tokens);
+  bool ConsumeTokensUntil(const std::set<Token::Kind>& tokens);
 
   // Indicates whether we are currently able to continue parsing.
   // Typically when the parser reports an error, it then attempts to recover

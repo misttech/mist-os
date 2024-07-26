@@ -102,6 +102,12 @@ class TreeVisitor {
     element->Accept(this);
   }
 
+  virtual void OnModifier(const std::unique_ptr<RawModifier>& element) { element->Accept(this); }
+
+  virtual void OnModifierList(const std::unique_ptr<RawModifierList>& element) {
+    element->Accept(this);
+  }
+
   virtual void OnAliasDeclaration(const std::unique_ptr<RawAliasDeclaration>& element) {
     element->Accept(this);
   }
@@ -140,7 +146,6 @@ class TreeVisitor {
   virtual void OnServiceDeclaration(const std::unique_ptr<RawServiceDeclaration>& element) {
     element->Accept(this);
   }
-  virtual void OnModifiers(const std::unique_ptr<RawModifiers>& element) { element->Accept(this); }
 
   virtual void OnLayoutParameter(const std::unique_ptr<RawLayoutParameter>& element) {
     RawLayoutParameter::Kind kind = element->kind;

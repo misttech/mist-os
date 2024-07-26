@@ -84,6 +84,8 @@ std::string Display(Element::Kind k) {
       return "enum member";
     case Element::Kind::kLibrary:
       return "library";
+    case Element::Kind::kModifier:
+      return "modifier";
     case Element::Kind::kNewType:
       return "new-type";
     case Element::Kind::kProtocol:

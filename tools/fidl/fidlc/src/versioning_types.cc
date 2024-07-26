@@ -266,22 +266,14 @@ Availability::InheritResult Availability::Inherit(const Availability& parent) {
   if (removed_.value() == parent.removed_.value()) {
     // Only inherit if the parent was removed at the same time. For example:
     //
-    //     @available(added=1, removed=100, legacy=true)
+    //     @available(added=1, removed=3)
     //     type Foo = table {
-    //         @available(removed=2) 1: string bar;
-    //         @available(added=2)   1: string bar:10;
-    //         @available(removed=3) 2: bool qux;
+    //         1: string bar;
+    //         @available(removed=2) 2: string baz;
     //     };
     //
-    // It's crucial we do not inherit legacy=true on the first `bar`,
-    // otherwise there will be two `bar` fields that collide at LEGACY. We
-    // also don't want to inherit legacy=true for `qux`: it had no legacy
-    // legacy support when it was removed at 3, so it doesn't make sense to
-    // change that when we later remove the entire table at 100.
-    //
-    // An alternative is to inherit when the child has no explicit `removed`.
-    // We prefer to base it on post-inheritance equality so that adding or
-    // removing a redundant `removed=...` on the child is purely stylistic.
+    // When we add back Foo at LEGACY, it should appear the same as it did at 2,
+    // i.e. it should only have the bar member, not the baz member.
     legacy_ = parent.legacy_.value();
   } else {
     ZX_ASSERT_MSG(

@@ -7,6 +7,14 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
 
+#ifdef __Fuchsia__
+void ::test_versions::wire::Struct::_CloseHandles() {
+}
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
 auto ::test_versions::wire::Union::Which() const -> ::test_versions::wire::Union::Tag {
   ZX_ASSERT(!has_invalid_tag());
   switch (ordinal_) {
@@ -22,6 +30,37 @@ void ::test_versions::wire::Union::SizeAndOffsetAssertionHelper() {
   static_assert(offsetof(Union, ordinal_) == offsetof(fidl_union_t, tag));
   static_assert(offsetof(Union, envelope_) == offsetof(fidl_union_t, envelope));
 }
+::test_versions::wire::Union::~Union() {
+  switch (ordinal_) {
+    case ::test_versions::wire::Union::Ordinal::kX:
+      envelope_.As<uint32_t>().clear_data();
+      break;
+    default:
+      break;
+  }
+}
+
+void ::test_versions::wire::Union::_Move(Union&& other) {
+  ordinal_ = other.ordinal_;
+  switch (ordinal_) {
+    case ::test_versions::wire::Union::Ordinal::kX:
+      envelope_.As<uint32_t>() = std::move(other.envelope_.As<uint32_t>());
+      break;
+    default:
+      break;
+  }
+}
+
+void ::test_versions::wire::Union::_CloseHandles() {
+  switch (ordinal_) {
+    default:
+      break;
+  }
+}
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
 
 bool ::fidl::WireTableFrame<::test_versions::wire::Table>::HasUnknownData() const {
   return false;
@@ -44,5 +83,10 @@ bool ::test_versions::wire::Table::HasUnknownData() const {
   }
   return frame_ptr_->HasUnknownData();
 }
+
+void ::test_versions::wire::Table::_CloseHandles() {
+}
+
+#endif  // __Fuchsia__
 
 #pragma clang diagnostic pop

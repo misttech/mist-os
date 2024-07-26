@@ -71,6 +71,8 @@ bool Compiler::Compile() {
     return false;
   if (!ReplacementStep(this).Run())
     return false;
+  if (!VerifyResourcenessStep(this).Run())
+    return false;
   if (!VerifyHandleTransportStep(this).Run())
     return false;
   if (!VerifyAttributesStep(this).Run())
@@ -223,7 +225,7 @@ static std::vector<const Struct*> ExternalStructs(const Library* target_library,
       if (auto& response = method_with_info.method->maybe_response) {
         visit(response->type);
       }
-      if (auto union_decl = method_with_info.method->result_union) {
+      if (auto union_decl = method_with_info.method->maybe_result_union) {
         for (auto& member : union_decl->members) {
           visit(member.type_ctor->type);
         }
@@ -291,7 +293,7 @@ class CalcDependencies {
           if (auto request = method->maybe_request.get()) {
             VisitTypeConstructorAndStructFields(request);
           }
-          if (auto union_decl = method->result_union) {
+          if (auto union_decl = method->maybe_result_union) {
             for (const auto& member : union_decl->members) {
               VisitTypeConstructorAndStructFields(member.type_ctor.get());
             }

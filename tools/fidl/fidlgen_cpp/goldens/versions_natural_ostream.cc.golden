@@ -35,6 +35,8 @@ std::ostream& fidl::ostream::Formatter<::test_versions::Bits>::Format(std::ostre
   os << ")";
   return os;
 }
+#ifdef __Fuchsia__
+
 std::ostream& fidl::ostream::Formatter<::test_versions::Struct>::Format(std::ostream& os, const ::test_versions::Struct& value) {
   os << "test_versions::Struct";
   os << "{ ";
@@ -43,6 +45,11 @@ std::ostream& fidl::ostream::Formatter<::test_versions::Struct>::Format(std::ost
   os << "}";
   return os;
 }
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
 std::ostream& fidl::ostream::Formatter<::test_versions::Table>::Format(std::ostream& os, const ::test_versions::Table& value) {
   os << "test_versions::Table";
   os << "{ ";
@@ -53,6 +60,11 @@ std::ostream& fidl::ostream::Formatter<::test_versions::Table>::Format(std::ostr
   os << "}";
   return os;
 }
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
 std::ostream& fidl::ostream::Formatter<::test_versions::Union>::Format(std::ostream& os, const ::test_versions::Union& value) {
   os << "test_versions::Union::";
   switch (value.Which()) {
@@ -65,6 +77,8 @@ std::ostream& fidl::ostream::Formatter<::test_versions::Union>::Format(std::ostr
   return os;
 }
 
+#endif  // __Fuchsia__
+
 namespace test_versions {
 
 std::ostream& operator<<(std::ostream& os, const ::test_versions::Bits& value) {
@@ -75,17 +89,29 @@ std::ostream& operator<<(std::ostream& os, const ::test_versions::Enum& value) {
   return fidl::ostream::Formatter<::test_versions::Enum>::Format(os, value);
 }
 
+#ifdef __Fuchsia__
+
 std::ostream& operator<<(std::ostream& os, const ::test_versions::Struct& value) {
   return fidl::ostream::Formatter<::test_versions::Struct>::Format(os, value);
 }
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
 
 std::ostream& operator<<(std::ostream& os, const ::test_versions::Table& value) {
   return fidl::ostream::Formatter<::test_versions::Table>::Format(os, value);
 }
 
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
 std::ostream& operator<<(std::ostream& os, const ::test_versions::Union& value) {
   return fidl::ostream::Formatter<::test_versions::Union>::Format(os, value);
 }
+
+#endif  // __Fuchsia__
 
 #pragma clang diagnostic pop
 

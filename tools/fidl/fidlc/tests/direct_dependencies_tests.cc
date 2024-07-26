@@ -4,11 +4,17 @@
 
 #include <gtest/gtest.h>
 
-#include "tools/fidl/fidlc/src/names.h"
 #include "tools/fidl/fidlc/tests/test_library.h"
 
 namespace fidlc {
 namespace {
+
+std::vector<std::string_view> DirectAndComposedDependencies(const TestLibrary& library) {
+  std::vector<std::string_view> names;
+  for (auto& dep : library.direct_and_composed_dependencies())
+    names.push_back(dep.library->name);
+  return names;
+}
 
 TEST(DirectDependenciesTests, GoodDirectDepsSimple) {
   for (const std::string& type_usage : {
@@ -55,11 +61,8 @@ protocol CapturesDependencyThroughCompose {
 )FIDL");
     ASSERT_COMPILED(lib);
 
-    auto deps = lib.direct_and_composed_dependencies();
-    ASSERT_EQ(deps.size(), 2u);
-    auto iter = deps.cbegin();
-    EXPECT_EQ((*iter++).library->name, "dep1");
-    EXPECT_EQ((*iter++).library->name, "dep2");
+    std::vector<std::string_view> expected = {"dep1", "dep2"};
+    EXPECT_EQ(DirectAndComposedDependencies(lib), expected);
   }
 }
 
@@ -98,10 +101,8 @@ protocol CapturesDependencyThroughCompose {
 )FIDL");
   ASSERT_COMPILED(lib);
 
-  auto deps = lib.direct_and_composed_dependencies();
-  ASSERT_EQ(deps.size(), 1u);
-  auto iter = deps.cbegin();
-  EXPECT_EQ((*iter++).library->name, "dep1");
+  std::vector<std::string_view> expected = {"dep1"};
+  EXPECT_EQ(DirectAndComposedDependencies(lib), expected);
 }
 
 TEST(DirectDependenciesTests, GoodDoesNotFollowNestedStruct) {
@@ -139,10 +140,8 @@ protocol CapturesDependencyThroughCompose {
 )FIDL");
   ASSERT_COMPILED(lib);
 
-  auto deps = lib.direct_and_composed_dependencies();
-  ASSERT_EQ(deps.size(), 1u);
-  auto iter = deps.cbegin();
-  EXPECT_EQ((*iter++).library->name, "dep1");
+  std::vector<std::string_view> expected = {"dep1"};
+  EXPECT_EQ(DirectAndComposedDependencies(lib), expected);
 }
 
 TEST(DirectDependenciesTests, GoodErrorSyntaxSuccessType) {
@@ -176,11 +175,8 @@ protocol CapturesDependencyThroughCompose {
 )FIDL");
   ASSERT_COMPILED(lib);
 
-  auto deps = lib.direct_and_composed_dependencies();
-  ASSERT_EQ(deps.size(), 2u);
-  auto iter = deps.cbegin();
-  EXPECT_EQ((*iter++).library->name, "dep1");
-  EXPECT_EQ((*iter++).library->name, "dep2");
+  std::vector<std::string_view> expected = {"dep1", "dep2"};
+  EXPECT_EQ(DirectAndComposedDependencies(lib), expected);
 }
 
 TEST(DirectDependenciesTests, GoodErrorSyntaxErrorType) {
@@ -214,11 +210,8 @@ protocol CapturesDependencyThroughCompose {
 )FIDL");
   ASSERT_COMPILED(lib);
 
-  auto deps = lib.direct_and_composed_dependencies();
-  ASSERT_EQ(deps.size(), 2u);
-  auto iter = deps.cbegin();
-  EXPECT_EQ((*iter++).library->name, "dep1");
-  EXPECT_EQ((*iter++).library->name, "dep2");
+  std::vector<std::string_view> expected = {"dep1", "dep2"};
+  EXPECT_EQ(DirectAndComposedDependencies(lib), expected);
 }
 
 TEST(DirectDependenciesTests, GoodFlexibleResponse) {
@@ -252,11 +245,8 @@ open protocol CapturesDependencyThroughCompose {
 )FIDL");
   ASSERT_COMPILED(lib);
 
-  auto deps = lib.direct_and_composed_dependencies();
-  ASSERT_EQ(deps.size(), 2u);
-  auto iter = deps.cbegin();
-  EXPECT_EQ((*iter++).library->name, "dep1");
-  EXPECT_EQ((*iter++).library->name, "dep2");
+  std::vector<std::string_view> expected = {"dep1", "dep2"};
+  EXPECT_EQ(DirectAndComposedDependencies(lib), expected);
 }
 
 }  // namespace

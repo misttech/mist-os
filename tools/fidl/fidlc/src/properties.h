@@ -6,7 +6,6 @@
 #define TOOLS_FIDL_FIDLC_SRC_PROPERTIES_H_
 
 #include <cstdint>
-#include <string_view>
 #include <variant>
 
 namespace fidlc {
@@ -37,6 +36,8 @@ enum class Openness : uint8_t {
   kAjar,
   kOpen,
 };
+
+using ModifierValue = std::variant<Strictness, Resourceness, Openness>;
 
 // TODO(https://fxbug.dev/42128146): zircon/types.h's zx_obj_type_t and related values must be
 // kept in sync with this. Eventually, they will be generated from

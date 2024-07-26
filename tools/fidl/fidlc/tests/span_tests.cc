@@ -52,7 +52,8 @@ namespace {
   DO(LibraryDeclaration)        \
   DO(LiteralConstant)           \
   DO(LiteralLayoutParameter)    \
-  DO(Modifiers)                 \
+  DO(Modifier)                  \
+  DO(ModifierList)              \
   DO(NamedLayoutReference)      \
   DO(NumericLiteral)            \
   DO(Ordinal64)                 \
@@ -187,9 +188,13 @@ class SourceSpanVisitor : public TreeVisitor {
     CheckSpanOfType(ElementType::kLiteralLayoutParameter, *element);
     TreeVisitor::OnLiteralLayoutParameter(element);
   }
-  void OnModifiers(const std::unique_ptr<RawModifiers>& element) override {
-    CheckSpanOfType(ElementType::kModifiers, *element);
-    TreeVisitor::OnModifiers(element);
+  void OnModifier(const std::unique_ptr<RawModifier>& element) override {
+    CheckSpanOfType(ElementType::kModifier, *element);
+    TreeVisitor::OnModifier(element);
+  }
+  void OnModifierList(const std::unique_ptr<RawModifierList>& element) override {
+    CheckSpanOfType(ElementType::kModifierList, *element);
+    TreeVisitor::OnModifierList(element);
   }
   void OnNamedLayoutReference(const std::unique_ptr<RawNamedLayoutReference>& element) override {
     CheckSpanOfType(ElementType::kNamedLayoutReference, *element);
@@ -524,7 +529,7 @@ const std::vector<TestCase> kTestCases = {
          R"FIDL(library x; type y = array<uint8,«4»>;)FIDL",
          R"FIDL(library x; type y = vector<array<uint8,«4»>>;)FIDL",
      }},
-    {ElementType::kModifiers,
+    {ElementType::kModifier,
      {
          // Layouts
          R"FIDL(library x; type MyBits = «flexible» bits { MY_VALUE = 1; };)FIDL",
@@ -536,14 +541,14 @@ const std::vector<TestCase> kTestCases = {
          R"FIDL(library x; type MyUnion = «resource» union { 1: my_member bool; };)FIDL",
          R"FIDL(library x; type MyUnion = «flexible» union { 1: my_member bool; };)FIDL",
          R"FIDL(library x; type MyUnion = «strict» union { 1: my_member bool; };)FIDL",
-         R"FIDL(library x; type MyUnion = «resource strict» union { 1: my_member bool; };)FIDL",
+         R"FIDL(library x; type MyUnion = «resource» «strict» union { 1: my_member bool; };)FIDL",
          R"FIDL(library x; @attr type MyEnum = «flexible» enum : uint32 { MY_VALUE = 1; };)FIDL",
          R"FIDL(library x; @attr type MyStruct = «resource» struct {};)FIDL",
-         R"FIDL(library x; @attr type MyUnion = «resource strict» union { 1: my_member bool; };)FIDL",
+         R"FIDL(library x; @attr type MyUnion = «resource» «strict» union { 1: my_member bool; };)FIDL",
          // Note that the following 3 tests have union members named like modifiers.
-         R"FIDL(library x; type MyUnion = «resource flexible» union { 1: my_member resource; };)FIDL",
-         R"FIDL(library x; type MyUnion = «strict resource» union { 1: my_member flexible; };)FIDL",
-         R"FIDL(library x; type MyUnion = «flexible resource» union { 1: my_member strict; };)FIDL",
+         R"FIDL(library x; type MyUnion = «resource» «flexible» union { 1: my_member resource; };)FIDL",
+         R"FIDL(library x; type MyUnion = «strict» «resource» union { 1: my_member flexible; };)FIDL",
+         R"FIDL(library x; type MyUnion = «flexible» «resource» union { 1: my_member strict; };)FIDL",
          // Protocols
          R"FIDL(library x; «ajar» protocol MyProtocol {};)FIDL",
          R"FIDL(library x; «closed» protocol MyProtocol {};)FIDL",
@@ -553,10 +558,33 @@ const std::vector<TestCase> kTestCases = {
          R"FIDL(library x; «open» protocol MyProtocol { «flexible» MyMethod(); };)FIDL",
          R"FIDL(library x; «open» protocol MyProtocol { «strict» MyMethod(); };)FIDL",
          R"FIDL(library x; «open» protocol MyProtocol { @attr «strict» MyMethod(); };)FIDL",
+         // With availabilities
+         R"FIDL(library x; type MyUnion = «flexible(added=2)» union {};)FIDL",
+         R"FIDL(library x; type MyUnion = «strict(removed=2)» «flexible(added=2)» «resource(added=3)» union {};)FIDL",
+         R"FIDL(library x; «open(removed=2)» «ajar(added=2)» protocol MyProtocol { @attr «strict(added=2)» MyMethod(); };)FIDL",
+
+// TODO(https://fxbug.dev/348403275): The ability to name methods "strict" or "flexible"
+// is temporarily regressed. Re-enable after we implement explicit method kind syntax.
+#if 0
          // Note that the following 3 tests have protocol methods named like modifiers.
          R"FIDL(library x; «open» protocol MyProtocol { «flexible» flexible(); strict(); };)FIDL",
          R"FIDL(library x; «open» protocol MyProtocol { «strict» strict(); flexible(); };)FIDL",
          R"FIDL(library x; «open» protocol MyProtocol { @attr «flexible» flexible(); @attr strict(); };)FIDL",
+#endif
+     }},
+    {ElementType::kModifierList,
+     {
+         // Single modifier
+         R"FIDL(library x; type MyUnion = «flexible» union {};)FIDL",
+         R"FIDL(library x; type MyStruct = struct { anon @attr «flexible» union {}; };)FIDL",
+         R"FIDL(library x; @attr «ajar» protocol MyProtocol { @attr «flexible» MyMethod(); };)FIDL",
+         // Multiple modifiers
+         R"FIDL(library x; type MyUnion = «flexible resource» union {};)FIDL",
+         R"FIDL(library x; type MyStruct = «resource» struct { anon @attr «flexible resource» union {}; };)FIDL",
+         // With availabilities
+         R"FIDL(library x; type MyUnion = «flexible(added=2)» union {};)FIDL",
+         R"FIDL(library x; type MyUnion = «strict(removed=2) flexible(added=2) resource(added=3)» union {};)FIDL",
+         R"FIDL(library x; «open(removed=2) ajar(added=2)» protocol MyProtocol { @attr «strict(added=2)» MyMethod(); };)FIDL",
      }},
     {ElementType::kNamedLayoutReference,
      {

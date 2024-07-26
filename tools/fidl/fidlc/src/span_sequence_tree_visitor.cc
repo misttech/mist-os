@@ -382,7 +382,7 @@ void SpanSequenceTreeVisitor::OnAttribute(const std::unique_ptr<RawAttribute>& e
   }
 
   // This attribute has at least one argument.  For each argument, first ingest the prelude (usually
-  // the preceding comment), but at it as a suffix to the previous attribute instead of as a prefix
+  // the preceding comment), but add it as a suffix to the previous attribute instead of as a prefix
   // to the current one.  If we did not do this, we'd end up with formatting like:
   //
   //   @foo
@@ -461,6 +461,18 @@ void SpanSequenceTreeVisitor::OnAttributeList(const std::unique_ptr<RawAttribute
         ClearLeadingBlankLines(child_span_sequence);
       }
     }
+  }
+}
+
+void SpanSequenceTreeVisitor::OnModifier(const std::unique_ptr<RawModifier>& element) {
+  const auto visiting = Visiting(this, VisitorKind::kModifier);
+  TreeVisitor::OnModifier(element);
+}
+
+void SpanSequenceTreeVisitor::OnModifierList(const std::unique_ptr<RawModifierList>& element) {
+  if (already_seen_.insert(element.get()).second) {
+    const auto visiting = Visiting(this, VisitorKind::kModifierList);
+    TreeVisitor::OnModifierList(element);
   }
 }
 
@@ -606,6 +618,10 @@ void SpanSequenceTreeVisitor::OnLayout(const std::unique_ptr<RawLayout>& element
   }
   const auto inner_visiting = Visiting(this, inner_kind);
 
+  if (element->modifiers != nullptr) {
+    OnModifierList(element->modifiers);
+  }
+
   // Special case: an empty layout (ex: `struct {}`) should always be atomic.
   if (element->members.empty()) {
     if (element->subtype_ctor) {
@@ -736,11 +752,20 @@ void SpanSequenceTreeVisitor::OnProtocolDeclaration(
     OnAttributeList(element->attributes);
   }
 
+  const auto first_modifier_or_identifier_token =
+      element->modifiers != nullptr ? element->modifiers->modifiers.front()->start_token
+                                    : element->identifier->start_token;
+
   // Special case: an empty protocol definition should always be atomic.
   if (element->methods.empty() && element->composed_protocols.empty()) {
     const auto builder = StatementBuilder<AtomicSpanSequence>(
-        this, element->identifier->start_token, element->end_token,
-        SpanSequence::Position::kNewlineUnindented);
+        this, first_modifier_or_identifier_token, SpanSequence::Position::kNewlineUnindented);
+    if (element->modifiers != nullptr) {
+      OnModifierList(element->modifiers);
+    }
+    auto postscript = IngestUpTo(element->end_token);
+    if (postscript.has_value())
+      building_.top().push_back(std::move(postscript.value()));
     ClearBlankLinesAfterAttributeList(element->attributes, building_.top());
     return;
   }
@@ -763,8 +788,24 @@ void SpanSequenceTreeVisitor::OnProtocolDeclaration(
     first_child_start_token = element->composed_protocols[0]->start_token;
   }
 
+  // The following logic is a bit complicated, arrived at by trial and error.
+  // We have to use StatementBuilder<MultilineSpanSequence> to start the
+  // declaration on a new line. If there are modifiers, we have to use
+  // SpanBuilder<AtomicSpanSequence> to put them on the same line as "protocol".
+  // If there are no modifiers, we must *not* use a SpanBuilder: if we do, there
+  // will be no space between "protocol" and the protocol name.
+  const auto multiline_start =
+      element->modifiers != nullptr ? first_modifier_or_identifier_token : first_child_start_token;
   const auto builder = StatementBuilder<MultilineSpanSequence>(
-      this, first_child_start_token, SpanSequence::Position::kNewlineUnindented);
+      this, multiline_start, SpanSequence::Position::kNewlineUnindented);
+  if (element->modifiers != nullptr) {
+    const auto first_line_builder =
+        SpanBuilder<AtomicSpanSequence>(this, first_modifier_or_identifier_token);
+    OnModifierList(element->modifiers);
+    auto postscript = IngestUpTo(first_child_start_token);
+    if (postscript.has_value())
+      building_.top().push_back(std::move(postscript.value()));
+  }
 
   // We want to purposefully ignore this identifier, as it has already been captured by the prelude
   // to the StatementBuilder we created above.  By running this method now, we mark the Identifier
@@ -783,9 +824,12 @@ void SpanSequenceTreeVisitor::OnProtocolMethod(const std::unique_ptr<RawProtocol
   if (element->attributes != nullptr) {
     OnAttributeList(element->attributes);
   }
-
   const auto builder = StatementBuilder<AtomicSpanSequence>(
       this, element->start_token, SpanSequence::Position::kNewlineIndented);
+  if (element->modifiers != nullptr) {
+    OnModifierList(element->modifiers);
+  }
+
   if (element->maybe_request != nullptr) {
     const auto visiting_request = Visiting(this, VisitorKind::kProtocolRequest);
     // This is not an event - make sure to process the identifier into an AtomicSpanSequence with

@@ -13,6 +13,12 @@ library fuchsia.examples.docs;
 const ANSWER uint64 = 42;
 // [END arguments]
 
+// [START modifiers]
+type Color = strict(removed=2) flexible(added=2) enum {
+    RED = 1;
+};
+// [END modifiers]
+
 // [START inheritance]
 @available(added=2, deprecated=3)
 open protocol Versioned {
@@ -42,17 +48,23 @@ open protocol Example {
 };
 // [END deprecation]
 
-// [START replaced]
+// [START replace_constant]
 @available(replaced=5)
-type Color = strict enum {
-    RED = 1;
-};
+const MAX_NAME_LEN uint32 = 32;
 
 @available(added=5)
-type Color = flexible enum { // Note: flexible instead of strict
-    RED = 1;
+const MAX_NAME_LEN uint32 = 64;
+// [END replace_constant]
+
+// [START replace_member]
+type Data = resource table {
+    @available(replaced=5)
+    1: name string:32;
+
+    @available(added=5)
+    1: name string:64;
 };
-// [END replaced]
+// [END replace_member]
 
 // [START renamed]
 type User = table {

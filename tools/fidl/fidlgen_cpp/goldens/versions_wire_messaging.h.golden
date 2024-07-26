@@ -220,8 +220,7 @@ struct ::fidl::internal::WireServerDispatcher<::test_versions::Protocol> final {
  private:
   static const ::fidl::internal::MethodEntry entries_[];
   static const ::fidl::internal::MethodEntry* entries_end_;
-  static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
-      ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
+  static const ::fidl::internal::UnknownMethodHandlerEntry unknown_method_handler_entry_;
 };
 
 #endif  // __Fuchsia__
@@ -331,7 +330,7 @@ class [[nodiscard]] ::fidl::WireUnownedResult<::test_versions::Protocol::Foo> fi
 };
 
 template <>
-class ::fidl::internal::WireEventHandlerInterface<::test_versions::Protocol> : public ::fidl::internal::BaseEventHandlerInterface {
+class ::fidl::internal::WireEventHandlerInterface<::test_versions::Protocol> : public ::fidl::internal::BaseEventHandlerInterface, public ::fidl::UnknownEventHandler<::test_versions::Protocol> {
  public:
   WireEventHandlerInterface() = default;
   virtual ~WireEventHandlerInterface() = default;
@@ -362,6 +361,9 @@ class ::fidl::internal::WireEventDispatcher<::test_versions::Protocol> final : p
  public:
   explicit WireEventDispatcher(::fidl::internal::WireEventHandlerInterface<::test_versions::Protocol>* event_handler)
       : IncomingEventDispatcher(event_handler) {}
+  ::fidl::Status DispatchEvent(
+      ::fidl::IncomingHeaderAndMessage& msg,
+      ::fidl::internal::MessageStorageViewBase* storage_view) override;
 };
 
 // Methods to make a sync FIDL call directly on an unowned handle or a
@@ -405,7 +407,7 @@ class ::fidl::internal::WireSyncBufferClientImpl<::test_versions::Protocol> fina
 // This interface uses typed channels (i.e. |::fidl::ClientEnd<::test_versions::Protocol>|
 // and |::fidl::ServerEnd<::test_versions::Protocol>|).
 template <>
-class ::fidl::WireServer<::test_versions::Protocol> : public ::fidl::internal::IncomingMessageDispatcher {
+class ::fidl::WireServer<::test_versions::Protocol> : public ::fidl::internal::IncomingMessageDispatcher, public ::fidl::UnknownMethodHandler<::test_versions::Protocol> {
  public:
   WireServer() = default;
   virtual ~WireServer() = default;

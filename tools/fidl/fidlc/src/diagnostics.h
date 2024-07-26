@@ -60,10 +60,9 @@ constexpr ErrorDef<30, Token::KindAndSubkind, Token::KindAndSubkind> ErrCannotSp
     "cannot specify modifier {0} for {1}");
 constexpr ErrorDef<31, Token::KindAndSubkind> ErrCannotSpecifySubtype(
     "cannot specify subtype for {0}");
-constexpr ErrorDef<32, Token::KindAndSubkind> ErrDuplicateModifier(
-    "duplicate occurrence of modifier {0}");
-constexpr ErrorDef<33, Token::KindAndSubkind, Token::KindAndSubkind> ErrConflictingModifier(
-    "modifier {0} conflicts with modifier {1}");
+constexpr ErrorDef<32, const Modifier *> ErrDuplicateModifier("duplicate occurrence of {0}");
+constexpr ErrorDef<33, const Modifier *, const Modifier *> ErrConflictingModifier(
+    "{0} conflicts with {1}");
 constexpr ErrorDef<34, Element::Kind, std::string_view, Element::Kind, SourceSpan> ErrNameCollision(
     "{0} '{1}' has the same name as the {2} declared at {3}");
 constexpr ErrorDef<35, Element::Kind, std::string_view, Element::Kind, std::string_view, SourceSpan,
@@ -434,6 +433,11 @@ constexpr ErrorDef<217, const Element *, Version, AbiKind, AbiValue, AbiValue, S
         "{0} is marked replaced={1}, but its {2} ({3}) does not match the "
         "replacement's {2} ({4}) at {5}; use removed={1} if you intend to "
         "remove the ABI, otherwise use the same {2}");
+constexpr ErrorDef<218, const AttributeArg *> ErrInvalidModifierAvailableArgument(
+    "invalid argument '{0}'; only 'added' and 'removed' are allowed on modifier availabilities");
+constexpr ErrorDef<219> ErrCannotChangeMethodStrictness(
+    "changing the strictness of a two-way method without error syntax is not "
+    "allowed because it is ABI breaking");
 
 // To add a new error:
 //
@@ -664,6 +668,8 @@ static constexpr const DiagnosticDef *kAllDiagnosticDefs[] = {
     /* fi-0215 */ &ErrInvalidReplacedAndRenamed,
     /* fi-0216 */ &ErrInvalidRemovedAbi,
     /* fi-0217 */ &ErrInvalidReplacedAbi,
+    /* fi-0218 */ &ErrInvalidModifierAvailableArgument,
+    /* fi-0219 */ &ErrCannotChangeMethodStrictness,
 };
 
 // In reporter.h we assert that reported error IDs are <= kNumDiagnosticDefs.

@@ -18,9 +18,22 @@ void ResolveStep::RunImpl() {
   // In a single pass:
   // (1) parse all references into keys/contextuals;
   // (2) insert reference edges into the graph.
-  library()->TraverseElements([&](Element* element) {
+  library()->ForEachElement([&](Element* element) {
     VisitElement(element, Context(Context::Mode::kParseAndInsert, element));
   });
+
+  // Add edges from protocols to result unions to stop result unions from being
+  // shared between decomposed methods. This lets us mutate the result union (to
+  // remove the framework error) when compiling methods in the CompileStep. The
+  // edge has to come from the protocol, not the method, because in a protocol
+  // like `open(added=2) protocol Foo { Bar() -> () error uint32; }`, Bar ends
+  // up getting split at 2 even though 2 is not in Bar's set of points.
+  for (auto& protocol : library()->declarations.protocols) {
+    for (auto& method : protocol->methods) {
+      if (method.maybe_result_union)
+        graph_[protocol.get()].neighbors.insert(method.maybe_result_union);
+    }
+  }
 
   // Add all elements of this library to the graph, with membership edges.
   for (auto& entry : library()->declarations.all) {
@@ -29,7 +42,8 @@ void ResolveStep::RunImpl() {
     // initialize its points in the next loop, and (2) we can always recursively
     // look up a neighbor in the graph, even if it has out-degree zero.
     graph_.try_emplace(decl);
-    decl->ForEachMember([this, &decl](Element* member) { graph_[member].neighbors.insert(decl); });
+    decl->ForEachEdge(
+        [&](Element* parent, Element* child) { graph_[child].neighbors.insert(parent); });
   }
 
   // Initialize point sets for each element in the graph.
@@ -102,7 +116,7 @@ void ResolveStep::RunImpl() {
   library()->declarations = std::move(decomposed_declarations);
 
   // Resolve all references and validate them.
-  library()->TraverseElements([&](Element* element) {
+  library()->ForEachElement([&](Element* element) {
     VisitElement(element, Context(Context::Mode::kResolveAndValidate, element));
   });
 }
@@ -209,6 +223,7 @@ void ResolveStep::VisitElement(Element* element, Context context) {
     }
     case Element::Kind::kBuiltin:
     case Element::Kind::kLibrary:
+    case Element::Kind::kModifier:
     case Element::Kind::kProtocol:
     case Element::Kind::kService:
     case Element::Kind::kStruct:

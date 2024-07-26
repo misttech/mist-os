@@ -36,6 +36,8 @@ class VirtualSourceFile;
 
 struct Decl;
 struct Library;
+struct Modifier;
+struct ModifierList;
 struct RawIdentifier;
 struct RawOrdinal64;
 
@@ -56,30 +58,34 @@ using AbiValue = std::variant<uint64_t, int64_t, std::string_view>;
 
 struct Element {
   enum class Kind : uint8_t {
+    // Special
+    kLibrary,
+    kModifier,
+    // Decls
     kAlias,
     kBits,
-    kBitsMember,
     kBuiltin,
     kConst,
     kEnum,
-    kEnumMember,
-    kLibrary,
     kNewType,
+    kOverlay,
     kProtocol,
+    kResource,
+    kService,
+    kStruct,
+    kTable,
+    kUnion,
+    // Members
+    kBitsMember,
+    kEnumMember,
+    kOverlayMember,
     kProtocolCompose,
     kProtocolMethod,
-    kResource,
     kResourceProperty,
-    kService,
     kServiceMember,
-    kStruct,
     kStructMember,
-    kTable,
     kTableMember,
-    kUnion,
     kUnionMember,
-    kOverlay,
-    kOverlayMember,
   };
 
   Element(const Element&) = delete;
@@ -94,6 +100,12 @@ struct Element {
   bool IsDecl() const;
   // Asserts that this element is a decl.
   Decl* AsDecl();
+
+  // Returns the element's modifiers, or null if it has none.
+  ModifierList* GetModifiers();
+
+  // Runs a function on every modifier of the element, if it has any.
+  void ForEachModifier(const fit::function<void(Modifier*)>& fn);
 
   // Returns true if this is an anonymous layout (i.e. a layout not
   // directly bound to a type declaration as in `type Foo = struct { ... };`).
@@ -124,13 +136,13 @@ struct Decl : public Element {
     kConst,
     kEnum,
     kNewType,
+    kOverlay,
     kProtocol,
     kResource,
     kService,
     kStruct,
     kTable,
     kUnion,
-    kOverlay,
   };
 
   static Element::Kind ElementKind(Kind kind) {
@@ -170,9 +182,12 @@ struct Decl : public Element {
   const Kind kind;
   const Name name;
 
-  // Runs a function on every member of the decl, if it has any. Note that
-  // unlike Library::TraverseElements, it does not call `fn(this)`.
+  // Runs a function on every member of the decl, if it has any.
   void ForEachMember(const fit::function<void(Element*)>& fn);
+
+  // Calls fn(this, modifier) for all modifiers, fn(this, member) for all
+  // members, and fn(member, modifier) for all members that have modifiers.
+  void ForEachEdge(const fit::function<void(Element* parent, Element* child)>& fn);
 
   // Returns a clone of this decl for the given range, only including members
   // that intersect the range. Narrows the returned decl's availability, and its
@@ -189,6 +204,27 @@ struct Decl : public Element {
  private:
   // Helper to implement Split. Leaves the result's availability unset.
   virtual std::unique_ptr<Decl> SplitImpl(VersionRange range) const = 0;
+};
+
+struct Modifier final : public Element {
+  Modifier(std::unique_ptr<AttributeList> attributes, SourceSpan name, ModifierValue value)
+      : Element(Kind::kModifier, std::move(attributes)), name(name), value(value) {}
+  std::unique_ptr<Modifier> Clone() const;
+
+  SourceSpan name;
+  ModifierValue value;
+};
+
+// In the flat AST, "no modifiers" is represented by an ModifierList
+// containing an empty vector. (In the raw AST, null is used instead.)
+struct ModifierList final {
+  ModifierList() = default;
+  explicit ModifierList(std::vector<std::unique_ptr<Modifier>> modifiers)
+      : modifiers(std::move(modifiers)) {}
+
+  std::unique_ptr<ModifierList> Split(VersionRange range) const;
+
+  std::vector<std::unique_ptr<Modifier>> modifiers;
 };
 
 struct Builtin : public Decl {
@@ -459,20 +495,20 @@ struct Enum final : public TypeDecl {
     std::unique_ptr<Constant> value;
   };
 
-  Enum(std::unique_ptr<AttributeList> attributes, Name name,
-       std::unique_ptr<TypeConstructor> subtype_ctor, std::vector<Member> members,
-       Strictness strictness)
+  Enum(std::unique_ptr<AttributeList> attributes, std::unique_ptr<ModifierList> modifiers,
+       Name name, std::unique_ptr<TypeConstructor> subtype_ctor, std::vector<Member> members)
       : TypeDecl(Kind::kEnum, std::move(attributes), std::move(name)),
+        modifiers(std::move(modifiers)),
         subtype_ctor(std::move(subtype_ctor)),
-        members(std::move(members)),
-        strictness(strictness) {}
+        members(std::move(members)) {}
 
   // Set during construction.
+  std::unique_ptr<ModifierList> modifiers;
   std::unique_ptr<TypeConstructor> subtype_ctor;
   std::vector<Member> members;
-  const Strictness strictness;
 
   // Set during compilation.
+  std::optional<Strictness> strictness;
   const PrimitiveType* type = nullptr;
   // Set only for flexible enums, and either is set depending on signedness of
   // underlying enum type.
@@ -496,20 +532,20 @@ struct Bits final : public TypeDecl {
     std::unique_ptr<Constant> value;
   };
 
-  Bits(std::unique_ptr<AttributeList> attributes, Name name,
-       std::unique_ptr<TypeConstructor> subtype_ctor, std::vector<Member> members,
-       Strictness strictness)
+  Bits(std::unique_ptr<AttributeList> attributes, std::unique_ptr<ModifierList> modifiers,
+       Name name, std::unique_ptr<TypeConstructor> subtype_ctor, std::vector<Member> members)
       : TypeDecl(Kind::kBits, std::move(attributes), std::move(name)),
+        modifiers(std::move(modifiers)),
         subtype_ctor(std::move(subtype_ctor)),
-        members(std::move(members)),
-        strictness(strictness) {}
+        members(std::move(members)) {}
 
   // Set during construction.
+  std::unique_ptr<ModifierList> modifiers;
   std::unique_ptr<TypeConstructor> subtype_ctor;
   std::vector<Member> members;
-  const Strictness strictness;
 
   // Set during compilation.
+  std::optional<Strictness> strictness;
   uint64_t mask = 0;
 
  private:
@@ -556,14 +592,18 @@ struct Struct final : public TypeDecl {
     FieldShape field_shape;
   };
 
-  Struct(std::unique_ptr<AttributeList> attributes, Name name, std::vector<Member> members,
-         Resourceness resourceness)
+  Struct(std::unique_ptr<AttributeList> attributes, std::unique_ptr<ModifierList> modifiers,
+         Name name, std::vector<Member> members)
       : TypeDecl(Kind::kStruct, std::move(attributes), std::move(name)),
-        members(std::move(members)),
-        resourceness(resourceness) {}
+        modifiers(std::move(modifiers)),
+        members(std::move(members)) {}
 
+  // Set during construction.
+  std::unique_ptr<ModifierList> modifiers;
   std::vector<Member> members;
-  const Resourceness resourceness;
+
+  // Set during compilation.
+  std::optional<Resourceness> resourceness;
 
  private:
   std::unique_ptr<Decl> SplitImpl(VersionRange range) const override;
@@ -586,20 +626,21 @@ struct Table final : public TypeDecl {
     SourceSpan name;
   };
 
-  Table(std::unique_ptr<AttributeList> attributes, Name name, std::vector<Member> members,
-        Strictness strictness, Resourceness resourceness)
+  Table(std::unique_ptr<AttributeList> attributes, std::unique_ptr<ModifierList> modifiers,
+        Name name, std::vector<Member> members)
       : TypeDecl(Kind::kTable, std::move(attributes), std::move(name)),
-        members(std::move(members)),
-        strictness(strictness),
-        resourceness(resourceness) {
-    ZX_ASSERT_MSG(strictness == Strictness::kFlexible, "tables cannot be strict");
-  }
+        modifiers(std::move(modifiers)),
+        members(std::move(members)) {}
 
+  // Set during construction.
+  std::unique_ptr<ModifierList> modifiers;
   std::vector<Member> members;
+
+  // Set during compilation.
   // Tables are always flexible, but it simplifies generic code to also store
   // strictness on it (and we could implement strict tables in the future).
-  const Strictness strictness;
-  const Resourceness resourceness;
+  std::optional<Strictness> strictness;
+  std::optional<Resourceness> resourceness;
 
  private:
   std::unique_ptr<Decl> SplitImpl(VersionRange range) const override;
@@ -622,19 +663,18 @@ struct Union final : public TypeDecl {
     SourceSpan name;
   };
 
-  Union(std::unique_ptr<AttributeList> attributes, Name name, std::vector<Member> embers,
-        Strictness strictness, std::optional<Resourceness> resourceness)
+  Union(std::unique_ptr<AttributeList> attributes, std::unique_ptr<ModifierList> modifiers,
+        Name name, std::vector<Member> members)
       : TypeDecl(Kind::kUnion, std::move(attributes), std::move(name)),
-        members(std::move(embers)),
-        strictness(strictness),
-        resourceness(resourceness) {}
+        modifiers(std::move(modifiers)),
+        members(std::move(members)) {}
 
+  // Set during construction.
+  std::unique_ptr<ModifierList> modifiers;
   std::vector<Member> members;
-  const Strictness strictness;
 
-  // For user-defined unions, this is set on construction. For synthesized
-  // unions (in error result responses) it is set during compilation based on
-  // the unions's members.
+  // Set during compilation.
+  std::optional<Strictness> strictness;
   std::optional<Resourceness> resourceness;
 
  private:
@@ -658,16 +698,19 @@ struct Overlay final : public TypeDecl {
     SourceSpan name;
   };
 
-  Overlay(std::unique_ptr<AttributeList> attributes, Name name, std::vector<Member> members,
-          Strictness strictness, Resourceness resourceness)
+  Overlay(std::unique_ptr<AttributeList> attributes, std::unique_ptr<ModifierList> modifiers,
+          Name name, std::vector<Member> members)
       : TypeDecl(Kind::kOverlay, std::move(attributes), std::move(name)),
-        members(std::move(members)),
-        strictness(strictness),
-        resourceness(resourceness) {}
+        modifiers(std::move(modifiers)),
+        members(std::move(members)) {}
 
+  // Set during construction.
+  std::unique_ptr<ModifierList> modifiers;
   std::vector<Member> members;
-  const Strictness strictness;
-  const Resourceness resourceness;
+
+  // Set during compilation.
+  std::optional<Strictness> strictness;
+  std::optional<Resourceness> resourceness;
 
  private:
   std::unique_ptr<Decl> SplitImpl(VersionRange range) const override;
@@ -677,18 +720,20 @@ struct Protocol final : public Decl {
   struct Method : public Element {
     enum class Kind : uint8_t { kOneWay, kTwoWay, kEvent };
 
-    Method(std::unique_ptr<AttributeList> attributes, Kind kind, Strictness strictness,
-           SourceSpan name, std::unique_ptr<TypeConstructor> maybe_request,
-           std::unique_ptr<TypeConstructor> maybe_response, bool has_error)
+    Method(std::unique_ptr<AttributeList> attributes, std::unique_ptr<ModifierList> modifiers,
+           Kind kind, SourceSpan name, std::unique_ptr<TypeConstructor> maybe_request,
+           std::unique_ptr<TypeConstructor> maybe_response, const Union* maybe_result_union,
+           bool has_error)
         : Element(Element::Kind::kProtocolMethod, std::move(attributes)),
+          modifiers(std::move(modifiers)),
           kind(kind),
-          strictness(strictness),
           name(name),
           maybe_request(std::move(maybe_request)),
           maybe_response(std::move(maybe_response)),
+          maybe_result_union(maybe_result_union),
           has_error(has_error) {}
 
-    Method Clone() const;
+    Method Clone(VersionRange range) const;
 
     enum ResultUnionOrdinal : uint64_t {
       kSuccess = 1,
@@ -696,17 +741,18 @@ struct Protocol final : public Decl {
       kFrameworkError = 3,
     };
 
+    std::unique_ptr<ModifierList> modifiers;
     Kind kind;
-    Strictness strictness;
     SourceSpan name;
     std::unique_ptr<TypeConstructor> maybe_request;
     std::unique_ptr<TypeConstructor> maybe_response;
+    const Union* maybe_result_union;
     bool has_error;
 
     // Set during compilation
+    std::optional<Strictness> strictness;
     std::string selector;
     uint64_t ordinal = 0;
-    const Union* result_union = nullptr;
     const TypeConstructor* result_success_type_ctor = nullptr;
     const TypeConstructor* result_domain_error_type_ctor = nullptr;
   };
@@ -730,18 +776,20 @@ struct Protocol final : public Decl {
     const ComposedProtocol* composed;
   };
 
-  Protocol(std::unique_ptr<AttributeList> attributes, Openness openness, Name name,
-           std::vector<ComposedProtocol> composed_protocols, std::vector<Method> methods)
+  Protocol(std::unique_ptr<AttributeList> attributes, std::unique_ptr<ModifierList> modifiers,
+           Name name, std::vector<ComposedProtocol> composed_protocols, std::vector<Method> methods)
       : Decl(Kind::kProtocol, std::move(attributes), std::move(name)),
-        openness(openness),
+        modifiers(std::move(modifiers)),
         composed_protocols(std::move(composed_protocols)),
         methods(std::move(methods)) {}
 
-  Openness openness;
+  // Set during construction.
+  std::unique_ptr<ModifierList> modifiers;
   std::vector<ComposedProtocol> composed_protocols;
   std::vector<Method> methods;
 
   // Set during compilation.
+  std::optional<Openness> openness;
   std::vector<MethodWithInfo> all_methods;
 
  private:
@@ -889,7 +937,7 @@ struct Library final : public Element {
 
   // Runs a function on every element in the library via depth-first traversal.
   // Runs it on the library itself, on all Decls, and on all their members.
-  void TraverseElements(const fit::function<void(Element*)>& fn);
+  void ForEachElement(const fit::function<void(Element*)>& fn);
 
   struct Declarations {
     // Inserts a declaration. When inserting builtins, this must be called in
