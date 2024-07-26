@@ -29,7 +29,10 @@ assembled_system("zedboot_assembly") {
   generate_vbmeta = use_vbmeta
   use_bringup_platform_bundles_only = true
   product_assembly_config_label = _product_config
-  board_config_label = board_configuration_label
+
+  # Use the same board configuration for zedboot that's used for recovery (this defaults to the
+  # non-recovery board).
+  board_config_label = recovery_board_configuration_label
 
   # Bazel assembly should not depend on any targets from GN assembly other
   # than the legacy AIB.
