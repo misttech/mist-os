@@ -7149,6 +7149,18 @@ variables whose default values are set by the chosen RBE mode (above).
 
 From //build/toolchain/rbe_modes.gni:38
 
+### recovery_board_configuration_label
+
+Possibly use a different configuration for recovery than for the main
+product.  By default, use the same board.
+
+This is a separate declare_args() block so that it can default to the
+provided value for 'board_configuration_label'
+
+**Current value (from the default):** `"//boards/arm64"`
+
+From //build/board.gni:84
+
 ### recovery_label
 
 Allows a product to specify the recovery image used in the zirconr slot.
