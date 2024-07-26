@@ -38,17 +38,6 @@ void RemoteDir::OpenRemote(fio::OpenFlags flags, fio::ModeType mode, fidl::Strin
                         ", response=", status.FormatDescription());
 }
 
-void RemoteDir::OpenRemote(fuchsia_io::wire::Directory2Open2Request request) const {
-  // We consume the |request| channel when making the wire call to the remote end, so on failure
-  // there isn't anywhere for us to propagate the error.
-  [[maybe_unused]] auto status =
-      fidl::WireCall(remote_client_)
-          ->Open2(request.path, request.protocols, std::move(request.object_request));
-  FS_PRETTY_TRACE_DEBUG("RemoteDir::OpenRemote: path='", request.path,
-                        "', protocols=", request.protocols,
-                        ", response=", status.FormatDescription());
-}
-
 #if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
 void RemoteDir::OpenRemote(fuchsia_io::wire::Directory2Open3Request request) const {
   // We consume the |request| channel when making the wire call to the remote end, so on failure

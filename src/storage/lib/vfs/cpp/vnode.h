@@ -199,10 +199,6 @@ class Vnode : public VnodeRefCounted<Vnode>, public fbl::Recyclable<Vnode> {
   virtual void OpenRemote(fuchsia_io::OpenFlags, fuchsia_io::ModeType, fidl::StringView,
                           fidl::ServerEnd<fuchsia_io::Node>) const;
 
-  // If |IsRemote()| returns true, requests to open this Vnode using fuchsia.io/Directory.Open2 will
-  // be forwarded to this function.
-  virtual void OpenRemote(fuchsia_io::wire::Directory2Open2Request request) const;
-
 #if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
   virtual void OpenRemote(fuchsia_io::wire::Directory2Open3Request request) const;
 #endif

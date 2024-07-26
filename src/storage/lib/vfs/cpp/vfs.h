@@ -63,12 +63,8 @@ class Vfs {
   OpenResult Open(fbl::RefPtr<Vnode> vn, std::string_view path, VnodeConnectionOptions options,
                   fuchsia_io::Rights connection_rights) __TA_EXCLUDES(vfs_lock_);
 
-  // Traverse the path to the target node, and create or open it.
-  zx::result<Open2Result> Open2(fbl::RefPtr<Vnode> vndir, std::string_view path,
-                                const fuchsia_io::wire::ConnectionProtocols& protocols,
-                                fuchsia_io::Rights connection_rights) __TA_EXCLUDES(vfs_lock_);
-
 #if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+  // Traverse the path to the target node, and create or open it.
   zx::result<Open2Result> Open3(fbl::RefPtr<Vnode> vndir, std::string_view path,
                                 fuchsia_io::Flags flags, const fuchsia_io::wire::Options* options,
                                 fuchsia_io::Rights connection_rights) __TA_EXCLUDES(vfs_lock_);
