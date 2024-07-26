@@ -38,7 +38,7 @@ async fn serve_realm_factory(stream: RealmFactoryRequestStream) {
 async fn handle_request_stream(mut stream: RealmFactoryRequestStream) -> Result<()> {
     let mut task_group = fasync::TaskGroup::new();
     let mut realms = vec![];
-    let mut dict_id = 1;
+    let id_gen = sandbox::CapabilityIdGenerator::new();
     let store = client::connect_to_protocol::<fsandbox::CapabilityStoreMarker>().unwrap();
     loop {
         match stream.try_next().await {
@@ -66,6 +66,7 @@ async fn handle_request_stream(mut stream: RealmFactoryRequestStream) -> Result<
                         Ok(realm) => {
                             let dict_ref =
                                 realm.root.controller().get_exposed_dictionary().await?.unwrap();
+                            let dict_id = id_gen.next();
                             store
                                 .import(dict_id, fsandbox::Capability::Dictionary(dict_ref))
                                 .await
@@ -76,7 +77,6 @@ async fn handle_request_stream(mut stream: RealmFactoryRequestStream) -> Result<
                                 .await
                                 .unwrap()
                                 .unwrap();
-                            dict_id += 1;
                             realms.push(realm);
                             responder.send(Ok(()))?;
                         }

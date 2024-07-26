@@ -21,9 +21,10 @@ async fn main() {
     // [START init]
     let factory = client::connect_to_protocol::<fsandbox::FactoryMarker>().unwrap();
     let store = client::connect_to_protocol::<fsandbox::CapabilityStoreMarker>().unwrap();
+    let id_gen = sandbox::CapabilityIdGenerator::new();
 
     // Create a dictionary
-    let dict_id = 1;
+    let dict_id = id_gen.next();
     store.dictionary_create(dict_id).await.unwrap().unwrap();
 
     // Add 3 Echo servers to the dictionary
@@ -31,7 +32,7 @@ async fn main() {
     for i in 1..=3 {
         let (receiver, receiver_stream) =
             endpoints::create_request_stream::<fsandbox::ReceiverMarker>().unwrap();
-        let connector_id = 100 + i;
+        let connector_id = id_gen.next();
         let sender = factory.create_connector(receiver).await.unwrap();
         store.import(connector_id, fsandbox::Capability::Connector(sender)).await.unwrap().unwrap();
         store
@@ -57,6 +58,7 @@ async fn main() {
     fs.take_and_serve_directory_handle().unwrap();
     fs.for_each_concurrent(None, move |request: IncomingRequest| {
         let store = store.clone();
+        let id_gen = id_gen.clone();
         async move {
             match request {
                 IncomingRequest::Router(mut stream) => {
@@ -64,7 +66,7 @@ async fn main() {
                         match request {
                             fsandbox::RouterRequest::Route { payload: _, responder } => {
                                 // [START export]
-                                let dup_dict_id = dict_id + 1;
+                                let dup_dict_id = id_gen.next();
                                 store.duplicate(dict_id, dup_dict_id).await.unwrap().unwrap();
                                 let capability = store.export(dup_dict_id).await.unwrap().unwrap();
                                 // [END export]

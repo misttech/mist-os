@@ -20,6 +20,7 @@ rustc_test("test_bin") {
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
+    "//src/lib/sandbox",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:tracing",
   ]

@@ -112,8 +112,9 @@ mod tests {
     async fn create() {
         let (store, stream) = create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>().unwrap();
         let _server = fasync::Task::spawn(serve_capability_store(stream));
+        let id_gen = sandbox::CapabilityIdGenerator::new();
 
-        let dict_id = 1;
+        let dict_id = id_gen.next();
         assert_matches!(store.dictionary_create(dict_id).await.unwrap(), Ok(()));
         assert_matches!(
             store.dictionary_create(dict_id).await.unwrap(),
@@ -401,19 +402,20 @@ mod tests {
     #[fuchsia::test]
     async fn read() {
         let dict = Dict::new();
+        let id_gen = sandbox::CapabilityIdGenerator::new();
 
         let (store, stream) = create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>().unwrap();
         let _server = fasync::Task::spawn(serve_capability_store(stream));
         let dict_ref = Capability::Dictionary(dict).into();
-        let dict_id = 1;
+        let dict_id = id_gen.next();
         store.import(dict_id, dict_ref).await.unwrap().unwrap();
 
         // Create two Data capabilities.
         let mut data_caps = vec![];
         for i in 1..3 {
-            let value = 10 + i;
-            store.import(value, Data::Int64(i.try_into().unwrap()).into()).await.unwrap().unwrap();
-            data_caps.push(value);
+            let id = id_gen.next();
+            store.import(id, Data::Int64(i.try_into().unwrap()).into()).await.unwrap().unwrap();
+            data_caps.push(id);
         }
 
         // Add the Data capabilities to the dict.
@@ -435,10 +437,10 @@ mod tests {
             .unwrap();
         let (ch, _) = fidl::Channel::create();
         let handle = ch.into_handle();
-        let value = 20;
-        store.import(value, fsandbox::Capability::Handle(handle)).await.unwrap().unwrap();
+        let id = id_gen.next();
+        store.import(id, fsandbox::Capability::Handle(handle)).await.unwrap().unwrap();
         store
-            .dictionary_insert(dict_id, &fsandbox::DictionaryItem { key: "cap3".into(), value })
+            .dictionary_insert(dict_id, &fsandbox::DictionaryItem { key: "cap3".into(), value: id })
             .await
             .unwrap()
             .unwrap();
@@ -608,6 +610,8 @@ mod tests {
         const EXPECTED_CHUNK_LENGTHS: &[u32] =
             &[fsandbox::MAX_DICTIONARY_ITERATOR_CHUNK, fsandbox::MAX_DICTIONARY_ITERATOR_CHUNK, 1];
 
+        let id_gen = sandbox::CapabilityIdGenerator::new();
+
         // Create a Dict with [NUM_ENTRIES] entries that have Unit values.
         let dict = Dict::new();
         for i in 0..NUM_ENTRIES {
@@ -618,7 +622,7 @@ mod tests {
         let (store, stream) = create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>().unwrap();
         let _server = fasync::Task::spawn(serve_capability_store(stream));
         let dict_ref = Capability::Dictionary(dict.clone()).into();
-        let dict_id = 1;
+        let dict_id = id_gen.next();
         store.import(dict_id, dict_ref).await.unwrap().unwrap();
 
         let (key_iterator, server_end) = create_proxy().unwrap();

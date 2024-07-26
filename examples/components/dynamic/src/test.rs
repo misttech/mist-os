@@ -34,11 +34,11 @@ async fn send_single_response_and_exit(
 
 async fn create_dictionary_with_receiver(
     store: &fsandbox::CapabilityStoreProxy,
-    next_id: u64,
+    id_gen: &sandbox::CapabilityIdGenerator,
     connector: fsandbox::Connector,
 ) -> fsandbox::DictionaryRef {
-    let dict_id = next_id;
-    let connector_id = next_id + 1;
+    let dict_id = id_gen.next();
+    let connector_id = id_gen.next();
 
     store.dictionary_create(dict_id).await.unwrap().unwrap();
     store.import(connector_id, fsandbox::Capability::Connector(connector)).await.unwrap().unwrap();
@@ -65,7 +65,7 @@ async fn create_child_with_specialized_name(
     store: &fsandbox::CapabilityStoreProxy,
     factory: &fsandbox::FactoryProxy,
     realm: &fidl_fuchsia_component::RealmProxy,
-    next_id: u64,
+    id_gen: &sandbox::CapabilityIdGenerator,
     name: String,
 ) {
     // Create our connector.
@@ -74,7 +74,7 @@ async fn create_child_with_specialized_name(
     let connector = factory.create_connector(receiver).await.unwrap();
 
     // Create our dictionary
-    let dict_ref = create_dictionary_with_receiver(&store, next_id, connector).await;
+    let dict_ref = create_dictionary_with_receiver(&store, id_gen, connector).await;
     tracing::info!("Populated the dictionary");
 
     // Create our child and supply it with the protocol in the form of a
@@ -106,7 +106,8 @@ async fn create_child() {
     let factory = client::connect_to_protocol::<fsandbox::FactoryMarker>().unwrap();
     let store = client::connect_to_protocol::<fsandbox::CapabilityStoreMarker>().unwrap();
     let realm = client::connect_to_protocol::<fidl_fuchsia_component::RealmMarker>().unwrap();
+    let id_gen = sandbox::CapabilityIdGenerator::new();
 
-    create_child_with_specialized_name(&store, &factory, &realm, 1, "child-a".into()).await;
-    create_child_with_specialized_name(&store, &factory, &realm, 3, "child-b".into()).await;
+    create_child_with_specialized_name(&store, &factory, &realm, &id_gen, "child-a".into()).await;
+    create_child_with_specialized_name(&store, &factory, &realm, &id_gen, "child-b".into()).await;
 }

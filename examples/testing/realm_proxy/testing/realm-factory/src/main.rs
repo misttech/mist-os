@@ -27,7 +27,7 @@ async fn main() -> Result<(), Error> {
 async fn serve_realm_factory(mut stream: RealmFactoryRequestStream) {
     let mut task_group = fasync::TaskGroup::new();
     let store = client::connect_to_protocol::<fsandbox::CapabilityStoreMarker>().unwrap();
-    let mut next_id = 1;
+    let id_gen = sandbox::CapabilityIdGenerator::new();
     let result: Result<(), Error> = async move {
         while let Ok(Some(request)) = stream.try_next().await {
             match request {
@@ -38,15 +38,13 @@ async fn serve_realm_factory(mut stream: RealmFactoryRequestStream) {
                     // Get a dict containing the capabilities exposed by the realm.
                     let exposed_dict =
                         realm.root.controller().get_exposed_dictionary().await?.unwrap();
-                    let source_dict_id = next_id;
-                    next_id += 1;
+                    let source_dict_id = id_gen.next();
                     store
                         .import(source_dict_id, fsandbox::Capability::Dictionary(exposed_dict))
                         .await
                         .unwrap()
                         .unwrap();
-                    let dict_id = next_id;
-                    next_id += 1;
+                    let dict_id = id_gen.next();
                     store.dictionary_copy(source_dict_id, dict_id).await?.unwrap();
 
                     // Mix in additional capabilities to the dict.
@@ -68,8 +66,7 @@ async fn serve_realm_factory(mut stream: RealmFactoryRequestStream) {
                         endpoints::create_request_stream::<fsandbox::ReceiverMarker>()?;
                     let echo_connector_client =
                         factory.create_connector(echo_receiver_client).await?;
-                    let value = next_id;
-                    next_id += 1;
+                    let value = id_gen.next();
                     store
                         .import(value, fsandbox::Capability::Connector(echo_connector_client))
                         .await?
