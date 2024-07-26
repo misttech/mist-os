@@ -48,6 +48,7 @@
 #include "src/graphics/display/drivers/intel-i915/dp-display.h"
 #include "src/graphics/display/drivers/intel-i915/dpll.h"
 #include "src/graphics/display/drivers/intel-i915/fuse-config.h"
+#include "src/graphics/display/drivers/intel-i915/hardware-common.h"
 #include "src/graphics/display/drivers/intel-i915/hdmi-display.h"
 #include "src/graphics/display/drivers/intel-i915/pch-engine.h"
 #include "src/graphics/display/drivers/intel-i915/pci-ids.h"
@@ -1831,7 +1832,8 @@ void Controller::DisplayEngineApplyConfiguration(const display_config_t* banjo_d
                                                  size_t display_config_count,
                                                  const config_stamp_t* banjo_config_stamp) {
   fbl::AutoLock lock(&display_lock_);
-  display::DisplayId fake_vsync_display_ids[display_devices_.size() + 1];
+  ZX_DEBUG_ASSERT(display_devices_.size() <= kMaximumConnectedDisplayCount);
+  display::DisplayId fake_vsync_display_ids[kMaximumConnectedDisplayCount];
   size_t fake_vsync_size = 0;
 
   cpp20::span<const display_config_t> banjo_display_configs_span(banjo_display_configs,

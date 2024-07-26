@@ -216,6 +216,12 @@ std::string EdpDpcdRevisionToString(dpcd::EdpRevision rev) {
   return "unknown";
 }
 
+// DisplayPort 2.1 supports up to 4 main link lanes.
+//
+// VESA DisplayPort (DP) Standard. Version 2.1. 10 October, 2022.
+// Section 2.1.1 "Number of Lanes and Per-lane Data Rate in SST and MST Modes".
+constexpr int kMaxDisplayPortLaneCount = 4;
+
 }  // namespace
 
 zx::result<DdiAuxChannel::ReplyInfo> DpAux::DoTransaction(const DdiAuxChannel::Request& request,
@@ -659,7 +665,7 @@ bool DpDisplay::DpcdRequestLinkTraining(const dpcd::TrainingPatternSet& tp_set,
   // registers with a single operation: "The AUX CH burst write must be
   // used for writing to TRAINING_LANEx_SET bytes of the enabled lanes."
   // (From section 3.5.1.3, "Link Training", in v1.1a.)
-  uint8_t reg_bytes[1 + dp_lane_count_];
+  uint8_t reg_bytes[1 + kMaxDisplayPortLaneCount];
   reg_bytes[0] = static_cast<uint8_t>(tp_set.reg_value());
   for (unsigned i = 0; i < dp_lane_count_; i++) {
     reg_bytes[i + 1] = static_cast<uint8_t>(lane[i].reg_value());
@@ -682,8 +688,9 @@ template <uint32_t addr, typename T>
 bool DpDisplay::DpcdReadPairedRegs(hwreg::RegisterBase<T, typename T::ValueType>* regs) {
   static_assert(addr == dpcd::DPCD_LANE0_1_STATUS || addr == dpcd::DPCD_ADJUST_REQUEST_LANE0_1,
                 "Bad register address");
+  constexpr int kMaximumRegisterSize = 2;
   uint32_t num_bytes = dp_lane_count_ == 4 ? 2 : 1;
-  uint8_t reg_byte[num_bytes];
+  uint8_t reg_byte[kMaximumRegisterSize];
   if (!DpcdRead(addr, reg_byte, num_bytes)) {
     FDF_LOG(ERROR, "Failure reading addr %d", addr);
     return false;
@@ -1394,8 +1401,8 @@ bool DpDisplay::LinkTrainingStage1(dpcd::TrainingPatternSet* tp_set, dpcd::Train
   tp_set->set_training_pattern_set(tp_set->kTrainingPattern1);
   tp_set->set_scrambling_disable(1);
 
-  dpcd::AdjustRequestLane adjust_req[dp_lane_count_];
-  dpcd::LaneStatus lane_status[dp_lane_count_];
+  dpcd::AdjustRequestLane adjust_req[kMaxDisplayPortLaneCount];
+  dpcd::LaneStatus lane_status[kMaxDisplayPortLaneCount];
 
   int poll_count = 0;
   auto delay =
@@ -1446,8 +1453,8 @@ bool DpDisplay::LinkTrainingStage1(dpcd::TrainingPatternSet* tp_set, dpcd::Train
 bool DpDisplay::LinkTrainingStage2(dpcd::TrainingPatternSet* tp_set, dpcd::TrainingLaneSet* lanes) {
   ZX_ASSERT(capabilities_);
 
-  dpcd::AdjustRequestLane adjust_req[dp_lane_count_];
-  dpcd::LaneStatus lane_status[dp_lane_count_];
+  dpcd::AdjustRequestLane adjust_req[kMaxDisplayPortLaneCount];
+  dpcd::LaneStatus lane_status[kMaxDisplayPortLaneCount];
 
   if (is_tgl(controller()->device_id())) {
     auto dp_transport_control =
@@ -1615,7 +1622,7 @@ bool DpDisplay::DoLinkTraining() {
   }
   if (result) {
     dpcd::TrainingPatternSet tp_set;
-    dpcd::TrainingLaneSet lanes[dp_lane_count_];
+    dpcd::TrainingLaneSet lanes[kMaxDisplayPortLaneCount];
     result &= LinkTrainingStage1(&tp_set, lanes);
     result &= LinkTrainingStage2(&tp_set, lanes);
   }
@@ -1741,6 +1748,7 @@ bool DpDisplay::Query() {
     }
   }
 
+  ZX_DEBUG_ASSERT(lane_count <= kMaxDisplayPortLaneCount);
   dp_lane_count_ = lane_count;
   dp_lane_count_inspect_.Set(lane_count);
 
