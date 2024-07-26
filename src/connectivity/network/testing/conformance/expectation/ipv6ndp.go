@@ -101,7 +101,10 @@ var ipv6ndpExpectations map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumber]
 	{24, 9}:  Pass,
 	{24, 10}: Pass,
 	{24, 11}: Pass,
-	{25, 1}:  Pass,
+	// TODO(https://fxbug.dev/355217224): Temporary address generation gets in
+	// the way of this test. If we end up implementing disable for netstack2
+	// this can be flipped back to Pass.
+	{25, 1}:  Flaky,
 	{25, 2}:  Fail,
 	{26, 1}:  Pass,
 	{26, 2}:  Pass,
