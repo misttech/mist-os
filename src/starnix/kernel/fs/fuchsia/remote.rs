@@ -821,13 +821,7 @@ impl FsNodeOps for RemoteNode {
         fs_ops.supports_open3
     }
 
-    fn update_attributes(
-        &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
-        _current_task: &CurrentTask,
-        info: &FsNodeInfo,
-        has: zxio_node_attr_has_t,
-    ) -> Result<(), Errno> {
+    fn update_attributes(&self, info: &FsNodeInfo, has: zxio_node_attr_has_t) -> Result<(), Errno> {
         // Omit updating creation_time. By definition, there shouldn't be a change in creation_time.
         let mutable_node_attributes = zxio_node_attributes_t {
             modification_time: info.time_modify.into_nanos() as u64,
@@ -2430,7 +2424,7 @@ mod test {
                     // Change the mode, this change should persist
                     file.entry
                         .node
-                        .chmod(locked, &current_task, &file.mount, MODE | FileMode::ALLOW_ALL)
+                        .chmod(&current_task, &file.mount, MODE | FileMode::ALLOW_ALL)
                         .expect("chmod failed");
                 }
             })
@@ -2809,7 +2803,6 @@ mod test {
                         .entry
                         .node
                         .update_atime_mtime(
-                            locked,
                             &current_task,
                             &child.mount,
                             TimeUpdateType::Time(zx::Time::from_nanos(30)),
@@ -2829,7 +2822,6 @@ mod test {
                         .entry
                         .node
                         .update_atime_mtime(
-                            locked,
                             &current_task,
                             &child.mount,
                             TimeUpdateType::Omit,
