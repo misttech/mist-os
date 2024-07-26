@@ -10,7 +10,7 @@ use fidl_fuchsia_power_broker::{self as fbroker, LeaseStatus};
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_zircon::{self as zx, HandleBased};
 use futures::channel::mpsc;
-use futures::StreamExt;
+use futures::{FutureExt, StreamExt};
 use power_broker_client::{basic_update_fn_factory, run_power_element, PowerElementContext};
 use realm_proxy_client::RealmProxyClient;
 use std::collections::HashMap;
@@ -1161,10 +1161,12 @@ async fn test_activity_governor_suspends_after_listener_hanging_on_resume() -> R
         .await
         .unwrap();
 
+    let (on_suspend_started_tx, mut on_suspend_started_rx) = mpsc::channel(1);
     let (on_suspend_tx, mut on_suspend_rx) = mpsc::channel(1);
     let (on_resume_tx, mut on_resume_rx) = mpsc::channel(1);
 
     fasync::Task::local(async move {
+        let mut on_suspend_started_tx = on_suspend_started_tx;
         let mut on_suspend_tx = on_suspend_tx;
         let mut on_resume_tx = on_resume_tx;
 
@@ -1178,6 +1180,10 @@ async fn test_activity_governor_suspends_after_listener_hanging_on_resume() -> R
                 }
                 fsystem::ActivityGovernorListenerRequest::OnSuspend { .. } => {
                     on_suspend_tx.try_send(()).unwrap();
+                }
+                fsystem::ActivityGovernorListenerRequest::OnSuspendStarted { responder } => {
+                    responder.send().unwrap();
+                    on_suspend_started_tx.try_send(()).unwrap();
                 }
                 fsystem::ActivityGovernorListenerRequest::OnSuspendFail { responder } => {
                     responder.send().unwrap();
@@ -1198,6 +1204,7 @@ async fn test_activity_governor_suspends_after_listener_hanging_on_resume() -> R
 
     // OnSuspend and OnResume should have been called once.
     on_suspend_rx.next().await.unwrap();
+    on_suspend_started_rx.next().await.unwrap();
 
     assert_eq!(0, suspend_device.await_suspend().await.unwrap().unwrap().state_index.unwrap());
     suspend_device
@@ -1267,6 +1274,80 @@ async fn test_activity_governor_suspends_after_listener_hanging_on_resume() -> R
 }
 
 #[fuchsia::test]
+async fn test_activity_governor_does_not_suspend_while_on_suspend_started_hangs() -> Result<()> {
+    let (realm, _) = create_realm().await?;
+    let suspend_device = realm.connect_to_protocol::<tsc::DeviceMarker>().await?;
+    set_up_default_suspender(&suspend_device).await;
+
+    let stats = realm.connect_to_protocol::<fsuspend::StatsMarker>().await?;
+    let activity_governor = realm.connect_to_protocol::<fsystem::ActivityGovernorMarker>().await?;
+
+    // First watch should return immediately with default values.
+    let current_stats = stats.watch().await?;
+    assert_eq!(Some(0), current_stats.success_count);
+    assert_eq!(Some(0), current_stats.fail_count);
+    assert_eq!(None, current_stats.last_failed_error);
+    assert_eq!(None, current_stats.last_time_in_suspend);
+
+    let (listener_client_end, mut listener_stream) =
+        fidl::endpoints::create_request_stream().unwrap();
+    activity_governor
+        .register_listener(fsystem::ActivityGovernorRegisterListenerRequest {
+            listener: Some(listener_client_end),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+
+    let (on_suspend_started_tx, mut on_suspend_started_rx) = mpsc::channel(1);
+    fasync::Task::local(async move {
+        let mut on_suspend_started_tx = on_suspend_started_tx;
+        let mut _on_suspend_started_responder;
+
+        while let Some(Ok(req)) = listener_stream.next().await {
+            match req {
+                fsystem::ActivityGovernorListenerRequest::OnResume { responder } => {
+                    responder.send().unwrap();
+                }
+                fsystem::ActivityGovernorListenerRequest::OnSuspend { .. } => (),
+                fsystem::ActivityGovernorListenerRequest::OnSuspendStarted { responder } => {
+                    _on_suspend_started_responder = responder;
+                    on_suspend_started_tx.try_send(()).unwrap();
+                }
+                fsystem::ActivityGovernorListenerRequest::OnSuspendFail { responder } => {
+                    responder.send().unwrap();
+                }
+                fsystem::ActivityGovernorListenerRequest::_UnknownMethod { ordinal, .. } => {
+                    panic!("Unexpected method: {}", ordinal);
+                }
+            }
+        }
+    })
+    .detach();
+
+    // Queue up a callback from `suspend_device`, to let us know when
+    // SAG requests to suspend the hardware.
+    let await_suspend = suspend_device.await_suspend();
+
+    // Cycle execution_state power level to make SAG start suspending.
+    {
+        let suspend_controller = create_suspend_topology(&realm).await?;
+        lease(&suspend_controller, 1).await?;
+    }
+
+    // Wait to receive the OnSuspendStarted() callback.
+    on_suspend_started_rx.next().await.unwrap();
+
+    // Give SAG some time to take any further suspend actions.
+    fasync::Timer::new(fasync::Duration::from_millis(1000)).await;
+
+    // Verify that SAG did _not_ suspend the hardware (because we did not
+    // respond to the callback).
+    assert!(await_suspend.now_or_never().is_none());
+    Ok(())
+}
+
+#[fuchsia::test]
 async fn test_activity_governor_handles_listener_raising_power_levels() -> Result<()> {
     let (realm, activity_governor_moniker) = create_realm().await?;
     let suspend_device = realm.connect_to_protocol::<tsc::DeviceMarker>().await?;
@@ -1287,10 +1368,12 @@ async fn test_activity_governor_handles_listener_raising_power_levels() -> Resul
         .await
         .unwrap();
 
+    let (on_suspend_started_tx, mut on_suspend_started_rx) = mpsc::channel(1);
     let (on_suspend_tx, mut on_suspend_rx) = mpsc::channel(1);
     let (on_resume_tx, mut on_resume_rx) = mpsc::channel(1);
 
     fasync::Task::local(async move {
+        let mut on_suspend_started_tx = on_suspend_started_tx;
         let mut on_suspend_tx = on_suspend_tx;
         let mut on_resume_tx = on_resume_tx;
 
@@ -1303,6 +1386,10 @@ async fn test_activity_governor_handles_listener_raising_power_levels() -> Resul
                 }
                 fsystem::ActivityGovernorListenerRequest::OnSuspend { .. } => {
                     on_suspend_tx.try_send(()).unwrap();
+                }
+                fsystem::ActivityGovernorListenerRequest::OnSuspendStarted { responder } => {
+                    responder.send().unwrap();
+                    on_suspend_started_tx.try_send(()).unwrap();
                 }
                 fsystem::ActivityGovernorListenerRequest::OnSuspendFail { responder } => {
                     responder.send().unwrap();
@@ -1319,6 +1406,7 @@ async fn test_activity_governor_handles_listener_raising_power_levels() -> Resul
 
     // OnSuspend should have been called.
     on_suspend_rx.next().await.unwrap();
+    on_suspend_started_rx.next().await.unwrap();
 
     assert_eq!(0, suspend_device.await_suspend().await.unwrap().unwrap().state_index.unwrap());
     suspend_device
@@ -1380,6 +1468,7 @@ async fn test_activity_governor_handles_listener_raising_power_levels() -> Resul
 
     // OnSuspend should be called again.
     on_suspend_rx.next().await.unwrap();
+    on_suspend_started_rx.next().await.unwrap();
 
     assert_eq!(0, suspend_device.await_suspend().await.unwrap().unwrap().state_index.unwrap());
     suspend_device
@@ -1467,10 +1556,12 @@ async fn test_activity_governor_handles_suspend_failure() -> Result<()> {
         .await
         .unwrap();
 
+    let (on_suspend_started_tx, mut on_suspend_started_rx) = mpsc::channel(1);
     let (on_suspend_tx, mut on_suspend_rx) = mpsc::channel(1);
     let (on_suspend_fail_tx, mut on_suspend_fail_rx) = mpsc::channel(1);
 
     fasync::Task::local(async move {
+        let mut on_suspend_started_tx = on_suspend_started_tx;
         let mut on_suspend_tx = on_suspend_tx;
         let mut on_suspend_fail_tx = on_suspend_fail_tx;
 
@@ -1481,6 +1572,10 @@ async fn test_activity_governor_handles_suspend_failure() -> Result<()> {
                 }
                 fsystem::ActivityGovernorListenerRequest::OnSuspend { .. } => {
                     on_suspend_tx.try_send(()).unwrap();
+                }
+                fsystem::ActivityGovernorListenerRequest::OnSuspendStarted { responder } => {
+                    responder.send().unwrap();
+                    on_suspend_started_tx.try_send(()).unwrap();
                 }
                 fsystem::ActivityGovernorListenerRequest::OnSuspendFail { responder } => {
                     let suspend_lease = lease(&suspend_controller, 1).await.unwrap();
@@ -1499,6 +1594,7 @@ async fn test_activity_governor_handles_suspend_failure() -> Result<()> {
 
     // OnSuspend should have been called.
     on_suspend_rx.next().await.unwrap();
+    on_suspend_started_rx.next().await.unwrap();
 
     assert_eq!(0, suspend_device.await_suspend().await.unwrap().unwrap().state_index.unwrap());
     suspend_device
@@ -1559,6 +1655,7 @@ async fn test_activity_governor_handles_suspend_failure() -> Result<()> {
 
     // OnSuspend should be called again.
     on_suspend_rx.next().await.unwrap();
+    on_suspend_started_rx.next().await.unwrap();
 
     assert_eq!(0, suspend_device.await_suspend().await.unwrap().unwrap().state_index.unwrap());
 
@@ -1581,9 +1678,18 @@ async fn test_activity_governor_blocks_lease_while_suspend_in_progress() -> Resu
     assert_eq!(None, current_stats.last_failed_error);
     assert_eq!(None, current_stats.last_time_in_suspend);
 
+    // Inform SAG that booting has completed.
+    //
+    // Note that the resulting lease is dropped immediately. Dropping
+    // the lease allows the `await_suspend()` call below to complete.
     let suspend_controller = create_suspend_topology(&realm).await?;
     lease(&suspend_controller, 1).await.unwrap();
 
+    // Register a listener to receive the `OnResume()` callback.
+    //
+    // This must be done before the `await_suspend()` call, to avoid
+    // having the registration race with the invocation of resume
+    // callbacks.
     let (listener_client_end, mut listener_stream) =
         fidl::endpoints::create_request_stream().unwrap();
     activity_governor
@@ -1594,23 +1700,21 @@ async fn test_activity_governor_blocks_lease_while_suspend_in_progress() -> Resu
         .await
         .unwrap();
 
-    assert_eq!(0, suspend_device.await_suspend().await.unwrap().unwrap().state_index.unwrap());
-
-    let now = Instant::now();
-
+    // Start a task to process callbacks from SAG.
+    //
+    // This must be done before the `await_suspend()` call. Otherwise:
+    // 1. SAG will be stuck waiting for a reply to `OnSuspendStarted()`.
+    // 2. The reply will never come, because `await_suspend()` has not
+    //    returned.
     let (mut on_resume_tx, mut on_resume_rx) = mpsc::channel(1);
-    let (mut on_lease_tx, mut on_lease_rx) = mpsc::channel(1);
     fasync::Task::local(async move {
-        {
-            // Try to take a lease before handling listener requests.
-            lease(&suspend_controller, 1).await.unwrap();
-            on_lease_tx.try_send(now.elapsed()).unwrap();
-        }
-
         while let Some(Ok(req)) = listener_stream.next().await {
             match req {
                 fsystem::ActivityGovernorListenerRequest::OnResume { responder } => {
-                    on_resume_tx.start_send(lease(&suspend_controller, 1).await.unwrap()).unwrap();
+                    on_resume_tx.start_send(()).unwrap();
+                    responder.send().unwrap();
+                }
+                fsystem::ActivityGovernorListenerRequest::OnSuspendStarted { responder } => {
                     responder.send().unwrap();
                 }
                 fsystem::ActivityGovernorListenerRequest::OnSuspendFail { responder } => {
@@ -1621,6 +1725,19 @@ async fn test_activity_governor_blocks_lease_while_suspend_in_progress() -> Resu
                     panic!("Unexpected method: {}", ordinal);
                 }
             }
+        }
+    })
+    .detach();
+
+    assert_eq!(0, suspend_device.await_suspend().await.unwrap().unwrap().state_index.unwrap());
+
+    let now = Instant::now();
+    let (mut on_lease_tx, mut on_lease_rx) = mpsc::channel(1);
+    fasync::Task::local(async move {
+        {
+            // Try to take a lease. This should not be granted until the system resumes.
+            lease(&suspend_controller, 1).await.unwrap();
+            on_lease_tx.try_send(now.elapsed()).unwrap();
         }
     })
     .detach();
@@ -1645,6 +1762,15 @@ async fn test_activity_governor_blocks_lease_while_suspend_in_progress() -> Resu
     // Wait for OnResume to be called.
     on_resume_rx.next().await.unwrap();
 
+    // Note: although there's no lease held here, and SAG could
+    // initiate another suspend before `stats.watch()` completes,
+    // there's no race regarding the values in `current_stats`.
+    //
+    // The values in `current_stats` are well-defined, because:
+    // 1. SAG cannot update these values until SAG's suspend request
+    //    to the suspend HAL completes, and
+    // 2. SAG's request to the suspend HAL can't complete until
+    //    this test call suspend_device.await_suspend() again.
     let current_stats = stats.watch().await?;
     assert_eq!(Some(1), current_stats.success_count);
     assert_eq!(Some(0), current_stats.fail_count);

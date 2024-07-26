@@ -89,6 +89,16 @@ fn init_sag_listener(
                     fsystem::ActivityGovernorListenerRequest::OnSuspend { .. } => {
                         handle_on_suspend()
                     }
+                    fsystem::ActivityGovernorListenerRequest::OnSuspendStarted { responder } => {
+                        handle_on_suspend();
+                        if let Err(e) = responder.send() {
+                            log_error!(
+                                "OnSuspendStarted server failed to send a respond to its
+                                    client: {}",
+                                e
+                            );
+                        }
+                    }
                     fsystem::ActivityGovernorListenerRequest::OnSuspendFail { responder } => {
                         handle_on_suspend_fail(&power_manager, || responder.send())
                     }

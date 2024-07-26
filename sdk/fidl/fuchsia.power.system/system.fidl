@@ -214,6 +214,12 @@ open protocol ActivityGovernorListener {
     /// suspension is triggered by the platform.
     flexible OnSuspend();
 
+    /// Called before the activity governor initiates a system suspension.
+    ///
+    /// The server is expected to respond once it has performed the operations
+    /// it needs to prepare itself for suspend, if any.
+    flexible OnSuspendStarted() -> ();
+
     /// Called when the activity governor detects a suspend failure.
     ///
     /// The server is expected to respond to this notification. The activity

@@ -61,7 +61,7 @@ trait SuspendResumeListener {
     /// Gets the manager of suspend stats.
     fn suspend_stats(&self) -> &SuspendStatsManager;
     /// Called when system suspension is about to begin.
-    fn on_suspend(&self);
+    async fn on_suspend(&self);
     /// Called after system suspension ends.
     async fn on_resume(&self);
     /// Called when Suspender reports a suspend failure.
@@ -191,7 +191,7 @@ impl ExecutionStateManager {
             // LINT.IfChange
             tracing::info!("Suspending");
             // LINT.ThenChange(//src/testing/end_to_end/honeydew/honeydew/affordances/starnix/system_power_state_controller.py)
-            listener.on_suspend();
+            listener.on_suspend().await;
 
             let response = if let Some(suspender) = inner.suspender.as_ref() {
                 // LINT.IfChange
@@ -979,12 +979,13 @@ impl SuspendResumeListener for SystemActivityGovernor {
         &self.suspend_stats
     }
 
-    fn on_suspend(&self) {
+    async fn on_suspend(&self) {
         // A client may call RegisterListener while handling on_suspend which may cause another
         // mutable borrow of listeners. Clone the listeners to prevent this.
         let listeners: Vec<_> = self.listeners.borrow_mut().clone();
         for l in listeners {
             let _ = l.on_suspend();
+            let _ = l.on_suspend_started().await;
         }
     }
 
