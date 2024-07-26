@@ -23,7 +23,7 @@ group("tests") {
 }
 
 driver_bind_rules("bind") {
-  rules = "{{snake_case PROJECT_NAME}}.bind"
+  rules = "meta/{{snake_case PROJECT_NAME}}.bind"
   bind_output = "{{snake_case PROJECT_NAME}}.bindbc"
 }
 
@@ -43,7 +43,7 @@ fuchsia_driver("driver") {
 fuchsia_driver_component("component") {
   component_name = "{{PROJECT_NAME}}"
   deps = [ ":driver" ]
-  info = "{{snake_case PROJECT_NAME}}-info.json"
+  info = "meta/{{snake_case PROJECT_NAME}}-info.json"
   manifest = "meta/component.cml"
 }
 

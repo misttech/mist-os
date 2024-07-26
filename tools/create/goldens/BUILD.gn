@@ -106,10 +106,10 @@ if (is_host) {
     golden_files = [
       "my-driver-cpp/BUILD.gn",
       "my-driver-cpp/README.md",
-      "my-driver-cpp/my_driver_cpp.h",
-      "my-driver-cpp/my_driver_cpp.bind",
+      "my-driver-cpp/meta/my_driver_cpp.bind",
+      "my-driver-cpp/meta/my_driver_cpp-info.json",
       "my-driver-cpp/my_driver_cpp.cc",
-      "my-driver-cpp/my_driver_cpp-info.json",
+      "my-driver-cpp/my_driver_cpp.h",
       "my-driver-cpp/unit-tests.cc",
     ]
   }

@@ -37,9 +37,9 @@ if (is_host) {
       "devicetree-visitor/{{PROJECT_NAME}}.yaml.tmpl",
       "driver-default/BUILD.gn.tmpl-cpp",
       "driver-default/README.md.tmpl",
+      "driver-default/meta/{{snake_case PROJECT_NAME}}-info.json.tmpl-cpp",
+      "driver-default/meta/{{snake_case PROJECT_NAME}}.bind.tmpl-cpp",
       "driver-default/unit-tests.cc.tmpl-cpp",
-      "driver-default/{{snake_case PROJECT_NAME}}-info.json.tmpl-cpp",
-      "driver-default/{{snake_case PROJECT_NAME}}.bind.tmpl-cpp",
       "driver-default/{{snake_case PROJECT_NAME}}.cc.tmpl-cpp",
       "driver-default/{{snake_case PROJECT_NAME}}.h.tmpl-cpp",
     ]
