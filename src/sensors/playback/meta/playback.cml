@@ -11,6 +11,13 @@
         { protocol: "fuchsia.hardware.sensors.Driver" },
         { protocol: "fuchsia.hardware.sensors.Playback" },
     ],
+    use: [
+        {
+            directory: "data",
+            rights: [ "r*" ],
+            path: "/data",
+        },
+    ],
     expose: [
         {
             protocol: "fuchsia.hardware.sensors.Driver",

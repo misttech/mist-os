@@ -4,6 +4,7 @@
 {
     include: [
         "//src/sys/test_runners/gtest/default.shard.cml",
+        "//src/sys/test_runners/tmp_storage.shard.cml",
         "syslog/client.shard.cml",
     ],
 
@@ -29,6 +30,11 @@
             protocol: [ "fuchsia.hardware.sensors.Playback" ],
             from: "#sensors_playback",
         },
+        {
+            storage: "custom_artifacts",
+            rights: [ "rw*" ],
+            path: "/custom_artifacts",
+        },
     ],
 
     // Capabilities required by components under test.
@@ -40,6 +46,13 @@
             ],
             from: "parent",
             to: "#sensors_playback",
+        },
+        {
+            directory: "pkg",
+            from: "framework",
+            as: "data",
+            to: "#sensors_playback",
+            subdir: "data",
         },
     ],
 }

@@ -4,7 +4,7 @@
 {
     children: [
         {
-            name: "sensors_playback",
+            name: "playback",
             url: "sensors#meta/playback.cm",
             startup: "eager",
         },
@@ -12,11 +12,11 @@
     use: [
         {
             protocol: [ "fuchsia.hardware.sensors.Driver" ],
-            from: "#sensors_playback",
+            from: "#playback",
         },
         {
             protocol: [ "fuchsia.hardware.sensors.Playback" ],
-            from: "#sensors_playback",
+            from: "#playback",
         },
     ],
     offer: [
@@ -24,6 +24,11 @@
             protocol: [ "fuchsia.logger.LogSink" ],
             from: "parent",
             to: [ "#sensors_playback" ],
+        },
+        {
+            directory: "data",
+            from: "parent",
+            to: "#playback",
         },
     ],
 }

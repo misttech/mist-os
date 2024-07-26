@@ -24,6 +24,8 @@ using fuchsia_sensors_types::SensorId;
 using fuchsia_sensors_types::SensorInfo;
 using fuchsia_sensors_types::SensorRateConfig;
 
+using RecordedSensorEvent = io::Deserializer::RecordedSensorEvent;
+
 // Pushing events to a channel too quickly can cause crashes due to the channel filling up. Right
 // now the limit seems to be in the neighbourhood of 1 kHz. Most real sensors will not support rates
 // that high, and if they do it will be via a shared memory interface rather than a channel. In
@@ -37,8 +39,11 @@ void TemporarilyClampSensorRateConfig(SensorRateConfig& rate_config) {
 
 }  // namespace
 
-PlaybackController::PlaybackController(async_dispatcher_t* dispatcher)
-    : ActorBase(dispatcher, scope_), running_playback_scope_(std::make_unique<scope>()) {}
+PlaybackController::PlaybackController(async_dispatcher_t* dispatcher,
+                                       async_dispatcher_t* file_read_dispatcher)
+    : ActorBase(dispatcher, scope_),
+      file_read_dispatcher_(file_read_dispatcher),
+      running_playback_scope_(std::make_unique<scope>()) {}
 
 promise<void, ConfigurePlaybackError> PlaybackController::ConfigurePlayback(
     const PlaybackSourceConfig& config) {
@@ -63,6 +68,23 @@ promise<void, ConfigurePlaybackError> PlaybackController::ConfigurePlayback(
               return fpromise::make_ok_promise();
             });
         break;
+      case PlaybackSourceConfig::Tag::kFilePlaybackConfig:
+        return StopScheduledPlayback()
+            .and_then(ClearPlaybackConfig())
+            .then([this, config](result<void>& result) -> promise<void, ConfigurePlaybackError> {
+              std::optional<FilePlaybackConfig> file_config = config.file_playback_config();
+              return ConfigureFilePlayback(*file_config);
+            })
+            .then([completer = std::move(completer)](
+                      result<void, ConfigurePlaybackError>& result) mutable -> promise<void> {
+              if (result.is_ok()) {
+                completer.complete_ok();
+              } else {
+                completer.complete_error(result.error());
+              }
+              return fpromise::make_ok_promise();
+            });
+        break;
       default:
         // Complete the bridged promise with an error and do nothing further.
         completer.complete_error(ConfigurePlaybackError::kInvalidConfigType);
@@ -76,10 +98,12 @@ promise<std::vector<SensorInfo>> PlaybackController::GetSensorsList() {
   bridge<std::vector<SensorInfo>> bridge;
   Schedule([this, completer = std::move(bridge.completer)]() mutable -> promise<void> {
     // TODO(b/343048375): Disconnect the client if no playback configuration is present.
-    FX_LOGS(WARNING)
-        << "GetSensorsList: Driver API call made while playback configuration is unset."
-        << " In the future this will result in the Driver client being disconnected "
-        << "with epitaph ZX_ERR_BAD_STATE.";
+    if (playback_mode_ == PlaybackMode::kNone) {
+      FX_LOGS(WARNING)
+          << "GetSensorsList: Driver API call made while playback configuration is unset."
+          << " In the future this will result in the Driver client being disconnected "
+          << "with epitaph ZX_ERR_BAD_STATE.";
+    }
 
     completer.complete_ok(sensor_list_);
     return fpromise::make_ok_promise();
@@ -259,6 +283,8 @@ promise<void> PlaybackController::ClearPlaybackConfig() {
     sensor_playback_state_.clear();
     enabled_sensor_count_ = 0;
     playback_mode_ = PlaybackMode::kNone;
+    file_reader_ = std::nullopt;
+    file_timestamp_data_ = std::nullopt;
   });
 }
 
@@ -288,6 +314,47 @@ promise<void, ConfigurePlaybackError> PlaybackController::ConfigureFixedValues(
     }
 
     return fpromise::make_result_promise<void, ConfigurePlaybackError>(fpromise::ok());
+  });
+}
+
+promise<void, ConfigurePlaybackError> PlaybackController::ConfigureFilePlayback(
+    const FilePlaybackConfig& config) {
+  return fpromise::make_promise([this, config]() -> promise<void, ConfigurePlaybackError> {
+    FX_LOGS(INFO) << "ConfigurePlayback: Configuring to read from a file.";
+    // Check for required fields.
+    if (!config.file_path()) {
+      FX_LOGS(ERROR) << "ConfigurePlayback: File playback config missing required fields.";
+      return fpromise::make_error_promise(ConfigurePlaybackError::kConfigMissingFields);
+    }
+
+    playback_mode_ = PlaybackMode::kFilePlaybackMode;
+    file_reader_.emplace(*config.file_path(), file_read_dispatcher_);
+
+    return file_reader_->Open()
+        .and_then([this, config]() {
+          promise<std::vector<SensorInfo>> sensor_list_promise = file_reader_->GetSensorsList();
+
+          return sensor_list_promise.then([this](result<std::vector<SensorInfo>>& list_result)
+                                              -> promise<void, ConfigurePlaybackError> {
+            std::optional<ConfigurePlaybackError> validation_error =
+                ValidateSensorList(std::make_optional(list_result.value()));
+
+            if (validation_error) {
+              FX_LOGS(ERROR) << "ConfigurePlayback: Received invalid or incomplete sensor list.";
+              return ClearPlaybackConfig().then([validation_error](result<void, void>& /*result*/) {
+                return fpromise::make_error_promise(*validation_error);
+              });
+            }
+
+            AdoptSensorList(list_result.value());
+            return fpromise::make_result_promise<void, ConfigurePlaybackError>(fpromise::ok());
+          });
+        })
+        .or_else([this](ConfigurePlaybackError& error) {
+          return ClearPlaybackConfig().then([error](result<void, void>& result) {
+            return fpromise::make_error_promise<ConfigurePlaybackError>(error);
+          });
+        });
   });
 }
 
@@ -343,8 +410,123 @@ promise<void> PlaybackController::ScheduleSensorEvents(SensorId sensor_id) {
     switch (playback_mode_) {
       case PlaybackMode::kFixedValuesMode:
         return ScheduleFixedEvent(sensor_id);
+      case PlaybackMode::kFilePlaybackMode:
+        if (!file_reader_running_) {
+          file_reader_running_ = true;
+          return StartFileReads();
+        }
+        return fpromise::make_ok_promise();
+        break;
       case PlaybackMode::kNone:
         ZX_ASSERT_MSG(false, "Events scheduled when no playback mode was set.");
+    }
+  });
+}
+
+promise<void> PlaybackController::StartFileReads() {
+  return file_reader_
+      ->SetEventCallback([this](const RecordedSensorEvent& recorded_event) {
+        Schedule([this, recorded_event]() {
+          // If playback shouldn't be running any more, do nothing further.
+          if (playback_state_ != PlaybackState::kRunning) {
+            return;
+          }
+
+          SensorEvent event = recorded_event.event;
+          zx::time receipt_timestamp =
+              zx::time(recorded_event.receipt_timestamp.value_or(recorded_event.event.timestamp()));
+
+          // Initialize the file timestamp initial conditions if they haven't been.
+          zx::time schedule_time, timestamp;
+          if (!file_timestamp_data_) {
+            // The first scheduled event time will be now.
+            schedule_time = zx::time(zx_clock_get_monotonic());
+            file_timestamp_data_ = FileTimestampData();
+            file_timestamp_data_->first_presentation_time = schedule_time;
+
+            // Record the first timestamp and presentation time in file time domain.
+            file_timestamp_data_->file_first_presentation_time = receipt_timestamp;
+            file_timestamp_data_->file_first_event_timestamp = zx::time(event.timestamp());
+
+            // Use the offset between the file domain timestamp and presentation time to calculate
+            // the initial event timestamp in the playback domain.
+            zx::duration offset = file_timestamp_data_->file_first_presentation_time -
+                                  file_timestamp_data_->file_first_event_timestamp;
+            timestamp = file_timestamp_data_->first_presentation_time - offset;
+            file_timestamp_data_->first_event_timestamp = timestamp;
+          } else {
+            // Use the file domain presentation timestamps to calculate the offset since the
+            // beginning of playback.
+            zx::duration schedule_offset =
+                zx::time(receipt_timestamp) - file_timestamp_data_->file_first_presentation_time;
+            // Add the offset to the starting time in the playback clock domain to get a scheduling
+            // time.
+            schedule_time = file_timestamp_data_->first_presentation_time + schedule_offset;
+
+            // Use the file domain event timestamps to calculate the offset from the first
+            // timestamp.
+            zx::duration timestamp_offset =
+                zx::time(event.timestamp()) - file_timestamp_data_->file_first_event_timestamp;
+            // Add the offset to the initial timestamp in the playback domain to get this event's
+            // timestamp.
+            timestamp = file_timestamp_data_->first_event_timestamp + timestamp_offset;
+          }
+          file_timestamp_data_->last_read_presentation_time = schedule_time;
+          file_timestamp_data_->last_read_event_timestamp = timestamp;
+
+          event.timestamp() = timestamp.get();
+          ScheduleAtTime(schedule_time,
+                         SendOrBufferEvent(event).wrap_with(*running_playback_scope_));
+        });
+      })
+      .and_then(
+          file_reader_->SetReadCompleteCallback([this](std::optional<zx_status_t> finished_early) {
+            Schedule([this, finished_early]() -> promise<void> {
+              if (finished_early) {
+                if (*finished_early == ZX_OK) {
+                  // We reached the end of the file. Seek back to the beginning.
+                  return file_reader_->SeekToFirstEvent().and_then(
+                      ScheduleFileReads(/*first_after_seek=*/true));
+                } else {
+                  FX_LOGS(ERROR) << "Stopping playback and clearing config. "
+                                 << "Saw error reading from data file: " << *finished_early;
+                  return StopScheduledPlayback().and_then(ClearPlaybackConfig());
+                }
+              }
+
+              return ScheduleFileReads(false);
+            });
+          }))
+      .and_then(ScheduleFileReads(false));
+}
+
+constexpr int kNumEventReads = 1;
+promise<void> PlaybackController::ScheduleFileReads(bool first_after_seek) {
+  static const zx::duration kResetTimeGap = zx::msec(10);
+  return fpromise::make_promise([this, first_after_seek]() {
+    if (playback_state_ != PlaybackState::kRunning) {
+      return;
+    }
+
+    // If we've started reading events, schedule the next read for when the last read event is
+    // scheduled to be sent. Otherwise schedule a read immediately.
+    if (file_timestamp_data_) {
+      // After a seek to the beginning of the file's events, reset the first presentation time and
+      // event timestamp to continue the sequence after a configured gap.
+      if (first_after_seek) {
+        zx::duration offset = file_timestamp_data_->file_first_presentation_time -
+                              file_timestamp_data_->file_first_event_timestamp;
+        file_timestamp_data_->first_presentation_time =
+            file_timestamp_data_->last_read_presentation_time + kResetTimeGap;
+        file_timestamp_data_->first_event_timestamp =
+            file_timestamp_data_->first_presentation_time - offset;
+      }
+      ScheduleAtTime(file_timestamp_data_->last_read_presentation_time,
+                     fpromise::make_promise([this]() {
+                       file_reader_->ReadEvents(kNumEventReads);
+                     }).wrap_with(*running_playback_scope_));
+    } else {
+      file_reader_->ReadEvents(kNumEventReads);
     }
   });
 }
@@ -369,7 +551,6 @@ promise<void> PlaybackController::ScheduleFixedEvent(SensorId sensor_id) {
     if (playback_state_ != PlaybackState::kRunning) {
       return;
     }
-
     SensorPlaybackState& state = sensor_playback_state_[sensor_id];
     // If the sensor has become disabled, schedule nothing further.
     if (!state.enabled) {
@@ -450,7 +631,16 @@ promise<void> PlaybackController::SendBufferedEvents(SensorId sensor_id) {
 }
 
 promise<void> PlaybackController::StopScheduledPlayback() {
-  return fpromise::make_promise([this]() { running_playback_scope_ = std::make_unique<scope>(); });
+  auto stop_scheduled_sends = fpromise::make_promise([this]() {
+    running_playback_scope_ = std::make_unique<scope>();
+    file_reader_running_ = false;
+    file_timestamp_data_ = std::nullopt;
+  });
+
+  if (file_reader_running_) {
+    return file_reader_->StopScheduledReads().and_then(std::move(stop_scheduled_sends));
+  }
+  return stop_scheduled_sends;
 }
 
 }  // namespace sensors::playback
