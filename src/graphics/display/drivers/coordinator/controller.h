@@ -176,6 +176,12 @@ class Controller : public ddk::DisplayEngineListenerProtocol<Controller>,
                                  OpenCoordinatorForVirtconCompleter::Sync& completer) override;
   void OpenCoordinatorForPrimary(OpenCoordinatorForPrimaryRequestView request,
                                  OpenCoordinatorForPrimaryCompleter::Sync& completer) override;
+  void OpenCoordinatorWithListenerForVirtcon(
+      OpenCoordinatorWithListenerForVirtconRequestView request,
+      OpenCoordinatorWithListenerForVirtconCompleter::Sync& completer) override;
+  void OpenCoordinatorWithListenerForPrimary(
+      OpenCoordinatorWithListenerForPrimaryRequestView request,
+      OpenCoordinatorWithListenerForPrimaryCompleter::Sync& completer) override;
 
  private:
   friend ControllerTest;

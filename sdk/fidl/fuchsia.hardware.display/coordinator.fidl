@@ -13,6 +13,61 @@ using zx;
 /// [`fuchsia.hardware.display/Coordinator.ApplyConfig2`].
 const APPLY_CONFIG_MAX_SIGNAL_FENCES uint64 = 32;
 
+/// Provides updates from a `Coordinator` to one of its clients.
+open protocol CoordinatorListener {
+    /// Called when displays are added or removed.
+    /// Called on client creation if there are any displays already connected.
+    ///
+    /// A display change always invalidates the current configuration. When a
+    /// `CoordinatorListener` receives this method call, the corresponding
+    /// `Coordinator` client must either apply a new configuration or
+    /// revalidate and reapply their current configuration.
+    ///
+    /// `added` and `removed` must not be both empty.
+    strict OnDisplaysChanged(struct {
+        added vector<Info>:MAX;
+        removed vector<fuchsia.hardware.display.types.DisplayId>:MAX;
+    });
+
+    /// Called on every display Vertical Synchronization (Vsync) signal.
+    ///
+    /// Response
+    ///
+    ///   A `CoordinatorListener` must respond to an `OnVsync` call
+    ///   immediately upon receipt. Failure to acknowledge `OnVsync` calls
+    ///   will result in the suspension of Vsync event notification.
+    ///
+    ///   If a `CoordinatorListener` fails to respond to vsync messages, the
+    ///   client will store incoming hardware-generated vsyncs in a circular
+    ///   buffer and send them to the listener once it resumes
+    ///   acknowledgement.
+    ///   Due to limited size of the buffers, only the most recently received
+    ///   Vsyncs will be stored and older ones will be dropped.
+    ///
+    /// + request `display_id` identifies the display on which the Vsync
+    ///   occurred.
+    /// + request `timestamp` indicates the time the Vsync occurred.
+    /// + request `applied_config_stamp` the stamp of the latest
+    ///   configuration that has been applied to the display.
+    strict OnVsync(resource struct {
+        display_id fuchsia.hardware.display.types.DisplayId;
+        timestamp uint64;
+        applied_config_stamp fuchsia.hardware.display.types.ConfigStamp;
+    }) -> ();
+
+    /// Called when the corresponding `Coordinator` client gains or loses
+    /// ownership of the displays.
+    ///
+    /// A `Coordinator` client's active config is displayed iff it holds the
+    /// ownership of the displays.
+    ///
+    /// A new `Coordinator` client should assume they do not have ownership
+    /// of the displays until this method informs them otherwise.
+    strict OnClientOwnershipChange(struct {
+        has_ownership bool;
+    });
+};
+
 /// Interface for accessing the display hardware.
 ///
 /// A display configuration can be separated into two parts: the layer layout and

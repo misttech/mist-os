@@ -57,6 +57,18 @@ void FakeDisplayCoordinatorConnector::OpenCoordinatorForVirtcon(
       }});
 }
 
+void FakeDisplayCoordinatorConnector::OpenCoordinatorWithListenerForPrimary(
+    OpenCoordinatorWithListenerForPrimaryRequest& request,
+    OpenCoordinatorWithListenerForPrimaryCompleter::Sync& completer) {
+  completer.Reply(fit::error(ZX_ERR_NOT_SUPPORTED));
+}
+
+void FakeDisplayCoordinatorConnector::OpenCoordinatorWithListenerForVirtcon(
+    OpenCoordinatorWithListenerForVirtconRequest& request,
+    OpenCoordinatorWithListenerForVirtconCompleter::Sync& completer) {
+  completer.Reply(fit::error(ZX_ERR_NOT_SUPPORTED));
+}
+
 void FakeDisplayCoordinatorConnector::ConnectOrDeferClient(OpenCoordinatorRequest req) {
   bool claimed =
       req.is_virtcon ? state_->virtcon_coordinator_claimed : state_->primary_coordinator_claimed;

@@ -831,6 +831,18 @@ void Controller::OpenCoordinatorForPrimary(OpenCoordinatorForPrimaryRequestView 
   completer.Reply(CreateClient(ClientPriority::kPrimary, std::move(request->coordinator)));
 }
 
+void Controller::OpenCoordinatorWithListenerForVirtcon(
+    OpenCoordinatorWithListenerForVirtconRequestView request,
+    OpenCoordinatorWithListenerForVirtconCompleter::Sync& completer) {
+  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+}
+
+void Controller::OpenCoordinatorWithListenerForPrimary(
+    OpenCoordinatorWithListenerForPrimaryRequestView request,
+    OpenCoordinatorWithListenerForPrimaryCompleter::Sync& completer) {
+  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+}
+
 ConfigStamp Controller::TEST_controller_stamp() const {
   fbl::AutoLock lock(mtx());
   return controller_stamp_;

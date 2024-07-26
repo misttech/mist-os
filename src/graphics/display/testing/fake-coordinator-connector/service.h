@@ -44,6 +44,12 @@ class FakeDisplayCoordinatorConnector : public fidl::Server<fuchsia_hardware_dis
                                  OpenCoordinatorForVirtconCompleter::Sync& completer) override;
   void OpenCoordinatorForPrimary(OpenCoordinatorForPrimaryRequest& request,
                                  OpenCoordinatorForPrimaryCompleter::Sync& completer) override;
+  void OpenCoordinatorWithListenerForVirtcon(
+      OpenCoordinatorWithListenerForVirtconRequest& request,
+      OpenCoordinatorWithListenerForVirtconCompleter::Sync& completer) override;
+  void OpenCoordinatorWithListenerForPrimary(
+      OpenCoordinatorWithListenerForPrimaryRequest& request,
+      OpenCoordinatorWithListenerForPrimaryCompleter::Sync& completer) override;
 
   // Check coordinator clients' connection status for tests only.
   int GetNumQueuedPrimaryRequestsTestOnly() const {
