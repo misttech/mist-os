@@ -120,6 +120,7 @@ source_set("common_srcs") {
     "//src/devices/pci/lib/pci",
     "//src/graphics/display/lib/api-types-cpp",
     "//src/lib/ddk",
+    "//src/lib/ddk:ddk-hw-headers",
     "//src/lib/ddktl",
     "//src/lib/fxl",
     "//src/lib/zbitl",

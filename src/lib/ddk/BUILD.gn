@@ -508,3 +508,10 @@ sdk_source_set("ddk_metadata") {
   non_sdk_deps = [ ":ddk_metadata_only" ]
   public_deps = [ "//sdk/lib/zbi-format" ]
 }
+
+library_headers("ddk-hw-headers") {
+  headers = [
+    "lib/ddk/hw/arch_ops.h",
+    "lib/ddk/hw/inout.h",
+  ]
+}
