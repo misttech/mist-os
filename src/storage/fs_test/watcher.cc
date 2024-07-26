@@ -6,7 +6,7 @@
 #include <fcntl.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <lib/fdio/cpp/caller.h>
-#include <lib/zx/channel.h>
+#include <lib/fidl/cpp/wire/channel.h>
 #include <lib/zx/time.h>
 #include <limits.h>
 #include <stdio.h>
@@ -16,8 +16,15 @@
 #include <zircon/errors.h>
 #include <zircon/types.h>
 
-#include <fbl/unique_fd.h>
+#include <cerrno>
+#include <cstdint>
+#include <string>
+#include <utility>
 
+#include <fbl/unique_fd.h>
+#include <gtest/gtest.h>
+
+#include "src/storage/fs_test/fs_test.h"
 #include "src/storage/fs_test/fs_test_fixture.h"
 
 namespace fs_test {
@@ -264,8 +271,7 @@ TEST_P(WatcherTest, Removed) {
 
 TEST_P(WatcherTest, DirectoryDeleted) {
   if (!fs().GetTraits().supports_watch_event_deleted) {
-    std::cout << "Skipping " << fs().GetTraits().name << std::endl;
-    return;
+    GTEST_SKIP();
   }
   std::string dir_name = GetPath("dir");
   ASSERT_EQ(mkdir(dir_name.c_str(), 0666), 0);
