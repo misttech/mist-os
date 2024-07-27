@@ -604,25 +604,43 @@ void ResolveStep::ResolveKeyReference(Reference& ref, Context context) {
   ref.ResolveTo(Reference::Target(member, decl));
 }
 
+static std::vector<std::pair<VersionRange, SourceSpan>> BuildCandidatesInfo(
+    std::multimap<std::string_view, Decl*>::const_iterator begin,
+    std::multimap<std::string_view, Decl*>::const_iterator end) {
+  std::vector<std::pair<VersionRange, SourceSpan>> info;
+  for (auto it = begin; it != end; ++it) {
+    auto decl = it->second;
+    auto span = decl->GetNameSource();
+    auto range = decl->availability.range().pair();
+    if (range.first == Version::kLegacy)
+      continue;
+    if (!info.empty() && info.back().second == span &&
+        info.back().first.pair().second == range.first) {
+      info.back().first.pair().second = range.second;
+    } else {
+      info.emplace_back(VersionRange(range.first, range.second), span);
+    }
+  }
+  return info;
+}
+
 Decl* ResolveStep::LookupDeclByKey(const Reference& ref, Context context) {
   auto key = ref.key();
   auto [begin, end] = key.library->declarations.all.equal_range(key.decl_name);
   ZX_ASSERT_MSG(begin != end, "key must exist");
   auto platform = key.library->platform.value();
+  auto source_range = context.enclosing->availability.range();
   // Case #1: source and target libraries are versioned in the same platform.
   if (library()->platform == platform) {
     for (auto it = begin; it != end; ++it) {
       auto decl = it->second;
-      auto us = context.enclosing->availability.range();
-      auto them = decl->availability.range();
-      if (auto overlap = VersionRange::Intersect(us, them)) {
-        ZX_ASSERT_MSG(overlap.value() == us, "referencee must outlive referencer");
+      if (auto overlap = VersionRange::Intersect(source_range, decl->availability.range())) {
+        ZX_ASSERT_MSG(overlap.value() == source_range, "referencee must outlive referencer");
         return decl;
       }
     }
-    // TODO(https://fxbug.dev/42146818): Provide a nicer error message in the case where a
-    // decl with that name does exist, but in a different version range.
-    reporter()->Fail(ErrNameNotFound, ref.span(), key.decl_name, key.library);
+    reporter()->Fail(ErrNameNotFoundInVersionRange, ref.span(), key.decl_name, key.library,
+                     source_range, BuildCandidatesInfo(begin, end));
     return nullptr;
   }
   // Case #2: source and target libraries are versioned in different platforms.
@@ -635,7 +653,8 @@ Decl* ResolveStep::LookupDeclByKey(const Reference& ref, Context context) {
   }
   // TODO(https://fxbug.dev/42146818): Provide a nicer error message in the case where
   // a decl with that name does exist, but in a different version range.
-  reporter()->Fail(ErrNameNotFound, ref.span(), key.decl_name, key.library);
+  reporter()->Fail(ErrNameNotFoundInVersionRange, ref.span(), key.decl_name, key.library,
+                   VersionRange(version, version.Successor()), BuildCandidatesInfo(begin, end));
   return nullptr;
 }
 

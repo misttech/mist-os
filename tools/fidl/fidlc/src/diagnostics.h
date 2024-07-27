@@ -438,6 +438,9 @@ constexpr ErrorDef<218, const AttributeArg *> ErrInvalidModifierAvailableArgumen
 constexpr ErrorDef<219> ErrCannotChangeMethodStrictness(
     "changing the strictness of a two-way method without error syntax is not "
     "allowed because it is ABI breaking");
+constexpr ErrorDef<220, std::string_view, const Library *, VersionRange,
+                   std::vector<std::pair<VersionRange, SourceSpan>>>
+    ErrNameNotFoundInVersionRange("cannot find '{0}' in {1} {2}; did find it {3}");
 
 // To add a new error:
 //
@@ -670,6 +673,7 @@ static constexpr const DiagnosticDef *kAllDiagnosticDefs[] = {
     /* fi-0217 */ &ErrInvalidReplacedAbi,
     /* fi-0218 */ &ErrInvalidModifierAvailableArgument,
     /* fi-0219 */ &ErrCannotChangeMethodStrictness,
+    /* fi-0220 */ &ErrNameNotFoundInVersionRange,
 };
 
 // In reporter.h we assert that reported error IDs are <= kNumDiagnosticDefs.

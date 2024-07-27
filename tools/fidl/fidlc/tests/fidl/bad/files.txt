@@ -200,3 +200,4 @@ fi-0216.test.fidl
 fi-0217.test.fidl
 fi-0218.test.fidl
 fi-0219.test.fidl
+fi-0220.test.fidl

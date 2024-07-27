@@ -259,7 +259,7 @@ the name `Open` as long as we (1) use `@selector` to give the new method a
 different [ABI identity](#identity) and (2) use `renamed` on the old definition,
 allowing bindings for the version set {4, 5} to include both methods.
 
-## References
+## References {#references}
 
 There are a variety of ways one FIDL element can reference another. For example:
 

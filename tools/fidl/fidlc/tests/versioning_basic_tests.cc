@@ -369,6 +369,15 @@ type Foo = resource(removed=2) table {
   }
 }
 
+TEST_P(VersioningBasicTest, BadReferenceOutsideAvailability) {
+  TestLibrary library;
+  library.AddFile("bad/fi-0220.test.fidl");
+  library.SelectVersions("test", GetParam());
+  library.ExpectFail(ErrNameNotFoundInVersionRange, "Bar", "library 'test.bad.fi0220'",
+                     VersionRange(V1, V2), "from version 2 onward (bad/fi-0220.test.fidl:10:6)");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
 // TODO(https://fxbug.dev/42052719): Generalize this with more comprehensive tests in
 // versioning_interleaving_tests.cc.
 TEST_P(VersioningBasicTest, GoodRegularDeprecatedReferencesVersionedDeprecated) {

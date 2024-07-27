@@ -80,6 +80,8 @@ class Version final {
   std::string ToString() const;
   // Returns the version that comes before this one. Panics if infinite.
   Version Predecessor() const;
+  // Returns the version that comes after this one. Panics if infinite.
+  Version Successor() const;
 
   constexpr bool operator==(const Version& rhs) const { return value_ == rhs.value_; }
   constexpr bool operator!=(const Version& rhs) const { return value_ != rhs.value_; }
@@ -118,6 +120,7 @@ class VersionRange final {
   }
 
   // Returns the [lower, upper) version pair.
+  std::pair<Version, Version>& pair() { return pair_; }
   const std::pair<Version, Version>& pair() const { return pair_; }
 
   // Returns true if this range contains `version`.

@@ -440,3 +440,5 @@ redirects:
   to: /fuchsia-src/reference/fidl/language/errcat.md#fi-0218
 - from: /fuchsia-src/error/fi-0219
   to: /fuchsia-src/reference/fidl/language/errcat.md#fi-0219
+- from: /fuchsia-src/error/fi-0220
+  to: /fuchsia-src/reference/fidl/language/errcat.md#fi-0220

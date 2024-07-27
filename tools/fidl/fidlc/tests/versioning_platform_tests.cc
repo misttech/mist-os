@@ -211,8 +211,10 @@ type Foo = struct {
     dep dependency.Foo;
 };
 )FIDL");
-  example.ExpectFail(ErrNameNotFound, "Foo", "library 'dependency'");
-  example.ExpectFail(ErrNameNotFound, "Foo", "library 'dependency'");
+  example.ExpectFail(ErrNameNotFoundInVersionRange, "Foo", "library 'dependency'",
+                     "at version HEAD", "from version 3 to 4 (dependency.fidl:6:6)");
+  example.ExpectFail(ErrNameNotFoundInVersionRange, "Foo", "library 'dependency'",
+                     "at version HEAD", "from version 3 to 4 (dependency.fidl:6:6)");
   ASSERT_COMPILER_DIAGNOSTICS(example);
 }
 

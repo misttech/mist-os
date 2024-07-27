@@ -77,7 +77,7 @@ std::string Version::ToString() const {
 }
 
 Version Version::Predecessor() const {
-  ZX_ASSERT(*this != kNegInf && *this != kPosInf);
+  ZX_ASSERT(*this != kNegInf && *this != kPosInf && *this != Version(1));
   if (*this == kSpecialVersions[0])
     return Version(kMaxNormalVersion);
   for (size_t i = 1; i < std::size(kSpecialVersions); ++i) {
@@ -85,6 +85,18 @@ Version Version::Predecessor() const {
       return kSpecialVersions[i - 1];
   }
   return Version(value_ - 1);
+}
+
+Version Version::Successor() const {
+  ZX_ASSERT(*this != kNegInf && *this != kPosInf &&
+            *this != kSpecialVersions[std::size(kSpecialVersions) - 1]);
+  if (*this == Version(kMaxNormalVersion))
+    return kSpecialVersions[0];
+  for (size_t i = 0; i < std::size(kSpecialVersions) - 1; ++i) {
+    if (*this == kSpecialVersions[i])
+      return kSpecialVersions[i + 1];
+  }
+  return Version(value_ + 1);
 }
 
 bool VersionRange::Contains(Version version) const {
