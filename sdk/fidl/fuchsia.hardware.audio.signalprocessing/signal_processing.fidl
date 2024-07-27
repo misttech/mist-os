@@ -379,38 +379,6 @@ closed protocol SignalProcessing {
     /// Exposes read-only signal processing properties.
     compose Reader;
 
-    /// Controls a processing element using a unique id returned by `GetElements`.
-    /// Returns `ZX_ERR_INVALID_ARGS` if the `processing_element_id` does not match an id returned
-    /// by `GetElements` or the type of `TypeSpecificElementState` does not
-    /// match the `ElementType` of the processing element returned by
-    /// `GetElements` for this id.
-    /// The driver may return `ZX_ERR_INVALID_ARGS` if the `state` values are invalid, i.e. any
-    /// of the values violates rules specified in this protocol, e.g. trying to change an
-    /// `EQUALIZER` processing element's `EqualizerBandState` `frequency` when this processing
-    /// element did not advertise `CAN_CONTROL_FREQUENCY` in its `supported_controls`.
-    ///
-    /// `SetElementState` may be called before or after non-`SignalProcessing` protocol
-    /// calls. If called after non-`SignalProcessing` protocol calls then
-    /// `SetElementState` may or may not require renegotiation of the driver state as
-    /// reached with calls of the protocol composing `SignalProcessing`, e.g. `Dai`.
-    /// For instance, `SetElementState` changing an `AGL` processing element's parameters
-    /// may not require renegotiation of the `Dai` state because changing a gain parameter usually
-    /// does not change the set of supported audio formats.
-    /// By contrast, if `SetElementState` changes the parameters of a `CONNECTION_POINT`
-    /// element, the change may require renegotiation because it may invalidate the set of
-    /// supported formats returned in a previous `GetDaiFormats` `Dai` protocol call.
-    ///
-    /// It is the driver's job to determine when renegotiation is required. If renegotiation is
-    /// required, then `SetElementState` must return `ZX_ERR_BAD_STATE` and the client must
-    /// close the protocol channel such that the protocol negotiations are started over.
-    /// The client then must make the `SetElementState` call that returned
-    /// `ZX_ERR_BAD_STATE` before any non-`SignalProcessing` protocol calls.
-    @available(replaced=20)
-    strict SetElementState(struct {
-        processing_element_id ElementId;
-        state ElementState;
-    }) -> () error zx.Status;
-
     /// Controls a processing element using a unique ElementId returned by `GetElements`.
     /// Note that `SettableElementState` is a subset of `ElementState`, because some fields returned
     /// from `WatchElementState` (e.g. `latency`) can only be observed (not set) by the client.
@@ -440,9 +408,12 @@ closed protocol SignalProcessing {
     /// close the protocol channel such that the protocol negotiations are started over.
     /// The client then must make the `SetElementState` call that returned
     /// `ZX_ERR_BAD_STATE` before any non-`SignalProcessing` protocol calls.
-    @available(added=20)
     strict SetElementState(struct {
         processing_element_id ElementId;
+
+        @available(replaced=20)
+        state ElementState;
+        @available(added=20)
         state SettableElementState;
     }) -> () error zx.Status;
 

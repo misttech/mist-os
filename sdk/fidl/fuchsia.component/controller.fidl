@@ -10,39 +10,23 @@ using fuchsia.process;
 @available(added=14)
 const MAX_NAMESPACE_COUNT uint32 = 32;
 
-@available(added=14, replaced=18)
-closed protocol Controller {
-    /// Start the component, optionally providing additional handles to be given
-    /// to the component. Returns INSTANCE_ALREADY_RUNNING if the instance is
-    /// currently running.
-    strict Start(resource struct {
-        args StartChildArgs;
-        execution_controller server_end:ExecutionController;
-    }) -> () error Error;
-
-    /// Returns true if this instance is currently running.
-    strict IsStarted() -> (resource struct {
-        is_started bool;
-    }) error Error;
-};
-
 /// A protocol used to operate on a component.
 ///
 /// One may get access to a `Controller` when creating a component with the
 /// `Realm.CreateChild` method. You may also obtain a `Controller` for an
 /// existing child component with the `Realm.OpenController` method.
-@available(added=18)
-open protocol Controller {
+@available(added=14)
+closed(removed=18) open(added=18) protocol Controller {
     /// Start the component, optionally providing additional handles to be given
     /// to the component. Returns INSTANCE_ALREADY_RUNNING if the instance is
     /// currently running.
-    flexible Start(resource struct {
+    strict(removed=18) flexible(added=18) Start(resource struct {
         args StartChildArgs;
         execution_controller server_end:ExecutionController;
     }) -> () error Error;
 
     /// Returns true if this instance is currently running.
-    flexible IsStarted() -> (resource struct {
+    strict(removed=18) flexible(added=18) IsStarted() -> (resource struct {
         is_started bool;
     }) error Error;
 
@@ -94,35 +78,19 @@ type StartChildArgs = resource table {
     3: dictionary fuchsia.component.sandbox.DictionaryRef;
 };
 
-@available(added=14, replaced=18)
-closed protocol ExecutionController {
+@available(added=14)
+closed(removed=18) open(added=18) protocol ExecutionController {
     /// Initiates a stop action on this component. Once complete, OnStop will be
     /// called with the stopped payload and this channel is closed.
     ///
     /// Note that a component may stop running on its own at any time, so it is
     /// possible for `OnStop` to be received before `Stop` is called.
-    strict Stop();
+    strict(removed=18) flexible(added=18) Stop();
 
     /// When the child is stopped due to `Stop` being called, the child exiting
     /// on its own, or for any other reason, `OnStop` is called and then this
     /// channel is closed.
-    strict -> OnStop(struct {
-        stopped_payload StoppedPayload;
-    });
-};
-@available(added=18)
-open protocol ExecutionController {
-    /// Initiates a stop action on this component. Once complete, OnStop will be
-    /// called with the stopped payload.
-    ///
-    /// Note that a component may stop running on its own at any time, so it is
-    /// possible for `OnStop` to be received before `Stop` is called.
-    flexible Stop();
-
-    /// When the child is stopped due to `Stop` being called, the child exiting
-    /// on its own, or for any other reason, `OnStop` is called and then this
-    /// channel is closed.
-    flexible -> OnStop(struct {
+    strict(removed=18) flexible(added=18) -> OnStop(struct {
         stopped_payload StoppedPayload;
     });
 };
