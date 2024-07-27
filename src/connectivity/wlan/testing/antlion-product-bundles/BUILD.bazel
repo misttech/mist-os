@@ -1,0 +1,43 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+load(
+    "@fuchsia_sdk//fuchsia:assembly.bzl",
+    "fuchsia_product",
+    "fuchsia_product_bundle",
+    "fuchsia_product_configuration",
+)
+
+fuchsia_product_bundle(
+    name = "antlion_testing_wlanix_product_bundle.vim3",
+    board_name = "vim3",
+    main = ":antlion_testing_wlanix_image.vim3",
+    partitions_config = "//build/bazel/assembly/partitions_configurations:vim3",
+)
+
+fuchsia_product(
+    name = "antlion_testing_wlanix_image.vim3",
+    board_config = "//boards:vim3",
+    platform_artifacts = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
+    product_config = ":antlion_testing_wlanix_product_config",
+)
+
+fuchsia_product_configuration(
+    name = "antlion_testing_wlanix_product_config",
+    product_config_json = {
+        "platform": {
+            "build_type": "eng",
+            "connectivity": {
+                "wlan": {
+                    "policy_layer": "via_wlanix",
+                },
+            },
+            # TODO(https://fxbug.dev/355710532): Remove SL4F support once
+            # antlion no longer requires SL4F to run tests.
+            "development_support": {
+                "include_sl4f": True,
+            },
+        },
+    },
+)

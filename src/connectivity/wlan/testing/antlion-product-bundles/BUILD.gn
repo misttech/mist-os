@@ -1,0 +1,22 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/bazel/assembly/bazel_product_bundle.gni")
+
+# A GN target to perform system assembly in Bazel exclusively, using
+# Ninja-generated inputs.
+
+bazel_product_bundle("antlion_testing_wlanix.vim3") {
+  testonly = true
+  allow_eng_platform_bundle_use = true
+  product_bundle_name = "antlion_testing_wlanix.vim3"
+  bazel_product_bundle_target = ":antlion_testing_wlanix_product_bundle.vim3"
+  bazel_product_image_target = ":antlion_testing_wlanix_image.vim3"
+  bazel_inputs_from_gn = [ "//boards/vim3:vim3.bazel_input" ]
+}
+
+group("antlion-product-bundles") {
+  testonly = true
+  deps = [ ":antlion_testing_wlanix.vim3" ]
+}
