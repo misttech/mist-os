@@ -1031,7 +1031,7 @@ primarily for external tools that use bitcode for analysis.
 
 **Current value (from the default):** `false`
 
-From //build/config/clang/clang.gni:17
+From //build/config/clang/clang.gni:20
 
 ### clang_enable_error_reproducers
 
@@ -1044,7 +1044,7 @@ clang.
 
 **Current value (from the default):** `false`
 
-From //build/config/clang/clang.gni:25
+From //build/config/clang/clang.gni:28
 
 ### clang_ml_inliner
 
@@ -1052,16 +1052,17 @@ Controls whether to use the ML inliner in Clang to reduce size.
 
 **Current value (from the default):** `true`
 
-From //build/config/clang/clang.gni:28
+From //build/config/clang/clang.gni:31
 
 ### clang_prefix
 
 The default clang toolchain provided by the prebuilt. This variable is
 additionally consumed by the Go toolchain.
+LINT.IfChange
 
 **Current value (from the default):** `"//prebuilt/third_party/clang/linux-x64/bin"`
 
-From //build/config/clang/clang.gni:13
+From //build/config/clang/clang.gni:14
 
 ### clang_tool_dir
 
