@@ -10,7 +10,10 @@ default_clang_prefix = "//prebuilt/third_party/clang/${host_platform}/bin"
 declare_args() {
   # The default clang toolchain provided by the prebuilt. This variable is
   # additionally consumed by the Go toolchain.
+  # LINT.IfChange
   clang_prefix = default_clang_prefix
+
+  # LINT.ThenChange(//build/bazel/gn_build_args.txt)
 
   # Embed LLVM bitcode as .llvmbc section in ELF files. This is intended
   # primarily for external tools that use bitcode for analysis.

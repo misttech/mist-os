@@ -8,6 +8,7 @@ import("//build/bazel/bazel_inputs.gni")
 import("//build/bazel/bazel_workspace.gni")
 import("//build/bazel/generate_prebuilt_dir_content_hash.gni")
 import("//build/bazel/legacy_ninja_build_outputs.gni")
+import("//build/config/clang/clang.gni")
 import("//build/images/vbmeta.gni")
 import("//build/info/info.gni")
 import("//build/product.gni")
@@ -170,7 +171,9 @@ generate_prebuilt_dir_content_hash(prebuilt_content_hash_targets.python) {
 }
 
 generate_prebuilt_dir_content_hash(prebuilt_content_hash_targets.clang) {
-  source_dir = "//prebuilt/third_party/clang/${host_os}-${host_cpu}"
+  # clang_prefix points to the "bin" directory in clang toolchain, so go one
+  # level up to get the clang root dir.
+  source_dir = get_path_info(clang_prefix, "dir")
   output = prebuilt_content_hash_files.clang
   cipd_name = "clang"
 }
