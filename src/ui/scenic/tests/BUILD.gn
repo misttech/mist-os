@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//sdk/ctf/build/ctf.gni")
 import("//src/lib/vulkan/vulkan.gni")
 
 group("tests") {
@@ -32,35 +31,6 @@ group("tests") {
   # riscv64.
   if (target_cpu != "riscv64") {
     public_deps += [ ":cpu-renderer-integration-test" ]
-  }
-}
-
-group("ctf-tests") {
-  testonly = true
-  deps = [
-    ":display-ownership-integration-test-suite_archive",
-    ":flatland-allocation-test-suite_archive",
-    ":flatland-focus-integration-test-suite_archive",
-    ":flatland-mouse-integration-test-suite_archive",
-    ":flatland-pixeltest-flip-and-orientation-suite_archive",
-    ":flatland-pixeltest-general-suite_archive",
-    ":flatland-pixeltest-yuv-suite_archive",
-    ":flatland-protected-memory-integration-test-suite_archive",
-    ":flatland-touch-integration-test-suite_archive",
-    ":flatland-view-integration-test-suite_archive",
-    ":flatland-view-ref-installed-integration-test-suite_archive",
-    ":null-renderer-integration-test-suite_archive",
-    ":observer-registry-integration-test-suite_archive",
-    ":scoped-observer-registry-integration-test-suite_archive",
-    ":screen-capture-integration-test-suite_archive",
-    ":screen-capture2-integration-test-suite_archive",
-    ":singleton-display-integration-test-suite_archive",
-  ]
-
-  # TODO(https://fxbug.dev/42075218): Re-enable this test once zx_cache_flush is implemented on
-  # riscv64.
-  if (target_cpu != "riscv64") {
-    deps += [ ":cpu-renderer-integration-test-suite_archive" ]
   }
 }
 
@@ -153,7 +123,8 @@ template("ctf_components_packages") {
     deps = [ ":${test_prefix}-validator-bin" ]
   }
 
-  ctf_fuchsia_package("${test_prefix}-suite") {
+  # ctf_fuchsia_package
+  fuchsia_package("${test_prefix}-suite") {
     package_name = "${test_prefix}-suite"
     testonly = true
     deps = [ ":${test_prefix}-validator" ]
