@@ -10,6 +10,6 @@ include /src/security/bin/tee_manager/OWNERS
 include /src/sys/pkg/OWNERS
 include /src/testing/metrics-logger/OWNERS
 include /third_party/rust_crates/vendor/criterion-0.2.11/OWNERS
-include /third_party/rust_crates/vendor/serde-1.0.203/OWNERS
+include /third_party/rust_crates/vendor/serde-1.0.204/OWNERS
 include /third_party/rust_crates/vendor/tuf-0.3.0-beta12/OWNERS
 include /tools/cargo-gnaw/OWNERS
