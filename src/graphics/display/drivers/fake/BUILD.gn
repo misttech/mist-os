@@ -9,7 +9,10 @@ import("//build/test.gni")
 
 group("tests") {
   testonly = true
-  deps = [ ":fake-display-unittests" ]
+  deps = [
+    ":fake-display-unittests",
+    ":sysmem-service-forwarder-tests",
+  ]
 }
 
 source_set("fake-lib") {
@@ -119,4 +122,50 @@ source_set("sysmem-service-provider") {
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
     "//zircon/system/ulib/zx",
   ]
+}
+
+source_set("sysmem-service-forwarder") {
+  sources = [
+    "sysmem-service-forwarder.cc",
+    "sysmem-service-forwarder.h",
+  ]
+  public_deps = [
+    ":sysmem-service-provider",
+    "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_cpp",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
+    "//sdk/lib/component/outgoing/cpp",
+    "//sdk/lib/syslog/cpp",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
+  ]
+  deps = [
+    "//sdk/lib/component/incoming/cpp",
+    "//zircon/system/ulib/async:async-cpp",
+    "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/sync:sync-cpp",
+  ]
+}
+
+test("sysmem-service-forwarder-unittest") {
+  sources = [ "sysmem-service-forwarder-unittest.cc" ]
+  deps = [
+    ":sysmem-service-forwarder",
+    "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_cpp",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
+    "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp",
+    "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp",
+    "//sdk/lib/component/incoming/cpp",
+    "//sdk/lib/device-watcher/cpp",
+    "//sdk/lib/fdio",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/predicates",
+  ]
+}
+
+fuchsia_unittest_package("sysmem-service-forwarder-tests") {
+  deps = [ ":sysmem-service-forwarder-unittest" ]
+  manifest = "meta/sysmem-service-forwarder-tests.cml"
+
+  # The test type must be "vulkan" in order to use the system-provided
+  # sysmem allocators.
+  test_type = "vulkan"
 }
