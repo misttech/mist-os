@@ -475,15 +475,6 @@ template("gvisor_tests_package") {
         max_severity = "ERROR"
       }
 
-      # gVisor tests rely heavily on sleep() for test ordering. These have proven to be rather
-      # flakey on emulator targets which sometimes run on heavily loaded hosts. Only run these on
-      # hardware to attempt to mitigate since we don't control these tests' definitions.
-      # TODO(https://fxbug.dev/355311252) run on emulators again once sleep-based flakes ruled out
-      environments = [
-        nuc11_env,
-        vim3_env,
-      ]
-
       # It takes a while to download the blobs. Debug builders are slower than
       # their release counterparts.
       if (is_debug) {
