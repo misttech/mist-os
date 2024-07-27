@@ -137,6 +137,34 @@ void HandoffPrep::SummarizeMiscZbiItems(ktl::span<ktl::byte> zbi) {
           extra_mem_config_ranges++;
         }
 
+        // TODO(https://fxbug.dev/42085637): Clean up when zircon initializes in virtual address
+        // mode.
+        //
+        // Peripheral ranges are only meaningful in ARM64 where accesses cannot be performed
+        // through the physmap at the time of writing.
+        ktl::optional<zbi_mem_range_t> uart_periph_range;
+        // TODO(https://fxbug.dev/42085637): Clean this up.
+        if constexpr (kArchHandoffGenerateUartPeripheralRanges) {
+          // TODO(https://fxbug.dev/42079911): Use length provided by the driver, not
+          // assume it is just one page. This works in practice but is not
+          // entirely correct.
+          uart::internal::Visit(
+              [&uart_periph_range, &extra_mem_config_ranges](const auto& uart) {
+                using dcfg_type = ktl::decay_t<decltype(uart.config())>;
+                if constexpr (ktl::is_same_v<dcfg_type, zbi_dcfg_simple_t>) {
+                  // If this range overlaps with other peripheral ranges, it will be coalesced,
+                  // otherwise it will be a single page.
+                  uart_periph_range = {
+                      .paddr = fbl::round_down(uart.config().mmio_phys, ZX_PAGE_SIZE),
+                      .length = ZX_PAGE_SIZE,
+                      .type = ZBI_MEM_TYPE_PERIPHERAL,
+                  };
+                  extra_mem_config_ranges++;
+                }
+              },
+              gBootOptions->serial);
+        }
+
         ktl::span handoff_mem_config =
             New(handoff()->mem_config, ac, mem_config.size() + extra_mem_config_ranges);
         ZX_ASSERT_MSG(ac.check(), "cannot allocate %zu bytes for memory handoff",
@@ -144,6 +172,11 @@ void HandoffPrep::SummarizeMiscZbiItems(ktl::span<ktl::byte> zbi) {
 
         // Align memory to page boundaries.
         size_t current = 0;
+
+        if (uart_periph_range) {
+          handoff_mem_config[current++] = *uart_periph_range;
+        }
+
         if (test_ram_reserve) {
           // TODO(mcgrathr): Note this will persist into the mexec handoff from
           // the kernel and be elided from the next kernel.  But that will be
