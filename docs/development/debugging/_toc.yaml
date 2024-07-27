@@ -14,7 +14,7 @@ toc:
   path: /docs/development/debugging/just_in_time_debugging.md
 - title: "UI debugging tips"
   path: /docs/development/debugging/ui_tips.md
-- title: "Use the native debugger (zxdb)"
+- title: "Using the native debugger (zxdb)"
   section:
   - include: /docs/development/debugger/_toc.yaml
 - title: "Debug the kernel"

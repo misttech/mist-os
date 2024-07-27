@@ -1,7 +1,12 @@
-# Handles and kernel objects in zxdb
+# List handles and kernel objects
 
-List all handles and [VMOs](/docs/reference/kernel_objects/vm_object.md) (some of these "Virtual
-Memory Objects" can be mapped but won't have open handles) with the `handles` command.
+## `handles`
+
+The `handles` command lists all handles and [VMOs][vmo-docs]. Some of these
+Virtual Memory Objects can be mapped but won't have open handles with the
+`handles` command.
+
+For example:
 
 ```none {:.devsite-disable-click-to-copy}
 [zxdb] handles
@@ -12,7 +17,10 @@ Memory Objects" can be mapped but won't have open handles) with the `handles` co
   4169819767  ZX_OBJ_TYPE_CHANNEL  30222
 ```
 
-You can look up more detailed information by handle value:
+You can use `handle` to specify a handle value to see more detailed information.
+For example:
+
+Note: This command is `handle` and not `handles`.
 
 ```none {:.devsite-disable-click-to-copy}
 [zxdb] handle 4166674259
@@ -24,9 +32,12 @@ You can look up more detailed information by handle value:
           ZX_RIGHT_INSPECT
 ```
 
-Or you can look up an object by koid. Koid lookup will only search the objects in the debugged
-process and won't match arbitrary kernel objects owned by other processes. Koid lookup is the only
-way to show detailed information for mapped VMOs that have no open handles.
+You can also look up an object by koid. Koid lookup only searches the objects
+in the debugged process and won't match arbitrary kernel objects owned by other
+processes. Koid lookup is the only way to show detailed information for mapped
+VMOs that have no open handles.
+
+For example:
 
 ```none {:.devsite-disable-click-to-copy}
 [zxdb] handle -k 30108
@@ -47,3 +58,5 @@ way to show detailed information for mapped VMOs that have no open handles.
            Metadata bytes  176
   Committed change events  0
 ```
+
+[vmo-docs]: /docs/reference/kernel_objects/vm_object.md
