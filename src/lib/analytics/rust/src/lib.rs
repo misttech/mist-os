@@ -16,7 +16,7 @@ use std::sync::{Arc, OnceLock};
 
 use std::ops::DerefMut;
 
-use crate::env_info::{analytics_folder, is_analytics_disabled_by_env};
+use crate::env_info::{is_analytics_disabled_by_env, migrate_legacy_folder};
 use crate::ga4_event::GA4Value;
 use crate::ga4_metrics_service::*;
 use crate::metrics_state::{MetricsState, UNKNOWN_VERSION};
@@ -25,11 +25,35 @@ const INIT_ERROR: &str = "Please call analytics::init prior to any other analyti
 
 pub static GA4_METRICS_INSTANCE: OnceLock<Arc<Mutex<GA4MetricsService>>> = OnceLock::new();
 
+pub use env_info::get_analytics_dir;
+
+// Keep old method until dependencies in other repositories are migrated to the new API.
+pub async fn init_ga4_metrics_service(
+    app_name: String,
+    build_version: Option<String>,
+    sdk_version: String,
+    ga4_product_code: String,
+    ga4_key: String,
+    invoker: Option<String>,
+) -> Result<Arc<Mutex<GA4MetricsService>>> {
+    initialize_ga4_metrics_service(
+        app_name,
+        get_analytics_dir().ok(),
+        build_version,
+        sdk_version,
+        ga4_product_code,
+        ga4_key,
+        invoker,
+    )
+    .await
+}
+
 /// Initializes and return the G4 Metrics Service.
 /// Only call this once, but, call it before calling
 /// ga4_metrics().
-pub async fn init_ga4_metrics_service(
+pub async fn initialize_ga4_metrics_service(
     app_name: String,
+    analytics_path: Option<PathBuf>,
     build_version: Option<String>,
     sdk_version: String,
     ga4_product_code: String,
@@ -39,10 +63,13 @@ pub async fn init_ga4_metrics_service(
     let metrics_dir: PathBuf;
     let mut disabled_by_init_failure = false;
 
-    match analytics_folder() {
-        Ok(metrics_dir_retrieved) => metrics_dir = metrics_dir_retrieved,
-        Err(e) => {
-            tracing::error!("Could not get analytics folder. Disabling analytics. Error: {:?}", e);
+    match analytics_path {
+        Some(metrics_dir_retrieved) => {
+            metrics_dir = metrics_dir_retrieved;
+            migrate_legacy_folder(&metrics_dir)?;
+        }
+        None => {
+            tracing::warn!("Analytics folder not set. Disabling analytics.");
             disabled_by_init_failure = true;
             metrics_dir = PathBuf::from("");
         }

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use analytics::{ga4_metrics, init_ga4_metrics_service};
+use analytics::{ga4_metrics, get_analytics_dir, initialize_ga4_metrics_service};
 use anyhow::Context;
 use std::collections::BTreeMap;
 use thiserror::Error;
@@ -30,8 +30,9 @@ pub struct GaMetricsService {}
 
 impl GaMetricsService {
     pub async fn new(version: String) -> Result<Self, MetricsError> {
-        let _ = init_ga4_metrics_service(
+        let _ = initialize_ga4_metrics_service(
             String::from("funnel"),
+            get_analytics_dir().ok(),
             Some(version),
             "no_sdk".to_string(),
             GA4_PROPERTY_ID.to_string(),

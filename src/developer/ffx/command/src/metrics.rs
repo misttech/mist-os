@@ -57,12 +57,13 @@ impl MetricsSession {
         let invoker = context.get("fuchsia.analytics.ffx_invoker").unwrap_or(None);
         let build_info = context.build_info();
         let enabled = context.analytics_enabled().await;
+        let analytics_path = context.get_analytics_path();
         let sdk_version = if enabled {
             get_sdk_version(&context).await.unwrap_or_else(|| UNKNOWN_SDK.to_string())
         } else {
             UNKNOWN_SDK.to_string()
         };
-        init_metrics_svc(build_info, invoker.clone(), sdk_version).await;
+        init_metrics_svc(analytics_path, build_info, invoker.clone(), sdk_version).await;
         if !enabled {
             opt_out_for_this_invocation().await?
         }

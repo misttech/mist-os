@@ -39,11 +39,16 @@ fn convert_macos_to_darwin(arch: &str) -> String {
 /// When, creating this folder, if there is a legacy analytics folder,
 /// it migrates those settings.
 ///
-pub fn analytics_folder() -> Result<PathBuf, Error> {
+pub fn get_analytics_dir() -> Result<PathBuf, Error> {
     let analytics_folder = new_analytics_folder();
+    migrate_legacy_folder(&analytics_folder)?;
+    Ok(analytics_folder)
+}
+
+pub(crate) fn migrate_legacy_folder(analytics_folder: &PathBuf) -> Result<(), Error> {
     let old_analytics_folder = old_analytics_folder();
     if !analytics_folder.exists() && old_analytics_folder.exists() {
-        tracing::trace!("Migrating analytics to {:?}", &analytics_folder);
+        tracing::trace!("Migrating analytics to {analytics_folder:?}");
         create_dir_all(&analytics_folder)?;
         copy_old_to_new(&old_analytics_folder, &analytics_folder)?;
         remove_old_analytics_dir(&old_analytics_folder);
@@ -51,7 +56,7 @@ pub fn analytics_folder() -> Result<PathBuf, Error> {
     } else if !analytics_folder.exists() {
         create_dir_all(&analytics_folder)?;
     }
-    Ok(analytics_folder)
+    Ok(())
 }
 
 fn remove_old_analytics_dir(old_analytics_folder: &PathBuf) {
