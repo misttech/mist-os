@@ -139,7 +139,8 @@ func NewOmahaServer(ctx context.Context, args OmahaToolArgs, providedStdout io.W
 
 		// parse line
 		words := strings.Fields(line)
-		_, parsedPort, err := net.SplitHostPort(words[2])
+		addr := strings.TrimPrefix(strings.TrimRight(words[2], "/"), "http://")
+		_, parsedPort, err := net.SplitHostPort(addr)
 		if err != nil {
 			return nil, err
 		}

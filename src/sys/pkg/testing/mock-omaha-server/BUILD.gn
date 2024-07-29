@@ -11,10 +11,13 @@ rustc_library("mock-omaha-server") {
   with_unit_tests = true
 
   deps = [
+    "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia-hyper",
     "//src/lib/fuchsia-sync",
     "//src/sys/pkg/lib/fuchsia-merkle",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:derive_builder",
+    "//third_party/rust_crates:futures",
     "//third_party/rust_crates:hex",
     "//third_party/rust_crates:hyper",
     "//third_party/rust_crates:omaha_client",
@@ -25,13 +28,14 @@ rustc_library("mock-omaha-server") {
     "//third_party/rust_crates:tracing",
     "//third_party/rust_crates:url",
   ]
-  if (is_fuchsia) {
+  if (!is_fuchsia) {
     deps += [
-      "//src/lib/fuchsia-async",
-      "//src/lib/fuchsia-hyper",
-      "//third_party/rust_crates:futures",
+      "//third_party/rust_crates:async-net",
+      "//third_party/rust_crates:tokio",
     ]
   }
+
+  features = [ "fasync" ]
 
   sources = [ "src/lib.rs" ]
   configs += [ "//build/config/rust/lints:clippy_warn_all" ]
@@ -59,18 +63,16 @@ if (is_host) {
     deps = [
       ":mock-omaha-server",
       "//src/lib/fuchsia-async",
-      "//src/lib/fuchsia-hyper",
       "//src/lib/fuchsia-sync",
       "//third_party/rust_crates:anyhow",
       "//third_party/rust_crates:argh",
       "//third_party/rust_crates:async-net",
-      "//third_party/rust_crates:futures",
-      "//third_party/rust_crates:hyper",
       "//third_party/rust_crates:serde_json",
-      "//third_party/rust_crates:tokio",
     ]
 
     inputs = [ "src/testing_keys/test_private_key.pem" ]
+
+    features = [ "fasync" ]
 
     sources = [ "src/main.rs" ]
     configs += [ "//build/config/rust/lints:clippy_warn_all" ]
@@ -83,5 +85,8 @@ group("bin-host") {
 
 group("tests") {
   testonly = true
-  public_deps = [ ":mock-omaha-server-lib-tests" ]
+  public_deps = [
+    ":mock-omaha-server-lib-tests",
+    ":mock-omaha-server_test",
+  ]
 }
