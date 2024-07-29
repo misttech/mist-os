@@ -14,7 +14,7 @@ Currently, only very basic software development is possible in `stardev`.
 In order to get reasonable performance in `stardev`, you should build Fuchsia using `--release`:
 
 ```sh
-$ fx set workbench_eng.x64 --release
+$ fx set workbench_eng.x64 --release --with //src/starnix/tools/convert_tarball_to_starnix_container
 $ fx build
 ```
 
@@ -44,7 +44,7 @@ $ ffx component run /core/starnix_runner/playground:stardev fuchsia-pkg://fuchsi
 Once you have the container running, you can connect to the container via the console:
 
 ```sh
-$ ffx starnix console --moniker /core/starnix_runner/playground:stardev /bin/bash
+$ ffx starnix console --moniker /core/starnix_runner/playground:stardev /bin/bash -l
 ```
 
 ### Installing software
@@ -85,10 +85,7 @@ int main(int argc, char** argv) {
 Next, build and run the program:
 
 ```sh
-# clang -fuse-ld=/usr/bin/ld main.c -Wall -Werror -o hello_world
+# clang main.c -Wall -Werror -o hello_world
 # ./hello_world
 hello, starnix
 ```
-
-TODO: Figure out why `-fuse-ld=/usr/bin/ld` is required. For some reason `clang` cannot find `ld`
-on its own.
