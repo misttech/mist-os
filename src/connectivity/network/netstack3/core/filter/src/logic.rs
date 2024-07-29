@@ -333,9 +333,6 @@ where
                     // TODO(https://fxbug.dev/328064909): Support configurable
                     // dropping of invalid packets.
                     Err(GetConnectionError::InvalidPacket(c)) => Some(c),
-                    Err(GetConnectionError::DropRequired) => {
-                        return IngressVerdict::Verdict(Verdict::Drop)
-                    }
                 };
 
             let mut verdict = match check_routines_for_ingress(
@@ -403,7 +400,6 @@ where
                         // TODO(https://fxbug.dev/328064909): Support
                         // configurable dropping of invalid packets.
                         Err(GetConnectionError::InvalidPacket(c)) => Some(c),
-                        Err(GetConnectionError::DropRequired) => return Verdict::Drop,
                     }
                 }
             };
@@ -472,7 +468,6 @@ where
                     // TODO(https://fxbug.dev/328064909): Support configurable
                     // dropping of invalid packets.
                     Err(GetConnectionError::InvalidPacket(c)) => Some(c),
-                    Err(GetConnectionError::DropRequired) => return Verdict::Drop,
                 };
 
             let verdict = match check_routines_for_hook(
@@ -536,7 +531,6 @@ where
                             // TODO(https://fxbug.dev/328064909): Support
                             // configurable dropping of invalid packets.
                             Err(GetConnectionError::InvalidPacket(c)) => Some(c),
-                            Err(GetConnectionError::DropRequired) => return Verdict::Drop,
                         }
                     }
                 };

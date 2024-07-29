@@ -255,7 +255,6 @@ impl<I: IpExt, BC: FilterBindingsContext, E: Default> Table<I, BC, E> {
                 ConnectionUpdateError::InvalidPacket => {
                     Err(GetConnectionError::InvalidPacket(connection))
                 }
-                ConnectionUpdateError::DropRequired => Err(GetConnectionError::DropRequired),
             },
         }
     }
@@ -454,9 +453,6 @@ enum ConnectionUpdateError {
     /// The packet was invalid. The caller may decide whether to drop this
     /// packet or not.
     InvalidPacket,
-
-    /// This packet must be dropped to maintain correctness.
-    DropRequired,
 }
 
 /// An error returned from [`Table::get_connection_for_packet_and_update`].
@@ -465,9 +461,6 @@ enum ConnectionUpdateError {
 pub(crate) enum GetConnectionError<I: IpExt, BT: FilterBindingsTypes, E> {
     /// The packet was invalid. The caller may decide whether to drop it or not.
     InvalidPacket(Connection<I, BT, E>),
-
-    /// The caller must drop the packet.
-    DropRequired,
 }
 
 /// A `Connection` contains all of the information about a single connection

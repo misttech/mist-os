@@ -31,16 +31,21 @@ pub(crate) struct Connection {
     /// TODO(https://fxbug.dev/328064736): Remove once we have implemented the
     /// ESTABLISHED state.
     established: bool,
-
-    /// TODO(https://fxbug.dev/355699182): Properly support self-connected
-    /// connections.
-    self_connected: bool,
     state: State,
 }
 
 impl Connection {
     pub fn new(segment: &SegmentHeader, payload_len: usize, self_connected: bool) -> Option<Self> {
-        Some(Self { state: State::new(segment, payload_len)?, established: false, self_connected })
+        Some(Self {
+            // TODO(https://fxbug.dev/355699182): Properly support self-connected
+            // connections.
+            state: if self_connected {
+                Untracked {}.into()
+            } else {
+                State::new(segment, payload_len)?
+            },
+            established: false,
+        })
     }
 
     pub fn expiry_duration(&self) -> Duration {
@@ -68,12 +73,6 @@ impl Connection {
             ConnectionDirection::Reply => self.established = true,
         }
 
-        // TODO(https://fxbug.dev/355699182): Remove once self-connected
-        // connections are supported.
-        if self.self_connected {
-            return Ok(ConnectionUpdateAction::NoAction);
-        }
-
         self.state.update(segment, payload_len, dir)
     }
 }
@@ -86,6 +85,12 @@ impl Connection {
 /// of each of the peers assuming that all packets are received and are valid.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum State {
+    /// The connection has properties that break standard state tracking. This
+    /// state does a good-enough job tracking the connection.
+    ///
+    /// This is a short-circuit state that can never be left.
+    Untracked(Untracked),
+
     /// The initial SYN for this connection has been sent. State contained
     /// within is everything that can be gleaned from the initial SYN packet
     /// sent in the original direction.
@@ -137,6 +142,7 @@ impl State {
         dir: ConnectionDirection,
     ) -> Result<ConnectionUpdateAction, ConnectionUpdateError> {
         let (new_state, action) = match self {
+            State::Untracked(s) => s.update(segment, payload_len, dir),
             State::SynSent(s) => s.update(segment, payload_len, dir),
             State::WaitingOnOpeningAck(s) => s.update(segment, payload_len, dir),
         }?;
@@ -213,6 +219,24 @@ struct Peer {
     /// Unset when a reply segment is seen that has an ACK number equal to
     /// `max_next_seq` (larger would mean an invalid packet).
     unacked_data: bool,
+}
+
+/// State for the Untracked state.
+///
+/// This state never transitions to another state.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Untracked {}
+state_from_state_struct!(Untracked);
+
+impl Untracked {
+    fn update(
+        &self,
+        _segment: &SegmentHeader,
+        _payload_len: usize,
+        _dir: ConnectionDirection,
+    ) -> Result<(Option<State>, ConnectionUpdateAction), ConnectionUpdateError> {
+        Ok((None, ConnectionUpdateAction::NoAction))
+    }
 }
 
 /// State for the SynSent state.
@@ -332,12 +356,14 @@ impl SynSent {
                         let Some(ack) = segment.ack else {
                             // TODO(https://fxbug.dev/355200767): Support
                             // simultaneous open.
-                            log::warn!("Dropping unsupported TCP simultaneous open");
-                            // This should make connection establishment take a
-                            // little longer, but should not prevent it as the
-                            // original direction will re-send the SYN, to which
-                            // the other side should respond with a SYN/ACK.
-                            return Err(ConnectionUpdateError::DropRequired);
+                            log::warn!(
+                                "Unsupported TCP simultaneous open. Giving up on detailed tracking"
+                            );
+
+                            return Ok((
+                                Some(Untracked {}.into()),
+                                ConnectionUpdateAction::NoAction,
+                            ));
                         };
 
                         let reply_window_scale = segment.options.window_scale;
@@ -424,7 +450,7 @@ impl WaitingOnOpeningAck {
 
 #[cfg(test)]
 mod tests {
-    use super::{Peer, State, SynSent};
+    use super::{Peer, State, SynSent, Untracked};
 
     use assert_matches::assert_matches;
     use netstack3_base::{
@@ -631,9 +657,9 @@ mod tests {
             options: Options::default(),
         };
 
-        assert_matches!(
+        assert_eq!(
             state.update(&segment, /*payload_len*/ 0, ConnectionDirection::Reply),
-            Err(ConnectionUpdateError::DropRequired)
+            Ok((Some(Untracked {}.into()), ConnectionUpdateAction::NoAction))
         );
     }
 
