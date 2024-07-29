@@ -53,9 +53,43 @@ impl<'a> Into<Segment<'a>> for &'a str {
 }
 
 #[derive(Debug, Eq, PartialEq)]
+pub enum TreeNames<'a> {
+    Some(Vec<Cow<'a, str>>),
+    All,
+}
+
+impl<'a> Into<TreeNames<'a>> for Vec<&'a str> {
+    fn into(self) -> TreeNames<'a> {
+        let mut payload = vec![];
+        for name in self {
+            if !name.contains('\\') {
+                payload.push(Cow::Borrowed(name));
+                continue;
+            }
+            let mut result = String::with_capacity(name.len());
+            let mut iter = name.chars();
+            while let Some(c) = iter.next() {
+                match c {
+                    '\\' => {
+                        // push unescaped character since we are constructing an exact match.
+                        if let Some(c) = iter.next() {
+                            result.push(c);
+                        }
+                    }
+                    c => result.push(c),
+                }
+            }
+            payload.push(Cow::Owned(result));
+        }
+        TreeNames::Some(payload)
+    }
+}
+
+#[derive(Debug, Eq, PartialEq)]
 pub struct TreeSelector<'a> {
     pub node: Vec<Segment<'a>>,
     pub property: Option<Segment<'a>>,
+    pub tree_names: Option<TreeNames<'a>>,
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -70,10 +104,12 @@ pub struct Selector<'a> {
 }
 
 impl Into<fdiagnostics::Selector> for Selector<'_> {
-    fn into(self) -> fdiagnostics::Selector {
+    fn into(mut self) -> fdiagnostics::Selector {
+        let tree_names = self.tree.tree_names.take();
         fdiagnostics::Selector {
             component_selector: Some(self.component.into()),
             tree_selector: Some(self.tree.into()),
+            tree_names: tree_names.map(|names| names.into()),
             ..Default::default()
         }
     }
@@ -102,6 +138,17 @@ impl Into<fdiagnostics::TreeSelector> for TreeSelector<'_> {
                     node_path,
                     target_properties: property.into(),
                 })
+            }
+        }
+    }
+}
+
+impl Into<fdiagnostics::TreeNames> for TreeNames<'_> {
+    fn into(self) -> fdiagnostics::TreeNames {
+        match self {
+            Self::All => fdiagnostics::TreeNames::All(fdiagnostics::All {}),
+            Self::Some(names) => {
+                fdiagnostics::TreeNames::Some(names.iter().map(|n| n.to_string()).collect())
             }
         }
     }

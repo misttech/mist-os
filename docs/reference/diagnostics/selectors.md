@@ -136,8 +136,9 @@ The component selector `**` alone matches all components on the system.
 ### Syntax {#syntax}
 
 The hierarchy path selector defines a pattern which describes a path through a structured data
-hierarchy, to one or many named nodes. The syntax of this sub-selector is identical to that of
-the component selector, since they both describe paths through a tree of named nodes.
+hierarchy, to one or many named nodes. The syntax of this sub-selector is nearly identical to that
+of the component selector, since they both describe paths through a tree of named nodes. The only
+difference is the optional tree name filter discussed below.
 
 Consider the following JSON-encoding of a diagnostics data hierarchy. In this case, the hierarchy
 comes from Inspect.
@@ -216,6 +217,65 @@ core/reverser_service/connection-*
 In the example above, the only matching node is `connection-0x0`, but if more connection nodes
 existed, they’d match as well.
 
+### Tree name filters
+
+When a component publishes multiple `fucshia.inspect.Tree` protocols, the selector syntax
+supports filtering those trees by the `name ` value in the protocol's metadata.
+
+Suppose you had an Inspect hierarchy that looked like this when you did
+`ffx inspect show core/my_component`:
+
+```
+core/my_component:
+  metadata:
+    name = root
+    component_url = fuchsia-boot:///my_component#meta/my_component.cm
+    timestamp = 70863435581892
+  payload:
+    root:
+      connections:
+        connections_closed = 7
+core/my_component:
+  metadata:
+    name = second_tree
+    component_url = fuchsia-boot:///my_component#meta/my_component.cm
+    timestamp = 70863435581892
+  payload:
+    root:
+      data:
+        values = [0, 1, 2]
+```
+
+If you know that you want the property `root/data:values`, you can use a tree name filter to
+avoid the overhead of snapshotting both trees with the following syntax (leaving out the property
+selector portion for now):
+
+```
+[name=second_tree]root/data
+```
+
+If you don't know which tree you want to select against, or you know you want to select from all
+the trees, you can use this hierarchy selector:
+
+```
+[...]root
+```
+
+This is equivalent to listing all of the names:
+
+```
+[name=root, name=second_tree]root
+```
+
+Omitting the list will currently be treated as equivalent to `[...]`, but this is a soft transition.
+Prefer the explicit syntax if you know your component exports multiple trees with different names.
+
+If a component doesn't specify a name when publishing Inspect, it will implicitly be `root`.
+This [bug](https://fxbug.dev/355732696) tracks making an omitted name filter list equivalent to
+`[name=root]`.
+
+There is no character restriction on the values in a name filter list, but `:`, `*`, and spaces
+must be escaped. If the name contains values other than `[a-zA-Z0-9-_]`, the name must be quoted.
 
 ## Property selector {#property_selector}
 

@@ -291,8 +291,9 @@ impl InspectRepositoryInner {
             }
 
             // This artifact contains inspect and matches a passed selector.
-            if let Some(unpopulated) =
-                container.create_unpopulated(identity, optional_hierarchy_matcher)
+            if let Some(unpopulated) = container
+                .create_unpopulated(identity, optional_hierarchy_matcher)
+                .map(|unpopulated| unpopulated.prefilter(component_selectors))
             {
                 containers.push(unpopulated);
             }
