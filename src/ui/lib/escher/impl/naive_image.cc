@@ -47,7 +47,7 @@ ImagePtr NaiveImage::AdoptVkImage(ResourceManager* image_owner, ImageInfo info, 
 
   auto bind_result = image_owner->vk_device().bindImageMemory(vk_image, mem->base(), mem->offset());
   if (bind_result != vk::Result::eSuccess) {
-    FX_DLOGS(ERROR) << "vkBindImageMemory failed: " << vk::to_string(bind_result);
+    FX_LOGS(ERROR) << "vkBindImageMemory failed: " << vk::to_string(bind_result);
     return nullptr;
   }
 
