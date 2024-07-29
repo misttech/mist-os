@@ -5,9 +5,8 @@
 pub mod constants;
 
 use anyhow::{anyhow, ensure, Context as _, Error};
-use fidl_fuchsia_hardware_block::BlockProxy;
-use fidl_fuchsia_hardware_block_partition::PartitionProxy;
-use fuchsia_zircon::{self as zx, HandleBased as _};
+use fuchsia_zircon as zx;
+use remote_block_device::{AsBlockProxy, BlockClient, MutableBufferSlice, RemoteBlockClient};
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum DiskFormat {
@@ -77,59 +76,7 @@ pub fn round_up(val: u64, divisor: u64) -> Option<u64> {
     ((val.checked_add(divisor.checked_sub(1)?)?).checked_div(divisor)?).checked_mul(divisor)
 }
 
-/// Wrap the functions that [`detect_disk_format`] needs to use from Block in a trait, so we can
-/// substitute something else (e.g. a PartitionProxy).
-pub trait DetectableDevice: Send + Sync {
-    fn get_info(
-        &self,
-    ) -> fidl::client::QueryResponseFut<fidl_fuchsia_hardware_block::BlockGetInfoResult>;
-
-    fn read_blocks(
-        &self,
-        vmo: fidl::Vmo,
-        length: u64,
-        dev_offset: u64,
-        vmo_offset: u64,
-    ) -> fidl::client::QueryResponseFut<fidl_fuchsia_hardware_block::BlockReadBlocksResult>;
-}
-
-impl DetectableDevice for BlockProxy {
-    fn get_info(
-        &self,
-    ) -> fidl::client::QueryResponseFut<fidl_fuchsia_hardware_block::BlockGetInfoResult> {
-        BlockProxy::get_info(self)
-    }
-
-    fn read_blocks(
-        &self,
-        vmo: fidl::Vmo,
-        length: u64,
-        dev_offset: u64,
-        vmo_offset: u64,
-    ) -> fidl::client::QueryResponseFut<fidl_fuchsia_hardware_block::BlockReadBlocksResult> {
-        BlockProxy::read_blocks(self, vmo, length, dev_offset, vmo_offset)
-    }
-}
-
-impl DetectableDevice for PartitionProxy {
-    fn get_info(
-        &self,
-    ) -> fidl::client::QueryResponseFut<fidl_fuchsia_hardware_block::BlockGetInfoResult> {
-        PartitionProxy::get_info(self)
-    }
-
-    fn read_blocks(
-        &self,
-        vmo: fidl::Vmo,
-        length: u64,
-        dev_offset: u64,
-        vmo_offset: u64,
-    ) -> fidl::client::QueryResponseFut<fidl_fuchsia_hardware_block::BlockReadBlocksResult> {
-        PartitionProxy::read_blocks(self, vmo, length, dev_offset, vmo_offset)
-    }
-}
-
-pub async fn detect_disk_format(block_proxy: &dyn DetectableDevice) -> DiskFormat {
+pub async fn detect_disk_format(block_proxy: impl AsBlockProxy) -> DiskFormat {
     match detect_disk_format_res(block_proxy).await {
         Ok(format) => format,
         Err(e) => {
@@ -139,7 +86,7 @@ pub async fn detect_disk_format(block_proxy: &dyn DetectableDevice) -> DiskForma
     }
 }
 
-async fn detect_disk_format_res(block_proxy: &dyn DetectableDevice) -> Result<DiskFormat, Error> {
+async fn detect_disk_format_res(block_proxy: impl AsBlockProxy) -> Result<DiskFormat, Error> {
     let block_info = block_proxy
         .get_info()
         .await
@@ -170,22 +117,10 @@ async fn detect_disk_format_res(block_proxy: &dyn DetectableDevice) -> Result<Di
 
     let buffer_size = round_up(header_size as u64, block_info.block_size as u64)
         .ok_or_else(|| anyhow!("overflow rounding header size up"))?;
-    let vmo = zx::Vmo::create(buffer_size).context("failed to create vmo")?;
-    let () = block_proxy
-        .read_blocks(
-            vmo.duplicate_handle(zx::Rights::SAME_RIGHTS)
-                .context("vmo duplicate handle call failed")?,
-            buffer_size,
-            0,
-            0,
-        )
-        .await
-        .context("transport error on read_blocks protocol")?
-        .map_err(zx::Status::from_raw)
-        .context("read_blocks returned an error status")?;
-
+    let client =
+        RemoteBlockClient::new(block_proxy).await.context("RemoteBlockClient::new failed")?;
     let mut data = vec![0; buffer_size as usize];
-    vmo.read(&mut data, 0).context("vmo read failed")?;
+    client.read_at(MutableBufferSlice::Memory(&mut data), 0).await.context("read_at failed")?;
 
     if data.starts_with(&constants::FVM_MAGIC) {
         return Ok(DiskFormat::Fvm);
@@ -244,46 +179,24 @@ async fn detect_disk_format_res(block_proxy: &dyn DetectableDevice) -> Result<Di
 mod tests {
     use super::{constants, detect_disk_format_res, DiskFormat};
     use anyhow::Error;
+    use fake_server::FakeServer;
     use fidl::endpoints::create_proxy_and_stream;
-    use fidl_fuchsia_hardware_block::{BlockInfo, BlockMarker, BlockRequest, Flag};
-    use futures::{pin_mut, select, FutureExt, TryStreamExt};
+    use fidl_fuchsia_hardware_block_volume::VolumeMarker;
+    use futures::{select, FutureExt};
+    use std::pin::pin;
 
     async fn get_detected_disk_format(
         content: &[u8],
         block_count: u64,
-        block_size: u64,
+        block_size: u32,
     ) -> Result<DiskFormat, Error> {
-        let (proxy, mut stream) = create_proxy_and_stream::<BlockMarker>().unwrap();
+        let (proxy, stream) = create_proxy_and_stream::<VolumeMarker>().unwrap();
 
-        let mock_device = async {
-            while let Some(request) = stream.try_next().await.unwrap() {
-                match request {
-                    BlockRequest::GetInfo { responder } => {
-                        responder
-                            .send(Ok(&BlockInfo {
-                                block_count: block_count,
-                                block_size: block_size as u32,
-                                max_transfer_size: 1024 * 1024,
-                                flags: Flag::empty(),
-                            }))
-                            .unwrap();
-                    }
-                    BlockRequest::ReadBlocks { vmo, length, dev_offset, vmo_offset, responder } => {
-                        assert_eq!(dev_offset, 0);
-                        assert_eq!(length, content.len() as u64);
-                        vmo.write(content, vmo_offset).unwrap();
-                        responder.send(Ok(())).unwrap();
-                    }
-                    _ => unreachable!(),
-                }
-            }
-        }
-        .fuse();
-
-        pin_mut!(mock_device);
+        let fake_server = FakeServer::new(block_count, block_size, content);
+        let mut request_handler = pin!(fake_server.serve(stream).fuse());
 
         select! {
-          _ = mock_device => unreachable!(),
+          _ = request_handler => unreachable!(),
           format = detect_disk_format_res(&proxy).fuse() => format,
         }
     }

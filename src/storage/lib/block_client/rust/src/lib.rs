@@ -4,6 +4,10 @@
 
 use anyhow::{ensure, Error};
 use async_trait::async_trait;
+use fidl::endpoints::ServerEnd;
+use fidl_fuchsia_hardware_block::BlockProxy;
+use fidl_fuchsia_hardware_block_partition::PartitionProxy;
+use fidl_fuchsia_hardware_block_volume::VolumeProxy;
 use fuchsia_async::{self as fasync, FifoReadable as _, FifoWritable as _};
 use fuchsia_zircon::sys::zx_handle_t;
 use fuchsia_zircon::{self as zx, HandleBased as _};
@@ -551,9 +555,45 @@ pub struct RemoteBlockClient {
     common: Common,
 }
 
+pub trait AsBlockProxy {
+    fn get_info(&self) -> impl Future<Output = Result<block::BlockGetInfoResult, fidl::Error>>;
+
+    fn open_session(&self, session: ServerEnd<block::SessionMarker>) -> Result<(), fidl::Error>;
+}
+
+impl<T: AsBlockProxy> AsBlockProxy for &T {
+    fn get_info(&self) -> impl Future<Output = Result<block::BlockGetInfoResult, fidl::Error>> {
+        AsBlockProxy::get_info(*self)
+    }
+    fn open_session(&self, session: ServerEnd<block::SessionMarker>) -> Result<(), fidl::Error> {
+        AsBlockProxy::open_session(*self, session)
+    }
+}
+
+macro_rules! impl_as_block_proxy {
+    ($name:ident) => {
+        impl AsBlockProxy for $name {
+            async fn get_info(&self) -> Result<block::BlockGetInfoResult, fidl::Error> {
+                $name::get_info(self).await
+            }
+
+            fn open_session(
+                &self,
+                session: ServerEnd<block::SessionMarker>,
+            ) -> Result<(), fidl::Error> {
+                $name::open_session(self, session)
+            }
+        }
+    };
+}
+
+impl_as_block_proxy!(BlockProxy);
+impl_as_block_proxy!(PartitionProxy);
+impl_as_block_proxy!(VolumeProxy);
+
 impl RemoteBlockClient {
     /// Returns a connection to a remote block device via the given channel.
-    pub async fn new(remote: block::BlockProxy) -> Result<Self, Error> {
+    pub async fn new(remote: impl AsBlockProxy) -> Result<Self, Error> {
         let info = remote.get_info().await?.map_err(zx::Status::from_raw)?;
         let (session, server) = fidl::endpoints::create_proxy()?;
         let () = remote.open_session(server)?;

@@ -59,12 +59,11 @@ class RemoteBlockDevice final : public BlockDevice {
   block_client::Client fifo_client_;
 };
 
-// Helper functions for performing single reads and writes from a block.
-// These functions are provided as a drop in replacement for the discontinued
-// pread and pwrite posix style calls, and should not be used in new code.
-// buffer_size and offset are considered sizes in bytes, although
-// reading and writing can only be done in whole block increments.
-// buffer must be pre-allocated to the correct size.
+// Helper functions for performing single reads and writes from a block.  These functions are
+// provided as a drop in replacement for the discontinued pread and pwrite posix style calls.
+// buffer_size and offset are considered sizes in bytes, although reading and writing can only be
+// done in whole block increments.  buffer must be pre-allocated to the correct size.  These
+// functions are not performant; use the `RemoteBlockDevice` API above if performance matters.
 zx_status_t SingleReadBytes(fidl::UnownedClientEnd<fuchsia_hardware_block::Block> device,
                             void* buffer, size_t buffer_size, size_t offset);
 zx_status_t SingleWriteBytes(fidl::UnownedClientEnd<fuchsia_hardware_block::Block> device,

@@ -4,9 +4,7 @@
 
 use crate::format::{detect_disk_format, DiskFormat};
 use anyhow::{anyhow, Context, Error};
-use fidl::endpoints::Proxy as _;
 use fidl_fuchsia_device::{ControllerMarker, ControllerProxy};
-use fidl_fuchsia_hardware_block::BlockProxy;
 use fidl_fuchsia_hardware_block_partition::{Guid, PartitionMarker};
 use fidl_fuchsia_hardware_block_volume::VolumeManagerProxy;
 use fidl_fuchsia_io as fio;
@@ -188,9 +186,7 @@ pub async fn partition_matches_with_proxy(
     }
 
     if let Some(matcher_detected_disk_formats) = &matcher.detected_disk_formats {
-        // TODO(https://fxbug.dev/42072982): avoid this cast
-        let block_proxy = BlockProxy::from_channel(partition_proxy.into_channel().unwrap());
-        let detected_format = detect_disk_format(&block_proxy).await;
+        let detected_format = detect_disk_format(&partition_proxy).await;
         if !matcher_detected_disk_formats.into_iter().any(|x| x == &detected_format) {
             return Ok(false);
         }
@@ -230,22 +226,17 @@ pub async fn fvm_allocate_partition(
 mod tests {
     use super::{partition_matches_with_proxy, PartitionMatcher};
     use crate::format::{constants, DiskFormat};
+    use fake_server::FakeServer;
     use fidl::endpoints::{create_proxy_and_stream, RequestStream as _};
     use fidl_fuchsia_device::{ControllerMarker, ControllerRequest};
-    use fidl_fuchsia_hardware_block::{BlockInfo, Flag};
-    use fidl_fuchsia_hardware_block_partition::{Guid, PartitionRequest, PartitionRequestStream};
+    use fidl_fuchsia_hardware_block_volume::VolumeRequestStream;
+    use fuchsia_async as fasync;
     use futures::{pin_mut, select, FutureExt, StreamExt};
-    use {fuchsia_async as fasync, fuchsia_zircon as zx};
+    use std::sync::Arc;
 
-    const VALID_TYPE_GUID: [u8; 16] = [
-        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e,
-        0x0f,
-    ];
+    const VALID_TYPE_GUID: [u8; 16] = fake_server::TYPE_GUID;
 
-    const VALID_INSTANCE_GUID: [u8; 16] = [
-        0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e,
-        0x1f,
-    ];
+    const VALID_INSTANCE_GUID: [u8; 16] = fake_server::INSTANCE_GUID;
 
     const INVALID_GUID_1: [u8; 16] = [
         0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2a, 0x2b, 0x2c, 0x2d, 0x2e,
@@ -257,7 +248,7 @@ mod tests {
         0x3f,
     ];
 
-    const VALID_LABEL: &str = "test";
+    const VALID_LABEL: &str = fake_server::PARTITION_NAME;
     const INVALID_LABEL_1: &str = "TheWrongLabel";
     const INVALID_LABEL_2: &str = "StillTheWrongLabel";
     const PARENT_DEVICE_PATH: &str = "/fake/block/device/1";
@@ -267,51 +258,7 @@ mod tests {
     async fn check_partition_matches(matcher: &PartitionMatcher) -> bool {
         let (proxy, mut stream) = create_proxy_and_stream::<ControllerMarker>().unwrap();
 
-        let mock_partition = |mut stream: PartitionRequestStream| async move {
-            while let Some(request) = stream.next().await {
-                match request {
-                    Ok(PartitionRequest::GetTypeGuid { responder }) => {
-                        responder
-                            .send(zx::sys::ZX_OK, Some(&Guid { value: VALID_TYPE_GUID }))
-                            .unwrap();
-                    }
-                    Ok(PartitionRequest::GetInstanceGuid { responder }) => {
-                        responder
-                            .send(zx::sys::ZX_OK, Some(&Guid { value: VALID_INSTANCE_GUID }))
-                            .unwrap();
-                    }
-                    Ok(PartitionRequest::GetName { responder }) => {
-                        responder.send(zx::sys::ZX_OK, Some(VALID_LABEL)).unwrap();
-                    }
-                    Ok(PartitionRequest::GetInfo { responder }) => {
-                        responder
-                            .send(Ok(&BlockInfo {
-                                block_count: 1000,
-                                block_size: 512,
-                                max_transfer_size: 1024 * 1024,
-                                flags: Flag::empty(),
-                            }))
-                            .unwrap();
-                    }
-                    Ok(PartitionRequest::ReadBlocks {
-                        responder,
-                        vmo_offset,
-                        vmo,
-                        length,
-                        dev_offset,
-                    }) => {
-                        assert_eq!(dev_offset, 0);
-                        assert_eq!(length, 4096);
-                        vmo.write(&constants::FVM_MAGIC, vmo_offset).unwrap();
-                        responder.send(Ok(())).unwrap();
-                    }
-                    _ => {
-                        println!("Unexpected request: {:?}", request);
-                        unreachable!()
-                    }
-                }
-            }
-        };
+        let fake_server = Arc::new(FakeServer::new(1000, 512, &constants::FVM_MAGIC));
 
         let mock_controller = async {
             while let Some(request) = stream.next().await {
@@ -320,9 +267,17 @@ mod tests {
                         responder.send(Ok(DEFAULT_PATH)).unwrap();
                     }
                     Ok(ControllerRequest::ConnectToDeviceFidl { server, .. }) => {
-                        fasync::Task::spawn(mock_partition(PartitionRequestStream::from_channel(
-                            fasync::Channel::from_channel(server),
-                        )))
+                        let fake_server = fake_server.clone();
+                        fasync::Task::spawn(async move {
+                            if let Err(e) = fake_server
+                                .serve(VolumeRequestStream::from_channel(
+                                    fasync::Channel::from_channel(server),
+                                ))
+                                .await
+                            {
+                                println!("FakeServer::serve failed: {e:?}");
+                            }
+                        })
                         .detach();
                     }
                     _ => {

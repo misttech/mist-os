@@ -163,26 +163,6 @@ impl<SM: SessionManager> BlockServer<SM> {
                         .open_session(session.into_stream()?, self.partition_info.block_size),
                 ));
             }
-            fvolume::VolumeRequest::ReadBlocks {
-                responder,
-                vmo: _,
-                length: _,
-                dev_offset: _,
-                vmo_offset: _,
-            } => {
-                // TODO(https://fxbug.dev/348077960): Implement or remove this
-                responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
-            }
-            fvolume::VolumeRequest::WriteBlocks {
-                responder,
-                vmo: _,
-                length: _,
-                dev_offset: _,
-                vmo_offset: _,
-            } => {
-                // TODO(https://fxbug.dev/348077960): Implement or remove this
-                responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
-            }
             fvolume::VolumeRequest::GetTypeGuid { responder } => {
                 let mut guid = fpartition::Guid { value: [0u8; fpartition::GUID_LENGTH as usize] };
                 guid.value.copy_from_slice(&self.partition_info.type_guid);

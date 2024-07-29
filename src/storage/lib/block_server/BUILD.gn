@@ -34,6 +34,18 @@ rustc_library("block_server") {
   test_deps = [ "//src/lib/fuchsia" ]
 }
 
+rustc_library("fake_server") {
+  edition = "2021"
+  sources = [ "src/fake_server.rs" ]
+  source_root = "src/fake_server.rs"
+  deps = [
+    ":block_server",
+    "//sdk/fidl/fuchsia.hardware.block.volume:fuchsia.hardware.block.volume_rust",
+    "//src/lib/zircon/rust:fuchsia-zircon",
+    "//third_party/rust_crates:anyhow",
+  ]
+}
+
 fuchsia_unittest_package("block_server_tests") {
   deps = [ ":block_server_test" ]
 }

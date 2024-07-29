@@ -149,57 +149,97 @@ RemoteBlockDevice::RemoteBlockDevice(fidl::ClientEnd<fuchsia_hardware_block_volu
 zx_status_t ReadWriteBlocks(fidl::UnownedClientEnd<fuchsia_hardware_block::Block> device,
                             void* buffer, size_t buffer_length, size_t offset, bool write) {
   // Get the Block info for block size calculations:
-  const fidl::WireResult result = fidl::WireCall(device)->GetInfo();
-  if (!result.ok()) {
-    return result.status();
+  const fidl::WireResult get_info_result = fidl::WireCall(device)->GetInfo();
+  if (!get_info_result.ok()) {
+    return get_info_result.status();
   }
-  const fit::result response = result.value();
+  const fit::result response = get_info_result.value();
   if (response.is_error()) {
     return response.error_value();
   }
+
+  size_t block_size = response.value()->info.block_size;
+  if (!buffer || buffer_length % block_size != 0 || offset % block_size != 0 ||
+      buffer_length / block_size > std::numeric_limits<uint32_t>::max()) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  // The Fifo API disallows zero length.
+  if (buffer_length == 0)
+    return ZX_OK;
 
   zx::vmo vmo;
   if (zx_status_t status = zx::vmo::create(buffer_length, 0, &vmo); status != ZX_OK) {
     return status;
   }
 
-  size_t block_size = response.value()->info.block_size;
-  if (!buffer || buffer_length % block_size != 0 || offset % block_size != 0) {
-    return ZX_ERR_INVALID_ARGS;
+  auto [session, server] = fidl::Endpoints<fuchsia_hardware_block::Session>::Create();
+  const fidl::OneWayStatus status = fidl::WireCall(device)->OpenSession(std::move(server));
+  if (!status.ok())
+    return status.status();
+
+  uint16_t vmo_id;
+  {
+    zx::vmo duplicate;
+    if (zx_status_t status = vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &duplicate); status != ZX_OK)
+      return status;
+    const fidl::WireResult result = fidl::WireCall(session)->AttachVmo(std::move(duplicate));
+    if (!result.ok())
+      return result.status();
+    const fit::result response = result.value();
+    if (response.is_error())
+      return response.error_value();
+    vmo_id = response->vmoid.id;
   }
 
-  zx::vmo read_vmo;
-  if (write) {
-    if (zx_status_t status = vmo.write(buffer, 0, buffer_length); status != ZX_OK) {
-      return status;
-    }
-    const fidl::WireResult result =
-        fidl::WireCall(device)->WriteBlocks(std::move(vmo), buffer_length, offset, 0);
-    if (!result.ok()) {
+  zx::fifo fifo;
+  {
+    const fidl::WireResult result = fidl::WireCall(session)->GetFifo();
+    if (!result.ok())
       return result.status();
-    }
     const fit::result response = result.value();
-    if (response.is_error()) {
+    if (response.is_error())
       return response.error_value();
-    }
-  } else {
-    // if reading, duplicate the vmo so we will retain a copy
-    if (zx_status_t status = vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &read_vmo); status != ZX_OK) {
-      return status;
-    }
-    const fidl::WireResult result =
-        fidl::WireCall(device)->ReadBlocks(std::move(vmo), buffer_length, offset, 0);
-    if (!result.ok()) {
-      return result.status();
-    }
-    const fit::result response = result.value();
-    if (response.is_error()) {
-      return response.error_value();
-    }
+    fifo = std::move(response->fifo);
   }
+
+  static std::atomic<uint32_t> counter;
+  block_fifo_request_t request = {
+      .command =
+          {
+              .opcode = static_cast<uint8_t>(write ? BLOCK_OPCODE_WRITE : BLOCK_OPCODE_READ),
+          },
+      .reqid = ++counter,
+      .vmoid = vmo_id,
+      .length = static_cast<uint32_t>(buffer_length / block_size),
+      .dev_offset = offset / block_size,
+  };
+
+  if (write) {
+    if (zx_status_t status = vmo.write(buffer, 0, buffer_length); status != ZX_OK)
+      return status;
+  }
+
+  size_t actual;
+  if (zx_status_t status = fifo.write(sizeof(block_fifo_request_t), &request, 1, &actual);
+      status != ZX_OK) {
+    return status;
+  }
+
+  block_fifo_response_t fifo_response;
+  zx_signals_t signals;
+  fifo.wait_one(ZX_FIFO_READABLE, zx::time::infinite(), &signals);
+  if (zx_status_t status = fifo.read(sizeof(block_fifo_response_t), &fifo_response, 1, &actual);
+      status != ZX_OK) {
+    return status;
+  }
+  if (fifo_response.reqid != request.reqid)
+    return ZX_ERR_INTERNAL;
+  if (fifo_response.status != ZX_OK)
+    return fifo_response.status;
 
   if (!write) {
-    return read_vmo.read(buffer, 0, buffer_length);
+    return vmo.read(buffer, 0, buffer_length);
   }
   return ZX_OK;
 }
