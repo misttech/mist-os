@@ -278,32 +278,23 @@ impl FatDirectory {
         Ok(cur_entry)
     }
 
-    fn lookup_with_protocols(
+    fn lookup_with_open3_flags(
         self: &Arc<Self>,
-        protocols: fio::ConnectionProtocols,
+        flags: fio::Flags,
         mut path: Path,
         closer: &mut Closer<'_>,
     ) -> Result<FatNode, Status> {
         let mut current_entry = FatNode::Dir(self.clone());
 
         while !path.is_empty() {
-            let child_protocols = if path.is_single_component() {
-                protocols.clone()
-            } else {
-                fio::ConnectionProtocols::Node(fio::NodeOptions {
-                    protocols: Some(fio::NodeProtocols {
-                        directory: Some(fio::DirectoryProtocolOptions::default()),
-                        ..Default::default()
-                    }),
-                    ..Default::default()
-                })
-            };
+            let child_flags =
+                if path.is_single_component() { flags } else { fio::Flags::PROTOCOL_DIRECTORY };
 
             match current_entry {
                 FatNode::Dir(entry) => {
                     let name = path.next().unwrap();
                     validate_filename(name)?;
-                    current_entry = entry.clone().open2_child(name, child_protocols, closer)?;
+                    current_entry = entry.clone().open3_child(name, child_flags, closer)?;
                 }
                 FatNode::File(_) => {
                     return Err(Status::NOT_DIR);
@@ -372,17 +363,17 @@ impl FatDirectory {
         Ok(node)
     }
 
-    pub(crate) fn open2_child(
+    pub(crate) fn open3_child(
         self: &Arc<Self>,
         name: &str,
-        protocols: fio::ConnectionProtocols,
+        flags: fio::Flags,
         closer: &mut Closer<'_>,
     ) -> Result<FatNode, Status> {
         let fs_lock = self.filesystem.lock().unwrap();
 
         // Check if the entry already exists in the cache.
         if let Some(entry) = self.cache_get(name) {
-            if protocols.creation_mode() == vfs::CreationMode::Always {
+            if flags.creation_mode() == vfs::CreationMode::Always {
                 return Err(Status::ALREADY_EXISTS);
             }
             entry.open_ref(&fs_lock)?;
@@ -392,7 +383,7 @@ impl FatDirectory {
         let mut created_entry = false;
         let node = match self.find_child(&fs_lock, name)? {
             Some(entry) => {
-                if protocols.creation_mode() == vfs::CreationMode::Always {
+                if flags.creation_mode() == vfs::CreationMode::Always {
                     return Err(Status::ALREADY_EXISTS);
                 }
                 if entry.is_dir() {
@@ -402,14 +393,14 @@ impl FatDirectory {
                 }
             }
             None => {
-                if protocols.creation_mode() == vfs::CreationMode::Never {
+                if flags.creation_mode() == vfs::CreationMode::Never {
                     return Err(Status::NOT_FOUND);
                 }
                 created_entry = true;
                 let dir = self.borrow_dir(&fs_lock)?;
 
                 // Create directory if the directory protocol was explicitly specified.
-                if protocols.is_dir_allowed() & !protocols.is_any_node_protocol_allowed() {
+                if flags.intersects(fio::Flags::PROTOCOL_DIRECTORY) {
                     let dir = dir.create_dir(name).map_err(fatfs_error_to_status)?;
                     self.add_directory(dir, name, closer)
                 } else {
@@ -944,22 +935,22 @@ impl Directory for FatDirectory {
         });
     }
 
-    fn open2(
+    fn open3(
         self: Arc<Self>,
         scope: ExecutionScope,
         path: Path,
-        protocols: fio::ConnectionProtocols,
+        flags: fio::Flags,
         object_request: ObjectRequestRef<'_>,
     ) -> Result<(), Status> {
         let mut closer = Closer::new(&self.filesystem);
 
-        match self.lookup_with_protocols(protocols.clone(), path, &mut closer)? {
+        match self.lookup_with_open3_flags(flags, path, &mut closer)? {
             FatNode::Dir(entry) => {
                 let () = entry.open_ref(&self.filesystem.lock().unwrap())?;
                 object_request.spawn_connection(
                     scope,
                     entry.clone(),
-                    protocols,
+                    flags,
                     MutableConnection::create,
                 )
             }
@@ -968,7 +959,7 @@ impl Directory for FatDirectory {
                 object_request.spawn_connection(
                     scope,
                     entry.clone(),
-                    protocols,
+                    flags,
                     FidlIoConnection::create,
                 )
             }
@@ -1104,6 +1095,7 @@ mod tests {
     use scopeguard::defer;
     use vfs::directory::dirents_sink::Sealed;
     use vfs::node::Node as _;
+    use vfs::ObjectRequest;
 
     const TEST_DISK_SIZE: u64 = 2048 << 10; // 2048K
 
@@ -1316,7 +1308,7 @@ mod tests {
     }
 
     #[fuchsia::test(allow_stalls = false)]
-    async fn test_reopen2_root() {
+    async fn test_reopen3_root() {
         let disk = TestFatDisk::empty_disk(TEST_DISK_SIZE);
         let structure = TestDiskContents::dir().add_child("test", "Hello".into());
         structure.create(&disk.root_dir());
@@ -1328,13 +1320,9 @@ mod tests {
 
         // Open and close root.
         let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
-        let protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
-            rights: Some(fio::Operations::READ_BYTES),
-            ..Default::default()
-        });
-        protocols
-            .to_object_request(server_end)
-            .handle(|request| root.clone().open2(scope.clone(), Path::dot(), protocols, request));
+        let flags = fio::Flags::PERM_READ;
+        ObjectRequest::new3(flags, &fio::Options::default(), server_end.into())
+            .handle(|request| root.clone().open3(scope.clone(), Path::dot(), flags, request));
         proxy
             .close()
             .await
@@ -1344,15 +1332,11 @@ mod tests {
 
         // Re-open and close root at "test".
         let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
-        let protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
-            rights: Some(fio::Operations::READ_BYTES),
-            ..Default::default()
-        });
-        protocols.to_object_request(server_end).handle(|request| {
-            root.clone().open2(
+        ObjectRequest::new3(flags, &fio::Options::default(), server_end.into()).handle(|request| {
+            root.clone().open3(
                 scope.clone(),
                 Path::validate_and_split("test").unwrap(),
-                protocols,
+                flags,
                 request,
             )
         });
@@ -1367,7 +1351,7 @@ mod tests {
     }
 
     #[fuchsia::test(allow_stalls = false)]
-    async fn test_open2_already_exists() {
+    async fn test_open3_already_exists() {
         let disk = TestFatDisk::empty_disk(TEST_DISK_SIZE);
         let structure = TestDiskContents::dir().add_child("test", "Hello".into());
         structure.create(&disk.root_dir());
@@ -1377,17 +1361,14 @@ mod tests {
 
         let scope = ExecutionScope::new();
         let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
-        let protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
-            rights: Some(fio::Operations::READ_BYTES),
-            mode: Some(vfs::CreationMode::Always.into()),
-            flags: Some(fio::NodeFlags::GET_REPRESENTATION),
-            ..Default::default()
-        });
-        protocols.to_object_request(server_end).handle(|request| {
-            root.clone().open2(
+        let flags = fio::Flags::PERM_READ
+            | fio::Flags::FLAG_MUST_CREATE
+            | fio::Flags::FLAG_SEND_REPRESENTATION;
+        ObjectRequest::new3(flags, &fio::Options::default(), server_end.into()).handle(|request| {
+            root.clone().open3(
                 scope.clone(),
                 Path::validate_and_split("test").unwrap(),
-                protocols,
+                flags,
                 request,
             )
         });
