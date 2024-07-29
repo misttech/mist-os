@@ -5,6 +5,7 @@
 """Preprocesses version_history.json before including it in the IDK."""
 
 import argparse
+import datetime
 import json
 import pathlib
 from typing import Any
@@ -32,12 +33,22 @@ def main() -> None:
     )
 
     parser.add_argument(
-        "--latest-commit-hash-file",
+        "--daily-commit-hash-file",
         type=pathlib.Path,
         help=(
             "File containing the hash of the latest commit to integration.git "
-            "as a hexadecimal UTF-8 string. Required unless "
+            "before today, as a hexadecimal UTF-8 string. Required unless "
             "--legacy-unstable-abi-revisions is specified."
+        ),
+    )
+
+    parser.add_argument(
+        "--daily-commit-timestamp-file",
+        type=pathlib.Path,
+        help=(
+            "File containing the commit timestamp of the latest commit to "
+            "integration.git before today, as a decimal UNIX timestamp. "
+            "Required unless --legacy-unstable-abi-revisions is specified."
         ),
     )
 
@@ -58,10 +69,14 @@ def main() -> None:
             version_history
         )
     else:
-        with args.latest_commit_hash_file.open() as f:
-            latest_commit_hash = f.read().strip()
-        generate_version_history.replace_special_abi_revisions_using_commit_hash(
-            version_history, latest_commit_hash
+        with args.daily_commit_hash_file.open() as f:
+            daily_commit_hash = f.read().strip()
+        with args.daily_commit_timestamp_file.open() as f:
+            daily_commit_timestamp = datetime.datetime.fromtimestamp(
+                int(f.read().strip()), datetime.UTC
+            )
+        generate_version_history.replace_special_abi_revisions_using_commit_hash_and_date(
+            version_history, daily_commit_hash, daily_commit_timestamp
         )
 
     with args.output.open("w") as f:
