@@ -1112,7 +1112,7 @@ pub fn sys_renameat2(
 }
 
 pub fn sys_fchmod(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     mode: FileMode,
@@ -1120,13 +1120,13 @@ pub fn sys_fchmod(
     // Remove the filetype from the mode.
     let mode = mode & FileMode::PERMISSIONS;
     let file = current_task.files.get(fd)?;
-    file.name.entry.node.chmod(current_task, &file.name.mount, mode)?;
+    file.name.entry.node.chmod(locked, current_task, &file.name.mount, mode)?;
     file.name.entry.notify_ignoring_excl_unlink(InotifyMask::ATTRIB);
     Ok(())
 }
 
 pub fn sys_fchmodat(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     dir_fd: FdNumber,
     user_path: UserCString,
@@ -1135,7 +1135,7 @@ pub fn sys_fchmodat(
     // Remove the filetype from the mode.
     let mode = mode & FileMode::PERMISSIONS;
     let name = lookup_at(current_task, dir_fd, user_path, LookupFlags::default())?;
-    name.entry.node.chmod(current_task, &name.mount, mode)?;
+    name.entry.node.chmod(locked, current_task, &name.mount, mode)?;
     name.entry.notify_ignoring_excl_unlink(InotifyMask::ATTRIB);
     Ok(())
 }
@@ -1149,7 +1149,7 @@ fn maybe_uid(id: u32) -> Option<uid_t> {
 }
 
 pub fn sys_fchown(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     owner: u32,
@@ -1157,6 +1157,7 @@ pub fn sys_fchown(
 ) -> Result<(), Errno> {
     let file = current_task.files.get(fd)?;
     file.name.entry.node.chown(
+        locked,
         current_task,
         &file.name.mount,
         maybe_uid(owner),
@@ -1167,7 +1168,7 @@ pub fn sys_fchown(
 }
 
 pub fn sys_fchownat(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     dir_fd: FdNumber,
     user_path: UserCString,
@@ -1177,7 +1178,7 @@ pub fn sys_fchownat(
 ) -> Result<(), Errno> {
     let flags = LookupFlags::from_bits(flags, AT_EMPTY_PATH | AT_SYMLINK_NOFOLLOW)?;
     let name = lookup_at(current_task, dir_fd, user_path, flags)?;
-    name.entry.node.chown(current_task, &name.mount, maybe_uid(owner), maybe_uid(group))?;
+    name.entry.node.chown(locked, current_task, &name.mount, maybe_uid(owner), maybe_uid(group))?;
     name.entry.notify_ignoring_excl_unlink(InotifyMask::ATTRIB);
     Ok(())
 }
@@ -2709,7 +2710,7 @@ pub fn sys_inotify_rm_watch(
 }
 
 pub fn sys_utimensat(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     dir_fd: FdNumber,
     user_path: UserCString,
@@ -2749,7 +2750,7 @@ pub fn sys_utimensat(
         let lookup_flags = LookupFlags::from_bits(flags, AT_SYMLINK_NOFOLLOW)?;
         lookup_at(current_task, dir_fd, user_path, lookup_flags)?
     };
-    name.entry.node.update_atime_mtime(current_task, &name.mount, atime, mtime)?;
+    name.entry.node.update_atime_mtime(locked, current_task, &name.mount, atime, mtime)?;
     let event_mask = match (atime, mtime) {
         (_, TimeUpdateType::Omit) => InotifyMask::ACCESS,
         (TimeUpdateType::Omit, _) => InotifyMask::MODIFY,

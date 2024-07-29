@@ -29,6 +29,7 @@ use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::{errno, error, ino_t, off_t, statfs};
 use std::collections::{BTreeSet, HashMap};
 use std::sync::Arc;
+use syncio::zxio_node_attr_has_t;
 
 // Name and value for the xattr used to mark opaque directories in the upper FS.
 // See https://docs.kernel.org/filesystems/overlayfs.html#whiteouts-and-opaque-directories
@@ -714,6 +715,37 @@ impl FsNodeOps for Arc<OverlayNode> {
         let mut lock = info.write();
         *lock = self.main_entry().entry().node.fetch_and_refresh_info(current_task)?.clone();
         Ok(RwLockWriteGuard::downgrade(lock))
+    }
+
+    fn update_attributes(
+        &self,
+        locked: &mut Locked<'_, FileOpsCore>,
+        current_task: &CurrentTask,
+        new_info: &FsNodeInfo,
+        has: zxio_node_attr_has_t,
+    ) -> Result<(), Errno> {
+        let upper = self.ensure_upper(locked, current_task)?.entry();
+        upper.node.update_attributes(locked, current_task, |info| {
+            if has.modification_time {
+                info.time_modify = new_info.time_modify;
+            }
+            if has.access_time {
+                info.time_access = new_info.time_access;
+            }
+            if has.mode {
+                info.mode = new_info.mode;
+            }
+            if has.uid {
+                info.uid = new_info.uid;
+            }
+            if has.gid {
+                info.gid = new_info.gid;
+            }
+            if has.rdev {
+                info.rdev = new_info.rdev;
+            }
+            Ok(())
+        })
     }
 
     fn append_lock_read<'a>(
