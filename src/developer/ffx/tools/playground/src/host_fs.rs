@@ -377,14 +377,14 @@ impl Directory for HostDirectory {
             .handle(|object_request| self.do_open(scope, path, flags, object_request));
     }
 
-    fn open2(
+    fn open3(
         self: Arc<Self>,
         scope: ExecutionScope,
         path: VfsPath,
-        protocols: fio::ConnectionProtocols,
+        flags: fio::Flags,
         object_request: ObjectRequestRef<'_>,
     ) -> Result<(), Status> {
-        self.do_open(scope, path, protocols, object_request)
+        self.do_open(scope, path, flags, object_request)
     }
 
     async fn read_dirents<'a>(

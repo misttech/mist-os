@@ -96,7 +96,7 @@ impl DotFile {
     }
 }
 
-/// Trait for dealing with flags and protocol lists in Open/Open2.
+/// Trait for dealing with flags and protocol lists in Open/Open3.
 trait OpenArgs: vfs::ProtocolsExt + Send + Sync {
     fn open_subdir(
         &self,
@@ -122,14 +122,19 @@ impl OpenArgs for fio::OpenFlags {
     }
 }
 
-impl OpenArgs for fio::ConnectionProtocols {
+impl OpenArgs for fio::Flags {
     fn open_subdir(
         &self,
         proxy: &fio::DirectoryProxy,
         path: &str,
         object_request: vfs::ObjectRequestRef<'_>,
     ) {
-        let _ = proxy.open2(path, self, object_request.take().into_channel());
+        let _ = proxy.open3(
+            path,
+            *self,
+            &object_request.options(),
+            object_request.take().into_channel(),
+        );
     }
 }
 
@@ -238,7 +243,7 @@ impl CFDirectory {
         }
     }
 
-    /// Common implementation for open and open2
+    /// Common implementation for open and open3
     fn do_open<P: OpenArgs>(
         self: Arc<Self>,
         scope: ExecutionScope,
@@ -405,14 +410,14 @@ impl Node for CFDirectory {
 }
 
 impl Directory for CFDirectory {
-    fn open2(
+    fn open3(
         self: Arc<Self>,
         scope: ExecutionScope,
         path: vfs::path::Path,
-        protocols: fio::ConnectionProtocols,
+        flags: fio::Flags,
         object_request: vfs::ObjectRequestRef<'_>,
     ) -> Result<(), Status> {
-        self.do_open(scope, protocols, path, object_request);
+        self.do_open(scope, flags, path, object_request);
         Ok(())
     }
 
