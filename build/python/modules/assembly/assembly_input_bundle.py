@@ -475,6 +475,12 @@ class AIBCreator:
             - the return value contains a list of all files read/written by the
             copying operation (ie. depfile contents)
         """
+
+        if self.boot_drivers or self.base_drivers:
+            raise ValueError(
+                "drivers can no longer be added via the legacy input bundle"
+            )
+
         # Remove the existing <outdir>, and recreate it and the "subpackages"
         # subdirectory.
         if os.path.exists(self.outdir):

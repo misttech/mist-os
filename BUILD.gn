@@ -31,11 +31,6 @@ declare_args() {
   #         product assembly is complete, and they should not be relied upon
   #         within developer's own args.gn files or BUILD.gn files.
 
-  # If you add fuchsia_driver_package labels to this variable, any drivers in these packages will
-  # be visible to Driver Manager. These package labels are also considered to be in the
-  # 'base' package set (for more info see 'base_package_labels').
-  base_driver_package_labels = []
-
   # If you add package labels to this variable, the packages will be included in
   # the 'base' package set, which represents the set of packages that are part
   # of an OTA. These packages are updated as an atomic unit during an OTA
@@ -1741,13 +1736,6 @@ group("default") {
 # For any target in this file, but only in this file.
 #
 
-# Base driver packages added by the developer, using `fx set` or `fx args`
-group("developer_base_driver_packages") {
-  testonly = base_cache_packages_testonly
-  visibility = [ "//build/images/*" ]
-  public_deps = base_driver_package_labels
-}
-
 # Base packages added by the developer, using `fx set` or `fx args`
 group("developer_base_packages") {
   testonly = base_cache_packages_testonly
@@ -1809,12 +1797,6 @@ group("developer_universe_packages") {
 # product definitions, not changed by developer options like
 # `fx set --with <foo>` or `fx args`
 #
-# Product+Board base driver packages
-group("legacy_base_driver_packages") {
-  testonly = base_cache_packages_testonly
-  visibility = [ "//build/images/*" ]
-  public_deps = board_driver_package_labels
-}
 
 # Product+Board base packages
 group("legacy_base_packages") {

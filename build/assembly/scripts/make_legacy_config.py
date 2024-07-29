@@ -11,10 +11,10 @@ removing any other configuration sets from it.
 import argparse
 import json
 import logging
-import os
 import sys
 from collections import defaultdict
 from dataclasses import dataclass
+from typing import Set
 
 import serialization
 from assembly import (
@@ -68,10 +68,6 @@ def copy_to_assembly_input_bundle(
     boot_args: list[str],
     config_data_entries: FileEntrylist,
     outdir: FilePath,
-    base_driver_packages_list: list[str],
-    base_driver_components_files_list: list[dict[str, str]],
-    boot_driver_packages_list: list[str],
-    boot_driver_components_files_list: list[dict[str, str]],
     shell_commands: dict[str, list[str]],
     core_realm_shards: list[FilePath],
     bootfs_files_package: FilePath | None,
@@ -95,8 +91,6 @@ def copy_to_assembly_input_bundle(
     aib_creator.kernel = kernel
     aib_creator.boot_args.update(boot_args)
 
-    aib_creator.base_drivers = set(base_driver_packages_list)
-
     if bootfs_files_package:
         aib_creator.bootfs_files_package = bootfs_files_package
 
@@ -104,32 +98,12 @@ def copy_to_assembly_input_bundle(
     # of base, base_drivers, cache, and cache_drivers, so we need to remove the
     # duplicates.
 
-    # Remove base_drivers from base
-    base_drivers = set(base_driver_packages_list)
-    base = list(set(base).difference(base_drivers))
-
     # Remove base_drivers and base from cache
-    cache = list(set(cache).difference(base).difference(base_drivers))
+    cache = list(set(cache).difference(base))
 
     # Now we can update the aib_creator
-    aib_creator.base_drivers = base_drivers
     aib_creator.packages.update([PackageDetails(m, "base") for m in base])
     aib_creator.packages.update([PackageDetails(m, "cache") for m in cache])
-
-    if len(aib_creator.base_drivers) != len(base_driver_packages_list):
-        raise ValueError(
-            f"Duplicate package specified "
-            " in base_driver_packages: {base_driver_packages_list}"
-        )
-    aib_creator.base_driver_component_files = base_driver_components_files_list
-
-    aib_creator.boot_drivers = set(boot_driver_packages_list)
-    if len(aib_creator.boot_drivers) != len(boot_driver_packages_list):
-        raise ValueError(
-            f"Duplicate package specified "
-            " in boot_driver_packages: {boot_driver_packages_list}"
-        )
-    aib_creator.boot_driver_component_files = boot_driver_components_files_list
 
     aib_creator.config_data = config_data_entries
     aib_creator.shell_commands = shell_commands
@@ -165,18 +139,6 @@ def main() -> None:
     parser.add_argument("--depfile")
     parser.add_argument("--export-manifest")
     parser.add_argument(
-        "--base-driver-packages-list", type=argparse.FileType("r")
-    )
-    parser.add_argument(
-        "--base-driver-components-files-list", type=argparse.FileType("r")
-    )
-    parser.add_argument(
-        "--boot-driver-packages-list", type=argparse.FileType("r")
-    )
-    parser.add_argument(
-        "--boot-driver-components-files-list", type=argparse.FileType("r")
-    )
-    parser.add_argument(
         "--shell-commands-packages-list", type=argparse.FileType("r")
     )
     parser.add_argument("--core-realm-shards-list", type=argparse.FileType("r"))
@@ -191,20 +153,6 @@ def main() -> None:
         ]
     else:
         config_data_entries = []
-
-    base_driver_packages_list = []
-    if args.base_driver_packages_list:
-        base_driver_packages_list = json.load(args.base_driver_packages_list)
-        base_driver_components_files_list = json.load(
-            args.base_driver_components_files_list
-        )
-
-    boot_driver_packages_list = []
-    if args.boot_driver_packages_list:
-        boot_driver_packages_list = json.load(args.boot_driver_packages_list)
-        boot_driver_components_files_list = json.load(
-            args.boot_driver_components_files_list
-        )
 
     shell_commands: dict[str, set[str]] = dict()
     shell_deps = set()
@@ -274,10 +222,6 @@ def main() -> None:
         boot_args,
         [entry.as_file_entry() for entry in config_data_entries],
         args.outdir,
-        base_driver_packages_list,
-        base_driver_components_files_list,
-        boot_driver_packages_list,
-        boot_driver_components_files_list,
         {
             package: sorted(list(components))
             for (package, components) in shell_commands.items()

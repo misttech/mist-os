@@ -96,17 +96,12 @@ if (is_fuchsia) {
     cmdline_deps = [ "//build/input:bootfs" ]
 
     base_packages = [
-      "//:developer_base_driver_packages",
       "//:developer_base_packages",
       "//:legacy_base_packages",
     ]
 
     core_realm_definition = ":core_realm"
 
-    base_driver_packages = [
-      "//:developer_base_driver_packages",
-      "//:legacy_base_driver_packages",
-    ]
     cache_packages = [
       "//:developer_cache_packages",
       "//:legacy_cache_packages",
