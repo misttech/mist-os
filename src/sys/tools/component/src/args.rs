@@ -4,7 +4,7 @@
 
 use argh::FromArgs;
 use component_debug::cli::{GraphFilter, GraphOrientation, ListFilter};
-use component_debug::config::RawConfigOverride;
+use component_debug::config::RawConfigEntry;
 use component_debug::explore::DashNamespaceLayout;
 use fuchsia_url::AbsoluteComponentUrl;
 use moniker::Moniker;
@@ -62,7 +62,7 @@ pub struct CreateArgs {
     /// `mutability: [ "parent" ]` on the configuration field. Specified in the format
     /// `KEY=VALUE` where `VALUE` is a JSON string which can be resolved as the correct type of
     /// configuration value.
-    pub config: Vec<RawConfigOverride>,
+    pub config: Vec<RawConfigEntry>,
 }
 
 #[derive(FromArgs, Debug, PartialEq)]
@@ -168,7 +168,7 @@ pub struct RunArgs {
     /// `mutability: [ "parent" ]` on the configuration field. Specified in the format
     /// `KEY=VALUE` where `VALUE` is a JSON string which can be resolved as the correct type of
     /// configuration value.
-    pub config: Vec<RawConfigOverride>,
+    pub config: Vec<RawConfigEntry>,
 }
 
 #[derive(FromArgs, Debug, PartialEq)]

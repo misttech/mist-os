@@ -17,6 +17,7 @@
             name: "session",
             durability: "transient",
             persistent_storage: true,
+            allowed_offers: "static_and_dynamic",
         },
     ],
     capabilities: [

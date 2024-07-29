@@ -5,7 +5,9 @@
 use assert_matches::assert_matches;
 use component_debug::capability;
 use component_debug::cli::*;
-use component_debug::config::{resolve_raw_config_overrides, RawConfigOverride};
+use component_debug::config::{
+    resolve_raw_config_capabilities, resolve_raw_config_overrides, RawConfigEntry,
+};
 use component_debug::realm::{get_resolved_declaration, resolve_declaration};
 use component_debug::route::{DeclType, RouteReport};
 use fuchsia_component::client::connect_to_protocol;
@@ -258,8 +260,8 @@ async fn get_manifest_potential_dynamic_instance_absolute_url() {
 async fn resolve_raw_foo_config_override() {
     let realm_query = connect_to_protocol::<fsys::RealmQueryMarker>().unwrap();
     let raw_overrides = &[
-        RawConfigOverride::from_str("my_uint8=5").unwrap(),
-        RawConfigOverride::from_str("my_string=\"should be a valid override\"").unwrap(),
+        RawConfigEntry::from_str("my_uint8=5").unwrap(),
+        RawConfigEntry::from_str("my_string=\"should be a valid override\"").unwrap(),
     ];
     let expected_typed_overrides = &[
         fdecl::ConfigOverride {
@@ -284,4 +286,36 @@ async fn resolve_raw_foo_config_override() {
     .await
     .unwrap();
     assert_eq!(resolved_overrides, expected_typed_overrides);
+}
+
+#[fuchsia::test]
+async fn resolve_raw_foo_config_capability() {
+    let realm_query = connect_to_protocol::<fsys::RealmQueryMarker>().unwrap();
+    let raw_capabilities = &[
+        RawConfigEntry::from_str("fuchsia.my.Uint8=5").unwrap(),
+        RawConfigEntry::from_str("fuchsia.my.String=\"should be a valid override\"").unwrap(),
+    ];
+    let expected_typed_capabilities = &[
+        fdecl::Configuration {
+            name: Some("fuchsia.my.Uint8".to_string()),
+            value: Some(fdecl::ConfigValue::Single(fdecl::ConfigSingleValue::Uint8(5))),
+            ..Default::default()
+        },
+        fdecl::Configuration {
+            name: Some("fuchsia.my.String".to_string()),
+            value: Some(fdecl::ConfigValue::Single(fdecl::ConfigSingleValue::String(
+                "should be a valid override".to_string(),
+            ))),
+            ..Default::default()
+        },
+    ];
+    let resolved_capabilities = resolve_raw_config_capabilities(
+        &realm_query,
+        &Moniker::parse_str("/for_manifest_resolution:config_capability_user").unwrap(),
+        "#meta/config_capability_user.cm",
+        raw_capabilities,
+    )
+    .await
+    .unwrap();
+    assert_eq!(resolved_capabilities, expected_typed_capabilities);
 }

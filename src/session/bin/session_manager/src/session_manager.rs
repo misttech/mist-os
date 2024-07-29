@@ -12,8 +12,8 @@ use std::sync::{Arc, Mutex};
 use tracing::{error, warn};
 use zx::HandleBased;
 use {
-    fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio,
-    fidl_fuchsia_power_broker as fbroker, fidl_fuchsia_session as fsession,
+    fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
+    fidl_fuchsia_io as fio, fidl_fuchsia_power_broker as fbroker, fidl_fuchsia_session as fsession,
     fidl_fuchsia_session_power as fpower, fuchsia_zircon as zx,
 };
 
@@ -183,19 +183,24 @@ impl SessionManagerState {
             .as_ref()
             .ok_or_else(|| anyhow!("no default session URL configured"))?
             .clone();
-        self.start(session_url).await?;
+        self.start(session_url, vec![]).await?;
         Ok(())
     }
 
     /// Start a session, replacing any already session.
-    async fn start(&self, url: String) -> Result<(), startup::StartupError> {
+    async fn start(
+        &self,
+        url: String,
+        config_capabilities: Vec<fdecl::Configuration>,
+    ) -> Result<(), startup::StartupError> {
         self.power.ensure_power_lease().await;
-        self.start_impl(&mut *self.session.lock().await, url).await
+        self.start_impl(&mut *self.session.lock().await, config_capabilities, url).await
     }
 
     async fn start_impl(
         &self,
         session: &mut Session,
+        config_capabilities: Vec<fdecl::Configuration>,
         url: String,
     ) -> Result<(), startup::StartupError> {
         let (proxy_on_failure, new_pending) = Session::new_pending();
@@ -208,8 +213,13 @@ impl SessionManagerState {
                 pending
             }
         };
-        if let Err(e) =
-            startup::launch_session(&url, pending.exposed_dir_server_end, &self.realm).await
+        if let Err(e) = startup::launch_session(
+            &url,
+            config_capabilities,
+            pending.exposed_dir_server_end,
+            &self.realm,
+        )
+        .await
         {
             self.inner.lock().expect("mutex should not be poisoned").exposed_dir = proxy_on_failure;
             return Err(e);
@@ -240,7 +250,7 @@ impl SessionManagerState {
             return Err(startup::StartupError::NotRunning);
         };
         let url = url.clone();
-        self.start_impl(&mut session, url).await?;
+        self.start_impl(&mut session, vec![], url).await?;
         Ok(())
     }
 
@@ -490,7 +500,8 @@ impl SessionManager {
         configuration: fsession::LaunchConfiguration,
     ) -> Result<(), fsession::LaunchError> {
         let session_url = configuration.session_url.ok_or(fsession::LaunchError::InvalidArgs)?;
-        self.state.start(session_url).await.map_err(Into::into)
+        let config_capabilities = configuration.config_capabilities.unwrap_or_default();
+        self.state.start(session_url, config_capabilities).await.map_err(Into::into)
     }
 
     /// Handles a `Restarter.Restart()` request.
@@ -511,7 +522,7 @@ impl SessionManager {
             .or(self.state.default_session_url.as_ref())
             .ok_or(fsession::LifecycleError::NotFound)?
             .to_owned();
-        self.state.start(session_url).await.map_err(Into::into)
+        self.state.start(session_url, vec![]).await.map_err(Into::into)
     }
 
     /// Handles a `Lifecycle.Stop()` request.
