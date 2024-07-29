@@ -2,20 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.accessibility.semantics/cpp/fidl.h>
+#include <fidl/fuchsia.element/cpp/fidl.h>
 #include <fidl/fuchsia.input.interaction.observation/cpp/fidl.h>
-#include <fuchsia/accessibility/semantics/cpp/fidl.h>
-#include <fuchsia/element/cpp/fidl.h>
-#include <fuchsia/input/interaction/cpp/fidl.h>
-#include <fuchsia/ui/composition/cpp/fidl.h>
-#include <fuchsia/ui/display/singleton/cpp/fidl.h>
-#include <fuchsia/ui/focus/cpp/fidl.h>
-#include <fuchsia/ui/input/cpp/fidl.h>
-#include <fuchsia/ui/input3/cpp/fidl.h>
-#include <fuchsia/ui/pointerinjector/cpp/fidl.h>
-#include <fuchsia/ui/policy/cpp/fidl.h>
-#include <fuchsia/ui/scenic/cpp/fidl.h>
-#include <fuchsia/ui/test/input/cpp/fidl.h>
-#include <fuchsia/ui/test/scene/cpp/fidl.h>
+#include <fidl/fuchsia.input.interaction/cpp/fidl.h>
+#include <fidl/fuchsia.ui.composition/cpp/fidl.h>
+#include <fidl/fuchsia.ui.display.singleton/cpp/fidl.h>
+#include <fidl/fuchsia.ui.focus/cpp/fidl.h>
+#include <fidl/fuchsia.ui.input/cpp/fidl.h>
+#include <fidl/fuchsia.ui.input3/cpp/fidl.h>
+#include <fidl/fuchsia.ui.pointerinjector/cpp/fidl.h>
+#include <fidl/fuchsia.ui.policy/cpp/fidl.h>
+#include <fidl/fuchsia.ui.scenic/cpp/fidl.h>
+#include <fidl/fuchsia.ui.test.input/cpp/fidl.h>
+#include <fidl/fuchsia.ui.test.scene/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/sys/cpp/component_context.h>
@@ -31,17 +31,6 @@ namespace {
 template <typename T>
 void AddPublicService(sys::ComponentContext* context,
                       sys::ServiceDirectory* realm_exposed_services) {
-  FX_CHECK(realm_exposed_services);
-
-  context->outgoing()->AddPublicService(
-      fidl::InterfaceRequestHandler<T>([realm_exposed_services](fidl::InterfaceRequest<T> request) {
-        realm_exposed_services->Connect(std::move(request));
-      }));
-}
-
-template <typename T>
-void AddPublicServiceWithName(sys::ComponentContext* context,
-                              sys::ServiceDirectory* realm_exposed_services) {
   FX_CHECK(realm_exposed_services);
 
   context->outgoing()->AddPublicService(
@@ -74,39 +63,35 @@ int run_test_ui_stack(int argc, const char** argv) {
   // Bind incoming service requests to realm's exposed services directory.
 
   // Base UI services.
-  AddPublicService<fuchsia::accessibility::semantics::SemanticsManager>(
-      context.get(), realm_exposed_services.get());
-  AddPublicService<fuchsia::element::GraphicalPresenter>(context.get(),
-                                                         realm_exposed_services.get());
-  AddPublicService<fuchsia::input::interaction::Notifier>(context.get(),
-                                                          realm_exposed_services.get());
-  AddPublicServiceWithName<fuchsia_input_interaction_observation::Aggregator>(
-      context.get(), realm_exposed_services.get());
-  AddPublicService<fuchsia::ui::composition::Allocator>(context.get(),
+  AddPublicService<fuchsia_accessibility_semantics::SemanticsManager>(context.get(),
+                                                                      realm_exposed_services.get());
+  AddPublicService<fuchsia_element::GraphicalPresenter>(context.get(),
                                                         realm_exposed_services.get());
-  AddPublicService<fuchsia::ui::composition::Flatland>(context.get(), realm_exposed_services.get());
-  AddPublicService<fuchsia::ui::scenic::Scenic>(context.get(), realm_exposed_services.get());
-  AddPublicService<fuchsia::ui::focus::FocusChainListenerRegistry>(context.get(),
-                                                                   realm_exposed_services.get());
-  AddPublicService<fuchsia::ui::input::ImeService>(context.get(), realm_exposed_services.get());
-  AddPublicService<fuchsia::ui::input3::Keyboard>(context.get(), realm_exposed_services.get());
-  AddPublicService<fuchsia::ui::input3::KeyEventInjector>(context.get(),
-                                                          realm_exposed_services.get());
-  AddPublicService<fuchsia::ui::pointerinjector::Registry>(context.get(),
-                                                           realm_exposed_services.get());
-  AddPublicService<fuchsia::ui::policy::DeviceListenerRegistry>(context.get(),
-                                                                realm_exposed_services.get());
-  AddPublicService<fuchsia::ui::composition::ScreenCapture>(context.get(),
-                                                            realm_exposed_services.get());
-  AddPublicService<fuchsia::ui::composition::Screenshot>(context.get(),
+  AddPublicService<fuchsia_input_interaction::Notifier>(context.get(),
+                                                        realm_exposed_services.get());
+  AddPublicService<fuchsia_input_interaction_observation::Aggregator>(context.get(),
+                                                                      realm_exposed_services.get());
+  AddPublicService<fuchsia_ui_composition::Allocator>(context.get(), realm_exposed_services.get());
+  AddPublicService<fuchsia_ui_composition::Flatland>(context.get(), realm_exposed_services.get());
+  AddPublicService<fuchsia_ui_scenic::Scenic>(context.get(), realm_exposed_services.get());
+  AddPublicService<fuchsia_ui_focus::FocusChainListenerRegistry>(context.get(),
+                                                                 realm_exposed_services.get());
+  AddPublicService<fuchsia_ui_input::ImeService>(context.get(), realm_exposed_services.get());
+  AddPublicService<fuchsia_ui_input3::Keyboard>(context.get(), realm_exposed_services.get());
+  AddPublicService<fuchsia_ui_input3::KeyEventInjector>(context.get(),
+                                                        realm_exposed_services.get());
+  AddPublicService<fuchsia_ui_pointerinjector::Registry>(context.get(),
                                                          realm_exposed_services.get());
-  AddPublicService<fuchsia::ui::display::singleton::Info>(context.get(),
+  AddPublicService<fuchsia_ui_policy::DeviceListenerRegistry>(context.get(),
+                                                              realm_exposed_services.get());
+  AddPublicService<fuchsia_ui_composition::ScreenCapture>(context.get(),
                                                           realm_exposed_services.get());
+  AddPublicService<fuchsia_ui_composition::Screenshot>(context.get(), realm_exposed_services.get());
+  AddPublicService<fuchsia_ui_display_singleton::Info>(context.get(), realm_exposed_services.get());
 
   // Helper services.
-  AddPublicService<fuchsia::ui::test::input::Registry>(context.get(), realm_exposed_services.get());
-  AddPublicService<fuchsia::ui::test::scene::Controller>(context.get(),
-                                                         realm_exposed_services.get());
+  AddPublicService<fuchsia_ui_test_input::Registry>(context.get(), realm_exposed_services.get());
+  AddPublicService<fuchsia_ui_test_scene::Controller>(context.get(), realm_exposed_services.get());
 
   context->outgoing()->ServeFromStartupInfo();
 
