@@ -17,6 +17,7 @@ group("tests") {
     "getifaddrs:tests",
     "integration:tests",
     "iperf:tests",
+    "iptables:tests",
     "multi_nic:tests",
     "socket:tests",
     "tproxy:tests",

@@ -1,0 +1,39 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [
+        "sys/component/realm_builder.shard.cml",
+        "sys/testing/rust_test_runner.shard.cml",
+        "syslog/client.shard.cml",
+    ],
+    program: {
+        binary: "bin/iptables_test",
+    },
+    use: [
+        { event_stream: "stopped" },
+    ],
+    offer: [
+        {
+            protocol: [
+                "fuchsia.buildinfo.Provider",
+                "fuchsia.kernel.Stats",
+                "fuchsia.kernel.VmexResource",
+                "fuchsia.power.battery.BatteryManager",
+                "fuchsia.sysmem.Allocator",
+                "fuchsia.sysmem2.Allocator",
+                "fuchsia.vulkan.loader.Loader",
+            ],
+            from: "parent",
+            to: "#realm_builder",
+        },
+        {
+            directory: [
+                "boot-kernel",
+                "dev-gpu",
+            ],
+            from: "parent",
+            to: "#realm_builder",
+        },
+    ],
+}
