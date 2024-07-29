@@ -91,9 +91,15 @@ class TestDirectoryServer : public zxio_tests::TestDirectoryServerBase {
       completer.Close(ZX_ERR_INVALID_ARGS);
       return;
     }
-    if (!request->options.has_attributes() ||
+    if (request->options.has_attributes() &&
         request->options.attributes() != fio::NodeAttributesQuery::kProtocols) {
       ADD_FAILURE() << "expected request to query only protocols attribute";
+      completer.Close(ZX_ERR_INVALID_ARGS);
+      return;
+    }
+    if (request->options.has_create_attributes() &&
+        !request->options.create_attributes().has_modification_time()) {
+      ADD_FAILURE() << "expected request to set only modification time";
       completer.Close(ZX_ERR_INVALID_ARGS);
       return;
     }
@@ -269,6 +275,30 @@ TEST_F(Directory, Open3) {
   EXPECT_BYTES_EQ(buffer, zxio_tests::TestReadFileServer::kTestData, sizeof(buffer));
 
   ASSERT_OK(zxio_close(file, /*should_wait=*/true));
+}
+
+TEST_F(Directory, Open3CreateAttrs) {
+  fio::Flags flags = fio::Flags::kPermRead;
+  zxio_node_attributes_t attrs = {};
+  attrs.modification_time = 1234;
+  attrs.has.modification_time = true;
+  const zxio_open_options_t options{.create_attr = &attrs};
+  zxio_storage_t file_storage;
+  ASSERT_OK(zxio_open3(directory(), kTestPath.data(), kTestPath.length(),
+                       static_cast<zxio_open_flags_t>(flags), &options, &file_storage));
+  zxio_t* file = &file_storage.io;
+  ASSERT_OK(zxio_close(directory(), /*should_wait=*/true));
+  ASSERT_OK(zxio_close(file, /*should_wait=*/true));
+}
+
+TEST_F(Directory, Open3NoOptions) {
+  // Should succeed to call zxio_open3 with options not provided.
+  fio::Flags flags = fio::Flags::kPermRead;
+  zxio_storage_t file_storage;
+  ASSERT_OK(zxio_open3(directory(), kTestPath.data(), kTestPath.length(),
+                       static_cast<zxio_open_flags_t>(flags), nullptr, &file_storage));
+  ASSERT_OK(zxio_close(directory(), /*should_wait=*/true));
+  ASSERT_OK(zxio_close(&file_storage.io, /*should_wait=*/true));
 }
 
 TEST_F(Directory, Unlink) {
