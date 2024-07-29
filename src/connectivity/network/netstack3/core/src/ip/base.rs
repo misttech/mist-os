@@ -680,12 +680,6 @@ impl<I: IpLayerIpExt, BT: BindingsTypes> LockLevelFor<StackState<BT>>
     type Data = PmtuCache<I, BT>;
 }
 
-impl<I: IpLayerIpExt, BT: BindingsTypes> LockLevelFor<StackState<BT>>
-    for crate::lock_ordering::IpStateRoutingTable<I>
-{
-    type Data = RoutingTable<I, DeviceId<BT>>;
-}
-
 impl<I: IpLayerIpExt, BT: BindingsTypes> LockLevelFor<RoutingTableId<I, DeviceId<BT>>>
     for crate::lock_ordering::IpStateRoutingTable<I>
 {
