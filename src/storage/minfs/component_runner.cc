@@ -7,7 +7,6 @@
 #include <fidl/fuchsia.fs.startup/cpp/wire.h>
 #include <lib/syslog/cpp/macros.h>
 
-#include "src/storage/lib/trace/trace.h"
 #include "src/storage/lib/vfs/cpp/remote_dir.h"
 #include "src/storage/minfs/service/admin.h"
 #include "src/storage/minfs/service/lifecycle.h"

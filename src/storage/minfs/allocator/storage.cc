@@ -9,9 +9,9 @@
 #include <cstdint>
 #include <utility>
 
-#include "src/storage/lib/trace/trace.h"
 #include "src/storage/minfs/allocator/allocator.h"
 #include "src/storage/minfs/format.h"
+#include "src/storage/minfs/trace.h"
 
 namespace minfs {
 

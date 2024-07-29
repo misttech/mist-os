@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/storage/minfs/vnode.h"
-
 #include <lib/syslog/cpp/macros.h>
 #include <stdlib.h>
 #include <string.h>
@@ -19,7 +17,6 @@
 #include <fbl/algorithm.h>
 #include <safemath/checked_math.h>
 
-#include "src/storage/lib/trace/trace.h"
 #include "src/storage/lib/vfs/cpp/vfs_types.h"
 
 #ifdef __Fuchsia__

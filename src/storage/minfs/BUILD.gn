@@ -51,6 +51,7 @@ static_library("minfs") {
     "runner.cc",
     "runner.h",
     "superblock.h",
+    "trace.h",
     "transaction_limits.cc",
     "unowned_vmo_buffer.h",
     "vnode.cc",
@@ -74,7 +75,6 @@ static_library("minfs") {
     "//sdk/lib/syslog/cpp",
     "//src/storage/fvm",
     "//src/storage/lib/disk_inspector",
-    "//src/storage/lib/trace:cpp",
     "//src/storage/lib/vfs/cpp",
     "//zircon/system/ulib/async:async-cpp",
     "//zircon/system/ulib/bitmap",
@@ -162,6 +162,8 @@ static_library("minfs") {
       "//zircon/system/ulib/fzl",
       "//zircon/system/ulib/inspect",
       "//zircon/system/ulib/sync",
+      "//zircon/system/ulib/trace",
+      "//zircon/system/ulib/trace-engine",
       "//zircon/system/ulib/trace-provider",
     ]
   } else {

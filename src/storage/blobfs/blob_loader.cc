@@ -7,6 +7,7 @@
 #include <lib/fit/defer.h>
 #include <lib/fzl/owned-vmo-mapper.h>
 #include <lib/syslog/cpp/macros.h>
+#include <lib/trace/event.h>
 #include <lib/zx/result.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
@@ -32,7 +33,6 @@
 #include "src/storage/blobfs/format.h"
 #include "src/storage/blobfs/iterator/block_iterator.h"
 #include "src/storage/blobfs/transfer_buffer.h"
-#include "src/storage/lib/trace/trace.h"
 #include "src/storage/lib/vfs/cpp/transaction/buffered_operations_builder.h"
 #include "storage/operation/operation.h"
 

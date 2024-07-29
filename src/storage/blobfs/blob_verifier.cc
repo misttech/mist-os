@@ -5,6 +5,7 @@
 #include "src/storage/blobfs/blob_verifier.h"
 
 #include <lib/syslog/cpp/macros.h>
+#include <lib/trace/event.h>
 #include <zircon/status.h>
 
 #include <safemath/checked_math.h>
@@ -12,7 +13,6 @@
 #include "src/lib/digest/digest.h"
 #include "src/lib/digest/merkle-tree.h"
 #include "src/storage/blobfs/blob_layout.h"
-#include "src/storage/lib/trace/trace.h"
 
 namespace blobfs {
 

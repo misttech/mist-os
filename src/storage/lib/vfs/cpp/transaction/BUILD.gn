@@ -30,13 +30,17 @@ static_library("transaction") {
   ]
 
   if (is_fuchsia) {
-    sources += [ "device_transaction_handler.cc" ]
+    sources += [
+      "device_transaction_handler.cc",
+      "trace.cc",
+      "trace.h",
+    ]
 
     public_deps += [ "//src/storage/lib/block_client/cpp" ]
 
     deps += [
       "//sdk/lib/fdio",
-      "//src/storage/lib/trace:cpp",
+      "//zircon/system/ulib/trace",
       "//zircon/system/ulib/zx",
     ]
   }

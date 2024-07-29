@@ -15,7 +15,7 @@
 
 #include "src/storage/blobfs/compression/configs/chunked_compression_params.h"
 #include "src/storage/blobfs/compression_settings.h"
-#include "src/storage/lib/trace/trace.h"
+#include "src/storage/blobfs/trace.h"
 
 namespace blobfs {
 

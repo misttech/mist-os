@@ -9,7 +9,6 @@
 #ifdef __Fuchsia__
 #include <lib/syslog/cpp/macros.h>
 
-#include "src/storage/lib/trace/trace.h"
 #include "src/storage/lib/vfs/cpp/pseudo_dir.h"
 #include "src/storage/minfs/service/admin.h"
 #endif
