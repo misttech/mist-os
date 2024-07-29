@@ -807,48 +807,6 @@ impl VfsDirectory for FxDirectory {
         });
     }
 
-    fn open2(
-        self: Arc<Self>,
-        _scope: ExecutionScope,
-        path: Path,
-        protocols: fio::ConnectionProtocols,
-        object_request: ObjectRequestRef<'_>,
-    ) -> Result<(), zx::Status> {
-        // Ignore the provided scope which might be for the parent pseudo filesystem and use the
-        // volume's scope instead.
-        let scope = self.volume().scope().clone();
-        object_request.take().spawn(&scope.clone(), move |object_request| {
-            Box::pin(async move {
-                let node =
-                    self.lookup(&protocols, path, &object_request).await.map_err(map_to_status)?;
-                if node.is::<FxDirectory>() {
-                    object_request.create_connection(
-                        scope,
-                        node.downcast::<FxDirectory>().unwrap_or_else(|_| unreachable!()).take(),
-                        protocols,
-                        MutableConnection::create,
-                    )
-                } else if node.is::<FxFile>() {
-                    let node = node.downcast::<FxFile>().unwrap_or_else(|_| unreachable!());
-                    FxFile::create_connection_async(node, scope, protocols, object_request)
-                } else if node.is::<FxSymlink>() {
-                    let node = node.downcast::<FxSymlink>().unwrap_or_else(|_| unreachable!());
-                    object_request.create_connection(
-                        scope.clone(),
-                        node.take(),
-                        protocols,
-                        |scope, symlink, protocols, object_request| {
-                            symlink::Connection::create(scope, symlink, &protocols, object_request)
-                        },
-                    )
-                } else {
-                    unreachable!();
-                }
-            })
-        });
-        Ok(())
-    }
-
     #[cfg(fuchsia_api_level_at_least = "HEAD")]
     fn open3(
         self: Arc<Self>,
@@ -1016,7 +974,7 @@ mod tests {
     use crate::directory::FxDirectory;
     use crate::file::FxFile;
     use crate::fuchsia::testing::{
-        close_dir_checked, close_file_checked, open2_dir, open2_dir_checked, open_dir,
+        close_dir_checked, close_file_checked, open3_dir, open3_dir_checked, open_dir,
         open_dir_checked, open_file, open_file_checked, TestFixture, TestFixtureOptions,
     };
     use assert_matches::assert_matches;
@@ -1037,9 +995,6 @@ mod tests {
     use vfs::path::Path;
     use vfs::{ObjectRequest, ToObjectRequest};
     use {fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon as zx};
-
-    #[cfg(fuchsia_api_level_at_least = "HEAD")]
-    use crate::fuchsia::testing::{open3_dir, open3_dir_checked};
 
     #[fuchsia::test]
     async fn test_open_root_dir() {
@@ -2610,62 +2565,6 @@ mod tests {
         fixture.close().await;
     }
 
-    #[fuchsia::test]
-    async fn test_open2_deleted_self() {
-        let fixture = TestFixture::new().await;
-        let root = fixture.root();
-
-        const PATH: &str = "foo";
-
-        let dir =
-            open_dir_checked(&root, fio::OpenFlags::CREATE | fio::OpenFlags::DIRECTORY, PATH).await;
-
-        root.unlink(PATH, &fio::UnlinkOptions::default())
-            .await
-            .expect("FIDL call failed")
-            .expect("unlink failed");
-
-        assert_eq!(
-            open2_dir(
-                &root,
-                &fio::ConnectionProtocols::Node(fio::NodeOptions {
-                    protocols: Some(fio::NodeProtocols {
-                        directory: Some(fio::DirectoryProtocolOptions::default()),
-                        ..Default::default()
-                    }),
-                    mode: Some(vfs::CreationMode::Never.into()),
-                    flags: Some(fio::NodeFlags::GET_REPRESENTATION),
-                    ..Default::default()
-                }),
-                PATH
-            )
-            .await
-            .expect_err("Open2 succeeded")
-            .root_cause()
-            .downcast_ref::<zx::Status>()
-            .expect("No status"),
-            &zx::Status::NOT_FOUND,
-        );
-
-        open2_dir_checked(
-            &dir,
-            &fio::ConnectionProtocols::Node(fio::NodeOptions {
-                protocols: Some(fio::NodeProtocols {
-                    directory: Some(fio::DirectoryProtocolOptions::default()),
-                    ..Default::default()
-                }),
-                mode: Some(vfs::CreationMode::Never.into()),
-                flags: Some(fio::NodeFlags::GET_REPRESENTATION),
-                ..Default::default()
-            }),
-            ".",
-        )
-        .await;
-
-        fixture.close().await;
-    }
-
-    #[cfg(fuchsia_api_level_at_least = "HEAD")]
     #[fuchsia::test]
     async fn test_open3_deleted_self() {
         let fixture = TestFixture::new().await;
