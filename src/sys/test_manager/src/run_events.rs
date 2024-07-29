@@ -56,14 +56,15 @@ pub(crate) enum SuiteEventPayload {
     CaseStderr(u32, zx::Socket),
     CustomArtifact(ftest_manager::CustomArtifact),
     SuiteSyslog(ftest_manager::Syslog),
+    SuiteStderr(zx::Socket),
     SuiteStarted,
     SuiteStopped(SuiteStatus),
     DebugData(ClientEnd<DebugDataIteratorMarker>),
 }
 
 pub struct SuiteEvents {
-    timestamp: i64,
-    payload: SuiteEventPayload,
+    pub timestamp: i64,
+    pub payload: SuiteEventPayload,
 }
 
 impl Into<FidlSuiteEvent> for SuiteEvents {
@@ -126,6 +127,13 @@ impl Into<FidlSuiteEvent> for SuiteEvents {
                 timestamp: Some(self.timestamp),
                 payload: Some(FidlSuiteEventPayload::SuiteArtifact(ftest_manager::SuiteArtifact {
                     artifact: ftest_manager::Artifact::Log(syslog),
+                })),
+                ..Default::default()
+            },
+            SuiteEventPayload::SuiteStderr(socket) => FidlSuiteEvent {
+                timestamp: Some(self.timestamp),
+                payload: Some(FidlSuiteEventPayload::SuiteArtifact(ftest_manager::SuiteArtifact {
+                    artifact: ftest_manager::Artifact::Stderr(socket),
                 })),
                 ..Default::default()
             },
@@ -269,6 +277,16 @@ impl Into<FidlEvent> for SuiteEvents {
                 )),
                 ..Default::default()
             },
+            SuiteEventPayload::SuiteStderr(socket) => FidlEvent {
+                timestamp: Some(self.timestamp),
+                details: Some(FidlEventDetails::SuiteArtifactGenerated(
+                    ftest_manager::SuiteArtifactGeneratedEventDetails {
+                        artifact: Some(ftest_manager::Artifact::Stderr(socket)),
+                        ..Default::default()
+                    },
+                )),
+                ..Default::default()
+            },
             SuiteEventPayload::SuiteStopped(status) => FidlEvent {
                 timestamp: Some(self.timestamp),
                 details: Some(FidlEventDetails::SuiteStopped(
@@ -340,6 +358,13 @@ impl SuiteEvents {
         Self {
             timestamp: zx::Time::get_monotonic().into_nanos(),
             payload: SuiteEventPayload::SuiteSyslog(syslog),
+        }
+    }
+
+    pub fn suite_stderr(socket: zx::Socket) -> Self {
+        Self {
+            timestamp: zx::Time::get_monotonic().into_nanos(),
+            payload: SuiteEventPayload::SuiteStderr(socket),
         }
     }
 

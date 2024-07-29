@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl_fuchsia_component as fcomponent;
 use fidl_fuchsia_test_manager::LaunchError;
 use fuchsia_component_test::error::Error as RealmBuilderError;
 use thiserror::Error;
 use tracing::warn;
+use {fidl_fuchsia_component as fcomponent, fidl_fuchsia_debugger as fdbg};
 
 /// Error encountered running test manager
 #[derive(Debug, Error)]
@@ -70,6 +70,24 @@ pub enum LaunchTestError {
 
     #[error("Failed validating test realm: {0:?}")]
     ValidateTestRealm(#[source] anyhow::Error),
+}
+
+#[derive(Debug, Error)]
+pub enum DebugAgentError {
+    #[error("Failed to connect to DebugAgent: {0:?}")]
+    ConnectToLauncher(#[source] anyhow::Error),
+
+    #[error("Launcher::Launch (for DebugAgent) failed with local error: {0:?}")]
+    LaunchLocal(#[source] fidl::Error),
+
+    #[error("Launcher::Launch (for DebugAgent) produced error response: {0:?}")]
+    LaunchResponse(i32),
+
+    #[error("DebugAgent::AttachTo failed with local error: {0:?}")]
+    AttachToTestsLocal(#[source] fidl::Error),
+
+    #[error("DebugAgent::AttachTo produced error response: {0:?}")]
+    AttachToTestsResponse(fdbg::FilterError),
 }
 
 #[derive(Debug, Error)]

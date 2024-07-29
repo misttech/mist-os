@@ -171,6 +171,10 @@
             from: "framework",
         },
         {
+            protocol: "fuchsia.debugger.Launcher",
+            from: "parent",
+        },
+        {
             protocol: [ "fuchsia.element.GraphicalPresenter" ],
             availability: "optional",
         },
