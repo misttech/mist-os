@@ -69,18 +69,25 @@ impl TryFrom<&[u8]> for Reply {
 
         let (reply_type, reply_data) = byte_vec.split_at(MIN_REPLY_LENGTH);
         let reply_type_str = String::from_utf8_lossy(reply_type).to_string().to_ascii_uppercase();
-        let reply_data_str = String::from_utf8_lossy(reply_data).to_string();
+        let mut reply_data_str = String::from_utf8_lossy(reply_data).to_string();
         match reply_type_str.as_ref() {
             "INFO" => Ok(Reply::Info(reply_data_str)),
             "FAIL" => Ok(Reply::Fail(reply_data_str)),
             "OKAY" => Ok(Reply::Okay(reply_data_str)),
             "DATA" => {
                 if reply_data_str.len() != DATA_SIZE_LENGTH {
-                    return Err(ParseReplyError::MismatchedDataPacketSize {
+                    // b/355706900: this should technically be an error as the Fastboot
+                    // specification says the length of the data packet is 12
+                    // bytes long (DATA + 8). The fastboot binary itself
+                    // does not enforce this limit, but instead only reads
+                    // the first 8 bytes after the DATA block and discards the rest
+                    let mismatched_err = ParseReplyError::MismatchedDataPacketSize {
                         reply_len: reply_data_str.len(),
                         reply: reply_data_str.to_string(),
-                    });
+                    };
+                    tracing::warn!("{}", mismatched_err);
                 }
+                reply_data_str.shrink_to(8);
                 match u32::from_str_radix(&reply_data_str, 16) {
                     Ok(ds) => Ok(Reply::Data(ds)),
                     Err(e) => Err(ParseReplyError::InvalidDataPacketSize(e)),
