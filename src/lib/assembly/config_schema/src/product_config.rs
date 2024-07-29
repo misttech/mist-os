@@ -167,6 +167,17 @@ pub struct ComponentPolicyConfig {
     pub product_policies: Vec<FileRelativePathBuf>,
 }
 
+#[derive(Clone, Debug, Default, Deserialize, Serialize, JsonSchema)]
+pub struct TrustedAppFeatures {
+    /// Whether this component needs /dev-class/securemem routed to it. If true, the securemem
+    //// directory will be routed as dev-securemem.
+    pub securemem: Option<bool>,
+    /// Whether this component requires persistent storage, routed as /data.
+    pub persistent_storage: Option<bool>,
+    /// Whether this component requires tmp storage, routed as /tmp.
+    pub tmp_storage: Option<bool>,
+}
+
 /// A configuration for a component which depends on TEE-based protocols.
 /// Examples include components which implement DRM, or authentication services.
 #[derive(Clone, Debug, Deserialize, Serialize, JsonSchema)]
@@ -187,6 +198,9 @@ pub struct TrustedApp {
     /// config data for this package (with a package name based on the component URL)
     #[serde(default)]
     pub config_data: Option<BTreeMap<String, String>>,
+    /// Additional features required for the component to function.
+    #[serde(default)]
+    pub additional_required_features: TrustedAppFeatures,
 }
 
 #[cfg(test)]

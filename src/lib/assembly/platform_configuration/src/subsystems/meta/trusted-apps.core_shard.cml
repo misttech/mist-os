@@ -41,6 +41,33 @@
             source_availability: "unknown",
         },
         {
+            protocol: [ "fuchsia.media.ProfileProvider" ],
+            from: "#audio_core",
+            to: "#trusted-apps",
+            source_availability: "unknown",
+        },
+        {
+            protocol: [
+                "fuchsia.sysmem.Allocator",
+                "fuchsia.sysmem2.Allocator",
+            ],
+            from: "parent",
+            to: "#trusted-apps",
+        },
+        {
+            storage: "data",
+            from: "self",
+            to: "#trusted-apps",
+        },
+        {
+            protocol: [
+                "fuchsia.hwinfo.Board",
+                "fuchsia.hwinfo.Product",
+            ],
+            from: "#hwinfo",
+            to: "#trusted-apps",
+        },
+        {
             directory: "config-data",
             from: "parent",
             to: "#trusted-apps",

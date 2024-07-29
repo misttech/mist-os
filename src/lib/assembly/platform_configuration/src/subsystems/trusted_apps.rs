@@ -143,6 +143,37 @@ impl DefineSubsystemConfiguration<Vec<ProductTrustedApp>> for TrustedAppsConfig 
                     )
                 })
             }
+
+            if let Some(true) = trusted_app.additional_required_features.persistent_storage {
+                offer.push(cml::Offer {
+                    storage: Some(create_name("data")?.into()),
+                    ..cml::Offer::empty(
+                        cml::OfferFromRef::Parent.into(),
+                        cml::OfferToRef::Named(component_name.clone()).into(),
+                    )
+                })
+            }
+
+            if let Some(true) = trusted_app.additional_required_features.tmp_storage {
+                offer.push(cml::Offer {
+                    storage: Some(create_name("tmp")?.into()),
+                    ..cml::Offer::empty(
+                        cml::OfferFromRef::Parent.into(),
+                        cml::OfferToRef::Named(component_name.clone()).into(),
+                    )
+                })
+            }
+
+            if let Some(true) = trusted_app.additional_required_features.securemem {
+                offer.push(cml::Offer {
+                    directory: Some(create_name("dev-securemem")?.into()),
+                    rights: Some(cml::Rights(vec![cml::Right::ReadAlias])),
+                    ..cml::Offer::empty(
+                        cml::OfferFromRef::Parent.into(),
+                        cml::OfferToRef::Named(component_name.clone()).into(),
+                    )
+                })
+            }
         }
 
         let cml = cml::Document {
@@ -186,6 +217,7 @@ impl DefineSubsystemConfiguration<Vec<ProductTrustedApp>> for TrustedAppsConfig 
 mod tests {
     use super::*;
     use crate::subsystems::ConfigurationBuilderImpl;
+    use assembly_config_schema::product_config::TrustedAppFeatures;
     use assembly_file_relative_path::FileRelativePathBuf;
     use std::collections::BTreeMap;
 
@@ -205,6 +237,11 @@ mod tests {
                 ("foo".to_string(), "bar".to_string()),
                 ("baz".to_string(), "qux".to_string()),
             ])),
+            additional_required_features: TrustedAppFeatures {
+                tmp_storage: Some(true),
+                persistent_storage: Some(true),
+                securemem: Some(true),
+            },
         }];
 
         let mut builder = ConfigurationBuilderImpl::default();
@@ -298,6 +335,22 @@ mod tests {
             "from": "parent",
             "to": "#test-app",
             "subdir": "trusted-apps",
+          },
+          {
+            "storage": "data",
+            "from": "parent",
+            "to": "#test-app",
+          },
+          {
+            "storage": "tmp",
+            "from": "parent",
+            "to": "#test-app",
+          },
+          {
+            "directory": "dev-securemem",
+            "from": "parent",
+            "rights": ["r*"],
+            "to": "#test-app",
           }
         ]});
 
