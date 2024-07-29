@@ -231,12 +231,11 @@ void DriverHostRunnerTest::StartDriverHost(std::string_view driver_host_path,
   // TODO(https://fxbug.dev/340928556): we should pass a channel to the loader rather than the
   // entire thing.
   bool got_cb = false;
-  auto res = driver_host_runner_->StartDriverHost(loader_.get(), std::move(bootstrap_receiver),
-                                                  [&](zx::result<> result) {
-                                                    ASSERT_EQ(ZX_OK, result.status_value());
-                                                    got_cb = true;
-                                                  });
-  ASSERT_EQ(ZX_OK, res.status_value());
+  driver_host_runner_->StartDriverHost(loader_.get(), std::move(bootstrap_receiver),
+                                       [&](zx::result<> result) {
+                                         ASSERT_EQ(ZX_OK, result.status_value());
+                                         got_cb = true;
+                                       });
 
   ASSERT_TRUE(RunLoopUntilIdle());
   ASSERT_TRUE(created_component);

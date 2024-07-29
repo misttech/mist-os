@@ -513,39 +513,44 @@ zx::result<DriverHost*> DriverRunner::CreateDriverHost(bool use_next_vdso) {
   return zx::ok(driver_host_ptr);
 }
 
-zx::result<DriverHost*> DriverRunner::CreateDriverHostDynamicLinker(
-    fit::callback<void(zx::result<>)> completion_cb) {
+void DriverRunner::CreateDriverHostDynamicLinker(
+    fit::callback<void(zx::result<DriverHost*>)> completion_cb) {
   if (!dynamic_linker_args_.has_value()) {
     LOGF(ERROR, "Dynamic linker was not available");
-    return zx::error(ZX_ERR_NOT_SUPPORTED);
+    completion_cb(zx::error(ZX_ERR_NOT_SUPPORTED));
+    return;
   }
   auto dynamic_linker_service_client = dynamic_linker_args_->linker_service_factory();
   if (!dynamic_linker_service_client) {
     LOGF(ERROR, "Failed to create dynamic linker client");
-    return zx::error(ZX_ERR_INTERNAL);
+    completion_cb(zx::error(ZX_ERR_INTERNAL));
+    return;
   }
 
   zx::channel bootstrap_sender, bootstrap_receiver;
   zx_status_t status = zx::channel::create(0, &bootstrap_sender, &bootstrap_receiver);
   if (status != ZX_OK) {
     LOGF(ERROR, "Failed to create bootstrap channels: %s", zx_status_get_string(status));
-    return zx::error(status);
+    completion_cb(zx::error(status));
+    return;
   }
 
-  auto res = dynamic_linker_args_->driver_host_runner->StartDriverHost(
-      dynamic_linker_service_client.get(), std::move(bootstrap_receiver), std::move(completion_cb));
-  if (res.is_error()) {
-    LOGF(ERROR, "Failed to start driver host: %s", res.status_string());
-    return res.take_error();
-  }
+  dynamic_linker_args_->driver_host_runner->StartDriverHost(
+      dynamic_linker_service_client.get(), std::move(bootstrap_receiver),
+      [this, linker = std::move(dynamic_linker_service_client),
+       bootstrap_sender = std::move(bootstrap_sender),
+       completion_cb = std::move(completion_cb)](zx::result<> result) mutable {
+        if (result.is_error()) {
+          completion_cb(result.take_error());
+          return;
+        }
+        auto driver_host = std::make_unique<DynamicLinkerDriverHostComponent>(
+            std::move(bootstrap_sender), std::move(linker));
 
-  auto driver_host = std::make_unique<DynamicLinkerDriverHostComponent>(
-      std::move(bootstrap_sender), std::move(dynamic_linker_service_client));
-
-  auto driver_host_ptr = driver_host.get();
-  dynamic_linker_driver_hosts_.push_back(std::move(driver_host));
-
-  return zx::ok(driver_host_ptr);
+        auto driver_host_ptr = driver_host.get();
+        dynamic_linker_driver_hosts_.push_back(std::move(driver_host));
+        completion_cb(zx::ok(driver_host_ptr));
+      });
 }
 
 bool DriverRunner::IsDriverHostValid(DriverHost* driver_host) const {

@@ -1114,23 +1114,17 @@ void Node::StartDriver(fuchsia_component_runner::wire::ComponentStartInfo start_
   // Launch a driver host if we are not colocated.
   if (!colocate) {
     if (use_dynamic_linker) {
-      auto result =
-          (*node_manager_)
-              ->CreateDriverHostDynamicLinker([this, cb = std::move(cb)](zx::result<>) mutable {
-                // This callback should not be called before the |StartDriver|
-                // function returns since we are either running on the same dispatcher,
-                // or |StartDriver| was running in main before running the dispatcher loop,
-                // so |driver_host_| should already be set.
-                ZX_ASSERT(driver_host_.has_value());
-
+      (*node_manager_)
+          ->CreateDriverHostDynamicLinker(
+              [this, cb = std::move(cb)](zx::result<DriverHost*> driver_host) mutable {
+                if (driver_host.is_error()) {
+                  cb(driver_host.take_error());
+                  return;
+                }
+                driver_host_ = driver_host.value();
                 // TODO(https://fxbug.dev/341998660): load the driver.
                 cb(zx::error(ZX_ERR_NOT_SUPPORTED));
               });
-      if (result.is_error()) {
-        cb(result.take_error());
-        return;
-      }
-      driver_host_ = result.value();
       return;
     }
     auto result = (*node_manager_)->CreateDriverHost(use_next_vdso);

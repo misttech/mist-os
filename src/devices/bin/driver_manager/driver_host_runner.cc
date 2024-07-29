@@ -160,9 +160,9 @@ zx_status_t DriverHostRunner::DriverHost::GetDuplicateHandles(zx::process* out_p
   return ZX_OK;
 }
 
-zx::result<> DriverHostRunner::StartDriverHost(driver_loader::Loader* loader,
-                                               zx::channel bootstrap_receiver,
-                                               StartDriverHostCallback callback) {
+void DriverHostRunner::StartDriverHost(driver_loader::Loader* loader,
+                                       zx::channel bootstrap_receiver,
+                                       StartDriverHostCallback callback) {
   constexpr std::string_view kUrl = "fuchsia-boot:///driver_host2#meta/driver_host2.cm";
   std::string name = "driver-host-new-" + std::to_string(next_driver_host_id_++);
 
@@ -183,7 +183,6 @@ zx::result<> DriverHostRunner::StartDriverHost(driver_loader::Loader* loader,
           callback(zx::ok());
         }
       });
-  return zx::ok();
 }
 
 std::unordered_set<const DriverHostRunner::DriverHost*> DriverHostRunner::DriverHosts() {

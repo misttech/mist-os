@@ -50,8 +50,8 @@ class DriverHostRunner : public fidl::WireServer<fuchsia_component_runner::Compo
 
   void PublishComponentRunner(component::OutgoingDirectory& outgoing);
 
-  zx::result<> StartDriverHost(driver_loader::Loader* loader, zx::channel bootstrap_receiver,
-                               StartDriverHostCallback callback);
+  void StartDriverHost(driver_loader::Loader* loader, zx::channel bootstrap_receiver,
+                       StartDriverHostCallback callback);
 
   // Returns all started driver hosts. This will be used by tests.
   std::unordered_set<const DriverHost*> DriverHosts();

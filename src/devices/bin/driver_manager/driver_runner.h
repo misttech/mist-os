@@ -156,8 +156,8 @@ class DriverRunner : public fidl::WireServer<fuchsia_driver_framework::Composite
   zx::result<DriverHost*> CreateDriverHost(bool use_next_vdso) override;
   // Creates the driver host component, loads the driver host using dynamic linking,
   // and calls |cb| on completion. |cb| will only be called if the return value is zx::ok.
-  zx::result<DriverHost*> CreateDriverHostDynamicLinker(
-      fit::callback<void(zx::result<>)> completion_cb) override;
+  void CreateDriverHostDynamicLinker(
+      fit::callback<void(zx::result<DriverHost*>)> completion_cb) override;
   bool IsDriverHostValid(DriverHost* driver_host) const override;
 
   // BindManagerBridge interface.

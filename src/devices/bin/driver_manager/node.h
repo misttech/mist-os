@@ -63,10 +63,10 @@ class NodeManager {
   virtual zx::result<DriverHost*> CreateDriverHost(bool use_next_vdso) = 0;
 
   // Creates the driver host component, loads the driver host using dynamic linking,
-  // and calls |cb| on completion. |cb| will only be called if the return value is zx::ok.
-  virtual zx::result<DriverHost*> CreateDriverHostDynamicLinker(
-      fit::callback<void(zx::result<>)> completion_cb) {
-    return zx::error(ZX_ERR_NOT_SUPPORTED);
+  // and calls |cb| on completion or error.
+  virtual void CreateDriverHostDynamicLinker(
+      fit::callback<void(zx::result<DriverHost*>)> completion_cb) {
+    completion_cb(zx::error(ZX_ERR_NOT_SUPPORTED));
   }
 
   // DriverHost lifetimes are managed through a linked list, and they will delete themselves
