@@ -9,6 +9,7 @@
 #include <fidl/fuchsia.hardware.serial/cpp/wire.h>
 #include <fidl/fuchsia.power.broker/cpp/fidl.h>
 #include <fidl/fuchsia.power.system/cpp/fidl.h>
+#include <fidl/fuchsia.power.system/cpp/test_base.h>
 #include <lib/ddk/metadata.h>
 #include <lib/driver/testing/cpp/driver_test.h>
 
@@ -25,7 +26,8 @@ static constexpr fuchsia_hardware_serial::wire::SerialPortInfo kSerialInfo = {
     .serial_pid = bind_fuchsia_broadcom_platform::BIND_PLATFORM_DEV_PID_BCM43458,
 };
 
-class FakeSystemActivityGovernor : public fidl::Server<fuchsia_power_system::ActivityGovernor> {
+class FakeSystemActivityGovernor
+    : public fidl::testing::TestBase<fuchsia_power_system::ActivityGovernor> {
  public:
   FakeSystemActivityGovernor() = default;
 
@@ -48,8 +50,9 @@ class FakeSystemActivityGovernor : public fidl::Server<fuchsia_power_system::Act
     completer.Reply({{std::move(elements)}});
   }
 
-  void RegisterListener(RegisterListenerRequest& request,
-                        RegisterListenerCompleter::Sync& completer) override {}
+  void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
+    ADD_FAILURE() << name << " is not implemented";
+  }
 
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_system::ActivityGovernor> md,
                              fidl::UnknownMethodCompleter::Sync& completer) override {}

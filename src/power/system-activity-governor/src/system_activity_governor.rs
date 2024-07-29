@@ -17,12 +17,14 @@ use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::{
     ArrayProperty, IntProperty as IInt, Node as INode, Property, UintProperty as IUint,
 };
-use fuchsia_inspect_contrib::nodes::BoundedListNode as IRingBuffer;
-use fuchsia_zircon::{self as zx, HandleBased};
+use fuchsia_inspect_contrib::nodes::{BoundedListNode as IRingBuffer, NodeExt};
+use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased};
 use futures::channel::mpsc::{self, Receiver, Sender};
 use futures::lock::Mutex;
 use futures::prelude::*;
-use power_broker_client::{basic_update_fn_factory, run_power_element, PowerElementContext};
+use power_broker_client::{
+    basic_update_fn_factory, run_power_element, LeaseHelper, PowerElementContext,
+};
 use std::cell::{OnceCell, RefCell};
 use std::rc::Rc;
 use std::sync::Arc;
@@ -369,6 +371,73 @@ impl SuspendStatsManager {
     }
 }
 
+/// Manager of leases that block suspension.
+///
+/// Used to facilitate the `TakeWakeLease()` functionality of
+/// `fuchsia.power.system.ActivityGovernor`.
+///
+/// A wake lease blocks suspension by requiring the power level of the Execution
+/// State to be at least [`ExecutionStateLevel::WakeHandling`].
+struct WakeLeaseManager {
+    /// The inspect node for lease stats.
+    inspect_node: INode,
+    /// Proxy to the power topology to create power elements.
+    topology: fbroker::TopologyProxy,
+    /// Dependency token for Execution State.
+    execution_state_assertive_dependency_token: fbroker::DependencyToken,
+}
+
+impl WakeLeaseManager {
+    pub fn new(
+        inspect_node: INode,
+        topology: fbroker::TopologyProxy,
+        execution_state_assertive_dependency_token: fbroker::DependencyToken,
+    ) -> Self {
+        Self { inspect_node, topology, execution_state_assertive_dependency_token }
+    }
+
+    async fn create_wake_lease(&self, name: String) -> Result<fsystem::WakeLeaseToken> {
+        let (server_token, client_token) = fsystem::WakeLeaseToken::create();
+
+        let lease_helper = LeaseHelper::new(
+            &self.topology,
+            &name,
+            vec![power_broker_client::LeaseDependency {
+                dependency_type: fbroker::DependencyType::Assertive,
+                requires_token: self
+                    .execution_state_assertive_dependency_token
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)?,
+                requires_level_by_preference: vec![
+                    ExecutionStateLevel::WakeHandling.into_primitive()
+                ],
+            }],
+        )
+        .await?;
+        tracing::info!("Acquiring lease for '{}'", name);
+        let lease = lease_helper.lease().await?;
+
+        let token_info = server_token.basic_info()?;
+        let inspect_lease_node =
+            self.inspect_node.create_child(token_info.koid.raw_koid().to_string());
+        let related_koid = token_info.related_koid.raw_koid();
+
+        inspect_lease_node.record_string("name", name.clone());
+        inspect_lease_node.record_uint("client_token_koid", related_koid);
+        inspect_lease_node.record_time("created_at");
+
+        fasync::Task::local(async move {
+            // Keep lease alive for as long as the client keeps it alive.
+            let _ = fasync::OnSignals::new(server_token, zx::Signals::EVENTPAIR_PEER_CLOSED).await;
+            tracing::debug!("Dropping lease for '{}'", name);
+            drop(inspect_lease_node);
+            drop(lease);
+        })
+        .detach();
+
+        Ok(client_token)
+    }
+}
+
 /// SystemActivityGovernor runs the server for fuchsia.power.suspend and fuchsia.power.system FIDL
 /// APIs.
 pub struct SystemActivityGovernor {
@@ -385,6 +454,8 @@ pub struct SystemActivityGovernor {
     /// The manager used to report suspend stats to inspect and clients of
     /// fuchsia.power.suspend.Stats.
     suspend_stats: SuspendStatsManager,
+    /// The manager used to create and report wake leases.
+    wake_lease_manager: WakeLeaseManager,
     /// The collection of ActivityGovernorListener that have registered through
     /// fuchsia.power.system.ActivityGovernor/RegisterListener.
     listeners: RefCell<Vec<fsystem::ActivityGovernorListenerProxy>>,
@@ -418,6 +489,12 @@ impl SystemActivityGovernor {
         .build()
         .await
         .expect("PowerElementContext encountered error while building execution_state");
+
+        let wake_lease_manager = WakeLeaseManager::new(
+            inspect_root.create_child("wake_leases"),
+            topology.clone(),
+            execution_state.assertive_dependency_token(),
+        );
 
         element_power_level_names.push(generate_element_power_level_names(
             "execution_state",
@@ -573,6 +650,7 @@ impl SystemActivityGovernor {
             wake_handling,
             resume_latency_ctx,
             suspend_stats,
+            wake_lease_manager,
             listeners: RefCell::new(Vec::new()),
             execution_state_manager,
             boot_control: boot_control.into(),
@@ -902,6 +980,25 @@ impl SystemActivityGovernor {
                         tracing::warn!(
                             ?error,
                             "Encountered error while responding to GetPowerElements request"
+                        );
+                    }
+                }
+                Ok(fsystem::ActivityGovernorRequest::TakeWakeLease { responder, name }) => {
+                    let client_token = match self.wake_lease_manager.create_wake_lease(name).await {
+                        Ok(client_token) => client_token,
+                        Err(error) => {
+                            tracing::warn!(
+                                ?error,
+                                "Encountered error while registering wake lease"
+                            );
+                            return;
+                        }
+                    };
+
+                    if let Err(error) = responder.send(client_token) {
+                        tracing::warn!(
+                            ?error,
+                            "Encountered error while responding to TakeWakeLease request"
                         );
                     }
                 }

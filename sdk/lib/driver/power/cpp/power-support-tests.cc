@@ -6,6 +6,7 @@
 #include <fidl/fuchsia.io/cpp/markers.h>
 #include <fidl/fuchsia.power.broker/cpp/fidl.h>
 #include <fidl/fuchsia.power.system/cpp/fidl.h>
+#include <fidl/fuchsia.power.system/cpp/test_base.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/task.h>
@@ -1108,7 +1109,8 @@ TEST_F(PowerLibTest, GetTokensOneLevelTwoDeps) {
   loop.JoinThreads();
 }
 
-class SystemActivityGovernor : public fidl::Server<fuchsia_power_system::ActivityGovernor> {
+class SystemActivityGovernor
+    : public fidl::testing::TestBase<fuchsia_power_system::ActivityGovernor> {
  public:
   SystemActivityGovernor(zx::event exec_state_opportunistic, zx::event wake_handling_assertive)
       : exec_state_opportunistic_(std::move(exec_state_opportunistic)),
@@ -1132,11 +1134,12 @@ class SystemActivityGovernor : public fidl::Server<fuchsia_power_system::Activit
     completer.Reply({{std::move(elements)}});
   }
 
-  void RegisterListener(RegisterListenerRequest& req,
-                        RegisterListenerCompleter::Sync& completer) override {}
-
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_system::ActivityGovernor> md,
                              fidl::UnknownMethodCompleter::Sync& completer) override {}
+
+  void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
+    ADD_FAILURE() << name << " is not implemented";
+  }
 
  private:
   zx::event exec_state_opportunistic_;

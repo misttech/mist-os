@@ -6,6 +6,7 @@
 #include <fidl/fuchsia.hardware.power/cpp/fidl.h>
 #include <fidl/fuchsia.power.broker/cpp/fidl.h>
 #include <fidl/fuchsia.power.system/cpp/fidl.h>
+#include <fidl/fuchsia.power.system/cpp/test_base.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/driver/testing/cpp/driver_test.h>
 #include <lib/fake-bti/bti.h>
@@ -175,7 +176,8 @@ class FakePlatformDevice : public fidl::Server<fuchsia_hardware_platform_device:
 // Power Specific.
 // TODO(https://fxbug.dev/342124966): Move to the Power Framework Testing Client
 // at //src/power/testing/client.
-class FakeSystemActivityGovernor : public fidl::Server<fuchsia_power_system::ActivityGovernor> {
+class FakeSystemActivityGovernor
+    : public fidl::testing::TestBase<fuchsia_power_system::ActivityGovernor> {
  public:
   FakeSystemActivityGovernor(zx::event wake_handling) : wake_handling_(std::move(wake_handling)) {}
 
@@ -197,8 +199,9 @@ class FakeSystemActivityGovernor : public fidl::Server<fuchsia_power_system::Act
     completer.Reply({{std::move(elements)}});
   }
 
-  void RegisterListener(RegisterListenerRequest& request,
-                        RegisterListenerCompleter::Sync& completer) override {}
+  void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
+    ADD_FAILURE() << name << " is not implemented";
+  }
 
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_system::ActivityGovernor> md,
                              fidl::UnknownMethodCompleter::Sync& completer) override {}

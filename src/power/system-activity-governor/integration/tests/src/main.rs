@@ -3,12 +3,12 @@
 // found in the LICENSE file.
 
 use anyhow::Result;
-use diagnostics_assertions::{tree_assertion, AnyProperty};
+use diagnostics_assertions::{tree_assertion, AnyProperty, NonZeroUintProperty, TreeAssertion};
 use diagnostics_reader::{ArchiveReader, Inspect};
 use fidl::endpoints::create_endpoints;
 use fidl_fuchsia_power_broker::{self as fbroker, LeaseStatus};
 use fuchsia_component::client::connect_to_protocol;
-use fuchsia_zircon::{self as zx, HandleBased};
+use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased};
 use futures::channel::mpsc;
 use futures::{FutureExt, StreamExt};
 use power_broker_client::{basic_update_fn_factory, run_power_element, PowerElementContext};
@@ -344,6 +344,7 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
             },
             suspend_events: {
             },
+            wake_leases: {},
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -405,6 +406,7 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
                     duration: 2u64,
                 },
             },
+            wake_leases: {},
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -451,6 +453,7 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
                     duration: 2u64,
                 },
             },
+            wake_leases: {},
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -519,6 +522,7 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
                     duration: 3u64,
                 },
             },
+            wake_leases: {},
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -605,6 +609,7 @@ async fn test_activity_governor_raises_execution_state_power_level_on_wake_handl
                     duration: 2u64,
                 },
             },
+            wake_leases: {},
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -667,6 +672,7 @@ async fn test_activity_governor_raises_execution_state_power_level_on_wake_handl
                     duration: 3u64,
                 },
             },
+            wake_leases: {},
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -753,6 +759,7 @@ async fn test_activity_governor_raises_execution_state_power_level_on_full_wake_
                     duration: 2u64,
                 },
             },
+            wake_leases: {},
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -815,6 +822,7 @@ async fn test_activity_governor_raises_execution_state_power_level_on_full_wake_
                     duration: 3u64,
                 },
             },
+            wake_leases: {},
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -880,6 +888,7 @@ async fn test_activity_governor_shows_resume_latency_in_inspect() -> Result<()> 
                 },
                 suspend_events: {
                 },
+                wake_leases: {},
                 "fuchsia.inspect.Health": contains {
                     status: "OK",
                 },
@@ -948,6 +957,7 @@ async fn test_activity_governor_forwards_resume_latency_to_suspender() -> Result
             },
             suspend_events: {
             },
+            wake_leases: {},
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -1008,6 +1018,7 @@ async fn test_activity_governor_forwards_resume_latency_to_suspender() -> Result
                     duration: 1000u64,
                 },
             },
+            wake_leases: {},
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -1075,6 +1086,7 @@ async fn test_activity_governor_increments_fail_count_on_suspend_error() -> Resu
             },
             suspend_events: {
             },
+            wake_leases: {},
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -1126,6 +1138,7 @@ async fn test_activity_governor_increments_fail_count_on_suspend_error() -> Resu
                     suspend_failed: AnyProperty,
                 },
             },
+            wake_leases: {},
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -1264,6 +1277,7 @@ async fn test_activity_governor_suspends_after_listener_hanging_on_resume() -> R
                     duration: 2u64,
                 },
             },
+            wake_leases: {},
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -1457,6 +1471,7 @@ async fn test_activity_governor_handles_listener_raising_power_levels() -> Resul
                     duration: 2u64,
                 },
             },
+            wake_leases: {},
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -1526,6 +1541,7 @@ async fn test_activity_governor_handles_listener_raising_power_levels() -> Resul
                     duration: 3u64,
                 },
             },
+            wake_leases: {},
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -1644,6 +1660,7 @@ async fn test_activity_governor_handles_suspend_failure() -> Result<()> {
                     suspend_failed: AnyProperty,
                 },
             },
+            wake_leases: {},
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -1826,6 +1843,7 @@ async fn test_activity_governor_handles_boot_signal() -> Result<()> {
             },
             suspend_events: {
             },
+            wake_leases: {},
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -1870,6 +1888,7 @@ async fn test_activity_governor_handles_boot_signal() -> Result<()> {
                     suspended: AnyProperty,
                 }
             },
+            wake_leases: {},
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -2160,5 +2179,134 @@ async fn test_execution_state_always_starts_at_active_power_level() -> Result<()
 
     let es_status = status_endpoints.get("execution_state").unwrap();
     assert_eq!(es_status.watch_power_level().await?.unwrap(), 2);
+    Ok(())
+}
+
+#[fuchsia::test]
+async fn test_activity_governor_take_wake_lease_raises_execution_state_to_wake_handling(
+) -> Result<()> {
+    let (realm, activity_governor_moniker) = create_realm().await?;
+    let suspend_device = realm.connect_to_protocol::<tsc::DeviceMarker>().await?;
+    set_up_default_suspender(&suspend_device).await;
+
+    let element_info_provider = realm
+        .connect_to_service_instance::<fbroker::ElementInfoProviderServiceMarker>(
+            &"system_activity_governor",
+        )
+        .await
+        .expect("failed to connect to service ElementInfoProviderService")
+        .connect_to_status_provider()
+        .expect("failed to connect to protocol ElementInfoProvider");
+
+    let status_endpoints: HashMap<String, fbroker::StatusProxy> = element_info_provider
+        .get_status_endpoints()
+        .await?
+        .unwrap()
+        .into_iter()
+        .map(|s| (s.identifier.unwrap(), s.status.unwrap().into_proxy().unwrap()))
+        .collect();
+
+    let es_status = status_endpoints.get("execution_state").unwrap();
+    assert_eq!(es_status.watch_power_level().await?.unwrap(), 2);
+
+    let activity_governor = realm.connect_to_protocol::<fsystem::ActivityGovernorMarker>().await?;
+    let wake_lease_name = "wake_lease";
+    let wake_lease = activity_governor.take_wake_lease(wake_lease_name).await?;
+
+    // Trigger "boot complete" signal.
+    {
+        let suspend_controller = create_suspend_topology(&realm).await?;
+        lease(&suspend_controller, 1).await.unwrap();
+    }
+
+    assert_eq!(es_status.watch_power_level().await?.unwrap(), 1);
+
+    let server_token_koid = &wake_lease.basic_info().unwrap().related_koid.raw_koid().to_string();
+
+    block_until_inspect_matches!(
+        activity_governor_moniker,
+        root: contains {
+            wake_leases: {
+                var server_token_koid: {
+                    created_at: NonZeroUintProperty,
+                    client_token_koid: wake_lease.get_koid().unwrap().raw_koid(),
+                    name: wake_lease_name,
+                }
+            },
+        }
+    );
+
+    drop(wake_lease);
+    assert_eq!(es_status.watch_power_level().await?.unwrap(), 0);
+
+    block_until_inspect_matches!(
+        activity_governor_moniker,
+        root: contains {
+            wake_leases: {},
+        }
+    );
+
+    Ok(())
+}
+
+#[fuchsia::test]
+async fn test_activity_governor_handles_1000_wake_leases() -> Result<()> {
+    let (realm, activity_governor_moniker) = create_realm().await?;
+    let suspend_device = realm.connect_to_protocol::<tsc::DeviceMarker>().await?;
+    set_up_default_suspender(&suspend_device).await;
+
+    let activity_governor = realm.connect_to_protocol::<fsystem::ActivityGovernorMarker>().await?;
+    let mut root = TreeAssertion::new("root", false);
+    let mut wake_leases_child = TreeAssertion::new("wake_leases", true);
+    let mut wake_leases = Vec::new();
+
+    for i in 0..1000 {
+        let wake_lease_name = format!("wake_lease{}", i);
+        let wake_lease = activity_governor.take_wake_lease(&wake_lease_name).await?;
+
+        let server_token_koid =
+            &wake_lease.basic_info().unwrap().related_koid.raw_koid().to_string();
+        let client_token_koid = &wake_lease.get_koid().unwrap().raw_koid();
+
+        let mut wake_lease_child = TreeAssertion::new(server_token_koid, false);
+        wake_lease_child.add_property_assertion("created_at", Box::new(NonZeroUintProperty));
+        wake_lease_child.add_property_assertion("client_token_koid", Box::new(*client_token_koid));
+        wake_lease_child.add_property_assertion("name", Box::new(wake_lease_name));
+        wake_leases_child.add_child_assertion(wake_lease_child);
+
+        wake_leases.push(wake_lease);
+    }
+
+    root.add_child_assertion(wake_leases_child);
+
+    let mut reader = ArchiveReader::new();
+
+    reader
+        .select_all_for_moniker(&format!(
+            "{}/{}",
+            REALM_FACTORY_CHILD_NAME, &activity_governor_moniker
+        ))
+        .with_minimum_schema_count(1);
+
+    let inspect = reader
+        .snapshot::<Inspect>()
+        .await?
+        .into_iter()
+        .next()
+        .and_then(|result| result.payload)
+        .ok_or(anyhow::anyhow!("expected one inspect hierarchy"))
+        .unwrap();
+
+    root.run(&inspect).unwrap();
+
+    drop(wake_leases);
+
+    block_until_inspect_matches!(
+        activity_governor_moniker,
+        root: contains {
+            wake_leases: {},
+        }
+    );
+
     Ok(())
 }
