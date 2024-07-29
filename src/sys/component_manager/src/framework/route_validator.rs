@@ -527,7 +527,6 @@ mod tests {
     use crate::model::start::Start;
     use crate::model::testing::out_dir::OutDir;
     use crate::model::testing::test_helpers::{TestEnvironmentBuilder, TestModelResult};
-    use ::routing::bedrock::structured_dict::ComponentInput;
     use assert_matches::assert_matches;
     use cm_rust::*;
     use cm_rust_testing::*;
@@ -584,7 +583,7 @@ mod tests {
         let test = TestEnvironmentBuilder::new().set_components(components).build().await;
         let (validator, _host) = route_validator(&test).await;
 
-        test.model.start(ComponentInput::default()).await;
+        test.model.start().await;
 
         // `my_child` should not be resolved right now
         let instance = test.model.root().find_resolved(&vec!["my_child"].try_into().unwrap()).await;
@@ -679,7 +678,7 @@ mod tests {
         let test = TestEnvironmentBuilder::new().set_components(components).build().await;
         let (validator, _host) = route_validator(&test).await;
 
-        test.model.start(ComponentInput::default()).await;
+        test.model.start().await;
 
         // `my_child` should not be resolved right now
         let instance = test.model.root().find_resolved(&vec!["my_child"].try_into().unwrap()).await;
@@ -766,7 +765,7 @@ mod tests {
         let test = TestEnvironmentBuilder::new().set_components(components).build().await;
         let (validator, _host) = route_validator(&test).await;
 
-        test.model.start(ComponentInput::default()).await;
+        test.model.start().await;
 
         // Validate the root
         let targets = &[
@@ -879,7 +878,7 @@ mod tests {
         let test = TestEnvironmentBuilder::new().set_components(components).build().await;
         let (validator, _host) = route_validator(&test).await;
 
-        test.model.start(ComponentInput::default()).await;
+        test.model.start().await;
 
         // Validate the root, passing an empty vector. This should match both capabilities
         let mut results = validator.route(".", &[]).await.unwrap().unwrap();
@@ -961,7 +960,7 @@ mod tests {
         let test = TestEnvironmentBuilder::new().set_components(components).build().await;
         let (validator, _host) = route_validator(&test).await;
 
-        test.model.start(ComponentInput::default()).await;
+        test.model.start().await;
 
         // Validate the root
         let targets = &[fsys::RouteTarget {
@@ -1068,7 +1067,7 @@ mod tests {
         let realm_proxy = test.realm_proxy.as_ref().unwrap();
         let (validator, _host) = route_validator(&test).await;
 
-        test.model.start(ComponentInput::default()).await;
+        test.model.start().await;
 
         // Create two children in the collection, each exposing `my_service` with two instances.
         let collection_ref = fdecl::CollectionRef { name: "coll".parse().unwrap() };
@@ -1193,7 +1192,7 @@ mod tests {
         let test = TestEnvironmentBuilder::new().set_components(components).build().await;
         let (validator, _host) = route_validator(&test).await;
 
-        test.model.start(ComponentInput::default()).await;
+        test.model.start().await;
 
         // `my_child` should not be resolved right now
         let instance = test.model.root().find_resolved(&vec!["my_child"].try_into().unwrap()).await;

@@ -368,9 +368,6 @@ fn create_event_payloads(
             stream_once(Ok(create_debug_started_payload(runtime_dir, break_on_start)))
         }
         payload => stream_once(Ok(match payload.event_type() {
-            EventType::Discovered => {
-                fcomponent::EventPayload::Discovered(fcomponent::DiscoveredPayload::default())
-            }
             EventType::Destroyed => {
                 fcomponent::EventPayload::Destroyed(fcomponent::DestroyedPayload::default())
             }

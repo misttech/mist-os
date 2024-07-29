@@ -95,7 +95,7 @@ use futures::future::BoxFuture;
 use futures::{FutureExt, StreamExt, TryStreamExt};
 use hooks::EventType;
 use std::sync::Arc;
-use tracing::{info, warn, error};
+use tracing::{error, info, warn};
 use vfs::directory::entry::OpenRequest;
 use vfs::path::Path;
 use vfs::ToObjectRequest;
@@ -340,8 +340,8 @@ impl BuiltinEnvironmentBuilder {
             ),
             runtime_config: Arc::clone(&runtime_config),
             top_instance,
+            instance_registry: self.instance_registry,
         };
-        let model = Model::new(params, self.instance_registry).await?;
 
         // Wrap BuiltinRunnerFactory in BuiltinRunner now that we have the definite RuntimeConfig.
         let builtin_runners = self
@@ -353,7 +353,7 @@ impl BuiltinEnvironmentBuilder {
             .collect();
 
         Ok(BuiltinEnvironment::new(
-            model,
+            params,
             runtime_config,
             system_resource_handle,
             builtin_runners,
@@ -521,14 +521,13 @@ pub struct BuiltinEnvironment {
     // TODO(https://fxbug.dev/332389972): Remove or explain #[allow(dead_code)].
     #[allow(dead_code)]
     pub realm_builder_resolver: Option<RealmBuilderResolver>,
-    pub root_component_input: ComponentInput,
     capability_passthrough: bool,
     _service_fs_task: Option<fasync::Task<()>>,
 }
 
 impl BuiltinEnvironment {
     async fn new(
-        model: Arc<Model>,
+        params: ModelParams,
         runtime_config: Arc<RuntimeConfig>,
         system_resource_handle: Option<Resource>,
         builtin_runners: Vec<BuiltinRunner>,
@@ -542,17 +541,10 @@ impl BuiltinEnvironment {
         let debug = runtime_config.debug;
 
         let num_threads = runtime_config.num_threads.clone();
-
-        let event_logger = if runtime_config.log_all_events {
-            let event_logger = Arc::new(EventLogger::new());
-            model.root().hooks.install(event_logger.hooks()).await;
-            Some(event_logger)
-        } else {
-            None
-        };
+        let top_instance = params.top_instance.clone();
 
         let mut root_input_builder =
-            RootComponentInputBuilder::new(model.top_instance().clone(), &runtime_config);
+            RootComponentInputBuilder::new(top_instance.clone(), &runtime_config);
 
         // If capability passthrough is enabled, add capabilities offered from
         // the parent to the input dictionary of the root component.
@@ -583,7 +575,7 @@ impl BuiltinEnvironment {
             }
         }
 
-        for namespace_capability in model.top_instance().namespace_capabilities() {
+        for namespace_capability in top_instance.namespace_capabilities() {
             match namespace_capability {
                 cm_rust::CapabilityDecl::Protocol(p) => {
                     root_input_builder.add_namespace_protocol(&p);
@@ -1113,10 +1105,12 @@ impl BuiltinEnvironment {
         }
 
         // Set up System Controller service.
-        let weak_model = Arc::downgrade(&model);
+        let weak_top_instance = Arc::downgrade(&top_instance);
         root_input_builder.add_builtin_protocol_if_enabled::<fsys::SystemControllerMarker>(
             move |stream| {
-                SystemController::new(weak_model.clone(), SHUTDOWN_TIMEOUT).serve(stream).boxed()
+                SystemController::new(weak_top_instance.clone(), SHUTDOWN_TIMEOUT)
+                    .serve(stream)
+                    .boxed()
             },
         );
 
@@ -1125,28 +1119,43 @@ impl BuiltinEnvironment {
 
         // Set up the event registry.
         let event_registry = {
-            let mut event_registry = EventRegistry::new(Arc::downgrade(&model));
+            let mut event_registry = EventRegistry::new(Arc::downgrade(&top_instance));
             event_registry.register_synthesis_provider(
                 EventType::CapabilityRequested,
                 inspect_sink_provider.clone(),
             );
             Arc::new(event_registry)
         };
-        model.root().hooks.install(event_registry.hooks()).await;
-
         let event_stream_provider =
             Arc::new(EventStreamProvider::new(Arc::downgrade(&event_registry)));
-        model.root().hooks.install(event_stream_provider.hooks()).await;
-
         let event_source_factory = EventSourceFactory::new(
-            Arc::downgrade(model.top_instance()),
+            Arc::downgrade(&top_instance),
             Arc::downgrade(&event_registry),
             Arc::downgrade(&event_stream_provider),
         );
-        let factory = Factory::new();
 
         let mut builtin_capabilities: Vec<Box<dyn BuiltinCapability>> =
             vec![Box::new(EventSourceFactoryCapability::new(event_source_factory.clone()))];
+
+        // Set up the boot resolver so it is routable from "above root".
+        if let Some(boot_resolver) = boot_resolver {
+            let b = boot_resolver.clone();
+            root_input_builder.add_builtin_protocol_if_enabled::<fresolution::ResolverMarker>(
+                move |stream| {
+                    let b = b.clone();
+                    async move { b.serve(stream).await.map_err(|e| format_err!("{:?}", e)) }.boxed()
+                },
+            );
+            builtin_capabilities.push(Box::new(boot_resolver));
+        }
+
+        let root_component_input = root_input_builder.build();
+        let model = Model::new(params, root_component_input).await?;
+
+        model.root().hooks.install(event_registry.hooks()).await;
+        model.root().hooks.install(event_stream_provider.hooks()).await;
+
+        let factory = Factory::new();
         let mut framework_capabilities: Vec<Box<dyn FrameworkCapability>> = vec![
             Box::new(Realm::new(Arc::downgrade(&model), runtime_config.clone())),
             Box::new(IntrospectorFrameworkCapability {
@@ -1165,17 +1174,13 @@ impl BuiltinEnvironment {
             builtin_capabilities.push(Box::new(runner));
         }
 
-        // Set up the boot resolver so it is routable from "above root".
-        if let Some(boot_resolver) = boot_resolver {
-            let b = boot_resolver.clone();
-            root_input_builder.add_builtin_protocol_if_enabled::<fresolution::ResolverMarker>(
-                move |stream| {
-                    let b = b.clone();
-                    async move { b.serve(stream).await.map_err(|e| format_err!("{:?}", e)) }.boxed()
-                },
-            );
-            builtin_capabilities.push(Box::new(boot_resolver));
-        }
+        let event_logger = if runtime_config.log_all_events {
+            let event_logger = Arc::new(EventLogger::new());
+            model.root().hooks.install(event_logger.hooks()).await;
+            Some(event_logger)
+        } else {
+            None
+        };
 
         // Set up the root realm stop notifier.
         let stop_notifier = Arc::new(RootStopNotifier::new());
@@ -1227,8 +1232,6 @@ impl BuiltinEnvironment {
         // Serve stats about inspect in a lazy node.
         inspector.record_lazy_stats();
 
-        let root_component_input = root_input_builder.build();
-
         Ok(BuiltinEnvironment {
             model,
             realm_query,
@@ -1246,7 +1249,6 @@ impl BuiltinEnvironment {
             debug,
             num_threads,
             realm_builder_resolver,
-            root_component_input,
             capability_passthrough,
             _service_fs_task: None,
         })
@@ -1339,18 +1341,6 @@ impl BuiltinEnvironment {
                                 EventSubscription {
                                     event_name: UseEventStreamDecl {
                                         source_name: EventType::Destroyed.into(),
-                                        source: UseSource::Parent,
-                                        scope: None,
-                                        target_path: "/svc/fuchsia.component.EventStream"
-                                            .parse()
-                                            .unwrap(),
-                                        filter: None,
-                                        availability: Availability::Required,
-                                    },
-                                },
-                                EventSubscription {
-                                    event_name: UseEventStreamDecl {
-                                        source_name: EventType::Discovered.into(),
                                         source: UseSource::Parent,
                                         scope: None,
                                         target_path: "/svc/fuchsia.component.EventStream"
@@ -1459,56 +1449,14 @@ impl BuiltinEnvironment {
         self.bind_service_fs(server_end).await
     }
 
-    #[cfg(test)]
-    /// Adds a protocol to the root dict, replacing prior entries. This must be called before
-    /// the model is started.
-    pub async fn add_protocol_to_root_dict<P>(
-        &mut self,
-        name: Name,
-        task_to_launch: impl Fn(P::RequestStream) -> BoxFuture<'static, Result<(), anyhow::Error>>
-            + Sync
-            + Send
-            + 'static,
-    ) where
-        P: ProtocolMarker,
-    {
-        let top_instance = Arc::downgrade(self.model.top_instance());
-        let capability_source = CapabilitySource::Builtin {
-            capability: InternalCapability::Protocol(name.clone()),
-            top_instance: top_instance.clone(),
-        };
-
-        let launch = LaunchTaskOnReceive::new(
-            capability_source,
-            self.model.top_instance().task_group().as_weak(),
-            name.clone(),
-            Some(self.model.root().context.policy().clone()),
-            Arc::new(move |server_end, _| {
-                task_to_launch(crate::sandbox_util::take_handle_as_stream::<P>(server_end)).boxed()
-            }),
-        );
-        self.root_component_input.insert_capability(&name, launch.into_router().into()).unwrap();
-    }
-
-    #[cfg(test)]
-    /// Causes the root component to be discovered, which provides the root component with the
-    /// dict from the builtin environment. This is called in some tests because the tests create
-    /// a new model but do not call `Model::start`.
-    pub async fn discover_root_component(&self) {
-        self.model.discover_root_component(self.root_component_input.clone()).await;
-    }
-
     pub async fn wait_for_root_stop(&self) {
         self.stop_notifier.wait_for_root_stop().await;
     }
 
     pub async fn run_root(&mut self) -> Result<(), Error> {
-        // We bind the service fs to out _after_ we discover the root component, so that these
-        // service implementations can safely assume the root component is discovered.
-        self.model.discover_root_component(self.root_component_input.clone()).await;
         self.bind_service_fs_to_out().await?;
 
-        self.model.start(self.root_component_input.clone()).await;
+        self.model.start().await;
         component::health().set_ok();
         self.wait_for_root_stop().await;
 

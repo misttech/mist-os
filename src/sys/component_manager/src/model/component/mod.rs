@@ -17,6 +17,7 @@ use crate::model::routing::{self, RoutingError};
 use crate::model::start::Start;
 use ::namespace::Entry as NamespaceEntry;
 use ::routing::bedrock::sandbox_construction::ComponentSandbox;
+use ::routing::bedrock::structured_dict::ComponentInput;
 use ::routing::component_instance::{
     ComponentInstanceInterface, ExtendedInstanceInterface, ResolvedInstanceInterface,
     WeakComponentInstanceInterface, WeakExtendedInstanceInterface,
@@ -40,7 +41,7 @@ use futures::lock::{MappedMutexGuard, Mutex, MutexGuard};
 use hooks::{Event, EventPayload, Hooks};
 use instance::{
     InstanceState, ResolvedInstanceState, ShutdownInstanceState, StartedInstanceState,
-    StopOutcomeWithEscrow,
+    StopOutcomeWithEscrow, UnresolvedInstanceState,
 };
 use manager::ComponentManagerInstance;
 use moniker::{ChildName, Moniker};
@@ -288,12 +289,14 @@ pub struct ComponentInstance {
 impl ComponentInstance {
     /// Instantiates a new root component instance.
     pub async fn new_root(
+        input: ComponentInput,
         environment: Environment,
         context: Arc<ModelContext>,
         component_manager_instance: Weak<ComponentManagerInstance>,
         component_url: Url,
     ) -> Arc<Self> {
         Self::new(
+            input,
             Arc::new(environment),
             Moniker::root(),
             0,
@@ -312,6 +315,7 @@ impl ComponentInstance {
     /// Instantiates a new component instance with the given contents.
     // TODO(https://fxbug.dev/42077692) convert this to a builder API
     pub async fn new(
+        input: ComponentInput,
         environment: Arc<Environment>,
         moniker: Moniker,
         incarnation_id: IncarnationId,
@@ -334,7 +338,7 @@ impl ComponentInstance {
             config_parent_overrides,
             context,
             parent,
-            state: Mutex::new(InstanceState::New),
+            state: Mutex::new(InstanceState::Unresolved(UnresolvedInstanceState::new(input))),
             actions: ActionsManager::new(),
             hooks,
             nonblocking_task_group: TaskGroup::new(),
@@ -775,9 +779,6 @@ impl ComponentInstance {
             // and let's calculate our new state.
             let mut state = self.lock_state().await;
             let new_state = match state.deref_mut() {
-                InstanceState::New => {
-                    panic!("component should be discovered before shutting down");
-                }
                 InstanceState::Unresolved(unresolved_state) => Some(InstanceState::Shutdown(
                     ShutdownInstanceState { children: HashMap::new(), routed_storage: vec![] },
                     unresolved_state.take(),
@@ -924,7 +925,7 @@ impl ComponentInstance {
                     state.children.get(&moniker).map(|r| r.clone())
                 }
                 InstanceState::Destroyed => None,
-                InstanceState::New | InstanceState::Unresolved(_) => {
+                InstanceState::Unresolved(_) => {
                     panic!("DestroyChild: target is not resolved");
                 }
             }
@@ -1052,7 +1053,7 @@ impl ComponentInstance {
     ) -> Result<(), OpenExposedDirError> {
         let state = self.lock_state().await;
         match &*state {
-            InstanceState::New | InstanceState::Unresolved(_) | InstanceState::Shutdown(_, _) => {
+            InstanceState::Unresolved(_) | InstanceState::Shutdown(_, _) => {
                 Err(OpenExposedDirError::InstanceNotResolved)
             }
             InstanceState::Resolved(resolved_instance_state)
@@ -1107,7 +1108,7 @@ impl ComponentInstance {
                     }
                     .into());
                 }
-                InstanceState::New | InstanceState::Unresolved(_) => {
+                InstanceState::Unresolved(_) => {
                     panic!("start: not resolved")
                 }
             }
@@ -2129,6 +2130,7 @@ pub mod tests {
 
     async fn new_component() -> Arc<ComponentInstance> {
         ComponentInstance::new(
+            ComponentInput::default(),
             Arc::new(Environment::empty()),
             Moniker::root(),
             0,
@@ -2173,17 +2175,12 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn instance_state_transitions_test() {
-        // New --> Discovered.
-        let mut is = InstanceState::New;
-        is.set(new_unresolved().await);
-        assert_matches!(is, InstanceState::Unresolved(_));
-
-        // New --> Destroyed.
-        let mut is = InstanceState::New;
+        // Unresolved --> Destroyed.
+        let mut is = new_unresolved().await;
         is.set(InstanceState::Destroyed);
         assert_matches!(is, InstanceState::Destroyed);
 
-        // Discovered --> Resolved.
+        // Unresolved --> Resolved.
         let mut is = new_unresolved().await;
         is.set(new_resolved().await);
         assert_matches!(is, InstanceState::Resolved(_));
@@ -2193,7 +2190,7 @@ pub mod tests {
         is.set(InstanceState::Destroyed);
         assert_matches!(is, InstanceState::Destroyed);
 
-        // Resolved --> Discovered.
+        // Resolved --> Unresolved.
         let mut is = new_resolved().await;
         is.set(new_unresolved().await);
         assert_matches!(is, InstanceState::Unresolved(_));
@@ -2232,20 +2229,14 @@ pub mod tests {
     // and should panic. As a result of the macro, the test names will be generated like
     // `confirm_invalid_transition___p2r`.
     panic_test!([
-        // Destroyed !-> {Destroyed, Resolved, Discovered, New}..
+        // Destroyed !-> {Destroyed, Resolved, Unresolved}
         p2p(InstanceState::Destroyed, InstanceState::Destroyed),
         p2r(InstanceState::Destroyed, new_resolved().await),
         p2d(InstanceState::Destroyed, new_unresolved().await),
-        p2n(InstanceState::Destroyed, InstanceState::New),
-        // Resolved !-> {Resolved, New}.
+        // Resolved !-> Resolved
         r2r(new_resolved().await, new_resolved().await),
-        r2n(new_resolved().await, InstanceState::New),
-        // Discovered !-> {Discovered, New}.
+        // Discovered !-> Unresolved
         d2d(new_unresolved().await, new_unresolved().await),
-        d2n(new_unresolved().await, InstanceState::New),
-        // New !-> {Resolved, New}.
-        n2r(InstanceState::New, new_resolved().await),
-        n2n(InstanceState::New, InstanceState::New),
     ]);
 
     #[fuchsia::test]

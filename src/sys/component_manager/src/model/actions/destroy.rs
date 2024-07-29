@@ -2,12 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::model::actions::{
-    Action, ActionKey, ActionsManager, DiscoverAction, ShutdownAction, ShutdownType,
-};
+use crate::model::actions::{Action, ActionKey, ActionsManager, ShutdownAction, ShutdownType};
 use crate::model::component::instance::InstanceState;
 use crate::model::component::ComponentInstance;
-use ::routing::bedrock::structured_dict::ComponentInput;
 use ::routing::component_instance::ExtendedInstanceInterface;
 use async_trait::async_trait;
 use errors::{ActionError, DestroyActionError};
@@ -45,12 +42,6 @@ async fn do_destroy(component: &Arc<ComponentInstance>) -> Result<(), ActionErro
             }
         }
 
-        // Require the component to be discovered before deleting it so a Destroyed event is
-        // always preceded by a Discovered.
-        // TODO: wait for a discover, don't register a new one
-        ActionsManager::register(component.clone(), DiscoverAction::new(ComponentInput::default()))
-            .await?;
-
         // For destruction to behave correctly, the component has to be shut down first.
         // NOTE: This will recursively shut down the whole subtree. If this component has children,
         // we'll call DestroyChild on them which in turn will call Shutdown on the child. Because
@@ -78,9 +69,6 @@ async fn do_destroy(component: &Arc<ComponentInstance>) -> Result<(), ActionErro
                     // The instance is not shut down, we must have raced with an unresolve action
                     // (potentially followed by a resolve action). Let's try again.
                     continue;
-                }
-                InstanceState::New => {
-                    panic!("discover action returned above but the component is undiscovered, this should be impossible");
                 }
                 InstanceState::Destroyed => {
                     panic!(
@@ -345,7 +333,7 @@ pub mod tests {
             ("a", component_decl_with_test_runner()),
         ];
         let test = ActionsTest::new("root", components, None).await;
-        test.model.start(ComponentInput::default()).await;
+        test.model.start().await;
 
         let component_root = test.model.root().clone();
         let component_a = component_root
@@ -398,17 +386,6 @@ pub mod tests {
     }
 
     #[fuchsia::test]
-    async fn destroy_waits_on_discover() {
-        run_destroy_waits_test(
-            ActionKey::Discover,
-            // The mocked action must return a result, even though the result is not used
-            // by the Destroy action.
-            Ok(()),
-        )
-        .await;
-    }
-
-    #[fuchsia::test]
     async fn destroy_waits_on_resolve() {
         run_destroy_waits_test(
             ActionKey::Resolve,
@@ -437,7 +414,7 @@ pub mod tests {
             ("a", component_decl_with_test_runner()),
         ];
         let test = ActionsTest::new("root", components, None).await;
-        test.model.start(ComponentInput::default()).await;
+        test.model.start().await;
 
         let component_root = test.model.root().clone();
         let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;

@@ -341,7 +341,6 @@ impl TestEnvironmentBuilder {
 
         model.root().hooks.install(self.hooks).await;
         model.root().hooks.install_front_for_test(self.front_hooks).await;
-        builtin_environment.lock().await.discover_root_component().await;
 
         // Host framework service for `moniker`, if requested.
         let realm_proxy = if let Some(moniker) = self.realm_moniker {

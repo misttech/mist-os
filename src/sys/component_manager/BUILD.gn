@@ -170,7 +170,6 @@ rustc_binary("bin") {
     "src/main.rs",
     "src/model/actions/coordinator.rs",
     "src/model/actions/destroy.rs",
-    "src/model/actions/discover.rs",
     "src/model/actions/mod.rs",
     "src/model/actions/resolve.rs",
     "src/model/actions/set.rs",

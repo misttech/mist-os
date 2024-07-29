@@ -313,6 +313,7 @@ pub mod tests {
     use fuchsia_async::TestExecutor;
     use moniker::Moniker;
     use router_error::DowncastErrorForTest;
+    use routing::bedrock::structured_dict::ComponentInput;
     use routing::{DictExt, LazyGet};
     use sandbox::{Data, Dict, Receiver, RemotableCapability, WeakInstanceToken};
     use std::pin::pin;
@@ -525,6 +526,7 @@ pub mod tests {
         assert_matches!(TestExecutor::poll_until_stalled(&mut receive).await, Poll::Pending);
 
         let component = ComponentInstance::new_root(
+            ComponentInput::default(),
             Environment::empty(),
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
@@ -578,6 +580,7 @@ pub mod tests {
         assert_matches!(TestExecutor::poll_until_stalled(&mut receive).await, Poll::Pending);
 
         let component = ComponentInstance::new_root(
+            ComponentInput::default(),
             Environment::empty(),
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
@@ -641,6 +644,7 @@ pub mod tests {
         let router = debug_router.clone().on_readable(scope.clone(), fio::DirentType::Service);
 
         let target = ComponentInstance::new_root(
+            ComponentInput::default(),
             Environment::empty(),
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),

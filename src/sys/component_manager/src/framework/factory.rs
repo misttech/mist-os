@@ -130,6 +130,7 @@ mod tests {
     use crate::model::component::ComponentInstance;
     use crate::model::context::ModelContext;
     use crate::model::environment::Environment;
+    use ::routing::bedrock::structured_dict::ComponentInput;
     use fidl::endpoints;
     use fidl_fuchsia_component_sandbox as fsandbox;
     use fuchsia_zircon::{self as zx, AsHandleRef};
@@ -137,6 +138,7 @@ mod tests {
 
     async fn new_root() -> Arc<ComponentInstance> {
         ComponentInstance::new_root(
+            ComponentInput::default(),
             Environment::empty(),
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),

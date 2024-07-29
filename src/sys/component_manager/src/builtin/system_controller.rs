@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use crate::model::actions::ShutdownType;
+use crate::model::component::manager::ComponentManagerInstance;
 use crate::model::component::ComponentInstance;
-use crate::model::model::Model;
 use anyhow::{format_err, Context as _, Error};
 use fidl_fuchsia_sys2::*;
 use fuchsia_async::{self as fasync};
@@ -18,14 +18,14 @@ use tracing::*;
 const SHUTDOWN_WATCHDOG_INTERVAL: zx::Duration = zx::Duration::from_seconds(15);
 
 pub struct SystemController {
-    model: Weak<Model>,
+    top_instance: Weak<ComponentManagerInstance>,
     request_timeout: Duration,
 }
 
 impl SystemController {
     // TODO(jmatt) allow timeout to be supplied in the constructor
-    pub fn new(model: Weak<Model>, request_timeout: Duration) -> Self {
-        Self { model, request_timeout }
+    pub fn new(top_instance: Weak<ComponentManagerInstance>, request_timeout: Duration) -> Self {
+        Self { top_instance, request_timeout }
     }
 
     pub async fn serve(self, mut stream: SystemControllerRequestStream) -> Result<(), Error> {
@@ -50,8 +50,13 @@ impl SystemController {
                     })
                     .detach();
                     info!("Component manager is shutting down the system");
-                    let root =
-                        self.model.upgrade().ok_or(format_err!("model is dropped"))?.root().clone();
+                    let root = self
+                        .top_instance
+                        .upgrade()
+                        .ok_or(format_err!("model is dropped"))?
+                        .root()
+                        .await
+                        .clone();
 
                     // Kick off a background task to log when shutdown is taking too long.
                     fuchsia_async::Task::spawn(shutdown_watchdog(root.clone())).detach();
@@ -153,7 +158,7 @@ mod tests {
 
         // Wire up connections to SystemController
         let sys_controller = SystemController::new(
-            Arc::downgrade(&test.model),
+            Arc::downgrade(test.model.top_instance()),
             // allow simulated shutdown to take up to 30 days
             Duration::from_secs(60 * 60 * 24 * 30),
         );
@@ -238,7 +243,7 @@ mod tests {
 
             // Wire up connections to SystemController
             let sys_controller = SystemController::new(
-                Arc::downgrade(&test.model),
+                Arc::downgrade(test.model.top_instance()),
                 // require shutdown in a second
                 Duration::from_secs(u64::try_from(TIMEOUT_SECONDS).unwrap()),
             );

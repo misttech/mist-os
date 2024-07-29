@@ -709,7 +709,6 @@ mod tests {
     use component_id_index::InstanceId;
     use fidl::endpoints;
     use fidl::endpoints::{create_endpoints, create_proxy};
-    use routing::bedrock::structured_dict::ComponentInput;
     use routing_test_helpers::component_id_index::make_index_file;
     use {fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
@@ -747,7 +746,7 @@ mod tests {
             .await;
         let (query, _host) = realm_query(&test).await;
 
-        test.model.start(ComponentInput::default()).await;
+        test.model.start().await;
 
         let instance = query.get_instance(".").await.unwrap().unwrap();
 
@@ -788,7 +787,7 @@ mod tests {
         let test = TestEnvironmentBuilder::new().set_components(components).build().await;
         let (query, _host) = realm_query(&test).await;
 
-        test.model.start(ComponentInput::default()).await;
+        test.model.start().await;
 
         let iterator = query.get_resolved_declaration("./").await.unwrap().unwrap();
         let iterator = iterator.into_proxy().unwrap();
@@ -858,7 +857,7 @@ mod tests {
             .await;
         let (query, _host) = realm_query(&test).await;
 
-        test.model.start(ComponentInput::default()).await;
+        test.model.start().await;
 
         let config = query.get_structured_config("./").await.unwrap().unwrap();
 
@@ -890,7 +889,7 @@ mod tests {
         let test = TestEnvironmentBuilder::new().set_components(components).build().await;
         let (query, _host) = realm_query(&test).await;
 
-        test.model.start(ComponentInput::default()).await;
+        test.model.start().await;
 
         let (outgoing_dir, server_end) = create_endpoints::<fio::DirectoryMarker>();
         let server_end = ServerEnd::new(server_end.into_channel());
@@ -1013,7 +1012,7 @@ mod tests {
         let test = TestEnvironmentBuilder::new().set_components(components).build().await;
         let (query, _host) = realm_query(&test).await;
 
-        test.model.start(ComponentInput::default()).await;
+        test.model.start().await;
 
         let mut ns = query.construct_namespace("./").await.unwrap().unwrap();
 
@@ -1082,7 +1081,7 @@ mod tests {
         let test = TestEnvironmentBuilder::new().set_components(components).build().await;
         let (query, _host) = realm_query(&test).await;
 
-        test.model.start(ComponentInput::default()).await;
+        test.model.start().await;
 
         let (storage_admin, server_end) = create_proxy::<fsys::StorageAdminMarker>().unwrap();
 

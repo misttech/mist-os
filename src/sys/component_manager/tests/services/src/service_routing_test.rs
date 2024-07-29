@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{format_err, Context, Error};
-use component_events::events::{Destroyed, Discovered, Event, EventStream, Started};
+use component_events::events::{Destroyed, Event, EventStream, Started};
 use component_events::matcher::EventMatcher;
 use component_events::sequence::*;
 use fidl::endpoints::ServiceMarker;
@@ -15,9 +15,9 @@ use moniker::ChildName;
 use test_case::test_case;
 use tracing::*;
 use {
-    fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_examples as fecho,
-    fidl_fuchsia_examples_services as fexamples, fidl_fuchsia_io as fio,
-    fidl_fuchsia_sys2 as fsys2,
+    fidl_fidl_test_components as ftest, fidl_fuchsia_component_decl as fdecl,
+    fidl_fuchsia_examples as fecho, fidl_fuchsia_examples_services as fexamples,
+    fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys2,
 };
 
 const BRANCHES_COLLECTION: &str = "branches";
@@ -342,39 +342,13 @@ async fn static_aggregate_expose() {
 
 /// Starts a branch child component.
 async fn start_branch(input: &TestInput) -> Result<ScopedInstance, Error> {
-    let event_stream = EventStream::open_at_path("/events/discovered")
-        .await
-        .context("failed to subscribe to EventSource")?;
-
     let branch = ScopedInstance::new(BRANCHES_COLLECTION.to_string(), input.url.to_string())
         .await
         .context("failed to create branch component instance")?;
-    branch.start_with_binder_sync().await?;
-
-    // Wait for the providers to be discovered (created) to ensure that
-    // subsequent calls to `start_provider` can start them.
-    EventSequence::new()
-        .has_subset(
-            vec![
-                EventMatcher::ok().r#type(Discovered::TYPE).moniker(format!(
-                    "./{}:{}/{}",
-                    BRANCHES_COLLECTION,
-                    branch.child_name(),
-                    input.provider_a_moniker,
-                )),
-                EventMatcher::ok().r#type(Discovered::TYPE).moniker(format!(
-                    "./{}:{}/{}",
-                    BRANCHES_COLLECTION,
-                    branch.child_name(),
-                    input.provider_b_moniker,
-                )),
-            ],
-            Ordering::Unordered,
-        )
-        .expect(event_stream)
-        .await
-        .context("event sequence did not match expected")?;
-
+    let trigger = branch
+        .connect_to_protocol_at_exposed_dir::<ftest::TriggerMarker>()
+        .context("failed to connect to trigger")?;
+    let _ = trigger.run().await.context("failed to call trigger")?;
     Ok(branch)
 }
 

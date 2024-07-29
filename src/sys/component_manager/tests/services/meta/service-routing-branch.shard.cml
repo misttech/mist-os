@@ -13,6 +13,9 @@
         runner: "elf",
         binary: "bin/service_routing_branch_bin",
     },
+    capabilities: [
+        { protocol: "fidl.test.components.Trigger" },
+    ],
     use: [
         {
             protocol: "fuchsia.component.Realm",
@@ -21,8 +24,8 @@
     ],
     expose: [
         {
-            protocol: "fuchsia.component.Binder",
-            from: "framework",
+            protocol: "fidl.test.components.Trigger",
+            from: "self",
         },
     ],
 }

@@ -460,14 +460,13 @@ mod tests {
         )
         .await;
 
-        let (_event_source, mut event_stream) = test
-            .new_event_stream(vec![EventType::Discovered.into(), EventType::Started.into()])
-            .await;
+        let (_event_source, mut event_stream) =
+            test.new_event_stream(vec![EventType::Started.into()]).await;
 
         // Test that a dynamic child with a long name can also be created.
         let long_name = &"c".repeat(cm_types::MAX_LONG_NAME_LENGTH);
 
-        // Create children "a", "b", and "<long_name>" in collection. Expect a Discovered event for
+        // Create children "a", "b", and "<long_name>" in collection.
         // each.
         let collection_ref = fdecl::CollectionRef { name: "coll".to_string() };
         {
@@ -481,12 +480,6 @@ mod tests {
                 .await
                 .unwrap()
                 .unwrap();
-
-            // Ensure that an event exists for the new child
-            event_stream
-                .wait_until(EventType::Discovered, "system/coll:a".try_into().unwrap())
-                .await
-                .unwrap();
         }
         {
             // Create a child (eager)
@@ -499,10 +492,6 @@ mod tests {
                 .unwrap();
 
             // Ensure that an event exists for the new child
-            event_stream
-                .wait_until(EventType::Discovered, "system/coll:b".try_into().unwrap())
-                .await
-                .unwrap();
             event_stream
                 .wait_until(EventType::Started, "system/coll:b".try_into().unwrap())
                 .await
@@ -519,15 +508,6 @@ mod tests {
                 .await
                 .unwrap()
                 .unwrap();
-
-            // Ensure that an event exists for the new child
-            event_stream
-                .wait_until(
-                    EventType::Discovered,
-                    format!("system/coll:{long_name}").as_str().try_into().unwrap(),
-                )
-                .await
-                .unwrap();
         }
 
         // Verify that the component topology matches expectations.
@@ -537,7 +517,6 @@ mod tests {
         expected_children.insert("coll:b".try_into().unwrap());
         expected_children.insert(format!("coll:{}", long_name).as_str().try_into().unwrap());
         assert_eq!(actual_children, expected_children);
-        assert_eq!(format!("(system(coll:a,coll:b,coll:{}))", long_name), test.hook.print());
     }
 
     #[fuchsia::test]
@@ -953,9 +932,12 @@ mod tests {
 
         let child = get_live_child(test.component(), "coll:a").await;
         let instance_id = get_incarnation_id(test.component(), "coll:a").await;
-        assert_eq!("(system(coll:a,coll:b))", test.hook.print());
         assert_eq!(child.component_url, "test:///a");
         assert_eq!(instance_id, 1);
+        let child = get_live_child(test.component(), "coll:b").await;
+        let instance_id = get_incarnation_id(test.component(), "coll:b").await;
+        assert_eq!(child.component_url, "test:///b");
+        assert_eq!(instance_id, 2);
 
         // Destroy "a". "a" is no longer live from the client's perspective, although it's still
         // being destroyed.
@@ -983,7 +965,6 @@ mod tests {
             let child_b = get_live_child(test.component(), "coll:b").await;
             assert!(!execution_is_shut_down(&child_b).await);
             assert_eq!(actual_children, expected_children);
-            assert_eq!("(system(coll:b))", test.hook.print());
         }
 
         let res = destroy_handle.await;
@@ -1005,7 +986,6 @@ mod tests {
             .await;
         res.expect("fidl call failed").expect("failed to recreate child a");
 
-        assert_eq!("(system(coll:a,coll:b))", test.hook.print());
         let child = get_live_child(test.component(), "coll:a").await;
         let instance_id = get_incarnation_id(test.component(), "coll:a").await;
         assert_eq!(child.component_url, "test:///a_alt");

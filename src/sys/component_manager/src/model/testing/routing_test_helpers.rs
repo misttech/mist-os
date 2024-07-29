@@ -4,12 +4,16 @@
 
 use crate::builtin::runner::BuiltinRunnerFactory;
 use crate::builtin_environment::{BuiltinEnvironment, BuiltinEnvironmentBuilder};
+use crate::capability::CapabilitySource;
+use crate::model::component::instance::InstanceState;
 use crate::model::component::{ComponentInstance, StartReason};
 use crate::model::model::Model;
 use crate::model::testing::echo_service::{EchoProtocol, ECHO_CAPABILITY};
 use crate::model::testing::mocks::*;
 use crate::model::testing::out_dir::OutDir;
 use crate::model::testing::test_helpers::*;
+use crate::sandbox_util::LaunchTaskOnReceive;
+use ::routing::capability_source::InternalCapability;
 use ::routing::component_instance::ComponentInstanceInterface;
 use ::routing_test_helpers::{generate_storage_path, RoutingTestModel, RoutingTestModelBuilder};
 use anyhow::anyhow;
@@ -25,7 +29,6 @@ use component_id_index::InstanceId;
 use errors::ModelError;
 use fidl::endpoints::{self, create_proxy, ClientEnd, Proxy, ServerEnd};
 use fidl::{self};
-use fidl_fidl_examples_routing_echo::{self as echo};
 use fuchsia_component::client::connect_to_named_protocol_at_dir_root;
 use futures::channel::oneshot;
 use futures::prelude::*;
@@ -40,9 +43,9 @@ use tempfile::TempDir;
 use vfs::directory::entry::{DirectoryEntry, OpenRequest};
 use vfs::ToObjectRequest;
 use {
-    fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
-    fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys, fuchsia_inspect as inspect,
-    fuchsia_zircon as zx,
+    fidl_fidl_examples_routing_echo as echo, fidl_fuchsia_component as fcomponent,
+    fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
+    fuchsia_inspect as inspect, fuchsia_zircon as zx,
 };
 
 // TODO(https://fxbug.dev/42140194): remove type aliases once the routing_test_helpers lib has a stable
@@ -311,19 +314,40 @@ impl RoutingTest {
         for (name, runner) in builder.builtin_runners.clone() {
             env_builder = env_builder.add_runner(name, runner);
         }
-        let mut builtin_environment =
+        let builtin_environment =
             env_builder.build().await.expect("builtin environment setup failed");
 
-        builtin_environment
-            .add_protocol_to_root_dict::<fidl_fidl_examples_routing_echo::EchoMarker>(
-                ECHO_CAPABILITY.clone(),
-                |s| EchoProtocol::serve(s).boxed(),
-            )
-            .await;
-
         let model = builtin_environment.model.clone();
+        // Add `Echo` to the root input dict.
+        {
+            let name = ECHO_CAPABILITY.clone();
+            let top_instance = model.top_instance();
+            let root = top_instance.root().await;
+            let state = root.lock_state().await;
+            let InstanceState::Unresolved(state) = &*state else {
+                unreachable!();
+            };
+            let capability_source = CapabilitySource::Builtin {
+                capability: InternalCapability::Protocol(name.clone()),
+                top_instance: Arc::downgrade(top_instance),
+            };
+
+            let launch = LaunchTaskOnReceive::new(
+                capability_source,
+                top_instance.task_group().as_weak(),
+                name.clone(),
+                Some(model.root().context.policy().clone()),
+                Arc::new(move |server_end, _| {
+                    EchoProtocol::serve(crate::sandbox_util::take_handle_as_stream::<
+                        echo::EchoMarker,
+                    >(server_end))
+                    .boxed()
+                }),
+            );
+            state.component_input.insert_capability(&name, launch.into_router().into()).unwrap();
+        }
+
         model.root().hooks.install(builder.additional_hooks.clone()).await;
-        builtin_environment.discover_root_component().await;
 
         Self {
             components: builder.components,

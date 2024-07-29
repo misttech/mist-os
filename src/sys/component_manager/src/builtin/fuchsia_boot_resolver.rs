@@ -414,6 +414,7 @@ mod tests {
     use fidl::persist;
     use fuchsia_async::Task;
     use fuchsia_fs::directory::open_in_namespace;
+    use routing::bedrock::structured_dict::ComponentInput;
     use std::sync::Weak;
     use vfs::directory::entry::OpenRequest;
     use vfs::directory::entry_container::Directory;
@@ -648,6 +649,7 @@ mod tests {
         let resolver = FuchsiaBootResolver::new_from_directory(bootfs).await.unwrap();
 
         let root = ComponentInstance::new_root(
+            ComponentInput::default(),
             Environment::empty(),
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
@@ -695,6 +697,7 @@ mod tests {
         let (_task, bootfs) = serve_vfs_dir(root);
         let resolver = FuchsiaBootResolver::new_from_directory(bootfs).await.unwrap();
         let root = ComponentInstance::new_root(
+            ComponentInput::default(),
             Environment::empty(),
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),

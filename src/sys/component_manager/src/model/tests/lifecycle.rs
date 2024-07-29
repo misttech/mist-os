@@ -16,7 +16,6 @@ use crate::model::testing::out_dir::OutDir;
 use crate::model::testing::routing_test_helpers::RoutingTestBuilder;
 use crate::model::testing::test_helpers::*;
 use crate::model::testing::test_hook::{Lifecycle, TestHook};
-use ::routing::bedrock::structured_dict::ComponentInput;
 use ::routing::policy::PolicyError;
 use assert_matches::assert_matches;
 use async_trait::async_trait;
@@ -137,7 +136,7 @@ async fn bind_concurrent() {
     .await;
 
     // Start the root component.
-    model.start(ComponentInput::default()).await;
+    model.start().await;
 
     // Attempt to start the "system" component
     let system_component = model.root().find(&vec!["system"].try_into().unwrap()).await.unwrap();
@@ -205,10 +204,7 @@ async fn bind_parent_then_child() {
     let echo_component = get_live_child(&*root, "echo").await;
     let actual_children = get_live_children(&*system_component).await;
     assert!(actual_children.is_empty());
-    assert_matches!(
-        *echo_component.lock_state().await,
-        InstanceState::New | InstanceState::Unresolved(_)
-    );
+    assert_matches!(*echo_component.lock_state().await, InstanceState::Unresolved(_));
     // Start echo.
     let m: Moniker = vec!["echo"].try_into().unwrap();
     assert!(root.start_instance(&m, &StartReason::Root).await.is_ok());
@@ -338,8 +334,8 @@ async fn bind_eager_children() {
             ])
             .await;
     }
-    // Verify that the component topology matches expectations.
-    assert_eq!("(a(b,c(d(e))))", hook.print());
+    // Verify that the topology of started components matches expectations.
+    assert_eq!("(a(b,c(d)))", hook.print());
 }
 
 /// `b` is an eager child of `a` that uses a runner provided by `a`. In the process of binding
@@ -402,7 +398,7 @@ async fn bind_eager_children_reentrant() {
         // `root` and `a` use the test runner.
         mock_runner.wait_for_urls(&["test:///a_resolved"]).await;
     }
-    // Verify that the component topology matches expectations.
+    // Verify that the topology of started components matches expectations.
     assert_eq!("(a(b))", hook.print());
 }
 
@@ -439,8 +435,7 @@ async fn bind_action_sequence() {
         ("system", component_decl_with_test_runner()),
     ])
     .await;
-    let events =
-        vec![EventType::Discovered.into(), EventType::Resolved.into(), EventType::Started.into()];
+    let events = vec![EventType::Resolved.into(), EventType::Started.into()];
     let mut event_source =
         builtin_environment.lock().await.event_source_factory.create_for_above_root();
     let mut event_stream = event_source
@@ -464,8 +459,7 @@ async fn bind_action_sequence() {
 
     // Child of root should start out discovered but not resolved yet.
     let m = Moniker::parse_str("/system").unwrap();
-    model.start(ComponentInput::default()).await;
-    event_stream.wait_until(EventType::Discovered, m.clone()).await.unwrap();
+    model.start().await;
     event_stream.wait_until(EventType::Resolved, vec![].try_into().unwrap()).await.unwrap();
     event_stream.wait_until(EventType::Started, vec![].try_into().unwrap()).await.unwrap();
 

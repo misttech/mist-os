@@ -173,7 +173,6 @@ pub fn read_and_validate_config_values(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::actions::DiscoverAction;
     use crate::model::component::manager::ComponentManagerInstance;
     use crate::model::component::WeakExtendedInstance;
     use crate::model::context::ModelContext;
@@ -312,28 +311,23 @@ mod tests {
         }
     }
 
-    async fn new_root_discovered_component(
+    async fn new_root_component(
         environment: Environment,
         context: Arc<ModelContext>,
         component_manager_instance: Weak<ComponentManagerInstance>,
         component_url: &str,
     ) -> Arc<ComponentInstance> {
-        let component = ComponentInstance::new_root(
+        ComponentInstance::new_root(
+            ComponentInput::default(),
             environment,
             context,
             component_manager_instance,
             component_url.parse().unwrap(),
         )
-        .await;
-        // We don't care about waiting for the discover action to complete, just that it's started.
-        let _ = component
-            .actions()
-            .register_no_wait(DiscoverAction::new(ComponentInput::default()))
-            .await;
-        component
+        .await
     }
 
-    async fn new_discovered_component(
+    async fn new_component(
         environment: Arc<Environment>,
         moniker: Moniker,
         component_url: &str,
@@ -345,7 +339,8 @@ mod tests {
         hooks: Arc<Hooks>,
         persistent_storage: bool,
     ) -> Arc<ComponentInstance> {
-        let component = ComponentInstance::new(
+        ComponentInstance::new(
+            ComponentInput::default(),
             environment,
             moniker,
             0,
@@ -358,13 +353,7 @@ mod tests {
             hooks,
             persistent_storage,
         )
-        .await;
-        // We don't care about waiting for the discover action to complete, just that it's started.
-        let _ = component
-            .actions()
-            .register_no_wait(DiscoverAction::new(ComponentInput::default()))
-            .await;
-        component
+        .await
     }
 
     fn address_from_absolute_url(url: &str) -> ComponentAddress {
@@ -398,7 +387,7 @@ mod tests {
             }),
         );
 
-        let root = new_root_discovered_component(
+        let root = new_root_component(
             Environment::empty(),
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
@@ -592,7 +581,7 @@ mod tests {
             ResolverRegistry::new(),
             DebugRegistry::default(),
         );
-        let root = new_root_discovered_component(
+        let root = new_root_component(
             environment,
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
@@ -636,14 +625,14 @@ mod tests {
             resolver,
             DebugRegistry::default(),
         );
-        let root = new_root_discovered_component(
+        let root = new_root_component(
             environment,
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
             "fuchsia-pkg://fuchsia.com/package#meta/comp.cm",
         )
         .await;
-        let child = new_discovered_component(
+        let child = new_component(
             root.environment.clone(),
             Moniker::parse_str("root/child")?,
             "subpackage#meta/subcomp.cm",
@@ -698,14 +687,14 @@ mod tests {
             resolver,
             DebugRegistry::default(),
         );
-        let root = new_root_discovered_component(
+        let root = new_root_component(
             environment,
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
             "fuchsia-boot:///package#meta/comp.cm",
         )
         .await;
-        let child = new_discovered_component(
+        let child = new_component(
             root.environment.clone(),
             Moniker::parse_str("root/child")?,
             "subpackage#meta/subcomp.cm",
@@ -759,14 +748,14 @@ mod tests {
             resolver,
             DebugRegistry::default(),
         );
-        let root = new_root_discovered_component(
+        let root = new_root_component(
             environment,
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
             "cast:00000000/package#meta/comp.cm",
         )
         .await;
-        let child = new_discovered_component(
+        let child = new_component(
             root.environment.clone(),
             Moniker::parse_str("root/child")?,
             "subpackage#meta/subcomp.cm",
@@ -819,7 +808,7 @@ mod tests {
             resolver,
             DebugRegistry::default(),
         );
-        let root = new_root_discovered_component(
+        let root = new_root_component(
             environment,
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
@@ -827,7 +816,7 @@ mod tests {
         )
         .await;
 
-        let child = new_discovered_component(
+        let child = new_component(
             root.environment.clone(),
             Moniker::parse_str("root/child")?,
             "#meta/my-child.cm",
@@ -885,7 +874,7 @@ mod tests {
             resolver,
             DebugRegistry::default(),
         );
-        let root = new_root_discovered_component(
+        let root = new_root_component(
             environment,
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
@@ -893,7 +882,7 @@ mod tests {
         )
         .await;
 
-        let child_one = new_discovered_component(
+        let child_one = new_component(
             root.environment.clone(),
             Moniker::parse_str("root/child")?,
             "#meta/my-child.cm",
@@ -907,7 +896,7 @@ mod tests {
         )
         .await;
 
-        let child_two = new_discovered_component(
+        let child_two = new_component(
             root.environment.clone(),
             Moniker::parse_str("root/child")?,
             "#meta/my-child2.cm",
@@ -959,7 +948,7 @@ mod tests {
             resolver,
             DebugRegistry::default(),
         );
-        let root = new_root_discovered_component(
+        let root = new_root_component(
             environment,
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
@@ -967,7 +956,7 @@ mod tests {
         )
         .await;
 
-        let child = new_discovered_component(
+        let child = new_component(
             root.environment.clone(),
             Moniker::parse_str("root/child")?,
             "#meta/my-child.cm",
@@ -1019,7 +1008,7 @@ mod tests {
             resolver,
             DebugRegistry::default(),
         );
-        let root = new_root_discovered_component(
+        let root = new_root_component(
             environment,
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
@@ -1027,7 +1016,7 @@ mod tests {
         )
         .await;
 
-        let child = new_discovered_component(
+        let child = new_component(
             root.environment.clone(),
             Moniker::parse_str("root/child")?,
             "#meta/my-child.cm",
@@ -1062,7 +1051,7 @@ mod tests {
             resolver,
             DebugRegistry::default(),
         );
-        let root = new_root_discovered_component(
+        let root = new_root_component(
             environment,
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
@@ -1070,7 +1059,7 @@ mod tests {
         )
         .await;
 
-        let child = new_discovered_component(
+        let child = new_component(
             root.environment.clone(),
             Moniker::parse_str("root/child")?,
             "#meta/my-child.cm",
@@ -1122,7 +1111,7 @@ mod tests {
             resolver,
             DebugRegistry::default(),
         );
-        let root = new_root_discovered_component(
+        let root = new_root_component(
             environment,
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
@@ -1130,7 +1119,7 @@ mod tests {
         )
         .await;
 
-        let child_one = new_discovered_component(
+        let child_one = new_component(
             root.environment.clone(),
             Moniker::parse_str("root/child")?,
             "my-subpackage#meta/my-child.cm",
@@ -1144,7 +1133,7 @@ mod tests {
         )
         .await;
 
-        let child_two = new_discovered_component(
+        let child_two = new_component(
             root.environment.clone(),
             Moniker::parse_str("root/child/child2")?,
             "#meta/my-child2.cm",
@@ -1206,7 +1195,7 @@ mod tests {
             resolver,
             DebugRegistry::default(),
         );
-        let root = new_root_discovered_component(
+        let root = new_root_component(
             environment,
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
@@ -1214,7 +1203,7 @@ mod tests {
         )
         .await;
 
-        let child_one = new_discovered_component(
+        let child_one = new_component(
             root.environment.clone(),
             Moniker::parse_str("root/child")?,
             "my-subpackage#meta/my-child.cm",
@@ -1228,7 +1217,7 @@ mod tests {
         )
         .await;
 
-        let child_two = new_discovered_component(
+        let child_two = new_component(
             root.environment.clone(),
             Moniker::parse_str("root/child/child2")?,
             "#meta/my-child2.cm",
@@ -1242,7 +1231,7 @@ mod tests {
         )
         .await;
 
-        let child_three = new_discovered_component(
+        let child_three = new_component(
             root.environment.clone(),
             Moniker::parse_str("root/child/child2/child3")?,
             "#meta/my-child3.cm",
@@ -1317,7 +1306,7 @@ mod tests {
             DebugRegistry::default(),
         );
 
-        let root = new_root_discovered_component(
+        let root = new_root_component(
             environment,
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
@@ -1325,7 +1314,7 @@ mod tests {
         )
         .await;
 
-        let realm = new_discovered_component(
+        let realm = new_component(
             root.environment.clone(),
             Moniker::parse_str("root/realm/child")?,
             "realm-builder://0/my-realm",
@@ -1339,7 +1328,7 @@ mod tests {
         )
         .await;
 
-        let child_one = new_discovered_component(
+        let child_one = new_component(
             root.environment.clone(),
             Moniker::parse_str("root/realm/child")?,
             "my-subpackage1#meta/sub1.cm",
@@ -1353,7 +1342,7 @@ mod tests {
         )
         .await;
 
-        let child_two = new_discovered_component(
+        let child_two = new_component(
             root.environment.clone(),
             Moniker::parse_str("root/realm/child/child2")?,
             "#meta/sub1-child.cm",
@@ -1367,7 +1356,7 @@ mod tests {
         )
         .await;
 
-        let child_three = new_discovered_component(
+        let child_three = new_component(
             root.environment.clone(),
             Moniker::parse_str("root/realm/child/child2/child3")?,
             "my-subpackage2#meta/sub2.cm",
@@ -1381,7 +1370,7 @@ mod tests {
         )
         .await;
 
-        let child_four = new_discovered_component(
+        let child_four = new_component(
             root.environment.clone(),
             Moniker::parse_str("root/realm/child/child2/child3/child4")?,
             "#meta/sub2-child.cm",

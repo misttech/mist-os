@@ -21,7 +21,7 @@ pub fn event_name(event_type: &fcomponent::EventType) -> String {
     match event_type {
         fcomponent::EventType::CapabilityRequested => "capability_requested",
         fcomponent::EventType::DirectoryReady => unreachable!("This isn't used anymore"),
-        fcomponent::EventType::Discovered => "discovered",
+        fcomponent::EventType::Discovered => unreachable!("This isn't used anymore"),
         fcomponent::EventType::Destroyed => "destroyed",
         fcomponent::EventType::Resolved => "resolved",
         fcomponent::EventType::Unresolved => "unresolved",
@@ -356,7 +356,6 @@ macro_rules! create_event {
 }
 
 // To create a class for an event, use the above macro here.
-create_event!(Discovered, discovered);
 create_event!(Destroyed, destroyed);
 create_event!(Resolved, resolved);
 create_event!(Unresolved, unresolved);
