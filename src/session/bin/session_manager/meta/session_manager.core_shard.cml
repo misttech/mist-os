@@ -249,6 +249,13 @@
             subdir: "skip-block",
         },
         {
+            directory: "dev-class",
+            from: "parent",
+            as: "dev-hrtimer",
+            to: [ "#session-manager" ],
+            subdir: "hrtimer",
+        },
+        {
             protocol: [
                 "fuchsia.device.NameProvider",
                 "fuchsia.diagnostics.LegacyMetricsArchiveAccessor",

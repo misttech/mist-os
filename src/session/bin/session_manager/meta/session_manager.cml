@@ -453,6 +453,7 @@
             directory: [
                 "config-data",
                 "dev-class-radar",
+                "dev-hrtimer",
                 "dev-input-report",
                 "root-ssl-certificates",
 
