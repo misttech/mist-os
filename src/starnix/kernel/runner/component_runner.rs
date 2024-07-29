@@ -33,6 +33,7 @@ use starnix_uapi::mount_flags::MountFlags;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::ownership::WeakRef;
 use starnix_uapi::signals::{SIGINT, SIGKILL};
+use starnix_uapi::unmount_flags::UnmountFlags;
 use std::ffi::CString;
 use std::ops::DerefMut;
 use std::os::unix::ffi::OsStrExt;
@@ -424,7 +425,7 @@ impl MountRecord {
 
     fn unmount(&mut self) -> Result<(), Errno> {
         while let Some(node) = self.mounts.pop() {
-            node.unmount()?;
+            node.unmount(UnmountFlags::DETACH)?;
         }
         Ok(())
     }

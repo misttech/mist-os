@@ -11,8 +11,8 @@ use crate::signals::{SignalDetail, SignalInfo};
 use crate::task::{CurrentTask, ExceptionResult, PageFaultExceptionReport, Task};
 
 use crate::vfs::{
-    AioContexts, DynamicFile, DynamicFileBuf, FileWriteGuardRef, FsNodeOps, FsStr, FsString,
-    NamespaceNode, SequenceFileSource,
+    ActiveNamespaceNode, AioContexts, DynamicFile, DynamicFileBuf, FileWriteGuardRef, FsNodeOps,
+    FsStr, FsString, NamespaceNode, SequenceFileSource,
 };
 use anyhow::{anyhow, Error};
 use bitflags::bitflags;
@@ -262,7 +262,7 @@ pub enum MappingName {
     Vvar,
 
     /// The file backing this mapping.
-    File(NamespaceNode),
+    File(ActiveNamespaceNode),
 
     /// The name associated with the mapping. Set by prctl(PR_SET_VMA, PR_SET_VMA_ANON_NAME, ...).
     /// An empty name is distinct from an unnamed mapping. Mappings are initially created with no

@@ -4,7 +4,6 @@
 
 use super::{selinux_hooks, FileSystemState, ResolvedElfState, TaskState};
 use crate::task::{CurrentTask, Task};
-use crate::vfs::syscalls::LookupFlags;
 use crate::vfs::{FsNode, FsNodeHandle, FsStr, FsString, NamespaceNode};
 
 use linux_uapi::XATTR_NAME_SELINUX;
@@ -15,6 +14,7 @@ use starnix_uapi::error;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::mount_flags::MountFlags;
 use starnix_uapi::signals::Signal;
+use starnix_uapi::unmount_flags::UnmountFlags;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -358,7 +358,7 @@ pub fn sb_mount(
 pub fn sb_umount(
     source: &CurrentTask,
     node: &NamespaceNode,
-    flags: LookupFlags,
+    flags: UnmountFlags,
 ) -> Result<(), Errno> {
     check_if_selinux(source, |security_server| {
         let source_sid = get_current_sid(&source);

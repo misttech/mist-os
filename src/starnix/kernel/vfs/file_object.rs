@@ -12,9 +12,9 @@ use crate::vfs::fsverity::{
     FsVerityState, {self},
 };
 use crate::vfs::{
-    DirentSink, EpollFileObject, FallocMode, FdNumber, FdTableId, FileReleaser, FileSystemHandle,
-    FileWriteGuard, FileWriteGuardMode, FileWriteGuardRef, FsNodeHandle, NamespaceNode,
-    RecordLockCommand, RecordLockOwner,
+    ActiveNamespaceNode, DirentSink, EpollFileObject, FallocMode, FdNumber, FdTableId,
+    FileReleaser, FileSystemHandle, FileWriteGuard, FileWriteGuardMode, FileWriteGuardRef,
+    FsNodeHandle, NamespaceNode, RecordLockCommand, RecordLockOwner,
 };
 use fidl::HandleBased;
 use fuchsia_inspect_contrib::profile_duration;
@@ -285,7 +285,7 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
             length,
             prot_flags,
             options,
-            MappingName::File(filename),
+            MappingName::File(filename.into_active()),
             file_write_guard,
         )
     }
@@ -1151,7 +1151,7 @@ pub struct FileObject {
     /// The NamespaceNode associated with this FileObject.
     ///
     /// Represents the name the process used to open this file.
-    pub name: NamespaceNode,
+    pub name: ActiveNamespaceNode,
 
     pub fs: FileSystemHandle,
 
@@ -1213,7 +1213,7 @@ impl FileObject {
             Self {
                 weak_handle: weak_handle.clone(),
                 id,
-                name,
+                name: name.into_active(),
                 fs,
                 ops,
                 offset: Mutex::new(0),

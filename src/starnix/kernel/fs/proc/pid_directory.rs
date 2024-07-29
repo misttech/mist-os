@@ -360,7 +360,7 @@ impl FsNodeOps for FdDirectory {
             CallbackSymlinkNode::new(move || {
                 let task = Task::from_weak(&task_reference)?;
                 let file = task.files.get_allowing_opath(fd).map_err(|_| errno!(ENOENT))?;
-                Ok(SymlinkTarget::Node(file.name.clone()))
+                Ok(SymlinkTarget::Node(file.name.to_passive()))
             }),
             FsNodeInfo::new_factory(mode!(IFLNK, 0o777), task.as_fscred()),
         ))

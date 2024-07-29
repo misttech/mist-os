@@ -176,7 +176,6 @@
 
                 // https://fxbug.dev/42078242
                 "times03",
-                "umount02",
                 "umount2_01",
                 "umount2_02",
                 "utsname03_clone",

@@ -416,7 +416,7 @@ impl CurrentTask {
             //
             // See https://man7.org/linux/man-pages/man2/open.2.html
             let file = self.files.get_allowing_opath(dir_fd)?;
-            file.name.clone()
+            file.name.to_passive()
         };
 
         if !path.is_empty() {
@@ -883,7 +883,7 @@ impl CurrentTask {
         self.notify_robust_list();
 
         self.mm()
-            .exec(resolved_elf.file.name.clone())
+            .exec(resolved_elf.file.name.to_passive())
             .map_err(|status| from_status_like_fdio!(status))?;
 
         // Update the SELinux state, if enabled.

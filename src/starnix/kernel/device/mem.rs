@@ -139,7 +139,7 @@ impl FileOps for DevZero {
             // functionally equivalent to an anonymous mapping. Doing so affects
             // the output of `/proc/self/maps` and identifies this mapping as
             // file-based.
-            MappingName::File(filename),
+            MappingName::File(filename.into_active()),
             FileWriteGuardRef(None),
         )
     }

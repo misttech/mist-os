@@ -13,6 +13,7 @@
 #include <fstream>
 #include <iostream>
 
+#include <fbl/unique_fd.h>
 #include <gtest/gtest.h>
 #include <linux/loop.h>
 
@@ -93,6 +94,12 @@ class MountTest : public ::testing::Test {
   int MakeDir(const char *name) const {
     auto path = TestPath(name);
     return mkdir(path.c_str(), 0777);
+  }
+
+  // Create a file.
+  fbl::unique_fd MakeFile(const char *name) const {
+    auto path = TestPath(name);
+    return fbl::unique_fd(open(path.c_str(), O_CREAT | O_RDWR, S_IRUSR | S_IWUSR));
   }
 
   /// Make the directory into a bind mount of itself.
@@ -294,6 +301,42 @@ TEST_F(MountTest, Ext4ReadOnlySmokeTest) {
 
 // TODO(tbodt): write more tests:
 // - A and B are shared, make B downstream, make A private, should now both be private
+
+TEST_F(MountTest, BusyWithOpenFile) {
+  ASSERT_SUCCESS(MakeDir("a"));
+  auto dir = TestPath("a");
+  ASSERT_THAT(mount(nullptr, dir.c_str(), "tmpfs", 0, nullptr), SyscallSucceeds());
+  fbl::unique_fd foo = MakeFile("a/foo");
+  ASSERT_TRUE(foo.is_valid());
+  ASSERT_THAT(umount(dir.c_str()), SyscallFailsWithErrno(EBUSY));
+  foo.reset();
+  ASSERT_THAT(umount(dir.c_str()), SyscallSucceeds());
+}
+
+TEST_F(MountTest, BusyWithCwd) {
+  ASSERT_SUCCESS(MakeDir("a"));
+  auto dir = TestPath("a");
+  ASSERT_THAT(mount(nullptr, dir.c_str(), "tmpfs", 0, nullptr), SyscallSucceeds());
+  char original_cwd[PATH_MAX] = {};
+  getcwd(original_cwd, sizeof(original_cwd));
+  ASSERT_THAT(chdir(dir.c_str()), SyscallSucceeds());
+  ASSERT_THAT(umount(dir.c_str()), SyscallFailsWithErrno(EBUSY));
+  ASSERT_THAT(chdir(original_cwd), SyscallSucceeds());
+  ASSERT_THAT(umount(dir.c_str()), SyscallSucceeds());
+}
+
+TEST_F(MountTest, BusyWithMmap) {
+  ASSERT_SUCCESS(MakeDir("a"));
+  auto dir = TestPath("a");
+  ASSERT_THAT(mount(nullptr, dir.c_str(), "tmpfs", 0, nullptr), SyscallSucceeds());
+  fbl::unique_fd foo = MakeFile("a/foo");
+  const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+  void *mmap_addr = mmap(nullptr, page_size, PROT_READ, MAP_SHARED, foo.get(), 0);
+  foo.reset();
+  ASSERT_THAT(umount(dir.c_str()), SyscallFailsWithErrno(EBUSY));
+  SAFE_SYSCALL(munmap(mmap_addr, page_size));
+  ASSERT_THAT(umount(dir.c_str()), SyscallSucceeds());
+}
 
 class ProcMountsTest : public ProcTestBase {
   // Note that these tests can be affected by those in other suites e.g. a

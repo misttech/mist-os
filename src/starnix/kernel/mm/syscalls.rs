@@ -162,7 +162,7 @@ where
             length,
             prot_flags,
             options,
-            file.name.clone(),
+            file.name.to_passive(),
         )
     }
 }
