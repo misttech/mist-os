@@ -20,7 +20,7 @@ zx::result<fidl::ClientEnd<fuchsia_io::Directory>> MetadataForwarderTestDevice::
 
   zx_status_t status = metadata_server_.Serve(outgoing_, dispatcher_);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to server metadata server: %s", zx_status_get_string(status));
+    zxlogf(ERROR, "Failed to serve metadata: %s", zx_status_get_string(status));
     return zx::error(status);
   }
 
@@ -45,7 +45,7 @@ zx_status_t MetadataForwarderTestDevice::Bind(void* ctx, zx_device_t* dev) {
   std::array offers = {MetadataServer::kFidlServiceName};
   const std::vector<zx_device_str_prop_t> kStrProps = {
       ddk::MakeStrProperty(bind_metadata_server_test::PURPOSE,
-                           bind_metadata_server_test::PURPOSE_FORWARD_METADATA),
+                           bind_metadata_server_test::PURPOSE_RETRIEVE_METADATA),
   };
 
   zx_status_t status =

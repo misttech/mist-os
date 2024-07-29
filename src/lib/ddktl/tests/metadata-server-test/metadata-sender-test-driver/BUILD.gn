@@ -18,6 +18,8 @@ fuchsia_driver("driver") {
   sources = [
     "metadata_sender_test_device.cc",
     "metadata_sender_test_device.h",
+    "metadata_test_device.cc",
+    "metadata_test_device.h",
   ]
   deps = [ "//src/lib/ddktl/tests/metadata-server-test:metadata_server_test_bind_library_cpp" ]
   public_deps = [

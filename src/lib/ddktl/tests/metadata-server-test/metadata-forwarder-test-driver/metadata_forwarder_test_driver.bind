@@ -4,4 +4,4 @@
 
 using metadata.server.test;
 
-metadata.server.test.PURPOSE == metadata.server.test.PURPOSE.SEND_METADATA;
+metadata.server.test.PURPOSE == metadata.server.test.PURPOSE.FORWARD_METADATA;

@@ -9,19 +9,31 @@
 
 #include <bind/metadata_server_test_bind_library/cpp/bind.h>
 
+#include "src/lib/ddktl/tests/metadata-server-test/metadata-sender-test-driver/metadata_test_device.h"
+
 namespace ddk::test {
 
-zx::result<fidl::ClientEnd<fuchsia_io::Directory>> MetadataSenderTestDevice::InitOutgoing() {
-  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+zx_status_t MetadataSenderTestDevice::Init() {
+  zx_status_t status = metadata_server_.Serve(outgoing_, dispatcher_);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to serve metadata: %s", zx_status_get_string(status));
+    return status;
+  }
+
+  status = DdkAdd(DeviceAddArgs("metadata_sender").set_flags(DEVICE_ADD_NON_BINDABLE));
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to add device: %s", zx_status_get_string(status));
+    return status;
+  }
+
+  return ZX_OK;
+}
+
+zx::result<fidl::ClientEnd<fuchsia_io::Directory>> MetadataSenderTestDevice::ServeOutgoing() {
+  zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
   if (endpoints.is_error()) {
     zxlogf(ERROR, "Failed to create endpoints: %s", endpoints.status_string());
     return endpoints.take_error();
-  }
-
-  zx_status_t status = metadata_server_.Serve(outgoing_, dispatcher_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to server metadata server: %s", zx_status_get_string(status));
-    return zx::error(status);
   }
 
   zx::result result = outgoing_.Serve(std::move(endpoints->server));
@@ -35,30 +47,15 @@ zx::result<fidl::ClientEnd<fuchsia_io::Directory>> MetadataSenderTestDevice::Ini
 
 zx_status_t MetadataSenderTestDevice::Create(void* ctx, zx_device_t* parent, const char* name,
                                              zx_handle_t handle) {
-  auto sender = std::make_unique<MetadataSenderTestDevice>(parent);
+  auto device = std::make_unique<MetadataSenderTestDevice>(parent);
 
-  zx::result outgoing = sender->InitOutgoing();
-  if (outgoing.is_error()) {
-    zxlogf(ERROR, "Failed to initialize outgoing directory: %s", outgoing.status_string());
-    return outgoing.status_value();
-  }
-
-  std::array offers = {MetadataServer::kFidlServiceName};
-  const std::vector<zx_device_str_prop_t> kStrProps = {
-      ddk::MakeStrProperty(bind_metadata_server_test::PURPOSE,
-                           bind_metadata_server_test::PURPOSE_SEND_METADATA),
-  };
-
-  zx_status_t status = sender->DdkAdd(ddk::DeviceAddArgs("metadata_sender")
-                                          .set_fidl_service_offers(offers)
-                                          .set_str_props(kStrProps)
-                                          .set_outgoing_dir(outgoing->TakeChannel()));
+  zx_status_t status = device->Init();
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to add device: %s", zx_status_get_string(status));
+    zxlogf(ERROR, "Failed to initialize: %s", zx_status_get_string(status));
     return status;
   }
 
-  [[maybe_unused]] auto unused = sender.release();
+  [[maybe_unused]] auto unused = device.release();
   return ZX_OK;
 }
 
@@ -69,9 +66,55 @@ void MetadataSenderTestDevice::SetMetadata(SetMetadataRequestView request,
   zx_status_t status = metadata_server_.SetMetadata(request->metadata);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to set metadata: %s", zx_status_get_string(status));
-    completer.Reply(fit::error(status));
+    completer.ReplyError(status);
+    return;
   }
-  completer.Reply(fit::ok());
+  completer.ReplySuccess();
+}
+
+void MetadataSenderTestDevice::AddMetadataRetrieverDevice(
+    AddMetadataRetrieverDeviceCompleter::Sync& completer) {
+  zx::result device_name =
+      AddMetadataDevice(bind_metadata_server_test::PURPOSE_RETRIEVE_METADATA.c_str());
+  if (device_name.is_error()) {
+    zxlogf(ERROR, "Failed to add metadata device: %s", device_name.status_string());
+    completer.ReplyError(device_name.status_value());
+    return;
+  }
+  completer.ReplySuccess(fidl::StringView::FromExternal(device_name.value()));
+}
+
+void MetadataSenderTestDevice::AddMetadataForwarderDevice(
+    AddMetadataForwarderDeviceCompleter::Sync& completer) {
+  zx::result device_name =
+      AddMetadataDevice(bind_metadata_server_test::PURPOSE_FORWARD_METADATA.c_str());
+  if (device_name.is_error()) {
+    zxlogf(ERROR, "Failed to add metadata device: %s", device_name.status_string());
+    completer.ReplyError(device_name.status_value());
+    return;
+  }
+  completer.ReplySuccess(fidl::StringView::FromExternal(device_name.value()));
+}
+
+zx::result<std::string> MetadataSenderTestDevice::AddMetadataDevice(const char* device_purpose) {
+  std::stringstream device_name_builder;
+  device_name_builder << "metadata_" << num_metadata_devices_;
+  std::string device_name = device_name_builder.str();
+
+  zx::result outgoing = ServeOutgoing();
+  if (outgoing.is_error()) {
+    zxlogf(ERROR, "Failed to initialize outgoing directory: %s", outgoing.status_string());
+    return outgoing.take_error();
+  }
+
+  zx_status_t status = MetadataTestDevice::Create(zxdev(), device_name.c_str(), device_purpose,
+                                                  std::move(outgoing.value()));
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to create metadata device: %s", zx_status_get_string(status));
+    return zx::error(status);
+  }
+
+  return zx::ok(std::move(device_name));
 }
 
 static constexpr zx_driver_ops_t sender_driver_ops = []() {

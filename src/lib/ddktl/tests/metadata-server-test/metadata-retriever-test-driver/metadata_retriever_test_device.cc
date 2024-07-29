@@ -11,8 +11,8 @@
 
 namespace ddk::test {
 
-zx_status_t MetadataRetrieverTestDevice::Bind(void* ctx, zx_device_t* dev) {
-  auto retriever = std::make_unique<MetadataRetrieverTestDevice>(dev);
+zx_status_t MetadataRetrieverTestDevice::Bind(void* ctx, zx_device_t* parent) {
+  auto retriever = std::make_unique<MetadataRetrieverTestDevice>(parent);
 
   zx_status_t status = retriever->DdkAdd(ddk::DeviceAddArgs("metadata_retriever"));
   if (status != ZX_OK) {

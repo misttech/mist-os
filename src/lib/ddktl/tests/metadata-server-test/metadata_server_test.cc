@@ -28,7 +28,7 @@ class MetadataServerTest : public gtest::TestLoopFixture {
         {.root_driver = "fuchsia-boot:///dtr#meta/metadata_sender_test_driver.cm"}});
     ASSERT_TRUE(start_result.is_ok()) << start_result.error_value();
 
-    // Connect to /dev directory.
+    // Connect to devfs directory.
     zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
     ASSERT_EQ(endpoints.status_value(), ZX_OK);
     ASSERT_EQ(realm_->component().Connect("dev-topological", endpoints->server.TakeChannel()),
@@ -38,74 +38,156 @@ class MetadataServerTest : public gtest::TestLoopFixture {
   }
 
  protected:
-  // Connect to the |FidlProtocol| FIDL protocol found at "/dev/|path|".
+  // Make the metadata_sender driver create a child device that the metadata_retriever driver can
+  // bind to. Returns a connection to the metadata_sender driver and metadata_retriever driver.
+  std::pair<fidl::SyncClient<fuchsia_hardware_test::MetadataSender>,
+            fidl::SyncClient<fuchsia_hardware_test::MetadataRetriever>>
+  CreateMetadataSenderAndRetriever() {
+    fidl::SyncClient metadata_sender =
+        ConnectToDevice<fuchsia_hardware_test::MetadataSender>("metadata_sender");
+
+    // Create a child device for the metadata_retriever driver to bind to.
+    fidl::SyncClient<fuchsia_hardware_test::MetadataRetriever> metadata_retriever;
+    {
+      fidl::Result device_name = metadata_sender->AddMetadataRetrieverDevice();
+      EXPECT_TRUE(device_name.is_ok()) << device_name.error_value();
+      std::string metadata_retriever_path = std::string{"metadata_sender/"}
+                                                .append(device_name->child_device_name())
+                                                .append("/")
+                                                .append("metadata_retriever");
+      metadata_retriever =
+          ConnectToDevice<fuchsia_hardware_test::MetadataRetriever>(metadata_retriever_path);
+    }
+
+    return std::pair<fidl::SyncClient<fuchsia_hardware_test::MetadataSender>,
+                     fidl::SyncClient<fuchsia_hardware_test::MetadataRetriever>>(
+        std::move(metadata_sender), std::move(metadata_retriever));
+  }
+
+  // Make the metadata_sender driver create a child device that the metadata_forwarder driver can
+  // bind to. The metadata_forwarder driver will create a child device that the metadata_retriever
+  // driver can bind to. Returns a connection to the metadata_sender driver, metadata_forwarder
+  // driver, and the metadata_retriever driver that is bound to metadata_forwarder's child device.
+  std::tuple<fidl::SyncClient<fuchsia_hardware_test::MetadataSender>,
+             fidl::SyncClient<fuchsia_hardware_test::MetadataForwarder>,
+             fidl::SyncClient<fuchsia_hardware_test::MetadataRetriever>>
+  CreateMetadataSenderForwarderAndRetriever() {
+    fidl::SyncClient metadata_sender =
+        ConnectToDevice<fuchsia_hardware_test::MetadataSender>("metadata_sender");
+
+    // Create a child device for the metadata_forwarder driver to bind to. The metadat_forwarder
+    // driver will create a child device for the metadata_retriever driver to bind to.
+    fidl::SyncClient<fuchsia_hardware_test::MetadataForwarder> metadata_forwarder;
+    fidl::SyncClient<fuchsia_hardware_test::MetadataRetriever> metadata_retriever;
+    {
+      fidl::Result metadata_forwarder_device_name = metadata_sender->AddMetadataForwarderDevice();
+      EXPECT_TRUE(metadata_forwarder_device_name.is_ok())
+          << metadata_forwarder_device_name.error_value();
+      std::string metadata_forwarder_path =
+          std::string{"metadata_sender/"}
+              .append(metadata_forwarder_device_name->child_device_name())
+              .append("/")
+              .append("metadata_forwarder");
+      metadata_forwarder =
+          ConnectToDevice<fuchsia_hardware_test::MetadataForwarder>(metadata_forwarder_path);
+
+      std::string metadata_retriever_path =
+          std::string{metadata_forwarder_path}.append("/metadata_retriever");
+      metadata_retriever =
+          ConnectToDevice<fuchsia_hardware_test::MetadataRetriever>(metadata_retriever_path);
+    }
+
+    return std::tuple<fidl::SyncClient<fuchsia_hardware_test::MetadataSender>,
+                      fidl::SyncClient<fuchsia_hardware_test::MetadataForwarder>,
+                      fidl::SyncClient<fuchsia_hardware_test::MetadataRetriever>>(
+        std::move(metadata_sender), std::move(metadata_forwarder), std::move(metadata_retriever));
+  }
+
+ private:
+  // Connect to the |FidlProtocol| FIDL protocol found at |path| within devfs.
   template <typename FidlProtocol>
-  fidl::SyncClient<FidlProtocol> ConnectToNode(std::string_view path) const {
+  fidl::SyncClient<FidlProtocol> ConnectToDevice(std::string_view path) const {
     zx::result channel = device_watcher::RecursiveWaitForFile(dev_fd_, std::string{path}.c_str());
     EXPECT_EQ(channel.status_value(), ZX_OK) << path;
     return fidl::SyncClient{fidl::ClientEnd<FidlProtocol>{std::move(channel.value())}};
   }
 
- private:
   std::optional<component_testing::RealmRoot> realm_;
   int dev_fd_;
 };
 
-// Verify that `ddk::MetadataServer` can serve metadata from a device. Verify that one of the
-// device's child device can retrieve that metadata and forward it to its children using
-// `ddk::MetadataServer::ForwardMetadata()`. Lastly, verify that one of the grandchildren can
-// retrieve that metadata using `ddk::GetMetadata()`.
-TEST_F(MetadataServerTest, TransferMetadata) {
+// Verify that a driver can serve metadata with `ddk::MetadataServer` and that a child driver can
+// retrieve that metadata with `ddk::GetMetadata()`.
+TEST_F(MetadataServerTest, GetMetadata) {
   const char* kMetadataPropertyValue = "test property value";
-  const std::string kMetadataSenderTopologicalPath{"metadata_sender"};
-  const std::string kMetadataForwarderTopologicalPath =
-      kMetadataSenderTopologicalPath + "/metadata_forwarder";
-  const std::string kMetadataRetrieverTopologicalPath =
-      kMetadataForwarderTopologicalPath + "/metadata_retriever";
 
-  fidl::SyncClient metadata_sender =
-      ConnectToNode<fuchsia_hardware_test::MetadataSender>(kMetadataSenderTopologicalPath);
-  fidl::SyncClient metadata_forwarder =
-      ConnectToNode<fuchsia_hardware_test::MetadataForwarder>(kMetadataForwarderTopologicalPath);
-  fidl::SyncClient metadata_retriever =
-      ConnectToNode<fuchsia_hardware_test::MetadataRetriever>(kMetadataRetrieverTopologicalPath);
+  auto [metadata_sender, metadata_retriever] = CreateMetadataSenderAndRetriever();
 
-  // Verify that the "metadata_forwarder" driver fails to forward metadata from "metadata_sender" to
-  // "metadata_retriever" when "metadata_sender" has not set its metadata.
-  {
-    fidl::Result result = metadata_forwarder->ForwardMetadata();
-    ASSERT_TRUE(result.is_error());
-  }
-
-  // Serve the metadata to "metadata_forwarder" child device using `ddk::MetadataServer::Serve()`.
+  // Set the metadata provided by the metadata_sender driver.
   {
     fuchsia_hardware_test::Metadata metadata{{.test_property = kMetadataPropertyValue}};
     fidl::Result result = metadata_sender->SetMetadata(std::move(metadata));
     ASSERT_TRUE(result.is_ok()) << result.error_value();
   }
 
-  // Verify that the "metadata_retriever" driver fails to retrieve metadata from the
-  // "metadata_forwarder" driver when "metadata_forwarder" has not set its metadata.
-  {
-    fidl::Result result = metadata_retriever->GetMetadata();
-    ASSERT_TRUE(result.is_error());
-  }
-
-  // Forward the metadata from the "metadata_sender" device to the "metadata_retriever" device using
-  // `ddk::MetadataServer::ForwardMetadata()`.
-  {
-    fidl::Result result = metadata_forwarder->ForwardMetadata();
-    ASSERT_TRUE(result.is_ok()) << result.error_value();
-  }
-
-  // Make the "metadata_retreiver" driver retrieve the metadata from the "metadata_forwarder" device
-  // using `ddk::GetMetadata()`.
+  // Make the metadata_retriever driver retrieve the metadata from its parent, the metadata_sender
+  // driver, using `ddk::GetMetadata()`.
   {
     fidl::Result result = metadata_retriever->GetMetadata();
     ASSERT_TRUE(result.is_ok()) << result.error_value();
     fuchsia_hardware_test::Metadata metadata = std::move(result.value().metadata());
     ASSERT_EQ(metadata.test_property(), kMetadataPropertyValue);
   }
+}
+
+// Verify that `ddk::GetMetadata()` fails if the parent driver does not serve metadata to the
+// calling driver.
+TEST_F(MetadataServerTest, FailGetMetadata) {
+  auto [metadata_sender, metadata_retriever] = CreateMetadataSenderAndRetriever();
+
+  fidl::Result result = metadata_retriever->GetMetadata();
+  ASSERT_TRUE(result.is_error());
+}
+
+// Verify that a driver can forward metadata using `ddk::MetadataServer::ForwardMetadata()`.
+TEST_F(MetadataServerTest, ForwardMetadata) {
+  const char* kMetadataPropertyValue = "test property value";
+
+  auto [metadata_sender, metadata_forwarder, metadata_retriever] =
+      CreateMetadataSenderForwarderAndRetriever();
+
+  // Set the metadata.
+  {
+    fuchsia_hardware_test::Metadata metadata{{.test_property = kMetadataPropertyValue}};
+    fidl::Result result = metadata_sender->SetMetadata(std::move(metadata));
+    ASSERT_TRUE(result.is_ok()) << result.error_value();
+  }
+
+  // Forward the metadata from the metadata_sender device to the metadata_retriever device using
+  // `ddk::MetadataServer::ForwardMetadata()`.
+  {
+    fidl::Result result = metadata_forwarder->ForwardMetadata();
+    ASSERT_TRUE(result.is_ok()) << result.error_value();
+  }
+
+  // Verify that the metadata was successfully forwarded by the metadata_forwarder driver from the
+  // metadata_sender driver to the metadata_retriever driver.
+  {
+    fidl::Result result = metadata_retriever->GetMetadata();
+    ASSERT_TRUE(result.is_ok()) << result.error_value();
+    fuchsia_hardware_test::Metadata metadata = std::move(result.value().metadata());
+    ASSERT_EQ(metadata.test_property(), kMetadataPropertyValue);
+  }
+}
+
+// Verify that `ddk::MetadataServer::ForwardMetadata()` fails if the parent driver does not serve
+// metadata to the calling driver.
+TEST_F(MetadataServerTest, FailForwardMetadata) {
+  auto [metadata_sender, metadata_forwarder, metadata_retriever] =
+      CreateMetadataSenderForwarderAndRetriever();
+
+  fidl::Result result = metadata_forwarder->ForwardMetadata();
+  ASSERT_TRUE(result.is_error());
 }
 
 }  //  namespace ddk::test

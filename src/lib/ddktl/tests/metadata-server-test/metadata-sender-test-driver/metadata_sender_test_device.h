@@ -30,13 +30,20 @@ class MetadataSenderTestDevice final : public MetadataSenderTestDeviceType {
 
   // fuchsia.hardware.test/MetadataSender implementation.
   void SetMetadata(SetMetadataRequestView request, SetMetadataCompleter::Sync& completer) override;
+  void AddMetadataRetrieverDevice(AddMetadataRetrieverDeviceCompleter::Sync& completer) override;
+  void AddMetadataForwarderDevice(AddMetadataForwarderDeviceCompleter::Sync& completer) override;
 
-  zx::result<fidl::ClientEnd<fuchsia_io::Directory>> InitOutgoing();
+  zx_status_t Init();
+
+  zx::result<fidl::ClientEnd<fuchsia_io::Directory>> ServeOutgoing();
 
  private:
+  zx::result<std::string> AddMetadataDevice(const char* device_purpose);
+
   async_dispatcher_t* dispatcher_{fdf::Dispatcher::GetCurrent()->async_dispatcher()};
   component::OutgoingDirectory outgoing_{dispatcher_};
   ddk::test::MetadataServer metadata_server_;
+  size_t num_metadata_devices_ = 0;
 };
 
 }  // namespace ddk::test

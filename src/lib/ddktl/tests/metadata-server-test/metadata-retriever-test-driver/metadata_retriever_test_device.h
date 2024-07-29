@@ -17,10 +17,11 @@ using MetadataRetrieverTestDeviceType =
     ddk::Device<MetadataRetrieverTestDevice,
                 ddk::Messageable<fuchsia_hardware_test::MetadataRetriever>::Mixin>;
 
-// This driver's purpose is to retrieve metadata from its parent using `ddk::GetMetadata()`.
+// This driver's purpose is to retrieve metadata from its parent using `ddk::GetMetadata()` and
+// `ddk::TryGetMetadata()`.
 class MetadataRetrieverTestDevice final : public MetadataRetrieverTestDeviceType {
  public:
-  static zx_status_t Bind(void* ctx, zx_device_t* dev);
+  static zx_status_t Bind(void* ctx, zx_device_t* parent);
 
   explicit MetadataRetrieverTestDevice(zx_device_t* parent)
       : MetadataRetrieverTestDeviceType(parent) {}

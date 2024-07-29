@@ -4,8 +4,8 @@
 
 library metadata.server.test;
 
-// Purpose of the driver that owns the device.
+// Purpose of the driver that will bind to the device.
 string PURPOSE {
   FORWARD_METADATA = "forward_metadata",
-  SEND_METADATA = "send_metadata"
+  RETRIEVE_METADATA = "retrieve_metadata"
 };
