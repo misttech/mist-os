@@ -274,6 +274,7 @@ class MsdArmDevice : public msd::Device,
   inspect::UintProperty last_semaphore_hang_timeout_ns_;
   inspect::BoolProperty protected_mode_supported_property_;
   inspect::UintProperty memory_pressure_level_property_;
+  inspect::LazyNode dump_node_;
 
   std::mutex inspect_events_mutex_;
   FIT_GUARDED(inspect_events_mutex_) std::deque<InspectEvent> inspect_events_;

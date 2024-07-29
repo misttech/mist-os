@@ -319,6 +319,42 @@ void MsdArmDevice::InitInspect() {
   events_ = inspect_.CreateChild("events");
   protected_mode_supported_property_ = inspect_.CreateBool("protected_mode_supported", false);
   memory_pressure_level_property_ = inspect_.CreateUint("memory_pressure_level", 0);
+  dump_node_ = inspect_.CreateLazyNode("dump", [this]() -> fpromise::promise<inspect::Inspector> {
+    fpromise::bridge<inspect::Inspector> bridge;
+    RunTaskOnDeviceThread([this, completer = std::move(bridge.completer)](
+                              MsdArmDevice* device) mutable -> magma::Status {
+      std::vector<std::string> dump;
+      DumpToString(&dump, true);
+
+      std::vector<std::string> job_information = scheduler_->DumpStatus();
+
+      size_t full_length = 0;
+      for (auto& string : dump) {
+        full_length += string.size() + 1;
+      }
+      for (auto& string : job_information) {
+        full_length += string.size() + 1;
+      }
+
+      std::string full_dump;
+      full_dump.reserve(full_length);
+      for (auto& string : dump) {
+        full_dump.append(string);
+        full_dump.append("\n");
+      }
+      for (auto& string : job_information) {
+        full_dump.append(string);
+        full_dump.append("\n");
+      }
+      inspect::Inspector a;
+      a.GetRoot().CreateString("dump", full_dump, &a);
+
+      completer.complete_ok(std::move(a));
+      return MAGMA_STATUS_OK;
+    });
+
+    return bridge.consumer.promise();
+  });
 }
 
 void MsdArmDevice::UpdateProtectedModeSupported() {
