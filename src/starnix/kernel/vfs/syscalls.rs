@@ -1807,6 +1807,13 @@ pub fn sys_umount2(
         errno!(EINVAL)
     })?;
 
+    if unmount_flags.contains(UnmountFlags::EXPIRE)
+        && (unmount_flags.contains(UnmountFlags::FORCE)
+            || unmount_flags.contains(UnmountFlags::DETACH))
+    {
+        return error!(EINVAL);
+    }
+
     let lookup_flags = if unmount_flags.contains(UnmountFlags::NOFOLLOW) {
         LookupFlags::no_follow()
     } else {
