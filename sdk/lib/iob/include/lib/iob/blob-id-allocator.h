@@ -422,6 +422,11 @@ class BlobIdAllocator {
     uint32_t blob_head;
   };
 
+  // TODO(https://fxbug.dev/354716628): commented to unblock clang roll.
+  // TODO(https://github.com/llvm/llvm-project/pull/99570): Re-enable when libcxx underlying
+  // implementation of `atomic_ref<T>` calculates `is_always_lockfree` appropriately.
+  // static_assert(cpp20::atomic_ref<Index>::is_always_lock_free);
+
   // Represents a blob bookkeeping index.
   struct alignas(8) Index {
     // See BlobError::kInvalidIndex. The current blob head offset and length
@@ -435,11 +440,14 @@ class BlobIdAllocator {
     uint32_t size;
     uint32_t offset;
   };
+  // TODO(https://fxbug.dev/354716628): commented to unblock clang roll.
+  // TODO(https://github.com/llvm/llvm-project/pull/99570): Re-enable when libcxx underlying
+  // implementation of `atomic_ref<T>` calculates `is_always_lockfree` appropriately.
+  // static_assert(cpp20::atomic_ref<Index>::is_always_lock_free);
 
-  // TODO(fxbug.dev/354716628): Remove workaround for const/volatile qualified atomic_ref.
+  // TODO(https://fxbug.dev/354716628): Remove workaround for const/volatile qualified atomic_ref.
   BlobIdAllocator* self() const { return const_cast<BlobIdAllocator*>(this); }
-
-  static_assert(cpp20::atomic_ref<Header>::is_always_lock_free);
+  //  static_assert(cpp20::atomic_ref<uint64_t>::is_always_lock_free);
   cpp20::atomic_ref<Header> header() {
     return cpp20::atomic_ref{*reinterpret_cast<Header*>(bytes_.data())};
   }
@@ -448,7 +456,7 @@ class BlobIdAllocator {
     return cpp20::atomic_ref{*reinterpret_cast<const Header*>(bytes_.data())};
   }
 
-  static_assert(cpp20::atomic_ref<Index>::is_always_lock_free);
+  static_assert(cpp20::atomic_ref<Index>::required_alignment == 8);
   cpp20::atomic_ref<Index> GetIndex(uint32_t id) {
     return cpp20::atomic_ref{*reinterpret_cast<Index*>(&bytes_[(id + 1) * sizeof(Index)])};
   }
