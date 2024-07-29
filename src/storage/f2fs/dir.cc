@@ -37,12 +37,6 @@ const unsigned char kTypeByMode[S_IFMT >> kStatShift] = {
 };
 #pragma GCC diagnostic pop
 
-static inline void CompareAndUpdateHash(DirHash &dst, const DirHash &src) {
-  if (dst.hash != src.hash) {
-    dst = src;
-  }
-}
-
 static inline uint32_t DirBuckets(uint32_t level, uint8_t dir_level) {
   if (level + dir_level < kMaxDirHashDepth / 2) {
     return 1 << (level + dir_level);
@@ -55,6 +49,10 @@ static inline uint32_t BucketBlocks(uint32_t level) {
     return 2;
   }
   return 4;
+}
+
+void SetDirEntryType(DirEntry &de, VnodeF2fs &vnode) {
+  de.file_type = kTypeByMode[(vnode.GetMode() & S_IFMT) >> kStatShift];
 }
 
 uint64_t DirBlockIndex(uint32_t level, uint8_t dir_level, uint32_t idx) {
@@ -75,58 +73,47 @@ fuchsia_io::NodeProtocolKinds Dir::GetProtocols() const {
   return fuchsia_io::NodeProtocolKinds::kDirectory;
 }
 
+DirEntry &Dir::GetDirEntry(const DentryInfo &info, fbl::RefPtr<Page> &page) {
+  if (info.page_index == kCachedInlineDirEntryPageIndex) {
+    ZX_DEBUG_ASSERT(TestFlag(InodeInfoFlag::kInlineDentry));
+    return InlineDentryArray(page.get(), *this)[info.bit_pos];
+  }
+  ZX_DEBUG_ASSERT(!TestFlag(InodeInfoFlag::kInlineDentry));
+  return page->GetAddress<DentryBlock>()->dentry[info.bit_pos];
+}
+
 size_t Dir::DirBlocks() { return CheckedDivRoundUp<uint64_t>(GetSize(), kBlockSize); }
-
-void Dir::SetDeType(DirEntry *de, VnodeF2fs *vnode) {
-  de->file_type = kTypeByMode[(vnode->GetMode() & S_IFMT) >> kStatShift];
-}
-
 bool Dir::EarlyMatchName(std::string_view name, f2fs_hash_t namehash, const DirEntry &de) {
-  if (LeToCpu(de.name_len) != name.length())
-    return false;
-
-  if (LeToCpu(de.hash_code) != namehash)
-    return false;
-
-  return true;
+  return LeToCpu(de.name_len) == name.length() && LeToCpu(de.hash_code) == namehash;
 }
 
-DirEntry *Dir::FindInBlock(fbl::RefPtr<Page> dentry_page, std::string_view name,
-                           uint64_t *max_slots, f2fs_hash_t namehash, fbl::RefPtr<Page> *res_page) {
+zx::result<DentryInfo> Dir::FindInBlock(fbl::RefPtr<Page> dentry_page, std::string_view name,
+                                        f2fs_hash_t namehash, fbl::RefPtr<Page> *res_page) {
   DentryBlock *dentry_blk = dentry_page->GetAddress<DentryBlock>();
   auto bits = GetBitmap(dentry_page);
   ZX_DEBUG_ASSERT(bits.is_ok());
   size_t bit_pos = bits->FindNextBit(0);
   while (bit_pos < kNrDentryInBlock) {
-    DirEntry &de = dentry_blk->dentry[bit_pos];
-    size_t slots = (LeToCpu(de.name_len) + kNameLen - 1) / kNameLen;
+    const DirEntry &de = dentry_blk->dentry[bit_pos];
+    size_t slots = GetDentrySlots(LeToCpu(de.name_len));
     if (EarlyMatchName(name, namehash, de) &&
         !memcmp(dentry_blk->filename[bit_pos], name.data(), name.length())) {
+      DentryInfo info = {LeToCpu(de.ino), dentry_page->GetKey(), bit_pos};
+      GetDirEntryCache().UpdateDirEntry(name, info);
       *res_page = std::move(dentry_page);
-      return &de;
+      return zx::ok(info);
     }
-    size_t next_pos = bit_pos + slots;
-    bit_pos = bits->FindNextBit(next_pos);
-    size_t end_pos = bit_pos;
-    if (bit_pos >= kNrDentryInBlock)
-      end_pos = kNrDentryInBlock;
-
-    if (*max_slots < end_pos - next_pos)
-      *max_slots = end_pos - next_pos;
+    bit_pos = bits->FindNextBit(bit_pos + slots);
   }
-
-  return nullptr;
+  return zx::error(ZX_ERR_NOT_FOUND);
 }
 
-DirEntry *Dir::FindInLevel(unsigned int level, std::string_view name, f2fs_hash_t namehash,
-                           bool *update_hash, fbl::RefPtr<Page> *res_page) {
-  uint64_t slot = (name.length() + kNameLen - 1) / kNameLen;
+zx::result<DentryInfo> Dir::FindInLevel(unsigned int level, std::string_view name,
+                                        f2fs_hash_t namehash, fbl::RefPtr<Page> *res_page) {
   unsigned int nbucket, nblock;
   uint64_t bidx, end_block;
-  DirEntry *de = nullptr;
-  uint64_t max_slots = 0;
 
-  ZX_ASSERT(level <= kMaxDirHashDepth);
+  ZX_DEBUG_ASSERT(level <= kMaxDirHashDepth);
 
   nbucket = DirBuckets(level, dir_level_);
   nblock = BucketBlocks(level);
@@ -138,163 +125,121 @@ DirEntry *Dir::FindInLevel(unsigned int level, std::string_view name, f2fs_hash_
     // no need to allocate new dentry pages to all the indices
     auto dentry_page_or = FindDataPage(bidx);
     if (dentry_page_or.is_error()) {
-      *update_hash = true;
       continue;
     }
-    if (de = FindInBlock(dentry_page_or.value().release(), name, &max_slots, namehash, res_page);
-        de != nullptr) {
-      break;
-    }
-    if (max_slots >= slot) {
-      *update_hash = true;
+    if (auto info = FindInBlock(dentry_page_or.value().release(), name, namehash, res_page);
+        info.is_ok()) {
+      return info;
     }
   }
-  return de;
+  return zx::error(ZX_ERR_NOT_FOUND);
 }
 
 // Find an entry in the specified directory with the wanted name.
-// It returns the page where the entry was found (as a parameter - res_page),
-// and the entry itself. Page is returned mapped and unlocked.
-// Entry is guaranteed to be valid.
-std::pair<DirEntry *, DirHash> Dir::FindEntryOnDevice(std::string_view name,
-                                                      fbl::RefPtr<Page> *res_page) {
-  DirHash current = {DentryHash(name), 0}, dir_hash = cached_hash_;
+// It returns the page where the entry was found and the entry info.
+// Page is returned mapped and unlocked. Entry is guaranteed to be valid.
+zx::result<DentryInfo> Dir::FindEntryOnDevice(std::string_view name, fbl::RefPtr<Page> *res_page) {
+  DirHash current = {DentryHash(name), 0};
   if (TestFlag(InodeInfoFlag::kInlineDentry)) {
-    return std::pair<DirEntry *, DirHash>{FindInInlineDir(name, res_page), dir_hash};
+    return FindInInlineDir(name, res_page);
   }
 
   if (!DirBlocks()) {
-    return std::pair<DirEntry *, DirHash>{nullptr, dir_hash};
+    return zx::error(ZX_ERR_NOT_FOUND);
   }
 
   *res_page = nullptr;
-
   uint64_t max_depth = current_depth_;
-  DirEntry *de = nullptr;
   for (; current.level < max_depth; ++current.level) {
-    bool update_current_hash = false;
-    if (de = FindInLevel(current.level, name, current.hash, &update_current_hash, res_page);
-        de != nullptr) {
-      break;
-    }
-    if (update_current_hash) {
-      CompareAndUpdateHash(dir_hash, current);
+    if (auto info = FindInLevel(current.level, name, current.hash, res_page); info.is_ok()) {
+      return info;
     }
   }
-  if (!de) {
-    CompareAndUpdateHash(dir_hash, {current.hash, current.level - 1});
-  }
-  return std::pair<DirEntry *, DirHash>{de, dir_hash};
+  return zx::error(ZX_ERR_NOT_FOUND);
 }
 
-DirEntry *Dir::FindEntry(std::string_view name, fbl::RefPtr<Page> *res_page) {
-  if (auto cache_page_index = fs()->GetDirEntryCache().LookupDataPageIndex(Ino(), name);
-      !cache_page_index.is_error()) {
+zx::result<DentryInfo> Dir::FindEntry(std::string_view name, fbl::RefPtr<Page> *res_page) {
+  if (auto dentry_info = GetDirEntryCache().LookupDirEntry(name); dentry_info.is_ok()) {
     if (TestFlag(InodeInfoFlag::kInlineDentry)) {
-      return FindInInlineDir(name, res_page);
+      ZX_DEBUG_ASSERT(dentry_info->page_index == kCachedInlineDirEntryPageIndex);
+      LockedPage ipage;
+      if (zx_status_t ret = fs()->GetNodeManager().GetNodePage(Ino(), &ipage); ret != ZX_OK) {
+        return zx::error(ZX_ERR_NOT_FOUND);
+      }
+      *res_page = ipage.release();
+      return dentry_info;
     }
-
-    auto dentry_page_or = FindDataPage(*cache_page_index);
-    if (dentry_page_or.is_error()) {
-      return nullptr;
+    if (dentry_info->page_index == kCachedInlineDirEntryPageIndex) {
+      dentry_info->page_index = 0;
     }
-
-    uint64_t max_slots = 0;
-    f2fs_hash_t name_hash = DentryHash(name);
-    DirEntry *de =
-        FindInBlock(dentry_page_or.value().release(), name, &max_slots, name_hash, res_page);
-    if (de) {
-      return de;
-    }
+    auto dentry_page = FindDataPage(dentry_info->page_index);
+    ZX_ASSERT(dentry_page.is_ok());
+    *res_page = (*dentry_page).release();
+    return dentry_info;
   }
-
-  auto entry = FindEntryOnDevice(name, res_page);
-  SetDirHash(entry.second);
-  if (!entry.first) {
-    return nullptr;
-  }
-  fs()->GetDirEntryCache().UpdateDirEntry(Ino(), name, *entry.first, (*res_page)->GetIndex());
-  return entry.first;
+  return FindEntryOnDevice(name, res_page);
 }
 
-DirEntry *Dir::FindEntrySafe(std::string_view name, fbl::RefPtr<Page> *res_page) {
+zx::result<DentryInfo> Dir::FindEntrySafe(std::string_view name, fbl::RefPtr<Page> *res_page) {
   std::lock_guard dir_lock(mutex_);
   return FindEntry(name, res_page);
 }
 
-zx::result<DirEntry> Dir::FindEntry(std::string_view name) {
-  auto element = fs()->GetDirEntryCache().LookupDirEntry(Ino(), name);
-  if (!element.is_error()) {
-    return zx::ok(*element);
+zx::result<ino_t> Dir::LookUpEntries(std::string_view name) {
+  auto dentry_info = GetDirEntryCache().LookupDirEntry(name);
+  if (dentry_info.is_ok()) {
+    return zx::ok(dentry_info->ino);
   }
 
   fbl::RefPtr<Page> page;
   auto entry = FindEntryOnDevice(name, &page);
-  SetDirHash(entry.second);
-  if (!entry.first) {
-    return zx::error(ZX_ERR_NOT_FOUND);
+  if (entry.is_error()) {
+    return entry.take_error();
   }
-
-  fs()->GetDirEntryCache().UpdateDirEntry(Ino(), name, *entry.first, page->GetIndex());
-  return zx::ok(*entry.first);
+  return zx::ok(entry->ino);
 }
 
-zx::result<DirEntry> Dir::LookUpEntries(std::string_view name) {
-  auto element = fs()->GetDirEntryCache().LookupDirEntry(Ino(), name);
-  if (!element.is_error()) {
-    return zx::ok(*element);
-  }
-
-  fbl::RefPtr<Page> page;
-  auto entry = FindEntryOnDevice(name, &page);
-  if (!entry.first) {
-    return zx::error(ZX_ERR_NOT_FOUND);
-  }
-
-  fs()->GetDirEntryCache().UpdateDirEntry(Ino(), name, *entry.first, page->GetIndex());
-  return zx::ok(*entry.first);
-}
-
-DirEntry *Dir::ParentDir(fbl::RefPtr<Page> *out) {
-  DirEntry *de = nullptr;
-  DentryBlock *dentry_blk = nullptr;
-
+zx::result<DentryInfo> Dir::GetParentDentryInfo(fbl::RefPtr<Page> *out) {
   fs::SharedLock dir_lock(mutex_);
-  if (TestFlag(InodeInfoFlag::kInlineDentry)) {
-    return ParentInlineDir(out);
-  }
-
   LockedPage page;
-  if (GetLockedDataPage(0, &page) != ZX_OK) {
-    return nullptr;
+  DentryInfo info = {kNullIno, 0, kParentBitPos};
+  if (TestFlag(InodeInfoFlag::kInlineDentry)) {
+    if (zx_status_t ret = fs()->GetNodeManager().GetNodePage(Ino(), &page); ret != ZX_OK) {
+      return zx::error(ZX_ERR_NOT_FOUND);
+    }
+    info.page_index = kCachedInlineDirEntryPageIndex;
+  } else {
+    if (GetLockedDataPage(0, &page) != ZX_OK) {
+      return zx::error(ZX_ERR_NOT_FOUND);
+    }
   }
-
-  dentry_blk = page->GetAddress<DentryBlock>();
-  de = &dentry_blk->dentry[1];
   *out = page.release();
-  return de;
+  info.ino = LeToCpu(GetDirEntry(info, *out).ino);
+  return zx::ok(info);
 }
 
-void Dir::SetLink(DirEntry *de, fbl::RefPtr<Page> &page, VnodeF2fs *vnode) {
+void Dir::SetLink(const DentryInfo &info, fbl::RefPtr<Page> &page, VnodeF2fs *vnode) {
   {
     LockedPage page_lock(page);
     page->WaitOnWriteback();
-    de->ino = CpuToLe(vnode->Ino());
-    SetDeType(de, vnode);
+    DirEntry &de = GetDirEntry(info, page);
+    de.ino = CpuToLe(vnode->Ino());
+    SetDirEntryType(de, *vnode);
     // If |de| is an inline dentry, the inode block should be flushed.
     // Otherwise, it writes out the data block.
     page_lock.SetDirty();
-
-    fs()->GetDirEntryCache().UpdateDirEntry(Ino(), vnode->GetNameView(), *de, page->GetIndex());
+    if (info.bit_pos != kParentBitPos && info.bit_pos != kCurrentBitPos) {
+      GetDirEntryCache().UpdateDirEntry(vnode->GetNameView(),
+                                        {vnode->GetKey(), info.page_index, info.bit_pos});
+    }
     time_->Update<Timestamps::ModificationTime>();
   }
-
   SetDirty();
 }
 
-void Dir::SetLinkSafe(DirEntry *de, fbl::RefPtr<Page> &page, VnodeF2fs *vnode) {
+void Dir::SetLinkSafe(const DentryInfo &info, fbl::RefPtr<Page> &page, VnodeF2fs *vnode) {
   std::lock_guard dir_lock(mutex_);
-  SetLink(de, page, vnode);
+  SetLink(info, page, vnode);
 }
 
 void Dir::InitDentInode(VnodeF2fs *vnode, NodePage &ipage) {
@@ -307,7 +252,7 @@ void Dir::InitDentInode(VnodeF2fs *vnode, NodePage &ipage) {
   ZX_DEBUG_ASSERT(IsValidNameLength(name));
   auto size = safemath::checked_cast<uint32_t>(name.size());
   inode.i_namelen = CpuToLe(size);
-  name.copy(reinterpret_cast<char *>(&inode.i_name[0]), size);
+  name.copy(reinterpret_cast<char *>(&inode.i_name[kCurrentBitPos]), size);
 
   LockedPage lock_page(fbl::RefPtr<Page>(&ipage), false);
   lock_page.SetDirty();
@@ -408,13 +353,8 @@ zx_status_t Dir::AddLink(std::string_view name, VnodeF2fs *vnode) {
 
   uint32_t level = 0;
   f2fs_hash_t dentry_hash = DentryHash(name);
-  if (cached_hash_.hash == dentry_hash) {
-    cached_hash_.hash = 0;
-    level = cached_hash_.level;
-  }
-
-  size_t namelen = name.length();
-  size_t slots = (namelen + kNameLen - 1) / kNameLen;
+  uint16_t namelen = safemath::checked_cast<uint16_t>(name.length());
+  size_t slots = GetDentrySlots(namelen);
   for (auto current_depth = current_depth_; current_depth < kMaxDirHashDepth; ++level) {
     // Increase the depth, if required
     if (level == current_depth) {
@@ -447,16 +387,16 @@ zx_status_t Dir::AddLink(std::string_view name, VnodeF2fs *vnode) {
 
       DirEntry &de = dentry_blk->dentry[bit_pos];
       de.hash_code = CpuToLe(dentry_hash);
-      de.name_len = CpuToLe(safemath::checked_cast<uint16_t>(namelen));
+      de.name_len = CpuToLe(namelen);
       std::memcpy(dentry_blk->filename[bit_pos], name.data(), namelen);
       de.ino = CpuToLe(vnode->Ino());
-      SetDeType(&de, vnode);
+      SetDirEntryType(de, *vnode);
 
       for (size_t i = 0; i < slots; ++i) {
         bits->Set(bit_pos + i);
       }
       dentry_page.SetDirty();
-      fs()->GetDirEntryCache().UpdateDirEntry(Ino(), name, de, dentry_page->GetIndex());
+      GetDirEntryCache().UpdateDirEntry(name, {vnode->Ino(), dentry_page->GetIndex(), bit_pos});
       UpdateParentMetadata(vnode, safemath::checked_cast<uint32_t>(current_depth));
       return ZX_OK;
     }
@@ -471,33 +411,32 @@ zx_status_t Dir::AddLinkSafe(std::string_view name, VnodeF2fs *vnode) {
 
 // It only removes the dentry from the dentry page, corresponding name
 // entry in name page does not need to be touched during deletion.
-void Dir::DeleteEntry(DirEntry *dentry, fbl::RefPtr<Page> &page, VnodeF2fs *vnode) {
-  int slots = (LeToCpu(dentry->name_len) + kNameLen - 1) / kNameLen;
-
+void Dir::DeleteEntry(const DentryInfo &info, fbl::RefPtr<Page> &page, VnodeF2fs *vnode) {
   // Add to VnodeSet to ensure consistency of deleted entry.
   fs()->AddToVnodeSet(VnodeSet::kModifiedDir, Ino());
 
   if (TestFlag(InodeInfoFlag::kInlineDentry)) {
-    DeleteInlineEntry(dentry, page, vnode);
-    return;
+    return DeleteInlineEntry(info, page, vnode);
   }
 
   LockedPage page_lock(page);
   page->WaitOnWriteback();
 
   DentryBlock *dentry_blk = page->GetAddress<DentryBlock>();
-  size_t bit_pos = dentry - dentry_blk->dentry;
+  DirEntry &dentry = GetDirEntry(info, page);
   auto bits = GetBitmap(page_lock.CopyRefPtr());
   ZX_DEBUG_ASSERT(bits.is_ok());
+  int slots = GetDentrySlots(LeToCpu(dentry.name_len));
+  size_t bit_pos = info.bit_pos;
   for (int i = 0; i < slots; ++i) {
     bits->Clear(bit_pos + i);
   }
   page_lock.SetDirty();
 
   std::string_view remove_name(reinterpret_cast<char *>(dentry_blk->filename[bit_pos]),
-                               LeToCpu(dentry->name_len));
+                               LeToCpu(dentry.name_len));
 
-  fs()->GetDirEntryCache().RemoveDirEntry(Ino(), remove_name);
+  GetDirEntryCache().RemoveDirEntry(remove_name);
 
   time_->Update<Timestamps::ModificationTime>();
 
@@ -542,19 +481,19 @@ zx_status_t Dir::MakeEmpty(VnodeF2fs *vnode) {
 
   DentryBlock *dentry_blk = dentry_page->GetAddress<DentryBlock>();
 
-  DirEntry *de = &dentry_blk->dentry[0];
+  DirEntry *de = &dentry_blk->dentry[kCurrentBitPos];
   de->name_len = CpuToLe(static_cast<uint16_t>(1));
   de->hash_code = 0;
   de->ino = CpuToLe(vnode->Ino());
-  std::memcpy(dentry_blk->filename[0], ".", 1);
-  SetDeType(de, vnode);
+  std::memcpy(dentry_blk->filename[kCurrentBitPos], ".", 1);
+  SetDirEntryType(*de, *vnode);
 
-  de = &dentry_blk->dentry[1];
+  de = &dentry_blk->dentry[kParentBitPos];
   de->hash_code = 0;
   de->name_len = CpuToLe(static_cast<uint16_t>(2));
   de->ino = CpuToLe(Ino());
-  std::memcpy(dentry_blk->filename[1], "..", 2);
-  SetDeType(de, vnode);
+  std::memcpy(dentry_blk->filename[kParentBitPos], "..", 2);
+  SetDirEntryType(*de, *vnode);
 
   auto bits = vnode->GetBitmap(dentry_page.CopyRefPtr());
   ZX_DEBUG_ASSERT(bits.is_ok());
@@ -642,7 +581,7 @@ zx_status_t Dir::Readdir(fs::VdirCookie *cookie, void *dirents, size_t len, size
         }
       }
 
-      size_t slots = (LeToCpu(de.name_len) + kNameLen - 1) / kNameLen;
+      size_t slots = GetDentrySlots(LeToCpu(de.name_len));
       bit_pos += slots;
     }
     if (done)

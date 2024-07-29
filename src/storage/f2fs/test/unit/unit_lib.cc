@@ -112,7 +112,6 @@ void FileTester::SuddenPowerOff(std::unique_ptr<F2fs> fs, std::unique_ptr<Bcache
     return ZX_OK;
   });
   fs->GetVCache().Reset();
-  fs->GetDirEntryCache().Reset();
 
   // destroy f2fs internal modules
   fs->Reset();

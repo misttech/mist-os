@@ -78,7 +78,6 @@
 #include "src/storage/f2fs/service/startup.h"
 #include "src/storage/f2fs/service/lifecycle.h"
 #include "src/storage/f2fs/component_runner.h"
-#include "src/storage/f2fs/dir_entry_cache.h"
 #include "src/storage/f2fs/inspect.h"
 #include "src/storage/f2fs/memory_watcher.h"
 #include "src/storage/f2fs/xattr.h"
@@ -104,7 +103,6 @@ class F2fs final {
                                                   const MountOptions &options, PlatformVfs *vfs);
 
   zx::result<fs::FilesystemInfo> GetFilesystemInfo();
-  DirEntryCache &GetDirEntryCache() { return dir_entry_cache_; }
   InspectTree &GetInspectTree() { return *inspect_tree_; }
 
   VnodeCache &GetVCache() { return vnode_cache_; }
@@ -316,7 +314,6 @@ class F2fs final {
   fbl::RefPtr<VnodeF2fs> root_vnode_;
 
   VnodeCache vnode_cache_;
-  DirEntryCache dir_entry_cache_;
 
   bool on_recovery_ = false;  // recovery is doing or not
   // for inode number management
