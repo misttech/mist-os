@@ -24,7 +24,6 @@ from assembly import (
 from assembly.assembly_input_bundle import (
     CompiledComponentDefinition,
     CompiledPackageDefinition,
-    CompiledPackageDefinitionFromGN,
     DriverDetails,
     PackageDetails,
 )
@@ -518,7 +517,7 @@ class AIBCreatorTest(unittest.TestCase):
 
         # Mock out the copy routine so it doesn't fail, but we can see the ops
         # it would have made.
-        (_, copies) = mock_fast_copy_in(assembly.assembly_input_bundle)
+        (_, copies) = mock_fast_copy_in(assembly.package_copier)
 
         outdir = tempfile.TemporaryDirectory()
 

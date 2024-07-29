@@ -39,9 +39,14 @@ def create_fast_copy_mock_instance() -> (
 
 def mock_fast_copy_in(
     context: Any,
+    mock: tuple[functools.partial[FilePath | None], list[FileEntry]]
+    | None = None,
 ) -> tuple[functools.partial[FilePath | None], list[FileEntry]]:
     """Insert a new mock of `fast_copy` into the context, and return it."""
-    (mock_instance, copies) = create_fast_copy_mock_instance()
+    if mock:
+        (mock_instance, copies) = mock
+    else:
+        (mock_instance, copies) = create_fast_copy_mock_instance()
     context.fast_copy = mock_instance
     context.fast_copy_makedirs = mock_instance
     return (mock_instance, copies)

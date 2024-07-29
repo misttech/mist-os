@@ -163,7 +163,8 @@ class MakeLegacyConfig(unittest.TestCase):
         self.maxDiff = None
 
         # Patch in a mock for the fast_copy() fn
-        _, copies = mock_fast_copy_in(assembly.assembly_input_bundle)
+        instance, copies = mock_fast_copy_in(assembly.assembly_input_bundle)
+        mock_fast_copy_in(assembly.package_copier, mock=(instance, copies))
 
         with setup_temp_dir() as setup_args:
             (
@@ -462,7 +463,7 @@ class MakeLegacyConfig(unittest.TestCase):
         """
         with setup_temp_dir() as setup_args:
             # Patch in a mock for the fast_copy() fn
-            mock_fast_copy_in(assembly.assembly_input_bundle)
+            mock_fast_copy_in(assembly.package_copier)
             duplicate_package = "cache_a"
             manifest_path = make_package_manifest(
                 duplicate_package, [], SOURCE_DIR
@@ -502,7 +503,7 @@ class MakeLegacyConfig(unittest.TestCase):
         """
         with setup_temp_dir() as setup_args:
             # Patch in a mock for the fast_copy() fn
-            mock_fast_copy_in(assembly.assembly_input_bundle)
+            mock_fast_copy_in(assembly.package_copier)
             duplicate_package = "package_a"
             manifest_path = make_package_manifest(
                 duplicate_package, [], SOURCE_DIR
