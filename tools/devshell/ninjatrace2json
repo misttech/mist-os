@@ -9,126 +9,18 @@
 ## Usage: fx ninjatrace2json
 ##
 ## Use this after a build to write "ninjatrace.json" in the build directory.
+##
+## See //build/scripts/ninjatrace2json.py for more usage information.
 
 set -e
 
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" > /dev/null 2>&1 && pwd)"/lib/vars.sh || exit $?
 fx-config-read
 
-function usage() {
-  cat << EOF
-Use this after a build to write "ninjatrace.json" in the build directory.
-See https://fuchsia.dev/internal/intree/concepts/build-performance?hl=en#build-performance-analysis-as-a-trace.
-
-fx ninjatrace2json [options]
-
-Options:
-  --help|-h: print this help and exit
-  --dev: if set, use the locally built ninjatrace binary, instead of the prebuilt one.
-  --rbe-rpl-path: when provided, interleave remote execution stats from RBE into
-      the main trace
-  --save-temps: if set, keep the intermediate compdb.json and graph.dot files
-      in each build directory.  The are only needed temporarily to produce the
-      final ninjatrace.json, and can be large at O(100)s of MBs.
-EOF
-}
-
-dev=0
-save_temps=0
-rbe_rpl_path=''
-# Extract script options before --
-for opt; do
-  # handle --option arg
-  if test -n "$prev_opt"; then
-    eval "$prev_opt"=\$opt
-    prev_opt=
-    shift
-    continue
-  fi
-  # Extract optarg from --opt=optarg
-  case "$opt" in
-    *=?*) optarg=$(expr "X$opt" : '[^=]*=\(.*\)') ;;
-    *=) optarg= ;;
-  esac
-  case "$opt" in
-    --help | -h)
-      usage
-      exit
-      ;;
-    --dev) dev=1 ;;
-    --rbe-rpl-path=*) rbe_rpl_path="$optarg" ;;
-    --rbe-rpl-path) prev_opt='rbe_rpl_path' ;;
-    --save-temps) save_temps=1 ;;
-    *)
-      echo "Unknown option ${opt}"
-      usage
-      exit 1
-      ;;
-  esac
-  shift
-done
-
-test -z "$prev_opt" || {
-  echo "Option is missing argument to set $prev_opt."
-  exit 1
-}
-
-ninjatrace="${PREBUILT_NINJATRACE}"
-if [[ "$dev" == 1 ]]; then
-  ninjatrace="${HOST_OUT_DIR}/ninjatrace"
-fi
-
-ninja_logs=($(find ${FUCHSIA_BUILD_DIR} -name .ninja_log -type f))
-build_dirs=("${ninja_logs[@]%/.ninja_log}")  # dirname
-
-function cleanup() {
-  if [[ "$save_temps" != 1 ]]; then
-    for d in "${build_dirs[@]}"
-    do
-      rm -f "$d/compdb.json" "$d/graph.dot"
-    done
-  fi
-}
-
-trap cleanup EXIT
-
-function trace_one_build_dir() {
-  local build_dir="$1"
-  local log="$build_dir/.ninja_log"
-  local compdb="$build_dir/compdb.json"
-  local graph="$build_dir/graph.dot"
-  local trace="$build_dir/ninjatrace.json"
-  if [[ -f "$trace" && "$trace" -nt "$log" ]]; then
-    # treat ninjatrace as already cached
-    echo "Using cached $trace (not regenerating)"
-    return
-  fi
-  "${PREBUILT_NINJA}" -C "$build_dir" -t compdb > "$compdb"
-  "${PREBUILT_NINJA}" -C "$build_dir" -t graph > "$graph"
-
-  local ninjatrace_args=(
-    -ninjalog "$log"
-    -compdb "$compdb"
-    -graph "$graph"
-    -trace-json "$trace"
-    -critical-path
-  )
-
-  if [[ -n "${rbe_rpl_path}" ]]; then
-    ninjatrace_args+=(
-      -rbe-rpl-path "${rbe_rpl_path}"
-      '-rpl2trace-path' "${PREBUILT_RECLIENT_DIR}/rpl2trace"
-    )
-  fi
-
-  "${ninjatrace}" "${ninjatrace_args[@]}"
-}
-
-# Process each build dir in parallel.
-for build_dir in "${build_dirs[@]}"; do
-  trace_one_build_dir "$build_dir" &
-done
-
-wait
-
-echo "Now visit chrome://tracing and load ${FUCHSIA_BUILD_DIR}/ninjatrace.json"
+exec "${PREBUILT_PYTHON3}" \
+  "$FUCHSIA_DIR/build/scripts/ninjatrace2json.py" \
+  --fuchsia-build-dir "$FUCHSIA_BUILD_DIR" \
+  --ninja-path "$PREBUILT_NINJA" \
+  --ninjatrace-path "$PREBUILT_NINJATRACE" \
+  --subbuilds-in-place \
+  "$@"
