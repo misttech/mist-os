@@ -126,22 +126,6 @@ impl<T> From<RemoveResult<T>> for GroupLeaveResult<T> {
     }
 }
 
-/// A set of reference-counted multicast groups and associated data.
-///
-/// `MulticastGroupSet` is a set of multicast groups, each with associated data
-/// `T`. Each group is reference-counted, only being removed once its reference
-/// count reaches zero.
-#[cfg_attr(test, derive(Debug))]
-pub struct MulticastGroupSet<A: IpAddress, T> {
-    inner: RefCountedHashMap<MulticastAddr<A>, T>,
-}
-
-impl<A: IpAddress, T> Default for MulticastGroupSet<A, T> {
-    fn default() -> MulticastGroupSet<A, T> {
-        MulticastGroupSet { inner: RefCountedHashMap::default() }
-    }
-}
-
 /// Actions to take as a consequence of joining a group.
 #[cfg_attr(test, derive(Debug, PartialEq, Eq))]
 struct JoinGroupActions<P> {
@@ -194,6 +178,22 @@ impl<P: ProtocolSpecific> QueryReceivedActions<P> {
 #[cfg_attr(test, derive(Debug, PartialEq, Eq))]
 struct ReportTimerExpiredActions<P> {
     send_report: P,
+}
+
+/// A set of reference-counted multicast groups and associated data.
+///
+/// `MulticastGroupSet` is a set of multicast groups, each with associated data
+/// `T`. Each group is reference-counted, only being removed once its reference
+/// count reaches zero.
+#[cfg_attr(test, derive(Debug))]
+pub struct MulticastGroupSet<A: IpAddress, T> {
+    inner: RefCountedHashMap<MulticastAddr<A>, T>,
+}
+
+impl<A: IpAddress, T> Default for MulticastGroupSet<A, T> {
+    fn default() -> MulticastGroupSet<A, T> {
+        MulticastGroupSet { inner: RefCountedHashMap::default() }
+    }
 }
 
 impl<A: IpAddress, T> MulticastGroupSet<A, T> {
@@ -391,6 +391,12 @@ pub trait ProtocolSpecific: Copy + Default {
     ) -> (Self, Option<Self::Actions>);
 }
 
+/// The transition between one state and the next.
+///
+/// A `Transition` includes the next state to enter and any actions to take
+/// while executing the transition.
+struct Transition<S, P: ProtocolSpecific, Actions>(GmpHostState<S, P>, Actions);
+
 /// This is used to represent the states that are common in both MLD and IGMPv2.
 /// The state machine should behave as described on [RFC 2236 page 10] and [RFC
 /// 2710 page 10].
@@ -409,6 +415,17 @@ struct GmpHostState<State, P: ProtocolSpecific> {
     cfg: P::Config,
 }
 
+impl<S, P: ProtocolSpecific> GmpHostState<S, P> {
+    /// Construct a `Transition` from this state into the new state `T` with the
+    /// given actions.
+    fn transition<T, A>(self, t: T, actions: A) -> Transition<T, P, A> {
+        Transition(
+            GmpHostState { state: t, protocol_specific: self.protocol_specific, cfg: self.cfg },
+            actions,
+        )
+    }
+}
+
 // Used to write tests in the `igmp` and `mld` modules.
 #[cfg(test)]
 impl<S, P: ProtocolSpecific> GmpHostState<S, P> {
@@ -420,26 +437,6 @@ impl<S, P: ProtocolSpecific> GmpHostState<S, P> {
         &self.state
     }
 }
-
-/// The state for a multicast group membership.
-///
-/// The terms used here are biased towards [IGMPv2]. In [MLD], their names are
-/// {Non, Delaying, Idle}-Listener instead.
-///
-/// [IGMPv2]: https://tools.ietf.org/html/rfc2236
-/// [MLD]: https://tools.ietf.org/html/rfc2710
-#[cfg_attr(test, derive(Debug))]
-enum MemberState<I: Instant, P: ProtocolSpecific> {
-    NonMember(GmpHostState<NonMember, P>),
-    Delaying(GmpHostState<DelayingMember<I>, P>),
-    Idle(GmpHostState<IdleMember, P>),
-}
-
-/// The transition between one state and the next.
-///
-/// A `Transition` includes the next state to enter and any actions to take
-/// while executing the transition.
-struct Transition<S, P: ProtocolSpecific, Actions>(GmpHostState<S, P>, Actions);
 
 /// Represents Non Member-specific state variables.
 ///
@@ -472,15 +469,60 @@ struct IdleMember {
     last_reporter: bool,
 }
 
-impl<S, P: ProtocolSpecific> GmpHostState<S, P> {
-    /// Construct a `Transition` from this state into the new state `T` with the
-    /// given actions.
-    fn transition<T, A>(self, t: T, actions: A) -> Transition<T, P, A> {
-        Transition(
-            GmpHostState { state: t, protocol_specific: self.protocol_specific, cfg: self.cfg },
-            actions,
-        )
+/// The state for a multicast group membership.
+///
+/// The terms used here are biased towards [IGMPv2]. In [MLD], their names are
+/// {Non, Delaying, Idle}-Listener instead.
+///
+/// [IGMPv2]: https://tools.ietf.org/html/rfc2236
+/// [MLD]: https://tools.ietf.org/html/rfc2710
+#[cfg_attr(test, derive(Debug))]
+enum MemberState<I: Instant, P: ProtocolSpecific> {
+    NonMember(GmpHostState<NonMember, P>),
+    Delaying(GmpHostState<DelayingMember<I>, P>),
+    Idle(GmpHostState<IdleMember, P>),
+}
+
+impl<I: Instant, P: ProtocolSpecific> From<GmpHostState<NonMember, P>> for MemberState<I, P> {
+    fn from(s: GmpHostState<NonMember, P>) -> Self {
+        MemberState::NonMember(s)
     }
+}
+
+impl<I: Instant, P: ProtocolSpecific> From<GmpHostState<DelayingMember<I>, P>>
+    for MemberState<I, P>
+{
+    fn from(s: GmpHostState<DelayingMember<I>, P>) -> Self {
+        MemberState::Delaying(s)
+    }
+}
+
+impl<I: Instant, P: ProtocolSpecific> From<GmpHostState<IdleMember, P>> for MemberState<I, P> {
+    fn from(s: GmpHostState<IdleMember, P>) -> Self {
+        MemberState::Idle(s)
+    }
+}
+
+impl<S, P: ProtocolSpecific, A> Transition<S, P, A> {
+    fn into_state_actions<I: Instant>(self) -> (MemberState<I, P>, A)
+    where
+        MemberState<I, P>: From<GmpHostState<S, P>>,
+    {
+        (self.0.into(), self.1)
+    }
+}
+
+/// Randomly generates a timeout in (0, period].
+///
+/// # Panics
+///
+/// `random_report_timeout` may panic if `period.as_micros()` overflows `u64`.
+fn random_report_timeout<R: Rng>(rng: &mut R, period: Duration) -> Duration {
+    let micros = rng.gen_range(0..u64::try_from(period.as_micros()).unwrap()) + 1;
+    // u64 will be enough here because the only input of the function is from
+    // the `MaxRespTime` field of the GMP query packets. The representable
+    // number of microseconds is bounded by 2^33.
+    Duration::from_micros(micros)
 }
 
 /// Compute the next state and actions to take for a member state (Delaying or
@@ -537,19 +579,6 @@ fn member_query_received<P: ProtocolSpecific, R: Rng, I: Instant>(
     };
 
     (transition, QueryReceivedActions { generic: generic_actions, protocol_specific: ps_actions })
-}
-
-/// Randomly generates a timeout in (0, period].
-///
-/// # Panics
-///
-/// `random_report_timeout` may panic if `period.as_micros()` overflows `u64`.
-fn random_report_timeout<R: Rng>(rng: &mut R, period: Duration) -> Duration {
-    let micros = rng.gen_range(0..u64::try_from(period.as_micros()).unwrap()) + 1;
-    // u64 will be enough here because the only input of the function is from
-    // the `MaxRespTime` field of the GMP query packets. The representable
-    // number of microseconds is bounded by 2^33.
-    Duration::from_micros(micros)
 }
 
 impl<P: ProtocolSpecific> GmpHostState<NonMember, P> {
@@ -638,35 +667,6 @@ impl<P: ProtocolSpecific> GmpHostState<IdleMember, P> {
             stop_timer: false,
         };
         self.transition(NonMember, actions)
-    }
-}
-
-impl<I: Instant, P: ProtocolSpecific> From<GmpHostState<NonMember, P>> for MemberState<I, P> {
-    fn from(s: GmpHostState<NonMember, P>) -> Self {
-        MemberState::NonMember(s)
-    }
-}
-
-impl<I: Instant, P: ProtocolSpecific> From<GmpHostState<DelayingMember<I>, P>>
-    for MemberState<I, P>
-{
-    fn from(s: GmpHostState<DelayingMember<I>, P>) -> Self {
-        MemberState::Delaying(s)
-    }
-}
-
-impl<I: Instant, P: ProtocolSpecific> From<GmpHostState<IdleMember, P>> for MemberState<I, P> {
-    fn from(s: GmpHostState<IdleMember, P>) -> Self {
-        MemberState::Idle(s)
-    }
-}
-
-impl<S, P: ProtocolSpecific, A> Transition<S, P, A> {
-    fn into_state_actions<I: Instant>(self) -> (MemberState<I, P>, A)
-    where
-        MemberState<I, P>: From<GmpHostState<S, P>>,
-    {
-        (self.0.into(), self.1)
     }
 }
 
