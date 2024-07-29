@@ -14,7 +14,7 @@ Currently, only very basic software development is possible in `stardev`.
 In order to get reasonable performance in `stardev`, you should build Fuchsia using `--release`:
 
 ```sh
-$ fx set workbench_eng.x64 --release --with //src/starnix/tools/convert_tarball_to_starnix_container
+$ fx set workbench_eng.x64 --release --with //src/starnix/tools
 $ fx build
 ```
 
