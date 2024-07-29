@@ -528,4 +528,8 @@ group("core_realm_shards_allowlist") {
     "//src/connectivity/lowpan/drivers/lowpan-ot-driver:lowpan_ot_driver_core_shard",
     "//src/connectivity/lowpan/service:lowpanservice_shard",
   ]
+
+  # Used to facilitate b/353560491
+  visibility +=
+      [ "//src/session/bin/session_manager:fake_session_manager_core_shard" ]
 }
