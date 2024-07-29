@@ -12,7 +12,6 @@ use std::{cmp, iter};
 use crate::experimental::clock::{Duration, DurationExt as _, Quanta, QuantaExt as _, Tick};
 use crate::experimental::series::interpolation::InterpolationState;
 use crate::experimental::series::statistic::Statistic;
-use crate::experimental::Vec1;
 
 /// An interval that has elapsed during a [`Tick`].
 ///
@@ -187,7 +186,7 @@ pub struct SamplingInterval {
 }
 
 impl SamplingInterval {
-    fn new(
+    pub(crate) fn new(
         capacity: u32,
         sampling_period_count: u32,
         max_sampling_period: impl Into<Duration>,
@@ -207,6 +206,10 @@ impl SamplingInterval {
     /// Gets the maximum sampling period of the interval.
     pub fn max_sampling_period(&self) -> Duration {
         Duration::from_quanta(self.max_sampling_period)
+    }
+
+    pub(crate) fn capacity(&self) -> u32 {
+        self.capacity
     }
 
     /// Gets the [expirations][`IntervalExpiration`] of intervals intersected by the given
@@ -310,77 +313,16 @@ impl Display for SamplingInterval {
 }
 
 /// One or more cooperative [`SamplingInterval`]s.
+/// Used to produce one or more cooperative [`SamplingInterval`]s.
 #[derive(Clone, Debug)]
-pub struct SamplingProfile(Vec1<SamplingInterval>);
-
-impl SamplingProfile {
-    fn from_sampling_intervals<I>(intervals: I) -> Self
-    where
-        Vec1<SamplingInterval>: From<I>,
-    {
-        SamplingProfile(intervals.into())
-    }
-
-    /// Constructs a granular sampling profile with high fidelity but low durability.
-    ///
-    /// The minimum granularity is 1s and the maximum durability is 20m.
-    pub fn granular() -> Self {
-        SamplingProfile::from_sampling_intervals([
-            // 120x1x10s
-            SamplingInterval::new(120, 1, Duration::from_seconds(10)),
-            // 120x1x1s
-            SamplingInterval::new(120, 1, Duration::from_seconds(1)),
-        ])
-    }
-
-    /// Constructs a sampling profile with fidelity and durability that is applicable to most
-    /// metrics.
-    ///
-    /// The minimum granularity is 10s and the maximum durability is 5d.
-    pub fn balanced() -> Self {
-        SamplingProfile::from_sampling_intervals([
-            // 120x1x1h
-            SamplingInterval::new(120, 1, Duration::from_hours(1)),
-            // 120x1x10m
-            SamplingInterval::new(120, 1, Duration::from_minutes(10)),
-            // 120x1x1m
-            SamplingInterval::new(120, 1, Duration::from_minutes(1)),
-            // 120x1x10s
-            SamplingInterval::new(120, 1, Duration::from_seconds(10)),
-        ])
-    }
-
-    /// Constructs a durable sampling profile with high historical longevity but low fidelity.
-    ///
-    /// The minimum granularity is 1h and the maximum durability is 60d.
-    pub fn durable() -> Self {
-        SamplingProfile::from_sampling_intervals([
-            // 120x1x12h
-            SamplingInterval::new(120, 1, Duration::from_hours(12)),
-            // 120x1x1h
-            SamplingInterval::new(120, 1, Duration::from_hours(1)),
-        ])
-    }
-
-    /// Gets the minimum granularity of the profile.
-    pub fn granularity(&self) -> Duration {
-        self.0.iter().map(SamplingInterval::max_sampling_period).min().unwrap()
-    }
-
-    pub(crate) fn into_sampling_intervals(self) -> Vec1<SamplingInterval> {
-        self.0
-    }
+pub enum SamplingProfile {
+    Granular,
+    Balanced,
 }
 
 impl Default for SamplingProfile {
     fn default() -> Self {
-        SamplingProfile::balanced()
-    }
-}
-
-impl From<SamplingInterval> for SamplingProfile {
-    fn from(interval: SamplingInterval) -> Self {
-        SamplingProfile(Vec1::from_item(interval))
+        SamplingProfile::Balanced
     }
 }
 

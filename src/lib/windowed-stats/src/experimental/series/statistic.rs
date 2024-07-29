@@ -10,6 +10,8 @@ use std::cmp;
 use std::fmt::Debug;
 use thiserror::Error;
 
+use crate::experimental::series::buffer::BufferStrategy;
+use crate::experimental::series::interpolation::Interpolation;
 use crate::experimental::series::{Counter, DataSemantic, Fill, Gauge, Sample, Sampler};
 
 pub mod recipe {
@@ -56,6 +58,28 @@ pub type Semantic<F> = <F as Statistic>::Semantic;
 
 /// The associated aggregation type of a `Statistic`.
 pub type Aggregation<F> = <F as Statistic>::Aggregation;
+
+impl<F, P> BufferStrategy<F::Aggregation, P> for F
+where
+    F: Statistic,
+    F::Semantic: BufferStrategy<F::Aggregation, P>,
+    P: Interpolation,
+{
+    type Buffer = <F::Semantic as BufferStrategy<F::Aggregation, P>>::Buffer;
+}
+
+pub trait StatisticFor<P>: BufferStrategy<Self::Aggregation, P> + Statistic
+where
+    P: Interpolation<FillSample<Self> = Self::Sample>,
+{
+}
+
+impl<F, P> StatisticFor<P> for F
+where
+    F: BufferStrategy<Self::Aggregation, P> + Statistic,
+    P: Interpolation<FillSample<Self> = Self::Sample>,
+{
+}
 
 /// Arithmetic mean statistic.
 ///

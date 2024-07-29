@@ -19,14 +19,19 @@ rustc_library("windowed-stats") {
     "//third_party/rust_crates:itertools",
     "//third_party/rust_crates:num",
     "//third_party/rust_crates:thiserror",
+    "//third_party/rust_crates:tracing",
   ]
 
-  test_deps = [ "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions" ]
+  test_deps = [
+    "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
+    "//third_party/rust_crates:test-case",
+  ]
 
   sources = [
     "src/aggregations.rs",
     "src/experimental/clock.rs",
     "src/experimental/mod.rs",
+    "src/experimental/series/buffer.rs",
     "src/experimental/series/interpolation.rs",
     "src/experimental/series/interval.rs",
     "src/experimental/series/mod.rs",
