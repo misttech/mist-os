@@ -8,7 +8,6 @@
 #include <lib/fzl/vmo-mapper.h>
 #include <lib/scheduler/role.h>
 #include <lib/syslog/cpp/macros.h>
-#include <lib/trace/event.h>
 #include <lib/watchdog/operations.h>
 #include <lib/watchdog/watchdog.h>
 #include <lib/zx/result.h>
@@ -41,6 +40,7 @@
 #include "src/storage/blobfs/format.h"
 #include "src/storage/blobfs/loader_info.h"
 #include "src/storage/blobfs/transfer_buffer.h"
+#include "src/storage/lib/trace/trace.h"
 #include "src/storage/lib/vfs/cpp/ticker.h"
 
 namespace blobfs {

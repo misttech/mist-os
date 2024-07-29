@@ -44,7 +44,6 @@
 #include "src/storage/minfs/format.h"
 #include "src/storage/minfs/minfs.h"
 #include "src/storage/minfs/superblock.h"
-#include "src/storage/minfs/trace.h"
 #include "src/storage/minfs/transaction_limits.h"
 #include "src/storage/minfs/writeback.h"
 

@@ -8,7 +8,6 @@
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <lib/fdio/cpp/caller.h>
 #include <lib/syslog/cpp/macros.h>
-#include <lib/trace/event.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -23,6 +22,7 @@
 #include <storage/buffer/vmo_buffer.h>
 #include <storage/operation/operation.h>
 
+#include "src/storage/lib/trace/trace.h"
 #include "src/storage/minfs/format.h"
 
 namespace minfs {

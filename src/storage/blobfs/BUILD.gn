@@ -73,7 +73,6 @@ static_library("blobfs") {
     "iterator/node_populator.cc",
     "iterator/vector_extent_iterator.cc",
     "iterator/vector_extent_iterator.h",
-    "trace.h",
   ]
   public_deps = [
     # format.h includes digest.h.
@@ -100,6 +99,7 @@ static_library("blobfs") {
     "//src/lib/digest",
     "//src/storage/fvm",
     "//src/storage/lib/disk_inspector",
+    "//src/storage/lib/trace:cpp",
     "//src/storage/lib/vfs/cpp/journal",
     "//src/storage/lib/vfs/cpp/transaction",
     "//zircon/system/ulib/bitmap",
@@ -186,8 +186,6 @@ static_library("blobfs") {
       "//zircon/system/ulib/async-loop:async-loop-default",
       "//zircon/system/ulib/fzl",
       "//zircon/system/ulib/sync",
-      "//zircon/system/ulib/trace",
-      "//zircon/system/ulib/trace-engine",
       "//zircon/system/ulib/trace-provider",
       "//zircon/system/ulib/zx",
     ]
@@ -235,8 +233,8 @@ source_set("decompressor_impl") {
     "//sdk/lib/scheduler/cpp",
     "//sdk/lib/syslog/cpp",
     "//src/lib/chunked-compression",
+    "//src/storage/lib/trace:cpp",
     "//zircon/system/ulib/fzl",
-    "//zircon/system/ulib/trace",
     "//zircon/system/ulib/zx",
     "//zircon/third_party/ulib/safemath",
   ]

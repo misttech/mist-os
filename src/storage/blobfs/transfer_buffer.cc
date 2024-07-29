@@ -5,9 +5,10 @@
 #include "src/storage/blobfs/transfer_buffer.h"
 
 #include <lib/syslog/cpp/macros.h>
-#include <lib/trace/event.h>
 
 #include <safemath/safe_conversions.h>
+
+#include "src/storage/lib/trace/trace.h"
 
 namespace blobfs {
 

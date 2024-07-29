@@ -6,12 +6,15 @@
 
 #include <lib/fit/defer.h>
 #include <lib/syslog/cpp/macros.h>
+#include <lib/zx/result.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
+#include <zircon/assert.h>
+#include <zircon/errors.h>
 #include <zircon/time.h>
 
 #include <memory>
@@ -20,10 +23,8 @@
 
 #include <fbl/algorithm.h>
 
-#include "lib/zx/result.h"
+#include "src/storage/lib/trace/trace.h"
 #include "src/storage/lib/vfs/cpp/vfs_types.h"
-#include "zircon/assert.h"
-#include "zircon/errors.h"
 
 #ifdef __Fuchsia__
 #include <zircon/syscalls.h>

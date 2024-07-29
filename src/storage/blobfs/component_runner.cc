@@ -16,6 +16,7 @@
 #include "src/storage/blobfs/service/health_check.h"
 #include "src/storage/blobfs/service/lifecycle.h"
 #include "src/storage/blobfs/service/startup.h"
+#include "src/storage/lib/trace/trace.h"
 #include "src/storage/lib/vfs/cpp/fuchsia_vfs.h"
 #include "src/storage/lib/vfs/cpp/remote_dir.h"
 
@@ -215,7 +216,8 @@ zx::result<> ComponentRunner::Configure(std::unique_ptr<BlockDevice> device,
   // Specify to fall back to DeepCopy mode instead of Live mode (the default) on failures to send
   // a Frozen copy of the tree (e.g. if we could not create a child copy of the backing VMO).
   // This helps prevent any issues with querying the inspect tree while the filesystem is under
-  // load, since snapshots at the receiving end must be consistent. See https://fxbug.dev/42135165 for details.
+  // load, since snapshots at the receiving end must be consistent. See https://fxbug.dev/42135165
+  // for details.
   exposed_inspector_.emplace(inspect::ComponentInspector{
       loop_.dispatcher(),
       {.inspector = *blobfs_->GetMetrics()->inspector(),
