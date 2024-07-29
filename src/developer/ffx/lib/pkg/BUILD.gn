@@ -55,7 +55,9 @@ rustc_library("pkg") {
     "//third_party/rust_crates:async-lock",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:nix",
     "//third_party/rust_crates:percent-encoding",
+    "//third_party/rust_crates:serde",
     "//third_party/rust_crates:serde_json",
     "//third_party/rust_crates:tracing",
     "//third_party/rust_crates:tuf",
@@ -68,10 +70,12 @@ rustc_library("pkg") {
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:maplit",
     "//third_party/rust_crates:pretty_assertions",
+    "//third_party/rust_crates:tempfile",
   ]
 
   sources = [
     "src/config.rs",
+    "src/instance.rs",
     "src/lib.rs",
     "src/metrics.rs",
     "src/repo.rs",
