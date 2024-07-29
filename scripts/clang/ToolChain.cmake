@@ -22,7 +22,6 @@ set(HOST_PLATFORM "${HOST_OS}-${HOST_CPU}")
 
 set(CLANG_PREFIX "${FUCHSIA_SOURCE_DIR}/prebuilt/third_party/clang/${HOST_PLATFORM}/bin")
 
-set(GOMA_DIR "${FUCHSIA_SOURCE_DIR}/prebuilt/third_party/goma/${HOST_PLATFORM}")
 set(PYTHON_DIR "${FUCHSIA_SOURCE_DIR}/prebuilt/third_party/python3/${HOST_PLATFORM}")
 
 if(NOT CLANG_TARGET)
@@ -92,12 +91,6 @@ set(CMAKE_OBJDUMP "${CLANG_PREFIX}/llvm-objdump" CACHE PATH "")
 set(CMAKE_RANLIB "${CLANG_PREFIX}/llvm-ranlib" CACHE PATH "")
 set(CMAKE_READELF "${CLANG_PREFIX}/llvm-readelf" CACHE PATH "")
 set(CMAKE_STRIP "${CLANG_PREFIX}/llvm-strip" CACHE PATH "")
-
-if(USE_GOMA)
-  set(CMAKE_C_COMPILER_LAUNCHER "${GOMA_DIR}/gomacc" CACHE PATH "")
-  set(CMAKE_CXX_COMPILER_LAUNCHER "${GOMA_DIR}/gomacc" CACHE PATH "")
-  set(CMAKE_ASM_COMPILER_LAUNCHER "${GOMA_DIR}/gomacc" CACHE PATH "")
-endif()
 
 set(Python3_ROOT_DIR "${PYTHON_DIR}" CACHE PATH "")
 set(Python3_FIND_STRATEGY LOCATION CACHE STRING "")
