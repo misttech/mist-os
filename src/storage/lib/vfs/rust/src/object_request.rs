@@ -67,7 +67,7 @@ impl ObjectRequest {
         self.what_to_send
     }
 
-    pub(crate) fn attributes(&self) -> fio::NodeAttributesQuery {
+    pub fn attributes(&self) -> fio::NodeAttributesQuery {
         self.attributes
     }
 

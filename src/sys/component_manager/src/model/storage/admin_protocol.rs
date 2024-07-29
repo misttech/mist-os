@@ -1044,15 +1044,15 @@ mod tests {
             });
         }
 
-        fn open2(
+        fn open3(
             self: Arc<Self>,
             scope: ExecutionScope,
             _path: Path,
-            protocols: fio::ConnectionProtocols,
+            flags: fio::Flags,
             object_request: ObjectRequestRef<'_>,
         ) -> Result<(), zx::Status> {
             object_request.take().handle(|object_request| {
-                object_request.spawn_connection(scope, self, protocols, ImmutableConnection::create)
+                object_request.spawn_connection(scope, self, flags, ImmutableConnection::create)
             });
             Ok(())
         }

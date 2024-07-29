@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::common::{inherit_rights_for_clone, send_on_open_with_error, CreationMode};
+use crate::common::{inherit_rights_for_clone, send_on_open_with_error};
 use crate::directory::common::check_child_connection_flags;
 use crate::directory::entry_container::{Directory, DirectoryWatcher};
 use crate::directory::traversal_position::TraversalPosition;
@@ -11,17 +11,17 @@ use crate::execution_scope::{yield_to_executor, ExecutionScope};
 use crate::node::OpenNode;
 use crate::object_request::Representation;
 use crate::path::Path;
-use crate::{ObjectRequestRef, ProtocolsExt, ToObjectRequest};
 
 use anyhow::Error;
 use fidl::endpoints::ServerEnd;
+use fidl::epitaph::ChannelEpitaphExt;
 use fidl_fuchsia_io as fio;
 use fuchsia_zircon_status::Status;
 use std::convert::TryInto as _;
 use storage_trace::{self as trace, TraceFutureExt};
 
 #[cfg(fuchsia_api_level_at_least = "HEAD")]
-use crate::ObjectRequest;
+use crate::{common::CreationMode, ObjectRequest, ObjectRequestRef, ProtocolsExt};
 
 /// Return type for `BaseConnection::handle_request`.
 pub enum ConnectionState {
@@ -189,48 +189,13 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
                 yield_to_executor().await;
             }
             fio::DirectoryRequest::Open2 {
-                path,
-                mut protocols,
+                path: _,
+                protocols: _,
                 object_request,
                 control_handle: _,
             } => {
-                {
-                    trace::duration!(c"storage", c"Directory::Open2");
-                    if let fio::ConnectionProtocols::Node(fio::NodeOptions { rights, .. }) =
-                        &mut protocols
-                    {
-                        if rights.is_none() {
-                            // If no rights were set, it is the equivalent of opening the connection
-                            // with empty rights. The rights need to be set to some value as the
-                            // ProtocolsExt library expects some value when converting the protocols
-                            // to Directory / File / Node / Symlink options.
-                            *rights = Some(fio::Operations::empty());
-                        }
-                    }
-                    // If optional_rights is set, remove any rights that are not present on the
-                    // current connection.
-                    if let fio::ConnectionProtocols::Node(fio::NodeOptions {
-                        protocols:
-                            Some(fio::NodeProtocols {
-                                directory:
-                                    Some(fio::DirectoryProtocolOptions {
-                                        optional_rights: Some(optional_rights),
-                                        ..
-                                    }),
-                                ..
-                            }),
-                        ..
-                    }) = &mut protocols
-                    {
-                        *optional_rights &= self.options.rights;
-                    }
-                    protocols
-                        .to_object_request(object_request)
-                        .handle(|req| self.handle_open2(path, protocols, req));
-                }
-                // Since open typically spawns a task, yield to the executor now to give that task a
-                // chance to run before we try and process the next request for this directory.
-                yield_to_executor().await;
+                trace::duration!(c"storage", c"Directory::Open2");
+                let _: Result<_, _> = object_request.close_with_epitaph(Status::NOT_SUPPORTED);
             }
             fio::DirectoryRequest::AdvisoryLock { request: _, responder } => {
                 trace::duration!(c"storage", c"Directory::AdvisoryLock");
@@ -378,53 +343,6 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
         // It is up to the open method to handle OPEN_FLAG_DESCRIBE from this point on.
         let directory = self.directory.clone();
         directory.open(self.scope.clone(), flags, path, server_end);
-    }
-
-    fn handle_open2(
-        &self,
-        path: String,
-        protocols: fio::ConnectionProtocols,
-        object_request: ObjectRequestRef<'_>,
-    ) -> Result<(), Status> {
-        let path = Path::validate_and_split(path)?;
-
-        if let Some(rights) = protocols.rights() {
-            if rights.intersects(!self.options.rights) {
-                return Err(Status::ACCESS_DENIED);
-            }
-        }
-
-        // If requesting attributes, check permission.
-        if !object_request.attributes().is_empty()
-            && !self.options.rights.contains(fio::Operations::GET_ATTRIBUTES)
-        {
-            return Err(Status::ACCESS_DENIED);
-        }
-
-        // If creating an object, it's not legal to specify more than one protocol.
-        if protocols.creation_mode() != CreationMode::Never
-            && ((protocols.is_file_allowed() && protocols.is_dir_allowed())
-                || protocols.is_symlink_allowed())
-        {
-            return Err(Status::INVALID_ARGS);
-        }
-
-        if object_request.create_attributes().is_some()
-            && protocols.creation_mode() == CreationMode::Never
-        {
-            return Err(Status::INVALID_ARGS);
-        }
-
-        if path.is_dot() {
-            if !protocols.is_node() && !protocols.is_dir_allowed() {
-                return Err(Status::INVALID_ARGS);
-            }
-            if protocols.creation_mode() == CreationMode::Always {
-                return Err(Status::ALREADY_EXISTS);
-            }
-        }
-
-        self.directory.clone().open2(self.scope.clone(), path, protocols, object_request)
     }
 
     #[cfg(fuchsia_api_level_at_least = "HEAD")]

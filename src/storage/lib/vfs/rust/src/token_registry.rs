@@ -307,11 +307,11 @@ mod tests {
             ) {
             }
 
-            fn open2(
+            fn open3(
                 self: Arc<Self>,
                 _scope: ExecutionScope,
                 _path: Path,
-                _protocols: fio::ConnectionProtocols,
+                _flags: fio::Flags,
                 _object_request: ObjectRequestRef<'_>,
             ) -> Result<(), Status> {
                 unimplemented!("Not implemented");
