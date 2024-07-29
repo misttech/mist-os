@@ -14,3 +14,8 @@ pub mod clock;
 pub mod series;
 
 pub use crate::experimental::vec1::Vec1;
+
+pub mod prelude {
+    pub use crate::experimental::clock::{DurationExt as _, QuantaExt as _, TimestampExt as _};
+    pub use crate::experimental::series::{RoundRobinSampler, Sampler};
+}
