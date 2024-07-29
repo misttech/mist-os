@@ -219,19 +219,30 @@ impl<I: IpExt, BC: FilterBindingsContext, E: Default> Table<I, BC, E> {
         &self,
         bindings_ctx: &BC,
         packet: &P,
-    ) -> Option<Connection<I, BC, E>> {
-        let packet = PacketMetadata::new(packet)?;
+    ) -> Result<Option<Connection<I, BC, E>>, GetConnectionError<I, BC, E>> {
+        let Some(packet) = PacketMetadata::new(packet) else {
+            return Ok(None);
+        };
 
         let mut connection = match self.inner.lock().table.get(&packet.tuple) {
             Some(connection) => Connection::Shared(connection.clone()),
-            None => Connection::Exclusive(ConnectionExclusive::from_deconstructed_packet(
-                bindings_ctx,
-                &packet,
-            )?),
+            None => Connection::Exclusive(
+                match ConnectionExclusive::from_deconstructed_packet(bindings_ctx, &packet) {
+                    None => return Ok(None),
+                    Some(c) => c,
+                },
+            ),
         };
 
         match connection.update(bindings_ctx, &packet) {
-            Ok(()) => Some(connection),
+            Ok(ConnectionUpdateAction::NoAction) => Ok(Some(connection)),
+            Ok(ConnectionUpdateAction::RemoveEntry) => match connection {
+                Connection::Exclusive(_) => Ok(None),
+                Connection::Shared(_) => {
+                    let _ = self.inner.lock().table.remove(&packet.tuple);
+                    Ok(None)
+                }
+            },
             Err(e) => match e {
                 ConnectionUpdateError::NonMatchingTuple => {
                     panic!(
@@ -241,6 +252,10 @@ impl<I: IpExt, BC: FilterBindingsContext, E: Default> Table<I, BC, E> {
                         connection.reply_tuple()
                     );
                 }
+                ConnectionUpdateError::InvalidPacket => {
+                    Err(GetConnectionError::InvalidPacket(connection))
+                }
+                ConnectionUpdateError::DropRequired => Err(GetConnectionError::DropRequired),
             },
         }
     }
@@ -420,11 +435,39 @@ pub(crate) enum FinalizeConnectionError {
     TableFull,
 }
 
+/// Type to track additional processing required after updating a connection.
+#[derive(Debug, PartialEq, Eq)]
+enum ConnectionUpdateAction {
+    /// Processing completed and no further action necessary.
+    NoAction,
+
+    /// The entry for this connection should be removed from the conntrack table.
+    RemoveEntry,
+}
+
 /// An error returned from [`Connection::update`].
-#[derive(Debug)]
-pub(crate) enum ConnectionUpdateError {
+#[derive(Debug, PartialEq, Eq)]
+enum ConnectionUpdateError {
     /// The provided tuple doesn't belong to the connection being updated.
     NonMatchingTuple,
+
+    /// The packet was invalid. The caller may decide whether to drop this
+    /// packet or not.
+    InvalidPacket,
+
+    /// This packet must be dropped to maintain correctness.
+    DropRequired,
+}
+
+/// An error returned from [`Table::get_connection_for_packet_and_update`].
+#[derive(Derivative)]
+#[derivative(Debug(bound = "E: Debug"))]
+pub(crate) enum GetConnectionError<I: IpExt, BT: FilterBindingsTypes, E> {
+    /// The packet was invalid. The caller may decide whether to drop it or not.
+    InvalidPacket(Connection<I, BT, E>),
+
+    /// The caller must drop the packet.
+    DropRequired,
 }
 
 /// A `Connection` contains all of the information about a single connection
@@ -505,7 +548,7 @@ impl<I: IpExt, BC: FilterBindingsContext, E> Connection<I, BC, E> {
         &mut self,
         bindings_ctx: &BC,
         packet: &PacketMetadata<I>,
-    ) -> Result<(), ConnectionUpdateError> {
+    ) -> Result<ConnectionUpdateAction, ConnectionUpdateError> {
         let direction = match self.direction(&packet.tuple) {
             Some(d) => d,
             None => return Err(ConnectionUpdateError::NonMatchingTuple),
@@ -571,20 +614,26 @@ enum ProtocolState {
 }
 
 impl ProtocolState {
-    fn update(&mut self, dir: ConnectionDirection, transport_data: &TransportPacketData) {
+    fn update(
+        &mut self,
+        dir: ConnectionDirection,
+        transport_data: &TransportPacketData,
+    ) -> Result<ConnectionUpdateAction, ConnectionUpdateError> {
         match self {
             ProtocolState::Tcp(tcp_conn) => {
                 let (segment, payload_len) = assert_matches!(
                     transport_data,
                     TransportPacketData::Tcp { segment, payload_len, .. } => (segment, payload_len)
                 );
-                tcp_conn.update(&segment, *payload_len, dir);
+                tcp_conn.update(&segment, *payload_len, dir)
             }
             ProtocolState::Udp { established } | ProtocolState::Other { established } => {
                 match dir {
                     ConnectionDirection::Original => (),
                     ConnectionDirection::Reply => *established = true,
                 }
+
+                Ok(ConnectionUpdateAction::NoAction)
             }
         }
     }
@@ -608,14 +657,12 @@ impl<BT: FilterBindingsTypes> ConnectionState<BT> {
         dir: ConnectionDirection,
         transport_data: &TransportPacketData,
         now: BT::Instant,
-    ) -> Result<(), ConnectionUpdateError> {
+    ) -> Result<ConnectionUpdateAction, ConnectionUpdateError> {
         if self.last_packet_time < now {
             self.last_packet_time = now;
         }
 
-        self.protocol_state.update(dir, transport_data);
-
-        Ok(())
+        self.protocol_state.update(dir, transport_data)
     }
 
     fn is_established(&self) -> bool {
@@ -667,6 +714,7 @@ impl<I: IpExt, BC: FilterBindingsContext, E: Default> ConnectionExclusive<I, BC,
         PacketMetadata { tuple, transport_data }: &PacketMetadata<I>,
     ) -> Option<Self> {
         let reply_tuple = tuple.clone().invert();
+        let self_connected = reply_tuple == *tuple;
 
         Some(Self {
             inner: ConnectionCommon {
@@ -682,7 +730,11 @@ impl<I: IpExt, BC: FilterBindingsContext, E: Default> ConnectionExclusive<I, BC,
                             .tcp_segment_and_len()
                             .expect("protocol was TCP, so transport data should have TCP info");
 
-                        ProtocolState::Tcp(tcp::Connection::new(segment, payload_len)?)
+                        ProtocolState::Tcp(tcp::Connection::new(
+                            segment,
+                            payload_len,
+                            self_connected,
+                        )?)
                     }
                     TransportProtocol::Udp => ProtocolState::Udp { established: false },
                     TransportProtocol::Icmp | TransportProtocol::Other(_) => {
@@ -1091,7 +1143,10 @@ mod tests {
             ConnectionKind::Shared => Connection::Shared(connection.make_shared()),
         };
 
-        assert_matches!(connection.update(&bindings_ctx, &packet), Ok(()));
+        assert_matches!(
+            connection.update(&bindings_ctx, &packet),
+            Ok(ConnectionUpdateAction::NoAction)
+        );
         let state = connection.state();
         assert!(!state.is_established());
         assert_eq!(state.last_packet_time.offset, Duration::from_secs(1));
@@ -1099,7 +1154,10 @@ mod tests {
         // Tuple in reply direction should set established to true and obviously
         // update last packet time.
         bindings_ctx.sleep(Duration::from_secs(1));
-        assert_matches!(connection.update(&bindings_ctx, &reply_packet), Ok(()));
+        assert_matches!(
+            connection.update(&bindings_ctx, &reply_packet),
+            Ok(ConnectionUpdateAction::NoAction)
+        );
         let state = connection.state();
         assert!(state.is_established());
         assert_eq!(state.last_packet_time.offset, Duration::from_secs(2));
@@ -1138,7 +1196,8 @@ mod tests {
 
         let conn = table
             .get_connection_for_packet_and_update(&bindings_ctx, &packet)
-            .expect("packet should be valid");
+            .expect("packet should be valid")
+            .expect("connection should be present");
         let state = conn.state();
         assert!(!state.is_established());
         assert_eq!(state.last_packet_time.offset, Duration::from_secs(1));
@@ -1158,7 +1217,9 @@ mod tests {
         // We should now get a shared connection back for packets in either
         // direction now that the connection is present in the table.
         bindings_ctx.sleep(Duration::from_secs(1));
-        let conn = table.get_connection_for_packet_and_update(&bindings_ctx, &packet);
+        let conn = table
+            .get_connection_for_packet_and_update(&bindings_ctx, &packet)
+            .expect("packet should be valid");
         let conn = assert_matches!(conn, Some(conn) => conn);
         let state = conn.state();
         assert!(!state.is_established());
@@ -1166,7 +1227,9 @@ mod tests {
         let conn = assert_matches!(conn, Connection::Shared(conn) => conn);
 
         bindings_ctx.sleep(Duration::from_secs(1));
-        let reply_conn = table.get_connection_for_packet_and_update(&bindings_ctx, &reply_packet);
+        let reply_conn = table
+            .get_connection_for_packet_and_update(&bindings_ctx, &reply_packet)
+            .expect("packet should be valid");
         let reply_conn = assert_matches!(reply_conn, Some(conn) => conn);
         let state = reply_conn.state();
         assert!(state.is_established());
@@ -1177,7 +1240,10 @@ mod tests {
         assert!(Arc::ptr_eq(&conn, &reply_conn));
 
         // Inserting the connection a second time shouldn't change the map.
-        let conn = table.get_connection_for_packet_and_update(&bindings_ctx, &packet).unwrap();
+        let conn = table
+            .get_connection_for_packet_and_update(&bindings_ctx, &packet)
+            .expect("packet should be valid")
+            .unwrap();
         assert_matches!(table.finalize_connection(&mut bindings_ctx, conn), Ok(false));
         assert!(table.contains_tuple(&original_tuple));
         assert!(table.contains_tuple(&reply_tuple));
@@ -1300,7 +1366,8 @@ mod tests {
         let conn = core_ctx
             .conntrack()
             .get_connection_for_packet_and_update(&bindings_ctx, &first_packet)
-            .expect("packet should be valid");
+            .expect("packet should be valid")
+            .expect("packet should be trackable");
         assert!(core_ctx
             .conntrack()
             .finalize_connection(&mut bindings_ctx, conn)
@@ -1308,7 +1375,8 @@ mod tests {
         let conn = core_ctx
             .conntrack()
             .get_connection_for_packet_and_update(&bindings_ctx, &second_packet)
-            .expect("packet should be valid");
+            .expect("packet should be valid")
+            .expect("packet should be trackable");
         assert!(core_ctx
             .conntrack()
             .finalize_connection(&mut bindings_ctx, conn)
@@ -1333,7 +1401,8 @@ mod tests {
         let conn = core_ctx
             .conntrack()
             .get_connection_for_packet_and_update(&bindings_ctx, &second_packet_reply)
-            .expect("packet should be valid");
+            .expect("packet should be valid")
+            .expect("packet should be trackable");
         assert!(conn.state().is_established());
         assert!(!core_ctx
             .conntrack()
@@ -1423,7 +1492,8 @@ mod tests {
             let (packet, reply_packet) = make_packets(i);
             let conn = table
                 .get_connection_for_packet_and_update(&bindings_ctx, &packet)
-                .expect("packet should be valid");
+                .expect("packet should be valid")
+                .expect("packet should be trackable");
             assert!(table
                 .finalize_connection(&mut bindings_ctx, conn)
                 .expect("connection finalize should succeed"));
@@ -1433,7 +1503,8 @@ mod tests {
             if established {
                 let conn = table
                     .get_connection_for_packet_and_update(&bindings_ctx, &reply_packet)
-                    .expect("packet should be valid");
+                    .expect("packet should be valid")
+                    .expect("packet should be trackable");
                 assert!(!table
                     .finalize_connection(&mut bindings_ctx, conn)
                     .expect("connection finalize should succeed"));
@@ -1448,8 +1519,8 @@ mod tests {
         let (packet, _) = make_packets(MAXIMUM_CONNECTIONS);
         let conn = table
             .get_connection_for_packet_and_update(&bindings_ctx, &packet)
-            .expect("packet should be valid");
-
+            .expect("packet should be valid")
+            .expect("packet should be trackable");
         if established {
             // Inserting a new connection should fail because it would grow the
             // table.
@@ -1463,7 +1534,8 @@ mod tests {
             let (packet, _) = make_packets(MAXIMUM_CONNECTIONS - 1);
             let conn = table
                 .get_connection_for_packet_and_update(&bindings_ctx, &packet)
-                .expect("packet should be valid");
+                .expect("packet should be valid")
+                .expect("packet should be trackable");
             assert!(!table
                 .finalize_connection(&mut bindings_ctx, conn)
                 .expect("connection finalize should succeed"));
@@ -1504,7 +1576,8 @@ mod tests {
         let (packet, _) = make_packets::<I>(0);
         let conn = table
             .get_connection_for_packet_and_update(&bindings_ctx, &packet)
-            .expect("packet should be valid");
+            .expect("packet should be valid")
+            .expect("packet should be trackable");
         assert!(!conn.state().is_established());
         assert!(table
             .finalize_connection(&mut bindings_ctx, conn)
@@ -1548,14 +1621,16 @@ mod tests {
             let (packet, reply_packet) = make_packets(i);
             let conn = table
                 .get_connection_for_packet_and_update(&bindings_ctx, &packet)
-                .expect("packet should be valid");
+                .expect("packet should be valid")
+                .expect("packet should be trackable");
             assert!(table
                 .finalize_connection(&mut bindings_ctx, conn)
                 .expect("connection finalize should succeed"));
 
             let conn = table
                 .get_connection_for_packet_and_update(&bindings_ctx, &reply_packet)
-                .expect("packet should be valid");
+                .expect("packet should be valid")
+                .unwrap();
             assert!(!table
                 .finalize_connection(&mut bindings_ctx, conn)
                 .expect("connection finalize should succeed"));
@@ -1568,13 +1643,15 @@ mod tests {
         let (packet, reply_packet) = make_packets(MAXIMUM_CONNECTIONS);
         let conn = table
             .get_connection_for_packet_and_update(&bindings_ctx, &packet)
-            .expect("packet should be valid");
+            .expect("packet should be valid")
+            .expect("packet should be trackable");
         assert!(table
             .finalize_connection(&mut bindings_ctx, conn)
             .expect("connection finalize should succeed"));
         let conn = table
             .get_connection_for_packet_and_update(&bindings_ctx, &reply_packet)
-            .expect("packet should be valid");
+            .expect("packet should be valid")
+            .expect("packet should be trackable");
         assert!(!table
             .finalize_connection(&mut bindings_ctx, conn)
             .expect("connection finalize should succeed"));
@@ -1584,7 +1661,8 @@ mod tests {
         let (packet, _) = make_packets(MAXIMUM_CONNECTIONS + 1);
         let conn = table
             .get_connection_for_packet_and_update(&bindings_ctx, &packet)
-            .expect("packet should be valid");
+            .expect("packet should be valid")
+            .expect("packet should be trackable");
         assert_matches!(
             table.finalize_connection(&mut bindings_ctx, conn),
             Err(FinalizeConnectionError::TableFull)
@@ -1621,7 +1699,8 @@ mod tests {
 
         let conn = table
             .get_connection_for_packet_and_update(&bindings_ctx, &packet)
-            .expect("packet should be valid");
+            .expect("packet should be valid")
+            .expect("packet should be trackable");
         let state = conn.state();
         // Since we can't differentiate between the original and reply tuple,
         // the connection ends up being marked established immediately.

@@ -22,7 +22,7 @@ use crate::packets::{IpPacket, MaybeTransportPacketMut as _, TransportPacketMut 
 use crate::state::Hook;
 
 /// The NAT configuration for a given conntrack connection.
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct NatConfig {
     /// NAT is configured exactly once for a given connection, for the first
     /// packet encountered on that connection. This is not to say that all
@@ -820,6 +820,7 @@ mod tests {
         let pre_nat_packet = packet.clone();
         let mut conn = conntrack
             .get_connection_for_packet_and_update(&bindings_ctx, &packet)
+            .expect("packet should be valid")
             .expect("packet should be trackable");
         let original = conn.original_tuple().clone();
 
@@ -945,6 +946,7 @@ mod tests {
         // should be dropped.
         let conn = table
             .get_connection_for_packet_and_update(&bindings_ctx, &packet)
+            .expect("packet should be valid")
             .expect("packet should be trackable");
         assert!(table
             .finalize_connection(&mut bindings_ctx, conn)
@@ -967,6 +969,7 @@ mod tests {
             let packet = packet_with_src_port(port);
             let conn = table
                 .get_connection_for_packet_and_update(&bindings_ctx, &packet)
+                .expect("packet should be valid")
                 .expect("packet should be trackable");
             assert!(table
                 .finalize_connection(&mut bindings_ctx, conn)

@@ -12,6 +12,7 @@ use net_types::ip::{GenericOverIp, Ip, IpVersionMarker};
 use netstack3_base::{AnyDevice, DeviceIdContext, HandleableTimer};
 use packet_formats::ip::IpExt;
 
+use crate::conntrack::GetConnectionError;
 use crate::context::{FilterBindingsContext, FilterBindingsTypes, FilterIpContext};
 use crate::matchers::InterfaceProperties;
 use crate::packets::{IpPacket, MaybeTransportPacket};
@@ -326,7 +327,16 @@ where
         this.with_filter_state_and_nat_ctx(|state, core_ctx| {
             // There isn't going to be an existing connection in the metadata
             // before this hook, so we don't have to look.
-            let conn = state.conntrack.get_connection_for_packet_and_update(bindings_ctx, packet);
+            let conn =
+                match state.conntrack.get_connection_for_packet_and_update(bindings_ctx, packet) {
+                    Ok(c) => c,
+                    // TODO(https://fxbug.dev/328064909): Support configurable
+                    // dropping of invalid packets.
+                    Err(GetConnectionError::InvalidPacket(c)) => Some(c),
+                    Err(GetConnectionError::DropRequired) => {
+                        return IngressVerdict::Verdict(Verdict::Drop)
+                    }
+                };
 
             let mut verdict = match check_routines_for_ingress(
                 &state.installed_routines.get().ip.ingress,
@@ -382,11 +392,21 @@ where
     {
         let Self(this) = self;
         this.with_filter_state(|state| {
-            let conn = metadata.take_conntrack_connection().or_else(|| {
+            let conn = match metadata.take_conntrack_connection() {
+                Some(c) => Some(c),
                 // If packet reassembly happened, then there won't be a
                 // connection in the metadata.
-                state.conntrack.get_connection_for_packet_and_update(bindings_ctx, packet)
-            });
+                None => {
+                    match state.conntrack.get_connection_for_packet_and_update(bindings_ctx, packet)
+                    {
+                        Ok(c) => c,
+                        // TODO(https://fxbug.dev/328064909): Support
+                        // configurable dropping of invalid packets.
+                        Err(GetConnectionError::InvalidPacket(c)) => Some(c),
+                        Err(GetConnectionError::DropRequired) => return Verdict::Drop,
+                    }
+                }
+            };
 
             let verdict = match check_routines_for_hook(
                 &state.installed_routines.get().ip.local_ingress,
@@ -446,7 +466,14 @@ where
         this.with_filter_state_and_nat_ctx(|state, core_ctx| {
             // There isn't going to be an existing connection in the metadata
             // before this hook, so we don't have to look.
-            let conn = state.conntrack.get_connection_for_packet_and_update(bindings_ctx, packet);
+            let conn =
+                match state.conntrack.get_connection_for_packet_and_update(bindings_ctx, packet) {
+                    Ok(c) => c,
+                    // TODO(https://fxbug.dev/328064909): Support configurable
+                    // dropping of invalid packets.
+                    Err(GetConnectionError::InvalidPacket(c)) => Some(c),
+                    Err(GetConnectionError::DropRequired) => return Verdict::Drop,
+                };
 
             let verdict = match check_routines_for_hook(
                 &state.installed_routines.get().ip.local_egress,
@@ -496,11 +523,23 @@ where
         let Self(this) = self;
         (
             this.with_filter_state(|state| {
-                let conn = metadata.take_conntrack_connection().or_else(|| {
+                let conn = match metadata.take_conntrack_connection() {
+                    Some(c) => Some(c),
                     // If packet reassembly happened, then there won't be a
                     // connection in the metadata.
-                    state.conntrack.get_connection_for_packet_and_update(bindings_ctx, packet)
-                });
+                    None => {
+                        match state
+                            .conntrack
+                            .get_connection_for_packet_and_update(bindings_ctx, packet)
+                        {
+                            Ok(c) => c,
+                            // TODO(https://fxbug.dev/328064909): Support
+                            // configurable dropping of invalid packets.
+                            Err(GetConnectionError::InvalidPacket(c)) => Some(c),
+                            Err(GetConnectionError::DropRequired) => return Verdict::Drop,
+                        }
+                    }
+                };
 
                 let verdict = match check_routines_for_hook(
                     &state.installed_routines.get().ip.egress,

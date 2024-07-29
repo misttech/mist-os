@@ -165,13 +165,7 @@ impl<P: Payload> Segment<P> {
     ///   SEG.LEN = the number of octets occupied by the data in the segment
     ///   (counting SYN and FIN)
     pub fn len(&self) -> u32 {
-        let Self { header: SegmentHeader { control, .. }, data } = self;
-
-        // The following unwrap and addition are fine because:
-        // - `u32::from(has_control_len)` is 0 or 1.
-        // - `self.data.len() <= 2^31`.
-        let has_control_len = control.map(Control::has_sequence_no).unwrap_or(false);
-        u32::try_from(data.len()).unwrap() + u32::from(has_control_len)
+        self.header.len(self.data.len())
     }
 
     /// Returns the part of the incoming segment within the receive window.
@@ -261,6 +255,19 @@ impl<P: Payload> Segment<P> {
 }
 
 impl SegmentHeader {
+    /// Returns the length of the segment in sequence number space.
+    ///
+    /// Per RFC 793 (https://tools.ietf.org/html/rfc793#page-25):
+    ///   SEG.LEN = the number of octets occupied by the data in the segment
+    ///   (counting SYN and FIN)
+    pub fn len(&self, payload_len: usize) -> u32 {
+        // The following unwrap and addition are fine because:
+        // - `u32::from(has_control_len)` is 0 or 1.
+        // - `self.data.len() <= 2^31`.
+        let has_control_len = self.control.map(Control::has_sequence_no).unwrap_or(false);
+        u32::try_from(payload_len).unwrap() + u32::from(has_control_len)
+    }
+
     /// Create a `SegmentHeader` from the provided builder and data length.  The
     /// options will be set to their default values.
     pub fn from_builder<A: IpAddress>(
