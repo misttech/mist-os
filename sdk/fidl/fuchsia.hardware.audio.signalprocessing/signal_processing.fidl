@@ -438,6 +438,9 @@ closed protocol SignalProcessing {
 closed protocol Reader {
     /// Returns a vector of supported processing elements.
     /// Must return one or more processing elements, or `ZX_ERR_NOT_SUPPORTED`.
+    /// If `GetTopologies` returns one or more topologies, then `GetElements` must return one or
+    /// more elements.
+    // TODO(https://fxbug.dev/355468611): Don't rely on errors to detect signalprocessing support.
     strict GetElements() -> (struct {
         processing_elements vector<Element>:MAX_COUNT_PROCESSING_ELEMENTS;
     }) error zx.Status;
@@ -463,8 +466,9 @@ closed protocol Reader {
     /// the list with `SetTopology`.
     /// If only one topology is returned, then the topology definition is informational only since
     /// the one and only topology used can't be changed with `SetTopology`.
-    /// If `GetElements` returns one or more elements, `GetTopologies` must return one or
+    /// If `GetElements` returns one or more elements, then `GetTopologies` must return one or
     /// more topologies.
+    // TODO(https://fxbug.dev/355468611): Don't rely on errors to detect signalprocessing support.
     strict GetTopologies() -> (struct {
         topologies vector<Topology>:MAX_COUNT_TOPOLOGIES;
     }) error zx.Status;
