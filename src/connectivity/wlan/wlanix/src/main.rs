@@ -245,6 +245,7 @@ async fn handle_wifi_request<I: IfaceManager>(
     req: fidl_wlanix::WifiRequest,
     state: Arc<Mutex<WifiState>>,
     iface_manager: Arc<I>,
+    telemetry_sender: TelemetrySender,
 ) -> Result<(), Error> {
     match req {
         fidl_wlanix::WifiRequest::RegisterEventCallback { payload, .. } => {
@@ -263,6 +264,9 @@ async fn handle_wifi_request<I: IfaceManager>(
                 &state.callbacks[..],
                 "OnStart",
             );
+
+            let event = wlan_telemetry::ClientConnectionsToggleEvent::Enabled;
+            telemetry_sender.send(TelemetryEvent::ClientConnectionsToggle { event });
         }
         fidl_wlanix::WifiRequest::Stop { responder } => {
             info!("fidl_wlanix::WifiRequest::Stop");
@@ -282,6 +286,9 @@ async fn handle_wifi_request<I: IfaceManager>(
                 &state.callbacks[..],
                 "OnStop",
             );
+
+            let event = wlan_telemetry::ClientConnectionsToggleEvent::Disabled;
+            telemetry_sender.send(TelemetryEvent::ClientConnectionsToggle { event });
             responder.send(Ok(())).context("send Stop response")?;
         }
         fidl_wlanix::WifiRequest::GetState { responder } => {
@@ -338,12 +345,18 @@ async fn serve_wifi<I: IfaceManager>(
     reqs: fidl_wlanix::WifiRequestStream,
     state: Arc<Mutex<WifiState>>,
     iface_manager: Arc<I>,
+    telemetry_sender: TelemetrySender,
 ) {
     reqs.for_each_concurrent(None, |req| async {
         match req {
             Ok(req) => {
-                if let Err(e) =
-                    handle_wifi_request(req, Arc::clone(&state), Arc::clone(&iface_manager)).await
+                if let Err(e) = handle_wifi_request(
+                    req,
+                    Arc::clone(&state),
+                    Arc::clone(&iface_manager),
+                    telemetry_sender.clone(),
+                )
+                .await
                 {
                     warn!("Failed to handle WifiRequest: {}", e);
                 }
@@ -1330,7 +1343,13 @@ async fn handle_wlanix_request<I: IfaceManager>(
             info!("fidl_wlanix::WlanixRequest::GetWifi");
             if let Some(wifi) = payload.wifi {
                 let wifi_stream = wifi.into_stream().context("create Wifi stream")?;
-                serve_wifi(wifi_stream, Arc::clone(&state), Arc::clone(&iface_manager)).await;
+                serve_wifi(
+                    wifi_stream,
+                    Arc::clone(&state),
+                    Arc::clone(&iface_manager),
+                    telemetry_sender,
+                )
+                .await;
             }
         }
         fidl_wlanix::WlanixRequest::GetSupplicant { payload, .. } => {
@@ -1518,6 +1537,13 @@ mod tests {
             Poll::Ready(Ok(response)) => response
         );
         assert_eq!(response.is_started, Some(true));
+
+        assert_variant!(
+            test_helper.telemetry_receiver.try_next(),
+            Ok(Some(TelemetryEvent::ClientConnectionsToggle {
+                event: wlan_telemetry::ClientConnectionsToggleEvent::Enabled
+            }))
+        );
     }
 
     #[test]
@@ -1549,6 +1575,21 @@ mod tests {
             &calls[calls.len() - 1],
             ifaces::test_utils::IfaceManagerCall::DestroyIface(_)
         );
+
+        // There was a start and a stop, so expect enabled and disabled mesages.
+        assert_variant!(
+            test_helper.telemetry_receiver.try_next(),
+            Ok(Some(TelemetryEvent::ClientConnectionsToggle {
+                event: wlan_telemetry::ClientConnectionsToggleEvent::Enabled
+            }))
+        );
+        assert_variant!(
+            test_helper.telemetry_receiver.try_next(),
+            Ok(Some(TelemetryEvent::ClientConnectionsToggle {
+                event: wlan_telemetry::ClientConnectionsToggleEvent::Disabled
+            }))
+        );
+        assert!(test_helper.telemetry_receiver.try_next().is_err());
     }
 
     #[test]
@@ -1737,7 +1778,7 @@ mod tests {
         wifi_proxy: fidl_wlanix::WifiProxy,
         wifi_chip_proxy: fidl_wlanix::WifiChipProxy,
         wifi_sta_iface_proxy: fidl_wlanix::WifiStaIfaceProxy,
-        _telemetry_receiver: mpsc::Receiver<TelemetryEvent>,
+        telemetry_receiver: mpsc::Receiver<TelemetryEvent>,
         iface_manager: Arc<TestIfaceManager>,
 
         // Note: keep the executor field last in the struct so it gets dropped last.
@@ -1799,7 +1840,7 @@ mod tests {
             wifi_proxy,
             wifi_chip_proxy,
             wifi_sta_iface_proxy,
-            _telemetry_receiver: telemetry_receiver,
+            telemetry_receiver,
             iface_manager,
             exec,
         };
