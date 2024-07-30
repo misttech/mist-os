@@ -12,7 +12,6 @@ use futures::prelude::*;
 use std::ffi::{CStr, CString};
 use std::{iter, mem};
 use thiserror::Error;
-use tracing::warn;
 use {fidl_fuchsia_io as fio, fidl_fuchsia_ldsvc as fldsvc};
 
 /// Error type returned by ProcessBuilder methods.
@@ -937,7 +936,7 @@ impl ReservationVmar {
 // and its root VMAR will get cleaned up along with this sub-VMAR.
 impl Drop for ReservationVmar {
     fn drop(&mut self) {
-        self.destroy().unwrap_or_else(|e| warn!("Failed to destroy reservation VMAR: {}", e));
+        _ = self.destroy();
     }
 }
 
