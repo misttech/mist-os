@@ -18,8 +18,11 @@ use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
 static VVAR_SIZE: Lazy<usize> = Lazy::new(|| *PAGE_SIZE as usize);
-pub static ZX_TIME_VALUES_MEMORY: Lazy<Arc<MemoryObject>> =
-    Lazy::new(|| load_time_values_memory().expect("Could not find time values VMO"));
+pub static ZX_TIME_VALUES_MEMORY: Lazy<Arc<MemoryObject>> = Lazy::new(|| {
+    load_time_values_memory().expect(
+        "Could not find time values VMO! Please ensure /boot/kernel was routed to the starnix kernel.",
+    )
+});
 
 #[derive(Default)]
 pub struct MemoryMappedVvar {
