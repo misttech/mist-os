@@ -254,6 +254,12 @@ fn generate(cmd: Command) -> Result<()> {
 
     if let Some(depfile) = cmd.depfile {
         let deps: String = deps.into();
+        // Create the parent directory just in case it doesn't exist, which would cause depfile
+        // write to fail.
+        let dir =
+            &depfile.parent().context(format!("Getting parent dir for depfile: {}", depfile))?;
+        std::fs::create_dir_all(dir)
+            .with_context(|| format!("Creating directory for depfile: {}", dir))?;
         std::fs::write(&depfile, &deps).with_context(|| format!("Writing depfile: {}", depfile))?;
     }
 
