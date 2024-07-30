@@ -7,6 +7,7 @@
 load("//fuchsia/private/workflows:fuchsia_package_tasks.bzl", "fuchsia_package_tasks")
 load(":fuchsia_api_level.bzl", "FUCHSIA_API_LEVEL_ATTRS", "get_fuchsia_api_level")
 load(":fuchsia_component.bzl", "fuchsia_component_for_unit_test")
+load(":fuchsia_package_resource.bzl", "fuchsia_find_all_package_resources")
 load(
     ":fuchsia_debug_symbols.bzl",
     "FUCHSIA_DEBUG_SYMBOLS_ATTRS",
@@ -18,6 +19,7 @@ load(
 load(":fuchsia_transition.bzl", "fuchsia_transition")
 load(
     ":providers.bzl",
+    "FuchsiaCollectedPackageResourcesInfo",
     "FuchsiaComponentInfo",
     "FuchsiaDebugSymbolInfo",
     "FuchsiaDriverToolInfo",
@@ -116,10 +118,19 @@ def fuchsia_package(
     if _FUCHSIA_OS_PLATFORM not in target_compat:
         target_compat.append(_FUCHSIA_OS_PLATFORM)
 
+    _deps_to_search = components + resources + tools
+
     processed_binaries = "%s_fuchsia_package.elf_binaries" % name
     find_and_process_unstripped_binaries(
         name = processed_binaries,
-        deps = components + resources + tools,
+        deps = _deps_to_search,
+        tags = tags + ["manual"],
+    )
+
+    collected_resources = "%s_fuchsia_package.resources" % name
+    fuchsia_find_all_package_resources(
+        name = collected_resources,
+        deps = _deps_to_search,
         tags = tags + ["manual"],
     )
 
@@ -128,6 +139,7 @@ def fuchsia_package(
         components = components,
         resources = resources,
         processed_binaries = processed_binaries,
+        collected_resources = collected_resources,
         tools = tools,
         subpackages = subpackages,
         subpackages_to_flatten = subpackages_to_flatten,
@@ -177,10 +189,20 @@ def _fuchsia_test_package(
     if _FUCHSIA_OS_PLATFORM not in target_compat:
         target_compat.append(_FUCHSIA_OS_PLATFORM)
 
+    _deps_to_search = _components + resources + _test_component_mapping.values()
+
     processed_binaries = "%s_fuchsia_package.elf_binaries" % name
     find_and_process_unstripped_binaries(
         name = processed_binaries,
-        deps = _components + resources + _test_component_mapping.values(),
+        deps = _deps_to_search,
+        testonly = True,
+        tags = tags + ["manual"],
+    )
+
+    collected_resources = "%s_fuchsia_package.resources" % name
+    fuchsia_find_all_package_resources(
+        name = collected_resources,
+        deps = _deps_to_search,
         testonly = True,
         tags = tags + ["manual"],
     )
@@ -191,6 +213,7 @@ def _fuchsia_test_package(
         components = _components,
         resources = resources,
         processed_binaries = processed_binaries,
+        collected_resources = collected_resources,
         subpackages = subpackages,
         subpackages_to_flatten = subpackages_to_flatten,
         package_name = package_name or name,
@@ -311,6 +334,11 @@ def _build_fuchsia_package_impl(ctx):
         ),
     ]
 
+    # Add all of the collected resources
+    package_resources.extend(
+        [r for r in ctx.attr.collected_resources[FuchsiaCollectedPackageResourcesInfo].collected_resources.to_list()],
+    )
+
     # Resources that we will pass through the debug symbol stripping process
     resources_to_strip = []
     packaged_components = []
@@ -324,7 +352,9 @@ def _build_fuchsia_package_impl(ctx):
             fail("Please use `test_components` for test components.")
 
     # Collect all the resources from the deps
-    for dep in ctx.attr.test_components + ctx.attr.components + ctx.attr.resources:
+    # TODO(342560609) Move all resource publishing from componennts into the
+    # component rules so they get collected into the collected_resources attr.
+    for dep in ctx.attr.test_components + ctx.attr.components:
         if FuchsiaStructuredConfigInfo in dep:
             sc_info = dep[FuchsiaStructuredConfigInfo]
             package_resources.append(
@@ -344,18 +374,6 @@ def _build_fuchsia_package_impl(ctx):
                 component_info = component_info,
                 dest = component_dest,
             ))
-
-            package_resources.append(
-                # add the component manifest
-                make_resource_struct(
-                    src = component_manifest,
-                    dest = component_dest,
-                ),
-            )
-            resources_to_strip.extend([r for r in component_info.resources])
-        elif FuchsiaPackageResourcesInfo in dep:
-            # Don't strip debug symbols from resources.
-            package_resources.extend(dep[FuchsiaPackageResourcesInfo].resources)
         else:
             fail("Unknown dependency type being added to package: %s" % dep.label)
 
@@ -375,6 +393,7 @@ def _build_fuchsia_package_impl(ctx):
     # parse the subpackages contents, and append them into package manifest of
     # parent package.
     content = "\n".join(["%s=%s" % (r.dest, r.src.path) for r in package_resources])
+
     meta_content_inputs = []
     if ctx.attr.subpackages_to_flatten:
         subpackage_manfiests = []
@@ -516,7 +535,7 @@ def _build_fuchsia_package_impl(ctx):
     collected_blobs = {}
     for resource in package_resources:
         if resource.dest in collected_blobs and resource.src.path != collected_blobs[resource.dest]:
-            fail("Trying to add multiple resources with the same filename and different content")
+            fail("Trying to add multiple resources with the same filename and different content", resource)
         else:
             collected_blobs[resource.dest] = resource.src.path
 
@@ -590,6 +609,11 @@ _build_fuchsia_package, _build_fuchsia_package_test = rule_variants(
         "processed_binaries": attr.label(
             doc = "Label to a find_and_process_unstripped_binaries() target for this package.",
             providers = [FuchsiaPackageResourcesInfo, FuchsiaDebugSymbolInfo],
+        ),
+        "collected_resources": attr.label(
+            doc = "Label to a fuchsia_find_all_package_resources() target for this pacakge.",
+            providers = [FuchsiaCollectedPackageResourcesInfo],
+            mandatory = True,
         ),
         "tools": attr.label_list(
             doc = "The list of tools included in this package",

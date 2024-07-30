@@ -3,8 +3,8 @@
 # found in the LICENSE file.
 
 # buildifier: disable=module-docstring
-load(":providers.bzl", "FuchsiaPackageResourcesInfo")
-load(":utils.bzl", "make_resource_struct")
+load(":providers.bzl", "FuchsiaCollectedPackageResourcesInfo", "FuchsiaPackageResourcesInfo")
+load(":utils.bzl", "get_target_deps_from_attributes", "make_resource_struct")
 
 def _package_resources_providers(ctx, resources):
     return [
@@ -108,6 +108,70 @@ fuchsia_package_resource_group = rule(
         ),
         "basename_only": attr.bool(
             doc = "The dir will be removed from srcs attribute, and installed in dest + basename",
+        ),
+    },
+)
+
+## Resource Collection
+
+def _collect_package_resources_info(deps):
+    resource_depsets = []
+    for t in deps:
+        if FuchsiaCollectedPackageResourcesInfo in t:
+            resource_depsets.append(t[FuchsiaCollectedPackageResourcesInfo].collected_resources)
+    return resource_depsets
+
+def _fuchsia_collect_all_package_resources_aspect_impl(target, aspect_ctx):
+    direct = []
+    if FuchsiaPackageResourcesInfo in target:
+        direct.extend(target[FuchsiaPackageResourcesInfo].resources)
+
+    return FuchsiaCollectedPackageResourcesInfo(
+        collected_resources = depset(
+            direct = direct,
+            transitive = _collect_package_resources_info(
+                get_target_deps_from_attributes(
+                    aspect_ctx.rule.attr,
+                    aspect_ctx.rule.kind,
+                ),
+            ),
+        ),
+    )
+
+_fuchsia_collect_all_package_resources_aspect = aspect(
+    doc = """An apsect which collects all of the package resources in the dependency
+    chain. The resources will be added to a FuchsiaCollectedPackageResourcesInfo
+    provider.""",
+    implementation = _fuchsia_collect_all_package_resources_aspect_impl,
+    attr_aspects = ["*"],
+    provides = [FuchsiaCollectedPackageResourcesInfo],
+)
+
+def _fuchsia_find_all_package_resources_impl(ctx):
+    return FuchsiaCollectedPackageResourcesInfo(
+        collected_resources = depset(
+            direct = [],
+            transitive = _collect_package_resources_info(
+                ctx.attr.deps,
+            ),
+        ),
+    )
+
+fuchsia_find_all_package_resources = rule(
+    doc = """A rule which collects all of the FuchsiaPackageResourcesInfo providers.
+
+    This rule will take a set of deps and runs through all of their dependencies
+    to find any rules which export the FuchsiaPackageResourcesInfo provider. It
+    then will collect all of the resources and expose them in a FuchsiaCollectedPackageResourcesInfo
+    provider.
+        """,
+    implementation = _fuchsia_find_all_package_resources_impl,
+    provides = [FuchsiaCollectedPackageResourcesInfo],
+    attrs = {
+        "deps": attr.label_list(
+            doc = "A list of roots for the DAG of dependencies to scan.",
+            mandatory = True,
+            aspects = [_fuchsia_collect_all_package_resources_aspect],
         ),
     },
 )

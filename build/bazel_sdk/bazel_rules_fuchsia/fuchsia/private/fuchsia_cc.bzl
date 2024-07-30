@@ -25,7 +25,7 @@ load(
     "FuchsiaUnitTestComponentInfo",
     "FuchsiaUnstrippedBinaryInfo",
 )
-load(":utils.bzl", "find_cc_toolchain", "forward_providers", "get_runfiles", "is_lib", "make_resource_struct", "rule_variant", "rule_variants")
+load(":utils.bzl", "find_cc_toolchain", "forward_providers", "rule_variant", "rule_variants")
 
 KNOWN_PROVIDERS = [
     CcInfo,
@@ -59,23 +59,6 @@ def _fuchsia_cc_impl(ctx):
     # which will later be processed to generate the corresponding resource
     # entry, referencing its stripped version.
     resources = []
-
-    for data in ctx.attr.data:
-        resources.extend(data[FuchsiaPackageResourcesInfo].resources)
-
-    # Collect files the native target, deps, and implicit libs.
-    dep_files = [file for dep in ctx.attr.deps + [
-        implicit
-        for implicit in ctx.attr.implicit_deps
-        if implicit not in ctx.attr.deps
-    ] for file in dep.files.to_list()] + get_runfiles(ctx.attr.native_target)
-
-    # Add libraries from above files as resources.
-    resources += [
-        make_resource_struct(src = file, dest = "lib/" + file.basename)
-        for file in dep_files
-        if is_lib(file)
-    ]
 
     # Check the restricted symbols
     if ctx.attr.restricted_symbols:
@@ -225,6 +208,7 @@ def fuchsia_wrap_cc_binary(
         "%s//pkg/sysroot:dist" % sdk_root_label,
         "%s//:runtime" % clang_root_label,
     ]
+
     if package_clang_dist_files:
         data.append("%s//:dist" % clang_root_label)
 

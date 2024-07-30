@@ -97,15 +97,23 @@ def fuchsia_driver_component(name, manifest, driver_lib, bind_bytecode, deps = [
         **kwargs
     )
 
-def _make_fuchsia_component_info(*, component_name, manifest, resources, is_driver, is_test, run_tag):
-    return FuchsiaComponentInfo(
-        name = component_name,
-        manifest = manifest,
-        resources = resources,
-        is_driver = is_driver,
-        is_test = is_test,
-        run_tag = run_tag,
-    )
+def _make_fuchsia_component_providers(*, component_name, manifest, resources, is_driver, is_test, run_tag):
+    return [
+        FuchsiaComponentInfo(
+            name = component_name,
+            manifest = manifest,
+            resources = resources,
+            is_driver = is_driver,
+            is_test = is_test,
+            run_tag = run_tag,
+        ),
+        FuchsiaPackageResourcesInfo(resources = [
+            make_resource_struct(
+                src = manifest,
+                dest = "meta/{}".format(manifest.basename),
+            ),
+        ]),
+    ]
 
 def _fuchsia_component_impl(ctx):
     component_name = ctx.attr.component_name or ctx.label.name
@@ -132,15 +140,14 @@ def _fuchsia_component_impl(ctx):
             for f in dep.files.to_list():
                 resources.append(make_resource_struct(src = f, dest = f.short_path))
 
-    return [
-        _make_fuchsia_component_info(
-            component_name = component_name,
-            manifest = manifest,
-            resources = resources,
-            is_driver = ctx.attr.is_driver,
-            is_test = ctx.attr._variant == "test",
-            run_tag = label_name(str(ctx.label)),
-        ),
+    return _make_fuchsia_component_providers(
+        component_name = component_name,
+        manifest = manifest,
+        resources = resources,
+        is_driver = ctx.attr.is_driver,
+        is_test = ctx.attr._variant == "test",
+        run_tag = label_name(str(ctx.label)),
+    ) + [
         collect_debug_symbols(ctx.attr.deps),
     ]
 
@@ -187,15 +194,14 @@ def _fuchsia_component_for_unit_test_impl(ctx):
     underlying_component = ctx.attr.unit_test[FuchsiaUnitTestComponentInfo].test_component
     component_info = underlying_component[FuchsiaComponentInfo]
 
-    return [
-        _make_fuchsia_component_info(
-            component_name = component_info.name,
-            manifest = component_info.manifest,
-            resources = component_info.resources,
-            is_driver = component_info.is_driver,
-            is_test = component_info.is_test,
-            run_tag = ctx.attr.run_tag,
-        ),
+    return _make_fuchsia_component_providers(
+        component_name = component_info.name,
+        manifest = component_info.manifest,
+        resources = component_info.resources,
+        is_driver = component_info.is_driver,
+        is_test = component_info.is_test,
+        run_tag = ctx.attr.run_tag,
+    ) + [
         collect_debug_symbols(underlying_component),
     ]
 

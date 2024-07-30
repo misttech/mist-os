@@ -105,6 +105,7 @@ load(
 )
 load(
     "//fuchsia/private:fuchsia_package_resource.bzl",
+    _fuchsia_find_all_package_resources = "fuchsia_find_all_package_resources",
     _fuchsia_package_resource = "fuchsia_package_resource",
     _fuchsia_package_resource_collection = "fuchsia_package_resource_collection",
     _fuchsia_package_resource_group = "fuchsia_package_resource_group",
@@ -170,6 +171,7 @@ fuchsia_fidl_bind_library = _fuchsia_fidl_bind_library
 fuchsia_fidl_hlcpp_library = _fuchsia_fidl_hlcpp_library
 fuchsia_fidl_library = _fuchsia_fidl_library
 fuchsia_fidl_llcpp_library = _fuchsia_fidl_llcpp_library
+fuchsia_find_all_package_resources = _fuchsia_find_all_package_resources
 fuchsia_package = _fuchsia_package
 fuchsia_package_group = _fuchsia_package_group
 fuchsia_package_resource = _fuchsia_package_resource

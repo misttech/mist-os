@@ -23,17 +23,13 @@ fuchsia_package_checker_test(
         # Common files that should automatically be added
 
         # From SDK sysroot
-        "lib/ld.so.1": "ld.so.1_stripped",
+        "lib/ld.so.1": "ld.so.1",
 
         # From Clang toolchain runtimes
-        "lib/libc++.so.2": "libc++.so.2_stripped",
-        "lib/libc++abi.so.1": "libc++abi.so.1_stripped",
-        "lib/libunwind.so.1": "libunwind.so.1_stripped",
-
-        # From SDK prebuilt libraries (implicit dependencies).
-        # TODO(https://fxbug.dev/342560609): Uncomment the following
-        # once the bug is fixed.
-        # "lib/libfdio.so": "libfdio.so_stripped",
+        "lib/libc++.so.2": "libc++.so.2",
+        "lib/libc++abi.so.1": "libc++abi.so.1",
+        "lib/libunwind.so.1": "libunwind.so.1",
+        "lib/libfdio.so": "libfdio.so",
     },
     manifests = [
         "meta/cc_component.cm",
@@ -56,17 +52,13 @@ fuchsia_package_checker_test(
         # Common files that should automatically be added
 
         # From SDK sysroot
-        "lib/ld.so.1": "ld.so.1_stripped",
+        "lib/ld.so.1": "ld.so.1",
 
         # From Clang toolchain runtimes
-        "lib/libc++.so.2": "libc++.so.2_stripped",
-        "lib/libc++abi.so.1": "libc++abi.so.1_stripped",
-        "lib/libunwind.so.1": "libunwind.so.1_stripped",
-
-        # From SDK prebuilt libraries (implicit dependencies).
-        # TODO(https://fxbug.dev/342560609): Uncomment the following
-        # once the bug is fixed.
-        # "lib/libfdio.so": "libfdio.so_stripped",
+        "lib/libc++.so.2": "libc++.so.2",
+        "lib/libc++abi.so.1": "libc++abi.so.1",
+        "lib/libunwind.so.1": "libunwind.so.1",
+        "lib/libfdio.so": "libfdio.so",
     },
     manifests = [
         "meta/cc_component.cm",
@@ -102,14 +94,20 @@ fuchsia_package_checker_test(
         "bin/ctl": "ctl_native_stripped",
 
         # Common files
-        # Note: all of these files are not required and will be cleaned up but we
-        # do not have a way to ignore files in this test so removing them will
-        # break the test
-        "lib/ld.so.1": "ld.so.1_stripped",
-        "lib/libfdio.so": "libfdio.so_stripped",
-        "lib/libsvc.so": "libsvc.so_stripped",
-        "lib/libtrace-engine.so": "libtrace-engine.so_stripped",
-        "lib/libdriver_runtime.so": "libdriver_runtime.so_stripped",
+        "lib/ld.so.1": "ld.so.1",
+        "lib/libfdio.so": "libfdio.so",
+        "lib/libsvc.so": "libsvc.so",
+        "lib/libtrace-engine.so": "libtrace-engine.so",
+        "lib/libdriver_runtime.so": "libdriver_runtime.so",
+
+        # The following files are not actually needed because we are statically
+        # linking c++ but our resource collection logic still pulls them in because
+        # it does not know that the driver is statically linked. We will keep it
+        # as is because drivers will eventually not need to statically link c++
+        # and so will still need to include these objects.
+        "lib/libc++.so.2": "libc++.so.2",
+        "lib/libc++abi.so.1": "libc++abi.so.1",
+        "lib/libunwind.so.1": "libunwind.so.1",
     },
     manifests = [
         "meta/test_driver.cm",
