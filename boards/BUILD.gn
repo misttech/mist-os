@@ -11,12 +11,16 @@ group("boards") {
 
 if (target_cpu == "x64") {
   group("x64") {
-    deps = [ "//boards/x64" ]
+    deps = [
+      "//boards/pkvm:x64",
+      "//boards/x64",
+    ]
   }
 } else if (target_cpu == "arm64") {
   group("arm64") {
     deps = [
       "//boards/arm64",
+      "//boards/pkvm:arm64",
       "//boards/qemu-arm64",
       "//boards/vim3",
     ]

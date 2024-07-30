@@ -17,6 +17,7 @@ common_arguments = {
 
 if (target_cpu == "x64") {
   board_configuration("x64") {
+    name = "pkvm-x64"
     forward_variables_from(common_arguments, "*")
 
     hardware_info = {
@@ -28,6 +29,7 @@ if (target_cpu == "x64") {
   }
 } else if (target_cpu == "arm64") {
   board_configuration("arm64") {
+    name = "pkvm-arm64"
     forward_variables_from(common_arguments, "*")
 
     hardware_info = {
