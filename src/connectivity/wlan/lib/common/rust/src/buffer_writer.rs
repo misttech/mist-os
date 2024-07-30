@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::appendable::{Appendable, BufferTooSmall};
+use crate::append::{Append, BufferTooSmall, TrackedAppend};
 use zerocopy::ByteSliceMut;
 
 pub struct BufferWriter<B> {
@@ -38,7 +38,7 @@ impl<B: ByteSliceMut> BufferWriter<B> {
     }
 }
 
-impl<B: ByteSliceMut> Appendable for BufferWriter<B> {
+impl<B: ByteSliceMut> Append for BufferWriter<B> {
     fn append_bytes(&mut self, bytes: &[u8]) -> Result<(), BufferTooSmall> {
         self.next_mut_slice(bytes.len())?.copy_from_slice(bytes);
         Ok(())
@@ -52,12 +52,14 @@ impl<B: ByteSliceMut> Appendable for BufferWriter<B> {
         Ok(ret)
     }
 
-    fn bytes_written(&self) -> usize {
-        self.written
-    }
-
     fn can_append(&self, bytes: usize) -> bool {
         self.remaining() >= bytes
+    }
+}
+
+impl<B: ByteSliceMut> TrackedAppend for BufferWriter<B> {
+    fn bytes_appended(&self) -> usize {
+        self.written
     }
 }
 

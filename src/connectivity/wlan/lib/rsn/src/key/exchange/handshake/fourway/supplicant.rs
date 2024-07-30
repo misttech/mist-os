@@ -58,9 +58,9 @@ fn create_message_2<B: ByteSlice>(
         .with_key_type(msg1.key_frame_fields.key_info().key_type())
         .with_key_mic(true);
 
-    let mut w = kde::Writer::new(vec![]);
+    let mut w = kde::Writer::new();
     w.write_protection(&cfg.s_protection)?;
-    let key_data = w.finalize_for_plaintext()?;
+    let key_data = w.finalize_for_plaintext()?.into();
 
     let msg2 = eapol::KeyFrameTx::new(
         msg1.eapol_fields.version,

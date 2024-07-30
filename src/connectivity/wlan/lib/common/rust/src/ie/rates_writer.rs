@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::appendable::Appendable;
+use crate::append::Append;
 use crate::error::FrameWriteError;
 use crate::ie::{
     write_extended_supported_rates, write_supported_rates, EXTENDED_SUPPORTED_RATES_MAX_LEN,
@@ -23,13 +23,13 @@ impl<S: ByteSlice> RatesWriter<S> {
         }
     }
 
-    pub fn write_supported_rates<B: Appendable>(&self, buf: &mut B) {
+    pub fn write_supported_rates<B: Append>(&self, buf: &mut B) {
         let num_rates = std::cmp::min(self.0.len(), SUPPORTED_RATES_MAX_LEN);
         // safe to unwrap because we truncated the slice
         write_supported_rates(&mut *buf, &self.0[..num_rates]).unwrap();
     }
 
-    pub fn write_extended_supported_rates<B: Appendable>(&self, buf: &mut B) {
+    pub fn write_extended_supported_rates<B: Append>(&self, buf: &mut B) {
         if self.0.len() > SUPPORTED_RATES_MAX_LEN {
             // safe to unwrap because it is guaranteed to fit.
             write_extended_supported_rates(&mut *buf, &self.0[SUPPORTED_RATES_MAX_LEN..]).unwrap();

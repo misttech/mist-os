@@ -6,7 +6,7 @@
 //! to be used for WLAN SME, MLME, and binaries written in Rust.
 
 #![cfg_attr(feature = "benchmark", feature(test))]
-pub mod appendable;
+pub mod append;
 pub mod big_endian;
 pub mod bss;
 pub mod buffer_reader;

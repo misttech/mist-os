@@ -6,7 +6,7 @@ pub mod fake_wpa_ies;
 
 use super::rsn::{akm, cipher, suite_selector};
 
-use crate::appendable::{Appendable, BufferTooSmall};
+use crate::append::{Append, BufferTooSmall};
 use crate::organization::Oui;
 use nom::number::streaming::le_u16;
 use nom::{call, count, do_parse, named, named_attr, take, try_parse, IResult};
@@ -40,7 +40,13 @@ impl WpaIe {
         Self::FIXED_FIELDS_LENGTH + self.unicast_cipher_list.len() * 4 + self.akm_list.len() * 4
     }
 
-    pub fn write_into<A: Appendable>(&self, buf: &mut A) -> Result<(), BufferTooSmall> {
+    pub fn into_bytes(self) -> Vec<u8> {
+        let mut buf = Vec::new();
+        self.write_into(&mut buf).unwrap();
+        buf
+    }
+
+    pub fn write_into<A: Append>(&self, buf: &mut A) -> Result<(), BufferTooSmall> {
         if !buf.can_append(self.len()) {
             return Err(BufferTooSmall);
         }
@@ -130,14 +136,12 @@ mod tests {
 
     #[test]
     fn test_write_into() {
-        let wpa_frame = WpaIe {
+        let wpa_frame_bytes = WpaIe {
             multicast_cipher: cipher::Cipher { oui: OUI, suite_type: cipher::TKIP },
             unicast_cipher_list: vec![cipher::Cipher { oui: OUI, suite_type: cipher::TKIP }],
             akm_list: vec![akm::Akm { oui: OUI, suite_type: akm::PSK }],
-        };
-
-        let mut wpa_frame_bytes = vec![];
-        wpa_frame.write_into(&mut wpa_frame_bytes).expect("failed to write frame");
+        }
+        .into_bytes();
         assert_eq!(&wpa_frame_bytes[..], &DEFAULT_FRAME[..]);
     }
 
@@ -146,8 +150,7 @@ mod tests {
         let wpa_frame = from_bytes(&DEFAULT_FRAME[..]);
         assert!(wpa_frame.is_ok());
         let wpa_frame = wpa_frame.unwrap().1;
-        let mut wpa_frame_bytes = vec![];
-        wpa_frame.write_into(&mut wpa_frame_bytes).expect("failed to write frame");
+        let wpa_frame_bytes = wpa_frame.into_bytes();
         assert_eq!(&wpa_frame_bytes[..], &DEFAULT_FRAME[..]);
     }
 

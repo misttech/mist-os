@@ -15,7 +15,6 @@ use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::pin::pin;
 use tracing::info;
-use wlan_common::appendable::Appendable;
 use wlan_common::big_endian::BigEndianU16;
 use wlan_common::bss::Protection;
 use wlan_common::channel::{Cbw, Channel};
@@ -26,6 +25,7 @@ use wlan_hw_sim::{
     connect_or_timeout, default_wlantap_config_client, loop_until_iface_is_found, netdevice_helper,
     test_utils, ApAdvertisement, Beacon, AP_SSID, CLIENT_MAC_ADDR, ETH_DST_MAC,
 };
+use zerocopy::IntoBytes;
 use {fidl_fuchsia_wlan_policy as fidl_policy, fidl_fuchsia_wlan_tap as fidl_tap};
 // Remedy for https://fxbug.dev/42162128 (https://fxbug.dev/42108316)
 // Refer to |KMinstrelUpdateIntervalForHwSim| in //src/connectivity/wlan/drivers/wlan/device.cpp
@@ -224,13 +224,12 @@ async fn send_eth_beacons<'a>(
     receiver: &'a mut mpsc::Receiver<Option<Maxima<TxVecCount>>>,
     phy: &'a fidl_tap::WlantapPhyProxy,
 ) -> Result<Maxima<TxVecCount>, Error> {
-    let mut buf: Vec<u8> = vec![];
-    buf.append_value(&mac::EthernetIIHdr {
+    let ethernet_header = mac::EthernetIIHdr {
         da: *ETH_DST_MAC,
         sa: *CLIENT_MAC_ADDR,
         ether_type: BigEndianU16::from_native(mac::ETHER_TYPE_IPV4),
-    })
-    .expect("error creating fake ethernet header");
+    };
+    let buf = ethernet_header.as_bytes();
 
     let mut timer_stream = Interval::new(DATA_FRAME_INTERVAL_NANOS.nanos());
     let mut intervals_since_last_beacon: i64 = i64::max_value() / DATA_FRAME_INTERVAL_NANOS;

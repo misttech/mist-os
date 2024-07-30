@@ -1432,7 +1432,7 @@ mod free_function_tests {
 
     #[test]
     fn test_extract_ht_vht_op_success() {
-        let mut buffer = Vec::<u8>::new();
+        let mut buffer = Vec::new();
         ie::write_ht_operation(&mut buffer, &ie::fake_ht_operation()).expect("valid HT Op");
         ie::write_vht_operation(&mut buffer, &ie::fake_vht_operation()).expect("valid VHT Op");
         let (ht_operation, vht_operation) =
@@ -1456,7 +1456,7 @@ mod free_function_tests {
 
     #[test]
     fn test_extract_vht_op_too_short() {
-        let mut buffer = Vec::<u8>::new();
+        let mut buffer = Vec::new();
         ie::write_ht_operation(&mut buffer, &ie::fake_ht_operation()).expect("valid HT Op");
         let ht_end = buffer.len();
         ie::write_vht_operation(&mut buffer, &ie::fake_vht_operation()).expect("valid VHT Op");
@@ -1493,7 +1493,7 @@ mod tests {
     use wlan_common::test_utils::fake_stas::IesOverrides;
     use wlan_common::timer::{self, create_timer};
     use wlan_common::{assert_variant, fake_bss_description, mgmt_writer};
-    use wlan_frame_writer::write_frame_with_dynamic_buffer;
+    use wlan_frame_writer::append_frame_to;
     use {
         fidl_fuchsia_wlan_common as fidl_common, fuchsia_zircon as zx,
         wlan_statemachine as statemachine,
@@ -2078,7 +2078,7 @@ mod tests {
         let frame = {
             let mut buffer = [0u8; ADDBA_REQ_FRAME_LEN];
             let writer = BufferWriter::new(&mut buffer[..]);
-            let mut writer = write_frame_with_dynamic_buffer!(
+            let mut writer = append_frame_to!(
                 writer,
                 {
                     headers: {

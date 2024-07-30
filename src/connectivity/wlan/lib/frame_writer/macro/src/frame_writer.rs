@@ -56,8 +56,8 @@ impl BufferWrite for Writeable {
     fn gen_write_to_buf_tokens(&self) -> Result<proc_macro2::TokenStream> {
         match self {
             Writeable::FillZeroes => Ok(quote!(
-                offset = w.remaining() - frame_len;
-                w.append_bytes_zeroed(offset)?;
+                frame_start_offset = w.remaining() - frame_len;
+                w.append_bytes_zeroed(frame_start_offset)?;
             )),
             Writeable::Header(x) => x.gen_write_to_buf_tokens(),
             Writeable::Body(_) => Ok(quote!(w.append_value(&body[..])?;)),
@@ -267,12 +267,13 @@ fn process_write_definitions(
     TokenStream::from(quote! {
         || -> Result<_, Error> {
             use {
-                wlan_common::{
-                    appendable::Appendable,
+                wlan_frame_writer::__wlan_common::{
+                    append::{Append, TrackedAppend},
                     buffer_writer::BufferWriter,
                     error::FrameWriteError,
                     ie::{self, IE_PREFIX_LEN, SUPPORTED_RATES_MAX_LEN},
                 },
+                wlan_frame_writer::__zerocopy::AsBytes,
                 std::convert::AsRef,
                 std::mem::size_of,
             };
@@ -299,15 +300,13 @@ pub fn process_with_default_source(input: TokenStream) -> TokenStream {
         let mut w = BufferWriter::new(&mut buffer[..]);
     );
     let return_buf_tokens = quote!(
-        let written = w.bytes_written();
-        assert_eq!(written, frame_len);
-
+        assert_eq!(w.bytes_appended(), frame_len);
         Ok(arena.make_static(buffer))
     );
     process_write_definitions(macro_args.write_defs, buf_tokens, return_buf_tokens, false)
 }
 
-pub fn process_with_dynamic_buffer(input: TokenStream) -> TokenStream {
+pub fn process_with_cursor(input: TokenStream) -> TokenStream {
     let macro_args = parse_macro_input!(input as MacroArgs);
     let buffer_source = macro_args.buffer_source;
     let buf_tokens = quote!(
@@ -322,17 +321,17 @@ pub fn process_with_fixed_slice(input: TokenStream) -> TokenStream {
     let buffer_source = macro_args.buffer_source;
     let buf_tokens = quote!(
         let mut w = BufferWriter::new(#buffer_source);
-        let mut offset = 0;
+        let mut frame_start_offset = 0;
     );
     let return_buf_tokens = quote!(
         // offset is the start of the frame because it is either the
         // beginning of the buffer or the first byte of the frame
         // after filling the front of the buffer with zeroes.
-        let frame_start = offset;
-        // w.bytes_written() is always the end of the frame because it
+        let frame_start = frame_start_offset;
+        // w.bytes_appended() is always the end of the frame because it
         // already counts the zeroes that might be written before the
-        // offset.
-        let frame_end = w.bytes_written();
+        // appended
+        let frame_end = w.bytes_appended();
         Ok((frame_start, frame_end))
     );
     process_write_definitions(macro_args.write_defs, buf_tokens, return_buf_tokens, true)

@@ -10,7 +10,7 @@ use fdf::ArenaStaticBox;
 use ieee80211::{MacAddr, MacAddrBytes, Ssid};
 use std::collections::VecDeque;
 use tracing::warn;
-use wlan_common::appendable::Appendable;
+use wlan_common::append::Append;
 use wlan_common::buffer_writer::BufferWriter;
 use wlan_common::mac::{self, Aid, AuthAlgorithmNumber, FrameClass, ReasonCode};
 use wlan_common::timer::EventId;

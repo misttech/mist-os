@@ -151,8 +151,7 @@ async fn send_then_receive(
     while sender_to_peer_ptr.is_some() || receiver_from_peer_ptr.is_some() {
         if receiver_from_peer_ptr.is_some() {
             info!("{} sending payload to {}", me.name, peer.name);
-            let mut buf = Vec::new();
-            netdevice_helper::write_fake_frame(peer.addr, me.addr, me.payload, &mut buf);
+            let buf = netdevice_helper::write_fake_frame(peer.addr, me.addr, me.payload);
             netdevice_helper::send(session, port, &buf).await;
         }
 

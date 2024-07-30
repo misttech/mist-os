@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::appendable;
+use crate::append;
 use thiserror::Error;
 
 #[derive(Error, Debug, PartialEq, Eq)]
@@ -19,8 +19,8 @@ impl FrameWriteError {
     }
 }
 
-impl From<appendable::BufferTooSmall> for FrameWriteError {
-    fn from(_error: appendable::BufferTooSmall) -> Self {
+impl From<append::BufferTooSmall> for FrameWriteError {
+    fn from(_error: append::BufferTooSmall) -> Self {
         FrameWriteError::BufferTooSmall
     }
 }

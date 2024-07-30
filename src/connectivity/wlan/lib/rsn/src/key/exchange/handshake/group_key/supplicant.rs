@@ -206,7 +206,7 @@ mod tests {
     }
 
     fn fake_msg1(protection_type: Msg1Config) -> eapol::KeyFrameBuf {
-        let mut w = kde::Writer::new(vec![]);
+        let mut w = kde::Writer::new();
         w.write_gtk(&kde::Gtk::new(GTK_KEY_ID, kde::GtkInfoTx::BothRxTx, &GTK[..]))
             .expect("error writing GTK KDE");
         if let Msg1Config::Wpa3 = &protection_type {

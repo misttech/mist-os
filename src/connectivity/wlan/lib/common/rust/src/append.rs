@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use std::mem::size_of;
+use std::ops::Deref;
 use thiserror::Error;
 use zerocopy::{AsBytes, FromBytes, NoCell, Ref, Unaligned};
 
@@ -10,12 +11,10 @@ use zerocopy::{AsBytes, FromBytes, NoCell, Ref, Unaligned};
 #[error("Buffer is too small for the written data")]
 pub struct BufferTooSmall;
 
-pub trait Appendable {
+pub trait Append {
     fn append_bytes(&mut self, bytes: &[u8]) -> Result<(), BufferTooSmall>;
 
     fn append_bytes_zeroed(&mut self, len: usize) -> Result<&mut [u8], BufferTooSmall>;
-
-    fn bytes_written(&self) -> usize;
 
     fn can_append(&self, bytes: usize) -> bool;
 
@@ -50,7 +49,7 @@ pub trait Appendable {
     }
 }
 
-impl Appendable for Vec<u8> {
+impl Append for Vec<u8> {
     fn append_bytes(&mut self, bytes: &[u8]) -> Result<(), BufferTooSmall> {
         self.extend_from_slice(bytes);
         Ok(())
@@ -62,12 +61,79 @@ impl Appendable for Vec<u8> {
         Ok(&mut self[old_len..])
     }
 
-    fn bytes_written(&self) -> usize {
-        self.len()
+    fn can_append(&self, _bytes: usize) -> bool {
+        true
+    }
+}
+
+pub trait TrackedAppend: Append {
+    fn bytes_appended(&self) -> usize;
+}
+
+#[derive(Debug)]
+pub struct VecCursor {
+    written: usize,
+    inner: Vec<u8>,
+}
+
+impl VecCursor {
+    pub fn new() -> Self {
+        Self { written: 0, inner: vec![] }
+    }
+
+    pub fn with_capacity(capacity: usize) -> Self {
+        Self { written: 0, inner: Vec::with_capacity(capacity) }
+    }
+
+    pub fn len(&self) -> usize {
+        self.inner.len()
+    }
+
+    pub fn capacity(&self) -> usize {
+        self.inner.capacity()
+    }
+
+    pub fn into_vec(self) -> Vec<u8> {
+        self.inner
+    }
+}
+
+impl From<VecCursor> for Vec<u8> {
+    fn from(other: VecCursor) -> Self {
+        other.inner
+    }
+}
+
+impl Deref for VecCursor {
+    type Target = [u8];
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner[..]
+    }
+}
+
+impl Append for VecCursor {
+    fn append_bytes(&mut self, bytes: &[u8]) -> Result<(), BufferTooSmall> {
+        self.inner.extend_from_slice(bytes);
+        self.written += bytes.len();
+        Ok(())
+    }
+
+    fn append_bytes_zeroed(&mut self, len: usize) -> Result<&mut [u8], BufferTooSmall> {
+        let old_len = self.len();
+        self.inner.resize(old_len + len, 0);
+        self.written += len;
+        Ok(&mut self.inner[old_len..])
     }
 
     fn can_append(&self, _bytes: usize) -> bool {
         true
+    }
+}
+
+impl TrackedAppend for VecCursor {
+    fn bytes_appended(&self) -> usize {
+        self.written
     }
 }
 
@@ -77,32 +143,32 @@ mod tests {
 
     #[test]
     pub fn append_to_vec() {
-        let mut data = vec![];
-        assert_eq!(0, data.bytes_written());
+        let mut data = VecCursor::new();
+        assert_eq!(0, data.bytes_appended());
 
         data.append_bytes(&[1, 2, 3]).unwrap();
-        assert_eq!(3, data.bytes_written());
+        assert_eq!(3, data.bytes_appended());
 
         let bytes = data.append_bytes_zeroed(2).unwrap();
         bytes[0] = 4;
-        assert_eq!(5, data.bytes_written());
+        assert_eq!(5, data.bytes_appended());
 
         data.append_value(&0x0706_u16).unwrap();
-        assert_eq!(7, data.bytes_written());
+        assert_eq!(7, data.bytes_appended());
 
         data.append_byte(8).unwrap();
-        assert_eq!(8, data.bytes_written());
+        assert_eq!(8, data.bytes_appended());
 
         let mut bytes = data.append_value_zeroed::<[u8; 2]>().unwrap();
         bytes[0] = 9;
-        assert_eq!(10, data.bytes_written());
+        assert_eq!(10, data.bytes_appended());
 
         data.append_value(&[0x0c0b_u16, 0x0e0d_u16]).unwrap();
-        assert_eq!(14, data.bytes_written());
+        assert_eq!(14, data.bytes_appended());
 
         let mut arr = data.append_array_zeroed::<[u8; 2]>(2).unwrap();
         arr[0] = [15, 16];
-        assert_eq!(18, data.bytes_written());
+        assert_eq!(18, data.bytes_appended());
 
         #[rustfmt::skip]
         assert_eq!(

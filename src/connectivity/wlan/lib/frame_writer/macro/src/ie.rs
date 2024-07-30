@@ -238,7 +238,9 @@ impl BufferWrite for IeDefinition {
 
         let emit_offset = match &self.emit_offset {
             None => quote!(),
-            Some(ident) => quote!(#ident = w.bytes_written();),
+            Some(ident) => {
+                quote!(#ident = w.bytes_appended();)
+            }
         };
         Ok(quote!(
             #emit_offset

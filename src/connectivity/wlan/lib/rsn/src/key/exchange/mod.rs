@@ -112,10 +112,7 @@ pub fn compute_mic<B: ByteSlice>(
         return Err(Error::MicSizesDiffer(frame.key_mic.len(), mic_len));
     }
 
-    let mut buf = vec![];
-    frame.write_into(true, &mut buf).expect("write_into should never fail for Vec");
-    let written = buf.len();
-    buf.truncate(written);
+    let buf = frame.to_bytes(true);
     let mut mic = integrity_alg.compute(kck, &buf[..])?;
     mic.truncate(mic_len);
     Ok(mic)

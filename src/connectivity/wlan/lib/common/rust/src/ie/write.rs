@@ -7,7 +7,7 @@ use super::fields::*;
 use super::id::Id;
 use super::rsn::rsne;
 use super::{wpa, wsc};
-use crate::appendable::{Appendable, BufferTooSmall};
+use crate::append::{Append, BufferTooSmall};
 use crate::error::FrameWriteError;
 use crate::organization::Oui;
 use fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211;
@@ -43,7 +43,7 @@ macro_rules! write_ie {
     }
 }
 
-pub fn write_ssid<B: Appendable>(buf: &mut B, ssid: &[u8]) -> Result<(), FrameWriteError> {
+pub fn write_ssid<B: Append>(buf: &mut B, ssid: &[u8]) -> Result<(), FrameWriteError> {
     validate!(
         ssid.len() <= (fidl_ieee80211::MAX_SSID_BYTE_LEN as usize),
         "SSID is too long (max: {} bytes, got: {})",
@@ -53,10 +53,7 @@ pub fn write_ssid<B: Appendable>(buf: &mut B, ssid: &[u8]) -> Result<(), FrameWr
     write_ie!(buf, Id::SSID, ssid)
 }
 
-pub fn write_supported_rates<B: Appendable>(
-    buf: &mut B,
-    rates: &[u8],
-) -> Result<(), FrameWriteError> {
+pub fn write_supported_rates<B: Append>(buf: &mut B, rates: &[u8]) -> Result<(), FrameWriteError> {
     validate!(!rates.is_empty(), "List of Supported Rates is empty");
     validate!(
         rates.len() <= SUPPORTED_RATES_MAX_LEN,
@@ -67,7 +64,7 @@ pub fn write_supported_rates<B: Appendable>(
     write_ie!(buf, Id::SUPPORTED_RATES, rates)
 }
 
-pub fn write_extended_supported_rates<B: Appendable>(
+pub fn write_extended_supported_rates<B: Append>(
     buf: &mut B,
     rates: &[u8],
 ) -> Result<(), FrameWriteError> {
@@ -81,32 +78,32 @@ pub fn write_extended_supported_rates<B: Appendable>(
     write_ie!(buf, Id::EXTENDED_SUPPORTED_RATES, rates)
 }
 
-pub fn write_rsne<B: Appendable>(buf: &mut B, rsne: &rsne::Rsne) -> Result<(), FrameWriteError> {
+pub fn write_rsne<B: Append>(buf: &mut B, rsne: &rsne::Rsne) -> Result<(), FrameWriteError> {
     rsne.write_into(buf).map_err(|e| e.into())
 }
 
-pub fn write_ht_capabilities<B: Appendable>(
+pub fn write_ht_capabilities<B: Append>(
     buf: &mut B,
     ht_cap: &HtCapabilities,
 ) -> Result<(), FrameWriteError> {
     write_ie!(buf, Id::HT_CAPABILITIES, ht_cap.as_bytes())
 }
 
-pub fn write_ht_operation<B: Appendable>(
+pub fn write_ht_operation<B: Append>(
     buf: &mut B,
     ht_op: &HtOperation,
 ) -> Result<(), FrameWriteError> {
     write_ie!(buf, Id::HT_OPERATION, ht_op.as_bytes())
 }
 
-pub fn write_dsss_param_set<B: Appendable>(
+pub fn write_dsss_param_set<B: Append>(
     buf: &mut B,
     dsss: &DsssParamSet,
 ) -> Result<(), FrameWriteError> {
     write_ie!(buf, Id::DSSS_PARAM_SET, dsss)
 }
 
-pub fn write_tim<B: Appendable>(
+pub fn write_tim<B: Append>(
     buf: &mut B,
     header: &TimHeader,
     bitmap: &[u8],
@@ -121,21 +118,21 @@ pub fn write_tim<B: Appendable>(
     write_ie!(buf, Id::TIM, header, bitmap)
 }
 
-pub fn write_bss_max_idle_period<B: Appendable>(
+pub fn write_bss_max_idle_period<B: Append>(
     buf: &mut B,
     bss_max_idle_period: &BssMaxIdlePeriod,
 ) -> Result<(), FrameWriteError> {
     write_ie!(buf, Id::BSS_MAX_IDLE_PERIOD, bss_max_idle_period)
 }
 
-pub fn write_vht_capabilities<B: Appendable>(
+pub fn write_vht_capabilities<B: Append>(
     buf: &mut B,
     vht_cap: &VhtCapabilities,
 ) -> Result<(), FrameWriteError> {
     write_ie!(buf, Id::VHT_CAPABILITIES, vht_cap.as_bytes())
 }
 
-pub fn write_vht_operation<B: Appendable>(
+pub fn write_vht_operation<B: Append>(
     buf: &mut B,
     vht_op: &VhtOperation,
 ) -> Result<(), FrameWriteError> {
@@ -143,10 +140,7 @@ pub fn write_vht_operation<B: Appendable>(
 }
 
 /// Writes the entire WPA1 IE into the given buffer, including the vendor IE header.
-pub fn write_wpa1_ie<B: Appendable>(
-    buf: &mut B,
-    wpa_ie: &wpa::WpaIe,
-) -> Result<(), BufferTooSmall> {
+pub fn write_wpa1_ie<B: Append>(buf: &mut B, wpa_ie: &wpa::WpaIe) -> Result<(), BufferTooSmall> {
     let len = std::mem::size_of::<Oui>() + 1 + wpa_ie.len();
     if !buf.can_append(len + 2) {
         return Err(BufferTooSmall);
@@ -159,7 +153,7 @@ pub fn write_wpa1_ie<B: Appendable>(
 }
 
 /// Writes the entire WSC IE into the given buffer, including the vendor IE header.
-pub fn write_wsc_ie<B: Appendable>(buf: &mut B, wsc: &[u8]) -> Result<(), BufferTooSmall> {
+pub fn write_wsc_ie<B: Append>(buf: &mut B, wsc: &[u8]) -> Result<(), BufferTooSmall> {
     let len = std::mem::size_of::<Oui>() + 1 + wsc.len();
     if !buf.can_append(len + 2) {
         return Err(BufferTooSmall);
@@ -171,10 +165,7 @@ pub fn write_wsc_ie<B: Appendable>(buf: &mut B, wsc: &[u8]) -> Result<(), Buffer
     buf.append_bytes(wsc)
 }
 
-pub fn write_wmm_param<B: Appendable>(
-    buf: &mut B,
-    wmm_param: &WmmParam,
-) -> Result<(), BufferTooSmall> {
+pub fn write_wmm_param<B: Append>(buf: &mut B, wmm_param: &WmmParam) -> Result<(), BufferTooSmall> {
     let len = std::mem::size_of::<Oui>() + 3 + ::std::mem::size_of_val(wmm_param);
     if !buf.can_append(len + 2) {
         return Err(BufferTooSmall);

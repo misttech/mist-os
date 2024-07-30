@@ -40,7 +40,7 @@ rustc_library("wlan-common") {
   }
 
   sources = [
-    "src/appendable.rs",
+    "src/append.rs",
     "src/big_endian.rs",
     "src/bss.rs",
     "src/buffer_reader.rs",

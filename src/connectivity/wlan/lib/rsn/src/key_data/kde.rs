@@ -8,7 +8,7 @@ use bitfield::bitfield;
 use nom::error::ErrorKind;
 use nom::number::streaming::{le_u16, le_u8};
 use nom::{call, do_parse, eof, map, named, named_args, take, try_parse, IResult};
-use wlan_common::appendable::{Appendable, BufferTooSmall};
+use wlan_common::append::{BufferTooSmall, TrackedAppend, VecCursor};
 use wlan_common::ie::{wpa, write_wpa1_ie};
 use wlan_common::organization::Oui;
 
@@ -210,8 +210,14 @@ pub struct Writer<A> {
     buf: A,
 }
 
-impl<A: Appendable> Writer<A> {
-    pub fn new(buf: A) -> Self {
+impl Writer<VecCursor> {
+    pub fn new() -> Self {
+        Self { buf: VecCursor::new() }
+    }
+}
+
+impl<A: TrackedAppend> Writer<A> {
+    pub fn new_with(buf: A) -> Self {
         Self { buf }
     }
 
@@ -268,7 +274,7 @@ impl<A: Appendable> Writer<A> {
         // See IEEE Std 802.11-2016, 12.7.2 j)
         // Padding is added to extend the key data field to a minimum size of 16 octets or
         // otherwise be a multiple of 8 octets.
-        let written = self.buf.bytes_written();
+        let written = self.buf.bytes_appended();
         let padding_len =
             if written < 16 { 16 - written } else { ((written + 7) / 8) * 8 - written };
         if !self.buf.can_append(padding_len) {
@@ -295,11 +301,12 @@ mod tests {
     use wlan_common::test_utils::FixedSizedTestBuffer;
 
     fn write_and_extract_padding(gtk_len: usize) -> Vec<u8> {
-        let mut w = Writer::new(vec![]);
+        let mut w = Writer::new();
         w.write_gtk(&Gtk::new(2, GtkInfoTx::BothRxTx, &vec![2; gtk_len]))
             .expect("failure writing GTK KDE");
         w.finalize_for_encryption()
             .expect("failure finializing key data")
+            .into_vec()
             .split_off(HDR_LEN + GTK_FIXED_LEN + gtk_len)
     }
 
@@ -317,12 +324,12 @@ mod tests {
 
     #[test]
     fn test_no_padding_expected_for_plaintext() {
-        let mut w = Writer::new(vec![]);
+        let mut w = Writer::new();
         w.write_gtk(&Gtk::new(2, GtkInfoTx::BothRxTx, &[2; 2])).expect("failure writing GTK KDE");
         let buf = w.finalize_for_plaintext().expect("failure finalizing key data");
         assert_eq!(
-            buf,
-            vec![
+            &buf[..],
+            &[
                 // GTK KDE:
                 TYPE,
                 8,
@@ -334,7 +341,7 @@ mod tests {
                 0,
                 2,
                 2
-            ]
+            ][..]
         );
     }
 
@@ -356,16 +363,16 @@ mod tests {
     #[test]
     fn test_write_read_gtk_with_padding() {
         // Write KDE:
-        let mut w = Writer::new(vec![]);
+        let mut w = Writer::new();
         w.write_gtk(&Gtk::new(2, GtkInfoTx::BothRxTx, &[24; 5])).expect("failure writing GTK KDE");
         let buf = w.finalize_for_encryption().expect("failure finializing key data");
         #[rustfmt::skip]
-        assert_eq!(buf, vec![
+        assert_eq!(&buf[..], &[
             // GTK KDE:
             TYPE, 11, 0x00, 0x0F, 0xAC, GTK_DATA_TYPE, 0b0000_0110, 0, 24, 24, 24, 24, 24,
             // Padding:
             TYPE, 0, 0,
-        ]);
+        ][..]);
 
         // Read KDE:
         let result = extract_elements(&buf[..]);
@@ -384,13 +391,13 @@ mod tests {
     fn test_write_read_igtk() {
         let igtk = Igtk::new(10, &[11; 6], &[22; 2]);
         // Write KDE:
-        let mut w = Writer::new(vec![]);
+        let mut w = Writer::new();
         w.write_igtk(&igtk).expect("failure writing IGTK KDE");
         let buf = w.finalize_for_encryption().expect("failure finializing key data");
         #[rustfmt::skip]
-        assert_eq!(buf, vec![
-            TYPE, 14, 0x00, 0x0F, 0xAC, IGTK_DATA_TYPE, 10, 0, 11,11,11,11,11,11,22,22,
-        ]);
+        assert_eq!(&buf[..], &[
+            TYPE, 14, 0x00, 0x0F, 0xAC, IGTK_DATA_TYPE, 10, 0, 11,11,11,11,11,11,22,22
+        ][..]);
 
         // Read KDE:
         let result = extract_elements(&buf[..]);
@@ -408,14 +415,14 @@ mod tests {
 
     #[test]
     fn test_write_gtk_too_small_buffer() {
-        Writer::new(FixedSizedTestBuffer::new(10))
+        Writer::new_with(FixedSizedTestBuffer::new(10))
             .write_gtk(&Gtk::new(2, GtkInfoTx::BothRxTx, &[24; 5]))
             .expect_err("expected failure writing GTK KDE");
     }
 
     #[test]
     fn test_write_gtk_sufficient_fixed_buffer() {
-        Writer::new(FixedSizedTestBuffer::new(13))
+        Writer::new_with(FixedSizedTestBuffer::new(13))
             .write_gtk(&Gtk::new(2, GtkInfoTx::BothRxTx, &[24; 5]))
             .expect("expected success writing GTK KDE");
     }

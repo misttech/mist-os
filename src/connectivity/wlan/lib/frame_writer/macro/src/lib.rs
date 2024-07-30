@@ -182,7 +182,7 @@ pub fn write_frame_with_fixed_slice(input: proc_macro::TokenStream) -> proc_macr
     frame_writer::process_with_fixed_slice(input)
 }
 
-/// Appends a frame to a dynamically sized buffer.
+/// Appends a frame to a buffer that implements `wlan_common::append::Append`.
 ///
 /// This macro mutates the dynamically sized buffer in the first
 /// argument and returns a `Result<B, Error>` where `B` is the type of
@@ -190,6 +190,24 @@ pub fn write_frame_with_fixed_slice(input: proc_macro::TokenStream) -> proc_macr
 /// the specification of the frame defined in the documentation for
 /// `write_frame`.
 #[proc_macro]
-pub fn write_frame_with_dynamic_buffer(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    frame_writer::process_with_dynamic_buffer(input)
+pub fn append_frame_to(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    frame_writer::process_with_cursor(input)
+}
+
+/// Writes a frame to a Vec<u8>
+///
+/// This macro returns a `Result<Vec<u8>, Error>` containing the frame
+/// specified according to the documentation for `write_frame`.
+#[proc_macro]
+pub fn write_frame_to_vec(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    let input = proc_macro2::TokenStream::from(input);
+    let out = proc_macro2::TokenStream::from(frame_writer::process_with_cursor(
+        proc_macro::TokenStream::from(quote::quote!(
+            wlan_frame_writer::__wlan_common::append::VecCursor::new(),
+            #input
+        )),
+    ));
+    proc_macro::TokenStream::from(quote::quote!(
+        #out.map(|buffer| Vec::from(buffer))
+    ))
 }

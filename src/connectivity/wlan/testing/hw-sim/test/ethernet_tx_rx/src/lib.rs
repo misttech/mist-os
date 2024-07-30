@@ -47,13 +47,8 @@ async fn verify_tx_and_rx(
     let phy = helper.proxy();
     let mock_payload = vec![7; payload_size];
     for _ in 0..25 {
-        let mut buf: Vec<u8> = Vec::new();
-        netdevice_helper::write_fake_frame(
-            *ETH_DST_MAC,
-            *CLIENT_MAC_ADDR,
-            &mock_payload[..],
-            &mut buf,
-        );
+        let buf =
+            netdevice_helper::write_fake_frame(*ETH_DST_MAC, *CLIENT_MAC_ADDR, &mock_payload[..]);
         let tx_rx_fut = pin!(send_and_receive(session, port, &buf));
 
         let mut sent_payload = Vec::new();

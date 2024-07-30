@@ -24,7 +24,7 @@ use state::States;
 use std::mem;
 use std::ptr::NonNull;
 use tracing::{error, warn};
-use wlan_common::appendable::Appendable;
+use wlan_common::append::Append;
 use wlan_common::bss::BssDescription;
 use wlan_common::buffer_writer::BufferWriter;
 use wlan_common::capabilities::{derive_join_capabilities, ClientCapabilities};
@@ -36,9 +36,7 @@ use wlan_common::sequence::SequenceManager;
 use wlan_common::time::TimeUnit;
 use wlan_common::timer::{EventId, Timer};
 use wlan_common::{data_writer, mgmt_writer, wmm};
-use wlan_frame_writer::{
-    write_frame, write_frame_with_dynamic_buffer, write_frame_with_fixed_slice,
-};
+use wlan_frame_writer::{append_frame_to, write_frame, write_frame_with_fixed_slice};
 use zerocopy::ByteSlice;
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
@@ -1309,7 +1307,7 @@ impl<'a, D: DeviceOps> BlockAckTx for BoundClient<'a, D> {
 ///
 /// The address may be that of the originator or recipient. The frame formats are described by IEEE
 /// Std 802.11-2016, 9.6.5.
-fn write_block_ack_hdr<B: Appendable>(
+fn write_block_ack_hdr<B: Append>(
     buffer: &mut B,
     bssid: Bssid,
     addr: MacAddr,
@@ -1318,7 +1316,7 @@ fn write_block_ack_hdr<B: Appendable>(
     // The management header differs for APs and clients. The frame control and management header
     // are constructed here, but AP and client STAs share the code that constructs the body. See
     // the `block_ack` module.
-    write_frame_with_dynamic_buffer!(
+    append_frame_to!(
         buffer,
         {
             headers: {
