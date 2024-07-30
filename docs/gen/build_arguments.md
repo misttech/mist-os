@@ -52,7 +52,7 @@ the //:default target
 
 **Current value (from the default):** `[]`
 
-From //BUILD.gn:143
+From //BUILD.gn:138
 
 ### all_cpu_kernel_boot_tests
 
@@ -153,7 +153,7 @@ The result will be built and uploaded to CIPD by infra.
 
 **Current value (from the default):** `[]`
 
-From //BUILD.gn:135
+From //BUILD.gn:130
 
 ### assembly_generate_fvm_fastboot
 
@@ -184,7 +184,7 @@ The result will be built and uploaded to CIPD by infra.
 
 **Current value (from the default):** `[]`
 
-From //BUILD.gn:139
+From //BUILD.gn:134
 
 ### authorized_ssh_keys_label
 
@@ -252,28 +252,6 @@ From //boards/common/x64-common.gni:43
 
 From //build/images/vbmeta.gni:20
 
-### base_driver_package_labels
-
-If you add fuchsia_driver_package labels to this variable, any drivers in these packages will
-be visible to Driver Manager. These package labels are also considered to be in the
-'base' package set (for more info see 'base_package_labels').
-
-**Current value for `target_cpu = "arm64"`:** `[]`
-
-From //products/bringup.gni:33
-
-**Overridden from the default:** `[]`
-
-From //BUILD.gn:37
-
-**Current value for `target_cpu = "x64"`:** `[]`
-
-From //products/bringup.gni:33
-
-**Overridden from the default:** `[]`
-
-From //BUILD.gn:37
-
 ### base_package_labels
 
 If you add package labels to this variable, the packages will be included in
@@ -288,7 +266,7 @@ From //out/not-default/args.gn:16
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:44
+From //BUILD.gn:39
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -296,7 +274,7 @@ From //out/not-default/args.gn:16
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:44
+From //BUILD.gn:39
 
 ### basic_env_names
 
@@ -513,7 +491,7 @@ A list of binary labels to include in the ZBI.
 
 **Current value (from the default):** `[]`
 
-From //build/board.gni:36
+From //build/board.gni:32
 
 ### board_configs
 
@@ -533,7 +511,7 @@ From //boards/arm64.gni:23
 
 **Overridden from the default:** `false`
 
-From //build/board.gni:64
+From //build/board.gni:60
 
 **Current value for `target_cpu = "x64"`:** `"//boards/x64"`
 
@@ -541,7 +519,7 @@ From //boards/x64.gni:23
 
 **Overridden from the default:** `false`
 
-From //build/board.gni:64
+From //build/board.gni:60
 
 ### board_core_realm_shards
 
@@ -550,7 +528,7 @@ context.
 
 **Current value (from the default):** `[]`
 
-From //build/board.gni:46
+From //build/board.gni:42
 
 ### board_description
 
@@ -581,15 +559,6 @@ Amount of rotation in degrees to apply to a board. Expected values are 0,
 
 From //build/board.gni:18
 
-### board_driver_package_labels
-
-A list of driver package labels to include in the 'base' package set. Used
-by the board definition rather than the product definition.
-
-**Current value (from the default):** `[]`
-
-From //build/board.gni:25
-
 ### board_extra_vbmeta_images
 
 DEPRECATED:  Remove when no boards set a value for these.
@@ -605,7 +574,7 @@ board's fastboot protocol.
 
 **Current value (from the default):** `[]`
 
-From //build/board.gni:50
+From //build/board.gni:46
 
 ### board_is_emu
 
@@ -619,7 +588,7 @@ From //boards/arm64.gni:29
 
 **Overridden from the default:** `false`
 
-From //build/board.gni:69
+From //build/board.gni:65
 
 **Current value for `target_cpu = "x64"`:** `true`
 
@@ -627,7 +596,7 @@ From //boards/x64.gni:29
 
 **Overridden from the default:** `false`
 
-From //build/board.gni:69
+From //build/board.gni:65
 
 ### board_is_phys
 
@@ -637,11 +606,11 @@ From //boards/arm64.gni:30
 
 **Overridden from the default:** `true`
 
-From //build/board.gni:70
+From //build/board.gni:66
 
 **Current value (from the default):** `true`
 
-From //build/board.gni:70
+From //build/board.gni:66
 
 ### board_name
 
@@ -670,7 +639,7 @@ board definition rather than the product definition.
 
 **Current value (from the default):** `[]`
 
-From //build/board.gni:29
+From //build/board.gni:25
 
 ### board_recovery_bootfs_labels
 
@@ -678,7 +647,7 @@ A list of binary labels to include in the recovery ZBI.
 
 **Current value (from the default):** `[]`
 
-From //build/board.gni:42
+From //build/board.gni:38
 
 ### board_recovery_package_labels
 
@@ -687,7 +656,7 @@ board definition rather than the product definition.
 
 **Current value (from the default):** `[]`
 
-From //build/board.gni:33
+From //build/board.gni:29
 
 ### board_tools
 
@@ -703,7 +672,7 @@ any kind of stable contract for users of the archive.
 
 **Current value (from the default):** `[]`
 
-From //build/board.gni:61
+From //build/board.gni:57
 
 ### board_zedboot_bootfs_labels
 
@@ -711,7 +680,7 @@ A list of binary labels to include in the zedboot ZBI.
 
 **Current value (from the default):** `[]`
 
-From //build/board.gni:39
+From //build/board.gni:35
 
 ### bootfs_only
 
@@ -904,7 +873,7 @@ From //out/not-default/args.gn:17
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:53
+From //BUILD.gn:48
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -912,7 +881,7 @@ From //out/not-default/args.gn:17
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:53
+From //BUILD.gn:48
 
 ### camera_debug
 
@@ -1535,7 +1504,7 @@ From //out/not-default/args.gn:28
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:114
+From //BUILD.gn:109
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -1543,7 +1512,7 @@ From //out/not-default/args.gn:28
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:114
+From //BUILD.gn:109
 
 ### dir_docker
 
@@ -2761,7 +2730,7 @@ As these cannot be part of the legacy AIB for a product, there is no
 
 **Current value (from the default):** `[]`
 
-From //BUILD.gn:74
+From //BUILD.gn:69
 
 ### dont_profile_source_files
 
@@ -2857,7 +2826,7 @@ From //out/not-default/args.gn:24
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:103
+From //BUILD.gn:98
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -2865,7 +2834,7 @@ From //out/not-default/args.gn:24
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:103
+From //BUILD.gn:98
 
 ### emu_window_size_height
 
@@ -3289,7 +3258,7 @@ packages instead of explicitly adding the labels of the
 
 **Current value (from the default):** `[]`
 
-From //BUILD.gn:88
+From //BUILD.gn:83
 
 ### extra_bazel_assembly_targets
 
@@ -3783,7 +3752,7 @@ From //out/not-default/args.gn:22
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:95
+From //BUILD.gn:90
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -3791,7 +3760,7 @@ From //out/not-default/args.gn:22
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:95
+From //BUILD.gn:90
 
 ### host_byteorder
 
@@ -3817,7 +3786,7 @@ From //out/not-default/args.gn:9
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:121
+From //BUILD.gn:116
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -3825,7 +3794,7 @@ From //out/not-default/args.gn:9
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:121
+From //BUILD.gn:116
 
 ### host_os
 
@@ -3844,7 +3813,7 @@ From //out/not-default/args.gn:25
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:109
+From //BUILD.gn:104
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -3852,7 +3821,7 @@ From //out/not-default/args.gn:25
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:109
+From //BUILD.gn:104
 
 ### host_tools_base_path_override
 
@@ -4496,13 +4465,13 @@ From //build/config/BUILDCONFIG.gn:1649
 
 **Current value (from the default):** `[]`
 
-From //BUILD.gn:45
+From //BUILD.gn:40
 
 ### legacy_cache_package_labels
 
 **Current value (from the default):** `[]`
 
-From //BUILD.gn:54
+From //BUILD.gn:49
 
 ### link_rbe_check
 
@@ -5475,7 +5444,7 @@ From //boards/arm64.gni:42
 
 **Overridden from the default:** `[]`
 
-From //build/board.gni:75
+From //build/board.gni:71
 
 **Current value for `target_cpu = "x64"`:** `["//out/not-default/fuchsia.esp.blk"]`
 
@@ -5483,7 +5452,7 @@ From //boards/common/x64-common.gni:39
 
 **Overridden from the default:** `[]`
 
-From //build/board.gni:75
+From //build/board.gni:71
 
 ### partitions_config_label
 
@@ -5496,7 +5465,7 @@ From //boards/arm64.gni:41
 
 **Overridden from the default:** `false`
 
-From //build/board.gni:74
+From //build/board.gni:70
 
 **Current value for `target_cpu = "x64"`:** `"//boards/partitions:x64"`
 
@@ -5504,7 +5473,7 @@ From //boards/common/x64-common.gni:38
 
 **Overridden from the default:** `false`
 
-From //build/board.gni:74
+From //build/board.gni:70
 
 ### perfetto_build_with_android
 
@@ -5683,7 +5652,7 @@ Labels for product bundles to assemble in addition to the main product bundle.
 
 **Current value (from the default):** `[]`
 
-From //BUILD.gn:146
+From //BUILD.gn:141
 
 ### product_description
 
@@ -7168,7 +7137,7 @@ provided value for 'board_configuration_label'
 
 **Current value (from the default):** `"//boards/arm64"`
 
-From //build/board.gni:84
+From //build/board.gni:80
 
 ### recovery_label
 
@@ -7594,19 +7563,19 @@ extension mechanism for IDK bits outside of the main repository.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //products/bringup.gni:34
+From //products/bringup.gni:33
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:131
+From //BUILD.gn:126
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //products/bringup.gni:34
+From //products/bringup.gni:33
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:131
+From //BUILD.gn:126
 
 ### sdk_cross_compile_host_tools
 
@@ -8184,7 +8153,7 @@ afterwards.
 
 **Current value (from the default):** `""`
 
-From //BUILD.gn:127
+From //BUILD.gn:122
 
 ### test_package_labels
 
@@ -8197,7 +8166,7 @@ From //out/not-default/args.gn:23
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:99
+From //BUILD.gn:94
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -8205,7 +8174,7 @@ From //out/not-default/args.gn:23
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:99
+From //BUILD.gn:94
 
 ### testonly_in_containers
 
@@ -8345,7 +8314,7 @@ From //out/not-default/args.gn:18
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:62
+From //BUILD.gn:57
 
 **Current value for `target_cpu = "x64"`:** `["//bundles/kitchen_sink"]`
 
@@ -8353,7 +8322,7 @@ From //out/not-default/args.gn:18
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:62
+From //BUILD.gn:57
 
 ### update_goldens
 
@@ -8871,7 +8840,7 @@ The product assembly config used to configure the Zedboot image.
 
 **Current value for `target_cpu = "arm64"`:** `"//products/zedboot"`
 
-From //products/bringup.gni:36
+From //products/bringup.gni:35
 
 **Overridden from the default:** `false`
 
@@ -8879,7 +8848,7 @@ From //build/product.gni:38
 
 **Current value for `target_cpu = "x64"`:** `"//products/zedboot"`
 
-From //products/bringup.gni:36
+From //products/bringup.gni:35
 
 **Overridden from the default:** `false`
 
