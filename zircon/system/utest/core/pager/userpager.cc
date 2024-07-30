@@ -673,9 +673,16 @@ void UserPager::PageFaultHandler() {
       // Just brute force find matching VMO keys, no need for efficiency.
       for (auto& vmo : vmos_) {
         if (vmo.key() == actual_packet.key) {
-          // Supply the requested range.
-          SupplyPages(&vmo, actual_packet.page_request.offset / zx_system_get_page_size(),
-                      actual_packet.page_request.length / zx_system_get_page_size());
+          // Trim the request to the VMOs supply limit, and then supply any non-zero resulting
+          // range.
+          const uint64_t request_limit =
+              std::min(actual_packet.page_request.offset + actual_packet.page_request.length,
+                       vmo.GetPageFaultSupplyLimit());
+          if (request_limit > actual_packet.page_request.offset) {
+            const uint64_t supply_len = request_limit - actual_packet.page_request.offset;
+            SupplyPages(&vmo, actual_packet.page_request.offset / zx_system_get_page_size(),
+                        supply_len / zx_system_get_page_size());
+          }
         }
       }
     }
