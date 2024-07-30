@@ -276,7 +276,7 @@ pub fn write_addba_req_body<B: Append>(buffer: &mut B, dialog_token: u8) -> Resu
             .with_fragment_number(0) // Always zero. See IEEE Std 802.11-2016, 9.6.5.2.
             .with_starting_sequence_number(1), // TODO(https://fxbug.dev/42104687): Determine a better value.
     };
-    append_frame_to!(
+    Ok(append_frame_to!(
         buffer,
         {
             headers: {
@@ -287,7 +287,7 @@ pub fn write_addba_req_body<B: Append>(buffer: &mut B, dialog_token: u8) -> Resu
             body: body.as_bytes(),
         }
     )
-    .map(|_buffer| {})
+    .map(|_buffer| {})?)
 }
 
 /// Writes the body of the management frame for an `ADDBA` request to the given buffer. The
@@ -307,7 +307,7 @@ pub fn write_addba_resp_body<B: Append>(buffer: &mut B, dialog_token: u8) -> Res
             .with_buffer_size(BLOCK_ACK_BUFFER_SIZE),
         timeout: 0, // TODO(https://fxbug.dev/42104687): No timeout. Determina a better value.
     };
-    append_frame_to!(
+    Ok(append_frame_to!(
         buffer,
         {
             headers: {
@@ -318,7 +318,7 @@ pub fn write_addba_resp_body<B: Append>(buffer: &mut B, dialog_token: u8) -> Res
             body: body.as_bytes(),
         }
     )
-    .map(|_buffer| {})
+    .map(|_buffer| {})?)
 }
 
 pub fn write_delba_body<B: Append>(
@@ -331,7 +331,7 @@ pub fn write_delba_body<B: Append>(
         parameters: mac::DelbaParameters(0).with_initiator(is_initiator).with_tid(BLOCK_ACK_TID),
         reason_code,
     };
-    append_frame_to!(
+    Ok(append_frame_to!(
         buffer,
         {
             headers: {
@@ -342,7 +342,7 @@ pub fn write_delba_body<B: Append>(
             body: body.as_bytes(),
         }
     )
-    .map(|_buffer| {})
+    .map(|_buffer| {})?)
 }
 
 /// Reads an ADDBA request header from an ADDBA frame body.

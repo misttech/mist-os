@@ -761,6 +761,12 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
         let vht_cap = cap.vht_cap;
         let security_ie = self.sta.connect_req.security_ie.clone();
 
+        let rsne = (!security_ie.is_empty() && security_ie[0] == ie::Id::RSNE.0)
+            .then(|| match rsne::from_bytes(&security_ie[..]) {
+                Ok((_, x)) => Ok(x),
+                Err(e) => Err(format_err!("error parsing rsne {:?} : {:?}", security_ie, e)),
+            })
+            .transpose()?;
         let buffer = write_frame!({
             headers: {
                 mac::MgmtHdr: &mgmt_writer::mgmt_hdr_to_ap(
@@ -781,11 +787,7 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
                 ssid: ssid,
                 supported_rates: rates,
                 extended_supported_rates: {/* continue rates */},
-                rsne?: if !security_ie.is_empty() && security_ie[0] == ie::Id::RSNE.0 {
-                    rsne::from_bytes(&security_ie[..])
-                        .map_err(|e| format_err!("error parsing rsne {:?} : {:?}", security_ie, e))?
-                        .1
-                },
+                rsne?: rsne,
                 ht_cap?: ht_cap,
                 vht_cap?: vht_cap,
             },
@@ -1316,7 +1318,7 @@ fn write_block_ack_hdr<B: Append>(
     // The management header differs for APs and clients. The frame control and management header
     // are constructed here, but AP and client STAs share the code that constructs the body. See
     // the `block_ack` module.
-    append_frame_to!(
+    Ok(append_frame_to!(
         buffer,
         {
             headers: {
@@ -1332,7 +1334,7 @@ fn write_block_ack_hdr<B: Append>(
             },
         }
     )
-    .map(|_buffer| {})
+    .map(|_buffer| {})?)
 }
 
 #[cfg(test)]

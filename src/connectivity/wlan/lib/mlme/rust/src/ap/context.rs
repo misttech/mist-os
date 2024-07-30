@@ -52,7 +52,7 @@ impl<D> Context<D> {
         auth_txn_seq_num: u16,
         status_code: StatusCode,
     ) -> Result<ArenaStaticBox<[u8]>, Error> {
-        write_frame!({
+        Ok(write_frame!({
             headers: {
                 mac::MgmtHdr: &mgmt_writer::mgmt_hdr_from_ap(
                     mac::FrameControl(0)
@@ -64,7 +64,7 @@ impl<D> Context<D> {
                 ),
                 mac::AuthHdr: &mac::AuthHdr { auth_alg_num, auth_txn_seq_num, status_code },
             }
-        })
+        })?)
     }
 
     /// Sends a WLAN association response frame (IEEE Std 802.11-2016, 9.3.3.7) to the PHY.
@@ -76,7 +76,7 @@ impl<D> Context<D> {
         rates: &[u8],
         max_idle_period: Option<u16>,
     ) -> Result<ArenaStaticBox<[u8]>, Error> {
-        write_frame!({
+        Ok(write_frame!({
             headers: {
                 mac::MgmtHdr: &mgmt_writer::mgmt_hdr_from_ap(
                     mac::FrameControl(0)
@@ -109,7 +109,7 @@ impl<D> Context<D> {
                     }
                 },
             }
-        })
+        })?)
     }
 
     /// Sends a WLAN association response frame (IEEE Std 802.11-2016, 9.3.3.7) to the PHY, but only
@@ -120,7 +120,7 @@ impl<D> Context<D> {
         capabilities: mac::CapabilityInfo,
         status_code: StatusCode,
     ) -> Result<ArenaStaticBox<[u8]>, Error> {
-        write_frame!({
+        Ok(write_frame!({
             headers: {
                 mac::MgmtHdr: &mgmt_writer::mgmt_hdr_from_ap(
                     mac::FrameControl(0)
@@ -136,7 +136,7 @@ impl<D> Context<D> {
                     aid: 0,
                 },
             },
-        })
+        })?)
     }
 
     /// Sends a WLAN deauthentication frame (IEEE Std 802.11-2016, 9.3.3.1) to the PHY.
@@ -145,7 +145,7 @@ impl<D> Context<D> {
         addr: MacAddr,
         reason_code: mac::ReasonCode,
     ) -> Result<ArenaStaticBox<[u8]>, Error> {
-        write_frame!({
+        Ok(write_frame!({
             headers: {
                 mac::MgmtHdr: &mgmt_writer::mgmt_hdr_from_ap(
                     mac::FrameControl(0)
@@ -157,7 +157,7 @@ impl<D> Context<D> {
                 ),
                 mac::DeauthHdr: &mac::DeauthHdr { reason_code },
             },
-        })
+        })?)
     }
 
     /// Sends a WLAN disassociation frame (IEEE Std 802.11-2016, 9.3.3.5) to the PHY.
@@ -166,7 +166,7 @@ impl<D> Context<D> {
         addr: MacAddr,
         reason_code: mac::ReasonCode,
     ) -> Result<ArenaStaticBox<[u8]>, Error> {
-        write_frame!({
+        Ok(write_frame!({
             headers: {
                 mac::MgmtHdr: &mgmt_writer::mgmt_hdr_from_ap(
                     mac::FrameControl(0)
@@ -178,7 +178,7 @@ impl<D> Context<D> {
                 ),
                 mac::DisassocHdr: &mac::DisassocHdr { reason_code },
             },
-        })
+        })?)
     }
 
     /// Sends a WLAN probe response frame (IEEE Std 802.11-2016, 9.3.3.11) to the PHY.
@@ -193,7 +193,13 @@ impl<D> Context<D> {
         channel: u8,
         rsne: &[u8],
     ) -> Result<ArenaStaticBox<[u8]>, Error> {
-        write_frame!({
+        let rsne = (!rsne.is_empty())
+            .then(|| match rsne::from_bytes(rsne) {
+                Ok((_, x)) => Ok(x),
+                Err(e) => Err(format_err!("error parsing rsne {:?} : {:?}", rsne, e)),
+            })
+            .transpose()?;
+        Ok(write_frame!({
             headers: {
                 mac::MgmtHdr: &mgmt_writer::mgmt_hdr_from_ap(
                     mac::FrameControl(0)
@@ -217,14 +223,10 @@ impl<D> Context<D> {
                 // 16. Extended Supported Rates and BSS Membership Selectors
                 extended_supported_rates: {/* continue rates */},
                 // 17. RSN
-                rsne?: if !rsne.is_empty() {
-                    rsne::from_bytes(rsne)
-                        .map_err(|e| format_err!("error parsing rsne {:?} : {:?}", rsne, e))?
-                        .1
-                },
+                rsne?: rsne,
 
             }
-        })
+        })?)
     }
 
     pub fn make_beacon_frame(
@@ -239,6 +241,12 @@ impl<D> Context<D> {
         rsne: &[u8],
     ) -> Result<(ArenaStaticBox<[u8]>, BeaconOffloadParams), Error> {
         let mut tim_ele_offset = 0;
+        let rsne = (!rsne.is_empty())
+            .then(|| match rsne::from_bytes(rsne) {
+                Ok((_, x)) => Ok(x),
+                Err(e) => Err(format_err!("error parsing rsne {:?} : {:?}", rsne, e)),
+            })
+            .transpose()?;
         let buffer = write_frame!({
             headers: {
                 mac::MgmtHdr: &mgmt_writer::mgmt_hdr_from_ap(
@@ -271,11 +279,7 @@ impl<D> Context<D> {
                 // 17. Extended Supported Rates and BSS Membership Selectors
                 extended_supported_rates: {/* continue rates */},
                 // 18. RSN
-                rsne?: if !rsne.is_empty() {
-                    rsne::from_bytes(rsne)
-                        .map_err(|e| format_err!("error parsing rsne {:?} : {:?}", rsne, e))?
-                        .1
-                },
+                rsne?: rsne,
 
             }
         })?;
@@ -300,7 +304,7 @@ impl<D> Context<D> {
             None
         };
 
-        write_frame!({
+        Ok(write_frame!({
             headers: {
                 mac::FixedDataHdrFields: &mac::FixedDataHdrFields {
                     frame_ctrl: mac::FrameControl(0)
@@ -323,7 +327,7 @@ impl<D> Context<D> {
                 mac::LlcHdr: &data_writer::make_snap_llc_hdr(ether_type),
             },
             payload: payload,
-        })
+        })?)
     }
 
     /// Sends an EAPoL data frame (IEEE Std 802.1X, 11.3) to the PHY.

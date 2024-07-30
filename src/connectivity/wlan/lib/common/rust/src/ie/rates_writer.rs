@@ -15,9 +15,9 @@ pub struct RatesWriter<S>(S);
 impl<S: ByteSlice> RatesWriter<S> {
     pub fn try_new(rates: S) -> Result<RatesWriter<S>, FrameWriteError> {
         if rates.len() == 0 {
-            Err(FrameWriteError::new_invalid_data("no rates to write"))
+            Err(FrameWriteError::InvalidData(format!("no rates to write")))
         } else if rates.len() > SUPPORTED_RATES_MAX_LEN + EXTENDED_SUPPORTED_RATES_MAX_LEN {
-            Err(FrameWriteError::new_invalid_data("rates will not fit in elements"))
+            Err(FrameWriteError::InvalidData(format!("rates will not fit in elements")))
         } else {
             Ok(RatesWriter(rates))
         }

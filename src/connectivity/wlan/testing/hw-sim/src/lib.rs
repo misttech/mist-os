@@ -4,7 +4,6 @@
 
 use crate::event::action::{self, AuthenticationControl, AuthenticationTap};
 use crate::event::{branch, Handler};
-use anyhow::Error;
 use fidl::endpoints::{create_endpoints, create_proxy};
 use fidl_fuchsia_wlan_common::WlanMacRole;
 use fidl_fuchsia_wlan_tap::{WlanRxInfo, WlantapPhyConfig, WlantapPhyProxy};

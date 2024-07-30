@@ -16,7 +16,7 @@ use zerocopy::AsBytes;
 macro_rules! validate {
     ( $condition:expr, $fmt:expr $(, $args:expr)* $(,)? ) => {
         if !$condition {
-            return Err($crate::error::FrameWriteError::new_invalid_data(format!($fmt, $($args,)*)));
+            return Err($crate::error::FrameWriteError::InvalidData(format!($fmt, $($args,)*)));
         }
     };
 }
@@ -192,9 +192,9 @@ mod tests {
         let mut buf = vec![];
         let mut f = || write_ie!(buf, Id::SSID, &[0u8; 256][..]);
         assert_eq!(
-            Err(FrameWriteError::new_invalid_data(
-                "Element body length 256 exceeds max of 255".to_string()
-            )),
+            Err(FrameWriteError::InvalidData(format!(
+                "Element body length 256 exceeds max of 255"
+            ))),
             f()
         );
     }
@@ -236,9 +236,7 @@ mod tests {
     fn ssid_too_long() {
         let mut buf = vec![];
         assert_eq!(
-            Err(FrameWriteError::new_invalid_data(
-                "SSID is too long (max: 32 bytes, got: 33)".to_string()
-            )),
+            Err(FrameWriteError::InvalidData(format!("SSID is too long (max: 32 bytes, got: 33)"))),
             write_ssid(&mut buf, &[0u8; 33])
         );
     }
@@ -254,7 +252,7 @@ mod tests {
     fn supported_rates_empty() {
         let mut buf = vec![];
         assert_eq!(
-            Err(FrameWriteError::new_invalid_data("List of Supported Rates is empty".to_string())),
+            Err(FrameWriteError::InvalidData(format!("List of Supported Rates is empty"))),
             write_supported_rates(&mut buf, &[])
         );
     }
@@ -263,9 +261,7 @@ mod tests {
     fn supported_rates_too_long() {
         let mut buf = vec![];
         assert_eq!(
-            Err(FrameWriteError::new_invalid_data(
-                "Too many Supported Rates (max 8, got 9)".to_string()
-            )),
+            Err(FrameWriteError::InvalidData(format!("Too many Supported Rates (max 8, got 9)"))),
             write_supported_rates(&mut buf, &[0u8; 9])
         );
     }
@@ -281,9 +277,7 @@ mod tests {
     fn ext_supported_rates_empty() {
         let mut buf = vec![];
         assert_eq!(
-            Err(FrameWriteError::new_invalid_data(
-                "List of Extended Supported Rates is empty".to_string()
-            )),
+            Err(FrameWriteError::InvalidData(format!("List of Extended Supported Rates is empty"))),
             write_extended_supported_rates(&mut buf, &[])
         );
     }
@@ -311,9 +305,7 @@ mod tests {
     fn tim_empty_bitmap() {
         let mut buf = vec![];
         assert_eq!(
-            Err(FrameWriteError::new_invalid_data(
-                "Partial virtual bitmap in TIM is empty".to_string()
-            )),
+            Err(FrameWriteError::InvalidData(format!("Partial virtual bitmap in TIM is empty"))),
             write_tim(
                 &mut buf,
                 &TimHeader { dtim_count: 1, dtim_period: 2, bmp_ctrl: BitmapControl(3) },
@@ -326,9 +318,9 @@ mod tests {
     fn tim_bitmap_too_long() {
         let mut buf = vec![];
         assert_eq!(
-            Err(FrameWriteError::new_invalid_data(
-                "Partial virtual bitmap in TIM too large (max: 251 bytes, got 252)".to_string()
-            )),
+            Err(FrameWriteError::InvalidData(format!(
+                "Partial virtual bitmap in TIM too large (max: 251 bytes, got 252)"
+            ))),
             write_tim(
                 &mut buf,
                 &TimHeader { dtim_count: 1, dtim_period: 2, bmp_ctrl: BitmapControl(3) },

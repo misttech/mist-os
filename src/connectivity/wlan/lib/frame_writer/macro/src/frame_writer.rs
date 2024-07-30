@@ -265,7 +265,7 @@ fn process_write_definitions(
     }
 
     TokenStream::from(quote! {
-        || -> Result<_, Error> {
+        {
             use {
                 wlan_frame_writer::__wlan_common::{
                     append::{Append, TrackedAppend},
@@ -278,17 +278,20 @@ fn process_write_definitions(
                 std::mem::size_of,
             };
 
-            #declare_var_tokens
-            #frame_len_tokens
 
-            #make_buf_tokens
+            || -> Result<_, FrameWriteError> {
+                #declare_var_tokens
+                #frame_len_tokens
 
-            {
-                #write_to_buf_tokens
-            }
+                #make_buf_tokens
 
-            #return_buf_tokens
-        }()
+                {
+                    #write_to_buf_tokens
+                }
+
+                #return_buf_tokens
+            }()
+        }
     })
 }
 
@@ -300,7 +303,12 @@ pub fn process_with_default_source(input: TokenStream) -> TokenStream {
         let mut w = BufferWriter::new(&mut buffer[..]);
     );
     let return_buf_tokens = quote!(
-        assert_eq!(w.bytes_appended(), frame_len);
+        if w.bytes_appended() != frame_len {
+            return Err(FrameWriteError::BadWrite(
+                format!("bytes_appended does not match frame length: {} != {}",
+                    w.bytes_appended(), frame_len)
+            ));
+        }
         Ok(arena.make_static(buffer))
     );
     process_write_definitions(macro_args.write_defs, buf_tokens, return_buf_tokens, false)
