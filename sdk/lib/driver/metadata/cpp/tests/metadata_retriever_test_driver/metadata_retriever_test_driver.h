@@ -30,6 +30,7 @@ class MetadataRetrieverTestDriver : public fdf::DriverBase,
 
   // fuchsia.hardware.test/MetadataRetriever implementation.
   void GetMetadata(GetMetadataCompleter::Sync& completer) override;
+  void GetMetadataIfExists(GetMetadataIfExistsCompleter::Sync& completer) override;
 
  private:
   void Serve(fidl::ServerEnd<fuchsia_hardware_test::MetadataRetriever> request);

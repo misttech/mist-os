@@ -27,6 +27,7 @@ class MetadataSenderTestDriver : public fdf::DriverBase,
   zx::result<> Start() override;
 
   // fuchsia.hardware.test/MetadataSender implementation.
+  void ServeMetadata(ServeMetadataCompleter::Sync& completer) override;
   void SetMetadata(SetMetadataRequest& request, SetMetadataCompleter::Sync& completer) override;
   void AddMetadataRetrieverNode(AddMetadataRetrieverNodeRequest& request,
                                 AddMetadataRetrieverNodeCompleter::Sync& completer) override;
@@ -48,6 +49,7 @@ class MetadataSenderTestDriver : public fdf::DriverBase,
   driver_devfs::Connector<fuchsia_hardware_test::MetadataSender> devfs_connector_{
       fit::bind_member<&MetadataSenderTestDriver::Serve>(this)};
   fuchsia_hardware_test::MetadataServer metadata_server_;
+  bool offer_metadata_to_child_nodes_ = false;
 
   std::optional<fdf::OwnedChildNode> controller_node_;
 

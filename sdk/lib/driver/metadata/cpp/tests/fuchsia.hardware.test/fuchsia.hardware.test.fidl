@@ -13,6 +13,11 @@ type Metadata = table {
 };
 
 closed protocol MetadataSender {
+    // Use `fdf_metadata::MetadataServer::Serve()` to serve metadata to the driver's outgoing
+    // directory and offer the metadata to the driver's future child nodes using
+    // `fdf_metadata::MetadataServer::MakeOffer()`
+    strict ServeMetadata() -> () error zx.Status;
+
     /// Use `fdf_metadata::MetadataServer::SetMetadata()` to serve |metadata| to the driver's child
     /// nodes.
     strict SetMetadata(struct {
@@ -48,6 +53,15 @@ closed protocol MetadataRetriever {
     /// Use `fdf_metadata::GetMetadata()` to retrieve metadata from its parent driver and return it.
     strict GetMetadata() -> (struct {
         metadata Metadata;
+    }) error zx.Status;
+
+    /// Use `fdf_metadata::GetMetadataIfExists()` to retrieve metadata from its parent driver and
+    /// return it.
+    strict GetMetadataIfExists() -> (struct {
+        metadata Metadata;
+
+        /// False if `fdf_metadata::GetMetadataIfExists()` returned a std::nullopt.
+        retrieved_metadata bool;
     }) error zx.Status;
 };
 
