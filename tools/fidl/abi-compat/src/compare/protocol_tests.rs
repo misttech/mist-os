@@ -335,3 +335,72 @@ mod protocol {
         .is_compatible());
     }
 }
+
+#[test]
+fn tear_off() {
+    let error_message = "Server(@1) missing method fuchsia.compat.test/TearOff.Added";
+    assert!(compare_fidl_library(
+        Versions { external: "1", platform: "1,2,NEXT,HEAD" },
+        r#"
+            // Server @1 will be incompatible with clients @PLATFORM
+            closed protocol TearOff {
+                @available(added=2)
+                strict Added();
+            };
+
+            @discoverable(server="external")
+            protocol ServerExternal {
+                // Ok - TearOff server in ServerExternal client.
+                ClientEndInRequest(resource struct { t client_end:TearOff; });
+                // Error - TearOff server in ServerExternal server.
+                ClientEndInResponse() -> (resource struct { t client_end:TearOff; });
+                // Error - TearOff server in ServerExternal server.
+                ServerEndInRequest(resource struct { t server_end:TearOff; });
+                // Ok - TearOff server in ServerExternal client.
+                ServerEndInResponse() -> (resource struct { t server_end:TearOff; });
+            };
+
+            @discoverable(server="platform")
+            protocol ServerPlatform {
+                // Error - TearOff server in ServerPlatform server.
+                ClientEndInRequest(resource struct { t client_end:TearOff; });
+                // Ok - TearOff server in ServerPlatform client.
+                ClientEndInResponse() -> (resource struct { t client_end:TearOff; });
+                // Ok - TearOff server in ServerPlatform client.
+                ServerEndInRequest(resource struct { t server_end:TearOff; });
+                // Error - TearOff server in ServerPlatform server.
+                ServerEndInResponse() -> (resource struct { t server_end:TearOff; });
+            };
+            "#
+    )
+    .has_problems(vec![
+        // ServerExternal.ClientEndInResponse
+        ProblemPattern::protocol("PLATFORM", "1")
+            .path(Contains("ServerExternal.ClientEndInResponse"))
+            .message(Equals(error_message)),
+        ProblemPattern::protocol("PLATFORM", "1")
+            .path(Contains("ServerExternal.ClientEndInResponse"))
+            .message(Contains("Incompatible response")),
+        // ServerExternal.ServerEndInRequest
+        ProblemPattern::protocol("PLATFORM", "1")
+            .path(Contains("ServerExternal.ServerEndInRequest"))
+            .message(Equals(error_message)),
+        ProblemPattern::protocol("PLATFORM", "1")
+            .path(Contains("ServerExternal.ServerEndInRequest"))
+            .message(Contains("Incompatible request")),
+        // ServerPlatform.ClientEndInRequest
+        ProblemPattern::protocol("PLATFORM", "1")
+            .path(Contains("ServerPlatform.ClientEndInRequest"))
+            .message(Equals(error_message)),
+        ProblemPattern::protocol("1", "PLATFORM")
+            .path(Contains("ServerPlatform.ClientEndInRequest"))
+            .message(Contains("Incompatible request")),
+        // ServerPlatform.ServerEndInResponse
+        ProblemPattern::protocol("PLATFORM", "1")
+            .path(Contains("ServerPlatform.ServerEndInResponse"))
+            .message(Equals(error_message)),
+        ProblemPattern::protocol("1", "PLATFORM")
+            .path(Contains("ServerPlatform.ServerEndInResponse"))
+            .message(Contains("Incompatible response")),
+    ]));
+}

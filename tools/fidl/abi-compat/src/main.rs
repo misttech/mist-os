@@ -31,27 +31,52 @@ struct Args {
     #[argh(option)]
     out: PathBuf,
 
-    /// if any errors are found print them to stderr and return an exit status
+    /// if any errors are found print them to stderr and return an exit status.
     #[argh(switch, short = 'e')]
     enforce: bool,
+
+    /// follow protocol endpoints to evaluate tear-off protocols and their associated types.
+    #[argh(switch, short = 't')]
+    tear_off: bool,
 }
 
-fn compare_platforms(external: PathBuf, platform: PathBuf) -> Result<CompatibilityProblems> {
+pub struct Configuration {
+    pub tear_off: bool,
+}
+
+impl Configuration {
+    fn new(args: &Args) -> Self {
+        Self { tear_off: args.tear_off }
+    }
+}
+
+impl Default for Configuration {
+    fn default() -> Self {
+        Self { tear_off: true }
+    }
+}
+
+fn compare_platforms(
+    external: PathBuf,
+    platform: PathBuf,
+    config: &Configuration,
+) -> Result<CompatibilityProblems> {
     let external = ir::IR::load(&external).context(format!("loading {external:?}"))?;
     let platform = ir::IR::load(&platform).context(format!("loading {platform:?}"))?;
 
     let external = convert::convert_platform(external).context("processing external IR")?;
     let platform = convert::convert_platform(platform).context("processing platform IR")?;
 
-    compare::compatible(&external, &platform).context("comparing external and platform IR")
+    compare::compatible(&external, &platform, &config).context("comparing external and platform IR")
 }
 
 fn main() -> Result<ExitCode> {
     let args: Args = argh::from_env();
+    let config = Configuration::new(&args);
 
     let mut out = File::create(args.out).unwrap();
 
-    let problems = compare_platforms(args.external, args.platform).unwrap();
+    let problems = compare_platforms(args.external, args.platform, &config).unwrap();
 
     let (errors, warnings) = problems.into_errors_and_warnings();
 

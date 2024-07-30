@@ -10,7 +10,7 @@ use StringPattern::*;
 use Type::*;
 
 pub fn type_compatible(sender: &Type, receiver: &Type) -> CompatibilityDegree {
-    compare_types(sender, receiver).compatibility_degree()
+    compare_types(sender, receiver, &Default::default()).compatibility_degree()
 }
 
 #[test]
@@ -587,4 +587,72 @@ fn similar() {
         ProblemPattern::type_error("2", "1"),
         ProblemPattern::type_error("1", "2")
     ]));
+}
+
+#[test]
+fn endpoints() {
+    let source = "
+    closed protocol Incompatible {
+        @available(removed=2)
+        strict Foo();
+        @available(added=2)
+        strict Bar();
+    };
+
+    type ClientIncompatible = resource table {
+        1: ep client_end:Incompatible;
+    };
+
+    type ServerIncompatible = resource table {
+        1: ep server_end:Incompatible;
+    };
+
+    closed protocol AddMethod {
+        @available(added=2)
+        strict M();
+    };
+
+    type ClientAddMethod = resource table {
+        1: ep client_end:AddMethod;
+    };
+
+    type ServerAddMethod = resource table {
+        1: ep server_end:AddMethod;
+    };
+
+    closed protocol RemoveMethod {
+        @available(added=2)
+        strict M();
+    };
+
+    type ClientRemoveMethod = resource table {
+        1: ep client_end:RemoveMethod;
+    };
+
+    type ServerRemoveMethod = resource table {
+        1: ep server_end:RemoveMethod;
+    };
+    ";
+
+    let versions = vec![TypeVersions { send: "1", recv: "2" }];
+
+    assert!(compare_fidl_type_between("ClientIncompatible", &versions, source)
+        .has_problems(vec![ProblemPattern::protocol("2", "1")
+            .message(Equals("Server(@1) missing method fuchsia.compat.test/Incompatible.Bar"))]));
+
+    assert!(compare_fidl_type_between("ServerIncompatible", &versions, source)
+        .has_problems(vec![ProblemPattern::protocol("1", "2")
+            .message(Equals("Server(@2) missing method fuchsia.compat.test/Incompatible.Foo"))]));
+
+    assert!(compare_fidl_type_between("ClientAddMethod", &versions, source)
+        .has_problems(vec![ProblemPattern::protocol("2", "1")
+            .message(Equals("Server(@1) missing method fuchsia.compat.test/AddMethod.M"))]));
+
+    assert!(compare_fidl_type_between("ServerAddMethod", &versions, source).has_problems(vec![]));
+
+    assert!(compare_fidl_type_between("ClientRemoveMethod", &versions, source)
+        .has_problems(vec![ProblemPattern::protocol("2", "1")
+            .message(Equals("Server(@1) missing method fuchsia.compat.test/RemoveMethod.M"))]));
+
+    assert!(compare_fidl_type_between("ServerRemoveMethod", &versions, source).has_problems(vec![]));
 }
