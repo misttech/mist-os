@@ -34,7 +34,13 @@ The `--release` flag is necessary to get reasonable performance for self-hosted 
 After building and running Fuchsia, you can run `stardev` in the Starnix playground:
 
 ```sh
-$ ffx component run /core/starnix_runner/playground:stardev fuchsia-pkg://fuchsia.com/stardev#meta/container.cm
+$ src/starnix/containers/stardev/start.sh
+```
+
+Later, if you want to stop the container, you can run the following command:
+
+```sh
+$ src/starnix/containers/stardev/stop.sh
 ```
 
 ### Get a shell
@@ -42,7 +48,7 @@ $ ffx component run /core/starnix_runner/playground:stardev fuchsia-pkg://fuchsi
 Once you have the container running, you can connect to the container via the console:
 
 ```sh
-$ ffx starnix console --moniker /core/starnix_runner/playground:stardev /bin/bash -l
+$ src/starnix/containers/stardev/shell.sh
 ```
 
 ### Installing software
