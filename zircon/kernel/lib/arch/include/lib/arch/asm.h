@@ -18,6 +18,15 @@
 #define DW_OP_bregx 0x92            // ULEB128 regno, SLEB128 offset
 #define DW_OP_deref 0x06
 #define DW_OP_xor 0x27
+#define DW_OP_consts 0x11
+#define DW_OP_mul 0x1e
+#define DW_OP_plus 0x22
+#define DW_OP_plus_uconst 0x23
+#define DW_OP_lit0 0x30
+#define DW_OP_lit(n) (DW_OP_lit0 + (n))  // n <= 31
+
+#define ULEB128_2BYTE(n) (((n) & 0x7f) | 0x80), ((n) >> 7)
+#define SLEB128_2BYTE(n) (((n) & 0x7f) | 0x80), (((n) >> 7) & 0x7f)
 
 #ifdef __ASSEMBLER__  // clang-format off
 
