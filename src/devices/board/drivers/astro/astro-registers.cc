@@ -8,12 +8,10 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
-#include <lib/ddk/platform-defs.h>
 
 #include <memory>
 #include <vector>
 
-#include <bind/fuchsia/amlogic/platform/cpp/bind.h>
 #include <soc/aml-common/aml-registers.h>
 #include <soc/aml-s905d2/s905d2-hw.h>
 
@@ -98,9 +96,9 @@ zx_status_t Astro::RegistersInit() {
 
   fpbus::Node registers_dev;
   registers_dev.name() = "registers";
-  registers_dev.vid() = PDEV_VID_GENERIC;
-  registers_dev.pid() = PDEV_PID_GENERIC;
-  registers_dev.did() = PDEV_DID_REGISTERS;
+  registers_dev.vid() = bind_fuchsia_platform::BIND_PLATFORM_DEV_VID_GENERIC;
+  registers_dev.pid() = bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC;
+  registers_dev.did() = bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_REGISTERS;
   registers_dev.mmio() = registers_mmios;
   registers_dev.metadata() = registers_metadata;
 

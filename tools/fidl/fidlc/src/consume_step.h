@@ -52,22 +52,27 @@ class ConsumeStep : public Compiler::Step {
                         std::unique_ptr<Attribute>* out_attribute);
   void ConsumeAttributeList(std::unique_ptr<RawAttributeList> raw_attribute_list,
                             std::unique_ptr<AttributeList>* out_attribute_list);
+  void ConsumeModifier(std::unique_ptr<RawModifier> raw_modifier,
+                       std::unique_ptr<Modifier>* out_modifier);
+  void ConsumeModifierList(std::unique_ptr<RawModifierList> raw_modifier_list,
+                           std::unique_ptr<ModifierList>* out_modifier_list);
   bool ConsumeConstant(std::unique_ptr<RawConstant> raw_constant,
                        std::unique_ptr<Constant>* out_constant);
   void ConsumeLiteralConstant(RawLiteralConstant* raw_constant,
                               std::unique_ptr<LiteralConstant>* out_constant);
-  bool ConsumeParameterList(SourceSpan method_name, const std::shared_ptr<NamingContext>& context,
-                            std::unique_ptr<RawParameterList> parameter_layout,
-                            bool is_request_or_response,
-                            std::unique_ptr<TypeConstructor>* out_payload);
   bool ConsumeTypeConstructor(std::unique_ptr<RawTypeConstructor> raw_type_ctor,
                               const std::shared_ptr<NamingContext>& context,
-                              std::unique_ptr<RawAttributeList> raw_attribute_list,
+                              std::unique_ptr<TypeConstructor>* out_type_ctor);
 
-                              std::unique_ptr<TypeConstructor>* out_type, Decl** out_inline_decl);
-  bool ConsumeTypeConstructor(std::unique_ptr<RawTypeConstructor> raw_type_ctor,
-                              const std::shared_ptr<NamingContext>& context,
-                              std::unique_ptr<TypeConstructor>* out_type);
+  // Method result unions
+  bool NeedMethodResultUnion(const RawModifierList* raw_modifiers, Protocol::Method::Kind kind,
+                             bool has_error);
+  void ConsumeMethodResultUnion(const Name& protocol_name, std::string_view method_name,
+                                SourceSpan response_span,
+                                const std::shared_ptr<NamingContext>& response_context,
+                                std::unique_ptr<RawTypeConstructor> raw_success_type_ctor,
+                                std::unique_ptr<RawTypeConstructor> raw_error_type_ctor,
+                                Union** out_union);
 
   // Elements stored in the library
   const RawLiteral* ConsumeLiteral(std::unique_ptr<RawLiteral> raw_literal);
@@ -76,18 +81,6 @@ class ConsumeStep : public Compiler::Step {
   // Sets the naming context's generated name override to the @generated_name
   // attribute's value if present, otherwise does nothing.
   void MaybeOverrideName(AttributeList& attributes, NamingContext* context);
-  // Generates the synthetic result type used for encoding the method's response, if the method has
-  // an error type or is marked as flexible (or both). Adds the generated type to the library and
-  // provides a `TypeConstructor` that refers to it.
-  //
-  // The generated type includes both the outer wrapping struct and the result union.
-  bool CreateMethodResult(const std::shared_ptr<NamingContext>& success_variant_context,
-                          const std::shared_ptr<NamingContext>& err_variant_context,
-                          const std::shared_ptr<NamingContext>& framework_err_variant_context,
-                          bool has_err, bool has_framework_err, SourceSpan response_span,
-                          RawProtocolMethod* method,
-                          std::unique_ptr<TypeConstructor> success_variant,
-                          std::unique_ptr<TypeConstructor>* out_payload);
 
   std::unique_ptr<File> file_;
 

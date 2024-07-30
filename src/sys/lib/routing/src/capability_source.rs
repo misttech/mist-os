@@ -68,25 +68,20 @@ impl fmt::Display for AggregateMember {
 
 /// Describes the source of a capability, as determined by `find_capability_source`
 #[derive(Debug, Derivative)]
-#[derivative(Clone(bound = ""))]
-pub enum CapabilitySource<C: ComponentInstanceInterface> {
+#[derivative(Clone(bound = ""), PartialEq)]
+pub enum CapabilitySource<C: ComponentInstanceInterface + 'static> {
     /// This capability originates from the component instance for the given Realm.
     /// point.
-    Component {
-        capability: ComponentCapability,
-        component: WeakComponentInstanceInterface<C>,
-    },
+    Component { capability: ComponentCapability, component: WeakComponentInstanceInterface<C> },
     /// This capability originates from "framework". It's implemented by component manager and is
     /// scoped to the realm of the source.
-    Framework {
-        capability: InternalCapability,
-        component: WeakComponentInstanceInterface<C>,
-    },
+    Framework { capability: InternalCapability, component: WeakComponentInstanceInterface<C> },
     /// This capability originates from the parent of the root component, and is built in to
     /// component manager. `top_instance` is the instance at the top of the tree, i.e.  the
     /// instance representing component manager.
     Builtin {
         capability: InternalCapability,
+        #[derivative(PartialEq = "ignore")]
         top_instance: Weak<C::TopInstance>,
     },
     /// This capability originates from the parent of the root component, and is offered from
@@ -94,6 +89,7 @@ pub enum CapabilitySource<C: ComponentInstanceInterface> {
     /// the instance representing component manager.
     Namespace {
         capability: ComponentCapability,
+        #[derivative(PartialEq = "ignore")]
         top_instance: Weak<C::TopInstance>,
     },
     /// This capability is provided by the framework based on some other capability.
@@ -106,6 +102,7 @@ pub enum CapabilitySource<C: ComponentInstanceInterface> {
     AnonymizedAggregate {
         capability: AggregateCapability,
         component: WeakComponentInstanceInterface<C>,
+        #[derivative(PartialEq = "ignore")]
         aggregate_capability_provider: Box<dyn AnonymizedAggregateCapabilityProvider<C>>,
         members: Vec<AggregateMember>,
     },
@@ -113,19 +110,15 @@ pub enum CapabilitySource<C: ComponentInstanceInterface> {
     /// The instances in the aggregate service are the union of these filters.
     FilteredAggregate {
         capability: AggregateCapability,
+        #[derivative(PartialEq = "ignore")]
         capability_provider: Box<dyn FilteredAggregateCapabilityProvider<C>>,
         component: WeakComponentInstanceInterface<C>,
     },
-    // This capability originates from "environment". It's implemented by a component instance.
-    Environment {
-        capability: ComponentCapability,
-        component: WeakComponentInstanceInterface<C>,
-    },
-    // This capability originates from "void". This is only a valid origination for optional capabilities.
-    Void {
-        capability: InternalCapability,
-        component: WeakComponentInstanceInterface<C>,
-    },
+    /// This capability originates from "environment". It's implemented by a component instance.
+    Environment { capability: ComponentCapability, component: WeakComponentInstanceInterface<C> },
+    /// This capability originates from "void". This is only a valid origination for optional
+    /// capabilities.
+    Void { capability: InternalCapability, component: WeakComponentInstanceInterface<C> },
 }
 
 impl<C: ComponentInstanceInterface> CapabilitySource<C> {
@@ -248,6 +241,25 @@ const STORAGE_STR: &'static str = "storage";
 const USE_STR: &'static str = "use";
 const VALUE_STR: &'static str = "value";
 const VOID_STR: &'static str = "void";
+
+impl<C: ComponentInstanceInterface + 'static> TryFrom<CapabilitySource<C>> for Capability {
+    type Error = fidl::Error;
+
+    fn try_from(capability_source: CapabilitySource<C>) -> Result<Self, Self::Error> {
+        Ok(Capability::Dictionary(capability_source.try_into()?))
+    }
+}
+
+impl<C: ComponentInstanceInterface + 'static> TryFrom<Capability> for CapabilitySource<C> {
+    type Error = fidl::Error;
+
+    fn try_from(capability: Capability) -> Result<Self, Self::Error> {
+        let Capability::Dictionary(dictionary) = capability else {
+            return Err(fidl::Error::InvalidEnumValue);
+        };
+        dictionary.try_into()
+    }
+}
 
 impl<C: ComponentInstanceInterface + 'static> TryFrom<CapabilitySource<C>> for Dict {
     type Error = fidl::Error;
@@ -492,7 +504,7 @@ impl<C> fmt::Debug for Box<dyn AnonymizedAggregateCapabilityProvider<C>> {
 #[derive(Debug)]
 pub struct FilteredAggregateCapabilityRouteData<C>
 where
-    C: ComponentInstanceInterface,
+    C: ComponentInstanceInterface + 'static,
 {
     /// The source of the capability.
     pub capability_source: CapabilitySource<C>,

@@ -36,8 +36,6 @@ pub enum EventType {
     /// After a CapabilityProvider has been selected, the CapabilityRequested event is dispatched
     /// with the ServerEnd of the channel for the capability.
     CapabilityRequested,
-    /// A component instance was discovered.
-    Discovered,
     /// Destruction of an instance has begun. The instance may/may not be stopped by this point.
     /// The instance still exists in the parent's realm but will soon be removed.
     Destroyed,
@@ -59,7 +57,6 @@ impl EventType {
     fn as_str(&self) -> &str {
         match self {
             EventType::CapabilityRequested => "capability_requested",
-            EventType::Discovered => "discovered",
             EventType::Destroyed => "destroyed",
             EventType::Resolved => "resolved",
             EventType::Started => "started",
@@ -73,7 +70,6 @@ impl EventType {
     pub fn values() -> Vec<EventType> {
         vec![
             EventType::CapabilityRequested,
-            EventType::Discovered,
             EventType::Destroyed,
             EventType::Resolved,
             EventType::Started,
@@ -112,7 +108,6 @@ impl HasEventType for EventPayload {
     fn event_type(&self) -> EventType {
         match self {
             EventPayload::CapabilityRequested { .. } => EventType::CapabilityRequested,
-            EventPayload::Discovered => EventType::Discovered,
             EventPayload::Destroyed => EventType::Destroyed,
             EventPayload::Resolved { .. } => EventType::Resolved,
             EventPayload::Started { .. } => EventType::Started,
@@ -128,7 +123,7 @@ impl From<fcomponent::EventType> for EventType {
         match fidl_event_type {
             fcomponent::EventType::CapabilityRequested => EventType::CapabilityRequested,
             fcomponent::EventType::DirectoryReady => unreachable!("This isn't used anymore"),
-            fcomponent::EventType::Discovered => EventType::Discovered,
+            fcomponent::EventType::Discovered => unreachable!("This isn't used anymore"),
             fcomponent::EventType::Destroyed => EventType::Destroyed,
             fcomponent::EventType::Resolved => EventType::Resolved,
             fcomponent::EventType::Started => EventType::Started,
@@ -144,7 +139,6 @@ impl TryInto<fcomponent::EventType> for EventType {
     fn try_into(self) -> Result<fcomponent::EventType, anyhow::Error> {
         match self {
             EventType::CapabilityRequested => Ok(fcomponent::EventType::CapabilityRequested),
-            EventType::Discovered => Ok(fcomponent::EventType::Discovered),
             EventType::Destroyed => Ok(fcomponent::EventType::Destroyed),
             EventType::Resolved => Ok(fcomponent::EventType::Resolved),
             EventType::Started => Ok(fcomponent::EventType::Started),
@@ -232,7 +226,6 @@ pub enum EventPayload {
         name: String,
         receiver: CapabilityReceiver,
     },
-    Discovered,
     Destroyed,
     Resolved {
         component: WeakInstanceToken,
@@ -289,7 +282,6 @@ impl fmt::Debug for EventPayload {
             }
             EventPayload::Stopped { status, .. } => formatter.field("status", status).finish(),
             EventPayload::Unresolved
-            | EventPayload::Discovered
             | EventPayload::Destroyed
             | EventPayload::DebugStarted { .. } => formatter.finish(),
         }
@@ -365,8 +357,7 @@ impl fmt::Display for Event {
             EventPayload::Stopped { status, .. } => {
                 format!("with status: {}", status.to_string())
             }
-            EventPayload::Discovered { .. }
-            | EventPayload::Destroyed { .. }
+            EventPayload::Destroyed { .. }
             | EventPayload::Resolved { .. }
             | EventPayload::DebugStarted { .. }
             | EventPayload::Started { .. }

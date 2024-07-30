@@ -1,6 +1,7 @@
 // Copyright 2019 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+@available(added=15)
 library fuchsia.hardware.ramdisk;
 
 using zx;
@@ -56,6 +57,7 @@ closed protocol Ramdisk {
     /// Causes the ramdisk size to grow to `required_size` in bytes.
     /// If `required_size` is smaller than the current size an error will be
     /// returned. `required_size` must be a multiple of `block_size`.
+    @available(removed=22)
     strict Grow(struct {
         new_size uint64;
     }) -> () error zx.Status;

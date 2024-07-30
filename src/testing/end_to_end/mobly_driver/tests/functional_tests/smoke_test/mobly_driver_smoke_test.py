@@ -1,4 +1,3 @@
-#!/usr/bin/env fuchsia-vendored-python
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
@@ -18,11 +17,8 @@ infra integration points:
 """
 import os
 
-from mobly import asserts
-from mobly import base_test
-from mobly import test_runner
-
 import fuchsia_device
+from mobly import asserts, base_test, test_runner
 
 
 class MoblyDriverSmokeTest(base_test.BaseTestClass):

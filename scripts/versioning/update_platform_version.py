@@ -13,35 +13,7 @@ import re
 import secrets
 import shutil
 import sys
-
 from pathlib import Path
-
-
-def update_fidl_compatibility_doc(
-    fuchsia_api_level: int, fidl_compatiblity_doc_path: str
-) -> bool:
-    """Updates fidl_api_compatibility_testing.md given the in-development API level."""
-    try:
-        with open(fidl_compatiblity_doc_path, "r+") as f:
-            old_content = f.read()
-            new_content = re.sub(
-                r"\{% set in_development_api_level = \d+ %\}",
-                f"{{% set in_development_api_level = {fuchsia_api_level} %}}",
-                old_content,
-            )
-            f.seek(0)
-            f.write(new_content)
-            f.truncate()
-        return True
-    except FileNotFoundError:
-        print(
-            """error: Unable to open '{path}'.
-Did you run this script from the root of the source tree?""".format(
-                path=fidl_compatiblity_doc_path
-            ),
-            file=sys.stderr,
-        )
-        return False
 
 
 def generate_random_abi_revision(already_used: set[int]) -> int:
@@ -93,7 +65,7 @@ def update_version_history(
                 # Print `abi_revision` in hex, with a leading 0x, with capital
                 # letters, padded to 16 chars.
                 abi_revision=f"0x{abi_revision:016X}",
-                status="in-development",
+                status="supported",
             )
             f.seek(0)
             json.dump(version_history, f, indent=4)
@@ -136,11 +108,6 @@ def main() -> int:
     if not update_version_history(new_level, args.sdk_version_history):
         return 1
 
-    if not update_fidl_compatibility_doc(
-        new_level, args.fidl_compatibility_doc_path
-    ):
-        return 1
-
     level_dir_path = os.path.join(
         args.root_source_dir, "sdk", "history", str(new_level)
     )
@@ -154,8 +121,12 @@ def main() -> int:
     create_owners_file_for_in_development_level(level_dir_path)
 
     # TODO(https://fxbug.dev/349622444): Automate this.
-    # TODO(https://fxbug.dev/326277078): Move this to the instructions for
-    # promoting "NEXT" to a stable API level.
+    # TODO(https://fxbug.dev/349622444): If this is automated, enable building
+    # with `FUCHSIA_INTERNAL_LEVEL_NEXT_()` undefined to ensure there are no
+    # stray instances of `NEXT` that have not been converted to the new level.
+    # Otherwise, perhaps use a preprocessor condition. This would avoid the need
+    # to regenerate `levels_file` twice but would include a preprocessor
+    # condition in the production code. Do the same for the Rust macros.
     levels_file = "zircon/system/public/zircon/availability_levels.inc"
     sysroot_api_file = "zircon/public/sysroot/sdk/sysroot.api"
     print(
@@ -164,12 +135,9 @@ def main() -> int:
 
     # Before printing, rebase the paths to what a developer would use from `//`.
     history = os.path.relpath(args.sdk_version_history, args.root_source_dir)
-    compatibility = os.path.relpath(
-        args.fidl_compatibility_doc_path, args.root_source_dir
-    )
     level_dir = os.path.relpath(level_dir_path, args.root_source_dir)
     print(
-        f"Then run `git add -u {history} {compatibility} {levels_file} {sysroot_api_file} && git add {level_dir}`."
+        f"Then run `git add -u {history} {levels_file} {sysroot_api_file} && git add {level_dir}`."
     )
     return 0
 

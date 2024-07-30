@@ -43,8 +43,7 @@ zx::result<> FakeChild::Start() {
     fdf_power::ElementDesc description =
         fdf_power::ElementDescBuilder(power_config->value()->config[0], std::move(tokens)).Build();
 
-    fit::result<fdf_power::Error, fuchsia_power_broker::TopologyAddElementResponse> add_result =
-        fdf_power::AddElement(broker, description);
+    auto add_result = fdf_power::AddElement(broker, description);
     if (!add_result.is_ok()) {
       return zx::error(ZX_ERR_INTERNAL);
     }

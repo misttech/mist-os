@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::puppet::LogMessage;
-use diagnostics_data::LogsData;
+use diagnostics_data::{ExtendedMoniker, LogsData};
 use fidl_fuchsia_diagnostics::Severity;
 use futures::{Stream, StreamExt};
 
@@ -22,7 +22,7 @@ impl<T: Stream<Item = LogStreamItem> + Unpin> LogStream for T {}
 /// Panics if any the contiguous sequence of messages is not found.
 pub(crate) async fn assert_logs_sequence<S: LogStream>(
     mut logs: S,
-    component_moniker: &str,
+    component_moniker: &ExtendedMoniker,
     messages: Vec<LogMessage>,
 ) {
     let mut m = 0; // the number of matches so far.
@@ -38,11 +38,11 @@ pub(crate) async fn assert_logs_sequence<S: LogStream>(
 
 fn logs_data_matches(
     data: LogsData,
-    component_moniker: &str,
+    component_moniker: &ExtendedMoniker,
     severity: &Severity,
     message: &str,
 ) -> bool {
-    return data.moniker == component_moniker
+    return data.moniker == *component_moniker
         && data.msg().unwrap() == message
         && data.metadata.severity == *severity;
 }

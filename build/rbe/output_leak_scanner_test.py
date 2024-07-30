@@ -13,11 +13,10 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from typing import Any, Sequence
 from unittest import mock
 
 import output_leak_scanner
-
-from typing import Any, Sequence
 
 
 def _strs(items: Sequence[Any]) -> Sequence[str]:

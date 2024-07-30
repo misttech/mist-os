@@ -5,12 +5,12 @@
 
 import argparse
 import json
-import sys
 import os
+import sys
+from pathlib import Path
 
 from assembly import FilePath, PackageManifest
 from depfile import DepFile
-from pathlib import Path
 from serialization import json_load
 
 

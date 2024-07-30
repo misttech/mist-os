@@ -249,6 +249,12 @@ impl<C: ComponentInstanceInterface + 'static> TryFrom<WeakInstanceToken>
     }
 }
 
+impl<C: ComponentInstanceInterface + 'static> PartialEq for WeakComponentInstanceInterface<C> {
+    fn eq(&self, other: &Self) -> bool {
+        self.inner.ptr_eq(&other.inner) && self.moniker == other.moniker
+    }
+}
+
 /// Either a type implementing `ComponentInstanceInterface` or its `TopInstance`.
 #[derive(Debug, Clone)]
 pub enum ExtendedInstanceInterface<C: ComponentInstanceInterface> {

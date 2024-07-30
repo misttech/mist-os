@@ -70,16 +70,7 @@ type LevelDependency = resource struct {
 open protocol Topology {
     /// Called by a Power Element owner to register a new Power Element and
     /// open control channels for that element.
-    flexible AddElement(ElementSchema) -> (resource struct {
-        // TODO(b/346997964): Remove this return struct once all callers have
-        // migrated to pass their ElementControl channel via ElementSchema.
-        /// ElementControl channel for this element.
-        /// When this channel is dropped, the element will be removed from the
-        /// topology. All channels associated with this element will be
-        /// closed and all tokens registered to this element will be
-        /// unregistered.
-        element_control_channel client_end:ElementControl;
-    }) error AddElementError;
+    flexible AddElement(ElementSchema) -> () error AddElementError;
 };
 
 /// Passed to Topology.AddElement.

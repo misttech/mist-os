@@ -96,7 +96,7 @@ static int cmd_usage(const char* cmd_name) {
       "optionally specify the rate at which to leak (in MB per second). "
       "This tries to reliably get the system into OOM state, so might disable some kinds of "
       "kernel reclamation that prevent going into OOM. If you want to test system response "
-      "to memory pressure, unaltered from the default behavior, use mem_avail_state instead.\n",
+      "to memory pressure, unaltered from the default behavior, use avail_state instead.\n",
       cmd_name);
   printf("%s oom dip                                  : allocate until no mem, then free\n",
          cmd_name);

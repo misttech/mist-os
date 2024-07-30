@@ -4,6 +4,7 @@
 
 #include "src/graphics/display/drivers/intel-i915/ddi-physical-layer-manager.h"
 
+#include <lib/driver/testing/cpp/scoped_global_logger.h>
 #include <lib/mmio/mmio-buffer.h>
 
 #include <fake-mmio-reg/fake-mmio-reg.h>
@@ -84,7 +85,12 @@ class TestDdiManager : public DdiManager {
   }
 };
 
-TEST(DdiManager, GetDdiReference_Success) {
+class DdiManagerTest : public ::testing::Test {
+ private:
+  fdf_testing::ScopedGlobalLogger logger_;
+};
+
+TEST_F(DdiManagerTest, GetDdiReference_Success) {
   TestDdiManager ddi_manager;
   ddi_manager.AddDdi(DdiId::DDI_A);
   ddi_manager.AddDdi(DdiId::DDI_B);
@@ -149,7 +155,7 @@ TEST(DdiManager, GetDdiReference_Success) {
   }
 }
 
-TEST(DdiManager, GetDdiReference_Failure_UnsupportedDdi) {
+TEST_F(DdiManagerTest, GetDdiReference_Failure_UnsupportedDdi) {
   TestDdiManager ddi_manager;
   ddi_manager.AddDdi(DdiId::DDI_A);
   ddi_manager.AddDdi(DdiId::DDI_B);
@@ -157,7 +163,7 @@ TEST(DdiManager, GetDdiReference_Failure_UnsupportedDdi) {
   EXPECT_DEATH(ddi_manager.GetDdiReference(DdiId::DDI_TC_1), "DDI .+ is not available");
 }
 
-TEST(DdiManager, GetDdiReference_Failure_DdiCannotEnable) {
+TEST_F(DdiManagerTest, GetDdiReference_Failure_DdiCannotEnable) {
   TestDdiManager ddi_manager;
   ddi_manager.AddDdi(DdiId::DDI_A);
   ddi_manager.AddDdi(DdiId::DDI_B);
@@ -220,7 +226,12 @@ constexpr int kPortTxDw8Ln2AOffset = 0x162aa0;
 constexpr int kPortPcsDw1Ln3AOffset = 0x162b04;
 constexpr int kPortTxDw8Ln3AOffset = 0x162ba0;
 
-TEST(DdiManagerTigerLake, ParseVbtTable_Dell5420) {
+class DdiManagerTigerLakeTest : public ::testing::Test {
+ private:
+  fdf_testing::ScopedGlobalLogger logger_;
+};
+
+TEST_F(DdiManagerTigerLakeTest, ParseVbtTable_Dell5420) {
   // On Dell Latitude 5420, there are 4 DDIs:
   // - DDI_A: COMBO eDP port
   // - DDI_B: COMBO HDMI port
@@ -323,7 +334,7 @@ TEST(DdiManagerTigerLake, ParseVbtTable_Dell5420) {
   EXPECT_NE(ddi_tc_2_info.connection_type, DdiPhysicalLayer::ConnectionType::kBuiltIn);
 }
 
-TEST(DdiManagerTigerLake, ParseVbtTable_NUC11PAHi5) {
+TEST_F(DdiManagerTigerLakeTest, ParseVbtTable_NUC11PAHi5) {
   // On Intel NUC11PAHi5, there are 4 DDIs:
   // - DDI_TC_1: Type-C DDI with Type-C port
   // - DDI_TC_3: Type-C DDI with built-in HDMI Port

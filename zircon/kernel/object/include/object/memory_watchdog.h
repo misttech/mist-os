@@ -64,8 +64,8 @@ class MemoryWatchdog {
   // Kernel-owned events used to signal userspace at different levels of memory pressure.
   ktl::array<fbl::RefPtr<EventDispatcher>, PressureLevel::kNumLevels> mem_pressure_events_;
 
-  // Event used for communicating memory state between the mem_avail_state_updated_cb callback and
-  // the WorkerThread.
+  // Event used for communicating memory related state changes between other parts of the system
+  // and the WorkerThread.
   AutounsignalEvent mem_state_signal_;
 
   // Relaxed atomic so that debug methods can safely read it.
@@ -95,6 +95,14 @@ class MemoryWatchdog {
   // A timer is used to trigger eviction so that user space is given a chance to act upon a memory
   // pressure signal first.
   Timer eviction_trigger_;
+
+  // Tracks whether or not continuous eviction is presently happening or not. This is an atomic so
+  // that it can be set by the eviction_trigger_ after the timeout occurs, and this happens in a
+  // different thread. This value is only allowed to be set to true by the `eviction_trigger_`
+  // callback, and is only allowed to be set to false by the main `WorkerThread`, preventing any
+  // races in transitioning its state. Races in reading the state are fine, and the correctness of
+  // these is justified at each usage site.
+  ktl::atomic<bool> continuous_eviction_active_ = false;
 
   // OneShot eviction strategy only triggers eviction events at memory pressure state transitions.
   // Continuous eviction strategy enables continuous background eviction as long the system remains

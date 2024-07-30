@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 library fuchsia.element;
 
-using fuchsia.sys;
 using fuchsia.url;
 
 @available(added=19)
@@ -85,12 +84,6 @@ type Spec = resource table {
     /// manager URL annotation is included (which is allowed, but not necessary), then it *must*
     /// match `component_url`.
     2: annotations Annotations;
-
-    @available(removed=12)
-    3: additional_services fuchsia.sys.ServiceList;
-
-    @available(removed=12)
-    4: arguments vector<string:MAX>:MAX;
 };
 
 /// Errors that can be returned when using the Manager protocol.

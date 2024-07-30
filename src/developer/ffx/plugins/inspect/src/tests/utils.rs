@@ -221,10 +221,14 @@ pub fn make_inspect(moniker: &str, timestamp: i64, len: usize, file_name: &str) 
         vec![Property::String(format!("hello_{}", timestamp), long_string)],
         vec![],
     );
-    InspectDataBuilder::new(moniker, format!("fake-url://{}", moniker), timestamp)
-        .with_hierarchy(hierarchy)
-        .with_name(InspectHandleName::filename(file_name))
-        .build()
+    InspectDataBuilder::new(
+        moniker.try_into().unwrap(),
+        format!("fake-url://{}", moniker),
+        timestamp,
+    )
+    .with_hierarchy(hierarchy)
+    .with_name(InspectHandleName::filename(file_name))
+    .build()
 }
 
 pub fn make_inspects() -> Vec<InspectData> {

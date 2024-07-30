@@ -12,9 +12,9 @@ use crate::vfs::fsverity::{
     FsVerityState, {self},
 };
 use crate::vfs::{
-    DirentSink, EpollFileObject, FallocMode, FdNumber, FdTableId, FileReleaser, FileSystemHandle,
-    FileWriteGuard, FileWriteGuardMode, FileWriteGuardRef, FsNodeHandle, NamespaceNode,
-    RecordLockCommand, RecordLockOwner,
+    ActiveNamespaceNode, DirentSink, EpollFileObject, FallocMode, FdNumber, FdTableId,
+    FileReleaser, FileSystemHandle, FileWriteGuard, FileWriteGuardMode, FileWriteGuardRef,
+    FsNodeHandle, NamespaceNode, RecordLockCommand, RecordLockOwner,
 };
 use fidl::HandleBased;
 use fuchsia_inspect_contrib::profile_duration;
@@ -24,7 +24,7 @@ use starnix_logging::{
 };
 use starnix_sync::{
     BeforeFsNodeAppend, FileOpsCore, FileOpsToHandle, LockBefore, LockEqualOrBefore, Locked, Mutex,
-    Unlocked, WriteOps,
+    Unlocked,
 };
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::as_any::AsAny;
@@ -155,7 +155,7 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
     /// Returns the number of bytes written.
     fn write(
         &self,
-        locked: &mut Locked<'_, WriteOps>,
+        locked: &mut Locked<'_, FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -221,7 +221,7 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
         trace_duration!(CATEGORY_STARNIX_MM, c"FileOpsDefaultMmap");
         let min_memory_size = (memory_offset as usize)
             .checked_add(round_up_to_system_page_size(length)?)
-            .ok_or(errno!(EINVAL))?;
+            .ok_or_else(|| errno!(EINVAL))?;
         let mut memory = if options.contains(MappingOptions::SHARED) {
             profile_duration!("GetSharedVmo");
             trace_duration!(CATEGORY_STARNIX_MM, c"GetSharedVmo");
@@ -285,7 +285,7 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
             length,
             prot_flags,
             options,
-            MappingName::File(filename),
+            MappingName::File(filename.into_active()),
             file_write_guard,
         )
     }
@@ -314,6 +314,7 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
     /// If your file does not support blocking waits, leave this as the default implementation.
     fn wait_async(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _waiter: &Waiter,
@@ -332,6 +333,7 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
     /// See https://linux.die.net/man/2/poll
     fn query_events(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
@@ -419,7 +421,7 @@ impl<T: FileOps, P: Deref<Target = T> + Send + Sync + 'static> FileOps for P {
 
     fn write(
         &self,
-        locked: &mut Locked<'_, WriteOps>,
+        locked: &mut Locked<'_, FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -494,21 +496,23 @@ impl<T: FileOps, P: Deref<Target = T> + Send + Sync + 'static> FileOps for P {
 
     fn wait_async(
         &self,
+        locked: &mut Locked<'_, FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         waiter: &Waiter,
         events: FdEvents,
         handler: EventHandler,
     ) -> Option<WaitCanceler> {
-        self.deref().wait_async(file, current_task, waiter, events, handler)
+        self.deref().wait_async(locked, file, current_task, waiter, events, handler)
     }
 
     fn query_events(
         &self,
+        locked: &mut Locked<'_, FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
-        self.deref().query_events(file, current_task)
+        self.deref().query_events(locked, file, current_task)
     }
 
     fn ioctl(
@@ -720,7 +724,7 @@ macro_rules! fileops_impl_dataless {
     () => {
         fn write(
             &self,
-            _locked: &mut starnix_sync::Locked<'_, starnix_sync::WriteOps>,
+            _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
             _file: &crate::vfs::FileObject,
             _current_task: &crate::task::CurrentTask,
             _offset: usize,
@@ -764,7 +768,7 @@ macro_rules! fileops_impl_directory {
 
         fn write(
             &self,
-            _locked: &mut starnix_sync::Locked<'_, starnix_sync::WriteOps>,
+            _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
             _file: &crate::vfs::FileObject,
             _current_task: &crate::task::CurrentTask,
             _offset: usize,
@@ -907,7 +911,7 @@ impl FileOps for OPathOps {
     }
     fn write(
         &self,
-        _locked: &mut Locked<'_, WriteOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -985,14 +989,6 @@ impl FileOps for ProxyFileOps {
             offset: off_t,
             target: SeekTarget,
         ) -> Result<off_t, Errno>;
-        fn wait_async(
-            &self,
-            _file: &FileObject,
-            _current_task: &CurrentTask,
-            _waiter: &Waiter,
-            _events: FdEvents,
-            _handler: EventHandler,
-        ) -> Option<WaitCanceler>;
         fn fcntl(
             &self,
             file: &FileObject,
@@ -1003,13 +999,6 @@ impl FileOps for ProxyFileOps {
         fn sync(&self, file: &FileObject, current_task: &CurrentTask) -> Result<(), Errno>;
     }
     // These don't take &FileObject making it too hard to handle them properly in the macro
-    fn query_events(
-        &self,
-        file: &FileObject,
-        current_task: &CurrentTask,
-    ) -> Result<FdEvents, Errno> {
-        self.0.ops().query_events(file, current_task)
-    }
     fn has_persistent_offsets(&self) -> bool {
         self.0.ops().has_persistent_offsets()
     }
@@ -1017,6 +1006,25 @@ impl FileOps for ProxyFileOps {
         self.0.ops().is_seekable()
     }
     // These take &mut Locked<'_, L> as a second argument
+    fn wait_async(
+        &self,
+        locked: &mut Locked<'_, FileOpsCore>,
+        _file: &FileObject,
+        current_task: &CurrentTask,
+        waiter: &Waiter,
+        events: FdEvents,
+        handler: EventHandler,
+    ) -> Option<WaitCanceler> {
+        self.0.ops().wait_async(locked, &self.0, current_task, waiter, events, handler)
+    }
+    fn query_events(
+        &self,
+        locked: &mut Locked<'_, FileOpsCore>,
+        _file: &FileObject,
+        current_task: &CurrentTask,
+    ) -> Result<FdEvents, Errno> {
+        self.0.ops().query_events(locked, &self.0, current_task)
+    }
     fn read(
         &self,
         locked: &mut Locked<'_, FileOpsCore>,
@@ -1029,7 +1037,7 @@ impl FileOps for ProxyFileOps {
     }
     fn write(
         &self,
-        locked: &mut Locked<'_, WriteOps>,
+        locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -1143,7 +1151,7 @@ pub struct FileObject {
     /// The NamespaceNode associated with this FileObject.
     ///
     /// Represents the name the process used to open this file.
-    pub name: NamespaceNode,
+    pub name: ActiveNamespaceNode,
 
     pub fs: FileSystemHandle,
 
@@ -1205,7 +1213,7 @@ impl FileObject {
             Self {
                 weak_handle: weak_handle.clone(),
                 id,
-                name,
+                name: name.into_active(),
                 fs,
                 ops,
                 offset: Mutex::new(0),
@@ -1260,18 +1268,20 @@ impl FileObject {
         self.flags().contains(OpenFlags::NONBLOCK)
     }
 
-    pub fn blocking_op<T, Op>(
+    pub fn blocking_op<L, T, Op>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         events: FdEvents,
         deadline: Option<zx::Time>,
         mut op: Op,
     ) -> Result<T, Errno>
     where
-        Op: FnMut() -> Result<T, Errno>,
+        L: LockEqualOrBefore<FileOpsCore>,
+        Op: FnMut(&mut Locked<'_, L>) -> Result<T, Errno>,
     {
         // Run the operation a first time without registering a waiter in case no wait is needed.
-        match op() {
+        match op(locked) {
             Err(errno) if errno == EAGAIN && !self.flags().contains(OpenFlags::NONBLOCK) => {}
             result => return result,
         }
@@ -1279,8 +1289,8 @@ impl FileObject {
         let waiter = Waiter::new();
         loop {
             // Register the waiter before running the operation to prevent a race.
-            self.wait_async(current_task, &waiter, events, WaitCallback::none());
-            match op() {
+            self.wait_async(locked, current_task, &waiter, events, WaitCallback::none());
+            match op(locked) {
                 Err(e) if e == EAGAIN => {}
                 result => return result,
             }
@@ -1372,7 +1382,7 @@ impl FileObject {
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno>
     where
-        L: LockEqualOrBefore<WriteOps>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         // We need to cap the size of `data` to prevent us from growing the file too large,
         // according to <https://man7.org/linux/man-pages/man2/write.2.html>:
@@ -1381,7 +1391,7 @@ impl FileObject {
         //   insufficient space on the underlying physical medium, or the RLIMIT_FSIZE resource
         //   limit is encountered (see setrlimit(2)),
         checked_add_offset_and_length(offset, data.available())?;
-        let mut locked = locked.cast_locked::<WriteOps>();
+        let mut locked = locked.cast_locked::<FileOpsCore>();
         self.ops().write(&mut locked, self, current_task, offset, data)
     }
 
@@ -1393,13 +1403,13 @@ impl FileObject {
         write: W,
     ) -> Result<usize, Errno>
     where
-        L: LockEqualOrBefore<WriteOps>,
+        L: LockEqualOrBefore<FileOpsCore>,
         W: FnOnce(&mut Locked<'_, L>) -> Result<usize, Errno>,
     {
         if !self.can_write() {
             return error!(EBADF);
         }
-        self.node().clear_suid_and_sgid_bits(current_task)?;
+        self.node().clear_suid_and_sgid_bits(locked, current_task)?;
         let bytes_written = write(locked)?;
         self.node().update_ctime_mtime();
 
@@ -1417,14 +1427,14 @@ impl FileObject {
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno>
     where
-        L: LockEqualOrBefore<WriteOps>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         self.write_fn(locked, current_task, |locked| {
             if !self.ops().has_persistent_offsets() {
                 return self.write_common(locked, current_task, 0, data);
             }
             // TODO(https://fxbug.dev/333540469): write_fn should take L: LockBefore<FsNodeAppend>,
-            // but WriteOps must be after FsNodeAppend
+            // but FileOpsCore must be after FsNodeAppend
             let mut locked = Unlocked::new();
             let mut offset = self.offset.lock();
             let bytes_written = if self.flags().contains(OpenFlags::APPEND) {
@@ -1450,14 +1460,14 @@ impl FileObject {
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno>
     where
-        L: LockEqualOrBefore<WriteOps>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         if !self.ops().is_seekable() {
             return error!(ESPIPE);
         }
         self.write_fn(locked, current_task, |_locked| {
             // TODO(https://fxbug.dev/333540469): write_fn should take L: LockBefore<FsNodeAppend>,
-            // but WriteOps must be after FsNodeAppend
+            // but FileOpsCore must be after FsNodeAppend
             let mut locked = Unlocked::new();
             let (_guard, mut locked) =
                 self.node().append_lock.read_and(&mut locked, current_task)?;
@@ -1540,8 +1550,7 @@ impl FileObject {
         L: LockEqualOrBefore<FileOpsCore>,
     {
         let mut locked = locked.cast_locked::<FileOpsCore>();
-        if prot_flags.intersects(ProtectionFlags::READ | ProtectionFlags::WRITE) && !self.can_read()
-        {
+        if !self.can_read() {
             return error!(EACCES);
         }
         if prot_flags.contains(ProtectionFlags::WRITE)
@@ -1719,20 +1728,40 @@ impl FileObject {
     }
 
     /// Wait on the specified events and call the EventHandler when ready
-    pub fn wait_async(
+    pub fn wait_async<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         waiter: &Waiter,
         events: FdEvents,
         mut handler: EventHandler,
-    ) -> Option<WaitCanceler> {
+    ) -> Option<WaitCanceler>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         handler.add_mapping(add_equivalent_fd_events);
-        self.ops().wait_async(self, current_task, waiter, events, handler)
+        self.ops().wait_async(
+            &mut locked.cast_locked::<FileOpsCore>(),
+            self,
+            current_task,
+            waiter,
+            events,
+            handler,
+        )
     }
 
     /// The events currently active on this file.
-    pub fn query_events(&self, current_task: &CurrentTask) -> Result<FdEvents, Errno> {
-        self.ops().query_events(self, current_task).map(add_equivalent_fd_events)
+    pub fn query_events<L>(
+        &self,
+        locked: &mut Locked<'_, L>,
+        current_task: &CurrentTask,
+    ) -> Result<FdEvents, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
+        self.ops()
+            .query_events(&mut locked.cast_locked::<FileOpsCore>(), self, current_task)
+            .map(add_equivalent_fd_events)
     }
 
     pub fn record_lock(

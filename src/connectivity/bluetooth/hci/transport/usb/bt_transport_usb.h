@@ -5,10 +5,14 @@
 #ifndef SRC_CONNECTIVITY_BLUETOOTH_HCI_TRANSPORT_USB_BT_TRANSPORT_USB_H_
 #define SRC_CONNECTIVITY_BLUETOOTH_HCI_TRANSPORT_USB_BT_TRANSPORT_USB_H_
 
+#include <fidl/fuchsia.hardware.bluetooth/cpp/fidl.h>
 #include <fuchsia/hardware/bt/hci/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/async/cpp/task.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/sync/completion.h>
+#include <zircon/device/bt-hci.h>
 
 #include <queue>
 
@@ -19,8 +23,28 @@
 
 namespace bt_transport_usb {
 
-// See ddk::Device in ddktl/device.h
 class Device;
+class ScoConnectionServer : public fidl::Server<fuchsia_hardware_bluetooth::ScoConnection> {
+  using SendHandler = fit::function<void(std::vector<uint8_t>&, fit::function<void(void)>)>;
+  using StopHandler = fit::function<void(void)>;
+
+ public:
+  explicit ScoConnectionServer(SendHandler send_handler, StopHandler stop_handler);
+
+  // fuchsia_hardware_bluetooth::ScoConnection overrides.
+  void Send(SendRequest& request, SendCompleter::Sync& completer) override;
+  void AckReceive(AckReceiveCompleter::Sync& completer) override;
+  void Stop(StopCompleter::Sync& completer) override;
+  void handle_unknown_method(
+      ::fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::ScoConnection> metadata,
+      ::fidl::UnknownMethodCompleter::Sync& completer) override;
+
+ private:
+  SendHandler send_handler_;
+  StopHandler stop_handler_;
+};
+
+// See ddk::Device in ddktl/device.h
 using DeviceType = ddk::Device<Device, ddk::GetProtocolable, ddk::Unbindable>;
 
 // This driver can be bound to devices requiring the ZX_PROTOCOL_BT_TRANSPORT protocol, but this
@@ -29,7 +53,10 @@ using DeviceType = ddk::Device<Device, ddk::GetProtocolable, ddk::Unbindable>;
 // driver.
 //
 // BtHciProtocol is not a ddk::base_protocol because vendor drivers proxy requests to this driver.
-class Device final : public DeviceType, public ddk::BtHciProtocol<Device> {
+class Device final : public DeviceType,
+                     public ddk::BtHciProtocol<Device>,
+                     public fidl::Server<fuchsia_hardware_bluetooth::HciTransport>,
+                     public fidl::AsyncEventHandler<fuchsia_hardware_bluetooth::Snoop> {
  public:
   // If |dispatcher| is non-null, it will be used instead of a new work thread.
   // tests.
@@ -44,6 +71,11 @@ class Device final : public DeviceType, public ddk::BtHciProtocol<Device> {
 
   // Adds the device.
   zx_status_t Bind();
+
+  // This is only for test purpose, mock_ddk doesn't provide a way for the test to connect to a fidl
+  // protocol exposed from the driver's outgoing directory.
+  // TODO(https://fxbug.dev/332333517): Remove this function after DFv2 migration.
+  void ConnectHciTransport(fidl::ServerEnd<fuchsia_hardware_bluetooth::HciTransport> server_end);
 
   // Methods required by DDK mixins:
   zx_status_t DdkGetProtocol(uint32_t proto_id, void* out);
@@ -60,6 +92,23 @@ class Device final : public DeviceType, public ddk::BtHciProtocol<Device> {
   void BtHciResetSco(bt_hci_reset_sco_callback callback, void* cookie);
   zx_status_t BtHciOpenIsoDataChannel(zx::channel channel);
   zx_status_t BtHciOpenSnoopChannel(zx::channel channel);
+
+  // fuchsia_hardware_bluetooth::HciTransport protocol overrides.
+  void Send(SendRequest& request, SendCompleter::Sync& completer) override;
+  void AckReceive(AckReceiveCompleter::Sync& completer) override;
+  void ConfigureSco(ConfigureScoRequest& request, ConfigureScoCompleter::Sync& completer) override;
+  void SetSnoop(SetSnoopRequest& request, SetSnoopCompleter::Sync& completer) override;
+  void handle_unknown_method(
+      ::fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::HciTransport> metadata,
+      ::fidl::UnknownMethodCompleter::Sync& completer) override;
+
+  // fuchsia_hardware_bluetooth::Snoop protocol overrides.
+  void OnAcknowledgePackets(
+      fidl::Event<fuchsia_hardware_bluetooth::Snoop::OnAcknowledgePackets>& event) override;
+  void handle_unknown_event(
+      fidl::UnknownEventMetadata<fuchsia_hardware_bluetooth::Snoop> metadata) override;
+
+  mtx_t mutex() { return mutex_; }
 
  private:
   struct IsocEndpointDescriptors {
@@ -150,10 +199,6 @@ class Device final : public DeviceType, public ddk::BtHciProtocol<Device> {
   // separately.
   static const int kNumChannels = 2;
 
-  static const int kEventBufSize = 255 + 2;  // 2 byte header + payload
-
-  static const int kScoMaxPacketSize = 255 + 3;  // 3 byte header + payload
-
   using usb_callback_t = void (*)(void*, usb_request_t*);
 
   void ReadIsocInterfaces(usb_desc_iter_t* config_desc_iter);
@@ -173,8 +218,8 @@ class Device final : public DeviceType, public ddk::BtHciProtocol<Device> {
 
   void QueueInterruptRequestsLocked() __TA_REQUIRES(mutex_);
 
-  void SnoopChannelWriteLocked(uint8_t flags, const uint8_t* bytes, size_t length)
-      __TA_REQUIRES(mutex_);
+  void SnoopChannelWriteLocked(bt_hci_snoop_type_t type, bool is_received, const uint8_t* bytes,
+                               size_t length) __TA_REQUIRES(mutex_);
 
   // Requests removal of this device. Idempotent.
   void RemoveDeviceLocked() __TA_REQUIRES(mutex_);
@@ -207,6 +252,9 @@ class Device final : public DeviceType, public ddk::BtHciProtocol<Device> {
 
   // Handle a readable or closed signal from the snoop channel.
   void HciHandleSnoopSignals(zx_signals_t);
+
+  void OnScoData(std::vector<uint8_t>&, fit::function<void(void)>);
+  void OnScoStop();
 
   zx_status_t HciOpenChannel(ChannelWrapper* out, zx::channel in);
 
@@ -253,11 +301,12 @@ class Device final : public DeviceType, public ddk::BtHciProtocol<Device> {
   std::vector<IsocEndpointDescriptors> isoc_endp_descriptors_;
 
   // for accumulating HCI events
-  uint8_t event_buffer_[kEventBufSize] __TA_GUARDED(mutex_);
+  uint8_t event_buffer_[fuchsia_hardware_bluetooth::kEventMax] __TA_GUARDED(mutex_);
   size_t event_buffer_offset_ __TA_GUARDED(mutex_) = 0u;
   size_t event_buffer_packet_length_ __TA_GUARDED(mutex_) = 0u;
 
-  PacketReassembler<kScoMaxPacketSize> sco_reassembler_ __TA_GUARDED(mutex_);
+  PacketReassembler<fuchsia_hardware_bluetooth::kScoPacketMax> sco_reassembler_
+      __TA_GUARDED(mutex_);
 
   // pool of free USB requests
   list_node_t free_event_reqs_ __TA_GUARDED(mutex_);
@@ -265,6 +314,14 @@ class Device final : public DeviceType, public ddk::BtHciProtocol<Device> {
   list_node_t free_acl_write_reqs_ __TA_GUARDED(mutex_);
   list_node_t free_sco_read_reqs_ __TA_GUARDED(mutex_);
   list_node_t free_sco_write_reqs_ __TA_GUARDED(mutex_);
+
+  // Enqueue the completer when queuing a ACL packet send request to with |UsbRequestSend|. Take out
+  // a completer and reply when the packet is sent(i.e. |HciAclWriteComplete| is called).
+  std::queue<SendCompleter::Async> acl_completer_queue_;
+
+  // When SCO data packet gets into sco_send_queue_, the corresponding completer will be queued
+  // here, and the callback will be dequeued and called when that packet is sent.
+  std::queue<fit::function<void(void)>> sco_callback_queue_;
 
   size_t parent_req_size_ = 0u;
   std::atomic_size_t allocated_requests_count_ = 0u;
@@ -286,6 +343,32 @@ class Device final : public DeviceType, public ddk::BtHciProtocol<Device> {
   // This is separate from mutex_ so that request operations don't need to acquire mutex_ (which
   // may degrade performance).
   mtx_t pending_request_lock_ __TA_ACQUIRED_AFTER(mutex_);
+
+  std::optional<component::OutgoingDirectory> outgoing_;
+
+  // When |snoop_seq_| - |acked_snoop_seq_| > |kSeqNumMaxDiff|, it means that the receiver of
+  // snoop packets can't catch up the speed that the driver sends packets. Drop snoop packets if
+  // this happens.
+  static constexpr uint64_t kSeqNumMaxDiff = 20;
+
+  fidl::Client<fuchsia_hardware_bluetooth::Snoop> snoop_client_;
+
+  // This is the sequence number of the snoop packets that this driver sends out. The receiver will
+  // need to ack the packets with their sequence number, and the driver will record the highest
+  // acked sequence number with |acked_snoop_seq_|.
+  uint64_t snoop_seq_ = 0;
+  uint64_t acked_snoop_seq_ = 0;
+
+  // When |acked_snoop_seq_| fails to catch up |snoop_seq_|, the driver will drop the snoop packets
+  // until |acked_snoop_seq_| catches up. Only one warning log should be emitted during this
+  // process, instead of for all the snoop packets after the failure starts happening. This boolean
+  // is to mark whether the log has been emitted in each failure.
+  bool snoop_warning_emitted_ = false;
+
+  ScoConnectionServer sco_connection_server_;
+  std::optional<fidl::ServerBinding<fuchsia_hardware_bluetooth::ScoConnection>>
+      sco_connection_binding_;
+  fidl::ServerBindingGroup<fuchsia_hardware_bluetooth::HciTransport> hci_transport_binding_;
 };
 
 }  // namespace bt_transport_usb

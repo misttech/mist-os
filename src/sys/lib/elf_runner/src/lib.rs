@@ -384,7 +384,7 @@ impl ElfRunner {
         // If the program escrowed a dictionary, give it back via `numbered_handles`.
         if let Some(escrowed_dictionary) = start_info.escrowed_dictionary {
             handle_infos.push(fproc::HandleInfo {
-                handle: escrowed_dictionary.into_channel().into(),
+                handle: escrowed_dictionary.token.into_handle().into(),
                 id: HandleInfo::new(HandleType::EscrowedDictionary, 0).as_raw(),
             });
         }

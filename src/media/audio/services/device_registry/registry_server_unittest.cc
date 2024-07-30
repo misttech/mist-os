@@ -161,7 +161,7 @@ TEST_F(RegistryServerCodecTest, WatchRemovesThenDeviceRemove) {
 
   RunLoopUntilIdle();
   ASSERT_TRUE(received_callback);
-  ASSERT_TRUE(added_device_id);
+  ASSERT_TRUE(added_device_id.has_value());
   received_callback = false;
   std::optional<TokenId> removed_device_id;
 
@@ -213,7 +213,7 @@ TEST_F(RegistryServerCodecTest, DeviceRemoveThenWatchRemoves) {
 
   RunLoopUntilIdle();
   ASSERT_TRUE(received_callback);
-  ASSERT_TRUE(added_device_id);
+  ASSERT_TRUE(added_device_id.has_value());
   fake_driver->DropCodec();
 
   RunLoopUntilIdle();
@@ -299,7 +299,7 @@ TEST_F(RegistryServerCodecTest, DeviceRemoveAddThenWatches) {
 
   RunLoopUntilIdle();
   ASSERT_TRUE(received_callback);
-  ASSERT_TRUE(first_added_id);
+  ASSERT_TRUE(first_added_id.has_value());
   fake_driver->DropCodec();
 
   RunLoopUntilIdle();
@@ -325,7 +325,7 @@ TEST_F(RegistryServerCodecTest, DeviceRemoveAddThenWatches) {
 
   RunLoopUntilIdle();
   ASSERT_TRUE(received_callback);
-  ASSERT_TRUE(removed_device_id);
+  ASSERT_TRUE(removed_device_id.has_value());
   EXPECT_EQ(*first_added_id, *removed_device_id);
   received_callback = false;
   std::optional<TokenId> second_added_id;
@@ -342,7 +342,7 @@ TEST_F(RegistryServerCodecTest, DeviceRemoveAddThenWatches) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
-  ASSERT_TRUE(second_added_id);
+  ASSERT_TRUE(second_added_id.has_value());
   EXPECT_NE(*first_added_id, *second_added_id);
   EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
 }
@@ -373,7 +373,7 @@ TEST_F(RegistryServerCodecTest, CreateObserver) {
 
   RunLoopUntilIdle();
   ASSERT_TRUE(received_callback);
-  ASSERT_TRUE(added_id);
+  ASSERT_TRUE(added_id.has_value());
   auto [observer_client_end, observer_server_end] = CreateNaturalAsyncClientOrDie<fad::Observer>();
   auto observer_client = fidl::Client<fad::Observer>(std::move(observer_client_end), dispatcher(),
                                                      observer_fidl_handler().get());
@@ -510,7 +510,7 @@ TEST_F(RegistryServerCompositeTest, WatchRemovesThenDeviceRemove) {
 
   RunLoopUntilIdle();
   ASSERT_TRUE(received_callback);
-  ASSERT_TRUE(added_device_id);
+  ASSERT_TRUE(added_device_id.has_value());
   received_callback = false;
   std::optional<TokenId> removed_device_id;
 
@@ -562,7 +562,7 @@ TEST_F(RegistryServerCompositeTest, DeviceRemoveThenWatchRemoves) {
 
   RunLoopUntilIdle();
   ASSERT_TRUE(received_callback);
-  ASSERT_TRUE(added_device_id);
+  ASSERT_TRUE(added_device_id.has_value());
   fake_driver->DropComposite();
 
   RunLoopUntilIdle();
@@ -648,7 +648,7 @@ TEST_F(RegistryServerCompositeTest, DeviceRemoveAddThenWatches) {
 
   RunLoopUntilIdle();
   ASSERT_TRUE(received_callback);
-  ASSERT_TRUE(first_added_id);
+  ASSERT_TRUE(first_added_id.has_value());
   fake_driver->DropComposite();
 
   RunLoopUntilIdle();
@@ -674,7 +674,7 @@ TEST_F(RegistryServerCompositeTest, DeviceRemoveAddThenWatches) {
 
   RunLoopUntilIdle();
   ASSERT_TRUE(received_callback);
-  ASSERT_TRUE(removed_device_id);
+  ASSERT_TRUE(removed_device_id.has_value());
   EXPECT_EQ(*first_added_id, *removed_device_id);
   received_callback = false;
   std::optional<TokenId> second_added_id;
@@ -691,7 +691,7 @@ TEST_F(RegistryServerCompositeTest, DeviceRemoveAddThenWatches) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
-  ASSERT_TRUE(second_added_id);
+  ASSERT_TRUE(second_added_id.has_value());
   EXPECT_NE(*first_added_id, *second_added_id);
   EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
 }
@@ -722,7 +722,7 @@ TEST_F(RegistryServerCompositeTest, CreateObserver) {
 
   RunLoopUntilIdle();
   ASSERT_TRUE(received_callback);
-  ASSERT_TRUE(added_id);
+  ASSERT_TRUE(added_id.has_value());
   auto [observer_client_end, observer_server_end] = CreateNaturalAsyncClientOrDie<fad::Observer>();
   auto observer_client = fidl::Client<fad::Observer>(std::move(observer_client_end), dispatcher(),
                                                      observer_fidl_handler().get());
@@ -859,7 +859,7 @@ TEST_F(RegistryServerStreamConfigTest, WatchRemovesThenDeviceRemove) {
 
   RunLoopUntilIdle();
   ASSERT_TRUE(received_callback);
-  ASSERT_TRUE(added_device_id);
+  ASSERT_TRUE(added_device_id.has_value());
   received_callback = false;
   std::optional<TokenId> removed_device_id;
 
@@ -911,7 +911,7 @@ TEST_F(RegistryServerStreamConfigTest, DeviceRemoveThenWatchRemoves) {
 
   RunLoopUntilIdle();
   ASSERT_TRUE(received_callback);
-  ASSERT_TRUE(added_device_id);
+  ASSERT_TRUE(added_device_id.has_value());
   fake_driver->DropStreamConfig();
 
   RunLoopUntilIdle();
@@ -997,7 +997,7 @@ TEST_F(RegistryServerStreamConfigTest, DeviceRemoveAddThenWatches) {
 
   RunLoopUntilIdle();
   ASSERT_TRUE(received_callback);
-  ASSERT_TRUE(first_added_id);
+  ASSERT_TRUE(first_added_id.has_value());
   fake_driver->DropStreamConfig();
 
   RunLoopUntilIdle();
@@ -1023,7 +1023,7 @@ TEST_F(RegistryServerStreamConfigTest, DeviceRemoveAddThenWatches) {
 
   RunLoopUntilIdle();
   ASSERT_TRUE(received_callback);
-  ASSERT_TRUE(removed_device_id);
+  ASSERT_TRUE(removed_device_id.has_value());
   EXPECT_EQ(*first_added_id, *removed_device_id);
   received_callback = false;
   std::optional<TokenId> second_added_id;
@@ -1040,7 +1040,7 @@ TEST_F(RegistryServerStreamConfigTest, DeviceRemoveAddThenWatches) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
-  ASSERT_TRUE(second_added_id);
+  ASSERT_TRUE(second_added_id.has_value());
   EXPECT_NE(*first_added_id, *second_added_id);
   EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
 }
@@ -1071,7 +1071,7 @@ TEST_F(RegistryServerStreamConfigTest, CreateObserver) {
 
   RunLoopUntilIdle();
   ASSERT_TRUE(received_callback);
-  ASSERT_TRUE(added_id);
+  ASSERT_TRUE(added_id.has_value());
   auto [observer_client_end, observer_server_end] = CreateNaturalAsyncClientOrDie<fad::Observer>();
   auto observer_client = fidl::Client<fad::Observer>(std::move(observer_client_end), dispatcher(),
                                                      observer_fidl_handler().get());

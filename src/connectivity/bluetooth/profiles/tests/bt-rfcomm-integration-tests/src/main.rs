@@ -190,26 +190,17 @@ async fn multiple_rfcomm_clients_can_register_advertisements() {
 
 /// Verifies that the `send` RFCOMM channel can be written to and that the `data` is received by the
 /// `receive` RFCOMM channel.
-async fn send_and_expect_data(send: &Channel, receive: &Channel, data: Vec<u8>) {
+async fn send_and_expect_data(send: &Channel, receive: &mut Channel, data: Vec<u8>) {
     let n = data.len();
-    assert_eq!(send.as_ref().write(&data[..]), Ok(n));
+    assert_eq!(send.write(&data[..]), Ok(n));
 
-    // `read_datagram` occasionally returns ready with Ok(0) when there are no bytes read from the
-    // socket. Instead of erroring, we retry the read operation until we actually receive a nonzero
-    // amount of data over the channel.
-    loop {
-        let mut actual_bytes = Vec::new();
-        let read_result = receive
-            .read_datagram(&mut actual_bytes)
-            .on_timeout(RFCOMM_CHANNEL_TIMEOUT.after_now(), move || Err(fidl::Status::TIMED_OUT))
-            .await
-            .expect("reading from channel is ok");
-
-        if read_result != 0 {
-            assert_eq!(actual_bytes, data);
-            break;
-        }
-    }
+    let actual_bytes = receive
+        .next()
+        .on_timeout(RFCOMM_CHANNEL_TIMEOUT.after_now(), || Some(Err(fidl::Status::TIMED_OUT)))
+        .await
+        .expect("not closed")
+        .expect("is ok");
+    assert_eq!(actual_bytes, data);
 }
 
 /// Tests the connection flow between two Fuchsia RFCOMM components. Each RFCOMM component is driven
@@ -257,7 +248,7 @@ async fn rfcomm_component_connecting_to_another_rfcomm_component() {
     let connect_fut = pin!(connect_fut);
 
     // Each client should be delivered one end of the RFCOMM channel.
-    let (channel1, channel2): (Channel, Channel) =
+    let (mut channel1, mut channel2): (Channel, Channel) =
         match futures::future::join(client1.next(), connect_fut).await {
             (Some(Ok(ProfileEvent::PeerConnected { id, channel, .. })), Ok(Ok(channel2))) => {
                 assert_eq!(id, other_rfcomm.peer_id());
@@ -273,9 +264,9 @@ async fn rfcomm_component_connecting_to_another_rfcomm_component() {
 
     // Data can be exchanged in both directions.
     let data1 = vec![0x05, 0x06, 0x07, 0x08, 0x09];
-    send_and_expect_data(&channel1, &channel2, data1).await;
+    send_and_expect_data(&channel1, &mut channel2, data1).await;
     let data2 = vec![0x98, 0x97, 0x96, 0x95];
-    send_and_expect_data(&channel2, &channel1, data2).await;
+    send_and_expect_data(&channel2, &mut channel1, data2).await;
 }
 
 fn a2dp_service_definition() -> bredr::ServiceDefinition {

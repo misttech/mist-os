@@ -94,7 +94,7 @@ zx::result<> GuestPhysicalAspace::UnmapRange(zx_gpaddr_t guest_paddr, size_t len
 }
 
 zx::result<> GuestPhysicalAspace::PageFault(zx_gpaddr_t guest_paddr) {
-  __UNINITIALIZED LazyPageRequest page_request;
+  __UNINITIALIZED MultiPageRequest page_request;
 
   zx_status_t status;
   do {
@@ -122,7 +122,7 @@ zx::result<> GuestPhysicalAspace::PageFault(zx_gpaddr_t guest_paddr) {
     }
 
     if (status == ZX_ERR_SHOULD_WAIT) {
-      zx_status_t st = page_request->Wait();
+      zx_status_t st = page_request.Wait();
       if (st != ZX_OK) {
         return zx::error(st);
       }

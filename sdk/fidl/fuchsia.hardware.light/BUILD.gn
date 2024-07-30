@@ -9,7 +9,10 @@ fidl("fuchsia.hardware.light") {
   stable = true
   sdk_area = "Unknown"
 
-  sources = [ "light.fidl" ]
+  sources = [
+    "light.fidl",
+    "metadata.fidl",
+  ]
 
   enable_hlcpp = true
 }

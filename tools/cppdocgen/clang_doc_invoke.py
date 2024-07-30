@@ -5,9 +5,9 @@
 
 import argparse
 import os
-import tempfile
 import subprocess
 import sys
+import tempfile
 import zipfile
 
 # Wraps a clang-doc invocation for the hermetic build.

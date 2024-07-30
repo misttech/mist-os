@@ -29,14 +29,103 @@ namespace provider = fuchsia::tracing::provider;
 
 // forward decl, here to break mutual header dependency
 class TraceManagerApp;
+class TraceManager;
+class OldTraceManager;
 
-class TraceManager : public controller::Controller, public provider::Registry {
+class TraceController : public controller::Session {
+  friend TraceManager;
+  friend OldTraceManager;
+
+ public:
+  TraceController(TraceManagerApp* app, std::unique_ptr<TraceSession> session);
+  ~TraceController() override;
+
+  void TerminateTracing(controller::TerminateOptions options, fit::closure cb);
+
+  void OnAlert(const std::string& alert_name);
+
+  // For testing.
+  TraceSession* session() const { return session_.get(); }
+
+ private:
+  // |Session| implementation.
+  void StartTracing(controller::StartOptions options, StartTracingCallback cb) override;
+  void StopTracing(controller::StopOptions options, StopTracingCallback cb) override;
+  void WatchAlert(WatchAlertCallback cb) override;
+  void handle_unknown_method(uint64_t ordinal, bool method_has_response) override;
+
+  void SendSessionStateEvent(controller::SessionState state);
+  controller::SessionState TranslateSessionState(TraceSession::State state);
+
+  TraceManagerApp* const app_;
+
+  std::unique_ptr<TraceSession> session_;
+  std::queue<std::string> alerts_;
+  std::queue<WatchAlertCallback> watch_alert_callbacks_;
+};
+
+class TraceManager : public controller::Provisioner, public provider::Registry {
+  friend TraceController;
+  friend OldTraceManager;
+
  public:
   TraceManager(TraceManagerApp* app, Config config, async::Executor& executor);
   ~TraceManager() override;
 
   // For testing.
-  const TraceSession* session() const { return session_.get(); }
+  TraceSession* session() const;
+
+  // Allow terminate tracing with callback for testing
+  void TerminateTracing(controller::TerminateOptions options,
+                        fit::function<void(controller::Controller_TerminateTracing_Result)> cb);
+
+  void OnEmptyControllerSet();
+
+ private:
+  // |Provisioner| implementation.
+  void InitializeTracing(fidl::InterfaceRequest<controller::Session> controller,
+                         controller::TraceConfig config, zx::socket output) override;
+  void GetProviders(GetProvidersCallback cb) override;
+  void GetKnownCategories(GetKnownCategoriesCallback callback) override;
+  void handle_unknown_method(uint64_t ordinal, bool method_has_response) override;
+
+  // |TraceRegistry| implementation.
+  void RegisterProviderWorker(fidl::InterfaceHandle<provider::Provider> provider, uint64_t pid,
+                              fidl::StringPtr name);
+  void RegisterProvider(fidl::InterfaceHandle<provider::Provider> provider, uint64_t pid,
+                        std::string name) override;
+  void RegisterProviderSynchronously(fidl::InterfaceHandle<provider::Provider> provider,
+                                     uint64_t pid, std::string name,
+                                     RegisterProviderSynchronouslyCallback callback) override;
+
+  void CloseSession();
+
+  TraceManagerApp* const app_;
+
+  const Config config_;
+
+  std::shared_ptr<TraceController> trace_controller_;
+  uint32_t next_provider_id_ = 1u;
+  std::list<TraceProviderBundle> providers_;
+  async::Executor& executor_;
+
+  TraceManager(const TraceManager&) = delete;
+  TraceManager(TraceManager&&) = delete;
+  TraceManager& operator=(const TraceManager&) = delete;
+  TraceManager& operator=(TraceManager&&) = delete;
+};
+
+// TODO(b/42083286): Remove after the old trace Controller protocol is removed
+// This is an implementations of the old trace controller FIDL protocol. It is a
+// temporary internal implementation which will be removed once all tracing
+// clients are migrated to use the new protocols.
+class OldTraceManager : public controller::Controller {
+ public:
+  OldTraceManager(TraceManagerApp* app, TraceManager* trace_manager, async::Executor& executor);
+  ~OldTraceManager() override;
+
+  // For testing.
+  TraceSession* session() const;
 
   void OnEmptyControllerSet();
 
@@ -51,35 +140,16 @@ class TraceManager : public controller::Controller, public provider::Registry {
   void WatchAlert(WatchAlertCallback cb) override;
   void handle_unknown_method(uint64_t ordinal, bool method_has_response) override;
 
-  // |TraceRegistry| implementation.
-  void RegisterProviderWorker(fidl::InterfaceHandle<provider::Provider> provider, uint64_t pid,
-                              fidl::StringPtr name);
-  void RegisterProvider(fidl::InterfaceHandle<provider::Provider> provider, uint64_t pid,
-                        std::string name) override;
-  void RegisterProviderSynchronously(fidl::InterfaceHandle<provider::Provider> provider,
-                                     uint64_t pid, std::string name,
-                                     RegisterProviderSynchronouslyCallback callback) override;
-
   void SendSessionStateEvent(controller::SessionState state);
   controller::SessionState TranslateSessionState(TraceSession::State state);
 
   void OnAlert(const std::string& alert_name);
 
+  controller::TerminateResult terminate_result_;
   TraceManagerApp* const app_;
-
-  const Config config_;
-
-  uint32_t next_provider_id_ = 1u;
-  std::unique_ptr<TraceSession> session_;
-  std::list<TraceProviderBundle> providers_;
-  std::queue<std::string> alerts_;
-  std::queue<WatchAlertCallback> watch_alert_callbacks_;
+  TraceManager* const trace_manager_;
+  fidl::InterfacePtr<controller::Session> trace_controller_;
   async::Executor& executor_;
-
-  TraceManager(const TraceManager&) = delete;
-  TraceManager(TraceManager&&) = delete;
-  TraceManager& operator=(const TraceManager&) = delete;
-  TraceManager& operator=(TraceManager&&) = delete;
 };
 
 }  // namespace tracing

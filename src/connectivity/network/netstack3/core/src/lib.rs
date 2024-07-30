@@ -57,7 +57,8 @@ pub mod device {
         PureIpDeviceReceiveFrameMetadata, PureIpHeaderParams, PureIpWeakDeviceId,
     };
     pub use netstack3_device::queue::{
-        ReceiveQueueBindingsContext, TransmitQueueBindingsContext, TransmitQueueConfiguration,
+        BatchSize, ReceiveQueueBindingsContext, TransmitQueueBindingsContext,
+        TransmitQueueConfiguration,
     };
     pub use netstack3_device::{
         ArpConfiguration, ArpConfigurationUpdate, DeviceClassMatcher, DeviceConfiguration,
@@ -73,7 +74,7 @@ pub mod device_socket {
     pub use netstack3_device::socket::{
         DeviceSocketBindingsContext, DeviceSocketMetadata, DeviceSocketTypes, EthernetFrame,
         EthernetHeaderParams, Frame, IpFrame, Protocol, ReceivedFrame, SentFrame, SocketId,
-        SocketInfo, TargetDevice,
+        SocketInfo, TargetDevice, WeakDeviceSocketId,
     };
 }
 
@@ -113,6 +114,7 @@ pub mod ip {
     pub(crate) mod integration {
         mod base;
         mod device;
+        mod multicast_forwarding;
         mod raw;
 
         pub(crate) use device::{CoreCtxWithIpDeviceConfiguration, IpAddrCtxSpec};
@@ -190,7 +192,7 @@ pub mod sync {
 
 /// Methods for dealing with TCP sockets.
 pub mod tcp {
-    pub use netstack3_base::{Payload, SendPayload};
+    pub use netstack3_base::{Payload, PayloadLen, SendPayload};
     pub use netstack3_tcp::{
         AcceptError, BindError, BoundInfo, Buffer, BufferLimits, BufferSizes, ConnectError,
         ConnectionError, ConnectionInfo, IntoBuffers, ListenError, ListenerNotifier, NoConnection,

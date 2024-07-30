@@ -9,9 +9,9 @@ import("//build/test.gni")
 import("//build/zbi/kernel_cmdline.gni")
 
 driver_bind_rules("amlogic_display_bind") {
-  rules = "amlogic-display.bind"
+  rules = "meta/amlogic-display.bind"
   bind_output = "amlogic-display.bindbc"
-  tests = "bind_tests.json"
+  tests = "meta/bind-tests.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.amlogiccanvas:fuchsia.hardware.amlogiccanvas_bindlib",
     "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_bindlib",
@@ -154,7 +154,7 @@ fuchsia_driver("amlogic-display-driver") {
 
 fuchsia_driver_component("amlogic-display") {
   component_name = "amlogic-display"
-  info = "amlogic-display-info.json"
+  info = "meta/amlogic-display-info.json"
   deps = [ ":amlogic-display-driver" ]
   manifest = "meta/amlogic-display.cml"
 }

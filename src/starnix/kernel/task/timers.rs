@@ -2,16 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use starnix_sync::Mutex;
-use std::collections::HashMap;
-
 use crate::signals::{SignalEvent, SignalEventNotify, SignalEventValue};
 use crate::task::interval_timer::{IntervalTimer, IntervalTimerHandle};
 use crate::task::CurrentTask;
 use crate::timer::Timeline;
+use starnix_sync::Mutex;
 use starnix_uapi::errors::Errno;
+use starnix_uapi::ownership::OwnedRef;
 use starnix_uapi::signals::SIGALRM;
 use starnix_uapi::{__kernel_timer_t, error, itimerspec, uapi, TIMER_ABSTIME};
+use std::collections::HashMap;
 
 // Table for POSIX timers from timer_create() that deliver timers via signals (not new-style
 // timerfd's).
@@ -20,21 +20,32 @@ pub struct TimerTable {
     state: Mutex<TimerTableMutableState>,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 struct TimerTableMutableState {
     /// The `TimerId` at which allocation should begin searching for an unused ID.
     next_timer_id: TimerId,
     timers: HashMap<TimerId, IntervalTimerHandle>,
+    itimer_real: IntervalTimerHandle,
+}
+
+impl Default for TimerTableMutableState {
+    fn default() -> Self {
+        let signal_event =
+            SignalEvent::new(SignalEventValue(0), SIGALRM, SignalEventNotify::Signal);
+        let itimer_real = IntervalTimer::new(0, Timeline::RealTime, signal_event)
+            .expect("Failed to create itimer_real");
+        TimerTableMutableState {
+            itimer_real,
+            timers: Default::default(),
+            next_timer_id: Default::default(),
+        }
+    }
 }
 
 pub type TimerId = __kernel_timer_t;
 pub type ClockId = uapi::__kernel_clockid_t;
 
 impl TimerTable {
-    pub fn new() -> TimerTable {
-        Default::default()
-    }
-
     /// Creates a new per-process interval timer.
     ///
     /// The new timer is initially disarmed.
@@ -80,6 +91,10 @@ impl TimerTable {
         Ok(timer_id)
     }
 
+    pub fn itimer_real(&self) -> IntervalTimerHandle {
+        self.state.lock().itimer_real.clone()
+    }
+
     /// Disarms and deletes a timer.
     pub fn delete(&self, id: TimerId) -> Result<(), Errno> {
         let mut state = self.state.lock();
@@ -119,7 +134,7 @@ impl TimerTable {
             let is_absolute = flags == TIMER_ABSTIME as i32;
             itimer.arm(
                 &current_task.kernel(),
-                std::sync::Arc::downgrade(&current_task.thread_group),
+                OwnedRef::downgrade(&current_task.thread_group),
                 new_value,
                 is_absolute,
             )?;

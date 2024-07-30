@@ -14,12 +14,11 @@ import shlex
 import subprocess
 import sys
 import tempfile
-
 from pathlib import Path
 from typing import Any, Dict, Iterable, Sequence, Tuple
 
-import fuchsia
 import cl_utils
+import fuchsia
 
 _SCRIPT_BASENAME = Path(__file__).name
 _SCRIPT_DIR = Path(__file__).parent

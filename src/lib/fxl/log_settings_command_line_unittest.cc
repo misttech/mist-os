@@ -40,19 +40,6 @@ TEST(LogSettings, ParseValidOptions) {
   EXPECT_TRUE(ParseLogSettings(CommandLineFromInitializerList({"argv0"}), &settings));
   EXPECT_EQ(fuchsia_logging::LOG_FATAL, settings.min_log_level);
 
-  EXPECT_TRUE(ParseLogSettings(CommandLineFromInitializerList({"argv0", "--verbose"}), &settings));
-  // verbosity scaled between INFO & DEBUG
-  EXPECT_EQ(fuchsia_logging::LOG_INFO - 1, settings.min_log_level);
-
-  EXPECT_TRUE(
-      ParseLogSettings(CommandLineFromInitializerList({"argv0", "--verbose=0"}), &settings));
-  EXPECT_EQ(fuchsia_logging::LOG_INFO, settings.min_log_level);
-
-  EXPECT_TRUE(
-      ParseLogSettings(CommandLineFromInitializerList({"argv0", "--verbose=5"}), &settings));
-  // verbosity scaled between INFO & DEBUG
-  EXPECT_EQ(fuchsia_logging::LOG_INFO - 5, settings.min_log_level);
-
   EXPECT_TRUE(ParseLogSettings(CommandLineFromInitializerList({"argv0", "--quiet=0"}), &settings));
   EXPECT_EQ(fuchsia_logging::LOG_INFO, settings.min_log_level);
 
@@ -96,12 +83,6 @@ TEST(LogSettings, ParseInvalidOptions) {
   fxl::LogSettings settings;
   settings.min_log_level = fuchsia_logging::LOG_FATAL;
 
-  EXPECT_FALSE(
-      ParseLogSettings(CommandLineFromInitializerList({"argv0", "--verbose=-1"}), &settings));
-  EXPECT_EQ(fuchsia_logging::LOG_FATAL, settings.min_log_level);
-
-  EXPECT_FALSE(ParseLogSettings(CommandLineFromInitializerList({"argv0", "--verbose=123garbage"}),
-                                &settings));
   EXPECT_EQ(fuchsia_logging::LOG_FATAL, settings.min_log_level);
 
   EXPECT_FALSE(
@@ -117,28 +98,8 @@ TEST(LogSettings, ParseInvalidOptions) {
   EXPECT_EQ(fuchsia_logging::LOG_FATAL, settings.min_log_level);
 
   EXPECT_FALSE(ParseLogSettings(
-      CommandLineFromInitializerList({"argv0", "--severity=TRACE --verbose=1"}), &settings));
-  EXPECT_EQ(fuchsia_logging::LOG_FATAL, settings.min_log_level);
-
-  EXPECT_FALSE(ParseLogSettings(
       CommandLineFromInitializerList({"argv0", "--severity=TRACE --quiet=1"}), &settings));
   EXPECT_EQ(fuchsia_logging::LOG_FATAL, settings.min_log_level);
-}
-
-TEST_F(LogSettingsFixture, SetValidOptions) {
-  EXPECT_TRUE(
-      SetLogSettingsFromCommandLine(CommandLineFromInitializerList({"argv0", "--verbose=20"})));
-  // verbosity scaled between INFO & DEBUG, but capped at 15 levels
-  EXPECT_EQ(fuchsia_logging::LOG_DEBUG + 1, fuchsia_logging::GetMinLogSeverity());
-}
-
-TEST_F(LogSettingsFixture, SetInvalidOptions) {
-  fuchsia_logging::LogSeverity old_severity = fuchsia_logging::GetMinLogSeverity();
-
-  EXPECT_FALSE(SetLogSettingsFromCommandLine(
-      CommandLineFromInitializerList({"argv0", "--verbose=garbage"})));
-
-  EXPECT_EQ(old_severity, fuchsia_logging::GetMinLogSeverity());
 }
 
 TEST_F(LogSettingsFixture, ToArgv) {
@@ -150,18 +111,6 @@ TEST_F(LogSettingsFixture, ToArgv) {
 
   EXPECT_TRUE(ParseLogSettings(CommandLineFromInitializerList({"argv0", "--quiet=3"}), &settings));
   EXPECT_TRUE(LogSettingsToArgv(settings) == std::vector<std::string>{"--severity=FATAL"});
-
-  EXPECT_TRUE(ParseLogSettings(CommandLineFromInitializerList({"argv0", "--verbose"}), &settings));
-  EXPECT_TRUE(LogSettingsToArgv(settings) == std::vector<std::string>{"--verbose=1"});
-
-  EXPECT_TRUE(
-      ParseLogSettings(CommandLineFromInitializerList({"argv0", "--verbose=10"}), &settings));
-  EXPECT_TRUE(LogSettingsToArgv(settings) == std::vector<std::string>{"--verbose=10"});
-
-  EXPECT_TRUE(
-      ParseLogSettings(CommandLineFromInitializerList({"argv0", "--verbose=20"}), &settings));
-  EXPECT_TRUE(LogSettingsToArgv(settings) ==
-              std::vector<std::string>{"--verbose=15"});  // verbosity capped
 
   EXPECT_TRUE(
       ParseLogSettings(CommandLineFromInitializerList({"argv0", "--severity=TRACE"}), &settings));
@@ -190,11 +139,6 @@ TEST_F(LogSettingsFixture, ToArgv) {
       ParseLogSettings(CommandLineFromInitializerList({"argv0", "--log-file=/foo"}), &settings));
   EXPECT_TRUE(LogSettingsToArgv(settings) == std::vector<std::string>{"--log-file=/foo"})
       << LogSettingsToArgv(settings)[0];
-
-  EXPECT_TRUE(ParseLogSettings(
-      CommandLineFromInitializerList({"argv0", "--verbose", "--log-file=/foo"}), &settings));
-  EXPECT_TRUE(LogSettingsToArgv(settings) ==
-              (std::vector<std::string>{"--verbose=1", "--log-file=/foo"}));
 #endif
 }
 

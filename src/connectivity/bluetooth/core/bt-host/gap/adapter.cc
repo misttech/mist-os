@@ -32,6 +32,7 @@
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci/low_energy_connector.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci/sequential_command_runner.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/channel_manager.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sm/security_manager.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/transport/emboss_control_packets.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/transport/transport.h"
 
@@ -759,14 +760,14 @@ void AdapterImpl::GetSupportedDelayRange(
     pw::bluetooth::emboss::LogicalTransportType logical_transport_type,
     pw::bluetooth::emboss::DataPathDirection direction,
     const std::optional<std::vector<uint8_t>>& codec_configuration,
-    fit::function<void(zx_status_t, uint32_t, uint32_t)> cb) {
+    GetSupportedDelayRangeCallback cb) {
   if (!state_.IsCommandSupported(
           /*octet=*/45,
           hci_spec::SupportedCommand::kReadLocalSupportedControllerDelay)) {
     bt_log(WARN,
            "gap",
            "read local supported controller delay command not supported");
-    cb(ZX_ERR_NOT_SUPPORTED, /*min=*/0, /*max=*/0);
+    cb(PW_STATUS_UNIMPLEMENTED, /*min=*/0, /*max=*/0);
     return;
   }
   bt_log(INFO, "gap", "retrieving controller codec delay");
@@ -805,11 +806,11 @@ void AdapterImpl::GetSupportedDelayRange(
                          WARN,
                          "gap",
                          "read local supported controller delay failed")) {
-          cb(ZX_ERR_INTERNAL, /*min=*/0, /*max=*/0);
+          cb(PW_STATUS_UNKNOWN, /*min=*/0, /*max=*/0);
           return;
         }
         bt_log(INFO, "gap", "controller delay read successfully");
-        cb(ZX_OK,
+        cb(PW_STATUS_OK,
            view.min_controller_delay().Read(),
            view.max_controller_delay().Read());
       });
@@ -1353,6 +1354,29 @@ void AdapterImpl::InitializeStep3() {
            "supported: %d)",
            state_.sco_buffer_info.IsAvailable(),
            sco_flow_control_supported);
+  }
+
+  const hci::DataBufferInfo iso_data_buffer_info =
+      state_.low_energy_state.iso_data_buffer_info();
+  if (iso_data_buffer_info.IsAvailable()) {
+    bt_log(INFO,
+           "gap",
+           "ISO data buffer information available (size: %zu, count: %zu)",
+           iso_data_buffer_info.max_data_length(),
+           iso_data_buffer_info.max_num_packets());
+    if (hci_->InitializeIsoDataChannel(iso_data_buffer_info)) {
+      bt_log(INFO, "gap", "IsoDataChannel initialized successfully");
+    } else {
+      bt_log(
+          WARN,
+          "gap",
+          "Failed to initialize IsoDataChannel, proceeding without HCI ISO support");
+    }
+  } else {
+    bt_log(
+        INFO,
+        "gap",
+        "No ISO data buffer information available, not starting data channel");
   }
 
   hci_->AttachInspect(adapter_node_);

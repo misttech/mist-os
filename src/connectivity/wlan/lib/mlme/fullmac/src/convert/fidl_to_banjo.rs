@@ -294,17 +294,17 @@ pub fn convert_start_bss_request(
         vendor_ie_count: 0,
     };
     if let Some(rsne) = &req.rsne {
-        if rsne.len() > banjo_wlan_ieee80211::WLAN_IE_BODY_MAX_LEN as usize {
+        if rsne.len() > banjo_wlan_ieee80211::WLAN_IE_MAX_LEN as usize {
             warn!(
                 "Truncating rsne len from {} to {}",
                 rsne.len(),
-                banjo_wlan_ieee80211::WLAN_IE_BODY_MAX_LEN
+                banjo_wlan_ieee80211::WLAN_IE_MAX_LEN
             );
         }
         // Assuming here that the input StartRequest outlives the output
         // WlanFullmacImplStartBssRequest.
         request.rsne_list = rsne.as_ptr();
-        request.rsne_count = min(rsne.len(), banjo_wlan_ieee80211::WLAN_IE_BODY_MAX_LEN as usize);
+        request.rsne_count = min(rsne.len(), banjo_wlan_ieee80211::WLAN_IE_MAX_LEN as usize);
     }
     request
 }

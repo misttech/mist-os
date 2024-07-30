@@ -222,27 +222,6 @@ void BlockDevice::OpenSession(OpenSessionRequestView request,
       });
 }
 
-void BlockDevice::ReadBlocks(ReadBlocksRequestView request, ReadBlocksCompleter::Sync& completer) {
-  if (zx_status_t status =
-          DoIo(request->vmo, request->length, request->dev_offset, request->vmo_offset, false);
-      status != ZX_OK) {
-    completer.ReplyError(status);
-    return;
-  }
-  completer.ReplySuccess();
-}
-
-void BlockDevice::WriteBlocks(WriteBlocksRequestView request,
-                              WriteBlocksCompleter::Sync& completer) {
-  if (zx_status_t status =
-          DoIo(request->vmo, request->length, request->dev_offset, request->vmo_offset, true);
-      status != ZX_OK) {
-    completer.ReplyError(status);
-    return;
-  }
-  completer.ReplySuccess();
-}
-
 void BlockDevice::GetTypeGuid(GetTypeGuidCompleter::Sync& completer) {
   if (!parent_partition_protocol_.is_valid()) {
     completer.Reply(ZX_ERR_NOT_SUPPORTED, {});

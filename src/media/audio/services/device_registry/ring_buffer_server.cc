@@ -89,7 +89,7 @@ void RingBufferServer::SetActiveChannels(SetActiveChannelsRequest& request,
     return;
   }
 
-  if (active_channels_completer_) {
+  if (active_channels_completer_.has_value()) {
     ADR_WARN_METHOD() << "previous `SetActiveChannels` request has not yet completed";
     completer.Reply(fit::error(fad::RingBufferSetActiveChannelsError::kAlreadyPending));
     return;
@@ -103,13 +103,13 @@ void RingBufferServer::SetActiveChannels(SetActiveChannelsRequest& request,
     return;
   }
 
-  if (!request.channel_bitmask()) {
+  if (!request.channel_bitmask().has_value()) {
     ADR_WARN_METHOD() << "required field 'channel_bitmask' is missing";
     completer.Reply(fit::error(fad::RingBufferSetActiveChannelsError::kInvalidChannelBitmask));
     return;
   }
 
-  FX_CHECK(device_->ring_buffer_format(element_id_).channel_count());
+  FX_CHECK(device_->ring_buffer_format(element_id_).channel_count().has_value());
   if (*request.channel_bitmask() >=
       (1u << *device_->ring_buffer_format(element_id_).channel_count())) {
     ADR_WARN_METHOD() << "channel_bitmask (0x0" << std::hex << *request.channel_bitmask()
@@ -125,7 +125,7 @@ void RingBufferServer::SetActiveChannels(SetActiveChannelsRequest& request,
       element_id_, *request.channel_bitmask(), [this](zx::result<zx::time> result) {
         ADR_LOG_OBJECT(kLogRingBufferFidlResponses) << "Device/SetActiveChannels response";
         // If we have no async completer, maybe we're shutting down and it was cleared. Just exit.
-        if (!active_channels_completer_) {
+        if (!active_channels_completer_.has_value()) {
           ADR_WARN_OBJECT()
               << "active_channels_completer_ gone by the time the StartRingBuffer callback ran";
           return;
@@ -164,7 +164,7 @@ void RingBufferServer::Start(StartRequest& request, StartCompleter::Sync& comple
     return;
   }
 
-  if (start_completer_) {
+  if (start_completer_.has_value()) {
     ADR_WARN_METHOD() << "previous `Start` request has not yet completed";
     completer.Reply(fit::error(fad::RingBufferStartError::kAlreadyPending));
     return;
@@ -180,7 +180,7 @@ void RingBufferServer::Start(StartRequest& request, StartCompleter::Sync& comple
   device_->StartRingBuffer(element_id_, [this](zx::result<zx::time> result) {
     ADR_LOG_OBJECT(kLogRingBufferFidlResponses) << "Device/StartRingBuffer response";
     // If we have no async completer, maybe we're shutting down and it was cleared. Just exit.
-    if (!start_completer_) {
+    if (!start_completer_.has_value()) {
       ADR_WARN_OBJECT() << "start_completer_ gone by the time the StartRingBuffer callback ran";
       return;
     }
@@ -208,7 +208,7 @@ void RingBufferServer::Stop(StopRequest& request, StopCompleter::Sync& completer
     return;
   }
 
-  if (stop_completer_) {
+  if (stop_completer_.has_value()) {
     ADR_WARN_METHOD() << "previous `Stop` request has not yet completed";
     completer.Reply(fit::error(fad::RingBufferStopError::kAlreadyPending));
     return;
@@ -223,7 +223,7 @@ void RingBufferServer::Stop(StopRequest& request, StopCompleter::Sync& completer
   stop_completer_ = completer.ToAsync();
   device_->StopRingBuffer(element_id_, [this](zx_status_t status) {
     ADR_LOG_OBJECT(kLogRingBufferFidlResponses) << "Device/StopRingBuffer response";
-    if (!stop_completer_) {
+    if (!stop_completer_.has_value()) {
       // If we have no async completer, maybe we're shutting down and it was cleared. Just exit.
       ADR_WARN_OBJECT() << "stop_completer_ gone by the time the StopRingBuffer callback ran";
       return;
@@ -251,7 +251,7 @@ void RingBufferServer::WatchDelayInfo(WatchDelayInfoCompleter::Sync& completer) 
     return;
   }
 
-  if (delay_info_completer_) {
+  if (delay_info_completer_.has_value()) {
     ADR_WARN_METHOD() << "previous `WatchDelayInfo` request has not yet completed";
     completer.Reply(fit::error(fad::RingBufferWatchDelayInfoError::kAlreadyPending));
     return;
@@ -261,7 +261,7 @@ void RingBufferServer::WatchDelayInfo(WatchDelayInfoCompleter::Sync& completer) 
   MaybeCompleteWatchDelayInfo();
 }
 
-void RingBufferServer::DelayInfoChanged(const fad::DelayInfo& delay_info) {
+void RingBufferServer::DelayInfoIsChanged(const fad::DelayInfo& delay_info) {
   ADR_LOG_METHOD(kLogRingBufferFidlResponses || kLogNotifyMethods);
 
   new_delay_info_to_notify_ = delay_info;
@@ -269,7 +269,7 @@ void RingBufferServer::DelayInfoChanged(const fad::DelayInfo& delay_info) {
 }
 
 void RingBufferServer::MaybeCompleteWatchDelayInfo() {
-  if (new_delay_info_to_notify_ && delay_info_completer_) {
+  if (new_delay_info_to_notify_.has_value() && delay_info_completer_.has_value()) {
     auto delay_info = *new_delay_info_to_notify_;
     new_delay_info_to_notify_.reset();
 

@@ -77,7 +77,7 @@ static_library("blobfs") {
   ]
   public_deps = [
     # format.h includes digest.h.
-    "//sdk/fidl/fuchsia.fs:fuchsia.fs_hlcpp",
+    "//sdk/fidl/fuchsia.fs:fuchsia.fs_cpp",
     "//sdk/lib/fit",
     "//sdk/lib/fit-promise",
     "//src/lib/digest",

@@ -4,8 +4,8 @@
 # found in the LICENSE file.
 """Assert that drivers aren't included in the build without a driver component"""
 
-import json
 import argparse
+import json
 
 
 def main():

@@ -13,6 +13,7 @@ namespace {
 
 TEST(CustomArtifactTest, WriteFile) {
   struct stat buf;
+  // TODO(https://fxbug.dev/317285180) don't skip on baseline
   if (stat("/custom_artifacts", &buf) == -1 && errno == ENOENT) {
     GTEST_SKIP() << "No /custom_artifacts found, skipping";
   }

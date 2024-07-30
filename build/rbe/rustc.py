@@ -11,11 +11,10 @@ import dataclasses
 import enum
 import os
 import tempfile
-
-import cl_utils
-
 from pathlib import Path
 from typing import AbstractSet, Iterable, Mapping, Optional, Sequence, Tuple
+
+import cl_utils
 
 _RUSTC_FUSED_FLAGS = ["-C", "-L", "-Z"]
 

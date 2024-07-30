@@ -4,11 +4,11 @@
 # found in the LICENSE file.
 
 import argparse
-import sys
-import subprocess
-import pathlib
-import os
 import json
+import os
+import pathlib
+import subprocess
+import sys
 import unittest
 from typing import List
 

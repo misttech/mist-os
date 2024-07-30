@@ -54,6 +54,11 @@ class LoadModule;
 template <class Loader>
 using LoadModuleList = fbl::DoublyLinkedList<std::unique_ptr<LoadModule<Loader>>>;
 
+// Use an AllocCheckerContainer that supports fallible allocations; methods
+// return a boolean value to signify allocation success or failure.
+template <typename T>
+using Vector = elfldltl::AllocCheckerContainer<fbl::Vector>::Container<T>;
+
 // TODO(https://fxbug.dev/324136831): comment on how ModuleHandle relates to
 // startup modules when the latter is supported.
 // TODO(https://fxbug.dev/328135195): comment on the reference counting when
@@ -125,11 +130,6 @@ class ModuleHandle : public fbl::DoublyLinkedListable<std::unique_ptr<ModuleHand
   AbiModule abi_module_;
 };
 
-// Use a AllocCheckerContainer that supports fallible allocations; methods
-// return a boolean value to signify allocation success or failure.
-template <typename T>
-using Vector = elfldltl::AllocCheckerContainer<fbl::Vector>::Container<T>;
-
 // LoadModule is the temporary data structure created to load a file; a
 // LoadModule is created when a file needs to be loaded, and is destroyed after
 // the file module and all its dependencies have been loaded, decoded, symbols
@@ -188,7 +188,7 @@ class LoadModule : public ld::LoadModule<ld::DecodedModuleInMemory<>>,
     // the image.  This fills in load_info() as well as the module vaddr bounds
     // and phdrs fields.
     Loader loader;
-    auto headers = decoded().LoadFromFile(diag, loader, std::move(file));
+    auto headers = decoded().LoadFromFile(diag, loader, std::forward<File>(file));
     if (!headers) [[unlikely]] {
       return std::nullopt;
     }

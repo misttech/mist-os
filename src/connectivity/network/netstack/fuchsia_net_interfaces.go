@@ -73,7 +73,7 @@ func deviceClassFromPortClass(portClass network.PortClass) network.DeviceClass {
 		return network.DeviceClassPpp
 	case network.PortClassEthernet:
 		return network.DeviceClassEthernet
-	case network.PortClassWlan:
+	case network.PortClassWlanClient:
 		return network.DeviceClassWlan
 	case network.PortClassWlanAp:
 		return network.DeviceClassWlanAp

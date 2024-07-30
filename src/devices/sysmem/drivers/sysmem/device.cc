@@ -725,18 +725,12 @@ zx::result<fidl::ClientEnd<fuchsia_io::Directory>> Device::SetupOutgoingServiceD
                 .allocator_v1 =
                     [this](fidl::ServerEnd<fuchsia_sysmem::Allocator> request) {
                       // The Allocator is channel-owned / self-owned.
-                      postTask([this, allocator_request = request.TakeChannel()]() mutable {
-                        // The Allocator is channel-owned / self-owned.
-                        Allocator::CreateChannelOwnedV1(std::move(allocator_request), this);
-                      });
+                      Allocator::CreateChannelOwnedV1(request.TakeChannel(), this);
                     },
                 .allocator_v2 =
                     [this](fidl::ServerEnd<fuchsia_sysmem2::Allocator> request) {
                       // The Allocator is channel-owned / self-owned.
-                      postTask([this, allocator_request = request.TakeChannel()]() mutable {
-                        // The Allocator is channel-owned / self-owned.
-                        Allocator::CreateChannelOwnedV2(std::move(allocator_request), this);
-                      });
+                      Allocator::CreateChannelOwnedV2(request.TakeChannel(), this);
                     },
             }));
 

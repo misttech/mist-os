@@ -214,7 +214,7 @@ zx::result<> Controller::RemoveDisplay(DisplayId display_id) {
   }
 
   while (fbl::RefPtr<Image> image = removed_display->images.pop_front()) {
-    AssertMtxAliasHeld(image->mtx());
+    AssertMtxAliasHeld(*image->mtx());
     image->StartRetire();
     image->OnRetire();
   }
@@ -247,8 +247,7 @@ zx::result<> Controller::RemoveDisplay(DisplayId display_id) {
   return post_task_result;
 }
 
-void Controller::DisplayControllerInterfaceOnDisplayAdded(
-    const raw_display_info_t* banjo_display_info) {
+void Controller::DisplayEngineListenerOnDisplayAdded(const raw_display_info_t* banjo_display_info) {
   ZX_DEBUG_ASSERT(banjo_display_info != nullptr);
   zx::result<> added_display_result = AddDisplay(*banjo_display_info);
   if (added_display_result.is_error()) {
@@ -257,7 +256,7 @@ void Controller::DisplayControllerInterfaceOnDisplayAdded(
   }
 }
 
-void Controller::DisplayControllerInterfaceOnDisplayRemoved(uint64_t banjo_display_id) {
+void Controller::DisplayEngineListenerOnDisplayRemoved(uint64_t banjo_display_id) {
   DisplayId display_id = ToDisplayId(banjo_display_id);
   zx::result<> remove_display_result = RemoveDisplay(display_id);
   if (remove_display_result.is_error()) {
@@ -265,7 +264,7 @@ void Controller::DisplayControllerInterfaceOnDisplayRemoved(uint64_t banjo_displ
   }
 }
 
-void Controller::DisplayControllerInterfaceOnCaptureComplete() {
+void Controller::DisplayEngineListenerOnCaptureComplete() {
   if (!supports_capture_) {
     zxlogf(ERROR,
            "OnCaptureComplete(): the display engine doesn't support "
@@ -296,9 +295,9 @@ void Controller::DisplayControllerInterfaceOnCaptureComplete() {
   }
 }
 
-void Controller::DisplayControllerInterfaceOnDisplayVsync(
-    uint64_t banjo_display_id, zx_time_t banjo_timestamp,
-    const config_stamp_t* banjo_config_stamp_ptr) {
+void Controller::DisplayEngineListenerOnDisplayVsync(uint64_t banjo_display_id,
+                                                     zx_time_t banjo_timestamp,
+                                                     const config_stamp_t* banjo_config_stamp_ptr) {
   // Emit an event called "VSYNC", which is by convention the event
   // that Trace Viewer looks for in its "Highlight VSync" feature.
   TRACE_INSTANT("gfx", "VSYNC", TRACE_SCOPE_THREAD, "display_id", banjo_display_id);
@@ -395,7 +394,7 @@ void Controller::DisplayControllerInterfaceOnDisplayVsync(
       if (should_retire) {
         fbl::RefPtr<Image> image_to_retire = info->images.erase(it++);
 
-        AssertMtxAliasHeld(image_to_retire->mtx());
+        AssertMtxAliasHeld(*image_to_retire->mtx());
         image_to_retire->OnRetire();
         // Older images may not be presented. Ending their flows here
         // ensures the correctness of traces.
@@ -557,7 +556,7 @@ void Controller::ApplyConfig(DisplayConfig* configs[], int32_t count, ConfigStam
 
         // Set the image controller config stamp so vsync knows what config the
         // image was used at.
-        AssertMtxAliasHeld(image->mtx());
+        AssertMtxAliasHeld(*image->mtx());
         image->set_latest_controller_config_stamp(applied_config_stamp);
         image->StartPresent();
 
@@ -666,7 +665,6 @@ void Controller::OnClientDead(ClientProxy* client) {
 }
 
 zx::result<cpp20::span<const DisplayTiming>> Controller::GetDisplayTimings(DisplayId display_id) {
-  ZX_DEBUG_ASSERT(mtx_trylock(&mtx_) == thrd_busy);
   if (unbinding_) {
     return zx::error(ZX_ERR_BAD_STATE);
   }
@@ -685,7 +683,6 @@ zx::result<cpp20::span<const DisplayTiming>> Controller::GetDisplayTimings(Displ
 
 zx::result<fbl::Array<CoordinatorPixelFormat>> Controller::GetSupportedPixelFormats(
     DisplayId display_id) {
-  ZX_DEBUG_ASSERT(mtx_trylock(&mtx_) == thrd_busy);
   fbl::Array<CoordinatorPixelFormat> formats_out;
   for (auto& display : displays_) {
     if (display.id == display_id) {
@@ -834,6 +831,18 @@ void Controller::OpenCoordinatorForPrimary(OpenCoordinatorForPrimaryRequestView 
   completer.Reply(CreateClient(ClientPriority::kPrimary, std::move(request->coordinator)));
 }
 
+void Controller::OpenCoordinatorWithListenerForVirtcon(
+    OpenCoordinatorWithListenerForVirtconRequestView request,
+    OpenCoordinatorWithListenerForVirtconCompleter::Sync& completer) {
+  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+}
+
+void Controller::OpenCoordinatorWithListenerForPrimary(
+    OpenCoordinatorWithListenerForPrimaryRequestView request,
+    OpenCoordinatorWithListenerForPrimaryCompleter::Sync& completer) {
+  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+}
+
 ConfigStamp Controller::TEST_controller_stamp() const {
   fbl::AutoLock lock(mtx());
   return controller_stamp_;
@@ -869,8 +878,8 @@ zx::result<> Controller::Initialize() {
     return vsync_monitor_init_result.take_error();
   }
 
-  engine_driver_client_->SetDisplayControllerInterface({
-      .ops = &display_controller_interface_protocol_ops_,
+  engine_driver_client_->RegisterDisplayEngineListener({
+      .ops = &display_engine_listener_protocol_ops_,
       .ctx = this,
   });
 
@@ -921,8 +930,6 @@ Controller::Controller(std::unique_ptr<EngineDriverClient> engine_driver_client,
       engine_driver_client_(std::move(engine_driver_client)) {
   ZX_DEBUG_ASSERT(engine_driver_client_ != nullptr);
 
-  mtx_init(&mtx_, mtx_plain);
-
   last_valid_apply_config_timestamp_ns_property_ =
       root_.CreateUint("last_valid_apply_config_timestamp_ns", 0);
   last_valid_apply_config_interval_ns_property_ =
@@ -933,7 +940,7 @@ Controller::Controller(std::unique_ptr<EngineDriverClient> engine_driver_client,
 
 Controller::~Controller() {
   zxlogf(INFO, "Controller::~Controller");
-  engine_driver_client_->ResetDisplayControllerInterface();
+  engine_driver_client_->DeregisterDisplayEngineListener();
 }
 
 size_t Controller::TEST_imported_images_count() const {

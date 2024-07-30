@@ -46,7 +46,14 @@ async fn read_components_inspect() {
 
     let child_puppet = test_topology::connect_to_puppet(&realm_proxy, "child").await.unwrap();
 
-    child_puppet.set_health_ok().await.unwrap();
+    let writer = child_puppet
+        .create_inspector(&ftest::InspectPuppetCreateInspectorRequest::default())
+        .await
+        .unwrap()
+        .into_proxy()
+        .unwrap();
+
+    writer.set_health_ok().await.unwrap();
 
     let accessor = realm_proxy.connect_to_protocol::<ArchiveAccessorMarker>().await.unwrap();
     let data = ArchiveReader::new()
@@ -66,6 +73,61 @@ async fn read_components_inspect() {
 }
 
 #[fuchsia::test]
+async fn read_same_named_trees_from_single_component() {
+    let realm_proxy = test_topology::create_realm(ftest::RealmOptions {
+        puppets: Some(vec![test_topology::PuppetDeclBuilder::new("child").into()]),
+        ..Default::default()
+    })
+    .await
+    .unwrap();
+
+    let child_puppet = test_topology::connect_to_puppet(&realm_proxy, "child").await.unwrap();
+
+    let writer1 = child_puppet
+        .create_inspector(&ftest::InspectPuppetCreateInspectorRequest {
+            name: Some("tree-name".into()),
+            ..Default::default()
+        })
+        .await
+        .unwrap()
+        .into_proxy()
+        .unwrap();
+
+    let writer2 = child_puppet
+        .create_inspector(&ftest::InspectPuppetCreateInspectorRequest {
+            name: Some("tree-name".into()),
+            ..Default::default()
+        })
+        .await
+        .unwrap()
+        .into_proxy()
+        .unwrap();
+
+    writer1.record_string("prop1".into(), "val1".into()).await.unwrap();
+    writer2.record_string("prop2".into(), "val2".into()).await.unwrap();
+
+    let accessor = realm_proxy.connect_to_protocol::<ArchiveAccessorMarker>().await.unwrap();
+    let data = ArchiveReader::new()
+        .with_archive(accessor)
+        .add_selector("child:root")
+        .with_minimum_schema_count(2)
+        .snapshot::<Inspect>()
+        .await
+        .expect("got inspect data");
+
+    assert_eq!(data.len(), 2);
+
+    assert!(data.iter().any(|d| {
+        let p = d.payload.as_ref().unwrap().get_property("prop1");
+        p.is_some() && p.unwrap().string().unwrap() == "val1"
+    }));
+    assert!(data.iter().any(|d| {
+        let p = d.payload.as_ref().unwrap().get_property("prop2");
+        p.is_some() && p.unwrap().string().unwrap() == "val2"
+    }));
+}
+
+#[fuchsia::test]
 async fn read_component_with_hanging_lazy_node() -> Result<(), Error> {
     let realm_proxy = test_topology::create_realm(ftest::RealmOptions {
         realm_name: Some("hanging_lazy".to_string()),
@@ -77,12 +139,22 @@ async fn read_component_with_hanging_lazy_node() -> Result<(), Error> {
 
     let puppet = test_topology::connect_to_puppet(&realm_proxy, "hanging_data").await?;
 
-    puppet.record_string("child", "value").await?;
+    let writer = puppet
+        .create_inspector(&ftest::InspectPuppetCreateInspectorRequest {
+            name: Some("tree-name".into()),
+            ..Default::default()
+        })
+        .await
+        .unwrap()
+        .into_proxy()
+        .unwrap();
+
+    writer.record_string("child", "value").await?;
 
     let lazy = puppet.record_lazy_values("lazy-node-always-hangs").await?.into_proxy()?;
     lazy.commit(&ftest::CommitOptions { hang: Some(true), ..Default::default() }).await?;
 
-    puppet.record_int("int", 3).await?;
+    writer.record_int("int", 3).await?;
 
     let accessor = realm_proxy.connect_to_protocol::<ArchiveAccessorMarker>().await?;
     let data = ArchiveReader::new()
@@ -116,8 +188,23 @@ async fn read_components_single_selector() -> Result<(), Error> {
     let child_a = test_topology::connect_to_puppet(&realm_proxy, "child_a").await?;
     let child_b = test_topology::connect_to_puppet(&realm_proxy, "child_b").await?;
 
-    child_a.set_health_ok().await?;
-    child_b.set_health_ok().await?;
+    let writer_a = child_a
+        .create_inspector(&ftest::InspectPuppetCreateInspectorRequest::default())
+        .await
+        .unwrap()
+        .into_proxy()
+        .unwrap();
+
+    writer_a.set_health_ok().await.unwrap();
+
+    let writer_b = child_b
+        .create_inspector(&ftest::InspectPuppetCreateInspectorRequest::default())
+        .await
+        .unwrap()
+        .into_proxy()
+        .unwrap();
+
+    writer_b.set_health_ok().await.unwrap();
 
     let accessor = realm_proxy.connect_to_protocol::<ArchiveAccessorMarker>().await?;
     let data = ArchiveReader::new()
@@ -135,7 +222,7 @@ async fn read_components_single_selector() -> Result<(), Error> {
             start_timestamp_nanos: AnyProperty,
         }
     });
-    assert_eq!(data[0].moniker, "child_a");
+    assert_eq!(data[0].moniker.to_string(), "child_a");
 
     Ok(())
 }
@@ -150,7 +237,14 @@ async fn unified_reader() -> Result<(), Error> {
     .expect("create realm");
 
     let puppet = test_topology::connect_to_puppet(&realm_proxy, "puppet").await.unwrap();
-    puppet.emit_example_inspect_data().await.unwrap();
+    let writer = puppet
+        .create_inspector(&ftest::InspectPuppetCreateInspectorRequest::default())
+        .await
+        .unwrap()
+        .into_proxy()
+        .unwrap();
+
+    writer.emit_example_inspect_data().await.unwrap();
 
     // First, retrieve all of the information in our realm to make sure that everything
     // we expect is present.
@@ -185,14 +279,15 @@ async fn unified_reader() -> Result<(), Error> {
     .await;
 
     // Then verify that a selector with a correct moniker, but no resolved nodes
-    // produces an error schema.
+    // produces no data.
     let accessor = realm_proxy.connect_to_protocol::<ArchiveAccessorMarker>().await.unwrap();
     retrieve_and_validate_results(
         accessor,
         vec!["puppet*:root/non-existent-node:bloop"],
         &UNIFIED_FULL_FILTER_GOLDEN,
-        // we are selecting puppet, so we don't expect archivist own inspect
-        ALL_INSPECT_ENTRIES - 1,
+        // we are selecting puppet, so we don't expect archivist own inspect, and the puppet was
+        // entirely filtered so we don't expect it either.
+        ALL_INSPECT_ENTRIES - 2,
     )
     .await;
 
@@ -213,7 +308,14 @@ async fn feedback_canonical_reader_test() -> Result<(), Error> {
     .expect("create base topology");
 
     let puppet = test_topology::connect_to_puppet(&realm_proxy, "test_component").await.unwrap();
-    puppet.emit_example_inspect_data().await.unwrap();
+    let writer = puppet
+        .create_inspector(&ftest::InspectPuppetCreateInspectorRequest::default())
+        .await
+        .unwrap()
+        .into_proxy()
+        .unwrap();
+
+    writer.emit_example_inspect_data().await.unwrap();
 
     // First, retrieve all of the information in our realm to make sure that everything
     // we expect is present.
@@ -242,7 +344,7 @@ async fn feedback_canonical_reader_test() -> Result<(), Error> {
         accessor,
         vec![r"test_component:root:array\:0x15"],
         &PIPELINE_NONOVERLAPPING_SELECTORS_GOLDEN,
-        1,
+        0,
     )
     .await;
 
@@ -267,7 +369,14 @@ async fn feedback_disabled_pipeline() -> Result<(), Error> {
     .expect("create base topology");
 
     let puppet = test_topology::connect_to_puppet(&realm_proxy, "test_component").await.unwrap();
-    puppet.emit_example_inspect_data().await.unwrap();
+    let writer = puppet
+        .create_inspector(&ftest::InspectPuppetCreateInspectorRequest::default())
+        .await
+        .unwrap()
+        .into_proxy()
+        .unwrap();
+
+    writer.emit_example_inspect_data().await.unwrap();
 
     assert!(!pipeline_is_filtered(realm_proxy, 2, constants::FEEDBACK_ARCHIVE_ACCESSOR_NAME).await);
 
@@ -285,7 +394,14 @@ async fn feedback_pipeline_missing_selectors() -> Result<(), Error> {
     .expect("create base topology");
 
     let puppet = test_topology::connect_to_puppet(&realm_proxy, "test_component").await.unwrap();
-    puppet.emit_example_inspect_data().await.unwrap();
+    let writer = puppet
+        .create_inspector(&ftest::InspectPuppetCreateInspectorRequest::default())
+        .await
+        .unwrap()
+        .into_proxy()
+        .unwrap();
+
+    writer.emit_example_inspect_data().await.unwrap();
 
     assert!(!pipeline_is_filtered(realm_proxy, 2, constants::FEEDBACK_ARCHIVE_ACCESSOR_NAME).await);
 
@@ -306,7 +422,14 @@ async fn lowpan_canonical_reader_test() -> Result<(), Error> {
     .expect("create base topology");
 
     let puppet = test_topology::connect_to_puppet(&realm_proxy, "test_component").await.unwrap();
-    puppet.emit_example_inspect_data().await.unwrap();
+    let writer = puppet
+        .create_inspector(&ftest::InspectPuppetCreateInspectorRequest::default())
+        .await
+        .unwrap()
+        .into_proxy()
+        .unwrap();
+
+    writer.emit_example_inspect_data().await.unwrap();
 
     // First, retrieve all of the information in our realm to make sure that everything
     // we expect is present.
@@ -335,7 +458,7 @@ async fn lowpan_canonical_reader_test() -> Result<(), Error> {
         accessor,
         vec![r"test_component:root:array\:0x15"],
         &PIPELINE_NONOVERLAPPING_SELECTORS_GOLDEN,
-        1,
+        0,
     )
     .await;
 

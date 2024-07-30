@@ -12,6 +12,7 @@
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/inspect/cpp/reader.h>
 
+#include <cstdint>
 #include <thread>
 #include <unordered_set>
 
@@ -36,6 +37,11 @@ fidl::Endpoints<fuchsia_hardware_display::Coordinator> CreateCoordinatorEndpoint
   return std::move(endpoints_result.value());
 }
 
+struct DisplayPowerInfo {
+  bool power_on = true;
+  int64_t timestamp;
+};
+
 }  // namespace
 
 class DisplayPowerManagerMockTest : public gtest::RealLoopFixture {
@@ -49,13 +55,24 @@ class DisplayPowerManagerMockTest : public gtest::RealLoopFixture {
   display::DisplayManager* display_manager() { return display_manager_.get(); }
   display::DisplayPowerManager* display_power_manager() { return display_power_manager_.get(); }
   display::Display* display() { return display_manager()->default_display(); }
-  bool GetDisplayPowerInspectValue() {
+  DisplayPowerInfo GetLastDisplayPowerInspectValue() {
     auto result = inspect::ReadFromVmo(inspector_.DuplicateVmo());
     EXPECT_TRUE(result.is_ok());
     auto hierarchy = result.take_value();
-    EXPECT_EQ("DisplayPower", hierarchy.children()[0].name());
-    EXPECT_EQ("display_power_is_on", hierarchy.children()[0].node().properties()[0].name());
-    return hierarchy.children()[0].node().properties()[0].Get<inspect::BoolPropertyValue>().value();
+    const auto& power_node = hierarchy.children()[0];
+    EXPECT_EQ("display_power_events", power_node.name());
+
+    DisplayPowerInfo info;
+    if (power_node.children().empty()) {
+      return info;
+    }
+    const auto& property = power_node.children().back().node().properties()[0];
+    const auto& name = property.name();
+    EXPECT_TRUE(name == "on" || name == "off");
+    info.power_on = name == "on";
+    info.timestamp = property.Get<inspect::IntPropertyValue>().value();
+    EXPECT_NE(info.timestamp, 0);
+    return info;
   }
 
  private:
@@ -82,8 +99,9 @@ TEST_F(DisplayPowerManagerMockTest, Ok) {
   mock_display_coordinator.set_set_display_power_result(ZX_OK);
 
   RunLoopUntilIdle();
-  EXPECT_TRUE(GetDisplayPowerInspectValue());
-
+  auto power_info_1 = GetLastDisplayPowerInspectValue();
+  EXPECT_TRUE(power_info_1.power_on);
+  auto last_power_timestamp = power_info_1.timestamp;
   {
     bool callback_executed = false;
     std::thread set_display_power_thread([&callback_executed, this] {
@@ -97,7 +115,10 @@ TEST_F(DisplayPowerManagerMockTest, Ok) {
     });
 
     RunLoopUntil([&callback_executed] { return callback_executed; });
-    EXPECT_FALSE(GetDisplayPowerInspectValue());
+    auto power_info_2 = GetLastDisplayPowerInspectValue();
+    EXPECT_FALSE(power_info_2.power_on);
+    EXPECT_GT(power_info_2.timestamp, last_power_timestamp);
+    last_power_timestamp = power_info_2.timestamp;
     set_display_power_thread.join();
     EXPECT_FALSE(mock_display_coordinator.display_power_on());
   }
@@ -115,7 +136,9 @@ TEST_F(DisplayPowerManagerMockTest, Ok) {
     });
 
     RunLoopUntil([&callback_executed] { return callback_executed; });
-    EXPECT_TRUE(GetDisplayPowerInspectValue());
+    auto power_info_3 = GetLastDisplayPowerInspectValue();
+    EXPECT_TRUE(power_info_3.power_on);
+    EXPECT_GT(power_info_3.timestamp, last_power_timestamp);
     set_display_power_thread.join();
     EXPECT_TRUE(mock_display_coordinator.display_power_on());
   }

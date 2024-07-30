@@ -92,7 +92,8 @@ import dataclasses
 import functools
 import inspect
 import json
-
+import types
+import typing
 from typing import (
     Any,
     Callable,
@@ -105,8 +106,6 @@ from typing import (
     Union,
     get_type_hints,
 )
-import typing
-import types
 
 __all__ = [
     "instance_from_dict",

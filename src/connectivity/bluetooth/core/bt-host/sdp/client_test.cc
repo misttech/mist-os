@@ -101,7 +101,7 @@ TEST_F(ClientTest, ConnectAndQuery) {
         0x00   // No continuation state
     );
 
-    uint32_t request_tid;
+    uint16_t request_tid;
     bool success = false;
 
     fake_chan()->SetSendCallback(
@@ -202,7 +202,7 @@ TEST_F(ClientTest, TwoQueriesSubsequent) {
         0x00   // No continuation state
     );
 
-    uint32_t request_tid;
+    uint16_t request_tid;
     bool success = false;
 
     fake_chan()->SetSendCallback(
@@ -292,7 +292,7 @@ TEST_F(ClientTest, TwoQueriesQueued) {
         0x00   // No continuation state
     );
 
-    uint32_t request_tid;
+    uint16_t request_tid;
     size_t sent_packets = 0;
 
     fake_chan()->SetSendCallback(
@@ -490,7 +490,7 @@ TEST_F(ClientTest, NoResults) {
       0x00   // No continuation state
   );
 
-  uint32_t request_tid;
+  uint16_t request_tid;
   bool success = false;
 
   fake_chan()->SetSendCallback(
@@ -638,7 +638,7 @@ TEST_F(ClientTest, InvalidResponse) {
       0x00   // No continuation state
   );
 
-  uint32_t request_tid;
+  uint16_t request_tid;
   bool requested = false;
 
   fake_chan()->SetSendCallback(

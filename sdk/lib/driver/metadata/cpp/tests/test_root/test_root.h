@@ -5,32 +5,43 @@
 #ifndef LIB_DRIVER_METADATA_CPP_TESTS_TEST_ROOT_TEST_ROOT_H_
 #define LIB_DRIVER_METADATA_CPP_TESTS_TEST_ROOT_TEST_ROOT_H_
 
+#include <fidl/fuchsia.driver.framework/cpp/fidl.h>
 #include <lib/driver/component/cpp/driver_base.h>
+#include <lib/driver/devfs/cpp/connector.h>
+#include <lib/driver/metadata/cpp/tests/fuchsia.hardware.test/metadata.h>
+#include <lib/driver/node/cpp/add_child.h>
 
 namespace fdf_metadata::test {
 
 // This driver's purpose is to create two child nodes: one for the "test_parent_expose" driver to
 // bind to and one for the "test_parent_no_expose" driver to bind to.
-class TestRoot : public fdf::DriverBase {
+class TestRootDriver : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_test::Root> {
  public:
   static constexpr std::string_view kDriverName = "test_root";
-  static constexpr std::string_view kTestParentExposeNodeName = "test_parent_expose";
-  static constexpr std::string_view kTestParentNoExposeNodeName = "test_parent_no_expose";
+  static constexpr std::string_view kControllerNodeName = "controller";
 
-  TestRoot(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher)
+  TestRootDriver(fdf::DriverStartArgs start_args,
+                 fdf::UnownedSynchronizedDispatcher driver_dispatcher)
       : DriverBase(kDriverName, std::move(start_args), std::move(driver_dispatcher)) {}
 
   zx::result<> Start() override;
 
- private:
-  zx::result<fidl::ClientEnd<fuchsia_driver_framework::NodeController>> AddTestParentNode(
-      std::string node_name, std::string test_parent_property_value);
+  // fuchsia.hardware.test/MetadataSender implementation.
+  void AddMetadataSenderNode(AddMetadataSenderNodeRequest& request,
+                             AddMetadataSenderNodeCompleter::Sync& completer) override;
 
-  fidl::SyncClient<fuchsia_driver_framework::Node> node_;
-  std::optional<fidl::ClientEnd<fuchsia_driver_framework::NodeController>>
-      test_parent_expose_controller_;
-  std::optional<fidl::ClientEnd<fuchsia_driver_framework::NodeController>>
-      test_parent_no_expose_controller_;
+ private:
+  void Serve(fidl::ServerEnd<fuchsia_hardware_test::Root> request);
+  zx_status_t InitControllerChildNode();
+
+  fidl::ServerBindingGroup<fuchsia_hardware_test::Root> bindings_;
+  driver_devfs::Connector<fuchsia_hardware_test::Root> devfs_connector_{
+      fit::bind_member<&TestRootDriver::Serve>(this)};
+
+  std::optional<fdf::OwnedChildNode> controller_node_;
+
+  std::vector<fidl::ClientEnd<fuchsia_driver_framework::NodeController>>
+      metadata_sender_node_controllers_;
 };
 
 }  // namespace fdf_metadata::test

@@ -92,7 +92,9 @@ class DirectoryConnection final : public Connection,
   void Watch(WatchRequestView request, WatchCompleter::Sync& completer) final;
   void QueryFilesystem(QueryFilesystemCompleter::Sync& completer) final;
   void Open2(fuchsia_io::wire::Directory2Open2Request* request,
-             Open2Completer::Sync& completer) final;
+             Open2Completer::Sync& completer) final {
+    completer.Close(ZX_ERR_NOT_SUPPORTED);
+  }
 #if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
   void Open3(fuchsia_io::wire::Directory2Open3Request* request,
              Open3Completer::Sync& completer) final;

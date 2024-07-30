@@ -7,7 +7,6 @@
 #include <lib/ddk/binding.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/metadata.h>
-#include <lib/ddk/platform-defs.h>
 #include <lib/driver/component/cpp/composite_node_spec.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/mmio/mmio.h>
@@ -15,11 +14,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <bind/fuchsia/amlogic/platform/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/hardware/registers/cpp/bind.h>
 #include <bind/fuchsia/hardware/usb/phy/cpp/bind.h>
-#include <bind/fuchsia/platform/cpp/bind.h>
 #include <bind/fuchsia/register/cpp/bind.h>
 #include <bind/fuchsia/usb/phy/cpp/bind.h>
 #include <soc/aml-common/aml-registers.h>
@@ -120,9 +117,9 @@ static const std::vector<fpbus::Bti> usb_btis{
 static const fpbus::Node xhci_dev = []() {
   fpbus::Node dev = {};
   dev.name() = "xhci";
-  dev.vid() = PDEV_VID_GENERIC;
-  dev.pid() = PDEV_PID_GENERIC;
-  dev.did() = PDEV_DID_USB_XHCI_COMPOSITE;
+  dev.vid() = bind_fuchsia_platform::BIND_PLATFORM_DEV_VID_GENERIC;
+  dev.pid() = bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC;
+  dev.did() = bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_XHCI;
   dev.mmio() = xhci_mmios;
   dev.irq() = xhci_irqs;
   dev.bti() = usb_btis;

@@ -4,6 +4,7 @@
 
 #include "src/graphics/display/drivers/intel-i915/ddi-aux-channel.h"
 
+#include <lib/driver/testing/cpp/scoped_global_logger.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <lib/stdcompat/span.h>
 #include <lib/zx/result.h>
@@ -16,6 +17,7 @@
 #include <mock-mmio-range/mock-mmio-range.h>
 
 #include "src/graphics/display/drivers/intel-i915/registers-ddi.h"
+#include "src/lib/testing/predicates/status.h"
 
 namespace i915 {
 
@@ -57,6 +59,7 @@ class DdiAuxChannelTest : public ::testing::Test {
 
  protected:
   constexpr static int kMmioRangeSize = 0x100000;
+  fdf_testing::ScopedGlobalLogger logger_;
   ddk_mock::MockMmioRange mmio_range_{kMmioRangeSize, ddk_mock::MockMmioRange::Size::k32};
   fdf::MmioBuffer mmio_buffer_{mmio_range_.GetMmioBuffer()};
 };
@@ -494,8 +497,7 @@ TEST_F(DdiAuxChannelTransactTest, DdiReportsReceiveError) {
 
   SetUpTransaction();
   const zx::result transact_status = aux_channel_->TransactForTesting();
-  EXPECT_EQ(ZX_ERR_IO_DATA_INTEGRITY, transact_status.error_value())
-      << transact_status.status_string();
+  EXPECT_STATUS(ZX_ERR_IO_DATA_INTEGRITY, transact_status.error_value());
 }
 
 TEST_F(DdiAuxChannelTransactTest, DdiReportsTimeout) {
@@ -507,8 +509,7 @@ TEST_F(DdiAuxChannelTransactTest, DdiReportsTimeout) {
 
   SetUpTransaction();
   const zx::result transact_status = aux_channel_->TransactForTesting();
-  EXPECT_EQ(ZX_ERR_IO_MISSED_DEADLINE, transact_status.error_value())
-      << transact_status.status_string();
+  EXPECT_STATUS(ZX_ERR_IO_MISSED_DEADLINE, transact_status.error_value());
 }
 
 TEST_F(DdiAuxChannelTransactTest, EmptyReply) {
@@ -520,8 +521,7 @@ TEST_F(DdiAuxChannelTransactTest, EmptyReply) {
 
   SetUpTransaction();
   const zx::result transact_status = aux_channel_->TransactForTesting();
-  EXPECT_EQ(ZX_ERR_IO_DATA_INTEGRITY, transact_status.error_value())
-      << transact_status.status_string();
+  EXPECT_STATUS(ZX_ERR_IO_DATA_INTEGRITY, transact_status.error_value());
 }
 
 TEST_F(DdiAuxChannelTransactTest, LongReply) {
@@ -533,8 +533,7 @@ TEST_F(DdiAuxChannelTransactTest, LongReply) {
 
   SetUpTransaction();
   const zx::result transact_status = aux_channel_->TransactForTesting();
-  EXPECT_EQ(ZX_ERR_IO_DATA_INTEGRITY, transact_status.error_value())
-      << transact_status.status_string();
+  EXPECT_STATUS(ZX_ERR_IO_DATA_INTEGRITY, transact_status.error_value());
 }
 
 TEST_F(DdiAuxChannelTransactTest, DdiTimesOut) {
@@ -555,8 +554,7 @@ TEST_F(DdiAuxChannelTransactTest, DdiTimesOut) {
 
   SetUpTransaction();
   const zx::result transact_status = aux_channel_->TransactForTesting();
-  EXPECT_EQ(ZX_ERR_IO_MISSED_DEADLINE, transact_status.error_value())
-      << transact_status.status_string();
+  EXPECT_STATUS(ZX_ERR_IO_MISSED_DEADLINE, transact_status.error_value());
 }
 
 class DdiAuxChannelReadReplyTest : public DdiAuxChannelTest {

@@ -38,7 +38,6 @@ class FakeParent : public fdf::DriverBase {
   std::unique_ptr<FakeParentServer> server_;
   std::unique_ptr<FakeParentServer> server2_;
   fidl::WireClient<fuchsia_power_broker::Topology> topology_client_;
-  fidl::ClientEnd<fuchsia_power_broker::ElementControl> element_ctrl_;
 };
 
 }  // namespace fake_parent_device

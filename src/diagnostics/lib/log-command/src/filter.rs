@@ -2,15 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::log_formatter::{LogData, LogEntry};
+use crate::LogCommand;
 use diagnostics_data::{LogsData, Severity};
 use fidl_fuchsia_diagnostics::LogInterestSelector;
 use fuchsia_zircon_types::zx_koid_t;
-use moniker::Moniker;
-use selectors::match_moniker_against_component_selector;
+use moniker::{ExtendedMoniker, EXTENDED_MONIKER_COMPONENT_MANAGER_STR};
+use once_cell::sync::Lazy;
+use selectors::SelectorExt;
 use std::str::FromStr;
 
-use crate::log_formatter::{LogData, LogEntry};
-use crate::LogCommand;
+static KLOG_MONIKER: Lazy<ExtendedMoniker> =
+    Lazy::new(|| ExtendedMoniker::try_from("klog").unwrap());
 
 /// A struct that holds the criteria for filtering logs.
 pub struct LogFilterCriteria {
@@ -102,12 +105,10 @@ impl LogFilterCriteria {
     /// Returns true if the given 'LogsData' matches the filter string by
     /// message, moniker, or component URL.
     fn matches_filter_string(filter_string: &str, message: &str, log: &LogsData) -> bool {
-        let moniker = log.moniker.as_str();
         return message.contains(filter_string)
-            || log.moniker.contains(filter_string)
             || log.file_path().map_or(false, |s| s.contains(filter_string))
-            || moniker.contains(filter_string)
-            || log.metadata.component_url.as_ref().map_or(false, |s| s.contains(filter_string));
+            || log.metadata.component_url.as_ref().map_or(false, |s| s.contains(filter_string))
+            || log.moniker.to_string().contains(filter_string);
     }
 
     // TODO(b/303315896): If/when debuglog is strutured remove this.
@@ -141,9 +142,10 @@ impl LogFilterCriteria {
 
     /// Returns true if the given `LogsData` matches the moniker string.
     fn matches_filter_by_moniker_string(filter_string: &str, log: &LogsData) -> bool {
-        let filter_moniker = Moniker::from_str(filter_string);
-        let moniker = Moniker::from_str(log.moniker.as_str());
-        matches!((moniker, filter_moniker), (Ok(a), Ok(b)) if a == b)
+        let Ok(filter_moniker) = ExtendedMoniker::from_str(filter_string) else {
+            return false;
+        };
+        filter_moniker == log.moniker
     }
 
     /// Returns true if the given `LogsData` matches the filter criteria.
@@ -151,13 +153,7 @@ impl LogFilterCriteria {
         let min_severity = self
             .interest_selectors
             .iter()
-            .filter(|selector| {
-                match_moniker_against_component_selector(
-                    data.moniker.split('/'),
-                    &selector.selector,
-                )
-                .unwrap_or(false)
-            })
+            .filter(|s| data.moniker.matches_component_selector(&s.selector).unwrap_or(false))
             .map(|selector| selector.interest.min_severity)
             .flatten()
             .min()
@@ -203,16 +199,11 @@ impl LogFilterCriteria {
             && !self.tags.iter().any(|query_tag| {
                 let has_tag = data.tags().map(|t| t.contains(query_tag)).unwrap_or(false);
                 let moniker_has_tag = data.tags().map(|tags| tags.is_empty()).unwrap_or(true)
-                    && data
-                        .moniker
-                        .split("/")
-                        .last()
-                        .map(|segment| segment.contains(query_tag))
-                        .unwrap_or(false);
+                    && moniker_contains_in_last_segment(&data.moniker, query_tag);
                 has_tag || moniker_has_tag
             })
         {
-            if data.moniker == "klog" {
+            if data.moniker == *KLOG_MONIKER {
                 return self.match_synthetic_klog_tags(data.msg().unwrap_or(""));
             }
             return false;
@@ -226,9 +217,22 @@ impl LogFilterCriteria {
     }
 }
 
+fn moniker_contains_in_last_segment(moniker: &ExtendedMoniker, query_tag: &str) -> bool {
+    match moniker {
+        ExtendedMoniker::ComponentInstance(moniker) => moniker
+            .path()
+            .last()
+            .map(|segment| segment.to_string().contains(query_tag))
+            .unwrap_or(false),
+        ExtendedMoniker::ComponentManager => {
+            EXTENDED_MONIKER_COMPONENT_MANAGER_STR.contains(query_tag)
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
-    use diagnostics_data::Timestamp;
+    use diagnostics_data::{ExtendedMoniker, Timestamp};
     use selectors::parse_log_interest_selector;
     use std::time::Duration;
 
@@ -265,8 +269,8 @@ mod test {
         assert!(criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                 timestamp_nanos: 0.into(),
-                component_url: Some(String::default()),
-                moniker: String::default(),
+                component_url: Some("".into()),
+                moniker: ExtendedMoniker::ComponentManager,
                 severity: diagnostics_data::Severity::Error,
             })
             .set_message("included")
@@ -279,8 +283,8 @@ mod test {
         assert!(!criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                 timestamp_nanos: 0.into(),
-                component_url: Some(String::default()),
-                moniker: String::default(),
+                component_url: Some("".into()),
+                moniker: ExtendedMoniker::ComponentManager,
                 severity: diagnostics_data::Severity::Error,
             })
             .set_message("included")
@@ -291,8 +295,8 @@ mod test {
         assert!(!criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                 timestamp_nanos: 0.into(),
-                component_url: Some(String::default()),
-                moniker: String::default(),
+                component_url: Some("".into()),
+                moniker: ExtendedMoniker::ComponentManager,
                 severity: diagnostics_data::Severity::Error,
             })
             .set_message("included")
@@ -321,8 +325,8 @@ mod test {
             let entry = make_log_entry(
                 diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                     timestamp_nanos: 0.into(),
-                    component_url: Some(String::default()),
-                    moniker: moniker.into(),
+                    component_url: Some("".into()),
+                    moniker: moniker.try_into().unwrap(),
                     severity,
                 })
                 .set_message("message")
@@ -358,8 +362,8 @@ mod test {
             let entry = make_log_entry(
                 diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                     timestamp_nanos: 0.into(),
-                    component_url: Some(String::default()),
-                    moniker: "test_selector".into(),
+                    component_url: Some("".into()),
+                    moniker: "test_selector".try_into().unwrap(),
                     severity,
                 })
                 .set_message("message")
@@ -384,8 +388,8 @@ mod test {
         assert!(criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                 timestamp_nanos: 0.into(),
-                component_url: Some(String::default()),
-                moniker: String::default(),
+                component_url: Some("".into()),
+                moniker: ExtendedMoniker::ComponentManager,
                 severity: diagnostics_data::Severity::Error,
             })
             .set_message("included")
@@ -398,8 +402,8 @@ mod test {
         assert!(!criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                 timestamp_nanos: 0.into(),
-                component_url: Some(String::default()),
-                moniker: String::default(),
+                component_url: Some("".into()),
+                moniker: ExtendedMoniker::ComponentManager,
                 severity: diagnostics_data::Severity::Error,
             })
             .set_message("included")
@@ -410,8 +414,8 @@ mod test {
         assert!(!criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                 timestamp_nanos: 0.into(),
-                component_url: Some(String::default()),
-                moniker: String::default(),
+                component_url: Some("".into()),
+                moniker: ExtendedMoniker::ComponentManager,
                 severity: diagnostics_data::Severity::Error,
             })
             .set_message("included")
@@ -431,8 +435,8 @@ mod test {
         assert!(criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                 timestamp_nanos: 0.into(),
-                component_url: Some(String::default()),
-                moniker: "included/moniker".to_string(),
+                component_url: Some("".into()),
+                moniker: "included/moniker".try_into().unwrap(),
                 severity: diagnostics_data::Severity::Error,
             })
             .set_message("included message")
@@ -442,8 +446,8 @@ mod test {
         assert!(criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                 timestamp_nanos: 0.into(),
-                component_url: Some(String::default()),
-                moniker: "included/moniker".to_string(),
+                component_url: Some("".into()),
+                moniker: "included/moniker".try_into().unwrap(),
                 severity: diagnostics_data::Severity::Info,
             })
             .set_message("different message")
@@ -453,8 +457,8 @@ mod test {
         assert!(criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                 timestamp_nanos: 0.into(),
-                component_url: Some(String::default()),
-                moniker: "other/moniker".to_string(),
+                component_url: Some("".into()),
+                moniker: "other/moniker".try_into().unwrap(),
                 severity: diagnostics_data::Severity::Debug,
             })
             .set_message("included message")
@@ -472,8 +476,8 @@ mod test {
         assert!(criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                 timestamp_nanos: 0.into(),
-                component_url: Some(String::default()),
-                moniker: "included/moniker".to_string(),
+                component_url: Some("".into()),
+                moniker: "included/moniker".try_into().unwrap(),
                 severity: diagnostics_data::Severity::Error,
             })
             .set_message("included message")
@@ -484,8 +488,8 @@ mod test {
         assert!(!criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                 timestamp_nanos: 0.into(),
-                component_url: Some(String::default()),
-                moniker: "included/moniker".to_string(),
+                component_url: Some("".into()),
+                moniker: "included/moniker".try_into().unwrap(),
                 severity: diagnostics_data::Severity::Error,
             })
             .set_message("included message")
@@ -506,8 +510,8 @@ mod test {
         assert!(!criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                 timestamp_nanos: 0.into(),
-                component_url: Some(String::default()),
-                moniker: "bootstrap/archivist".into(),
+                component_url: Some("".into()),
+                moniker: "bootstrap/archivist".try_into().unwrap(),
                 severity: diagnostics_data::Severity::Error,
             })
             .set_message("excluded")
@@ -518,8 +522,8 @@ mod test {
         assert!(criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                 timestamp_nanos: 0.into(),
-                component_url: Some(String::default()),
-                moniker: "core/network/netstack".into(),
+                component_url: Some("".into()),
+                moniker: "core/network/netstack".try_into().unwrap(),
                 severity: diagnostics_data::Severity::Error,
             })
             .set_message("included")
@@ -530,8 +534,8 @@ mod test {
         assert!(!criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                 timestamp_nanos: 0.into(),
-                component_url: Some(String::default()),
-                moniker: "core/network/dhcp".into(),
+                component_url: Some("".into()),
+                moniker: "core/network/dhcp".try_into().unwrap(),
                 severity: diagnostics_data::Severity::Error,
             })
             .set_message("included")
@@ -549,8 +553,8 @@ mod test {
         assert!(criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                 timestamp_nanos: 0.into(),
-                component_url: Some(String::default()),
-                moniker: "included/moniker".to_string(),
+                component_url: Some("".into()),
+                moniker: "included/moniker".try_into().unwrap(),
                 severity: diagnostics_data::Severity::Error,
             })
             .set_message("included message")
@@ -561,8 +565,8 @@ mod test {
         assert!(!criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                 timestamp_nanos: 0.into(),
-                component_url: Some(String::default()),
-                moniker: "included/moniker".to_string(),
+                component_url: Some("".into()),
+                moniker: "included/moniker".try_into().unwrap(),
                 severity: diagnostics_data::Severity::Error,
             })
             .set_message("included message")
@@ -596,8 +600,8 @@ mod test {
         assert!(criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                 timestamp_nanos: 0.into(),
-                component_url: Some(String::default()),
-                moniker: "included/moniker".to_string(),
+                component_url: Some("".into()),
+                moniker: "included/moniker".try_into().unwrap(),
                 severity: diagnostics_data::Severity::Error,
             })
             .set_message("included message")
@@ -607,8 +611,8 @@ mod test {
         assert!(criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                 timestamp_nanos: 0.into(),
-                component_url: Some(String::default()),
-                moniker: "included/moniker".to_string(),
+                component_url: Some("".into()),
+                moniker: "included/moniker".try_into().unwrap(),
                 severity: diagnostics_data::Severity::Fatal,
             })
             .set_message("included message")
@@ -618,9 +622,9 @@ mod test {
         assert!(criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                 timestamp_nanos: 0.into(),
-                component_url: Some(String::default()),
+                component_url: Some("".into()),
                 // Include a "/" prefix on the moniker to test filter permissiveness.
-                moniker: "/included/moniker".to_string(),
+                moniker: "included/moniker".try_into().unwrap(),
                 severity: diagnostics_data::Severity::Fatal,
             })
             .set_message("included message")
@@ -630,8 +634,8 @@ mod test {
         assert!(!criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                 timestamp_nanos: 0.into(),
-                component_url: Some(String::default()),
-                moniker: "not/this/moniker".to_string(),
+                component_url: Some("".into()),
+                moniker: "not/this/moniker".try_into().unwrap(),
                 severity: diagnostics_data::Severity::Error,
             })
             .set_message("different message")
@@ -641,8 +645,8 @@ mod test {
         assert!(!criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                 timestamp_nanos: 0.into(),
-                component_url: Some(String::default()),
-                moniker: "included/moniker".to_string(),
+                component_url: Some("".into()),
+                moniker: "included/moniker".try_into().unwrap(),
                 severity: diagnostics_data::Severity::Warn,
             })
             .set_message("included message")
@@ -652,8 +656,8 @@ mod test {
         assert!(!criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                 timestamp_nanos: 0.into(),
-                component_url: Some(String::default()),
-                moniker: "other/moniker".to_string(),
+                component_url: Some("".into()),
+                moniker: "other/moniker".try_into().unwrap(),
                 severity: diagnostics_data::Severity::Error,
             })
             .set_message("not this message")
@@ -663,8 +667,8 @@ mod test {
         assert!(!criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                 timestamp_nanos: 0.into(),
-                component_url: Some(String::default()),
-                moniker: "included/moniker".to_string(),
+                component_url: Some("".into()),
+                moniker: "included/moniker".try_into().unwrap(),
                 severity: diagnostics_data::Severity::Error,
             })
             .set_message("not this message")
@@ -681,8 +685,8 @@ mod test {
         assert!(criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                 timestamp_nanos: 0.into(),
-                component_url: Some(String::default()),
-                moniker: "klog".to_string(),
+                component_url: Some("".into()),
+                moniker: "klog".try_into().unwrap(),
                 severity: diagnostics_data::Severity::Error,
             })
             .set_message("[component_manager] included message")
@@ -692,8 +696,8 @@ mod test {
         assert!(!criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                 timestamp_nanos: 0.into(),
-                component_url: Some(String::default()),
-                moniker: "klog".to_string(),
+                component_url: Some("".into()),
+                moniker: "klog".try_into().unwrap(),
                 severity: diagnostics_data::Severity::Error,
             })
             .set_message("excluded message[component_manager]")
@@ -703,8 +707,8 @@ mod test {
         assert!(criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                 timestamp_nanos: 0.into(),
-                component_url: Some(String::default()),
-                moniker: "klog".to_string(),
+                component_url: Some("".into()),
+                moniker: "klog".try_into().unwrap(),
                 severity: diagnostics_data::Severity::Error,
             })
             .set_message("[tag0][component_manager] included message")
@@ -714,8 +718,8 @@ mod test {
         assert!(!criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                 timestamp_nanos: 0.into(),
-                component_url: Some(String::default()),
-                moniker: "klog".to_string(),
+                component_url: Some("".into()),
+                moniker: "klog".try_into().unwrap(),
                 severity: diagnostics_data::Severity::Error,
             })
             .set_message("[other] excluded message")
@@ -725,8 +729,8 @@ mod test {
         assert!(!criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                 timestamp_nanos: 0.into(),
-                component_url: Some(String::default()),
-                moniker: "klog".to_string(),
+                component_url: Some("".into()),
+                moniker: "klog".try_into().unwrap(),
                 severity: diagnostics_data::Severity::Error,
             })
             .set_message("no tags, excluded")
@@ -736,8 +740,8 @@ mod test {
         assert!(!criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                 timestamp_nanos: 0.into(),
-                component_url: Some(String::default()),
-                moniker: "other/moniker".to_string(),
+                component_url: Some("".into()),
+                moniker: "other/moniker".try_into().unwrap(),
                 severity: diagnostics_data::Severity::Error,
             })
             .set_message("[component_manager] excluded message")
@@ -754,8 +758,8 @@ mod test {
         assert!(criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                 timestamp_nanos: 0.into(),
-                component_url: Some(String::default()),
-                moniker: "klog".to_string(),
+                component_url: Some("".into()),
+                moniker: "klog".try_into().unwrap(),
                 severity: diagnostics_data::Severity::Error,
             })
             .set_message("included message")
@@ -765,8 +769,8 @@ mod test {
         assert!(!criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                 timestamp_nanos: 0.into(),
-                component_url: Some(String::default()),
-                moniker: "other/moniker".to_string(),
+                component_url: Some("".into()),
+                moniker: "other/moniker".try_into().unwrap(),
                 severity: diagnostics_data::Severity::Error,
             })
             .set_message("included message")
@@ -783,8 +787,8 @@ mod test {
         assert!(criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                 timestamp_nanos: 0.into(),
-                component_url: Some(String::default()),
-                moniker: "core/last_segment".into(),
+                component_url: Some("".into()),
+                moniker: "core/last_segment".try_into().unwrap(),
                 severity: diagnostics_data::Severity::Error,
             })
             .set_file("sometestfile")
@@ -802,8 +806,8 @@ mod test {
         assert!(criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                 timestamp_nanos: 0.into(),
-                component_url: Some(String::default()),
-                moniker: "included/moniker".to_string(),
+                component_url: Some("".into()),
+                moniker: "included/moniker".try_into().unwrap(),
                 severity: diagnostics_data::Severity::Error,
             })
             .set_message("included message")
@@ -813,8 +817,8 @@ mod test {
         assert!(criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                 timestamp_nanos: 0.into(),
-                component_url: Some(String::default()),
-                moniker: "included/moniker".to_string(),
+                component_url: Some("".into()),
+                moniker: "included/moniker".try_into().unwrap(),
                 severity: diagnostics_data::Severity::Info,
             })
             .set_message("different message")
@@ -824,8 +828,8 @@ mod test {
         assert!(!criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                 timestamp_nanos: 0.into(),
-                component_url: Some(String::default()),
-                moniker: "other/moniker".to_string(),
+                component_url: Some("".into()),
+                moniker: "other/moniker".try_into().unwrap(),
                 severity: diagnostics_data::Severity::Debug,
             })
             .set_message("included message")
@@ -836,8 +840,8 @@ mod test {
         let entry = make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                 timestamp_nanos: 0.into(),
-                component_url: Some(String::default()),
-                moniker: "other/moniker".to_string(),
+                component_url: Some("".into()),
+                moniker: "other/moniker".try_into().unwrap(),
                 severity: diagnostics_data::Severity::Debug,
             })
             .set_message("included message")
@@ -857,8 +861,8 @@ mod test {
         assert!(criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
                 timestamp_nanos: 0.into(),
-                component_url: Some(String::default()),
-                moniker: "core/last_segment".into(),
+                component_url: Some("".into()),
+                moniker: "core/last_segment".try_into().unwrap(),
                 severity: diagnostics_data::Severity::Error,
             })
             .set_message("hello world")

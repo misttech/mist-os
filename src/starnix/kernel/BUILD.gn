@@ -6,6 +6,7 @@ import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
 import("//build/rust/rustc_macro.gni")
 import("//build/rust/rustc_test.gni")
+import("//build/toolchain/concurrent_jobs.gni")
 import("//src/starnix/kernel/starnix.gni")
 import("//src/starnix/lib/gzip/gzip.gni")
 import("//src/storage/fshost/generated_fshost_config.gni")
@@ -178,9 +179,11 @@ rustc_library("starnix_core") {
     "mm/memory_manager.rs",
     "mm/mod.rs",
     "mm/syscalls.rs",
+    "mm/vmar.rs",
     "mm/vmex_resource.rs",
     "mm/vmsplice.rs",
     "mutable_state.rs",
+    "power/listener.rs",
     "power/manager.rs",
     "power/mod.rs",
     "power/state.rs",
@@ -247,7 +250,6 @@ rustc_library("starnix_core") {
     "vfs/file_server.rs",
     "vfs/file_system/file_system.rs",
     "vfs/file_system/mod.rs",
-    "vfs/file_system/selinux_contexts.rs",
     "vfs/file_write_guard.rs",
     "vfs/fs_args.rs",
     "vfs/fs_context.rs",
@@ -396,7 +398,6 @@ rustc_library("starnix_core") {
     "//third_party/rust_crates:netlink-packet-core",
     "//third_party/rust_crates:netlink-packet-generic",
     "//third_party/rust_crates:netlink-packet-route",
-    "//third_party/rust_crates:netlink-packet-sock-diag",
     "//third_party/rust_crates:netlink-packet-utils",
     "//third_party/rust_crates:nom",
     "//third_party/rust_crates:num-derive",
@@ -422,6 +423,7 @@ rustc_library("starnix_core") {
 
   test_deps = [
     "//src/connectivity/lib/net-declare",
+    "//src/lib/const-unwrap",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-fs",
     "//src/lib/test_util",
@@ -450,6 +452,13 @@ rustc_library("starnix_core") {
     "//src/starnix/lib/selinux/testdata/micro_policies/hooks_tests_policy.pp",
   ]
   configs += [ "//src/starnix/config:starnix_clippy_lints" ]
+
+  if (is_asan) {
+    # At least for ASan, remote execution requires machine with more memory.
+    _concurrent_jobs = concurrent_jobs.rust_highmem
+    test_configs = _concurrent_jobs.configs
+    test_vars = _concurrent_jobs.vars
+  }
 }
 
 rustc_library("starnix_kernel_runner") {

@@ -139,10 +139,13 @@ cc_library(
 )
 
 cc_library(
-    name = "fake_hci_test_fixture",
+    name = "fake_vendor_server",
     testonly = True,
+    srcs = [
+        "fake_hci_transport_server.cc",
+    ],
     hdrs = [
-        "fake_hci_server.h",
+        "fake_hci_transport_server.h",
         "fake_vendor_server.h",
     ],
     deps = [
@@ -154,6 +157,7 @@ cc_library(
         "@fuchsia_sdk//pkg/fidl_cpp",
         "@fuchsia_sdk//pkg/zx",
         "@internal_sdk//fidl/fuchsia.hardware.bluetooth:fuchsia.hardware.bluetooth_cpp",
+        "@pigweed//pw_unit_test",
     ],
 )
 

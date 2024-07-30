@@ -22,6 +22,8 @@ constexpr const ::test::versions::Bits Bits::kMask = ::test::versions::Bits(1u);
 constexpr const ::test::versions::Enum Enum::A = ::test::versions::Enum(1u);
 #endif  // (__cplusplus < 201703)
 
+#ifdef __Fuchsia__
+
 extern "C" const fidl_type_t test_versions_StructTable;
 const fidl_type_t* Struct::FidlType = &test_versions_StructTable;
 
@@ -48,6 +50,10 @@ zx_status_t Struct::Clone(Struct* _result) const {
     return _status;
   return ZX_OK;
 }
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
 
 extern "C" const fidl_type_t test_versions_TableTable;
 const fidl_type_t* Table::FidlType = &test_versions_TableTable;
@@ -150,6 +156,18 @@ void Table::Decode(::fidl::Decoder* _decoder, Table* _value, size_t _offset) {
     goto done_1;
   }
 
+  if (count > 1) {
+    for (uint64_t ordinal = 1; ordinal <= count; ordinal++) {
+      if (IsOrdinalKnown(ordinal)) {
+        continue;
+      }
+
+      size_t envelope_base = base + (ordinal - 1) * sizeof(fidl_envelope_t);
+      fidl_envelope_t* envelope = _decoder->GetPtr<fidl_envelope_t>(envelope_base);
+      _decoder->CloseUnknownHandlesInEnvelope(envelope);
+    }
+  }
+
   return;
 
   // Clear unset values.
@@ -169,6 +187,10 @@ zx_status_t Table::Clone(Table* result) const {
   }
   return ZX_OK;
 }
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
 
 extern "C" const fidl_type_t test_versions_UnionTable;
 const fidl_type_t* Union::FidlType = &test_versions_UnionTable;
@@ -248,7 +270,7 @@ void Union::Encode(::fidl::Encoder* encoder, size_t offset,
       break;
     }
     case ::test::versions::Union::Tag::kUnknown: {
-      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_union_t, envelope));
+      ::fidl::EncodeUnknownData(encoder, &unknown_data_, offset + offsetof(fidl_union_t, envelope));
       *encoder->GetPtr<uint64_t>(offset) = tag_;
       break;
     }
@@ -278,8 +300,9 @@ void Union::Decode(::fidl::Decoder* _decoder, Union* value, size_t offset) {
     }
     default: {
       auto unknown_info = _decoder->EnvelopeUnknownDataInfo(&xunion->envelope);
-      value->unknown_data_.resize(unknown_info.num_bytes);
-      ::fidl::DecodeUnknownBytesContents(_decoder, &value->unknown_data_, unknown_info.value_offset);
+      value->unknown_data_.bytes.resize(unknown_info.num_bytes);
+      value->unknown_data_.handles.resize(unknown_info.num_handles);
+      ::fidl::DecodeUnknownDataContents(_decoder, &value->unknown_data_, unknown_info.value_offset);
       break;
     }
   }
@@ -305,9 +328,10 @@ Union& Union::set_x(uint32_t value) {
   x_ = std::move(value);
   return *this;
 }
-Union& Union::SetUnknownData(fidl_xunion_tag_t ordinal, std::vector<uint8_t> bytes) {
+Union& Union::SetUnknownData(fidl_xunion_tag_t ordinal, std::vector<uint8_t> bytes, std::vector<zx::handle> handles) {
   EnsureStorageInitialized(ordinal);
-  unknown_data_ = std::move(bytes);
+  unknown_data_.bytes = std::move(bytes);
+  unknown_data_.handles = std::move(handles);
   return *this;
 }
 
@@ -341,6 +365,8 @@ void Union::EnsureStorageInitialized(::fidl_xunion_tag_t tag) {
     }
   }
 }
+
+#endif  // __Fuchsia__
 
 //
 // Proxies and stubs definitions
@@ -487,6 +513,18 @@ zx_status_t Protocol_Proxy::Dispatch_(::fidl::HLCPPIncomingMessage message) {
   zx_status_t status = ZX_OK;
   switch (message.ordinal()) {
     default: {
+      auto txid = message.txid();
+      auto is_flexible = message.is_flexible();
+      auto ordinal = message.ordinal();
+      // To satisfy RFC-0138, move the message so it is destructed before
+      // calling the unknown event handler.
+      {
+        auto message_ = std::move(message);
+      }
+      if (txid == 0 && is_flexible) {
+        handle_unknown_event(ordinal);
+        break;
+      }
       status = ZX_ERR_NOT_SUPPORTED;
       break;
     }
@@ -518,6 +556,24 @@ zx_status_t Protocol_Stub::Dispatch_(
   const fidl_type_t* request_type = ::test::versions::Protocol_RequestDecoder::GetType(message.ordinal(), &needs_response, &is_known);
 
   if (!is_known) {
+    auto is_flexible = message.is_flexible();
+    auto ordinal = message.ordinal();
+    // To satisfy RFC-0138, move the message so it is destructed before sending
+    // a reply or calling the unknown method handler.
+    {
+      auto message_ = std::move(message);
+    }
+    if (is_flexible) {
+      if (response.needs_response()) {
+        ::fidl::MessageEncoder encoder(ordinal, ::fidl::MessageDynamicFlags::kFlexibleMethod);
+        const fidl_type_t* resp_type = &kFidlInternalUnknownMethodResponseTable;
+        response.Send(resp_type, ::fidl::internal::EncodeUnknownMethodResponse(&encoder));
+        impl_->handle_unknown_method(ordinal, true);
+      } else {
+        impl_->handle_unknown_method(ordinal, false);
+      }
+      return ZX_OK;
+    }
     return ZX_ERR_NOT_SUPPORTED;
   }
 

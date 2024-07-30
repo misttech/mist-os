@@ -110,7 +110,9 @@ impl MockResolver {
             package: Some(ResolvedPackage { url: "pkg".to_string(), directory: client }),
             config_values,
             abi_revision: Some(
-                version_history::HISTORY.get_example_supported_version_for_tests().abi_revision,
+                version_history_data::HISTORY
+                    .get_example_supported_version_for_tests()
+                    .abi_revision,
             ),
         })
     }

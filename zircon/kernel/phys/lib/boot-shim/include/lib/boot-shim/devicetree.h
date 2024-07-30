@@ -9,6 +9,7 @@
 
 #include <lib/boot-shim/devicetree-boot-shim.h>
 #include <lib/boot-shim/item-base.h>
+#include <lib/boot-shim/watchdog.h>
 #include <lib/devicetree/devicetree.h>
 #include <lib/devicetree/matcher.h>
 #include <lib/fit/function.h>
@@ -28,12 +29,11 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <zircon/assert.h>
+#include <zircon/errors.h>
 
 #include <algorithm>
-#include <array>
 #include <cstdint>
 #include <optional>
-#include <string>
 #include <string_view>
 #include <type_traits>
 #include <variant>
@@ -929,6 +929,65 @@ class ArmDevicetreeTimerItem
 
 // A flat Devicetree ZBI Item.
 using DevicetreeDtbItem = SingleItem<ZBI_TYPE_DEVICETREE>;
+
+// Define an item that maps an arbitrary set of `Watchdogs` to `zbi_dcfg_generic32_watchdog_t`, that
+// is a generic representation of a watchdog driver described by a set of actions that are mapped to
+// a sequence of R-M-W operations in specific MMIO regions.
+//
+// Specifically given the set of `Wacthdogs` the first non-disabled matching device node will be
+// used to fill the payload.
+//
+// See '<lib/boot-shim/watchdog.h>' for Watchdog Item API contract.
+template <class... Watchdogs>
+class GenericWatchdogItemBase
+    : public DevicetreeItemBase<GenericWatchdogItemBase<Watchdogs...>, 1>,
+      public SingleOptionalItem<zbi_dcfg_generic32_watchdog_t, ZBI_TYPE_KERNEL_DRIVER,
+                                ZBI_KERNEL_DRIVER_GENERIC32_WATCHDOG> {
+ public:
+  devicetree::ScanState OnNode(const devicetree::NodePath& path,
+                               const devicetree::PropertyDecoder& decoder) {
+    auto compatibles =
+        decoder.FindAndDecodeProperty<&devicetree::PropertyValue::AsStringList>("compatible");
+    if (!compatibles) {
+      return devicetree::ScanState::kActive;
+    }
+
+    auto device_status =
+        decoder.FindAndDecodeProperty<&devicetree::PropertyValue::AsString>("status");
+    // Ignore disabled device nodes and keep looking.
+    if (device_status && device_status.value() == "disabled") {
+      return devicetree::ScanState::kActive;
+    }
+
+    for (auto compatible : *compatibles) {
+      auto result = (Match<Watchdogs>(compatible, decoder) || ...);
+      // Matched and maybe filled the payload.
+      if (result) {
+        return devicetree::ScanState::kDone;
+      }
+    }
+    return devicetree::ScanState::kActive;
+  }
+
+  // If after a full scan no watchdog is found, we should end.
+  devicetree::ScanState OnScan() { return devicetree::ScanState::kDone; }
+
+ private:
+  template <class Watchdog>
+  bool Match(std::string_view compatible, const devicetree::PropertyDecoder& decoder) {
+    for (std::string_view device_compatible : Watchdog::kCompatibleDevices) {
+      if (device_compatible == compatible) {
+        if (auto payload = Watchdog::MaybeCreate(decoder); payload) {
+          set_payload(*payload);
+        }
+        return true;
+      }
+    }
+    return false;
+  }
+};
+
+using GenericWatchdogItem = WithAllWatchdogs<GenericWatchdogItemBase>;
 
 }  // namespace boot_shim
 

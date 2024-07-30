@@ -10,6 +10,7 @@
 
 #include <iostream>
 #include <optional>
+#include <vector>
 
 #ifdef __Fuchsia__
 #include <lib/zx/object.h>

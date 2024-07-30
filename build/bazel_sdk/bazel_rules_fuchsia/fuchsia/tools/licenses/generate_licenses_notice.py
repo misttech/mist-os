@@ -6,9 +6,9 @@
 
 import argparse
 from sys import stderr
+
 from fuchsia.tools.licenses.classification_types import *
 from fuchsia.tools.licenses.spdx_types import *
-
 
 _VERBOSE = True
 

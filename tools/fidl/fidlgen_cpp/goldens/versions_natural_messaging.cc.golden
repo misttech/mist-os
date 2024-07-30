@@ -97,6 +97,31 @@ fidl::internal::NaturalSyncClientImpl<::test_versions::Protocol>::Foo() {
   fidl::internal::NaturalEventDispatcher<::test_versions::Protocol> dispatcher{this};
   return HandleOneEventImpl_(client_end.channel(), event_storage.view(), dispatcher);
 }
+::fidl::Status
+fidl::internal::NaturalEventDispatcher<::test_versions::Protocol>::DispatchEvent(
+    ::fidl::IncomingHeaderAndMessage& msg,
+    ::fidl::internal::MessageStorageViewBase* storage_view) {
+  switch (msg.header()->ordinal) {
+    default:
+      auto* hdr = msg.header();
+      ::fidl::UnknownMethodType unknown_method_type =
+          ::fidl::internal::UnknownMethodTypeFromHeader(hdr);
+      bool is_flexible_interaction = ::fidl::IsFlexibleInteraction(hdr);
+      auto ordinal = hdr->ordinal;
+      std::move(msg).CloseHandles();
+      if (is_flexible_interaction &&
+          ::fidl::internal::CanHandleEvent(::test_versions::Protocol::kOpenness, unknown_method_type)) {
+        if (event_handler()) {
+          ::fidl::UnknownEventMetadata<::test_versions::Protocol> metadata{
+              .event_ordinal = ordinal,
+          };
+          event_handler()->handle_unknown_event(metadata);
+        }
+        return ::fidl::Status::Ok();
+      }
+      return ::fidl::Status::UnknownOrdinal();
+  }
+}
 
 #endif  // __Fuchsia__
 
@@ -127,6 +152,22 @@ constexpr ::fidl::internal::MethodEntry fidl::internal::NaturalServerDispatcher<
 
 const ::fidl::internal::MethodEntry* fidl::internal::NaturalServerDispatcher<::test_versions::Protocol>::entries_end_ =
     &entries_[1];
+const ::fidl::internal::UnknownMethodHandlerEntry fidl::internal::NaturalServerDispatcher<::test_versions::Protocol>::unknown_method_handler_entry_ = {
+    .openness = ::fidl::internal::Openness::kOpen,
+    .dispatch = [](void* interface, uint64_t method_ordinal,
+                   ::fidl::UnknownMethodType unknown_method_type, ::fidl::Transaction* txn) {
+      ::fidl::UnknownMethodCompleter::Sync completer(txn);
+      static_cast<::fidl::Server<::test_versions::Protocol>*>(interface)->handle_unknown_method(
+          ::fidl::UnknownMethodMetadata<::test_versions::Protocol>{
+              .method_ordinal = method_ordinal,
+
+              .unknown_method_type = unknown_method_type,
+
+          },
+          completer);
+    },
+    .send_reply = ::fidl::internal::SendChannelUnknownMethodReply,
+};
 
 void fidl::internal::NaturalServerDispatcher<::test_versions::Protocol>::Dispatch(::fidl::Server<::test_versions::Protocol>* impl, ::fidl::IncomingHeaderAndMessage&& msg,
                                                                                   internal::MessageStorageViewBase* storage_view, ::fidl::Transaction* txn) {

@@ -1,0 +1,146 @@
+# Copyright 2020 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/bind/bind.gni")
+import("//build/components.gni")
+import("//build/drivers.gni")
+import("//build/test.gni")
+
+driver_bind_rules("virtio-gpu-display-bind") {
+  rules = "meta/virtio-gpu-display.bind"
+  bind_output = "virtio-gpu-display.bindbc"
+  tests = "meta/bind-tests.json"
+  deps = [
+    "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_bindlib",
+    "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_bindlib",
+    "//src/devices/bind/fuchsia.acpi",
+    "//src/devices/bind/fuchsia.pci",
+  ]
+}
+
+group("tests") {
+  testonly = true
+  deps = [
+    ":virtio-gpu-display-bind_test",
+    ":virtio-gpu-display-test-package",
+  ]
+}
+
+source_set("gpu_control_server") {
+  sources = [
+    "gpu-control-server.cc",
+    "gpu-control-server.h",
+  ]
+  public_deps = [
+    "//sdk/fidl/fuchsia.gpu.virtio:fuchsia.gpu.virtio_cpp",
+    "//sdk/lib/driver/logging/cpp",
+    "//sdk/lib/stdcompat",
+    "//zircon/system/ulib/async",
+    "//zircon/system/ulib/fbl",
+  ]
+}
+
+source_set("common_srcs") {
+  configs += [ "//build/config:all_source" ]
+  sources = [
+    "display-controller-banjo.cc",
+    "display-controller-banjo.h",
+    "display-coordinator-events-banjo.cc",
+    "display-coordinator-events-banjo.h",
+    "display-coordinator-events-interface.h",
+    "display-engine-interface.h",
+    "display-engine.cc",
+    "display-engine.h",
+    "virtio-gpu-device.cc",
+    "virtio-gpu-device.h",
+    "virtio-pci-device.cc",
+    "virtio-pci-device.h",
+  ]
+  public_deps = [
+    ":gpu_control_server",
+    "//sdk/banjo/fuchsia.hardware.display.controller:fuchsia.hardware.display.controller_banjo_cpp",
+    "//sdk/fidl/fuchsia.hardware.display.engine:fuchsia.hardware.display.engine_cpp",
+    "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_cpp",
+    "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp",
+    "//sdk/lib/driver/logging/cpp",
+    "//src/devices/bus/lib/virtio:virtio-dfv2",
+    "//src/graphics/display/lib/api-types-cpp",
+    "//src/graphics/lib/virtio:virtio-spec",
+    "//src/lib/fxl",
+    "//zircon/system/ulib/image-format",
+    "//zircon/system/ulib/sysmem-version",
+  ]
+}
+
+test("virtio-gpu-display-test") {
+  output_name = "virtio-gpu-display-test"
+  if (is_fuchsia) {
+    fdio_config = [ "//build/config/fuchsia:fdio_config" ]
+    if (configs + fdio_config - fdio_config != configs) {
+      configs -= fdio_config
+    }
+  }
+  sources = [
+    "display-engine-test.cc",
+    "virtio-abi-test.cc",
+  ]
+  deps = [
+    ":common_srcs",
+    "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_cpp_testing",
+    "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp_testing",
+    "//sdk/lib/async-loop-testing/cpp",
+    "//sdk/lib/driver/logging/cpp",
+    "//src/devices/testing/fake-bti",
+    "//src/lib/fsl",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/predicates",
+    "//third_party/googletest:gtest",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
+    "//zircon/system/ulib/async-loop:async-loop-default",
+  ]
+}
+
+fuchsia_driver("driver") {
+  configs += [
+    "//build/config:all_source",
+    "//build/config/fuchsia:enable_zircon_asserts",
+  ]
+  output_name = "virtio-gpu-display"
+  sources = [
+    "gpu-device-driver.cc",
+    "gpu-device-driver.h",
+  ]
+  deps = [
+    ":common_srcs",
+    ":virtio-gpu-display-bind",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
+    "//sdk/lib/component/outgoing/cpp",
+    "//sdk/lib/driver/compat/cpp",
+    "//sdk/lib/driver/component/cpp",
+    "//sdk/lib/driver/incoming/cpp",
+    "//sdk/lib/driver/outgoing/cpp",
+    "//sdk/lib/driver/runtime:driver_runtime_cpp",
+    "//src/devices/bin/driver_runtime",
+    "//src/devices/bind/fuchsia:fuchsia_cpp",
+    "//src/devices/bind/fuchsia.display:fuchsia.display_cpp",
+    "//src/graphics/display/lib/driver-framework-migration-utils/logging:logging-dfv2",
+  ]
+}
+
+fuchsia_driver_component("component") {
+  component_name = "virtio-gpu-display"
+  info = "meta/virtio-gpu-display-info.json"
+  manifest = "meta/virtio-gpu-display.cml"
+  deps = [ ":driver" ]
+}
+
+fuchsia_driver_package("package") {
+  package_name = "virtio-gpu-display"
+  driver_components = [ ":component" ]
+}
+
+fuchsia_unittest_package("virtio-gpu-display-test-package") {
+  package_name = "virtio-gpu-display-test"
+  deps = [ ":virtio-gpu-display-test" ]
+}

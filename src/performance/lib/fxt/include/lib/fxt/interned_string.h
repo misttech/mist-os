@@ -10,6 +10,7 @@
 #include <zircon/types.h>
 
 #include <atomic>
+#include <type_traits>
 
 namespace fxt {
 
@@ -110,8 +111,8 @@ struct InternedString {
   // resulting in every InternedString instance from instantiations of the _intern literal operator
   // being placed in the "__fxt_interned_string_table" section. However, GCC ignores section
   // attributes on COMDAT symbols as of this writing, resulting in an empty section when compiled
-  // with GCC.  TODO(https://fxbug.dev/42101573): Cleanup this comment when GCC supports section attributes on
-  // COMDAT.
+  // with GCC.  TODO(https://fxbug.dev/42101573): Cleanup this comment when GCC supports section
+  // attributes on COMDAT.
 
   static void PreRegister() {
     for (const InternedString& interned_string : IterateSection) {
@@ -125,8 +126,8 @@ struct InternedString {
   static void SetMapStringCallback(MapStringCallback callback) { map_string_callback_ = callback; }
 
  private:
-  // TODO(https://fxbug.dev/42108473): Replace runtime lock-free linked list with comdat linker sections once
-  // the toolchain supports it with all compilers.
+  // TODO(https://fxbug.dev/42108473): Replace runtime lock-free linked list with comdat linker
+  // sections once the toolchain supports it with all compilers.
   [[gnu::noinline]] static uint16_t Register(const InternedString& interned_string) {
     // Return the id if the string ref is already registered.
     uint16_t id = interned_string.id.load(std::memory_order_relaxed);

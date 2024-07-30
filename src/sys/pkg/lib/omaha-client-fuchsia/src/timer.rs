@@ -50,20 +50,21 @@ impl Timer for FuchsiaTimer {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use fuchsia_async::TestExecutor;
     use std::task::Poll;
 
-    #[test]
-    fn test_timer() {
-        let mut exec = fasync::TestExecutor::new();
+    #[fuchsia::test(allow_stalls = false)]
+    async fn test_timer() {
         let start_time = fasync::Time::now();
 
         let mut timer = FuchsiaTimer;
         let mut future = timer.wait_for(Duration::from_secs(1234));
-        assert_eq!(Poll::Pending, exec.run_until_stalled(&mut future));
+        assert_eq!(Poll::Pending, TestExecutor::poll_until_stalled(&mut future).await);
 
-        let future_time = exec.wake_next_timer().unwrap();
+        let future_time = TestExecutor::next_timer().unwrap();
+        TestExecutor::advance_to(future_time).await;
         assert_eq!(1234, (future_time - start_time).into_seconds());
 
-        assert_eq!(Poll::Ready(()), exec.run_until_stalled(&mut future));
+        let () = future.await;
     }
 }

@@ -409,12 +409,17 @@ void UITestRealm::ConfigureSceneOwner() {
       .name = "fuchsia.ui.IdleThresholdMs",
       .value = ConfigValue::Uint64(config_.idle_threshold_ms),
   });
+  configurations.push_back({
+      .name = "fuchsia.ui.SuspendEnabled",
+      .value = ConfigValue::Bool(config_.suspend_enabled),
+  });
   realm_builder_.AddConfiguration(std::move(configurations));
   realm_builder_.AddRoute({
       .capabilities =
           {
               component_testing::Config{.name = "fuchsia.ui.DisplayPixelDensity"},
               component_testing::Config{.name = "fuchsia.scenic.DisplayRotation"},
+              component_testing::Config{.name = "fuchsia.ui.SuspendEnabled"},
               component_testing::Config{.name = "fuchsia.ui.IdleThresholdMs"},
           },
       .source = component_testing::SelfRef{},

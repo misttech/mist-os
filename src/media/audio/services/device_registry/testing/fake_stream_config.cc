@@ -38,7 +38,7 @@ FakeStreamConfig::~FakeStreamConfig() {
 fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig> FakeStreamConfig::Enable() {
   ADR_LOG_METHOD(kLogFakeStreamConfig);
 
-  EXPECT_FALSE(stream_config_binding_);
+  EXPECT_FALSE(stream_config_binding_.has_value());
   stream_config_binding_.emplace(this, std::move(stream_config_server_end_), dispatcher_);
   EXPECT_TRUE(stream_config_binding_->is_bound());
   stream_config_binding_->set_error_handler([this](zx_status_t status) { DropStreamConfig(); });
@@ -69,7 +69,7 @@ void FakeStreamConfig::InjectGainChange(fuchsia_hardware_audio::GainState gain_s
 
 void FakeStreamConfig::InjectPluggedAt(zx::time plug_time) {
   ADR_LOG_METHOD(kLogFakeStreamConfig) << "(plugged, " << plug_time.get() << ")";
-  if (!plugged_ || (!*plugged_ && plug_time > plug_state_time_)) {
+  if (!plugged_.has_value() || (!*plugged_ && plug_time > plug_state_time_)) {
     plugged_ = true;
     plug_state_time_ = plug_time;
     plug_has_changed_ = true;
@@ -82,7 +82,7 @@ void FakeStreamConfig::InjectPluggedAt(zx::time plug_time) {
 
 void FakeStreamConfig::InjectUnpluggedAt(zx::time plug_time) {
   ADR_LOG_METHOD(kLogFakeStreamConfig) << "(unplugged, " << plug_time.get() << ")";
-  if (!plugged_ || (*plugged_ && plug_time > plug_state_time_)) {
+  if (!plugged_.has_value() || (*plugged_ && plug_time > plug_state_time_)) {
     plugged_ = false;
     plug_state_time_ = plug_time;
     plug_has_changed_ = true;
@@ -94,7 +94,7 @@ void FakeStreamConfig::InjectUnpluggedAt(zx::time plug_time) {
 }
 
 void FakeStreamConfig::DropRingBuffer() {
-  if (ring_buffer_binding_) {
+  if (ring_buffer_binding_.has_value()) {
     ADR_LOG_METHOD(kLogFakeStreamConfig);
 
     ring_buffer_binding_->Close(ZX_ERR_PEER_CLOSED);
@@ -121,7 +121,7 @@ fzl::VmoMapper FakeStreamConfig::AllocateRingBuffer(size_t size) {
 
 void FakeStreamConfig::GetHealthState(fha::StreamConfig::GetHealthStateCallback callback) {
   fha::HealthState health_state;
-  if (healthy_) {
+  if (healthy_.has_value()) {
     health_state.set_healthy(*healthy_);
   }
   callback(std::move(health_state));
@@ -136,31 +136,31 @@ void FakeStreamConfig::GetProperties(fha::StreamConfig::GetPropertiesCallback ca
        : props.clear_unique_id();
   is_input_ ? (void)props.set_is_input(*is_input_) : props.clear_is_input();
 
-  if (can_mute_) {
+  if (can_mute_.has_value()) {
     props.set_can_mute(*can_mute_);
   }
-  if (can_agc_) {
+  if (can_agc_.has_value()) {
     props.set_can_agc(*can_agc_);
   }
-  if (min_gain_db_) {
+  if (min_gain_db_.has_value()) {
     props.set_min_gain_db(*min_gain_db_);
   }
-  if (max_gain_db_) {
+  if (max_gain_db_.has_value()) {
     props.set_max_gain_db(*max_gain_db_);
   }
-  if (gain_step_db_) {
+  if (gain_step_db_.has_value()) {
     props.set_gain_step_db(*gain_step_db_);
   }
-  if (plug_detect_capabilities_) {
+  if (plug_detect_capabilities_.has_value()) {
     props.set_plug_detect_capabilities(*plug_detect_capabilities_);
   }
-  if (manufacturer_) {
+  if (manufacturer_.has_value()) {
     props.set_manufacturer(*manufacturer_);
   }
-  if (product_) {
+  if (product_.has_value()) {
     props.set_product(*product_);
   }
-  if (clock_domain_) {
+  if (clock_domain_.has_value()) {
     props.set_clock_domain(*clock_domain_);
   }
 
@@ -183,17 +183,19 @@ void FakeStreamConfig::GetSupportedFormats(
   for (auto supported_format_idx = 0u; supported_format_idx < ring_buffer_format_sets_count;
        ++supported_format_idx) {
     fha::SupportedFormats supported_format;
-    if (channel_sets_[supported_format_idx] || sample_formats_[supported_format_idx] ||
-        bytes_per_sample_[supported_format_idx] || valid_bits_per_sample_[supported_format_idx] ||
-        frame_rates_[supported_format_idx]) {
+    if (channel_sets_[supported_format_idx].has_value() ||
+        sample_formats_[supported_format_idx].has_value() ||
+        bytes_per_sample_[supported_format_idx].has_value() ||
+        valid_bits_per_sample_[supported_format_idx].has_value() ||
+        frame_rates_[supported_format_idx].has_value()) {
       fha::PcmSupportedFormats pcm_supported_formats;
-      if (channel_sets_[supported_format_idx]) {
+      if (channel_sets_[supported_format_idx].has_value()) {
         auto channel_sets =
             std::vector<fha::ChannelSet>(channel_sets_[supported_format_idx]->size());
         for (auto channel_sets_idx = 0u;
              channel_sets_idx < channel_sets_[supported_format_idx]->size(); ++channel_sets_idx) {
           fha::ChannelSet channel_set;
-          if (channel_sets_[supported_format_idx]->at(channel_sets_idx)) {
+          if (channel_sets_[supported_format_idx]->at(channel_sets_idx).has_value()) {
             auto attribs = std::vector<fha::ChannelAttributes>(
                 channel_sets_[supported_format_idx]->at(channel_sets_idx)->size());
             for (auto attributes_idx = 0u;
@@ -224,17 +226,17 @@ void FakeStreamConfig::GetSupportedFormats(
         }
         pcm_supported_formats.set_channel_sets(std::move(channel_sets));
       }
-      if (sample_formats_[supported_format_idx]) {
+      if (sample_formats_[supported_format_idx].has_value()) {
         pcm_supported_formats.set_sample_formats(*sample_formats_[supported_format_idx]);
       }
-      if (bytes_per_sample_[supported_format_idx]) {
+      if (bytes_per_sample_[supported_format_idx].has_value()) {
         pcm_supported_formats.set_bytes_per_sample(*bytes_per_sample_[supported_format_idx]);
       }
-      if (valid_bits_per_sample_[supported_format_idx]) {
+      if (valid_bits_per_sample_[supported_format_idx].has_value()) {
         pcm_supported_formats.set_valid_bits_per_sample(
             *valid_bits_per_sample_[supported_format_idx]);
       }
-      if (frame_rates_[supported_format_idx]) {
+      if (frame_rates_[supported_format_idx].has_value()) {
         pcm_supported_formats.set_frame_rates(*frame_rates_[supported_format_idx]);
       }
       supported_format.set_pcm_supported_formats(std::move(pcm_supported_formats));
@@ -249,13 +251,13 @@ void FakeStreamConfig::WatchGainState(fha::StreamConfig::WatchGainStateCallback 
 
   if (gain_has_changed_) {
     fha::GainState gain_state = {};
-    if (current_mute_) {
+    if (current_mute_.has_value()) {
       gain_state.set_muted(*current_mute_);
     }
-    if (current_agc_) {
+    if (current_agc_.has_value()) {
       gain_state.set_agc_enabled(*current_agc_);
     }
-    if (current_gain_db_) {
+    if (current_gain_db_.has_value()) {
       gain_state.set_gain_db(*current_gain_db_);
     }
     gain_has_changed_ = false;
@@ -270,7 +272,7 @@ void FakeStreamConfig::WatchPlugState(fha::StreamConfig::WatchPlugStateCallback 
 
   if (plug_has_changed_) {
     fha::PlugState plug_state = {};
-    if (plugged_) {
+    if (plugged_.has_value()) {
       plug_state.set_plugged(*plugged_);
     }
     plug_state.set_plug_state_time(plug_state_time_.get());
@@ -354,7 +356,7 @@ void FakeStreamConfig::SendPositionNotification(zx::time timestamp, uint32_t pos
   position_notify_position_bytes_ = position;
 
   position_notification_values_are_set_ = true;
-  if (position_notify_callback_) {
+  if (position_notify_callback_.has_value()) {
     PositionNotification();
   }
 }
@@ -373,7 +375,7 @@ void FakeStreamConfig::WatchClockRecoveryPositionInfo(
 void FakeStreamConfig::PositionNotification() {
   ADR_LOG_METHOD(kLogFakeStreamConfig);
 
-  FX_CHECK(position_notify_callback_);
+  FX_CHECK(position_notify_callback_.has_value());
   FX_CHECK(position_notification_values_are_set_);
 
   // Real audio drivers can't emit position notifications until started; we shouldn't either
@@ -398,7 +400,7 @@ void FakeStreamConfig::GetVmo(uint32_t min_frames, uint32_t clock_recovery_notif
 
   // This should be true since it's set as part of creating the channel that's carrying these
   // messages.
-  FX_CHECK(selected_format_);
+  FX_CHECK(selected_format_.has_value());
 
   if (!ring_buffer_) {
     // If we haven't created a ring buffer, we'll just drop this request.
@@ -469,10 +471,10 @@ void FakeStreamConfig::WatchDelayInfo(WatchDelayInfoCallback callback) {
   if (delay_has_changed_) {
     fha::DelayInfo delay_info = {};
 
-    if (internal_delay_) {
+    if (internal_delay_.has_value()) {
       delay_info.set_internal_delay(internal_delay_->to_nsecs());
     }
-    if (external_delay_) {
+    if (external_delay_.has_value()) {
       delay_info.set_external_delay(external_delay_->to_nsecs());
     }
 

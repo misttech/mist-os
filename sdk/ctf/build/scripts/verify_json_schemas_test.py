@@ -5,15 +5,16 @@
 
 """Unit tests for verify_json_schemas.py"""
 
-from tempfile import TemporaryDirectory
 import json
 import unittest
+from tempfile import TemporaryDirectory
 from typing import Any
+
 from verify_json_schemas import (
-    fail_on_breaking_changes,
-    SchemaListMismatchError,
-    MissingInputError,
     GoldenMismatchError,
+    MissingInputError,
+    SchemaListMismatchError,
+    fail_on_breaking_changes,
 )
 
 

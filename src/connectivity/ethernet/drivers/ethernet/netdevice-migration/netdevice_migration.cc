@@ -82,7 +82,7 @@ zx::result<std::unique_ptr<NetdeviceMigration>> NetdeviceMigration::Create(zx_de
     // If both WLAN and WLAN_AP flags are set, WLAN_AP takes precedence
     port_class = fuchsia_hardware_network::wire::PortClass::kWlanAp;
   } else if (eth_info.features & ETHERNET_FEATURE_WLAN) {
-    port_class = fuchsia_hardware_network::wire::PortClass::kWlan;
+    port_class = fuchsia_hardware_network::wire::PortClass::kWlanClient;
   }
 
   std::array<uint8_t, sizeof(eth_info.mac)> mac;

@@ -186,7 +186,7 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_versions::Protocol> final
 #ifdef __Fuchsia__
 
 template <>
-class ::fidl::internal::NaturalEventHandlerInterface<::test_versions::Protocol> : public ::fidl::internal::BaseEventHandlerInterface {
+class ::fidl::internal::NaturalEventHandlerInterface<::test_versions::Protocol> : public ::fidl::internal::BaseEventHandlerInterface, public ::fidl::UnknownEventHandler<::test_versions::Protocol> {
  public:
   NaturalEventHandlerInterface() = default;
   virtual ~NaturalEventHandlerInterface() = default;
@@ -217,6 +217,9 @@ class ::fidl::internal::NaturalEventDispatcher<::test_versions::Protocol> final 
  public:
   explicit NaturalEventDispatcher(::fidl::internal::NaturalEventHandlerInterface<::test_versions::Protocol>* event_handler)
       : IncomingEventDispatcher(event_handler) {}
+  ::fidl::Status DispatchEvent(
+      ::fidl::IncomingHeaderAndMessage& msg,
+      internal::MessageStorageViewBase* storage_view) override;
 };
 
 #endif  // __Fuchsia__
@@ -238,7 +241,7 @@ class ::fidl::internal::NaturalEventSender<::test_versions::Protocol>
 #endif  // __Fuchsia__
 
 template <>
-class ::fidl::Server<::test_versions::Protocol> : public ::fidl::internal::IncomingMessageDispatcher {
+class ::fidl::Server<::test_versions::Protocol> : public ::fidl::internal::IncomingMessageDispatcher, public ::fidl::UnknownMethodHandler<::test_versions::Protocol> {
  public:
   Server() = default;
   virtual ~Server() = default;
@@ -284,8 +287,7 @@ struct ::fidl::internal::NaturalServerDispatcher<::test_versions::Protocol> fina
  private:
   static const ::fidl::internal::MethodEntry entries_[];
   static const ::fidl::internal::MethodEntry* entries_end_;
-  static constexpr const ::fidl::internal::UnknownMethodHandlerEntry& unknown_method_handler_entry_ =
-      ::fidl::internal::UnknownMethodHandlerEntry::kClosedProtocolHandlerEntry;
+  static const ::fidl::internal::UnknownMethodHandlerEntry unknown_method_handler_entry_;
 };
 
 #endif  // __Fuchsia__

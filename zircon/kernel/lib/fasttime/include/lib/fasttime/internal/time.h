@@ -80,9 +80,34 @@ inline zx_time_t compute_monotonic_time(const TimeValues& tvalues) {
       return ticks;
     }
   }
-  const affine::Ratio ticks_to_mono_ratio(tvalues.ticks_to_mono_numerator,
-                                          tvalues.ticks_to_mono_denominator);
-  return ticks_to_mono_ratio.Scale(ticks);
+  const affine::Ratio ticks_to_time_ratio(tvalues.ticks_to_time_numerator,
+                                          tvalues.ticks_to_time_denominator);
+  return ticks_to_time_ratio.Scale(ticks);
+}
+
+template <FasttimeVerificationMode kVerificationMode = FasttimeVerificationMode::kNormal>
+inline zx_ticks_t compute_boot_ticks(const TimeValues& tvalues) {
+  if constexpr (kVerificationMode == FasttimeVerificationMode::kNormal) {
+    if (!tvalues.usermode_can_access_ticks || tvalues.version != kFasttimeVersion) {
+      return ZX_TIME_INFINITE_PAST;
+    }
+  }
+  return internal::get_raw_ticks(tvalues) + tvalues.boot_ticks_offset;
+}
+
+template <FasttimeVerificationMode kVerificationMode = FasttimeVerificationMode::kNormal>
+inline zx_time_t compute_boot_time(const TimeValues& tvalues) {
+  const zx_ticks_t ticks = compute_boot_ticks<kVerificationMode>(tvalues);
+  if constexpr (kVerificationMode == FasttimeVerificationMode::kNormal) {
+    if (ticks == ZX_TIME_INFINITE_PAST) {
+      return ticks;
+    }
+  }
+  // The scaling factor from raw ticks to boot ticks is the same as that from raw ticks to mono
+  // ticks.
+  const affine::Ratio ticks_to_time_ratio(tvalues.ticks_to_time_numerator,
+                                          tvalues.ticks_to_time_denominator);
+  return ticks_to_time_ratio.Scale(ticks);
 }
 
 }  // namespace fasttime::internal

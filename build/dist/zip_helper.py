@@ -6,8 +6,8 @@
 # Extracts a zip file and writes a partial distribution manifest.
 # See //docs/development/build/build_system/internals/manifest_formats.md
 
-from argparse import ArgumentParser
 import json
+from argparse import ArgumentParser
 from os import path
 from zipfile import ZipFile
 

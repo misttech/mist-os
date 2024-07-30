@@ -99,4 +99,16 @@ void DevFsCoordinatorFactory::OpenCoordinatorForPrimary(
   pending_device_watchers_[id] = std::move(watcher);
 }
 
+void DevFsCoordinatorFactory::OpenCoordinatorWithListenerForVirtcon(
+    OpenCoordinatorWithListenerForVirtconRequest& request,
+    OpenCoordinatorWithListenerForVirtconCompleter::Sync& completer) {
+  completer.Reply(fit::error(ZX_ERR_NOT_SUPPORTED));
+}
+
+void DevFsCoordinatorFactory::OpenCoordinatorWithListenerForPrimary(
+    OpenCoordinatorWithListenerForPrimaryRequest& request,
+    OpenCoordinatorWithListenerForPrimaryCompleter::Sync& completer) {
+  completer.Reply(fit::error(ZX_ERR_NOT_SUPPORTED));
+}
+
 }  // namespace display

@@ -54,5 +54,9 @@ source_set("power_utils") {
 
 group("tests") {
   testonly = true
-  deps = [ "tests" ]
+  deps = [
+    # Build the host binary to make sure it at least typechecks
+    ":merge_power_trace_bin($host_toolchain)",
+    "tests",
+  ]
 }

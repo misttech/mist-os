@@ -1,12 +1,11 @@
-#!/usr/bin/env fuchsia-vendored-python
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 """Unit tests for mobly_driver/driver/infra.py."""
 
 import unittest
-from unittest.mock import ANY, call, mock_open, patch
 from typing import Any
+from unittest.mock import ANY, call, mock_open, patch
 
 from mobly_driver.driver import common, infra
 

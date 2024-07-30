@@ -9,6 +9,7 @@
 
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "src/developer/forensics/utils/redact/cache.h"
 
@@ -21,11 +22,48 @@ using Replacer = ::fit::function<std::string&(RedactionIdCache&, std::string& te
 Replacer ReplaceWithText(std::string_view pattern, std::string_view replacement);
 
 // Constructs a Replacer that substitutes all instances of |pattern| with |format| and the id for
-// the matched pattern.
+// the matched pattern. However, text will not be replaced if any strings from |ignore_prefixes|
+// occur just _before_ the matching pattern begins, regardless of whether the found prefix starts on
+// a word boundary. See examples 1 and 2.
+//
+// If a match happens to start with a string X from |ignore_prefixes|, the match will still be
+// redacted unless that matching text also has an instance of X _before_ the matching text begins.
+// See examples 3 and 4.
+//
+// Some examples:
+//
+//   1)
+//   pattern: "id:a+"
+//   ignore_prefix: "elf:"
+//   replace: "<REDACTED>"
+//   content: "other_stuff:id:aaa"
+//   result: "other_stuff:<REDACTED>"
+//
+//   2)
+//   pattern: "id:a+"
+//   ignore_prefix: "elf:"
+//   replace: "<REDACTED>"
+//   content: "elf:id:aaa"
+//   result: "elf:id:aaa"
+//
+//   3)
+//   pattern: "elf:a+"
+//   ignore_prefix: "elf:"
+//   replace: "<REDACTED>"
+//   content: "other_stuff:elf:aaa"
+//   result: "other_stuff:<REDACTED>"
+//
+//   4)
+//   pattern: "elf:a+"
+//   ignore_prefix: "elf:"
+//   replace: "<REDACTED>"
+//   content: "elf:elf:aaa"
+//   result: "elf:elf:aaa"
 //
 // Note: |pattern| must extract at least 1 value.
 // Note: |format| must contain exactly 1 integer format specifier, i.e. '%d'.
-Replacer ReplaceWithIdFormatString(std::string_view pattern, std::string_view format);
+Replacer ReplaceWithIdFormatString(std::string_view pattern, std::string_view format,
+                                   const std::vector<std::string>& ignore_prefixes);
 
 // Constructs a Replacer that substitutes all instances IPv4 address with "<REDACTED-IPV4: %d>"
 Replacer ReplaceIPv4();

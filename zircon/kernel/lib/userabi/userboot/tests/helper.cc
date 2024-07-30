@@ -4,7 +4,14 @@
 
 #include "helper.h"
 
+#include <fidl/fuchsia.boot/cpp/markers.h>
+#include <fidl/fuchsia.boot/cpp/wire.h>
+#include <lib/async-loop/cpp/loop.h>
+#include <lib/fidl/cpp/wire/channel.h>
+#include <lib/fidl/cpp/wire/internal/transport_channel.h>
+#include <lib/fidl/cpp/wire/wire_messaging.h>
 #include <lib/standalone-test/standalone.h>
+#include <lib/zx/channel.h>
 #include <lib/zx/vmo.h>
 #include <zircon/assert.h>
 #include <zircon/fidl.h>
@@ -14,10 +21,35 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <vector>
 
 #include <zxtest/zxtest.h>
 
 namespace {
+
+class UserbootServer final : public fidl::WireServer<fuchsia_boot::Userboot> {
+ public:
+  void PostStashSvc(PostStashSvcRequestView request, PostStashSvcCompleter::Sync& completer) final {
+    stash_svc_ = request->stash_svc_endpoint.TakeChannel();
+  }
+
+  zx::channel take_stash_svc() { return std::move(stash_svc_); }
+
+ private:
+  zx::channel stash_svc_;
+};
+
+class StashSvcServer final : public fidl::WireServer<fuchsia_boot::SvcStash> {
+ public:
+  void Store(StoreRequestView request, StoreCompleter::Sync& completer) final {
+    stashed_svc_.push_back(request->svc_endpoint.TakeChannel());
+  }
+
+  auto& stashed_svcs() { return stashed_svc_; }
+
+ private:
+  std::vector<zx::channel> stashed_svc_;
+};
 
 // TODO(https://fxbug.dev/42072759): Replace copy & pasted FIDL C bindings with new C++ bindings
 // when that's allowed.
@@ -38,14 +70,6 @@ struct fuchsia_debugdata_PublisherPublishRequestMessage {
   zx_handle_t data;
   zx_handle_t vmo_token;
 };
-
-struct fuchsia_boot_SvcStashStoreRequestMessage {
-  FIDL_ALIGNDECL
-  fidl_message_header_t hdr;
-  zx_handle_t svc_endpoint;
-};
-
-constexpr uint64_t fuchsia_boot_SvcStashStoreOrdinal = 0xC2648E356CA2870;
 
 }  // namespace
 
@@ -85,25 +109,41 @@ zx::unowned_eventpair DebugDataMessageView::token() const {
   return zx::unowned_eventpair(message->handles[1]);
 }
 
-zx::channel GetSvcStash() { return zx::channel(zx_take_startup_handle(PA_HND(PA_USER0, 0))); }
+void GetSvcStash(zx::channel& svc_stash) {
+  auto userboot = zx::channel(zx_take_startup_handle(PA_HND(PA_USER0, 0)));
+  // Drain messages, until you find the Post message for SvcStash.
+  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
+  UserbootServer server;
+  fidl::ServerEnd<fuchsia_boot::Userboot> userboot_endpoint(std::move(userboot));
+  fidl::BindServer(loop.dispatcher(), std::move(userboot_endpoint), &server);
+  // Drain all messages.
+  loop.RunUntilIdle();
 
-void GetStashedSvc(zx::unowned_channel svc_stash, zx::channel& svc) {
-  ASSERT_TRUE(*svc_stash);
-  uint32_t actual_handles = 0;
-  uint32_t actual_bytes = 0;
-  fuchsia_boot_SvcStashStoreRequestMessage request = {};
-  ASSERT_OK(svc_stash->read(0, &request, svc.reset_and_get_address(), sizeof(request), 1,
-                            &actual_bytes, &actual_handles),
-            "actual_bytes %zu actual_handles %zu\n", static_cast<size_t>(actual_bytes),
-            static_cast<size_t>(actual_handles));
+  svc_stash = server.take_stash_svc();
+  ASSERT_TRUE(svc_stash.is_valid());
+}
 
-  ASSERT_EQ(actual_bytes, sizeof(request));
-  ASSERT_EQ(actual_handles, 1);
+void GetStashedSvc(zx::channel svc_stash, zx::channel& svc_0, zx::channel& svc_1) {
+  ASSERT_TRUE(svc_stash.is_valid());
+  // Drain messages, until you find the Post message for SvcStash.
+  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
+  StashSvcServer server;
+  fidl::ServerEnd<fuchsia_boot::SvcStash> svc_stash_endpoint(std::move(svc_stash));
+  fidl::BindServer(loop.dispatcher(), std::move(svc_stash_endpoint), &server);
+  // Drain all messages.
+  loop.RunUntilIdle();
 
-  ASSERT_EQ(request.hdr.magic_number, kFidlWireFormatMagicNumberInitial);
-  ASSERT_EQ(request.hdr.ordinal, fuchsia_boot_SvcStashStoreOrdinal);
-  ASSERT_EQ(request.svc_endpoint, FIDL_HANDLE_PRESENT);
-  ASSERT_TRUE(svc);
+  auto& svcs = server.stashed_svcs();
+  ASSERT_GT(svcs.size(), 0);
+  svc_1 = std::move(svcs.back());
+  ASSERT_TRUE(svc_1.is_valid());
+  svcs.pop_back();
+  if (!svcs.empty()) {
+    svc_0 = std::move(svcs.back());
+    ASSERT_TRUE(svc_0.is_valid());
+    svcs.pop_back();
+  }
+  ASSERT_EQ(svcs.size(), 0u);
 }
 
 void GetDebugDataMessage(zx::unowned_channel svc, Message& msg) {

@@ -5,30 +5,26 @@
 #ifndef LIB_SYSLOG_CPP_LOG_LEVEL_H_
 #define LIB_SYSLOG_CPP_LOG_LEVEL_H_
 
-#include <cstdint>
+#include <lib/syslog/structured_backend/fuchsia_syslog.h>
 
-// REVIEWERS: DO NOT +2 any changes to this header
-// file unless this number is incremented with each change.
-#define FX_LOG_INTREE_API_VERSION (0)
+#include <cstdint>
 
 namespace fuchsia_logging {
 
-using LogSeverity = int8_t;
+using LogSeverity = uint8_t;
 
 // Default log levels.
-constexpr LogSeverity LOG_TRACE = 0x10;
-constexpr LogSeverity LOG_DEBUG = 0x20;
-constexpr LogSeverity LOG_INFO = 0x30;
-constexpr LogSeverity LOG_WARNING = 0x40;
-constexpr LogSeverity LOG_ERROR = 0x50;
-constexpr LogSeverity LOG_FATAL = 0x60;
+constexpr LogSeverity LOG_TRACE = FUCHSIA_LOG_TRACE;
+constexpr LogSeverity LOG_DEBUG = FUCHSIA_LOG_DEBUG;
+constexpr LogSeverity LOG_INFO = FUCHSIA_LOG_INFO;
+constexpr LogSeverity LOG_WARNING = FUCHSIA_LOG_WARNING;
+constexpr LogSeverity LOG_ERROR = FUCHSIA_LOG_ERROR;
+constexpr LogSeverity LOG_FATAL = FUCHSIA_LOG_FATAL;
 
 constexpr LogSeverity DefaultLogLevel = LOG_INFO;
 
 constexpr uint8_t LogSeverityStepSize = 0x10;
 constexpr uint8_t LogVerbosityStepSize = 0x1;
-
-inline LogSeverity LOG_LEVEL(int8_t level) { return level; }
 
 }  // namespace fuchsia_logging
 

@@ -12,6 +12,7 @@ rustc_binary("bin") {
   sources = [ "src/main.rs" ]
   deps = [
     "../fidl:fuchsia.settings.test_rust",
+    "//sdk/fidl/fuchsia.component.sandbox:fuchsia.component.sandbox_rust",
     "//sdk/fidl/fuchsia.inspect:fuchsia.inspect_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.settings:fuchsia.settings_rust",
@@ -21,6 +22,7 @@ rustc_binary("bin") {
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-component-test",
+    "//src/lib/sandbox",
     "//src/settings/service:setui_service_v2",
     "//src/storage/lib/vfs/rust:vfs",
     "//src/sys/stash:stash_v2",

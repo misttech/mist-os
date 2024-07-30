@@ -449,5 +449,119 @@ type Foo = struct {
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
+TEST_P(VersioningOverlapTest, BadModifierEqual) {
+  TestLibrary library(R"FIDL(
+@available(added=1)
+library example;
+
+type Foo = strict strict enum {
+    VALUE = 1;
+};
+)FIDL");
+  library.SelectVersions("example", GetParam());
+  library.ExpectFail(ErrDuplicateModifier, "modifier 'strict'");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
+TEST_P(VersioningOverlapTest, BadModifierEqualConflict) {
+  TestLibrary library(R"FIDL(
+@available(added=1)
+library example;
+
+type Foo = strict flexible enum {
+    VALUE = 1;
+};
+)FIDL");
+  library.SelectVersions("example", GetParam());
+  library.ExpectFail(ErrConflictingModifier, "modifier 'flexible'", "modifier 'strict'");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
+TEST_P(VersioningOverlapTest, BadModifierSubset) {
+  TestLibrary library(R"FIDL(
+@available(added=1)
+library example;
+
+type Foo = strict strict(removed=2) enum {
+    VALUE = 1;
+};
+)FIDL");
+  library.SelectVersions("example", GetParam());
+  library.ExpectFail(ErrDuplicateModifier, "modifier 'strict'");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
+TEST_P(VersioningOverlapTest, BadModifierSubsetConflict) {
+  TestLibrary library(R"FIDL(
+@available(added=1)
+library example;
+
+type Foo = strict flexible(removed=2) enum {
+    VALUE = 1;
+};
+)FIDL");
+  library.SelectVersions("example", GetParam());
+  library.ExpectFail(ErrConflictingModifier, "modifier 'flexible'", "modifier 'strict'");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
+TEST_P(VersioningOverlapTest, BadModifierIntersect) {
+  TestLibrary library(R"FIDL(
+@available(added=1)
+library example;
+
+type Foo = strict(removed=5) strict(added=3) enum {
+    VALUE = 1;
+};
+)FIDL");
+  library.SelectVersions("example", GetParam());
+  library.ExpectFail(ErrDuplicateModifier, "modifier 'strict'");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
+TEST_P(VersioningOverlapTest, BadModifierIntersectConflict) {
+  TestLibrary library(R"FIDL(
+@available(added=1)
+library example;
+
+type Foo = strict(removed=5) flexible(added=3) enum {
+    VALUE = 1;
+};
+)FIDL");
+  library.SelectVersions("example", GetParam());
+  library.ExpectFail(ErrConflictingModifier, "modifier 'flexible'", "modifier 'strict'");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
+TEST_P(VersioningOverlapTest, BadModifierMultiple) {
+  TestLibrary library(R"FIDL(
+@available(added=1)
+library example;
+
+type Foo = strict strict(added=3) strict(added=HEAD) enum {
+    VALUE = 1;
+};
+)FIDL");
+  library.SelectVersions("example", GetParam());
+  library.ExpectFail(ErrDuplicateModifier, "modifier 'strict'");
+  library.ExpectFail(ErrDuplicateModifier, "modifier 'strict'");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
+TEST_P(VersioningOverlapTest, BadModifierMultipleConflict) {
+  TestLibrary library(R"FIDL(
+@available(added=1)
+library example;
+
+type Foo = strict flexible(added=3) strict(added=HEAD) enum {
+    VALUE = 1;
+};
+)FIDL");
+  library.SelectVersions("example", GetParam());
+  library.ExpectFail(ErrConflictingModifier, "modifier 'flexible'", "modifier 'strict'");
+  library.ExpectFail(ErrDuplicateModifier, "modifier 'strict'");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
 }  // namespace
 }  // namespace fidlc

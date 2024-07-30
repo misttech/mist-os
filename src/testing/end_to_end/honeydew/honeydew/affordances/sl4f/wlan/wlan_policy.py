@@ -1,4 +1,3 @@
-#!/usr/bin/env fuchsia-vendored-python
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
@@ -134,7 +133,8 @@ class WlanPolicy(wlan_policy.WlanPolicy):
         return networks
 
     def get_update(
-        self, timeout: float = wlan_policy.DEFAULTS["UPDATE_TIMEOUT_S"]
+        self,
+        timeout: float | None = None,
     ) -> ClientStateSummary:
         """Gets one client listener update.
 
@@ -146,7 +146,8 @@ class WlanPolicy(wlan_policy.WlanPolicy):
 
         Args:
             timeout: Timeout in seconds to wait for the get_update command to
-                return.
+                return. By default it is set to None (which means timeout is
+                disabled)
 
         Returns:
             An update of connection status. If there is no error, the result is

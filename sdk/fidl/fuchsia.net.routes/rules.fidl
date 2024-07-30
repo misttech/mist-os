@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 library fuchsia.net.routes;
 
-using fuchsia.net;
+using fuchsia.net.interfaces;
 
 /// The priority of the rule set, all rule sets are linearized based on this.
 ///
@@ -51,6 +51,17 @@ type MarkSelector = flexible union {
     };
 };
 
+/// Selector that matches on the originating interface of the outgoing packet.
+@available(added=HEAD)
+type InterfaceSelector = flexible union {
+    /// Matches the device iff the names match.
+    ///
+    /// The name is not a pattern or regex, it needs to be an exact match for
+    /// the rule to be chosen.
+    1: device_name fuchsia.net.interfaces.Name;
+    // TODO(https://fxbug.dev/351015513): Introduce a variant that matches on the ID.
+};
+
 /// The common selector that can be applied to both IPv4 and IPv6 packets.
 ///
 /// A selector matches a packet if all of the present fields match the
@@ -60,9 +71,8 @@ type BaseSelector = table {
     /// Matches the packet iff the packet was locally generated.
     1: locally_generated bool;
 
-    /// Matches the packet iff the socket that was bound to the device using
-    /// `SO_BINDTODEVICE`.
-    2: bound_device fuchsia.net.InterfaceId;
+    /// Matches the packet iff the packet is sent with `SO_BINDTODEVICE`.
+    2: bound_device InterfaceSelector;
 
     /// The selector for the MARK_1 domain.
     3: mark_1_selector MarkSelector;

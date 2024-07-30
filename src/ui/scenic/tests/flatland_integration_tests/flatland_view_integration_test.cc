@@ -8,7 +8,6 @@
 #include <lib/fidl/cpp/binding.h>
 #include <lib/fidl/cpp/interface_handle.h>
 #include <lib/fidl/cpp/interface_ptr.h>
-#include <lib/sys/component/cpp/testing/realm_builder.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/ui/scenic/cpp/view_creation_tokens.h>
 #include <lib/ui/scenic/cpp/view_identity.h>
@@ -20,9 +19,8 @@
 #include <zxtest/zxtest.h>
 
 #include "src/ui/scenic/tests/utils/blocking_present.h"
-#include "src/ui/scenic/tests/utils/scenic_realm_builder.h"
+#include "src/ui/scenic/tests/utils/scenic_ctf_test_base.h"
 #include "src/ui/scenic/tests/utils/utils.h"
-#include "src/ui/testing/util/logging_event_loop.h"
 
 // This test exercises a two node topology and tests the signals propagated between the
 // parent instance and the child instance.
@@ -31,39 +29,25 @@ namespace integration_tests {
 namespace fuc = fuchsia::ui::composition;
 namespace fuv = fuchsia::ui::views;
 
-using RealmRoot = component_testing::RealmRoot;
-
 constexpr fuc::TransformId kTransformId = {1};
 constexpr fuc::ContentId kContentId = {1};
 
 // Test fixture that sets up an environment with a Scenic we can connect to.
-class FlatlandViewIntegrationTest : public zxtest::Test, public ui_testing::LoggingEventLoop {
+class FlatlandViewIntegrationTest : public ScenicCtfTest {
  protected:
   void SetUp() override {
-    // Build the realm topology and route the protocols required by this test fixture from the
-    // scenic subrealm.
-    realm_ = std::make_unique<RealmRoot>(
-        ScenicRealmBuilder()
-            .AddRealmProtocol(fuc::Flatland::Name_)
-            .AddRealmProtocol(fuc::FlatlandDisplay::Name_)
-            .AddRealmProtocol(fuc::Allocator::Name_)
-            .AddRealmProtocol(fuchsia::ui::display::singleton::Info::Name_)
-            .Build());
+    ScenicCtfTest::SetUp();
 
     // Create the flatland display.
-    flatland_display_ = realm_->component().Connect<fuc::FlatlandDisplay>();
-    flatland_display_.set_error_handler([](zx_status_t status) {
-      FAIL("Lost connection to Scenic: %s", zx_status_get_string(status));
-    });
+    flatland_display_ = ConnectSyncIntoRealm<fuc::FlatlandDisplay>();
 
     // Get the display's width and height.
-    auto singleton_display = realm_->component().Connect<fuchsia::ui::display::singleton::Info>();
-    std::optional<fuchsia::ui::display::singleton::Metrics> info;
-    singleton_display->GetMetrics([&info](auto result) { info = std::move(result); });
-    RunLoopUntil([&info] { return info.has_value(); });
+    auto singleton_display = ConnectSyncIntoRealm<fuchsia::ui::display::singleton::Info>();
+    fuchsia::ui::display::singleton::Metrics info;
+    ASSERT_EQ(ZX_OK, singleton_display->GetMetrics(&info));
 
-    display_width_ = info->extent_in_px().width;
-    display_height_ = info->extent_in_px().height;
+    display_width_ = info.extent_in_px().width;
+    display_height_ = info.extent_in_px().height;
   }
 
   // Create a new transform and viewport, then call |BlockingPresent| to wait for it to take
@@ -86,7 +70,7 @@ class FlatlandViewIntegrationTest : public zxtest::Test, public ui_testing::Logg
   }
 
   fuc::FlatlandPtr MakeFlatland() {
-    auto flatland = realm_->component().Connect<fuc::Flatland>();
+    auto flatland = ConnectAsyncIntoRealm<fuc::Flatland>();
     flatland.set_error_handler([](zx_status_t error) {
       // Log at INFO so that tests which deliberately close a session don't require
       // `max_severity_logs` to be adjusted.
@@ -103,8 +87,7 @@ class FlatlandViewIntegrationTest : public zxtest::Test, public ui_testing::Logg
     return flatland;
   }
 
-  std::unique_ptr<RealmRoot> realm_;
-  fuc::FlatlandDisplayPtr flatland_display_;
+  fuc::FlatlandDisplaySyncPtr flatland_display_;
   uint32_t display_width_ = 0;
   uint32_t display_height_ = 0;
   std::optional<fuc::FlatlandError> last_error_;

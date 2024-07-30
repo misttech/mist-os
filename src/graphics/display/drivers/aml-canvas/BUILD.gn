@@ -8,9 +8,9 @@ import("//build/drivers.gni")
 import("//build/test.gni")
 
 driver_bind_rules("aml_canvas_bind") {
-  rules = "aml_canvas.bind"
+  rules = "meta/aml_canvas.bind"
   bind_output = "aml-canvas.bindbc"
-  tests = "bind_tests.json"
+  tests = "meta/bind_tests.json"
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.devicetree",
@@ -57,7 +57,7 @@ fuchsia_driver("aml-canvas-driver") {
 fuchsia_driver_component("aml-canvas") {
   component_name = "aml-canvas"
   deps = [ ":aml-canvas-driver" ]
-  info = "aml-canvas-info.json"
+  info = "meta/aml-canvas-info.json"
   manifest = "meta/aml-canvas.cml"
 }
 

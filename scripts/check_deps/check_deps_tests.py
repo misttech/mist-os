@@ -5,10 +5,11 @@
 # found in the LICENSE file.
 
 import os
-import check_deps
 import shutil
 import tempfile
 import unittest
+
+import check_deps
 
 areas = [
     "src/rockets",

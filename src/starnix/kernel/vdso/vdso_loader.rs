@@ -18,8 +18,11 @@ use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
 static VVAR_SIZE: Lazy<usize> = Lazy::new(|| *PAGE_SIZE as usize);
-pub static ZX_TIME_VALUES_MEMORY: Lazy<Arc<MemoryObject>> =
-    Lazy::new(|| load_time_values_memory().expect("Could not find time values VMO"));
+pub static ZX_TIME_VALUES_MEMORY: Lazy<Arc<MemoryObject>> = Lazy::new(|| {
+    load_time_values_memory().expect(
+        "Could not find time values VMO! Please ensure /boot/kernel was routed to the starnix kernel.",
+    )
+});
 
 #[derive(Default)]
 pub struct MemoryMappedVvar {
@@ -210,12 +213,15 @@ fn load_time_values_memory() -> Result<Arc<MemoryObject>, Errno> {
 fn get_sigreturn_offset(vdso_memory: &MemoryObject, sigreturn_name: &str) -> Result<u64, Errno> {
     let vdso_vmo = vdso_memory.as_vmo().ok_or_else(|| errno!(EINVAL))?;
     let dyn_section = elf_parse::Elf64DynSection::from_vmo(vdso_vmo).map_err(|_| errno!(EINVAL))?;
-    let symtab =
-        dyn_section.dynamic_entry_with_tag(elf_parse::Elf64DynTag::Symtab).ok_or(errno!(EINVAL))?;
-    let strtab =
-        dyn_section.dynamic_entry_with_tag(elf_parse::Elf64DynTag::Strtab).ok_or(errno!(EINVAL))?;
-    let strsz =
-        dyn_section.dynamic_entry_with_tag(elf_parse::Elf64DynTag::Strsz).ok_or(errno!(EINVAL))?;
+    let symtab = dyn_section
+        .dynamic_entry_with_tag(elf_parse::Elf64DynTag::Symtab)
+        .ok_or_else(|| errno!(EINVAL))?;
+    let strtab = dyn_section
+        .dynamic_entry_with_tag(elf_parse::Elf64DynTag::Strtab)
+        .ok_or_else(|| errno!(EINVAL))?;
+    let strsz = dyn_section
+        .dynamic_entry_with_tag(elf_parse::Elf64DynTag::Strsz)
+        .ok_or_else(|| errno!(EINVAL))?;
 
     // Find the name of the signal trampoline in the string table and store the index.
     let strtab_bytes = vdso_vmo
@@ -224,7 +230,7 @@ fn get_sigreturn_offset(vdso_memory: &MemoryObject, sigreturn_name: &str) -> Res
     let mut strtab_items = strtab_bytes.split(|c: &u8| *c == 0u8);
     let strtab_idx = strtab_items
         .position(|entry: &[u8]| std::str::from_utf8(entry) == Ok(sigreturn_name))
-        .ok_or(errno!(ENOENT))?;
+        .ok_or_else(|| errno!(ENOENT))?;
 
     const SYM_ENTRY_SIZE: usize = std::mem::size_of::<elf_parse::Elf64Sym>();
 

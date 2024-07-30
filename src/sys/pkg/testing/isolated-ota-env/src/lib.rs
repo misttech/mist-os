@@ -344,7 +344,7 @@ impl<R> TestEnv<R> {
                     )
                     .build()
                     .unwrap();
-                let addr = OmahaServer::start(Arc::new(Mutex::new(server)))
+                let addr = OmahaServer::start_and_detach(Arc::new(Mutex::new(server)), None)
                     .await
                     .context("Starting omaha server")?;
                 let config =

@@ -4,7 +4,7 @@
 
 """Allowlists rules names, attributes, targets for licenses collecting."""
 
-load("common.bzl", "bool_dict", "check_is_target")
+load("common.bzl", "bool_dict", "check_is_target", "to_package_str")
 
 # TODO(114260): Evolve policy to handle real-world projects.
 ignore_policy = struct(
@@ -23,12 +23,18 @@ ignore_policy = struct(
 
     # These targets will be ignored:
     targets = bool_dict([
-        "@fuchsia_sdk//:meta/manifest.json",  # SDK metadata, not shipping to clients.
-        "@platforms//os:os",  # Constraint
-        "@platforms//os:fuchsia",  # Constraint
+        str(Label(l))
+        for l in [
+            "@fuchsia_sdk//:meta/manifest.json",  # SDK metadata, not shipping to clients.
+            "@platforms//os:os",  # Constraint
+            "@platforms//os:fuchsia",  # Constraint
+        ]
     ]),
 
     # Anything withing these workspaces will be ignored:
+    # NOTE: with Bzlmod enabled, these check against canonical repo names, which might not be
+    # intended. However, we can't just pass these through `Label()` as some of these repo names
+    # are not actually known to `fuchsia_workspace` (this module).
     workspaces = bool_dict([
         "bazel_tools",
         "fuchsia_clang",  # TODO(95670): clang bazel defs should provide licenses.
@@ -39,7 +45,10 @@ ignore_policy = struct(
 
     # Anything withing these package will be ignored:
     packages = bool_dict([
-        "@fuchsia_sdk//fuchsia/tools",
+        to_package_str(Label(l))
+        for l in [
+            "@fuchsia_sdk//fuchsia/tools",
+        ]
     ]),
 )
 

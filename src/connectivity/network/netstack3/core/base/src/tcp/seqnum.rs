@@ -219,6 +219,8 @@ pub struct WindowScale(u8);
 impl WindowScale {
     /// The largest possible [`WindowScale`].
     pub const MAX: WindowScale = WindowScale(14);
+    /// The smallest possible [`WindowScale`].
+    pub const ZERO: WindowScale = WindowScale(0);
 
     /// Creates a new `WindowScale`.
     ///

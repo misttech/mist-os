@@ -6,9 +6,9 @@
 
 import unittest
 
+import test_utils
 import trace_processing.trace_model as trace_model
 import trace_processing.trace_time as trace_time
-import test_utils
 
 
 class TraceModelTest(unittest.TestCase):

@@ -20,10 +20,10 @@ Prior to building a custom Rust toolchain for Fuchsia, you need to do the follow
    git clone --recurse-submodules https://github.com/rust-lang/rust.git $DEV_ROOT/rust
    ```
 
-1. Run the following command to install cmake and jq/tomlq:
+1. Run the following command to install cmake and ninja:
 
    ```posix-terminal
-   sudo apt-get install cmake ninja-build jq yq
+   sudo apt-get install cmake ninja-build
    ```
 
 1. Run the following command to obtain the infra sources:
@@ -53,17 +53,20 @@ Prior to building a custom Rust toolchain for Fuchsia, you need to do the follow
    HOST_TRIPLE={{ '<var>' }}x86_64-unknown-linux-gnu{{ '</var>' }}
    cat << "EOF" > cipd.ensure
    @Subdir sdk
-   fuchsia/sdk/core/${platform} latest
+   fuchsia/sdk/core/\${platform} latest
    @Subdir sysroot/linux
    fuchsia/third_party/sysroot/linux git_revision:db18eec0b4f14b6b16174aa2b91e016663157376
    @Subdir sysroot/focal
    fuchsia/third_party/sysroot/focal latest
    @Subdir clang
-   fuchsia/third_party/clang/${platform} integration
+   fuchsia/third_party/clang/\${platform} integration
    EOF
-   STAGE0_DATE=`jq .compiler.date ${DEV_ROOT}/rust/src/stage0.json --raw-output`
-   STAGE0_VERSION=`jq .compiler.version ${DEV_ROOT}/rust/src/stage0.json --raw-output`
-   STAGE0_COMMIT_HASH=`curl -s "https://static.rust-lang.org/dist/${STAGE0_DATE}/channel-rust-${STAGE0_VERSION}.toml" | tomlq .pkg.rust.git_commit_hash --raw-output`
+
+   STAGE0_DATE=$(sed -nr 's/^compiler_date=(.*)/\1/p' ${DEV_ROOT}/rust/src/stage0)
+   STAGE0_VERSION=$(sed -nr 's/^compiler_version=(.*)/\1/p' ${DEV_ROOT}/rust/src/stage0)
+   STAGE0_COMMIT_HASH=$( \
+     curl -s "https://static.rust-lang.org/dist/${STAGE0_DATE}/channel-rust-${STAGE0_VERSION}.toml" \
+     | python3 -c 'import tomllib, sys; print(tomllib.load(sys.stdin.buffer)["pkg"]["rust"]["git_commit_hash"])')
    echo "@Subdir stage0" >> cipd.ensure
    echo "fuchsia/third_party/rust/host/\${platform} git_revision:${STAGE0_COMMIT_HASH}" >> cipd.ensure
    echo "fuchsia/third_party/rust/target/${HOST_TRIPLE} git_revision:${STAGE0_COMMIT_HASH}" >> cipd.ensure

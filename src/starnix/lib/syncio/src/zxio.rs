@@ -662,7 +662,7 @@ pub type zxio_shutdown_options_t = u32;
 pub type zxio_creation_mode_t = u32;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-pub struct zxio_open_options {
+pub struct zxio_open2_options {
     pub protocols: zxio_node_protocols_t,
     pub optional_rights: u64,
     pub file_flags: u64,
@@ -672,7 +672,7 @@ pub struct zxio_open_options {
     pub rights: u64,
     pub create_attr: *const zxio_node_attributes_t,
 }
-impl Default for zxio_open_options {
+impl Default for zxio_open2_options {
     fn default() -> Self {
         let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
         unsafe {
@@ -681,7 +681,7 @@ impl Default for zxio_open_options {
         }
     }
 }
-pub type zxio_open_options_t = zxio_open_options;
+pub type zxio_open2_options_t = zxio_open2_options;
 pub type zxio_xattr_set_mode_t = u32;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -702,6 +702,23 @@ impl Default for zxio_xattr_data {
 }
 pub type zxio_xattr_data_t = zxio_xattr_data;
 pub type zxio_allocate_mode_t = u32;
+pub type zxio_open_flags_t = u64;
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct zxio_open_options {
+    pub inout_attr: *mut zxio_node_attributes_t,
+    pub create_attr: *const zxio_node_attributes_t,
+}
+impl Default for zxio_open_options {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+pub type zxio_open_options_t = zxio_open_options;
 pub type va_list = __builtin_va_list;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
@@ -933,8 +950,18 @@ extern "C" {
         directory: *mut zxio_t,
         path: *const ::std::os::raw::c_char,
         path_len: usize,
-        options: *const zxio_open_options_t,
+        options: *const zxio_open2_options_t,
         inout_attr: *mut zxio_node_attributes_t,
+        storage: *mut zxio_storage_t,
+    ) -> zx_status_t;
+}
+extern "C" {
+    pub fn zxio_open3(
+        directory: *mut zxio_t,
+        path: *const ::std::os::raw::c_char,
+        path_len: usize,
+        flags: zxio_open_flags_t,
+        options: *const zxio_open_options_t,
         storage: *mut zxio_storage_t,
     ) -> zx_status_t;
 }

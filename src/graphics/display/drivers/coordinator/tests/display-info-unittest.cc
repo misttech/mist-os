@@ -13,6 +13,7 @@
 #include <gtest/gtest.h>
 
 #include "src/graphics/display/lib/edid-values/edid-values.h"
+#include "src/lib/testing/predicates/status.h"
 
 namespace display {
 
@@ -99,7 +100,7 @@ TEST(DisplayInfo, InitializeWithEdidValueOfInvalidLength) {
 
   zx::result<fbl::RefPtr<DisplayInfo>> display_info_result = DisplayInfo::Create(raw_display_info);
   ASSERT_FALSE(display_info_result.is_ok());
-  EXPECT_EQ(display_info_result.error_value(), ZX_ERR_INTERNAL);
+  EXPECT_STATUS(display_info_result.error_value(), ZX_ERR_INTERNAL);
 }
 
 TEST(DisplayInfo, InitializeWithEdidValueIncomplete) {
@@ -123,7 +124,7 @@ TEST(DisplayInfo, InitializeWithEdidValueIncomplete) {
 
   zx::result<fbl::RefPtr<DisplayInfo>> display_info_result = DisplayInfo::Create(raw_display_info);
   ASSERT_FALSE(display_info_result.is_ok());
-  EXPECT_EQ(display_info_result.error_value(), ZX_ERR_INTERNAL);
+  EXPECT_STATUS(display_info_result.error_value(), ZX_ERR_INTERNAL);
 }
 
 TEST(DisplayInfo, InitializeWithEdidValueNonDigitalDisplay) {
@@ -155,7 +156,7 @@ TEST(DisplayInfo, InitializeWithEdidValueNonDigitalDisplay) {
 
   zx::result<fbl::RefPtr<DisplayInfo>> display_info_result = DisplayInfo::Create(raw_display_info);
   ASSERT_FALSE(display_info_result.is_ok());
-  EXPECT_EQ(display_info_result.error_value(), ZX_ERR_INTERNAL);
+  EXPECT_STATUS(display_info_result.error_value(), ZX_ERR_INTERNAL);
 }
 
 }  // namespace

@@ -16,8 +16,8 @@ group("tests") {
 }
 
 driver_bind_rules("gdc_bind") {
-  rules = "gdc.bind"
-  tests = "bind_tests.json"
+  rules = "meta/gdc.bind"
+  tests = "meta/bind_tests.json"
   deps = [
     "//src/devices/bind/fuchsia.arm.platform",
     "//src/devices/bind/fuchsia.camera",
@@ -68,7 +68,7 @@ fuchsia_driver("fuchsia_driver") {
 fuchsia_driver_component("driver") {
   component_name = "gdc"
   deps = [ ":fuchsia_driver" ]
-  info = "driver-info.json"
+  info = "meta/driver-info.json"
   manifest = "meta/driver.cml"
 }
 

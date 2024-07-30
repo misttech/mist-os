@@ -152,7 +152,7 @@ fn send_frame<I: TestIpExt + IpExt>(tx_queue_config: TransmitQueueConfiguration)
         let result = ctx
             .core_api()
             .transmit_queue::<PureIpDevice>()
-            .transmit_queued_frames(&device)
+            .transmit_queued_frames(&device, Default::default(), &mut ())
             .expect("drain queue should succeed");
         assert_eq!(result, WorkQueueReport::AllDone);
         // Expect the PureIpDevice TX task to have been woken.

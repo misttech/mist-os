@@ -18,12 +18,12 @@ toc:
   path: /docs/development/debugger/tests.md
 - title: "Evaluate expressions"
   path: /docs/development/debugger/expressions.md
-- title: "Inspecting memory"
+- title: "Inspect memory"
   path: /docs/development/debugger/memory.md
-- title: "Working with assembly language"
-  path: /docs/development/debugger/assembly.md
-- title: "Looking at handles"
+- title: "List handles and kernerl objects"
   path: /docs/development/debugger/kernel_objects.md
+- title: "Work with assembly language"
+  path: /docs/development/debugger/assembly.md
 - title: "Diagnosing symbol problems"
   path: /docs/development/debugger/symbols.md
 - title: "Working with exceptions"

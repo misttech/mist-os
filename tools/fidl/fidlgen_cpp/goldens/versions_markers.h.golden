@@ -24,7 +24,7 @@ class Protocol final {
  public:
   using Transport = ::fidl::internal::ChannelTransport;
 
-  static constexpr ::fidl::internal::Openness kOpenness = ::fidl::internal::Openness::kClosed;
+  static constexpr ::fidl::internal::Openness kOpenness = ::fidl::internal::Openness::kOpen;
 
   class Foo final {
     Foo() = delete;

@@ -11,12 +11,31 @@ config("includes") {
   include_dirs = [ "include" ]
 }
 
+config("enable-dfv2-compat-logging") {
+  defines = [ "DFV2_COMPAT_LOGGING" ]
+}
+
 source_set("usb-phy") {
   sources = [ "usb-phy.cc" ]
   public_deps = [
     "//sdk/banjo/fuchsia.hardware.usb.phy:fuchsia.hardware.usb.phy_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.usb.phy:fuchsia.hardware.usb.phy_cpp",
+    "//sdk/lib/driver/compat/cpp",
     "//src/devices/lib/driver:driver_runtime",
   ]
   public_configs = [ ":includes" ]
+}
+
+source_set("usb-phy-dfv2-compat-logging") {
+  sources = [ "usb-phy.cc" ]
+  public_deps = [
+    "//sdk/banjo/fuchsia.hardware.usb.phy:fuchsia.hardware.usb.phy_banjo_cpp",
+    "//sdk/fidl/fuchsia.hardware.usb.phy:fuchsia.hardware.usb.phy_cpp",
+    "//sdk/lib/driver/compat/cpp",
+    "//src/devices/lib/driver:driver_runtime",
+  ]
+  public_configs = [
+    ":includes",
+    ":enable-dfv2-compat-logging",
+  ]
 }

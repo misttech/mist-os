@@ -103,6 +103,8 @@
                 "watch_routing_events_dropped_events_v6_ns3",
                 "watch_routing_events_hanging_v6_ns3",
                 "multiple_multicast_controllers_v4_ns3",
+                "overwrite_multicast_route_v4_ns3",
+                "overwrite_multicast_route_v6_ns3",
             ],
         },
     ],

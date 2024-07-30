@@ -118,7 +118,7 @@ mod fuchsia {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use diagnostics_data::{Severity, Timestamp};
+    use diagnostics_data::{ExtendedMoniker, Severity, Timestamp};
     use fuchsia_async as fasync;
 
     #[cfg(target_os = "fuchsia")]
@@ -289,8 +289,8 @@ mod tests {
     fn get_json_data(value: i64) -> String {
         let data = diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
             timestamp_nanos: Timestamp::from(0).into(),
-            component_url: Some(String::from("fake-url")),
-            moniker: String::from("test/moniker"),
+            component_url: Some("fake-url".into()),
+            moniker: ExtendedMoniker::parse_str("test/moniker").unwrap(),
             severity: Severity::Info,
         })
         .set_message(value.to_string())

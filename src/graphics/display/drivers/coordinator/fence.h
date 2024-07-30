@@ -19,6 +19,7 @@
 #include <fbl/intrusive_double_list.h>
 #include <fbl/intrusive_single_list.h>
 #include <fbl/macros.h>
+#include <fbl/mutex.h>
 #include <fbl/ref_counted.h>
 #include <fbl/ref_ptr.h>
 
@@ -183,7 +184,7 @@ class FenceCollection : private FenceCallback {
   // |FenceCallback|
   void OnRefForFenceDead(Fence* fence) __TA_EXCLUDES(mtx_) override;
 
-  mtx_t mtx_ = MTX_INIT;
+  fbl::Mutex mtx_;
   Fence::Map fences_ __TA_GUARDED(mtx_);
   async_dispatcher_t* const dispatcher_;
   fit::function<void(FenceReference*)> on_fence_fired_;

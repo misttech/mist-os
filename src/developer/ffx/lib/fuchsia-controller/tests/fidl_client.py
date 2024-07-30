@@ -5,12 +5,10 @@ import asyncio
 import unittest
 from unittest.mock import Mock
 
-from fidl._ipc import _QueueWrapper
 import fidl.fuchsia_developer_ffx as ffx
-from fidl_codec import encode_fidl_message
-from fidl_codec import method_ordinal
-from fuchsia_controller_py import Channel
-from fuchsia_controller_py import ZxStatus
+from fidl._ipc import _QueueWrapper
+from fidl_codec import encode_fidl_message, method_ordinal
+from fuchsia_controller_py import Channel, ZxStatus
 
 
 class FidlClientTests(unittest.IsolatedAsyncioTestCase):

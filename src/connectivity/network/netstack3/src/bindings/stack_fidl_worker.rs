@@ -27,9 +27,9 @@ impl StackFidlWorker {
             .try_fold(Self { netstack }, |mut worker, req| async {
                 match req {
                     StackRequest::AddForwardingEntry { entry, responder } => {
-                        responder.send(
-                            worker.fidl_add_forwarding_entry(entry).await
-                        ).unwrap_or_log("failed to respond");
+                        responder
+                            .send(worker.fidl_add_forwarding_entry(entry).await)
+                            .unwrap_or_log("failed to respond");
                     }
                     StackRequest::DelForwardingEntry {
                         entry:
@@ -41,9 +41,9 @@ impl StackFidlWorker {
                             },
                         responder,
                     } => {
-                        responder.send(
-                            worker.fidl_del_forwarding_entry(subnet).await
-                        ).unwrap_or_log("failed to respond");
+                        responder
+                            .send(worker.fidl_del_forwarding_entry(subnet).await)
+                            .unwrap_or_log("failed to respond");
                     }
                     StackRequest::SetInterfaceIpForwardingDeprecated {
                         id,
@@ -57,22 +57,25 @@ impl StackFidlWorker {
                         );
                         // TODO(https://fxbug.dev/42156951): Support configuring
                         // per-NIC forwarding.
-                        responder.send(Err(fidl_net_stack::Error::NotSupported)).unwrap_or_log("failed to respond");
+                        responder
+                            .send(Err(fidl_net_stack::Error::NotSupported))
+                            .unwrap_or_log("failed to respond");
                     }
                     StackRequest::SetDhcpClientEnabled { responder, id: _, enable } => {
                         // TODO(https://fxbug.dev/42162065): Remove this once
                         // DHCPv4 client is implemented out-of-stack.
                         if enable {
-                            error!("TODO(https://fxbug.dev/42062356): Support starting DHCP client");
+                            error!(
+                                "TODO(https://fxbug.dev/42062356): Support starting DHCP client"
+                            );
                         }
                         responder.send(Ok(())).unwrap_or_log("failed to respond");
                     }
-                    StackRequest::BridgeInterfaces{ interfaces: _, bridge, control_handle: _ } => {
-                        error!("TODO(https://fxbug.dev/42167696): Support bridging in NS3, probably via a new API");
-                        bridge.close_with_epitaph(fuchsia_zircon::Status::NOT_SUPPORTED)
-                        .unwrap_or_else(|e| {
-                            debug!("failed to close bridge control {:?}", e)
-                        });
+                    StackRequest::BridgeInterfaces { interfaces: _, bridge, control_handle: _ } => {
+                        error!("bridging is not supported in netstack3");
+                        bridge
+                            .close_with_epitaph(fuchsia_zircon::Status::NOT_SUPPORTED)
+                            .unwrap_or_else(|e| debug!("failed to close bridge control {:?}", e));
                     }
                 }
                 Ok(worker)

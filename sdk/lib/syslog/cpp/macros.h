@@ -277,20 +277,6 @@ class LogMessage final {
 #endif
 };
 
-// LogFirstNState is used by the macro FX_SLOG_FIRST_N_SECONDS below.
-class LogEveryNSecondsState final {
- public:
-  bool ShouldLog(uint32_t n);
-  uint32_t GetCounter();
-
- private:
-  std::chrono::high_resolution_clock::time_point GetCurrentTime();
-  bool ShouldLogInternal(uint32_t n);
-
-  std::atomic<uint32_t> counter_{0};
-  std::chrono::high_resolution_clock::time_point last_;
-};
-
 // LogFirstNState is used by the macro FX_LOGS_FIRST_N below.
 class LogFirstNState final {
  public:
@@ -300,12 +286,9 @@ class LogFirstNState final {
   std::atomic<uint32_t> counter_{0};
 };
 
-// Gets the FX_VLOGS default verbosity level.
-uint8_t GetVlogVerbosity();
-
 // Returns true if |severity| is at or above the current minimum log level.
 // LOG_FATAL and above is always true.
-bool ShouldCreateLogMessage(LogSeverity severity);
+bool IsSeverityEnabled(LogSeverity severity);
 
 }  // namespace fuchsia_logging
 
@@ -330,7 +313,7 @@ bool ShouldCreateLogMessage(LogSeverity severity);
                 .stream()
 
 #define FX_LOG_IS_ON(severity) \
-  (::fuchsia_logging::ShouldCreateLogMessage(::fuchsia_logging::LOG_##severity))
+  (::fuchsia_logging::IsSeverityEnabled(::fuchsia_logging::LOG_##severity))
 
 #define FX_LOGS(severity) FX_LOGST(severity, nullptr)
 
@@ -364,15 +347,6 @@ bool ShouldCreateLogMessage(LogSeverity severity);
 #define FX_LOGS_FIRST_N(severity, n) FX_FIRST_N(n, FX_LOGS(severity))
 #define FX_LOGST_FIRST_N(severity, n, tag) FX_FIRST_N(n, FX_LOGST(severity, tag))
 
-#define FX_FIRST_N_SECS(n, log_statement)                                                 \
-  for (bool do_log = true; do_log; do_log = false)                                        \
-    for (static ::fuchsia_logging::LogEveryNSecondsState internal_state;                  \
-         do_log && internal_state.ShouldLog(n); do_log = false)                           \
-      for ([[maybe_unused]] const uint32_t COUNTER = internal_state.GetCounter(); do_log; \
-           do_log = false)                                                                \
-  log_statement
-#define FX_SLOG_EVERY_N_SECONDS(severity, n, msg...) FX_FIRST_N_SECS(n, FX_SLOG(severity, msg))
-
 #define FX_CHECK(condition) FX_CHECKT(condition, nullptr)
 
 #define FX_CHECKT(condition, tag)                                                                \
@@ -382,11 +356,6 @@ bool ShouldCreateLogMessage(LogSeverity severity);
                  !(condition))
 
 // The VLOG macros log with translated verbosities
-
-// Get the severity corresponding to the given verbosity. Note that
-// verbosity relative to the default severity and can be thought of
-// as incrementally "more vebose than" the baseline.
-fuchsia_logging::LogSeverity GetSeverityFromVerbosity(uint8_t verbosity);
 
 #ifndef NDEBUG
 #define FX_DLOGS(severity) FX_LOGS(severity)
@@ -415,11 +384,11 @@ void fx_slog_internal(fuchsia_logging::LogSeverity severity, const char* file, i
   buffer.Flush();
 }
 
-#define FX_SLOG_ETC(severity, args...)                         \
-  do {                                                         \
-    if (::fuchsia_logging::ShouldCreateLogMessage(severity)) { \
-      fx_slog_internal(severity, __FILE__, __LINE__, args);    \
-    }                                                          \
+#define FX_SLOG_ETC(severity, args...)                      \
+  do {                                                      \
+    if (::fuchsia_logging::IsSeverityEnabled(severity)) {   \
+      fx_slog_internal(severity, __FILE__, __LINE__, args); \
+    }                                                       \
   } while (0)
 
 #define FX_SLOG(severity, msg...) FX_SLOG_ETC(::fuchsia_logging::LOG_##severity, msg)

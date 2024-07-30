@@ -59,7 +59,8 @@ std::unique_ptr<Loader> Loader::Create() {
 
 zx_status_t Loader::Start(zx::process process, zx::thread thread, zx::vmar root_vmar,
                           zx::vmo exec_vmo, zx::vmo vdso_vmo,
-                          fidl::ClientEnd<fuchsia_io::Directory> lib_dir) {
+                          fidl::ClientEnd<fuchsia_io::Directory> lib_dir,
+                          zx::channel bootstrap_receiver) {
   auto diag = MakeDiagnostics();
 
   Linker linker;
@@ -134,7 +135,7 @@ zx_status_t Loader::Start(zx::process process, zx::thread thread, zx::vmar root_
     LOGF(ERROR, "Failed to create process state: %s", process_state.status_string());
     return process_state.status_value();
   }
-  zx_status_t status = process_state->Start();
+  zx_status_t status = process_state->Start(std::move(bootstrap_receiver));
   if (status != ZX_OK) {
     LOGF(ERROR, "Failed to start process: %s", zx_status_get_string(status));
     return status;
@@ -213,8 +214,7 @@ zx_status_t Loader::ProcessState::AllocateStack() {
   return ZX_OK;
 }
 
-zx_status_t Loader::ProcessState::Start() {
-  zx::channel bootstrap_receiver = zx::channel(ZX_HANDLE_INVALID);
+zx_status_t Loader::ProcessState::Start(zx::channel bootstrap_receiver) {
   return process_.start(thread_, process_start_args_.entry, initial_stack_pointer_,
                         std::move(bootstrap_receiver), process_start_args_.vdso_base);
 }

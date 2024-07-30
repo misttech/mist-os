@@ -40,8 +40,24 @@
         {
             protocol: [
                 "fuchsia.developer.remotecontrol.connector.Connector",
+
+                // For 'driver' command.
+                "fuchsia.driver.development.Manager",
+
+                // For 'dm' command
+                "fuchsia.hardware.power.statecontrol.Admin",
                 "fuchsia.hardware.pty.Device",
+
+                // For 'ps' and 'top' commands
+                "fuchsia.kernel.RootJob",
                 "fuchsia.process.Launcher",
+                "fuchsia.sys2.LifecycleController.root",
+
+                // For 'iquery' and 'component' commands
+                "fuchsia.sys2.RealmQuery.root",
+
+                // For 'component' command
+                "fuchsia.sys2.RouteValidator.root",
             ],
         },
     ],

@@ -54,6 +54,8 @@ dts_synthetic = [
   "synthetic/psci-smc.dts",
   "synthetic/reserved_memory.dts",
   "synthetic/simple_with_properties.dts",
+  "synthetic/qcom_msm_watchdog.dts",
+  "synthetic/qcom_msm_watchdog_multiple_regs.dts",
 ]
 
 # Compile the synthetic source file to get blobs.

@@ -5,14 +5,11 @@
 use anyhow::{anyhow, bail, Result};
 use ffx_scrutiny_shell_args::ScrutinyShellCommand;
 use fho::{FfxMain, FfxTool, SimpleWriter};
-use scrutiny_plugins::toolkit::blobfs::BlobFsExtractController;
-use scrutiny_plugins::toolkit::far::FarMetaExtractController;
-use scrutiny_plugins::toolkit::fvm::FvmExtractController;
-use scrutiny_plugins::toolkit::zbi::ZbiExtractController;
-use scrutiny_plugins::toolkit::zbi_bootfs::{
-    ZbiExtractBootfsPackageIndex, ZbiListBootfsController,
+use scrutiny_frontend::{
+    BlobFsExtractController, FarMetaExtractController, FvmExtractController,
+    ZbiExtractBootfsPackageIndex, ZbiExtractCmdlineController, ZbiExtractController,
+    ZbiListBootfsController,
 };
-use scrutiny_plugins::toolkit::zbi_cmdline::ZbiExtractCmdlineController;
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::collections::{HashMap, VecDeque};

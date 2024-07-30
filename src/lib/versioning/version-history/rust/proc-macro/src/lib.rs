@@ -3,11 +3,11 @@
 // found in the LICENSE file.
 
 use proc_macro::TokenStream;
-use version_history_shared::version_history;
 
 #[proc_macro]
 pub fn declare_version_history(_tokens: TokenStream) -> TokenStream {
-    let versions = version_history().expect("version-history.json to be parsed");
+    let versions = version_history::parse_version_history(version_history_data::VERSION_HISTORY)
+        .expect("version-history.json to be parsed");
     if versions.is_empty() {
         panic!("version-history.json did not contain any versions");
     }

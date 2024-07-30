@@ -9,13 +9,13 @@ import argparse
 import collections
 import os
 import sys
+from pathlib import Path
+from typing import Any, Iterable, Sequence, Tuple
 
 import tablefmt
 
 # Rather than depend on the proto (from reclient source),
 import textpb
-from pathlib import Path
-from typing import Any, Iterable, Sequence, Tuple
 
 _SCRIPT = Path(__file__)
 

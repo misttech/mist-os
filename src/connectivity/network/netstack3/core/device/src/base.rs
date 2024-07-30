@@ -427,16 +427,27 @@ pub trait DeviceLayerEventDispatcher:
     + TransmitQueueBindingsContext<PureIpDeviceId<Self>>
     + Sized
 {
+    /// The transmit queue dequeueing context used by bindings.
+    ///
+    /// `DequeueContext` is a passthrough type from bindings (i.e. entirely
+    /// opaque to core) when using `TransmitQueueApi` to trigger the transmit
+    /// queue to send frames to the underlying devices.
+    type DequeueContext;
+
     /// Send a frame to an Ethernet device driver.
     ///
     /// See [`DeviceSendFrameError`] for the ways this call may fail; all other
     /// errors are silently ignored and reported as success. Implementations are
     /// expected to gracefully handle non-conformant but correctable input, e.g.
     /// by padding too-small frames.
+    ///
+    /// `dequeue_context` is `Some` iff this is called from the context of
+    /// operating the transmit queue via `TransmitQueueApi`.
     fn send_ethernet_frame(
         &mut self,
         device: &EthernetDeviceId<Self>,
         frame: Buf<Vec<u8>>,
+        dequeue_context: Option<&mut Self::DequeueContext>,
     ) -> Result<(), DeviceSendFrameError>;
 
     /// Send an IP packet to an IP device driver.
@@ -445,11 +456,15 @@ pub trait DeviceLayerEventDispatcher:
     /// errors are silently ignored and reported as success. Implementations are
     /// expected to gracefully handle non-conformant but correctable input, e.g.
     /// by padding too-small frames.
+    ///
+    /// `dequeue_context` is `Some` iff this is called from the context of
+    /// operating the transmit queue via `TransmitQueueApi`.
     fn send_ip_packet(
         &mut self,
         device: &PureIpDeviceId<Self>,
         packet: Buf<Vec<u8>>,
         ip_version: IpVersion,
+        dequeue_context: Option<&mut Self::DequeueContext>,
     ) -> Result<(), DeviceSendFrameError>;
 }
 

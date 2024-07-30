@@ -52,6 +52,7 @@ pub struct PublisherOptions<'t> {
     pub(crate) metatags: HashSet<Metatag>,
     pub(crate) tags: &'t [&'t str],
     wait_for_initial_interest: bool,
+    pub(crate) always_log_file_line: bool,
 }
 
 impl<'t> Default for PublisherOptions<'t> {
@@ -64,6 +65,7 @@ impl<'t> Default for PublisherOptions<'t> {
             metatags: HashSet::new(),
             tags: &[],
             wait_for_initial_interest: true,
+            always_log_file_line: false,
         }
     }
 }
@@ -84,6 +86,7 @@ impl PublisherOptions<'_> {
             metatags: HashSet::new(),
             tags: &[],
             wait_for_initial_interest: false,
+            always_log_file_line: false,
         }
     }
 }
@@ -220,6 +223,7 @@ pub fn initialize_sync(opts: PublishOptions<'_>) -> impl Drop {
                 log_sink_proxy,
                 tags,
                 wait_for_initial_interest,
+                always_log_file_line,
             },
         install_panic_hook,
         panic_prefix,
@@ -236,6 +240,7 @@ pub fn initialize_sync(opts: PublishOptions<'_>) -> impl Drop {
                 log_sink_proxy,
                 wait_for_initial_interest,
                 blocking,
+                always_log_file_line,
             },
             install_panic_hook,
             panic_prefix,
@@ -326,6 +331,7 @@ impl Publisher {
                 tags: opts.tags.into_iter().map(|s| s.to_string()).collect(),
                 metatags: opts.metatags,
                 retry_on_buffer_full: opts.blocking,
+                always_log_file_line: opts.always_log_file_line,
             },
         )?;
         let (filter, on_change) =

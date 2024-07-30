@@ -479,13 +479,13 @@ async fn define_msg_handling_loop_future<DS: DataStore>(
 
             let mut sll_addr = [0; 8];
             (&mut sll_addr[..chaddr.bytes().len()]).copy_from_slice(&chaddr.bytes());
-            // TODO(https://fxbug.dev/42055726): Add `ETH_P_IP` upstream in the `libc` crate.
-            const ETH_P_IP: u16 = 0x0800;
             let sockaddr_ll = libc::sockaddr_ll {
                 sll_family: libc::AF_PACKET.try_into().expect("convert sll_family failed"),
                 sll_ifindex: iface_id.try_into().expect("convert sll_ifindex failed"),
                 // Network order is big endian.
-                sll_protocol: ETH_P_IP.to_be(),
+                sll_protocol: u16::try_from(libc::ETH_P_IP)
+                    .expect("convert ETH_P_IP failed")
+                    .to_be(),
                 sll_halen: chaddr.bytes().len().try_into().expect("convert chaddr size failed"),
                 sll_addr: sll_addr,
                 sll_hatype: 0,

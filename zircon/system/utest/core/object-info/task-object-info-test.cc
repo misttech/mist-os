@@ -17,7 +17,7 @@
 namespace object_info_test {
 namespace {
 
-TEST(TaskGetInfoTest, InfoStatsUnstartedSuceeds) {
+TEST(TaskGetInfoTest, InfoStatsUnstartedSucceeds) {
   static constexpr char kProcessName[] = "object-info-unstarted";
 
   zx::vmar vmar;
@@ -55,16 +55,16 @@ TEST(TaskGetInfoTest, InfoTaskStatsInvalidHandleFails) {
 TEST(TaskGetInfoTest, InfoTaskStatsNullAvailSucceeds) {
   ASSERT_TRUE(handle_provider().is_valid());
   ASSERT_NO_FATAL_FAILURE(
-      (CheckNullAvailSuceeds<zx_info_task_stats_t>(ZX_INFO_TASK_STATS, 1, handle_provider)));
+      (CheckNullAvailSucceeds<zx_info_task_stats_t>(ZX_INFO_TASK_STATS, 1, handle_provider)));
 }
 
 TEST(TaskGetInfoTest, InfoTaskStatsNullActualSucceeds) {
   ASSERT_NO_FATAL_FAILURE(
-      (CheckNullActualSuceeds<zx_info_task_stats_t>(ZX_INFO_TASK_STATS, 1, handle_provider)));
+      (CheckNullActualSucceeds<zx_info_task_stats_t>(ZX_INFO_TASK_STATS, 1, handle_provider)));
 }
 
 TEST(TaskGetInfoTest, InfoTaskStatsNullActualAndAvailSucceeds) {
-  ASSERT_NO_FATAL_FAILURE((CheckNullActualAndAvailSuceeds<zx_info_task_stats_t>(
+  ASSERT_NO_FATAL_FAILURE((CheckNullActualAndAvailSucceeds<zx_info_task_stats_t>(
       ZX_INFO_TASK_STATS, 1, handle_provider)));
 }
 

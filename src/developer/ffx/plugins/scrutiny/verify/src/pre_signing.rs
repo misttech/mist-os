@@ -4,10 +4,7 @@
 
 use anyhow::{anyhow, Context as _, Result};
 use ffx_scrutiny_verify_args::pre_signing::Command;
-use scrutiny_config::{ConfigBuilder, ModelConfig};
-use scrutiny_frontend::command_builder::CommandBuilder;
-use scrutiny_frontend::launcher;
-use scrutiny_plugins::verify::PreSigningResponse;
+use scrutiny_frontend::Scrutiny;
 use std::collections::HashSet;
 use std::path::PathBuf;
 
@@ -20,39 +17,26 @@ pub async fn verify(cmd: &Command, recovery: bool) -> Result<HashSet<PathBuf>> {
         .to_str()
         .context("failed to convert golden_files_dir PathBuf to string")?
         .to_owned();
-    let command = CommandBuilder::new("verify.pre_signing")
-        .param("policy_path", policy_path.clone())
-        .param("golden_files_dir", golden_files_dir.clone())
-        .build();
-    let model = if recovery {
-        ModelConfig::from_product_bundle_recovery(&cmd.product_bundle.clone())
+    let artifacts = if recovery {
+        Scrutiny::from_product_bundle_recovery(&cmd.product_bundle)
     } else {
-        ModelConfig::from_product_bundle(&cmd.product_bundle.clone())
-    }?;
-    let mut config = ConfigBuilder::with_model(model).command(command).build();
-    config.runtime.logging.silent_mode = true;
+        Scrutiny::from_product_bundle(&cmd.product_bundle)
+    }?
+    .collect()?;
 
-    let scrutiny_output =
-        launcher::launch_from_config(config).context("Failed to run verify.pre_signing")?;
-
-    match serde_json::from_str::<PreSigningResponse>(&scrutiny_output) {
-        Ok(response) => {
-            if response.errors.len() > 0 {
-                println!(
-                    "The build has failed pre-signing checks defined by the policy file: {:?}",
-                    policy_path
-                );
-                println!("");
-                for e in response.errors {
-                    println!("{}", e);
-                }
-                println!("");
-                return Err(anyhow!("Pre-signing verification failed."));
-            }
+    let response =
+        artifacts.collect_presigning_errors(policy_path.clone(), golden_files_dir.clone())?;
+    if response.errors.len() > 0 {
+        println!(
+            "The build has failed pre-signing checks defined by the policy file: {:?}",
+            policy_path
+        );
+        println!("");
+        for e in response.errors {
+            println!("{}", e);
         }
-        Err(serde_error) => {
-            return Err(anyhow!("Failed to parse PreSigningResponse: {:?}\nPre-signing verifier did not complete successfully: {:?}", serde_error, scrutiny_output));
-        }
+        println!("");
+        return Err(anyhow!("Pre-signing verification failed."));
     }
 
     deps.insert(cmd.policy.clone());

@@ -87,7 +87,7 @@ class WakeLease : public WakeLeaseBase {
   std::vector<fpromise::suspended_task> waiting_for_required_level_;
 
   // Channels that will be valid and must be kept open once the element is added to the topology.
-  fidl::ClientEnd<fuchsia_power_broker::ElementControl> element_control_channel_;
+  fidl::Client<fuchsia_power_broker::ElementControl> element_control_;
   fidl::Client<fuchsia_power_broker::Lessor> lessor_;
 
   // Enables this to be safely captured in promises returned by Acquire. Any public method that

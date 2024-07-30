@@ -41,32 +41,34 @@ class ControlServer
   //
   void DeviceIsRemoved() final;
   void DeviceHasError() final;
-  void GainStateChanged(const fuchsia_audio_device::GainState&) final;
-  void PlugStateChanged(const fuchsia_audio_device::PlugState& new_plug_state,
-                        zx::time plug_change_time) final;
-  void TopologyChanged(TopologyId topology_id) final;
-  void ElementStateChanged(
+  void GainStateIsChanged(const fuchsia_audio_device::GainState&) final;
+  void PlugStateIsChanged(const fuchsia_audio_device::PlugState& new_plug_state,
+                          zx::time plug_change_time) final;
+  void TopologyIsChanged(TopologyId topology_id) final;
+  void ElementStateIsChanged(
       ElementId element_id,
       fuchsia_hardware_audio_signalprocessing::ElementState element_state) final;
 
   // ControlNotify
   //
   void DeviceDroppedRingBuffer(ElementId element_id) final;
-  void DelayInfoChanged(ElementId element_id, const fuchsia_audio_device::DelayInfo&) final;
+  void DelayInfoIsChanged(ElementId element_id, const fuchsia_audio_device::DelayInfo&) final;
   // If `dai_format` contains no value, no DaiFormat is set. The Device might be newly-initialized,
   // or `Reset` may have been called. `SetDaiFormat` must be called.
-  void DaiFormatChanged(
+  void DaiFormatIsChanged(
       ElementId element_id, const std::optional<fuchsia_hardware_audio::DaiFormat>& dai_format,
       const std::optional<fuchsia_hardware_audio::CodecFormatInfo>& codec_format_info) final;
   // `SetDaiFormat` did not change the format. The previously-set DaiFormat is still be in effect.
-  void DaiFormatNotSet(ElementId element_id, const fuchsia_hardware_audio::DaiFormat& dai_format,
-                       fuchsia_audio_device::ControlSetDaiFormatError error) final;
-  void CodecStarted(const zx::time& start_time) final;
+  void DaiFormatIsNotChanged(ElementId element_id,
+                             const fuchsia_hardware_audio::DaiFormat& dai_format,
+                             fuchsia_audio_device::ControlSetDaiFormatError error) final;
+  void CodecIsStarted(const zx::time& start_time) final;
   // A call to `CodecStart` did not succeed.
-  void CodecNotStarted() final;
-  void CodecStopped(const zx::time& stop_time) final;
+  void CodecIsNotStarted() final;
+  void CodecIsStopped(const zx::time& stop_time) final;
   // A call to `CodecStop` did not succeed.
-  void CodecNotStopped() final;
+  void CodecIsNotStopped() final;
+  void DeviceIsReset() final;
 
   // fuchsia.audio.device.Control
   //
@@ -111,6 +113,7 @@ class ControlServer
 
   std::optional<CodecStartCompleter::Async> codec_start_completer_;
   std::optional<CodecStopCompleter::Async> codec_stop_completer_;
+  std::optional<ResetCompleter::Async> reset_completer_;
 
   bool device_has_error_ = false;
 

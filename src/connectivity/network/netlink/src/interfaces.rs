@@ -1091,7 +1091,7 @@ fn port_class_to_link_type(port_class: fnet_interfaces_ext::PortClass) -> u16 {
         fnet_interfaces_ext::PortClass::Loopback => ARPHRD_LOOPBACK,
         fnet_interfaces_ext::PortClass::Ethernet
         | fnet_interfaces_ext::PortClass::Bridge
-        | fnet_interfaces_ext::PortClass::Wlan
+        | fnet_interfaces_ext::PortClass::WlanClient
         | fnet_interfaces_ext::PortClass::WlanAp => ARPHRD_ETHER,
         fnet_interfaces_ext::PortClass::Ppp => ARPHRD_PPP,
         // NB: Virtual devices on fuchsia are overloaded. This may be a
@@ -1393,7 +1393,8 @@ pub(crate) mod testutil {
         fnet_interfaces_ext::PortClass::Bridge;
     pub(crate) const ETHERNET: fnet_interfaces_ext::PortClass =
         fnet_interfaces_ext::PortClass::Ethernet;
-    pub(crate) const WLAN: fnet_interfaces_ext::PortClass = fnet_interfaces_ext::PortClass::Wlan;
+    pub(crate) const WLAN_CLIENT: fnet_interfaces_ext::PortClass =
+        fnet_interfaces_ext::PortClass::WlanClient;
     pub(crate) const WLAN_AP: fnet_interfaces_ext::PortClass =
         fnet_interfaces_ext::PortClass::WlanAp;
     pub(crate) const PPP: fnet_interfaces_ext::PortClass = fnet_interfaces_ext::PortClass::Ppp;
@@ -1935,8 +1936,8 @@ mod tests {
 
     #[test_case(ETHERNET, false, 0, ARPHRD_ETHER)]
     #[test_case(ETHERNET, true, ONLINE_IF_FLAGS, ARPHRD_ETHER)]
-    #[test_case(WLAN, false, 0, ARPHRD_ETHER)]
-    #[test_case(WLAN, true, ONLINE_IF_FLAGS, ARPHRD_ETHER)]
+    #[test_case(WLAN_CLIENT, false, 0, ARPHRD_ETHER)]
+    #[test_case(WLAN_CLIENT, true, ONLINE_IF_FLAGS, ARPHRD_ETHER)]
     #[test_case(WLAN_AP, false, 0, ARPHRD_ETHER)]
     #[test_case(WLAN_AP, true, ONLINE_IF_FLAGS, ARPHRD_ETHER)]
     #[test_case(PPP, false, 0, ARPHRD_PPP)]
@@ -2146,7 +2147,7 @@ mod tests {
                 fnet_interfaces::Event::Added(fnet_interfaces::Properties {
                     id: Some(WLAN_INTERFACE_ID),
                     name: Some(WLAN_NAME.to_string()),
-                    port_class: Some(WLAN.into()),
+                    port_class: Some(WLAN_CLIENT.into()),
                     online: Some(false),
                     addresses: Some(vec![
                         test_addr_with_assignment_state(

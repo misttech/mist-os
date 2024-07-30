@@ -101,7 +101,6 @@ static_library("f2fs") {
 
     public_deps += [
       "//sdk/fidl/fuchsia.memorypressure:fuchsia.memorypressure_cpp",
-      "//sdk/fidl/fuchsia.net.interfaces:fuchsia.net.interfaces_hlcpp",
       "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_cpp",
       "//sdk/lib/component/incoming/cpp",
       "//sdk/lib/inspect/component/cpp",
@@ -114,7 +113,7 @@ static_library("f2fs") {
 
     deps += [
       "//sdk/fidl/fuchsia.fs:fuchsia.fs_cpp",
-      "//sdk/fidl/fuchsia.io:fuchsia.io_hlcpp",
+      "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
       "//sdk/lib/fdio",
       "//sdk/lib/fidl",
       "//src/lib/fuchsia-component",

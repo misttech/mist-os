@@ -1798,11 +1798,11 @@ async fn invalid_matcher_for_hook(
             id: rule_id.clone(),
             matchers: match interface_matcher {
                 WhichInterface::In => Matchers {
-                    in_interface: Some(InterfaceMatcher::PortClass(PortClass::Wlan)),
+                    in_interface: Some(InterfaceMatcher::PortClass(PortClass::WlanClient)),
                     ..Default::default()
                 },
                 WhichInterface::Out => Matchers {
-                    out_interface: Some(InterfaceMatcher::PortClass(PortClass::Wlan)),
+                    out_interface: Some(InterfaceMatcher::PortClass(PortClass::WlanClient)),
                     ..Default::default()
                 },
             },

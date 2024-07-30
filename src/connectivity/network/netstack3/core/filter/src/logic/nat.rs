@@ -22,7 +22,7 @@ use crate::packets::{IpPacket, MaybeTransportPacketMut as _, TransportPacketMut 
 use crate::state::Hook;
 
 /// The NAT configuration for a given conntrack connection.
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct NatConfig {
     /// NAT is configured exactly once for a given connection, for the first
     /// packet encountered on that connection. This is not to say that all
@@ -509,7 +509,7 @@ mod tests {
     use crate::matchers::testutil::{ethernet_interface, FakeDeviceId};
     use crate::matchers::PacketMatcher;
     use crate::packets::testutil::internal::{
-        ArbitraryValue, FakeIpPacket, FakeTcpSegment, TestIpExt,
+        ArbitraryValue, FakeIpPacket, FakeUdpPacket, TestIpExt,
     };
     use crate::state::{Action, Routine, Rule, TransparentProxy};
 
@@ -518,7 +518,7 @@ mod tests {
         let mut bindings_ctx = FakeBindingsCtx::<Ipv4>::new();
         let conntrack = Table::new::<IntoCoreTimerCtx>(&mut bindings_ctx);
         let mut core_ctx = FakeNatCtx::default();
-        let packet = FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value();
+        let packet = FakeIpPacket::<_, FakeUdpPacket>::arbitrary_value();
 
         assert_eq!(
             configure_nat::<LocalEgressHook, _, _, _, _>(
@@ -539,7 +539,7 @@ mod tests {
         let mut bindings_ctx = FakeBindingsCtx::<Ipv4>::new();
         let conntrack = Table::new::<IntoCoreTimerCtx>(&mut bindings_ctx);
         let mut core_ctx = FakeNatCtx::default();
-        let packet = FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value();
+        let packet = FakeIpPacket::<_, FakeUdpPacket>::arbitrary_value();
 
         let hook = Hook {
             routines: vec![Routine {
@@ -565,7 +565,7 @@ mod tests {
         let mut bindings_ctx = FakeBindingsCtx::<Ipv4>::new();
         let conntrack = Table::new::<IntoCoreTimerCtx>(&mut bindings_ctx);
         let mut core_ctx = FakeNatCtx::default();
-        let packet = FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value();
+        let packet = FakeIpPacket::<_, FakeUdpPacket>::arbitrary_value();
 
         // The first installed routine should terminate at its `Accept` result.
         let routine = Routine {
@@ -621,7 +621,7 @@ mod tests {
         let mut bindings_ctx = FakeBindingsCtx::<Ipv4>::new();
         let conntrack = Table::new::<IntoCoreTimerCtx>(&mut bindings_ctx);
         let mut core_ctx = FakeNatCtx::default();
-        let packet = FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value();
+        let packet = FakeIpPacket::<_, FakeUdpPacket>::arbitrary_value();
 
         let hook = Hook {
             routines: vec![
@@ -659,7 +659,7 @@ mod tests {
         let mut bindings_ctx = FakeBindingsCtx::<Ipv4>::new();
         let conntrack = Table::new::<IntoCoreTimerCtx>(&mut bindings_ctx);
         let mut core_ctx = FakeNatCtx::default();
-        let packet = FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value();
+        let packet = FakeIpPacket::<_, FakeUdpPacket>::arbitrary_value();
 
         let ingress = Hook {
             routines: vec![
@@ -700,7 +700,7 @@ mod tests {
         let mut bindings_ctx = FakeBindingsCtx::<Ipv4>::new();
         let conntrack = Table::new::<IntoCoreTimerCtx>(&mut bindings_ctx);
         let mut core_ctx = FakeNatCtx::default();
-        let packet = FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value();
+        let packet = FakeIpPacket::<_, FakeUdpPacket>::arbitrary_value();
 
         let hook = Hook {
             routines: vec![
@@ -738,7 +738,7 @@ mod tests {
         let mut bindings_ctx = FakeBindingsCtx::<Ipv4>::new();
         let conntrack = Table::new::<IntoCoreTimerCtx>(&mut bindings_ctx);
         let mut core_ctx = FakeNatCtx::default();
-        let packet = FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value();
+        let packet = FakeIpPacket::<_, FakeUdpPacket>::arbitrary_value();
 
         let hook = Hook {
             routines: vec![Routine {
@@ -816,10 +816,11 @@ mod tests {
         };
 
         // Create a packet and get the corresponding connection from conntrack.
-        let mut packet = FakeIpPacket::<_, FakeTcpSegment>::arbitrary_value();
+        let mut packet = FakeIpPacket::<_, FakeUdpPacket>::arbitrary_value();
         let pre_nat_packet = packet.clone();
         let mut conn = conntrack
             .get_connection_for_packet_and_update(&bindings_ctx, &packet)
+            .expect("packet should be valid")
             .expect("packet should be trackable");
         let original = conn.original_tuple().clone();
 
@@ -848,10 +849,10 @@ mod tests {
         // The packet's destination should be rewritten, and DNAT should be configured
         // for the packet; the reply tuple's source should be rewritten to match the new
         // destination.
-        let expected = FakeIpPacket::<_, FakeTcpSegment> {
+        let expected = FakeIpPacket::<_, FakeUdpPacket> {
             src_ip: packet.src_ip,
             dst_ip: N::redirect_dst(),
-            body: FakeTcpSegment {
+            body: FakeUdpPacket {
                 src_port: packet.body.src_port,
                 dst_port: dst_port.map(NonZeroU16::get).unwrap_or(packet.body.dst_port),
             },
@@ -893,9 +894,9 @@ mod tests {
         assert_eq!(reply_packet, pre_nat_packet.reply());
     }
 
-    fn packet_with_src_port(src_port: u16) -> FakeIpPacket<Ipv4, FakeTcpSegment> {
+    fn packet_with_src_port(src_port: u16) -> FakeIpPacket<Ipv4, FakeUdpPacket> {
         FakeIpPacket {
-            body: FakeTcpSegment { src_port, ..ArbitraryValue::arbitrary_value() },
+            body: FakeUdpPacket { src_port, ..ArbitraryValue::arbitrary_value() },
             ..ArbitraryValue::arbitrary_value()
         }
     }
@@ -945,6 +946,7 @@ mod tests {
         // should be dropped.
         let conn = table
             .get_connection_for_packet_and_update(&bindings_ctx, &packet)
+            .expect("packet should be valid")
             .expect("packet should be trackable");
         assert!(table
             .finalize_connection(&mut bindings_ctx, conn)
@@ -967,6 +969,7 @@ mod tests {
             let packet = packet_with_src_port(port);
             let conn = table
                 .get_connection_for_packet_and_update(&bindings_ctx, &packet)
+                .expect("packet should be valid")
                 .expect("packet should be trackable");
             assert!(table
                 .finalize_connection(&mut bindings_ctx, conn)

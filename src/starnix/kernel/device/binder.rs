@@ -35,7 +35,7 @@ use starnix_logging::{
 };
 use starnix_sync::{
     DeviceOpen, FileOpsCore, InterruptibleEvent, LockBefore, Locked, Mutex, MutexGuard,
-    ResourceAccessorAddFile, RwLock, Unlocked, WriteOps,
+    ResourceAccessorAddFile, RwLock, Unlocked,
 };
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::arc_key::ArcKey;
@@ -46,7 +46,7 @@ use starnix_uapi::file_mode::mode;
 use starnix_uapi::math::round_up_to_increment;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::ownership::{
-    release_after, release_on_error, DropGuard, OwnedRef, Releasable, ReleaseGuard, TempRef,
+    release_after, release_on_error, DropGuard, OwnedRef, Releasable, ReleaseGuard, Share, TempRef,
     WeakRef,
 };
 use starnix_uapi::union::struct_with_union_into_bytes;
@@ -180,6 +180,7 @@ impl FileOps for BinderConnection {
 
     fn query_events(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
@@ -206,6 +207,7 @@ impl FileOps for BinderConnection {
 
     fn wait_async(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
         waiter: &Waiter,
@@ -302,7 +304,7 @@ impl FileOps for BinderConnection {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, WriteOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         offset: usize,
@@ -904,10 +906,10 @@ impl<'a> BinderProcessGuard<'a> {
     /// Return the `BinderThread` with the given `tid`, creating it if it doesn't exist.
     fn find_or_register_thread(&mut self, tid: pid_t) -> OwnedRef<BinderThread> {
         if let Some(thread) = self.thread_pool.0.get(&tid) {
-            return thread.clone();
+            return OwnedRef::share(thread);
         }
         let thread = BinderThread::new(self, tid);
-        self.thread_pool.0.insert(tid, OwnedRef::clone(&thread));
+        self.thread_pool.0.insert(tid, OwnedRef::share(&thread));
         thread
     }
 
@@ -3095,7 +3097,7 @@ impl Default for BinderDriver {
 
 impl BinderDriver {
     fn find_process(&self, identifier: u64) -> Result<OwnedRef<BinderProcess>, Errno> {
-        self.procs.read().get(&identifier).map(OwnedRef::clone).ok_or_else(|| errno!(ENOENT))
+        self.procs.read().get(&identifier).map(OwnedRef::share).ok_or_else(|| errno!(ENOENT))
     }
 
     /// Creates and register the binder process state to represent a local process with `pid`.
@@ -4219,7 +4221,7 @@ impl BinderDriver {
             length,
             prot_flags,
             mapping_options,
-            MappingName::File(filename),
+            MappingName::File(filename.into_active()),
             FileWriteGuardRef(None),
         )?;
 

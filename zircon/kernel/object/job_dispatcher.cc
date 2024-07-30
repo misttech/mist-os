@@ -16,7 +16,6 @@
 
 #include <fbl/alloc_checker.h>
 #include <fbl/array.h>
-#include <fbl/auto_lock.h>
 #include <fbl/inline_array.h>
 #include <kernel/mutex.h>
 #include <ktl/algorithm.h>

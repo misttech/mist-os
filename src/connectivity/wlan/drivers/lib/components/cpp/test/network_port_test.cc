@@ -1,8 +1,8 @@
 // Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be found in the LICENSE file.
 
-#include <lib/driver/testing/cpp/fixture/driver_test_fixture.h>
-#include <lib/driver/testing/cpp/fixture/minimal_compat_environment.h>
+#include <lib/driver/testing/cpp/driver_test.h>
+#include <lib/driver/testing/cpp/minimal_compat_environment.h>
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
@@ -39,22 +39,20 @@ class TestNetworkPortInterface : public NetworkPort::Callbacks {
 };
 
 struct TestFixtureConfig {
-  static constexpr bool kDriverOnForeground = false;
-  static constexpr bool kAutoStartDriver = true;
-  static constexpr bool kAutoStopDriver = false;
-
   using DriverType = wlan::drivers::components::test::TestDriver;
   using EnvironmentType = fdf_testing::MinimalCompatEnvironment;
 };
 
-struct NetworkPortTest : public fdf_testing::DriverTestFixture<TestFixtureConfig>,
-                         public ::testing::Test {
+struct NetworkPortTest : public ::testing::Test {
   static constexpr uint8_t kPortId = 13;
 
   void SetUp() override {
-    auto client_end = netdev_ifc_.Bind(runtime().StartBackgroundDispatcher()->get());
+    zx::result<> result = driver_test().StartDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
+    auto client_end = netdev_ifc_.Bind(driver_test().runtime().StartBackgroundDispatcher()->get());
     ASSERT_OK(client_end.status_value());
-    ifc_client_.Bind(std::move(*client_end), runtime().StartBackgroundDispatcher()->get());
+    ifc_client_.Bind(std::move(*client_end),
+                     driver_test().runtime().StartBackgroundDispatcher()->get());
     ASSERT_TRUE(ifc_client_.is_valid());
   }
 
@@ -79,7 +77,7 @@ struct NetworkPortTest : public fdf_testing::DriverTestFixture<TestFixtureConfig
                       [&] { port_->RemovePort([&](zx_status_t) { port_removed.Signal(); }); });
       port_removed.Wait();
     }
-    ASSERT_OK(StopDriver().status_value());
+    ASSERT_OK(driver_test().StopDriver().status_value());
   }
 
   NetworkPort& CreatePort(uint8_t port_id) {
@@ -100,10 +98,13 @@ struct NetworkPortTest : public fdf_testing::DriverTestFixture<TestFixtureConfig
     return result;
   }
 
+  fdf_testing::BackgroundDriverTest<TestFixtureConfig>& driver_test() { return driver_test_; }
+  fdf_testing::BackgroundDriverTest<TestFixtureConfig> driver_test_;
+
   TestNetworkPortInterface port_ifc_;
   TestNetworkDeviceIfc netdev_ifc_;
   std::unique_ptr<NetworkPort> port_;
-  fdf_dispatcher_t* dispatcher_ = runtime().StartBackgroundDispatcher()->get();
+  fdf_dispatcher_t* dispatcher_ = driver_test().runtime().StartBackgroundDispatcher()->get();
   fdf::WireSharedClient<fuchsia_hardware_network_driver::NetworkDeviceIfc> ifc_client_;
 };
 
@@ -291,7 +292,7 @@ TEST_F(NetworkPortTest, GetInfoClient) {
   fdf::Arena arena('WLAN');
   auto result = netdev_ifc_.PortClient().sync().buffer(arena)->GetInfo();
   ASSERT_OK(result.status());
-  EXPECT_EQ(result->info.port_class(), fuchsia_hardware_network::wire::PortClass::kWlan);
+  EXPECT_EQ(result->info.port_class(), fuchsia_hardware_network::wire::PortClass::kWlanClient);
 }
 
 TEST_F(NetworkPortTest, GetInfoAp) {
@@ -327,7 +328,7 @@ TEST_F(NetworkPortTestWithPort, GetInfo) {
   ASSERT_OK(result.status());
   auto& info = result->info;
   // Should be a WLAN port in the default setting
-  EXPECT_EQ(info.port_class(), fuchsia_hardware_network::wire::PortClass::kWlan);
+  EXPECT_EQ(info.port_class(), fuchsia_hardware_network::wire::PortClass::kWlanClient);
 
   // Must support at least reception of ethernet frames
   const auto& rx_types = info.rx_types();

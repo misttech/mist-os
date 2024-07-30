@@ -66,16 +66,8 @@ fuchsia_package("system-update-configurator") {
   deps = [ ":component" ]
 }
 
-fuchsia_unittest_package("system-update-configurator-tests") {
+fuchsia_unittest_package("system-update-configurator-unit-tests") {
   deps = [ ":lib_test" ]
-}
-
-group("tests") {
-  testonly = true
-  public_deps = [
-    ":system-update-configurator-integration-test",
-    ":system-update-configurator-tests",
-  ]
 }
 
 rustc_test("bin_test") {
@@ -121,4 +113,14 @@ fuchsia_test_package("system-update-configurator-integration-test") {
       nelson_env,
     ]
   }
+}
+
+group("hermetic_tests") {
+  testonly = true
+  public_deps = [ ":system-update-configurator-unit-tests" ]
+}
+
+group("non_hermetic_tests") {
+  testonly = true
+  public_deps = [ ":system-update-configurator-integration-test" ]
 }

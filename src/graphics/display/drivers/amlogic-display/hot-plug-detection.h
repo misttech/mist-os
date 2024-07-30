@@ -83,7 +83,7 @@ class HotPlugDetection {
 
  private:
   // Translates raw values from the GPIO connected to the HPD pin.
-  static HotPlugDetectionState GpioValueToState(uint8_t gpio_value);
+  static HotPlugDetectionState GpioValueToState(bool gpio_value);
 
   // The GPIO polarity for detecting an HPD state change.
   static fuchsia_hardware_gpio::wire::GpioPolarity GpioPolarityForStateChange(

@@ -30,7 +30,7 @@ rustc_binary("bin") {
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-url",
-    "//src/lib/versioning/version-history/rust:version-history",
+    "//src/lib/versioning/version-history/rust",
     "//src/sys/lib/fidl-fuchsia-component-abi-ext",
     "//src/sys/lib/mem_util",
     "//third_party/rust_crates:anyhow",

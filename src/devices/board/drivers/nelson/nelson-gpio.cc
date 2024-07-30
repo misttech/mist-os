@@ -212,9 +212,8 @@ zx_status_t Nelson::GpioInit() {
   // Enable mute LED so it will be controlled by mute switch.
   gpio_init_steps_.push_back(GpioConfigOut(GPIO_AMBER_LED_PWM, 1));
 
-  fuchsia_hardware_gpioimpl::wire::InitMetadata metadata;
-  metadata.steps = fidl::VectorView<fuchsia_hardware_gpioimpl::wire::InitStep>::FromExternal(
-      gpio_init_steps_.data(), gpio_init_steps_.size());
+  fuchsia_hardware_gpioimpl::InitMetadata metadata{{std::move(gpio_init_steps_)}};
+  gpio_init_steps_.clear();
 
   const fit::result encoded_metadata = fidl::Persist(metadata);
   if (!encoded_metadata.is_ok()) {

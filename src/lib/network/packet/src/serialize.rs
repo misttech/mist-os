@@ -1576,6 +1576,12 @@ pub struct InnerSerializer<I, B> {
     buffer: B,
 }
 
+impl<I, B> InnerSerializer<I, B> {
+    pub fn inner(&self) -> &I {
+        &self.inner
+    }
+}
+
 /// A wrapper for `InnerPacketBuilders` which implements `PacketBuilder` by
 /// treating the entire `InnerPacketBuilder` as the header of the
 /// `PacketBuilder`. This allows us to compose our InnerPacketBuilder with

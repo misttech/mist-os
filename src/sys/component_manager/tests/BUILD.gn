@@ -10,6 +10,7 @@ group("non_hermetic_tests") {
   testonly = true
   deps = [
     "bootfs:tests",
+    "bootfs_launching_benchmark:tests($default_toolchain)",
     "capability_provider_vfs_compliance:tests",
     "fuchsia_boot_resolver:tests($default_toolchain)",
     "fuchsia_io:tests",

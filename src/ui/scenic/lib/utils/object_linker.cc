@@ -222,6 +222,7 @@ std::unique_ptr<async::Wait> ObjectLinkerBase::WaitForPeerDeath(async_dispatcher
                                                                 zx_handle_t endpoint_handle,
                                                                 zx_koid_t endpoint_id,
                                                                 bool is_import) {
+  FX_DCHECK(dispatcher);
   auto access = GetScopedAccess();
   // Each endpoint must be removed from being considered for linking if its
   // peer's handle is closed before the two entries are successfully linked.

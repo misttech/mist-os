@@ -15,7 +15,6 @@
 #include <zircon/types.h>
 
 #include <fbl/alloc_checker.h>
-#include <fbl/auto_lock.h>
 #include <kernel/thread.h>
 
 KCOUNTER(dispatcher_timer_create_count, "dispatcher.timer.create")

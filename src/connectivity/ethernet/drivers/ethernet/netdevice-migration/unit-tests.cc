@@ -293,7 +293,7 @@ const PortClassTestCase port_class_test_cases[]{
     {
         .name = "WLAN",
         .features = ETHERNET_FEATURE_WLAN,
-        .expected_port_class = fuchsia_hardware_network::wire::PortClass::kWlan,
+        .expected_port_class = fuchsia_hardware_network::wire::PortClass::kWlanClient,
     },
     {
         .name = "WLAN_AP",

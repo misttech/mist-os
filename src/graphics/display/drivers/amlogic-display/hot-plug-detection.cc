@@ -155,7 +155,7 @@ zx::result<> HotPlugDetection::Init() {
 }
 
 // static
-HotPlugDetectionState HotPlugDetection::GpioValueToState(uint8_t gpio_value) {
+HotPlugDetectionState HotPlugDetection::GpioValueToState(bool gpio_value) {
   return gpio_value ? HotPlugDetectionState::kDetected : HotPlugDetectionState::kNotDetected;
 }
 

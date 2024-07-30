@@ -18,6 +18,7 @@
 #include "logging.h"
 
 namespace bt_hci_intel {
+namespace fhbt = fuchsia_hardware_bluetooth;
 
 using ::bt::hci::CommandPacket;
 
@@ -28,7 +29,9 @@ constexpr auto kInitTimeoutMs = zx::sec(10);
 
 }  // namespace
 
-VendorHci::VendorHci(zx::channel* ctrl) : ctrl_(ctrl), acl_(nullptr), manufacturer_(false) {}
+VendorHci::VendorHci(fidl::SharedClient<fuchsia_hardware_bluetooth::HciTransport>& client,
+                     HciEventHandler& event_handler)
+    : hci_transport_client_(client), hci_event_handler_(event_handler), manufacturer_(false) {}
 
 // Fetch unsigned integer values from 'p' with 'fetch_len' bytes at maximum (little-endian).
 uint32_t fetch_tlv_value(const uint8_t* p, size_t fetch_len) {
@@ -255,7 +258,7 @@ bool VendorHci::SendSecureSend(uint8_t type, const bt::BufferView& bytes) const 
     data[0] = type;
     data.Write(bytes.view(bytes.size() - left, frag_len), 1);
 
-    SendCommand(cmd->view());
+    SendAcl(cmd->view());
     std::unique_ptr<bt::hci::EventPacket> event = WaitForEventPacket();
     if (!event) {
       errorf("VendorHci: SecureSend: Error reading response!");
@@ -346,92 +349,75 @@ bool VendorHci::ExitManufacturerMode(MfgDisableMode mode) {
 }
 
 void VendorHci::SendCommand(const bt::PacketView<bt::hci_spec::CommandHeader>& command) const {
-  zx_status_t status = ctrl_->write(0, command.data().data(), command.size(), nullptr, 0);
-  if (status < 0) {
-    errorf("VendorHci: SendCommand failed: %s", zx_status_get_string(status));
-  }
+  auto command_vec =
+      std::vector<uint8_t>(command.data().data(), command.data().data() + command.size());
+  hci_transport_client_->Send(fhbt::SentPacket::WithCommand(command_vec))
+      .Then([](fidl::Result<fhbt::HciTransport::Send>& result) {
+        if (!result.is_ok()) {
+          errorf("VendorHci: SendCommand failed: %s", result.error_value().status_string());
+          return;
+        }
+      });
+}
+
+void VendorHci::SendAcl(const bt::PacketView<bt::hci_spec::CommandHeader>& command) const {
+  auto command_vec =
+      std::vector<uint8_t>(command.data().data(), command.data().data() + command.size());
+  hci_transport_client_->Send(fhbt::SentPacket::WithAcl(command_vec))
+      .Then([](fidl::Result<fhbt::HciTransport::Send>& result) {
+        if (!result.is_ok()) {
+          errorf("VendorHci: SendAcl failed: %s", result.error_value().status_string());
+          return;
+        }
+      });
 }
 
 std::unique_ptr<bt::hci::EventPacket> VendorHci::WaitForEventPacket(
     zx::duration timeout, bt::hci_spec::EventCode expected_event) const {
-  zx_wait_item_t wait_items[2];
-  uint32_t wait_item_count = 1;
+  // Allocate a buffer for the event. We don't know the size
+  // beforehand we allocate the largest possible buffer.
+  auto packet = bt::hci::EventPacket::New(bt::hci_spec::kMaxCommandPacketPayloadSize);
+  if (!packet) {
+    errorf("VendorHci: Failed to allocate event packet!");
+    return nullptr;
+  }
+  auto packet_bytes = packet->mutable_view()->mutable_data();
 
-  ZX_DEBUG_ASSERT(ctrl_);
-  wait_items[0].handle = ctrl_->get();
-  wait_items[0].waitfor = ZX_CHANNEL_READABLE;
-  wait_items[0].pending = 0;
-
-  if (acl_) {
-    wait_items[1].handle = acl_->get();
-    wait_items[1].waitfor = ZX_CHANNEL_READABLE;
-    wait_items[1].pending = 0;
-    wait_item_count++;
+  std::vector<uint8_t> read_from_queue = hci_event_handler_.WaitForPacket(timeout);
+  const auto& read_size = read_from_queue.size();
+  if (read_size >
+      (bt::hci_spec::kMaxCommandPacketPayloadSize + sizeof(bt::hci_spec::EventHeader))) {
+    errorf("VendorHci: Packet too large, size: %zu", read_size);
+    return nullptr;
   }
 
-  auto begin = zx::clock::get_monotonic();
-  for (zx::duration elapsed; elapsed < timeout; elapsed = zx::clock::get_monotonic() - begin) {
-    zx_status_t status = zx_object_wait_many(wait_items, wait_item_count,
-                                             zx::deadline_after(timeout - elapsed).get());
-    if (status != ZX_OK) {
-      errorf("VendorHci: channel error: %s", zx_status_get_string(status));
-      return nullptr;
-    }
-
-    // Determine which channel caused the event.
-    zx_handle_t evt_handle = 0;
-    for (unsigned i = 0; i < wait_item_count; ++i) {
-      if (wait_items[i].pending & ZX_CHANNEL_READABLE) {
-        evt_handle = wait_items[0].handle;
-        break;
-      }
-    }
-
-    ZX_DEBUG_ASSERT(evt_handle);
-
-    // Allocate a buffer for the event. We don't know the size
-    // beforehand we allocate the largest possible buffer.
-    auto packet = bt::hci::EventPacket::New(bt::hci_spec::kMaxCommandPacketPayloadSize);
-    if (!packet) {
-      errorf("VendorHci: Failed to allocate event packet!");
-      return nullptr;
-    }
-
-    uint32_t read_size;
-    auto packet_bytes = packet->mutable_view()->mutable_data();
-    zx_status_t read_status = zx_channel_read(evt_handle, 0u, packet_bytes.mutable_data(), nullptr,
-                                              packet_bytes.size(), 0, &read_size, nullptr);
-    if (read_status < 0) {
-      errorf("VendorHci: Failed to read event bytes: %sn", zx_status_get_string(read_status));
-      return nullptr;
-    }
-
-    if (read_size < sizeof(bt::hci_spec::EventHeader)) {
-      errorf("VendorHci: Malformed event packet expected >%zu bytes, got %d",
-             sizeof(bt::hci_spec::EventHeader), read_size);
-      return nullptr;
-    }
-
-    // Compare the received payload size to what is in the header.
-    const size_t rx_payload_size = read_size - sizeof(bt::hci_spec::EventHeader);
-    const size_t size_from_header = packet->view().header().parameter_total_size;
-    if (size_from_header != rx_payload_size) {
-      errorf(
-          "VendorHci: Malformed event packet - header payload size (%zu) != "
-          "received (%zu)",
-          size_from_header, rx_payload_size);
-      return nullptr;
-    }
-
-    if (expected_event && expected_event != packet->event_code()) {
-      tracef("VendorHci: keep waiting (expected: 0x%02x, got: 0x%02x)", expected_event,
-             packet->event_code());
-      continue;
-    }
-
-    packet->InitializeFromBuffer();
-    return packet;
+  if (read_size < sizeof(bt::hci_spec::EventHeader)) {
+    errorf("VendorHci: Malformed event packet expected >%zu bytes, got %lu",
+           sizeof(bt::hci_spec::EventHeader), read_size);
+    return nullptr;
   }
+
+  memcpy(packet_bytes.mutable_data(), read_from_queue.data(), read_from_queue.size());
+
+  // Compare the received payload size to what is in the header.
+  const size_t rx_payload_size = read_size - sizeof(bt::hci_spec::EventHeader);
+  const size_t size_from_header = packet->view().header().parameter_total_size;
+  if (size_from_header != rx_payload_size) {
+    errorf(
+        "VendorHci: Malformed event packet - header payload size (%zu) != "
+        "received (%zu)",
+        size_from_header, rx_payload_size);
+    return nullptr;
+  }
+
+  if (expected_event && expected_event != packet->event_code()) {
+    tracef("VendorHci: keep waiting (expected: 0x%02x, got: 0x%02x)", expected_event,
+           packet->event_code());
+    return nullptr;
+  }
+
+  packet->InitializeFromBuffer();
+  return packet;
 
   errorf("VendorHci: timed out waiting for event");
   return nullptr;

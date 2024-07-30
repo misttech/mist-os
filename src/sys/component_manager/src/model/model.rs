@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::model::actions::{ActionKey, ActionsManager, DiscoverAction};
+use crate::model::actions::ActionKey;
 use crate::model::component::manager::ComponentManagerInstance;
 use crate::model::component::{ComponentInstance, StartReason};
 use crate::model::context::ModelContext;
@@ -28,6 +28,8 @@ pub struct ModelParams {
     pub runtime_config: Arc<RuntimeConfig>,
     /// The instance at the top of the tree, representing component manager.
     pub top_instance: Arc<ComponentManagerInstance>,
+    /// The [`InstanceRegistry`] to attach to the model.
+    pub instance_registry: Arc<InstanceRegistry>,
 }
 
 /// The component model holds authoritative state about a tree of component instances, including
@@ -49,20 +51,20 @@ impl Model {
     /// Creates a new component model and initializes its topology.
     pub async fn new(
         params: ModelParams,
-        instance_registry: Arc<InstanceRegistry>,
+        root_component_input: ComponentInput,
     ) -> Result<Arc<Model>, ModelError> {
-        let context = Arc::new(ModelContext::new(params.runtime_config, instance_registry)?);
+        let context = Arc::new(ModelContext::new(params.runtime_config, params.instance_registry)?);
         let root = ComponentInstance::new_root(
+            root_component_input,
             params.root_environment,
             context.clone(),
             Arc::downgrade(&params.top_instance),
             params.root_component_url,
         )
         .await;
-        let model =
-            Arc::new(Model { root: root.clone(), context, top_instance: params.top_instance });
-        model.top_instance.init(root).await;
-        Ok(model)
+        let top_instance = params.top_instance;
+        top_instance.init(root.clone()).await;
+        Ok(Arc::new(Model { root, context, top_instance }))
     }
 
     /// Returns a reference to the instance at the top of the tree (component manager's own
@@ -84,21 +86,10 @@ impl Model {
         self.context.component_id_index()
     }
 
-    /// Discovers the root component, providing it with `dict_for_root`.
-    pub async fn discover_root_component(self: &Arc<Model>, input_for_root: ComponentInput) {
-        ActionsManager::register(self.root.clone(), DiscoverAction::new(input_for_root))
-            .await
-            .expect("failed to discover root component");
-    }
-
     /// Starts root, starting the component tree.
     ///
     /// If `discover_root_component` has already been called, then `input_for_root` is unused.
-    pub async fn start(self: &Arc<Model>, input_for_root: ComponentInput) {
-        // Normally the Discovered event is dispatched when an instance is added as a child, but
-        // since the root isn't anyone's child we need to dispatch it here.
-        self.discover_root_component(input_for_root).await;
-
+    pub async fn start(self: &Arc<Model>) {
         // In debug mode, we don't start the component root. It must be started manually from
         // the lifecycle controller.
         if self.context.runtime_config().debug {
@@ -130,16 +121,9 @@ impl Model {
 
 #[cfg(test)]
 pub mod tests {
-    use crate::model::actions::{ShutdownAction, ShutdownType};
-    use crate::model::model::{ActionsManager, Model};
+    use crate::model::actions::{ActionsManager, ShutdownAction, ShutdownType};
     use crate::model::testing::test_helpers::{TestEnvironmentBuilder, TestModelResult};
-    use async_trait::async_trait;
     use cm_rust_testing::*;
-    use errors::ModelError;
-    use hooks::{Event, EventType, Hook, HooksRegistration};
-    use moniker::Moniker;
-    use routing::bedrock::structured_dict::ComponentInput;
-    use std::sync::{Arc, Weak};
 
     #[fuchsia::test]
     async fn already_shut_down_when_start_fails() {
@@ -160,7 +144,7 @@ pub mod tests {
         .await
         .unwrap();
 
-        model.start(ComponentInput::default()).await;
+        model.start().await;
     }
 
     #[fuchsia::test]
@@ -175,42 +159,13 @@ pub mod tests {
         let TestModelResult { model, .. } =
             TestEnvironmentBuilder::new().set_components(components).build().await;
 
-        // Wait for the child to be discovered -- this happens in the middle of starting
-        // the root component (eagerly starting children), then register the shutdown
-        // action. This means the root will already be scheduled for shutdown after
-        // start inevitably fails.
-        struct RegisterShutdown {
-            model: Arc<Model>,
-        }
-
-        #[async_trait]
-        impl Hook for RegisterShutdown {
-            async fn on(self: Arc<Self>, event: &Event) -> Result<(), ModelError> {
-                if event.target_moniker != "bad-scheme".parse::<Moniker>().unwrap().into() {
-                    return Ok(());
-                }
-                let _ = self
-                    .model
-                    .root()
-                    .actions()
-                    .register_no_wait(ShutdownAction::new(ShutdownType::Instance))
-                    .await;
-                Ok(())
-            }
-        }
-
-        let hook = Arc::new(RegisterShutdown { model: model.clone() });
-        model
+        let _ = model
             .root()
-            .hooks
-            .install(vec![HooksRegistration::new(
-                "shutdown_root_on_child_discover",
-                vec![EventType::Discovered],
-                Arc::downgrade(&hook) as Weak<dyn Hook>,
-            )])
+            .actions()
+            .register_no_wait(ShutdownAction::new(ShutdownType::Instance))
             .await;
 
-        model.start(ComponentInput::default()).await;
+        model.start().await;
     }
 
     #[should_panic]
@@ -226,6 +181,6 @@ pub mod tests {
         let TestModelResult { model, .. } =
             TestEnvironmentBuilder::new().set_components(components).build().await;
 
-        model.start(ComponentInput::default()).await;
+        model.start().await;
     }
 }

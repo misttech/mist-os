@@ -9,7 +9,7 @@ use crate::vfs::{
     FileOps,
 };
 use starnix_logging::log_info;
-use starnix_sync::{FileOpsCore, Locked, Unlocked, WriteOps};
+use starnix_sync::{FileOpsCore, Locked, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
@@ -28,7 +28,7 @@ impl FileOps for SyslogFile {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, WriteOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         offset: usize,

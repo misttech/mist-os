@@ -5,7 +5,6 @@
 #include <fuchsia/sysmem/cpp/fidl.h>
 #include <fuchsia/ui/composition/cpp/fidl.h>
 #include <fuchsia/ui/composition/internal/cpp/fidl.h>
-#include <lib/sys/component/cpp/testing/realm_builder.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/ui/scenic/cpp/view_creation_tokens.h>
 #include <lib/ui/scenic/cpp/view_identity.h>
@@ -16,35 +15,21 @@
 #include <iostream>
 #include <utility>
 
-#include <gmock/gmock.h>
-#include <gtest/gtest.h>
+#include <zxtest/zxtest.h>
 
-#include "src/ui/lib/escher/geometry/types.h"
-#include "src/ui/scenic/lib/allocation/allocator.h"
 #include "src/ui/scenic/lib/allocation/buffer_collection_import_export_tokens.h"
-#include "src/ui/scenic/lib/flatland/buffers/util.h"
-#include "src/ui/scenic/lib/screen_capture2/screen_capture2.h"
 #include "src/ui/scenic/lib/utils/helpers.h"
 #include "src/ui/scenic/tests/utils/blocking_present.h"
-#include "src/ui/scenic/tests/utils/scenic_realm_builder.h"
+#include "src/ui/scenic/tests/utils/scenic_ctf_test_base.h"
 #include "src/ui/scenic/tests/utils/screen_capture_utils.h"
-#include "src/ui/scenic/tests/utils/utils.h"
-#include "src/ui/testing/util/logging_event_loop.h"
-#include "zircon/system/ulib/fbl/include/fbl/algorithm.h"
 
 namespace integration_tests {
 
-using flatland::MapHostPointer;
-using RealmRoot = component_testing::RealmRoot;
-using flatland::MapHostPointer;
-using fuchsia::math::SizeU;
-using fuchsia::math::Vec;
 using fuchsia::ui::composition::ChildViewWatcher;
 using fuchsia::ui::composition::ContentId;
 using fuchsia::ui::composition::Flatland;
 using fuchsia::ui::composition::FlatlandDisplay;
 using fuchsia::ui::composition::ParentViewportWatcher;
-using fuchsia::ui::composition::RegisterBufferCollectionArgs;
 using fuchsia::ui::composition::RegisterBufferCollectionUsages;
 using fuchsia::ui::composition::TransformId;
 using fuchsia::ui::composition::ViewportProperties;
@@ -53,30 +38,16 @@ using fuchsia::ui::composition::internal::ScreenCapture;
 using fuchsia::ui::composition::internal::ScreenCaptureConfig;
 using fuchsia::ui::composition::internal::ScreenCaptureError;
 
-class ScreenCapture2IntegrationTest : public ui_testing::LoggingEventLoop, public ::testing::Test {
+class ScreenCapture2IntegrationTest : public ScenicCtfTest {
  public:
-  ScreenCapture2IntegrationTest()
-      : realm_(ScenicRealmBuilder()
-                   .AddRealmProtocol(fuchsia::ui::composition::Flatland::Name_)
-                   .AddRealmProtocol(fuchsia::ui::composition::FlatlandDisplay::Name_)
-                   .AddRealmProtocol(fuchsia::ui::composition::Allocator::Name_)
-                   .AddRealmProtocol(fuchsia::ui::composition::internal::ScreenCapture::Name_)
-                   .Build()) {
-    auto context = sys::ComponentContext::Create();
-    context->svc()->Connect(sysmem_allocator_.NewRequest());
+  void SetUp() override {
+    ScenicCtfTest::SetUp();
 
-    flatland_display_ = realm_.component().Connect<fuchsia::ui::composition::FlatlandDisplay>();
-    flatland_display_.set_error_handler([](zx_status_t status) {
-      FAIL() << "Lost connection to Scenic: " << zx_status_get_string(status);
-    });
+    LocalServiceDirectory()->Connect(sysmem_allocator_.NewRequest());
 
-    flatland_allocator_ = realm_.component().ConnectSync<fuchsia::ui::composition::Allocator>();
-
-    // Set up root view.
-    root_session_ = realm_.component().Connect<fuchsia::ui::composition::Flatland>();
-    root_session_.set_error_handler([](zx_status_t status) {
-      FAIL() << "Lost connection to Scenic: " << zx_status_get_string(status);
-    });
+    flatland_display_ = ConnectSyncIntoRealm<fuchsia::ui::composition::FlatlandDisplay>();
+    flatland_allocator_ = ConnectSyncIntoRealm<fuchsia::ui::composition::Allocator>();
+    root_session_ = ConnectAsyncIntoRealm<fuchsia::ui::composition::Flatland>();
 
     fidl::InterfacePtr<ChildViewWatcher> child_view_watcher;
     fidl::InterfacePtr<ParentViewportWatcher> parent_viewport_watcher;
@@ -116,7 +87,7 @@ class ScreenCapture2IntegrationTest : public ui_testing::LoggingEventLoop, publi
     BlockingPresent(this, root_session_);
 
     // Set up the child view.
-    child_session_ = realm_.component().Connect<fuchsia::ui::composition::Flatland>();
+    child_session_ = ConnectAsyncIntoRealm<fuchsia::ui::composition::Flatland>();
     fidl::InterfacePtr<ParentViewportWatcher> parent_viewport_watcher2;
     auto identity = scenic::NewViewIdentityOnCreation();
     auto child_view_ref = fidl::Clone(identity.view_ref);
@@ -128,10 +99,7 @@ class ScreenCapture2IntegrationTest : public ui_testing::LoggingEventLoop, publi
     BlockingPresent(this, child_session_);
 
     // Create ScreenCapture client.
-    screen_capture_ =
-        realm_.component().Connect<fuchsia::ui::composition::internal::ScreenCapture>();
-    screen_capture_.set_error_handler(
-        [](zx_status_t status) { FAIL() << "Lost connection to ScreenCapture"; });
+    screen_capture_ = ConnectAsyncIntoRealm<fuchsia::ui::composition::internal::ScreenCapture>();
 
     // Set up error handling.
     root_session_.events().OnError = [](fuchsia::ui::composition::FlatlandError error) {
@@ -177,11 +145,9 @@ class ScreenCapture2IntegrationTest : public ui_testing::LoggingEventLoop, publi
   const TransformId kChildRootTransform{.value = 1};
   static constexpr zx::duration kEventDelay = zx::msec(1000);
 
-  RealmRoot realm_;
-
   fuchsia::sysmem2::AllocatorSyncPtr sysmem_allocator_;
   fuchsia::ui::composition::AllocatorSyncPtr flatland_allocator_;
-  fuchsia::ui::composition::FlatlandDisplayPtr flatland_display_;
+  fuchsia::ui::composition::FlatlandDisplaySyncPtr flatland_display_;
   fuchsia::ui::composition::FlatlandPtr root_session_;
   fuchsia::ui::composition::FlatlandPtr child_session_;
   fuchsia::ui::composition::internal::ScreenCapturePtr screen_capture_;

@@ -37,6 +37,7 @@ use core::cmp::Ordering;
 use core::time::Duration;
 
 use assert_matches::assert_matches;
+use log::debug;
 use net_types::ip::{GenericOverIp, Ip, IpAddr, IpAddress, IpVersionMarker};
 use netstack3_base::{
     CoreTimerContext, HandleableTimer, InstantBindingsTypes, IpExt, LocalTimerHeap,
@@ -205,8 +206,15 @@ impl<I: IpExt, BC: FragmentBindingsContext, CC: FragmentContext<I, BC>> Handleab
             let Some((key, ())) = cache.timers.pop(bindings_ctx) else {
                 return;
             };
+
             // If a timer fired, the `key` must still exist in our fragment cache.
-            assert_matches!(cache.remove_data(&key), Some(_));
+            let FragmentCacheData { missing_blocks: _, body_fragments, header: _, total_size } =
+                assert_matches!(cache.remove_data(&key), Some(c) => c);
+            debug!(
+                "reassembly for {key:?} \
+                timed out with {} fragments and {total_size} bytes",
+                body_fragments.len(),
+            );
         });
     }
 }
@@ -436,8 +444,6 @@ enum CacheTimerAction<A: IpAddress> {
     CancelExistingTimer(FragmentCacheKey<A>),
 }
 
-// TODO(https://fxbug.dev/42174372): Make these operate on a context trait rather
-// than `&self` and `&mut self`.
 impl<I: IpExt, BT: FragmentBindingsTypes> IpPacketFragmentCache<I, BT> {
     /// Attempts to process a packet fragment.
     ///

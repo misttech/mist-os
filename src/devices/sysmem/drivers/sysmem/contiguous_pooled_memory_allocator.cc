@@ -213,7 +213,7 @@ void ContiguousPooledMemoryAllocator::InitGuardRegion(
 void ContiguousPooledMemoryAllocator::SetupUnusedPages() {
   ZX_DEBUG_ASSERT(is_ever_cpu_accessible_);
   ZX_DEBUG_ASSERT((is_always_cpu_accessible_ && is_ready_ && !protected_ranges_.has_value()) ||
-                  protected_ranges_->ranges().size() == 0);
+                  (protected_ranges_.has_value() && protected_ranges_->ranges().size() == 0));
   ZX_DEBUG_ASSERT(!is_setup_unused_pages_called_);
   is_setup_unused_pages_called_ = true;
   std::vector<ralloc_region_t> todo;

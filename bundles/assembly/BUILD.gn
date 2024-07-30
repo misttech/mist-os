@@ -429,6 +429,20 @@ assembly_input_bundle("wlanphy_driver") {
   ]
 }
 
+# AIB for the bt-transport-uart driver.
+assembly_input_bundle("bt_transport_uart_driver") {
+  base_driver_packages = [
+    {
+      package_target = "//src/connectivity/bluetooth/hci/transport/uart:uart"
+      driver_components = [ "meta/bt-transport-uart.cm" ]
+    },
+  ]
+}
+
+# AIB for the bus-pci driver
+assembly_input_bundle("bus_pci_driver") {
+}
+
 # The most minimal AIB that is included in eng assembled systems that are meant
 # to be standalone.
 #
@@ -745,7 +759,7 @@ assembly_input_bundle("core_realm") {
   bootfs_packages = [ "//src/sys/pkg/bin/pkg-cache" ]
   base_packages = [
     # This is a required dependency of pkg-cache
-    "//src/sys/pkg/bin/system-update-committer",
+    "//src/sys/pkg/bin/system-update-committer:system-update-committer-without-config",
 
     # Build-Information
     "//src/developer/build_info:build-info-service",
@@ -1161,14 +1175,6 @@ assembly_input_bundle("core_realm_eng") {
     {
       package = "bt-avrcp-controller"
       components = [ "bt-avrcp-controller" ]
-    },
-    {
-      package = "display-detect"
-      components = [ "display_detect" ]
-    },
-    {
-      package = "display-png"
-      components = [ "display_png" ]
     },
     {
       package = "display-tool"
@@ -2444,6 +2450,11 @@ assembly_input_bundle("fshost_common") {
           source = "${clang_prefix}/../lib/${clang_cpu}-unknown-fuchsia/libunwind.so.1"
           destination = "lib/libunwind.so.1"
         },
+        {
+          label = "//sdk/lib/svc($shlib_toolchain)"
+          source = "${root_out_dir}/${target_cpu}-shared/libsvc.so"
+          destination = "lib/libsvc.so"
+        },
       ]
       component_includes = [
         {
@@ -2927,6 +2938,68 @@ assembly_input_bundle("netstack3_packages") {
 # netstack3_packages.
 assembly_input_bundle("netstack3_packages_gub") {
   base_packages = [ "//src/connectivity/network:netstack3_gub" ]
+}
+
+# Enable netpol network-socket-proxy. Either this or
+# network-socket-proxy-disabled must be included.
+#
+# feature_set_levels: minimal
+# build-types: all
+#
+# To be used in conjunction with socket_proxy_packages or socket_proxy_packages_gub.
+#
+assembly_input_bundle("socket-proxy-enabled") {
+  compiled_packages = [
+    {
+      name = "network"
+      components = [
+        {
+          component_name = "network"
+          shards = [
+            "//src/connectivity/network/meta/socket-proxy-enabled.shard.cml",
+          ]
+        },
+      ]
+    },
+  ]
+}
+
+# Disable netpol network-socket-proxy. Either this or
+# network-socket-proxy-enabled must be included.
+#
+# feature_set_levels: minimal
+# build-types: all
+#
+assembly_input_bundle("socket-proxy-disabled") {
+  compiled_packages = [
+    {
+      name = "network"
+      components = [
+        {
+          component_name = "network"
+          shards = [
+            "//src/connectivity/network/meta/socket-proxy-disabled.shard.cml",
+          ]
+        },
+      ]
+    },
+  ]
+}
+
+# Netpol socket-proxy packages without unified binary.
+#
+# This AIB provides packages for the socket-proxy-enabled configuration. It is mutually
+# exclusive with socket_proxy_packages_gub.
+assembly_input_bundle("socket_proxy_packages") {
+  base_packages = [ "//src/connectivity/policy/socket-proxy:package" ]
+}
+
+# Netpol socket-proxy packages with unified binary.
+#
+# This AIB provides packages for the socket-proxy-enabled configuration. It is mutually
+# exclusive with socket_proxy_packages.
+assembly_input_bundle("socket_proxy_packages_gub") {
+  base_packages = [ "//src/connectivity/policy/socket-proxy:package_gub" ]
 }
 
 # Netstack-migration as the netstack for use by base networking.

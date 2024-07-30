@@ -5,16 +5,29 @@
 use crate::utils::{self, on_off_to_bool};
 use anyhow::{bail, Context as _, Error};
 use argh::FromArgs;
-use fidl_fuchsia_hardware_display as display;
 use futures::prelude::*;
+use {fidl_fuchsia_hardware_display as display, fidl_fuchsia_io as fio, fuchsia_fs};
+
+async fn get_display_coordinator_path() -> anyhow::Result<String> {
+    const DEVICE_CLASS_PATH: &'static str = "/dev/class/display-coordinator";
+    let dir = fuchsia_fs::directory::open_in_namespace(DEVICE_CLASS_PATH, fio::OpenFlags::empty())
+        .context("open directory")?;
+    let entries = fuchsia_fs::directory::readdir(&dir).await.context("read directory")?;
+    let first_entry = entries.first().context("no valid display-coordinator")?;
+    Ok(String::from(DEVICE_CLASS_PATH) + "/" + &first_entry.name)
+}
 
 /// Obtains a handle to the display entry point at the default hard-coded path.
-fn open_display_provider() -> Result<display::ProviderProxy, Error> {
+async fn open_display_provider() -> Result<display::ProviderProxy, Error> {
     tracing::trace!("Opening display coordinator");
 
     let (proxy, server) = fidl::endpoints::create_proxy::<display::ProviderMarker>()
         .context("Failed to create fuchsia.hardware.display.Provider proxy")?;
-    fdio::service_connect("/dev/class/display-coordinator/000", server.into_channel())
+    let display_coordinator_path: String =
+        get_display_coordinator_path().await.context("Failed to get display coordinator path")?;
+    println!("Display coordinator path: {}", display_coordinator_path);
+
+    fdio::service_connect(&display_coordinator_path, server.into_channel())
         .context("Failed to connect to default display coordinator provider")?;
 
     Ok(proxy)
@@ -43,8 +56,8 @@ struct DisplayClient {
 }
 
 impl DisplayProviderClient {
-    pub fn new() -> Result<DisplayProviderClient, Error> {
-        let provider = open_display_provider()?;
+    pub async fn new() -> Result<DisplayProviderClient, Error> {
+        let provider = open_display_provider().await?;
         Ok(DisplayProviderClient { provider })
     }
 
@@ -122,7 +135,7 @@ pub struct PanelCmd {
 
 impl PanelCmd {
     pub async fn exec(&self) -> Result<(), Error> {
-        let display_provider_client = DisplayProviderClient::new()?;
+        let display_provider_client = DisplayProviderClient::new().await?;
         let display_coordinator_client = display_provider_client.open_display_coordinator().await?;
         let mut display_client = display_coordinator_client.into_display_client().await?;
 

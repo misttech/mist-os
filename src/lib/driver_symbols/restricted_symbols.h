@@ -212,6 +212,7 @@ const std::set<std::string> kCreateThreadSymbols = {
     "pthread_create",
 };
 
+// LINT.IfChange
 const std::set<std::string> kRestrictedLibcSymbols = {
     "a64l",
     "accept",
@@ -1384,6 +1385,9 @@ const std::set<std::string> kRestrictedLibcSymbols = {
     "_zx_utc_reference_swap",
     "zx_utc_reference_swap",
 };
+// Keep this list in sync with the list in SDK so that we can check that drivers built with the
+// SDK are not using restricted symbols at build time.
+// LINT.ThenChange(//build/bazel_sdk/bazel_rules_fuchsia/fuchsia/private/driver_restricted_symbols.txt)
 
 //  ________  _________  ________  ________
 // |\   ____\|\___   ___\\   __  \|\   __  \

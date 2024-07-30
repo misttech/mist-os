@@ -5,8 +5,8 @@
 //! Type-safe bindings for Zircon channel objects.
 
 use crate::{
-    ok, size_to_u32_sat, usize_into_u32, AsHandleRef, Handle, HandleBased, HandleDisposition,
-    HandleInfo, HandleOp, HandleRef, ObjectType, Peered, Rights, Status, Time,
+    ok, AsHandleRef, Handle, HandleBased, HandleDisposition, HandleInfo, HandleOp, HandleRef,
+    ObjectType, Peered, Rights, Status, Time,
 };
 use fuchsia_zircon_sys as sys;
 use std::mem::{self, MaybeUninit};
@@ -247,8 +247,8 @@ impl Channel {
     /// syscall.
     pub fn write(&self, bytes: &[u8], handles: &mut [Handle]) -> Result<(), Status> {
         let opts = 0;
-        let n_bytes = usize_into_u32(bytes.len()).map_err(|_| Status::OUT_OF_RANGE)?;
-        let n_handles = usize_into_u32(handles.len()).map_err(|_| Status::OUT_OF_RANGE)?;
+        let n_bytes: u32 = bytes.len().try_into().map_err(|_| Status::OUT_OF_RANGE)?;
+        let n_handles: u32 = handles.len().try_into().map_err(|_| Status::OUT_OF_RANGE)?;
         unsafe {
             let status = sys::zx_channel_write(
                 self.raw_handle(),
@@ -276,9 +276,9 @@ impl Channel {
         handle_dispositions: &mut [HandleDisposition<'_>],
     ) -> Result<(), Status> {
         let opts = 0;
-        let n_bytes = usize_into_u32(bytes.len()).map_err(|_| Status::OUT_OF_RANGE)?;
-        let n_handle_dispositions =
-            usize_into_u32(handle_dispositions.len()).map_err(|_| Status::OUT_OF_RANGE)?;
+        let n_bytes: u32 = bytes.len().try_into().map_err(|_| Status::OUT_OF_RANGE)?;
+        let n_handle_dispositions: u32 =
+            handle_dispositions.len().try_into().map_err(|_| Status::OUT_OF_RANGE)?;
         if n_handle_dispositions > sys::ZX_CHANNEL_MAX_MSG_HANDLES {
             // don't let the kernel check this bound for us because we have a fixed size array below
             return Err(Status::OUT_OF_RANGE);
@@ -332,11 +332,11 @@ impl Channel {
         handles: &mut [Handle],
         buf: &mut MessageBuf,
     ) -> Result<(), Status> {
-        let write_num_bytes = usize_into_u32(bytes.len()).map_err(|_| Status::OUT_OF_RANGE)?;
-        let write_num_handles = usize_into_u32(handles.len()).map_err(|_| Status::OUT_OF_RANGE)?;
+        let write_num_bytes: u32 = bytes.len().try_into().map_err(|_| Status::OUT_OF_RANGE)?;
+        let write_num_handles: u32 = handles.len().try_into().map_err(|_| Status::OUT_OF_RANGE)?;
         buf.clear();
-        let read_num_bytes: u32 = size_to_u32_sat(buf.bytes.capacity());
-        let read_num_handles: u32 = size_to_u32_sat(buf.handles.capacity());
+        let read_num_bytes: u32 = buf.bytes.capacity().try_into().unwrap_or(u32::MAX);
+        let read_num_handles: u32 = buf.handles.capacity().try_into().unwrap_or(u32::MAX);
         let args = sys::zx_channel_call_args_t {
             wr_bytes: bytes.as_ptr(),
             wr_handles: handles.as_ptr() as *const sys::zx_handle_t,
@@ -403,9 +403,9 @@ impl Channel {
         handle_dispositions: &mut [HandleDisposition<'_>],
         buf: &mut MessageBufEtc,
     ) -> Result<(), Status> {
-        let write_num_bytes = usize_into_u32(bytes.len()).map_err(|_| Status::OUT_OF_RANGE)?;
-        let write_num_handle_dispositions =
-            usize_into_u32(handle_dispositions.len()).map_err(|_| Status::OUT_OF_RANGE)?;
+        let write_num_bytes: u32 = bytes.len().try_into().map_err(|_| Status::OUT_OF_RANGE)?;
+        let write_num_handle_dispositions: u32 =
+            handle_dispositions.len().try_into().map_err(|_| Status::OUT_OF_RANGE)?;
         if write_num_handle_dispositions > sys::ZX_CHANNEL_MAX_MSG_HANDLES {
             // don't let the kernel check this bound for us because we have a fixed size array below
             return Err(Status::OUT_OF_RANGE);
@@ -419,8 +419,8 @@ impl Channel {
             zx_handle_dispositions[i].write(handle_disposition.into_raw());
         }
         buf.clear();
-        let read_num_bytes: u32 = size_to_u32_sat(buf.bytes.capacity());
-        let read_num_handle_infos: u32 = size_to_u32_sat(buf.handle_infos.capacity());
+        let read_num_bytes: u32 = buf.bytes.capacity().try_into().unwrap_or(u32::MAX);
+        let read_num_handle_infos: u32 = buf.handle_infos.capacity().try_into().unwrap_or(u32::MAX);
         let mut zx_handle_infos: [std::mem::MaybeUninit<sys::zx_handle_info_t>;
             sys::ZX_CHANNEL_MAX_MSG_HANDLES as usize] =
             unsafe { std::mem::MaybeUninit::uninit().assume_init() };

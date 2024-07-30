@@ -6,7 +6,6 @@ import json
 import os
 import tempfile
 import unittest
-
 from typing import Any
 
 from generate_metadata_json import convert_to_final_dict, validate

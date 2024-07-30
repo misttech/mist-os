@@ -30,10 +30,10 @@ package_set_budgets: size limit that applies to one or more packages. It has the
       such as base_package_manifest.json.
 """
 import argparse
-import json
-import sys
 import collections
+import json
 import os
+import sys
 from typing import Any
 
 

@@ -14,6 +14,7 @@ import typing
 import unittest
 import unittest.mock as mock
 
+import async_utils.command as command
 from parameterized import parameterized
 
 import args
@@ -21,7 +22,6 @@ import environment
 import event
 import main
 import test_list_file
-import async_utils.command as command
 
 
 class TestMainIntegration(unittest.IsolatedAsyncioTestCase):

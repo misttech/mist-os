@@ -762,7 +762,7 @@ zx_status_t VmMapping::MapRange(size_t offset, size_t len, bool commit, bool ign
         // However, should these assumptions ever get violated it's better to catch this gracefully
         // than have RequireOwnedPage error/crash internally, and it costs nothing to create and
         // pass in.
-        __UNINITIALIZED LazyPageRequest page_request;
+        __UNINITIALIZED MultiPageRequest page_request;
 
         VmMappingCoalescer<16> coalescer(this, base, mmu_flags,
                                          ignore_existing
@@ -922,7 +922,7 @@ zx_status_t VmMapping::DestroyLocked() {
 }
 
 zx_status_t VmMapping::PageFaultLocked(vaddr_t va, const uint pf_flags,
-                                       LazyPageRequest* page_request) {
+                                       MultiPageRequest* page_request) {
   VM_KTRACE_DURATION(
       2, "VmMapping::PageFault",
       ("user_id", KTRACE_ANNOTATED_VALUE(AssertHeld(lock_ref()), object_->user_id())),
@@ -1016,17 +1016,6 @@ zx_status_t VmMapping::PageFaultLocked(vaddr_t va, const uint pf_flags,
   if (likely(object_->is_paged())) {
     VmObjectPaged* object = static_cast<VmObjectPaged*>(object_.get());
     AssertHeld(object->lock_ref());
-
-    // If this is a write fault and the VMO supports dirty tracking, only lookup 1 page. The pages
-    // will also be marked dirty for a write, which we only want for the current page. We could
-    // optimize this to lookup following pages here too and map them in, however we would have to
-    // not mark them dirty during the lookup, and map them in without write permissions here, so
-    // that we can take a permission fault on a write to update their dirty tracking later. Instead,
-    // we can keep things simple by just looking up 1 page.
-    // TODO(rashaeqbal): Revisit this decision if there are performance issues.
-    if (write && object->is_dirty_tracked_locked()) {
-      max_out_pages = 1;
-    }
 
     // fault in or grab existing pages.
     __UNINITIALIZED auto cursor =

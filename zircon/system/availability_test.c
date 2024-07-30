@@ -9,6 +9,11 @@
 // __Fuchsia_API_level__. To "run the test," compile it at a variety of API
 // levels, including numbered API levels and named API levels such as PLATFORM.
 
+// The tests use levels that are not supported in production. Define the necessary macros.
+#define FUCHSIA_INTERNAL_LEVEL_10000_() 10000
+#define FUCHSIA_INTERNAL_LEVEL_2147483648_() 2147483648
+#define FUCHSIA_INTERNAL_LEVEL_4294967296_() 4294967296
+
 // =============================================================================
 // ZX_*_SINCE() macro tests.
 //
@@ -18,13 +23,16 @@
 // =============================================================================
 
 void AddedAtLevel15(void) ZX_AVAILABLE_SINCE(15) {}
+void AddedAtNEXT(void) ZX_AVAILABLE_SINCE(NEXT) {}
 void AddedAtHEAD(void) ZX_AVAILABLE_SINCE(HEAD) {}
 
-void DeprecatedAtLevel15(void) ZX_DEPRECATED_SINCE(14, 15, "Use AddedAtLevel15().") {}
-void DeprecatedAtHEAD(void) ZX_DEPRECATED_SINCE(14, HEAD, "Use AddedAtHEAD().") {}
+void DeprecatedAtLevel15(void) ZX_DEPRECATED_SINCE(12, 15, "Use AddedAtLevel15().") {}
+void DeprecatedAtNEXT(void) ZX_DEPRECATED_SINCE(15, NEXT, "Use AddedAtNEXT().") {}
+void DeprecatedAtHEAD(void) ZX_DEPRECATED_SINCE(15, HEAD, "Use AddedAtHEAD().") {}
 
-void RemovedAtLevel15(void) ZX_REMOVED_SINCE(12, 14, 15, "Use AddedAtLevel14().") {}
-void RemovedAtHEAD(void) ZX_REMOVED_SINCE(14, 15, HEAD, "Use AddedAtLevel15().") {}
+void RemovedAtLevel21(void) ZX_REMOVED_SINCE(12, 15, 21, "Use AddedAtLevel15().") {}
+void RemovedAtNEXT(void) ZX_REMOVED_SINCE(15, 10000, NEXT, "Use AddedAtLevel10000().") {}
+void RemovedAtHEAD(void) ZX_REMOVED_SINCE(15, NEXT, HEAD, "Use AddedAtLevelNEXT().") {}
 
 void CallVersionedFunctions(void) {
 #pragma clang diagnostic push
@@ -33,8 +41,13 @@ void CallVersionedFunctions(void) {
 #pragma clang diagnostic error "-Wdeprecated-declarations"
 
   AddedAtLevel15();
-#if !defined(BUILT_AT_NUMBERED_API_LEVEL)
-  AddedAtHEAD();
+#if defined(BUILT_AT_NUMBERED_API_LEVEL)
+  DeprecatedAtNEXT();
+  DeprecatedAtHEAD();
+  RemovedAtNEXT();
+  RemovedAtHEAD();
+#else
+  AddedAtNEXT();
 #endif
 
   // Deprecation warnings that would occur must be suppressed to avoid failing the build..
@@ -81,11 +94,6 @@ static_assert(__Fuchsia_API_level__ <= 4292870144, "Condition can only be true f
 #define FIRST_RESERVED_API_LEVEL() 2147483648
 // 0xFFFFFFFF + 1
 #define UINT32_MAX_PLUS_ONE() 4294967296
-
-// The tests use levels that are not supported in production. Define the necessary macros.
-#define FUCHSIA_INTERNAL_LEVEL_10000_() 10000
-#define FUCHSIA_INTERNAL_LEVEL_2147483648_() 2147483648
-#define FUCHSIA_INTERNAL_LEVEL_4294967296_() 4294967296
 
 // Test using conditions that are always true.
 

@@ -51,6 +51,7 @@ int OpenMainTerminal(int additional_flags = 0) {
 
 TEST(JobControl, BackgroundProcessGroupDoNotUpdateOnDeath) {
   // Assume starnix always has /dev/ptmx mapped in.
+  // TODO(https://fxbug.dev/317285180) don't skip on baseline
   if (!test_helper::IsStarnix() && access("/dev/ptmx", F_OK) == -1) {
     GTEST_SKIP() << "Pseudoterminal not available, skipping...";
   }
@@ -117,6 +118,7 @@ TEST(JobControl, OrphanedProcessGroupsReceivesSignal) {
 class Pty : public testing::Test {
   void SetUp() {
     // Assume starnix always has /dev/ptmx mapped in.
+    // TODO(https://fxbug.dev/317285180) don't skip on baseline
     if (!test_helper::IsStarnix() && access("/dev/ptmx", F_OK) == -1) {
       GTEST_SKIP() << "Pseudoterminal not available, skipping...";
     }

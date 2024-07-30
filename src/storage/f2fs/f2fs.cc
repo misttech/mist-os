@@ -207,7 +207,6 @@ void F2fs::PutSuper() {
   writer_.reset();
   reader_.reset();
   GetVCache().Reset();
-  GetDirEntryCache().Reset();
   Reset();
 }
 

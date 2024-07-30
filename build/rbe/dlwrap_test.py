@@ -9,15 +9,13 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from typing import Tuple
 from unittest import mock
 
-import dlwrap
-
 import cl_utils
+import dlwrap
 import remote_action
 import remotetool
-
-from typing import Tuple
 
 
 class MainArgParserTests(unittest.TestCase):

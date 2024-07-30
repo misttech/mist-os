@@ -4,10 +4,13 @@
 
 use std::collections::HashMap;
 use std::convert::{TryFrom as _, TryInto as _};
+use std::num::TryFromIntError;
 use std::sync::Arc;
 
+use super::devices::TxTask;
 use assert_matches::assert_matches;
 use fidl_fuchsia_hardware_network::{self as fhardware_network, FrameType};
+
 use {fidl_fuchsia_net as fnet, fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext};
 
 use futures::lock::Mutex;
@@ -99,8 +102,6 @@ pub(crate) enum Error {
 
 const DEFAULT_BUFFER_LENGTH: usize = 2048;
 
-// TODO(https://fxbug.dev/42052114): Decorate *all* logging with human-readable
-// device debug information to disambiguate.
 impl NetdeviceWorker {
     pub(crate) async fn new(
         ctx: Ctx,
@@ -325,7 +326,7 @@ impl DeviceHandler {
         (
             BindingId,
             impl futures::Stream<Item = netdevice_client::Result<netdevice_client::PortStatus>>,
-            fuchsia_async::Task<()>,
+            TxTask,
         ),
         Error,
     > {
@@ -353,8 +354,11 @@ impl DeviceHandler {
         let netdevice_client::client::PortStatus { flags, mtu } =
             status_stream.try_next().await?.ok_or_else(|| Error::PortClosed)?;
         let phy_up = flags.contains(fhardware_network::StatusFlags::ONLINE);
-        let netdevice_client::client::PortBaseInfo { port_class, rx_types: _, tx_types: _ } =
-            base_info;
+        let netdevice_client::client::PortBaseInfo {
+            port_class: hw_port_class,
+            rx_types: _,
+            tx_types: _,
+        } = base_info;
 
         enum DeviceProperties {
             Ethernet {
@@ -408,135 +412,151 @@ impl DeviceHandler {
             })
             .transpose()?;
 
-        let binding_id = ctx.bindings_ctx().devices.alloc_new_id();
+        let max_frame_size =
+            mtu.try_into().map_err(|TryFromIntError { .. }| Error::ConfigurationNotSupported)?;
 
-        let name = name.unwrap_or_else(|| match wire_format {
-            PortWireFormat::Ethernet => format!("eth{}", binding_id),
-            PortWireFormat::Ip => format!("ip{}", binding_id),
-        });
-
-        let tx_notifier = NeedsDataNotifier::default();
-        let static_netdevice_info = devices::StaticNetdeviceInfo {
-            handler: PortHandler {
-                id: binding_id,
-                port_id: port,
-                inner: self.inner.clone(),
-                port_class: port_class.clone(),
-                wire_format,
-            },
-            tx_notifier: tx_notifier.clone(),
-        };
-        let port_class = fnet_interfaces_ext::PortClass::try_from(port_class)
+        let port_class = fnet_interfaces_ext::PortClass::try_from(hw_port_class)
             .map_err(Error::InvalidPortClass)?;
-        let dynamic_netdevice_info_builder = |mtu: Mtu| devices::DynamicNetdeviceInfo {
-            phy_up,
-            common_info: devices::DynamicCommonInfo {
-                mtu,
-                admin_enabled: false,
-                events: crate::bindings::create_interface_event_producer(
-                    interfaces_event_sink,
-                    binding_id,
-                    crate::bindings::InterfaceProperties { name: name.clone(), port_class },
-                ),
-                control_hook: control_hook,
-                addresses: HashMap::new(),
-            },
-        };
 
-        let core_id = match properties {
-            DeviceProperties::Ethernet { max_frame_size, mac, mac_proxy } => {
-                let info = devices::EthernetInfo {
-                    mac,
-                    _mac_proxy: mac_proxy,
-                    netdevice: static_netdevice_info,
-                    common_info: Default::default(),
-                    dynamic_info: CoreRwLock::new(devices::DynamicEthernetInfo {
-                        netdevice: dynamic_netdevice_info_builder(max_frame_size.as_mtu()),
-                        neighbor_event_sink: neighbor_event_sink.clone(),
-                    }),
-                }
-                .into();
-                let core_ethernet_id = ctx.api().device::<EthernetLinkDevice>().add_device(
-                    devices::DeviceIdAndName { id: binding_id, name: name.clone() },
-                    EthernetCreationProperties { mac, max_frame_size },
-                    RawMetric(metric.unwrap_or(DEFAULT_INTERFACE_METRIC)),
-                    info,
-                );
-                state_entry.insert(WeakNetdeviceId::Ethernet(core_ethernet_id.downgrade()));
-                DeviceId::from(core_ethernet_id)
-            }
-            DeviceProperties::Ip { max_frame_size } => {
-                let info = devices::PureIpDeviceInfo {
-                    common_info: Default::default(),
-                    netdevice: static_netdevice_info,
-                    dynamic_info: CoreRwLock::new(dynamic_netdevice_info_builder(max_frame_size)),
-                }
-                .into();
-                let core_pure_ip_id = ctx.api().device::<PureIpDevice>().add_device(
-                    devices::DeviceIdAndName { id: binding_id, name: name.clone() },
-                    PureIpDeviceCreationProperties { mtu: max_frame_size },
-                    RawMetric(metric.unwrap_or(DEFAULT_INTERFACE_METRIC)),
-                    info,
-                );
-                state_entry.insert(WeakNetdeviceId::PureIp(core_pure_ip_id.downgrade()));
-                DeviceId::from(core_pure_ip_id)
-            }
-        };
+        // Do the rest of the work in a closure so we don't accidentally add
+        // errors after the binding ID is already allocated. This part of the
+        // function should be infallible.
+        let finalize = move || async move {
+            let binding_id = ctx.bindings_ctx().devices.alloc_new_id();
 
-        let binding_id = core_id.bindings_id().id;
-        let task =
-            crate::bindings::devices::spawn_tx_task(&tx_notifier, ctx.clone(), core_id.clone());
-        netstack3_core::for_any_device_id!(DeviceId, DeviceProvider, D, &core_id, device => {
-            ctx.api().transmit_queue::<D>().set_configuration(
-                device,
-                netstack3_core::device::TransmitQueueConfiguration::Fifo,
-            );
-        });
-        add_initial_routes(ctx.bindings_ctx(), &core_id).await;
+            let name = name.unwrap_or_else(|| match wire_format {
+                PortWireFormat::Ethernet => format!("eth{}", binding_id),
+                PortWireFormat::Ip => format!("ip{}", binding_id),
+            });
 
-        // TODO(https://fxbug.dev/42148800): Use a different secret key (not this
-        // one) to generate stable opaque interface identifiers.
-        let secret_key = StableIidSecret::new_random(&mut ctx.rng());
-
-        let ip_config = IpDeviceConfigurationUpdate {
-            ip_enabled: Some(false),
-            unicast_forwarding_enabled: Some(false),
-            multicast_forwarding_enabled: Some(false),
-            gmp_enabled: Some(true),
-        };
-
-        let _: Ipv6DeviceConfigurationUpdate = ctx
-            .api()
-            .device_ip::<Ipv6>()
-            .update_configuration(
-                &core_id,
-                Ipv6DeviceConfigurationUpdate {
-                    dad_transmits: Some(Some(
-                        Ipv6DeviceConfiguration::DEFAULT_DUPLICATE_ADDRESS_DETECTION_TRANSMITS,
-                    )),
-                    max_router_solicitations: Some(Some(
-                        Ipv6DeviceConfiguration::DEFAULT_MAX_RTR_SOLICITATIONS,
-                    )),
-                    slaac_config: Some(SlaacConfiguration {
-                        enable_stable_addresses: true,
-                        temporary_address_configuration: Some(
-                            TemporarySlaacAddressConfiguration::default_with_secret_key(secret_key),
-                        ),
-                    }),
-                    ip_config,
+            let tx_notifier = NeedsDataNotifier::default();
+            let tx_watcher = tx_notifier.watcher();
+            let static_netdevice_info = devices::StaticNetdeviceInfo {
+                handler: PortHandler {
+                    id: binding_id,
+                    port_id: port,
+                    inner: self.inner.clone(),
+                    port_class: hw_port_class,
+                    wire_format,
+                    max_frame_size,
                 },
-            )
-            .unwrap();
-        let _: Ipv4DeviceConfigurationUpdate = ctx
-            .api()
-            .device_ip::<Ipv4>()
-            .update_configuration(&core_id, Ipv4DeviceConfigurationUpdate { ip_config })
-            .unwrap();
+                tx_notifier,
+            };
+            let dynamic_netdevice_info_builder = |mtu: Mtu| devices::DynamicNetdeviceInfo {
+                phy_up,
+                common_info: devices::DynamicCommonInfo {
+                    mtu,
+                    admin_enabled: false,
+                    events: crate::bindings::create_interface_event_producer(
+                        interfaces_event_sink,
+                        binding_id,
+                        crate::bindings::InterfaceProperties { name: name.clone(), port_class },
+                    ),
+                    control_hook: control_hook,
+                    addresses: HashMap::new(),
+                },
+            };
 
-        info!("created interface {:?}", core_id);
-        ctx.bindings_ctx().devices.add_device(binding_id, core_id);
+            let core_id = match properties {
+                DeviceProperties::Ethernet { max_frame_size, mac, mac_proxy } => {
+                    let info = devices::EthernetInfo {
+                        mac,
+                        _mac_proxy: mac_proxy,
+                        netdevice: static_netdevice_info,
+                        common_info: Default::default(),
+                        dynamic_info: CoreRwLock::new(devices::DynamicEthernetInfo {
+                            netdevice: dynamic_netdevice_info_builder(max_frame_size.as_mtu()),
+                            neighbor_event_sink: neighbor_event_sink.clone(),
+                        }),
+                    }
+                    .into();
+                    let core_ethernet_id = ctx.api().device::<EthernetLinkDevice>().add_device(
+                        devices::DeviceIdAndName { id: binding_id, name: name.clone() },
+                        EthernetCreationProperties { mac, max_frame_size },
+                        RawMetric(metric.unwrap_or(DEFAULT_INTERFACE_METRIC)),
+                        info,
+                    );
+                    state_entry.insert(WeakNetdeviceId::Ethernet(core_ethernet_id.downgrade()));
+                    DeviceId::from(core_ethernet_id)
+                }
+                DeviceProperties::Ip { max_frame_size } => {
+                    let info = devices::PureIpDeviceInfo {
+                        common_info: Default::default(),
+                        netdevice: static_netdevice_info,
+                        dynamic_info: CoreRwLock::new(dynamic_netdevice_info_builder(
+                            max_frame_size,
+                        )),
+                    }
+                    .into();
+                    let core_pure_ip_id = ctx.api().device::<PureIpDevice>().add_device(
+                        devices::DeviceIdAndName { id: binding_id, name: name.clone() },
+                        PureIpDeviceCreationProperties { mtu: max_frame_size },
+                        RawMetric(metric.unwrap_or(DEFAULT_INTERFACE_METRIC)),
+                        info,
+                    );
+                    state_entry.insert(WeakNetdeviceId::PureIp(core_pure_ip_id.downgrade()));
+                    DeviceId::from(core_pure_ip_id)
+                }
+            };
 
-        Ok((binding_id, status_stream, task))
+            let tx_task = TxTask::new(ctx.clone(), core_id.downgrade(), tx_watcher);
+            netstack3_core::for_any_device_id!(DeviceId, DeviceProvider, D, &core_id, device => {
+                ctx.api().transmit_queue::<D>().set_configuration(
+                    device,
+                    netstack3_core::device::TransmitQueueConfiguration::Fifo,
+                );
+            });
+            add_initial_routes(ctx.bindings_ctx(), &core_id).await;
+
+            // TODO(https://fxbug.dev/42148800): Use a different secret key (not this
+            // one) to generate stable opaque interface identifiers.
+            let secret_key = StableIidSecret::new_random(&mut ctx.rng());
+
+            let ip_config = IpDeviceConfigurationUpdate {
+                ip_enabled: Some(false),
+                unicast_forwarding_enabled: Some(false),
+                multicast_forwarding_enabled: Some(false),
+                gmp_enabled: Some(true),
+            };
+
+            let _: Ipv6DeviceConfigurationUpdate = ctx
+                .api()
+                .device_ip::<Ipv6>()
+                .update_configuration(
+                    &core_id,
+                    Ipv6DeviceConfigurationUpdate {
+                        dad_transmits: Some(Some(
+                            Ipv6DeviceConfiguration::DEFAULT_DUPLICATE_ADDRESS_DETECTION_TRANSMITS,
+                        )),
+                        max_router_solicitations: Some(Some(
+                            Ipv6DeviceConfiguration::DEFAULT_MAX_RTR_SOLICITATIONS,
+                        )),
+                        slaac_config: Some(SlaacConfiguration {
+                            enable_stable_addresses: true,
+                            temporary_address_configuration: Some(
+                                TemporarySlaacAddressConfiguration::default_with_secret_key(
+                                    secret_key,
+                                ),
+                            ),
+                        }),
+                        ip_config,
+                    },
+                )
+                .unwrap();
+            let _: Ipv4DeviceConfigurationUpdate = ctx
+                .api()
+                .device_ip::<Ipv4>()
+                .update_configuration(&core_id, Ipv4DeviceConfigurationUpdate { ip_config })
+                .unwrap();
+
+            info!("created interface {:?}", core_id);
+            ctx.bindings_ctx().devices.add_device(binding_id, core_id);
+
+            (binding_id, tx_task)
+        };
+        let (binding_id, tx_task) = finalize().await;
+
+        Ok((binding_id, status_stream, tx_task))
     }
 }
 
@@ -634,14 +654,7 @@ pub(crate) struct PortHandler {
     inner: Inner,
     port_class: fhardware_network::PortClass,
     wire_format: PortWireFormat,
-}
-
-#[derive(thiserror::Error, Debug)]
-pub(crate) enum SendError {
-    #[error("no buffers available")]
-    NoTxBuffers,
-    #[error("device error: {0}")]
-    Device(#[from] netdevice_client::Error),
+    max_frame_size: usize,
 }
 
 impl PortHandler {
@@ -659,20 +672,40 @@ impl PortHandler {
         session.detach(*port_id).await
     }
 
+    /// Waits for at least one buffer be available and returns an iterator of
+    /// available tx buffers.
+    ///
+    /// Buffers are allocated with the ports's maximum frame size.
+    pub(crate) async fn alloc_tx_buffers(
+        &self,
+    ) -> Result<
+        impl Iterator<Item = Result<netdevice_client::TxBuffer, netdevice_client::Error>> + '_,
+        netdevice_client::Error,
+    > {
+        let Self { inner: Inner { session, .. }, max_frame_size, .. } = self;
+        session.alloc_tx_buffers(*max_frame_size).await
+    }
+
+    /// Attempts to allocate a [`netdevice::TxBuffer`] synchronously.
+    ///
+    /// Returns `Ok(None)` if no buffers are available.
+    ///
+    /// The buffer is always allocated with the ports's maximum frame size.
+    pub(crate) fn alloc_tx_buffer(
+        &self,
+    ) -> Result<Option<netdevice_client::TxBuffer>, netdevice_client::Error> {
+        let Self { inner: Inner { session, .. }, max_frame_size, .. } = self;
+        session.alloc_tx_buffer(*max_frame_size).now_or_never().transpose()
+    }
+
     pub(crate) fn send(
         &self,
         frame: &[u8],
         frame_type: fhardware_network::FrameType,
-    ) -> Result<(), SendError> {
+        mut tx: netdevice_client::TxBuffer,
+    ) -> Result<(), netdevice_client::Error> {
         trace_duration!(c"netdevice::send");
-
         let Self { port_id, inner: Inner { session, .. }, .. } = self;
-        // NB: We currently send on a dispatcher, so we can't wait for new
-        // buffers to become available. If that ends up being the long term way
-        // of enqueuing outgoing buffers we might want to fix this impedance
-        // mismatch here.
-        let mut tx =
-            session.alloc_tx_buffer(frame.len()).now_or_never().ok_or(SendError::NoTxBuffers)??;
         tx.set_port(*port_id);
         tx.set_frame_type(frame_type);
         tx.write_at(0, frame)?;
@@ -700,12 +733,13 @@ impl PortHandler {
 
 impl std::fmt::Debug for PortHandler {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let Self { id, port_id, inner: _, port_class, wire_format } = self;
+        let Self { id, port_id, inner: _, port_class, wire_format, max_frame_size } = self;
         f.debug_struct("PortHandler")
             .field("id", id)
             .field("port_id", port_id)
             .field("port_class", port_class)
             .field("wire_format", wire_format)
+            .field("max_frame_size", max_frame_size)
             .finish()
     }
 }

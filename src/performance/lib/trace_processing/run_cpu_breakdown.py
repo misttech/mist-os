@@ -10,6 +10,9 @@ Returns CPU breakdown in a JSON file.
 import argparse
 import json
 import pathlib
+import sys
+from typing import Any, Dict, List
+
 from trace_processing import (
     hardware_configs,
     trace_importing,
@@ -17,8 +20,6 @@ from trace_processing import (
     trace_model,
 )
 from trace_processing.metrics import agg_cpu_breakdown, cpu_breakdown
-from typing import Any, Dict, List
-import sys
 
 # Default cut-off for the percentage CPU. Any process that has CPU below this
 # won't be listed in the results. User can pass in a cutoff.

@@ -6,7 +6,7 @@ use super::access_vector_cache::{Fixed, Locked, Query, QueryMut, DEFAULT_SHARED_
 use super::security_server::SecurityServer;
 use super::SecurityId;
 
-use selinux_common::{AbstractObjectClass, ClassPermission, Permission};
+use selinux_common::{AbstractObjectClass, ClassPermission, ObjectClass, Permission};
 use selinux_policy::{AccessVector, AccessVectorComputer};
 use std::sync::{Arc, Weak};
 
@@ -38,12 +38,21 @@ pub trait PermissionCheck: AccessVectorComputer + Query + private::PermissionChe
             Some(permission) => permission.class(),
             None => return true,
         };
-        if let Some(permissions_access_vector) = self.access_vector_from_permissions(permissions) {
+        let has_permissions = if let Some(permissions_access_vector) =
+            self.access_vector_from_permissions(permissions)
+        {
             let permitted_access_vector = self.query(source_sid, target_sid, target_class.into());
             permissions_access_vector & permitted_access_vector == permissions_access_vector
         } else {
             false
+        };
+        if !has_permissions {
+            // TODO(b/331375792): Failures should be audit-logged, even if permitted.
+            if !self.is_permissive(target_class) {
+                return false;
+            }
         }
+        true
     }
 }
 
@@ -110,6 +119,10 @@ impl<'a> AccessVectorComputer for PermissionCheckImpl<'a> {
         permissions: &[P],
     ) -> Option<AccessVector> {
         self.security_server.access_vector_from_permissions(permissions)
+    }
+
+    fn is_permissive(&self, class: ObjectClass) -> bool {
+        self.security_server.is_permissive(class)
     }
 }
 
@@ -197,6 +210,10 @@ mod tests {
         ) -> Option<AccessVector> {
             Some(access_vector_from_permissions(permissions))
         }
+
+        fn is_permissive(&self, _class: ObjectClass) -> bool {
+            false
+        }
     }
 
     /// A [`Query`] that permits all [`AccessVector`].
@@ -222,6 +239,10 @@ mod tests {
             permissions: &[P],
         ) -> Option<AccessVector> {
             Some(access_vector_from_permissions(permissions))
+        }
+
+        fn is_permissive(&self, _class: ObjectClass) -> bool {
+            false
         }
     }
 

@@ -11,6 +11,8 @@ rustc_binary("bin") {
   name = "system_activity_governor_realm_factory"
   sources = [ "src/main.rs" ]
   deps = [
+    "//sdk/fidl/fuchsia.testing.harness:fuchsia.testing.harness_rust",
+    "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
@@ -39,4 +41,5 @@ fuchsia_package("realm-factory") {
     ":realm-factory-component",
     "//src/power/testing/fake-suspend",
   ]
+  subpackages = [ "//src/power/system-activity-governor/fake:package" ]
 }

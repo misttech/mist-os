@@ -10,6 +10,7 @@ import sys
 import typing
 
 import termout
+
 import selection_action
 
 LOG_TO_STDOUT_OPTION = "-"
@@ -53,6 +54,7 @@ class Flags:
 
     build: bool
     updateifinbase: bool
+    build_updates: bool
 
     host: bool
     device: bool
@@ -126,6 +128,10 @@ class Flags:
             raise FlagError("--parallel must be non-negative")
         if self.parallel_cases < 0:
             raise FlagError("--parallel-cases must be non-negative")
+        if self.has_debugger() and self.host:
+            raise FlagError(
+                "--break-on-failure and --breakpoint flags are not supported with host tests."
+            )
 
         if not termout.is_valid() and self.status:
             raise FlagError(
@@ -252,6 +258,12 @@ def parse_args(
         "--updateifinbase",
         action=argparse.BooleanOptionalAction,
         help="Invoke `fx update-if-in-base` before running device tests (defaults to on)",
+        default=True,
+    )
+    build.add_argument(
+        "--build-updates",
+        action=argparse.BooleanOptionalAction,
+        help="Build the updates package if there are device tests (defaults to on)",
         default=True,
     )
 

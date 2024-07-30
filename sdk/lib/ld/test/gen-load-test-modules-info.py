@@ -61,11 +61,25 @@ def main():
     def process_file(file):
         source = file["FileSummary"]["File"]
         dest = elf_files[source]
-        for note in file["Notes"]:
-            note = note["NoteSection"]["Note"]
-            if "Build ID" in note:
-                build_id = note["Build ID"]
+
+        def gen_notes():
+            if "Notes" in file:
+                # Old schema.
+                for note in file["Notes"]:
+                    yield note["NoteSection"]["Note"]
+            else:
+                # New schema.
+                for notesection in file["NoteSections"]:
+                    notesection = notesection["NoteSection"]
+                    for note in notesection["Notes"]:
+                        yield note
+
+        build_id = None
+        for note in gen_notes():
+            build_id = note.get("Build ID")
+            if build_id is not None:
                 break
+        assert build_id is not None, f"no Build ID in {file}"
 
         args.output.write(
             'TestModule{"%(dest)s", "%(build_id)s", { // %(source)s\n'

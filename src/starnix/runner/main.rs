@@ -9,9 +9,8 @@ use fuchsia_component::server::ServiceFs;
 use fuchsia_sync::Mutex;
 use fuchsia_zircon::{HandleBased, Task};
 use futures::{StreamExt, TryStreamExt};
-use kernel_manager::StarnixKernel;
 use std::sync::Arc;
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 use zx::AsHandleRef;
 use {
     fidl_fuchsia_component_runner as frunner, fidl_fuchsia_memory_attribution as fattribution,
@@ -95,15 +94,22 @@ async fn serve_starnix_manager(
 ) -> Result<(), Error> {
     while let Some(event) = stream.try_next().await? {
         match event {
-            fstarnixrunner::ManagerRequest::Suspend { .. } => {
-                let kernels = kernels.list();
-                for kernel in kernels {
-                    suspended_processes.lock().append(&mut suspend_kernel(&kernel).await);
+            fstarnixrunner::ManagerRequest::Suspend { responder, .. } => {
+                debug!("suspending processes...");
+                for job in kernels.all_jobs() {
+                    suspended_processes.lock().append(&mut suspend_kernel(&job).await);
+                }
+                debug!("...done suspending processes");
+
+                if let Err(e) = responder.send() {
+                    warn!("error replying to suspend request: {e}");
                 }
             }
             fstarnixrunner::ManagerRequest::Resume { .. } => {
+                debug!("requesting resume...");
                 // Drop all the suspend handles to resume the kernel.
                 *suspended_processes.lock() = vec![];
+                debug!("...requested resume (completes asynchronously)");
             }
             _ => {}
         }
@@ -131,10 +137,10 @@ async fn serve_attribution_provider(
 }
 
 /// Suspends `kernel` by suspending all the processes in the kernel's job.
-async fn suspend_kernel(kernel: &StarnixKernel) -> Vec<zx::Handle> {
+async fn suspend_kernel(kernel_job: &zx::Job) -> Vec<zx::Handle> {
     let mut handles = std::collections::HashMap::<zx::Koid, zx::Handle>::new();
     loop {
-        let process_koids = kernel.job().processes().expect("failed to get processes");
+        let process_koids = kernel_job.processes().expect("failed to get processes");
         let mut found_new_process = false;
         let mut processes = vec![];
 
@@ -146,7 +152,7 @@ async fn suspend_kernel(kernel: &StarnixKernel) -> Vec<zx::Handle> {
             found_new_process = true;
 
             if let Ok(process_handle) =
-                kernel.job().get_child(&process_koid, zx::Rights::SAME_RIGHTS.bits())
+                kernel_job.get_child(&process_koid, zx::Rights::SAME_RIGHTS.bits())
             {
                 let process = zx::Process::from_handle(process_handle);
                 if let Ok(suspend_handle) = process.suspend() {

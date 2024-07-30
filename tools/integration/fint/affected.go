@@ -60,11 +60,12 @@ func affectedImpl(
 	if err != nil {
 		return artifacts, err
 	}
+	jobCount := int(contextSpec.JobCount)
 	r := ninjaRunner{
 		runner:    runner,
 		ninjaPath: ninjaPath,
 		buildDir:  contextSpec.BuildDir,
-		jobCount:  int(contextSpec.GomaJobCount),
+		jobCount:  jobCount,
 	}
 
 	if contextSpec.ArtifactDir != "" && len(contextSpec.ChangedFiles) > 0 && len(modules.TestSpecs()) > 0 {

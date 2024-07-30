@@ -73,7 +73,7 @@ pub async fn serve_controller(
                 let component = component.unwrap();
                 responder.send(Ok(component.is_started().await))?;
             }
-            fcomponent::ControllerRequest::GetExposedDictionary { dictionary, responder } => {
+            fcomponent::ControllerRequest::GetExposedDictionary { responder } => {
                 let res = async {
                     let component = weak_component_instance
                         .upgrade()
@@ -82,9 +82,8 @@ pub async fn serve_controller(
                         .lock_resolved_state()
                         .await
                         .map_err(|_| fcomponent::Error::InstanceCannotResolve)?;
-                    let exposed_dict = resolved.get_exposed_dict().await;
-                    exposed_dict.serve(dictionary.into_stream().unwrap());
-                    Ok(())
+                    let exposed_dict = resolved.get_exposed_dict().await.clone();
+                    Ok(exposed_dict.into())
                 }
                 .await;
                 responder.send(res)?;

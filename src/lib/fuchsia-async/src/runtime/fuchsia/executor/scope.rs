@@ -6,6 +6,7 @@
 #![doc(hidden)]
 
 use super::common::{Executor, Task};
+use crate::atomic_future::CancelAndDetachResult;
 use fuchsia_sync::{Mutex, MutexGuard};
 use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
 use std::borrow::Borrow;
@@ -158,6 +159,23 @@ impl ScopeRef {
             })
     }
 
+    /// Cancels and detaches the task.
+    pub(crate) fn cancel_and_detach(&self, task_id: usize) {
+        let mut state = self.lock();
+        state.join_wakers.remove(&task_id);
+        if let Some(task) = state.all_tasks.get(&task_id) {
+            match task.future.cancel_and_detach() {
+                CancelAndDetachResult::Done => {
+                    state.all_tasks.remove(&task_id);
+                }
+                CancelAndDetachResult::AddToRunQueue => {
+                    self.inner.executor.ready_tasks.push(task.clone());
+                }
+                CancelAndDetachResult::Pending => {}
+            }
+        };
+    }
+
     /// Polls for a join result for the given task ID.
     ///
     /// # Safety
@@ -177,6 +195,26 @@ impl ScopeRef {
         } else {
             state.join_wakers.insert(task_id, cx.waker().clone());
             Poll::Pending
+        }
+    }
+
+    /// Polls for the task to be cancelled.
+    pub(crate) unsafe fn poll_cancelled<R>(
+        &self,
+        task_id: usize,
+        cx: &mut Context<'_>,
+    ) -> Poll<Option<R>> {
+        let mut state = self.inner.state.lock();
+        if let Some(task) = state.all_tasks.get(&task_id) {
+            if let Some(result) = task.future.take_result() {
+                state.all_tasks.remove(&task_id);
+                Poll::Ready(Some(result))
+            } else {
+                state.join_wakers.insert(task_id, cx.waker().clone());
+                Poll::Pending
+            }
+        } else {
+            Poll::Ready(None)
         }
     }
 
@@ -304,6 +342,7 @@ impl hash::Hash for PtrKey {
 mod tests {
     use super::*;
     use crate::TestExecutor;
+    use futures::FutureExt;
     use std::pin::pin;
     use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -377,7 +416,7 @@ mod tests {
 
         // Running the executor after cancelling the task isn't currently
         // necessary, but we might decide to do async cleanup in the future.
-        assert_eq!(Some(1), task.cancel());
+        assert_eq!(Some(Some(1)), task.cancel().now_or_never());
         assert_eq!(executor.run_until_stalled(&mut std::future::pending::<()>()), Poll::Pending);
         assert_eq!(scope.lock().all_tasks.len(), 0);
     }

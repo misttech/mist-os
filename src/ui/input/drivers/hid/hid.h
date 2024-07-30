@@ -8,25 +8,16 @@
 #include <fidl/fuchsia.hardware.hidbus/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.hidbus/cpp/wire.h>
 #include <fidl/fuchsia.hardware.input/cpp/wire.h>
-#include <fuchsia/hardware/hiddevice/cpp/banjo.h>
-#include <lib/component/outgoing/cpp/outgoing_directory.h>
-#include <lib/ddk/debug.h>
-#include <lib/ddk/device.h>
-#include <lib/ddk/driver.h>
+#include <lib/driver/compat/cpp/device_server.h>
+#include <lib/driver/component/cpp/driver_base.h>
+#include <lib/driver/devfs/cpp/connector.h>
 #include <lib/hid-parser/item.h>
 #include <lib/hid-parser/parser.h>
 #include <lib/hid-parser/usages.h>
 
-#include <array>
-#include <memory>
-#include <set>
 #include <vector>
 
-#include <ddktl/device.h>
-#include <ddktl/fidl.h>
-#include <ddktl/protocol/empty-protocol.h>
 #include <fbl/intrusive_double_list.h>
-#include <fbl/mutex.h>
 #include <fbl/ref_ptr.h>
 
 #include "hid-instance.h"
@@ -43,44 +34,22 @@ struct HidPageUsage {
   }
 };
 
-class HidDevice;
-
-using HidDeviceType =
-    ddk::Device<HidDevice, ddk::Messageable<fuchsia_hardware_input::Controller>::Mixin,
-                ddk::Unbindable>;
-
-class HidDevice : public HidDeviceType,
-                  public ddk::HidDeviceProtocol<HidDevice, ddk::base_protocol>,
+class HidDevice : public fidl::WireServer<fuchsia_hardware_input::Controller>,
                   public fidl::WireAsyncEventHandler<fuchsia_hardware_hidbus::Hidbus> {
  public:
-  explicit HidDevice(zx_device_t* parent, fidl::ClientEnd<fuchsia_hardware_hidbus::Hidbus> hidbus)
-      : HidDeviceType(parent),
-        outgoing_(fdf::Dispatcher::GetCurrent()->async_dispatcher()),
-        hidbus_(std::move(hidbus), fdf::Dispatcher::GetCurrent()->async_dispatcher(), this) {}
-  ~HidDevice() override = default;
+  explicit HidDevice(fidl::ClientEnd<fuchsia_hardware_hidbus::Hidbus> hidbus)
+      : hidbus_(std::move(hidbus), fdf::Dispatcher::GetCurrent()->async_dispatcher(), this) {}
+  ~HidDevice() override {
+    instance_list_.clear();
+    ReleaseReassemblyBuffer();
+    if (parsed_hid_desc_) {
+      FreeDeviceDescriptor(parsed_hid_desc_);
+    }
+  }
 
-  zx_status_t Bind();
-  void DdkUnbind(ddk::UnbindTxn txn);
-  void DdkRelease();
+  zx::result<std::vector<fuchsia_driver_framework::NodeProperty>> Init();
 
   void OpenSession(OpenSessionRequestView request, OpenSessionCompleter::Sync& completer) override;
-
-  // |HidDeviceProtocol|
-  zx_status_t HidDeviceRegisterListener(const hid_report_listener_protocol_t* listener);
-  // |HidDeviceProtocol|
-  void HidDeviceUnregisterListener();
-  // |HidDeviceProtocol|
-  zx_status_t HidDeviceGetDescriptor(uint8_t* out_descriptor_data, size_t descriptor_count,
-                                     size_t* out_descriptor_actual);
-  // |HidDeviceProtocol|
-  zx_status_t HidDeviceGetReport(hid_report_type_t rpt_type, uint8_t rpt_id,
-                                 uint8_t* out_report_data, size_t report_count,
-                                 size_t* out_report_actual);
-  // |HidDeviceProtocol|
-  zx_status_t HidDeviceSetReport(hid_report_type_t rpt_type, uint8_t rpt_id,
-                                 const uint8_t* report_data, size_t report_count);
-  // |HidDeviceProtocol|
-  void HidDeviceGetHidDeviceInfo(hid_device_info_t* out_info);
 
   // fidl::WireAsyncEventHandler<fuchsia_hardware_hidbus::Hidbus> Methods.
   void OnReportReceived(
@@ -92,34 +61,22 @@ class HidDevice : public HidDeviceType,
   // Owned by HidDevice. Will be destructed when HidDevice is destructed.
   const fuchsia_hardware_hidbus::HidInfo& GetHidInfo() { return info_; }
 
-  fidl::WireSharedClient<fuchsia_hardware_hidbus::Hidbus>& GetHidbusProtocol() { return hidbus_; }
+  fidl::WireClient<fuchsia_hardware_hidbus::Hidbus>& GetHidbusProtocol() { return hidbus_; }
 
-  zx::result<fbl::RefPtr<HidInstance>> CreateInstance(
-      async_dispatcher_t* dispatcher, fidl::ServerEnd<fuchsia_hardware_input::Device> session);
+  zx::result<> CreateInstance(fidl::ServerEnd<fuchsia_hardware_input::Device> session);
 
   size_t GetReportDescLen() { return hid_report_desc_.size(); }
   const uint8_t* GetReportDesc() { return hid_report_desc_.data(); }
 
-  const char* GetName();
-
   void RemoveInstance(HidInstance& instance);
 
  private:
-  zx_status_t ProcessReportDescriptor();
   zx_status_t InitReassemblyBuffer();
   void ReleaseReassemblyBuffer();
   zx_status_t SetReportDescriptor();
 
-  void ParseUsagePage(const hid::ReportDescriptor* descriptor);
-
-  component::OutgoingDirectory outgoing_;
-  fidl::ServerBindingGroup<fuchsia_hardware_input::Controller> bindings_;
-
-  std::set<HidPageUsage> page_usage_;
   fuchsia_hardware_hidbus::HidInfo info_;
-  // TODO (rdzhuang): Use fidl::WireSharedClient to avoid thread synchronization errors when calling
-  // from Banjo methods. Change to fidl::WireClient when we've ripped out Banjo.
-  fidl::WireSharedClient<fuchsia_hardware_hidbus::Hidbus> hidbus_;
+  fidl::WireClient<fuchsia_hardware_hidbus::Hidbus> hidbus_;
 
   // Reassembly buffer for input events too large to fit in a single interrupt
   // transaction.
@@ -129,17 +86,36 @@ class HidDevice : public HidDeviceType,
   size_t rbuf_needed_ = 0;
 
   std::vector<uint8_t> hid_report_desc_;
-
   hid::DeviceDescriptor* parsed_hid_desc_ = nullptr;
-  size_t num_reports_ = 0;
 
-  fbl::Mutex instance_lock_;
-  fbl::DoublyLinkedList<fbl::RefPtr<HidInstance>> instance_list_ __TA_GUARDED(instance_lock_);
+  fbl::DoublyLinkedList<fbl::RefPtr<HidInstance>> instance_list_;
+};
 
-  std::array<char, ZX_DEVICE_NAME_MAX + 1> name_;
+class HidDriver : public fdf::DriverBase {
+ private:
+  static constexpr char kDeviceName[] = "hid-device";
 
-  fbl::Mutex listener_lock_;
-  ddk::HidReportListenerProtocolClient report_listener_ __TA_GUARDED(listener_lock_);
+ public:
+  HidDriver(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher)
+      : fdf::DriverBase(kDeviceName, std::move(start_args), std::move(driver_dispatcher)),
+        devfs_connector_(fit::bind_member<&HidDriver::Serve>(this)) {}
+
+  zx::result<> Start() override;
+
+  HidDevice& hiddev() { return *hiddev_; }
+
+ private:
+  void Serve(fidl::ServerEnd<fuchsia_hardware_input::Controller> server) {
+    bindings_.AddBinding(fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(server),
+                         hiddev_.get(), fidl::kIgnoreBindingClosure);
+  }
+
+  std::unique_ptr<HidDevice> hiddev_;
+
+  compat::SyncInitializedDeviceServer compat_server_;
+  fidl::ServerBindingGroup<fuchsia_hardware_input::Controller> bindings_;
+  fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_;
+  driver_devfs::Connector<fuchsia_hardware_input::Controller> devfs_connector_;
 };
 
 }  // namespace hid_driver

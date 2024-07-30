@@ -7,8 +7,8 @@ import os
 import sys
 import unittest
 from pathlib import Path
-from unittest import mock
 from typing import Iterable, Sequence
+from unittest import mock
 
 import textpb
 

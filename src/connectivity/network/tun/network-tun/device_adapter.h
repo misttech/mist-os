@@ -81,8 +81,7 @@ class DeviceAdapter : public ddk::NetworkDeviceImplProtocol<DeviceAdapter> {
   void NetworkDeviceImplPrepareVmo(uint8_t vmo_id, zx::vmo vmo,
                                    network_device_impl_prepare_vmo_callback callback, void* cookie);
   void NetworkDeviceImplReleaseVmo(uint8_t vmo_id);
-  void NetworkDeviceImplSetSnoop(bool snoop) { /* do nothing , only auto-snooping is allowed */
-  }
+  void NetworkDeviceImplSetSnoop(bool snoop) { /* do nothing , only auto-snooping is allowed */ }
 
   // Attempts to get a pending transmit buffer containing data expected to reach the network from
   // the pool of pending buffers.
@@ -126,7 +125,7 @@ class DeviceAdapter : public ddk::NetworkDeviceImplProtocol<DeviceAdapter> {
   void RemovePort(uint8_t port_id);
 
  private:
-  static constexpr uint16_t kFifoDepth = 128;
+  static constexpr uint16_t kFifoDepth = fuchsia_net_tun::wire::kFifoDepth;
   explicit DeviceAdapter(DeviceAdapterParent* parent);
 
   // Enqueues a single fulfilled rx frame.

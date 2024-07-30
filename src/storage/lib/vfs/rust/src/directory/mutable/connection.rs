@@ -164,7 +164,7 @@ impl<DirectoryType: MutableDirectory> MutableConnection<DirectoryType> {
         flags: fio::NodeAttributeFlags,
         attributes: fio::NodeAttributes,
     ) -> Result<(), Status> {
-        if !self.base.options.rights.contains(fio::W_STAR_DIR) {
+        if !self.base.options.rights.contains(fio::Rights::UPDATE_ATTRIBUTES) {
             return Err(Status::BAD_HANDLE);
         }
 
@@ -189,7 +189,7 @@ impl<DirectoryType: MutableDirectory> MutableConnection<DirectoryType> {
         name: String,
         options: fio::UnlinkOptions,
     ) -> Result<(), Status> {
-        if !self.base.options.rights.contains(fio::W_STAR_DIR) {
+        if !self.base.options.rights.contains(fio::Rights::MODIFY_DIRECTORY) {
             return Err(Status::BAD_HANDLE);
         }
 
@@ -211,7 +211,7 @@ impl<DirectoryType: MutableDirectory> MutableConnection<DirectoryType> {
     }
 
     fn handle_get_token(this: Pin<&Tokenizable<Self>>) -> Result<Handle, Status> {
-        if !this.base.options.rights.contains(fio::W_STAR_DIR) {
+        if !this.base.options.rights.contains(fio::Rights::MODIFY_DIRECTORY) {
             return Err(Status::BAD_HANDLE);
         }
         Ok(TokenRegistry::get_token(this)?)
@@ -223,7 +223,7 @@ impl<DirectoryType: MutableDirectory> MutableConnection<DirectoryType> {
         dst_parent_token: Handle,
         dst: String,
     ) -> Result<(), Status> {
-        if !self.base.options.rights.contains(fio::W_STAR_DIR) {
+        if !self.base.options.rights.contains(fio::Rights::MODIFY_DIRECTORY) {
             return Err(Status::BAD_HANDLE);
         }
 
@@ -386,11 +386,11 @@ mod tests {
             unimplemented!("Not implemented!");
         }
 
-        fn open2(
+        fn open3(
             self: Arc<Self>,
             _scope: ExecutionScope,
             _path: Path,
-            _protocols: fio::ConnectionProtocols,
+            _flags: fio::Flags,
             _object_request: ObjectRequestRef<'_>,
         ) -> Result<(), Status> {
             unimplemented!("Not implemented!");

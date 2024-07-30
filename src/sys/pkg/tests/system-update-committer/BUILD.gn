@@ -49,7 +49,9 @@ fuchsia_test_component("system-update-committer-integration-test") {
 fuchsia_test_package("package") {
   package_name = "system-update-committer-integration-tests"
   test_components = [ ":system-update-committer-integration-test" ]
-  deps = [ "//src/sys/pkg/bin/system-update-committer:component" ]
+  deps = [
+    "//src/sys/pkg/bin/system-update-committer:production-component-and-config",
+  ]
 }
 
 group("tests") {

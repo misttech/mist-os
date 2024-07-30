@@ -15,7 +15,6 @@ pub mod ap;
 pub mod auth;
 mod block_ack;
 pub mod client;
-pub mod completers;
 mod ddk_converter;
 pub mod device;
 pub mod disconnect;
@@ -34,9 +33,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use std::{cmp, fmt};
 use tracing::info;
-use wlan_ffi_transport::{
-    BufferProvider, EthernetTxEvent, EthernetTxEventSender, WlanRxEvent, WlanRxEventSender,
-};
+use wlan_ffi_transport::{EthernetTxEvent, EthernetTxEventSender, WlanRxEvent, WlanRxEventSender};
 use wlan_fidl_ext::{ResponderExt, SendResultExt};
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_softmac as fidl_softmac,
@@ -119,7 +116,6 @@ pub trait MlmeImpl {
     fn new(
         config: Self::Config,
         device: Self::Device,
-        buffer_provider: BufferProvider,
         scheduler: common::timer::Timer<Self::TimerEvent>,
     ) -> impl Future<Output = Result<Self, Error>>
     where
@@ -304,7 +300,6 @@ pub async fn mlme_main_loop<T: MlmeImpl>(
     init_sender: oneshot::Sender<()>,
     config: T::Config,
     mut device: T::Device,
-    buffer_provider: BufferProvider,
     mlme_request_stream: mpsc::UnboundedReceiver<wlan_sme::MlmeRequest>,
     driver_event_stream: mpsc::UnboundedReceiver<DriverEvent>,
 ) -> Result<(), Error> {
@@ -329,8 +324,7 @@ pub async fn mlme_main_loop<T: MlmeImpl>(
 
     // Failure to create MLME likely indicates a problem querying the device. There is no recovery
     // path if this occurs.
-    let mlme_impl =
-        T::new(config, device, buffer_provider, timer).await.expect("Failed to create MLME.");
+    let mlme_impl = T::new(config, device, timer).await.expect("Failed to create MLME.");
 
     info!("MLME initialization complete!");
     init_sender.send(()).map_err(|_| format_err!("Failed to signal init complete."))?;
@@ -392,14 +386,18 @@ async fn main_loop_impl<T: MlmeImpl>(
                             minstrel.lock().handle_tx_result_report(&tx_result)
                         }
                     }
-                    DriverEvent::EthernetTxEvent(EthernetTxEvent { bytes, async_id }) => {
+                    DriverEvent::EthernetTxEvent(EthernetTxEvent { bytes, async_id, borrowed_operation }) => {
                         wtrace::duration!(c"DriverEvent::EthernetTxEvent");
-                        let _: Result<(), ()> = mlme_impl.handle_eth_frame_tx(&bytes[..], async_id)
-                            .map_err(|e| {
+                        let bytes: &[u8] = unsafe { &*bytes.as_ptr() };
+                        match mlme_impl.handle_eth_frame_tx(&bytes[..], async_id) {
+                            Ok(()) => borrowed_operation.reply(Ok(())),
+                            Err(e) => {
                                 // TODO(https://fxbug.dev/42121991): Keep a counter of these failures.
                                 info!("Failed to handle eth frame: {}", e);
                                 wtrace::async_end_wlansoftmac_tx(async_id, zx::Status::INTERNAL);
-                            });
+                                borrowed_operation.reply(Err(zx::Status::INTERNAL));
+                            }
+                        }
                     }
                     DriverEvent::WlanRxEvent(WlanRxEvent { bytes, rx_info, async_id }) => {
                         wtrace::duration!(c"DriverEvent::WlanRxEvent");
@@ -442,7 +440,6 @@ pub mod test_utils {
         async fn new(
             _config: Self::Config,
             device: Self::Device,
-            _buffer_provider: BufferProvider,
             _scheduler: wlan_common::timer::Timer<Self::TimerEvent>,
         ) -> Result<Self, Error> {
             Ok(Self { device })
@@ -567,7 +564,6 @@ mod tests {
     use fuchsia_async::TestExecutor;
     use std::task::Poll;
     use wlan_common::assert_variant;
-    use wlan_ffi_transport::FakeFfiBufferProvider;
 
     // The following type definitions emulate the definition of FIDL requests and responder types.
     // In addition to testing `unbounded_send_or_respond_with_error`, these tests demonstrate how
@@ -642,7 +638,6 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn start_and_stop_main_loop() {
         let (fake_device, _fake_device_state) = FakeDevice::new().await;
-        let buffer_provider = BufferProvider::new(FakeFfiBufferProvider::new());
         let (device_sink, device_stream) = mpsc::unbounded();
         let (_mlme_request_sink, mlme_request_stream) = mpsc::unbounded();
         let (init_sender, mut init_receiver) = oneshot::channel();
@@ -650,7 +645,6 @@ mod tests {
             init_sender,
             (),
             fake_device,
-            buffer_provider,
             mlme_request_stream,
             device_stream,
         ));

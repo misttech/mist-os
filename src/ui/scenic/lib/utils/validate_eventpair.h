@@ -4,6 +4,7 @@
 #ifndef SRC_UI_SCENIC_LIB_UTILS_VALIDATE_EVENTPAIR_H_
 #define SRC_UI_SCENIC_LIB_UTILS_VALIDATE_EVENTPAIR_H_
 
+#include <fidl/fuchsia.ui.views/cpp/fidl.h>
 #include <fuchsia/ui/views/cpp/fidl.h>
 #include <lib/zx/eventpair.h>
 #include <zircon/rights.h>
@@ -20,6 +21,8 @@ bool validate_eventpair(const zx::eventpair& a_object, zx_rights_t a_rights,
 //  - The view ref is expected to have ZX_RIGHTS_BASIC.
 bool validate_viewref(const fuchsia::ui::views::ViewRefControl& control_ref,
                       const fuchsia::ui::views::ViewRef& view_ref);
+bool validate_viewref(const fuchsia_ui_views::ViewRefControl& control_ref,
+                      const fuchsia_ui_views::ViewRef& view_ref);
 
 }  // namespace utils
 

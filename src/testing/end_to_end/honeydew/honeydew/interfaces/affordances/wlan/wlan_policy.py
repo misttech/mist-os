@@ -1,4 +1,3 @@
-#!/usr/bin/env fuchsia-vendored-python
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
@@ -12,10 +11,6 @@ from honeydew.typing.wlan import (
     RequestStatus,
     SecurityType,
 )
-
-DEFAULTS: dict[str, float] = {
-    "UPDATE_TIMEOUT_S": 30.0,
-}
 
 
 class WlanPolicy(abc.ABC):
@@ -51,7 +46,8 @@ class WlanPolicy(abc.ABC):
 
     @abc.abstractmethod
     def get_update(
-        self, timeout: float = DEFAULTS["UPDATE_TIMEOUT_S"]
+        self,
+        timeout: float | None = None,
     ) -> ClientStateSummary:
         """Gets one client listener update.
 
@@ -63,7 +59,8 @@ class WlanPolicy(abc.ABC):
 
         Args:
             timeout: Timeout in seconds to wait for the get_update command to
-                return.
+                return. By default it is set to None (which means timeout is
+                disabled)
 
         Returns: ClientStateSummary
         """

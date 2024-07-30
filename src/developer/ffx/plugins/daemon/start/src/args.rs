@@ -17,4 +17,9 @@ pub struct StartCommand {
     #[argh(option)]
     /// override the path the socket will be bound to
     pub path: Option<PathBuf>,
+
+    #[argh(switch, short = 'b')]
+    /// runs the daemon in the background. Returns after verifying daemon connection. No-op if the
+    /// daemon is already running.
+    pub background: bool,
 }

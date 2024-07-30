@@ -10,6 +10,7 @@
 #include "infra_if.h"
 #if OPENTHREAD_CONFIG_BORDER_ROUTING_ENABLE
 
+#include <arpa/inet.h>
 #include <errno.h>
 #include <ifaddrs.h>
 #include <lib/syslog/cpp/macros.h>
@@ -27,6 +28,11 @@
 
 #include "common/code_utils.hpp"
 #include "common/debug.hpp"
+
+static const char *Ip6AddrToString(const void *aAddress) {
+  static char string[INET6_ADDRSTRLEN];
+  return inet_ntop(AF_INET6, aAddress, string, sizeof(string));
+}
 
 bool otPlatInfraIfHasAddress(uint32_t a_infra_if_index, const otIp6Address *a_address) {
   bool ret = false;
@@ -358,7 +364,8 @@ void InfraNetif::ReceiveIcmp6Message(otInstance *a_instance) {
 
   if (!IN6_IS_ADDR_LINKLOCAL(&srcAddr.sin6_addr)) {
     otPlatLog(OT_LOG_LEVEL_CRIT, OT_LOG_REGION_PLATFORM,
-              "receving non link-local address in infra_if, ignoring the message");
+              "received non link-local src address [%s] on infra_if, ignoring the message",
+              Ip6AddrToString(&srcAddr.sin6_addr));
     return;
   }
 

@@ -1,0 +1,152 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/assembly/assembled_system.gni")
+import("//build/assembly/board_configuration.gni")
+import("//build/assembly/product_assembly_configuration.gni")
+import("//build/component/config.gni")
+import("//build/components/fuchsia_package.gni")
+import("//build/testing/host_test_data.gni")
+import("//build/zircon/tools.gni")
+
+rustc_test("bootfs_launching_benchmark") {
+  name = "bootfs-launching-benchmark"
+  edition = "2021"
+
+  source_root = "src/main.rs"
+
+  deps = [
+    "//examples/components/routing/fidl:echo_rust",
+    "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
+    "//sdk/fidl/fuchsia.component.sandbox:fuchsia.component.sandbox_rust",
+    "//sdk/fidl/fuchsia.process:fuchsia.process_rust",
+    "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia",
+    "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia-component",
+    "//src/lib/fuchsia-component-test",
+    "//src/lib/fuchsia-runtime",
+    "//src/lib/zircon/rust:fuchsia-zircon",
+    "//third_party/rust_crates:futures",
+  ]
+
+  sources = [ "src/main.rs" ]
+}
+
+if (current_toolchain == default_toolchain) {
+  fuchsia_component("root_component") {
+    component_name = "root_component"
+    manifest = "meta/root_component.cml"
+    testonly = true
+  }
+
+  fuchsia_package("root_package") {
+    deps = [ ":root_component" ]
+    testonly = true
+  }
+
+  board_configuration("board_config") {
+    name = "test"
+  }
+
+  product_assembly_configuration("product_config") {
+    platform = {
+      build_type = "eng"
+      feature_set_level = "bootstrap"
+      storage = {
+        filesystems = {
+          image_name = "test_zbi"
+          image_mode = "no_image"
+        }
+      }
+    }
+  }
+
+  # `assembled_system` builds a zbi for consumption by the test.
+  assembled_system("test_zbi") {
+    testonly = true
+    product_assembly_config_label = ":product_config"
+    board_config_label = ":board_config"
+    use_bringup_platform_bundles_only = true
+    bootfs_labels = [ ":config" ]
+    bootfs_package_labels = [
+      "//src/security/tests/pkg_test/assemblies/hello_world_v1:hello_world-package",
+      "test_data/components",
+      ":root_package",
+    ]
+    base_packages = []
+  }
+
+  output_file = "$target_out_dir/uncompressed_bootfs"
+
+  action("test_assembly") {
+    testonly = true
+    script = "//src/sys/component_manager/tests/bootfs_launching_benchmark/scripts/extract_bootfs_from_zbi.py"
+
+    deps = [
+      ":test_zbi",
+      zbi_tool_target,
+    ]
+
+    inputs = [
+      target_out_dir + "/test_zbi/test_zbi.zbi",
+      zbi_tool_path,
+    ]
+    outputs = [ output_file ]
+
+    args = [
+      "--zbi",
+      rebase_path(zbi_tool_path, root_build_dir),
+      "--zbi-image",
+      rebase_path(target_out_dir + "/test_zbi/test_zbi.zbi", root_build_dir),
+      "--output",
+      rebase_path(outputs[0], root_build_dir),
+    ]
+  }
+
+  resource("bootfs_resource") {
+    testonly = true
+    sources = [ output_file ]
+    outputs = [ "data/tests/uncompressed_bootfs" ]
+    deps = [ ":test_assembly" ]
+  }
+
+  fuchsia_test_component("bootfs_launching_benchmark_component") {
+    component_name = "bootfs_launching_benchmark"
+    manifest = "meta/bootfs_launching_benchmark.cml"
+    deps = [
+      ":bootfs_launching_benchmark",
+      ":bootfs_resource",
+    ]
+
+    # Need system test type for Vmex resource.
+    test_type = "system"
+  }
+
+  fuchsia_test_package("bootfs-launching-benchmark-integration-tests") {
+    test_components = [ ":bootfs_launching_benchmark_component" ]
+    deps = [
+      ":bootfs_resource",
+      ":component-manager-cmp",
+    ]
+  }
+
+  component_config("config") {
+    testonly = true
+    sources = [ "config.json5" ]
+    dest = "data/component_manager_config"
+  }
+
+  fuchsia_component("component-manager-cmp") {
+    testonly = true
+    component_name = "component_manager"
+    manifest = "meta/component_manager.cml"
+    deps = [ "//src/sys/component_manager:bin" ]
+  }
+
+  group("tests") {
+    testonly = true
+    deps = [ ":bootfs-launching-benchmark-integration-tests" ]
+  }
+}

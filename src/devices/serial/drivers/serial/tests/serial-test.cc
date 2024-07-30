@@ -5,13 +5,12 @@
 #include "serial.h"
 
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
+#include <lib/driver/testing/cpp/driver_test.h>
 #include <lib/fit/function.h>
 
-#include <memory>
-
-#include <zxtest/zxtest.h>
-
-#include "src/devices/testing/mock-ddk/mock-device.h"
+#include <gtest/gtest.h>
+#include <sdk/lib/driver/testing/cpp/driver_runtime.h>
+#include <src/lib/testing/predicates/status.h>
 
 namespace {
 
@@ -112,100 +111,67 @@ class FakeSerialImpl : public fdf::WireServer<fuchsia_hardware_serialimpl::Devic
   fdf::ServerBindingGroup<fuchsia_hardware_serialimpl::Device> bindings_;
 };
 
-class SerialTester {
- public:
-  SerialTester()
-      : runtime_(mock_ddk::GetDriverRuntime()),
-        incoming_dispatcher_(runtime_->StartBackgroundDispatcher()),
-        serial_impl_(incoming_dispatcher_->async_dispatcher(), std::in_place) {}
-
-  auto& serial_impl() { return serial_impl_; }
-  zx_device_t* fake_parent() { return fake_parent_.get(); }
-  auto& runtime() { return *runtime_; }
-
-  fdf::ClientEnd<fuchsia_hardware_serialimpl::Device> CreateSerialImplClient() {
-    auto [client, server] = fdf::Endpoints<fuchsia_hardware_serialimpl::Device>::Create();
-    serial_impl_.SyncCall(&FakeSerialImpl::Bind, std::move(server));
-    return std::move(client);
+struct SerialTestEnvironment : public fdf_testing::Environment {
+  zx::result<> Serve(fdf::OutgoingDirectory& to_driver_vfs) override {
+    fuchsia_hardware_serialimpl::Service::InstanceHandler instance_handler({
+        .device =
+            [this](fdf::ServerEnd<fuchsia_hardware_serialimpl::Device> server) {
+              serial_impl.Bind(std::move(server));
+            },
+    });
+    return to_driver_vfs.AddService<fuchsia_hardware_serialimpl::Service>(
+        std::move(instance_handler));
   }
 
- private:
-  std::shared_ptr<fdf_testing::DriverRuntime> runtime_;
-  fdf::UnownedSynchronizedDispatcher incoming_dispatcher_;
-  std::shared_ptr<MockDevice> fake_parent_ = MockDevice::FakeRootParent();
-  async_patterns::TestDispatcherBound<FakeSerialImpl> serial_impl_;
+  FakeSerialImpl serial_impl;
 };
 
-TEST(SerialTest, Init) {
-  SerialTester tester;
-  serial::SerialDevice device(tester.fake_parent(), tester.CreateSerialImplClient());
-  ASSERT_EQ(ZX_OK, device.Init());
-}
+class FixtureConfig final {
+ public:
+  using DriverType = serial::SerialDevice;
+  using EnvironmentType = SerialTestEnvironment;
+};
 
-TEST(SerialTest, DdkLifetime) {
-  SerialTester tester;
-  serial::SerialDevice* device(
-      new serial::SerialDevice(tester.fake_parent(), tester.CreateSerialImplClient()));
+class SerialTest : public ::testing::Test {
+ public:
+  template <typename Callable>
+  auto serial_impl(Callable&& callable) {
+    return driver_test()
+        .RunInEnvironmentTypeContext<std::invoke_result_t<Callable, FakeSerialImpl&>>(
+            [callback = std::forward<Callable>(callable)](SerialTestEnvironment& env) mutable {
+              return callback(env.serial_impl);
+            });
+  }
+  fdf_testing::ForegroundDriverTest<FixtureConfig>& driver_test() { return driver_test_; }
 
-  ASSERT_EQ(ZX_OK, device->Init());
-  ASSERT_EQ(ZX_OK, device->Bind());
-  device->DdkAsyncRemove();
+ private:
+  fdf_testing::ForegroundDriverTest<FixtureConfig> driver_test_;
+};
 
-  ASSERT_EQ(ZX_OK, mock_ddk::ReleaseFlaggedDevices(tester.fake_parent()));
-}
-
-TEST(SerialTest, DdkRelease) {
-  SerialTester tester;
-  serial::SerialDevice* device(
-      new serial::SerialDevice(tester.fake_parent(), tester.CreateSerialImplClient()));
-  ASSERT_EQ(ZX_OK, device->Init());
+TEST_F(SerialTest, Lifetime) {
+  EXPECT_TRUE(driver_test().StartDriver().is_ok());
 
   // Manually set enabled to true.
-  tester.serial_impl().SyncCall(&FakeSerialImpl::set_enabled, true);
+  serial_impl([](FakeSerialImpl& serial_impl) { serial_impl.set_enabled(true); });
 
-  device->DdkRelease();
+  EXPECT_TRUE(driver_test().StopDriver().is_ok());
 
-  EXPECT_FALSE(tester.serial_impl().SyncCall(&FakeSerialImpl::enabled));
+  EXPECT_FALSE(serial_impl([](FakeSerialImpl& serial_impl) { return serial_impl.enabled(); }));
 }
 
-// Provides control primitives for tests that issue IO requests to the device.
-class SerialDeviceTest : public zxtest::Test {
- public:
-  SerialDeviceTest();
-  ~SerialDeviceTest() override;
+TEST_F(SerialTest, Read) {
+  EXPECT_TRUE(driver_test().StartDriver().is_ok());
 
-  serial::SerialDevice* device() { return device_; }
-  auto& serial_impl() { return tester_.serial_impl(); }
-  auto& runtime() { return tester_.runtime(); }
-
-  // DISALLOW_COPY_ASSIGN_AND_MOVE(SerialDeviceTest);
-
- private:
-  SerialTester tester_;
-  serial::SerialDevice* device_;
-};
-
-SerialDeviceTest::SerialDeviceTest() {
-  device_ = new serial::SerialDevice(tester_.fake_parent(), tester_.CreateSerialImplClient());
-
-  if (ZX_OK != device_->Init()) {
-    delete device_;
-    device_ = nullptr;
-  }
-}
-
-SerialDeviceTest::~SerialDeviceTest() { device_->DdkRelease(); }
-
-TEST_F(SerialDeviceTest, Read) {
-  auto [client_end, server] = fidl::Endpoints<fuchsia_hardware_serial::Device>::Create();
-  fidl::BindServer(fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(server), device());
-  fidl::WireClient client(std::move(client_end), fdf::Dispatcher::GetCurrent()->async_dispatcher());
+  zx::result client_end = driver_test().Connect<fuchsia_hardware_serial::Service::Device>();
+  EXPECT_TRUE(client_end.is_ok());
+  fidl::WireClient client(*std::move(client_end),
+                          fdf::Dispatcher::GetCurrent()->async_dispatcher());
 
   constexpr std::string_view data = "test";
 
   // Test set up.
-  serial_impl().SyncCall([&data](FakeSerialImpl* serial_impl) {
-    *std::copy(data.begin(), data.end(), serial_impl->read_buffer()) = 0;
+  serial_impl([&data](FakeSerialImpl& serial_impl) {
+    *std::copy(data.begin(), data.end(), serial_impl.read_buffer()) = 0;
   });
 
   // Test.
@@ -213,19 +179,23 @@ TEST_F(SerialDeviceTest, Read) {
       [this, want = data](fidl::WireUnownedResult<fuchsia_hardware_serial::Device::Read>& result) {
         ASSERT_OK(result.status());
         const fit::result response = result.value();
-        ASSERT_TRUE(response.is_ok(), "%s", zx_status_get_string(response.error_value()));
+        ASSERT_TRUE(response.is_ok()) << zx_status_get_string(response.error_value());
         const cpp20::span data = response.value()->data.get();
         const std::string_view got{reinterpret_cast<const char*>(data.data()), data.size_bytes()};
         ASSERT_EQ(got, want);
-        runtime().Quit();
+        driver_test().runtime().Quit();
       });
-  runtime().Run();
+  driver_test().runtime().Run();
+
+  EXPECT_TRUE(driver_test().StopDriver().is_ok());
 }
 
-TEST_F(SerialDeviceTest, Write) {
-  auto [client_end, server] = fidl::Endpoints<fuchsia_hardware_serial::Device>::Create();
-  fidl::BindServer(fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(server), device());
-  fidl::WireClient client(std::move(client_end), fdf::Dispatcher::GetCurrent()->async_dispatcher());
+TEST_F(SerialTest, Write) {
+  EXPECT_TRUE(driver_test().StartDriver().is_ok());
+  zx::result client_end = driver_test().Connect<fuchsia_hardware_serial::Service::Device>();
+  EXPECT_TRUE(client_end.is_ok());
+  fidl::WireClient client(*std::move(client_end),
+                          fdf::Dispatcher::GetCurrent()->async_dispatcher());
 
   constexpr std::string_view data = "test";
   uint8_t payload[data.size()];
@@ -238,14 +208,17 @@ TEST_F(SerialDeviceTest, Write) {
            want = data](fidl::WireUnownedResult<fuchsia_hardware_serial::Device::Write>& result) {
             ASSERT_OK(result.status());
             const fit::result response = result.value();
-            ASSERT_TRUE(response.is_ok(), "%s", zx_status_get_string(response.error_value()));
-            serial_impl().SyncCall([&want](FakeSerialImpl* serial_impl) {
-              ASSERT_EQ(serial_impl->write_buffer_length(), want.size());
-              ASSERT_BYTES_EQ(serial_impl->write_buffer(), want.data(), want.size());
+            ASSERT_TRUE(response.is_ok()) << zx_status_get_string(response.error_value());
+            serial_impl([&want](FakeSerialImpl& serial_impl) {
+              const std::string_view got{reinterpret_cast<const char*>(serial_impl.write_buffer()),
+                                         serial_impl.write_buffer_length()};
+              ASSERT_EQ(got, want);
             });
-            runtime().Quit();
+            driver_test().runtime().Quit();
           });
-  runtime().Run();
+  driver_test().runtime().Run();
+
+  EXPECT_TRUE(driver_test().StopDriver().is_ok());
 }
 
 }  // namespace

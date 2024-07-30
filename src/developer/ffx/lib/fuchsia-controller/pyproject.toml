@@ -27,10 +27,8 @@ test = [
 guidelines = [
     "coverage==7.2.7",        # for measuring code coverage using unit tests
     "pylint==2.17.4",         # for code linting
-    "isort==5.12.0",          # for sorting imports
     "autoflake==2.1.1",       # for removeing unused imports and unused variables
     "mypy==1.3.0",            # for type checking
-    "black==23.7.0",          # for formatting
     "types-colorama==0.4.6",  # for type checking
     "jellyfish==0.11.0",      # for type checking
 ]
@@ -40,7 +38,7 @@ where = ["."] # list of folders that contain the packages (["."] by default)
 
 [tool.isort]
 # Reference at https://pycqa.github.io/isort/docs/configuration/config_files.html
-profile = "google"
+profile = "black"
 line_length = 80
 
 [tool.mypy]

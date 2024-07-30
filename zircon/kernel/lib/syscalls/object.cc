@@ -518,6 +518,33 @@ zx_status_t sys_object_get_info(zx_handle_t handle, uint32_t topic, user_out_ptr
 
       return single_record_result(_buffer, buffer_size, _actual, _avail, info);
     }
+    case ZX_INFO_VMAR_MAPS: {
+      fbl::RefPtr<VmAddressRegionDispatcher> vmar;
+      zx_status_t status =
+          up->handle_table().GetDispatcherWithRights(*up, handle, ZX_RIGHT_INSPECT, &vmar);
+      if (status != ZX_OK) {
+        return status;
+      }
+
+      SubsetVmarMapsInfoWriter<zx_info_maps_t> writer{_buffer.reinterpret<zx_info_maps_t>()};
+      const size_t max_records = buffer_size / sizeof(zx_info_maps_t);
+      size_t actual_records = 0;
+      size_t avail_records = 0;
+      status =
+          GetVmarMaps(vmar->vmar().get(), writer, max_records, &actual_records, &avail_records);
+
+      if (_actual) {
+        zx_status_t copy_status = _actual.copy_to_user(actual_records);
+        if (copy_status != ZX_OK)
+          return copy_status;
+      }
+      if (_avail) {
+        zx_status_t copy_status = _avail.copy_to_user(avail_records);
+        if (copy_status != ZX_OK)
+          return copy_status;
+      }
+      return status;
+    }
     case ZX_INFO_PROCESS_MAPS_V1:
     case ZX_INFO_PROCESS_MAPS: {
       fbl::RefPtr<ProcessDispatcher> process;

@@ -27,8 +27,10 @@ pub mod syslog;
 pub mod time;
 pub mod uapi;
 pub mod union;
+pub mod unmount_flags;
 pub mod user_address;
 pub mod user_buffer;
+pub mod user_value;
 pub mod vfs;
 
 #[cfg(target_arch = "aarch64")]

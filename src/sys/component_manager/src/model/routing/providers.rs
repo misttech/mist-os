@@ -4,16 +4,18 @@
 use crate::capability::CapabilityProvider;
 use crate::model::component::WeakComponentInstance;
 use crate::model::routing::router_ext::WeakInstanceTokenExt;
-use ::routing::error::RoutingError;
 use ::routing::DictExt;
 use async_trait::async_trait;
 use clonable_error::ClonableError;
-use cm_rust::Availability;
+use cm_rust::{Availability, CapabilityTypeName};
 use cm_types::{Name, OPEN_FLAGS_MAX_POSSIBLE_RIGHTS};
 use cm_util::TaskGroup;
 use errors::{CapabilityProviderError, OpenError};
 use router_error::RouterError;
-use sandbox::{RemotableCapability, Request, WeakInstanceToken};
+use routing::bedrock::request_metadata::METADATA_KEY_TYPE;
+use routing::error::{ComponentInstanceError, RoutingError};
+use sandbox::{Dict, RemotableCapability, Request, WeakInstanceToken};
+use std::collections::HashMap;
 use std::sync::Arc;
 use vfs::directory::entry::OpenRequest;
 use vfs::path::Path as VfsPath;
@@ -42,6 +44,30 @@ impl CapabilityProvider for DefaultComponentCapabilityProvider {
         open_request: OpenRequest<'_>,
     ) -> Result<(), CapabilityProviderError> {
         let source = self.source.upgrade()?;
+        let caps_with_metadata: HashMap<Name, CapabilityTypeName> = source
+            .lock_resolved_state()
+            .await
+            .map_err(|e| CapabilityProviderError::ComponentInstanceError {
+                err: ComponentInstanceError::ResolveFailed {
+                    moniker: source.moniker.clone(),
+                    err: ClonableError::from(anyhow::anyhow!("{e}")),
+                },
+            })?
+            .decl()
+            .capabilities
+            .iter()
+            .filter(|e| matches!(e, cm_rust::CapabilityDecl::Protocol(_)))
+            .map(|e| (e.name().clone(), CapabilityTypeName::from(e)))
+            .collect();
+        let metadata = Dict::new();
+        if let Some(porcelain_type) = caps_with_metadata.get(&self.name) {
+            metadata
+                .insert(
+                    cm_types::Name::new(METADATA_KEY_TYPE).unwrap(),
+                    sandbox::Capability::Data(sandbox::Data::String(porcelain_type.to_string())),
+                )
+                .unwrap();
+        }
         let capability = source
             .get_program_output_dict()
             .await?
@@ -53,6 +79,7 @@ impl CapabilityProvider for DefaultComponentCapabilityProvider {
                     availability: Availability::Transitional,
                     target: WeakInstanceToken::new_component(self.target.clone()),
                     debug: false,
+                    metadata,
                 },
             )
             .await?

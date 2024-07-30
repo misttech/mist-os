@@ -18,10 +18,7 @@ fuchsia_driver("serial-driver") {
     "//build/config:all_source",
     "//build/config/fuchsia:enable_zircon_asserts",
   ]
-  deps = [
-    ":common",
-    "//src/devices/lib/driver",
-  ]
+  deps = [ ":common" ]
 }
 
 fuchsia_driver_component("serial") {
@@ -44,9 +41,12 @@ source_set("common") {
     ":serial_bind",
     "//sdk/fidl/fuchsia.hardware.serial:fuchsia.hardware.serial_cpp",
     "//sdk/fidl/fuchsia.hardware.serialimpl:fuchsia.hardware.serialimpl_cpp",
-    "//src/devices/lib/driver:driver_runtime",
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
+    "//sdk/lib/driver/component/cpp",
+    "//sdk/lib/driver/node/cpp",
+    "//sdk/lib/driver/runtime:driver_runtime_cpp",
+    "//src/devices/bin/driver_runtime",
+    "//src/devices/bind/fuchsia:fuchsia_cpp",
+    "//src/devices/bind/fuchsia.serial:fuchsia.serial_cpp",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/zircon-internal",
     "//zircon/system/ulib/zx",

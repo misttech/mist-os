@@ -18,6 +18,7 @@ fidl("fuchsia.net.routes") {
   ]
   public_deps = [
     "//sdk/fidl/fuchsia.net",
+    "//sdk/fidl/fuchsia.net.interfaces",
     "//zircon/vdso/zx",
   ]
   enable_hlcpp = true

@@ -8,4 +8,6 @@
 
 mod stream;
 
-pub use stream::{until_stalled, StallableRequestStream};
+pub use stream::{
+    until_stalled, StallableRequestStream, StreamAndControlHandle, WeakControlHandle,
+};

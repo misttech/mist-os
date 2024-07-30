@@ -2649,8 +2649,14 @@ struct datagram_socket
       }
     }
 
-    // TODO(https://fxbug.dev/42054820): Avoid allocating into this arena.
-    fidl::Arena alloc;
+    constexpr size_t kSendControlDataArenaSize =
+        fidl::MaxSizeInChannel<fsocket::wire::DatagramSocketSendControlData,
+                               fidl::MessageDirection::kSending>();
+    // Set a sensible upper limit for how much stack space we're going to allow
+    // using here to prevent deep stack usage in zxio/fdio. If this grows to
+    // untenable sizes we might have to change strategies here.
+    static_assert(kSendControlDataArenaSize <= 192);
+    fidl::Arena<kSendControlDataArenaSize> alloc;
     fit::result cmsg_result =
         ParseControlMessages<fsocket::wire::DatagramSocketSendControlData>(alloc, msghdr_ref);
     if (cmsg_result.is_error()) {

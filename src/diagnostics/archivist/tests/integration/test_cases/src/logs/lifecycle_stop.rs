@@ -118,7 +118,7 @@ async fn embedding_stop_api_works_for_batch_iterator() {
 
     assert_logs_sequence(
         &mut logs,
-        PUPPET_NAME,
+        &PUPPET_NAME.try_into().unwrap(),
         vec![
             (Severity::Debug, "my debug message."),
             (Severity::Info, "my info message."),

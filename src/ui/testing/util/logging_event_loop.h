@@ -41,6 +41,8 @@ class LoggingEventLoop : private loop_fixture::RealLoop {
                                  cpp20::source_location caller = cpp20::source_location::current());
 
   void RunLoopUntilIdle(cpp20::source_location caller = cpp20::source_location::current());
+
+  async_dispatcher_t* dispatcher();
 };
 
 }  // namespace ui_testing

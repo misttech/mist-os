@@ -21,7 +21,7 @@ zx::result<std::unique_ptr<DeviceManager>> DeviceManager::Create(
   auto device_manager =
       fbl::make_unique_checked<DeviceManager>(&ac, controller, transfer_request_processor);
   if (!ac.check()) {
-    zxlogf(ERROR, "Failed to allocate device manager.");
+    FDF_LOG(ERROR, "Failed to allocate device manager.");
     return zx::error(ZX_ERR_NO_MEMORY);
   }
   return zx::ok(std::move(device_manager));
@@ -31,7 +31,7 @@ zx::result<> DeviceManager::SendLinkStartUp() {
   DmeLinkStartUpUicCommand link_startup_command(controller_);
   if (zx::result<std::optional<uint32_t>> result = link_startup_command.SendCommand();
       result.is_error()) {
-    zxlogf(ERROR, "Failed to startup UFS link: %s", result.status_string());
+    FDF_LOG(ERROR, "Failed to startup UFS link: %s", result.status_string());
     return result.take_error();
   }
   return zx::ok();
@@ -58,7 +58,7 @@ zx::result<> DeviceManager::DeviceInit() {
       break;
 
     if (zx::clock::get_monotonic() > device_init_time_out) {
-      zxlogf(ERROR, "Wait for fDeviceInit timed out");
+      FDF_LOG(ERROR, "Wait for fDeviceInit timed out");
       return zx::error(ZX_ERR_TIMED_OUT);
     }
     usleep(10000);
@@ -78,10 +78,10 @@ zx::result<> DeviceManager::GetControllerDescriptor() {
   // The field definitions for VersionReg and wSpecVersion are the same.
   // wSpecVersion use big-endian byte ordering.
   auto version = VersionReg::Get().FromValue(betoh16(device_descriptor_.wSpecVersion));
-  zxlogf(INFO, "UFS device version %u.%u%u", version.major_version_number(),
-         version.minor_version_number(), version.version_suffix());
+  FDF_LOG(INFO, "UFS device version %u.%u%u", version.major_version_number(),
+          version.minor_version_number(), version.version_suffix());
 
-  zxlogf(INFO, "%u enabled LUNs found", device_descriptor_.bNumberLU);
+  FDF_LOG(INFO, "%u enabled LUNs found", device_descriptor_.bNumberLU);
 
   ReadDescriptorUpiu read_geometry_desc_upiu(DescriptorType::kGeometry);
   response = req_processor_.SendQueryRequestUpiu(read_geometry_desc_upiu);
@@ -97,16 +97,16 @@ zx::result<> DeviceManager::GetControllerDescriptor() {
   } else if (geometry_descriptor_.bMaxNumberLU == 1) {
     max_lun_count_ = 32;
   } else {
-    zxlogf(ERROR, "Invalid Geometry Descriptor bMaxNumberLU value=%d",
-           geometry_descriptor_.bMaxNumberLU);
+    FDF_LOG(ERROR, "Invalid Geometry Descriptor bMaxNumberLU value=%d",
+            geometry_descriptor_.bMaxNumberLU);
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
   // The kDeviceDensityUnit is defined in the spec as 512.
   // qTotalRawDeviceCapacity use big-endian byte ordering.
   constexpr uint32_t kDeviceDensityUnit = 512;
-  zxlogf(INFO, "UFS device total size is %lu bytes",
-         betoh64(geometry_descriptor_.qTotalRawDeviceCapacity) * kDeviceDensityUnit);
+  FDF_LOG(INFO, "UFS device total size is %lu bytes",
+          betoh64(geometry_descriptor_.qTotalRawDeviceCapacity) * kDeviceDensityUnit);
 
   return zx::ok();
 }
@@ -167,7 +167,7 @@ zx::result<uint32_t> DeviceManager::GetBootLunEnabled() {
   if (boot_lun_enabled.is_error()) {
     return boot_lun_enabled.take_error();
   }
-  zxlogf(DEBUG, "bBootLunEn 0x%0x", boot_lun_enabled.value());
+  FDF_LOG(DEBUG, "bBootLunEn 0x%0x", boot_lun_enabled.value());
   return zx::ok(boot_lun_enabled.value());
 }
 
@@ -190,16 +190,16 @@ zx::result<> DeviceManager::ConfigureWriteBooster(inspect::Node &wb_node) {
   }
 
   if (zx::result<> result = EnableWriteBooster(wb_node); result.is_error()) {
-    zxlogf(ERROR, "Failed to enable WriteBooster: %s", result.status_string());
+    FDF_LOG(ERROR, "Failed to enable WriteBooster: %s", result.status_string());
     return result.take_error();
   }
 
   auto disable_write_booster = fit::defer([&] {
     if (is_write_booster_enabled_) {
       if (zx::result<> result = DisableWriteBooster(); result.is_error()) {
-        zxlogf(ERROR, "Failed to disable WriteBooster: %s", result.status_string());
+        FDF_LOG(ERROR, "Failed to disable WriteBooster: %s", result.status_string());
       } else {
-        zxlogf(WARNING, "WriteBooster is disabled");
+        FDF_LOG(WARNING, "WriteBooster is disabled");
       }
     }
   });
@@ -236,14 +236,14 @@ zx::result<> DeviceManager::ConfigureWriteBooster(inspect::Node &wb_node) {
       }
     }
   } else {
-    zxlogf(WARNING, "Not supported WriteBooster buffer type: 0x%x",
-           static_cast<uint8_t>(write_booster_buffer_type_));
+    FDF_LOG(WARNING, "Not supported WriteBooster buffer type: 0x%x",
+            static_cast<uint8_t>(write_booster_buffer_type_));
     return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 
   if (alloc_units == 0) {
     // Unable to enable WriteBooster due to lack of resources.
-    zxlogf(WARNING, "The WriteBooster buffer size is zero.");
+    FDF_LOG(WARNING, "The WriteBooster buffer size is zero.");
     return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 
@@ -254,19 +254,19 @@ zx::result<> DeviceManager::ConfigureWriteBooster(inspect::Node &wb_node) {
 
   zx::result<bool> result = IsWriteBoosterBufferLifeTimeLeft();
   if (result.is_error()) {
-    zxlogf(ERROR, "Failed to IsWriteBoosterBufferLifeTimeLeft(): %s", result.status_string());
+    FDF_LOG(ERROR, "Failed to IsWriteBoosterBufferLifeTimeLeft(): %s", result.status_string());
     return result.take_error();
   }
   if (!result.value()) {
     // Unable to enable WriteBooster due to lack of resources.
-    zxlogf(WARNING, "Exceeded its maximum estimated WriteBooster Buffer life time");
+    FDF_LOG(WARNING, "Exceeded its maximum estimated WriteBooster Buffer life time");
     return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 
   // TODO(https://fxbug.dev/42075643): Need to handle WRITEBOOSTER_FLUSH_NEEDED exception case.
 
   disable_write_booster.cancel();
-  zxlogf(INFO, "WriteBooster is enabled");
+  FDF_LOG(INFO, "WriteBooster is enabled");
   return zx::ok();
 }
 
@@ -362,7 +362,7 @@ zx::result<bool> DeviceManager::NeedWriteBoosterBufferFlush() {
   }
   if (!result.value()) {
     if (auto result = DisableWriteBooster(); result.is_error()) {
-      zxlogf(ERROR, "Failed to disable WriteBooster: %s", result.status_string());
+      FDF_LOG(ERROR, "Failed to disable WriteBooster: %s", result.status_string());
       return result.take_error();
     }
     return zx::ok(false);
@@ -600,7 +600,7 @@ zx::result<> DeviceManager::InitUicPowerMode(inspect::Node &unipro_node) {
           .ReadFrom(&controller_.GetMmio())
           .uic_power_mode_change_request_status();
   if (power_mode_status != HostControllerStatusReg::PowerModeStatus::kPowerLocal) {
-    zxlogf(ERROR, "Failed to change power mode: power_mode_status = 0x%x", power_mode_status);
+    FDF_LOG(ERROR, "Failed to change power mode: power_mode_status = 0x%x", power_mode_status);
     return zx::error(ZX_ERR_BAD_STATE);
   }
 
@@ -644,7 +644,7 @@ zx::result<> DeviceManager::SetPowerCondition(scsi::PowerCondition target_power_
   zx_status_t status = controller_.StartStopUnit(kPlaceholderTarget, scsi_lun.value(),
                                                  /*immed*/ false, target_power_condition);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to send START STOP UNIT SCSI command: %s", zx_status_get_string(status));
+    FDF_LOG(ERROR, "Failed to send START STOP UNIT SCSI command: %s", zx_status_get_string(status));
     return zx::error(status);
   }
 
@@ -677,7 +677,7 @@ zx::result<> DeviceManager::Suspend() {
   if (result.value()) {
     // TODO(https://fxbug.dev/42075643): We need to keep the power mode active until the
     // Writebooster flush is complete.
-    zxlogf(WARNING, "WriteBooster buffer flush is needed");
+    FDF_LOG(WARNING, "WriteBooster buffer flush is needed");
     return zx::ok();
   }
 
@@ -753,11 +753,11 @@ zx::result<> DeviceManager::InitUfsPowerMode(inspect::Node &controller_node,
   }
   current_power_mode_ = static_cast<UfsPowerMode>(power_mode.value());
   if (current_power_mode_ != UfsPowerMode::kActive) {
-    zxlogf(ERROR, "Initial power mode is not active: 0x%x",
-           static_cast<uint8_t>(current_power_mode_));
+    FDF_LOG(ERROR, "Initial power mode is not active: 0x%x",
+            static_cast<uint8_t>(current_power_mode_));
     return zx::error(ZX_ERR_BAD_STATE);
   }
-  zxlogf(DEBUG, "bCurrentPowerMode 0x%0x", power_mode.value());
+  FDF_LOG(DEBUG, "bCurrentPowerMode 0x%0x", power_mode.value());
 
   current_power_condition_ = power_mode_map_[current_power_mode_].first;
   current_link_state_ = power_mode_map_[current_power_mode_].second;

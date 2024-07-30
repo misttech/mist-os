@@ -29,11 +29,11 @@ aes-gcm = "0.10.1"
 aes-gcm-siv = { version = "0.11.1", features = ["std"] }
 ahash = { version = "0.8.6", default-features = false, features = [ "runtime-rng" ] }
 ansi_term = "0.12.0"
-anyhow = "1.0.75"
+anyhow = "1.0.86"
 arbitrary = { version = "1.0.3", features = ["derive"] }
 argh = "0.1.12"
 arrayref = "0.3.5"
-arrayvec = "0.7.1"
+arrayvec = "0.7.4"
 ash = { version = "0.37.0", features = ["linked"], default-features = false }
 assert_matches = "1.5.0"
 async-channel = "1.8.0"
@@ -41,7 +41,7 @@ async-lock = "2.3"
 async-stream = "0.3.5"
 async-trait = "0.1.71"
 atty = "0.2.11"
-base64 = "0.21.7"
+base64 = "0.22.1"
 bincode = "1.3"
 bitfield = "0.14.0"
 bitflags = { version = "2.4.1", features = ["serde"] }
@@ -77,7 +77,6 @@ crc = "1.8.1"
 criterion = { version = "0.2", default-features = false }
 crossbeam = "0.8.0"
 crossbeam-utils = "0.8.14"
-crypto-mac = { version = "0.11.1", features = ["std"] }
 cfg-if = "1.0.0"
 chacha20 = "0.9.0"
 csv = "1.2.1"
@@ -191,7 +190,7 @@ rutabaga_gfx = { version = "0.1.3", features = ["gfxstream"] }
 schemars = { version = "0.8", features = ["chrono", "preserve_order"] }
 scopeguard = "1.1.0"
 scrypt = "0.10.0"
-serde = { version = "1.0.203", features = ["derive"] }
+serde = { version = "1.0.204", features = ["derive"] }
 serde_cbor = "0.11.1"
 serde_derive = "1.0.147"
 serde_json = "1.0.87"
@@ -389,7 +388,7 @@ prettytable-rs = { path = "forks/prettytable-rs" }
 # tokio to 1.x.
 rustls = { path = "forks/rustls" }
 rustyline = { path = "forks/rustyline" }
-netlink-packet-route = { path="forks/netlink-packet-route-0.20.0" }
+netlink-packet-route = { path="forks/netlink-packet-route" }
 netlink-packet-utils = { path="forks/netlink-packet-utils-0.5.2" }
 netlink-packet-core = {path = "forks/netlink-packet-core-0.7.0"}
 netlink-packet-sock-diag = {path = "forks/netlink-packet-sock-diag-0.4.2"}
@@ -461,7 +460,7 @@ rustflags = [ "--cfg=aes_armv8" ]
 [gn.package.ahash."0.8.6".platform."cfg(any(target_arch = \"x86_64\", target_arch = \"aarch64\", target_arch = \"mips64\", target_arch = \"powerpc64\", target_arch = \"riscv64gc\", target_arch = \"s390x\"))"]
 rustflags = [ "--cfg=feature=\\\"folded_multiply\\\"" ]
 
-[gn.package.anyhow."1.0.75"]
+[gn.package.anyhow."1.0.86"]
 # TODO(https://github.com/rust-lang/rust/pull/99301): uncomment when generic member access is stable
 #rustflags = ["--cfg=backtrace"]
 
@@ -801,10 +800,10 @@ configs = [ "//build/config:optimize_speed" ]
 [gn.package.semver."1.0.4"]
 rustflags = []
 
-[gn.package.serde."1.0.203"]
+[gn.package.serde."1.0.204"]
 rustflags = []
 
-[gn.package.serde_derive."1.0.203"]
+[gn.package.serde_derive."1.0.204"]
 rustflags = []
 
 [gn.package.serde_json."1.0.87"]

@@ -32,18 +32,21 @@ struct Pixel {
                        fuchsia::images2::PixelFormat type);
   static Pixel FromVmo(const uint8_t* vmo_host, uint32_t stride, uint32_t x, uint32_t y,
                        fuchsia::sysmem::PixelFormatType type);
+  static Pixel FromVmoRgb565(const uint8_t* vmo_host, uint32_t stride, uint32_t x, uint32_t y);
 
   static Pixel FromVmoBgra(const uint8_t* vmo_host, uint32_t stride, uint32_t x, uint32_t y);
 
   static Pixel FromVmoRgba(const uint8_t* vmo_host, uint32_t stride, uint32_t x, uint32_t y);
 
-  std::vector<uint8_t> ToFormat(fuchsia::images2::PixelFormat type);
+  std::vector<uint8_t> ToFormat(fuchsia::images2::PixelFormat type) const;
 
-  std::vector<uint8_t> ToFormat(fuchsia::sysmem::PixelFormatType type);
+  std::vector<uint8_t> ToFormat(fuchsia::sysmem::PixelFormatType type) const;
 
-  std::vector<uint8_t> ToBgra() { return {blue, green, red, alpha}; }
+  std::vector<uint8_t> ToRgb565() const;
 
-  std::vector<uint8_t> ToRgba() { return {red, green, blue, alpha}; }
+  std::vector<uint8_t> ToBgra() const { return {blue, green, red, alpha}; }
+
+  std::vector<uint8_t> ToRgba() const { return {red, green, blue, alpha}; }
 
   static bool IsFormatSupported(fuchsia::images2::PixelFormat type);
   // deprecated; use other overload just above

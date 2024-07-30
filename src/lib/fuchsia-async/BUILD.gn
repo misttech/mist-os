@@ -42,6 +42,7 @@ rustc_library("fuchsia-async") {
   test_deps = [ "//third_party/rust_crates:futures-test" ]
   if (is_fuchsia || is_mistos) {
     deps += [
+      "//sdk/lib/fdio",
       "//src/lib/fuchsia-sync",
       "//src/lib/zircon/rust:fuchsia-zircon",
       "//third_party/rust_crates:crossbeam",

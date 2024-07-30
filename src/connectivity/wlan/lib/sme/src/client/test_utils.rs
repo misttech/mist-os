@@ -76,7 +76,7 @@ pub fn create_connect_conf(
     }
 }
 
-pub fn create_on_wmm_status_resp(status: zx::zx_status_t) -> fidl_mlme::MlmeEvent {
+pub fn create_on_wmm_status_resp(status: zx::sys::zx_status_t) -> fidl_mlme::MlmeEvent {
     fidl_mlme::MlmeEvent::OnWmmStatusResp { status, resp: fake_wmm_status_resp() }
 }
 

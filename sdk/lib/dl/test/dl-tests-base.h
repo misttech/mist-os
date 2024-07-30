@@ -29,6 +29,11 @@ class DlTestsBase : public ::testing::Test {
   static constexpr bool kCanMatchExactError = true;
   // Whether the dlopen implementation validates the mode argument.
   static constexpr bool kCanValidateMode = true;
+  // Whether the test fixture's implementation supports `RTLD_NOLOAD`
+  static constexpr bool kSupportsNoLoadMode = true;
+  // TODO(https://fxbug.dev/348722959): A test fixture may still retrieve the
+  // file with RTLD_NOLOAD mode.
+  static constexpr bool kRetrievesFileWithNoLoad = false;
 
   // Test fixtures are expected to provide definitions for the following API:
   fit::result<Error, void*> DlOpen(const char* file, int mode);

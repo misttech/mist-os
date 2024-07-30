@@ -51,6 +51,7 @@ if (toolchain_environment == "user.basic") {
       "syscall-wrappers.cc",
       "zx_cache_flush.cc",
       "zx_channel_call.cc",
+      "zx_clock_get_boot.cc",
       "zx_clock_get_monotonic.cc",
       "zx_cprng_draw.cc",
       "zx_deadline_after.cc",
@@ -63,6 +64,7 @@ if (toolchain_environment == "user.basic") {
       "zx_system_get_physmem.cc",
       "zx_system_get_version_string.cc",
       "zx_ticks_get.cc",
+      "zx_ticks_get_boot.cc",
       "zx_ticks_per_second.cc",
     ]
 

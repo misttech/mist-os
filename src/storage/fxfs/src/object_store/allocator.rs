@@ -97,7 +97,7 @@ use crate::lsm_tree::cache::NullCache;
 use crate::lsm_tree::skip_list_layer::SkipListLayer;
 use crate::lsm_tree::types::{
     FuzzyHash, Item, ItemRef, Layer, LayerIterator, LayerKey, MergeType, OrdLowerBound,
-    OrdUpperBound, RangeKey, SortByU64,
+    OrdUpperBound, RangeKey, SortByU64, Value,
 };
 use crate::lsm_tree::{layers_from_handles, LSMTree, Query};
 use crate::object_handle::{ObjectHandle, ReadObjectHandle, INVALID_OBJECT_ID};
@@ -400,6 +400,9 @@ impl RangeKey for AllocatorKey {
 /// Allocations are "owned" by a single ObjectStore and are reference counted
 /// (for future snapshot/clone support).
 pub type AllocatorValue = AllocatorValueV32;
+impl Value for AllocatorValue {
+    const DELETED_MARKER: Self = Self::None;
+}
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize, TypeFingerprint, Versioned)]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]

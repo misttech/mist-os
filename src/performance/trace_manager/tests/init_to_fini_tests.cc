@@ -131,7 +131,8 @@ TEST_F(TraceManagerTest, InitToFiniWithNoStop) {
   VerifyCounts(1, 0);
 
   ASSERT_TRUE(TerminateSession());
-  VerifyCounts(1, 0);
+  // Stop is immplicitly called first before terminating.
+  VerifyCounts(1, 1);
 }
 
 static constexpr char kAlertName[] = "alert-name";

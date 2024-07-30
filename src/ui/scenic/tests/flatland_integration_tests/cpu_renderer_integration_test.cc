@@ -4,21 +4,22 @@
 
 #include <fuchsia/sysmem/cpp/fidl.h>
 #include <fuchsia/ui/composition/cpp/fidl.h>
-#include <lib/sys/component/cpp/testing/realm_builder.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/ui/scenic/cpp/view_creation_tokens.h>
 #include <lib/ui/scenic/cpp/view_identity.h>
 
-#include <gtest/gtest.h>
+#include <cstdint>
 
+#include <zxtest/zxtest.h>
+
+#include "fuchsia/ui/test/context/cpp/fidl.h"
 #include "src/ui/scenic/lib/allocation/buffer_collection_import_export_tokens.h"
 #include "src/ui/scenic/lib/flatland/buffers/util.h"
 #include "src/ui/scenic/lib/utils/helpers.h"
 #include "src/ui/scenic/lib/utils/pixel.h"
 #include "src/ui/scenic/tests/utils/blocking_present.h"
-#include "src/ui/scenic/tests/utils/scenic_realm_builder.h"
+#include "src/ui/scenic/tests/utils/scenic_ctf_test_base.h"
 #include "src/ui/scenic/tests/utils/utils.h"
-#include "src/ui/testing/util/logging_event_loop.h"
 #include "src/ui/testing/util/screenshot_helper.h"
 
 namespace integration_tests {
@@ -29,30 +30,16 @@ using fuchsia::ui::composition::FlatlandPtr;
 using fuchsia::ui::composition::ParentViewportWatcher;
 using fuchsia::ui::composition::TransformId;
 
-constexpr auto kBytesPerPixel = 4;
-
-class CpuRendererIntegrationTest : public ui_testing::LoggingEventLoop, public ::testing::Test {
+class CpuRendererIntegrationTest : public ScenicCtfTest {
  public:
-  CpuRendererIntegrationTest()
-      : realm_(ScenicRealmBuilder({.renderer_type_config = "cpu", .display_rotation = 0})
-                   .AddRealmProtocol(fuchsia::ui::composition::Flatland::Name_)
-                   .AddRealmProtocol(fuchsia::ui::composition::FlatlandDisplay::Name_)
-                   .AddRealmProtocol(fuchsia::ui::composition::Allocator::Name_)
-                   .Build()) {
-    auto context = sys::ComponentContext::Create();
-    context->svc()->Connect(sysmem_allocator_.NewRequest());
+  void SetUp() override {
+    ScenicCtfTest::SetUp();
 
-    flatland_display_ = realm_.component().Connect<fuchsia::ui::composition::FlatlandDisplay>();
-    flatland_display_.set_error_handler([](zx_status_t status) {
-      FAIL() << "Lost connection to Scenic: " << zx_status_get_string(status);
-    });
+    LocalServiceDirectory()->Connect(sysmem_allocator_.NewRequest());
 
-    flatland_allocator_ = realm_.component().ConnectSync<fuchsia::ui::composition::Allocator>();
-
-    root_flatland_ = realm_.component().Connect<fuchsia::ui::composition::Flatland>();
-    root_flatland_.set_error_handler([](zx_status_t status) {
-      FAIL() << "Lost connection to Scenic: " << zx_status_get_string(status);
-    });
+    flatland_display_ = ConnectSyncIntoRealm<fuchsia::ui::composition::FlatlandDisplay>();
+    flatland_allocator_ = ConnectSyncIntoRealm<fuchsia::ui::composition::Allocator>();
+    root_flatland_ = ConnectAsyncIntoRealm<fuchsia::ui::composition::Flatland>();
 
     // Attach |root_flatland_| as the only Flatland under |flatland_display_|.
     auto [child_token, parent_token] = scenic::ViewCreationTokenPair::New();
@@ -70,12 +57,18 @@ class CpuRendererIntegrationTest : public ui_testing::LoggingEventLoop, public :
     display_width_ = info->logical_size().width;
     display_height_ = info->logical_size().height;
 
-    screenshotter_ = realm_.component().ConnectSync<fuchsia::ui::composition::Screenshot>();
+    screenshotter_ = ConnectSyncIntoRealm<fuchsia::ui::composition::Screenshot>();
   }
+
+  fuchsia::ui::test::context::RendererType Renderer() const override {
+    return fuchsia::ui::test::context::RendererType::CPU;
+  }
+
+  uint64_t DisplayRotation() const override { return 0; }
 
  protected:
   fuchsia::sysmem2::BufferCollectionInfo SetConstraintsAndAllocateBuffer(
-      fuchsia::sysmem2::BufferCollectionTokenSyncPtr token) {
+      fuchsia::sysmem2::BufferCollectionTokenSyncPtr token, fuchsia::images2::PixelFormat format) {
     fuchsia::sysmem2::BufferCollectionSyncPtr buffer_collection;
     fuchsia::sysmem2::AllocatorBindSharedCollectionRequest bind_shared_request;
     bind_shared_request.set_token(std::move(token));
@@ -87,7 +80,7 @@ class CpuRendererIntegrationTest : public ui_testing::LoggingEventLoop, public :
     constraints.mutable_usage()->set_cpu(fuchsia::sysmem2::CPU_USAGE_WRITE);
     constraints.set_min_buffer_count(1);
     auto& image_constraints = constraints.mutable_image_format_constraints()->emplace_back();
-    image_constraints.set_pixel_format(fuchsia::images2::PixelFormat::B8G8R8A8);
+    image_constraints.set_pixel_format(format);
     image_constraints.mutable_color_spaces()->emplace_back(fuchsia::images2::ColorSpace::SRGB);
     image_constraints.set_required_min_size(
         fuchsia::math::SizeU{.width = display_width_, .height = display_height_});
@@ -118,8 +111,7 @@ class CpuRendererIntegrationTest : public ui_testing::LoggingEventLoop, public :
   fuchsia::ui::composition::ScreenshotSyncPtr screenshotter_;
 
  private:
-  component_testing::RealmRoot realm_;
-  fuchsia::ui::composition::FlatlandDisplayPtr flatland_display_;
+  fuchsia::ui::composition::FlatlandDisplaySyncPtr flatland_display_;
 };
 
 TEST_F(CpuRendererIntegrationTest, RenderSmokeTest) {
@@ -139,7 +131,7 @@ TEST_F(CpuRendererIntegrationTest, RenderSmokeTest) {
 
   // Use the local token to allocate a protected buffer. CpuRenderer sets
   // constraint to complete the allocation.
-  SetConstraintsAndAllocateBuffer(std::move(local_token));
+  SetConstraintsAndAllocateBuffer(std::move(local_token), fuchsia::images2::PixelFormat::B8G8R8A8);
 
   // Create the image in the Flatland instance.
   fuchsia::ui::composition::ImageProperties image_properties = {};
@@ -164,7 +156,11 @@ TEST_F(CpuRendererIntegrationTest, RenderSmokeTest) {
   EXPECT_TRUE(utils::IsEventSignalled(release_fence_copy, ZX_EVENT_SIGNALED));
 }
 
-TEST_F(CpuRendererIntegrationTest, RendersImage) {
+class CpuRendererIntegrationTestWithFormat
+    : public CpuRendererIntegrationTest,
+      public zxtest::WithParamInterface<fuchsia::images2::PixelFormat> {};
+
+TEST_P(CpuRendererIntegrationTestWithFormat, RendersImage) {
   auto [local_token, scenic_token] = utils::CreateSysmemTokens(sysmem_allocator_.get());
 
   // Send one token to Flatland Allocator.
@@ -180,26 +176,38 @@ TEST_F(CpuRendererIntegrationTest, RendersImage) {
   ASSERT_FALSE(result.is_err());
 
   // Use the local token to allocate a protected buffer.
-  auto info = SetConstraintsAndAllocateBuffer(std::move(local_token));
+  auto info = SetConstraintsAndAllocateBuffer(std::move(local_token), GetParam());
+
+  const uint32_t bytes_per_pixel = GetParam() == fuchsia::images2::PixelFormat::B8G8R8A8 ? 4 : 2;
 
   // Write the pixel values to the VMO.
   const uint32_t num_pixels = display_width_ * display_height_;
 
   const utils::Pixel color = utils::kBlue;
+  std::vector<uint8_t> pixel_data = color.ToFormat(GetParam());
   flatland::MapHostPointer(info.buffers()[0].vmo(), flatland::HostPointerAccessMode::kWriteOnly,
-                           [&num_pixels, &color, &info](uint8_t* vmo_ptr, uint32_t num_bytes) {
-                             ASSERT_EQ(num_bytes, num_pixels * kBytesPerPixel);
+                           [&num_pixels, &color, &pixel_data, &info, bytes_per_pixel](
+                               uint8_t* vmo_ptr, uint32_t num_bytes) {
+                             ASSERT_EQ(num_bytes, num_pixels * bytes_per_pixel);
                              ASSERT_EQ(num_bytes, info.settings().buffer_settings().size_bytes());
 
-                             ASSERT_EQ(info.settings().image_format_constraints().pixel_format(),
-                                       fuchsia::images2::PixelFormat::B8G8R8A8);
-                             for (uint32_t i = 0; i < num_bytes; i += kBytesPerPixel) {
-                               // For BGRA32 pixel format, the first and the third byte in the pixel
-                               // corresponds to the blue and the red channel respectively.
-                               vmo_ptr[i] = color.blue;
-                               vmo_ptr[i + 1] = color.green;
-                               vmo_ptr[i + 2] = color.red;
-                               vmo_ptr[i + 3] = color.alpha;
+                             if (info.settings().image_format_constraints().pixel_format() ==
+                                 fuchsia::images2::PixelFormat::B8G8R8A8) {
+                               for (uint32_t i = 0; i < num_bytes; i += bytes_per_pixel) {
+                                 // For BGRA32 pixel format, the first and the third byte in the
+                                 // pixel corresponds to the blue and the red channel respectively.
+                                 vmo_ptr[i] = color.blue;
+                                 vmo_ptr[i + 1] = color.green;
+                                 vmo_ptr[i + 2] = color.red;
+                                 vmo_ptr[i + 3] = color.alpha;
+                               }
+                             } else {
+                               ASSERT_EQ(info.settings().image_format_constraints().pixel_format(),
+                                         fuchsia::images2::PixelFormat::R5G6B5);
+                               for (uint32_t i = 0; i < num_bytes; i += 2) {
+                                 vmo_ptr[i] = pixel_data[0];
+                                 vmo_ptr[i + 1] = pixel_data[1];
+                               }
                              }
 
                              if (info.settings().buffer_settings().coherency_domain() ==
@@ -229,6 +237,10 @@ TEST_F(CpuRendererIntegrationTest, RendersImage) {
 
   EXPECT_EQ(histogram[color], num_pixels);
 }
+
+INSTANTIATE_TEST_SUITE_P(Formats, CpuRendererIntegrationTestWithFormat,
+                         zxtest::Values(fuchsia::images2::PixelFormat::B8G8R8A8,
+                                        fuchsia::images2::PixelFormat::R5G6B5));
 
 TEST_F(CpuRendererIntegrationTest, RendersSolidFill) {
   // Create a red solid fill.

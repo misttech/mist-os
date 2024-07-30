@@ -21,7 +21,7 @@
 #include <random>
 #include <stack>
 
-#include "src/devices/bin/driver_manager/composite_node_spec_v2.h"
+#include "src/devices/bin/driver_manager/composite_node_spec_impl.h"
 #include "src/devices/lib/log/log.h"
 #include "src/lib/fxl/strings/join_strings.h"
 
@@ -228,7 +228,8 @@ Collection ToCollection(const Node& node, fdf::DriverPackageType package_type) {
 DriverRunner::DriverRunner(fidl::ClientEnd<fcomponent::Realm> realm,
                            fidl::ClientEnd<fdi::DriverIndex> driver_index, InspectManager& inspect,
                            LoaderServiceFactory loader_service_factory,
-                           async_dispatcher_t* dispatcher, bool enable_test_shutdown_delays)
+                           async_dispatcher_t* dispatcher, bool enable_test_shutdown_delays,
+                           std::optional<DynamicLinkerArgs> dynamic_linker_args)
     : driver_index_(std::move(driver_index), dispatcher),
       loader_service_factory_(std::move(loader_service_factory)),
       dispatcher_(dispatcher),
@@ -239,7 +240,8 @@ DriverRunner::DriverRunner(fidl::ClientEnd<fcomponent::Realm> realm,
       bind_manager_(this, this, dispatcher),
       runner_(dispatcher, fidl::WireClient(std::move(realm), dispatcher)),
       removal_tracker_(dispatcher),
-      enable_test_shutdown_delays_(enable_test_shutdown_delays) {
+      enable_test_shutdown_delays_(enable_test_shutdown_delays),
+      dynamic_linker_args_(std::move(dynamic_linker_args)) {
   if (enable_test_shutdown_delays_) {
     // TODO(https://fxbug.dev/42084497): Allow the seed to be set from the configuration.
     auto seed = std::chrono::system_clock::now().time_since_epoch().count();
@@ -272,7 +274,7 @@ void DriverRunner::AddSpec(AddSpecRequestView request, AddSpecCompleter::Sync& c
     return;
   }
 
-  auto spec = std::make_unique<CompositeNodeSpecV2>(
+  auto spec = std::make_unique<CompositeNodeSpecImpl>(
       CompositeNodeSpecCreateInfo{
           .name = std::string(request->name().get()),
           .parents = fidl::ToNatural(request->parents()).value(),
@@ -509,6 +511,46 @@ zx::result<DriverHost*> DriverRunner::CreateDriverHost(bool use_next_vdso) {
   driver_hosts_.push_back(std::move(driver_host));
 
   return zx::ok(driver_host_ptr);
+}
+
+void DriverRunner::CreateDriverHostDynamicLinker(
+    fit::callback<void(zx::result<DriverHost*>)> completion_cb) {
+  if (!dynamic_linker_args_.has_value()) {
+    LOGF(ERROR, "Dynamic linker was not available");
+    completion_cb(zx::error(ZX_ERR_NOT_SUPPORTED));
+    return;
+  }
+  auto dynamic_linker_service_client = dynamic_linker_args_->linker_service_factory();
+  if (!dynamic_linker_service_client) {
+    LOGF(ERROR, "Failed to create dynamic linker client");
+    completion_cb(zx::error(ZX_ERR_INTERNAL));
+    return;
+  }
+
+  zx::channel bootstrap_sender, bootstrap_receiver;
+  zx_status_t status = zx::channel::create(0, &bootstrap_sender, &bootstrap_receiver);
+  if (status != ZX_OK) {
+    LOGF(ERROR, "Failed to create bootstrap channels: %s", zx_status_get_string(status));
+    completion_cb(zx::error(status));
+    return;
+  }
+
+  dynamic_linker_args_->driver_host_runner->StartDriverHost(
+      dynamic_linker_service_client.get(), std::move(bootstrap_receiver),
+      [this, linker = std::move(dynamic_linker_service_client),
+       bootstrap_sender = std::move(bootstrap_sender),
+       completion_cb = std::move(completion_cb)](zx::result<> result) mutable {
+        if (result.is_error()) {
+          completion_cb(result.take_error());
+          return;
+        }
+        auto driver_host = std::make_unique<DynamicLinkerDriverHostComponent>(
+            std::move(bootstrap_sender), std::move(linker));
+
+        auto driver_host_ptr = driver_host.get();
+        dynamic_linker_driver_hosts_.push_back(std::move(driver_host));
+        completion_cb(zx::ok(driver_host_ptr));
+      });
 }
 
 bool DriverRunner::IsDriverHostValid(DriverHost* driver_host) const {

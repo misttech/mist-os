@@ -7,8 +7,9 @@ use fidl::endpoints::{create_proxy, ServerEnd};
 use thiserror::Error;
 use tracing::info;
 use {
-    fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio, fidl_fuchsia_session as fsession,
-    fuchsia_async as fasync, fuchsia_zircon as zx,
+    fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
+    fidl_fuchsia_io as fio, fidl_fuchsia_session as fsession, fuchsia_async as fasync,
+    fuchsia_zircon as zx,
 };
 
 /// Errors returned by calls startup functions.
@@ -104,6 +105,7 @@ const SESSION_CHILD_COLLECTION: &str = "session";
 ///
 /// # Parameters
 /// - `session_url`: The URL of the session to launch.
+/// - `config_capabilities`: Configuration capabilities that will target the session.
 /// - `exposed_dir`: The server end on which to serve the session's exposed directory.
 /// - `realm`: The realm in which to launch the session.
 ///
@@ -111,13 +113,14 @@ const SESSION_CHILD_COLLECTION: &str = "session";
 /// If there was a problem creating or binding to the session component instance.
 pub async fn launch_session(
     session_url: &str,
+    config_capabilities: Vec<fdecl::Configuration>,
     exposed_dir: ServerEnd<fio::DirectoryMarker>,
     realm: &fcomponent::RealmProxy,
 ) -> Result<fcomponent::ExecutionControllerProxy, StartupError> {
     info!(session_url, "Launching session");
 
     let start_time = zx::Time::get_monotonic();
-    let controller = set_session(session_url, realm, exposed_dir).await?;
+    let controller = set_session(session_url, config_capabilities, realm, exposed_dir).await?;
     let end_time = zx::Time::get_monotonic();
 
     fasync::Task::local(async move {
@@ -156,6 +159,7 @@ pub async fn stop_session(realm: &fcomponent::RealmProxy) -> Result<(), StartupE
 ///
 /// # Parameters
 /// - `session_url`: The URL of the session to instantiate.
+/// - `config_capabilities`: Configuration capabilities that will target the session.
 /// - `realm`: The realm in which to create the session.
 /// - `exposed_dir`: The server end on which the session's exposed directory will be served.
 ///
@@ -163,6 +167,7 @@ pub async fn stop_session(realm: &fcomponent::RealmProxy) -> Result<(), StartupE
 /// Returns an error if any of the realm operations fail, or the realm is unavailable.
 async fn set_session(
     session_url: &str,
+    config_capabilities: Vec<fdecl::Configuration>,
     realm: &fcomponent::RealmProxy,
     exposed_dir: ServerEnd<fio::DirectoryMarker>,
 ) -> Result<fcomponent::ExecutionControllerProxy, StartupError> {
@@ -186,6 +191,7 @@ async fn set_session(
         create_proxy::<fcomponent::ControllerMarker>().expect("creating proxy should not fail");
     let create_child_args = fcomponent::CreateChildArgs {
         controller: Some(controller_server_end),
+        config_capabilities: Some(config_capabilities),
         ..Default::default()
     };
     realm_management::create_child_component(
@@ -312,7 +318,7 @@ mod tests {
         })?;
 
         let (_exposed_dir, exposed_dir_server_end) = create_endpoints::<fio::DirectoryMarker>();
-        let _controller = set_session(session_url, &realm, exposed_dir_server_end).await?;
+        let _controller = set_session(session_url, vec![], &realm, exposed_dir_server_end).await?;
 
         Ok(())
     }
@@ -359,7 +365,7 @@ mod tests {
         })?;
 
         let (_exposed_dir, exposed_dir_server_end) = create_endpoints::<fio::DirectoryMarker>();
-        let _controller = set_session(session_url, &realm, exposed_dir_server_end).await?;
+        let _controller = set_session(session_url, vec![], &realm, exposed_dir_server_end).await?;
         assert_eq!(NUM_START_CALLS.get(), 1);
 
         Ok(())

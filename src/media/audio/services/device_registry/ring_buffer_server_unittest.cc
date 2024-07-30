@@ -80,7 +80,7 @@ RingBufferServerTest::SetupForCleanShutdownTesting(ElementId element_id,
                                                    const fad::RingBufferOptions& options) {
   auto registry = CreateTestRegistryServer();
   auto token_id = WaitForAddedDeviceTokenId(registry->client());
-  FX_CHECK(token_id);
+  FX_CHECK(token_id.has_value());
   auto control_creator = CreateTestControlCreatorServer();
   auto [presence, device_to_control] = adr_service()->FindDeviceByTokenId(*token_id);
   EXPECT_TRUE(presence == AudioDeviceRegistry::DevicePresence::Active);
@@ -184,7 +184,7 @@ TEST_F(RingBufferServerCompositeTest, CreateRingBufferReturnParameters) {
   auto registry = CreateTestRegistryServer();
 
   auto token_id = WaitForAddedDeviceTokenId(registry->client());
-  ASSERT_TRUE(token_id);
+  ASSERT_TRUE(token_id.has_value());
   auto [presence, device_to_control] = adr_service()->FindDeviceByTokenId(*token_id);
   EXPECT_EQ(presence, AudioDeviceRegistry::DevicePresence::Active);
   auto control = CreateTestControlServer(device_to_control);
@@ -248,7 +248,7 @@ TEST_F(RingBufferServerCompositeTest, DriverSupportsSetActiveChannels) {
   auto registry = CreateTestRegistryServer();
 
   auto token_id = WaitForAddedDeviceTokenId(registry->client());
-  ASSERT_TRUE(token_id);
+  ASSERT_TRUE(token_id.has_value());
   auto [presence, device_to_control] = adr_service()->FindDeviceByTokenId(*token_id);
   EXPECT_EQ(presence, AudioDeviceRegistry::DevicePresence::Active);
   auto control = CreateTestControlServer(device_to_control);
@@ -305,7 +305,7 @@ TEST_F(RingBufferServerCompositeTest, DriverDoesNotSupportSetActiveChannels) {
   auto registry = CreateTestRegistryServer();
 
   auto token_id = WaitForAddedDeviceTokenId(registry->client());
-  ASSERT_TRUE(token_id);
+  ASSERT_TRUE(token_id.has_value());
   auto [presence, added_device] = adr_service()->FindDeviceByTokenId(*token_id);
   ASSERT_EQ(presence, AudioDeviceRegistry::DevicePresence::Active);
   auto control = CreateTestControlServer(added_device);
@@ -357,7 +357,7 @@ TEST_F(RingBufferServerCompositeTest, StartAndStop) {
   auto registry = CreateTestRegistryServer();
 
   auto token_id = WaitForAddedDeviceTokenId(registry->client());
-  ASSERT_TRUE(token_id);
+  ASSERT_TRUE(token_id.has_value());
   auto [presence, device_to_control] = adr_service()->FindDeviceByTokenId(*token_id);
   EXPECT_EQ(presence, AudioDeviceRegistry::DevicePresence::Active);
   auto control = CreateTestControlServer(device_to_control);
@@ -443,7 +443,7 @@ TEST_F(RingBufferServerCompositeTest, WatchDelayInfoInitialValues) {
   auto registry = CreateTestRegistryServer();
 
   auto token_id = WaitForAddedDeviceTokenId(registry->client());
-  ASSERT_TRUE(token_id);
+  ASSERT_TRUE(token_id.has_value());
   auto [presence, device_to_control] = adr_service()->FindDeviceByTokenId(*token_id);
   EXPECT_EQ(presence, AudioDeviceRegistry::DevicePresence::Active);
   auto control = CreateTestControlServer(device_to_control);
@@ -497,7 +497,7 @@ TEST_F(RingBufferServerCompositeTest, WatchDelayInfoDynamicUpdates) {
   auto registry = CreateTestRegistryServer();
 
   auto token_id = WaitForAddedDeviceTokenId(registry->client());
-  ASSERT_TRUE(token_id);
+  ASSERT_TRUE(token_id.has_value());
   auto [presence, device_to_control] = adr_service()->FindDeviceByTokenId(*token_id);
   ASSERT_EQ(presence, AudioDeviceRegistry::DevicePresence::Active);
   auto control = CreateTestControlServer(device_to_control);
@@ -567,7 +567,7 @@ TEST_F(RingBufferServerCompositeTest, ControlClientDropCausesRingBufferDrop) {
   auto registry = CreateTestRegistryServer();
 
   auto token_id = WaitForAddedDeviceTokenId(registry->client());
-  ASSERT_TRUE(token_id);
+  ASSERT_TRUE(token_id.has_value());
   auto [presence, device_to_control] = adr_service()->FindDeviceByTokenId(*token_id);
   EXPECT_EQ(presence, AudioDeviceRegistry::DevicePresence::Active);
   auto control = CreateTestControlServer(device_to_control);
@@ -609,7 +609,7 @@ TEST_F(RingBufferServerCompositeTest, ControlServerShutdownCausesRingBufferDrop)
   auto registry = CreateTestRegistryServer();
 
   auto token_id = WaitForAddedDeviceTokenId(registry->client());
-  ASSERT_TRUE(token_id);
+  ASSERT_TRUE(token_id.has_value());
   auto [presence, device_to_control] = adr_service()->FindDeviceByTokenId(*token_id);
   EXPECT_EQ(presence, AudioDeviceRegistry::DevicePresence::Active);
   auto control = CreateTestControlServer(device_to_control);
@@ -653,7 +653,7 @@ TEST_F(RingBufferServerCompositeTest, SecondRingBufferAfterDrop) {
   auto registry = CreateTestRegistryServer();
 
   auto token_id = WaitForAddedDeviceTokenId(registry->client());
-  ASSERT_TRUE(token_id);
+  ASSERT_TRUE(token_id.has_value());
   auto [presence, device_to_control] = adr_service()->FindDeviceByTokenId(*token_id);
   ASSERT_EQ(presence, AudioDeviceRegistry::DevicePresence::Active);
   {
@@ -805,7 +805,7 @@ TEST_F(RingBufferServerStreamConfigTest, CreateRingBufferReturnParameters) {
   auto registry = CreateTestRegistryServer();
 
   auto token_id = WaitForAddedDeviceTokenId(registry->client());
-  ASSERT_TRUE(token_id);
+  ASSERT_TRUE(token_id.has_value());
   auto [presence, device_to_control] = adr_service()->FindDeviceByTokenId(*token_id);
   EXPECT_EQ(presence, AudioDeviceRegistry::DevicePresence::Active);
   auto control = CreateTestControlServer(device_to_control);
@@ -859,7 +859,7 @@ TEST_F(RingBufferServerStreamConfigTest, DriverSupportsSetActiveChannels) {
   auto registry = CreateTestRegistryServer();
 
   auto token_id = WaitForAddedDeviceTokenId(registry->client());
-  ASSERT_TRUE(token_id);
+  ASSERT_TRUE(token_id.has_value());
   auto [presence, device_to_control] = adr_service()->FindDeviceByTokenId(*token_id);
   EXPECT_EQ(presence, AudioDeviceRegistry::DevicePresence::Active);
   auto control = CreateTestControlServer(device_to_control);
@@ -911,7 +911,7 @@ TEST_F(RingBufferServerStreamConfigTest, DriverDoesNotSupportSetActiveChannels) 
   auto registry = CreateTestRegistryServer();
 
   auto token_id = WaitForAddedDeviceTokenId(registry->client());
-  ASSERT_TRUE(token_id);
+  ASSERT_TRUE(token_id.has_value());
   auto [presence, added_device] = adr_service()->FindDeviceByTokenId(*token_id);
   ASSERT_EQ(presence, AudioDeviceRegistry::DevicePresence::Active);
   auto control = CreateTestControlServer(added_device);
@@ -959,7 +959,7 @@ TEST_F(RingBufferServerStreamConfigTest, StartAndStop) {
   auto registry = CreateTestRegistryServer();
 
   auto token_id = WaitForAddedDeviceTokenId(registry->client());
-  ASSERT_TRUE(token_id);
+  ASSERT_TRUE(token_id.has_value());
   auto [presence, device_to_control] = adr_service()->FindDeviceByTokenId(*token_id);
   EXPECT_EQ(presence, AudioDeviceRegistry::DevicePresence::Active);
   auto control = CreateTestControlServer(device_to_control);
@@ -1040,7 +1040,7 @@ TEST_F(RingBufferServerStreamConfigTest, WatchDelayInfoInitialValues) {
   auto registry = CreateTestRegistryServer();
 
   auto token_id = WaitForAddedDeviceTokenId(registry->client());
-  ASSERT_TRUE(token_id);
+  ASSERT_TRUE(token_id.has_value());
   auto [presence, device_to_control] = adr_service()->FindDeviceByTokenId(*token_id);
   EXPECT_EQ(presence, AudioDeviceRegistry::DevicePresence::Active);
   auto control = CreateTestControlServer(device_to_control);
@@ -1090,7 +1090,7 @@ TEST_F(RingBufferServerStreamConfigTest, WatchDelayInfoDynamicUpdates) {
   auto registry = CreateTestRegistryServer();
 
   auto token_id = WaitForAddedDeviceTokenId(registry->client());
-  ASSERT_TRUE(token_id);
+  ASSERT_TRUE(token_id.has_value());
   auto [presence, device_to_control] = adr_service()->FindDeviceByTokenId(*token_id);
   ASSERT_EQ(presence, AudioDeviceRegistry::DevicePresence::Active);
   auto control = CreateTestControlServer(device_to_control);
@@ -1155,7 +1155,7 @@ TEST_F(RingBufferServerStreamConfigTest, ControlClientDropCausesRingBufferDrop) 
   auto registry = CreateTestRegistryServer();
 
   auto token_id = WaitForAddedDeviceTokenId(registry->client());
-  ASSERT_TRUE(token_id);
+  ASSERT_TRUE(token_id.has_value());
   auto [presence, device_to_control] = adr_service()->FindDeviceByTokenId(*token_id);
   EXPECT_EQ(presence, AudioDeviceRegistry::DevicePresence::Active);
   auto control = CreateTestControlServer(device_to_control);
@@ -1193,7 +1193,7 @@ TEST_F(RingBufferServerStreamConfigTest, ControlServerShutdownCausesRingBufferDr
   auto registry = CreateTestRegistryServer();
 
   auto token_id = WaitForAddedDeviceTokenId(registry->client());
-  ASSERT_TRUE(token_id);
+  ASSERT_TRUE(token_id.has_value());
   auto [presence, device_to_control] = adr_service()->FindDeviceByTokenId(*token_id);
   EXPECT_EQ(presence, AudioDeviceRegistry::DevicePresence::Active);
   auto control = CreateTestControlServer(device_to_control);
@@ -1233,7 +1233,7 @@ TEST_F(RingBufferServerStreamConfigTest, SecondRingBufferAfterDrop) {
   auto registry = CreateTestRegistryServer();
 
   auto token_id = WaitForAddedDeviceTokenId(registry->client());
-  ASSERT_TRUE(token_id);
+  ASSERT_TRUE(token_id.has_value());
   auto [presence, device_to_control] = adr_service()->FindDeviceByTokenId(*token_id);
   ASSERT_EQ(presence, AudioDeviceRegistry::DevicePresence::Active);
   {

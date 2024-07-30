@@ -284,17 +284,17 @@ fn new_file_security_context_minimal() {
         .validate()
         .expect("validate policy");
     let source = policy
-        .parse_security_context("source_u:source_r:source_t:s0:c0-s2:c0.c1".as_bytes())
+        .parse_security_context(b"source_u:source_r:source_t:s0:c0-s2:c0.c1".into())
         .expect("valid source security context");
     let target = policy
-        .parse_security_context("target_u:target_r:target_t:s1:c1".as_bytes())
+        .parse_security_context(b"target_u:target_r:target_t:s1:c1".into())
         .expect("valid target security context");
 
     let actual = policy
         .new_file_security_context(&source, &target, &FileClass::File)
         .expect("compute new context for new file");
     let expected: SecurityContext = policy
-        .parse_security_context("source_u:object_r:target_t:s0:c0".as_bytes())
+        .parse_security_context(b"source_u:object_r:target_t:s0:c0".into())
         .expect("valid expected security context");
 
     assert_eq!(expected, actual);
@@ -310,10 +310,10 @@ fn new_security_context_minimal() {
         .validate()
         .expect("validate policy");
     let source = policy
-        .parse_security_context("source_u:source_r:source_t:s0:c0-s2:c0.c1".as_bytes())
+        .parse_security_context(b"source_u:source_r:source_t:s0:c0-s2:c0.c1".into())
         .expect("valid source security context");
     let target = policy
-        .parse_security_context("target_u:target_r:target_t:s1:c1".as_bytes())
+        .parse_security_context(b"target_u:target_r:target_t:s1:c1".into())
         .expect("valid target security context");
 
     let actual = policy
@@ -333,17 +333,17 @@ fn new_file_security_context_class_defaults() {
         .validate()
         .expect("validate policy");
     let source = policy
-        .parse_security_context("source_u:source_r:source_t:s0:c0-s2:c0.c1".as_bytes())
+        .parse_security_context(b"source_u:source_r:source_t:s0:c0-s2:c0.c1".into())
         .expect("valid source security context");
     let target = policy
-        .parse_security_context("target_u:target_r:target_t:s1:c0-s1:c0.c1".as_bytes())
+        .parse_security_context(b"target_u:target_r:target_t:s1:c0-s1:c0.c1".into())
         .expect("valid target security context");
 
     let actual = policy
         .new_file_security_context(&source, &target, &FileClass::File)
         .expect("compute new context for new file");
     let expected: SecurityContext = policy
-        .parse_security_context("target_u:source_r:source_t:s1:c0-s1:c0.c1".as_bytes())
+        .parse_security_context(b"target_u:source_r:source_t:s1:c0-s1:c0.c1".into())
         .expect("valid expected security context");
 
     assert_eq!(expected, actual);
@@ -359,17 +359,17 @@ fn new_security_context_class_defaults() {
         .validate()
         .expect("validate policy");
     let source = policy
-        .parse_security_context("source_u:source_r:source_t:s0:c0-s2:c0.c1".as_bytes())
+        .parse_security_context(b"source_u:source_r:source_t:s0:c0-s2:c0.c1".into())
         .expect("valid source security context");
     let target = policy
-        .parse_security_context("target_u:target_r:target_t:s1:c0-s1:c0.c1".as_bytes())
+        .parse_security_context(b"target_u:target_r:target_t:s1:c0-s1:c0.c1".into())
         .expect("valid target security context");
 
     let actual = policy
         .new_security_context(&source, &target, &ObjectClass::Process)
         .expect("compute new context for new file");
     let expected: SecurityContext = policy
-        .parse_security_context("target_u:source_r:source_t:s1:c0-s1:c0.c1".as_bytes())
+        .parse_security_context(b"target_u:source_r:source_t:s1:c0-s1:c0.c1".into())
         .expect("valid expected security context");
 
     assert_eq!(expected, actual);
@@ -387,17 +387,17 @@ fn new_file_security_context_role_transition() {
         .validate()
         .expect("validate policy");
     let source = policy
-        .parse_security_context("source_u:source_r:source_t:s0:c0-s2:c0.c1".as_bytes())
+        .parse_security_context(b"source_u:source_r:source_t:s0:c0-s2:c0.c1".into())
         .expect("valid source security context");
     let target = policy
-        .parse_security_context("target_u:target_r:target_t:s1:c1".as_bytes())
+        .parse_security_context(b"target_u:target_r:target_t:s1:c1".into())
         .expect("valid target security context");
 
     let actual = policy
         .new_file_security_context(&source, &target, &FileClass::File)
         .expect("compute new context for new file");
     let expected: SecurityContext = policy
-        .parse_security_context("source_u:transition_r:target_t:s0:c0".as_bytes())
+        .parse_security_context(b"source_u:transition_r:target_t:s0:c0".into())
         .expect("valid expected security context");
 
     assert_eq!(expected, actual);
@@ -415,17 +415,17 @@ fn new_security_context_role_transition() {
         .validate()
         .expect("validate policy");
     let source = policy
-        .parse_security_context("source_u:source_r:source_t:s0:c0-s2:c0.c1".as_bytes())
+        .parse_security_context(b"source_u:source_r:source_t:s0:c0-s2:c0.c1".into())
         .expect("valid source security context");
     let target = policy
-        .parse_security_context("target_u:target_r:target_t:s1:c1".as_bytes())
+        .parse_security_context(b"target_u:target_r:target_t:s1:c1".into())
         .expect("valid target security context");
 
     let actual = policy
         .new_security_context(&source, &target, &ObjectClass::Process)
         .expect("compute new context for new file");
     let expected: SecurityContext = policy
-        .parse_security_context("source_u:transition_r:source_t:s0:c0-s2:c0.c1".as_bytes())
+        .parse_security_context(b"source_u:transition_r:source_t:s0:c0-s2:c0.c1".into())
         .expect("valid expected security context");
 
     assert_eq!(expected, actual);
@@ -445,10 +445,10 @@ fn new_file_security_context_role_transition_not_allowed() {
         .validate()
         .expect("validate policy");
     let source = policy
-        .parse_security_context("source_u:source_r:source_t:s0:c0-s2:c0.c1".as_bytes())
+        .parse_security_context(b"source_u:source_r:source_t:s0:c0-s2:c0.c1".into())
         .expect("valid source security context");
     let target = policy
-        .parse_security_context("target_u:target_r:target_t:s1:c1".as_bytes())
+        .parse_security_context(b"target_u:target_r:target_t:s1:c1".into())
         .expect("valid target security context");
 
     let actual = policy.new_file_security_context(&source, &target, &FileClass::File);
@@ -469,17 +469,17 @@ fn new_file_security_context_type_transition() {
         .validate()
         .expect("validate policy");
     let source = policy
-        .parse_security_context("source_u:source_r:source_t:s0:c0-s2:c0.c1".as_bytes())
+        .parse_security_context(b"source_u:source_r:source_t:s0:c0-s2:c0.c1".into())
         .expect("valid source security context");
     let target = policy
-        .parse_security_context("target_u:target_r:target_t:s1:c1".as_bytes())
+        .parse_security_context(b"target_u:target_r:target_t:s1:c1".into())
         .expect("valid target security context");
 
     let actual = policy
         .new_file_security_context(&source, &target, &FileClass::File)
         .expect("compute new context for new file");
     let expected: SecurityContext = policy
-        .parse_security_context("source_u:object_r:transition_t:s0:c0".as_bytes())
+        .parse_security_context(b"source_u:object_r:transition_t:s0:c0".into())
         .expect("valid expected security context");
 
     assert_eq!(expected, actual);
@@ -497,17 +497,17 @@ fn new_security_context_type_transition() {
         .validate()
         .expect("validate policy");
     let source = policy
-        .parse_security_context("source_u:source_r:source_t:s0:c0-s2:c0.c1".as_bytes())
+        .parse_security_context(b"source_u:source_r:source_t:s0:c0-s2:c0.c1".into())
         .expect("valid source security context");
     let target = policy
-        .parse_security_context("target_u:target_r:target_t:s1:c1".as_bytes())
+        .parse_security_context(b"target_u:target_r:target_t:s1:c1".into())
         .expect("valid target security context");
 
     let actual = policy
         .new_security_context(&source, &target, &ObjectClass::Process)
         .expect("compute new context for new file");
     let expected: SecurityContext = policy
-        .parse_security_context("source_u:source_r:transition_t:s0:c0-s2:c0.c1".as_bytes())
+        .parse_security_context(b"source_u:source_r:transition_t:s0:c0-s2:c0.c1".into())
         .expect("valid expected security context");
 
     assert_eq!(expected, actual);
@@ -525,17 +525,17 @@ fn new_file_security_context_range_transition() {
         .validate()
         .expect("validate policy");
     let source = policy
-        .parse_security_context("source_u:source_r:source_t:s0:c0-s2:c0.c1".as_bytes())
+        .parse_security_context(b"source_u:source_r:source_t:s0:c0-s2:c0.c1".into())
         .expect("valid source security context");
     let target = policy
-        .parse_security_context("target_u:target_r:target_t:s1:c1".as_bytes())
+        .parse_security_context(b"target_u:target_r:target_t:s1:c1".into())
         .expect("valid target security context");
 
     let actual = policy
         .new_file_security_context(&source, &target, &FileClass::File)
         .expect("compute new context for new file");
     let expected: SecurityContext = policy
-        .parse_security_context("source_u:object_r:target_t:s1:c1-s2:c1.c2".as_bytes())
+        .parse_security_context(b"source_u:object_r:target_t:s1:c1-s2:c1.c2".into())
         .expect("valid expected security context");
 
     assert_eq!(expected, actual);
@@ -553,17 +553,17 @@ fn new_security_context_range_transition() {
         .validate()
         .expect("validate policy");
     let source = policy
-        .parse_security_context("source_u:source_r:source_t:s0:c0-s2:c0.c1".as_bytes())
+        .parse_security_context(b"source_u:source_r:source_t:s0:c0-s2:c0.c1".into())
         .expect("valid source security context");
     let target = policy
-        .parse_security_context("target_u:target_r:target_t:s1:c1".as_bytes())
+        .parse_security_context(b"target_u:target_r:target_t:s1:c1".into())
         .expect("valid target security context");
 
     let actual = policy
         .new_security_context(&source, &target, &ObjectClass::Process)
         .expect("compute new context for new file");
     let expected: SecurityContext = policy
-        .parse_security_context("source_u:source_r:source_t:s1:c1-s2:c1.c2".as_bytes())
+        .parse_security_context(b"source_u:source_r:source_t:s1:c1-s2:c1.c2".into())
         .expect("valid expected security context");
 
     assert_eq!(expected, actual);

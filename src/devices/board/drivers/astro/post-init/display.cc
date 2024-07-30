@@ -5,7 +5,6 @@
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
 #include <lib/ddk/metadata.h>
-#include <lib/ddk/platform-defs.h>
 #include <lib/device-protocol/display-panel.h>
 #include <lib/driver/component/cpp/composite_node_spec.h>
 #include <lib/driver/component/cpp/node_add_args.h>
@@ -119,9 +118,9 @@ zx::result<> PostInit::InitDisplay() {
   const fpbus::Node display_dev = []() {
     fpbus::Node dev = {};
     dev.name() = "display";
-    dev.vid() = PDEV_VID_AMLOGIC;
-    dev.pid() = PDEV_PID_AMLOGIC_S905D2;
-    dev.did() = PDEV_DID_AMLOGIC_DISPLAY;
+    dev.vid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_VID_AMLOGIC;
+    dev.pid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_PID_S905D2;
+    dev.did() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_DISPLAY;
     dev.metadata() = display_panel_metadata;
     dev.mmio() = display_mmios;
     dev.irq() = display_irqs;

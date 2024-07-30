@@ -157,6 +157,8 @@ impl Graveyard {
         let graveyard_object_id = store.graveyard_directory_object_id();
         let mut iter = Self::iter(graveyard_object_id, &mut merger).await?;
         let store_id = store.store_object_id();
+        // TODO(https://fxbug.dev/355246066): This iteration can sometimes attempt to reap
+        // attributes after they've been reaped as part of the parent object.
         while let Some(GraveyardEntryInfo { object_id, attribute_id, sequence: _, value }) =
             iter.get()
         {

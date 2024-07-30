@@ -56,7 +56,7 @@ async fn component_selectors_filter_logs() {
     // We should see logs from components started before and after we began to listen.
     for _ in 0..6 {
         let log = stream.next().await.unwrap();
-        assert!(log.moniker.starts_with("puppet_a"));
+        assert!(log.moniker.to_string().starts_with("puppet_a"));
         assert_data_tree!(log.payload.unwrap(), root: {
             message: {
                 value: HELLO_WORLD,

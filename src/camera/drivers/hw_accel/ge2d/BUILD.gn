@@ -15,8 +15,8 @@ group("tests") {
 }
 
 driver_bind_rules("ge2d_bind") {
-  rules = "ge2d.bind"
-  tests = "bind_tests.json"
+  rules = "meta/ge2d.bind"
+  tests = "meta/bind_tests.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.amlogiccanvas:fuchsia.hardware.amlogiccanvas_bindlib",
     "//src/devices/bind/fuchsia.amlogic.platform",
@@ -70,7 +70,7 @@ fuchsia_driver("ge2d-driver-driver") {
 fuchsia_driver_component("ge2d-driver") {
   component_name = "ge2d"
   deps = [ ":ge2d-driver-driver" ]
-  info = "ge2d-driver-info.json"
+  info = "meta/ge2d-driver-info.json"
   manifest = "meta/ge2d-driver.cml"
 }
 

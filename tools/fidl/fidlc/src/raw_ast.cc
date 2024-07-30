@@ -92,6 +92,20 @@ void RawAttributeList::Accept(TreeVisitor* visitor) const {
   }
 }
 
+void RawModifier::Accept(TreeVisitor* visitor) const {
+  SourceElementMark sem(visitor, *this);
+  if (auto& attribute = maybe_available_attribute) {
+    visitor->OnAttribute(attribute);
+  }
+}
+
+void RawModifierList::Accept(TreeVisitor* visitor) const {
+  SourceElementMark sem(visitor, *this);
+  for (auto& i : modifiers) {
+    visitor->OnModifier(i);
+  }
+}
+
 void RawLibraryDeclaration::Accept(TreeVisitor* visitor) const {
   SourceElementMark sem(visitor, *this);
   if (attributes != nullptr) {
@@ -143,7 +157,7 @@ void RawProtocolMethod::Accept(TreeVisitor* visitor) const {
     visitor->OnAttributeList(attributes);
   }
   if (modifiers != nullptr) {
-    visitor->OnModifiers(modifiers);
+    visitor->OnModifierList(modifiers);
   }
   visitor->OnIdentifier(identifier);
   if (maybe_request != nullptr) {
@@ -171,7 +185,7 @@ void RawProtocolDeclaration::Accept(TreeVisitor* visitor) const {
     visitor->OnAttributeList(attributes);
   }
   if (modifiers != nullptr) {
-    visitor->OnModifiers(modifiers);
+    visitor->OnModifierList(modifiers);
   }
   visitor->OnIdentifier(identifier);
   for (const auto& composed_protocol : composed_protocols) {
@@ -224,8 +238,6 @@ void RawServiceDeclaration::Accept(TreeVisitor* visitor) const {
     visitor->OnServiceMember(member);
   }
 }
-
-void RawModifiers::Accept(TreeVisitor* visitor) const { SourceElementMark sem(visitor, *this); }
 
 void RawIdentifierLayoutParameter::Accept(TreeVisitor* visitor) const {
   SourceElementMark sem(visitor, *this);
@@ -288,7 +300,7 @@ void RawValueLayoutMember::Accept(TreeVisitor* visitor) const {
 void RawLayout::Accept(TreeVisitor* visitor) const {
   SourceElementMark sem(visitor, *this);
   if (modifiers != nullptr) {
-    visitor->OnModifiers(modifiers);
+    visitor->OnModifierList(modifiers);
   }
   if (subtype_ctor != nullptr) {
     visitor->OnTypeConstructor(subtype_ctor);

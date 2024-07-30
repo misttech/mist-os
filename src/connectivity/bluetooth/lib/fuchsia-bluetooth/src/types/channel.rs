@@ -146,6 +146,12 @@ impl Channel {
         }
     }
 
+    /// Consume this to make it into a socket.  Useful in tests to adjust socket parameters.
+    /// If it fails, returns itself back.
+    pub fn into_socket(self) -> Result<zx::Socket, Self> {
+        Ok(self.socket.into_zx_socket())
+    }
+
     /// Attempt to set the flush timeout for this channel.
     /// If the timeout is not already set within 1ms of `duration`, we attempt to set it using the
     /// L2cap parameter extension.
@@ -183,6 +189,38 @@ impl Channel {
         let close_signals = zx::Signals::SOCKET_PEER_CLOSED;
         let close_wait = fasync::OnSignals::new(&self.socket, close_signals);
         close_wait.map_ok(|_o| ())
+    }
+
+    pub fn poll_datagram(
+        &self,
+        cx: &mut Context<'_>,
+        out: &mut Vec<u8>,
+    ) -> Poll<Result<usize, zx::Status>> {
+        self.socket.poll_datagram(cx, out)
+    }
+
+    /// Read from the channel, allocating a Vec for the packet.
+    /// This will return zx::Status::SHOULD_WAIT if there is no data waiting to read.
+    pub fn read_packet(&self) -> Result<Vec<u8>, zx::Status> {
+        let bytes_waiting = self.socket.as_ref().outstanding_read_bytes()?;
+        if bytes_waiting == 0 {
+            return Err(zx::Status::SHOULD_WAIT);
+        }
+        let mut packet = vec![0; bytes_waiting];
+        let _ = self.read(&mut packet[..])?;
+        Ok(packet)
+    }
+
+    /// Read from the channel. This will return zx::Status::SHOULD_WAIT if there is no data
+    /// available.  If `buf` is not large enough, the rest of the packet will be thrown out.
+    pub fn read(&self, buf: &mut [u8]) -> Result<usize, zx::Status> {
+        self.socket.as_ref().read(buf)
+    }
+
+    /// Write to the channel.  This will return zx::Status::SHOULD_WAIT if the
+    /// the channel is too full.  Use the poll_write for asynchronous writing.
+    pub fn write(&self, bytes: &[u8]) -> Result<usize, zx::Status> {
+        self.socket.as_ref().write(bytes)
     }
 }
 
@@ -249,14 +287,19 @@ impl Stream for Channel {
         }
 
         let mut res = Vec::<u8>::new();
-        match self.socket.poll_datagram(cx, &mut res) {
-            Poll::Ready(Ok(_size)) => Poll::Ready(Some(Ok(res))),
-            Poll::Ready(Err(zx::Status::PEER_CLOSED)) => {
-                self.terminated = true;
-                Poll::Ready(None)
-            }
-            Poll::Ready(Err(e)) => Poll::Ready(Some(Err(e))),
-            Poll::Pending => Poll::Pending,
+        loop {
+            break match self.socket.poll_datagram(cx, &mut res) {
+                // TODO(https://fxbug.dev/42072274): Sometimes sockets return spirious 0 byte packets when polled.
+                // Try again.
+                Poll::Ready(Ok(0)) => continue,
+                Poll::Ready(Ok(_size)) => Poll::Ready(Some(Ok(res))),
+                Poll::Ready(Err(zx::Status::PEER_CLOSED)) => {
+                    self.terminated = true;
+                    Poll::Ready(None)
+                }
+                Poll::Ready(Err(e)) => Poll::Ready(Some(Err(e))),
+                Poll::Pending => Poll::Pending,
+            };
         }
     }
 }
@@ -272,6 +315,16 @@ impl Deref for Channel {
 
     fn deref(&self) -> &Self::Target {
         &self.socket
+    }
+}
+
+impl io::AsyncRead for Channel {
+    fn poll_read(
+        mut self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut [u8],
+    ) -> Poll<Result<usize, futures::io::Error>> {
+        Pin::new(&mut self.socket).as_mut().poll_read(cx, buf)
     }
 }
 
@@ -297,22 +350,25 @@ impl io::AsyncWrite for Channel {
 mod tests {
     use super::*;
     use fidl::endpoints::create_request_stream;
-    use futures::{FutureExt, StreamExt};
+    use futures::{AsyncReadExt, FutureExt, StreamExt};
     use std::pin::pin;
 
     #[test]
     fn test_channel_create_and_write() {
         let _exec = fasync::TestExecutor::new();
-        let (recv, send) = Channel::create();
+        let (mut recv, send) = Channel::create();
 
-        let mut vec = Vec::new();
-        let datagram_fut = recv.read_datagram(&mut vec);
+        let mut buf: [u8; 8] = [0; 8];
+        let read_fut = AsyncReadExt::read(&mut recv, &mut buf);
 
         let heart: &[u8] = &[0xF0, 0x9F, 0x92, 0x96];
-        assert_eq!(heart.len(), send.as_ref().write(heart).expect("should write successfully"));
+        assert_eq!(heart.len(), send.write(heart).expect("should write successfully"));
 
-        assert_eq!(Some(Ok(4)), datagram_fut.now_or_never());
-        assert_eq!(heart, vec.as_slice());
+        match read_fut.now_or_never() {
+            Some(Ok(4)) => {}
+            x => panic!("Expected Ok(4) from the read, got {x:?}"),
+        };
+        assert_eq!(heart, &buf[0..4]);
     }
 
     #[test]

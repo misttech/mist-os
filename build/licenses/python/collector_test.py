@@ -5,20 +5,21 @@
 """Tests for Collector."""
 
 
-from collections import defaultdict
 import dataclasses
-from gn_license_metadata import (
-    GnLicenseMetadata,
-    GnLicenseMetadataDB,
-    GnApplicableLicensesMetadata,
-)
+import tempfile
+import unittest
+from collections import defaultdict
 from pathlib import Path
+
+from collector import Collector, CollectorError, CollectorErrorKind
 from file_access import FileAccess
 from gn_label import GnLabel
+from gn_license_metadata import (
+    GnApplicableLicensesMetadata,
+    GnLicenseMetadata,
+    GnLicenseMetadataDB,
+)
 from readme_fuchsia import ReadmesDB
-from collector import Collector, CollectorError, CollectorErrorKind
-import unittest
-import tempfile
 
 
 class CollectorTest(unittest.TestCase):

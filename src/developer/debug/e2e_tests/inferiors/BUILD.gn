@@ -109,6 +109,25 @@ inferior("pretty_types") {
   deps = [ "//build/config/fuchsia:uses-outline-atomics-fxbug98632" ]
 }
 
+# Creates some types that are linked in to the pretty_types_rust binary below to make sure the
+# expression evaluation doesn't fail when types shadow member variable names.
+static_library("rust_pretty_types_lib") {
+  visibility = [ ":*" ]
+  sources = [
+    "rust_pretty_types_lib.cc",
+    "rust_pretty_types_lib.h",
+  ]
+}
+
+inferior("pretty_types_rust") {
+  type = "rustc_binary"
+  edition = "2021"
+  sources = [ "pretty_types.rs" ]
+  source_root = "pretty_types.rs"
+
+  non_rust_deps = [ ":rust_pretty_types_lib" ]
+}
+
 inferior("rust_functions") {
   type = "rustc_binary"
   edition = "2021"
@@ -164,6 +183,7 @@ fuchsia_package("zxdb_e2e_inferiors") {
     ":inlined_crasher",
     ":loop",
     ":pretty_types",
+    ":pretty_types_rust",
     ":rust_functions",
     ":simplified_templates",
     ":step_plt",

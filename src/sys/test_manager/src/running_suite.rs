@@ -7,8 +7,9 @@ use crate::constants::{
     CUSTOM_ARTIFACTS_CAPABILITY_NAME, HERMETIC_RESOLVER_REALM_NAME, TEST_ENVIRONMENT_NAME,
     TEST_ROOT_COLLECTION, TEST_ROOT_REALM_NAME, WRAPPER_REALM_NAME,
 };
+use crate::debug_agent::DebugAgent;
 use crate::debug_data_processor::{serve_debug_data_publisher, DebugDataSender};
-use crate::error::LaunchTestError;
+use crate::error::{DebugAgentError, LaunchTestError};
 use crate::offers::apply_offers;
 use crate::run_events::SuiteEvents;
 use crate::self_diagnostics::DiagnosticNode;
@@ -71,6 +72,9 @@ pub(crate) struct RunningSuite {
     test_realm_proxy: fcomponent::RealmProxy,
     /// exposed directory of the test realm.
     exposed_dir: fio::DirectoryProxy,
+
+    /// Wrapper for `DebugAgent` service.
+    debug_agent: Option<DebugAgent>,
 }
 
 impl RunningSuite {
@@ -83,6 +87,7 @@ impl RunningSuite {
         debug_data_sender: DebugDataSender,
         diagnostics: &DiagnosticNode,
         suite_realm: &Option<SuiteRealm>,
+        use_debug_agent: bool,
     ) -> Result<Self, LaunchTestError> {
         info!(test_url, ?diagnostics, collection = facets.collection, "Starting test suite.");
 
@@ -150,6 +155,11 @@ impl RunningSuite {
             instance,
             test_realm_proxy,
             exposed_dir,
+            debug_agent: if use_debug_agent {
+                DebugAgent::new().await.map_err(log_warning).ok()
+            } else {
+                None
+            },
         })
     }
 
@@ -318,6 +328,9 @@ impl RunningSuite {
                     }
                 };
                 if res == SuiteStatus::TimedOut {
+                    if let Some(debug_agent) = &self.debug_agent {
+                        debug_agent.report_all_backtraces(sender.clone()).await;
+                    }
                     sender
                         .send(Ok(SuiteEvents::suite_stopped(SuiteStatus::TimedOut).into()))
                         .await
@@ -327,6 +340,33 @@ impl RunningSuite {
                 suite_status = concat_suite_status(suite_status, res);
             }
             sender.send(Ok(SuiteEvents::suite_stopped(suite_status).into())).await.unwrap();
+            if let Some(debug_agent) = &mut self.debug_agent {
+                let mut fatal_exception_receiver = debug_agent.take_fatal_exception_receiver();
+                debug_agent.stop_sending_fatal_exceptions();
+                loop {
+                    match fatal_exception_receiver.next().await {
+                        Some(backtrace_info) => {
+                            let (client_end, mut server_end) =
+                                fidl::handle::fuchsia_handles::Socket::create_stream();
+                            sender
+                                .send(Ok(SuiteEvents::suite_stderr(client_end).into()))
+                                .await
+                                .unwrap();
+
+                            warn!("fatal exception occurred, thread {:?}", backtrace_info.thread);
+                            let _ = server_end.write(
+                                format!("fatal exception, thread {:?}\n", backtrace_info.thread)
+                                    .as_bytes(),
+                            );
+                            DebugAgent::write_backtrace_info(&backtrace_info, &mut server_end)
+                                .await;
+                        }
+                        None => {
+                            break;
+                        }
+                    }
+                }
+            }
             self.report_custom_artifacts(&mut sender).await
         };
         if let Err(e) = fut.await {
@@ -494,6 +534,12 @@ impl RunningSuite {
             (Ok(()), Ok(())) => Ok(()),
         }
     }
+}
+
+/// Logs an error an returns it.
+fn log_warning(error: DebugAgentError) -> DebugAgentError {
+    warn!("{}", error);
+    error
 }
 
 /// Enumerates test cases and return invocations.
@@ -1034,19 +1080,19 @@ async fn run_invocations(
             all_tasks.append(&mut tasks);
             drop(tasks);
             drop(all_tasks);
-                let running_test_cases = running_test_cases.lock().await;
-                for i in &*running_test_cases {
-                    sender
-                        .send(Ok(SuiteEvents::case_stopped(*i, CaseStatus::TimedOut).into()))
-                        .await
-                        .unwrap();
-                    sender
-                        .send(Ok(SuiteEvents::case_finished(*i).into()))
-                        .await
-                        .unwrap();
-                }
-                return Ok(SuiteStatus::TimedOut);
+            let running_test_cases = running_test_cases.lock().await;
+            for i in &*running_test_cases {
+                sender
+                    .send(Ok(SuiteEvents::case_stopped(*i, CaseStatus::TimedOut).into()))
+                    .await
+                    .unwrap();
+                sender
+                    .send(Ok(SuiteEvents::case_finished(*i).into()))
+                    .await
+                    .unwrap();
             }
+            return Ok(SuiteStatus::TimedOut);
+        }
         r = test_fut => {
             initial_suite_status = match r {
                 Err(e) => {

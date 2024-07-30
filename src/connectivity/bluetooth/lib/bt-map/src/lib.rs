@@ -3,6 +3,8 @@
 // found in the LICENSE file.
 
 use bitflags::bitflags;
+use bt_obex::ObexError;
+use fidl_fuchsia_bluetooth_map as fidl_bt_map;
 use objects::ObexObjectError;
 use packet_encoding::{codable_as_bitmask, decodable_enum};
 use std::fmt;
@@ -12,24 +14,68 @@ pub mod packets;
 
 use thiserror::Error;
 
+// Tag IDs are listed in MAP v1.4.2 Section 6.3.1.
+pub const NOTIFICATION_STATUS_TAG_ID: u8 = 0x0E;
+pub const MAP_SUPPORTED_FEATURES_TAG_ID: u8 = 0x29;
+
 /// Errors that occur during the use of the MAP library.
 #[non_exhaustive]
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("Obex error: {:?}", .0)]
-    Obex(ObexObjectError),
+    Obex(#[from] ObexError),
 
     #[error("Invalid message type")]
     InvalidMessageType,
 
-    #[error("Service record item does not exist: {:?}", .0)]
-    DoesNotExist(ServiceRecordItem),
+    #[error("Service record item is missing or invalid: {:?}", .0)]
+    InvalidSdp(ServiceRecordItem),
 
     #[error("Service is not GOEP interoperable")]
     NotGoepInteroperable,
 
     #[error("Invalid parameters")]
     InvalidParameters,
+
+    #[error("Repository does not exist: (id {:?})", .0)]
+    RepoDoesNotExist(u8),
+
+    #[error("Feature is not supported by the remote peer")]
+    NotSupported,
+
+    #[error("Invalid MAP session")]
+    InvalidMapSession,
+
+    #[error(transparent)]
+    Other(#[from] anyhow::Error),
+}
+
+impl Error {
+    pub fn other(error_msg: String) -> Self {
+        Error::Other(anyhow::format_err!("{error_msg}"))
+    }
+}
+
+impl From<&Error> for fidl_bt_map::Error {
+    fn from(value: &Error) -> Self {
+        match value {
+            &Error::Obex(_) => fidl_bt_map::Error::Unavailable,
+            &Error::InvalidMessageType => fidl_bt_map::Error::Unknown,
+            &Error::InvalidSdp(_) => fidl_bt_map::Error::Unavailable,
+            &Error::NotGoepInteroperable => fidl_bt_map::Error::Unavailable,
+            &Error::InvalidParameters => fidl_bt_map::Error::BadRequest,
+            &Error::RepoDoesNotExist(_) => fidl_bt_map::Error::NotFound,
+            &Error::NotSupported => fidl_bt_map::Error::NotSupported,
+            &Error::InvalidMapSession => fidl_bt_map::Error::BadRequest,
+            &Error::Other(_) => fidl_bt_map::Error::Unknown,
+        }
+    }
+}
+
+impl From<Error> for fidl_bt_map::Error {
+    fn from(value: Error) -> Self {
+        (&value).into()
+    }
 }
 
 /// Service record item expected from MAP related SDP.
@@ -46,8 +92,8 @@ pub enum ServiceRecordItem {
 
 bitflags! {
     /// See MAP v1.4.2 section 7.1 SDP Interoperability Requirements.
-    /// According to MAP v1.4.2 section 6.3.1, the features represented
-    /// in big-endian byte ordering.
+    /// According to MAP v1.4.2 section 6.3.1, the features are
+    /// represented in big-endian byte ordering.
     #[derive(Clone, Copy, Debug, PartialEq, Eq)]
     pub struct MapSupportedFeatures: u32 {
         const NOTIFICATION_REGISTRATION                     = 0x00000001;
@@ -69,6 +115,8 @@ bitflags! {
         const PBAP_CONTACT_CROSS_REFERENCE                  = 0x00010000;
         const NOTIFICATION_FILTERING                        = 0x00020000;
         const UTC_OFFSET_TIMESTAMP_FORMAT                   = 0x00040000;
+        // Below feature bits are only available for Message Access
+        // Services and not for Message Notification Services.
         const MAPSUPPORTEDFEATURES_IN_CONNECT_REQUEST       = 0x00080000;
         const CONVERSATION_LISTING                          = 0x00100000;
         const OWNER_STATUS                                  = 0x00200000;
@@ -87,15 +135,24 @@ decodable_enum! {
     }
 }
 
+impl MessageType {
+    const MESSAGE_TYPE_EMAIL: &'static str = "EMAIL";
+    const MESSAGE_TYPE_SMS_GSM: &'static str = "SMS_GSM";
+    const MESSAGE_TYPE_SMS_CDMA: &'static str = "SMS_CDMA";
+    const MESSAGE_TYPE_MMS: &'static str = "MMS";
+    const MESSAGE_TYPE_IM: &'static str = "IM";
+}
+
 impl fmt::Display for MessageType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Email => write!(f, "EMAIL"),
-            Self::SmsGsm => write!(f, "SMS_GSM"),
-            Self::SmsCdma => write!(f, "SMS_CDMA"),
-            Self::Mms => write!(f, "MMS"),
-            Self::Im => write!(f, "IM"),
-        }
+        let val = match self {
+            Self::Email => Self::MESSAGE_TYPE_EMAIL,
+            Self::SmsGsm => Self::MESSAGE_TYPE_SMS_GSM,
+            Self::SmsCdma => Self::MESSAGE_TYPE_SMS_CDMA,
+            Self::Mms => Self::MESSAGE_TYPE_MMS,
+            Self::Im => Self::MESSAGE_TYPE_IM,
+        };
+        write!(f, "{}", val)
     }
 }
 
@@ -103,12 +160,24 @@ impl FromStr for MessageType {
     type Err = ObexObjectError;
     fn from_str(src: &str) -> Result<Self, Self::Err> {
         match src {
-            "EMAIL" => Ok(Self::Email),
-            "SMS_GSM" => Ok(Self::SmsGsm),
-            "SMS_CDMA" => Ok(Self::SmsCdma),
-            "MMS" => Ok(Self::Mms),
-            "IM" => Ok(Self::Im),
+            Self::MESSAGE_TYPE_EMAIL => Ok(Self::Email),
+            Self::MESSAGE_TYPE_SMS_GSM => Ok(Self::SmsGsm),
+            Self::MESSAGE_TYPE_SMS_CDMA => Ok(Self::SmsCdma),
+            Self::MESSAGE_TYPE_MMS => Ok(Self::Mms),
+            Self::MESSAGE_TYPE_IM => Ok(Self::Im),
             v => Err(ObexObjectError::invalid_data(v)),
+        }
+    }
+}
+
+impl From<MessageType> for fidl_bt_map::MessageType {
+    fn from(value: MessageType) -> Self {
+        match value {
+            MessageType::Email => fidl_bt_map::MessageType::EMAIL,
+            MessageType::SmsGsm => fidl_bt_map::MessageType::SMS_GSM,
+            MessageType::SmsCdma => fidl_bt_map::MessageType::SMS_CDMA,
+            MessageType::Mms => fidl_bt_map::MessageType::MMS,
+            MessageType::Im => fidl_bt_map::MessageType::IM,
         }
     }
 }

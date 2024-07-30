@@ -7,7 +7,6 @@ use libc::{c_char, c_int, c_void, size_t};
 use std::ffi::CStr;
 
 // "C" externs provided from the zstd third_party library.
-#[link(name = "zstd")]
 extern "C" {
     fn ZSTD_compress(
         dst: *mut c_void,
@@ -27,7 +26,6 @@ extern "C" {
 }
 
 // "C" externs for ffi compression functions.
-#[link(name = "ffi")]
 extern "C" {
     fn zstd_chunked_decompress(
         src: *const c_void,

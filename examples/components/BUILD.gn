@@ -30,6 +30,7 @@ group("hermetic_tests") {
     "config:hermetic_tests",
     "config_from_parent:hermetic_tests",
     "dictionaries:hermetic_tests",
+    "dynamic:tests",
     "echo:hermetic_tests",
     "realm_builder:hermetic_tests",
     "routing:hermetic_tests",

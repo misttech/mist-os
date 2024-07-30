@@ -10,11 +10,11 @@ It reads a response file containing the name of the internal ZBI kernel image
 file, and compares that image's load time memory requirement to a threshold.
 """
 
-from collections import namedtuple
 import argparse
 import os
 import struct
 import sys
+from collections import namedtuple
 
 BIG_KERNEL_SIZE = 7 << 20
 

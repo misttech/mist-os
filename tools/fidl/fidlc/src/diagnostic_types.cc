@@ -84,6 +84,8 @@ std::string Display(Element::Kind k) {
       return "enum member";
     case Element::Kind::kLibrary:
       return "library";
+    case Element::Kind::kModifier:
+      return "modifier";
     case Element::Kind::kNewType:
       return "new-type";
     case Element::Kind::kProtocol:
@@ -154,12 +156,13 @@ std::string Display(VersionRange r) {
   std::stringstream ss;
   // Ranges with these values should never show up in error messages.
   ZX_ASSERT(a != Version::kNegInf && a != Version::kPosInf);
-  ZX_ASSERT(b != Version::kNegInf && b != Version::kLegacy);
+  ZX_ASSERT(b != Version::kNegInf);
   if (b == Version::kPosInf) {
     ss << "from version " << Display(a) << " onward";
   } else if (auto b_inclusive = b.Predecessor(); a == b_inclusive) {
     ss << "at version " << Display(a);
   } else {
+    ZX_ASSERT(b != Version::kLegacy);
     ss << "from version " << Display(a) << " to " << Display(b_inclusive);
   }
   return ss.str();
@@ -190,6 +193,19 @@ std::string Display(AbiKind k) {
 
 std::string Display(AbiValue v) {
   return std::visit([](auto&& value) { return Display(value); }, v);
+}
+
+std::string Display(const std::vector<std::pair<VersionRange, SourceSpan>>& v) {
+  std::stringstream ss;
+  for (size_t i = 0; i < v.size(); ++i) {
+    auto& [range, span] = v[i];
+    ss << Display(range) << " (" << Display(span) << ")";
+    if (i != v.size() - 1)
+      ss << ", ";
+    if (i == v.size() - 2)
+      ss << "and ";
+  }
+  return ss.str();
 }
 
 }  // namespace internal

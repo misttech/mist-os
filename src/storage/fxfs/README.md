@@ -6,7 +6,7 @@ commands like:
 
 ```shell
 # Configure the build to generate cargo output.
-$ fx set core.x64 --goma --auto-dir --with //src/storage/fxfs:tests --cargo-toml-gen
+$ fx set core.x64 --auto-dir --with //src/storage/fxfs:tests --cargo-toml-gen
 # Rebuild to actually generates cargo .toml files.
 $ fx build
 # Generate rustdoc.

@@ -4,11 +4,11 @@
 """Classes for using an SPDX document and its sub-elements"""
 
 
-from collections import defaultdict
 import dataclasses
+import hashlib
 import json
 import re
-import hashlib
+from collections import defaultdict
 from typing import Any, ClassVar, Dict, List, Set, Tuple, Type, Union
 
 try:

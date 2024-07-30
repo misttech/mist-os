@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::file_handler::{self, PersistData, PersistPayload, PersistSchema, Timestamps};
-use diagnostics_data::{Data, DiagnosticsHierarchy, Inspect};
+use diagnostics_data::{Data, DiagnosticsHierarchy, ExtendedMoniker, Inspect};
 use diagnostics_reader::{ArchiveReader, RetryConfig};
 use fidl_fuchsia_diagnostics::{ArchiveAccessorProxy, Selector};
 use fuchsia_async::{self as fasync, Task};
@@ -11,6 +11,8 @@ use fuchsia_zircon as zx;
 use futures::channel::mpsc::{self, UnboundedSender};
 use futures::StreamExt;
 use persistence_config::{Config, ServiceName, Tag, TagConfig};
+use serde::ser::SerializeMap;
+use serde::{Serialize, Serializer};
 use serde_json::{Map, Value};
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
@@ -43,8 +45,32 @@ fn extract_json_map(hierarchy: Option<DiagnosticsHierarchy>) -> Option<Map<Strin
     None
 }
 
-fn condensed_map_of_data(items: impl IntoIterator<Item = Data<Inspect>>) -> HashMap<String, Value> {
-    items.into_iter().fold(HashMap::new(), |mut entries, item| {
+#[derive(Debug, Eq, PartialEq)]
+struct DataMap(HashMap<ExtendedMoniker, Value>);
+
+impl Serialize for DataMap {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut map = serializer.serialize_map(Some(self.0.len()))?;
+        for (moniker, value) in &self.0 {
+            map.serialize_entry(&moniker.to_string(), &value)?;
+        }
+        map.end()
+    }
+}
+
+impl std::ops::Deref for DataMap {
+    type Target = HashMap<ExtendedMoniker, Value>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+fn condensed_map_of_data(items: impl IntoIterator<Item = Data<Inspect>>) -> DataMap {
+    DataMap(items.into_iter().fold(HashMap::new(), |mut entries, item| {
         let Data { payload, moniker, .. } = item;
         if let Some(new_map) = extract_json_map(payload) {
             match entries.entry(moniker) {
@@ -60,7 +86,7 @@ fn condensed_map_of_data(items: impl IntoIterator<Item = Data<Inspect>>) -> Hash
             }
         }
         entries
-    })
+    }))
 }
 
 fn save_data_for_tag(
@@ -96,7 +122,7 @@ fn save_data_for_tag(
     }
     PersistSchema {
         timestamps,
-        payload: PersistPayload::Data(PersistData { data_length, entries }),
+        payload: PersistPayload::Data(PersistData { data_length, entries: entries.0 }),
     }
 }
 
@@ -288,21 +314,22 @@ mod tests {
 
     #[fuchsia::test]
     fn test_condense_empty() {
-        let empty_data = InspectDataBuilder::new("a/b/c/d", "fuchsia-pkg://test", 123456i64)
-            .with_name(InspectHandleName::filename("test_file_plz_ignore.inspect"))
-            .build();
+        let empty_data =
+            InspectDataBuilder::new("a/b/c/d".try_into().unwrap(), "fuchsia-pkg://test", 123456i64)
+                .with_name(InspectHandleName::filename("test_file_plz_ignore.inspect"))
+                .build();
         let empty_data_result = condensed_map_of_data(vec![empty_data].into_iter());
         let empty_vec_result = condensed_map_of_data(vec![].into_iter());
 
         let expected_map = HashMap::new();
 
-        pretty_assertions::assert_eq!(empty_data_result, expected_map, "golden diff failed.");
-        pretty_assertions::assert_eq!(empty_vec_result, expected_map, "golden diff failed.");
+        pretty_assertions::assert_eq!(*empty_data_result, expected_map, "golden diff failed.");
+        pretty_assertions::assert_eq!(*empty_vec_result, expected_map, "golden diff failed.");
     }
 
     fn make_data(mut hierarchy: DiagnosticsHierarchy, moniker: &str) -> Data<Inspect> {
         hierarchy.sort();
-        InspectDataBuilder::new(moniker, "fuchsia-pkg://test", 123456i64)
+        InspectDataBuilder::new(moniker.try_into().unwrap(), "fuchsia-pkg://test", 123456i64)
             .with_hierarchy(hierarchy)
             .with_name(InspectHandleName::filename("test_file_plz_ignore.inspect"))
             .build()

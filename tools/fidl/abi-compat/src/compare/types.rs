@@ -6,6 +6,7 @@ use super::{
     CompatibilityProblems, Flexibility, HandleRights, HandleType, Optionality, Path, Primitive,
     Protocol, Transport,
 };
+use flyweights::FlyStr;
 use itertools::Itertools;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Display;
@@ -25,8 +26,8 @@ fn member_list(members: &BTreeMap<u64, Type>) -> String {
 pub enum Type {
     Primitive(Path, Primitive),
     String(Path, u64, Optionality),
-    Enum(Path, Flexibility, Primitive, BTreeSet<i128>),
-    Bits(Path, Flexibility, Primitive, BTreeSet<i128>),
+    Enum(Path, Flexibility, Primitive, BTreeSet<i128>, BTreeMap<i128, FlyStr>),
+    Bits(Path, Flexibility, Primitive, BTreeSet<i128>, BTreeMap<i128, FlyStr>),
     Handle(Path, Option<HandleType>, Optionality, HandleRights),
     ClientEnd(Path, String, Transport, Optionality, Box<Protocol>),
     ServerEnd(Path, String, Transport, Optionality, Box<Protocol>),
@@ -51,8 +52,8 @@ impl Type {
         match self {
             Type::Primitive(path, _) => path,
             Type::String(path, _, _) => path,
-            Type::Enum(path, _, _, _) => path,
-            Type::Bits(path, _, _, _) => path,
+            Type::Enum(path, _, _, _, _) => path,
+            Type::Bits(path, _, _, _, _) => path,
             Type::Handle(path, _, _, _) => path,
             Type::ClientEnd(path, _, _, _, _) => path,
             Type::ServerEnd(path, _, _, _, _) => path,
@@ -77,10 +78,10 @@ impl Display for Type {
                 Optionality::Optional => write!(f, "string:<{size},optional>"),
                 Optionality::Required => write!(f, "string:{size}"),
             },
-            Type::Enum(_, flex, primitive, members) => {
+            Type::Enum(_, flex, primitive, members, _) => {
                 write!(f, "{flex} enum : {primitive} {{ {} }}", value_list(members))
             }
-            Type::Bits(_, flex, primitive, members) => {
+            Type::Bits(_, flex, primitive, members, _) => {
                 write!(f, "{flex} bits : {primitive} {{ {} }}", value_list(members))
             }
             Type::Handle(_, _, _, _) => f.write_str("zx.Handle:TODO"),
@@ -147,8 +148,8 @@ pub fn compare_types(sender: &Type, receiver: &Type) -> CompatibilityProblems {
             }
         }
         (
-            Enum(send_path, _, send_type, send_values),
-            Enum(recv_path, recv_flexibility, recv_type, recv_values),
+            Enum(send_path, _, send_type, send_values, send_names),
+            Enum(recv_path, recv_flexibility, recv_type, recv_values, _recv_names),
         ) => {
             let send_level = send_path.api_level();
             if send_type != recv_type {
@@ -159,8 +160,11 @@ pub fn compare_types(sender: &Type, receiver: &Type) -> CompatibilityProblems {
                     format!("Incompatible enum types, sender(@{send_level}):{send_type}, receiver(@{recv_level}):{recv_type}"),
                 )
             } else {
-                let missing_values: Vec<_> =
-                    send_values.difference(recv_values).sorted().map(|v| format!("{v}")).collect();
+                let missing_values: Vec<_> = send_values
+                    .difference(recv_values)
+                    .sorted()
+                    .map(|v| format!("{}={v}", send_names.get(v).unwrap()))
+                    .collect();
                 if !missing_values.is_empty() {
                     let missing_values_str = missing_values.join(", ");
                     if recv_flexibility == &Flexible {
@@ -180,8 +184,8 @@ pub fn compare_types(sender: &Type, receiver: &Type) -> CompatibilityProblems {
             }
         }
         (
-            Bits(send_path, _, send_type, send_values),
-            Bits(recv_path, recv_flexibility, recv_type, recv_values),
+            Bits(send_path, _, send_type, send_values, send_names),
+            Bits(recv_path, recv_flexibility, recv_type, recv_values, _recv_names),
         ) => {
             let send_level = send_path.api_level();
             if send_type != recv_type {
@@ -192,8 +196,11 @@ pub fn compare_types(sender: &Type, receiver: &Type) -> CompatibilityProblems {
                     format!("Incompatible bits types, sender(@{send_level}):{send_type}, receiver(@{recv_level}):{recv_type}"),
                 )
             } else {
-                let missing_values: Vec<_> =
-                    send_values.difference(recv_values).sorted().map(|v| format!("{v}")).collect();
+                let missing_values: Vec<_> = send_values
+                    .difference(recv_values)
+                    .sorted()
+                    .map(|v| format!("{}={v}", send_names.get(v).unwrap()))
+                    .collect();
                 if !missing_values.is_empty() {
                     let missing_values_str = missing_values.join(", ");
                     if recv_flexibility == &Flexible {

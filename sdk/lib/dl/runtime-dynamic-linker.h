@@ -58,8 +58,11 @@ class RuntimeDynamicLinker {
   // or an error if not found (ie undefined symbol).
   fit::result<Error, void*> LookupSymbol(ModuleHandle* module, const char* ref);
 
-  // TODO(https://fxbug.dev/339037138): Add a test exercising the system error
+  // - TODO(https://fxbug.dev/341473244): Introduce LinkingSession and
+  // LinkingState to the RuntimeDynamicLinker
+  // - TODO(https://fxbug.dev/339037138): Add a test exercising the system error
   // case and include it as an example for the fit::error{Error} description.
+
   // Open `file` with the given `mode`, returning a pointer to the loaded module
   // for the file. The `retrieve_file` argument is passed on to LoadModule.Load
   // and is called as a
@@ -146,6 +149,11 @@ class RuntimeDynamicLinker {
     LoadModuleList<Loader> load_modules;
     ModuleHandleList modules;
 
+    // The root module will always be the first module in the list.
+    if (!EnqueueModule(diag, soname, modules, load_modules)) {
+      return {};
+    }
+
     // This lambda will retrieve the module's file, load the module into the
     // system image, and then create new modules for each of its dependencies
     // to enqueue onto load_modules list for future processing. A
@@ -181,14 +189,10 @@ class RuntimeDynamicLinker {
       return fit::error(false);
     };
 
-    if (!EnqueueModule(diag, soname, modules, load_modules)) {
-      return {};
-    }
-
     // Load the root module and enqueue all its dependencies.
     if (auto result = load_and_enqueue_deps(load_modules.front()); result.is_error()) {
       if (result.error_value()) {
-        diag.SystemError(load_modules.front().name().str(), " not found");
+        diag.SystemError(soname.str(), " not found");
       }
       return {};
     }

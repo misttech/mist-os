@@ -9,7 +9,21 @@
 
 #include <assert.h>
 #include <lib/boot-options/boot-options.h>
+#include <lib/cksum.h>
+#include <lib/debuglog.h>
+#include <lib/lazy_init/lazy_init.h>
+#include <lib/memalloc/range.h>
+#include <lib/system-topology.h>
+#include <lib/zbi-format/cpu.h>
+#include <lib/zbi-format/driver-config.h>
+#include <lib/zbi-format/zbi.h>
 #include <lib/zircon-internal/macros.h>
+#include <mexec.h>
+#include <platform.h>
+#include <string.h>
+#include <trace.h>
+#include <zircon/errors.h>
+#include <zircon/types.h>
 
 #include <cstddef>
 
@@ -19,36 +33,16 @@
 #include <arch/x86/apic.h>
 #include <arch/x86/mmu.h>
 #include <arch/x86/pv.h>
-#include <fbl/array.h>
-#include <kernel/cpu_distance_map.h>
-#include <ktl/algorithm.h>
-#include <phys/handoff.h>
-
-#include "platform_p.h"
-
-#if defined(WITH_KERNEL_PCIE)
-#include <dev/pcie_bus_driver.h>
-#endif
-#include <lib/cksum.h>
-#include <lib/debuglog.h>
-#include <lib/lazy_init/lazy_init.h>
-#include <lib/system-topology.h>
-#include <lib/zbi-format/cpu.h>
-#include <lib/zbi-format/driver-config.h>
-#include <lib/zbi-format/zbi.h>
-#include <mexec.h>
-#include <platform.h>
-#include <string.h>
-#include <trace.h>
-#include <zircon/errors.h>
-#include <zircon/types.h>
-
 #include <dev/uart.h>
 #include <explicit-memory/bytes.h>
 #include <fbl/alloc_checker.h>
+#include <fbl/array.h>
 #include <fbl/vector.h>
 #include <kernel/cpu.h>
+#include <kernel/cpu_distance_map.h>
+#include <ktl/algorithm.h>
 #include <lk/init.h>
+#include <phys/handoff.h>
 #include <platform/console.h>
 #include <platform/crashlog.h>
 #include <platform/efi.h>
@@ -63,6 +57,8 @@
 #include <vm/physmap.h>
 #include <vm/pmm.h>
 #include <vm/vm_aspace.h>
+
+#include "platform_p.h"
 
 #include <ktl/enforce.h>
 
@@ -132,17 +128,6 @@ static paddr_t mexec_safe_pages[kTotalPageTableCount];
 void platform_mexec_prep(uintptr_t final_bootimage_addr, size_t final_bootimage_len) {
   DEBUG_ASSERT(!arch_ints_disabled());
   DEBUG_ASSERT(mp_get_online_mask() == cpu_num_to_mask(BOOT_CPU_ID));
-
-  // A hacky way to handle disabling all PCI devices until we have devhost
-  // lifecycles implemented.
-  // Leaving PCI running will also leave DMA running which may cause memory
-  // corruption after boot.
-  // Disabling PCI may cause devices to fail to enumerate after boot.
-#ifdef WITH_KERNEL_PCIE
-  if (gBootOptions->mexec_pci_shutdown) {
-    PcieBusDriver::GetDriver()->DisableBus();
-  }
-#endif
 
   // This code only handles one L3 and one L4 page table for now. Fail if
   // there are more L2 page tables than can fit in one L3 page table.

@@ -19,8 +19,8 @@ use futures::AsyncWriteExt;
 pub async fn send_log_entry<S: AsRef<str>>(socket: &mut fidl::AsyncSocket, msg: S) -> Result<()> {
     let builder_args = BuilderArgs {
         timestamp_nanos: 0.into(),
-        component_url: Some(String::default()),
-        moniker: "moniker".to_string(),
+        component_url: Some("".into()),
+        moniker: "moniker".try_into().unwrap(),
         severity: Severity::Info,
     };
     let builder = LogsDataBuilder::new(builder_args);

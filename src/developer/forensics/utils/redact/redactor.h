@@ -51,7 +51,8 @@ class Redactor : public RedactorBase {
  private:
   Redactor& Add(Replacer replacer);
   Redactor& AddTextReplacer(std::string_view pattern, std::string_view replacement);
-  Redactor& AddIdReplacer(std::string_view pattern, std::string_view format);
+  Redactor& AddIdReplacer(std::string_view pattern, std::string_view format,
+                          const std::vector<std::string>& ignore_prefixes);
   Redactor& AddJsonReplacer(Replacer replacer);
 
   RedactionIdCache cache_;

@@ -17,7 +17,7 @@ use fuchsia_zircon as zx;
 use fuchsia_zircon::AsHandleRef;
 use starnix_lifecycle::AtomicUsizeCounter;
 use starnix_logging::{impossible_error, log_warn};
-use starnix_sync::{FileOpsCore, FileOpsToHandle, Locked, Unlocked, WriteOps};
+use starnix_sync::{FileOpsCore, FileOpsToHandle, Locked, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
@@ -286,6 +286,7 @@ impl FileOps for SyncFile {
 
     fn wait_async(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         waiter: &Waiter,
@@ -348,6 +349,7 @@ impl FileOps for SyncFile {
 
     fn query_events(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
@@ -375,7 +377,7 @@ impl FileOps for SyncFile {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, WriteOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,

@@ -61,7 +61,7 @@ fuchsia_cc_test(
     visibility = ["//visibility:public"],
     deps = [
         ":controllers",
-        "//src/connectivity/bluetooth/core/bt-host/fidl:fake_hci_test_fixture",
+        "//src/connectivity/bluetooth/core/bt-host/fidl:fake_vendor_server",
         "//src/connectivity/bluetooth/core/bt-host/testing",
         "//src/connectivity/bluetooth/core/bt-host/testing:gtest_main",
         "//src/connectivity/bluetooth/core/bt-host/testing:loop_fixture",

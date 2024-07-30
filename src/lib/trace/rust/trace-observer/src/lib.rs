@@ -8,7 +8,7 @@ pub fn start_trace_observer(callback: extern "C" fn()) {
 }
 
 mod sys {
-    #[link(name = "rust-trace-observer")]
+    // From librust-trace-observer.so
     extern "C" {
         pub fn start_trace_observer_rust(callback: unsafe extern "C" fn());
     }

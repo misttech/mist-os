@@ -6,13 +6,21 @@
 #include <lib/stdcompat/atomic.h>
 #include <zircon/assert.h>
 
+#include <type_traits>
+
 namespace concurrent {
 namespace internal {
 
 template <typename T, CopyDir kDirection, std::memory_order kOrder>
 inline void CopyElement(void* _dst, const void* _src, size_t offset_bytes) {
-  const T* src = reinterpret_cast<const T*>(reinterpret_cast<const uint8_t*>(_src) + offset_bytes);
-  T* dst = reinterpret_cast<T*>(reinterpret_cast<uint8_t*>(_dst) + offset_bytes);
+  // TODO(https://fxbug.dev/355287217): Allow const/volatile qualifiers when libcxx `atomic_ref<T>`
+  // is fixed.
+  using SrcType = std::remove_cv_t<T>;
+  using DestType = std::remove_cv_t<T>;
+
+  SrcType* src = reinterpret_cast<SrcType*>(reinterpret_cast<uint8_t*>(const_cast<void*>(_src)) +
+                                            offset_bytes);
+  DestType* dst = reinterpret_cast<DestType*>(reinterpret_cast<uint8_t*>(_dst) + offset_bytes);
 
   static_assert(((kDirection == CopyDir::To) && ((kOrder == std::memory_order_relaxed) ||
                                                  (kOrder == std::memory_order_release))) ||

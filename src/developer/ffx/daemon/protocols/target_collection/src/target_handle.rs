@@ -110,7 +110,7 @@ impl TargetHandleInner {
             }
             ffx::TargetRequest::OpenRemoteControl { remote_control, responder } => {
                 self.target.run_host_pipe(&cx.overnet_node()?);
-                let rcs = wait_for_rcs(&self.target).await?;
+                let rcs = wait_for_rcs(&self.target, &cx).await?;
                 match rcs {
                     Ok(mut c) => {
                         // TODO(awdavies): Return this as a specific error to
@@ -139,6 +139,7 @@ impl TargetHandleInner {
 #[tracing::instrument]
 pub(crate) async fn wait_for_rcs(
     t: &Rc<Target>,
+    cx: &Context,
 ) -> Result<Result<rcs::RcsConnection, ffx::TargetConnectionError>> {
     // This setup here is due to the events not having a proper streaming implementation. The
     // closure is intended to have a static lifetime, which forces this to happen to extract an
@@ -149,7 +150,15 @@ pub(crate) async fn wait_for_rcs(
         if let Some(rcs) = t.rcs() {
             break Ok(rcs);
         } else if let Some(err) = seen_event.borrow_mut().take() {
-            break Err(host_pipe_err_to_fidl(err));
+            tracing::debug!("host pipe connection failed: {err:?}. Restarting connection.");
+            t.disconnect();
+            t.run_host_pipe(match &cx.overnet_node() {
+                Ok(n) => n,
+                Err(e) => {
+                    tracing::debug!("unable to get overnet node, forcing connection to exit with last seen SSH error: {err:?}. Overnet node error was {e:?}");
+                    break Err(host_pipe_err_to_fidl(err));
+                }
+            });
         } else {
             tracing::trace!("RCS dropped after event fired. Waiting again.");
         }

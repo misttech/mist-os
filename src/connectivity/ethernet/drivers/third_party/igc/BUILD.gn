@@ -6,8 +6,8 @@ import("//build/bind/bind.gni")
 import("//build/drivers.gni")
 
 driver_bind_rules("igc_bind") {
-  rules = "igc.bind"
-  tests = "bind-tests.json"
+  rules = "meta/igc.bind"
+  tests = "meta/bind-tests.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_bindlib",
     "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_bindlib",
@@ -60,7 +60,7 @@ fuchsia_driver("igc-driver") {
 fuchsia_driver_component("igc") {
   component_name = "igc"
   deps = [ ":igc-driver" ]
-  info = "igc-info.json"
+  info = "meta/igc-info.json"
   manifest = "meta/igc.cml"
 }
 

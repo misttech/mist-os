@@ -5,7 +5,7 @@
 import("//build/drivers.gni")
 
 driver_bind_rules("parent_bind") {
-  rules = "bind/parent-driver.bind"
+  rules = "meta/parent-driver.bind"
   bind_output = "parent-driver.bindbc"
   deps = [
     "//examples/drivers/bind/bindlib:gizmo.example",
@@ -33,11 +33,11 @@ fuchsia_driver_component("parent_component") {
     ":parent_bind",
     ":parent_driver",
   ]
-  info = "component-info.json"
+  info = "meta/component-info.json"
 }
 
 driver_bind_rules("child_bind") {
-  rules = "bind/child-driver.bind"
+  rules = "meta/child-driver.bind"
   bind_output = "child-driver.bindbc"
   deps = [
     "//examples/drivers/bind/bindlib:gizmo.example",
@@ -63,7 +63,7 @@ fuchsia_driver_component("child_component") {
     ":child_bind",
     ":child_driver",
   ]
-  info = "component-info.json"
+  info = "meta/component-info.json"
 }
 
 fuchsia_driver_package("pkg") {

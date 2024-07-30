@@ -1,0 +1,17 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+library fuchsia.boot;
+
+/// Protocol for communication between `userboot` and the process booted by userboot.
+///
+/// Userboot process will act as a client, pipelining requests containing information and/or handles that might
+/// be useful for the booted process. The booted process, or whoever processes the server endpoint of this protocol,
+/// will then process the pipelined requests from userboot.
+closed protocol Userboot {
+    /// Posts `svc_stash` server endpoint. For more information refer to `fuchsia.boot.SvcStash`.
+    strict PostStashSvc(resource struct {
+        stash_svc_endpoint server_end:SvcStash;
+    });
+};

@@ -14,6 +14,7 @@ use netstack3_device::{DeviceAnyApi, DeviceApi};
 use netstack3_filter::FilterApi;
 use netstack3_icmp_echo::IcmpEchoSocketApi;
 use netstack3_ip::device::{DeviceIpAnyApi, DeviceIpApi};
+use netstack3_ip::multicast_forwarding::MulticastForwardingApi;
 use netstack3_ip::nud::NeighborApi;
 use netstack3_ip::raw::RawIpSocketApi;
 use netstack3_ip::{RoutesAnyApi, RoutesApi};
@@ -88,6 +89,12 @@ where
     pub fn routes_any(self) -> RoutesAnyApi<CoreApiCtxPair<'a, BP>> {
         let Self(ctx) = self;
         RoutesAnyApi::new(ctx)
+    }
+
+    /// Gets access to the multicast forwarding API for IP version `I`.
+    pub fn multicast_forwarding<I: Ip>(self) -> MulticastForwardingApi<I, CoreApiCtxPair<'a, BP>> {
+        let Self(ctx) = self;
+        MulticastForwardingApi::new(ctx)
     }
 
     /// Gets access to the neighbor API for IP version `I` and device `D`.

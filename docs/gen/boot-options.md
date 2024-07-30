@@ -255,7 +255,7 @@ Refer to `kernel.oom.outofmemory-mb`, `kernel.oom.critical-mb`,
 memory pressure state transitions.
 
 The current memory availability state can be queried with the command
-`k mem mem_avail_state info`.
+`k mem dump`.
 
 ### kernel.oom.outofmemory-mb=\<uint64_t>
 
@@ -460,12 +460,12 @@ If this option is set, the `zx_ticks_get` vDSO call will be forced to be a true
 syscall, even if the hardware cycle counter registers are accessible from
 user-mode.
 
-### vdso.clock_get_monotonic_force_syscall=\<bool>
+### vdso.clock_get_force_syscall=\<bool>
 
 **Default:** `false`
 
-If this option is set, the `zx_clock_get_monotonic` vDSO call will be forced to
-be a true syscall, instead of simply performing a transformation of the tick
+If this option is set, the `zx_clock_get_monotonic` and `zx_clock_get_boot` vDSO calls will be
+forced to be a true syscall, instead of simply performing a transformation of the tick
 counter in user-mode.
 
 ### kernel.userpager.overtime_wait_seconds=\<uint64_t>
@@ -717,17 +717,6 @@ of 0 will disable aging based on the active page ratio.
 The active ratio only triggers aging in the period between the
 `kernel.page-scanner.min-aging-interval-ms` and the `kernel.page-scanner.max-aging-interval-ms`,
 and as such has no effect if the intervals are equal.
-
-### kernel.page-scanner.eviction-interval-seconds=\<uint32_t>
-
-**Default:** `0xa`
-
-This option specifies the periodic interval (in seconds) at which kernel eviction
-will run in the background to try and keep the system out of memory pressure.
-This will only take effect if continuous eviction is enabled with
-`kernel.oom.evict-continuous`. If this value is lower than the page queue
-rotation / aging interval (10s by default), it will be ignored and the eviction
-interval will instead be set equal to the page queue rotation interval.
 
 ### kernel.page-scanner.start-at-boot=\<bool>
 

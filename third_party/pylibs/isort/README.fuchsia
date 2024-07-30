@@ -1,0 +1,10 @@
+Name: isort
+License: MIT License
+License File: src/LICENSE
+Upstream Git: https://github.com/PyCQA/isort
+Description: Python library to sort imports.
+
+Changes made to Work with Fuchsia:
+
+Created a wrapper script (isort_wrapper.py) to dynamically add missing version
+metadata when running isort from a local source checkout.

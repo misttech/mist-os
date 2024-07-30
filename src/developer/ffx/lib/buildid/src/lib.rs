@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 mod c {
-    #[link(name = "buildid", kind = "static")]
+    // From buildid static library
     extern "C" {
         pub fn get_build_id(out: *mut std::os::raw::c_uchar) -> std::os::raw::c_int;
     }

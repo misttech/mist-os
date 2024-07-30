@@ -4,12 +4,13 @@
 # found in the LICENSE file.
 
 import argparse
-import depfile
 import json
 import os
-import sys
 import shutil
+import sys
 import time
+
+import depfile
 
 
 def main() -> int:

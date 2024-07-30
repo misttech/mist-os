@@ -67,11 +67,10 @@ open protocol LogPuppet {
     });
 };
 
-/// InspectPuppet emits inspect data when requested.
+/// InspectWriter emits inspect data when requested.
 ///
 /// Values are always reported on the root inspect node.
-@discoverable
-open protocol InspectPuppet {
+open protocol InspectWriter {
     /// Emits a health inspect node with OK status.
     flexible SetHealthOk() -> ();
 
@@ -103,6 +102,19 @@ open protocol InspectPuppet {
     });
 };
 
+/// InspectPuppet allows creating and serving Inspectors.
+@discoverable
+open protocol InspectPuppet {
+
+    /// Create and serve an Inspector with the provided name.
+    /// InspectWriters created this way are RAII.
+    flexible CreateInspector(table {
+        1: name string:fuchsia.inspect.MAX_NAME_LENGTH;
+    }) -> (resource struct {
+        writer client_end:InspectWriter;
+    });
+};
+
 /// Records values on a lazy inspect node.
 ///
 /// If this connection is dropped before [`CommitLazyValues`] is called, no
@@ -110,7 +122,7 @@ open protocol InspectPuppet {
 ///
 /// Values are always reported on the root inspect node.
 open protocol LazyInspectPuppet {
-    compose InspectPuppet;
+    compose InspectWriter;
 
     /// Reports all recorded values on the root node.
     ///

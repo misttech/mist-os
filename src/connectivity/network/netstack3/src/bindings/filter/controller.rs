@@ -262,7 +262,7 @@ impl Controller {
     }
 
     pub(crate) fn validate_and_convert_changes(
-        &mut self,
+        &self,
         changes: Vec<fnet_filter_ext::Change>,
         idempotent: bool,
     ) -> Result<CommitResult, CommitError> {

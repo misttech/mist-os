@@ -1926,7 +1926,7 @@
   full_description: "A service is used and routed to other components as a
   <a href=\"/docs/glossary#service-capability\">service capability</a>."
   see_also: ["<a href=\"/docs/glossary#service-capability\">Service capability</a>"]
-  related_guides: ["<a href=\"/docs/concepts/fidl/services.md\">FIDL services</a>"]
+  related_guides: ["<a href=\"/docs/concepts/components/v2/capabilities/service.md\">FIDL services</a>"]
   area: ["Component Framework", "FIDL"]
 
 - term: "Service capability"

@@ -65,6 +65,10 @@ bootstrap_user_platform_aib_names = [
 
   # Temporary AIB holds wlanphy driver
   "wlanphy_driver",
+
+  # Migration of drivers to platform AIBs.
+  "bt_transport_uart_driver",
+  "bus_pci_driver",
 ]
 
 # These are the userdebug platform AIBs that are used by bootstrap
@@ -189,6 +193,10 @@ user_platform_aib_names =
       "netstack_migration",
       "netstack_migration_packages",
       "netstack_migration_packages_gub",
+      "socket-proxy-enabled",
+      "socket-proxy-disabled",
+      "socket_proxy_packages",
+      "socket_proxy_packages_gub",
 
       # WLAN
       "wlan_legacy_privacy_support",

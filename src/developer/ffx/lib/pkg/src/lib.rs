@@ -2,9 +2,52 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-mod tunnel;
+use fidl_fuchsia_developer_ffx::{RepositoryRegistrationAliasConflictMode, RepositoryStorageType};
+use serde::{Deserialize, Serialize};
 
 pub mod config;
-// TODO(fxbug/127781) Change to mod once repo library moves to this crate.
+mod instance;
 pub mod metrics;
 pub mod repo;
+mod tunnel;
+
+pub use instance::{write_instance_info, PkgServerInstanceInfo, PkgServerInstances};
+
+/// Type of registration of the repository on the target device.
+/// This mirrors the fidl type RepositoryStorageType, since
+/// we need JSON serialization.
+///
+#[derive(Debug, Deserialize, Serialize)]
+pub enum RepoStorageType {
+    Ephemeral,
+    Persistent,
+}
+
+impl From<RepositoryStorageType> for RepoStorageType {
+    fn from(value: RepositoryStorageType) -> Self {
+        match value {
+            RepositoryStorageType::Ephemeral => RepoStorageType::Ephemeral,
+            RepositoryStorageType::Persistent => RepoStorageType::Persistent,
+        }
+    }
+}
+
+/// How  conflicts in the registration of the repository on the target device will
+/// be resolved.
+/// This mirrors the fidl type RepositoryRegistrationAliasConflictMode, since
+/// we need JSON serialization.
+///
+#[derive(Debug, Deserialize, Serialize)]
+pub enum RegistrationConflictMode {
+    ErrorOut,
+    Replace,
+}
+
+impl From<RepositoryRegistrationAliasConflictMode> for RegistrationConflictMode {
+    fn from(value: RepositoryRegistrationAliasConflictMode) -> Self {
+        match value {
+            RepositoryRegistrationAliasConflictMode::ErrorOut => RegistrationConflictMode::ErrorOut,
+            RepositoryRegistrationAliasConflictMode::Replace => RegistrationConflictMode::Replace,
+        }
+    }
+}

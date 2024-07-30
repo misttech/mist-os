@@ -7,9 +7,9 @@ import("//build/components.gni")
 import("//build/drivers.gni")
 
 driver_bind_rules("ti_tas5707-bind") {
-  rules = "ti_tas5707.bind"
+  rules = "meta/ti_tas5707.bind"
   bind_output = "tas5707.bindbc"
-  tests = "tests.json"
+  tests = "meta/tests.json"
   deps = [ "//src/devices/bind/fuchsia.ti.platform" ]
 }
 
@@ -34,6 +34,6 @@ fuchsia_driver("tas5707-driver") {
 fuchsia_driver_component("tas5707") {
   component_name = "tas5707"
   deps = [ ":tas5707-driver" ]
-  info = "tas5707-info.json"
+  info = "meta/tas5707-info.json"
   manifest = "meta/tas5707.cml"
 }

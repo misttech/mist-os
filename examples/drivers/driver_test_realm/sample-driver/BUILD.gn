@@ -13,7 +13,7 @@ fidl("fuchsia.hardware.sample") {
 }
 
 driver_bind_rules("bind") {
-  rules = "sample_driver.bind"
+  rules = "meta/sample_driver.bind"
   bind_output = "sample_driver.bindbc"
   deps = [ "//src/devices/bind/fuchsia.test" ]
 }
@@ -35,6 +35,6 @@ fuchsia_driver("driver") {
 fuchsia_driver_component("sample-driver") {
   component_name = "sample-driver"
   deps = [ ":driver" ]
-  info = "sample_driver-info.json"
+  info = "meta/sample_driver-info.json"
   manifest = "meta/sample-driver.cml"
 }

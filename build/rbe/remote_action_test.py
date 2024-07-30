@@ -13,15 +13,14 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from typing import Any, Collection, Dict, Sequence, Tuple
 from unittest import mock
 
-import fuchsia
-import remote_action
 import cl_utils
+import fuchsia
 import output_leak_scanner
+import remote_action
 import remotetool
-
-from typing import Any, Collection, Dict, Sequence, Tuple
 
 _HAVE_XATTR = hasattr(os, "setxattr")
 

@@ -89,7 +89,7 @@ const device_bind_prop_t kGpioBtProperties[] = {
 };
 
 zx_status_t Nelson::PwmInit() {
-  gpio_init_steps_.push_back(GpioSetAltFunction(GPIO_SOC_WIFI_LPO_32K768, S905D3_PWM_E_FN));
+  gpio_init_steps_.push_back(GpioFunction(GPIO_SOC_WIFI_LPO_32K768, S905D3_PWM_E_FN));
 
   fuchsia_hardware_pwm::PwmChannelsMetadata metadata = {{{{
       {{.id = S905D3_PWM_A}},

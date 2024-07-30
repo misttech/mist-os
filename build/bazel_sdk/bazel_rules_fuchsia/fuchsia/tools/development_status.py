@@ -7,8 +7,8 @@ import argparse
 import datetime
 import json
 import subprocess
-
 from pathlib import Path
+
 from fuchsia_task_lib import Terminal
 
 

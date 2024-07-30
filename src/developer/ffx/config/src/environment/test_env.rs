@@ -40,6 +40,7 @@ impl TestEnv {
             ConfigMap::default(),
             Some(env_file.path().to_owned()),
             None,
+            false,
         )?;
         Self::build_test_env(context, env_file, isolate_root, guard).await
     }
@@ -54,6 +55,7 @@ impl TestEnv {
             Some(PathBuf::from(build_dir)),
             ConfigMap::default(),
             Some(env_file.path().to_owned()),
+            false,
         );
         Self::build_test_env(context, env_file, isolate_root, guard).await
     }

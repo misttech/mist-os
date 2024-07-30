@@ -25,15 +25,6 @@ namespace display {
 class FakeDisplayCoordinatorConnector : public fidl::Server<fuchsia_hardware_display::Provider> {
  public:
   // Creates a FakeDisplayCoordinatorConnector where the fake display driver
-  // is initialized using `fake_display_device_config`, and then publish its
-  // service to `component`'s outgoing service directory.
-  // Callers must guarantee that all FIDL methods run on `dispatcher`.
-  static zx::result<> CreateAndPublishService(
-      std::shared_ptr<zx_device> mock_root, async_dispatcher_t* dispatcher,
-      const fake_display::FakeDisplayDeviceConfig& fake_display_device_config,
-      std::string_view parent_directory, component::OutgoingDirectory& outgoing);
-
-  // Creates a FakeDisplayCoordinatorConnector where the fake display driver
   // is initialized using `fake_display_device_config`.
   // Callers are responsible for binding incoming FIDL clients to it.
   // Callers must guarantee that all FIDL methods run on `dispatcher`.
@@ -53,6 +44,12 @@ class FakeDisplayCoordinatorConnector : public fidl::Server<fuchsia_hardware_dis
                                  OpenCoordinatorForVirtconCompleter::Sync& completer) override;
   void OpenCoordinatorForPrimary(OpenCoordinatorForPrimaryRequest& request,
                                  OpenCoordinatorForPrimaryCompleter::Sync& completer) override;
+  void OpenCoordinatorWithListenerForVirtcon(
+      OpenCoordinatorWithListenerForVirtconRequest& request,
+      OpenCoordinatorWithListenerForVirtconCompleter::Sync& completer) override;
+  void OpenCoordinatorWithListenerForPrimary(
+      OpenCoordinatorWithListenerForPrimaryRequest& request,
+      OpenCoordinatorWithListenerForPrimaryCompleter::Sync& completer) override;
 
   // Check coordinator clients' connection status for tests only.
   int GetNumQueuedPrimaryRequestsTestOnly() const {

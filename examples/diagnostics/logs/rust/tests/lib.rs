@@ -30,8 +30,8 @@ async fn launch_example_and_read_hello_world() {
     assert_ne!(next.tid, 0);
 
     assert_eq!(new_next.metadata.severity, Severity::Info);
-    assert_eq!(new_next.metadata.component_url, Some(url.to_string()));
-    assert_eq!(new_next.moniker, "logs_example");
+    assert_eq!(new_next.metadata.component_url, Some(url.into()));
+    assert_eq!(new_next.moniker.to_string(), "logs_example");
     assert_data_tree!(new_next.payload.unwrap(), root:
     {
         "message": {
@@ -47,9 +47,8 @@ async fn launch_example_and_read_hello_world() {
     assert_ne!(next.tid, 0);
 
     assert_eq!(new_next.metadata.severity, Severity::Info);
-    assert_eq!(new_next.metadata.component_url, Some(url.to_string()));
-    assert_eq!(new_next.moniker, "logs_example");
-    eprintln!("{:?}", new_next);
+    assert_eq!(new_next.metadata.component_url, Some(url.into()));
+    assert_eq!(new_next.moniker.to_string(), "logs_example");
     assert_data_tree!(new_next.payload.unwrap(), root:
     {
         "message":

@@ -17,6 +17,7 @@
 #include <kernel/mutex.h>
 #include <ktl/optional.h>
 #include <ktl/unique_ptr.h>
+#include <vm/anonymous_page_request.h>
 #include <vm/page.h>
 #include <vm/vm.h>
 
@@ -512,8 +513,69 @@ class LazyPageRequest {
 
   PageRequest& operator*() { return *get(); }
 
+  bool is_initialized() const { return request_.has_value(); }
+
  private:
   ktl::optional<PageRequest> request_ = ktl::nullopt;
+};
+
+// Wrapper around tracking multiple different page requests that might need waiting. Only one
+// individual request is allowed to considered 'active' at a time as the one that next needs waiting
+// on. Tracking whether a request is active is, depending on the request type, partially automatic
+// and partially requiring additional input from the user.
+// The PageRequest and LazyPageRequest access methods do not currently have a way to enforce that
+// those specific types of requests are made with the returned objects, however this could change
+// and callers are expected to use the correct method.
+// TODO(adanis): Implement an enforcement strategy.
+class MultiPageRequest {
+ public:
+  // Wait on the currently active page request.
+  zx_status_t Wait();
+
+  // Retrieve the anonymous page request. The caller may or may not arm the AnonymousPageRequest, if
+  // it does the anonymous request becomes considered active and no other request may be retrieved.
+  AnonymousPageRequest* GetAnonymous() {
+    DEBUG_ASSERT(NoRequestActive());
+    return &anonymous_;
+  }
+
+  // Retrieve and commit to initializing the page request for read. After calling this it is assumed
+  // that the page request will be made waitable and no other request may be retrieved.
+  PageRequest* GetReadRequest() {
+    DEBUG_ASSERT(NoRequestActive());
+    read_active_ = true;
+    return page_request_.get();
+  }
+
+  // Retrieve a lazy accessor to page request. If a dirty request is generated the caller must
+  // then call MadeDirtyRequest so that this helper knows that the page request is active and
+  // should be waited on.
+  LazyPageRequest* GetLazyDirtyRequest() {
+    DEBUG_ASSERT(NoRequestActive());
+    return &page_request_;
+  }
+
+  // Indicate that the page request retrieved by GetLazyDirtyRequest was used and should be waited
+  // on.
+  void MadeDirtyRequest() {
+    DEBUG_ASSERT(NoRequestActive());
+    dirty_active_ = true;
+  }
+
+  // Cancel all requests and have no active request.
+  void CancelRequests();
+
+ private:
+  bool NoRequestActive() const {
+    return !anonymous_.is_active() && !read_active_ && !dirty_active_;
+  }
+  // Track which request is active. This is multiple bools for consistency since the anonymous
+  // request being active is tracked directly in the AnonymousPageRequest and could not be part of
+  // an enum.
+  bool read_active_ = false;
+  bool dirty_active_ = false;
+  AnonymousPageRequest anonymous_;
+  LazyPageRequest page_request_;
 };
 
 #endif  // ZIRCON_KERNEL_VM_INCLUDE_VM_PAGE_SOURCE_H_

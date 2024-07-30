@@ -5,9 +5,7 @@
 import asyncio
 import unittest
 
-from fuchsia_controller_py import Channel
-from fuchsia_controller_py import Socket
-from fuchsia_controller_py import ZxStatus
+from fuchsia_controller_py import Channel, Socket, ZxStatus
 
 from fidl import AsyncSocket
 

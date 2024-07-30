@@ -10,6 +10,7 @@ use fidl_fuchsia_developer_ffx::RepositoryRegistryProxy;
 use fidl_fuchsia_developer_ffx_ext::{RepositoryError, RepositorySpec};
 use fuchsia_repo::repository::RepoProvider;
 use fuchsia_url::RepositoryUrl;
+use pkg::config as pkg_config;
 use sdk_metadata::get_repositories;
 use std::io::Write as _;
 #[derive(FfxTool)]
@@ -58,6 +59,11 @@ pub async fn add_from_product(
 
         match repos.add_repository(repo_name, &repo_spec).await.map_err(|e| bug!(e))? {
             Ok(()) => {
+                // Save the filesystem configuration.
+                pkg_config::set_repository(repo_name, &repository.spec())
+                    .await
+                    .map_err(|err| user_error!("Failed to save repository: {:#?}", err))?;
+
                 writeln!(writer, "added repository {}", repo_name).map_err(|e| bug!(e))?;
             }
             Err(err) => {

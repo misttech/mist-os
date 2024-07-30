@@ -106,33 +106,6 @@ To download the sysroot, you can use the following:
 cipd install fuchsia/third_party/sysroot/linux integration -root ${SYSROOT_DIR}
 ```
 
-{% dynamic if user.is_googler %}
-
-### \[Googlers only\] Goma
-
-Goma is a service for accelerating builds by distributing compilations across
-many machines. Googlers should ensure Goma is installed on your machine for faster
-builds. It will become available as part of your normal Fuchsia checkout. Then you
-can take advantage of Goma by allowing multiple `ninja` jobs to run in parallel:
-
-```bash
-ninja -j1000
-```
-
-Use `-j100` for Goma on macOS and `-j1000` for Goma on Linux. You may
-need to tune the job count to suit your particular machine and workload.
-
-Warning: The examples below assume you can use Goma. If you cannot use Goma, do not
-add the provided CMake flags or use an absurdly high number of jobs.
-
-Note: In order to use Goma, you need a host compiler that is
-supported by Goma such as the Fuchsia Clang installation.
-To verify your compiler is available on Goma, you can set
-`GOMA_USE_LOCAL=0 GOMA_FALLBACK=0` environment variables. If the
-compiler is not available, you will see an error.
-
-{% dynamic endif %}
-
 ## Building a Clang Toolchain for Fuchsia
 
 The Clang CMake build system supports bootstrap (aka multi-stage)
@@ -171,7 +144,6 @@ incremental development, without having to manually specify all options:
 ```bash
 cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug \
   -DCMAKE_TOOLCHAIN_FILE=${FUCHSIA_DIR}/scripts/clang/ToolChain.cmake \
-  -DUSE_GOMA=ON \
   -DLLVM_ENABLE_LTO=OFF \
   -DLINUX_x86_64-unknown-linux-gnu_SYSROOT=${SYSROOT_DIR} \
   -DLINUX_aarch64-unknown-linux-gnu_SYSROOT=${SYSROOT_DIR} \
@@ -204,7 +176,6 @@ a toolchain that Fuchsia ships to users.
 ```bash
 cmake -GNinja \
   -DCMAKE_TOOLCHAIN_FILE=${FUCHSIA_DIR}/scripts/clang/ToolChain.cmake \
-  -DUSE_GOMA=ON \
   -DCMAKE_INSTALL_PREFIX= \
   -DSTAGE2_LINUX_aarch64-unknown-linux-gnu_SYSROOT=${SYSROOT_DIR} \
   -DSTAGE2_LINUX_x86_64-unknown-linux-gnu_SYSROOT=${SYSROOT_DIR} \
@@ -247,7 +218,6 @@ LLVM_SRCDIR=${HOME}/llvm/llvm-project  # Replace with wherever llvm-project live
 IDK_DIR=${HOME}/fuchsia-idk/
 SYSROOT_DIR=${HOME}/fuchsia-sysroot/
 CLANG_TOOLCHAIN_PREFIX=${FUCHSIA_DIR}/prebuilt/third_party/clang/linux-x64/bin/
-GOMA_DIR=${FUCHSIA_DIR}/prebuilt/third_party/goma/linux-x64/
 
 # Download necessary dependencies
 cipd install fuchsia/sdk/core/linux-amd64 latest -root ${IDK_DIR}
@@ -256,7 +226,6 @@ cipd install fuchsia/third_party/sysroot/linux integration -root ${SYSROOT_DIR}
 # CMake invocation
 cmake -G Ninja -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_TOOLCHAIN_FILE=${FUCHSIA_DIR}/scripts/clang/ToolChain.cmake \
-  -DUSE_GOMA=ON \
   -DLLVM_ENABLE_LTO=OFF \
   -DLINUX_x86_64-unknown-linux-gnu_SYSROOT=${SYSROOT_DIR} \
   -DLINUX_aarch64-unknown-linux-gnu_SYSROOT=${SYSROOT_DIR} \
@@ -279,11 +248,11 @@ python3 ${FUCHSIA_DIR}/scripts/clang/generate_runtimes.py    \
 ### Building Fuchsia with a Custom Clang
 
 To specify a custom clang toolchain for building Fuchsia, pass
-`--args clang_prefix=\"${INSTALL_DIR}/bin\" --no-goma`
+`--args clang_prefix=\"${INSTALL_DIR}/bin\"`
 to `fx set` command and run `fx build`.
 
 ```bash
-fx set core.x64 --args=clang_prefix=\"${INSTALL_DIR}/bin\" --no-goma
+fx set core.x64 --args=clang_prefix=\"${INSTALL_DIR}/bin\"
 fx build
 ```
 

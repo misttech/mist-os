@@ -171,6 +171,8 @@ using Alias = ::std::string;
 
 constexpr uint32_t Const = 0u;
 
+#ifdef __Fuchsia__
+
 class Struct final {
  public:
   static const fidl_type_t* FidlType;
@@ -191,6 +193,10 @@ inline zx_status_t Clone(const ::test::versions::Struct& _value,
 }
 
 using StructPtr = ::std::unique_ptr<Struct>;
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
 
 class Table final {
  public:
@@ -270,6 +276,10 @@ class Table final {
 
 using TablePtr = ::std::unique_ptr<Table>;
 
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
 class Union final {
  public:
   static const fidl_type_t* FidlType;
@@ -312,7 +322,7 @@ class Union final {
     return x_;
   }
   Union& set_x(uint32_t value);
-  Union& SetUnknownData(fidl_xunion_tag_t ordinal, std::vector<uint8_t> bytes);
+  Union& SetUnknownData(fidl_xunion_tag_t ordinal, std::vector<uint8_t> bytes, std::vector<zx::handle> handles);
 
   ::test::versions::Union::Tag Which() const {
     switch (tag_) {
@@ -333,7 +343,13 @@ class Union final {
     if (Which() != ::test::versions::Union::Tag::kUnknown) {
       return nullptr;
     }
-    return &unknown_data_;
+    return &unknown_data_.bytes;
+  }
+  const std::vector<zx::handle>* UnknownHandles() const {
+    if (Which() != ::test::versions::Union::Tag::kUnknown) {
+      return nullptr;
+    }
+    return &unknown_data_.handles;
   }
 
   friend ::fidl::Equality<::test::versions::Union>;
@@ -345,7 +361,7 @@ class Union final {
   ::fidl_xunion_tag_t tag_ = static_cast<fidl_xunion_tag_t>(::test::versions::Union::Tag::Invalid);
   union {
     uint32_t x_;
-    std::vector<uint8_t> unknown_data_;
+    ::fidl::UnknownData unknown_data_;
   };
 };
 
@@ -355,6 +371,8 @@ inline zx_status_t Clone(const ::test::versions::Union& value,
 }
 
 using UnionPtr = ::std::unique_ptr<Union>;
+
+#endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
 
@@ -447,6 +465,8 @@ struct Equality<::test::versions::Enum> {
   }
 };
 
+#ifdef __Fuchsia__
+
 template <>
 struct CodingTraits<::test::versions::Struct>
     : public EncodableCodingTraits<::test::versions::Struct, 4> {};
@@ -469,6 +489,11 @@ struct Equality<::test::versions::Struct> {
     return true;
   }
 };
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
 template <>
 struct CodingTraits<::test::versions::Table>
     : public EncodableCodingTraits<::test::versions::Table, 16> {};
@@ -493,6 +518,11 @@ struct Equality<::test::versions::Table> {
     return true;
   }
 };
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
 template <>
 struct IsFidlXUnion<::test::versions::Union> : public std::true_type{};
 
@@ -547,6 +577,8 @@ struct Equality<::test::versions::Union> {
     }
   }
 };
+
+#endif  // __Fuchsia__
 
 //
 // Proxies and stubs declarations
@@ -677,6 +709,12 @@ class Protocol {
   virtual ~Protocol();
 
   virtual void Foo() = 0;
+
+ protected:
+  // Allow the stub to access the handle_unknown_method method.
+  friend class Protocol_Stub;
+
+  virtual void handle_unknown_method(uint64_t ordinal, bool method_has_response) = 0;
 };
 
 class Protocol_RequestDecoder {
@@ -714,6 +752,16 @@ class Protocol_Proxy final : public ::fidl::internal::Proxy, public Protocol {
   zx_status_t Dispatch_(::fidl::HLCPPIncomingMessage message) override;
   // cts-coverage-fidl-name:test.versions/Protocol.Foo
   void Foo() override;
+
+  fit::function<void(uint64_t)> handle_unknown_event;
+
+ protected:
+  void handle_unknown_method(uint64_t ordinal, bool method_has_response) override {
+    // This method is only provided to satisfy the base interface. It's
+    // protected and should never be called by generated code on the client
+    // side, so it should never be called.
+    ZX_PANIC("Unreachable: Protocol_Proxy::handle_unknown_method should not be callable");
+  }
 
  private:
   Protocol_Proxy(const ::test::versions::Protocol_Proxy&) = delete;

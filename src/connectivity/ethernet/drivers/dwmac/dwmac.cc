@@ -556,6 +556,7 @@ void DWMacDevice::ProcRxBuffer(uint32_t int_status) {
     if (curr_rx_buf_ == 0) {
       loop_count_++;
     }
+    hw_mb();
     mmio_->Write32(~0, DW_MAC_DMA_RXPOLLDEMAND);
   }
 }

@@ -6,7 +6,6 @@
 #include <fuchsia/ui/composition/cpp/fidl.h>
 #include <fuchsia/ui/pointer/cpp/fidl.h>
 #include <fuchsia/ui/pointerinjector/cpp/fidl.h>
-#include <lib/sys/component/cpp/testing/realm_builder.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/ui/scenic/cpp/view_creation_tokens.h>
 #include <lib/ui/scenic/cpp/view_identity.h>
@@ -14,11 +13,10 @@
 
 #include <zxtest/zxtest.h>
 
-#include "src/ui/scenic/lib/utils/helpers.h"
 #include "src/ui/scenic/tests/utils/blocking_present.h"
-#include "src/ui/scenic/tests/utils/scenic_realm_builder.h"
+#include "src/ui/scenic/tests/utils/scenic_ctf_test_base.h"
 #include "src/ui/scenic/tests/utils/utils.h"
-#include "src/ui/testing/util/logging_event_loop.h"
+#include "zircon/errors.h"
 
 // These tests exercise the integration between Flatland and the InputSystem, including the
 // View-to-View transform logic between the injection point and the receiver.
@@ -35,7 +33,7 @@ using Flatland = fuchsia::ui::composition::Flatland;
 using FlatlandPtr = fuchsia::ui::composition::FlatlandPtr;
 using ViewBoundProtocols = fuchsia::ui::composition::ViewBoundProtocols;
 using FlatlandDisplay = fuchsia::ui::composition::FlatlandDisplay;
-using FlatlandDisplayPtr = fuchsia::ui::composition::FlatlandDisplayPtr;
+using FlatlandDisplaySyncPtr = fuchsia::ui::composition::FlatlandDisplaySyncPtr;
 using Orientation = fuchsia::ui::composition::Orientation;
 using ViewportProperties = fuchsia::ui::composition::ViewportProperties;
 using TransformId = fuchsia::ui::composition::TransformId;
@@ -56,12 +54,11 @@ using PointerSample = fuchsia::ui::pointerinjector::PointerSample;
 using Context = fuchsia::ui::pointerinjector::Context;
 using Data = fuchsia::ui::pointerinjector::Data;
 using Registry = fuchsia::ui::pointerinjector::Registry;
-using RegistryPtr = fuchsia::ui::pointerinjector::RegistryPtr;
+using RegistrySyncPtr = fuchsia::ui::pointerinjector::RegistrySyncPtr;
 using DevicePtr = fuchsia::ui::pointerinjector::DevicePtr;
 using DeviceType = fuchsia::ui::pointerinjector::DeviceType;
 using Target = fuchsia::ui::pointerinjector::Target;
 using Viewport = fuchsia::ui::pointerinjector::Viewport;
-using RealmRoot = component_testing::RealmRoot;
 using fir_Axis = fuchsia::input::report::Axis;
 
 // Macros for calling EXPECT on fuchsia::ui::pointer::MousePointerSample.
@@ -130,7 +127,7 @@ void ExpectEqualPointer(const fuchsia::ui::pointer::MousePointerSample& pointer_
   }
 }
 
-class FlatlandMouseIntegrationTest : public zxtest::Test, public ui_testing::LoggingEventLoop {
+class FlatlandMouseIntegrationTest : public ScenicCtfTest {
  protected:
   static constexpr uint32_t kDeviceId = 1111;
 
@@ -147,28 +144,13 @@ class FlatlandMouseIntegrationTest : public zxtest::Test, public ui_testing::Log
   // clang-format on
 
   void SetUp() override {
-    // Build the realm topology and route the protocols required by this test fixture from the
-    // scenic subrealm.
-    realm_ = std::make_unique<RealmRoot>(
-        ScenicRealmBuilder()
-            .AddRealmProtocol(fuchsia::ui::composition::Flatland::Name_)
-            .AddRealmProtocol(fuchsia::ui::composition::FlatlandDisplay::Name_)
-            .AddRealmProtocol(fuchsia::ui::composition::Allocator::Name_)
-            .AddRealmProtocol(fuchsia::ui::pointerinjector::Registry::Name_)
-            .Build());
+    ScenicCtfTest::SetUp();
 
-    flatland_display_ = realm_->component().Connect<FlatlandDisplay>();
-    flatland_display_.set_error_handler([](zx_status_t status) {
-      FAIL("Lost connection to Scenic: %s", zx_status_get_string(status));
-    });
-
-    pointerinjector_registry_ = realm_->component().Connect<Registry>();
-    pointerinjector_registry_.set_error_handler([](zx_status_t status) {
-      FAIL("Lost connection to pointerinjector Registry: %s", zx_status_get_string(status));
-    });
+    flatland_display_ = ConnectSyncIntoRealm<FlatlandDisplay>();
+    pointerinjector_registry_ = ConnectSyncIntoRealm<Registry>();
 
     // Set up root view and root transform.
-    root_instance_ = realm_->component().Connect<Flatland>();
+    root_instance_ = ConnectAsyncIntoRealm<Flatland>();
     root_instance_.set_error_handler([](zx_status_t status) {
       FAIL("Lost connection to Scenic: %s", zx_status_get_string(status));
     });
@@ -298,12 +280,9 @@ class FlatlandMouseIntegrationTest : public zxtest::Test, public ui_testing::Log
     }
 
     injector_.set_error_handler([this](zx_status_t) { injector_channel_closed_ = true; });
-    bool register_callback_fired = false;
-    pointerinjector_registry_->Register(
-        std::move(config), injector_.NewRequest(),
-        [&register_callback_fired] { register_callback_fired = true; });
+    ASSERT_EQ(ZX_OK,
+              pointerinjector_registry_->Register(std::move(config), injector_.NewRequest()));
 
-    RunLoopUntil([&register_callback_fired] { return register_callback_fired; });
     EXPECT_FALSE(injector_channel_closed_);
   }
 
@@ -329,7 +308,7 @@ class FlatlandMouseIntegrationTest : public zxtest::Test, public ui_testing::Log
                                 ContentId parent_content_id, FlatlandPtr& child_instance,
                                 fidl::InterfaceRequest<MouseSource> child_mouse_source = nullptr,
                                 fidl::InterfaceRequest<ViewRefFocused> child_focused = nullptr) {
-    child_instance = realm_->component().Connect<Flatland>();
+    child_instance = ConnectAsyncIntoRealm<Flatland>();
 
     // Set up the child view watcher.
     fidl::InterfacePtr<ChildViewWatcher> child_view_watcher;
@@ -380,13 +359,9 @@ class FlatlandMouseIntegrationTest : public zxtest::Test, public ui_testing::Log
 
   float display_height_ = 0;
 
-  std::unique_ptr<RealmRoot> realm_;
-
  private:
-  FlatlandDisplayPtr flatland_display_;
-
-  RegistryPtr pointerinjector_registry_;
-
+  FlatlandDisplaySyncPtr flatland_display_;
+  RegistrySyncPtr pointerinjector_registry_;
   DevicePtr injector_;
 
   // Holds watch loops so they stay alive through the duration of the test.
@@ -1797,7 +1772,7 @@ TEST_F(FlatlandMouseIntegrationTest, AnonymousSubtree) {
       /*parent_of_viewport_transform*/ kRootTransform,
       /*parent_content_id*/ {.value = 1}, parent_instance, parent_mouse_source.NewRequest());
 
-  FlatlandPtr child_instance = realm_->component().Connect<Flatland>();
+  FlatlandPtr child_instance = ConnectAsyncIntoRealm<Flatland>();
   child_instance.set_error_handler([](zx_status_t status) {
     FAIL("Lost connection to Scenic: %s", zx_status_get_string(status));
   });

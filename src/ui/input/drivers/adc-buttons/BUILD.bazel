@@ -40,7 +40,7 @@ _common_deps = [
 fuchsia_driver_bind_bytecode(
     name = "adc-buttons-bind",
     output = "adc-buttons.bindbc",
-    rules = "adc-buttons.bind",
+    rules = "meta/adc-buttons.bind",
     deps = [
         "@fuchsia_sdk//bind/fuchsia.adc",
         "@fuchsia_sdk//bind/fuchsia.devicetree",
@@ -91,7 +91,7 @@ fuchsia_cc_test(
     srcs = ["adc-buttons-test.cc"] + _common_sources,
     deps = [
         "//sdk/lib/driver/compat/cpp",
-        "//sdk/lib/driver/testing/cpp/fixture:driver_testing_cpp_fixture",
+        "//sdk/lib/driver/testing/cpp:driver_testing_cpp",
         "@com_google_googletest//:gtest",
         "@com_google_googletest//:gtest_main",
     ] + _common_deps,

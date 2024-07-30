@@ -3,17 +3,18 @@
 // found in the LICENSE file.
 
 use anyhow::Result;
-use diagnostics_assertions::{tree_assertion, AnyProperty};
+use diagnostics_assertions::{tree_assertion, AnyProperty, NonZeroUintProperty, TreeAssertion};
 use diagnostics_reader::{ArchiveReader, Inspect};
 use fidl::endpoints::create_endpoints;
 use fidl_fuchsia_power_broker::{self as fbroker, LeaseStatus};
 use fuchsia_component::client::connect_to_protocol;
-use fuchsia_zircon::{self as zx, HandleBased};
+use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased};
 use futures::channel::mpsc;
-use futures::StreamExt;
-use power_broker_client::PowerElementContext;
+use futures::{FutureExt, StreamExt};
+use power_broker_client::{basic_update_fn_factory, run_power_element, PowerElementContext};
 use realm_proxy_client::RealmProxyClient;
 use std::collections::HashMap;
+use std::sync::Arc;
 use std::time::Instant;
 use {
     fidl_fuchsia_hardware_suspend as fhsuspend, fidl_fuchsia_power_suspend as fsuspend,
@@ -95,51 +96,79 @@ async fn test_activity_governor_returns_expected_power_elements() -> Result<()> 
     Ok(())
 }
 
-async fn create_suspend_topology(realm: &RealmProxyClient) -> Result<PowerElementContext> {
+async fn create_suspend_topology(realm: &RealmProxyClient) -> Result<Arc<PowerElementContext>> {
     let topology = realm.connect_to_protocol::<fbroker::TopologyMarker>().await?;
     let activity_governor = realm.connect_to_protocol::<fsystem::ActivityGovernorMarker>().await?;
     let power_elements = activity_governor.get_power_elements().await?;
     let aa_token = power_elements.application_activity.unwrap().assertive_dependency_token.unwrap();
 
-    let suspend_controller = PowerElementContext::builder(&topology, "suspend_controller", &[0, 1])
-        .dependencies(vec![fbroker::LevelDependency {
-            dependency_type: fbroker::DependencyType::Assertive,
-            dependent_level: 1,
-            requires_token: aa_token,
-            requires_level_by_preference: vec![1],
-        }])
-        .build()
-        .await?;
+    let suspend_controller = Arc::new(
+        PowerElementContext::builder(&topology, "suspend_controller", &[0, 1])
+            .dependencies(vec![fbroker::LevelDependency {
+                dependency_type: fbroker::DependencyType::Assertive,
+                dependent_level: 1,
+                requires_token: aa_token,
+                requires_level_by_preference: vec![1],
+            }])
+            .build()
+            .await?,
+    );
+    let sc_context = suspend_controller.clone();
+    fasync::Task::local(async move {
+        run_power_element(
+            &sc_context.name(),
+            &sc_context.required_level,
+            0,    /* initial_level */
+            None, /* inspect_node */
+            basic_update_fn_factory(&sc_context),
+        )
+        .await;
+    })
+    .detach();
 
     Ok(suspend_controller)
 }
 
-async fn create_wake_topology(realm: &RealmProxyClient) -> Result<PowerElementContext> {
+async fn create_wake_topology(realm: &RealmProxyClient) -> Result<Arc<PowerElementContext>> {
     let topology = realm.connect_to_protocol::<fbroker::TopologyMarker>().await?;
     let activity_governor = realm.connect_to_protocol::<fsystem::ActivityGovernorMarker>().await?;
     let power_elements = activity_governor.get_power_elements().await?;
     let wh_token = power_elements.wake_handling.unwrap().assertive_dependency_token.unwrap();
 
-    let wake_controller = PowerElementContext::builder(&topology, "wake_controller", &[0, 1])
-        .dependencies(vec![fbroker::LevelDependency {
-            dependency_type: fbroker::DependencyType::Assertive,
-            dependent_level: 1,
-            requires_token: wh_token,
-            requires_level_by_preference: vec![1],
-        }])
-        .build()
-        .await?;
+    let wake_controller = Arc::new(
+        PowerElementContext::builder(&topology, "wake_controller", &[0, 1])
+            .dependencies(vec![fbroker::LevelDependency {
+                dependency_type: fbroker::DependencyType::Assertive,
+                dependent_level: 1,
+                requires_token: wh_token,
+                requires_level_by_preference: vec![1],
+            }])
+            .build()
+            .await?,
+    );
+    let wc_context = wake_controller.clone();
+    fasync::Task::local(async move {
+        run_power_element(
+            &wc_context.name(),
+            &wc_context.required_level,
+            0,    /* initial_level */
+            None, /* inspect_node */
+            basic_update_fn_factory(&wc_context),
+        )
+        .await;
+    })
+    .detach();
 
     Ok(wake_controller)
 }
 
-async fn create_full_wake_topology(realm: &RealmProxyClient) -> Result<PowerElementContext> {
+async fn create_full_wake_topology(realm: &RealmProxyClient) -> Result<Arc<PowerElementContext>> {
     let topology = realm.connect_to_protocol::<fbroker::TopologyMarker>().await?;
     let activity_governor = realm.connect_to_protocol::<fsystem::ActivityGovernorMarker>().await?;
     let power_elements = activity_governor.get_power_elements().await?;
     let fwh_token = power_elements.full_wake_handling.unwrap().assertive_dependency_token.unwrap();
 
-    let full_wake_controller =
+    let full_wake_controller = Arc::new(
         PowerElementContext::builder(&topology, "full_wake_controller", &[0, 1])
             .dependencies(vec![fbroker::LevelDependency {
                 dependency_type: fbroker::DependencyType::Assertive,
@@ -148,7 +177,20 @@ async fn create_full_wake_topology(realm: &RealmProxyClient) -> Result<PowerElem
                 requires_level_by_preference: vec![1],
             }])
             .build()
-            .await?;
+            .await?,
+    );
+    let fwc_context = full_wake_controller.clone();
+    fasync::Task::local(async move {
+        run_power_element(
+            &fwc_context.name(),
+            &fwc_context.required_level,
+            0,    /* initial_level */
+            None, /* inspect_node */
+            basic_update_fn_factory(&fwc_context),
+        )
+        .await;
+    })
+    .detach();
 
     Ok(full_wake_controller)
 }
@@ -156,7 +198,7 @@ async fn create_full_wake_topology(realm: &RealmProxyClient) -> Result<PowerElem
 async fn create_latency_topology(
     realm: &RealmProxyClient,
     expected_latencies: &Vec<i64>,
-) -> Result<PowerElementContext> {
+) -> Result<Arc<PowerElementContext>> {
     let topology = realm.connect_to_protocol::<fbroker::TopologyMarker>().await?;
     let activity_governor = realm.connect_to_protocol::<fsystem::ActivityGovernorMarker>().await?;
     let power_elements = activity_governor.get_power_elements().await?;
@@ -167,20 +209,36 @@ async fn create_latency_topology(
 
     let levels = Vec::from_iter(0..expected_latencies.len().try_into().unwrap());
 
-    let erl_controller = PowerElementContext::builder(&topology, "erl_controller", &levels)
-        .dependencies(
-            levels
-                .iter()
-                .map(|level| fbroker::LevelDependency {
-                    dependency_type: fbroker::DependencyType::Assertive,
-                    dependent_level: *level,
-                    requires_token: erl_token.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap(),
-                    requires_level_by_preference: vec![*level],
-                })
-                .collect(),
+    let erl_controller = Arc::new(
+        PowerElementContext::builder(&topology, "erl_controller", &levels)
+            .dependencies(
+                levels
+                    .iter()
+                    .map(|level| fbroker::LevelDependency {
+                        dependency_type: fbroker::DependencyType::Assertive,
+                        dependent_level: *level,
+                        requires_token: erl_token
+                            .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                            .unwrap(),
+                        requires_level_by_preference: vec![*level],
+                    })
+                    .collect(),
+            )
+            .build()
+            .await?,
+    );
+    let erlc_context = erl_controller.clone();
+    fasync::Task::local(async move {
+        run_power_element(
+            &erlc_context.name(),
+            &erlc_context.required_level,
+            0,    /* initial_level */
+            None, /* inspect_node */
+            basic_update_fn_factory(&erlc_context),
         )
-        .build()
-        .await?;
+        .await;
+    })
+    .detach();
 
     Ok(erl_controller)
 }
@@ -286,6 +344,7 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
             },
             suspend_events: {
             },
+            wake_leases: {},
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -347,6 +406,7 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
                     duration: 2u64,
                 },
             },
+            wake_leases: {},
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -393,6 +453,7 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
                     duration: 2u64,
                 },
             },
+            wake_leases: {},
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -461,6 +522,7 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
                     duration: 3u64,
                 },
             },
+            wake_leases: {},
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -547,6 +609,7 @@ async fn test_activity_governor_raises_execution_state_power_level_on_wake_handl
                     duration: 2u64,
                 },
             },
+            wake_leases: {},
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -609,6 +672,7 @@ async fn test_activity_governor_raises_execution_state_power_level_on_wake_handl
                     duration: 3u64,
                 },
             },
+            wake_leases: {},
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -695,6 +759,7 @@ async fn test_activity_governor_raises_execution_state_power_level_on_full_wake_
                     duration: 2u64,
                 },
             },
+            wake_leases: {},
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -757,6 +822,7 @@ async fn test_activity_governor_raises_execution_state_power_level_on_full_wake_
                     duration: 3u64,
                 },
             },
+            wake_leases: {},
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -822,6 +888,7 @@ async fn test_activity_governor_shows_resume_latency_in_inspect() -> Result<()> 
                 },
                 suspend_events: {
                 },
+                wake_leases: {},
                 "fuchsia.inspect.Health": contains {
                     status: "OK",
                 },
@@ -890,6 +957,7 @@ async fn test_activity_governor_forwards_resume_latency_to_suspender() -> Result
             },
             suspend_events: {
             },
+            wake_leases: {},
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -950,6 +1018,7 @@ async fn test_activity_governor_forwards_resume_latency_to_suspender() -> Result
                     duration: 1000u64,
                 },
             },
+            wake_leases: {},
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -1017,6 +1086,7 @@ async fn test_activity_governor_increments_fail_count_on_suspend_error() -> Resu
             },
             suspend_events: {
             },
+            wake_leases: {},
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -1068,6 +1138,7 @@ async fn test_activity_governor_increments_fail_count_on_suspend_error() -> Resu
                     suspend_failed: AnyProperty,
                 },
             },
+            wake_leases: {},
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -1103,10 +1174,12 @@ async fn test_activity_governor_suspends_after_listener_hanging_on_resume() -> R
         .await
         .unwrap();
 
+    let (on_suspend_started_tx, mut on_suspend_started_rx) = mpsc::channel(1);
     let (on_suspend_tx, mut on_suspend_rx) = mpsc::channel(1);
     let (on_resume_tx, mut on_resume_rx) = mpsc::channel(1);
 
     fasync::Task::local(async move {
+        let mut on_suspend_started_tx = on_suspend_started_tx;
         let mut on_suspend_tx = on_suspend_tx;
         let mut on_resume_tx = on_resume_tx;
 
@@ -1120,6 +1193,10 @@ async fn test_activity_governor_suspends_after_listener_hanging_on_resume() -> R
                 }
                 fsystem::ActivityGovernorListenerRequest::OnSuspend { .. } => {
                     on_suspend_tx.try_send(()).unwrap();
+                }
+                fsystem::ActivityGovernorListenerRequest::OnSuspendStarted { responder } => {
+                    responder.send().unwrap();
+                    on_suspend_started_tx.try_send(()).unwrap();
                 }
                 fsystem::ActivityGovernorListenerRequest::OnSuspendFail { responder } => {
                     responder.send().unwrap();
@@ -1140,6 +1217,7 @@ async fn test_activity_governor_suspends_after_listener_hanging_on_resume() -> R
 
     // OnSuspend and OnResume should have been called once.
     on_suspend_rx.next().await.unwrap();
+    on_suspend_started_rx.next().await.unwrap();
 
     assert_eq!(0, suspend_device.await_suspend().await.unwrap().unwrap().state_index.unwrap());
     suspend_device
@@ -1199,12 +1277,87 @@ async fn test_activity_governor_suspends_after_listener_hanging_on_resume() -> R
                     duration: 2u64,
                 },
             },
+            wake_leases: {},
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
         }
     );
 
+    Ok(())
+}
+
+#[fuchsia::test]
+async fn test_activity_governor_does_not_suspend_while_on_suspend_started_hangs() -> Result<()> {
+    let (realm, _) = create_realm().await?;
+    let suspend_device = realm.connect_to_protocol::<tsc::DeviceMarker>().await?;
+    set_up_default_suspender(&suspend_device).await;
+
+    let stats = realm.connect_to_protocol::<fsuspend::StatsMarker>().await?;
+    let activity_governor = realm.connect_to_protocol::<fsystem::ActivityGovernorMarker>().await?;
+
+    // First watch should return immediately with default values.
+    let current_stats = stats.watch().await?;
+    assert_eq!(Some(0), current_stats.success_count);
+    assert_eq!(Some(0), current_stats.fail_count);
+    assert_eq!(None, current_stats.last_failed_error);
+    assert_eq!(None, current_stats.last_time_in_suspend);
+
+    let (listener_client_end, mut listener_stream) =
+        fidl::endpoints::create_request_stream().unwrap();
+    activity_governor
+        .register_listener(fsystem::ActivityGovernorRegisterListenerRequest {
+            listener: Some(listener_client_end),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+
+    let (on_suspend_started_tx, mut on_suspend_started_rx) = mpsc::channel(1);
+    fasync::Task::local(async move {
+        let mut on_suspend_started_tx = on_suspend_started_tx;
+        let mut _on_suspend_started_responder;
+
+        while let Some(Ok(req)) = listener_stream.next().await {
+            match req {
+                fsystem::ActivityGovernorListenerRequest::OnResume { responder } => {
+                    responder.send().unwrap();
+                }
+                fsystem::ActivityGovernorListenerRequest::OnSuspend { .. } => (),
+                fsystem::ActivityGovernorListenerRequest::OnSuspendStarted { responder } => {
+                    _on_suspend_started_responder = responder;
+                    on_suspend_started_tx.try_send(()).unwrap();
+                }
+                fsystem::ActivityGovernorListenerRequest::OnSuspendFail { responder } => {
+                    responder.send().unwrap();
+                }
+                fsystem::ActivityGovernorListenerRequest::_UnknownMethod { ordinal, .. } => {
+                    panic!("Unexpected method: {}", ordinal);
+                }
+            }
+        }
+    })
+    .detach();
+
+    // Queue up a callback from `suspend_device`, to let us know when
+    // SAG requests to suspend the hardware.
+    let await_suspend = suspend_device.await_suspend();
+
+    // Cycle execution_state power level to make SAG start suspending.
+    {
+        let suspend_controller = create_suspend_topology(&realm).await?;
+        lease(&suspend_controller, 1).await?;
+    }
+
+    // Wait to receive the OnSuspendStarted() callback.
+    on_suspend_started_rx.next().await.unwrap();
+
+    // Give SAG some time to take any further suspend actions.
+    fasync::Timer::new(fasync::Duration::from_millis(1000)).await;
+
+    // Verify that SAG did _not_ suspend the hardware (because we did not
+    // respond to the callback).
+    assert!(await_suspend.now_or_never().is_none());
     Ok(())
 }
 
@@ -1229,10 +1382,12 @@ async fn test_activity_governor_handles_listener_raising_power_levels() -> Resul
         .await
         .unwrap();
 
+    let (on_suspend_started_tx, mut on_suspend_started_rx) = mpsc::channel(1);
     let (on_suspend_tx, mut on_suspend_rx) = mpsc::channel(1);
     let (on_resume_tx, mut on_resume_rx) = mpsc::channel(1);
 
     fasync::Task::local(async move {
+        let mut on_suspend_started_tx = on_suspend_started_tx;
         let mut on_suspend_tx = on_suspend_tx;
         let mut on_resume_tx = on_resume_tx;
 
@@ -1245,6 +1400,10 @@ async fn test_activity_governor_handles_listener_raising_power_levels() -> Resul
                 }
                 fsystem::ActivityGovernorListenerRequest::OnSuspend { .. } => {
                     on_suspend_tx.try_send(()).unwrap();
+                }
+                fsystem::ActivityGovernorListenerRequest::OnSuspendStarted { responder } => {
+                    responder.send().unwrap();
+                    on_suspend_started_tx.try_send(()).unwrap();
                 }
                 fsystem::ActivityGovernorListenerRequest::OnSuspendFail { responder } => {
                     responder.send().unwrap();
@@ -1261,6 +1420,7 @@ async fn test_activity_governor_handles_listener_raising_power_levels() -> Resul
 
     // OnSuspend should have been called.
     on_suspend_rx.next().await.unwrap();
+    on_suspend_started_rx.next().await.unwrap();
 
     assert_eq!(0, suspend_device.await_suspend().await.unwrap().unwrap().state_index.unwrap());
     suspend_device
@@ -1311,6 +1471,7 @@ async fn test_activity_governor_handles_listener_raising_power_levels() -> Resul
                     duration: 2u64,
                 },
             },
+            wake_leases: {},
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -1322,6 +1483,7 @@ async fn test_activity_governor_handles_listener_raising_power_levels() -> Resul
 
     // OnSuspend should be called again.
     on_suspend_rx.next().await.unwrap();
+    on_suspend_started_rx.next().await.unwrap();
 
     assert_eq!(0, suspend_device.await_suspend().await.unwrap().unwrap().state_index.unwrap());
     suspend_device
@@ -1379,6 +1541,7 @@ async fn test_activity_governor_handles_listener_raising_power_levels() -> Resul
                     duration: 3u64,
                 },
             },
+            wake_leases: {},
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -1409,10 +1572,12 @@ async fn test_activity_governor_handles_suspend_failure() -> Result<()> {
         .await
         .unwrap();
 
+    let (on_suspend_started_tx, mut on_suspend_started_rx) = mpsc::channel(1);
     let (on_suspend_tx, mut on_suspend_rx) = mpsc::channel(1);
     let (on_suspend_fail_tx, mut on_suspend_fail_rx) = mpsc::channel(1);
 
     fasync::Task::local(async move {
+        let mut on_suspend_started_tx = on_suspend_started_tx;
         let mut on_suspend_tx = on_suspend_tx;
         let mut on_suspend_fail_tx = on_suspend_fail_tx;
 
@@ -1423,6 +1588,10 @@ async fn test_activity_governor_handles_suspend_failure() -> Result<()> {
                 }
                 fsystem::ActivityGovernorListenerRequest::OnSuspend { .. } => {
                     on_suspend_tx.try_send(()).unwrap();
+                }
+                fsystem::ActivityGovernorListenerRequest::OnSuspendStarted { responder } => {
+                    responder.send().unwrap();
+                    on_suspend_started_tx.try_send(()).unwrap();
                 }
                 fsystem::ActivityGovernorListenerRequest::OnSuspendFail { responder } => {
                     let suspend_lease = lease(&suspend_controller, 1).await.unwrap();
@@ -1441,6 +1610,7 @@ async fn test_activity_governor_handles_suspend_failure() -> Result<()> {
 
     // OnSuspend should have been called.
     on_suspend_rx.next().await.unwrap();
+    on_suspend_started_rx.next().await.unwrap();
 
     assert_eq!(0, suspend_device.await_suspend().await.unwrap().unwrap().state_index.unwrap());
     suspend_device
@@ -1490,6 +1660,7 @@ async fn test_activity_governor_handles_suspend_failure() -> Result<()> {
                     suspend_failed: AnyProperty,
                 },
             },
+            wake_leases: {},
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -1501,6 +1672,7 @@ async fn test_activity_governor_handles_suspend_failure() -> Result<()> {
 
     // OnSuspend should be called again.
     on_suspend_rx.next().await.unwrap();
+    on_suspend_started_rx.next().await.unwrap();
 
     assert_eq!(0, suspend_device.await_suspend().await.unwrap().unwrap().state_index.unwrap());
 
@@ -1523,9 +1695,18 @@ async fn test_activity_governor_blocks_lease_while_suspend_in_progress() -> Resu
     assert_eq!(None, current_stats.last_failed_error);
     assert_eq!(None, current_stats.last_time_in_suspend);
 
+    // Inform SAG that booting has completed.
+    //
+    // Note that the resulting lease is dropped immediately. Dropping
+    // the lease allows the `await_suspend()` call below to complete.
     let suspend_controller = create_suspend_topology(&realm).await?;
     lease(&suspend_controller, 1).await.unwrap();
 
+    // Register a listener to receive the `OnResume()` callback.
+    //
+    // This must be done before the `await_suspend()` call, to avoid
+    // having the registration race with the invocation of resume
+    // callbacks.
     let (listener_client_end, mut listener_stream) =
         fidl::endpoints::create_request_stream().unwrap();
     activity_governor
@@ -1536,23 +1717,21 @@ async fn test_activity_governor_blocks_lease_while_suspend_in_progress() -> Resu
         .await
         .unwrap();
 
-    assert_eq!(0, suspend_device.await_suspend().await.unwrap().unwrap().state_index.unwrap());
-
-    let now = Instant::now();
-
+    // Start a task to process callbacks from SAG.
+    //
+    // This must be done before the `await_suspend()` call. Otherwise:
+    // 1. SAG will be stuck waiting for a reply to `OnSuspendStarted()`.
+    // 2. The reply will never come, because `await_suspend()` has not
+    //    returned.
     let (mut on_resume_tx, mut on_resume_rx) = mpsc::channel(1);
-    let (mut on_lease_tx, mut on_lease_rx) = mpsc::channel(1);
     fasync::Task::local(async move {
-        {
-            // Try to take a lease before handling listener requests.
-            lease(&suspend_controller, 1).await.unwrap();
-            on_lease_tx.try_send(now.elapsed()).unwrap();
-        }
-
         while let Some(Ok(req)) = listener_stream.next().await {
             match req {
                 fsystem::ActivityGovernorListenerRequest::OnResume { responder } => {
-                    on_resume_tx.start_send(lease(&suspend_controller, 1).await.unwrap()).unwrap();
+                    on_resume_tx.start_send(()).unwrap();
+                    responder.send().unwrap();
+                }
+                fsystem::ActivityGovernorListenerRequest::OnSuspendStarted { responder } => {
                     responder.send().unwrap();
                 }
                 fsystem::ActivityGovernorListenerRequest::OnSuspendFail { responder } => {
@@ -1563,6 +1742,19 @@ async fn test_activity_governor_blocks_lease_while_suspend_in_progress() -> Resu
                     panic!("Unexpected method: {}", ordinal);
                 }
             }
+        }
+    })
+    .detach();
+
+    assert_eq!(0, suspend_device.await_suspend().await.unwrap().unwrap().state_index.unwrap());
+
+    let now = Instant::now();
+    let (mut on_lease_tx, mut on_lease_rx) = mpsc::channel(1);
+    fasync::Task::local(async move {
+        {
+            // Try to take a lease. This should not be granted until the system resumes.
+            lease(&suspend_controller, 1).await.unwrap();
+            on_lease_tx.try_send(now.elapsed()).unwrap();
         }
     })
     .detach();
@@ -1587,6 +1779,15 @@ async fn test_activity_governor_blocks_lease_while_suspend_in_progress() -> Resu
     // Wait for OnResume to be called.
     on_resume_rx.next().await.unwrap();
 
+    // Note: although there's no lease held here, and SAG could
+    // initiate another suspend before `stats.watch()` completes,
+    // there's no race regarding the values in `current_stats`.
+    //
+    // The values in `current_stats` are well-defined, because:
+    // 1. SAG cannot update these values until SAG's suspend request
+    //    to the suspend HAL completes, and
+    // 2. SAG's request to the suspend HAL can't complete until
+    //    this test call suspend_device.await_suspend() again.
     let current_stats = stats.watch().await?;
     assert_eq!(Some(1), current_stats.success_count);
     assert_eq!(Some(0), current_stats.fail_count);
@@ -1642,6 +1843,7 @@ async fn test_activity_governor_handles_boot_signal() -> Result<()> {
             },
             suspend_events: {
             },
+            wake_leases: {},
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -1686,6 +1888,7 @@ async fn test_activity_governor_handles_boot_signal() -> Result<()> {
                     suspended: AnyProperty,
                 }
             },
+            wake_leases: {},
             "fuchsia.inspect.Health": contains {
                 status: "OK",
             },
@@ -1853,12 +2056,12 @@ async fn test_element_info_provider() -> Result<()> {
         .map(|s| (s.identifier.unwrap(), s.status.unwrap().into_proxy().unwrap()))
         .collect();
 
-    let es_status = status_endpoints.get("execution_state".into()).unwrap();
-    let aa_status = status_endpoints.get("application_activity".into()).unwrap();
-    let fwh_status = status_endpoints.get("full_wake_handling".into()).unwrap();
-    let wh_status = status_endpoints.get("wake_handling".into()).unwrap();
-    let bc_status = status_endpoints.get("boot_control".into()).unwrap();
-    let erl_status = status_endpoints.get("execution_resume_latency".into()).unwrap();
+    let es_status = status_endpoints.get("execution_state").unwrap();
+    let aa_status = status_endpoints.get("application_activity").unwrap();
+    let fwh_status = status_endpoints.get("full_wake_handling").unwrap();
+    let wh_status = status_endpoints.get("wake_handling").unwrap();
+    let bc_status = status_endpoints.get("boot_control").unwrap();
+    let erl_status = status_endpoints.get("execution_resume_latency").unwrap();
 
     // First watch should return immediately with default values.
     assert_eq!(es_status.watch_power_level().await?.unwrap(), 2);
@@ -1974,7 +2177,136 @@ async fn test_execution_state_always_starts_at_active_power_level() -> Result<()
         .map(|s| (s.identifier.unwrap(), s.status.unwrap().into_proxy().unwrap()))
         .collect();
 
-    let es_status = status_endpoints.get("execution_state".into()).unwrap();
+    let es_status = status_endpoints.get("execution_state").unwrap();
     assert_eq!(es_status.watch_power_level().await?.unwrap(), 2);
+    Ok(())
+}
+
+#[fuchsia::test]
+async fn test_activity_governor_take_wake_lease_raises_execution_state_to_wake_handling(
+) -> Result<()> {
+    let (realm, activity_governor_moniker) = create_realm().await?;
+    let suspend_device = realm.connect_to_protocol::<tsc::DeviceMarker>().await?;
+    set_up_default_suspender(&suspend_device).await;
+
+    let element_info_provider = realm
+        .connect_to_service_instance::<fbroker::ElementInfoProviderServiceMarker>(
+            &"system_activity_governor",
+        )
+        .await
+        .expect("failed to connect to service ElementInfoProviderService")
+        .connect_to_status_provider()
+        .expect("failed to connect to protocol ElementInfoProvider");
+
+    let status_endpoints: HashMap<String, fbroker::StatusProxy> = element_info_provider
+        .get_status_endpoints()
+        .await?
+        .unwrap()
+        .into_iter()
+        .map(|s| (s.identifier.unwrap(), s.status.unwrap().into_proxy().unwrap()))
+        .collect();
+
+    let es_status = status_endpoints.get("execution_state").unwrap();
+    assert_eq!(es_status.watch_power_level().await?.unwrap(), 2);
+
+    let activity_governor = realm.connect_to_protocol::<fsystem::ActivityGovernorMarker>().await?;
+    let wake_lease_name = "wake_lease";
+    let wake_lease = activity_governor.take_wake_lease(wake_lease_name).await?;
+
+    // Trigger "boot complete" signal.
+    {
+        let suspend_controller = create_suspend_topology(&realm).await?;
+        lease(&suspend_controller, 1).await.unwrap();
+    }
+
+    assert_eq!(es_status.watch_power_level().await?.unwrap(), 1);
+
+    let server_token_koid = &wake_lease.basic_info().unwrap().related_koid.raw_koid().to_string();
+
+    block_until_inspect_matches!(
+        activity_governor_moniker,
+        root: contains {
+            wake_leases: {
+                var server_token_koid: {
+                    created_at: NonZeroUintProperty,
+                    client_token_koid: wake_lease.get_koid().unwrap().raw_koid(),
+                    name: wake_lease_name,
+                }
+            },
+        }
+    );
+
+    drop(wake_lease);
+    assert_eq!(es_status.watch_power_level().await?.unwrap(), 0);
+
+    block_until_inspect_matches!(
+        activity_governor_moniker,
+        root: contains {
+            wake_leases: {},
+        }
+    );
+
+    Ok(())
+}
+
+#[fuchsia::test]
+async fn test_activity_governor_handles_1000_wake_leases() -> Result<()> {
+    let (realm, activity_governor_moniker) = create_realm().await?;
+    let suspend_device = realm.connect_to_protocol::<tsc::DeviceMarker>().await?;
+    set_up_default_suspender(&suspend_device).await;
+
+    let activity_governor = realm.connect_to_protocol::<fsystem::ActivityGovernorMarker>().await?;
+    let mut root = TreeAssertion::new("root", false);
+    let mut wake_leases_child = TreeAssertion::new("wake_leases", true);
+    let mut wake_leases = Vec::new();
+
+    for i in 0..1000 {
+        let wake_lease_name = format!("wake_lease{}", i);
+        let wake_lease = activity_governor.take_wake_lease(&wake_lease_name).await?;
+
+        let server_token_koid =
+            &wake_lease.basic_info().unwrap().related_koid.raw_koid().to_string();
+        let client_token_koid = &wake_lease.get_koid().unwrap().raw_koid();
+
+        let mut wake_lease_child = TreeAssertion::new(server_token_koid, false);
+        wake_lease_child.add_property_assertion("created_at", Box::new(NonZeroUintProperty));
+        wake_lease_child.add_property_assertion("client_token_koid", Box::new(*client_token_koid));
+        wake_lease_child.add_property_assertion("name", Box::new(wake_lease_name));
+        wake_leases_child.add_child_assertion(wake_lease_child);
+
+        wake_leases.push(wake_lease);
+    }
+
+    root.add_child_assertion(wake_leases_child);
+
+    let mut reader = ArchiveReader::new();
+
+    reader
+        .select_all_for_moniker(&format!(
+            "{}/{}",
+            REALM_FACTORY_CHILD_NAME, &activity_governor_moniker
+        ))
+        .with_minimum_schema_count(1);
+
+    let inspect = reader
+        .snapshot::<Inspect>()
+        .await?
+        .into_iter()
+        .next()
+        .and_then(|result| result.payload)
+        .ok_or(anyhow::anyhow!("expected one inspect hierarchy"))
+        .unwrap();
+
+    root.run(&inspect).unwrap();
+
+    drop(wake_leases);
+
+    block_until_inspect_matches!(
+        activity_governor_moniker,
+        root: contains {
+            wake_leases: {},
+        }
+    );
+
     Ok(())
 }

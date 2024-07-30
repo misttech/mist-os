@@ -222,10 +222,13 @@ Individual test runners have restrictions on these custom flags:
 
 #### GoogleTest runner {#gtest-runner-custom-arg}
 
-Note the following known behavior change:
+Note the following known behavior changes:
 
-**--gtest_break_on_failure**: As each test case is executed in a different process,
-this flag will not work.
+**--gtest_break_on_failure** - Instead use:
+
+```posix-terminal
+fx test --break-on-failure <test_url>
+```
 
 The following flags are restricted and the test fails if any are passed as
 fuchsia.test.Suite provides equivalent functionality that replaces them.
@@ -251,10 +254,13 @@ given glob patterns will be executed.
 
 #### GoogleTest (Gunit) runner {#gunit-runner-custom-arg}
 
-Note the following known behavior change:
+Note the following known behavior changes:
 
-**--gunit_break_on_failure**: As each test case is executed in a different process,
-this flag will not work.
+**--gunit_break_on_failure** - Instead use:
+
+```posix-terminal
+fx test --break-on-failure <test_url>
+```
 
 The following flags are restricted and the test fails if any are passed as
 fuchsia.test.Suite provides equivalent functionality that replaces them.
@@ -396,11 +402,44 @@ produced by the test.
 
 ## Hermeticity
 
-A test is *hermetic* if it:
+In the context of software testing, Hermeticity refers to the isolation of a
+test or test suite from external factors and dependencies, ensuring that it
+produces consistent and reliable results regardless of changes in the
+surrounding environment. A hermetic test is self-contained and doesn't rely on
+external systems or data that might change unexpectedly, leading to flaky or
+non-deterministic test outcomes.
 
-1. Does not [use][manifests-use] or [offer][manifests-offer] any
-capabilities from the [test root's](#test-roles) parent.
-1. Does not [resolve][resolvers] any components outside of the test package.
+*Hermeticity does not mean protection from in-stable platform or routed
+capabilities/APIs. If an API surface is in-stable for certain components in the
+system, then they will be instable for tests and dependent components and will
+help catch regressions due to any direct or in direct changes to system's API
+surface.*
+
+Ability to write fully, provably hermetic tests is Fuchsia's **Testing
+Superpower**. There are two type of test hermeticity:
+
+- Capability: The Test does not [use][manifests-use] or [offer][manifests-offer]
+  any capabilities from the [test root's](#test-roles) parent. These tests don't
+  have access to any system capabilities which can affect larger system. Due to
+  this property of hermetic tests they can be run in parallel and will not flake
+  due to cross-talk or shared state, it improves stability and performance of
+  tests.
+
+- Package: The Test does not [resolve][resolvers] any components outside of the
+  test package. A hermetically packaged test does not have any implicit contract
+  with platform packages. This provides a way to update them without affecting
+  system packages and avoids dependence on incompatible packaged dependencies.
+
+Hermeticity does not apply to platform APIs/capabilities which are available to
+all components in the system. For eg
+
+- clock
+- Kernel provided identifiers, such as koids.
+- Framework capabilities provided to all components which allow clients to
+  mutate component manager state, and while this is not strictly hermetic it is
+  component manager's responsibility to ensure isolation
+
+The tests should be careful when using these APIs/capabilities.
 
 The tests are by default hermetic unless explicitly stated otherwise.
 

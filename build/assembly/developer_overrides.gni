@@ -133,10 +133,9 @@ template("assembly_developer_overrides") {
   }
 
   files = {
-    outdir = "$target_out_dir/$target_name"
+    outdir = "${target_out_dir}/${target_name}"
     assembly_config_file = "$outdir/product_assembly_overrides.json"
-    assembly_config_file_intermediate =
-        "$outdir/product_assembly_overrides.intermediate.json"
+    assembly_config_file_intermediate = "${target_out_dir}/${target_name}.product_assembly_overrides.intermediate.json"
   }
 
   creation_inputs = []
@@ -289,15 +288,32 @@ template("assembly_developer_overrides") {
       ":${labels.assembly_overrides_intermediate}",
     ]
 
+    # The contents of these folders is dynamic, and managed entirely by this
+    # action.  Further, this action will need to delete items from these
+    # directories that are not added back (on an incremental build, if an item
+    # is removed from one of these sets)
+    #
+    # These folders would grow in size forever, if it was not cleaned out on
+    # each incremental build.
+    hermetic_action_ignored_prefixes = [
+      "${files.outdir}/blobs",
+      "${files.outdir}/compiled_packages",
+      "${files.outdir}/packages",
+      "${files.outdir}/subpackages",
+    ]
+
     inputs = creation_inputs + [ files.assembly_config_file_intermediate ]
     deps = creation_deps
     outputs = [ files.assembly_config_file ]
+    depfile = "${files.assembly_config_file}.d"
 
     args = [
       "--input",
       rebase_path(files.assembly_config_file_intermediate, root_build_dir),
-      "--output",
-      rebase_path(files.assembly_config_file, root_build_dir),
+      "--outdir",
+      rebase_path(files.outdir, root_build_dir),
+      "--depfile",
+      rebase_path(depfile, root_build_dir),
     ]
 
     # Block all metadata walks for packages, distribution entries, etc.  These

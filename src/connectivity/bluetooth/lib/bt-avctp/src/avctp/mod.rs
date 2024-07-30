@@ -282,7 +282,7 @@ impl PeerInner {
         if body.len() > 0 {
             rbuf.extend_from_slice(body);
         }
-        let _ = self.channel.as_ref().write(rbuf.as_slice()).map_err(|x| Error::PeerWrite(x))?;
+        let _ = self.channel.write(rbuf.as_slice()).map_err(|x| Error::PeerWrite(x))?;
         Ok(())
     }
 }
@@ -301,7 +301,7 @@ impl Stream for CommandStream {
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         Poll::Ready(match ready!(self.inner.poll_recv_request(cx)) {
             Ok(Packet { header, body, .. }) => {
-                Some(Ok(Command { peer: self.inner.clone(), avctp_header: header, body: body }))
+                Some(Ok(Command { peer: self.inner.clone(), avctp_header: header, body }))
             }
             Err(Error::PeerDisconnected) => None,
             Err(e) => Some(Err(e)),

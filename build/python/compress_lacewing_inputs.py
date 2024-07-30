@@ -21,15 +21,14 @@ dir/
 """
 
 import argparse
-import json
 import glob
+import json
 import os
 import pathlib
 import shutil
 import sys
 import tempfile
 from pathlib import Path
-
 
 parser = argparse.ArgumentParser()
 parser.add_argument(

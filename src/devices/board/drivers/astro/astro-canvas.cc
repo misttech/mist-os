@@ -6,7 +6,6 @@
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
-#include <lib/ddk/platform-defs.h>
 
 #include <soc/aml-s905d2/s905d2-gpio.h>
 #include <soc/aml-s905d2/s905d2-hw.h>
@@ -33,9 +32,9 @@ static const std::vector<fpbus::Bti> astro_canvas_btis{
 static const fpbus::Node canvas_dev = []() {
   fpbus::Node dev = {};
   dev.name() = "canvas";
-  dev.vid() = PDEV_VID_AMLOGIC;
-  dev.pid() = PDEV_PID_GENERIC;
-  dev.did() = PDEV_DID_AMLOGIC_CANVAS;
+  dev.vid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_VID_AMLOGIC;
+  dev.pid() = bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC;
+  dev.did() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_CANVAS;
   dev.mmio() = astro_canvas_mmios;
   dev.bti() = astro_canvas_btis;
   return dev;

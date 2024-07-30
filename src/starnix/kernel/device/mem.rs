@@ -19,9 +19,7 @@ use fuchsia_zircon::{
     cprng_draw_uninit, {self as zx},
 };
 use starnix_logging::{log_info, track_stub};
-use starnix_sync::{
-    DeviceOpen, FileOpsCore, FileOpsToHandle, LockBefore, Locked, Mutex, Unlocked, WriteOps,
-};
+use starnix_sync::{DeviceOpen, FileOpsCore, FileOpsToHandle, LockBefore, Locked, Mutex, Unlocked};
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::error;
@@ -50,7 +48,7 @@ impl FileOps for DevNull {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, WriteOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -141,14 +139,14 @@ impl FileOps for DevZero {
             // functionally equivalent to an anonymous mapping. Doing so affects
             // the output of `/proc/self/maps` and identifies this mapping as
             // file-based.
-            MappingName::File(filename),
+            MappingName::File(filename.into_active()),
             FileWriteGuardRef(None),
         )
     }
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, WriteOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -177,7 +175,7 @@ impl FileOps for DevFull {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, WriteOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -209,7 +207,7 @@ impl FileOps for DevRandom {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, WriteOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -325,6 +323,7 @@ impl FileOps for DevKmsg {
 
     fn wait_async(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         waiter: &Waiter,
@@ -336,6 +335,7 @@ impl FileOps for DevKmsg {
 
     fn query_events(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
@@ -350,13 +350,13 @@ impl FileOps for DevKmsg {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<'_, FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         _offset: usize,
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
-        file.blocking_op(current_task, FdEvents::POLLIN | FdEvents::POLLHUP, None, || {
+        file.blocking_op(locked, current_task, FdEvents::POLLIN | FdEvents::POLLHUP, None, |_| {
             match self.0.as_ref().unwrap().lock().next() {
                 Some(Ok(log)) => data.write(&log),
                 Some(Err(err)) => Err(err),
@@ -367,7 +367,7 @@ impl FileOps for DevKmsg {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, WriteOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,

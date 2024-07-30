@@ -14,7 +14,7 @@ use futures::stream::BoxStream;
 use futures::StreamExt;
 use moniker::Moniker;
 use regex::Regex;
-use zx::{MapsMappingInfo, ProcessMapsInfo};
+use zx::{MapDetails, MapInfo, MappingDetails};
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_io as fio, fidl_fuchsia_memory_attribution as fattribution,
@@ -294,7 +294,7 @@ async fn get_process_handle_by_name(realm: &RealmInstance, name: &str) -> zx::Pr
     let process_koids = starnix_kernel_job.processes().unwrap();
     for koid in process_koids {
         let process = starnix_kernel_job.get_child(&koid, zx::Rights::SAME_RIGHTS.bits()).unwrap();
-        if &process.get_name().unwrap().to_string_lossy() == name {
+        if &process.get_name().unwrap() == name {
             let process: zx::Process = process.into();
             return process;
         }
@@ -323,14 +323,17 @@ async fn find_starnix_kernel_moniker(realm_query: &fsys2::RealmQueryProxy) -> St
 /// Find a mapping in the process that satisfies the predicate.
 fn find_mapping_in_range(
     process: &zx::Process,
-    predicate: impl Fn(&ProcessMapsInfo, &MapsMappingInfo) -> bool,
+    predicate: impl Fn(&MapInfo, &MappingDetails) -> bool,
 ) -> bool {
     let maps = process.info_maps_vec().unwrap();
     for map in maps {
-        if let Some(info) = map.into_mapping_info() {
-            if predicate(&map, &info) {
-                return true;
+        match map.details {
+            MapDetails::Mapping(info) => {
+                if predicate(&map, &info) {
+                    return true;
+                }
             }
+            _ => (),
         }
     }
     false

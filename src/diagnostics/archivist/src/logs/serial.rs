@@ -193,7 +193,7 @@ mod tests {
     use crate::identity::ComponentIdentity;
     use crate::logs::stored_message::{GenericStoredMessage, StructuredStoredMessage};
     use diagnostics_data::{BuilderArgs, LogsDataBuilder, LogsField, LogsProperty, Severity};
-    use diagnostics_log_encoding::encode::Encoder;
+    use diagnostics_log_encoding::encode::{Encoder, EncoderOpts};
     use diagnostics_log_encoding::{Argument, Record, Severity as StreamSeverity, Value};
     use fuchsia_async as fasync;
     use fuchsia_zircon::Time;
@@ -228,8 +228,8 @@ mod tests {
     fn write_to_serial_handles_denied_tags() {
         let log = LogsDataBuilder::new(BuilderArgs {
             timestamp_nanos: Time::from_nanos(1).into(),
-            component_url: Some("url".to_string()),
-            moniker: "core/foo".to_string(),
+            component_url: Some("url".into()),
+            moniker: "core/foo".try_into().unwrap(),
             severity: Severity::Info,
         })
         .add_tag("denied-tag")
@@ -249,8 +249,8 @@ mod tests {
         );
         let log = LogsDataBuilder::new(BuilderArgs {
             timestamp_nanos: Time::from_nanos(123456789).into(),
-            component_url: Some("url".to_string()),
-            moniker: "core/foo".to_string(),
+            component_url: Some("url".into()),
+            moniker: "core/foo".try_into().unwrap(),
             severity: Severity::Info,
         })
         .add_tag("bar")
@@ -276,8 +276,8 @@ mod tests {
     fn when_no_tags_are_present_the_component_name_is_used() {
         let log = LogsDataBuilder::new(BuilderArgs {
             timestamp_nanos: Time::from_nanos(123456789).into(),
-            component_url: Some("url".to_string()),
-            moniker: "core/foo".to_string(),
+            component_url: Some("url".into()),
+            moniker: "core/foo".try_into().unwrap(),
             severity: Severity::Info,
         })
         .set_message("my msg")
@@ -352,7 +352,7 @@ mod tests {
                 .push(Argument { name: "tag".to_string(), value: Value::Text(tag.to_string()) });
         }
         let mut buffer = Cursor::new(vec![0u8; 1024]);
-        let mut encoder = Encoder::new(&mut buffer);
+        let mut encoder = Encoder::new(&mut buffer, EncoderOpts::default());
         encoder.write_record(&record).unwrap();
         let encoded = &buffer.get_ref()[..buffer.position() as usize];
         StructuredStoredMessage::create(encoded.to_vec(), Default::default())

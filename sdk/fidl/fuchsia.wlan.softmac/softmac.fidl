@@ -380,12 +380,25 @@ closed protocol EthernetRx {
 /// This protocol is implemented as a foreign function interface (FFI)
 /// between the wlansoftmac driver and the bridged driver solely to improve
 /// the performance of processing data frames through the wlan-mlme library.
+///
+/// # Safety
+///
+/// The `complete_borrowed_operation` field must be a function pointer of the type
+/// void (*)(eth::BorrowedOperation<>*, zx_status_t) where the first argument
+/// is the value of `borrowed_operation` field.
+///
+/// Calling `complete_borrowed_operation` will result in calling
+/// `eth::BorrowedOperation<>::Complete()` to release ownership of the packet. This
+/// must be called exactly once. Failing to call `complete_borrowed_operation`
+/// will leak memory, and calling more than once will result in use-after-free.
 @available(added=HEAD)
 closed protocol EthernetTx {
     strict Transfer(table {
         1: packet_address uint64;
         2: packet_size uint64;
         3: async_id uint64;
+        4: borrowed_operation uint64;
+        5: complete_borrowed_operation uint64;
     }) -> () error zx.Status;
 };
 
@@ -404,6 +417,7 @@ closed protocol WlanRx {
         2: packet_size uint64;
         3: packet_info WlanRxInfo;
         4: async_id uint64;
+        5: arena uint64;
     }) -> ();
 };
 
@@ -422,6 +436,7 @@ closed protocol WlanTx {
         2: packet_size uint64;
         3: packet_info WlanTxInfo;
         4: async_id uint64;
+        5: arena uint64;
     }) -> () error zx.Status;
 };
 

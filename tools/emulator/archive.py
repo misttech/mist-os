@@ -4,9 +4,9 @@
 # found in the LICENSE file.
 
 import argparse
+import os
 import sys
 import tarfile
-import os
 
 
 def main():

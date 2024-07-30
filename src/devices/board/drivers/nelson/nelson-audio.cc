@@ -174,38 +174,38 @@ zx_status_t Nelson::AudioInit() {
       }},
   };
 
-  auto sleep = [&arena = init_arena_](zx::duration delay) {
-    return fuchsia_hardware_gpioimpl::wire::InitStep::Builder(arena)
-        .call(fuchsia_hardware_gpioimpl::wire::InitCall::WithDelay(arena, delay.get()))
-        .Build();
+  auto sleep = [](zx::duration delay) {
+    return fuchsia_hardware_gpioimpl::InitStep{{
+        .call = fuchsia_hardware_gpioimpl::InitCall::WithDelay(delay.get()),
+    }};
   };
 
   // TDM pin assignments.
-  gpio_init_steps_.push_back(GpioSetAltFunction(GPIO_SOC_I2S_SCLK, S905D3_GPIOA_1_TDMB_SCLK_FN));
-  gpio_init_steps_.push_back(GpioSetAltFunction(GPIO_SOC_I2S_FS, S905D3_GPIOA_2_TDMB_FS_FN));
-  gpio_init_steps_.push_back(GpioSetAltFunction(GPIO_SOC_I2S_DO0, S905D3_GPIOA_3_TDMB_D0_FN));
+  gpio_init_steps_.push_back(GpioFunction(GPIO_SOC_I2S_SCLK, S905D3_GPIOA_1_TDMB_SCLK_FN));
+  gpio_init_steps_.push_back(GpioFunction(GPIO_SOC_I2S_FS, S905D3_GPIOA_2_TDMB_FS_FN));
+  gpio_init_steps_.push_back(GpioFunction(GPIO_SOC_I2S_DO0, S905D3_GPIOA_3_TDMB_D0_FN));
   constexpr uint64_t ua = 3000;
-  gpio_init_steps_.push_back(GpioSetDriveStrength(GPIO_SOC_I2S_SCLK, ua));
-  gpio_init_steps_.push_back(GpioSetDriveStrength(GPIO_SOC_I2S_FS, ua));
-  gpio_init_steps_.push_back(GpioSetDriveStrength(GPIO_SOC_I2S_DO0, ua));
+  gpio_init_steps_.push_back(GpioDriveStrength(GPIO_SOC_I2S_SCLK, ua));
+  gpio_init_steps_.push_back(GpioDriveStrength(GPIO_SOC_I2S_FS, ua));
+  gpio_init_steps_.push_back(GpioDriveStrength(GPIO_SOC_I2S_DO0, ua));
 
 #ifdef ENABLE_BT
   // PCM pin assignments.
-  gpio_init_steps_.push_back(GpioSetAltFunction(GPIO_SOC_BT_PCM_IN, S905D3_GPIOX_8_TDMA_DIN1_FN));
-  gpio_init_steps_.push_back(GpioSetAltFunction(GPIO_SOC_BT_PCM_OUT, S905D3_GPIOX_9_TDMA_D0_FN));
-  gpio_init_steps_.push_back(GpioSetAltFunction(GPIO_SOC_BT_PCM_SYNC, S905D3_GPIOX_10_TDMA_FS_FN));
-  gpio_init_steps_.push_back(GpioSetAltFunction(GPIO_SOC_BT_PCM_CLK, S905D3_GPIOX_11_TDMA_SCLK_FN));
-  gpio_init_steps_.push_back(GpioSetDriveStrength(GPIO_SOC_BT_PCM_OUT, ua));
-  gpio_init_steps_.push_back(GpioSetDriveStrength(GPIO_SOC_BT_PCM_SYNC, ua));
-  gpio_init_steps_.push_back(GpioSetDriveStrength(GPIO_SOC_BT_PCM_CLK, ua));
+  gpio_init_steps_.push_back(GpioFunction(GPIO_SOC_BT_PCM_IN, S905D3_GPIOX_8_TDMA_DIN1_FN));
+  gpio_init_steps_.push_back(GpioFunction(GPIO_SOC_BT_PCM_OUT, S905D3_GPIOX_9_TDMA_D0_FN));
+  gpio_init_steps_.push_back(GpioFunction(GPIO_SOC_BT_PCM_SYNC, S905D3_GPIOX_10_TDMA_FS_FN));
+  gpio_init_steps_.push_back(GpioFunction(GPIO_SOC_BT_PCM_CLK, S905D3_GPIOX_11_TDMA_SCLK_FN));
+  gpio_init_steps_.push_back(GpioDriveStrength(GPIO_SOC_BT_PCM_OUT, ua));
+  gpio_init_steps_.push_back(GpioDriveStrength(GPIO_SOC_BT_PCM_SYNC, ua));
+  gpio_init_steps_.push_back(GpioDriveStrength(GPIO_SOC_BT_PCM_CLK, ua));
 #endif
 
   // PDM pin assignments
-  gpio_init_steps_.push_back(GpioSetAltFunction(GPIO_SOC_MIC_DCLK, S905D3_GPIOA_7_PDM_DCLK_FN));
+  gpio_init_steps_.push_back(GpioFunction(GPIO_SOC_MIC_DCLK, S905D3_GPIOA_7_PDM_DCLK_FN));
   // First 2 MICs.
-  gpio_init_steps_.push_back(GpioSetAltFunction(GPIO_SOC_MICLR_DIN0, S905D3_GPIOA_8_PDM_DIN0_FN));
+  gpio_init_steps_.push_back(GpioFunction(GPIO_SOC_MICLR_DIN0, S905D3_GPIOA_8_PDM_DIN0_FN));
   // Third MIC.
-  gpio_init_steps_.push_back(GpioSetAltFunction(GPIO_SOC_MICLR_DIN1, S905D3_GPIOA_9_PDM_DIN1_FN));
+  gpio_init_steps_.push_back(GpioFunction(GPIO_SOC_MICLR_DIN1, S905D3_GPIOA_9_PDM_DIN1_FN));
 
   // Board info.
   fidl::Arena<> fidl_arena;
@@ -266,8 +266,8 @@ zx_status_t Nelson::AudioInit() {
   controller_out.metadata() = tdm_metadata;
 
   // CODEC pin assignments.
-  gpio_init_steps_.push_back(GpioSetAltFunction(GPIO_INRUSH_EN_SOC, 0));  // BOOST_EN_SOC as GPIO.
-  gpio_init_steps_.push_back(GpioConfigOut(GPIO_INRUSH_EN_SOC, 1));       // BOOST_EN_SOC to high.
+  gpio_init_steps_.push_back(GpioFunction(GPIO_INRUSH_EN_SOC, 0));   // BOOST_EN_SOC as GPIO.
+  gpio_init_steps_.push_back(GpioConfigOut(GPIO_INRUSH_EN_SOC, 1));  // BOOST_EN_SOC to high.
   // From the TAS5805m codec reference manual:
   // "9.5.3.1 Startup Procedures
   // 1. Configure ADR/FAULT pin with proper settings for I2C device address.

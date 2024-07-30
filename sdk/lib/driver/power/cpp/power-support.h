@@ -9,6 +9,7 @@
 #include <fidl/fuchsia.power.broker/cpp/fidl.h>
 #include <lib/driver/incoming/cpp/namespace.h>
 #include <lib/fidl/cpp/wire/internal/transport_channel.h>
+#include <lib/fit/function.h>
 #include <lib/zx/event.h>
 #include <lib/zx/handle.h>
 
@@ -52,6 +53,33 @@ enum class Error : uint8_t {
   ACTIVITY_GOVERNOR_REQUEST,
 };
 
+enum class ElementRunnerError : uint8_t {
+  /// Maps to fuchsia.power.broker/RequiredLevelError::INTERNAL
+  REQUIRED_LEVEL_INTERNAL,
+  /// Maps to fuchsia.power.broker/RequiredLevelError::NOT_AUTHORIZED
+  REQUIRED_LEVEL_NOT_AUTHORIZED,
+  /// Maps to fuchsia.power.broker/RequiredLevelError::UNKNOWN
+  REQUIRED_LEVEL_UNKNOWN,
+  /// fuchsia.power.broker/RequiredLevelError has a value we don't recognize
+  REQUIRED_LEVEL_UNEXPECTED,
+  /// The fuchsia.power.broker/RequiredLevel channel closed
+  REQUIRED_LEVEL_TRANSPORT_PEER_CLOSED,
+  /// The fuchsia.power.broker/RequiredLevel had a FIDL transport error other
+  /// than closed.
+  REQUIRED_LEVEL_TRANSPORT_OTHER,
+  /// Maps to fuchsia.power.broker/CurrentLevelError::NOT_AUTHORIZED
+  CURRENT_LEVEL_NOT_AUTHORIZED,
+  /// fuchsia.power.broker/CurrentLevelError has a value we don't recognize
+  CURRENT_LEVEL_UNEXPECTED,
+  /// The fuchsia.power.broker/CurrentLevel channel closed
+  CURRENT_LEVEL_TRANSPORT_PEER_CLOSED,
+  /// The fuchsia.power.broker/CurrentLevel had a FIDL transport error other
+  /// than closed.
+  CURRENT_LEVEL_TRANSPORT_OTHER,
+  /// The level change callback returned an error
+  LEVEL_CHANGE_CALLBACK,
+};
+
 class ParentElementHasher final {
  public:
   /// Make a unique string as our hash key. The string is the ordinal of the SAG
@@ -77,12 +105,75 @@ struct ElementDesc {
             fidl::ServerEnd<fuchsia_power_broker::RequiredLevel>>
       level_control_servers_;
   fidl::ServerEnd<fuchsia_power_broker::Lessor> lessor_server_;
+  fidl::ServerEnd<fuchsia_power_broker::ElementControl> element_control_server_;
 
   // The below are created if the caller did not supply their corresponding server end
   std::optional<fidl::ClientEnd<fuchsia_power_broker::CurrentLevel>> current_level_client_;
   std::optional<fidl::ClientEnd<fuchsia_power_broker::RequiredLevel>> required_level_client_;
   std::optional<fidl::ClientEnd<fuchsia_power_broker::Lessor>> lessor_client_;
+  std::optional<fidl::ClientEnd<fuchsia_power_broker::ElementControl>> element_control_client_;
 };
+
+/// Runs a power element.
+///
+/// Once |RunPowerElement| is called, this object listens for new levels
+/// reported to it via |RequiredLevel.Watch|, calls the provided
+/// |level_change_callback|, and reports the level returned by that callback
+/// via |CurrentLevel.Update|. This object stops running the power element if
+/// an error occurs and reports the error via |error_handler|. This class is
+/// not thread-safe and should created on a thread with a synchronized
+/// dispatcher and given a pointer to that same dispatcher. Since the callbacks
+/// happen on the same dispatcher, blocking the callbacks blocks runnng the
+/// element. Calls to |SetLevel| do not trigger a |level_change_callback|
+/// invocation.
+class ElementRunner {
+ public:
+  ElementRunner(fidl::ClientEnd<fuchsia_power_broker::RequiredLevel> required_level,
+                fidl::ClientEnd<fuchsia_power_broker::CurrentLevel> current_level,
+                fit::function<fit::result<zx_status_t, uint8_t>(uint8_t)> level_change_callback,
+                fit::function<void(ElementRunnerError)> error_handler,
+                async_dispatcher_t* dispatcher) {
+    on_error_ = std::move(error_handler);
+    on_level_change_ = std::move(level_change_callback);
+    required_level_client_ =
+        fidl::Client<fuchsia_power_broker::RequiredLevel>(std::move(required_level), dispatcher);
+    current_level_client_ =
+        fidl::Client<fuchsia_power_broker::CurrentLevel>(std::move(current_level), dispatcher);
+  }
+
+  /// Runs the power element asynchronously. The object continues running the
+  /// power element until an error occurs or the object is destroyed. Running
+  /// the element *and* making callbacks via |level_change_callback| and
+  /// |error_handler| are done on the object's dispatcher.
+  ///
+  /// The object listens for new levels, calls |level_change_callback| when one
+  /// is received, reports the power level returned from |level_change_callback|
+  /// via the |current_level| channel provided to the constructor, and calls
+  /// |error_handler| if an error occurs.
+  ///
+  /// After |error_handler| is called, this object stops running the element.
+  /// |RunPowerElement| can then be called again to continue running it.
+  void RunPowerElement();
+
+  /// Sets the level of the element via the |CurrentLevel| channel provided to
+  /// the constructor. The call returns immediately and the result is delivered
+  /// to |callback| on the |dispatcher| passed to the constructor.
+  void SetLevel(
+      uint8_t level,
+      fit::function<void(
+          fit::result<fidl::ErrorsIn<fuchsia_power_broker::CurrentLevel::Update>, zx_status_t>)>
+          callback);
+
+ private:
+  fidl::Client<fuchsia_power_broker::RequiredLevel> required_level_client_;
+  fidl::Client<fuchsia_power_broker::CurrentLevel> current_level_client_;
+  fit::function<fit::result<zx_status_t, uint8_t>(uint8_t)> on_level_change_;
+  fit::function<void(ElementRunnerError)> on_error_;
+};
+
+inline fit::result<zx_status_t, uint8_t> default_level_changer(uint8_t level) {
+  return fit::ok(level);
+}
 
 /// Given a `PowerElementConfiguration` from driver framework, convert this
 /// into a set of Power Broker's `LevelDependency` objects. The map is keyed
@@ -153,9 +244,6 @@ fit::result<Error, TokenMap> GetDependencyTokens(
 /// can pass in tokens to be registered for granting assertive and opportunistic
 /// dependency access on the created element.
 ///
-/// Returns the response from power broker if successful which includes
-/// channels to further control the created power element.
-///
 /// Error
 ///   - Error::DEPENDENCY_NOT_FOUND if there is a dependency specified by
 ///     `config` which is to found in `tokens`.
@@ -163,23 +251,21 @@ fit::result<Error, TokenMap> GetDependencyTokens(
 ///     duplicate a token and therefore assume it must have been invalid, or
 ///     the call to power broker fails for any reason *other* than a closed
 ///     channel.
-fit::result<Error, fuchsia_power_broker::TopologyAddElementResponse> AddElement(
-    fidl::ClientEnd<fuchsia_power_broker::Topology>& power_broker,
+fit::result<Error> AddElement(
+    const fidl::ClientEnd<fuchsia_power_broker::Topology>& power_broker,
     fuchsia_hardware_power::wire::PowerElementConfiguration config, TokenMap tokens,
     const zx::unowned_event& assertive_token, const zx::unowned_event& opportunistic_token,
     std::optional<std::pair<fidl::ServerEnd<fuchsia_power_broker::CurrentLevel>,
                             fidl::ServerEnd<fuchsia_power_broker::RequiredLevel>>>
         level_control,
-    std::optional<fidl::ServerEnd<fuchsia_power_broker::Lessor>> lessor);
+    std::optional<fidl::ServerEnd<fuchsia_power_broker::Lessor>> lessor,
+    std::optional<fidl::ServerEnd<fuchsia_power_broker::ElementControl>> element_control);
 
 /// Call `AddElement` on the `power_broker` channel passed in.
 /// This function uses `ElementDescription` passed in to make the proper call
 /// to `fuchsia.power.broker/Topology.AddElement`. See `ElementDescription` for
 /// more information about what fields are inputs to `AddElement`.
 ///
-/// Returns the response from power broker if successful which includes
-/// channels to further control the created power element.
-///
 /// Error
 ///   - Error::DEPENDENCY_NOT_FOUND if there is a dependency specified by
 ///     `config` which is to found in `tokens`.
@@ -187,8 +273,8 @@ fit::result<Error, fuchsia_power_broker::TopologyAddElementResponse> AddElement(
 ///     duplicate a token and therefore assume it must have been invalid, or
 ///     the call to power broker fails for any reason *other* than a closed
 ///     channel.
-fit::result<Error, fuchsia_power_broker::TopologyAddElementResponse> AddElement(
-    fidl::ClientEnd<fuchsia_power_broker::Topology>& power_broker, ElementDesc& description);
+fit::result<Error> AddElement(fidl::ClientEnd<fuchsia_power_broker::Topology>& power_broker,
+                              ElementDesc& description);
 }  // namespace fdf_power
 
 #endif  // LIB_DRIVER_POWER_CPP_POWER_SUPPORT_H_

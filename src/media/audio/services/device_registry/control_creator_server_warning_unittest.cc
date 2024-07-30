@@ -82,7 +82,7 @@ TEST_F(ControlCreatorServerCodecWarningTest, BadId) {
 
   RunLoopUntilIdle();
   ASSERT_TRUE(received_callback);
-  ASSERT_TRUE(added_device_id);
+  ASSERT_TRUE(added_device_id.has_value());
   auto [client, server] = fidl::Endpoints<fad::Control>::Create();
   auto control_client_unused =
       fidl::Client<fad::Control>(std::move(client), dispatcher(), control_fidl_handler().get());
@@ -136,7 +136,7 @@ TEST_F(ControlCreatorServerCodecWarningTest, MissingServerEnd) {
       });
 
   RunLoopUntilIdle();
-  ASSERT_TRUE(added_device_id);
+  ASSERT_TRUE(added_device_id.has_value());
   auto [client, server] = fidl::Endpoints<fad::Control>::Create();
   auto control_client_unused =
       fidl::Client<fad::Control>(std::move(client), dispatcher(), control_fidl_handler().get());
@@ -196,7 +196,7 @@ TEST_F(ControlCreatorServerCodecWarningTest, BadServerEnd) {
     EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
   }
 
-  ASSERT_TRUE(added_device_id);
+  ASSERT_TRUE(added_device_id.has_value());
   auto [client, server] = fidl::Endpoints<fad::Control>::Create();
   auto control_client_unused =
       fidl::Client<fad::Control>(std::move(client), dispatcher(), control_fidl_handler().get());
@@ -256,7 +256,7 @@ TEST_F(ControlCreatorServerCodecWarningTest, IdAlreadyControlled) {
     EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
   }
 
-  ASSERT_TRUE(added_device_id);
+  ASSERT_TRUE(added_device_id.has_value());
   ASSERT_EQ(ControlServer::count(), 0u);
   auto [client, server] = fidl::Endpoints<fad::Control>::Create();
   auto control_client_1 =
@@ -339,7 +339,7 @@ TEST_F(ControlCreatorServerCompositeWarningTest, BadId) {
       });
 
   RunLoopUntilIdle();
-  ASSERT_TRUE(added_device_id);
+  ASSERT_TRUE(added_device_id.has_value());
   auto [client, server] = fidl::Endpoints<fad::Control>::Create();
   auto control_client_unused =
       fidl::Client<fad::Control>(std::move(client), dispatcher(), control_fidl_handler().get());
@@ -394,7 +394,7 @@ TEST_F(ControlCreatorServerCompositeWarningTest, MissingServerEnd) {
 
   RunLoopUntilIdle();
   ASSERT_TRUE(received_callback);
-  ASSERT_TRUE(added_device_id);
+  ASSERT_TRUE(added_device_id.has_value());
 
   auto [client, server] = fidl::Endpoints<fad::Control>::Create();
   auto control_client_unused =
@@ -455,7 +455,7 @@ TEST_F(ControlCreatorServerCompositeWarningTest, BadServerEnd) {
     EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
   }
 
-  ASSERT_TRUE(added_device_id);
+  ASSERT_TRUE(added_device_id.has_value());
   auto [client, server] = fidl::Endpoints<fad::Control>::Create();
   auto control_client_unused =
       fidl::Client<fad::Control>(std::move(client), dispatcher(), control_fidl_handler().get());
@@ -515,7 +515,7 @@ TEST_F(ControlCreatorServerCompositeWarningTest, IdAlreadyControlled) {
     EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
   }
 
-  ASSERT_TRUE(added_device_id);
+  ASSERT_TRUE(added_device_id.has_value());
   ASSERT_EQ(ControlServer::count(), 0u);
   auto [client, server] = fidl::Endpoints<fad::Control>::Create();
   auto control_client_1 =
@@ -596,7 +596,7 @@ TEST_F(ControlCreatorServerStreamConfigWarningTest, BadId) {
       });
 
   RunLoopUntilIdle();
-  ASSERT_TRUE(added_device_id);
+  ASSERT_TRUE(added_device_id.has_value());
   auto [client, server] = fidl::Endpoints<fad::Control>::Create();
   auto control_client_unused =
       fidl::Client<fad::Control>(std::move(client), dispatcher(), control_fidl_handler().get());
@@ -651,7 +651,7 @@ TEST_F(ControlCreatorServerStreamConfigWarningTest, MissingServerEnd) {
 
   RunLoopUntilIdle();
   ASSERT_TRUE(received_callback);
-  ASSERT_TRUE(added_device_id);
+  ASSERT_TRUE(added_device_id.has_value());
 
   auto [client, server] = fidl::Endpoints<fad::Control>::Create();
   auto control_client_unused =
@@ -712,7 +712,7 @@ TEST_F(ControlCreatorServerStreamConfigWarningTest, BadServerEnd) {
     EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
   }
 
-  ASSERT_TRUE(added_device_id);
+  ASSERT_TRUE(added_device_id.has_value());
   auto [client, server] = fidl::Endpoints<fad::Control>::Create();
   auto control_client_unused =
       fidl::Client<fad::Control>(std::move(client), dispatcher(), control_fidl_handler().get());
@@ -772,7 +772,7 @@ TEST_F(ControlCreatorServerStreamConfigWarningTest, IdAlreadyControlled) {
     EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
   }
 
-  ASSERT_TRUE(added_device_id);
+  ASSERT_TRUE(added_device_id.has_value());
   ASSERT_EQ(ControlServer::count(), 0u);
   auto [client, server] = fidl::Endpoints<fad::Control>::Create();
   auto control_client_1 =

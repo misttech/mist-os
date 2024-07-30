@@ -3,37 +3,32 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-from collections import namedtuple
-from contextlib import contextmanager
-from functools import partial
 import hashlib
-import json
 import os
 import tempfile
 import unittest
+from collections import namedtuple
+from contextlib import contextmanager
+from functools import partial
 from typing import Any, Generator
-from unittest import mock
 
+import assembly
+import make_legacy_config
+import serialization
 from assembly import (
-    AIBCreator,
-    FileEntry,
-    ImageAssemblyConfig,
-    PackageManifest,
     BlobEntry,
-    PackageMetaData,
+    FileEntry,
     KernelInfo,
+    PackageManifest,
+    PackageMetaData,
 )
 from assembly.assembly_input_bundle import (
-    CompiledPackageDefinition,
     CompiledComponentDefinition,
-    DriverDetails,
-    PackageDetails,
+    CompiledPackageDefinition,
     DuplicatePackageException,
+    PackageDetails,
 )
 from fast_copy_mock import mock_fast_copy_in
-import make_legacy_config
-import assembly
-import serialization
 
 
 def make_merkle(blob_name: str) -> str:
@@ -85,7 +80,7 @@ def make_package_path(package_name: str) -> str:
 
 TestSetupArgs = namedtuple(
     "TestSetupArgs",
-    "base, cache, bootfs_packages, kernel, boot_args, shell_commands_file, driver_manifest_path, driver_component_file, bootfs",
+    "base, cache, bootfs_packages, kernel, boot_args, shell_commands_file, bootfs",
 )
 SOURCE_DIR = "source"
 OUTDIR = "outdir"
@@ -129,37 +124,11 @@ def setup_temp_dir(
             SOURCE_DIR,
         )
 
-        # Write out a driver package
-        package_name = "base_driver"
-        blob_names = ["meta/driver.cm"]
-        driver_manifest_path = make_package_manifest(
-            package_name, blob_names, SOURCE_DIR
-        )
-
-        # Write out the driver component files list
-        distribution_manifest_path = os.path.join(
-            SOURCE_DIR, "base_driver_distribution_manifest.json"
-        )
-        driver_component_file = {
-            "package_name": "base_driver",
-            "distribution_manifest": distribution_manifest_path,
-        }
         shell_commands_file = {
             "accountctl": ["accountctl"],
             "activity-ctl": ["activity_ctl"],
             "audio_listener": ["audio_listener"],
         }
-        # Write out the driver component distribution manifest
-        with open(
-            distribution_manifest_path, "w"
-        ) as distribution_manifest_file:
-            # We only care about the destination field
-            driver_distribution_manifest = [{"destination": "meta/driver.cm"}]
-            json.dump(
-                driver_distribution_manifest,
-                distribution_manifest_file,
-                indent=2,
-            )
 
         # Add the rest of the fields we expect to see in an image_assembly
         # config.
@@ -183,8 +152,6 @@ def setup_temp_dir(
             kernel,
             boot_args,
             shell_commands_file,
-            driver_manifest_path,
-            driver_component_file,
             bootfs,
         )
     finally:
@@ -196,7 +163,8 @@ class MakeLegacyConfig(unittest.TestCase):
         self.maxDiff = None
 
         # Patch in a mock for the fast_copy() fn
-        _, copies = mock_fast_copy_in(assembly.assembly_input_bundle)
+        instance, copies = mock_fast_copy_in(assembly.assembly_input_bundle)
+        mock_fast_copy_in(assembly.package_copier, mock=(instance, copies))
 
         with setup_temp_dir() as setup_args:
             (
@@ -206,8 +174,6 @@ class MakeLegacyConfig(unittest.TestCase):
                 kernel,
                 boot_args,
                 shell_commands_file,
-                driver_manifest_path,
-                driver_component_file,
                 bootfs,
             ) = setup_args
             # Create the outdir path, and perform the "copying" into the
@@ -220,10 +186,6 @@ class MakeLegacyConfig(unittest.TestCase):
                 boot_args=boot_args,
                 config_data_entries=[],
                 outdir=OUTDIR,
-                base_driver_packages_list=[driver_manifest_path],
-                base_driver_components_files_list=[driver_component_file],
-                boot_driver_packages_list=[],
-                boot_driver_components_files_list=[],
                 shell_commands=shell_commands_file,
                 core_realm_shards=[
                     os.path.join(SOURCE_DIR, "core/realm/shard1.cml"),
@@ -257,7 +219,7 @@ class MakeLegacyConfig(unittest.TestCase):
 
             self.assertEqual(
                 aib.base_drivers,
-                [DriverDetails("packages/base_driver", ["meta/driver.cm"])],
+                [],
             )
             self.assertEqual(aib.shell_commands, shell_commands_file)
             self.assertEqual(
@@ -351,9 +313,6 @@ class MakeLegacyConfig(unittest.TestCase):
                         "source/base_b/internal/path/file_b_1",
                         "source/base_b/internal/path/file_b_2",
                         "source/base_b/internal/path/file_b_3",
-                        "source/base_driver.json",
-                        "source/base_driver/meta/driver.cm",
-                        "source/base_driver_distribution_manifest.json",
                         "source/cache_a.json",
                         "source/cache_a/internal/path/file_a_1",
                         "source/cache_a/internal/path/file_a_2",
@@ -408,10 +367,6 @@ class MakeLegacyConfig(unittest.TestCase):
                         FileEntry(
                             source="source/base_b/internal/path/file_b_3",
                             destination="outdir/blobs/6468d9d6761c8afcc97744dfd9e066f29bb697a9a0c8248b5e6eec989134a048",
-                        ),
-                        FileEntry(
-                            source="source/base_driver/meta/driver.cm",
-                            destination="outdir/blobs/38b7b79ef8e827ea8d283d4e01d61563a8feeecf95650f224c047502ea1edb4b",
                         ),
                         FileEntry(
                             source="source/cache_a/internal/path/file_a_1",
@@ -477,7 +432,6 @@ class MakeLegacyConfig(unittest.TestCase):
                     "blobs/1834109a42a5ff6501fbe05216475b2b0acc44e0d9c94924469a485d6f45dc86",
                     "blobs/1be711a4235aefc04302d3a20eefafcf0ac26b573881bc7967479aff6e1e8dd7",
                     "blobs/301e8584305e63f0b764daf52dcf312eecb6378b201663fcc77d7ad68aab1f23",
-                    "blobs/38b7b79ef8e827ea8d283d4e01d61563a8feeecf95650f224c047502ea1edb4b",
                     "blobs/6468d9d6761c8afcc97744dfd9e066f29bb697a9a0c8248b5e6eec989134a048",
                     "blobs/809aae59e2ca524e21f93c4e5747fc718b6f61aefe9eabc46f981d5856b88de3",
                     "blobs/8135016519df51d386efaea9b02f50cb454b6c7afe69c77895c1d4d844c3584d",
@@ -509,7 +463,7 @@ class MakeLegacyConfig(unittest.TestCase):
         """
         with setup_temp_dir() as setup_args:
             # Patch in a mock for the fast_copy() fn
-            mock_fast_copy_in(assembly.assembly_input_bundle)
+            mock_fast_copy_in(assembly.package_copier)
             duplicate_package = "cache_a"
             manifest_path = make_package_manifest(
                 duplicate_package, [], SOURCE_DIR
@@ -524,10 +478,6 @@ class MakeLegacyConfig(unittest.TestCase):
                 boot_args=[],
                 config_data_entries=[],
                 outdir=OUTDIR,
-                base_driver_packages_list=[],
-                base_driver_components_files_list=[],
-                boot_driver_packages_list=[],
-                boot_driver_components_files_list=[],
                 shell_commands=dict(),
                 core_realm_shards=[],
                 bootfs_files_package=None,
@@ -546,54 +496,6 @@ class MakeLegacyConfig(unittest.TestCase):
                 ),
             )
 
-    def test_driver_package_removed_from_base(self) -> None:
-        """
-        Asserts that the copy_to_assembly_input_bundle function has the side effect of
-        removing packages from base if they are listed as driver packages, and adds them to the
-        base_drivers package set in the AIB.
-        """
-        with setup_temp_dir() as setup_args:
-            # Patch in a mock for the fast_copy() fn
-            mock_fast_copy_in(assembly.assembly_input_bundle)
-            duplicate_package = "base_driver_package"
-            manifest_path = make_package_manifest(
-                duplicate_package, [], SOURCE_DIR
-            )
-
-            # Replace the AIBCreator._get_driver_details function within the
-            # context manager with a mock.
-            with mock.patch.object(
-                AIBCreator, "_get_driver_details"
-            ) as patched_method:
-                # This fixed return value should add the contents of the set in the first index
-                # of the tuple to the aib.base_drivers, and remove it from the aib.base package set
-                # when we copy the contents of the image assembly to the AIB
-                patched_method.return_value = (
-                    {make_package_path(duplicate_package)},
-                    list(),
-                )
-                aib, _, _ = make_legacy_config.copy_to_assembly_input_bundle(
-                    base=[manifest_path],
-                    cache=[],
-                    bootfs_packages=[],
-                    kernel=KernelInfo(),
-                    boot_args=[],
-                    config_data_entries=[],
-                    outdir=OUTDIR,
-                    base_driver_packages_list=[manifest_path],
-                    base_driver_components_files_list=[],
-                    boot_driver_packages_list=[],
-                    boot_driver_components_files_list=[],
-                    shell_commands=dict(),
-                    core_realm_shards=[],
-                    bootfs_files_package=None,
-                )
-
-            self.assertEqual(aib.packages, set([]))
-            self.assertIn(
-                make_package_path(duplicate_package), aib.base_drivers
-            )
-
     def test_different_manifest_same_pkg_name(self) -> None:
         """
         Asserts that when a package is found in a package set that has a different package
@@ -601,7 +503,7 @@ class MakeLegacyConfig(unittest.TestCase):
         """
         with setup_temp_dir() as setup_args:
             # Patch in a mock for the fast_copy() fn
-            mock_fast_copy_in(assembly.assembly_input_bundle)
+            mock_fast_copy_in(assembly.package_copier)
             duplicate_package = "package_a"
             manifest_path = make_package_manifest(
                 duplicate_package, [], SOURCE_DIR
@@ -634,10 +536,6 @@ class MakeLegacyConfig(unittest.TestCase):
                     boot_args=[],
                     config_data_entries=[],
                     outdir=OUTDIR,
-                    base_driver_packages_list=[],
-                    base_driver_components_files_list=[],
-                    boot_driver_packages_list=[],
-                    boot_driver_components_files_list=[],
                     shell_commands=dict(),
                     core_realm_shards=[],
                     bootfs_files_package=None,

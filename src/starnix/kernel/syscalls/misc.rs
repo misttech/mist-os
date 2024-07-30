@@ -15,7 +15,7 @@ use {
 
 use crate::arch::ARCH_NAME;
 use crate::device::android::bootloader_message_store::BootloaderMessage;
-use crate::mm::{read_to_vec, MemoryAccessor, MemoryAccessorExt, NumberOfElementsRead};
+use crate::mm::{MemoryAccessor, MemoryAccessorExt, PAGE_SIZE};
 use crate::task::CurrentTask;
 use crate::vfs::{FdNumber, FsString};
 use starnix_logging::{log_error, log_info, log_warn, track_stub};
@@ -26,8 +26,9 @@ use starnix_uapi::auth::{CAP_SYS_ADMIN, CAP_SYS_BOOT, CAP_SYS_MODULE};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::personality::PersonalityFlags;
 use starnix_uapi::user_address::{UserAddress, UserCString, UserRef};
+use starnix_uapi::user_buffer::MAX_RW_COUNT;
 use starnix_uapi::{
-    c_char, errno, error, from_status_like_fdio, perf_event_attr, pid_t, uapi, utsname,
+    c_char, errno, error, from_status_like_fdio, perf_event_attr, pid_t, uapi, utsname, EFAULT,
     GRND_NONBLOCK, GRND_RANDOM, LINUX_REBOOT_CMD_CAD_OFF, LINUX_REBOOT_CMD_CAD_ON,
     LINUX_REBOOT_CMD_HALT, LINUX_REBOOT_CMD_KEXEC, LINUX_REBOOT_CMD_RESTART,
     LINUX_REBOOT_CMD_RESTART2, LINUX_REBOOT_CMD_SW_SUSPEND, LINUX_REBOOT_MAGIC1,
@@ -175,7 +176,7 @@ pub fn sys_setdomainname(
 pub fn sys_getrandom(
     _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
-    buf_addr: UserAddress,
+    start_addr: UserAddress,
     size: usize,
     flags: u32,
 ) -> Result<usize, Errno> {
@@ -183,12 +184,38 @@ pub fn sys_getrandom(
         return error!(EINVAL);
     }
 
-    // SAFETY: The callback returns the number of bytes read.
-    let buf = unsafe {
-        read_to_vec::<u8, _>(size, |b| Ok(NumberOfElementsRead(zx::cprng_draw_uninit(b).len())))
-    }?;
-    current_task.write_memory(buf_addr, &buf)?;
-    Ok(size)
+    // Copy random bytes in up-to-page-size chunks, stopping either when all the user-requested
+    // space has been written to or when we fault.
+    let mut bytes_written = 0;
+    let mut bounce_buffer = Vec::with_capacity(std::cmp::min(*PAGE_SIZE as usize, size));
+    let bounce_buffer = bounce_buffer.spare_capacity_mut();
+
+    let bytes_to_write = std::cmp::min(size, *MAX_RW_COUNT);
+
+    while bytes_written < bytes_to_write {
+        let chunk_start = start_addr.saturating_add(bytes_written);
+        let chunk_len = std::cmp::min(*PAGE_SIZE as usize, size - bytes_written);
+
+        // Fine to index, chunk_len can't be greater than bounce_buffer.len();
+        let chunk = zx::cprng_draw_uninit(&mut bounce_buffer[..chunk_len]);
+        match current_task.write_memory_partial(chunk_start, chunk) {
+            Ok(n) => {
+                bytes_written += n;
+
+                // If we didn't write the whole chunk then we faulted. Don't try to write any more.
+                if n < chunk_len {
+                    break;
+                }
+            }
+
+            // write_memory_partial fails if no bytes were written, but we might have
+            // written bytes already.
+            Err(e) if e.code.error_code() == EFAULT && bytes_written > 0 => break,
+            Err(e) => return Err(e),
+        }
+    }
+
+    Ok(bytes_written)
 }
 
 pub fn sys_reboot(

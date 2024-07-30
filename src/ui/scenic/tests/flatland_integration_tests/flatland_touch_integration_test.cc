@@ -5,23 +5,19 @@
 #include <fuchsia/ui/composition/cpp/fidl.h>
 #include <fuchsia/ui/pointer/cpp/fidl.h>
 #include <fuchsia/ui/pointerinjector/cpp/fidl.h>
-#include <lib/sys/component/cpp/testing/realm_builder.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/ui/scenic/cpp/view_creation_tokens.h>
 #include <lib/ui/scenic/cpp/view_identity.h>
 #include <zircon/status.h>
 
-#include <map>
 #include <memory>
-#include <string>
 #include <vector>
 
 #include <zxtest/zxtest.h>
 
 #include "src/ui/scenic/tests/utils/blocking_present.h"
-#include "src/ui/scenic/tests/utils/scenic_realm_builder.h"
+#include "src/ui/scenic/tests/utils/scenic_ctf_test_base.h"
 #include "src/ui/scenic/tests/utils/utils.h"
-#include "src/ui/testing/util/logging_event_loop.h"
 
 // These tests exercise the integration between Flatland and the InputSystem, including the
 // View-to-View transform logic between the injection point and the receiver.
@@ -63,10 +59,8 @@ using fuchsia::ui::pointer::EventPhase;
 using fuchsia::ui::pointer::TouchEvent;
 using fuchsia::ui::pointer::TouchResponse;
 using fuchsia::ui::pointer::TouchResponseType;
-using fuchsia::ui::views::ViewCreationToken;
 using fuchsia::ui::views::ViewportCreationToken;
 using fuchsia::ui::views::ViewRef;
-using RealmRoot = component_testing::RealmRoot;
 
 namespace {
 std::array<float, 2> TransformPointerCoords(std::array<float, 2> pointer, const Mat3& transform) {
@@ -79,7 +73,7 @@ std::array<float, 2> TransformPointerCoords(std::array<float, 2> pointer, const 
 
 }  // namespace
 
-class FlatlandTouchIntegrationTest : public zxtest::Test, public ui_testing::LoggingEventLoop {
+class FlatlandTouchIntegrationTest : public ScenicCtfTest {
  protected:
   static constexpr uint32_t kDeviceId = 1111;
   static constexpr uint32_t kPointerId = 2222;
@@ -92,28 +86,13 @@ class FlatlandTouchIntegrationTest : public zxtest::Test, public ui_testing::Log
   // clang-format on
 
   void SetUp() override {
-    // Build the realm topology and route the protocols required by this test fixture from the
-    // scenic subrealm.
-    realm_ = std::make_unique<RealmRoot>(
-        ScenicRealmBuilder()
-            .AddRealmProtocol(fuchsia::ui::composition::Flatland::Name_)
-            .AddRealmProtocol(fuchsia::ui::composition::FlatlandDisplay::Name_)
-            .AddRealmProtocol(fuchsia::ui::composition::Allocator::Name_)
-            .AddRealmProtocol(fuchsia::ui::pointerinjector::Registry::Name_)
-            .Build());
+    ScenicCtfTest::SetUp();
 
-    flatland_display_ = realm_->component().Connect<fuchsia::ui::composition::FlatlandDisplay>();
-    flatland_display_.set_error_handler([](zx_status_t status) {
-      FAIL("Lost connection to Scenic: %s", zx_status_get_string(status));
-    });
-    pointerinjector_registry_ =
-        realm_->component().Connect<fuchsia::ui::pointerinjector::Registry>();
-    pointerinjector_registry_.set_error_handler([](zx_status_t status) {
-      FAIL("Lost connection to pointerinjector Registry: %s", zx_status_get_string(status));
-    });
+    flatland_display_ = ConnectSyncIntoRealm<fuchsia::ui::composition::FlatlandDisplay>();
+    pointerinjector_registry_ = ConnectSyncIntoRealm<fuchsia::ui::pointerinjector::Registry>();
 
     // Set up root view.
-    root_session_ = realm_->component().Connect<fuchsia::ui::composition::Flatland>();
+    root_session_ = ConnectAsyncIntoRealm<fuchsia::ui::composition::Flatland>();
     root_session_.set_error_handler([](zx_status_t status) {
       FAIL("Lost connection to Scenic: %s", zx_status_get_string(status));
     });
@@ -204,11 +183,8 @@ class FlatlandTouchIntegrationTest : public zxtest::Test, public ui_testing::Log
     }
 
     injector_.set_error_handler([this](zx_status_t) { injector_channel_closed_ = true; });
-    bool register_callback_fired = false;
-    pointerinjector_registry_->Register(
-        std::move(config), injector_.NewRequest(),
-        [&register_callback_fired] { register_callback_fired = true; });
-    RunLoopUntil([&register_callback_fired] { return register_callback_fired; });
+    ASSERT_EQ(ZX_OK,
+              pointerinjector_registry_->Register(std::move(config), injector_.NewRequest()));
     ASSERT_FALSE(injector_channel_closed_);
   }
 
@@ -308,11 +284,10 @@ class FlatlandTouchIntegrationTest : public zxtest::Test, public ui_testing::Log
 
   fuchsia::ui::composition::FlatlandPtr root_session_;
   fuchsia::ui::views::ViewRef root_view_ref_;
-  std::unique_ptr<RealmRoot> realm_;
 
  private:
-  fuchsia::ui::composition::FlatlandDisplayPtr flatland_display_;
-  fuchsia::ui::pointerinjector::RegistryPtr pointerinjector_registry_;
+  fuchsia::ui::composition::FlatlandDisplaySyncPtr flatland_display_;
+  fuchsia::ui::pointerinjector::RegistrySyncPtr pointerinjector_registry_;
   fuchsia::ui::pointerinjector::DevicePtr injector_;
 
   // Holds watch loops so they stay alive through the duration of the test.
@@ -324,7 +299,7 @@ class FlatlandTouchIntegrationTest : public zxtest::Test, public ui_testing::Log
 TEST_F(FlatlandTouchIntegrationTest, BasicInputTest) {
   fuchsia::ui::composition::FlatlandPtr child_session;
   fuchsia::ui::pointer::TouchSourcePtr child_touch_source;
-  child_session = realm_->component().Connect<fuchsia::ui::composition::Flatland>();
+  child_session = ConnectAsyncIntoRealm<fuchsia::ui::composition::Flatland>();
   child_touch_source.set_error_handler([](zx_status_t status) {
     FAIL("Touch source closed with status: %s", zx_status_get_string(status));
   });
@@ -385,7 +360,7 @@ TEST_F(FlatlandTouchIntegrationTest, BasicInputTest) {
 TEST_F(FlatlandTouchIntegrationTest, ViewportSmallerThanContextView) {
   fuchsia::ui::composition::FlatlandPtr child_session;
   fuchsia::ui::pointer::TouchSourcePtr child_touch_source;
-  child_session = realm_->component().Connect<fuchsia::ui::composition::Flatland>();
+  child_session = ConnectAsyncIntoRealm<fuchsia::ui::composition::Flatland>();
   child_touch_source.set_error_handler([](zx_status_t status) {
     FAIL("Touch source closed with status: %s", zx_status_get_string(status));
   });
@@ -457,7 +432,7 @@ TEST_F(FlatlandTouchIntegrationTest, ViewportSmallerThanContextView) {
 TEST_F(FlatlandTouchIntegrationTest, DisconnectTargetView_TriggersChannelClosure) {
   fuchsia::ui::composition::FlatlandPtr child_session;
   fuchsia::ui::pointer::TouchSourcePtr child_touch_source;
-  child_session = realm_->component().Connect<fuchsia::ui::composition::Flatland>();
+  child_session = ConnectAsyncIntoRealm<fuchsia::ui::composition::Flatland>();
   child_touch_source.set_error_handler([](zx_status_t status) {
     FAIL("Touch source closed with status: %s", zx_status_get_string(status));
   });
@@ -570,7 +545,7 @@ TEST_F(FlatlandTouchIntegrationTest, DisconnectTargetView_TriggersChannelClosure
 TEST_F(FlatlandTouchIntegrationTest, TargetViewWithScaleRotationTranslation) {
   fuchsia::ui::composition::FlatlandPtr child_session;
   fuchsia::ui::pointer::TouchSourcePtr child_touch_source;
-  child_session = realm_->component().Connect<fuchsia::ui::composition::Flatland>();
+  child_session = ConnectAsyncIntoRealm<fuchsia::ui::composition::Flatland>();
   child_touch_source.set_error_handler([](zx_status_t status) {
     FAIL("Touch source closed with status: %s", zx_status_get_string(status));
   });
@@ -638,7 +613,7 @@ TEST_F(FlatlandTouchIntegrationTest, TargetViewWithScaleRotationTranslation) {
 TEST_F(FlatlandTouchIntegrationTest, InjectedInput_OnRotatedChild_ShouldHitEdges) {
   fuchsia::ui::composition::FlatlandPtr child_session;
   fuchsia::ui::pointer::TouchSourcePtr child_touch_source;
-  child_session = realm_->component().Connect<fuchsia::ui::composition::Flatland>();
+  child_session = ConnectAsyncIntoRealm<fuchsia::ui::composition::Flatland>();
   child_touch_source.set_error_handler([](zx_status_t status) {
     FAIL("Touch source closed with status: %s", zx_status_get_string(status));
   });
@@ -788,7 +763,7 @@ TEST_F(FlatlandTouchIntegrationTest, PartialScreenOverlappingViews) {
   // input events.
   {
     auto [child_token, parent_token] = scenic::ViewCreationTokenPair::New();
-    parent_session = realm_->component().Connect<fuchsia::ui::composition::Flatland>();
+    parent_session = ConnectAsyncIntoRealm<fuchsia::ui::composition::Flatland>();
     fidl::InterfacePtr<ParentViewportWatcher> parent_viewport_watcher;
     ViewBoundProtocols protocols;
     protocols.set_touch_source(parent_touch_source.NewRequest());
@@ -823,7 +798,7 @@ TEST_F(FlatlandTouchIntegrationTest, PartialScreenOverlappingViews) {
   // Create child view A.
   fuchsia::ui::composition::FlatlandPtr child_session_A;
   fuchsia::ui::pointer::TouchSourcePtr child_A_touch_source;
-  child_session_A = realm_->component().Connect<fuchsia::ui::composition::Flatland>();
+  child_session_A = ConnectAsyncIntoRealm<fuchsia::ui::composition::Flatland>();
   child_A_touch_source.set_error_handler([](zx_status_t status) {
     FAIL("Touch source A closed with status: %s", zx_status_get_string(status));
   });
@@ -831,7 +806,7 @@ TEST_F(FlatlandTouchIntegrationTest, PartialScreenOverlappingViews) {
   // Create child view B.
   fuchsia::ui::composition::FlatlandPtr child_session_B;
   fuchsia::ui::pointer::TouchSourcePtr child_B_touch_source;
-  child_session_B = realm_->component().Connect<fuchsia::ui::composition::Flatland>();
+  child_session_B = ConnectAsyncIntoRealm<fuchsia::ui::composition::Flatland>();
   child_B_touch_source.set_error_handler([](zx_status_t status) {
     FAIL("Touch source B closed with status: %s", zx_status_get_string(status));
   });
@@ -1106,7 +1081,7 @@ TEST_F(FlatlandTouchIntegrationTest, ChildCreatedUsingCreateView_DoesNotGetInput
   // view to receive input events.
   {
     auto [child_token, parent_token] = scenic::ViewCreationTokenPair::New();
-    parent_session = realm_->component().Connect<fuchsia::ui::composition::Flatland>();
+    parent_session = ConnectAsyncIntoRealm<fuchsia::ui::composition::Flatland>();
     fidl::InterfacePtr<ParentViewportWatcher> parent_viewport_watcher;
     ViewBoundProtocols protocols;
     protocols.set_touch_source(parent_touch_source.NewRequest());
@@ -1132,7 +1107,7 @@ TEST_F(FlatlandTouchIntegrationTest, ChildCreatedUsingCreateView_DoesNotGetInput
   fuchsia::ui::composition::FlatlandPtr child_session;
   {
     auto [child_token, parent_token] = scenic::ViewCreationTokenPair::New();
-    child_session = realm_->component().Connect<fuchsia::ui::composition::Flatland>();
+    child_session = ConnectAsyncIntoRealm<fuchsia::ui::composition::Flatland>();
 
     TransformId kTransformId = {.value = 2};
     ConnectChildView(parent_session, std::move(parent_token), FullscreenSize(), kTransformId,
@@ -1192,7 +1167,7 @@ TEST_F(FlatlandTouchIntegrationTest, SetHitRegion_CapturesTouch) {
   // Create the parent view and attach it to |root_session_|. Register for input events.
   {
     auto [child_token, parent_token] = scenic::ViewCreationTokenPair::New();
-    parent_session = realm_->component().Connect<fuchsia::ui::composition::Flatland>();
+    parent_session = ConnectAsyncIntoRealm<fuchsia::ui::composition::Flatland>();
 
     ViewBoundProtocols protocols;
     protocols.set_touch_source(parent_touch_source.NewRequest());
@@ -1223,7 +1198,7 @@ TEST_F(FlatlandTouchIntegrationTest, SetHitRegion_CapturesTouch) {
   // Create the child view and attach it to the |parent_session|. Register for input events.
   {
     auto [child_token, parent_token] = scenic::ViewCreationTokenPair::New();
-    child_session = realm_->component().Connect<fuchsia::ui::composition::Flatland>();
+    child_session = ConnectAsyncIntoRealm<fuchsia::ui::composition::Flatland>();
 
     ViewBoundProtocols protocols;
     protocols.set_touch_source(child_touch_source.NewRequest());
@@ -1347,7 +1322,7 @@ TEST_F(FlatlandTouchIntegrationTest, InfiniteHitRegion_CapturesTouch) {
   // Create the parent view and attach it to |root_session_|. Register for input events.
   {
     auto [child_token, parent_token] = scenic::ViewCreationTokenPair::New();
-    parent_session = realm_->component().Connect<fuchsia::ui::composition::Flatland>();
+    parent_session = ConnectAsyncIntoRealm<fuchsia::ui::composition::Flatland>();
 
     ViewBoundProtocols protocols;
     protocols.set_touch_source(parent_touch_source.NewRequest());
@@ -1378,7 +1353,7 @@ TEST_F(FlatlandTouchIntegrationTest, InfiniteHitRegion_CapturesTouch) {
   // Create the child view and attach it to the |parent_session|. Register for input events.
   {
     auto [child_token, parent_token] = scenic::ViewCreationTokenPair::New();
-    child_session = realm_->component().Connect<fuchsia::ui::composition::Flatland>();
+    child_session = ConnectAsyncIntoRealm<fuchsia::ui::composition::Flatland>();
 
     ViewBoundProtocols protocols;
     protocols.set_touch_source(child_touch_source.NewRequest());
@@ -1444,7 +1419,7 @@ TEST_F(FlatlandTouchIntegrationTest, InfiniteHitRegion_CapturesTouch) {
 TEST_F(FlatlandTouchIntegrationTest, ExclusiveMode_TargetDisconnectedMidStream_ShouldCancelStream) {
   fuchsia::ui::composition::FlatlandPtr child_session;
   fuchsia::ui::pointer::TouchSourcePtr child_touch_source;
-  child_session = realm_->component().Connect<fuchsia::ui::composition::Flatland>();
+  child_session = ConnectAsyncIntoRealm<fuchsia::ui::composition::Flatland>();
   child_touch_source.set_error_handler([](zx_status_t status) {
     FAIL("Touch source closed with status: %s", zx_status_get_string(status));
   });
@@ -1496,7 +1471,7 @@ TEST_F(FlatlandTouchIntegrationTest, ExclusiveMode_TargetDisconnectedMidStream_S
 TEST_F(FlatlandTouchIntegrationTest, ExclusiveMode_TargetDyingMidStream_ShouldKillChannel) {
   fuchsia::ui::composition::FlatlandPtr child_session;
   fuchsia::ui::pointer::TouchSourcePtr child_touch_source;
-  child_session = realm_->component().Connect<fuchsia::ui::composition::Flatland>();
+  child_session = ConnectAsyncIntoRealm<fuchsia::ui::composition::Flatland>();
   child_touch_source.set_error_handler([](zx_status_t status) {
     FAIL("Touch source closed with status: %s", zx_status_get_string(status));
   });
@@ -1568,7 +1543,7 @@ TEST_F(FlatlandTouchIntegrationTest, HitTested_ViewDisconnectedMidContest_Should
   // input events.
   {
     auto [child_token, parent_token] = scenic::ViewCreationTokenPair::New();
-    parent_session = realm_->component().Connect<fuchsia::ui::composition::Flatland>();
+    parent_session = ConnectAsyncIntoRealm<fuchsia::ui::composition::Flatland>();
     fidl::InterfacePtr<ParentViewportWatcher> parent_viewport_watcher;
     ViewBoundProtocols protocols;
     protocols.set_touch_source(parent_touch_source.NewRequest());
@@ -1599,7 +1574,7 @@ TEST_F(FlatlandTouchIntegrationTest, HitTested_ViewDisconnectedMidContest_Should
   // Create child view.
   fuchsia::ui::composition::FlatlandPtr child_session;
   fuchsia::ui::pointer::TouchSourcePtr child_touch_source;
-  child_session = realm_->component().Connect<fuchsia::ui::composition::Flatland>();
+  child_session = ConnectAsyncIntoRealm<fuchsia::ui::composition::Flatland>();
   child_touch_source.set_error_handler([](zx_status_t status) {
     FAIL("Touch source A closed with status: %s", zx_status_get_string(status));
   });
@@ -1684,7 +1659,7 @@ TEST_F(FlatlandTouchIntegrationTest, HitTested_ViewDisconnectedAfterWinning_Shou
   // input events.
   {
     auto [child_token, parent_token] = scenic::ViewCreationTokenPair::New();
-    parent_session = realm_->component().Connect<fuchsia::ui::composition::Flatland>();
+    parent_session = ConnectAsyncIntoRealm<fuchsia::ui::composition::Flatland>();
     fidl::InterfacePtr<ParentViewportWatcher> parent_viewport_watcher;
     ViewBoundProtocols protocols;
     protocols.set_touch_source(parent_touch_source.NewRequest());
@@ -1715,7 +1690,7 @@ TEST_F(FlatlandTouchIntegrationTest, HitTested_ViewDisconnectedAfterWinning_Shou
   // Create child view A.
   fuchsia::ui::composition::FlatlandPtr child_session;
   fuchsia::ui::pointer::TouchSourcePtr child_touch_source;
-  child_session = realm_->component().Connect<fuchsia::ui::composition::Flatland>();
+  child_session = ConnectAsyncIntoRealm<fuchsia::ui::composition::Flatland>();
   child_touch_source.set_error_handler([](zx_status_t status) {
     FAIL("Touch source A closed with status: %s", zx_status_get_string(status));
   });
@@ -1791,7 +1766,7 @@ TEST_F(FlatlandTouchIntegrationTest, HitTested_ViewDisconnectedAfterWinning_Shou
 TEST_F(FlatlandTouchIntegrationTest, MagnificationTest) {
   // Set up the parent_view and connect it to the root_view.
   fuchsia::ui::composition::FlatlandPtr parent_session =
-      realm_->component().Connect<fuchsia::ui::composition::Flatland>();
+      ConnectAsyncIntoRealm<fuchsia::ui::composition::Flatland>();
   fuchsia::ui::views::ViewRef parent_view_ref;
   {
     auto [view_token, viewport_creation_token] = scenic::ViewCreationTokenPair::New();
@@ -1812,7 +1787,7 @@ TEST_F(FlatlandTouchIntegrationTest, MagnificationTest) {
 
   // Set up the child_view and connect it to the parent_view.
   fuchsia::ui::composition::FlatlandPtr child_session =
-      realm_->component().Connect<fuchsia::ui::composition::Flatland>();
+      ConnectAsyncIntoRealm<fuchsia::ui::composition::Flatland>();
 
   // Set up the touch source channel for the child_view so that it can listen to the pointer events.
   fuchsia::ui::pointer::TouchSourcePtr child_touch_source;

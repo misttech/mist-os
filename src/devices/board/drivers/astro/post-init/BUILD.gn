@@ -44,6 +44,7 @@ fuchsia_driver("post-init-driver") {
     "//src/devices/bind/fuchsia.goodix.platform:fuchsia.goodix.platform_cpp",
     "//src/devices/bind/fuchsia.gpio:fuchsia.gpio_cpp",
     "//src/devices/bind/fuchsia.i2c:fuchsia.i2c_cpp",
+    "//src/devices/bind/fuchsia.platform:fuchsia.platform_cpp",
     "//src/devices/lib/amlogic",
     "//src/devices/lib/focaltech",
     "//src/graphics/display/lib/device-protocol-display",

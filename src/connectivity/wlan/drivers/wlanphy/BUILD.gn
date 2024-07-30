@@ -29,9 +29,9 @@ wlanphy_deps = [
 ]
 
 driver_bind_rules("wlanphy_bind") {
-  rules = "wlanphy.bind"
+  rules = "meta/wlanphy.bind"
   bind_output = "wlanphy.bindbc"
-  tests = "wlanphy_bind_test.json"
+  tests = "meta/wlanphy_bind_test.json"
   deps = [ "//sdk/fidl/fuchsia.wlan.phyimpl:fuchsia.wlan.phyimpl_bindlib" ]
 }
 
@@ -48,7 +48,7 @@ fuchsia_driver("wlanphy_driver-driver") {
 fuchsia_driver_component("wlanphy_driver") {
   component_name = "wlanphy"
   deps = [ ":wlanphy_driver-driver" ]
-  info = "wlanphy_driver-info.json"
+  info = "meta/wlanphy_driver-info.json"
   manifest = "meta/wlanphy.cml"
 }
 

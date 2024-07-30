@@ -7,7 +7,6 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
-#include <lib/ddk/platform-defs.h>
 #include <lib/driver/component/cpp/composite_node_spec.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/thermal/ntc.h>
@@ -15,6 +14,7 @@
 
 #include <bind/fuchsia/adc/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/google/platform/cpp/bind.h>
 #include <bind/fuchsia/hardware/adc/cpp/bind.h>
 #include <soc/aml-s905d2/s905d2-hw.h>
 
@@ -102,9 +102,9 @@ zx_status_t Astro::ThermistorInit() {
 
   fpbus::Node thermistor;
   thermistor.name() = "thermistor";
-  thermistor.vid() = PDEV_VID_GOOGLE;
-  thermistor.pid() = PDEV_PID_ASTRO;
-  thermistor.did() = PDEV_DID_AMLOGIC_THERMISTOR;
+  thermistor.vid() = bind_fuchsia_google_platform::BIND_PLATFORM_DEV_VID_GOOGLE;
+  thermistor.pid() = bind_fuchsia_google_platform::BIND_PLATFORM_DEV_PID_ASTRO;
+  thermistor.did() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_THERMISTOR;
   thermistor.metadata() = therm_metadata;
 
   fidl::Arena<> fidl_arena;

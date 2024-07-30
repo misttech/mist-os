@@ -6,6 +6,7 @@
 //! in the loopback module.
 
 use alloc::vec::Vec;
+use core::convert::Infallible as Never;
 
 use lock_order::lock::{LockLevelFor, UnlockedAccessMarkerFor};
 use lock_order::relation::LockBefore;
@@ -86,6 +87,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::LoopbackTxQueue>>
     type Meta = LoopbackTxQueueMeta<WeakDeviceId<BC>>;
     type Allocator = BufVecU8Allocator;
     type Buffer = Buf<Vec<u8>>;
+    type DequeueContext = Never;
 
     fn parse_outgoing_frame<'a, 'b>(
         buf: &'a [u8],
@@ -111,13 +113,32 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::LoopbackTxQueue>>
         cb(&mut x)
     }
 
+    fn with_transmit_queue<
+        O,
+        F: FnOnce(&TransmitQueueState<Self::Meta, Self::Buffer, Self::Allocator>) -> O,
+    >(
+        &mut self,
+        device_id: &LoopbackDeviceId<BC>,
+        cb: F,
+    ) -> O {
+        let mut state = integration::device_state(self, device_id);
+        let x = state.lock::<crate::lock_ordering::LoopbackTxQueue>();
+        cb(&x)
+    }
+
     fn send_frame(
         &mut self,
         bindings_ctx: &mut BC,
         device_id: &Self::DeviceId,
+        dequeue_context: Option<&mut Never>,
         meta: Self::Meta,
         buf: Self::Buffer,
     ) -> Result<(), DeviceSendFrameError> {
+        // Loopack does not support dequeueing context from bindings.
+        match dequeue_context {
+            Some(never) => match *never {},
+            None => (),
+        };
         // Never handle frames synchronously with the send path - always queue
         // the frame to be received by the loopback device into a queue which
         // a dedicated RX task will kick to handle the queued packet.

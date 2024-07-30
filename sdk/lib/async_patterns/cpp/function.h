@@ -20,47 +20,47 @@ class Receiver;
 template <typename F>
 class Function;
 
-// An asynchronous |Function| that will always execute on the async dispatcher
-// associated with a |Receiver|. Invoking this function translates to posting a
-// task to the destination dispatcher. It will not block the caller.
-//
-// The receiver may not necessarily receive the function call. The call will be
-// a no-op if:
-// - The |Receiver| object goes out of scope.
-// - The async dispatcher of the |Receiver| shuts down.
-//
-// A function can be invoked many times, and distributed to many senders. It is
-// akin to a multi-producer, single-consumer, uni-directional channel. Calls
-// posted to the same |Receiver| will be processed in the order they are made,
-// regardless which |Function|s and |Callback|s they are made from.
+/// An asynchronous |Function| that will always execute on the async dispatcher
+/// associated with a |Receiver|. Invoking this function translates to posting a
+/// task to the destination dispatcher. It will not block the caller.
+///
+/// The receiver may not necessarily receive the function call. The call will be
+/// a no-op if:
+/// - The |Receiver| object goes out of scope.
+/// - The async dispatcher of the |Receiver| shuts down.
+///
+/// A function can be invoked many times, and distributed to many senders. It is
+/// akin to a multi-producer, single-consumer, uni-directional channel. Calls
+/// posted to the same |Receiver| will be processed in the order they are made,
+/// regardless which |Function|s and |Callback|s they are made from.
 template <typename ReturnType, typename... Args>
 class Function<ReturnType(Args...)> {
  public:
-  // Schedules the call to be asynchronously run on the receiver's
-  // dispatcher.
-  //
-  // See |async_patterns::BindForSending| for detailed requirements on |args|.
-  //
-  // This operator returns a pending call. You may either:
-  //
-  // - Make a fire-and-forget call, by discarding the returned object, or
-  // - Get a promise carrying the return value of the function by calling
-  //   `promise()` on the object, yielding a |fpromise::promise<ReturnType>|, or
-  // - Call `Then()` on the object and pass a |Callback<void(ReturnType)>|
-  //
-  // See |async_patterns::PendingCall| for details.
-  //
-  // Example:
-  //
-  //     async_patterns::Function<int(std::string)> parse = ...;
-  //
-  //     // Ignore the returned integer.
-  //     parse(std::string("abc"));
-  //
-  //     // Get a promise that will resolve when the function is asynchronously
-  //     // executed on the receiver's async dispatcher.
-  //     fpromise::promise<int> promise = parse(std::string("abc")).promise();
-  //
+  /// Schedules the call to be asynchronously run on the receiver's
+  /// dispatcher.
+  ///
+  /// See |async_patterns::BindForSending| for detailed requirements on |args|.
+  ///
+  /// This operator returns a pending call. You may either:
+  ///
+  /// - Make a fire-and-forget call, by discarding the returned object, or
+  /// - Get a promise carrying the return value of the function by calling
+  ///   `promise()` on the object, yielding a |fpromise::promise<ReturnType>|, or
+  /// - Call `Then()` on the object and pass a |Callback<void(ReturnType)>|
+  ///
+  /// See |async_patterns::PendingCall| for details.
+  ///
+  /// Example:
+  ///
+  ///     async_patterns::Function<int(std::string)> parse = ...;
+  ///
+  ///     // Ignore the returned integer.
+  ///     parse(std::string("abc"));
+  ///
+  ///     // Get a promise that will resolve when the function is asynchronously
+  ///     // executed on the receiver's async dispatcher.
+  ///     fpromise::promise<int> promise = parse(std::string("abc")).promise();
+  ///
   auto operator()(Args... args) {
     ZX_DEBUG_ASSERT(task_queue_handle_.has_value());
     return PendingCall{
@@ -69,9 +69,9 @@ class Function<ReturnType(Args...)> {
         internal::SubmitWithTaskQueueHandle{task_queue_handle_}, internal::Tag<ReturnType>{}};
   }
 
-  // Returns a functor that performs the same actions as this |Function|, but returns
-  // void, instead of potentially a promise object. This is useful when converting the
-  // |Function| into a |fit::function<void(ReturnType)|.
+  /// Returns a functor that performs the same actions as this |Function|, but returns
+  /// void, instead of potentially a promise object. This is useful when converting the
+  /// |Function| into a |fit::function<void(ReturnType)|.
   auto ignore_result() && {
     return [function = std::move(*this)](Args... args) mutable {
       function(std::forward<Args>(args)...);

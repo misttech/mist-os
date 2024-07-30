@@ -27,7 +27,7 @@ fuchsia_bind_library(
 fuchsia_driver_bind_bytecode(
     name = "bind_bytecode",
     output = "test_driver.bindbc",
-    rules = "test_driver.bind",
+    rules = "meta/test_driver.bind",
     deps = [
         ":test.driver.bind",
     ],
@@ -49,7 +49,7 @@ fuchsia_cc_driver(
 
 fuchsia_component_manifest(
     name = "manifest",
-    src = "test_driver.cml",
+    src = "meta/test_driver.cml",
 )
 
 fuchsia_driver_component(

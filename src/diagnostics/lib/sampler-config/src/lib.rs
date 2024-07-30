@@ -10,6 +10,7 @@ use anyhow::{bail, Context as _, Error};
 use fuchsia_inspect as inspect;
 use futures::FutureExt;
 use glob::{GlobError, Paths};
+use moniker::ExtendedMoniker;
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use std::fs;
@@ -177,7 +178,8 @@ pub struct ComponentIdInfoList(Vec<ComponentIdInfo>);
 #[derive(Deserialize, Debug)]
 pub struct ComponentIdInfo {
     /// The component's moniker
-    moniker: String,
+    #[serde(deserialize_with = "moniker_deserialize")]
+    moniker: ExtendedMoniker,
     /// The Component Instance ID - may not be available
     instance_id: Option<String>,
     /// The ID sent to Cobalt as an event code
@@ -186,6 +188,14 @@ pub struct ComponentIdInfo {
     /// Human-readable label, not used by Sampler, but we need to validate it
     #[allow(unused)]
     label: String,
+}
+
+fn moniker_deserialize<'de, D>(deserializer: D) -> Result<ExtendedMoniker, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let moniker_str = String::deserialize(deserializer)?;
+    ExtendedMoniker::parse_str(&moniker_str).map_err(serde::de::Error::custom)
 }
 
 impl std::ops::Deref for ComponentIdInfoList {
@@ -393,11 +403,11 @@ impl MetricConfig {
             &component_info.instance_id,
         ) {
             (Some(i), Some(s), _, _) if i < s => {
-                Ok(template.replace(MONIKER_INTERPOLATION, &component_info.moniker))
+                Ok(template.replace(MONIKER_INTERPOLATION, &component_info.moniker.to_string()))
             }
             (Some(_), Some(_), _, _) => Ok(template.replace(
                 MONIKER_INTERPOLATION,
-                &selectors::sanitize_string_for_selectors(&component_info.moniker),
+                &selectors::sanitize_string_for_selectors(&component_info.moniker.to_string()),
             )),
             (_, _, Some(_), Some(id)) => Ok(template.replace(INSTANCE_ID_INTERPOLATION, &id)),
             (_, _, Some(_), None) => {
@@ -443,7 +453,7 @@ impl ProjectConfig {
 
 fn add_instance_ids(ids: component_id_index::Index, fire_components: &mut Vec<ComponentIdInfo>) {
     for component in fire_components {
-        if let Ok(moniker) = moniker::Moniker::try_from(component.moniker.as_str()) {
+        if let ExtendedMoniker::ComponentInstance(moniker) = &component.moniker {
             component.instance_id = ids.id_for_moniker(&moniker).map(|h| format!("{h}"));
         }
     }
@@ -972,13 +982,13 @@ mod tests {
         .unwrap();
         let mut components = vec![
             ComponentIdInfo {
-                moniker: "baz/quux".to_string(),
+                moniker: "baz/quux".try_into().unwrap(),
                 event_id: 101,
                 label: "bq".into(),
                 instance_id: None,
             },
             ComponentIdInfo {
-                moniker: "foo/bar".to_string(),
+                moniker: "foo/bar".try_into().unwrap(),
                 event_id: 102,
                 label: "fb".into(),
                 instance_id: None,

@@ -632,6 +632,7 @@ fn expected_diagnostics_persistence_inspect(published: Published) -> String {
     "data_source": "Inspect",
     "metadata": {
       "component_url": "realm-builder/persistence",
+      "name": "root",
       "timestamp": 0
     },
     "moniker": "realm_builder/persistence",

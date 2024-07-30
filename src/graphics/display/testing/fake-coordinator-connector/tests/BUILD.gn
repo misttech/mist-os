@@ -3,10 +3,14 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//build/test.gni")
 
 group("tests") {
   testonly = true
-  public_deps = [ ":fake-display-coordinator-connector-unittest" ]
+  public_deps = [
+    ":fake-display-coordinator-connector-integration-test",
+    ":fake-display-coordinator-connector-unittest",
+  ]
 }
 
 executable("fake-display-coordinator-connector-unittest-bin") {
@@ -37,4 +41,34 @@ fuchsia_unittest_package("fake-display-coordinator-connector-unittest") {
     }
   }
   test_type = "vulkan"
+}
+
+test("fake-display-coordinator-connector-integration-test-bin") {
+  output_name = "fake-display-coordinator-connector-integration-test"
+  sources = [ "fake-display-coordinator-connector-integration-test.cc" ]
+  deps = [
+    "//sdk/fidl/fuchsia.hardware.display:fuchsia.hardware.display_cpp",
+    "//sdk/lib/component/incoming/cpp",
+    "//sdk/lib/device-watcher/cpp",
+    "//sdk/lib/fidl/cpp",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/predicates",
+    "//third_party/googletest:gtest",
+  ]
+}
+
+fuchsia_component(
+    "fake-display-coordinator-connector-integration-test-component") {
+  testonly = true
+  component_name = "fake-display-coordinator-connector-integration-test"
+  manifest = "meta/fake-display-coordinator-connector-integration-test.cml"
+  deps = [ ":fake-display-coordinator-connector-integration-test-bin" ]
+}
+
+fuchsia_test_package("fake-display-coordinator-connector-integration-test") {
+  test_components =
+      [ ":fake-display-coordinator-connector-integration-test-component" ]
+  deps = [
+    "//src/graphics/display/testing/fake-coordinator-connector:child-component",
+  ]
 }

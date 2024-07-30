@@ -3,11 +3,11 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import datetime
 import os
 import re
 import subprocess
 import sys
-import datetime
 
 # All other paths are relative to here (main changes to this directory on startup).
 ROOT_PATH = os.path.join(os.path.dirname(__file__), "..", "..")
@@ -152,9 +152,9 @@ class Bindgen:
             args += ["-I", i]
         args += ["-I", "."]
 
-        env = os.environ.copy()
-        env["RUSTFMT"] = os.path.abspath(RUSTFMT_PATH)
-        subprocess.check_call(args, env=env)
+        subprocess.check_call(
+            args, env={"RUSTFMT": os.path.abspath(RUSTFMT_PATH)}
+        )
 
     def get_auto_derive_traits(self, line):
         """Returns true if the given line defines a Rust structure with a name

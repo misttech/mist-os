@@ -3,8 +3,9 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import verify_product_configuration
 import unittest
+
+import verify_product_configuration
 
 
 def fake_file_sha1(path: str) -> str:

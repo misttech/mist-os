@@ -10,10 +10,10 @@ use hyper::body::HttpBody;
 use hyper::{Body, Method, Request};
 use std::collections::{BTreeMap, HashMap};
 
-use crate::env_info::{get_arch, get_os};
+use crate::env_info::{get_arch, get_os, is_googler};
 use crate::ga4_event::*;
 use crate::metrics_state::*;
-use crate::notice::{BRIEF_NOTICE, FULL_NOTICE};
+use crate::notice::{BRIEF_NOTICE, FULL_NOTICE, GOOGLER_ENHANCED_NOTICE, SHOW_NOTICE_TEMPLATE};
 
 const DOMAIN: &str = "www.google-analytics.com";
 const ENDPOINT: &str = "/mp/collect";
@@ -36,16 +36,51 @@ impl GA4MetricsService {
 
     /// Returns Analytics disclosure notice according to PDD rules.
     pub fn get_notice(&self) -> Option<String> {
-        match self.state.status {
-            MetricsStatus::NewUser => Some(FULL_NOTICE.to_string()),
-            MetricsStatus::NewToTool => Some(BRIEF_NOTICE.to_string()),
-            _ => None,
+        if !is_googler() {
+            match self.state.status {
+                MetricsStatus::NewUser => Some(FULL_NOTICE.to_string()),
+                MetricsStatus::NewToTool => Some(BRIEF_NOTICE.to_string()),
+                _ => None,
+            }
+        } else {
+            match self.state.status {
+                MetricsStatus::GooglerNeedsNotice | MetricsStatus::GooglerOptedInAndNeedsNotice => {
+                    Some(GOOGLER_ENHANCED_NOTICE.to_string())
+                }
+                _ => None,
+            }
         }
     }
 
+    pub async fn show_status_message(&self) -> String {
+        let optin_status = match self.state.status {
+            MetricsStatus::OptedIn
+            | MetricsStatus::GooglerOptedInAndNeedsNotice
+            | MetricsStatus::NewToTool => "enabled",
+            MetricsStatus::OptedInEnhanced => "enable-enhanced",
+            MetricsStatus::OptedOut
+            | MetricsStatus::Disabled
+            | MetricsStatus::NewUser
+            | MetricsStatus::GooglerNeedsNotice => "disabled",
+        };
+        let message = SHOW_NOTICE_TEMPLATE.replace("{status}", optin_status);
+        message
+    }
+
     /// Records Analytics participation status.
+    /// TODO remove this once foxtrot is migrated to set_new_opt_in_status
     pub fn set_opt_in_status(&mut self, enabled: bool) -> Result<()> {
         self.state.set_opt_in_status(enabled)
+    }
+
+    /// Record analytics participation status in new migrated status file to support
+    /// enhanced analytics for Googlers.
+    pub fn set_new_opt_in_status(&mut self, status: MetricsStatus) -> Result<()> {
+        self.state.set_new_opt_in_status(status)
+    }
+
+    pub fn opt_in_status(&self) -> MetricsStatus {
+        self.state.status.clone()
     }
 
     /// Returns Analytics participation status.
@@ -212,7 +247,20 @@ impl GA4MetricsService {
             ("os".into(), ValueObject { value: get_os().into() }),
             ("arch".into(), ValueObject { value: get_arch().into() }),
             ("sdk_version".into(), ValueObject { value: self.state.sdk_version.clone().into() }),
+            ("internal".into(), ValueObject { value: is_googler_as_int().into() }),
+            ("metrics_level".into(), ValueObject { value: self.opted_in_metrics_level().into() }),
         ])
+    }
+
+    // This returns which level of opted in is set
+    // only when user is opted in.
+    // Used to encode level for analytics.
+    fn opted_in_metrics_level(&self) -> u64 {
+        if self.opt_in_status() == MetricsStatus::OptedInEnhanced {
+            2
+        } else {
+            1
+        }
     }
 
     fn get_url(&self) -> String {
@@ -220,6 +268,14 @@ impl GA4MetricsService {
             "https://{}{}?api_secret={}&measurement_id={}",
             DOMAIN, ENDPOINT, self.state.ga4_key, self.state.ga4_product_code
         )
+    }
+}
+
+// encode bool as 1 or 0 for analytics
+fn is_googler_as_int() -> u64 {
+    match is_googler() {
+        true => 1,
+        false => 0,
     }
 }
 
@@ -281,7 +337,11 @@ mod tests {
             false,
         );
 
-        assert_eq!(ms.get_notice(), Some(FULL_NOTICE.replace("{app_name}", APP_NAME)));
+        if !is_googler() {
+            assert_eq!(ms.get_notice(), Some(FULL_NOTICE.into()));
+        } else {
+            assert_eq!(ms.get_notice(), Some(GOOGLER_ENHANCED_NOTICE.into()));
+        }
 
         drop(dir);
         Ok(())
@@ -302,9 +362,16 @@ mod tests {
             UNKNOWN_GA4_KEY.to_string(),
             false,
         );
-
-        assert_eq!(ms.state.status, MetricsStatus::NewToTool);
-        assert_eq!(ms.get_notice(), Some(BRIEF_NOTICE.replace("{app_name}", APP_NAME)));
+        if !is_googler() {
+            assert_eq!(ms.state.status, MetricsStatus::NewToTool);
+        } else {
+            assert_eq!(ms.state.status, MetricsStatus::GooglerOptedInAndNeedsNotice);
+        }
+        if !is_googler() {
+            assert_eq!(ms.get_notice(), Some(BRIEF_NOTICE.into()));
+        } else {
+            assert_eq!(ms.get_notice(), Some(GOOGLER_ENHANCED_NOTICE.into()));
+        }
         drop(dir);
         Ok(())
     }
@@ -325,7 +392,11 @@ mod tests {
             false,
         );
 
-        assert_eq!(ms.get_notice(), None);
+        if !is_googler() {
+            assert_eq!(ms.get_notice(), None);
+        } else {
+            assert_eq!(ms.get_notice(), Some(GOOGLER_ENHANCED_NOTICE.into()));
+        }
         drop(dir);
         Ok(())
     }
@@ -389,7 +460,11 @@ mod tests {
             false,
         );
 
-        assert_eq!(ms.state.status, MetricsStatus::NewUser);
+        if !is_googler() {
+            assert_eq!(ms.state.status, MetricsStatus::NewUser);
+        } else {
+            assert_eq!(ms.state.status, MetricsStatus::GooglerNeedsNotice);
+        }
         let _res = ms.opt_out_for_this_invocation().unwrap();
         assert_eq!(ms.state.status, MetricsStatus::OptedOut);
 

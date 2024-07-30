@@ -29,7 +29,7 @@ rustc_library("testing") {
     "//src/connectivity/network/testing/netemul/runner:*",
     "//src/lib/fuchsia-component-test/realm_builder_server/*",
     "//src/lib/fuchsia-component-test/tests/*",
-    "//src/security/lib/scrutiny/plugins:*",
+    "//src/security/lib/scrutiny/frontend:*",
     "//src/security/lib/scrutiny/x:*",
     "//src/sys/component_manager/*",
     "//src/sys/lib/cm_rust/testing:*",

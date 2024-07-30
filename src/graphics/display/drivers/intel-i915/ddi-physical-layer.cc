@@ -4,7 +4,7 @@
 
 #include "src/graphics/display/drivers/intel-i915/ddi-physical-layer.h"
 
-#include <lib/ddk/debug.h>
+#include <lib/driver/logging/cpp/logger.h>
 #include <lib/fit/defer.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <lib/zx/result.h>
@@ -55,17 +55,17 @@ const char* PortTypeToString(DdiPhysicalLayer::ConnectionType type) {
 void DdiPhysicalLayer::AddRef() {
   ZX_DEBUG_ASSERT(IsEnabled());
   ++ref_count_;
-  zxlogf(TRACE, "DdiPhysicalLayer: Reference count of DDI %d increased to %d", ddi_id(),
-         ref_count_);
+  FDF_LOG(TRACE, "DdiPhysicalLayer: Reference count of DDI %d increased to %d", ddi_id(),
+          ref_count_);
 }
 
 void DdiPhysicalLayer::Release() {
   ZX_DEBUG_ASSERT(ref_count_ > 0);
   if (--ref_count_ == 0) {
-    zxlogf(TRACE, "DdiPhysicalLayer: Reference count of DDI %d decreased to %d", ddi_id(),
-           ref_count_);
+    FDF_LOG(TRACE, "DdiPhysicalLayer: Reference count of DDI %d decreased to %d", ddi_id(),
+            ref_count_);
     if (!Disable()) {
-      zxlogf(ERROR, "DdiPhysicalLayer: Failed to disable unused DDI %d", ddi_id());
+      FDF_LOG(ERROR, "DdiPhysicalLayer: Failed to disable unused DDI %d", ddi_id());
     }
   }
 }
@@ -78,7 +78,7 @@ fbl::String DdiPhysicalLayer::PhysicalLayerInfo::DebugString() const {
 
 bool DdiSkylake::Enable() {
   if (enabled_) {
-    zxlogf(WARNING, "DDI %d: Enable: PHY already enabled", ddi_id());
+    FDF_LOG(WARNING, "DDI %d: Enable: PHY already enabled", ddi_id());
   }
   enabled_ = true;
   return true;
@@ -86,7 +86,7 @@ bool DdiSkylake::Enable() {
 
 bool DdiSkylake::Disable() {
   if (!enabled_) {
-    zxlogf(WARNING, "DDI %d: Disable: PHY already disabled", ddi_id());
+    FDF_LOG(WARNING, "DDI %d: Disable: PHY already disabled", ddi_id());
   }
   enabled_ = false;
   return true;
@@ -107,7 +107,7 @@ ComboDdiTigerLake::ComboDdiTigerLake(DdiId ddi_id, fdf::MmioBuffer* mmio_space)
 
 bool ComboDdiTigerLake::Enable() {
   if (enabled_) {
-    zxlogf(WARNING, "DDI %d: Enable: PHY already enabled", ddi_id());
+    FDF_LOG(WARNING, "DDI %d: Enable: PHY already enabled", ddi_id());
   }
   enabled_ = true;
   return true;
@@ -115,7 +115,7 @@ bool ComboDdiTigerLake::Enable() {
 
 bool ComboDdiTigerLake::Disable() {
   if (!enabled_) {
-    zxlogf(WARNING, "DDI %d: Enable: PHY already disabled", ddi_id());
+    FDF_LOG(WARNING, "DDI %d: Enable: PHY already disabled", ddi_id());
   }
   enabled_ = false;
   return true;
@@ -151,8 +151,9 @@ TigerLakeProcessCompensationConfig ReadTigerLakeProcessCompensationConfig(
   auto compensation_low =
       registers::PortCompensationLowVoltageReferences::GetForDdi(ddi_id).ReadFrom(mmio_space);
 
-  zxlogf(TRACE, "DDI %d PORT_COMP_DW1: %08x PORT_COMP_DW_9: %08x PORT_COMP_DW10: %08x", ddi_id,
-         compensation1.reg_value(), compensation_nominal.reg_value(), compensation_low.reg_value());
+  FDF_LOG(TRACE, "DDI %d PORT_COMP_DW1: %08x PORT_COMP_DW_9: %08x PORT_COMP_DW10: %08x", ddi_id,
+          compensation1.reg_value(), compensation_nominal.reg_value(),
+          compensation_low.reg_value());
 
   return TigerLakeProcessCompensationConfig{
       .nominal =
@@ -293,7 +294,7 @@ TigerLakeProcessCompensationConfig ProcessCompensationConfigFor(
       };
   };
 
-  zxlogf(ERROR, "Undocumented process/voltage combination");
+  FDF_LOG(ERROR, "Undocumented process/voltage combination");
   return {};
 }
 
@@ -324,8 +325,8 @@ bool ComboDdiTigerLake::Initialize() {
         process_name = "dot-4";
         break;
       default:
-        zxlogf(WARNING, "DDI %d process monitor reports undocumented process variation %" PRIu32,
-               ddi_id(), static_cast<unsigned int>(procmon_status.process_select()));
+        FDF_LOG(WARNING, "DDI %d process monitor reports undocumented process variation %" PRIu32,
+                ddi_id(), static_cast<unsigned int>(procmon_status.process_select()));
         process_name = "dot-undocumented";
     };
 
@@ -341,59 +342,59 @@ bool ComboDdiTigerLake::Initialize() {
         voltage_name = "1.05v";
         break;
       default:
-        zxlogf(WARNING, "DDI %d process monitor reports undocumented voltage variation %" PRIu32,
-               ddi_id(), static_cast<unsigned int>(procmon_status.voltage_select()));
+        FDF_LOG(WARNING, "DDI %d process monitor reports undocumented voltage variation %" PRIu32,
+                ddi_id(), static_cast<unsigned int>(procmon_status.voltage_select()));
         voltage_name = "undocumented-v";
     };
 
-    zxlogf(TRACE, "DDI %d Process variation: %s %s, Process monitor done: %s ", ddi_id(),
-           process_name, voltage_name, procmon_status.process_monitor_done() ? "yes" : "no");
-    zxlogf(TRACE,
-           "DDI %d Current comp: %u%s%s, MIPI LPDn code: %u%s%s, First compensation done: %s",
-           ddi_id(), procmon_status.current_compensation_code(),
-           procmon_status.current_compensation_code_maxout() ? " maxout" : "",
-           procmon_status.current_compensation_code_minout() ? " minout" : "",
-           procmon_status.mipi_low_power_data_negative_code(),
-           procmon_status.mipi_low_power_data_negative_code_maxout() ? " maxout" : "",
-           procmon_status.mipi_low_power_data_negative_code_minout() ? " minout" : "",
-           procmon_status.first_compensation_done() ? "yes" : "no");
+    FDF_LOG(TRACE, "DDI %d Process variation: %s %s, Process monitor done: %s ", ddi_id(),
+            process_name, voltage_name, procmon_status.process_monitor_done() ? "yes" : "no");
+    FDF_LOG(TRACE,
+            "DDI %d Current comp: %u%s%s, MIPI LPDn code: %u%s%s, First compensation done: %s",
+            ddi_id(), procmon_status.current_compensation_code(),
+            procmon_status.current_compensation_code_maxout() ? " maxout" : "",
+            procmon_status.current_compensation_code_minout() ? " minout" : "",
+            procmon_status.mipi_low_power_data_negative_code(),
+            procmon_status.mipi_low_power_data_negative_code_maxout() ? " maxout" : "",
+            procmon_status.mipi_low_power_data_negative_code_minout() ? " minout" : "",
+            procmon_status.first_compensation_done() ? "yes" : "no");
   }
 
   {
     TigerLakeProcessCompensationConfig process_compensation =
         ReadTigerLakeProcessCompensationConfig(ddi_id(), mmio_space_);
-    zxlogf(
+    FDF_LOG(
         TRACE,
         "DDI %d Process monitor nominal voltage references: -ve low %x high %x, +ve low %x high %x",
         ddi_id(), process_compensation.nominal.negative.low,
         process_compensation.nominal.negative.high, process_compensation.nominal.positive.low,
         process_compensation.nominal.positive.high);
-    zxlogf(TRACE,
-           "DDI %d Process monitor low voltage references: -ve low %x high %x, +ve low %x high %x",
-           ddi_id(), process_compensation.low.negative.low, process_compensation.low.negative.high,
-           process_compensation.low.positive.low, process_compensation.low.positive.high);
+    FDF_LOG(TRACE,
+            "DDI %d Process monitor low voltage references: -ve low %x high %x, +ve low %x high %x",
+            ddi_id(), process_compensation.low.negative.low, process_compensation.low.negative.high,
+            process_compensation.low.positive.low, process_compensation.low.positive.high);
   }
 
   auto common_lane5 = registers::PortCommonLane5::GetForDdi(ddi_id()).ReadFrom(mmio_space_);
-  zxlogf(TRACE,
-         "DDI %d PORT_CL_DW5: %08x, common lane power down %s, suspend clock config %d, "
-         "downlink broadcast %s, force %02x, CRI clock: count max %d select %d, "
-         "IOSF PD: count %d divider select %d, PHY power ack override %s, "
-         "staggering: port %s power gate %s, fuse flags: %s %s %s",
-         ddi_id(), common_lane5.reg_value(),
-         common_lane5.common_lane_power_down_enabled() ? "enabled" : "disabled",
-         common_lane5.suspend_clock_config(),
-         common_lane5.downlink_broadcast_enable() ? "enabled" : "disabled", common_lane5.force(),
-         common_lane5.common_register_interface_clock_count_max(),
-         common_lane5.common_register_interface_clock_select(),
-         common_lane5.onchip_system_fabric_presence_detection_count(),
-         common_lane5.onchip_system_fabric_clock_divider_select(),
-         common_lane5.phy_power_ack_override() ? "enabled" : "disabled",
-         common_lane5.port_staggering_enabled() ? "enabled" : "disabled",
-         common_lane5.port_staggering_enabled() ? "enabled" : "disabled",
-         common_lane5.fuse_valid_override() ? "valid override" : "-",
-         common_lane5.fuse_valid_reset() ? "valid reset" : "-",
-         common_lane5.fuse_repull() ? "repull" : "-");
+  FDF_LOG(TRACE,
+          "DDI %d PORT_CL_DW5: %08x, common lane power down %s, suspend clock config %d, "
+          "downlink broadcast %s, force %02x, CRI clock: count max %d select %d, "
+          "IOSF PD: count %d divider select %d, PHY power ack override %s, "
+          "staggering: port %s power gate %s, fuse flags: %s %s %s",
+          ddi_id(), common_lane5.reg_value(),
+          common_lane5.common_lane_power_down_enabled() ? "enabled" : "disabled",
+          common_lane5.suspend_clock_config(),
+          common_lane5.downlink_broadcast_enable() ? "enabled" : "disabled", common_lane5.force(),
+          common_lane5.common_register_interface_clock_count_max(),
+          common_lane5.common_register_interface_clock_select(),
+          common_lane5.onchip_system_fabric_presence_detection_count(),
+          common_lane5.onchip_system_fabric_clock_divider_select(),
+          common_lane5.phy_power_ack_override() ? "enabled" : "disabled",
+          common_lane5.port_staggering_enabled() ? "enabled" : "disabled",
+          common_lane5.port_staggering_enabled() ? "enabled" : "disabled",
+          common_lane5.fuse_valid_override() ? "valid override" : "-",
+          common_lane5.fuse_valid_reset() ? "valid reset" : "-",
+          common_lane5.fuse_repull() ? "repull" : "-");
 
   static constexpr registers::PortLane kAllLanes[] = {
       registers::PortLane::kAux, registers::PortLane::kMainLinkLane0,
@@ -403,72 +404,74 @@ bool ComboDdiTigerLake::Initialize() {
     auto transmitter_dcc =
         registers::PortTransmitterDutyCycleCorrection::GetForDdiLane(ddi_id(), lane)
             .ReadFrom(mmio_space_);
-    zxlogf(TRACE,
-           "DDI %d Lane %d PORT_TX_DW8: %08x, output DCC clock: select %d divider select %d, "
-           "output DCC code: override %s %d limits %d - %d, output DCC fuse %s, "
-           "input DCC code: %d thermal %d",
-           ddi_id(), static_cast<int>(lane), transmitter_dcc.reg_value(),
-           transmitter_dcc.output_duty_cycle_correction_clock_select(),
-           static_cast<int>(transmitter_dcc.output_duty_cycle_correction_clock_divider_select()),
-           transmitter_dcc.output_duty_cycle_correction_code_override_valid() ? "valid" : "invalid",
-           transmitter_dcc.output_duty_cycle_correction_code_override(),
-           transmitter_dcc.output_duty_cycle_correction_lower_limit(),
-           transmitter_dcc.output_duty_cycle_correction_upper_limit(),
-           transmitter_dcc.output_duty_cycle_correction_fuse_enabled() ? "enabled" : "disabled",
-           transmitter_dcc.input_duty_cycle_correction_code(),
-           (transmitter_dcc.input_duty_cycle_correction_thermal_bits43() << 2) |
-               transmitter_dcc.input_duty_cycle_correction_thermal_bits20());
+    FDF_LOG(
+        TRACE,
+        "DDI %d Lane %d PORT_TX_DW8: %08x, output DCC clock: select %d divider select %d, "
+        "output DCC code: override %s %d limits %d - %d, output DCC fuse %s, "
+        "input DCC code: %d thermal %d",
+        ddi_id(), static_cast<int>(lane), transmitter_dcc.reg_value(),
+        transmitter_dcc.output_duty_cycle_correction_clock_select(),
+        static_cast<int>(transmitter_dcc.output_duty_cycle_correction_clock_divider_select()),
+        transmitter_dcc.output_duty_cycle_correction_code_override_valid() ? "valid" : "invalid",
+        transmitter_dcc.output_duty_cycle_correction_code_override(),
+        transmitter_dcc.output_duty_cycle_correction_lower_limit(),
+        transmitter_dcc.output_duty_cycle_correction_upper_limit(),
+        transmitter_dcc.output_duty_cycle_correction_fuse_enabled() ? "enabled" : "disabled",
+        transmitter_dcc.input_duty_cycle_correction_code(),
+        (transmitter_dcc.input_duty_cycle_correction_thermal_bits43() << 2) |
+            transmitter_dcc.input_duty_cycle_correction_thermal_bits20());
 
     auto physical_coding1 =
         registers::PortPhysicalCoding1::GetForDdiLane(ddi_id(), lane).ReadFrom(mmio_space_);
-    zxlogf(TRACE,
-           "DDI %d Lane %d PORT_PCS_DW1: %08x, power-gated %s, DCC schedule %d, "
-           "DCC calibration: force %s bypass %s on wake %s, clock request %d, "
-           "commmon keeper: %s / %s while power-gated / bias control %d, latency optimization %d, "
-           "soft lane reset: %s %s, transmitter fifo reset override: %s %s, "
-           "transmiter de-emphasis %d, TBC as symbol clock %s",
-           ddi_id(), static_cast<int>(lane), physical_coding1.reg_value(),
-           physical_coding1.power_gate_powered_down() ? "yes" : "no",
-           static_cast<int>(physical_coding1.duty_cycle_correction_schedule_select()),
-           physical_coding1.force_transmitter_duty_cycle_correction_calibration() ? "yes" : "no",
-           physical_coding1.duty_cycle_correction_calibration_bypassed() ? "enabled" : "disabled",
-           physical_coding1.duty_cycle_correction_calibration_on_wake() ? "yes" : "no",
-           physical_coding1.clock_request(),
-           physical_coding1.common_mode_keeper_enabled() ? "enabled" : "disabled",
-           physical_coding1.common_mode_keeper_enabled_while_power_gated() ? "enabled" : "disabled",
-           physical_coding1.common_mode_keeper_bias_control(),
-           physical_coding1.latency_optimization_value(),
-           physical_coding1.soft_lane_reset() ? "on" : "off",
-           physical_coding1.soft_lane_reset_valid() ? "valid" : "invalid",
-           physical_coding1.transmitter_fifo_reset_main_override() ? "on" : "off",
-           physical_coding1.transmitter_fifo_reset_main_override_valid() ? "valid" : "invalid",
-           physical_coding1.transmitter_deemphasis_value(),
-           physical_coding1.use_transmitter_buffer_clock_as_symbol_clock() ? "yes" : "no");
+    FDF_LOG(
+        TRACE,
+        "DDI %d Lane %d PORT_PCS_DW1: %08x, power-gated %s, DCC schedule %d, "
+        "DCC calibration: force %s bypass %s on wake %s, clock request %d, "
+        "commmon keeper: %s / %s while power-gated / bias control %d, latency optimization %d, "
+        "soft lane reset: %s %s, transmitter fifo reset override: %s %s, "
+        "transmiter de-emphasis %d, TBC as symbol clock %s",
+        ddi_id(), static_cast<int>(lane), physical_coding1.reg_value(),
+        physical_coding1.power_gate_powered_down() ? "yes" : "no",
+        static_cast<int>(physical_coding1.duty_cycle_correction_schedule_select()),
+        physical_coding1.force_transmitter_duty_cycle_correction_calibration() ? "yes" : "no",
+        physical_coding1.duty_cycle_correction_calibration_bypassed() ? "enabled" : "disabled",
+        physical_coding1.duty_cycle_correction_calibration_on_wake() ? "yes" : "no",
+        physical_coding1.clock_request(),
+        physical_coding1.common_mode_keeper_enabled() ? "enabled" : "disabled",
+        physical_coding1.common_mode_keeper_enabled_while_power_gated() ? "enabled" : "disabled",
+        physical_coding1.common_mode_keeper_bias_control(),
+        physical_coding1.latency_optimization_value(),
+        physical_coding1.soft_lane_reset() ? "on" : "off",
+        physical_coding1.soft_lane_reset_valid() ? "valid" : "invalid",
+        physical_coding1.transmitter_fifo_reset_main_override() ? "on" : "off",
+        physical_coding1.transmitter_fifo_reset_main_override_valid() ? "valid" : "invalid",
+        physical_coding1.transmitter_deemphasis_value(),
+        physical_coding1.use_transmitter_buffer_clock_as_symbol_clock() ? "yes" : "no");
   }
 
   auto phy_misc = registers::PhyMisc::GetForDdi(ddi_id()).ReadFrom(mmio_space_);
-  zxlogf(TRACE, "DDI %d PHY_MISC %08x, DE to IO: %x, IO to DE: %x, Comp power down: %s", ddi_id(),
-         phy_misc.reg_value(), phy_misc.display_engine_to_io(), phy_misc.io_to_display_engine(),
-         phy_misc.compensation_resistors_powered_down() ? "enabled" : "disabled");
+  FDF_LOG(TRACE, "DDI %d PHY_MISC %08x, DE to IO: %x, IO to DE: %x, Comp power down: %s", ddi_id(),
+          phy_misc.reg_value(), phy_misc.display_engine_to_io(), phy_misc.io_to_display_engine(),
+          phy_misc.compensation_resistors_powered_down() ? "enabled" : "disabled");
 
   auto compensation_source =
       registers::PortCompensationSource::GetForDdi(ddi_id()).ReadFrom(mmio_space_);
-  zxlogf(TRACE,
-         "DDI %d PORT_COMP_DW8 %08x, internal reference generation %s, periodic compensation %s",
-         ddi_id(), compensation_source.reg_value(),
-         compensation_source.generate_internal_references() ? "enabled" : "disabled",
-         compensation_source.periodic_current_compensation_disabled() ? "disabled" : "enabled");
+  FDF_LOG(TRACE,
+          "DDI %d PORT_COMP_DW8 %08x, internal reference generation %s, periodic compensation %s",
+          ddi_id(), compensation_source.reg_value(),
+          compensation_source.generate_internal_references() ? "enabled" : "disabled",
+          compensation_source.periodic_current_compensation_disabled() ? "disabled" : "enabled");
 
   auto compensation_initialized =
       registers::PortCompensation0::GetForDdi(ddi_id()).ReadFrom(mmio_space_);
-  zxlogf(TRACE, "DDI %d PORT_COMP_DW0: %08x PORT_COMP_DW3: %08x ", ddi_id(),
-         compensation_initialized.reg_value(), procmon_status.reg_value());
+  FDF_LOG(TRACE, "DDI %d PORT_COMP_DW0: %08x PORT_COMP_DW3: %08x ", ddi_id(),
+          compensation_initialized.reg_value(), procmon_status.reg_value());
   if (compensation_initialized.initialized()) {
     // The PRMs advise that we consider the PHY initialized if this bit is set,
     // and skip the entire initialize process. A more robust approach would be
     // to reset (de-initialize, initialize) the PHY if its current configuration
     // doesn't match what we expect.
-    zxlogf(TRACE, "DDI %d PHY already initialized. Assuming everything is correct.", ddi_id());
+    FDF_LOG(TRACE, "DDI %d PHY already initialized. Assuming everything is correct.", ddi_id());
     return true;
   }
 
@@ -550,7 +553,7 @@ TypeCDdiTigerLake::TypeCDdiTigerLake(DdiId ddi_id, Power* power, fdf::MmioBuffer
 
 TypeCDdiTigerLake::~TypeCDdiTigerLake() {
   if (initialization_phase_ != InitializationPhase::kUninitialized) {
-    zxlogf(WARNING, "DDI %d: not fully disabled on port teardown", ddi_id());
+    FDF_LOG(WARNING, "DDI %d: not fully disabled on port teardown", ddi_id());
   }
 }
 
@@ -671,8 +674,8 @@ bool TypeCDdiTigerLake::Enable() {
   while (AdvanceEnableFsm()) {
   }
   if (initialization_phase_ == InitializationPhase::kInitialized) {
-    zxlogf(TRACE, "DDI %d: Enabled. New physical layer info: %s", ddi_id(),
-           physical_layer_info_.DebugString().c_str());
+    FDF_LOG(TRACE, "DDI %d: Enabled. New physical layer info: %s", ddi_id(),
+            physical_layer_info_.DebugString().c_str());
     return true;
   }
   while (AdvanceDisableFsm()) {
@@ -690,13 +693,13 @@ bool TypeCDdiTigerLake::Disable() {
       while (AdvanceDisableFsm()) {
       }
       if (initialization_phase_ == InitializationPhase::kUninitialized) {
-        zxlogf(TRACE, "DDI %d: Disabled successfully.", ddi_id());
+        FDF_LOG(TRACE, "DDI %d: Disabled successfully.", ddi_id());
         return true;
       }
       [[fallthrough]];
     default:
       ZX_ASSERT(!IsHealthy());
-      zxlogf(ERROR, "DDI %d: Failed to disable.", ddi_id());
+      FDF_LOG(ERROR, "DDI %d: Failed to disable.", ddi_id());
       return false;
   }
 }
@@ -706,7 +709,7 @@ bool TypeCDdiTigerLake::SetAuxIoPower(bool target_enabled) const {
 
   if (target_enabled) {
     if (!PollUntil([&] { return power_->GetAuxIoPowerState(ddi_id()); }, zx::usec(1), 1500)) {
-      zxlogf(ERROR, "DDI %d: failed to enable AUX power for ddi", ddi_id());
+      FDF_LOG(ERROR, "DDI %d: failed to enable AUX power for ddi", ddi_id());
       return false;
     }
 
@@ -729,7 +732,7 @@ bool TypeCDdiTigerLake::SetAuxIoPower(bool target_enabled) const {
                     .microcontroller_firmware_is_ready();
               },
               zx::usec(1), 10)) {
-        zxlogf(ERROR, "DDI %d: microcontroller health bit is not set", ddi_id());
+        FDF_LOG(ERROR, "DDI %d: microcontroller health bit is not set", ddi_id());
         return false;
       }
     }
@@ -738,11 +741,11 @@ bool TypeCDdiTigerLake::SetAuxIoPower(bool target_enabled) const {
     ddi_aux_ctl.set_use_thunderbolt(is_thunderbolt);
     ddi_aux_ctl.WriteTo(mmio_space_);
 
-    zxlogf(TRACE, "DDI %d: AUX IO power enabled", ddi_id());
+    FDF_LOG(TRACE, "DDI %d: AUX IO power enabled", ddi_id());
   } else {
     zx::nanosleep(zx::deadline_after(zx::usec(10)));
-    zxlogf(TRACE, "DDI %d: AUX IO power %sdisabled", ddi_id(),
-           power_->GetAuxIoPowerState(ddi_id()) ? "not " : "");
+    FDF_LOG(TRACE, "DDI %d: AUX IO power %sdisabled", ddi_id(),
+            power_->GetAuxIoPowerState(ddi_id()) ? "not " : "");
   }
 
   return true;
@@ -752,7 +755,7 @@ bool TypeCDdiTigerLake::SetPhySafeModeDisabled(bool target_disabled) const {
   if (target_disabled && !registers::DynamicFlexIoDisplayPortPhyModeStatus::GetForDdi(ddi_id())
                               .ReadFrom(mmio_space_)
                               .phy_is_ready_for_ddi(ddi_id())) {
-    zxlogf(ERROR, "DDI %d: lane not in DP mode", ddi_id());
+    FDF_LOG(ERROR, "DDI %d: lane not in DP mode", ddi_id());
     return false;
   }
 
@@ -762,7 +765,7 @@ bool TypeCDdiTigerLake::SetPhySafeModeDisabled(bool target_disabled) const {
   dp_csss.set_safe_mode_disabled_for_ddi(ddi_id(), /*disabled=*/target_disabled);
   dp_csss.WriteTo(mmio_space_);
   dp_csss.ReadFrom(mmio_space_);
-  zxlogf(TRACE, "DDI %d: %s DP safe mode", ddi_id(), target_disabled ? "disabled" : "enabled");
+  FDF_LOG(TRACE, "DDI %d: %s DP safe mode", ddi_id(), target_disabled ? "disabled" : "enabled");
   return true;
 }
 
@@ -770,17 +773,17 @@ bool TypeCDdiTigerLake::BlockTypeCColdPowerState() {
   // TODO(https://fxbug.dev/42062380): TCCOLD (Type C cold power state) blocking should
   // be decided at the display engine level. We may have already blocked TCCOLD
   // while bringing up another Type C DDI.
-  zxlogf(TRACE, "Asking PCU firmware to block Type C cold power state");
+  FDF_LOG(TRACE, "Asking PCU firmware to block Type C cold power state");
   PowerController power_controller(mmio_space_);
   const zx::result<> power_status = power_controller.SetDisplayTypeCColdBlockingTigerLake(
       /*blocked=*/true, PowerController::RetryBehavior::kRetryUntilStateChanges);
   switch (power_status.status_value()) {
     case ZX_OK:
-      zxlogf(TRACE, "PCU firmware blocked Type C cold power state");
+      FDF_LOG(TRACE, "PCU firmware blocked Type C cold power state");
       return true;
     default:
-      zxlogf(ERROR, "Type C ports unusable. PCU firmware didn't block Type C cold power state: %s",
-             power_status.status_string());
+      FDF_LOG(ERROR, "Type C ports unusable. PCU firmware didn't block Type C cold power state: %s",
+              power_status.status_string());
       return false;
   }
 }
@@ -789,23 +792,23 @@ bool TypeCDdiTigerLake::UnblockTypeCColdPowerState() {
   // TODO(https://fxbug.dev/42062380): TCCOLD (Type C cold power state) blocking should
   // be decided at the display engine level. We may have already blocked TCCOLD
   // while bringing up another Type C DDI.
-  zxlogf(TRACE, "Asking PCU firmware to unblock Type C cold power state");
+  FDF_LOG(TRACE, "Asking PCU firmware to unblock Type C cold power state");
   PowerController power_controller(mmio_space_);
   const zx::result<> power_status = power_controller.SetDisplayTypeCColdBlockingTigerLake(
       /*blocked=*/false, PowerController::RetryBehavior::kNoRetry);
   switch (power_status.status_value()) {
     case ZX_OK:
-      zxlogf(TRACE, "PCU firmware unblocked and entered Type C cold power state");
+      FDF_LOG(TRACE, "PCU firmware unblocked and entered Type C cold power state");
       return true;
     case ZX_ERR_IO_REFUSED:
-      zxlogf(INFO,
-             "PCU firmware did not enter Type C cold power state. "
-             "Type C ports in use elsewhere.");
+      FDF_LOG(INFO,
+              "PCU firmware did not enter Type C cold power state. "
+              "Type C ports in use elsewhere.");
       return true;
     default:
-      zxlogf(ERROR,
-             "PCU firmware failed to unblock Type C cold power state. "
-             "Type C ports unusable.");
+      FDF_LOG(ERROR,
+              "PCU firmware failed to unblock Type C cold power state. "
+              "Type C ports unusable.");
       return false;
   }
 }

@@ -49,6 +49,7 @@ class Capability : public fbl::DoublyLinkedListable<std::unique_ptr<Capability>>
 
   Capability(uint8_t id, uint8_t base, const char* addr = nullptr)
       : id_(id), base_(base), addr_(addr) {}
+  virtual ~Capability() = default;
   [[nodiscard]] uint8_t id() const { return id_; }
   [[nodiscard]] uint8_t base() const { return base_; }
   const char* addr() { return addr_; }

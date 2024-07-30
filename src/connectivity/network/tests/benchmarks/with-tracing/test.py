@@ -71,7 +71,6 @@ class NetstackBenchmarksWithTracingTest(fuchsia_base_test.FuchsiaBaseTest):
                 "--output-directory",
                 self.test_case_path,
             ],
-            timeout=None,
             capture_output=False,
         )
         test_result_files = list(

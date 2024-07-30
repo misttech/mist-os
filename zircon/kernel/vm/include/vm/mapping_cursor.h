@@ -15,18 +15,23 @@
 class MappingCursor {
  public:
   MappingCursor() = default;
-  MappingCursor(vaddr_t vaddr, size_t size) : vaddr_(vaddr), size_(size) {}
+  MappingCursor(vaddr_t vaddr, size_t size) : start_vaddr_(vaddr), vaddr_(vaddr), size_(size) {}
   MappingCursor(const paddr_t* paddrs, size_t paddr_count, size_t page_size, vaddr_t vaddr)
-      : paddrs_(paddrs), page_size_(page_size), vaddr_(vaddr), size_(page_size * paddr_count) {
+      : paddrs_(paddrs),
+        page_size_(page_size),
+        start_vaddr_(vaddr),
+        vaddr_(vaddr),
+        size_(page_size * paddr_count) {
 #ifdef DEBUG_ASSERT_IMPLEMENTED
     paddr_count_ = paddr_count;
 #endif
   }
 
   // Sets offset used for |vaddr_rel| and returns true if the cursor lies within that offset and
-  // some specified maximum.
+  // some specified maximum. Should only be called before the cursor has started to be used.
   bool SetVaddrRelativeOffset(vaddr_t vaddr_rel_offset, size_t vaddr_rel_max) {
-    vaddr_t vaddr_rel = vaddr_ - vaddr_rel_offset;
+    DEBUG_ASSERT(start_vaddr_ == vaddr_);
+    vaddr_t vaddr_rel = start_vaddr_ - vaddr_rel_offset;
 
     if (vaddr_rel > vaddr_rel_max - size_ || size_ > vaddr_rel_max) {
       return false;
@@ -105,6 +110,16 @@ class MappingCursor {
     return page_size_ - paddr_consumed_;
   }
 
+  // Returns a new cursor to the, possibly empty, virtual range that has already been processed by
+  // this cursor. The returned cursor will always be a subset of the original cursors range and
+  // does not include the paddrs.
+  MappingCursor ProcessedRange() const {
+    MappingCursor ret(start_vaddr_, vaddr_ - start_vaddr_);
+    // As our new cursor is a subrange we know the relative offset will always be valid.
+    ret.vaddr_rel_offset_ = vaddr_rel_offset_;
+    return ret;
+  }
+
   vaddr_t vaddr() const { return vaddr_; }
 
   vaddr_t vaddr_rel() const { return vaddr_ - vaddr_rel_offset_; }
@@ -124,6 +139,7 @@ class MappingCursor {
   size_t paddr_consumed_ = 0;
   size_t page_size_ = 0;
 
+  vaddr_t start_vaddr_;
   vaddr_t vaddr_;
   vaddr_t vaddr_rel_offset_ = 0;
   size_t size_;

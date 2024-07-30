@@ -6,7 +6,6 @@ use anyhow::Error;
 use fidl::{endpoints, AsHandleRef, HandleBased};
 use fuchsia_component::client;
 use fuchsia_runtime::{HandleInfo, HandleType};
-use std::ffi::CString;
 use {
     fidl_fidl_test_components as ftest, fidl_fuchsia_component as fcomponent,
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio, fidl_fuchsia_process as fprocess,
@@ -200,7 +199,7 @@ async fn child_args() {
         let (their_socket, our_socket) = zx::Socket::create_stream();
         let job =
             fuchsia_runtime::job_default().create_child_job().expect("fail to create_child_job");
-        job.set_name(&CString::new("new-job-new-name").unwrap()).expect("fail to set_name");
+        job.set_name(&zx::Name::new("new-job-new-name").unwrap()).expect("fail to set_name");
         let numbered_handles = vec![
             fprocess::HandleInfo {
                 handle: job.into_handle(),

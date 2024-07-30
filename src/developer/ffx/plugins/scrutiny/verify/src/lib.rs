@@ -50,7 +50,7 @@ impl FfxMain for ScrutinyVerifyTool {
         let deps_set = match &self.cmd.subcommand {
             SubCommand::Bootfs(subcommand) => bootfs::verify(subcommand, recovery).await,
             SubCommand::ComponentResolvers(subcommand) => {
-                component_resolvers::verify(subcommand, tmp_dir, recovery).await
+                component_resolvers::verify(subcommand, recovery).await
             }
             SubCommand::KernelCmdline(subcommand) => {
                 kernel_cmdline::verify(subcommand, recovery).await

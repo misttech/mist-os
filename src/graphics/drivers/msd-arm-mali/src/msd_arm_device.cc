@@ -319,6 +319,42 @@ void MsdArmDevice::InitInspect() {
   events_ = inspect_.CreateChild("events");
   protected_mode_supported_property_ = inspect_.CreateBool("protected_mode_supported", false);
   memory_pressure_level_property_ = inspect_.CreateUint("memory_pressure_level", 0);
+  dump_node_ = inspect_.CreateLazyNode("dump", [this]() -> fpromise::promise<inspect::Inspector> {
+    fpromise::bridge<inspect::Inspector> bridge;
+    RunTaskOnDeviceThread([this, completer = std::move(bridge.completer)](
+                              MsdArmDevice* device) mutable -> magma::Status {
+      std::vector<std::string> dump;
+      DumpToString(&dump, true);
+
+      std::vector<std::string> job_information = scheduler_->DumpStatus();
+
+      size_t full_length = 0;
+      for (auto& string : dump) {
+        full_length += string.size() + 1;
+      }
+      for (auto& string : job_information) {
+        full_length += string.size() + 1;
+      }
+
+      std::string full_dump;
+      full_dump.reserve(full_length);
+      for (auto& string : dump) {
+        full_dump.append(string);
+        full_dump.append("\n");
+      }
+      for (auto& string : job_information) {
+        full_dump.append(string);
+        full_dump.append("\n");
+      }
+      inspect::Inspector a;
+      a.GetRoot().CreateString("dump", full_dump, &a);
+
+      completer.complete_ok(std::move(a));
+      return MAGMA_STATUS_OK;
+    });
+
+    return bridge.consumer.promise();
+  });
 }
 
 void MsdArmDevice::UpdateProtectedModeSupported() {
@@ -543,11 +579,12 @@ int MsdArmDevice::DeviceThreadLoop() {
 
   uint32_t timeout_count = 0;
   while (!device_thread_quit_flag_) {
-    auto timeout_duration = TimeoutSource::Clock::duration::max();
+    auto timeout_point = TimeoutSource::Clock::time_point::max();
     bool timeout_triggered = false;
+    auto current_time = TimeoutSource::Clock::now();
     for (TimeoutSource* source : timeout_sources_) {
-      auto duration = source->GetCurrentTimeoutDuration();
-      if (duration <= TimeoutSource::Clock::duration::zero()) {
+      auto timeout = source->GetCurrentTimeoutPoint();
+      if (timeout <= current_time) {
         if (source->CheckForDeviceThreadDelay()) {
           constexpr uint32_t kMaxConsecutiveTimeouts = 5;
           if (!device_request_semaphore_->WaitNoReset(0).ok() ||
@@ -564,7 +601,7 @@ int MsdArmDevice::DeviceThreadLoop() {
           timeout_triggered = true;
         }
       } else {
-        timeout_duration = std::min(timeout_duration, duration);
+        timeout_point = std::min(timeout_point, timeout);
       }
     }
     if (timeout_triggered) {
@@ -573,10 +610,13 @@ int MsdArmDevice::DeviceThreadLoop() {
     uint64_t key;
     uint64_t timestamp;
     magma::Status status(MAGMA_STATUS_OK);
-    if (timeout_duration < TimeoutSource::Clock::duration::max()) {
+    if (timeout_point < TimeoutSource::Clock::time_point::max()) {
       // Add 1 to avoid rounding time down and spinning with timeouts close to 0.
-      int64_t millisecond_timeout =
-          std::chrono::duration_cast<std::chrono::milliseconds>(timeout_duration).count() + 1;
+      // Get a new time since the loop could have taken some time.
+      int64_t millisecond_timeout = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                        timeout_point - TimeoutSource::Clock::now())
+                                        .count() +
+                                    1;
       status = device_port_->Wait(&key, millisecond_timeout, &timestamp);
     } else {
       status = device_port_->Wait(&key, UINT64_MAX, &timestamp);
@@ -1012,7 +1052,9 @@ void MsdArmDevice::CancelAtoms(std::shared_ptr<MsdArmConnection> connection) {
 
 magma::PlatformPort* MsdArmDevice::GetPlatformPort() { return device_port_.get(); }
 
-void MsdArmDevice::UpdateGpuActive(bool active) { power_manager_->UpdateGpuActive(active); }
+void MsdArmDevice::UpdateGpuActive(bool active, bool has_pending_work) {
+  power_manager_->UpdateGpuActive(active, has_pending_work);
+}
 
 void MsdArmDevice::DumpRegisters(const GpuFeatures& features, mali::RegisterIo* io,
                                  DumpState* dump_state) {

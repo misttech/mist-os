@@ -1,4 +1,3 @@
-#!/usr/bin/env fuchsia-vendored-python
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
@@ -13,6 +12,7 @@ from honeydew.interfaces.transports import (
     fuchsia_controller as fuchsia_controller_interface,
 )
 from honeydew.typing import custom_types
+from honeydew.utils import decorators
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -94,9 +94,8 @@ class FuchsiaController(fuchsia_controller_interface.FuchsiaController):
                 "Failed to create Fuchsia-Controller context"
             ) from err
 
-    def check_connection(
-        self,
-    ) -> None:
+    @decorators.liveness_check
+    def check_connection(self) -> None:
         """Checks the Fuchsia-Controller connection from host to Fuchsia device.
 
         Raises:

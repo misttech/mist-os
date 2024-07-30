@@ -13,7 +13,7 @@ use net_types::ip::{IpAddress, Subnet};
 use packet_formats::ip::IpExt;
 
 use crate::logic::Interfaces;
-use crate::packets::{IpPacket, MaybeTransportPacket, TransportPacket};
+use crate::packets::{IpPacket, MaybeTransportPacket, TransportPacketData};
 
 /// Matches on metadata of packets that come through the filtering framework.
 trait Matcher<T> {
@@ -172,10 +172,10 @@ impl<P: PartialEq, T: MaybeTransportPacket> Matcher<(P, T)> for TransportProtoco
 
         proto == packet_proto
             && src_port.required_matches(
-                packet.transport_packet().as_ref().map(TransportPacket::src_port).as_ref(),
+                packet.transport_packet_data().as_ref().map(TransportPacketData::src_port).as_ref(),
             )
             && dst_port.required_matches(
-                packet.transport_packet().as_ref().map(TransportPacket::dst_port).as_ref(),
+                packet.transport_packet_data().as_ref().map(TransportPacketData::dst_port).as_ref(),
             )
     }
 }
@@ -215,7 +215,7 @@ impl<I: IpExt, DeviceClass> PacketMatcher<I, DeviceClass> {
             && out_interface.required_matches(*out_if)
             && src_address.matches(&packet.src_addr())
             && dst_address.matches(&packet.dst_addr())
-            && transport_protocol.matches(&(packet.protocol(), packet.transport_packet()))
+            && transport_protocol.matches(&(packet.protocol(), packet.maybe_transport_packet()))
     }
 }
 
@@ -252,6 +252,12 @@ pub(crate) mod testutil {
     impl FakeStrongDeviceId for FakeDeviceId {
         fn is_alive(&self) -> bool {
             true
+        }
+    }
+
+    impl PartialEq<FakeWeakDeviceId<FakeDeviceId>> for FakeDeviceId {
+        fn eq(&self, FakeWeakDeviceId(other): &FakeWeakDeviceId<FakeDeviceId>) -> bool {
+            self == other
         }
     }
 
@@ -340,6 +346,8 @@ mod tests {
     use net_types::ip::{Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
     use packet_formats::ip::{IpProto, Ipv4Proto};
     use test_case::test_case;
+
+    use netstack3_base::SegmentHeader;
 
     use super::testutil::*;
     use super::*;
@@ -578,7 +586,12 @@ mod tests {
         assert_eq!(
             matcher.matches::<_, FakeDeviceId>(
                 &FakeIpPacket::<Ipv4, _> {
-                    body: FakeTcpSegment { src_port: src, dst_port: dst },
+                    body: FakeTcpSegment {
+                        src_port: src,
+                        dst_port: dst,
+                        segment: SegmentHeader::arbitrary_value(),
+                        payload_len: 8888,
+                    },
                     ..ArbitraryValue::arbitrary_value()
                 },
                 &Interfaces { ingress: None, egress: None },

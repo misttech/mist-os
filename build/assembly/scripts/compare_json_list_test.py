@@ -3,12 +3,13 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import unittest
-import tempfile
-import compare_json_list
 import os
 import sys
-from parameterized import parameterized, param
+import tempfile
+import unittest
+
+import compare_json_list
+from parameterized import param, parameterized
 
 
 class CompareJsonListTest(unittest.TestCase):

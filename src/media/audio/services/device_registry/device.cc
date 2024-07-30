@@ -41,16 +41,20 @@ namespace fad = fuchsia_audio_device;
 namespace fha = fuchsia_hardware_audio;
 namespace fhasp = fuchsia_hardware_audio_signalprocessing;
 
+namespace {
+
 TokenId NextTokenId() {
   static TokenId token_id = 0;
   return token_id++;
 }
 
+}  // namespace
+
 // Invoked when a RingBuffer channel drops. Device state previously was Configured/Paused/Started.
 template <>
 void Device::RingBufferFidlErrorHandler<fha::RingBuffer>::on_fidl_error(fidl::UnbindInfo info) {
   ADR_LOG_METHOD(kLogRingBufferFidlResponses || kLogObjectLifetimes) << "(RingBuffer)";
-  if (device()->state_ == State::Error) {
+  if (device()->has_error()) {
     ADR_WARN_METHOD() << "device already has an error; no device state to unwind";
   } else if (info.is_peer_closed() || info.is_user_initiated()) {
     ADR_LOG_METHOD(kLogRingBufferFidlResponses) << name() << " disconnected: " << info;
@@ -69,7 +73,7 @@ template <>
 void Device::FidlErrorHandler<fhasp::SignalProcessing>::on_fidl_error(fidl::UnbindInfo info) {
   ADR_LOG_METHOD(kLogRingBufferFidlResponses || kLogObjectLifetimes) << "(SignalProcessing)";
   // If a device already encountered some other error, disconnects like this are not unexpected.
-  if (device_->state_ == State::Error) {
+  if (device_->has_error()) {
     ADR_WARN_METHOD() << "(signalprocessing) device already has error; no state to unwind";
     return;
   }
@@ -130,7 +134,7 @@ std::shared_ptr<Device> Device::Create(std::weak_ptr<DevicePresenceWatcher> pres
                                           std::move(driver_client));
 }
 
-// Device notifies presence_watcher when it is available (DeviceInitialized), unhealthy (Error) or
+// Device notifies presence_watcher when it is available (Initialized), unhealthy (Error) or
 // removed. The dispatcher member is needed for Device to create client connections to protocols
 // such as fuchsia.hardware.audio.signalprocessing.Reader or fuchsia.hardware.audio.RingBuffer.
 Device::Device(std::weak_ptr<DevicePresenceWatcher> presence_watcher,
@@ -141,7 +145,8 @@ Device::Device(std::weak_ptr<DevicePresenceWatcher> presence_watcher,
       name_(name.substr(0, name.find('\0'))),
       device_type_(device_type),
       driver_client_(std::move(driver_client)),
-      token_id_(NextTokenId()) {
+      token_id_(NextTokenId()),
+      state_(State::Initializing) {
   ADR_LOG_METHOD(kLogObjectLifetimes);
   ++count_;
   LogObjectCounts();
@@ -189,9 +194,9 @@ Device::~Device() {
 // If this is the first time this is called, then call `OnInitializationResponse` to unblock the
 // signalprocessing-related aspect of the "wait for multiple responses" state machine.
 void Device::SetSignalProcessingSupported(bool is_supported) {
-  ADR_LOG_METHOD(kLogSignalProcessingFidlResponses);
-  auto first_set_of_signalprocessing_support = !supports_signalprocessing_.has_value();
+  ADR_LOG_METHOD(kLogSignalProcessingState);
 
+  auto first_set_of_signalprocessing_support = !supports_signalprocessing_.has_value();
   supports_signalprocessing_ = is_supported;
 
   // Only poke the initialization state machine the FIRST time this is called.
@@ -202,10 +207,10 @@ void Device::SetSignalProcessingSupported(bool is_supported) {
 
 void Device::OnRemoval() {
   ADR_LOG_METHOD(kLogDeviceState);
-  if (state_ == State::Error) {
+  if (has_error()) {
     ADR_WARN_METHOD() << "device already has an error; no device state to unwind";
     --unhealthy_count_;
-  } else if (state_ != State::DeviceInitializing) {
+  } else if (is_operational()) {
     --initialized_count_;
 
     DropControl();  // Probably unneeded (the Device is going away) but makes unwind "complete".
@@ -238,14 +243,14 @@ void Device::ForEachObserver(fit::function<void(std::shared_ptr<ObserverNotify>)
 // Unwind any operational state or configuration the device might be in, and remove this device.
 void Device::OnError(zx_status_t error) {
   ADR_LOG_METHOD(kLogDeviceState);
-  if (state_ == State::Error) {
+  if (has_error()) {
     ADR_WARN_METHOD() << "device already has an error; ignoring subsequent error (" << error << ")";
     return;
   }
 
   FX_PLOGS(WARNING, error) << __func__;
 
-  if (state_ != State::DeviceInitializing) {
+  if (is_operational()) {
     --initialized_count_;
 
     DropControl();
@@ -261,7 +266,7 @@ void Device::OnError(zx_status_t error) {
     pw->DeviceHasError(shared_from_this());
   }
 }
-bool Device::IsFullyInitialized() {
+bool Device::IsInitializationComplete() {
   switch (device_type_) {
     case fad::DeviceType::kCodec:
       return has_codec_properties() && has_health_state() && checked_for_signalprocessing() &&
@@ -285,12 +290,12 @@ bool Device::IsFullyInitialized() {
 
 // An initialization command returned a successful response. Is initialization complete?
 void Device::OnInitializationResponse() {
-  if (state_ == State::Error) {
+  if (has_error()) {
     ADR_WARN_METHOD() << "device has already encountered a problem; ignoring this";
     return;
   }
 
-  if (state_ != State::DeviceInitializing) {
+  if (is_operational()) {
     ADR_WARN_METHOD() << "unexpected device initialization response when not Initializing";
   }
 
@@ -330,11 +335,11 @@ void Device::OnInitializationResponse() {
       return;
   }
 
-  if (IsFullyInitialized()) {
+  if (IsInitializationComplete()) {
     ++initialized_count_;
     SetDeviceInfo();
     LogDeviceAddition(*info());
-    SetState(State::DeviceInitialized);
+    OnInitializationComplete();
     LogObjectCounts();
 
     if (std::shared_ptr<DevicePresenceWatcher> pw = presence_watcher_.lock(); pw) {
@@ -343,44 +348,43 @@ void Device::OnInitializationResponse() {
   }
 }
 
-bool Device::SetControl(std::shared_ptr<ControlNotify> control_notify) {
+// Returns true if the specified entity successfully asserts control of this device.
+bool Device::SetControl(std::shared_ptr<ControlNotify> control_notify_to_set) {
   ADR_LOG_METHOD(kLogDeviceState || kLogNotifyMethods);
-  FX_CHECK(state_ != State::DeviceInitializing);
 
-  if (state_ == State::Error) {
+  if (has_error()) {
     ADR_WARN_METHOD() << "device has an error; cannot set control";
     return false;
   }
+  FX_CHECK(is_operational());
 
   if (GetControlNotify()) {
     ADR_WARN_METHOD() << "already controlled";
     return false;
   }
 
-  if (state_ != State::DeviceInitialized) {
-    ADR_WARN_METHOD() << "wrong state for this call (" << state_ << ")";
-    return false;
-  }
+  control_notify_ = control_notify_to_set;
+  AddObserver(std::move(control_notify_to_set));
 
-  control_notify_ = control_notify;
-  AddObserver(std::move(control_notify));
-
-  // For this new control, "catch it up" on the current state.
+  // For this new control, "catch it up" with notifications about the device's current state.
+  // We do this to explicitly confirm that a Device persists its set DaiFormats and CodecStart/Stop
+  // state even after its Control is dropped.
   if (auto notify = GetControlNotify(); notify) {
     // DaiFormat(s)
     if (is_codec()) {
       if (codec_format_) {
-        notify->DaiFormatChanged(fad::kDefaultDaiInterconnectElementId, codec_format_->dai_format,
-                                 codec_format_->codec_format_info);
+        notify->DaiFormatIsChanged(fad::kDefaultDaiInterconnectElementId, codec_format_->dai_format,
+                                   codec_format_->codec_format_info);
       } else {
-        notify->DaiFormatChanged(fad::kDefaultDaiInterconnectElementId, std::nullopt, std::nullopt);
+        notify->DaiFormatIsChanged(fad::kDefaultDaiInterconnectElementId, std::nullopt,
+                                   std::nullopt);
       }
       // Codec start state
-      codec_start_state_.started ? notify->CodecStarted(codec_start_state_.start_stop_time)
-                                 : notify->CodecStopped(codec_start_state_.start_stop_time);
+      codec_start_state_.started ? notify->CodecIsStarted(codec_start_state_.start_stop_time)
+                                 : notify->CodecIsStopped(codec_start_state_.start_stop_time);
     } else if (is_composite()) {
       for (auto [element_id, dai_format] : composite_dai_formats_) {
-        notify->DaiFormatChanged(element_id, dai_format, std::nullopt);
+        notify->DaiFormatIsChanged(element_id, dai_format, std::nullopt);
       }
     }
   }
@@ -389,9 +393,9 @@ bool Device::SetControl(std::shared_ptr<ControlNotify> control_notify) {
   return true;
 }
 
+// Returns true if this device previously had a controlling entity.
 bool Device::DropControl() {
   ADR_LOG_METHOD(kLogDeviceMethods || kLogNotifyMethods);
-  FX_CHECK(state_ != State::DeviceInitializing);
 
   auto control_notify = GetControlNotify();
   if (!control_notify) {
@@ -410,12 +414,12 @@ bool Device::DropControl() {
 bool Device::AddObserver(const std::shared_ptr<ObserverNotify>& observer_to_add) {
   ADR_LOG_METHOD(kLogDeviceMethods || kLogNotifyMethods) << " (" << observer_to_add << ")";
 
-  FX_CHECK(state_ != State::DeviceInitializing);
-
-  if (state_ == State::Error) {
+  if (has_error()) {
     ADR_WARN_METHOD() << ": unhealthy, cannot be observed";
     return false;
   }
+  FX_CHECK(is_operational());
+
   for (auto weak_obs = observers_.begin(); weak_obs < observers_.end(); ++weak_obs) {
     if (auto observer = weak_obs->lock(); observer) {
       if (observer == observer_to_add) {
@@ -429,25 +433,25 @@ bool Device::AddObserver(const std::shared_ptr<ObserverNotify>& observer_to_add)
   }
   observers_.push_back(observer_to_add);
 
-  // For this new observer, "catch it up" on any current state that we already know.
+  // For this new observer, "catch it up" with notifications about the device's current state.
   // This may include:
   //
   // (1) current signalprocessing topology.
   if (current_topology_id_.has_value()) {
-    observer_to_add->TopologyChanged(*current_topology_id_);
+    observer_to_add->TopologyIsChanged(*current_topology_id_);
   }
 
   // (2) ElementState, for each signalprocessing element where this has already been retrieved.
   for (const auto& element_record : sig_proc_element_map_) {
     if (element_record.second.state.has_value()) {
-      observer_to_add->ElementStateChanged(element_record.first, *element_record.second.state);
+      observer_to_add->ElementStateIsChanged(element_record.first, *element_record.second.state);
     }
   }
 
   // (3) GainState (if StreamConfig).
   if (is_stream_config()) {
-    observer_to_add->GainStateChanged({{
-        .gain_db = *gain_state_->gain_db(),
+    observer_to_add->GainStateIsChanged({{
+        .gain_db = gain_state_->gain_db(),
         .muted = gain_state_->muted().value_or(false),
         .agc_enabled = gain_state_->agc_enabled().value_or(false),
     }});
@@ -455,14 +459,13 @@ bool Device::AddObserver(const std::shared_ptr<ObserverNotify>& observer_to_add)
 
   // (4) PlugState (if Codec or StreamConfig).
   if (is_codec() || is_stream_config()) {
-    observer_to_add->PlugStateChanged(
+    observer_to_add->PlugStateIsChanged(
         *plug_state_->plugged() ? fad::PlugState::kPlugged : fad::PlugState::kUnplugged,
         zx::time(*plug_state_->plug_state_time()));
   }
 
   LogObjectCounts();
 
-  // SetState(State::DeviceInitialized);
   return true;
 }
 
@@ -482,20 +485,28 @@ void Device::DeviceDroppedRingBuffer(ElementId element_id) {
 
 // Whether client- or device-originated, reset any state associated with an active RingBuffer.
 void Device::DropRingBuffer(ElementId element_id) {
-  ADR_LOG_METHOD(kLogDeviceState);
+  if (!is_composite() && !is_stream_config()) {
+    ADR_WARN_METHOD() << "Incorrect device_type " << device_type_ << ": cannot DropRingBuffer";
+    return;
+  }
 
-  // if (state_ != State::Error) {
-  //   SetState(State::DeviceInitialized);
-  // }
+  if (has_error()) {
+    ADR_WARN_METHOD() << "device already has an error";
+    return;
+  }
+  FX_CHECK(is_operational());
+  ADR_LOG_METHOD(kLogDeviceState);
 
   auto rb_pair = ring_buffer_map_.find(element_id);
   if (rb_pair == ring_buffer_map_.end()) {
+    ADR_LOG_METHOD(kLogRingBufferMethods) << "element_id " << element_id << " not found";
     return;
   }
 
   // If we've already cleaned out any state with the underlying driver RingBuffer, then we're done.
   auto& rb_record = rb_pair->second;
   if (!rb_record.ring_buffer_client.has_value() || !rb_record.ring_buffer_client->is_valid()) {
+    ADR_LOG_METHOD(kLogRingBufferMethods) << "Driver RingBuffer connection is already dropped";
     return;
   }
 
@@ -503,11 +514,10 @@ void Device::DropRingBuffer(ElementId element_id) {
   //
   rb_record.start_time.reset();  // Pause, if we are started.
 
-  rb_record.requested_ring_buffer_bytes
-      .reset();  // User must call CreateRingBuffer again, leading to ...
+  rb_record.requested_ring_buffer_bytes.reset();  // User must call CreateRingBuffer again ...
   rb_record.create_ring_buffer_callback = nullptr;
 
-  rb_record.driver_format.reset();  // ... our re-calling ConnectToRingBufferFidl ...
+  rb_record.driver_format.reset();  // ... making us re-call ConnectToRingBufferFidl ...
   rb_record.vmo_format = {};
   rb_record.num_ring_buffer_frames.reset();  // ... and GetVmo ...
   rb_record.ring_buffer_vmo.reset();
@@ -533,18 +543,18 @@ void Device::SetError(zx_status_t error) {
   state_ = State::Error;
 }
 
-void Device::SetState(State state) {
-  if (state_ == State::Error) {
+void Device::OnInitializationComplete() {
+  if (has_error()) {
     ADR_WARN_METHOD() << "device already has an error; ignoring this";
     return;
   }
 
-  ADR_LOG_METHOD(kLogDeviceState) << state;
-  state_ = state;
+  ADR_LOG_METHOD(kLogDeviceState);
+  state_ = State::Initialized;
 }
 
 void Device::SetRingBufferState(ElementId element_id, RingBufferState ring_buffer_state) {
-  if (state_ == State::Error) {
+  if (has_error()) {
     ADR_WARN_METHOD() << "device already has an error; ignoring this";
     return;
   }
@@ -561,34 +571,35 @@ void Device::SetRingBufferState(ElementId element_id, RingBufferState ring_buffe
 
 void Device::Initialize() {
   ADR_LOG_METHOD(kLogDeviceMethods);
+  FX_CHECK(!has_error());
+  FX_CHECK(!is_operational());
 
   if (is_codec()) {
-    RetrieveCodecProperties();
-    RetrieveCodecHealthState();
+    RetrieveDeviceProperties();
+    RetrieveHealthState();
     RetrieveSignalProcessingState();
-    RetrieveCodecDaiFormatSets();
-    RetrieveCodecPlugState();
+    RetrieveDaiFormatSets();
+    RetrievePlugState();
   } else if (is_composite()) {
-    RetrieveCompositeProperties();
-    RetrieveCompositeHealthState();
+    RetrieveDeviceProperties();
+    RetrieveHealthState();
     RetrieveSignalProcessingState();  // On completion, this starts format-set-retrieval.
   } else if (is_stream_config()) {
-    RetrieveStreamProperties();
-    RetrieveStreamHealthState();
+    RetrieveDeviceProperties();
+    RetrieveHealthState();
     RetrieveSignalProcessingState();
-    RetrieveStreamRingBufferFormatSets();
-    RetrieveStreamPlugState();
+    RetrieveRingBufferFormatSets();
+    RetrievePlugState();
     RetrieveGainState();
   } else {
     FX_LOGS(WARNING) << "Different device type: " << device_type_;
   }
 }
 
-// This method also sets OnError, so it is not just for logging.
 // Use this when the Result might contain a domain_error or framework_error.
 template <typename ResultT>
-bool Device::LogResultError(const ResultT& result, const char* debug_context) {
-  if (state_ == State::Error) {
+bool Device::SetDeviceErrorOnFidlError(const ResultT& result, const char* debug_context) {
+  if (has_error()) {
     ADR_WARN_METHOD() << debug_context << ": device already has an error";
     return true;
   }
@@ -611,11 +622,10 @@ bool Device::LogResultError(const ResultT& result, const char* debug_context) {
   return result.is_error();
 }
 
-// This method also sets OnError, so it is not just for logging.
 // Use this when the Result error can only be a framework_error.
 template <typename ResultT>
-bool Device::LogResultFrameworkError(const ResultT& result, const char* debug_context) {
-  if (state_ == State::Error) {
+bool Device::SetDeviceErrorOnFidlFrameworkError(const ResultT& result, const char* debug_context) {
+  if (has_error()) {
     ADR_WARN_METHOD() << debug_context << ": device already has an error";
     return true;
   }
@@ -633,70 +643,26 @@ bool Device::LogResultFrameworkError(const ResultT& result, const char* debug_co
   return result.is_error();
 }
 
-void Device::RetrieveStreamProperties() {
-  ADR_LOG_METHOD(kLogStreamConfigFidlCalls);
-
-  if (state_ == State::Error) {
+void Device::RetrieveDeviceProperties() {
+  if (has_error()) {
     ADR_WARN_METHOD() << "device already has an error";
     return;
   }
   // TODO(https://fxbug.dev/42064765): handle command timeouts
 
-  (*stream_config_client_)
-      ->GetProperties()
-      .Then([this](fidl::Result<fha::StreamConfig::GetProperties>& result) {
-        if (LogResultFrameworkError(result, "GetProperties response")) {
-          return;
-        }
-
-        ADR_LOG_OBJECT(kLogStreamConfigFidlResponses) << "StreamConfig/GetProperties: success";
-        if (!ValidateStreamProperties(result->properties())) {
-          OnError(ZX_ERR_INVALID_ARGS);
-          return;
-        }
-
-        FX_CHECK(!has_stream_config_properties())
-            << "StreamConfig/GetProperties response: stream_config_properties_ already set";
-        stream_config_properties_ = result->properties();
-        SanitizeStreamPropertiesStrings(stream_config_properties_);
-        // We have our clock domain now. Create the device clock.
-        CreateDeviceClock();
-
-        OnInitializationResponse();
-      });
-}
-
-// Some drivers return manufacturer or product strings with embedded '\0' characters. Trim them.
-void Device::SanitizeStreamPropertiesStrings(
-    std::optional<fha::StreamProperties>& stream_properties) {
-  if (!stream_properties) {
-    FX_LOGS(ERROR) << __func__ << " called with unspecified StreamProperties";
-    return;
-  }
-
-  if (stream_properties->manufacturer()) {
-    stream_properties->manufacturer(stream_properties->manufacturer()->substr(
-        0, std::min<uint64_t>(stream_properties->manufacturer()->find('\0'),
-                              fha::kMaxUiStringSize - 1)));
-  }
-  if (stream_properties->product()) {
-    stream_properties->product(stream_properties->product()->substr(
-        0,
-        std::min<uint64_t>(stream_properties->product()->find('\0'), fha::kMaxUiStringSize - 1)));
+  if (is_codec()) {
+    RetrieveCodecProperties();
+  } else if (is_composite()) {
+    RetrieveCompositeProperties();
+  } else if (is_stream_config()) {
+    RetrieveStreamProperties();
   }
 }
 
 void Device::RetrieveCodecProperties() {
   ADR_LOG_METHOD(kLogCodecFidlCalls);
-
-  if (state_ == State::Error) {
-    ADR_WARN_METHOD() << "device already has an error";
-    return;
-  }
-  // TODO(https://fxbug.dev/113429): handle command timeouts
-
   (*codec_client_)->GetProperties().Then([this](fidl::Result<fha::Codec::GetProperties>& result) {
-    if (LogResultFrameworkError(result, "GetProperties response")) {
+    if (SetDeviceErrorOnFidlFrameworkError(result, "GetProperties response")) {
       return;
     }
 
@@ -715,36 +681,13 @@ void Device::RetrieveCodecProperties() {
   });
 }
 
-void Device::SanitizeCodecPropertiesStrings(std::optional<fha::CodecProperties>& codec_properties) {
-  if (!codec_properties) {
-    FX_LOGS(ERROR) << __func__ << " called with unspecified CodecProperties";
-    return;
-  }
-
-  if (codec_properties->manufacturer()) {
-    codec_properties->manufacturer(codec_properties->manufacturer()->substr(
-        0, std::min<uint64_t>(codec_properties->manufacturer()->find('\0'),
-                              fha::kMaxUiStringSize - 1)));
-  }
-  if (codec_properties->product()) {
-    codec_properties->product(codec_properties->product()->substr(
-        0, std::min<uint64_t>(codec_properties->product()->find('\0'), fha::kMaxUiStringSize - 1)));
-  }
-}
-
 void Device::RetrieveCompositeProperties() {
   ADR_LOG_METHOD(kLogCompositeFidlCalls);
-
-  if (state_ == State::Error) {
-    ADR_WARN_METHOD() << "device already has an error; ignoring this";
-    return;
-  }
-  // TODO(https://fxbug.dev/113429): handle command timeouts
 
   (*composite_client_)
       ->GetProperties()
       .Then([this](fidl::Result<fha::Composite::GetProperties>& result) {
-        if (LogResultFrameworkError(result, "GetProperties response")) {
+        if (SetDeviceErrorOnFidlFrameworkError(result, "GetProperties response")) {
           return;
         }
 
@@ -765,9 +708,52 @@ void Device::RetrieveCompositeProperties() {
       });
 }
 
+void Device::RetrieveStreamProperties() {
+  ADR_LOG_METHOD(kLogStreamConfigFidlCalls);
+  (*stream_config_client_)
+      ->GetProperties()
+      .Then([this](fidl::Result<fha::StreamConfig::GetProperties>& result) {
+        if (SetDeviceErrorOnFidlFrameworkError(result, "GetProperties response")) {
+          return;
+        }
+
+        ADR_LOG_OBJECT(kLogStreamConfigFidlResponses) << "StreamConfig/GetProperties: success";
+        if (!ValidateStreamProperties(result->properties())) {
+          OnError(ZX_ERR_INVALID_ARGS);
+          return;
+        }
+
+        FX_CHECK(!has_stream_config_properties())
+            << "StreamConfig/GetProperties response: stream_config_properties_ already set";
+        stream_config_properties_ = result->properties();
+        SanitizeStreamPropertiesStrings(stream_config_properties_);
+        // We have our clock domain now. Create the device clock.
+        CreateDeviceClock();
+
+        OnInitializationResponse();
+      });
+}
+
+void Device::SanitizeCodecPropertiesStrings(std::optional<fha::CodecProperties>& codec_properties) {
+  if (!codec_properties.has_value()) {
+    FX_LOGS(ERROR) << __func__ << " called with unspecified CodecProperties";
+    return;
+  }
+
+  if (codec_properties->manufacturer()) {
+    codec_properties->manufacturer(codec_properties->manufacturer()->substr(
+        0, std::min<uint64_t>(codec_properties->manufacturer()->find('\0'),
+                              fha::kMaxUiStringSize - 1)));
+  }
+  if (codec_properties->product()) {
+    codec_properties->product(codec_properties->product()->substr(
+        0, std::min<uint64_t>(codec_properties->product()->find('\0'), fha::kMaxUiStringSize - 1)));
+  }
+}
+
 void Device::SanitizeCompositePropertiesStrings(
     std::optional<fha::CompositeProperties>& composite_properties) {
-  if (!composite_properties) {
+  if (!composite_properties.has_value()) {
     FX_LOGS(ERROR) << __func__ << " called with unspecified CompositeProperties";
     return;
   }
@@ -784,83 +770,89 @@ void Device::SanitizeCompositePropertiesStrings(
   }
 }
 
-void Device::RetrieveStreamRingBufferFormatSets() {
-  ADR_LOG_METHOD(kLogStreamConfigFidlCalls);
+// Some drivers return manufacturer or product strings with embedded '\0' characters. Trim them.
+void Device::SanitizeStreamPropertiesStrings(
+    std::optional<fha::StreamProperties>& stream_properties) {
+  if (!stream_properties.has_value()) {
+    FX_LOGS(ERROR) << __func__ << " called with unspecified StreamProperties";
+    return;
+  }
 
-  RetrieveRingBufferFormatSets(
-      fad::kDefaultRingBufferElementId,
-      [this](ElementId element_id,
-             const std::vector<fha::SupportedFormats>& ring_buffer_format_sets) {
-        if (state_ == State::Error) {
-          ADR_WARN_OBJECT() << "device has an error while retrieving initial RingBuffer formats";
-          return;
-        }
-
-        // Required for StreamConfig and Dai, absent for Codec and Composite.
-        auto translated_ring_buffer_format_sets =
-            TranslateRingBufferFormatSets(ring_buffer_format_sets);
-        if (translated_ring_buffer_format_sets.empty()) {
-          ADR_WARN_OBJECT() << "RingBuffer format sets could not be translated";
-          OnError(ZX_ERR_INVALID_ARGS);
-          return;
-        };
-        element_driver_ring_buffer_format_sets_ = {{
-            {
-                element_id,
-                ring_buffer_format_sets,
-            },
-        }};
-        element_ring_buffer_format_sets_ = {{
-            fad::ElementRingBufferFormatSet{{
-                .element_id = element_id,
-                .format_sets = translated_ring_buffer_format_sets,
-            }},
-        }};
-        ring_buffer_format_sets_retrieved_ = true;
-        OnInitializationResponse();
-      });
+  if (stream_properties->manufacturer().has_value()) {
+    stream_properties->manufacturer(stream_properties->manufacturer()->substr(
+        0, std::min<uint64_t>(stream_properties->manufacturer()->find('\0'),
+                              fha::kMaxUiStringSize - 1)));
+  }
+  if (stream_properties->product().has_value()) {
+    stream_properties->product(stream_properties->product()->substr(
+        0,
+        std::min<uint64_t>(stream_properties->product()->find('\0'), fha::kMaxUiStringSize - 1)));
+  }
 }
 
-void Device::RetrieveRingBufferFormatSets(
-    ElementId element_id, fit::callback<void(ElementId, const std::vector<fha::SupportedFormats>&)>
-                              ring_buffer_format_sets_callback) {
-  ADR_LOG_METHOD(kLogStreamConfigFidlCalls || kLogRingBufferMethods);
-
-  if (state_ == State::Error) {
-    ADR_WARN_METHOD() << "device already has an error";
+// TODO(https://fxbug.dev/42068381): Decide when we proactively call GetHealthState, if at all.
+void Device::RetrieveHealthState() {
+  if (has_error()) {
+    ADR_WARN_METHOD() << "device already has an error; ignoring this";
     return;
   }
-  // TODO(https://fxbug.dev/42064765): handle command timeouts
+  ADR_LOG_METHOD(kLogCodecFidlCalls || kLogCompositeFidlCalls || kLogStreamConfigFidlCalls);
 
-  if (element_id != fad::kDefaultRingBufferElementId) {
-    OnError(ZX_ERR_INVALID_ARGS);
+  // TODO(https://fxbug.dev/42064765): handle command timeouts, because that's the most likely
+  // indicator of an unhealthy driver/device.
+
+  if (is_codec()) {
+    (*codec_client_)
+        ->GetHealthState()
+        .Then([this](fidl::Result<fha::Codec::GetHealthState>& result) {
+          if (SetDeviceErrorOnFidlFrameworkError(result, "HealthState response")) {
+            return;
+          }
+          SetHealthState(result->state().healthy());
+        });
+  } else if (is_composite()) {
+    (*composite_client_)
+        ->GetHealthState()
+        .Then([this](fidl::Result<fha::Composite::GetHealthState>& result) {
+          if (SetDeviceErrorOnFidlFrameworkError(result, "HealthState response")) {
+            return;
+          }
+          SetHealthState(result->state().healthy());
+        });
+  } else if (is_stream_config()) {
+    (*stream_config_client_)
+        ->GetHealthState()
+        .Then([this](fidl::Result<fha::StreamConfig::GetHealthState>& result) {
+          if (SetDeviceErrorOnFidlFrameworkError(result, "HealthState response")) {
+            return;
+          }
+          SetHealthState(result->state().healthy());
+        });
+  }
+}
+
+void Device::SetHealthState(std::optional<bool> is_healthy) {
+  auto preexisting_health_state = health_state_;
+
+  // An empty health state is permitted; it still indicates that the driver is responsive.
+  health_state_ = is_healthy.value_or(true);
+  // ...but if the driver actually self-reported as unhealthy, this is a problem.
+  if (!*health_state_) {
+    FX_LOGS(WARNING) << "RetrieveHealthState response: .healthy is FALSE (unhealthy)";
+    OnError(ZX_ERR_IO);
     return;
   }
-  ring_buffer_ids_.insert(fad::kDefaultRingBufferElementId);
 
-  (*stream_config_client_)
-      ->GetSupportedFormats()
-      .Then([this, element_id, rb_formats_callback = std::move(ring_buffer_format_sets_callback)](
-                fidl::Result<fha::StreamConfig::GetSupportedFormats>& result) mutable {
-        if (LogResultFrameworkError(result, "GetSupportedFormats response")) {
-          return;
-        }
-
-        ADR_LOG_OBJECT(kLogStreamConfigFidlResponses)
-            << "StreamConfig/GetSupportedFormats: success";
-        if (!ValidateRingBufferFormatSets(result->supported_formats())) {
-          OnError(ZX_ERR_INVALID_ARGS);
-          return;
-        }
-
-        rb_formats_callback(element_id, result->supported_formats());
-      });
+  ADR_LOG_OBJECT(kLogCompositeFidlResponses) << "RetrieveHealthState response: healthy";
+  if (!preexisting_health_state.has_value()) {
+    OnInitializationResponse();
+  }
 }
 
 void Device::RetrieveSignalProcessingState() {
-  ADR_LOG_METHOD(kLogDeviceMethods);
+  ADR_LOG_METHOD(kLogDeviceMethods || kLogSignalProcessingState);
 
-  if (state_ == State::Error) {
+  if (has_error()) {
     ADR_WARN_METHOD() << "device already has an error";
     return;
   }
@@ -868,7 +860,7 @@ void Device::RetrieveSignalProcessingState() {
   auto [sig_proc_client_end, sig_proc_server_end] =
       fidl::Endpoints<fhasp::SignalProcessing>::Create();
 
-  // TODO(https://fxbug.dev/113429): handle command timeouts
+  // TODO(https://fxbug.dev/42064765): handle command timeouts
 
   if (is_codec()) {
     ADR_LOG_METHOD(kLogCodecFidlCalls) << "calling SignalProcessingConnect";
@@ -935,15 +927,31 @@ void Device::RetrieveSignalProcessingState() {
   sig_proc_client_->Bind(std::move(sig_proc_client_end), dispatcher_, &sig_proc_handler_);
 
   RetrieveSignalProcessingElements();
+  RetrieveSignalProcessingTopologies();
 }
 
 void Device::RetrieveSignalProcessingElements() {
-  ADR_LOG_METHOD(kLogSignalProcessingFidlCalls);
-  if (state_ == State::Error) {
+  // Must be false -- THIS is what leads to supports_signalprocessing being set.
+  if (supports_signalprocessing()) {
+    ADR_WARN_METHOD() << "unexpected signalprocessing query (already supported)";
+    return;
+  }
+
+  if (has_error()) {
     ADR_WARN_METHOD() << "device already has an error";
     return;
   }
 
+  // Another signalprocessing query (retrieve topologies) must have returned NOT_SUPPORTED.
+  if (checked_for_signalprocessing()) {
+    ADR_LOG_METHOD(kLogSignalProcessingState)
+        << "ignoring signalprocessing query (already checked)";
+    return;
+  }
+  FX_CHECK(!is_operational());  // This is part of initialization; we shouldn't be operational yet.
+  ADR_LOG_METHOD(kLogSignalProcessingFidlCalls);
+
+  FX_CHECK(sig_proc_client_->is_valid());
   (*sig_proc_client_)
       ->GetElements()
       .Then([this](fidl::Result<fhasp::SignalProcessing::GetElements>& result) {
@@ -955,7 +963,7 @@ void Device::RetrieveSignalProcessingElements() {
           SetSignalProcessingSupported(false);
           return;
         }
-        if (LogResultError(result, context.c_str())) {
+        if (SetDeviceErrorOnFidlError(result, context.c_str())) {
           return;
         }
 
@@ -975,23 +983,43 @@ void Device::RetrieveSignalProcessingElements() {
         for (const auto& [element_id, _] : sig_proc_element_map_) {
           element_ids_.insert(element_id);
         }
-        RetrieveSignalProcessingTopologies();
+        OnSignalProcessingInitializationResponse();
+
+        // Now that we know we support signalprocessing, query the current element states.
+        // These initial states are not required for our DeviceInfo struct; the queries can
+        // complete after we mark the device as operational and make it available to clients.
+        RetrieveSignalProcessingElementStates();
 
         if (is_composite()) {
-          RetrieveCompositeDaiFormatSets();
-          RetrieveCompositeRingBufferFormatSets();
+          // Now that we know our element IDs, we can query the DAI and RingBuffer elements.
+          RetrieveDaiFormatSets();
+          RetrieveRingBufferFormatSets();
         }
       });
 }
 
 void Device::RetrieveSignalProcessingTopologies() {
-  ADR_LOG_METHOD(kLogSignalProcessingFidlCalls);
-  if (state_ == State::Error || (checked_for_signalprocessing() && !supports_signalprocessing())) {
+  // Must be false -- THIS is what leads to supports_signalprocessing being set.
+  if (supports_signalprocessing()) {
+    ADR_WARN_METHOD() << "unexpected signalprocessing query (already supported)";
+    return;
+  }
+
+  if (has_error()) {
     ADR_WARN_METHOD() << "device already has an error";
     return;
   }
-  FX_DCHECK(sig_proc_client_->is_valid());
 
+  // Another signalprocessing query (retrieve elements) must have returned NOT_SUPPORTED.
+  if (checked_for_signalprocessing()) {
+    ADR_LOG_METHOD(kLogSignalProcessingState)
+        << "ignoring signalprocessing query (already checked)";
+    return;
+  }
+  FX_CHECK(!is_operational());  // This is part of initialization; we shouldn't be operational yet.
+  ADR_LOG_METHOD(kLogSignalProcessingFidlCalls);
+
+  FX_CHECK(sig_proc_client_->is_valid());
   (*sig_proc_client_)
       ->GetTopologies()
       .Then([this](fidl::Result<fhasp::SignalProcessing::GetTopologies>& result) {
@@ -1001,7 +1029,7 @@ void Device::RetrieveSignalProcessingTopologies() {
           SetSignalProcessingSupported(false);
           return;
         }
-        if (LogResultError(result, context.c_str())) {
+        if (SetDeviceErrorOnFidlError(result, context.c_str())) {
           return;
         }
 
@@ -1021,30 +1049,193 @@ void Device::RetrieveSignalProcessingTopologies() {
         for (const auto& [topology_id, _] : sig_proc_topology_map_) {
           topology_ids_.insert(topology_id);
         }
+        OnSignalProcessingInitializationResponse();
 
-        SetSignalProcessingSupported(true);
-
-        // Now we know we support signalprocessing: query the current topology/element states.
-        RetrieveCurrentTopology();
-        RetrieveCurrentElementStates();
+        // Now that we know we support signalprocessing, query the current topology.
+        // The initial topology is not required for our DeviceInfo struct; the query can complete
+        // after we mark the device as operational and make it available to clients.
+        RetrieveSignalProcessingTopology();
       });
 }
 
-void Device::RetrieveCurrentTopology() {
-  ADR_LOG_METHOD(kLogSignalProcessingFidlCalls);
-  if (state_ == State::Error) {
+// An initial signalprocessing query returned successfully. Is initialization complete?
+void Device::OnSignalProcessingInitializationResponse() {
+  if (has_error()) {
+    ADR_WARN_METHOD() << "device has already encountered a problem; ignoring this";
+    return;
+  }
+
+  if (checked_for_signalprocessing()) {
+    ADR_WARN_METHOD() << "unexpected signalprocessing query response (already checked)";
+    return;
+  }
+
+  if (is_operational()) {
+    ADR_WARN_METHOD() << "unexpected signalprocessing query response (not Initializing)";
+  }
+  ADR_LOG_METHOD(kLogSignalProcessingState);
+
+  if (!sig_proc_element_map_.empty() && !sig_proc_topology_map_.empty()) {
+    SetSignalProcessingSupported(true);
+    OnInitializationResponse();
+  }
+}
+
+// We support signalprocessing; we know our element list. For each, retrieve its initial state.
+void Device::RetrieveSignalProcessingElementStates() {
+  // We know that `GetElements` completed successfully but `GetTopologies` might still be pending.
+  // Only fail/exit if it DID complete and told us that we do NOT support signalprocessing.
+  if (checked_for_signalprocessing() && !supports_signalprocessing()) {
+    ADR_WARN_METHOD() << "device does not support signalprocessing";
+    return;
+  }
+
+  if (has_error()) {
     ADR_WARN_METHOD() << "device already has an error";
     return;
   }
-  FX_DCHECK(sig_proc_client_->is_valid());
 
+  // Although this is one of the initial driver queries, it is not a prerequisite for transitioning
+  // the Device from Initializing to Initialized. So don't check is_operational() here.
+  ADR_LOG_METHOD(kLogSignalProcessingState);
+
+  // `RetrieveSignalProcessingElements` has completed successfully, so we have the info needed for
+  // the DeviceInfo struct. We need not wait for these WatchElementState calls complete: if a client
+  // retrieves ElementState, it will simply pend until this underlying Device retrieval completes.
+  for (auto& [element_id, _] : sig_proc_element_map_) {
+    RetrieveSignalProcessingElementState(element_id);
+  }
+}
+
+void Device::RetrieveSignalProcessingElementState(ElementId element_id) {
+  auto element_match = sig_proc_element_map_.find(element_id);
+  FX_CHECK(element_match != sig_proc_element_map_.end());
+  auto& element = element_match->second.element;
+
+  // Although this is one of the initial driver queries, it is not a prerequisite for transitioning
+  // the Device from Initializing to Initialized. Furthermore it can be called after initialization.
+  // So don't check is_operational() here.
+  ADR_LOG_METHOD(kLogSignalProcessingFidlCalls);
+
+  FX_CHECK(sig_proc_client_->is_valid());
+  (*sig_proc_client_)
+      ->WatchElementState({element_id})
+      .Then([this, element_id,
+             element](fidl::Result<fhasp::SignalProcessing::WatchElementState>& result) {
+        std::string context("signalprocessing::WatchElementState response: element_id ");
+        context.append(std::to_string(element_id));
+        if (SetDeviceErrorOnFidlFrameworkError(result, context.c_str())) {
+          return;
+        }
+        ADR_LOG_OBJECT(kLogSignalProcessingFidlResponses) << context;
+
+        auto element_state = result->state();
+        if (!ValidateElementState(element_state, element)) {
+          // Either (a) sig_proc_topology_map_.at(element_id).element is incorrect,
+          //     or (b) the driver is behaving incorrectly.
+          FX_LOGS(ERROR) << context << ": not found";
+          OnError(ZX_ERR_INVALID_ARGS);
+          return;
+        }
+
+        // Save the state and notify Observers, but only if this is a change in element state.
+        auto element_record = sig_proc_element_map_.find(*element.id());
+        if (element_record->second.state.has_value() &&
+            *element_record->second.state == element_state) {
+          ADR_LOG_OBJECT(kLogNotifyMethods)
+              << "Not sending ElementStateIsChanged: state is unchanged.";
+        } else {
+          element_record->second.state = element_state;
+          // Notify any Observers of this change in element state.
+          ADR_LOG_OBJECT(kLogNotifyMethods)
+              << "ForEachObserver => ElementStateIsChanged(" << element_id << ")";
+          ForEachObserver([element_id, element_state](auto obs) {
+            obs->ElementStateIsChanged(element_id, element_state);
+          });
+        }
+
+        // Register for any future change in element state, whether this was a change or not.
+        RetrieveSignalProcessingElementState(element_id);
+      });
+}
+
+// If the method does not return ZX_OK, then the driver was not called.
+zx_status_t Device::SetElementState(ElementId element_id,
+                                    const fhasp::SettableElementState& element_state) {
+  if (!GetControlNotify()) {
+    ADR_WARN_METHOD() << "Device must be controlled before this method can be called";
+    return ZX_ERR_ACCESS_DENIED;
+  }
+
+  if (!supports_signalprocessing()) {
+    ADR_WARN_METHOD() << "device does not support signalprocessing";
+    return ZX_ERR_NOT_SUPPORTED;
+  }
+
+  if (has_error()) {
+    ADR_WARN_METHOD() << "device already has an error";
+    return ZX_ERR_IO;
+  }
+  FX_CHECK(is_operational());
+
+  if (sig_proc_element_map_.find(element_id) == sig_proc_element_map_.end()) {
+    ADR_WARN_METHOD() << "invalid element_id " << element_id;
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  if (!ValidateSettableElementState(element_state, sig_proc_element_map_.at(element_id).element)) {
+    ADR_WARN_METHOD() << "invalid ElementState for element_id " << element_id;
+    return ZX_ERR_INVALID_ARGS;
+  }
+  ADR_LOG_METHOD(kLogSignalProcessingFidlCalls);
+
+  // We don't check/prevent "no-change" here, since sig_proc_element_map_ may not reflect in-flight
+  // updates. We update sig_proc_element_map_ and call ObserverNotify::ElementStateIsChanged (or
+  // not, if no change) at only one place: the WatchElementState response handler.
+
+  FX_CHECK(sig_proc_client_->is_valid());
+  (*sig_proc_client_)
+      ->SetElementState({element_id, element_state})
+      .Then([this, element_id](fidl::Result<fhasp::SignalProcessing::SetElementState>& result) {
+        std::string context("SigProc::SetElementState response: element_id ");
+        context.append(std::to_string(element_id));
+        if (SetDeviceErrorOnFidlError(result, context.c_str())) {
+          return;
+        }
+
+        ADR_LOG_OBJECT(kLogSignalProcessingFidlResponses) << context;
+        // Our hanging WatchElementState call will complete now, updating our cached state and
+        // calling ObserverNotify::ElementStateIsChanged (or not, if no change).
+      });
+
+  return ZX_OK;
+}
+
+void Device::RetrieveSignalProcessingTopology() {
+  // We know that `GetTopologies` completed successfully but `GetElements` might still be pending.
+  // Only fail/exit if it DID complete and told us that we do NOT support signalprocessing.
+  if (checked_for_signalprocessing() && !supports_signalprocessing()) {
+    ADR_WARN_METHOD() << "device does not support signalprocessing";
+    return;
+  }
+
+  if (has_error()) {
+    ADR_WARN_METHOD() << "device already has an error";
+    return;
+  }
+  // Although this is one of the initial driver queries, it is not a prerequisite for transitioning
+  // the Device from Initializing to Initialized. Furthermore it can be called after initialization.
+  // So don't check is_operational() here.
+  ADR_LOG_METHOD(kLogSignalProcessingFidlCalls);
+
+  FX_CHECK(sig_proc_client_->is_valid());
   (*sig_proc_client_)
       ->WatchTopology()
       .Then([this](fidl::Result<fhasp::SignalProcessing::WatchTopology>& result) {
         TopologyId topology_id = result->topology_id();
         std::string context("signalprocessing::WatchTopology response: topology_id ");
         context.append(std::to_string(topology_id));
-        if (LogResultFrameworkError(result, context.c_str())) {
+        if (SetDeviceErrorOnFidlFrameworkError(result, context.c_str())) {
           return;
         }
         ADR_LOG_OBJECT(kLogSignalProcessingFidlResponses) << context;
@@ -1060,80 +1251,20 @@ void Device::RetrieveCurrentTopology() {
         if (!current_topology_id_.has_value() || *current_topology_id_ != topology_id) {
           current_topology_id_ = topology_id;
           ADR_LOG_OBJECT(kLogNotifyMethods)
-              << "ForEachObserver => TopologyChanged: " << topology_id;
-          ForEachObserver([topology_id](auto obs) { obs->TopologyChanged(topology_id); });
+              << "ForEachObserver => TopologyIsChanged: " << topology_id;
+          ForEachObserver([topology_id](auto obs) { obs->TopologyIsChanged(topology_id); });
         }
 
         // Register for any future change in topology, whether this was a change or not.
-        RetrieveCurrentTopology();
-      });
-}
-
-void Device::RetrieveCurrentElementStates() {
-  ADR_LOG_METHOD(kLogSignalProcessingFidlCalls);
-  if (state_ == State::Error) {
-    ADR_WARN_METHOD() << "device already has an error";
-    return;
-  }
-  FX_DCHECK(sig_proc_client_->is_valid());
-
-  for (auto& [element_id, _] : sig_proc_element_map_) {
-    RetrieveElementState(element_id);
-  }
-}
-
-void Device::RetrieveElementState(ElementId element_id) {
-  auto element_match = sig_proc_element_map_.find(element_id);
-  FX_CHECK(element_match != sig_proc_element_map_.end());
-  auto& element = element_match->second.element;
-
-  (*sig_proc_client_)
-      ->WatchElementState({element_id})
-      .Then([this, element_id,
-             element](fidl::Result<fhasp::SignalProcessing::WatchElementState>& result) {
-        std::string context("signalprocessing::WatchElementState response: element_id ");
-        context.append(std::to_string(element_id));
-        if (LogResultFrameworkError(result, context.c_str())) {
-          return;
-        }
-        ADR_LOG_OBJECT(kLogSignalProcessingFidlResponses) << context;
-
-        // Either (a) sig_proc_topology_map_.at(element_id).element is incorrect, or (b) the driver
-        // is behaving incorrectly.
-        auto element_state = result->state();
-        if (!ValidateElementState(element_state, element)) {
-          FX_LOGS(ERROR) << context << ": not found";
-          OnError(ZX_ERR_INVALID_ARGS);
-          return;
-        }
-
-        // Save the state and notify Observers, but only if this is a change in element state.
-        auto element_record = sig_proc_element_map_.find(*element.id());
-        if (element_record->second.state.has_value() &&
-            *element_record->second.state == element_state) {
-          ADR_LOG_OBJECT(kLogNotifyMethods)
-              << "Not sending ElementStateChanged: state is unchanged.";
-        } else {
-          element_record->second.state = element_state;
-          // Notify any Observers of this change in element state.
-          ADR_LOG_OBJECT(kLogNotifyMethods)
-              << "ForEachObserver => ElementStateChanged(" << element_id << ")";
-          ForEachObserver([element_id, element_state](auto obs) {
-            obs->ElementStateChanged(element_id, element_state);
-          });
-        }
-
-        // Register for any future change in element state, whether this was a change or not.
-        RetrieveElementState(element_id);
+        RetrieveSignalProcessingTopology();
       });
 }
 
 // If the method does not return ZX_OK, then the driver was not called.
 zx_status_t Device::SetTopology(uint64_t topology_id) {
-  ADR_LOG_METHOD(kLogSignalProcessingFidlCalls);
-  if (state_ == State::Error) {
-    ADR_WARN_METHOD() << "device already has an error";
-    return ZX_ERR_IO;
+  if (!GetControlNotify()) {
+    ADR_WARN_METHOD() << "Device is not yet controlled: cannot SetTopology";
+    return ZX_ERR_ACCESS_DENIED;
   }
 
   if (!supports_signalprocessing()) {
@@ -1141,235 +1272,290 @@ zx_status_t Device::SetTopology(uint64_t topology_id) {
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  if (!GetControlNotify()) {
-    ADR_WARN_METHOD() << "Device must be controlled before this method can be called";
-    return ZX_ERR_ACCESS_DENIED;
+  if (has_error()) {
+    ADR_WARN_METHOD() << "device already has an error";
+    return ZX_ERR_IO;
   }
+  FX_CHECK(is_operational());
 
-  FX_DCHECK(sig_proc_client_->is_valid());
   if (sig_proc_topology_map_.find(topology_id) == sig_proc_topology_map_.end()) {
     ADR_WARN_METHOD() << "invalid topology_id " << topology_id;
     return ZX_ERR_INVALID_ARGS;
   }
+  ADR_LOG_METHOD(kLogSignalProcessingFidlCalls);
 
   // We don't check/prevent "no-change" here, since current_topology_id_ may not reflect in-flight
-  // updates. We update current_topology_id_ and call ObserverNotify::TopologyChanged (or
+  // updates. We update current_topology_id_ and call ObserverNotify::TopologyIsChanged (or
   // not, if no change) at only one place: the WatchTopology response handler.
 
+  FX_CHECK(sig_proc_client_->is_valid());
   (*sig_proc_client_)
       ->SetTopology(topology_id)
       .Then([this, topology_id](fidl::Result<fhasp::SignalProcessing::SetTopology>& result) {
         std::string context("SigProc::SetTopology response: topology_id ");
         context.append(std::to_string(topology_id));
-        if (LogResultError(result, context.c_str())) {
+        if (SetDeviceErrorOnFidlError(result, context.c_str())) {
           return;
         }
 
         ADR_LOG_OBJECT(kLogSignalProcessingFidlResponses) << context;
-        // Our hanging WatchTopology call will complete now, updating topology_id_ and calling
-        // ObserverNotify::TopologyChanged (or not, if no change).
+        // Our hanging WatchTopology will complete, IF this changes the topology. That completer
+        // (not this one) updates topology_id_ and calls ObserverNotify::TopologyIsChanged.
       });
 
   return ZX_OK;
 }
 
-// If the method does not return ZX_OK, then the driver was not called.
-zx_status_t Device::SetElementState(ElementId element_id,
-                                    const fhasp::SettableElementState& element_state) {
-  ADR_LOG_METHOD(kLogSignalProcessingFidlCalls);
-
-  if (state_ == State::Error) {
-    ADR_WARN_METHOD() << "device already has an error";
-    return ZX_ERR_IO;
-  }
-  if (!supports_signalprocessing()) {
-    ADR_WARN_METHOD() << "device does not support signalprocessing";
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-  if (!GetControlNotify()) {
-    ADR_WARN_METHOD() << "Device must be controlled before this method can be called";
-    return ZX_ERR_ACCESS_DENIED;
-  }
-
-  FX_DCHECK(sig_proc_client_->is_valid());
-  if (sig_proc_element_map_.find(element_id) == sig_proc_element_map_.end()) {
-    ADR_WARN_METHOD() << "invalid element_id " << element_id;
-    return ZX_ERR_INVALID_ARGS;
-  }
-
-  if (!ValidateSettableElementState(element_state, sig_proc_element_map_.at(element_id).element)) {
-    ADR_WARN_METHOD() << "invalid ElementState for element_id " << element_id;
-    return ZX_ERR_INVALID_ARGS;
-  }
-
-  // We don't check/prevent "no-change" here, since sig_proc_element_map_ may not reflect in-flight
-  // updates. We update sig_proc_element_map_ and call ObserverNotify::ElementStateChanged (or
-  // not, if no change) at only one place: the WatchElementState response handler.
-
-  (*sig_proc_client_)
-      ->SetElementState({element_id, element_state})
-      .Then([this, element_id](fidl::Result<fhasp::SignalProcessing::SetElementState>& result) {
-        std::string context("SigProc::SetElementState response: element_id ");
-        context.append(std::to_string(element_id));
-        if (LogResultError(result, context.c_str())) {
-          return;
-        }
-
-        ADR_LOG_OBJECT(kLogSignalProcessingFidlResponses) << context;
-        // Our hanging WatchElementState call will complete now, updating our cached state and
-        // calling ObserverNotify::ElementStateChanged (or not, if no change).
-      });
-
-  return ZX_OK;
-}
-
-void Device::RetrieveCodecDaiFormatSets() {
-  ADR_LOG_METHOD(kLogCodecFidlCalls);
-  RetrieveDaiFormatSets(
-      fad::kDefaultDaiInterconnectElementId,
-      [this](ElementId element_id, const std::vector<fha::DaiSupportedFormats>& dai_format_sets) {
-        if (state_ == State::Error) {
-          ADR_WARN_OBJECT() << "device already has an error";
-          return;
-        }
-        element_dai_format_sets_.push_back({{element_id, dai_format_sets}});
-        dai_format_sets_retrieved_ = true;
-        OnInitializationResponse();
-      });
-}
-
-// We have our signalprocessing Elements now; GetDaiFormats on each DAI element.
-void Device::RetrieveCompositeDaiFormatSets() {
-  ADR_LOG_METHOD(kLogCompositeFidlCalls);
-  dai_ids_ = dais(sig_proc_element_map_);
-  temp_dai_ids_ = dai_ids_;
-  element_dai_format_sets_.clear();
-  for (auto element_id : temp_dai_ids_) {
-    RetrieveDaiFormatSets(
-        element_id,
-        [this](ElementId element_id, const std::vector<fha::DaiSupportedFormats>& dai_format_sets) {
-          element_dai_format_sets_.push_back({{element_id, dai_format_sets}});
-          temp_dai_ids_.erase(element_id);
-          if (temp_dai_ids_.empty()) {
-            dai_format_sets_retrieved_ = true;
-            OnInitializationResponse();
-          }
-        });
-  }
-}
-
-void Device::RetrieveDaiFormatSets(
-    ElementId element_id,
-    fit::callback<void(ElementId, const std::vector<fha::DaiSupportedFormats>&)>
-        dai_format_sets_callback) {
+void Device::RetrieveDaiFormatSets() {
   ADR_LOG_METHOD(kLogCodecFidlCalls || kLogCompositeFidlCalls);
 
-  if (state_ == State::Error) {
+  dai_ids_.clear();
+  if (is_codec()) {
+    dai_ids_.insert(fad::kDefaultDaiInterconnectElementId);
+  } else if (is_composite()) {
+    dai_ids_ = dais(sig_proc_element_map_);
+  }
+  auto remaining_dai_ids = std::make_shared<std::unordered_set<ElementId>>(dai_ids_);
+  element_dai_format_sets_.clear();
+  for (auto element_id : *remaining_dai_ids) {
+    GetDaiFormatSets(element_id, [this, remaining_dai_ids](
+                                     ElementId element_id,
+                                     const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>&
+                                         dai_format_sets) mutable {
+      ADR_LOG_OBJECT(kLogCodecFidlCalls || kLogCompositeFidlCalls)
+          << "GetDaiFormats(id " << element_id << "): success";
+      element_dai_format_sets_.push_back({{element_id, dai_format_sets}});
+      remaining_dai_ids->erase(element_id);
+      if (remaining_dai_ids->empty()) {
+        dai_format_sets_retrieved_ = true;
+        OnInitializationResponse();
+      }
+    });
+  }
+}
+
+void Device::GetDaiFormatSets(
+    ElementId element_id,
+    fit::callback<void(ElementId, const std::vector<fuchsia_hardware_audio::DaiSupportedFormats>&)>
+        dai_format_sets_callback) {
+  if (has_error()) {
     ADR_WARN_METHOD() << "device already has an error";
+    // We need not invoke dai_format_sets_callback: this device is in the process of being unwound.
+    // The client has already received a HasError notification for this device.
     return;
   }
-  // TODO(https://fxbug.dev/113429): handle command timeouts
+  // This is part of the initialization process, but might be called afterward as well,
+  // so we can't check is_operational().
+
+  // TODO(https://fxbug.dev/42064765): handle command timeouts
 
   if (is_codec()) {
-    if (element_id != fad::kDefaultDaiInterconnectElementId) {
-      OnError(ZX_ERR_INVALID_ARGS);
-      return;
-    }
+    FX_CHECK(element_id == fad::kDefaultDaiInterconnectElementId);
+    ADR_LOG_METHOD(kLogCodecFidlCalls) << "element " << element_id;
 
     (*codec_client_)
         ->GetDaiFormats()
-        .Then([this, element_id, callback = std::move(dai_format_sets_callback)](
-                  fidl::Result<fha::Codec::GetDaiFormats>& result) mutable {
-          if (LogResultError(result, "GetDaiFormats response")) {
-            return;
-          }
-
-          ADR_LOG_OBJECT(kLogCodecFidlResponses) << "Codec/GetDaiFormats: success";
-
-          if (!ValidateDaiFormatSets(result->formats())) {
-            OnError(ZX_ERR_INVALID_ARGS);
-            return;
-          }
-          callback(element_id, result->formats());
-        });
+        .Then(
+            [this, element_id, get_dai_format_sets_callback = std::move(dai_format_sets_callback)](
+                fidl::Result<fha::Codec::GetDaiFormats>& result) mutable {
+              if (SetDeviceErrorOnFidlError(result, "Codec/GetDaiFormats response")) {
+                // We need not invoke the callback: this device is being unwound.
+                return;
+              }
+              if (has_error()) {
+                ADR_WARN_OBJECT() << "device already has an error";
+                // We need not invoke the callback: this device is being unwound.
+                return;
+              }
+              if (!ValidateDaiFormatSets(result->formats())) {
+                OnError(ZX_ERR_INVALID_ARGS);
+                // We need not invoke the callback: this device is being unwound.
+                return;
+              }
+              get_dai_format_sets_callback(element_id, result->formats());
+            });
   } else if (is_composite()) {
-    ADR_LOG_METHOD(kLogCompositeFidlCalls) << " GetDaiFormats (element " << element_id << ")";
+    ADR_LOG_METHOD(kLogCompositeFidlCalls) << "element " << element_id;
     (*composite_client_)
         ->GetDaiFormats(element_id)
-        .Then([this, element_id, callback = std::move(dai_format_sets_callback)](
-                  fidl::Result<fha::Composite::GetDaiFormats>& result) mutable {
-          std::string str{"GetDaiFormats (element "};
-          str.append(std::to_string(element_id)).append(") response");
-          ADR_LOG_OBJECT(kLogCompositeFidlResponses) << str;
-          if (state_ == State::Error) {
-            ADR_WARN_OBJECT() << "device already has error during " << str;
-            return;
-          }
-          if (LogResultError(result, str.c_str())) {
-            return;
-          }
-          if (!ValidateDaiFormatSets(result->dai_formats())) {
-            OnError(ZX_ERR_INVALID_ARGS);
-            return;
-          }
-
-          callback(element_id, result->dai_formats());
-        });
+        .Then(
+            [this, element_id, get_dai_format_sets_callback = std::move(dai_format_sets_callback)](
+                fidl::Result<fha::Composite::GetDaiFormats>& result) mutable {
+              if (SetDeviceErrorOnFidlError(result, "Composite/GetDaiFormats response")) {
+                // We need not invoke the callback: this device is  being unwound.
+                return;
+              }
+              if (has_error()) {
+                ADR_WARN_OBJECT() << "device already has an error";
+                // We need not invoke the callback: this device is  being unwound.
+                return;
+              }
+              if (!ValidateDaiFormatSets(result->dai_formats())) {
+                OnError(ZX_ERR_INVALID_ARGS);
+                // We need not invoke the callback: this device is  being unwound.
+                return;
+              }
+              get_dai_format_sets_callback(element_id, result->dai_formats());
+            });
   }
 }
 
-// We have our signalprocessing Elements now; GetDaiFormats on each RingBuffer element.
-void Device::RetrieveCompositeRingBufferFormatSets() {
-  ADR_LOG_METHOD(kLogCompositeFidlCalls);
-  ring_buffer_ids_ = ring_buffers(sig_proc_element_map_);
-  temp_ring_buffer_ids_ = ring_buffer_ids_;
-
-  element_ring_buffer_format_sets_.clear();
-  for (auto id : ring_buffer_ids_) {
-    ADR_LOG_METHOD(kLogCompositeFidlCalls) << " GetRingBufferFormats (element " << id << ")";
-    (*composite_client_)
-        ->GetRingBufferFormats(id)
-        .Then([this, id](fidl::Result<fha::Composite::GetRingBufferFormats>& result) {
-          std::string str{"GetRingBufferFormats (element "};
-          str.append(std::to_string(id)).append(") response");
-          ADR_LOG_OBJECT(kLogCompositeFidlResponses) << str;
-          if (state_ == State::Error) {
-            ADR_WARN_OBJECT() << "device already has error during " << str;
-            return;
-          }
-          if (LogResultError(result, str.c_str())) {
-            return;
-          }
-          if (!ValidateRingBufferFormatSets(result->ring_buffer_formats())) {
-            OnError(ZX_ERR_INVALID_ARGS);
-            return;
-          }
-          auto translated_ring_buffer_format_sets =
-              TranslateRingBufferFormatSets(result->ring_buffer_formats());
-          if (translated_ring_buffer_format_sets.empty()) {
-            ADR_WARN_OBJECT() << "Failed to translate " << str;
-            OnError(ZX_ERR_INVALID_ARGS);
-            return;
-          }
-
-          element_driver_ring_buffer_format_sets_.emplace_back(id, result->ring_buffer_formats());
-          element_ring_buffer_format_sets_.push_back({{id, translated_ring_buffer_format_sets}});
-          temp_ring_buffer_ids_.erase(id);
-          if (temp_ring_buffer_ids_.empty()) {
-            ring_buffer_format_sets_retrieved_ = true;
-            OnInitializationResponse();
-          }
-        });
-  }
-}
-
-void Device::RetrieveGainState() {
-  ADR_LOG_METHOD(kLogStreamConfigFidlCalls);
-
-  if (state_ == State::Error) {
+void Device::RetrieveRingBufferFormatSets() {
+  if (has_error()) {
     ADR_WARN_METHOD() << "device already has an error";
     return;
   }
+  // TODO(https://fxbug.dev/42064765): handle command timeouts
+
+  if (is_composite()) {
+    ADR_LOG_METHOD(kLogCompositeFidlCalls);
+    ring_buffer_ids_ = ring_buffers(sig_proc_element_map_);
+  } else if (is_stream_config()) {
+    ADR_LOG_METHOD(kLogStreamConfigFidlCalls || kLogRingBufferMethods);
+    ring_buffer_ids_.insert(fad::kDefaultRingBufferElementId);
+  }
+  element_ring_buffer_format_sets_.clear();
+  auto remaining_ring_buffer_ids =
+      std::make_shared<std::unordered_set<ElementId>>(ring_buffer_ids_);
+
+  for (auto id : ring_buffer_ids_) {
+    if (is_composite()) {
+      ADR_LOG_METHOD(kLogCompositeFidlCalls) << " GetRingBufferFormats (element " << id << ")";
+      (*composite_client_)
+          ->GetRingBufferFormats(id)
+          .Then([this, id, remaining_ring_buffer_ids](
+                    fidl::Result<fha::Composite::GetRingBufferFormats>& result) mutable {
+            if (SetDeviceErrorOnFidlError(result, "Composite/GetRingBufferFormats response")) {
+              // We need not call AddRingBufferFormatSet: this device is in the process of being
+              // unwound. The client has already received a HasError notification for this device.
+              return;
+            }
+            AddRingBufferFormatSet(id, remaining_ring_buffer_ids, result->ring_buffer_formats());
+          });
+    } else if (is_stream_config()) {
+      (*stream_config_client_)
+          ->GetSupportedFormats()
+          .Then([this, id, remaining_ring_buffer_ids](
+                    fidl::Result<fha::StreamConfig::GetSupportedFormats>& result) mutable {
+            if (SetDeviceErrorOnFidlFrameworkError(result,
+                                                   "StreamConfig/GetSupportedFormats response")) {
+              // We need not call AddRingBufferFormatSet: this device is in the process of being
+              // unwound. The client has already received a HasError notification for this device.
+              return;
+            }
+            AddRingBufferFormatSet(id, remaining_ring_buffer_ids, result->supported_formats());
+          });
+    }
+  }
+}
+
+void Device::AddRingBufferFormatSet(
+    ElementId id, std::shared_ptr<std::unordered_set<ElementId>>& remaining_ring_buffer_ids,
+    const std::vector<fuchsia_hardware_audio::SupportedFormats>& format_set) {
+  std::string context{"GetRingBufferFormats (element "};
+  context.append(std::to_string(id)).append(") response");
+  if (has_error()) {
+    ADR_WARN_OBJECT() << "device already has error during " << context;
+    return;
+  }
+  if (!ValidateRingBufferFormatSets(format_set)) {
+    OnError(ZX_ERR_INVALID_ARGS);
+    return;
+  }
+  auto translated_ring_buffer_format_sets = TranslateRingBufferFormatSets(format_set);
+  if (translated_ring_buffer_format_sets.empty()) {
+    ADR_WARN_OBJECT() << "Failed to translate " << context;
+    OnError(ZX_ERR_INVALID_ARGS);
+    return;
+  }
+  ADR_LOG_METHOD(kLogCompositeFidlResponses || kLogStreamConfigFidlResponses) << context;
+
+  element_driver_ring_buffer_format_sets_.emplace_back(id, format_set);
+  element_ring_buffer_format_sets_.push_back({{id, translated_ring_buffer_format_sets}});
+  remaining_ring_buffer_ids->erase(id);
+  if (remaining_ring_buffer_ids->empty()) {
+    ADR_LOG_OBJECT(kLogCompositeFidlResponses) << context << ": success";
+    ring_buffer_format_sets_retrieved_ = true;
+    OnInitializationResponse();
+  }
+}
+
+void Device::RetrievePlugState() {
+  if (has_error()) {
+    ADR_WARN_METHOD() << "device already has an error";
+    return;
+  }
+  ADR_LOG_METHOD(kLogCodecFidlCalls || kLogStreamConfigFidlCalls);
+
+  if (!has_plug_state()) {
+    // TODO(https://fxbug.dev/42064765): handle command timeouts (but not on subsequent watches)
+  }
+
+  if (is_codec()) {
+    (*codec_client_)
+        ->WatchPlugState()
+        .Then([this](fidl::Result<fha::Codec::WatchPlugState>& result) {
+          if (SetDeviceErrorOnFidlFrameworkError(result, "Codec/PlugState response")) {
+            return;
+          }
+          ADR_LOG_OBJECT(kLogCodecFidlResponses) << "Codec/WatchPlugState response";
+
+          std::optional<fha::PlugDetectCapabilities> plug_detect_capabilities =
+              has_codec_properties() ? codec_properties_->plug_detect_capabilities() : std::nullopt;
+          SetPlugState(result->plug_state(), plug_detect_capabilities);
+        });
+  } else if (is_stream_config()) {
+    (*stream_config_client_)
+        ->WatchPlugState()
+        .Then([this](fidl::Result<fha::StreamConfig::WatchPlugState>& result) {
+          if (SetDeviceErrorOnFidlFrameworkError(result, "StreamConfig/PlugState response")) {
+            return;
+          }
+          ADR_LOG_OBJECT(kLogStreamConfigFidlResponses) << "StreamConfig/PlugState response";
+
+          std::optional<fha::PlugDetectCapabilities> plug_detect_capabilities =
+              has_stream_config_properties() ? stream_config_properties_->plug_detect_capabilities()
+                                             : std::nullopt;
+          SetPlugState(result->plug_state(), plug_detect_capabilities);
+        });
+  }
+}
+
+void Device::SetPlugState(const fuchsia_hardware_audio::PlugState& plug_state,
+                          std::optional<fha::PlugDetectCapabilities> plug_detect_capabilities) {
+  if (!ValidatePlugState(plug_state, plug_detect_capabilities)) {
+    OnError(ZX_ERR_INVALID_ARGS);
+    return;
+  }
+
+  auto preexisting_plug_state = plug_state_;
+  plug_state_ = plug_state;
+
+  if (!preexisting_plug_state.has_value()) {
+    ADR_LOG_OBJECT(kLogCodecFidlResponses || kLogStreamConfigFidlResponses)
+        << "WatchPlugState received initial value";
+    OnInitializationResponse();
+  } else {
+    ADR_LOG_OBJECT(kLogCodecFidlResponses || kLogStreamConfigFidlResponses)
+        << "WatchPlugState received update";
+    ADR_LOG_OBJECT(kLogNotifyMethods) << "ForEachObserver => PlugStateIsChanged";
+    ForEachObserver([plug_state = *plug_state_](auto obs) {
+      obs->PlugStateIsChanged(plug_state.plugged().value_or(true) ? fad::PlugState::kPlugged
+                                                                  : fad::PlugState::kUnplugged,
+                              zx::time(*plug_state.plug_state_time()));
+    });
+  }
+  // Kick off the next watch.
+  RetrievePlugState();
+}
+
+void Device::RetrieveGainState() {
+  if (has_error()) {
+    ADR_WARN_METHOD() << "device already has an error";
+    return;
+  }
+  ADR_LOG_METHOD(kLogStreamConfigFidlCalls);
+
   if (!has_gain_state()) {
     // TODO(https://fxbug.dev/42064765): handle command timeout on initial (not subsequent) watches.
   }
@@ -1377,7 +1563,7 @@ void Device::RetrieveGainState() {
   (*stream_config_client_)
       ->WatchGainState()
       .Then([this](fidl::Result<fha::StreamConfig::WatchGainState>& result) {
-        if (LogResultFrameworkError(result, "GainState response")) {
+        if (SetDeviceErrorOnFidlFrameworkError(result, "GainState response")) {
           return;
         }
 
@@ -1397,10 +1583,10 @@ void Device::RetrieveGainState() {
           OnInitializationResponse();
         } else {
           ADR_LOG_OBJECT(kLogStreamConfigFidlResponses) << "WatchGainState received update";
-          ADR_LOG_OBJECT(kLogNotifyMethods) << "ForEachObserver => GainStateChanged";
+          ADR_LOG_OBJECT(kLogNotifyMethods) << "ForEachObserver => GainStateIsChanged";
           ForEachObserver([gain_state = *gain_state_](auto obs) {
-            obs->GainStateChanged({{
-                .gain_db = *gain_state.gain_db(),
+            obs->GainStateIsChanged({{
+                .gain_db = gain_state.gain_db(),
                 .muted = gain_state.muted().value_or(false),
                 .agc_enabled = gain_state.agc_enabled().value_or(false),
             }});
@@ -1408,208 +1594,6 @@ void Device::RetrieveGainState() {
         }
         // Kick off the next watch.
         RetrieveGainState();
-      });
-}
-
-void Device::RetrieveStreamPlugState() {
-  ADR_LOG_METHOD(kLogStreamConfigFidlCalls);
-
-  if (state_ == State::Error) {
-    ADR_WARN_METHOD() << "device already has an error";
-    return;
-  }
-  if (!has_plug_state()) {
-    // TODO(https://fxbug.dev/42064765): handle command timeouts (but not on subsequent watches)
-  }
-
-  (*stream_config_client_)
-      ->WatchPlugState()
-      .Then([this](fidl::Result<fha::StreamConfig::WatchPlugState>& result) {
-        if (LogResultFrameworkError(result, "PlugState response")) {
-          return;
-        }
-
-        ADR_LOG_OBJECT(kLogStreamConfigFidlResponses) << "WatchPlugState response";
-        std::optional<fha::PlugDetectCapabilities> plug_detect_capabilities;
-        if (has_stream_config_properties()) {
-          plug_detect_capabilities = stream_config_properties_->plug_detect_capabilities();
-        }
-        if (!ValidatePlugState(result->plug_state(), plug_detect_capabilities)) {
-          OnError(ZX_ERR_INVALID_ARGS);
-          return;
-        }
-
-        auto old_plug_state = plug_state_;
-        plug_state_ = result->plug_state();
-
-        if (!old_plug_state) {
-          ADR_LOG_OBJECT(kLogStreamConfigFidlResponses) << "WatchPlugState received initial value";
-          OnInitializationResponse();
-        } else {
-          ADR_LOG_OBJECT(kLogStreamConfigFidlResponses) << "WatchPlugState received update";
-          ADR_LOG_OBJECT(kLogNotifyMethods) << "ForEachObserver => PlugStateChanged";
-          ForEachObserver([plug_state = *plug_state_](auto obs) {
-            obs->PlugStateChanged(plug_state.plugged().value_or(true) ? fad::PlugState::kPlugged
-                                                                      : fad::PlugState::kUnplugged,
-                                  zx::time(*plug_state.plug_state_time()));
-          });
-        }
-        // Kick off the next watch.
-        RetrieveStreamPlugState();
-      });
-}
-
-void Device::RetrieveCodecPlugState() {
-  ADR_LOG_METHOD(kLogCodecFidlCalls);
-
-  if (state_ == State::Error) {
-    ADR_WARN_METHOD() << "device already has an error";
-    return;
-  }
-  if (!has_plug_state()) {
-    // TODO(https://fxbug.dev/113429): handle command timeouts (but not on subsequent watches)
-  }
-
-  (*codec_client_)->WatchPlugState().Then([this](fidl::Result<fha::Codec::WatchPlugState>& result) {
-    if (LogResultFrameworkError(result, "Codec::PlugState response")) {
-      return;
-    }
-
-    ADR_LOG_OBJECT(kLogCodecFidlResponses) << "Codec::WatchPlugState response";
-    std::optional<fha::PlugDetectCapabilities> plug_detect_capabilities;
-    if (has_codec_properties()) {
-      plug_detect_capabilities = codec_properties_->plug_detect_capabilities();
-    }
-    if (!ValidatePlugState(result->plug_state(), plug_detect_capabilities)) {
-      OnError(ZX_ERR_INVALID_ARGS);
-      return;
-    }
-
-    auto old_plug_state = plug_state_;
-    plug_state_ = result->plug_state();
-
-    if (!old_plug_state) {
-      ADR_LOG_OBJECT(kLogCodecFidlResponses) << "Codec::WatchPlugState received initial value";
-      OnInitializationResponse();
-    } else {
-      ADR_LOG_OBJECT(kLogCodecFidlResponses) << "Codec::WatchPlugState received update";
-      ADR_LOG_OBJECT(kLogNotifyMethods) << "ForEachObserver => PlugStateChanged";
-      ForEachObserver([plug_state = *plug_state_](auto obs) {
-        obs->PlugStateChanged(plug_state.plugged().value_or(true) ? fad::PlugState::kPlugged
-                                                                  : fad::PlugState::kUnplugged,
-                              zx::time(*plug_state.plug_state_time()));
-      });
-    }
-    // Kick off the next watch.
-    RetrieveCodecPlugState();
-  });
-}
-
-// TODO(https://fxbug.dev/42068381): Decide when we proactively call GetHealthState, if at all.
-void Device::RetrieveStreamHealthState() {
-  ADR_LOG_METHOD(kLogStreamConfigFidlCalls);
-
-  if (state_ == State::Error) {
-    ADR_WARN_METHOD() << "device already has an error";
-    return;
-  }
-  // TODO(https://fxbug.dev/42064765): handle command timeouts
-
-  (*stream_config_client_)
-      ->GetHealthState()
-      .Then([this](fidl::Result<fha::StreamConfig::GetHealthState>& result) {
-        if (LogResultFrameworkError(result, "HealthState response")) {
-          return;
-        }
-
-        auto old_health_state = health_state_;
-
-        // An empty health state is permitted; it still indicates that the driver is responsive.
-        health_state_ = result->state().healthy().value_or(true);
-        // ...but if the driver actually self-reported as unhealthy, this is a problem.
-        if (!*health_state_) {
-          FX_LOGS(WARNING)
-              << "RetrieveStreamConfigHealthState response: .healthy is FALSE (unhealthy)";
-          OnError(ZX_ERR_IO);
-          return;
-        }
-
-        ADR_LOG_OBJECT(kLogStreamConfigFidlResponses)
-            << "RetrieveStreamConfigHealthState response: healthy";
-        if (!old_health_state) {
-          OnInitializationResponse();
-        }
-      });
-}
-
-void Device::RetrieveCodecHealthState() {
-  ADR_LOG_METHOD(kLogCodecFidlCalls);
-
-  if (state_ == State::Error) {
-    ADR_WARN_METHOD() << "device already has an error";
-    return;
-  }
-  // TODO(https://fxbug.dev/113429): handle command timeouts, because that's the most likely
-  // indicator of an unhealthy driver/device.
-
-  (*codec_client_)->GetHealthState().Then([this](fidl::Result<fha::Codec::GetHealthState>& result) {
-    if (LogResultFrameworkError(result, "HealthState response")) {
-      return;
-    }
-
-    auto old_health_state = health_state_;
-
-    // An empty health state is permitted; it still indicates that the driver is responsive.
-    health_state_ = result->state().healthy().value_or(true);
-    // ...but if the driver actually self-reported as unhealthy, this is a problem.
-    if (!*health_state_) {
-      FX_LOGS(WARNING) << "RetrieveCodecHealthState response: .healthy is FALSE (unhealthy)";
-      OnError(ZX_ERR_IO);
-      return;
-    }
-
-    ADR_LOG_OBJECT(kLogCodecFidlResponses) << "RetrieveCodecHealthState response: healthy";
-    if (!old_health_state) {
-      OnInitializationResponse();
-    }
-  });
-}
-
-void Device::RetrieveCompositeHealthState() {
-  ADR_LOG_METHOD(kLogCompositeFidlCalls);
-
-  if (state_ == State::Error) {
-    ADR_WARN_METHOD() << "device already has an error; ignoring this";
-    return;
-  }
-
-  // TODO(https://fxbug.dev/113429): handle command timeouts, because that's the most likely
-  // indicator of an unhealthy driver/device.
-
-  (*composite_client_)
-      ->GetHealthState()
-      .Then([this](fidl::Result<fha::Composite::GetHealthState>& result) {
-        if (LogResultFrameworkError(result, "HealthState response")) {
-          return;
-        }
-
-        auto old_health_state = health_state_;
-
-        // An empty health state is permitted; it still indicates that the driver is responsive.
-        health_state_ = result->state().healthy().value_or(true);
-        // ...but if the driver actually self-reported as unhealthy, this is a problem.
-        if (!*health_state_) {
-          FX_LOGS(WARNING)
-              << "RetrieveCompositeHealthState response: .healthy is FALSE (unhealthy)";
-          OnError(ZX_ERR_IO);
-          return;
-        }
-
-        ADR_LOG_OBJECT(kLogCompositeFidlResponses)
-            << "RetrieveCompositeHealthState response: healthy";
-        if (!old_health_state) {
-          OnInitializationResponse();
-        }
       });
 }
 
@@ -1706,10 +1690,10 @@ void Device::CreateDeviceClock() {
 
   ClockDomain clock_domain;
   if (is_stream_config()) {
-    FX_CHECK(stream_config_properties_->clock_domain()) << "Clock domain is required";
+    FX_CHECK(stream_config_properties_->clock_domain().has_value()) << "Clock domain is required";
     clock_domain = stream_config_properties_->clock_domain().value_or(fha::kClockDomainMonotonic);
   } else if (is_composite()) {
-    FX_CHECK(composite_properties_->clock_domain()) << "Clock domain is required";
+    FX_CHECK(composite_properties_->clock_domain().has_value()) << "Clock domain is required";
     clock_domain = composite_properties_->clock_domain().value_or(fha::kClockDomainMonotonic);
   } else {
     ADR_WARN_METHOD() << "Cannot create a device clock for device_type " << device_type();
@@ -1731,7 +1715,7 @@ zx::result<zx::clock> Device::GetReadOnlyClock() const {
   }
 
   auto dupe_clock = device_clock_->DuplicateZxClockReadOnly();
-  if (!dupe_clock) {
+  if (!dupe_clock.has_value()) {
     return zx::error(ZX_ERR_ACCESS_DENIED);
   }
 
@@ -1838,18 +1822,46 @@ std::optional<fha::Format> Device::SupportedDriverFormatForClientFormat(
   }};
 }
 
-bool Device::SetGain(fha::GainState& gain_state) {
-  ADR_LOG_METHOD(kLogStreamConfigFidlCalls);
-  FX_CHECK(state_ != State::DeviceInitializing);
+// If the optional<weak_ptr> is set AND the weak_ptr can be locked to its shared_ptr, then the
+// resulting shared_ptr is returned. Otherwise, nullptr is returned, after first resetting the
+// optional `control_notify` if it is set but the weak_ptr is no longer valid.
+std::shared_ptr<ControlNotify> Device::GetControlNotify() {
+  if (!control_notify_) {
+    return nullptr;
+  }
 
-  if (state_ == State::Error) {
+  auto sh_ptr_control = control_notify_->lock();
+  if (!sh_ptr_control) {
+    control_notify_.reset();
+    LogObjectCounts();
+  }
+
+  return sh_ptr_control;
+}
+
+////////////////
+// Subsequent methods require the device to have a ControlNotify set. As a general pattern, before
+// executing a method we check for the ControlNotify, then check for the appropriate device type,
+// then check for device error, then check for the presence/validity of required parameters.
+
+// Returns true if the gain was successfully changed.
+bool Device::SetGain(fha::GainState& gain_state) {
+  if (!GetControlNotify()) {
+    ADR_WARN_METHOD() << "Device is not yet controlled: cannot SetGain";
+    return false;
+  }
+
+  if (!is_stream_config()) {
+    ADR_WARN_METHOD() << "Incorrect device_type " << device_type_ << ": cannot SetGain";
+    return false;
+  }
+
+  if (has_error()) {
     ADR_WARN_METHOD() << "device already has an error";
     return false;
   }
-  if (!GetControlNotify()) {
-    ADR_WARN_METHOD() << "Device must be allocated before this method can be called";
-    return false;
-  }
+  FX_CHECK(is_operational());
+  ADR_LOG_METHOD(kLogStreamConfigFidlCalls);
 
   auto status = (*stream_config_client_)->SetGain(std::move(gain_state));
   if (status.is_error()) {
@@ -1872,89 +1884,73 @@ bool Device::SetGain(fha::GainState& gain_state) {
   return true;
 }
 
-// If the optional<weak_ptr> is set AND the weak_ptr can be locked to its shared_ptr, then the
-// resulting shared_ptr is returned. Otherwise, nullptr is returned, after first resetting the
-// optional `control_notify` if it is set but the weak_ptr is no longer valid.
-std::shared_ptr<ControlNotify> Device::GetControlNotify() {
-  if (!control_notify_) {
-    return nullptr;
-  }
-
-  auto sh_ptr_control = control_notify_->lock();
-  if (!sh_ptr_control) {
-    control_notify_.reset();
-    LogObjectCounts();
-  }
-
-  return sh_ptr_control;
-}
-
+// This method guarantees that ControlNotify's DaiFormatIsChanged or DaiFormatIsNotChanged will
+// eventually be called, either immediately or asynchronously when driver SetDaiFormat concludes.
 void Device::SetDaiFormat(ElementId element_id, const fha::DaiFormat& dai_format) {
-  ADR_LOG_METHOD(kLogCodecFidlCalls || kLogCompositeFidlCalls);
-
   auto notify = GetControlNotify();
   if (!notify) {
-    ADR_WARN_METHOD() << "Device must be controlled before SetDaiFormat can be called";
+    ADR_WARN_METHOD() << "Device is not yet controlled: cannot SetDaiFormat";
     return;
   }
 
   if (!is_codec() && !is_composite()) {
-    ADR_WARN_METHOD() << "Incorrect device_type " << device_type_ << " cannot SetDaiFormat";
-    notify->DaiFormatNotSet(element_id, dai_format,
-                            fad::ControlSetDaiFormatError::kWrongDeviceType);
+    ADR_WARN_METHOD() << "Incorrect device_type " << device_type_ << ": cannot SetDaiFormat";
+    notify->DaiFormatIsNotChanged(element_id, dai_format,
+                                  fad::ControlSetDaiFormatError::kWrongDeviceType);
     return;
   }
 
-  FX_CHECK(state_ != State::DeviceInitializing)
-      << "Cannot call SetDaiFormat before device is initialized";
-  if (state_ == State::Error) {
-    ADR_WARN_METHOD() << "device already has an error";
-    notify->DaiFormatNotSet(element_id, dai_format, fad::ControlSetDaiFormatError::kDeviceError);
+  if (has_error()) {
+    ADR_WARN_METHOD() << "device already has an error: cannot SetDaiFormat";
+    // We need not invoke DaiFormatIsNotChanged: this device is in the process of being unwound. The
+    // client has already received a HasError notification for this device.
     return;
   }
+  FX_CHECK(is_operational());
+  ADR_LOG_METHOD(kLogCodecFidlCalls || kLogCompositeFidlCalls);
 
   if (is_codec() ? (element_id != fad::kDefaultDaiInterconnectElementId)
                  : (dai_ids_.find(element_id) == dai_ids_.end())) {
-    ADR_WARN_METHOD() << "element_id not found, or not a DaiInterconnect element";
-    notify->DaiFormatNotSet(element_id, dai_format,
-                            fad::ControlSetDaiFormatError::kInvalidElementId);
+    ADR_WARN_METHOD()
+        << "element_id not found, or not a DaiInterconnect element: cannot SetDaiFormat";
+    notify->DaiFormatIsNotChanged(element_id, dai_format,
+                                  fad::ControlSetDaiFormatError::kInvalidElementId);
     return;
   }
 
   if (!ValidateDaiFormat(dai_format)) {
-    ADR_WARN_METHOD() << "Invalid dai_format -- cannot SetDaiFormat";
-    notify->DaiFormatNotSet(element_id, dai_format,
-                            fad::ControlSetDaiFormatError::kInvalidDaiFormat);
+    ADR_WARN_METHOD() << "Invalid dai_format: cannot SetDaiFormat";
+    notify->DaiFormatIsNotChanged(element_id, dai_format,
+                                  fad::ControlSetDaiFormatError::kInvalidDaiFormat);
     return;
   }
 
   if (!DaiFormatIsSupported(element_id, dai_format_sets(), dai_format)) {
-    ADR_WARN_METHOD() << "Unsupported dai_format cannot be set";
-    notify->DaiFormatNotSet(element_id, dai_format, fad::ControlSetDaiFormatError::kFormatMismatch);
+    ADR_WARN_METHOD() << "Unsupported dai_format: cannot SetDaiFormat";
+    notify->DaiFormatIsNotChanged(element_id, dai_format,
+                                  fad::ControlSetDaiFormatError::kFormatMismatch);
     return;
   }
 
   // Check for no-change
 
   if (is_codec()) {
-    // auto new_dai_format = dai_format;
-
-    // TODO(https://fxbug.dev/113429): handle command timeouts
+    // TODO(https://fxbug.dev/42064765): handle command timeouts
 
     (*codec_client_)
         ->SetDaiFormat(dai_format)
         .Then([this, element_id, dai_format](fidl::Result<fha::Codec::SetDaiFormat>& result) {
+          std::string context("Codec/SetDaiFormat response: ");
           auto notify = GetControlNotify();
           if (!notify) {
-            ADR_WARN_OBJECT()
-                << "SetDaiFormat response: device must be controlled before SetDaiFormat can be called";
+            ADR_WARN_OBJECT() << context
+                              << "device must be controlled before SetDaiFormat can be called";
             return;
           }
 
-          if (state_ == State::Error) {
-            ADR_WARN_OBJECT() << "Codec/SetDaiFormat response: device already has an error";
-            notify->DaiFormatNotSet(element_id, dai_format,
-                                    fad::ControlSetDaiFormatError::kDeviceError);
+          if (has_error()) {
+            ADR_WARN_OBJECT() << context << "device already has an error";
+            // We need not call DaiFormatIsNotChanged: device is in the process of being unwound.
             return;
           }
 
@@ -1964,50 +1960,44 @@ void Device::SetDaiFormat(ElementId element_id, const fha::DaiFormat& dai_format
             if (result.error_value().is_domain_error() &&
                 (result.error_value().domain_error() == ZX_ERR_INVALID_ARGS ||
                  result.error_value().domain_error() == ZX_ERR_NOT_SUPPORTED)) {
-              ADR_WARN_OBJECT()
-                  << "Codec/SetDaiFormat response: ZX_ERR_INVALID_ARGS or ZX_ERR_NOT_SUPPORTED";
+              ADR_WARN_OBJECT() << context << "ZX_ERR_INVALID_ARGS or ZX_ERR_NOT_SUPPORTED";
               error = (result.error_value().domain_error() == ZX_ERR_NOT_SUPPORTED
                            ? fad::ControlSetDaiFormatError::kFormatMismatch
                            : fad::ControlSetDaiFormatError::kInvalidDaiFormat);
+              notify->DaiFormatIsNotChanged(element_id, dai_format, error);
             } else {
-              LogResultError(result, "SetDaiFormat response");
-              error = fad::ControlSetDaiFormatError::kOther;
+              (void)SetDeviceErrorOnFidlError(result, context.c_str());
+              // We need not call DaiFormatIsNotChanged: device is in the process of being unwound.
             }
-            notify->DaiFormatNotSet(element_id, dai_format, error);
             return;
           }
 
-          ADR_LOG_OBJECT(kLogCodecFidlResponses) << "Codec/SetDaiFormat: success";
+          ADR_LOG_OBJECT(kLogCodecFidlResponses) << context << "success";
           if (!ValidateCodecFormatInfo(result->state())) {
-            FX_LOGS(ERROR) << "Codec/SetDaiFormat error: " << result.error_value();
+            FX_LOGS(ERROR) << context << "error " << result.error_value();
             OnError(ZX_ERR_INVALID_ARGS);
-            notify->DaiFormatNotSet(element_id, dai_format,
-                                    fad::ControlSetDaiFormatError::kInvalidDaiFormat);
+            // We need not call DaiFormatIsNotChanged: device is in the process of being unwound.
             return;
           }
 
-          if (codec_format_ && codec_format_->dai_format == dai_format &&
+          if (codec_format_.has_value() && codec_format_->dai_format == dai_format &&
               codec_format_->codec_format_info == result->state()) {
             // No DaiFormat change for this element
-            notify->DaiFormatNotSet(element_id, dai_format, fad::ControlSetDaiFormatError(0));
+            notify->DaiFormatIsNotChanged(element_id, dai_format, fad::ControlSetDaiFormatError(0));
             return;
           }
 
-          // Reset Start state and DaiFormat (if it's a change). Notify our controlling entity.
-          bool was_started = codec_start_state_.started;
-          if (was_started) {
-            codec_start_state_.started = false;
-            codec_start_state_ = CodecStartState{false, zx::clock::get_monotonic()};
-          }
+          // Reset DaiFormat (and Start state if it's a change). Notify our controlling entity.
           codec_format_ = CodecFormat{dai_format, result->state()};
-          if (was_started) {
-            notify->CodecStopped(codec_start_state_.start_stop_time);
+          if (codec_start_state_.started) {
+            codec_start_state_ = CodecStartState{false, zx::clock::get_monotonic()};
+            notify->CodecIsStopped(codec_start_state_.start_stop_time);
           }
-          notify->DaiFormatChanged(element_id, codec_format_->dai_format,
-                                   codec_format_->codec_format_info);
+          notify->DaiFormatIsChanged(element_id, codec_format_->dai_format,
+                                     codec_format_->codec_format_info);
         });
   } else {
-    // TODO(https://fxbug.dev/113429): handle command timeouts
+    // TODO(https://fxbug.dev/42064765): handle command timeouts
 
     (*composite_client_)
         ->SetDaiFormat({element_id, dai_format})
@@ -2020,10 +2010,9 @@ void Device::SetDaiFormat(ElementId element_id, const fha::DaiFormat& dai_format
             return;
           }
 
-          if (state_ == State::Error) {
+          if (has_error()) {
             ADR_WARN_OBJECT() << context << "device already has an error";
-            notify->DaiFormatNotSet(element_id, dai_format,
-                                    fad::ControlSetDaiFormatError::kDeviceError);
+            // We need not call DaiFormatIsNotChanged: device is in the process of being unwound.
             return;
           }
 
@@ -2039,167 +2028,184 @@ void Device::SetDaiFormat(ElementId element_id, const fha::DaiFormat& dai_format
               ADR_WARN_OBJECT() << context << "kNotSupported";
               error = fad::ControlSetDaiFormatError::kFormatMismatch;
             } else {
-              LogResultError(result, context.c_str());
-              error = fad::ControlSetDaiFormatError::kOther;
+              (void)SetDeviceErrorOnFidlError(result, context.c_str());
+              // We need not call DaiFormatIsNotChanged: device is in the process of being unwound.
+              return;
             }
-            notify->DaiFormatNotSet(element_id, dai_format, error);
+            notify->DaiFormatIsNotChanged(element_id, dai_format, error);
             return;
           }
 
-          ADR_LOG_OBJECT(kLogCompositeFidlResponses) << "Composite/SetDaiFormat: success";
+          ADR_LOG_OBJECT(kLogCompositeFidlResponses) << context << "success";
           if (auto match = composite_dai_formats_.find(element_id);
               match != composite_dai_formats_.end() && match->second == dai_format) {
             // No DaiFormat change for this element
-            notify->DaiFormatNotSet(element_id, dai_format, fad::ControlSetDaiFormatError(0));
+            notify->DaiFormatIsNotChanged(element_id, dai_format, fad::ControlSetDaiFormatError(0));
             return;
           }
 
-          // Unlike Codec, Composite DAI elements don't generate `CodecStopped` notifications.
+          // Unlike Codec, Composite DAI elements don't generate `CodecIsStopped` notifications.
           composite_dai_formats_.insert_or_assign(element_id, dai_format);
-          notify->DaiFormatChanged(element_id, dai_format, std::nullopt);
+          notify->DaiFormatIsChanged(element_id, dai_format, std::nullopt);
         });
   }
 }
 
+// If true is returned, then we guarantee to call ControlNotify::DeviceIsReset (and CodecIsStopped
+// if the Start/Stop state is changed, and DaiFormatIsChanged if the DaiFormat is changed).
+// If false is returned, then no change occurs and these notifications will not be called.
 bool Device::Reset() {
-  if (!is_codec() && !is_composite()) {
-    ADR_WARN_METHOD() << "Incorrect device_type " << device_type_ << " cannot Reset";
-    return false;
-  }
-
-  ADR_LOG_METHOD(kLogCodecFidlCalls);
-  FX_CHECK(state_ != State::DeviceInitializing);
-
-  if (state_ == State::Error) {
-    ADR_WARN_METHOD() << "device already has an error";
-    return false;
-  }
   if (!GetControlNotify()) {
-    ADR_WARN_METHOD() << "Codec must be controlled before Reset can be called";
+    ADR_WARN_METHOD() << "Device is not yet controlled: cannot Reset";
     return false;
   }
 
-  // TODO(https://fxbug.dev/113429): handle command timeouts
+  if (!is_codec() && !is_composite()) {
+    ADR_WARN_METHOD() << "Incorrect device_type " << device_type_ << ": cannot Reset";
+    return false;
+  }
+
+  if (has_error()) {
+    ADR_WARN_METHOD() << "Device already has an error: cannot Reset";
+    return false;
+  }
+  FX_CHECK(is_operational());
+  ADR_LOG_METHOD(kLogCodecFidlCalls);
+
+  // TODO(https://fxbug.dev/42064765): handle command timeouts
 
   if (is_codec()) {
     (*codec_client_)->Reset().Then([this](fidl::Result<fha::Codec::Reset>& result) {
-      std::string context = "Codec/Reset response";
-      if (LogResultFrameworkError(result, context.c_str())) {
+      if (SetDeviceErrorOnFidlFrameworkError(result, "Codec/Reset")) {
+        // We need not call any notifications: device is in the process of being unwound.
         return;
       }
-      ADR_LOG_OBJECT(kLogCodecFidlResponses) << context;
+      ADR_LOG_OBJECT(kLogCodecFidlResponses) << "Codec/Reset response";
+
+      auto notify = GetControlNotify();
 
       // Reset to Stopped (if Started), even if no ControlNotify listens for notifications.
       if (codec_start_state_.started) {
         codec_start_state_.started = false;
         codec_start_state_.start_stop_time = zx::clock::get_monotonic();
-        if (auto notify = GetControlNotify(); notify) {
-          notify->CodecStopped(codec_start_state_.start_stop_time);
+        if (notify) {
+          notify->CodecIsStopped(codec_start_state_.start_stop_time);
         }
       }
 
-      if (codec_format_) {
-        // Reset our DaiFormat, even if no ControlNotify listens for notifications.
+      // Reset our DaiFormat, even if no ControlNotify listens for notifications.
+      if (codec_format_.has_value()) {
         codec_format_.reset();
-        if (auto notify = GetControlNotify(); notify) {
-          notify->DaiFormatChanged(fad::kDefaultDaiInterconnectElementId, std::nullopt,
-                                   std::nullopt);
+        if (notify) {
+          notify->DaiFormatIsChanged(fad::kDefaultDaiInterconnectElementId, std::nullopt,
+                                     std::nullopt);
         }
       }
 
       // TODO(https://fxbug.dev/323270827): implement signalprocessing for Codec (topology,
       // gain). When implemented, reset the signalprocessing topology and all elements, here.
+
+      // If a ControlNotify is listening, notify it that the Reset has now completed.
+      if (notify) {
+        notify->DeviceIsReset();
+      }
     });
   }
   if (is_composite()) {
     (*composite_client_)->Reset().Then([this](fidl::Result<fha::Composite::Reset>& result) {
-      std::string context = "Composite/Reset response";
-      if (LogResultError(result, context.c_str())) {
+      if (SetDeviceErrorOnFidlError(result, "Composite/Reset")) {
+        // We need not call any notifications: device is in the process of being unwound.
         return;
       }
-      ADR_LOG_OBJECT(kLogCompositeFidlResponses) << context;
+      ADR_LOG_OBJECT(kLogCompositeFidlResponses) << "Composite/Reset response";
 
-      ////    Expect DeviceDroppedRingBuffer(element_id) from the driver, for all RingBuffers.
-      ////    We shouldn't need to format-reset them or reset any hanging gets or expressly
-      ////    change their state in any way.
-      //
-      // ring_buffer_map_.clear();
+      auto notify = GetControlNotify();
 
-      // For each DAI node, clear its DaiFormat and notify our controlling entity.
+      // We expect DeviceDroppedRingBuffer(element_id) from the driver, for all RingBuffers.
+      // We shouldn't need to expressly change their state in any way, reset any hanging gets
+      // or clear 'ring_buffer_map_'. Upon receiving the DeviceDroppedRingBuffer notifications,
+      // we destroy the client RingBuffer connections, and they will re-create them.
 
+      // For each DAI node with DaiFormat set, explicitly reset its state. ADR does this because the
+      // driver has no way of conveying that a DaiFormat has changed (or is no longer set).
       if (!composite_dai_formats_.empty()) {
-        // Reset our DaiFormat, even if no ControlNotify listens for notifications.
-        if (auto notify = GetControlNotify(); notify) {
+        // If a ControlNotify is listening, notify it about each DAI node.
+        if (notify) {
           for (const auto& [element_id, _] : composite_dai_formats_) {
-            notify->DaiFormatChanged(element_id, std::nullopt, std::nullopt);
+            notify->DaiFormatIsChanged(element_id, std::nullopt, std::nullopt);
           }
         }
         composite_dai_formats_.clear();
       }
 
-      ////    Expect the driver's WatchTopology and WatchElementState hanging-gets to all fire.
-      ////    We shouldn't need to touch the hardware in any way until then.
-      //
-      // TODO(https://fxbug.dev/323270827): implement signalprocessing
-      // current_topology_id_.reset();
-      // for (auto& [element_id, element_record] : sig_proc_element_map_) {
-      //   element_record.state.reset();
-      // }
-      //
-      ////    Maybe ObserverNotify should emit optionals for [Topology|ElementState]Changed?
-      //
-      // ForEachObserver([...](auto obs) { ... });
+      // We expect WatchTopology and WatchElementState notifications from the driver -- but ONLY
+      // IF these were set to something other than the power-on defaults (and thus change as a
+      // result of Composite::Reset). This is why we never need to convey that the Topology or
+      // ElementState are indeterminate (thus ObserverNotify need not emit OPTIONALs for
+      // TopologyIsChanged and ElementStateIsChanged).
+      // We shouldn't need to expressly touch the hardware in any way; the client will receive
+      // these notifications and re-establish the Topology and ElementStates.
+
+      // If a ControlNotify is listening, notify it that the Reset has now completed.
+      if (notify) {
+        notify->DeviceIsReset();
+      }
     });
   }
 
   return true;
 }
 
+// If true is returned, then we guarantee to call CodecIsStarted/CodecIsNotStarted on ControlNotify.
+// If false is returned, then this notification will not be called.
 bool Device::CodecStart() {
+  auto notify = GetControlNotify();
+  if (!notify) {
+    ADR_WARN_METHOD() << "Codec is not yet controlled: cannot CodecStart";
+    return false;
+  }
+
   if (!is_codec()) {
-    ADR_WARN_METHOD() << "Incorrect device_type " << device_type_ << " cannot Start";
+    ADR_WARN_METHOD() << "Incorrect device_type " << device_type_ << ": cannot CodecStart";
     return false;
   }
 
+  if (has_error()) {
+    ADR_WARN_METHOD() << "device already has an error: cannot CodecStart";
+    return false;
+  }
+  FX_CHECK(is_operational());
   ADR_LOG_METHOD(kLogCodecFidlCalls);
-  FX_CHECK(state_ != State::DeviceInitializing);
 
-  if (state_ == State::Error) {
-    ADR_WARN_METHOD() << "device already has an error";
-    return false;
-  }
-  // TODO(https://fxbug.dev/113429): handle command timeouts
-  if (!GetControlNotify()) {
-    ADR_WARN_METHOD() << "Codec must be controlled before Start can be called";
-    return false;
-  }
-  if (!codec_format_) {
-    ADR_WARN_METHOD() << "Format must be set before Start can be called";
+  if (!codec_format_.has_value()) {
+    ADR_WARN_METHOD() << "Format is not yet set: cannot CodecStart";
     return false;
   }
 
   if (codec_start_state_.started) {
-    ADR_LOG_METHOD(kLogCodecFidlCalls) << "Codec is already started; ignoring CodecStart command";
+    ADR_LOG_METHOD(kLogCodecFidlCalls) << "Codec already started; immediately completing";
+    notify->CodecIsStarted(codec_start_state_.start_stop_time);
     return true;
   }
 
+  // TODO(https://fxbug.dev/42064765): handle command timeouts
+
   (*codec_client_)->Start().Then([this](fidl::Result<fha::Codec::Start>& result) {
-    if (LogResultFrameworkError(result, "Start response")) {
-      if (auto notify = GetControlNotify(); notify) {
-        notify->CodecNotStarted();
-      }
+    auto notify = GetControlNotify();
+    if (SetDeviceErrorOnFidlFrameworkError(result, "CodecStart response")) {
+      // We need not call CodecIsNotStarted: this device is in the process of being unwound.
       return;
     }
 
-    ADR_LOG_OBJECT(kLogCodecFidlResponses) << "Codec/Start: success";
+    ADR_LOG_OBJECT(kLogCodecFidlResponses) << "CodecStart: success";
 
     // Notify our controlling entity, if this was a change.
     if (!codec_start_state_.started ||
         codec_start_state_.start_stop_time.get() <= result->start_time()) {
       codec_start_state_.started = true;
       codec_start_state_.start_stop_time = zx::time(result->start_time());
-      if (auto notify = GetControlNotify(); notify) {
-        notify->CodecStarted(codec_start_state_.start_stop_time);
+      if (notify) {
+        notify->CodecIsStarted(codec_start_state_.start_stop_time);
       }
     }
   });
@@ -2207,52 +2213,56 @@ bool Device::CodecStart() {
   return true;
 }
 
+// If true is returned, then we guarantee to call CodecIsStopped or CodecIsNotStopped on
+// ControlNotify. If false is returned, then this notification will not be called.
 bool Device::CodecStop() {
+  auto notify = GetControlNotify();
+  if (!notify) {
+    ADR_WARN_METHOD() << "Codec is not yet controlled: cannot CodecStop";
+    return false;
+  }
+
   if (!is_codec()) {
-    ADR_WARN_METHOD() << "Incorrect device_type " << device_type_ << " cannot Stop";
+    ADR_WARN_METHOD() << "Incorrect device_type " << device_type_ << ": cannot CodecStop";
     return false;
   }
 
+  if (has_error()) {
+    ADR_WARN_METHOD() << "device already has an error: cannot CodecStop";
+    return false;
+  }
+  FX_CHECK(is_operational());
   ADR_LOG_METHOD(kLogCodecFidlCalls);
-  FX_CHECK(state_ != State::DeviceInitializing);
 
-  if (state_ == State::Error) {
-    ADR_WARN_METHOD() << "device already has an error";
-    return false;
-  }
-  if (!GetControlNotify()) {
-    ADR_WARN_METHOD() << "Codec must be controlled before Stop can be called";
-    return false;
-  }
-  if (!codec_format_) {
-    ADR_WARN_METHOD() << "Format must be set before Stop can be called";
+  if (!codec_format_.has_value()) {
+    ADR_WARN_METHOD() << "Format is not yet set: cannot CodecStop";
     return false;
   }
 
   if (!codec_start_state_.started) {
-    ADR_LOG_METHOD(kLogCodecFidlCalls) << "Codec is already stopped; ignoring CodecStop command";
+    ADR_LOG_METHOD(kLogCodecFidlCalls) << "Codec already stopped; immediately completing";
+    notify->CodecIsStopped(codec_start_state_.start_stop_time);
     return true;
   }
 
-  // TODO(https://fxbug.dev/113429): handle command timeouts
+  // TODO(https://fxbug.dev/42064765): handle command timeouts
 
   (*codec_client_)->Stop().Then([this](fidl::Result<fha::Codec::Stop>& result) {
-    if (LogResultFrameworkError(result, "Stop response")) {
-      if (auto notify = GetControlNotify(); notify) {
-        notify->CodecNotStopped();
-      }
+    auto notify = GetControlNotify();
+    if (SetDeviceErrorOnFidlFrameworkError(result, "CodecStop response")) {
+      // We need not call CodecIsNotStopped: this device is in the process of being unwound.
       return;
     }
 
-    ADR_LOG_OBJECT(kLogCodecFidlResponses) << "Codec/Stop: success";
+    ADR_LOG_OBJECT(kLogCodecFidlResponses) << "CodecStop: success";
 
     // Notify our controlling entity, if this was a change.
     if (codec_start_state_.started ||
         codec_start_state_.start_stop_time.get() <= result->stop_time()) {
       codec_start_state_.started = false;
       codec_start_state_.start_stop_time = zx::time(result->stop_time());
-      if (auto notify = GetControlNotify(); notify) {
-        notify->CodecStopped(codec_start_state_.start_stop_time);
+      if (notify) {
+        notify->CodecIsStopped(codec_start_state_.start_stop_time);
       }
     }
   });
@@ -2260,24 +2270,36 @@ bool Device::CodecStop() {
   return true;
 }
 
+// This method guarantees to call create_ring_buffer_callback (immediately or asynchronously).
+// For certain unrecoverable errors, OnError is called as well.
 bool Device::CreateRingBuffer(
     ElementId element_id, const fha::Format& format, uint32_t requested_ring_buffer_bytes,
     fit::callback<void(fit::result<fad::ControlCreateRingBufferError, Device::RingBufferInfo>)>
         create_ring_buffer_callback) {
-  ADR_LOG_METHOD(kLogRingBufferMethods);
-  if (!is_composite() && !is_stream_config()) {
-    ADR_WARN_METHOD() << "Wrong device type";
-    create_ring_buffer_callback(fit::error(fad::ControlCreateRingBufferError::kWrongDeviceType));
-    return false;
-  }
-
   if (!GetControlNotify()) {
-    ADR_WARN_METHOD() << "Device must be controlled before CreateRingBuffer can be called";
+    ADR_WARN_METHOD() << "Device is not yet controlled: cannot CreateRingBuffer";
     create_ring_buffer_callback(fit::error(fad::ControlCreateRingBufferError::kOther));
     return false;
   }
 
+  if (!is_composite() && !is_stream_config()) {
+    ADR_WARN_METHOD() << "Incorrect device_type " << device_type_ << ": cannot CreateRingBuffer";
+    create_ring_buffer_callback(fit::error(fad::ControlCreateRingBufferError::kWrongDeviceType));
+    return false;
+  }
+
+  if (has_error()) {
+    ADR_WARN_METHOD() << "device already has an error";
+    // We need not invoke create_ring_buffer_callback: this device is in the process of being
+    // unwound. The client has already received a HasError notification for this device.
+    return false;
+  }
+  FX_CHECK(is_operational());
+  ADR_LOG_METHOD(kLogRingBufferMethods);
+
   if (ring_buffer_ids_.find(element_id) == ring_buffer_ids_.end()) {
+    ADR_WARN_METHOD() << "No RingBuffer element found for id " << element_id
+                      << ": cannot CreateRingBuffer";
     create_ring_buffer_callback(fit::error(fad::ControlCreateRingBufferError::kInvalidElementId));
     return false;
   }
@@ -2308,7 +2330,7 @@ fad::ControlCreateRingBufferError Device::ConnectRingBufferFidl(ElementId elemen
                                                                 fha::Format driver_format) {
   ADR_LOG_METHOD(kLogRingBufferMethods || kLogRingBufferFidlCalls);
 
-  if (state_ == State::Error) {
+  if (has_error()) {
     ADR_WARN_METHOD() << "device already has an error";
     return fad::ControlCreateRingBufferError::kDeviceError;
   }
@@ -2341,7 +2363,7 @@ fad::ControlCreateRingBufferError Device::ConnectRingBufferFidl(ElementId elemen
         ->CreateRingBuffer({element_id, driver_format, std::move(server)})
         .Then([this](fidl::Result<fha::Composite::CreateRingBuffer>& result) {
           std::string context{"Composite/CreateRingBuffer response"};
-          if (LogResultError(result, context.c_str())) {
+          if (SetDeviceErrorOnFidlError(result, context.c_str())) {
             return;
           }
           ADR_LOG_OBJECT(kLogCompositeFidlResponses) << context;
@@ -2360,7 +2382,7 @@ fad::ControlCreateRingBufferError Device::ConnectRingBufferFidl(ElementId elemen
   } else if (bytes_per_sample == 8 && sample_format == fha::SampleFormat::kPcmFloat) {
     sample_type = fuchsia_audio::SampleType::kFloat64;
   }
-  FX_CHECK(sample_type)
+  FX_CHECK(sample_type.has_value())
       << "Invalid sample format was not detected in ValidateSampleFormatCompatibility";
   uint64_t active_channels_bitmask =
       (1ull << driver_format.pcm_format()->number_of_channels()) - 1ull;
@@ -2370,7 +2392,7 @@ fad::ControlCreateRingBufferError Device::ConnectRingBufferFidl(ElementId elemen
       .ring_buffer_handler = std::make_unique<RingBufferFidlErrorHandler<fha::RingBuffer>>(
           this, element_id, "RingBuffer"),
       .vmo_format = {{
-          .sample_type = *sample_type,
+          .sample_type = sample_type,
           .channel_count = driver_format.pcm_format()->number_of_channels(),
           .frames_per_second = driver_format.pcm_format()->frame_rate(),
           // TODO(https://fxbug.dev/42168795): handle channel_layout when communicated from driver.
@@ -2411,7 +2433,7 @@ void Device::RetrieveRingBufferProperties(ElementId element_id) {
   (*ring_buffer.ring_buffer_client)
       ->GetProperties()
       .Then([this, &ring_buffer, element_id](fidl::Result<fha::RingBuffer::GetProperties>& result) {
-        if (LogResultFrameworkError(result, "RingBuffer/GetProperties response")) {
+        if (SetDeviceErrorOnFidlFrameworkError(result, "RingBuffer/GetProperties response")) {
           return;
         }
 
@@ -2438,7 +2460,7 @@ void Device::RetrieveDelayInfo(ElementId element_id) {
       ->WatchDelayInfo()
       .Then(
           [this, &ring_buffer, element_id](fidl::Result<fha::RingBuffer::WatchDelayInfo>& result) {
-            if (LogResultFrameworkError(result, "RingBuffer/WatchDelayInfo response")) {
+            if (SetDeviceErrorOnFidlFrameworkError(result, "RingBuffer/WatchDelayInfo response")) {
               return;
             }
             ADR_LOG_OBJECT(kLogRingBufferFidlResponses) << "RingBuffer/WatchDelayInfo: success";
@@ -2456,7 +2478,7 @@ void Device::RetrieveDelayInfo(ElementId element_id) {
               // Needed, to set requested_ring_buffer_frames_ before calling GetVmo.
               CalculateRequiredRingBufferSizes(element_id);
 
-              FX_CHECK(device_info_->clock_domain());
+              FX_CHECK(device_info_->clock_domain().has_value());
               const auto clock_position_notifications_per_ring =
                   *device_info_->clock_domain() == fha::kClockDomainMonotonic ? 0 : 2;
               GetVmo(element_id, static_cast<uint32_t>(ring_buffer.requested_ring_buffer_frames),
@@ -2465,7 +2487,7 @@ void Device::RetrieveDelayInfo(ElementId element_id) {
 
             // Notify our controlling entity, if we have one.
             if (auto notify = GetControlNotify(); notify) {
-              notify->DelayInfoChanged(
+              notify->DelayInfoIsChanged(
                   element_id, {{
                                   .internal_delay = ring_buffer.delay_info->internal_delay(),
                                   .external_delay = ring_buffer.delay_info->external_delay(),
@@ -2482,13 +2504,13 @@ void Device::GetVmo(ElementId element_id, uint32_t min_frames,
   auto& ring_buffer = ring_buffer_map_.find(element_id)->second;
   FX_CHECK(ring_buffer.ring_buffer_client.has_value() &&
            ring_buffer.ring_buffer_client->is_valid());
-  FX_CHECK(ring_buffer.driver_format);
+  FX_CHECK(ring_buffer.driver_format.has_value());
 
   (*ring_buffer.ring_buffer_client)
       ->GetVmo({{.min_frames = min_frames,
                  .clock_recovery_notifications_per_ring = position_notifications_per_ring}})
       .Then([this, &ring_buffer, element_id](fidl::Result<fha::RingBuffer::GetVmo>& result) {
-        if (LogResultError(result, "RingBuffer/GetVmo response")) {
+        if (SetDeviceErrorOnFidlError(result, "RingBuffer/GetVmo response")) {
           return;
         }
         ADR_LOG_OBJECT(kLogRingBufferFidlResponses) << "RingBuffer/GetVmo: success";
@@ -2508,7 +2530,7 @@ void Device::GetVmo(ElementId element_id, uint32_t min_frames,
 // RingBuffer FIDL successful-response handlers.
 void Device::CheckForRingBufferReady(ElementId element_id) {
   ADR_LOG_METHOD(kLogRingBufferFidlResponses);
-  if (state_ == State::Error) {
+  if (has_error()) {
     ADR_WARN_METHOD() << "device already has an error";
     return;
   }
@@ -2520,8 +2542,8 @@ void Device::CheckForRingBufferReady(ElementId element_id) {
   }
 
   // We're creating the ring buffer but don't have all our prerequisites yet.
-  if (!ring_buffer.ring_buffer_properties || !ring_buffer.delay_info ||
-      !ring_buffer.num_ring_buffer_frames) {
+  if (!ring_buffer.ring_buffer_properties.has_value() || !ring_buffer.delay_info.has_value() ||
+      !ring_buffer.num_ring_buffer_frames.has_value()) {
     return;
   }
 
@@ -2548,7 +2570,7 @@ void Device::CheckForRingBufferReady(ElementId element_id) {
           .producer_bytes = ring_buffer.ring_buffer_producer_bytes,
           .consumer_bytes = ring_buffer.ring_buffer_consumer_bytes,
           .reference_clock = std::move(*ref_clock),
-          .reference_clock_domain = *device_info_->clock_domain(),
+          .reference_clock_domain = device_info_->clock_domain(),
       }},
       .properties = fad::RingBufferProperties{{
           .valid_bits_per_sample = valid_bits_per_sample(element_id),
@@ -2558,11 +2580,30 @@ void Device::CheckForRingBufferReady(ElementId element_id) {
   ring_buffer.create_ring_buffer_callback = nullptr;
 }
 
-// Returns TRUE if it actually calls out to the driver. It avoid doing so if it already knows
+// Returns TRUE if it actually calls out to the driver. We avoid doing so if we already know
 // that this RingBuffer does not support SetActiveChannels.
 bool Device::SetActiveChannels(
     ElementId element_id, uint64_t channel_bitmask,
     fit::callback<void(zx::result<zx::time>)> set_active_channels_callback) {
+  if (!GetControlNotify()) {
+    ADR_WARN_METHOD() << "Device is not yet controlled: cannot SetActiveChannels";
+    set_active_channels_callback(zx::error(ZX_ERR_INTERNAL));
+    return false;
+  }
+
+  if (!is_composite() && !is_stream_config()) {
+    ADR_WARN_METHOD() << "Incorrect device_type " << device_type_ << ": cannot SetActiveChannels";
+    set_active_channels_callback(zx::error(ZX_ERR_INTERNAL));
+    return false;
+  }
+
+  if (has_error()) {
+    ADR_WARN_METHOD() << "device already has an error";
+    // We need not invoke set_active_channels_callback: this device is in the process of being
+    // unwound. The client has already received a HasError notification for this device.
+    return false;
+  }
+  FX_CHECK(is_operational());
   ADR_LOG_METHOD(kLogRingBufferFidlCalls);
 
   auto& ring_buffer = ring_buffer_map_.find(element_id)->second;
@@ -2586,9 +2627,9 @@ bool Device::SetActiveChannels(
               callback(zx::error(ZX_ERR_NOT_SUPPORTED));
               return;
             }
-            if (LogResultError(result, "RingBuffer/SetActiveChannels response")) {
+            if (SetDeviceErrorOnFidlError(result, "RingBuffer/SetActiveChannels response")) {
               ring_buffer.supports_set_active_channels = false;
-              callback(zx::error(ZX_ERR_INTERNAL));
+              // We need not invoke the callback: this device is in the process of being unwound.
               return;
             }
 
@@ -2606,6 +2647,25 @@ bool Device::SetActiveChannels(
 
 void Device::StartRingBuffer(ElementId element_id,
                              fit::callback<void(zx::result<zx::time>)> start_callback) {
+  if (!GetControlNotify()) {
+    ADR_WARN_METHOD() << "Device is not yet controlled: cannot StartRingBuffer";
+    start_callback(zx::error(ZX_ERR_INTERNAL));
+    return;
+  }
+
+  if (!is_composite() && !is_stream_config()) {
+    ADR_WARN_METHOD() << "Incorrect device_type " << device_type_ << ": cannot StartRingBuffer";
+    start_callback(zx::error(ZX_ERR_INTERNAL));
+    return;
+  }
+
+  if (has_error()) {
+    ADR_WARN_METHOD() << "device already has an error";
+    // We need not invoke start_callback: this device is in the process of being unwound. The
+    // client has already received a HasError notification for this device.
+    return;
+  }
+  FX_CHECK(is_operational());
   ADR_LOG_METHOD(kLogRingBufferFidlCalls);
 
   auto& ring_buffer = ring_buffer_map_.find(element_id)->second;
@@ -2616,8 +2676,8 @@ void Device::StartRingBuffer(ElementId element_id,
       ->Start()
       .Then([this, &ring_buffer, element_id, callback = std::move(start_callback)](
                 fidl::Result<fha::RingBuffer::Start>& result) mutable {
-        if (LogResultFrameworkError(result, "RingBuffer/Start response")) {
-          callback(zx::error(ZX_ERR_INTERNAL));
+        if (SetDeviceErrorOnFidlFrameworkError(result, "RingBuffer/Start response")) {
+          // We need not invoke start_callback: this device is in the process of being unwound.
           return;
         }
         ADR_LOG_OBJECT(kLogRingBufferFidlResponses) << "RingBuffer/Start: success";
@@ -2629,6 +2689,25 @@ void Device::StartRingBuffer(ElementId element_id,
 }
 
 void Device::StopRingBuffer(ElementId element_id, fit::callback<void(zx_status_t)> stop_callback) {
+  if (!GetControlNotify()) {
+    ADR_WARN_METHOD() << "Device is not yet controlled: cannot StopRingBuffer";
+    stop_callback(ZX_ERR_INTERNAL);
+    return;
+  }
+
+  if (!is_composite() && !is_stream_config()) {
+    ADR_WARN_METHOD() << "Incorrect device_type " << device_type_ << ": cannot StopRingBuffer";
+    stop_callback(ZX_ERR_INTERNAL);
+    return;
+  }
+
+  if (has_error()) {
+    ADR_WARN_METHOD() << "device already has an error";
+    // We need not invoke stop_callback: this device is in the process of being unwound. The
+    // client has already received a HasError notification for this device.
+    return;
+  }
+  FX_CHECK(is_operational());
   ADR_LOG_METHOD(kLogRingBufferFidlCalls);
 
   auto& ring_buffer = ring_buffer_map_.find(element_id)->second;
@@ -2639,8 +2718,8 @@ void Device::StopRingBuffer(ElementId element_id, fit::callback<void(zx_status_t
       ->Stop()
       .Then([this, &ring_buffer, element_id, callback = std::move(stop_callback)](
                 fidl::Result<fha::RingBuffer::Stop>& result) mutable {
-        if (LogResultFrameworkError(result, "RingBuffer/Stop response")) {
-          callback(ZX_ERR_INTERNAL);
+        if (SetDeviceErrorOnFidlFrameworkError(result, "RingBuffer/Stop response")) {
+          // We need not invoke the callback: this device is in the process of being unwound.
           return;
         }
         ADR_LOG_OBJECT(kLogRingBufferFidlResponses) << "RingBuffer/Stop: success";
@@ -2657,12 +2736,12 @@ void Device::CalculateRequiredRingBufferSizes(ElementId element_id) {
   ADR_LOG_METHOD(kLogRingBufferMethods);
 
   auto& ring_buffer = ring_buffer_map_.find(element_id)->second;
-  FX_CHECK(ring_buffer.vmo_format.channel_count());
-  FX_CHECK(ring_buffer.vmo_format.sample_type());
-  FX_CHECK(ring_buffer.vmo_format.frames_per_second());
-  FX_CHECK(ring_buffer.ring_buffer_properties);
-  FX_CHECK(ring_buffer.ring_buffer_properties->driver_transfer_bytes());
-  FX_CHECK(ring_buffer.requested_ring_buffer_bytes);
+  FX_CHECK(ring_buffer.vmo_format.channel_count().has_value());
+  FX_CHECK(ring_buffer.vmo_format.sample_type().has_value());
+  FX_CHECK(ring_buffer.vmo_format.frames_per_second().has_value());
+  FX_CHECK(ring_buffer.ring_buffer_properties.has_value());
+  FX_CHECK(ring_buffer.ring_buffer_properties->driver_transfer_bytes().has_value());
+  FX_CHECK(ring_buffer.requested_ring_buffer_bytes.has_value());
   FX_CHECK(*ring_buffer.requested_ring_buffer_bytes > 0);
 
   switch (*ring_buffer.vmo_format.sample_type()) {

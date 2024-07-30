@@ -90,7 +90,7 @@ struct vm_page {
 #pragma GCC diagnostic pop
         }
 
-        ktl::atomic_ref<const uintptr_t> get() const {
+        ktl::atomic_ref<uintptr_t> get() const {
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Waddress-of-packed-member"
           // This is fine, because vm_page_t are 8 byte aligned, and object_or_stack_owner_priv is 8
@@ -101,7 +101,9 @@ struct vm_page {
           DEBUG_ASSERT(reinterpret_cast<uintptr_t>(&object_or_stack_owner) %
                            sizeof(decltype(object_or_stack_owner)) ==
                        0);
-          return ktl::atomic_ref<const uintptr_t>(*&object_or_stack_owner);
+          // TODO(https://fxbug.dev/355287217): Remove const_cast when libcxx `atomic_ref<T>` is
+          // fixed.
+          return ktl::atomic_ref<uintptr_t>(*const_cast<uintptr_t*>(&object_or_stack_owner));
 #pragma GCC diagnostic pop
         }
 
@@ -114,8 +116,12 @@ struct vm_page {
       } __PACKED object_or_stack_owner;
       using object_or_stack_owner_t = decltype(object_or_stack_owner);
 
+      // TODO(https://fxbug.dev/354716628): Remove workaround for const/volatile qualified
+      // atomic_ref.
+      auto* self() const { return const_cast<ktl::remove_const_t<decltype(this)>>(this); }
+
       void* get_object() const {
-        uintptr_t value = object_or_stack_owner.get().load(ktl::memory_order_relaxed);
+        uintptr_t value = self()->object_or_stack_owner.get().load(ktl::memory_order_relaxed);
         if (unlikely(value & kObjectOrStackOwnerIsStackOwnerFlag)) {
           return nullptr;
         }
@@ -174,7 +180,7 @@ struct vm_page {
       }
 
       StackOwnedLoanedPagesInterval* maybe_stack_owner() const {
-        uintptr_t value = object_or_stack_owner.get().load(ktl::memory_order_relaxed);
+        uintptr_t value = self()->object_or_stack_owner.get().load(ktl::memory_order_relaxed);
         if (!(value & kObjectOrStackOwnerIsStackOwnerFlag)) {
           return nullptr;
         }
@@ -182,7 +188,7 @@ struct vm_page {
       }
 
       StackOwnedLoanedPagesInterval& stack_owner() const {
-        uintptr_t value = object_or_stack_owner.get().load(ktl::memory_order_relaxed);
+        uintptr_t value = self()->object_or_stack_owner.get().load(ktl::memory_order_relaxed);
         DEBUG_ASSERT(value & kObjectOrStackOwnerIsStackOwnerFlag);
         return *reinterpret_cast<StackOwnedLoanedPagesInterval*>(value & ~kObjectOrStackOwnerFlags);
       }
@@ -237,7 +243,7 @@ struct vm_page {
 
       bool is_stack_owned() const {
         // This can return true for a page that was loaned fairly recently but is no longer loaned.
-        return !!(object_or_stack_owner.get().load(ktl::memory_order_relaxed) &
+        return !!(self()->object_or_stack_owner.get().load(ktl::memory_order_relaxed) &
                   kObjectOrStackOwnerIsStackOwnerFlag);
       }
 
@@ -277,8 +283,10 @@ struct vm_page {
       ktl::atomic_ref<uint8_t> get_page_queue_ref() {
         return ktl::atomic_ref<uint8_t>(page_queue_priv);
       }
-      ktl::atomic_ref<const uint8_t> get_page_queue_ref() const {
-        return ktl::atomic_ref<const uint8_t>(page_queue_priv);
+
+      // TODO(https://fxbug.dev/355287217): Remove const_cast when libcxx `atomic_ref<T>` is fixed.
+      ktl::atomic_ref<uint8_t> get_page_queue_ref() const {
+        return ktl::atomic_ref<uint8_t>(*const_cast<uint8_t*>(&page_queue_priv));
       }
 
       // offset 0x29
@@ -369,7 +377,9 @@ struct vm_page {
   // itself can be non-loaned or loaned).  A loaned page cannot be used to allocate a new contiguous
   // VMO.
   bool is_loaned() const {
-    return !!(ktl::atomic_ref<const uint8_t>(loaned_state_priv).load(ktl::memory_order_relaxed) &
+    // TODO(https://fxbug.dev/355287217): Remove const_cast when libcxx `atomic_ref<T>` is fixed.
+    return !!(ktl::atomic_ref<uint8_t>(*const_cast<uint8_t*>(&loaned_state_priv))
+                  .load(ktl::memory_order_relaxed) &
               kLoanedStateIsLoaned);
   }
   // If true, the original contiguous VMO wants the page back.  Such pages won't be re-used until
@@ -377,7 +387,7 @@ struct vm_page {
   // loaned the page, or via deletion of the contiguous VMO that loaned the page.  Such pages are
   // not in the free_loaned_list_ in pmm, which is how re-use is prevented.
   bool is_loan_cancelled() const {
-    return !!(ktl::atomic_ref<const uint8_t>(loaned_state_priv).load(ktl::memory_order_relaxed) &
+    return !!(ktl::atomic_ref<uint8_t>(*const_cast<uint8_t*>(&loaned_state_priv)) &
               kLoanedStateIsLoanCancelled);
   }
   // Manipulation of 'loaned' should only be done by the PmmNode under its lock whilst it is the
@@ -407,7 +417,9 @@ struct vm_page {
   paddr_t paddr() const { return paddr_priv; }
 
   vm_page_state state() const {
-    return ktl::atomic_ref<const vm_page_state>(state_priv).load(ktl::memory_order_relaxed);
+    // TODO(https://fxbug.dev/355287217): Remove const_cast when libcxx `atomic_ref<T>` is fixed.
+    return ktl::atomic_ref<vm_page_state>(*const_cast<vm_page_state*>(&state_priv))
+        .load(ktl::memory_order_relaxed);
   }
 
   void set_state(vm_page_state new_state) {

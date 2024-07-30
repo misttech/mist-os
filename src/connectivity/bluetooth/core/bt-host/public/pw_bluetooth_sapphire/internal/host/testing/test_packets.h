@@ -26,12 +26,15 @@ DynamicByteBuffer AcceptConnectionRequestPacket(DeviceAddress address);
 DynamicByteBuffer AuthenticationRequestedPacket(
     hci_spec::ConnectionHandle conn);
 
-DynamicByteBuffer CommandCompletePacket(hci_spec::OpCode opcode,
-                                        pw::bluetooth::emboss::StatusCode);
+DynamicByteBuffer CommandCompletePacket(
+    hci_spec::OpCode opcode,
+    pw::bluetooth::emboss::StatusCode =
+        pw::bluetooth::emboss::StatusCode::SUCCESS);
 
 DynamicByteBuffer CommandStatusPacket(
     hci_spec::OpCode op_code,
-    pw::bluetooth::emboss::StatusCode status_code,
+    pw::bluetooth::emboss::StatusCode status_code =
+        pw::bluetooth::emboss::StatusCode::SUCCESS,
     uint8_t num_packets = 0xF0);
 
 DynamicByteBuffer ConnectionCompletePacket(
@@ -45,6 +48,8 @@ DynamicByteBuffer ConnectionRequestPacket(
     hci_spec::LinkType link_type = hci_spec::LinkType::kACL);
 
 DynamicByteBuffer CreateConnectionPacket(DeviceAddress address);
+
+DynamicByteBuffer CreateConnectionCancelPacket(DeviceAddress address);
 
 DynamicByteBuffer DisconnectionCompletePacket(
     hci_spec::ConnectionHandle conn,
@@ -75,8 +80,21 @@ DynamicByteBuffer EnhancedSetupSynchronousConnectionPacket(
 
 DynamicByteBuffer InquiryCommandPacket(
     uint16_t inquiry_length = gap::kInquiryLengthDefault);
-DynamicByteBuffer InquiryCommandResponse(
-    pw::bluetooth::emboss::StatusCode status_code);
+
+DynamicByteBuffer IoCapabilityRequestNegativeReplyPacket(
+    DeviceAddress address, pw::bluetooth::emboss::StatusCode status_code);
+DynamicByteBuffer IoCapabilityRequestNegativeReplyResponse(
+    DeviceAddress address);
+DynamicByteBuffer IoCapabilityRequestPacket(DeviceAddress address);
+DynamicByteBuffer IoCapabilityRequestReplyPacket(
+    DeviceAddress address,
+    pw::bluetooth::emboss::IoCapability io_cap,
+    pw::bluetooth::emboss::AuthenticationRequirements auth_req);
+DynamicByteBuffer IoCapabilityRequestReplyResponse(DeviceAddress address);
+DynamicByteBuffer IoCapabilityResponsePacket(
+    DeviceAddress address,
+    pw::bluetooth::emboss::IoCapability io_cap,
+    pw::bluetooth::emboss::AuthenticationRequirements auth_req);
 
 DynamicByteBuffer LEReadRemoteFeaturesCompletePacket(
     hci_spec::ConnectionHandle conn, hci_spec::LESupportedFeatures le_features);
@@ -124,6 +142,17 @@ DynamicByteBuffer LEStartEncryptionPacket(hci_spec::ConnectionHandle,
                                           uint64_t random_number,
                                           uint16_t encrypted_diversifier,
                                           UInt128 ltk);
+
+DynamicByteBuffer LinkKeyNotificationPacket(DeviceAddress address,
+                                            UInt128 link_key,
+                                            hci_spec::LinkKeyType key_type);
+
+DynamicByteBuffer LinkKeyRequestPacket(DeviceAddress address);
+DynamicByteBuffer LinkKeyRequestNegativeReplyPacket(DeviceAddress address);
+DynamicByteBuffer LinkKeyRequestNegativeReplyResponse(DeviceAddress address);
+DynamicByteBuffer LinkKeyRequestReplyPacket(DeviceAddress address,
+                                            UInt128 link_key);
+DynamicByteBuffer LinkKeyRequestReplyResponse(DeviceAddress address);
 
 DynamicByteBuffer NumberOfCompletedPacketsPacket(
     hci_spec::ConnectionHandle conn, uint16_t num_packets);
@@ -175,6 +204,9 @@ DynamicByteBuffer ScoDataPacket(
 DynamicByteBuffer SetConnectionEncryption(hci_spec::ConnectionHandle conn,
                                           bool enable);
 
+DynamicByteBuffer SimplePairingCompletePacket(
+    DeviceAddress address, pw::bluetooth::emboss::StatusCode status_code);
+
 DynamicByteBuffer StartA2dpOffloadRequest(
     const l2cap::A2dpOffloadManager::Configuration& config,
     hci_spec::ConnectionHandle connection_handle,
@@ -189,27 +221,39 @@ DynamicByteBuffer SynchronousConnectionCompletePacket(
     hci_spec::LinkType link_type,
     pw::bluetooth::emboss::StatusCode status);
 
+DynamicByteBuffer UserConfirmationRequestNegativeReplyPacket(
+    DeviceAddress address);
+DynamicByteBuffer UserConfirmationRequestPacket(DeviceAddress address,
+                                                uint32_t passkey);
+DynamicByteBuffer UserConfirmationRequestReplyPacket(DeviceAddress address);
+
+DynamicByteBuffer UserPasskeyNotificationPacket(DeviceAddress address,
+                                                uint32_t passkey);
+
+DynamicByteBuffer UserPasskeyRequestNegativeReply(DeviceAddress address);
+DynamicByteBuffer UserPasskeyRequestNegativeReplyResponse(
+    DeviceAddress address);
+
+DynamicByteBuffer UserPasskeyRequestPacket(DeviceAddress address);
+DynamicByteBuffer UserPasskeyRequestReplyPacket(DeviceAddress address,
+                                                uint32_t passkey);
+DynamicByteBuffer UserPasskeyRequestReplyResponse(DeviceAddress address);
+
 DynamicByteBuffer WriteAutomaticFlushTimeoutPacket(
     hci_spec::ConnectionHandle conn, uint16_t flush_timeout);
 
-DynamicByteBuffer WriteExtendedInquiryResponse(
-    pw::bluetooth::emboss::StatusCode status_code);
-
 DynamicByteBuffer WriteInquiryScanActivity(uint16_t scan_interval,
                                            uint16_t scan_window);
-DynamicByteBuffer WriteInquiryScanActivityResponse();
-
-DynamicByteBuffer WriteLocalNameResponse(
-    pw::bluetooth::emboss::StatusCode status_code);
 
 DynamicByteBuffer WritePageScanActivityPacket(uint16_t scan_interval,
                                               uint16_t scan_window);
-DynamicByteBuffer WritePageScanActivityResponse();
+
+DynamicByteBuffer WritePageScanTypePacket(uint8_t scan_type);
+DynamicByteBuffer WritePageScanTypeResponse();
 
 DynamicByteBuffer WritePageTimeoutPacket(uint16_t page_timeout);
 
 DynamicByteBuffer WriteScanEnable(uint8_t scan_enable);
-DynamicByteBuffer WriteScanEnableResponse();
 
 }  // namespace bt::testing
 

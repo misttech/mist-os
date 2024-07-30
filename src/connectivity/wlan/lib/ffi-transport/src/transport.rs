@@ -2,9 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::completers::Completer;
+use fdf::{fdf_arena_t, Arena, ArenaStaticBox};
+use std::ffi::c_void;
 use std::marker::{PhantomData, PhantomPinned};
 use std::pin::Pin;
-use std::slice;
+use std::ptr::NonNull;
+use std::{mem, slice};
 use tracing::error;
 use wlan_fidl_ext::{TryUnpack, WithName};
 use {
@@ -33,8 +37,12 @@ pub struct FfiEthernetRx {
         ctx: *mut FfiEthernetRxCtx,
         payload: *const u8,
         payload_len: usize,
-    ) -> zx::zx_status_t,
+    ) -> zx::sys::zx_status_t,
 }
+
+// Safety: The FFI provided by FfiEthernetRx is thread-safe. In particular, the wlansoftmac
+// driver synchronizes all of its ddk::EthernetIfcProtocolClient calls.
+unsafe impl Send for FfiEthernetRx {}
 
 pub struct EthernetRx {
     ffi: FfiEthernetRx,
@@ -90,8 +98,13 @@ pub struct FfiWlanTx {
         ctx: *mut FfiWlanTxCtx,
         payload: *const u8,
         payload_len: usize,
-    ) -> zx::zx_status_t,
+    ) -> zx::sys::zx_status_t,
 }
+
+// Safety: The FFI provided by FfiWlanTx is thread-safe. In particular, the wlansoftmac
+// driver synchronizes all of its fdf::SharedClient<fuchsia_wlan_softmac::WlanSoftmac>
+// calls.
+unsafe impl Send for FfiWlanTx {}
 
 pub struct WlanTx {
     ffi: FfiWlanTx,
@@ -142,7 +155,7 @@ pub struct FfiEthernetTx {
         ctx: *const FfiEthernetTxCtx,
         request: *const u8,
         request_size: usize,
-    ) -> zx::zx_status_t,
+    ) -> zx::sys::zx_status_t,
 }
 
 pub struct EthernetTx {
@@ -151,8 +164,9 @@ pub struct EthernetTx {
 
 // TODO(https://fxbug.dev/42119762): We need to keep stats for these events and respond to StatsQueryRequest.
 pub struct EthernetTxEvent {
-    pub bytes: Vec<u8>,
+    pub bytes: NonNull<[u8]>,
     pub async_id: trace::Id,
+    pub borrowed_operation: Completer<Box<dyn FnOnce(zx::sys::zx_status_t)>>,
 }
 
 impl EthernetTx {
@@ -194,6 +208,11 @@ impl EthernetTx {
     /// rust_device_interface_t.queue_tx() with the same |async_id|. At that point, the C++ portion of
     /// wlansoftmac will assume responsibility for ending the async trace event.
     ///
+    /// # Errors
+    ///
+    /// This function will return ZX_ERR_BAD_STATE if and only if it did not claim ownership
+    /// of the eth::BorrowedOperation before returning.
+    ///
     /// # Safety
     ///
     /// Behavior is undefined unless `payload` points to a persisted
@@ -204,7 +223,7 @@ impl EthernetTx {
         ctx: *const FfiEthernetTxCtx,
         payload: *const u8,
         payload_len: usize,
-    ) -> zx::zx_status_t {
+    ) -> zx::sys::zx_status_t {
         wtrace::duration!(c"EthernetTx transfer");
 
         // Safety: This call is safe because the caller promises `payload` points to a persisted
@@ -215,8 +234,49 @@ impl EthernetTx {
             Ok(payload) => payload,
             Err(e) => {
                 error!("Unable to unpersist EthernetTx.Transfer request: {}", e);
-                return zx::Status::INTERNAL.into_raw();
+                return zx::Status::BAD_STATE.into_raw();
             }
+        };
+
+        let borrowed_operation =
+            match payload.borrowed_operation.with_name("borrowed_operation").try_unpack() {
+                Ok(x) => x as *mut c_void,
+                Err(e) => {
+                    let e = e.context("Missing required field in EthernetTxTransferRequest.");
+                    error!("{}", e);
+                    return zx::Status::BAD_STATE.into_raw();
+                }
+            };
+
+        let complete_borrowed_operation: unsafe extern "C" fn(
+            borrowed_operation: *mut c_void,
+            status: zx::sys::zx_status_t,
+        ) = match payload
+            .complete_borrowed_operation
+            .with_name("complete_borrowed_operation")
+            .try_unpack()
+        {
+            // Safety: Per the safety documentation of this FFI, the sender promises
+            // this field has the type unsafe extern "C" fn(*mut c_void, zx::sys::zx_status_t).
+            Ok(x) => unsafe { mem::transmute(x) },
+            Err(e) => {
+                let e = e.context("Missing required field in EthernetTxTransferRequest.");
+                error!("{}", e);
+                return zx::Status::BAD_STATE.into_raw();
+            }
+        };
+
+        // Box the closure so that EthernetTxEventSender can be object-safe.
+        let borrowed_operation: Completer<Box<dyn FnOnce(zx::sys::zx_status_t)>> = {
+            // Safety: This call of `complete_borrowed_operation` uses the value
+            // of the received `borrowed_operation` field as its first argument
+            // and will only be called once.
+            let completer = Box::new(move |status| unsafe {
+                complete_borrowed_operation(borrowed_operation, status);
+            });
+            // Safety: The borrowed_operation pointer and complete_borrowed_operation
+            // function are both thread-safe.
+            unsafe { Completer::new_unchecked(completer) }
         };
 
         let async_id = match payload.async_id.with_name("async_id").try_unpack() {
@@ -242,7 +302,7 @@ impl EthernetTx {
             }
         };
 
-        let packet_ptr = packet_address as *const u8;
+        let packet_ptr = packet_address as *mut u8;
         if packet_ptr.is_null() {
             error!("EthernetTx.Transfer request contained NULL packet_address");
             return zx::Status::INVALID_ARGS.into_raw();
@@ -250,15 +310,18 @@ impl EthernetTx {
 
         // Safety: This call is safe because a `EthernetTx` request is defined such that a slice
         // such as this one can be constructed from the `packet_address` and `packet_size` fields.
-        let packet_bytes: Vec<u8> =
-            unsafe { slice::from_raw_parts(packet_ptr, packet_size as usize) }.into();
+        let bytes = unsafe {
+            NonNull::new_unchecked(slice::from_raw_parts_mut(packet_ptr, packet_size as usize))
+        };
 
         // Safety: This dereference is safe because the lifetime of this pointer was promised to
         // live as long as function could be called when `EthernetTx::to_ffi` was called.
         match unsafe {
-            (*ctx)
-                .sender
-                .unbounded_send(EthernetTxEvent { bytes: packet_bytes, async_id: async_id.into() })
+            (*ctx).sender.unbounded_send(EthernetTxEvent {
+                bytes,
+                async_id: async_id.into(),
+                borrowed_operation,
+            })
         } {
             Err((error, _event)) => {
                 error!("Failed to queue EthernetTx.Transfer request: {}", error);
@@ -289,10 +352,11 @@ pub struct FfiWlanRx {
 pub struct WlanRx {
     ctx: Pin<Box<FfiWlanRxCtx>>,
 }
+
+/// Indicates receipt of a MAC frame.
 // TODO(https://fxbug.dev/42119762): We need to keep stats for these events and respond to StatsQueryRequest.
 pub struct WlanRxEvent {
-    // Indicates receipt of a MAC frame from a peer.
-    pub bytes: Vec<u8>,
+    pub bytes: ArenaStaticBox<[u8]>,
     pub rx_info: fidl_softmac::WlanRxInfo,
     pub async_id: trace::Id,
 }
@@ -362,6 +426,22 @@ impl WlanRx {
             }
         };
 
+        let arena = match payload.arena.with_name("arena").try_unpack() {
+            Ok(x) => {
+                if x == 0 {
+                    error!("Received arena is null");
+                    return;
+                }
+                // Safety: The received arena is assumed to be valid if it's not null.
+                unsafe { Arena::from_raw(NonNull::new_unchecked(x as *mut fdf_arena_t)) }
+            }
+            Err(e) => {
+                let e = e.context("Missing required field in WlanRxTransferRequest.");
+                error!("{}", e);
+                return;
+            }
+        };
+
         let (packet_address, packet_size, packet_info) = match (
             payload.packet_address.with_name("packet_address"),
             payload.packet_size.with_name("packet_size"),
@@ -378,7 +458,7 @@ impl WlanRx {
             }
         };
 
-        let packet_ptr = packet_address as *const u8;
+        let packet_ptr = packet_address as *mut u8;
         if packet_ptr.is_null() {
             let e = "WlanRx.Transfer request contained NULL packet_address";
             error!("{}", e);
@@ -388,14 +468,20 @@ impl WlanRx {
 
         // Safety: This call is safe because a `WlanRx` request is defined such that a slice
         // such as this one can be constructed from the `packet_address` and `packet_size` fields.
-        let packet_bytes: Vec<u8> =
-            unsafe { slice::from_raw_parts(packet_ptr, packet_size as usize) }.into();
+        // Also, the slice is allocated in `arena`.
+        let bytes = unsafe {
+            arena.assume_unchecked(NonNull::new_unchecked(slice::from_raw_parts_mut(
+                packet_ptr,
+                packet_size as usize,
+            )))
+        };
+        let bytes = arena.make_static(bytes);
 
         // Safety: This dereference is safe because the lifetime of this pointer was promised to
         // live as long as function could be called when `WlanRx::to_ffi` was called.
         let _: Result<(), ()> = unsafe {
             (*ctx).sender.unbounded_send(WlanRxEvent {
-                bytes: packet_bytes,
+                bytes,
                 rx_info: packet_info,
                 async_id: async_id.into(),
             })

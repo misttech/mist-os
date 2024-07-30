@@ -58,6 +58,7 @@ forensics
 ?netstack-migration
 ?netstack3
 ?network
+?network-socket-proxy
 ?network-tun
 ?omaha-client
 ?overnet-usb
@@ -97,6 +98,7 @@ system-update-committer
 ?triage-detect
 ?trusted-apps
 ?tzdata-provider
+?uart
 ?ui
 ?update-bin
 ?virtual_keyboard_manager

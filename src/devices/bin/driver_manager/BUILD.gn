@@ -69,18 +69,21 @@ source_set("driver_runner") {
     "bind/bind_result_tracker.h",
     "bootup_tracker.cc",
     "bootup_tracker.h",
-    "composite_node_spec_v2.cc",
-    "composite_node_spec_v2.h",
+    "composite_node_spec_impl.cc",
+    "composite_node_spec_impl.h",
     "controller_allowlist_passthrough.cc",
     "controller_allowlist_passthrough.h",
     "driver_host.cc",
     "driver_host.h",
+    "driver_host_runner.cc",
+    "driver_host_runner.h",
     "driver_runner.cc",
     "driver_runner.h",
     "node.cc",
     "node.h",
     "parent_set_collector.cc",
     "parent_set_collector.h",
+    "pkg_utils.h",
     "runner.cc",
     "runner.h",
     "shutdown/node_removal_tracker.cc",
@@ -120,34 +123,12 @@ source_set("driver_runner") {
     "//sdk/lib/async_patterns/cpp",
     "//sdk/lib/inspect/component/cpp",
     "//sdk/lib/vfs/cpp",
+    "//src/devices/bin/driver_loader",
     "//src/devices/bin/driver_manager:inspect",
     "//src/devices/bin/driver_manager/devfs",
     "//src/lib/ddk",
     "//src/storage/lib/vfs/cpp",
     "//zircon/system/ulib/zircon-internal",
-  ]
-}
-
-source_set("driver_host_runner") {
-  sources = [
-    "driver_host_runner.cc",
-    "driver_host_runner.h",
-  ]
-  deps = [
-    "//sdk/lib/component/incoming/cpp",
-    "//sdk/lib/component/outgoing/cpp",
-    "//sdk/lib/driver/component/cpp:cpp",
-    "//src/devices/lib/log",
-  ]
-
-  public_deps = [
-    "//sdk/fidl/fuchsia.component:fuchsia.component_cpp",
-    "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_cpp",
-    "//sdk/fidl/fuchsia.component.runner:fuchsia.component.runner_cpp",
-    "//sdk/fidl/fuchsia.device.manager:fuchsia.device.manager_cpp",
-    "//sdk/lib/vfs/cpp",
-    "//src/devices/bin/driver_loader",
-    "//zircon/system/ulib/fbl",
   ]
 }
 

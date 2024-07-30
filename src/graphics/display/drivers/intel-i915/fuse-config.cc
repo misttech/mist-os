@@ -4,7 +4,7 @@
 
 #include "src/graphics/display/drivers/intel-i915/fuse-config.h"
 
-#include <lib/ddk/debug.h>
+#include <lib/driver/logging/cpp/logger.h>
 #include <lib/mmio/mmio.h>
 #include <zircon/assert.h>
 
@@ -97,25 +97,25 @@ FuseConfig FuseConfig::ReadFrom(fdf::MmioBuffer& mmio_space, uint16_t device_id)
 
 void FuseConfig::Log() {
   if (!graphics_enabled)
-    zxlogf(WARNING, "Unusual fuse state - Graphics disabled");
+    FDF_LOG(WARNING, "Unusual fuse state - Graphics disabled");
 
   for (size_t i = 0; i < std::size(pipe_enabled); ++i) {
     if (!pipe_enabled[i])
-      zxlogf(WARNING, "Unusual fuse state - Pipe %zu disabled", i);
+      FDF_LOG(WARNING, "Unusual fuse state - Pipe %zu disabled", i);
   }
 
   if (!edp_enabled)
-    zxlogf(WARNING, "Unusual fuse state - eDP disabled");
+    FDF_LOG(WARNING, "Unusual fuse state - eDP disabled");
   if (!display_capture_enabled)
-    zxlogf(WARNING, "Unusual fuse state - WD (display capture) disabled");
+    FDF_LOG(WARNING, "Unusual fuse state - WD (display capture) disabled");
   if (!display_stream_compression_enabled)
-    zxlogf(WARNING, "Unusual fuse state - DSC disabled");
+    FDF_LOG(WARNING, "Unusual fuse state - DSC disabled");
   if (!frame_buffer_compression_enabled)
-    zxlogf(WARNING, "Unusual fuse state - FBC disabled");
+    FDF_LOG(WARNING, "Unusual fuse state - FBC disabled");
   if (!display_power_savings_enabled)
-    zxlogf(WARNING, "Unusual fuse state - DPST disabled");
+    FDF_LOG(WARNING, "Unusual fuse state - DPST disabled");
 
-  zxlogf(TRACE, "Maximum clock: %d kHz", core_clock_limit_khz);
+  FDF_LOG(TRACE, "Maximum clock: %d kHz", core_clock_limit_khz);
 }
 
 }  // namespace i915

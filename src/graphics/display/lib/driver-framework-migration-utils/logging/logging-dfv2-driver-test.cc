@@ -11,6 +11,7 @@
 #include <gtest/gtest.h>
 
 #include "src/graphics/display/lib/driver-framework-migration-utils/logging/testing/dfv2-driver-with-logging.h"
+#include "src/lib/testing/predicates/status.h"
 
 namespace display {
 
@@ -22,23 +23,23 @@ class DriverLoggingTest : public ::testing::Test {
     // Create start args
     node_server_.emplace("root");
     zx::result start_args = node_server_->CreateStartArgsAndServe();
-    EXPECT_EQ(ZX_OK, start_args.status_value());
+    EXPECT_OK(start_args);
 
     // Start the test environment
     test_environment_.emplace();
     zx::result result =
         test_environment_->Initialize(std::move(start_args->incoming_directory_server));
-    EXPECT_EQ(ZX_OK, result.status_value());
+    EXPECT_OK(result);
 
     // Start driver
     zx::result start_result =
         runtime_.RunToCompletion(driver_.Start(std::move(start_args->start_args)));
-    EXPECT_EQ(ZX_OK, start_result.status_value());
+    EXPECT_OK(start_result);
   }
 
   void TearDown() override {
     zx::result prepare_stop_result = runtime_.RunToCompletion(driver_.PrepareStop());
-    EXPECT_EQ(ZX_OK, prepare_stop_result.status_value());
+    EXPECT_OK(prepare_stop_result);
 
     test_environment_.reset();
     node_server_.reset();

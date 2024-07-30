@@ -19,7 +19,7 @@ use fuchsia_url::AbsoluteComponentUrl;
 use futures::FutureExt;
 use moniker::{ChildName, Moniker};
 use router_error::Explain;
-use routing::capability_source::{CapabilitySource, ComponentCapability};
+use routing::capability_source::{CapabilitySource, ComponentCapability, InternalCapability};
 use routing::component_instance::{
     ComponentInstanceInterface, ExtendedInstanceInterface, TopInstanceInterface,
 };
@@ -521,7 +521,7 @@ impl ComponentModelForAnalyzer {
         self: &Arc<Self>,
         offer_decl: &OfferDecl,
         target: &Arc<ComponentInstanceForAnalyzer>,
-    ) -> Vec<VerifyRouteResult> {
+    ) -> Vec<VerifyRouteResult<ComponentInstanceForAnalyzer>> {
         let target_moniker = target.moniker();
 
         let offer_target = offer_decl.target();
@@ -555,7 +555,7 @@ impl ComponentModelForAnalyzer {
         self: &Arc<Self>,
         offer_decl: &OfferDecl,
         target: &Arc<ComponentInstanceForAnalyzer>,
-    ) -> Vec<VerifyRouteResult> {
+    ) -> Vec<VerifyRouteResult<ComponentInstanceForAnalyzer>> {
         let mut results = Vec::new();
         let (capability, route_request) = match offer_decl.clone() {
             OfferDecl::Protocol(offer_decl) => {
@@ -619,6 +619,7 @@ impl ComponentModelForAnalyzer {
                                     capability: Some(capability.clone()),
                                     error: None,
                                     route,
+                                    source: Some(source.source.clone()),
                                 });
                             }
                         }
@@ -629,6 +630,7 @@ impl ComponentModelForAnalyzer {
                                     capability: Some(capability.clone()),
                                     error: Some(err.clone()),
                                     route,
+                                    source: Some(source.source.clone()),
                                 });
                             }
                         }
@@ -640,6 +642,7 @@ impl ComponentModelForAnalyzer {
                                 capability: Some(capability.clone()),
                                 error: Some(err.clone()),
                                 route,
+                                source: None,
                             });
                         }
                     }
@@ -661,6 +664,7 @@ impl ComponentModelForAnalyzer {
                     capability: Some(capability.clone()),
                     error: Some(err.into()),
                     route,
+                    source: None,
                 });
                 return results;
             }
@@ -678,6 +682,7 @@ impl ComponentModelForAnalyzer {
                     capability: Some(capability.clone()),
                     error: None,
                     route,
+                    source: Some(source.source),
                 });
             }
             Err(err) => {
@@ -686,6 +691,7 @@ impl ComponentModelForAnalyzer {
                     capability: Some(capability.clone()),
                     error: Some(err),
                     route,
+                    source: Some(source.source),
                 });
             }
         };
@@ -698,7 +704,7 @@ impl ComponentModelForAnalyzer {
         self: &Arc<Self>,
         target: &Arc<ComponentInstanceForAnalyzer>,
         capability_types: &HashSet<CapabilityTypeName>,
-    ) -> HashMap<CapabilityTypeName, Vec<VerifyRouteResult>> {
+    ) -> HashMap<CapabilityTypeName, Vec<VerifyRouteResult<ComponentInstanceForAnalyzer>>> {
         let mut results = HashMap::new();
         for capability_type in capability_types.iter() {
             results.insert(capability_type.clone(), vec![]);
@@ -766,7 +772,7 @@ impl ComponentModelForAnalyzer {
         self: &Arc<Self>,
         use_decl: &UseDecl,
         target: &Arc<ComponentInstanceForAnalyzer>,
-    ) -> Vec<VerifyRouteResult> {
+    ) -> Vec<VerifyRouteResult<ComponentInstanceForAnalyzer>> {
         let mut results = Vec::new();
         let route_result = match use_decl.clone() {
             UseDecl::Directory(use_directory_decl) => {
@@ -868,6 +874,7 @@ impl ComponentModelForAnalyzer {
                             capability: Some(capability.clone()),
                             error: None,
                             route,
+                            source: Some(source.source.clone()),
                         });
                     }
                 }
@@ -878,6 +885,7 @@ impl ComponentModelForAnalyzer {
                             capability: Some(capability.clone()),
                             error: Some(err.clone()),
                             route,
+                            source: Some(source.source.clone()),
                         });
                     }
                 }
@@ -889,6 +897,7 @@ impl ComponentModelForAnalyzer {
                         capability: Some(capability.clone()),
                         error: Some(err.clone()),
                         route,
+                        source: None,
                     });
                 }
             }
@@ -903,18 +912,21 @@ impl ComponentModelForAnalyzer {
         self: &Arc<Self>,
         expose_decl: &ExposeDecl,
         target: &Arc<ComponentInstanceForAnalyzer>,
-    ) -> Option<VerifyRouteResult> {
+    ) -> Option<VerifyRouteResult<ComponentInstanceForAnalyzer>> {
         match self.request_from_expose(expose_decl) {
             Some(request) => {
                 let (result, route) = Self::route_capability_sync(request, target);
-                let error =
-                    result.map_err(|e| e.into()).and_then(|s| self.check_use_source(&s)).err();
+                let (error, source) = match result {
+                    Err(e) => (Some(e.into()), None),
+                    Ok(source) => (self.check_use_source(&source).err(), Some(source.source)),
+                };
 
                 Some(VerifyRouteResult {
                     using_node: target.moniker().clone(),
                     capability: Some(expose_decl.target_name().clone()),
                     error,
                     route,
+                    source,
                 })
             }
             None => None,
@@ -927,7 +939,7 @@ impl ComponentModelForAnalyzer {
         self: &Arc<Self>,
         program_decl: &ProgramDecl,
         target: &Arc<ComponentInstanceForAnalyzer>,
-    ) -> Option<VerifyRouteResult> {
+    ) -> Option<VerifyRouteResult<ComponentInstanceForAnalyzer>> {
         match program_decl.runner {
             Some(ref runner) => {
                 let (result, route) = Self::route_capability_sync(
@@ -939,17 +951,19 @@ impl ComponentModelForAnalyzer {
                     target,
                 );
                 match result {
-                    Ok(_source) => Some(VerifyRouteResult {
+                    Ok(source) => Some(VerifyRouteResult {
                         using_node: target.moniker().clone(),
                         capability: Some(runner.clone()),
                         error: None,
                         route,
+                        source: Some(source.source),
                     }),
                     Err(err) => Some(VerifyRouteResult {
                         using_node: target.moniker().clone(),
                         capability: Some(runner.clone()),
                         error: Some(err.into()),
                         route,
+                        source: None,
                     }),
                 }
             }
@@ -963,7 +977,7 @@ impl ComponentModelForAnalyzer {
     pub fn check_resolver(
         self: &Arc<Self>,
         target: &Arc<ComponentInstanceForAnalyzer>,
-    ) -> VerifyRouteResult {
+    ) -> VerifyRouteResult<ComponentInstanceForAnalyzer> {
         let scheme = target.url().scheme().expect("all urls are absolute");
 
         match target.environment.get_registered_resolver(&scheme) {
@@ -973,21 +987,23 @@ impl ComponentModelForAnalyzer {
                     &instance,
                 );
                 match route_result {
-                    Ok(_source) => VerifyRouteResult {
+                    Ok(source) => VerifyRouteResult {
                         using_node: target.moniker().clone(),
                         capability: Some(resolver.resolver),
                         error: None,
                         route,
+                        source: Some(source.source),
                     },
                     Err(err) => VerifyRouteResult {
                         using_node: target.moniker().clone(),
                         capability: Some(resolver.resolver),
                         error: Some(err.into()),
                         route,
+                        source: None,
                     },
                 }
             }
-            Ok(Some((ExtendedInstanceInterface::AboveRoot(_), resolver))) => {
+            Ok(Some((ExtendedInstanceInterface::AboveRoot(top_instance), resolver))) => {
                 match self.get_builtin_resolver_decl(&resolver) {
                     Ok(decl) => {
                         let route = vec![RouteSegment::ProvideAsBuiltin { capability: decl }];
@@ -996,6 +1012,12 @@ impl ComponentModelForAnalyzer {
                             capability: Some(resolver.resolver),
                             error: None,
                             route,
+                            source: Some(CapabilitySource::Builtin {
+                                capability: InternalCapability::Resolver(
+                                    Name::new(scheme).unwrap(),
+                                ),
+                                top_instance: Arc::downgrade(&top_instance),
+                            }),
                         }
                     }
                     Err(err) => VerifyRouteResult {
@@ -1003,6 +1025,7 @@ impl ComponentModelForAnalyzer {
                         capability: Some(resolver.resolver),
                         error: Some(err),
                         route: vec![],
+                        source: None,
                     },
                 }
             }
@@ -1011,12 +1034,14 @@ impl ComponentModelForAnalyzer {
                 capability: None,
                 error: Some(AnalyzerModelError::MissingResolverForScheme(scheme.to_string())),
                 route: vec![],
+                source: None,
             },
             Err(err) => VerifyRouteResult {
                 using_node: target.moniker().clone(),
                 capability: None,
                 error: Some(AnalyzerModelError::from(err)),
                 route: vec![],
+                source: None,
             },
         }
     }

@@ -12,7 +12,8 @@
 // looks up the symbols directly instead of invoking them.
 
 const char* const kExpectedTeeSymbols[] = {
-    "TEE_Panic",
+    "TEE_Panic",   "TEE_Malloc",     "TEE_Realloc", "TEE_Free",
+    "TEE_MemMove", "TEE_MemCompare", "TEE_MemFill",
 };
 
 void load_expected_tee_symbols() {

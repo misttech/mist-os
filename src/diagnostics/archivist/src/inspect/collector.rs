@@ -8,15 +8,13 @@ use fidl::endpoints::{DiscoverableProtocolMarker, Proxy};
 use fidl_fuchsia_inspect::{TreeMarker, TreeProxy};
 use fidl_fuchsia_inspect_deprecated::{InspectMarker, InspectProxy};
 use futures::stream::StreamExt;
-use std::collections::HashMap;
 use std::pin::pin;
 use std::sync::{Arc, Weak};
 use tracing::error;
 use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
-/// Mapping from a diagnostics filename to the underlying encoding of that
-/// diagnostics data.
-pub type DataMap = HashMap<Option<InspectHandleName>, InspectData>;
+/// Pairs a diagnostics data-object's name to the underlying encoding of that data.
+pub type InspectHandleDeque = std::collections::VecDeque<(Option<InspectHandleName>, InspectData)>;
 
 /// Data associated with a component.
 /// This data is stored by data collectors and passed by the collectors to processors.
@@ -54,8 +52,8 @@ fn maybe_load_service<P: DiscoverableProtocolMarker>(
     Ok(None)
 }
 
-pub async fn populate_data_map(inspect_handles: &[Weak<InspectHandle>]) -> DataMap {
-    let mut data_map = DataMap::new();
+pub async fn populate_data_map(inspect_handles: &[Weak<InspectHandle>]) -> InspectHandleDeque {
+    let mut data_map = InspectHandleDeque::new();
     for inspect_handle in inspect_handles {
         let Some(handle) = inspect_handle.upgrade() else {
             continue;
@@ -65,16 +63,16 @@ pub async fn populate_data_map(inspect_handles: &[Weak<InspectHandle>]) -> DataM
                 return populate_data_map_from_dir(dir).await
             }
             InspectHandle::Tree { proxy, name } => {
-                data_map.insert(
+                data_map.push_back((
                     name.as_ref().map(|name| InspectHandleName::name(name.clone())),
                     InspectData::Tree(proxy.clone()),
-                );
+                ));
             }
             InspectHandle::Escrow { vmo, name, .. } => {
-                data_map.insert(
+                data_map.push_back((
                     name.as_ref().map(|name| InspectHandleName::name(name.clone())),
                     InspectData::Vmo { data: Arc::clone(vmo), escrowed: true },
-                );
+                ));
             }
         }
     }
@@ -84,7 +82,7 @@ pub async fn populate_data_map(inspect_handles: &[Weak<InspectHandle>]) -> DataM
 
 /// Searches the directory specified by inspect_directory_proxy for
 /// .inspect files and populates the `inspect_data_map` with the found VMOs.
-async fn populate_data_map_from_dir(inspect_proxy: &fio::DirectoryProxy) -> DataMap {
+async fn populate_data_map_from_dir(inspect_proxy: &fio::DirectoryProxy) -> InspectHandleDeque {
     // TODO(https://fxbug.dev/42112326): Use a streaming and bounded readdir API when available to avoid
     // being hung.
     let mut entries =
@@ -96,22 +94,24 @@ async fn populate_data_map_from_dir(inspect_proxy: &fio::DirectoryProxy) -> Data
                     result.ok()
                 }
             }));
-    let mut data_map = DataMap::new();
+    let mut data_map = InspectHandleDeque::new();
     // TODO(https://fxbug.dev/42138410) convert this async loop to a stream so we can carry backpressure
     while let Some(entry) = entries.next().await {
         // We are only currently interested in inspect VMO files (root.inspect) and
         // inspect services.
         if let Ok(Some(proxy)) = maybe_load_service::<TreeMarker>(inspect_proxy, &entry) {
-            data_map
-                .insert(Some(InspectHandleName::filename(entry.name)), InspectData::Tree(proxy));
+            data_map.push_back((
+                Some(InspectHandleName::filename(entry.name)),
+                InspectData::Tree(proxy),
+            ));
             continue;
         }
 
         if let Ok(Some(proxy)) = maybe_load_service::<InspectMarker>(inspect_proxy, &entry) {
-            data_map.insert(
+            data_map.push_back((
                 Some(InspectHandleName::filename(entry.name)),
                 InspectData::DeprecatedFidl(proxy),
-            );
+            ));
             continue;
         }
 
@@ -166,7 +166,7 @@ async fn populate_data_map_from_dir(inspect_proxy: &fio::DirectoryProxy) -> Data
                 }
             }
         };
-        data_map.insert(Some(InspectHandleName::filename(entry.name)), data);
+        data_map.push_back((Some(InspectHandleName::filename(entry.name)), data));
     }
 
     data_map
@@ -229,19 +229,27 @@ mod tests {
         let data = populate_data_map(&handles.iter().map(Arc::downgrade).collect::<Vec<_>>()).await;
         assert_eq!(data.len(), 3);
 
-        assert_matches!(data.get(&name1), Some(InspectData::Tree(t)) => {
+        let (_, tree1) = data.iter().find(|(n, _)| *n == name1).unwrap();
+
+        assert_matches!(tree1, InspectData::Tree(t) => {
             let h = reader::read(t).await.unwrap();
             assert_data_tree!(h, root: {
                 one: 1i64,
             });
         });
-        assert_matches!(data.get(&name2), Some(InspectData::Tree(t)) => {
+
+        let (_, tree2) = data.iter().find(|(n, _)| *n == name2).unwrap();
+
+        assert_matches!(tree2, InspectData::Tree(t) => {
             let h = reader::read(t).await.unwrap();
             assert_data_tree!(h, root: {
                 two: 2i64,
             });
         });
-        assert_matches!(data.get(&name3), Some(InspectData::Tree(t)) => {
+
+        let (_, tree3) = data.iter().find(|(n, _)| *n == name3).unwrap();
+
+        assert_matches!(tree3, InspectData::Tree(t) => {
             let h = reader::read(t).await.unwrap();
             assert_data_tree!(h, root: {
                 three: 3i64,
@@ -292,10 +300,12 @@ mod tests {
                 assert_eq!(3, extra_data.len());
 
                 let assert_extra_data = |path: &str, content: &[u8]| {
-                    let extra = extra_data.get(&Some(InspectHandleName::filename(path)));
-                    assert!(extra.is_some());
+                    let (_, extra) = extra_data
+                        .iter()
+                        .find(|(n, _)| *n == Some(InspectHandleName::filename(path)))
+                        .unwrap();
 
-                    match extra.unwrap() {
+                    match extra {
                         InspectData::Vmo { data: vmo, escrowed: _ } => {
                             let mut buf = [0u8; 5];
                             vmo.read(&mut buf, 0).expect("reading vmo");

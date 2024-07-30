@@ -34,6 +34,7 @@ import("//build/sdk/sdk_atom_alias.gni")
 #     Usual GN meaning.
 template("sdk_host_tool") {
   assert(defined(invoker.category), "Must define an SDK category")
+  assert(is_host)
 
   output_name = target_name
   if (defined(invoker.output_name)) {

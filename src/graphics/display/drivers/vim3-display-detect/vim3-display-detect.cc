@@ -71,7 +71,7 @@ zx::result<> Vim3DisplayDetect::DetectDisplay() {
   return zx::ok();
 }
 
-zx::result<uint8_t> Vim3DisplayDetect::ReadGpio(std::string_view gpio_node_name) {
+zx::result<bool> Vim3DisplayDetect::ReadGpio(std::string_view gpio_node_name) {
   zx::result gpio = incoming()->Connect<fuchsia_hardware_gpio::Service::Device>(gpio_node_name);
   if (gpio.is_error()) {
     FDF_LOG(ERROR, "Failed to connect to GPIO node: %s", gpio.status_string());

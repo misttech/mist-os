@@ -98,6 +98,8 @@ impl ToolEnv {
 }
 
 pub struct FakeInjector {
+    daemon_factory_force_autostart_closure:
+        Box<dyn Fn() -> Pin<Box<dyn Future<Output = anyhow::Result<DaemonProxy>>>>>,
     daemon_factory_closure:
         Box<dyn Fn() -> Pin<Box<dyn Future<Output = anyhow::Result<DaemonProxy>>>>>,
     try_daemon_closure:
@@ -114,6 +116,9 @@ impl Default for FakeInjector {
     fn default() -> Self {
         Self {
             daemon_factory_closure: Box::new(|| Box::pin(async { unimplemented!() })),
+            daemon_factory_force_autostart_closure: Box::new(|| {
+                Box::pin(async { unimplemented!() })
+            }),
             try_daemon_closure: Box::new(|| Box::pin(async { unimplemented!() })),
             remote_factory_closure: Box::new(|| Box::pin(async { unimplemented!() })),
             target_factory_closure: Box::new(|| Box::pin(async { unimplemented!() })),
@@ -125,6 +130,12 @@ impl Default for FakeInjector {
 
 #[async_trait(?Send)]
 impl Injector for FakeInjector {
+    async fn daemon_factory_force_autostart(
+        &self,
+    ) -> anyhow::Result<DaemonProxy, FfxInjectorError> {
+        downcast_injector_error((self.daemon_factory_force_autostart_closure)().await)
+    }
+
     async fn daemon_factory(&self) -> anyhow::Result<DaemonProxy, FfxInjectorError> {
         downcast_injector_error((self.daemon_factory_closure)().await)
     }

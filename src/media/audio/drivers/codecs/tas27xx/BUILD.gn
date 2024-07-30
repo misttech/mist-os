@@ -8,9 +8,9 @@ import("//build/drivers.gni")
 import("//build/test.gni")
 
 driver_bind_rules("ti_tas27xx-bind") {
-  rules = "ti_tas27xx.bind"
+  rules = "meta/ti_tas27xx.bind"
   bind_output = "tas27xx.bindbc"
-  tests = "tests.json"
+  tests = "meta/tests.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_bindlib",
     "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c_bindlib",
@@ -50,7 +50,7 @@ fuchsia_driver("tas27xx-driver") {
 fuchsia_driver_component("tas27xx") {
   component_name = "tas27xx"
   deps = [ ":tas27xx-driver" ]
-  info = "tas27xx-info.json"
+  info = "meta/tas27xx-info.json"
   manifest = "meta/tas27xx.cml"
 }
 

@@ -6,12 +6,7 @@
 
 #include <zircon/assert.h>
 
-#include <algorithm>
-#include <optional>
-
 #include "tools/fidl/fidlc/src/attribute_schema.h"
-#include "tools/fidl/fidlc/src/diagnostics.h"
-#include "tools/fidl/fidlc/src/experimental_flags.h"
 #include "tools/fidl/fidlc/src/flat_ast.h"
 #include "tools/fidl/fidlc/src/name.h"
 #include "tools/fidl/fidlc/src/type_resolver.h"
@@ -598,6 +593,25 @@ void CompileStep::CompileAttributeEarly(Compiler* compiler, Attribute* attribute
   CompileStep(compiler).CompileAttribute(attribute, /* early = */ true);
 }
 
+void CompileStep::CompileModifierList(ModifierList* modifiers, OutModifiers out) {
+  for (auto& modifier : modifiers->modifiers) {
+    CompileAttributeList(modifier->attributes.get());
+    std::visit(overloaded{
+                   [&](Strictness strictness) { *out.strictness = strictness; },
+                   [&](Resourceness resourceness) { *out.resourceness = resourceness; },
+                   [&](Openness openness) { *out.openness = openness; },
+               },
+               modifier->value);
+  }
+  // This matches ConsumeStep::NeedMethodResultUnion which considers methods flexible by default.
+  if (out.strictness && !out.strictness->has_value())
+    *out.strictness = Strictness::kFlexible;
+  if (out.resourceness && !out.resourceness->has_value())
+    *out.resourceness = Resourceness::kValue;
+  if (out.openness && !out.openness->has_value())
+    *out.openness = Openness::kOpen;
+}
+
 const Type* CompileStep::UnderlyingType(const Type* type) {
   if (type->kind != Type::Kind::kIdentifier) {
     return type;
@@ -690,6 +704,9 @@ void CompileStep::CompileBits(Bits* bits_declaration) {
     CompileAttributeList(member.attributes.get());
   }
 
+  CompileModifierList(bits_declaration->modifiers.get(),
+                      OutModifiers{.strictness = &bits_declaration->strictness});
+
   CompileTypeConstructor(bits_declaration->subtype_ctor.get());
   if (!bits_declaration->subtype_ctor->type) {
     return;
@@ -699,6 +716,11 @@ void CompileStep::CompileBits(Bits* bits_declaration) {
     reporter()->Fail(ErrBitsTypeMustBeUnsignedIntegralPrimitive,
                      bits_declaration->name.span().value(), bits_declaration->subtype_ctor->type);
     return;
+  }
+
+  if (bits_declaration->strictness.value() == Strictness::kStrict &&
+      bits_declaration->members.empty()) {
+    reporter()->Fail(ErrMustHaveOneMember, bits_declaration->name.span().value());
   }
 
   // Validate constants.
@@ -768,6 +790,9 @@ void CompileStep::CompileEnum(Enum* enum_declaration) {
     CompileAttributeList(member.attributes.get());
   }
 
+  CompileModifierList(enum_declaration->modifiers.get(),
+                      OutModifiers{.strictness = &enum_declaration->strictness});
+
   CompileTypeConstructor(enum_declaration->subtype_ctor.get());
   if (!enum_declaration->subtype_ctor->type) {
     return;
@@ -777,6 +802,11 @@ void CompileStep::CompileEnum(Enum* enum_declaration) {
     reporter()->Fail(ErrEnumTypeMustBeIntegralPrimitive, enum_declaration->name.span().value(),
                      enum_declaration->subtype_ctor->type);
     return;
+  }
+
+  if (enum_declaration->strictness.value() == Strictness::kStrict &&
+      enum_declaration->members.empty()) {
+    reporter()->Fail(ErrMustHaveOneMember, enum_declaration->name.span().value());
   }
 
   // Validate constants.
@@ -900,10 +930,11 @@ void CompileStep::CompileResource(Resource* resource_declaration) {
   }
 }
 
-static void SetResultUnionFields(Protocol::Method* method) {
-  bool has_framework_error = method->kind == Protocol::Method::Kind::kTwoWay &&
-                             method->strictness == Strictness::kFlexible;
-  if (!method->has_error && !has_framework_error)
+void CompileStep::CompileResultUnion(Protocol::Method* method) {
+  using Ordinal = Protocol::Method::ResultUnionOrdinal;
+  if (method->kind != Protocol::Method::Kind::kTwoWay)
+    return;
+  if (method->strictness == Strictness::kStrict && !method->has_error)
     return;
   auto& response = method->maybe_response;
   ZX_ASSERT(response && response->type);
@@ -913,20 +944,21 @@ static void SetResultUnionFields(Protocol::Method* method) {
   auto anonymous = identifier_type->type_decl->name.as_anonymous();
   ZX_ASSERT(anonymous && anonymous->provenance == Name::Provenance::kGeneratedResultUnion);
   auto decl = static_cast<Union*>(identifier_type->type_decl);
-  method->result_union = decl;
-  for (auto& member : decl->members) {
-    switch (member.ordinal->value) {
-      case Protocol::Method::ResultUnionOrdinal::kSuccess:
-        method->result_success_type_ctor = member.type_ctor.get();
-        break;
-      case Protocol::Method::ResultUnionOrdinal::kDomainError:
-        method->result_domain_error_type_ctor = member.type_ctor.get();
-        break;
-      case Protocol::Method::ResultUnionOrdinal::kFrameworkError:
-        break;
-      default:
-        ZX_PANIC("unexpected ordinal in result union");
-    }
+  ZX_ASSERT(decl->members.size() == (method->has_error ? 3 : 2));
+  method->maybe_result_union = decl;
+  ZX_ASSERT(decl->members[0].ordinal->value == Ordinal::kSuccess);
+  method->result_success_type_ctor = decl->members[0].type_ctor.get();
+  if (method->has_error) {
+    ZX_ASSERT(decl->members[1].ordinal->value == Ordinal::kDomainError);
+    method->result_domain_error_type_ctor = decl->members[1].type_ctor.get();
+  }
+  // The ConsumeStep always adds a framework error because it doesn't know if
+  // method is strict or flexible. We remove it here if the method is strict.
+  // This will never mutate the same union twice because the ResolveStep adds
+  // edges from result unions to protocols, ensuring they get split together.
+  if (method->strictness == Strictness::kStrict) {
+    ZX_ASSERT(decl->members.back().ordinal->value == Ordinal::kFrameworkError);
+    decl->members.pop_back();
   }
 }
 
@@ -979,7 +1011,9 @@ class PopulateAllMethods {
 
 void CompileStep::CompileProtocol(Protocol* protocol_declaration) {
   CompileAttributeList(protocol_declaration->attributes.get());
-  auto openness = protocol_declaration->openness;
+  CompileModifierList(protocol_declaration->modifiers.get(),
+                      OutModifiers{.openness = &protocol_declaration->openness});
+  auto openness = protocol_declaration->openness.value();
 
   for (auto& composed : protocol_declaration->composed_protocols) {
     CompileAttributeList(composed.attributes.get());
@@ -992,13 +1026,14 @@ void CompileStep::CompileProtocol(Protocol* protocol_declaration) {
     CompileDecl(composed_protocol);
     if (openness < composed_protocol->openness) {
       reporter()->Fail(ErrComposedProtocolTooOpen, composed.reference.span(), openness,
-                       protocol_declaration->name, composed_protocol->openness,
+                       protocol_declaration->name, composed_protocol->openness.value(),
                        composed_protocol->name);
     }
   }
 
   for (auto& method : protocol_declaration->methods) {
     CompileAttributeList(method.attributes.get());
+    CompileModifierList(method.modifiers.get(), OutModifiers{.strictness = &method.strictness});
     ValidateSelectorAndCalcOrdinal(protocol_declaration->name, &method);
     if (auto& type_ctor = method.maybe_request) {
       CompileTypeConstructor(type_ctor.get());
@@ -1008,12 +1043,12 @@ void CompileStep::CompileProtocol(Protocol* protocol_declaration) {
       CompileTypeConstructor(type_ctor.get());
       ValidatePayload(type_ctor.get());
     }
-    SetResultUnionFields(&method);
+    CompileResultUnion(&method);
     if (auto* type_ctor = method.result_success_type_ctor)
       ValidatePayload(type_ctor);
     if (auto* type_ctor = method.result_domain_error_type_ctor)
       ValidateDomainError(type_ctor);
-    bool flexible = method.strictness == Strictness::kFlexible;
+    bool flexible = method.strictness.value() == Strictness::kFlexible;
     bool two_way = method.kind == Protocol::Method::Kind::kTwoWay;
     if (flexible && two_way && openness != Openness::kOpen) {
       reporter()->Fail(ErrFlexibleTwoWayMethodRequiresOpenProtocol, method.name, openness);
@@ -1157,25 +1192,16 @@ void CompileStep::CompileService(Service* service_decl) {
   }
 }
 
-template <typename DeclType>
-void CompileStep::ValidateResourceness(const DeclType* decl,
-                                       const typename DeclType::Member& member) {
-  if (decl->resourceness == Resourceness::kValue &&
-      member.type_ctor->type->Resourceness() == Resourceness::kResource) {
-    reporter()->Fail(ErrTypeMustBeResource, decl->name.span().value(), decl->kind, decl->name,
-                     member.name.data(), member.name);
-  }
-}
-
 void CompileStep::CompileStruct(Struct* struct_declaration) {
   CompileAttributeList(struct_declaration->attributes.get());
+  CompileModifierList(struct_declaration->modifiers.get(),
+                      OutModifiers{.resourceness = &struct_declaration->resourceness});
   for (auto& member : struct_declaration->members) {
     CompileAttributeList(member.attributes.get());
     CompileTypeConstructor(member.type_ctor.get());
     if (!member.type_ctor->type) {
       continue;
     }
-    ValidateResourceness(struct_declaration, member);
     if (member.maybe_default_value) {
       const auto* default_value_type = member.type_ctor->type;
       if (!TypeCanBeConst(default_value_type)) {
@@ -1192,6 +1218,9 @@ void CompileStep::CompileTable(Table* table_declaration) {
   Ordinal64Scope ordinal_scope;
 
   CompileAttributeList(table_declaration->attributes.get());
+  CompileModifierList(table_declaration->modifiers.get(),
+                      OutModifiers{.strictness = &table_declaration->strictness,
+                                   .resourceness = &table_declaration->resourceness});
   for (size_t i = 0; i < table_declaration->members.size(); i++) {
     auto& member = table_declaration->members[i];
     CompileAttributeList(member.attributes.get());
@@ -1210,7 +1239,6 @@ void CompileStep::CompileTable(Table* table_declaration) {
     if (member.type_ctor->type->IsNullable()) {
       reporter()->Fail(ErrOptionalTableMember, member.name);
     }
-    ValidateResourceness(table_declaration, member);
     if (i == kMaxTableOrdinals - 1) {
       if (member.type_ctor->type->kind != Type::Kind::kIdentifier) {
         reporter()->Fail(ErrMaxOrdinalNotTable, member.name);
@@ -1228,7 +1256,11 @@ void CompileStep::CompileUnion(Union* union_declaration) {
   Ordinal64Scope ordinal_scope;
 
   CompileAttributeList(union_declaration->attributes.get());
-  bool infer_resourceness = !union_declaration->resourceness.has_value();
+  CompileModifierList(union_declaration->modifiers.get(),
+                      OutModifiers{.strictness = &union_declaration->strictness,
+                                   .resourceness = &union_declaration->resourceness});
+  auto anon = union_declaration->name.as_anonymous();
+  bool infer_resourceness = anon && anon->provenance == Name::Provenance::kGeneratedResultUnion;
   auto resourceness = Resourceness::kValue;
   for (const auto& member : union_declaration->members) {
     CompileAttributeList(member.attributes.get());
@@ -1244,33 +1276,32 @@ void CompileStep::CompileUnion(Union* union_declaration) {
     if (member.type_ctor->type->IsNullable()) {
       reporter()->Fail(ErrOptionalUnionMember, member.name);
     }
-    ValidateResourceness(union_declaration, member);
     if (infer_resourceness && member.type_ctor->type->Resourceness() == Resourceness::kResource) {
       resourceness = Resourceness::kResource;
     }
   }
 
-  if (infer_resourceness) {
-    auto* name = union_declaration->name.as_anonymous();
-    ZX_ASSERT(name && name->provenance == Name::Provenance::kGeneratedResultUnion);
+  if (infer_resourceness)
     union_declaration->resourceness = resourceness;
-  }
 
-  if (union_declaration->strictness == Strictness::kStrict && union_declaration->members.empty()) {
+  if (union_declaration->strictness.value() == Strictness::kStrict &&
+      union_declaration->members.empty()) {
     reporter()->Fail(ErrMustHaveOneMember, union_declaration->name.span().value());
   }
 }
 
 void CompileStep::CompileOverlay(Overlay* overlay_declaration) {
-  if (overlay_declaration->strictness != Strictness::kStrict) {
+  Ordinal64Scope ordinal_scope;
+  CompileAttributeList(overlay_declaration->attributes.get());
+  CompileModifierList(overlay_declaration->modifiers.get(),
+                      OutModifiers{.strictness = &overlay_declaration->strictness,
+                                   .resourceness = &overlay_declaration->resourceness});
+  if (overlay_declaration->strictness.value() != Strictness::kStrict) {
     reporter()->Fail(ErrOverlayMustBeStrict, overlay_declaration->name.span().value());
   }
-  if (overlay_declaration->resourceness == Resourceness::kResource) {
+  if (overlay_declaration->resourceness.value() == Resourceness::kResource) {
     reporter()->Fail(ErrOverlayMustBeValue, overlay_declaration->name.span().value());
   }
-  Ordinal64Scope ordinal_scope;
-
-  CompileAttributeList(overlay_declaration->attributes.get());
   for (const auto& member : overlay_declaration->members) {
     CompileAttributeList(member.attributes.get());
     const auto ordinal_result = ordinal_scope.Insert(member.ordinal->value, member.ordinal->span());
@@ -1283,7 +1314,6 @@ void CompileStep::CompileOverlay(Overlay* overlay_declaration) {
     if (!member.type_ctor->type) {
       continue;
     }
-    ValidateResourceness(overlay_declaration, member);
   }
 }
 
@@ -1452,7 +1482,7 @@ bool CompileStep::ValidateEnumMembersAndCalcUnknownValue(Enum* enum_decl,
   auto validator = [enum_decl, &explicit_unknown_value](
                        MemberType member, const AttributeList* attributes,
                        SourceSpan span) -> std::unique_ptr<Diagnostic> {
-    switch (enum_decl->strictness) {
+    switch (enum_decl->strictness.value()) {
       case Strictness::kStrict:
         if (attributes->Get("unknown") != nullptr) {
           return Diagnostic::MakeError(ErrUnknownAttributeOnStrictEnumMember, span);

@@ -12,7 +12,6 @@
 #include <zircon/syscalls/log.h>
 
 #include <fbl/alloc_checker.h>
-#include <fbl/auto_lock.h>
 
 KCOUNTER(dispatcher_log_create_count, "dispatcher.log.create")
 KCOUNTER(dispatcher_log_destroy_count, "dispatcher.log.destroy")

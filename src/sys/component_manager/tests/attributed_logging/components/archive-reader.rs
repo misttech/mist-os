@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use diagnostics_data::Logs;
+use diagnostics_data::{ExtendedMoniker, Logs};
 use diagnostics_reader::ArchiveReader;
 use futures::stream::StreamExt;
 use std::collections::HashMap;
@@ -14,9 +14,11 @@ async fn main() {
     let mut non_matching_logs = vec![];
 
     type Fingerprint = Vec<&'static str>;
-    let mut treasure = HashMap::<String, Vec<Fingerprint>>::new();
+    let mut treasure = HashMap::<ExtendedMoniker, Vec<Fingerprint>>::new();
     treasure.insert(
-        "routing-tests/offers-to-children-unavailable/child-for-offer-from-parent".to_string(),
+        "routing-tests/offers-to-children-unavailable/child-for-offer-from-parent"
+            .try_into()
+            .unwrap(),
         vec![vec![
             "protocol `fidl.test.components.Trigger`",
             "not available for target \
@@ -26,7 +28,7 @@ async fn main() {
         ]],
     );
     treasure.insert(
-        "routing-tests/offers-to-children-unavailable-but-optional/child-for-offer-from-parent".to_string(),
+        "routing-tests/offers-to-children-unavailable-but-optional/child-for-offer-from-parent".try_into().unwrap(),
         vec![vec![
             "Optional",
             "protocol `fidl.test.components.Trigger`",
@@ -37,7 +39,7 @@ async fn main() {
         ]],
     );
     treasure.insert(
-        "routing-tests/child".to_string(),
+        "routing-tests/child".try_into().unwrap(),
         vec![vec![
             "protocol `fidl.test.components.Trigger`",
             "not available for target \
@@ -47,7 +49,7 @@ async fn main() {
         ]],
     );
     treasure.insert(
-        "routing-tests/child-with-optional-use".to_string(),
+        "routing-tests/child-with-optional-use".try_into().unwrap(),
         vec![vec![
             "Optional",
             "protocol `fidl.test.components.Trigger`",
@@ -58,7 +60,7 @@ async fn main() {
         ]],
     );
     treasure.insert(
-        "routing-tests/offers-to-children-unavailable/child-for-offer-from-sibling".to_string(),
+        "routing-tests/offers-to-children-unavailable/child-for-offer-from-sibling".try_into().unwrap(),
         vec![vec![
             "protocol `fidl.test.components.Trigger`",
             "not available for target \
@@ -68,7 +70,7 @@ async fn main() {
         ]],
     );
     treasure.insert(
-        "routing-tests/offers-to-children-unavailable-but-optional/child-for-offer-from-sibling".to_string(),
+        "routing-tests/offers-to-children-unavailable-but-optional/child-for-offer-from-sibling".try_into().unwrap(),
         vec![vec![
             "Optional",
             "protocol `fidl.test.components.Trigger`",
@@ -79,7 +81,7 @@ async fn main() {
         ]],
     );
     treasure.insert(
-        "routing-tests/offers-to-children-unavailable/child-open-unrequested".to_string(),
+        "routing-tests/offers-to-children-unavailable/child-open-unrequested".try_into().unwrap(),
         vec![vec![
             "No capability available",
             "fidl.test.components.Trigger",
@@ -89,7 +91,8 @@ async fn main() {
     );
     treasure.insert(
         "routing-tests/offers-to-children-unavailable-but-optional/child-open-unrequested"
-            .to_string(),
+            .try_into()
+            .unwrap(),
         vec![vec![
             "No capability available",
             "fidl.test.components.Trigger",

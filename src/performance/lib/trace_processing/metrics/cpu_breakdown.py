@@ -3,10 +3,11 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-from typing import Any, Dict, List, Tuple
 import itertools
 import logging
 import sys
+from typing import Any, Dict, List, Tuple
+
 import trace_processing.trace_model as trace_model
 import trace_processing.trace_time as trace_time
 

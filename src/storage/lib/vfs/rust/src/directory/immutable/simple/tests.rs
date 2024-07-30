@@ -21,7 +21,7 @@ use crate::directory::test_utils::{run_server_client, DirentsSameInodeBuilder};
 use crate::execution_scope::ExecutionScope;
 use crate::file;
 use crate::path::Path;
-use crate::test_utils::node::{open2_get_proxy, open_get_proxy};
+use crate::test_utils::node::{open3_get_proxy, open_get_proxy};
 use crate::test_utils::{build_flag_combinations, run_client};
 
 use assert_matches::assert_matches;
@@ -277,7 +277,7 @@ fn one_file_open_missing_not_found_handler() {
 }
 
 #[test]
-fn one_file_open2_missing_not_found_handler() {
+fn one_file_open3_missing_not_found_handler() {
     let root = pseudo_directory! {
         "foo" => file::read_only("Content"),
     };
@@ -292,15 +292,10 @@ fn one_file_open2_missing_not_found_handler() {
     }
 
     run_server_client(fio::OpenFlags::RIGHT_READABLE, root, |proxy| async move {
-        let file = open2_get_proxy::<fio::FileMarker>(
+        let file = open3_get_proxy::<fio::FileMarker>(
             &proxy,
-            &fio::ConnectionProtocols::Node(fio::NodeOptions {
-                protocols: Some(fio::NodeProtocols {
-                    file: Some(fio::FileProtocolFlags::default()),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            }),
+            fio::Flags::PROTOCOL_FILE,
+            &fio::Options::default(),
             "bar",
         );
         assert_matches!(

@@ -9,13 +9,8 @@ import logging
 import os
 import subprocess
 import sys
-from typing import Any, TextIO
+from typing import Any, List, TextIO
 
-from assembly.assembly_input_bundle import (
-    CompiledPackageDefinition,
-    CompiledPackageDefinitionFromGN,
-)
-from depfile import DepFile
 from assembly import (
     AIBCreator,
     AssemblyInputBundle,
@@ -25,10 +20,9 @@ from assembly import (
     PackageDetails,
     PackageManifest,
 )
-from serialization import (
-    instance_from_dict,
-    json_load,
-)
+from assembly.assembly_input_bundle import CompiledPackageDefinitionFromGN
+from depfile import DepFile
+from serialization import instance_from_dict, json_load
 
 logger = logging.getLogger()
 
@@ -46,31 +40,23 @@ def create_bundle(args: argparse.Namespace) -> None:
 
     # Add the base and cache packages, if they exist.
     if args.base_pkg_list:
-        add_pkg_list_from_file(aib_creator.packages, args.base_pkg_list, "base")
+        add_pkg_list_from_file(aib_creator, args.base_pkg_list, "base")
 
     if args.cache_pkg_list:
-        add_pkg_list_from_file(
-            aib_creator.packages, args.cache_pkg_list, "cache"
-        )
+        add_pkg_list_from_file(aib_creator, args.cache_pkg_list, "cache")
 
     if args.flexible_pkg_list:
-        add_pkg_list_from_file(
-            aib_creator.packages, args.flexible_pkg_list, "flexible"
-        )
+        add_pkg_list_from_file(aib_creator, args.flexible_pkg_list, "flexible")
 
     if args.system_pkg_list:
-        add_pkg_list_from_file(
-            aib_creator.system, args.system_pkg_list, "system"
-        )
+        add_pkg_list_from_file(aib_creator, args.system_pkg_list, "system")
 
     if args.bootfs_pkg_list:
-        add_pkg_list_from_file(
-            aib_creator.packages, args.bootfs_pkg_list, "bootfs"
-        )
+        add_pkg_list_from_file(aib_creator, args.bootfs_pkg_list, "bootfs")
 
     if args.on_demand_pkg_list:
         add_pkg_list_from_file(
-            aib_creator.packages, args.on_demand_pkg_list, "on_demand"
+            aib_creator, args.on_demand_pkg_list, "on_demand"
         )
 
     if args.shell_cmds_list:
@@ -133,19 +119,19 @@ def create_bundle(args: argparse.Namespace) -> None:
 
 
 def add_pkg_list_from_file(
-    pkg_set: set[PackageDetails], pkg_list_file: TextIO, pkg_set_name: str
+    aib_creator: AIBCreator, pkg_list_file: TextIO, pkg_set_name: str
 ) -> None:
-    pkg_list = _read_json_file(pkg_list_file)
+    pkg_list: List[str] = _read_json_file(pkg_list_file)  # type: ignore
     for package in [PackageDetails(m, pkg_set_name) for m in pkg_list]:
-        if package in pkg_set:
+        if package in aib_creator.packages:
             raise ValueError(f"duplicate pkg manifest found: {package.package}")
-        pkg_set.add(package)
+        aib_creator.packages.add(package)
 
 
 def add_kernel_cmdline_from_file(
     aib_creator: AIBCreator, kernel_cmdline_file: TextIO
 ) -> None:
-    cmdline_list = _read_json_file(kernel_cmdline_file)
+    cmdline_list: List[str] = _read_json_file(kernel_cmdline_file)  # type: ignore
     for cmd in cmdline_list:
         if cmd in aib_creator.kernel.args:
             raise ValueError(f"duplicate kernel cmdline arg found: {cmd}")

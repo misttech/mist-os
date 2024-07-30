@@ -2,13 +2,13 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-from dataclasses import dataclass
-from enum import IntEnum
 import enum
 import inspect
 import re
 import sys
 import typing
+from dataclasses import dataclass
+from enum import IntEnum
 from typing import List, Tuple
 
 import fuchsia_controller_py as fc

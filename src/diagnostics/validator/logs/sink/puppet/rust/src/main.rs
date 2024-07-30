@@ -14,7 +14,7 @@ use fuchsia_zircon::{self as zx, AsHandleRef};
 use futures::prelude::*;
 use tracing::*;
 
-#[fuchsia::main]
+#[fuchsia::main(always_log_file_line = true)]
 async fn main() {
     tracing::info!("Puppet started.");
     tracing::dispatcher::get_default(|dispatcher| {

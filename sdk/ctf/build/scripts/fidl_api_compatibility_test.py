@@ -7,8 +7,9 @@ import errno
 import filecmp
 import os
 import sys
-import plasa_differ
 from enum import Enum
+
+import plasa_differ
 
 
 class Policy(Enum):

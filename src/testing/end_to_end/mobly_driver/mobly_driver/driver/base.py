@@ -1,4 +1,3 @@
-#!/usr/bin/env fuchsia-vendored-python
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
@@ -10,7 +9,6 @@ interface is used.
 import os
 from abc import ABC, abstractmethod
 from typing import Any, Optional
-
 
 TEST_OUTDIR_ENV = "FUCHSIA_TEST_OUTDIR"
 

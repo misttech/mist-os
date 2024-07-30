@@ -33,15 +33,24 @@
 //
 #ifdef __cplusplus
 
+// Only use the [[likely]/[[unlikely]]] attribute if we are sure the compiler is
+// going to understand it.
+#if defined(__has_cpp_attribute) && (__has_cpp_attribute(likely) >= 201803L)
+#define _ZIRCON_KERNEL_ASSERT_ATTRIBUTE_LIKELY [[likely]]
+#else
+#define _ZIRCON_KERNEL_ASSERT_ATTRIBUTE_LIKELY
+#endif
+
 // Assert that |x| is true, else panic.
 //
 // ASSERT is always enabled and |x| will be evaluated regardless of any build arguments.
-#define ASSERT(x)                          \
-  do {                                     \
-    if (x) [[likely]] {                    \
-    } else [[unlikely]] {                  \
-      assert_fail(__FILE__, __LINE__, #x); \
-    }                                      \
+#define ASSERT(x)                               \
+  do {                                          \
+    if (x)                                      \
+      _ZIRCON_KERNEL_ASSERT_ATTRIBUTE_LIKELY {} \
+    else {                                      \
+      assert_fail(__FILE__, __LINE__, #x);      \
+    }                                           \
   } while (0)
 
 // Assert that |x| is true, else panic with the given message.
@@ -49,8 +58,9 @@
 // ASSERT_MSG is always enabled and |x| will be evaluated regardless of any build arguments.
 #define ASSERT_MSG(x, msg, msgargs...)                         \
   do {                                                         \
-    if (x) [[likely]] {                                        \
-    } else [[unlikely]] {                                      \
+    if (x)                                                     \
+      _ZIRCON_KERNEL_ASSERT_ATTRIBUTE_LIKELY {}                \
+    else {                                                     \
       assert_fail_msg(__FILE__, __LINE__, #x, msg, ##msgargs); \
     }                                                          \
   } while (0)
@@ -59,14 +69,15 @@
 //
 // Depending on build arguments, DEBUG_ASSERT may or may not be enabled. When disabled, |x| will not
 // be evaluated.
-#define DEBUG_ASSERT(x)                       \
-  do {                                        \
-    if constexpr (DEBUG_ASSERT_IMPLEMENTED) { \
-      if (x) [[likely]] {                     \
-      } else [[unlikely]] {                   \
-        assert_fail(__FILE__, __LINE__, #x);  \
-      }                                       \
-    }                                         \
+#define DEBUG_ASSERT(x)                           \
+  do {                                            \
+    if constexpr (DEBUG_ASSERT_IMPLEMENTED) {     \
+      if (x)                                      \
+        _ZIRCON_KERNEL_ASSERT_ATTRIBUTE_LIKELY {} \
+      else {                                      \
+        assert_fail(__FILE__, __LINE__, #x);      \
+      }                                           \
+    }                                             \
   } while (0)
 
 // Assert that |x| is true, else panic with the given message.
@@ -76,8 +87,9 @@
 #define DEBUG_ASSERT_MSG(x, msg, msgargs...)                     \
   do {                                                           \
     if constexpr (DEBUG_ASSERT_IMPLEMENTED) {                    \
-      if (x) [[likely]] {                                        \
-      } else [[unlikely]] {                                      \
+      if (x)                                                     \
+        _ZIRCON_KERNEL_ASSERT_ATTRIBUTE_LIKELY {}                \
+      else {                                                     \
         assert_fail_msg(__FILE__, __LINE__, #x, msg, ##msgargs); \
       }                                                          \
     }                                                            \

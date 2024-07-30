@@ -3,11 +3,11 @@
 # found in the LICENSE file.
 """A tiny example binary for the native Python rules of Bazel."""
 
+import difflib
 import io
 import os
 import unittest
 import zipfile
-import difflib
 
 
 class TestReview(unittest.TestCase):

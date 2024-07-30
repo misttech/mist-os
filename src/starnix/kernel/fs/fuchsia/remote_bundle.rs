@@ -21,7 +21,7 @@ use fuchsia_zircon::{
     HandleBased, {self as zx},
 };
 use starnix_logging::{impossible_error, log_warn};
-use starnix_sync::{FileOpsCore, Locked, RwLock, RwLockReadGuard, RwLockWriteGuard, WriteOps};
+use starnix_sync::{FileOpsCore, Locked, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::errors::{Errno, SourceContext};
 use starnix_uapi::file_mode::FileMode;
@@ -119,7 +119,7 @@ impl RemoteBundle {
             .get_node(node.node_id)
             .extended_attributes
             .get(&**name)
-            .ok_or(errno!(ENOENT))?[..];
+            .ok_or_else(|| errno!(ENOENT))?[..];
         Ok(FsString::from(value).into())
     }
 
@@ -274,7 +274,7 @@ impl FileOps for MemoryFile {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, WriteOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -306,6 +306,7 @@ impl FileOps for MemoryFile {
 
     fn wait_async(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _waiter: &Waiter,
@@ -317,6 +318,7 @@ impl FileOps for MemoryFile {
 
     fn query_events(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
@@ -350,11 +352,15 @@ impl FileOps for DirectoryObject {
         emit_dotdot(file, sink)?;
 
         let bundle = RemoteBundle::from_fs(&file.fs);
-        let child_iter =
-            bundle.get_node(file.node().node_id).directory().ok_or(errno!(EIO))?.children.iter();
+        let child_iter = bundle
+            .get_node(file.node().node_id)
+            .directory()
+            .ok_or_else(|| errno!(EIO))?
+            .children
+            .iter();
 
         for (name, inode_num) in child_iter.skip(sink.offset() as usize - 2) {
-            let node = bundle.metadata.get(*inode_num).ok_or(errno!(EIO))?;
+            let node = bundle.metadata.get(*inode_num).ok_or_else(|| errno!(EIO))?;
             sink.add(
                 *inode_num,
                 sink.offset() + 1,
@@ -397,7 +403,7 @@ impl FsNodeOps for DirectoryObject {
         let inode_num = metadata
             .lookup(node.node_id, name)
             .map_err(|e| errno!(ENOENT, format!("Error: {e:?} opening {name}")))?;
-        let metadata_node = metadata.get(inode_num).ok_or(errno!(EIO))?;
+        let metadata_node = metadata.get(inode_num).ok_or_else(|| errno!(EIO))?;
         let info = to_fs_node_info(inode_num, metadata_node);
 
         match metadata_node.info() {
@@ -461,7 +467,8 @@ impl FsNodeOps for SymlinkObject {
     fn readlink(&self, node: &FsNode, _current_task: &CurrentTask) -> Result<SymlinkTarget, Errno> {
         let fs = node.fs();
         let bundle = RemoteBundle::from_fs(&fs);
-        let target = bundle.get_node(node.node_id).symlink().ok_or(errno!(EIO))?.target.clone();
+        let target =
+            bundle.get_node(node.node_id).symlink().ok_or_else(|| errno!(EIO))?.target.clone();
         Ok(SymlinkTarget::Path(target.into()))
     }
 

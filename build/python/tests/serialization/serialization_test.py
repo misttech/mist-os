@@ -3,17 +3,17 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-from dataclasses import dataclass, field
 import json
-from typing import Dict, List, Optional, Set, Union
 import unittest
+from dataclasses import dataclass, field
+from typing import Dict, List, Optional, Set, Union
 
 from serialization import (
-    instance_to_dict,
     instance_from_dict,
+    instance_to_dict,
     serialize_dict,
-    serialize_json,
     serialize_fields_as,
+    serialize_json,
 )
 
 

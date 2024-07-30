@@ -6,13 +6,15 @@ use crate::error::ParseError;
 use crate::types::*;
 use crate::validate::{ValidateComponentSelectorExt, ValidateExt, ValidateTreeSelectorExt};
 use nom::branch::alt;
-use nom::bytes::complete::{escaped, is_not, tag, take_while};
+use nom::bytes::complete::{escaped, is_not, tag, take_till, take_while};
 use nom::character::complete::{alphanumeric1, multispace0, none_of, one_of};
 use nom::combinator::{all_consuming, complete, cond, map, opt, peek, recognize, verify};
 use nom::error::{ErrorKind, ParseError as NomParseError};
 use nom::multi::separated_nonempty_list;
-use nom::sequence::{pair, preceded, tuple};
+use nom::sequence::{delimited, pair, preceded, separated_pair, tuple};
 use nom::IResult;
+
+static ALL_TREE_NAMES_SELECTED_SYMBOL: &'static str = "...";
 
 /// Recognizes 0 or more spaces or tabs.
 fn whitespace0<'a, E>(input: &'a str) -> IResult<&'a str, &'a str, E>
@@ -31,13 +33,56 @@ where
     preceded(whitespace0, parser)
 }
 
+fn extract_conjoined_names<'a, E>(input: &'a str) -> IResult<&'a str, Option<&'a str>, E>
+where
+    E: NomParseError<&'a str>,
+{
+    delimited(tag::<&str, &str, E>("["), take_till(|c| c == ']'), tag("]"))(input)
+        .map(|(rest, names)| (rest, Some(names)))
+}
+
+fn extract_from_quotes<'a, E>(input: &'a str) -> &'a str
+where
+    E: NomParseError<&'a str>,
+{
+    if let Ok((_, stripped)) =
+        delimited(tag::<&str, &str, E>(r#"""#), take_till(|c| c == '"'), tag(r#"""#))(input)
+    {
+        stripped
+    } else {
+        input
+    }
+}
+
 /// Parses a tree selector, which is a node selector and an optional property selector.
 pub fn tree_selector<'a, E>(input: &'a str) -> IResult<&'a str, TreeSelector<'a>, E>
 where
     E: NomParseError<&'a str>,
 {
     let esc = escaped(none_of(":/\\ \t\n"), '\\', one_of("* \t/:\\"));
-    let (rest, node_segments) = separated_nonempty_list(tag("/"), &esc)(input)?;
+
+    let (rest, unparsed_name_list) = extract_conjoined_names::<E>(input).unwrap_or((input, None));
+
+    let tree_names = if unparsed_name_list == Some(ALL_TREE_NAMES_SELECTED_SYMBOL) {
+        Some(TreeNames::All)
+    } else {
+        unparsed_name_list
+            .map(|names: &str| {
+                let tree_names = names.split(",");
+                tree_names
+                    .into_iter()
+                    .map(|name| {
+                        Ok(extract_from_quotes::<E>(
+                            spaced(separated_pair(tag("name"), tag("="), &esc))(name)?.1 .1,
+                        ))
+                    })
+                    .collect::<Result<Vec<_>, _>>()
+            })
+            .transpose()?
+            .map(|value| value.into())
+    };
+
+    let (rest, node_segments) = separated_nonempty_list(tag("/"), &esc)(rest)?;
     let (rest, property_segment) = if peek::<&str, _, E, _>(tag(":"))(rest).is_ok() {
         let (rest, _) = tag(":")(rest)?;
         let (rest, property) = verify(esc, |value: &str| !value.is_empty())(rest)?;
@@ -50,6 +95,7 @@ where
         TreeSelector {
             node: node_segments.into_iter().map(|value| value.into()).collect(),
             property: property_segment.map(|value| value.into()),
+            tree_names,
         },
     ))
 }
@@ -365,34 +411,83 @@ mod tests {
     fn canonical_tree_selector_test() {
         let test_vector = vec![
             (
+                "[name=a]b/c:d",
+                vec![Segment::ExactMatch("b".into()), Segment::ExactMatch("c".into())],
+                Some(Segment::ExactMatch("d".into())),
+                Some(vec!["a"].into()),
+            ),
+            (
+                "[name=a,name=bb]b/c:d",
+                vec![Segment::ExactMatch("b".into()), Segment::ExactMatch("c".into())],
+                Some(Segment::ExactMatch("d".into())),
+                Some(vec!["a", "bb"].into()),
+            ),
+            (
+                "[...]b/c:d",
+                vec![Segment::ExactMatch("b".into()), Segment::ExactMatch("c".into())],
+                Some(Segment::ExactMatch("d".into())),
+                Some(TreeNames::All),
+            ),
+            (
+                "[name=a, name=bb]b/c:d",
+                vec![Segment::ExactMatch("b".into()), Segment::ExactMatch("c".into())],
+                Some(Segment::ExactMatch("d".into())),
+                Some(vec!["a", "bb"].into()),
+            ),
+            (
+                "[name=a, name=\"bb\"]b/c:d",
+                vec![Segment::ExactMatch("b".into()), Segment::ExactMatch("c".into())],
+                Some(Segment::ExactMatch("d".into())),
+                Some(vec!["a", "bb"].into()),
+            ),
+            (
+                r#"[name=a, name="a\/\*\:a"]b/c:d"#,
+                vec![Segment::ExactMatch("b".into()), Segment::ExactMatch("c".into())],
+                Some(Segment::ExactMatch("d".into())),
+                Some(vec!["a", "a/*:a"].into()),
+            ),
+            (
                 "a/b:c",
                 vec![Segment::ExactMatch("a".into()), Segment::ExactMatch("b".into())],
                 Some(Segment::ExactMatch("c".into())),
+                None,
             ),
             (
                 "a/*:c",
                 vec![Segment::ExactMatch("a".into()), Segment::Pattern("*")],
                 Some(Segment::ExactMatch("c".into())),
+                None,
             ),
             (
                 "a/b:*",
                 vec![Segment::ExactMatch("a".into()), Segment::ExactMatch("b".into())],
                 Some(Segment::Pattern("*")),
+                None,
             ),
-            ("a/b", vec![Segment::ExactMatch("a".into()), Segment::ExactMatch("b".into())], None),
+            (
+                "a/b",
+                vec![Segment::ExactMatch("a".into()), Segment::ExactMatch("b".into())],
+                None,
+                None,
+            ),
             (
                 r#"a/b\:\*c"#,
                 vec![Segment::ExactMatch("a".into()), Segment::ExactMatch("b:*c".into())],
                 None,
+                None,
             ),
         ];
 
-        for (string, expected_path, expected_property) in test_vector {
+        for (string, expected_path, expected_property, expected_tree_name) in test_vector {
             let (_, tree_selector) =
                 tree_selector::<nom::error::VerboseError<&str>>(string).unwrap();
             assert_eq!(
                 tree_selector,
-                TreeSelector { node: expected_path, property: expected_property }
+                TreeSelector {
+                    node: expected_path,
+                    property: expected_property,
+                    tree_names: expected_tree_name,
+                }
             );
         }
     }
@@ -453,7 +548,7 @@ mod tests {
                 all_consuming::<_, _, nom::error::VerboseError<&str>, _>(tree_selector)(string)
                     .unwrap()
                     .1,
-                TreeSelector { node, property }
+                TreeSelector { node, property, tree_names: None }
             );
         }
 
@@ -475,6 +570,7 @@ mod tests {
                 tree: TreeSelector {
                     node: vec![Segment::ExactMatch("some-node".into()), Segment::Pattern("he*re"),],
                     property: Some(Segment::ExactMatch("prop".into())),
+                    tree_names: None,
                 },
             }
         );
@@ -486,7 +582,24 @@ mod tests {
                 component: ComponentSelector { segments: vec![Segment::ExactMatch("foo".into())] },
                 tree: TreeSelector {
                     node: vec![Segment::ExactMatch("bar".into())],
-                    property: None
+                    property: None,
+                    tree_names: None
+                },
+            }
+        );
+
+        // parses tree names
+        assert_eq!(
+            selector::<VerboseError>("core/**:[name=foo, name=\"bar\\*\"]some-node/he*re:prop")
+                .unwrap(),
+            Selector {
+                component: ComponentSelector {
+                    segments: vec![Segment::ExactMatch("core".into()), Segment::Pattern("**"),],
+                },
+                tree: TreeSelector {
+                    node: vec![Segment::ExactMatch("some-node".into()), Segment::Pattern("he*re"),],
+                    property: Some(Segment::ExactMatch("prop".into())),
+                    tree_names: Some(vec!["foo", r"bar*"].into()),
                 },
             }
         );
@@ -514,6 +627,7 @@ mod tests {
                 tree: TreeSelector {
                     node: vec![Segment::ExactMatch("some node".into()), Segment::Pattern("*"),],
                     property: Some(Segment::ExactMatch("prop".into())),
+                    tree_names: None,
                 },
             }
         );

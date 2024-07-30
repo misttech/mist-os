@@ -110,11 +110,6 @@ where
     }
 
     /// Removes the raw IP socket from the system, returning its external state.
-    ///
-    /// # Panics
-    ///
-    /// If the provided `id` is not the last instance for the socket, this
-    /// method will panic.
     pub fn close(
         &mut self,
         id: RawIpApiSocketId<I, C>,

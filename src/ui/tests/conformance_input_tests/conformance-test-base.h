@@ -6,6 +6,7 @@
 #define SRC_UI_TESTS_CONFORMANCE_INPUT_TESTS_CONFORMANCE_TEST_BASE_H_
 
 #include <fuchsia/testing/harness/cpp/fidl.h>
+#include <fuchsia/ui/test/context/cpp/fidl.h>
 #include <lib/fidl/cpp/interface_handle.h>
 #include <lib/fidl/cpp/synchronous_interface_ptr.h>
 #include <lib/sys/cpp/component_context.h>
@@ -16,12 +17,14 @@
 #include <cstdlib>
 #include <iostream>
 
-#include "src/lib/testing/loop_fixture/real_loop_fixture.h"
+#include <zxtest/zxtest.h>
+
+#include "src/ui/testing/util/logging_event_loop.h"
 
 namespace ui_conformance_test_base {
 
 /// ConformanceTest use realm_proxy to connect test realm.
-class ConformanceTest : public gtest::RealLoopFixture {
+class ConformanceTest : public zxtest::Test, public ui_testing::LoggingEventLoop {
  public:
   ConformanceTest() = default;
   ~ConformanceTest() override = default;
@@ -57,6 +60,7 @@ class ConformanceTest : public gtest::RealLoopFixture {
   }
 
  private:
+  fuchsia::ui::test::context::RealmFactorySyncPtr realm_factory_;
   fuchsia::testing::harness::RealmProxySyncPtr realm_proxy_;
   std::unique_ptr<sys::ComponentContext> context_;
 };

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "protected_ranges.h"
+#include "src/devices/sysmem/drivers/sysmem/protected_ranges.h"
 
 #include <lib/ddk/debug.h>
 #include <lib/fit/defer.h>
@@ -10,7 +10,7 @@
 #include <limits>
 #include <random>
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 // Output the same way as protected_ranges.cc so we won't get shifted output.
 #define LOG(severity, fmt, ...) zxlogf(severity, fmt, ##__VA_ARGS__)
@@ -54,7 +54,8 @@ void CheckNoOverlapAndCoalesced(const Ranges& ranges) {
 
 }  // namespace
 
-class ProtectedRangesTest : public zxtest::Test, public protected_ranges::ProtectedRangesControl {
+class ProtectedRangesTest : public ::testing::Test,
+                            public protected_ranges::ProtectedRangesControl {
  public:
   class TestRange {
    public:

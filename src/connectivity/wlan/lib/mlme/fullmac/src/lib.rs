@@ -120,6 +120,7 @@ pub struct FullmacMlme<D: DeviceOps + Send> {
     mlme_event_sink: wlan_sme::MlmeEventSink,
     driver_event_stream: mpsc::UnboundedReceiver<FullmacDriverEvent>,
     is_bss_protected: bool,
+    device_link_state: fidl_mlme::ControlledPortState,
 }
 
 impl<D: DeviceOps + Send + 'static> FullmacMlme<D> {
@@ -324,6 +325,7 @@ impl<D: DeviceOps + Send + 'static> FullmacMlme<D> {
             mlme_event_sink,
             driver_event_stream,
             is_bss_protected: false,
+            device_link_state: fidl_mlme::ControlledPortState::Closed,
         };
 
         // Startup is complete. Signal the main thread to proceed.
@@ -363,25 +365,31 @@ impl<D: DeviceOps + Send + 'static> FullmacMlme<D> {
         match req {
             Scan(req) => self.handle_mlme_scan_request(req),
             Connect(req) => {
-                self.device.set_link_state(fidl_mlme::ControlledPortState::Closed);
+                self.set_link_state(fidl_mlme::ControlledPortState::Closed);
                 self.is_bss_protected = !req.security_ie.is_empty();
                 self.device.connect(*convert_connect_request(&req))
             }
             Reconnect(req) => self.device.reconnect(convert_reconnect_request(&req)),
             AuthResponse(resp) => self.device.auth_resp(convert_authenticate_response(&resp)),
             Deauthenticate(req) => {
-                self.device.set_link_state(fidl_mlme::ControlledPortState::Closed);
+                self.set_link_state(fidl_mlme::ControlledPortState::Closed);
                 self.device.deauth(convert_deauthenticate_request(&req))
             }
             AssocResponse(resp) => self.device.assoc_resp(convert_associate_response(&resp)),
-            Disassociate(req) => self.device.disassoc(convert_disassociate_request(&req)),
-            Reset(req) => self.device.reset(convert_reset_request(&req)),
+            Disassociate(req) => {
+                self.set_link_state(fidl_mlme::ControlledPortState::Closed);
+                self.device.disassoc(convert_disassociate_request(&req));
+            }
+            Reset(req) => {
+                self.set_link_state(fidl_mlme::ControlledPortState::Closed);
+                self.device.reset(convert_reset_request(&req));
+            }
             Start(req) => self.device.start_bss(convert_start_bss_request(&req)),
             Stop(req) => self.device.stop_bss(convert_stop_bss_request(&req)),
             SetKeys(req) => self.handle_mlme_set_keys_request(req),
             DeleteKeys(req) => self.device.del_keys_req(convert_delete_keys_request(&req)),
             Eapol(req) => self.device.eapol_tx(*convert_eapol_request(&req)),
-            SetCtrlPort(req) => self.device.set_link_state(req.state),
+            SetCtrlPort(req) => self.set_link_state(req.state),
             QueryDeviceInfo(responder) => {
                 let info = self.device.query_device_info();
                 match banjo_to_fidl::convert_device_info(info) {
@@ -475,7 +483,7 @@ impl<D: DeviceOps + Send + 'static> FullmacMlme<D> {
                 // point we would receive a request to open the controlled port from SME.
                 if !self.is_bss_protected && resp.result_code == fidl_ieee80211::StatusCode::Success
                 {
-                    self.device.set_link_state(fidl_mlme::ControlledPortState::Open);
+                    self.set_link_state(fidl_mlme::ControlledPortState::Open);
                 }
                 self.mlme_event_sink.send(fidl_mlme::MlmeEvent::ConnectConf { resp });
             }
@@ -488,13 +496,13 @@ impl<D: DeviceOps + Send + 'static> FullmacMlme<D> {
             }
             FullmacDriverEvent::DeauthConf { resp } => {
                 if *mac_role == banjo_wlan_common::WlanMacRole::CLIENT {
-                    self.device.set_link_state(fidl_mlme::ControlledPortState::Closed);
+                    self.set_link_state(fidl_mlme::ControlledPortState::Closed);
                 }
                 self.mlme_event_sink.send(fidl_mlme::MlmeEvent::DeauthenticateConf { resp });
             }
             FullmacDriverEvent::DeauthInd { ind } => {
                 if *mac_role == banjo_wlan_common::WlanMacRole::CLIENT {
-                    self.device.set_link_state(fidl_mlme::ControlledPortState::Closed);
+                    self.set_link_state(fidl_mlme::ControlledPortState::Closed);
                 }
                 self.mlme_event_sink.send(fidl_mlme::MlmeEvent::DeauthenticateInd { ind });
             }
@@ -503,25 +511,25 @@ impl<D: DeviceOps + Send + 'static> FullmacMlme<D> {
             }
             FullmacDriverEvent::DisassocConf { resp } => {
                 if *mac_role == banjo_wlan_common::WlanMacRole::CLIENT {
-                    self.device.set_link_state(fidl_mlme::ControlledPortState::Closed);
+                    self.set_link_state(fidl_mlme::ControlledPortState::Closed);
                 }
                 self.mlme_event_sink.send(fidl_mlme::MlmeEvent::DisassociateConf { resp });
             }
             FullmacDriverEvent::DisassocInd { ind } => {
                 if *mac_role == banjo_wlan_common::WlanMacRole::CLIENT {
-                    self.device.set_link_state(fidl_mlme::ControlledPortState::Closed);
+                    self.set_link_state(fidl_mlme::ControlledPortState::Closed);
                 }
                 self.mlme_event_sink.send(fidl_mlme::MlmeEvent::DisassociateInd { ind });
             }
             FullmacDriverEvent::StartConf { resp } => {
                 if resp.result_code == fidl_mlme::StartResultCode::Success {
-                    self.device.set_link_state(fidl_mlme::ControlledPortState::Open);
+                    self.set_link_state(fidl_mlme::ControlledPortState::Open);
                 }
                 self.mlme_event_sink.send(fidl_mlme::MlmeEvent::StartConf { resp });
             }
             FullmacDriverEvent::StopConf { resp } => {
                 if resp.result_code == fidl_mlme::StopResultCode::Success {
-                    self.device.set_link_state(fidl_mlme::ControlledPortState::Closed);
+                    self.set_link_state(fidl_mlme::ControlledPortState::Closed);
                 }
                 self.mlme_event_sink.send(fidl_mlme::MlmeEvent::StopConf { resp });
             }
@@ -551,6 +559,17 @@ impl<D: DeviceOps + Send + 'static> FullmacMlme<D> {
             }
         }
         DriverState::Running
+    }
+
+    fn set_link_state(&mut self, new_link_state: fidl_mlme::ControlledPortState) {
+        // TODO(https://fxbug.dev/42128153): Let SME handle these changes.
+        if new_link_state == self.device_link_state {
+            return;
+        }
+
+        let online = new_link_state == fidl_mlme::ControlledPortState::Open;
+        self.device.on_link_state_changed(online);
+        self.device_link_state = new_link_state;
     }
 }
 
@@ -845,7 +864,7 @@ mod handle_mlme_request_tests {
 
     #[test]
     fn test_connect_request() {
-        let mut h = TestHelper::set_up();
+        let mut h = TestHelper::set_up_with_link_state(fidl_mlme::ControlledPortState::Open);
         let fidl_req = wlan_sme::MlmeRequest::Connect(fidl_mlme::ConnectRequest {
             selected_bss: fidl_internal::BssDescription {
                 bssid: [100u8; 6],
@@ -965,7 +984,7 @@ mod handle_mlme_request_tests {
 
     #[test]
     fn test_deauthenticate_request() {
-        let mut h = TestHelper::set_up();
+        let mut h = TestHelper::set_up_with_link_state(fidl_mlme::ControlledPortState::Open);
         let fidl_req = wlan_sme::MlmeRequest::Deauthenticate(fidl_mlme::DeauthenticateRequest {
             peer_sta_address: [1u8; 6],
             reason_code: fidl_ieee80211::ReasonCode::LeavingNetworkDeauth,
@@ -1012,7 +1031,7 @@ mod handle_mlme_request_tests {
 
     #[test]
     fn test_disassociate_request() {
-        let mut h = TestHelper::set_up();
+        let mut h = TestHelper::set_up_with_link_state(fidl_mlme::ControlledPortState::Open);
         let fidl_req = wlan_sme::MlmeRequest::Disassociate(fidl_mlme::DisassociateRequest {
             peer_sta_address: [1u8; 6],
             reason_code: fidl_ieee80211::ReasonCode::LeavingNetworkDisassoc,
@@ -1022,6 +1041,12 @@ mod handle_mlme_request_tests {
 
         let binding = h.fake_device.lock().unwrap();
         let mut driver_calls = binding.captured_driver_calls.iter();
+
+        assert_variant!(
+            driver_calls.next(),
+            Some(DriverCall::OnLinkStateChanged { online: false })
+        );
+
         let driver_req =
             assert_variant!(driver_calls.next(), Some(DriverCall::Disassoc{ req }) => req);
         assert_eq!(driver_req.peer_sta_address, [1u8; 6]);
@@ -1033,7 +1058,7 @@ mod handle_mlme_request_tests {
 
     #[test]
     fn test_reset_request() {
-        let mut h = TestHelper::set_up();
+        let mut h = TestHelper::set_up_with_link_state(fidl_mlme::ControlledPortState::Open);
         let fidl_req = wlan_sme::MlmeRequest::Reset(fidl_mlme::ResetRequest {
             sta_address: [1u8; 6],
             set_default_mib: true,
@@ -1043,6 +1068,11 @@ mod handle_mlme_request_tests {
 
         let binding = h.fake_device.lock().unwrap();
         let mut driver_calls = binding.captured_driver_calls.iter();
+
+        assert_variant!(
+            driver_calls.next(),
+            Some(DriverCall::OnLinkStateChanged { online: false })
+        );
 
         let driver_req =
             assert_variant!(driver_calls.next(), Some(DriverCall::Reset { req }) => req);
@@ -1308,7 +1338,12 @@ mod handle_mlme_request_tests {
         controlled_port_state: fidl_mlme::ControlledPortState,
         expected_link_state: bool,
     ) {
-        let mut h = TestHelper::set_up();
+        let mut h = match controlled_port_state {
+            fidl_mlme::ControlledPortState::Open => TestHelper::set_up(),
+            fidl_mlme::ControlledPortState::Closed => {
+                TestHelper::set_up_with_link_state(fidl_mlme::ControlledPortState::Open)
+            }
+        };
         let fidl_req = wlan_sme::MlmeRequest::SetCtrlPort(fidl_mlme::SetControlledPortRequest {
             peer_sta_address: [1u8; 6],
             state: controlled_port_state,
@@ -1554,7 +1589,7 @@ mod handle_mlme_request_tests {
     }
 
     impl TestHelper {
-        pub fn set_up() -> Self {
+        pub fn set_up_with_link_state(device_link_state: fidl_mlme::ControlledPortState) -> Self {
             let fake_device = FakeFullmacDevice::new();
             let (mlme_request_sender, mlme_request_stream) = mpsc::unbounded();
             let (mlme_event_sender, mlme_event_receiver) = mpsc::unbounded();
@@ -1569,6 +1604,7 @@ mod handle_mlme_request_tests {
                 mlme_event_sink,
                 driver_event_stream,
                 is_bss_protected: false,
+                device_link_state,
             };
             Self {
                 fake_device: mocks,
@@ -1577,6 +1613,11 @@ mod handle_mlme_request_tests {
                 _mlme_request_sender: mlme_request_sender,
                 _driver_event_sender: driver_event_sender,
             }
+        }
+
+        // By default, link state starts off closed
+        pub fn set_up() -> Self {
+            Self::set_up_with_link_state(fidl_mlme::ControlledPortState::Closed)
         }
     }
 }
@@ -1749,7 +1790,8 @@ mod handle_driver_event_tests {
         connect_result_code: banjo_wlan_ieee80211::StatusCode,
         expected_online: bool,
     ) {
-        let (mut h, mut test_fut) = TestHelper::set_up();
+        let (mut h, mut test_fut) =
+            TestHelper::set_up_with_link_state(fidl_mlme::ControlledPortState::Open);
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         let connect_req =
@@ -1822,7 +1864,8 @@ mod handle_driver_event_tests {
     #[test_case(banjo_wlan_common::WlanMacRole::AP; "ap")]
     #[fuchsia::test(add_test_attr = false)]
     fn test_deauth_conf(mac_role: banjo_wlan_common::WlanMacRole) {
-        let (mut h, mut test_fut) = TestHelper::set_up();
+        let (mut h, mut test_fut) =
+            TestHelper::set_up_with_link_state(fidl_mlme::ControlledPortState::Open);
         h.fake_device.lock().unwrap().query_device_info_mock.role = mac_role;
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
@@ -1857,7 +1900,8 @@ mod handle_driver_event_tests {
     #[test_case(banjo_wlan_common::WlanMacRole::AP; "ap")]
     #[fuchsia::test(add_test_attr = false)]
     fn test_deauth_ind(mac_role: banjo_wlan_common::WlanMacRole) {
-        let (mut h, mut test_fut) = TestHelper::set_up();
+        let (mut h, mut test_fut) =
+            TestHelper::set_up_with_link_state(fidl_mlme::ControlledPortState::Open);
         h.fake_device.lock().unwrap().query_device_info_mock.role = mac_role;
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
@@ -1939,7 +1983,8 @@ mod handle_driver_event_tests {
     #[test_case(banjo_wlan_common::WlanMacRole::AP; "ap")]
     #[fuchsia::test(add_test_attr = false)]
     fn test_disassoc_conf(mac_role: banjo_wlan_common::WlanMacRole) {
-        let (mut h, mut test_fut) = TestHelper::set_up();
+        let (mut h, mut test_fut) =
+            TestHelper::set_up_with_link_state(fidl_mlme::ControlledPortState::Open);
         h.fake_device.lock().unwrap().query_device_info_mock.role = mac_role;
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
@@ -1973,7 +2018,8 @@ mod handle_driver_event_tests {
     #[test_case(banjo_wlan_common::WlanMacRole::AP; "ap")]
     #[fuchsia::test(add_test_attr = false)]
     fn test_disassoc_ind(mac_role: banjo_wlan_common::WlanMacRole) {
-        let (mut h, mut test_fut) = TestHelper::set_up();
+        let (mut h, mut test_fut) =
+            TestHelper::set_up_with_link_state(fidl_mlme::ControlledPortState::Open);
         h.fake_device.lock().unwrap().query_device_info_mock.role = mac_role;
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
@@ -2349,7 +2395,16 @@ mod handle_driver_event_tests {
     }
 
     impl TestHelper {
+        // By default, MLME is set up closed
         pub fn set_up() -> (Self, Pin<Box<impl Future<Output = Result<(), anyhow::Error>>>>) {
+            Self::set_up_with_link_state(fidl_mlme::ControlledPortState::Closed)
+        }
+
+        /// For tests that need to observe all OnLinkStateChanged calls, they can choose what link
+        /// state the device starts with to ensure that none get filtered out by MLME.
+        pub fn set_up_with_link_state(
+            device_link_state: fidl_mlme::ControlledPortState,
+        ) -> (Self, Pin<Box<impl Future<Output = Result<(), anyhow::Error>>>>) {
             let exec = fasync::TestExecutor::new();
 
             let fake_device = FakeFullmacDevice::new();
@@ -2369,6 +2424,7 @@ mod handle_driver_event_tests {
                 mlme_event_sink,
                 driver_event_stream,
                 is_bss_protected: false,
+                device_link_state,
             };
             let test_fut = Box::pin(mlme.run_main_loop());
             let test_helper = TestHelper {

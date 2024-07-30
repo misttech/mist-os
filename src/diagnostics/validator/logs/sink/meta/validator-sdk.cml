@@ -9,10 +9,7 @@
     ],
     program: {
         binary: "bin/sink_validator",
-        args: [
-            "--new-file-line-rules",
-            "--test-stop-listener",
-        ],
+        args: [ "--test-stop-listener" ],
     },
     use: [
         {

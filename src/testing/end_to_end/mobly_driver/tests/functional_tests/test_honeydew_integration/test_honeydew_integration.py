@@ -1,4 +1,3 @@
-#!/usr/bin/env fuchsia-vendored-python
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
@@ -7,10 +6,7 @@
 Test that Mobly driver's Mobly config interfaces with Honeydew correctly.
 """
 
-from mobly import asserts
-from mobly import base_test
-from mobly import test_runner
-
+from mobly import asserts, base_test, test_runner
 from mobly_controller import fuchsia_device
 
 

@@ -10,7 +10,7 @@ use frunner::{ComponentControllerMarker, ComponentStartInfo};
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_sync::Mutex;
 use kernel_manager::StarnixKernel;
-use std::collections::HashMap;
+use slab::Slab;
 use std::sync::Arc;
 use vfs::execution_scope::ExecutionScope;
 use zx::AsHandleRef;
@@ -26,8 +26,7 @@ const KERNEL_URL: &str = "starnix_kernel#meta/starnix_kernel.cm";
 ///
 /// It also reports the memory usage attribution of each kernel.
 pub struct Kernels {
-    /// Mapping from kernel name to StarnixKernel.
-    kernels: Arc<Mutex<HashMap<String, Arc<StarnixKernel>>>>,
+    kernels: Arc<Mutex<Slab<StarnixKernel>>>,
     memory_attribution_server: AttributionServerHandle,
     memory_update_publisher: attribution_server::Publisher,
     background_tasks: ExecutionScope,
@@ -61,25 +60,23 @@ impl Kernels {
         let (kernel, on_stop) =
             StarnixKernel::create(realm, KERNEL_URL, start_info, controller).await?;
         self.memory_update_publisher.on_update(attribution_info_for_kernel(&kernel));
-        let name = kernel.name().to_string();
-        self.kernels.lock().insert(name.clone(), Arc::new(kernel));
+        let kernel_idx = self.kernels.lock().insert(kernel);
         let kernels = self.kernels.clone();
         let on_removed_publisher = self.memory_attribution_server.new_publisher();
         self.background_tasks.spawn(async move {
             on_stop.await;
-            if let Some(kernel) = kernels.lock().remove(&name) {
+            if let Some(kernel) = kernels.lock().try_remove(kernel_idx) {
+                let koid = kernel.component_instance().get_koid().unwrap().raw_koid();
                 _ = kernel.destroy().await.inspect_err(|e| tracing::error!("{e:?}"));
-                on_removed_publisher.on_update(vec![fattribution::AttributionUpdate::Remove(
-                    kernel.component_instance().get_koid().unwrap().raw_koid(),
-                )]);
+                on_removed_publisher.on_update(vec![fattribution::AttributionUpdate::Remove(koid)]);
             }
         });
         Ok(())
     }
 
-    /// Gets a momentary snapshot of the currently running kernels.
-    pub fn list(&self) -> Vec<Arc<StarnixKernel>> {
-        self.kernels.lock().values().cloned().collect()
+    /// Gets a momentary snapshot of all kernel jobs.
+    pub fn all_jobs(&self) -> Vec<Arc<zx::Job>> {
+        self.kernels.lock().iter().map(|(_, k)| Arc::clone(k.job())).collect()
     }
 
     pub fn new_memory_attribution_observer(
@@ -97,11 +94,11 @@ impl Drop for Kernels {
 }
 
 fn get_attribution(
-    kernels: Arc<Mutex<HashMap<String, Arc<StarnixKernel>>>>,
+    kernels: Arc<Mutex<Slab<StarnixKernel>>>,
 ) -> Vec<fattribution::AttributionUpdate> {
     let kernels = kernels.lock();
     let mut updates = vec![];
-    for kernel in kernels.values() {
+    for kernel in kernels.iter().map(|(_, v)| v) {
         updates.extend(attribution_info_for_kernel(kernel));
     }
     vec![]

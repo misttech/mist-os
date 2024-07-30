@@ -6,8 +6,8 @@ use anyhow::{anyhow, Context, Result};
 use errors::{ffx_bail, ffx_bail_with_code};
 use ffx_config::api::ConfigError;
 use ffx_config::{
-    print_config, set_metrics_status, show_metrics_status, BuildOverride, ConfigLevel,
-    EnvironmentContext,
+    disable_metrics, enable_basic_metrics, enable_enhanced_metrics, print_config,
+    show_metrics_status, BuildOverride, ConfigLevel, EnvironmentContext,
 };
 use ffx_config_plugin_args::{
     AddCommand, AnalyticsCommand, AnalyticsControlCommand, ConfigCommand, EnvAccessCommand,
@@ -207,11 +207,17 @@ async fn exec_env<W: Write>(
 async fn exec_analytics(analytics_cmd: &AnalyticsCommand) -> Result<()> {
     let writer = Box::new(std::io::stdout());
     match &analytics_cmd.sub {
+        AnalyticsControlCommand::EnableEnhanced(_) => {
+            enable_enhanced_metrics().await.with_context(|| "Failed to enable metrics")?;
+            show_metrics_status(writer).await.with_context(|| "Failed to read metrics state")?
+        }
         AnalyticsControlCommand::Enable(_) => {
-            set_metrics_status(true).await.with_context(|| "Failed to enable metrics")?
+            enable_basic_metrics().await.with_context(|| "Failed to enable metrics")?;
+            show_metrics_status(writer).await.with_context(|| "Failed to read metrics state")?
         }
         AnalyticsControlCommand::Disable(_) => {
-            set_metrics_status(false).await.with_context(|| "Failed to disable metrics")?
+            disable_metrics().await.with_context(|| "Failed to disable metrics")?;
+            show_metrics_status(writer).await.with_context(|| "Failed to read metrics state")?
         }
         AnalyticsControlCommand::Show(_) => {
             show_metrics_status(writer).await.with_context(|| "Failed to read metrics state")?

@@ -20,7 +20,6 @@
 
 #include <fbl/alloc_checker.h>
 #include <fbl/arena.h>
-#include <fbl/auto_lock.h>
 #include <lk/init.h>
 #include <object/process_dispatcher.h>
 #include <object/thread_dispatcher.h>

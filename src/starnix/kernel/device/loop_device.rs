@@ -17,7 +17,7 @@ use crate::vfs::{
 use bitflags::bitflags;
 use fuchsia_zircon::VmoChildOptions;
 use starnix_logging::track_stub;
-use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex, Unlocked, WriteOps};
+use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::device_type::{DeviceType, LOOP_MAJOR};
 use starnix_uapi::errors::Errno;
@@ -303,7 +303,7 @@ impl FileOps for LoopDeviceFile {
 
     fn write(
         &self,
-        locked: &mut Locked<'_, WriteOps>,
+        locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,

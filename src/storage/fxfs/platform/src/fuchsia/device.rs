@@ -332,26 +332,6 @@ impl BlockServer {
                     .await?;
             }
             // TODO(https://fxbug.dev/42171261)
-            VolumeAndNodeRequest::ReadBlocks {
-                responder,
-                vmo: _,
-                length: _,
-                dev_offset: _,
-                vmo_offset: _,
-            } => {
-                responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
-            }
-            // TODO(https://fxbug.dev/42171261)
-            VolumeAndNodeRequest::WriteBlocks {
-                responder,
-                vmo: _,
-                length: _,
-                dev_offset: _,
-                vmo_offset: _,
-            } => {
-                responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
-            }
-            // TODO(https://fxbug.dev/42171261)
             VolumeAndNodeRequest::GetTypeGuid { responder } => {
                 responder.send(zx::sys::ZX_ERR_NOT_SUPPORTED, None)?;
             }

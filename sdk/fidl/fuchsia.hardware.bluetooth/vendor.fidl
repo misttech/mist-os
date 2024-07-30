@@ -78,4 +78,11 @@ open protocol Vendor {
     flexible OpenHciTransport() -> (resource struct {
         channel client_end:HciTransport;
     }) error zx.Status;
+
+
+    /// Open the Snoop protocol to the transport driver.
+    /// Returns ALREADY_BOUND if another client has already connected.
+    flexible OpenSnoop() -> (resource struct {
+        channel client_end:Snoop2;
+    }) error zx.Status;
 };

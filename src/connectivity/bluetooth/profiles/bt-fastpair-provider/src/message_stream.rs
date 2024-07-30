@@ -83,7 +83,7 @@ impl MessageStream {
         };
         let mut buf = vec![0; packet.encoded_len()];
         packet.encode(&mut buf[..]).expect("valid packet");
-        rfcomm.as_ref().write(&buf).map(|_| ()).map_err(|e| Error::internal(&format!("{e:?}")))
+        rfcomm.write(&buf).map(|_| ()).map_err(|e| Error::internal(&format!("{e:?}")))
     }
 
     /// Processes an event from the `bredr.Profile` protocol.
@@ -177,10 +177,12 @@ mod tests {
     use futures::FutureExt;
 
     async fn expect_data(remote: &mut Channel, expected_data: Vec<u8>) {
-        let mut vec = Vec::new();
-        let read_result = remote.read_datagram(&mut vec).await;
-        assert_eq!(read_result, Ok(expected_data.len()));
-        assert_eq!(vec, expected_data);
+        let read = match remote.next().await {
+            Some(Ok(data)) => data,
+            x => panic!("Expected data from the peer, got {x:?}"),
+        };
+        assert_eq!(read.len(), expected_data.len());
+        assert_eq!(read, expected_data);
     }
 
     #[fuchsia::test]
@@ -218,7 +220,7 @@ mod tests {
         assert!(message_stream.rfcomm_connected());
 
         // Remote can write data - it's just logged.
-        let _ = remote.as_ref().write(&[0, 1, 2, 3]).expect("can write data");
+        let _ = remote.write(&[0, 1, 2, 3]).expect("can write data");
         assert_matches!(message_stream.select_next_some().now_or_never(), None);
 
         // Local can send Model ID and local address.

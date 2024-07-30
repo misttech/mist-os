@@ -4,7 +4,7 @@
 
 __all__ = ["IDENTIFIERS"]
 
-from common import Identifier, Deny
+from common import Deny, Identifier
 
 # These are keywords and identifiers used in languages we support and in
 # generated bindings. This list is maintained by hand and should be expanded

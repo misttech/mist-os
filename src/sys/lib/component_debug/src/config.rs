@@ -12,19 +12,14 @@ pub async fn resolve_raw_config_overrides(
     realm_query: &fsys::RealmQueryProxy,
     moniker: &Moniker,
     url: &str,
-    raw_overrides: &[RawConfigOverride],
+    raw_overrides: &[RawConfigEntry],
 ) -> Result<Vec<fdecl::ConfigOverride>, ConfigResolveError> {
     // Don't worry about any of the below failure modes if there aren't actually any overrides.
     if raw_overrides.is_empty() {
         return Ok(vec![]);
     }
 
-    let parent = moniker.parent().ok_or_else(|| ConfigResolveError::BadMoniker(moniker.clone()))?;
-    let leaf = moniker.leaf().ok_or_else(|| ConfigResolveError::BadMoniker(moniker.clone()))?;
-    let collection =
-        leaf.collection().ok_or_else(|| ConfigResolveError::BadMoniker(moniker.clone()))?;
-    let child_location = fsys::ChildLocation::Collection(collection.to_string());
-    let manifest = resolve_declaration(realm_query, &parent, &child_location, url).await?;
+    let manifest = resolve_manifest(moniker, realm_query, url).await?;
     let config = manifest.config.as_ref().ok_or(ConfigResolveError::MissingConfigSchema)?;
 
     let mut resolved_overrides = vec![];
@@ -39,20 +34,75 @@ pub async fn resolve_raw_config_overrides(
         resolved_overrides.push(fdecl::ConfigOverride {
             key: Some(raw_override.key.clone()),
             value: Some(resolved_value.native_into_fidl()),
-            ..fdecl::ConfigOverride::default()
+            ..Default::default()
         });
     }
 
     Ok(resolved_overrides)
 }
 
+pub async fn resolve_raw_config_capabilities(
+    realm_query: &fsys::RealmQueryProxy,
+    moniker: &Moniker,
+    url: &str,
+    raw_capabilities: &[RawConfigEntry],
+) -> Result<Vec<fdecl::Configuration>, ConfigResolveError> {
+    // Don't worry about any of the below failure modes if there aren't actually any overrides.
+    if raw_capabilities.is_empty() {
+        return Ok(vec![]);
+    }
+
+    let manifest = resolve_manifest(moniker, realm_query, url).await?;
+    let config_uses: Vec<_> = manifest
+        .uses
+        .into_iter()
+        .filter_map(|u| if let cm_rust::UseDecl::Config(c) = u { Some(c) } else { None })
+        .collect();
+
+    let mut resolved_capabilities = vec![];
+    for raw_capability in raw_capabilities {
+        let config_field =
+            config_uses.iter().find(|f| f.source_name == raw_capability.key.as_str()).ok_or_else(
+                || ConfigResolveError::MissingConfigField { name: raw_capability.key.clone() },
+            )?;
+
+        let resolved_value =
+            config_value_from_json_value(&raw_capability.value, &config_field.type_)
+                .map_err(ConfigResolveError::FieldTypeError)?;
+        resolved_capabilities.push(fdecl::Configuration {
+            name: Some(raw_capability.key.clone()),
+            value: Some(resolved_value.native_into_fidl()),
+            ..Default::default()
+        });
+    }
+
+    Ok(resolved_capabilities)
+}
+
+async fn resolve_manifest(
+    moniker: &Moniker,
+    realm_query: &fsys::RealmQueryProxy,
+    url: &str,
+) -> Result<cm_rust::ComponentDecl, ConfigResolveError> {
+    let parent = moniker.parent().ok_or_else(|| ConfigResolveError::BadMoniker(moniker.clone()))?;
+    let leaf = moniker.leaf().ok_or_else(|| ConfigResolveError::BadMoniker(moniker.clone()))?;
+    let collection =
+        leaf.collection().ok_or_else(|| ConfigResolveError::BadMoniker(moniker.clone()))?;
+    let child_location = fsys::ChildLocation::Collection(collection.to_string());
+    let manifest = resolve_declaration(realm_query, &parent, &child_location, url).await?;
+    Ok(manifest)
+}
+
+/// [`RawConfigEntry`] may either represent a config override (where the key is
+/// usually `snake_case`) or a configuration capability declaration (where the
+/// key is usually `fully.qualified.Name`).
 #[derive(Debug, PartialEq)]
-pub struct RawConfigOverride {
+pub struct RawConfigEntry {
     key: String,
     value: serde_json::Value,
 }
 
-impl std::str::FromStr for RawConfigOverride {
+impl std::str::FromStr for RawConfigEntry {
     type Err = ConfigParseError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let (key, value) = s.split_once("=").ok_or(ConfigParseError::MissingEqualsSeparator)?;
@@ -92,4 +142,31 @@ pub enum ConfigParseError {
 
     #[error("Unable to parse provided value as JSON.")]
     InvalidJsonValue(#[source] serde_json::Error),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use assert_matches::assert_matches;
+    use std::str::FromStr;
+
+    #[test]
+    fn parse_config() {
+        let config = RawConfigEntry::from_str("foo=\"bar\"").unwrap();
+        assert_eq!(config.key, "foo");
+        assert_matches!(config.value, serde_json::Value::String(s) if &s == "bar");
+
+        let config = RawConfigEntry::from_str("foo=true").unwrap();
+        assert_eq!(config.key, "foo");
+        assert_matches!(config.value, serde_json::Value::Bool(true));
+
+        RawConfigEntry::from_str("invalid").unwrap_err();
+    }
+
+    #[test]
+    fn parse_config_capabilities() {
+        let config = RawConfigEntry::from_str("fuchsia.my.Config=\"bar\"").unwrap();
+        assert_eq!(config.key, "fuchsia.my.Config");
+        assert_matches!(config.value, serde_json::Value::String(s) if &s == "bar");
+    }
 }

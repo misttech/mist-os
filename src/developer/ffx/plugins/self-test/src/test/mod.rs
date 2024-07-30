@@ -46,6 +46,7 @@ pub async fn new_isolate(name: &str) -> Result<ffx_isolate::Isolate> {
     let context = global_env_context().context("No global context")?;
     let isolate = ffx_isolate::Isolate::new_with_sdk(name, ssh_key, &context).await?;
     set_value_in_isolate(&isolate, "watchdogs.host_pipe.enabled", true.into()).await?;
+    set_value_in_isolate(&isolate, "ffx.isolated", true.into()).await?;
     // Globally change the log file to one appropriate to the isolate.  We'll reset it after
     // the test completes
     change_log_file(&subtest_log_file(&isolate))?;

@@ -63,6 +63,8 @@ pub struct Features {
     pub perfetto: Option<FsString>,
 
     pub android_fdr: bool,
+
+    pub rootfs_rw: bool,
 }
 
 /// Parses all the featurse in `entries`.
@@ -105,6 +107,7 @@ pub fn parse_features(entries: &Vec<String>) -> Result<Features, Error> {
             ("perfetto", None) => {
                 return Err(anyhow!("Perfetto feature must contain a socket path"));
             }
+            ("rootfs_rw", _) => features.rootfs_rw = true,
             ("self_profile", _) => features.self_profile = true,
             ("selinux", mode_arg) => features.selinux = match mode_arg.as_ref() {
                 Some(mode) => if mode == "fake" {

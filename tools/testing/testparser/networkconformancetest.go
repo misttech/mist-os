@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"go.fuchsia.dev/fuchsia/src/connectivity/network/testing/conformance/expectation/outcome"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/testing/conformance/parseoutput"
 	"go.fuchsia.dev/fuchsia/tools/testing/runtests"
 )
@@ -59,7 +60,8 @@ func parseNetworkConformanceTest(lines [][]byte) []runtests.TestCaseResult {
 			result.OutputFiles = []string{f}
 		}
 
-		if parsedCaseEnd.ActualOutcome == parsedCaseEnd.ExpectedOutcome {
+		if parsedCaseEnd.ActualOutcome == parsedCaseEnd.ExpectedOutcome ||
+			parsedCaseEnd.ExpectedOutcome == outcome.Flaky.String() {
 			result.Status = runtests.TestSuccess
 		} else {
 			result.Status = runtests.TestFailure

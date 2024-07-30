@@ -249,36 +249,6 @@ TEST_F(ServerTest, TestLargeGroupedTransaction) {
   ASSERT_EQ(res.group, 0);
 }
 
-TEST(BlockTest, TestReadWriteSingle) {
-  auto fake_parent = MockDevice::FakeRootParent();
-  StubBlockDevice blkdev;
-  fake_parent->AddProtocol(ZX_PROTOCOL_BLOCK_IMPL, blkdev.proto()->ops, &blkdev);
-  ASSERT_OK(BlockDevice::Bind(nullptr, fake_parent.get()));
-  MockDevice* child_dev = fake_parent->GetLatestChild();
-  auto* dut = child_dev->GetDeviceContext<BlockDevice>();
-
-  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
-
-  auto [client_end, server_end] = fidl::Endpoints<fuchsia_hardware_block_volume::Volume>::Create();
-
-  fidl::BindServer(loop.dispatcher(), std::move(server_end), dut);
-
-  zx::vmo vmo;
-  constexpr uint64_t kBufferLength = kBlockCount * 5;
-  ASSERT_OK(zx::vmo::create(kBufferLength, 0, &vmo));
-
-  fidl::WireClient<fuchsia_hardware_block_volume::Volume> client(std::move(client_end),
-                                                                 loop.dispatcher());
-  client->WriteBlocks(std::move(vmo), kBufferLength, 0, 0)
-      .ThenExactlyOnce(
-          [](fidl::WireUnownedResult<fuchsia_hardware_block_volume::Volume::WriteBlocks>& result) {
-            ASSERT_OK(result.status());
-            const fit::result response = result.value();
-            ASSERT_TRUE(response.is_ok(), "%s", zx_status_get_string(response.error_value()));
-          });
-  ASSERT_OK(loop.RunUntilIdle());
-}
-
 TEST_F(ServerTest, FuaWrite) {
   block_info_t block_info = {
       .block_count = kBlockCount, .block_size = kBlockSize, .max_transfer_size = kBlockSize};

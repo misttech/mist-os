@@ -149,17 +149,6 @@ pub fn impossible_error(status: zx::Status) -> Errno {
     panic!("encountered impossible error: {status}");
 }
 
-fn truncate_name(name: &[u8]) -> std::ffi::CString {
-    std::ffi::CString::from_vec_with_nul(
-        name.iter()
-            .map(|c| if *c == b'\0' { b'?' } else { *c })
-            .take(zx::sys::ZX_MAX_NAME_LEN - 1)
-            .chain(b"\0".iter().cloned())
-            .collect(),
-    )
-    .expect("all the null bytes should have been replace with an escape")
-}
-
-pub fn set_zx_name(obj: &impl zx::AsHandleRef, name: &[u8]) {
-    obj.set_name(&truncate_name(name)).map_err(impossible_error).unwrap();
+pub fn set_zx_name(obj: &impl zx::AsHandleRef, name: impl AsRef<[u8]>) {
+    obj.set_name(&zx::Name::from_bytes_lossy(name.as_ref())).map_err(impossible_error).unwrap();
 }

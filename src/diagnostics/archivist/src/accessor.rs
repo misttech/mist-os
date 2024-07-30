@@ -10,8 +10,7 @@ use crate::inspect::repository::InspectRepository;
 use crate::inspect::ReaderServer;
 use crate::logs::repository::LogsRepository;
 use crate::pipeline::Pipeline;
-use crate::ImmutableString;
-use diagnostics_data::{Data, DiagnosticsData, Metadata};
+use diagnostics_data::{Data, DiagnosticsData, ExtendedMoniker, Metadata};
 use fidl::endpoints::{ControlHandle, RequestStream};
 use fidl_fuchsia_diagnostics::{
     ArchiveAccessorRequest, ArchiveAccessorRequestStream, BatchIteratorControlHandle,
@@ -20,7 +19,6 @@ use fidl_fuchsia_diagnostics::{
     StreamParameters, StringSelector, TreeSelector, TreeSelectorUnknown,
 };
 use fidl_fuchsia_mem::Buffer;
-use flyweights::FlyStr;
 use fuchsia_async::{self as fasync, Task};
 use fuchsia_inspect::NumericProperty;
 use fuchsia_sync::Mutex;
@@ -536,12 +534,12 @@ pub(crate) struct BatchIterator<R> {
 // Checks if a given schema is within a components budget, and if it is, updates the budget,
 // then returns true. Otherwise, if the schema is not within budget, returns false.
 fn maybe_update_budget(
-    budget_map: &mut HashMap<ImmutableString, usize>,
-    moniker: &str,
+    budget_map: &mut HashMap<ExtendedMoniker, usize>,
+    moniker: &ExtendedMoniker,
     bytes: usize,
     byte_limit: usize,
 ) -> bool {
-    if let Some(remaining_budget) = budget_map.get_mut(&FlyStr::new(moniker)) {
+    if let Some(remaining_budget) = budget_map.get_mut(moniker) {
         if *remaining_budget + bytes > byte_limit {
             false
         } else {
@@ -549,10 +547,10 @@ fn maybe_update_budget(
             true
         }
     } else if bytes > byte_limit {
-        budget_map.insert(FlyStr::new(moniker), 0);
+        budget_map.insert(moniker.clone(), 0);
         false
     } else {
-        budget_map.insert(FlyStr::new(moniker), bytes);
+        budget_map.insert(moniker.clone(), bytes);
         true
     }
 }
@@ -595,7 +593,7 @@ where
                     // so we include the nonce as metadata to manually determine relationship.
                     "parent_trace_id" => u64::from(parent_trace_id),
                     "trace_id" => u64::from(trace_id),
-                    "moniker" => d.moniker.as_ref()
+                    "moniker" => d.moniker.to_string().as_ref()
                 );
                 let mut unlocked_counter = stream_owned_counter.lock();
                 let mut tracker_guard = budget_tracker.lock();

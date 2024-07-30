@@ -9,9 +9,8 @@ use std::ops::Deref;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Weak};
 
-use explicit::UnreachableExt as _;
 use futures::task::AtomicWaker;
-use futures::{Future, FutureExt as _, Stream, StreamExt as _};
+use futures::{Future, FutureExt as _, Stream};
 use log::debug;
 use net_types::ethernet::Mac;
 use net_types::ip::{
@@ -30,7 +29,6 @@ use netstack3_core::socket::{
     self as core_socket, MulticastInterfaceSelector, MulticastMembershipInterfaceSelector,
 };
 use netstack3_core::sync::RemoveResourceResult;
-use netstack3_core::types::WorkQueueReport;
 use packet_formats::utils::NonZeroDuration;
 use {
     fidl_fuchsia_net as fidl_net, fidl_fuchsia_net_interfaces as fnet_interfaces,
@@ -242,32 +240,6 @@ impl TaskWaitGroupSpawner {
             std::mem::drop(spawner);
         }))
         .detach();
-    }
-}
-
-/// Extracts common bounded work operations performed on [`NeedsDataWatcher`].
-///
-/// Runs the watcher loop until `watcher` is finished or `f` returns `None`.
-pub(crate) async fn yielding_data_notifier_loop<F: FnMut() -> Option<WorkQueueReport>>(
-    mut watcher: NeedsDataWatcher,
-    mut f: F,
-) {
-    let mut yield_fut = futures::future::OptionFuture::default();
-    loop {
-        // Loop while we are woken up to handle enqueued RX packets.
-        let r = futures::select! {
-            w = watcher.next().fuse() => w,
-            y = yield_fut => Some(y.expect("OptionFuture is only selected when non-empty")),
-        };
-
-        match r.and_then(|()| f()) {
-            Some(WorkQueueReport::AllDone) => (),
-            Some(WorkQueueReport::Pending) => {
-                // Yield the task to the executor once.
-                yield_fut = Some(async_utils::futures::YieldToExecutorOnce::new()).into();
-            }
-            None => break,
-        }
     }
 }
 
@@ -789,27 +761,6 @@ impl<F, C: TryFromFidlWithContext<F>> TryIntoCoreWithContext<C> for F {
 
     fn try_into_core_with_ctx<X: ConversionContext>(self, ctx: &X) -> Result<C, Self::Error> {
         C::try_from_fidl_with_ctx(ctx, self)
-    }
-}
-
-#[allow(dead_code)] // TODO(https://fxbug.dev/351850359)
-pub(crate) struct UninstantiableFuture<O>(Never, std::marker::PhantomData<O>);
-
-impl<O: std::marker::Unpin> futures::Future for UninstantiableFuture<O> {
-    type Output = O;
-
-    fn poll(
-        self: std::pin::Pin<&mut Self>,
-        _cx: &mut futures::task::Context<'_>,
-    ) -> futures::task::Poll<Self::Output> {
-        self.get_mut().uninstantiable_unreachable()
-    }
-}
-
-impl<O> AsRef<Never> for UninstantiableFuture<O> {
-    fn as_ref(&self) -> &Never {
-        let Self(never, _) = self;
-        never
     }
 }
 

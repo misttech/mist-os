@@ -5,8 +5,9 @@
 """Create a global documentation file with driver provided data."""
 
 import argparse
-import os
 import json
+import os
+
 import yaml
 
 

@@ -3,6 +3,8 @@
 // found in the LICENSE file.
 
 use anyhow::{Error, Result};
+use fidl::endpoints::ServerEnd;
+use fidl_fuchsia_testing_harness::RealmProxy_Marker;
 use fidl_test_systemactivitygovernor::*;
 use fuchsia_async as fasync;
 use fuchsia_component::server::ServiceFs;
@@ -34,21 +36,15 @@ async fn handle_request_stream(mut stream: RealmFactoryRequestStream) -> Result<
     while let Ok(Some(request)) = stream.try_next().await {
         match request {
             RealmFactoryRequest::CreateRealm { realm_server, responder } => {
-                let realm = create_realm().await?;
-                let moniker = format!(
-                    "{}:{}/{}",
-                    DEFAULT_COLLECTION_NAME,
-                    realm.root.child_name(),
-                    ACTIVITY_GOVERNOR_CHILD_NAME
-                );
-
-                let request_stream = realm_server.into_stream()?;
-                task_group.spawn(async move {
-                    realm_proxy::service::serve(realm, request_stream).await.unwrap();
-                });
-                responder.send(Ok(&moniker))?;
+                let realm = create_realm(RealmOptions::default()).await?;
+                responder.send(Ok(&realm.moniker()))?;
+                task_group.spawn(realm.serve(realm_server));
             }
-
+            RealmFactoryRequest::CreateRealmExt { options, realm_server, responder } => {
+                let realm = create_realm(options).await?;
+                responder.send(Ok(&realm.moniker()))?;
+                task_group.spawn(realm.serve(realm_server));
+            }
             RealmFactoryRequest::_UnknownMethod { .. } => unreachable!(),
         }
     }
@@ -57,15 +53,40 @@ async fn handle_request_stream(mut stream: RealmFactoryRequestStream) -> Result<
     Ok(())
 }
 
-async fn create_realm() -> Result<RealmInstance, Error> {
+struct SagRealm {
+    realm: RealmInstance,
+}
+
+impl SagRealm {
+    fn moniker(&self) -> String {
+        format!(
+            "{}:{}/{}",
+            DEFAULT_COLLECTION_NAME,
+            self.realm.root.child_name(),
+            ACTIVITY_GOVERNOR_CHILD_NAME
+        )
+    }
+
+    async fn serve(self, server_end: ServerEnd<RealmProxy_Marker>) {
+        realm_proxy::service::serve(self.realm, server_end.into_stream().unwrap()).await.unwrap()
+    }
+}
+
+async fn create_realm(options: RealmOptions) -> Result<SagRealm, Error> {
     info!("building the realm");
+
+    let use_fake_sag = options.use_fake_sag.unwrap_or(false);
 
     let builder = RealmBuilder::new().await?;
 
     let component_ref = builder
         .add_child(
             ACTIVITY_GOVERNOR_CHILD_NAME,
-            "#meta/system-activity-governor.cm",
+            if use_fake_sag {
+                "fake-system-activity-governor#meta/fake-system-activity-governor.cm"
+            } else {
+                "#meta/system-activity-governor.cm"
+            },
             ChildOptions::new(),
         )
         .await?;
@@ -130,6 +151,17 @@ async fn create_realm() -> Result<RealmInstance, Error> {
         )
         .await?;
 
+    if use_fake_sag {
+        builder
+            .add_route(
+                Route::new()
+                    .capability(Capability::protocol_by_name("test.sagcontrol.State"))
+                    .from(&component_ref)
+                    .to(Ref::parent()),
+            )
+            .await?;
+    }
+
     let realm = builder.build().await?;
-    Ok(realm)
+    Ok(SagRealm { realm })
 }

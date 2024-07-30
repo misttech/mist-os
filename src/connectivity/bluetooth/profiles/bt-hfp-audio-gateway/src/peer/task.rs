@@ -925,7 +925,6 @@ mod tests {
     use bt_rfcomm::profile::build_rfcomm_protocol;
     use bt_rfcomm::ServerChannel;
     use core::task::Poll;
-    use fidl::AsHandleRef;
     use fidl_fuchsia_bluetooth_bredr::{ProfileMarker, ProfileRequestStream, ScoErrorCode};
     use fidl_fuchsia_bluetooth_hfp::{
         CallDirection, CallRequest, CallRequestStream, CallState, NextCall, PeerHandlerMarker,
@@ -1135,9 +1134,7 @@ mod tests {
     /// contents of the data received.
     #[track_caller]
     fn expect_message_received_by_peer(exec: &mut fasync::TestExecutor, remote: &mut Channel) {
-        let mut vec = Vec::new();
-        let mut remote_fut = Box::pin(remote.read_datagram(&mut vec));
-        assert!(exec.run_until_stalled(&mut remote_fut).is_ready());
+        assert!(exec.run_until_stalled(&mut remote.next()).is_ready());
     }
 
     #[fuchsia::test]
@@ -1156,7 +1153,7 @@ mod tests {
         // Simulate remote peer (HF) sending AT command to start the SLC Init Procedure.
         let features = HfFeatures::empty();
         let command = format!("AT+BRSF={}\r", features.bits()).into_bytes();
-        let _ = remote.as_ref().write(&command);
+        let _ = remote.write(&command);
         let _ = exec.run_until_stalled(&mut peer_task_fut);
         // We then expect an outgoing message to the peer.
         expect_message_received_by_peer(&mut exec, &mut remote);
@@ -1285,14 +1282,8 @@ mod tests {
 
         // Produces an error when polling the ServiceLevelConnection stream by disabling write
         // on the remote socket and read on the local socket.
-        let status = unsafe {
-            zx::sys::zx_socket_set_disposition(
-                remote.as_ref().raw_handle(),
-                zx::sys::ZX_SOCKET_DISPOSITION_WRITE_DISABLED,
-                0,
-            )
-        };
-        zx::Status::ok(status).unwrap();
+        let socket = remote.into_socket().unwrap();
+        assert!(socket.set_disposition(Some(zx::SocketWriteDisposition::Disabled), None).is_ok());
 
         // Error on the SLC connection will result in the completion of the peer task.
         let result = exec.run_until_stalled(&mut run_fut);
@@ -1537,7 +1528,7 @@ mod tests {
         };
         let mut buf = Vec::new();
         at::Command::serialize(&mut buf, &vec![battery_level_cmd]).expect("serialization is ok");
-        let _ = remote.as_ref().write(&buf[..]).expect("channel write is ok");
+        let _ = remote.write(&buf[..]).expect("channel write is ok");
 
         // Run the main future - the task should receive the HF indicator and report it.
         let (battery_level, _run_fut) = run_while(&mut exec, run_fut, stream.next());
@@ -1688,7 +1679,7 @@ mod tests {
         let dial_cmd = at::Command::AtdNumber { number: String::from("7654321") };
         let mut buf = Vec::new();
         at::Command::serialize(&mut buf, &vec![dial_cmd]).expect("serialization is ok");
-        let _ = remote.as_ref().write(&buf[..]).expect("channel write is ok");
+        let _ = remote.write(&buf[..]).expect("channel write is ok");
 
         let (watch_state_req, run_fut) = run_while(&mut exec, run_fut, &mut call_stream.next());
         let _watch_state_resp = match watch_state_req {
@@ -2061,7 +2052,7 @@ mod tests {
         let codec_confirm_cmd = at::Command::Bcs { codec: CodecId::MSBC.into() };
         let mut buf = Vec::new();
         at::Command::serialize(&mut buf, &vec![codec_confirm_cmd]).expect("serialization is ok");
-        let _ = remote.as_ref().write(&buf[..]).expect("channel write is ok");
+        let _ = remote.write(&buf[..]).expect("channel write is ok");
 
         // First SCO connections fail (T2 and T1), causing a re-negotiation of the codec state.
         let accepted_paramset = vec![bredr::HfpParameterSet::S4];
@@ -2082,7 +2073,7 @@ mod tests {
         let codec_confirm_cmd = at::Command::Bcs { codec: CodecId::CVSD.into() };
         let mut buf = Vec::new();
         at::Command::serialize(&mut buf, &vec![codec_confirm_cmd]).expect("serialization is ok");
-        let _ = remote.as_ref().write(&buf[..]).expect("channel write is ok");
+        let _ = remote.write(&buf[..]).expect("channel write is ok");
 
         // Expect a connection with the CVSD params.
         let (sco, mut run_fut) = run_while(

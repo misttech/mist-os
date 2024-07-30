@@ -26,6 +26,8 @@ pub struct PlatformConnectivityConfig {
     pub thread: ThreadConfig,
     #[serde(default)]
     pub weave: WeaveConfig,
+    #[serde(default)]
+    pub netpol: NetpolConfig,
 }
 
 /// Platform configuration options for the network area.
@@ -237,4 +239,13 @@ pub struct WeaveConfig {
     ///   e.g. fuchsia-pkg://fuchsia.com/weavestack#meta/weavestack.cm
     #[serde(default)]
     pub component_url: Option<String>,
+}
+
+/// Platform configuration options to use for the Network Policy area.
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct NetpolConfig {
+    /// Whether to include network-socket-proxy.
+    #[serde(default)]
+    pub include_socket_proxy: bool,
 }

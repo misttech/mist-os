@@ -5,25 +5,33 @@
 #include "src/storage/blobfs/compression/external_decompressor.h"
 
 #include <fcntl.h>
-#include <lib/async-loop/cpp/loop.h>
-#include <lib/async-loop/default.h>
-#include <lib/async/cpp/executor.h>
-#include <lib/async/default.h>
-#include <lib/fdio/directory.h>
 #include <lib/fdio/io.h>
 #include <lib/fzl/owned-vmo-mapper.h>
-#include <lib/inspect/cpp/hierarchy.h>
+#include <lib/stdcompat/span.h>
+#include <lib/zx/result.h>
+#include <lib/zx/vmo.h>
+#include <unistd.h>
 #include <zircon/errors.h>
-#include <zircon/status.h>
+#include <zircon/rights.h>
 #include <zircon/types.h>
 
+#include <cstdint>
 #include <cstdlib>
+#include <cstring>
+#include <limits>
+#include <memory>
+#include <utility>
+#include <vector>
 
+#include <fbl/unique_fd.h>
 #include <gtest/gtest.h>
 
-#include "src/storage/blobfs/blob_layout.h"
+#include "src/storage/blobfs/cache_policy.h"
 #include "src/storage/blobfs/compression/chunked.h"
+#include "src/storage/blobfs/compression/compressor.h"
+#include "src/storage/blobfs/compression/seekable_decompressor.h"
 #include "src/storage/blobfs/compression_settings.h"
+#include "src/storage/blobfs/mount.h"
 #include "src/storage/blobfs/test/blob_utils.h"
 #include "src/storage/blobfs/test/integration/fdio_test.h"
 

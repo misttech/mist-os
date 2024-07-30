@@ -91,8 +91,9 @@ impl<'a> PowerElementContextBuilder<'a> {
         let (required_level, required_level_server_end) =
             create_proxy::<fbroker::RequiredLevelMarker>()?;
         let (lessor, lessor_server_end) = create_proxy::<fbroker::LessorMarker>()?;
-        let element_control_client_end = self
-            .topology
+        let (element_control, element_control_server_end) =
+            create_proxy::<fbroker::ElementControlMarker>()?;
+        self.topology
             .add_element(fbroker::ElementSchema {
                 element_name: Some(self.element_name.into()),
                 initial_current_level: Some(self.initial_current_level),
@@ -103,11 +104,11 @@ impl<'a> PowerElementContextBuilder<'a> {
                     required: required_level_server_end,
                 }),
                 lessor_channel: Some(lessor_server_end),
+                element_control: Some(element_control_server_end),
                 ..Default::default()
             })
             .await?
             .map_err(|d| anyhow::anyhow!("{d:?}"))?;
-        let element_control = element_control_client_end.into_proxy()?;
 
         let assertive_dependency_token = fbroker::DependencyToken::create();
         let _ = element_control

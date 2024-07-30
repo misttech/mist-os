@@ -72,7 +72,7 @@ fuchsia_unittest_package("update-lib-tests") {
   deps = [ ":lib_test" ]
 }
 
-group("tests") {
+group("hermetic_tests") {
   testonly = true
   deps = [ ":update-lib-tests" ]
 }

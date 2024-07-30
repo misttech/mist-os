@@ -7,8 +7,7 @@
 
 #include <lib/zx/channel.h>
 
-#include <queue>
-
+#include "hci_event_handler.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/byte_buffer.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/device_address.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/macros.h"
@@ -147,11 +146,8 @@ ReadVersionReturnParamsTlv parse_tlv_version_return_params(const uint8_t* p, siz
 
 class VendorHci {
  public:
-  explicit VendorHci(zx::channel* ctrl);
-
-  // When |acl| is not nullptr, WaitForEventPacket will wait on both control and
-  // ACL channels.
-  void enable_events_on_bulk(zx::channel* acl) { acl_ = acl; }
+  explicit VendorHci(fidl::SharedClient<fuchsia_hardware_bluetooth::HciTransport>& client,
+                     HciEventHandler& event_handler);
 
   // Read the version info from the hardware.
   //
@@ -176,17 +172,21 @@ class VendorHci {
   bool ExitManufacturerMode(MfgDisableMode mode);
 
  private:
-  // The control and ACL (interrupt and bulk on USB) endpoints of the
-  // controller. Intel controllers that support the "secure send" can send
+  // Intel controllers that support the "secure send" can send
   // vendor events over the bulk endpoint while in bootloader mode. We listen on
-  // incoming events on both channels, if provided.
-  zx::channel* ctrl_;
-  zx::channel* acl_;
+  // both types of incoming events, if provided.
+  fidl::SharedClient<fuchsia_hardware_bluetooth::HciTransport>& hci_transport_client_;
+  HciEventHandler& hci_event_handler_;
 
   // True when we are in Manufacturer Mode
   bool manufacturer_;
 
   void SendCommand(const bt::PacketView<bt::hci_spec::CommandHeader>& command) const;
+  // Send commands as ACL packets. When |FirmwareLoader::LoadSfi| invokes |SendSecureSend|, it
+  // assumes that the commands will be sent as ACL packets. This logic is to match behavior before
+  // HciTransport migration, where all the packets were sent through channels, and |SendSecureSend|
+  // sends commands through acl channel at that time.
+  void SendAcl(const bt::PacketView<bt::hci_spec::CommandHeader>& command) const;
 
   std::unique_ptr<bt::hci::EventPacket> WaitForEventPacket(
       zx::duration timeout = zx::sec(5), bt::hci_spec::EventCode expected_event = 0) const;

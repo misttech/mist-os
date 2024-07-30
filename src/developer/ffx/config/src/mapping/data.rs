@@ -33,6 +33,7 @@ mod test {
             ConfigMap::default(),
             None,
             None,
+            false,
         )
         .unwrap();
         let value =
@@ -50,6 +51,7 @@ mod test {
             ConfigMap::default(),
             None,
             None,
+            false,
         )
         .unwrap();
         let value =
@@ -67,6 +69,7 @@ mod test {
             ConfigMap::default(),
             None,
             None,
+            false,
         )
         .unwrap();
         let test = Value::String("$WHATEVER".to_string());

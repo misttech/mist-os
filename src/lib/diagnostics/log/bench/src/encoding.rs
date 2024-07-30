@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use diagnostics_log_encoding::encode::{Argument, Encoder, TracingEvent, Value, WriteEventParams};
+use diagnostics_log_encoding::encode::{
+    Argument, Encoder, EncoderOpts, TracingEvent, Value, WriteEventParams,
+};
 use fidl_fuchsia_logger::MAX_DATAGRAM_LEN_BYTES;
 use fuchsia_criterion::{criterion, FuchsiaCriterion};
 use std::io::Cursor;
@@ -16,7 +18,7 @@ mod common;
 #[inline]
 fn encoder() -> Encoder<Cursor<[u8; MAX_DATAGRAM_LEN_BYTES as usize]>> {
     let buffer = [0u8; MAX_DATAGRAM_LEN_BYTES as usize];
-    Encoder::new(Cursor::new(buffer))
+    Encoder::new(Cursor::new(buffer), EncoderOpts::default())
 }
 
 fn bench_argument(

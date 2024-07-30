@@ -253,7 +253,7 @@ void NetworkPort::GetInfo(fdf::Arena& arena, GetInfoCompleter::Sync& completer) 
   fuchsia_hardware_network::wire::PortClass port_class;
   switch (role_) {
     case Role::Client:
-      port_class = fuchsia_hardware_network::wire::PortClass::kWlan;
+      port_class = fuchsia_hardware_network::wire::PortClass::kWlanClient;
       break;
     case Role::Ap:
       port_class = fuchsia_hardware_network::wire::PortClass::kWlanAp;

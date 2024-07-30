@@ -4,9 +4,7 @@
 # found in the LICENSE file.
 
 import argparse
-import colorama
 import dataclasses
-import jellyfish
 import json
 import os
 import re
@@ -14,6 +12,9 @@ import sys
 import time
 import typing
 from collections import defaultdict
+
+import colorama
+import jellyfish
 from colorama import Fore, Style
 
 colorama.init(strip=bool(os.getenv("NO_COLOR", None)))

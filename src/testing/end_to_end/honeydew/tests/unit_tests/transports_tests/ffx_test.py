@@ -1,4 +1,3 @@
-#!/usr/bin/env fuchsia-vendored-python
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
@@ -185,24 +184,19 @@ class FfxConfigTests(unittest.TestCase):
         )
 
         ffx_configs_calls = [
-            mock.call(_FFX_CONFIG_SET + ["log.dir", _LOGS_DIR], timeout=10),
+            mock.call(_FFX_CONFIG_SET + ["log.dir", _LOGS_DIR]),
+            mock.call(_FFX_CONFIG_SET + ["log.level", _LOGS_LEVEL.lower()]),
             mock.call(
-                _FFX_CONFIG_SET + ["log.level", _LOGS_LEVEL.lower()], timeout=10
+                _FFX_CONFIG_SET
+                + ["discovery.mdns.enabled", str(_MDNS_ENABLED).lower()]
             ),
             mock.call(
                 _FFX_CONFIG_SET
-                + ["discovery.mdns.enabled", str(_MDNS_ENABLED).lower()],
-                timeout=10,
+                + ["proxy.timeout_secs", str(_PROXY_TIMEOUT_SECS)]
             ),
             mock.call(
                 _FFX_CONFIG_SET
-                + ["proxy.timeout_secs", str(_PROXY_TIMEOUT_SECS)],
-                timeout=10,
-            ),
-            mock.call(
-                _FFX_CONFIG_SET
-                + ["ffx.subtool-search-paths", _SUBTOOLS_SEARCH_PATH],
-                timeout=10,
+                + ["ffx.subtool-search-paths", _SUBTOOLS_SEARCH_PATH]
             ),
         ]
         mock_host_shell_run.assert_has_calls(ffx_configs_calls, any_order=True)
@@ -235,34 +229,6 @@ class FfxConfigTests(unittest.TestCase):
         ffx_config = ffx.FfxConfig()
 
         with self.assertRaises(errors.FfxConfigError):
-            ffx_config.setup(
-                binary_path=_BINARY_PATH,
-                isolate_dir=_ISOLATE_DIR,
-                logs_dir=_LOGS_DIR,
-                logs_level=_LOGS_LEVEL,
-                enable_mdns=_MDNS_ENABLED,
-                subtools_search_path=_SUBTOOLS_SEARCH_PATH,
-                proxy_timeout_secs=_PROXY_TIMEOUT_SECS,
-            )
-
-        mock_host_shell_run.assert_called()
-
-    @mock.patch.object(
-        host_shell,
-        "run",
-        side_effect=errors.FfxTimeoutError(
-            "timed out",
-        ),
-        autospec=True,
-    )
-    def test_setup_raises_timeout_error(
-        self, mock_host_shell_run: mock.Mock
-    ) -> None:
-        """Test case for ffx.FfxConfig.setup() raises errors.FfxTimeoutError"""
-
-        ffx_config = ffx.FfxConfig()
-
-        with self.assertRaises(errors.FfxTimeoutError):
             ffx_config.setup(
                 binary_path=_BINARY_PATH,
                 isolate_dir=_ISOLATE_DIR,
@@ -541,7 +507,7 @@ class FfxTests(unittest.TestCase):
             + ffx._FFX_CMDS["TARGET_SHOW"],
             capture_output=True,
             log_output=True,
-            timeout=10,
+            timeout=None,
         )
 
     @parameterized.expand(
@@ -622,7 +588,6 @@ class FfxTests(unittest.TestCase):
                 "--x",
                 "2",
             ],
-            timeout=10,
             capture_output=False,
         )
 
@@ -645,7 +610,6 @@ class FfxTests(unittest.TestCase):
                 "ssh",
                 "killall iperf3",
             ],
-            timeout=10,
             capture_output=True,
         )
 
@@ -700,15 +664,6 @@ class FfxTests(unittest.TestCase):
                         "command output and error",
                     ),
                     "expected_error": errors.FfxCommandError,
-                },
-            ),
-            (
-                {
-                    "label": "TimeoutExpired",
-                    "side_effect": errors.HoneydewTimeoutError(
-                        "timed out",
-                    ),
-                    "expected_error": errors.FfxTimeoutError,
                 },
             ),
         ],

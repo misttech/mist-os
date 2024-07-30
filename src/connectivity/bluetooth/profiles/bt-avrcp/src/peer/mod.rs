@@ -949,7 +949,7 @@ pub(crate) mod tests {
     #[track_caller]
     fn expect_channel_writable(channel: &Channel) {
         // Should be able to send data over the channel.
-        match channel.as_ref().write(&[0; 1]) {
+        match channel.write(&[0; 1]) {
             Ok(1) => {}
             x => panic!("Expected data write but got {:?} instead", x),
         }
@@ -957,7 +957,7 @@ pub(crate) mod tests {
 
     #[track_caller]
     fn expect_channel_closed(channel: &Channel) {
-        match channel.as_ref().write(&[0; 1]) {
+        match channel.write(&[0; 1]) {
             Err(zx::Status::PEER_CLOSED) => {}
             x => panic!("Expected PEER_CLOSED but got {:?}", x),
         }
@@ -2065,7 +2065,7 @@ pub(crate) mod tests {
         let _ = exec.run_until_stalled(&mut futures::future::pending::<()>());
 
         // Send erroneous data over the control channel.
-        match remote_control.as_ref().write(&[0, 17, 14, 0, 72]) {
+        match remote_control.write(&[0, 17, 14, 0, 72]) {
             Ok(_) => {}
             Err(e) => panic!("Expected data write but got {:?} instead", e),
         }
@@ -2093,7 +2093,10 @@ pub(crate) mod tests {
         // Simulate inbound browse connection.
         let (remote_browse, local_browse) = Channel::create();
         // Set write to not work to trigger error on socket read.
-        assert!(local_browse.as_ref().half_close().is_ok());
+        let socket = local_browse.into_socket().unwrap();
+        assert!(socket.half_close().is_ok());
+        let local_browse = Channel::from_socket(socket, Channel::DEFAULT_MAX_TX).unwrap();
+
         let browse_channel = AvctpPeer::new(local_browse);
         peer_handle.set_browse_connection(browse_channel);
         exec.set_fake_time(MAX_CONNECTION_EST_TIME.after_now());
@@ -2114,7 +2117,7 @@ pub(crate) mod tests {
         let _ = exec.run_until_stalled(&mut futures::future::pending::<()>());
 
         // Send data over the browse channel with socket that'll cause error on write.
-        let _ = remote_browse.as_ref().write(&[1, 1]).expect_err("should have failed");
+        let _ = remote_browse.write(&[1, 1]).expect_err("should have failed");
 
         let _ = exec.run_until_stalled(&mut futures::future::pending::<()>());
 

@@ -265,6 +265,7 @@ mod tests {
         (parameter_string, target_spec, target_vec)
     }
 
+    // TODO(https://fxbug.dev/317285180) panic if this fails once running as root for baseline
     fn open_dm_control() -> Option<std::fs::File> {
         match OpenOptions::new().read(true).write(true).open("/dev/mapper/control") {
             Ok(file) => Some(file),

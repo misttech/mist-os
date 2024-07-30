@@ -31,6 +31,7 @@ wrapping.
 """
 
 import argparse
+import dataclasses
 import filecmp
 import os
 import shutil
@@ -39,7 +40,6 @@ import sys
 import time
 from pathlib import Path
 from typing import Any, Callable, Collection, Dict, Iterable, Sequence, Tuple
-import dataclasses
 
 _SCRIPT_BASENAME = Path(__file__).name
 _SCRIPT_DIR = Path(__file__).parent

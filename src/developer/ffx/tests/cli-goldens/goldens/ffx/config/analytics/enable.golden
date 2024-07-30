@@ -1,6 +1,6 @@
 {
   "name": "enable",
-  "description": "enable analytics",
+  "description": "enable basic (redacted) analytics",
   "examples": [],
   "flags": [
     {

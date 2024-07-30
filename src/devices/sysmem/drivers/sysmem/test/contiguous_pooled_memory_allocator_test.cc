@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "contiguous_pooled_memory_allocator.h"
+#include "src/devices/sysmem/drivers/sysmem/contiguous_pooled_memory_allocator.h"
 
 #include <lib/async-loop/loop.h>
 #include <lib/async-testing/test_loop.h>
@@ -17,7 +17,9 @@
 #include <vector>
 
 #include <fbl/algorithm.h>
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
+
+#include "src/lib/testing/predicates/status.h"
 
 namespace sysmem_driver {
 namespace {
@@ -47,7 +49,7 @@ class FakeOwner : public MemoryAllocator::Owner {
   SysmemMetrics metrics_;
 };
 
-class ContiguousPooledSystem : public zxtest::Test {
+class ContiguousPooledSystem : public ::testing::Test {
  public:
   ContiguousPooledSystem()
       : allocator_(&fake_owner_, kVmoName, &inspector_.GetRoot(),
@@ -88,7 +90,7 @@ TEST_F(ContiguousPooledSystem, VmoNamesAreSet) {
 
   char name[ZX_MAX_NAME_LEN] = {};
   EXPECT_OK(allocator_.GetPoolVmoForTest().get_property(ZX_PROP_NAME, name, sizeof(name)));
-  EXPECT_EQ(0u, strcmp(kVmoName, name));
+  EXPECT_EQ(0, strcmp(kVmoName, name));
 
   zx::vmo vmo;
   fuchsia_sysmem2::SingleBufferSettings settings;
@@ -96,7 +98,7 @@ TEST_F(ContiguousPooledSystem, VmoNamesAreSet) {
   settings.buffer_settings()->size_bytes() = kVmoSize - 42;
   EXPECT_OK(allocator_.Allocate(kVmoSize, settings, "", kBufferCollectionId, kBufferIndex, &vmo));
   EXPECT_OK(vmo.get_property(ZX_PROP_NAME, name, sizeof(name)));
-  EXPECT_EQ(0u, strcmp("test-pool-child", name));
+  EXPECT_EQ(0, strcmp("test-pool-child", name));
   allocator_.Delete(std::move(vmo));
 }
 
@@ -129,18 +131,18 @@ TEST_F(ContiguousPooledSystem, Full) {
   fuchsia_sysmem2::SingleBufferSettings settings;
   settings.buffer_settings().emplace();
   settings.buffer_settings()->size_bytes() = kVmoSize;
-  EXPECT_NOT_OK(
-      allocator_.Allocate(kVmoSize, settings, "", kBufferCollectionId, kBufferIndex, &vmo));
+  EXPECT_NE(ZX_OK,
+            allocator_.Allocate(kVmoSize, settings, "", kBufferCollectionId, kBufferIndex, &vmo));
 
   auto after_time = zx::clock::get_monotonic();
 
   hierarchy = inspect::ReadFromVmo(inspector_.DuplicateVmo());
   value = hierarchy.value().GetByPath({"test-pool"});
-  EXPECT_LE(before_time.get(),
+  EXPECT_LE(static_cast<uint64_t>(before_time.get()),
             value->node()
                 .get_property<inspect::UintPropertyValue>("last_allocation_failed_timestamp_ns")
                 ->value());
-  EXPECT_GE(after_time.get(),
+  EXPECT_GE(static_cast<uint64_t>(after_time.get()),
             value->node()
                 .get_property<inspect::UintPropertyValue>("last_allocation_failed_timestamp_ns")
                 ->value());
@@ -162,16 +164,16 @@ TEST_F(ContiguousPooledSystem, Full) {
   // allocator's layout strategy changes this check might start to fail
   // without there necessarily being a real problem.
   settings.buffer_settings()->size_bytes() = kVmoSize + 1;
-  EXPECT_NOT_OK(allocator_.Allocate(
-      fbl::round_up(*settings.buffer_settings()->size_bytes(), zx_system_get_page_size()), settings,
-      "", kBufferCollectionId, kBufferIndex, &vmo));
+  EXPECT_NE(ZX_OK, allocator_.Allocate(fbl::round_up(*settings.buffer_settings()->size_bytes(),
+                                                     zx_system_get_page_size()),
+                                       settings, "", kBufferCollectionId, kBufferIndex, &vmo));
 
   // This allocation should fail because there's not enough space in the pool, with or without
   // fragmentation.:
   settings.buffer_settings()->size_bytes() = kVmoSize * kVmoCount - 1;
-  EXPECT_NOT_OK(allocator_.Allocate(
-      fbl::round_up(*settings.buffer_settings()->size_bytes(), zx_system_get_page_size()), settings,
-      "", kBufferCollectionId, kBufferIndex, &vmo));
+  EXPECT_NE(ZX_OK, allocator_.Allocate(fbl::round_up(*settings.buffer_settings()->size_bytes(),
+                                                     zx_system_get_page_size()),
+                                       settings, "", kBufferCollectionId, kBufferIndex, &vmo));
 
   hierarchy = inspect::ReadFromVmo(inspector_.DuplicateVmo());
   value = hierarchy.value().GetByPath({"test-pool"});
@@ -199,7 +201,7 @@ TEST_F(ContiguousPooledSystem, GetPhysicalMemoryInfo) {
   zx_paddr_t base;
   size_t size;
   ASSERT_OK(allocator_.GetPhysicalMemoryInfo(&base, &size));
-  EXPECT_EQ(base, FAKE_BTI_PHYS_ADDR);
+  EXPECT_EQ(base, zx_paddr_t{FAKE_BTI_PHYS_ADDR});
   EXPECT_EQ(size, kVmoSize * kVmoCount);
 }
 
@@ -212,7 +214,7 @@ TEST_F(ContiguousPooledSystem, InitPhysical) {
   zx_paddr_t base;
   size_t size;
   ASSERT_OK(allocator_.GetPhysicalMemoryInfo(&base, &size));
-  EXPECT_EQ(base, FAKE_BTI_PHYS_ADDR);
+  EXPECT_EQ(base, zx_paddr_t{FAKE_BTI_PHYS_ADDR});
   EXPECT_EQ(size, kVmoSize * kVmoCount);
 
   zx::vmo vmo;
@@ -249,8 +251,8 @@ TEST_F(ContiguousPooledSystem, GuardPages) {
                              /*unused_guard_pattern_period_bytes=*/-1, kUnusedPageCheckCyclePeriod,
                              /*internal_guard_regions=*/true,
                              /*crash_on_guard_failure=*/false, loop.dispatcher());
-  allocator_.SetupUnusedPages();
   allocator_.set_ready();
+  allocator_.SetupUnusedPages();
 
   zx::vmo vmo;
   fuchsia_sysmem2::SingleBufferSettings settings;
@@ -292,8 +294,8 @@ TEST_F(ContiguousPooledSystem, ExternalGuardPages) {
                              /*unused_guard_pattern_period_bytes=*/-1, kUnusedPageCheckCyclePeriod,
                              /*internal_guard_regions=*/false,
                              /*crash_on_guard_failure=*/false, loop.dispatcher());
-  allocator_.SetupUnusedPages();
   allocator_.set_ready();
+  allocator_.SetupUnusedPages();
 
   zx::vmo vmo;
   fuchsia_sysmem2::SingleBufferSettings settings;
@@ -341,16 +343,16 @@ TEST_F(ContiguousPooledSystem, UnusedGuardPages) {
   const zx::duration unused_page_check_cycle_period = zx::sec(2);
   const uint32_t loop_time_seconds = unused_page_check_cycle_period.to_secs() + 1;
 
-  EXPECT_EQ(0, kBigVmoSize % (ContiguousPooledMemoryAllocator::kUnusedGuardPatternPeriodPages *
-                              zx_system_get_page_size()));
+  EXPECT_EQ(0u, kBigVmoSize % (ContiguousPooledMemoryAllocator::kUnusedGuardPatternPeriodPages *
+                               zx_system_get_page_size()));
 
   EXPECT_OK(allocator_.Init());
   allocator_.InitGuardRegion(/*guard_region_size=*/0, /*unused_pages_guarded=*/true,
                              /*unused_guard_pattern_period_bytes=*/-1,
                              unused_page_check_cycle_period, /*internal_guard_regions=*/false,
                              /*crash_on_guard_failure=*/false, loop.dispatcher());
-  allocator_.SetupUnusedPages();
   allocator_.set_ready();
+  allocator_.SetupUnusedPages();
 
   zx::vmo vmo;
   fuchsia_sysmem2::SingleBufferSettings settings;
@@ -366,9 +368,9 @@ TEST_F(ContiguousPooledSystem, UnusedGuardPages) {
   // ContiguousPooledMemoryAllocator::kUnusedGuardPatternPeriodPages alignment requirement instead
   // of just asserting that alignment.  For now this will be true based on internal behavior of
   // RegionAllocator, but that's not guaranteed by the RegionAllocator interface contract.
-  EXPECT_EQ(0, allocator_.GetVmoRegionOffsetForTest(vmo) %
-                   (ContiguousPooledMemoryAllocator::kUnusedGuardPatternPeriodPages *
-                    zx_system_get_page_size()));
+  EXPECT_EQ(0u, allocator_.GetVmoRegionOffsetForTest(vmo) %
+                    (ContiguousPooledMemoryAllocator::kUnusedGuardPatternPeriodPages *
+                     zx_system_get_page_size()));
 
   printf("check for spurious pattern check failure...\n");
 

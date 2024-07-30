@@ -21,7 +21,7 @@ use starnix_sync::{Locked, Unlocked};
 use starnix_syscalls::SyscallResult;
 use starnix_uapi::errors::{Errno, ErrnoResultExt, EINTR, ETIMEDOUT};
 use starnix_uapi::open_flags::OpenFlags;
-use starnix_uapi::ownership::WeakRef;
+use starnix_uapi::ownership::{OwnedRef, TempRef, WeakRef};
 use starnix_uapi::signals::{SigSet, Signal, UncheckedSignal, UNBLOCKABLE_SIGNALS};
 use starnix_uapi::time::{duration_from_timespec, timeval_from_duration};
 use starnix_uapi::user_address::{UserAddress, UserRef};
@@ -32,7 +32,6 @@ use starnix_uapi::{
     WNOWAIT, WSTOPPED, WUNTRACED, __WALL, __WCLONE,
 };
 use static_assertions::const_assert_eq;
-use std::sync::Arc;
 use zerocopy::FromBytes;
 
 // Rust will let us do this cast in a const assignment but not in a const generic constraint.
@@ -391,7 +390,7 @@ pub fn sys_kill(
                     None => {
                         let weak_task = pids.get_task(pid);
                         let task = Task::from_weak(&weak_task)?;
-                        task.thread_group.clone()
+                        TempRef::into_static(OwnedRef::temp(&task.thread_group))
                     }
                 }
             };
@@ -433,14 +432,11 @@ pub fn sys_kill(
                 _ => negate_pid(pid)?,
             };
 
-            let thread_groups = {
-                let process_group = pids.get_process_group(process_group_id);
-                process_group
-                    .iter()
-                    .flat_map(|pg| pg.read(locked).thread_groups().collect::<Vec<_>>())
-                    .collect::<Vec<_>>()
-            };
-            signal_thread_groups(current_task, unchecked_signal, thread_groups.into_iter())?;
+            let process_group = pids.get_process_group(process_group_id);
+            let thread_groups = process_group.iter().flat_map(|pg| {
+                pg.read(locked).thread_groups().map(TempRef::into_static).collect::<Vec<_>>()
+            });
+            signal_thread_groups(current_task, unchecked_signal, thread_groups)?;
         }
     };
 
@@ -448,12 +444,13 @@ pub fn sys_kill(
 }
 
 fn verify_tgid_for_task(task: &Task, tgid: pid_t) -> Result<(), Errno> {
-    let thread_group = match task.thread_group.kernel.pids.read().get_process(tgid) {
+    let pids = task.thread_group.kernel.pids.read();
+    let thread_group = match pids.get_process(tgid) {
         Some(ProcessEntryRef::Process(proc)) => proc,
         Some(ProcessEntryRef::Zombie(_)) => return error!(EINVAL),
         None => return error!(ESRCH),
     };
-    if !Arc::ptr_eq(&task.thread_group, &thread_group) {
+    if task.thread_group != thread_group {
         return error!(EINVAL);
     } else {
         Ok(())
@@ -584,15 +581,15 @@ fn signal_thread_groups<F>(
     thread_groups: F,
 ) -> Result<(), Errno>
 where
-    F: Iterator<Item = Arc<ThreadGroup>>,
+    F: IntoIterator<Item: AsRef<ThreadGroup>>,
 {
     let mut last_error = errno!(ESRCH);
     let mut sent_signal = false;
 
     // This loop keeps track of whether a signal was sent, so that "on
     // success (at least one signal was sent), zero is returned."
-    for thread_group in thread_groups {
-        match thread_group.send_signal_unchecked(current_task, unchecked_signal) {
+    for thread_group in thread_groups.into_iter() {
+        match thread_group.as_ref().send_signal_unchecked(current_task, unchecked_signal) {
             Ok(_) => sent_signal = true,
             Err(errno) => last_error = errno,
         }

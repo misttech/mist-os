@@ -1,4 +1,3 @@
-#!/usr/bin/env fuchsia-vendored-python
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
@@ -16,7 +15,6 @@ import time
 from typing import Any
 
 from fuchsia_base_test import fuchsia_base_test
-
 from mobly import test_runner
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
@@ -163,7 +161,6 @@ class FuchsiaPowerBaseTest(fuchsia_base_test.FuchsiaBaseTest):
                 self.device.ffx.run_test_component(
                     self.ffx_test_url,
                     ffx_test_args=ffx_test_args,
-                    timeout=self.timeout_sec,
                     capture_output=False,
                 )
             finally:

@@ -224,7 +224,7 @@ void Tas58xx::PeriodicPollFaults() {
     zxlogf(WARNING, "Failed to read fault gpio: %s",
            zx_status_get_string(read_result->error_value()));
     inspect_reporter_.ReportGpioError(time_now);
-  } else if (read_result.value()->value == 0) {  // Active low; 0 means the pin is active!
+  } else if (!read_result.value()->value) {  // Active low; 0 means the pin is active!
     // Codec is driving fault pin active.  Read the fault registers.
     fault_info_.i2c_error = (ReadReg(kRegChanFault, &fault_info_.chan_fault) != ZX_OK) ||
                             (ReadReg(kRegGlobalFault1, &fault_info_.global_fault1) != ZX_OK) ||

@@ -97,13 +97,21 @@ impl<K> Key for K where
 pub trait MergeableKey: Key + Eq + LayerKey + OrdLowerBound {}
 impl<K> MergeableKey for K where K: Key + Eq + LayerKey + OrdLowerBound {}
 
-pub trait Value:
+/// Trait required for supporting Layer functionality.
+pub trait LayerValue:
     Clone + Send + Sync + Versioned + VersionedLatest + Debug + std::marker::Unpin + 'static
 {
 }
-impl<V> Value for V where
+impl<V> LayerValue for V where
     V: Clone + Send + Sync + Versioned + VersionedLatest + Debug + std::marker::Unpin + 'static
 {
+}
+
+/// Superset of `LayerValue` to additionally support tree searching, requires comparison and an
+/// `DELETED_MARKER` for indicating empty values used to indicate deletion in the `LSMTree`.
+pub trait Value: PartialEq + LayerValue {
+    /// Value used to represent that the entry is actually empty, and should be ignored.
+    const DELETED_MARKER: Self;
 }
 
 /// ItemRef is a struct that contains references to key and value, which is useful since in many

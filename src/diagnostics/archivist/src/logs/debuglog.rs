@@ -155,8 +155,8 @@ pub fn convert_debuglog_to_log_message(record: &zx::sys::zx_log_record_t) -> Opt
     Some(
         LogsDataBuilder::new(BuilderArgs {
             timestamp_nanos: record.timestamp.into(),
-            component_url: Some(KERNEL_IDENTITY.url.to_string()),
-            moniker: KERNEL_IDENTITY.to_string(),
+            component_url: Some(KERNEL_IDENTITY.url.clone()),
+            moniker: KERNEL_IDENTITY.moniker.clone(),
             severity,
         })
         .set_pid(record.pid)
@@ -186,8 +186,8 @@ mod tests {
             data,
             LogsDataBuilder::new(BuilderArgs {
                 timestamp_nanos: klog.record.timestamp.into(),
-                component_url: Some(KERNEL_IDENTITY.url.to_string()),
-                moniker: KERNEL_IDENTITY.to_string(),
+                component_url: Some(KERNEL_IDENTITY.url.clone()),
+                moniker: KERNEL_IDENTITY.moniker.clone(),
                 severity: Severity::Info,
             })
             .set_pid(klog.record.pid)
@@ -218,8 +218,8 @@ mod tests {
             data,
             LogsDataBuilder::new(BuilderArgs {
                 timestamp_nanos: klog.record.timestamp.into(),
-                component_url: Some(KERNEL_IDENTITY.url.to_string()),
-                moniker: KERNEL_IDENTITY.to_string(),
+                component_url: Some(KERNEL_IDENTITY.url.clone()),
+                moniker: KERNEL_IDENTITY.moniker.clone(),
                 severity: Severity::Info,
             })
             .set_pid(klog.record.pid)
@@ -236,8 +236,8 @@ mod tests {
             data,
             LogsDataBuilder::new(BuilderArgs {
                 timestamp_nanos: klog.record.timestamp.into(),
-                component_url: Some(KERNEL_IDENTITY.url.to_string()),
-                moniker: KERNEL_IDENTITY.to_string(),
+                component_url: Some(KERNEL_IDENTITY.url.clone()),
+                moniker: KERNEL_IDENTITY.moniker.clone(),
                 severity: Severity::Info,
             })
             .set_pid(klog.record.pid)
@@ -269,8 +269,8 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec![LogsDataBuilder::new(BuilderArgs {
                 timestamp_nanos: klog.record.timestamp.into(),
-                component_url: Some(KERNEL_IDENTITY.url.to_string()),
-                moniker: KERNEL_IDENTITY.to_string(),
+                component_url: Some(KERNEL_IDENTITY.url.clone()),
+                moniker: KERNEL_IDENTITY.moniker.clone(),
                 severity: Severity::Info,
             })
             .set_pid(klog.record.pid)

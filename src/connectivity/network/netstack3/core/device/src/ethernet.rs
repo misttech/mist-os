@@ -883,6 +883,7 @@ pub(crate) mod testutil {
 #[cfg(test)]
 mod tests {
     use alloc::vec;
+    use core::convert::Infallible as Never;
 
     use net_types::ip::{Ipv4Addr, Ipv6Addr};
     use net_types::SpecifiedAddr;
@@ -1243,6 +1244,7 @@ mod tests {
         type Meta = ();
         type Allocator = BufVecU8Allocator;
         type Buffer = Buf<Vec<u8>>;
+        type DequeueContext = Never;
 
         fn parse_outgoing_frame<'a>(
             buf: &'a [u8],
@@ -1256,6 +1258,7 @@ mod tests {
         type Meta = ();
         type Allocator = BufVecU8Allocator;
         type Buffer = Buf<Vec<u8>>;
+        type DequeueContext = Never;
 
         fn parse_outgoing_frame<'a, 'b>(
             buf: &'a [u8],
@@ -1277,14 +1280,33 @@ mod tests {
             self.inner.with_transmit_queue_mut(device_id, cb)
         }
 
+        fn with_transmit_queue<
+            O,
+            F: FnOnce(&TransmitQueueState<Self::Meta, Self::Buffer, Self::Allocator>) -> O,
+        >(
+            &mut self,
+            device_id: &Self::DeviceId,
+            cb: F,
+        ) -> O {
+            self.inner.with_transmit_queue(device_id, cb)
+        }
+
         fn send_frame(
             &mut self,
             bindings_ctx: &mut FakeBindingsCtx,
             device_id: &Self::DeviceId,
+            dequeue_context: Option<&mut Never>,
             (): Self::Meta,
             buf: Self::Buffer,
         ) -> Result<(), DeviceSendFrameError> {
-            TransmitQueueContext::send_frame(&mut self.inner, bindings_ctx, device_id, (), buf)
+            TransmitQueueContext::send_frame(
+                &mut self.inner,
+                bindings_ctx,
+                device_id,
+                dequeue_context,
+                (),
+                buf,
+            )
         }
     }
 
@@ -1300,13 +1322,29 @@ mod tests {
             cb(&mut self.state.tx_queue)
         }
 
+        fn with_transmit_queue<
+            O,
+            F: FnOnce(&TransmitQueueState<Self::Meta, Self::Buffer, Self::Allocator>) -> O,
+        >(
+            &mut self,
+            _device_id: &Self::DeviceId,
+            cb: F,
+        ) -> O {
+            cb(&self.state.tx_queue)
+        }
+
         fn send_frame(
             &mut self,
             _bindings_ctx: &mut FakeBindingsCtx,
             device_id: &Self::DeviceId,
+            dequeue_context: Option<&mut Never>,
             (): Self::Meta,
             buf: Self::Buffer,
         ) -> Result<(), DeviceSendFrameError> {
+            match dequeue_context {
+                Some(never) => match *never {},
+                None => (),
+            }
             self.frames.push(device_id.clone(), buf.as_ref().to_vec());
             Ok(())
         }

@@ -108,6 +108,26 @@ defaults to the first component of the library name. For example:
 {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/fidl/fuchsia.examples.docs/versioning.test.fidl" region_tag="library" %}
 ```
 
+## Modifiers {#modifiers}
+
+FIDL versioning lets you add or remove modifiers at specific versions. After a
+modifier, you can write arguments in parentheses the same way you would after
+`@available`. However, only the `added` and `removed` arguments are allowed.
+
+Here is an example of changing an enum from strict to flexible:
+
+```fidl
+{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/fidl/fuchsia.examples.docs/versioning.test.fidl" region_tag="modifiers" %}
+```
+
+All modifiers support this syntax: `strict`, `flexible`, `resource`, `closed`,
+`ajar`, and `open`. However, changing the `strict` or `flexible` modifier on a
+two-way method without error syntax is [not allowed][fi-0219].
+
+When you target a [set of versions](#target-versions), the compiler uses the
+latest modifiers. In the example above, the enum would be flexible if the set
+includes any version equal or greater to 2, even if it also includes 1.
+
 ## Inheritance {#inheritance}
 
 The arguments to `@available` flow from the library declaration to top-level
@@ -160,15 +180,20 @@ aspects of FIDL elements, including:
 - The type of a struct, table, or union member
 - The kind of a declaration, e.g. changing a struct to an alias
 - The presence of `error` syntax on a method
-- Other attributes on the element
-- Modifiers such as `strict`, `flexible`, and `resource`
+- Attributes on the element
 
 To replace an element at version `N`, annotate the old definition with
 `@available(replaced=N)` and the new definition with `@available(added=N)`.
-For example, here is how you change an enum from `strict` to `flexible`:
+For example, here is how you change the value of a constant:
 
 ```fidl
-{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/fidl/fuchsia.examples.docs/versioning.test.fidl" region_tag="replaced" %}
+{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/fidl/fuchsia.examples.docs/versioning.test.fidl" region_tag="replace_constant" %}
+```
+
+As another example, here is how you would change the type of a table field:
+
+```fidl
+{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/fidl/fuchsia.examples.docs/versioning.test.fidl" region_tag="replace_member" %}
 ```
 
 The FIDL compiler verifies that for every `@available(replaced=N)` element there
@@ -195,7 +220,7 @@ declaration, simply remove the old definition in favor of a new one:
 {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/fidl/fuchsia.examples.docs/versioning.test.fidl" region_tag="rename_declaration" %}
 ```
 
-### After removal
+### After removal {#after-removal}
 
 Normally the `renamed` argument is used with `replaced=N`, but you can also use
 it with `removed=N`. This gives a new name to refer to the member after its
@@ -234,7 +259,7 @@ the name `Open` as long as we (1) use `@selector` to give the new method a
 different [ABI identity](#identity) and (2) use `renamed` on the old definition,
 allowing bindings for the version set {4, 5} to include both methods.
 
-## References
+## References {#references}
 
 There are a variety of ways one FIDL element can reference another. For example:
 
@@ -274,3 +299,4 @@ const B bool = true;
 [overview]: /docs/development/languages/fidl/guides/style.md#library-overview
 [deprecation-bug]: https://bugs.fuchsia.dev/p/fuchsia/issues/detail?id=7692
 [api-evolution]: /docs/development/api/evolution.md
+[fi-0219]: /docs/reference/fidl/language/errcat.md#fi-0219

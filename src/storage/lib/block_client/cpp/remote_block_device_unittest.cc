@@ -105,26 +105,6 @@ class MockBlockDevice final
                      });
   }
 
-  void ReadBlocks(ReadBlocksRequestView request, ReadBlocksCompleter::Sync& completer) override {
-    if (zx_status_t status = request->vmo.write(buffer_.data() + request->dev_offset,
-                                                request->vmo_offset, request->length);
-        status != ZX_OK) {
-      completer.ReplyError(status);
-      return;
-    }
-    completer.ReplySuccess();
-  }
-
-  void WriteBlocks(WriteBlocksRequestView request, WriteBlocksCompleter::Sync& completer) override {
-    if (zx_status_t status = request->vmo.read(buffer_.data() + request->dev_offset,
-                                               request->vmo_offset, request->length);
-        status != ZX_OK) {
-      completer.ReplyError(status);
-      return;
-    }
-    completer.ReplySuccess();
-  }
-
  private:
   class MockSession : public fidl::WireServer<fuchsia_hardware_block::Session> {
    public:
@@ -236,46 +216,6 @@ TEST(RemoteBlockDeviceTest, WriteTransactionReadResponse) {
   ASSERT_EQ(device->FifoTransaction(&request, 1), ZX_OK);
   vmoid.TakeId();
   server_thread.join();
-}
-
-// Tests that the RemoteBlockDevice is capable of transmitting and receiving
-// messages with the block device.
-TEST(RemoteBlockDeviceTest, WriteReadBlock) {
-  auto [client, server] = fidl::Endpoints<fuchsia_hardware_block_volume::Volume>::Create();
-
-  MockBlockDevice mock_device;
-  mock_device.BindServer(std::move(server));
-
-  constexpr size_t max_count = 3;
-
-  std::vector<uint8_t> write_buffer(kBlockSize * max_count + 5),
-      read_buffer(kBlockSize * max_count);
-  // write some pattern to the write buffer
-  for (size_t i = 0; i < kBlockSize * max_count; ++i) {
-    write_buffer[i] = static_cast<uint8_t>(i % 251);
-  }
-  // Test that unaligned counts and offsets result in failures:
-  fidl::ClientEnd<fuchsia_hardware_block::Block> block{client.TakeChannel()};
-  ASSERT_NE(SingleWriteBytes(block, write_buffer.data(), 5, 0), ZX_OK);
-  ASSERT_NE(SingleWriteBytes(block, write_buffer.data(), kBlockSize, 5), ZX_OK);
-  ASSERT_NE(SingleWriteBytes(block, nullptr, kBlockSize, 0), ZX_OK);
-  ASSERT_NE(SingleReadBytes(block, read_buffer.data(), 5, 0), ZX_OK);
-  ASSERT_NE(SingleReadBytes(block, read_buffer.data(), kBlockSize, 5), ZX_OK);
-  ASSERT_NE(SingleReadBytes(block, nullptr, kBlockSize, 0), ZX_OK);
-
-  // test multiple counts, multiple offsets
-  for (uint64_t count = 1; count < max_count; ++count) {
-    for (uint64_t offset = 0; offset < 2; ++offset) {
-      size_t buffer_offset = count + 10 * offset;
-      ASSERT_EQ(SingleWriteBytes(block, write_buffer.data() + buffer_offset, kBlockSize * count,
-                                 kBlockSize * offset),
-                ZX_OK);
-      ASSERT_EQ(SingleReadBytes(block, read_buffer.data(), kBlockSize * count, kBlockSize * offset),
-                ZX_OK);
-      ASSERT_EQ(memcmp(write_buffer.data() + buffer_offset, read_buffer.data(), kBlockSize * count),
-                0);
-    }
-  }
 }
 
 TEST(RemoteBlockDeviceTest, VolumeManagerOrdinals) {

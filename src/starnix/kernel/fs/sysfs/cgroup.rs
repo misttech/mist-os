@@ -14,7 +14,7 @@ use crate::vfs::{
     AppendLockGuard, DynamicFile, DynamicFileBuf, DynamicFileSource, FileObject, FileOps, FsNode,
     FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, MemoryDirectoryFile,
 };
-use starnix_sync::{FileOpsCore, Locked, Mutex, WriteOps};
+use starnix_sync::{FileOpsCore, Locked, Mutex};
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
@@ -214,7 +214,7 @@ impl FileOps for ControlGroupFile {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, WriteOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
         _offset: usize,

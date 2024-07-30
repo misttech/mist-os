@@ -3,8 +3,8 @@
 
 use crate::PublishError;
 use diagnostics_log_encoding::encode::{
-    EncodedSpanArguments, Encoder, EncodingError, MutableBuffer, TestRecord, TracingEvent,
-    WriteEventParams,
+    EncodedSpanArguments, Encoder, EncoderOpts, EncodingError, MutableBuffer, TestRecord,
+    TracingEvent, WriteEventParams,
 };
 use diagnostics_log_encoding::Metatag;
 use fidl_fuchsia_logger::{LogSinkProxy, MAX_DATAGRAM_LEN_BYTES};
@@ -23,6 +23,7 @@ pub(crate) struct SinkConfig {
     pub(crate) metatags: HashSet<Metatag>,
     pub(crate) retry_on_buffer_full: bool,
     pub(crate) tags: Vec<String>,
+    pub(crate) always_log_file_line: bool,
 }
 
 thread_local! {
@@ -59,8 +60,13 @@ impl Sink {
         };
 
         let mut buf = [0u8; MAX_DATAGRAM_LEN_BYTES as _];
-        let mut encoder = Encoder::new(Cursor::new(&mut buf[..]));
-
+        let mut encoder = Encoder::new(
+            Cursor::new(&mut buf[..]),
+            EncoderOpts {
+                always_log_file_line: self.config.always_log_file_line,
+                ..EncoderOpts::default()
+            },
+        );
         if encode(&mut encoder, previously_dropped).is_err() {
             restore_and_increment_dropped_count();
             return;

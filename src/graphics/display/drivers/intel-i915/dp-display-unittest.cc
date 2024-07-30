@@ -4,6 +4,7 @@
 
 #include "src/graphics/display/drivers/intel-i915/dp-display.h"
 
+#include <lib/driver/testing/cpp/scoped_global_logger.h>
 #include <lib/mmio-ptr/fake.h>
 #include <lib/mmio/mmio.h>
 
@@ -135,7 +136,7 @@ class TestDdiPhysicalLayer final : public DdiPhysicalLayer {
 class DpDisplayTest : public ::testing::Test {
  protected:
   DpDisplayTest()
-      : controller_(nullptr, inspect::Inspector{}),
+      : controller_(inspect::Inspector{}),
         mmio_buffer_({
             .vaddr = FakeMmioPtr(buffer_),
             .offset = 0,
@@ -195,6 +196,8 @@ class DpDisplayTest : public ::testing::Test {
   fdf::MmioBuffer* mmio_buffer() { return &mmio_buffer_; }
 
  private:
+  fdf_testing::ScopedGlobalLogger logger_;
+
   // TODO(https://fxbug.dev/42164736): Remove DpDisplay's dependency on Controller which will remove
   // the need for much of what's in SetUp() and TearDown().
   Controller controller_;

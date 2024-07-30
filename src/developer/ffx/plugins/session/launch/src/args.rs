@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use argh::{ArgsInfo, FromArgs};
+use component_debug::config::RawConfigEntry;
 use ffx_core::ffx_command;
 
 #[ffx_command()]
@@ -20,4 +21,11 @@ pub struct SessionLaunchCommand {
     #[argh(positional)]
     /// the component URL of a session.
     pub url: String,
+
+    #[argh(option)]
+    /// provide additional configuration capabilities to the component being run. Specified
+    /// in the format `fully.qualified.Name=VALUE` where `fully.qualified.Name` is the name
+    /// of the configuration capability, and `VALUE` is a JSON string which can be resolved
+    /// as the correct type of configuration value.
+    pub config: Vec<RawConfigEntry>,
 }

@@ -32,8 +32,6 @@
 
 namespace syslog_runtime {
 
-using log_word_t = uint64_t;
-
 class GlobalStateLock;
 namespace internal {
 class LogState {
@@ -102,41 +100,18 @@ class GlobalStateLock {
 };
 namespace {
 
-fuchsia_logging::LogSeverity IntoLogSeverity(fuchsia_diagnostics::wire::Severity severity) {
-  switch (severity) {
-    case fuchsia_diagnostics::Severity::kTrace:
-      return fuchsia_logging::LOG_TRACE;
-      break;
-    case fuchsia_diagnostics::Severity::kDebug:
-      return fuchsia_logging::LOG_DEBUG;
-      break;
-    case fuchsia_diagnostics::Severity::kInfo:
-      return fuchsia_logging::LOG_INFO;
-      break;
-    case fuchsia_diagnostics::Severity::kWarn:
-      return fuchsia_logging::LOG_WARNING;
-      break;
-    case fuchsia_diagnostics::Severity::kError:
-      return fuchsia_logging::LOG_ERROR;
-      break;
-    case fuchsia_diagnostics::Severity::kFatal:
-      return fuchsia_logging::LOG_FATAL;
-      break;
-  }
-}
-
-zx_koid_t GetKoid(zx_handle_t handle) {
+zx_koid_t ProcessSelfKoid() {
   zx_info_handle_basic_t info;
   // We need to use _zx_object_get_info to avoid breaking the driver ABI.
   // fake_ddk can fake out this method, which results in us deadlocking
   // when used in certain drivers because the fake doesn't properly pass-through
   // to the real syscall in this case.
-  zx_status_t status =
-      _zx_object_get_info(handle, ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
+  zx_status_t status = _zx_object_get_info(zx_process_self(), ZX_INFO_HANDLE_BASIC, &info,
+                                           sizeof(info), nullptr, nullptr);
   return status == ZX_OK ? info.koid : ZX_KOID_INVALID;
 }
 
-zx_koid_t pid = GetKoid(zx_process_self());
+zx_koid_t pid = ProcessSelfKoid();
 thread_local zx_koid_t tid = internal::FuchsiaLogGetCurrentThreadKoid();
 const char kTagFieldName[] = "tag";
 
@@ -230,7 +205,7 @@ void internal::LogState::HandleInterest(fuchsia_diagnostics::wire::Interest inte
   if (!interest.has_min_severity()) {
     min_severity_ = default_severity_;
   } else {
-    min_severity_ = IntoLogSeverity(interest.min_severity());
+    min_severity_ = static_cast<FuchsiaLogSeverity>(interest.min_severity());
   }
 }
 

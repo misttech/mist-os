@@ -16,13 +16,12 @@ import os
 import shutil
 import subprocess
 import sys
-
-from api.log import log_pb2
-from go.api.command import command_pb2
 from pathlib import Path
 from typing import Callable, Dict, Iterable, Optional, Sequence, Tuple
 
 import fuchsia
+from api.log import log_pb2
+from go.api.command import command_pb2
 
 _SCRIPT_BASENAME = Path(__file__).name
 

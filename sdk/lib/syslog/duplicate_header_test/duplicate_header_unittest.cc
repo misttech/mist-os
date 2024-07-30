@@ -26,10 +26,6 @@ TEST(HeaderTest, CompileTimeAsserts) {
   // to prevent future inadvertent breakages. Reviewers MUST make
   // sure that anything new added to those header files
   // are properly tested in this file prior to approval.
-  static_assert(FX_LOG_LEGACY_API_VERSION == 0);
-  constexpr int versions[] = {FX_LOG_LEGACY_API_VERSION, FUCHSIA_LOG_API_VERSION,
-                              FX_LOG_INTREE_API_VERSION};
-  static_assert(MultiEquals<int, 3>(versions));
   constexpr int traces[] = {FX_LOG_TRACE, FUCHSIA_LOG_TRACE, fuchsia_logging::LOG_TRACE,
                             static_cast<uint8_t>(fuchsia_diagnostics::Severity::kTrace)};
   static_assert(MultiEquals<int, 4>(traces));

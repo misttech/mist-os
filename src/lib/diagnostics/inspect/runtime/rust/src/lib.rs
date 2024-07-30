@@ -79,8 +79,9 @@ pub struct PublishOptions {
     /// `TreeServerSendPreference::Frozen { on_failure: TreeServerSendPreference::Live }`.
     pub(crate) vmo_preference: TreeServerSendPreference,
 
-    /// An optional name value which will show up in the metadata of snapshots
-    /// taken from this `fuchsia.inspect.Tree` server.
+    /// An name value which will show up in the metadata of snapshots
+    /// taken from this `fuchsia.inspect.Tree` server. Defaults to
+    /// fuchsia.inspect#DEFAULT_TREE_NAME.
     pub(crate) tree_name: Option<String>,
 
     /// Channel over which the InspectSink protocol will be used.

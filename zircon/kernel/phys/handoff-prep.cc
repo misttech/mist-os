@@ -20,6 +20,7 @@
 #include <zircon/assert.h>
 
 #include <ktl/algorithm.h>
+#include <ktl/tuple.h>
 #include <phys/allocation.h>
 #include <phys/elf-image.h>
 #include <phys/handoff.h>
@@ -60,7 +61,7 @@ void FindTestRamReservation(RamReservation& ram) {
       uint64_t aligned_start = (it->addr + it->size - ram.size) & -uint64_t{ZX_PAGE_SIZE};
       uint64_t aligned_end = aligned_start + ram.size;
       if (aligned_start >= it->addr && aligned_end <= aligned_start + ram.size) {
-        if (pool.UpdateFreeRamSubranges(memalloc::Type::kTestRamReserve, aligned_start, ram.size)
+        if (pool.UpdateRamSubranges(memalloc::Type::kTestRamReserve, aligned_start, ram.size)
                 .is_ok()) {
           ram.paddr = aligned_start;
           if (gBootOptions->phys_verbose) {
@@ -148,6 +149,10 @@ void HandoffPrep::SetMemory() {
   // remain.
   auto normed_type = [](memalloc::Type type) -> ktl::optional<memalloc::Type> {
     switch (type) {
+      // We pretend that our reserved 'test' RAM isn't RAM at all.
+      case memalloc::Type::kTestRamReserve:
+        return ktl::nullopt;
+
       case memalloc::Type::kPeripheral:
         [[fallthrough]];
 
@@ -179,7 +184,7 @@ void HandoffPrep::SetMemory() {
     ++len;
     return true;
   };
-  pool.NormalizeRanges(count_ranges, normed_type);
+  memalloc::NormalizeRanges(pool, count_ranges, normed_type);
 
   fbl::AllocChecker ac;
   ktl::span handoff_ranges = New(handoff()->memory, ac, len);
@@ -190,7 +195,12 @@ void HandoffPrep::SetMemory() {
     *it++ = range;
     return true;
   };
-  pool.NormalizeRanges(record_ranges, normed_type);
+  memalloc::NormalizeRanges(pool, record_ranges, normed_type);
+
+  if (gBootOptions->phys_verbose) {
+    printf("%s: Physical memory handed off to the kernel:\n", ProgramName());
+    memalloc::PrintRanges(handoff_ranges, ProgramName());
+  }
 }
 
 BootOptions& HandoffPrep::SetBootOptions(const BootOptions& boot_options) {
@@ -217,6 +227,15 @@ void HandoffPrep::PublishLog(ktl::string_view name, Log&& log) {
   ktl::span copy = PublishVmo(name, content_size);
   ZX_ASSERT(copy.size_bytes() == content_size);
   memcpy(copy.data(), buffer.get(), content_size);
+
+  // TODO(https://fxbug.dev/347766366): While trampoline booting is in effect in
+  // the x86 codepath, care needs to be taken with `Allocation`s made before
+  // the fixed-address image recharacterization that TrampolineBoot does. In
+  // particular, we do not want to absent-mindedly free a region that was
+  // recharacterized as being a part of a fixed-address image. Until
+  // TrampolineBoot is removed from kernel boot, defensively leak the log buffer
+  // allocation.
+  ktl::ignore = buffer.release();
 }
 
 void HandoffPrep::UsePackageFiles(const KernelStorage::Bootfs& kernel_package) {

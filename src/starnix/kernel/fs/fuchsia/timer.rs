@@ -2,18 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::power::OnWakeOps;
 use crate::task::{
     CurrentTask, EventHandler, HandleWaitCanceler, HrTimer, SignalHandler, SignalHandlerInner,
     WaitCanceler, Waiter,
 };
-use crate::timer::{Timeline, TimerWakeup};
+use crate::timer::{Timeline, TimerOps, TimerWakeup};
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::{
     fileops_impl_nonseekable, fileops_impl_noop_sync, Anon, FileHandle, FileObject, FileOps,
 };
 use fuchsia_zircon::{self as zx, AsHandleRef, HandleRef};
 use starnix_logging::track_stub;
-use starnix_sync::{FileOpsCore, Locked, Mutex, WriteOps};
+use starnix_sync::{FileOpsCore, Locked, Mutex};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::time::{
@@ -22,32 +23,8 @@ use starnix_uapi::time::{
 };
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{error, from_status_like_fdio, itimerspec, TFD_TIMER_ABSTIME};
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 use zerocopy::AsBytes;
-
-pub trait TimerOps: Send + Sync + 'static {
-    /// Starts the timer with the specified `deadline`.
-    ///
-    /// This method should start the timer and schedule it to trigger at the specified `deadline`.
-    /// The timer should be cancelled if it is already running.
-    fn start(
-        &self,
-        current_task: &CurrentTask,
-        file_object: &FileObject,
-        deadline: zx::Time,
-    ) -> Result<(), Errno>;
-
-    /// Stops the timer.
-    ///
-    /// This method should stop the timer and prevent it from triggering.
-    fn stop(&self, current_task: &CurrentTask, file_object: &FileObject) -> Result<(), Errno>;
-
-    /// Creates a `WaitCnaceler` that can be used to wait for the timer to be cancelled.
-    fn wait_canceler(&self, canceler: HandleWaitCanceler) -> WaitCanceler;
-
-    /// Returns a reference to the underlying Zircon handle.
-    fn as_handle_ref(&self) -> HandleRef<'_>;
-}
 
 struct ZxTimer {
     timer: Arc<zx::Timer>,
@@ -63,7 +40,7 @@ impl TimerOps for ZxTimer {
     fn start(
         &self,
         _currnet_task: &CurrentTask,
-        _file_object: &FileObject,
+        _source: Option<Weak<dyn OnWakeOps>>,
         deadline: zx::Time,
     ) -> Result<(), Errno> {
         self.timer
@@ -72,7 +49,7 @@ impl TimerOps for ZxTimer {
         Ok(())
     }
 
-    fn stop(&self, _current_task: &CurrentTask, _file_object: &FileObject) -> Result<(), Errno> {
+    fn stop(&self, _current_task: &CurrentTask) -> Result<(), Errno> {
         self.timer.cancel().map_err(|status| from_status_like_fdio!(status))
     }
 
@@ -165,7 +142,7 @@ impl TimerFile {
         if timespec_is_zero(timer_spec.it_value) {
             // Sayeth timerfd_settime(2):
             // Setting both fields of new_value.it_value to zero disarms the timer.
-            self.timer.stop(current_task, file_object)?;
+            self.timer.stop(current_task)?;
         } else {
             let now_monotonic = zx::Time::get_monotonic();
             let new_deadline = if flags & TFD_TIMER_ABSTIME != 0 {
@@ -196,7 +173,7 @@ impl TimerFile {
             };
             let new_interval = duration_from_timespec(timer_spec.it_interval)?;
 
-            self.timer.start(current_task, file_object, new_deadline)?;
+            self.timer.start(current_task, Some(file_object.weak_handle.clone()), new_deadline)?;
             *deadline_interval = (new_deadline, new_interval);
         }
 
@@ -230,7 +207,7 @@ impl FileOps for TimerFile {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, WriteOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         file: &FileObject,
         _current_task: &CurrentTask,
         offset: usize,
@@ -247,14 +224,14 @@ impl FileOps for TimerFile {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<'_, FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
         debug_assert!(offset == 0);
-        file.blocking_op(current_task, FdEvents::POLLIN | FdEvents::POLLHUP, None, || {
+        file.blocking_op(locked, current_task, FdEvents::POLLIN | FdEvents::POLLHUP, None, |_| {
             let mut deadline_interval = self.deadline_interval.lock();
             let (deadline, interval) = *deadline_interval;
 
@@ -277,7 +254,7 @@ impl FileOps for TimerFile {
 
                 // The timer is set to clear the `ZX_TIMER_SIGNALED` signal until the next deadline
                 // is reached.
-                self.timer.start(current_task, file, new_deadline)?;
+                self.timer.start(current_task, Some(file.weak_handle.clone()), new_deadline)?;
 
                 // Update the stored deadline.
                 *deadline_interval = (new_deadline, interval);
@@ -287,7 +264,7 @@ impl FileOps for TimerFile {
                 // The timer is non-repeating, so cancel the timer to clear the `ZX_TIMER_SIGNALED`
                 // signal.
                 *deadline_interval = (zx::Time::default(), interval);
-                self.timer.stop(current_task, file)?;
+                self.timer.stop(current_task)?;
                 1
             };
 
@@ -297,6 +274,7 @@ impl FileOps for TimerFile {
 
     fn wait_async(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         waiter: &Waiter,
@@ -320,6 +298,7 @@ impl FileOps for TimerFile {
 
     fn query_events(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {

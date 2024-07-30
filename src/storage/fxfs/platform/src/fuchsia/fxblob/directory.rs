@@ -468,11 +468,12 @@ impl VfsDirectory for BlobDirectory {
         });
     }
 
-    fn open2(
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
+    fn open3(
         self: Arc<Self>,
         scope: ExecutionScope,
         path: Path,
-        protocols: fio::ConnectionProtocols,
+        flags: fio::Flags,
         object_request: ObjectRequestRef<'_>,
     ) -> Result<(), Status> {
         object_request.take().handle(|object_request| {
@@ -480,7 +481,7 @@ impl VfsDirectory for BlobDirectory {
                 object_request.spawn_connection(
                     scope,
                     OpenedNode::new(self).take(),
-                    protocols,
+                    flags,
                     MutableConnection::create,
                 )
             } else {

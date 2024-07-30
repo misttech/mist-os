@@ -2,12 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::model::actions::{
-    Action, ActionKey, ActionsManager, DiscoverAction, ShutdownAction, ShutdownType,
-};
+use crate::model::actions::{Action, ActionKey, ActionsManager, ShutdownAction, ShutdownType};
 use crate::model::component::instance::InstanceState;
 use crate::model::component::ComponentInstance;
-use ::routing::bedrock::structured_dict::ComponentInput;
 use ::routing::component_instance::ExtendedInstanceInterface;
 use async_trait::async_trait;
 use errors::{ActionError, DestroyActionError};
@@ -45,12 +42,6 @@ async fn do_destroy(component: &Arc<ComponentInstance>) -> Result<(), ActionErro
             }
         }
 
-        // Require the component to be discovered before deleting it so a Destroyed event is
-        // always preceded by a Discovered.
-        // TODO: wait for a discover, don't register a new one
-        ActionsManager::register(component.clone(), DiscoverAction::new(ComponentInput::default()))
-            .await?;
-
         // For destruction to behave correctly, the component has to be shut down first.
         // NOTE: This will recursively shut down the whole subtree. If this component has children,
         // we'll call DestroyChild on them which in turn will call Shutdown on the child. Because
@@ -78,9 +69,6 @@ async fn do_destroy(component: &Arc<ComponentInstance>) -> Result<(), ActionErro
                     // The instance is not shut down, we must have raced with an unresolve action
                     // (potentially followed by a resolve action). Let's try again.
                     continue;
-                }
-                InstanceState::New => {
-                    panic!("discover action returned above but the component is undiscovered, this should be impossible");
                 }
                 InstanceState::Destroyed => {
                     panic!(
@@ -156,7 +144,6 @@ pub mod tests {
         ActionsTest,
     };
     use crate::model::testing::test_hook::Lifecycle;
-    use async_utils::PollExt;
     use cm_rust_testing::*;
     use futures::channel::mpsc;
     use futures::StreamExt;
@@ -346,7 +333,7 @@ pub mod tests {
             ("a", component_decl_with_test_runner()),
         ];
         let test = ActionsTest::new("root", components, None).await;
-        test.model.start(ComponentInput::default()).await;
+        test.model.start().await;
 
         let component_root = test.model.root().clone();
         let component_a = component_root
@@ -399,17 +386,6 @@ pub mod tests {
     }
 
     #[fuchsia::test]
-    async fn destroy_waits_on_discover() {
-        run_destroy_waits_test(
-            ActionKey::Discover,
-            // The mocked action must return a result, even though the result is not used
-            // by the Destroy action.
-            Ok(()),
-        )
-        .await;
-    }
-
-    #[fuchsia::test]
     async fn destroy_waits_on_resolve() {
         run_destroy_waits_test(
             ActionKey::Resolve,
@@ -438,7 +414,7 @@ pub mod tests {
             ("a", component_decl_with_test_runner()),
         ];
         let test = ActionsTest::new("root", components, None).await;
-        test.model.start(ComponentInput::default()).await;
+        test.model.start().await;
 
         let component_root = test.model.root().clone();
         let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
@@ -792,136 +768,128 @@ pub mod tests {
     ///    c   d
     ///
     /// `a` fails to destroy the first time, but succeeds the second time.
-    #[fuchsia::test]
-    fn destroy_error() {
-        let mut executor = fasync::TestExecutor::new();
-        let mut test_body = Box::pin(async move {
-            let components = vec![
-                ("root", ComponentDeclBuilder::new().child_default("a").build()),
-                (
-                    "a",
-                    ComponentDeclBuilder::new()
-                        .child(ChildBuilder::new().name("b").eager().build())
-                        .build(),
-                ),
-                (
-                    "b",
-                    ComponentDeclBuilder::new()
-                        .child(ChildBuilder::new().name("c").eager().build())
-                        .child(ChildBuilder::new().name("d").eager().build())
-                        .build(),
-                ),
-                ("c", component_decl_with_test_runner()),
-                ("d", component_decl_with_test_runner()),
-            ];
-            let test = ActionsTest::new("root", components, None).await;
-            let component_root = test.model.root();
-            let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
-            let component_b = test.look_up(vec!["a", "b"].try_into().unwrap()).await;
-            let component_c = test.look_up(vec!["a", "b", "c"].try_into().unwrap()).await;
-            let component_d = test.look_up(vec!["a", "b", "d"].try_into().unwrap()).await;
+    #[fuchsia::test(allow_stalls = false)]
+    async fn destroy_error() {
+        let components = vec![
+            ("root", ComponentDeclBuilder::new().child_default("a").build()),
+            (
+                "a",
+                ComponentDeclBuilder::new()
+                    .child(ChildBuilder::new().name("b").eager().build())
+                    .build(),
+            ),
+            (
+                "b",
+                ComponentDeclBuilder::new()
+                    .child(ChildBuilder::new().name("c").eager().build())
+                    .child(ChildBuilder::new().name("d").eager().build())
+                    .build(),
+            ),
+            ("c", component_decl_with_test_runner()),
+            ("d", component_decl_with_test_runner()),
+        ];
+        let test = ActionsTest::new("root", components, None).await;
+        let component_root = test.model.root();
+        let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
+        let component_b = test.look_up(vec!["a", "b"].try_into().unwrap()).await;
+        let component_c = test.look_up(vec!["a", "b", "c"].try_into().unwrap()).await;
+        let component_d = test.look_up(vec!["a", "b", "d"].try_into().unwrap()).await;
 
-            // Component startup was eager, so they should all have an `Execution`.
-            component_root
-                .start_instance(&component_a.moniker, &StartReason::Eager)
-                .await
-                .expect("could not start a");
-            assert!(component_a.is_started().await);
-            assert!(component_b.is_started().await);
-            assert!(component_c.is_started().await);
-            assert!(component_d.is_started().await);
+        // Component startup was eager, so they should all have an `Execution`.
+        component_root
+            .start_instance(&component_a.moniker, &StartReason::Eager)
+            .await
+            .expect("could not start a");
+        assert!(component_a.is_started().await);
+        assert!(component_b.is_started().await);
+        assert!(component_c.is_started().await);
+        assert!(component_d.is_started().await);
 
-            // Mock a failure to delete "d".
-            let (destroy_completer, mock_destroy_action) =
-                TestUtilsMockAction::new(ActionKey::Destroy);
-            let _destroy_notifier =
-                component_d.actions().register_no_wait(mock_destroy_action).await;
+        // Mock a failure to delete "d".
+        let (destroy_completer, mock_destroy_action) = TestUtilsMockAction::new(ActionKey::Destroy);
+        let _destroy_notifier = component_d.actions().register_no_wait(mock_destroy_action).await;
 
-            // Register destroy action on "a", and wait for it. but "d"'s destroy action is blocked
-            // until we use destroy_completer. Move this into another task, so that this can run
-            // concurrently.
-            let component_root_clone = component_root.clone();
-            let destroy_child_task = fasync::Task::spawn(async move {
-                component_root_clone.destroy_child("a".try_into().unwrap(), 0).await
-            });
-
-            // We need to wait for the destroy action of "b" to register a destroy action on "d",
-            // which will be deduplicated with the destroy action we registered on "d" earlier.
-            _ = fasync::TestExecutor::poll_until_stalled(std::future::pending::<()>()).await;
-
-            // Now we can allow the mock destroy action to complete with an error, and wait for our
-            // destroy child call to finish.
-            destroy_completer
-                .send(Err(ActionError::DestroyError {
-                    err: DestroyActionError::InstanceNotFound {
-                        moniker: component_d.moniker.clone(),
-                    },
-                }))
-                .unwrap();
-            destroy_child_task.await.expect_err("destroy succeeded unexpectedly");
-
-            // In this state, "d" is marked destroyed but hasn't been removed from the
-            // children list of "b". "c" is destroyed and has been removed from the children
-            // list of "b".
-            assert!(has_child(&component_root, "a").await);
-            assert!(has_child(&component_a, "b").await);
-            assert!(!has_child(&component_b, "c").await);
-            assert!(has_child(&component_b, "d").await);
-            assert!(!is_destroyed(&component_a).await);
-            assert!(!is_destroyed(&component_b).await);
-            assert!(is_destroyed(&component_c).await);
-            assert!(!is_destroyed(&component_d).await);
-            {
-                let events: Vec<_> = test
-                    .test_hook
-                    .lifecycle()
-                    .into_iter()
-                    .filter(|e| match e {
-                        Lifecycle::Destroy(_) => true,
-                        _ => false,
-                    })
-                    .collect();
-                let expected: Vec<_> =
-                    vec![Lifecycle::Destroy(vec!["a", "b", "c"].try_into().unwrap())];
-                assert_eq!(events, expected);
-            }
-
-            // Register destroy action on "a" again. Without our mock action queued up on it, "d"'s
-            // delete succeeds, and "a" is deleted this time.
-            component_root.destroy_child("a".try_into().unwrap(), 0).await.expect("destroy failed");
-            assert!(!has_child(&component_root, "a").await);
-            assert!(is_destroyed(&component_a).await);
-            assert!(is_destroyed(&component_b).await);
-            assert!(is_destroyed(&component_c).await);
-            assert!(is_destroyed(&component_d).await);
-            {
-                let mut events: Vec<_> = test
-                    .test_hook
-                    .lifecycle()
-                    .into_iter()
-                    .filter(|e| match e {
-                        Lifecycle::Destroy(_) => true,
-                        _ => false,
-                    })
-                    .collect();
-                // The leaves could be stopped in any order.
-                let mut first: Vec<_> = events.drain(0..2).collect();
-                first.sort_unstable();
-                let expected: Vec<_> = vec![
-                    Lifecycle::Destroy(vec!["a", "b", "c"].try_into().unwrap()),
-                    Lifecycle::Destroy(vec!["a", "b", "d"].try_into().unwrap()),
-                ];
-                assert_eq!(first, expected);
-                assert_eq!(
-                    events,
-                    vec![
-                        Lifecycle::Destroy(vec!["a", "b"].try_into().unwrap()),
-                        Lifecycle::Destroy(vec!["a"].try_into().unwrap())
-                    ]
-                );
-            }
+        // Register destroy action on "a", and wait for it. but "d"'s destroy action is blocked
+        // until we use destroy_completer. Move this into another task, so that this can run
+        // concurrently.
+        let component_root_clone = component_root.clone();
+        let destroy_child_task = fasync::Task::spawn(async move {
+            component_root_clone.destroy_child("a".try_into().unwrap(), 0).await
         });
-        executor.run_until_stalled(&mut test_body).unwrap();
+
+        // We need to wait for the destroy action of "b" to register a destroy action on "d",
+        // which will be deduplicated with the destroy action we registered on "d" earlier.
+        _ = fasync::TestExecutor::poll_until_stalled(std::future::pending::<()>()).await;
+
+        // Now we can allow the mock destroy action to complete with an error, and wait for our
+        // destroy child call to finish.
+        destroy_completer
+            .send(Err(ActionError::DestroyError {
+                err: DestroyActionError::InstanceNotFound { moniker: component_d.moniker.clone() },
+            }))
+            .unwrap();
+        destroy_child_task.await.expect_err("destroy succeeded unexpectedly");
+
+        // In this state, "d" is marked destroyed but hasn't been removed from the
+        // children list of "b". "c" is destroyed and has been removed from the children
+        // list of "b".
+        assert!(has_child(&component_root, "a").await);
+        assert!(has_child(&component_a, "b").await);
+        assert!(!has_child(&component_b, "c").await);
+        assert!(has_child(&component_b, "d").await);
+        assert!(!is_destroyed(&component_a).await);
+        assert!(!is_destroyed(&component_b).await);
+        assert!(is_destroyed(&component_c).await);
+        assert!(!is_destroyed(&component_d).await);
+        {
+            let events: Vec<_> = test
+                .test_hook
+                .lifecycle()
+                .into_iter()
+                .filter(|e| match e {
+                    Lifecycle::Destroy(_) => true,
+                    _ => false,
+                })
+                .collect();
+            let expected: Vec<_> =
+                vec![Lifecycle::Destroy(vec!["a", "b", "c"].try_into().unwrap())];
+            assert_eq!(events, expected);
+        }
+
+        // Register destroy action on "a" again. Without our mock action queued up on it, "d"'s
+        // delete succeeds, and "a" is deleted this time.
+        component_root.destroy_child("a".try_into().unwrap(), 0).await.expect("destroy failed");
+        assert!(!has_child(&component_root, "a").await);
+        assert!(is_destroyed(&component_a).await);
+        assert!(is_destroyed(&component_b).await);
+        assert!(is_destroyed(&component_c).await);
+        assert!(is_destroyed(&component_d).await);
+        {
+            let mut events: Vec<_> = test
+                .test_hook
+                .lifecycle()
+                .into_iter()
+                .filter(|e| match e {
+                    Lifecycle::Destroy(_) => true,
+                    _ => false,
+                })
+                .collect();
+            // The leaves could be stopped in any order.
+            let mut first: Vec<_> = events.drain(0..2).collect();
+            first.sort_unstable();
+            let expected: Vec<_> = vec![
+                Lifecycle::Destroy(vec!["a", "b", "c"].try_into().unwrap()),
+                Lifecycle::Destroy(vec!["a", "b", "d"].try_into().unwrap()),
+            ];
+            assert_eq!(first, expected);
+            assert_eq!(
+                events,
+                vec![
+                    Lifecycle::Destroy(vec!["a", "b"].try_into().unwrap()),
+                    Lifecycle::Destroy(vec!["a"].try_into().unwrap())
+                ]
+            );
+        }
     }
 
     #[fuchsia::test]

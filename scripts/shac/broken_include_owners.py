@@ -6,9 +6,9 @@
 """
 
 import json
+import os
 import re
 import sys
-import os
 
 
 def main():

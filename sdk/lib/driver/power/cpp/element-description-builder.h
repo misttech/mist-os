@@ -45,6 +45,10 @@ class ElementDescBuilder {
   /// Sets the channel to use for the Lessor protocol.
   ElementDescBuilder& SetLessor(fidl::ServerEnd<fuchsia_power_broker::Lessor> lessor);
 
+  /// Sets the channel to use for the ElementControl protocol.
+  ElementDescBuilder& SetElementControl(
+      fidl::ServerEnd<fuchsia_power_broker::ElementControl> element_control);
+
  private:
   fuchsia_hardware_power::wire::PowerElementConfiguration element_config_;
   TokenMap tokens_;
@@ -53,6 +57,7 @@ class ElementDescBuilder {
   std::optional<fidl::ServerEnd<fuchsia_power_broker::CurrentLevel>> current_level_;
   std::optional<fidl::ServerEnd<fuchsia_power_broker::RequiredLevel>> required_level_;
   std::optional<fidl::ServerEnd<fuchsia_power_broker::Lessor>> lessor_;
+  std::optional<fidl::ServerEnd<fuchsia_power_broker::ElementControl>> element_control_;
 };
 
 }  // namespace fdf_power

@@ -22,6 +22,14 @@
       "short": null,
       "description": "override the path the socket will be bound to",
       "hidden": false
+    },
+    {
+      "kind": "Switch",
+      "optionality": "optional",
+      "long": "--background",
+      "short": "b",
+      "description": "runs the daemon in the background. Returns after verifying daemon connection. No-op if the daemon is already running.",
+      "hidden": false
     }
   ],
   "notes": [],

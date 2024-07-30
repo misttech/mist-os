@@ -73,13 +73,15 @@ class ExternalDecompressorClient {
  private:
   ExternalDecompressorClient() = default;
 
-  // If the fifo is useable nothing is done and returns ZX_OK. If the fifo is not ready to use, this
-  // attempts to set one up via the DecompressorCreator.
-  zx_status_t Prepare();
+  // Attempts to set up a new fifo connection via the DecompressorCreator.
+  zx_status_t ConnectToDecompressor();
 
   // If the DecompressorCreator fidl channel is ready then nothing is done. Otherwise the channel is
   // set up.
   zx_status_t PrepareDecompressorCreator();
+
+  // Sends a request to the connected decompressor.
+  zx_status_t SendRequest(const fuchsia_blobfs_internal::wire::DecompressRequest& request);
 
   // The vmo that will contain the decompressed data for requests. A copy is kept so that if it
   // needs to reconnect with the server another copy can be sent.

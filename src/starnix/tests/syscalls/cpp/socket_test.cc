@@ -241,6 +241,7 @@ TEST_F(UnixSocketTest, ImmediatePeercredCheck) {
 }
 
 TEST(NetlinkSocket, RecvMsg) {
+  // TODO(https://fxbug.dev/317285180) don't skip on baseline
   if (!test_helper::HasSysAdmin()) {
     GTEST_SKIP() << "Not running with sysadmin capabilities, skipping suite.";
   }
@@ -308,6 +309,40 @@ TEST(NetlinkSocket, RecvMsg) {
   received = recvmsg(fd, &header, 0);
   ASSERT_EQ(static_cast<size_t>(received), sizeof(input_2));
   ASSERT_EQ(input_2.hdr.nlmsg_type, NLMSG_ERROR);
+}
+
+TEST(NetlinkSocket, FamilyMissing) {
+  int fd = socket(AF_NETLINK, SOCK_RAW, NETLINK_GENERIC);
+  ASSERT_GT(fd, 0);
+  test_helper::NetlinkEncoder encoder(GENL_ID_CTRL, NLM_F_REQUEST);
+  encoder.BeginGenetlinkHeader(CTRL_CMD_GETFAMILY);
+  encoder.BeginNla(CTRL_ATTR_FAMILY_NAME);
+  encoder.Write("Hyainailouridae");
+  encoder.EndNla();
+  iovec iov = {};
+  encoder.Finalize(iov);
+  struct msghdr header = {};
+  header.msg_iov = &iov;
+  header.msg_iovlen = 1;
+
+  ASSERT_EQ(sendmsg(fd, &header, 0), static_cast<ssize_t>(iov.iov_len));
+
+  nlmsghdr* orig_nlmsghdr = static_cast<nlmsghdr*>(iov.iov_base);
+  iov.iov_len = 0;
+  ssize_t received = recvmsg(fd, &header, MSG_PEEK | MSG_TRUNC);
+  ASSERT_GT(static_cast<size_t>(received), sizeof(nlmsghdr));
+  struct {
+    nlmsghdr hdr;
+    nlmsgerr err;
+  } input;
+  iov.iov_len = sizeof(input);
+  iov.iov_base = &input;
+  received = recvmsg(fd, &header, 0);
+
+  ASSERT_EQ(static_cast<size_t>(received), sizeof(input));
+  ASSERT_EQ(input.hdr.nlmsg_type, NLMSG_ERROR);
+  ASSERT_EQ(input.err.error, -ENOENT);
+  ASSERT_FALSE(memcmp(&input.err.msg, orig_nlmsghdr, sizeof(nlmsghdr)));
 }
 
 TEST(UnixSocket, SendZeroFds) {
@@ -404,6 +439,7 @@ class SocketFault : public FaultTest, public testing::WithParamInterface<std::pa
   void SetUp() override {
     const auto [type, protocol] = GetParam();
 
+    // TODO(https://fxbug.dev/317285180) don't skip on baseline
     if (type == SOCK_DGRAM && protocol == IPPROTO_ICMP && getuid() != 0) {
       GTEST_SKIP() << "Ping sockets require root.";
     }

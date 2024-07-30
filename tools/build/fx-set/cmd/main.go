@@ -126,10 +126,10 @@ func mainImpl(ctx context.Context) error {
 			path = filepath.Join(args.checkoutDir, path)
 		}
 		staticSpec, err = fint.ReadStatic(path)
-		staticSpec.GnArgs = append(staticSpec.GnArgs, args.gnArgs...)
 		if err != nil {
 			return err
 		}
+		staticSpec.GnArgs = append(staticSpec.GnArgs, args.gnArgs...)
 	}
 
 	contextSpec := &fintpb.Context{
@@ -357,7 +357,7 @@ func constructStaticSpec(ctx context.Context, fx fxRunner, checkoutDir string, a
 
 	var (
 		// These variables eventually represent our final decisions of whether
-		// to use rbe/goma/ccache, since the logic is somewhat convoluted.
+		// to use a compiler prefix, since the logic is somewhat convoluted.
 		useCxxRbeFinal bool
 		useCcacheFinal bool
 	)

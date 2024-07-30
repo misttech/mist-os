@@ -57,7 +57,7 @@ impl<'a> Component for Client<'a> {
         self.matcher.clone()
     }
     fn matches_log(&self, raw_log: &Data<Logs>) -> bool {
-        self.regex.is_match(raw_log.moniker.as_str())
+        self.regex.is_match(raw_log.moniker.to_string().as_ref())
     }
 }
 
@@ -95,7 +95,7 @@ impl<'a> Component for Proxy<'a> {
         self.matcher.clone()
     }
     fn matches_log(&self, raw_log: &Data<Logs>) -> bool {
-        self.regex.is_match(raw_log.moniker.as_str())
+        self.regex.is_match(raw_log.moniker.to_string().as_ref())
     }
 }
 
@@ -133,7 +133,7 @@ impl<'a> Component for Server<'a> {
         self.matcher.clone()
     }
     fn matches_log(&self, raw_log: &Data<Logs>) -> bool {
-        self.regex.is_match(raw_log.moniker.as_str())
+        self.regex.is_match(raw_log.moniker.to_string().as_ref())
     }
 }
 

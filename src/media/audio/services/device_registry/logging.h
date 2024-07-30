@@ -37,19 +37,26 @@ namespace media_audio {
 
 inline constexpr bool kLogMain = true;
 
+// Device detection and initialization
 inline constexpr bool kLogDeviceDetection = false;
 inline constexpr bool kLogDeviceInitializationProgress = false;
 inline constexpr bool kLogAudioDeviceRegistryMethods = false;
 inline constexpr bool kLogDeviceAddErrorRemove = true;
 inline constexpr bool kLogDeviceInfo = true;
 
-inline constexpr bool kLogDeviceMethods = false;
 inline constexpr bool kLogObjectLifetimes = false;
-inline constexpr bool kLogDeviceState = false;
 inline constexpr bool kLogObjectCounts = false;
-inline constexpr bool kLogNotifyMethods = false;
 
-// Driver FIDL methods
+// Device state and methods that do not interact with driver FIDL
+inline constexpr bool kLogDeviceState = false;
+inline constexpr bool kLogSignalProcessingState = false;
+inline constexpr bool kLogRingBufferState = false;
+
+inline constexpr bool kLogDeviceMethods = false;
+inline constexpr bool kLogNotifyMethods = false;
+inline constexpr bool kLogRingBufferMethods = false;
+
+// Device methods that directly interact with driver FIDL
 inline constexpr bool kLogCodecFidlCalls = false;
 inline constexpr bool kLogCodecFidlResponses = false;
 inline constexpr bool kLogCodecFidlResponseValues = false;
@@ -66,8 +73,6 @@ inline constexpr bool kLogSignalProcessingFidlCalls = false;
 inline constexpr bool kLogSignalProcessingFidlResponses = false;
 inline constexpr bool kLogSignalProcessingFidlResponseValues = false;
 
-inline constexpr bool kLogRingBufferState = false;
-inline constexpr bool kLogRingBufferMethods = false;
 inline constexpr bool kLogRingBufferFidlCalls = false;
 inline constexpr bool kLogRingBufferFidlResponses = false;
 inline constexpr bool kLogRingBufferFidlResponseValues = false;
@@ -407,7 +412,7 @@ inline std::ostream& operator<<(std::ostream& out, const fuchsia_audio::SampleTy
 // fuchsia_audio_device types
 inline std::ostream& operator<<(
     std::ostream& out, const std::optional<fuchsia_audio_device::DeviceType>& device_type) {
-  if (device_type) {
+  if (device_type.has_value()) {
     switch (*device_type) {
       case fuchsia_audio_device::DeviceType::kCodec:
         return (out << "CODEC");
@@ -449,7 +454,7 @@ inline std::ostream& operator<<(std::ostream& out,
 inline std::ostream& operator<<(
     std::ostream& out,
     const std::optional<fuchsia_audio_device::PlugDetectCapabilities>& plug_caps) {
-  if (plug_caps) {
+  if (plug_caps.has_value()) {
     switch (*plug_caps) {
       case fuchsia_audio_device::PlugDetectCapabilities::kHardwired:
         return (out << "HARDWIRED");

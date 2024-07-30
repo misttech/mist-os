@@ -10,7 +10,7 @@
 #include <lib/component/incoming/cpp/service.h>
 #include <lib/ddk/metadata.h>
 #include <lib/driver/outgoing/cpp/outgoing_directory.h>
-#include <lib/driver/testing/cpp/fixture/driver_test_fixture.h>
+#include <lib/driver/testing/cpp/driver_test.h>
 #include <lib/fidl/cpp/wire/client.h>
 #include <lib/spi/spi.h>
 #include <zircon/errors.h>
@@ -365,54 +365,61 @@ class TestEnvironment : public fdf_testing::Environment {
 
 struct FixtureConfig {
  public:
-  static constexpr bool kDriverOnForeground = false;
-  static constexpr bool kAutoStartDriver = false;
-  static constexpr bool kAutoStopDriver = true;
-
   using DriverType = SpiDevice;
   using EnvironmentType = TestEnvironment;
 };
 
-class SpiDeviceTest : public fdf_testing::DriverTestFixture<FixtureConfig>, public ::testing::Test {
- protected:
+class SpiDeviceTest : public ::testing::Test {
+ public:
   void CreateSpiDevice(uint32_t channel_count) {
-    RunInEnvironmentTypeContext([channel_count](TestEnvironment& environment) {
+    driver_test().RunInEnvironmentTypeContext([channel_count](TestEnvironment& environment) {
       ASSERT_TRUE(environment.SetSpiChannelCount(channel_count).is_ok());
     });
-    EXPECT_TRUE(StartDriver().is_ok());
+    EXPECT_TRUE(driver_test().StartDriver().is_ok());
 
-    bool all_children_added = RunInNodeContext<bool>([channel_count](fdf_testing::TestNode& node) {
-      if (node.children().begin() == node.children().end()) {
-        return false;
-      }
-      auto& spi_bus = node.children().begin()->second;
-      return spi_bus.children().size() == channel_count;
-    });
+    bool all_children_added =
+        driver_test().RunInNodeContext<bool>([channel_count](fdf_testing::TestNode& node) {
+          if (node.children().begin() == node.children().end()) {
+            return false;
+          }
+          auto& spi_bus = node.children().begin()->second;
+          return spi_bus.children().size() == channel_count;
+        });
     EXPECT_TRUE(all_children_added);
   }
 
   // Helper Methods that access fake_spi_impl
   void set_current_test_cs(uint32_t i) {
-    RunInEnvironmentTypeContext(
+    driver_test().RunInEnvironmentTypeContext(
         [i](TestEnvironment& environment) { environment.fake_spi_impl().current_test_cs_ = i; });
   }
   void set_test_mode(FakeSpiImplServer::SpiTestMode test_mode) {
-    RunInEnvironmentTypeContext([test_mode](TestEnvironment& environment) {
+    driver_test().RunInEnvironmentTypeContext([test_mode](TestEnvironment& environment) {
       environment.fake_spi_impl().test_mode_ = test_mode;
     });
   }
   void set_corrupt_rx_actual(bool actual) {
-    RunInEnvironmentTypeContext([actual](TestEnvironment& environment) {
+    driver_test().RunInEnvironmentTypeContext([actual](TestEnvironment& environment) {
       environment.fake_spi_impl().corrupt_rx_actual_ = actual;
     });
   }
   bool vmos_released_since_last_call() {
-    return RunInEnvironmentTypeContext<bool>([](TestEnvironment& environment) {
+    return driver_test().RunInEnvironmentTypeContext<bool>([](TestEnvironment& environment) {
       const bool value = environment.fake_spi_impl().vmos_released_since_last_call_;
       environment.fake_spi_impl().vmos_released_since_last_call_ = false;
       return value;
     });
   }
+
+  void TearDown() override {
+    zx::result<> result = driver_test().StopDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
+  }
+
+  fdf_testing::BackgroundDriverTest<FixtureConfig>& driver_test() { return driver_test_; }
+
+ private:
+  fdf_testing::BackgroundDriverTest<FixtureConfig> driver_test_;
 };
 
 TEST_F(SpiDeviceTest, SpiTest) {
@@ -426,7 +433,7 @@ TEST_F(SpiDeviceTest, SpiTest) {
 
   uint32_t i = 0;
   for (auto name = kExpectedNodeNames.cbegin(); name != kExpectedNodeNames.cend(); name++, i++) {
-    zx::result client = Connect<fuchsia_hardware_spi::Service::Device>(*name);
+    zx::result client = driver_test().Connect<fuchsia_hardware_spi::Service::Device>(*name);
     ASSERT_TRUE(client.is_ok());
 
     set_current_test_cs(i);
@@ -453,13 +460,15 @@ TEST_F(SpiDeviceTest, SpiFidlVmoTest) {
   fidl::WireSyncClient<fuchsia_hardware_spi::Device> cs0_client, cs1_client;
 
   {
-    zx::result client = Connect<fuchsia_hardware_spi::Service::Device>(kExpectedNodeNames[0]);
+    zx::result client =
+        driver_test().Connect<fuchsia_hardware_spi::Service::Device>(kExpectedNodeNames[0]);
     ASSERT_TRUE(client.is_ok());
     cs0_client.Bind(std::move(client.value()));
   }
 
   {
-    zx::result client = Connect<fuchsia_hardware_spi::Service::Device>(kExpectedNodeNames[1]);
+    zx::result client =
+        driver_test().Connect<fuchsia_hardware_spi::Service::Device>(kExpectedNodeNames[1]);
     ASSERT_TRUE(client.is_ok());
     cs1_client.Bind(std::move(client.value()));
   }
@@ -552,13 +561,15 @@ TEST_F(SpiDeviceTest, SpiFidlVectorTest) {
   CreateSpiDevice(kExpectedNodeNames.size());
 
   {
-    zx::result client = Connect<fuchsia_hardware_spi::Service::Device>(kExpectedNodeNames[0]);
+    zx::result client =
+        driver_test().Connect<fuchsia_hardware_spi::Service::Device>(kExpectedNodeNames[0]);
     ASSERT_TRUE(client.is_ok());
     cs0_client.Bind(std::move(client.value()));
   }
 
   {
-    zx::result client = Connect<fuchsia_hardware_spi::Service::Device>(kExpectedNodeNames[1]);
+    zx::result client =
+        driver_test().Connect<fuchsia_hardware_spi::Service::Device>(kExpectedNodeNames[1]);
     ASSERT_TRUE(client.is_ok());
     cs1_client.Bind(std::move(client.value()));
   }
@@ -603,13 +614,15 @@ TEST_F(SpiDeviceTest, SpiFidlVectorErrorTest) {
   CreateSpiDevice(kExpectedNodeNames.size());
 
   {
-    zx::result client = Connect<fuchsia_hardware_spi::Service::Device>(kExpectedNodeNames[0]);
+    zx::result client =
+        driver_test().Connect<fuchsia_hardware_spi::Service::Device>(kExpectedNodeNames[0]);
     ASSERT_TRUE(client.is_ok());
     cs0_client.Bind(std::move(client.value()));
   }
 
   {
-    zx::result client = Connect<fuchsia_hardware_spi::Service::Device>(kExpectedNodeNames[1]);
+    zx::result client =
+        driver_test().Connect<fuchsia_hardware_spi::Service::Device>(kExpectedNodeNames[1]);
     ASSERT_TRUE(client.is_ok());
     cs1_client.Bind(std::move(client.value()));
   }
@@ -654,13 +667,15 @@ TEST_F(SpiDeviceTest, AssertCsWithSiblingTest) {
   CreateSpiDevice(kExpectedNodeNames.size());
 
   {
-    zx::result client = Connect<fuchsia_hardware_spi::Service::Device>(kExpectedNodeNames[0]);
+    zx::result client =
+        driver_test().Connect<fuchsia_hardware_spi::Service::Device>(kExpectedNodeNames[0]);
     ASSERT_TRUE(client.is_ok());
     cs0_client.Bind(std::move(client.value()));
   }
 
   {
-    zx::result client = Connect<fuchsia_hardware_spi::Service::Device>(kExpectedNodeNames[1]);
+    zx::result client =
+        driver_test().Connect<fuchsia_hardware_spi::Service::Device>(kExpectedNodeNames[1]);
     ASSERT_TRUE(client.is_ok());
     cs1_client.Bind(std::move(client.value()));
   }
@@ -710,7 +725,8 @@ TEST_F(SpiDeviceTest, AssertCsNoSiblingTest) {
   CreateSpiDevice(kExpectedNodeNames.size());
 
   {
-    zx::result client = Connect<fuchsia_hardware_spi::Service::Device>(kExpectedNodeNames[0]);
+    zx::result client =
+        driver_test().Connect<fuchsia_hardware_spi::Service::Device>(kExpectedNodeNames[0]);
     ASSERT_TRUE(client.is_ok());
     cs0_client.Bind(std::move(client.value()));
   }
@@ -744,7 +760,8 @@ TEST_F(SpiDeviceTest, OneClient) {
 
   // Establish a FIDL connection and verify that it works.
   {
-    zx::result client = Connect<fuchsia_hardware_spi::Service::Device>(kExpectedNodeNames[0]);
+    zx::result client =
+        driver_test().Connect<fuchsia_hardware_spi::Service::Device>(kExpectedNodeNames[0]);
     ASSERT_TRUE(client.is_ok());
     cs0_client.Bind(std::move(client.value()));
   }
@@ -757,7 +774,8 @@ TEST_F(SpiDeviceTest, OneClient) {
 
   // Trying to make a new connection should fail.
   {
-    zx::result client = Connect<fuchsia_hardware_spi::Service::Device>(kExpectedNodeNames[0]);
+    zx::result client =
+        driver_test().Connect<fuchsia_hardware_spi::Service::Device>(kExpectedNodeNames[0]);
     ASSERT_TRUE(client.is_ok());
     fidl::WireSyncClient cs0_client_1(std::move(client.value()));
     EXPECT_EQ(cs0_client_1->UnregisterVmo(1).status(), ZX_ERR_PEER_CLOSED);
@@ -771,7 +789,8 @@ TEST_F(SpiDeviceTest, OneClient) {
   // We don't know when the driver will be ready for a new client, just loop
   // until the connection is established.
   for (;;) {
-    zx::result client = Connect<fuchsia_hardware_spi::Service::Device>(kExpectedNodeNames[0]);
+    zx::result client =
+        driver_test().Connect<fuchsia_hardware_spi::Service::Device>(kExpectedNodeNames[0]);
     ASSERT_TRUE(client.is_ok());
     cs0_client.Bind(std::move(client.value()));
 
@@ -792,7 +811,8 @@ TEST_F(SpiDeviceTest, OneClient) {
 
   // OpenSession should fail when another client is connected.
   {
-    zx::result controller = ConnectThroughDevfs<fuchsia_hardware_spi::Controller>(kDevfsPath);
+    zx::result controller =
+        driver_test().ConnectThroughDevfs<fuchsia_hardware_spi::Controller>(kDevfsPath);
     ASSERT_TRUE(controller.is_ok());
     {
       auto [device, server] = fidl::Endpoints<fuchsia_hardware_spi::Device>::Create();
@@ -806,7 +826,8 @@ TEST_F(SpiDeviceTest, OneClient) {
 
   fidl::ClientEnd<fuchsia_hardware_spi::Device> device;
   while (true) {
-    zx::result controller = ConnectThroughDevfs<fuchsia_hardware_spi::Controller>(kDevfsPath);
+    zx::result controller =
+        driver_test().ConnectThroughDevfs<fuchsia_hardware_spi::Controller>(kDevfsPath);
     ASSERT_TRUE(controller.is_ok());
     {
       zx::result server = fidl::CreateEndpoints<fuchsia_hardware_spi::Device>(&device);
@@ -824,14 +845,16 @@ TEST_F(SpiDeviceTest, OneClient) {
 
   // FIDL clients shouldn't be able to connect, and calling OpenSession a second time should fail.
   {
-    zx::result client = Connect<fuchsia_hardware_spi::Service::Device>(kExpectedNodeNames[0]);
+    zx::result client =
+        driver_test().Connect<fuchsia_hardware_spi::Service::Device>(kExpectedNodeNames[0]);
     ASSERT_TRUE(client.is_ok());
     fidl::WireSyncClient cs0_client_1(std::move(client.value()));
     EXPECT_EQ(cs0_client_1->CanAssertCs().status(), ZX_ERR_PEER_CLOSED);
   }
 
   {
-    zx::result controller = ConnectThroughDevfs<fuchsia_hardware_spi::Controller>(kDevfsPath);
+    zx::result controller =
+        driver_test().ConnectThroughDevfs<fuchsia_hardware_spi::Controller>(kDevfsPath);
     ASSERT_TRUE(controller.is_ok());
     {
       auto [device, server] = fidl::Endpoints<fuchsia_hardware_spi::Device>::Create();
@@ -844,7 +867,8 @@ TEST_F(SpiDeviceTest, OneClient) {
   device = {};
 
   for (;;) {
-    zx::result client = Connect<fuchsia_hardware_spi::Service::Device>(kExpectedNodeNames[0]);
+    zx::result client =
+        driver_test().Connect<fuchsia_hardware_spi::Service::Device>(kExpectedNodeNames[0]);
     ASSERT_TRUE(client.is_ok());
     cs0_client.Bind(std::move(client.value()));
 
@@ -865,7 +889,7 @@ TEST_F(SpiDeviceTest, SchedulerRoleName) {
 
   // Add scheduler role metadata that will cause the core driver to create a new driver dispatcher.
   // Verify that FIDL calls can still be made.
-  RunInEnvironmentTypeContext([](TestEnvironment& environment) {
+  driver_test().RunInEnvironmentTypeContext([](TestEnvironment& environment) {
     environment.AddSchedulerRoleMetadata("no.such.scheduler.role");
   });
 
@@ -874,7 +898,8 @@ TEST_F(SpiDeviceTest, SchedulerRoleName) {
   CreateSpiDevice(kExpectedNodeNames.size());
 
   {
-    zx::result client = Connect<fuchsia_hardware_spi::Service::Device>(kExpectedNodeNames[0]);
+    zx::result client =
+        driver_test().Connect<fuchsia_hardware_spi::Service::Device>(kExpectedNodeNames[0]);
     ASSERT_TRUE(client.is_ok());
     ASSERT_OK(client.status_value());
     cs0_client.Bind(std::move(client.value()));

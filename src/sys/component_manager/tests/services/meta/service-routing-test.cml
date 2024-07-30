@@ -19,11 +19,6 @@
     ],
     use: [
         {
-            event_stream: [ "discovered" ],
-            from: "parent",
-            path: "/events/discovered",
-        },
-        {
             event_stream: [ "started" ],
             from: "parent",
             path: "/events/started",

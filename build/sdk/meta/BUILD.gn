@@ -25,6 +25,7 @@ schemas = [
   "host_tool.json",
   "loadable_module.json",
   "manifest.json",
+  "package.json",
   "sysroot.json",
   "version_history-22rnd667.json",
   "virtual_device-93A41932.json",

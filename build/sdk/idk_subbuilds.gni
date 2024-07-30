@@ -18,7 +18,11 @@ template("_subbuild") {
   assert(defined(invoker.build_dir_prefix))
 
   _build_dir = root_build_dir + "/${invoker.build_dir_prefix}"
+
+  # LINT.IfChange
   _build_dir_stamp = _build_dir + ".stamp"
+
+  # LINT.ThenChange(//build/scripts/ninjatrace2json.py)
 
   _sdk_collection_dir = get_label_info(invoker.sdk_collection, "dir")
   _sdk_collection_name = get_label_info(invoker.sdk_collection, "name")

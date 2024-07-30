@@ -48,9 +48,6 @@ async fn do_resolve(
     abortable_scope: AbortableScope,
 ) -> Result<(), ResolveActionError> {
     match &*component.lock_state().await {
-        InstanceState::New => {
-            panic!("Component {} should be at least discovered", component.moniker)
-        }
         InstanceState::Unresolved(_) => (),
         InstanceState::Resolved(_) | InstanceState::Started(_, _) => {
             // The component is already resolved, there's no work for us to do.
@@ -91,7 +88,7 @@ async fn do_resolve(
     let policy = component.context.abi_revision_policy();
     policy
         .check_compatibility(
-            &version_history::HISTORY,
+            &version_history_data::HISTORY,
             &component.moniker,
             component_info.abi_revision,
         )
@@ -112,9 +109,6 @@ async fn do_resolve(
                 return Err(ResolveActionError::InstanceShutDown {
                     moniker: component.moniker.clone(),
                 });
-            }
-            InstanceState::New => {
-                panic!("Component was not marked Discovered before Resolve action?");
             }
             InstanceState::Destroyed => {
                 return Err(ResolveActionError::InstanceDestroyed {

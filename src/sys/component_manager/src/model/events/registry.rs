@@ -4,11 +4,11 @@
 
 use crate::capability::CapabilitySource;
 use crate::model::component::instance::InstanceState;
+use crate::model::component::manager::ComponentManagerInstance;
 use crate::model::component::{ComponentInstance, ExtendedInstance, WeakExtendedInstance};
 use crate::model::events::dispatcher::{EventDispatcher, EventDispatcherScope};
 use crate::model::events::stream::EventStream;
 use crate::model::events::synthesizer::{ComponentManagerEventSynthesisProvider, EventSynthesizer};
-use crate::model::model::Model;
 use crate::model::routing::RouteSource;
 use ::routing::capability_source::InternalCapability;
 use ::routing::component_instance::ComponentInstanceInterface;
@@ -88,7 +88,7 @@ impl RouteEventsResult {
 
 /// Subscribes to events from multiple tasks and sends events to all of them.
 pub struct EventRegistry {
-    model: Weak<Model>,
+    top_instance: Weak<ComponentManagerInstance>,
     dispatcher_map: Arc<Mutex<HashMap<Name, Vec<Weak<EventDispatcher>>>>>,
     event_synthesizer: EventSynthesizer,
 }
@@ -123,9 +123,13 @@ impl ComponentEventRoute {
 }
 
 impl EventRegistry {
-    pub fn new(model: Weak<Model>) -> Self {
+    pub fn new(top_instance: Weak<ComponentManagerInstance>) -> Self {
         let event_synthesizer = EventSynthesizer::default();
-        Self { model, dispatcher_map: Arc::new(Mutex::new(HashMap::new())), event_synthesizer }
+        Self {
+            top_instance,
+            dispatcher_map: Arc::new(Mutex::new(HashMap::new())),
+            event_synthesizer,
+        }
     }
 
     pub fn hooks(self: &Arc<Self>) -> Vec<HooksRegistration> {
@@ -278,12 +282,12 @@ impl EventRegistry {
         target_moniker: &Moniker,
         events: &HashSet<UseEventStreamDecl>,
     ) -> Result<RouteEventsResult, ModelError> {
-        let model = self.model.upgrade().ok_or(EventsError::ModelNotAvailable)?;
-        let component = model.root().find_and_maybe_resolve(target_moniker).await?;
+        let top_instance = self.top_instance.upgrade().ok_or(EventsError::ModelNotAvailable)?;
+        let component = top_instance.root().await.find_and_maybe_resolve(target_moniker).await?;
         let decl = {
             let state = component.lock_state().await;
             match *state {
-                InstanceState::New | InstanceState::Unresolved(_) => {
+                InstanceState::Unresolved(_) => {
                     // This should never happen. By this point,
                     // we've validated that the instance state should
                     // be resolved because we're routing events to it.
@@ -428,7 +432,7 @@ mod tests {
         let event = ComponentEvent {
             target_moniker: ExtendedMoniker::ComponentInstance(Moniker::root()),
             component_url: "fuchsia-pkg://root".parse().unwrap(),
-            payload: EventPayload::Discovered,
+            payload: EventPayload::Unresolved,
             timestamp: zx::Time::get_monotonic(),
         };
         registry.dispatch(&event).await;
@@ -437,14 +441,14 @@ mod tests {
     #[fuchsia::test]
     async fn drop_dispatcher_when_event_stream_dropped() {
         let TestModelResult { model, .. } = TestEnvironmentBuilder::new().build().await;
-        let event_registry = EventRegistry::new(Arc::downgrade(&model));
+        let event_registry = EventRegistry::new(Arc::downgrade(model.top_instance()));
 
-        assert_eq!(0, event_registry.dispatchers_per_event_type(EventType::Discovered).await);
+        assert_eq!(0, event_registry.dispatchers_per_event_type(EventType::Unresolved).await);
         let mut event_stream_a = event_registry
             .subscribe(
                 &WeakExtendedInstance::AboveRoot(Arc::downgrade(model.top_instance())),
                 vec![EventSubscription::new(UseEventStreamDecl {
-                    source_name: EventType::Discovered.into(),
+                    source_name: EventType::Unresolved.into(),
                     source: UseSource::Parent,
                     scope: None,
                     target_path: cm_types::Path::from_str("/svc/fuchsia.component.EventStream")
@@ -456,13 +460,13 @@ mod tests {
             .await
             .expect("subscribe succeeds");
 
-        assert_eq!(1, event_registry.dispatchers_per_event_type(EventType::Discovered).await);
+        assert_eq!(1, event_registry.dispatchers_per_event_type(EventType::Unresolved).await);
 
         let mut event_stream_b = event_registry
             .subscribe(
                 &WeakExtendedInstance::AboveRoot(Arc::downgrade(model.top_instance())),
                 vec![EventSubscription::new(UseEventStreamDecl {
-                    source_name: EventType::Discovered.into(),
+                    source_name: EventType::Unresolved.into(),
                     source: UseSource::Parent,
                     scope: None,
                     target_path: cm_types::Path::from_str("/svc/fuchsia.component.EventStream")
@@ -474,35 +478,35 @@ mod tests {
             .await
             .expect("subscribe succeeds");
 
-        assert_eq!(2, event_registry.dispatchers_per_event_type(EventType::Discovered).await);
+        assert_eq!(2, event_registry.dispatchers_per_event_type(EventType::Unresolved).await);
 
         dispatch_fake_event(&event_registry).await;
 
         // Verify that both EventStreams receive the event.
         assert!(event_stream_a.next().await.is_some());
         assert!(event_stream_b.next().await.is_some());
-        assert_eq!(2, event_registry.dispatchers_per_event_type(EventType::Discovered).await);
+        assert_eq!(2, event_registry.dispatchers_per_event_type(EventType::Unresolved).await);
 
         drop(event_stream_a);
 
         // EventRegistry won't drop EventDispatchers until an event is dispatched.
-        assert_eq!(2, event_registry.dispatchers_per_event_type(EventType::Discovered).await);
+        assert_eq!(2, event_registry.dispatchers_per_event_type(EventType::Unresolved).await);
 
         dispatch_fake_event(&event_registry).await;
 
         assert!(event_stream_b.next().await.is_some());
-        assert_eq!(1, event_registry.dispatchers_per_event_type(EventType::Discovered).await);
+        assert_eq!(1, event_registry.dispatchers_per_event_type(EventType::Unresolved).await);
 
         drop(event_stream_b);
 
         dispatch_fake_event(&event_registry).await;
-        assert_eq!(0, event_registry.dispatchers_per_event_type(EventType::Discovered).await);
+        assert_eq!(0, event_registry.dispatchers_per_event_type(EventType::Unresolved).await);
     }
 
     #[fuchsia::test]
     async fn capability_requested_over_two_event_streams() {
         let TestModelResult { model, .. } = TestEnvironmentBuilder::new().build().await;
-        let event_registry = EventRegistry::new(Arc::downgrade(&model));
+        let event_registry = EventRegistry::new(Arc::downgrade(model.top_instance()));
 
         assert_eq!(
             0,

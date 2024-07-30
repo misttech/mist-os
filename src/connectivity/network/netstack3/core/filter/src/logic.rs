@@ -12,9 +12,10 @@ use net_types::ip::{GenericOverIp, Ip, IpVersionMarker};
 use netstack3_base::{AnyDevice, DeviceIdContext, HandleableTimer};
 use packet_formats::ip::IpExt;
 
+use crate::conntrack::GetConnectionError;
 use crate::context::{FilterBindingsContext, FilterBindingsTypes, FilterIpContext};
 use crate::matchers::InterfaceProperties;
-use crate::packets::{IpPacket, MaybeTransportPacket, TransportPacket};
+use crate::packets::{IpPacket, MaybeTransportPacket};
 use crate::state::{Action, FilterIpMetadata, Hook, Routine, Rule, TransparentProxy};
 
 /// The final result of packet processing at a given filtering hook.
@@ -107,7 +108,7 @@ fn apply_transparent_proxy<I: IpExt, P: MaybeTransportPacket>(
     let (addr, port) = match proxy {
         TransparentProxy::LocalPort(port) => (dst_addr, *port),
         TransparentProxy::LocalAddr(addr) => {
-            let Some(transport_packet) = maybe_transport_packet.transport_packet() else {
+            let Some(transport_packet_data) = maybe_transport_packet.transport_packet_data() else {
                 // We ensure that TransparentProxy rules are always accompanied by a
                 // TCP or UDP matcher when filtering state is provided to Core, but
                 // given this invariant is enforced far from here, we log an error
@@ -119,7 +120,7 @@ fn apply_transparent_proxy<I: IpExt, P: MaybeTransportPacket>(
                 );
                 return RoutineResult::Drop;
             };
-            let port = NonZeroU16::new(transport_packet.dst_port())
+            let port = NonZeroU16::new(transport_packet_data.dst_port())
                 .expect("TCP and UDP destination port is always non-zero");
             (*addr, port)
         }
@@ -157,7 +158,7 @@ where
                     return apply_transparent_proxy(
                         proxy,
                         packet.dst_addr(),
-                        packet.transport_packet(),
+                        packet.maybe_transport_packet(),
                     );
                 }
                 Action::Redirect { dst_port } => {
@@ -326,7 +327,13 @@ where
         this.with_filter_state_and_nat_ctx(|state, core_ctx| {
             // There isn't going to be an existing connection in the metadata
             // before this hook, so we don't have to look.
-            let conn = state.conntrack.get_connection_for_packet_and_update(bindings_ctx, packet);
+            let conn =
+                match state.conntrack.get_connection_for_packet_and_update(bindings_ctx, packet) {
+                    Ok(c) => c,
+                    // TODO(https://fxbug.dev/328064909): Support configurable
+                    // dropping of invalid packets.
+                    Err(GetConnectionError::InvalidPacket(c)) => Some(c),
+                };
 
             let mut verdict = match check_routines_for_ingress(
                 &state.installed_routines.get().ip.ingress,
@@ -382,11 +389,20 @@ where
     {
         let Self(this) = self;
         this.with_filter_state(|state| {
-            let conn = metadata.take_conntrack_connection().or_else(|| {
+            let conn = match metadata.take_conntrack_connection() {
+                Some(c) => Some(c),
                 // If packet reassembly happened, then there won't be a
                 // connection in the metadata.
-                state.conntrack.get_connection_for_packet_and_update(bindings_ctx, packet)
-            });
+                None => {
+                    match state.conntrack.get_connection_for_packet_and_update(bindings_ctx, packet)
+                    {
+                        Ok(c) => c,
+                        // TODO(https://fxbug.dev/328064909): Support
+                        // configurable dropping of invalid packets.
+                        Err(GetConnectionError::InvalidPacket(c)) => Some(c),
+                    }
+                }
+            };
 
             let verdict = match check_routines_for_hook(
                 &state.installed_routines.get().ip.local_ingress,
@@ -446,7 +462,13 @@ where
         this.with_filter_state_and_nat_ctx(|state, core_ctx| {
             // There isn't going to be an existing connection in the metadata
             // before this hook, so we don't have to look.
-            let conn = state.conntrack.get_connection_for_packet_and_update(bindings_ctx, packet);
+            let conn =
+                match state.conntrack.get_connection_for_packet_and_update(bindings_ctx, packet) {
+                    Ok(c) => c,
+                    // TODO(https://fxbug.dev/328064909): Support configurable
+                    // dropping of invalid packets.
+                    Err(GetConnectionError::InvalidPacket(c)) => Some(c),
+                };
 
             let verdict = match check_routines_for_hook(
                 &state.installed_routines.get().ip.local_egress,
@@ -496,11 +518,22 @@ where
         let Self(this) = self;
         (
             this.with_filter_state(|state| {
-                let conn = metadata.take_conntrack_connection().or_else(|| {
+                let conn = match metadata.take_conntrack_connection() {
+                    Some(c) => Some(c),
                     // If packet reassembly happened, then there won't be a
                     // connection in the metadata.
-                    state.conntrack.get_connection_for_packet_and_update(bindings_ctx, packet)
-                });
+                    None => {
+                        match state
+                            .conntrack
+                            .get_connection_for_packet_and_update(bindings_ctx, packet)
+                        {
+                            Ok(c) => c,
+                            // TODO(https://fxbug.dev/328064909): Support
+                            // configurable dropping of invalid packets.
+                            Err(GetConnectionError::InvalidPacket(c)) => Some(c),
+                        }
+                    }
+                };
 
                 let verdict = match check_routines_for_hook(
                     &state.installed_routines.get().ip.egress,
@@ -666,6 +699,7 @@ mod tests {
     use const_unwrap::const_unwrap_option;
     use ip_test_macro::ip_test;
     use net_types::ip::Ipv4;
+    use netstack3_base::SegmentHeader;
     use test_case::test_case;
 
     use super::*;
@@ -1178,7 +1212,12 @@ mod tests {
         FilterImpl(&mut ctx).local_ingress_hook(
             &mut bindings_ctx,
             &mut FakeIpPacket::<I, _> {
-                body: FakeTcpSegment { dst_port: port, src_port: 11111 },
+                body: FakeTcpSegment {
+                    dst_port: port,
+                    src_port: 11111,
+                    segment: SegmentHeader::arbitrary_value(),
+                    payload_len: 8888,
+                },
                 ..ArbitraryValue::arbitrary_value()
             },
             &wlan_interface(),

@@ -98,7 +98,7 @@ trait FlowController {
     async fn send_data_to_peer(&mut self, data: UserData);
 
     /// Receive `data` from the remote peer to be relayed to the provided RFCOMM `client`.
-    async fn receive_data_from_peer(&mut self, data: FlowControlledData, client: &fidl::Socket);
+    async fn receive_data_from_peer(&mut self, data: FlowControlledData, client: &Channel);
 }
 
 /// A flow controller that indiscriminantly relays frames between a remote peer and an RFCOMM
@@ -146,7 +146,7 @@ impl FlowController for SimpleController {
         };
     }
 
-    async fn receive_data_from_peer(&mut self, data: FlowControlledData, client: &fidl::Socket) {
+    async fn receive_data_from_peer(&mut self, data: FlowControlledData, client: &Channel) {
         if let Ok(num_bytes) = client.write(&data.user_data.information[..]) {
             self.stream_inspect.record_inbound_transfer(num_bytes, fasync::Time::now());
         }
@@ -257,7 +257,7 @@ impl FlowController for CreditFlowController {
         self.send_user_data(data).await;
     }
 
-    async fn receive_data_from_peer(&mut self, data: FlowControlledData, client: &fidl::Socket) {
+    async fn receive_data_from_peer(&mut self, data: FlowControlledData, client: &Channel) {
         let FlowControlledData { user_data, credits } = data;
         self.handle_received_credits(credits.unwrap_or(0)).await;
 
@@ -421,7 +421,7 @@ impl SessionChannel {
                     };
                 },
                 data_from_peer = pending_writes.select_next_some() => {
-                    flow_controller.receive_data_from_peer(data_from_peer, channel.as_ref()).await;
+                    flow_controller.receive_data_from_peer(data_from_peer, &channel).await;
                 },
                 complete => break,
             }
@@ -612,7 +612,7 @@ mod tests {
 
         // Client responds with some user data.
         let client_data = vec![0xff, 0x00, 0xaa, 0x0bb];
-        assert!(client.as_ref().write(&client_data).is_ok());
+        assert!(client.write(&client_data).is_ok());
 
         // Data should be processed by the SessionChannel, packed into an RFCOMM frame, and relayed
         // to peer.
@@ -678,7 +678,7 @@ mod tests {
         // Client wants to send data to the remote peer. We have no local credits, so it should
         // be queued for later.
         let client_data = vec![0xaa, 0xcc];
-        assert!(client.as_ref().write(&client_data).is_ok());
+        assert!(client.write(&client_data).is_ok());
         poll_stream(&mut exec, &mut outgoing_frames).expect_pending("shouldn't have frames");
 
         // Remote peer sends more user data with a refreshed credit amount.
@@ -739,7 +739,7 @@ mod tests {
 
         // Client responds with some user data.
         let client_data = vec![0xff, 0x00, 0xaa];
-        assert!(client.as_ref().write(&client_data).is_ok());
+        assert!(client.write(&client_data).is_ok());
 
         // Data should be processed by the SessionChannel, packed into an RFCOMM frame, and relayed
         // using the `frame_sender`. There should be credits associated with the frame - we always
@@ -777,7 +777,7 @@ mod tests {
         {
             let mut receive_fut = Box::pin(flow_controller.receive_data_from_peer(
                 FlowControlledData { user_data: data1, credits: Some(0) },
-                local.as_ref(),
+                &local,
             ));
             exec.run_until_stalled(&mut receive_fut)
                 .expect_pending("should wait for outgoing frame");
@@ -838,7 +838,7 @@ mod tests {
         {
             let mut receive_fut = Box::pin(flow_controller.receive_data_from_peer(
                 FlowControlledData { user_data: data3, credits: Some(10) },
-                local.as_ref(),
+                &local,
             ));
             exec.run_until_stalled(&mut receive_fut)
                 .expect_pending("should wait for outgoing frame");
@@ -1035,7 +1035,7 @@ mod tests {
         {
             let mut receive_fut = Box::pin(flow_controller.receive_data_from_peer(
                 FlowControlledData { user_data: data1, credits: Some(10) },
-                local.as_ref(),
+                &local,
             ));
             assert!(exec.run_until_stalled(&mut receive_fut).is_ready());
             // The user data should be relayed to the RFCOMM client.

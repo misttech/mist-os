@@ -23,7 +23,6 @@ include = ["wlan_ffi_transport"]
 include = [ "FfiEthernetTx", "FfiWlanRx" ]
 exclude = [
     # Voided types.
-    "FfiBufferCtx",
     "FfiEthernetRxCtx",
     "FfiEthernetTxCtx",
     "FfiWlanRxCtx",
@@ -31,9 +30,6 @@ exclude = [
 ]
 
 [export.rename]
-"FfiBuffer" = "wlansoftmac_buffer_t"
-"FfiBufferCtx" = "void"
-"FfiBufferProvider" = "wlansoftmac_buffer_provider_ops_t"
 "FfiEthernetRx" = "ethernet_rx_t"
 "FfiEthernetRxCtx" = "void"
 "FfiEthernetTx" = "ethernet_tx_t"

@@ -35,6 +35,9 @@ class WireTestBase<::test_versions::Protocol> : public ::fidl::WireServer<::test
       FooCompleter::Sync& completer) override {
     NotImplemented_("Foo", completer);
   }
+  virtual void handle_unknown_method(::fidl::UnknownMethodMetadata<::test_versions::Protocol> metadata, UnknownMethodCompleter::Sync& completer) override {
+    NotImplemented_("handle_unknown_method", completer);
+  }
 };
 
 template <>
@@ -42,6 +45,9 @@ class WireSyncEventHandlerTestBase<::test_versions::Protocol> : public ::fidl::W
  public:
   virtual ~WireSyncEventHandlerTestBase<::test_versions::Protocol>() = default;
   virtual void NotImplemented_(const std::string& name) = 0;
+  virtual void handle_unknown_event(::fidl::UnknownEventMetadata<::test_versions::Protocol> metadata) override {
+    NotImplemented_("handle_unknown_event");
+  }
 };
 #pragma clang diagnostic pop
 

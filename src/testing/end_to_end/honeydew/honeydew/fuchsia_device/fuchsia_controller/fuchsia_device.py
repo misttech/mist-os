@@ -1,4 +1,3 @@
-#!/usr/bin/env fuchsia-vendored-python
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
@@ -342,6 +341,7 @@ class FuchsiaDevice(
         return system_power_state_controller_starnix.SystemPowerStateController(
             device_name=self.device_name,
             ffx=self.ffx,
+            inspect=self.inspect,
             device_logger=self,
         )
 
@@ -600,44 +600,34 @@ class FuchsiaDevice(
         _LOGGER.info("Snapshot file has been saved @ '%s'", snapshot_file_path)
         return snapshot_file_path
 
-    def wait_for_offline(
-        self, timeout: float = fuchsia_device_interface.TIMEOUTS["OFFLINE"]
-    ) -> None:
+    def wait_for_offline(self) -> None:
         """Wait for Fuchsia device to go offline.
-
-        Args:
-            timeout: How long in sec to wait for device to go offline.
 
         Raises:
             errors.FuchsiaDeviceError: If device is not offline.
         """
         _LOGGER.info("Waiting for %s to go offline...", self.device_name)
         try:
-            self.ffx.wait_for_rcs_disconnection(timeout=timeout)
+            self.ffx.wait_for_rcs_disconnection()
             _LOGGER.info("%s is offline.", self.device_name)
-        except Exception as err:  # pylint: disable=broad-except
+        except (errors.DeviceNotConnectedError, errors.FfxCommandError) as err:
             raise errors.FuchsiaDeviceError(
-                f"'{self.device_name}' failed to go offline in {timeout}sec."
+                f"'{self.device_name}' failed to go offline."
             ) from err
 
-    def wait_for_online(
-        self, timeout: float = fuchsia_device_interface.TIMEOUTS["ONLINE"]
-    ) -> None:
+    def wait_for_online(self) -> None:
         """Wait for Fuchsia device to go online.
-
-        Args:
-            timeout: How long in sec to wait for device to go offline.
 
         Raises:
             errors.FuchsiaDeviceError: If device is not online.
         """
         _LOGGER.info("Waiting for %s to go online...", self.device_name)
         try:
-            self.ffx.wait_for_rcs_connection(timeout=timeout)
+            self.ffx.wait_for_rcs_connection()
             _LOGGER.info("%s is online.", self.device_name)
-        except Exception as err:  # pylint: disable=broad-except
+        except (errors.DeviceNotConnectedError, errors.FfxCommandError) as err:
             raise errors.FuchsiaDeviceError(
-                f"'{self.device_name}' failed to go online in {timeout}sec."
+                f"'{self.device_name}' failed to go online."
             ) from err
 
     # List all private properties

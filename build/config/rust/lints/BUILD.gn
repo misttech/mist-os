@@ -98,6 +98,7 @@ config("allow_unused_results") {
     "//src/starnix_lite/*",
     "//src/storage/*",
     "//src/sys/*",
+    "//src/tee/*",
     "//src/testing/*",
     "//src/tests/*",
     "//src/ui/*",

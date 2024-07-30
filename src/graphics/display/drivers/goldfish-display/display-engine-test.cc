@@ -109,7 +109,7 @@ void GoldfishDisplayEngineTest::TearDown() { allocator_binding_->Unbind(); }
 TEST_F(GoldfishDisplayEngineTest, CheckConfigNoDisplay) {
   // Test No display
   size_t client_composition_opcodes_actual = 0;
-  config_check_result_t res = display_engine_->DisplayControllerImplCheckConfiguration(
+  config_check_result_t res = display_engine_->DisplayEngineCheckConfiguration(
       configs_.data(), 0, results_.data(), results_.size(), &client_composition_opcodes_actual);
   EXPECT_OK(res);
 }
@@ -121,7 +121,7 @@ TEST_F(GoldfishDisplayEngineTest, CheckConfigMultiLayer) {
   }
 
   size_t actual_result_size = 0;
-  config_check_result_t res = display_engine_->DisplayControllerImplCheckConfiguration(
+  config_check_result_t res = display_engine_->DisplayEngineCheckConfiguration(
       configs_.data(), kDisplayCount, results_.data(), results_.size(), &actual_result_size);
   EXPECT_OK(res);
   EXPECT_EQ(actual_result_size, kDisplayCount * kMaxLayerCount);
@@ -144,7 +144,7 @@ TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerColor) {
   }
 
   size_t actual_result_size = 0;
-  config_check_result_t res = display_engine_->DisplayControllerImplCheckConfiguration(
+  config_check_result_t res = display_engine_->DisplayEngineCheckConfiguration(
       configs_.data(), kDisplayCount, results_.data(), results_.size(), &actual_result_size);
   EXPECT_OK(res);
   EXPECT_EQ(actual_result_size, kDisplayCount * kNumLayersPerDisplay);
@@ -173,7 +173,7 @@ TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerPrimary) {
   }
 
   size_t actual_result_size = 0;
-  config_check_result_t res = display_engine_->DisplayControllerImplCheckConfiguration(
+  config_check_result_t res = display_engine_->DisplayEngineCheckConfiguration(
       configs_.data(), kDisplayCount, results_.data(), results_.size(), &actual_result_size);
   EXPECT_OK(res);
   EXPECT_EQ(actual_result_size, kDisplayCount * kNumLayersPerDisplay);
@@ -205,7 +205,7 @@ TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerDestFrame) {
   }
 
   size_t actual_result_size = 0;
-  config_check_result_t res = display_engine_->DisplayControllerImplCheckConfiguration(
+  config_check_result_t res = display_engine_->DisplayEngineCheckConfiguration(
       configs_.data(), kDisplayCount, results_.data(), results_.size(), &actual_result_size);
   EXPECT_OK(res);
   EXPECT_EQ(actual_result_size, kDisplayCount * kNumLayersPerDisplay);
@@ -237,7 +237,7 @@ TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerSrcFrame) {
   }
 
   size_t actual_result_size = 0;
-  config_check_result_t res = display_engine_->DisplayControllerImplCheckConfiguration(
+  config_check_result_t res = display_engine_->DisplayEngineCheckConfiguration(
       configs_.data(), kDisplayCount, results_.data(), results_.size(), &actual_result_size);
   EXPECT_OK(res);
   EXPECT_EQ(actual_result_size, kDisplayCount * kNumLayersPerDisplay);
@@ -264,7 +264,7 @@ TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerAlpha) {
   }
 
   size_t actual_result_size = 0;
-  config_check_result_t res = display_engine_->DisplayControllerImplCheckConfiguration(
+  config_check_result_t res = display_engine_->DisplayEngineCheckConfiguration(
       configs_.data(), kDisplayCount, results_.data(), results_.size(), &actual_result_size);
   EXPECT_OK(res);
   EXPECT_EQ(actual_result_size, kDisplayCount * kNumLayersPerDisplay);
@@ -291,7 +291,7 @@ TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerTransform) {
   }
 
   size_t actual_result_size = 0;
-  config_check_result_t res = display_engine_->DisplayControllerImplCheckConfiguration(
+  config_check_result_t res = display_engine_->DisplayEngineCheckConfiguration(
       configs_.data(), kDisplayCount, results_.data(), results_.size(), &actual_result_size);
   EXPECT_OK(res);
   EXPECT_EQ(actual_result_size, kDisplayCount * kNumLayersPerDisplay);
@@ -318,7 +318,7 @@ TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerColorCoversion) {
   }
 
   size_t actual_result_size = 0;
-  config_check_result_t res = display_engine_->DisplayControllerImplCheckConfiguration(
+  config_check_result_t res = display_engine_->DisplayEngineCheckConfiguration(
       configs_.data(), kDisplayCount, results_.data(), results_.size(), &actual_result_size);
   EXPECT_OK(res);
   EXPECT_EQ(actual_result_size, kDisplayCount * kNumLayersPerDisplay);
@@ -355,7 +355,7 @@ TEST_F(GoldfishDisplayEngineTest, CheckConfigAllFeatures) {
   }
 
   size_t actual_result_size = 0;
-  config_check_result_t res = display_engine_->DisplayControllerImplCheckConfiguration(
+  config_check_result_t res = display_engine_->DisplayEngineCheckConfiguration(
       configs_.data(), kDisplayCount, results_.data(), results_.size(), &actual_result_size);
   EXPECT_OK(res);
   EXPECT_EQ(actual_result_size, kDisplayCount * kNumLayersPerDisplay);
@@ -379,11 +379,11 @@ TEST_F(GoldfishDisplayEngineTest, ImportBufferCollection) {
   constexpr display::DriverBufferCollectionId kValidCollectionId(1);
   constexpr uint64_t kBanjoValidCollectionId =
       display::ToBanjoDriverBufferCollectionId(kValidCollectionId);
-  EXPECT_OK(display_engine_->DisplayControllerImplImportBufferCollection(
+  EXPECT_OK(display_engine_->DisplayEngineImportBufferCollection(
       kBanjoValidCollectionId, token1_endpoints->client.TakeChannel()));
 
   // `collection_id` must be unused.
-  EXPECT_EQ(display_engine_->DisplayControllerImplImportBufferCollection(
+  EXPECT_EQ(display_engine_->DisplayEngineImportBufferCollection(
                 kBanjoValidCollectionId, token2_endpoints->client.TakeChannel()),
             ZX_ERR_ALREADY_EXISTS);
 
@@ -391,10 +391,9 @@ TEST_F(GoldfishDisplayEngineTest, ImportBufferCollection) {
   constexpr display::DriverBufferCollectionId kInvalidCollectionId(2);
   constexpr uint64_t kBanjoInvalidCollectionId =
       display::ToBanjoDriverBufferCollectionId(kInvalidCollectionId);
-  EXPECT_EQ(
-      display_engine_->DisplayControllerImplReleaseBufferCollection(kBanjoInvalidCollectionId),
-      ZX_ERR_NOT_FOUND);
-  EXPECT_OK(display_engine_->DisplayControllerImplReleaseBufferCollection(kBanjoValidCollectionId));
+  EXPECT_EQ(display_engine_->DisplayEngineReleaseBufferCollection(kBanjoInvalidCollectionId),
+            ZX_ERR_NOT_FOUND);
+  EXPECT_OK(display_engine_->DisplayEngineReleaseBufferCollection(kBanjoValidCollectionId));
 
   loop_.Shutdown();
 }

@@ -35,6 +35,10 @@ class LlvmProfdata {
   size_t counters_offset() const { return counters_offset_; }
   size_t counters_size_bytes() const { return counters_size_bytes_; }
 
+  // This returns true if single byte counters are used.
+  // It is only public to be used by tests.
+  static bool UsingSingleByteCounters();
+
   // These return the offset and size within the blob of the char[] bitmap
   // bytes array.
   size_t bitmap_offset() const { return bitmap_offset_; }

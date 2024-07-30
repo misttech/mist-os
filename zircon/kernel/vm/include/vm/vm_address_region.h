@@ -78,7 +78,7 @@ enum class VmAddressRegionEnumeratorType : bool;
 template <VmAddressRegionEnumeratorType>
 class VmAddressRegionEnumerator;
 
-class LazyPageRequest;
+class MultiPageRequest;
 
 // A VmAddressRegion represents a contiguous region of the virtual address
 // space.  It is partitioned by non-overlapping children of the following types:
@@ -716,6 +716,12 @@ class VmAddressRegion final : public VmAddressRegionOrMapping {
     return base >= base_ && offset < size_ && size_ - offset >= size;
   }
 
+  // Traverses this vmar (and any sub-vmars) starting at this node, in depth-first pre-order. If any
+  // methods of |ve| return false, the traversal stops and this method returns ZX_ERR_CANCELED. If
+  // this vmar is not alive (in the LifeCycleState sense) or otherwise not enumerable this returns
+  // ZX_ERR_BAD_STATE, otherwise ZX_OK is returned if traversal completes successfully.
+  zx_status_t EnumerateChildren(VmEnumerator* ve) TA_EXCL(lock());
+
  protected:
   friend class VmAspace;
   friend void vm_init_preheap_vmars();
@@ -726,7 +732,7 @@ class VmAddressRegion final : public VmAddressRegionOrMapping {
   // Count the allocated pages, caller must be holding the aspace lock
   AttributionCounts GetAttributedMemoryLocked() TA_REQ(lock()) override;
 
-  // Used to implement VmAspace::EnumerateChildren.
+  // Used to implement VmAspace::EnumerateChildren and VmAddressRegion::EnumerateChildren.
   // |aspace_->lock()| must be held.
   zx_status_t EnumerateChildrenLocked(VmEnumerator* ve) TA_REQ(lock());
 
@@ -1010,7 +1016,7 @@ class VmMapping final : public VmAddressRegionOrMapping,
   // Page fault in an address within the mapping.
   // If this returns ZX_ERR_SHOULD_WAIT, then the caller should wait on |page_request|
   // and try again.
-  zx_status_t PageFaultLocked(vaddr_t va, uint pf_flags, LazyPageRequest* page_request)
+  zx_status_t PageFaultLocked(vaddr_t va, uint pf_flags, MultiPageRequest* page_request)
       TA_REQ(lock());
 
   // Apis intended for use by VmObject

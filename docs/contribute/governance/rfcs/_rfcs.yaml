@@ -3283,3 +3283,29 @@
   reviewers: ['pesk@google.com', 'surajmalhotra@google.com', 'geb@google.com', 'maniscalco@google.com', 'cja@google.com']
   submitted: '2023-11-20'
   reviewed: '2024-06-05'
+
+- name: 'RFC-0252'
+  title: 'No Physical VMO CacheOps'
+  short_description: 'Remove cache operations on physical VMOs.'
+  authors: ['adanis@google.com']
+  file: '0252_no_phys_vmo_cacheops.md'
+  area: ['Kernel']
+  issue: ['']
+  gerrit_change_id: ['1064852']
+  status: 'Accepted'
+  reviewers: ['jbauman@google.com', 'mcgrathr@google.com', 'hansens@google.com']
+  submitted: '2024-06-12'
+  reviewed: '2024-07-18'
+
+- name: 'RFC-0253'
+  title: 'zx_object_get_info ZX_INFO_VMAR_MAPS'
+  short_description: 'This RFC proposes adding a new zx_object_get_info topic, ZX_INFO_VMAR_MAPS.'
+  authors: ['maniscalco@google.com']
+  file: '0253_getinfo_vmar_maps.md'
+  area: ['Kernel']
+  issue: ['42085954']
+  gerrit_change_id: ['1068292']
+  status: 'Accepted'
+  reviewers: ['adamperry@google.com', 'adanis@google.com', 'dworsham@google.com', 'mcgrathr@google.com']
+  submitted: '2024-07-19'
+  reviewed: '2024-07-17'

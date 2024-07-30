@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 #include <fidl/fuchsia.hardware.input/cpp/wire_test_base.h>
-#include <lib/driver/testing/cpp/fixture/driver_test_fixture.h>
+#include <lib/driver/testing/cpp/driver_test.h>
 #include <lib/hid/acer12.h>
 #include <lib/hid/ambient-light.h>
 #include <lib/hid/boot.h>
@@ -177,19 +177,19 @@ class InputReportTestEnvironment : public fdf_testing::Environment {
 
 class FixtureConfig final {
  public:
-  static constexpr bool kDriverOnForeground = false;
-  static constexpr bool kAutoStartDriver = false;
-  static constexpr bool kAutoStopDriver = true;
-
   using DriverType = InputReportDriver;
   using EnvironmentType = InputReportTestEnvironment;
 };
 
-class HidDevTest : public fdf_testing::DriverTestFixture<FixtureConfig>, public ::testing::Test {
+class HidDevTest : public ::testing::Test {
  public:
+  void TearDown() override {
+    zx::result<> result = driver_test().StopDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
+  }
   fidl::WireSyncClient<fuchsia_input_report::InputDevice> GetSyncClient() {
     auto connect_result =
-        RunInNodeContext<zx::result<zx::channel>>([](fdf_testing::TestNode& node) {
+        driver_test().RunInNodeContext<zx::result<zx::channel>>([](fdf_testing::TestNode& node) {
           return node.children().at("InputReport").ConnectToDevice();
         });
     EXPECT_TRUE(connect_result.is_ok());
@@ -206,7 +206,7 @@ class HidDevTest : public fdf_testing::DriverTestFixture<FixtureConfig>, public 
     auto result = sync_client->GetInputReportsReader(std::move(endpoints.server));
     EXPECT_OK(result.status());
     sync_completion_t* next_reader_wait;
-    RunInDriverContext([&next_reader_wait](InputReportDriver& driver) {
+    driver_test().RunInDriverContext([&next_reader_wait](InputReportDriver& driver) {
       next_reader_wait = &driver.input_report_for_testing().next_reader_wait();
     });
     EXPECT_OK(sync_completion_wait(next_reader_wait, ZX_TIME_INFINITE));
@@ -220,75 +220,76 @@ class HidDevTest : public fdf_testing::DriverTestFixture<FixtureConfig>, public 
     }
 
     libsync::Completion* wait_for_read;
-    RunInEnvironmentTypeContext([&wait_for_read](InputReportTestEnvironment& env) {
+    driver_test().RunInEnvironmentTypeContext([&wait_for_read](InputReportTestEnvironment& env) {
       ASSERT_TRUE(env.fake_hid().reader_);
       wait_for_read = &env.fake_hid().reader_->wait_for_read_;
     });
     wait_for_read->Wait();
     wait_for_read->Reset();
-    RunInEnvironmentTypeContext([&report, &timestamp](InputReportTestEnvironment& env) {
-      ASSERT_TRUE(env.fake_hid().reader_);
-      env.fake_hid().reader_->SendReport(std::move(report), timestamp);
-    });
+    driver_test().RunInEnvironmentTypeContext(
+        [&report, &timestamp](InputReportTestEnvironment& env) {
+          ASSERT_TRUE(env.fake_hid().reader_);
+          env.fake_hid().reader_->SendReport(std::move(report), timestamp);
+        });
     wait_for_read->Wait();
   }
+
+  fdf_testing::BackgroundDriverTest<FixtureConfig>& driver_test() { return driver_test_; }
+
+ private:
+  fdf_testing::BackgroundDriverTest<FixtureConfig> driver_test_;
 };
 
 TEST_F(HidDevTest, HidLifetimeTest) {
-  RunInEnvironmentTypeContext([](InputReportTestEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([](InputReportTestEnvironment& env) {
     size_t boot_mouse_desc_size;
     const uint8_t* boot_mouse_desc = get_boot_mouse_report_desc(&boot_mouse_desc_size);
     env.fake_hid().SetReportDesc(ToBinaryVector(boot_mouse_desc, boot_mouse_desc_size));
   });
-  ASSERT_TRUE(StartDriver().is_ok());
+  ASSERT_TRUE(driver_test().StartDriver().is_ok());
 }
 
-class UnregisterFixtureConfig final {
+class UnregisterHidDevTest : public ::testing::Test {
  public:
-  static constexpr bool kDriverOnForeground = true;
-  static constexpr bool kAutoStartDriver = false;
-  static constexpr bool kAutoStopDriver = false;
+  fdf_testing::ForegroundDriverTest<FixtureConfig>& driver_test() { return driver_test_; }
 
-  using DriverType = InputReportDriver;
-  using EnvironmentType = InputReportTestEnvironment;
+ private:
+  fdf_testing::ForegroundDriverTest<FixtureConfig> driver_test_;
 };
 
-class UnregisterHidDevTest : public fdf_testing::DriverTestFixture<UnregisterFixtureConfig>,
-                             public ::testing::Test {};
-
 TEST_F(UnregisterHidDevTest, InputReportUnregisterTest) {
-  RunInEnvironmentTypeContext([](InputReportTestEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([](InputReportTestEnvironment& env) {
     size_t boot_mouse_desc_size;
     const uint8_t* boot_mouse_desc = get_boot_mouse_report_desc(&boot_mouse_desc_size);
     env.fake_hid().SetReportDesc(ToBinaryVector(boot_mouse_desc, boot_mouse_desc_size));
   });
-  ASSERT_TRUE(StartDriver().is_ok());
+  ASSERT_TRUE(driver_test().StartDriver().is_ok());
 
-  zx::result prepare_stop_result = StopDriver();
+  zx::result prepare_stop_result = driver_test().StopDriver();
   EXPECT_EQ(ZX_OK, prepare_stop_result.status_value());
 
   libsync::Completion* unbound;
-  RunInEnvironmentTypeContext(
+  driver_test().RunInEnvironmentTypeContext(
       [&unbound](InputReportTestEnvironment& env) { unbound = &env.fake_hid().unbound_; });
   unbound->Wait();
 }
 
 TEST_F(HidDevTest, InputReportUnregisterTestBindFailed) {
   // We don't set a input report on `fake_hid` so the bind will fail.
-  ASSERT_EQ(StartDriver().status_value(), ZX_ERR_INTERNAL);
+  ASSERT_EQ(driver_test().StartDriver().status_value(), ZX_ERR_INTERNAL);
 
   // Make sure that the InputReport class is not registered to the HID device.
-  RunInEnvironmentTypeContext(
+  driver_test().RunInEnvironmentTypeContext(
       [](InputReportTestEnvironment& env) { ASSERT_FALSE(env.fake_hid().reader_); });
 }
 
 TEST_F(HidDevTest, GetReportDescTest) {
-  RunInEnvironmentTypeContext([](InputReportTestEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([](InputReportTestEnvironment& env) {
     size_t boot_mouse_desc_size;
     const uint8_t* boot_mouse_desc = get_boot_mouse_report_desc(&boot_mouse_desc_size);
     env.fake_hid().SetReportDesc(ToBinaryVector(boot_mouse_desc, boot_mouse_desc_size));
   });
-  ASSERT_TRUE(StartDriver().is_ok());
+  ASSERT_TRUE(driver_test().StartDriver().is_ok());
 
   auto sync_client = GetSyncClient();
   fidl::WireResult<fuchsia_input_report::InputDevice::GetDescriptor> result =
@@ -310,12 +311,12 @@ TEST_F(HidDevTest, GetReportDescTest) {
 }
 
 TEST_F(HidDevTest, ReportDescInfoTest) {
-  RunInEnvironmentTypeContext([](InputReportTestEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([](InputReportTestEnvironment& env) {
     size_t boot_mouse_desc_size;
     const uint8_t* boot_mouse_desc = get_boot_mouse_report_desc(&boot_mouse_desc_size);
     env.fake_hid().SetReportDesc(ToBinaryVector(boot_mouse_desc, boot_mouse_desc_size));
   });
-  ASSERT_TRUE(StartDriver().is_ok());
+  ASSERT_TRUE(driver_test().StartDriver().is_ok());
 
   auto sync_client = GetSyncClient();
   fidl::WireResult<fuchsia_input_report::InputDevice::GetDescriptor> result =
@@ -330,12 +331,12 @@ TEST_F(HidDevTest, ReportDescInfoTest) {
 }
 
 TEST_F(HidDevTest, ReadInputReportsTest) {
-  RunInEnvironmentTypeContext([](InputReportTestEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([](InputReportTestEnvironment& env) {
     size_t boot_mouse_desc_size;
     const uint8_t* boot_mouse_desc = get_boot_mouse_report_desc(&boot_mouse_desc_size);
     env.fake_hid().SetReportDesc(ToBinaryVector(boot_mouse_desc, boot_mouse_desc_size));
   });
-  ASSERT_TRUE(StartDriver().is_ok());
+  ASSERT_TRUE(driver_test().StartDriver().is_ok());
 
   // GetReader() must be called before SendReport() because SendReport() only sends reports to
   // existing readers.
@@ -368,12 +369,12 @@ TEST_F(HidDevTest, ReadInputReportsTest) {
 }
 
 TEST_F(HidDevTest, ReadInputReportsHangingGetTest) {
-  RunInEnvironmentTypeContext([](InputReportTestEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([](InputReportTestEnvironment& env) {
     size_t boot_mouse_desc_size;
     const uint8_t* boot_mouse_desc = get_boot_mouse_report_desc(&boot_mouse_desc_size);
     env.fake_hid().SetReportDesc(ToBinaryVector(boot_mouse_desc, boot_mouse_desc_size));
   });
-  ASSERT_TRUE(StartDriver().is_ok());
+  ASSERT_TRUE(driver_test().StartDriver().is_ok());
 
   fidl::WireClient<fuchsia_input_report::InputReportsReader> reader(
       GetReader(), fdf::Dispatcher::GetCurrent()->async_dispatcher());
@@ -396,23 +397,23 @@ TEST_F(HidDevTest, ReadInputReportsHangingGetTest) {
 
         ASSERT_TRUE(mouse.has_movement_y());
         ASSERT_EQ(0x70, mouse.movement_y());
-        runtime().Quit();
+        driver_test().runtime().Quit();
       });
-  runtime().RunUntilIdle();
+  driver_test().runtime().RunUntilIdle();
 
   // Send the report.
   SendReport(std::vector<uint8_t>{0xFF, 0x50, 0x70});
 
-  runtime().Run();
+  driver_test().runtime().Run();
 }
 
 TEST_F(HidDevTest, CloseReaderWithOutstandingRead) {
-  RunInEnvironmentTypeContext([](InputReportTestEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([](InputReportTestEnvironment& env) {
     size_t boot_mouse_desc_size;
     const uint8_t* boot_mouse_desc = get_boot_mouse_report_desc(&boot_mouse_desc_size);
     env.fake_hid().SetReportDesc(ToBinaryVector(boot_mouse_desc, boot_mouse_desc_size));
   });
-  ASSERT_TRUE(StartDriver().is_ok());
+  ASSERT_TRUE(driver_test().StartDriver().is_ok());
 
   fidl::WireClient<fuchsia_input_report::InputReportsReader> reader(
       GetReader(), fdf::Dispatcher::GetCurrent()->async_dispatcher());
@@ -421,19 +422,19 @@ TEST_F(HidDevTest, CloseReaderWithOutstandingRead) {
   reader->ReadInputReports().ThenExactlyOnce(
       [&](fidl::WireUnownedResult<fuchsia_input_report::InputReportsReader::ReadInputReports>&
               result) { ASSERT_TRUE(result.is_canceled()); });
-  runtime().RunUntilIdle();
+  driver_test().runtime().RunUntilIdle();
 
   // Unbind the reader now that the report is waiting.
   reader = {};
 }
 
 TEST_F(HidDevTest, SensorTest) {
-  RunInEnvironmentTypeContext([](InputReportTestEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([](InputReportTestEnvironment& env) {
     const uint8_t* sensor_desc_ptr;
     size_t sensor_desc_size = get_ambient_light_report_desc(&sensor_desc_ptr);
     env.fake_hid().SetReportDesc(ToBinaryVector(sensor_desc_ptr, sensor_desc_size));
   });
-  ASSERT_TRUE(StartDriver().is_ok());
+  ASSERT_TRUE(driver_test().StartDriver().is_ok());
 
   auto sync_client = GetSyncClient();
 
@@ -501,12 +502,12 @@ TEST_F(HidDevTest, SensorTest) {
 }
 
 TEST_F(HidDevTest, GetTouchInputReportTest) {
-  RunInEnvironmentTypeContext([](InputReportTestEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([](InputReportTestEnvironment& env) {
     size_t desc_len;
     const uint8_t* report_desc = get_paradise_touch_report_desc(&desc_len);
     env.fake_hid().SetReportDesc(ToBinaryVector(report_desc, desc_len));
   });
-  ASSERT_TRUE(StartDriver().is_ok());
+  ASSERT_TRUE(driver_test().StartDriver().is_ok());
 
   // Get an InputReportsReader.
   fidl::WireSyncClient<fuchsia_input_report::InputReportsReader> reader(GetReader());
@@ -544,12 +545,12 @@ TEST_F(HidDevTest, GetTouchInputReportTest) {
 }
 
 TEST_F(HidDevTest, GetTouchPadDescTest) {
-  RunInEnvironmentTypeContext([](InputReportTestEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([](InputReportTestEnvironment& env) {
     size_t desc_len;
     const uint8_t* report_desc = get_paradise_touchpad_v1_report_desc(&desc_len);
     env.fake_hid().SetReportDesc(ToBinaryVector(report_desc, desc_len));
   });
-  ASSERT_TRUE(StartDriver().is_ok());
+  ASSERT_TRUE(driver_test().StartDriver().is_ok());
 
   auto sync_client = GetSyncClient();
   fidl::WireResult<fuchsia_input_report::InputDevice::GetDescriptor> result =
@@ -564,12 +565,12 @@ TEST_F(HidDevTest, GetTouchPadDescTest) {
 }
 
 TEST_F(HidDevTest, KeyboardTest) {
-  RunInEnvironmentTypeContext([](InputReportTestEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([](InputReportTestEnvironment& env) {
     size_t keyboard_descriptor_size;
     const uint8_t* keyboard_descriptor = get_boot_kbd_report_desc(&keyboard_descriptor_size);
     env.fake_hid().SetReportDesc(ToBinaryVector(keyboard_descriptor, keyboard_descriptor_size));
   });
-  ASSERT_TRUE(StartDriver().is_ok());
+  ASSERT_TRUE(driver_test().StartDriver().is_ok());
 
   // Get an InputReportsReader.
   fidl::WireSyncClient<fuchsia_input_report::InputReportsReader> reader(GetReader());
@@ -599,12 +600,12 @@ TEST_F(HidDevTest, KeyboardTest) {
 }
 
 TEST_F(HidDevTest, KeyboardOutputReportTest) {
-  RunInEnvironmentTypeContext([](InputReportTestEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([](InputReportTestEnvironment& env) {
     size_t keyboard_descriptor_size;
     const uint8_t* keyboard_descriptor = get_boot_kbd_report_desc(&keyboard_descriptor_size);
     env.fake_hid().SetReportDesc(ToBinaryVector(keyboard_descriptor, keyboard_descriptor_size));
   });
-  ASSERT_TRUE(StartDriver().is_ok());
+  ASSERT_TRUE(driver_test().StartDriver().is_ok());
 
   auto sync_client = GetSyncClient();
   // Make an output report.
@@ -623,13 +624,13 @@ TEST_F(HidDevTest, KeyboardOutputReportTest) {
   ASSERT_TRUE(response.ok());
   ASSERT_TRUE(response->is_ok());
   // Check the hid output report.
-  RunInEnvironmentTypeContext([](InputReportTestEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([](InputReportTestEnvironment& env) {
     EXPECT_EQ(env.fake_hid().GetReport(), std::vector<uint8_t>{0b101});
   });
 }
 
 TEST_F(HidDevTest, ConsumerControlTest) {
-  RunInEnvironmentTypeContext([](InputReportTestEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([](InputReportTestEnvironment& env) {
     const uint8_t* descriptor;
     size_t descriptor_size = get_buttons_report_desc(&descriptor);
     env.fake_hid().SetReportDesc(ToBinaryVector(descriptor, descriptor_size));
@@ -639,7 +640,7 @@ TEST_F(HidDevTest, ConsumerControlTest) {
     report.rpt_id = BUTTONS_RPT_ID_INPUT;
     env.fake_hid().SetReport(ToBinaryVector(report));
   });
-  ASSERT_TRUE(StartDriver().is_ok());
+  ASSERT_TRUE(driver_test().StartDriver().is_ok());
 
   auto sync_client = GetSyncClient();
 
@@ -710,7 +711,7 @@ TEST_F(HidDevTest, ConsumerControlTest) {
 }
 
 TEST_F(HidDevTest, ConsumerControlTwoClientsTest) {
-  RunInEnvironmentTypeContext([](InputReportTestEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([](InputReportTestEnvironment& env) {
     const uint8_t* descriptor;
     size_t descriptor_size = get_buttons_report_desc(&descriptor);
     env.fake_hid().SetReportDesc(ToBinaryVector(descriptor, descriptor_size));
@@ -720,7 +721,7 @@ TEST_F(HidDevTest, ConsumerControlTwoClientsTest) {
     report.rpt_id = BUTTONS_RPT_ID_INPUT;
     env.fake_hid().SetReport(ToBinaryVector(report));
   });
-  ASSERT_TRUE(StartDriver().is_ok());
+  ASSERT_TRUE(driver_test().StartDriver().is_ok());
 
   // Open the device.
   auto client = GetSyncClient();
@@ -802,15 +803,15 @@ TEST_F(HidDevTest, ConsumerControlTwoClientsTest) {
 }
 
 TEST_F(HidDevTest, TouchLatencyMeasurements) {
-  RunInEnvironmentTypeContext([](InputReportTestEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([](InputReportTestEnvironment& env) {
     const uint8_t* report_desc;
     const size_t desc_len = get_gt92xx_report_desc(&report_desc);
     env.fake_hid().SetReportDesc(ToBinaryVector(report_desc, desc_len));
   });
-  ASSERT_TRUE(StartDriver().is_ok());
+  ASSERT_TRUE(driver_test().StartDriver().is_ok());
 
   using namespace inspect::testing;
-  RunInDriverContext([](InputReportDriver& driver) {
+  driver_test().RunInDriverContext([](InputReportDriver& driver) {
     auto hierarchy = inspect::ReadFromVmo(driver.input_report_for_testing().InspectVmo());
     EXPECT_TRUE(hierarchy.is_ok());
   });
@@ -827,7 +828,7 @@ TEST_F(HidDevTest, TouchLatencyMeasurements) {
   SendReport(ToBinaryVector(report), timestamp);
   SendReport(ToBinaryVector(report), timestamp - zx::msec(5));
 
-  RunInDriverContext([](InputReportDriver& driver) {
+  driver_test().RunInDriverContext([](InputReportDriver& driver) {
     auto hierarchy = inspect::ReadFromVmo(driver.input_report_for_testing().InspectVmo());
     EXPECT_TRUE(hierarchy.is_ok());
     const inspect::Hierarchy* root = hierarchy.value().GetByPath({"hid-input-report-touch"});
@@ -856,14 +857,14 @@ TEST_F(HidDevTest, TouchLatencyMeasurements) {
 }
 
 TEST_F(HidDevTest, InspectDeviceTypes) {
-  RunInEnvironmentTypeContext([](InputReportTestEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([](InputReportTestEnvironment& env) {
     size_t desc_len;
     const uint8_t* report_desc = get_paradise_touch_report_desc(&desc_len);
     env.fake_hid().SetReportDesc(ToBinaryVector(report_desc, desc_len));
   });
-  ASSERT_TRUE(StartDriver().is_ok());
+  ASSERT_TRUE(driver_test().StartDriver().is_ok());
 
-  RunInDriverContext([](InputReportDriver& driver) {
+  driver_test().RunInDriverContext([](InputReportDriver& driver) {
     auto hierarchy = inspect::ReadFromVmo(driver.input_report_for_testing().InspectVmo());
     EXPECT_TRUE(hierarchy.is_ok());
     const inspect::Hierarchy* root =
@@ -879,12 +880,12 @@ TEST_F(HidDevTest, InspectDeviceTypes) {
 }
 
 TEST_F(HidDevTest, GetInputReport) {
-  RunInEnvironmentTypeContext([](InputReportTestEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([](InputReportTestEnvironment& env) {
     const uint8_t* sensor_desc_ptr;
     size_t sensor_desc_size = get_ambient_light_report_desc(&sensor_desc_ptr);
     env.fake_hid().SetReportDesc(ToBinaryVector(sensor_desc_ptr, sensor_desc_size));
   });
-  ASSERT_TRUE(StartDriver().is_ok());
+  ASSERT_TRUE(driver_test().StartDriver().is_ok());
 
   auto sync_client = GetSyncClient();
 
@@ -892,7 +893,7 @@ TEST_F(HidDevTest, GetInputReport) {
   const int kRedTestVal = 101;
   const int kBlueTestVal = 5;
   const int kGreenTestVal = 3;
-  RunInEnvironmentTypeContext([](InputReportTestEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([](InputReportTestEnvironment& env) {
     ambient_light_input_rpt_t report_data = {};
     report_data.rpt_id = AMBIENT_LIGHT_RPT_ID_INPUT;
     report_data.illuminance = kIlluminanceTestVal;
@@ -930,16 +931,16 @@ TEST_F(HidDevTest, GetInputReport) {
 }
 
 TEST_F(HidDevTest, GetInputReportMultipleDevices) {
-  RunInEnvironmentTypeContext([](InputReportTestEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([](InputReportTestEnvironment& env) {
     size_t touch_desc_size;
     const uint8_t* touch_desc_ptr = get_acer12_touch_report_desc(&touch_desc_size);
     env.fake_hid().SetReportDesc(ToBinaryVector(touch_desc_ptr, touch_desc_size));
   });
-  ASSERT_TRUE(StartDriver().is_ok());
+  ASSERT_TRUE(driver_test().StartDriver().is_ok());
 
   auto sync_client = GetSyncClient();
 
-  RunInEnvironmentTypeContext([](InputReportTestEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([](InputReportTestEnvironment& env) {
     acer12_stylus_t report_data = {};
     report_data.rpt_id = ACER12_RPT_ID_STYLUS;
     report_data.status = 0;

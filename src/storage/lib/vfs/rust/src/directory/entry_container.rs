@@ -105,6 +105,17 @@ pub trait Directory: Node {
         _path: Path,
         _protocols: fio::ConnectionProtocols,
         _object_request: ObjectRequestRef<'_>,
+    ) -> Result<(), Status> {
+        Err(Status::NOT_SUPPORTED)
+    }
+
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
+    fn open3(
+        self: Arc<Self>,
+        _scope: ExecutionScope,
+        _path: Path,
+        _flags: fio::Flags,
+        _object_request: ObjectRequestRef<'_>,
     ) -> Result<(), Status>;
 
     /// Reads directory entries starting from `pos` by adding them to `sink`.

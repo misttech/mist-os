@@ -1584,8 +1584,9 @@ where
             Request::GetIpv6ReceiveTrafficClass { responder } => {
                 respond_not_supported!("syncudp::GetIpv6ReceiveTrafficClass", responder)
             }
-            Request::SetIpv6ReceiveHopLimit { value: _, responder } => {
-                respond_not_supported!("syncudp::SetIpv6ReceiveHopLimit", responder)
+            Request::SetIpv6ReceiveHopLimit { value, responder } => {
+                debug!("syncudp::SetIpv6ReceiveHopLimit({value}) is not implemented, returning Ok");
+                responder.send(Ok(())).unwrap_or_log("failed to respond");
             }
             Request::GetIpv6ReceiveHopLimit { responder } => {
                 respond_not_supported!("syncudp::GetIpv6ReceiveHopLimit", responder)

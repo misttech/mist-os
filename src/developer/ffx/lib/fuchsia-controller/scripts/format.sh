@@ -35,13 +35,9 @@ autoflake \
     --exclude "__init__.py,.venvs**" \
     $FCT_SRC
 
-echo "Sorting imports..."
-isort $FCT_SRC \
-    --sg '.venvs**'
 echo "Formatting code..."
-black  \
-    $FCT_SRC \
-    --exclude '\.venvs'
+fx format-code
+
 echo "Checking types..."
 mypy \
     $FCT_SRC \

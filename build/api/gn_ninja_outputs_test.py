@@ -4,9 +4,9 @@
 # found in the LICENSE file.
 
 import json
+import sys
 import tempfile
 import unittest
-import sys
 from pathlib import Path
 
 sys.path.insert(0, Path(__file__).parent)

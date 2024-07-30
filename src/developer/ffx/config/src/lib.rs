@@ -4,8 +4,11 @@
 
 use crate::api::value::{ConfigValue, ValueStrategy};
 use crate::api::{validate_type, ConfigError};
-use analytics::{is_opted_in, set_opt_in_status};
+use ::errors::ffx_bail;
+use analytics::metrics_state::MetricsStatus;
+use analytics::{set_new_opt_in_status, show_status_message};
 use anyhow::{anyhow, Context, Result};
+use core::fmt;
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -76,6 +79,19 @@ impl ConfigLevel {
         }
     }
 }
+impl fmt::Display for ConfigLevel {
+    // Required method
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let val = match self {
+            ConfigLevel::Default => "default",
+            ConfigLevel::Global => "global",
+            ConfigLevel::User => "user",
+            ConfigLevel::Build => "build",
+            ConfigLevel::Runtime => "runtime",
+        };
+        write!(f, "{}", val)
+    }
+}
 
 impl argh::FromArgValue for ConfigLevel {
     fn from_arg_value(val: &str) -> Result<Self, String> {
@@ -87,6 +103,12 @@ impl argh::FromArgValue for ConfigLevel {
                 "Unrecognized value. Possible values are \"user\",\"build\",\"global\".",
             )),
         }
+    }
+}
+
+pub async fn invalidate_global_cache() {
+    if let Some(env_context) = global_env_context() {
+        crate::cache::invalidate(&env_context.cache).await;
     }
 }
 
@@ -194,7 +216,7 @@ pub async fn print_config<W: Write>(ctx: &EnvironmentContext, mut writer: W) -> 
 pub async fn get_log_dirs() -> Result<Vec<String>> {
     match query("log.dir").get() {
         Ok(log_dirs) => Ok(log_dirs),
-        Err(e) => errors::ffx_bail!("Failed to load host log directories from ffx config: {:?}", e),
+        Err(e) => ffx_bail!("Failed to load host log directories from ffx config: {:?}", e),
     }
 }
 
@@ -219,16 +241,25 @@ pub async fn print_log_hint<W: std::io::Write>(writer: &mut W) {
     }
 }
 
-pub async fn set_metrics_status(value: bool) -> Result<()> {
-    set_opt_in_status(value).await
+pub async fn set_metrics_status(value: MetricsStatus) -> Result<()> {
+    set_new_opt_in_status(value).await
+}
+
+pub async fn enable_basic_metrics() -> Result<()> {
+    set_new_opt_in_status(MetricsStatus::OptedIn).await
+}
+
+pub async fn enable_enhanced_metrics() -> Result<()> {
+    set_new_opt_in_status(MetricsStatus::OptedInEnhanced).await
+}
+
+pub async fn disable_metrics() -> Result<()> {
+    set_new_opt_in_status(MetricsStatus::OptedOut).await
 }
 
 pub async fn show_metrics_status<W: Write>(mut writer: W) -> Result<()> {
-    let state = match is_opted_in().await {
-        true => "enabled",
-        false => "disabled",
-    };
-    writeln!(&mut writer, "Analytics data collection is {}", state)?;
+    let status_message = show_status_message().await;
+    writeln!(&mut writer, "{status_message}")?;
     Ok(())
 }
 

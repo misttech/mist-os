@@ -301,23 +301,27 @@ pub async fn open_dir_checked(
     open_dir(dir, flags, path).await.expect("open_dir failed")
 }
 
-pub async fn open2_dir(
+#[cfg(fuchsia_api_level_at_least = "HEAD")]
+pub async fn open3_dir(
     dir: &fio::DirectoryProxy,
-    protocols: &fio::ConnectionProtocols,
+    flags: fio::Flags,
+    options: &fio::Options,
     path: &str,
 ) -> Result<fio::DirectoryProxy, Error> {
     let (proxy, server_end) = create_proxy::<fio::DirectoryMarker>().expect("create_proxy failed");
-    dir.open2(path, protocols, server_end.into_channel())?;
+    dir.open3(path, flags, options, server_end.into_channel())?;
     let _: Vec<_> = proxy.query().await?;
     Ok(proxy)
 }
 
-pub async fn open2_dir_checked(
+#[cfg(fuchsia_api_level_at_least = "HEAD")]
+pub async fn open3_dir_checked(
     dir: &fio::DirectoryProxy,
-    protocols: &fio::ConnectionProtocols,
+    flags: fio::Flags,
+    options: &fio::Options,
     path: &str,
 ) -> fio::DirectoryProxy {
-    open2_dir(dir, protocols, path).await.expect("open2_dir failed")
+    open3_dir(dir, flags, options, path).await.expect("open3_dir failed")
 }
 
 /// Utility function to write to an `FxFile`.

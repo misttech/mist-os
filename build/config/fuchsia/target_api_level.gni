@@ -28,13 +28,43 @@ if (override_target_api_level != false) {
   current_build_target_api_level = override_target_api_level
 }
 
-# Numerical values associated with special API levels, as established by
-# RFC-0246.
-_FUCHSIA_PLATFORM_VALUE = 4293918720
+# Numerical values associated with special API levels, as defined in
+# https://fuchsia.dev/fuchsia-src/contribute/governance/rfcs/0246_api_levels_are_32_bits#special_api_levels.
+_FIRST_RESERVED_API_LEVEL = 2147483648  # 0x80000000
+_API_LEVEL_NEXT_AS_INTEGER = 4291821568
+_API_LEVEL_HEAD_AS_INTEGER = 4292870144
+_API_LEVEL_PLATFORM_AS_INTEGER = 4293918720
+
+if (current_build_target_api_level == "NEXT") {
+  # The numerical value for `current_build_target_api_level`, which may be a
+  # string. Use when API level comparisons are necessary or for tools, such as Clang, that do not
+  # support string API levels. Prefer using `current_build_target_api_level` when possible.
+  current_build_target_api_level_as_integer = _API_LEVEL_NEXT_AS_INTEGER
+} else if (current_build_target_api_level == "HEAD") {
+  current_build_target_api_level_as_integer = _API_LEVEL_HEAD_AS_INTEGER
+
+  assert(
+      false,
+      "Targeting \"HEAD\" is not currently supported. See https://fxbug.dev/334936990.")
+} else if (current_build_target_api_level == "PLATFORM") {
+  current_build_target_api_level_as_integer = _API_LEVEL_PLATFORM_AS_INTEGER
+} else {
+  assert(current_build_target_api_level != "$current_build_target_api_level",
+         "Unrecognized API level string ${current_build_target_api_level}")
+
+  # `current_build_target_api_level` must be an integer. Ensure it adheres to
+  # https://fuchsia.dev/fuchsia-src/contribute/governance/rfcs/0246_api_levels_are_32_bits#design.
+  assert(
+      current_build_target_api_level < _FIRST_RESERVED_API_LEVEL,
+      "Special API levels should be given by name, not number: ${current_build_target_api_level}")
+  assert(
+      0 < current_build_target_api_level,
+      "Non-special API levels must be a positive integer, not: ${current_build_target_api_level}")
+
+  current_build_target_api_level_as_integer = current_build_target_api_level
+}
 
 if (current_build_target_api_level == "PLATFORM") {
-  clang_fuchsia_api_level = _FUCHSIA_PLATFORM_VALUE
-
   # Directory name to use for target API level.
   target_cpu_dir_name_for_target_api_level = target_cpu
 
@@ -42,18 +72,11 @@ if (current_build_target_api_level == "PLATFORM") {
   sdk_prebuilt_base_for_target_api_level =
       "arch/${target_cpu_dir_name_for_target_api_level}"
 } else {
-  # Ensure that `current_build_target_api_level` is an integer corresponding to a
-  # normal API level.
-  assert(
-      0 < current_build_target_api_level,
-      "Override must be 'PLATFORM' or a positive integer, not: ${current_build_target_api_level}")
-  assert(current_build_target_api_level < 2147483648,
-         "Special API levels should be given by name, not number.")
-
-  clang_fuchsia_api_level = current_build_target_api_level
-
+  # Directory name to use for target API level.
   target_cpu_dir_name_for_target_api_level =
       "${target_cpu}-api-${current_build_target_api_level}"
+
+  # Base path for library binaries in SDKs.
   sdk_prebuilt_base_for_target_api_level =
       "obj/${target_cpu_dir_name_for_target_api_level}"
 }

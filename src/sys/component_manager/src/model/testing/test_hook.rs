@@ -4,21 +4,18 @@
 
 use async_trait::async_trait;
 use errors::ModelError;
-use futures::executor::block_on;
-use futures::lock::Mutex;
-use futures::prelude::*;
 use hooks::{Event, EventPayload, EventType, Hook, HooksRegistration};
 use moniker::Moniker;
 use std::cmp::Eq;
+use std::collections::hash_map::Entry;
 use std::collections::HashMap;
-use std::fmt;
 use std::ops::Deref;
-use std::pin::Pin;
 use std::sync::{Arc, Weak};
+use std::{fmt, sync};
 
 struct ComponentInstance {
     pub moniker: Moniker,
-    pub children: Mutex<Vec<Arc<ComponentInstance>>>,
+    pub children: sync::Mutex<Vec<Arc<ComponentInstance>>>,
 }
 
 impl Clone for ComponentInstance {
@@ -26,10 +23,10 @@ impl Clone for ComponentInstance {
     // needs to be made, TestHook clones ComponentInstance and makes the change
     // in the new copy.
     fn clone(&self) -> Self {
-        let children = block_on(self.children.lock());
+        let children = self.children.lock().unwrap();
         return ComponentInstance {
             moniker: self.moniker.clone(),
-            children: Mutex::new(children.clone()),
+            children: sync::Mutex::new(children.clone()),
         };
     }
 }
@@ -43,9 +40,9 @@ impl PartialEq for ComponentInstance {
 impl Eq for ComponentInstance {}
 
 impl ComponentInstance {
-    pub async fn print(&self) -> String {
+    pub fn print(&self) -> String {
         let mut s: String = self.moniker.leaf().map_or(String::new(), |m| m.to_string());
-        let mut children = self.children.lock().await;
+        let mut children = self.children.lock().unwrap();
         if children.is_empty() {
             return s;
         }
@@ -62,15 +59,11 @@ impl ComponentInstance {
             if count > 0 {
                 s.push(',');
             }
-            s.push_str(&child.boxed_print().await);
+            s.push_str(&child.print());
             count += 1;
         }
         s.push(')');
         s
-    }
-
-    fn boxed_print<'a>(&'a self) -> Pin<Box<dyn Future<Output = String> + 'a>> {
-        Box::pin(self.print())
     }
 }
 
@@ -94,8 +87,8 @@ impl fmt::Display for Lifecycle {
 /// TestHook is a Hook that generates a strings representing the component
 /// topology.
 pub struct TestHook {
-    instances: Mutex<HashMap<Moniker, Arc<ComponentInstance>>>,
-    lifecycle_events: Mutex<Vec<Lifecycle>>,
+    instances: sync::Mutex<HashMap<Moniker, Arc<ComponentInstance>>>,
+    lifecycle_events: sync::Mutex<Vec<Lifecycle>>,
 }
 
 impl fmt::Display for TestHook {
@@ -107,19 +100,19 @@ impl fmt::Display for TestHook {
 
 impl TestHook {
     pub fn new() -> TestHook {
-        Self { instances: Mutex::new(HashMap::new()), lifecycle_events: Mutex::new(vec![]) }
+        let this = Self {
+            instances: sync::Mutex::new(HashMap::new()),
+            lifecycle_events: sync::Mutex::new(vec![]),
+        };
+        this.create_instance_if_necessary(&Moniker::root()).unwrap();
+        this
     }
 
     /// Returns the set of hooks into the component manager that TestHook is interested in.
     pub fn hooks(self: &Arc<Self>) -> Vec<HooksRegistration> {
         vec![HooksRegistration::new(
             "TestHook",
-            vec![
-                EventType::Discovered,
-                EventType::Destroyed,
-                EventType::Started,
-                EventType::Stopped,
-            ],
+            vec![EventType::Destroyed, EventType::Started, EventType::Stopped],
             Arc::downgrade(self) as Weak<dyn Hook>,
         )]
     }
@@ -127,24 +120,24 @@ impl TestHook {
     /// Recursively traverse the Instance tree to generate a string representing the component
     /// topology.
     pub fn print(&self) -> String {
-        let instances = block_on(self.instances.lock());
+        let instances = self.instances.lock().unwrap();
         let moniker = Moniker::root();
         let root_instance =
             instances.get(&moniker).map(|x| x.clone()).expect("Unable to find root instance.");
-        block_on(root_instance.print())
+        root_instance.print()
     }
 
     /// Return the sequence of lifecycle events.
     pub fn lifecycle(&self) -> Vec<Lifecycle> {
-        block_on(self.lifecycle_events.lock()).clone()
+        self.lifecycle_events.lock().unwrap().clone()
     }
 
     pub async fn on_started_async<'a>(
         &'a self,
         target_moniker: &Moniker,
     ) -> Result<(), ModelError> {
-        self.create_instance_if_necessary(target_moniker).await?;
-        let mut events = self.lifecycle_events.lock().await;
+        self.create_instance_if_necessary(target_moniker)?;
+        let mut events = self.lifecycle_events.lock().unwrap();
         events.push(Lifecycle::Start(target_moniker.clone()));
         Ok(())
     }
@@ -153,7 +146,7 @@ impl TestHook {
         &'a self,
         target_moniker: &Moniker,
     ) -> Result<(), ModelError> {
-        let mut events = self.lifecycle_events.lock().await;
+        let mut events = self.lifecycle_events.lock().unwrap();
         events.push(Lifecycle::Stop(target_moniker.clone()));
         Ok(())
     }
@@ -166,50 +159,54 @@ impl TestHook {
         // deleted too.
         if let Some(child_moniker) = target_moniker.leaf() {
             if child_moniker.collection().is_some() {
-                self.remove_instance(target_moniker).await?;
+                self.remove_instance(target_moniker)?;
             }
         }
 
-        let mut events = self.lifecycle_events.lock().await;
+        let mut events = self.lifecycle_events.lock().unwrap();
         events.push(Lifecycle::Destroy(target_moniker.clone()));
         Ok(())
     }
 
-    pub async fn create_instance_if_necessary(&self, moniker: &Moniker) -> Result<(), ModelError> {
-        let mut instances = self.instances.lock().await;
+    pub fn create_instance_if_necessary(&self, moniker: &Moniker) -> Result<(), ModelError> {
+        let mut instances = self.instances.lock().unwrap();
         let new_instance = match instances.get(moniker) {
             Some(old_instance) => Arc::new((old_instance.deref()).clone()),
             None => Arc::new(ComponentInstance {
                 moniker: moniker.clone(),
-                children: Mutex::new(vec![]),
+                children: sync::Mutex::new(vec![]),
             }),
         };
         instances.insert(moniker.clone(), new_instance.clone());
         if let Some(parent_moniker) = moniker.parent() {
-            // If the parent isn't available yet then opt_parent_instance will have a value
-            // of None.
-            let opt_parent_instance = instances.get(&parent_moniker).map(|x| x.clone());
-            // If the parent is available then add this instance as a child to it.
-            if let Some(parent_instance) = opt_parent_instance {
-                let mut children = parent_instance.children.lock().await;
-                let opt_index = children.iter().position(|c| c.moniker == new_instance.moniker);
-                if let Some(index) = opt_index {
-                    children.remove(index);
-                }
-                children.push(new_instance.clone());
+            // If the parent isn't in the list of instances (this can happen if the child was
+            // started before the parent), add it in.
+            let entry = instances.entry(parent_moniker.clone());
+            let parent_instance = match entry {
+                Entry::Occupied(ref e) => e.get(),
+                Entry::Vacant(e) => e.insert(Arc::new(ComponentInstance {
+                    moniker: parent_moniker,
+                    children: sync::Mutex::new(vec![]),
+                })),
+            };
+            let mut children = parent_instance.children.lock().unwrap();
+            let opt_index = children.iter().position(|c| c.moniker == new_instance.moniker);
+            if let Some(index) = opt_index {
+                children.remove(index);
             }
+            children.push(new_instance.clone());
         }
         Ok(())
     }
 
-    pub async fn remove_instance(&self, moniker: &Moniker) -> Result<(), ModelError> {
-        let mut instances = self.instances.lock().await;
+    pub fn remove_instance(&self, moniker: &Moniker) -> Result<(), ModelError> {
+        let mut instances = self.instances.lock().unwrap();
         if let Some(parent_moniker) = moniker.parent() {
             instances.remove(moniker);
             let parent_instance = instances
                 .get(&parent_moniker)
                 .unwrap_or_else(|| panic!("parent instance {} not found", parent_moniker));
-            let mut children = parent_instance.children.lock().await;
+            let mut children = parent_instance.children.lock().unwrap();
             let opt_index = children.iter().position(|c| c.moniker == *moniker);
             if let Some(index) = opt_index {
                 children.remove(index);
@@ -226,9 +223,6 @@ impl Hook for TestHook {
             .target_moniker
             .unwrap_instance_moniker_or(ModelError::UnexpectedComponentManagerMoniker)?;
         match &event.payload {
-            EventPayload::Discovered { .. } => {
-                self.create_instance_if_necessary(&target_moniker).await?;
-            }
             EventPayload::Destroyed => {
                 self.on_destroyed_async(&target_moniker).await?;
             }
@@ -262,50 +256,50 @@ mod tests {
         // is correct.
         {
             let test_hook = TestHook::new();
-            assert!(test_hook.create_instance_if_necessary(&root).await.is_ok());
-            assert!(test_hook.create_instance_if_necessary(&a).await.is_ok());
-            assert!(test_hook.create_instance_if_necessary(&ab).await.is_ok());
-            assert!(test_hook.create_instance_if_necessary(&ac).await.is_ok());
-            assert!(test_hook.create_instance_if_necessary(&abd).await.is_ok());
-            assert!(test_hook.create_instance_if_necessary(&abe).await.is_ok());
-            assert!(test_hook.create_instance_if_necessary(&acf).await.is_ok());
+            assert!(test_hook.create_instance_if_necessary(&root).is_ok());
+            assert!(test_hook.create_instance_if_necessary(&a).is_ok());
+            assert!(test_hook.create_instance_if_necessary(&ab).is_ok());
+            assert!(test_hook.create_instance_if_necessary(&ac).is_ok());
+            assert!(test_hook.create_instance_if_necessary(&abd).is_ok());
+            assert!(test_hook.create_instance_if_necessary(&abe).is_ok());
+            assert!(test_hook.create_instance_if_necessary(&acf).is_ok());
             assert_eq!("(a(b(d,e),c(f)))", test_hook.print());
         }
 
         // Changing the order of monikers should not affect the output string.
         {
             let test_hook = TestHook::new();
-            assert!(test_hook.create_instance_if_necessary(&root).await.is_ok());
-            assert!(test_hook.create_instance_if_necessary(&a).await.is_ok());
-            assert!(test_hook.create_instance_if_necessary(&ac).await.is_ok());
-            assert!(test_hook.create_instance_if_necessary(&ab).await.is_ok());
-            assert!(test_hook.create_instance_if_necessary(&abd).await.is_ok());
-            assert!(test_hook.create_instance_if_necessary(&abe).await.is_ok());
-            assert!(test_hook.create_instance_if_necessary(&acf).await.is_ok());
+            assert!(test_hook.create_instance_if_necessary(&root).is_ok());
+            assert!(test_hook.create_instance_if_necessary(&a).is_ok());
+            assert!(test_hook.create_instance_if_necessary(&ac).is_ok());
+            assert!(test_hook.create_instance_if_necessary(&ab).is_ok());
+            assert!(test_hook.create_instance_if_necessary(&abd).is_ok());
+            assert!(test_hook.create_instance_if_necessary(&abe).is_ok());
+            assert!(test_hook.create_instance_if_necessary(&acf).is_ok());
             assert_eq!("(a(b(d,e),c(f)))", test_hook.print());
         }
 
         // Submitting children before parents should still succeed.
         {
             let test_hook = TestHook::new();
-            assert!(test_hook.create_instance_if_necessary(&root).await.is_ok());
-            assert!(test_hook.create_instance_if_necessary(&acf).await.is_ok());
-            assert!(test_hook.create_instance_if_necessary(&abe).await.is_ok());
-            assert!(test_hook.create_instance_if_necessary(&abd).await.is_ok());
-            assert!(test_hook.create_instance_if_necessary(&ab).await.is_ok());
+            assert!(test_hook.create_instance_if_necessary(&root).is_ok());
+            assert!(test_hook.create_instance_if_necessary(&acf).is_ok());
+            assert!(test_hook.create_instance_if_necessary(&abe).is_ok());
+            assert!(test_hook.create_instance_if_necessary(&abd).is_ok());
+            assert!(test_hook.create_instance_if_necessary(&ab).is_ok());
             // Model will call create_instance_if_necessary for ab's children again
             // after the call to bind_instance for ab.
-            assert!(test_hook.create_instance_if_necessary(&abe).await.is_ok());
-            assert!(test_hook.create_instance_if_necessary(&abd).await.is_ok());
-            assert!(test_hook.create_instance_if_necessary(&ac).await.is_ok());
+            assert!(test_hook.create_instance_if_necessary(&abe).is_ok());
+            assert!(test_hook.create_instance_if_necessary(&abd).is_ok());
+            assert!(test_hook.create_instance_if_necessary(&ac).is_ok());
             // Model will call create_instance_if_necessary for ac's children again
             // after the call to bind_instance for ac.
-            assert!(test_hook.create_instance_if_necessary(&acf).await.is_ok());
-            assert!(test_hook.create_instance_if_necessary(&a).await.is_ok());
+            assert!(test_hook.create_instance_if_necessary(&acf).is_ok());
+            assert!(test_hook.create_instance_if_necessary(&a).is_ok());
             // Model will call create_instance_if_necessary for a's children again
             // after the call to bind_instance for a.
-            assert!(test_hook.create_instance_if_necessary(&ab).await.is_ok());
-            assert!(test_hook.create_instance_if_necessary(&ac).await.is_ok());
+            assert!(test_hook.create_instance_if_necessary(&ab).is_ok());
+            assert!(test_hook.create_instance_if_necessary(&ac).is_ok());
             assert_eq!("(a(b(d,e),c(f)))", test_hook.print());
         }
     }

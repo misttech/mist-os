@@ -10,7 +10,7 @@ use crate::bpf::program::Program;
 use crate::bpf::syscalls::BpfTypeFormat;
 use crate::mm::memory::MemoryObject;
 use crate::mm::ProtectionFlags;
-use crate::task::{CurrentTask, Kernel, Task};
+use crate::task::{CurrentTask, EventHandler, Kernel, Task, WaitCanceler, Waiter};
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::{
     fileops_impl_nonseekable, fileops_impl_noop_sync, fs_node_impl_not_dir,
@@ -18,14 +18,15 @@ use crate::vfs::{
     FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo,
     FsNodeOps, FsStr, FsString, MemoryDirectoryFile, MemoryXattrStorage, NamespaceNode, XattrOp,
 };
+use linux_uapi::XATTR_NAME_SELINUX;
 use starnix_logging::track_stub;
-use starnix_sync::{FileOpsCore, Locked, WriteOps};
+use starnix_sync::{FileOpsCore, Locked};
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::{mode, FileMode};
 use starnix_uapi::open_flags::OpenFlags;
-use starnix_uapi::vfs::default_statfs;
+use starnix_uapi::vfs::{default_statfs, FdEvents};
 use starnix_uapi::{errno, error, statfs, BPF_FS_MAGIC};
 use std::sync::Arc;
 
@@ -98,7 +99,7 @@ impl FileOps for BpfHandle {
     }
     fn write(
         &self,
-        _locked: &mut Locked<'_, WriteOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &crate::task::CurrentTask,
         _offset: usize,
@@ -118,6 +119,31 @@ impl FileOps for BpfHandle {
         match self {
             Self::Map(map) => map.get_memory(locked, length, prot),
             _ => error!(ENODEV),
+        }
+    }
+    fn wait_async(
+        &self,
+        locked: &mut Locked<'_, FileOpsCore>,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+        waiter: &Waiter,
+        events: FdEvents,
+        handler: EventHandler,
+    ) -> Option<WaitCanceler> {
+        match self {
+            Self::Map(map) => map.wait_async(locked, waiter, events, handler),
+            _ => None,
+        }
+    }
+    fn query_events(
+        &self,
+        locked: &mut Locked<'_, FileOpsCore>,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+    ) -> Result<FdEvents, Errno> {
+        match self {
+            Self::Map(map) => map.query_events(locked),
+            _ => Ok(FdEvents::empty()),
         }
     }
 }
@@ -175,7 +201,7 @@ impl BpfFsDir {
     fn new(selinux_context: &FsStr) -> Self {
         let xattrs = MemoryXattrStorage::default();
         xattrs
-            .set_xattr("security.selinux".into(), selinux_context, XattrOp::Create)
+            .set_xattr(XATTR_NAME_SELINUX.to_bytes().into(), selinux_context, XattrOp::Create)
             .expect("Failed to set selinux context.");
         Self { xattrs }
     }
@@ -286,7 +312,7 @@ impl BpfFsObject {
     fn new(handle: BpfHandle, selinux_context: &FsStr) -> Self {
         let xattrs = MemoryXattrStorage::default();
         xattrs
-            .set_xattr("security.selinux".as_ref(), selinux_context, XattrOp::Create)
+            .set_xattr(XATTR_NAME_SELINUX.to_bytes().into(), selinux_context, XattrOp::Create)
             .expect("Failed to set selinux context.");
         Self { handle, xattrs }
     }

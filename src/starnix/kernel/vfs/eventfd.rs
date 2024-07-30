@@ -9,7 +9,7 @@ use crate::vfs::buffers::{InputBuffer, InputBufferExt as _, OutputBuffer};
 use crate::vfs::{
     fileops_impl_nonseekable, fileops_impl_noop_sync, Anon, FileHandle, FileObject, FileOps,
 };
-use starnix_sync::{FileOpsCore, Locked, WriteOps};
+use starnix_sync::{FileOpsCore, Locked};
 use starnix_uapi::error;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
@@ -64,14 +64,14 @@ impl FileOps for EventFdFileObject {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, WriteOps>,
+        locked: &mut Locked<'_, FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         debug_assert!(offset == 0);
-        file.blocking_op(current_task, FdEvents::POLLOUT | FdEvents::POLLHUP, None, || {
+        file.blocking_op(locked, current_task, FdEvents::POLLOUT | FdEvents::POLLHUP, None, |_| {
             let written_data = data.read_to_array::<DATA_SIZE>()?;
             let add_value = u64::from_ne_bytes(written_data);
             if add_value == u64::MAX {
@@ -94,14 +94,14 @@ impl FileOps for EventFdFileObject {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<'_, FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
         debug_assert!(offset == 0);
-        file.blocking_op(current_task, FdEvents::POLLIN | FdEvents::POLLHUP, None, || {
+        file.blocking_op(locked, current_task, FdEvents::POLLIN | FdEvents::POLLHUP, None, |_| {
             if data.available() < DATA_SIZE {
                 return error!(EINVAL);
             }
@@ -131,6 +131,7 @@ impl FileOps for EventFdFileObject {
 
     fn wait_async(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         waiter: &Waiter,
@@ -142,6 +143,7 @@ impl FileOps for EventFdFileObject {
 
     fn query_events(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {

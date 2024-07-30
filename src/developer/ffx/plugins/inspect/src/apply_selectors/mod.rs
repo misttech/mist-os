@@ -7,7 +7,7 @@ use crate::apply_selectors::screen::{Line, Screen};
 use crate::apply_selectors::terminal::{Terminal, Termion};
 use crate::HostArchiveReader;
 use anyhow::{Context, Result};
-use diagnostics_data::{Inspect, InspectData};
+use diagnostics_data::{ExtendedMoniker, Inspect, InspectData};
 use ffx_inspect_args::ApplySelectorsCommand;
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use fidl_fuchsia_diagnostics_host::ArchiveAccessorProxy;
@@ -44,8 +44,11 @@ pub async fn execute(
         let provider = HostArchiveReader::new(diagnostics_proxy, rcs_proxy);
         provider.snapshot::<Inspect>(&cmd.accessor_path, &[]).await?
     };
-
-    interactive_apply(&cmd.selector_file, &inspect_data, &cmd.moniker)?;
+    let moniker = match cmd.moniker {
+        Some(m) => Some(ExtendedMoniker::parse_str(&m)?),
+        None => None,
+    };
+    interactive_apply(&cmd.selector_file, &inspect_data, moniker)?;
 
     Ok(())
 }
@@ -53,14 +56,14 @@ pub async fn execute(
 fn interactive_apply(
     selector_file: &Path,
     data: &[InspectData],
-    requested_moniker: &Option<String>,
+    requested_moniker: Option<ExtendedMoniker>,
 ) -> Result<()> {
     let stdin = stdin();
     let stdout = stdout().into_raw_mode().context("Unable to convert terminal to raw mode.")?;
 
     let mut screen = Screen::new(
         Termion::new(stdout),
-        filter_data_to_lines(selector_file, data, requested_moniker)?,
+        filter_data_to_lines(selector_file, data, requested_moniker.as_ref())?,
     );
 
     screen.terminal.switch_interactive();
@@ -79,7 +82,11 @@ fn interactive_apply(
                 screen.set_lines(vec![Line::new("Refressing filtered hierarchiers...")]);
                 screen.clear_screen();
                 screen.refresh_screen_and_flush();
-                screen.set_lines(filter_data_to_lines(selector_file, data, requested_moniker)?);
+                screen.set_lines(filter_data_to_lines(
+                    selector_file,
+                    data,
+                    requested_moniker.as_ref(),
+                )?);
                 true
             }
             Event::Key(Key::PageUp) => screen.scroll(-screen.max_lines(), 0),
@@ -125,7 +132,7 @@ realm1/realm2/session5/account_manager:root/listeners:active";
         let fake_terminal = FakeTerminal::new(90, 30);
         let mut screen = Screen::new(
             fake_terminal.clone(),
-            filter_data_to_lines(&selector_file.path(), &data, &None)
+            filter_data_to_lines(&selector_file.path(), &data, None)
                 .expect("Unable to filter hierarchy."),
         );
 

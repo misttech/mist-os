@@ -151,10 +151,9 @@ function main {
   done
 
   if [[ "$(uname)" == [Dd]arwin ]]; then
-    fx-warn "Support for building Fuchsia on macOS will be removed by 2024-06-30."
+    fx-warn "Support for building Fuchsia on macOS will be removed soon."
     fx-warn "This warning will soon become an error."
     fx-warn "Please see http://go/local-platform-support-prd for details."
-    fx-warn "Contact dannyrosen@google.com with any concerns."
   fi
 
   # Cache the compiled executable for later invocations.
@@ -200,7 +199,9 @@ function main {
     #   resulting binary. It's not needed, and including it requires `go build`
     #   to query for git status, which takes time and can trigger git garbage
     #   collection that messes with ninja build convergence.
-    if ! CGO_ENABLED=0 GOPROXY=off GO111MODULE=on fx-command-run go build -buildvcs=false -o "$exe_path" ./tools/build/fx-set/cmd; then
+    # - GOCACHE="${FX_CACHE_DIR}/gocache" makes sure this script won't write
+    #   outside of Fuchsia dir when bootstrapping.
+    if ! CGO_ENABLED=0 GOPROXY=off GO111MODULE=on GOCACHE="${FX_CACHE_DIR}/gocache" fx-command-run go build -buildvcs=false -o "$exe_path" ./tools/build/fx-set/cmd; then
       if ! $dev; then # If running in dev mode, compilation failures are expected.
         fx-error "Failed to build fx set."
       fi

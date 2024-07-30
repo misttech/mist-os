@@ -11,11 +11,7 @@
 
 __BEGIN_CDECLS
 
-// REVIEWERS: DO NOT +2 any changes to this header
-// file unless this number is incremented with each change.
-#define FUCHSIA_LOG_API_VERSION (0)
-
-typedef int8_t FuchsiaLogSeverity;
+typedef uint8_t FuchsiaLogSeverity;
 
 // Default log levels.
 #define FUCHSIA_LOG_TRACE ((FuchsiaLogSeverity)0x10)

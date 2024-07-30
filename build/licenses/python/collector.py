@@ -4,19 +4,20 @@
 # found in the LICENSE file.
 """Collects licenses from GN metadata."""
 
-from collections import defaultdict
+import dataclasses
 import enum
 import logging
-from readme_fuchsia import ReadmesDB, Readme
+import os
+from collections import defaultdict
+from typing import Dict, List, Set, Tuple
+
+from file_access import FileAccess
+from gn_label import GnLabel
 from gn_license_metadata import (
     GnApplicableLicensesMetadata,
     GnLicenseMetadataDB,
 )
-from typing import Dict, List, Set, Tuple
-from gn_label import GnLabel
-from file_access import FileAccess
-import dataclasses
-import os
+from readme_fuchsia import Readme, ReadmesDB
 
 
 @dataclasses.dataclass(frozen=True, order=True)

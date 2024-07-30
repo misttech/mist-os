@@ -9,7 +9,6 @@
 use fuchsia_runtime::vmar_root_self;
 use fuchsia_zircon::{self as zx, AsHandleRef};
 use shared_buffer::SharedBuffer;
-use std::ffi::CString;
 use std::ops::{Deref, DerefMut};
 
 mod immutable;
@@ -59,9 +58,9 @@ impl Mapping {
     ///
     /// The resulting VMO will not be resizeable.
     pub fn allocate_with_name(size: usize, name: &str) -> Result<(Self, zx::Vmo), zx::Status> {
-        let cname = CString::new(name).map_err(|_e| Err(zx::Status::INVALID_ARGS))?;
+        let name = zx::Name::new(name)?;
         let vmo = zx::Vmo::create(size as u64)?;
-        vmo.set_name(&cname)?;
+        vmo.set_name(&name)?;
         let flags = zx::VmarFlags::PERM_READ
             | zx::VmarFlags::PERM_WRITE
             | zx::VmarFlags::MAP_RANGE
@@ -155,7 +154,7 @@ mod tests {
         let size = PAGE_SIZE;
         let (mapping, vmo) = Mapping::allocate_with_name(size, "TestName").unwrap();
         assert_eq!(size, mapping.len());
-        assert_eq!(CString::new("TestName").unwrap(), vmo.get_name().expect("Has name"));
+        assert_eq!("TestName", vmo.get_name().expect("Has name"));
         let res = Mapping::allocate_with_name(size, "Invalid\0TestName");
         assert_eq!(zx::Status::INVALID_ARGS, res.unwrap_err());
     }

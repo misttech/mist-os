@@ -4,12 +4,12 @@
 # found in the LICENSE file.
 """Unit tests for ../metrics/power.py."""
 
-import unittest
 import collections.abc
+import unittest
 from typing import Any, Iterable
 
-from trace_processing.metrics import power, suspend
 from trace_processing import trace_metrics, trace_model, trace_time
+from trace_processing.metrics import power, suspend
 
 # Boilerplate-busting constants:
 U = trace_metrics.Unit

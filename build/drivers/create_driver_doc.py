@@ -4,8 +4,8 @@
 # found in the LICENSE file.
 """Create a driver documentation from driver metadata."""
 
-import json
 import argparse
+import json
 import os
 
 

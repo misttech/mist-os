@@ -91,12 +91,6 @@ class GNStatusParser {
   }
 
   void _addCalculatedItems(BasicGnParser parser, List<Item> appendTo) {
-    // goma
-    bool isGomaEnabled = parser.assignedVariables['use_goma'] == 'true';
-    String gomaDir = parser.assignedVariables['goma_dir'];
-    appendTo.add(Item(CategoryType.buildInfo, 'goma', 'Goma',
-        isGomaEnabled ? 'enabled' : 'disabled', gomaDir));
-
     // release
     bool isRelease = parser.assignedVariables['is_debug'] == 'false';
     appendTo.add(Item(CategoryType.buildInfo, 'release', 'Is release?',

@@ -24,7 +24,7 @@ class FuchsiaPowerManager final : public TimeoutSource {
 
   bool Initialize(ParentDevice* parent_device, inspect::Node& node);
 
-  TimeoutSource::Clock::duration GetCurrentTimeoutDuration() override;
+  TimeoutSource::Clock::time_point GetCurrentTimeoutPoint() override;
   void TimeoutTriggered() override {
     DisablePower();
     MAGMA_DASSERT(!LeaseIsRequested());

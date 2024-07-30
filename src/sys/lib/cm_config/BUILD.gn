@@ -10,7 +10,9 @@ rustc_library("cm_config") {
   with_unit_tests = true
 
   visibility = [
-    "//src/security/lib/scrutiny/plugins/*",
+    "//src/security/lib/scrutiny/collection/*",
+    "//src/security/lib/scrutiny/collector/*",
+    "//src/security/lib/scrutiny/frontend/*",
     "//src/security/lib/scrutiny/x/*",
     "//src/sys/component_manager/*",
     "//src/sys/lib/cm_config/*",
@@ -23,7 +25,7 @@ rustc_library("cm_config") {
     "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_rust",
     "//sdk/fidl/fuchsia.component.internal:fuchsia.component.internal_rust",
     "//src/lib/fidl/rust/fidl",
-    "//src/lib/versioning/version-history/rust:version-history",
+    "//src/lib/versioning/version-history/rust",
     "//src/sys/lib/cm_fidl_validator",
     "//src/sys/lib/cm_rust",
     "//src/sys/lib/cm_types",

@@ -58,6 +58,7 @@ def fuchsia_package(
         tools = [],
         subpackages = [],
         subpackages_to_flatten = [],
+        tags = [],
         **kwargs):
     """Builds a fuchsia package.
 
@@ -102,6 +103,7 @@ def fuchsia_package(
         archive_name: An option name for the far file.
         fuchsia_api_level: The API level to build for.
         platform: Optionally override the platform to build the package for.
+        tags: Forward additional tags to all generated targets.
         **kwargs: extra attributes to pass along to the build rule.
     """
 
@@ -118,6 +120,7 @@ def fuchsia_package(
     find_and_process_unstripped_binaries(
         name = processed_binaries,
         deps = components + resources + tools,
+        tags = tags + ["manual"],
     )
 
     _build_fuchsia_package(
@@ -133,6 +136,7 @@ def fuchsia_package(
         fuchsia_api_level = fuchsia_api_level,
         platform = platform,
         target_compatible_with = target_compat,
+        tags = tags + ["manual"],
         **kwargs
     )
 
@@ -145,6 +149,7 @@ def fuchsia_package(
         # TODO(b/339099331) fuchsia_packages that are testonly shouldn't have the
         # full set of tasks.
         is_test = kwargs.pop("testonly", False),
+        tags = tags,
         **kwargs
     )
 
@@ -177,6 +182,7 @@ def _fuchsia_test_package(
         name = processed_binaries,
         deps = _components + resources + _test_component_mapping.values(),
         testonly = True,
+        tags = tags + ["manual"],
     )
 
     _build_fuchsia_package_test(

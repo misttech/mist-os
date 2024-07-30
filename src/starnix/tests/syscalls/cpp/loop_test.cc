@@ -27,6 +27,7 @@ bool skip_loop_tests = false;
 class LoopTest : public ::testing::Test {
  public:
   static void SetUpTestSuite() {
+    // TODO(https://fxbug.dev/317285180) don't skip on baseline
     int fd = open("/dev/loop-control", O_RDWR, 0777);
     if (fd == -1 && (errno == EACCES || errno == ENOENT)) {
       // GTest does not support GTEST_SKIP() from a suite setup, so record that we want to skip

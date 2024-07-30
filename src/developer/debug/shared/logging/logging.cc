@@ -36,7 +36,7 @@ LogStatement::~LogStatement() {
   }
   if (log_enable_syslog) {
     auto severity = ConvertSeverity(severity_);
-    if (fuchsia_logging::ShouldCreateLogMessage(severity)) {
+    if (fuchsia_logging::IsSeverityEnabled(severity)) {
       fuchsia_logging::LogMessage(severity, location_.file(), static_cast<int>(location_.line()),
                                   nullptr, nullptr)
               .stream()

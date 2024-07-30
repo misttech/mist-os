@@ -5,7 +5,7 @@
 #include <fidl/fuchsia.hardware.clock/cpp/wire_test_base.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/driver/compat/cpp/compat.h>
-#include <lib/driver/testing/cpp/fixture/driver_test_fixture.h>
+#include <lib/driver/testing/cpp/driver_test.h>
 
 #include <fake-mmio-reg/fake-mmio-reg.h>
 #include <gtest/gtest.h>
@@ -254,16 +254,11 @@ class AmlCpuEnvironment : public fdf_testing::Environment {
 
 class AmlCpuBindingConfiguration final {
  public:
-  static constexpr bool kDriverOnForeground = false;
-  static constexpr bool kAutoStartDriver = false;
-  static constexpr bool kAutoStopDriver = true;
-
   using DriverType = AmlCpuDriver;
   using EnvironmentType = AmlCpuEnvironment;
 };
 
-class AmlCpuTest : public fdf_testing::DriverTestFixture<AmlCpuBindingConfiguration>,
-                   public ::testing::Test {
+class AmlCpuTest : public ::testing::Test {
  public:
   void StartWithMetadata(const std::vector<perf_domain_t>& perf_domains,
                          const std::vector<operating_point_t>& op_points) {
@@ -274,7 +269,7 @@ class AmlCpuTest : public fdf_testing::DriverTestFixture<AmlCpuBindingConfigurat
     const operating_point_t& slowest = op_points.front();
     const operating_point_t& fastest = op_points.back();
 
-    RunInEnvironmentTypeContext([slowest, fastest](AmlCpuEnvironment& env) {
+    driver_test().RunInEnvironmentTypeContext([slowest, fastest](AmlCpuEnvironment& env) {
       // The DUT should initialize.
       env.power_server_.SetSupportedVoltageRange(slowest.volt_uv, fastest.volt_uv);
 
@@ -282,29 +277,40 @@ class AmlCpuTest : public fdf_testing::DriverTestFixture<AmlCpuBindingConfigurat
       env.power_server_.SetVoltage(fastest.volt_uv);
     });
 
-    RunInEnvironmentTypeContext([&perf_domains, &op_points](AmlCpuEnvironment& env) {
+    driver_test().RunInEnvironmentTypeContext([&perf_domains, &op_points](AmlCpuEnvironment& env) {
       env.device_server_.AddMetadata(DEVICE_METADATA_AML_PERF_DOMAINS, perf_domains.data(),
                                      perf_domains.size() * sizeof(perf_domain_t));
       env.device_server_.AddMetadata(DEVICE_METADATA_AML_OP_POINTS, op_points.data(),
                                      op_points.size() * sizeof(operating_point_t));
     });
-    ASSERT_OK(StartDriver().status_value());
+    ASSERT_OK(driver_test().StartDriver().status_value());
 
-    RunInEnvironmentTypeContext([slowest, fastest](AmlCpuEnvironment& env) {
+    driver_test().RunInEnvironmentTypeContext([slowest, fastest](AmlCpuEnvironment& env) {
       ASSERT_EQ(env.power_server_.min_needed_voltage(), slowest.volt_uv);
       ASSERT_EQ(env.power_server_.max_supported_voltage(), fastest.volt_uv);
     });
 
-    RunInNodeContext([&perf_domains](fdf_testing::TestNode& node) {
+    driver_test().RunInNodeContext([&perf_domains](fdf_testing::TestNode& node) {
       ASSERT_EQ(node.children().size(), perf_domains.size());
     });
   }
 
   void ConnectToCpuCtrl(const perf_domain_t& perf_domain) {
-    auto device = ConnectThroughDevfs<fuchsia_hardware_cpu_ctrl::Device>(perf_domain.name);
+    auto device =
+        driver_test().ConnectThroughDevfs<fuchsia_hardware_cpu_ctrl::Device>(perf_domain.name);
     EXPECT_OK(device.status_value());
     cpu_ctrl_.Bind(std::move(device.value()));
   }
+
+  void TearDown() override {
+    zx::result<> result = driver_test().StopDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
+  }
+
+  fdf_testing::BackgroundDriverTest<AmlCpuBindingConfiguration>& driver_test() {
+    return driver_test_;
+  }
+  fdf_testing::BackgroundDriverTest<AmlCpuBindingConfiguration> driver_test_;
 
   CpuCtrlClient cpu_ctrl_;
 };
@@ -329,7 +335,7 @@ TEST_F(AmlCpuTest, UnorderedOperatingPoints) {
   EXPECT_OK(out.status());
   EXPECT_EQ(out->value()->out_opp, 0ul);
 
-  RunInEnvironmentTypeContext([](AmlCpuEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([](AmlCpuEnvironment& env) {
     uint32_t voltage = env.power_server_.voltage();
     EXPECT_EQ(voltage, 300'000u);
   });
@@ -380,14 +386,14 @@ TEST_F(AmlCpuTest, TestSetCurrentOperatingPoint) {
   const uint32_t min_opp_index = static_cast<uint32_t>(kTestOperatingPoints.size() - 1);
   const operating_point_t& min_opp = kTestOperatingPoints[min_opp_index];
 
-  RunInEnvironmentTypeContext(
+  driver_test().RunInEnvironmentTypeContext(
       [&min_opp](AmlCpuEnvironment& env) { env.power_server_.SetVoltage(min_opp.volt_uv); });
 
   auto min_result = cpu_ctrl_->SetCurrentOperatingPoint(min_opp_index);
   EXPECT_OK(min_result.status());
   EXPECT_TRUE(min_result->is_ok());
   EXPECT_EQ(min_result->value()->out_opp, min_opp_index);
-  RunInEnvironmentTypeContext([&min_opp](AmlCpuEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([&min_opp](AmlCpuEnvironment& env) {
     auto rate = env.clock_cpu_scaler_server_.rate();
     ASSERT_TRUE(rate.has_value());
     ASSERT_EQ(rate.value(), min_opp.freq_hz);
@@ -402,14 +408,14 @@ TEST_F(AmlCpuTest, TestSetCurrentOperatingPoint) {
   const uint32_t max_opp_index = 0;
   const operating_point_t& max_opp = kTestOperatingPoints[max_opp_index];
 
-  RunInEnvironmentTypeContext(
+  driver_test().RunInEnvironmentTypeContext(
       [&max_opp](AmlCpuEnvironment& env) { env.power_server_.SetVoltage(max_opp.volt_uv); });
 
   auto max_result = cpu_ctrl_->SetCurrentOperatingPoint(max_opp_index);
   EXPECT_OK(max_result.status());
   EXPECT_TRUE(max_result->is_ok());
   EXPECT_EQ(max_result->value()->out_opp, max_opp_index);
-  RunInEnvironmentTypeContext([&max_opp](AmlCpuEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([&max_opp](AmlCpuEnvironment& env) {
     auto rate = env.clock_cpu_scaler_server_.rate();
     ASSERT_TRUE(rate.has_value());
     ASSERT_EQ(rate.value(), max_opp.freq_hz);
@@ -437,7 +443,7 @@ TEST_F(AmlCpuTest, TestCpuInfo) {
 
   StartWithMetadata(kTestPerfDomains, kTestOperatingPoints);
 
-  RunInDriverContext([](AmlCpuDriver& driver) {
+  driver_test().RunInDriverContext([](AmlCpuDriver& driver) {
     auto& dut = driver.performance_domains().front();
 
     auto hierarchy = inspect::ReadFromVmo(dut->inspect_vmo());

@@ -59,7 +59,7 @@ zx::result<PowerConfiguration> AmlHrtimer::GetPowerConfiguration(
   }
 
   PowerConfiguration response;
-  response.element_control_client = std::move(result_add_element->element_control_channel());
+  response.element_control_client = std::move(description.element_control_client_.value());
   response.lessor_client = std::move(description.lessor_client_.value());
   response.current_level_client = std::move(*description.current_level_client_);
   response.required_level_client = std::move(*description.required_level_client_);

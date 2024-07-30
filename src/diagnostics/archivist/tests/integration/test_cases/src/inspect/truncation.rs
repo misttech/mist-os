@@ -20,10 +20,20 @@ async fn accessor_truncation_test() {
     .await
     .expect("create base topology");
 
+    let mut writers = vec![];
     for (i, x) in itertools::iproduct!(0..3, letters.iter()) {
         let puppet =
             test_topology::connect_to_puppet(&realm_proxy, &format!("child_{x}{i}")).await.unwrap();
-        puppet.emit_example_inspect_data().await.unwrap();
+
+        let writer = puppet
+            .create_inspector(&ftest::InspectPuppetCreateInspectorRequest::default())
+            .await
+            .unwrap()
+            .into_proxy()
+            .unwrap();
+
+        writer.emit_example_inspect_data().await.unwrap();
+        writers.push(writer);
     }
 
     let accessor = realm_proxy.connect_to_protocol::<ArchiveAccessorMarker>().await.unwrap();
@@ -83,7 +93,7 @@ async fn accessor_truncation_test() {
 fn count_dropped_schemas_per_moniker(data: &[Data<Inspect>], moniker: &str) -> i64 {
     let mut dropped_schema_count = 0;
     for data_entry in data {
-        if !data_entry.moniker.contains(moniker) {
+        if !data_entry.moniker.to_string().contains(moniker) {
             continue;
         }
         if let Some(errors) = &data_entry.metadata.errors {

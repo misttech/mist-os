@@ -95,14 +95,14 @@ class TraceSession {
   // Stops tracing first if necessary (see |Stop()|).
   // If terminating providers takes longer than |stop_timeout_|, we forcefully
   // terminate tracing and invoke |callback|.
-  void Terminate(fit::function<void(controller::Controller_TerminateTracing_Result)> callback);
+  void Terminate(fit::closure callback);
 
   // Starts the trace.
   // Invokes |callback| when all providers in this session have
   // acknowledged the start request, or after |start_timeout_| has elapsed.
   void Start(fuchsia::tracing::BufferDisposition buffer_disposition,
              const std::vector<std::string>& additional_categories,
-             controller::Controller::StartTracingCallback callback);
+             controller::Session::StartTracingCallback callback);
 
   // Stops all providers that are part of this session, streams out
   // all remaining trace records and finally invokes |callback|.
@@ -113,7 +113,7 @@ class TraceSession {
   // If stopping providers takes longer than |stop_timeout_|, we forcefully
   // stop tracing and invoke |callback|.
   void Stop(bool write_results,
-            fit::function<void(controller::Controller_StopTracing_Result)> callback);
+            fit::function<void(controller::Session_StopTracing_Result)> callback);
 
   // Remove |provider|, it's dead Jim.
   void RemoveDeadProvider(TraceProviderBundle* provider);
@@ -181,9 +181,9 @@ class TraceSession {
   async::TaskMethod<TraceSession, &TraceSession::SessionTerminateTimeout>
       session_terminate_timeout_{this};
 
-  controller::Controller::StartTracingCallback start_callback_;
-  fit::function<void(controller::Controller_StopTracing_Result)> stop_callback_;
-  fit::function<void(controller::Controller_TerminateTracing_Result)> terminate_callback_;
+  controller::Session::StartTracingCallback start_callback_;
+  fit::function<void(controller::Session_StopTracing_Result)> stop_callback_;
+  fit::closure terminate_callback_;
 
   fit::closure abort_handler_;
   AlertCallback alert_callback_;

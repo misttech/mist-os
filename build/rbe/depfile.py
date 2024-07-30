@@ -5,10 +5,9 @@
 """Generic utilities for working with depfiles
 """
 
-import enum
 import dataclasses
+import enum
 import re
-
 from pathlib import Path
 from typing import AbstractSet, Callable, Iterable, Optional, Sequence
 

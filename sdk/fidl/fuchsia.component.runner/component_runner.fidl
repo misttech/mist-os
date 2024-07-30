@@ -140,7 +140,7 @@ type ComponentStartInfo = resource table {
     /// A dictionary containing data and handles that the component has escrowed
     /// during its previous execution via [`ComponentController.OnEscrow`].
     @available(added=HEAD)
-    10: escrowed_dictionary client_end:fuchsia.component.sandbox.Dictionary;
+    10: escrowed_dictionary fuchsia.component.sandbox.DictionaryRef;
 };
 
 /// A protocol for binding and controlling the lifetime of a component instance
@@ -263,6 +263,6 @@ closed protocol ComponentController {
         /// the result of some expensive calculation. It can create a
         /// dictionary, put the event pair inside with an appropriate key
         /// (e.g. `"my_event_pair"`), then check for that entry on startup.
-        2: escrowed_dictionary client_end:fuchsia.component.sandbox.Dictionary;
+        2: escrowed_dictionary fuchsia.component.sandbox.DictionaryRef;
     });
 };

@@ -4,6 +4,7 @@
 library fuchsia.session;
 
 using fuchsia.url;
+using fuchsia.component.decl;
 
 /// A protocol used to launch sessions.
 @discoverable
@@ -45,4 +46,16 @@ type LaunchError = flexible enum {
 type LaunchConfiguration = table {
     /// The component URL of the session.
     1: session_url string:fuchsia.url.MAX_URL_LENGTH;
+
+    /// Configuration capabilities that will be offered to the session.
+    ///
+    /// In the intended use case, the session component would use a particular
+    /// configuration capability with `transitional` availability. When such a
+    /// transitional capability is not offered to the session, the config value
+    /// from the package will be used. When it is offered using
+    /// `config_capabilities`, then the config value specified here will be
+    /// used. As such, one may override config values of the session component
+    /// that are set up following this pattern.
+    @available(added=HEAD)
+    2: config_capabilities vector<fuchsia.component.decl.Configuration>:MAX;
 };

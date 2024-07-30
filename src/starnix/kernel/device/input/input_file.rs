@@ -9,7 +9,7 @@ use starnix_core::task::{CurrentTask, EventHandler, WaitCanceler, WaitQueue, Wai
 use starnix_core::vfs::buffers::{InputBuffer, OutputBuffer};
 use starnix_core::vfs::{fileops_impl_noop_sync, FileObject, FileOps};
 use starnix_logging::{log_info, track_stub};
-use starnix_sync::{FileOpsCore, Locked, Mutex, Unlocked, WriteOps};
+use starnix_sync::{FileOpsCore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::user_address::{UserAddress, UserRef};
@@ -21,6 +21,8 @@ use starnix_uapi::{
 };
 use std::collections::VecDeque;
 use zerocopy::AsBytes as _; // for `as_bytes()`
+
+const INPUT_EVENT_SIZE: usize = std::mem::size_of::<uapi::input_event>();
 
 pub struct InspectStatus {
     /// A node that contains the state below.
@@ -372,27 +374,35 @@ impl FileOps for InputFile {
     ) -> Result<usize, Errno> {
         debug_assert!(offset == 0);
         let mut inner = self.inner.lock();
-        let event = inner.events.pop_front();
-        match event {
-            Some(event) => {
-                inner.inspect_status.as_ref().map(|status| status.count_read_events(1));
-                drop(inner);
-                // TODO(https://fxbug.dev/42075443): Consider sending as many events as will fit
-                // in `data`, instead of sending them one at a time.
-                data.write_all(event.as_bytes())
-            }
+        let num_events = inner.events.len();
+        if num_events == 0 {
             // TODO(https://fxbug.dev/42075445): `EAGAIN` is only permitted if the file is opened
             // with `O_NONBLOCK`. Figure out what to do if the file is opened without that flag.
-            None => {
-                log_info!("read() returning EAGAIN");
-                error!(EAGAIN)
-            }
+            log_info!("read() returning EAGAIN");
+            return error!(EAGAIN);
         }
+
+        // The limit of the buffer is determined by taking the available bytes
+        // and using integer division on the size of uapi::input_event in bytes.
+        // This is how many events we can write at a time, up to the amount of
+        // events queued to be written.
+        let limit = std::cmp::min(data.available() / INPUT_EVENT_SIZE, num_events);
+        if num_events > limit {
+            log_info!(
+                "There was only space in the given buffer to read {} of the {} queued events. Sending a notification to prompt another read.",
+                limit,
+                num_events
+            );
+            inner.waiters.notify_fd_events(FdEvents::POLLIN);
+        }
+        let events = inner.events.drain(..limit).collect::<Vec<_>>();
+        inner.inspect_status.as_ref().map(|status| status.count_read_events(events.len() as u64));
+        data.write_all(events.as_bytes())
     }
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, WriteOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         offset: usize,
@@ -405,6 +415,7 @@ impl FileOps for InputFile {
 
     fn wait_async(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         waiter: &Waiter,
@@ -416,6 +427,7 @@ impl FileOps for InputFile {
 
     fn query_events(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {

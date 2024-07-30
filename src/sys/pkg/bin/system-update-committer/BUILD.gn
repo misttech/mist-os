@@ -15,6 +15,7 @@ rustc_library("lib") {
   edition = "2021"
 
   deps = [
+    ":config_lib",
     "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_rust",
     "//sdk/fidl/fuchsia.paver:fuchsia.paver_rust",
     "//sdk/fidl/fuchsia.update:fuchsia.update_rust",
@@ -70,13 +71,44 @@ grand_swd_binary("bin") {
   output_name = "system_update_committer"
 }
 
-fuchsia_component("component") {
+fuchsia_component_manifest("manifest") {
   component_name = "system-update-committer"
   manifest = "meta/system-update-committer.cml"
+}
+
+fuchsia_component("component") {
+  cm_label = ":manifest"
   deps = [ ":bin" ]
 }
 
+group("production-component-and-config") {
+  public_deps = [
+    ":component",
+    ":config_values_from_gn",
+  ]
+}
+
+fuchsia_structured_config_rust_lib("config_lib") {
+  cm_label = ":manifest"
+  name = "system_update_committer_structured_config"
+  visibility = [ ":*" ]
+}
+
+fuchsia_structured_config_values("config_values_from_gn") {
+  cm_label = ":manifest"
+  values = {
+    blobfs = false
+    netstack = false
+  }
+}
+
 fuchsia_package("system-update-committer") {
+  deps = [ ":production-component-and-config" ]
+}
+
+fuchsia_package("system-update-committer-without-config") {
+  package_name = "system-update-committer"
+  validate_structured_config = false
   deps = [ ":component" ]
 }
 
@@ -95,7 +127,7 @@ system_update_committer_config("disable") {
   enable = false
 }
 
-group("tests") {
+group("hermetic_tests") {
   testonly = true
   public_deps = [ ":system-update-committer-tests" ]
 }

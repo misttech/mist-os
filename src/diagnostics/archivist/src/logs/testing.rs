@@ -6,7 +6,7 @@ use crate::events::types::{Event, EventPayload, LogSinkRequestedPayload};
 use crate::identity::ComponentIdentity;
 use crate::logs::repository::LogsRepository;
 use crate::logs::servers::LogServer;
-use diagnostics_log_encoding::encode::Encoder;
+use diagnostics_log_encoding::encode::{Encoder, EncoderOpts};
 use diagnostics_log_encoding::Record;
 use diagnostics_message::{fx_log_packet_t, MAX_DATAGRAM_LEN};
 use fidl::prelude::*;
@@ -256,7 +256,7 @@ impl LogWriter for StructuredMessageWriter {
 
     fn write(sin: &zx::Socket, record: &Record) {
         let mut buffer = Cursor::new(vec![0; MAX_DATAGRAM_LEN]);
-        let mut encoder = Encoder::new(&mut buffer);
+        let mut encoder = Encoder::new(&mut buffer, EncoderOpts::default());
         encoder.write_record(record).unwrap();
         let slice = buffer.get_ref().as_slice();
         sin.write(slice).unwrap();

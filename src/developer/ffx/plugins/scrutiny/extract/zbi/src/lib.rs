@@ -4,7 +4,7 @@
 
 use ffx_scrutiny_zbi_args::ScrutinyZbiCommand;
 use fho::{FfxMain, FfxTool, Result, SimpleWriter};
-use scrutiny_plugins::toolkit::zbi::ZbiExtractController;
+use scrutiny_frontend::ZbiExtractController;
 
 #[derive(FfxTool)]
 pub struct ScrutinyZbiTool {

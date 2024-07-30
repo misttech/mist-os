@@ -212,6 +212,35 @@ type TopLevel = struct {
   ASSERT_EQUIVALENT(fidl, v2_onward, "1,2,HEAD");
 }
 
+TEST(VersioningDecompositionTests, SplitByModifier) {
+  auto fidl = R"FIDL(
+@available(added=1)
+library example;
+
+type TopLevel = resource(added=2) struct {};
+)FIDL";
+
+  auto v1 = R"FIDL(
+@available(added=1, removed=2)
+library example;
+
+type TopLevel = struct {};
+)FIDL";
+
+  auto v2_onward = R"FIDL(
+@available(added=2)
+library example;
+
+type TopLevel = resource struct {};
+)FIDL";
+
+  ASSERT_EQUIVALENT(fidl, v1, "1");
+  ASSERT_EQUIVALENT(fidl, v2_onward, "2");
+  ASSERT_EQUIVALENT(fidl, v2_onward, "HEAD");
+  ASSERT_EQUIVALENT(fidl, v2_onward, "1,HEAD");
+  ASSERT_EQUIVALENT(fidl, v2_onward, "1,2,HEAD");
+}
+
 TEST(VersioningDecompositionTests, SplitByReference) {
   auto fidl = R"FIDL(
 @available(added=1)
@@ -646,11 +675,8 @@ type X = struct {
     y Y;
 };
 
-@available(added=2, replaced=3)
-type Y = strict enum { A = 1; };
-
-@available(added=3)
-type Y = flexible enum { A = 1; };
+@available(added=2)
+type Y = strict(removed=3) flexible(added=3) enum { A = 1; };
 )FIDL";
 
   auto v1 = R"FIDL(

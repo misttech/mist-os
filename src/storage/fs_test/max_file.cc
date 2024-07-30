@@ -5,18 +5,28 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <zircon/errors.h>
 #include <zircon/syscalls.h>
 
 #include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
 #include <iostream>
+#include <limits>
+#include <memory>
+#include <sstream>
+#include <string>
+#include <tuple>
+#include <vector>
 
-#include <fbl/algorithm.h>
 #include <fbl/unique_fd.h>
+#include <gtest/gtest.h>
 
-#include "fs_test_fixture.h"
+#include "src/storage/fs_test/fs_test.h"
+#include "src/storage/fs_test/fs_test_fixture.h"
 
 namespace fs_test {
 namespace {
@@ -30,7 +40,7 @@ class MaxFileTest : public BaseFilesystemTest, public testing::WithParamInterfac
  public:
   MaxFileTest() : BaseFilesystemTest(std::get<0>(GetParam())) {}
 
-  bool ShouldRemount() const { return std::get<1>(GetParam()); }
+  static bool ShouldRemount() { return std::get<1>(GetParam()); }
 };
 
 // Test writing as much as we can to a file until we run out of space.
@@ -55,11 +65,11 @@ TEST_P(MaxFileTest, ReadAfterWriteMaxFileSucceeds) {
   auto rotate = [&](const char* data) {
     if (data == data_a) {
       return data_b;
-    } else if (data == data_b) {
-      return data_c;
-    } else {
-      return data_a;
     }
+    if (data == data_b) {
+      return data_c;
+    }
+    return data_a;
   };
 
   const char* data = data_a;
@@ -137,11 +147,12 @@ TEST_P(MaxFileSizeTest, WritingToMaxSupportedOffset) {
 
 TEST_P(MaxFileTest, WritingBeyondMaxSupportedOffset) {
   if (!fs().GetTraits().supports_sparse_files) {
-    return;
+    GTEST_SKIP();
   }
   if (fs().GetTraits().name == "memfs") {
-    // TODO(https://fxbug.dev/42067655): Remove this when the memfs file size limit is back under off_t::max.
-    return;
+    // TODO(https://fxbug.dev/42067655): Remove this when the memfs file size limit is back under
+    // off_t::max.
+    GTEST_SKIP();
   }
   fbl::unique_fd fd(open(GetPath("foo").c_str(), O_CREAT | O_RDWR, S_IRUSR | S_IWUSR));
   ASSERT_TRUE(fd);
@@ -150,7 +161,7 @@ TEST_P(MaxFileTest, WritingBeyondMaxSupportedOffset) {
 
 TEST_P(MaxFileTest, TruncatingToMaxSupportedOffset) {
   if (!fs().GetTraits().supports_sparse_files) {
-    return;
+    GTEST_SKIP();
   }
   fbl::unique_fd fd(open(GetPath("foo").c_str(), O_CREAT | O_RDWR, S_IRUSR | S_IWUSR));
   ASSERT_TRUE(fd);
@@ -160,7 +171,7 @@ TEST_P(MaxFileTest, TruncatingToMaxSupportedOffset) {
 TEST_P(MaxFileTest, TruncatingBeyondMaxSupportedOffset) {
   if (!fs().GetTraits().supports_sparse_files ||
       fs().GetTraits().max_file_size == std::numeric_limits<off_t>::max()) {
-    return;
+    GTEST_SKIP();
   }
   fbl::unique_fd fd(open(GetPath("foo").c_str(), O_CREAT | O_RDWR, S_IRUSR | S_IWUSR));
   ASSERT_TRUE(fd);
@@ -170,7 +181,7 @@ TEST_P(MaxFileTest, TruncatingBeyondMaxSupportedOffset) {
 // Test writing to two files, in alternation, until we run out of space. For trivial (sequential)
 // block allocation policies, this will create two large files with non-contiguous block
 // allocations.
-TEST_P(MaxFileTest, ReadAfterNonContiguousWritesSuceeds) {
+TEST_P(MaxFileTest, ReadAfterNonContiguousWritesSucceeds) {
   // TODO(https://fxbug.dev/42106597): We avoid making files that consume more than half
   // of physical memory. When we can page out files, this restriction
   // should be removed.

@@ -45,7 +45,7 @@ class DriverDevelopmentService : public fidl::WireServer<fuchsia_driver_developm
 
   driver_manager::DriverRunner& driver_runner_;
   // A map of the test nodes that have been created.
-  std::map<std::string, std::weak_ptr<driver_manager::Node>> test_nodes_;
+  std::map<std::string, NodeWkPtr> test_nodes_;
   fidl::ServerBindingGroup<fuchsia_driver_development::Manager> bindings_;
 
   async_dispatcher_t* const dispatcher_;

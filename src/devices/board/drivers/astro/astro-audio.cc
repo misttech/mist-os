@@ -8,11 +8,9 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
-#include <lib/ddk/platform-defs.h>
 #include <lib/driver/component/cpp/composite_node_spec.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 
-#include <bind/fuchsia/amlogic/platform/cpp/bind.h>
 #include <bind/fuchsia/clock/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/gpio/cpp/bind.h>
@@ -161,36 +159,36 @@ zx_status_t Astro::AudioInit() {
   clock_init_steps_.push_back(ClockSetRate(g12a_clk::CLK_HIFI_PLL, 768'000'000));
   clock_init_steps_.push_back(ClockEnable(g12a_clk::CLK_HIFI_PLL));
 
-  auto sleep = [&arena = init_arena_](zx::duration delay) {
-    return fuchsia_hardware_gpioimpl::wire::InitStep::Builder(arena)
-        .call(fuchsia_hardware_gpioimpl::wire::InitCall::WithDelay(arena, delay.get()))
-        .Build();
+  auto sleep = [](zx::duration delay) {
+    return fuchsia_hardware_gpioimpl::InitStep{{
+        .call = fuchsia_hardware_gpioimpl::InitCall::WithDelay(delay.get()),
+    }};
   };
 
   // TDM pin assignments
-  gpio_init_steps_.push_back(GpioSetAltFunction(S905D2_GPIOA(1), S905D2_GPIOA_1_TDMB_SCLK_FN));
-  gpio_init_steps_.push_back(GpioSetAltFunction(S905D2_GPIOA(2), S905D2_GPIOA_2_TDMB_FS_FN));
-  gpio_init_steps_.push_back(GpioSetAltFunction(S905D2_GPIOA(3), S905D2_GPIOA_3_TDMB_D0_FN));
-  gpio_init_steps_.push_back(GpioSetAltFunction(S905D2_GPIOA(6), S905D2_GPIOA_6_TDMB_DIN3_FN));
+  gpio_init_steps_.push_back(GpioFunction(S905D2_GPIOA(1), S905D2_GPIOA_1_TDMB_SCLK_FN));
+  gpio_init_steps_.push_back(GpioFunction(S905D2_GPIOA(2), S905D2_GPIOA_2_TDMB_FS_FN));
+  gpio_init_steps_.push_back(GpioFunction(S905D2_GPIOA(3), S905D2_GPIOA_3_TDMB_D0_FN));
+  gpio_init_steps_.push_back(GpioFunction(S905D2_GPIOA(6), S905D2_GPIOA_6_TDMB_DIN3_FN));
   constexpr uint64_t ua = 3000;
-  gpio_init_steps_.push_back(GpioSetDriveStrength(S905D2_GPIOA(1), ua));
-  gpio_init_steps_.push_back(GpioSetDriveStrength(S905D2_GPIOA(2), ua));
-  gpio_init_steps_.push_back(GpioSetDriveStrength(S905D2_GPIOA(3), ua));
+  gpio_init_steps_.push_back(GpioDriveStrength(S905D2_GPIOA(1), ua));
+  gpio_init_steps_.push_back(GpioDriveStrength(S905D2_GPIOA(2), ua));
+  gpio_init_steps_.push_back(GpioDriveStrength(S905D2_GPIOA(3), ua));
 
 #ifdef ENABLE_BT
   // PCM pin assignments.
-  gpio_init_steps_.push_back(GpioSetAltFunction(S905D2_GPIOX(8), S905D2_GPIOX_8_TDMA_DIN1_FN));
-  gpio_init_steps_.push_back(GpioSetAltFunction(S905D2_GPIOX(9), S905D2_GPIOX_9_TDMA_D0_FN));
-  gpio_init_steps_.push_back(GpioSetAltFunction(S905D2_GPIOX(10), S905D2_GPIOX_10_TDMA_FS_FN));
-  gpio_init_steps_.push_back(GpioSetAltFunction(S905D2_GPIOX(11), S905D2_GPIOX_11_TDMA_SCLK_FN));
-  gpio_init_steps_.push_back(GpioSetDriveStrength(S905D2_GPIOX(9), ua));
-  gpio_init_steps_.push_back(GpioSetDriveStrength(S905D2_GPIOX(10), ua));
-  gpio_init_steps_.push_back(GpioSetDriveStrength(S905D2_GPIOX(11), ua));
+  gpio_init_steps_.push_back(GpioFunction(S905D2_GPIOX(8), S905D2_GPIOX_8_TDMA_DIN1_FN));
+  gpio_init_steps_.push_back(GpioFunction(S905D2_GPIOX(9), S905D2_GPIOX_9_TDMA_D0_FN));
+  gpio_init_steps_.push_back(GpioFunction(S905D2_GPIOX(10), S905D2_GPIOX_10_TDMA_FS_FN));
+  gpio_init_steps_.push_back(GpioFunction(S905D2_GPIOX(11), S905D2_GPIOX_11_TDMA_SCLK_FN));
+  gpio_init_steps_.push_back(GpioDriveStrength(S905D2_GPIOX(9), ua));
+  gpio_init_steps_.push_back(GpioDriveStrength(S905D2_GPIOX(10), ua));
+  gpio_init_steps_.push_back(GpioDriveStrength(S905D2_GPIOX(11), ua));
 #endif
 
   // PDM pin assignments
-  gpio_init_steps_.push_back(GpioSetAltFunction(S905D2_GPIOA(7), S905D2_GPIOA_7_PDM_DCLK_FN));
-  gpio_init_steps_.push_back(GpioSetAltFunction(S905D2_GPIOA(8), S905D2_GPIOA_8_PDM_DIN0_FN));
+  gpio_init_steps_.push_back(GpioFunction(S905D2_GPIOA(7), S905D2_GPIOA_7_PDM_DCLK_FN));
+  gpio_init_steps_.push_back(GpioFunction(S905D2_GPIOA(8), S905D2_GPIOA_8_PDM_DIN0_FN));
 
   // Hardware Reset of the codec.
   gpio_init_steps_.push_back(GpioConfigOut(S905D2_GPIOA(5), 0));
@@ -236,13 +234,13 @@ zx_status_t Astro::AudioInit() {
     };
 
     fpbus::Node tdm_dev;
-    tdm_dev.vid() = PDEV_VID_AMLOGIC;
-    tdm_dev.pid() = PDEV_PID_AMLOGIC_S905D2;
+    tdm_dev.vid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_VID_AMLOGIC;
+    tdm_dev.pid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_PID_S905D2;
     tdm_dev.mmio() = audio_mmios;
     tdm_dev.bti() = pcm_out_btis;
     tdm_dev.metadata() = tdm_metadata;
     tdm_dev.name() = "astro-pcm-dai-out";
-    tdm_dev.did() = PDEV_DID_AMLOGIC_DAI_OUT;
+    tdm_dev.did() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_DAI_OUT;
     auto tdm_spec = fdf::CompositeNodeSpec{{
         "aml_tdm_dai_out",
         kParentSpecInit,
@@ -277,8 +275,8 @@ zx_status_t Astro::AudioInit() {
 
     fpbus::Node dev;
     dev.name() = "audio_codec_tas27xx";
-    dev.vid() = PDEV_VID_TI;
-    dev.did() = PDEV_DID_TI_TAS2770;
+    dev.vid() = bind_fuchsia_ti_platform::BIND_PLATFORM_DEV_VID_TI;
+    dev.did() = bind_fuchsia_ti_platform::BIND_PLATFORM_DEV_DID_TAS2770;
     dev.metadata() = std::vector<fpbus::Metadata>{
         {{
             .type = DEVICE_METADATA_PRIVATE,
@@ -356,9 +354,9 @@ zx_status_t Astro::AudioInit() {
 
     fpbus::Node tdm_dev;
     tdm_dev.name() = "astro-i2s-audio-out";
-    tdm_dev.vid() = PDEV_VID_AMLOGIC;
-    tdm_dev.pid() = PDEV_PID_AMLOGIC_S905D2;
-    tdm_dev.did() = PDEV_DID_AMLOGIC_TDM;
+    tdm_dev.vid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_VID_AMLOGIC;
+    tdm_dev.pid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_PID_S905D2;
+    tdm_dev.did() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_TDM;
     tdm_dev.instance_id() = tdm_instance_id++;
     tdm_dev.mmio() = audio_mmios;
     tdm_dev.bti() = tdm_btis;
@@ -419,13 +417,13 @@ zx_status_t Astro::AudioInit() {
         }},
     };
     fpbus::Node tdm_dev;
-    tdm_dev.vid() = PDEV_VID_AMLOGIC;
-    tdm_dev.pid() = PDEV_PID_AMLOGIC_S905D2;
+    tdm_dev.vid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_VID_AMLOGIC;
+    tdm_dev.pid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_PID_S905D2;
     tdm_dev.mmio() = audio_mmios;
     tdm_dev.bti() = pcm_in_btis;
     tdm_dev.metadata() = tdm_metadata;
     tdm_dev.name() = "astro-pcm-dai-in";
-    tdm_dev.did() = PDEV_DID_AMLOGIC_DAI_IN;
+    tdm_dev.did() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_DAI_IN;
     auto tdm_spec = fdf::CompositeNodeSpec{{
         "aml_tdm_dai_in",
         kParentSpecInit,
@@ -482,9 +480,9 @@ zx_status_t Astro::AudioInit() {
 
     fpbus::Node dev_in;
     dev_in.name() = "astro-audio-pdm-in";
-    dev_in.vid() = PDEV_VID_AMLOGIC;
-    dev_in.pid() = PDEV_PID_AMLOGIC_S905D2;
-    dev_in.did() = PDEV_DID_AMLOGIC_PDM;
+    dev_in.vid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_VID_AMLOGIC;
+    dev_in.pid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_PID_S905D2;
+    dev_in.did() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_PDM;
     dev_in.mmio() = pdm_mmios;
     dev_in.bti() = pdm_btis;
     dev_in.irq() = toddr_b_irqs;

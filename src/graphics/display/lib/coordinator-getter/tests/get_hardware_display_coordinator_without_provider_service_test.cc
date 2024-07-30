@@ -11,6 +11,7 @@
 
 #include "src/graphics/display/lib/coordinator-getter/client.h"
 #include "src/lib/testing/loop_fixture/real_loop_fixture.h"
+#include "src/lib/testing/predicates/status.h"
 
 namespace display {
 
@@ -32,7 +33,7 @@ TEST_F(GetHardwareDisplayCoordinatorWithoutProviderServiceTest, FailedOnNoProvid
       }));
   RunLoopUntil([&coordinator] { return coordinator.has_value(); });
   ASSERT_TRUE(coordinator.value().is_error());
-  EXPECT_EQ(coordinator.value().error(), ZX_ERR_NOT_FOUND);
+  EXPECT_STATUS(coordinator.value().error(), ZX_ERR_NOT_FOUND);
 }
 
 }  // namespace

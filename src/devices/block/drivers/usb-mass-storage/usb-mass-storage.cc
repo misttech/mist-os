@@ -7,8 +7,8 @@
 #include <endian.h>
 #include <lib/driver/compat/cpp/compat.h>
 #include <lib/driver/component/cpp/driver_export.h>
+#include <lib/scsi/block-device.h>
 #include <lib/scsi/controller.h>
-#include <lib/scsi/disk.h>
 #include <stdio.h>
 #include <string.h>
 #include <zircon/assert.h>
@@ -43,15 +43,15 @@ class WaiterImpl : public WaiterInterface {
 
 void UsbMassStorageDevice::ExecuteCommandAsync(uint8_t target, uint16_t lun, iovec cdb,
                                                bool is_write, uint32_t block_size_bytes,
-                                               scsi::DiskOp* disk_op, iovec data) {
-  Transaction* txn = containerof(disk_op, Transaction, disk_op);
+                                               scsi::DeviceOp* device_op, iovec data) {
+  Transaction* txn = containerof(device_op, Transaction, device_op);
 
   if (lun > UINT8_MAX) {
-    disk_op->Complete(ZX_ERR_OUT_OF_RANGE);
+    device_op->Complete(ZX_ERR_OUT_OF_RANGE);
     return;
   }
   if (cdb.iov_len > sizeof(txn->cdb_buffer)) {
-    disk_op->Complete(ZX_ERR_NOT_SUPPORTED);
+    device_op->Complete(ZX_ERR_NOT_SUPPORTED);
     return;
   }
 
@@ -61,12 +61,12 @@ void UsbMassStorageDevice::ExecuteCommandAsync(uint8_t target, uint16_t lun, iov
   txn->block_size_bytes = block_size_bytes;
 
   // Currently, data is only used in the UNMAP command.
-  if (disk_op->op.command.opcode == BLOCK_OPCODE_TRIM && data.iov_len != 0) {
+  if (device_op->op.command.opcode == BLOCK_OPCODE_TRIM && data.iov_len != 0) {
     if (sizeof(txn->data_buffer) != data.iov_len) {
       FDF_LOG(ERROR,
               "The size of the requested data buffer(%zu) and data_buffer(%lu) are different.",
               data.iov_len, sizeof(txn->data_buffer));
-      disk_op->Complete(ZX_ERR_INVALID_ARGS);
+      device_op->Complete(ZX_ERR_INVALID_ARGS);
       return;
     }
     memcpy(txn->data_buffer, data.iov_base, data.iov_len);
@@ -216,7 +216,7 @@ zx_status_t UsbMassStorageDevice::Init() {
   } else if (out_length != sizeof(max_lun)) {
     return ZX_ERR_BAD_STATE;
   }
-  block_devs_ = std::vector<std::unique_ptr<scsi::Disk>>(max_lun + 1);
+  block_devs_ = std::vector<std::unique_ptr<scsi::BlockDevice>>(max_lun + 1);
   FDF_LOG(DEBUG, "UMS: Max lun is: %u", max_lun);
   max_lun_ = max_lun;
 
@@ -513,7 +513,7 @@ zx_status_t UsbMassStorageDevice::DataTransfer(zx_handle_t vmo_handle, zx_off_t 
 
 zx_status_t UsbMassStorageDevice::DoTransaction(Transaction* txn, uint8_t flags, uint8_t ep_address,
                                                 const std::string& action) {
-  const block_op_t& op = txn->disk_op.op;
+  const block_op_t& op = txn->device_op.op;
 
   const size_t num_bytes = op.command.opcode == BLOCK_OPCODE_TRIM
                                ? sizeof(txn->data_buffer)
@@ -576,20 +576,20 @@ zx_status_t UsbMassStorageDevice::CheckLunsReady() {
       break;
     }
     if (ready && !block_devs_[lun]) {
-      scsi::DiskOptions options(/*check_unmap_support*/ true, /*use_mode_sense_6*/ true,
-                                /*use_read_write_12*/ false);
-      zx::result disk =
-          scsi::Disk::Bind(this, kPlaceholderTarget, lun, max_transfer_bytes_, options);
-      if (disk.is_ok() && disk->block_size_bytes() != 0) {
-        block_devs_[lun] = std::move(disk.value());
-        scsi::Disk* dev = block_devs_[lun].get();
+      scsi::DeviceOptions options(/*check_unmap_support*/ true, /*use_mode_sense_6*/ true,
+                                  /*use_read_write_12*/ false);
+      zx::result block_device =
+          scsi::BlockDevice::Bind(this, kPlaceholderTarget, lun, max_transfer_bytes_, options);
+      if (block_device.is_ok() && block_device->block_size_bytes() != 0) {
+        block_devs_[lun] = std::move(block_device.value());
+        scsi::BlockDevice* dev = block_devs_[lun].get();
         FDF_LOG(DEBUG, "UMS: block size is: 0x%08x", dev->block_size_bytes());
         FDF_LOG(DEBUG, "UMS: total blocks is: %lu", dev->block_count());
         FDF_LOG(DEBUG, "UMS: total size is: %lu", dev->block_count() * dev->block_size_bytes());
         FDF_LOG(DEBUG, "UMS: read-only: %d removable: %d", dev->write_protected(),
                 dev->removable());
       } else {
-        zx_status_t error = disk.status_value();
+        zx_status_t error = block_device.status_value();
         if (error == ZX_OK) {
           FDF_LOG(ERROR, "UMS zero block size");
           error = ZX_ERR_INVALID_ARGS;
@@ -656,10 +656,10 @@ void UsbMassStorageDevice::WorkerLoop() {
       }
       current_txn = txn;
     }
-    const block_op_t& op = txn->disk_op.op;
+    const block_op_t& op = txn->device_op.op;
     FDF_LOG(DEBUG, "UMS PROCESS (%p)", &op);
 
-    scsi::Disk* dev = block_devs_[txn->lun].get();
+    scsi::BlockDevice* dev = block_devs_[txn->lun].get();
     zx_status_t status;
     if (dev == nullptr) {
       // Device is absent (likely been removed).
@@ -713,7 +713,7 @@ void UsbMassStorageDevice::WorkerLoop() {
       if (current_txn == txn) {
         FDF_LOG(DEBUG, "UMS DONE %d (%p)", status, &op);
         txn->data_vmo.reset();
-        txn->disk_op.Complete(status);
+        txn->device_op.Complete(status);
         current_txn = nullptr;
       }
     }
@@ -728,7 +728,7 @@ void UsbMassStorageDevice::WorkerLoop() {
 
   Transaction* txn;
   while ((txn = list_remove_head_type(&queued_txns_, Transaction, node)) != NULL) {
-    const block_op_t& op = txn->disk_op.op;
+    const block_op_t& op = txn->device_op.op;
     switch (op.command.opcode) {
       case BLOCK_OPCODE_READ:
         FDF_LOG(ERROR, "UMS: read of %u @ %zu discarded during unbind", op.rw.length,
@@ -739,7 +739,7 @@ void UsbMassStorageDevice::WorkerLoop() {
                 op.rw.offset_dev);
         break;
     }
-    txn->disk_op.Complete(ZX_ERR_IO_NOT_PRESENT);
+    txn->device_op.Complete(ZX_ERR_IO_NOT_PRESENT);
   }
 }
 

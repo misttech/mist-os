@@ -8,56 +8,39 @@ mod frame_writer;
 mod header;
 mod ie;
 
-/// This macro allows for writing frames into a buffer. The macro operates in three steps:
-/// (1) Compute the frame's resulting length by adding up all headers and IEs.
-/// (2) Request a buffer from a given provider with a minimum buffer length of the computed length.
-/// (3) Write all headers and IEs into the given buffer.
+/// Allocates a buffer in a new `fdf::Arena` and writes a frame into the buffer.
 ///
-/// The buffer and amount of bytes written will be returned to the caller.
+/// This happens in three steps:
 ///
-/// # Buffer Source
-/// A buffer can be provided through either a `CBufferProvider` or an expression.
-/// * `write_frame!` requires a `CBufferProvider`:
-///   ```
-///   let (buffer, written) = write_frame!(my_buffer_provider, { ... })?;
-///   let (buffer, written) = write_frame!(make_buffer_provider(), { ... })?;
-///   let (buffer, written) = write_frame!(self.buffer_provider, { ... })?;
-///   ```
-///   Note: the `CBufferProvider` can be any struct which provides a
-///   `get_buffer(usize) -> Result<_, Error>` implementation. The returned buffer type must
-///   implement the `Appendable` trait.
-/// * `write_frame_with_dynamic_buffer!` works with dynamically sized buffers. Such buffers can grow
-///   in size and must implement the `Appendable` trait.
-/// * `write_frame_with_fixed_buffer!` works with fixed sized buffers. Such buffers must implement the
-///   `AsMut<[u8]>` trait.
-///   ```
-///   let (buffer, written) = write_frame_with_fixed_buffer!([0u8; 20], { ... })?;
-///   let (buffer, written) = write_frame_with_dynamic_buffer!(vec![], { ... })?;
-///   ```
+///   1. Compute the frame's length.
+///   2. Allocate a buffer an `fdf::Arena`.
+///   3. Write the frame into the buffer.
 ///
 /// # Headers
-/// Headers can be of arbitrary type, however, a header type must derive zerocopy's various traits
-/// and declared to be packed & C-compatible.
-/// Headers are declared through a qualified path to the type followed by an expression evaluating
-/// to this type. For example:
+///
+/// Headers must derive zerocopy's various traits and be declared as packed & C-compatible.
+/// Headers are declared through a qualified path to a type followed by an expression evaluating
+/// to a reference of the same type. For example:
+///
 /// ```
-///  mac::MgmtHdr: &mac::MgmtHdr {
-///      frame_ctrl: mac::FrameControl(0)
-///          .with_frame_type(mac::FrameType::MGMT)
-///          .with_mgmt_subtype(mac::MgmtSubtype::PROBE_REQ),
-///      duration: 0,
-///      addr1: mac::BCAST_ADDR,
-///      addr2: self.iface_mac,
-///      addr3: mac::BCAST_ADDR,
-///      seq_ctrl: mac::SequenceControl(0)
-///          .with_seq_num(self.ctx.seq_mgr.next_sns1(&mac::BCAST_ADDR) as u16),
-///  },
+/// headers: {
+///     mac::EthernetIIHdr: &mac::EthernetIIHdr {
+///         da: dst_addr,
+///         sa: src_addr,
+///         ether_type: llc_frame.hdr.protocol_id,
+///     },
+/// },
 /// ```
-/// The value expression can be any valid Rust expression evaluating to the corresponding type
-/// including but not limited to function & method calls, match- & ifstatements and constants.
+///
+/// # Body
+///
+/// An arbitrary body can be written to the end of the buffer's header section.
+/// The body's type must be a slice of a compatible type.
 ///
 /// # IEs
+///
 /// ## Supported IEs
+///
 /// * ssid: a byte slice
 /// * supported_rates: a byte slice
 /// * dsss_param_set: wlan_common::ie::DsssParamSet
@@ -73,21 +56,26 @@ mod ie;
 /// * vht_caps: wlan_common::ie::VhtCapabilities
 /// * rsne: wlan_common::ie::rsn::rsne::Rsne
 /// * bss_max_idle_period: wlan_common::ie::BssMaxIdlePeriod
+/// * wsc: wlan_common::ie::Wsc
+/// * wpa1: wlan_common::ie::Wpa1
 ///
 /// ## IE values
-/// IE values may be arbitrary expressions such as function calls, literals, constants or
-/// variable. For example the following expressions are valid:
+///
+/// IE values can be any expression that evaluates to the corresponding IE type.
+/// For example the following expressions are valid:
+///
 /// ```
-///  ssid: vec![4u8; 12],
-///  ssid: SSID_CONSTANT,
-///  ssid: b"foobar",
-///  ssid: self.generate_ssid(),
-///  ssid: local_var,
-///  ssid: match x { 0 => b"foo", _ => b"bar" },
-///  ssid: if x { b"foo" } else { b"bar" },
+/// ssid: vec![4u8; 12],
+/// ssid: SSID_CONSTANT,
+/// ssid: b"foobar",
+/// ssid: self.generate_ssid(),
+/// ssid: local_var,
+/// ssid: match x { 0 => b"foo", _ => b"bar" },
+/// ssid: if x { b"foo" } else { b"bar" },
 /// ```
 ///
 /// ## Optional IEs
+///
 /// IEs may be optional (see examples below). Optional IEs are declared through an `?` token.
 /// Value expressions in optional IEs must evaluate to a value of type `Option<V>` with `V` being
 /// a compatible value type. If the value is declared through an if-statement and **NO** else branch
@@ -96,10 +84,11 @@ mod ie;
 /// If an else-brach was defined both branches must return an `Option<V>` value.
 ///
 /// ## Emit IE offset
+///
 /// One can emit the offset at which a particular IE is written at.
 /// ```
 /// let mut offset = 0;
-/// let (buffer, written) = write_frame!(buffer_provider, {
+/// let buffer = write_frame!({
 ///     ...
 ///     ies: {
 ///         ssid: ssid,
@@ -110,27 +99,25 @@ mod ie;
 /// });
 /// ```
 ///
-/// # Body
-/// An arbitrary body can be written to the end of the buffer's header section.
-/// The body's type must be a slice of a compatible type.
-///
 /// # Payload
+///
 /// An arbitrary payload can be written to the end of the buffer. The payload's type must be a slice
 /// of a compatible type.
 ///
 /// # Return type
-/// The macro returns a `Result<(Inbuffer, usize), Error>`. If the frame was written successfully,
-/// `Ok((buffer, written))` is returned, `Err(_)` otherwise.
+///
+/// The macro returns a `Result<ArenaStaticBuffer<[u8]>, Error>`.
 ///
 /// # Constraints
+///
 /// The macro early returns with an error if the writing to the buffer failed, thus, the caller must
-/// carry a return type of `Result<(), Error>`.
-/// This macro is heavily dependent on the `wlan_common` crates and assumes the caller
-/// to depend on those.
+/// carry a return type of `Result<(), Error>`. This macro is heavily dependent on the `wlan_common`
+/// crates and assumes the caller to depend on those.
 ///
 /// # Examples
+///
 /// ```
-/// let (buffer, written) = write_frame!(self.ctx.buffer_provider, {
+/// let buffer = write_frame!({
 ///     headers: {
 ///         mac::MgmtHdr: &mac::MgmtHdr {
 ///             frame_ctrl: mac::FrameControl(0)
@@ -144,7 +131,6 @@ mod ie;
 ///                 .with_seq_num(self.ctx.seq_mgr.next_sns1(&mac::BCAST_ADDR) as u16),
 ///         },
 ///     },
-///     body: vec![412u8; 15],
 ///     ies: {
 ///         ssid: ssid,
 ///         supported_rates: &rates,
@@ -161,14 +147,48 @@ mod ie;
 /// ```
 #[proc_macro]
 pub fn write_frame(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    frame_writer::process_with_buffer_provider(input)
+    frame_writer::process_with_default_source(input)
 }
 
+/// Writes a frame into a fixed sized slice.
+///
+/// This macro writes the frame into the fixed sized buffer in the
+/// first argument and returns a `Result<(usize, usize), Error>` where
+/// the values in the returned tuple are the beginning and ending indices
+/// of the frame, respectively.
+///
+/// The second argument of this macro is the specification of the
+/// frame defined in the documentation for `write_frame` with the
+/// addition of an optional `fill_zeroes` field.
+///
+/// # Fill with zeroes
+///
+/// The caller may optionally specify `fill_zeroes: ()` at the
+/// beginning of the frame specification. The effect is that the frame
+/// will be written so that the end of the frame ends at the end of
+/// the buffer. The beginning of the buffer will be filled with zeroes
+/// up to the start of the frame. For example,
+///
+/// ```
+/// let buffer = [0u8; 10];
+/// let (frame_start, frame_end) = write_frame_with_fixed_slice!(&mut buffer[..], {
+///     fill_zeroes: (),
+///     ies: { ssid: &b"foobar"[..] },
+/// });
+/// assert_eq!(&[0, 6, 102, 111, 111, 98, 97, 114, 0, 0][..], &buffer[frame_start..frame_end]);
+/// ```
 #[proc_macro]
-pub fn write_frame_with_fixed_buffer(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    frame_writer::process_with_fixed_buffer(input)
+pub fn write_frame_with_fixed_slice(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    frame_writer::process_with_fixed_slice(input)
 }
 
+/// Appends a frame to a dynamically sized buffer.
+///
+/// This macro mutates the dynamically sized buffer in the first
+/// argument and returns a `Result<B, Error>` where `B` is the type of
+/// the dynamically sized buffer. The second argument of this macro is
+/// the specification of the frame defined in the documentation for
+/// `write_frame`.
 #[proc_macro]
 pub fn write_frame_with_dynamic_buffer(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     frame_writer::process_with_dynamic_buffer(input)

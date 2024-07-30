@@ -2,24 +2,30 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use analytics::{add_custom_event, ga4_metrics, init_ga4_metrics_service};
+use analytics::metrics_state::MetricsStatus;
+use analytics::{
+    add_custom_event, ga4_metrics, initialize_ga4_metrics_service, redact_host_and_user_from,
+};
 use anyhow::{Context, Result};
 use fidl_fuchsia_developer_ffx::VersionInfo;
 use fuchsia_async::TimeoutExt;
 use std::collections::BTreeMap;
+use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
 pub const GA4_PROPERTY_ID: &str = "G-L10R82HSYT";
 pub const GA4_KEY: &str = "mHeVJ5GxQTCvAVCmVHn_dw";
 
 pub async fn init_metrics_svc(
+    analytics_path: Option<PathBuf>,
     build_info: VersionInfo,
     invoker: Option<String>,
     sdk_version: String,
 ) {
     let build_version = build_info.build_version;
-    let _ = init_ga4_metrics_service(
+    let _ = initialize_ga4_metrics_service(
         String::from("ffx"),
+        analytics_path,
         build_version,
         sdk_version,
         GA4_PROPERTY_ID.to_string(),
@@ -28,6 +34,17 @@ pub async fn init_metrics_svc(
     )
     .await
     .with_context(|| "Could not initialize metrics service");
+}
+
+pub async fn enhanced_analytics() -> bool {
+    match ga4_metrics().await {
+        Ok(metrics_svc) => metrics_svc.opt_in_status() == MetricsStatus::OptedInEnhanced,
+        Err(_) => false,
+    }
+}
+
+pub fn sanitize(parameter: &str) -> String {
+    redact_host_and_user_from(parameter)
 }
 
 pub async fn add_ffx_overnet_proxy_drop_event(error_message: String) -> Result<()> {

@@ -788,8 +788,7 @@ pub(crate) mod tests {
     /// Expects the provided `expected` AT data to be received by the `remote` channel.
     pub async fn expect_data_received_by_peer(remote: &mut Channel, expected: Vec<at::Response>) {
         for expected_at in expected {
-            let mut bytes = Vec::new();
-            assert_matches!(remote.read_datagram(&mut bytes).await, Ok(_));
+            let bytes = remote.read_packet().expect("packet expected");
             let actual_result =
                 at::Response::deserialize(&mut Cursor::new(bytes), DeserializeBytes::new());
             let actual = actual_result.values.get(0).expect("valid response");
@@ -805,18 +804,12 @@ pub(crate) mod tests {
         remote: &mut Channel,
         expected: Option<Vec<u8>>,
     ) {
-        let mut vec = Vec::new();
-        let actual_bytes = {
-            let mut remote_fut = Box::pin(remote.read_datagram(&mut vec));
-            match exec.run_until_stalled(&mut remote_fut) {
-                Poll::Ready(Ok(bytes)) => bytes,
-                x => panic!("Expected ready but got: {:?}", x),
-            }
+        let vec = match exec.run_until_stalled(&mut remote.next()) {
+            Poll::Ready(Some(Ok(packet))) => packet,
+            x => panic!("Expected ready but got: {:?}", x),
         };
 
         if let Some(expected) = expected {
-            let expected_bytes = expected.len();
-            assert_eq!(actual_bytes, expected_bytes);
             assert_eq!(vec, expected);
         }
     }
@@ -824,9 +817,7 @@ pub(crate) mod tests {
     /// Expects nothing to be received by the `remote` peer.
     #[track_caller]
     fn expect_peer_pending(exec: &mut fasync::TestExecutor, remote: &mut Channel) {
-        let mut vec = Vec::new();
-        let mut remote_fut = Box::pin(remote.read_datagram(&mut vec));
-        assert_matches!(exec.run_until_stalled(&mut remote_fut), Poll::Pending);
+        assert_matches!(exec.run_until_stalled(&mut remote.next()), Poll::Pending);
     }
 
     /// Expects the service level connection to be pending, and polls to check that it is.
@@ -915,10 +906,10 @@ pub(crate) mod tests {
         let set_speaker_gain_part_one = b"AT+VG";
         let set_speaker_gain_part_two = b"S=1\r";
 
-        let _ = remote.as_ref().write(set_speaker_gain_part_one).expect("Sending part one.");
+        let _ = remote.write(set_speaker_gain_part_one).expect("Sending part one.");
         expect_slc_pending(&mut exec, &mut slc);
 
-        let _ = remote.as_ref().write(set_speaker_gain_part_two).expect("Sending part two.");
+        let _ = remote.write(set_speaker_gain_part_two).expect("Sending part two.");
         let slc_volume_request = SlcRequest::SpeakerVolumeSynchronization {
             level: Gain::try_from(0 as u8).unwrap(),
             response: Box::new(|| AgUpdate::Ok),
@@ -935,7 +926,7 @@ pub(crate) mod tests {
 
         let set_speaker_gain_send_dtmf = b"AT+VGS=1\rAT+VTS=#\r";
 
-        let _ = remote.as_ref().write(set_speaker_gain_send_dtmf).expect("Sending.");
+        let _ = remote.write(set_speaker_gain_send_dtmf).expect("Sending.");
 
         let slc_volume_request = SlcRequest::SpeakerVolumeSynchronization {
             level: Gain::try_from(0 as u8).unwrap(),
@@ -957,7 +948,7 @@ pub(crate) mod tests {
 
         // Peer sends an unexpected AT command.
         let unexpected = format!("AT+CIND=?\r").into_bytes();
-        let _ = remote.as_ref().write(&unexpected);
+        let _ = remote.write(&unexpected);
 
         // No requests should be received on the stream.
         expect_slc_pending(&mut exec, &mut slc);
@@ -977,7 +968,7 @@ pub(crate) mod tests {
         let slci_marker = ProcedureMarker::SlcInitialization;
         let features = HfFeatures::THREE_WAY_CALLING;
         let command = format!("AT+BRSF={}\r", features.bits()).into_bytes();
-        let _ = remote.as_ref().write(&command);
+        let _ = remote.write(&command);
         match slc.next().await {
             Some(Ok(SlcRequest::GetAgFeatures { .. })) => {}
             x => panic!("Expected a GetAgFeatures request but got: {:?}", x),
@@ -1008,7 +999,7 @@ pub(crate) mod tests {
         // SLC stream.
         let features = HfFeatures::THREE_WAY_CALLING;
         let command1 = format!("AT+BRSF={}\r", features.bits()).into_bytes();
-        let _ = remote.as_ref().write(&command1);
+        let _ = remote.write(&command1);
 
         let response_fn1 = {
             match exec.run_until_stalled(&mut slc.next()) {
@@ -1029,14 +1020,14 @@ pub(crate) mod tests {
         // Peer sends us an HF supported indicators request - since the SLC can handle the request,
         // we expect no item in the SLC stream. The response should directly be sent to the peer.
         let command2 = format!("AT+CIND=?\r").into_bytes();
-        let _ = remote.as_ref().write(&command2);
+        let _ = remote.write(&command2);
         expect_slc_pending(&mut exec, &mut slc);
         expect_peer_ready(&mut exec, &mut remote, None);
 
         // Peer requests the indicator status. Since this status is not managed by the SLC, we
         // expect a stream item to get the information.
         let command3 = format!("AT+CIND?\r").into_bytes();
-        let _ = remote.as_ref().write(&command3);
+        let _ = remote.write(&command3);
         let response_fn2 = {
             match exec.run_until_stalled(&mut slc.next()) {
                 Poll::Ready(Some(Ok(SlcRequest::GetAgIndicatorStatus { response }))) => response,
@@ -1054,7 +1045,7 @@ pub(crate) mod tests {
         // handle the request, we expect no item in the SLC stream, and the response should directly
         // be sent to the peer.
         let command4 = format!("AT+CMER=3,0,0,1\r").into_bytes();
-        let _ = remote.as_ref().write(&command4);
+        let _ = remote.write(&command4);
         expect_slc_pending(&mut exec, &mut slc);
         expect_peer_ready(&mut exec, &mut remote, None);
 
@@ -1141,7 +1132,7 @@ pub(crate) mod tests {
         // SLC stream and the SLCI procedure should begin.
         let features = HfFeatures::THREE_WAY_CALLING;
         let command1 = format!("AT+BRSF={}\r", features.bits()).into_bytes();
-        let _ = remote.as_ref().write(&command1);
+        let _ = remote.write(&command1);
 
         // Simulate local response with AG Features - expect these to be sent to the peer.
         let ag_features_update = {
@@ -1167,11 +1158,11 @@ pub(crate) mod tests {
 
         // Peer continues the SLCI procedure.
         let command2 = format!("AT+CIND=?\r").into_bytes();
-        let _ = remote.as_ref().write(&command2);
+        let _ = remote.write(&command2);
         expect_slc_pending(&mut exec, &mut slc);
         expect_peer_ready(&mut exec, &mut remote, None);
         let command3 = format!("AT+CIND?\r").into_bytes();
-        let _ = remote.as_ref().write(&command3);
+        let _ = remote.write(&command3);
         let ag_indicators = {
             match exec.run_until_stalled(&mut slc.next()) {
                 Poll::Ready(Some(Ok(SlcRequest::GetAgIndicatorStatus { response }))) => {
@@ -1188,7 +1179,7 @@ pub(crate) mod tests {
 
         // Peer requests to enable the Indicator Status update in the AG.
         let command4 = format!("AT+CMER=3,0,0,1\r").into_bytes();
-        let _ = remote.as_ref().write(&command4);
+        let _ = remote.write(&command4);
         expect_slc_pending(&mut exec, &mut slc);
         expect_peer_ready(&mut exec, &mut remote, None);
 
@@ -1221,11 +1212,11 @@ pub(crate) mod tests {
         assert!(!connection.is_terminated());
 
         let data1 = vec![0x01, 0x02, 0x03, 0x04];
-        let _ = remote.as_ref().write(&data1);
+        let _ = remote.write(&data1);
         assert_matches!(connection.next().await, Some(Ok(buf)) if buf == data1);
 
         let data2 = vec![0x01];
-        let _ = remote.as_ref().write(&data2);
+        let _ = remote.write(&data2);
         assert_matches!(connection.next().await, Some(Ok(buf)) if buf == data2);
 
         drop(remote);
@@ -1271,12 +1262,14 @@ pub(crate) mod tests {
         // Close the remote end of the channel so that local reads and remote writes
         // fail.
         let (local, remote) = Channel::create();
-        assert!(local.as_ref().half_close().is_ok());
+        let socket = local.into_socket().unwrap();
+        assert!(socket.half_close().is_ok());
+        let local = Channel::from_socket(socket, Channel::DEFAULT_MAX_TX).unwrap();
         let mut connection = DataController::new(local);
 
         // Remote writing to us should fail.
         let bytes = vec![0x00, 0x03];
-        assert_matches!(remote.as_ref().write(&bytes), Err(zx::Status::BAD_STATE));
+        assert_matches!(remote.write(&bytes), Err(zx::Status::BAD_STATE));
         // A local read should also fail - the error should be propagated to the stream.
         assert_matches!(connection.next().await, Some(Err(zx::Status::BAD_STATE)));
     }
@@ -1286,7 +1279,8 @@ pub(crate) mod tests {
         // Close the local end of the channel so that remote reads and local writes
         // fail.
         let (local, remote) = Channel::create();
-        assert!(remote.as_ref().half_close().is_ok());
+        let socket = remote.into_socket().unwrap();
+        assert!(socket.half_close().is_ok());
         let mut connection = DataController::new(local);
 
         // Queue some data to be sent to the remote.

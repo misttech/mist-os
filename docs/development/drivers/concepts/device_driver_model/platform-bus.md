@@ -111,12 +111,10 @@ different.
 
 ## Platform Bus Protocol
 
-The [platform bus protocol](/sdk/banjo/fuchsia.hardware.platform.bus/platform-bus.fidl)
-(`ZX_PROTOCOL_PBUS`) is used by board drivers and protocol implementation drivers
-to communicate with the platform bus driver. It is only available to drivers running in the
-platform bus's driver host (in particular, it is not accessible to platform device drivers).
-The purpose of this protocol is for the board driver to load protocol implementation drivers
-and to start platform device drivers. It is also used by protocol implementation drivers to
-register their protocols with the platform bus so their protocols can be made available
-to platform device drivers.
-
+The [platform bus protocol](/sdk/fidl/fuchsia.hardware.platform.bus/platform-bus.fidl)
+is used by board drivers and protocol implementation drivers to communicate with the platform
+bus driver. It is only available to drivers running in the platform bus's driver host (in
+particular, it is not accessible to platform device drivers). The purpose of this protocol
+is for the board driver to load protocol implementation drivers and to start platform device
+drivers. It is also used by protocol implementation drivers to register their protocols with
+the platform bus so their protocols can be made available to platform device drivers.

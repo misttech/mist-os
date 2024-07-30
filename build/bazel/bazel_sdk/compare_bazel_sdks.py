@@ -9,9 +9,8 @@ import argparse
 import filecmp
 import os
 import sys
-from pathlib import Path
-
 import typing as T
+from pathlib import Path
 
 
 def get_file_tree_set(root_dir: Path) -> T.Set[Path]:

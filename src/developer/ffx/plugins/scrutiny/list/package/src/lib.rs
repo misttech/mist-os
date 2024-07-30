@@ -4,7 +4,7 @@
 
 use ffx_scrutiny_package_list_args::ScrutinyPackageCommand;
 use fho::{FfxMain, FfxTool, Result, SimpleWriter};
-use scrutiny_frontend::scrutiny2::Scrutiny;
+use scrutiny_frontend::Scrutiny;
 
 #[derive(FfxTool)]
 pub struct ScrutinyPackageTool {

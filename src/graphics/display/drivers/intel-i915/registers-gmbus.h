@@ -5,7 +5,7 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_REGISTERS_GMBUS_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_REGISTERS_GMBUS_H_
 
-#include <lib/ddk/debug.h>
+#include <lib/driver/logging/cpp/logger.h>
 #include <lib/stdcompat/span.h>
 #include <zircon/assert.h>
 

@@ -6,7 +6,6 @@
 
 use crate::{elf_parse as elf, util};
 use fuchsia_zircon::{self as zx, AsHandleRef};
-use std::ffi::{CStr, CString};
 use thiserror::Error;
 
 /// Possible errors that can occur during ELF loading.
@@ -256,30 +255,17 @@ pub fn map_elf_segments(
 }
 
 // These must not be longer than zx::sys::ZX_MAX_NAME_LEN.
-const VMO_NAME_UNKNOWN: &[u8] = b"<unknown ELF>";
-const VMO_NAME_PREFIX_BSS: &[u8] = b"bss:";
-const VMO_NAME_PREFIX_DATA: &[u8] = b"data:";
+const VMO_NAME_PREFIX_BSS: &str = "bss:";
+const VMO_NAME_PREFIX_DATA: &str = "data:";
 
 // prefix length must be less than zx::sys::ZX_MAX_NAME_LEN-1 and not contain any nul bytes.
-fn vmo_name_with_prefix(name: &CStr, prefix: &[u8]) -> CString {
-    const MAX_LEN: usize = zx::sys::ZX_MAX_NAME_LEN - 1;
-    assert!(prefix.len() <= MAX_LEN);
-
-    let mut name_bytes = name.to_bytes();
-    if name_bytes.len() == 0 {
-        name_bytes = VMO_NAME_UNKNOWN;
+fn vmo_name_with_prefix(name: &zx::Name, prefix: &str) -> zx::Name {
+    assert!(prefix.len() <= zx::sys::ZX_MAX_NAME_LEN - 1);
+    if name.is_empty() {
+        zx::Name::new_lossy(&format!("{prefix}<unknown ELF>"))
+    } else {
+        zx::Name::new_lossy(&format!("{prefix}{name}"))
     }
-    let name_len = std::cmp::min(MAX_LEN, prefix.len() + name_bytes.len());
-    let suffix_len = name_len - prefix.len();
-
-    let mut buf = Vec::with_capacity(name_len);
-    buf.extend_from_slice(prefix);
-    buf.extend_from_slice(&name_bytes[..suffix_len]);
-    assert!(buf.len() <= MAX_LEN);
-
-    // The input name is already a CStr, so it doesn't contain nul, so this should only fail if the
-    // prefix contains a nul, and since the prefixes are constants, panic if this fails.
-    CString::new(buf).expect("Unexpected nul byte in prefix")
 }
 
 fn elf_to_vmar_can_map_flags(elf_flags: &elf::SegmentFlags) -> zx::VmarFlags {
@@ -314,7 +300,6 @@ fn elf_to_vmar_perm_flags(elf_flags: &elf::SegmentFlags) -> zx::VmarFlags {
 mod tests {
     use super::*;
     use crate::elf_parse;
-    use anyhow::Error;
     use assert_matches::assert_matches;
     use fidl::HandleBased;
     use lazy_static::lazy_static;
@@ -322,41 +307,37 @@ mod tests {
     use std::mem::size_of;
 
     #[test]
-    fn test_vmo_name_with_prefix() -> Result<(), Error> {
-        let empty_vmo_name = CStr::from_bytes_with_nul(b"\0")?;
-        let short_vmo_name = CStr::from_bytes_with_nul(b"short_vmo_name\0")?;
-        let max_vmo_name = CStr::from_bytes_with_nul(b"a_great_maximum_length_vmo_name\0")?;
+    fn test_vmo_name_with_prefix() {
+        let empty_vmo_name = zx::Name::default();
+        let short_vmo_name = zx::Name::new("short_vmo_name").unwrap();
+        let max_vmo_name = zx::Name::new("a_great_maximum_length_vmo_name").unwrap();
 
+        assert_eq!(vmo_name_with_prefix(&empty_vmo_name, VMO_NAME_PREFIX_BSS), "bss:<unknown ELF>");
         assert_eq!(
-            vmo_name_with_prefix(&empty_vmo_name, VMO_NAME_PREFIX_BSS).as_bytes(),
-            b"bss:<unknown ELF>"
+            vmo_name_with_prefix(&short_vmo_name, VMO_NAME_PREFIX_BSS),
+            "bss:short_vmo_name",
         );
         assert_eq!(
-            vmo_name_with_prefix(&short_vmo_name, VMO_NAME_PREFIX_BSS).as_bytes(),
-            b"bss:short_vmo_name"
+            vmo_name_with_prefix(&max_vmo_name, VMO_NAME_PREFIX_BSS),
+            "bss:a_great_maximum_length_vmo_",
         );
         assert_eq!(
-            vmo_name_with_prefix(&max_vmo_name, VMO_NAME_PREFIX_BSS).as_bytes(),
-            b"bss:a_great_maximum_length_vmo_"
-        );
-        assert_eq!(
-            vmo_name_with_prefix(&max_vmo_name, VMO_NAME_PREFIX_DATA).as_bytes(),
-            b"data:a_great_maximum_length_vmo"
+            vmo_name_with_prefix(&max_vmo_name, VMO_NAME_PREFIX_DATA),
+            "data:a_great_maximum_length_vmo",
         );
 
         assert_eq!(
-            vmo_name_with_prefix(&empty_vmo_name, b"a_long_vmo_name_prefix:").as_bytes(),
-            b"a_long_vmo_name_prefix:<unknown"
+            vmo_name_with_prefix(&empty_vmo_name, "a_long_vmo_name_prefix:"),
+            "a_long_vmo_name_prefix:<unknown",
         );
         assert_eq!(
-            vmo_name_with_prefix(&empty_vmo_name, max_vmo_name.to_bytes()).as_bytes(),
-            max_vmo_name.to_bytes()
+            vmo_name_with_prefix(&empty_vmo_name, "a_great_maximum_length_vmo_name"),
+            max_vmo_name,
         );
         assert_eq!(
-            vmo_name_with_prefix(&max_vmo_name, max_vmo_name.to_bytes()).as_bytes(),
-            max_vmo_name.to_bytes()
+            vmo_name_with_prefix(&max_vmo_name, "anystringhere"),
+            "anystringherea_great_maximum_le"
         );
-        Ok(())
     }
 
     #[derive(Debug)]

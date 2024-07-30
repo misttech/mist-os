@@ -34,7 +34,7 @@ fuchsia_unittest_package("fake-system-update-committer-tests") {
   deps = [ ":fake-system-update-committer-bin_test" ]
 }
 
-group("tests") {
+group("hermetic_tests") {
   testonly = true
   deps = [ ":fake-system-update-committer-tests" ]
 }

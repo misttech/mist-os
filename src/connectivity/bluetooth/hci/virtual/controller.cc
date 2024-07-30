@@ -76,17 +76,16 @@ void VirtualController::CreateLoopbackDevice(CreateLoopbackDeviceRequestView req
   loopback_device_ = std::make_unique<LoopbackDevice>();
 
   BT_ASSERT(request->has_uart_channel());
-  zx_handle_t uart_channel = request->uart_channel().release();
-  zx_status_t status =
-      loopback_device_->Initialize(uart_channel, std::string_view(name), [this](auto args) {
+  zx_status_t status = loopback_device_->Initialize(
+      std::move(request->uart_channel()), std::string_view(name), [this](auto args) {
         // Add LoopbackDevice as a child node of VirtualController
         FDF_LOG(INFO, "LoopbackDevice successfully initialized");
         AddLoopbackChildNode(args);
       });
   if (status != ZX_OK) {
     FDF_LOG(ERROR, "Failed to bind: %s\n", zx_status_get_string(status));
-    loopback_device_->Shutdown();
     auto _ = loopback_node_controller_->Remove();
+    loopback_device_.reset();
     return;
   }
 }

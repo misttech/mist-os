@@ -22,7 +22,7 @@ use netlink_packet_route::address::{AddressAttribute, AddressMessage};
 use netlink_packet_route::link::{LinkAttribute, LinkFlags, LinkMessage};
 use netlink_packet_route::{AddressFamily, RouteNetlinkMessage};
 use starnix_logging::{log_warn, track_stub};
-use starnix_sync::{FileOpsCore, LockBefore, LockEqualOrBefore, Locked, Mutex, WriteOps};
+use starnix_sync::{FileOpsCore, LockBefore, LockEqualOrBefore, Locked, Mutex};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::as_any::AsAny;
 use starnix_uapi::auth::CAP_NET_RAW;
@@ -116,7 +116,7 @@ pub trait SocketOps: Send + Sync + AsAny {
     /// Advances the iterator to indicate how much was actually written.
     fn write(
         &self,
-        locked: &mut Locked<'_, WriteOps>,
+        locked: &mut Locked<'_, FileOpsCore>,
         socket: &Socket,
         current_task: &CurrentTask,
         data: &mut dyn InputBuffer,
@@ -136,6 +136,7 @@ pub trait SocketOps: Send + Sync + AsAny {
     /// Returns a WaitCanceler that can be used to cancel the wait.
     fn wait_async(
         &self,
+        locked: &mut Locked<'_, FileOpsCore>,
         socket: &Socket,
         current_task: &CurrentTask,
         waiter: &Waiter,
@@ -144,7 +145,12 @@ pub trait SocketOps: Send + Sync + AsAny {
     ) -> WaitCanceler;
 
     /// Return the events that are currently active on the `socket`.
-    fn query_events(&self, socket: &Socket, current_task: &CurrentTask) -> Result<FdEvents, Errno>;
+    fn query_events(
+        &self,
+        locked: &mut Locked<'_, FileOpsCore>,
+        socket: &Socket,
+        current_task: &CurrentTask,
+    ) -> Result<FdEvents, Errno>;
 
     /// Shuts down this socket according to how, preventing any future reads and/or writes.
     ///
@@ -426,7 +432,7 @@ impl Socket {
     ) -> Result<SyscallResult, Errno>
     where
         L: LockBefore<FileOpsCore>,
-        L: LockBefore<WriteOps>,
+        L: LockBefore<FileOpsCore>,
     {
         let user_addr = UserAddress::from(arg);
 
@@ -742,24 +748,42 @@ impl Socket {
         ancillary_data: &mut Vec<AncillaryData>,
     ) -> Result<usize, Errno>
     where
-        L: LockEqualOrBefore<WriteOps>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
-        let mut locked = locked.cast_locked::<WriteOps>();
+        let mut locked = locked.cast_locked::<FileOpsCore>();
         self.ops.write(&mut locked, self, current_task, data, dest_address, ancillary_data)
     }
 
-    pub fn wait_async(
+    pub fn wait_async<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         waiter: &Waiter,
         events: FdEvents,
         handler: EventHandler,
-    ) -> WaitCanceler {
-        self.ops.wait_async(self, current_task, waiter, events, handler)
+    ) -> WaitCanceler
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
+        self.ops.wait_async(
+            &mut locked.cast_locked::<FileOpsCore>(),
+            self,
+            current_task,
+            waiter,
+            events,
+            handler,
+        )
     }
 
-    pub fn query_events(&self, current_task: &CurrentTask) -> Result<FdEvents, Errno> {
-        self.ops.query_events(self, current_task)
+    pub fn query_events<L>(
+        &self,
+        locked: &mut Locked<'_, L>,
+        current_task: &CurrentTask,
+    ) -> Result<FdEvents, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
+        self.ops.query_events(&mut locked.cast_locked::<FileOpsCore>(), self, current_task)
     }
 
     pub fn shutdown(&self, how: SocketShutdownFlags) -> Result<(), Errno> {
@@ -802,7 +826,7 @@ fn get_netlink_interface_info<L>(
     read_buf: &mut VecOutputBuffer,
 ) -> Result<(FileHandle, LinkMessage), Errno>
 where
-    L: LockBefore<WriteOps>,
+    L: LockBefore<FileOpsCore>,
     L: LockBefore<FileOpsCore>,
 {
     let iface_name = unsafe { CStr::from_ptr(in_ifreq.ifr_ifrn.ifrn_name.as_ptr()) }
@@ -862,7 +886,7 @@ fn get_netlink_ipv4_addresses<L>(
 ) -> Result<(FileHandle, Vec<AddressMessage>, u32), Errno>
 where
     L: LockBefore<FileOpsCore>,
-    L: LockBefore<WriteOps>,
+    L: LockBefore<FileOpsCore>,
 {
     let sockaddr { sa_family, sa_data: _ } = unsafe { in_ifreq.ifr_ifru.ifru_addr };
     if sa_family != AF_INET {
@@ -924,7 +948,7 @@ fn set_netlink_interface_flags<L>(
     in_ifreq: &ifreq,
 ) -> Result<(), Errno>
 where
-    L: LockBefore<WriteOps>,
+    L: LockBefore<FileOpsCore>,
     L: LockBefore<FileOpsCore>,
 {
     let iface_name = unsafe { CStr::from_ptr(in_ifreq.ifr_ifrn.ifrn_name.as_ptr()) }
@@ -990,7 +1014,7 @@ fn send_netlink_msg_and_wait_response<L>(
     read_buf: &mut VecOutputBuffer,
 ) -> Result<NetlinkMessage<RouteNetlinkMessage>, Errno>
 where
-    L: LockBefore<WriteOps>,
+    L: LockBefore<FileOpsCore>,
     L: LockBefore<FileOpsCore>,
 {
     msg.finalize();

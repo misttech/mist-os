@@ -1,0 +1,94 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+library fuchsia.fdomain;
+
+// Signals which are valid for sockets.
+// See `Signals` in zx.fidl
+type SocketSignals = flexible bits {
+    READABLE = 1; // 1 << 0
+    WRITABLE = 2; // 1 << 1
+    PEER_CLOSED = 4; // 1 << 2
+    PEER_WRITE_DISABLED = 8; // 1 << 3
+    WRITE_DISABLED = 16; // 1 << 4
+    READ_THRESHOLD = 32; // 1 << 5
+    WRITE_THRESHOLD = 64; // 1 << 6
+};
+
+// Result from a socket write operation.
+type WriteSocketError = struct {
+    error Error;
+    wrote uint64;
+};
+
+// Socket disposition.
+type SocketDisposition = flexible enum {
+    NO_CHANGE = 0;
+    WRITE_ENABLED = 1;
+    WRITE_DISABLED = 2;
+};
+
+// Socket type.
+type SocketType = flexible enum {
+    STREAM = 0;
+    DATAGRAM = 1;
+};
+
+// FDomain operations on sockets
+open protocol Socket {
+    // Create a new socket in this FDomain and return both its ends.
+    flexible CreateSocket(struct {
+        options SocketType;
+        handles array<NewHid, 2>;
+    }) -> () error Error;
+
+    // Set the disposition of a given socket.
+    flexible SetSocketDisposition(struct {
+        handle Hid;
+        disposition SocketDisposition;
+        disposition_peer SocketDisposition;
+    }) -> () error Error;
+
+    // Read data from a socket. This method will fail if the socket is currently being read
+    // asynchronously.
+    flexible ReadSocket(struct {
+        handle Hid;
+        max_bytes uint64;
+    }) -> (struct {
+        data vector<uint8>;
+    }) error Error;
+
+    // Write to a socket. This will attempt to write all the data passed, and
+    // will block and retry whenever it is safe (e.g. it should never return
+    // SHOULD_WAIT). The `WriteSocketError` contains a `wrote` parameter to
+    // indicate if some bytes were written successfully before the failure
+    // occurred.
+    flexible WriteSocket(struct {
+        handle Hid;
+        data vector<uint8>;
+    }) -> (struct {
+        wrote uint64;
+    }) error WriteSocketError;
+
+    // Starts reading from the given socket. Data is returned via the `SocketStreamingData` event. That
+    // event will occur repeatedly until `ReadSocketStreamingStop` is called for the same handle or the
+    // event indicates the handle is closed.
+    flexible ReadSocketStreamingStart(struct {
+        handle Hid;
+    }) -> () error Error;
+
+    // Stop asynchronous reading from the given socket.
+    flexible ReadSocketStreamingStop(struct {
+        handle Hid;
+    }) -> () error Error;
+
+    // Data read asynchronously from a socket.
+    flexible -> OnSocketStreamingData(struct {
+        handle Hid;
+        socket_message flexible union {
+            1: data vector<uint8>;
+            2: error Error;
+            3: socket_read_stopped struct {};
+        };
+    });
+};

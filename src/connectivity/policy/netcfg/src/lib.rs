@@ -173,8 +173,12 @@ pub struct FilterConfig {
 #[serde(deny_unknown_fields, rename_all = "lowercase")]
 pub enum InterfaceType {
     Ethernet,
-    Wlan,
-    Ap,
+    // NB: Serde alias provides backwards compatibility.
+    #[serde(alias = "wlan")]
+    WlanClient,
+    // NB: Serde alias provides backwards compatibility.
+    #[serde(alias = "ap")]
+    WlanAp,
 }
 
 impl TryFrom<fidl_fuchsia_hardware_network::PortClass> for InterfaceType {
@@ -188,8 +192,8 @@ impl TryFrom<fidl_fuchsia_hardware_network::PortClass> for InterfaceType {
 impl From<DeviceClass> for InterfaceType {
     fn from(device_class: DeviceClass) -> Self {
         match device_class {
-            DeviceClass::Wlan => InterfaceType::Wlan,
-            DeviceClass::WlanAp => InterfaceType::Ap,
+            DeviceClass::WlanClient => InterfaceType::WlanClient,
+            DeviceClass::WlanAp => InterfaceType::WlanAp,
             DeviceClass::Ethernet
             | DeviceClass::Virtual
             | DeviceClass::Ppp
@@ -215,7 +219,9 @@ pub struct InterfaceMetrics {
 pub enum DeviceClass {
     Virtual,
     Ethernet,
-    Wlan,
+    // NB: Serde alias provides backwards compatibility.
+    #[serde(alias = "wlan")]
+    WlanClient,
     Ppp,
     Bridge,
     WlanAp,
@@ -234,7 +240,7 @@ impl TryFrom<fidl_fuchsia_hardware_network::PortClass> for DeviceClass {
         match port_class {
             fidl_fuchsia_hardware_network::PortClass::Virtual => Ok(DeviceClass::Virtual),
             fidl_fuchsia_hardware_network::PortClass::Ethernet => Ok(DeviceClass::Ethernet),
-            fidl_fuchsia_hardware_network::PortClass::Wlan => Ok(DeviceClass::Wlan),
+            fidl_fuchsia_hardware_network::PortClass::WlanClient => Ok(DeviceClass::WlanClient),
             fidl_fuchsia_hardware_network::PortClass::Ppp => Ok(DeviceClass::Ppp),
             fidl_fuchsia_hardware_network::PortClass::Bridge => Ok(DeviceClass::Bridge),
             fidl_fuchsia_hardware_network::PortClass::WlanAp => Ok(DeviceClass::WlanAp),
@@ -257,7 +263,7 @@ impl Default for AllowedDeviceClasses {
         match DeviceClass::Virtual {
             DeviceClass::Virtual
             | DeviceClass::Ethernet
-            | DeviceClass::Wlan
+            | DeviceClass::WlanClient
             | DeviceClass::Ppp
             | DeviceClass::Bridge
             | DeviceClass::WlanAp
@@ -266,7 +272,7 @@ impl Default for AllowedDeviceClasses {
         Self(HashSet::from([
             DeviceClass::Virtual,
             DeviceClass::Ethernet,
-            DeviceClass::Wlan,
+            DeviceClass::WlanClient,
             DeviceClass::Ppp,
             DeviceClass::Bridge,
             DeviceClass::WlanAp,
@@ -2142,7 +2148,7 @@ impl<'a> NetCfg<'a> {
 
         let interface_type = device_info.interface_type();
         let metric = match interface_type {
-            InterfaceType::Wlan | InterfaceType::Ap => self.interface_metrics.wlan_metric,
+            InterfaceType::WlanClient | InterfaceType::WlanAp => self.interface_metrics.wlan_metric,
             InterfaceType::Ethernet => self.interface_metrics.eth_metric,
         }
         .into();
@@ -3310,7 +3316,7 @@ mod tests {
             match self {
                 Self::Virtual => fidl_fuchsia_hardware_network::PortClass::Virtual,
                 Self::Ethernet => fidl_fuchsia_hardware_network::PortClass::Ethernet,
-                Self::Wlan => fidl_fuchsia_hardware_network::PortClass::Wlan,
+                Self::WlanClient => fidl_fuchsia_hardware_network::PortClass::WlanClient,
                 Self::Ppp => fidl_fuchsia_hardware_network::PortClass::Ppp,
                 Self::Bridge => fidl_fuchsia_hardware_network::PortClass::Bridge,
                 Self::WlanAp => fidl_fuchsia_hardware_network::PortClass::WlanAp,
@@ -5217,18 +5223,18 @@ mod tests {
     "nat_rules": [],
     "rdr_rules": []
   },
-  "filter_enabled_interface_types": ["wlan", "ap"],
+  "filter_enabled_interface_types": ["wlanclient", "wlanap"],
   "interface_metrics": {
     "wlan_metric": 100,
     "eth_metric": 10
   },
-  "allowed_upstream_device_classes": ["ethernet", "wlan"],
+  "allowed_upstream_device_classes": ["ethernet", "wlanclient"],
   "allowed_bridge_upstream_device_classes": ["ethernet"],
   "enable_dhcpv6": true,
-  "forwarded_device_classes": { "ipv4": [ "ethernet" ], "ipv6": [ "wlan" ] },
+  "forwarded_device_classes": { "ipv4": [ "ethernet" ], "ipv6": [ "wlanclient" ] },
   "interface_naming_policy": [ { "matchers": [
         {"bus_types": ["usb", "pci", "sdio"]},
-        {"device_classes": ["ethernet", "wlan", "wlanap"]},
+        {"device_classes": ["ethernet", "wlanclient", "wlanap"]},
         {"topological_path": "abcde"},
         {"any": true}
     ], "naming_scheme": [
@@ -5269,7 +5275,7 @@ mod tests {
         assert_eq!(Vec::<String>::new(), rdr_rules);
 
         assert_eq!(
-            HashSet::from([InterfaceType::Wlan, InterfaceType::Ap]),
+            HashSet::from([InterfaceType::WlanClient, InterfaceType::WlanAp]),
             filter_enabled_interface_types
         );
 
@@ -5278,7 +5284,7 @@ mod tests {
         assert_eq!(interface_metrics, expected_metrics);
 
         assert_eq!(
-            AllowedDeviceClasses(HashSet::from([DeviceClass::Ethernet, DeviceClass::Wlan])),
+            AllowedDeviceClasses(HashSet::from([DeviceClass::Ethernet, DeviceClass::WlanClient])),
             allowed_upstream_device_classes
         );
         assert_eq!(
@@ -5290,7 +5296,7 @@ mod tests {
 
         let expected_classes = ForwardedDeviceClasses {
             ipv4: HashSet::from([DeviceClass::Ethernet]),
-            ipv6: HashSet::from([DeviceClass::Wlan]),
+            ipv6: HashSet::from([DeviceClass::WlanClient]),
         };
         assert_eq!(forwarded_device_classes, expected_classes);
 
@@ -5303,7 +5309,7 @@ mod tests {
                 ]),
                 interface::MatchingRule::DeviceClasses(vec![
                     DeviceClass::Ethernet,
-                    DeviceClass::Wlan,
+                    DeviceClass::WlanClient,
                     DeviceClass::WlanAp,
                 ]),
                 interface::MatchingRule::TopologicalPath(glob::Pattern::new("abcde").unwrap()),
@@ -5427,7 +5433,7 @@ mod tests {
     #[test]
     fn test_config_denies_unknown_fields() {
         let config_str = r#"{
-            "filter_enabled_interface_types": ["wlan"],
+            "filter_enabled_interface_types": ["wlanclient"],
             "foobar": "baz"
         }"#;
 
@@ -5755,5 +5761,31 @@ mod tests {
         assert_eq!(err.classify(), serde_json::error::Category::Data);
         // Ensure the error is complaining about invalid glob.
         assert!(format!("{:?}", err).contains(err_text));
+    }
+
+    #[test]
+    fn test_config_legacy_wlan_name() {
+        let config_str = r#"
+{
+  "dns_config": { "servers": [] },
+  "filter_config": {
+    "rules": [],
+    "nat_rules": [],
+    "rdr_rules": []
+  },
+  "filter_enabled_interface_types": ["wlan", "ap"],
+  "allowed_upstream_device_classes": ["wlan"]
+}
+"#;
+        let Config { filter_enabled_interface_types, allowed_upstream_device_classes, .. } =
+            Config::load_str(config_str).unwrap();
+        assert_eq!(
+            HashSet::from([InterfaceType::WlanClient, InterfaceType::WlanAp]),
+            filter_enabled_interface_types
+        );
+        assert_eq!(
+            AllowedDeviceClasses(HashSet::from([DeviceClass::WlanClient])),
+            allowed_upstream_device_classes
+        );
     }
 }

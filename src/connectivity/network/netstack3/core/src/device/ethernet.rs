@@ -450,6 +450,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::EthernetTxQueue>>
     type Meta = ();
     type Allocator = BufVecU8Allocator;
     type Buffer = Buf<Vec<u8>>;
+    type DequeueContext = BC::DequeueContext;
 
     fn parse_outgoing_frame<'a, 'b>(
         buf: &'a [u8],
@@ -475,14 +476,33 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::EthernetTxQueue>>
         cb(&mut x)
     }
 
+    fn with_transmit_queue<
+        O,
+        F: FnOnce(&TransmitQueueState<Self::Meta, Self::Buffer, Self::Allocator>) -> O,
+    >(
+        &mut self,
+        device_id: &EthernetDeviceId<BC>,
+        cb: F,
+    ) -> O {
+        let mut state = integration::device_state(self, device_id);
+        let x = state.lock::<crate::lock_ordering::EthernetTxQueue>();
+        cb(&x)
+    }
+
     fn send_frame(
         &mut self,
         bindings_ctx: &mut BC,
         device_id: &Self::DeviceId,
+        dequeue_context: Option<&mut BC::DequeueContext>,
         _meta: Self::Meta,
         buf: Self::Buffer,
     ) -> Result<(), DeviceSendFrameError> {
-        DeviceLayerEventDispatcher::send_ethernet_frame(bindings_ctx, device_id, buf)
+        DeviceLayerEventDispatcher::send_ethernet_frame(
+            bindings_ctx,
+            device_id,
+            buf,
+            dequeue_context,
+        )
     }
 }
 

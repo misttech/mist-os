@@ -38,6 +38,9 @@ const SOURCE_SUBNET: fnet::Subnet = fidl_subnet!("192.168.255.1/16");
 const TARGET_SUBNET: fnet::Subnet = fidl_subnet!("192.168.254.1/16");
 const SOURCE_MAC_ADDRESS: fnet::MacAddress = fidl_mac!("02:00:00:00:00:01");
 const TARGET_MAC_ADDRESS: fnet::MacAddress = fidl_mac!("02:00:00:00:00:02");
+/// Arbitrary Ethernet frame type that doesn't correspond to any frames
+/// normally sent by the netstack.
+const ARBITRARY_ETHERTYPE: u16 = 1600;
 
 /// An MTU that will result in an ICMP packet that is entirely used. Since the
 /// payload length is rounded down to the nearest 8 bytes, this value minus the
@@ -422,16 +425,12 @@ async fn device_minimum_tx_frame_size<N: Netstack>(
 
     let id = NonZeroU64::new(id).unwrap();
 
-    /// Arbitrary Ethernet frame type that doesn't correspond to any frames
-    /// normally sent by the netstack.
-    const ETHERTYPE: u16 = 1600;
-
     fn expected_frame(body_len: usize) -> Buf<Vec<u8>> {
         Buf::new(vec![0; body_len], ..)
             .encapsulate(EthernetFrameBuilder::new(
                 SOURCE_MAC_ADDRESS.into_ext(),
                 TARGET_MAC_ADDRESS.into_ext(),
-                ETHERTYPE.into(),
+                ARBITRARY_ETHERTYPE.into(),
                 0,
             ))
             .serialize_vec_outer()
@@ -454,7 +453,7 @@ async fn device_minimum_tx_frame_size<N: Netstack>(
             &libc::sockaddr_ll::from(EthernetSockaddr {
                 interface_id: Some(id),
                 addr: TARGET_MAC_ADDRESS.into_ext(),
-                protocol: ETHERTYPE.into(),
+                protocol: ARBITRARY_ETHERTYPE.into(),
             })
             .into_sockaddr(),
         )
@@ -468,7 +467,10 @@ async fn device_minimum_tx_frame_size<N: Netstack>(
 
             match EthernetFrame::parse(&mut body, EthernetFrameLengthCheck::NoCheck) {
                 Ok(ethernet) => {
-                    if ethernet.ethertype().is_some_and(|e| e == EtherType::from(ETHERTYPE)) {
+                    if ethernet
+                        .ethertype()
+                        .is_some_and(|e| e == EtherType::from(ARBITRARY_ETHERTYPE))
+                    {
                         break frame;
                     }
                 }
@@ -484,4 +486,107 @@ async fn device_minimum_tx_frame_size<N: Netstack>(
     .await;
 
     assert_eq!(full_frame, expected_frame(expected_body_len).as_ref());
+}
+
+/// Tests that frames parked in the TX queue wait for device buffers to become
+/// available.
+#[netstack_test]
+#[variant(N, Netstack)]
+async fn tx_queue_drops<N: Netstack>(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
+    let realm = sandbox.create_netstack_realm::<N, _>(name).expect("failed to create source realm");
+
+    let (tun, netdevice) =
+        netstack_testing_common::devices::create_tun_device_with(fnet_tun::DeviceConfig {
+            blocking: Some(true),
+            ..Default::default()
+        });
+    let (tun_port, dev_port) = netstack_testing_common::devices::create_eth_tun_port(
+        &tun,
+        /* port_id */ 1,
+        TARGET_MAC_ADDRESS,
+    )
+    .await;
+
+    let device_control = netstack_testing_common::devices::install_device(&realm, netdevice);
+    let port_id = dev_port.get_info().await.expect("get info").id.expect("missing port id");
+    let (control, server_end) =
+        fidl::endpoints::create_proxy::<fnet_interfaces_admin::ControlMarker>()
+            .expect("create proxy");
+    device_control
+        .create_interface(&port_id, server_end, &fnet_interfaces_admin::Options::default())
+        .expect("create interface");
+    assert_eq!(control.enable().await.expect("can enabled"), Ok(true));
+    tun_port.set_online(true).await.expect("can set online");
+
+    let id = control.get_id().await.expect("get ID");
+    let state = realm
+        .connect_to_protocol::<fidl_fuchsia_net_interfaces::StateMarker>()
+        .expect("connect to protocol");
+    netstack_testing_common::interfaces::wait_for_online(&state, id, true)
+        .await
+        .expect("waiting interface online");
+    let id = NonZeroU64::new(id).unwrap();
+
+    let socket =
+        realm.packet_socket(fposix_socket_packet::Kind::Link).await.expect("can create socket");
+
+    let message = Buf::new(vec![0; 20], ..)
+        .encapsulate(EthernetFrameBuilder::new(
+            SOURCE_MAC_ADDRESS.into_ext(),
+            TARGET_MAC_ADDRESS.into_ext(),
+            ARBITRARY_ETHERTYPE.into(),
+            0,
+        ))
+        .serialize_vec_outer()
+        .unwrap()
+        .into_inner();
+
+    // Send more packets than the underlying device can handle at once, so we're
+    // certain to exercise netstack waiting for tx buffers to be available
+    // again.
+    //
+    // NB: There's some knowledge at a distance here that the maximum TX QUEUE
+    // depth size is larger than the arbitrary multiplier here to the device
+    // FIFO depth. If this value exceeded the maximum TX QUEUE size packets
+    // would be dropped in netstack before reaching netdevice.
+    let packet_send_count = 4 * fidl_fuchsia_net_tun::FIFO_DEPTH;
+
+    for _ in 0..packet_send_count {
+        let sent = socket
+            .send_to(
+                message.as_ref(),
+                &libc::sockaddr_ll::from(EthernetSockaddr {
+                    interface_id: Some(id),
+                    addr: TARGET_MAC_ADDRESS.into_ext(),
+                    protocol: ARBITRARY_ETHERTYPE.into(),
+                })
+                .into_sockaddr(),
+            )
+            .expect("can send");
+        assert_eq!(sent, message.as_ref().len());
+    }
+
+    // We should see `packet_send_count` frames in total.
+    let mut seen = 0;
+    while seen < packet_send_count {
+        let frame = tun
+            .read_frame()
+            .on_timeout(ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT, || {
+                panic!("failed to receive {}th frame", seen + 1)
+            })
+            .await
+            .expect("can read")
+            .expect("has frame")
+            .data
+            .unwrap();
+        let mut body = &frame[..];
+        let ethernet = EthernetFrame::parse(&mut body, EthernetFrameLengthCheck::NoCheck)
+            .expect("bad ethernet frame");
+        {
+            if ethernet.ethertype().is_some_and(|e| e == EtherType::from(ARBITRARY_ETHERTYPE)) {
+                seen += 1;
+            }
+        }
+    }
 }

@@ -6,8 +6,8 @@ import("//build/bind/bind.gni")
 import("//build/drivers.gni")
 
 driver_bind_rules("dwmac_bind") {
-  rules = "dwmac.bind"
-  tests = "bind-tests.json"
+  rules = "meta/dwmac.bind"
+  tests = "meta/bind-tests.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.ethernet.board:fuchsia.hardware.ethernet.board_bindlib",
     "//src/devices/bind/fuchsia.designware.platform",
@@ -51,7 +51,7 @@ fuchsia_driver("dwmac-driver") {
 fuchsia_driver_component("dwmac") {
   component_name = "dwmac"
   deps = [ ":dwmac-driver" ]
-  info = "dwmac-info.json"
+  info = "meta/dwmac-info.json"
   manifest = "meta/dwmac.cml"
 }
 

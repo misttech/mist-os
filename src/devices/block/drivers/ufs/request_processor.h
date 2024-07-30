@@ -6,7 +6,7 @@
 #define SRC_DEVICES_BLOCK_DRIVERS_UFS_REQUEST_PROCESSOR_H_
 
 #include <fuchsia/hardware/block/driver/cpp/banjo.h>
-#include <lib/device-protocol/pci.h>
+#include <lib/mmio/mmio.h>
 #include <lib/zircon-internal/thread_annotations.h>
 
 #include <ddktl/device.h>
@@ -22,7 +22,7 @@ class Ufs;
 class RequestProcessor {
  public:
   explicit RequestProcessor(RequestList request_list, Ufs &ufs, zx::unowned_bti bti,
-                            fdf::MmioBuffer &mmio, uint32_t slot_count)
+                            const fdf::MmioBuffer &mmio, uint32_t slot_count)
       : request_list_(std::move(request_list)),
         controller_(ufs),
         register_(mmio),
@@ -59,7 +59,7 @@ class RequestProcessor {
   RequestList request_list_;
 
   Ufs &controller_;
-  fdf::MmioBuffer &register_;
+  const fdf::MmioBuffer &register_;
 
   zx::duration timeout_ = kCommandTimeout;
 

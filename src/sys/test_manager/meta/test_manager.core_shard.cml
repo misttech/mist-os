@@ -447,5 +447,13 @@
             from: "self",
             to: "#test_manager",
         },
+
+        // Debugger
+        {
+            protocol: "fuchsia.debugger.Launcher",
+            from: "#debugger",
+            to: "#test_manager",
+            dependency: "weak",
+        },
     ],
 }

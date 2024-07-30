@@ -13,8 +13,8 @@ https://fuchsia.dev/fuchsia-src/development/memory/memory#visualize_memory_usage
 import collections
 import html
 import json
-import sys
 import os.path
+import sys
 import textwrap
 
 FUCHSIA_DIR = os.path.abspath(

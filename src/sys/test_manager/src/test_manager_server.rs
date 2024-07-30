@@ -238,6 +238,7 @@ pub async fn run_test_manager_query_server(
                     sender,
                     &diagnostics,
                     &realm,
+                    false, // use_debug_agent
                 )
             });
         match launch_fut.await {
@@ -433,6 +434,7 @@ pub async fn run_test_manager_test_case_enumerator_server(
                             sender,
                             &diagnostics,
                             &realm,
+                            false, // use_debug_agent
                         )
                     });
                 match launch_fut.await {

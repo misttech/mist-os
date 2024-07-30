@@ -5,7 +5,6 @@
 # found in the LICENSE file.
 
 import unittest
-
 from typing import List
 
 import util

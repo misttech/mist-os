@@ -1,86 +1,128 @@
-# Inspecting memory in zxdb
+# Inspect memory in zxdb
 
-Zxdb supports the following commands for inspecting memory:
+Zxdb can help you inspect memory for debugging purposes with the following
+commands:
 
-  * [`aspace`](#aspace_show_mapped_memory_regions)
-  * [`mem-analyze`](#mem-analyze_dumps_memory_trying_to_interpret_pointers)
-  * [`mem-read` / `x`](#mem-read_dumps_process_memory)
-  * [`stack-data`](#stack-data_provides_a_low-level_analysis_of_the_stack)
-  * [`sym-near`](#sym-near_map_addresses_to_symbols)
+  * [`aspace`](#aspace)
 
-## `aspace`: Show mapped memory regions.
+    Shows mapped memory regions.
 
-The `aspace` command, abbreviated `as`, outputs address space information for the process. In
+  * [`mem-analyze`](#mem-analyze)
+
+    Dumps memory to help you to interpret pointers.
+
+  * [`mem-read` / `x`](#mem-read)
+
+    Dumps process memory.
+
+  * [`stack-data`](#stack-data)
+
+    Provides a low-level analysis of the stack.
+
+  * [`sym-near`](#sym-near)
+
+    Maps addresses to symbols.
+
+## `aspace` {#aspace}
+
+Note: This is the `aspace` command. You can also use `as` to express `aspace`.
+
+The `aspace` command outputs address space information for the process. In
 Fuchsia, virtual memory consists of a hierarchy of [Virtual Memory
-Objects](/docs/reference/kernel_objects/vm_object.md) (VMOs).
+Objects][vmo-object] (VMOs).
 
-With no parameters, the `aspace` command shows all VMOs in the process.
-
-```none {:.devsite-disable-click-to-copy}
-[zxdb] as
-```
-
-When given an address, the `aspace` command shows the VMO hierarchy containing just that address.
-This can be useful to determine where an address is in memory, as the names of the VMOs typically
-indicate what type of region that is.
+For example, the `aspace` command shows all VMOs in the process:
 
 ```none {:.devsite-disable-click-to-copy}
-[zxdb] as 0x10b7f304d28
+[zxdb] aspace
+           Start              End  Prot   Size      Koid       Offset  Cmt.Pgs  Name
+        0x200000   0x7ffffffff000  ---    127T                                  proc:14629522
+        0x200000   0x7ffffffff000  ---    127T                                    root
+     0xe4ff29000      0xe5012a000  ---      2M                                      useralloc
+     0xe4ff2a000      0xe5012a000  rw-      2M  14629569     0x201000        2        initial-thread
+    0x6d0d1ad000     0x6d4d1b2000  ---      1G  14629573          0x0        0      scudo:reserved
+    0x6d4d1b2000     0x6d4d1f2000  rw-    256K  14629575       0x5000        2      scudo:primary
+...
+  0x42afdf75e000   0x42afdf761000  rw-     12K  14629536          0x0        1        data:uncompressed-bootfs
+  0x42afdf761000   0x42afdf771000  rw-     64K  14629537          0x0       16        bss:uncompressed-bootfs
+
+              Page size: 4096
+     Total mapped bytes: 48329449472
+  Total committed pages: 125 = 512000 bytes
+                         (See "help aspace" for what committed pages mean.)
 ```
 
-### Understanding the output
+If you specify an address, the `aspace` command shows the VMO hierarchy that
+contains the specified address. This can be useful to determine where an address
+is in memory, as the names of the VMOs typically indicate what type of region
+that memory address is.
 
-In the following example, the `aspace` command details the following about the `0x10b7f304d28`
-address:
+```none {:.devsite-disable-click-to-copy}
+[zxdb] aspace 0x6d0d1ad000
+         Start              End  Prot  Size      Koid  Offset  Cmt.Pgs  Name
+      0x200000   0x7ffffffff000  ---   127T                             proc:14629522
+      0x200000   0x7ffffffff000  ---   127T                               root
+  0x6d0d1ad000     0x6d4d1b2000  ---     1G  14629573     0x0        0      scudo:reserved
+
+              Page size: 4096
+```
+
+In the example above, the `aspace` command details the following about the
+`0x6d0d1ad000` address:
 
   * Hierarchy of VMOs that contain the address.
   * The address and size of each VMO.
   * The name of each VMO, which can give clues about their purpose.
-      * From the name in this example, you can tell the address is in a stack allocated by pthreads.
+      * From the name in this example, you can tell the address is in a stack
+        allocated by `pthreads`.
 
-```none {:.devsite-disable-click-to-copy}
-          Start              End   Size  Koid    Offset  Com.Pgs  Name
-      0x1000000   0x7ffffffff000   127T                           proc:3109
-      0x1000000   0x7ffffffff000   127T                             root
-  0x10b7f104000    0x10b7f305000     2M                               useralloc
-  0x10b7f105000    0x10b7f305000     2M  3824       0x0        2        pthread_t:0x10c4ea38b00
-```
+The `Cmt.Pgs` column shows the number of committed pages (not bytes) in that
+memory region in the mapped VMO.
 
-The following are relevant VMO names that could be included in output from the `aspace` command:
+If a VMO is a child (as in the case of mapped blobs), the original data is
+present in the parent VMO but the child VMO that is actually mapped indirectly
+references this data. The only pages in the child that count as committed
+are those that are duplicated due to copy-on-write. This is why BLOBs and other
+files that are unmodified will have a 0 committed page count.
+
+### Additional details about the output
+
+The following are relevant VMO names that could be included in output from the
+`aspace` command:
 
   * `initial-thread`: The stack of the startup thread.
-  * `pthread_t:0x...`: The stack of a pthread-created thread. The address indicates the memory
-    location of the `pthread_t structure for that thread.
-  * `*uncompressed-bootfs`: A memory-mapped library coming from bootfs (core system libraries). The
-    `libs` command can tell you the library name for that address.
-  * `stack: msg of ...`: The startup stack. This very small stack is used only by the dynamic linker
-    and loader code.
-  * `scudo:*`: Pages allocated with the scudo memory manager. If the process is using scudo, these
-    regions are the application heap.
+  * `pthread_t:0x...`: The stack of a pthread-created thread. The address
+    indicates the memory location of the `pthread_t structure for that thread.
+  * `*uncompressed-bootfs`: A memory-mapped library coming from bootfs (core
+    system libraries). The `libs` command can tell you the library name for that
+    address.
+  * `stack: msg of ...`: The startup stack. This very small stack is only used
+    by the dynamic linker and loader code.
+  * `scudo:*`: Pages allocated with the scudo memory manager. If the process is
+    using scudo, these regions are the application heap.
   * `vdso/next`: The built-in library that implements the next system calls.
   * `vdso/stable`: The built-in library that implements the stable system calls.
-  * `blob-*`: Mapped library coming from blobfs. The `libs` command can tell you the library name
-    for that address.
+  * `blob-*`: Mapped library coming from blobfs. The `libs` command returns
+    the library name for that address.
 
 To see more information about a VMO, use the command `handle -k <koid>`
 
-The "Cmt.Pgs" column shows the number of committed pages (not bytes) in that memory region in the
-mapped VMO. This can be surprising for memory mapped files like blobs and other shared VMOs.
+## `mem-analyze` {#mem-analyze}
 
-If a VMO is a child (as in the case of mapped blobs), the original data will be present in the
-parent VMO but the child VMO that is actually mapped will indirectly reference this data. The only
-pages in the child that will count as committed are those that are duplicated due to copy-on-write.
-This is why blobs and other files that are not modified will have a 0 committed page count.
+Note: This is the `mem-analyze` command. You can also use `ma` to express
+`mem-analyze`.
 
-## `mem-analyze`: Dumps memory, trying to interpret pointers.
+This command attempts to interpret memory as pointers and decode what they
+point to. Addresses with corresponding symbols are symbolized, while other
+addresses indicate the name of the memory-mapping region they fall into.
 
-This command attempts to interpret memory as pointers and decode what they point to. Addresses with
-corresponding symbols are symbolized, while other addresses indicate the name of the
-memory-mapping region they fall into (see the [`aspace`](#aspace_show_mapped_memory_regions)
-command). It can be useful for dumping unknown memory.
+Note: For more information about dumping unknown memory, see the
+[`aspace`](#aspace) command.
+
+This example analyzes `0x42ff9c2fdd30`:
 
 ```none {:.devsite-disable-click-to-copy}
-[zxdb] ma 0x42ff9c2fdd30
+[zxdb] mem-analyze 0x42ff9c2fdd30
        Address               Data
 0x42ff9c2fdd30 0x00000000000015f0
 0x42ff9c2fdd38 0x0000000000000008
@@ -97,39 +139,48 @@ command). It can be useful for dumping unknown memory.
 0x42ff9c2fdd90 0x10469c2710469c37
 ```
 
-See also [`stack`](#stack_provides_a_low-level_analysis_of_the_stack), which is a variant of the
-`mem-analyze` command for stack analysis.
+The `stack-data` command is a variant of `mem-analyze` and helps you analyze a stack.
+For more information, see [`stack-data`](#stack-data).
 
-## `mem-read`: Dump process memory
+## `mem-read` {#mem-read}
 
-The `mem-read` command, abbreviated `x`, provides hex dumps of the given address. You supply
-the address and optionally override the default size with the `-s` option.
+Note: This is the `mem-read` command. You can also use `x` to express `mem-read`.
+
+The `mem-read` command provides hex dumps of the given address. Optionally, you
+can override the default byte size to read with the `-size` (`-s`) option.
+
+This example show the hex dumps for address `0x42ff9c2fdd30` while only reading
+up to `100` bytes:
 
 ```none {:.devsite-disable-click-to-copy}
-[zxdb] x -s 100 0x42ff9c2fdd30
+[zxdb] mem-read -s 100 0x42ff9c2fdd30
 0x42ff9c2fdd30:  f0 15 00 00 00 00 00 00-08 00 00 00 00 00 00 00  |
 0x42ff9c2fdd40:  30 a7 a8 01 f4 42 00 00-f8 a9 a8 01 f4 42 00 00  |0    B       B
 0x42ff9c2fdd50:  53 00 00 00 00 00 00 00-6b 9c 46 10 00 00 00 00  |S       k F
 0x42ff9c2fdd60:  f8 a9 a8 01 f4 42 00 00-00 00 00 00 00 00 00 00  |     B
 0x42ff9c2fdd70:  70 de 2f 9c ff 42 00 00-48 55 5e 01 f4 42 00 00  |p /  B  HU^  B
-0x42ff9c2fdd80:  7b 9c 76 10 6b 9c 46 10-23 9c 46 10 33 9c 56 10  |{ v k F # F 3 V 
+0x42ff9c2fdd80:  7b 9c 76 10 6b 9c 46 10-23 9c 46 10 33 9c 56 10  |{ v k F # F 3 V
 0x42ff9c2fdd90:  37 9c 46 10
 ```
 
-You can also supply an expression that evaluates to an address. If the type of the pointer has
-a known size, the dump automatically shows that many bytes:
+The `mem-read` command also supports an expression that evaluates to an address.
+For example, if the type of the pointer has a known size, the dump automatically
+shows that many bytes:
 
 ```none {:.devsite-disable-click-to-copy}
-[zxdb] x &self->main_waker
+[zxdb] mem-read &self->main_waker
 0x1605a5d1ed0:  70 1a c8 36 47 04 00 00-68 fe 3d dd 25 01 00 00  |p  6G   h = %
 ```
 
-## `stack-data`: Provides a low-level analysis of the stack
+## `stack-data`
 
-The `stack-data` command analyzes the stack in a similar way to `mem-analyze`. It defaults to the
-top of the current thread's stack. The `stack-data` command attempts to decode addresses present in
-the memory region, but it also adds annotations for the known register values and stack base
-pointers of the thread.
+The `stack-data` command provides a low-level analysis of the stack. This works
+similarly to `mem-analyze`. `stack-data` defaults to the top of the current
+thread's stack. The `stack-data` command attempts to decode addresses present in
+the memory region, but it also adds annotations for the known register values
+and stack base pointers of the thread.
+
+For example:
 
 ```none {:.devsite-disable-click-to-copy}
 [zxdb] stack-data
@@ -148,17 +199,25 @@ pointers of the thread.
 0x1605a5d1480 0x0000000000000000 ◁ rdx, r14
 ```
 
-In the notes column, left-pointing arrows indicate which registers point to that stack location,
-while right-pointing arrows indicate where the value of the stack entry points to if it is
-interpreted as an address.
+In the notes column:
 
-## `sym-near`: Map addresses to symbols
+ * Left-pointing arrows indicate which registers point to that stack location.
+ * Right-pointing arrows indicate where the value of the stack entry points to
+   if it is interpreted as an address.
 
-The `sym-near` command, abbreviated `sn`, attempts to map an address to a symbol name. Running the
-command outputs the name and line information (if available) for the symbol at or preceding the
-address and is most often used to tell what a pointer points to.
+## `sym-near` {#sym-near}
+
+Note: This is the `sym-near` command. You can also use `sn` to express `sym-near`.
+
+The `sym-near` command attempts to map an address to a symbol name. Running the
+command outputs the name and line information (if available) for the symbol at
+or preceding the address and is most often used to tell what a pointer points to.
+
+For example:
 
 ```none {:.devsite-disable-click-to-copy}
 [zxdb] sym-near 0x125dd3a845e
 0x125dd3a845e, power_manager::main() • main.rs:37
 ```
+
+[vmo-object]: /docs/reference/kernel_objects/vm_object.md

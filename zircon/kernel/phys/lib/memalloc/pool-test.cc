@@ -138,9 +138,9 @@ void TestPoolFreeing(Pool& pool, uint64_t addr, uint64_t size, bool free_error =
   }
 }
 
-void TestPoolFreeRamSubrangeUpdating(Pool& pool, Type type, uint64_t addr, uint64_t size,
-                                     bool alloc_error = false) {
-  auto status = pool.UpdateFreeRamSubranges(type, addr, size);
+void TestPoolRamSubrangeUpdating(Pool& pool, Type type, uint64_t addr, uint64_t size,
+                                 bool alloc_error = false) {
+  auto status = pool.UpdateRamSubranges(type, addr, size);
   if (alloc_error) {
     EXPECT_TRUE(status.is_error());
     return;
@@ -1035,7 +1035,7 @@ TEST(MemallocPoolTests, FreedAllocations) {
   ASSERT_NO_FATAL_FAILURE(TestPoolContents(ctx.pool, {expected}));
 }
 
-TEST(MemallocPoolTests, FreeRamSubrangeUpdates) {
+TEST(MemallocPoolTests, RamSubrangeUpdates) {
   PoolContext ctx;
   Range ranges[] = {
       // RAM: [0, 3*kChunkSize)
@@ -1055,12 +1055,6 @@ TEST(MemallocPoolTests, FreeRamSubrangeUpdates) {
           .addr = 4 * kChunkSize,
           .size = kChunkSize,
           .type = Type::kFreeRam,
-      },
-      // RAM: [5*kChunkSize, 6*kChunkSize)
-      {
-          .addr = 5 * kChunkSize,
-          .size = kChunkSize,
-          .type = Type::kPhysKernel,
       },
       // RAM: [6*kChunkSize, 7*kChunkSize)
       {
@@ -1098,12 +1092,6 @@ TEST(MemallocPoolTests, FreeRamSubrangeUpdates) {
             .size = kChunkSize,
             .type = Type::kFreeRam,
         },
-        // RAM: [5*kChunkSize, 6*kChunkSize)
-        {
-            .addr = 5 * kChunkSize,
-            .size = kChunkSize,
-            .type = Type::kPhysKernel,
-        },
         // RAM: [6*kChunkSize, 7*kChunkSize)
         {
             .addr = 6 * kChunkSize,
@@ -1114,10 +1102,10 @@ TEST(MemallocPoolTests, FreeRamSubrangeUpdates) {
     ASSERT_NO_FATAL_FAILURE(TestPoolContents(ctx.pool, {expected}));
   }
 
-  // Updating can happen across an allocated type.
+  // Updating can happen across partial allocated and free RAM types.
   {
-    ASSERT_NO_FATAL_FAILURE(TestPoolFreeRamSubrangeUpdating(ctx.pool, Type::kPoolTestPayload,
-                                                            kDefaultMinAddr, 3 * kChunkSize));
+    ASSERT_NO_FATAL_FAILURE(TestPoolRamSubrangeUpdating(ctx.pool, Type::kPoolTestPayload,
+                                                        3 * kChunkSize / 2, 2 * kChunkSize));
 
     const Range expected[] = {
         // bookkeeping: [0, kChunkSize)
@@ -1126,17 +1114,22 @@ TEST(MemallocPoolTests, FreeRamSubrangeUpdates) {
             .size = kChunkSize,
             .type = Type::kPoolBookkeeping,
         },
-        // test payload: [kChunkSize, 3*kChunkSize)
-        // Updated.
+        // RAM: [kChunkSize, 3*kChunkSize/2)
         {
             .addr = kChunkSize,
+            .size = kChunkSize / 2,
+            .type = Type::kFreeRam,
+        },
+        // test payload: [(3/2)*kChunkSize, (7/2)*kChunkSize)
+        {
+            .addr = 3 * kChunkSize / 2,
             .size = 2 * kChunkSize,
             .type = Type::kPoolTestPayload,
         },
-        // data ZBI: [3*kChunkSize, 4*kChunkSize)
+        // data ZBI: [(7/2)*kChunkSize, 4*kChunkSize)
         {
-            .addr = 3 * kChunkSize,
-            .size = kChunkSize,
+            .addr = 7 * kChunkSize / 2,
+            .size = kChunkSize / 2,
             .type = Type::kDataZbi,
         },
         // RAM: [4*kChunkSize, 5*kChunkSize)
@@ -1145,12 +1138,6 @@ TEST(MemallocPoolTests, FreeRamSubrangeUpdates) {
             .size = kChunkSize,
             .type = Type::kFreeRam,
         },
-        // RAM: [5*kChunkSize, 6*kChunkSize)
-        {
-            .addr = 5 * kChunkSize,
-            .size = kChunkSize,
-            .type = Type::kPhysKernel,
-        },
         // RAM: [6*kChunkSize, 7*kChunkSize)
         {
             .addr = 6 * kChunkSize,
@@ -1159,17 +1146,12 @@ TEST(MemallocPoolTests, FreeRamSubrangeUpdates) {
         },
     };
     ASSERT_NO_FATAL_FAILURE(TestPoolContents(ctx.pool, {expected}));
-
-    // Weak allocation does not affect allocated type ranges, even when there
-    // is no free RAM in the provided range.
-    ASSERT_NO_FATAL_FAILURE(TestPoolFreeRamSubrangeUpdating(ctx.pool, Type::kPoolTestPayload,
-                                                            3 * kChunkSize, kChunkSize));
-    ASSERT_NO_FATAL_FAILURE(TestPoolContents(ctx.pool, {expected}));
   }
 
+  // Updating can happen across whole allocated and free RAM types.
   {
-    ASSERT_NO_FATAL_FAILURE(TestPoolFreeRamSubrangeUpdating(ctx.pool, Type::kPoolTestPayload,
-                                                            3 * kChunkSize, 3 * kChunkSize));
+    ASSERT_NO_FATAL_FAILURE(
+        TestPoolRamSubrangeUpdating(ctx.pool, Type::kPoolTestPayload, kChunkSize, 3 * kChunkSize));
 
     const Range expected[] = {
         // bookkeeping: [0, kChunkSize)
@@ -1178,31 +1160,18 @@ TEST(MemallocPoolTests, FreeRamSubrangeUpdates) {
             .size = kChunkSize,
             .type = Type::kPoolBookkeeping,
         },
-        // test payload: [kChunkSize, 3*kChunkSize)
+        // test payload: [kChunkSize, 4*kChunkSize)
         // Updated.
         {
             .addr = kChunkSize,
-            .size = 2 * kChunkSize,
+            .size = 3 * kChunkSize,
             .type = Type::kPoolTestPayload,
         },
-        // data ZBI: [3*kChunkSize, 4*kChunkSize)
+        // RAM: [4*kChunkSize, 5*kChunkSize)
         {
-            .addr = 3 * kChunkSize,
-            .size = kChunkSize,
-            .type = Type::kDataZbi,
-        },
-        // test payload: [4*kChunkSize, 5*kChunkSize)
-        {
-            // Updated.
             .addr = 4 * kChunkSize,
             .size = kChunkSize,
-            .type = Type::kPoolTestPayload,
-        },
-        // RAM: [5*kChunkSize, 6*kChunkSize)
-        {
-            .addr = 5 * kChunkSize,
-            .size = kChunkSize,
-            .type = Type::kPhysKernel,
+            .type = Type::kFreeRam,
         },
         // RAM: [6*kChunkSize, 7*kChunkSize)
         {
@@ -1214,9 +1183,10 @@ TEST(MemallocPoolTests, FreeRamSubrangeUpdates) {
     ASSERT_NO_FATAL_FAILURE(TestPoolContents(ctx.pool, {expected}));
   }
 
+  // Updating can happen across holes.
   {
-    ASSERT_NO_FATAL_FAILURE(TestPoolFreeRamSubrangeUpdating(ctx.pool, Type::kPoolTestPayload,
-                                                            kDefaultMinAddr, 7 * kChunkSize));
+    ASSERT_NO_FATAL_FAILURE(TestPoolRamSubrangeUpdating(ctx.pool, Type::kPoolTestPayload,
+                                                        4 * kChunkSize, 3 * kChunkSize));
 
     const Range expected[] = {
         // bookkeeping: [0, kChunkSize)
@@ -1225,34 +1195,40 @@ TEST(MemallocPoolTests, FreeRamSubrangeUpdates) {
             .size = kChunkSize,
             .type = Type::kPoolBookkeeping,
         },
-        // test payload: [kChunkSize, 3*kChunkSize)
+        // test payload: [kChunkSize, 5*kChunkSize)
         // Updated.
         {
             .addr = kChunkSize,
-            .size = 2 * kChunkSize,
+            .size = 4 * kChunkSize,
             .type = Type::kPoolTestPayload,
-        },
-        // data ZBI: [3*kChunkSize, 4*kChunkSize)
-        {
-            .addr = 3 * kChunkSize,
-            .size = kChunkSize,
-            .type = Type::kDataZbi,
-        },
-        // test payload: [4*kChunkSize, 5*kChunkSize)
-        {
-            .addr = 4 * kChunkSize,
-            .size = kChunkSize,
-            .type = Type::kPoolTestPayload,
-        },
-        // RAM: [5*kChunkSize, 6*kChunkSize)
-        {
-            .addr = 5 * kChunkSize,
-            .size = kChunkSize,
-            .type = Type::kPhysKernel,
         },
         // test payload: [6*kChunkSize, 7*kChunkSize)
+        // Updated.
         {
-            // Updated.
+            .addr = 6 * kChunkSize,
+            .size = kChunkSize,
+            .type = Type::kPoolTestPayload,
+        },
+    };
+    ASSERT_NO_FATAL_FAILURE(TestPoolContents(ctx.pool, {expected}));
+  }
+
+  // Updating can even overwrite tracked bookkeeping.
+  {
+    ASSERT_NO_FATAL_FAILURE(TestPoolRamSubrangeUpdating(ctx.pool, Type::kPoolTestPayload,
+                                                        kDefaultMinAddr, 7 * kChunkSize));
+
+    const Range expected[] = {
+        // test payload: [0, 5*kChunkSize)
+        // Updated.
+        {
+            .addr = 0,
+            .size = 5 * kChunkSize,
+            .type = Type::kPoolTestPayload,
+        },
+        // test payload: [6*kChunkSize, 7*kChunkSize)
+        // Updated.
+        {
             .addr = 6 * kChunkSize,
             .size = kChunkSize,
             .type = Type::kPoolTestPayload,
@@ -2098,163 +2074,15 @@ TEST(MemallocPoolTests, OutOfMemory) {
       return range.type == Type::kFreeRam && range.size > 1;
     });
     ASSERT_NE(ctx.pool.end(), it);
-    ASSERT_NO_FATAL_FAILURE(TestPoolFreeRamSubrangeUpdating(ctx.pool, Type::kPoolTestPayload,
-                                                            it->addr, 1,
-                                                            /*alloc_error=*/true));
+    ASSERT_NO_FATAL_FAILURE(TestPoolRamSubrangeUpdating(ctx.pool, Type::kPoolTestPayload, it->addr,
+                                                        1,
+                                                        /*alloc_error=*/true));
   }
 
   // Now, after the failed operations, verify that the contents remain
   // unmodified.
   std::vector<Range> after(ctx.pool.begin(), ctx.pool.end());
   ASSERT_NO_FATAL_FAILURE(CompareRanges(before, after));
-}
-
-TEST(MemallocPoolTests, NormalizeRanges) {
-  PoolContext ctx;
-  Range ranges[] = {
-      // RAM: [0, kChunkSize)
-      {
-          .addr = 0,
-          .size = kChunkSize,
-          .type = Type::kFreeRam,
-      },
-      // data ZBI: [kChunkSize, 2*kChunkSize)
-      {
-          .addr = kChunkSize,
-          .size = kChunkSize,
-          .type = Type::kDataZbi,
-      },
-      // test payload: [2*kChunkSize, 3*kChunkSize)
-      {
-          .addr = 2 * kChunkSize,
-          .size = kChunkSize,
-          .type = Type::kPoolTestPayload,
-      },
-      // peripheral: [3*kChunkSize, 4*kChunkSize)
-      {
-          .addr = 3 * kChunkSize,
-          .size = kChunkSize,
-          .type = Type::kPeripheral,
-      },
-      // test payload: [5*kChunkSize, 6*kChunkSize)
-      {
-          .addr = 5 * kChunkSize,
-          .size = kChunkSize,
-          .type = Type::kPoolTestPayload,
-      },
-      // phys kernel: [6*kChunkSize, 7*kChunkSize)
-      {
-          .addr = 6 * kChunkSize,
-          .size = kChunkSize,
-          .type = Type::kPhysKernel,
-      },
-  };
-
-  ASSERT_NO_FATAL_FAILURE(TestPoolInit(ctx.pool, {ranges}));
-
-  // Normalize away all ranges.
-  {
-    std::vector<Range> normalized;
-    ctx.pool.NormalizeRanges(
-        [&normalized](const Range& range) {
-          normalized.push_back(range);
-          return true;
-        },
-        [](Type) { return std::nullopt; });
-    EXPECT_TRUE(normalized.empty());
-  }
-
-  // Bail after the first range.
-  {
-    std::vector<Range> normalized;
-    ctx.pool.NormalizeRanges(
-        [&normalized](const Range& range) {
-          normalized.push_back(range);
-          return false;
-        },
-        [](Type type) { return type; });
-    EXPECT_EQ(1u, normalized.size());
-  }
-
-  // Normalize just RAM.
-  {
-    std::vector<Range> normalized;
-    ctx.pool.NormalizeRam([&normalized](const Range& range) {
-      normalized.push_back(range);
-      return true;
-    });
-
-    constexpr Range kExpected[] = {
-        {
-            .addr = 0,
-            .size = 3 * kChunkSize,
-            .type = Type::kFreeRam,
-        },
-        {
-            .addr = 5 * kChunkSize,
-            .size = 2 * kChunkSize,
-            .type = Type::kFreeRam,
-        },
-    };
-    CompareRanges(cpp20::span{kExpected}, {normalized});
-  }
-
-  // Discard RAM.
-  {
-    std::vector<Range> normalized;
-    ctx.pool.NormalizeRanges(
-        [&normalized](const Range& range) {
-          normalized.push_back(range);
-          return true;
-        },
-        [](Type type) {
-          return (IsAllocatedType(type) || type == Type::kFreeRam) ? std::nullopt
-                                                                   : std::make_optional(type);
-        });
-
-    constexpr Range kExpected[] = {
-        {
-            .addr = 3 * kChunkSize,
-            .size = kChunkSize,
-            .type = Type::kPeripheral,
-        },
-    };
-    CompareRanges(cpp20::span{kExpected}, {normalized});
-  }
-
-  // Just keep pool test payloads and bookkeeping.
-  {
-    std::vector<Range> normalized;
-    ctx.pool.NormalizeRanges(
-        [&normalized](const Range& range) {
-          normalized.push_back(range);
-          return true;
-        },
-        [](Type type) {
-          return (type == Type::kPoolBookkeeping || type == Type::kPoolTestPayload)
-                     ? std::make_optional(type)
-                     : std::nullopt;
-        });
-
-    constexpr Range kExpected[] = {
-        {
-            .addr = 0,
-            .size = kChunkSize,
-            .type = Type::kPoolBookkeeping,
-        },
-        {
-            .addr = 2 * kChunkSize,
-            .size = kChunkSize,
-            .type = Type::kPoolTestPayload,
-        },
-        {
-            .addr = 5 * kChunkSize,
-            .size = kChunkSize,
-            .type = Type::kPoolTestPayload,
-        },
-    };
-    CompareRanges(cpp20::span{kExpected}, {normalized});
-  }
 }
 
 TEST(MemallocPoolTests, MarkAsPeripheralBeforeFirstRange) {

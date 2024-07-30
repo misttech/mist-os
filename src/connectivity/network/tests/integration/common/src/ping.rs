@@ -147,6 +147,7 @@ impl<'a> Node<'a> {
                     },
                 )| {
                     const UNSPECIFIED_PORT: u16 = 0;
+                    const PING_SEQ: u16 = 1;
                     let v4_futs = (!src_v4_addrs.is_empty()).then(|| {
                         dst_v4_addrs.iter().map(move |&addr| {
                             let dst_sockaddr = std::net::SocketAddrV4::new(
@@ -154,7 +155,7 @@ impl<'a> Node<'a> {
                                 UNSPECIFIED_PORT,
                             );
                             realm
-                                .ping::<Ipv4>(dst_sockaddr)
+                                .ping_once::<Ipv4>(dst_sockaddr, PING_SEQ)
                                 .map(move |r| {
                                     r.with_context(|| {
                                         format!("failed to ping {} from {:?}", dst_sockaddr, realm)
@@ -177,7 +178,7 @@ impl<'a> Node<'a> {
                                 },
                             );
                             realm
-                                .ping::<Ipv6>(dst_sockaddr)
+                                .ping_once::<Ipv6>(dst_sockaddr, PING_SEQ)
                                 .map(move |r| {
                                     r.with_context(|| {
                                         format!("failed to ping {} from {:?}", dst_sockaddr, realm)

@@ -1,4 +1,3 @@
-#!/usr/bin/env fuchsia-vendored-python
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
@@ -9,7 +8,6 @@ import json
 import subprocess
 from dataclasses import dataclass
 from typing import Any
-
 
 _REMOTE_TARGET_SSH_PORT = 8022
 

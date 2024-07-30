@@ -11,6 +11,7 @@ use std::collections::BTreeMap;
 use std::ops::Deref;
 
 /// An enum encoding all the possible metadata value types and contents.
+#[derive(Debug)]
 pub enum MetadataValue<'a> {
     Int(i64),
     Uint(u64),
@@ -363,6 +364,9 @@ where
             }
         }
         let value = value.into();
+
+        // Turn this log line on to understand if setting a property had issues.
+        tracing::debug!("trying to set key={:?} to value={:?}", &key, &value);
         match (self.map.get(key.as_ref()), value) {
             (
                 Some((MetadataProperty::Int(property), track_events)),

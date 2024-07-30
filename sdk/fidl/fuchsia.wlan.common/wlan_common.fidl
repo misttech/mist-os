@@ -15,8 +15,7 @@ type RequestStatus = strict enum {
 
 /// PHY types supporting different MCS and payload data rates.
 /// Based off of dot11PHYType from IEEE 802.11-2016/2020 Annex C + Amendments
-@available(added=13)
-type WlanPhyType = flexible enum {
+type WlanPhyType = strict(removed=13) flexible(added=13) enum {
     /// IEEE 802.11-2016 Clause 15:
     ///     Direct Sequence Spread Spectrum
     /// Supports 1, 2 Mbps.
@@ -83,8 +82,7 @@ const MAX_SUPPORTED_PHY_TYPES uint8 = 64;
 
 // Numbers defined to guarantee consistent numbering between all code bindings
 // to ease conversion.
-@available(added=13)
-type WlanMacRole = flexible enum {
+type WlanMacRole = strict(removed=13) flexible(added=13) enum {
     CLIENT = 1;
     AP = 2;
     MESH = 3;
@@ -101,7 +99,7 @@ const MAX_SUPPORTED_MAC_ROLES uint8 = 16;
 const MAX_BANDS uint8 = 16;
 
 @available(added=13)
-type ChannelBandwidth = flexible enum { // Channel Bandwidth
+type ChannelBandwidth = flexible enum {
     CBW20 = 1;
     CBW40 = 2;
     CBW40BELOW = 3;
@@ -263,6 +261,10 @@ type WlanKeyConfig = table {
     /// Index for rotating keys, e.g. group keys.
     /// This value is always 0 for key types which aren't rotating, e.g. pairwise keys.
     /// Required.
+    ///
+    /// TODO(https://fxbug.dev/301104836): This is a uint8, but SetKeyDescriptor in MLME FIDL and
+    /// DeleteKeysDescriptor in Fullmac FIDL use a uint16 for key_id/key_idx. We should consider
+    /// making all these use the same type.
     6: key_idx uint8;
     /// They key's actual bytes.
     /// Required.

@@ -11,10 +11,10 @@ use futures::stream::AbortHandle;
 use starnix_logging::{log_trace, log_warn, track_stub};
 use starnix_sync::Mutex;
 use starnix_uapi::errors::Errno;
-use starnix_uapi::ownership::TempRef;
+use starnix_uapi::ownership::{TempRef, WeakRef};
 use starnix_uapi::time::{duration_from_timespec, time_from_timespec, timespec_from_duration};
 use starnix_uapi::{itimerspec, SI_TIMER};
-use std::sync::{Arc, Weak};
+use std::sync::Arc;
 use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
 #[derive(Default)]
@@ -93,7 +93,7 @@ impl IntervalTimer {
         Some(SignalInfo::new(self.signal_event.signo?, SI_TIMER, signal_detail))
     }
 
-    async fn start_timer_loop(self: &IntervalTimerHandle, thread_group: Weak<ThreadGroup>) {
+    async fn start_timer_loop(self: &IntervalTimerHandle, thread_group: WeakRef<ThreadGroup>) {
         loop {
             let target_monotonic = loop {
                 // We may have to issue multiple sleeps if the target time in the timer is
@@ -187,7 +187,7 @@ impl IntervalTimer {
     pub fn arm(
         self: &IntervalTimerHandle,
         kernel: &Kernel,
-        thread_group: Weak<ThreadGroup>,
+        thread_group: WeakRef<ThreadGroup>,
         new_value: itimerspec,
         is_absolute: bool,
     ) -> Result<(), Errno> {

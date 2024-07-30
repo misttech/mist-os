@@ -412,7 +412,17 @@ TEST(VkLoop, EventHang) {
 
 TEST(VkLoop, DriverDeath) {
   VkLoopTest test(true);
+
   ASSERT_TRUE(test.Initialize());
+
+  // TODO(https://fxbug.dev/351097268): The test is currently disabled on Intel
+  // GPUs because the DFv2 intel-i915 driver doesn't support the
+  // fuchsia.device/Controller protocol and the test cannot kill and
+  // restart the driver.
+  static constexpr uint32_t kIntelVendorId = 0x8086;  // MAGMA_VENDOR_ID_INTEL
+  if (test.get_vendor_id() == kIntelVendorId) {
+    GTEST_SKIP();
+  }
 
   ASSERT_TRUE(test.Exec(true, VkLoopTest::AllowSuccess::kDisallow));
 }

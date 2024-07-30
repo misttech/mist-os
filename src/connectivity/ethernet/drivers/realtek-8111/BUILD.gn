@@ -6,8 +6,8 @@ import("//build/bind/bind.gni")
 import("//build/drivers.gni")
 
 driver_bind_rules("realtek_rtl8111_bind") {
-  rules = "realtek_rtl8111.bind"
-  tests = "bind-tests.json"
+  rules = "meta/realtek_rtl8111.bind"
+  tests = "meta/bind-tests.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_bindlib",
     "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_bindlib",
@@ -39,7 +39,7 @@ if (current_cpu == "x64") {
   fuchsia_driver_component("realtek-8111") {
     component_name = "realtek-8111"
     deps = [ ":realtek-8111-driver" ]
-    info = "realtek-8111-info.json"
+    info = "meta/realtek-8111-info.json"
     manifest = "meta/realtek-8111.cml"
   }
 

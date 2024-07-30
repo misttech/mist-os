@@ -900,8 +900,8 @@ struct SendDiagnosticCDB {
 
 static_assert(sizeof(SendDiagnosticCDB) == 6, "Send Diagnostic CDB must be 6 bytes");
 
-struct DiskOp;
-struct DiskOptions;
+struct DeviceOp;
+struct DeviceOptions;
 
 using LuCallback =
     fit::function<zx::result<>(uint16_t lun, size_t block_size, uint64_t block_count)>;
@@ -911,7 +911,7 @@ class Controller {
   virtual ~Controller() = default;
 
   // Size of metadata struct required for each command transaction by this controller. This metadata
-  // struct must include scsi::DiskOp as its first (and possibly only) member.
+  // struct must include scsi::DeviceOp as its first (and possibly only) member.
   virtual size_t BlockOpSize() = 0;
 
   // Synchronously execute a SCSI command on the device at target:lun.
@@ -925,15 +925,15 @@ class Controller {
 
   // Asynchronously execute a SCSI command on the device at target:lun.
   // |cdb| contains the SCSI CDB to execute.
-  // |disk_op|, |block_size_bytes|, and |is_write| specify optional data-out or data-in regions.
-  // Command execution status is returned by invoking |disk_op|->Complete(status).
+  // |device_op|, |block_size_bytes|, and |is_write| specify optional data-out or data-in regions.
+  // Command execution status is returned by invoking |device_op|->Complete(status).
   // Typically used for IO commands where data may not reside in process memory.
   // The |data| is used when there is an additional data buffer to pass. For example, an operation
   // like TRIM(block_trim_t) does not have a data vmo, but the SCSI UNMAP command requires a data
   // vmo to record the address and length of the block to be trimmed. In this case, the additional
   // buffer is passed through |data| and the device driver creates and manages the data vmo.
   virtual void ExecuteCommandAsync(uint8_t target, uint16_t lun, iovec cdb, bool is_write,
-                                   uint32_t block_size_bytes, DiskOp* disk_op,
+                                   uint32_t block_size_bytes, DeviceOp* device_op,
                                    iovec data = {nullptr, 0}) = 0;
 
   // Test whether the target-lun is ready.
@@ -989,7 +989,8 @@ class Controller {
   // Check the status of each LU and bind it. This function returns the number of LUs found.
   zx::result<uint32_t> ScanAndBindLogicalUnits(zx_device_t* device, uint8_t target,
                                                uint32_t max_transfer_bytes, uint16_t max_lun,
-                                               LuCallback lu_callback, DiskOptions disk_options);
+                                               LuCallback lu_callback,
+                                               DeviceOptions device_options);
 };
 
 }  // namespace scsi

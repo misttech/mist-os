@@ -212,6 +212,7 @@ impl Isolate {
             ffx_config::ConfigMap::new(),
             Some(tmpdir.path().join(".ffx_env").to_owned()),
             None,
+            env_context.has_no_environment(),
         )?;
 
         // NOTE: config values from this Isolate might not be found correctly,

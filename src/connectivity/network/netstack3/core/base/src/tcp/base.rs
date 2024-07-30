@@ -15,7 +15,7 @@ use packet::InnerPacketBuilder;
 use packet_formats::ip::IpExt;
 
 use crate::ip::Mms;
-use crate::tcp::segment::Payload;
+use crate::tcp::segment::{Payload, PayloadLen};
 
 /// Control flags that can alter the state of a TCP control block.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -98,14 +98,16 @@ impl SendPayload<'_> {
     }
 }
 
-impl Payload for SendPayload<'_> {
+impl PayloadLen for SendPayload<'_> {
     fn len(&self) -> usize {
         match self {
             SendPayload::Contiguous(p) => p.len(),
             SendPayload::Straddle(p1, p2) => p1.len() + p2.len(),
         }
     }
+}
 
+impl Payload for SendPayload<'_> {
     fn slice(self, range: Range<u32>) -> Self {
         match self {
             SendPayload::Contiguous(p) => SendPayload::Contiguous(p.slice(range)),

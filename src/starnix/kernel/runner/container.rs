@@ -20,6 +20,7 @@ use fuchsia_zircon::{
 };
 use futures::channel::oneshot;
 use futures::{FutureExt, StreamExt, TryStreamExt};
+use magma_device::get_magma_params;
 use runner::{get_program_string, get_program_strvec};
 use selinux::security_server::SecurityServer;
 use starnix_core::device::init_common_devices;
@@ -28,6 +29,7 @@ use starnix_core::execution::{
     execute_task_with_prerun_result,
 };
 use starnix_core::fs::layeredfs::LayeredFs;
+use starnix_core::fs::overlayfs::OverlayFs;
 use starnix_core::fs::tmpfs::TmpFs;
 use starnix_core::task::{set_thread_role, CurrentTask, ExitStatus, Kernel, Task};
 use starnix_core::time::utc::update_utc_clock;
@@ -346,6 +348,11 @@ async fn create_container(
             Err(err) => log_warn!("could not get serial number: {err:?}"),
         }
     }
+    if features.magma {
+        kernel_cmdline.extend(b" ");
+        let params = get_magma_params();
+        kernel_cmdline.extend(&*params);
+    }
 
     // Check whether we actually have access to a role manager by trying to set our own
     // thread's role.
@@ -538,8 +545,11 @@ where
     if features.test_data {
         mappings.push(("test_data".into(), TmpFs::new_fs(kernel)));
     }
-    let root_fs = LayeredFs::new_fs(kernel, root_fs, mappings.into_iter().collect());
 
+    let mut root_fs = LayeredFs::new_fs(kernel, root_fs, mappings.into_iter().collect());
+    if features.rootfs_rw {
+        root_fs = OverlayFs::wrap_fs_in_writable_layer(kernel, root_fs)?;
+    }
     Ok(FsContext::new(root_fs))
 }
 

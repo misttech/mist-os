@@ -2,15 +2,28 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fuchsia/io/cpp/fidl.h>
+#include <fidl/fuchsia.io/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/fidl/cpp/wire/channel.h>
+#include <lib/fidl/cpp/wire/client.h>
+#include <lib/sync/completion.h>
+#include <lib/syslog/cpp/macros.h>
+#include <lib/zx/time.h>
+#include <sys/stat.h>
+#include <zircon/errors.h>
+#include <zircon/time.h>
 
+#include <memory>
+#include <thread>
+#include <tuple>
+#include <utility>
+
+#include <fbl/ref_ptr.h>
 #include <gtest/gtest.h>
 
 #include "src/storage/f2fs/f2fs.h"
 #include "src/storage/f2fs/vnode.h"
-#include "src/storage/lib/block_client/cpp/fake_block_device.h"
 #include "unit_lib.h"
 
 namespace f2fs {
@@ -81,15 +94,14 @@ TEST(Teardown, ShutdownOnNoConnections) {
   root_dir->SetMode(S_IFDIR);
 
   async::Loop clients_loop(&kAsyncLoopConfigAttachToCurrentThread);
-  fuchsia::io::DirectoryPtr root_client;
-  auto root_server = root_client.NewRequest();
-  ASSERT_TRUE(root_client.is_bound());
-  ASSERT_EQ(vfs_or->ServeDirectory(std::move(root_dir), fidl::ServerEnd<fuchsia_io::Directory>(
-                                                            root_server.TakeChannel())),
-            ZX_OK);
+  auto root_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  ASSERT_TRUE(root_endpoints.is_ok());
+  fidl::WireClient<fuchsia_io::Directory> root_client(std::move(root_endpoints->client),
+                                                      loop.dispatcher());
+  ASSERT_EQ(vfs_or->ServeDirectory(std::move(root_dir), std::move(root_endpoints->server)), ZX_OK);
 
   // A) Wait for root directory sync to begin.
-  root_client->Sync([](fuchsia::io::Node2_Sync_Result) {});
+  root_client->Sync().Then([](auto& result) {});
   sync_completion_wait(&root_completions[0], ZX_TIME_INFINITE);
 
   // Create child vnode connection.
@@ -100,22 +112,19 @@ TEST(Teardown, ShutdownOnNoConnections) {
   auto child_dir = fbl::AdoptRef(new AsyncTearDownVnode(fs, child_nid, child_completions));
   child_dir->SetMode(S_IFDIR);
 
-  fuchsia::io::DirectoryPtr child_client;
-  child_client.set_error_handler([&clients_loop](zx_status_t status) {
-    ASSERT_EQ(status, ZX_OK);
-    clients_loop.Quit();
-  });
-  auto child_server = child_client.NewRequest();
-  ASSERT_TRUE(child_client.is_bound());
+  auto child_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  ASSERT_TRUE(child_endpoints.is_ok());
+  fidl::WireClient<fuchsia_io::Directory> child_client(std::move(child_endpoints->client),
+                                                       clients_loop.dispatcher());
   ASSERT_EQ(child_dir->Open(nullptr), ZX_OK);
-  ASSERT_EQ(vfs_or->Serve(std::move(child_dir), child_server.TakeChannel(), {}), ZX_OK);
+  ASSERT_EQ(vfs_or->Serve(std::move(child_dir), child_endpoints->server.TakeChannel(), {}), ZX_OK);
 
   // A) Wait for child vnode sync to begin.
-  child_client->Sync([](fuchsia::io::Node2_Sync_Result) {});
+  child_client->Sync().Then([](auto& result) {});
   sync_completion_wait(&child_completions[0], ZX_TIME_INFINITE);
 
   // Terminate root directory connection.
-  root_client.Unbind();
+  std::ignore = root_client.UnbindMaybeGetEndpoint();
 
   // B) Let complete sync.
   sync_completion_signal(&root_completions[1]);
@@ -128,7 +137,7 @@ TEST(Teardown, ShutdownOnNoConnections) {
   ASSERT_FALSE(vfs_or->IsTerminating());
 
   // Terminate child vnode connection.
-  child_client.Unbind();
+  std::ignore = child_client.UnbindMaybeGetEndpoint().is_ok();
 
   // B) Let complete sync.
   sync_completion_signal(&child_completions[1]);

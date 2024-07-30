@@ -103,6 +103,7 @@ filegroup(
             "lib/clang/%{CLANG_VERSION}/include/**",
         ]) + glob([
             "include/%s-unknown-fuchsia/c++/v1/*" % cpu,
+            "include/%s-unknown-fuchsia/*/c++/v1/*" % cpu,
         ]),
     )
     for cpu in TARGET_CPUS
@@ -168,6 +169,13 @@ filegroup(
 )
 
 filegroup(
+    name = "objdump",
+    srcs = [
+        "//:bin/llvm-objdump",
+    ],
+)
+
+filegroup(
     name = "strip",
     srcs = [
         "//:bin/llvm-strip",
@@ -191,6 +199,7 @@ filegroup(
             ":ar",
             ":nm",
             ":objcopy",
+            ":objdump",
         ],
     )
     for cpu in TARGET_CPUS

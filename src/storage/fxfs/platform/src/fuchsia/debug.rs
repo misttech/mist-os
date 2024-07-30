@@ -374,11 +374,11 @@ impl Directory for ObjectDirectory {
         });
     }
 
-    fn open2(
+    fn open3(
         self: Arc<Self>,
         scope: ExecutionScope,
         mut path: vfs::path::Path,
-        protocols: fio::ConnectionProtocols,
+        flags: fio::Flags,
         object_request: ObjectRequestRef<'_>,
     ) -> Result<(), Status> {
         object_request.take().handle(|object_request| {
@@ -390,14 +390,14 @@ impl Directory for ObjectDirectory {
                     vfs::file::serve(
                         InternalFile::new(object_id, self.store.clone()),
                         scope,
-                        &protocols,
+                        &flags,
                         object_request,
                     )
                 }
                 (_, None) => object_request.spawn_connection(
                     scope,
                     self,
-                    protocols,
+                    flags,
                     vfs::directory::immutable::connection::ImmutableConnection::create,
                 ),
             }

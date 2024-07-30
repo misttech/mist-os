@@ -4,9 +4,10 @@
 
 use anyhow::{anyhow, Context, Result};
 use ffx_scrutiny_verify_args::component_resolvers::Command;
-use scrutiny_config::{ConfigBuilder, ModelConfig};
-use scrutiny_frontend::command_builder::CommandBuilder;
-use scrutiny_frontend::launcher;
+use scrutiny_frontend::verify::component_resolvers::{
+    ComponentResolverRequest, ComponentResolverResponse,
+};
+use scrutiny_frontend::{Scrutiny, ScrutinyArtifacts};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fs;
@@ -14,23 +15,10 @@ use std::path::PathBuf;
 
 type Moniker = String;
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Clone)]
-struct ComponentResolversRequest {
-    scheme: String,
-    moniker: Moniker,
-    protocol: String,
-}
-
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
-struct ComponentResolversResponse {
-    deps: HashSet<PathBuf>,
-    monikers: Vec<Moniker>,
-}
-
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 struct AllowListEntry {
     #[serde(flatten)]
-    query: ComponentResolversRequest,
+    query: ComponentResolverRequest,
     components: Vec<Moniker>,
 }
 
@@ -38,7 +26,7 @@ struct AllowListEntry {
 struct AllowList(Vec<AllowListEntry>);
 
 impl AllowList {
-    pub fn iter(&self) -> impl Iterator<Item = (ComponentResolversRequest, &[Moniker])> {
+    pub fn iter(&self) -> impl Iterator<Item = (ComponentResolverRequest, &[Moniker])> {
         self.0.iter().map(|entry| (entry.query.clone(), entry.components.as_slice()))
     }
 }
@@ -52,16 +40,13 @@ trait QueryComponentResolvers {
         scheme: String,
         moniker: Moniker,
         protocol: String,
-    ) -> Result<ComponentResolversResponse>;
+    ) -> Result<ComponentResolverResponse>;
 }
 
-/// An impl of [`QueryComponentResolvers`] that launches and queries scrutiny relative to the
-/// current working directory.
-#[derive(Debug)]
+/// An impl of [`QueryComponentResolvers`] that launches and queries scrutiny
+/// for artifacts inside a product bundle.
 struct ScrutinyQueryComponentResolvers {
-    product_bundle: PathBuf,
-    tmp_dir_path: Option<PathBuf>,
-    recovery: bool,
+    artifacts: ScrutinyArtifacts,
 }
 
 impl QueryComponentResolvers for ScrutinyQueryComponentResolvers {
@@ -70,31 +55,8 @@ impl QueryComponentResolvers for ScrutinyQueryComponentResolvers {
         scheme: String,
         moniker: Moniker,
         protocol: String,
-    ) -> Result<ComponentResolversResponse> {
-        let request = ComponentResolversRequest { scheme, moniker, protocol };
-        let command = CommandBuilder::new("verify.component_resolvers")
-            .param("scheme", &request.scheme)
-            .param("moniker", request.moniker.to_string())
-            .param("protocol", &request.protocol)
-            .build();
-        let model = if self.recovery {
-            ModelConfig::from_product_bundle_recovery(self.product_bundle.clone())
-        } else {
-            ModelConfig::from_product_bundle(self.product_bundle.clone())
-        }?;
-        let mut config = ConfigBuilder::with_model(model).command(command).build();
-        config.runtime.model.tmp_dir_path = self.tmp_dir_path.clone();
-        config.runtime.logging.silent_mode = true;
-
-        let results = launcher::launch_from_config(config).context("Failed to launch scrutiny")?;
-        if results.starts_with("Error: ") {
-            return Err(anyhow!(results))
-                .with_context(|| format!("Failed to query scrutiny with {:?}", request));
-        }
-        Ok(serde_json5::from_str(&results).context(format!(
-            "Failed to deserialize verify component resolvers results: {:?}",
-            results
-        ))?)
+    ) -> Result<ComponentResolverResponse> {
+        self.artifacts.get_monikers_for_resolver(scheme, moniker, protocol)
     }
 }
 
@@ -140,17 +102,16 @@ fn verify_component_resolvers(
     }
 }
 
-pub async fn verify(
-    cmd: &Command,
-    tmp_dir: Option<&PathBuf>,
-    recovery: bool,
-) -> Result<HashSet<PathBuf>> {
+pub async fn verify(cmd: &Command, recovery: bool) -> Result<HashSet<PathBuf>> {
     let allowlist_path = &cmd.allowlist;
-    let scrutiny = ScrutinyQueryComponentResolvers {
-        product_bundle: cmd.product_bundle.clone(),
-        tmp_dir_path: tmp_dir.map(PathBuf::clone),
-        recovery,
-    };
+
+    let artifacts = if recovery {
+        Scrutiny::from_product_bundle_recovery(&cmd.product_bundle)
+    } else {
+        Scrutiny::from_product_bundle(&cmd.product_bundle)
+    }?
+    .collect()?;
+    let scrutiny = ScrutinyQueryComponentResolvers { artifacts };
 
     let allowlist: AllowList = serde_json5::from_str(
         &fs::read_to_string(&allowlist_path).context("Failed to read allowlist")?,
@@ -197,7 +158,7 @@ mod tests {
             response: Vec<Moniker>,
             response_deps: Vec<String>,
         ) -> Self {
-            let raw_response = serde_json::to_string(&ComponentResolversResponse {
+            let raw_response = serde_json::to_string(&ComponentResolverResponse {
                 monikers: response,
                 deps: response_deps.into_iter().map(PathBuf::from).collect(),
             })
@@ -217,7 +178,7 @@ mod tests {
             scheme: String,
             moniker: Moniker,
             protocol: String,
-        ) -> Result<ComponentResolversResponse> {
+        ) -> Result<ComponentResolverResponse> {
             let key = (scheme, moniker, protocol);
 
             let response = self

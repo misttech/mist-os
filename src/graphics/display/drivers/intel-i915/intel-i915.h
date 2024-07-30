@@ -5,6 +5,7 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_INTEL_I915_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_INTEL_I915_H_
 
+#include <fidl/fuchsia.device.manager/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.pci/cpp/wire.h>
 #include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
@@ -54,68 +55,87 @@ typedef struct buffer_allocation {
   uint16_t end;
 } buffer_allocation_t;
 
-class Controller : public ddk::DisplayControllerImplProtocol<Controller>,
+struct ControllerResources {
+  // Must be of type `ZX_RSRC_KIND_SYSTEM` with base
+  // `ZX_RSRC_SYSTEM_FRAMEBUFFER_BASE`.
+  zx::unowned_resource framebuffer;
+
+  // Must be of type `ZX_RSRC_KIND_MMIO` with access to all valid ranges.
+  zx::unowned_resource mmio;
+
+  // Must be of type `ZX_RSRC_KIND_IOPORT` with access to all valid ranges.
+  zx::unowned_resource ioport;
+};
+
+class Controller : public ddk::DisplayEngineProtocol<Controller>,
                    public ddk::IntelGpuCoreProtocol<Controller> {
  public:
-  explicit Controller(zx_device_t* parent, inspect::Inspector inspector);
-  ~Controller();
-
   // Creates a `Controller` instance and performs short-running initialization
   // of all subcomponents.
   //
   // Long-running initialization is performed in the Start() hook.
-  static zx::result<std::unique_ptr<Controller>> Create(zx_device_t* parent,
-                                                        inspect::Inspector inspector);
+  //
+  // `sysmem` must be non-null.
+  // `pci` must be non-null.
+  // `resources` must be valid while the Controller instance is alive.
+  static zx::result<std::unique_ptr<Controller>> Create(
+      fidl::ClientEnd<fuchsia_sysmem2::Allocator> sysmem,
+      fidl::ClientEnd<fuchsia_hardware_pci::Device> pci, ControllerResources resources,
+      inspect::Inspector inspector);
 
-  // Corresponds to DFv1 `DdkInit()` and DFv2 `Start()`.
+  // Prefer to use the `Create()` factory function in production code.
+  explicit Controller(fidl::ClientEnd<fuchsia_sysmem2::Allocator> sysmem,
+                      fidl::ClientEnd<fuchsia_hardware_pci::Device> pci,
+                      ControllerResources resources, inspect::Inspector inspector);
+
+  // Creates a Controller with no valid FIDL clients and no resources for
+  // testing purpose only.
+  explicit Controller(inspect::Inspector inspector);
+
+  ~Controller();
+
+  // Corresponds to DFv2 `Start()`.
   void Start(fdf::StartCompleter completer);
 
-  // Corresponds to DFv1 `DdkUnbind()` and DFv2 `PrepareStop()`.
+  // Corresponds to DFv2 `PrepareStop()`.
   void PrepareStopOnPowerOn(fdf::PrepareStopCompleter completer);
 
-  // Corresponds to DFv1 `DdkSuspend()` and DFv2 `PrepareStop()`.
-  void PrepareStopOnSuspend(uint8_t suspend_reason, fdf::PrepareStopCompleter completer);
+  // Corresponds to DFv2 `PrepareStop()`.
+  void PrepareStopOnPowerStateTransition(fuchsia_device_manager::SystemPowerState power_state,
+                                         fdf::PrepareStopCompleter completer);
 
   // display controller protocol ops
-  void DisplayControllerImplSetDisplayControllerInterface(
-      const display_controller_interface_protocol* intf);
-  void DisplayControllerImplResetDisplayControllerInterface();
-  zx_status_t DisplayControllerImplImportBufferCollection(
-      uint64_t banjo_driver_buffer_collection_id, zx::channel collection_token);
-  zx_status_t DisplayControllerImplReleaseBufferCollection(
-      uint64_t banjo_driver_buffer_collection_id);
-  zx_status_t DisplayControllerImplImportImage(const image_metadata_t* image_metadata,
-                                               uint64_t banjo_driver_buffer_collection_id,
-                                               uint32_t index, uint64_t* out_image_handle);
-  zx_status_t DisplayControllerImplImportImageForCapture(uint64_t banjo_driver_buffer_collection_id,
-                                                         uint32_t index,
-                                                         uint64_t* out_capture_handle) {
+  void DisplayEngineRegisterDisplayEngineListener(
+      const display_engine_listener_protocol* engine_listener);
+  void DisplayEngineDeregisterDisplayEngineListener();
+  zx_status_t DisplayEngineImportBufferCollection(uint64_t banjo_driver_buffer_collection_id,
+                                                  zx::channel collection_token);
+  zx_status_t DisplayEngineReleaseBufferCollection(uint64_t banjo_driver_buffer_collection_id);
+  zx_status_t DisplayEngineImportImage(const image_metadata_t* image_metadata,
+                                       uint64_t banjo_driver_buffer_collection_id, uint32_t index,
+                                       uint64_t* out_image_handle);
+  zx_status_t DisplayEngineImportImageForCapture(uint64_t banjo_driver_buffer_collection_id,
+                                                 uint32_t index, uint64_t* out_capture_handle) {
     return ZX_ERR_NOT_SUPPORTED;
   }
-  void DisplayControllerImplReleaseImage(uint64_t image_handle);
-  config_check_result_t DisplayControllerImplCheckConfiguration(
+  void DisplayEngineReleaseImage(uint64_t image_handle);
+  config_check_result_t DisplayEngineCheckConfiguration(
       const display_config_t* display_configs, size_t display_count,
       client_composition_opcode_t* out_client_composition_opcodes_list,
       size_t client_composition_opcodes_count, size_t* out_client_composition_opcodes_actual);
-  void DisplayControllerImplApplyConfiguration(const display_config_t* banjo_display_configs,
-                                               size_t display_config_count,
-                                               const config_stamp_t* banjo_config_stamp);
-  zx_status_t DisplayControllerImplSetBufferCollectionConstraints(
+  void DisplayEngineApplyConfiguration(const display_config_t* banjo_display_configs,
+                                       size_t display_config_count,
+                                       const config_stamp_t* banjo_config_stamp);
+  zx_status_t DisplayEngineSetBufferCollectionConstraints(
       const image_buffer_usage_t* usage, uint64_t banjo_driver_buffer_collection_id);
-  zx_status_t DisplayControllerImplSetDisplayPower(uint64_t banjo_display_id, bool power_on) {
+  zx_status_t DisplayEngineSetDisplayPower(uint64_t banjo_display_id, bool power_on) {
     return ZX_ERR_NOT_SUPPORTED;
   }
-  bool DisplayControllerImplIsCaptureSupported() { return false; }
-  zx_status_t DisplayControllerImplStartCapture(uint64_t capture_handle) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-  zx_status_t DisplayControllerImplReleaseCapture(uint64_t capture_handle) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-  bool DisplayControllerImplIsCaptureCompleted() { return false; }
-  zx_status_t DisplayControllerImplSetMinimumRgb(uint8_t minimum_rgb) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
+  bool DisplayEngineIsCaptureSupported() { return false; }
+  zx_status_t DisplayEngineStartCapture(uint64_t capture_handle) { return ZX_ERR_NOT_SUPPORTED; }
+  zx_status_t DisplayEngineReleaseCapture(uint64_t capture_handle) { return ZX_ERR_NOT_SUPPORTED; }
+  bool DisplayEngineIsCaptureCompleted() { return false; }
+  zx_status_t DisplayEngineSetMinimumRgb(uint8_t minimum_rgb) { return ZX_ERR_NOT_SUPPORTED; }
 
   // gpu core ops
   zx_status_t IntelGpuCoreReadPciConfig16(uint16_t addr, uint16_t* value_out);
@@ -214,7 +234,7 @@ class Controller : public ddk::DisplayControllerImplProtocol<Controller>,
   // Disables the PCU (power controller)'s automated voltage adjustments.
   void DisableSystemAgentGeyserville();
 
-  zx_device_t* const parent_;
+  ControllerResources resources_;
 
   std::unique_ptr<DisplayDevice> QueryDisplay(DdiId ddi_id, display::DisplayId display_id)
       __TA_REQUIRES(display_lock_);
@@ -277,7 +297,7 @@ class Controller : public ddk::DisplayControllerImplProtocol<Controller>,
                      fidl::WireSyncClient<fuchsia_sysmem2::BufferCollection>>
       buffer_collections_;
 
-  ddk::DisplayControllerInterfaceProtocolClient dc_intf_ __TA_GUARDED(display_lock_);
+  ddk::DisplayEngineListenerProtocolClient engine_listener_ __TA_GUARDED(display_lock_);
 
   // True iff the driver initialization (Bind() and DdkInit()) is fully
   // completed.

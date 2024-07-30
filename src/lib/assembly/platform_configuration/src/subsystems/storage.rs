@@ -23,8 +23,11 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
             builder.platform_bundle("live_usb");
         }
 
-        // Include legacy paver implementation if the board doesn't include it.
-        if !context.board_info.provides_feature("fuchsia::paver") {
+        // Include legacy paver implementation in all feature sets above "embeddable" if the board
+        // doesn't include it. Embeddable doesn't support paving.
+        if *context.feature_set_level != FeatureSupportLevel::Embeddable
+            && !context.board_info.provides_feature("fuchsia::paver")
+        {
             builder.platform_bundle("paver_legacy");
         }
 

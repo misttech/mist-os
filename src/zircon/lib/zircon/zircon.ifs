@@ -14,6 +14,7 @@ Symbols:
   - { Name: _zx_channel_write, Type: Func }
   - { Name: _zx_channel_write_etc, Type: Func }
   - { Name: _zx_clock_create, Type: Func }
+  - { Name: _zx_clock_get_boot, Type: Func }
   - { Name: _zx_clock_get_details, Type: Func }
   - { Name: _zx_clock_get_monotonic, Type: Func }
   - { Name: _zx_clock_read, Type: Func }
@@ -178,6 +179,7 @@ Symbols:
   - { Name: _zx_thread_start, Type: Func }
   - { Name: _zx_thread_write_state, Type: Func }
   - { Name: _zx_ticks_get, Type: Func }
+  - { Name: _zx_ticks_get_boot, Type: Func }
   - { Name: _zx_ticks_per_second, Type: Func }
   - { Name: _zx_timer_cancel, Type: Func }
   - { Name: _zx_timer_create, Type: Func }
@@ -222,6 +224,7 @@ Symbols:
   - { Name: zx_channel_write, Type: Func, Weak: true }
   - { Name: zx_channel_write_etc, Type: Func, Weak: true }
   - { Name: zx_clock_create, Type: Func, Weak: true }
+  - { Name: zx_clock_get_boot, Type: Func, Weak: true }
   - { Name: zx_clock_get_details, Type: Func, Weak: true }
   - { Name: zx_clock_get_monotonic, Type: Func, Weak: true }
   - { Name: zx_clock_read, Type: Func, Weak: true }
@@ -386,6 +389,7 @@ Symbols:
   - { Name: zx_thread_start, Type: Func, Weak: true }
   - { Name: zx_thread_write_state, Type: Func, Weak: true }
   - { Name: zx_ticks_get, Type: Func, Weak: true }
+  - { Name: zx_ticks_get_boot, Type: Func, Weak: true }
   - { Name: zx_ticks_per_second, Type: Func, Weak: true }
   - { Name: zx_timer_cancel, Type: Func, Weak: true }
   - { Name: zx_timer_create, Type: Func, Weak: true }

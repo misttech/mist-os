@@ -4,6 +4,7 @@
 
 #include "bt_transport_usb.h"
 
+#include <fidl/fuchsia.hardware.bluetooth/cpp/fidl.h>
 #include <fuchsia/hardware/bt/hci/cpp/banjo.h>
 #include <fuchsia/hardware/usb/cpp/banjo.h>
 #include <lib/async/cpp/task.h>
@@ -22,6 +23,7 @@
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
 
 namespace {
+namespace fhbt = fuchsia_hardware_bluetooth;
 
 constexpr uint16_t kVendorId = 1;
 constexpr uint16_t kProductId = 2;
@@ -111,6 +113,8 @@ class FakeUsbDevice : public ddk::UsbProtocol<FakeUsbDevice> {
     ZX_ASSERT(isoc_in_requests_.is_empty());
   }
 
+  void HangSco() { hanging_sco_ = true; }
+
   usb_protocol_t proto() const {
     usb_protocol_t proto;
     proto.ctx = const_cast<FakeUsbDevice*>(this);
@@ -195,6 +199,12 @@ class FakeUsbDevice : public ddk::UsbProtocol<FakeUsbDevice> {
       ZX_ASSERT(isoc_out_enabled_);
       ZX_ASSERT_MSG(isoc_interface_alt_ != 0,
                     "requests must not be sent to isoc interface with alt setting 0");
+
+      if (hanging_sco_) {
+        isoc_out_requests_.push(std::move(request));
+        return;
+      }
+
       std::vector<uint8_t> packet(request.request()->header.length);
       ssize_t actual_bytes_copied = request.CopyFrom(packet.data(), packet.size(), /*offset=*/0);
       EXPECT_EQ(actual_bytes_copied, static_cast<ssize_t>(packet.size()));
@@ -335,7 +345,8 @@ class FakeUsbDevice : public ddk::UsbProtocol<FakeUsbDevice> {
 
     if (isoc_out_addr_ && isoc_out_addr_.value() == ep_address) {
       isoc_out_canceled_count_++;
-      // There's nothing to cancel because isoc out requests are completed immediately.
+      UnownedRequestQueue isoc_out_reqs = std::move(isoc_out_requests_);
+      isoc_out_reqs.CompleteAll(ZX_ERR_CANCELED, 0);
       return ZX_OK;
     }
 
@@ -430,6 +441,8 @@ class FakeUsbDevice : public ddk::UsbProtocol<FakeUsbDevice> {
   async_dispatcher_t* dispatcher_;
 
   bool unplugged_ = false;
+  // Put the usb driver into a state that ignores requests.
+  bool hanging_sco_ = false;
 
   // Command packets received from bt-transport-usb.
   std::vector<std::vector<uint8_t>> cmd_packets_;
@@ -449,6 +462,7 @@ class FakeUsbDevice : public ddk::UsbProtocol<FakeUsbDevice> {
 
   // Inbound SCO requests.
   UnownedRequestQueue isoc_in_requests_;
+  UnownedRequestQueue isoc_out_requests_;
 
   std::vector<uint8_t> device_descriptor_data_;
   std::vector<uint8_t> config_descriptor_data_;
@@ -517,6 +531,232 @@ class BtTransportUsbTest : public ::gtest::TestLoopFixture {
  private:
   std::shared_ptr<MockDevice> root_device_;
   std::optional<FakeUsbDevice> fake_usb_device_;
+};
+
+class BtTransportUsbHciTransportProtocolTest
+    : public BtTransportUsbTest,
+      public fidl::Server<fhbt::Snoop>,
+      public fidl::WireAsyncEventHandler<fhbt::HciTransport>,
+      public fidl::WireAsyncEventHandler<fhbt::ScoConnection> {
+ public:
+  void SetUp() override {
+    BtTransportUsbTest::SetUp();
+    // Open HciTransport protocol.
+    auto [hci_transport_client_end, hci_transport_server_end] =
+        fidl::CreateEndpoints<fhbt::HciTransport>().value();
+
+    hci_transport_client_.Bind(std::move(hci_transport_client_end), dispatcher(), this);
+    dut()->GetDeviceContext<bt_transport_usb::Device>()->ConnectHciTransport(
+        std::move(hci_transport_server_end));
+
+    auto [snoop_client_end, snoop_server_end] = fidl::CreateEndpoints<fhbt::Snoop>().value();
+    auto set_snoop_result = hci_transport_client_->SetSnoop(std::move(snoop_client_end));
+    ASSERT_EQ(set_snoop_result.status(), ZX_OK);
+
+    snoop_binding_.AddBinding(dispatcher(), std::move(snoop_server_end), this,
+                              fidl::kIgnoreBindingClosure);
+
+    RunLoopUntilIdle();
+  }
+
+  void SetAckSnoop(bool ack_snoop) { ack_snoop_ = ack_snoop; }
+
+  void AckSnoop() {
+    // Acknowledge the snoop packet with |current_snoop_seq_|.
+    snoop_binding_.ForEachBinding([&](const fidl::ServerBinding<fhbt::Snoop>& binding) {
+      fit::result<fidl::OneWayError> result =
+          fidl::SendEvent(binding)->OnAcknowledgePackets(current_snoop_seq_);
+      ASSERT_FALSE(result.is_error());
+    });
+  }
+
+  // fhbt::Snoop request handlers
+  void ObservePacket(ObservePacketRequest& request,
+                     ObservePacketCompleter::Sync& completer) override {
+    ASSERT_TRUE(request.sequence().has_value());
+    ASSERT_TRUE(request.direction().has_value());
+    ASSERT_TRUE(request.packet().has_value());
+
+    current_snoop_seq_ = request.sequence().value();
+
+    if (request.direction().value() == fhbt::PacketDirection::kHostToController) {
+      switch (request.packet()->Which()) {
+        case fhbt::SnoopPacket::Tag::kAcl:
+          snoop_sent_acl_packets_.push_back(request.packet()->acl().value());
+          break;
+        case fhbt::SnoopPacket::Tag::kCommand:
+          snoop_sent_command_packets_.push_back(request.packet()->command().value());
+          break;
+        case fhbt::SnoopPacket::Tag::kSco:
+          snoop_sent_sco_packets_.push_back(request.packet()->sco().value());
+          break;
+        case fhbt::SnoopPacket::Tag::kIso:
+          // No Iso data should be sent.
+          FAIL();
+        default:
+          // Unknown packet type sent.
+          FAIL();
+      };
+    } else if (request.direction().value() == fhbt::PacketDirection::kControllerToHost) {
+      switch (request.packet()->Which()) {
+        case fhbt::SnoopPacket::Tag::kEvent:
+          snoop_received_event_packets_.push_back(request.packet()->event().value());
+          break;
+        case fhbt::SnoopPacket::Tag::kAcl:
+          snoop_received_acl_packets_.push_back(request.packet()->acl().value());
+          break;
+        case fhbt::SnoopPacket::Tag::kSco:
+          snoop_received_sco_packets_.push_back(request.packet()->sco().value());
+          break;
+        case fhbt::SnoopPacket::Tag::kIso:
+          // No Iso data should be received.
+          FAIL();
+        default:
+          // Unknown packet type received.
+          FAIL();
+      };
+    }
+
+    if (ack_snoop_) {
+      AckSnoop();
+    }
+  }
+
+  void OnDroppedPackets(OnDroppedPacketsRequest& request,
+                        OnDroppedPacketsCompleter::Sync& completer) override {
+    // Do nothing, the driver shouldn't drop any packet for now.
+    FAIL();
+  }
+
+  void handle_unknown_method(::fidl::UnknownMethodMetadata<fhbt::Snoop> metadata,
+                             ::fidl::UnknownMethodCompleter::Sync& completer) override {
+    // Shouldn't receive unknown request from fhbt::Snoop protocol.
+    FAIL();
+  }
+
+  // fhbt::HciTransport event handler overrides
+  void OnReceive(fhbt::wire::ReceivedPacket* packet) override {
+    std::vector<uint8_t> received;
+    switch (packet->Which()) {
+      case fhbt::wire::ReceivedPacket::Tag::kEvent:
+        received.assign(packet->event().get().begin(), packet->event().get().end());
+        received_event_packets_.push_back(received);
+        break;
+      case fhbt::wire::ReceivedPacket::Tag::kAcl:
+        received.assign(packet->acl().get().begin(), packet->acl().get().end());
+        received_acl_packets_.push_back(received);
+        break;
+      case fhbt::wire::ReceivedPacket::Tag::kIso:
+        // No Iso data should be received.
+        FAIL();
+      default:
+        // Unknown packet type received.
+        FAIL();
+    }
+  }
+
+  void handle_unknown_event(fidl::UnknownEventMetadata<fhbt::HciTransport> metadata) override {
+    FAIL();
+  }
+
+  void on_fidl_error(fidl::UnbindInfo error) override {}
+
+  // fhbt::ScoConnection event handler overrides
+  void OnReceive(fhbt::wire::ScoPacket* packet) override {
+    std::vector<uint8_t> received;
+    received.assign(packet->packet.begin(), packet->packet.end());
+    received_sco_packets_.push_back(received);
+  }
+
+  void handle_unknown_event(fidl::UnknownEventMetadata<fhbt::ScoConnection> metadata) override {
+    FAIL();
+  }
+
+  void ConfigureSco(fhbt::ScoCodingFormat coding_format, fhbt::ScoEncoding encoding,
+                    fhbt::ScoSampleRate sample_rate) {
+    fidl::Arena arena;
+    auto [sco_client_end, sco_server_end] = fidl::CreateEndpoints<fhbt::ScoConnection>().value();
+
+    auto sco_request_builder = fhbt::wire::HciTransportConfigureScoRequest::Builder(arena);
+    auto configure_sco_result =
+        hci_transport_client_->ConfigureSco(sco_request_builder.coding_format(coding_format)
+                                                .encoding(encoding)
+                                                .sample_rate(sample_rate)
+                                                .connection(std::move(sco_server_end))
+                                                .Build());
+    ASSERT_EQ(configure_sco_result.status(), ZX_OK);
+
+    sco_client_.emplace(std::move(sco_client_end), dispatcher(), this);
+  }
+  void StopScoConnection() {
+    auto result = sco_client_.value()->Stop();
+    ASSERT_TRUE(result.ok());
+    auto client_end = sco_client_->UnbindMaybeGetEndpoint();
+    RunLoopUntilIdle();
+    sco_client_.reset();
+  }
+
+  const std::vector<std::vector<uint8_t>>& snoop_sent_acl_packets() const {
+    return snoop_sent_acl_packets_;
+  }
+
+  const std::vector<std::vector<uint8_t>>& snoop_sent_command_packets() const {
+    return snoop_sent_command_packets_;
+  }
+
+  const std::vector<std::vector<uint8_t>>& snoop_sent_sco_packets() const {
+    return snoop_sent_sco_packets_;
+  }
+
+  const std::vector<std::vector<uint8_t>>& snoop_received_acl_packets() const {
+    return snoop_received_acl_packets_;
+  }
+
+  const std::vector<std::vector<uint8_t>>& snoop_received_event_packets() const {
+    return snoop_received_event_packets_;
+  }
+
+  const std::vector<std::vector<uint8_t>>& snoop_received_sco_packets() const {
+    return snoop_received_sco_packets_;
+  }
+
+  const std::vector<std::vector<uint8_t>>& received_event_packets() const {
+    return received_event_packets_;
+  }
+
+  const std::vector<std::vector<uint8_t>>& received_acl_packets() const {
+    return received_acl_packets_;
+  }
+
+  const std::vector<std::vector<uint8_t>>& received_sco_packets() const {
+    return received_sco_packets_;
+  }
+
+  fidl::WireClient<fhbt::HciTransport> hci_transport_client_;
+  std::optional<fidl::WireClient<fhbt::ScoConnection>> sco_client_;
+  fidl::ServerBindingGroup<fhbt::Snoop> snoop_binding_;
+
+ private:
+  std::shared_ptr<fdf_testing::DriverRuntime> runtime_ = mock_ddk::GetDriverRuntime();
+  fdf::UnownedSynchronizedDispatcher hci_transport_server_dispatcher_ =
+      runtime_->StartBackgroundDispatcher();
+
+  std::optional<fidl::ServerBindingRef<fhbt::HciTransport>> hci_transport_server_;
+
+  std::vector<std::vector<uint8_t>> received_event_packets_;
+  std::vector<std::vector<uint8_t>> received_acl_packets_;
+  std::vector<std::vector<uint8_t>> received_sco_packets_;
+
+  std::vector<std::vector<uint8_t>> snoop_sent_acl_packets_;
+  std::vector<std::vector<uint8_t>> snoop_sent_command_packets_;
+  std::vector<std::vector<uint8_t>> snoop_sent_sco_packets_;
+
+  std::vector<std::vector<uint8_t>> snoop_received_acl_packets_;
+  std::vector<std::vector<uint8_t>> snoop_received_event_packets_;
+  std::vector<std::vector<uint8_t>> snoop_received_sco_packets_;
+
+  bool ack_snoop_ = true;
+  uint64_t current_snoop_seq_ = 0;
 };
 
 class BtTransportUsbHciProtocolTest : public BtTransportUsbTest {
@@ -715,7 +955,7 @@ TEST_F(BtTransportUsbTest, IgnoresStalledRequest) {
   EXPECT_FALSE(dut()->RemoveCalled());
 }
 
-TEST_F(BtTransportUsbTest, Name) { EXPECT_EQ(std::string(dut()->name()), "bt_transport_usb"); }
+TEST_F(BtTransportUsbTest, Name) { EXPECT_EQ(std::string(dut()->name()), "bt-transport-usb"); }
 
 TEST_F(BtTransportUsbTest, Properties) {
   cpp20::span<const zx_device_prop_t> props = dut()->GetProperties();
@@ -831,6 +1071,65 @@ TEST_F(BtTransportUsbHciProtocolTest, ReceiveManySmallHciEvents) {
   }
 }
 
+TEST_F(BtTransportUsbHciTransportProtocolTest, ReceiveManySmallHciEvents) {
+  std::vector<uint8_t> kEventBuffer = {
+      0x01,  // arbitrary event code
+      0x01,  // parameter_total_size
+      0x02   // arbitrary parameter
+  };
+  const int kNumEvents = 50;
+
+  for (int i = 0; i < kNumEvents; i++) {
+    ASSERT_TRUE(fake_usb()->SendHciEvent(kEventBuffer));
+    RunLoopUntilIdle();
+  }
+
+  ASSERT_EQ(received_event_packets().size(), static_cast<size_t>(kNumEvents));
+  for (const std::vector<uint8_t>& event : received_event_packets()) {
+    EXPECT_EQ(event, kEventBuffer);
+  }
+
+  auto packets = snoop_received_event_packets();
+  ASSERT_EQ(packets.size(), static_cast<size_t>(kNumEvents));
+  for (const std::vector<uint8_t>& packet : packets) {
+    EXPECT_EQ(packet, kEventBuffer);
+  }
+}
+
+TEST_F(BtTransportUsbHciTransportProtocolTest, DropSnoopPackets) {
+  SetAckSnoop(false);
+  std::vector<uint8_t> kEventBuffer = {
+      0x01,  // arbitrary event code
+      0x01,  // parameter_total_size
+      0x02   // arbitrary parameter
+  };
+
+  // If the test doesn't ack the snoop sequence until the total sent snoop packet number reaches
+  // this limit, the driver will start dropping packets. i.e. The driver will drop the 22nd snoop
+  // packet.
+  const size_t kSnoopPacketLimit = 21;
+
+  for (size_t i = 0; i < kSnoopPacketLimit + 1; i++) {
+    ASSERT_TRUE(fake_usb()->SendHciEvent(kEventBuffer));
+    RunLoopUntilIdle();
+  }
+
+  auto packets = snoop_received_event_packets();
+  // Test will only receive |kSnoopPacketLimit| of packet after |kSnoopPacketLimit + 1| packets have
+  // been sent.
+  ASSERT_EQ(packets.size(), kSnoopPacketLimit);
+
+  // The acked sequence number will catch up in the driver and it resumes sending snoop packets
+  // again.
+  AckSnoop();
+  RunLoopUntilIdle();
+
+  ASSERT_TRUE(fake_usb()->SendHciEvent(kEventBuffer));
+  RunLoopUntilIdle();
+  packets = snoop_received_event_packets();
+  ASSERT_EQ(packets.size(), kSnoopPacketLimit + 1);
+}
+
 TEST_F(BtTransportUsbHciProtocolTest, ReceiveManyHciEventsSplitIntoTwoResponses) {
   ConnectDriver();
   const std::vector<uint8_t> kSnoopEventBuffer = {
@@ -863,6 +1162,35 @@ TEST_F(BtTransportUsbHciProtocolTest, ReceiveManyHciEventsSplitIntoTwoResponses)
   }
 }
 
+TEST_F(BtTransportUsbHciTransportProtocolTest, ReceiveManyHciEventsSplitIntoTwoResponses) {
+  const std::vector<uint8_t> kEventBuffer = {
+      0x01,  // event code
+      0x02,  // parameter_total_size
+      0x03,  // arbitrary parameter
+      0x04   // arbitrary parameter
+  };
+  const std::vector<uint8_t> kPart1(kEventBuffer.begin(), kEventBuffer.begin() + 3);
+  const std::vector<uint8_t> kPart2(kEventBuffer.begin() + 3, kEventBuffer.end());
+
+  const int kNumEvents = 50;
+  for (int i = 0; i < kNumEvents; i++) {
+    EXPECT_TRUE(fake_usb()->SendHciEvent(kPart1));
+    EXPECT_TRUE(fake_usb()->SendHciEvent(kPart2));
+    RunLoopUntilIdle();
+  }
+
+  ASSERT_EQ(received_event_packets().size(), static_cast<size_t>(kNumEvents));
+  for (const std::vector<uint8_t>& event : received_event_packets()) {
+    EXPECT_EQ(event, kEventBuffer);
+  }
+
+  auto packets = snoop_received_event_packets();
+  ASSERT_EQ(packets.size(), static_cast<size_t>(kNumEvents));
+  for (const std::vector<uint8_t>& packet : packets) {
+    EXPECT_EQ(packet, kEventBuffer);
+  }
+}
+
 TEST_F(BtTransportUsbHciProtocolTest, SendHciCommands) {
   const std::vector<uint8_t> kSnoopCmd0 = {
       BT_HCI_SNOOP_TYPE_CMD,  // Snoop packet flag
@@ -887,8 +1215,8 @@ TEST_F(BtTransportUsbHciProtocolTest, SendHciCommands) {
                                    /*num_handles=*/0);
   EXPECT_EQ(write_status, ZX_OK);
 
-  // Delayed connect to the driver, so the HCI CMD read loop must process both of the above commands
-  // at once.
+  // Delayed connect to the driver, so the HCI CMD read loop must process both of the above
+  // commands at once.
   ConnectDriver();
   RunLoopUntilIdle();
   std::vector<std::vector<uint8_t>> cmd_packets = fake_usb()->received_command_packets();
@@ -900,6 +1228,46 @@ TEST_F(BtTransportUsbHciProtocolTest, SendHciCommands) {
   ASSERT_EQ(snoop_packets.size(), 2u);
   EXPECT_EQ(snoop_packets[0], kSnoopCmd0);
   EXPECT_EQ(snoop_packets[1], kSnoopCmd1);
+}
+
+TEST_F(BtTransportUsbHciTransportProtocolTest, SendHciCommands) {
+  fidl::Arena arena;
+  std::vector<uint8_t> kCmd0 = {
+      0x00,  // arbitrary payload
+  };
+
+  {
+    auto packet_view = fidl::VectorView<uint8_t>::FromExternal(kCmd0);
+    hci_transport_client_->Send(fhbt::wire::SentPacket::WithCommand(arena, packet_view))
+        .Then([](fidl::WireUnownedResult<fhbt::HciTransport::Send>& result) {
+          ASSERT_TRUE(result.ok());
+        });
+  }
+
+  std::vector<uint8_t> kCmd1 = {
+      0x01,  // arbitrary payload (longer than before)
+      0xC0,
+      0xDE,
+  };
+
+  {
+    auto packet_view = fidl::VectorView<uint8_t>::FromExternal(kCmd1);
+    hci_transport_client_->Send(fhbt::wire::SentPacket::WithCommand(arena, packet_view))
+        .Then([](fidl::WireUnownedResult<fhbt::HciTransport::Send>& result) {
+          ASSERT_TRUE(result.ok());
+        });
+  }
+
+  RunLoopUntilIdle();
+  std::vector<std::vector<uint8_t>> cmd_packets = fake_usb()->received_command_packets();
+  ASSERT_EQ(cmd_packets.size(), 2u);
+  EXPECT_EQ(cmd_packets[0], kCmd0);
+  EXPECT_EQ(cmd_packets[1], kCmd1);
+
+  std::vector<std::vector<uint8_t>> snoop_packets = snoop_sent_command_packets();
+  ASSERT_EQ(snoop_packets.size(), 2u);
+  EXPECT_EQ(snoop_packets[0], kCmd0);
+  EXPECT_EQ(snoop_packets[1], kCmd1);
 }
 
 TEST_F(BtTransportUsbHciProtocolTest, ReceiveManyAclPackets) {
@@ -927,6 +1295,31 @@ TEST_F(BtTransportUsbHciProtocolTest, ReceiveManyAclPackets) {
   ASSERT_EQ(packets.size(), static_cast<size_t>(kNumPackets));
   for (const std::vector<uint8_t>& packet : packets) {
     EXPECT_EQ(packet, kSnoopAclBuffer);
+  }
+}
+
+TEST_F(BtTransportUsbHciTransportProtocolTest, ReceiveManyAclPackets) {
+  const std::vector<uint8_t> kAclBuffer = {
+      0x04, 0x05  // arbitrary payload
+  };
+
+  const int kNumPackets = 50;
+  for (int i = 0; i < kNumPackets; i++) {
+    EXPECT_TRUE(fake_usb()->SendOneBulkInResponse(kAclBuffer));
+    RunLoopUntilIdle();
+  }
+
+  ASSERT_EQ(received_acl_packets().size(), static_cast<size_t>(kNumPackets));
+  for (const std::vector<uint8_t>& packet : received_acl_packets()) {
+    EXPECT_EQ(packet.size(), kAclBuffer.size());
+    EXPECT_EQ(packet, kAclBuffer);
+  }
+
+  RunLoopUntilIdle();
+  auto packets = snoop_received_acl_packets();
+  ASSERT_EQ(packets.size(), static_cast<size_t>(kNumPackets));
+  for (const std::vector<uint8_t>& packet : packets) {
+    EXPECT_EQ(packet, kAclBuffer);
   }
 }
 
@@ -972,6 +1365,48 @@ TEST_F(BtTransportUsbHciProtocolTest, SendManyAclPackets) {
     } else {
       const std::vector<uint8_t> data(10, i);
       expectedSnoopPacket.insert(expectedSnoopPacket.end(), data.begin(), data.end());
+    }
+    EXPECT_EQ(snoop_packets[i], expectedSnoopPacket);
+  }
+}
+
+TEST_F(BtTransportUsbHciTransportProtocolTest, SendManyAclPackets) {
+  const uint8_t kNumPackets = 8;
+  fidl::Arena arena;
+  for (uint8_t i = 0; i < kNumPackets; i++) {
+    std::vector<uint8_t> packet;
+    // Vary the length of the packets (start small)
+    if (i % 2) {
+      packet = std::vector<uint8_t>(1, i);
+    } else {
+      packet = std::vector<uint8_t>(10, i);
+    }
+    auto packet_view = fidl::VectorView<uint8_t>::FromExternal(packet);
+    hci_transport_client_->Send(fhbt::wire::SentPacket::WithAcl(arena, packet_view))
+        .Then([](fidl::WireUnownedResult<fhbt::HciTransport::Send>& result) {
+          ASSERT_TRUE(result.ok());
+        });
+  }
+  RunLoopUntilIdle();
+
+  std::vector<std::vector<uint8_t>> packets = fake_usb()->received_acl_packets();
+  ASSERT_EQ(packets.size(), kNumPackets);
+  for (uint8_t i = 0; i < kNumPackets; i++) {
+    if (i % 2) {
+      EXPECT_EQ(packets[i], std::vector<uint8_t>(1, i));
+    } else {
+      EXPECT_EQ(packets[i], std::vector<uint8_t>(10, i));
+    }
+  }
+
+  std::vector<std::vector<uint8_t>> snoop_packets = snoop_sent_acl_packets();
+  ASSERT_EQ(snoop_packets.size(), kNumPackets);
+  for (uint8_t i = 0; i < kNumPackets; i++) {
+    std::vector<uint8_t> expectedSnoopPacket;
+    if (i % 2) {
+      expectedSnoopPacket = std::vector<uint8_t>(1, i);
+    } else {
+      expectedSnoopPacket = std::vector<uint8_t>(10, i);
     }
     EXPECT_EQ(snoop_packets[i], expectedSnoopPacket);
   }
@@ -1072,6 +1507,39 @@ TEST_F(BtTransportUsbHciProtocolTest, SendManyScoPackets) {
   EXPECT_EQ(fake_usb()->isoc_interface_alt(), 0);
 }
 
+TEST_F(BtTransportUsbHciTransportProtocolTest, SendManyScoPackets) {
+  ConfigureSco(fhbt::ScoCodingFormat::kCvsd, fhbt::ScoEncoding::kBits8, fhbt::ScoSampleRate::kKhz8);
+  RunLoopUntilIdle();
+  EXPECT_EQ(fake_usb()->isoc_interface_alt(), 1);
+  const uint8_t kNumPackets = 8;
+  for (uint8_t i = 0; i < kNumPackets; i++) {
+    std::vector<uint8_t> kScoPacket = {i};
+
+    auto packet_view = fidl::VectorView<uint8_t>::FromExternal(kScoPacket);
+    sco_client_.value()
+        ->Send(packet_view)
+        .Then([](fidl::WireUnownedResult<fhbt::ScoConnection::Send>& result) {
+          ASSERT_TRUE(result.ok());
+        });
+  }
+
+  // Completes USB requests.
+  RunLoopUntilIdle();
+
+  std::vector<std::vector<uint8_t>> sco_packets = fake_usb()->received_sco_packets();
+  ASSERT_EQ(sco_packets.size(), kNumPackets);
+  for (uint8_t i = 0; i < kNumPackets; i++) {
+    EXPECT_EQ(sco_packets[i], std::vector<uint8_t>{i});
+  }
+
+  std::vector<std::vector<uint8_t>> snoop_packets = snoop_sent_sco_packets();
+  ASSERT_EQ(snoop_packets.size(), kNumPackets);
+  for (uint8_t i = 0; i < kNumPackets; i++) {
+    std::vector<uint8_t> expectedSnoopPacket = {i};
+    EXPECT_EQ(snoop_packets[i], expectedSnoopPacket);
+  }
+}
+
 TEST_F(BtTransportUsbHciProtocolTest, QueueManyScoPacketsDueToNoAltSettingSelected) {
   ConnectDriver();
   EXPECT_EQ(fake_usb()->isoc_interface_alt(), 0);
@@ -1098,6 +1566,32 @@ TEST_F(BtTransportUsbHciProtocolTest, QueueManyScoPacketsDueToNoAltSettingSelect
   RunLoopUntilIdle();
   packets = fake_usb()->received_sco_packets();
   ASSERT_EQ(packets.size(), kNumPackets);
+}
+
+TEST_F(BtTransportUsbHciTransportProtocolTest, TooManyScoPacketsQueuedInDriver) {
+  ConfigureSco(fhbt::ScoCodingFormat::kCvsd, fhbt::ScoEncoding::kBits8, fhbt::ScoSampleRate::kKhz8);
+  RunLoopUntilIdle();
+  EXPECT_EQ(fake_usb()->isoc_interface_alt(), 1);
+
+  fake_usb()->HangSco();
+
+  const uint8_t kNumPackets = 9;
+  for (uint8_t i = 0; i < kNumPackets; i++) {
+    std::vector<uint8_t> kScoPacket = {i};
+
+    auto packet_view = fidl::VectorView<uint8_t>::FromExternal(kScoPacket);
+    sco_client_.value()
+        ->Send(packet_view)
+        .Then([](fidl::WireUnownedResult<fhbt::ScoConnection::Send>& result) {
+          // The completers of all the packets will never be called since the driver won't
+          // process the data in queue, and the completers will all be closed when the server end of
+          // SCO connection is closed.
+          ASSERT_FALSE(result.ok());
+        });
+  }
+
+  // Complete any requests.
+  RunLoopUntilIdle();
 }
 
 TEST_F(BtTransportUsbHciProtocolTest, ReceiveManyScoPackets) {
@@ -1136,6 +1630,87 @@ TEST_F(BtTransportUsbHciProtocolTest, ReceiveManyScoPackets) {
   ASSERT_EQ(snoop_packets.size(), static_cast<size_t>(kNumPackets));
   for (const std::vector<uint8_t>& packet : snoop_packets) {
     EXPECT_EQ(packet, kSnoopScoBuffer);
+  }
+}
+
+TEST_F(BtTransportUsbHciTransportProtocolTest, ReceiveManyScoPackets) {
+  ConfigureSco(fhbt::ScoCodingFormat::kCvsd, fhbt::ScoEncoding::kBits8, fhbt::ScoSampleRate::kKhz8);
+  RunLoopUntilIdle();
+
+  const std::vector<uint8_t> kScoBuffer = {
+      0x01,  // arbitrary header fields
+      0x02,
+      0x03,  // payload length
+      0x04,  // arbitrary payload
+      0x05, 0x06,
+  };
+  // Split the packet into 2 chunks to test recombination.
+  const std::vector<uint8_t> kScoBufferChunk0(kScoBuffer.begin(), kScoBuffer.begin() + 4);
+  const std::vector<uint8_t> kScoBufferChunk1(kScoBuffer.begin() + 4, kScoBuffer.end());
+
+  const int kNumPackets = 25;
+  for (int i = 0; i < kNumPackets; i++) {
+    EXPECT_TRUE(fake_usb()->SendOneIsocInResponse(kScoBufferChunk0));
+    EXPECT_TRUE(fake_usb()->SendOneIsocInResponse(kScoBufferChunk1));
+    RunLoopUntilIdle();
+  }
+
+  ASSERT_EQ(received_sco_packets().size(), static_cast<size_t>(kNumPackets));
+  for (const std::vector<uint8_t>& packet : received_sco_packets()) {
+    EXPECT_EQ(packet.size(), kScoBuffer.size());
+    EXPECT_EQ(packet, kScoBuffer);
+  }
+
+  auto packets = snoop_received_sco_packets();
+  ASSERT_EQ(packets.size(), static_cast<size_t>(kNumPackets));
+  for (const std::vector<uint8_t>& packet : packets) {
+    EXPECT_EQ(packet, kScoBuffer);
+  }
+}
+
+TEST_F(BtTransportUsbHciTransportProtocolTest, TwoScoConnections) {
+  ConfigureSco(fhbt::ScoCodingFormat::kCvsd, fhbt::ScoEncoding::kBits8, fhbt::ScoSampleRate::kKhz8);
+  RunLoopUntilIdle();
+
+  {
+    std::vector<uint8_t> kScoPacket = {1};
+
+    auto packet_view = fidl::VectorView<uint8_t>::FromExternal(kScoPacket);
+    sco_client_.value()
+        ->Send(packet_view)
+        .Then([](fidl::WireUnownedResult<fhbt::ScoConnection::Send>& result) {
+          ASSERT_TRUE(result.ok());
+        });
+
+    RunLoopUntilIdle();
+
+    std::vector<std::vector<uint8_t>> sco_packets = fake_usb()->received_sco_packets();
+    ASSERT_EQ(sco_packets.size(), 1U);
+    EXPECT_EQ(sco_packets[0], std::vector<uint8_t>{1});
+  }
+
+  StopScoConnection();
+  RunLoopUntilIdle();
+
+  // Establish a new ScoConnection with the driver.
+  ConfigureSco(fhbt::ScoCodingFormat::kCvsd, fhbt::ScoEncoding::kBits8, fhbt::ScoSampleRate::kKhz8);
+
+  // Send Another SCO packet and make sure it's received.
+  {
+    std::vector<uint8_t> kScoPacket = {2};
+
+    auto packet_view = fidl::VectorView<uint8_t>::FromExternal(kScoPacket);
+    sco_client_.value()
+        ->Send(packet_view)
+        .Then([](fidl::WireUnownedResult<fhbt::ScoConnection::Send>& result) {
+          ASSERT_TRUE(result.ok());
+        });
+
+    RunLoopUntilIdle();
+
+    std::vector<std::vector<uint8_t>> sco_packets = fake_usb()->received_sco_packets();
+    ASSERT_EQ(sco_packets.size(), 2U);
+    EXPECT_EQ(sco_packets[1], std::vector<uint8_t>{2});
   }
 }
 

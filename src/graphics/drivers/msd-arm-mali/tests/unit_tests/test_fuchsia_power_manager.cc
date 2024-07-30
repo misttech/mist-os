@@ -5,6 +5,7 @@
 #include <fidl/fuchsia.hardware.power/cpp/fidl.h>
 #include <fidl/fuchsia.power.broker/cpp/fidl.h>
 #include <fidl/fuchsia.power.system/cpp/fidl.h>
+#include <fidl/fuchsia.power.system/cpp/test_base.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
 #include <lib/driver/testing/cpp/test_environment.h>
@@ -19,7 +20,8 @@
 
 namespace {
 
-class FakeSystemActivityGovernor : public fidl::Server<fuchsia_power_system::ActivityGovernor> {
+class FakeSystemActivityGovernor
+    : public fidl::testing::TestBase<fuchsia_power_system::ActivityGovernor> {
  public:
   FakeSystemActivityGovernor(zx::event exec_state_opportunistic, zx::event wake_handling_assertive)
       : exec_state_opportunistic_(std::move(exec_state_opportunistic)),
@@ -50,8 +52,9 @@ class FakeSystemActivityGovernor : public fidl::Server<fuchsia_power_system::Act
     completer.Reply({{std::move(elements)}});
   }
 
-  void RegisterListener(RegisterListenerRequest& req,
-                        RegisterListenerCompleter::Sync& completer) override {}
+  void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
+    ADD_FAILURE() << name << " is not implemented";
+  }
 
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_system::ActivityGovernor> md,
                              fidl::UnknownMethodCompleter::Sync& completer) override {}
@@ -234,11 +237,7 @@ class FakePowerBroker : public fidl::Server<fuchsia_power_broker::Topology> {
     servers_.emplace_back(std::move(element_control_server_end), std::move(lessor_binding),
                           std::move(current_level_binding), std::move(required_level_binding));
 
-    fuchsia_power_broker::TopologyAddElementResponse result{
-        {.element_control_channel = std::move(element_control_client_end)},
-    };
-
-    completer.Reply(fit::success(std::move(result)));
+    completer.Reply(fit::success());
   }
 
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_broker::Topology> md,

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl::{endpoints, HandleBased, Rights};
+use fidl::endpoints;
 use fidl_fidl_examples_routing_echo::{EchoMarker, EchoRequest, EchoRequestStream};
 use fuchsia_component::client;
 use fuchsia_component::server::ServiceFs;
@@ -20,26 +20,32 @@ async fn main() {
 
     // [START init]
     let factory = client::connect_to_protocol::<fsandbox::FactoryMarker>().unwrap();
+    let store = client::connect_to_protocol::<fsandbox::CapabilityStoreMarker>().unwrap();
+    let id_gen = sandbox::CapabilityIdGenerator::new();
 
     // Create a dictionary
-    let dict_ref = factory.create_dictionary().await.unwrap();
-    let (dict, server) = endpoints::create_proxy().unwrap();
-    let dict_token = dict_ref.token.duplicate_handle(Rights::SAME_RIGHTS).unwrap();
-    factory.open_dictionary(dict_ref, server).unwrap();
+    let dict_id = id_gen.next();
+    store.dictionary_create(dict_id).await.unwrap().unwrap();
 
     // Add 3 Echo servers to the dictionary
     let mut receiver_tasks = fasync::TaskGroup::new();
     for i in 1..=3 {
         let (receiver, receiver_stream) =
             endpoints::create_request_stream::<fsandbox::ReceiverMarker>().unwrap();
+        let connector_id = id_gen.next();
         let sender = factory.create_connector(receiver).await.unwrap();
-        dict.insert(
-            &format!("fidl.examples.routing.echo.Echo-{i}"),
-            fsandbox::Capability::Connector(sender),
-        )
-        .await
-        .unwrap()
-        .unwrap();
+        store.import(connector_id, fsandbox::Capability::Connector(sender)).await.unwrap().unwrap();
+        store
+            .dictionary_insert(
+                dict_id,
+                &fsandbox::DictionaryItem {
+                    key: format!("fidl.examples.routing.echo.Echo-{i}"),
+                    value: connector_id,
+                },
+            )
+            .await
+            .unwrap()
+            .unwrap();
         receiver_tasks.spawn(async move { handle_echo_receiver(i, receiver_stream).await });
     }
     // [END init]
@@ -51,23 +57,19 @@ async fn main() {
     fs.dir("svc").add_fidl_service(IncomingRequest::Router);
     fs.take_and_serve_directory_handle().unwrap();
     fs.for_each_concurrent(None, move |request: IncomingRequest| {
-        // [START outer_clone]
-        let dict_token = dict_token.duplicate_handle(Rights::SAME_RIGHTS).unwrap();
-        // [END outer_clone]
+        let store = store.clone();
+        let id_gen = id_gen.clone();
         async move {
             match request {
                 IncomingRequest::Router(mut stream) => {
                     while let Ok(Some(request)) = stream.try_next().await {
                         match request {
                             fsandbox::RouterRequest::Route { payload: _, responder } => {
-                                // [START inner_clone]
-                                let dict_ref = fsandbox::DictionaryRef {
-                                    token: dict_token
-                                        .duplicate_handle(Rights::SAME_RIGHTS)
-                                        .unwrap(),
-                                };
-                                let capability = fsandbox::Capability::Dictionary(dict_ref);
-                                // [END inner_clone]
+                                // [START export]
+                                let dup_dict_id = id_gen.next();
+                                store.duplicate(dict_id, dup_dict_id).await.unwrap().unwrap();
+                                let capability = store.export(dup_dict_id).await.unwrap().unwrap();
+                                // [END export]
                                 let _ = responder.send(Ok(capability));
                             }
                             fsandbox::RouterRequest::_UnknownMethod { ordinal, .. } => {
@@ -84,7 +86,7 @@ async fn main() {
 }
 
 // [START receiver]
-async fn handle_echo_receiver(index: u32, mut receiver_stream: fsandbox::ReceiverRequestStream) {
+async fn handle_echo_receiver(index: u64, mut receiver_stream: fsandbox::ReceiverRequestStream) {
     let mut task_group = fasync::TaskGroup::new();
     while let Some(request) = receiver_stream.try_next().await.unwrap() {
         match request {
@@ -101,7 +103,7 @@ async fn handle_echo_receiver(index: u32, mut receiver_stream: fsandbox::Receive
     }
 }
 
-async fn run_echo_server(index: u32, mut stream: EchoRequestStream) {
+async fn run_echo_server(index: u64, mut stream: EchoRequestStream) {
     while let Ok(Some(event)) = stream.try_next().await {
         let EchoRequest::EchoString { value, responder } = event;
         let res = match value {

@@ -61,13 +61,9 @@ zx_status_t UfsLogicalUnit::BufferRead(void *buf, size_t block_count, off_t bloc
   return ZX_OK;
 }
 
-UfsMockDevice::UfsMockDevice(zx::interrupt irq)
-    : irq_(std::move(irq)),
-      register_mmio_processor_(*this),
-      uiccmd_processor_(*this),
-      transfer_request_processor_(*this),
-      query_request_processor_(*this),
-      scsi_command_processor_(*this) {
+void UfsMockDevice::Init(std::unique_ptr<zx::interrupt> irq) {
+  irq_ = std::move(irq);
+
   VersionReg::Get()
       .ReadFrom(&registers_)
       .set_major_version_number(kMajorVersion)
@@ -127,6 +123,18 @@ UfsMockDevice::UfsMockDevice(zx::interrupt irq)
   power_desc_.bLength = sizeof(PowerParametersDescriptor);
   power_desc_.bDescriptorIDN = static_cast<size_t>(DescriptorType::kPower);
 
+  UnitDescriptor default_unit_descriptor = UnitDescriptor{
+      .bLength = sizeof(UnitDescriptor),
+      .bDescriptorIDN = static_cast<size_t>(DescriptorType::kUnit),
+      .bLUEnable = 0x00,
+      .bLogicalBlockSize = kMockBlockSizeShift,
+      .dLUNumWriteBoosterBufferAllocUnits = 0,
+  };
+  for (auto &lu : logical_units_) {
+    std::memcpy(&lu.GetUnitDesc(), &default_unit_descriptor, sizeof(default_unit_descriptor));
+  }
+
+  std::memset(&attributes_, 0, sizeof(attributes_));
   SetAttribute(Attributes::bBootLunEn, true);
   SetAttribute(Attributes::bCurrentPowerMode, static_cast<uint32_t>(UfsPowerMode::kActive));
 
@@ -142,6 +150,15 @@ UfsMockDevice::UfsMockDevice(zx::interrupt irq)
                0x01);  // 0% - 10% WriteBooster Buffer life time used
   SetAttribute(Attributes::bAvailableWBBufferSize, 10);  // 100%
   SetAttribute(Attributes::dCurrentWBBufferSize, 0x01);
+
+  std::memset(&flags_, 0, sizeof(flags_));
+}
+
+zx::interrupt UfsMockDevice::GetIrq() {
+  zx::interrupt irq_duplicated;
+  zx_status_t status = irq_->duplicate(ZX_RIGHT_SAME_RIGHTS, &irq_duplicated);
+  ZX_ASSERT(status == ZX_OK);
+  return irq_duplicated;
 }
 
 zx_status_t UfsMockDevice::AddLun(uint8_t lun) {

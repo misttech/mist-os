@@ -1,4 +1,3 @@
-#!/usr/bin/env fuchsia-vendored-python
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
@@ -394,47 +393,27 @@ class FastbootTests(unittest.TestCase):
         mock_is_in_fastboot_mode.assert_called()
         mock_host_shell_run.assert_called()
 
-    @parameterized.expand(
-        [
-            (
-                {
-                    "label": "HoneydewTimeoutError",
-                    "host_shell_run_return_value": errors.HoneydewTimeoutError(
-                        "timed out"
-                    ),
-                    "expected_exception": errors.HoneydewTimeoutError,
-                },
-            ),
-            (
-                {
-                    "label": "FastbootCommandError",
-                    "host_shell_run_return_value": errors.HostCmdError("error"),
-                    "expected_exception": errors.FastbootCommandError,
-                },
-            ),
-        ],
-        name_func=_custom_test_name_func,
+    @mock.patch.object(
+        host_shell,
+        "run",
+        side_effect=errors.HostCmdError("error"),
+        autospec=True,
     )
-    @mock.patch.object(host_shell, "run", autospec=True)
     @mock.patch.object(
         fastboot.Fastboot,
         "is_in_fastboot_mode",
         return_value=True,
         autospec=True,
     )
-    def test_run_when_in_fastboot_mode_exceptions(
+    def test_run_when_in_fastboot_mode_exception(
         self,
-        parameterized_dict: dict[str, Any],
         mock_is_in_fastboot_mode: mock.Mock,
         mock_host_shell_run: mock.Mock,
     ) -> None:
         """Test case for Fastboot.run() when device is in fastboot mode and
         returns in exceptions."""
-        mock_host_shell_run.side_effect = parameterized_dict[
-            "host_shell_run_return_value"
-        ]
 
-        with self.assertRaises(parameterized_dict["expected_exception"]):
+        with self.assertRaises(errors.FastbootCommandError):
             self.fastboot_obj.run(cmd=_INPUT_ARGS["run_cmd"])
 
         mock_is_in_fastboot_mode.assert_called()
@@ -546,31 +525,9 @@ class FastbootTests(unittest.TestCase):
         self.fastboot_obj.wait_for_fastboot_mode()
         mock_wait_for_state.assert_called()
 
-    @mock.patch.object(
-        common,
-        "wait_for_state",
-        side_effect=errors.HoneydewTimeoutError("error"),
-        autospec=True,
-    )
-    def test_wait_for_fastboot_mode_exception(
-        self, mock_wait_for_state: mock.Mock
-    ) -> None:
-        """Test case for Fastboot.wait_for_fastboot_mode() failure case."""
-        with self.assertRaises(errors.FuchsiaDeviceError):
-            self.fastboot_obj.wait_for_fastboot_mode()
-        mock_wait_for_state.assert_called()
-
     def test_wait_for_fuchsia_mode_success(self) -> None:
         """Test case for Fastboot.wait_for_fuchsia_mode() success case."""
         self.fastboot_obj.wait_for_fuchsia_mode()
-
-    def test_wait_for_fuchsia_mode_exception(self) -> None:
-        """Test case for Fastboot.wait_for_fuchsia_mode() failure case."""
-        self.ffx_obj.wait_for_rcs_connection.side_effect = (
-            errors.FfxTimeoutError("error")
-        )
-        with self.assertRaises(errors.FuchsiaDeviceError):
-            self.fastboot_obj.wait_for_fuchsia_mode()
 
     @mock.patch.object(common, "wait_for_state", autospec=True)
     def test_wait_for_valid_tcp_address_success(
@@ -578,18 +535,4 @@ class FastbootTests(unittest.TestCase):
     ) -> None:
         """Test case for Fastboot._wait_for_valid_tcp_address() success case."""
         self.fastboot_obj._wait_for_valid_tcp_address()
-        mock_wait_for_state.assert_called()
-
-    @mock.patch.object(
-        common,
-        "wait_for_state",
-        side_effect=errors.HoneydewTimeoutError("error"),
-        autospec=True,
-    )
-    def test_wait_for_valid_tcp_address_exception(
-        self, mock_wait_for_state: mock.Mock
-    ) -> None:
-        """Test case for Fastboot._wait_for_valid_tcp_address() failure case."""
-        with self.assertRaises(errors.FuchsiaDeviceError):
-            self.fastboot_obj._wait_for_valid_tcp_address()
         mock_wait_for_state.assert_called()

@@ -5,17 +5,13 @@ import asyncio
 import typing
 import unittest
 
-import fidl.fuchsia_controller_test as fc_test
 import fidl.fuchsia_controller_othertest as fc_othertest
+import fidl.fuchsia_controller_test as fc_test
 import fidl.fuchsia_developer_ffx as ffx
 import fidl.fuchsia_io as f_io
-from fuchsia_controller_py import Channel
-from fuchsia_controller_py import ZxStatus
+from fuchsia_controller_py import Channel, ZxStatus
 
-from fidl import DomainError
-from fidl import StopServer
-from fidl import StopEventHandler
-from fidl import FrameworkError
+from fidl import DomainError, FrameworkError, StopEventHandler, StopServer
 
 
 # [START echo_server_impl]

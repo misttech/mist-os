@@ -63,7 +63,7 @@ impl<'a> ObexTransport<'a> {
     pub fn send(&self, data: impl Encodable<Error = PacketError>) -> Result<(), Error> {
         let mut buf = vec![0; data.encoded_len()];
         data.encode(&mut buf[..])?;
-        let _ = self.channel.as_ref().write(&buf)?;
+        let _ = self.channel.write(&buf)?;
         Ok(())
     }
 
@@ -163,7 +163,7 @@ pub(crate) mod test_utils {
     pub fn reply(channel: &mut Channel, response: ResponsePacket) {
         let mut response_buf = vec![0; response.encoded_len()];
         response.encode(&mut response_buf[..]).expect("can encode response");
-        let _ = channel.as_ref().write(&response_buf[..]).expect("write to channel success");
+        let _ = channel.write(&response_buf[..]).expect("write to channel success");
     }
 
     /// Sends the `packet` over the provided `channel`.
@@ -175,7 +175,7 @@ pub(crate) mod test_utils {
     {
         let mut buf = vec![0; packet.encoded_len()];
         packet.encode(&mut buf[..]).expect("can encode packet");
-        let _ = channel.as_ref().write(&buf[..]).expect("write to channel success");
+        let _ = channel.write(&buf[..]).expect("write to channel success");
     }
 
     #[track_caller]

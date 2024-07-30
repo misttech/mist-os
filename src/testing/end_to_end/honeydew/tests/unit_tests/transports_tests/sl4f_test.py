@@ -1,4 +1,3 @@
-#!/usr/bin/env fuchsia-vendored-python
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
@@ -310,7 +309,7 @@ class Sl4fTests(unittest.TestCase):
     @mock.patch.object(
         http_utils,
         "send_http_request",
-        side_effect=RuntimeError("some run time error"),
+        side_effect=errors.HttpRequestError("some run time error"),
         autospec=True,
     )
     @mock.patch.object(

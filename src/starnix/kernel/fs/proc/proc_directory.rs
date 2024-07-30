@@ -22,7 +22,7 @@ use fuchsia_zircon as zx;
 use maplit::btreemap;
 use once_cell::sync::Lazy;
 use starnix_logging::{bug_ref, log_error, track_stub};
-use starnix_sync::{FileOpsCore, Locked, WriteOps};
+use starnix_sync::{FileOpsCore, Locked};
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::mode;
@@ -347,6 +347,7 @@ impl FileOps for ProcKmsgFile {
 
     fn wait_async(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
         waiter: &Waiter,
@@ -359,6 +360,7 @@ impl FileOps for ProcKmsgFile {
 
     fn query_events(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
@@ -372,14 +374,14 @@ impl FileOps for ProcKmsgFile {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<'_, FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         _offset: usize,
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
         let syslog = current_task.kernel().syslog.access(current_task)?;
-        file.blocking_op(current_task, FdEvents::POLLIN | FdEvents::POLLHUP, None, || {
+        file.blocking_op(locked, current_task, FdEvents::POLLIN | FdEvents::POLLHUP, None, |_| {
             let bytes_written = syslog.read(data)?;
             Ok(bytes_written as usize)
         })
@@ -387,7 +389,7 @@ impl FileOps for ProcKmsgFile {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, WriteOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -498,7 +500,7 @@ impl FileOps for PressureFile {
     /// Pressure notifications are configured by writing to the file.
     fn write(
         &self,
-        _locked: &mut Locked<'_, WriteOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -511,6 +513,7 @@ impl FileOps for PressureFile {
 
     fn wait_async(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         waiter: &Waiter,
@@ -522,6 +525,7 @@ impl FileOps for PressureFile {
 
     fn query_events(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
@@ -762,7 +766,7 @@ impl LoadavgFile {
 impl DynamicFileSource for LoadavgFile {
     fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
         let (runnable_tasks, existing_tasks, last_pid) = {
-            let kernel = self.0.upgrade().ok_or(errno!(EIO))?;
+            let kernel = self.0.upgrade().ok_or_else(|| errno!(EIO))?;
             let pid_table = kernel.pids.read();
 
             let curr_tids = pid_table.task_ids();

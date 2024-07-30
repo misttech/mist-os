@@ -40,4 +40,38 @@ closed protocol Provider {
     }) -> (struct {
         s zx.Status;
     });
+
+    /// Opens a Virtcon client connection to the display coordinator.
+    ///
+    /// On success, `coordinator` and `coordinator_listener` will be bound to
+    /// the display coordinator, as the Virtcon client.
+    ///
+    /// No event will be dispatched to the `Coordinator` protocol.
+    ///
+    /// Returns `ZX_ERR_ALREADY_BOUND` if the display coordinator already has a
+    /// connected Virtcon client.
+    strict OpenCoordinatorWithListenerForVirtcon(resource table {
+        /// Required.
+        1: coordinator server_end:Coordinator;
+
+        /// Required.
+        2: coordinator_listener client_end:CoordinatorListener;
+    }) -> () error zx.Status;
+
+    /// Opens a primary client connection to the display coordinator.
+    ///
+    /// On success, `coordinator` and `coordinator_listener` will be bound to
+    /// the display coordinator, as the primary client.
+    ///
+    /// No event will be dispatched to the `Coordinator` protocol.
+    ///
+    /// Returns `ZX_ERR_ALREADY_BOUND` if the display coordinator already has a
+    /// connected primary client.
+    strict OpenCoordinatorWithListenerForPrimary(resource table {
+        /// Required.
+        1: coordinator server_end:Coordinator;
+
+        /// Required.
+        2: coordinator_listener client_end:CoordinatorListener;
+    }) -> () error zx.Status;
 };

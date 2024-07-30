@@ -605,7 +605,7 @@ pub fn net_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsNod
     dir.entry(
         current_task,
         "ip_tables_names",
-        BytesFile::new_node(b"nat\nfilter\nmangle\n".to_vec()),
+        BytesFile::new_node(b"nat\nfilter\nmangle\nraw\n".to_vec()),
         mode!(IFREG, 0o644),
     );
     dir.entry(

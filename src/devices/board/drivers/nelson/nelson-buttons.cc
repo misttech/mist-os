@@ -57,16 +57,16 @@ static const buttons_gpio_config_t gpios[] = {
 
 zx_status_t Nelson::ButtonsInit() {
   gpio_init_steps_.push_back(GpioConfigIn(GPIO_VOL_UP_L, GpioFlags::kPullUp));
-  gpio_init_steps_.push_back(GpioSetAltFunction(GPIO_VOL_UP_L, 0));
+  gpio_init_steps_.push_back(GpioFunction(GPIO_VOL_UP_L, 0));
 
   gpio_init_steps_.push_back(GpioConfigIn(GPIO_VOL_DN_L, GpioFlags::kPullUp));
-  gpio_init_steps_.push_back(GpioSetAltFunction(GPIO_VOL_DN_L, 0));
+  gpio_init_steps_.push_back(GpioFunction(GPIO_VOL_DN_L, 0));
 
   gpio_init_steps_.push_back(GpioConfigIn(GPIO_FDR_L, GpioFlags::kNoPull));
-  gpio_init_steps_.push_back(GpioSetAltFunction(GPIO_FDR_L, 0));
+  gpio_init_steps_.push_back(GpioFunction(GPIO_FDR_L, 0));
 
   gpio_init_steps_.push_back(GpioConfigIn(GPIO_MUTE_SOC, GpioFlags::kNoPull));
-  gpio_init_steps_.push_back(GpioSetAltFunction(GPIO_MUTE_SOC, 0));
+  gpio_init_steps_.push_back(GpioFunction(GPIO_MUTE_SOC, 0));
 
   fidl::Arena<> fidl_arena;
   fdf::Arena buttons_arena('BTTN');

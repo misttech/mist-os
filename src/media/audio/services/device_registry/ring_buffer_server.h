@@ -38,7 +38,7 @@ class RingBufferServer
   void WatchDelayInfo(WatchDelayInfoCompleter::Sync& completer) override;
 
   // Forwarded from ControlNotify
-  void DelayInfoChanged(const fuchsia_audio_device::DelayInfo& delay_info);
+  void DelayInfoIsChanged(const fuchsia_audio_device::DelayInfo& delay_info);
 
   void MaybeCompleteWatchDelayInfo();
 

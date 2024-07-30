@@ -25,11 +25,21 @@ int main(int argc, char* argv[]) {
 
   component::OutgoingDirectory outgoing(fidl_dispatcher);
 
+  // File system reads happen on their own thread.
+  async::Loop file_reader_loop(&kAsyncLoopConfigNoAttachToCurrentThread);
+
   // The controller runs on a separate thread from all the FIDL interactions with clients.
   async::Loop controller_loop(&kAsyncLoopConfigNoAttachToCurrentThread);
-  PlaybackController controller(controller_loop.dispatcher());
 
-  zx_status_t start_result = controller_loop.StartThread("PlaybackController Thread");
+  PlaybackController controller(controller_loop.dispatcher(), file_reader_loop.dispatcher());
+
+  zx_status_t start_result = file_reader_loop.StartThread("FileReader Thread");
+  if (start_result != ZX_OK) {
+    FX_LOGS(ERROR) << "Failed to start FileReader thread.";
+    return -1;
+  }
+
+  start_result = controller_loop.StartThread("PlaybackController Thread");
   if (start_result != ZX_OK) {
     FX_LOGS(ERROR) << "Failed to start PlaybackController thread.";
     return -1;
@@ -71,6 +81,9 @@ int main(int argc, char* argv[]) {
 
   controller_loop.Quit();
   controller_loop.JoinThreads();
+
+  file_reader_loop.Quit();
+  file_reader_loop.JoinThreads();
 
   FX_LOGS(INFO) << "Playback service exiting.";
   return EXIT_SUCCESS;

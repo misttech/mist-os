@@ -74,28 +74,33 @@ impl package_directory::NonMetaStorage for BootfsThenBlobfs {
         }
     }
 
-    fn open2(
+    fn open3(
         &self,
         blob: &fuchsia_hash::Hash,
-        protocols: fio::ConnectionProtocols,
+        flags: fio::Flags,
         scope: package_directory::ExecutionScope,
         object_request: vfs::ObjectRequestRef<'_>,
     ) -> Result<(), fuchsia_zircon::Status> {
         if self.0.bootfs_contents.contains(blob) {
             self.0
                 .bootfs
-                .open2(&blob.to_string(), &protocols, object_request.take().into_channel())
+                .open3(
+                    &blob.to_string(),
+                    flags,
+                    &object_request.options(),
+                    object_request.take().into_channel(),
+                )
                 .map_err(|e| {
                     tracing::warn!(
-                        "Error calling open2 on bootfs blobs dir for blob {blob}: {e:?}"
+                        "Error calling open3 on bootfs blobs dir for blob {blob}: {e:?}"
                     );
                     fuchsia_zircon::Status::INTERNAL
                 })
         } else {
-            package_directory::NonMetaStorage::open2(
+            package_directory::NonMetaStorage::open3(
                 &self.0.blobfs,
                 blob,
-                protocols,
+                flags,
                 scope,
                 object_request,
             )

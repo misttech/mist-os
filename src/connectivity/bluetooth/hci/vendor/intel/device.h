@@ -5,16 +5,20 @@
 #ifndef SRC_CONNECTIVITY_BLUETOOTH_HCI_VENDOR_INTEL_DEVICE_H_
 #define SRC_CONNECTIVITY_BLUETOOTH_HCI_VENDOR_INTEL_DEVICE_H_
 
+#include <fidl/fuchsia.hardware.bluetooth/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.bluetooth/cpp/wire.h>
 #include <fuchsia/hardware/bt/hci/c/banjo.h>
 #include <fuchsia/hardware/bt/hci/cpp/banjo.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/driver/devfs/cpp/connector.h>
+#include <lib/sync/cpp/completion.h>
 
+#include <mutex>
 #include <optional>
 
 #include "fidl/fuchsia.hardware.bluetooth/cpp/markers.h"
+#include "hci_event_handler.h"
 #include "vendor_hci.h"
 
 namespace bt_hci_intel {
@@ -74,7 +78,8 @@ class Device : public fdf::DriverBase,
   void EncodeCommand(EncodeCommandRequestView request,
                      EncodeCommandCompleter::Sync& completer) override;
   void OpenHci(OpenHciCompleter::Sync& completer) override;
-  void OpenHciTransport(OpenHciTransportCompleter::Sync& completer) override {}
+  void OpenHciTransport(OpenHciTransportCompleter::Sync& completer) override;
+  void OpenSnoop(OpenSnoopCompleter::Sync& completer) override;
   void handle_unknown_method(
       fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Vendor> metadata,
       fidl::UnknownMethodCompleter::Sync& completer) override;
@@ -107,8 +112,10 @@ class Device : public fdf::DriverBase,
   fidl::WireClient<fuchsia_driver_framework::NodeController> node_controller_;
   fidl::WireClient<fuchsia_driver_framework::Node> child_node_;
 
-  zx::channel cmd_;
-  zx::channel acl_;
+  fdf::Dispatcher hci_client_dispatcher_;
+  HciEventHandler hci_event_handler_;
+  fidl::SharedClient<fuchsia_hardware_bluetooth::HciTransport> hci_transport_client_;
+
   ddk::BtHciProtocolClient hci_;
   bool secure_{false};
   bool firmware_loaded_{false};

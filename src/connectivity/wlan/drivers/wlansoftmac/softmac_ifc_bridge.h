@@ -18,7 +18,7 @@
 
 namespace wlan::drivers::wlansoftmac {
 
-class SoftmacIfcBridge : public fdf::Server<fuchsia_wlan_softmac::WlanSoftmacIfc> {
+class SoftmacIfcBridge : public fdf::WireServer<fuchsia_wlan_softmac::WlanSoftmacIfc> {
  public:
   static zx::result<std::unique_ptr<SoftmacIfcBridge>> New(
       fidl::SharedClient<fuchsia_driver_framework::Node> node_client,
@@ -28,11 +28,13 @@ class SoftmacIfcBridge : public fdf::Server<fuchsia_wlan_softmac::WlanSoftmacIfc
 
   ~SoftmacIfcBridge() override = default;
 
-  void Recv(RecvRequest& fdf_request, RecvCompleter::Sync& completer) override;
-  zx::result<> EthernetTx(eth::BorrowedOperation<>* op, trace_async_id_t async_id) const;
-  void ReportTxResult(ReportTxResultRequest& request,
+  void Recv(RecvRequestView fdf_request, fdf::Arena& arena,
+            RecvCompleter::Sync& completer) override;
+  zx::result<> EthernetTx(std::unique_ptr<eth::BorrowedOperation<>> op,
+                          trace_async_id_t async_id) const;
+  void ReportTxResult(ReportTxResultRequestView request, fdf::Arena& arena,
                       ReportTxResultCompleter::Sync& completer) override;
-  void NotifyScanComplete(NotifyScanCompleteRequest& request,
+  void NotifyScanComplete(NotifyScanCompleteRequestView request, fdf::Arena& arena,
                           NotifyScanCompleteCompleter::Sync& completer) override;
   void StopBridgedDriver(fit::callback<void()> stop_completer);
 

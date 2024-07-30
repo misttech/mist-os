@@ -4,11 +4,11 @@
 # found in the LICENSE file.
 
 import argparse
-import zipfile
-import subprocess
 import os
 import shutil
+import subprocess
 import tempfile
+import zipfile
 
 
 def zip_dir(dir, zip_file):

@@ -7,6 +7,7 @@ use crate::RETRY_DELAY;
 use anyhow::anyhow;
 use async_trait::async_trait;
 use compat_info::CompatibilityInfo;
+use ffx_config::EnvironmentContext;
 use ffx_daemon_core::events;
 use ffx_daemon_events::TargetEvent;
 use ffx_ssh::parse::{
@@ -113,6 +114,7 @@ impl HostPipeChildBuilder for HostPipeChildDefaultBuilder<'_> {
             ssh_timeout,
             verbose_ssh,
             node,
+            ctx,
         )
         .await
     }
@@ -171,6 +173,7 @@ impl HostPipeChild {
         ssh_timeout: u16,
         verbose_ssh: bool,
         node: Arc<overnet_core::Router>,
+        ctx: EnvironmentContext,
     ) -> Result<(Option<HostAddr>, HostPipeChild), PipeError> {
         let id_string = format!("{}", id);
         let args = vec![
@@ -192,6 +195,7 @@ impl HostPipeChild {
             ssh_timeout,
             verbose_ssh,
             node,
+            ctx,
         )
         .await
     }
@@ -207,12 +211,13 @@ impl HostPipeChild {
         ssh_timeout: u16,
         verbose_ssh: bool,
         node: Arc<overnet_core::Router>,
+        ctx: EnvironmentContext,
     ) -> Result<(Option<HostAddr>, HostPipeChild), PipeError> {
         let id_string = format!("{}", id);
 
         // pass the abi revision as a base 10 number so it is easy to parse.
         let rev: u64 =
-            version_history::HISTORY.get_misleading_version_for_ffx().abi_revision.as_u64();
+            version_history_data::HISTORY.get_misleading_version_for_ffx().abi_revision.as_u64();
         let abi_revision = format!("{}", rev);
         let args =
             vec!["remote_control_runner", "--circuit", &id_string, "--abi-revision", &abi_revision];
@@ -227,6 +232,7 @@ impl HostPipeChild {
             ssh_timeout,
             verbose_ssh,
             Arc::clone(&node),
+            ctx.clone(),
         )
         .await
         {
@@ -242,6 +248,7 @@ impl HostPipeChild {
                     ssh_timeout,
                     verbose_ssh,
                     node,
+                    ctx,
                 )
                 .await
             }
@@ -259,6 +266,7 @@ impl HostPipeChild {
         ssh_timeout: u16,
         verbose_ssh: bool,
         node: Arc<overnet_core::Router>,
+        ctx: EnvironmentContext,
     ) -> Result<(Option<HostAddr>, HostPipeChild), PipeError> {
         if verbose_ssh {
             args.insert(0, "-vv");
@@ -314,7 +322,7 @@ impl HostPipeChild {
         tracing::debug!("Awaiting client address from ssh connection");
         let ssh_timeout = Duration::from_secs(ssh_timeout as u64);
         let (ssh_host_address, compatibility_status) =
-            match parse_ssh_output(&mut stdout, &mut stderr, verbose_ssh)
+            match parse_ssh_output(&mut stdout, &mut stderr, verbose_ssh, &ctx)
                 .on_timeout(ssh_timeout, || {
                     Err(PipeError::ConnectionFailed(format!(
                         "ssh connection timed out after {ssh_timeout:?}"
@@ -325,7 +333,8 @@ impl HostPipeChild {
                 Ok(res) => res,
                 Err(e) => {
                     ssh.kill().await?;
-                    let ssh_err = ffx_ssh::ssh::extract_ssh_error(&mut stderr, verbose_ssh).await;
+                    let ssh_err =
+                        ffx_ssh::ssh::extract_ssh_error(&mut stderr, verbose_ssh, &ctx).await;
                     if let Some(status) = ssh.try_wait()? {
                         match status.code() {
                             // Possible to catch more error codes here, hence the use of a match.
@@ -372,7 +381,7 @@ impl HostPipeChild {
                         // know the connection is established, the error messages
                         // go to the event queue as normal.
                         if verbose_ssh {
-                            write_ssh_log("E", &line).await;
+                            write_ssh_log("E", &line, &ctx).await;
                         } else {
                             // Sometimes the SSH message that comes from openssh has a carriage
                             // return at the end which messes up the flow of the info log.

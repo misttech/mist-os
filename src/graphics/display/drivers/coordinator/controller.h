@@ -29,6 +29,7 @@
 #include <memory>
 
 #include <fbl/array.h>
+#include <fbl/mutex.h>
 #include <fbl/ref_ptr.h>
 #include <fbl/vector.h>
 
@@ -56,7 +57,7 @@ class DisplayConfig;
 class IntegrationTest;
 
 // Multiplexes between display controller clients and display engine drivers.
-class Controller : public ddk::DisplayControllerInterfaceProtocol<Controller>,
+class Controller : public ddk::DisplayEngineListenerProtocol<Controller>,
                    public fidl::WireServer<fuchsia_hardware_display::Provider> {
  public:
   // Factory method for production use.
@@ -103,12 +104,12 @@ class Controller : public ddk::DisplayControllerInterfaceProtocol<Controller>,
   // Must be called after `client_dispatcher_` is shut down.
   void Stop();
 
-  // fuchsia.hardware.display.controller/DisplayControllerInterface:
-  void DisplayControllerInterfaceOnDisplayAdded(const raw_display_info_t* banjo_display_info);
-  void DisplayControllerInterfaceOnDisplayRemoved(uint64_t display_id);
-  void DisplayControllerInterfaceOnDisplayVsync(uint64_t banjo_display_id, zx_time_t timestamp,
-                                                const config_stamp_t* config_stamp);
-  void DisplayControllerInterfaceOnCaptureComplete();
+  // fuchsia.hardware.display.controller/DisplayEngineListener:
+  void DisplayEngineListenerOnDisplayAdded(const raw_display_info_t* banjo_display_info);
+  void DisplayEngineListenerOnDisplayRemoved(uint64_t display_id);
+  void DisplayEngineListenerOnDisplayVsync(uint64_t banjo_display_id, zx_time_t timestamp,
+                                           const config_stamp_t* config_stamp);
+  void DisplayEngineListenerOnCaptureComplete();
 
   void OnClientDead(ClientProxy* client);
   void SetVirtconMode(fuchsia_hardware_display::wire::VirtconMode virtcon_mode);
@@ -155,8 +156,8 @@ class Controller : public ddk::DisplayControllerInterfaceProtocol<Controller>,
 
   // Thread-safety annotations currently don't deal with pointer aliases. Use this to document
   // places where we believe a mutex aliases mtx()
-  void AssertMtxAliasHeld(mtx_t* m) __TA_ASSERT(m) { ZX_DEBUG_ASSERT(m == mtx()); }
-  mtx_t* mtx() const { return &mtx_; }
+  void AssertMtxAliasHeld(fbl::Mutex& m) __TA_ASSERT(m) { ZX_DEBUG_ASSERT(&m == mtx()); }
+  fbl::Mutex* mtx() const { return &mtx_; }
   const inspect::Inspector& inspector() const { return inspector_; }
 
   // Test helpers
@@ -175,6 +176,12 @@ class Controller : public ddk::DisplayControllerInterfaceProtocol<Controller>,
                                  OpenCoordinatorForVirtconCompleter::Sync& completer) override;
   void OpenCoordinatorForPrimary(OpenCoordinatorForPrimaryRequestView request,
                                  OpenCoordinatorForPrimaryCompleter::Sync& completer) override;
+  void OpenCoordinatorWithListenerForVirtcon(
+      OpenCoordinatorWithListenerForVirtconRequestView request,
+      OpenCoordinatorWithListenerForVirtconCompleter::Sync& completer) override;
+  void OpenCoordinatorWithListenerForPrimary(
+      OpenCoordinatorWithListenerForPrimaryRequestView request,
+      OpenCoordinatorWithListenerForPrimaryCompleter::Sync& completer) override;
 
  private:
   friend ControllerTest;
@@ -196,7 +203,7 @@ class Controller : public ddk::DisplayControllerInterfaceProtocol<Controller>,
   VsyncMonitor vsync_monitor_;
 
   // mtx_ is a global lock on state shared among clients.
-  mutable mtx_t mtx_;
+  mutable fbl::Mutex mtx_;
   bool unbinding_ __TA_GUARDED(mtx()) = false;
 
   DisplayInfo::Map displays_ __TA_GUARDED(mtx());
@@ -238,8 +245,6 @@ class Controller : public ddk::DisplayControllerInterfaceProtocol<Controller>,
 
 template <typename Callback>
 bool Controller::FindDisplayInfo(DisplayId display_id, Callback callback) {
-  ZX_DEBUG_ASSERT(mtx_trylock(&mtx_) == thrd_busy);
-
   for (const DisplayInfo& display : displays_) {
     if (display.id == display_id) {
       callback(display);

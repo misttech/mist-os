@@ -82,7 +82,7 @@ if [[ "$1" == "--no-build" ]]; then
     exit 1
   fi
 else
-  fx-command-run build ${GNAW_TARGET} || ( \
+  fx-run-ninja false ${PREBUILT_NINJA} -C ${FUCHSIA_BUILD_DIR} ${GNAW_TARGET} || ( \
     fx-error "Failed to build cargo-gnaw."; \
     fx-error "This can happen after cargo-gnaw exits early."; \
     fx-error "To retry an old build of cargo-gnaw, specify --no-build."; \

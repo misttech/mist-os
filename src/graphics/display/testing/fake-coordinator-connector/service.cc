@@ -16,16 +16,6 @@
 
 namespace display {
 
-// static
-zx::result<> FakeDisplayCoordinatorConnector::CreateAndPublishService(
-    std::shared_ptr<zx_device> mock_root, async_dispatcher_t* dispatcher,
-    const fake_display::FakeDisplayDeviceConfig& fake_display_device_config,
-    std::string_view parent_directory, component::OutgoingDirectory& outgoing) {
-  return outgoing.AddProtocolAt<fuchsia_hardware_display::Provider>(
-      parent_directory, std::make_unique<FakeDisplayCoordinatorConnector>(
-                            std::move(mock_root), dispatcher, fake_display_device_config));
-}
-
 FakeDisplayCoordinatorConnector::FakeDisplayCoordinatorConnector(
     std::shared_ptr<zx_device> mock_root, async_dispatcher_t* dispatcher,
     const fake_display::FakeDisplayDeviceConfig& fake_display_device_config) {
@@ -65,6 +55,18 @@ void FakeDisplayCoordinatorConnector::OpenCoordinatorForVirtcon(
       .on_coordinator_opened = [async_completer = completer.ToAsync()](zx_status_t status) mutable {
         async_completer.Reply({{.s = status}});
       }});
+}
+
+void FakeDisplayCoordinatorConnector::OpenCoordinatorWithListenerForPrimary(
+    OpenCoordinatorWithListenerForPrimaryRequest& request,
+    OpenCoordinatorWithListenerForPrimaryCompleter::Sync& completer) {
+  completer.Reply(fit::error(ZX_ERR_NOT_SUPPORTED));
+}
+
+void FakeDisplayCoordinatorConnector::OpenCoordinatorWithListenerForVirtcon(
+    OpenCoordinatorWithListenerForVirtconRequest& request,
+    OpenCoordinatorWithListenerForVirtconCompleter::Sync& completer) {
+  completer.Reply(fit::error(ZX_ERR_NOT_SUPPORTED));
 }
 
 void FakeDisplayCoordinatorConnector::ConnectOrDeferClient(OpenCoordinatorRequest req) {

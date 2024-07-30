@@ -14,7 +14,6 @@ import tempfile
 import time
 import unittest
 import unittest.mock as mock
-
 from typing import Any
 
 import main

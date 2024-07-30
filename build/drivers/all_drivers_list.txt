@@ -19,9 +19,9 @@
 //examples/drivers/transport/zircon/v2:child_driver
 //examples/drivers/transport/zircon/v2:parent_driver
 //sdk/lib/driver/devicetree/examples/example-board:bazel_package.bazel_build
-//sdk/lib/driver/metadata/cpp/tests/test_child:driver
-//sdk/lib/driver/metadata/cpp/tests/test_grandchild:driver
-//sdk/lib/driver/metadata/cpp/tests/test_parent:driver
+//sdk/lib/driver/metadata/cpp/tests/metadata_forwarder_test_driver:driver
+//sdk/lib/driver/metadata/cpp/tests/metadata_retriever_test_driver:driver
+//sdk/lib/driver/metadata/cpp/tests/metadata_sender_test_driver:driver
 //sdk/lib/driver/metadata/cpp/tests/test_root:driver
 //sdk/lib/driver_test_realm/fake_driver:driver
 //src/camera/drivers/bus/aml_mipicsi:aml_mipicsi_driver-driver
@@ -299,8 +299,7 @@
 //src/graphics/display/drivers/simple:simple.bochs-driver
 //src/graphics/display/drivers/simple:simple.intel-driver
 //src/graphics/display/drivers/vim3-display-detect:vim3-display-detect-driver
-//src/graphics/display/drivers/virtio-guest/v1:driver
-//src/graphics/display/drivers/virtio-guest/v2:driver
+//src/graphics/display/drivers/virtio-gpu-display:driver
 //src/graphics/drivers/aml-gpu:aml-gpu-driver
 //src/graphics/drivers/misc/goldfish:goldfish_driver-driver
 //src/graphics/drivers/misc/goldfish_address_space:address_space_driver-driver
@@ -313,6 +312,9 @@
 //src/graphics/drivers/msd-virtio-gpu:msd-virtio-gpu-driver
 //src/graphics/drivers/msd-vsi-vip:msd_vsi-driver
 //src/graphics/drivers/msd-vsi-vip:msd_vsi_test-driver
+//src/lib/ddktl/tests/metadata-server-test/metadata-forwarder-test-driver:driver
+//src/lib/ddktl/tests/metadata-server-test/metadata-retriever-test-driver:driver
+//src/lib/ddktl/tests/metadata-server-test/metadata-sender-test-driver:driver
 //src/media/audio/drivers/codecs/alc5514:alc5514-driver
 //src/media/audio/drivers/codecs/alc5663:alc5663-driver
 //src/media/audio/drivers/codecs/da7219:driver

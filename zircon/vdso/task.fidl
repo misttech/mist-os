@@ -272,7 +272,7 @@ closed protocol Task {
 
     /// ## Summary
     ///
-    /// Kill the provided task (job, process, or thread).
+    /// Kill the provided job or process.
     ///
     /// ## Declaration
     ///
@@ -320,6 +320,8 @@ closed protocol Task {
     ///
     /// `ZX_ERR_ACCESS_DENIED`  *handle* does not have the `ZX_RIGHT_DESTROY`
     /// right.
+    ///
+    /// `ZX_ERR_NOT_SUPPORTED`  *handle* is a thread handle.
     ///
     /// ## See also
     ///

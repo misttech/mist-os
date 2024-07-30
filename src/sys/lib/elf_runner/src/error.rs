@@ -4,7 +4,6 @@
 
 use clonable_error::ClonableError;
 use fuchsia_zircon as zx;
-use std::ffi::CString;
 use thiserror::Error;
 use tracing::error;
 
@@ -130,14 +129,14 @@ pub enum ExceptionError {
 
 #[derive(Debug, Clone, Error)]
 pub enum VdsoError {
-    #[error("Could not duplicate VMO handle for vDSO with name \"{}\": {}", name.to_string_lossy(), status)]
+    #[error("Could not duplicate VMO handle for vDSO with name \"{name}\": {status}")]
     CouldNotDuplicate {
-        name: CString,
+        name: zx::Name,
         #[source]
         status: zx::Status,
     },
-    #[error("No vDSO VMO found with name \"{}\"", _0.to_string_lossy())]
-    NotFound(CString),
+    #[error("No vDSO VMO found with name \"{_0}\"")]
+    NotFound(zx::Name),
     #[error("failed to get vDSO name: {_0}")]
     GetName(#[source] zx::Status),
 }

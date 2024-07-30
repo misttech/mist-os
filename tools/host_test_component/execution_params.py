@@ -3,9 +3,8 @@
 # found in the LICENSE file.
 
 import json
-
-from typing import List, Self
 from dataclasses import dataclass
+from typing import List, Self
 
 TEST_URL_KEY = "test_url"
 TEST_ARGS_KEY = "test_args"

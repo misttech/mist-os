@@ -2,19 +2,23 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::component_instance::ComponentInstanceForAnalyzer;
+use crate::component_instance::{ComponentInstanceForAnalyzer, TopInstanceForAnalyzer};
+use ::routing::bedrock::structured_dict::ComponentInput;
+use ::routing::bedrock::with_policy_check::WithPolicyCheck;
 use ::routing::capability_source::{CapabilitySource, ComponentCapability, InternalCapability};
 use ::routing::component_instance::{ComponentInstanceInterface, WeakComponentInstanceInterface};
 use ::routing::error::RoutingError;
+use ::routing::policy::GlobalPolicyChecker;
 use ::routing::DictExt;
 use async_trait::async_trait;
+use cm_config::RuntimeConfig;
 use cm_rust::ComponentDecl;
 use cm_types::RelativePath;
 use fidl::endpoints::DiscoverableProtocolMarker;
 use futures::{future, FutureExt};
 use moniker::ChildName;
 use router_error::RouterError;
-use sandbox::{Capability, Data, Dict, Request, Routable, Router};
+use sandbox::{Capability, Dict, Request, Routable, Router};
 use std::collections::HashMap;
 use std::sync::Arc;
 use {
@@ -23,9 +27,8 @@ use {
 };
 
 fn new_debug_only_router(source: CapabilitySource<ComponentInstanceForAnalyzer>) -> Router {
-    let cap = Capability::Dictionary(
-        source.try_into().expect("failed to convert capability source to dictionary"),
-    );
+    let cap: Capability =
+        source.try_into().expect("failed to convert capability source to dictionary");
     Router::new(move |request: Request| {
         if !request.debug {
             future::ready(Err(RouterError::NotFound(Arc::new(
@@ -36,6 +39,56 @@ fn new_debug_only_router(source: CapabilitySource<ComponentInstanceForAnalyzer>)
             future::ready(Ok(cap.try_clone().unwrap())).boxed()
         }
     })
+}
+
+pub fn build_root_component_input(
+    top_instance: &Arc<TopInstanceForAnalyzer>,
+    runtime_config: &Arc<RuntimeConfig>,
+    policy: &GlobalPolicyChecker,
+) -> ComponentInput {
+    let root_component_input = ComponentInput::default();
+    let names_and_capability_sources = runtime_config
+        .namespace_capabilities
+        .iter()
+        .filter_map(|capability_decl| match capability_decl {
+            cm_rust::CapabilityDecl::Protocol(protocol_decl) => Some((
+                protocol_decl.name.clone(),
+                CapabilitySource::<ComponentInstanceForAnalyzer>::Namespace {
+                    capability: ComponentCapability::Protocol(protocol_decl.clone()),
+                    top_instance: Arc::downgrade(top_instance),
+                },
+            )),
+            _ => None,
+        })
+        .chain(runtime_config.builtin_capabilities.iter().filter_map(|capability_decl| {
+            match capability_decl {
+                cm_rust::CapabilityDecl::Protocol(protocol_decl) => Some((
+                    protocol_decl.name.clone(),
+                    CapabilitySource::<ComponentInstanceForAnalyzer>::Builtin {
+                        capability: InternalCapability::Protocol(protocol_decl.name.clone()),
+                        top_instance: Arc::downgrade(top_instance),
+                    },
+                )),
+                _ => None,
+            }
+        }));
+    for (name, capability_source) in names_and_capability_sources {
+        root_component_input
+            .capabilities()
+            .insert_capability(
+                &name,
+                Router::new_ok(Capability::Dictionary(
+                    capability_source
+                        .clone()
+                        .try_into()
+                        .expect("failed to convert builtin capability to dicttionary"),
+                ))
+                .with_policy_check(capability_source, policy.clone())
+                .into(),
+            )
+            .expect("failed to insert builtin capability into dictionary");
+    }
+    root_component_input
 }
 
 pub fn build_framework_dictionary(component: &Arc<ComponentInstanceForAnalyzer>) -> Dict {
@@ -88,10 +141,15 @@ pub fn build_capability_sourced_capabilities_dictionary(
 }
 
 pub fn new_program_router(
-    _weak_component: WeakComponentInstanceInterface<ComponentInstanceForAnalyzer>,
+    component: WeakComponentInstanceInterface<ComponentInstanceForAnalyzer>,
     _relative_path: RelativePath,
+    capability: ComponentCapability,
 ) -> Router {
-    Router::new_ok(Data::String("TODO: this comes from a program".to_string()))
+    let capability_source = CapabilitySource::Component { capability, component };
+    Router::new_ok(
+        Capability::try_from(capability_source)
+            .expect("failed to convert capability source to dictionary"),
+    )
 }
 
 pub fn new_outgoing_dir_router(

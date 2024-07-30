@@ -341,6 +341,7 @@ TEST(SeccompTest, GetActionsAvailProc) {
 // Read-only test.  There is a test in starnix/task/seccomp.rs that exercises the ability to
 // write to this file; it isn't here, because we don't want to change a global config.
 TEST(SeccompTest, ActionsLoggedProc) {
+  // TODO(https://fxbug.dev/317285180) don't skip on baseline
   if (!test_helper::HasSysAdmin()) {
     GTEST_SKIP() << "Skipped ActionsLoggedProc because not running as root";
   }

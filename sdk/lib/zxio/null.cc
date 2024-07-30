@@ -312,7 +312,7 @@ zx_status_t zxio_default_xattr_remove(zxio_t* io, const uint8_t* name, size_t na
 }
 
 zx_status_t zxio_default_open2(zxio_t* directory, const char* path, size_t path_len,
-                               const zxio_open_options_t* options,
+                               const zxio_open2_options_t* options,
                                zxio_node_attributes_t* inout_attr, zxio_storage_t* storage) {
   return ZX_ERR_NOT_SUPPORTED;
 }
@@ -327,5 +327,11 @@ zx_status_t zxio_default_enable_verity(zxio_t* io, const zxio_fsverity_descripto
 }
 
 zx_status_t zxio_default_get_descriptor(zxio_t* io, zxio_fsverity_descriptor_t* out_descriptor) {
+  return ZX_ERR_NOT_SUPPORTED;
+}
+
+zx_status_t zxio_default_open3(zxio_t* directory, const char* path, size_t path_len,
+                               zxio_open_flags_t flags, const zxio_open_options_t* options,
+                               zxio_storage_t* storage) {
   return ZX_ERR_NOT_SUPPORTED;
 }

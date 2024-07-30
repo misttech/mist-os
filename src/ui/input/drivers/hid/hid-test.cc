@@ -2,40 +2,33 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "hid.h"
+#include "src/ui/input/drivers/hid/hid.h"
 
 #include <fidl/fuchsia.hardware.hidbus/cpp/wire_test_base.h>
-#include <lib/driver/runtime/testing/cpp/sync_helpers.h>
-#include <lib/fdf/cpp/dispatcher.h>
+#include <lib/driver/testing/cpp/driver_test.h>
 #include <lib/hid/ambient-light.h>
 #include <lib/hid/boot.h>
 #include <lib/hid/paradise.h>
-#include <unistd.h>
 
-#include <thread>
-#include <vector>
+#include <gtest/gtest.h>
 
-#include <fbl/ref_ptr.h>
-#include <zxtest/zxtest.h>
-
-#include "src/devices/testing/mock-ddk/mock-device.h"
+#include "src/lib/testing/predicates/status.h"
 
 namespace hid_driver {
 
 namespace fhidbus = fuchsia_hardware_hidbus;
+namespace finput = fuchsia_hardware_input;
 
 class FakeHidbus : public fidl::testing::WireTestBase<fhidbus::Hidbus> {
  public:
-  FakeHidbus() : loop_(&kAsyncLoopConfigNeverAttachToThread) {
-    loop_.StartThread("hid-test-fake-hidbus-loop");
-  }
-  ~FakeHidbus() {
-    libsync::Completion wait;
-    async::PostTask(loop_.dispatcher(), [this, &wait]() {
-      binding_.RemoveAll();
-      wait.Signal();
+  fhidbus::Service::InstanceHandler GetInstanceHandler() {
+    return fhidbus::Service::InstanceHandler({
+        .device =
+            [this](fidl::ServerEnd<fhidbus::Hidbus> server) {
+              binding_.AddBinding(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+                                  std::move(server), this, fidl::kIgnoreBindingClosure);
+            },
     });
-    wait.Wait();
   }
 
   void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
@@ -122,19 +115,6 @@ class FakeHidbus : public fidl::testing::WireTestBase<fhidbus::Hidbus> {
     report_desc_ = std::vector<uint8_t>(desc, desc + desc_len);
   }
 
-  fidl::ClientEnd<fhidbus::Hidbus> GetClient() {
-    auto endpoints = fidl::CreateEndpoints<fhidbus::Hidbus>();
-    EXPECT_OK(endpoints);
-    libsync::Completion wait;
-    EXPECT_OK(async::PostTask(loop_.dispatcher(), [this, &endpoints, &wait]() {
-      binding_.AddBinding(loop_.dispatcher(), std::move(endpoints->server), this,
-                          fidl::kIgnoreBindingClosure);
-      wait.Signal();
-    }));
-    wait.Wait();
-    return std::move(endpoints->client);
-  }
-
  protected:
   std::vector<uint8_t> report_desc_;
 
@@ -146,102 +126,101 @@ class FakeHidbus : public fidl::testing::WireTestBase<fhidbus::Hidbus> {
   zx_status_t start_status_ = ZX_OK;
 
  private:
-  async::Loop loop_;
   fidl::ServerBindingGroup<fhidbus::Hidbus> binding_;
 };
 
-class HidDeviceTest : public zxtest::Test {
+class HidDriverTestEnvironment : fdf_testing::Environment {
  public:
-  HidDeviceTest() = default;
-  void SetUp() override {
-    // TODO(https://fxbug.dev/42075363): Migrate test to use dispatcher integration.
-    fake_root_ = MockDevice::FakeRootParent();
-    device_ = new HidDevice(fake_root_.get(), fake_hidbus_.GetClient());
-
-    // Each test is responsible for calling Bind().
+  zx::result<> Serve(fdf::OutgoingDirectory& to_driver_vfs) override {
+    return to_driver_vfs.AddService<fhidbus::Service>(fake_hidbus_.GetInstanceHandler());
   }
 
+  FakeHidbus& fake_hidbus() { return fake_hidbus_; }
+
+ private:
+  FakeHidbus fake_hidbus_;
+};
+
+class TestConfig final {
+ public:
+  using DriverType = hid_driver::HidDriver;
+  using EnvironmentType = HidDriverTestEnvironment;
+};
+
+class HidDeviceTest : public ::testing::Test {
+ public:
   void TearDown() override {
-    auto child = fake_root_->GetLatestChild();
-    child->UnbindOp();
-    EXPECT_EQ(ZX_OK, child->WaitUntilUnbindReplyCalled());
-    EXPECT_TRUE(child->UnbindReplyCalled());
-  }
-
-  void SetupBootMouseDevice() {
-    size_t desc_size;
-    const uint8_t* boot_mouse_desc = get_boot_mouse_report_desc(&desc_size);
-    fake_hidbus_.SetDescriptor(boot_mouse_desc, desc_size);
-
-    fidl::Arena<> arena;
-    fake_hidbus_.SetHidInfo(fhidbus::wire::HidInfo::Builder(arena)
-                                .boot_protocol(fhidbus::wire::HidBootProtocol::kPointer)
-                                .vendor_id(0xabc)
-                                .product_id(123)
-                                .version(5)
-                                .dev_num(0)
-                                .polling_rate(0)
-                                .Build());
-  }
-
-  fbl::RefPtr<HidInstance> SetupInstanceDriver() {
-    auto endpoints = fidl::Endpoints<fuchsia_hardware_input::Device>::Create();
-
-    auto instance = device_->CreateInstance(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
-                                            std::move(endpoints.server));
-    EXPECT_OK(instance);
-
-    sync_client_ = fidl::WireSyncClient(std::move(endpoints.client));
-
-    RunSyncClientTask([&]() {
-      auto result = sync_client_->GetReportsEvent();
-      ASSERT_TRUE(result.ok());
-      ASSERT_TRUE(result->is_ok());
-      report_event_ = std::move(result.value()->event);
-    });
-
-    return instance.is_ok() ? *instance : nullptr;
-  }
-
-  void ReadOneReport(uint8_t* report_data, size_t report_size, size_t* returned_size) {
-    RunSyncClientTask([&]() {
-      ASSERT_OK(report_event_.wait_one(DEV_STATE_READABLE, zx::time::infinite(), nullptr));
-
-      auto result = sync_client_->ReadReport();
-      ASSERT_TRUE(result.ok());
-      ASSERT_TRUE(result->is_ok());
-      ASSERT_TRUE(result.value()->report.has_buf());
-      ASSERT_TRUE(result.value()->report.buf().count() <= report_size);
-
-      for (size_t i = 0; i < result.value()->report.buf().count(); i++) {
-        report_data[i] = result.value()->report.buf()[i];
-      }
-      *returned_size = result.value()->report.buf().count();
-    });
-  }
-
- protected:
-  // Because this test is using a fidl::WireSyncClient, we need to run any ops on the client on
-  // their own thread because the testing thread is shared with the fidl::Server<finput::Device>.
-  static void RunSyncClientTask(fit::closure task) {
-    async::Loop loop{&kAsyncLoopConfigNeverAttachToThread};
-    loop.StartThread();
-    zx::result result = fdf::RunOnDispatcherSync(loop.dispatcher(), std::move(task));
+    zx::result<> result = driver_test().StopDriver();
     ASSERT_EQ(ZX_OK, result.status_value());
   }
 
-  fidl::WireSyncClient<fuchsia_hardware_input::Device> sync_client_;
+  void SetupBootMouseDevice() {
+    driver_test().RunInEnvironmentTypeContext([](HidDriverTestEnvironment& env) {
+      size_t desc_size;
+      const uint8_t* boot_mouse_desc = get_boot_mouse_report_desc(&desc_size);
+      env.fake_hidbus().SetDescriptor(boot_mouse_desc, desc_size);
+
+      fidl::Arena<> arena;
+      env.fake_hidbus().SetHidInfo(fhidbus::wire::HidInfo::Builder(arena)
+                                       .boot_protocol(fhidbus::wire::HidBootProtocol::kPointer)
+                                       .vendor_id(0xabc)
+                                       .product_id(123)
+                                       .version(5)
+                                       .dev_num(0)
+                                       .polling_rate(0)
+                                       .Build());
+    });
+  }
+
+  fidl::ClientEnd<finput::Device> GetClient() {
+    auto endpoints = fidl::Endpoints<finput::Device>::Create();
+
+    auto result = driver_test().driver()->hiddev().CreateInstance(std::move(endpoints.server));
+    EXPECT_OK(result);
+
+    EXPECT_TRUE(driver_test()
+                    .RunOnBackgroundDispatcherSync([&]() {
+                      auto result = fidl::WireCall(endpoints.client)->GetReportsEvent();
+                      ASSERT_TRUE(result.ok());
+                      ASSERT_TRUE(result->is_ok());
+                      report_event_ = std::move(result.value()->event);
+                    })
+                    .is_ok());
+
+    return std::move(endpoints.client);
+  }
+
+  void ReadOneReport(fidl::WireSyncClient<finput::Device>& client, uint8_t* report_data,
+                     size_t report_size, size_t* returned_size) {
+    EXPECT_TRUE(driver_test()
+                    .RunOnBackgroundDispatcherSync([&]() {
+                      ASSERT_OK(
+                          report_event_.wait_one(ZX_USER_SIGNAL_0, zx::time::infinite(), nullptr));
+
+                      auto result = client->ReadReport();
+                      ASSERT_TRUE(result.ok());
+                      ASSERT_TRUE(result->is_ok());
+                      ASSERT_TRUE(result.value()->report.has_buf());
+                      ASSERT_TRUE(result.value()->report.buf().count() <= report_size);
+
+                      for (size_t i = 0; i < result.value()->report.buf().count(); i++) {
+                        report_data[i] = result.value()->report.buf()[i];
+                      }
+                      *returned_size = result.value()->report.buf().count();
+                    })
+                    .is_ok());
+  }
+
+  fdf_testing::ForegroundDriverTest<TestConfig>& driver_test() { return driver_test_; }
+
+ protected:
+  fdf_testing::ForegroundDriverTest<TestConfig> driver_test_;
   zx::event report_event_;
-
-  HidDevice* device_;
-
-  std::shared_ptr<MockDevice> fake_root_;
-  FakeHidbus fake_hidbus_;
 };
 
 TEST_F(HidDeviceTest, LifeTimeTest) {
   SetupBootMouseDevice();
-  ASSERT_OK(device_->Bind());
+  ASSERT_TRUE(driver_test().StartDriver().is_ok());
 }
 
 TEST_F(HidDeviceTest, TestQuery) {
@@ -251,42 +230,45 @@ TEST_F(HidDeviceTest, TestQuery) {
   constexpr uint16_t kVersion = 0x1234;
 
   SetupBootMouseDevice();
-  fidl::Arena<> arena;
-  fake_hidbus_.SetHidInfo(fhidbus::wire::HidInfo::Builder(arena)
-                              .boot_protocol(fhidbus::wire::HidBootProtocol::kPointer)
-                              .vendor_id(kVendorId)
-                              .product_id(kProductId)
-                              .version(kVersion)
-                              .dev_num(0)
-                              .polling_rate(0)
-                              .Build());
-
-  ASSERT_OK(device_->Bind());
-
-  SetupInstanceDriver();
-
-  RunSyncClientTask([&]() {
-    auto result = sync_client_->Query();
-    ASSERT_OK(result.status());
-
-    ASSERT_EQ(kVendorId, result.value()->info.vendor_id());
-    ASSERT_EQ(kProductId, result.value()->info.product_id());
-    ASSERT_EQ(kVersion, result.value()->info.version());
+  driver_test().RunInEnvironmentTypeContext([](HidDriverTestEnvironment& env) {
+    fidl::Arena<> arena;
+    env.fake_hidbus().SetHidInfo(fhidbus::wire::HidInfo::Builder(arena)
+                                     .boot_protocol(fhidbus::wire::HidBootProtocol::kPointer)
+                                     .vendor_id(kVendorId)
+                                     .product_id(kProductId)
+                                     .version(kVersion)
+                                     .dev_num(0)
+                                     .polling_rate(0)
+                                     .Build());
   });
+  ASSERT_TRUE(driver_test().StartDriver().is_ok());
+
+  auto client = fidl::WireSyncClient<finput::Device>(GetClient());
+  EXPECT_TRUE(driver_test()
+                  .RunOnBackgroundDispatcherSync([&]() {
+                    auto result = client->Query();
+                    ASSERT_OK(result.status());
+
+                    ASSERT_EQ(kVendorId, result.value()->info.vendor_id());
+                    ASSERT_EQ(kProductId, result.value()->info.product_id());
+                    ASSERT_EQ(kVersion, result.value()->info.version());
+                  })
+                  .is_ok());
 }
 
 TEST_F(HidDeviceTest, BootMouseSendReport) {
   SetupBootMouseDevice();
   uint8_t mouse_report[] = {0xDE, 0xAD, 0xBE};
-  ASSERT_OK(device_->Bind());
+  ASSERT_TRUE(driver_test().StartDriver().is_ok());
 
-  SetupInstanceDriver();
-
-  fake_hidbus_.SendReport(mouse_report, sizeof(mouse_report));
+  auto client = fidl::WireSyncClient<finput::Device>(GetClient());
+  driver_test().RunInEnvironmentTypeContext([&mouse_report](HidDriverTestEnvironment& env) {
+    env.fake_hidbus().SendReport(mouse_report, sizeof(mouse_report));
+  });
 
   uint8_t returned_report[3] = {};
   size_t actual;
-  ReadOneReport(returned_report, sizeof(returned_report), &actual);
+  ReadOneReport(client, returned_report, sizeof(returned_report), &actual);
 
   ASSERT_EQ(actual, sizeof(returned_report));
   for (size_t i = 0; i < actual; i++) {
@@ -297,43 +279,43 @@ TEST_F(HidDeviceTest, BootMouseSendReport) {
 TEST_F(HidDeviceTest, BootMouseSendReportWithTime) {
   SetupBootMouseDevice();
   uint8_t mouse_report[] = {0xDE, 0xAD, 0xBE};
-  ASSERT_OK(device_->Bind());
+  ASSERT_TRUE(driver_test().StartDriver().is_ok());
 
-  // Regsiter a device listener
-  std::pair<sync_completion_t, zx_time_t> callback_data;
-  callback_data.second = 0xabcd;
-
-  hid_report_listener_protocol_ops_t listener_ops;
-  listener_ops.receive_report = [](void* ctx, const uint8_t* report_list, size_t report_count,
-                                   zx_time_t report_time) {
-    auto callback_data = static_cast<std::pair<sync_completion_t, zx_time_t>*>(ctx);
-    ASSERT_EQ(callback_data->second, report_time);
-    sync_completion_signal(&callback_data->first);
-  };
-  hid_report_listener_protocol_t listener = {&listener_ops, &callback_data};
-  device_->HidDeviceRegisterListener(&listener);
-
-  fake_hidbus_.SendReportWithTime(mouse_report, sizeof(mouse_report), callback_data.second);
-  RunSyncClientTask([&callback_data]() {
-    sync_completion_wait_deadline(&callback_data.first, zx::time::infinite().get());
+  auto client = fidl::WireSyncClient<finput::Device>(GetClient());
+  const zx_time_t kTimestamp = 0xabcd;
+  driver_test().RunInEnvironmentTypeContext([&mouse_report](HidDriverTestEnvironment& env) {
+    env.fake_hidbus().SendReportWithTime(mouse_report, sizeof(mouse_report), kTimestamp);
   });
+  EXPECT_TRUE(driver_test()
+                  .RunOnBackgroundDispatcherSync([&]() {
+                    ASSERT_OK(
+                        report_event_.wait_one(ZX_USER_SIGNAL_0, zx::time::infinite(), nullptr));
+
+                    auto result = client->ReadReport();
+                    ASSERT_TRUE(result.ok());
+                    ASSERT_TRUE(result->is_ok());
+                    ASSERT_TRUE(result.value()->report.has_timestamp());
+                    ASSERT_EQ(result.value()->report.timestamp(), kTimestamp);
+                  })
+                  .is_ok());
   ASSERT_NO_FATAL_FAILURE();
 }
 
 TEST_F(HidDeviceTest, BootMouseSendReportInPieces) {
   SetupBootMouseDevice();
   uint8_t mouse_report[] = {0xDE, 0xAD, 0xBE};
-  ASSERT_OK(device_->Bind());
+  ASSERT_TRUE(driver_test().StartDriver().is_ok());
 
-  SetupInstanceDriver();
-
-  fake_hidbus_.SendReport(&mouse_report[0], sizeof(uint8_t));
-  fake_hidbus_.SendReport(&mouse_report[1], sizeof(uint8_t));
-  fake_hidbus_.SendReport(&mouse_report[2], sizeof(uint8_t));
+  auto client = fidl::WireSyncClient<finput::Device>(GetClient());
+  driver_test().RunInEnvironmentTypeContext([&mouse_report](HidDriverTestEnvironment& env) {
+    env.fake_hidbus().SendReport(&mouse_report[0], sizeof(uint8_t));
+    env.fake_hidbus().SendReport(&mouse_report[1], sizeof(uint8_t));
+    env.fake_hidbus().SendReport(&mouse_report[2], sizeof(uint8_t));
+  });
 
   uint8_t returned_report[3] = {};
   size_t actual;
-  ReadOneReport(returned_report, sizeof(returned_report), &actual);
+  ReadOneReport(client, returned_report, sizeof(returned_report), &actual);
 
   ASSERT_EQ(actual, sizeof(returned_report));
   for (size_t i = 0; i < actual; i++) {
@@ -344,220 +326,238 @@ TEST_F(HidDeviceTest, BootMouseSendReportInPieces) {
 TEST_F(HidDeviceTest, BootMouseSendMultipleReports) {
   SetupBootMouseDevice();
   uint8_t double_mouse_report[] = {0xDE, 0xAD, 0xBE, 0x12, 0x34, 0x56};
-  ASSERT_OK(device_->Bind());
+  ASSERT_TRUE(driver_test().StartDriver().is_ok());
 
-  SetupInstanceDriver();
-
-  fake_hidbus_.SendReport(double_mouse_report, sizeof(double_mouse_report));
+  auto client = fidl::WireSyncClient<finput::Device>(GetClient());
+  driver_test().RunInEnvironmentTypeContext([&double_mouse_report](HidDriverTestEnvironment& env) {
+    env.fake_hidbus().SendReport(double_mouse_report, sizeof(double_mouse_report));
+  });
 
   uint8_t returned_report[3] = {};
   size_t actual;
 
   // Read the first report.
-  ReadOneReport(returned_report, sizeof(returned_report), &actual);
+  ReadOneReport(client, returned_report, sizeof(returned_report), &actual);
   ASSERT_EQ(actual, sizeof(returned_report));
   for (size_t i = 0; i < actual; i++) {
     ASSERT_EQ(returned_report[i], double_mouse_report[i]);
   }
 
   // Read the second report.
-  ReadOneReport(returned_report, sizeof(returned_report), &actual);
+  ReadOneReport(client, returned_report, sizeof(returned_report), &actual);
   ASSERT_EQ(actual, sizeof(returned_report));
   for (size_t i = 0; i < actual; i++) {
     ASSERT_EQ(returned_report[i], double_mouse_report[i + 3]);
   }
 }
 
-TEST(HidDeviceTest, FailToRegister) {
-  FakeHidbus fake_hidbus;
-  auto fake_root = MockDevice::FakeRootParent();
-
-  fidl::Arena<> arena;
-  fake_hidbus.SetHidInfo(fhidbus::wire::HidInfo::Builder(arena)
-                             .boot_protocol(fhidbus::wire::HidBootProtocol::kOther)
-                             .vendor_id(0)
-                             .product_id(0)
-                             .version(0)
-                             .dev_num(0)
-                             .polling_rate(0)
-                             .Build());
-  fake_hidbus.SetStartStatus(ZX_ERR_INTERNAL);
-  HidDevice device(fake_root.get(), fake_hidbus.GetClient());
-
-  ASSERT_EQ(device.Bind(), ZX_ERR_INTERNAL);
+TEST_F(HidDeviceTest, FailToRegister) {
+  driver_test().RunInEnvironmentTypeContext([](HidDriverTestEnvironment& env) {
+    fidl::Arena<> arena;
+    env.fake_hidbus().SetHidInfo(fhidbus::wire::HidInfo::Builder(arena)
+                                     .boot_protocol(fhidbus::wire::HidBootProtocol::kOther)
+                                     .vendor_id(0)
+                                     .product_id(0)
+                                     .version(0)
+                                     .dev_num(0)
+                                     .polling_rate(0)
+                                     .Build());
+    env.fake_hidbus().SetStartStatus(ZX_ERR_INTERNAL);
+  });
+  ASSERT_EQ(driver_test().StartDriver().status_value(), ZX_ERR_INTERNAL);
 }
 
 TEST_F(HidDeviceTest, ReadReportSingleReport) {
   SetupBootMouseDevice();
-  ASSERT_OK(device_->Bind());
+  ASSERT_TRUE(driver_test().StartDriver().is_ok());
 
   uint8_t mouse_report[] = {0xDE, 0xAD, 0xBE};
 
-  SetupInstanceDriver();
-
+  auto client = fidl::WireSyncClient<finput::Device>(GetClient());
   // Send the reports.
-  zx_time_t time = 0xabcd;
-  fake_hidbus_.SendReportWithTime(mouse_report, sizeof(mouse_report), time);
-
-  RunSyncClientTask([&]() {
-    auto result = sync_client_->ReadReport();
-    ASSERT_TRUE(result.ok());
-    ASSERT_TRUE(result->is_ok());
-    ASSERT_EQ(time, result.value()->report.timestamp());
-    ASSERT_EQ(sizeof(mouse_report), result.value()->report.buf().count());
-    for (size_t i = 0; i < result.value()->report.buf().count(); i++) {
-      EXPECT_EQ(mouse_report[i], result.value()->report.buf()[i]);
-    }
+  const zx_time_t time = 0xabcd;
+  driver_test().RunInEnvironmentTypeContext([&mouse_report](HidDriverTestEnvironment& env) {
+    env.fake_hidbus().SendReportWithTime(mouse_report, sizeof(mouse_report), time);
   });
 
-  RunSyncClientTask([&]() {
-    auto result = sync_client_->ReadReport();
-    ASSERT_TRUE(result.ok());
-    ASSERT_TRUE(result->is_error());
-    ASSERT_EQ(result->error_value(), ZX_ERR_SHOULD_WAIT);
-  });
+  EXPECT_TRUE(driver_test()
+                  .RunOnBackgroundDispatcherSync([&]() {
+                    auto result = client->ReadReport();
+                    ASSERT_TRUE(result.ok());
+                    ASSERT_TRUE(result->is_ok());
+                    ASSERT_EQ(time, result.value()->report.timestamp());
+                    ASSERT_EQ(sizeof(mouse_report), result.value()->report.buf().count());
+                    for (size_t i = 0; i < result.value()->report.buf().count(); i++) {
+                      EXPECT_EQ(mouse_report[i], result.value()->report.buf()[i]);
+                    }
+                  })
+                  .is_ok());
+
+  EXPECT_TRUE(driver_test()
+                  .RunOnBackgroundDispatcherSync([&]() {
+                    auto result = client->ReadReport();
+                    ASSERT_TRUE(result.ok());
+                    ASSERT_TRUE(result->is_error());
+                    ASSERT_EQ(result->error_value(), ZX_ERR_SHOULD_WAIT);
+                  })
+                  .is_ok());
 }
 
 TEST_F(HidDeviceTest, ReadReportDoubleReport) {
   SetupBootMouseDevice();
-  ASSERT_OK(device_->Bind());
+  ASSERT_TRUE(driver_test().StartDriver().is_ok());
 
   uint8_t double_mouse_report[] = {0xDE, 0xAD, 0xBE, 0x12, 0x34, 0x56};
 
-  SetupInstanceDriver();
-
+  auto client = fidl::WireSyncClient<finput::Device>(GetClient());
   // Send the reports.
-  zx_time_t time = 0xabcd;
-  fake_hidbus_.SendReportWithTime(double_mouse_report, sizeof(double_mouse_report), time);
-
-  RunSyncClientTask([&]() {
-    auto result = sync_client_->ReadReport();
-    ASSERT_TRUE(result.ok());
-    ASSERT_TRUE(result->is_ok());
-    ASSERT_EQ(time, result.value()->report.timestamp());
-    ASSERT_EQ(sizeof(hid_boot_mouse_report_t), result.value()->report.buf().count());
-    for (size_t i = 0; i < result.value()->report.buf().count(); i++) {
-      EXPECT_EQ(double_mouse_report[i], result.value()->report.buf()[i]);
-    }
+  const zx_time_t time = 0xabcd;
+  driver_test().RunInEnvironmentTypeContext([&double_mouse_report](HidDriverTestEnvironment& env) {
+    env.fake_hidbus().SendReportWithTime(double_mouse_report, sizeof(double_mouse_report), time);
   });
 
-  RunSyncClientTask([&]() {
-    auto result = sync_client_->ReadReport();
-    ASSERT_TRUE(result.ok());
-    ASSERT_TRUE(result->is_ok());
-    ASSERT_EQ(time, result.value()->report.timestamp());
-    ASSERT_EQ(sizeof(hid_boot_mouse_report_t), result.value()->report.buf().count());
-    for (size_t i = 0; i < result.value()->report.buf().count(); i++) {
-      EXPECT_EQ(double_mouse_report[i + sizeof(hid_boot_mouse_report_t)],
-                result.value()->report.buf()[i]);
-    }
-  });
+  EXPECT_TRUE(driver_test()
+                  .RunOnBackgroundDispatcherSync([&]() {
+                    auto result = client->ReadReport();
+                    ASSERT_TRUE(result.ok());
+                    ASSERT_TRUE(result->is_ok());
+                    ASSERT_EQ(time, result.value()->report.timestamp());
+                    ASSERT_EQ(sizeof(hid_boot_mouse_report_t),
+                              result.value()->report.buf().count());
+                    for (size_t i = 0; i < result.value()->report.buf().count(); i++) {
+                      EXPECT_EQ(double_mouse_report[i], result.value()->report.buf()[i]);
+                    }
+                  })
+                  .is_ok());
 
-  RunSyncClientTask([&]() {
-    auto result = sync_client_->ReadReport();
-    ASSERT_TRUE(result.ok());
-    ASSERT_TRUE(result->is_error());
-    ASSERT_EQ(result->error_value(), ZX_ERR_SHOULD_WAIT);
-  });
+  EXPECT_TRUE(driver_test()
+                  .RunOnBackgroundDispatcherSync([&]() {
+                    auto result = client->ReadReport();
+                    ASSERT_TRUE(result.ok());
+                    ASSERT_TRUE(result->is_ok());
+                    ASSERT_EQ(time, result.value()->report.timestamp());
+                    ASSERT_EQ(sizeof(hid_boot_mouse_report_t),
+                              result.value()->report.buf().count());
+                    for (size_t i = 0; i < result.value()->report.buf().count(); i++) {
+                      EXPECT_EQ(double_mouse_report[i + sizeof(hid_boot_mouse_report_t)],
+                                result.value()->report.buf()[i]);
+                    }
+                  })
+                  .is_ok());
+
+  EXPECT_TRUE(driver_test()
+                  .RunOnBackgroundDispatcherSync([&]() {
+                    auto result = client->ReadReport();
+                    ASSERT_TRUE(result.ok());
+                    ASSERT_TRUE(result->is_error());
+                    ASSERT_EQ(result->error_value(), ZX_ERR_SHOULD_WAIT);
+                  })
+                  .is_ok());
 }
 
 TEST_F(HidDeviceTest, ReadReportsSingleReport) {
   SetupBootMouseDevice();
-  ASSERT_OK(device_->Bind());
+  ASSERT_TRUE(driver_test().StartDriver().is_ok());
 
   uint8_t mouse_report[] = {0xDE, 0xAD, 0xBE};
 
-  SetupInstanceDriver();
-
+  auto client = fidl::WireSyncClient<finput::Device>(GetClient());
   // Send the reports.
-  fake_hidbus_.SendReport(mouse_report, sizeof(mouse_report));
-
-  RunSyncClientTask([&]() {
-    auto result = sync_client_->ReadReports();
-    ASSERT_TRUE(result.ok());
-    ASSERT_TRUE(result->is_ok());
-    ASSERT_EQ(sizeof(mouse_report), result.value()->data.count());
-    for (size_t i = 0; i < result.value()->data.count(); i++) {
-      EXPECT_EQ(mouse_report[i], result.value()->data[i]);
-    }
+  driver_test().RunInEnvironmentTypeContext([&mouse_report](HidDriverTestEnvironment& env) {
+    env.fake_hidbus().SendReport(mouse_report, sizeof(mouse_report));
   });
+
+  EXPECT_TRUE(driver_test()
+                  .RunOnBackgroundDispatcherSync([&]() {
+                    auto result = client->ReadReports();
+                    ASSERT_TRUE(result.ok());
+                    ASSERT_TRUE(result->is_ok());
+                    ASSERT_EQ(sizeof(mouse_report), result.value()->data.count());
+                    for (size_t i = 0; i < result.value()->data.count(); i++) {
+                      EXPECT_EQ(mouse_report[i], result.value()->data[i]);
+                    }
+                  })
+                  .is_ok());
 }
 
 TEST_F(HidDeviceTest, ReadReportsDoubleReport) {
   SetupBootMouseDevice();
-  ASSERT_OK(device_->Bind());
+  ASSERT_TRUE(driver_test().StartDriver().is_ok());
 
   uint8_t double_mouse_report[] = {0xDE, 0xAD, 0xBE, 0x12, 0x34, 0x56};
 
-  SetupInstanceDriver();
-
+  auto client = fidl::WireSyncClient<finput::Device>(GetClient());
   // Send the reports.
-  fake_hidbus_.SendReport(double_mouse_report, sizeof(double_mouse_report));
-
-  RunSyncClientTask([&]() {
-    auto result = sync_client_->ReadReports();
-    ASSERT_TRUE(result.ok());
-    ASSERT_TRUE(result->is_ok());
-    ASSERT_EQ(sizeof(double_mouse_report), result.value()->data.count());
-    for (size_t i = 0; i < result.value()->data.count(); i++) {
-      EXPECT_EQ(double_mouse_report[i], result.value()->data[i]);
-    }
+  driver_test().RunInEnvironmentTypeContext([&double_mouse_report](HidDriverTestEnvironment& env) {
+    env.fake_hidbus().SendReport(double_mouse_report, sizeof(double_mouse_report));
   });
+
+  EXPECT_TRUE(driver_test()
+                  .RunOnBackgroundDispatcherSync([&]() {
+                    auto result = client->ReadReports();
+                    ASSERT_TRUE(result.ok());
+                    ASSERT_TRUE(result->is_ok());
+                    ASSERT_EQ(sizeof(double_mouse_report), result.value()->data.count());
+                    for (size_t i = 0; i < result.value()->data.count(); i++) {
+                      EXPECT_EQ(double_mouse_report[i], result.value()->data[i]);
+                    }
+                  })
+                  .is_ok());
 }
 
 TEST_F(HidDeviceTest, ReadReportsBlockingWait) {
   SetupBootMouseDevice();
-  ASSERT_OK(device_->Bind());
+  ASSERT_TRUE(driver_test().StartDriver().is_ok());
 
-  SetupInstanceDriver();
-
-  // Send the reports, but delayed.
   uint8_t mouse_report[] = {0xDE, 0xAD, 0xBE};
-  std::thread report_thread([&]() {
+
+  auto dispatcher = driver_test().runtime().StartBackgroundDispatcher();
+  ASSERT_OK(async::PostTask(dispatcher->async_dispatcher(), [&]() {
     sleep(1);
-    fake_hidbus_.SendReport(mouse_report, sizeof(mouse_report));
-  });
+    driver_test().RunInEnvironmentTypeContext([&mouse_report](HidDriverTestEnvironment& env) {
+      env.fake_hidbus().SendReport(mouse_report, sizeof(mouse_report));
+    });
+  }));
 
-  // Get the report.
-  RunSyncClientTask([&]() {
-    ASSERT_OK(report_event_.wait_one(DEV_STATE_READABLE, zx::time::infinite(), nullptr));
-
-    auto result = sync_client_->ReadReports();
-    ASSERT_TRUE(result.ok());
-    ASSERT_TRUE(result->is_ok());
-    ASSERT_EQ(sizeof(mouse_report), result.value()->data.count());
-    for (size_t i = 0; i < result.value()->data.count(); i++) {
-      EXPECT_EQ(mouse_report[i], result.value()->data[i]);
-    }
-
-    report_thread.join();
-  });
+  uint8_t returned_report[3] = {};
+  size_t actual;
+  auto client = fidl::WireSyncClient<finput::Device>(GetClient());
+  ReadOneReport(client, returned_report, sizeof(returned_report), &actual);
+  ASSERT_EQ(sizeof(mouse_report), actual);
+  for (size_t i = 0; i < actual; i++) {
+    EXPECT_EQ(mouse_report[i], returned_report[i]);
+  }
 }
 
 // Test that only whole reports get sent through.
 TEST_F(HidDeviceTest, ReadReportsOneAndAHalfReports) {
   SetupBootMouseDevice();
-  ASSERT_OK(device_->Bind());
+  ASSERT_TRUE(driver_test().StartDriver().is_ok());
 
-  SetupInstanceDriver();
-
+  auto client = fidl::WireSyncClient<finput::Device>(GetClient());
   // Send the report.
   uint8_t mouse_report[] = {0xDE, 0xAD, 0xBE};
-  fake_hidbus_.SendReport(mouse_report, sizeof(mouse_report));
+  driver_test().RunInEnvironmentTypeContext([&mouse_report](HidDriverTestEnvironment& env) {
+    env.fake_hidbus().SendReport(mouse_report, sizeof(mouse_report));
+  });
 
   // Send a half of a report.
-  uint8_t half_report[] = {0xDE, 0xAD};
-  fake_hidbus_.SendReport(half_report, sizeof(half_report));
-
-  RunSyncClientTask([&]() {
-    auto result = sync_client_->ReadReports();
-    ASSERT_TRUE(result.ok());
-    ASSERT_TRUE(result->is_ok());
-    ASSERT_EQ(sizeof(mouse_report), result.value()->data.count());
-    for (size_t i = 0; i < result.value()->data.count(); i++) {
-      EXPECT_EQ(mouse_report[i], result.value()->data[i]);
-    }
+  driver_test().RunInEnvironmentTypeContext([](HidDriverTestEnvironment& env) {
+    uint8_t half_report[] = {0xDE, 0xAD};
+    env.fake_hidbus().SendReport(half_report, sizeof(half_report));
   });
+
+  EXPECT_TRUE(driver_test()
+                  .RunOnBackgroundDispatcherSync([&]() {
+                    auto result = client->ReadReports();
+                    ASSERT_TRUE(result.ok());
+                    ASSERT_TRUE(result->is_ok());
+                    ASSERT_EQ(sizeof(mouse_report), result.value()->data.count());
+                    for (size_t i = 0; i < result.value()->data.count(); i++) {
+                      EXPECT_EQ(mouse_report[i], result.value()->data[i]);
+                    }
+                  })
+                  .is_ok());
 }
 
 // This tests that we can set the boot mode for a non-boot device, and that the device will
@@ -567,29 +567,30 @@ TEST_F(HidDeviceTest, ReadReportsOneAndAHalfReports) {
 // (The descriptor doesn't matter, as long as a device claims its a boot device it should
 //  support this transformation in hardware).
 TEST_F(HidDeviceTest, SettingBootModeMouse) {
-  size_t desc_size;
-  const uint8_t* desc = get_paradise_touchpad_v1_report_desc(&desc_size);
-  fake_hidbus_.SetDescriptor(desc, desc_size);
+  driver_test().RunInEnvironmentTypeContext([](HidDriverTestEnvironment& env) {
+    size_t desc_size;
+    const uint8_t* desc = get_paradise_touchpad_v1_report_desc(&desc_size);
+    env.fake_hidbus().SetDescriptor(desc, desc_size);
 
-  fidl::Arena<> arena;
-  fake_hidbus_.SetHidInfo(fhidbus::wire::HidInfo::Builder(arena)
-                              .boot_protocol(fhidbus::wire::HidBootProtocol::kPointer)
-                              .vendor_id(0)
-                              .product_id(0)
-                              .version(0)
-                              .dev_num(0)
-                              .polling_rate(0)
-                              .Build());
+    fidl::Arena<> arena;
+    env.fake_hidbus().SetHidInfo(fhidbus::wire::HidInfo::Builder(arena)
+                                     .boot_protocol(fhidbus::wire::HidBootProtocol::kPointer)
+                                     .vendor_id(0)
+                                     .product_id(0)
+                                     .version(0)
+                                     .dev_num(0)
+                                     .polling_rate(0)
+                                     .Build());
 
-  // Set the device to boot protocol.
-  fake_hidbus_.SetProtocol(fhidbus::wire::HidProtocol::kBoot);
-
-  ASSERT_OK(device_->Bind());
+    // Set the device to boot protocol.
+    env.fake_hidbus().SetProtocol(fhidbus::wire::HidProtocol::kBoot);
+  });
+  ASSERT_TRUE(driver_test().StartDriver().is_ok());
 
   size_t boot_mouse_desc_size;
   const uint8_t* boot_mouse_desc = get_boot_mouse_report_desc(&boot_mouse_desc_size);
-  ASSERT_EQ(boot_mouse_desc_size, device_->GetReportDescLen());
-  const uint8_t* received_desc = device_->GetReportDesc();
+  ASSERT_EQ(boot_mouse_desc_size, driver_test().driver()->hiddev().GetReportDescLen());
+  const uint8_t* received_desc = driver_test().driver()->hiddev().GetReportDesc();
   for (size_t i = 0; i < boot_mouse_desc_size; i++) {
     ASSERT_EQ(boot_mouse_desc[i], received_desc[i]);
   }
@@ -602,118 +603,75 @@ TEST_F(HidDeviceTest, SettingBootModeMouse) {
 // (The descriptor doesn't matter, as long as a device claims its a boot device it should
 //  support this transformation in hardware).
 TEST_F(HidDeviceTest, SettingBootModeKbd) {
-  size_t desc_size;
-  const uint8_t* desc = get_paradise_touchpad_v1_report_desc(&desc_size);
-  fake_hidbus_.SetDescriptor(desc, desc_size);
+  driver_test().RunInEnvironmentTypeContext([](HidDriverTestEnvironment& env) {
+    size_t desc_size;
+    const uint8_t* desc = get_paradise_touchpad_v1_report_desc(&desc_size);
+    env.fake_hidbus().SetDescriptor(desc, desc_size);
 
-  fidl::Arena<> arena;
-  fake_hidbus_.SetHidInfo(fhidbus::wire::HidInfo::Builder(arena)
-                              .boot_protocol(fhidbus::wire::HidBootProtocol::kKbd)
-                              .vendor_id(0)
-                              .product_id(0)
-                              .version(0)
-                              .dev_num(0)
-                              .polling_rate(0)
-                              .Build());
+    fidl::Arena<> arena;
+    env.fake_hidbus().SetHidInfo(fhidbus::wire::HidInfo::Builder(arena)
+                                     .boot_protocol(fhidbus::wire::HidBootProtocol::kKbd)
+                                     .vendor_id(0)
+                                     .product_id(0)
+                                     .version(0)
+                                     .dev_num(0)
+                                     .polling_rate(0)
+                                     .Build());
 
-  // Set the device to boot protocol.
-  fake_hidbus_.SetProtocol(fhidbus::wire::HidProtocol::kBoot);
-
-  ASSERT_OK(device_->Bind());
+    // Set the device to boot protocol.
+    env.fake_hidbus().SetProtocol(fhidbus::wire::HidProtocol::kBoot);
+  });
+  ASSERT_TRUE(driver_test().StartDriver().is_ok());
 
   size_t boot_kbd_desc_size;
   const uint8_t* boot_kbd_desc = get_boot_kbd_report_desc(&boot_kbd_desc_size);
-  ASSERT_EQ(boot_kbd_desc_size, device_->GetReportDescLen());
-  const uint8_t* received_desc = device_->GetReportDesc();
+  ASSERT_EQ(boot_kbd_desc_size, driver_test().driver()->hiddev().GetReportDescLen());
+  const uint8_t* received_desc = driver_test().driver()->hiddev().GetReportDesc();
   for (size_t i = 0; i < boot_kbd_desc_size; i++) {
     ASSERT_EQ(boot_kbd_desc[i], received_desc[i]);
   }
 }
 
-TEST_F(HidDeviceTest, GetHidDeviceInfo) {
-  SetupBootMouseDevice();
-  ASSERT_OK(device_->Bind());
-
-  hid_device_info_t info;
-  device_->HidDeviceGetHidDeviceInfo(&info);
-
-  auto hidbus_info = fake_hidbus_.Query();
-  ASSERT_EQ(hidbus_info.vendor_id(), info.vendor_id);
-  ASSERT_EQ(hidbus_info.product_id(), info.product_id);
-  ASSERT_EQ(hidbus_info.version(), info.version);
-}
-
 TEST_F(HidDeviceTest, GetDescriptor) {
   SetupBootMouseDevice();
-  ASSERT_OK(device_->Bind());
+  ASSERT_TRUE(driver_test().StartDriver().is_ok());
 
-  size_t known_size;
-  const uint8_t* known_descriptor = get_boot_mouse_report_desc(&known_size);
+  auto client = fidl::WireSyncClient<finput::Device>(GetClient());
+  EXPECT_TRUE(
+      driver_test()
+          .RunOnBackgroundDispatcherSync([&]() {
+            size_t known_size;
+            const uint8_t* known_descriptor = get_boot_mouse_report_desc(&known_size);
 
-  uint8_t report_descriptor[HID_MAX_DESC_LEN];
-  size_t actual;
-  ASSERT_OK(device_->HidDeviceGetDescriptor(report_descriptor, sizeof(report_descriptor), &actual));
+            auto result = client->GetReportDesc();
+            ASSERT_TRUE(result.ok());
 
-  ASSERT_EQ(known_size, actual);
-  ASSERT_BYTES_EQ(known_descriptor, report_descriptor, known_size);
-}
-
-TEST_F(HidDeviceTest, RegisterListenerSendReport) {
-  SetupBootMouseDevice();
-  ASSERT_OK(device_->Bind());
-
-  uint8_t mouse_report[] = {0xDE, 0xAD, 0xBE};
-
-  struct ReportCtx {
-    sync_completion_t* completion;
-    uint8_t* known_report;
-  };
-
-  sync_completion_t seen_report;
-  ReportCtx ctx;
-  ctx.completion = &seen_report;
-  ctx.known_report = mouse_report;
-
-  hid_report_listener_protocol_ops_t ops;
-  ops.receive_report = [](void* ctx, const uint8_t* report_list, size_t report_count,
-                          zx_time_t time) {
-    ASSERT_EQ(sizeof(mouse_report), report_count);
-    auto report_ctx = reinterpret_cast<ReportCtx*>(ctx);
-    ASSERT_BYTES_EQ(report_ctx->known_report, report_list, report_count);
-    sync_completion_signal(report_ctx->completion);
-  };
-
-  hid_report_listener_protocol_t listener;
-  listener.ctx = &ctx;
-  listener.ops = &ops;
-
-  ASSERT_OK(device_->HidDeviceRegisterListener(&listener));
-
-  fake_hidbus_.SendReport(mouse_report, sizeof(mouse_report));
-
-  RunSyncClientTask([&seen_report]() {
-    ASSERT_OK(sync_completion_wait(&seen_report, zx::time::infinite().get()));
-  });
-  device_->HidDeviceUnregisterListener();
+            ASSERT_EQ(known_size, result->desc.count());
+            ASSERT_EQ(std::vector(known_descriptor, known_descriptor + known_size),
+                      std::vector(result->desc.data(), result->desc.data() + result->desc.count()));
+          })
+          .is_ok());
 }
 
 TEST_F(HidDeviceTest, GetSetReport) {
-  const uint8_t* desc;
-  size_t desc_size = get_ambient_light_report_desc(&desc);
-  fake_hidbus_.SetDescriptor(desc, desc_size);
+  driver_test().RunInEnvironmentTypeContext([](HidDriverTestEnvironment& env) {
+    const uint8_t* desc;
+    size_t desc_size = get_ambient_light_report_desc(&desc);
+    env.fake_hidbus().SetDescriptor(desc, desc_size);
 
-  fidl::Arena<> arena;
-  fake_hidbus_.SetHidInfo(fhidbus::wire::HidInfo::Builder(arena)
-                              .boot_protocol(fhidbus::wire::HidBootProtocol::kNone)
-                              .vendor_id(0)
-                              .product_id(0)
-                              .version(0)
-                              .dev_num(0)
-                              .polling_rate(0)
-                              .Build());
+    fidl::Arena<> arena;
+    env.fake_hidbus().SetHidInfo(fhidbus::wire::HidInfo::Builder(arena)
+                                     .boot_protocol(fhidbus::wire::HidBootProtocol::kNone)
+                                     .vendor_id(0)
+                                     .product_id(0)
+                                     .version(0)
+                                     .dev_num(0)
+                                     .polling_rate(0)
+                                     .Build());
+  });
+  ASSERT_TRUE(driver_test().StartDriver().is_ok());
 
-  ASSERT_OK(device_->Bind());
-
+  auto client = fidl::WireSyncClient<finput::Device>(GetClient());
   ambient_light_feature_rpt_t feature_report = {};
   feature_report.rpt_id = AMBIENT_LIGHT_RPT_ID_FEATURE;
   // Below value are chosen arbitrarily.
@@ -722,281 +680,331 @@ TEST_F(HidDeviceTest, GetSetReport) {
   feature_report.threshold_high = 40;
   feature_report.threshold_low = 10;
 
-  ASSERT_OK(device_->HidDeviceSetReport(HID_REPORT_TYPE_FEATURE, AMBIENT_LIGHT_RPT_ID_FEATURE,
-                                        reinterpret_cast<uint8_t*>(&feature_report),
-                                        sizeof(feature_report)));
+  EXPECT_TRUE(driver_test()
+                  .RunOnBackgroundDispatcherSync([&]() {
+                    auto result = client->SetReport(
+                        fhidbus::wire::ReportType::kFeature, AMBIENT_LIGHT_RPT_ID_FEATURE,
+                        fidl::VectorView<uint8_t>::FromExternal(
+                            reinterpret_cast<uint8_t*>(&feature_report), sizeof(feature_report)));
+                    ASSERT_TRUE(result.ok());
+                    ASSERT_TRUE(result->is_ok());
+                  })
+                  .is_ok());
 
-  ambient_light_feature_rpt_t received_report = {};
-  size_t actual;
-  ASSERT_OK(device_->HidDeviceGetReport(HID_REPORT_TYPE_FEATURE, AMBIENT_LIGHT_RPT_ID_FEATURE,
-                                        reinterpret_cast<uint8_t*>(&received_report),
-                                        sizeof(received_report), &actual));
+  EXPECT_TRUE(
+      driver_test()
+          .RunOnBackgroundDispatcherSync([&]() {
+            auto result = client->GetReport(fhidbus::wire::ReportType::kFeature,
+                                            AMBIENT_LIGHT_RPT_ID_FEATURE);
+            ASSERT_TRUE(result.ok());
+            ASSERT_TRUE(result->is_ok());
 
-  ASSERT_EQ(sizeof(received_report), actual);
-  ASSERT_BYTES_EQ(&feature_report, &received_report, actual);
+            ASSERT_EQ(sizeof(feature_report), result->value()->report.count());
+            ASSERT_EQ(
+                std::vector(reinterpret_cast<uint8_t*>(&feature_report),
+                            reinterpret_cast<uint8_t*>(&feature_report) + sizeof(feature_report)),
+                std::vector(result->value()->report.data(),
+                            result->value()->report.data() + result->value()->report.count()));
+          })
+          .is_ok());
 }
 
 // Tests that a device with too large reports don't cause buffer overruns.
 TEST_F(HidDeviceTest, GetReportBufferOverrun) {
-  const uint8_t desc[] = {
-      0x05, 0x01,                    // Usage Page (Generic Desktop Ctrls)
-      0x09, 0x02,                    // Usage (Mouse)
-      0xA1, 0x01,                    // Collection (Application)
-      0x05, 0x09,                    //   Usage Page (Button)
-      0x09, 0x30,                    //   Usage (0x30)
-      0x97, 0x00, 0xF0, 0x00, 0x00,  //   Report Count (65279)
-      0x75, 0x08,                    //   Report Size (8)
-      0x25, 0x01,                    //   Logical Maximum (1)
-      0x81, 0x02,  //   Input (Data,Var,Abs,No Wrap,Linear,Preferred State,No Null Position)
-      0xC0,        // End Collection
+  driver_test().RunInEnvironmentTypeContext([](HidDriverTestEnvironment& env) {
+    const uint8_t desc[] = {
+        0x05, 0x01,                    // Usage Page (Generic Desktop Ctrls)
+        0x09, 0x02,                    // Usage (Mouse)
+        0xA1, 0x01,                    // Collection (Application)
+        0x05, 0x09,                    //   Usage Page (Button)
+        0x09, 0x30,                    //   Usage (0x30)
+        0x97, 0x00, 0xF0, 0x00, 0x00,  //   Report Count (65279)
+        0x75, 0x08,                    //   Report Size (8)
+        0x25, 0x01,                    //   Logical Maximum (1)
+        0x81, 0x02,  //   Input (Data,Var,Abs,No Wrap,Linear,Preferred State,No Null Position)
+        0xC0,        // End Collection
 
-      // 22 bytes
-  };
-  size_t desc_size = sizeof(desc);
-  fake_hidbus_.SetDescriptor(desc, desc_size);
+        // 22 bytes
+    };
+    size_t desc_size = sizeof(desc);
+    env.fake_hidbus().SetDescriptor(desc, desc_size);
 
-  fidl::Arena<> arena;
-  fake_hidbus_.SetHidInfo(fhidbus::wire::HidInfo::Builder(arena)
-                              .boot_protocol(fhidbus::wire::HidBootProtocol::kNone)
-                              .vendor_id(0)
-                              .product_id(0)
-                              .version(0)
-                              .dev_num(0)
-                              .polling_rate(0)
-                              .Build());
+    fidl::Arena<> arena;
+    env.fake_hidbus().SetHidInfo(fhidbus::wire::HidInfo::Builder(arena)
+                                     .boot_protocol(fhidbus::wire::HidBootProtocol::kNone)
+                                     .vendor_id(0)
+                                     .product_id(0)
+                                     .version(0)
+                                     .dev_num(0)
+                                     .polling_rate(0)
+                                     .Build());
+  });
+  ASSERT_TRUE(driver_test().StartDriver().is_ok());
 
-  ASSERT_OK(device_->Bind());
-
-  std::vector<uint8_t> report(0xFF0000);
-  size_t actual;
-  ASSERT_EQ(
-      device_->HidDeviceGetReport(HID_REPORT_TYPE_INPUT, 0, report.data(), report.size(), &actual),
-      ZX_ERR_INTERNAL);
+  auto client = fidl::WireSyncClient<finput::Device>(GetClient());
+  EXPECT_TRUE(driver_test()
+                  .RunOnBackgroundDispatcherSync([&]() {
+                    auto result = client->GetReport(fhidbus::wire::ReportType::kInput, 0);
+                    ASSERT_TRUE(result.ok());
+                    ASSERT_FALSE(result->is_ok());
+                    EXPECT_EQ(result->error_value(), ZX_ERR_INTERNAL);
+                  })
+                  .is_ok());
 }
 
 TEST_F(HidDeviceTest, DeviceReportReaderSingleReport) {
   SetupBootMouseDevice();
-  ASSERT_OK(device_->Bind());
+  ASSERT_TRUE(driver_test().StartDriver().is_ok());
 
   uint8_t mouse_report[] = {0xDE, 0xAD, 0xBE};
 
-  SetupInstanceDriver();
-
-  fidl::WireSyncClient<fuchsia_hardware_input::DeviceReportsReader> reader;
+  auto client = fidl::WireSyncClient<finput::Device>(GetClient());
+  fidl::WireSyncClient<finput::DeviceReportsReader> reader;
   {
-    auto endpoints = fidl::Endpoints<fuchsia_hardware_input::DeviceReportsReader>::Create();
+    auto endpoints = fidl::Endpoints<finput::DeviceReportsReader>::Create();
 
-    RunSyncClientTask([&]() {
-      auto result = sync_client_->GetDeviceReportsReader(std::move(endpoints.server));
-      ASSERT_OK(result.status());
-      reader = fidl::WireSyncClient<fuchsia_hardware_input::DeviceReportsReader>(
-          std::move(endpoints.client));
-    });
+    EXPECT_TRUE(driver_test()
+                    .RunOnBackgroundDispatcherSync([&]() {
+                      auto result = client->GetDeviceReportsReader(std::move(endpoints.server));
+                      ASSERT_OK(result.status());
+                      reader = fidl::WireSyncClient<finput::DeviceReportsReader>(
+                          std::move(endpoints.client));
+                    })
+                    .is_ok());
   }
 
   // Send the reports.
-  fake_hidbus_.SendReport(mouse_report, sizeof(mouse_report));
-
-  RunSyncClientTask([&]() {
-    auto response = reader->ReadReports();
-    ASSERT_OK(response.status());
-    ASSERT_FALSE(response->is_error());
-    auto result = response->value();
-    ASSERT_EQ(result->reports.count(), 1);
-    ASSERT_EQ(result->reports[0].buf().count(), sizeof(mouse_report));
-    for (size_t i = 0; i < result->reports[0].buf().count(); i++) {
-      EXPECT_EQ(mouse_report[i], result->reports[0].buf()[i]);
-    }
+  driver_test().RunInEnvironmentTypeContext([&mouse_report](HidDriverTestEnvironment& env) {
+    env.fake_hidbus().SendReport(mouse_report, sizeof(mouse_report));
   });
+
+  EXPECT_TRUE(driver_test()
+                  .RunOnBackgroundDispatcherSync([&]() {
+                    auto response = reader->ReadReports();
+                    ASSERT_OK(response.status());
+                    ASSERT_FALSE(response->is_error());
+                    auto result = response->value();
+                    ASSERT_EQ(result->reports.count(), 1UL);
+                    ASSERT_EQ(result->reports[0].buf().count(), sizeof(mouse_report));
+                    for (size_t i = 0; i < result->reports[0].buf().count(); i++) {
+                      EXPECT_EQ(mouse_report[i], result->reports[0].buf()[i]);
+                    }
+                  })
+                  .is_ok());
 }
 
 TEST_F(HidDeviceTest, DeviceReportReaderDoubleReport) {
   SetupBootMouseDevice();
-  ASSERT_OK(device_->Bind());
+  ASSERT_TRUE(driver_test().StartDriver().is_ok());
 
   uint8_t mouse_report[] = {0xDE, 0xAD, 0xBE};
   uint8_t mouse_report_two[] = {0xDE, 0xAD, 0xBE};
 
-  auto instance = SetupInstanceDriver();
-
-  fidl::WireSyncClient<fuchsia_hardware_input::DeviceReportsReader> reader;
+  auto client = fidl::WireSyncClient<finput::Device>(GetClient());
+  fidl::WireSyncClient<finput::DeviceReportsReader> reader;
   {
-    auto endpoints = fidl::Endpoints<fuchsia_hardware_input::DeviceReportsReader>::Create();
+    auto endpoints = fidl::Endpoints<finput::DeviceReportsReader>::Create();
 
-    RunSyncClientTask([&]() {
-      auto result = sync_client_->GetDeviceReportsReader(std::move(endpoints.server));
-      ASSERT_OK(result.status());
-      reader = fidl::WireSyncClient<fuchsia_hardware_input::DeviceReportsReader>(
-          std::move(endpoints.client));
-    });
+    EXPECT_TRUE(driver_test()
+                    .RunOnBackgroundDispatcherSync([&]() {
+                      auto result = client->GetDeviceReportsReader(std::move(endpoints.server));
+                      ASSERT_OK(result.status());
+                      reader = fidl::WireSyncClient<finput::DeviceReportsReader>(
+                          std::move(endpoints.client));
+                    })
+                    .is_ok());
   }
 
   // Send the reports.
-  // Note: testing_write_to_fifo_called_ ensures that we wait for both reports to be written as
-  // ReadReports only waits for one.
-  // TODO(b/341791565): Refactor tests so that testing_write_to_fifo_called_ is not needed.
-  fake_hidbus_.SendReport(mouse_report, sizeof(mouse_report));
-  RunSyncClientTask([&instance]() {
-    instance->testing_write_to_fifo_called_.Wait();
-    instance->testing_write_to_fifo_called_.Reset();
+  driver_test().RunInEnvironmentTypeContext([&mouse_report](HidDriverTestEnvironment& env) {
+    env.fake_hidbus().SendReport(mouse_report, sizeof(mouse_report));
   });
-  fake_hidbus_.SendReport(mouse_report_two, sizeof(mouse_report_two));
-  RunSyncClientTask([&instance]() { instance->testing_write_to_fifo_called_.Wait(); });
+  EXPECT_TRUE(driver_test()
+                  .RunOnBackgroundDispatcherSync([&]() {
+                    report_event_.wait_one(ZX_USER_SIGNAL_0, zx::time::infinite(), nullptr);
+                    report_event_.signal(ZX_USER_SIGNAL_0, 0);
+                  })
+                  .is_ok());
+  driver_test().RunInEnvironmentTypeContext([&mouse_report_two](HidDriverTestEnvironment& env) {
+    env.fake_hidbus().SendReport(mouse_report_two, sizeof(mouse_report_two));
+  });
 
-  RunSyncClientTask([&]() {
-    auto response = reader->ReadReports();
-    ASSERT_OK(response.status());
-    ASSERT_FALSE(response->is_error());
-    auto result = response->value();
-    ASSERT_EQ(result->reports.count(), 2);
-    ASSERT_EQ(result->reports[0].buf().count(), sizeof(mouse_report));
-    for (size_t i = 0; i < result->reports[0].buf().count(); i++) {
-      EXPECT_EQ(mouse_report[i], result->reports[0].buf()[i]);
-    }
-    ASSERT_EQ(result->reports[1].buf().count(), sizeof(mouse_report));
-    for (size_t i = 0; i < result->reports[1].buf().count(); i++) {
-      EXPECT_EQ(mouse_report[i], result->reports[1].buf()[i]);
-    }
-  });
+  EXPECT_TRUE(driver_test()
+                  .RunOnBackgroundDispatcherSync([&]() {
+                    report_event_.wait_one(ZX_USER_SIGNAL_0, zx::time::infinite(), nullptr);
+                    auto response = reader->ReadReports();
+                    ASSERT_OK(response.status());
+                    ASSERT_FALSE(response->is_error());
+                    auto result = response->value();
+                    ASSERT_EQ(result->reports.count(), 2UL);
+                    ASSERT_EQ(result->reports[0].buf().count(), sizeof(mouse_report));
+                    for (size_t i = 0; i < result->reports[0].buf().count(); i++) {
+                      EXPECT_EQ(mouse_report[i], result->reports[0].buf()[i]);
+                    }
+                    ASSERT_EQ(result->reports[1].buf().count(), sizeof(mouse_report));
+                    for (size_t i = 0; i < result->reports[1].buf().count(); i++) {
+                      EXPECT_EQ(mouse_report[i], result->reports[1].buf()[i]);
+                    }
+                  })
+                  .is_ok());
 }
 
 TEST_F(HidDeviceTest, DeviceReportReaderTwoClients) {
   SetupBootMouseDevice();
-  ASSERT_OK(device_->Bind());
+  ASSERT_TRUE(driver_test().StartDriver().is_ok());
 
   uint8_t mouse_report[] = {0xDE, 0xAD, 0xBE};
 
-  SetupInstanceDriver();
-
-  fidl::WireSyncClient<fuchsia_hardware_input::DeviceReportsReader> reader1;
-  fidl::WireSyncClient<fuchsia_hardware_input::DeviceReportsReader> reader2;
+  auto client = fidl::WireSyncClient<finput::Device>(GetClient());
+  fidl::WireSyncClient<finput::DeviceReportsReader> reader1;
+  fidl::WireSyncClient<finput::DeviceReportsReader> reader2;
   {
-    auto endpoints1 = fidl::Endpoints<fuchsia_hardware_input::DeviceReportsReader>::Create();
+    auto endpoints1 = fidl::Endpoints<finput::DeviceReportsReader>::Create();
 
-    RunSyncClientTask([&]() {
-      auto result1 = sync_client_->GetDeviceReportsReader(std::move(endpoints1.server));
-      ASSERT_OK(result1.status());
-      reader1 = fidl::WireSyncClient<fuchsia_hardware_input::DeviceReportsReader>(
-          std::move(endpoints1.client));
-    });
+    EXPECT_TRUE(driver_test()
+                    .RunOnBackgroundDispatcherSync([&]() {
+                      auto result1 = client->GetDeviceReportsReader(std::move(endpoints1.server));
+                      ASSERT_OK(result1.status());
+                      reader1 = fidl::WireSyncClient<finput::DeviceReportsReader>(
+                          std::move(endpoints1.client));
+                    })
+                    .is_ok());
 
-    auto endpoints2 = fidl::Endpoints<fuchsia_hardware_input::DeviceReportsReader>::Create();
+    auto endpoints2 = fidl::Endpoints<finput::DeviceReportsReader>::Create();
 
-    RunSyncClientTask([&]() {
-      auto result2 = sync_client_->GetDeviceReportsReader(std::move(endpoints2.server));
-      ASSERT_OK(result2.status());
-      reader2 = fidl::WireSyncClient<fuchsia_hardware_input::DeviceReportsReader>(
-          std::move(endpoints2.client));
-    });
+    EXPECT_TRUE(driver_test()
+                    .RunOnBackgroundDispatcherSync([&]() {
+                      auto result2 = client->GetDeviceReportsReader(std::move(endpoints2.server));
+                      ASSERT_OK(result2.status());
+                      reader2 = fidl::WireSyncClient<finput::DeviceReportsReader>(
+                          std::move(endpoints2.client));
+                    })
+                    .is_ok());
   }
 
   // Send the report.
-  fake_hidbus_.SendReport(mouse_report, sizeof(mouse_report));
-
-  RunSyncClientTask([&]() {
-    auto response = reader1->ReadReports();
-    ASSERT_OK(response.status());
-    ASSERT_FALSE(response->is_error());
-    auto result = response->value();
-    ASSERT_EQ(result->reports.count(), 1);
-    ASSERT_EQ(result->reports[0].buf().count(), sizeof(mouse_report));
-    for (size_t i = 0; i < result->reports[0].buf().count(); i++) {
-      EXPECT_EQ(mouse_report[i], result->reports[0].buf()[i]);
-    }
+  driver_test().RunInEnvironmentTypeContext([&mouse_report](HidDriverTestEnvironment& env) {
+    env.fake_hidbus().SendReport(mouse_report, sizeof(mouse_report));
   });
 
-  RunSyncClientTask([&]() {
-    auto response = reader2->ReadReports();
-    ASSERT_OK(response.status());
-    ASSERT_FALSE(response->is_error());
-    auto result = response->value();
-    ASSERT_EQ(result->reports.count(), 1);
-    ASSERT_EQ(result->reports[0].buf().count(), sizeof(mouse_report));
-    for (size_t i = 0; i < result->reports[0].buf().count(); i++) {
-      EXPECT_EQ(mouse_report[i], result->reports[0].buf()[i]);
-    }
-  });
+  EXPECT_TRUE(driver_test()
+                  .RunOnBackgroundDispatcherSync([&]() {
+                    auto response = reader1->ReadReports();
+                    ASSERT_OK(response.status());
+                    ASSERT_FALSE(response->is_error());
+                    auto result = response->value();
+                    ASSERT_EQ(result->reports.count(), 1UL);
+                    ASSERT_EQ(result->reports[0].buf().count(), sizeof(mouse_report));
+                    for (size_t i = 0; i < result->reports[0].buf().count(); i++) {
+                      EXPECT_EQ(mouse_report[i], result->reports[0].buf()[i]);
+                    }
+                  })
+                  .is_ok());
+
+  EXPECT_TRUE(driver_test()
+                  .RunOnBackgroundDispatcherSync([&]() {
+                    auto response = reader2->ReadReports();
+                    ASSERT_OK(response.status());
+                    ASSERT_FALSE(response->is_error());
+                    auto result = response->value();
+                    ASSERT_EQ(result->reports.count(), 1UL);
+                    ASSERT_EQ(result->reports[0].buf().count(), sizeof(mouse_report));
+                    for (size_t i = 0; i < result->reports[0].buf().count(); i++) {
+                      EXPECT_EQ(mouse_report[i], result->reports[0].buf()[i]);
+                    }
+                  })
+                  .is_ok());
 }
 
 // Test that only whole reports get sent through.
 TEST_F(HidDeviceTest, DeviceReportReaderOneAndAHalfReports) {
   SetupBootMouseDevice();
-  ASSERT_OK(device_->Bind());
+  ASSERT_TRUE(driver_test().StartDriver().is_ok());
 
-  SetupInstanceDriver();
-
-  fidl::WireSyncClient<fuchsia_hardware_input::DeviceReportsReader> reader;
+  auto client = fidl::WireSyncClient<finput::Device>(GetClient());
+  fidl::WireSyncClient<finput::DeviceReportsReader> reader;
   {
-    auto endpoints = fidl::Endpoints<fuchsia_hardware_input::DeviceReportsReader>::Create();
+    auto endpoints = fidl::Endpoints<finput::DeviceReportsReader>::Create();
 
-    RunSyncClientTask([&]() {
-      auto result = sync_client_->GetDeviceReportsReader(std::move(endpoints.server));
-      ASSERT_OK(result.status());
-      reader = fidl::WireSyncClient<fuchsia_hardware_input::DeviceReportsReader>(
-          std::move(endpoints.client));
-    });
+    EXPECT_TRUE(driver_test()
+                    .RunOnBackgroundDispatcherSync([&]() {
+                      auto result = client->GetDeviceReportsReader(std::move(endpoints.server));
+                      ASSERT_OK(result.status());
+                      reader = fidl::WireSyncClient<finput::DeviceReportsReader>(
+                          std::move(endpoints.client));
+                    })
+                    .is_ok());
   }
 
   // Send the report.
   uint8_t mouse_report[] = {0xDE, 0xAD, 0xBE};
-  fake_hidbus_.SendReport(mouse_report, sizeof(mouse_report));
+  driver_test().RunInEnvironmentTypeContext([&mouse_report](HidDriverTestEnvironment& env) {
+    env.fake_hidbus().SendReport(mouse_report, sizeof(mouse_report));
+  });
 
   // Send a half of a report.
   uint8_t half_report[] = {0xDE, 0xAD};
-  fake_hidbus_.SendReport(half_report, sizeof(half_report));
-
-  RunSyncClientTask([&]() {
-    auto response = reader->ReadReports();
-    ASSERT_OK(response.status());
-    ASSERT_FALSE(response->is_error());
-    auto result = response->value();
-    ASSERT_EQ(result->reports.count(), 1);
-    ASSERT_EQ(sizeof(mouse_report), result->reports[0].buf().count());
-    for (size_t i = 0; i < result->reports[0].buf().count(); i++) {
-      EXPECT_EQ(mouse_report[i], result->reports[0].buf()[i]);
-    }
+  driver_test().RunInEnvironmentTypeContext([&half_report](HidDriverTestEnvironment& env) {
+    env.fake_hidbus().SendReport(half_report, sizeof(half_report));
   });
+
+  EXPECT_TRUE(driver_test()
+                  .RunOnBackgroundDispatcherSync([&]() {
+                    auto response = reader->ReadReports();
+                    ASSERT_OK(response.status());
+                    ASSERT_FALSE(response->is_error());
+                    auto result = response->value();
+                    ASSERT_EQ(result->reports.count(), 1UL);
+                    ASSERT_EQ(sizeof(mouse_report), result->reports[0].buf().count());
+                    for (size_t i = 0; i < result->reports[0].buf().count(); i++) {
+                      EXPECT_EQ(mouse_report[i], result->reports[0].buf()[i]);
+                    }
+                  })
+                  .is_ok());
 }
 
 TEST_F(HidDeviceTest, DeviceReportReaderHangingGet) {
   SetupBootMouseDevice();
-  ASSERT_OK(device_->Bind());
+  ASSERT_TRUE(driver_test().StartDriver().is_ok());
 
   uint8_t mouse_report[] = {0xDE, 0xAD, 0xBE};
 
-  SetupInstanceDriver();
-
-  fidl::WireSyncClient<fuchsia_hardware_input::DeviceReportsReader> reader;
+  auto client = fidl::WireSyncClient<finput::Device>(GetClient());
+  fidl::WireSyncClient<finput::DeviceReportsReader> reader;
   {
-    auto endpoints = fidl::Endpoints<fuchsia_hardware_input::DeviceReportsReader>::Create();
+    auto endpoints = fidl::Endpoints<finput::DeviceReportsReader>::Create();
 
-    RunSyncClientTask([&]() {
-      auto result = sync_client_->GetDeviceReportsReader(std::move(endpoints.server));
-      ASSERT_OK(result.status());
-      reader = fidl::WireSyncClient<fuchsia_hardware_input::DeviceReportsReader>(
-          std::move(endpoints.client));
-    });
+    EXPECT_TRUE(driver_test()
+                    .RunOnBackgroundDispatcherSync([&]() {
+                      auto result = client->GetDeviceReportsReader(std::move(endpoints.server));
+                      ASSERT_OK(result.status());
+                      reader = fidl::WireSyncClient<finput::DeviceReportsReader>(
+                          std::move(endpoints.client));
+                    })
+                    .is_ok());
   }
 
-  // Send the reports, but delayed.
-  std::thread report_thread([&]() {
+  auto dispatcher = driver_test().runtime().StartBackgroundDispatcher();
+  ASSERT_OK(async::PostTask(dispatcher->async_dispatcher(), [&]() {
     sleep(1);
-    fake_hidbus_.SendReport(mouse_report, sizeof(mouse_report));
-  });
+    driver_test().RunInEnvironmentTypeContext([&mouse_report](HidDriverTestEnvironment& env) {
+      env.fake_hidbus().SendReport(mouse_report, sizeof(mouse_report));
+    });
+  }));
 
-  RunSyncClientTask([&]() {
-    auto response = reader->ReadReports();
-    ASSERT_OK(response.status());
-    ASSERT_FALSE(response->is_error());
-    auto result = response->value();
-    ASSERT_EQ(result->reports.count(), 1);
-    ASSERT_EQ(result->reports[0].buf().count(), sizeof(mouse_report));
-    for (size_t i = 0; i < result->reports[0].buf().count(); i++) {
-      EXPECT_EQ(mouse_report[i], result->reports[0].buf()[i]);
-    }
-
-    report_thread.join();
-  });
+  EXPECT_TRUE(driver_test()
+                  .RunOnBackgroundDispatcherSync([&]() {
+                    auto response = reader->ReadReports();
+                    ASSERT_OK(response.status());
+                    ASSERT_FALSE(response->is_error());
+                    auto result = response->value();
+                    ASSERT_EQ(result->reports.count(), 1UL);
+                    ASSERT_EQ(sizeof(mouse_report), result->reports[0].buf().count());
+                    for (size_t i = 0; i < result->reports[0].buf().count(); i++) {
+                      EXPECT_EQ(mouse_report[i], result->reports[0].buf()[i]);
+                    }
+                  })
+                  .is_ok());
 }
 
 }  // namespace hid_driver

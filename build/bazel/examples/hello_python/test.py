@@ -4,6 +4,7 @@
 """Tests for lib.py"""
 
 import unittest
+
 from lib import Fib
 
 

@@ -81,54 +81,6 @@ bool LogFirstNState::ShouldLog(uint32_t n) {
   return counter_value < n;
 }
 
-bool LogEveryNSecondsState::ShouldLog(uint32_t n) {
-  if (ShouldLogInternal(n)) {
-    counter_++;
-    last_ = GetCurrentTime();
-    return true;
-  }
-  return false;
-}
-
-__attribute__((weak)) std::chrono::high_resolution_clock::time_point
-LogEveryNSecondsState::GetCurrentTime() {
-  return std::chrono::steady_clock::now();
-}
-
-bool LogEveryNSecondsState::ShouldLogInternal(uint32_t n) {
-  if (counter_ == 0) {
-    return true;
-  }
-  if (std::chrono::duration_cast<std::chrono::seconds>(GetCurrentTime() - last_).count() >= n) {
-    return true;
-  }
-  return false;
-}
-
-uint32_t LogEveryNSecondsState::GetCounter() { return counter_; }
-
-uint8_t GetVlogVerbosity() {
-  LogSeverity min_severity = GetMinLogSeverity();
-  if (min_severity < LOG_INFO && min_severity > LOG_DEBUG) {
-    return LOG_INFO - min_severity;
-  }
-  return 0;
-}
-
-bool ShouldCreateLogMessage(LogSeverity severity) { return severity >= GetMinLogSeverity(); }
+bool IsSeverityEnabled(LogSeverity severity) { return severity >= GetMinLogSeverity(); }
 
 }  // namespace fuchsia_logging
-
-fuchsia_logging::LogSeverity GetSeverityFromVerbosity(uint8_t verbosity) {
-  // Clamp verbosity scale to the interstitial space between INFO and DEBUG
-  uint8_t max_verbosity = (fuchsia_logging::LOG_INFO - fuchsia_logging::LOG_DEBUG) /
-                          fuchsia_logging::LogVerbosityStepSize;
-  if (verbosity > max_verbosity) {
-    verbosity = max_verbosity;
-  }
-  int severity = fuchsia_logging::LOG_INFO - (verbosity * fuchsia_logging::LogVerbosityStepSize);
-  if (severity < fuchsia_logging::LOG_DEBUG + 1) {
-    return fuchsia_logging::LOG_DEBUG + 1;
-  }
-  return static_cast<fuchsia_logging::LogSeverity>(severity);
-}

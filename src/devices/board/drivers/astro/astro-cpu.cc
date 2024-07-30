@@ -8,11 +8,9 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
-#include <lib/ddk/platform-defs.h>
 #include <lib/driver/component/cpp/composite_node_spec.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 
-#include <bind/fuchsia/amlogic/platform/cpp/bind.h>
 #include <bind/fuchsia/clock/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/google/platform/cpp/bind.h>
@@ -125,7 +123,7 @@ zx_status_t Astro::CpuInit() {
 
   // Configure the GPIO to be Output & set it to alternate
   // function 3 which puts in PWM_D mode.
-  gpio_init_steps_.push_back(GpioSetAltFunction(S905D2_PWM_D_PIN, S905D2_PWM_D_FN));
+  gpio_init_steps_.push_back(GpioFunction(S905D2_PWM_D_PIN, S905D2_PWM_D_FN));
 
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('CPU_');

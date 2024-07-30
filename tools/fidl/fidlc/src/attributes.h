@@ -53,10 +53,13 @@ struct Attribute final {
   // Set to true by Library::CompileAttribute.
   bool compiled = false;
 
-  // We parse `///` doc comments as nameless RawAttribute with `provenance`
-  // set to RawAttribute::Provenance::kDocComment. When consuming into a
-  // Attribute, we set the name to kDocCommentName.
+  // We parse `///` doc comments as nameless RawAttribute with `provenance` set
+  // to kDocComment. When consuming into an Attribute, we use this name.
   static constexpr std::string_view kDocCommentName = "doc";
+  // We parse modifier availabilities like `flexible(added=5)` as nameless
+  // RawAttribute with `provenance` set to kModifierAvailability. When consuming
+  // into an Attribute, we use this name.
+  static constexpr std::string_view kModifierAvailabilityName = "available";
 };
 
 // In the flat AST, "no attributes" is represented by an AttributeList

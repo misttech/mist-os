@@ -7,7 +7,7 @@ import("//build/rust/rustc_binary.gni")
 import("//build/rust/rustc_library.gni")
 import("//build/rust/rustc_test.gni")
 
-common_sources = [
+_common_sources = [
   "src/bti.rs",
   "src/channel.rs",
   "src/clock.rs",
@@ -26,6 +26,8 @@ common_sources = [
   "src/iommu.rs",
   "src/job.rs",
   "src/lib.rs",
+  "src/macros.rs",
+  "src/name.rs",
   "src/pager.rs",
   "src/pmt.rs",
   "src/port.rs",
@@ -37,6 +39,7 @@ common_sources = [
   "src/signals.rs",
   "src/socket.rs",
   "src/stream.rs",
+  "src/system.rs",
   "src/task.rs",
   "src/thread.rs",
   "src/time.rs",
@@ -44,20 +47,22 @@ common_sources = [
   "src/version.rs",
   "src/vmar.rs",
   "src/vmo.rs",
+  "src/wait.rs",
+]
+_common_deps = [
+  "//src/lib/zircon/rust/fuchsia-zircon-status",
+  "//third_party/rust_crates:bitflags",
+  "//third_party/rust_crates:bstr",
+  "//third_party/rust_crates:zerocopy",
+  "//zircon/vdso:fuchsia-zircon-sys",
 ]
 
 if (is_fuchsia || is_mistos) {
   rustc_library("fuchsia-zircon") {
     version = "0.3.3"
     edition = "2021"
-    deps = [
-      ":fuchsia-zircon-status",
-      "//third_party/rust_crates:bitflags",
-      "//third_party/rust_crates:zerocopy",
-      "//zircon/vdso:fuchsia-zircon-sys",
-    ]
-
-    sources = common_sources
+    sources = _common_sources
+    deps = _common_deps
   }
 }
 
@@ -74,11 +79,6 @@ rustc_library("fuchsia-cprng") {
 
 # LINT.ThenChange(BUILD.bazel)
 
-# Left as forwarding target for vendor/ deps.
-group("fuchsia-zircon-status") {
-  public_deps = [ "//src/lib/zircon/rust/fuchsia-zircon-status" ]
-}
-
 # Certain tests written as unit tests of fuchsia-zircon make use of other
 # crates which themselves depend on fuchsia-zircon. This causes
 # fuchsia_zircon::foo to be a different type from crate::foo in the context of
@@ -93,24 +93,17 @@ group("fuchsia-zircon-status") {
 rustc_test("fuchsia-zircon-unittests") {
   edition = "2021"
   output_name = "fuchsia_zircon_tests"
-  deps = [
-    ":fuchsia-zircon-status",
-    "//third_party/rust_crates:bitflags",
-    "//third_party/rust_crates:zerocopy",
-    "//zircon/vdso:fuchsia-zircon-sys",
-
-    # Test-only deps
-    ":fuchsia-zircon",
-    "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_rust",
-    "//src/lib/fdio/rust:fdio",
-    "//src/lib/fuchsia",
-    "//src/lib/fuchsia-component",
-    "//src/lib/fuchsia-runtime",
-    "//third_party/rust_crates:assert_matches",
-    "//third_party/rust_crates:test-case",
-  ]
-
-  sources = common_sources
+  sources = _common_sources
+  deps = _common_deps + [
+           ":fuchsia-zircon",
+           "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_rust",
+           "//src/lib/fdio/rust:fdio",
+           "//src/lib/fuchsia",
+           "//src/lib/fuchsia-component",
+           "//src/lib/fuchsia-runtime",
+           "//third_party/rust_crates:assert_matches",
+           "//third_party/rust_crates:test-case",
+         ]
 }
 
 rustc_binary("exit_with_code_util") {

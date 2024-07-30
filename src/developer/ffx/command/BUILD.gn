@@ -24,6 +24,7 @@ rustc_library("lib") {
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:camino",
     "//third_party/rust_crates:itertools",
+    "//third_party/rust_crates:regex",
     "//third_party/rust_crates:serde",
     "//third_party/rust_crates:serde_json",
     "//third_party/rust_crates:tracing",

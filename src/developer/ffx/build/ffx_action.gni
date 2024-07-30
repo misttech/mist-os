@@ -78,6 +78,12 @@ sdk_host_tools_visibility_bridge_label =
 #       reduce incremental build churn caused by the integration commit date
 #       being stamped into the tools.
 #
+#   no_environment (optional; default=true)
+#       When true, adds the `--no-environment` flag to ffx. This disables
+#       reading the various implicit configuration files in order to be
+#       hermetic. If this option is set to false, it is up to the caller
+#       to make sure the correct input file specification is provided.
+#
 #   args (all optional)
 #   depfile
 #   deps
@@ -253,16 +259,21 @@ template("ffx_action") {
       ]
     }
 
+    args = [ "--no-environment" ]
+    if (defined(invoker.no_environment) && invoker.no_environment == false) {
+      args = []
+    }
+
     # Pass the ffx config at runtime. ffx checks that it has read and write access to the
     # config files which causes hermetic actions error if using a global ffx config file.
-    args = [
-             "--env",
-             rebase_path(env_file, root_build_dir),
-             "--isolate-dir",
-             rebase_path(target_out_dir, root_build_dir),
-             "--config",
-             string_join(",", _ffx_config),
-           ] + invoker.args
+    args += [
+              "--env",
+              rebase_path(env_file, root_build_dir),
+              "--isolate-dir",
+              rebase_path(target_out_dir, root_build_dir),
+              "--config",
+              string_join(",", _ffx_config),
+            ] + invoker.args
 
     if (_use_hermetic_inputs_file) {
       hermetic_inputs_target = ":${hermetic_inputs_label}"

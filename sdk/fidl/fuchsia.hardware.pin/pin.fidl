@@ -1,0 +1,65 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+@available(added=HEAD)
+library fuchsia.hardware.pin;
+
+using fuchsia.hardware.gpio;
+using zx;
+
+/// Maximum length of the pin name.
+const MAX_PIN_NAME_LEN uint32 = 64;
+
+type Pull = strict enum {
+    DOWN = 0;
+    UP = 1;
+    NONE = 2;
+};
+
+type Configuration = table {
+    /// Whether to enable the built-in pull-down resistor, pull-up resistor, or neither.
+    1: pull Pull;
+    /// Configures the pin for an alternate function (I2C, SPI, etc). The interpretation of
+    /// `function` is controller dependent.
+    2: function uint64;
+    /// The pin drive strength in microamps.
+    3: drive_strength_ua uint64;
+};
+
+open protocol Pin {
+    /// Applies the configuration passed in `config`; see `Configuration` above. Fields not set in
+    /// `config` are not changed. The drive strength is rounded up or capped to a value that the
+    /// controller supports.
+    ///
+    /// `new_config` contains the configuration of the pin after all supported fields have been set.
+    /// `Configure()` can be called with an empty `config` to return the current configuration
+    /// without making any changes.
+    strict Configure(struct {
+        config Configuration;
+    }) -> (struct {
+        new_config Configuration;
+    }) error zx.Status;
+};
+
+service Service {
+    device client_end:Pin;
+};
+
+open protocol Debug {
+    /// Returns the static properties of a pin.
+    strict GetProperties() -> (table {
+        /// The platform-specific number of this pin, set as a bind property on the driver node.
+        1: pin uint32;
+        /// The platform-specific name of this pin.
+        2: name string:MAX_PIN_NAME_LEN;
+    });
+
+    strict ConnectPin(resource struct {
+        server server_end:Pin;
+    }) -> () error zx.Status;
+
+    /// Returns ZX_ERR_NOT_SUPPORTED if the pin does not support GPIO.
+    strict ConnectGpio(resource struct {
+        server server_end:fuchsia.hardware.gpio.Gpio;
+    }) -> () error zx.Status;
+};

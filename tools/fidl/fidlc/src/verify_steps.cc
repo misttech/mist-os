@@ -14,6 +14,8 @@
 
 namespace fidlc {
 
+namespace {
+
 class HandleTransportHelper {
  public:
   HandleTransportHelper(const Protocol* protocol, Reporter* reporter)
@@ -125,6 +127,31 @@ class HandleTransportHelper {
   std::set<const Decl*> seen_;
 };
 
+}  // namespace
+
+void VerifyResourcenessStep::RunImpl() {
+  for (auto& decl : library()->declarations.structs)
+    ValidateResourceness(decl.get());
+  for (auto& decl : library()->declarations.tables)
+    ValidateResourceness(decl.get());
+  for (auto& decl : library()->declarations.unions)
+    ValidateResourceness(decl.get());
+  for (auto& decl : library()->declarations.overlays)
+    ValidateResourceness(decl.get());
+}
+
+template <typename DeclType>
+void VerifyResourcenessStep::ValidateResourceness(const DeclType* decl) {
+  if (decl->resourceness.value() == Resourceness::kResource)
+    return;
+  for (auto& member : decl->members) {
+    if (member.type_ctor->type->Resourceness() == Resourceness::kResource) {
+      reporter()->Fail(ErrTypeMustBeResource, decl->name.span().value(), decl->kind, decl->name,
+                       member.name.data(), member.name);
+    }
+  }
+}
+
 void VerifyHandleTransportStep::RunImpl() {
   for (const auto& protocol : library()->declarations.protocols) {
     HandleTransportHelper(protocol.get(), reporter()).Check();
@@ -132,7 +159,7 @@ void VerifyHandleTransportStep::RunImpl() {
 }
 
 void VerifyAttributesStep::RunImpl() {
-  library()->TraverseElements([&](Element* element) {
+  library()->ForEachElement([&](Element* element) {
     for (const auto& attribute : element->attributes->attributes) {
       auto& schema = all_libraries()->RetrieveAttributeSchema(attribute.get());
       schema.Validate(reporter(), experimental_flags(), attribute.get(), element);

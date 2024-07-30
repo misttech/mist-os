@@ -354,7 +354,7 @@ if [[ $? -ne 0 || ! -x "${command_path[0]}" ]]; then
   exit 1
 fi
 
-metrics-init
+metrics-init "${command_name}"
 
 # For each optional feature, force the existence of the FUCHSIA_DISABLE_* env
 # variable. This is needed so that non-bash code can reliably use this

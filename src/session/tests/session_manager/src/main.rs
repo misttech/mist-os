@@ -12,15 +12,17 @@ use fuchsia_component_test::{
 };
 use futures::{select, FutureExt, StreamExt};
 use realm_proxy_client::RealmProxyClient;
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use tsc::DeviceProxy;
 use {
-    fidl_fuchsia_component as fcomponent, fidl_fuchsia_hardware_suspend as fhsuspend,
-    fidl_fuchsia_io as fio, fidl_fuchsia_power_broker as fbroker,
-    fidl_fuchsia_power_suspend as fsuspend, fidl_fuchsia_power_system as fsystem,
-    fidl_fuchsia_session as fsession, fidl_fuchsia_session_power as fpower,
-    fidl_fuchsia_sys2 as fsys2, fidl_test_suspendcontrol as tsc,
-    fidl_test_systemactivitygovernor as ftest, fuchsia_async as fasync,
+    fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
+    fidl_fuchsia_hardware_suspend as fhsuspend, fidl_fuchsia_io as fio,
+    fidl_fuchsia_power_broker as fbroker, fidl_fuchsia_power_suspend as fsuspend,
+    fidl_fuchsia_power_system as fsystem, fidl_fuchsia_session as fsession,
+    fidl_fuchsia_session_power as fpower, fidl_fuchsia_sys2 as fsys2,
+    fidl_test_suspendcontrol as tsc, fidl_test_systemactivitygovernor as ftest,
+    fuchsia_async as fasync,
 };
 
 const SESSION_URL: &'static str = "hello-world-session#meta/hello-world-session.cm";
@@ -40,9 +42,14 @@ async fn launch_root_session() {
     // immediately close a `Directory` channel.
     let (_exposed_dir, exposed_dir_server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
 
-    session_manager_lib::startup::launch_session(&session_url, exposed_dir_server_end, &realm)
-        .await
-        .expect("Failed to launch session");
+    session_manager_lib::startup::launch_session(
+        &session_url,
+        vec![],
+        exposed_dir_server_end,
+        &realm,
+    )
+    .await
+    .expect("Failed to launch session");
 }
 
 // Add a `session_manager` component to the `RealmBuilder`, with the given
@@ -444,5 +451,83 @@ async fn take_power_lease_and_restart() -> anyhow::Result<()> {
     assert_eq!(Some(0), current_stats.fail_count);
     assert_eq!(None, current_stats.last_failed_error);
     assert_eq!(None, current_stats.last_time_in_suspend);
+    Ok(())
+}
+
+#[fuchsia::test]
+async fn test_launch_with_config_capabilities() -> anyhow::Result<()> {
+    let builder = RealmBuilder::new().await?;
+
+    // Add a session manager but don't launch the session yet.
+    let session_manager = add_session_manager(&builder, "".to_string(), false, false).await?;
+
+    // Obtain a `Launcher` capability.
+    builder
+        .add_route(
+            Route::new()
+                .capability(Capability::protocol_by_name("fuchsia.session.Launcher"))
+                .from(&session_manager)
+                .to(Ref::parent()),
+        )
+        .await?;
+    builder
+        .add_route(
+            Route::new()
+                .capability(Capability::protocol_by_name("fuchsia.sys2.RealmQuery"))
+                .from(Ref::framework())
+                .to(Ref::parent()),
+        )
+        .await?;
+
+    let realm = builder.build().await?;
+    let launcher =
+        realm.root.connect_to_protocol_at_exposed_dir::<fsession::LauncherMarker>().unwrap();
+
+    // Launch the component and with the needed configuration capabilities.
+    launcher
+        .launch(&fsession::LaunchConfiguration {
+            session_url: Some("#meta/use-configuration.cm".to_string()),
+            config_capabilities: Some(vec![
+                fdecl::Configuration {
+                    name: Some("fuchsia.my.Uint8".to_string()),
+                    value: Some(fdecl::ConfigValue::Single(fdecl::ConfigSingleValue::Uint8(1))),
+                    ..Default::default()
+                },
+                fdecl::Configuration {
+                    name: Some("fuchsia.my.String".to_string()),
+                    value: Some(fdecl::ConfigValue::Single(fdecl::ConfigSingleValue::String(
+                        "test".to_string(),
+                    ))),
+                    ..Default::default()
+                },
+            ]),
+            ..Default::default()
+        })
+        .await
+        .unwrap()
+        .unwrap();
+
+    // Verify that the configuration has been read correctly.
+    // Use RealmQuery to get the resolved structured config values.
+    let realm_query =
+        realm.root.connect_to_protocol_at_exposed_dir::<fsys2::RealmQueryMarker>().unwrap();
+    let resolved_config = realm_query
+        .get_structured_config("session-manager/session:session")
+        .await
+        .unwrap()
+        .unwrap();
+    let resolved_config: HashMap<String, fdecl::ConfigValue> =
+        resolved_config.fields.into_iter().map(|item| (item.key.to_string(), item.value)).collect();
+    assert_eq!(resolved_config.len(), 2);
+    assert_eq!(
+        resolved_config.get("my_uint8").unwrap(),
+        &fdecl::ConfigValue::Single(fdecl::ConfigSingleValue::Uint8(1))
+    );
+    assert_eq!(
+        resolved_config.get("my_string").unwrap(),
+        &fdecl::ConfigValue::Single(fdecl::ConfigSingleValue::String("test".to_string()))
+    );
+
+    realm.destroy().await?;
     Ok(())
 }

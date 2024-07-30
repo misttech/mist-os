@@ -143,7 +143,7 @@ mod tests {
         let abi_revision = read_abi_revision(&dir_proxy, AbiRevision::PATH)
             .await
             .expect("test package doesn't contain an ABI revision");
-        version_history::HISTORY
+        version_history_data::HISTORY
             .check_abi_revision_for_runtime(abi_revision)
             .expect("test package ABI revision should be valid");
         Ok(())

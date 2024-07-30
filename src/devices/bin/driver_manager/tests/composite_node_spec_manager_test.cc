@@ -22,8 +22,6 @@ namespace fdf {
 using namespace fuchsia_driver_framework;
 }  // namespace fdf
 
-struct DeviceV1Wrapper {};
-
 namespace {
 
 fdf::CompositeParent MakeCompositeNodeSpecInfo(std::string spec_name, uint32_t index,
@@ -53,10 +51,10 @@ class FakeCompositeNodeSpec : public driver_manager::CompositeNodeSpec {
   explicit FakeCompositeNodeSpec(driver_manager::CompositeNodeSpecCreateInfo create_info)
       : driver_manager::CompositeNodeSpec(std::move(create_info)) {}
 
-  zx::result<std::optional<driver_manager::DeviceOrNode>> BindParentImpl(
+  zx::result<std::optional<driver_manager::NodeWkPtr>> BindParentImpl(
       fuchsia_driver_framework::wire::CompositeParent composite_parent,
-      const driver_manager::DeviceOrNode& device_or_node) override {
-    return zx::ok(std::make_shared<DeviceV1Wrapper>(DeviceV1Wrapper{}));
+      const driver_manager::NodeWkPtr& node_ptr) override {
+    return zx::ok(std::weak_ptr<driver_manager::Node>());
   }
 
   fuchsia_driver_development::wire::CompositeNodeInfo GetCompositeInfo(

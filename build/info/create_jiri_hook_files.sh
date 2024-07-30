@@ -37,8 +37,41 @@ if [[ ! -f "${OUTPUT_DIR}/README.md" ]]; then
 fi
 
 # Call git directly, as Python is not available when Jiri hooks run on infra bots.
-# LINT.IfChange
+export GIT_CONFIG_GLOBAL=/dev/null
 export GIT_OPTIONAL_LOCKS=0
-git -C "${FUCHSIA_DIR}/integration" rev-parse HEAD > "${OUTPUT_DIR}/integration_commit_hash.txt"
-git -C "${FUCHSIA_DIR}/integration" log -n1 --date=unix --format=%cd > "${OUTPUT_DIR}/integration_commit_stamp.txt"
+export GIT_CONFIG_NOSYSTEM=1
+
+INTEGRATION_DIR="${FUCHSIA_DIR}/integration"
+INTEGRATION_HASH="$(git -C "$INTEGRATION_DIR" rev-parse HEAD)"
+INTEGRATION_STAMP="$(git -C "$INTEGRATION_DIR" log -n1 --date=unix --format=%cd)"
+
+# Get the same metadata (hash and commit timestamp) about yesterday's last
+# integration.git commit*.
+#
+# (*) "Yesterday's last integration.git commit" isn't exactly right - the commit
+# in question is actually "the most recent commit made to integration.git before
+# midnight (UTC) on the day that integration.git HEAD was committed.
+
+# Get the date when HEAD was committed, which is probably today. Looks like
+# `YYYY-MM-DD`.
+TODAY="$(git -C "$INTEGRATION_DIR" log -n1 --date=iso-strict --format=%cI | cut -b 1-11)"
+DAILY_HASH="$(git -C "$INTEGRATION_DIR" log -n1 --until "${TODAY}T00:00:00Z" --format=%H)"
+DAILY_STAMP="$(git -C "$INTEGRATION_DIR" log -n1 --until "${TODAY}T00:00:00Z" --date=unix --format=%cd)"
+
+# Write $1 to the path given in $2, but only if doing so would actually change
+# $2.
+function _write_if_changed() {
+  local contents="$1"
+  local path="$2"
+
+  if [ ! -r "$path" ] || [ "$(<"$path")" != "$contents" ]; then
+    echo "$contents" > "$path"
+  fi
+}
+
+# LINT.IfChange
+_write_if_changed "$INTEGRATION_HASH" "${OUTPUT_DIR}/integration_commit_hash.txt"
+_write_if_changed "$INTEGRATION_STAMP" "${OUTPUT_DIR}/integration_commit_stamp.txt"
+_write_if_changed "$DAILY_HASH" "${OUTPUT_DIR}/integration_daily_commit_hash.txt"
+_write_if_changed "$DAILY_STAMP" "${OUTPUT_DIR}/integration_daily_commit_stamp.txt"
 # LINT.ThenChange(//build/info/BUILD.gn)

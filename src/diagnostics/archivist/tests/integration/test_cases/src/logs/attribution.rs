@@ -42,7 +42,7 @@ async fn log_attribution() {
 
     for log_str in &messages {
         let log_record = result.next().await.expect("received log").expect("log is not an error");
-        assert_eq!(log_record.moniker, REALM_NAME);
+        assert_eq!(log_record.moniker.to_string(), REALM_NAME);
         assert_eq!(log_record.metadata.severity, Severity::Info);
         assert_data_tree!(log_record.payload.unwrap(), root: contains {
             message: {

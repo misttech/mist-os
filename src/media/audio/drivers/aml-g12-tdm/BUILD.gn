@@ -12,9 +12,9 @@ import("//build/toolchain/variant_tags.gni")
 
 # TDM driver.
 driver_bind_rules("aml-g12-tdm-bind") {
-  rules = "aml_tdm.bind"
+  rules = "meta/aml_tdm.bind"
   bind_output = "aml-g12-tdm.bindbc"
-  tests = "tests-stream.json"
+  tests = "meta/tests-stream.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.audio:fuchsia.hardware.audio_bindlib",
     "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_bindlib",
@@ -68,7 +68,7 @@ fuchsia_driver("aml-g12-tdm-driver") {
 fuchsia_driver_component("aml-g12-tdm") {
   component_name = "aml-g12-tdm"
   deps = [ ":aml-g12-tdm-driver" ]
-  info = "aml-g12-tdm-info.json"
+  info = "meta/aml-g12-tdm-info.json"
   manifest = "meta/aml-g12-tdm.cml"
 }
 
@@ -79,9 +79,9 @@ fuchsia_driver_package("aml-g12-tdm-package") {
 
 # DAI driver.
 driver_bind_rules("aml-g12-tdm-dai-bind") {
-  rules = "aml_tdm_dai.bind"
+  rules = "meta/aml_tdm_dai.bind"
   bind_output = "aml-g12-tdm-dai.bindbc"
-  tests = "tests-dai.json"
+  tests = "meta/tests-dai.json"
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.clock",
@@ -128,7 +128,7 @@ fuchsia_driver("aml-g12-tdm-dai-driver") {
 fuchsia_driver_component("aml-g12-tdm-dai") {
   component_name = "aml-g12-tdm-dai"
   deps = [ ":aml-g12-tdm-dai-driver" ]
-  info = "aml-g12-tdm-dai-info.json"
+  info = "meta/aml-g12-tdm-dai-info.json"
   manifest = "meta/aml-g12-tdm-dai.cml"
 }
 
@@ -152,9 +152,9 @@ bazel_driver_package("aml-g12-composite-bazel-package") {
 }
 
 driver_bind_rules("aml-g12-composite-bind") {
-  rules = "aml_composite.bind"
+  rules = "meta/aml_composite.bind"
   bind_output = "aml-g12-composite.bindbc"
-  tests = "tests-composite.json"
+  tests = "meta/tests-composite.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_bindlib",
     "//src/devices/bind/fuchsia.amlogic.platform",

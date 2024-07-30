@@ -5,7 +5,7 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_REGISTERS_TYPEC_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_REGISTERS_TYPEC_H_
 
-#include <lib/ddk/debug.h>
+#include <lib/driver/logging/cpp/logger.h>
 #include <lib/stdcompat/bit.h>
 #include <zircon/assert.h>
 
@@ -271,7 +271,7 @@ class DynamicFlexIoScratchPad : public hwreg::RegisterBase<DynamicFlexIoScratchP
     if (IsSupportedTypeCLiveState(val)) {
       return static_cast<TypeCLiveState>(val);
     }
-    zxlogf(WARNING, "PORT_TX_DFLEXDPSP: Invalid type_c_live_state: 0x%x", val);
+    FDF_LOG(WARNING, "PORT_TX_DFLEXDPSP: Invalid type_c_live_state: 0x%x", val);
     return TypeCLiveState::kInvalid;
   }
 
@@ -429,8 +429,8 @@ class DynamicFlexIoDisplayPortPinAssignment
     if (IsValidPinAssignment(raw_pin_assignment)) {
       return static_cast<PinAssignment>(raw_pin_assignment);
     }
-    zxlogf(WARNING, "PORT_TX_DFLEXPA1: Invalid pin assignment value for DDI %d: 0x%x", ddi_id,
-           raw_pin_assignment);
+    FDF_LOG(WARNING, "PORT_TX_DFLEXPA1: Invalid pin assignment value for DDI %d: 0x%x", ddi_id,
+            raw_pin_assignment);
     return std::nullopt;
   }
 
@@ -1025,8 +1025,8 @@ class DekelPllClktop2HighSpeedClockControl
   // value into standard integer format.
   uint32_t programmable_divider_ratio() const {
     if (programmable_divider_ratio_selection() > 10) {
-      zxlogf(WARNING, "DKL_CLKTOP2_HSCLKCTL: Invalid programmable_divider_ratio selection: %u",
-             programmable_divider_ratio_selection());
+      FDF_LOG(WARNING, "DKL_CLKTOP2_HSCLKCTL: Invalid programmable_divider_ratio selection: %u",
+              programmable_divider_ratio_selection());
     }
     if (programmable_divider_ratio_selection() == 0) {
       // To avoid division by zero.

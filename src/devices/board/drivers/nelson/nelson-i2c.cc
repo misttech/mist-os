@@ -237,20 +237,20 @@ zx_status_t Nelson::I2cInit() {
   // setup pinmux for our I2C busses
 
   // i2c_ao_0
-  gpio_init_steps_.push_back(GpioSetAltFunction(GPIO_SOC_SENSORS_I2C_SCL, 1));
-  gpio_init_steps_.push_back(GpioSetDriveStrength(GPIO_SOC_SENSORS_I2C_SCL, 2500));
-  gpio_init_steps_.push_back(GpioSetAltFunction(GPIO_SOC_SENSORS_I2C_SDA, 1));
-  gpio_init_steps_.push_back(GpioSetDriveStrength(GPIO_SOC_SENSORS_I2C_SDA, 2500));
+  gpio_init_steps_.push_back(GpioFunction(GPIO_SOC_SENSORS_I2C_SCL, 1));
+  gpio_init_steps_.push_back(GpioDriveStrength(GPIO_SOC_SENSORS_I2C_SCL, 2500));
+  gpio_init_steps_.push_back(GpioFunction(GPIO_SOC_SENSORS_I2C_SDA, 1));
+  gpio_init_steps_.push_back(GpioDriveStrength(GPIO_SOC_SENSORS_I2C_SDA, 2500));
   // i2c2
-  gpio_init_steps_.push_back(GpioSetAltFunction(GPIO_SOC_TOUCH_I2C_SDA, 3));
-  gpio_init_steps_.push_back(GpioSetDriveStrength(GPIO_SOC_TOUCH_I2C_SDA, 3000));
-  gpio_init_steps_.push_back(GpioSetAltFunction(GPIO_SOC_TOUCH_I2C_SCL, 3));
-  gpio_init_steps_.push_back(GpioSetDriveStrength(GPIO_SOC_TOUCH_I2C_SCL, 3000));
+  gpio_init_steps_.push_back(GpioFunction(GPIO_SOC_TOUCH_I2C_SDA, 3));
+  gpio_init_steps_.push_back(GpioDriveStrength(GPIO_SOC_TOUCH_I2C_SDA, 3000));
+  gpio_init_steps_.push_back(GpioFunction(GPIO_SOC_TOUCH_I2C_SCL, 3));
+  gpio_init_steps_.push_back(GpioDriveStrength(GPIO_SOC_TOUCH_I2C_SCL, 3000));
   // i2c3
-  gpio_init_steps_.push_back(GpioSetAltFunction(GPIO_SOC_AV_I2C_SDA, 2));
-  gpio_init_steps_.push_back(GpioSetDriveStrength(GPIO_SOC_AV_I2C_SDA, 3000));
-  gpio_init_steps_.push_back(GpioSetAltFunction(GPIO_SOC_AV_I2C_SCL, 2));
-  gpio_init_steps_.push_back(GpioSetDriveStrength(GPIO_SOC_AV_I2C_SCL, 3000));
+  gpio_init_steps_.push_back(GpioFunction(GPIO_SOC_AV_I2C_SDA, 2));
+  gpio_init_steps_.push_back(GpioDriveStrength(GPIO_SOC_AV_I2C_SDA, 3000));
+  gpio_init_steps_.push_back(GpioFunction(GPIO_SOC_AV_I2C_SCL, 2));
+  gpio_init_steps_.push_back(GpioDriveStrength(GPIO_SOC_AV_I2C_SCL, 3000));
 
   for (const auto& bus : buses) {
     AddI2cBus(bus, pbus_);

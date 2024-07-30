@@ -85,6 +85,7 @@ template("exported_fuchsia_package_archive") {
       ]
     }
   } else {
+    not_needed(invoker, "*")
     group(target_name) {
       public_deps = [ ":${target_name}($default_toolchain)" ]
     }

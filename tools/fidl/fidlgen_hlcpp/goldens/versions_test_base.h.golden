@@ -22,6 +22,9 @@ class Protocol_TestBase : public ::test::versions::Protocol {
   void Foo() override {
     NotImplemented_("Foo");
   }
+  void handle_unknown_method(uint64_t ordinal, bool method_has_response) override {
+    NotImplemented_("handle_unknown_method");
+  }
 };
 }  // namespace testing
 }  // namespace versions

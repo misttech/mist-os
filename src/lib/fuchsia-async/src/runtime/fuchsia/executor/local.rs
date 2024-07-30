@@ -62,7 +62,7 @@ impl LocalExecutor {
         let Poll::Ready(result) = self.run::</* UNTIL_STALLED: */ false, F::Output>(
             // SAFETY: This is a singlethreaded executor, so the future will never be sent across
             // threads.
-            unsafe { AtomicFuture::new_local(main_future, true) }
+            unsafe { AtomicFuture::new_local(main_future, false) }
         ) else {
             unreachable!()
         };
@@ -207,7 +207,7 @@ impl TestExecutor {
         loop {
             let result = self.local.run::</* UNTIL_STALLED: */ true, F::Output>(
                 // SAFETY: We don't move the main future across threads.
-                unsafe { AtomicFuture::new_local(main_future.as_mut(), true) }
+                unsafe { AtomicFuture::new_local(main_future.as_mut(), false) }
             );
             if result.is_ready() {
                 return result;

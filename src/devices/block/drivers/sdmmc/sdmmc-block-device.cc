@@ -354,7 +354,7 @@ zx::result<> SdmmcBlockDevice::ConfigurePowerManagement() {
     if (config.element().name().get() == kHardwarePowerElementName) {
       hardware_power_element_control_client_ =
           fidl::WireSyncClient<fuchsia_power_broker::ElementControl>(
-              std::move(result.value().element_control_channel()));
+              std::move(description.element_control_client_.value()));
       hardware_power_lessor_client_ = fidl::WireSyncClient<fuchsia_power_broker::Lessor>(
           std::move(description.lessor_client_.value()));
       hardware_power_current_level_client_ =
@@ -366,7 +366,7 @@ zx::result<> SdmmcBlockDevice::ConfigurePowerManagement() {
     } else if (config.element().name().get() == kSystemWakeOnRequestPowerElementName) {
       wake_on_request_element_control_client_ =
           fidl::WireSyncClient<fuchsia_power_broker::ElementControl>(
-              std::move(result.value().element_control_channel()));
+              std::move(description.element_control_client_.value()));
       wake_on_request_lessor_client_ = fidl::WireSyncClient<fuchsia_power_broker::Lessor>(
           std::move(description.lessor_client_.value()));
       wake_on_request_current_level_client_ =

@@ -93,6 +93,7 @@ template("host_test") {
                              "visibility",
                              "isolated",
                              "timeout_secs",
+                             "product_bundle",
                            ])
 
     # If we have args, we put most deps on the script target,

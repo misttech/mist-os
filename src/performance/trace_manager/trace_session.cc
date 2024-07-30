@@ -117,8 +117,7 @@ void TraceSession::AddProvider(TraceProviderBundle* provider) {
 
 void TraceSession::MarkInitialized() { TransitionToState(State::kInitialized); }
 
-void TraceSession::Terminate(
-    fit::function<void(controller::Controller_TerminateTracing_Result)> callback) {
+void TraceSession::Terminate(fit::closure callback) {
   if (state_ == State::kTerminating) {
     FX_LOGS(DEBUG) << "Ignoring terminate request, already terminating";
     return;
@@ -137,7 +136,7 @@ void TraceSession::Terminate(
 
 void TraceSession::Start(fuchsia::tracing::BufferDisposition buffer_disposition,
                          const std::vector<std::string>& additional_categories,
-                         controller::Controller::StartTracingCallback callback) {
+                         controller::Session::StartTracingCallback callback) {
   FX_DCHECK(state_ == State::kInitialized || state_ == State::kStopped);
 
   if (force_clear_buffer_contents_) {
@@ -168,7 +167,7 @@ void TraceSession::Start(fuchsia::tracing::BufferDisposition buffer_disposition,
 }
 
 void TraceSession::Stop(bool write_results,
-                        fit::function<void(controller::Controller_StopTracing_Result)> callback) {
+                        fit::function<void(controller::Session_StopTracing_Result)> callback) {
   FX_DCHECK(state_ == State::kInitialized || state_ == State::kStarting ||
             state_ == State::kStarted);
 
@@ -249,8 +248,8 @@ void TraceSession::NotifyStarted() {
     FX_LOGS(DEBUG) << "Marking session as having started";
     session_start_timeout_.Cancel();
     auto callback = std::move(start_callback_);
-    controller::Controller_StartTracing_Result result;
-    controller::Controller_StartTracing_Response response;
+    controller::Session_StartTracing_Result result;
+    controller::Session_StartTracing_Response response;
     result.set_response(response);
     callback(std::move(result));
   }
@@ -309,9 +308,18 @@ void TraceSession::NotifyStopped() {
   if (stop_callback_) {
     FX_LOGS(DEBUG) << "Marking session as having stopped";
     session_stop_timeout_.Cancel();
-    controller::Controller_StopTracing_Result stop_result;
-    controller::Controller_StopTracing_Response response;
-    stop_result.set_response(response);
+    for (auto& tracee : tracees_) {
+      if (auto trace_stat = tracee->GetStats(); trace_stat.has_value()) {
+        trace_stats_.push_back(std::move(trace_stat.value()));
+      } else {
+        FX_LOGS(WARNING) << "No stats generated for " << tracee->bundle();
+      }
+    }
+
+    controller::Session_StopTracing_Result stop_result;
+    controller::TerminateResult result;
+    result.set_provider_stats(std::move(trace_stats_));
+    stop_result.set_response(controller::Session_StopTracing_Response(std::move(result)));
     auto callback = std::move(stop_callback_);
     FX_DCHECK(callback);
     callback(std::move(stop_result));
@@ -347,11 +355,6 @@ void TraceSession::OnProviderTerminated(TraceProviderBundle* bundle) {
         }
       }
     }
-    if (auto trace_stat = (*it)->GetStats(); trace_stat.has_value()) {
-      trace_stats_.push_back(std::move(trace_stat.value()));
-    } else {
-      FX_LOGS(WARNING) << "No stats generated for " << *bundle;
-    }
     tracees_.erase(it);
   }
 
@@ -374,15 +377,9 @@ void TraceSession::TerminateSessionIfEmpty() {
     FX_LOGS(DEBUG) << "Marking session as terminated, no more tracees";
 
     session_terminate_timeout_.Cancel();
-
-    controller::Controller_TerminateTracing_Result result;
-    controller::TerminateResult terminate_result;
-    terminate_result.set_provider_stats(std::move(trace_stats_));
-    result.set_response(
-        controller::Controller_TerminateTracing_Response(std::move(terminate_result)));
     auto callback = std::move(terminate_callback_);
     FX_DCHECK(callback);
-    callback(std::move(result));
+    callback();
   }
 }
 
@@ -396,22 +393,11 @@ void TraceSession::FinishTerminatingDueToTimeout() {
       if (tracee->state() != Tracee::State::kTerminated) {
         FX_LOGS(WARNING) << "Timed out waiting for trace provider " << tracee->bundle()
                          << " to terminate";
-      } else {
-        if (auto trace_stat = tracee->GetStats(); trace_stat.has_value()) {
-          trace_stats_.push_back(std::move(trace_stat.value()));
-        } else {
-          FX_LOGS(WARNING) << "No stats generated for " << tracee->bundle();
-        }
       }
     }
-    controller::Controller_TerminateTracing_Result result;
-    controller::TerminateResult terminate_result;
-    terminate_result.set_provider_stats(std::move(trace_stats_));
-    result.set_response(
-        controller::Controller_TerminateTracing_Response(std::move(terminate_result)));
     auto callback = std::move(terminate_callback_);
     FX_DCHECK(callback);
-    callback(std::move(result));
+    callback();
   }
 }
 
@@ -467,6 +453,15 @@ bool TraceSession::WriteProviderData(Tracee* tracee) {
 void TraceSession::Abort() {
   FX_LOGS(DEBUG) << "Fatal error occurred, aborting session";
   write_results_on_terminate_ = false;
+  if (stop_callback_) {
+    TransitionToState(State::kStopped);
+    session_stop_timeout_.Cancel();
+    controller::Session_StopTracing_Result stop_result;
+    stop_result.set_err(controller::StopErrorCode::ABORTED);
+    auto callback = std::move(stop_callback_);
+    FX_DCHECK(callback);
+    callback(std::move(stop_result));
+  }
   abort_handler_();
 }
 

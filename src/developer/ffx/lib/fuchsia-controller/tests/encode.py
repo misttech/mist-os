@@ -7,9 +7,7 @@ import typing
 import unittest  # NOQA
 
 import common
-from fidl_codec import decode_fidl_request
-from fidl_codec import encode_fidl_message
-from fidl_codec import method_ordinal
+from fidl_codec import decode_fidl_request, encode_fidl_message, method_ordinal
 
 
 class EncodeObj(object):

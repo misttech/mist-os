@@ -306,7 +306,7 @@ impl<B: BridgeHandler> Bridge<B> {
             fnet_interfaces_ext::PortClass::Loopback => None,
             fnet_interfaces_ext::PortClass::Virtual => Some(DeviceClass::Virtual),
             fnet_interfaces_ext::PortClass::Ethernet => Some(DeviceClass::Ethernet),
-            fnet_interfaces_ext::PortClass::Wlan => Some(DeviceClass::Wlan),
+            fnet_interfaces_ext::PortClass::WlanClient => Some(DeviceClass::WlanClient),
             fnet_interfaces_ext::PortClass::WlanAp => Some(DeviceClass::WlanAp),
             fnet_interfaces_ext::PortClass::Ppp => Some(DeviceClass::Ppp),
             fnet_interfaces_ext::PortClass::Bridge => Some(DeviceClass::Bridge),

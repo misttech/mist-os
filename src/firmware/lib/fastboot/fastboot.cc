@@ -737,7 +737,7 @@ zx::result<> Fastboot::OemInstallFromUsb(const std::string& command, Transport* 
   //
   // Note: source/destination aren't really usable at the moment because the path names will
   // often be too large to fit in the fastboot packet. Example paths from a NUC11:
-  //   * "/dev/sys/platform/pt/PC00/bus/00:14.0/00:14.0/xhci/usb-bus/001/001/ifc-000/ums/scsi-disk-0-0/block"
+  //   * "/dev/sys/platform/pt/PC00/bus/00:14.0/00:14.0/xhci/usb-bus/001/001/ifc-000/ums/scsi-block-device-0-0/block"
   //   * "/dev/sys/platform/pt/PC00/bus/01:00.0/01:00.0/nvme/namespace-1/block"
   // We'll need to implement some sort of substring matching to make this actually useful.
   // Probably also a way to list the current disks so the user doesn't have to magically know this

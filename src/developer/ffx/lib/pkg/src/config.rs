@@ -95,6 +95,7 @@ pub async fn get_repository_server_enabled() -> Result<bool> {
 
 /// Sets if the repository server is enabled.
 pub async fn set_repository_server_enabled(enabled: bool) -> Result<()> {
+    ffx_config::invalidate_global_cache().await; // Necessary when the daemon does some writes and the CLI does others
     ffx_config::query(CONFIG_KEY_SERVER_ENABLED)
         .level(Some(ConfigLevel::User))
         .set(enabled.into())
@@ -122,6 +123,7 @@ pub async fn get_repository_server_last_address_used() -> Result<Option<std::net
 
 /// Sets the repository server last used address.
 pub async fn set_repository_server_last_address_used(socket_address: String) -> Result<()> {
+    ffx_config::invalidate_global_cache().await; // Necessary when the daemon does some writes and the CLI does others
     ffx_config::query(CONFIG_KEY_LAST_USED_ADDRESS)
         .level(Some(ConfigLevel::User))
         .set(socket_address.into())
@@ -178,6 +180,7 @@ pub async fn get_default_repository() -> Result<Option<String>> {
 
 /// Sets the default repository from the config.
 pub async fn set_default_repository(repo_name: &str) -> Result<()> {
+    ffx_config::invalidate_global_cache().await; // Necessary when the daemon does some writes and the CLI does others
     ffx_config::query(CONFIG_KEY_DEFAULT_REPOSITORY)
         .level(Some(ConfigLevel::User))
         .set(repo_name.into())
@@ -246,6 +249,7 @@ pub async fn get_repositories() -> BTreeMap<String, RepositorySpec> {
 pub async fn set_repository(repo_name: &str, repo_spec: &RepositorySpec) -> Result<()> {
     let repo_spec = serde_json::to_value(repo_spec.clone())?;
 
+    ffx_config::invalidate_global_cache().await; // Necessary when the daemon does some writes and the CLI does others
     ffx_config::query(&repository_query(repo_name))
         .level(Some(ConfigLevel::User))
         .set(repo_spec)
@@ -363,6 +367,7 @@ pub async fn set_registration(target_nodename: &str, target_info: &RepositoryTar
     let json_target_info =
         serde_json::to_value(&target_info).context("serializing RepositorySpec")?;
 
+    ffx_config::invalidate_global_cache().await; // Necessary when the daemon does some writes and the CLI does others
     ffx_config::query(&registration_query(&target_info.repo_name, &target_nodename))
         .level(Some(ConfigLevel::User))
         .set(json_target_info)

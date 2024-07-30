@@ -106,8 +106,8 @@ pub async fn cmd_package_archive_extract(cmd: PackageArchiveExtractCommand) -> R
         .write_with_relative_paths(&package_manifest_path)
         .with_context(|| format!("creating {package_manifest_path}"))?;
 
-    // FIXME(https://fxbug.dev/42052115): Some tools still depend on the legacy `blobs.json` file. We
-    // should migrate them over to using `package_manifest.json` so we can stop producing this file.
+    // TODO(https://fxbug.dev/300181454): blobs.json files are deprecated. Support to output
+    // blobs.json will be removed once migration to using package_manifest.json is completed.
     if cmd.blobs_json {
         let blobs_json_path = cmd.out.join(BLOBS_JSON_NAME);
         let file = File::create(&blobs_json_path)

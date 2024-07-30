@@ -153,7 +153,11 @@ python_binary("validate_config_data_is_empty") {
 python_binary("developer_overrides") {
   enable_mypy = true
   main_source = "developer_overrides.py"
-  deps = [ "//build/python/modules/serialization" ]
+  deps = [
+    "//build/python/modules/assembly",
+    "//build/python/modules/depfile",
+    "//build/python/modules/serialization",
+  ]
 }
 
 group("tests") {

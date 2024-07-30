@@ -6,10 +6,11 @@
 
 import argparse
 import dataclasses
-import sys
 import shutil
-from fuchsia.tools.licenses.common_types import *
+import sys
 from typing import List
+
+from fuchsia.tools.licenses.common_types import *
 
 
 @dataclasses.dataclass(frozen=True)

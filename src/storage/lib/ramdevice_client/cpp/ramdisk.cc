@@ -399,18 +399,6 @@ zx_status_t ramdisk_wake(const ramdisk_client* client) {
 }
 
 __EXPORT
-zx_status_t ramdisk_grow(const ramdisk_client* client, uint64_t required_size) {
-  const fidl::WireResult result = fidl::WireCall(client->ramdisk_interface())->Grow(required_size);
-  if (!result.ok()) {
-    return result.status();
-  }
-  if (!result->is_ok()) {
-    return result->error_value();
-  }
-  return ZX_OK;
-}
-
-__EXPORT
 zx_status_t ramdisk_set_flags(const ramdisk_client* client, uint32_t flags) {
   const fidl::WireResult result =
       fidl::WireCall(client->ramdisk_interface())

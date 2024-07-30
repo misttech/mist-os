@@ -9,12 +9,12 @@ Test that asserts that we can read logs and Inspect.
 
 import json
 import logging
+from typing import Any, Dict, List
 
 from fuchsia_base_test import fuchsia_base_test
 from honeydew.interfaces.transports.ffx import FFX
 from mobly import asserts, test_runner
 from perf_utils.utils import FuchsiaPerfResults
-from typing import Dict, Any, List
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 _TEST_SUITE = "fuchsia.test.diagnostics"

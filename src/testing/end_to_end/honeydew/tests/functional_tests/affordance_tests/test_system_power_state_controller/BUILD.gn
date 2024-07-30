@@ -13,7 +13,9 @@ if (is_host) {
       "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
     ]
     transport = "fuchsia-controller"
-    params_source = "params_starnix.yaml"
+    params = {
+      is_starnix_supported = true
+    }
     environments = [ vim3_env ]
   }
 
@@ -24,7 +26,9 @@ if (is_host) {
       "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
     ]
     transport = "fuchsia-controller"
-    params_source = "params_non_starnix.yaml"
+    params = {
+      is_starnix_supported = false
+    }
     environments = [ vim3_env ]
   }
 }

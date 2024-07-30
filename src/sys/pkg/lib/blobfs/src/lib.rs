@@ -301,32 +301,37 @@ impl Client {
         };
     }
 
-    /// Open a blob for read using open2. `scope` will only be used if the client was configured to
+    /// Open a blob for read using open3. `scope` will only be used if the client was configured to
     /// use fuchsia.fxfs.BlobReader.
-    pub fn open2_blob_for_read(
+    pub fn open3_blob_for_read(
         &self,
         blob: &Hash,
-        protocols: fio::ConnectionProtocols,
+        flags: fio::Flags,
         scope: ExecutionScope,
         object_request: ObjectRequestRef<'_>,
     ) -> Result<(), zx::Status> {
         // Reject requests that attempt to open blobs as writable.
-        if protocols.rights().is_some_and(|rights| rights.contains(fio::Operations::WRITE_BYTES)) {
+        if flags.rights().is_some_and(|rights| rights.contains(fio::Operations::WRITE_BYTES)) {
             return Err(zx::Status::ACCESS_DENIED);
         }
         // Reject requests that attempt to create new blobs.
-        if protocols.creation_mode() != vfs::CreationMode::Never {
+        if flags.creation_mode() != vfs::CreationMode::Never {
             return Err(zx::Status::NOT_SUPPORTED);
         }
         // Errors below will be communicated via the `object_request` channel.
         let object_request = object_request.take();
-        // Use blob reader protocol if available, otherwise fallback to fuchsia.io/Directory.Open2.
+        // Use blob reader protocol if available, otherwise fallback to fuchsia.io/Directory.Open3.
         if let Some(reader) = &self.reader {
-            let () = open_blob_with_reader(reader.clone(), *blob, scope, protocols, object_request);
+            let () = open_blob_with_reader(reader.clone(), *blob, scope, flags, object_request);
         } else {
             let _: Result<(), ()> = self
                 .dir
-                .open2(&blob.to_string(), &protocols, object_request.into_channel())
+                .open3(
+                    &blob.to_string(),
+                    flags,
+                    &object_request.options(),
+                    object_request.into_channel(),
+                )
                 .map_err(|fidl_error| warn!("Failed to open blob {:?}: {:?}", blob, fidl_error));
         }
         Ok(())

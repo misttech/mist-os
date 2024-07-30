@@ -20,7 +20,7 @@ use selinux::security_server::SecurityServer;
 use selinux::{InitialSid, SecurityId};
 use selinux_policy::SUPPORTED_POLICY_VERSION;
 use starnix_logging::{impossible_error, log_error, log_info, track_stub};
-use starnix_sync::{FileOpsCore, Locked, Mutex, WriteOps};
+use starnix_sync::{FileOpsCore, Locked, Mutex};
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::mode;
@@ -100,7 +100,7 @@ impl SeLinuxFs {
         dir.entry(
             current_task,
             "policyvers",
-            BytesFile::new_node(format!("{}", SUPPORTED_POLICY_VERSION).as_bytes().to_vec()),
+            BytesFile::new_node(format!("{}", SUPPORTED_POLICY_VERSION).into_bytes()),
             mode!(IFREG, 0o444),
         );
         dir.entry(
@@ -219,7 +219,7 @@ impl BytesFileOps for SeEnforce {
     }
 
     fn read(&self, _current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
-        Ok(format!("{}", self.security_server.is_enforcing() as u32).as_bytes().to_vec().into())
+        Ok(format!("{}", self.security_server.is_enforcing() as u32).into_bytes().into())
     }
 }
 
@@ -235,7 +235,7 @@ impl SeDenyUnknown {
 
 impl BytesFileOps for SeDenyUnknown {
     fn read(&self, _current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
-        Ok(format!("{}", self.security_server.deny_unknown() as u32).as_bytes().to_vec().into())
+        Ok(format!("{}", self.security_server.deny_unknown() as u32).into_bytes().into())
     }
 }
 
@@ -251,7 +251,7 @@ impl SeRejectUnknown {
 
 impl BytesFileOps for SeRejectUnknown {
     fn read(&self, _current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
-        Ok(format!("{}", self.security_server.reject_unknown() as u32).as_bytes().to_vec().into())
+        Ok(format!("{}", self.security_server.reject_unknown() as u32).into_bytes().into())
     }
 }
 
@@ -361,7 +361,7 @@ impl FileOps for AccessFile {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, WriteOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         offset: usize,
@@ -520,7 +520,7 @@ impl BytesFileOps for SeLinuxBoolean {
         // e.g. "1 0" will be read if a boolean is True but will become False.
         let (active, pending) =
             self.security_server.get_boolean(&self.name).map_err(|_| errno!(EIO))?;
-        Ok(format!("{} {}", active as u32, pending as u32).as_bytes().to_vec().into())
+        Ok(format!("{} {}", active as u32, pending as u32).into_bytes().into())
     }
 }
 
@@ -654,7 +654,7 @@ impl FsNodeOps for Arc<SeLinuxPermsDirectory> {
             .map_err(|_| errno!(ENOENT))?
             .iter()
             .find(|(_permission_id, permission_name)| permission_name == name.as_bytes())
-            .ok_or(errno!(ENOENT))?
+            .ok_or_else(|| errno!(ENOENT))?
             .0;
 
         Ok(node.fs().create_node(

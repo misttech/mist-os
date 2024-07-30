@@ -40,6 +40,7 @@ struct Args {
 enum CommandArgs {
     Process(ProcessArgs),
     Html(HtmlArgs),
+    Print(PrintArgs),
 }
 
 #[derive(FromArgs)]
@@ -80,6 +81,19 @@ struct HtmlArgs {
     output: PathBuf,
 }
 
+#[derive(FromArgs)]
+#[argh(subcommand, name = "print")]
+/// print all package contents in order, for diff
+struct PrintArgs {
+    /// input file generated using "process" command
+    #[argh(option)]
+    input: PathBuf,
+
+    /// output file name, if absent print to stdout
+    #[argh(option)]
+    output: Option<PathBuf>,
+}
+
 fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
     let args: Args = argh::from_env();
@@ -87,6 +101,7 @@ fn main() -> Result<()> {
     match args.cmd {
         CommandArgs::Process(args) => do_process_command(args),
         CommandArgs::Html(args) => do_html_command(args),
+        CommandArgs::Print(args) => do_print_command(args),
     }
 }
 
@@ -769,6 +784,52 @@ fn do_process_command(args: ProcessArgs) -> Result<()> {
         serde_json::to_writer(&mut file, &output)?;
         let dur = Instant::now() - start;
         println!("Output JSON in {:?}", dur);
+    }
+
+    Ok(())
+}
+
+fn do_print_command(args: PrintArgs) -> Result<()> {
+    let data: OutputSummary = {
+        let file = File::open(args.input)?;
+        serde_json::from_reader(file)?
+    };
+
+    let mut packages = data
+        .packages
+        .iter()
+        .flat_map(|(k, v)| v.files.iter().map(|f| (k.name(), &f.name, &f.hash)))
+        .collect::<Vec<_>>();
+    packages.sort();
+
+    enum StdoutOrFile {
+        Stdout,
+        File(File),
+    }
+
+    impl Write for StdoutOrFile {
+        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+            match self {
+                StdoutOrFile::Stdout => std::io::stdout().write(buf),
+                StdoutOrFile::File(f) => f.write(buf),
+            }
+        }
+
+        fn flush(&mut self) -> std::io::Result<()> {
+            match self {
+                StdoutOrFile::Stdout => std::io::stdout().flush(),
+                StdoutOrFile::File(f) => f.flush(),
+            }
+        }
+    }
+
+    let mut write = match args.output {
+        None => StdoutOrFile::Stdout,
+        Some(path) => StdoutOrFile::File(File::open(path)?),
+    };
+
+    for (pkg, file, hash) in packages {
+        writeln!(&mut write, "{} {}={}", pkg, file, hash)?;
     }
 
     Ok(())

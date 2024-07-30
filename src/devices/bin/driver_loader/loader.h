@@ -30,7 +30,8 @@ class Loader {
 
   // Loads the executable |exec| with |vdso| into |process|, and begins the execution on |thread|.
   zx_status_t Start(zx::process process, zx::thread thread, zx::vmar root_vmar, zx::vmo exec,
-                    zx::vmo vdso, fidl::ClientEnd<fuchsia_io::Directory> lib_dir);
+                    zx::vmo vdso, fidl::ClientEnd<fuchsia_io::Directory> lib_dir,
+                    zx::channel bootstrap_receiver);
 
  private:
   using Linker = ld::RemoteDynamicLinker<>;
@@ -56,7 +57,7 @@ class Loader {
         const ProcessStartArgs& process_start_args);
 
     // Begins execution of the process.
-    zx_status_t Start();
+    zx_status_t Start(zx::channel bootstrap_receiver);
 
    private:
     // Use |Create| instead.

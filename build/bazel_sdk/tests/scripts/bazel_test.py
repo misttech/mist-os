@@ -20,8 +20,8 @@ import json
 import os
 import platform
 import shlex
-import sys
 import subprocess
+import sys
 from pathlib import Path
 from typing import (
     Any,
@@ -852,6 +852,11 @@ def main() -> int:
         if disk_cache:
             bazel_common_args += [f"--disk_cache={disk_cache}"]
 
+    # Pass explicit job count if needed. https://fxbug.dev/351623259
+    job_count = os.environ.get("FUCHSIA_BAZEL_JOB_COUNT")
+    if job_count:
+        jobs = int(job_count)
+
     bazel_config_args += build_metadata_flags()
 
     if args.bazel_build_events_log_json:
@@ -951,7 +956,7 @@ def main() -> int:
             + extra_args
         )
 
-    if jobs:
+    if jobs and args.command not in ("query", "info"):
         command_args += [f"--jobs={jobs}"]
 
     # If the test failed, exit early with a non-zero error code, (but don't

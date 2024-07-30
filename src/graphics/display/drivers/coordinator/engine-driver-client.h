@@ -32,12 +32,12 @@ class EngineDriverClient {
       std::shared_ptr<fdf::Namespace> incoming);
 
   // Production code must use the Create() factory method.
-  // `dc` must be valid.
-  explicit EngineDriverClient(ddk::DisplayControllerImplProtocolClient dc);
+  // `banjo_engine` must be valid.
+  explicit EngineDriverClient(ddk::DisplayEngineProtocolClient banjo_engine);
 
   // Production code must use the Create() factory method.
-  // `engine` must be valid.
-  explicit EngineDriverClient(fdf::ClientEnd<fuchsia_hardware_display_engine::Engine> engine);
+  // `fidl_engine` must be valid.
+  explicit EngineDriverClient(fdf::ClientEnd<fuchsia_hardware_display_engine::Engine> fidl_engine);
 
   EngineDriverClient(const EngineDriverClient&) = delete;
   EngineDriverClient& operator=(const EngineDriverClient&) = delete;
@@ -56,8 +56,8 @@ class EngineDriverClient {
 
   // TODO(https://fxbug.dev/314126494): These methods are only used in the
   // banjo transport. Remove when all drivers are migrated to FIDL transport.
-  void SetDisplayControllerInterface(const display_controller_interface_protocol_t& protocol);
-  void ResetDisplayControllerInterface();
+  void RegisterDisplayEngineListener(const display_engine_listener_protocol_t& protocol);
+  void DeregisterDisplayEngineListener();
 
   zx::result<DriverImageId> ImportImage(const ImageMetadata& image_metadata,
                                         DriverBufferCollectionId collection_id, uint32_t index);
@@ -80,10 +80,10 @@ class EngineDriverClient {
   bool use_engine_;
 
   // FIDL Client
-  fdf::WireSyncClient<fuchsia_hardware_display_engine::Engine> engine_;
+  fdf::WireSyncClient<fuchsia_hardware_display_engine::Engine> fidl_engine_;
 
   // Banjo Client
-  ddk::DisplayControllerImplProtocolClient dc_;
+  ddk::DisplayEngineProtocolClient banjo_engine_;
 };
 
 }  // namespace display

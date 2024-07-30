@@ -5,16 +5,13 @@
 use itertools::Itertools;
 
 use crate::task::CurrentTask;
-use crate::vfs::{
-    fileops_impl_noop_sync, fileops_impl_seekable, FileObject, FileOps, FsNodeOps, InputBuffer,
-    OutputBuffer, SimpleFileNode,
-};
+use crate::vfs::{BytesFile, BytesFileOps, FsNodeOps};
 use fidl_fuchsia_power_broker::PowerLevel;
-use starnix_sync::{FileOpsCore, Locked, WriteOps};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{errno, error};
+use std::borrow::Cow;
 
-#[derive(Copy, Clone, Eq, PartialEq, Hash)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub enum SuspendState {
     /// Suspend-to-disk
     ///
@@ -38,7 +35,7 @@ pub enum SuspendState {
 }
 
 impl SuspendState {
-    fn to_str(&self) -> &'static str {
+    pub fn to_str(&self) -> &'static str {
         match self {
             SuspendState::Disk => "disk",
             SuspendState::Ram => "mem",
@@ -77,25 +74,13 @@ pub struct PowerStateFile;
 
 impl PowerStateFile {
     pub fn new_node() -> impl FsNodeOps {
-        SimpleFileNode::new(move || Ok(Self {}))
+        BytesFile::new_node(Self {})
     }
 }
 
-impl FileOps for PowerStateFile {
-    fileops_impl_seekable!();
-    fileops_impl_noop_sync!();
-
-    fn write(
-        &self,
-        _locked: &mut Locked<'_, WriteOps>,
-        _file: &FileObject,
-        current_task: &CurrentTask,
-        offset: usize,
-        data: &mut dyn InputBuffer,
-    ) -> Result<usize, Errno> {
-        debug_assert!(offset == 0);
-        let bytes = data.read_all()?;
-        let state_str = std::str::from_utf8(&bytes).map_err(|_| errno!(EINVAL))?;
+impl BytesFileOps for PowerStateFile {
+    fn write(&self, current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
+        let state_str = std::str::from_utf8(&data).map_err(|_| errno!(EINVAL))?;
         let clean_state_str = state_str.split('\n').next().unwrap_or("");
         let state: SuspendState = clean_state_str.try_into()?;
 
@@ -104,21 +89,14 @@ impl FileOps for PowerStateFile {
         if !supported_states.contains(&state) {
             return error!(EINVAL);
         }
+        fuchsia_trace::duration!(c"power", c"starnix-sysfs:suspend");
         power_manager.suspend(state)?;
-
-        Ok(bytes.len())
+        Ok(())
     }
 
-    fn read(
-        &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
-        _file: &FileObject,
-        current_task: &CurrentTask,
-        offset: usize,
-        data: &mut dyn OutputBuffer,
-    ) -> Result<usize, Errno> {
+    fn read(&self, current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
         let states = current_task.kernel().suspend_resume_manager.suspend_states();
         let content = states.iter().map(SuspendState::to_str).join(" ") + "\n";
-        data.write(content.get(offset..).ok_or(errno!(EINVAL))?.as_bytes())
+        Ok(content.as_bytes().to_owned().into())
     }
 }

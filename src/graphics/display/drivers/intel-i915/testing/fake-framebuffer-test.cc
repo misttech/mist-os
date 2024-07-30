@@ -9,6 +9,8 @@
 
 #include <gtest/gtest.h>
 
+#include "src/lib/testing/predicates/status.h"
+
 namespace {
 
 TEST(FakeFramebuffer, Error) {
@@ -19,7 +21,7 @@ TEST(FakeFramebuffer, Error) {
   uint32_t format, width, height, stride;
   zx_handle_t resource = 0x0a0b0c0d;
   zx_status_t status = zx_framebuffer_get_info(resource, &format, &width, &height, &stride);
-  EXPECT_EQ(status, ZX_ERR_NOT_FOUND);
+  EXPECT_STATUS(status, ZX_ERR_NOT_FOUND);
 }
 
 TEST(FakeFramebuffer, Ok) {
@@ -35,7 +37,7 @@ TEST(FakeFramebuffer, Ok) {
   uint32_t format, width, height, stride;
   zx_handle_t resource = 0x01020304;
   zx_status_t status = zx_framebuffer_get_info(resource, &format, &width, &height, &stride);
-  EXPECT_EQ(status, ZX_OK);
+  EXPECT_OK(status);
   EXPECT_EQ(format, kExpectedFramebuffer.format);
   EXPECT_EQ(width, kExpectedFramebuffer.width);
   EXPECT_EQ(height, kExpectedFramebuffer.height);

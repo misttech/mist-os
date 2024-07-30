@@ -27,7 +27,7 @@ group("tests") {
 }
 
 driver_bind_rules("bind") {
-  rules = "my_driver_cpp.bind"
+  rules = "meta/my_driver_cpp.bind"
   bind_output = "my_driver_cpp.bindbc"
 }
 
@@ -47,7 +47,7 @@ fuchsia_driver("driver") {
 fuchsia_driver_component("component") {
   component_name = "my-driver-cpp"
   deps = [ ":driver" ]
-  info = "my_driver_cpp-info.json"
+  info = "meta/my_driver_cpp-info.json"
   manifest = "meta/component.cml"
 }
 

@@ -55,8 +55,8 @@ melon/output: \
 
 >>>
 """
-from os import PathLike
 import os
+from os import PathLike
 from typing import Iterable, Set, Union
 
 FilePath = Union[str, PathLike]

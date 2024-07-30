@@ -87,6 +87,10 @@ library fuchsia.power.system;
 using fuchsia.power.broker;
 using zx;
 
+// TODO(https://fxbug.dev/339474151): Update this when EventPair is the standard
+// token for leases in Power Broker.
+alias WakeLeaseToken = zx.Handle:EVENTPAIR;
+
 /// Holds a token to the execution state power element.
 ///
 /// Power elements intentionally cannot take assertive dependencies on this power
@@ -214,6 +218,12 @@ open protocol ActivityGovernorListener {
     /// suspension is triggered by the platform.
     flexible OnSuspend();
 
+    /// Called before the activity governor initiates a system suspension.
+    ///
+    /// The server is expected to respond once it has performed the operations
+    /// it needs to prepare itself for suspend, if any.
+    flexible OnSuspendStarted() -> ();
+
     /// Called when the activity governor detects a suspend failure.
     ///
     /// The server is expected to respond to this notification. The activity
@@ -242,6 +252,24 @@ open protocol ActivityGovernor {
     /// element, then the channel to `ActivityGovernor` will be closed by the
     /// server and no response will be returned.
     flexible GetPowerElements() -> (PowerElements);
+
+    /// Creates a lease that blocks suspension of the hardware platform.
+    ///
+    /// The hardware platform will not suspend as long as a valid
+    /// [`WakeLeaseToken`] exists.
+    ///
+    /// If an error occurs while creating a token for the wake lease, then the
+    /// channel to `ActivityGovernor` will be closed by the server and no
+    /// response will be returned.
+    flexible TakeWakeLease(struct {
+        /// The name of the lease.
+        ///
+        /// The name is not required to be globally unique.
+        name string:fuchsia.power.broker.MAX_ELEMENT_NAME_LEN;
+    }) -> (resource struct {
+        /// The token that blocks hardware platform suspension.
+        token WakeLeaseToken;
+    });
 
     /// Registers a listener for activity governor events.
     ///

@@ -334,7 +334,7 @@ impl FileOps for DevTun {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, starnix_sync::WriteOps>,
+        _locked: &mut Locked<'_, starnix_sync::FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,

@@ -195,6 +195,7 @@ test("sysmem-unittest-bin") {
     if (configs + fdio_config - fdio_config != configs) {
       configs -= fdio_config
     }
+    configs += [ "//build/config/fuchsia:enable_zircon_asserts" ]
   }
   output_name = "sysmem-unittest"
   sources = [
@@ -214,6 +215,9 @@ test("sysmem-unittest-bin") {
     "//src/devices/testing/mock-ddk",
     "//src/lib/ddk",
     "//src/lib/ddktl",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/predicates",
+    "//third_party/googletest:gtest",
     "//zircon/system/ulib/async:async-cpp",
     "//zircon/system/ulib/async-default",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
@@ -226,7 +230,6 @@ test("sysmem-unittest-bin") {
     "//zircon/system/ulib/sync",
     "//zircon/system/ulib/sysmem-version",
     "//zircon/system/ulib/zx",
-    "//zircon/system/ulib/zxtest",
     "//zircon/third_party/ulib/safemath",
   ]
 }

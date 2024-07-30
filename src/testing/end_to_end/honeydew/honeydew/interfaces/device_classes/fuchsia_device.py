@@ -1,4 +1,3 @@
-#!/usr/bin/env fuchsia-vendored-python
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
@@ -31,11 +30,6 @@ from honeydew.interfaces.transports import (
 from honeydew.interfaces.transports import sl4f as sl4f_transport
 from honeydew.typing import custom_types
 from honeydew.utils import properties
-
-TIMEOUTS: dict[str, float] = {
-    "OFFLINE": 60,
-    "ONLINE": 180,
-}
 
 
 class FuchsiaDevice(abc.ABC):
@@ -338,17 +332,9 @@ class FuchsiaDevice(abc.ABC):
         """
 
     @abc.abstractmethod
-    def wait_for_offline(self, timeout: float = TIMEOUTS["OFFLINE"]) -> None:
-        """Wait for Fuchsia device to go offline.
-
-        Args:
-            timeout: How long in sec to wait for device to go offline.
-        """
+    def wait_for_offline(self) -> None:
+        """Wait for Fuchsia device to go offline."""
 
     @abc.abstractmethod
-    def wait_for_online(self, timeout: float = TIMEOUTS["ONLINE"]) -> None:
-        """Wait for Fuchsia device to go online.
-
-        Args:
-            timeout: How long in sec to wait for device to go offline.
-        """
+    def wait_for_online(self) -> None:
+        """Wait for Fuchsia device to go online."""

@@ -21,6 +21,7 @@ group("tests") {
     "fakes",
     "kernel:tests",
     "lib:tests",
+    "runner:tests",
     "tests",
     "tools:tests",
   ]

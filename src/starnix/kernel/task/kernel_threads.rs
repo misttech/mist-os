@@ -9,13 +9,13 @@ use once_cell::sync::OnceCell;
 use pin_project::pin_project;
 use starnix_sync::{Locked, Unlocked};
 use starnix_uapi::errors::Errno;
-use starnix_uapi::ownership::WeakRef;
+use starnix_uapi::ownership::{OwnedRef, TempRef, WeakRef};
 use starnix_uapi::{errno, error};
 use std::cell::{RefCell, RefMut};
 use std::ffi::CString;
 use std::future::Future;
 use std::pin::Pin;
-use std::sync::{Arc, Weak};
+use std::sync::Weak;
 use std::task::{Context, Poll};
 use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
@@ -89,8 +89,15 @@ impl KernelThreads {
 
     /// Access the `ThreadGroup` for the system tasks. This can be safely called from anywhere as
     /// soon as KernelThreads::init has been called.
-    pub fn system_thread_group(&self) -> &Arc<ThreadGroup> {
-        &self.system_task.get().expect("KernelThreads::init must be called").system_thread_group
+    pub fn system_thread_group(&self) -> TempRef<'_, ThreadGroup> {
+        TempRef::into_static(
+            self.system_task
+                .get()
+                .expect("KernelThreads::init must be called")
+                .system_thread_group
+                .upgrade()
+                .expect("System task must be still alive"),
+        )
     }
 
     pub fn spawn<F>(&self, f: F)
@@ -140,7 +147,7 @@ struct SystemTask {
     system_task: Fragile<CurrentTask>,
 
     /// The system `ThreadGroup` is accessible from everywhere.
-    system_thread_group: Arc<ThreadGroup>,
+    system_thread_group: WeakRef<ThreadGroup>,
 }
 
 struct UnlockedForAsync {
@@ -155,7 +162,7 @@ impl UnlockedForAsync {
 
 impl SystemTask {
     fn new(system_task: CurrentTask) -> Self {
-        let system_thread_group = Arc::clone(&system_task.thread_group);
+        let system_thread_group = OwnedRef::downgrade(&system_task.thread_group);
         Self { system_task: system_task.into(), system_thread_group }
     }
 }

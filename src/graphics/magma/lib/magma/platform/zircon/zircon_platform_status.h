@@ -33,6 +33,10 @@ inline zx_status_t ToZxStatus(magma_status_t status) {
       return ZX_ERR_NOT_SUPPORTED;
     case MAGMA_STATUS_BAD_STATE:
       return ZX_ERR_BAD_STATE;
+    case MAGMA_STATUS_CONSTRAINTS_INTERSECTION_EMPTY:
+      return ZX_ERR_NOT_SUPPORTED;
+    case MAGMA_STATUS_TOO_MANY_GROUP_CHILD_COMBINATIONS:
+      return ZX_ERR_OUT_OF_RANGE;
     default:
       MAGMA_DMESSAGE("No match for magma status %d", status);
       MAGMA_DASSERT(false);

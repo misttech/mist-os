@@ -536,6 +536,11 @@ where
             r.borrow().serialize_into(b.take_front_zero(r.borrow().serialized_len()).unwrap());
         }
     }
+
+    /// Returns a reference to the inner records of this builder.
+    pub fn records(&self) -> &I {
+        &self.records
+    }
 }
 
 impl<R, I> InnerPacketBuilder for RecordSequenceBuilder<R, I>

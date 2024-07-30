@@ -10,8 +10,8 @@ use crate::SecurityId;
 use anyhow::Context as _;
 use fuchsia_zircon::{self as zx};
 use selinux_common::{
-    AbstractObjectClass, ClassPermission, FileClass, InitialSid, ObjectClass, Permission,
-    FIRST_UNUSED_SID,
+    AbstractObjectClass, ClassPermission, FileClass, InitialSid, NullessByteStr, ObjectClass,
+    Permission, FIRST_UNUSED_SID,
 };
 use selinux_policy::metadata::HandleUnknown;
 use selinux_policy::parser::ByValue;
@@ -203,7 +203,7 @@ impl SecurityServer {
     /// All objects with the same security context will have the same SID associated.
     pub fn security_context_to_sid(
         &self,
-        security_context: &[u8],
+        security_context: NullessByteStr<'_>,
     ) -> Result<SecurityId, anyhow::Error> {
         let mut state = self.state.lock();
         let policy = &state.policy.as_ref().ok_or(anyhow::anyhow!("no policy loaded"))?.parsed;
@@ -242,7 +242,8 @@ impl SecurityServer {
             let new_sids = state.sids.iter().filter_map(|(sid, context)| {
                 let context_str =
                     state.policy.as_ref().unwrap().parsed.serialize_security_context(context);
-                let new_context = policy.parsed.parse_security_context(context_str.as_slice());
+                let new_context =
+                    policy.parsed.parse_security_context(context_str.as_slice().into());
                 new_context.ok().map(|context| (*sid, context))
             });
             state.sids = HashMap::from_iter(new_sids);
@@ -442,7 +443,7 @@ impl SecurityServer {
             .parsed
             .new_file_security_context(source_context, target_context, &file_class)
             // TODO(http://b/334968228): check that transitions are allowed.
-            .map(|sc| state.security_context_to_sid(sc))
+            .map(|sc| state.security_context_to_sid(sc.into()))
             .map_err(anyhow::Error::from)
             .context("computing new file security context from policy")
     }
@@ -464,7 +465,7 @@ impl SecurityServer {
         policy
             .parsed
             .new_security_context(source_context, target_context, &target_class)
-            .map(|sc| state.security_context_to_sid(sc))
+            .map(|sc| state.security_context_to_sid(sc.into()))
             .map_err(anyhow::Error::from)
             .context("computing new security context from policy")
     }
@@ -527,6 +528,22 @@ impl AccessVectorComputer for SecurityServer {
             None => Some(AccessVector::NONE),
         }
     }
+
+    fn is_permissive(&self, class: ObjectClass) -> bool {
+        match self.mode {
+            Mode::Fake => true,
+            _ => {
+                let state = self.state.lock();
+                if !state.enforcing {
+                    true
+                } else if let Some(policy) = &state.policy {
+                    policy.parsed.is_permissive(class)
+                } else {
+                    true
+                }
+            }
+        }
+    }
 }
 
 /// Header of the C-style struct exposed via the /sys/fs/selinux/status file,
@@ -564,6 +581,7 @@ mod tests {
     use super::*;
 
     use fuchsia_zircon::AsHandleRef as _;
+    use selinux_common::ProcessPermission;
     use std::mem::size_of;
     use zerocopy::{FromBytes, FromZeroes};
 
@@ -571,9 +589,9 @@ mod tests {
     const TESTS_BINARY_POLICY: &[u8] =
         include_bytes!("../testdata/micro_policies/security_server_tests_policy.pp");
 
-    fn security_server_with_tests_policy() -> Arc<SecurityServer> {
+    fn security_server_with_tests_policy(mode: Mode) -> Arc<SecurityServer> {
         let policy_bytes = TESTS_BINARY_POLICY.to_vec();
-        let security_server = SecurityServer::new(Mode::Enable);
+        let security_server = SecurityServer::new(mode);
         assert_eq!(
             Ok(()),
             security_server.load_policy(policy_bytes).map_err(|e| format!("{:?}", e))
@@ -584,9 +602,9 @@ mod tests {
     #[fuchsia::test]
     fn sid_to_security_context() {
         let security_context = b"unconfined_u:unconfined_r:unconfined_t:s0";
-        let security_server = security_server_with_tests_policy();
+        let security_server = security_server_with_tests_policy(Mode::Enable);
         let sid = security_server
-            .security_context_to_sid(security_context)
+            .security_context_to_sid(security_context.into())
             .expect("creating SID from security context should succeed");
         assert_eq!(
             security_server.sid_to_security_context(sid).expect("sid not found"),
@@ -596,12 +614,12 @@ mod tests {
 
     #[fuchsia::test]
     fn sids_for_different_security_contexts_differ() {
-        let security_server = security_server_with_tests_policy();
+        let security_server = security_server_with_tests_policy(Mode::Enable);
         let sid1 = security_server
-            .security_context_to_sid(b"user0:object_r:type0:s0")
+            .security_context_to_sid(b"user0:object_r:type0:s0".into())
             .expect("creating SID from security context should succeed");
         let sid2 = security_server
-            .security_context_to_sid(b"unconfined_u:unconfined_r:unconfined_t:s0")
+            .security_context_to_sid(b"unconfined_u:unconfined_r:unconfined_t:s0".into())
             .expect("creating SID from security context should succeed");
         assert_ne!(sid1, sid2);
     }
@@ -609,13 +627,13 @@ mod tests {
     #[fuchsia::test]
     fn sids_for_same_security_context_are_equal() {
         let security_context = b"unconfined_u:unconfined_r:unconfined_t:s0";
-        let security_server = security_server_with_tests_policy();
+        let security_server = security_server_with_tests_policy(Mode::Enable);
         let sid_count_before = security_server.state.lock().sids.len();
         let sid1 = security_server
-            .security_context_to_sid(security_context)
+            .security_context_to_sid(security_context.into())
             .expect("creating SID from security context should succeed");
         let sid2 = security_server
-            .security_context_to_sid(security_context)
+            .security_context_to_sid(security_context.into())
             .expect("creating SID from security context should succeed");
         assert_eq!(sid1, sid2);
         assert_eq!(security_server.state.lock().sids.len(), sid_count_before + 1);
@@ -624,10 +642,10 @@ mod tests {
     #[fuchsia::test]
     fn sids_allocated_outside_initial_range() {
         let security_context = b"unconfined_u:unconfined_r:unconfined_t:s0";
-        let security_server = security_server_with_tests_policy();
+        let security_server = security_server_with_tests_policy(Mode::Enable);
         let sid_count_before = security_server.state.lock().sids.len();
         let sid = security_server
-            .security_context_to_sid(security_context)
+            .security_context_to_sid(security_context.into())
             .expect("creating SID from security context should succeed");
         assert_eq!(security_server.state.lock().sids.len(), sid_count_before + 1);
         assert!(sid.0.get() >= FIRST_UNUSED_SID);
@@ -655,7 +673,7 @@ mod tests {
 
     #[fuchsia::test]
     fn loaded_policy_can_be_retrieved() {
-        let security_server = security_server_with_tests_policy();
+        let security_server = security_server_with_tests_policy(Mode::Enable);
         assert_eq!(TESTS_BINARY_POLICY, security_server.get_binary_policy().as_slice());
     }
 
@@ -803,7 +821,7 @@ mod tests {
     fn parse_security_context_no_policy() {
         let security_server = SecurityServer::new(Mode::Enable);
         let error = security_server
-            .security_context_to_sid(b"unconfined_u:unconfined_r:unconfined_t:s0")
+            .security_context_to_sid(b"unconfined_u:unconfined_r:unconfined_t:s0".into())
             .expect_err("expected error");
         let error_string = format!("{:?}", error);
         assert!(error_string.contains("no policy"));
@@ -824,23 +842,6 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn compute_new_file_sid_unknown_sids() {
-        let security_server = security_server_with_tests_policy();
-
-        // Synthesize two SIDs having been created, and subsequently invalidated.
-        let source_sid = SecurityId(NonZeroU32::new(FIRST_UNUSED_SID + 1).unwrap());
-        let target_sid = SecurityId(NonZeroU32::new(FIRST_UNUSED_SID + 2).unwrap());
-
-        // Both source and target will fall-back to the "unlabeled" Context,
-        // so that the new file Context will be identical to "unlabeled", and the
-        // same SID will be returned.
-        let sid = security_server
-            .compute_new_file_sid(source_sid, target_sid, FileClass::File)
-            .expect("new sid computed");
-        assert_eq!(sid, SecurityId::initial(InitialSid::Unlabeled));
-    }
-
-    #[fuchsia::test]
     fn compute_new_file_sid_no_defaults() {
         let security_server = SecurityServer::new(Mode::Enable);
         let policy_bytes =
@@ -848,10 +849,10 @@ mod tests {
         security_server.load_policy(policy_bytes).expect("binary policy loads");
 
         let source_sid = security_server
-            .security_context_to_sid(b"user_u:unconfined_r:unconfined_t:s0-s1")
+            .security_context_to_sid(b"user_u:unconfined_r:unconfined_t:s0-s1".into())
             .expect("creating SID from security context should succeed");
         let target_sid = security_server
-            .security_context_to_sid(b"file_u:object_r:file_t:s0")
+            .security_context_to_sid(b"file_u:object_r:file_t:s0".into())
             .expect("creating SID from security context should succeed");
 
         let computed_sid = security_server
@@ -874,10 +875,10 @@ mod tests {
         security_server.load_policy(policy_bytes).expect("binary policy loads");
 
         let source_sid = security_server
-            .security_context_to_sid(b"user_u:unconfined_r:unconfined_t:s0-s2:c0")
+            .security_context_to_sid(b"user_u:unconfined_r:unconfined_t:s0-s2:c0".into())
             .expect("creating SID from security context should succeed");
         let target_sid = security_server
-            .security_context_to_sid(b"file_u:object_r:file_t:s1-s3:c0")
+            .security_context_to_sid(b"file_u:object_r:file_t:s1-s3:c0".into())
             .expect("creating SID from security context should succeed");
 
         let computed_sid = security_server
@@ -900,10 +901,10 @@ mod tests {
         security_server.load_policy(policy_bytes).expect("binary policy loads");
 
         let source_sid = security_server
-            .security_context_to_sid(b"user_u:unconfined_r:unconfined_t:s0-s2:c0")
+            .security_context_to_sid(b"user_u:unconfined_r:unconfined_t:s0-s2:c0".into())
             .expect("creating SID from security context should succeed");
         let target_sid = security_server
-            .security_context_to_sid(b"file_u:object_r:file_t:s1-s3:c0")
+            .security_context_to_sid(b"file_u:object_r:file_t:s1-s3:c0".into())
             .expect("creating SID from security context should succeed");
 
         let computed_sid = security_server
@@ -925,10 +926,10 @@ mod tests {
         security_server.load_policy(policy_bytes).expect("binary policy loads");
 
         let source_sid = security_server
-            .security_context_to_sid(b"user_u:unconfined_r:unconfined_t:s0-s1:c0")
+            .security_context_to_sid(b"user_u:unconfined_r:unconfined_t:s0-s1:c0".into())
             .expect("creating SID from security context should succeed");
         let target_sid = security_server
-            .security_context_to_sid(b"file_u:object_r:file_t:s1")
+            .security_context_to_sid(b"file_u:object_r:file_t:s1".into())
             .expect("creating SID from security context should succeed");
 
         let computed_sid = security_server
@@ -951,10 +952,10 @@ mod tests {
         security_server.load_policy(policy_bytes).expect("binary policy loads");
 
         let source_sid = security_server
-            .security_context_to_sid(b"user_u:unconfined_r:unconfined_t:s0-s1:c0")
+            .security_context_to_sid(b"user_u:unconfined_r:unconfined_t:s0-s1:c0".into())
             .expect("creating SID from security context should succeed");
         let target_sid = security_server
-            .security_context_to_sid(b"file_u:object_r:file_t:s1")
+            .security_context_to_sid(b"file_u:object_r:file_t:s1".into())
             .expect("creating SID from security context should succeed");
 
         let computed_sid = security_server
@@ -976,10 +977,10 @@ mod tests {
         security_server.load_policy(policy_bytes).expect("binary policy loads");
 
         let source_sid = security_server
-            .security_context_to_sid(b"user_u:unconfined_r:unconfined_t:s0-s1:c0")
+            .security_context_to_sid(b"user_u:unconfined_r:unconfined_t:s0-s1:c0".into())
             .expect("creating SID from security context should succeed");
         let target_sid = security_server
-            .security_context_to_sid(b"file_u:object_r:file_t:s0")
+            .security_context_to_sid(b"file_u:object_r:file_t:s0".into())
             .expect("creating SID from security context should succeed");
 
         let computed_sid = security_server
@@ -1001,10 +1002,10 @@ mod tests {
         security_server.load_policy(policy_bytes).expect("binary policy loads");
 
         let source_sid = security_server
-            .security_context_to_sid(b"user_u:unconfined_r:unconfined_t:s1")
+            .security_context_to_sid(b"user_u:unconfined_r:unconfined_t:s1".into())
             .expect("creating SID from security context should succeed");
         let target_sid = security_server
-            .security_context_to_sid(b"file_u:object_r:file_t:s0-s1:c0")
+            .security_context_to_sid(b"file_u:object_r:file_t:s0-s1:c0".into())
             .expect("creating SID from security context should succeed");
 
         let computed_sid = security_server
@@ -1027,10 +1028,10 @@ mod tests {
         security_server.load_policy(policy_bytes).expect("binary policy loads");
 
         let source_sid = security_server
-            .security_context_to_sid(b"user_u:unconfined_r:unconfined_t:s1")
+            .security_context_to_sid(b"user_u:unconfined_r:unconfined_t:s1".into())
             .expect("creating SID from security context should succeed");
         let target_sid = security_server
-            .security_context_to_sid(b"file_u:object_r:file_t:s0-s1:c0")
+            .security_context_to_sid(b"file_u:object_r:file_t:s0-s1:c0".into())
             .expect("creating SID from security context should succeed");
 
         let computed_sid = security_server
@@ -1052,10 +1053,10 @@ mod tests {
         security_server.load_policy(policy_bytes).expect("binary policy loads");
 
         let source_sid = security_server
-            .security_context_to_sid(b"user_u:unconfined_r:unconfined_t:s0")
+            .security_context_to_sid(b"user_u:unconfined_r:unconfined_t:s0".into())
             .expect("creating SID from security context should succeed");
         let target_sid = security_server
-            .security_context_to_sid(b"file_u:object_r:file_t:s0-s1:c0")
+            .security_context_to_sid(b"file_u:object_r:file_t:s0-s1:c0".into())
             .expect("creating SID from security context should succeed");
 
         let computed_sid = security_server
@@ -1067,5 +1068,101 @@ mod tests {
 
         // User copied from source, high security level from target, role and type as default.
         assert_eq!(computed_context, b"user_u:object_r:file_t:s1:c0");
+    }
+
+    #[fuchsia::test]
+    fn unknown_sids_are_effectively_unlabeled() {
+        let security_server = security_server_with_tests_policy(Mode::Enable);
+        security_server.set_enforcing(true);
+
+        let valid_sid =
+            security_server.security_context_to_sid(b"user1:object_r:type0:s0:c0".into()).unwrap();
+
+        // Synthesize a SID with no Security Context in the SID table, which would be the case if the
+        // SID had been allocated, but then removed because a policy load invalidated the Context.
+        let unlabeled_sid =
+            SecurityId(NonZeroU32::new(security_server.state.lock().next_sid.into()).unwrap());
+
+        let permission_check = security_server.as_permission_check();
+
+        // Test policy allows "type0" the process getsched capability to "unlabeled_t".
+        assert!(permission_check.has_permissions(
+            valid_sid,
+            unlabeled_sid,
+            &[ProcessPermission::GetSched]
+        ));
+        assert!(!permission_check.has_permissions(
+            valid_sid,
+            unlabeled_sid,
+            &[ProcessPermission::SetSched]
+        ));
+
+        // Test policy allows "unlabeled_t" the process setsched capability to "type0".
+        assert!(!permission_check.has_permissions(
+            unlabeled_sid,
+            valid_sid,
+            &[ProcessPermission::GetSched]
+        ));
+        assert!(permission_check.has_permissions(
+            unlabeled_sid,
+            valid_sid,
+            &[ProcessPermission::SetSched]
+        ));
+    }
+
+    #[fuchsia::test]
+    fn permission_check_fake_mode_enforcing() {
+        let security_server = security_server_with_tests_policy(Mode::Fake);
+        security_server.set_enforcing(true);
+        assert!(security_server.is_fake());
+        assert!(security_server.is_enforcing());
+
+        let sid =
+            security_server.security_context_to_sid("user0:object_r:type0:s0".into()).unwrap();
+        let permission_check = security_server.as_permission_check();
+
+        // Test policy grants "type0" the process-fork permission to itself.
+        assert!(permission_check.has_permissions(sid, sid, &[ProcessPermission::Fork]));
+
+        // Test policy does not grant "type0" the process-getrlimit permission to itself, but
+        // the security server's "fake" mode makes the check permissive.
+        assert!(permission_check.has_permissions(sid, sid, &[ProcessPermission::GetRlimit]));
+    }
+
+    #[fuchsia::test]
+    fn permission_check_permissive() {
+        let security_server = security_server_with_tests_policy(Mode::Enable);
+        security_server.set_enforcing(false);
+        assert!(!security_server.is_fake());
+        assert!(!security_server.is_enforcing());
+
+        let sid =
+            security_server.security_context_to_sid("user0:object_r:type0:s0".into()).unwrap();
+        let permission_check = security_server.as_permission_check();
+
+        // Test policy grants "type0" the process-fork permission to itself.
+        assert!(permission_check.has_permissions(sid, sid, &[ProcessPermission::Fork]));
+
+        // Test policy does not grant "type0" the process-getrlimit permission to itself, but
+        // the security server is configured to be permissive.
+        assert!(permission_check.has_permissions(sid, sid, &[ProcessPermission::GetRlimit]));
+    }
+
+    #[fuchsia::test]
+    fn permission_check_enforcing() {
+        let security_server = security_server_with_tests_policy(Mode::Enable);
+        security_server.set_enforcing(true);
+        assert!(!security_server.is_fake());
+        assert!(security_server.is_enforcing());
+
+        let sid =
+            security_server.security_context_to_sid("user0:object_r:type0:s0".into()).unwrap();
+        let permission_check = security_server.as_permission_check();
+
+        // Test policy grants "type0" the process-fork permission to itself.
+        assert!(permission_check.has_permissions(sid, sid, &[ProcessPermission::Fork]));
+
+        // Test policy does not grant "type0" the process-getrlimit permission to itself.
+        assert!(!permission_check.has_permissions(sid, sid, &[ProcessPermission::GetRlimit]));
     }
 }

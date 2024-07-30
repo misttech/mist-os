@@ -57,7 +57,7 @@ struct State {
 
 class FakeGpio;
 
-using ReadCallback = std::function<zx::result<uint8_t>(FakeGpio&)>;
+using ReadCallback = std::function<zx::result<bool>(FakeGpio&)>;
 
 using WriteCallback = std::function<zx_status_t(FakeGpio&)>;
 
@@ -76,6 +76,8 @@ class FakeGpio : public fidl::testing::WireTestBase<fuchsia_hardware_gpio::Gpio>
   void Read(ReadCompleter::Sync& completer) override;
   void ReleaseInterrupt(ReleaseInterruptCompleter::Sync& completer) override;
   void SetPolarity(SetPolarityRequestView request, SetPolarityCompleter::Sync& completer) override;
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_gpio::Gpio> metadata,
+                             fidl::UnknownMethodCompleter::Sync& completer) override;
   void NotImplemented_(const std::string& name, ::fidl::CompleterBase& completer) override {
     completer.Close(ZX_ERR_NOT_SUPPORTED);
   }
@@ -104,11 +106,11 @@ class FakeGpio : public fidl::testing::WireTestBase<fuchsia_hardware_gpio::Gpio>
 
   // Add a callback that will return `response` to the queue of callbacks used
   // to handle `Read` requests.
-  void PushReadResponse(zx::result<uint8_t> response);
+  void PushReadResponse(zx::result<bool> response);
 
   // Set the default response for `Read` requests if the callback queue for
   // `Read` requests is empty. Set to none for no default response.
-  void SetDefaultReadResponse(std::optional<zx::result<uint8_t>> response);
+  void SetDefaultReadResponse(std::optional<zx::result<bool>> response);
 
   // Set the callback used for responding to Write requests to `write_callback`.
   void SetWriteCallback(WriteCallback write_callback);
@@ -136,7 +138,7 @@ class FakeGpio : public fidl::testing::WireTestBase<fuchsia_hardware_gpio::Gpio>
   std::vector<State> state_log_;
 
   // Default response for `Read` requests if `read_callbacks_` is empty.
-  std::optional<zx::result<uint8_t>> default_read_response_;
+  std::optional<zx::result<bool>> default_read_response_;
 
   // Queue of callbacks that provide values to respond to `Read` requests with.
   std::queue<ReadCallback> read_callbacks_;

@@ -1,4 +1,3 @@
-#!/usr/bin/env fuchsia-vendored-python
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
@@ -11,13 +10,6 @@ from typing import Any
 from honeydew.typing import custom_types
 from honeydew.typing import ffx as ffx_types
 from honeydew.utils import properties
-
-TIMEOUTS: dict[str, float] = {
-    "FFX_CLI": 10,
-    "TARGET_ADD": 60,  # TODO(https://fxbug.dev/336608577): Increasing to 60sec as a workaround for this issue
-    "TARGET_RCS_CONNECTION_WAIT": 15,
-    "TARGET_RCS_DISCONNECTION_WAIT": 15,
-}
 
 
 class FFX(abc.ABC):
@@ -34,134 +26,91 @@ class FFX(abc.ABC):
         """
 
     @abc.abstractmethod
-    def add_target(
-        self,
-        timeout: float = TIMEOUTS["TARGET_ADD"],
-    ) -> None:
+    def add_target(self) -> None:
         """Adds a target to the ffx collection
-
-        Args:
-            timeout: How long in seconds to wait for FFX command to complete.
 
         Raises:
             errors.DeviceNotConnectedError: If FFX fails to reach target.
-            errors.FfxTimeoutError: In case of FFX command timeout.
             errors.FfxCommandError: In case of other FFX command failure.
         """
 
     @abc.abstractmethod
-    def check_connection(
-        self, timeout: float = TIMEOUTS["TARGET_RCS_CONNECTION_WAIT"]
-    ) -> None:
+    def check_connection(self) -> None:
         """Checks the FFX connection from host to Fuchsia device.
-
-        Args:
-            timeout: How long in seconds to wait for FFX to establish the RCS
-                connection.
 
         Raises:
             errors.FfxConnectionError
         """
 
     @abc.abstractmethod
-    def get_target_information(
-        self, timeout: float = TIMEOUTS["FFX_CLI"]
-    ) -> ffx_types.TargetInfoData:
+    def get_target_information(self) -> ffx_types.TargetInfoData:
         """Executed and returns the output of `ffx -t {target} target show`.
-
-        Args:
-            timeout: Timeout to wait for the ffx command to return.
 
         Returns:
             Output of `ffx -t {target} target show`.
 
         Raises:
             errors.DeviceNotConnectedError: If FFX fails to reach target.
-            errors.FfxTimeoutError: In case of FFX command timeout.
             errors.FfxCommandError: In case of other FFX command failure.
         """
 
     @abc.abstractmethod
-    def get_target_info_from_target_list(
-        self, timeout: float = TIMEOUTS["FFX_CLI"]
-    ) -> dict[str, Any]:
+    def get_target_info_from_target_list(self) -> dict[str, Any]:
         """Executed and returns the output of
         `ffx --machine json target list <target>`.
-
-        Args:
-            timeout: Timeout to wait for the ffx command to return.
 
         Returns:
             Output of `ffx --machine json target list <target>`.
 
         Raises:
-            errors.FfxTimeoutError: In case of FFX command timeout.
             errors.FfxCommandError: In case of FFX command failure.
         """
 
     @abc.abstractmethod
-    def get_target_name(self, timeout: float = TIMEOUTS["FFX_CLI"]) -> str:
+    def get_target_name(self) -> str:
         """Returns the target name.
-
-        Args:
-            timeout: Timeout to wait for the ffx command to return.
 
         Returns:
             Target name.
 
         Raises:
             errors.DeviceNotConnectedError: If FFX fails to reach target.
-            errors.FfxTimeoutError: In case of FFX command timeout.
             errors.FfxCommandError: In case of other FFX command failure.
         """
 
     @abc.abstractmethod
-    def get_target_ssh_address(
-        self, timeout: float | None = TIMEOUTS["FFX_CLI"]
-    ) -> custom_types.TargetSshAddress:
+    def get_target_ssh_address(self) -> custom_types.TargetSshAddress:
         """Returns the target's ssh ip address and port information.
-
-        Args:
-            timeout: Timeout to wait for the ffx command to return.
 
         Returns:
             (Target SSH IP Address, Target SSH Port)
 
         Raises:
             errors.DeviceNotConnectedError: If FFX fails to reach target.
-            errors.FfxTimeoutError: In case of FFX command timeout.
             errors.FfxCommandError: In case of other FFX command failure.
         """
 
     @abc.abstractmethod
-    def get_target_board(self, timeout: float = TIMEOUTS["FFX_CLI"]) -> str:
+    def get_target_board(self) -> str:
         """Returns the target's board.
-
-        Args:
-            timeout: Timeout to wait for the ffx command to return.
 
         Returns:
             Target's board.
 
         Raises:
             errors.DeviceNotConnectedError: If FFX fails to reach target.
-            errors.FfxTimeoutError: In case of FFX command timeout.
             errors.FfxCommandError: In case of other FFX command failure.
         """
 
     @abc.abstractmethod
-    def get_target_product(self, timeout: float = TIMEOUTS["FFX_CLI"]) -> str:
+    def get_target_product(self) -> str:
         """Returns the target's product.
-
-        Args:
-            timeout: Timeout to wait for the ffx command to return.
 
         Returns:
             Target's product.
 
         Raises:
             errors.DeviceNotConnectedError: If FFX fails to reach target.
-            errors.FfxTimeoutError: In case of FFX command timeout.
             errors.FfxCommandError: In case of other FFX command failure.
         """
 
@@ -169,7 +118,7 @@ class FFX(abc.ABC):
     def run(
         self,
         cmd: list[str],
-        timeout: float | None = TIMEOUTS["FFX_CLI"],
+        timeout: float | None = None,
         capture_output: bool = True,
         log_output: bool = True,
     ) -> str:
@@ -177,7 +126,8 @@ class FFX(abc.ABC):
 
         Args:
             cmd: FFX command to run.
-            timeout: Timeout to wait for the ffx command to return.
+            timeout: Timeout to wait for the ffx command to return. By default,
+                timeout is not set.
             capture_output: When True, the stdout/err from the command will be
                 captured and returned. When False, the output of the command
                 will be streamed to stdout/err accordingly and it won't be
@@ -230,7 +180,6 @@ class FFX(abc.ABC):
         component_url: str,
         ffx_test_args: list[str] | None = None,
         test_component_args: list[str] | None = None,
-        timeout: float | None = TIMEOUTS["FFX_CLI"],
         capture_output: bool = True,
     ) -> str:
         """Executes and returns the output of
@@ -254,7 +203,6 @@ class FFX(abc.ABC):
             component_url: The URL of the test to run.
             ffx_test_args: args to pass to `ffx test run`.
             test_component_args: args to pass to the test component.
-            timeout: Timeout to wait for the ffx command to return.
             capture_output: When True, the stdout/err from the command will be captured and
                 returned. When False, the output of the command will be streamed to stdout/err
                 accordingly and it won't be returned. Defaults to True.
@@ -265,7 +213,6 @@ class FFX(abc.ABC):
 
         Raises:
             errors.DeviceNotConnectedError: If FFX fails to reach target.
-            errors.FfxTimeoutError: In case of FFX command timeout.
             errors.FfxCommandError: In case of other FFX command failure.
         """
 
@@ -273,14 +220,12 @@ class FFX(abc.ABC):
     def run_ssh_cmd(
         self,
         cmd: str,
-        timeout: float | None = TIMEOUTS["FFX_CLI"],
         capture_output: bool = True,
     ) -> str:
         """Executes and returns the output of `ffx -t target ssh <cmd>`.
 
         Args:
             cmd: SSH command to run.
-            timeout: Timeout to wait for the ffx command to return.
             capture_output: When True, the stdout/err from the command will be
                 captured and returned. When False, the output of the command
                 will be streamed to stdout/err accordingly and it won't be
@@ -292,38 +237,24 @@ class FFX(abc.ABC):
 
         Raises:
             errors.DeviceNotConnectedError: If FFX fails to reach target.
-            errors.FfxTimeoutError: In case of FFX command timeout.
             errors.FfxCommandError: In case of other FFX command failure.
         """
 
     @abc.abstractmethod
-    def wait_for_rcs_connection(
-        self, timeout: float = TIMEOUTS["TARGET_RCS_CONNECTION_WAIT"]
-    ) -> None:
+    def wait_for_rcs_connection(self) -> None:
         """Wait until FFX is able to establish a RCS connection to the target.
 
-        Args:
-            timeout: How long in seconds to wait for FFX to establish the RCS
-                connection.
-
         Raises:
             errors.DeviceNotConnectedError: If FFX fails to reach target.
-            errors.FfxTimeoutError: In case of FFX command timeout.
             errors.FfxCommandError: In case of other FFX command failure.
         """
 
     @abc.abstractmethod
-    def wait_for_rcs_disconnection(
-        self, timeout: float = TIMEOUTS["TARGET_RCS_DISCONNECTION_WAIT"]
-    ) -> None:
+    def wait_for_rcs_disconnection(self) -> None:
         """Wait until FFX is able to disconnect RCS connection to the target.
-
-        Args:
-            timeout: How long in seconds to wait for disconnection.
 
         Raises:
             errors.DeviceNotConnectedError: If FFX fails to reach target.
-            errors.FfxTimeoutError: In case of FFX command timeout.
             errors.FfxCommandError: In case of other FFX command failure.
         """
 

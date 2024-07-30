@@ -37,6 +37,8 @@ constexpr bool kAddedAtNext = true;
 
 constexpr bool kAddedAtHead = true;
 
+#ifdef __Fuchsia__
+
 class Struct {
  private:
   struct Storage_;
@@ -53,15 +55,6 @@ class Struct {
 
   Struct(Struct&&) noexcept = default;
   Struct& operator=(Struct&&) noexcept = default;
-  Struct(const Struct& other) noexcept;
-  Struct& operator=(const Struct& other) noexcept;
-
-  bool operator==(const Struct& other) const noexcept {
-    return ::fidl::internal::NaturalStructCodingTraits<::test_versions::Struct, 4>::Equal(this, &other);
-  }
-  bool operator!=(const Struct& other) const noexcept {
-    return !::fidl::internal::NaturalStructCodingTraits<::test_versions::Struct, 4>::Equal(this, &other);
-  }
 
   uint32_t
   x() const {
@@ -85,7 +78,6 @@ class Struct {
   };
 
   Storage_ storage_;
-  Storage_ CloneStorage_() const;
 
   friend struct ::fidl::internal::NaturalStructCodingTraits<::test_versions::Struct, 4>;
   friend struct ::fidl::internal::MemberVisitor<::test_versions::Struct>;
@@ -93,6 +85,10 @@ class Struct {
       &Storage_::x, 0});
   static constexpr auto kPadding = std::make_tuple();
 };
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
 
 class Table {
  private:
@@ -103,14 +99,6 @@ class Table {
   Table() noexcept = default;
   Table(Table&&) noexcept = default;
   Table& operator=(Table&&) noexcept = default;
-  Table(const Table& other) noexcept;
-  Table& operator=(const Table& other) noexcept;
-  bool operator==(const Table& other) const noexcept {
-    return ::fidl::internal::NaturalTableCodingTraits<::test_versions::Table>::Equal(this, &other);
-  }
-  bool operator!=(const Table& other) const noexcept {
-    return !::fidl::internal::NaturalTableCodingTraits<::test_versions::Table>::Equal(this, &other);
-  }
 
   bool IsEmpty() const {
     return !(storage_.x.has_value());
@@ -133,12 +121,15 @@ class Table {
 
   // TODO(https://fxbug.dev/42172795): Box the storage.
   Storage_ storage_;
-  Storage_ CloneStorage_() const;
   friend struct ::fidl::internal::NaturalTableCodingTraits<::test_versions::Table>;
   friend struct ::fidl::internal::MemberVisitor<::test_versions::Table>;
   static constexpr auto kMembers = std::make_tuple(::fidl::internal::NaturalTableMember<Storage_, uint32_t, fidl::internal::NaturalCodingConstraintEmpty>{
       1, &Storage_::x});
 };
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
 
 class Union {
  private:
@@ -162,20 +153,6 @@ class Union {
       *storage_ = std::move(*other.storage_);
     }
     return *this;
-  }
-  Union(const Union& other) noexcept : Union(other.CloneStorage_()) {}
-  Union& operator=(const Union& other) noexcept {
-    if (this != &other) {
-      storage_ = other.CloneStorage_();
-    }
-    return *this;
-  }
-
-  bool operator==(const Union& other) const noexcept {
-    return *storage_ == *other.storage_;
-  }
-  bool operator!=(const Union& other) const noexcept {
-    return *storage_ != *other.storage_;
   }
   constexpr bool IsUnknown() const {
     return Which() == ::test_versions::Union::Tag::_do_not_handle_this__write_a_default_case_instead;
@@ -211,7 +188,6 @@ class Union {
 
  private:
   std::shared_ptr<Storage_> storage_;
-  std::shared_ptr<Storage_> CloneStorage_() const;
   friend struct ::fidl::internal::NaturalUnionCodingTraits<::test_versions::Union>;
   static constexpr auto kMembers = std::make_tuple(
       ::fidl::internal::NaturalUnionMember<::fidl::internal::NaturalCodingConstraintEmpty>(), ::fidl::internal::NaturalUnionMember<fidl::internal::NaturalCodingConstraintEmpty>());
@@ -238,14 +214,13 @@ class Union {
   }
 };
 
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
 inline Struct::Struct(Storage_ storage) noexcept : storage_(std::move(storage)) {}
 inline Struct::Struct(uint32_t x) noexcept
     : storage_({.x = std::move(x)}) {}
-inline Struct::Struct(const ::test_versions::Struct& other) noexcept : ::test_versions::Struct(other.CloneStorage_()) {}
-inline Struct& ::test_versions::Struct::operator=(const ::test_versions::Struct & other) noexcept {
-  storage_ = other.CloneStorage_();
-  return *this;
-}
 
 inline Struct::Struct(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Struct(Storage_{
                                                                                         .x = {},
@@ -255,12 +230,11 @@ inline Struct& Struct::x(uint32_t value) {
   return *this;
 }
 
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
 inline Table::Table(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-inline Table::Table(const ::test_versions::Table& other) noexcept : Table(other.CloneStorage_()) {}
-inline Table& ::test_versions::Table::operator=(const Table & other) noexcept {
-  storage_ = other.CloneStorage_();
-  return *this;
-}
 
 inline Table::Table(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Table(Storage_{}) {}
 inline Table& Table::x(std::optional<uint32_t> value) {
@@ -268,9 +242,15 @@ inline Table& Table::x(std::optional<uint32_t> value) {
   return *this;
 }
 
+#endif  // __Fuchsia__
+
 }  // namespace test_versions
 namespace fidl {
 
+#ifdef __Fuchsia__
+
+template <>
+struct IsResource<::test_versions::Struct> : public std::true_type{};
 template <>
 struct IsFidlType<::test_versions::Struct> : public std::true_type{};
 
@@ -290,6 +270,12 @@ template <>
 struct internal::NaturalCodingTraits<::test_versions::Struct, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_versions::Struct, 4> {};
 
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
+template <>
+struct IsResource<::test_versions::Table> : public std::true_type{};
 template <>
 struct IsFidlType<::test_versions::Table> : public std::true_type{};
 
@@ -308,6 +294,12 @@ struct IsTable<::test_versions::Table> : public std::true_type{};
 template <>
 struct internal::NaturalCodingTraits<::test_versions::Table, ::fidl::internal::NaturalCodingConstraintEmpty> : public ::fidl::internal::NaturalTableCodingTraits<::test_versions::Table> {};
 
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
+template <>
+struct IsResource<::test_versions::Union> : public std::true_type{};
 template <>
 struct IsFidlType<::test_versions::Union> : public std::true_type{};
 
@@ -326,6 +318,8 @@ struct IsUnion<::test_versions::Union> : public std::true_type{};
 template <>
 struct internal::NaturalCodingTraits<::test_versions::Union, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_versions::Union> {};
+
+#endif  // __Fuchsia__
 
 template <>
 struct internal::NaturalCodingTraits<::test_versions::Bits, ::fidl::internal::NaturalCodingConstraintEmpty> {

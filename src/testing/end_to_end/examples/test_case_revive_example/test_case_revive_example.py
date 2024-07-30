@@ -5,8 +5,8 @@
 
 import logging
 
-from test_case_revive import test_case_revive
 from mobly import test_runner
+from test_case_revive import test_case_revive
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 

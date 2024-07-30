@@ -299,7 +299,7 @@ TEST_F(FvmVolumeManagerApiTest, SetPartitionName) {
   }
 
   // Make sure that the change was persisted.
-  ASSERT_OK(fvm->Rebind({}));
+  ASSERT_OK(fvm->Rebind());
 
   // This time, the path should include the new name.
   device_name = ramdisk->path();

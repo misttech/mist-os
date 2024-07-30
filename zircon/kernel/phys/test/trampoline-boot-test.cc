@@ -188,8 +188,7 @@ uint64_t GetRandomAlignedMemoryRange(memalloc::Pool& pool, BootZbi::Size size, u
   }
 
   ZX_ASSERT_MSG(
-      pool.UpdateFreeRamSubranges(memalloc::Type::kZbiTestPayload, target_address, size.size)
-          .is_ok(),
+      pool.UpdateRamSubranges(memalloc::Type::kZbiTestPayload, target_address, size.size).is_ok(),
       "Insufficient bookkeeping to track new ranges.");
   return target_address;
 }

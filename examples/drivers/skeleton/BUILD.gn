@@ -7,7 +7,7 @@ import("//build/components.gni")
 import("//build/drivers.gni")
 
 driver_bind_rules("bind") {
-  rules = "skeleton_driver.bind"
+  rules = "meta/skeleton_driver.bind"
   bind_output = "skeleton.bindbc"
   deps = [ "//examples/drivers/bind/bindlib:gizmo.example" ]
 }
@@ -28,7 +28,7 @@ fuchsia_driver_component("component") {
     ":bind",
     ":driver",
   ]
-  info = "component-info.json"
+  info = "meta/component-info.json"
 }
 
 fuchsia_driver_package("pkg") {

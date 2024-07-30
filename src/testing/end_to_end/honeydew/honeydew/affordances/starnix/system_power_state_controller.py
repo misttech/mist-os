@@ -1,28 +1,30 @@
-#!/usr/bin/env fuchsia-vendored-python
 # Copyright 2024 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 """SystemPowerStateController affordance implementation using startnix."""
 
 import contextlib
-import enum
 import io
 import logging
 import os
 import pty
 import re
 import subprocess
-import time
 import typing
 from collections.abc import Generator
+from typing import Any
+
+import fuchsia_inspect
 
 from honeydew import errors
+from honeydew.interfaces.affordances import inspect as inspect_affordance
 from honeydew.interfaces.affordances import (
     system_power_state_controller as system_power_state_controller_interface,
 )
 from honeydew.interfaces.device_classes import affordances_capable
-from honeydew.transports import ffx as ffx_transport
+from honeydew.interfaces.transports import ffx as ffx_transport
 from honeydew.typing import custom_types
+from honeydew.utils import decorators
 
 
 class _StarnixCmds:
@@ -55,13 +57,6 @@ class _FuchsiaCmds:
     @staticmethod
     def set_timer_command(duration: int) -> str:
         return f"hrtimer-ctl --id 2 --event {duration}"
-
-
-class _Timeouts(enum.IntEnum):
-    """Class to hold the timeouts."""
-
-    STARNIX_CMD = 15
-    FFX_LOGS_CMD = 60
 
 
 class _RegExPatterns:
@@ -114,7 +109,10 @@ class SystemPowerStateController(
 
     Args:
         device_name: Device name returned by `ffx target list`.
-        ffx: FFX transport.
+        ffx: interfaces.transports.FFX implementation.
+        device_logger: interfaces.device_classes.affordances_capable.FuchsiaDeviceLogger
+            implementation.
+        inspect: interfaces.affordances.inspect.Inspect implementation.
 
     Raises:
         errors.NotSupportedError: If Fuchsia device does not support Starnix.
@@ -125,12 +123,14 @@ class SystemPowerStateController(
         device_name: str,
         ffx: ffx_transport.FFX,
         device_logger: affordances_capable.FuchsiaDeviceLogger,
+        inspect: inspect_affordance.Inspect,
     ) -> None:
         self._device_name: str = device_name
         self._ffx: ffx_transport.FFX = ffx
         self._device_logger: affordances_capable.FuchsiaDeviceLogger = (
             device_logger
         )
+        self._insect: inspect_affordance.Inspect = inspect
 
         _LOGGER.debug(
             "Checking if %s supports %s affordance...",
@@ -141,7 +141,7 @@ class SystemPowerStateController(
             cmd=_StarnixCmds.IS_STARNIX_SUPPORTED
         )
         _LOGGER.debug(
-            "%s does support %s affordance...",
+            "%s supports %s affordance...",
             self._device_name,
             self.__class__.__name__,
         )
@@ -151,7 +151,6 @@ class SystemPowerStateController(
         self,
         suspend_state: system_power_state_controller_interface.SuspendState,
         resume_mode: system_power_state_controller_interface.ResumeMode,
-        verify: bool = True,
     ) -> None:
         """Perform suspend-resume operation on the device.
 
@@ -161,10 +160,6 @@ class SystemPowerStateController(
         Args:
             suspend_state: Which state to suspend the Fuchsia device into.
             resume_mode: Information about how to resume the device.
-            verify: Whether or not to verify if suspend-resume operation
-                performed successfully. Optional and default is True. Note that
-                this raises SystemPowerStateControllerError if verification
-                fails.
 
         Raises:
             errors.SystemPowerStateControllerError: In case of failure
@@ -177,57 +172,41 @@ class SystemPowerStateController(
             resume_mode=resume_mode,
         )
 
-        logs_start_time: float = time.time()
-        log_message: str = (
-            f"Performing '{suspend_state}' followed by '{resume_mode}' "
-            f"operations on '{self._device_name}'..."
-        )
-        _LOGGER.info(log_message)
-        self._device_logger.log_message_to_device(
-            message=log_message,
-            level=custom_types.LEVEL.INFO,
-        )
-
-        suspend_resume_start_time: float = time.time()
-
-        with self._set_resume_mode(resume_mode=resume_mode):
-            self._suspend(suspend_state=suspend_state)
-
-        suspend_resume_end_time: float = time.time()
-        suspend_resume_execution_time: float = (
-            suspend_resume_end_time - suspend_resume_start_time
-        )
-
-        log_message = (
-            f"Completed '{suspend_state}' followed by '{resume_mode}' "
-            f"operations on '{self._device_name}' in {suspend_resume_execution_time} "
-            f"seconds."
-        )
-        self._device_logger.log_message_to_device(
-            message=log_message,
-            level=custom_types.LEVEL.INFO,
-        )
-        _LOGGER.info(log_message)
-        logs_end_time: float = time.time()
-        logs_duration: float = logs_end_time - logs_start_time
-
-        if verify:
-            self._verify_suspend_resume(
-                suspend_state=suspend_state,
-                resume_mode=resume_mode,
-                suspend_resume_execution_time=suspend_resume_execution_time,
-                logs_duration=logs_duration,
+        with self._valid_suspend_resume_using_inspect(
+            suspend_state=suspend_state,
+            resume_mode=resume_mode,
+        ):
+            log_message: str = (
+                f"Performing '{suspend_state}' followed by '{resume_mode}' "
+                f"operations on '{self._device_name}'..."
+            )
+            _LOGGER.info(log_message)
+            self._device_logger.log_message_to_device(
+                message=log_message,
+                level=custom_types.LEVEL.INFO,
             )
 
+            with self._set_resume_mode(resume_mode=resume_mode):
+                self._suspend(suspend_state=suspend_state)
+
+            log_message = (
+                f"Completed '{suspend_state}' followed by '{resume_mode}' "
+                f"operations on '{self._device_name}'."
+            )
+            self._device_logger.log_message_to_device(
+                message=log_message,
+                level=custom_types.LEVEL.INFO,
+            )
+            _LOGGER.info(log_message)
+
     def idle_suspend_timer_based_resume(
-        self, duration: int, verify: bool = True
+        self,
+        duration: int,
     ) -> None:
         """Perform idle-suspend and timer-based-resume operation on the device.
 
         Args:
             duration: Resume timer duration in seconds.
-            verify: Whether or not to verify if suspend-resume operation
-                performed successfully. Optional and default is True.
 
         Raises:
             errors.SystemPowerStateControllerError: In case of failure
@@ -238,7 +217,6 @@ class SystemPowerStateController(
             resume_mode=system_power_state_controller_interface.TimerResume(
                 duration=duration,
             ),
-            verify=verify,
         )
 
     # List all the private methods
@@ -315,9 +293,9 @@ class SystemPowerStateController(
         """
         try:
             self._run_starnix_console_shell_cmd(
-                cmd=_StarnixCmds.IDLE_SUSPEND, timeout=None
+                cmd=_StarnixCmds.IDLE_SUSPEND,
             )
-        except Exception as err:  # pylint: disable=broad-except
+        except errors.HoneydewError as err:
             raise errors.SystemPowerStateControllerError(
                 f"Failed to put {self._device_name} into idle-suspend mode"
             ) from err
@@ -359,7 +337,7 @@ class SystemPowerStateController(
         if isinstance(
             resume_mode, system_power_state_controller_interface.TimerResume
         ):
-            self._wait_for_timer_end(proc=proc, resume_mode=resume_mode)
+            self._wait_for_timer_end(proc=proc)
 
     def _set_timer(self, duration: int) -> subprocess.Popen[str]:
         """Sets the timer.
@@ -389,6 +367,7 @@ class SystemPowerStateController(
                 f"Failed to set timer on {self._device_name}"
             ) from err
 
+    @decorators.liveness_check
     def _wait_for_timer_start(self, proc: subprocess.Popen[str]) -> None:
         """Wait for the timer to start on the device.
 
@@ -397,19 +376,14 @@ class SystemPowerStateController(
 
         Raises:
             errors.SystemPowerStateControllerError: Timer start failed.
-            errors.HoneydewTimeoutError: Wait for timer start resulted in
-                timeout.
         """
-        timeout: int = 2
-        start_time: float = time.time()
-        end_time: float = start_time + timeout
-
         std_out: typing.IO[str] | None = proc.stdout
         if not isinstance(std_out, io.TextIOWrapper):
             raise errors.SystemPowerStateControllerError(
                 f"Failed to read hrtimer-ctl output on {self._device_name}"
             )
-        while time.time() < end_time:
+        _LOGGER.info("Waiting for the timer to start on %s", self._device_name)
+        while True:
             try:
                 line: str = std_out.readline()
                 _LOGGER.debug(
@@ -430,33 +404,23 @@ class SystemPowerStateController(
                 raise errors.SystemPowerStateControllerError(
                     f"Timer has not been started on {self._device_name}"
                 ) from err
-        else:
-            raise errors.HoneydewTimeoutError(
-                f"Timer has not been started on {self._device_name} in "
-                f"{timeout} sec"
-            )
 
+    @decorators.liveness_check
     def _wait_for_timer_end(
         self,
         proc: subprocess.Popen[str],
-        resume_mode: system_power_state_controller_interface.TimerResume,
     ) -> None:
         """Wait for the timer to end on the device.
 
         Args:
             proc: process used to set the timer.
-            resume_mode: Information about how to resume the device.
 
         Raises:
             errors.SystemPowerStateControllerError: Timer end failed.
         """
         output: str
         error: str
-        # For timer to end, wait for minimum of that duration. Otherwise, there
-        # is a chance that proc.communicate() timeout can happen right at the
-        # same time as timer expires
-        timeout: float = resume_mode.duration + 1
-        output, error = proc.communicate(timeout=timeout)
+        output, error = proc.communicate()
 
         if proc.returncode != 0:
             message: str = (
@@ -474,14 +438,12 @@ class SystemPowerStateController(
                 "hrtimer-ctl completed without ending the timer"
             )
 
-    def _run_starnix_console_shell_cmd(
-        self, cmd: list[str], timeout: float | None = _Timeouts.STARNIX_CMD
-    ) -> str:
+    @decorators.liveness_check
+    def _run_starnix_console_shell_cmd(self, cmd: list[str]) -> str:
         """Run a starnix console command and return its output.
 
         Args:
             cmd: cmd that need to be run excluding `starnix /bin/sh -c`.
-            timeout: command timeout.
 
         Returns:
             Output of `ffx -t {target} starnix /bin/sh -c {cmd}`.
@@ -489,7 +451,6 @@ class SystemPowerStateController(
         Raises:
             errors.StarnixError: In case of starnix command failure.
             errors.NotSupportedError: If Fuchsia device does not support Starnix.
-            subprocess.TimeoutExpired: In case of command timeout.
         """
         # starnix console requires the process to run in tty:
         host_fd: int
@@ -504,7 +465,7 @@ class SystemPowerStateController(
             stdout=child_fd,
             stderr=child_fd,
         )
-        process.wait(timeout)
+        process.wait()
 
         # Note: This call may sometime return less chars than _MAX_READ_SIZE
         # even when command output contains more chars. This happened with
@@ -528,7 +489,7 @@ class SystemPowerStateController(
             try:
                 board = self._ffx.get_target_board()
                 product = self._ffx.get_target_product()
-            except Exception:  # pylint: disable=broad-except
+            except errors.HoneydewError:
                 pass
             error_msg: str
             if board and product:
@@ -545,166 +506,341 @@ class SystemPowerStateController(
                 "logs for command output)"
             )
 
-    def _verify_suspend_resume(
+    @contextlib.contextmanager
+    def _valid_suspend_resume_using_inspect(
         self,
         suspend_state: system_power_state_controller_interface.SuspendState,
         resume_mode: system_power_state_controller_interface.ResumeMode,
-        suspend_resume_execution_time: float,
-        logs_duration: float,
-    ) -> None:
-        """Verifies suspend resume operation has been indeed performed
-        correctly.
+    ) -> Generator[None, None, None]:
+        """Validate suspend-resume operation using inspect data.
 
         Args:
             suspend_state: Which state to suspend the Fuchsia device into.
             resume_mode: Information about how to resume the device.
-            suspend_resume_execution_time: How long suspend-resume operation
-                took.
-            logs_duration: How many seconds of logs need to be captured for
-                the log analysis.
+
         Raises:
-            errors.SystemPowerStateControllerError: In case of verification
-                failure.
+            errors.SystemPowerStateControllerError: In case of failure
         """
+        suspend_resume_count_before: int = (
+            self._get_suspend_resume_count_sag_inspect_data()
+        )
+
+        suspend_events_before: dict[
+            str, dict[str, int]
+        ] = self._get_suspend_events_from_fsh_inspect_data()
+
+        yield
+
+        suspend_resume_count_after: int = (
+            self._get_suspend_resume_count_sag_inspect_data()
+        )
+        self._validate_using_sag_inspect_data(
+            suspend_state,
+            resume_mode,
+            suspend_resume_count_before,
+            suspend_resume_count_after,
+        )
+
+        suspend_events_after: dict[
+            str, dict[str, int]
+        ] = self._get_suspend_events_from_fsh_inspect_data()
+        self._validate_using_fsh_inspect_data(
+            suspend_state,
+            resume_mode,
+            suspend_events_before,
+            suspend_events_after,
+        )
+
+    def _validate_using_sag_inspect_data(
+        self,
+        suspend_state: system_power_state_controller_interface.SuspendState,
+        resume_mode: system_power_state_controller_interface.ResumeMode,
+        suspend_resume_count_before: int,
+        suspend_resume_count_after: int,
+    ) -> None:
+        """Validate suspend-resume operation using SAG inspect data.
+
+        Args:
+            suspend_state: Which state to suspend the Fuchsia device into.
+            resume_mode: Information about how to resume the device.
+            suspend_resume_count_before: Suspend-Resume count before.
+            suspend_resume_count_after: Suspend-Resume count after.
+
+        Raises:
+            errors.SystemPowerStateControllerError: In case of failure
+        """
+        if suspend_resume_count_after != suspend_resume_count_before + 1:
+            raise errors.SystemPowerStateControllerError(
+                f"Based on SAG inspect data, '{suspend_state}' followed "
+                f"by '{resume_mode}' operation didn't succeed on "
+                f"'{self._device_name}'. "
+            )
         _LOGGER.info(
-            "Verifying the '%s' followed by '%s' operations that were "
-            "performed on '%s'...",
+            "Successfully verified '%s' followed by '%s' operations on '%s' "
+            "using SAG inspect data.",
             suspend_state,
             resume_mode,
             self._device_name,
         )
 
-        self._verify_suspend_resume_using_duration(
-            suspend_state=suspend_state,
-            resume_mode=resume_mode,
-            suspend_resume_duration=suspend_resume_execution_time,
-            max_buffer_duration=3,
-        )
-
-        # TODO (https://fxbug.dev/335494603): Use inspect based verification
-        self._verify_suspend_resume_using_log_analysis(
-            suspend_state=suspend_state,
-            resume_mode=resume_mode,
-            logs_duration=logs_duration,
-        )
-
-        _LOGGER.info(
-            "Successfully verified the '%s' followed by '%s' operations that "
-            "were performed on '%s'",
-            suspend_state,
-            resume_mode,
-            self._device_name,
-        )
-
-    def _verify_suspend_resume_using_duration(
+    def _validate_using_fsh_inspect_data(
         self,
         suspend_state: system_power_state_controller_interface.SuspendState,
         resume_mode: system_power_state_controller_interface.ResumeMode,
-        suspend_resume_duration: float,
-        max_buffer_duration: float,
+        suspend_events_before: dict[str, dict[str, int]],
+        suspend_events_after: dict[str, dict[str, int]],
     ) -> None:
-        """Verify that suspend-resume operation was indeed triggered by checking
-        the duration it took to perform suspend-resume operation.
+        """Validate suspend-resume operation using FSH inspect data.
 
         Args:
             suspend_state: Which state to suspend the Fuchsia device into.
             resume_mode: Information about how to resume the device.
-            suspend_resume_duration: How long suspend-resume operation took.
-            max_buffer_duration: How much maximum buffer time to consider while
-                verifying the duration.
+            suspend_events_before: Suspend-Resume events before.
+            suspend_events_after: Suspend-Resume events after.
 
         Raises:
-            errors.SystemPowerStateControllerError: In case of verification
-                failure.
+            errors.SystemPowerStateControllerError: In case of failure
         """
+        # suspend_events_before:
+        # {
+        #     '0': {'suspended': 75685149500},
+        #     '1': {'resumed': 76510325583},
+        # }
+
+        # suspend_events_after:
+        # {
+        #     '0': {'suspended': 75685149500},
+        #     '1': {'resumed': 76510325583},
+        #     '2': {'suspended': 109243654875},
+        #     '3': {'resumed': 109833015166}
+        # }
+
+        # current_suspend_events:
+        # {
+        #     '2': {'suspended': 109243654875},
+        #     '3': {'resumed': 109833015166}
+        # }
+        current_suspend_events: dict[str, dict[str, int]] = {
+            k: v
+            for k, v in suspend_events_after.items()
+            if k not in suspend_events_before
+        }
+        if len(current_suspend_events) != 2:
+            raise errors.SystemPowerStateControllerError(
+                f"Based on FSH inspect data, '{suspend_state}' followed "
+                f"by '{resume_mode}' operation didn't succeed on "
+                f"'{self._device_name}'. "
+            )
+
+        suspend_enter_timer: int | None = None
+        suspend_exit_timer: int | None = None
+        for k, v in current_suspend_events.items():
+            if "suspended" in v:
+                suspend_enter_timer = v["suspended"]
+            elif "resumed" in v:
+                suspend_exit_timer = v["resumed"]
+        if (
+            suspend_enter_timer is None
+            or suspend_exit_timer is None
+            or suspend_exit_timer < suspend_enter_timer
+        ):
+            raise errors.SystemPowerStateControllerError(
+                f"Based on FSH inspect data, '{suspend_state}' followed "
+                f"by '{resume_mode}' operation didn't succeed on "
+                f"'{self._device_name}'. "
+            )
+        suspend_resume_duration_nano_sec: float = (
+            suspend_exit_timer - suspend_enter_timer
+        )
+        suspend_resume_duration_sec: float = round(
+            suspend_resume_duration_nano_sec / 1e9, 2
+        )
         if isinstance(
             resume_mode,
             (system_power_state_controller_interface.TimerResume,),
         ):
-            max_expected_duration: float = (
-                resume_mode.duration + max_buffer_duration
-            )
-
-            if suspend_resume_duration > max_expected_duration:
+            timer_duration_nano_sec: float = resume_mode.duration * 1e9
+            if suspend_resume_duration_nano_sec > timer_duration_nano_sec:
                 raise errors.SystemPowerStateControllerError(
-                    f"'{suspend_state}' followed by '{resume_mode}' operation "
-                    f"took {suspend_resume_duration} seconds on "
+                    f"Based on FSH inspect data, '{suspend_state}' followed by "
+                    f"'{resume_mode}' operation took "
+                    f"'{suspend_resume_duration_sec} seconds' on "
                     f"'{self._device_name}'. Expected it to not take more than "
-                    f"{max_expected_duration} seconds.",
+                    f"'{resume_mode.duration} seconds'.",
                 )
 
-    def _verify_suspend_resume_using_log_analysis(
-        self,
-        suspend_state: system_power_state_controller_interface.SuspendState,
-        resume_mode: system_power_state_controller_interface.ResumeMode,
-        logs_duration: float,
-    ) -> None:
-        """Verify that suspend resume operation was indeed triggered using log
-        analysis.
-
-        Args:
-            suspend_state: Which state to suspend the Fuchsia device into.
-            resume_mode: Information about how to resume the device.
-            logs_duration: How many seconds of logs need to be captured for
-                the log analysis.
-        """
-        duration: int = round(logs_duration) + 1
-        suspend_resume_logs_cmd: list[str] = [
-            "log",
-            "--symbolize",
-            "off",  # Turn off symbolize to run this cmd in infra
-            "--filter",
-            "remote-control",  # Lacewing logs
-            "--filter",
-            "system-activity-governor",  # suspend-resume logs
-            "--since",
-            f"{duration}s ago",
-            "dump",
-        ]
-
-        suspend_resume_logs: list[str] = self._ffx.run(
-            suspend_resume_logs_cmd,
-            timeout=_Timeouts.FFX_LOGS_CMD,
-        ).split("\n")
-
-        suspend_time: float = 0
-        resume_time: float = 0
-
-        expected_patterns: list[
-            re.Pattern[str]
-        ] = _RegExPatterns.SUSPEND_RESUME_PATTERNS.copy()
-        for suspend_resume_log in suspend_resume_logs:
-            reg_ex: re.Pattern[str] = expected_patterns[0]
-            match: re.Match[str] | None = reg_ex.search(suspend_resume_log)
-            if match:
-                if reg_ex == _RegExPatterns.SUSPEND_OPERATION:
-                    suspend_time = float(match.group(1))
-                elif reg_ex == _RegExPatterns.RESUME_OPERATION:
-                    resume_time = float(match.group(1))
-                expected_patterns.remove(reg_ex)
-                if not expected_patterns:
-                    break
-                reg_ex = expected_patterns[0]
-
-        if expected_patterns:
-            raise errors.SystemPowerStateControllerError(
-                f"Log analysis for '{suspend_state}' followed by "
-                f"'{resume_mode}' operation failed on '{self._device_name}'. "
-                f"Following patterns were not found: {expected_patterns}"
-            )
-
-        suspend_resume_duration: float = round(resume_time - suspend_time, 2)
         _LOGGER.info(
-            "'%s' followed by '%s' operations on '%s' took %s seconds as per "
-            "device logs.",
+            "Successfully verified '%s' followed by '%s' operations on '%s' "
+            "using FSH inspect data. Operations took '%s seconds' to complete.",
             suspend_state,
             resume_mode,
             self._device_name,
-            suspend_resume_duration,
+            suspend_resume_duration_sec,
         )
-        self._verify_suspend_resume_using_duration(
-            suspend_state=suspend_state,
-            resume_mode=resume_mode,
-            suspend_resume_duration=suspend_resume_duration,
-            max_buffer_duration=0.5,
-        )
+
+    # TODO (https://fxbug.dev/335494603): Update this logic, once fxr/1072776 lands
+    # pylint: disable=missing-raises-doc
+    def _get_suspend_resume_count_sag_inspect_data(self) -> int:
+        """Returns suspend-resume count by reading the SAG inspect data.
+
+        Returns:
+            suspend-resume count.
+
+        Raises:
+            errors.SystemPowerStateControllerError: Failed to read SAG inspect data.
+        """
+        # Sample SAG inspect data:
+        # [
+        #     {
+        #         "data_source": "Inspect",
+        #         "metadata": {
+        #             "component_url": "fuchsia-boot:///system-activity-governor#meta/system-activity-governor.cm",
+        #             "timestamp": 372140515750,
+        #         },
+        #         "moniker": "bootstrap/system-activity-governor",
+        #         "payload": {
+        #             "root": {
+        #                 "booting": False,
+        #                 "power_elements": {
+        #                     "execution_resume_latency": {
+        #                         "resume_latencies": [0],
+        #                         "resume_latency": 0,
+        #                         "power_level": 0,
+        #                     },
+        #                     "wake_handling": {"power_level": 0},
+        #                     "full_wake_handling": {"power_level": 0},
+        #                     "application_activity": {"power_level": 1},
+        #                     "execution_state": {"power_level": 2},
+        #                 },
+        #                 "suspend_events": {},
+        #                 "suspend_stats": {
+        #                     "success_count": 0,
+        #                     "fail_count": 0,
+        #                     "last_failed_error": 0,
+        #                     "last_time_in_suspend": -1,
+        #                     "last_time_in_suspend_operations": -1,
+        #                 },
+        #                 "fuchsia.inspect.Health": {
+        #                     "start_timestamp_nanos": 892116500,
+        #                     "status": "OK",
+        #                 },
+        #             }
+        #         },
+        #         "version": 1,
+        #     }
+        # ]
+        try:
+            inspect_data_collection: fuchsia_inspect.InspectDataCollection = (
+                self._insect.get_data(
+                    selectors=["/bootstrap/system-activity-governor"],
+                )
+            )
+            _LOGGER.debug(
+                "SAG Inspect data associated with '%s' is: %s",
+                self._device_name,
+                inspect_data_collection,
+            )
+
+            if len(inspect_data_collection.data) == 0:
+                raise errors.InspectError(
+                    f"SAG inspect data associated with {self._device_name} is empty"
+                )
+
+            sag_inspect_data: fuchsia_inspect.InspectData = (
+                inspect_data_collection.data[0]
+            )
+
+            if sag_inspect_data.payload is None:
+                raise errors.InspectError(
+                    f"SAG inspect data associated with {self._device_name} does "
+                    f"not have a valid payload"
+                )
+
+            sag_inspect_root_data: dict[str, Any] = sag_inspect_data.payload[
+                "root"
+            ]
+            suspend_stats: dict[str, Any] = sag_inspect_root_data[
+                "suspend_stats"
+            ]
+            suspend_resume_count: int = suspend_stats["success_count"]
+
+            return suspend_resume_count
+        except errors.InspectError as err:
+            raise errors.SystemPowerStateControllerError(
+                f"Failed to read SAG inspect data from {self._device_name}"
+            ) from err
+
+    def _get_suspend_events_from_fsh_inspect_data(
+        self,
+    ) -> dict[str, dict[str, int]]:
+        """Returns suspend-resume events by reading the FSH inspect data.
+
+        Returns:
+            suspend-resume events.
+
+        Raises:
+            errors.SystemPowerStateControllerError: Failed to read FSH inspect data.
+        """
+        # Sample FSH inspect data:
+        # [
+        #     {
+        #         "data_source": "Inspect",
+        #         "metadata": {
+        #             "component_url": "fuchsia-boot:///aml-suspend#meta/aml-suspend.cm",
+        #             "timestamp": 372140515750,
+        #         },
+        #         "moniker": "'bootstrap/boot-drivers:dev.sys.platform.pt.suspend'",
+        #         "payload": {
+        #             'root': {
+        #                 'suspend_events': {
+        #                     '0': {'suspended': 73886828041},
+        #                     '1': {'resumed': 75687395083}
+        #                 }
+        #             }
+        #         },
+        #         "version": 1,
+        #     }
+        # ]
+        try:
+            inspect_data_collection: fuchsia_inspect.InspectDataCollection = (
+                self._insect.get_data(
+                    monikers=[
+                        "bootstrap/boot-drivers:dev.sys.platform.pt.suspend"
+                    ],
+                )
+            )
+            _LOGGER.debug(
+                "FSH (Fuchsia Suspend HAL) inspect data associated with '%s' is: %s",
+                self._device_name,
+                inspect_data_collection,
+            )
+
+            if len(inspect_data_collection.data) == 0:
+                raise errors.InspectError(
+                    f"FSH inspect data associated with {self._device_name} is empty"
+                )
+
+            fsh_inspect_data: fuchsia_inspect.InspectData = (
+                inspect_data_collection.data[0]
+            )
+
+            if fsh_inspect_data.payload is None:
+                raise errors.InspectError(
+                    f"FSH inspect data associated with {self._device_name} does "
+                    f"not have a valid payload"
+                )
+
+            fsh_inspect_root_data: dict[str, Any] = fsh_inspect_data.payload[
+                "root"
+            ]
+            suspend_events: dict[str, dict[str, int]] = fsh_inspect_root_data[
+                "suspend_events"
+            ]
+
+            return suspend_events
+        except errors.InspectError as err:
+            raise errors.SystemPowerStateControllerError(
+                f"Failed to read FSH inspect data from {self._device_name}"
+            ) from err
+
+    # pylint: enable=missing-raises-doc

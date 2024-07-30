@@ -670,7 +670,7 @@ async fn successfully_retrieves_ipv6_record_despite_ipv4_timeout<N: Netstack>(na
     futures::stream::once(futures::future::ready(()))
         .chain(fuchsia_async::Interval::new(
             // Wait an arbitrary short duration to avoid busy-looping.
-            zx::Duration::from_millis(10),
+            zx::Duration::from_millis(100),
         ))
         .take_until(lookup_fut)
         .for_each(|()| async {

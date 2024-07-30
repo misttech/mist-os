@@ -25,7 +25,7 @@ group("tests") {
 }
 
 driver_bind_rules("bind") {
-  rules = "da7219.bind"
+  rules = "meta/da7219.bind"
   bind_output = "da7219.bindbc"
   deps = [
     "//sdk/fidl/fuchsia.hardware.interrupt:fuchsia.hardware.interrupt_bindlib",
@@ -70,7 +70,7 @@ fuchsia_driver("driver") {
 fuchsia_driver_component("component") {
   component_name = "da7219"
   deps = [ ":driver" ]
-  info = "da7219-info.json"
+  info = "meta/da7219-info.json"
   manifest = "meta/da7219-dfv1.cml"
 }
 
@@ -138,7 +138,7 @@ fuchsia_driver("driver-dfv2") {
 fuchsia_driver_component("component-dfv2") {
   component_name = "da7219-dfv2"
   deps = [ ":driver-dfv2" ]
-  info = "da7219-info.json"
+  info = "meta/da7219-info.json"
   manifest = "meta/da7219.cml"
 }
 

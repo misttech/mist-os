@@ -53,7 +53,6 @@
 
 mod coordinator;
 mod destroy;
-mod discover;
 pub mod resolve;
 mod set;
 pub mod shutdown;
@@ -63,7 +62,6 @@ mod unresolve;
 
 // Re-export the actions
 pub use destroy::DestroyAction;
-pub use discover::DiscoverAction;
 pub use resolve::ResolveAction;
 pub use shutdown::{ShutdownAction, ShutdownType};
 pub use start::StartAction;
@@ -105,7 +103,6 @@ pub trait Action: Send + Sync + 'static {
 /// A key that uniquely identifies an action.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ActionKey {
-    Discover,
     Resolve,
     Unresolve,
     Start,

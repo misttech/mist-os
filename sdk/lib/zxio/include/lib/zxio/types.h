@@ -506,7 +506,7 @@ typedef uint32_t zxio_creation_mode_t;
 #define ZXIO_CREATION_MODE_ALWAYS 0x3
 
 // See fuchsia.io for detailed semantics.
-typedef struct zxio_open_options {
+typedef struct zxio_open2_options {
   // Which protocols to accept. If no protocols are specified, a limited node protocol will
   // be used; see fuchsia.io's node protocol.
   zxio_node_protocols_t protocols;
@@ -533,7 +533,7 @@ typedef struct zxio_open_options {
   // Attributes to be set if creating an object. Not all servers support setting
   // all attributes.
   const zxio_node_attributes_t* create_attr;
-} zxio_open_options_t;
+} zxio_open2_options_t;
 
 // The mode for setting extended attributes.
 typedef uint32_t zxio_xattr_set_mode_t;
@@ -572,6 +572,23 @@ typedef uint32_t zxio_allocate_mode_t;
 #define ZXIO_ALLOCATE_COLLAPSE_RANGE ((zxio_allocate_mode_t)1ul << 3)
 #define ZXIO_ALLOCATE_ZERO_RANGE ((zxio_allocate_mode_t)1ul << 4)
 #define ZXIO_ALLOCATE_INSERT_RANGE ((zxio_allocate_mode_t)1ul << 5)
+
+// Equivalent to [`fuchsia.io/Flags`]. See protocol documentation for flag semantics.
+typedef uint64_t zxio_open_flags_t;
+
+// Equivalent to [`fuchsia.io/Options`]. See protocol documentation for option semantics.
+typedef struct zxio_open_options {
+  // Attributes to query when opening the node. Fields in the |has| field of |inout_attr| will be
+  // queried and written to the respective fields in |inout_attr|. Servers may not support all
+  // requested attributes, so callers must verify the result by checking |inout_attr->has| before
+  // reading the resulting attributes.
+  zxio_node_attributes_t* inout_attr;
+
+  // Mutable attributes to be set when creating a node. If the target node already exists, the given
+  // attributes will be ignored. If immutable attributes are set in this field, the open call will
+  // fail with |ZX_ERR_INVALID_ARGS|.
+  const zxio_node_attributes_t* create_attr;
+} zxio_open_options_t;
 
 // NOLINTEND(modernize-use-using)
 

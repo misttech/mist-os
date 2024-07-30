@@ -19,9 +19,9 @@ group("tests") {
 }
 
 driver_bind_rules("gvnic_bind") {
-  rules = "gvnic.bind"
+  rules = "meta/gvnic.bind"
   bind_output = "gvnic.bindbc"
-  tests = "bind-tests.json"
+  tests = "meta/bind-tests.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_bindlib",
     "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_bindlib",
@@ -62,7 +62,7 @@ fuchsia_driver("gvnic-driver") {
 fuchsia_driver_component("gvnic") {
   component_name = "gvnic"
   deps = [ ":gvnic-driver" ]
-  info = "gvnic-info.json"
+  info = "meta/gvnic-info.json"
   manifest = "meta/gvnic.cml"
 }
 

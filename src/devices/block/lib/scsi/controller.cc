@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 #include <endian.h>
+#include <lib/scsi/block-device.h>
 #include <lib/scsi/controller.h>
-#include <lib/scsi/disk.h>
 #include <zircon/status.h>
 
 #include <tuple>
@@ -375,7 +375,7 @@ zx_status_t Controller::SendDiagnostic(uint8_t target, uint16_t lun, SelfTestCod
 zx::result<uint32_t> Controller::ScanAndBindLogicalUnits(uint8_t target,
                                                          uint32_t max_transfer_bytes,
                                                          uint16_t max_lun, LuCallback lu_callback,
-                                                         DiskOptions disk_options) {
+                                                         DeviceOptions device_options) {
   zx::result<uint16_t> lun_count = ReportLuns(target);
   if (lun_count.is_error()) {
     return lun_count.take_error();
@@ -384,10 +384,11 @@ zx::result<uint32_t> Controller::ScanAndBindLogicalUnits(uint8_t target,
   // TODO(b/317838849): We should only attempt to bind to the luns obtained by ReportLuns().
   uint16_t luns_found = 0;
   for (uint16_t lun = 0; lun < max_lun; ++lun) {
-    zx::result disk = Disk::Bind(this, target, lun, max_transfer_bytes, disk_options);
-    if (disk.is_ok()) {
-      scsi::Disk* dev = disk.value().get();
-      block_devs_[target][lun] = std::move(disk.value());
+    zx::result block_device =
+        BlockDevice::Bind(this, target, lun, max_transfer_bytes, device_options);
+    if (block_device.is_ok()) {
+      scsi::BlockDevice* dev = block_device.value().get();
+      block_devs_[target][lun] = std::move(block_device.value());
       if (lu_callback) {
         zx::result result = lu_callback(lun, dev->block_size_bytes(), dev->block_count());
         if (result.is_error()) {

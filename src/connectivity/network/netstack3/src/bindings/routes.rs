@@ -17,9 +17,10 @@
 //! fuchsia.net.routes.admin.
 
 use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 
 use assert_matches::assert_matches;
-use fidl_fuchsia_net_routes_admin as fnet_routes_admin;
+use derivative::Derivative;
 use fidl_fuchsia_net_routes_ext::admin::FidlRouteAdminIpExt;
 use fidl_fuchsia_net_routes_ext::rules::{InstalledRule, RuleSetPriority};
 use futures::channel::{mpsc, oneshot};
@@ -30,8 +31,10 @@ use net_types::ip::{
 };
 use net_types::SpecifiedAddr;
 use netstack3_core::routes::AddableMetric;
+use zx::AsHandleRef as _;
+use {fidl_fuchsia_net_routes_admin as fnet_routes_admin, fuchsia_zircon as zx};
 
-use crate::bindings::util::{EntryAndTableId, IntoFidlWithContext as _, TryIntoFidlWithContext};
+use crate::bindings::util::{EntryAndTableId, TryIntoFidlWithContext};
 use crate::bindings::{BindingsCtx, Ctx, IpExt};
 
 pub(crate) mod admin;
@@ -68,12 +71,13 @@ pub(crate) enum TableOp<I: Ip> {
     AddTable(IpVersionMarker<I>),
 }
 
-#[derive(GenericOverIp, Debug)]
+#[derive(GenericOverIp, Derivative)]
 #[generic_over_ip(A, IpAddress)]
 #[derive(Clone)]
+#[derivative(Debug)]
 pub(crate) enum Change<A: IpAddress> {
     RouteOp(RouteOp<A>, WeakSetMembership<A::Version>),
-    RemoveSet(WeakUserRouteSet<A::Version>),
+    RemoveSet(#[derivative(Debug = "ignore")] WeakUserRouteSet<A::Version>),
     RemoveMatchingDevice(WeakDeviceId),
     RemoveTable(TableId<A::Version>),
 }
@@ -130,7 +134,11 @@ pub(crate) struct RouteWorkItem<A: IpAddress> {
 
 #[derive(Debug)]
 enum TableOpOutcome<I: Ip> {
-    Added { table_id: TableId<I>, route_work_sink: mpsc::UnboundedSender<RouteWorkItem<I::Addr>> },
+    Added {
+        table_id: TableId<I>,
+        route_work_sink: mpsc::UnboundedSender<RouteWorkItem<I::Addr>>,
+        token: Arc<zx::Event>,
+    },
 }
 
 struct NewTable<I: Ip> {
@@ -151,6 +159,8 @@ struct Table<A: IpAddress> {
     /// entries. This allows the routing table ordering to explicitly take into
     /// account the order in which routes are added to the table.
     next_generation: netstack3_core::routes::Generation,
+    /// The authentication token used to authorize route rules.
+    token: Arc<zx::Event>,
 }
 
 #[derive(Clone, Copy, Debug, PartialOrd, Ord, PartialEq, Eq, Hash)]
@@ -168,7 +178,8 @@ pub(crate) enum ChangeOutcome {
 
 impl<A: IpAddress> Table<A> {
     fn new(initial_generation: netstack3_core::routes::Generation) -> Self {
-        Self { inner: HashMap::new(), next_generation: initial_generation }
+        let token = Arc::new(zx::Event::create());
+        Self { inner: HashMap::new(), next_generation: initial_generation, token }
     }
 
     fn insert(
@@ -179,7 +190,7 @@ impl<A: IpAddress> Table<A> {
         netstack3_core::routes::AddableEntry<A, DeviceId>,
         netstack3_core::routes::Generation,
     )> {
-        let Self { inner, next_generation } = self;
+        let Self { inner, next_generation, token: _ } = self;
         let (entry, new_to_table) = match inner.entry(route.clone()) {
             std::collections::hash_map::Entry::Occupied(occupied_entry) => {
                 (occupied_entry.into_mut(), false)
@@ -225,7 +236,7 @@ impl<A: IpAddress> Table<A> {
             netstack3_core::routes::Generation,
         )>,
     > {
-        let Self { inner, next_generation: _ } = self;
+        let Self { inner, next_generation: _, token: _ } = self;
 
         let mut removed_any_from_set = false;
         let mut removed_from_table = Vec::new();
@@ -299,7 +310,7 @@ impl<A: IpAddress> Table<A> {
         set: WeakUserRouteSet<A::Version>,
     ) -> Vec<(netstack3_core::routes::AddableEntry<A, DeviceId>, netstack3_core::routes::Generation)>
     {
-        let Self { inner, next_generation: _ } = self;
+        let Self { inner, next_generation: _, token: _ } = self;
         let set = SetMembership::User(set);
         let mut removed_from_table = Vec::new();
         inner.retain(|route, data| {
@@ -321,7 +332,8 @@ impl<A: IpAddress> Table<A> {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash, Derivative)]
+#[derivative(Debug)]
 pub(crate) enum SetMembership<T> {
     /// Indicates route changes that are applied globally -- routes added
     /// globally cannot be removed by other route sets, but removing a route
@@ -337,7 +349,7 @@ pub(crate) enum SetMembership<T> {
     /// Route sets created ephemerally (usually as part of serving FIDL
     /// protocols that involve managing route lifetimes) belong to this class
     /// of route sets.
-    User(T),
+    User(#[derivative(Debug = "ignore")] T),
 }
 
 type StrongSetMembership<I> = SetMembership<StrongUserRouteSet<I>>;
@@ -401,17 +413,23 @@ pub(crate) struct State<I: Ip> {
     dispatchers: Dispatchers<I>,
 }
 
-#[derive(derivative::Derivative)]
+#[derive(Derivative)]
 #[derivative(Clone(bound = ""))]
 pub(crate) struct Changes<A: IpAddress> {
     new_table_sink: mpsc::UnboundedSender<NewTable<A::Version>>,
     main_table_route_work_sink: mpsc::UnboundedSender<RouteWorkItem<A>>,
+    main_table_token: Arc<zx::Event>,
     new_rule_set_sink: mpsc::UnboundedSender<NewRuleSet<A::Version>>,
 }
 
 impl<A: IpAddress> Changes<A> {
     fn close_senders(&self) {
-        let Self { new_table_sink, main_table_route_work_sink, new_rule_set_sink } = self;
+        let Self {
+            new_table_sink,
+            main_table_route_work_sink,
+            new_rule_set_sink,
+            main_table_token: _,
+        } = self;
         new_table_sink.close_channel();
         main_table_route_work_sink.close_channel();
         new_rule_set_sink.close_channel();
@@ -492,29 +510,42 @@ where
                     responder.send(result).expect("failed to send result");
                 }
                 rule_set_work_item = rule_set_work_receivers.next() => {
-                    let Some((Some(RuleWorkItem {
-                        op,
-                        responder
-                    }), mut rest)) = rule_set_work_item else {
+                    let Some((Some(rule_work), mut rest)) = rule_set_work_item else {
                         continue;
                     };
-                    let is_removal = matches!(op, RuleOp::RemoveSet { .. });
-                    let result = Self::handle_rule_op(
-                        ctx.bindings_ctx(),
-                        rules,
-                        op,
-                        rule_update_dispatcher
-                    );
-                    if is_removal {
-                        // We must close the channel so that the rule set
-                        // can no longer send RuleOps. Note that we make
-                        // sure no more operations will be sent once
-                        // `RemoveSet` is sent.
-                        rest.close();
-                    } else {
-                        rule_set_work_receivers.push(rest.into_future());
+                    match rule_work {
+                        RuleWorkItem::RuleOp {
+                            op, responder
+                        } => {
+                            let is_removal = matches!(op, RuleOp::RemoveSet { .. });
+                            let result = Self::handle_rule_op(
+                                rules,
+                                op,
+                                rule_update_dispatcher
+                            );
+                            if is_removal {
+                                // We must close the channel so that the rule set
+                                // can no longer send RuleOps. Note that we make
+                                // sure no more operations will be sent once
+                                // `RemoveSet` is sent.
+                                rest.close();
+                            } else {
+                                rule_set_work_receivers.push(rest.into_future());
+                            }
+                            responder.send(result).expect("the receiver is dropped");
+                        }
+                        RuleWorkItem::AuthenticateForRouteTable {
+                            table_id, token, responder
+                        } => {
+                            let result = Self::handle_route_table_authentication(
+                                tables,
+                                table_id,
+                                token,
+                            );
+                            rule_set_work_receivers.push(rest.into_future());
+                            responder.send(result).expect("the receiver is dropped");
+                        }
                     }
-                    responder.send(result).expect("the receiver is dropped");
                 }
                 complete => break,
             )
@@ -565,17 +596,14 @@ where
                         // increasing.
                         None => Err(TableIdOverflowsError),
                         Some(table_id) => {
-                            assert_matches!(
-                                tables.insert(
-                                    table_id,
-                                    Table::new(netstack3_core::routes::Generation::initial())
-                                ),
-                                None
-                            );
+                            let new_table =
+                                Table::new(netstack3_core::routes::Generation::initial());
+                            let token = new_table.token.clone();
+                            assert_matches!(tables.insert(table_id, new_table), None);
                             *last_table_id = table_id;
                             let (route_work_sink, route_work_receiver) = mpsc::unbounded();
                             route_work_receivers.push(route_work_receiver.into_future());
-                            Ok(TableOpOutcome::Added { table_id, route_work_sink })
+                            Ok(TableOpOutcome::Added { table_id, route_work_sink, token })
                         }
                     }
                 };
@@ -585,14 +613,13 @@ where
     }
 
     fn handle_rule_op(
-        ctx: &BindingsCtx,
-        table: &mut RuleTable<I>,
+        rule_table: &mut RuleTable<I>,
         op: RuleOp<I>,
         rules_update_dispatcher: &rules_state::RuleUpdateDispatcher<I>,
     ) -> Result<(), fnet_routes_admin::RuleSetError> {
         match op {
             RuleOp::RemoveSet { priority } => {
-                let removed = table.remove_rule_set(ctx, priority);
+                let removed = rule_table.remove_rule_set(priority);
                 for rule in removed {
                     rules_update_dispatcher
                         .notify(watcher::Update::Removed(rule))
@@ -601,24 +628,40 @@ where
                 Ok(())
             }
             RuleOp::Add { priority, index, selector, action } => {
-                table.add_rule(priority, index, selector.clone(), action)?;
+                rule_table.add_rule(priority, index, selector.clone(), action)?;
                 rules_update_dispatcher
                     .notify(watcher::Update::Added(InstalledRule {
                         priority,
                         index,
-                        selector: selector.into_fidl_with_ctx(ctx),
+                        selector: selector.into(),
                         action,
                     }))
                     .expect("failed to notify an added rule");
                 Ok(())
             }
             RuleOp::Remove { priority, index } => {
-                let removed = table.remove_rule(ctx, priority, index)?;
+                let removed = rule_table.remove_rule(priority, index)?;
                 rules_update_dispatcher
                     .notify(watcher::Update::Removed(removed))
                     .expect("failed to notify a removed rule");
                 Ok(())
             }
+        }
+    }
+
+    fn handle_route_table_authentication(
+        route_tables: &HashMap<TableId<I>, Table<I::Addr>>,
+        table_id: TableId<I>,
+        token: zx::Event,
+    ) -> Result<(), fnet_routes_admin::AuthenticateForRouteTableError> {
+        let route_table = route_tables
+            .get(&table_id)
+            .ok_or(fnet_routes_admin::AuthenticateForRouteTableError::InvalidAuthentication)?;
+        let stored_koid = route_table.token.basic_info().expect("failed to get basic info").koid;
+        if token.basic_info().expect("failed to get basic info").koid != stored_koid {
+            Err(fnet_routes_admin::AuthenticateForRouteTableError::InvalidAuthentication)
+        } else {
+            Ok(())
         }
     }
 }
@@ -926,10 +969,9 @@ pub(crate) fn create_sink_and_runner() -> (ChangeSink, ChangeRunner) {
         let mut tables = HashMap::new();
         let main_table_id = main_table_id::<I>();
 
-        assert_matches!(
-            tables.insert(main_table_id, Table::new(netstack3_core::routes::Generation::initial())),
-            None
-        );
+        let main_table = Table::new(netstack3_core::routes::Generation::initial());
+        let main_table_token = main_table.token.clone();
+        assert_matches!(tables.insert(main_table_id, main_table), None);
 
         let (main_table_route_work_sink, main_table_route_work_receiver) = mpsc::unbounded();
         let route_work_receivers =
@@ -945,7 +987,15 @@ pub(crate) fn create_sink_and_runner() -> (ChangeSink, ChangeRunner) {
             last_table_id: main_table_id,
             dispatchers: Default::default(),
         };
-        (Changes { new_table_sink, main_table_route_work_sink, new_rule_set_sink }, state)
+        (
+            Changes {
+                new_table_sink,
+                main_table_route_work_sink,
+                main_table_token,
+                new_rule_set_sink,
+            },
+            state,
+        )
     }
     let (v4, v4_state) = create::<Ipv4>();
     let (v6, v6_state) = create::<Ipv6>();
@@ -968,7 +1018,7 @@ impl ChangeSink {
             Ok(()) => (),
             Err(e) => warn!(
                 "failed to send route change {:?} because route change sink is closed",
-                e.into_inner().change
+                e.into_inner()
             ),
         };
     }
@@ -991,8 +1041,10 @@ impl ChangeSink {
 
     async fn add_table<I: Ip>(
         &self,
-    ) -> Result<(TableId<I>, mpsc::UnboundedSender<RouteWorkItem<I::Addr>>), TableIdOverflowsError>
-    {
+    ) -> Result<
+        (TableId<I>, mpsc::UnboundedSender<RouteWorkItem<I::Addr>>, Arc<zx::Event>),
+        TableIdOverflowsError,
+    > {
         let sender = &self.changes::<I>().new_table_sink;
         let (responder, receiver) = oneshot::channel();
         let item = NewTable { op: TableOp::AddTable(IpVersionMarker::new()), responder };
@@ -1003,7 +1055,8 @@ impl ChangeSink {
                 TableOpOutcome::Added{
                     table_id,
                     route_work_sink,
-                } => (table_id, route_work_sink)
+                    token,
+                } => (table_id, route_work_sink, token)
             )
         })
     }
@@ -1025,6 +1078,10 @@ impl ChangeSink {
         &self,
     ) -> &mpsc::UnboundedSender<RouteWorkItem<I::Addr>> {
         &self.changes::<I>().main_table_route_work_sink
+    }
+
+    pub(crate) fn main_table_token<I: Ip>(&self) -> &Arc<zx::Event> {
+        &self.changes::<I>().main_table_token
     }
 
     fn changes<I: Ip>(&self) -> &Changes<I::Addr> {

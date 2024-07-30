@@ -34,7 +34,10 @@ CML = """{{
 
 FILTERING_ENABLED_SELECTOR = "bootstrap/archivist:root/pipelines/{pipeline_name}:filtering_enabled WHERE [s] {value}"
 
-COUNT_SELECTOR = "bootstrap/archivist:root/pipelines/{pipeline_name}/config_files/* WHERE [s] Count(s) == {count}"
+# This selector checks that the number of selectors we see configured are greater or equal to the
+# number of selector files we got. This should be a good enough signal to know that the pipeline is
+# configured correctly. Further checking would require parsing the selector files, deduping, etc.
+COUNT_SELECTOR = "bootstrap/archivist:root/pipelines/{pipeline_name}:selector_count WHERE [s] s >= {count}"
 
 CONFIG_FILE_SELECTOR = "\"bootstrap/archivist:root/pipelines/{pipeline_name}/config_files/{file_name}\""
 

@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#![recursion_limit = "256"]
+#![recursion_limit = "512"]
+
 use tracing_mutex as _;
 
 pub mod arch;

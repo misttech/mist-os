@@ -369,7 +369,7 @@ template("go_build") {
     }
 
     if (is_fuchsia) {
-      args += [ "--clang-fuchsia-api-level=${clang_fuchsia_api_level}" ]
+      args += [ "--clang-fuchsia-api-level=${current_build_target_api_level_as_integer}" ]
 
       # When building with an instrumented variant, ensure the binary embeds a reference
       # to the right dynamic linker path.
@@ -514,7 +514,7 @@ template("go_build") {
     no_output_dir_leaks = false
   }
 
-  if (define_sdk_target) {
+  if (define_sdk_target && is_host) {
     sdk_host_tool("${target_name}_sdk") {
       forward_variables_from(invoker, "*", [ "deps" ])
       category = invoker.sdk_category

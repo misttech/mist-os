@@ -9,6 +9,18 @@
 
 namespace fidlc {
 
+// Checks that value types do not contain resource types.
+class VerifyResourcenessStep : public Compiler::Step {
+ public:
+  using Step::Step;
+
+ private:
+  void RunImpl() override;
+
+  template <typename DeclType>
+  void ValidateResourceness(const DeclType* decl);
+};
+
 // Ensures that protocols don't use endpoints of incompatible transports.
 class VerifyHandleTransportStep : public Compiler::Step {
  public:

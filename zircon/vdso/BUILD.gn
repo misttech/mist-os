@@ -175,6 +175,7 @@ if (current_toolchain == default_toolchain) {
     # zither_library().
     inputs = get_target_outputs(deps[0])
     outputs = [ "${target_out_dir}/syscall_docs.zip" ]
+    depfile = "${target_gen_dir}/syscall_docs.d"
 
     script = "//zircon/tools/zither/scripts/create-doc-archive.py"
     args = [
@@ -182,6 +183,8 @@ if (current_toolchain == default_toolchain) {
       rebase_path(inputs[0], root_build_dir),
       "--output",
       rebase_path(outputs[0], root_build_dir),
+      "--depfile",
+      rebase_path(depfile, root_build_dir),
     ]
   }
 }

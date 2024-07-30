@@ -67,7 +67,7 @@ static zx_status_t test_gpio(fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> gpio_c
     return result.status();
   } else if (result->is_error()) {
     return result->error_value();
-  } else if (result->value()->value != 0) {
+  } else if (result->value()->value) {
     return ZX_ERR_BAD_STATE;
   }
 
@@ -81,7 +81,7 @@ static zx_status_t test_gpio(fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> gpio_c
     return result.status();
   } else if (result->is_error()) {
     return result->error_value();
-  } else if (result->value()->value != 1) {
+  } else if (!result->value()->value) {
     return ZX_ERR_BAD_STATE;
   }
 

@@ -4,24 +4,17 @@
 
 #include "src/ui/scenic/tests/utils/screen_capture_utils.h"
 
-#include <lib/sys/component/cpp/testing/realm_builder.h>
-
 #include <fbl/algorithm.h>
-#include <gmock/gmock.h>
+#include <zxtest/zxtest.h>
 
 #include "src/ui/scenic/lib/flatland/buffers/util.h"
 #include "src/ui/scenic/lib/utils/helpers.h"
 
 namespace integration_tests {
 using flatland::MapHostPointer;
-using RealmRoot = component_testing::RealmRoot;
-using fuchsia::ui::composition::ChildViewWatcher;
-using fuchsia::ui::composition::ContentId;
-using fuchsia::ui::composition::ParentViewportWatcher;
 using fuchsia::ui::composition::RegisterBufferCollectionArgs;
 using fuchsia::ui::composition::RegisterBufferCollectionUsages;
 using fuchsia::ui::composition::TransformId;
-using fuchsia::ui::composition::ViewportProperties;
 
 bool PixelEquals(const uint8_t* a, const uint8_t* b) { return memcmp(a, b, kBytesPerPixel) == 0; }
 
@@ -62,37 +55,39 @@ void WriteToSysmemBuffer(const std::vector<uint8_t>& write_values,
                          uint32_t image_width, uint32_t image_height) {
   FX_DCHECK(kBytesPerPixel == utils::GetBytesPerPixel(buffer_collection_info.settings()));
   uint32_t pixels_per_row = utils::GetPixelsPerRow(buffer_collection_info.settings(), image_width);
-
-  MapHostPointer(buffer_collection_info, buffer_collection_idx,
-                 flatland::HostPointerAccessMode::kReadWrite,
-                 [&write_values, pixels_per_row, kBytesPerPixel, image_width, image_height](
-                     uint8_t* vmo_host, uint32_t num_bytes) {
-                   uint32_t bytes_per_row = pixels_per_row * kBytesPerPixel;
-                   uint32_t valid_bytes_per_row = image_width * kBytesPerPixel;
-
-                   EXPECT_GE(bytes_per_row, valid_bytes_per_row);
-                   EXPECT_GE(num_bytes, bytes_per_row * image_height);
-
-                   if (bytes_per_row == valid_bytes_per_row) {
-                     // Fast path.
-                     memcpy(vmo_host, write_values.data(), write_values.size());
-                   } else {
-                     // Copy over row-by-row.
-                     for (size_t i = 0; i < image_height; ++i) {
-                       memcpy(&vmo_host[i * bytes_per_row],
-                              &write_values[i * image_width * kBytesPerPixel], valid_bytes_per_row);
-                     }
-                   }
-                 });
-
   // Flush the cache if we are operating in RAM.
-  if (buffer_collection_info.settings().buffer_settings().coherency_domain() ==
-      fuchsia::sysmem2::CoherencyDomain::RAM) {
-    EXPECT_EQ(ZX_OK,
-              buffer_collection_info.buffers()[buffer_collection_idx].vmo().op_range(
-                  ZX_VMO_OP_CACHE_CLEAN, 0,
-                  buffer_collection_info.settings().buffer_settings().size_bytes(), nullptr, 0));
-  }
+  const bool need_flush = buffer_collection_info.settings().buffer_settings().coherency_domain() ==
+                          fuchsia::sysmem2::CoherencyDomain::RAM;
+
+  MapHostPointer(
+      buffer_collection_info, buffer_collection_idx, flatland::HostPointerAccessMode::kReadWrite,
+      [&write_values, pixels_per_row, kBytesPerPixel, image_width, image_height, need_flush](
+          uint8_t* vmo_host, uint32_t num_bytes) {
+        uint32_t bytes_per_row = pixels_per_row * kBytesPerPixel;
+        uint32_t valid_bytes_per_row = image_width * kBytesPerPixel;
+
+        EXPECT_GE(bytes_per_row, valid_bytes_per_row);
+        EXPECT_GE(num_bytes, bytes_per_row * image_height);
+
+        if (bytes_per_row == valid_bytes_per_row) {
+          // Fast path.
+          memcpy(vmo_host, write_values.data(), write_values.size());
+          if (need_flush) {
+            EXPECT_EQ(ZX_OK, zx_cache_flush(vmo_host, write_values.size(), ZX_CACHE_FLUSH_DATA));
+          }
+        } else {
+          // Copy over row-by-row.
+          for (size_t i = 0; i < image_height; ++i) {
+            memcpy(&vmo_host[i * bytes_per_row], &write_values[i * image_width * kBytesPerPixel],
+                   valid_bytes_per_row);
+          }
+          if (need_flush) {
+            EXPECT_EQ(ZX_OK,
+                      zx_cache_flush(vmo_host, static_cast<size_t>(image_height) * bytes_per_row,
+                                     ZX_CACHE_FLUSH_DATA));
+          }
+        }
+      });
 }
 
 fuchsia::sysmem2::BufferCollectionInfo CreateBufferCollectionInfoWithConstraints(
@@ -154,10 +149,6 @@ std::vector<uint8_t> ExtractScreenCapture(
   // which is not a multiple of 64. The next multiple would be 2432, which would mean the buffer
   // is actually a 608x1024 "pixel" buffer, since 2432/4=608. We must account for that 8 byte
   // padding when copying the bytes over to be inspected.
-  EXPECT_EQ(ZX_OK,
-            buffer_collection_info.buffers()[buffer_id].vmo().op_range(
-                ZX_VMO_OP_CACHE_CLEAN_INVALIDATE, 0,
-                buffer_collection_info.settings().buffer_settings().size_bytes(), nullptr, 0));
 
   FX_DCHECK(kBytesPerPixel == utils::GetBytesPerPixel(buffer_collection_info.settings()));
   uint32_t pixels_per_row =
@@ -166,25 +157,32 @@ std::vector<uint8_t> ExtractScreenCapture(
   read_values.resize(static_cast<size_t>(render_target_width) * render_target_height *
                      kBytesPerPixel);
 
-  MapHostPointer(buffer_collection_info, buffer_id, flatland::HostPointerAccessMode::kReadOnly,
-                 [&read_values, kBytesPerPixel, pixels_per_row, render_target_width,
-                  render_target_height](const uint8_t* vmo_host, uint32_t num_bytes) {
-                   uint32_t bytes_per_row = pixels_per_row * kBytesPerPixel;
-                   uint32_t valid_bytes_per_row = render_target_width * kBytesPerPixel;
+  MapHostPointer(
+      buffer_collection_info, buffer_id, flatland::HostPointerAccessMode::kReadOnly,
+      [&read_values, kBytesPerPixel, pixels_per_row, render_target_width, render_target_height](
+          const uint8_t* vmo_host, uint32_t num_bytes) {
+        uint32_t bytes_per_row = pixels_per_row * kBytesPerPixel;
+        uint32_t valid_bytes_per_row = render_target_width * kBytesPerPixel;
 
-                   EXPECT_GE(bytes_per_row, valid_bytes_per_row);
+        EXPECT_GE(bytes_per_row, valid_bytes_per_row);
 
-                   if (bytes_per_row == valid_bytes_per_row) {
-                     // Fast path.
-                     memcpy(read_values.data(), vmo_host,
-                            static_cast<size_t>(bytes_per_row) * render_target_height);
-                   } else {
-                     for (size_t i = 0; i < render_target_height; ++i) {
-                       memcpy(&read_values[i * render_target_width * kBytesPerPixel],
-                              &vmo_host[i * bytes_per_row], valid_bytes_per_row);
-                     }
-                   }
-                 });
+        if (bytes_per_row == valid_bytes_per_row) {
+          EXPECT_EQ(ZX_OK, zx_cache_flush(vmo_host,
+                                          static_cast<size_t>(bytes_per_row) * render_target_height,
+                                          ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE));
+          // Fast path.
+          memcpy(read_values.data(), vmo_host,
+                 static_cast<size_t>(bytes_per_row) * render_target_height);
+        } else {
+          EXPECT_EQ(ZX_OK, zx_cache_flush(vmo_host,
+                                          static_cast<size_t>(render_target_height) * bytes_per_row,
+                                          ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE));
+          for (size_t i = 0; i < render_target_height; ++i) {
+            memcpy(&read_values[i * render_target_width * kBytesPerPixel],
+                   &vmo_host[i * bytes_per_row], valid_bytes_per_row);
+          }
+        }
+      });
 
   return read_values;
 }

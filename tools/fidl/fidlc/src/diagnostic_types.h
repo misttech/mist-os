@@ -46,6 +46,7 @@ std::string Display(VersionRange r);
 std::string Display(const VersionSet& s);
 std::string Display(AbiKind k);
 std::string Display(AbiValue v);
+std::string Display(const std::vector<std::pair<VersionRange, SourceSpan>>& v);
 template <typename T, typename = decltype(std::to_string(std::declval<T>()))>
 std::string Display(T val) {
   return std::to_string(val);

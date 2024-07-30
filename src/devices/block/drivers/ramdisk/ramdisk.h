@@ -8,7 +8,7 @@
 #include <fidl/fuchsia.hardware.ramdisk/cpp/wire.h>
 #include <fuchsia/hardware/block/driver/cpp/banjo.h>
 #include <fuchsia/hardware/block/partition/cpp/banjo.h>
-#include <lib/fzl/resizeable-vmo-mapper.h>
+#include <lib/fzl/owned-vmo-mapper.h>
 #include <lib/operation/block.h>
 #include <lib/sync/completion.h>
 #include <lib/zbi-format/partition.h>
@@ -64,7 +64,7 @@ class Ramdisk : public RamdiskDeviceType,
 
  private:
   Ramdisk(zx_device_t* parent, uint64_t block_size, uint64_t block_count, const uint8_t* type_guid,
-          fzl::ResizeableVmoMapper mapping);
+          fzl::OwnedVmoMapper mapping);
 
   // Processes requests made to the ramdisk until it is unbound.
   void ProcessRequests();
@@ -78,7 +78,7 @@ class Ramdisk : public RamdiskDeviceType,
   uint64_t block_size_;
   uint64_t block_count_;
   uint8_t type_guid_[ZBI_PARTITION_GUID_LEN];
-  fzl::ResizeableVmoMapper mapping_;
+  fzl::OwnedVmoMapper mapping_;
 
   // |signal| identifies when the worker thread should stop sleeping.
   // This may occur when the device:

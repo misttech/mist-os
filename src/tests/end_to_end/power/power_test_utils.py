@@ -4,7 +4,6 @@
 # found in the LICENSE file.
 """Fuchsia power test utility library."""
 
-# keep-sorted start
 import abc
 import csv
 import dataclasses
@@ -17,18 +16,12 @@ import signal
 import struct
 import subprocess
 import time
-
-# keep-sorted end
-
-# keep-sorted start
 from collections import deque
 from collections.abc import Iterable, Mapping
-from trace_processing import trace_metrics, trace_model, trace_time
-from trace_processing.metrics import power as power_metrics
 from typing import Any, Sequence
 
-# keep-sorted end
-
+from trace_processing import trace_metrics, trace_model, trace_time
+from trace_processing.metrics import power as power_metrics
 
 SAMPLE_INTERVAL_NS = 200000
 
@@ -49,6 +42,13 @@ def weighted_average(arr: Iterable[float], weights: Iterable[int]) -> float:
             zip(arr, weights, strict=True),
         )
     ) / sum(weights)
+
+
+def normalize(lst: Iterable[float]) -> list[float]:
+    """Return a copy of the list normalized between [0, 1.0]."""
+    lst_min = min(lst)
+    lst_max = max(lst)
+    return [(f - lst_min) / (lst_max - lst_min) for f in lst]
 
 
 # We don't have numpy in the vendored python libraries so we'll have to roll our own correlate
@@ -339,7 +339,7 @@ class _RealPowerSampler(PowerSampler):
         return self._sampled_data
 
     def extract_samples(self) -> Sequence["Sample"]:
-        return _read_power_samples(self._csv_output_path)
+        return read_power_samples(self._csv_output_path)
 
 
 def create_power_sampler(
@@ -439,7 +439,7 @@ class Sample:
         )
 
 
-def _read_power_samples(power_trace_path: str) -> list[Sample]:
+def read_power_samples(power_trace_path: str) -> list[Sample]:
     """Return a tuple of the current and power samples from the power csv"""
     samples: list[Sample] = []
     with open(power_trace_path, "r") as power_csv:
@@ -812,6 +812,9 @@ def merge_power_data(
         max_sequence_samples, len(avg_cpu_combined), len(power_samples)
     )
 
+    current_samples = normalize([sample.current for sample in power_samples])
+    avg_cpu_combined = normalize(avg_cpu_combined)
+
     # Ensures feature list is always shorter than the number of signal samples
     feature_samples = int(0.8 * signal_samples)
     (
@@ -819,13 +822,13 @@ def merge_power_data(
         power_after_cpu_correlation_idx,
     ) = cross_correlate_arg_max(
         avg_cpu_combined[0:signal_samples],
-        [s.current for s in power_samples[0:feature_samples]],
+        current_samples[0:feature_samples],
     )
     (
         cpu_after_power_correlation,
         cpu_after_power_correlation_idx,
     ) = cross_correlate_arg_max(
-        [s.current for s in power_samples[0:signal_samples]],
+        current_samples[0:signal_samples],
         avg_cpu_combined[0:feature_samples],
     )
     starting_ticks = 0

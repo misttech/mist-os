@@ -8,9 +8,9 @@ import("//build/drivers.gni")
 import("//build/test.gni")
 
 driver_bind_rules("ti_tas58xx-bind") {
-  rules = "ti_tas58xx.bind"
+  rules = "meta/ti_tas58xx.bind"
   bind_output = "tas58xx.bindbc"
-  tests = "tests.json"
+  tests = "meta/tests.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_bindlib",
     "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c_bindlib",
@@ -51,7 +51,7 @@ fuchsia_driver("tas58xx-driver") {
 fuchsia_driver_component("tas58xx") {
   component_name = "tas58xx"
   deps = [ ":tas58xx-driver" ]
-  info = "tas58xx-info.json"
+  info = "meta/tas58xx-info.json"
   manifest = "meta/tas58xx.cml"
 }
 

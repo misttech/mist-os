@@ -334,7 +334,7 @@ auto ToNatural(WireType value) {
 
 // fidl::ToWire(natural_value, arena) -> wire_value
 //
-// ToWire is a converter from wire types to natural types.
+// ToWire is a converter from natural types to wire types.
 // ToWire will succeed so long as the input data is valid (e.g. no bad pointers).
 //
 // All out-of-line values will be copied to |arena|.

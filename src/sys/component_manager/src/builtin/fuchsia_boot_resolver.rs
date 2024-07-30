@@ -98,7 +98,7 @@ impl FuchsiaBootResolver {
 
         // unpackaged components resolved from the zbi are assigned the platform
         // abi revision
-        let abi_revision = version_history::HISTORY.get_abi_revision_for_platform_components();
+        let abi_revision = version_history_data::HISTORY.get_abi_revision_for_platform_components();
 
         self.construct_component(path_proxy, boot_url, Some(abi_revision)).await
     }
@@ -414,6 +414,7 @@ mod tests {
     use fidl::persist;
     use fuchsia_async::Task;
     use fuchsia_fs::directory::open_in_namespace;
+    use routing::bedrock::structured_dict::ComponentInput;
     use std::sync::Weak;
     use vfs::directory::entry::OpenRequest;
     use vfs::directory::entry_container::Directory;
@@ -455,7 +456,7 @@ mod tests {
         // the resolver returned the right package dir.
         let ResolvedComponent { resolved_url, decl, package, abi_revision, .. } = component;
         assert_eq!(url, resolved_url);
-        version_history::HISTORY
+        version_history_data::HISTORY
             .check_abi_revision_for_runtime(
                 abi_revision.expect("boot component should present ABI revision"),
             )
@@ -648,6 +649,7 @@ mod tests {
         let resolver = FuchsiaBootResolver::new_from_directory(bootfs).await.unwrap();
 
         let root = ComponentInstance::new_root(
+            ComponentInput::default(),
             Environment::empty(),
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
@@ -695,6 +697,7 @@ mod tests {
         let (_task, bootfs) = serve_vfs_dir(root);
         let resolver = FuchsiaBootResolver::new_from_directory(bootfs).await.unwrap();
         let root = ComponentInstance::new_root(
+            ComponentInput::default(),
             Environment::empty(),
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),

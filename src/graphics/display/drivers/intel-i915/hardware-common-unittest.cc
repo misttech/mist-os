@@ -4,12 +4,19 @@
 
 #include "src/graphics/display/drivers/intel-i915/hardware-common.h"
 
+#include <lib/driver/testing/cpp/scoped_global_logger.h>
+
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
 namespace i915 {
 
-TEST(HardwareCommonTest, Skylake) {
+class HardwareCommonTest : public ::testing::Test {
+ private:
+  fdf_testing::ScopedGlobalLogger logger_;
+};
+
+TEST_F(HardwareCommonTest, Skylake) {
   // Skylake has 5 DDIs (A-E), 4 DPLLs, 3 Pipes and 4 Transcoders
   // (including an eDP transcoder).
 
@@ -35,7 +42,7 @@ TEST(HardwareCommonTest, Skylake) {
                                TranscoderId::TRANSCODER_B, TranscoderId::TRANSCODER_C));
 }
 
-TEST(HardwareCommonTest, KabyLake) {
+TEST_F(HardwareCommonTest, KabyLake) {
   // Kaby Lake has 5 DDIs (A-E), 4 DPLLs, 3 Pipes and 4 Transcoders
   // (including an eDP transcoder).
 
@@ -61,7 +68,7 @@ TEST(HardwareCommonTest, KabyLake) {
                                TranscoderId::TRANSCODER_B, TranscoderId::TRANSCODER_C));
 }
 
-TEST(HardwareCommonTest, TigerLake) {
+TEST_F(HardwareCommonTest, TigerLake) {
   // Tiger Lake has 9 DDIs (A-C, TC1-TC6), currently it supports 3 Pipes and 3 Transcoders.
   // There is no eDP transcoder in Tiger Lake.
 

@@ -60,16 +60,12 @@ closed protocol SecureMem {
     /// some physical space to auto-detect how many ranges are REE-usable.  Any
     /// temporary HW protection ranges will be deleted before this request
     /// completes.
-    @available(added=9)
+    @available(added=7)
     strict GetPhysicalSecureHeapProperties(struct {
-        entire_heap SecureHeapAndRange;
-    }) -> (struct {
-        properties SecureHeapProperties;
-    }) error zx.Status;
-
-    @available(added=7, deprecated=8, replaced=9)
-    strict GetPhysicalSecureHeapProperties(struct {
+        @available(replaced=9, renamed="entire_heap")
         heap HeapType;
+        @available(added=9)
+        entire_heap SecureHeapAndRange;
     }) -> (struct {
         properties SecureHeapProperties;
     }) error zx.Status;

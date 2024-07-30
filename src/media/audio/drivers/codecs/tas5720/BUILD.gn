@@ -8,9 +8,9 @@ import("//build/drivers.gni")
 import("//build/test.gni")
 
 driver_bind_rules("ti_tas5720-bind") {
-  rules = "ti_tas5720.bind"
+  rules = "meta/ti_tas5720.bind"
   bind_output = "tas5720.bindbc"
-  tests = "tests.json"
+  tests = "meta/tests.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c_bindlib",
     "//src/devices/bind/fuchsia.gpio",
@@ -47,7 +47,7 @@ fuchsia_driver("tas5720-driver") {
 fuchsia_driver_component("tas5720") {
   component_name = "tas5720"
   deps = [ ":tas5720-driver" ]
-  info = "tas5720-info.json"
+  info = "meta/tas5720-info.json"
   manifest = "meta/tas5720.cml"
 }
 

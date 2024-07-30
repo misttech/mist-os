@@ -4,10 +4,7 @@
 
 use anyhow::{anyhow, Context, Result};
 use ffx_scrutiny_verify_args::static_pkgs::Command;
-use scrutiny_config::{ConfigBuilder, ModelConfig};
-use scrutiny_frontend::command_builder::CommandBuilder;
-use scrutiny_frontend::launcher;
-use scrutiny_plugins::static_pkgs::StaticPkgsCollection;
+use scrutiny_frontend::Scrutiny;
 use scrutiny_utils::golden::{CompareResult, GoldenFile};
 use std::collections::HashSet;
 use std::path::PathBuf;
@@ -27,22 +24,14 @@ struct Query {
 }
 
 fn verify_static_pkgs(query: &Query, golden_files: &Vec<PathBuf>) -> Result<HashSet<PathBuf>> {
-    let command = CommandBuilder::new("static.pkgs").build();
-    let model = if query.recovery {
-        ModelConfig::from_product_bundle_recovery(query.product_bundle.clone())
+    let artifacts = if query.recovery {
+        Scrutiny::from_product_bundle_recovery(&query.product_bundle)
     } else {
-        ModelConfig::from_product_bundle(query.product_bundle.clone())
-    }?;
-    let mut config = ConfigBuilder::with_model(model).command(command).build();
-    config.runtime.logging.silent_mode = true;
+        Scrutiny::from_product_bundle(&query.product_bundle)
+    }?
+    .collect()?;
 
-    let scrutiny_output =
-        launcher::launch_from_config(config).context("Failed to run static.pkgs")?;
-    let static_pkgs_result: StaticPkgsCollection =
-        serde_json::from_str(&scrutiny_output).context(format!(
-            "Failed to parse static.pkgs JSON output as structured static packages list: {}",
-            scrutiny_output
-        ))?;
+    let static_pkgs_result = artifacts.get_static_packages()?;
     if static_pkgs_result.errors.len() > 0 {
         return Err(anyhow!("static.pkgs reported errors: {:#?}", static_pkgs_result.errors));
     }

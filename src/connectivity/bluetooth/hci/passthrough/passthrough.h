@@ -2,6 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#ifndef SRC_CONNECTIVITY_BLUETOOTH_HCI_PASSTHROUGH_PASSTHROUGH_H_
+#define SRC_CONNECTIVITY_BLUETOOTH_HCI_PASSTHROUGH_PASSTHROUGH_H_
+
 #include <assert.h>
 #include <fidl/fuchsia.hardware.bluetooth/cpp/wire.h>
 #include <lib/driver/component/cpp/driver_base.h>
@@ -35,6 +38,7 @@ class PassthroughDevice
                      EncodeCommandCompleter::Sync& completer) override;
   void OpenHci(OpenHciCompleter::Sync& completer) override;
   void OpenHciTransport(OpenHciTransportCompleter::Sync& completer) override;
+  void OpenSnoop(OpenSnoopCompleter::Sync& completer) override;
   void handle_unknown_method(
       fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Vendor> metadata,
       fidl::UnknownMethodCompleter::Sync& completer) override;
@@ -72,3 +76,5 @@ class PassthroughDevice
 };
 
 }  // namespace bt::passthrough
+
+#endif  //  SRC_CONNECTIVITY_BLUETOOTH_HCI_PASSTHROUGH_PASSTHROUGH_H_

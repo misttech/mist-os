@@ -34,7 +34,6 @@ class RemoteDir : public Vnode {
   bool IsRemote() const final;
   void OpenRemote(fuchsia_io::OpenFlags, fuchsia_io::ModeType, fidl::StringView,
                   fidl::ServerEnd<fuchsia_io::Node>) const final;
-  void OpenRemote(fuchsia_io::wire::Directory2Open2Request request) const final;
 #if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
   void OpenRemote(fuchsia_io::wire::Directory2Open3Request request) const final;
 #endif

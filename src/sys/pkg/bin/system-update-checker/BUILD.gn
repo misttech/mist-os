@@ -63,6 +63,7 @@ rustc_binary("bin") {
     "src/channel.rs",
     "src/channel_handler.rs",
     "src/check.rs",
+    "src/completion_responder.rs",
     "src/connect.rs",
     "src/errors.rs",
     "src/main.rs",
@@ -98,7 +99,7 @@ fuchsia_test_package("system-update-checker-tests") {
   }
 }
 
-group("tests") {
+group("hermetic_tests") {
   testonly = true
   public_deps = [ ":system-update-checker-tests" ]
 }

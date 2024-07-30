@@ -107,7 +107,7 @@ func TestExtractStats(t *testing.T) {
 						Out:            "a.o",
 						Outs:           []string{"aa.o", "aaa.o"},
 						End:            3 * time.Second,
-						Command:        &compdb.Command{Command: "gomacc a.cc"},
+						Command:        &compdb.Command{Command: "clang++ a.cc"},
 						OnCriticalPath: true,
 						Drag:           123 * time.Second,
 					},
@@ -125,7 +125,7 @@ func TestExtractStats(t *testing.T) {
 						Out:        "c.o",
 						Start:      9 * time.Second,
 						End:        10 * time.Second,
-						Command:    &compdb.Command{Command: "gomacc c.cc"},
+						Command:    &compdb.Command{Command: "clang++ c.cc"},
 						TotalFloat: 789 * time.Second,
 					},
 				},
@@ -133,10 +133,10 @@ func TestExtractStats(t *testing.T) {
 			want: buildStats{
 				CriticalPath: []action{
 					{
-						Command:  "gomacc a.cc",
+						Command:  "clang++ a.cc",
 						Outputs:  []string{"aa.o", "aaa.o", "a.o"},
 						End:      3 * time.Second,
-						Category: "gomacc",
+						Category: "clang++",
 						Drag:     123 * time.Second,
 					},
 					{
@@ -150,10 +150,10 @@ func TestExtractStats(t *testing.T) {
 				},
 				Slowests: []action{
 					{
-						Command:  "gomacc a.cc",
+						Command:  "clang++ a.cc",
 						Outputs:  []string{"aa.o", "aaa.o", "a.o"},
 						End:      3 * time.Second,
-						Category: "gomacc",
+						Category: "clang++",
 						Drag:     123 * time.Second,
 					},
 					{
@@ -165,17 +165,17 @@ func TestExtractStats(t *testing.T) {
 						Drag:     321 * time.Second,
 					},
 					{
-						Command:    "gomacc c.cc",
+						Command:    "clang++ c.cc",
 						Outputs:    []string{"c.o"},
 						Start:      9 * time.Second,
 						End:        10 * time.Second,
-						Category:   "gomacc",
+						Category:   "clang++",
 						TotalFloat: 789 * time.Second,
 					},
 				},
 				CatBuildTimes: []catBuildTime{
 					{
-						Category:     "gomacc",
+						Category:     "clang++",
 						Count:        2,
 						BuildTime:    4 * time.Second,
 						MinBuildTime: time.Second,
@@ -191,10 +191,10 @@ func TestExtractStats(t *testing.T) {
 				},
 				All: []action{
 					{
-						Command:  "gomacc a.cc",
+						Command:  "clang++ a.cc",
 						Outputs:  []string{"aa.o", "aaa.o", "a.o"},
 						End:      3 * time.Second,
-						Category: "gomacc",
+						Category: "clang++",
 						Drag:     123 * time.Second,
 					},
 					{
@@ -206,20 +206,20 @@ func TestExtractStats(t *testing.T) {
 						Drag:     321 * time.Second,
 					},
 					{
-						Command:    "gomacc c.cc",
+						Command:    "clang++ c.cc",
 						Outputs:    []string{"c.o"},
 						Start:      9 * time.Second,
 						End:        10 * time.Second,
-						Category:   "gomacc",
+						Category:   "clang++",
 						TotalFloat: 789 * time.Second,
 					},
 				},
 				Actions: []action{
 					{
-						Command:  "gomacc a.cc",
+						Command:  "clang++ a.cc",
 						Outputs:  []string{"aa.o", "aaa.o", "a.o"},
 						End:      3 * time.Second,
-						Category: "gomacc",
+						Category: "clang++",
 						Drag:     123 * time.Second,
 					},
 					{
@@ -231,11 +231,11 @@ func TestExtractStats(t *testing.T) {
 						Drag:     321 * time.Second,
 					},
 					{
-						Command:    "gomacc c.cc",
+						Command:    "clang++ c.cc",
 						Outputs:    []string{"c.o"},
 						Start:      9 * time.Second,
 						End:        10 * time.Second,
-						Category:   "gomacc",
+						Category:   "clang++",
 						TotalFloat: 789 * time.Second,
 					},
 				},

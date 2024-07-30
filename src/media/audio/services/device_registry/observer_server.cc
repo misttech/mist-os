@@ -76,7 +76,7 @@ void ObserverServer::WatchGainState(WatchGainStateCompleter::Sync& completer) {
     return;
   }
 
-  if (watch_gain_state_completer_) {
+  if (watch_gain_state_completer_.has_value()) {
     ADR_WARN_METHOD() << "previous `WatchGainState` request has not yet completed";
     completer.Reply(fit::error<fad::ObserverWatchGainStateError>(
         fad::ObserverWatchGainStateError::kAlreadyPending));
@@ -87,7 +87,7 @@ void ObserverServer::WatchGainState(WatchGainStateCompleter::Sync& completer) {
   MaybeCompleteWatchGainState();
 }
 
-void ObserverServer::GainStateChanged(const fad::GainState& new_gain_state) {
+void ObserverServer::GainStateIsChanged(const fad::GainState& new_gain_state) {
   ADR_LOG_METHOD(kLogObserverServerMethods || kLogNotifyMethods);
 
   FX_DCHECK(device_->is_stream_config());
@@ -97,7 +97,7 @@ void ObserverServer::GainStateChanged(const fad::GainState& new_gain_state) {
 }
 
 void ObserverServer::MaybeCompleteWatchGainState() {
-  if (watch_gain_state_completer_ && new_gain_state_to_notify_) {
+  if (watch_gain_state_completer_.has_value() && new_gain_state_to_notify_.has_value()) {
     auto completer = std::move(*watch_gain_state_completer_);
     watch_gain_state_completer_.reset();
 
@@ -126,7 +126,7 @@ void ObserverServer::WatchPlugState(WatchPlugStateCompleter::Sync& completer) {
     return;
   }
 
-  if (watch_plug_state_completer_) {
+  if (watch_plug_state_completer_.has_value()) {
     ADR_WARN_METHOD() << "previous `WatchPlugState` request has not yet completed";
     completer.Reply(fit::error<fad::ObserverWatchPlugStateError>(
         fad::ObserverWatchPlugStateError::kAlreadyPending));
@@ -137,8 +137,8 @@ void ObserverServer::WatchPlugState(WatchPlugStateCompleter::Sync& completer) {
   MaybeCompleteWatchPlugState();
 }
 
-void ObserverServer::PlugStateChanged(const fad::PlugState& new_plug_state,
-                                      zx::time plug_change_time) {
+void ObserverServer::PlugStateIsChanged(const fad::PlugState& new_plug_state,
+                                        zx::time plug_change_time) {
   ADR_LOG_METHOD(kLogObserverServerMethods || kLogNotifyMethods)
       << new_plug_state << " @ " << plug_change_time.get();
 
@@ -150,7 +150,7 @@ void ObserverServer::PlugStateChanged(const fad::PlugState& new_plug_state,
 }
 
 void ObserverServer::MaybeCompleteWatchPlugState() {
-  if (watch_plug_state_completer_ && new_plug_state_to_notify_) {
+  if (watch_plug_state_completer_.has_value() && new_plug_state_to_notify_.has_value()) {
     auto completer = std::move(*watch_plug_state_completer_);
     watch_plug_state_completer_.reset();
 
@@ -216,7 +216,7 @@ void ObserverServer::GetElements(GetElementsCompleter::Sync& completer) {
 
   FX_CHECK(device_->info().has_value() &&
            device_->info()->signal_processing_elements().has_value() &&
-           !device_->info()->signal_processing_elements()->empty());
+           device_->info()->signal_processing_elements()->size());
   completer.Reply(fit::success(*device_->info()->signal_processing_elements()));
 }
 
@@ -244,7 +244,7 @@ void ObserverServer::GetTopologies(GetTopologiesCompleter::Sync& completer) {
 
   FX_CHECK(device_->info().has_value() &&
            device_->info()->signal_processing_topologies().has_value() &&
-           !device_->info()->signal_processing_topologies()->empty());
+           device_->info()->signal_processing_topologies()->size());
   completer.Reply(fit::success(*device_->info()->signal_processing_topologies()));
 }
 
@@ -270,7 +270,7 @@ void ObserverServer::WatchTopology(WatchTopologyCompleter::Sync& completer) {
     return;
   }
 
-  if (watch_topology_completer_) {
+  if (watch_topology_completer_.has_value()) {
     ADR_WARN_METHOD() << "previous `WatchTopology` request has not yet completed";
     completer.Close(ZX_ERR_BAD_STATE);
     return;
@@ -280,7 +280,7 @@ void ObserverServer::WatchTopology(WatchTopologyCompleter::Sync& completer) {
   MaybeCompleteWatchTopology();
 }
 
-void ObserverServer::TopologyChanged(TopologyId topology_id) {
+void ObserverServer::TopologyIsChanged(TopologyId topology_id) {
   ADR_LOG_METHOD(kLogObserverServerMethods || kLogNotifyMethods)
       << "(topology_id " << topology_id << ")";
 
@@ -289,8 +289,6 @@ void ObserverServer::TopologyChanged(TopologyId topology_id) {
 }
 
 void ObserverServer::MaybeCompleteWatchTopology() {
-  // ADR_LOG_METHOD(kLogObserverServerMethods || kLogNotifyMethods);
-
   if (watch_topology_completer_.has_value() && topology_id_to_notify_.has_value()) {
     ADR_LOG_METHOD(kLogObserverServerMethods || kLogNotifyMethods) << " will Reply";
 
@@ -347,7 +345,7 @@ void ObserverServer::WatchElementState(WatchElementStateRequest& request,
   MaybeCompleteWatchElementState(element_id);
 }
 
-void ObserverServer::ElementStateChanged(
+void ObserverServer::ElementStateIsChanged(
     ElementId element_id, fuchsia_hardware_audio_signalprocessing::ElementState element_state) {
   ADR_LOG_METHOD(kLogObserverServerMethods || kLogNotifyMethods)
       << "(element_id " << element_id << ")";
@@ -358,11 +356,10 @@ void ObserverServer::ElementStateChanged(
 
 // If we have an outstanding hanging-get and a state-change, respond with the state change.
 void ObserverServer::MaybeCompleteWatchElementState(ElementId element_id) {
-  // ADR_LOG_METHOD(kLogObserverServerMethods || kLogNotifyMethods) << element_id;
-
   if (watch_element_state_completers_.find(element_id) != watch_element_state_completers_.end() &&
       element_states_to_notify_.find(element_id) != element_states_to_notify_.end()) {
-    ADR_LOG_METHOD(kLogObserverServerMethods || kLogNotifyMethods) << element_id << " will Reply";
+    ADR_LOG_METHOD(kLogObserverServerMethods || kLogNotifyMethods)
+        << "(" << element_id << ") will Reply";
     auto completer = std::move(watch_element_state_completers_.find(element_id)->second);
     watch_element_state_completers_.erase(element_id);
 
@@ -371,7 +368,8 @@ void ObserverServer::MaybeCompleteWatchElementState(ElementId element_id) {
 
     completer.Reply(new_element_state);
   } else {
-    ADR_LOG_METHOD(kLogObserverServerMethods || kLogNotifyMethods) << " did not occur";
+    ADR_LOG_METHOD(kLogObserverServerMethods || kLogNotifyMethods)
+        << "(" << element_id << ") did not occur";
   }
 }
 

@@ -39,6 +39,7 @@ rustc_binary("provider_bin") {
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
+    "//src/lib/sandbox",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:tracing",
   ]
@@ -50,7 +51,10 @@ rustc_binary("provider_bin") {
 fuchsia_component("dynamic-dictionary-provider") {
   manifest = "meta/dynamic_dictionary_provider.cml"
   deps = [ ":provider_bin" ]
-  restricted_features = [ "dictionaries" ]
+  restricted_features = [
+    "dictionaries",
+    "dynamic_dictionaries",
+  ]
 }
 
 fuchsia_test_component("dynamic-dictionary-example") {

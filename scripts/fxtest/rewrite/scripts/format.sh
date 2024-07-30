@@ -35,10 +35,6 @@ autoflake \
     --exclude "__init__.py,.venvs**" \
     $FXTEST_SRC
 
-echo "Sorting imports..."
-isort $FXTEST_SRC \
-    --sg '.venvs**'
-
 echo "Formatting code..."
 fx format-code
 

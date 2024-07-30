@@ -314,10 +314,21 @@ impl MemoryFileObject {
 
     pub fn get_memory(
         memory: &Arc<MemoryObject>,
-        _file: &FileObject,
+        file: &FileObject,
         _current_task: &CurrentTask,
         prot: ProtectionFlags,
     ) -> Result<Arc<MemoryObject>, Errno> {
+        // In MemoryFileNode::create_file_ops, we downscoped the rights
+        // on the VMO to match the rights on the file object. If the caller
+        // wants more rights than exist on the file object, return an error
+        // instead of returning a MemoryObject that does not conform to
+        // the FileOps::get_memory contract.
+        if prot.contains(ProtectionFlags::READ) && !file.can_read() {
+            return error!(EACCES);
+        }
+        if prot.contains(ProtectionFlags::WRITE) && !file.can_write() {
+            return error!(EACCES);
+        }
         let mut memory = Arc::clone(memory);
         if prot.contains(ProtectionFlags::EXEC) {
             memory = Arc::new(
@@ -350,7 +361,7 @@ macro_rules! fileops_impl_memory {
 
         fn write(
             &$self,
-            _locked: &mut starnix_sync::Locked<'_, starnix_sync::WriteOps>,
+            _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
             file: &$crate::vfs::FileObject,
             current_task: &$crate::task::CurrentTask,
             offset: usize,

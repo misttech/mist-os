@@ -6,7 +6,6 @@
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
-#include <lib/ddk/platform-defs.h>
 
 #include <soc/aml-s905d2/s905d2-hw.h>
 
@@ -39,9 +38,9 @@ static const std::vector<fpbus::Irq> astro_ram_ctl_irqs{
 static const fpbus::Node ramctl_dev = []() {
   fpbus::Node dev = {};
   dev.name() = "aml-ram-ctl";
-  dev.vid() = PDEV_VID_AMLOGIC;
-  dev.pid() = PDEV_PID_AMLOGIC_S905D2;
-  dev.did() = PDEV_DID_AMLOGIC_RAM_CTL;
+  dev.vid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_VID_AMLOGIC;
+  dev.pid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_PID_S905D2;
+  dev.did() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_RAM_CTL;
   dev.mmio() = astro_ram_ctl_mmios;
   dev.bti() = astro_ram_ctl_btis;
   dev.irq() = astro_ram_ctl_irqs;

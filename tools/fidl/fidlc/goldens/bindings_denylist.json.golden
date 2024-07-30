@@ -3085,7 +3085,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 21,
+            "line": 27,
             "column": 1,
             "length": 8
           },
@@ -3109,7 +3109,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 22,
+            "line": 28,
             "column": 1,
             "length": 3
           },
@@ -3241,7 +3241,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 6,
+            "line": 7,
             "column": 1,
             "length": 8
           },
@@ -3265,7 +3265,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 7,
+            "line": 8,
             "column": 1,
             "length": 3
           },
@@ -3319,7 +3319,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 9,
+            "line": 11,
             "column": 1,
             "length": 8
           },
@@ -3343,7 +3343,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 10,
+            "line": 12,
             "column": 1,
             "length": 3
           },
@@ -3384,84 +3384,6 @@
           "type": {
             "kind": "identifier",
             "identifier": "test.bindingsdenylist/DenyEachBinding_OnlyDenyLibfuzzer_Response",
-            "nullable": false,
-            "type_shape_v2": {
-              "inline_size": 4,
-              "alignment": 4,
-              "depth": 0,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": false,
-              "has_flexible_envelope": false
-            }
-          },
-          "location": {
-            "filename": "generated",
-            "line": 12,
-            "column": 1,
-            "length": 8
-          },
-          "deprecated": false
-        },
-        {
-          "ordinal": 2,
-          "name": "err",
-          "type": {
-            "kind": "primitive",
-            "subtype": "uint32",
-            "type_shape_v2": {
-              "inline_size": 4,
-              "alignment": 4,
-              "depth": 0,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": false,
-              "has_flexible_envelope": false
-            }
-          },
-          "location": {
-            "filename": "generated",
-            "line": 13,
-            "column": 1,
-            "length": 3
-          },
-          "deprecated": false
-        }
-      ],
-      "strict": true,
-      "resource": false,
-      "is_result": true,
-      "type_shape_v2": {
-        "inline_size": 16,
-        "alignment": 8,
-        "depth": 1,
-        "max_handles": 0,
-        "max_out_of_line": 0,
-        "has_padding": false,
-        "has_flexible_envelope": false
-      }
-    },
-    {
-      "name": "test.bindingsdenylist/DenyEachBinding_OnlyDenyRust_Result",
-      "naming_context": [
-        "DenyEachBinding",
-        "OnlyDenyRust",
-        "Response"
-      ],
-      "location": {
-        "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
-        "line": 83,
-        "column": 11,
-        "length": 33
-      },
-      "deprecated": false,
-      "members": [
-        {
-          "ordinal": 1,
-          "name": "response",
-          "type": {
-            "kind": "identifier",
-            "identifier": "test.bindingsdenylist/DenyEachBinding_OnlyDenyRust_Response",
             "nullable": false,
             "type_shape_v2": {
               "inline_size": 4,
@@ -3520,6 +3442,84 @@
       }
     },
     {
+      "name": "test.bindingsdenylist/DenyEachBinding_OnlyDenyRust_Result",
+      "naming_context": [
+        "DenyEachBinding",
+        "OnlyDenyRust",
+        "Response"
+      ],
+      "location": {
+        "filename": "../../tools/fidl/fidlc/testdata/bindings_denylist/example.test.fidl",
+        "line": 83,
+        "column": 11,
+        "length": 33
+      },
+      "deprecated": false,
+      "members": [
+        {
+          "ordinal": 1,
+          "name": "response",
+          "type": {
+            "kind": "identifier",
+            "identifier": "test.bindingsdenylist/DenyEachBinding_OnlyDenyRust_Response",
+            "nullable": false,
+            "type_shape_v2": {
+              "inline_size": 4,
+              "alignment": 4,
+              "depth": 0,
+              "max_handles": 0,
+              "max_out_of_line": 0,
+              "has_padding": false,
+              "has_flexible_envelope": false
+            }
+          },
+          "location": {
+            "filename": "generated",
+            "line": 19,
+            "column": 1,
+            "length": 8
+          },
+          "deprecated": false
+        },
+        {
+          "ordinal": 2,
+          "name": "err",
+          "type": {
+            "kind": "primitive",
+            "subtype": "uint32",
+            "type_shape_v2": {
+              "inline_size": 4,
+              "alignment": 4,
+              "depth": 0,
+              "max_handles": 0,
+              "max_out_of_line": 0,
+              "has_padding": false,
+              "has_flexible_envelope": false
+            }
+          },
+          "location": {
+            "filename": "generated",
+            "line": 20,
+            "column": 1,
+            "length": 3
+          },
+          "deprecated": false
+        }
+      ],
+      "strict": true,
+      "resource": false,
+      "is_result": true,
+      "type_shape_v2": {
+        "inline_size": 16,
+        "alignment": 8,
+        "depth": 1,
+        "max_handles": 0,
+        "max_out_of_line": 0,
+        "has_padding": false,
+        "has_flexible_envelope": false
+      }
+    },
+    {
       "name": "test.bindingsdenylist/DenyEachBinding_OnlyDenySyzkaller_Result",
       "naming_context": [
         "DenyEachBinding",
@@ -3553,7 +3553,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 18,
+            "line": 23,
             "column": 1,
             "length": 8
           },
@@ -3577,7 +3577,7 @@
           },
           "location": {
             "filename": "generated",
-            "line": 19,
+            "line": 24,
             "column": 1,
             "length": 3
           },

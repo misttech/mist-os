@@ -13,6 +13,7 @@
 #include <lib/zx/result.h>
 
 #include <optional>
+#include <variant>
 
 namespace gigaboot {
 

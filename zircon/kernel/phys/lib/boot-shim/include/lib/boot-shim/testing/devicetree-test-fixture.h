@@ -9,6 +9,8 @@
 #include <lib/stdcompat/span.h>
 #include <lib/zbi-format/cpu.h>
 
+#include <optional>
+
 #include <zxtest/zxtest.h>
 
 #ifndef ZIRCON_KERNEL_PHYS_LIB_BOOT_SHIM_INCLUDE_LIB_BOOT_SHIM_TESTING_DEVICETREE_TEST_FIXTURE_H_
@@ -44,7 +46,13 @@ class SyntheticDevicetreeTest {
     arm_gic3_subsumed_stride_ = std::move(loaded_dtb).value();
   }
 
-  static void TearDownTestSuite() { empty_dtb_ = std::nullopt; }
+  static void TearDownTestSuite() {
+    empty_dtb_ = std::nullopt;
+    arm_gic2_no_msi_ = std::nullopt;
+    arm_gic3_four_stride_ = std::nullopt;
+    arm_gic3_stride_ = std::nullopt;
+    arm_gic3_subsumed_stride_ = std::nullopt;
+  }
 
   auto empty_fdt() { return empty_dtb_->fdt(); }
   auto arm_gic2_no_msi() { return arm_gic2_no_msi_->fdt(); }

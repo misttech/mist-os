@@ -1,4 +1,3 @@
-#!/usr/bin/env fuchsia-vendored-python
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
@@ -8,10 +7,10 @@ import enum
 import logging
 import os
 
-from honeydew.typing import custom_types
-from honeydew.interfaces.device_classes import fuchsia_device
-from honeydew.interfaces.auxiliary_devices import power_switch
 from honeydew.auxiliary_devices import power_switch_dmc
+from honeydew.interfaces.auxiliary_devices import power_switch
+from honeydew.interfaces.device_classes import fuchsia_device
+from honeydew.typing import custom_types
 from mobly import base_test, signals, test_runner
 from mobly_controller import fuchsia_device as fuchsia_device_mobly_controller
 

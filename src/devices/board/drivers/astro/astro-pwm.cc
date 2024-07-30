@@ -9,11 +9,9 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
-#include <lib/ddk/platform-defs.h>
 
 #include <vector>
 
-#include <bind/fuchsia/amlogic/platform/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/gpio/cpp/bind.h>
 #include <bind/fuchsia/hardware/gpio/cpp/bind.h>
@@ -91,7 +89,7 @@ const device_bind_prop_t kGpioBtProperties[] = {
 };
 
 zx_status_t Astro::PwmInit() {
-  gpio_init_steps_.push_back(GpioSetAltFunction(GPIO_SOC_WIFI_LPO_32k768, S905D2_PWM_E_FN));
+  gpio_init_steps_.push_back(GpioFunction(GPIO_SOC_WIFI_LPO_32k768, S905D2_PWM_E_FN));
 
   /* PWM_AO_B used by bootloader to control PP800_EE rail. The init flag is set
   to false to prevent access to that channel as the configuration set by the

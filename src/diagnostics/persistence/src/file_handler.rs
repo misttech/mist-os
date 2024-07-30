@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{format_err, Error};
+use diagnostics_data::ExtendedMoniker;
 use glob::glob;
 use persistence_config::{ServiceName, Tag};
 use serde::ser::SerializeMap;
@@ -27,7 +28,7 @@ pub(crate) enum PersistPayload {
 
 pub(crate) struct PersistData {
     pub data_length: usize,
-    pub entries: HashMap<String, Value>,
+    pub entries: HashMap<ExtendedMoniker, Value>,
 }
 
 #[derive(Clone, Serialize)]
@@ -55,7 +56,7 @@ impl Serialize for PersistSchema {
                 s.serialize_entry(TIMESTAMPS_KEY, &self.timestamps)?;
                 s.serialize_entry(SIZE_KEY, &data.data_length)?;
                 for (k, v) in data.entries.iter() {
-                    s.serialize_entry(k, v)?;
+                    s.serialize_entry(&k.to_string(), v)?;
                 }
                 s.end()
             }

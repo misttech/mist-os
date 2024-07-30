@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::framebuffer::{DetectResult, DisplayInfo, Framebuffer};
-use anyhow::Error;
+use anyhow::{Context, Error};
 use fidl::endpoints;
 use fidl_fuchsia_hardware_display::{
     CoordinatorEvent, CoordinatorMarker, CoordinatorSynchronousProxy, Info,
@@ -12,7 +12,18 @@ use fidl_fuchsia_hardware_display::{
 use fuchsia_zircon as zx;
 use serde_json::json;
 
-const DEVICE_PATH: &'static str = "/dev/class/display-coordinator/000";
+fn get_display_coordinator_path() -> anyhow::Result<String> {
+    // TODO(liyl): This assumes that a display-coordinator device is ready before the test binary
+    // starts. Consider switching to `fuchsia_fs::directory::Watcher` if this flakes.
+    const DEVICE_CLASS_PATH: &'static str = "/dev/class/display-coordinator";
+    let entries = std::fs::read_dir(DEVICE_CLASS_PATH).context("read directory")?;
+    let entry = entries
+        .into_iter()
+        .next()
+        .context("no valid display-coordinator")?
+        .context("entry invalid")?;
+    Ok(String::from(entry.path().to_string_lossy()))
+}
 
 fn convert_info(info: &Info) -> DisplayInfo {
     DisplayInfo {
@@ -26,7 +37,12 @@ fn read_info() -> Result<DetectResult, Error> {
     // Connect to the display coordinator.
     let provider = {
         let (client_end, server_end) = zx::Channel::create();
-        fuchsia_component::client::connect_channel_to_protocol_at_path(server_end, DEVICE_PATH)?;
+        let display_coordinator_path =
+            get_display_coordinator_path().context("get display coordinator path")?;
+        fuchsia_component::client::connect_channel_to_protocol_at_path(
+            server_end,
+            &display_coordinator_path,
+        )?;
         ProviderSynchronousProxy::new(client_end)
     };
     let coordinator = {

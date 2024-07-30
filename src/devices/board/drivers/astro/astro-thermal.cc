@@ -9,7 +9,6 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
-#include <lib/ddk/platform-defs.h>
 
 #include <soc/aml-s905d2/s905d2-hw.h>
 
@@ -124,9 +123,9 @@ static const std::vector<fpbus::Metadata> thermal_metadata_ddr{
 static const fpbus::Node thermal_dev_pll = []() {
   fpbus::Node dev = {};
   dev.name() = "aml-thermal-pll";
-  dev.vid() = PDEV_VID_AMLOGIC;
-  dev.pid() = PDEV_PID_AMLOGIC_S905D2;
-  dev.did() = PDEV_DID_AMLOGIC_THERMAL_PLL;
+  dev.vid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_VID_AMLOGIC;
+  dev.pid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_PID_S905D2;
+  dev.did() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_THERMAL_PLL;
   dev.mmio() = thermal_mmios_pll;
   dev.irq() = thermal_irqs_pll;
   dev.metadata() = thermal_metadata_pll;
@@ -136,9 +135,9 @@ static const fpbus::Node thermal_dev_pll = []() {
 static const fpbus::Node thermal_dev_ddr = []() {
   fpbus::Node dev = {};
   dev.name() = "aml-thermal-ddr";
-  dev.vid() = PDEV_VID_AMLOGIC;
-  dev.pid() = PDEV_PID_AMLOGIC_S905D2;
-  dev.did() = PDEV_DID_AMLOGIC_THERMAL_DDR;
+  dev.vid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_VID_AMLOGIC;
+  dev.pid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_PID_S905D2;
+  dev.did() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_THERMAL_DDR;
   dev.mmio() = thermal_mmios_ddr;
   dev.irq() = thermal_irqs_ddr;
   dev.metadata() = thermal_metadata_ddr;

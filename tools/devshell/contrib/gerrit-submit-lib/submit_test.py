@@ -4,17 +4,15 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import subprocess
 import json
-import unittest
 import os
+import subprocess
+import unittest
+from typing import List
 from unittest import mock
 
-from typing import List
-
-import util
 import submit
-
+import util
 
 # Labels for CQ+1 and CQ+2 respectively.
 _CQ_PLUS1_LABEL = {"Commit-Queue": {"recommended": {"user_id": 1}}}

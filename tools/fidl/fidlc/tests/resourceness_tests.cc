@@ -74,9 +74,9 @@ type One = resource struct {};
 type Two = resource resource struct {};
 type Three = resource resource resource struct {};
 )FIDL");
-  library.ExpectFail(ErrDuplicateModifier, Token::KindAndSubkind(Token::Subkind::kResource));
-  library.ExpectFail(ErrDuplicateModifier, Token::KindAndSubkind(Token::Subkind::kResource));
-  library.ExpectFail(ErrDuplicateModifier, Token::KindAndSubkind(Token::Subkind::kResource));
+  library.ExpectFail(ErrDuplicateModifier, "modifier 'resource'");
+  library.ExpectFail(ErrDuplicateModifier, "modifier 'resource'");
+  library.ExpectFail(ErrDuplicateModifier, "modifier 'resource'");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 

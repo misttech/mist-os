@@ -282,7 +282,9 @@ TEST_F(CommandChannelTest, OneSentUntilStatus) {
           hci_spec::kReset);
   [[maybe_unused]] auto reset_id =
       cmd_channel()->SendCommand(std::move(reset), cb);
-  auto inquiry = CommandPacket::New(hci_spec::kInquiryCancel);
+  auto inquiry = hci::EmbossCommandPacket::New<
+      pw::bluetooth::emboss::InquiryCancelCommandWriter>(
+      hci_spec::kInquiryCancel);
   [[maybe_unused]] auto inquiry_id =
       cmd_channel()->SendCommand(std::move(inquiry), cb);
 
@@ -1283,8 +1285,8 @@ TEST_F(CommandChannelTest,
                        UpperBits(hci_spec::kInquiry),  // HCI_Inquiry opcode
                        0x00                            // parameter_total_size
       );
-  auto cmd_status = testing::InquiryCommandResponse(
-      pw::bluetooth::emboss::StatusCode::SUCCESS);
+  auto cmd_status = testing::CommandStatusPacket(
+      hci_spec::kInquiry, pw::bluetooth::emboss::StatusCode::SUCCESS);
 
   EXPECT_CMD_PACKET_OUT(test_device(), cmd, &cmd_status);
 
@@ -1702,7 +1704,9 @@ TEST_F(CommandChannelTest, ExclusiveCommands) {
         EXPECT_EQ(hci_spec::kCommandStatusEventCode, event.event_code());
         auto params = event.params<hci_spec::CommandStatusEventParams>();
         EXPECT_EQ(pw::bluetooth::emboss::StatusCode::SUCCESS, params.status);
-        auto packet = CommandPacket::New(kExclusiveTwo);
+        auto packet =
+            EmbossCommandPacket::New<pw::bluetooth::emboss::CommandHeaderView>(
+                kExclusiveTwo);
         id2 = cmd_channel->SendExclusiveCommand(std::move(packet),
                                                 exclusive_cb.share(),
                                                 kExclTwoCompleteEvent,
@@ -1715,13 +1719,17 @@ TEST_F(CommandChannelTest, ExclusiveCommands) {
         EXPECT_EQ(id1, callback_id);
         EXPECT_EQ(kExclOneCompleteEvent, event.event_code());
         // Add the second command when the first one completes.
-        auto packet = CommandPacket::New(kExclusiveOne);
+        auto packet =
+            EmbossCommandPacket::New<pw::bluetooth::emboss::CommandHeaderView>(
+                kExclusiveOne);
         id3 = cmd_channel->SendExclusiveCommand(std::move(packet),
                                                 exclusive_cb.share(),
                                                 kExclOneCompleteEvent,
                                                 {kExclusiveTwo});
         std::cout << "queued Second Exclusive One: " << id3 << std::endl;
-        packet = CommandPacket::New(kNonExclusive);
+        packet =
+            EmbossCommandPacket::New<pw::bluetooth::emboss::CommandHeaderView>(
+                kNonExclusive);
         cmd_channel->SendCommand(std::move(packet), nonexclusive_cb.share());
 
         break;
@@ -1761,12 +1769,16 @@ TEST_F(CommandChannelTest, ExclusiveCommands) {
   EXPECT_CMD_PACKET_OUT(test_device(), excl_one_cmd, &rsp_excl_one_status);
   EXPECT_CMD_PACKET_OUT(
       test_device(), nonexclusive_cmd, &nonexclusive_complete);
-  id1 = cmd_channel()->SendExclusiveCommand(CommandPacket::New(kExclusiveOne),
-                                            exclusive_cb.share(),
-                                            kExclOneCompleteEvent,
-                                            {kExclusiveTwo});
-  cmd_channel()->SendCommand(CommandPacket::New(kNonExclusive),
-                             nonexclusive_cb.share());
+  id1 = cmd_channel()->SendExclusiveCommand(
+      EmbossCommandPacket::New<pw::bluetooth::emboss::CommandHeaderView>(
+          kExclusiveOne),
+      exclusive_cb.share(),
+      kExclOneCompleteEvent,
+      {kExclusiveTwo});
+  cmd_channel()->SendCommand(
+      EmbossCommandPacket::New<pw::bluetooth::emboss::CommandHeaderView>(
+          kNonExclusive),
+      nonexclusive_cb.share());
   RunUntilIdle();
   // Should have received the ExclusiveOne status but not the complete.
   // ExclusiveTwo should be queued.
@@ -1791,8 +1803,10 @@ TEST_F(CommandChannelTest, ExclusiveCommands) {
       test_device(), nonexclusive_cmd, &nonexclusive_complete);
   EXPECT_CMD_PACKET_OUT(test_device(), excl_one_cmd, &rsp_excl_one_status);
   test_device()->SendCommandChannelPacket(rsp_two_complete);
-  cmd_channel()->SendCommand(CommandPacket::New(kNonExclusive),
-                             nonexclusive_cb.share());
+  cmd_channel()->SendCommand(
+      EmbossCommandPacket::New<pw::bluetooth::emboss::CommandHeaderView>(
+          kNonExclusive),
+      nonexclusive_cb.share());
   RunUntilIdle();
   EXPECT_EQ(5u,
             exclusive_cb_count);  // +2: rsp_two_complete, rsp_excl_one_status
@@ -1878,7 +1892,9 @@ TEST_F(CommandChannelTest, SendCommandWithLEMetaEventSubeventRsp) {
 
   EXPECT_CMD_PACKET_OUT(test_device(), cmd, &cmd_status_event);
 
-  auto cmd_packet = CommandPacket::New(kOpCode);
+  auto cmd_packet =
+      EmbossCommandPacket::New<pw::bluetooth::emboss::CommandHeaderView>(
+          kOpCode);
 
   size_t event_count = 0;
   auto event_cb = [&event_count](auto, const EventPacket& event) {
@@ -1929,22 +1945,26 @@ TEST_F(
                 kSubeventCode, [](const EmbossEventPacket&) {
                   return EventCallbackResult::kContinue;
                 }));
-  EXPECT_EQ(0u,
-            cmd_channel()->SendLeAsyncCommand(
-                CommandPacket::New(kOpCode),
-                [](auto, const auto&) {},
-                kSubeventCode));
+  EXPECT_EQ(
+      0u,
+      cmd_channel()->SendLeAsyncCommand(
+          EmbossCommandPacket::New<pw::bluetooth::emboss::CommandHeaderView>(
+              kOpCode),
+          [](auto, const auto&) {},
+          kSubeventCode));
 
   auto cmd = StaticByteBuffer(LowerBits(kOpCode),
                               UpperBits(kOpCode),
                               // parameter total size (0 byte payload)
                               0x00);
   EXPECT_CMD_PACKET_OUT(test_device(), std::move(cmd), );
-  EXPECT_NE(0u,
-            cmd_channel()->SendLeAsyncCommand(
-                CommandPacket::New(kOpCode),
-                [](auto, const auto&) {},
-                kSubeventCode + 1));
+  EXPECT_NE(
+      0u,
+      cmd_channel()->SendLeAsyncCommand(
+          EmbossCommandPacket::New<pw::bluetooth::emboss::CommandHeaderView>(
+              kOpCode),
+          [](auto, const auto&) {},
+          kSubeventCode + 1));
   RunUntilIdle();
 }
 
@@ -2012,7 +2032,10 @@ TEST_F(CommandChannelTest,
     event_count_0++;
   };
   auto id_0 = cmd_channel()->SendLeAsyncCommand(
-      CommandPacket::New(kOpCode0), std::move(event_cb_0), kSubeventCode);
+      EmbossCommandPacket::New<pw::bluetooth::emboss::CommandHeaderView>(
+          kOpCode0),
+      std::move(event_cb_0),
+      kSubeventCode);
   EXPECT_NE(0u, id_0);
 
   RunUntilIdle();
@@ -2038,7 +2061,10 @@ TEST_F(CommandChannelTest,
   // Command should be queued and not sent until after first complete event
   // received.
   auto id_1 = cmd_channel()->SendLeAsyncCommand(
-      CommandPacket::New(kOpCode1), std::move(event_cb_1), kSubeventCode);
+      EmbossCommandPacket::New<pw::bluetooth::emboss::CommandHeaderView>(
+          kOpCode1),
+      std::move(event_cb_1),
+      kSubeventCode);
   EXPECT_NE(0u, id_1);
   RunUntilIdle();
   EXPECT_EQ(0u, event_count_1);
@@ -2090,7 +2116,10 @@ TEST_F(
     event_count++;
   };
   auto id = cmd_channel()->SendLeAsyncCommand(
-      CommandPacket::New(kOpCode), std::move(event_cb), kSubeventCode);
+      EmbossCommandPacket::New<pw::bluetooth::emboss::CommandHeaderView>(
+          kOpCode),
+      std::move(event_cb),
+      kSubeventCode);
   EXPECT_NE(0u, id);
   RunUntilIdle();
   EXPECT_EQ(1u, event_count);

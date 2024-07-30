@@ -8,8 +8,8 @@ Gets relevant supported and in development Fuchsia platform versions from main c
 
 import argparse
 import json
-from pathlib import Path
 import sys
+from pathlib import Path
 from typing import Any, Dict
 
 
@@ -20,6 +20,7 @@ def main() -> int:
     parser.add_argument(
         "--version-history-path",
         type=Path,
+        required=True,
         help="Path to the version history JSON file",
     )
 
@@ -48,42 +49,78 @@ def get_gn_variables(version_history_path: Path) -> Dict[str, Any]:
 
     all_numbered_api_levels = [int(level) for level in api_levels]
 
+    retired_api_levels: list[int] = [
+        int(level)
+        for level in api_levels
+        if api_levels[level]["status"] == "unsupported"
+    ]
+    sunset_api_levels: list[int] = [
+        int(level)
+        for level in api_levels
+        if api_levels[level]["status"] == "sunset"
+    ]
     supported_api_levels: list[int] = [
         int(level)
         for level in api_levels
         if api_levels[level]["status"] == "supported"
     ]
+    # In-development API level 22 is temporarily supported alongside "NEXT".
+    # TODO(https://fxbug.dev/326277078): Remove 22 and this block.
     in_development_api_levels: list[int] = [
         int(level)
         for level in api_levels
         if api_levels[level]["status"] == "in-development"
     ]
+    assert len(in_development_api_levels) == 1
+    assert api_levels["22"]["status"] == "in-development"
 
-    assert (
-        len(in_development_api_levels) < 2
-    ), f"Should be at most one in-development API level. Found: {in_development_api_levels}"
+    assert len(api_levels) == (
+        len(retired_api_levels)
+        + len(sunset_api_levels)
+        + len(supported_api_levels)
+        + len(in_development_api_levels)
+    ), '"api_levels" contains a level with an unexpected "status".'
 
-    # Sometimes, there actually *isn't* an "in development" API level, and GN
-    # doesn't support null values. As a hack, if there's no in-development API
-    # level, just say that the greatest supported level is "in-development",
-    # even though it isn't.
-    #
-    # TODO: https://fxbug.dev/305961460 - Remove this special case.
-    if not in_development_api_levels:
-        in_development_api_level: int = max(supported_api_levels)
-    else:
-        in_development_api_level = in_development_api_levels[0]
+    # Special API levels are added below.
+    runtime_supported_api_levels = sunset_api_levels + supported_api_levels
+    idk_buildable_api_levels = supported_api_levels.copy()
+
+    # In-development API level 22 is temporarily still supported alongside
+    # "NEXT", but it was never in the IDK.
+    # TODO(https://fxbug.dev/326277078): Remove API level 22 and this line.
+    runtime_supported_api_levels += in_development_api_levels
+
+    # Explicitly add concrete special API levels.
+    # "HEAD" is not supported in the IDK - see https://fxbug.dev/334936990.
+    runtime_supported_api_levels += ["NEXT", "HEAD"]
+    idk_buildable_api_levels += ["NEXT"]
+
+    # Validate the JSON data, including the specific levels and their status.
+    expected_special_levels = ["NEXT", "HEAD", "PLATFORM"]
+    special_api_levels = data["data"]["special_api_levels"]
+    assert len(special_api_levels) == len(expected_special_levels)
+    for level in special_api_levels:
+        expected_level = expected_special_levels.pop(0)
+        assert (
+            level == expected_level
+        ), f'Special API level "{level}" is in the position expected to contain "{expected_level}".'
+        assert special_api_levels[level]["status"] == "in-development"
 
     return {
+        # All numbered API levels in the JSON file.
+        # TODO(https://fxbug.dev/326277078): Add that these levels are all
+        # frozen once "NEXT" is implemented.
         "all_numbered_api_levels": all_numbered_api_levels,
-        # TODO: https://fxbug.dev/305961460 - Remove this.
-        "in_development_api_level": in_development_api_level,
         # API levels that the IDK supports targeting.
-        "build_time_supported_api_levels": (
-            supported_api_levels + in_development_api_levels
-        ),
+        "idk_buildable_api_levels": idk_buildable_api_levels,
+        # API levels that the platform build supports at runtime.
+        "runtime_supported_api_levels": runtime_supported_api_levels,
         # API levels whose contents should not change anymore.
-        "frozen_api_levels": supported_api_levels,
+        "frozen_api_levels": sunset_api_levels + supported_api_levels,
+        # The greatest number assigned to a numbered API level.
+        # TODO(https://fxbug.dev/305961460): Remove this because the highest
+        # numbered API level should not be particularly special.
+        "deprecated_highest_numbered_api_level": max(all_numbered_api_levels),
     }
 
 

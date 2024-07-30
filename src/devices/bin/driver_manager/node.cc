@@ -1084,6 +1084,8 @@ void Node::StartDriver(fuchsia_component_runner::wire::ComponentStartInfo start_
       "true";
   bool use_next_vdso =
       fdf_internal::ProgramValue(start_info.program(), "use_next_vdso").value_or("") == "true";
+  bool use_dynamic_linker =
+      fdf_internal::ProgramValue(start_info.program(), "use_dynamic_linker").value_or("") == "true";
 
   if (host_restart_on_crash && colocate) {
     LOGF(ERROR,
@@ -1111,6 +1113,20 @@ void Node::StartDriver(fuchsia_component_runner::wire::ComponentStartInfo start_
 
   // Launch a driver host if we are not colocated.
   if (!colocate) {
+    if (use_dynamic_linker) {
+      (*node_manager_)
+          ->CreateDriverHostDynamicLinker(
+              [this, cb = std::move(cb)](zx::result<DriverHost*> driver_host) mutable {
+                if (driver_host.is_error()) {
+                  cb(driver_host.take_error());
+                  return;
+                }
+                driver_host_ = driver_host.value();
+                // TODO(https://fxbug.dev/341998660): load the driver.
+                cb(zx::error(ZX_ERR_NOT_SUPPORTED));
+              });
+      return;
+    }
     auto result = (*node_manager_)->CreateDriverHost(use_next_vdso);
     if (result.is_error()) {
       cb(result.take_error());
@@ -1119,6 +1135,11 @@ void Node::StartDriver(fuchsia_component_runner::wire::ComponentStartInfo start_
     driver_host_ = result.value();
   }
 
+  if (use_dynamic_linker) {
+    // TODO(https://fxbug.dev/341998660): load the driver.
+    cb(zx::error(ZX_ERR_NOT_SUPPORTED));
+    return;
+  }
   // Bind the Node associated with the driver.
   auto [client_end, server_end] = fidl::Endpoints<fdf::Node>::Create();
   node_ref_.emplace(

@@ -6,6 +6,7 @@
 
 #include <lib/async/cpp/task.h>
 #include <lib/async/default.h>
+#include <lib/fidl/cpp/hlcpp_conversion.h>
 #include <lib/fit/function.h>
 #include <lib/trace/event.h>
 
@@ -128,49 +129,49 @@ std::shared_ptr<Flatland> FlatlandManager::NewFlatland(
     const std::vector<std::shared_ptr<allocation::BufferCollectionImporter>>&
         buffer_collection_importers) const {
   return Flatland::New(
-      std::move(dispatcher_holder), std::move(request), session_id,
+      std::move(dispatcher_holder), fidl::HLCPPToNatural(std::move(request)), session_id,
       std::move(destroy_instance_function), std::move(flatland_presenter), std::move(link_system),
       std::move(uber_struct_queue), std::move(buffer_collection_importers),
       // All the register callbacks will be called on the instance thread, so we
       // must make sure to post the work back on the main thread.
       /*register_view_focuser*/
-      [this](fidl::InterfaceRequest<fuchsia::ui::views::Focuser> focuser, zx_koid_t view_ref_koid) {
+      [this](fidl::ServerEnd<fuchsia_ui_views::Focuser> focuser, zx_koid_t view_ref_koid) {
         async::PostTask(executor_.dispatcher(),
                         [this, focuser = std::move(focuser), view_ref_koid]() mutable {
                           TRACE_DURATION("gfx", "FlatlandManager::NewFlatland[Focuser]");
                           CheckIsOnMainThread();
-                          register_view_focuser_(std::move(focuser), view_ref_koid);
+                          register_view_focuser_(fidl::NaturalToHLCPP(focuser), view_ref_koid);
                         });
       },
       /*register_view_ref_focused*/
-      [this](fidl::InterfaceRequest<fuchsia::ui::views::ViewRefFocused> view_ref_focused,
+      [this](fidl::ServerEnd<fuchsia_ui_views::ViewRefFocused> view_ref_focused,
              zx_koid_t view_ref_koid) {
         async::PostTask(
             executor_.dispatcher(),
             [this, view_ref_focused = std::move(view_ref_focused), view_ref_koid]() mutable {
               TRACE_DURATION("gfx", "FlatlandManager::NewFlatland[ViewRefFocused]");
               CheckIsOnMainThread();
-              register_view_ref_focused_(std::move(view_ref_focused), view_ref_koid);
+              register_view_ref_focused_(fidl::NaturalToHLCPP(view_ref_focused), view_ref_koid);
             });
       },
       /*register_touch_source*/
-      [this](fidl::InterfaceRequest<fuchsia::ui::pointer::TouchSource> touch_source,
+      [this](fidl::ServerEnd<fuchsia_ui_pointer::TouchSource> touch_source,
              zx_koid_t view_ref_koid) {
         async::PostTask(executor_.dispatcher(),
                         [this, touch_source = std::move(touch_source), view_ref_koid]() mutable {
                           TRACE_DURATION("gfx", "FlatlandManager::NewFlatland[TouchSource]");
                           CheckIsOnMainThread();
-                          register_touch_source_(std::move(touch_source), view_ref_koid);
+                          register_touch_source_(fidl::NaturalToHLCPP(touch_source), view_ref_koid);
                         });
       },
       /*register_mouse_source*/
-      [this](fidl::InterfaceRequest<fuchsia::ui::pointer::MouseSource> mouse_source,
+      [this](fidl::ServerEnd<fuchsia_ui_pointer::MouseSource> mouse_source,
              zx_koid_t view_ref_koid) {
         async::PostTask(executor_.dispatcher(),
                         [this, mouse_source = std::move(mouse_source), view_ref_koid]() mutable {
                           TRACE_DURATION("gfx", "FlatlandManager::NewFlatland[MouseSource]");
                           CheckIsOnMainThread();
-                          register_mouse_source_(std::move(mouse_source), view_ref_koid);
+                          register_mouse_source_(fidl::NaturalToHLCPP(mouse_source), view_ref_koid);
                         });
       });
 }
@@ -181,8 +182,8 @@ void FlatlandManager::CreateFlatlandDisplay(
   FX_DCHECK(flatland_instances_.find(id) == flatland_instances_.end());
   FX_DCHECK(flatland_display_instances_.find(id) == flatland_display_instances_.end());
 
-  // TODO(https://fxbug.dev/42156949): someday there will be a DisplayToken or something for the client
-  // to identify which hardware display this FlatlandDisplay is associated with.  For now:
+  // TODO(https://fxbug.dev/42156949): someday there will be a DisplayToken or something for the
+  // client to identify which hardware display this FlatlandDisplay is associated with.  For now:
   // hard-coded.
   auto hw_display = primary_display_;
 
@@ -280,9 +281,9 @@ void FlatlandManager::SendHintsToStartRendering() {
     Flatland::FuturePresentationInfos presentation_infos_copy(presentation_infos.size());
     for (size_t i = 0; i < presentation_infos.size(); ++i) {
       auto& info = presentation_infos[i];
-      fuchsia::scenic::scheduling::PresentationInfo info_copy;
-      info_copy.set_latch_point(info.latch_point.get());
-      info_copy.set_presentation_time(info.presentation_time.get());
+      fuchsia_scenic_scheduling::PresentationInfo info_copy;
+      info_copy.latch_point(info.latch_point.get());
+      info_copy.presentation_time(info.presentation_time.get());
       presentation_infos_copy[i] = std::move(info_copy);
     }
 

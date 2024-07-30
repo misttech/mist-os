@@ -378,9 +378,6 @@ Devfs::Devfs(std::optional<Devnode>& root) : root_(root.emplace(*this)) {
       // TODO(https://fxbug.dev/42065064): Remove.
       "cpu-ctrl",
 
-      // TODO(https://fxbug.dev/42065065): Remove.
-      "display-coordinator",
-
       // TODO(https://fxbug.dev/42065067): Remove.
       "goldfish-address-space",
       "goldfish-control",

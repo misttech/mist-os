@@ -9,30 +9,22 @@ delivery system itself.
 
 """
 import functools
-from collections import defaultdict
-from dataclasses import dataclass, field
+import json
 import os
 import pathlib
 import shutil
-import json
-from typing import (
-    Any,
-    Dict,
-    List,
-    ItemsView,
-    Optional,
-    Set,
-    TextIO,
-    Tuple,
-    Union,
-)
+from collections import defaultdict
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional, Set, TextIO, Tuple, Union
 
 import serialization
-from serialization import json_dump, json_dumps, json_load, serialize_json
+from assembly import package_copier
+from assembly.package_manifest import PackageManifest
+from serialization import serialize_json
 
-from .image_assembly_config import ImageAssemblyConfig, KernelInfo
-from .common import FileEntry, FilePath, fast_copy, fast_copy_makedirs
-from .package_manifest import BlobEntry, PackageManifest, SubpackageEntry
+from .common import FileEntry, FilePath, fast_copy_makedirs
+from .image_assembly_config import KernelInfo
+from .package_copier import PackageCopier
 
 __all__ = [
     "AIBCreator",
@@ -75,7 +67,7 @@ class PackageManifestParsingException(Exception):
     ...
 
 
-@dataclass
+@dataclass(order=True)
 @serialize_json
 class DriverDetails:
     """Details for constructing a driver manifest fragment from a driver package"""
@@ -315,7 +307,7 @@ class AssemblyInputBundle:
         return serialization.json_dumps(self, indent=2)
 
     def add_packages(self, packages: List[PackageDetails]):
-        for details in packages:
+        for details in sorted(packages):
             # This 'in' check only looks at the package manifest file path and
             # ignores the package set. This is intentional in order to
             # deduplicate packages across sets.
@@ -412,9 +404,6 @@ class AIBCreator:
         # The packages (paths to package manifests)
         self.packages: Set[PackageDetails] = set()
 
-        # The "system packages"
-        self.system: Set[FilePath] = set()
-
         # The shell command configurations
         self.shell_commands: Dict[str, List[str]] = defaultdict(list)
 
@@ -433,36 +422,23 @@ class AIBCreator:
         # The config_data entries
         self.config_data: FileEntryList = []
 
-        # Base driver package manifests
-        self.base_drivers: Set[FilePath] = set()
-
-        # Base driver component distribution manifests
-        self.base_driver_component_files: List[dict] = list()
-
         # Additional base drivers directly specified without requiring
         # us to parse GN generated files
-        self.provided_base_driver_details: List[dict] = list()
-
-        # Boot driver package manifests
-        self.boot_drivers: Set[FilePath] = set()
-
-        # Boot driver component distribution manifests
-        self.boot_driver_component_files: List[dict] = list()
+        self.provided_base_driver_details: List[DriverDetails] = list()
 
         # Additional boot drivers directly specified without requiring
         # us to parse GN generated files
-        self.provided_boot_driver_details: List[dict] = list()
+        self.provided_boot_driver_details: List[DriverDetails] = list()
 
         # A set containing all the unique packageUrls seen by the AIBCreator instance
         self.package_urls: Set[str] = set()
 
-        # A set containing the unique subpackage merkles, used to keep track of
-        # which subpackages have already been copied.
-        self.subpackages: Set[Merkle] = set()
-
         # A list of CompiledPackageDefinitions from either a parsed json GN
         # scope, or directly set by the legacy AIB creator.
         self.compiled_packages: List[CompiledPackageDefinitionFromGN] = list()
+
+        # The package copying mechanism.
+        self.package_copier: PackageCopier = PackageCopier(outdir)
 
     def build(self) -> Tuple[AssemblyInputBundle, FilePath, DepSet]:
         """
@@ -475,11 +451,11 @@ class AIBCreator:
             - the return value contains a list of all files read/written by the
             copying operation (ie. depfile contents)
         """
+
         # Remove the existing <outdir>, and recreate it and the "subpackages"
         # subdirectory.
         if os.path.exists(self.outdir):
             shutil.rmtree(self.outdir)
-        os.makedirs(os.path.join(self.outdir, "subpackages"))
 
         # Track all files we read
         deps: DepSet = set()
@@ -494,105 +470,44 @@ class AIBCreator:
         if kernel_args:
             result.kernel.args = kernel_args
 
-        # Copy the manifests for the packages into the assembly bundle
-        (pkgs, pkg_blobs, pkg_deps) = self._copy_packages()
-        deps.update(pkg_deps)
-        result.add_packages(pkgs)
+        # Copy the manifests for the packages into the assembly bundle.
+        result.add_packages(
+            self._prepare_packages_for_copying(sorted(self.packages))
+        )
 
-        # Copy base driver packages into the base driver list of the assembly bundle
-        for d in self.provided_base_driver_details:
-            if d.package not in self.base_drivers:
-                self.base_drivers.add(d.package)
-            else:
-                raise ValueError(
-                    f"Duplicate driver package {d} specified in"
-                    " base drivers list: {self.base_drivers}"
+        # Copy the base drivers' packages.
+        result.base_drivers.extend(
+            sorted(
+                self._prepare_drivers_for_copying(
+                    self.provided_base_driver_details, "base"
                 )
-        (
-            base_driver_pkgs,
-            base_driver_blobs,
-            base_driver_deps,
-        ) = self._copy_packages(
-            [PackageDetails(m, "base_drivers") for m in self.base_drivers]
+            )
         )
-        deps.update(base_driver_deps)
 
-        (base_driver_details, base_driver_deps) = self._get_driver_details(
-            self.base_driver_component_files,
-            self.provided_base_driver_details,
-            base_driver_pkgs,
-        )
-        result.base_drivers.extend(base_driver_details)
-        deps.update(base_driver_deps)
-
-        # Copy boot driver packages into the boot driver list of the assembly bundle
-        for d in self.provided_boot_driver_details:
-            if d.package not in self.boot_drivers:
-                self.boot_drivers.add(d.package)
-            else:
-                raise ValueError(
-                    f"Duplicate driver package {d} specified in"
-                    " base drivers list: {self.boot_drivers}"
+        # Copy bootfs drivers' packages.
+        result.boot_drivers.extend(
+            sorted(
+                self._prepare_drivers_for_copying(
+                    self.provided_boot_driver_details, "bootfs"
                 )
-        (
-            boot_driver_pkgs,
-            boot_driver_blobs,
-            boot_driver_deps,
-        ) = self._copy_packages(
-            [PackageDetails(m, "boot_drivers") for m in self.boot_drivers]
+            )
         )
-        deps.update(boot_driver_deps)
 
-        (boot_driver_details, boot_driver_deps) = self._get_driver_details(
-            self.boot_driver_component_files,
-            self.provided_boot_driver_details,
-            boot_driver_pkgs,
-        )
-        result.boot_drivers.extend(boot_driver_details)
-        deps.update(boot_driver_deps)
-
-        # Copy the manifests for the system package set into the assembly bundle
-        (system_pkgs, system_blobs, system_deps) = self._copy_packages(
-            self.system
-        )
-        deps.update(system_deps)
-        result.add_packages(system_pkgs)
-
-        bootfs_pkg_blobs = []
+        # Copy the package that contains the bootfs files.
         if self.bootfs_files_package:
             (
-                bootfs_files_pkg,
-                bootfs_files_pkg_blobs,
-                bootfs_files_pkg_deps,
-            ) = self._copy_package_from_path(
-                self.bootfs_files_package, "bootfs_packages"
-            )
-            deps.update(bootfs_files_pkg_deps)
-            result.bootfs_files_package = bootfs_files_pkg
-            bootfs_pkg_blobs.extend(bootfs_files_pkg_blobs)
+                bootfs_pkg_manifest_path,
+                _,
+            ) = self.package_copier.add_package(self.bootfs_files_package)
+            result.bootfs_files_package = bootfs_pkg_manifest_path
 
         # Add shell_commands field to assembly_config.json field in AIBCreator
         result.shell_commands = self.shell_commands
 
-        # Deduplicate all blobs by merkle, but don't validate unique sources for
-        # each merkle, last one wins (we trust that in the in-tree build isn't going
-        # to make invalid merkles).
-        all_blobs = {}
-        for merkle, source in [
-            *pkg_blobs,
-            *base_driver_blobs,
-            *boot_driver_blobs,
-            *system_blobs,
-            *bootfs_pkg_blobs,
-        ]:
-            all_blobs[merkle] = source
-
         # Copy all the blobs to their dir in the out-of-tree layout
-        (all_blobs, blob_deps) = self._copy_blobs(all_blobs)
-        deps.update(blob_deps)
-        result.blobs = set(
-            [os.path.relpath(blob_path) for blob_path in all_blobs]
-        )
+        (all_blobs, pkg_copy_deps) = self.package_copier.perform_copy()
+        deps.update(pkg_copy_deps)
+        result.blobs = set(all_blobs)
 
         # Copy the bootfs entries
         (bootfs, bootfs_deps) = self._copy_file_entries(
@@ -711,328 +626,85 @@ class AIBCreator:
 
         return (result, assembly_config_path, deps)
 
-    def _get_driver_details(
+    def _prepare_packages_for_copying(
         self,
-        driver_component_files: List[dict],
-        provided_driver_details: List[dict],
-        driver_pkgs: Set[PackageDetails],
-    ) -> List[DriverDetails]:
-        """Read the driver package manifests and produce DriverDetails for the AIB config"""
-        driver_details_list: List[DriverDetails] = list()
-
-        # The deps touched by this function.
-        deps: DepSet = set()
-
-        # Associate the set of base driver component files with their packages
-        component_files: Dict[str, List[str]] = dict()
-        for component_manifest in driver_component_files:
-            with open(
-                component_manifest["distribution_manifest"], "r"
-            ) as manifest_file:
-                manifest: List[Dict] = json.load(manifest_file)
-                component_manifest_list = component_files.setdefault(
-                    component_manifest["package_name"], []
-                )
-                component_manifest_list += [
-                    f["destination"]
-                    for f in manifest
-                    if f["destination"].startswith("meta/")
-                    and f["destination"].endswith(".cm")
-                ]
-
-            deps.add(component_manifest["distribution_manifest"])
-
-        # Include the component lists which were provided directly for
-        # packages instead of those which were generated by GN metadata walks
-        for driver_details in provided_driver_details:
-            with open(driver_details.package, "r") as file:
-                try:
-                    manifest = json_load(PackageManifest, file)
-                except Exception as exc:
-                    raise PackageManifestParsingException(
-                        f"loading PackageManifest from {driver_details.package}"
-                    ) from exc
-
-                package_name = manifest.package.name
-                if component_files.get(package_name):
-                    raise ValueError(
-                        f"Duplicate package {package_name}"
-                        " specified in driver_packages and"
-                        " provided_driver_details list"
-                    )
-                component_files[package_name] = driver_details.components
-
-        for package_detail in sorted(driver_pkgs):
-            with open(
-                os.path.join(self.outdir, package_detail.package), "r"
-            ) as file:
-                try:
-                    manifest = json_load(PackageManifest, file)
-                except Exception as exc:
-                    raise PackageManifestParsingException(
-                        f"loading PackageManifest from {package_detail.package}"
-                    ) from exc
-
-                package_name = manifest.package.name
-                driver_details_list.append(
-                    DriverDetails(
-                        package_detail.package,
-                        # Include the driver components specified for this package
-                        component_files[package_name],
-                    )
-                )
-
-        return driver_details_list, deps
-
-    def _copy_packages(
-        self,
-        package_details_list: PackageDetailsList = None,
-    ) -> Tuple[PackageDetailsList, BlobList, DepSet]:
-        """Copy package manifests to the assembly bundle outdir, returning the set of blobs
-        that need to be copied as well (so that they blob copying can be done in a
-        single, deduplicated step).
-        """
-        if package_details_list is None:
-            package_details_list = self.packages
+        package_details_list: List[PackageDetails],
+    ) -> PackageDetailsList:
+        """Queue up the packages for copying, and return the list of package details, using the destination path"""
 
         # Resultant paths to package manifests
-        packages: PackageDetailsList = []
-
-        # All of the blobs to copy, deduplicated by merkle, and validated for
-        # conflicting sources.
-        blobs: BlobList = []
-
-        # The deps touched by this function.
-        deps: DepSet = set()
+        package_details: PackageDetailsList = []
+        manifest_path_mapping: Dict[FilePath, FilePath] = {}
 
         # Bail early if empty
-        if len(package_details_list) == 0:
-            return (packages, blobs, deps)
+        if not package_details_list:
+            return package_details
 
         # Open each manifest, record the blobs, and then copy it to its destination,
         # sorted by path to the package manifest.
-        for package_detail in sorted(package_details_list):
-            (manifest, blob_list, dep_set) = self._copy_package_from_path(
-                package_detail.package, package_detail.set
-            )
-            if manifest:
-                # Track the package manifest in our set of packages
-                packages.append(PackageDetails(manifest, package_detail.set))
-                blobs.extend(blob_list)
-                deps.update(dep_set)
-
-        return (packages, blobs, deps)
-
-    def _copy_package_from_path(
-        self,
-        package_manifest_path: FilePath,
-        set_name: str,
-    ) -> Tuple[Optional[FilePath], BlobList, DepSet]:
-        """Copy a package manifest by its path to the assembly bundle outdir,
-        adding its blobs to the set of blobs that need to be copied as well.
-        If the package has subpackages, recursively copy those as well, skipping
-        any subpackages that have already been copied.
-        """
-
-        def validate_unique_packages(package_url, package_path):
-            invalid = False
-            if package_url in self.package_urls:
-                invalid = True
-                message = f"There is a duplicate declaration of {package_url} in {set_name}"
-            if os.path.exists(package_path):
-                invalid = True
-                message = f"The package path {package_path} already exists, and can't be replaced."
-            if invalid:
-                raise DuplicatePackageException(message)
-            self.package_urls.add(package_url)
-
-        # All of the blobs to copy, deduplicated by merkle, and validated for
-        # conflicting sources.
-        blobs: BlobList = []
-
-        # The deps touched by this function.
-        deps: DepSet = set()
-
-        with open(package_manifest_path, "r") as file:
+        for package_detail in package_details_list:
             try:
-                manifest = json_load(PackageManifest, file)
-            except Exception as exc:
-                raise PackageManifestParsingException(
-                    f"loading PackageManifest from {package_manifest_path}"
-                ) from exc
+                (destination_path, manifest) = self.package_copier.add_package(
+                    package_detail.package
+                )
+            except package_copier.DuplicatePackageException as e:
+                raise DuplicatePackageException(e)
 
-            package_name = manifest.package.name
-            # Track in deps, since it was opened.
-            deps.add(package_manifest_path)
+            self._validate_package_url(manifest, package_detail.set)
 
-        # Create the directory for the packages, now that we know it will exist
-        packages_dir = "packages"
-        os.makedirs(os.path.join(self.outdir, packages_dir), exist_ok=True)
+            # Track the package manifest in our set of packages
+            package_details.append(
+                PackageDetails(destination_path, package_detail.set)
+            )
 
-        # Path to which we will write the new manifest within the input bundle.
-        rebased_destination = os.path.join(packages_dir, package_name)
+            # Create the mapping from the source to the copied path, so we can correct the driver
+            # details entries.
+            manifest_path_mapping[package_detail.package] = destination_path
 
-        # Bail if we are trying to add a duplicate package
-        validate_unique_packages(
-            AIBCreator.package_url_template.format(
-                repository=manifest.repository,
-                package_name=manifest.package.name,
-            ),
-            rebased_destination,
+        return package_details
+
+    def _prepare_drivers_for_copying(
+        self, driver_details_list: List[DriverDetails], pkg_set: str
+    ) -> List[DriverDetails]:
+        """Queue up the package copying for each driver, returning a DriverDetails with the new destination path"""
+
+        driver_details: List[DriverDetails] = []
+
+        for driver_detail in driver_details_list:
+            try:
+                (destination_path, manifest) = self.package_copier.add_package(
+                    driver_detail.package
+                )
+            except package_copier.DuplicatePackageException as e:
+                raise DuplicatePackageException(e)
+
+            self._validate_package_url(manifest, pkg_set)
+
+            driver_details.append(
+                DriverDetails(
+                    destination_path,
+                    driver_detail.components,
+                )
+            )
+
+        return driver_details
+
+    def _validate_package_url(
+        self, manifest: PackageManifest, pkg_set: str
+    ) -> None:
+        """Validate that a given package url only appears once in the set of packages being copied"""
+        package_url = AIBCreator.package_url_template.format(
+            repository=manifest.repository,
+            package_name=manifest.package.name,
         )
 
-        # But skip config-data, if we find it.
-        if "config-data" == package_name:
-            return (None, [], [])
-
-        try:
-            self._copy_package(
-                manifest,
-                os.path.dirname(package_manifest_path),
-                rebased_destination,
-                blobs,
-                deps,
+        # Validate that there's a single source for each package url.
+        if package_url not in self.package_urls:
+            self.package_urls.add(package_url)
+        else:
+            raise DuplicatePackageException(
+                f"There is a duplicate declaration of {package_url} in {pkg_set}"
             )
-        except Exception as e:
-            raise AssemblyInputBundleCreationException(
-                f"Copying '{set_name}' package '{package_name}' with manifest: {package_manifest_path}"
-            ) from e
-
-        return (rebased_destination, blobs, deps)
-
-    def _copy_package(
-        self,
-        manifest: PackageManifest,
-        package_manifest_dir: FilePath,
-        rebased_destination: FilePath,
-        blobs: BlobList,
-        deps: DepSet,
-    ):
-        """Copy a package manifest to the assembly bundle outdir, adding its
-        blobs to the set of blobs that need to be copied as well. If the package
-        has subpackages, recursively copy those as well, skipping any
-        subpackages that have already been copied.
-        """
-
-        # Instead of copying the package manifest itself, the contents of the
-        # manifest needs to be rewritten to reflect the new location of the
-        # blobs within it.
-        new_manifest = PackageManifest(manifest.package, [])
-        new_manifest.repository = manifest.repository
-        new_manifest.set_paths_relative(True)
-
-        # For each blob in the manifest:
-        #  1) add it to set of all blobs
-        #  2) add it to the PackageManifest that will be written to the Assembly
-        #     Input Bundle, using the correct source path for within the
-        #     Assembly Input Bundle.
-        for blob in manifest.blobs:
-            source = blob.source_path
-            if source is None:
-                raise ValueError(
-                    f"Found a blob with no source path: {blob.path}"
-                )
-
-            # Make the path relative to the package manifest if necessary.
-            if manifest.blob_sources_relative == "file":
-                source = os.path.join(package_manifest_dir, source)
-
-            blobs.append((blob.merkle, source))
-
-            blob_destination = _make_internal_blob_path(blob.merkle)
-            relative_blob_destination = os.path.relpath(
-                blob_destination, os.path.dirname(rebased_destination)
-            )
-            new_manifest.blobs.append(
-                BlobEntry(
-                    blob.path,
-                    blob.merkle,
-                    blob.size,
-                    source_path=relative_blob_destination,
-                )
-            )
-
-        for subpackage in manifest.subpackages:
-            # Copy the SubpackageEntry to the new_manifest, with the
-            # updated `subpackages/<merkle>` path
-            subpackage_destination = _make_internal_subpackage_path(
-                subpackage.merkle
-            )
-            relative_subpackage_destination = os.path.relpath(
-                subpackage_destination, os.path.dirname(rebased_destination)
-            )
-            new_manifest.subpackages.append(
-                SubpackageEntry(
-                    subpackage.name,
-                    subpackage.merkle,
-                    manifest_path=relative_subpackage_destination,
-                )
-            )
-
-            if subpackage.merkle not in self.subpackages:
-                # This is a new subpackage. Track it and copy it and any of its
-                # subpackages, recursively.
-                self.subpackages.add(subpackage.merkle)
-
-                # Make the path relative to the package manifest if necessary.
-                subpackage_manifest_path = subpackage.manifest_path
-                if manifest.blob_sources_relative == "file":
-                    subpackage_manifest_path = os.path.join(
-                        package_manifest_dir, subpackage_manifest_path
-                    )
-
-                with open(subpackage_manifest_path, "r") as file:
-                    try:
-                        subpackage_manifest = json_load(PackageManifest, file)
-                    except Exception as exc:
-                        raise PackageManifestParsingException(
-                            f"loading PackageManifest from {subpackage_manifest_path}"
-                        ) from exc
-
-                    # Track in deps, since it was opened.
-                    deps.add(subpackage_manifest_path)
-
-                try:
-                    self._copy_package(
-                        subpackage_manifest,
-                        os.path.dirname(subpackage_manifest_path),
-                        subpackage_destination,
-                        blobs,
-                        deps,
-                    )
-                except Exception as e:
-                    raise AssemblyInputBundleCreationException(
-                        f"Copying subpackage '{subpackage.name}' with manifest: {subpackage_manifest_path}"
-                    ) from e
-
-        package_manifest_destination = os.path.join(
-            self.outdir, rebased_destination
-        )
-        with open(package_manifest_destination, "w") as new_manifest_file:
-            json_dump(new_manifest, new_manifest_file)
-
-    def _copy_blobs(
-        self, blobs: Dict[Merkle, FilePath]
-    ) -> Tuple[List[FilePath], DepSet]:
-        blob_paths: List[FilePath] = []
-        deps: DepSet = set()
-
-        # Bail early if empty
-        if len(blobs) == 0:
-            return (blob_paths, deps)
-
-        # Create the directory for the blobs, now that we know it will exist.
-        blobs_dir = os.path.join(self.outdir, "blobs")
-        os.makedirs(blobs_dir)
-
-        # Copy all blobs
-        for merkle, source in blobs.items():
-            blob_path = _make_internal_blob_path(merkle)
-            blob_destination = os.path.join(self.outdir, blob_path)
-            blob_paths.append(blob_path)
-            deps.add(fast_copy(source, blob_destination))
-
-        return (blob_paths, deps)
 
     def _copy_component_includes(
         self,
@@ -1177,17 +849,3 @@ class AIBCreator:
             )
 
         return (results, deps)
-
-
-def _make_internal_blob_path(merkle: str) -> FilePath:
-    """Common function to compute the destination path to a blob within the
-    AssemblyInputBundle's folder hierarchy.
-    """
-    return os.path.join("blobs", merkle)
-
-
-def _make_internal_subpackage_path(merkle: str) -> FilePath:
-    """Common function to compute the destination path to a subpackage within
-    the AssemblyInputBundle's folder hierarchy.
-    """
-    return os.path.join("subpackages", merkle)

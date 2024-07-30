@@ -188,7 +188,7 @@ mod test {
         let mut decoder = LogsDataStream::new(socket);
         let test_log = LogsDataBuilder::new(BuilderArgs {
             component_url: None,
-            moniker: "ffx".to_string(),
+            moniker: "ffx".try_into().unwrap(),
             severity: Severity::Info,
             timestamp_nanos: Timestamp::from(BOOT_TS as i64),
         })
@@ -215,7 +215,7 @@ mod test {
         let mut decoder = LogsDataStream::new(socket);
         let test_log = LogsDataBuilder::new(BuilderArgs {
             component_url: None,
-            moniker: "ffx".to_string(),
+            moniker: "ffx".try_into().unwrap(),
             severity: Severity::Info,
             timestamp_nanos: Timestamp::from(BOOT_TS as i64),
         })
@@ -242,7 +242,7 @@ mod test {
             .map(|value| {
                 LogsDataBuilder::new(BuilderArgs {
                     component_url: None,
-                    moniker: "ffx".to_string(),
+                    moniker: "ffx".try_into().unwrap(),
                     severity: Severity::Info,
                     timestamp_nanos: Timestamp::from(BOOT_TS as i64),
                 })
@@ -278,7 +278,7 @@ mod test {
         );
         let test_log = LogsDataBuilder::new(BuilderArgs {
             component_url: None,
-            moniker: "ffx".to_string(),
+            moniker: "ffx".try_into().unwrap(),
             severity: Severity::Info,
             timestamp_nanos: Timestamp::from(BOOT_TS as i64),
         })
@@ -305,7 +305,7 @@ mod test {
         let mut decoder = LogsDataStream::new(socket);
         let test_log = LogsDataBuilder::new(BuilderArgs {
             component_url: None,
-            moniker: "ffx".to_string(),
+            moniker: "ffx".try_into().unwrap(),
             severity: Severity::Info,
             timestamp_nanos: Timestamp::from(BOOT_TS as i64),
         })

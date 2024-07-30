@@ -21,8 +21,8 @@ void UicCmdProcessor::HandleUicCmd(UicCommandOpcode value) {
   } else {
     // TODO(https://fxbug.dev/42075643): Revisit it when UICCMD error handling logic is implemented
     // in the driver.
-    zxlogf(ERROR, "UFS MOCK: uiccmd value: 0x%x is not supported",
-           static_cast<unsigned int>(value));
+    FDF_LOG(ERROR, "UFS MOCK: uiccmd value: 0x%x is not supported",
+            static_cast<unsigned int>(value));
   }
 
   InterruptStatusReg::Get()
@@ -91,7 +91,7 @@ void UicCmdProcessor::DefaultDmeGetHandler(UfsMockDevice &mock_device, uint32_t 
       mib_value = kGranularity;
       break;
     default:
-      zxlogf(ERROR, "UFS MOCK: Get attribute 0x%x is not supported", mib_attribute);
+      FDF_LOG(ERROR, "UFS MOCK: Get attribute 0x%x is not supported", mib_attribute);
       break;
   }
   UicCommandArgument3Reg::Get().FromValue(mib_value).WriteTo(mock_device.GetRegisters());
@@ -144,7 +144,7 @@ void UicCmdProcessor::DefaultDmeSetHandler(UfsMockDevice &mock_device, uint32_t 
       }
       break;
     default:
-      zxlogf(ERROR, "UFS MOCK: Set attribute 0x%x is not supported", mib_attribute);
+      FDF_LOG(ERROR, "UFS MOCK: Set attribute 0x%x is not supported", mib_attribute);
       break;
   }
 }
@@ -161,7 +161,7 @@ void UicCmdProcessor::DefaultDmePeerGetHandler(UfsMockDevice &mock_device, uint3
       mib_value = kGranularity;
       break;
     default:
-      zxlogf(ERROR, "UFS MOCK: Peer Get attribute 0x%x is not supported", mib_attribute);
+      FDF_LOG(ERROR, "UFS MOCK: Peer Get attribute 0x%x is not supported", mib_attribute);
       break;
   }
   UicCommandArgument3Reg::Get().FromValue(mib_value).WriteTo(mock_device.GetRegisters());
@@ -175,7 +175,7 @@ void UicCmdProcessor::DefaultDmePeerSetHandler(UfsMockDevice &mock_device, uint3
     case PA_Granularity:
       break;
     default:
-      zxlogf(ERROR, "UFS MOCK: Peer Set attribute 0x%x is not supported", mib_attribute);
+      FDF_LOG(ERROR, "UFS MOCK: Peer Set attribute 0x%x is not supported", mib_attribute);
       break;
   }
 }

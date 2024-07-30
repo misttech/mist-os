@@ -44,7 +44,8 @@ template("sdk_version_history") {
 
     inputs = [
       invoker.source,
-      build_info_files.latest_commit_hash,
+      "//build/info/jiri_generated/integration_daily_commit_hash.txt",
+      "//build/info/jiri_generated/integration_daily_commit_stamp.txt",
     ]
 
     outputs = [ _files.compiled ]
@@ -52,8 +53,10 @@ template("sdk_version_history") {
     args = [
       "--input",
       rebase_path(inputs[0], root_build_dir),
-      "--latest-commit-hash-file",
+      "--daily-commit-hash-file",
       rebase_path(inputs[1], root_build_dir),
+      "--daily-commit-timestamp-file",
+      rebase_path(inputs[2], root_build_dir),
       "--output",
       rebase_path(outputs[0], root_build_dir),
     ]

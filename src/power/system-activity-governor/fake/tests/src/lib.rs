@@ -141,10 +141,12 @@ async fn test_fsystem_activity_governor_listener_and_get_power_element() -> Resu
         .await
         .unwrap();
 
+    let (on_suspend_started_tx, mut on_suspend_started_rx) = mpsc::channel(1);
     let (on_suspend_tx, mut on_suspend_rx) = mpsc::channel(1);
     let (on_resume_tx, mut on_resume_rx) = mpsc::channel(1);
 
     fasync::Task::local(async move {
+        let mut on_suspend_started_tx = on_suspend_started_tx;
         let mut on_suspend_tx = on_suspend_tx;
         let mut on_resume_tx = on_resume_tx;
 
@@ -156,6 +158,10 @@ async fn test_fsystem_activity_governor_listener_and_get_power_element() -> Resu
                 }
                 fsystem::ActivityGovernorListenerRequest::OnSuspend { .. } => {
                     on_suspend_tx.try_send(()).unwrap();
+                }
+                fsystem::ActivityGovernorListenerRequest::OnSuspendStarted { responder } => {
+                    responder.send().unwrap();
+                    on_suspend_started_tx.try_send(()).unwrap();
                 }
                 fsystem::ActivityGovernorListenerRequest::OnSuspendFail { responder } => {
                     responder.send().unwrap();
@@ -201,6 +207,7 @@ async fn test_fsystem_activity_governor_listener_and_get_power_element() -> Resu
     assert_eq!(sag_ctrl_state.watch().await.unwrap(), current_state);
 
     // OnSuspend and OnResume should have been called once.
+    on_suspend_started_rx.next().await.unwrap();
     on_suspend_rx.next().await.unwrap();
     on_resume_rx.next().await.unwrap();
 
@@ -235,6 +242,11 @@ async fn test_fsystem_activity_governor_listener_and_get_power_element() -> Resu
         lease_control.watch_status(LeaseStatus::Unknown).await.unwrap()
     );
     test_driver.current_level.update(1).await?.unwrap();
+    assert_eq!(
+        LeaseStatus::Pending,
+        lease_control.watch_status(LeaseStatus::Unknown).await.unwrap()
+    );
+    test_driver_controller.current_level.update(1).await?.unwrap();
     assert_eq!(
         LeaseStatus::Satisfied,
         lease_control.watch_status(LeaseStatus::Unknown).await.unwrap()

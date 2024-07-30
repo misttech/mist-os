@@ -18,7 +18,7 @@ use netstack3_base::socket::{
 };
 use netstack3_base::{
     trace_duration, BidirectionalConverter as _, Control, CounterContext, CtxPair, EitherDeviceId,
-    Mss, NotFoundError, Segment, SendPayload, SeqNum, StrongDeviceIdentifier as _,
+    Mss, NotFoundError, Segment, SegmentHeader, SendPayload, SeqNum, StrongDeviceIdentifier as _,
     WeakDeviceIdentifier,
 };
 use netstack3_filter::TransportPacketSerializer;
@@ -180,7 +180,7 @@ where
             ConnIpAddr { local: (local_ip, local_port), remote: (remote_ip, remote_port) };
 
         core_ctx.increment(|counters: &TcpCounters<I>| &counters.valid_segments_received);
-        match incoming.contents.control() {
+        match incoming.header.control {
             None => {}
             Some(Control::RST) => {
                 core_ctx.increment(|counters: &TcpCounters<I>| &counters.resets_received)
@@ -382,7 +382,8 @@ fn handle_incoming_packet<WireI, BC, CC>(
         // Per RFC 793 (https://tools.ietf.org/html/rfc793#page-21):
         // CLOSED is fictional because it represents the state when
         // there is no TCB, and therefore, no connection.
-        if let Some(seg) = (Closed { reason: None::<Option<ConnectionError>> }.on_segment(incoming))
+        if let Some(seg) =
+            (Closed { reason: None::<Option<ConnectionError>> }.on_segment(&incoming))
         {
             socket::send_tcp_segment::<WireI, WireI, _, _, _>(
                 core_ctx,
@@ -601,7 +602,7 @@ where
     //       connection incarnation, and
     //   (2) returns to TIME-WAIT state if the SYN turns out to be an old
     //       duplicate.
-    if *defunct && incoming.contents.control() == Some(Control::SYN) && incoming.ack.is_none() {
+    if *defunct && incoming.header.control == Some(Control::SYN) && incoming.header.ack.is_none() {
         if let State::TimeWait(TimeWait {
             last_seq: _,
             last_ack,
@@ -610,7 +611,7 @@ where
             expiry: _,
         }) = state
         {
-            if !incoming.seq.before(*last_ack) {
+            if !incoming.header.seq.before(*last_ack) {
                 return ConnectionIncomingSegmentDisposition::ReuseCandidateForListener;
             }
         }
@@ -1082,7 +1083,8 @@ where
     S: Into<Segment<SendPayload<'a>>>,
     I: IpExt,
 {
-    let Segment { seq, ack, wnd, contents, options } = segment.into();
+    let Segment { header: SegmentHeader { seq, ack, wnd, control, options, .. }, data } =
+        segment.into();
     let ConnIpAddr { local: (local_ip, local_port), remote: (remote_ip, remote_port) } = conn_addr;
     let mut builder = TcpSegmentBuilder::new(
         local_ip.addr(),
@@ -1093,13 +1095,13 @@ where
         ack.map(Into::into),
         u16::from(wnd),
     );
-    match contents.control() {
+    match control {
         None => {}
         Some(Control::SYN) => builder.syn(true),
         Some(Control::FIN) => builder.fin(true),
         Some(Control::RST) => builder.rst(true),
     }
-    (*contents.data()).into_serializer().encapsulate(
+    data.into_serializer().encapsulate(
         TcpSegmentBuilderWithOptions::new(builder, options.iter()).unwrap_or_else(
             |TcpOptionsTooLongError| {
                 panic!("Too many TCP options");
@@ -1136,7 +1138,7 @@ mod test {
         const SOURCE_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(1111));
         const DEST_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(2222));
 
-        let options = segment.options;
+        let options = segment.header.options;
         let serializer = super::tcp_serialize_segment::<_, I>(
             segment,
             ConnIpAddr {

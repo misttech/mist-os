@@ -24,6 +24,7 @@ import argparse
 import os
 import re
 import sys
+
 from depfile import DepFile
 
 disallowed_gn_args = [

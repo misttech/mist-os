@@ -7,7 +7,6 @@
 import json
 import os
 import pathlib
-from parameterized import parameterized, param
 import tempfile
 import unittest
 
@@ -16,6 +15,7 @@ import trace_processing.metrics.cpu as cpu_metrics
 import trace_processing.metrics.fps as fps_metrics
 import trace_processing.metrics.input_latency as input_latency_metrics
 import trace_processing.metrics.scenic as scenic_metrics
+from parameterized import param, parameterized
 from trace_processing import trace_importing, trace_metrics, trace_model
 
 # Boilerplate-busting constants:

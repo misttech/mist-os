@@ -15,7 +15,6 @@
 #include <zircon/rights.h>
 
 #include <fbl/alloc_checker.h>
-#include <fbl/auto_lock.h>
 #include <kernel/auto_lock.h>
 #include <object/pci_interrupt_dispatcher.h>
 #include <object/process_dispatcher.h>

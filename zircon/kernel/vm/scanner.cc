@@ -385,8 +385,6 @@ static void scanner_init_func(uint level) {
   if (gBootOptions->page_scanner_enable_eviction) {
     pmm_evictor()->EnableEviction(gBootOptions->compression_at_memory_pressure);
   }
-  zx_time_t eviction_interval = ZX_SEC(gBootOptions->page_scanner_eviction_interval_seconds);
-  pmm_evictor()->SetContinuousEvictionInterval(eviction_interval);
 
   pmm_page_queues()->SetActiveRatioMultiplier(gBootOptions->page_scanner_active_ratio_multiplier);
   pmm_page_queues()->StartThreads(ZX_MSEC(gBootOptions->page_scanner_min_aging_interval_ms),

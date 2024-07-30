@@ -15,11 +15,17 @@ use futures::TryStreamExt as _;
 use log::{error, warn};
 
 use crate::bindings::util::ResultExt as _;
+use crate::bindings::{BindingsCtx, Ctx};
 
 /// Serves the multicast routing table controller FIDL for ip version `I`.
-pub(crate) async fn serve_table_controller<I: FidlMulticastAdminIpExt>(
+#[netstack3_core::context_ip_bounds(I, BindingsCtx)]
+pub(crate) async fn serve_table_controller<I: FidlMulticastAdminIpExt + netstack3_core::IpExt>(
+    mut ctx: Ctx,
     request_stream: I::TableControllerRequestStream,
 ) {
+    // TODO(https://fxbug.dev/353330225): Associate the lifetime of this channel
+    // with whether multicast forwarding is enabled in core.
+    let _newly_enabled = ctx.api().multicast_forwarding::<I>().enable();
     let mut watcher = MulticastRoutingEventsWatcher::<I>::default();
     request_stream
         .try_for_each(|request| {

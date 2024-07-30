@@ -42,7 +42,7 @@ async fn serve_resolver(mut stream: fresolution::ResolverRequestStream) -> Resul
                         }),
                         // component-manager-test-resolver only resolves test://trigger
                         resolution_context: None,
-                        abi_revision: Some(version_history::HISTORY
+                        abi_revision: Some(version_history_data::HISTORY
                             .get_example_supported_version_for_tests()
                             .abi_revision
                             .into()),

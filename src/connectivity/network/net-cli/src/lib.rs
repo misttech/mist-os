@@ -192,7 +192,7 @@ fn write_tabulated_interfaces_info<
                     ser::DeviceClass::Loopback => "loopback",
                     ser::DeviceClass::Virtual => "virtual",
                     ser::DeviceClass::Ethernet => "ethernet",
-                    ser::DeviceClass::Wlan => "wlan",
+                    ser::DeviceClass::WlanClient => "wlan-client",
                     ser::DeviceClass::Ppp => "ppp",
                     ser::DeviceClass::Bridge => "bridge",
                     ser::DeviceClass::WlanAp => "wlan-ap",
@@ -1930,19 +1930,19 @@ mod tests {
             get_fake_interface(
                 100,
                 "wlan001",
-                finterfaces_ext::PortClass::Wlan,
+                finterfaces_ext::PortClass::WlanClient,
                 Some([2, 2, 3, 4, 5, 6]),
             ),
             get_fake_interface(
                 200,
                 "wlan002",
-                finterfaces_ext::PortClass::Wlan,
+                finterfaces_ext::PortClass::WlanClient,
                 Some([2, 2, 3, 4, 5, 7]),
             ),
             get_fake_interface(
                 300,
                 "wlan003",
-                finterfaces_ext::PortClass::Wlan,
+                finterfaces_ext::PortClass::WlanClient,
                 Some([2, 2, 3, 4, 5, 8]),
             ),
         ]

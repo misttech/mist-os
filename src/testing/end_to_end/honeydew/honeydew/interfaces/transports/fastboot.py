@@ -1,4 +1,3 @@
-#!/usr/bin/env fuchsia-vendored-python
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
@@ -7,13 +6,6 @@
 import abc
 
 from honeydew.utils import properties
-
-TIMEOUTS: dict[str, float] = {
-    "FASTBOOT_CLI": 30,
-    "FASTBOOT_MODE": 45,
-    "FUCHSIA_MODE": 45,
-    "TCP_ADDRESS": 30,
-}
 
 
 class Fastboot(abc.ABC):
@@ -57,48 +49,24 @@ class Fastboot(abc.ABC):
         """
 
     @abc.abstractmethod
-    def run(
-        self,
-        cmd: list[str],
-        timeout: float = TIMEOUTS["FASTBOOT_CLI"],
-    ) -> list[str]:
+    def run(self, cmd: list[str]) -> list[str]:
         """Executes and returns the output of `fastboot -s {node} {cmd}`.
 
         Args:
             cmd: Fastboot command to run.
-            timeout: Timeout to wait for the fastboot command to return.
 
         Returns:
             Output of `fastboot -s {node} {cmd}`.
 
         Raises:
             errors.FuchsiaStateError: Invalid state to perform this operation.
-            errors.HoneydewTimeoutError: Timeout running a fastboot command.
             errors.FastbootCommandError: In case of failure.
         """
 
     @abc.abstractmethod
-    def wait_for_fastboot_mode(
-        self, timeout: float = TIMEOUTS["FASTBOOT_MODE"]
-    ) -> None:
-        """Wait for Fuchsia device to go to fastboot mode.
-
-        Args:
-            timeout: How long in sec to wait for device to go fastboot mode.
-
-        Raises:
-            errors.FuchsiaDeviceError: If device is not in fastboot mode.
-        """
+    def wait_for_fastboot_mode(self) -> None:
+        """Wait for Fuchsia device to go to fastboot mode."""
 
     @abc.abstractmethod
-    def wait_for_fuchsia_mode(
-        self, timeout: float = TIMEOUTS["FUCHSIA_MODE"]
-    ) -> None:
-        """Wait for Fuchsia device to go to fuchsia mode.
-
-        Args:
-            timeout: How long in sec to wait for device to go fuchsia mode.
-
-        Raises:
-            errors.FuchsiaDeviceError: If device is not in fuchsia mode.
-        """
+    def wait_for_fuchsia_mode(self) -> None:
+        """Wait for Fuchsia device to go to fuchsia mode."""

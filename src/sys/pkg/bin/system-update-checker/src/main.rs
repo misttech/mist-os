@@ -9,6 +9,7 @@ mod apply;
 mod channel;
 mod channel_handler;
 mod check;
+mod completion_responder;
 mod connect;
 mod errors;
 mod rate_limiter;
@@ -17,8 +18,10 @@ mod update_monitor;
 mod update_service;
 
 use crate::channel_handler::ChannelHandler;
+use crate::completion_responder::{CompletionResponder, CompletionResponderFidlServer};
 use crate::update_service::{RealUpdateManager, UpdateService};
 use anyhow::{anyhow, Context as _, Error};
+use fidl_fuchsia_update::ListenerRequestStream;
 use fidl_fuchsia_update_channel::ProviderRequestStream;
 use fidl_fuchsia_update_channelcontrol::ChannelControlRequestStream;
 use fuchsia_component::server::ServiceFs;
@@ -28,7 +31,7 @@ use futures::stream::FuturesUnordered;
 use std::sync::Arc;
 use tracing::error;
 
-const MAX_CONCURRENT_CONNECTIONS: usize = 100;
+const MAX_CONCURRENT_CONNECTIONS: usize = 200;
 const DEFAULT_UPDATE_PACKAGE_URL: &str = "fuchsia-pkg://fuchsia.com/update";
 
 #[fuchsia::main(threads = 1, logging_tags = ["system-update-checker"])]
@@ -59,8 +62,12 @@ async fn main_inner() -> Result<(), Error> {
         channel::build_current_channel_manager(connect::ServiceConnector).await?;
     let current_channel_manager = Arc::new(current_channel_manager);
 
+    let (completion_responder_state_reactor, completion_responder_fidl_server, waiter) =
+        CompletionResponder::build();
+    futures.push(waiter.wait_for_messages().boxed());
     let (update_manager, update_manager_fut) = RealUpdateManager::new(
         Arc::clone(&target_channel_manager),
+        completion_responder_state_reactor,
         inspector.root().create_child("update-manager"),
     )
     .await
@@ -73,7 +80,7 @@ async fn main_inner() -> Result<(), Error> {
         Arc::new(ChannelHandler::new(current_channel_manager, target_channel_manager));
     let channel_handler_clone = Arc::clone(&channel_handler);
     let channel_handler_provider_clone = Arc::clone(&channel_handler);
-
+    let completion_responder_fidl_server_clone = completion_responder_fidl_server.clone();
     fs.dir("svc")
         .add_fidl_service(move |stream| {
             IncomingServices::Manager(stream, UpdateService::new(update_manager_clone.clone()))
@@ -83,6 +90,12 @@ async fn main_inner() -> Result<(), Error> {
         })
         .add_fidl_service(move |stream| {
             IncomingServices::ChannelControl(stream, Arc::clone(&channel_handler_clone))
+        })
+        .add_fidl_service(move |stream| {
+            IncomingServices::CompletionResponder(
+                stream,
+                completion_responder_fidl_server_clone.clone(),
+            )
         });
 
     fs.take_and_serve_directory_handle().context("ServiceFs::take_and_serve_directory_handle")?;
@@ -103,6 +116,7 @@ enum IncomingServices {
     Manager(fidl_fuchsia_update::ManagerRequestStream, UpdateService),
     Provider(ProviderRequestStream, Arc<ChannelHandler>),
     ChannelControl(ChannelControlRequestStream, Arc<ChannelHandler>),
+    CompletionResponder(ListenerRequestStream, CompletionResponderFidlServer),
 }
 
 async fn handle_incoming_service(incoming_service: IncomingServices) -> Result<(), Error> {
@@ -115,6 +129,9 @@ async fn handle_incoming_service(incoming_service: IncomingServices) -> Result<(
         }
         IncomingServices::ChannelControl(request_stream, handler) => {
             handler.handle_control_request_stream(request_stream).await
+        }
+        IncomingServices::CompletionResponder(request_stream, fidl_server) => {
+            fidl_server.serve_completion_responses(request_stream).await
         }
     }
 }

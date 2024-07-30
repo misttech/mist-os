@@ -254,6 +254,7 @@ fn instance_type_to_string(instance_type: &InstanceType) -> Result<String> {
         schemars::schema::InstanceType::String => "string",
         schemars::schema::InstanceType::Integer => "integer",
         schemars::schema::InstanceType::Number => "integer",
+        schemars::schema::InstanceType::Object => "object",
         _ => bail!("unsupported type"),
     }
     .to_string();

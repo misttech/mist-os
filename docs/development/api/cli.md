@@ -1460,8 +1460,11 @@ specific error code and message. [See FIDL error catalog for an example](/docs/r
 
 *   For success, return an exit code of zero
 *   For failure, return a non-zero exit code
-*   Avoid producing unnecessary output on success. Don't print "succeeded"
-(unless the user is asking for verbose output).
+
+Avoid producing unnecessary output on success, unless the output includes
+specific, critical information for a user to complete the next step in a
+workflow (e.g., a file path). Don't print "succeeded" unless the user is asking
+for verbose output.
 
 
 ### Logging

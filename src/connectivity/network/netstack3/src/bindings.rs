@@ -63,7 +63,7 @@ use {
 use devices::{
     BindingId, DeviceIdAndName, DeviceSpecificInfo, Devices, DynamicCommonInfo,
     DynamicEthernetInfo, DynamicNetdeviceInfo, EthernetInfo, LoopbackInfo, PureIpDeviceInfo,
-    StaticCommonInfo, StaticNetdeviceInfo,
+    StaticCommonInfo, StaticNetdeviceInfo, TxTaskState,
 };
 use interfaces_watcher::{InterfaceEventProducer, InterfaceProperties, InterfaceUpdate};
 use resource_removal::{ResourceRemovalSink, ResourceRemovalWorker};
@@ -102,6 +102,7 @@ pub(crate) use inspect::InspectPublisher;
 
 mod ctx {
     use super::*;
+    use thiserror::Error;
 
     /// Provides an implementation of [`BindingsContext`].
     pub(crate) struct BindingsCtx(Arc<BindingsCtxInner>);
@@ -125,19 +126,15 @@ mod ctx {
         core_ctx: Arc<StackState<BindingsCtx>>,
     }
 
-    #[derive(Debug)]
     /// Error observed while attempting to destroy the last remaining clone of `Ctx`.
+    #[derive(Debug, Error)]
     pub enum DestructionError {
-        /// Another clone of `BindingsCtx` still exists.
-        BindingsCtxStillCloned(
-            // TODO(https://fxbug.dev/42148629): Remove or explain #[allow(dead_code)].
-            #[allow(dead_code)] usize,
-        ),
-        /// Another clone of `CoreCtx` still exists.
-        CoreCtxStillCloned(
-            // TODO(https://fxbug.dev/42148629): Remove or explain #[allow(dead_code)].
-            #[allow(dead_code)] usize,
-        ),
+        /// Another reference of `BindingsCtx` still exists.
+        #[error("bindings ctx still has {0} references")]
+        BindingsCtxStillCloned(usize),
+        /// Another reference of `CoreCtx` still exists.
+        #[error("core ctx still has {0} references")]
+        CoreCtxStillCloned(usize),
     }
 
     impl Ctx {
@@ -509,10 +506,13 @@ impl<D: DeviceIdExt> TransmitQueueBindingsContext<D> for BindingsCtx {
 }
 
 impl DeviceLayerEventDispatcher for BindingsCtx {
+    type DequeueContext = TxTaskState;
+
     fn send_ethernet_frame(
         &mut self,
         device: &EthernetDeviceId<Self>,
         frame: Buf<Vec<u8>>,
+        dequeue_context: Option<&mut Self::DequeueContext>,
     ) -> Result<(), DeviceSendFrameError> {
         let EthernetInfo { mac: _, _mac_proxy: _, common_info: _, netdevice, dynamic_info } =
             device.external_state();
@@ -522,6 +522,7 @@ impl DeviceLayerEventDispatcher for BindingsCtx {
             &dynamic_info.netdevice,
             frame,
             fhardware_network::FrameType::Ethernet,
+            dequeue_context,
         )
     }
 
@@ -530,6 +531,7 @@ impl DeviceLayerEventDispatcher for BindingsCtx {
         device: &PureIpDeviceId<Self>,
         packet: Buf<Vec<u8>>,
         ip_version: IpVersion,
+        dequeue_context: Option<&mut Self::DequeueContext>,
     ) -> Result<(), DeviceSendFrameError> {
         let frame_type = match ip_version {
             IpVersion::V4 => fhardware_network::FrameType::Ipv4,
@@ -537,7 +539,7 @@ impl DeviceLayerEventDispatcher for BindingsCtx {
         };
         let PureIpDeviceInfo { common_info: _, netdevice, dynamic_info } = device.external_state();
         let dynamic_info = dynamic_info.read();
-        send_netdevice_frame(netdevice, &dynamic_info, packet, frame_type)
+        send_netdevice_frame(netdevice, &dynamic_info, packet, frame_type, dequeue_context)
     }
 }
 
@@ -551,13 +553,39 @@ fn send_netdevice_frame(
     }: &DynamicNetdeviceInfo,
     frame: Buf<Vec<u8>>,
     frame_type: fhardware_network::FrameType,
+    dequeue_context: Option<&mut TxTaskState>,
 ) -> Result<(), DeviceSendFrameError> {
     let StaticNetdeviceInfo { handler, .. } = netdevice;
-    if *phy_up && *admin_enabled {
-        handler
-            .send(frame.as_ref(), frame_type)
-            .unwrap_or_else(|e| warn!("failed to send frame to {:?}: {:?}", handler, e))
+    if !(*phy_up && *admin_enabled) {
+        debug!("dropped frame to {handler:?}, device offline");
+        return Ok(());
     }
+
+    let tx_buffer = match dequeue_context.and_then(|TxTaskState { tx_buffers }| tx_buffers.pop()) {
+        Some(b) => b,
+        None => {
+            match handler.alloc_tx_buffer() {
+                Ok(Some(b)) => b,
+                Ok(None) => {
+                    return Err(DeviceSendFrameError::NoBuffers);
+                }
+                Err(e) => {
+                    error!("failed to allocate frame to {handler:?}: {e:?}");
+                    // There's nothing core can do with this error, pretend like
+                    // everything's okay.
+
+                    // TODO(https://fxbug.dev/353718697): Consider signalling
+                    // back through the handler that we want to shutdown this
+                    // interface.
+                    return Ok(());
+                }
+            }
+        }
+    };
+
+    handler
+        .send(frame.as_ref(), frame_type, tx_buffer)
+        .unwrap_or_else(|e| warn!("failed to send frame to {:?}: {:?}", handler, e));
     Ok(())
 }
 
@@ -1066,6 +1094,7 @@ impl Netstack {
             control_receiver,
             removable,
             state_stream,
+            || (),
         ));
         (
             stop_sender,
@@ -1496,14 +1525,20 @@ impl NetstackSeed {
                                 "serving {}",
                                 fnet_multicast_admin::Ipv4RoutingTableControllerMarker::PROTOCOL_NAME
                             );
-                            multicast_admin::serve_table_controller::<Ipv4>(controller).await;
+                            multicast_admin::serve_table_controller::<Ipv4>(
+                                netstack.ctx.clone(),
+                                controller
+                            ).await;
                         }
                         Service::MulticastAdminV6(controller) => {
                             debug!(
                                 "serving {}",
                                 fnet_multicast_admin::Ipv6RoutingTableControllerMarker::PROTOCOL_NAME
                             );
-                            multicast_admin::serve_table_controller::<Ipv6>(controller).await;
+                            multicast_admin::serve_table_controller::<Ipv6>(
+                                netstack.ctx.clone(),
+                                controller
+                            ).await;
                         }
                         Service::DebugInterfaces(debug_interfaces) => {
                             debug_interfaces

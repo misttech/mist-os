@@ -14,7 +14,6 @@ rustc_binary("bin") {
   deps = [
     "../fidl:fuchsia.archivist.test_rust",
     "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust",
-    "//sdk/fidl/fuchsia.inspect:fuchsia.inspect_rust",
     "//src/lib/diagnostics/hierarchy/rust",
     "//src/lib/diagnostics/inspect/runtime/rust",
     "//src/lib/diagnostics/inspect/rust",

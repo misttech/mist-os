@@ -1075,9 +1075,13 @@ impl<PS: ParseStrategy> Validate for GenericFsContexts<PS> {
     }
 }
 
+/// Information parsed parsed from `genfscon [fs_type] [partial_path] [fs_context]` statements
+/// about a specific filesystem type.
 #[derive(Debug, PartialEq)]
 pub(crate) struct GenericFsContext<PS: ParseStrategy> {
-    type_name: SimpleArray<PS, PS::Slice<u8>>,
+    /// The filesystem type.
+    fs_type: SimpleArray<PS, PS::Slice<u8>>,
+    /// The set of contexts defined for this filesystem.
     contexts: SimpleArray<PS, FsContexts<PS>>,
 }
 
@@ -1091,7 +1095,7 @@ where
     fn parse(bytes: PS) -> Result<(Self, PS), Self::Error> {
         let tail = bytes;
 
-        let (type_name, tail) = SimpleArray::<PS, PS::Slice<u8>>::parse(tail)
+        let (fs_type, tail) = SimpleArray::<PS, PS::Slice<u8>>::parse(tail)
             .map_err(Into::<anyhow::Error>::into)
             .context("parsing generic filesystem context name")?;
 
@@ -1099,7 +1103,7 @@ where
             .map_err(Into::<anyhow::Error>::into)
             .context("parsing generic filesystem contexts")?;
 
-        Ok((Self { type_name, contexts }, tail))
+        Ok((Self { fs_type, contexts }, tail))
     }
 }
 
@@ -1107,8 +1111,14 @@ pub(crate) type FsContexts<PS> = Vec<FsContext<PS>>;
 
 #[derive(Debug, PartialEq)]
 pub(crate) struct FsContext<PS: ParseStrategy> {
-    name: SimpleArray<PS, PS::Slice<u8>>,
+    /// The partial path, relative to the root of the filesystem. The partial path can only be set for
+    /// virtual filesystems, like `proc/`. Otherwise, this must be `/`
+    partial_path: SimpleArray<PS, PS::Slice<u8>>,
+    /// Optional. When provided, the context will only be applied to files of this type. Allowed files
+    /// types are: blk_file, chr_file, dir, fifo_file, lnk_file, sock_file, file. When set to 0, the
+    /// context applies to all file types.
     class: PS::Output<le::U32>,
+    /// The security context allocated to the filesystem.
     context: Context<PS>,
 }
 
@@ -1122,9 +1132,9 @@ where
     fn parse(bytes: PS) -> Result<(Self, PS), Self::Error> {
         let tail = bytes;
 
-        let (name, tail) = SimpleArray::<PS, PS::Slice<u8>>::parse(tail)
+        let (partial_path, tail) = SimpleArray::<PS, PS::Slice<u8>>::parse(tail)
             .map_err(Into::<anyhow::Error>::into)
-            .context("parsing filesystem context name")?;
+            .context("parsing filesystem context partial path")?;
 
         let num_bytes = tail.len();
         let (class, tail) = PS::parse::<le::U32>(tail).ok_or(ParseError::MissingData {
@@ -1137,7 +1147,7 @@ where
             .map_err(Into::<anyhow::Error>::into)
             .context("parsing context for filesystem context")?;
 
-        Ok((Self { name, class, context }, tail))
+        Ok((Self { partial_path, class, context }, tail))
     }
 }
 

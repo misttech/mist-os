@@ -536,14 +536,15 @@ impl EventLoop {
         &fnet_interfaces_ext::Properties { port_class, .. }: &fnet_interfaces_ext::Properties,
     ) -> bool {
         return match port_class {
-            fnet_interfaces_ext::PortClass::Loopback => false,
+            fnet_interfaces_ext::PortClass::Loopback | fnet_interfaces_ext::PortClass::Lowpan => {
+                false
+            }
             fnet_interfaces_ext::PortClass::Virtual
             | fnet_interfaces_ext::PortClass::Ethernet
-            | fnet_interfaces_ext::PortClass::Wlan
+            | fnet_interfaces_ext::PortClass::WlanClient
             | fnet_interfaces_ext::PortClass::WlanAp
             | fnet_interfaces_ext::PortClass::Ppp
-            | fnet_interfaces_ext::PortClass::Bridge
-            | fnet_interfaces_ext::PortClass::Lowpan => true,
+            | fnet_interfaces_ext::PortClass::Bridge => true,
         };
     }
 

@@ -7,9 +7,9 @@
 import argparse
 import json
 import sys
-from typing import Sequence, Dict, AbstractSet, Any
-from pathlib import Path
 from enum import Enum
+from pathlib import Path
+from typing import AbstractSet, Any, Dict, Sequence
 
 SizeCheckMode = Enum("SizeCheckMode", ["EQUAL", "BAZEL_SMALLER"])
 

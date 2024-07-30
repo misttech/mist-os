@@ -4,20 +4,8 @@
 
 #include "hid-instance.h"
 
-#include <assert.h>
-#include <lib/ddk/debug.h>
-#include <lib/ddk/device.h>
-#include <lib/ddk/driver.h>
-#include <lib/ddk/trace/event.h>
 #include <lib/hid/boot.h>
-#include <stdlib.h>
-#include <string.h>
-#include <zircon/assert.h>
-
-#include <algorithm>
-#include <memory>
-
-#include <fbl/auto_lock.h>
+#include <lib/trace/event.h>
 
 #include "hid.h"
 
@@ -36,12 +24,11 @@ constexpr uint64_t hid_report_trace_id(uint32_t instance_id, uint64_t report_id)
 
 }  // namespace
 
-HidInstance::HidInstance(HidDevice* base, zx::event fifo_event, async_dispatcher_t* dispatcher,
+HidInstance::HidInstance(HidDevice* base, zx::event fifo_event,
                          fidl::ServerEnd<fuchsia_hardware_input::Device> session)
     : base_(base),
       fifo_event_(std::move(fifo_event)),
-      loop_(&kAsyncLoopConfigNoAttachToCurrentThread),
-      binding_(dispatcher, std::move(session), this,
+      binding_(fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(session), this,
                [](HidInstance* instance, fidl::UnbindInfo info) {
                  if (!instance) {
                    return;
@@ -52,9 +39,9 @@ HidInstance::HidInstance(HidDevice* base, zx::event fifo_event, async_dispatcher
   zx_hid_fifo_init(&fifo_);
 }
 
-void HidInstance::SetReadable() { fifo_event_.signal(0, DEV_STATE_READABLE); }
+void HidInstance::SetReadable() { fifo_event_.signal(0, ZX_USER_SIGNAL_0); }
 
-void HidInstance::ClearReadable() { fifo_event_.signal(DEV_STATE_READABLE, 0); }
+void HidInstance::ClearReadable() { fifo_event_.signal(ZX_USER_SIGNAL_0, 0); }
 
 zx_status_t HidInstance::ReadReportFromFifo(uint8_t* buf, size_t buf_size, zx_time_t* time,
                                             size_t* report_size) {
@@ -65,7 +52,7 @@ zx_status_t HidInstance::ReadReportFromFifo(uint8_t* buf, size_t buf_size, zx_ti
 
   size_t xfer = base_->GetReportSizeById(rpt_id, fhidbus::ReportType::kInput);
   if (xfer == 0) {
-    zxlogf(ERROR, "error reading hid device: unknown report id (%u)!", rpt_id);
+    FDF_LOG(ERROR, "error reading hid device: unknown report id (%u)!", rpt_id);
     return ZX_ERR_BAD_STATE;
   }
 
@@ -107,12 +94,7 @@ void HidInstance::ReadReport(ReadReportCompleter::Sync& completer) {
   std::array<uint8_t, fhidbus::wire::kMaxReportData> buf;
   zx_time_t time = 0;
   size_t report_size = 0;
-  zx_status_t status;
-
-  {
-    fbl::AutoLock lock(&fifo_lock_);
-    status = ReadReportFromFifo(buf.data(), buf.size(), &time, &report_size);
-  }
+  zx_status_t status = ReadReportFromFifo(buf.data(), buf.size(), &time, &report_size);
   if (status != ZX_OK) {
     return completer.ReplyError(status);
   }
@@ -136,15 +118,12 @@ void HidInstance::ReadReports(ReadReportsCompleter::Sync& completer) {
   zx_status_t status = ZX_OK;
   zx_time_t time;
 
-  {
-    fbl::AutoLock lock(&fifo_lock_);
-    while (status == ZX_OK) {
-      size_t report_size;
-      status =
-          ReadReportFromFifo(buf.data() + buf_index, buf.size() - buf_index, &time, &report_size);
-      if (status == ZX_OK) {
-        buf_index += report_size;
-      }
+  while (status == ZX_OK) {
+    size_t report_size;
+    status =
+        ReadReportFromFifo(buf.data() + buf_index, buf.size() - buf_index, &time, &report_size);
+    if (status == ZX_OK) {
+      buf_index += report_size;
     }
   }
 
@@ -191,17 +170,23 @@ void HidInstance::GetReport(GetReportRequestView request, GetReportCompleter::Sy
     completer.ReplyError(ZX_ERR_NOT_FOUND);
     return;
   }
+  if (needed > fhidbus::kMaxReportLen) {
+    FDF_LOG(ERROR, "hid: GetReport: Report size 0x%lx larger than max size 0x%x", needed,
+            fhidbus::kMaxReportLen);
+    completer.ReplyError(ZX_ERR_INTERNAL);
+    return;
+  }
 
   auto& client = base_->GetHidbusProtocol();
   auto result = client.sync()->GetReport(request->type, request->id, needed);
   if (!result.ok()) {
-    zxlogf(ERROR, "FIDL transport failed on GetReport(): %s",
-           result.error().FormatDescription().c_str());
+    FDF_LOG(ERROR, "FIDL transport failed on GetReport(): %s",
+            result.error().FormatDescription().c_str());
     completer.ReplyError(result.status());
     return;
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "HID device failed to get report: %d", result->error_value());
+    FDF_LOG(ERROR, "HID device failed to get report: %d", result->error_value());
     completer.ReplyError(result->error_value());
     return;
   }
@@ -212,8 +197,8 @@ void HidInstance::GetReport(GetReportRequestView request, GetReportCompleter::Sy
 void HidInstance::SetReport(SetReportRequestView request, SetReportCompleter::Sync& completer) {
   size_t needed = base_->GetReportSizeById(request->id, request->type);
   if (needed != request->report.count()) {
-    zxlogf(ERROR, "%s: Tried to set Report %d (size 0x%lx) with 0x%lx bytes\n", base_->GetName(),
-           request->id, needed, request->report.count());
+    FDF_LOG(ERROR, "Tried to set Report %d (size 0x%lx) with 0x%lx bytes\n", request->id, needed,
+            request->report.count());
     completer.ReplyError(ZX_ERR_INVALID_ARGS);
     return;
   }
@@ -221,13 +206,13 @@ void HidInstance::SetReport(SetReportRequestView request, SetReportCompleter::Sy
   auto& client = base_->GetHidbusProtocol();
   auto result = client.sync()->SetReport(request->type, request->id, request->report);
   if (!result.ok()) {
-    zxlogf(ERROR, "FIDL transport failed on SetReport(): %s",
-           result.error().FormatDescription().c_str());
+    FDF_LOG(ERROR, "FIDL transport failed on SetReport(): %s",
+            result.error().FormatDescription().c_str());
     completer.ReplyError(result.status());
     return;
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "HID device failed to set report: %d", result->error_value());
+    FDF_LOG(ERROR, "HID device failed to set report: %d", result->error_value());
     completer.ReplyError(result->error_value());
     return;
   }
@@ -236,18 +221,9 @@ void HidInstance::SetReport(SetReportRequestView request, SetReportCompleter::Sy
 
 void HidInstance::GetDeviceReportsReader(GetDeviceReportsReaderRequestView request,
                                          GetDeviceReportsReaderCompleter::Sync& completer) {
-  fbl::AutoLock lock(&readers_lock_);
-  zx_status_t status;
-  if (!loop_started_) {
-    status = loop_.StartThread("hid-reports-reader-loop");
-    if (status != ZX_OK) {
-      completer.ReplyError(status);
-      return;
-    }
-    loop_started_ = true;
-  }
-
-  fidl::BindServer(loop_.dispatcher(), std::move(request->reader), &readers_.emplace_back(base_));
+  readers_binding_.AddBinding(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+                              std::move(request->reader), &readers_.emplace_back(base_),
+                              fidl::kIgnoreBindingClosure);
   completer.ReplySuccess();
 }
 
@@ -261,19 +237,14 @@ void HidInstance::CloseInstance() {
 }
 
 void HidInstance::WriteToFifo(const uint8_t* report, size_t report_len, zx_time_t time) {
-  {
-    fbl::AutoLock lock(&readers_lock_);
-    auto iter = readers_.begin();
-    while (iter != readers_.end()) {
-      if ((*iter).WriteToFifo(report, report_len, time) != ZX_OK) {
-        iter = readers_.erase(iter);
-      } else {
-        iter++;
-      }
+  auto iter = readers_.begin();
+  while (iter != readers_.end()) {
+    if ((*iter).WriteToFifo(report, report_len, time) != ZX_OK) {
+      iter = readers_.erase(iter);
+    } else {
+      iter++;
     }
   }
-
-  fbl::AutoLock lock(&fifo_lock_);
 
   if (timestamps_.full()) {
     flags_ |= kHidFlagsWriteFailed;
@@ -285,7 +256,7 @@ void HidInstance::WriteToFifo(const uint8_t* report, size_t report_len, zx_time_
   ssize_t wrote = zx_hid_fifo_write(&fifo_, report, report_len);
   if (wrote <= 0) {
     if (!(flags_ & kHidFlagsWriteFailed)) {
-      zxlogf(ERROR, "%s: could not write to hid fifo (ret=%zd)", base_->GetName(), wrote);
+      FDF_LOG(ERROR, "Could not write to hid fifo (ret=%zd)", wrote);
       flags_ |= kHidFlagsWriteFailed;
     }
     return;
@@ -299,7 +270,6 @@ void HidInstance::WriteToFifo(const uint8_t* report, size_t report_len, zx_time_
   if (was_empty) {
     SetReadable();
   }
-  testing_write_to_fifo_called_.Signal();
 }
 
 }  // namespace hid_driver

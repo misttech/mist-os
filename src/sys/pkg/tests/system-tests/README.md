@@ -55,6 +55,7 @@ You should be able to run the tests with:
 ```sh
 % $(fx get-build-dir)/host_x64/system_tests_upgrade \
   --ssh-private-key $(ffx config get ssh.priv | tr -d '"') \
+  --ffx-path $(fx get-build-dir)/host-tools/ffx \
   --builder-name fuchsia/global.ci/core.x64-release-nuc_in_basic_envs \
   --fuchsia-build-dir $(fx get-build-dir)
 ```
@@ -69,6 +70,7 @@ determine the build ids from the downgrade and upgrade builds, then run:
 ```sh
 % $(fx get-build-dir)/host_x64/system_tests_upgrade \
   --ssh-private-key $(ffx config get ssh.priv | tr -d '"') \
+  --ffx-path $(fx get-build-dir)/host-tools/ffx \
   --build-id 123456789... \
   --build-id 987654321...
 ```
@@ -78,6 +80,7 @@ Or you can combine these options:
 ```sh
 % $(fx get-build-dir)/host_x64/system_tests_upgrade \
   --ssh-private-key $(ffx config get ssh.priv | tr -d '"') \
+  --ffx-path $(fx get-build-dir)/host-tools/ffx \
   --build-id 123456789... \
   --fuchsia-build-dir $(fx get-build-dir)
 ```
@@ -94,6 +97,7 @@ can be done by running:
 ```sh
 % $(fx get-build-dir)/host_x64/system_tests_reboot \
   --ssh-private-key $(ffx config get ssh.priv | tr -d '"') \
+  --ffx-path $(fx get-build-dir)/host-tools/ffx \
   --fuchsia-build-dir $(fx get-build-dir)
 ```
 
@@ -116,6 +120,7 @@ for you. You can run it like this:
   -o ~/logs \
   --tty /dev/ttyUSB0 \
   $(fx get-build-dir)/host_x64/system_tests_upgrade \
+  --ffx-path $(fx get-build-dir)/host-tools/ffx \
   --builder-name fuchsia/global.ci/core.x64-release-nuc_in_basic_envs \
   --fuchsia-build-dir $(fx get-build-dir)
 ```
@@ -155,6 +160,7 @@ Once the VM has finished paving, you can then use it with the upgrade tests:
 ```sh
 % $(fx get-build-dir)/host_x64/system_tests_upgrade \
   --ssh-private-key $(ffx config get ssh.priv | tr -d '"') \
+  --ffx-path $(fx get-build-dir)/host-tools/ffx \
   --builder-name fuchsia/global.ci/workstation_eng.x64-release-e2e-isolated \
   --fuchsia-build-dir $(fx get-build-dir) \
   --device fuchsia-5254-0063-5e7a

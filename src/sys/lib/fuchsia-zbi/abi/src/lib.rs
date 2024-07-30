@@ -223,7 +223,7 @@ mod tests {
 
     const MAX_SERIALIZATION_BUFFER_SIZE: usize = 128;
 
-    #[link(name = "test-lib")]
+    // From libtest-lib.a
     extern "C" {
         pub fn serialize_zbi_topology_x64_info_t(
             buffer: &[u8; MAX_SERIALIZATION_BUFFER_SIZE],

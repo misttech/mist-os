@@ -21,7 +21,7 @@ group("tests") {
 }
 
 driver_bind_rules("bind") {
-  rules = "usb_fastboot_function.bind"
+  rules = "meta/usb_fastboot_function.bind"
   bind_output = "usb_fastboot_function.bindbc"
   deps = [
     "//src/devices/bind/fuchsia.google.platform.usb",
@@ -66,7 +66,7 @@ fuchsia_driver("driver") {
 fuchsia_driver_component("component") {
   component_name = "usb-fastboot-function"
   deps = [ ":driver" ]
-  info = "usb_fastboot_function-info.json"
+  info = "meta/usb_fastboot_function-info.json"
   manifest = "meta/usb_fastboot_function.cml"
 }
 

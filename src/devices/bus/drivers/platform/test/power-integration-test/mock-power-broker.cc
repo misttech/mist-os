@@ -10,6 +10,8 @@
 
 #include <sdk/lib/sys/cpp/outgoing_directory.h>
 
+#include "lib/fit/internal/result.h"
+
 namespace mock_power_broker {
 
 class PowerElement {
@@ -37,20 +39,10 @@ class Topology : public fidl::Server<fuchsia_power_broker::Topology>,
     FX_LOGS(INFO) << "Got add element request for element named '"
                   << req.element_name().value().c_str() << "'";
 
-    // Make channel to return to client
-    auto element_control = fidl::CreateEndpoints<fuchsia_power_broker::ElementControl>();
-
-    clients_.emplace_back(std::move(element_control->server),
+    clients_.emplace_back(std::move(req.element_control().value()),
                           std::move(req.lessor_channel().value()),
                           std::move(req.level_control_channels().value().current()),
                           std::move(req.level_control_channels().value().required()));
-
-    fuchsia_power_broker::TopologyAddElementResponse result{
-        {
-            .element_control_channel = std::move(element_control->client),
-        },
-    };
-    fit::success<fuchsia_power_broker::TopologyAddElementResponse> success(std::move(result));
 
     std::string element_name(req.element_name().value().data(),
                              req.element_name().value().length());
@@ -60,7 +52,7 @@ class Topology : public fidl::Server<fuchsia_power_broker::Topology>,
       SendReply(local);
     }
 
-    completer.Reply(std::move(success));
+    completer.Reply(fit::success());
   }
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_broker::Topology> md,
                              fidl::UnknownMethodCompleter::Sync& completer) override {}

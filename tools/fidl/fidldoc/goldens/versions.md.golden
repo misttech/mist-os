@@ -31,7 +31,7 @@
 
 ## **STRUCTS**
 
-### Struct  {#Struct data-text="Struct"}
+### Struct [resource](/fuchsia-src/reference/fidl/language/language.md#value-vs-resource){:.fidl-attribute} {#Struct data-text="Struct"}
 *Defined in [test.versions/versions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/versions.test.fidl;l=23)*
 <div class="fidl-version-div"><span class="fidl-attribute fidl-version">Deprecated: 3</span> <span class="fidl-attribute fidl-version">Added: 2</span></div>
 
@@ -70,7 +70,7 @@ Type: <code>uint32</code>
 
 ## **TABLES**
 
-### Table  {#Table data-text="Table"}
+### Table [resource](/fuchsia-src/reference/fidl/language/language.md#value-vs-resource){:.fidl-attribute} {#Table data-text="Table"}
 
 
 *Defined in [test.versions/versions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/versions.test.fidl;l=29)*
@@ -92,7 +92,7 @@ Type: <code>uint32</code>
 
 ## **UNIONS**
 
-### Union [flexible](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#Union data-text="Union"}
+### Union [flexible](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute} [resource](/fuchsia-src/reference/fidl/language/language.md#value-vs-resource){:.fidl-attribute} {#Union data-text="Union"}
 *Defined in [test.versions/versions.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/versions.test.fidl;l=35)*
 <div class="fidl-version-div"><span class="fidl-attribute fidl-version">Deprecated: 3</span> <span class="fidl-attribute fidl-version">Added: 2</span></div>
 <table>

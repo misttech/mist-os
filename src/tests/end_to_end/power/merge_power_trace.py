@@ -6,8 +6,8 @@
 
 import argparse
 import pathlib
-import sys
 import shutil
+import sys
 
 from power_test_utils import power_test_utils
 from trace_processing import trace_importing, trace_model
@@ -24,8 +24,10 @@ def merge_trace(trace: str = "", power: str = "", output: str = "") -> None:
         trace_json_path
     )
 
+    samples = power_test_utils.read_power_samples(power)
+
     shutil.copy(trace, output)
-    power_test_utils.merge_power_data(model, power, output)
+    power_test_utils.merge_power_data(model, samples, output)
 
 
 def main() -> None:

@@ -12,16 +12,14 @@ config("wlansoftmac_config") {
 }
 
 driver_bind_rules("wlansoftmac-bind") {
-  rules = "wlansoftmac.bind"
+  rules = "meta/wlansoftmac.bind"
   bind_output = "wlansoftmac.bindbc"
-  tests = "bind_tests.json"
+  tests = "meta/bind_tests.json"
   deps = [ "//sdk/fidl/fuchsia.wlan.softmac:fuchsia.wlan.softmac_bindlib" ]
 }
 
 source_set("source_set") {
   sources = [
-    "buffer_allocator.cc",
-    "buffer_allocator.h",
     "softmac_bridge.cc",
     "softmac_bridge.h",
     "softmac_driver.cc",
@@ -63,34 +61,13 @@ fuchsia_driver("wlansoftmac_driver-driver") {
 fuchsia_driver_component("wlansoftmac_driver") {
   component_name = "wlansoftmac"
   deps = [ ":wlansoftmac_driver-driver" ]
-  info = "wlansoftmac.json"
+  info = "meta/wlansoftmac.json"
   manifest = "meta/wlansoftmac.cml"
 }
 
 fuchsia_driver_package("wlansoftmac") {
   package_name = "wlansoftmac"
   driver_components = [ ":wlansoftmac_driver" ]
-}
-
-test("buffer-allocator-tests") {
-  sources = [
-    "buffer_allocator.cc",
-    "buffer_allocator.h",
-    "tests/buffer_allocator_tests.cc",
-  ]
-
-  deps = [
-    "//sdk/lib/driver/component/cpp:cpp",
-    "//src/connectivity/wlan/drivers/lib/log/cpp:dfv2",
-    "//src/connectivity/wlan/drivers/wlansoftmac/rust_driver/c-binding:wlansoftmac-c",
-    "//src/connectivity/wlan/lib/common/cpp:common",
-    "//src/lib/fxl/test:gtest_main",
-    "//zircon/system/ulib/fbl",
-  ]
-}
-
-fuchsia_unittest_package("wlansoftmac-buffer-allocator-tests") {
-  deps = [ ":buffer-allocator-tests" ]
 }
 
 test("good-driver-tests") {
@@ -103,7 +80,7 @@ test("good-driver-tests") {
   deps = [
     ":source_set",
     "//sdk/fidl/fuchsia.wlan.sme:fuchsia.wlan.sme_cpp",
-    "//sdk/lib/driver/testing/cpp/fixture:cpp_fixture",
+    "//sdk/lib/driver/testing/cpp:driver_testing_cpp",
     "//src/lib/fxl/test:gtest_main",
   ]
 }
@@ -122,7 +99,7 @@ test("bad-driver-tests") {
   deps = [
     ":source_set",
     "//sdk/fidl/fuchsia.wlan.sme:fuchsia.wlan.sme_cpp",
-    "//sdk/lib/driver/testing/cpp/fixture:cpp_fixture",
+    "//sdk/lib/driver/testing/cpp:driver_testing_cpp",
     "//src/lib/fxl/test:gtest_main",
   ]
 }
@@ -141,7 +118,6 @@ group("tests") {
   deps = [
     ":wlansoftmac-bad-driver-tests",
     ":wlansoftmac-bind_test",
-    ":wlansoftmac-buffer-allocator-tests",
     ":wlansoftmac-good-driver-tests",
   ]
 }

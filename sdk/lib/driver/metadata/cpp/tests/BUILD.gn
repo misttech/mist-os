@@ -42,11 +42,11 @@ fuchsia_unittest_package("metadata_test") {
   }
   deps = [
     ":metadata-test",
-    "test_child:no_use_component",
-    "test_child:use_component",
-    "test_grandchild:component",
-    "test_parent:expose_component",
-    "test_parent:no_expose_component",
+    "metadata_forwarder_test_driver:component",
+    "metadata_retriever_test_driver:no_use_component",
+    "metadata_retriever_test_driver:use_component",
+    "metadata_sender_test_driver:expose_component",
+    "metadata_sender_test_driver:no_expose_component",
     "test_root:component",
   ]
 }

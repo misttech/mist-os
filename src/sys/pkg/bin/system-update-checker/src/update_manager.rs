@@ -5,6 +5,7 @@
 use crate::apply::{apply_system_update, ApplyProgress, ApplyState};
 use crate::channel::TargetChannelManager;
 use crate::check::{check_for_system_update, SystemUpdateStatus};
+use crate::completion_responder::CompletionResponderStateReactor;
 use crate::connect::ServiceConnect;
 use crate::update_monitor::{AttemptNotifier, StateNotifier, UpdateMonitor};
 use crate::update_service::{RealAttemptNotifier, RealStateNotifier};
@@ -150,6 +151,7 @@ where
 {
     monitor: UpdateMonitor<N, Att>,
     updater: SystemInterface<T, C, A, Cq>,
+    completion_reactor: CompletionResponderStateReactor,
 }
 
 struct SystemInterface<T, C, A, Cq>
@@ -179,7 +181,11 @@ impl<T>
 where
     T: TargetChannelUpdater,
 {
-    pub async fn new(target_channel_updater: Arc<T>, node: finspect::Node) -> Self {
+    pub async fn new(
+        target_channel_updater: Arc<T>,
+        completion_reactor: CompletionResponderStateReactor,
+        node: finspect::Node,
+    ) -> Self {
         let (fut, attempt_fut, update_monitor) = UpdateMonitor::from_inspect_node(node);
         fasync::Task::spawn(fut).detach();
         fasync::Task::spawn(attempt_fut).detach();
@@ -193,6 +199,7 @@ where
                 RealCommitQuerier,
                 None,
             ),
+            completion_reactor,
         }
     }
 }
@@ -226,6 +233,7 @@ where
                 commit_querier,
                 None,
             ),
+            completion_reactor: CompletionResponderStateReactor::test_stub(),
         }
     }
 
@@ -251,6 +259,7 @@ where
                 commit_querier,
                 commit_status,
             ),
+            completion_reactor: CompletionResponderStateReactor::test_stub(),
         }
     }
 
@@ -269,8 +278,8 @@ where
         ctl
     }
 
-    async fn run(self, requests: mpsc::Receiver<UpdateManagerRequest<N, Att>>) {
-        let Self { mut monitor, mut updater } = self;
+    async fn run(mut self, requests: mpsc::Receiver<UpdateManagerRequest<N, Att>>) {
+        let Self { mut monitor, mut updater, .. } = self;
         pin_mut!(requests);
 
         loop {
@@ -360,6 +369,7 @@ where
                     }
                     Op::Status(StatusEvent::State(state)) => {
                         current_state = Some(state.clone());
+                        self.completion_reactor.react_to(&state).await;
                         let should_flush = matches!(state, State::WaitingForReboot(_));
                         monitor.advance_update_state(state).await;
                         if should_flush {

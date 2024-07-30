@@ -1,4 +1,3 @@
-#!/usr/bin/env fuchsia-vendored-python
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
@@ -100,7 +99,7 @@ class SL4F(sl4f_interface.SL4F):
                     f"Device name expected: '{device_name}' but received: "
                     f"'{self._name}'."
                 )
-        except Exception as err:  # pylint: disable=broad-except
+        except errors.Sl4fError as err:
             raise errors.Sl4fConnectionError(
                 f"SL4F connection check failed for {self._name} with err: {err}"
             ) from err
@@ -109,7 +108,7 @@ class SL4F(sl4f_interface.SL4F):
         self,
         method: str,
         params: dict[str, Any] | None = None,
-        timeout: float = sl4f_interface.TIMEOUTS["RESPONSE"],
+        timeout: float | None = None,
         attempts: int = sl4f_interface.DEFAULTS["ATTEMPTS"],
         interval: int = sl4f_interface.DEFAULTS["INTERVAL"],
         exceptions_to_skip: Iterable[type[Exception]] | None = None,
@@ -119,11 +118,12 @@ class SL4F(sl4f_interface.SL4F):
         Args:
             method: SL4F method.
             params: Any optional params needed for method param.
-            timeout: Timeout in seconds to wait for SL4F request to complete.
+            timeout: Timeout in seconds to wait for SL4F request to complete. By
+                default, timeout is not set.
             attempts: number of attempts to try in case of a failure.
             interval: wait time in sec before each retry in case of a failure.
-            exceptions_to_skip: Any non fatal exceptions for which retry will
-                not be attempted and no error will be raised.
+            exceptions_to_skip: Any non fatal HTTP exceptions for which retry
+                will not be attempted and no error will be raised.
 
         Returns:
             SL4F command response returned by the Fuchsia device.
@@ -135,9 +135,6 @@ class SL4F(sl4f_interface.SL4F):
         """
         if not params:
             params = {}
-
-        if not exceptions_to_skip:
-            exceptions_to_skip = []
 
         # id is required by the SL4F server to parse test_data but is not
         # currently used.
@@ -181,7 +178,7 @@ class SL4F(sl4f_interface.SL4F):
                     exception_msg = f"{exception_msg} Error: '{error}'."
                     break
 
-            except Exception as err:
+            except errors.HttpRequestError as err:
                 raise errors.Sl4fError(exception_msg) from err
         raise errors.Sl4fError(exception_msg)
 
@@ -195,7 +192,7 @@ class SL4F(sl4f_interface.SL4F):
 
         try:
             self._ffx_transport.run(cmd=_FFX_CMDS["START_SL4F"])
-        except Exception as err:  # pylint: disable=broad-except
+        except errors.HoneydewError as err:
             raise errors.Sl4fError(err) from err
 
         # verify the device is responsive to SL4F requests

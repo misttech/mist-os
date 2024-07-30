@@ -7,7 +7,6 @@ use cm_rust::{ComponentDecl, FidlIntoNative};
 use fidl::endpoints::{
     create_endpoints, create_proxy, create_request_stream, ProtocolMarker, Proxy, ServerEnd,
 };
-use fidl::Rights;
 use fuchsia_component_test::{
     Capability, ChildOptions, LocalComponentHandles, RealmBuilder, RealmInstance, Ref, Route,
 };
@@ -117,6 +116,16 @@ async fn launch_child_in_a_collection_in_nested_component_manager(
         .add_route(
             Route::new()
                 .capability(Capability::protocol::<fcomponent::RealmMarker>())
+                .from(Ref::framework())
+                .to(&realm_user)
+                .to(Ref::parent()),
+        )
+        .await
+        .unwrap();
+    builder
+        .add_route(
+            Route::new()
+                .capability(Capability::protocol::<fsandbox::CapabilityStoreMarker>())
                 .from(Ref::framework())
                 .to(&realm_user)
                 .to(Ref::parent()),
@@ -452,7 +461,11 @@ async fn start_with_dict() {
         .root
         .connect_to_protocol_at_exposed_dir::<fsandbox::FactoryMarker>()
         .expect("failed to connect to fuchsia.component.sandbox.Factory");
-
+    let store = spawned_child
+        .cm_realm_instance
+        .root
+        .connect_to_protocol_at_exposed_dir::<fsandbox::CapabilityStoreMarker>()
+        .unwrap();
     // StartChild dictionary entries must be Sender capabilities.
     let (receiver_client, mut receiver_stream) =
         create_request_stream::<fsandbox::ReceiverMarker>().unwrap();
@@ -483,27 +496,37 @@ async fn start_with_dict() {
     let connector_client =
         factory.create_connector(receiver_client).await.expect("failed to call CreateOpen");
 
-    let dictionary_ref = factory.create_dictionary().await.unwrap();
-    let (dictionary_client, server) = fidl::endpoints::create_proxy().unwrap();
-    let dictionary_ref2 = fsandbox::DictionaryRef {
-        token: dictionary_ref.token.duplicate_handle(Rights::SAME_RIGHTS).unwrap(),
-    };
-    factory.open_dictionary(dictionary_ref, server).unwrap();
-    dictionary_client
-        .insert(
-            "fidl.examples.routing.echo.Echo",
-            fsandbox::Capability::Connector(connector_client),
+    let dict_id = 1;
+    store.dictionary_create(dict_id).await.unwrap().unwrap();
+    let connector_id = 10;
+    store
+        .import(connector_id, fsandbox::Capability::Connector(connector_client))
+        .await
+        .unwrap()
+        .unwrap();
+    store
+        .dictionary_insert(
+            dict_id,
+            &fsandbox::DictionaryItem {
+                key: "fidl.examples.routing.echo.Echo".into(),
+                value: connector_id,
+            },
         )
         .await
         .unwrap()
         .unwrap();
+    let fsandbox::Capability::Dictionary(dictionary_ref) =
+        store.export(dict_id).await.unwrap().unwrap()
+    else {
+        unreachable!();
+    };
 
     let (_execution_controller_proxy, execution_controller_server_end) =
         create_proxy::<fcomponent::ExecutionControllerMarker>().unwrap();
     spawned_child
         .controller_proxy
         .start(
-            fcomponent::StartChildArgs { dictionary: Some(dictionary_ref2), ..Default::default() },
+            fcomponent::StartChildArgs { dictionary: Some(dictionary_ref), ..Default::default() },
             execution_controller_server_end,
         )
         .await
@@ -647,12 +670,26 @@ async fn start_when_already_started(spawn_child_future: BoxFuture<'static, Spawn
 
 #[fuchsia::test]
 async fn get_exposed_dictionary() {
-    let (controller_proxy, _child_ref, _instance) =
+    let (controller_proxy, _child_ref, instance) =
         spawn_child_with_url("#meta/echo_server.cm").await;
-    let (exposed_dict, server_end) = create_proxy().unwrap();
-
-    controller_proxy.get_exposed_dictionary(server_end).await.unwrap().unwrap();
-    let echo_cap = exposed_dict.get(fecho::EchoMarker::DEBUG_NAME).await.unwrap().unwrap();
+    let exposed_dict = controller_proxy.get_exposed_dictionary().await.unwrap().unwrap();
+    let store = instance
+        .root
+        .connect_to_protocol_at_exposed_dir::<fsandbox::CapabilityStoreMarker>()
+        .unwrap();
+    let exposed_dict_id = 1;
+    store
+        .import(exposed_dict_id, fsandbox::Capability::Dictionary(exposed_dict))
+        .await
+        .unwrap()
+        .unwrap();
+    let dest_id = 2;
+    store
+        .dictionary_get(exposed_dict_id, fecho::EchoMarker::DEBUG_NAME, dest_id)
+        .await
+        .unwrap()
+        .unwrap();
+    let echo_cap = store.export(dest_id).await.unwrap().unwrap();
 
     // TODO(https://fxbug.dev/340891837): The Open type here is a stopgap until we have updated the
     // exposed dictionary to use other bedrock capability types. Since externally Open is just an

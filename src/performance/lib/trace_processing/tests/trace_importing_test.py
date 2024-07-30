@@ -5,14 +5,14 @@
 """Unit tests for trace_importing.py."""
 
 import os
-from typing import Any, Dict, List
 import unittest
+from typing import Any, Dict, List
 
+import test_utils
 import trace_processing.trace_importing as trace_importing
 import trace_processing.trace_model as trace_model
 import trace_processing.trace_utils as trace_utils
 from trace_processing.trace_time import TimePoint
-import test_utils
 
 
 class TraceImportingTest(unittest.TestCase):

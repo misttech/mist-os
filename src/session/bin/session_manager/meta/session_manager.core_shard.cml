@@ -138,6 +138,11 @@
             to: "#session-manager",
         },
         {
+            protocol: "fuchsia.starnix.runner.Manager",
+            from: "#starnix_runner",
+            to: "#session-manager",
+        },
+        {
             protocol: [
                 "fuchsia.sysmem.Allocator",
                 "fuchsia.sysmem2.Allocator",
@@ -242,6 +247,13 @@
             as: "dev-skip-block",
             to: "#session-manager",
             subdir: "skip-block",
+        },
+        {
+            directory: "dev-class",
+            from: "parent",
+            as: "dev-hrtimer",
+            to: [ "#session-manager" ],
+            subdir: "hrtimer",
         },
         {
             protocol: [

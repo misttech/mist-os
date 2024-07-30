@@ -24,6 +24,8 @@ bool page_cache_tests() {
   page_cache::PageCache page_cache = ktl::move(page_cache_result.value());
   EXPECT_EQ(reserve_pages, page_cache.reserve_pages());
 
+  page_cache.SeedRandomShouldWait();
+
   // Stay on one CPU during the following tests to verify numeric properties of
   // a single per-CPU cache. Accounting for CPU migration during the tests would
   // make them overly complicated for little value.
@@ -112,6 +114,21 @@ bool page_cache_tests() {
     auto null_result2 = page_cache.Allocate(0);
     EXPECT_EQ(reserve_pages, null_result2->available_pages);
     EXPECT_EQ(0u, list_length(&null_result2->page_list));
+  }
+
+  // Verify that random should wait will work by repeatedly allocating and freeing a page until we
+  // get should wait.
+  {
+    // Allocate a page without SHOULD_WAIT to ensure that the cache has items.
+    auto result = page_cache.Allocate(1);
+    ASSERT_TRUE(result.is_ok());
+
+    // Now repeatedly free and allocate this page until we get should wait.
+    do {
+      page_cache.Free(ktl::move(result->page_list));
+      result = page_cache.Allocate(1, PMM_ALLOC_FLAG_CAN_WAIT);
+    } while (result.is_ok());
+    EXPECT_EQ(result.status_value(), ZX_ERR_SHOULD_WAIT);
   }
 
   END_TEST;

@@ -6,12 +6,13 @@ import os
 import re
 import tempfile
 
-import args
 import async_utils.command as command
+import statusinfo
+
+import args
 import environment
 import event
 import package_repository
-import statusinfo
 import test_list_file
 
 

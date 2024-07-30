@@ -1305,10 +1305,13 @@ impl<D: Clone + Into<DeviceId<Self>>> TransmitQueueBindingsContext<D> for FakeBi
 }
 
 impl DeviceLayerEventDispatcher for FakeBindingsCtx {
+    type DequeueContext = ();
+
     fn send_ethernet_frame(
         &mut self,
         device: &EthernetDeviceId<FakeBindingsCtx>,
         frame: Buf<Vec<u8>>,
+        _dequeue_context: Option<&mut Self::DequeueContext>,
     ) -> Result<(), DeviceSendFrameError> {
         let frame_meta = DispatchedFrame::Ethernet(device.downgrade());
         self.with_inner_mut(|ctx| ctx.frames.push(frame_meta, frame.into_inner()));
@@ -1320,6 +1323,7 @@ impl DeviceLayerEventDispatcher for FakeBindingsCtx {
         device: &PureIpDeviceId<FakeBindingsCtx>,
         packet: Buf<Vec<u8>>,
         ip_version: IpVersion,
+        _dequeue_context: Option<&mut Self::DequeueContext>,
     ) -> Result<(), DeviceSendFrameError> {
         let frame_meta = DispatchedFrame::PureIp(PureIpDeviceAndIpVersion {
             device: device.downgrade(),

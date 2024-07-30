@@ -5,7 +5,7 @@
 //! This module implements the conversion between the IR representation and the
 //! comparison representation.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::rc::Rc;
 
 use anyhow::{anyhow, bail, Context as _, Result};
@@ -224,12 +224,18 @@ impl ConvertType for ir::BitsDeclaration {
         Some(FlyStr::new(&self.name))
     }
     fn convert(&self, context: Context) -> Result<compare::Type> {
-        let mut members = BTreeSet::new();
+        let mut members = BTreeMap::new();
         for m in &self.members {
-            members.insert(m.value.integer_value()?);
+            members.insert(m.value.integer_value()?, FlyStr::new(&m.name));
         }
         let t = self.r#type.clone().try_into()?;
-        Ok(compare::Type::Bits(context.path, convert_strict(self.strict), t, members))
+        Ok(compare::Type::Bits(
+            context.path,
+            convert_strict(self.strict),
+            t,
+            members.keys().cloned().collect(),
+            members,
+        ))
     }
 }
 
@@ -238,12 +244,18 @@ impl ConvertType for ir::EnumDeclaration {
         Some(FlyStr::new(&self.name))
     }
     fn convert(&self, context: Context) -> Result<compare::Type> {
-        let mut members = BTreeSet::new();
+        let mut members = BTreeMap::new();
         for m in &self.members {
-            members.insert(m.value.integer_value()?);
+            members.insert(m.value.integer_value()?, FlyStr::new(&m.name));
         }
         let t = convert_primitive_subtype(self.r#type.as_str())?;
-        Ok(compare::Type::Enum(context.path, convert_strict(self.strict), t, members))
+        Ok(compare::Type::Enum(
+            context.path,
+            convert_strict(self.strict),
+            t,
+            members.keys().cloned().collect(),
+            members,
+        ))
     }
 }
 

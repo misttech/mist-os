@@ -3,12 +3,13 @@
 # found in the LICENSE file.
 
 import contextlib
-import fuzzy_matcher
 import io
 import json
 import os
 import tempfile
 import unittest
+
+import fuzzy_matcher
 
 
 class PreserveEnvAndCaptureOutputTestCase(unittest.TestCase):

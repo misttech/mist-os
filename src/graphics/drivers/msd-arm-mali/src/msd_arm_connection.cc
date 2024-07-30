@@ -361,6 +361,8 @@ void MsdArmConnection::InitializeInspectNode(inspect::Node* parent) {
   node_ = parent->CreateChild(StringPrintf("connection-%ld", counter++).c_str());
   jit_regions_ = node_.CreateChild("jit_regions");
   client_id_property_ = node_.CreateUint("client_id", client_id_);
+  slow_atom_count_property_ = node_.CreateUint("slow_atom_count", 0);
+  slow_semaphore_set_atom_count_property_ = node_.CreateUint("slow_semaphore_set_atom_count", 0);
 }
 
 bool MsdArmConnection::Init() {
@@ -1004,6 +1006,15 @@ void MsdArmConnection::SendNotificationData(MsdArmAtom* atom) {
   status.result_code = atom->result_code();
   status.atom_number = atom->atom_number();
   status.data = atom->user_data();
+
+  constexpr std::chrono::seconds kSlowAtomDuration{5};
+
+  if (std::chrono::steady_clock::now() - atom->creation_time() >= kSlowAtomDuration) {
+    slow_atom_count_property_.Add(1);
+    if (atom->flags() == kAtomFlagSemaphoreSet) {
+      slow_semaphore_set_atom_count_property_.Add(1);
+    }
+  }
 
   // Arbitrary limit to keep the max coalescing notifications list from growing forever.
   constexpr size_t kMaxCoalescingNotifications = 16;

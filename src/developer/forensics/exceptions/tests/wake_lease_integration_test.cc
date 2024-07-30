@@ -70,10 +70,17 @@ constexpr uint8_t ToUint(const ExecutionStateLevel value) { return static_cast<u
 #define ASSIGN_OR_CHECK(lhs, rexpr) \
   ASSIGN_OR_CHECK_IMPL(RESULT_MACROS_CONCAT_NAME(result, __LINE__), lhs, rexpr)
 
-#define ASSIGN_OR_CHECK_IMPL(result, lhs, rexpr)                     \
-  auto(result) = (rexpr);                                            \
-  FX_CHECK((result).is_ok()) << "Error: " << (result).error_value(); \
+// Same as |ASSIGN_OR_CHECK|, but doesn't attempt to set the result value of |expr| to a variable.
+// Useful for checking a FIDL call that doesn't return a value but can still return an error.
+#define CHECK_RESULT(expr) CHECK_RESULT_IMPL(RESULT_MACROS_CONCAT_NAME(result, __LINE__), expr)
+
+#define ASSIGN_OR_CHECK_IMPL(result, lhs, rexpr) \
+  CHECK_RESULT_IMPL(result, rexpr);              \
   lhs = std::move(result).value()
+
+#define CHECK_RESULT_IMPL(result, rexpr) \
+  auto(result) = (rexpr);                \
+  FX_CHECK((result).is_ok()) << "Error: " << (result).error_value()
 
 #define RESULT_MACROS_CONCAT_NAME(x, y) RESULT_MACROS_CONCAT_IMPL(x, y)
 #define RESULT_MACROS_CONCAT_IMPL(x, y) x##y
@@ -108,10 +115,10 @@ std::unique_ptr<WakeLease> CreateWakeLease(async_dispatcher_t* dispatcher) {
                                      std::move(topology_client_end).value());
 }
 
-ElementSchema BuildAssertiveApplicationActivitySchema(zx::event requires_token,
-                                                      ServerEnd<Lessor> server_end,
-                                                      LevelControlChannels level_control_channels,
-                                                      const std::string& element_name) {
+ElementSchema BuildAssertiveApplicationActivitySchema(
+    zx::event requires_token, ServerEnd<ElementControl> element_control_server_end,
+    ServerEnd<Lessor> lessor_server_end, LevelControlChannels level_control_channels,
+    const std::string& element_name) {
   LevelDependency dependency(
       /*dependency_type=*/DependencyType::kAssertive,
       /*dependent_level=*/kPowerLevelActive,
@@ -124,7 +131,8 @@ ElementSchema BuildAssertiveApplicationActivitySchema(zx::event requires_token,
       .initial_current_level = kPowerLevelActive,
       .valid_levels = std::vector<uint8_t>({kPowerLevelInactive, kPowerLevelActive}),
       .level_control_channels = std::move(level_control_channels),
-      .lessor_channel = std::move(server_end),
+      .lessor_channel = std::move(lessor_server_end),
+      .element_control = std::move(element_control_server_end),
   }};
 
   std::optional<std::vector<LevelDependency>>& dependencies = schema.dependencies();
@@ -160,15 +168,16 @@ fit::result<uint8_t, ElementWithLease> RaiseApplicationActivity() {
   zx::event aa_token =
       std::move(power_elements.application_activity()->assertive_dependency_token()).value();
 
+  Endpoints<ElementControl> element_control_endpoints = Endpoints<ElementControl>::Create();
   Endpoints<Lessor> lessor_endpoints = Endpoints<Lessor>::Create();
   SyncClient<Lessor> lessor_client(std::move(lessor_endpoints.client));
 
   ElementSchema schema = BuildAssertiveApplicationActivitySchema(
-      std::move(aa_token), std::move(lessor_endpoints.server), std::move(level_control_endpoints),
+      std::move(aa_token), std::move(element_control_endpoints.server),
+      std::move(lessor_endpoints.server), std::move(level_control_endpoints),
       /*element_name=*/kBootCompleteIndicator);
 
-  ASSIGN_OR_CHECK(TopologyAddElementResponse element,
-                  Connect<Topology>()->AddElement(std::move(schema)));
+  CHECK_RESULT(Connect<Topology>()->AddElement(std::move(schema)));
 
   ASSIGN_OR_CHECK(LessorLeaseResponse aa_lease, lessor_client->Lease(kPowerLevelActive));
 
@@ -185,7 +194,7 @@ fit::result<uint8_t, ElementWithLease> RaiseApplicationActivity() {
   }
 
   return fit::success(ElementWithLease{
-      .element_control = std::move(element.element_control_channel()),
+      .element_control = std::move(element_control_endpoints.client),
       .lease_control = std::move(aa_lease.lease_control()),
   });
 }

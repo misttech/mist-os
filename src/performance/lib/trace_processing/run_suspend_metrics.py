@@ -10,6 +10,7 @@ Returns suspend metrics in a JSON file.
 import argparse
 import pathlib
 import sys
+
 from trace_processing import trace_importing, trace_metrics, trace_model
 from trace_processing.metrics import suspend
 

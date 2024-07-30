@@ -20,6 +20,7 @@
 #include <vector>
 
 #include "src/camera/lib/actor/actor_base.h"
+#include "src/sensors/playback/file_reader.h"
 #include "src/sensors/playback/playback_config_validation.h"
 
 namespace sensors::playback {
@@ -29,6 +30,7 @@ class PlaybackController : public camera::actor::ActorBase {
   using DeactivateSensorError = fuchsia_hardware_sensors::DeactivateSensorError;
   using ConfigurePlaybackError = fuchsia_hardware_sensors::ConfigurePlaybackError;
   using ConfigureSensorRateError = fuchsia_hardware_sensors::ConfigureSensorRateError;
+  using FilePlaybackConfig = fuchsia_hardware_sensors::FilePlaybackConfig;
   using FixedValuesPlaybackConfig = fuchsia_hardware_sensors::FixedValuesPlaybackConfig;
   using PlaybackSourceConfig = fuchsia_hardware_sensors::PlaybackSourceConfig;
   using SensorEvent = fuchsia_sensors_types::SensorEvent;
@@ -37,7 +39,7 @@ class PlaybackController : public camera::actor::ActorBase {
   using SensorRateConfig = fuchsia_sensors_types::SensorRateConfig;
 
  public:
-  explicit PlaybackController(async_dispatcher_t* dispatcher);
+  PlaybackController(async_dispatcher_t* dispatcher, async_dispatcher_t* file_read_dispatcher);
 
   fpromise::promise<void, ConfigurePlaybackError> ConfigurePlayback(
       const PlaybackSourceConfig& config);
@@ -66,6 +68,7 @@ class PlaybackController : public camera::actor::ActorBase {
 
   enum class PlaybackMode : std::uint8_t {
     kNone,
+    kFilePlaybackMode,
     kFixedValuesMode,
   };
 
@@ -85,6 +88,23 @@ class PlaybackController : public camera::actor::ActorBase {
     std::optional<zx::time> last_scheduled_event_time;
   };
 
+  struct FileTimestampData {
+    // The time at which the first event from a file was scheduled to be sent (in the
+    // playback time domain).
+    zx::time first_presentation_time;
+    // The timestamp of the first event from a file (in the playback time domain).
+    zx::time first_event_timestamp;
+    // The presentation timestamp of the last event read from a file (in the playback time domain).
+    zx::time last_read_presentation_time;
+    // The event timestamp of the last event read from a file (in the playback time domain).
+    zx::time last_read_event_timestamp;
+
+    // The first event presentation time in a file (in the file's time domain).
+    zx::time file_first_presentation_time;
+    // The first event timestamp time in a file (in the file's time domain).
+    zx::time file_first_event_timestamp;
+  };
+
   // Tells any attached Driver protocol implementation to disconnect their client with the given
   // epitaph.
   fpromise::promise<void> DisconnectDriverClient(zx_status_t epitaph);
@@ -98,9 +118,15 @@ class PlaybackController : public camera::actor::ActorBase {
   fpromise::promise<void, ConfigurePlaybackError> ConfigureFixedValues(
       const FixedValuesPlaybackConfig& config);
 
+  fpromise::promise<void, ConfigurePlaybackError> ConfigureFilePlayback(
+      const FilePlaybackConfig& config);
+
   fpromise::promise<void> UpdatePlaybackState(SensorId sensor_id, bool enabled);
 
   fpromise::promise<void> ScheduleSensorEvents(SensorId sensor_id);
+
+  fpromise::promise<void> StartFileReads();
+  fpromise::promise<void> ScheduleFileReads(bool first_after_seek);
 
   // Generates the next event for a sensor given the current internal state of the fixed playback
   // sequence.
@@ -134,6 +160,17 @@ class PlaybackController : public camera::actor::ActorBase {
 
   // Which playback mode is currently active.
   PlaybackMode playback_mode_;
+
+  // Dispatcher to use when creating a FileReader.
+  async_dispatcher_t* file_read_dispatcher_;
+
+  // A FileReader actor which will be created if playback from a file is configured.
+  std::optional<FileReader> file_reader_;
+  // Flag to indicate if the FileReader playback is currently running.
+  bool file_reader_running_ = false;
+  // A set of initial timestamp conditions. Used for calculating event and presentation timestamps
+  // in the playback time domain from the ones in the data file.
+  std::optional<FileTimestampData> file_timestamp_data_;
 
   // A promise scope to wrap scheduled SendEvent and scheduling promises.
   std::unique_ptr<fpromise::scope> running_playback_scope_;

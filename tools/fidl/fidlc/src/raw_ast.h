@@ -220,26 +220,29 @@ struct RawAttributeArg final : public SourceElement {
 
 struct RawAttribute final : public SourceElement {
   enum class Provenance : uint8_t {
+    // The normal attribute syntax, e.g. `@some_attribute`.
     kDefault,
+    // A @doc attribute derived from doc comment syntax, e.g. `/// Documentation`.
     kDocComment,
+    // An @available attribute derived from modifier change syntax, e.g. `flexible(added=5)`.
+    kModifierAvailability,
   };
 
-  // Constructor for cases where the name of the attribute is explicitly defined in the text.
-  RawAttribute(const SourceElement& element, std::unique_ptr<RawIdentifier> maybe_name,
+  RawAttribute(const SourceElement& element, Provenance provenance,
+               std::unique_ptr<RawIdentifier> name,
                std::vector<std::unique_ptr<RawAttributeArg>> args)
-      : SourceElement(element), maybe_name(std::move(maybe_name)), args(std::move(args)) {}
-
-  // Factory for "///"-style doc comments, which have no attribute name.
-  static RawAttribute CreateDocComment(const SourceElement& element,
-                                       std::vector<std::unique_ptr<RawAttributeArg>> args) {
-    auto attr = RawAttribute(element, nullptr, std::move(args));
-    attr.provenance = Provenance::kDocComment;
-    return attr;
+      : SourceElement(element),
+        provenance(provenance),
+        maybe_name(std::move(name)),
+        args(std::move(args)) {
+    bool has_name = maybe_name != nullptr;
+    bool is_default = provenance == Provenance::kDefault;
+    ZX_ASSERT(has_name == is_default);
   }
 
   void Accept(TreeVisitor* visitor) const;
 
-  Provenance provenance = Provenance::kDefault;
+  Provenance provenance;
   std::unique_ptr<RawIdentifier> maybe_name;
   std::vector<std::unique_ptr<RawAttributeArg>> args;
 };
@@ -346,53 +349,35 @@ struct RawConstDeclaration final : public SourceElement {
 };
 
 // A single modifier applied to a layout, protocol, or method.
-template <typename T>
-struct RawModifier final {
-  RawModifier(T value, Token token) : value(value), token(token) {}
-
-  // Value of the modifier
-  T value;
-  // Token that the modifier is from.
-  Token token;
-};
-
-struct RawModifiers final : public SourceElement {
-  // Constructor for Layouts (has resourceness and strictness, but not openness).
-  RawModifiers(const SourceElement& element,
-               std::optional<RawModifier<Resourceness>> maybe_resourceness,
-               std::optional<RawModifier<Strictness>> maybe_strictness,
-               bool resourceness_comes_first)
+struct RawModifier final : SourceElement {
+  RawModifier(const SourceElement& element, ModifierValue value, Token token,
+              std::unique_ptr<RawAttribute> maybe_available_attribute)
       : SourceElement(element),
-        maybe_resourceness(maybe_resourceness),
-        maybe_strictness(maybe_strictness),
-        maybe_openness(std::nullopt),
-        resourceness_comes_first(resourceness_comes_first) {}
-
-  // Constructor for Protocols (only has openness).
-  RawModifiers(const SourceElement& element, std::optional<RawModifier<Openness>> maybe_openness)
-      : SourceElement(element),
-        maybe_resourceness(std::nullopt),
-        maybe_strictness(std::nullopt),
-        maybe_openness(maybe_openness),
-        resourceness_comes_first(false) {}
-
-  // Constructor for Protocol methods (only has strictness).
-  RawModifiers(const SourceElement& element,
-               std::optional<RawModifier<Strictness>> maybe_strictness)
-      : SourceElement(element),
-        maybe_resourceness(std::nullopt),
-        maybe_strictness(maybe_strictness),
-        maybe_openness(std::nullopt),
-        resourceness_comes_first(false) {}
+        value(value),
+        token(token),
+        maybe_available_attribute(std::move(maybe_available_attribute)) {}
 
   void Accept(TreeVisitor* visitor) const;
 
-  std::optional<RawModifier<Resourceness>> maybe_resourceness;
-  std::optional<RawModifier<Strictness>> maybe_strictness;
-  std::optional<RawModifier<Openness>> maybe_openness;
-  // Whether the resourceness modifier for a layout was before the strictness
-  // modifier, used for linting.
-  bool resourceness_comes_first;
+  // Value of the modifier
+  ModifierValue value;
+  // Token that the modifier is from.
+  Token token;
+  // Modifier availability, e.g. `resource(added=2)` or `strict(added=3, removed=5)`.
+  std::unique_ptr<RawAttribute> maybe_available_attribute;
+};
+
+// In the raw AST, "no modifiers" is represented by a null ModifierList*,
+// because every SourceElement must have a valid span. (In the flat AST, it is
+// the opposite: never null, but the vector can be empty.)
+struct RawModifierList final : public SourceElement {
+  explicit RawModifierList(const SourceElement& element,
+                           std::vector<std::unique_ptr<RawModifier>> modifiers)
+      : SourceElement(element), modifiers(std::move(modifiers)) {}
+
+  void Accept(TreeVisitor* visitor) const;
+
+  std::vector<std::unique_ptr<RawModifier>> modifiers;
 };
 
 struct RawParameterList final : public SourceElement {
@@ -406,7 +391,7 @@ struct RawParameterList final : public SourceElement {
 
 struct RawProtocolMethod : public SourceElement {
   RawProtocolMethod(const SourceElement& element, std::unique_ptr<RawAttributeList> attributes,
-                    std::unique_ptr<RawModifiers> modifiers,
+                    std::unique_ptr<RawModifierList> modifiers,
                     std::unique_ptr<RawIdentifier> identifier,
                     std::unique_ptr<RawParameterList> maybe_request,
                     std::unique_ptr<RawParameterList> maybe_response,
@@ -422,7 +407,7 @@ struct RawProtocolMethod : public SourceElement {
   void Accept(TreeVisitor* visitor) const;
 
   std::unique_ptr<RawAttributeList> attributes;
-  std::unique_ptr<RawModifiers> modifiers;
+  std::unique_ptr<RawModifierList> modifiers;
   std::unique_ptr<RawIdentifier> identifier;
   std::unique_ptr<RawParameterList> maybe_request;
   std::unique_ptr<RawParameterList> maybe_response;
@@ -444,7 +429,7 @@ struct RawProtocolCompose final : public SourceElement {
 
 struct RawProtocolDeclaration final : public SourceElement {
   RawProtocolDeclaration(const SourceElement& element, std::unique_ptr<RawAttributeList> attributes,
-                         std::unique_ptr<RawModifiers> modifiers,
+                         std::unique_ptr<RawModifierList> modifiers,
                          std::unique_ptr<RawIdentifier> identifier,
                          std::vector<std::unique_ptr<RawProtocolCompose>> composed_protocols,
                          std::vector<std::unique_ptr<RawProtocolMethod>> methods)
@@ -458,7 +443,7 @@ struct RawProtocolDeclaration final : public SourceElement {
   void Accept(TreeVisitor* visitor) const;
 
   std::unique_ptr<RawAttributeList> attributes;
-  std::unique_ptr<RawModifiers> modifiers;
+  std::unique_ptr<RawModifierList> modifiers;
   std::unique_ptr<RawIdentifier> identifier;
   std::vector<std::unique_ptr<RawProtocolCompose>> composed_protocols;
   std::vector<std::unique_ptr<RawProtocolMethod>> methods;
@@ -565,7 +550,7 @@ struct RawLayout final : public SourceElement {
 
   RawLayout(const SourceElement& element, Kind kind,
             std::vector<std::unique_ptr<RawLayoutMember>> members,
-            std::unique_ptr<RawModifiers> modifiers,
+            std::unique_ptr<RawModifierList> modifiers,
             std::unique_ptr<RawTypeConstructor> subtype_ctor)
       : SourceElement(element),
         kind(kind),
@@ -577,7 +562,7 @@ struct RawLayout final : public SourceElement {
 
   Kind kind;
   std::vector<std::unique_ptr<RawLayoutMember>> members;
-  std::unique_ptr<RawModifiers> modifiers;
+  std::unique_ptr<RawModifierList> modifiers;
   // Only used for Kind::kBits and Kind::kEnum.
   std::unique_ptr<RawTypeConstructor> subtype_ctor;
 };

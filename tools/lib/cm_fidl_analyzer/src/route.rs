@@ -5,18 +5,21 @@
 use crate::component_model::AnalyzerModelError;
 use cm_types::Name;
 use moniker::Moniker;
+use routing::capability_source::CapabilitySource;
+use routing::component_instance::ComponentInstanceInterface;
 use routing::mapper::RouteSegment;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 /// A summary of a specific capability route and the outcome of verification.
 #[derive(Clone, Debug, PartialEq)]
-pub struct VerifyRouteResult {
+pub struct VerifyRouteResult<C: ComponentInstanceInterface + 'static> {
     /// TODO(https://fxbug.dev/42053778): Rename to `moniker`.
     pub using_node: Moniker,
     pub capability: Option<Name>,
     pub error: Option<AnalyzerModelError>,
     pub route: Vec<RouteSegment>,
+    pub source: Option<CapabilitySource<C>>,
 }
 
 #[derive(Clone, Debug, Deserialize, Error, PartialEq, Serialize)]

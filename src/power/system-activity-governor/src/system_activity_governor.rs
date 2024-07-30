@@ -17,14 +17,17 @@ use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::{
     ArrayProperty, IntProperty as IInt, Node as INode, Property, UintProperty as IUint,
 };
-use fuchsia_inspect_contrib::nodes::BoundedListNode as IRingBuffer;
-use fuchsia_zircon::{self as zx, HandleBased};
+use fuchsia_inspect_contrib::nodes::{BoundedListNode as IRingBuffer, NodeExt};
+use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased};
 use futures::channel::mpsc::{self, Receiver, Sender};
 use futures::lock::Mutex;
 use futures::prelude::*;
-use power_broker_client::{basic_update_fn_factory, run_power_element, PowerElementContext};
+use power_broker_client::{
+    basic_update_fn_factory, run_power_element, LeaseHelper, PowerElementContext,
+};
 use std::cell::{OnceCell, RefCell};
 use std::rc::Rc;
+use std::sync::Arc;
 use {
     fidl_fuchsia_power_broker as fbroker, fidl_fuchsia_power_suspend as fsuspend,
     fuchsia_async as fasync,
@@ -60,7 +63,7 @@ trait SuspendResumeListener {
     /// Gets the manager of suspend stats.
     fn suspend_stats(&self) -> &SuspendStatsManager;
     /// Called when system suspension is about to begin.
-    fn on_suspend(&self);
+    async fn on_suspend(&self);
     /// Called after system suspension ends.
     async fn on_resume(&self);
     /// Called when Suspender reports a suspend failure.
@@ -190,7 +193,7 @@ impl ExecutionStateManager {
             // LINT.IfChange
             tracing::info!("Suspending");
             // LINT.ThenChange(//src/testing/end_to_end/honeydew/honeydew/affordances/starnix/system_power_state_controller.py)
-            listener.on_suspend();
+            listener.on_suspend().await;
 
             let response = if let Some(suspender) = inner.suspender.as_ref() {
                 // LINT.IfChange
@@ -368,6 +371,73 @@ impl SuspendStatsManager {
     }
 }
 
+/// Manager of leases that block suspension.
+///
+/// Used to facilitate the `TakeWakeLease()` functionality of
+/// `fuchsia.power.system.ActivityGovernor`.
+///
+/// A wake lease blocks suspension by requiring the power level of the Execution
+/// State to be at least [`ExecutionStateLevel::WakeHandling`].
+struct WakeLeaseManager {
+    /// The inspect node for lease stats.
+    inspect_node: INode,
+    /// Proxy to the power topology to create power elements.
+    topology: fbroker::TopologyProxy,
+    /// Dependency token for Execution State.
+    execution_state_assertive_dependency_token: fbroker::DependencyToken,
+}
+
+impl WakeLeaseManager {
+    pub fn new(
+        inspect_node: INode,
+        topology: fbroker::TopologyProxy,
+        execution_state_assertive_dependency_token: fbroker::DependencyToken,
+    ) -> Self {
+        Self { inspect_node, topology, execution_state_assertive_dependency_token }
+    }
+
+    async fn create_wake_lease(&self, name: String) -> Result<fsystem::WakeLeaseToken> {
+        let (server_token, client_token) = fsystem::WakeLeaseToken::create();
+
+        let lease_helper = LeaseHelper::new(
+            &self.topology,
+            &name,
+            vec![power_broker_client::LeaseDependency {
+                dependency_type: fbroker::DependencyType::Assertive,
+                requires_token: self
+                    .execution_state_assertive_dependency_token
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)?,
+                requires_level_by_preference: vec![
+                    ExecutionStateLevel::WakeHandling.into_primitive()
+                ],
+            }],
+        )
+        .await?;
+        tracing::info!("Acquiring lease for '{}'", name);
+        let lease = lease_helper.lease().await?;
+
+        let token_info = server_token.basic_info()?;
+        let inspect_lease_node =
+            self.inspect_node.create_child(token_info.koid.raw_koid().to_string());
+        let related_koid = token_info.related_koid.raw_koid();
+
+        inspect_lease_node.record_string("name", name.clone());
+        inspect_lease_node.record_uint("client_token_koid", related_koid);
+        inspect_lease_node.record_time("created_at");
+
+        fasync::Task::local(async move {
+            // Keep lease alive for as long as the client keeps it alive.
+            let _ = fasync::OnSignals::new(server_token, zx::Signals::EVENTPAIR_PEER_CLOSED).await;
+            tracing::debug!("Dropping lease for '{}'", name);
+            drop(inspect_lease_node);
+            drop(lease);
+        })
+        .detach();
+
+        Ok(client_token)
+    }
+}
+
 /// SystemActivityGovernor runs the server for fuchsia.power.suspend and fuchsia.power.system FIDL
 /// APIs.
 pub struct SystemActivityGovernor {
@@ -384,13 +454,15 @@ pub struct SystemActivityGovernor {
     /// The manager used to report suspend stats to inspect and clients of
     /// fuchsia.power.suspend.Stats.
     suspend_stats: SuspendStatsManager,
+    /// The manager used to create and report wake leases.
+    wake_lease_manager: WakeLeaseManager,
     /// The collection of ActivityGovernorListener that have registered through
     /// fuchsia.power.system.ActivityGovernor/RegisterListener.
     listeners: RefCell<Vec<fsystem::ActivityGovernorListenerProxy>>,
     /// The manager used to modify execution_state and trigger suspend.
     execution_state_manager: Rc<ExecutionStateManager>,
     /// The context used to manage the boot_control power element.
-    boot_control: PowerElementContext,
+    boot_control: Arc<PowerElementContext>,
     /// The collection of information about PowerElements managed
     /// by system-activity-governor.
     element_power_level_names: Vec<fbroker::ElementPowerLevelNames>,
@@ -417,6 +489,12 @@ impl SystemActivityGovernor {
         .build()
         .await
         .expect("PowerElementContext encountered error while building execution_state");
+
+        let wake_lease_manager = WakeLeaseManager::new(
+            inspect_root.create_child("wake_leases"),
+            topology.clone(),
+            execution_state.assertive_dependency_token(),
+        );
 
         element_power_level_names.push(generate_element_power_level_names(
             "execution_state",
@@ -505,20 +583,34 @@ impl SystemActivityGovernor {
             ],
         ));
 
-        let boot_control = PowerElementContext::builder(
-            topology,
-            "boot_control",
-            &[BootControlLevel::Inactive.into(), BootControlLevel::Active.into()],
-        )
-        .dependencies(vec![fbroker::LevelDependency {
-            dependency_type: fbroker::DependencyType::Assertive,
-            dependent_level: BootControlLevel::Active.into(),
-            requires_token: execution_state.assertive_dependency_token(),
-            requires_level_by_preference: vec![ExecutionStateLevel::Active.into_primitive()],
-        }])
-        .build()
-        .await
-        .expect("PowerElementContext encountered error while building boot_control");
+        let boot_control = Arc::new(
+            PowerElementContext::builder(
+                topology,
+                "boot_control",
+                &[BootControlLevel::Inactive.into(), BootControlLevel::Active.into()],
+            )
+            .dependencies(vec![fbroker::LevelDependency {
+                dependency_type: fbroker::DependencyType::Assertive,
+                dependent_level: BootControlLevel::Active.into(),
+                requires_token: execution_state.assertive_dependency_token(),
+                requires_level_by_preference: vec![ExecutionStateLevel::Active.into_primitive()],
+            }])
+            .build()
+            .await
+            .expect("PowerElementContext encountered error while building boot_control"),
+        );
+        let bc_context = boot_control.clone();
+        fasync::Task::local(async move {
+            run_power_element(
+                &bc_context.name(),
+                &bc_context.required_level,
+                0,    /* initial_level */
+                None, /* inspect_node */
+                basic_update_fn_factory(&bc_context),
+            )
+            .await;
+        })
+        .detach();
 
         element_power_level_names.push(generate_element_power_level_names(
             "boot_control",
@@ -558,9 +650,10 @@ impl SystemActivityGovernor {
             wake_handling,
             resume_latency_ctx,
             suspend_stats,
+            wake_lease_manager,
             listeners: RefCell::new(Vec::new()),
             execution_state_manager,
-            boot_control,
+            boot_control: boot_control.into(),
             element_power_level_names,
         }))
     }
@@ -586,6 +679,7 @@ impl SystemActivityGovernor {
             lease_status = boot_control_lease.watch_status(lease_status).await.unwrap();
         }
 
+        tracing::info!("Boot control required. Updating boot_control level to active.");
         let res = self.boot_control.current_level.update(BootControlLevel::Active.into()).await;
         if let Err(error) = res {
             tracing::warn!(?error, "failed to update boot_control level to Active");
@@ -889,6 +983,25 @@ impl SystemActivityGovernor {
                         );
                     }
                 }
+                Ok(fsystem::ActivityGovernorRequest::TakeWakeLease { responder, name }) => {
+                    let client_token = match self.wake_lease_manager.create_wake_lease(name).await {
+                        Ok(client_token) => client_token,
+                        Err(error) => {
+                            tracing::warn!(
+                                ?error,
+                                "Encountered error while registering wake lease"
+                            );
+                            return;
+                        }
+                    };
+
+                    if let Err(error) = responder.send(client_token) {
+                        tracing::warn!(
+                            ?error,
+                            "Encountered error while responding to TakeWakeLease request"
+                        );
+                    }
+                }
                 Ok(fsystem::ActivityGovernorRequest::RegisterListener { responder, payload }) => {
                     match payload.listener {
                         Some(listener) => {
@@ -963,12 +1076,13 @@ impl SuspendResumeListener for SystemActivityGovernor {
         &self.suspend_stats
     }
 
-    fn on_suspend(&self) {
+    async fn on_suspend(&self) {
         // A client may call RegisterListener while handling on_suspend which may cause another
         // mutable borrow of listeners. Clone the listeners to prevent this.
         let listeners: Vec<_> = self.listeners.borrow_mut().clone();
         for l in listeners {
             let _ = l.on_suspend();
+            let _ = l.on_suspend_started().await;
         }
     }
 

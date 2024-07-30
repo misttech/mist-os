@@ -13,9 +13,9 @@ use futures::task::Poll;
 use futures::StreamExt;
 use packet_encoding::Encodable;
 
-/// Simulates the peer sending an RFCOMM frame over the L2CAP `remote` socket.
+/// Simulates the peer sending an RFCOMM frame over the L2CAP `remote` channel
 #[track_caller]
-pub fn send_peer_frame(remote: &fidl::Socket, frame: Frame) {
+pub fn send_peer_frame(remote: &Channel, frame: Frame) {
     let mut buf = vec![0; frame.encoded_len()];
     assert!(frame.encode(&mut buf[..]).is_ok());
     assert!(remote.write(&buf).is_ok());
@@ -25,8 +25,7 @@ pub fn send_peer_frame(remote: &fidl::Socket, frame: Frame) {
 /// contents of the data received.
 #[track_caller]
 pub fn expect_frame_received_by_peer(exec: &mut fasync::TestExecutor, remote: &mut Channel) {
-    let mut vec = Vec::new();
-    let mut remote_fut = Box::pin(remote.read_datagram(&mut vec));
+    let mut remote_fut = Box::pin(remote.next());
     assert!(exec.run_until_stalled(&mut remote_fut).is_ready());
 }
 

@@ -3,10 +3,14 @@
 // found in the LICENSE file.
 
 use fidl::AsHandleRef as _;
-use fuchsia_bootfs::{BootfsParser, BootfsParserError};
+use fuchsia_bootfs::{
+    zbi_bootfs_is_aligned, zbi_bootfs_page_align, BootfsParser, BootfsParserError,
+};
 use fuchsia_component::client;
 use fuchsia_runtime::{take_startup_handle, HandleInfo, HandleType};
 use fuchsia_zircon::{self as zx, HandleBased, Resource};
+use std::collections::HashMap;
+use std::ops::Range;
 use std::sync::Arc;
 use thiserror::Error;
 use tracing::info;
@@ -62,14 +66,26 @@ pub enum BootfsError {
     Vmo(zx::Status),
     #[error("Failed to get VMO name: {0}")]
     VmoName(zx::Status),
-    #[error("Failed to create VMO child at offset {offset}: {err}")]
-    VmoCreateChild { offset: u64, err: zx::Status },
     #[error("Failed to convert numerical value: {0}")]
     ConvertNumber(#[from] std::num::TryFromIntError),
     #[error("Failed to convert string value: {0}")]
     ConvertString(#[from] std::ffi::IntoStringError),
     #[error("Failed to bind Bootfs to Component Manager's namespace: {0}")]
     Namespace(zx::Status),
+    #[error("Bootfs entry at offset {0} is not page-aligned")]
+    MisalignedOffset(u32),
+}
+
+// Transferring data from Bootfs can only be done with page-aligned offsets
+// and sizes. It is expected for the VMO offset to be aligned by BootfsParser,
+// but the size alignment is not guaranteed.
+fn aligned_range(offset: u32, size: u32) -> Result<Range<u64>, BootfsError> {
+    if !zbi_bootfs_is_aligned(offset) {
+        return Err(BootfsError::MisalignedOffset(offset));
+    }
+    let aligned_offset: u64 = offset.into();
+    let aligned_size: u64 = zbi_bootfs_page_align(size).into();
+    return Ok(aligned_offset..(aligned_offset + aligned_size));
 }
 
 pub struct BootfsSvc {
@@ -123,26 +139,6 @@ impl BootfsSvc {
             }
         }
         false
-    }
-
-    fn create_dir_entry_with_child(
-        parent: &zx::Vmo,
-        offset: u64,
-        size: u64,
-        executable: bool,
-        inode: u64,
-    ) -> Result<Arc<vmo::VmoFile>, BootfsError> {
-        // If this is a VMO with execution rights, passing zx::VmoChildOptions::NO_WRITE will
-        // allow the child to also inherit execution rights. Without that flag execution
-        // rights are stripped, even if the VMO already lacked write permission.
-        let child = parent
-            .create_child(
-                zx::VmoChildOptions::SNAPSHOT_AT_LEAST_ON_WRITE | zx::VmoChildOptions::NO_WRITE,
-                offset,
-                size,
-            )
-            .map_err(|err| BootfsError::VmoCreateChild { offset, err })?;
-        Ok(BootfsSvc::create_dir_entry(child, executable, inode))
     }
 
     fn create_dir_entry(vmo: zx::Vmo, executable: bool, inode: u64) -> Arc<vmo::VmoFile> {
@@ -199,41 +195,84 @@ impl BootfsSvc {
         self.ingest_bootfs_vmo(vmex)
     }
 
-    fn ingest_bootfs_vmo(self, vmex: Resource) -> Result<Self, BootfsError> {
-        // The bootfs VFS is comprised of multiple child VMOs which are just offsets into a
-        // single backing parent VMO.
-        //
-        // The parent VMO is duplicated here and marked as executable to reduce the total
-        // number of syscalls required. Files in directories that are read-only will just
-        // be children of the original read-only VMO, and files in directories that are
-        // read-execution will be children of the duplicated read-execution VMO.
-        let bootfs_exec: zx::Vmo = self
-            .bootfs
-            .duplicate_handle(zx::Rights::SAME_RIGHTS)
-            .map_err(BootfsError::DuplicateHandle)?
-            .into();
-        let bootfs_exec = bootfs_exec.replace_as_executable(&vmex).map_err(BootfsError::ExecVmo)?;
-
-        self.ingest_bootfs_vmo_internal(bootfs_exec)
+    // Create a VMO and transfer the entry's data from Bootfs to it. This
+    // operation will also decommit the transferred range in the Bootfs image.
+    fn create_vmo_from_bootfs(
+        &self,
+        range: &Range<u64>,
+        original_size: u64,
+    ) -> Result<zx::Vmo, BootfsError> {
+        let aligned_size = range.end - range.start;
+        let vmo = zx::Vmo::create_with_opts(zx::VmoOptions::RESIZABLE, aligned_size)
+            .map_err(BootfsError::Vmo)?;
+        vmo.transfer_data(
+            zx::TransferDataOptions::empty(),
+            0,
+            aligned_size,
+            &self.bootfs,
+            range.start,
+        )
+        .map_err(BootfsError::Vmo)?;
+        // Set the VMO content size back to the original size.
+        vmo.set_size(original_size).map_err(BootfsError::Vmo)?;
+        Ok(vmo)
     }
 
-    pub fn ingest_bootfs_vmo_internal(mut self, bootfs_exec: zx::Vmo) -> Result<Self, BootfsError> {
+    // This function will iterate through all entries parsed from the Bootfs
+    // VMO. A VMO is created for each entry, and the content located at the
+    // entry's offset in the Bootfs VMO is  transferred to the newly created
+    // VMO. The entry VMO corresponds to a new VMO file that gets inserted into
+    // the Bootfs VFS. The Bootfs VMO gets decommitted during this process.
+    //
+    // Note that until https://fxbug.dev/352179816 is landed, Userboot continues
+    // to hold onto copy-on-write VMO clones of the Component Manager binary and
+    // deps backing this process, so that even when this function creates
+    // true-copy VMOs and decommits their regions, the COW VMO will still have
+    // its own copy of pages with the original content.
+    fn ingest_bootfs_vmo(mut self, vmex: Resource) -> Result<Self, BootfsError> {
+        // A map of `seen_ranges` records the range in the Bootfs VMO that has
+        // already been processed by a previous entry. `seen_ranges` is checked
+        // first to see if a VMO has already been created for a particular range
+        // of data.
+        let mut seen_ranges: HashMap<Range<u64>, zx::Vmo> = HashMap::new();
         for entry in self.parser.zero_copy_iter() {
             let entry = entry?;
             assert!(entry.payload.is_none()); // Using the zero copy iterator.
 
-            let name = entry.name;
-            let path_parts: Vec<&str> = name.split("/").filter(|&x| !x.is_empty()).collect();
+            let vmo_range = aligned_range(entry.offset.try_into()?, entry.size.try_into()?)?;
+            let vmo = match seen_ranges.get(&vmo_range) {
+                Some(vmo) => vmo
+                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .map_err(BootfsError::DuplicateHandle)?,
+                None => {
+                    let vmo = self.create_vmo_from_bootfs(&vmo_range, entry.size)?;
+                    seen_ranges.insert(
+                        vmo_range,
+                        vmo.duplicate_handle(zx::Rights::SAME_RIGHTS)
+                            .map_err(BootfsError::DuplicateHandle)?,
+                    );
+                    vmo
+                }
+            };
 
+            // TODO(https://fxbug.dev/353380758): this strategy of granting
+            // exec rights may be overly liberal.
+            // If the VMO is not an executable, it is read-only. Exec rights are
+            // granted on the handle based on the entry's file path in Bootfs.
+            let path_parts: Vec<&str> = entry.name.split("/").filter(|&x| !x.is_empty()).collect();
             let is_exec = BootfsSvc::file_in_executable_directory(&path_parts);
-            let vmo = if is_exec { &bootfs_exec } else { &self.bootfs };
-            let dir_entry = BootfsSvc::create_dir_entry_with_child(
+            let vmo = if is_exec {
+                vmo.replace_as_executable(&vmex).map_err(BootfsError::ExecVmo)?
+            } else {
+                vmo.replace_handle(zx::Rights::VMO_DEFAULT - zx::Rights::WRITE)
+                    .map_err(BootfsError::Vmo)?
+            };
+
+            let dir_entry = BootfsSvc::create_dir_entry(
                 vmo,
-                entry.offset,
-                entry.size,
                 is_exec,
                 BootfsSvc::get_next_inode(&mut self.next_inode),
-            )?;
+            );
             self.tree_builder.add_entry(&path_parts, dir_entry)?;
         }
 
@@ -242,7 +281,7 @@ impl BootfsSvc {
 
     // Publish a VMO beneath '/boot/kernel'. Used to publish VDSOs and kernel files.
     pub fn publish_kernel_vmo(mut self, vmo: zx::Vmo) -> Result<Self, BootfsError> {
-        let name = vmo.get_name().map_err(BootfsError::VmoName)?.into_string()?;
+        let name = vmo.get_name().map_err(BootfsError::VmoName)?.to_string();
         if name.is_empty() {
             // Skip VMOs without names.
             return Ok(self);
@@ -347,5 +386,194 @@ impl BootfsSvc {
         info!("[BootfsSvc] Bootfs is ready and is now serving /boot.");
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use fuchsia_bootfs::BootfsEntry;
+    use std::fs::File;
+    use std::io::Read;
+
+    // This uses a test bootfs image containing synthetic data from
+    // //src/sys/lib/fuchsia-bootfs.
+    static BASIC_BOOTFS_UNCOMPRESSED_FILE: &str = "/pkg/data/basic.bootfs.uncompressed";
+
+    // Returns the number of total committed bytes in this VMO.
+    fn committed_bytes(bootfs_vmo: &zx::Vmo) -> u64 {
+        let info = bootfs_vmo.info().unwrap();
+        // Assert the kernel did not make any changes that would have altered
+        // committed_change_events (this value does not include user-triggered
+        // events) .
+        assert_eq!(info.committed_change_events, 0);
+        info.committed_bytes
+    }
+
+    fn read_file_to_vmo(path: &str) -> zx::Vmo {
+        let mut file_buffer = Vec::new();
+        File::open(path).unwrap().read_to_end(&mut file_buffer).unwrap();
+        let vmo = zx::Vmo::create(file_buffer.len() as u64).unwrap();
+        vmo.write(&file_buffer, 0).unwrap();
+        vmo
+    }
+
+    async fn open_file_to_read(dir: &fio::DirectoryProxy, name: &str) -> fio::FileProxy {
+        fuchsia_fs::directory::open_file(&dir, &name, fio::OpenFlags::RIGHT_READABLE).await.unwrap()
+    }
+
+    fn parsed_payload(entry: &BootfsEntry) -> String {
+        String::from_utf8(entry.payload.clone().unwrap()).unwrap()
+    }
+
+    // Test that bootfs entries are all parsed into true copy VMOs and inserted
+    // into the BootfsVFS, and that the Bootfs VMO is decommitted.
+    #[fuchsia::test]
+    async fn bootfs_is_parsed_and_decommitted() {
+        let bootfs_vmo = read_file_to_vmo(BASIC_BOOTFS_UNCOMPRESSED_FILE);
+        let bootfs_svc = BootfsSvc::new_internal(bootfs_vmo).unwrap();
+        let entries = bootfs_svc.parser.iter().map(|e| e.unwrap()).collect::<Vec<BootfsEntry>>();
+
+        // Save a copy of the Bootfs handle so we can check that this region is
+        // decommitted later.
+        let bootfs_dup =
+            bootfs_svc.bootfs.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap().into();
+        // All of the bootfs VMO should be committed.
+        assert_eq!(committed_bytes(&bootfs_dup), bootfs_dup.get_size().unwrap());
+
+        bootfs_svc
+            .ingest_bootfs_vmo(Resource::from(zx::Handle::invalid()))
+            .unwrap()
+            .create_and_bind_vfs()
+            .unwrap();
+
+        let boot_proxy = fuchsia_fs::directory::open_in_namespace(
+            "/boot",
+            fuchsia_fs::OpenFlags::RIGHT_READABLE,
+        )
+        .unwrap();
+
+        // Confirm that each entry from the uncompressed Bootfs is inserted into
+        // the BootfsVFS as distinct copies.
+        for entry in &entries {
+            let file = open_file_to_read(&boot_proxy, &entry.name).await;
+            let contents = fuchsia_fs::file::read(&file).await.unwrap();
+            assert_eq!(entry.payload.as_ref().unwrap(), &contents);
+            // Assert that the VMO handle backing the file is a fully-owned VMO
+            // (i.e. it does not have a parent VMO).
+            let vmo = file.get_backing_memory(fio::VmoFlags::READ).await.unwrap().unwrap();
+            assert_eq!(vmo.info().unwrap().parent_koid, zx::Koid::from_raw(0));
+        }
+
+        // Confirm that the only committed bytes of the Bootfs VMO is up to the
+        // start of the VMO data.
+        let data_start = entries.first().unwrap().offset;
+        let data_size = bootfs_dup.get_size().unwrap() - data_start;
+        assert_eq!(committed_bytes(&bootfs_dup), data_start);
+
+        // Expect the entire data VMO region to be zero-ed out.
+        let content = bootfs_dup.read_to_vec(data_start, data_size).unwrap();
+        assert!(content.iter().all(|b| *b == 0x0));
+    }
+
+    // Test that bootfs entries that share the same offset are parsed as
+    // distinct VMOs.
+    #[fuchsia::test]
+    async fn shared_bootfs_offsets() {
+        let bootfs_vmo = read_file_to_vmo(BASIC_BOOTFS_UNCOMPRESSED_FILE);
+        let bootfs_svc = BootfsSvc::new_internal(bootfs_vmo).unwrap();
+        let entries = bootfs_svc.parser.iter().map(|e| e.unwrap()).collect::<Vec<BootfsEntry>>();
+
+        // `entry1` is just an empty file, so the offset for this entry is the
+        // same as `entry2`, even if the entry.size of `entry1` is 0 and the
+        // entry.size of `entry2` is > 0.
+        let entry1 = entries.iter().find(|e| e.name == "dir/empty").unwrap();
+        let entry2 = entries.iter().find(|e| e.name == "dir/lorem.txt").unwrap();
+        assert_eq!(entry1.offset, entry2.offset);
+
+        // Confirm the payload copied from the bootfs VMO is as expected.
+        assert!(parsed_payload(entry1).is_empty());
+        assert!(parsed_payload(entry2).starts_with("Lorem ipsum"));
+
+        bootfs_svc
+            .ingest_bootfs_vmo(Resource::from(zx::Handle::invalid()))
+            .unwrap()
+            .create_and_bind_vfs()
+            .unwrap();
+
+        let boot_proxy = fuchsia_fs::directory::open_in_namespace(
+            "/boot",
+            fuchsia_fs::OpenFlags::RIGHT_READABLE,
+        )
+        .unwrap();
+
+        // Make sure entry1 was translated correctly to the VFS.
+        let entry1_file = open_file_to_read(&boot_proxy, &entry1.name).await;
+        let entry1_contents = fuchsia_fs::file::read_to_string(&entry1_file).await.unwrap();
+        assert_eq!(entry1_contents, parsed_payload(entry1));
+
+        // Make sure entry2 was translated correctly to the VFS.
+        let entry2_file = open_file_to_read(&boot_proxy, &entry2.name).await;
+        let entry2_contents = fuchsia_fs::file::read_to_string(&entry2_file).await.unwrap();
+        assert_eq!(entry2_contents, parsed_payload(entry2));
+
+        // Re-confirm the content of the VFS entries are as expected.
+        assert_ne!(entry1_contents, entry2_contents);
+        assert!(entry1_contents.is_empty());
+        assert!(entry2_contents.starts_with("Lorem ipsum"));
+    }
+
+    // Test that a duplicated handle is given to different bootfs entries that
+    // point to the same VMO content range.
+    #[fuchsia::test]
+    async fn shared_bootfs_ranges() {
+        let bootfs_vmo = read_file_to_vmo(BASIC_BOOTFS_UNCOMPRESSED_FILE);
+        let bootfs_svc = BootfsSvc::new_internal(bootfs_vmo).unwrap();
+        let entries = bootfs_svc.parser.iter().map(|e| e.unwrap()).collect::<Vec<BootfsEntry>>();
+
+        // `entry1` and `entry2` share the same parsed VMO offset and size under
+        // different named entries.
+        let entry1 = entries.iter().find(|e| e.name == "simple.txt").unwrap();
+        let entry2 = entries.iter().find(|e| e.name == "dir/simple-copy.txt").unwrap();
+        assert_eq!(entry1.offset, entry2.offset);
+        assert_eq!(entry1.size, entry2.size);
+        assert_eq!(parsed_payload(entry1), parsed_payload(entry2));
+
+        bootfs_svc
+            .ingest_bootfs_vmo(Resource::from(zx::Handle::invalid()))
+            .unwrap()
+            .create_and_bind_vfs()
+            .unwrap();
+
+        let boot_proxy = fuchsia_fs::directory::open_in_namespace(
+            "/boot",
+            fuchsia_fs::OpenFlags::RIGHT_READABLE,
+        )
+        .unwrap();
+
+        // Make sure entry1 was translated correctly to the VFS.
+        let entry1_file = open_file_to_read(&boot_proxy, &entry1.name).await;
+        let entry1_contents = fuchsia_fs::file::read_to_string(&entry1_file).await.unwrap();
+        assert_eq!(entry1_contents, parsed_payload(entry1));
+
+        // Make sure entry2 was translated correctly to the VFS.
+        let entry2_file = open_file_to_read(&boot_proxy, &entry2.name).await;
+        let entry2_contents = fuchsia_fs::file::read_to_string(&entry2_file).await.unwrap();
+        assert_eq!(entry2_contents, parsed_payload(entry2));
+
+        // Re-confirm the content of the VFS entries are the same.
+        assert_eq!(entry1_contents, entry2_contents);
+
+        // Test that both VFS entries share the same memory backing VMO.
+        let entry1_vmo =
+            entry1_file.get_backing_memory(fio::VmoFlags::READ).await.unwrap().unwrap();
+        let entry1_vmo_info = entry1_vmo.info().unwrap();
+
+        let entry2_vmo =
+            entry2_file.get_backing_memory(fio::VmoFlags::READ).await.unwrap().unwrap();
+        let entry2_vmo_info = entry2_vmo.info().unwrap();
+
+        // Expect the same KOID for both VMO handles.
+        assert_eq!(entry1_vmo_info.koid, entry2_vmo_info.koid);
     }
 }

@@ -49,7 +49,7 @@ use netstack3_ip::device::{
 use netstack3_ip::nud::{
     ConfirmationFlags, DynamicNeighborUpdateSource, NudHandler, NudIpHandler, NudUserConfig,
 };
-use netstack3_ip::{self as ip, IpForwardingDeviceContext, IpPacketDestination, RawMetric};
+use netstack3_ip::{self as ip, IpPacketDestination, IpRoutingDeviceContext, RawMetric};
 use packet::{BufferMut, Serializer};
 use packet_formats::ethernet::EthernetIpExt;
 
@@ -1177,7 +1177,7 @@ impl<BT: BindingsTypes, L> CounterContext<DeviceCounters> for CoreCtx<'_, BT, L>
     }
 }
 
-impl<I: IpDeviceIpExt, BC: BindingsContext, L> IpForwardingDeviceContext<I> for CoreCtx<'_, BC, L>
+impl<I: IpDeviceIpExt, BC: BindingsContext, L> IpRoutingDeviceContext<I> for CoreCtx<'_, BC, L>
 where
     Self: IpDeviceStateContext<I, BC, DeviceId = DeviceId<BC>>,
 {

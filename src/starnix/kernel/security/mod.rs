@@ -29,3 +29,13 @@ pub struct TaskState(selinux_hooks::TaskState);
 /// Opaque structure holding security state associated with a `ResolvedElf` instance.
 #[derive(Debug, PartialEq)]
 pub struct ResolvedElfState(SecurityId);
+
+/// The opaque type used by [`crate::vfs::FsNodeInfo`] to store security state. Note that
+/// [`crate::vfs::FsNodeInfo`] implements `Default` and `Clone`, requiring [`FsNodeState`] to
+/// implement them as well.
+#[derive(Debug, Default, Clone)]
+pub struct FsNodeState(Option<SecurityId>);
+
+/// Opaque structure holding security state for a [`crate::vfs::Filesystem`].
+#[derive(Debug, Clone)]
+pub struct FileSystemState(selinux_hooks::FileSystemState);

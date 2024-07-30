@@ -68,6 +68,16 @@ ElementDesc ElementDescBuilder::Build() {
     to_return.lessor_server_ = std::move(endpoints.server);
   }
 
+  if (this->element_control_.has_value()) {
+    to_return.element_control_server_ = std::move(this->element_control_.value());
+  } else {
+    // make a channel instead, include it in output
+    fidl::Endpoints<fuchsia_power_broker::ElementControl> endpoints =
+        fidl::CreateEndpoints<fuchsia_power_broker::ElementControl>().value();
+    to_return.element_control_client_ = std::move(endpoints.client);
+    to_return.element_control_server_ = std::move(endpoints.server);
+  }
+
   return to_return;
 }
 
@@ -102,6 +112,12 @@ ElementDescBuilder& ElementDescBuilder::SetRequiredLevel(
 ElementDescBuilder& ElementDescBuilder::SetLessor(
     fidl::ServerEnd<fuchsia_power_broker::Lessor> lessor) {
   lessor_ = std::move(lessor);
+  return *this;
+}
+
+ElementDescBuilder& ElementDescBuilder::SetElementControl(
+    fidl::ServerEnd<fuchsia_power_broker::ElementControl> element_control) {
+  element_control_ = std::move(element_control);
   return *this;
 }
 

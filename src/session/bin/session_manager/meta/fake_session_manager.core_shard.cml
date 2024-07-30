@@ -1,0 +1,23 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+//  ________  _________  ________  ________
+// |\   ____\|\___   ___\\   __  \|\   __  \
+// \ \  \___|\|___ \  \_\ \  \|\  \ \  \|\  \
+//  \ \_____  \   \ \  \ \ \  \\\  \ \   ____\
+//   \|____|\  \   \ \  \ \ \  \\\  \ \  \___|
+//     ____\_\  \   \ \__\ \ \_______\ \__\
+//    |\_________\   \|__|  \|_______|\|__|
+//    \|_________|
+// This file only exists for 24 hours to facilitate an annoying migration being performed by
+// wittrock@. See bug b/353560491 for context. Do not use this core shard for ANYTHING.
+{
+    children: [
+        {
+            name: "session-manager",
+            url: "fuchsia-pkg://fuchsia.com/fake_session_manager#meta/session_manager.cm",
+            startup: "eager",
+        },
+    ],
+}

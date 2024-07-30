@@ -17,7 +17,6 @@
 #include <zircon/types.h>
 
 #include <fbl/alloc_checker.h>
-#include <fbl/auto_lock.h>
 #include <kernel/event.h>
 #include <object/handle.h>
 #include <object/message_packet.h>

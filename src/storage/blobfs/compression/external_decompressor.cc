@@ -60,21 +60,14 @@ zx::result<std::unique_ptr<ExternalDecompressorClient>> ExternalDecompressorClie
     FX_LOGS(ERROR) << "Failed to duplicate compressed VMO: " << zx_status_get_string(status);
     return zx::error(status);
   }
-  status = client->Prepare();
+  status = client->ConnectToDecompressor();
   if (status != ZX_OK) {
     return zx::error(status);
   }
   return zx::ok(std::move(client));
 }
 
-zx_status_t ExternalDecompressorClient::Prepare() {
-  zx_signals_t signal;
-  if (zx_status_t status = fifo_.wait_one(ZX_FIFO_WRITABLE | ZX_FIFO_PEER_CLOSED,
-                                          zx::time::infinite_past(), &signal);
-      status == ZX_OK && (signal & ZX_FIFO_PEER_CLOSED) == 0 && (signal & ZX_FIFO_WRITABLE) != 0) {
-    return ZX_OK;
-  }
-
+zx_status_t ExternalDecompressorClient::ConnectToDecompressor() {
   if (zx_status_t status = PrepareDecompressorCreator(); status != ZX_OK) {
     return status;
   }
@@ -86,6 +79,7 @@ zx_status_t ExternalDecompressorClient::Prepare() {
     FX_PLOGS(ERROR, status) << "Failed to create remote duplicate of decompressed VMO";
     return status;
   }
+
   zx::vmo remote_compressed_vmo;
   if (zx_status_t status = compressed_vmo_.duplicate(ZX_RIGHT_SAME_RIGHTS, &remote_compressed_vmo);
       status != ZX_OK) {
@@ -152,19 +146,46 @@ zx_status_t ExternalDecompressorClient::PrepareDecompressorCreator() {
   return ZX_OK;
 }
 
+zx_status_t ExternalDecompressorClient::SendRequest(
+    const fuchsia_blobfs_internal::wire::DecompressRequest& request) {
+  zx_status_t write_status = fifo_.write(sizeof(request), &request, 1, nullptr);
+  if (write_status == ZX_OK) {
+    return ZX_OK;
+  }
+  bool try_to_reconnect = false;
+  if (write_status == ZX_ERR_SHOULD_WAIT) {
+    // The fifo is full, wait for it to become writable.
+    zx_signals_t signals = 0;
+    if (zx_status_t status =
+            fifo_.wait_one(ZX_FIFO_WRITABLE | ZX_FIFO_PEER_CLOSED, zx::time::infinite(), &signals);
+        status != ZX_OK) {
+      return status;
+    }
+    if ((signals & ZX_FIFO_PEER_CLOSED) != 0) {
+      // The other end of the fifo was closed while waiting for the fifo to become writable. Try to
+      // make a new connection.
+      try_to_reconnect = true;
+    }
+  } else if (write_status == ZX_ERR_PEER_CLOSED || write_status == ZX_ERR_BAD_HANDLE) {
+    try_to_reconnect = true;
+  } else {
+    FX_PLOGS(ERROR, write_status) << "Unexpected response when writing to fifo";
+    return write_status;
+  }
+  if (try_to_reconnect) {
+    fifo_.reset();
+    if (zx_status_t status = ConnectToDecompressor(); status != ZX_OK) {
+      return status;
+    }
+  }
+  // The original fifo should now be writable or a new connection was established.
+  return fifo_.write(sizeof(request), &request, 1, nullptr);
+}
+
 zx_status_t ExternalDecompressorClient::SendMessage(
     const fuchsia_blobfs_internal::wire::DecompressRequest& request) {
-  zx_status_t status;
-  fuchsia_blobfs_internal::wire::DecompressResponse response;
-  status = Prepare();
-  if (status != ZX_OK) {
-    return status;
-  }
-
-  status = fifo_.write(sizeof(request), &request, 1, nullptr);
-  if (status != ZX_OK) {
-    FX_LOGS(ERROR) << "Failed to write fifo request to decompressor: "
-                   << zx_status_get_string(status);
+  if (zx_status_t status = SendRequest(request); status != ZX_OK) {
+    FX_PLOGS(ERROR, status) << "Failed to write fifo request to decompressor";
     return status;
   }
 
@@ -176,14 +197,13 @@ zx_status_t ExternalDecompressorClient::SendMessage(
     return ZX_ERR_INTERNAL;
   }
 
-  status = fifo_.read(sizeof(response), &response, 1, nullptr);
-  if (status != ZX_OK) {
-    FX_LOGS(ERROR) << "Failed to read from fifo: " << zx_status_get_string(status);
+  fuchsia_blobfs_internal::wire::DecompressResponse response;
+  if (zx_status_t status = fifo_.read(sizeof(response), &response, 1, nullptr); status != ZX_OK) {
+    FX_PLOGS(ERROR, status) << "Failed to read from fifo";
     return status;
   }
   if (response.status != ZX_OK) {
-    FX_LOGS(ERROR) << "Error from external decompressor: " << zx_status_get_string(status)
-                   << " size: " << response.size;
+    FX_PLOGS(ERROR, response.status) << "Error from external decompressor";
     return response.status;
   }
   if (response.size != request.decompressed.size) {

@@ -43,6 +43,7 @@ extern "C" {
 #undef BLOCKING_SYSCALL
 #undef _ZX_SYSCALL_ANNO
 
+__LOCAL decltype(zx_clock_get_boot) CODE_clock_get_boot_via_kernel_ticks;
 __LOCAL decltype(zx_clock_get_monotonic) CODE_clock_get_monotonic_via_kernel_ticks;
 __LOCAL decltype(zx_deadline_after) CODE_deadline_after_via_kernel_mono;
 __LOCAL decltype(zx_deadline_after) CODE_deadline_after_via_kernel_ticks;

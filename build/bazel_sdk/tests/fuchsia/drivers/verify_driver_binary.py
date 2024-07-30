@@ -6,8 +6,8 @@
 import argparse
 import json
 import subprocess
-import tempfile
 import sys
+import tempfile
 
 
 def parse_args():

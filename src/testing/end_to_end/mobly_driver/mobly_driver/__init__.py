@@ -1,14 +1,13 @@
-#!/usr/bin/env fuchsia-vendored-python
 # Copyright 2024 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 """Mobly Driver module."""
 
 import os
+import signal
 import subprocess
-import time
 from tempfile import NamedTemporaryFile
-from typing import Optional
+from typing import Any, Optional
 
 from mobly_driver.api import api_infra
 from mobly_driver.driver import base
@@ -75,13 +74,31 @@ def _execute_test(
         if verbose:
             cmd.append("-v")
         cmd_str = " ".join(cmd)
-        print(f'Executing Mobly test via cmd:\n"$ {cmd_str}"')
+        print(f'[Mobly Driver] - Executing Mobly test via cmd:\n"$ {cmd_str}"')
 
         with subprocess.Popen(
             cmd,
             universal_newlines=True,
             env=test_env,
         ) as proc:
+
+            def sigterm_handler(signum: int, _: Any) -> None:
+                print(
+                    f"[Mobly Driver] - Received signal: {signum}, terminating the mobly test"
+                )
+                proc.terminate()
+                try:
+                    proc.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    print(
+                        "[Mobly Driver] - After terminating the mobly test, "
+                        "it is still running even after waiting for 5 seconds"
+                    )
+                    pass
+                driver.teardown()
+
+            signal.signal(signal.SIGINT, sigterm_handler)
+            signal.signal(signal.SIGTERM, sigterm_handler)
             try:
                 return_code = proc.wait(timeout=timeout_sec)
             except subprocess.TimeoutExpired:

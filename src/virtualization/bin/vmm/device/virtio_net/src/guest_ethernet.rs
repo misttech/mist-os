@@ -134,7 +134,10 @@ impl GuestEthernetInterface for GuestEthernet {
 
 impl GuestEthernet {
     // Callback from C++.
-    pub fn set_guest_ethernet_status(guest_ethernet: *const libc::c_void, status: zx::zx_status_t) {
+    pub fn set_guest_ethernet_status(
+        guest_ethernet: *const libc::c_void,
+        status: zx::sys::zx_status_t,
+    ) {
         let status = zx::Status::from_raw(status);
         let guest_ethernet = unsafe {
             (guest_ethernet as *const GuestEthernet)

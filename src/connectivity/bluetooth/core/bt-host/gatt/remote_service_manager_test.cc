@@ -1184,7 +1184,7 @@ CharacteristicData WritableChrc() {
       Property::kWrite, std::nullopt, 2, kDefaultChrcValueHandle, kTestUuid3);
 }
 CharacteristicData WriteableExtendedPropChrc() {
-  auto props = Property::kWrite | Property::kExtendedProperties;
+  uint8_t props = Property::kWrite | Property::kExtendedProperties;
   return CharacteristicData(
       props, std::nullopt, 2, kDefaultChrcValueHandle, kTestUuid3);
 }
@@ -1375,7 +1375,7 @@ TEST_F(RemoteServiceManagerTest, ReadLongMultipleBlobs) {
   StaticByteBuffer<att::kLEMinMTU * 3> expected_value;
 
   // Initialize the contents.
-  for (size_t i = 0; i < expected_value.size(); ++i) {
+  for (uint8_t i = 0; i < expected_value.size(); ++i) {
     expected_value[i] = i;
   }
 
@@ -1439,7 +1439,7 @@ TEST_F(RemoteServiceManagerTest,
       {ReadableChrc()});
 
   StaticByteBuffer<att::kLEMinMTU - 1> expected_value;
-  for (size_t i = 0; i < expected_value.size(); ++i) {
+  for (uint8_t i = 0; i < expected_value.size(); ++i) {
     expected_value[i] = i;
   }
 
@@ -1534,7 +1534,7 @@ TEST_F(RemoteServiceManagerTest, ReadLongValueExactMultipleOfMTU) {
   StaticByteBuffer<(att::kLEMinMTU - 1) * 3> expected_value;
 
   // Initialize the contents.
-  for (size_t i = 0; i < expected_value.size(); ++i) {
+  for (uint8_t i = 0; i < expected_value.size(); ++i) {
     expected_value[i] = i;
   }
 
@@ -1600,7 +1600,7 @@ TEST_F(RemoteServiceManagerTest, ReadLongMultipleBlobsWithMaxSize) {
   StaticByteBuffer<att::kLEMinMTU * 3> expected_value;
 
   // Initialize the contents.
-  for (size_t i = 0; i < expected_value.size(); ++i) {
+  for (uint8_t i = 0; i < expected_value.size(); ++i) {
     expected_value[i] = i;
   }
 
@@ -1655,7 +1655,7 @@ TEST_F(RemoteServiceManagerTest, ReadLongAtOffset) {
   StaticByteBuffer<att::kLEMinMTU * 3> expected_value;
 
   // Initialize the contents.
-  for (size_t i = 0; i < expected_value.size(); ++i) {
+  for (uint8_t i = 0; i < expected_value.size(); ++i) {
     expected_value[i] = i;
   }
 
@@ -1916,8 +1916,9 @@ TEST_F(RemoteServiceManagerTest, ReadByTypeReturnsReadErrorsWithResults) {
   service->ReadByType(kCharUuid, [&](att::Result<> cb_status, auto values) {
     status = cb_status;
     ASSERT_EQ(errors.size(), values.size());
-    for (size_t i = 0; i < values.size(); i++) {
-      SCOPED_TRACE(bt_lib_cpp_string::StringPrintf("i: %zu", i));
+    for (uint16_t i = 0; i < values.size(); i++) {
+      SCOPED_TRACE(
+          bt_lib_cpp_string::StringPrintf("i: %zu", static_cast<size_t>(i)));
       EXPECT_EQ(CharacteristicHandle(kStartHandle + i), values[i].handle);
       ASSERT_TRUE(values[i].result.is_error());
       EXPECT_EQ(errors[i], values[i].result.error_value());
@@ -2164,7 +2165,7 @@ TEST_F(RemoteServiceManagerTest, WriteCharLongOffsetSuccess) {
   std::vector<uint8_t> full_write_value(att::kLEMinMTU * 3);
 
   // Initialize the contents.
-  for (size_t i = 0; i < full_write_value.size(); ++i) {
+  for (uint8_t i = 0; i < full_write_value.size(); ++i) {
     full_write_value[i] = i;
   }
 
@@ -2229,7 +2230,7 @@ TEST_F(RemoteServiceManagerTest, WriteCharLongAtExactMultipleOfMtu) {
   std::vector<uint8_t> full_write_value((att::kLEMinMTU - 5) * 4);
 
   // Initialize the contents.
-  for (size_t i = 0; i < full_write_value.size(); ++i) {
+  for (uint8_t i = 0; i < full_write_value.size(); ++i) {
     full_write_value[i] = i;
   }
 
@@ -2298,7 +2299,7 @@ TEST_F(RemoteServiceManagerTest, WriteCharLongReliableWrite) {
   std::vector<uint8_t> full_write_value((att::kLEMinMTU - 5));
 
   // Initialize the contents.
-  for (size_t i = 0; i < full_write_value.size(); ++i) {
+  for (uint8_t i = 0; i < full_write_value.size(); ++i) {
     full_write_value[i] = i;
   }
 
@@ -2559,7 +2560,7 @@ TEST_F(RemoteServiceManagerTest, ReadLongDescriptor) {
   StaticByteBuffer<att::kLEMinMTU * 3> expected_value;
 
   // Initialize the contents.
-  for (size_t i = 0; i < expected_value.size(); ++i) {
+  for (uint8_t i = 0; i < expected_value.size(); ++i) {
     expected_value[i] = i;
   }
 
@@ -2717,7 +2718,7 @@ TEST_F(RemoteServiceManagerTest, WriteDescLongSuccess) {
   std::vector<uint8_t> full_write_value(att::kLEMinMTU * 3);
 
   // Initialize the contents.
-  for (size_t i = 0; i < full_write_value.size(); ++i) {
+  for (uint8_t i = 0; i < full_write_value.size(); ++i) {
     full_write_value[i] = i;
   }
 

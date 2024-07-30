@@ -9,6 +9,7 @@ use crate::device::{self, DeviceOps};
 use crate::error::Error;
 use crate::WlanTxPacketExt as _;
 use anyhow::format_err;
+use fdf::ArenaStaticBox;
 use ieee80211::{MacAddr, MacAddrBytes, Ssid};
 use std::collections::{HashMap, VecDeque};
 use std::fmt::Display;
@@ -16,7 +17,6 @@ use tracing::error;
 use wlan_common::mac::{self, CapabilityInfo, EthernetIIHdr};
 use wlan_common::timer::EventId;
 use wlan_common::{ie, tim, TimeUnit};
-use wlan_ffi_transport::Buffer;
 use zerocopy::ByteSlice;
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_mlme as fidl_mlme,
@@ -92,7 +92,7 @@ impl InfraBss {
 
         // TODO(https://fxbug.dev/42113580): Support DTIM.
 
-        let (in_buffer, _, beacon_offload_params) = bss.make_beacon_frame(ctx)?;
+        let (in_buffer, beacon_offload_params) = bss.make_beacon_frame(ctx)?;
         let mac_frame = in_buffer.to_vec();
         let tim_ele_offset = u64::try_from(beacon_offload_params.tim_ele_offset).map_err(|_| {
             Error::Internal(format_err!(
@@ -276,7 +276,7 @@ impl InfraBss {
     fn make_beacon_frame<D>(
         &self,
         ctx: &Context<D>,
-    ) -> Result<(Buffer, usize, BeaconOffloadParams), Error> {
+    ) -> Result<(ArenaStaticBox<[u8]>, BeaconOffloadParams), Error> {
         let tim = self.make_tim();
         let (pvb_offset, pvb_bitmap) = tim.make_partial_virtual_bitmap();
 
@@ -306,7 +306,7 @@ impl InfraBss {
         // According to IEEE Std 802.11-2016, 11.1.4.1, we should intersect our IEs with the probe
         // request IEs. However, the client is able to do this anyway so we just send the same IEs
         // as we would with a beacon frame.
-        let (buffer, written) = ctx
+        let buffer = ctx
             .make_probe_resp_frame(
                 client_addr,
                 self.beacon_interval,
@@ -317,9 +317,8 @@ impl InfraBss {
                 self.rsne.as_ref().map_or(&[], |rsne| &rsne),
             )
             .map_err(|e| Rejection::Client(client_addr, ClientRejection::WlanSendError(e)))?;
-        ctx.device
-            .send_wlan_frame(buffer.finalize(written), fidl_softmac::WlanTxInfoFlags::empty(), None)
-            .map_err(|s| {
+        ctx.device.send_wlan_frame(buffer, fidl_softmac::WlanTxInfoFlags::empty(), None).map_err(
+            |s| {
                 Rejection::Client(
                     client_addr,
                     ClientRejection::WlanSendError(Error::Status(
@@ -327,7 +326,8 @@ impl InfraBss {
                         s,
                     )),
                 )
-            })
+            },
+        )
     }
 
     pub async fn handle_mgmt_frame<B: ByteSlice, D: DeviceOps>(
@@ -516,7 +516,7 @@ impl InfraBss {
         body: &[u8],
         async_id: trace::Id,
     ) -> Result<(), Rejection> {
-        let (buffer, written) = ctx
+        let buffer = ctx
             .make_data_frame(
                 hdr.da,
                 hdr.sa,
@@ -529,19 +529,17 @@ impl InfraBss {
         let tx_flags = fidl_softmac::WlanTxInfoFlags::empty();
 
         if !self.clients.values().any(|client| client.dozing()) {
-            ctx.device
-                .send_wlan_frame(buffer.finalize(written), tx_flags, Some(async_id))
-                .map_err(move |s| {
-                    Rejection::Client(
-                        hdr.da,
-                        ClientRejection::WlanSendError(Error::Status(
-                            format!("error sending multicast data frame"),
-                            s,
-                        )),
-                    )
-                })?;
+            ctx.device.send_wlan_frame(buffer, tx_flags, Some(async_id)).map_err(move |s| {
+                Rejection::Client(
+                    hdr.da,
+                    ClientRejection::WlanSendError(Error::Status(
+                        format!("error sending multicast data frame"),
+                        s,
+                    )),
+                )
+            })?;
         } else {
-            self.group_buffered.push_back(BufferedFrame { buffer, written, tx_flags, async_id });
+            self.group_buffered.push_back(BufferedFrame { buffer, tx_flags, async_id });
         }
 
         Ok(())
@@ -584,14 +582,13 @@ impl InfraBss {
         self.dtim_count = self.dtim_period;
 
         let mut buffered = self.group_buffered.drain(..).peekable();
-        while let Some(BufferedFrame { mut buffer, written, tx_flags, async_id }) = buffered.next()
-        {
+        while let Some(BufferedFrame { mut buffer, tx_flags, async_id }) = buffered.next() {
             if buffered.peek().is_some() {
-                frame_writer::set_more_data(&mut buffer[..written])?;
+                frame_writer::set_more_data(&mut buffer[..])?;
             }
             ctx.device
-                .send_wlan_frame(buffer.finalize(written), tx_flags, Some(async_id))
-                .map_err(|s| Error::Status(format!("error sending buffered frame on wake"), s))?;
+                .send_wlan_frame(buffer, tx_flags, Some(async_id))
+                .map_err(|s| Error::Status(format!("error sending buffered frame"), s))?;
         }
 
         Ok(())
@@ -635,7 +632,6 @@ mod tests {
     use wlan_common::mac::AsBytesExt as _;
     use wlan_common::test_utils::fake_frames::fake_wpa2_rsne;
     use wlan_common::timer::{self, create_timer};
-    use wlan_ffi_transport::{BufferProvider, FakeFfiBufferProvider};
 
     lazy_static! {
         static ref CLIENT_ADDR: MacAddr = [4u8; 6].into();
@@ -648,15 +644,7 @@ mod tests {
         fake_device: FakeDevice,
     ) -> (Context<FakeDevice>, timer::EventStream<TimedEvent>) {
         let (timer, time_stream) = create_timer();
-        (
-            Context::new(
-                fake_device,
-                BufferProvider::new(FakeFfiBufferProvider::new()),
-                timer,
-                *BSSID,
-            ),
-            time_stream,
-        )
+        (Context::new(fake_device, timer, *BSSID), time_stream)
     }
 
     async fn make_infra_bss(ctx: &mut Context<FakeDevice>) -> InfraBss {

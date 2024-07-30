@@ -8,12 +8,10 @@ import json
 import logging
 import subprocess
 
-from mobly import asserts
-from mobly import test_runner
-
+import honeydew
 from fuchsia_base_test import fuchsia_base_test
 from honeydew.interfaces.device_classes import fuchsia_device
-import honeydew
+from mobly import asserts, test_runner
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -93,7 +91,8 @@ class FfxTest(fuchsia_base_test.FuchsiaBaseTest):
     # Note: in this test we do _not_ want to probe the device, since we will try
     # to probe every device visible in the builder. But in EngProd environments,
     # that could be dozens of devices
-    def test_target_list_without_discovery(self) -> None:
+    # TODO(b/355292969): re-enable when client-side discovery is re-enabled (see libtarget::is_discover_enabled())
+    def _test_target_list_without_discovery(self) -> None:
         """Test `ffx target list` output returns as expected when discovery is off."""
         self.dut.ffx.run(["daemon", "stop"])
         output = self.dut.ffx.run(
@@ -119,7 +118,8 @@ class FfxTest(fuchsia_base_test.FuchsiaBaseTest):
         with asserts.assert_raises(honeydew.errors.FfxCommandError):
             self.dut.ffx.run(["-c", "daemon.autostart=false", "daemon", "echo"])
 
-    def test_target_list_nodename_without_discovery(self) -> None:
+    # TODO(b/355292969): re-enable when client-side discovery is re-enabled (see libtarget::is_discover_enabled())
+    def _test_target_list_nodename_without_discovery(self) -> None:
         """Test `ffx target list <nodename>` output returns as expected when discovery is off."""
         self.dut.ffx.run(["daemon", "stop"], capture_output=False)
         output = self.dut.ffx.run(

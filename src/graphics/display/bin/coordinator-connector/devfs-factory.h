@@ -49,6 +49,12 @@ class DevFsCoordinatorFactory : public fidl::Server<fuchsia_hardware_display::Pr
                                  OpenCoordinatorForVirtconCompleter::Sync& completer) override;
   void OpenCoordinatorForPrimary(OpenCoordinatorForPrimaryRequest& request,
                                  OpenCoordinatorForPrimaryCompleter::Sync& completer) override;
+  void OpenCoordinatorWithListenerForVirtcon(
+      OpenCoordinatorWithListenerForVirtconRequest& request,
+      OpenCoordinatorWithListenerForVirtconCompleter::Sync& completer) override;
+  void OpenCoordinatorWithListenerForPrimary(
+      OpenCoordinatorWithListenerForPrimaryRequest& request,
+      OpenCoordinatorWithListenerForPrimaryCompleter::Sync& completer) override;
 
  private:
   // Opens fuchsia.hardware.display.Coordinator service for a primary client

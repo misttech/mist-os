@@ -3,15 +3,12 @@
 // found in the LICENSE file.
 
 use std::collections::btree_map::{Entry as BTreeEntry, OccupiedEntry as BTreeOccupiedEntry};
-use std::collections::BTreeMap;
-use std::convert::Infallible as Never;
-use std::num::NonZeroU64;
+use std::collections::{BTreeMap, HashSet};
 use std::ops::ControlFlow;
 use std::pin::pin;
 
 use assert_matches::assert_matches;
 use fidl::endpoints::{ControlHandle as _, ProtocolMarker as _};
-use fidl_fuchsia_net_routes_admin::RuleSetError;
 use fnet_routes_ext::rules::{
     FidlRuleAdminIpExt, InstalledRule, MarkSelector, RuleAction, RuleIndex, RuleSelector,
     RuleSetPriority, RuleSetRequest, RuleTableRequest,
@@ -25,35 +22,26 @@ use {
     fidl_fuchsia_net_routes_ext as fnet_routes_ext, fuchsia_zircon as zx,
 };
 
-use crate::bindings::devices::BindingId;
-use crate::bindings::util::{
-    ConversionContext, DeviceNotFoundError, IntoFidlWithContext as _, TaskWaitGroupSpawner,
-    TryFromFidlWithContext, TryIntoCoreWithContext, TryIntoFidlWithContext,
-};
-use crate::bindings::{routes, BindingsCtx, Ctx};
+use crate::bindings::util::TaskWaitGroupSpawner;
+use crate::bindings::{routes, Ctx};
 
 #[derive(Debug, Clone)]
-pub(super) struct AddableSelector<I: Ip, D> {
+pub(super) struct AddableSelector<I: Ip> {
     /// Matches whether the source address of the packet is from the subnet.
     from: Option<Subnet<I::Addr>>,
     /// Matches the packet iff the packet was locally generated.
     locally_generated: Option<bool>,
     /// Matches the packet iff the socket that was bound to the device using
     /// `SO_BINDTODEVICE`.
-    bound_device: Option<D>,
+    bound_device: Option<fnet_routes_ext::rules::InterfaceSelector>,
     /// The selector for the MARK_1 domain.
     mark_1_selector: Option<MarkSelector>,
     /// The selector for the MARK_2 domain.
     mark_2_selector: Option<MarkSelector>,
 }
 
-impl<I: Ip> TryFromFidlWithContext<RuleSelector<I>> for AddableSelector<I, routes::WeakDeviceId> {
-    type Error = DeviceNotFoundError;
-
-    fn try_from_fidl_with_ctx<C: ConversionContext>(
-        ctx: &C,
-        selector: RuleSelector<I>,
-    ) -> Result<Self, Self::Error> {
+impl<I: Ip> From<RuleSelector<I>> for AddableSelector<I> {
+    fn from(selector: RuleSelector<I>) -> Self {
         let RuleSelector {
             from,
             locally_generated,
@@ -61,34 +49,20 @@ impl<I: Ip> TryFromFidlWithContext<RuleSelector<I>> for AddableSelector<I, route
             mark_1_selector,
             mark_2_selector,
         } = selector;
-        let bound_device = bound_device
-            .map(|d| {
-                BindingId::new(d)
-                    .ok_or(DeviceNotFoundError)
-                    .and_then(|bid| routes::DeviceId::try_from_fidl_with_ctx(ctx, bid))
-                    .map(|id| id.downgrade())
-            })
-            .transpose()?;
-        Ok(Self { from, locally_generated, bound_device, mark_1_selector, mark_2_selector })
+        Self { from, locally_generated, bound_device, mark_1_selector, mark_2_selector }
     }
 }
 
-impl<I: Ip> TryIntoFidlWithContext<RuleSelector<I>> for AddableSelector<I, routes::WeakDeviceId> {
-    type Error = Never;
-
-    fn try_into_fidl_with_ctx<C: ConversionContext>(
-        self,
-        ctx: &C,
-    ) -> Result<RuleSelector<I>, Self::Error> {
-        let Self { from, locally_generated, bound_device, mark_1_selector, mark_2_selector } = self;
-        let bound_device = bound_device
-            // TODO(https://fxbug.dev/351015513): We should implement the
-            // trait on `DeviceId` so we don't need to upgrade.
-            .and_then(|d| d.upgrade())
-            .map(|d: routes::DeviceId| d.try_into_fidl_with_ctx(ctx))
-            .transpose()?
-            .map(NonZeroU64::get);
-        Ok(RuleSelector { from, locally_generated, bound_device, mark_1_selector, mark_2_selector })
+impl<I: Ip> From<AddableSelector<I>> for RuleSelector<I> {
+    fn from(selector: AddableSelector<I>) -> Self {
+        let AddableSelector {
+            from,
+            locally_generated,
+            bound_device,
+            mark_1_selector,
+            mark_2_selector,
+        } = selector;
+        Self { from, locally_generated, bound_device, mark_1_selector, mark_2_selector }
     }
 }
 
@@ -96,7 +70,7 @@ pub(super) enum RuleOp<I: Ip> {
     Add {
         priority: RuleSetPriority,
         index: RuleIndex,
-        selector: AddableSelector<I, routes::WeakDeviceId>,
+        selector: AddableSelector<I>,
         action: RuleAction,
     },
     Remove {
@@ -114,16 +88,21 @@ pub(super) struct NewRuleSet<I: Ip> {
     pub(super) responder: oneshot::Sender<Result<(), SetPriorityConflict>>,
 }
 
-pub(super) struct RuleWorkItem<I: Ip> {
-    pub(super) op: RuleOp<I>,
-    pub(super) responder: oneshot::Sender<Result<(), fnet_routes_admin::RuleSetError>>,
+pub(super) enum RuleWorkItem<I: Ip> {
+    RuleOp {
+        op: RuleOp<I>,
+        responder: oneshot::Sender<Result<(), fnet_routes_admin::RuleSetError>>,
+    },
+    AuthenticateForRouteTable {
+        table_id: routes::TableId<I>,
+        token: zx::Event,
+        responder: oneshot::Sender<Result<(), fnet_routes_admin::AuthenticateForRouteTableError>>,
+    },
 }
 
 #[derive(Debug)]
 struct Rule<I: Ip> {
-    // TODO(https://fxbug.dev/351015513): Change to `DeviceId` when we remove
-    // the rules after the interface is removed.
-    selector: AddableSelector<I, routes::WeakDeviceId>,
+    selector: AddableSelector<I>,
     action: RuleAction,
 }
 
@@ -168,13 +147,12 @@ impl<I: Ip> RuleTable<I> {
 
     pub(super) fn remove_rule_set<'c>(
         &mut self,
-        ctx: &'c BindingsCtx,
         priority: RuleSetPriority,
     ) -> impl Iterator<Item = InstalledRule<I>> + 'c {
         let removed = self.rule_sets.remove(&priority);
         removed.into_iter().flat_map(move |rule_set| {
             rule_set.rules.into_iter().map(move |(index, Rule { selector, action })| {
-                let selector = selector.into_fidl_with_ctx(ctx);
+                let selector = selector.into();
                 InstalledRule { priority, index, selector, action }
             })
         })
@@ -184,7 +162,7 @@ impl<I: Ip> RuleTable<I> {
         &mut self,
         priority: RuleSetPriority,
         index: RuleIndex,
-        selector: AddableSelector<I, routes::WeakDeviceId>,
+        selector: AddableSelector<I>,
         action: RuleAction,
     ) -> Result<(), fnet_routes_admin::RuleSetError> {
         let mut set = self.get_rule_set_entry(priority);
@@ -199,7 +177,6 @@ impl<I: Ip> RuleTable<I> {
 
     pub(super) fn remove_rule(
         &mut self,
-        ctx: &BindingsCtx,
         priority: RuleSetPriority,
         index: RuleIndex,
     ) -> Result<InstalledRule<I>, fnet_routes_admin::RuleSetError> {
@@ -207,43 +184,42 @@ impl<I: Ip> RuleTable<I> {
         match set.get_mut().rules.entry(index) {
             BTreeEntry::Occupied(entry) => {
                 let Rule { selector, action } = entry.remove();
-                let selector = selector.into_fidl_with_ctx(ctx);
+                let selector = selector.into();
                 Ok(InstalledRule { priority, index, selector, action })
             }
             BTreeEntry::Vacant(_entry) => Err(fnet_routes_admin::RuleSetError::RuleDoesNotExist),
         }
     }
 }
+
 struct UserRuleSet<I: Ip> {
-    ctx: Ctx,
     priority: RuleSetPriority,
     rule_work_sink: mpsc::UnboundedSender<RuleWorkItem<I>>,
+    route_table_authorization_set: HashSet<routes::TableId<I>>,
 }
 
 #[derive(Debug)]
-enum ApplyRuleOpError {
+enum ApplyRuleWorkError<E> {
     RuleSetClosed,
-    RuleSetError(fnet_routes_admin::RuleSetError),
+    RuleWorkError(E),
 }
 
-impl From<fnet_routes_admin::RuleSetError> for ApplyRuleOpError {
-    fn from(err: fnet_routes_admin::RuleSetError) -> Self {
-        Self::RuleSetError(err)
+impl<E> From<E> for ApplyRuleWorkError<E> {
+    fn from(err: E) -> Self {
+        Self::RuleWorkError(err)
     }
 }
 
-impl ApplyRuleOpError {
-    fn respond_result_with<
-        R: Responder<ControlHandle: Clone, Payload = Result<(), fnet_routes_admin::RuleSetError>>,
-    >(
+impl<E> ApplyRuleWorkError<E> {
+    fn respond_result_with<R: Responder<ControlHandle: Clone, Payload = Result<(), E>>>(
         result: Result<(), Self>,
         responder: R,
     ) -> Result<ControlFlow<R::ControlHandle>, fidl::Error> {
         match result {
-            Err(ApplyRuleOpError::RuleSetClosed) => {
+            Err(ApplyRuleWorkError::RuleSetClosed) => {
                 Ok(ControlFlow::Break(responder.control_handle().clone()))
             }
-            Err(ApplyRuleOpError::RuleSetError(err)) => {
+            Err(ApplyRuleWorkError::RuleWorkError(err)) => {
                 responder.send(Err(err)).map(ControlFlow::Continue)
             }
             Ok(()) => responder.send(Ok(())).map(ControlFlow::Continue),
@@ -252,8 +228,45 @@ impl ApplyRuleOpError {
 }
 
 impl<I: Ip + FidlRuleAdminIpExt> UserRuleSet<I> {
-    async fn handle_request(
+    async fn add_fidl_rule(
         &self,
+        priority: RuleSetPriority,
+        index: RuleIndex,
+        selector: RuleSelector<I>,
+        action: RuleAction,
+    ) -> Result<(), ApplyRuleWorkError<fnet_routes_admin::RuleSetError>> {
+        let selector = AddableSelector::from(selector);
+        if let RuleAction::Lookup(table_id) = action {
+            let table_id = routes::TableId::new(table_id)
+                .ok_or(fnet_routes_admin::RuleSetError::Unauthenticated)?;
+            if !self.route_table_authorization_set.contains(&table_id) {
+                Err(fnet_routes_admin::RuleSetError::Unauthenticated)?;
+            }
+        }
+        self.apply_rule_op(RuleOp::Add { priority, index, selector, action }).await
+    }
+
+    async fn authenticate_for_route_table(
+        &mut self,
+        table: u32,
+        token: zx::Event,
+    ) -> Result<(), ApplyRuleWorkError<fnet_routes_admin::AuthenticateForRouteTableError>> {
+        let table_id = routes::TableId::new(table)
+            .ok_or(fnet_routes_admin::AuthenticateForRouteTableError::InvalidAuthentication)?;
+        let (responder, receiver) = oneshot::channel();
+        self.rule_work_sink
+            .unbounded_send(RuleWorkItem::AuthenticateForRouteTable { table_id, token, responder })
+            .map_err(|mpsc::TrySendError { .. }| ApplyRuleWorkError::RuleSetClosed)?;
+        receiver
+            .await
+            .expect("responder should not be dropped")
+            .map_err(ApplyRuleWorkError::RuleWorkError)?;
+        let _: bool = self.route_table_authorization_set.insert(table_id);
+        Ok(())
+    }
+
+    async fn handle_request(
+        &mut self,
         request: RuleSetRequest<I>,
     ) -> Result<ControlFlow<I::RuleSetControlHandle>, fidl::Error> {
         match request {
@@ -267,58 +280,41 @@ impl<I: Ip + FidlRuleAdminIpExt> UserRuleSet<I> {
                             .map(ControlFlow::Continue);
                     }
                 };
-                let result = self.add_rule(index, selector, action).await;
-                ApplyRuleOpError::respond_result_with(result, responder)
+                let result = self.add_fidl_rule(self.priority, index, selector, action).await;
+                ApplyRuleWorkError::respond_result_with(result, responder)
             }
             RuleSetRequest::RemoveRule { index, responder } => {
                 let priority = self.priority;
 
                 let result = self.apply_rule_op(RuleOp::Remove { priority, index }).await;
-                ApplyRuleOpError::respond_result_with(result, responder)
+                ApplyRuleWorkError::respond_result_with(result, responder)
             }
-            RuleSetRequest::AuthenticateForInterface { credential: _, responder } => {
-                // TODO(https://fxbug.dev/345315995): Implement authentication.
-                responder
-                    .send(Err(fnet_routes_admin::RuleSetError::BadAuthentication))
-                    .map(ControlFlow::Continue)
-            }
-            RuleSetRequest::AuthenticateForRouteTable { table: _, token: _, responder } => {
-                // TODO(https://fxbug.dev/345315995): Implement authentication.
-                responder
-                    .send(Err(fnet_routes_admin::RuleSetError::BadAuthentication))
-                    .map(ControlFlow::Continue)
+            RuleSetRequest::AuthenticateForRouteTable { table, token, responder } => {
+                let result = self.authenticate_for_route_table(table, token).await;
+                ApplyRuleWorkError::respond_result_with(result, responder)
             }
             RuleSetRequest::Close { control_handle } => Ok(ControlFlow::Break(control_handle)),
         }
     }
 
-    async fn add_rule(
+    async fn apply_rule_op(
         &self,
-        index: RuleIndex,
-        selector: RuleSelector<I>,
-        action: RuleAction,
-    ) -> Result<(), ApplyRuleOpError> {
-        let selector = selector
-            .try_into_core_with_ctx(self.ctx.bindings_ctx())
-            .map_err(|DeviceNotFoundError| RuleSetError::Unauthenticated)?;
-        self.apply_rule_op(RuleOp::Add { priority: self.priority, index, selector, action }).await
-    }
-
-    async fn apply_rule_op(&self, op: RuleOp<I>) -> Result<(), ApplyRuleOpError> {
+        op: RuleOp<I>,
+    ) -> Result<(), ApplyRuleWorkError<fnet_routes_admin::RuleSetError>> {
         let (responder, receiver) = oneshot::channel();
         self.rule_work_sink
-            .unbounded_send(RuleWorkItem { op, responder })
-            .map_err(|mpsc::TrySendError { .. }| ApplyRuleOpError::RuleSetClosed)?;
+            .unbounded_send(RuleWorkItem::RuleOp { op, responder })
+            .map_err(|mpsc::TrySendError { .. }| ApplyRuleWorkError::RuleSetClosed)?;
         receiver
             .await
             .expect("responder should not be dropped")
-            .map_err(ApplyRuleOpError::RuleSetError)
+            .map_err(ApplyRuleWorkError::RuleWorkError)
     }
 }
 
 async fn serve_rule_set<I: FidlRuleAdminIpExt>(
     stream: I::RuleSetRequestStream,
-    set: UserRuleSet<I>,
+    mut set: UserRuleSet<I>,
 ) {
     let mut stream = pin!(stream);
 
@@ -354,7 +350,7 @@ async fn serve_rule_set<I: FidlRuleAdminIpExt>(
     match set.apply_rule_op(RuleOp::RemoveSet { priority: set.priority }).await {
         Ok(()) => {}
         Err(err) => {
-            assert_matches!(err, ApplyRuleOpError::RuleSetClosed);
+            assert_matches!(err, ApplyRuleWorkError::RuleSetClosed);
             log::warn!(
                 "rule set was already removed when finish serving {}",
                 I::RuleSetMarker::DEBUG_NAME
@@ -384,7 +380,11 @@ pub(crate) async fn serve_rule_table<I: FidlRuleAdminIpExt>(
                 match ctx.bindings_ctx().routes.new_rule_set(priority, receiver).await {
                     Ok(()) => {
                         let rule_set_request_stream = rule_set.into_stream()?;
-                        let rule_set = UserRuleSet { ctx: ctx.clone(), rule_work_sink, priority };
+                        let rule_set = UserRuleSet {
+                            rule_work_sink,
+                            priority,
+                            route_table_authorization_set: Default::default(),
+                        };
                         spawner.spawn(serve_rule_set::<I>(rule_set_request_stream, rule_set));
                     }
                     Err(err) => {

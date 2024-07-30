@@ -27,7 +27,6 @@
 #include <arch/riscv64/feature.h>
 #include <arch/riscv64/mmu.h>
 #include <arch/riscv64/sbi.h>
-#include <fbl/auto_lock.h>
 #include <kernel/mp.h>
 #include <kernel/mutex.h>
 #include <ktl/algorithm.h>

@@ -8,7 +8,7 @@
 #include <lib/driver/compat/cpp/compat.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/component/cpp/driver_export.h>
-#include <lib/driver/testing/cpp/fixture/driver_test_fixture.h>
+#include <lib/driver/testing/cpp/driver_test.h>
 
 #include <ddktl/device.h>
 #include <gtest/gtest.h>
@@ -41,19 +41,22 @@ struct BanjoTestFixtureEnvironment : public fdf_testing::Environment {
 };
 
 struct BanjoTestFixtureConfig {
-  static constexpr bool kDriverOnForeground = false;
-  static constexpr bool kAutoStartDriver = true;
-  static constexpr bool kAutoStopDriver = false;
-
   using DriverType = network::NetworkDevice;
   using EnvironmentType = BanjoTestFixtureEnvironment;
 };
 
-class BanjoNetDeviceDriverTest : public fdf_testing::DriverTestFixture<BanjoTestFixtureConfig>,
-                                 public ::testing::Test {
+class BanjoNetDeviceDriverTest : public ::testing::Test {
+ public:
+  fdf_testing::BackgroundDriverTest<BanjoTestFixtureConfig>& driver_test() { return driver_test_; }
+
  protected:
   // Use a nonzero port identifier to avoid default value traps.
   static constexpr uint8_t kPortId = 11;
+
+  void SetUp() override {
+    zx::result<> result = driver_test().StartDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
+  }
 
   void TearDown() override { ShutdownDriver(); }
 
@@ -61,7 +64,7 @@ class BanjoNetDeviceDriverTest : public fdf_testing::DriverTestFixture<BanjoTest
     if (shutdown_) {
       return;
     }
-    EXPECT_OK(StopDriver().status_value());
+    EXPECT_OK(driver_test().StopDriver().status_value());
     shutdown_ = true;
   }
 
@@ -71,14 +74,15 @@ class BanjoNetDeviceDriverTest : public fdf_testing::DriverTestFixture<BanjoTest
     }
     port_impl_.SetStatus(
         {.flags = static_cast<uint32_t>(netdev::wire::StatusFlags::kOnline), .mtu = 2048});
-    return RunInEnvironmentTypeContext<zx_status_t>([&](BanjoTestFixtureEnvironment& env) {
-      return port_impl_.AddPort(kPortId, env.device_impl_.client());
-    });
+    return driver_test().RunInEnvironmentTypeContext<zx_status_t>(
+        [&](BanjoTestFixtureEnvironment& env) {
+          return port_impl_.AddPort(kPortId, env.device_impl_.client());
+        });
   }
 
   zx::result<fidl::WireSyncClient<netdev::Device>> ConnectNetDevice() {
     auto [inst_client_end, inst_server_end] = fidl::Endpoints<netdev::DeviceInstance>::Create();
-    RunInDriverContext(
+    driver_test().RunInDriverContext(
         [this, server_end = std::move(inst_server_end)](network::NetworkDevice& driver) mutable {
           fidl::BindServer(fidl_dispatcher_, std::move(server_end), &driver);
         });
@@ -150,14 +154,16 @@ class BanjoNetDeviceDriverTest : public fdf_testing::DriverTestFixture<BanjoTest
   zx_status_t WaitForEvent(zx_signals_t event, zx::duration timeout = zx::duration::infinite()) {
     // Don't wait inside the environment context as that might be running on the dispatcher that
     // triggers the event. Waiting on it would then deadlock.
-    zx::unowned_event events = RunInEnvironmentTypeContext<zx::unowned_event>(
+    zx::unowned_event events = driver_test().RunInEnvironmentTypeContext<zx::unowned_event>(
         [&](BanjoTestFixtureEnvironment& env) { return env.device_impl_.events().borrow(); });
     return events->wait_one(event, zx::deadline_after(timeout), nullptr);
   }
 
  private:
+  fdf_testing::BackgroundDriverTest<BanjoTestFixtureConfig> driver_test_;
   bool shutdown_ = false;
-  async_dispatcher_t* fidl_dispatcher_ = runtime().StartBackgroundDispatcher()->async_dispatcher();
+  async_dispatcher_t* fidl_dispatcher_ =
+      driver_test().runtime().StartBackgroundDispatcher()->async_dispatcher();
 
   banjo::FakeMacDeviceImpl mac_impl_;
   banjo::FakeNetworkPortImpl port_impl_;

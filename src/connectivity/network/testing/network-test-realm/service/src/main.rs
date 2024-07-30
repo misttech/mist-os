@@ -1447,6 +1447,27 @@ impl Controller {
     }
 }
 
+async fn time_skew_watchdog() {
+    const TICK: fasync::Duration = fasync::Duration::from_seconds(1);
+    const WARN_THRESHOLD: fasync::Duration = fasync::Duration::from_seconds(2);
+    let mut timer = fasync::Timer::new(fasync::Time::now());
+    (&mut timer).await;
+    loop {
+        let now = fasync::Time::now();
+        timer.reset(now + TICK);
+        (&mut timer).await;
+        let later = fasync::Time::now();
+        let delta = later - now;
+        if delta >= WARN_THRESHOLD {
+            warn!(
+                "timer skew watchdog observed {}ms, expected {}ms",
+                delta.into_millis(),
+                TICK.into_millis()
+            );
+        }
+    }
+}
+
 #[fuchsia::main]
 async fn main() -> Result<(), Error> {
     let mut fs = fuchsia_component::server::ServiceFs::new_local();
@@ -1464,6 +1485,8 @@ async fn main() -> Result<(), Error> {
         ControllerRequest(Option<Result<fntr::ControllerRequest, fidl::Error>>),
         Dhcpv6ClientWatchItem(Option<(u64, Result<fnet_dhcpv6_ext::WatchItem, fidl::Error>)>),
     }
+
+    let _watchdog_task = fasync::Task::spawn(time_skew_watchdog());
 
     loop {
         let event = futures::select! {

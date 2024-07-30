@@ -11,9 +11,8 @@ ffx_plugin("ffx_scrutiny_verify") {
   deps = [
     "//src/developer/ffx/lib/errors:lib",
     "//src/developer/ffx/lib/fho:lib",
-    "//src/security/lib/scrutiny/config",
     "//src/security/lib/scrutiny/frontend",
-    "//src/security/lib/scrutiny/plugins",
+    "//src/security/lib/scrutiny/frontend",
     "//src/security/lib/scrutiny/utils",
     "//src/sys/lib/cm_rust",
     "//third_party/rust_crates:anyhow",
@@ -39,7 +38,7 @@ ffx_plugin("ffx_scrutiny_verify") {
   ]
 
   args_deps = [
-    "//src/security/lib/scrutiny/plugins",
+    "//src/security/lib/scrutiny/frontend",
     "//src/sys/lib/cm_rust",
   ]
 
@@ -50,7 +49,7 @@ ffx_plugin("ffx_scrutiny_verify") {
     "src/lib.rs",
     "src/pre_signing.rs",
     "src/route_sources.rs",
-    "src/routes/mod.rs",
+    "src/routes.rs",
     "src/static_pkgs.rs",
     "src/structured_config.rs",
   ]

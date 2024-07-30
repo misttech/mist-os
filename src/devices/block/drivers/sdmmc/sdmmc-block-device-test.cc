@@ -9,6 +9,7 @@
 #include <fidl/fuchsia.hardware.power/cpp/fidl.h>
 #include <fidl/fuchsia.power.broker/cpp/fidl.h>
 #include <fidl/fuchsia.power.system/cpp/fidl.h>
+#include <fidl/fuchsia.power.system/cpp/test_base.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
@@ -94,7 +95,8 @@ bool TestSdmmcRootDevice::use_fidl_;
 bool TestSdmmcRootDevice::is_sd_;
 FakeSdmmcDevice TestSdmmcRootDevice::sdmmc_;
 
-class FakeSystemActivityGovernor : public fidl::Server<fuchsia_power_system::ActivityGovernor> {
+class FakeSystemActivityGovernor
+    : public fidl::testing::TestBase<fuchsia_power_system::ActivityGovernor> {
  public:
   FakeSystemActivityGovernor(zx::event exec_state_opportunistic, zx::event wake_handling_assertive)
       : exec_state_opportunistic_(std::move(exec_state_opportunistic)),
@@ -123,8 +125,9 @@ class FakeSystemActivityGovernor : public fidl::Server<fuchsia_power_system::Act
     completer.Reply({{std::move(elements)}});
   }
 
-  void RegisterListener(RegisterListenerRequest& req,
-                        RegisterListenerCompleter::Sync& completer) override {}
+  void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
+    ADD_FAILURE("%s is not implemented", name.c_str());
+  }
 
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_system::ActivityGovernor> md,
                              fidl::UnknownMethodCompleter::Sync& completer) override {}
@@ -228,10 +231,8 @@ class FakePowerBroker : public fidl::Server<fuchsia_power_broker::Topology> {
     fidl::ServerEnd<fuchsia_power_broker::RequiredLevel>& required_level_server_end =
         req.level_control_channels().value().required();
     fidl::ServerEnd<fuchsia_power_broker::Lessor>& lessor_server_end = req.lessor_channel().value();
-
-    // Make channels to return to client
-    auto [element_control_client_end, element_control_server_end] =
-        fidl::Endpoints<fuchsia_power_broker::ElementControl>::Create();
+    fidl::ServerEnd<fuchsia_power_broker::ElementControl>& element_control_server_end =
+        req.element_control().value();
 
     // Instantiate (fake) element control implementation.
     auto element_control_impl = std::make_unique<FakeElementControl>();
@@ -299,11 +300,7 @@ class FakePowerBroker : public fidl::Server<fuchsia_power_broker::Topology> {
     servers_.emplace_back(std::move(element_control_binding), std::move(lessor_binding),
                           std::move(current_level_binding), std::move(required_level_binding));
 
-    fuchsia_power_broker::TopologyAddElementResponse result{
-        {.element_control_channel = std::move(element_control_client_end)},
-    };
-
-    completer.Reply(fit::success(std::move(result)));
+    completer.Reply(fit::success());
   }
 
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_broker::Topology> md,

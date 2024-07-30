@@ -189,7 +189,7 @@ impl From<CheckOptions> for AttemptOptions {
 /// with [`proptest`].
 ///
 /// Use [`From`] (and [`Into`]) to convert between the fidl type and this one.
-#[derive(Clone, Debug, PartialEq, Arbitrary)]
+#[derive(Clone, Debug, Default, PartialEq, Arbitrary)]
 pub struct InstallationErrorData {
     pub update: Option<UpdateInfo>,
     pub installation_progress: Option<InstallationProgress>,
@@ -239,7 +239,7 @@ impl From<fidl::InstallationProgress> for InstallationProgress {
 /// [`proptest`].
 ///
 /// Use [`From`] (and [`Into`]) to convert between the fidl type and this one.
-#[derive(Clone, Debug, PartialEq, Arbitrary)]
+#[derive(Clone, Debug, Default, PartialEq, Arbitrary)]
 pub struct InstallingData {
     pub update: Option<UpdateInfo>,
     pub installation_progress: Option<InstallationProgress>,
@@ -266,7 +266,7 @@ impl From<fidl::InstallingData> for InstallingData {
 /// works with [`proptest`].
 ///
 /// Use [`From`] (and [`Into`]) to convert between the fidl type and this one.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct InstallationDeferredData {
     pub update: Option<UpdateInfo>,
     pub deferral_reason: Option<fidl::InstallationDeferralReason>,

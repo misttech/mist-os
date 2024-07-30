@@ -9,6 +9,7 @@ Returns power metrics in a JSON file.
 
 import argparse
 import pathlib
+
 from trace_processing import trace_importing, trace_metrics, trace_model
 from trace_processing.metrics import power
 

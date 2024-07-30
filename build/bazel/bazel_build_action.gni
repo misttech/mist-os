@@ -134,7 +134,7 @@ import("//build/bazel/bazel_action.gni")
 #     Default: true
 #
 #   remote_build: (optional)
-#     Set this to true to override the global default `enable_bazel_remote_rbe`
+#     Set this to false to override the global default `enable_bazel_remote_rbe`
 #     setting which controls whether the underlying bazel invocation
 #     will build remotely using RBE.
 #     Type: boolean

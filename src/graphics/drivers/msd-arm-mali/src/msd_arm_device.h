@@ -255,7 +255,7 @@ class MsdArmDevice : public msd::Device,
   void SoftStopAtom(MsdArmAtom* atom) override;
   void ReleaseMappingsForAtom(MsdArmAtom* atom) override;
   magma::PlatformPort* GetPlatformPort() override;
-  void UpdateGpuActive(bool active) override;
+  void UpdateGpuActive(bool active, bool has_pending_work) override;
   void EnterProtectedMode() override;
   bool ExitProtectedMode() override;
   bool IsInProtectedMode() override;
@@ -274,6 +274,7 @@ class MsdArmDevice : public msd::Device,
   inspect::UintProperty last_semaphore_hang_timeout_ns_;
   inspect::BoolProperty protected_mode_supported_property_;
   inspect::UintProperty memory_pressure_level_property_;
+  inspect::LazyNode dump_node_;
 
   std::mutex inspect_events_mutex_;
   FIT_GUARDED(inspect_events_mutex_) std::deque<InspectEvent> inspect_events_;

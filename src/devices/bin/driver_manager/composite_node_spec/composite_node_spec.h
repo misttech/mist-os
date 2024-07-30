@@ -8,14 +8,10 @@
 #include <fidl/fuchsia.driver.development/cpp/wire.h>
 #include <fidl/fuchsia.driver.index/cpp/fidl.h>
 
-struct DeviceV1Wrapper;
-
 namespace driver_manager {
 class Node;
 
-using DeviceOrNode =
-    std::variant<std::weak_ptr<DeviceV1Wrapper>, std::weak_ptr<driver_manager::Node>>;
-
+using NodeWkPtr = std::weak_ptr<driver_manager::Node>;
 using RemoveCompositeNodeCallback = fit::callback<void(zx::result<>)>;
 
 struct CompositeNodeSpecCreateInfo {
@@ -25,8 +21,7 @@ struct CompositeNodeSpecCreateInfo {
 
 // This partially abstract class represents a composite node spec and is responsible for managing
 // its state and composite node. The CompositeNodeSpec class will manage the state of its bound
-// nodes while its subclasses manage the composite node under the spec. There should be a subclass
-// for DFv1 and DFv2.
+// nodes while its subclasses manage the composite node under the spec.
 class CompositeNodeSpec {
  public:
   explicit CompositeNodeSpec(CompositeNodeSpecCreateInfo create_info);
@@ -36,9 +31,8 @@ class CompositeNodeSpec {
   // Called when CompositeNodeManager receives a MatchedNodeRepresentation.
   // Returns ZX_ERR_ALREADY_BOUND if it's already bound. See BindParentImpl() for return type
   // details.
-  zx::result<std::optional<DeviceOrNode>> BindParent(
-      fuchsia_driver_framework::wire::CompositeParent composite_parent,
-      const DeviceOrNode& device_or_node);
+  zx::result<std::optional<NodeWkPtr>> BindParent(
+      fuchsia_driver_framework::wire::CompositeParent composite_parent, const NodeWkPtr& node_ptr);
 
   virtual fuchsia_driver_development::wire::CompositeNodeInfo GetCompositeInfo(
       fidl::AnyArena& arena) const = 0;
@@ -52,19 +46,17 @@ class CompositeNodeSpec {
   }
 
   // Exposed for testing.
-  const std::vector<std::optional<DeviceOrNode>>& parent_nodes() const { return parent_nodes_; }
+  const std::vector<std::optional<NodeWkPtr>>& parent_nodes() const { return parent_nodes_; }
 
   const std::string& name() const { return name_; }
 
  protected:
-  // Subclass implementation for binding the DeviceOrNode to its composite. If the composite is not
-  // yet created, the implementation is expected to create one with |info|. In DFv1, it returns
-  // std::nullopt. In DFv2, if the composite is complete, it returns a pointer to the new node.
-  // Otherwise, it returns std::nullopt. The lifetime of this node object is managed by
-  // the parent nodes.
-  virtual zx::result<std::optional<DeviceOrNode>> BindParentImpl(
+  // Subclass implementation for binding the NodeWkPtr to its composite.
+  // If the composite is complete, it should return a pointer to the new node. Otherwise, it returns
+  // a std::nullopt. The lifetime of this node object is managed by the parent nodes.
+  virtual zx::result<std::optional<NodeWkPtr>> BindParentImpl(
       fuchsia_driver_framework::wire::CompositeParent composite_parent,
-      const DeviceOrNode& device_or_node) = 0;
+      const NodeWkPtr& node_ptr) = 0;
 
   // Subclass implementation for Remove(). Subclasses are expected to remove the underlying
   // composite node and unmatch all of the parents from it.
@@ -74,7 +66,7 @@ class CompositeNodeSpec {
 
  private:
   std::string name_;
-  std::vector<std::optional<DeviceOrNode>> parent_nodes_;
+  std::vector<std::optional<NodeWkPtr>> parent_nodes_;
   std::vector<fuchsia_driver_framework::ParentSpec> parent_specs_;
 };
 

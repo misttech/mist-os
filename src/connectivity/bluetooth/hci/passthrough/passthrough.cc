@@ -81,6 +81,10 @@ void PassthroughDevice::OpenHciTransport(OpenHciTransportCompleter::Sync& comple
   completer.ReplySuccess(std::move(endpoints->client));
 }
 
+void PassthroughDevice::OpenSnoop(OpenSnoopCompleter::Sync& completer) {
+  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+}
+
 void PassthroughDevice::handle_unknown_method(
     fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Vendor> metadata,
     fidl::UnknownMethodCompleter::Sync& completer) {

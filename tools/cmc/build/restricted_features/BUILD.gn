@@ -11,9 +11,18 @@ group("structured_config") {
 group("dictionaries") {
   visibility = [
     "//examples/components/dictionaries/*",
+    "//examples/components/dynamic/*",
     "//src/session/bin/session_manager:*",
     "//src/sys/component_manager/tests/*",
     "//vendor/google/boards/*",
+  ]
+}
+
+# The allowlist of components that can define dynamic dictionaries in CML.
+group("dynamic_dictionaries") {
+  visibility = [
+    "//examples/components/dictionaries/*",
+    "//src/sys/component_manager/tests/*",
   ]
 }
 

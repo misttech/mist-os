@@ -10,12 +10,15 @@ if (is_host) {
     name = "scrutiny_testing"
     with_unit_tests = true
     edition = "2021"
-    visibility = [ "//src/security/lib/scrutiny/*" ]
+    visibility = [
+      "//src/developer/ffx/plugins/scrutiny/*",
+      "//src/security/lib/scrutiny/*",
+    ]
     deps = [
       "//src/lib/fuchsia-url",
-      "//src/security/lib/scrutiny/config",
-      "//src/security/lib/scrutiny/framework",
+      "//src/security/lib/scrutiny/collection",
       "//src/security/lib/scrutiny/utils",
+      "//src/sys/pkg/lib/fuchsia-merkle",
       "//third_party/rust_crates:anyhow",
       "//third_party/rust_crates:once_cell",
       "//third_party/rust_crates:tempfile",

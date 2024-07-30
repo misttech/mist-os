@@ -30,20 +30,23 @@ template <typename Thread>
 class RunQueue {
  private:
   // Forward-declared; defined below.
-  struct NodeTraits;
+  struct ReadyNodeTraits;
   struct SubtreeMinFinishObserverTraits;
 
-  using Tree =
-      fbl::WAVLTree<typename NodeTraits::KeyType, Thread*, NodeTraits, fbl::DefaultObjectTag,
-                    NodeTraits, fbl::WAVLTreeBestNodeObserver<SubtreeMinFinishObserverTraits>>;
+  using ReadyTree = fbl::WAVLTree<typename ReadyNodeTraits::KeyType, Thread*, ReadyNodeTraits,
+                                  fbl::DefaultObjectTag, ReadyNodeTraits,
+                                  fbl::WAVLTreeBestNodeObserver<SubtreeMinFinishObserverTraits>>;
 
  public:
   static_assert(std::is_base_of_v<ThreadBase<Thread>, Thread>);
 
-  ~RunQueue() { ready_.clear(); }
+  ~RunQueue() {
+    ready_.clear();
+    actively_blocked_.clear();
+  }
 
   // Threads are iterated through in order of start time.
-  using iterator = typename Tree::const_iterator;
+  using iterator = typename ReadyTree::const_iterator;
 
   iterator begin() const { return ready_.begin(); }
   iterator end() const { return ready_.end(); }
@@ -89,9 +92,12 @@ class RunQueue {
   void Queue(Thread& thread, Time now) {
     ZX_DEBUG_ASSERT(!thread.IsQueued());
 
-    // Contribute ready demand ahead of the IsExpired() check, as that is
-    // dependent on this quantity.
-    ready_firm_utilization_ += thread.firm_utilization();
+    // Account for demand ahead of the IsExpired() check, as that is dependent
+    // on this quantity.
+    if (InActivelyBlockedTree(thread)) {
+      DequeueActivelyBlocked(thread);
+    }
+    ready_and_actively_blocked_firm_utilization_ += thread.firm_utilization();
     ready_flexible_demand_ += thread.flexible_weight();
 
     if (IsExpired(thread, now)) {
@@ -107,7 +113,7 @@ class RunQueue {
     ZX_DEBUG_ASSERT(thread.IsQueued());
     ZX_DEBUG_ASSERT(thread.state() == ThreadState::kReady);
     ready_.erase(thread);
-    ready_firm_utilization_ -= thread.firm_utilization();
+    ready_and_actively_blocked_firm_utilization_ -= thread.firm_utilization();
     ready_flexible_demand_ -= thread.flexible_weight();
   }
 
@@ -122,6 +128,31 @@ class RunQueue {
   // See //zircon/kernel/lib/sched/README.md#thread-selection for more detail on
   // the behavior of this method.
   SelectNextThreadResult SelectNextThread(Time now) {
+    // Reaccount for blocked threads and their impacts on bandwidth before
+    // further bandwidth-dependent decisions are made: tracked blocked threads
+    // outside the period in which they blocked are dropped, reducing firm
+    // utilization.
+    while (!actively_blocked_.is_empty() && actively_blocked_.front().finish() <= now) {
+      DequeueActivelyBlocked(actively_blocked_.front());
+    }
+
+    // Ensure current_ is up-to-date:
+    // * If it is now blocked, track it as such if it is still in its current
+    //   active period (retaining its firm utilization), and unset it as the
+    //   currently running.
+    // * If it is now expired, reactivate it so that its true activation period
+    //   can factor into the next round of scheduling decisions.
+    if (current_) {
+      if (current_->state() == ThreadState::kBlocked) {
+        if (current_->IsActive(now)) {
+          QueueActivelyBlocked(*current_);
+        }
+        current_ = nullptr;
+      } else if (IsExpired(*current_, now)) {
+        current_->Reactivate(now);
+      }
+    }
+
     // The next eligible might actually be expired (e.g., due to bandwidth
     // oversubscription), in which case it should be reactivated and
     // requeued, and our search should begin again for an eligible thread
@@ -133,12 +164,8 @@ class RunQueue {
       next = FindNextEligibleThread(now).CopyPointer();
     }
 
-    // Ensure `current` is activated before having it - and its otherwise false
-    // finish time - factor into the next round of scheduling decisions.
-    if (current_ && IsExpired(*current_, now)) {
-      current_->Reactivate(now);
-    }
-
+    // Now select the next thread.
+    //
     // Try to avoid rebalancing (from tree insertion and deletion) in the case
     // where the next thread is the current one.
     if (current_ && current_->IsActive(now) &&
@@ -174,15 +201,24 @@ class RunQueue {
       preemption = empty() ? Time::Max() : begin()->start();
     }
 
+    // Also factor in when the next actively blocked thread - if any - will
+    // finish its period so that its firm utilization can be dropped as early as
+    // possible. At this point in the routine (courtesy of the popping at the
+    // top) any threads in actively_blocked_ are ensured to be active.
+    if (!actively_blocked_.is_empty()) {
+      preemption = std::min(preemption, actively_blocked_.front().finish());
+    }
+
     ZX_DEBUG_ASSERT((!next && preemption == Time::Max()) || preemption > now);
     return {next, preemption};
   }
 
  private:
-  using mutable_iterator = typename Tree::iterator;
+  using mutable_iterator = typename ReadyTree::iterator;
 
-  // Implements both the WAVLTree key and node traits.
-  struct NodeTraits {
+  // Implements both the WAVLTree key and node traits for the tree of ready
+  // threads.
+  struct ReadyNodeTraits {
     // Start time, along with the address of the thread as a convenient
     // tie-breaker.
     using KeyType = std::pair<Time, uintptr_t>;
@@ -195,7 +231,7 @@ class RunQueue {
 
     static bool EqualTo(KeyType a, KeyType b) { return a == b; }
 
-    static auto& node_state(Thread& thread) { return thread.run_queue_.node; }
+    static auto& node_state(Thread& thread) { return thread.run_queue_.ready; }
   };
 
   // Implements with traits for the WAVLTreeBestNodeObserver, which will
@@ -219,6 +255,31 @@ class RunQueue {
     static void ResetBest(Thread& target) {}
   };
 
+  // Implements both the WAVLTree key and node traits for the tree of 'currently
+  // blocked' threads. See actively_blocked_ below.
+  struct ActivelyBlockedNodeTraits {
+    // Finish time, along with the address of the thread as a convenient
+    // tie-breaker.
+    using KeyType = std::pair<Time, uintptr_t>;
+
+    static KeyType GetKey(const Thread& thread) {
+      return std::make_pair(thread.finish(), reinterpret_cast<uintptr_t>(&thread));
+    }
+
+    static bool LessThan(KeyType a, KeyType b) { return a < b; }
+
+    static bool EqualTo(KeyType a, KeyType b) { return a == b; }
+
+    // We reuse the same node state as the ReadyTree, as a node cannot be in
+    // both trees at once.
+    static auto& node_state(Thread& thread) { return thread.run_queue_.actively_blocked; }
+  };
+
+  // See actively_blocked_ below.
+  using ActivelyBlockedTree =
+      fbl::WAVLTree<typename ActivelyBlockedNodeTraits::KeyType, Thread*, ActivelyBlockedNodeTraits,
+                    fbl::DefaultObjectTag, ActivelyBlockedNodeTraits>;
+
   // Provided both threads are active, this gives whether the first should be
   // scheduled before the second, which is a simple lexicographic order on
   // (finish, start, address). (The address is a guaranteed and convenient final
@@ -235,13 +296,18 @@ class RunQueue {
     return it->run_queue_.subtree_min_finish;
   }
 
+  // Whether a thread is currently in currently in actively_blocked_.
+  static constexpr bool InActivelyBlockedTree(const Thread& thread) {
+    return thread.run_queue_.actively_blocked.InContainer();
+  }
+
   FlexibleWeight total_flexible_demand() const {
     return (current_ ? current_->flexible_weight() : FlexibleWeight{0}) + ready_flexible_demand_;
   }
 
   Utilization total_firm_utilization() const {
-    Utilization utilization =
-        (current_ ? current_->firm_utilization() : Utilization{0}) + ready_firm_utilization_;
+    Utilization utilization = (current_ ? current_->firm_utilization() : Utilization{0}) +
+                              ready_and_actively_blocked_firm_utilization_;
     // Clamp to account for oversubscription.
     return std::min(Utilization{1}, utilization);
   }
@@ -309,17 +375,39 @@ class RunQueue {
     return node;
   }
 
+  void QueueActivelyBlocked(Thread& thread) {
+    ZX_DEBUG_ASSERT(thread.state() == ThreadState::kBlocked);
+    ZX_DEBUG_ASSERT(!InActivelyBlockedTree(thread));
+
+    // No point in tracking the thread if it does not contribute firm demand.
+    if (thread.firm_capacity() > 0) {
+      actively_blocked_.insert(&thread);
+      ready_and_actively_blocked_firm_utilization_ += thread.firm_utilization();
+    }
+  }
+
+  void DequeueActivelyBlocked(Thread& thread) {
+    ZX_DEBUG_ASSERT(InActivelyBlockedTree(thread));
+    actively_blocked_.erase(thread);
+    ready_and_actively_blocked_firm_utilization_ -= thread.firm_utilization();
+  }
+
   // The thread currently selected to be run.
   Thread* current_ = nullptr;
 
   // The tree of threads ready to be run.
-  Tree ready_;
+  ReadyTree ready_;
+
+  // The tree of threads (with firm work to do) that were last seen to blocked
+  // within their active periods, ordered by finish time.
+  ActivelyBlockedTree actively_blocked_;
 
   // The aggregate flexible weight across all ready threads.
   FlexibleWeight ready_flexible_demand_{0};
 
-  // The aggregate firm utilization across all ready threads.
-  Utilization ready_firm_utilization_{0};
+  // The aggregate firm utilization across all ready and actively blocked
+  // threads.
+  Utilization ready_and_actively_blocked_firm_utilization_{0};
 };
 
 }  // namespace sched

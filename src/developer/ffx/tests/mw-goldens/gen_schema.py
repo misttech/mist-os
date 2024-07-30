@@ -110,6 +110,7 @@ def build_command_list(
             )
             schema_cmd = [
                 ffx_path,
+                "--no-environment",
                 "-c",
                 "sdk.module=host_tools.internal",
                 "-c",

@@ -4,7 +4,7 @@
 
 pub mod component;
 
-use fidl::endpoints::{ClientEnd, ServerEnd};
+use fidl::endpoints::ServerEnd;
 use std::path::Path;
 use thiserror::Error;
 use {
@@ -353,7 +353,7 @@ pub struct StartInfo {
     /// A dictionary containing data and handles that the component has escrowed
     /// during its previous execution via
     /// `fuchsia.component.runner/ComponentController.OnEscrow`.
-    pub escrowed_dictionary: Option<ClientEnd<fsandbox::DictionaryMarker>>,
+    pub escrowed_dictionary: Option<fsandbox::DictionaryRef>,
 }
 
 impl TryFrom<fcrunner::ComponentStartInfo> for StartInfo {

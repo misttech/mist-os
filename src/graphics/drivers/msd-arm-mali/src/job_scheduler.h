@@ -26,7 +26,7 @@ class JobScheduler : public TimeoutSource {
     virtual void SoftStopAtom(MsdArmAtom* atom) {}
     virtual void ReleaseMappingsForAtom(MsdArmAtom* atom) {}
     virtual magma::PlatformPort* GetPlatformPort() { return nullptr; }
-    virtual void UpdateGpuActive(bool active) {}
+    virtual void UpdateGpuActive(bool active, bool has_pending_work) {}
     virtual bool IsInProtectedMode() = 0;
     virtual void EnterProtectedMode() = 0;
     virtual bool ExitProtectedMode() = 0;
@@ -50,9 +50,9 @@ class JobScheduler : public TimeoutSource {
 
   size_t GetAtomListSize();
 
-  // Gets the duration until the earliest currently executing or waiting atom should time out, or
+  // Gets the time point when the earliest currently executing or waiting atom should time out, or
   // max if there's no timeout pending.
-  Clock::duration GetCurrentTimeoutDuration() override;
+  Clock::time_point GetCurrentTimeoutPoint() override;
   void TimeoutTriggered() override { HandleTimedOutAtoms(); }
   bool CheckForDeviceThreadDelay() override { return true; }
 

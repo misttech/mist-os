@@ -18,7 +18,7 @@ rustc_library("lib") {
   if (is_host) {
     deps += [
       "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
-      "//src/lib/versioning/version-history/rust:version-history",
+      "//src/lib/versioning/version-history/rust/data",
     ]
   }
 

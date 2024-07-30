@@ -2,7 +2,7 @@
   "name": "shell",
   "description": "Launch the scrutiny shell",
   "examples": [
-    "To start an interactive shell session:\n\n    $ ffx scrutiny shell\n\nTo run commands directly:\n\n    $ ffx scrutiny shell \"tool.blobfs.extract --input <path> --output <path>\"\n    "
+    "To run commands directly:\n\n    $ ffx scrutiny shell \"tool.blobfs.extract --input <path> --output <path>\"\n    "
   ],
   "flags": [
     {

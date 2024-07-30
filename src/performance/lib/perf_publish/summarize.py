@@ -9,7 +9,7 @@ a concise and human-readable format.
 import json
 import os
 import statistics
-from typing import Any, TextIO, Iterable
+from typing import Any, Iterable, TextIO
 
 
 def write_fuchsiaperf_json(

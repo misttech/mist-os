@@ -38,16 +38,105 @@ source_set("conformance-test-base") {
     "//sdk/fidl/fuchsia.testing.harness:fuchsia.testing.harness_hlcpp",
     "//sdk/fidl/fuchsia.ui.test.context:fuchsia.ui.test.context_hlcpp",
     "//sdk/lib/sys/cpp",
-    "//src/lib/testing/loop_fixture",
-    "//third_party/googletest:gtest",
+    "//src/ui/testing/util:loop_fixture",
+    "//src/ui/testing/util:zxtest_helpers",
+    "//zircon/system/ulib/zxtest",
   ]
 }
 
-############# TOUCH CONFORMANCE TEST #############
-executable("touch-validator-bin") {
-  testonly = true
-  sources = [ "touch-validator.cc" ]
-  output_name = "touch-validator"
+# Generate CTF tests required package format.
+#
+# Usage:
+#
+# ```
+# ctf_components_packages("the-test-name") {
+#   test_subject = "prefix of the test, for example: touch"
+#   deps = [
+#     "deps for *.cc test body"
+#   ]
+# }
+# ```
+#
+# To run the test: fx test the-test-name
+#
+# This requires file name in format:
+#  - cc test code: $prefix-validator.cc
+#  - validator cml: $prefix-validator.cml
+#  - test root cml: #prefix-conformance-test.cml
+#
+# Topology:
+#
+# test package: *-conformance-test
+#   component: *-conformance-test-component (test root)
+# ---------------------------------------------------------------------------
+#  Latest Code                    |  Latest code and Build archives
+# ---------------------------------------------------------------------------
+#  package: ui-context-factory    |  package: *-test-suites
+#             (real factory)      |    component: *-validator
+#                                 |      bin: *-validator-bin (test codes)
+#                                 |    component: ui-puppet-component
+#                                 |                  (test app)
+#                                 ↑
+#               fuchsia.ui.test.context.RealmFactory
+template("ctf_components_packages") {
+  test_subject = invoker.test_subject
+  assert(defined(test_subject), "test_subject must be provided")
+
+  executable("${test_subject}-validator-bin") {
+    testonly = true
+    sources = [ "${test_subject}-validator.cc" ]
+    output_name = "${test_subject}-validator"
+    deps = invoker.deps
+  }
+
+  fuchsia_component("${test_subject}-validator") {
+    testonly = true
+    manifest = "meta/${test_subject}-validator.cml"
+    deps = [ ":${test_subject}-validator-bin" ]
+  }
+
+  ctf_fuchsia_package("${test_subject}-test-suite") {
+    package_name = "${test_subject}-test-suite"
+    testonly = true
+    deps = [
+      ":${test_subject}-validator",
+      "//src/ui/testing/puppet:ui-puppet-component",
+    ]
+  }
+
+  _test_component_target = "${test_subject}-conformance-test-component"
+
+  fuchsia_test_component("$_test_component_target") {
+    testonly = true
+    component_name = "${test_subject}-conformance-test"
+    manifest = "meta/${test_subject}-conformance-test.cml"
+    test_type = "ctf"
+  }
+
+  fuchsia_test_package(target_name) {
+    test_components = [ ":$_test_component_target" ]
+    subpackages = [
+      ":${test_subject}-test-suite",
+      "//src/ui/testing/context:ui-context-factory",
+    ]
+    test_specs = {
+      log_settings = {
+        max_severity = "ERROR"
+      }
+      environments = [
+        {
+          dimensions = {
+            # Ensure the device has Vulkan.
+            device_type = "AEMU"
+          }
+        },
+      ]
+    }
+  }
+}
+
+ctf_components_packages("touch-conformance-test") {
+  test_subject = "touch"
   deps = [
     ":conformance-test-base",
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
@@ -59,58 +148,11 @@ executable("touch-validator-bin") {
     "//sdk/fidl/fuchsia.ui.test.scene:fuchsia.ui.test.scene_hlcpp",
     "//sdk/lib/syslog/cpp",
     "//sdk/lib/ui/scenic/cpp",
-    "//src/lib/fxl/test:gtest_main",
   ]
 }
 
-fuchsia_component("touch-validator") {
-  testonly = true
-  manifest = "meta/touch-validator.cml"
-  deps = [ ":touch-validator-bin" ]
-}
-
-ctf_fuchsia_package("touch-test-suite") {
-  package_name = "touch-test-suite"
-  testonly = true
-  deps = [
-    ":touch-validator",
-    "//src/ui/testing/puppet:ui-puppet-component",
-  ]
-}
-
-fuchsia_test_component("touch-conformance-test-component") {
-  testonly = true
-  component_name = "touch-conformance-test"
-  manifest = "meta/touch-conformance-test.cml"
-  test_type = "ctf"
-}
-
-fuchsia_test_package("touch-conformance-test") {
-  test_components = [ ":touch-conformance-test-component" ]
-  subpackages = [
-    ":touch-test-suite",
-    "//src/ui/testing/context:ui-context-factory",
-  ]
-  test_specs = {
-    log_settings = {
-      max_severity = "ERROR"
-    }
-    environments = [
-      {
-        dimensions = {
-          # Ensure the device has Vulkan.
-          device_type = "AEMU"
-        }
-      },
-    ]
-  }
-}
-
-############# MOUSE CONFORMANCE TEST #############
-executable("mouse-validator-bin") {
-  testonly = true
-  sources = [ "mouse-validator.cc" ]
-  output_name = "mouse-validator"
+ctf_components_packages("mouse-conformance-test") {
+  test_subject = "mouse"
   deps = [
     ":conformance-test-base",
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
@@ -121,58 +163,11 @@ executable("mouse-validator-bin") {
     "//sdk/fidl/fuchsia.ui.test.scene:fuchsia.ui.test.scene_hlcpp",
     "//sdk/lib/syslog/cpp",
     "//sdk/lib/ui/scenic/cpp",
-    "//src/lib/fxl/test:gtest_main",
   ]
 }
 
-fuchsia_component("mouse-validator") {
-  testonly = true
-  manifest = "meta/mouse-validator.cml"
-  deps = [ ":mouse-validator-bin" ]
-}
-
-ctf_fuchsia_package("mouse-test-suite") {
-  package_name = "mouse-test-suite"
-  testonly = true
-  deps = [
-    ":mouse-validator",
-    "//src/ui/testing/puppet:ui-puppet-component",
-  ]
-}
-
-fuchsia_test_component("mouse-conformance-test-component") {
-  testonly = true
-  component_name = "mouse-conformance-test"
-  manifest = "meta/mouse-conformance-test.cml"
-  test_type = "ctf"
-}
-
-fuchsia_test_package("mouse-conformance-test") {
-  test_components = [ ":mouse-conformance-test-component" ]
-  subpackages = [
-    ":mouse-test-suite",
-    "//src/ui/testing/context:ui-context-factory",
-  ]
-  test_specs = {
-    log_settings = {
-      max_severity = "ERROR"
-    }
-    environments = [
-      {
-        dimensions = {
-          # Ensure the device has Vulkan.
-          device_type = "AEMU"
-        }
-      },
-    ]
-  }
-}
-
-############# KEY CONFORMANCE TEST #############
-executable("key-validator-bin") {
-  testonly = true
-  sources = [ "key-validator.cc" ]
-  output_name = "key-validator"
+ctf_components_packages("key-conformance-test") {
+  test_subject = "key"
   deps = [
     ":conformance-test-base",
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
@@ -185,58 +180,11 @@ executable("key-validator-bin") {
     "//sdk/lib/syslog/cpp",
     "//sdk/lib/ui/scenic/cpp",
     "//src/lib/fsl",
-    "//src/lib/fxl/test:gtest_main",
   ]
 }
 
-fuchsia_component("key-validator") {
-  testonly = true
-  manifest = "meta/key-validator.cml"
-  deps = [ ":key-validator-bin" ]
-}
-
-ctf_fuchsia_package("key-test-suite") {
-  package_name = "key-test-suite"
-  testonly = true
-  deps = [
-    ":key-validator",
-    "//src/ui/testing/puppet:ui-puppet-component",
-  ]
-}
-
-fuchsia_test_component("key-conformance-test-component") {
-  testonly = true
-  component_name = "key-conformance-test"
-  manifest = "meta/key-conformance-test.cml"
-  test_type = "ctf"
-}
-
-fuchsia_test_package("key-conformance-test") {
-  test_components = [ ":key-conformance-test-component" ]
-  subpackages = [
-    ":key-test-suite",
-    "//src/ui/testing/context:ui-context-factory",
-  ]
-  test_specs = {
-    log_settings = {
-      max_severity = "ERROR"
-    }
-    environments = [
-      {
-        dimensions = {
-          # Ensure the device has Vulkan.
-          device_type = "AEMU"
-        }
-      },
-    ]
-  }
-}
-
-############# Focus CONFORMANCE TEST #############
-executable("focus-validator-bin") {
-  testonly = true
-  sources = [ "focus-validator.cc" ]
-  output_name = "focus-validator"
+ctf_components_packages("focus-conformance-test") {
+  test_subject = "focus"
   deps = [
     ":conformance-test-base",
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
@@ -248,58 +196,11 @@ executable("focus-validator-bin") {
     "//sdk/lib/syslog/cpp",
     "//sdk/lib/ui/scenic/cpp",
     "//src/lib/fsl",
-    "//src/lib/fxl/test:gtest_main",
   ]
 }
 
-fuchsia_component("focus-validator") {
-  testonly = true
-  manifest = "meta/focus-validator.cml"
-  deps = [ ":focus-validator-bin" ]
-}
-
-ctf_fuchsia_package("focus-test-suite") {
-  package_name = "focus-test-suite"
-  testonly = true
-  deps = [
-    ":focus-validator",
-    "//src/ui/testing/puppet:ui-puppet-component",
-  ]
-}
-
-fuchsia_test_component("focus-conformance-test-component") {
-  testonly = true
-  component_name = "focus-conformance-test"
-  manifest = "meta/focus-conformance-test.cml"
-  test_type = "ctf"
-}
-
-fuchsia_test_package("focus-conformance-test") {
-  test_components = [ ":focus-conformance-test-component" ]
-  subpackages = [
-    ":focus-test-suite",
-    "//src/ui/testing/context:ui-context-factory",
-  ]
-  test_specs = {
-    log_settings = {
-      max_severity = "ERROR"
-    }
-    environments = [
-      {
-        dimensions = {
-          # Ensure the device has Vulkan.
-          device_type = "AEMU"
-        }
-      },
-    ]
-  }
-}
-
-############# Media Button CONFORMANCE TEST #############
-executable("media-button-validator-bin") {
-  testonly = true
-  sources = [ "media-button-validator.cc" ]
-  output_name = "media-button-validator"
+ctf_components_packages("media-button-conformance-test") {
+  test_subject = "media-button"
   deps = [
     ":conformance-test-base",
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
@@ -314,49 +215,5 @@ executable("media-button-validator-bin") {
     "//sdk/lib/ui/scenic/cpp",
     "//src/lib/fostr/fidl/fuchsia.ui.input",
     "//src/lib/fsl",
-    "//src/lib/fxl/test:gtest_main",
   ]
-}
-
-fuchsia_component("media-button-validator") {
-  testonly = true
-  manifest = "meta/media-button-validator.cml"
-  deps = [ ":media-button-validator-bin" ]
-}
-
-ctf_fuchsia_package("media-button-test-suite") {
-  package_name = "media-button-test-suite"
-  testonly = true
-  deps = [
-    ":media-button-validator",
-    "//src/ui/testing/puppet:ui-puppet-component",
-  ]
-}
-
-fuchsia_test_component("media-button-conformance-test-component") {
-  testonly = true
-  component_name = "media-button-conformance-test"
-  manifest = "meta/media-button-conformance-test.cml"
-  test_type = "ctf"
-}
-
-fuchsia_test_package("media-button-conformance-test") {
-  test_components = [ ":media-button-conformance-test-component" ]
-  subpackages = [
-    ":media-button-test-suite",
-    "//src/ui/testing/context:ui-context-factory",
-  ]
-  test_specs = {
-    log_settings = {
-      max_severity = "ERROR"
-    }
-    environments = [
-      {
-        dimensions = {
-          # Ensure the device has Vulkan.
-          device_type = "AEMU"
-        }
-      },
-    ]
-  }
 }

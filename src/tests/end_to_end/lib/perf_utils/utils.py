@@ -5,9 +5,8 @@
 import json
 import os
 import time
-
 from abc import ABC, abstractmethod
-from typing import TypeVar, Generic, Any
+from typing import Any, Generic, TypeVar
 
 P = TypeVar("P")
 R = TypeVar("R")

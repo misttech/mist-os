@@ -22,5 +22,3 @@ mod utils;
 
 #[cfg(test)]
 mod testing;
-
-pub(crate) type ImmutableString = flyweights::FlyStr;

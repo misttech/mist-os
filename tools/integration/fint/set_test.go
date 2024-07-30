@@ -103,7 +103,6 @@ func TestSet(t *testing.T) {
 
 	t.Run("populates set_artifacts fields (Rust)", func(t *testing.T) {
 		staticSpec := proto.Clone(staticSpec).(*fintpb.Static)
-		staticSpec.UseGoma = true
 		staticSpec.RustRbeEnable = true // This turns on RBE.
 		runner := &fakeSubprocessRunner{
 			mockStdout: []byte("some stdout"),
@@ -336,16 +335,6 @@ func TestGenArgs(t *testing.T) {
 			},
 		},
 		{
-			name: "clang toolchain with goma not allowed",
-			contextSpec: &fintpb.Context{
-				ClangToolchainDir: "/tmp/clang_toolchain",
-			},
-			staticSpec: &fintpb.Static{
-				UseGoma: true,
-			},
-			expectErr: true,
-		},
-		{
 			name: "gcc toolchain",
 			contextSpec: &fintpb.Context{
 				GccToolchainDir: "/tmp/gcc_toolchain",
@@ -355,26 +344,13 @@ func TestGenArgs(t *testing.T) {
 			},
 		},
 		{
-			name: "gcc toolchain with goma not allowed",
-			contextSpec: &fintpb.Context{
-				GccToolchainDir: "/tmp/gcc_toolchain",
-			},
-			staticSpec: &fintpb.Static{
-				UseGoma: true,
-			},
-			expectErr: true,
-		},
-		{
-			name: "rust toolchain with goma",
+			name: "rust toolchain",
 			contextSpec: &fintpb.Context{
 				RustToolchainDir: "/tmp/rust_toolchain",
 			},
-			staticSpec: &fintpb.Static{
-				UseGoma: true,
-			},
+			staticSpec: &fintpb.Static{},
 			expectedArgs: []string{
 				`rustc_prefix="/tmp/rust_toolchain"`,
-				`use_goma=true`,
 			},
 		},
 		{

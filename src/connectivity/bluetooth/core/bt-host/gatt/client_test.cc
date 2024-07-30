@@ -2638,8 +2638,8 @@ TEST_F(ClientTest, ExecutePrepareWritesSuccess) {
 
   att::PrepareWriteQueue prep_write_queue;
   prep_write_queue.push(att::QueuedWrite(kHandle, kOffset, kValue1));
-  prep_write_queue.push(
-      att::QueuedWrite(kHandle, kOffset + kValue1.size(), kValue2));
+  prep_write_queue.push(att::QueuedWrite(
+      kHandle, static_cast<uint16_t>(kOffset + kValue1.size()), kValue2));
 
   EXPECT_PACKET_OUT(kExpectedPrep1, &kResponse1);
   EXPECT_PACKET_OUT(kExpectedPrep2, &kResponse2);
@@ -2704,8 +2704,8 @@ TEST_F(ClientTest, ExecutePrepareWritesMalformedFailure) {
 
   att::PrepareWriteQueue prep_write_queue;
   prep_write_queue.push(att::QueuedWrite(kHandle, kOffset, kValue1));
-  prep_write_queue.push(
-      att::QueuedWrite(kHandle, kOffset + kValue1.size(), kValue2));
+  prep_write_queue.push(att::QueuedWrite(
+      kHandle, static_cast<uint16_t>(kOffset + kValue1.size()), kValue2));
 
   EXPECT_PACKET_OUT(kExpectedPrep1, &kResponse1);
   EXPECT_PACKET_OUT(kExpectedExec, &kExecResponse);
@@ -2752,8 +2752,8 @@ TEST_F(ClientTest, ExecutePrepareWritesErrorFailure) {
   // Create the PrepareWriteQueue of requests to pass to the client
   att::PrepareWriteQueue prep_write_queue;
   prep_write_queue.push(att::QueuedWrite(kHandle, kOffset, kValue1));
-  prep_write_queue.push(
-      att::QueuedWrite(kHandle, kOffset + kValue1.size(), kValue2));
+  prep_write_queue.push(att::QueuedWrite(
+      kHandle, static_cast<uint16_t>(kOffset + kValue1.size()), kValue2));
 
   EXPECT_PACKET_OUT(kExpectedPrep1, &kResponse1);
   EXPECT_PACKET_OUT(kExpectedExec, &kExecResponse);
@@ -2860,8 +2860,8 @@ TEST_F(ClientTest, ExecutePrepareWritesEnqueueRequestSuccess) {
   auto cb1 = [&status1](att::Result<> cb_status) { status1 = cb_status; };
   att::PrepareWriteQueue prep_write_queue1;
   prep_write_queue1.push(att::QueuedWrite(kHandle1, kOffset, kValue1));
-  prep_write_queue1.push(
-      att::QueuedWrite(kHandle1, kOffset + kValue1.size(), kValue2));
+  prep_write_queue1.push(att::QueuedWrite(
+      kHandle1, static_cast<uint16_t>(kOffset + kValue1.size()), kValue2));
   EXPECT_PACKET_OUT(kExpectedPrep1, &kResponse1);
   client()->ExecutePrepareWrites(
       std::move(prep_write_queue1), ReliableMode::kDisabled, cb1);
@@ -2871,8 +2871,8 @@ TEST_F(ClientTest, ExecutePrepareWritesEnqueueRequestSuccess) {
   auto cb2 = [&status2](att::Result<> cb_status) { status2 = cb_status; };
   att::PrepareWriteQueue prep_write_queue2;
   prep_write_queue2.push(att::QueuedWrite(kHandle2, kOffset, kValue1));
-  prep_write_queue2.push(
-      att::QueuedWrite(kHandle2, kOffset + kValue1.size(), kValue2));
+  prep_write_queue2.push(att::QueuedWrite(
+      kHandle2, static_cast<uint16_t>(kOffset + kValue1.size()), kValue2));
   client()->ExecutePrepareWrites(
       std::move(prep_write_queue2), ReliableMode::kDisabled, cb2);
 
@@ -2954,8 +2954,8 @@ TEST_F(ClientTest, ExecutePrepareWritesDifferingResponseSuccess) {
   // Create the PrepareWriteQueue of requests to pass to the client
   att::PrepareWriteQueue prep_write_queue;
   prep_write_queue.push(att::QueuedWrite(kHandle, kOffset, kValue1));
-  prep_write_queue.push(
-      att::QueuedWrite(kHandle, kOffset + kValue1.size(), kValue2));
+  prep_write_queue.push(att::QueuedWrite(
+      kHandle, static_cast<uint16_t>(kOffset + kValue1.size()), kValue2));
 
   EXPECT_PACKET_OUT(kExpectedPrep1, &kResponse1);
   client()->ExecutePrepareWrites(
@@ -3025,8 +3025,8 @@ TEST_F(ClientTest, ExecutePrepareWritesReliableWriteSuccess) {
   // Create the PrepareWriteQueue of requests to pass to the client
   att::PrepareWriteQueue prep_write_queue;
   prep_write_queue.push(att::QueuedWrite(kHandle, kOffset, kValue1));
-  prep_write_queue.push(
-      att::QueuedWrite(kHandle, kOffset + kValue1.size(), kValue2));
+  prep_write_queue.push(att::QueuedWrite(
+      kHandle, static_cast<uint16_t>(kOffset + kValue1.size()), kValue2));
 
   EXPECT_PACKET_OUT(kExpectedPrep1, &kResponse1);
   client()->ExecutePrepareWrites(
@@ -3120,8 +3120,8 @@ TEST_F(ClientTest, ExecutePrepareWritesReliableDifferingResponseError) {
 
   att::PrepareWriteQueue prep_write_queue;
   prep_write_queue.push(att::QueuedWrite(kHandle, kOffset, kValue1));
-  prep_write_queue.push(
-      att::QueuedWrite(kHandle, kOffset + kValue1.size(), kValue2));
+  prep_write_queue.push(att::QueuedWrite(
+      kHandle, static_cast<uint16_t>(kOffset + kValue1.size()), kValue2));
 
   EXPECT_PACKET_OUT(kExpectedPrep1, &kResponse1);
   client()->ExecutePrepareWrites(
@@ -3168,8 +3168,8 @@ TEST_F(ClientTest, ExecutePrepareWritesReliableMalformedResponseError) {
 
   att::PrepareWriteQueue prep_write_queue;
   prep_write_queue.push(att::QueuedWrite(kHandle, kOffset, kValue1));
-  prep_write_queue.push(
-      att::QueuedWrite(kHandle, kOffset + kValue1.size(), kValue2));
+  prep_write_queue.push(att::QueuedWrite(
+      kHandle, static_cast<uint16_t>(kOffset + kValue1.size()), kValue2));
 
   EXPECT_PACKET_OUT(kExpectedPrep1, &kResponse1);
   client()->ExecutePrepareWrites(

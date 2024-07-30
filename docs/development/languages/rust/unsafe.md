@@ -81,8 +81,8 @@ For more discussion on encapsulating `unsafe` invariants, see
 
 To request an unsafe review for Rust code:
 
-1.  File a bug under the `Rust>Unsafe` component. Include a link to your review
-    in the bug description.
+1.  File a bug under the `Language Platforms > Rust > Unsafe` component. Include
+    a link to your review in the bug description.
 1.  Add "Fuchsia Rust Unsafe Reviews <fuchsia-rust-unsafe-reviews@google.com>"
     as a reviewer to your CL. A reviewer will be chosen at random and assigned
     to your CL.

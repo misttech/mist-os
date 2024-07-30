@@ -8,10 +8,13 @@ import("//build/drivers.gni")
 import("//build/test.gni")
 
 driver_bind_rules("hid_input_report_bind") {
-  rules = "hid_input_report.bind"
+  rules = "meta/hid_input_report.bind"
   bind_output = "hid-input-report.bindbc"
-  tests = "bind_tests.json"
-  deps = [ "//src/devices/bind/fuchsia.hid" ]
+  tests = "meta/bind_tests.json"
+  deps = [
+    "//sdk/fidl/fuchsia.hardware.input:fuchsia.hardware.input_bindlib",
+    "//src/devices/bind/fuchsia.hid",
+  ]
 }
 
 group("tests") {
@@ -71,7 +74,7 @@ fuchsia_driver_component("hid-input-report") {
   component_name = "hid-input-report"
   manifest = "meta/hid-input-report.cml"
   deps = [ ":hid-input-report-driver" ]
-  info = "hid-input-report-info.json"
+  info = "meta/hid-input-report-info.json"
 }
 
 test("hid-input-report-test-bin") {
@@ -82,8 +85,7 @@ test("hid-input-report-test-bin") {
   deps = [
     ":driver-internals",
     ":hid_input_report_bind",
-    "//sdk/lib/driver/testing/cpp",
-    "//sdk/lib/driver/testing/cpp/fixture:cpp_fixture",
+    "//sdk/lib/driver/testing/cpp:driver_testing_cpp",
     "//sdk/lib/inspect/testing/cpp",
     "//src/lib/ddk:ddk-metadata-headers",
     "//src/lib/fxl/test:gtest_main",

@@ -18,7 +18,6 @@ zx_library("synchronous-executor") {
     "//sdk/lib/fit-promise",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/zx",
-    "//zircon/system/ulib/zxtest",
   ]
   configs += [ "//build/config/fuchsia:static_cpp_standard_library" ]
 }

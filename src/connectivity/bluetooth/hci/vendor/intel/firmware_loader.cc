@@ -103,7 +103,7 @@ FirmwareLoader::LoadStatus FirmwareLoader::LoadBseq(const void* firmware, const 
       offset += event_size;
     }
 
-    if (!hci_cmd_.SendAndExpect(command, std::move(events))) {
+    if (!hci_.SendAndExpect(command, std::move(events))) {
       return LoadStatus::kError;
     }
   }
@@ -136,21 +136,21 @@ FirmwareLoader::LoadStatus FirmwareLoader::LoadSfi(const void* firmware, const s
 
   // SFI File format:
   // [128 bytes CSS Header]
-  if (!hci_acl_.SendSecureSend(0x00, file.view(sec_boot_params[idx].css_header_offset,
-                                               sec_boot_params[idx].css_header_size))) {
+  if (!hci_.SendSecureSend(0x00, file.view(sec_boot_params[idx].css_header_offset,
+                                           sec_boot_params[idx].css_header_size))) {
     errorf("FirmwareLoader: Failed sending CSS Header!\n");
     return LoadStatus::kError;
   }
 
   // [256 bytes PKI]
-  if (!hci_acl_.SendSecureSend(
+  if (!hci_.SendSecureSend(
           0x03, file.view(sec_boot_params[idx].pki_offset, sec_boot_params[idx].pki_size))) {
     errorf("FirmwareLoader: Failed sending PKI Header!\n");
     return LoadStatus::kError;
   }
 
   // [256 bytes signature info]
-  if (!hci_acl_.SendSecureSend(
+  if (!hci_.SendSecureSend(
           0x02, file.view(sec_boot_params[idx].sig_offset, sec_boot_params[idx].sig_size))) {
     errorf("FirmwareLoader: Failed sending signature Header!\n");
     return LoadStatus::kError;
@@ -176,7 +176,7 @@ FirmwareLoader::LoadStatus FirmwareLoader::LoadSfi(const void* firmware, const s
     }
     frag_len += cmd_size;
     if ((frag_len % 4) == 0) {
-      if (!hci_acl_.SendSecureSend(0x01, file.view(offset, frag_len))) {
+      if (!hci_.SendSecureSend(0x01, file.view(offset, frag_len))) {
         errorf("Failed sending a command chunk!\n");
         return LoadStatus::kError;
       }

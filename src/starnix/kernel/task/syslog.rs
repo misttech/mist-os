@@ -59,7 +59,7 @@ impl Syslog {
     }
 
     fn subscription(&self) -> Result<&Mutex<LogSubscription>, Errno> {
-        self.syscall_subscription.get().ok_or(errno!(ENOENT))
+        self.syscall_subscription.get().ok_or_else(|| errno!(ENOENT))
     }
 }
 
@@ -112,7 +112,7 @@ impl GrantedSyslog<'_> {
                 Ok(Some(log)) => return write_log(log),
                 Ok(None) => return Ok(0),
             }
-            waiter.wait_until(current_task, zx::Time::INFINITE)?;
+            waiter.wait(current_task)?;
         }
     }
 

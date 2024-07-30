@@ -6,12 +6,15 @@
 
 #include <lib/syslog/cpp/macros.h>
 
+#include <cstdint>
+
 namespace utils {
 
 namespace {
 // List of supported pixel formats
 std::vector<fuchsia::images2::PixelFormat> kSupportedPixelFormats = {
-    fuchsia::images2::PixelFormat::B8G8R8A8, fuchsia::images2::PixelFormat::R8G8B8A8};
+    fuchsia::images2::PixelFormat::B8G8R8A8, fuchsia::images2::PixelFormat::R8G8B8A8,
+    fuchsia::images2::PixelFormat::R5G6B5};
 }  // namespace
 
 uint8_t LinearToSrgb(const float val) {
@@ -33,6 +36,9 @@ Pixel Pixel::FromVmo(const uint8_t* vmo_host, uint32_t stride, uint32_t x, uint3
   if (type == fuchsia::images2::PixelFormat::B8G8R8A8) {
     return FromVmoBgra(vmo_host, stride, x, y);
   }
+  if (type == fuchsia::images2::PixelFormat::R5G6B5) {
+    return FromVmoRgb565(vmo_host, stride, x, y);
+  }
   FX_DCHECK(type == fuchsia::images2::PixelFormat::R8G8B8A8);
   return FromVmoRgba(vmo_host, stride, x, y);
 }
@@ -42,8 +48,24 @@ Pixel Pixel::FromVmo(const uint8_t* vmo_host, uint32_t stride, uint32_t x, uint3
   if (type == fuchsia::sysmem::PixelFormatType::BGRA32) {
     return FromVmoBgra(vmo_host, stride, x, y);
   }
+  if (type == fuchsia::sysmem::PixelFormatType::RGB565) {
+    return FromVmoRgb565(vmo_host, stride, x, y);
+  }
   FX_DCHECK(type == fuchsia::sysmem::PixelFormatType::R8G8B8A8);
   return FromVmoRgba(vmo_host, stride, x, y);
+}
+
+Pixel Pixel::FromVmoRgb565(const uint8_t* vmo_host, uint32_t stride, uint32_t x, uint32_t y) {
+  uint16_t pixel;
+  memcpy(&pixel, vmo_host + (y * stride + x) * sizeof(uint16_t), sizeof(uint16_t));
+  uint8_t r5 = pixel >> 11;
+  uint8_t g6 = (pixel >> 5) & 0x3F;
+  uint8_t b5 = pixel & 0x1F;
+  uint8_t r8 = static_cast<uint8_t>(r5 * 255.0f / 31 + 0.5f);
+  uint8_t g8 = static_cast<uint8_t>(g6 * 255.0f / 63 + 0.5f);
+  uint8_t b8 = static_cast<uint8_t>(b5 * 255.0f / 31 + 0.5f);
+
+  return utils::Pixel(b8, g8, r8, 255);
 }
 
 Pixel Pixel::FromVmoRgba(const uint8_t* vmo_host, uint32_t stride, uint32_t x, uint32_t y) {
@@ -62,20 +84,34 @@ Pixel Pixel::FromVmoBgra(const uint8_t* vmo_host, uint32_t stride, uint32_t x, u
   return utils::Pixel(b, g, r, a);
 }
 
-std::vector<uint8_t> Pixel::ToFormat(fuchsia::images2::PixelFormat type) {
+std::vector<uint8_t> Pixel::ToFormat(fuchsia::images2::PixelFormat type) const {
   if (type == fuchsia::images2::PixelFormat::B8G8R8A8) {
     return ToBgra();
+  }
+  if (type == fuchsia::images2::PixelFormat::R5G6B5) {
+    return ToRgb565();
   }
   FX_DCHECK(type == fuchsia::images2::PixelFormat::R8G8B8A8);
   return ToRgba();
 }
 
-std::vector<uint8_t> Pixel::ToFormat(fuchsia::sysmem::PixelFormatType type) {
+std::vector<uint8_t> Pixel::ToFormat(fuchsia::sysmem::PixelFormatType type) const {
   if (type == fuchsia::sysmem::PixelFormatType::BGRA32) {
     return ToBgra();
   }
+  if (type == fuchsia::sysmem::PixelFormatType::RGB565) {
+    return ToRgb565();
+  }
   FX_DCHECK(type == fuchsia::sysmem::PixelFormatType::R8G8B8A8);
   return ToRgba();
+}
+
+std::vector<uint8_t> Pixel::ToRgb565() const {
+  uint16_t color = static_cast<uint16_t>(((red >> 3) << 11) | ((green >> 2) << 5) | (blue >> 3));
+  std::vector<uint8_t> data(sizeof(color));
+
+  memcpy(data.data(), &color, sizeof(color));
+  return data;
 }
 
 bool Pixel::IsFormatSupported(fuchsia::images2::PixelFormat type) {

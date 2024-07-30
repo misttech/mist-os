@@ -5,11 +5,11 @@
 """Processes the zip archive of syscall markdown and adds toc and readme."""
 
 import argparse
+import io
 import json
 import os
 import shutil
 import sys
-import io
 import zipfile
 
 README_HEADER = """# Zircon System Calls

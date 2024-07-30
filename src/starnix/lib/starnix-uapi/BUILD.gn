@@ -39,8 +39,10 @@ rustc_library("starnix-uapi") {
     "src/time.rs",
     "src/uapi.rs",
     "src/union.rs",
+    "src/unmount_flags.rs",
     "src/user_address.rs",
     "src/user_buffer.rs",
+    "src/user_value.rs",
     "src/vfs.rs",
   ]
 

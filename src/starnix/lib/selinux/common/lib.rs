@@ -41,7 +41,7 @@ macro_rules! enumerable_enum {
 enumerable_enum! {
     /// A well-known class in SELinux policy that has a particular meaning in policy enforcement
     /// hooks.
-    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+    #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
     ObjectClass {
         /// The SELinux "process" object class.
         Process,
@@ -295,7 +295,7 @@ enum ReferenceInitialSid {
     _Security = 2,
     Unlabeled = 3,
     _Fs = 4,
-    _File = 5,
+    File = 5,
     _AnySocket = 6,
     _Port = 7,
     _Netif = 8,
@@ -341,8 +341,34 @@ initial_sid_enum! {
 /// These must be present in the policy, for it to be valid.
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
     InitialSid {
+        File("file"),
         Kernel("kernel"),
         Unlabeled("unlabeled"),
+    }
+}
+
+/// A borrowed byte slice that contains no `NUL` characters by truncating the input slice at the
+/// first `NUL` (if any) upon construction.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct NullessByteStr<'a>(&'a [u8]);
+
+impl<'a> NullessByteStr<'a> {
+    /// Returns a non-null-terminated representation of the security context string.
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+impl<'a, S: AsRef<[u8]> + ?Sized> From<&'a S> for NullessByteStr<'a> {
+    /// Any `AsRef<[u8]>` can be processed into a [`NullessByteStr`]. The [`NullessByteStr`] will
+    /// retain everything up to (but not including) a null character, or else the complete byte
+    /// string.
+    fn from(s: &'a S) -> Self {
+        let value = s.as_ref();
+        match value.iter().position(|c| *c == 0) {
+            Some(end) => Self(&value[..end]),
+            None => Self(value),
+        }
     }
 }
 
@@ -367,6 +393,19 @@ mod tests {
                 permission.into()
             );
             assert_eq!(AbstractObjectClass::System(ObjectClass::Process), variant.class().into());
+        }
+    }
+
+    #[test]
+    fn nulless_byte_str_equivalence() {
+        let unterminated: NullessByteStr<'_> = b"u:object_r:test_valid_t:s0".into();
+        let nul_terminated: NullessByteStr<'_> = b"u:object_r:test_valid_t:s0\0".into();
+        let nul_containing: NullessByteStr<'_> =
+            b"u:object_r:test_valid_t:s0\0IGNORE THIS\0!\0".into();
+
+        for context in [nul_terminated, nul_containing] {
+            assert_eq!(unterminated, context);
+            assert_eq!(unterminated.as_bytes(), context.as_bytes());
         }
     }
 }

@@ -157,13 +157,15 @@ impl InputDevice {
                                 }
                                 None => (),
                             }
-                            // TODO(https://fxbug.dev/42075438): Reading from an `InputFile` should
-                            // not provide access to events that occurred before the file was
-                            // opened.
-                            inner.events.append(&mut new_events);
-                            // TODO(https://fxbug.dev/42075439): Skip notify if `inner.events`
-                            // is empty.
-                            inner.waiters.notify_fd_events(FdEvents::POLLIN);
+
+                            if !new_events.is_empty() {
+                                // TODO(https://fxbug.dev/42075438): Reading from an `InputFile` should
+                                // not provide access to events that occurred before the file was
+                                // opened.
+                                inner.events.append(&mut new_events);
+                                inner.waiters.notify_fd_events(FdEvents::POLLIN);
+                            }
+
                             files.push(Arc::downgrade(&file));
                         }
                     }
@@ -201,8 +203,12 @@ impl InputDevice {
                                 files.drain(..).flat_map(|f| f.upgrade()).collect();
                             for file in filtered_files {
                                 let mut inner = file.inner.lock();
-                                inner.events.extend(new_events.clone());
-                                inner.waiters.notify_fd_events(FdEvents::POLLIN);
+
+                                if !new_events.is_empty() {
+                                    inner.events.extend(new_events.clone());
+                                    inner.waiters.notify_fd_events(FdEvents::POLLIN);
+                                }
+
                                 files.push(Arc::downgrade(&file));
                             }
 
@@ -272,8 +278,12 @@ impl InputDevice {
                                     }
                                     None => (),
                                 }
-                                inner.events.extend(new_events.clone());
-                                inner.waiters.notify_fd_events(FdEvents::POLLIN);
+
+                                if !new_events.is_empty() {
+                                  inner.events.extend(new_events.clone());
+                                  inner.waiters.notify_fd_events(FdEvents::POLLIN);
+                                }
+
                                 files.push(Arc::downgrade(&file));
                             }
 
@@ -659,14 +669,20 @@ mod test {
     #[::fuchsia::test]
     async fn notifies_polling_waiters_of_new_data() {
         // Set up resources.
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let (_input_device, input_file, mut touch_source_stream) = start_touch_input(&current_task);
         let waiter1 = Waiter::new();
         let waiter2 = Waiter::new();
 
         // Ask `input_file` to notify waiters when data is available to read.
         [&waiter1, &waiter2].iter().for_each(|waiter| {
-            input_file.wait_async(&current_task, waiter, FdEvents::POLLIN, EventHandler::None);
+            input_file.wait_async(
+                &mut locked,
+                &current_task,
+                waiter,
+                FdEvents::POLLIN,
+                EventHandler::None,
+            );
         });
         assert_matches!(waiter1.wait_until(&current_task, zx::Time::ZERO), Err(_));
         assert_matches!(waiter2.wait_until(&current_task, zx::Time::ZERO), Err(_));
@@ -689,12 +705,18 @@ mod test {
     #[::fuchsia::test]
     async fn notifies_blocked_waiter_of_new_data() {
         // Set up resources.
-        let (kernel, current_task) = create_kernel_and_task();
+        let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let (_input_device, input_file, mut touch_source_stream) = start_touch_input(&current_task);
         let waiter = Waiter::new();
 
         // Ask `input_file` to notify `waiter` when data is available to read.
-        input_file.wait_async(&current_task, &waiter, FdEvents::POLLIN, EventHandler::None);
+        input_file.wait_async(
+            &mut locked,
+            &current_task,
+            &waiter,
+            FdEvents::POLLIN,
+            EventHandler::None,
+        );
 
         let mut waiter_thread =
             kernel.kthreads.spawner().spawn_and_get_result(move |_, task| waiter.wait(&task));
@@ -715,6 +737,37 @@ mod test {
         answer_next_watch_request(&mut touch_source_stream, vec![make_touch_event(1)]).await;
     }
 
+    #[::fuchsia::test]
+    async fn does_not_notify_polling_waiters_without_new_data() {
+        // Set up resources.
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (_input_device, input_file, mut touch_source_stream) = start_touch_input(&current_task);
+        let waiter1 = Waiter::new();
+        let waiter2 = Waiter::new();
+
+        // Ask `input_file` to notify waiters when data is available to read.
+        [&waiter1, &waiter2].iter().for_each(|waiter| {
+            input_file.wait_async(
+                &mut locked,
+                &current_task,
+                waiter,
+                FdEvents::POLLIN,
+                EventHandler::None,
+            );
+        });
+        assert_matches!(waiter1.wait_until(&current_task, zx::Time::ZERO), Err(_));
+        assert_matches!(waiter2.wait_until(&current_task, zx::Time::ZERO), Err(_));
+
+        // Reply to first `Watch` request with an empty set of events.
+        answer_next_watch_request(&mut touch_source_stream, vec![]).await;
+
+        // `InputFile` should be done processing the first reply. Since there
+        // were no touch_events given, `InputFile` should not have notified the
+        // interested waiters.
+        assert_matches!(waiter1.wait_until(&current_task, zx::Time::ZERO), Err(_));
+        assert_matches!(waiter2.wait_until(&current_task, zx::Time::ZERO), Err(_));
+    }
+
     // Note: a user program may also want to be woken if events were already ready at the
     // time that the program called `epoll_wait()`. However, there's no test for that case
     // in this module, because:
@@ -730,7 +783,7 @@ mod test {
     #[::fuchsia::test]
     async fn honors_wait_cancellation() {
         // Set up input resources.
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let (_input_device, input_file, mut touch_source_stream) = start_touch_input(&current_task);
         let waiter1 = Waiter::new();
         let waiter2 = Waiter::new();
@@ -740,7 +793,13 @@ mod test {
             .iter()
             .map(|waiter| {
                 input_file
-                    .wait_async(&current_task, waiter, FdEvents::POLLIN, EventHandler::None)
+                    .wait_async(
+                        &mut locked,
+                        &current_task,
+                        waiter,
+                        FdEvents::POLLIN,
+                        EventHandler::None,
+                    )
                     .expect("wait_async")
             })
             .collect::<Vec<_>>();
@@ -767,12 +826,12 @@ mod test {
     #[::fuchsia::test]
     async fn query_events() {
         // Set up resources.
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let (_input_device, input_file, mut touch_source_stream) = start_touch_input(&current_task);
 
         // Check initial expectation.
         assert_eq!(
-            input_file.query_events(&current_task).expect("query_events"),
+            input_file.query_events(&mut locked, &current_task).expect("query_events"),
             FdEvents::empty(),
             "events should be empty before data arrives"
         );
@@ -789,7 +848,7 @@ mod test {
 
         // Check post-watch expectation.
         assert_eq!(
-            input_file.query_events(&current_task).expect("query_events"),
+            input_file.query_events(&mut locked, &current_task).expect("query_events"),
             FdEvents::POLLIN | FdEvents::POLLRDNORM,
             "events should be POLLIN after data arrives"
         );

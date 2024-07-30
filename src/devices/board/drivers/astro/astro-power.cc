@@ -8,15 +8,12 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
-#include <lib/ddk/platform-defs.h>
 #include <lib/driver/component/cpp/composite_node_spec.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 
-#include <bind/fuchsia/amlogic/platform/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/google/platform/cpp/bind.h>
 #include <bind/fuchsia/hardware/pwm/cpp/bind.h>
-#include <bind/fuchsia/platform/cpp/bind.h>
 #include <bind/fuchsia/power/cpp/bind.h>
 #include <soc/aml-common/aml-power.h>
 #include <soc/aml-s905d2/s905d2-pwm.h>

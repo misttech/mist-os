@@ -4,7 +4,7 @@
 
 use crate::task::TaskBuilder;
 use selinux::security_server::SecurityServer;
-use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Unlocked, WriteOps};
+use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Unlocked};
 use std::ffi::CString;
 use std::mem::MaybeUninit;
 use std::sync::Arc;
@@ -339,7 +339,7 @@ impl FileOps for PanickingFile {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, WriteOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,

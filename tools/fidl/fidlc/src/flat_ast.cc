@@ -13,23 +13,25 @@ namespace fidlc {
 
 bool Element::IsDecl() const {
   switch (kind) {
+    case Kind::kAlias:
     case Kind::kBits:
     case Kind::kBuiltin:
     case Kind::kConst:
     case Kind::kEnum:
+    case Kind::kNewType:
+    case Kind::kOverlay:
     case Kind::kProtocol:
     case Kind::kResource:
     case Kind::kService:
     case Kind::kStruct:
     case Kind::kTable:
-    case Kind::kAlias:
     case Kind::kUnion:
-    case Kind::kNewType:
-    case Kind::kOverlay:
       return true;
-    case Kind::kLibrary:
     case Kind::kBitsMember:
     case Kind::kEnumMember:
+    case Kind::kLibrary:
+    case Kind::kModifier:
+    case Kind::kOverlayMember:
     case Kind::kProtocolCompose:
     case Kind::kProtocolMethod:
     case Kind::kResourceProperty:
@@ -37,7 +39,6 @@ bool Element::IsDecl() const {
     case Kind::kStructMember:
     case Kind::kTableMember:
     case Kind::kUnionMember:
-    case Kind::kOverlayMember:
       return false;
   }
 }
@@ -45,6 +46,52 @@ bool Element::IsDecl() const {
 Decl* Element::AsDecl() {
   ZX_ASSERT(IsDecl());
   return static_cast<Decl*>(this);
+}
+
+ModifierList* Element::GetModifiers() {
+  switch (kind) {
+    case Kind::kBits:
+      return static_cast<Bits*>(this)->modifiers.get();
+    case Kind::kEnum:
+      return static_cast<Enum*>(this)->modifiers.get();
+    case Kind::kOverlay:
+      return static_cast<Overlay*>(this)->modifiers.get();
+    case Kind::kProtocol:
+      return static_cast<Protocol*>(this)->modifiers.get();
+    case Kind::kStruct:
+      return static_cast<Struct*>(this)->modifiers.get();
+    case Kind::kTable:
+      return static_cast<Table*>(this)->modifiers.get();
+    case Kind::kUnion:
+      return static_cast<Union*>(this)->modifiers.get();
+    case Kind::kProtocolMethod:
+      return static_cast<Protocol::Method*>(this)->modifiers.get();
+    case Kind::kLibrary:
+    case Kind::kModifier:
+    case Kind::kAlias:
+    case Kind::kBuiltin:
+    case Kind::kConst:
+    case Kind::kNewType:
+    case Kind::kResource:
+    case Kind::kService:
+    case Kind::kBitsMember:
+    case Kind::kEnumMember:
+    case Kind::kOverlayMember:
+    case Kind::kProtocolCompose:
+    case Kind::kResourceProperty:
+    case Kind::kServiceMember:
+    case Kind::kStructMember:
+    case Kind::kTableMember:
+    case Kind::kUnionMember:
+      return nullptr;
+  }
+}
+
+void Element::ForEachModifier(const fit::function<void(Modifier*)>& fn) {
+  if (auto modifiers = GetModifiers()) {
+    for (auto& modifier : modifiers->modifiers)
+      fn(modifier.get());
+  }
 }
 
 bool Element::IsAnonymousLayout() const {
@@ -65,6 +112,8 @@ std::string_view Element::GetName() const {
   switch (kind) {
     case Kind::kLibrary:
       return static_cast<const Library*>(this)->name;
+    case Kind::kModifier:
+      return static_cast<const Modifier*>(this)->name.data();
     case Kind::kBits:
     case Kind::kBuiltin:
     case Kind::kConst:
@@ -105,7 +154,9 @@ std::string_view Element::GetName() const {
 SourceSpan Element::GetNameSource() const {
   switch (kind) {
     case Kind::kLibrary:
-      ZX_PANIC("should not call GetName() on a library element");
+      ZX_PANIC("should not call GetNameSource() on a library element");
+    case Kind::kModifier:
+      return static_cast<const Modifier*>(this)->name;
     case Kind::kBits:
     case Kind::kBuiltin:
     case Kind::kConst:
@@ -338,18 +389,18 @@ std::unique_ptr<Library> Library::CreateRootLibrary() {
 
   // Simulate narrowing availabilities to maintain the invariant that they
   // always reach kNarrowed (except for the availability of `library`).
-  library->TraverseElements([](Element* element) {
+  library->ForEachElement([](Element* element) {
     element->availability.Narrow(VersionRange(Version::kHead, Version::kPosInf));
   });
 
   return library;
 }
 
-void Library::TraverseElements(const fit::function<void(Element*)>& fn) {
+void Library::ForEachElement(const fit::function<void(Element*)>& fn) {
   fn(this);
   for (auto& [name, decl] : declarations.all) {
     fn(decl);
-    decl->ForEachMember(fn);
+    decl->ForEachEdge([&](Element* parent, Element* child) { fn(child); });
   }
 }
 
@@ -411,6 +462,14 @@ void Decl::ForEachMember(const fit::function<void(Element*)>& fn) {
   }  // switch
 }
 
+void Decl::ForEachEdge(const fit::function<void(Element* parent, Element* child)>& fn) {
+  ForEachModifier([&](Modifier* modifier) { fn(this, modifier); });
+  ForEachMember([&](Element* member) {
+    fn(this, member);
+    member->ForEachModifier([&](Modifier* modifier) { fn(member, modifier); });
+  });
+}
+
 template <typename T>
 static T* StoreDecl(std::unique_ptr<Decl> decl, std::multimap<std::string_view, Decl*>* all,
                     std::vector<std::unique_ptr<T>>* declarations) {
@@ -460,6 +519,10 @@ Builtin* Library::Declarations::LookupBuiltin(Builtin::Identity id) const {
   auto builtin = builtins[index].get();
   ZX_ASSERT_MSG(builtin->id == id, "builtin's id does not match index");
   return builtin;
+}
+
+std::unique_ptr<Modifier> Modifier::Clone() const {
+  return std::make_unique<Modifier>(attributes->Clone(), name, value);
 }
 
 std::unique_ptr<TypeConstructor> TypeConstructor::Clone() const {
@@ -519,16 +582,33 @@ std::unique_ptr<Decl> Decl::Split(VersionRange range) const {
   return decl;
 }
 
-// For a decl member type T that has a Copy() method, takes a vector<T> and
+std::unique_ptr<ModifierList> ModifierList::Split(VersionRange range) const {
+  std::vector<std::unique_ptr<Modifier>> result;
+  for (auto& modifier : modifiers) {
+    if (VersionSet::Intersect(VersionSet(range), modifier->availability.set())) {
+      result.push_back(modifier->Clone());
+      result.back()->availability = modifier->availability;
+      result.back()->availability.Narrow(range);
+    }
+  }
+  return std::make_unique<ModifierList>(std::move(result));
+}
+
+// For a decl member type T that has a Clone() method, takes a vector<T> and
 // returns a vector of copies filtered to only include those that intersect with
 // the given range, and narrows their availabilities to that range.
 template <typename T>
 static std::vector<T> FilterMembers(const std::vector<T>& all, VersionRange range) {
   std::vector<T> result;
-  for (auto& member : all) {
-    if (VersionSet::Intersect(VersionSet(range), member.availability.set())) {
-      result.push_back(member.Clone());
-      result.back().availability = member.availability;
+  for (auto& child : all) {
+    if (VersionSet::Intersect(VersionSet(range), child.availability.set())) {
+      // Methods are a special case because we need to filter their modifiers.
+      if constexpr (std::is_same_v<T, Protocol::Method>) {
+        result.push_back(child.Clone(range));
+      } else {
+        result.push_back(child.Clone());
+      }
+      result.back().availability = child.availability;
       result.back().availability.Narrow(range);
     }
   }
@@ -554,13 +634,13 @@ std::unique_ptr<Decl> Const::SplitImpl(VersionRange range) const {
 }
 
 std::unique_ptr<Decl> Enum::SplitImpl(VersionRange range) const {
-  return std::make_unique<Enum>(attributes->Clone(), name, subtype_ctor->Clone(),
-                                FilterMembers(members, range), strictness);
+  return std::make_unique<Enum>(attributes->Clone(), modifiers->Split(range), name,
+                                subtype_ctor->Clone(), FilterMembers(members, range));
 }
 
 std::unique_ptr<Decl> Bits::SplitImpl(VersionRange range) const {
-  return std::make_unique<Bits>(attributes->Clone(), name, subtype_ctor->Clone(),
-                                FilterMembers(members, range), strictness);
+  return std::make_unique<Bits>(attributes->Clone(), modifiers->Split(range), name,
+                                subtype_ctor->Clone(), FilterMembers(members, range));
 }
 
 std::unique_ptr<Decl> Service::SplitImpl(VersionRange range) const {
@@ -568,27 +648,27 @@ std::unique_ptr<Decl> Service::SplitImpl(VersionRange range) const {
 }
 
 std::unique_ptr<Decl> Struct::SplitImpl(VersionRange range) const {
-  return std::make_unique<Struct>(attributes->Clone(), name, FilterMembers(members, range),
-                                  resourceness);
+  return std::make_unique<Struct>(attributes->Clone(), modifiers->Split(range), name,
+                                  FilterMembers(members, range));
 }
 
 std::unique_ptr<Decl> Table::SplitImpl(VersionRange range) const {
-  return std::make_unique<Table>(attributes->Clone(), name, FilterOrdinaledMembers(members, range),
-                                 strictness, resourceness);
+  return std::make_unique<Table>(attributes->Clone(), modifiers->Split(range), name,
+                                 FilterOrdinaledMembers(members, range));
 }
 
 std::unique_ptr<Decl> Union::SplitImpl(VersionRange range) const {
-  return std::make_unique<Union>(attributes->Clone(), name, FilterOrdinaledMembers(members, range),
-                                 strictness, resourceness);
+  return std::make_unique<Union>(attributes->Clone(), modifiers->Split(range), name,
+                                 FilterOrdinaledMembers(members, range));
 }
 
 std::unique_ptr<Decl> Overlay::SplitImpl(VersionRange range) const {
-  return std::make_unique<Overlay>(
-      attributes->Clone(), name, FilterOrdinaledMembers(members, range), strictness, resourceness);
+  return std::make_unique<Overlay>(attributes->Clone(), modifiers->Split(range), name,
+                                   FilterOrdinaledMembers(members, range));
 }
 
 std::unique_ptr<Decl> Protocol::SplitImpl(VersionRange range) const {
-  return std::make_unique<Protocol>(attributes->Clone(), openness, name,
+  return std::make_unique<Protocol>(attributes->Clone(), modifiers->Split(range), name,
                                     FilterMembers(composed_protocols, range),
                                     FilterMembers(methods, range));
 }
@@ -635,10 +715,13 @@ Overlay::Member Overlay::Member::Clone() const {
   return Member(ordinal, type_ctor->Clone(), name, attributes->Clone());
 }
 
-Protocol::Method Protocol::Method::Clone() const {
-  return Method(attributes->Clone(), kind, strictness, name,
+Protocol::Method Protocol::Method::Clone(VersionRange range) const {
+  // We don't copy maybe_result_union because it is an unowned AST node pointer.
+  // The CompileStep will make it point to the new union in the decomposed AST.
+  return Method(attributes->Clone(), modifiers->Split(range), kind, name,
                 maybe_request ? maybe_request->Clone() : nullptr,
-                maybe_response ? maybe_response->Clone() : nullptr, has_error);
+                maybe_response ? maybe_response->Clone() : nullptr, /*maybe_result_union=*/nullptr,
+                has_error);
 }
 
 Protocol::ComposedProtocol Protocol::ComposedProtocol::Clone() const {

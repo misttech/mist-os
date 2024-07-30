@@ -18,7 +18,7 @@
         ]
     },
     "filter_enabled_interface_types": [
-        "wlan"
+        "wlanclient"
     ],
     "interface_metrics": {
         "wlan_metric": 90,
@@ -29,7 +29,7 @@
     ],
     "allowed_upstream_device_classes": [
         "ethernet",
-        "wlan"
+        "wlanclient"
     ],
     "enable_dhcpv6": false,
     "interface_naming_policy": [

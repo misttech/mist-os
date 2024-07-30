@@ -11,8 +11,8 @@ use crate::signals::{SignalDetail, SignalInfo};
 use crate::task::{CurrentTask, ExceptionResult, PageFaultExceptionReport, Task};
 
 use crate::vfs::{
-    AioContexts, DynamicFile, DynamicFileBuf, FileWriteGuardRef, FsNodeOps, FsStr, FsString,
-    NamespaceNode, SequenceFileSource,
+    ActiveNamespaceNode, AioContexts, DynamicFile, DynamicFileBuf, FileWriteGuardRef, FsNodeOps,
+    FsStr, FsString, NamespaceNode, SequenceFileSource,
 };
 use anyhow::{anyhow, Error};
 use bitflags::bitflags;
@@ -33,6 +33,7 @@ use starnix_uapi::resource_limits::Resource;
 use starnix_uapi::signals::{SIGBUS, SIGSEGV};
 use starnix_uapi::user_address::{UserAddress, UserCString, UserRef};
 use starnix_uapi::user_buffer::{UserBuffer, UserBuffers};
+use starnix_uapi::user_value::UserValue;
 use starnix_uapi::{
     errno, error, MADV_DOFORK, MADV_DONTFORK, MADV_DONTNEED, MADV_KEEPONFORK, MADV_NOHUGEPAGE,
     MADV_NORMAL, MADV_WILLNEED, MADV_WIPEONFORK, MREMAP_DONTUNMAP, MREMAP_FIXED, MREMAP_MAYMOVE,
@@ -261,7 +262,7 @@ pub enum MappingName {
     Vvar,
 
     /// The file backing this mapping.
-    File(NamespaceNode),
+    File(ActiveNamespaceNode),
 
     /// The name associated with the mapping. Set by prctl(PR_SET_VMA, PR_SET_VMA_ANON_NAME, ...).
     /// An empty name is distinct from an unnamed mapping. Mappings are initially created with no
@@ -546,12 +547,11 @@ impl PrivateAnonymousMemoryManager {
         let dest_memory_offset = dest.ptr() as u64;
         let source_memory_offset = source.start.ptr() as u64;
         self.backing
-            .transfer_data(
+            .memmove(
                 fuchsia_zircon::TransferDataOptions::empty(),
                 dest_memory_offset,
-                length.try_into().unwrap(),
-                &self.backing,
                 source_memory_offset,
+                length.try_into().unwrap(),
             )
             .map_err(impossible_error)?;
         Ok(())
@@ -614,7 +614,7 @@ fn map_in_vmar(
     vmar: &zx::Vmar,
     vmar_info: &zx::VmarInfo,
     addr: DesiredAddress,
-    memory: &Arc<MemoryObject>,
+    memory: &MemoryObject,
     memory_offset: u64,
     length: usize,
     flags: MappingFlags,
@@ -684,7 +684,7 @@ impl MemoryManagerState {
     fn map_internal(
         &self,
         addr: DesiredAddress,
-        memory: &Arc<MemoryObject>,
+        memory: &MemoryObject,
         memory_offset: u64,
         length: usize,
         flags: MappingFlags,
@@ -820,6 +820,7 @@ impl MemoryManagerState {
         #[cfg(feature = "alternate_anon_allocs")]
         if !options.contains(MappingOptions::SHARED) {
             return self.map_private_anonymous(
+                mm,
                 addr,
                 length,
                 prot_flags,
@@ -1141,6 +1142,7 @@ impl MemoryManagerState {
                     let growth_length = dst_length - src_length;
 
                     self.map_private_anonymous(
+                        mm,
                         DesiredAddress::FixedOverwrite(growth_start_addr),
                         growth_length,
                         src_mapping.flags.prot_flags(),
@@ -2317,7 +2319,11 @@ pub trait MemoryAccessorExt: MemoryAccessor {
     /// Read exactly `iovec_count` `UserBuffer`s from `iovec_addr`.
     ///
     /// Fails if `iovec_count` is greater than `UIO_MAXIOV`.
-    fn read_iovec(&self, iovec_addr: UserAddress, iovec_count: i32) -> Result<UserBuffers, Errno> {
+    fn read_iovec(
+        &self,
+        iovec_addr: UserAddress,
+        iovec_count: UserValue<i32>,
+    ) -> Result<UserBuffers, Errno> {
         let iovec_count: usize = iovec_count.try_into().map_err(|_| errno!(EINVAL))?;
         if iovec_count > UIO_MAXIOV as usize {
             return error!(EINVAL);
@@ -2339,7 +2345,7 @@ pub trait MemoryAccessorExt: MemoryAccessor {
         let mut index = 0;
         loop {
             // This operation should never overflow: we should fail to read before that.
-            let addr = string.addr().checked_add(index).ok_or(errno!(EFAULT))?;
+            let addr = string.addr().checked_add(index).ok_or_else(|| errno!(EFAULT))?;
             let read = self.read_memory_partial_until_null_byte(
                 addr,
                 &mut buf.spare_capacity_mut()[index..][..chunk_size],
@@ -2973,7 +2979,7 @@ impl MemoryManager {
         }
 
         fn snapshot_memory(
-            memory: &Arc<MemoryObject>,
+            memory: &MemoryObject,
             size: u64,
             rights: zx::Rights,
         ) -> Result<Arc<MemoryObject>, Errno> {

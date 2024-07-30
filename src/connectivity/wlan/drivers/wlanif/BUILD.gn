@@ -48,7 +48,18 @@ all_deps = [
 source_set("lib_source") {
   public = all_hdrs
   sources = all_src
-  public_deps = all_deps
+  public_deps = all_deps + [ "//src/connectivity/wlan/lib/mlme/fullmac/c-binding:wlan-fullmac-mlme-c" ]
+  include_dirs = [ "src/connectivity/wlan/drivers/wlanif/" ]
+
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
+  configs += [ "//build/config:Wno-conversion" ]
+}
+
+source_set("lib_source_mlme_stub") {
+  testonly = true
+  public = all_hdrs
+  sources = all_src
+  public_deps = all_deps + [ "//src/connectivity/wlan/lib/mlme/fullmac/c-binding:wlan-fullmac-mlme-c-stub" ]
   include_dirs = [ "src/connectivity/wlan/drivers/wlanif/" ]
 
   # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
@@ -56,7 +67,7 @@ source_set("lib_source") {
 }
 
 driver_bind_rules("wlanif_bind") {
-  rules = "wlanif.bind"
+  rules = "meta/wlanif.bind"
   bind_output = "wlanif.bindbc"
   deps = [ "//sdk/fidl/fuchsia.wlan.fullmac:fuchsia.wlan.fullmac_bindlib" ]
 }
@@ -72,7 +83,7 @@ fuchsia_driver_component("wlanif_driver") {
   component_name = "wlanif"
   manifest = "meta/wlanif.cml"
   deps = [ ":wlanif_driver-driver" ]
-  info = "wlanif_driver-info.json"
+  info = "meta/wlanif_driver-info.json"
 }
 
 fuchsia_driver_package("wlanif") {

@@ -81,6 +81,7 @@ pub struct Transformer {
     logging: bool,
     logging_blocking: bool,
     logging_tags: LoggingTags,
+    logging_include_file_line: bool,
     panic_prefix: LitStr,
     interest: Interest,
     add_test_attr: bool,
@@ -92,6 +93,7 @@ struct Args {
     logging: bool,
     logging_blocking: bool,
     logging_tags: LoggingTags,
+    logging_include_file_line: bool,
     interest: Interest,
     panic_prefix: Option<LitStr>,
     add_test_attr: bool,
@@ -239,6 +241,7 @@ impl Parse for Args {
             logging: true,
             logging_blocking: false,
             logging_tags: LoggingTags::default(),
+            logging_include_file_line: false,
             panic_prefix: None,
             interest: Interest::default(),
             add_test_attr: true,
@@ -256,6 +259,9 @@ impl Parse for Args {
                 "logging" => args.logging = get_bool_arg(&input, true)?,
                 "logging_blocking" => args.logging_blocking = get_bool_arg(&input, true)?,
                 "logging_tags" => args.logging_tags = get_logging_tags(&input)?,
+                "always_log_file_line" => {
+                    args.logging_include_file_line = get_bool_arg(&input, true)?
+                }
                 "logging_minimum_severity" => args.interest = get_interest_arg(&input)?,
                 "logging_panic_prefix" => args.panic_prefix = Some(get_arg(&input)?),
                 "add_test_attr" => args.add_test_attr = get_bool_arg(&input, true)?,
@@ -328,6 +334,7 @@ impl Transformer {
             logging: args.logging,
             logging_blocking: args.logging_blocking,
             logging_tags: args.logging_tags,
+            logging_include_file_line: args.logging_include_file_line,
             panic_prefix,
             interest: args.interest,
             add_test_attr: args.add_test_attr,
@@ -347,6 +354,7 @@ impl Finish for Transformer {
         let block = self.block;
         let inputs = self.sig.inputs;
         let logging_blocking = self.logging_blocking;
+        let always_log_file_line = self.logging_include_file_line;
         let mut logging_tags = self.logging_tags;
         let panic_prefix = self.panic_prefix;
         let interest = self.interest;
@@ -362,6 +370,7 @@ impl Finish for Transformer {
                 ::fuchsia::LoggingOptions {
                     blocking: #logging_blocking,
                     interest: #interest,
+                    always_log_file_line: #always_log_file_line,
                     tags: &[#logging_tags],
                     panic_prefix: #panic_prefix,
                 }
@@ -376,6 +385,7 @@ impl Finish for Transformer {
                 ::fuchsia::LoggingOptions {
                     blocking: #logging_blocking,
                     interest: #interest,
+                    always_log_file_line: #always_log_file_line,
                     tags: &[#logging_tags],
                     panic_prefix: #panic_prefix,
                 }

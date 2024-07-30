@@ -89,7 +89,6 @@ closed protocol Stack {
     /// its own API at some point.
     ///
     /// Bridge lifetime is controlled through the `bridge` handle.
-    // TODO(https://fxbug.dev/42167696): Redesign and re-home this.
     strict BridgeInterfaces(resource struct {
         interfaces vector<fuchsia.net.InterfaceId>:MAX;
         bridge server_end:fuchsia.net.interfaces.admin.Control;

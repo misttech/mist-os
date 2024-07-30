@@ -18,9 +18,22 @@ void ResolveStep::RunImpl() {
   // In a single pass:
   // (1) parse all references into keys/contextuals;
   // (2) insert reference edges into the graph.
-  library()->TraverseElements([&](Element* element) {
+  library()->ForEachElement([&](Element* element) {
     VisitElement(element, Context(Context::Mode::kParseAndInsert, element));
   });
+
+  // Add edges from protocols to result unions to stop result unions from being
+  // shared between decomposed methods. This lets us mutate the result union (to
+  // remove the framework error) when compiling methods in the CompileStep. The
+  // edge has to come from the protocol, not the method, because in a protocol
+  // like `open(added=2) protocol Foo { Bar() -> () error uint32; }`, Bar ends
+  // up getting split at 2 even though 2 is not in Bar's set of points.
+  for (auto& protocol : library()->declarations.protocols) {
+    for (auto& method : protocol->methods) {
+      if (method.maybe_result_union)
+        graph_[protocol.get()].neighbors.insert(method.maybe_result_union);
+    }
+  }
 
   // Add all elements of this library to the graph, with membership edges.
   for (auto& entry : library()->declarations.all) {
@@ -29,7 +42,8 @@ void ResolveStep::RunImpl() {
     // initialize its points in the next loop, and (2) we can always recursively
     // look up a neighbor in the graph, even if it has out-degree zero.
     graph_.try_emplace(decl);
-    decl->ForEachMember([this, &decl](Element* member) { graph_[member].neighbors.insert(decl); });
+    decl->ForEachEdge(
+        [&](Element* parent, Element* child) { graph_[child].neighbors.insert(parent); });
   }
 
   // Initialize point sets for each element in the graph.
@@ -102,7 +116,7 @@ void ResolveStep::RunImpl() {
   library()->declarations = std::move(decomposed_declarations);
 
   // Resolve all references and validate them.
-  library()->TraverseElements([&](Element* element) {
+  library()->ForEachElement([&](Element* element) {
     VisitElement(element, Context(Context::Mode::kResolveAndValidate, element));
   });
 }
@@ -209,6 +223,7 @@ void ResolveStep::VisitElement(Element* element, Context context) {
     }
     case Element::Kind::kBuiltin:
     case Element::Kind::kLibrary:
+    case Element::Kind::kModifier:
     case Element::Kind::kProtocol:
     case Element::Kind::kService:
     case Element::Kind::kStruct:
@@ -589,25 +604,43 @@ void ResolveStep::ResolveKeyReference(Reference& ref, Context context) {
   ref.ResolveTo(Reference::Target(member, decl));
 }
 
+static std::vector<std::pair<VersionRange, SourceSpan>> BuildCandidatesInfo(
+    std::multimap<std::string_view, Decl*>::const_iterator begin,
+    std::multimap<std::string_view, Decl*>::const_iterator end) {
+  std::vector<std::pair<VersionRange, SourceSpan>> info;
+  for (auto it = begin; it != end; ++it) {
+    auto decl = it->second;
+    auto span = decl->GetNameSource();
+    auto range = decl->availability.range().pair();
+    if (range.first == Version::kLegacy)
+      continue;
+    if (!info.empty() && info.back().second == span &&
+        info.back().first.pair().second == range.first) {
+      info.back().first.pair().second = range.second;
+    } else {
+      info.emplace_back(VersionRange(range.first, range.second), span);
+    }
+  }
+  return info;
+}
+
 Decl* ResolveStep::LookupDeclByKey(const Reference& ref, Context context) {
   auto key = ref.key();
   auto [begin, end] = key.library->declarations.all.equal_range(key.decl_name);
   ZX_ASSERT_MSG(begin != end, "key must exist");
   auto platform = key.library->platform.value();
+  auto source_range = context.enclosing->availability.range();
   // Case #1: source and target libraries are versioned in the same platform.
   if (library()->platform == platform) {
     for (auto it = begin; it != end; ++it) {
       auto decl = it->second;
-      auto us = context.enclosing->availability.range();
-      auto them = decl->availability.range();
-      if (auto overlap = VersionRange::Intersect(us, them)) {
-        ZX_ASSERT_MSG(overlap.value() == us, "referencee must outlive referencer");
+      if (auto overlap = VersionRange::Intersect(source_range, decl->availability.range())) {
+        ZX_ASSERT_MSG(overlap.value() == source_range, "referencee must outlive referencer");
         return decl;
       }
     }
-    // TODO(https://fxbug.dev/42146818): Provide a nicer error message in the case where a
-    // decl with that name does exist, but in a different version range.
-    reporter()->Fail(ErrNameNotFound, ref.span(), key.decl_name, key.library);
+    reporter()->Fail(ErrNameNotFoundInVersionRange, ref.span(), key.decl_name, key.library,
+                     source_range, BuildCandidatesInfo(begin, end));
     return nullptr;
   }
   // Case #2: source and target libraries are versioned in different platforms.
@@ -620,7 +653,8 @@ Decl* ResolveStep::LookupDeclByKey(const Reference& ref, Context context) {
   }
   // TODO(https://fxbug.dev/42146818): Provide a nicer error message in the case where
   // a decl with that name does exist, but in a different version range.
-  reporter()->Fail(ErrNameNotFound, ref.span(), key.decl_name, key.library);
+  reporter()->Fail(ErrNameNotFoundInVersionRange, ref.span(), key.decl_name, key.library,
+                   VersionRange(version, version.Successor()), BuildCandidatesInfo(begin, end));
   return nullptr;
 }
 

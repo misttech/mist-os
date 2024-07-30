@@ -6,6 +6,7 @@
 #define SRC_STORAGE_F2FS_VNODE_H_
 
 #include "src/storage/f2fs/bitmap.h"
+#include "src/storage/f2fs/dir_entry_cache.h"
 #include "src/storage/f2fs/file_cache.h"
 #include "src/storage/f2fs/timestamp.h"
 #include "src/storage/f2fs/vmo_manager.h"
@@ -342,6 +343,7 @@ class VnodeF2fs : public fs::PagedVnode,
   }
   void SetOrphan() __TA_EXCLUDES(mutex_);
 
+  DirEntryCache &GetDirEntryCache() { return dir_entry_cache_; }
   VmoManager &GetVmoManager() { return vmo_manager(); }
   const VmoManager &GetVmoManager() const { return vmo_manager(); }
   block_t GetReadBlockSize(block_t start_block, block_t req_size, block_t end_block);
@@ -389,6 +391,7 @@ class VnodeF2fs : public fs::PagedVnode,
       __TA_REQUIRES(mutex_);
   void SetPagedVmoName() __TA_REQUIRES(mutex_);
 
+  DirEntryCache dir_entry_cache_;
   std::unique_ptr<VmoManager> vmo_manager_;
   std::unique_ptr<FileCache> file_cache_;
 

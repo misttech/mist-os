@@ -101,7 +101,7 @@ PhysBootTimes gBootTimes;
   // Use the putative eventual virtual address to relocate the kernel.
   const uint64_t kernel_vaddr = kArchHandoffVirtualAddress;
 
-  Allocation loaded_elf_kernel = elf_kernel.Load(kernel_vaddr);
+  Allocation loaded_elf_kernel = elf_kernel.Load(memalloc::Type::kKernel, kernel_vaddr);
 
   const ArchPatchInfo patch_info = ArchPreparePatchInfo();
   PatchElfKernel(elf_kernel, patch_info);

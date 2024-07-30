@@ -6,7 +6,7 @@
 use crate::checksum::Checksums;
 use crate::lsm_tree::types::{
     FuzzyHash, Item, ItemRef, LayerKey, MergeType, OrdLowerBound, OrdUpperBound, RangeKey,
-    SortByU64,
+    SortByU64, Value,
 };
 use crate::object_store::extent_record::{
     ExtentKey, ExtentKeyPartitionIterator, ExtentKeyV32, ExtentValue, ExtentValueV32,
@@ -573,6 +573,9 @@ pub struct FsverityMetadataV33 {
 /// Note that the tree stores deltas on objects, so these values describe deltas. Unless specified
 /// otherwise, a value indicates an insert/replace mutation.
 pub type ObjectValue = ObjectValueV38;
+impl Value for ObjectValue {
+    const DELETED_MARKER: Self = Self::None;
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, TypeFingerprint, Versioned)]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]

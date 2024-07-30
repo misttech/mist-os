@@ -12,10 +12,10 @@ a file named fidl-tags in the root of the source tree for use with your editor.
 See `fx fidltags` for help.
 """
 import argparse
-import sys
 import fnmatch
-import os
 import json
+import os
+import sys
 
 
 class Tag(object):

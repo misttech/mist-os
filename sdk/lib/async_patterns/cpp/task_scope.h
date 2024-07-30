@@ -13,44 +13,44 @@
 
 namespace async_patterns {
 
-// |TaskScope| lets you post asynchronous tasks that are silently discarded when
-// the |TaskScope| object is destroyed. In contrast, tasks posted using
-// |async::PostTask|, |async::PostDelayedTask|, and so on will always run unless
-// the dispatcher is shutdown -- there is no separate mechanism to cancel them.
-//
-// The task scope is usually a member of some bigger async business logic
-// object. By associating the lifetime of the posted async tasks with this
-// object, one can conveniently capture or borrow other members from the async
-// tasks without the need for reference counting to achieve memory safety.
-// Example:
-//
-//     class AsyncCounter {
-//      public:
-//       explicit AsyncCounter(async_dispatcher_t* dispatcher) : tasks_(dispatcher) {
-//         // Post some tasks to asynchronously count upwards.
-//         //
-//         // It is okay if |AsyncCounter| is destroyed before some of these tasks
-//         // come due. Those tasks will be discarded so they will not end up accessing
-//         // a destroyed object.
-//         tasks_.Post([this] { count_++ });
-//         tasks_.PostDelayed([this] { count_++ }, zx::sec(1));
-//         tasks_.PostDelayed(fit::bind_member<&AsyncCounter::CheckCount>(this), zx::sec(5));
-//       }
-//
-//       void CheckCount() {
-//         assert(count_ == 2);
-//       }
-//
-//      private:
-//       TaskScope tasks_;
-//       int count_ = 0;
-//     };
-//
-// |TaskScope| is thread-unsafe, and must be used and managed from a
-// [synchronized dispatcher][synchronized-dispatcher].
-//
-// [synchronized-dispatcher]:
-// https://fuchsia.dev/fuchsia-src/development/languages/c-cpp/thread-safe-async#synchronized-dispatcher
+/// |TaskScope| lets you post asynchronous tasks that are silently discarded when
+/// the |TaskScope| object is destroyed. In contrast, tasks posted using
+/// |async::PostTask|, |async::PostDelayedTask|, and so on will always run unless
+/// the dispatcher is shutdown -- there is no separate mechanism to cancel them.
+///
+/// The task scope is usually a member of some bigger async business logic
+/// object. By associating the lifetime of the posted async tasks with this
+/// object, one can conveniently capture or borrow other members from the async
+/// tasks without the need for reference counting to achieve memory safety.
+/// Example:
+///
+///     class AsyncCounter {
+///      public:
+///       explicit AsyncCounter(async_dispatcher_t* dispatcher) : tasks_(dispatcher) {
+///         // Post some tasks to asynchronously count upwards.
+///         //
+///         // It is okay if |AsyncCounter| is destroyed before some of these tasks
+///         // come due. Those tasks will be discarded so they will not end up accessing
+///         // a destroyed object.
+///         tasks_.Post([this] { count_++ });
+///         tasks_.PostDelayed([this] { count_++ }, zx::sec(1));
+///         tasks_.PostDelayed(fit::bind_member<&AsyncCounter::CheckCount>(this), zx::sec(5));
+///       }
+///
+///       void CheckCount() {
+///         assert(count_ == 2);
+///       }
+///
+///      private:
+///       TaskScope tasks_;
+///       int count_ = 0;
+///     };
+///
+/// |TaskScope| is thread-unsafe, and must be used and managed from a
+/// [synchronized dispatcher][synchronized-dispatcher].
+///
+/// [synchronized-dispatcher]:
+/// https://fuchsia.dev/fuchsia-src/development/languages/c-cpp/thread-safe-async#synchronized-dispatcher
 class TaskScope {
  private:
   // |F| must take zero arguments ard return void.
@@ -58,54 +58,54 @@ class TaskScope {
   using require_nullary_fn = std::enable_if_t<std::is_void_v<std::invoke_result_t<F>>>;
 
  public:
-  // Creates a |TaskScope| that will post all tasks to the provided |dispatcher|.
+  /// Creates a |TaskScope| that will post all tasks to the provided |dispatcher|.
   explicit TaskScope(async_dispatcher_t* dispatcher);
 
-  // Destroying the |TaskScope| synchronously destroys all pending tasks. If a
-  // task attempts to reentrantly post more tasks into the |TaskScope| within
-  // its destructor, those tasks will be synchronously destroyed too.
+  /// Destroying the |TaskScope| synchronously destroys all pending tasks. If a
+  /// task attempts to reentrantly post more tasks into the |TaskScope| within
+  /// its destructor, those tasks will be synchronously destroyed too.
   ~TaskScope();
 
-  // Schedules to invoke |handler| with a deadline of now.
-  //
-  // |handler| should be a |void()| callable object.
-  //
-  // The handler will not run if |TaskScope| is destroyed before it comes due.
-  // The handler will not run if the dispatcher shuts down before it comes due.
-  // In both cases, the handler will be synchronously destroyed during task scope
-  // destruction/dispatcher shutdown.
-  //
-  // This is a drop-in replacement for |async::PostTask|.
+  /// Schedules to invoke |handler| with a deadline of now.
+  ///
+  /// |handler| should be a |void()| callable object.
+  ///
+  /// The handler will not run if |TaskScope| is destroyed before it comes due.
+  /// The handler will not run if the dispatcher shuts down before it comes due.
+  /// In both cases, the handler will be synchronously destroyed during task scope
+  /// destruction/dispatcher shutdown.
+  ///
+  /// This is a drop-in replacement for |async::PostTask|.
   template <typename Closure>
   require_nullary_fn<Closure> Post(Closure&& handler) {
     PostImpl(internal::Task::Box(std::forward<Closure>(handler)));
   }
 
-  // Schedules to invoke |handler| with a deadline expressed as a |delay| from now.
-  //
-  // |handler| should be a |void()| callable object.
-  //
-  // The handler will not run if |TaskScope| is destroyed before it comes due.
-  // The handler will not run if the dispatcher shuts down before it comes due.
-  // In both cases, the handler will be synchronously destroyed during task scope
-  // destruction/dispatcher shutdown.
-  //
-  // This is a drop-in replacement for |async::PostDelayedTask|.
+  /// Schedules to invoke |handler| with a deadline expressed as a |delay| from now.
+  ///
+  /// |handler| should be a |void()| callable object.
+  ///
+  /// The handler will not run if |TaskScope| is destroyed before it comes due.
+  /// The handler will not run if the dispatcher shuts down before it comes due.
+  /// In both cases, the handler will be synchronously destroyed during task scope
+  /// destruction/dispatcher shutdown.
+  ///
+  /// This is a drop-in replacement for |async::PostDelayedTask|.
   template <typename Closure>
   require_nullary_fn<Closure> PostDelayed(Closure&& handler, zx::duration delay) {
     PostImpl(DelayedTask::Box(std::forward<Closure>(handler), this), delay);
   }
 
-  // Schedules to invoke |handler| with the specified |deadline|.
-  //
-  // |handler| should be a |void()| callable object.
-  //
-  // The handler will not run if |TaskScope| is destroyed before it comes due.
-  // The handler will not run if the dispatcher shuts down before it comes due.
-  // In both cases, the handler will be synchronously destroyed during task scope
-  // destruction/dispatcher shutdown.
-  //
-  // This is a drop-in replacement for |async::PostTaskForTime|.
+  /// Schedules to invoke |handler| with the specified |deadline|.
+  ///
+  /// |handler| should be a |void()| callable object.
+  ///
+  /// The handler will not run if |TaskScope| is destroyed before it comes due.
+  /// The handler will not run if the dispatcher shuts down before it comes due.
+  /// In both cases, the handler will be synchronously destroyed during task scope
+  /// destruction/dispatcher shutdown.
+  ///
+  /// This is a drop-in replacement for |async::PostTaskForTime|.
   template <typename Closure>
   require_nullary_fn<Closure> PostForTime(Closure&& handler, zx::time deadline) {
     PostImpl(DelayedTask::Box(std::forward<Closure>(handler), this), deadline);

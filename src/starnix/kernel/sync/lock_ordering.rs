@@ -26,13 +26,11 @@ lock_ordering! {
     // Artificial level for several FileOps and FsNodeOps method forming a connected group
     // because of dependencies between them: FileOps.read, FsNode.create_file_ops, ...
     DeviceOpen => FileOpsCore,
-    // Artificial level for {FileOps, SocketOps}.write(..)
-    FileOpsCore => WriteOps,
     // ProcessGroup.mutable_state. Artificial locks above need to be before it because of
     // dependencies in DevPtsFile.{read, write, ioctl}.
-    WriteOps => ProcessGroupState,
+    FileOpsCore => ProcessGroupState,
     // Bpf locks
-    WriteOps => BpfHelperOps,
+    FileOpsCore => BpfHelperOps,
     BpfHelperOps => BpfMapEntries,
     // Artificial level for methods in FsNodeOps/FileOps that require access to the
     // FsNode.append_lock

@@ -52,6 +52,9 @@ import("//build/rust/rustc_test.gni")
 #     List of GN config targets to pass to the compilation of this crate's
 #     tests.
 #
+#   test_vars (optional)
+#     A scope of variables to forward to the test target.
+#
 #   test_deps (optional)
 #     List of rust_library GN targets on which this crate's tests depend.
 #

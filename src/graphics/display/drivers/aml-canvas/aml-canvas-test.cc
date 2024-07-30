@@ -71,7 +71,7 @@ class AmlCanvasTest : public testing::Test {
     async::Loop loop{&kAsyncLoopConfigNeverAttachToThread};
     loop.StartThread();
     zx::result result = fdf::RunOnDispatcherSync(loop.dispatcher(), std::move(task));
-    ASSERT_EQ(ZX_OK, result.status_value());
+    ASSERT_OK(result);
   }
 
   zx_status_t CreateNewCanvas() {
@@ -261,7 +261,7 @@ TEST_F(AmlCanvasTest, CanvasConfigFreeMultipleInterleaved) {
 
 TEST_F(AmlCanvasTest, CanvasFreeInvalidIndex) {
   // Free a canvas without having created any.
-  EXPECT_EQ(FreeCanvas(0), ZX_ERR_INVALID_ARGS);
+  EXPECT_STATUS(FreeCanvas(0), ZX_ERR_INVALID_ARGS);
 }
 
 TEST_F(AmlCanvasTest, CanvasConfigMaxLimit) {
@@ -272,7 +272,7 @@ TEST_F(AmlCanvasTest, CanvasConfigMaxLimit) {
   }
 
   // Try to create another canvas, and verify that it fails.
-  EXPECT_EQ(CreateNewCanvas(), ZX_ERR_NOT_FOUND);
+  EXPECT_STATUS(CreateNewCanvas(), ZX_ERR_NOT_FOUND);
 
   EXPECT_OK(FreeAllCanvases());
 }
@@ -280,7 +280,7 @@ TEST_F(AmlCanvasTest, CanvasConfigMaxLimit) {
 TEST_F(AmlCanvasTest, CanvasConfigUnaligned) {
   // Try to create a canvas with unaligned fuchsia_hardware_amlogiccanvas::wire::CanvasInfo width,
   // and verify that it fails.
-  EXPECT_EQ(CreateNewCanvasInvalid(), ZX_ERR_INVALID_ARGS);
+  EXPECT_STATUS(CreateNewCanvasInvalid(), ZX_ERR_INVALID_ARGS);
 }
 
 }  // namespace

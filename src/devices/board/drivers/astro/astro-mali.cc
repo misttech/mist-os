@@ -7,11 +7,9 @@
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
 #include <lib/ddk/binding.h>
 #include <lib/ddk/debug.h>
-#include <lib/ddk/platform-defs.h>
 #include <lib/driver/component/cpp/composite_node_spec.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 
-#include <bind/fuchsia/amlogic/platform/cpp/bind.h>
 #include <bind/fuchsia/amlogic/platform/meson/cpp/bind.h>
 #include <bind/fuchsia/arm/platform/cpp/bind.h>
 #include <bind/fuchsia/clock/cpp/bind.h>
@@ -73,9 +71,9 @@ zx_status_t Astro::MaliInit() {
   {
     fpbus::Node aml_gpu_dev;
     aml_gpu_dev.name() = "aml_gpu";
-    aml_gpu_dev.vid() = PDEV_VID_AMLOGIC;
-    aml_gpu_dev.pid() = PDEV_PID_AMLOGIC_S905D2;
-    aml_gpu_dev.did() = PDEV_DID_AMLOGIC_MALI_INIT;
+    aml_gpu_dev.vid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_VID_AMLOGIC;
+    aml_gpu_dev.pid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_PID_S905D2;
+    aml_gpu_dev.did() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_MALI_INIT;
     aml_gpu_dev.mmio() = aml_gpu_mmios;
 
     using fuchsia_hardware_gpu_amlogic::wire::Metadata;
@@ -157,9 +155,9 @@ zx_status_t Astro::MaliInit() {
   {
     fpbus::Node mali_dev;
     mali_dev.name() = "mali";
-    mali_dev.vid() = PDEV_VID_ARM;
-    mali_dev.pid() = PDEV_PID_GENERIC;
-    mali_dev.did() = PDEV_DID_ARM_MAGMA_MALI;
+    mali_dev.vid() = bind_fuchsia_arm_platform::BIND_PLATFORM_DEV_VID_ARM;
+    mali_dev.pid() = bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC;
+    mali_dev.did() = bind_fuchsia_arm_platform::BIND_PLATFORM_DEV_DID_MAGMA_MALI;
     mali_dev.mmio() = mali_mmios;
     mali_dev.irq() = mali_irqs;
     mali_dev.bti() = mali_btis;

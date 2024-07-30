@@ -12,6 +12,7 @@
 #include <limits>
 #include <type_traits>
 #include <utility>
+#include <variant>
 
 #ifndef LIB_IOB_BLOB_ID_ALLOCATOR_H_
 #define LIB_IOB_BLOB_ID_ALLOCATOR_H_
@@ -290,14 +291,14 @@ class BlobIdAllocator {
   IterableView iterable() { return IterableView(this); }
 
   // The next ID to be allocated.
-  uint32_t next_id() const { return header().load(std::memory_order_relaxed).next_id; }
+  uint32_t next_id() const { return self()->header().load(std::memory_order_relaxed).next_id; }
 
   // The remaining number of available bytes in the allocator (including those
   // that might be used for bookkeeping). fit::failed() is returned in the case
   // of an invalid header (see `AllocateError::kInvalidHeader` for more
   // detail).
   fit::result<fit::failed, size_t> RemainingBytes() const {
-    return header().load(std::memory_order_relaxed).RemainingBytes(bytes_.size());
+    return self()->header().load(std::memory_order_relaxed).RemainingBytes(bytes_.size());
   }
 
   // Attempts to store the provided blob and allocate its ID.
@@ -373,7 +374,7 @@ class BlobIdAllocator {
 
   // Returns the blob corresponding to a given ID.
   fit::result<BlobError, cpp20::span<const std::byte>> GetBlob(uint32_t id) const {
-    Header hdr = header().load(std::memory_order_relaxed);
+    Header hdr = self()->header().load(std::memory_order_relaxed);
     if (!hdr.IsValid(bytes_.size())) [[unlikely]] {
       return fit::error{BlobError::kInvalidHeader};
     }
@@ -386,7 +387,7 @@ class BlobIdAllocator {
     //     blob.
     // (2) The read of the index stays ordered after previous updates, which
     //     were written with release semantics.
-    Index index = GetIndex(id).load(std::memory_order_acquire);
+    Index index = self()->GetIndex(id).load(std::memory_order_acquire);
     if (index.size == 0 && index.offset == 0) [[unlikely]] {
       return fit::error{BlobError::kUncommittedIndex};
     }
@@ -421,6 +422,11 @@ class BlobIdAllocator {
     uint32_t blob_head;
   };
 
+  // TODO(https://fxbug.dev/354716628): commented to unblock clang roll.
+  // TODO(https://github.com/llvm/llvm-project/pull/99570): Re-enable when libcxx underlying
+  // implementation of `atomic_ref<T>` calculates `is_always_lockfree` appropriately.
+  // static_assert(cpp20::atomic_ref<Index>::is_always_lock_free);
+
   // Represents a blob bookkeeping index.
   struct alignas(8) Index {
     // See BlobError::kInvalidIndex. The current blob head offset and length
@@ -434,8 +440,14 @@ class BlobIdAllocator {
     uint32_t size;
     uint32_t offset;
   };
+  // TODO(https://fxbug.dev/354716628): commented to unblock clang roll.
+  // TODO(https://github.com/llvm/llvm-project/pull/99570): Re-enable when libcxx underlying
+  // implementation of `atomic_ref<T>` calculates `is_always_lockfree` appropriately.
+  // static_assert(cpp20::atomic_ref<Index>::is_always_lock_free);
 
-  static_assert(cpp20::atomic_ref<Header>::is_always_lock_free);
+  // TODO(https://fxbug.dev/354716628): Remove workaround for const/volatile qualified atomic_ref.
+  BlobIdAllocator* self() const { return const_cast<BlobIdAllocator*>(this); }
+  //  static_assert(cpp20::atomic_ref<uint64_t>::is_always_lock_free);
   cpp20::atomic_ref<Header> header() {
     return cpp20::atomic_ref{*reinterpret_cast<Header*>(bytes_.data())};
   }
@@ -444,7 +456,7 @@ class BlobIdAllocator {
     return cpp20::atomic_ref{*reinterpret_cast<const Header*>(bytes_.data())};
   }
 
-  static_assert(cpp20::atomic_ref<Index>::is_always_lock_free);
+  static_assert(cpp20::atomic_ref<Index>::required_alignment == 8);
   cpp20::atomic_ref<Index> GetIndex(uint32_t id) {
     return cpp20::atomic_ref{*reinterpret_cast<Index*>(&bytes_[(id + 1) * sizeof(Index)])};
   }

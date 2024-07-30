@@ -8,8 +8,8 @@ The script to generate CMakeLists.txt file for SDK packages.
 """
 
 import argparse
-import os
 import json
+import os
 import sys
 from dataclasses import dataclass
 from pathlib import Path

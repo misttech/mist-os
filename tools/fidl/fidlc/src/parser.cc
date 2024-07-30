@@ -78,6 +78,18 @@ std::nullptr_t Parser::Fail(const ErrorDef<Id, Args...>& err, SourceSpan span,
   return nullptr;
 }
 
+template <typename... Allowlist>
+void Parser::ValidateModifiers(const std::unique_ptr<RawModifierList>& modifiers,
+                               Token decl_token) {
+  for (auto& modifier : modifiers->modifiers) {
+    if (!(std::holds_alternative<Allowlist>(modifier->value) || ...)) {
+      Fail(ErrCannotSpecifyModifier, modifier->token, modifier->token.kind_and_subkind(),
+           decl_token.kind_and_subkind());
+      RecoverOneError();
+    }
+  }
+}
+
 std::unique_ptr<RawIdentifier> Parser::ParseIdentifier() {
   ASTScope scope(this);
   std::optional<Token> token = ConsumeToken(OfKind(Token::Kind::kIdentifier));
@@ -229,6 +241,14 @@ std::unique_ptr<RawAttributeArg> Parser::ParseSubsequentAttributeArg() {
   if (!Ok())
     return Fail();
 
+  switch (Peek().kind()) {
+    case Token::Kind::kComma:
+    case Token::Kind::kRightParen:
+      return Fail(ErrAttributeArgsMustAllBeNamed);
+    default:
+      break;
+  }
+
   ConsumeToken(OfKind(Token::Kind::kEqual));
   if (!Ok())
     return Fail();
@@ -252,94 +272,100 @@ std::unique_ptr<RawAttribute> Parser::ParseAttribute() {
     return Fail();
 
   std::vector<std::unique_ptr<RawAttributeArg>> args;
-  if (MaybeConsumeToken(OfKind(Token::Kind::kLeftParen))) {
-    if (Peek().kind() == Token::Kind::kRightParen) {
-      return Fail(ErrAttributeWithEmptyParens);
-    }
+  ParseAttributeArgs(&args);
+  if (!Ok())
+    return Fail();
 
-    // There are two valid syntaxes for attribute arg lists: single arg lists contain just the
-    // arg constant by itself, like so:
-    //
-    //  @foo("bar") // Literal constant
-    //  @baz(qux)   // Identifier constant
-    //
-    // Conversely, multi-argument lists must name each argument, like so:
-    //
-    //   @foo(a="bar",b=qux)
-    //
-    // To resolve this ambiguity, we will speculatively parse the first token encountered as a
-    // constant.  If it is followed by a close paren, we know that we are in the single-arg case,
-    // and that this parsing is correct.  If is instead followed by an equal sign, we know that this
-    // is the multi-arg case, and we will extract the identifier from the constant to be used as the
-    // name token for the first arg in the list.
-    ASTScope arg_scope(this);
-    auto maybe_constant = ParseConstant();
-    if (!Ok())
-      return Fail();
+  return std::make_unique<RawAttribute>(scope.GetSourceElement(),
+                                        RawAttribute::Provenance::kDefault, std::move(name),
+                                        std::move(args));
+}
 
-    switch (Peek().kind()) {
-      case Token::Kind::kRightParen: {
-        // This attribute has a single, unnamed argument.
-        args.emplace_back(std::make_unique<RawAttributeArg>(arg_scope.GetSourceElement(),
-                                                            std::move(maybe_constant)));
-        ConsumeToken(OfKind(Token::Kind::kRightParen));
-        if (!Ok())
-          return Fail();
-        break;
-      }
-      case Token::Kind::kComma: {
-        // Common error case: multiple arguments, but the first one is not named
-        return Fail(ErrAttributeArgsMustAllBeNamed);
-      }
-      case Token::Kind::kEqual: {
-        // This attribute has multiple arguments.
-        if (maybe_constant->kind != RawConstant::Kind::kIdentifier) {
-          return Fail(ErrInvalidIdentifier, maybe_constant->span().data());
-        }
-        auto constant = static_cast<RawIdentifierConstant*>(maybe_constant.get());
-        if (constant->identifier->components.size() > 1) {
-          return Fail(ErrInvalidIdentifier, maybe_constant->span().data());
-        }
-
-        ConsumeToken(OfKind(Token::Kind::kEqual));
-        if (!Ok())
-          return Fail();
-
-        auto arg_name = std::move(constant->identifier->components.front());
-        auto value = ParseConstant();
-        if (!Ok())
-          return Fail();
-
-        args.emplace_back(std::make_unique<RawAttributeArg>(arg_scope.GetSourceElement(),
-                                                            std::move(arg_name), std::move(value)));
-        while (Peek().kind() == Token::Kind::kComma) {
-          ConsumeToken(OfKind(Token::Kind::kComma));
-          if (!Ok())
-            return Fail();
-
-          auto arg = ParseSubsequentAttributeArg();
-          if (!Ok()) {
-            const auto result = RecoverToEndOfAttributeArg();
-            if (result == RecoverResult::Failure) {
-              return Fail();
-            }
-          }
-          args.emplace_back(std::move(arg));
-        }
-        if (!Ok())
-          Fail();
-
-        ConsumeToken(OfKind(Token::Kind::kRightParen));
-        if (!Ok())
-          return Fail();
-        break;
-      }
-      default:
-        return Fail();
-    }
+void Parser::ParseAttributeArgs(std::vector<std::unique_ptr<RawAttributeArg>>* out_args) {
+  if (!MaybeConsumeToken(OfKind(Token::Kind::kLeftParen)))
+    return;
+  if (Peek().kind() == Token::Kind::kRightParen) {
+    Fail(ErrAttributeWithEmptyParens);
+    return;
   }
 
-  return std::make_unique<RawAttribute>(scope.GetSourceElement(), std::move(name), std::move(args));
+  // There are two valid syntaxes for attribute arg lists: single arg lists contain just the
+  // arg constant by itself, like so:
+  //
+  //  @foo("bar") // Literal constant
+  //  @baz(qux)   // Identifier constant
+  //
+  // Conversely, multi-argument lists must name each argument, like so:
+  //
+  //   @foo(a="bar",b=qux)
+  //
+  // To resolve this ambiguity, we will speculatively parse the first token encountered as a
+  // constant.  If it is followed by a close paren, we know that we are in the single-arg case,
+  // and that this parsing is correct.  If is instead followed by an equal sign, we know that
+  // this is the multi-arg case, and we will extract the identifier from the constant to be used
+  // as the name token for the first arg in the list.
+  ASTScope arg_scope(this);
+  auto maybe_constant = ParseConstant();
+  if (!Ok())
+    return;
+
+  switch (Peek().kind()) {
+    case Token::Kind::kRightParen: {
+      // This attribute has a single, unnamed argument.
+      out_args->emplace_back(std::make_unique<RawAttributeArg>(arg_scope.GetSourceElement(),
+                                                               std::move(maybe_constant)));
+      ConsumeToken(OfKind(Token::Kind::kRightParen));
+      break;
+    }
+    case Token::Kind::kComma: {
+      // Common error case: multiple arguments, but the first one is not named
+      Fail(ErrAttributeArgsMustAllBeNamed);
+      break;
+    }
+    case Token::Kind::kEqual: {
+      // This attribute has multiple arguments.
+      if (maybe_constant->kind != RawConstant::Kind::kIdentifier) {
+        Fail(ErrInvalidIdentifier, maybe_constant->span().data());
+        return;
+      }
+      auto constant = static_cast<RawIdentifierConstant*>(maybe_constant.get());
+      if (constant->identifier->components.size() > 1) {
+        Fail(ErrInvalidIdentifier, maybe_constant->span().data());
+        return;
+      }
+
+      ConsumeToken(OfKind(Token::Kind::kEqual));
+      if (!Ok())
+        return;
+
+      auto arg_name = std::move(constant->identifier->components.front());
+      auto value = ParseConstant();
+      if (!Ok())
+        return;
+
+      out_args->emplace_back(std::make_unique<RawAttributeArg>(
+          arg_scope.GetSourceElement(), std::move(arg_name), std::move(value)));
+      while (Peek().kind() == Token::Kind::kComma) {
+        ConsumeToken(OfKind(Token::Kind::kComma));
+        if (!Ok())
+          return;
+
+        auto arg = ParseSubsequentAttributeArg();
+        if (!Ok()) {
+          const auto result = RecoverToEndOfAttributeArg();
+          if (result == RecoverResult::Failure)
+            return;
+        }
+        out_args->emplace_back(std::move(arg));
+      }
+      ConsumeToken(OfKind(Token::Kind::kRightParen));
+      break;
+    }
+    default: {
+      Fail();
+      break;
+    }
+  }
 }
 
 std::unique_ptr<RawAttributeList> Parser::ParseAttributeList(
@@ -351,7 +377,7 @@ std::unique_ptr<RawAttributeList> Parser::ParseAttributeList(
   for (;;) {
     auto attribute = ParseAttribute();
     if (!Ok()) {
-      auto result = RecoverToEndOfAttributeNew();
+      auto result = RecoverToEndOfAttribute();
       if (result == RecoverResult::Failure) {
         return Fail();
       }
@@ -398,8 +424,8 @@ std::unique_ptr<RawAttribute> Parser::ParseDocComment() {
   args.emplace_back(
       std::make_unique<RawAttributeArg>(scope.GetSourceElement(), std::move(constant)));
 
-  auto doc_comment_attr = RawAttribute::CreateDocComment(scope.GetSourceElement(), std::move(args));
-  return std::make_unique<RawAttribute>(std::move(doc_comment_attr));
+  return std::make_unique<RawAttribute>(
+      scope.GetSourceElement(), RawAttribute::Provenance::kDocComment, nullptr, std::move(args));
 }
 
 std::unique_ptr<RawAttributeList> Parser::MaybeParseAttributeList() {
@@ -421,23 +447,94 @@ std::unique_ptr<RawAttributeList> Parser::MaybeParseAttributeList() {
   return nullptr;
 }
 
+static ModifierValue GetModifierValue(Token::Subkind subkind) {
+  switch (subkind) {
+    case Token::Subkind::kFlexible:
+      return Strictness::kFlexible;
+    case Token::Subkind::kStrict:
+      return Strictness::kStrict;
+    case Token::Subkind::kResource:
+      return Resourceness::kResource;
+    case Token::Subkind::kClosed:
+      return Openness::kClosed;
+    case Token::Subkind::kAjar:
+      return Openness::kAjar;
+    case Token::Subkind::kOpen:
+      return Openness::kOpen;
+    default:
+      ZX_PANIC("unexpected modifier token");
+  }
+}
+
+std::unique_ptr<RawModifierList> Parser::ParseModifierList(ASTScope& scope, Token first_token) {
+  std::vector<std::unique_ptr<RawModifier>> modifiers;
+
+  auto parse_modifier = [&modifiers, this](ASTScope& scope, Token token) {
+    std::unique_ptr<RawAttribute> availability;
+    {
+      ASTScope attribute_scope(this);
+      std::vector<std::unique_ptr<RawAttributeArg>> args;
+      ParseAttributeArgs(&args);
+      if (!Ok()) {
+        if (RecoverToEndOfAttribute() == RecoverResult::Failure)
+          return;
+      }
+      if (!args.empty()) {
+        availability = std::make_unique<RawAttribute>(
+            attribute_scope.GetSourceElement(), RawAttribute::Provenance::kModifierAvailability,
+            /*name=*/nullptr, std::move(args));
+      }
+    }
+    modifiers.emplace_back(std::make_unique<RawModifier>(scope.GetSourceElement(),
+                                                         GetModifierValue(token.subkind()), token,
+                                                         std::move(availability)));
+  };
+
+  auto next_is_modifier = [this]() {
+    switch (Peek().combined()) {
+      case CASE_IDENTIFIER(Token::Subkind::kStrict):
+      case CASE_IDENTIFIER(Token::Subkind::kFlexible):
+      case CASE_IDENTIFIER(Token::Subkind::kResource):
+      case CASE_IDENTIFIER(Token::Subkind::kClosed):
+      case CASE_IDENTIFIER(Token::Subkind::kAjar):
+      case CASE_IDENTIFIER(Token::Subkind::kOpen):
+        return true;
+      default:
+        return false;
+    }
+  };
+
+  parse_modifier(scope, first_token);
+  if (!Ok())
+    return Fail();
+  while (next_is_modifier()) {
+    ASTScope modifier_scope(this);
+    Token token = ConsumeToken(OfKind(Token::Kind::kIdentifier)).value();
+    parse_modifier(modifier_scope, token);
+    if (!Ok())
+      return Fail();
+  }
+  return std::make_unique<RawModifierList>(scope.GetSourceElement(), std::move(modifiers));
+}
+
 std::unique_ptr<RawConstant> Parser::ParseConstant() {
   std::unique_ptr<RawConstant> constant;
 
   switch (Peek().combined()) {
-  // TODO(https://fxbug.dev/42157590): by placing this before the kIdentifier check below, we are
-  // implicitly
+  // TODO(https://fxbug.dev/42157590): by placing this before the kIdentifier check below, we
+  // are implicitly
   //  stating that the tokens "true" and "false" will always be interpreted as their literal
   //  constants.  Consider the following example:
   //    const true string = "abc";
   //    const foo bool = false; // "false" retains its built-in literal value, so no problem
-  //    const bar bool = true;  // "true" has been redefined as a string type - should this fail?
-  //  We could maintain perfect purity by always treating all tokens, even "true" and "false," as
-  //  identifier (rather than literal) constants, meaning that we would never be able to parse a
-  //  Token::Subkind::True|False.  Since letting people overwrite the value of true and false is
-  //  undesirable for usability (and sanity) reasons, we should instead modify the compiler to
-  //  specifically catch `const true|false ...` cases, and show a "don't change the meaning of
-  //  true and false please" error instead.
+  //    const bar bool = true;  // "true" has been redefined as a string type - should this
+  //    fail?
+  //  We could maintain perfect purity by always treating all tokens, even "true" and "false,"
+  //  as identifier (rather than literal) constants, meaning that we would never be able to
+  //  parse a Token::Subkind::True|False.  Since letting people overwrite the value of true and
+  //  false is undesirable for usability (and sanity) reasons, we should instead modify the
+  //  compiler to specifically catch `const true|false ...` cases, and show a "don't change the
+  //  meaning of true and false please" error instead.
   TOKEN_LITERAL_CASES: {
     auto literal = ParseLiteral();
     if (!Ok())
@@ -596,7 +693,7 @@ std::unique_ptr<RawParameterList> Parser::ParseParameterList() {
 }
 
 std::unique_ptr<RawProtocolMethod> Parser::ParseProtocolEvent(
-    std::unique_ptr<RawAttributeList> attributes, std::unique_ptr<RawModifiers> modifiers,
+    std::unique_ptr<RawAttributeList> attributes, std::unique_ptr<RawModifierList> modifiers,
     ASTScope& scope) {
   ConsumeToken(OfKind(Token::Kind::kArrow));
   if (!Ok())
@@ -621,13 +718,14 @@ std::unique_ptr<RawProtocolMethod> Parser::ParseProtocolEvent(
   ZX_ASSERT(method_name);
   ZX_ASSERT(response != nullptr);
 
-  return std::make_unique<RawProtocolMethod>(
-      scope.GetSourceElement(), std::move(attributes), std::move(modifiers), std::move(method_name),
-      std::move(request), std::move(response), /*maybe_error_ctor=*/nullptr);
+  return std::make_unique<RawProtocolMethod>(scope.GetSourceElement(), std::move(attributes),
+                                             std::move(modifiers), std::move(method_name),
+                                             std::move(request), std::move(response),
+                                             /*maybe_error_ctor=*/nullptr);
 }
 
 std::unique_ptr<RawProtocolMethod> Parser::ParseProtocolMethod(
-    std::unique_ptr<RawAttributeList> attributes, std::unique_ptr<RawModifiers> modifiers,
+    std::unique_ptr<RawAttributeList> attributes, std::unique_ptr<RawModifierList> modifiers,
     std::unique_ptr<RawIdentifier> method_name, ASTScope& scope) {
   auto parse_params = [this](std::unique_ptr<RawParameterList>* params_out) {
     *params_out = ParseParameterList();
@@ -688,77 +786,70 @@ void Parser::ParseProtocolMember(
       return;
     }
     case Token::Kind::kIdentifier: {
-      std::unique_ptr<RawModifiers> modifiers;
+      std::unique_ptr<RawModifierList> modifiers;
       std::unique_ptr<RawIdentifier> method_name;
       if (Peek().combined() == CASE_IDENTIFIER(Token::Subkind::kCompose)) {
         // There are two possibilities here: we are looking at the first token in a compose
-        // statement like `compose a.b;`, or we are looking at the identifier of a method that has
-        // unfortunately been named `compose(...);`. Instead of calling ParseIdentifier here, we
-        // merely consume the token for now.
+        // statement like `compose a.b;`, or we are looking at the identifier of a method that
+        // has unfortunately been named `compose(...);`. Instead of calling ParseIdentifier
+        // here, we merely consume the token for now.
         const auto compose_token = ConsumeToken(IdentifierOfSubkind(Token::Subkind::kCompose));
         if (!Ok()) {
           Fail();
           return;
         }
 
-        // If the `compose` identifier is not immediately followed by a left paren we assume that we
-        // are looking at a compose clause.
+        // If the `compose` identifier is not immediately followed by a left paren we assume
+        // that we are looking at a compose clause.
         if (Peek().kind() != Token::Kind::kLeftParen) {
           add(composed_protocols,
               [&] { return ParseProtocolCompose(std::move(attributes), scope); });
           return;
         }
 
-        // Looks like this is a `compose(...);` method after all, so coerce the composed token into
-        // an Identifier source element.
+        // Looks like this is a `compose(...);` method after all, so coerce the composed token
+        // into an Identifier source element.
         method_name = std::make_unique<RawIdentifier>(
             SourceElement(compose_token.value(), compose_token.value()));
       } else if (Peek().combined() == CASE_IDENTIFIER(Token::Subkind::kStrict) ||
                  Peek().combined() == CASE_IDENTIFIER(Token::Subkind::kFlexible)) {
-        // There are two possibilities here: we are looking at a method or event with strictness
-        // modifier like `strict MyMethod(...);` or we are looking at a method
-        // that has unfortunately been named `flexible/strict(...);`. In either case we only expect
-        // one identifier, not a compound identifier, so we can just parse the identifier.
-        auto modifier_subkind = Peek().subkind();
-        auto maybe_modifier = ParseIdentifier();
+        // We should check if this is actually a method that happens to be named
+        // "strict" or "flexible". We used to do that by looking for "(", but
+        // with modifier change syntax (https://fxbug.dev/348405702) that no
+        // longer works. For now, we can't parse such methods.
+        // TODO(https://fxbug.dev/348403275): Fix this regression once we have
+        // explicit method kinds.
+        {
+          ASTScope modifier_scope(this);
+          Token token = ConsumeToken(OfKind(Token::Kind::kIdentifier)).value();
+          modifiers = ParseModifierList(modifier_scope, token);
+        }
         if (!Ok()) {
           Fail();
           return;
         }
-
-        if (Peek().kind() == Token::Kind::kLeftParen) {
-          // This is actually a method named `strict` or `flexible`.
-          method_name = std::move(maybe_modifier);
-        } else {
-          // This is a modifier on either an event or a method.
-          auto as_strictness = modifier_subkind == Token::Subkind::kFlexible ? Strictness::kFlexible
-                                                                             : Strictness::kStrict;
-          modifiers = std::make_unique<RawModifiers>(
-              SourceElement(maybe_modifier->start_token, maybe_modifier->end_token),
-              RawModifier<Strictness>(as_strictness, maybe_modifier->start_token));
-          switch (Peek().kind()) {
-            case Token::Kind::kArrow: {
-              add(methods, [&] {
-                return ParseProtocolEvent(std::move(attributes), std::move(modifiers), scope);
-              });
+        switch (Peek().kind()) {
+          case Token::Kind::kArrow: {
+            add(methods, [&] {
+              return ParseProtocolEvent(std::move(attributes), std::move(modifiers), scope);
+            });
+            return;
+          }
+          case Token::Kind::kIdentifier: {
+            method_name = ParseIdentifier();
+            if (!Ok()) {
+              Fail();
               return;
             }
-            case Token::Kind::kIdentifier: {
-              method_name = ParseIdentifier();
-              if (!Ok()) {
-                Fail();
-                return;
-              }
-              if (Peek().kind() != Token::Kind::kLeftParen) {
-                Fail(ErrInvalidProtocolMember);
-                return;
-              }
-              break;
-            }
-            default:
+            if (Peek().kind() != Token::Kind::kLeftParen) {
               Fail(ErrInvalidProtocolMember);
               return;
+            }
+            break;
           }
+          default:
+            Fail(ErrInvalidProtocolMember);
+            return;
         }
       } else {
         method_name = ParseIdentifier();
@@ -786,40 +877,31 @@ void Parser::ParseProtocolMember(
 
 std::unique_ptr<RawProtocolDeclaration> Parser::ParseProtocolDeclaration(
     std::unique_ptr<RawAttributeList> attributes, ASTScope& scope) {
-  std::unique_ptr<RawModifiers> modifiers;
+  std::unique_ptr<RawModifierList> modifiers;
   std::vector<std::unique_ptr<RawProtocolCompose>> composed_protocols;
   std::vector<std::unique_ptr<RawProtocolMethod>> methods;
 
-  if (Peek().combined() == CASE_IDENTIFIER(Token::Subkind::kOpen) ||
-      Peek().combined() == CASE_IDENTIFIER(Token::Subkind::kAjar) ||
-      Peek().combined() == CASE_IDENTIFIER(Token::Subkind::kClosed)) {
-    auto modifier_subkind = Peek().subkind();
-    auto modifier = ParseIdentifier();
-    if (!Ok())
-      return Fail();
-
-    Openness as_openness;
-    switch (modifier_subkind) {
-      case Token::Subkind::kOpen:
-        as_openness = Openness::kOpen;
-        break;
-      case Token::Subkind::kAjar:
-        as_openness = Openness::kAjar;
-        break;
-      case Token::Subkind::kClosed:
-        as_openness = Openness::kClosed;
-        break;
-      default:
-        ZX_PANIC("expected openness token");
+  switch (Peek().combined()) {
+    case CASE_IDENTIFIER(Token::Subkind::kClosed):
+    case CASE_IDENTIFIER(Token::Subkind::kAjar):
+    case CASE_IDENTIFIER(Token::Subkind::kOpen): {
+      ASTScope modifier_scope(this);
+      modifiers =
+          ParseModifierList(modifier_scope, ConsumeToken(OfKind(Token::Kind::kIdentifier)).value());
+      if (!Ok())
+        return Fail();
+      break;
     }
-    modifiers =
-        std::make_unique<RawModifiers>(SourceElement(modifier->start_token, modifier->end_token),
-                                       RawModifier<Openness>(as_openness, modifier->start_token));
+    default:
+      break;
   }
 
-  ConsumeToken(IdentifierOfSubkind(Token::Subkind::kProtocol));
+  auto decl_token = ConsumeToken(IdentifierOfSubkind(Token::Subkind::kProtocol));
   if (!Ok())
     return Fail();
+
+  if (modifiers)
+    ValidateModifiers<Openness>(modifiers, decl_token.value());
 
   auto identifier = ParseIdentifier();
   if (!Ok())
@@ -1040,9 +1122,10 @@ std::unique_ptr<RawLayoutParameter> Parser::ParseLayoutParameter() {
 
     // For non-anonymous type constructors like "foo<T>" or "foo:optional," the presence of type
     // parameters and constraints, respectively, confirms that "foo" refers to a type reference.
-    // In cases with no type parameters or constraints present (ie, just "foo"), it is impossible
-    // to deduce whether "foo" refers to a type or a value.  In such cases, we must discard the
-    // recently built type constructor, and convert it to a compound identifier instead.
+    // In cases with no type parameters or constraints present (ie, just "foo"), it is
+    // impossible to deduce whether "foo" refers to a type or a value.  In such cases, we must
+    // discard the recently built type constructor, and convert it to a compound identifier
+    // instead.
     if (type_ctor->layout_ref->kind == RawLayoutReference::Kind::kNamed &&
         type_ctor->parameters == nullptr && type_ctor->constraints == nullptr) {
       auto named_ref = static_cast<RawNamedLayoutReference*>(type_ctor->layout_ref.get());
@@ -1176,7 +1259,7 @@ std::unique_ptr<RawLayoutMember> Parser::ParseLayoutMember(RawLayoutMember::Kind
 }
 
 std::unique_ptr<RawLayout> Parser::ParseLayout(
-    ASTScope& scope, std::unique_ptr<RawModifiers> modifiers,
+    ASTScope& scope, std::unique_ptr<RawModifierList> modifiers,
     std::unique_ptr<RawCompoundIdentifier> compound_identifier,
     std::unique_ptr<RawTypeConstructor> subtype_ctor) {
   RawLayout::Kind layout_kind;
@@ -1340,107 +1423,31 @@ std::unique_ptr<RawTypeConstructor> Parser::ParseTypeConstructor() {
   NamedOrInline layout;
   auto attributes = MaybeParseAttributeList();
 
-  // Everything except for the (optional) attributes at the start of the type constructor
-  // declaration is placed in its own scope.  This is done because in cases of type-level attributes
-  // like this
-  //
-  // «@foo @bar «struct MyStruct { ... }»»;
-  //
-  // the start and end of the type_ctor and layout SourceElements should begin before and after the
-  // attributes block, respectively.
+  // Start a new scope for the layout since it should not include attributes
+  // (before) nor the type parameters and constraints (after).
   {
     ASTScope layout_scope(this);
-    bool resourceness_comes_first = false;
-    std::unique_ptr<RawModifiers> modifiers;
+    std::unique_ptr<RawModifierList> modifiers;
     std::unique_ptr<RawCompoundIdentifier> identifier;
-    std::optional<RawModifier<Strictness>> maybe_strictness = std::nullopt;
-    std::optional<RawModifier<Resourceness>> maybe_resourceness = std::nullopt;
 
-    // Consume tokens until we get one that isn't a modifier, treating duplicates
-    // and conflicts as immediately recovered errors. For conflicts (e.g. "strict
-    // flexible" or "flexible strict"), we use the earliest one.
-    for (;;) {
-      if (Peek().combined() == CASE_IDENTIFIER(Token::Subkind::kStrict) ||
-          Peek().combined() == CASE_IDENTIFIER(Token::Subkind::kFlexible) ||
-          Peek().combined() == CASE_IDENTIFIER(Token::Subkind::kResource)) {
-        ASTScope maybe_compound_identifier_scope(this);
-        auto modifier_subkind = Peek().subkind();
-        auto maybe_modifier = ParseIdentifier();
-        if (!Ok())
-          return Fail();
-
-        // Special case: this is either a reference to a type named "flexible/strict/resource" (ex:
-        // `struct { foo resource; };`), or otherwise the first modifier on an inline type
-        // definition (ex: `struct { foo resource union {...}; };`).  The only way to decide which
-        // is which is to peek ahead: if the next token is not an identifier, we assume that the
-        // last parsed modifier is actually the identifier of a named value instead.  For example,
-        // if the next token after this one isn't an identifier, we're looking at something like:
-        //
-        //   strict resource;
-        //
-        // If that's the case, the user is referencing a type named "flexible/strict/resource." This
-        // will need special handling to properly reclassify this modifier as the identifier for the
-        // whole TypeConstructorNew being built here.
-        if (Peek().kind() != Token::kIdentifier) {
-          // Looks like we're dealing with named layout reference that has unfortunately been named
-          // "flexible/strict/resource."
-          identifier =
-              ParseCompoundIdentifier(maybe_compound_identifier_scope, std::move(maybe_modifier));
-          break;
-        }
-
-        const Token& modifier_token = maybe_modifier->start_token;
-        switch (modifier_subkind) {
-          case Token::Subkind::kFlexible:
-          case Token::Subkind::kStrict: {
-            auto as_strictness = modifier_subkind == Token::Subkind::kFlexible
-                                     ? Strictness::kFlexible
-                                     : Strictness::kStrict;
-            if (maybe_strictness.has_value() && maybe_strictness->value == as_strictness) {
-              Fail(ErrDuplicateModifier, modifier_token, modifier_token.kind_and_subkind());
-              RecoverOneError();
-              break;
-            }
-            if (maybe_strictness.has_value()) {
-              Fail(ErrConflictingModifier, modifier_token, modifier_token.kind_and_subkind(),
-                   Token::KindAndSubkind(modifier_subkind == Token::Subkind::kFlexible
-                                             ? Token::Subkind::kStrict
-                                             : Token::Subkind::kFlexible));
-              RecoverOneError();
-              break;
-            }
-            maybe_strictness.emplace(as_strictness, maybe_modifier->start_token);
-            break;
-          }
-          case Token::Subkind::kResource: {
-            if (maybe_resourceness.has_value() &&
-                maybe_resourceness->value == Resourceness::kResource) {
-              Fail(ErrDuplicateModifier, modifier_token, modifier_token.kind_and_subkind());
-              RecoverOneError();
-              break;
-            }
-            if (maybe_strictness == std::nullopt) {
-              resourceness_comes_first = true;
-            }
-            maybe_resourceness.emplace(Resourceness::kResource, maybe_modifier->start_token);
-            break;
-          }
-          default: {
-            ZX_PANIC("expected modifier token");
-          }
-        }
+    if (Peek().combined() == CASE_IDENTIFIER(Token::Subkind::kStrict) ||
+        Peek().combined() == CASE_IDENTIFIER(Token::Subkind::kFlexible) ||
+        Peek().combined() == CASE_IDENTIFIER(Token::Subkind::kResource)) {
+      Token token = ConsumeToken(OfKind(Token::Kind::kIdentifier)).value();
+      if (Peek().kind() == Token::Kind::kIdentifier || Peek().kind() == Token::Kind::kLeftParen) {
+        // It's a modifier, e.g. `strict enum ...` or `strict(added=2) ...`.
+        modifiers = ParseModifierList(layout_scope, token);
       } else {
-        if (maybe_strictness.has_value() || maybe_resourceness.has_value()) {
-          modifiers =
-              std::make_unique<RawModifiers>(layout_scope.GetSourceElement(), maybe_resourceness,
-                                             maybe_strictness, resourceness_comes_first);
-        }
-        break;
+        // It's NOT a modifier, e.g. `struct { foo strict; }` or `struct { foo strict.Bar; }`.
+        identifier = ParseCompoundIdentifier(
+            layout_scope, std::make_unique<RawIdentifier>(layout_scope.GetSourceElement()));
       }
+      if (!Ok())
+        return Fail();
     }
 
-    // Any type constructor which is not a reference to a type named "flexible/strict/resource" will
-    // have the identifier unset, and will enter the block below to parse it.
+    // Any type constructor which is not a reference to a type named "flexible/strict/resource"
+    // will have the identifier unset, and will enter the block below to parse it.
     if (identifier == nullptr) {
       identifier = ParseCompoundIdentifier();
       if (!Ok())
@@ -1613,8 +1620,8 @@ std::unique_ptr<File> Parser::ParseFile() {
         return More;
       }
 
-      case CASE_IDENTIFIER(Token::Subkind::kAjar):
       case CASE_IDENTIFIER(Token::Subkind::kClosed):
+      case CASE_IDENTIFIER(Token::Subkind::kAjar):
       case CASE_IDENTIFIER(Token::Subkind::kOpen):
       case CASE_IDENTIFIER(Token::Subkind::kProtocol): {
         done_with_library_imports = true;
@@ -1673,7 +1680,7 @@ std::unique_ptr<File> Parser::ParseFile() {
       std::move(service_declaration_list), std::move(type_decls), std::move(tokens_));
 }
 
-bool Parser::ConsumeTokensUntil(std::set<Token::Kind> exit_tokens) {
+bool Parser::ConsumeTokensUntil(const std::set<Token::Kind>& exit_tokens) {
   auto p = [&](const Token& token) -> std::unique_ptr<Diagnostic> {
     if (exit_tokens.count(token.kind()) > 0) {
       // signal to ReadToken to stop by returning an error
@@ -1691,7 +1698,7 @@ bool Parser::ConsumeTokensUntil(std::set<Token::Kind> exit_tokens) {
   return true;
 }
 
-Parser::RecoverResult Parser::RecoverToEndOfAttributeNew() {
+Parser::RecoverResult Parser::RecoverToEndOfAttribute() {
   if (ConsumedEOF()) {
     return RecoverResult::Failure;
   }

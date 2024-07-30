@@ -5,8 +5,8 @@
 
 import argparse
 import filecmp
-import sys
 import subprocess
+import sys
 
 # Verifies that two files have matching contents.
 

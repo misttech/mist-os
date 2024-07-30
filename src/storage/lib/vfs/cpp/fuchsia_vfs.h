@@ -165,16 +165,11 @@ class FuchsiaVfs : public Vfs {
   zx_status_t Serve(const fbl::RefPtr<Vnode>& vnode, zx::channel server_end,
                     VnodeConnectionOptions options) __TA_EXCLUDES(vfs_lock_);
 
-  // Serve |open_result| using |protocol| and specified |rights|. On failure, |object_request| will
-  // be closed with an epitaph matching the returned error code.
-  //
-  // *NOTE*: |rights| and |node_options| are ignored for services. |protocols| may be nullptr if
-  // no additional options are required.
-  zx::result<> Serve2(Open2Result open_result, fuchsia_io::Rights rights,
-                      zx::channel object_request,
-                      const fuchsia_io::wire::ConnectionProtocols* protocols);
-
 #if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+  // Serve |open_result| using negotiated protocol and specified |rights|. On failure,
+  // |object_request| is left in a usable state for the caller to close.
+  //
+  // *NOTE*: |rights| and |flags| are ignored for services.
   zx::result<> Serve3(Open2Result open_result, fuchsia_io::Rights rights,
                       zx::channel& object_request, fuchsia_io::Flags flags,
                       const fuchsia_io::wire::Options& options);
@@ -210,13 +205,6 @@ class FuchsiaVfs : public Vfs {
   // responsible for closing |vnode| and |server_end|.
   zx_status_t ServeImpl(const fbl::RefPtr<Vnode>& vnode, zx::channel& server_end,
                         VnodeConnectionOptions options) __TA_EXCLUDES(vfs_lock_);
-
-  // On success, starts handling requests for |open_result| over |object_request|. On failure,
-  // callers are responsible for closing |server_end|. |open_result| will be closed automatically
-  // when the connection is closed, or on failure.
-  zx::result<> Serve2Impl(Vfs::Open2Result open_result, fuchsia_io::Rights rights,
-                          zx::channel& object_request,
-                          const fuchsia_io::wire::ConnectionProtocols* protocols);
 
   // Starts FIDL message dispatching on |channel|, at the same time starts to manage the lifetime of
   // |connection|. Consumes |channel| on success. On error, callers must close the associated vnode.

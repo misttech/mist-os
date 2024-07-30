@@ -7,7 +7,6 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
-#include <lib/ddk/platform-defs.h>
 #include <lib/driver/component/cpp/composite_node_spec.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 #include <zircon/compiler.h>
@@ -15,6 +14,7 @@
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/hardware/i2c/cpp/bind.h>
 #include <bind/fuchsia/i2c/cpp/bind.h>
+#include <bind/fuchsia/ti/platform/cpp/bind.h>
 #include <soc/aml-s905d2/s905d2-hw.h>
 
 #include "astro.h"
@@ -68,9 +68,9 @@ static const std::vector<fpbus::Metadata> backlight_metadata{
 static const fpbus::Node backlight_dev = []() {
   fpbus::Node dev = {};
   dev.name() = "backlight";
-  dev.vid() = PDEV_VID_TI;
-  dev.pid() = PDEV_PID_TI_LP8556;
-  dev.did() = PDEV_DID_TI_BACKLIGHT;
+  dev.vid() = bind_fuchsia_ti_platform::BIND_PLATFORM_DEV_VID_TI;
+  dev.pid() = bind_fuchsia_ti_platform::BIND_PLATFORM_DEV_PID_LP8556;
+  dev.did() = bind_fuchsia_ti_platform::BIND_PLATFORM_DEV_DID_BACKLIGHT;
   dev.metadata() = backlight_metadata;
   dev.mmio() = backlight_mmios;
   return dev;

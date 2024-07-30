@@ -77,6 +77,8 @@ void PortableUITest::SetUpRealmBase() {
                                 ConfigValue::Uint32(display_rotation()));
   realm_builder_.SetConfigValue(kTestUIStack, "device_pixel_ratio",
                                 ConfigValue(std::to_string(device_pixel_ratio())));
+  realm_builder_.SetConfigValue(kTestUIStack, "suspend_enabled",
+                                ConfigValue::Bool(suspend_enabled()));
 }
 
 void PortableUITest::SetUp() {

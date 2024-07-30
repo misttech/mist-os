@@ -41,6 +41,8 @@ template("assemble_network_conformance_system") {
         "//boards/emulation/virtio",
       ]
     }
+
+    provided_features = [ "fuchsia::real_time_clock" ]
   }
 
   product_assembly_base = {
@@ -52,6 +54,9 @@ template("assemble_network_conformance_system") {
       }
       graphics = {
         enable_virtual_console = false
+      }
+      development_support = {
+        include_netsvc = false
       }
     }
     base_packages = [

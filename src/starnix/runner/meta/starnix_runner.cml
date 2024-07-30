@@ -49,6 +49,8 @@
             config: "fuchsia.starnix.runner.EnableDataCollection",
             key: "enable_data_collection",
             type: "bool",
+            default: false,
+            availability: "transitional",
         },
     ],
     offer: [

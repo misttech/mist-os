@@ -13,7 +13,6 @@ import collections
 import json
 import sys
 
-
 COMMON_DOT_STAR = "scripts/shac/common.star"
 
 # Add a comment of this form after the closing parenthesis of a `print()` call

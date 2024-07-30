@@ -59,10 +59,11 @@ main_product_bundle_name = "${build_info_product}.${build_info_board}"
 #         https://fuchsia.dev/fuchsia-src/concepts/packages/ota?hl=en#verify-epoch
 #
 #   virtual_devices (optional; default=[])
-#     [list] A list of virtual device spec files.
+#     [list] A list of virtual device spec files. If not specified, a set of virtual devices
+#     are added if the configured board supports the emulator.
 #
 #   default_virtual_device (optional)
-#     [string] The name of the default virtual device
+#     [string] The name of the default virtual device.
 #
 #   delivery_blob_type (optional)
 #     [int] The type of delivery blob the product needs.
@@ -96,9 +97,35 @@ template("product_bundle") {
     tuf_keys = "//src/sys/pkg/repositories/devhost/keys"
   }
 
+  bundle_deps = []
+  if (defined(invoker.deps)) {
+    bundle_deps += invoker.deps
+  }
+
   virtual_devices = []
+  default_virtual_device = ""
   if (defined(invoker.virtual_devices)) {
     virtual_devices += invoker.virtual_devices
+    if (defined(invoker.default_virtual_device)) {
+      default_virtual_device = invoker.default_virtual_device
+    }
+
+    # If virtual devices were not specified by the invoker, add
+    # the "default" devices if the board type supports the emulator.
+    # Also, only add these in the Fuchsia toolchain, since //build/images/*
+    # are only valid in the Fuchsia toolchain.
+  } else if (board_is_emu && current_toolchain == default_toolchain) {
+    virtual_devices = [
+      "$root_build_dir/virtual_device_recommended.json",
+      "$root_build_dir/virtual_device_min.json",
+      "$root_build_dir/virtual_device_large.json",
+    ]
+    bundle_deps += [
+      "//build/images/flash:virtual_device_specification_large",
+      "//build/images/flash:virtual_device_specification_min",
+      "//build/images/flash:virtual_device_specification_recommended",
+    ]
+    default_virtual_device = "virtual_device_recommended"
   }
 
   skip_transfer_manifest = false
@@ -109,11 +136,10 @@ template("product_bundle") {
   python_action(targets.hermetic_inputs) {
     forward_variables_from(invoker,
                            [
-                             "deps",
                              "testonly",
                              "visibility",
                            ])
-
+    deps = bundle_deps
     binary_label =
         "//build/assembly/scripts:hermetic_inputs_from_assembly_outputs"
 
@@ -153,14 +179,10 @@ template("product_bundle") {
     no_output_dir_leaks = false
     forward_variables_from(invoker,
                            [
-                             "deps",
                              "testonly",
                              "visibility",
                            ])
-    if (!defined(deps)) {
-      deps = []
-    }
-
+    deps = bundle_deps
     outputs = []
     if (defined(invoker.system_a_contents)) {
       foreach(file, invoker.system_a_contents) {
@@ -285,10 +307,10 @@ template("product_bundle") {
       outputs += [ "${files.vd_dir}/${vd_filename}" ]
     }
 
-    if (defined(invoker.default_virtual_device)) {
+    if (default_virtual_device != "") {
       args += [
         "--recommended-device",
-        invoker.default_virtual_device,
+        default_virtual_device,
       ]
     }
 

@@ -35,4 +35,6 @@ pub use self::router::{Request, Routable, Router};
 pub use self::unit::Unit;
 
 #[cfg(target_os = "fuchsia")]
-pub use {self::dir_entry::DirEntry, fidl::RemotableCapability};
+pub use {
+    self::dir_entry::DirEntry, self::fidl::store::serve_capability_store, fidl::RemotableCapability,
+};

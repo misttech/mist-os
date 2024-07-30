@@ -241,6 +241,17 @@ impl Directory for Simple {
         self.open_impl(scope, path, protocols, object_request)
     }
 
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
+    fn open3(
+        self: Arc<Self>,
+        scope: ExecutionScope,
+        path: Path,
+        flags: fio::Flags,
+        object_request: ObjectRequestRef<'_>,
+    ) -> Result<(), Status> {
+        self.open_impl(scope, path, flags, object_request)
+    }
+
     async fn read_dirents<'a>(
         &'a self,
         pos: &'a TraversalPosition,
@@ -387,6 +398,13 @@ impl ToFlagsOrProtocols for fio::OpenFlags {
 impl ToFlagsOrProtocols for fio::ConnectionProtocols {
     fn to_flags_or_protocols(&self) -> FlagsOrProtocols<'_> {
         FlagsOrProtocols::Protocols(self)
+    }
+}
+
+#[cfg(fuchsia_api_level_at_least = "HEAD")]
+impl ToFlagsOrProtocols for fio::Flags {
+    fn to_flags_or_protocols(&self) -> FlagsOrProtocols<'_> {
+        FlagsOrProtocols::Flags3(*self)
     }
 }
 

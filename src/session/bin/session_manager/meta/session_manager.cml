@@ -17,6 +17,7 @@
             name: "session",
             durability: "transient",
             persistent_storage: true,
+            allowed_offers: "static_and_dynamic",
         },
     ],
     capabilities: [
@@ -106,8 +107,6 @@
                 "fuchsia.bluetooth.sys.Access",
                 "fuchsia.bluetooth.sys.Pairing",
                 "fuchsia.camera3.DeviceWatcher",
-                "fuchsia.castauth.CastCertificateRetriever",
-                "fuchsia.castauth.CastKeySigner",
                 "fuchsia.cobalt.SystemDataUpdater",
                 "fuchsia.device.NameProvider",
                 "fuchsia.diagnostics.LegacyMetricsArchiveAccessor",
@@ -169,6 +168,7 @@
                 "fuchsia.settings.Privacy",
                 "fuchsia.settings.Setup",
                 "fuchsia.ssh.AuthorizedKeys",
+                "fuchsia.starnix.runner.Manager",
                 "fuchsia.thermal.ClientStateConnector",
                 "fuchsia.tracing.perfetto.ProducerConnector",
                 "fuchsia.ultrasound.Factory",
@@ -189,6 +189,8 @@
         {
             // Routed to session-manager via trusted-apps.core_shard.cml
             protocol: [
+                "fuchsia.castauth.CastCertificateRetriever",
+                "fuchsia.castauth.CastKeySigner",
                 "fuchsia.weave.FactoryDataManager",
                 "fuchsia.weave.Provisioner",
                 "fuchsia.weave.Signer",
@@ -451,6 +453,7 @@
             directory: [
                 "config-data",
                 "dev-class-radar",
+                "dev-hrtimer",
                 "dev-input-report",
                 "root-ssl-certificates",
 

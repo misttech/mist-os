@@ -234,7 +234,7 @@ async fn test_system_activity_control() -> Result<()> {
 
     block_until_inspect_matches!(
         &env.sag_moniker,
-        root: {
+        root: contains {
             booting: false,
             power_elements: {
                 execution_state: {
@@ -269,7 +269,7 @@ async fn test_system_activity_control() -> Result<()> {
 
     block_until_inspect_matches!(
         &env.sag_moniker,
-        root: {
+        root: contains {
             booting: false,
             power_elements: {
                 execution_state: {

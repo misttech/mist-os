@@ -4,14 +4,16 @@
 
 use assert_matches::assert_matches;
 use fidl::endpoints::ProtocolMarker;
+use fidl::HandleBased;
 use fidl_fuchsia_net_routes_ext::admin::FidlRouteAdminIpExt;
 use fidl_fuchsia_net_routes_ext::rules::FidlRuleAdminIpExt;
 use fidl_fuchsia_net_routes_ext::FidlRouteIpExt;
-use fnet_routes_ext::rules::RuleIndex;
+use fnet_routes_ext::rules::{RuleAction, RuleIndex, RuleSelector};
 use futures::StreamExt as _;
 use net_types::ip::{GenericOverIp, Ip, IpInvariant};
-use netstack_testing_common::realms::{Netstack3, TestSandboxExt};
+use netstack_testing_common::realms::Netstack3;
 use netstack_testing_macros::netstack_test;
+use routes_common::TestSetup;
 use {
     fidl_fuchsia_net_routes_admin as fnet_routes_admin,
     fidl_fuchsia_net_routes_ext as fnet_routes_ext, fuchsia_zircon as zx,
@@ -45,9 +47,14 @@ async fn add_remove_rules<I: FidlRuleAdminIpExt + FidlRouteAdminIpExt + FidlRout
 ) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     // We don't support route rules in netstack2.
-    let realm = sandbox
-        .create_netstack_realm::<Netstack3, _>(format!("routes-admin-{name}"))
-        .expect("create realm");
+    let TestSetup {
+        realm,
+        network: _network,
+        interface: _,
+        route_table,
+        global_route_table: _,
+        state: _,
+    } = TestSetup::<I>::new::<Netstack3>(&sandbox, name).await;
     let rule_table =
         realm.connect_to_protocol::<I::RuleTableMarker>().expect("connect to rule table");
     let priority = fnet_routes_ext::rules::RuleSetPriority::from(0);
@@ -60,8 +67,8 @@ async fn add_remove_rules<I: FidlRuleAdminIpExt + FidlRouteAdminIpExt + FidlRout
     fnet_routes_ext::rules::add_rule::<I>(
         &rule_set,
         RULE_INDEX_0,
-        fnet_routes_ext::rules::RuleSelector::default(),
-        fnet_routes_ext::rules::RuleAction::Unreachable,
+        RuleSelector::default(),
+        RuleAction::Unreachable,
     )
     .await
     .expect("fidl error")
@@ -71,8 +78,8 @@ async fn add_remove_rules<I: FidlRuleAdminIpExt + FidlRouteAdminIpExt + FidlRout
         fnet_routes_ext::rules::add_rule::<I>(
             &rule_set,
             RULE_INDEX_0,
-            fnet_routes_ext::rules::RuleSelector::default(),
-            fnet_routes_ext::rules::RuleAction::Unreachable,
+            RuleSelector::default(),
+            RuleAction::Unreachable
         )
         .await,
         Ok(Err(fnet_routes_admin::RuleSetError::RuleAlreadyExists)),
@@ -83,8 +90,8 @@ async fn add_remove_rules<I: FidlRuleAdminIpExt + FidlRouteAdminIpExt + FidlRout
     fnet_routes_ext::rules::add_rule::<I>(
         &rule_set,
         RULE_INDEX_1,
-        fnet_routes_ext::rules::RuleSelector::default(),
-        fnet_routes_ext::rules::RuleAction::Unreachable,
+        RuleSelector::default(),
+        RuleAction::Unreachable,
     )
     .await
     .expect("fidl error")
@@ -108,8 +115,8 @@ async fn add_remove_rules<I: FidlRuleAdminIpExt + FidlRouteAdminIpExt + FidlRout
     fnet_routes_ext::rules::add_rule::<I>(
         &rule_set,
         RULE_INDEX_0,
-        fnet_routes_ext::rules::RuleSelector::default(),
-        fnet_routes_ext::rules::RuleAction::Unreachable,
+        RuleSelector::default(),
+        RuleAction::Unreachable,
     )
     .await
     .expect("fidl error")
@@ -133,11 +140,34 @@ async fn add_remove_rules<I: FidlRuleAdminIpExt + FidlRouteAdminIpExt + FidlRout
     // Create a new rule set and we should be able to add a new rule.
     let new_rule_set =
         fnet_routes_ext::rules::new_rule_set::<I>(&rule_table, priority).expect("fidl error");
+
+    let fnet_routes_admin::GrantForRouteTableAuthorization { table_id, token } =
+        fnet_routes_ext::admin::get_authorization_for_route_table::<I>(&route_table)
+            .await
+            .expect("fidl error");
+
+    assert_matches!(
+        fnet_routes_ext::rules::add_rule::<I>(
+            &new_rule_set,
+            RULE_INDEX_0,
+            RuleSelector::default(),
+            RuleAction::Lookup(table_id),
+        )
+        .await,
+        Ok(Err(fnet_routes_admin::RuleSetError::Unauthenticated)),
+        "the rule set is not authenticated to the table"
+    );
+
+    fnet_routes_ext::rules::authenticate_for_route_table::<I>(&new_rule_set, table_id, token)
+        .await
+        .expect("fidl error")
+        .expect("failed to authenticate");
+
     fnet_routes_ext::rules::add_rule::<I>(
         &new_rule_set,
         RULE_INDEX_0,
-        fnet_routes_ext::rules::RuleSelector::default(),
-        fnet_routes_ext::rules::RuleAction::Unreachable,
+        RuleSelector::default(),
+        RuleAction::Lookup(table_id),
     )
     .await
     .expect("fidl error")
@@ -146,34 +176,62 @@ async fn add_remove_rules<I: FidlRuleAdminIpExt + FidlRouteAdminIpExt + FidlRout
 
 #[netstack_test]
 #[variant(I, Ip)]
-async fn invalid_interface_id_selector<
+async fn bad_route_table_authentication<
     I: FidlRuleAdminIpExt + FidlRouteAdminIpExt + FidlRouteIpExt,
 >(
     name: &str,
 ) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     // We don't support route rules in netstack2.
-    let realm = sandbox
-        .create_netstack_realm::<Netstack3, _>(format!("routes-admin-{name}"))
-        .expect("create realm");
+    let TestSetup {
+        realm,
+        network: _network,
+        interface: _,
+        route_table,
+        global_route_table: _,
+        state: _,
+    } = TestSetup::<I>::new::<Netstack3>(&sandbox, name).await;
     let rule_table =
         realm.connect_to_protocol::<I::RuleTableMarker>().expect("connect to rule table");
-    let priority = fnet_routes_ext::rules::RuleSetPriority::from(0);
-    let rule_set =
-        fnet_routes_ext::rules::new_rule_set::<I>(&rule_table, priority).expect("fidl error");
+    let rule_set = fnet_routes_ext::rules::new_rule_set::<I>(
+        &rule_table,
+        fnet_routes_ext::rules::RuleSetPriority::from(0),
+    )
+    .expect("fidl error");
 
+    let fnet_routes_admin::GrantForRouteTableAuthorization { table_id, token } =
+        fnet_routes_ext::admin::get_authorization_for_route_table::<I>(&route_table)
+            .await
+            .expect("fidl error");
+
+    // Invalid table id because of version mismatch.
     assert_matches!(
-        fnet_routes_ext::rules::add_rule::<I>(
+        fnet_routes_ext::rules::authenticate_for_route_table::<I>(
             &rule_set,
-            RuleIndex::new(0),
-            fnet_routes_ext::rules::RuleSelector {
-                // Arbitrary non-existent interface ID.
-                bound_device: Some(1001),
-                ..Default::default()
-            },
-            fnet_routes_ext::rules::RuleAction::Unreachable
+            table_id + 1,
+            token
+                .duplicate_handle(fuchsia_zircon::Rights::SAME_RIGHTS)
+                .expect("failed to duplicate token")
         )
         .await,
-        Ok(Err(fnet_routes_admin::RuleSetError::Unauthenticated))
-    )
+        Ok(Err(fnet_routes_admin::AuthenticateForRouteTableError::InvalidAuthentication))
+    );
+
+    // Non-existent table that matches the IP version.
+    assert_matches!(
+        fnet_routes_ext::rules::authenticate_for_route_table::<I>(&rule_set, table_id + 2, token)
+            .await,
+        Ok(Err(fnet_routes_admin::AuthenticateForRouteTableError::InvalidAuthentication))
+    );
+
+    // Wrong token.
+    assert_matches!(
+        fnet_routes_ext::rules::authenticate_for_route_table::<I>(
+            &rule_set,
+            table_id,
+            zx::Event::create(),
+        )
+        .await,
+        Ok(Err(fnet_routes_admin::AuthenticateForRouteTableError::InvalidAuthentication))
+    );
 }

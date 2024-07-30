@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import os
-
 from dataclasses import dataclass
 from typing import Self
 

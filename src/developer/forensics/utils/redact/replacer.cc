@@ -8,10 +8,10 @@
 
 #include <algorithm>
 #include <memory>
-#include <queue>
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 #include <re2/re2.h>
 
@@ -36,75 +36,60 @@ Replacer ReplaceWithText(const std::string_view pattern, const std::string_view 
 
 namespace {
 
-// Replaces all non-overlapping instances of the keys in |redactions| with their values.
+struct Redaction {
+  int64_t original_position;
+  size_t match_size;
+  int64_t offset;
+  std::string replacement;
+};
+
+// Given |redactions|, replaces the text at position |original_position| with |replacement|. As
+// replacements are made, this function accounts for the position of characters shifting due to the
+// difference in size between the original text and the replacement text.
 //
-// For example, replacing "bc" with "1" and "c" with "2" in "abc" will result in "a1".
-void ApplyRedactions(const std::map<std::string, std::string>& redactions, std::string& text) {
-  // Grouping of a string and its position in |text|.
-  using Substr = std::pair<size_t, const std::string*>;
-  auto Compare = [](const Substr& lhs, const Substr& rhs) { return rhs.first < lhs.first; };
-  auto Overlap = [](const Substr& early, const Substr& later) {
-    return early.first + early.second->size() > later.first;
-  };
+// |redactions| is assumed to be sorted in order of |original_position|. The matches are assumed to
+// not overlap.
+void ApplyRedactions(const std::vector<Redaction>& redactions, std::string& text) {
+  size_t running_offset = 0;
+  for (const Redaction& redaction : redactions) {
+    text.replace(redaction.original_position + running_offset, redaction.match_size,
+                 redaction.replacement);
 
-  // Keep the next substring to replace at the front of |queue|.
-  std::priority_queue<Substr, std::vector<Substr>, decltype(Compare)> queue(std::move(Compare));
-
-  // Seed |queue| with the position of the first instance of each key in |redactions|.
-  for (const auto& [original, _] : redactions) {
-    const size_t pos = text.find(original);
-    if (pos != std::string::npos) {
-      queue.emplace(pos, &original);
-    }
-  }
-
-  std::vector<Substr> to_replace;
-  while (!queue.empty()) {
-    Substr top = queue.top();
-    queue.pop();
-
-    const size_t pos = top.first;
-    const std::string& original = *(top.second);
-
-    // Add the next instance of |original| to |queue|, if one exists.
-    if (const size_t next_pos = text.find(original, pos + original.size());
-        next_pos != std::string::npos) {
-      queue.emplace(next_pos, &original);
-    }
-
-    // Only add non-overlapping strings to |to_replace|.
-    if (to_replace.empty() || !Overlap(to_replace.back(), top)) {
-      to_replace.push_back(std::move(top));
-    }
-  }
-
-  // Replace each substring in |to_replace|.
-  size_t adjustment{0};
-  for (const auto& [pos, original] : to_replace) {
-    const auto& redacted = redactions.at(*original);
-    text.replace(pos + adjustment, original->size(), redacted);
-
-    // Account for the size difference between original and replacement text when replacing later
-    // instances.
-    adjustment += redacted.size();
-    adjustment -= original->size();
+    running_offset += redaction.offset;
   }
 }
 
 // Finds strings in |text| that match |regexp| and constructs their redacted replacements with
 // |build_redacted|.
-std::map<std::string, std::string> BuildRedactions(
+std::vector<Redaction> BuildRedactions(
     const std::string& text, const re2::RE2& regexp,
+    const std::vector<std::string>& ignore_prefixes,
     ::fit::function<std::string(const std::string& match)> build_redacted) {
-  std::map<std::string, std::string> redactions;
-
+  std::vector<Redaction> redactions;
   re2::StringPiece text_view(text);
-  std::string match;
+  re2::StringPiece match;
+
   while (RE2::FindAndConsume(&text_view, regexp, &match)) {
-    if (!match.empty()) {
-      redactions[match] = build_redacted(match);
-    } else {
-      FX_LOGS(INFO) << "EMPTY MATCH";
+    const bool has_prefix =
+        std::any_of(ignore_prefixes.begin(), ignore_prefixes.end(),
+                    [&text, &match](const std::string_view ignore_prefix) {
+                      const char* prefix_start = match.data() - ignore_prefix.size();
+
+                      // Don't access memory before the buffer that |text| owns.
+                      return prefix_start >= text.data() &&
+                             ignore_prefix == std::string_view(prefix_start, ignore_prefix.size());
+                    });
+
+    if (!match.empty() && !has_prefix) {
+      const std::string replacement = build_redacted(std::string(match));
+      redactions.push_back(Redaction{
+          // We're working with pointers, but want a relative position within |text| so we need to
+          // subtract the original start pointer.
+          .original_position = match.data() - text.data(),
+          .match_size = match.size(),
+          .offset = static_cast<int64_t>(replacement.size()) - static_cast<int64_t>(match.size()),
+          .replacement = replacement,
+      });
     }
   }
 
@@ -112,11 +97,12 @@ std::map<std::string, std::string> BuildRedactions(
 }
 
 // Builds a Replacer that redacts instances of |pattern| with strings constructed by
-// |build_redacted|.
+// |build_redacted|. Does NOT replace if any strings from |ignore_prefixes| occur just before the
+// matching string begins.
 //
 // Returns nullptr if pattern produces a bad regexp.
 Replacer FunctionBasedReplacer(
-    const std::string_view pattern,
+    const std::string_view pattern, const std::vector<std::string>& ignore_prefixes,
     ::fit::function<std::string(RedactionIdCache& cache, const std::string& match)>
         build_redacted) {
   auto regexp = std::make_unique<re2::RE2>(pattern);
@@ -132,12 +118,12 @@ Replacer FunctionBasedReplacer(
     return nullptr;
   }
 
-  return [regexp = std::move(regexp), build_redacted = std::move(build_redacted)](
+  return [regexp = std::move(regexp), build_redacted = std::move(build_redacted), ignore_prefixes](
              RedactionIdCache& cache, std::string& text) mutable -> std::string& {
-    const auto redactions =
-        BuildRedactions(text, *regexp, [&cache, &build_redacted](const std::string& match) {
-          return build_redacted(cache, match);
-        });
+    const auto redactions = BuildRedactions(text, *regexp, ignore_prefixes,
+                                            [&cache, &build_redacted](const std::string& match) {
+                                              return build_redacted(cache, match);
+                                            });
     ApplyRedactions(redactions, text);
     return text;
   };
@@ -146,7 +132,8 @@ Replacer FunctionBasedReplacer(
 }  // namespace
 
 Replacer ReplaceWithIdFormatString(const std::string_view pattern,
-                                   const std::string_view format_str) {
+                                   const std::string_view format_str,
+                                   const std::vector<std::string>& ignore_prefixes) {
   bool specificier_found{false};
 
   for (size_t pos{0}; (pos = format_str.find("%d", pos)) != std::string::npos; ++pos) {
@@ -163,10 +150,11 @@ Replacer ReplaceWithIdFormatString(const std::string_view pattern,
     return nullptr;
   }
 
-  return FunctionBasedReplacer(pattern, [format = std::string(format_str)](
-                                            RedactionIdCache& cache, const std::string& match) {
-    return fxl::StringPrintf(format.c_str(), cache.GetId(match));
-  });
+  return FunctionBasedReplacer(
+      pattern, ignore_prefixes,
+      [format = std::string(format_str)](RedactionIdCache& cache, const std::string& match) {
+        return fxl::StringPrintf(format.c_str(), cache.GetId(match));
+      });
 }
 
 namespace {
@@ -198,7 +186,9 @@ std::string RedactIPv4(RedactionIdCache& cache, const std::string& match) {
 
 }  // namespace
 
-Replacer ReplaceIPv4() { return FunctionBasedReplacer(kIPv4Pattern, RedactIPv4); }
+Replacer ReplaceIPv4() {
+  return FunctionBasedReplacer(kIPv4Pattern, /*ignore_prefixes=*/{}, RedactIPv4);
+}
 
 namespace {
 
@@ -254,7 +244,9 @@ std::string RedactIPv6(RedactionIdCache& cache, const std::string& match) {
 
 }  // namespace
 
-Replacer ReplaceIPv6() { return FunctionBasedReplacer(kIPv6Pattern, RedactIPv6); }
+Replacer ReplaceIPv6() {
+  return FunctionBasedReplacer(kIPv6Pattern, /*ignore_prefixes=*/{}, RedactIPv6);
+}
 
 namespace mac_utils {
 
@@ -309,7 +301,9 @@ std::string RedactMac(RedactionIdCache& cache, const std::string& mac) {
 
 }  // namespace
 
-Replacer ReplaceMac() { return FunctionBasedReplacer(mac_utils::kMacPattern, RedactMac); }
+Replacer ReplaceMac() {
+  return FunctionBasedReplacer(mac_utils::kMacPattern, /*ignore_prefixes=*/{}, RedactMac);
+}
 
 namespace {
 
@@ -324,6 +318,8 @@ std::string RedactSsid(RedactionIdCache& cache, const std::string& match) {
 
 }  // namespace
 
-Replacer ReplaceSsid() { return FunctionBasedReplacer(kSsidPattern, RedactSsid); }
+Replacer ReplaceSsid() {
+  return FunctionBasedReplacer(kSsidPattern, /*ignore_prefixes=*/{}, RedactSsid);
+}
 
 }  // namespace forensics

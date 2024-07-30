@@ -802,7 +802,7 @@ mod test {
     use test_case::test_case;
 
     use super::*;
-    use netstack3_base::WindowSize;
+    use netstack3_base::{PayloadLen, WindowSize};
 
     const TEST_BYTES: &'static [u8] = "Hello World!".as_bytes();
 

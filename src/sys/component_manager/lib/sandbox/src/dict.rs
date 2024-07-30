@@ -83,10 +83,10 @@ impl Dict {
         &self,
         key: Key,
         capability: Capability,
-    ) -> Result<(), fsandbox::DictionaryError> {
+    ) -> Result<(), fsandbox::CapabilityStoreError> {
         let mut this = self.lock();
         match this.entries.insert(key, capability) {
-            Some(_) => Err(fsandbox::DictionaryError::AlreadyExists),
+            Some(_) => Err(fsandbox::CapabilityStoreError::ItemAlreadyExists),
             None => Ok(()),
         }
     }

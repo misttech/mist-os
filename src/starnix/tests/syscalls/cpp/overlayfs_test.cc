@@ -133,6 +133,7 @@ std::string Readlink(const std::string& path) {
 class OverlayFsTest : public ::testing::Test {
  protected:
   void SetUp() override {
+    // TODO(https://fxbug.dev/317285180) don't skip on baseline
     if (!test_helper::HasSysAdmin()) {
       GTEST_SKIP() << "Not running with sysadmin capabilities, skipping suite.";
     }

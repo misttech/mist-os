@@ -74,6 +74,7 @@ impl EnvContext {
                 runtime_args,
                 env_path,
                 Utf8PathBuf::try_from(current_dir).ok().as_deref(),
+                false,
             )
             .map_err(fxe)?,
             None => EnvironmentContext::detect(
@@ -81,6 +82,7 @@ impl EnvContext {
                 runtime_args,
                 &current_dir,
                 env_path,
+                false,
             )
             .map_err(fxe)?,
         };
@@ -91,7 +93,7 @@ impl EnvContext {
         let injector = Box::new(Injection::new(
             context.clone(),
             DaemonVersionCheck::CheckApiLevel(
-                version_history::HISTORY.get_misleading_version_for_ffx().api_level,
+                version_history_data::HISTORY.get_misleading_version_for_ffx().api_level,
             ),
             node,
             target_spec,

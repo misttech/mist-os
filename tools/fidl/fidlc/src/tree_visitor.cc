@@ -107,6 +107,9 @@ void DeclarationOrderTreeVisitor::OnProtocolDeclaration(
   if (element->attributes != nullptr) {
     OnAttributeList(element->attributes);
   }
+  if (element->modifiers != nullptr) {
+    OnModifierList(element->modifiers);
+  }
   OnIdentifier(element->identifier);
 
   auto compose_it = element->composed_protocols.begin();

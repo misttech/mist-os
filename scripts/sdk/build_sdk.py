@@ -10,8 +10,8 @@ as a single GN target. This script thus serves as the canonical build script,
 providing a single reproducible process.
 """
 
-import atexit
 import argparse
+import atexit
 import json
 import os
 import shutil
@@ -20,8 +20,8 @@ import subprocess
 import tarfile
 import tempfile
 
-import merger.merge as merge
 import gn.generate as generate
+import merger.merge as merge
 
 REPOSITORY_ROOT = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "..", "..")

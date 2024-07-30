@@ -12,9 +12,7 @@ import asyncio
 import typing
 
 import fidl.fuchsia_developer_remotecontrol as remotecontrol
-from mobly import asserts
-from mobly import base_test
-from mobly import test_runner
+from mobly import asserts, base_test, test_runner
 from mobly_controller import fuchsia_device
 from mobly_controller.fuchsia_device import asynctest
 

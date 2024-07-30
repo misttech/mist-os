@@ -9,11 +9,10 @@
 
 namespace driver_transport {
 
-zx::result<> ChildDriverTransportDriver::Start() {
-  // Connect to the `fuchsia.examples.gizmo.Service` provided by the parent.
-  auto connect_result = incoming()->Connect<fuchsia_examples_gizmo::Service::Device>();
+zx::result<> ChildTransportDriver::Start() {
+  auto connect_result = incoming()->Connect<fuchsia_hardware_i2cimpl::Service::Device>();
   if (connect_result.is_error()) {
-    FDF_SLOG(ERROR, "Failed to connect gizmo device protocol.",
+    FDF_SLOG(ERROR, "Failed to connect fuchsia.hardware.i2cimpl device protocol.",
              KV("status", connect_result.status_string()));
     return connect_result.take_error();
   }
@@ -42,46 +41,43 @@ zx::result<> ChildDriverTransportDriver::Start() {
   return zx::ok();
 }
 
-zx::result<> ChildDriverTransportDriver::QueryParent(
-    fdf::ClientEnd<fuchsia_examples_gizmo::Device> client_end) {
+zx::result<> ChildTransportDriver::QueryParent(
+    fdf::ClientEnd<fuchsia_hardware_i2cimpl::Device> client_end) {
   fdf::Arena arena('GIZM');
 
   // Query and store the hardware ID.
-  auto hardware_id_result = fdf::WireCall(client_end).buffer(arena)->GetHardwareId();
-  if (!hardware_id_result.ok()) {
-    FDF_SLOG(ERROR, "Failed to request hardware ID.",
-             KV("status", hardware_id_result.status_string()));
-    return zx::error(hardware_id_result.status());
+  auto max_transfer_sz_result = fdf::WireCall(client_end).buffer(arena)->GetMaxTransferSize();
+  if (!max_transfer_sz_result.ok()) {
+    FDF_SLOG(ERROR, "Failed to request max transfer size.",
+             KV("status", max_transfer_sz_result.status_string()));
+    return zx::error(max_transfer_sz_result.status());
   }
-  if (hardware_id_result->is_error()) {
+  if (max_transfer_sz_result->is_error()) {
     FDF_SLOG(ERROR, "Hardware ID request returned an error.",
-             KV("status", hardware_id_result->error_value()));
-    return hardware_id_result->take_error();
+             KV("status", max_transfer_sz_result->error_value()));
+    return max_transfer_sz_result->take_error();
   }
 
-  hardware_id_ = hardware_id_result.value().value()->response;
-  FDF_LOG(INFO, "Transport client hardware: %X", hardware_id_);
+  max_transfer_size_ = max_transfer_sz_result.value()->size;
+  FDF_LOG(INFO, "Max transfer size: %zu", max_transfer_size_);
 
-  // Query and store the firmware version.
-  auto firmware_result = fdf::WireCall(client_end).buffer(arena)->GetFirmwareVersion();
-  if (!firmware_result.ok()) {
-    FDF_SLOG(ERROR, "Failed to request firmware version.",
-             KV("status", firmware_result.status_string()));
-    return zx::error(firmware_result.status());
+  // Set the bitrate.
+  constexpr uint32_t kBitrate = 5;
+  auto bitrate_result = fdf::WireCall(client_end).buffer(arena)->SetBitrate(kBitrate);
+  if (!bitrate_result.ok()) {
+    FDF_SLOG(ERROR, "Failed to set the bitrate.", KV("status", bitrate_result.status_string()));
+    return zx::error(bitrate_result.status());
   }
-  if (firmware_result->is_error()) {
-    FDF_SLOG(ERROR, "Firmware version request returned an error.",
-             KV("status", firmware_result->error_value()));
-    return firmware_result->take_error();
+  if (bitrate_result->is_error()) {
+    FDF_SLOG(ERROR, "Bitrate request returned an error.",
+             KV("status", bitrate_result->error_value()));
+    return bitrate_result->take_error();
   }
-
-  major_version_ = firmware_result.value().value()->major;
-  minor_version_ = firmware_result.value().value()->minor;
-  FDF_LOG(INFO, "Transport client firmware: %d.%d", major_version_, minor_version_);
+  FDF_LOG(INFO, "Successfully set the bitrate to %u", kBitrate);
 
   return zx::ok();
 }
 
 }  // namespace driver_transport
 
-FUCHSIA_DRIVER_EXPORT(driver_transport::ChildDriverTransportDriver);
+FUCHSIA_DRIVER_EXPORT(driver_transport::ChildTransportDriver);

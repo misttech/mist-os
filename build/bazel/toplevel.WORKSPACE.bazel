@@ -272,14 +272,23 @@ fuchsia_sdk_repository(
 register_toolchains("@fuchsia_sdk//:fuchsia_toolchain_sdk")
 
 # buildifier: disable=load-on-top
+load("@bazel_skylib//lib:paths.bzl", "paths")
+
+# buildifier: disable=load-on-top
+load("@fuchsia_build_info//:args.bzl", "clang_prefix")
+
+# buildifier: disable=load-on-top
 load(
     "@fuchsia_workspace//fuchsia:clang.bzl",
     "fuchsia_clang_repository",
 )
 
+# If clang_prefix is set in GN, it'll point to the "bin" directory under clang root.
+_clang_dir = paths.dirname(clang_prefix) if clang_prefix else "prebuilt/third_party/clang/" + fuchsia_host_tag
+
 fuchsia_clang_repository(
     name = "fuchsia_clang",
-    local_path = "prebuilt/third_party/clang/" + fuchsia_host_tag,
+    local_path = _clang_dir,
     local_version_file = "//:fuchsia_build_generated/fuchsia_clang.hash",
 )
 
@@ -311,7 +320,7 @@ generate_prebuilt_llvm_repository(
 
 generate_prebuilt_clang_toolchain_repository(
     name = "prebuilt_clang",
-    clang_install_dir = "prebuilt/third_party/clang/" + fuchsia_host_tag,
+    clang_install_dir = _clang_dir,
     # LINT.IfChange
     repository_version_file = "fuchsia_build_generated/prebuilt_clang.hash",
     # LINT.ThenChange(scripts/update_workspace.py)

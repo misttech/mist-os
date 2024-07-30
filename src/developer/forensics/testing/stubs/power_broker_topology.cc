@@ -4,6 +4,7 @@
 
 #include "src/developer/forensics/testing/stubs/power_broker_topology.h"
 
+#include <fidl/fuchsia.power.broker/cpp/natural_types.h>
 #include <lib/stdcompat/functional.h>
 
 #include "src/developer/forensics/testing/stubs/power_broker_required_level.h"
@@ -12,6 +13,7 @@ namespace forensics::stubs {
 
 void PowerBrokerTopology::AddElement(AddElementRequest& request,
                                      AddElementCompleter::Sync& completer) {
+  FX_CHECK(request.element_control().has_value());
   FX_CHECK(request.element_name().has_value());
   FX_CHECK(request.lessor_channel().has_value());
   FX_CHECK(request.dependencies().has_value());
@@ -23,9 +25,8 @@ void PowerBrokerTopology::AddElement(AddElementRequest& request,
       << "Duplicate element added to topology";
 
   // Remove the element from the topology if the element_control channel is dropped.
-  auto element_control_endpoints = fidl::CreateEndpoints<fuchsia_power_broker::ElementControl>();
   auto element_control_server = std::make_unique<PowerBrokerElementControl>(
-      std::move(element_control_endpoints->server), Dispatcher(),
+      std::move(*request.element_control()), Dispatcher(),
       [this, element_name = *request.element_name()]() { AddedElements().erase(element_name); });
 
   auto required_level_server = std::make_unique<PowerBrokerRequiredLevel>(
@@ -50,15 +51,12 @@ void PowerBrokerTopology::AddElement(AddElementRequest& request,
                                     .current_level_server = std::move(current_level_server),
                                 }});
 
-  fuchsia_power_broker::TopologyAddElementResponse response(
-      std::move(element_control_endpoints->client));
-
-  completer.Reply(
-      fidl::Response<fuchsia_power_broker::Topology::AddElement>(fit::ok(std::move(response))));
+  completer.Reply(fidl::Response<fuchsia_power_broker::Topology::AddElement>(fit::ok()));
 }
 
 void PowerBrokerTopologyDelaysResponse::AddElement(AddElementRequest& request,
                                                    AddElementCompleter::Sync& completer) {
+  FX_CHECK(request.element_control().has_value());
   FX_CHECK(request.element_name().has_value());
   FX_CHECK(request.lessor_channel().has_value());
   FX_CHECK(request.dependencies().has_value());
@@ -70,9 +68,8 @@ void PowerBrokerTopologyDelaysResponse::AddElement(AddElementRequest& request,
       << "Duplicate element added to topology";
 
   // Remove the element from the topology if the element_control channel is dropped.
-  auto element_control_endpoints = fidl::CreateEndpoints<fuchsia_power_broker::ElementControl>();
   auto element_control_server = std::make_unique<PowerBrokerElementControl>(
-      std::move(element_control_endpoints->server), Dispatcher(),
+      std::move(*request.element_control()), Dispatcher(),
       [this, element_name = *request.element_name()]() { AddedElements().erase(element_name); });
 
   auto required_level_server = std::make_unique<PowerBrokerRequiredLevel>(
@@ -97,22 +94,15 @@ void PowerBrokerTopologyDelaysResponse::AddElement(AddElementRequest& request,
                                     .current_level_server = std::move(current_level_server),
                                 }});
 
-  fuchsia_power_broker::TopologyAddElementResponse response(
-      std::move(element_control_endpoints->client));
-
-  queued_responses_.push(QueuedResponse{
-      .completer = completer.ToAsync(),
-      .response = std::move(response),
-  });
+  queued_completers_.push(completer.ToAsync());
 }
 
 void PowerBrokerTopologyDelaysResponse::PopResponse() {
-  FX_CHECK(!queued_responses_.empty());
+  FX_CHECK(!queued_completers_.empty());
 
-  queued_responses_.front().completer.Reply(
-      fidl::Response<fuchsia_power_broker::Topology::AddElement>(
-          fit::ok(std::move(queued_responses_.front().response))));
-  queued_responses_.pop();
+  queued_completers_.front().Reply(
+      fidl::Response<fuchsia_power_broker::Topology::AddElement>(fit::ok()));
+  queued_completers_.pop();
 }
 
 const std::vector<fuchsia_power_broker::LevelDependency>& PowerBrokerTopologyBase::Dependencies(

@@ -6,8 +6,8 @@
 
 use crate::{
     object_get_info_single, object_get_property, object_set_property, ok, AsHandleRef, Bti, Handle,
-    HandleBased, HandleRef, Koid, ObjectQuery, Property, PropertyQuery, Resource, Rights, Status,
-    Topic,
+    HandleBased, HandleRef, Koid, Name, ObjectQuery, Property, PropertyQuery, Resource, Rights,
+    Status, Topic,
 };
 use bitflags::bitflags;
 use fuchsia_zircon_sys as sys;
@@ -28,7 +28,7 @@ impl_handle_based!(Vmo);
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct VmoInfo {
     pub koid: Koid,
-    pub name: [u8; sys::ZX_MAX_NAME_LEN],
+    pub name: Name,
     pub size_bytes: u64,
     pub parent_koid: Koid,
     pub num_children: usize,
@@ -53,7 +53,7 @@ impl From<sys::zx_info_vmo_t> for VmoInfo {
     fn from(info: sys::zx_info_vmo_t) -> VmoInfo {
         VmoInfo {
             koid: Koid::from_raw(info.koid),
-            name: info.name,
+            name: Name::from_raw(info.name),
             size_bytes: info.size_bytes,
             parent_koid: Koid::from_raw(info.parent_koid),
             num_children: info.num_children,

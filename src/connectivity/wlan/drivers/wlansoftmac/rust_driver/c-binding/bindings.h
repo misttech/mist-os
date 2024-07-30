@@ -41,54 +41,6 @@ typedef struct {
   zx_status_t (*transfer)(void *ctx, const uint8_t *payload, uintptr_t payload_len);
 } wlan_tx_t;
 
-/**
- * Type that wraps a pointer to a buffer allocated in the C++ portion of wlansoftmac.
- */
-typedef struct {
-  /**
-   * Returns the buffer's ownership and free it.
-   *
-   * # Safety
-   *
-   * The `free` function is unsafe because the function cannot guarantee the pointer it's
-   * called with is the `ctx` field in this struct.
-   *
-   * By calling `free`, the caller promises the pointer it's called with is the `ctx` field
-   * in this struct.
-   */
-  void (*free)(void *ctx);
-  /**
-   * Pointer to the buffer allocated in the C++ portion of wlansoftmac and owned by the Rust
-   * portion of wlansoftmac. An `FfiBufferProvider` sets this pointer to null when the allocation
-   * failed.
-   */
-  void *ctx;
-  /**
-   * Pointer to the start of bytes written in the buffer.
-   */
-  uint8_t *data;
-  /**
-   * Capacity of the buffer, starting at `data`.
-   */
-  uintptr_t capacity;
-} wlansoftmac_buffer_t;
-
-typedef struct {
-  /**
-   * Allocate and take ownership of a buffer allocated by the C++ portion of wlansoftmac
-   * with at least `min_capacity` bytes of capacity.
-   *
-   * If the requested allocation is zero bytes, this function should return an `FfiBuffer`
-   * with a null `ctx` pointer indicating the allocation failed.
-   *
-   * The returned `FfiBuffer` contains a pointer whose pointee the caller now owns, unless that
-   * pointer is the null pointer. If the pointer is non-null, then the `Drop` implementation of
-   * `FfiBuffer` ensures its `free` will be called if its dropped. Otherwise, `free` will not,
-   * and should not, be called.
-   */
-  wlansoftmac_buffer_t (*get_buffer)(uintptr_t min_capacity);
-} wlansoftmac_buffer_provider_ops_t;
-
 typedef struct {
   const void *ctx;
   zx_status_t (*transfer)(const void *ctx, const uint8_t *request, uintptr_t request_size);
@@ -123,6 +75,9 @@ typedef struct {
  *   - This function cannot guarantee `run_start_completer` is thread-safe.
  *   - This function cannot guarantee `start_completer` points to a valid object when
  *     `run_start_completer` is called.
+ *   - This function cannot guarantee `run_shutdown_completer` is thread-safe.
+ *   - This function cannot guarantee `shutdown_completer` points to a valid object when
+ *     `run_shutdown_completer` is called.
  *   - This function cannot guarantee `wlan_softmac_bridge_client_handle` is a valid handle.
  *
  * By calling this function, the caller promises the following:
@@ -130,11 +85,15 @@ typedef struct {
  *   - The `run_start_completer` function is thread-safe.
  *   - The `start_completer` pointer will point to a valid object at least until
  *     `run_start_completer` is called.
+ *   - The `run_shutdown_completer` function is thread-safe.
+ *   - The `shutdown_completer` pointer will point to a valid object at least until
+ *     `run_shutdown_completer` is called.
  *   - The `wlan_softmac_bridge_client_handle` is a valid handle.
  */
-extern "C" zx_status_t start_and_run_bridged_wlansoftmac(
+extern "C" zx_status_t start_bridged_wlansoftmac(
     void *start_completer, void (*run_start_completer)(void *start_completer, zx_status_t status),
-    ethernet_rx_t ethernet_rx, wlan_tx_t wlan_tx, wlansoftmac_buffer_provider_ops_t buffer_provider,
-    zx_handle_t wlan_softmac_bridge_client_handle);
+    void *shutdown_completer,
+    void (*run_shutdown_completer)(void *shutdown_completer, zx_status_t status),
+    ethernet_rx_t ethernet_rx, wlan_tx_t wlan_tx, zx_handle_t wlan_softmac_bridge_client_handle);
 
 #endif  // SRC_CONNECTIVITY_WLAN_DRIVERS_WLANSOFTMAC_RUST_DRIVER_C_BINDING_BINDINGS_H_

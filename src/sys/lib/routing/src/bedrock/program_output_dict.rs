@@ -5,21 +5,20 @@
 use crate::bedrock::structured_dict::ComponentInput;
 use crate::bedrock::with_policy_check::WithPolicyCheck;
 use crate::capability_source::{CapabilitySource, ComponentCapability};
-use crate::component_instance::{
-    ComponentInstanceInterface, WeakComponentInstanceInterface, WeakExtendedInstanceInterface,
-};
+use crate::component_instance::{ComponentInstanceInterface, WeakComponentInstanceInterface};
 use crate::error::RoutingError;
 use crate::{DictExt, LazyGet};
 use cm_types::{IterablePath, RelativePath};
-use futures::FutureExt;
+use futures::{future, FutureExt};
 use itertools::Itertools;
 use moniker::ChildName;
-use sandbox::{Capability, Dict, Request, Routable, Router, WeakInstanceToken};
+use sandbox::{Capability, Dict, Request, Routable, Router};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::warn;
 
-pub type ProgramRouterFn<C> = dyn Fn(WeakComponentInstanceInterface<C>, RelativePath) -> Router;
+pub type ProgramRouterFn<C> =
+    dyn Fn(WeakComponentInstanceInterface<C>, RelativePath, ComponentCapability) -> Router;
 pub type OutgoingDirRouterFn<C> =
     dyn Fn(&Arc<C>, &cm_rust::ComponentDecl, &cm_rust::CapabilityDecl) -> Router;
 
@@ -153,16 +152,19 @@ fn extend_dict_with_dictionary<C: ComponentInstanceInterface + 'static>(
                     )),
                 }
             }
-            cm_rust::DictionarySource::Program => {
-                new_program_router(component.as_weak(), source_path.clone())
-            }
+            cm_rust::DictionarySource::Program => new_program_router(
+                component.as_weak(),
+                source_path.clone(),
+                ComponentCapability::Dictionary(decl.clone()),
+            ),
         };
         router = make_dict_extending_router(
             dict.clone(),
-            WeakInstanceToken {
-                inner: Arc::new(WeakExtendedInstanceInterface::Component(component.as_weak())),
-            },
             source_dict_router,
+            CapabilitySource::Component {
+                capability: ComponentCapability::Dictionary(decl.clone()),
+                component: component.as_weak(),
+            },
         );
     } else {
         router = Router::new_ok(dict.clone());
@@ -181,23 +183,28 @@ fn extend_dict_with_dictionary<C: ComponentInstanceInterface + 'static>(
 /// [Dict] returned by `source_dict_router`.
 ///
 /// This algorithm returns a new [Dict] each time, leaving `dict` unmodified.
-fn make_dict_extending_router(
+fn make_dict_extending_router<C: ComponentInstanceInterface + 'static>(
     dict: Dict,
-    dict_source: WeakInstanceToken,
     source_dict_router: Router,
+    source: CapabilitySource<C>,
 ) -> Router {
     let route_fn = move |request: Request| {
+        if request.debug {
+            return future::ok(
+                source
+                    .clone()
+                    .try_into()
+                    .expect("failed to convert capability source to dictionary"),
+            )
+            .boxed();
+        }
         let source_dict_router = source_dict_router.clone();
         let dict = dict.clone();
-        let dict_source = dict_source.clone();
         async move {
-            let debug = request.debug;
             let source_dict = match source_dict_router.route(request).await? {
                 Capability::Dictionary(d) => Some(d),
                 // Optional from void.
                 cap @ Capability::Unit(_) => return Ok(cap),
-                // Debug source token.
-                Capability::Instance(_) if debug => None,
                 cap => {
                     return Err(RoutingError::BedrockWrongCapabilityType {
                         actual: cap.debug_typename().into(),
@@ -206,9 +213,6 @@ fn make_dict_extending_router(
                     .into())
                 }
             };
-            if debug {
-                return Ok(Capability::Instance(dict_source.clone()));
-            }
             let source_dict = source_dict.unwrap();
             let out_dict = dict.shallow_copy().map_err(|_| RoutingError::BedrockNotCloneable)?;
             for (source_key, source_value) in source_dict.enumerate() {

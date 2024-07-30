@@ -177,6 +177,13 @@ constexpr cpp20::span<const PllId> PllIds() {
   }
 }
 
+// An upper bound on the number of displays that could be connected
+// simultaneously. The bound holds across all display engine versions
+// supported by this driver.
+//
+// Not all display engines can support this exact number of displays.
+constexpr int kMaximumConnectedDisplayCount = 4;
+
 }  // namespace i915
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_HARDWARE_COMMON_H_

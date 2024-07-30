@@ -8,6 +8,7 @@ use xml::writer::Error as XmlWriterError;
 
 /// The error types for packet parsing.
 #[derive(Error, Debug)]
+#[non_exhaustive]
 pub enum Error {
     /// Error encountered when trying to write XML.
     #[error("Error writing XML data: {:?}", .0)]
@@ -29,13 +30,17 @@ pub enum Error {
     #[error("Invalid data: {:?}", .0)]
     DuplicateData(String),
 
-    #[doc(hidden)]
-    #[error("__Nonexhaustive error should never be created.")]
-    __Nonexhaustive,
+    /// Error returned when unsupported version of the object was encountered.
+    #[error("Unsupported object version")]
+    UnsupportedVersion,
 }
 
 impl Error {
     pub fn invalid_data(msg: impl ToString) -> Self {
         Self::InvalidData(msg.to_string())
+    }
+
+    pub fn missing_data(msg: impl ToString) -> Self {
+        Self::MissingData(msg.to_string())
     }
 }

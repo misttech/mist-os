@@ -4,6 +4,7 @@
 
 #include "src/graphics/display/drivers/intel-i915/ddi-physical-layer.h"
 
+#include <lib/driver/testing/cpp/scoped_global_logger.h>
 #include <lib/mmio/mmio-buffer.h>
 
 #include <fake-mmio-reg/fake-mmio-reg.h>
@@ -54,6 +55,7 @@ class TypeCDdiTigerLakeTest : public ::testing::Test {
 
  protected:
   constexpr static int kMmioRangeSize = 0x200000;
+  fdf_testing::ScopedGlobalLogger logger_;
   ddk_mock::MockMmioRange mmio_range_{kMmioRangeSize, ddk_mock::MockMmioRange::Size::k32};
   fdf::MmioBuffer mmio_buffer_{mmio_range_.GetMmioBuffer()};
   TestPower power_{nullptr};
@@ -998,6 +1000,7 @@ class ComboDdiTigerLakeTest : public ::testing::Test {
 
  protected:
   constexpr static int kMmioRangeSize = 0x200000;
+  fdf_testing::ScopedGlobalLogger logger_;
   ddk_mock::MockMmioRange mmio_range_{kMmioRangeSize, ddk_mock::MockMmioRange::Size::k32};
   fdf::MmioBuffer mmio_buffer_{mmio_range_.GetMmioBuffer()};
 };

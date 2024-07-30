@@ -25,15 +25,23 @@ def main():
         help="Path at which to write the archive in zip format.",
         required=True,
     )
+    parser.add_argument(
+        "--depfile",
+        help="Path at which to write the depfile.",
+        required=True,
+    )
     args = parser.parse_args()
 
     with open(args.source_file_manifest) as f:
         srclist = json.load(f)
 
-    with zipfile.ZipFile(args.output, "w") as file:
-        for src in srclist:
-            file.write(src, os.path.basename(src))
-
+    with open(args.depfile, "w") as depfile:
+        depfile.write(f"{args.output}: ")
+        with zipfile.ZipFile(args.output, "w") as file:
+            for src in srclist:
+                file.write(src, os.path.basename(src))
+                depfile.write(f"{src} ")
+        depfile.write("\n")
     return 0
 
 

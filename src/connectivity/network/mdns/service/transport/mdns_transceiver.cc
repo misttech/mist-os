@@ -107,7 +107,7 @@ bool MdnsTransceiver::StartInterfaceTransceivers(const net::interfaces::Properti
       return false;
     case fuchsia::net::interfaces::PortClass::Tag::kDevice:
       switch (properties.port_class().device()) {
-        case fuchsia::hardware::network::PortClass::WLAN:
+        case fuchsia::hardware::network::PortClass::WLAN_CLIENT:
         case fuchsia::hardware::network::PortClass::WLAN_AP:
           media = Media::kWireless;
           break;

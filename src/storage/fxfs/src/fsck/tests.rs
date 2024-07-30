@@ -820,6 +820,10 @@ async fn test_overlapping_keys_in_layer_file() {
     );
 }
 
+impl Value for u32 {
+    const DELETED_MARKER: Self = 0;
+}
+
 #[fuchsia::test]
 async fn test_unexpected_record_in_layer_file() {
     let mut test = FsckTest::new().await;

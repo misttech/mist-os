@@ -23,7 +23,7 @@ constexpr uint64_t kMax = std::numeric_limits<uint64_t>::max();
 
 enum class Action {
   kAllocate,
-  kUpdateFreeRamSubranges,
+  kUpdateRamSubranges,
   kFree,
   kResize,
   kMaxValue,  // Required by FuzzedDataProvider::ConsumeEnum().
@@ -102,12 +102,12 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
         }
         break;
       }
-      case Action::kUpdateFreeRamSubranges: {
+      case Action::kUpdateRamSubranges: {
         auto type = static_cast<memalloc::Type>(provider.ConsumeIntegralInRange<uint64_t>(
             memalloc::kMinAllocatedTypeValue, memalloc::kMaxAllocatedTypeValue));
         uint64_t addr = provider.ConsumeIntegral<uint64_t>();
         uint64_t size = provider.ConsumeIntegralInRange<uint64_t>(0, kMax - addr);
-        (void)ctx.pool.UpdateFreeRamSubranges(type, addr, size);
+        (void)ctx.pool.UpdateRamSubranges(type, addr, size);
         break;
       }
       case Action::kFree: {

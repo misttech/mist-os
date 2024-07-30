@@ -24,8 +24,9 @@
 #include <utility>
 #include <vector>
 
-#include <gtest/gtest.h>
+#include <zxtest/zxtest.h>
 
+#include "src/ui/testing/util/zxtest_helpers.h"
 #include "src/ui/tests/conformance_input_tests/conformance-test-base.h"
 
 namespace ui_conformance_testing {
@@ -130,7 +131,7 @@ struct TouchPuppet {
 using device_pixel_ratio = float;
 
 class TouchConformanceTest : public ui_conformance_test_base::ConformanceTest,
-                             public ::testing::WithParamInterface<device_pixel_ratio> {
+                             public zxtest::WithParamInterface<device_pixel_ratio> {
  public:
   ~TouchConformanceTest() override = default;
 
@@ -229,8 +230,7 @@ class SingleViewTouchConformanceTest : public TouchConformanceTest {
   std::unique_ptr<TouchPuppet> puppet_;
 };
 
-INSTANTIATE_TEST_SUITE_P(/*no prefix*/, SingleViewTouchConformanceTest,
-                         ::testing::Values(1.0, 2.0));
+INSTANTIATE_TEST_SUITE_P(/*no prefix*/, SingleViewTouchConformanceTest, ::zxtest::Values(1.0, 2.0));
 
 TEST_P(SingleViewTouchConformanceTest, SimpleTap) {
   const auto kTapX = 3 * display_width_as_int() / 4;
@@ -631,7 +631,7 @@ class EmbeddedViewTouchConformanceTest : public TouchConformanceTest {
 };
 
 INSTANTIATE_TEST_SUITE_P(/*no prefix*/, EmbeddedViewTouchConformanceTest,
-                         ::testing::Values(1.0, 2.0));
+                         ::zxtest::Values(1.0, 2.0));
 
 TEST_P(EmbeddedViewTouchConformanceTest, EmbeddedViewTap) {
   const auto kTapX = 3 * display_width_as_int() / 4;

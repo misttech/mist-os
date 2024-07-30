@@ -4,12 +4,12 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-from merge import merge_irs
-from depfile import DepFile
-
 import argparse
 import json
 import os
+
+from depfile import DepFile
+from merge import merge_irs
 
 
 def main():

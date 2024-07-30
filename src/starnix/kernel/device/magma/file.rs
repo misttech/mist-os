@@ -142,7 +142,7 @@ use starnix_core::vfs::{
 };
 use starnix_lifecycle::AtomicU64Counter;
 use starnix_logging::{impossible_error, log_error, log_warn, set_zx_name, track_stub};
-use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex, Unlocked, WriteOps};
+use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
@@ -1274,7 +1274,7 @@ impl FileOps for MagmaFile {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, WriteOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         offset: usize,

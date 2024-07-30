@@ -7,26 +7,16 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
 
-::test_versions::Struct::Storage_ test_versions::Struct::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.x)};
-}
+#ifdef __Fuchsia__
 
-::test_versions::Table::Storage_ test_versions::Table::CloneStorage_() const {
-  return Storage_{
-      ::fidl::internal::NaturalClone(storage_.x)};
-}
+#endif  // __Fuchsia__
 
-std::shared_ptr<::test_versions::Union::Storage_> test_versions::Union::CloneStorage_() const {
-  const Storage_& storage = *storage_;
-  switch (storage_->index()) {
-    case 1:
-      return std::make_shared<Storage_>(
-          std::in_place_index<1>,
-          ::fidl::internal::NaturalClone(std::get<1>(storage)));
-    default:
-      return std::make_shared<Storage_>();
-  }
-}
+#ifdef __Fuchsia__
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
+#endif  // __Fuchsia__
 
 #pragma clang diagnostic pop

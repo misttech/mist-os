@@ -19,6 +19,7 @@
 #include "src/devices/lib/log/log.h"
 
 // fdf_arena_t interface
+__BEGIN_CDECLS
 
 __EXPORT zx_status_t fdf_arena_create(uint32_t options, uint32_t tag, fdf_arena_t** out_arena) {
   return fdf_arena::Create(options, tag, out_arena);
@@ -33,6 +34,8 @@ __EXPORT void fdf_arena_free(fdf_arena_t* arena, void* data) { return arena->Fre
 __EXPORT bool fdf_arena_contains(fdf_arena_t* arena, const void* data, size_t num_bytes) {
   return arena->Contains(data, num_bytes);
 }
+
+__EXPORT void fdf_arena_add_ref(fdf_arena_t* arena) { arena->AddRef(); }
 
 __EXPORT void fdf_arena_drop_ref(fdf_arena_t* arena) { arena->Destroy(); }
 
@@ -300,3 +303,5 @@ __EXPORT zx_status_t fdf_env_set_thread_limit(const char* scheduler_role, size_t
   return driver_runtime::DispatcherCoordinator::SetThreadLimit(
       std::string_view(scheduler_role, scheduler_role_len), max_threads);
 }
+
+__END_CDECLS

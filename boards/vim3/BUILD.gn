@@ -12,6 +12,8 @@ assert(current_cpu == "arm64",
 
 board_configuration("vim3") {
   provided_features = [
+    "fuchsia::bt_transport_uart",
+    "fuchsia::bus_pci",
     "fuchsia::driver_framework_v2_support",
     "fuchsia::fan",
     "fuchsia::mali_gpu",
@@ -297,11 +299,6 @@ board_input_bundle("main_bundle") {
       driver_components = [ "meta/libmsd_vsi.cm" ]
     },
     {
-      package_target = "//src/connectivity/bluetooth/hci/transport/uart"
-      package_set = "base"
-      driver_components = [ "meta/bt-transport-uart.cm" ]
-    },
-    {
       package_target = "//src/power/fake-powersource:fake-battery"
       package_set = "base"
       driver_components = [ "meta/fake_battery.cm" ]
@@ -340,5 +337,49 @@ board_input_bundle("rtc_driver") {
       package_set = "base"
       driver_components = [ "meta/pcf8563.cm" ]
     },
+  ]
+}
+
+# Note: This group contains bazel built drivers that are defined in individual bazel_actions.
+# Adding this to your build graph will greatly reduce your build speed.
+group("vim3-release") {
+  deps = [
+    "//src/connectivity/ethernet/drivers/dwmac:package-archive",
+    "//src/connectivity/ethernet/drivers/realtek-8211f:package-archive",
+    "//src/devices/adc/drivers/aml-saradc:package-archive",
+    "//src/devices/block/drivers/aml-sdmmc:package-archive",
+    "//src/devices/board/drivers/vim3-devicetree:bazel_package-archive",
+    "//src/devices/bus/drivers/pci:package-archive",
+    "//src/devices/clock/drivers/vim3-clk:bazel_package-archive",
+    "//src/devices/cpu/drivers/aml-cpu:package-archive",
+    "//src/devices/gpio/drivers/aml-gpio:bazel_package-archive",
+    "//src/devices/gpio/drivers/ti-tca6408a:package-archive",
+    "//src/devices/hrtimer/drivers/aml-hrtimer:package-archive",
+    "//src/devices/i2c/drivers/aml-i2c:bazel_package-archive",
+    "//src/devices/mcu/drivers/vim3-mcu:package-archive",
+    "//src/devices/ml/drivers/aml-nna:package-archive",
+    "//src/devices/power/drivers/aml-meson-power:package-archive",
+    "//src/devices/power/drivers/aml-pwm-regulator:package-archive",
+    "//src/devices/power/drivers/fusb302:package-archive",
+    "//src/devices/pwm/drivers/aml-pwm:package-archive",
+    "//src/devices/pwm/drivers/aml-pwm-init:package-archive",
+    "//src/devices/serial/drivers/aml-uart:package-dfv2-archive",
+    "//src/devices/suspend/drivers/aml-suspend:package-archive",
+    "//src/devices/temperature/drivers/aml-trip:package-archive",
+    "//src/devices/thermal/drivers/aml-thermal:package-archive",
+    "//src/devices/usb/drivers/aml-usb-phy:bazel_package-archive",
+    "//src/devices/usb/drivers/dwc2:package-archive",
+    "//src/devices/usb/drivers/xhci:package-archive",
+    "//src/graphics/display/drivers/aml-canvas:package-archive",
+    "//src/graphics/display/drivers/amlogic-display:package-archive",
+    "//src/graphics/display/drivers/vim3-display-detect:package-archive",
+    "//src/graphics/drivers/aml-gpu:aml-gpu-package-archive",
+    "//src/graphics/drivers/msd-arm-mali:msd-arm-mali-archive",
+    "//src/graphics/drivers/msd-vsi-vip:msd-vsi-vip-archive",
+    "//src/media/audio/drivers/aml-g12-tdm:aml-g12-composite-bazel-package-archive",
+    "//src/power/fake-powersource:fake-battery-archive",
+    "//src/ui/backlight/drivers/vim3-pwm-backlight:package-archive",
+    "//src/ui/input/drivers/adc-buttons:bazel_package-archive",
+    "//src/ui/input/drivers/focaltech:package-archive",
   ]
 }

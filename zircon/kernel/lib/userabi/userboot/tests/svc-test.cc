@@ -29,17 +29,16 @@ class SvcSingleProcessTest : public zxtest::Test {
     static zx::channel svc_server;
 
     // Prevents multiple iterations from discarding this.
-    if (!svc_stash) {
-      svc_stash = GetSvcStash();
+    if (!svc_server) {
+      GetSvcStash(svc_stash);
       ASSERT_TRUE(svc_stash);
     }
 
     // Order matters, provider is stored first.
-    if (!svc_server) {
-      ASSERT_NO_FATAL_FAILURE(GetStashedSvc(svc_stash.borrow(), svc_server));
+    if (svc_stash.is_valid()) {
+      ASSERT_NO_FATAL_FAILURE(GetStashedSvc(std::move(svc_stash), svc_server));
     }
 
-    svc_stash_ = svc_stash.borrow();
     svc_ = standalone::GetNsDir("/svc");
     stashed_svc_ = svc_server.borrow();
 
@@ -64,22 +63,15 @@ class SvcSingleProcessTest : public zxtest::Test {
     }
   }
 
-  zx::unowned_channel svc_stash() { return svc_stash_->borrow(); }
   zx::unowned_channel local_svc() { return svc_->borrow(); }
   zx::unowned_channel stashed_svc() { return stashed_svc_->borrow(); }
 
  private:
-  zx::unowned_channel svc_stash_;
   zx::unowned_channel svc_;
   zx::unowned_channel stashed_svc_;
 };
 
 TEST_F(SvcSingleProcessTest, SvcStubIsValidHandle) { ASSERT_TRUE(local_svc()->is_valid()); }
-
-TEST_F(SvcSingleProcessTest, SvcStashIsValidHandle) {
-  ASSERT_TRUE(svc_stash()->is_valid());
-  ASSERT_TRUE(stashed_svc()->is_valid());
-}
 
 TEST_F(SvcSingleProcessTest, WritingIntoSvcShowsUpInStashHandle) {
   ASSERT_TRUE(local_svc()->is_valid());

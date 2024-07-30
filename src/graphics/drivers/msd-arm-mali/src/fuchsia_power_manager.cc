@@ -70,7 +70,7 @@ bool FuchsiaPowerManager::Initialize(ParentDevice* parent_device, inspect::Node&
 
     if (config.element().name().get() == kHardwarePowerElementName) {
       hardware_power_element_control_client_end_ =
-          std::move(result.value().element_control_channel());
+          std::move(description.element_control_client_.value());
       hardware_power_lessor_client_ = fidl::WireSyncClient<fuchsia_power_broker::Lessor>(
           std::move(description.lessor_client_.value()));
       hardware_power_current_level_client_ =
@@ -163,9 +163,9 @@ void FuchsiaPowerManager::CheckRequiredLevel() {
       });
 }
 
-TimeoutSource::Clock::duration FuchsiaPowerManager::GetCurrentTimeoutDuration() {
+TimeoutSource::Clock::time_point FuchsiaPowerManager::GetCurrentTimeoutPoint() {
   if (!LeaseIsRequested()) {
-    return Clock::duration::max();
+    return Clock::time_point::max();
   }
   return owner_->GetPowerManager()->GetGpuPowerdownTimeout();
 }

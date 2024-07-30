@@ -71,7 +71,7 @@ class ButtonsDevice : public fidl::WireServer<fuchsia_input_report::InputDevice>
 
   int Thread();
   zx_status_t Init();
-  zx::result<uint8_t> ReconfigurePolarity(uint32_t idx, uint64_t int_port);
+  zx::result<bool> ReconfigurePolarity(uint32_t idx, uint64_t int_port);
   zx_status_t ConfigureInterrupt(uint32_t idx, uint64_t int_port);
   zx::result<bool> MatrixScan(uint32_t row, uint32_t col, zx_duration_t delay);
 

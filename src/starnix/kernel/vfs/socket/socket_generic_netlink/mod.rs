@@ -21,12 +21,13 @@ use netlink_packet_utils::Emitable;
 use starnix_logging::track_stub;
 use starnix_sync::Mutex;
 use std::collections::{HashMap, HashSet};
+use std::num::NonZero;
 use std::ops::DerefMut;
 use std::sync::Arc;
 
 use starnix_logging::{log_error, log_info, log_warn};
-use starnix_uapi::error;
 use starnix_uapi::errors::Errno;
+use starnix_uapi::{error, ENOENT};
 
 mod messages;
 mod nl80211;
@@ -236,6 +237,18 @@ impl<S: Sender<GenericMessage>> GenericNetlinkServerState<S> {
                             "Cannot serve requested netlink family {}",
                             family
                         );
+
+                        // Send back error message
+                        let mut buffer = [0; NETLINK_HEADER_LEN];
+                        netlink_header.emit(&mut buffer[..NETLINK_HEADER_LEN]);
+                        let mut error = ErrorMessage::default();
+                        error.code = NonZero::new(-(ENOENT as i32));
+                        error.header = buffer.to_vec();
+                        netlink_header.flags = NLM_F_CAPPED as u16;
+                        let mut netlink_message =
+                            NetlinkMessage::new(netlink_header, NetlinkPayload::Error(error));
+                        netlink_message.finalize();
+                        sender.send(netlink_message, None);
                     }
                 }
             }
@@ -612,8 +625,12 @@ mod tests {
         sender.unbounded_send(getfamily_request()).expect("Failed to send getfamily request");
         assert!(exec.run_until_stalled(&mut fut) == Poll::Pending);
 
-        // The family doesn't exist, so no response should be sent.
-        assert!(messages_to_client.lock().is_empty());
+        // The family doesn't exist, so an error should be returned.
+        assert!(messages_to_client.lock().len() == 1);
+
+        let (_netlink_header, payload) = messages_to_client.lock().pop().unwrap().into_parts();
+        let err_msg = assert_matches!(payload, NetlinkPayload::Error(m) => m);
+        assert_eq!(err_msg.code, NonZero::new(-2));
     }
 
     #[test]

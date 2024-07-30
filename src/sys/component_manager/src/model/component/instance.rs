@@ -4,7 +4,7 @@
 
 use crate::bedrock::program::{self as program, ComponentStopOutcome, Program, StopRequestSuccess};
 use crate::framework::{build_framework_dictionary, controller};
-use crate::model::actions::{shutdown, ActionsManager, DiscoverAction, StopAction};
+use crate::model::actions::{shutdown, StopAction};
 use crate::model::component::{
     Component, ComponentInstance, ExtendedInstance, IncarnationId, Package, StartReason,
     WeakComponentInstance, WeakExtendedInstance,
@@ -26,7 +26,7 @@ use ::routing::bedrock::sandbox_construction::{
     self, build_component_sandbox, extend_dict_with_offers, ComponentSandbox,
 };
 use ::routing::bedrock::structured_dict::{ComponentInput, StructuredDictMap};
-use ::routing::capability_source::ComponentCapability;
+use ::routing::capability_source::{CapabilitySource, ComponentCapability};
 use ::routing::component_instance::{
     ComponentInstanceInterface, ResolvedInstanceInterface, ResolvedInstanceInterfaceExt,
 };
@@ -40,7 +40,7 @@ use cm_fidl_validator::error::{DeclType, Error as ValidatorError};
 use cm_logger::scoped::ScopedLogger;
 use cm_rust::{
     CapabilityDecl, CapabilityTypeName, ChildDecl, CollectionDecl, ComponentDecl, DeliveryType,
-    FidlIntoNative, NativeIntoFidl, OfferDeclCommon, SourceName, UseDecl,
+    ExposeDeclCommon, FidlIntoNative, NativeIntoFidl, OfferDeclCommon, SourceName, UseDecl,
 };
 use cm_types::{Name, RelativePath};
 use config_encoder::ConfigFields;
@@ -73,9 +73,7 @@ use {
 
 /// The mutable state of a component instance.
 pub enum InstanceState {
-    /// The instance was just created.
-    New,
-    /// A Discovered event has been dispatched for the instance, but it has not been resolved yet.
+    /// The instance has not been resolved yet. This is the initial state.
     Unresolved(UnresolvedInstanceState),
     /// The instance has been resolved.
     Resolved(ResolvedInstanceState),
@@ -93,25 +91,20 @@ impl InstanceState {
     where
         F: FnOnce(InstanceState) -> InstanceState,
     {
-        // We place InstanceState::New into self temporarily, so that the function can take
+        // We place InstanceState::Destroyed into self temporarily, so that the function can take
         // ownership of the current InstanceState and move values out of it.
-        *self = f(std::mem::replace(self, InstanceState::New));
+        *self = f(std::mem::replace(self, InstanceState::Destroyed));
     }
 
     /// Changes the state, checking invariants.
     /// The allowed transitions:
-    /// • New -> Discovered <-> Resolved -> Destroyed
-    /// • {New, Discovered, Resolved} -> Destroyed
+    /// • Unresolved <-> Resolved -> Destroyed
+    /// • {Unresolved, Resolved} -> Destroyed
     pub fn set(&mut self, next: Self) {
         match (&self, &next) {
-            (Self::New, Self::New)
-            | (Self::New, Self::Resolved(_))
-            | (Self::Unresolved(_), Self::Unresolved(_))
-            | (Self::Unresolved(_), Self::New)
+            (Self::Unresolved(_), Self::Unresolved(_))
             | (Self::Resolved(_), Self::Resolved(_))
-            | (Self::Resolved(_), Self::New)
             | (Self::Destroyed, Self::Destroyed)
-            | (Self::Destroyed, Self::New)
             | (Self::Destroyed, Self::Unresolved(_))
             | (Self::Destroyed, Self::Resolved(_)) => {
                 panic!("Invalid instance state transition from {:?} to {:?}", self, next);
@@ -172,7 +165,6 @@ impl InstanceState {
         context: &Arc<ModelContext>,
     ) -> Option<InstanceToken> {
         match self {
-            InstanceState::New => None,
             InstanceState::Unresolved(unresolved_state)
             | InstanceState::Shutdown(_, unresolved_state) => {
                 Some(unresolved_state.instance_token(moniker, context))
@@ -204,8 +196,7 @@ impl InstanceState {
 impl fmt::Debug for InstanceState {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = match self {
-            Self::New => "New",
-            Self::Unresolved(_) => "Discovered",
+            Self::Unresolved(_) => "Unresolved",
             Self::Resolved(_) => "Resolved",
             Self::Started(_, _) => "Started",
             Self::Shutdown(_, _) => "Shutdown",
@@ -456,7 +447,7 @@ impl ResolvedInstanceState {
             &ResolvedInstanceState::make_program_outgoing_router,
         );
 
-        let (component_sandbox, child_inputs) = build_component_sandbox(
+        let component_sandbox = build_component_sandbox(
             &component,
             child_outgoing_dictionary_routers,
             &decl,
@@ -469,7 +460,7 @@ impl ResolvedInstanceState {
             declared_dictionaries,
         );
         state.sandbox = component_sandbox;
-        state.discover_static_children(child_inputs).await;
+        state.populate_child_inputs(&state.sandbox.child_inputs).await;
         Ok(state)
     }
 
@@ -498,8 +489,12 @@ impl ResolvedInstanceState {
             CapabilityDecl::Protocol(_) => sandbox::Connector::new_sendable(dir_entry).into(),
             _ => dir_entry.into(),
         };
-        let hook =
-            CapabilityRequestedHook { source: component.as_weak(), name: name.clone(), capability };
+        let hook = CapabilityRequestedHook {
+            source: component.as_weak(),
+            name: name.clone(),
+            capability,
+            capability_decl: capability_decl.clone(),
+        };
         match capability_decl {
             CapabilityDecl::Protocol(p) => match p.delivery {
                 DeliveryType::Immediate => Router::new(hook),
@@ -611,12 +606,20 @@ impl ResolvedInstanceState {
     /// backed by legacy routing, and hosts [`Open`]s instead of [`Router`]s. This [`Dict`] is used
     /// to generate the `exposed_dir`.
     pub async fn get_exposed_dict(&self) -> &Dict {
+        let exposes_needing_metadata: HashMap<Name, CapabilityTypeName> = self
+            .decl()
+            .exposes
+            .iter()
+            .filter(|e| matches!(e, cm_rust::ExposeDecl::Protocol(_)))
+            .map(|e| (e.target_name().clone(), CapabilityTypeName::from(e)))
+            .collect();
         let create_exposed_dict = async {
             let component = self.weak_component.upgrade().unwrap();
             let dict = Router::dict_routers_to_open(
                 &WeakInstanceToken::new_component(self.weak_component.clone()),
                 &component.execution_scope,
                 &self.sandbox.component_output_dict,
+                &exposes_needing_metadata,
             );
             Self::extend_exposed_dict_with_legacy(&component, self.decl(), &dict);
             dict
@@ -756,12 +759,6 @@ impl ResolvedInstanceState {
     }
 
     /// Adds a new child component instance.
-    ///
-    /// The new child starts with a registered `Discover` action. Returns the child and a future to
-    /// wait on the `Discover` action, or an error if a child with the same name already exists.
-    ///
-    /// If the outer `Result` is successful but the `Discover` future results in an error, the
-    /// `Discover` action failed, but the child was still created successfully.
     pub async fn add_child(
         &mut self,
         component: &Arc<ComponentInstance>,
@@ -772,7 +769,7 @@ impl ResolvedInstanceState {
         controller: Option<ServerEnd<fcomponent::ControllerMarker>>,
         input: ComponentInput,
     ) -> Result<Arc<ComponentInstance>, AddDynamicChildError> {
-        let (child, input) = self
+        let child = self
             .add_child_internal(
                 component,
                 child,
@@ -783,11 +780,6 @@ impl ResolvedInstanceState {
             )
             .await?;
 
-        // Run a Discover action.
-        ActionsManager::register(child.clone(), DiscoverAction::new(input)).await?;
-
-        // The controller is not started until this point, because the child must be discovered
-        // before a reference to it is given out to anyone.
         if let Some(controller) = controller {
             if let Ok(stream) = controller.into_stream() {
                 child
@@ -798,21 +790,6 @@ impl ResolvedInstanceState {
         Ok(child)
     }
 
-    /// Adds a new child of this instance for the given `ChildDecl`. Returns
-    /// a result indicating if the new child instance has been successfully added.
-    /// Like `add_child`, but doesn't register a `Discover` action, and therefore
-    /// doesn't return a future to wait for.
-    pub async fn add_child_no_discover(
-        &mut self,
-        component: &Arc<ComponentInstance>,
-        child: &ChildDecl,
-        collection: Option<&CollectionDecl>,
-    ) -> Result<(), AddChildError> {
-        self.add_child_internal(component, child, collection, None, None, ComponentInput::default())
-            .await
-            .map(|_| ())
-    }
-
     async fn add_child_internal(
         &mut self,
         component: &Arc<ComponentInstance>,
@@ -821,7 +798,7 @@ impl ResolvedInstanceState {
         dynamic_offers: Option<Vec<fdecl::Offer>>,
         dynamic_capabilities: Option<Vec<fdecl::Capability>>,
         child_input: ComponentInput,
-    ) -> Result<(Arc<ComponentInstance>, ComponentInput), AddChildError> {
+    ) -> Result<Arc<ComponentInstance>, AddChildError> {
         assert!(
             (dynamic_offers.is_none()) || collection.is_some(),
             "setting numbered handles or dynamic offers for static children",
@@ -866,6 +843,7 @@ impl ResolvedInstanceState {
             None => 0,
         };
         let child = ComponentInstance::new(
+            child_input,
             self.environment_for_child(component, child, collection.clone()),
             component.moniker.child(child_name.clone()),
             incarnation_id,
@@ -884,7 +862,7 @@ impl ResolvedInstanceState {
         self.dynamic_offers.extend(dynamic_offers.into_iter());
         self.dynamic_capabilities.extend(dynamic_capabilities.into_iter());
 
-        Ok((child, child_input))
+        Ok(child)
     }
 
     fn add_target_dynamic_offers(
@@ -1022,24 +1000,31 @@ impl ResolvedInstanceState {
         // on. To get around this, clone the children.
         let children = self.resolved_component.decl.children.clone();
         for child in &children {
-            self.add_child_no_discover(component, child, None).await.map_err(|err| {
-                ResolveActionError::AddStaticChildError { child_name: child.name.to_string(), err }
-            })?;
+            // `child_input` will be populated later, after the component's sandbox is
+            // constructed.
+            self.add_child_internal(component, child, None, None, None, ComponentInput::default())
+                .await
+                .map_err(|err| ResolveActionError::AddStaticChildError {
+                    child_name: child.name.to_string(),
+                    err,
+                })?;
         }
         Ok(())
     }
 
-    async fn discover_static_children(&self, child_inputs: StructuredDictMap<ComponentInput>) {
+    async fn populate_child_inputs(&self, child_inputs: &StructuredDictMap<ComponentInput>) {
         for (child_name, child_instance) in &self.children {
             if let Some(_) = child_name.collection {
                 continue;
             }
             let child_name =
                 Name::new(child_name.name.as_str()).expect("child is static so name is not long");
-            let child_input = child_inputs.remove(&child_name).expect("missing child dict");
-            ActionsManager::register(child_instance.clone(), DiscoverAction::new(child_input))
-                .await
-                .expect("failed to discover child");
+            let child_input = child_inputs.get(&child_name).expect("missing child dict");
+            let mut state = child_instance.lock_state().await;
+            let InstanceState::Unresolved(state) = &mut *state else {
+                unreachable!("still building sandbox, the child can't be resolved yet");
+            };
+            let _ = std::mem::replace(&mut state.component_input, child_input);
         }
     }
 
@@ -1258,6 +1243,7 @@ struct CapabilityRequestedHook {
     source: WeakComponentInstance,
     name: Name,
     capability: Capability,
+    capability_decl: cm_rust::CapabilityDecl,
 }
 
 #[async_trait]
@@ -1289,30 +1275,39 @@ impl Routable for CapabilityRequestedHook {
             receiver: receiver.clone(),
         });
         source.hooks.dispatch(&event).await;
-        let capability = if receiver.is_taken() {
+        let capability = if request.debug {
+            CapabilitySource::Component {
+                capability: self.capability_decl.clone().into(),
+                component: self.source.clone(),
+            }
+            .try_into()
+            .expect("failed to convert capability source to dictionary")
+        } else if receiver.is_taken() {
             sender.into()
         } else {
             self.capability.try_clone().map_err(|_| RoutingError::BedrockNotCloneable)?
         };
-        if !request.debug {
-            Ok(capability)
-        } else {
-            Ok(Capability::Instance(WeakInstanceToken::new_component(self.source.clone())))
-        }
+        Ok(capability)
     }
 }
 
 struct ProgramRouter {
     component: WeakComponentInstance,
     source_path: RelativePath,
+    capability: ComponentCapability,
 }
 
 #[async_trait]
 impl Routable for ProgramRouter {
     async fn route(&self, request: Request) -> Result<Capability, RouterError> {
         if request.debug {
-            let source = WeakInstanceToken::new_component(self.component.clone());
-            return Ok(Capability::Instance(source));
+            let source = CapabilitySource::Component {
+                capability: self.capability.clone(),
+                component: self.component.clone(),
+            };
+            return Ok(source
+                .try_into()
+                .expect("failed to convert capability source to dictionary"));
         }
         fn open_error(e: OpenOutgoingDirError) -> OpenError {
             CapabilityProviderError::from(ComponentProviderError::from(e)).into()
@@ -1350,6 +1345,10 @@ impl Routable for ProgramRouter {
     }
 }
 
-fn new_program_router(component: WeakComponentInstance, source_path: RelativePath) -> Router {
-    Router::new(ProgramRouter { component: component, source_path: source_path })
+fn new_program_router(
+    component: WeakComponentInstance,
+    source_path: RelativePath,
+    capability: ComponentCapability,
+) -> Router {
+    Router::new(ProgramRouter { component: component, source_path: source_path, capability })
 }

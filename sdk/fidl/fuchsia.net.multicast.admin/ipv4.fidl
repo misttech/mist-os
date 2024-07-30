@@ -6,7 +6,9 @@ library fuchsia.net.multicast.admin;
 
 using fuchsia.net;
 
-/// The properties used to lookup IPv4 multicast routes.
+/// The source and destination address of an IPv4 multicast route.
+///
+/// This address tuple uniquely identifies an IPv4 multicast route.
 type Ipv4UnicastSourceAndMulticastDestination = struct {
     /// A unicast source address found in a multicast packet.
     unicast_source fuchsia.net.Ipv4Address;
@@ -23,6 +25,10 @@ type Ipv4UnicastSourceAndMulticastDestination = struct {
 closed protocol Ipv4RoutingTableController {
     /// Adds a route such that packets matching the addresses will be forwarded
     /// accordingly.
+    ///
+    /// The provided addresses act as the key for the route; any existing route
+    /// with the same addresses will be overwritten when this route is
+    /// installed.
     ///
     /// If a packet arrives at an interface different from the expected input
     /// interface set in the route, the packet will not be forwarded and a

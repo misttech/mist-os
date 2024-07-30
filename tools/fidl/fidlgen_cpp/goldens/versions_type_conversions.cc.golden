@@ -10,6 +10,8 @@
 namespace fidl {
 namespace internal {
 
+#ifdef __Fuchsia__
+
 ::test_versions::Struct WireNaturalConversionTraits<::test_versions::wire::Struct, ::test_versions::Struct>::ToNatural(::test_versions::wire::Struct src) {
   return ::test_versions::Struct(WireNaturalConversionTraits<uint32_t, uint32_t>::ToNatural(std::move(src.x)));
 }
@@ -18,6 +20,10 @@ namespace internal {
       .x = WireNaturalConversionTraits<uint32_t, uint32_t>::ToWire(arena, std::move(src.x())),
   };
 }
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
 
 ::test_versions::Table WireNaturalConversionTraits<::test_versions::wire::Table, ::test_versions::Table>::ToNatural(::test_versions::wire::Table src) {
   ::test_versions::Table dst;
@@ -37,6 +43,10 @@ namespace internal {
   return builder.Build();
 }
 
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
 ::test_versions::Union WireNaturalConversionTraits<::test_versions::wire::Union, ::test_versions::Union>::ToNatural(::test_versions::wire::Union src) {
   switch (src.Which()) {
     case ::test_versions::wire::Union::Tag::kX:
@@ -55,6 +65,8 @@ namespace internal {
       return ::test_versions::wire::Union();
   }
 }
+
+#endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
 

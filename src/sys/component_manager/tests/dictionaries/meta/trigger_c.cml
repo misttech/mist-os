@@ -2,9 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [
-        "syslog/client.shard.cml",
-    ],
+    include: [ "syslog/client.shard.cml" ],
     program: {
         runner: "elf",
         binary: "bin/dict_trigger",
@@ -16,16 +14,16 @@
             // fidl.test.components.Trigger-d is provided by the dynamic dictionary.
             extends: "program/svc/fuchsia.component.sandbox.Router",
         },
-        {
-            protocol: "fidl.test.components.Trigger",
-        },
+        { protocol: "fidl.test.components.Trigger" },
     ],
     use: [
-        {
-            protocol: "fidl.examples.routing.echo.Echo",
-        },
+        { protocol: "fidl.examples.routing.echo.Echo" },
         {
             protocol: "fuchsia.component.sandbox.Factory",
+            from: "framework",
+        },
+        {
+            protocol: "fuchsia.component.sandbox.CapabilityStore",
             from: "framework",
         },
     ],
@@ -39,8 +37,8 @@
     ],
     expose: [
         {
-            from: "self",
             dictionary: "dict",
+            from: "self",
         },
     ],
 }

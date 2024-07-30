@@ -241,7 +241,7 @@ impl<'a, D: DeviceOps> BoundScanner<'a, D> {
     ) -> Result<OngoingScan, Error> {
         let ssids_list = req.ssid_list.iter().map(cssid_from_ssid_unchecked).collect::<Vec<_>>();
 
-        let (mac_header, _) = write_frame_with_dynamic_buffer!(vec![], {
+        let mac_header = write_frame_with_dynamic_buffer!(vec![], {
             headers: {
                 mac::MgmtHdr: &self.probe_request_mac_header(),
             },
@@ -498,15 +498,12 @@ fn active_scan_request_series(
             ssids: Some(ssids.clone()),
             mac_header: Some(mac_header.clone()),
             // Exclude the SSID IE because the device driver will generate using ssids_list.
-            ies: Some(
-                write_frame_with_dynamic_buffer!(vec![], {
+            ies: Some(write_frame_with_dynamic_buffer!(vec![], {
                 ies: {
                     supported_rates: supported_rates,
                     extended_supported_rates: {/* continue rates */},
-                    }
-                })?
-                .0,
-            ),
+                }
+            })?),
             min_channel_time: Some(min_channel_time),
             max_channel_time: Some(max_channel_time),
             min_home_time: Some(min_home_time),
@@ -551,7 +548,6 @@ mod tests {
     use wlan_common::assert_variant;
     use wlan_common::sequence::SequenceManager;
     use wlan_common::timer::{self, create_timer, Timer};
-    use wlan_ffi_transport::{BufferProvider, FakeFfiBufferProvider};
 
     lazy_static! {
         static ref BSSID_FOO: Bssid = [6u8; 6].into();
@@ -1193,7 +1189,6 @@ mod tests {
             Context {
                 _config: Default::default(),
                 device: self.fake_device.clone(),
-                buffer_provider: BufferProvider::new(FakeFfiBufferProvider::new()),
                 timer: self.timer.take().unwrap(),
                 seq_mgr: SequenceManager::new(),
             }

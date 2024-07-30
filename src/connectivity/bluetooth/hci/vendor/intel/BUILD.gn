@@ -10,8 +10,8 @@ import("//build/drivers.gni")
 import("//build_overrides/pigweed.gni")
 
 driver_bind_rules("bt_hci_intel_bind") {
-  rules = "bt_hci_intel.bind"
-  tests = "bind_tests.json"
+  rules = "meta/bt_hci_intel.bind"
+  tests = "meta/bind_tests.json"
   deps = [
     "//src/devices/bind/fuchsia.bluetooth",
     "//src/devices/bind/fuchsia.usb",
@@ -36,6 +36,7 @@ source_set("common") {
     "device.h",
     "firmware_loader.cc",
     "firmware_loader.h",
+    "hci_event_handler.cc",
     "logging.h",
     "vendor_hci.cc",
     "vendor_hci.h",
@@ -54,6 +55,7 @@ source_set("common") {
     "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/sync",
+    "//zircon/system/ulib/sync:sync-cpp",
     "//zircon/system/ulib/zx",
   ]
 
@@ -74,7 +76,7 @@ fuchsia_driver("fuchsia_driver") {
 fuchsia_driver_component("driver") {
   component_name = "bt-hci-intel"
   deps = [ ":fuchsia_driver" ]
-  info = "driver-info.json"
+  info = "meta/driver-info.json"
   manifest = "meta/driver.cml"
 }
 
@@ -117,7 +119,7 @@ executable("tests_executable") {
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/driver/compat/cpp",
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
-    "//sdk/lib/driver/testing/cpp/fixture:cpp_fixture",
+    "//sdk/lib/driver/testing/cpp:driver_testing_cpp",
     "//sdk/lib/fdio",
     "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/testing/mock-ddk",

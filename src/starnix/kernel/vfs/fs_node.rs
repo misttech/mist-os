@@ -4,7 +4,7 @@
 
 use crate::device::DeviceMode;
 use crate::mm::PAGE_SIZE;
-use crate::security::{get_fs_node_security_id, post_setxattr};
+use crate::security::{post_setxattr, FsNodeState};
 use crate::signals::{send_standard_signal, SignalInfo};
 use crate::task::{CurrentTask, Kernel, WaitQueue, Waiter};
 use crate::time::utc;
@@ -21,7 +21,6 @@ use crate::vfs::{
 use bitflags::bitflags;
 use fuchsia_zircon as zx;
 use once_cell::sync::OnceCell;
-use selinux::SecurityId;
 use starnix_logging::{log_error, track_stub};
 #[cfg(any(test, debug_assertions))]
 use starnix_sync::Unlocked;
@@ -193,9 +192,6 @@ pub type FsNodeHandle = Arc<FsNodeReleaser>;
 pub type WeakFsNodeHandle = Weak<FsNodeReleaser>;
 
 #[derive(Debug, Default, Clone)]
-pub struct FsNodeSecurityId(Option<SecurityId>);
-
-#[derive(Debug, Default, Clone)]
 pub struct FsNodeInfo {
     pub ino: ino_t,
     pub mode: FileMode,
@@ -209,7 +205,7 @@ pub struct FsNodeInfo {
     pub time_status_change: zx::Time,
     pub time_access: zx::Time,
     pub time_modify: zx::Time,
-    pub sid: FsNodeSecurityId,
+    pub security_state: FsNodeState,
 }
 
 impl FsNodeInfo {
@@ -763,6 +759,8 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
     /// Update node attributes persistently.
     fn update_attributes(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _current_task: &CurrentTask,
         _info: &FsNodeInfo,
         _has: zxio_node_attr_has_t,
     ) -> Result<(), Errno> {
@@ -857,10 +855,11 @@ macro_rules! fs_node_impl_symlink {
         fn create_file_ops(
             &self,
             _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
-            _node: &crate::vfs::FsNode,
+            node: &crate::vfs::FsNode,
             _current_task: &CurrentTask,
             _flags: starnix_uapi::open_flags::OpenFlags,
         ) -> Result<Box<dyn crate::vfs::FileOps>, starnix_uapi::errors::Errno> {
+            assert!(node.is_lnk());
             unreachable!("Symlink nodes cannot be opened.");
         }
     };
@@ -1611,10 +1610,10 @@ impl FsNode {
             send_standard_signal(current_task, SignalInfo::default(SIGXFSZ));
             return error!(EFBIG);
         }
-        self.clear_suid_and_sgid_bits(current_task)?;
+        let mut locked = locked.cast_locked::<M>();
+        self.clear_suid_and_sgid_bits(&mut locked, current_task)?;
         // We have to take the append lock since otherwise it would be possible to truncate and for
         // an append to continue using the old size.
-        let mut locked = locked.cast_locked::<M>();
         let (guard, mut locked) = strategy.lock(&mut locked, current_task, self)?;
         self.ops().truncate(&mut locked, &guard, self, current_task, length)?;
         self.update_ctime_mtime();
@@ -1664,8 +1663,8 @@ impl FsNode {
             return error!(EFBIG);
         }
 
-        self.clear_suid_and_sgid_bits(current_task)?;
         let mut locked = locked.cast_locked::<M>();
+        self.clear_suid_and_sgid_bits(&mut locked, current_task)?;
         let (guard, mut locked) = strategy.lock(&mut locked, current_task, self)?;
         self.ops().allocate(&mut locked, &guard, self, current_task, mode, offset, length)?;
         self.update_ctime_mtime();
@@ -1819,8 +1818,14 @@ impl FsNode {
         self.socket.get()
     }
 
-    fn update_attributes<F>(&self, mutator: F) -> Result<(), Errno>
+    pub fn update_attributes<L, F>(
+        &self,
+        locked: &mut Locked<'_, L>,
+        current_task: &CurrentTask,
+        mutator: F,
+    ) -> Result<(), Errno>
     where
+        L: LockEqualOrBefore<FileOpsCore>,
         F: FnOnce(&mut FsNodeInfo) -> Result<(), Errno>,
     {
         let mut info = self.info.write();
@@ -1835,7 +1840,8 @@ impl FsNode {
         has.rdev = info.rdev != new_info.rdev;
         // Call `update_attributes(..)` to persist the changes for the following fields.
         if has.modification_time || has.access_time || has.mode || has.uid || has.gid || has.rdev {
-            self.ops().update_attributes(&new_info, has)?;
+            let mut locked = locked.cast_locked::<FileOpsCore>();
+            self.ops().update_attributes(&mut locked, current_task, &new_info, has)?;
         }
         *info = new_info;
         Ok(())
@@ -1844,14 +1850,18 @@ impl FsNode {
     /// Set the permissions on this FsNode to the given values.
     ///
     /// Does not change the IFMT of the node.
-    pub fn chmod(
+    pub fn chmod<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         mount: &MountInfo,
         mut mode: FileMode,
-    ) -> Result<(), Errno> {
+    ) -> Result<(), Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         mount.check_readonly_filesystem()?;
-        self.update_attributes(|info| {
+        self.update_attributes(locked, current_task, |info| {
             let creds = current_task.creds();
             if !creds.has_capability(CAP_FOWNER) {
                 if info.uid != creds.euid {
@@ -1867,15 +1877,19 @@ impl FsNode {
     }
 
     /// Sets the owner and/or group on this FsNode.
-    pub fn chown(
+    pub fn chown<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         mount: &MountInfo,
         owner: Option<uid_t>,
         group: Option<gid_t>,
-    ) -> Result<(), Errno> {
+    ) -> Result<(), Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         mount.check_readonly_filesystem()?;
-        self.update_attributes(|info| {
+        self.update_attributes(locked, current_task, |info| {
             if !current_task.creds().has_capability(CAP_CHOWN) {
                 let creds = current_task.creds();
                 if info.uid != creds.euid {
@@ -2142,9 +2156,16 @@ impl FsNode {
     }
 
     /// Clear the SUID and SGID bits unless the `current_task` has `CAP_FSETID`
-    pub fn clear_suid_and_sgid_bits(&self, current_task: &CurrentTask) -> Result<(), Errno> {
+    pub fn clear_suid_and_sgid_bits<L>(
+        &self,
+        locked: &mut Locked<'_, L>,
+        current_task: &CurrentTask,
+    ) -> Result<(), Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         if !current_task.creds().has_capability(CAP_FSETID) {
-            self.update_attributes(|info| {
+            self.update_attributes(locked, current_task, |info| {
                 info.clear_suid_and_sgid_bits();
                 Ok(())
             })?;
@@ -2177,13 +2198,17 @@ impl FsNode {
 
     /// Update the atime and mtime if the `current_task` has write access, is the file owner, or
     /// holds either the CAP_DAC_OVERRIDE or CAP_FOWNER capability.
-    pub fn update_atime_mtime(
+    pub fn update_atime_mtime<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         mount: &MountInfo,
         atime: TimeUpdateType,
         mtime: TimeUpdateType,
-    ) -> Result<(), Errno> {
+    ) -> Result<(), Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         // If the filesystem is read-only, this always fail.
         mount.check_readonly_filesystem()?;
 
@@ -2212,7 +2237,7 @@ impl FsNode {
             // This function is called by `utimes(..)` which will update the access and
             // modification time. We need to call `update_attributes()` to update the mtime of
             // filesystems that manages file timestamps.
-            self.update_attributes(|info| {
+            self.update_attributes(locked, current_task, |info| {
                 let now = utc::utc_now();
                 info.time_status_change = now;
                 let get_time = |time: TimeUpdateType| match time {
@@ -2235,40 +2260,6 @@ impl FsNode {
     pub fn create_write_guard(&self, mode: FileWriteGuardMode) -> Result<FileWriteGuard, Errno> {
         let handle = self.weak_handle.upgrade().ok_or_else(|| errno!(ENOENT))?;
         self.write_guard_state.lock().create_write_guard(handle, mode)
-    }
-
-    /// Sets the cached security id to `sid`. Storing the security id will cause the security id to
-    /// *not* be recomputed in `FsNode::effective_sid`.
-    pub(crate) fn set_cached_sid(&self, sid: SecurityId) {
-        self.update_info(|info| info.sid = FsNodeSecurityId(Some(sid)));
-    }
-
-    /// Clears the cached security id. Clearing the security id will cause the security id to
-    /// be be recomputed using an extended attribute value on the next `FsNode::effective_sid`.
-    pub(crate) fn clear_cached_sid(&self) {
-        self.update_info(|info| info.sid = FsNodeSecurityId(None));
-    }
-
-    /// Returns the security id currently stored in this node. This API should only be used by code
-    /// that is responsible for controlling the cached security id; e.g., to check its current value
-    /// before engaging logic that may compute a new value. Access control enforcement code should
-    /// use `FsNode::effective_sid`, *not* this function.
-    pub fn cached_sid(&self) -> Option<SecurityId> {
-        self.info().sid.0
-    }
-
-    /// Returns the security id that should be used for SELinux access control checks at this time.
-    /// If no security id is cached, it is recomputed via `get_fs_node_security_id()`. Access
-    /// control enforcement code should use this function, *not* `FsNode::cached_sid`.
-    pub fn effective_sid(&self, current_task: &CurrentTask) -> SecurityId {
-        // Note: the sid is read before the match statement because otherwise the lock in
-        // `self.info()` would be held for the duration of the match statement, leading to a
-        // deadlock with `get_fs_node_security_id()`.
-        let sid = self.info().sid.0;
-        match sid {
-            Some(sid) => sid,
-            None => get_fs_node_security_id(current_task, self),
-        }
     }
 }
 
@@ -2301,21 +2292,6 @@ mod tests {
     use super::*;
     use crate::testing::*;
     use crate::vfs::buffers::VecOutputBuffer;
-    use selinux::security_server::{Mode as SecurityServerMode, SecurityServer};
-    use starnix_sync::Unlocked;
-
-    const VALID_SECURITY_CONTEXT: &'static str = "u:object_r:test_valid_t:s0";
-
-    fn create_test_file(
-        locked: &mut Locked<'_, Unlocked>,
-        current_task: &AutoReleasableTask,
-    ) -> NamespaceNode {
-        current_task
-            .fs()
-            .root()
-            .create_node(locked, &current_task, "file".into(), FileMode::IFREG, DeviceType::NONE)
-            .expect("create_node(file)")
-    }
 
     #[::fuchsia::test]
     async fn open_device_file() {
@@ -2492,34 +2468,5 @@ mod tests {
         assert_eq!(check_access(0, 3, 0o070, Access::EXEC), Ok(()));
         assert_eq!(check_access(0, 3, 0o070, Access::READ), Ok(()));
         assert_eq!(check_access(0, 3, 0o070, Access::WRITE), Ok(()));
-    }
-
-    #[::fuchsia::test]
-    async fn setxattr_set_sid() {
-        const BINARY_POLICY: &[u8] =
-            include_bytes!("../../lib/selinux/testdata/micro_policies/hooks_tests_policy.pp");
-
-        let security_server = SecurityServer::new(SecurityServerMode::Enable);
-        security_server.set_enforcing(true);
-        security_server.load_policy(BINARY_POLICY.to_vec()).expect("policy load failed");
-        let (_kernel, current_task, mut locked) =
-            create_kernel_task_and_unlocked_with_selinux(security_server);
-        let node = &create_test_file(&mut locked, &current_task).entry.node;
-        assert_eq!(None, node.info().sid.0);
-        assert_eq!(None, node.cached_sid());
-
-        node.set_xattr(
-            current_task.as_ref(),
-            &current_task.fs().root().mount,
-            "security.selinux".into(),
-            VALID_SECURITY_CONTEXT.into(),
-            XattrOp::Set,
-        )
-        .expect("setxattr");
-
-        let node_info_sid = node.info().sid.0.clone();
-        let node_stored_sid = node.cached_sid();
-        assert!(node_info_sid.is_some());
-        assert_eq!(node_info_sid, node_stored_sid);
     }
 }

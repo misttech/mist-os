@@ -15,8 +15,8 @@ use futures::{Stream, TryStreamExt as _};
 use net_types::ip::{GenericOverIp, Ip, Ipv4, Ipv6, Subnet};
 use thiserror::Error;
 use {
-    fidl_fuchsia_net as fnet, fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
-    fidl_fuchsia_net_routes as fnet_routes, fidl_fuchsia_net_routes_admin as fnet_routes_admin,
+    fidl_fuchsia_net as fnet, fidl_fuchsia_net_routes as fnet_routes,
+    fidl_fuchsia_net_routes_admin as fnet_routes_admin,
 };
 
 use crate::{impl_responder, FidlRouteIpExt, Responder, SliceResponder, WatcherCreationError};
@@ -267,13 +267,10 @@ pub trait FidlRuleAdminIpExt: Ip {
         Payload = Result<(), fnet_routes_admin::RuleSetError>,
         ControlHandle = Self::RuleSetControlHandle,
     >;
-    /// The responder for AuthenticateForInterface requests.
-    type RuleSetAuthenticateForInterfaceResponder: Responder<
-        Payload = Result<(), fnet_routes_admin::RuleSetError>,
-    >;
     /// The responder for AuthenticateForRouteTable requests.
     type RuleSetAuthenticateForRouteTableResponder: Responder<
-        Payload = Result<(), fnet_routes_admin::RuleSetError>,
+        Payload = Result<(), fnet_routes_admin::AuthenticateForRouteTableError>,
+        ControlHandle = Self::RuleSetControlHandle,
     >;
     /// The control handle for RuleTable protocols.
     type RuleTableControlHandle: fidl::endpoints::ControlHandle + Send + Clone;
@@ -298,8 +295,6 @@ impl FidlRuleAdminIpExt for Ipv4 {
     type RuleSetRequestStream = fnet_routes_admin::RuleSetV4RequestStream;
     type RuleSetAddRuleResponder = fnet_routes_admin::RuleSetV4AddRuleResponder;
     type RuleSetRemoveRuleResponder = fnet_routes_admin::RuleSetV4RemoveRuleResponder;
-    type RuleSetAuthenticateForInterfaceResponder =
-        fnet_routes_admin::RuleSetV4AuthenticateForInterfaceResponder;
     type RuleSetAuthenticateForRouteTableResponder =
         fnet_routes_admin::RuleSetV4AuthenticateForRouteTableResponder;
     type RuleTableControlHandle = fnet_routes_admin::RuleTableV4ControlHandle;
@@ -325,8 +320,6 @@ impl FidlRuleAdminIpExt for Ipv6 {
     type RuleSetRequestStream = fnet_routes_admin::RuleSetV6RequestStream;
     type RuleSetAddRuleResponder = fnet_routes_admin::RuleSetV6AddRuleResponder;
     type RuleSetRemoveRuleResponder = fnet_routes_admin::RuleSetV6RemoveRuleResponder;
-    type RuleSetAuthenticateForInterfaceResponder =
-        fnet_routes_admin::RuleSetV6AuthenticateForInterfaceResponder;
     type RuleSetAuthenticateForRouteTableResponder =
         fnet_routes_admin::RuleSetV6AuthenticateForRouteTableResponder;
     type RuleTableControlHandle = fnet_routes_admin::RuleTableV6ControlHandle;
@@ -354,12 +347,8 @@ impl_responder!(
     Result<(), fnet_routes_admin::RuleSetError>,
 );
 impl_responder!(
-    fnet_routes_admin::RuleSetV4AuthenticateForInterfaceResponder,
-    Result<(), fnet_routes_admin::RuleSetError>,
-);
-impl_responder!(
     fnet_routes_admin::RuleSetV4AuthenticateForRouteTableResponder,
-    Result<(), fnet_routes_admin::RuleSetError>,
+    Result<(), fnet_routes_admin::AuthenticateForRouteTableError>,
 );
 impl_responder!(
     fnet_routes_admin::RuleSetV6AddRuleResponder,
@@ -370,12 +359,8 @@ impl_responder!(
     Result<(), fnet_routes_admin::RuleSetError>,
 );
 impl_responder!(
-    fnet_routes_admin::RuleSetV6AuthenticateForInterfaceResponder,
-    Result<(), fnet_routes_admin::RuleSetError>,
-);
-impl_responder!(
     fnet_routes_admin::RuleSetV6AuthenticateForRouteTableResponder,
-    Result<(), fnet_routes_admin::RuleSetError>,
+    Result<(), fnet_routes_admin::AuthenticateForRouteTableError>,
 );
 
 /// Conversion error for rule elements.
@@ -433,6 +418,36 @@ impl From<u32> for RuleIndex {
     }
 }
 
+/// How the interface of a packet should be matched against a rule.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum InterfaceSelector {
+    /// Match on the name of the device.
+    DeviceName(String),
+}
+
+impl TryFrom<fnet_routes::InterfaceSelector> for InterfaceSelector {
+    type Error = RuleFidlConversionError;
+    fn try_from(selector: fnet_routes::InterfaceSelector) -> Result<Self, Self::Error> {
+        match selector {
+            fnet_routes::InterfaceSelector::DeviceName(name) => Ok(Self::DeviceName(name)),
+            fnet_routes::InterfaceSelector::__SourceBreaking { unknown_ordinal } => {
+                Err(RuleFidlConversionError::UnknownOrdinal {
+                    name: "InterfaceSelector",
+                    unknown_ordinal,
+                })
+            }
+        }
+    }
+}
+
+impl From<InterfaceSelector> for fnet_routes::InterfaceSelector {
+    fn from(selector: InterfaceSelector) -> Self {
+        match selector {
+            InterfaceSelector::DeviceName(name) => fnet_routes::InterfaceSelector::DeviceName(name),
+        }
+    }
+}
+
 /// The selector part of the rule that is used to match packets.
 ///
 /// The default selector is the one that matches every packets, i.e., all the
@@ -445,7 +460,7 @@ pub struct RuleSelector<I: Ip> {
     pub locally_generated: Option<bool>,
     /// Matches the packet iff the socket that was bound to the device using
     /// `SO_BINDTODEVICE`.
-    pub bound_device: Option<u64>,
+    pub bound_device: Option<InterfaceSelector>,
     /// The selector for the MARK_1 domain.
     pub mark_1_selector: Option<MarkSelector>,
     /// The selector for the MARK_2 domain.
@@ -473,7 +488,7 @@ impl TryFrom<fnet_routes::RuleSelectorV4> for RuleSelector<Ipv4> {
                 .map(|from| from.try_into_ext().map_err(RuleFidlConversionError::DestinationSubnet))
                 .transpose()?,
             locally_generated,
-            bound_device,
+            bound_device: bound_device.map(InterfaceSelector::try_from).transpose()?,
             mark_1_selector: mark_1_selector.map(MarkSelector::try_from).transpose()?,
             mark_2_selector: mark_2_selector.map(MarkSelector::try_from).transpose()?,
         })
@@ -497,7 +512,7 @@ impl From<RuleSelector<Ipv4>> for fnet_routes::RuleSelectorV4 {
             }),
             base: Some(fnet_routes::BaseSelector {
                 locally_generated,
-                bound_device,
+                bound_device: bound_device.map(fnet_routes::InterfaceSelector::from),
                 mark_1_selector: mark_1_selector.map(Into::into),
                 mark_2_selector: mark_2_selector.map(Into::into),
                 __source_breaking: fidl::marker::SourceBreaking,
@@ -528,7 +543,7 @@ impl TryFrom<fnet_routes::RuleSelectorV6> for RuleSelector<Ipv6> {
                 .map(|from| from.try_into_ext().map_err(RuleFidlConversionError::DestinationSubnet))
                 .transpose()?,
             locally_generated,
-            bound_device,
+            bound_device: bound_device.map(InterfaceSelector::try_from).transpose()?,
             mark_1_selector: mark_1_selector.map(MarkSelector::try_from).transpose()?,
             mark_2_selector: mark_2_selector.map(MarkSelector::try_from).transpose()?,
         })
@@ -552,7 +567,7 @@ impl From<RuleSelector<Ipv6>> for fnet_routes::RuleSelectorV6 {
             }),
             base: Some(fnet_routes::BaseSelector {
                 locally_generated,
-                bound_device,
+                bound_device: bound_device.map(fnet_routes::InterfaceSelector::from),
                 mark_1_selector: mark_1_selector.map(Into::into),
                 mark_2_selector: mark_2_selector.map(Into::into),
                 __source_breaking: fidl::marker::SourceBreaking,
@@ -710,13 +725,6 @@ pub enum RuleSetRequest<I: FidlRuleAdminIpExt> {
         /// The responder for this request.
         responder: I::RuleSetRemoveRuleResponder,
     },
-    /// Authenticates the rule set for managing routes on an interface.
-    AuthenticateForInterface {
-        /// The credential proving authorization for this interface.
-        credential: fnet_interfaces_admin::ProofOfInterfaceAuthorization,
-        /// The responder for this request.
-        responder: I::RuleSetAuthenticateForInterfaceResponder,
-    },
     /// Authenticates the rule set for managing routes on a route table.
     AuthenticateForRouteTable {
         /// The table id of the table being authenticated for.
@@ -747,10 +755,6 @@ impl From<fnet_routes_admin::RuleSetV4Request> for RuleSetRequest<Ipv4> {
             fnet_routes_admin::RuleSetV4Request::RemoveRule { index, responder } => {
                 RuleSetRequest::RemoveRule { index: RuleIndex(index), responder }
             }
-            fnet_routes_admin::RuleSetV4Request::AuthenticateForInterface {
-                credential,
-                responder,
-            } => RuleSetRequest::AuthenticateForInterface { credential, responder },
             fnet_routes_admin::RuleSetV4Request::AuthenticateForRouteTable {
                 table,
                 token,
@@ -776,10 +780,6 @@ impl From<fnet_routes_admin::RuleSetV6Request> for RuleSetRequest<Ipv6> {
             fnet_routes_admin::RuleSetV6Request::RemoveRule { index, responder } => {
                 RuleSetRequest::RemoveRule { index: RuleIndex(index), responder }
             }
-            fnet_routes_admin::RuleSetV6Request::AuthenticateForInterface {
-                credential,
-                responder,
-            } => RuleSetRequest::AuthenticateForInterface { credential, responder },
             fnet_routes_admin::RuleSetV6Request::AuthenticateForRouteTable {
                 table,
                 token,
@@ -829,6 +829,33 @@ pub fn new_rule_set<I: Ip + FidlRuleAdminIpExt>(
 
     result.map_err(RuleSetCreationError::RuleSet)?;
     Ok(rule_set_proxy)
+}
+
+/// Dispatches `authenticate_for_route_table` on either the `RuleSetV4` or
+/// `RuleSetV6` proxy.
+pub async fn authenticate_for_route_table<I: Ip + FidlRuleAdminIpExt>(
+    rule_set: &<I::RuleSetMarker as ProtocolMarker>::Proxy,
+    table_id: u32,
+    token: fidl::Event,
+) -> Result<Result<(), fnet_routes_admin::AuthenticateForRouteTableError>, fidl::Error> {
+    #[derive(GenericOverIp)]
+    #[generic_over_ip(I, Ip)]
+    struct AuthenticateForRouteTableInput<'a, I: FidlRuleAdminIpExt> {
+        rule_set: &'a <I::RuleSetMarker as ProtocolMarker>::Proxy,
+        table_id: u32,
+        token: fidl::Event,
+    }
+
+    I::map_ip_in(
+        AuthenticateForRouteTableInput { rule_set, table_id, token },
+        |AuthenticateForRouteTableInput { rule_set, table_id, token }| {
+            Either::Left(rule_set.authenticate_for_route_table(table_id, token))
+        },
+        |AuthenticateForRouteTableInput { rule_set, table_id, token }| {
+            Either::Right(rule_set.authenticate_for_route_table(table_id, token))
+        },
+    )
+    .await
 }
 
 /// Dispatches `add_rule` on either the `RuleSetV4` or `RuleSetV6` proxy.

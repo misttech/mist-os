@@ -7,10 +7,12 @@ using zx;
 using fuchsia.io;
 
 /// Maximum number of bytes in a [Data].
+@available(added=HEAD)
 const MAX_DATA_LENGTH uint32 = 8192;
 
 /// A token represents a bedrock object. Tokens are reference counted, dropping
 /// all counts of the token removes the object.
+@available(added=HEAD)
 alias Token = zx.Handle:EVENTPAIR;
 
 /// Maximum number of items returned by dictionary iterator.
@@ -62,25 +64,23 @@ const MAX_NAME_LENGTH uint64 = fuchsia.io.MAX_NAME_LENGTH;
 @available(added=HEAD)
 alias DictionaryKey = string:MAX_NAME_LENGTH;
 
-/// A key-value pair in a [`Dictionary`].
+/// A key-value pair in a [`DictionaryRef`].
 @available(added=HEAD)
-type DictionaryItem = resource struct {
+type DictionaryItem = struct {
     key DictionaryKey;
-    value Capability;
+    value CapabilityId;
 };
 
-/// A key-value pair in a [`Dictionary`], where the value may be an error. This is useful for APIs
-/// that wish to selectively report errors for particular items.
+/// A key-value pair in a [`DictionaryRef`], where the value may be elided.
+/// This is useful for APIs that may wish to omit the value, for example if it could not be
+/// duplicated.
 @available(added=HEAD)
-type DictionaryFallibleItem = resource struct {
+type DictionaryOptionalItem = resource struct {
     key DictionaryKey;
-    value @generated_name("DictionaryValueResult") strict resource union {
-        1: ok Capability;
-        2: error DictionaryError;
-    };
+    value box<WrappedCapabilityId>;
 };
 
-/// Error returned from methods in [`Dictionary`].
+/// Error returned from [CapabilityStore/Dictionary*] methods.
 @available(added=HEAD)
 type DictionaryError = flexible enum {
     /// The Dictionary does not contain an item with the given key.
@@ -107,80 +107,267 @@ type DictionaryError = flexible enum {
 
 @discoverable
 @available(added=20)
-open protocol Dictionary {
-    /// Inserts a key-value pair into the dictionary.
-    ///
-    /// * error `DictionaryError.ALREADY_EXISTS` if the dictionary already contains an
-    /// item with the same key.
-    @available(added=HEAD)
-    flexible Insert(DictionaryItem) -> () error DictionaryError;
+open protocol Dictionary {};
 
-    /// Get a clone of a capability from this dictionary.
-    ///
-    /// * error `DictionaryError.NOT_FOUND` if the dictionary does not contain the key.
-    /// * error `DictionaryError.NOT_CLONEABLE` if the capability could not be cloned.
-    @available(added=HEAD)
-    flexible Get(struct {
-        key DictionaryKey;
-    }) -> (resource struct {
-        capability Capability;
-    }) error DictionaryError;
+/// A client-assigned id of a [Capability] in a [CapabilityStore].
+///
+/// The id is relative to the [CapabilityStore]. In the case where two
+/// [CapabilityStore]s have a capability / assigned to the same id, there is
+/// no relation between them
+@available(added=HEAD)
+alias CapabilityId = uint64;
 
-    /// Removes a key from the dictionary, returning the [`Capability`] value.
-    ///
-    /// * error `DictionaryError.NOT_FOUND` if the dictionary does not contain the key.
-    @available(added=HEAD)
-    flexible Remove(struct {
-        key DictionaryKey;
-    }) -> (resource struct {
-        capability Capability;
-    }) error DictionaryError;
+/// A client-assigned id of a new [Capability] in a [CapabilityStore]. Same as [CapabilityId],
+/// but used to distinguish output parameters in [CapabilityStore] methods.
+@available(added=HEAD)
+alias NewCapabilityId = CapabilityId;
 
-    /// Create a new dictionary that contains a clone of all the entries in
-    /// this dictionary.
-    ///
-    /// For example, if this dictionary contains nested dictionaries, the newly
-    /// created dictionary will contain references to those same nested
-    /// dictionaries because the entries are cloned rather than copied.
-    ///
-    /// * error `DictionaryError.NOT_CLONEABLE` if one of the capabilities in the
-    ///   dictionary could not be cloned.
-    @available(added=HEAD)
-    flexible Copy() -> (resource struct {
-        dictionary DictionaryRef;
-    }) error DictionaryError;
-
-    /// Enumerates the items in this dictionary.
-    ///
-    /// Creates a clone of each item during enumeration. If a capability was not cloneable,
-    /// the value will be null.
-    @available(added=HEAD)
-    flexible Enumerate(resource struct {
-        iterator server_end:DictionaryEnumerateIterator;
-    });
-
-    /// Enumerates the keys in this dictionary.
-    @available(added=HEAD)
-    flexible Keys(resource struct {
-        iterator server_end:DictionaryKeysIterator;
-    });
-
-
-    /// Removes all the entries in this dictionary.
-    ///
-    /// If `contents` is not provided, all the items are discarded without
-    /// enumerating them.
-    @available(added=HEAD)
-    flexible Drain(resource struct {
-        iterator server_end:<DictionaryDrainIterator, optional>;
-    });
+/// A [CapabilityId] wrapped in a struct. This is useful for putting a [CapabilityId] in a `box<>`,
+/// which FIDL does not allow for pure integral types.
+@available(added=HEAD)
+type WrappedCapabilityId = struct {
+    id CapabilityId;
 };
 
 @available(added=HEAD)
-open protocol DictionaryEnumerateIterator {
-    flexible GetNext() -> (resource struct {
-        items vector<DictionaryFallibleItem>:MAX_DICTIONARY_ITERATOR_CHUNK;
-    });
+alias WrappedNewCapabilityId = WrappedCapabilityId;
+
+/// Protocol that represents the concept of a "capability store", a repository
+/// for [Capability]s that are held by the component framework runtime.
+///
+/// [CapabilityStore] serves as the main bridge between the component runtime and clients
+/// that enables them to operate on and exchange [Capability]s. A [CapabilityStore] instance
+/// contains a set of [Capability]s, each of which has a [CapabilityId] assigned by the client.
+///
+/// Normally, a program would not exchange a [CapabilityStore] or [CapabilityId] with other
+/// programs -- a [CapabilityStore] connection and its enclosed capabilities are intended to
+/// be "local" to a program. Instead, if a program wishes to exchange a [Capability] with other
+/// programs, it should [Export] the [Capability] out of the store, send the [Capability] to the
+/// target program, which can then [Import] the capability into its own store.
+///
+/// [CapabilityStore] is also used to manage capability lifetimes. The lifetime of a capability is
+/// scoped to the [CapabilityStore] in which it resides; i.e. to drop the [CapabilityStore]
+/// connections to release the capabilities instead it. In addition, [CapabilityStore] supports a
+/// [Drop] API to drop an individual [Capability] reference. (Note that it is possible for a
+/// some capabilities, like [DictionaryRef], to have multiple references, in which case all of
+/// the references must be dropped for the underlying resource to be released.)
+///
+/// A note about semantics: the [CapabilityStore] APIs do not return [CapabilityId]s, because
+/// [CapabilityId]s are assigned by the client. Instead, when a method would semantically return
+/// a capability, this is expressed by taking the destination [CapabilityId] as an output parameter.
+@discoverable
+@available(added=HEAD)
+open protocol CapabilityStore {
+    /// Duplicates the capability with `id` to `dest_id`.
+    ///
+    /// Errors:
+    ///
+    /// - `ID_NOT_FOUND` if `id` was not a valid capability id in this store.
+    /// - `ID_ALREADY_EXISTS` if a capability with `dest_id` already exists in this store.
+    /// - `NOT_DUPLICATABLE` if `id` could not be duplicated.
+    flexible Duplicate(struct {
+        id CapabilityId;
+        dest_id NewCapabilityId;
+    }) -> () error CapabilityStoreError;
+
+    /// Drops the capability with `id` from this [`CapabilityStore`].
+    ///
+    /// Errors:
+    ///
+    /// - `ID_NOT_FOUND` if `id` was not a valid capability id in this store.
+    flexible Drop(struct {
+        id CapabilityId;
+    }) -> () error CapabilityStoreError;
+
+    /// Exports the capability with the client-assigned identifier `id` to
+    /// `capability`. This operation removes the capability from the store. If
+    /// this is not desired, [Duplicate] the capability first.
+    ///
+    /// Errors:
+    ///
+    /// - `ID_NOT_FOUND` if `id` was not a valid capability id in this store.
+    flexible Export(struct {
+        id CapabilityId;
+    }) -> (resource struct {
+        capability Capability;
+    }) error CapabilityStoreError;
+
+    /// Imports `capability` into this store with the client-assigned `id`.
+    ///
+    /// Errors:
+    ///
+    /// - `ID_ALREADY_EXISTS` if a capability with `id` already exists in this store.
+    /// - `BAD_CAPABILITY` if `capability` was not a valid [Capability].
+    flexible Import(resource struct {
+        id NewCapabilityId;
+        capability Capability;
+    }) -> () error CapabilityStoreError;
+
+    /// Creates a new empty dictionary in this [`CapabilityStore`] with client-assigned `id`.
+    ///
+    /// Errors:
+    ///
+    /// - `ID_ALREADY_EXISTS` if a capability with `id` already exists in this store.
+    flexible DictionaryCreate(struct {
+        id CapabilityId;
+    }) -> () error CapabilityStoreError;
+
+    /// Imports a dictionary in the form of a channel.
+    ///
+    /// This is a legacy API to support backward compatibility with APIs that take a [Dictionary]
+    /// channel.
+    flexible DictionaryLegacyImport(resource struct {
+        id NewCapabilityId;
+        client_end zx.Handle:CHANNEL;
+    }) -> () error CapabilityStoreError;
+
+    /// Binds a channel to the dictionary with `id`. The channel can
+    /// be re-imported into a [CapabilityStore] with [DictionaryImportLegacy].
+    ///
+    /// This is a legacy API to support backward compatibility with APIs that take a [Dictionary]
+    /// channel.
+    flexible DictionaryLegacyExport(resource struct {
+        id CapabilityId;
+        server_end zx.Handle:CHANNEL;
+    }) -> () error CapabilityStoreError;
+
+    /// Inserts `item` into the dictionary with `id`. `item.value` is moved into the dictionary and
+    /// its id is released if this call succeeds.
+    ///
+    /// Errors:
+    ///
+    /// - `ID_NOT_FOUND` if `id` was not a valid capability id in this store.
+    /// - `WRONG_TYPE` if `id` was not a dictionary.
+    /// - `INVALID_KEY` if `item.key` was invalid.
+    /// - `ITEM_ALREADY_EXISTS` if the dictionary already contains an item with `item.key`.
+    flexible DictionaryInsert(struct {
+        id CapabilityId;
+        item DictionaryItem;
+    }) -> () error CapabilityStoreError;
+
+    /// Get a duplicate of a capability from the dictionary with `id`, which is
+    /// loaded into `dest_id`.
+    ///
+    /// Errors:
+    ///
+    /// - `ID_NOT_FOUND` if `id` was not a recognized capability id in this store.
+    /// - `ID_ALREADY_EXISTS` if a capability with `dest_id` already exists in this store.
+    /// - `WRONG_TYPE` if `id` was not a dictionary.
+    /// - `INVALID_KEY` if `item.key` was invalid.
+    /// - `ITEM_NOT_FOUND` if the dictionary does not contain `key`.
+    /// - `NOT_DUPLICATABLE` if the capability could not be duplicated.
+    flexible DictionaryGet(struct {
+        id CapabilityId;
+        key DictionaryKey;
+        dest_id NewCapabilityId;
+    }) -> () error CapabilityStoreError;
+
+    /// Removes a key from the dictionary with `id`. If `dest_id` is present, loads the value
+    /// into it, otherwise discards the value.
+    ///
+    /// Errors:
+    ///
+    /// - `ID_NOT_FOUND` if `id` was not a valid capability id in this store.
+    /// - `ID_ALREADY_EXISTS` if a capability with `dest_id` already exists in this store.
+    /// - `WRONG_TYPE` if `id` was not a dictionary.
+    /// - `INVALID_KEY` if `key` was invalid.
+    /// - `ITEM_NOT_FOUND` if the dictionary does not contain the key.
+    flexible DictionaryRemove(struct {
+        id CapabilityId;
+        key DictionaryKey;
+        dest_id box<WrappedNewCapabilityId>;
+    }) -> () error CapabilityStoreError;
+
+    /// Create a new dictionary that contains a duplicate of all the entries in
+    /// the dictionary with `id`, assigning `dest_id` to the new dictionary.
+    /// The runtime of this method is linear in the number of top-level entries
+    /// in the dictionary.
+    ///
+    /// For example, if the dictionary contains nested dictionaries, the newly
+    /// created dictionary will contain references to those same nested
+    /// dictionaries because the entries are duplicated rather than deep-copied.
+    ///
+    /// Errors:
+    ///
+    /// - `ID_NOT_FOUND` if `id` was not a valid capability id in this store.
+    /// - `ID_ALREADY_EXISTS` if a capability with `dest_id` already exists in this store.
+    /// - `WRONG_TYPE` if `id` was not a dictionary.
+    /// - `NOT_DUPLICATABLE` if one of the capabilities in `id` could not be duplicated.
+    flexible DictionaryCopy(struct {
+        id CapabilityId;
+        dest_id NewCapabilityId;
+    }) -> () error CapabilityStoreError;
+
+    /// Enumerates the keys in the dictionary with `id`.
+    ///
+    /// Errors:
+    ///
+    /// - `ID_NOT_FOUND` if `id` was not a valid capability id in this store.
+    /// - `WRONG_TYPE` if `id` was not a dictionary.
+    flexible DictionaryKeys(resource struct {
+        id CapabilityId;
+        iterator server_end:DictionaryKeysIterator;
+    }) -> () error CapabilityStoreError;
+
+    /// Enumerates the items (keys and values) in the dictionary with `id`.
+    ///
+    /// Creates a duplicate of each value (capability). If a value could not be duplicated,
+    /// the value will be null.
+    ///
+    /// Errors:
+    ///
+    /// - `ID_NOT_FOUND` if `id` was not a valid capability id in this store.
+    /// - `WRONG_TYPE` if `id` was not a dictionary.
+    flexible DictionaryEnumerate(resource struct {
+        id CapabilityId;
+        iterator server_end:DictionaryEnumerateIterator;
+    }) -> () error CapabilityStoreError;
+
+    /// Removes all the entries in this dictionary, returning them in `contents` if provided.
+    /// If `contents` is not provided, all the items are discarded without enumerating them.
+    ///
+    /// Errors:
+    ///
+    /// - `ID_NOT_FOUND` if `id` was not a valid capability id in this store.
+    /// - `WRONG_TYPE` if `id` was not a dictionary.
+    flexible DictionaryDrain(resource struct {
+        id CapabilityId;
+        iterator server_end:<DictionaryDrainIterator, optional>;
+    }) -> () error CapabilityStoreError;
+};
+
+/// Error returned from methods in [CapabilityStore].
+@available(added=HEAD)
+type CapabilityStoreError = flexible enum {
+    /// A capability was not found matching the given key or [CapabilityId].
+    ID_NOT_FOUND = 1;
+
+    /// A capability already exists matching the given key or [CapabilityId].
+    ID_ALREADY_EXISTS = 2;
+
+    /// A [Capability] was not valid. For example, a `Capability.Dictionary`
+    /// contained an invalid [DictionaryRef].
+    BAD_CAPABILITY = 3;
+
+    /// A [CapabilityId] had the wrong type for the requested operation.
+    WRONG_TYPE = 4;
+
+    /// A capability that needed to be duplicated to perform this operation could
+    /// not be.
+    NOT_DUPLICATABLE = 5;
+
+    /// An item in a dictionary was not found matching the given key.
+    ITEM_NOT_FOUND = 6;
+
+    /// An item in a dictionary already exists with the given key.
+    ITEM_ALREADY_EXISTS = 7;
+
+    /// The key is invalid. The constraints for valid keys are documented at
+    /// https://fuchsia.dev/reference/cml#names.
+    INVALID_KEY = 8;
+
+    /// One or more arguments were invalid.
+    INVALID_ARGS = 9;
 };
 
 @available(added=HEAD)
@@ -191,10 +378,61 @@ open protocol DictionaryKeysIterator {
 };
 
 @available(added=HEAD)
+open protocol DictionaryEnumerateIterator {
+    /// Returns the next batch of results for a [Dictionary.Enumerate] call, returning up to
+    /// `limit` results. `limit` can be at most [MAX_DICTIONARY_ITERATOR_CHUNK].
+    ///
+    /// The value of each of `items` is a duplicate of the original capability
+    /// ([CapabilityStore.Duplicate]), unless it could not be duplicated, it which case it will
+    /// be null.
+    ///
+    /// Each returned capability will be assigned a monotonically increasing [CapabilityId] starting
+    /// from `start_id`.
+    ///
+    /// In addition to the `items`, returns `end_id`, which is one more than the highest id reserved
+    /// by [GetNext]. `end_id` can be used as the `start_id` for the next call to [GetNext].
+    ///
+    /// If [GetNext] returns an error, the server will also close the channel.
+    ///
+    /// Errors:
+    ///
+    /// - `ID_ALREADY_EXISTS` if some id in the range `[start_id, limit)` already exists in this
+    ///   store.
+    /// - `INVALID_ARGS` if `limit` was `0` or greater than `MAX_DICTIONARY_ITERATOR_CHUNK`.
+    flexible GetNext(struct {
+        start_id CapabilityId;
+        limit uint32;
+    }) -> (resource struct {
+        items vector<DictionaryOptionalItem>:MAX_DICTIONARY_ITERATOR_CHUNK;
+        end_id CapabilityId;
+    }) error CapabilityStoreError;
+};
+
+@available(added=HEAD)
 open protocol DictionaryDrainIterator {
-    flexible GetNext() -> (resource struct {
+    /// Returns the next batch of results for a [Dictionary.Drain] call, returning up to
+    /// `limit` results. `limit` can be at most [MAX_DICTIONARY_ITERATOR_CHUNK].
+    ///
+    /// Each returned capability will be assigned a monotonically increasing [CapabilityId] starting
+    /// from `start_id`.
+    ///
+    /// In addition to the `items`, returns `end_id`, which is one more than the highest id reserved
+    /// by [GetNext]. `end_id` can be used as the `start_id` for the next call to [GetNext].
+    ///
+    /// If [GetNext] returns an error, the server will also close the channel.
+    ///
+    /// Errors:
+    ///
+    /// - `ID_ALREADY_EXISTS` if some id in the range `[start_id, limit)` already exists in this
+    ///   store.
+    /// - `INVALID_ARGS` if `limit` was `0` or greater than `MAX_DICTIONARY_ITERATOR_CHUNK`.
+    flexible GetNext(struct {
+        start_id CapabilityId;
+        limit uint32;
+    }) -> (resource struct {
         items vector<DictionaryItem>:MAX_DICTIONARY_ITERATOR_CHUNK;
-    });
+        end_id CapabilityId;
+    }) error CapabilityStoreError;
 };
 
 /// Represents an instance in the component tree, either a component
@@ -211,6 +449,8 @@ type RouteRequest = resource table {
     1: availability Availability;
     /// The component that is requesting the capability.
     2: requesting InstanceToken;
+    /// Metadata associated with this capability request.
+    3: metadata DictionaryRef;
 };
 
 @available(added=HEAD)
@@ -279,17 +519,5 @@ open protocol Factory {
         receiver client_end:Receiver;
     }) -> (resource struct {
         capability Connector;
-    });
-
-    /// Creates a new empty [`Dictionary`].
-    flexible CreateDictionary() -> (resource struct {
-        dictionary DictionaryRef;
-    });
-
-    /// Binds a fuchsia.component.sandbox/Dictionary channel to a `dictionary`
-    /// token.
-    flexible OpenDictionary(resource struct {
-        dictionary DictionaryRef;
-        server_end server_end:Dictionary;
     });
 };

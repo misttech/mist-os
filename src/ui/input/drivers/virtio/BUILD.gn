@@ -8,8 +8,8 @@ import("//build/drivers.gni")
 import("//build/test.gni")
 
 driver_bind_rules("virtio_input_bind") {
-  rules = "virtio_input.bind"
-  tests = "bind_tests.json"
+  rules = "meta/virtio_input.bind"
+  tests = "meta/bind_tests.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_bindlib",
     "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_bindlib",
@@ -46,7 +46,7 @@ fuchsia_driver("virtio_input-driver") {
 fuchsia_driver_component("virtio_input") {
   component_name = "virtio_input"
   deps = [ ":virtio_input-driver" ]
-  info = "virtio_input-info.json"
+  info = "meta/virtio_input-info.json"
   manifest = "meta/virtio_input.cml"
 }
 

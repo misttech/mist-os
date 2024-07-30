@@ -13,14 +13,6 @@ import dataclasses
 import itertools
 import os
 import sys
-
-import remote_action
-import reproxy_logs
-import remotetool
-import cl_utils
-import fuchsia
-
-from api.log import log_pb2
 from pathlib import Path
 from typing import (
     AbstractSet,
@@ -31,6 +23,13 @@ from typing import (
     Sequence,
     Tuple,
 )
+
+import cl_utils
+import fuchsia
+import remote_action
+import remotetool
+import reproxy_logs
+from api.log import log_pb2
 
 _SCRIPT_BASENAME = Path(__file__).name
 

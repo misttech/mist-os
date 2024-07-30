@@ -47,24 +47,6 @@ bool ParseLogSettingsInternal(const fxl::CommandLine& command_line, T* out_setti
     settings.min_log_level = level;
   }
 
-  // --verbose=<level>
-  // (always parse this even if --quiet is present)
-  // Errors if --severity is present.
-  std::string verbosity;
-  if (command_line.GetOptionValue("verbose", &verbosity)) {
-    if (!severity.empty()) {
-      FX_LOGS(ERROR) << "Setting both --severity and --verbose is not allowed.";
-      return false;
-    }
-
-    uint8_t level = 1;
-    if (!verbosity.empty() && (!fxl::StringToNumberWithError(verbosity, &level) || level < 0)) {
-      FX_LOGS(ERROR) << "Error parsing --verbose option: " << verbosity;
-      return false;
-    }
-
-    settings.min_log_level = GetSeverityFromVerbosity(level);
-  }
 #ifndef __Fuchsia__
   // --log-file=<file>
   std::string file;
@@ -170,20 +152,6 @@ bool SetLogSettingsFromCommandLine(const fxl::CommandLine& command_line,
 #endif
   builder.BuildAndInitializeWithTags(tags);
   return true;
-}
-
-fuchsia_logging::LogSeverity GetSeverityFromVerbosity(uint8_t verbosity) {
-  // Clamp verbosity scale to the interstitial space between INFO and DEBUG
-  uint8_t max_verbosity = (fuchsia_logging::LOG_INFO - fuchsia_logging::LOG_DEBUG) /
-                          fuchsia_logging::LogVerbosityStepSize;
-  if (verbosity > max_verbosity) {
-    verbosity = max_verbosity;
-  }
-  int severity = fuchsia_logging::LOG_INFO - (verbosity * fuchsia_logging::LogVerbosityStepSize);
-  if (severity < fuchsia_logging::LOG_DEBUG + 1) {
-    return fuchsia_logging::LOG_DEBUG + 1;
-  }
-  return static_cast<fuchsia_logging::LogSeverity>(severity);
 }
 
 std::vector<std::string> LogSettingsToArgv(const LogSettings& settings) {

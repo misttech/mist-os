@@ -28,7 +28,7 @@ zx::result<> RequestList::Init(zx::unowned_bti bti, size_t entry_size, uint8_t e
   // Allocate list.
   zx::result<> result = IoBufferInit(bti, &io_buffer_, list_size);
   if (result.is_error()) {
-    zxlogf(ERROR, "Failed to allocate memory for the Request List: %s", result.status_string());
+    FDF_LOG(ERROR, "Failed to allocate memory for the Request List: %s", result.status_string());
     return result.take_error();
   }
   request_slots_.resize(entry_count);
@@ -38,8 +38,8 @@ zx::result<> RequestList::Init(zx::unowned_bti bti, size_t entry_size, uint8_t e
     slot.state = SlotState::kFree;
     zx::result<> result = IoBufferInit(bti, &slot.command_descriptor_io, kUtpCommandDescriptorSize);
     if (result.is_error()) {
-      zxlogf(ERROR, "Failed to allocate memory for the Command Descriptor: %s",
-             result.status_string());
+      FDF_LOG(ERROR, "Failed to allocate memory for the Command Descriptor: %s",
+              result.status_string());
       return result.take_error();
     }
   }

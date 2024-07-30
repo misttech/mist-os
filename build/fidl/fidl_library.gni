@@ -280,28 +280,15 @@ template("fidl_library") {
     assert(!defined(invoker.available),
            "Cannot override `available` for SDK FIDL library $library_name")
 
-    # The current level might be a supported level. Don't double count it.
-    #
-    # TODO(https://fxbug.dev/326277078): Update when introducing "NEXT" as an
-    # API level. At that time, numbered API levels will always be frozen and the
-    # policy will always be "no_changes".
-    current_level = platform_version.deprecated_highest_numbered_api_level
-    policy_for_current_level = "ack_changes"
+    # GN lets us include both integers and strings in the same list.
+    _in_development_api_level = "NEXT"
 
-    # policy_for_current_level is unused when regenerating golden files.
-    not_needed([ "policy_for_current_level" ])
+    api_levels = platform_version.frozen_api_levels
 
-    api_levels = [ "$current_level" ]
-
-    # Include the next API level when bumping the API level.
+    # Include the next numbered API level when bumping the API level.
+    # This assumes that the highest numbered API level is frozen.
     # Note: This only affects the per-level FIDL compilation below and does not
-    # affect the platform build.
-    #
-    # There must not be a numbered in-development level when doing so.
-    # TODO(https://fxbug.dev/326277078): Remove or update this comment and logic
-    # when adding support for "NEXT" as an API level. At that time, numbered API
-    # levels can no longer be in-development and the "next API level" will
-    # always be "NEXT".
+    # affect the rest of the build or sub-builds.
     if (bump_api_level) {
       _max_frozen_api_level = 0
       foreach(level, platform_version.frozen_api_levels) {
@@ -309,27 +296,22 @@ template("fidl_library") {
           _max_frozen_api_level = level
         }
       }
-      if (platform_version.deprecated_highest_numbered_api_level !=
-          _max_frozen_api_level) {
-        # Although this should not happen, the platform-version-roller, like
-        # all fint recipes, runs a `gn check` after the build, which causes
-        # this condition to be hit now that the level has been added to
-        # version_history.json.
-        print(
-            "WARNING: The previous API level must be frozen before adding a new one. If this is not a post-build GN check, something is wrong.")
+      next_numbered_api_level = _max_frozen_api_level + 1
+
+      foreach(level, platform_version.all_numbered_api_levels) {
+        assert(
+            level < next_numbered_api_level,
+            "There is an (unfrozen) API level ${level} greater than or equal to the new API level ${next_numbered_api_level}.")
       }
 
-      next_level = 1 + platform_version.deprecated_highest_numbered_api_level
-      api_levels += [ "$next_level" ]
+      api_levels += [ next_numbered_api_level ]
+    } else {
+      # In-development API level 22 is temporarily supported alongside "NEXT".
+      # TODO(https://fxbug.dev/326277078): Remove API level 22 and this line.
+      api_levels += [ 22 ]
     }
 
-    foreach(supported_level, platform_version.frozen_api_levels) {
-      if (supported_level == current_level) {
-        policy_for_current_level = "no_changes"
-      } else {
-        api_levels += [ "$supported_level" ]
-      }
-    }
+    api_levels += [ _in_development_api_level ]
 
     foreach(level, api_levels) {
       fidl_ir_target_name = "${main_target_name}_compile_$level"
@@ -369,9 +351,14 @@ template("fidl_library") {
           golden = "$goldens_dir/$level/$library_name.api_summary.json"
 
           if (update_goldens || bump_api_level) {
+            # Using this policy for every level allows generating all goldens
+            # from scratch. See https://fxbug.dev/324481114#comment5.
             policy = "update_golden"
-          } else if (level == "$current_level") {
-            policy = policy_for_current_level
+          } else if (level == _in_development_api_level) {
+            policy = "ack_changes"
+          } else if (level == 22) {
+            # TODO(https://fxbug.dev/326277078): Remove API level 22 and this.
+            policy = "ack_changes"
           } else {
             policy = "no_changes"
           }

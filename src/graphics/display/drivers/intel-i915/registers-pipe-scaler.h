@@ -5,7 +5,7 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_REGISTERS_PIPE_SCALER_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_REGISTERS_PIPE_SCALER_H_
 
-#include <lib/ddk/debug.h>
+#include <lib/driver/logging/cpp/logger.h>
 #include <zircon/assert.h>
 
 #include <cmath>
@@ -325,7 +325,7 @@ class PipeScalerControlTigerLake
         // Valid values.
         break;
       default:
-        zxlogf(WARNING, "Scaler bound to an invalid Y plane (%u)", y_plane_binding_raw());
+        FDF_LOG(WARNING, "Scaler bound to an invalid Y plane (%u)", y_plane_binding_raw());
         break;
     }
     return y_plane_binding_raw();

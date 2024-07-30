@@ -91,9 +91,9 @@ zx_koid_t GetCurrentProcessKoid() {
 
 // implement display controller protocol:
 
-void SimpleDisplay::DisplayControllerImplSetDisplayControllerInterface(
-    const display_controller_interface_protocol_t* intf) {
-  intf_ = ddk::DisplayControllerInterfaceProtocolClient(intf);
+void SimpleDisplay::DisplayEngineRegisterDisplayEngineListener(
+    const display_engine_listener_protocol_t* engine_listener) {
+  engine_listener_ = ddk::DisplayEngineListenerProtocolClient(engine_listener);
 
   const int64_t pixel_clock_hz =
       int64_t{properties_.width_px} * properties_.height_px * kRefreshRateHz;
@@ -131,14 +131,14 @@ void SimpleDisplay::DisplayControllerImplSetDisplayControllerInterface(
       .pixel_formats_list = &pixel_format,
       .pixel_formats_count = 1,
   };
-  intf_.OnDisplayAdded(&banjo_display_info);
+  engine_listener_.OnDisplayAdded(&banjo_display_info);
 }
 
-void SimpleDisplay::DisplayControllerImplResetDisplayControllerInterface() {
-  intf_ = ddk::DisplayControllerInterfaceProtocolClient();
+void SimpleDisplay::DisplayEngineDeregisterDisplayEngineListener() {
+  engine_listener_ = ddk::DisplayEngineListenerProtocolClient();
 }
 
-zx_status_t SimpleDisplay::DisplayControllerImplImportBufferCollection(
+zx_status_t SimpleDisplay::DisplayEngineImportBufferCollection(
     uint64_t banjo_driver_buffer_collection_id, zx::channel collection_token) {
   const display::DriverBufferCollectionId driver_buffer_collection_id =
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
@@ -173,7 +173,7 @@ zx_status_t SimpleDisplay::DisplayControllerImplImportBufferCollection(
   return ZX_OK;
 }
 
-zx_status_t SimpleDisplay::DisplayControllerImplReleaseBufferCollection(
+zx_status_t SimpleDisplay::DisplayEngineReleaseBufferCollection(
     uint64_t banjo_driver_buffer_collection_id) {
   const display::DriverBufferCollectionId driver_buffer_collection_id =
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
@@ -188,9 +188,9 @@ zx_status_t SimpleDisplay::DisplayControllerImplReleaseBufferCollection(
   return ZX_OK;
 }
 
-zx_status_t SimpleDisplay::DisplayControllerImplImportImage(
-    const image_metadata_t* banjo_image_metadata, uint64_t banjo_driver_buffer_collection_id,
-    uint32_t index, uint64_t* out_image_handle) {
+zx_status_t SimpleDisplay::DisplayEngineImportImage(const image_metadata_t* banjo_image_metadata,
+                                                    uint64_t banjo_driver_buffer_collection_id,
+                                                    uint32_t index, uint64_t* out_image_handle) {
   const display::DriverBufferCollectionId driver_buffer_collection_id =
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
   const auto it = buffer_collections_.find(driver_buffer_collection_id);
@@ -292,11 +292,11 @@ zx_status_t SimpleDisplay::DisplayControllerImplImportImage(
   return ZX_OK;
 }
 
-void SimpleDisplay::DisplayControllerImplReleaseImage(uint64_t image_handle) {
+void SimpleDisplay::DisplayEngineReleaseImage(uint64_t image_handle) {
   // noop
 }
 
-config_check_result_t SimpleDisplay::DisplayControllerImplCheckConfiguration(
+config_check_result_t SimpleDisplay::DisplayEngineCheckConfiguration(
     const display_config_t* display_configs, size_t display_count,
     client_composition_opcode_t* out_client_composition_opcodes_list,
     size_t client_composition_opcodes_count, size_t* out_client_composition_opcodes_actual) {
@@ -377,9 +377,9 @@ bool SimpleDisplay::IsBanjoDisplayConfigSupported(const display_config_t& banjo_
   return true;
 }
 
-void SimpleDisplay::DisplayControllerImplApplyConfiguration(
-    const display_config_t* display_config, size_t display_count,
-    const config_stamp_t* banjo_config_stamp) {
+void SimpleDisplay::DisplayEngineApplyConfiguration(const display_config_t* display_config,
+                                                    size_t display_count,
+                                                    const config_stamp_t* banjo_config_stamp) {
   ZX_DEBUG_ASSERT(banjo_config_stamp != nullptr);
   has_image_ = display_count != 0 && display_config[0].layer_count != 0;
   {
@@ -388,7 +388,7 @@ void SimpleDisplay::DisplayControllerImplApplyConfiguration(
   }
 }
 
-zx_status_t SimpleDisplay::DisplayControllerImplSetBufferCollectionConstraints(
+zx_status_t SimpleDisplay::DisplayEngineSetBufferCollectionConstraints(
     const image_buffer_usage_t* usage, uint64_t banjo_driver_buffer_collection_id) {
   const display::DriverBufferCollectionId driver_buffer_collection_id =
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
@@ -572,19 +572,19 @@ SimpleDisplay::SimpleDisplay(fidl::WireSyncClient<fuchsia_hardware_sysmem::Sysme
 }
 
 void SimpleDisplay::OnPeriodicVSync() {
-  if (intf_.is_valid()) {
+  if (engine_listener_.is_valid()) {
     fbl::AutoLock lock(&mtx_);
     const uint64_t banjo_display_id = display::ToBanjoDisplayId(kDisplayId);
     const config_stamp_t banjo_config_stamp = display::ToBanjoConfigStamp(config_stamp_);
-    intf_.OnDisplayVsync(banjo_display_id, next_vsync_time_.get(), &banjo_config_stamp);
+    engine_listener_.OnDisplayVsync(banjo_display_id, next_vsync_time_.get(), &banjo_config_stamp);
   }
   next_vsync_time_ += kVSyncInterval;
   async::PostTaskForTime(loop_.dispatcher(), [this]() { OnPeriodicVSync(); }, next_vsync_time_);
 }
 
-display_controller_impl_protocol_t SimpleDisplay::GetProtocol() {
+display_engine_protocol_t SimpleDisplay::GetProtocol() {
   return {
-      .ops = &display_controller_impl_protocol_ops_,
+      .ops = &display_engine_protocol_ops_,
       .ctx = this,
   };
 }

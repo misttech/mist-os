@@ -49,14 +49,10 @@
                 "ProcSelfMemProts.CanWriteToPrivateAnonymousMappings/Read",
                 "ProcSelfMemProts.CanWriteToPrivateAnonymousMappings/ReadExecute",
 
-                // TODO(https://fxbug.dev/328412818)
+                // TODO(https://fxbug.dev/355404941)
                 "OverlayFs/FsMountTest.CantBypassDirectoryPermissions/0",
                 "OverlayFs/FsMountTest.ChmodWithDifferentModes/0",
                 "OverlayFs/FsMountTest.CreateWithDifferentModes/0",
-
-                // TODO(https://fxbug.dev/333037315)
-                "OverlayFs/FsMountTest.OpenWithTruncAndCreatWithExistingFileSucceeds/0",
-                "OverlayFs/FsMountTest.OpenWithTruncAndCreatOnReadOnlyFsReturnsEROFS/0",
 
                 // TODO(https://fxbug.dev/335701084)
                 "VmspliceTest.FileInPipe",
@@ -66,10 +62,13 @@
                 "FusePathWalkRefreshDirEntryTest/FusePathWalkRefreshDirEntryTest.PathWalkRefreshDirEntry/5",
                 "FusePathWalkRefreshDirEntryTest/FusePathWalkRefreshDirEntryTest.PathWalkRefreshDirEntry/6",
                 "FusePathWalkRefreshDirEntryTest/FusePathWalkRefreshDirEntryTest.PathWalkRefreshDirEntry/7",
-
-                // TODO(https://fxbug.dev/323847465)
-                "BpfMapTest.WriteRingBufTest",
-                "BpfMapTest.NotificationsRingBufTest",
+            ],
+        },
+        {
+            type: "skip",
+            matchers: [
+                // TODO(https://fxbug.dev/353537391) deflake and re-enable
+                "SignalHandling.SignalDeliveryWakesOnlyOneFutex",
             ],
         },
     ],

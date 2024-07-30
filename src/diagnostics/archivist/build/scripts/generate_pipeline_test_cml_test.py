@@ -2,10 +2,11 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import generate_pipeline_test_cml
 import os
 import tempfile
 import unittest
+
+import generate_pipeline_test_cml
 
 EXPECTED_CML = """{
     include: [ "//src/sys/test_runners/inspect/default.shard.cml" ],
@@ -15,7 +16,7 @@ EXPECTED_CML = """{
         cases: [
           "bootstrap/archivist:root/fuchsia.inspect.Health:status WHERE [s] s == 'OK'",
           "bootstrap/archivist:root/pipelines/feedback:filtering_enabled WHERE [s] s",
-          "bootstrap/archivist:root/pipelines/feedback/config_files/* WHERE [s] Count(s) == 2",
+          "bootstrap/archivist:root/pipelines/feedback:selector_count WHERE [s] s >= 2",
           "bootstrap/archivist:root/pipelines/feedback/config_files/archivist","bootstrap/archivist:root/pipelines/feedback/config_files/component_manager"
         ],
     },
@@ -30,7 +31,7 @@ EXPECTED_DISABLED_CML = """{
         cases: [
           "bootstrap/archivist:root/fuchsia.inspect.Health:status WHERE [s] s == 'OK'",
           "bootstrap/archivist:root/pipelines/feedback:filtering_enabled WHERE [s] Not(s)",
-          "bootstrap/archivist:root/pipelines/feedback/config_files/* WHERE [s] Count(s) == 2",
+          "bootstrap/archivist:root/pipelines/feedback:selector_count WHERE [s] s >= 2",
           "bootstrap/archivist:root/pipelines/feedback/config_files/archivist","bootstrap/archivist:root/pipelines/feedback/config_files/component_manager"
         ],
     },

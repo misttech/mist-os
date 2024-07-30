@@ -79,10 +79,13 @@ pw_source_set("gap") {
     "types.cc",
   ]
 
+  deps = [ "//src/connectivity/bluetooth/core/bt-host/sm" ]
+
   public_deps = [
     ":definitions",
     "$dir_pw_async:heap_dispatcher",
     "$dir_pw_bluetooth",
+    "$dir_pw_string:utf_codecs",
     "$dir_pw_third_party/fuchsia:fit",
     "//src/connectivity/bluetooth/core/bt-host/common",
     "//src/connectivity/bluetooth/core/bt-host/gatt",
@@ -91,7 +94,7 @@ pw_source_set("gap") {
     "//src/connectivity/bluetooth/core/bt-host/l2cap",
     "//src/connectivity/bluetooth/core/bt-host/sco",
     "//src/connectivity/bluetooth/core/bt-host/sdp",
-    "//src/connectivity/bluetooth/core/bt-host/sm",
+    "//src/connectivity/bluetooth/core/bt-host/sm:definitions",
   ]
 }
 
@@ -146,6 +149,7 @@ pw_test("tests") {
     "//src/connectivity/bluetooth/core/bt-host/gatt:testing",
     "//src/connectivity/bluetooth/core/bt-host/hci:testing",
     "//src/connectivity/bluetooth/core/bt-host/l2cap:testing",
+    "//src/connectivity/bluetooth/core/bt-host/sm",
     "//src/connectivity/bluetooth/core/bt-host/sm:testing",
     "//src/connectivity/bluetooth/core/bt-host/testing",
   ]

@@ -607,4 +607,133 @@ TEST(RunQueueTests, ThreadStateManagement) {
   EXPECT_EQ(sched::ThreadState::kReady, threadB.state());
 }
 
+TEST(RunQueueTests, BlockedThreadsAndFirmDemand) {
+  std::array threads = {
+      TestThread{{Period(10), Capacity(4)}, Start(0)},
+      TestThread{{Period(10), Capacity(6), FlexibleWeight{1}}, Start(0)},
+  };
+  TestThread& threadA = threads[0];
+  TestThread& threadB = threads[1];
+
+  sched::RunQueue<TestThread> queue;
+  queue.Queue(threadA, Start(0));
+  queue.Queue(threadB, Start(0));
+
+  // Suppose threadA blocks 2 units into its allotted 4-unit timeslice.
+  {
+    auto [next, preemption] = queue.SelectNextThread(Start(0));
+    EXPECT_EQ(&threadA, next);
+    EXPECT_EQ(Time{4}, preemption);
+  }
+  threadA.Tick(Duration{2});
+  threadA.set_state(sched::ThreadState::kBlocked);
+
+  // Next, we'd expect threadB to follow through on its firm capacity, but not
+  // its flexible, since threadA should still be contributing firm demand for
+  // a total firm utilization of 1.
+  {
+    auto [next, preemption] = queue.SelectNextThread(Start(2));
+    EXPECT_EQ(&threadB, next);
+    EXPECT_EQ(Time{8}, preemption);
+  }
+  threadB.Tick(Duration{6});
+  {
+    auto [next, preemption] = queue.SelectNextThread(Start(8));
+    EXPECT_EQ(nullptr, next);
+    EXPECT_EQ(Time{10}, preemption);
+  }
+
+  // Now that threadA's blocked period has expired, threadB should monopolize
+  // the period, following through on its flexible work.
+  {
+    auto [next, preemption] = queue.SelectNextThread(Start(10));
+    EXPECT_EQ(&threadB, next);
+    EXPECT_EQ(Time{20}, preemption);
+  }
+  threadB.Tick(Duration{10});
+}
+
+TEST(RunQueueTests, QuicklyUnblockingThread) {
+  std::array threads = {
+      TestThread{{Period(10), Capacity(4)}, Start(0)},
+      TestThread{{Period(10), Capacity(6)}, Start(0)},
+  };
+  TestThread& threadA = threads[0];
+  TestThread& threadB = threads[1];
+
+  sched::RunQueue<TestThread> queue;
+  queue.Queue(threadA, Start(0));
+  queue.Queue(threadB, Start(0));
+
+  // Suppose threadA blocks 2 units into its allotted 4-unit timeslice.
+  {
+    auto [next, preemption] = queue.SelectNextThread(Start(0));
+    EXPECT_EQ(&threadA, next);
+    EXPECT_EQ(Time{4}, preemption);
+  }
+  threadA.Tick(Duration{2});
+  threadA.set_state(sched::ThreadState::kBlocked);
+
+  // threadB's turn. Suppose it gets preempted 2 units of time for threadA to
+  // unblock.
+  {
+    auto [next, preemption] = queue.SelectNextThread(Start(2));
+    EXPECT_EQ(&threadB, next);
+    EXPECT_EQ(Time{8}, preemption);
+  }
+  threadB.Tick(Duration{2});
+  queue.Queue(threadA, Start(4));
+
+  // threadA should take precedence again.
+  {
+    auto [next, preemption] = queue.SelectNextThread(Start(4));
+    EXPECT_EQ(&threadA, next);
+    EXPECT_EQ(Time{6}, preemption);
+  }
+  threadA.Tick(Duration{2});
+
+  // And now threadB can finish out the period.
+  {
+    auto [next, preemption] = queue.SelectNextThread(Start(6));
+    EXPECT_EQ(&threadB, next);
+    EXPECT_EQ(Time{10}, preemption);
+  }
+  threadB.Tick(Duration{4});
+}
+
+TEST(RunQueueTests, BlockedThreadsAndPreemption) {
+  TestThread threadA = TestThread{{Period(5), Capacity(2)}, Start(0)};
+  TestThread threadB = TestThread{{Period(10), Capacity(6)}, Start(0)};
+
+  sched::RunQueue<TestThread> queue;
+  queue.Queue(threadA, Start(0));
+  queue.Queue(threadB, Start(0));
+
+  // Suppose threadA blocks 1 unit into its allotted 2-unit timeslice.
+  {
+    auto [next, preemption] = queue.SelectNextThread(Start(0));
+    EXPECT_EQ(&threadA, next);
+    EXPECT_EQ(Time{2}, preemption);
+  }
+  threadA.Tick(Duration{1});
+  threadA.set_state(sched::ThreadState::kBlocked);
+
+  // The preemption time should be set to when threadA's period expires - and not
+  // when threadB finishes the run of its capacity.
+  {
+    auto [next, preemption] = queue.SelectNextThread(Start(1));
+    EXPECT_EQ(&threadB, next);
+    EXPECT_EQ(Time{5}, preemption);
+  }
+  threadB.Tick(Duration{4});
+
+  // Now threadB can finish out.
+  {
+    auto [next, preemption] = queue.SelectNextThread(Start(5));
+    EXPECT_EQ(&threadB, next);
+    EXPECT_EQ(Time{7}, preemption);
+  }
+  threadB.Tick(Duration{2});
+}
+
 }  // namespace

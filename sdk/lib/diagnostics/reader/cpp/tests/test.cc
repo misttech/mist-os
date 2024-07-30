@@ -35,6 +35,7 @@ const char CM1_EXPECTED_DATA[] = R"JSON({
     "data_source": "Inspect",
     "metadata": {
         "component_url": "REALM_BUILDER_URL_PREFIX/test_app",
+        "name": "root",
         "timestamp": TIMESTAMP
     },
     "moniker": "REALM_BUILDER_MONIKER_PREFIX/test_app",
@@ -55,6 +56,7 @@ const char CM2_EXPECTED_DATA[] = R"JSON({
     "data_source": "Inspect",
     "metadata": {
         "component_url": "REALM_BUILDER_URL_PREFIX/test_app_2",
+        "name": "root",
         "timestamp": TIMESTAMP
     },
     "moniker": "REALM_BUILDER_MONIKER_PREFIX/test_app_2",

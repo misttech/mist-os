@@ -62,6 +62,13 @@ class NodeManager {
 
   virtual zx::result<DriverHost*> CreateDriverHost(bool use_next_vdso) = 0;
 
+  // Creates the driver host component, loads the driver host using dynamic linking,
+  // and calls |cb| on completion or error.
+  virtual void CreateDriverHostDynamicLinker(
+      fit::callback<void(zx::result<DriverHost*>)> completion_cb) {
+    completion_cb(zx::error(ZX_ERR_NOT_SUPPORTED));
+  }
+
   // DriverHost lifetimes are managed through a linked list, and they will delete themselves
   // when the FIDL connection is closed. Currently in the Node class we store a raw pointer to the
   // DriverHost object, and do not have a way to remove it from the class when the underlying

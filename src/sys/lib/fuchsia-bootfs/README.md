@@ -8,7 +8,7 @@ headers to allow Rust programs to parse bootfs payloads.
 
 To generate a test ZBI:
 ```sh
-cd ${FUCHSIA_DIR}/garnet/public/rust/fuchsia-bootfs
+cd ${FUCHSIA_DIR}/src/sys/lib/fuchsia-bootfs
 
 # Generate an uncompressed test ZBI.
 ${FUCHSIA_OUT_DIR}/default/host-tools/zbi -u --output testdata/basic.bootfs.full testdata/input

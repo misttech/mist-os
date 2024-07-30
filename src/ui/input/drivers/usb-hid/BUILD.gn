@@ -8,15 +8,15 @@ import("//build/drivers.gni")
 import("//build/test.gni")
 
 driver_bind_rules("usb_hid_bind") {
-  rules = "usb_hid.bind"
+  rules = "meta/usb_hid.bind"
   bind_output = "usb-hid.bindbc"
-  tests = "usb_hid_bind_tests.json"
+  tests = "meta/usb_hid_bind_tests.json"
   deps = [ "//src/devices/bind/fuchsia.usb" ]
 }
 
 driver_bind_rules("one_endpoint_hid_bind") {
-  rules = "function/one_endpoint_hid.bind"
-  tests = "function/one_endpoint_hid_bind_tests.json"
+  rules = "meta/one_endpoint_hid.bind"
+  tests = "meta/one_endpoint_hid_bind_tests.json"
   deps = [
     "//src/devices/bind/fuchsia.usb",
     "//src/ui/input/drivers/usb-hid/fuchsia.usb.hid.bind:fuchsia.usb.hid.test",
@@ -24,8 +24,8 @@ driver_bind_rules("one_endpoint_hid_bind") {
 }
 
 driver_bind_rules("two_endpoint_hid_bind") {
-  rules = "function/two_endpoint_hid.bind"
-  tests = "function/two_endpoint_hid_bind_tests.json"
+  rules = "meta/two_endpoint_hid.bind"
+  tests = "meta/two_endpoint_hid_bind_tests.json"
   deps = [
     "//src/devices/bind/fuchsia.usb",
     "//src/ui/input/drivers/usb-hid/fuchsia.usb.hid.bind:fuchsia.usb.hid.test",
@@ -65,7 +65,7 @@ fuchsia_driver_component("usb-hid") {
   visibility = [ ":*" ]
   component_name = "usb-hid"
   deps = [ ":usb-hid-driver" ]
-  info = "usb-hid-info.json"
+  info = "meta/usb-hid-info.json"
   manifest = "meta/usb-hid.cml"
 }
 
@@ -104,7 +104,7 @@ fuchsia_driver("usb-one-endpoint-hid-fake-usb-driver") {
 fuchsia_driver_component("usb-one-endpoint-hid-fake-usb") {
   component_name = "usb-one-endpoint-hid-fake-usb"
   deps = [ ":usb-one-endpoint-hid-fake-usb-driver" ]
-  info = "usb-one-endpoint-hid-fake-usb-info.json"
+  info = "meta/usb-one-endpoint-hid-fake-usb-info.json"
   manifest = "meta/usb-one-endpoint-hid-fake-usb.cml"
 }
 
@@ -138,7 +138,7 @@ fuchsia_driver("usb-two-endpoint-hid-fake-usb-driver") {
 fuchsia_driver_component("usb-two-endpoint-hid-fake-usb") {
   component_name = "usb-two-endpoint-hid-fake-usb"
   deps = [ ":usb-two-endpoint-hid-fake-usb-driver" ]
-  info = "usb-two-endpoint-hid-fake-usb-info.json"
+  info = "meta/usb-two-endpoint-hid-fake-usb-info.json"
   manifest = "meta/usb-two-endpoint-hid-fake-usb.cml"
 }
 

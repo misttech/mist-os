@@ -36,7 +36,7 @@ class AmlCanvasDriverTest : public ::testing::Test {
 
     zx::result init_result = test_environment_.SyncCall(&fdf_testing::TestEnvironment::Initialize,
                                                         std::move(incoming_directory_server));
-    ASSERT_EQ(ZX_OK, init_result.status_value());
+    ASSERT_OK(init_result);
 
     zx::vmo mmio_vmo;
     static constexpr uint64_t kMmioVmoSize = 0x2000;
@@ -75,7 +75,7 @@ class AmlCanvasDriverTest : public ::testing::Test {
     zx_status_t status = fdio_open_at(driver_outgoing_.handle()->get(), "/svc",
                                       static_cast<uint32_t>(fuchsia_io::OpenFlags::kDirectory),
                                       svc_endpoints.server.TakeChannel().release());
-    EXPECT_EQ(ZX_OK, status);
+    EXPECT_OK(status);
     return std::move(svc_endpoints.client);
   }
 

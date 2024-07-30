@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 use async_trait::async_trait;
 use camino::FromPathBufError;
+use errors::ffx_error;
 use ffx::RepositoryIteratorMarker;
 use ffx_repository_add_from_pm_args::AddFromPmCommand;
 use fho::{
@@ -12,6 +13,7 @@ use fho::{
 use fidl_fuchsia_developer_ffx as ffx;
 use fidl_fuchsia_developer_ffx_ext::{RepositoryError, RepositorySpec};
 use fuchsia_url::RepositoryUrl;
+use pkg::config as pkg_config;
 use schemars::JsonSchema;
 use serde::Serialize;
 use std::collections::BTreeSet;
@@ -91,11 +93,17 @@ impl AddFromPmTool {
             }
             RepoRegState::New => match self
                 .repos
-                .add_repository(repo_name, &repo_spec.into())
+                .add_repository(repo_name, &repo_spec.clone().into())
                 .await
                 .map_err(|e| bug!(e))?
             {
-                Ok(()) => Ok(repo_name.to_string()),
+                Ok(()) => {
+                    // Save the filesystem configuration.
+                    pkg_config::set_repository(repo_name, &repo_spec.into())
+                        .await
+                        .map_err(|err| ffx_error!("Failed to save repository: {:#?}", err))?;
+                    Ok(repo_name.to_string())
+                }
                 Err(err) => {
                     let err = RepositoryError::from(err);
                     Err(user_error!("Adding repository {} failed: {}", repo_name, err))
@@ -207,6 +215,7 @@ mod test {
 
     #[fuchsia::test]
     async fn test_add_from_pm() {
+        let _test_env = ffx_config::test_init().await.expect("test env init");
         let tmp = tempfile::tempdir().unwrap();
 
         let (sender, mut receiver) = futures::channel::mpsc::channel::<_>(1);
@@ -247,6 +256,7 @@ mod test {
 
     #[fuchsia::test]
     async fn test_add_from_pm_rejects_invalid_names() {
+        let _test_env = ffx_config::test_init().await.expect("test env init");
         let tmp = tempfile::tempdir().unwrap();
 
         let repos: ffx::RepositoryRegistryProxy = fho::testing::fake_proxy(move |req| {
@@ -276,6 +286,7 @@ mod test {
 
     #[fuchsia::test]
     async fn test_add_from_pm_machine() {
+        let _test_env = ffx_config::test_init().await.expect("test env init");
         let tmp = tempfile::tempdir().unwrap();
 
         let (sender, mut receiver) = futures::channel::mpsc::channel::<_>(1);
@@ -323,6 +334,7 @@ mod test {
 
     #[fuchsia::test]
     async fn test_add_from_pm_rejects_invalid_names_machine() {
+        let _test_env = ffx_config::test_init().await.expect("test env init");
         let tmp = tempfile::tempdir().unwrap();
 
         let repos: ffx::RepositoryRegistryProxy = fho::testing::fake_proxy(move |req| {
@@ -359,6 +371,7 @@ mod test {
 
     #[fuchsia::test]
     async fn test_add_from_pm_exits_when_existing_repo() {
+        let _test_env = ffx_config::test_init().await.expect("test env init");
         let tmp = tempfile::tempdir().unwrap();
 
         let (sender, mut receiver) = futures::channel::mpsc::channel::<_>(1);

@@ -271,8 +271,18 @@ impl TargetCollectionProtocol {
         let (update, filter) = match query {
             TargetInfoQuery::Addr(addr) => {
                 addrs = [addr];
-                let update =
-                    TargetUpdateBuilder::new().net_addresses(&addrs).transient_target().enable();
+                // Set the addresses, note that is transient, note that it is
+                // a network target, and enable it
+                let mut update = TargetUpdateBuilder::new()
+                    .net_addresses(&addrs)
+                    .transient_target()
+                    .discovered(TargetProtocol::Ssh, TargetTransport::Network)
+                    .enable();
+                let port = addr.port();
+                if port != 0 {
+                    update = update.ssh_port(Some(port));
+                }
+
                 let filter = [TargetUpdateFilter::NetAddrs(&addrs)];
                 (update, filter)
             }
@@ -456,7 +466,7 @@ impl FidlProtocol for TargetCollectionProtocol {
                         );
                     }
                 };
-                let rcs = target_handle::wait_for_rcs(&target).await?;
+                let rcs = target_handle::wait_for_rcs(&target, &cx).await?;
                 match rcs {
                     Ok(mut rcs) => {
                         let (rcs_proxy, server) =

@@ -28,12 +28,12 @@ closed protocol Clockfuncs {
     ///
     /// `zx_clock_get_monotonic()` returns the current time in the system
     /// monotonic clock. This is the number of nanoseconds since the system was
-    /// powered on. It does not always reset on reboot and does not adjust during
-    /// sleep, and thus should not be used as a reliable source of uptime.
+    /// powered on, not including any time spent in a suspended state. It is
+    /// set to zero whenever the kernel is initialized.
     ///
     /// ## Rights
     ///
-    /// TODO(https://fxbug.dev/42107318)
+    /// None.
     ///
     /// ## Return value
     ///
@@ -54,6 +54,52 @@ closed protocol Clockfuncs {
     // to be used by application code.
     @internal
     strict ClockGetMonotonicViaKernel() -> (@wrapped_return struct {
+        time Time;
+    });
+
+    /// ## Summary
+    ///
+    /// Acquire the current boot time.
+    ///
+    /// ## Declaration
+    ///
+    /// ```c
+    /// #include <zircon/syscalls.h>
+    ///
+    /// zx_time_t zx_clock_get_boot(void);
+    /// ```
+    ///
+    /// ## Description
+    ///
+    /// `zx_clock_get_boot()` returns the current time in the system
+    /// boot clock. This is the number of nanoseconds since the system was
+    /// powered on, including any time spent in a suspended state. It is set to
+    /// zero whenever the kernel is initialized.
+    ///
+    /// ## Rights
+    ///
+    /// None.
+    ///
+    /// ## Return value
+    ///
+    /// `zx_clock_get_boot()` returns the current boot time.
+    ///
+    /// ## Errors
+    ///
+    /// `zx_clock_get_boot()` cannot fail.
+    @next
+    @vdsocall
+    strict ClockGetBoot() -> (@wrapped_return struct {
+        time Time;
+    });
+
+    // Read clock boot, but demand that the read be performed using a
+    // syscall, instead of a vdso call.
+    //
+    // See the notes for ticks_get_via_kernel; this is not a syscall meant
+    // to be used by application code.
+    @internal
+    strict ClockGetBootViaKernel() -> (@wrapped_return struct {
         time Time;
     });
 

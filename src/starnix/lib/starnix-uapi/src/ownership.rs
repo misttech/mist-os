@@ -85,6 +85,21 @@ impl<T: [< Releasable $($suffix)? >]> [< Releasable $($suffix)? >] for ReleaseGu
 
 }}}
 
+/// Trait for object that can be shared. This is an equivalent of `Clone` for objects that require
+/// to be released.
+pub trait Share {
+    fn share(&self) -> Self;
+}
+
+impl<T: Share> Share for Option<T> {
+    fn share(&self) -> Self {
+        match self {
+            None => None,
+            Some(t) => Some(t.share()),
+        }
+    }
+}
+
 /// An owning reference to a shared owned object. Each instance must call `release` before being
 /// dropped.
 /// `OwnedRef` will panic on Drop in debug builds if it has not been released.
@@ -178,9 +193,9 @@ impl<T: std::fmt::Debug> std::fmt::Debug for OwnedRef<T> {
     }
 }
 
-impl<T> Clone for OwnedRef<T> {
+impl<T: Releasable> Share for OwnedRef<T> {
     /// Clone the `OwnedRef`. Both the current and the new reference needs to be `release`d.
-    fn clone(&self) -> Self {
+    fn share(&self) -> Self {
         let inner = Self::inner(self);
         let previous_count = inner.owned_refs_count.fetch_add(1, Ordering::Relaxed);
         debug_assert!(previous_count > 0, "OwnedRef should not be used after being released.");
@@ -222,6 +237,12 @@ impl<T> std::borrow::Borrow<T> for OwnedRef<T> {
 impl<T> std::convert::AsRef<T> for OwnedRef<T> {
     fn as_ref(&self) -> &T {
         self.deref()
+    }
+}
+
+impl<T: PartialEq> PartialEq<TempRef<'_, T>> for OwnedRef<T> {
+    fn eq(&self, other: &TempRef<'_, T>) -> bool {
+        Arc::ptr_eq(Self::inner(self), &other.0)
     }
 }
 
@@ -774,7 +795,7 @@ mod test {
     fn test_clone() {
         let value = OwnedRef::new(Data {});
         {
-            let value2 = OwnedRef::clone(&value);
+            let value2 = OwnedRef::share(&value);
             value2.release(());
         }
         #[allow(clippy::redundant_clone)]

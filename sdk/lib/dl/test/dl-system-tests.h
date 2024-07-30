@@ -29,9 +29,14 @@ class DlSystemTests : public DlSystemLoadTestsBase {
   // Fuchsia's musl implementation of dlopen does not validate flag values for
   // the mode argument.
   static constexpr bool kCanValidateMode = false;
+  // TODO(https://fxbug.dev/348722959): Musl shouldn't retrieve file w/
+  // RTLD_NOLOAD.
+  static constexpr bool kRetrievesFileWithNoLoad = true;
 #endif
 
   fit::result<Error, void*> DlOpen(const char* file, int mode);
+
+  static fit::result<Error> DlClose(void* module);
 
   static fit::result<Error, void*> DlSym(void* module, const char* ref);
 

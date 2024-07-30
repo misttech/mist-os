@@ -4,7 +4,7 @@
 
 #include "src/graphics/display/drivers/intel-i915/clock/cdclk.h"
 
-#include <lib/ddk/debug.h>
+#include <lib/driver/logging/cpp/logger.h>
 #include <lib/zx/result.h>
 #include <lib/zx/time.h>
 #include <zircon/assert.h>
@@ -27,7 +27,7 @@ CoreDisplayClockSkylake::CoreDisplayClockSkylake(fdf::MmioBuffer* mmio_space)
 bool CoreDisplayClockSkylake::LoadState() {
   auto dpll_enable = registers::PllEnable::GetForSkylakeDpll(PllId::DPLL_0).ReadFrom(mmio_space_);
   if (!dpll_enable.pll_enabled()) {
-    zxlogf(ERROR, "Skylake CDCLK LoadState: DPLL0 is disabled");
+    FDF_LOG(ERROR, "Skylake CDCLK LoadState: DPLL0 is disabled");
     return false;
   }
 
@@ -53,7 +53,7 @@ bool CoreDisplayClockSkylake::LoadState() {
       set_current_freq_khz(dpll0_uses_vco_8640 ? 617'140 : 675'000);
       break;
     default:
-      zxlogf(ERROR, "Invalid CD Clock frequency");
+      FDF_LOG(ERROR, "Invalid CD Clock frequency");
       return false;
   }
 
@@ -61,40 +61,40 @@ bool CoreDisplayClockSkylake::LoadState() {
 }
 
 bool CoreDisplayClockSkylake::PreChangeFreq() {
-  zxlogf(TRACE, "Asking PCU firmware to raise display voltage to maximum level");
+  FDF_LOG(TRACE, "Asking PCU firmware to raise display voltage to maximum level");
   PowerController power_controller(mmio_space_);
   const zx::result<> status = power_controller.RequestDisplayVoltageLevel(
       3, PowerController::RetryBehavior::kRetryUntilStateChanges);
   if (status.is_error()) {
-    zxlogf(ERROR, "PCU firmware malfunction! Failed to raise voltage to maximum level: %s",
-           status.status_string());
+    FDF_LOG(ERROR, "PCU firmware malfunction! Failed to raise voltage to maximum level: %s",
+            status.status_string());
     return false;
   }
-  zxlogf(TRACE, "PMU firmware raised display voltage to maximum level");
+  FDF_LOG(TRACE, "PMU firmware raised display voltage to maximum level");
   return true;
 }
 
 bool CoreDisplayClockSkylake::PostChangeFreq(uint32_t freq_khz) {
   const int voltage_level = VoltageLevelForFrequency(freq_khz);
-  zxlogf(TRACE, "Asking PCU firmware to drop display voltage to level %d", voltage_level);
+  FDF_LOG(TRACE, "Asking PCU firmware to drop display voltage to level %d", voltage_level);
 
   PowerController power_controller(mmio_space_);
   const zx::result<> status = power_controller.RequestDisplayVoltageLevel(
       voltage_level, PowerController::RetryBehavior::kNoRetry);
   if (status.is_error()) {
     if (status.error_value() == ZX_ERR_IO_REFUSED) {
-      zxlogf(
+      FDF_LOG(
           INFO,
           "PCU firmware refused to drop voltage level to %d. Another consumer may need more power.",
           voltage_level);
     } else {
-      zxlogf(WARNING,
-             "PCU firmware malfunction! Failed to communicate requested voltage level %d: %s",
-             voltage_level, status.status_string());
+      FDF_LOG(WARNING,
+              "PCU firmware malfunction! Failed to communicate requested voltage level %d: %s",
+              voltage_level, status.status_string());
       return false;
     }
   } else {
-    zxlogf(TRACE, "PMU firmware dropped display voltage level to %d", voltage_level);
+    FDF_LOG(TRACE, "PMU firmware dropped display voltage level to %d", voltage_level);
   }
   return true;
 }
@@ -102,7 +102,7 @@ bool CoreDisplayClockSkylake::PostChangeFreq(uint32_t freq_khz) {
 bool CoreDisplayClockSkylake::CheckFrequency(uint32_t freq_khz) {
   auto dpll_enable = registers::PllEnable::GetForSkylakeDpll(PllId::DPLL_0).ReadFrom(mmio_space_);
   if (!dpll_enable.pll_enabled()) {
-    zxlogf(ERROR, "Skylake CDCLK CheckFrequency: DPLL0 is disabled");
+    FDF_LOG(ERROR, "Skylake CDCLK CheckFrequency: DPLL0 is disabled");
     return false;
   }
 
@@ -150,7 +150,7 @@ bool CoreDisplayClockSkylake::ChangeFreq(uint32_t freq_khz) {
 
 bool CoreDisplayClockSkylake::SetFrequency(uint32_t freq_khz) {
   if (!CheckFrequency(freq_khz)) {
-    zxlogf(ERROR, "Skylake CDCLK ChangeFreq: Invalid frequency %u KHz", freq_khz);
+    FDF_LOG(ERROR, "Skylake CDCLK ChangeFreq: Invalid frequency %u KHz", freq_khz);
     return false;
   }
 
@@ -201,11 +201,11 @@ bool CoreDisplayClockTigerLake::LoadState() {
   auto display_straps = registers::DisplayStraps::Get().ReadFrom(mmio_space_);
   ref_clock_khz_ = display_straps.reference_frequency_khz_tiger_lake();
   if (ref_clock_khz_ == 0) {
-    zxlogf(ERROR, "Invalid reference clock frequency select! Display straps register: %x",
-           display_straps.reg_value());
+    FDF_LOG(ERROR, "Invalid reference clock frequency select! Display straps register: %x",
+            display_straps.reg_value());
     return false;
   }
-  zxlogf(TRACE, "Display reference clock frequency: %d kHz", ref_clock_khz_);
+  FDF_LOG(TRACE, "Display reference clock frequency: %d kHz", ref_clock_khz_);
 
   auto cdclk_pll_enable = registers::IclCdClkPllEnable::Get().ReadFrom(mmio_space_);
   if (!cdclk_pll_enable.pll_lock()) {
@@ -232,10 +232,10 @@ bool CoreDisplayClockTigerLake::LoadState() {
 
   uint32_t freq_khz = ref_clock_khz_ * state_.pll_ratio / state_.cd2x_divider / 2;
   if (cdclk_ctl.cd_freq_decimal() != registers::CdClockCtl::FreqDecimal(freq_khz)) {
-    zxlogf(ERROR,
-           "The CD frequency value (0x%x) doesn't match loaded hardware "
-           "state (ref_clock %u KHz, pll ratio %u, cd2x divider %u)",
-           cdclk_ctl.cd_freq_decimal(), ref_clock_khz_, state_.pll_ratio, state_.cd2x_divider);
+    FDF_LOG(ERROR,
+            "The CD frequency value (0x%x) doesn't match loaded hardware "
+            "state (ref_clock %u KHz, pll ratio %u, cd2x divider %u)",
+            cdclk_ctl.cd_freq_decimal(), ref_clock_khz_, state_.pll_ratio, state_.cd2x_divider);
     return false;
   }
 
@@ -301,7 +301,7 @@ bool CoreDisplayClockTigerLake::CheckFrequency(uint32_t freq_khz) {
 
 bool CoreDisplayClockTigerLake::SetFrequency(uint32_t freq_khz) {
   if (!CheckFrequency(freq_khz)) {
-    zxlogf(ERROR, "Tiger Lake CDCLK SetFrequency: Invalid frequency %u KHz", freq_khz);
+    FDF_LOG(ERROR, "Tiger Lake CDCLK SetFrequency: Invalid frequency %u KHz", freq_khz);
     return false;
   }
 
@@ -321,14 +321,14 @@ bool CoreDisplayClockTigerLake::SetFrequency(uint32_t freq_khz) {
 }
 
 bool CoreDisplayClockTigerLake::PreChangeFreq() {
-  zxlogf(TRACE, "Asking PCU firmware to raise display voltage to maximum level");
+  FDF_LOG(TRACE, "Asking PCU firmware to raise display voltage to maximum level");
 
   PowerController power_controller(mmio_space_);
   const zx::result<> status = power_controller.RequestDisplayVoltageLevel(
       3, PowerController::RetryBehavior::kRetryUntilStateChanges);
   if (!status.is_ok()) {
-    zxlogf(ERROR, "PCU firmware malfunction! Failed to raise voltage to maximum level: %s",
-           status.status_string());
+    FDF_LOG(ERROR, "PCU firmware malfunction! Failed to raise voltage to maximum level: %s",
+            status.status_string());
     return false;
   }
   return true;
@@ -336,7 +336,7 @@ bool CoreDisplayClockTigerLake::PreChangeFreq() {
 
 bool CoreDisplayClockTigerLake::PostChangeFreq(uint32_t freq_khz) {
   const int voltage_level = VoltageLevelForFrequency(freq_khz);
-  zxlogf(TRACE, "Asking PCU firmware to drop display voltage to level %d", voltage_level);
+  FDF_LOG(TRACE, "Asking PCU firmware to drop display voltage to level %d", voltage_level);
 
   // The display engine PRM states that the driver can continue after submitting
   // the voltage level change request to the PCU firmware via the GT Driver
@@ -349,13 +349,13 @@ bool CoreDisplayClockTigerLake::PostChangeFreq(uint32_t freq_khz) {
       voltage_level, PowerController::RetryBehavior::kNoRetry);
   if (status.is_error()) {
     if (status.error_value() == ZX_ERR_IO_REFUSED) {
-      zxlogf(
+      FDF_LOG(
           INFO,
           "PCU firmware refused to drop voltage level to %d. Another consumer may need more power.",
           voltage_level);
     } else {
-      zxlogf(WARNING, "PCU malfunction! Failed to communicate requested voltage level %d: %s",
-             voltage_level, status.status_string());
+      FDF_LOG(WARNING, "PCU malfunction! Failed to communicate requested voltage level %d: %s",
+              voltage_level, status.status_string());
     }
     return false;
   }
@@ -383,7 +383,7 @@ bool CoreDisplayClockTigerLake::Enable(uint32_t freq_khz, State state) {
   // 200 us.
   if (!PollUntil([&] { return cdclk_pll_enable.ReadFrom(mmio_space_).pll_lock(); }, zx::usec(1),
                  200)) {
-    zxlogf(ERROR, "Tiger Lake CDCLK Enable: Timeout");
+    FDF_LOG(ERROR, "Tiger Lake CDCLK Enable: Timeout");
     return false;
   }
 
@@ -425,7 +425,7 @@ bool CoreDisplayClockTigerLake::Disable() {
   // after 200 us.
   if (!PollUntil([&] { return !cdclk_pll_enable.ReadFrom(mmio_space_).pll_lock(); }, zx::usec(1),
                  200)) {
-    zxlogf(ERROR, "Tiger Lake CDCLK Disable: Timeout");
+    FDF_LOG(ERROR, "Tiger Lake CDCLK Disable: Timeout");
     return false;
   }
   enabled_ = false;
@@ -469,11 +469,11 @@ bool CoreDisplayClockTigerLake::ChangeFreq(uint32_t freq_khz) {
     // If changing the CDCLK PLL frequency, we need to first disable CDCLK PLL,
     // then enable CDCLK PLL using the new PLL ratio.
     if (!Disable()) {
-      zxlogf(ERROR, "Cannot disable CDCLK");
+      FDF_LOG(ERROR, "Cannot disable CDCLK");
       return false;
     }
     if (!Enable(freq_khz, new_state)) {
-      zxlogf(ERROR, "Cannot enable CDCLK");
+      FDF_LOG(ERROR, "Cannot enable CDCLK");
       return false;
     }
   }

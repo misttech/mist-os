@@ -18,7 +18,7 @@ use tracing::warn;
 use vfs::execution_scope::ExecutionScope;
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_sandbox as fsandbox,
-    fuchsia_zircon as zx,
+    fuchsia_async as fasync, fuchsia_zircon as zx,
 };
 
 lazy_static! {
@@ -52,9 +52,14 @@ impl NamespaceCapabilityProvider {
         &self,
         mut stream: fcomponent::NamespaceRequestStream,
     ) -> Result<(), fidl::Error> {
+        let (store, store_stream) =
+            endpoints::create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>().unwrap();
+        let _store_task = fasync::Task::spawn(async move {
+            let _ = sandbox::serve_capability_store(store_stream).await;
+        });
         while let Some(request) = stream.try_next().await? {
             let method_name = request.method_name();
-            let result = self.handle_request(request).await;
+            let result = self.handle_request(&store, request).await;
             match result {
                 // If the error was PEER_CLOSED then we don't need to log it as a client can
                 // disconnect while we are processing its request.
@@ -69,11 +74,12 @@ impl NamespaceCapabilityProvider {
 
     async fn handle_request(
         &self,
+        store: &fsandbox::CapabilityStoreProxy,
         request: fcomponent::NamespaceRequest,
     ) -> Result<(), fidl::Error> {
         match request {
             fcomponent::NamespaceRequest::Create { entries, responder } => {
-                let res = self.create(entries).await;
+                let res = self.create(store, entries).await;
                 responder.send(res)?;
             }
             fcomponent::NamespaceRequest::_UnknownMethod { ordinal, .. } => {
@@ -85,33 +91,34 @@ impl NamespaceCapabilityProvider {
 
     async fn create(
         &self,
+        store: &fsandbox::CapabilityStoreProxy,
         entries: Vec<fcomponent::NamespaceInputEntry>,
     ) -> Result<Vec<fcomponent::NamespaceEntry>, fcomponent::NamespaceError> {
         let mut namespace_builder =
             NamespaceBuilder::new(self.namespace_scope.clone(), Self::ignore_not_found());
         for entry in entries {
+            const ERR: fcomponent::NamespaceError = fcomponent::NamespaceError::DictionaryRead;
+
+            // This API accepts legacy [Dictionary] channel. Round-trip through the import/export
+            // CapabilityStore API to convert the channel to a local Dict object that we can
+            // enumerate.
             let path = entry.path;
-            let dict = entry.dictionary.into_proxy().unwrap();
-            let (iterator, server_end) = endpoints::create_proxy().unwrap();
-            dict.enumerate(server_end).map_err(|_| fcomponent::NamespaceError::DictionaryRead)?;
-            loop {
-                let items = iterator
-                    .get_next()
-                    .await
-                    .map_err(|_| fcomponent::NamespaceError::DictionaryRead)?;
-                if items.is_empty() {
-                    break;
-                }
-                for item in items {
-                    let fsandbox::DictionaryValueResult::Ok(value) = item.value else {
-                        // Capability was not cloneable
-                        return Err(fcomponent::NamespaceError::DictionaryRead);
-                    };
-                    let capability: Capability = value.try_into().unwrap();
-                    let path = Path::new(format!("{}/{}", path, item.key))
-                        .map_err(|_| fcomponent::NamespaceError::BadEntry)?;
-                    namespace_builder.add_object(capability, &path).map_err(Self::error_to_fidl)?;
-                }
+            let dict_id = 1;
+            store
+                .dictionary_legacy_import(dict_id, entry.dictionary.into())
+                .await
+                .map_err(|_| ERR)?
+                .map_err(|_| ERR)?;
+            let dict = store.export(dict_id).await.map_err(|_| ERR)?.map_err(|_| ERR)?;
+            let dict = Capability::try_from(dict).map_err(|_| ERR)?;
+            let Capability::Dictionary(dict) = dict else {
+                return Err(ERR);
+            };
+            for (key, capability) in dict.enumerate() {
+                let capability = capability.map_err(|_| fcomponent::NamespaceError::Conversion)?;
+                let path = Path::new(format!("{}/{}", path, key))
+                    .map_err(|_| fcomponent::NamespaceError::BadEntry)?;
+                namespace_builder.add_object(capability, &path).map_err(Self::error_to_fidl)?;
             }
         }
         let namespace = namespace_builder.serve().map_err(Self::error_to_fidl)?;
@@ -169,6 +176,7 @@ mod tests {
     use crate::model::component::ComponentInstance;
     use crate::model::context::ModelContext;
     use crate::model::environment::Environment;
+    use ::routing::bedrock::structured_dict::ComponentInput;
     use assert_matches::assert_matches;
     use fidl::endpoints::{ProtocolMarker, Proxy};
     use fuchsia_component::client;
@@ -192,6 +200,7 @@ mod tests {
 
     async fn new_root() -> Arc<ComponentInstance> {
         ComponentInstance::new_root(
+            ComponentInput::default(),
             Environment::empty(),
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
@@ -215,8 +224,12 @@ mod tests {
         let root = new_root().await;
         let (namespace_proxy, _host) = namespace(&root).await;
 
+        let (store, stream) =
+            endpoints::create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>().unwrap();
+        tasks.spawn(async move { sandbox::serve_capability_store(stream).await.unwrap() });
+
         let mut namespace_pairs = vec![];
-        let mut dicts = vec![];
+        let mut next_id = 1;
         for (path, response) in [("/svc", "first"), ("/zzz/svc", "second")] {
             // Initialize the host and sender/receiver pair.
             let (receiver, sender) = Receiver::new();
@@ -239,21 +252,20 @@ mod tests {
             )
             .expect("dict entry already exists");
 
-            let (dict_proxy, stream) =
-                endpoints::create_proxy_and_stream::<fsandbox::DictionaryMarker>().unwrap();
-            dict.serve(stream);
-            // We must do this to keep the dictionaries alive until the namespace is created.
-            dicts.push(dict);
+            let dict_id = next_id;
+            next_id += 1;
+            store.import(dict_id, Capability::from(dict).into()).await.unwrap().unwrap();
+            let (client_end, server_end) = fidl::Channel::create();
+            store.dictionary_legacy_export(dict_id, server_end).await.unwrap().unwrap();
 
             namespace_pairs.push(fcomponent::NamespaceInputEntry {
                 path: path.into(),
-                dictionary: dict_proxy.into_channel().unwrap().into_zx_channel().into(),
+                dictionary: client_end.into(),
             })
         }
 
         // Convert the dictionaries to a namespace.
         let mut namespace_entries = namespace_proxy.create(namespace_pairs).await.unwrap().unwrap();
-        drop(dicts);
 
         // Confirm that the Sender in the dictionary was converted to a service node, and we
         // can access the Echo protocol (served by the Receiver) through this node.
@@ -279,9 +291,13 @@ mod tests {
         let root = new_root().await;
         let (namespace_proxy, _host) = namespace(&root).await;
 
+        let (store, stream) =
+            endpoints::create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>().unwrap();
+        tasks.spawn(async move { sandbox::serve_capability_store(stream).await.unwrap() });
+
         // Two entries with a shadowing path.
         let mut namespace_pairs = vec![];
-        let mut dicts = vec![];
+        let mut next_id = 1;
         for path in ["/svc", "/svc/shadow"] {
             // Initialize the host and sender/receiver pair.
             let (receiver, sender) = Receiver::new();
@@ -303,15 +319,15 @@ mod tests {
             )
             .expect("dict entry already exists");
 
-            let (dict_proxy, stream) =
-                endpoints::create_proxy_and_stream::<fsandbox::DictionaryMarker>().unwrap();
-            dict.serve(stream);
-            // We must do this to keep the dictionaries alive until the namespace is created.
-            dicts.push(dict);
+            let dict_id = next_id;
+            next_id += 1;
+            store.import(dict_id, Capability::from(dict).into()).await.unwrap().unwrap();
+            let (client_end, server_end) = fidl::Channel::create();
+            store.dictionary_legacy_export(dict_id, server_end).await.unwrap().unwrap();
 
             namespace_pairs.push(fcomponent::NamespaceInputEntry {
                 path: path.into(),
-                dictionary: dict_proxy.into_channel().unwrap().into_zx_channel().into(),
+                dictionary: client_end.into(),
             })
         }
 

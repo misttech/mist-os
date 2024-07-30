@@ -164,6 +164,7 @@ mod tests {
 
     use alloc::vec;
     use alloc::vec::Vec;
+    use assert_matches::assert_matches;
 
     use netstack3_base::testutil::{
         FakeBindingsCtx, FakeCoreCtx, FakeLinkDevice, FakeLinkDeviceId,
@@ -172,7 +173,7 @@ mod tests {
     use packet::Buf;
 
     use crate::internal::queue::api::ReceiveQueueApi;
-    use crate::internal::queue::{MAX_BATCH_SIZE, MAX_RX_QUEUED_LEN};
+    use crate::internal::queue::{BatchSize, MAX_RX_QUEUED_LEN};
 
     #[derive(Default)]
     struct FakeRxQueueState {
@@ -285,16 +286,15 @@ mod tests {
             // We should only ever be woken up once when the first frame
             // was enqueued.
             assert_eq!(core::mem::take(&mut bindings_ctx.state.woken_rx_tasks), [FakeLinkDeviceId]);
-
-            assert!(MAX_RX_QUEUED_LEN > MAX_BATCH_SIZE);
-            for i in (0..(MAX_RX_QUEUED_LEN - MAX_BATCH_SIZE)).step_by(MAX_BATCH_SIZE) {
+            assert!(MAX_RX_QUEUED_LEN > BatchSize::MAX);
+            for i in (0..(MAX_RX_QUEUED_LEN - BatchSize::MAX)).step_by(BatchSize::MAX) {
                 assert_eq!(
                     ctx.receive_queue_api().handle_queued_frames(&FakeLinkDeviceId),
                     WorkQueueReport::Pending
                 );
                 assert_eq!(
                     core::mem::take(&mut ctx.core_ctx.state.handled_frames),
-                    (i..i + MAX_BATCH_SIZE)
+                    (i..i + BatchSize::MAX)
                         .map(|i| Buf::new(vec![i as u8], ..))
                         .collect::<Vec<_>>()
                 );
@@ -307,13 +307,13 @@ mod tests {
             let CtxPair { core_ctx, bindings_ctx } = &mut ctx;
             assert_eq!(
                 core::mem::take(&mut core_ctx.state.handled_frames),
-                (MAX_BATCH_SIZE * (MAX_RX_QUEUED_LEN / MAX_BATCH_SIZE - 1)..MAX_RX_QUEUED_LEN)
+                (BatchSize::MAX * (MAX_RX_QUEUED_LEN / BatchSize::MAX - 1)..MAX_RX_QUEUED_LEN)
                     .map(|i| Buf::new(vec![i as u8], ..))
                     .collect::<Vec<_>>()
             );
             // Should not have woken up the RX task since the queue should be
             // empty.
-            assert_eq!(core::mem::take(&mut bindings_ctx.state.woken_rx_tasks), []);
+            assert_matches!(&core::mem::take(&mut bindings_ctx.state.woken_rx_tasks)[..], []);
 
             // The queue should now be empty so the next iteration of queueing
             // `MAX_RX_QUEUED_LEN` frames should succeed.

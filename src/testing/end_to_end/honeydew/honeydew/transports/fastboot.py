@@ -1,4 +1,3 @@
-#!/usr/bin/env fuchsia-vendored-python
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
@@ -30,9 +29,6 @@ _FFX_CMDS: dict[str, list[str]] = {
     "BOOT_TO_FASTBOOT_MODE": ["target", "reboot", "--bootloader"],
 }
 
-_TIMEOUTS: dict[str, float] = {
-    "TCP_ADDRESS": 30,
-}
 
 _NO_SERIAL = "<unknown>"
 
@@ -167,8 +163,7 @@ class Fastboot(fastboot_interface.Fastboot):
             self.wait_for_fuchsia_mode()
             self._reboot_affordance.wait_for_online()
             self._reboot_affordance.on_device_boot()
-
-        except Exception as err:  # pylint: disable=broad-except
+        except errors.HoneydewError as err:
             raise errors.FuchsiaDeviceError(
                 f"Failed to reboot {self._device_name} to fuchsia mode from "
                 f"fastboot mode"
@@ -193,20 +188,17 @@ class Fastboot(fastboot_interface.Fastboot):
     def run(
         self,
         cmd: list[str],
-        timeout: float = fastboot_interface.TIMEOUTS["FASTBOOT_CLI"],
     ) -> list[str]:
         """Executes and returns the output of `fastboot -s {node} {cmd}`.
 
         Args:
             cmd: Fastboot command to run.
-            timeout: Timeout to wait for the fastboot command to return.
 
         Returns:
             Output of `fastboot -s {node} {cmd}`.
 
         Raises:
             errors.FuchsiaStateError: Invalid state to perform this operation.
-            errors.HoneydewTimeoutError: Timeout running a fastboot command.
             errors.FastbootCommandError: In case of failure.
         """
         if not self.is_in_fastboot_mode():
@@ -225,7 +217,6 @@ class Fastboot(fastboot_interface.Fastboot):
             output: str = (
                 host_shell.run(
                     cmd=fastboot_cmd,
-                    timeout=timeout,
                     # fastboot cmd output is coming in stderr instead of stdout
                     capture_error_in_output=True,
                 )
@@ -238,57 +229,20 @@ class Fastboot(fastboot_interface.Fastboot):
         except errors.HostCmdError as err:
             raise errors.FastbootCommandError(err) from err
 
-    def wait_for_fastboot_mode(
-        self, timeout: float = fastboot_interface.TIMEOUTS["FASTBOOT_MODE"]
-    ) -> None:
-        """Wait for Fuchsia device to go to fastboot mode.
-
-        Args:
-            timeout: How long in sec to wait for device to go fastboot mode.
-
-        Raises:
-            errors.FuchsiaDeviceError: If device is not in fastboot mode.
-        """
+    def wait_for_fastboot_mode(self) -> None:
+        """Wait for Fuchsia device to go to fastboot mode."""
         _LOGGER.info("Waiting for %s to go fastboot mode...", self._device_name)
+        common.wait_for_state(
+            state_fn=self.is_in_fastboot_mode,
+            expected_state=True,
+        )
+        _LOGGER.info("%s is in fastboot mode...", self._device_name)
 
-        try:
-            common.wait_for_state(
-                state_fn=self.is_in_fastboot_mode,
-                expected_state=True,
-                timeout=timeout,
-            )
-            _LOGGER.info("%s is in fastboot mode...", self._device_name)
-        except errors.HoneydewTimeoutError as err:
-            raise errors.FuchsiaDeviceError(
-                f"'{self._device_name}' failed to go into fastboot mode in "
-                f"{timeout}sec."
-            ) from err
-
-    def wait_for_fuchsia_mode(
-        self, timeout: float = fastboot_interface.TIMEOUTS["FUCHSIA_MODE"]
-    ) -> None:
-        """Wait for Fuchsia device to go to fuchsia mode.
-
-        Args:
-            timeout: How long in sec to wait for device to go fuchsia mode.
-
-        Raises:
-            errors.FuchsiaDeviceError: If device is not in fuchsia mode.
-        """
+    def wait_for_fuchsia_mode(self) -> None:
+        """Wait for Fuchsia device to go to fuchsia mode."""
         _LOGGER.info("Waiting for %s to go fuchsia mode...", self._device_name)
-
-        try:
-            self._ffx_transport.wait_for_rcs_connection(timeout=timeout)
-            _LOGGER.info("%s is in fuchsia mode...", self._device_name)
-        except (
-            errors.FfxCommandError,
-            errors.DeviceNotConnectedError,
-            errors.FfxTimeoutError,
-        ) as err:
-            raise errors.FuchsiaDeviceError(
-                f"'{self._device_name}' failed to go into fuchsia mode in "
-                f"{timeout}sec."
-            ) from err
+        self._ffx_transport.wait_for_rcs_connection()
+        _LOGGER.info("%s is in fuchsia mode...", self._device_name)
 
     # List all the private methods
     def _get_fastboot_node(self, fastboot_node_id: str | None = None) -> None:
@@ -329,7 +283,7 @@ class Fastboot(fastboot_interface.Fastboot):
                 # self._fastboot_node_id need to be populated
                 self.boot_to_fuchsia_mode()
                 return
-        except Exception as err:  # pylint: disable=broad-except
+        except errors.HoneydewError as err:
             raise errors.FuchsiaDeviceError(
                 f"Failed to get the fastboot node id of '{self._device_name}'"
             ) from err
@@ -347,31 +301,18 @@ class Fastboot(fastboot_interface.Fastboot):
         ] = self._ffx_transport.get_target_info_from_target_list()
         return len(target["addresses"]) == 1
 
-    def _wait_for_valid_tcp_address(
-        self, timeout: float = _TIMEOUTS["TCP_ADDRESS"]
-    ) -> None:
-        """Wait for Fuchsia device to have a valid TCP address.
-
-        Args:
-            timeout: How long in sec to wait for a valid TCP address.
-
-        Raises:
-            errors.FuchsiaDeviceError: If failed to get valid TCP address.
-        """
-        _LOGGER.info(
+    def _wait_for_valid_tcp_address(self) -> None:
+        """Wait for Fuchsia device to have a valid TCP address."""
+        _LOGGER.debug(
             "Waiting for a valid TCP address assigned to %s in fastboot "
             "mode...",
             self._device_name,
         )
-
-        try:
-            common.wait_for_state(
-                state_fn=self._is_a_single_ip_address,
-                expected_state=True,
-                timeout=timeout,
-            )
-        except errors.HoneydewTimeoutError as err:
-            raise errors.FuchsiaDeviceError(
-                f"Unable to get the TCP address of '{self._device_name}' "
-                f"when in fastboot mode "
-            ) from err
+        common.wait_for_state(
+            state_fn=self._is_a_single_ip_address,
+            expected_state=True,
+        )
+        _LOGGER.debug(
+            "Valid TCP address has been assigned to %s in the fastboot mode.",
+            self._device_name,
+        )

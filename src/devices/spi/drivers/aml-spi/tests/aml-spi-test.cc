@@ -74,25 +74,34 @@ zx::result<fuchsia_scheduler::RoleName> GetSchedulerRoleName(
 
 class AmlSpiTestConfig final {
  public:
-  static constexpr bool kDriverOnForeground = true;
-  static constexpr bool kAutoStartDriver = true;
-  static constexpr bool kAutoStopDriver = true;
-
   using DriverType = TestAmlSpiDriver;
   using EnvironmentType = BaseTestEnvironment;
 };
 
-class AmlSpiTest : public fdf_testing::DriverTestFixture<AmlSpiTestConfig>,
-                   public ::testing::Test {};
+class AmlSpiTest : public ::testing::Test {
+ public:
+  void SetUp() override {
+    zx::result<> result = driver_test().StartDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
+  }
+  void TearDown() override {
+    zx::result<> result = driver_test().StopDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
+  }
+  fdf_testing::ForegroundDriverTest<AmlSpiTestConfig>& driver_test() { return driver_test_; }
+
+ private:
+  fdf_testing::ForegroundDriverTest<AmlSpiTestConfig> driver_test_;
+};
 
 TEST_F(AmlSpiTest, DdkLifecycle) {
-  RunInNodeContext([](fdf_testing::TestNode& node) {
+  driver_test().RunInNodeContext([](fdf_testing::TestNode& node) {
     EXPECT_NE(node.children().find("aml-spi-0"), node.children().cend());
   });
 }
 
 TEST_F(AmlSpiTest, ChipSelectCount) {
-  auto spiimpl_client = Connect<fuchsia_hardware_spiimpl::Service::Device>();
+  auto spiimpl_client = driver_test().Connect<fuchsia_hardware_spiimpl::Service::Device>();
   ASSERT_TRUE(spiimpl_client.is_ok());
 
   fdf::WireClient<fuchsia_hardware_spiimpl::SpiImpl> spiimpl(std::move(spiimpl_client.value()),
@@ -101,28 +110,29 @@ TEST_F(AmlSpiTest, ChipSelectCount) {
   spiimpl.buffer(arena)->GetChipSelectCount().Then([&](auto& result) {
     ASSERT_TRUE(result.ok());
     EXPECT_EQ(result->count, 3u);
-    runtime().Quit();
+    driver_test().runtime().Quit();
   });
-  runtime().Run();
+  driver_test().runtime().Run();
 }
 
 TEST_F(AmlSpiTest, Exchange) {
   uint8_t kTxData[] = {0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12};
   constexpr uint8_t kExpectedRxData[] = {0xab, 0xab, 0xab, 0xab, 0xab, 0xab, 0xab};
 
-  auto spiimpl_client = Connect<fuchsia_hardware_spiimpl::Service::Device>();
+  auto spiimpl_client = driver_test().Connect<fuchsia_hardware_spiimpl::Service::Device>();
   ASSERT_TRUE(spiimpl_client.is_ok());
 
   fdf::WireClient<fuchsia_hardware_spiimpl::SpiImpl> spiimpl(*std::move(spiimpl_client),
                                                              fdf::Dispatcher::GetCurrent()->get());
 
-  driver()->mmio()[AML_SPI_RXDATA].SetReadCallback([]() { return kExpectedRxData[0]; });
+  driver_test().driver()->mmio()[AML_SPI_RXDATA].SetReadCallback(
+      []() { return kExpectedRxData[0]; });
 
   uint64_t tx_data = 0;
-  driver()->mmio()[AML_SPI_TXDATA].SetWriteCallback(
+  driver_test().driver()->mmio()[AML_SPI_TXDATA].SetWriteCallback(
       [&tx_data](uint64_t value) { tx_data = value; });
 
-  RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
     env.ExpectGpioWrite(ZX_OK, 0);
     env.ExpectGpioWrite(ZX_OK, 1);
   });
@@ -135,13 +145,13 @@ TEST_F(AmlSpiTest, Exchange) {
         ASSERT_EQ(result->value()->rxdata.count(), sizeof(kExpectedRxData));
         EXPECT_TRUE(
             IsBytesEqual(result->value()->rxdata.data(), kExpectedRxData, sizeof(kExpectedRxData)));
-        runtime().Quit();
+        driver_test().runtime().Quit();
       });
-  runtime().Run();
+  driver_test().runtime().Run();
 
   EXPECT_EQ(tx_data, kTxData[0]);
 
-  RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
     EXPECT_FALSE(env.ControllerReset());
     ASSERT_NO_FATAL_FAILURE(env.VerifyGpioAndClear());
   });
@@ -151,16 +161,17 @@ TEST_F(AmlSpiTest, ExchangeCsManagedByClient) {
   uint8_t kTxData[] = {0x12, 0x12, 0x12, 0x12, 0x12, 0x12, 0x12};
   constexpr uint8_t kExpectedRxData[] = {0xab, 0xab, 0xab, 0xab, 0xab, 0xab, 0xab};
 
-  auto spiimpl_client = Connect<fuchsia_hardware_spiimpl::Service::Device>();
+  auto spiimpl_client = driver_test().Connect<fuchsia_hardware_spiimpl::Service::Device>();
   ASSERT_TRUE(spiimpl_client.is_ok());
 
   fdf::WireClient<fuchsia_hardware_spiimpl::SpiImpl> spiimpl(*std::move(spiimpl_client),
                                                              fdf::Dispatcher::GetCurrent()->get());
 
-  driver()->mmio()[AML_SPI_RXDATA].SetReadCallback([]() { return kExpectedRxData[0]; });
+  driver_test().driver()->mmio()[AML_SPI_RXDATA].SetReadCallback(
+      []() { return kExpectedRxData[0]; });
 
   uint64_t tx_data = 0;
-  driver()->mmio()[AML_SPI_TXDATA].SetWriteCallback(
+  driver_test().driver()->mmio()[AML_SPI_TXDATA].SetWriteCallback(
       [&tx_data](uint64_t value) { tx_data = value; });
 
   fdf::Arena arena('TEST');
@@ -171,13 +182,13 @@ TEST_F(AmlSpiTest, ExchangeCsManagedByClient) {
         ASSERT_EQ(result->value()->rxdata.count(), sizeof(kExpectedRxData));
         EXPECT_TRUE(
             IsBytesEqual(result->value()->rxdata.data(), kExpectedRxData, sizeof(kExpectedRxData)));
-        runtime().Quit();
+        driver_test().runtime().Quit();
       });
-  runtime().Run();
+  driver_test().runtime().Run();
 
   EXPECT_EQ(tx_data, kTxData[0]);
 
-  RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
     EXPECT_FALSE(env.ControllerReset());
 
     // There should be no GPIO calls as the client manages CS for this device.
@@ -188,7 +199,7 @@ TEST_F(AmlSpiTest, ExchangeCsManagedByClient) {
 TEST_F(AmlSpiTest, RegisterVmo) {
   using fuchsia_hardware_sharedmemory::SharedVmoRight;
 
-  auto spiimpl_client = Connect<fuchsia_hardware_spiimpl::Service::Device>();
+  auto spiimpl_client = driver_test().Connect<fuchsia_hardware_spiimpl::Service::Device>();
   ASSERT_TRUE(spiimpl_client.is_ok());
 
   fdf::WireClient<fuchsia_hardware_spiimpl::SpiImpl> spiimpl(*std::move(spiimpl_client),
@@ -232,9 +243,9 @@ TEST_F(AmlSpiTest, RegisterVmo) {
   spiimpl.buffer(arena)->UnregisterVmo(0, 1).Then([&](auto& result) {
     ASSERT_TRUE(result.ok());
     EXPECT_TRUE(result->is_error());
-    runtime().Quit();
+    driver_test().runtime().Quit();
   });
-  runtime().Run();
+  driver_test().runtime().Run();
 }
 
 TEST_F(AmlSpiTest, TransmitVmo) {
@@ -242,7 +253,7 @@ TEST_F(AmlSpiTest, TransmitVmo) {
 
   constexpr uint8_t kTxData[] = {0xa5, 0xa5, 0xa5, 0xa5, 0xa5, 0xa5, 0xa5};
 
-  auto spiimpl_client = Connect<fuchsia_hardware_spiimpl::Service::Device>();
+  auto spiimpl_client = driver_test().Connect<fuchsia_hardware_spiimpl::Service::Device>();
   ASSERT_TRUE(spiimpl_client.is_ok());
   fdf::WireClient<fuchsia_hardware_spiimpl::SpiImpl> spiimpl(*std::move(spiimpl_client),
                                                              fdf::Dispatcher::GetCurrent()->get());
@@ -263,7 +274,7 @@ TEST_F(AmlSpiTest, TransmitVmo) {
         });
   }
 
-  RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
     env.ExpectGpioWrite(ZX_OK, 0);
     env.ExpectGpioWrite(ZX_OK, 1);
   });
@@ -271,19 +282,19 @@ TEST_F(AmlSpiTest, TransmitVmo) {
   EXPECT_OK(test_vmo.write(kTxData, 512, sizeof(kTxData)));
 
   uint64_t tx_data = 0;
-  driver()->mmio()[AML_SPI_TXDATA].SetWriteCallback(
+  driver_test().driver()->mmio()[AML_SPI_TXDATA].SetWriteCallback(
       [&tx_data](uint64_t value) { tx_data = value; });
 
   spiimpl.buffer(arena)->TransmitVmo(0, {1, 256, sizeof(kTxData)}).Then([&](auto& result) {
     ASSERT_TRUE(result.ok());
     EXPECT_TRUE(result->is_ok());
-    runtime().Quit();
+    driver_test().runtime().Quit();
   });
-  runtime().Run();
+  driver_test().runtime().Run();
 
   EXPECT_EQ(tx_data, kTxData[0]);
 
-  RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
     EXPECT_FALSE(env.ControllerReset());
     ASSERT_NO_FATAL_FAILURE(env.VerifyGpioAndClear());
   });
@@ -294,7 +305,7 @@ TEST_F(AmlSpiTest, ReceiveVmo) {
 
   constexpr uint8_t kExpectedRxData[] = {0x78, 0x78, 0x78, 0x78, 0x78, 0x78, 0x78};
 
-  auto spiimpl_client = Connect<fuchsia_hardware_spiimpl::Service::Device>();
+  auto spiimpl_client = driver_test().Connect<fuchsia_hardware_spiimpl::Service::Device>();
   ASSERT_TRUE(spiimpl_client.is_ok());
 
   fdf::WireClient<fuchsia_hardware_spiimpl::SpiImpl> spiimpl(*std::move(spiimpl_client),
@@ -317,9 +328,10 @@ TEST_F(AmlSpiTest, ReceiveVmo) {
         });
   }
 
-  driver()->mmio()[AML_SPI_RXDATA].SetReadCallback([]() { return kExpectedRxData[0]; });
+  driver_test().driver()->mmio()[AML_SPI_RXDATA].SetReadCallback(
+      []() { return kExpectedRxData[0]; });
 
-  RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
     env.ExpectGpioWrite(ZX_OK, 0);
     env.ExpectGpioWrite(ZX_OK, 1);
   });
@@ -327,15 +339,15 @@ TEST_F(AmlSpiTest, ReceiveVmo) {
   spiimpl.buffer(arena)->ReceiveVmo(0, {1, 512, sizeof(kExpectedRxData)}).Then([&](auto& result) {
     ASSERT_TRUE(result.ok());
     EXPECT_TRUE(result->is_ok());
-    runtime().Quit();
+    driver_test().runtime().Quit();
   });
-  runtime().Run();
+  driver_test().runtime().Run();
 
   uint8_t rx_buffer[sizeof(kExpectedRxData)];
   EXPECT_OK(test_vmo.read(rx_buffer, 768, sizeof(rx_buffer)));
   EXPECT_TRUE(IsBytesEqual(rx_buffer, kExpectedRxData, sizeof(rx_buffer)));
 
-  RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
     EXPECT_FALSE(env.ControllerReset());
     ASSERT_NO_FATAL_FAILURE(env.VerifyGpioAndClear());
   });
@@ -347,7 +359,7 @@ TEST_F(AmlSpiTest, ExchangeVmo) {
   constexpr uint8_t kTxData[] = {0xef, 0xef, 0xef, 0xef, 0xef, 0xef, 0xef};
   constexpr uint8_t kExpectedRxData[] = {0x78, 0x78, 0x78, 0x78, 0x78, 0x78, 0x78};
 
-  auto spiimpl_client = Connect<fuchsia_hardware_spiimpl::Service::Device>();
+  auto spiimpl_client = driver_test().Connect<fuchsia_hardware_spiimpl::Service::Device>();
   ASSERT_TRUE(spiimpl_client.is_ok());
 
   fdf::WireClient<fuchsia_hardware_spiimpl::SpiImpl> spiimpl(*std::move(spiimpl_client),
@@ -370,13 +382,14 @@ TEST_F(AmlSpiTest, ExchangeVmo) {
         });
   }
 
-  driver()->mmio()[AML_SPI_RXDATA].SetReadCallback([]() { return kExpectedRxData[0]; });
+  driver_test().driver()->mmio()[AML_SPI_RXDATA].SetReadCallback(
+      []() { return kExpectedRxData[0]; });
 
   uint64_t tx_data = 0;
-  driver()->mmio()[AML_SPI_TXDATA].SetWriteCallback(
+  driver_test().driver()->mmio()[AML_SPI_TXDATA].SetWriteCallback(
       [&tx_data](uint64_t value) { tx_data = value; });
 
-  RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
     env.ExpectGpioWrite(ZX_OK, 0);
     env.ExpectGpioWrite(ZX_OK, 1);
   });
@@ -388,9 +401,9 @@ TEST_F(AmlSpiTest, ExchangeVmo) {
       .Then([&](auto& result) {
         ASSERT_TRUE(result.ok());
         EXPECT_TRUE(result->is_ok());
-        runtime().Quit();
+        driver_test().runtime().Quit();
       });
-  runtime().Run();
+  driver_test().runtime().Run();
 
   uint8_t rx_buffer[sizeof(kExpectedRxData)];
   EXPECT_OK(test_vmo.read(rx_buffer, 768, sizeof(rx_buffer)));
@@ -398,7 +411,7 @@ TEST_F(AmlSpiTest, ExchangeVmo) {
 
   EXPECT_EQ(tx_data, kTxData[0]);
 
-  RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
     EXPECT_FALSE(env.ControllerReset());
     ASSERT_NO_FATAL_FAILURE(env.VerifyGpioAndClear());
   });
@@ -407,7 +420,7 @@ TEST_F(AmlSpiTest, ExchangeVmo) {
 TEST_F(AmlSpiTest, TransfersOutOfRange) {
   using fuchsia_hardware_sharedmemory::SharedVmoRight;
 
-  auto spiimpl_client = Connect<fuchsia_hardware_spiimpl::Service::Device>();
+  auto spiimpl_client = driver_test().Connect<fuchsia_hardware_spiimpl::Service::Device>();
   ASSERT_TRUE(spiimpl_client.is_ok());
 
   fdf::WireClient<fuchsia_hardware_spiimpl::SpiImpl> spiimpl(*std::move(spiimpl_client),
@@ -430,7 +443,7 @@ TEST_F(AmlSpiTest, TransfersOutOfRange) {
         });
   }
 
-  RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
     env.ExpectGpioWrite(ZX_OK, 0);
     env.ExpectGpioWrite(ZX_OK, 1);
   });
@@ -452,7 +465,7 @@ TEST_F(AmlSpiTest, TransfersOutOfRange) {
     EXPECT_TRUE(result->is_error());
   });
 
-  RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
     env.ExpectGpioWrite(ZX_OK, 0);
     env.ExpectGpioWrite(ZX_OK, 1);
   });
@@ -478,7 +491,7 @@ TEST_F(AmlSpiTest, TransfersOutOfRange) {
     EXPECT_TRUE(result->is_error());
   });
 
-  RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
     env.ExpectGpioWrite(ZX_OK, 0);
     env.ExpectGpioWrite(ZX_OK, 1);
   });
@@ -488,7 +501,7 @@ TEST_F(AmlSpiTest, TransfersOutOfRange) {
     EXPECT_TRUE(result->is_ok());
   });
 
-  RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
     env.ExpectGpioWrite(ZX_OK, 0);
     env.ExpectGpioWrite(ZX_OK, 1);
   });
@@ -509,18 +522,18 @@ TEST_F(AmlSpiTest, TransfersOutOfRange) {
   spiimpl.buffer(arena)->ReceiveVmo(1, {1, 5, 1}).Then([&](auto& result) {
     ASSERT_TRUE(result.ok());
     EXPECT_TRUE(result->is_error());
-    runtime().Quit();
+    driver_test().runtime().Quit();
   });
-  runtime().Run();
+  driver_test().runtime().Run();
 
-  RunInEnvironmentTypeContext(
+  driver_test().RunInEnvironmentTypeContext(
       [](BaseTestEnvironment& env) { ASSERT_NO_FATAL_FAILURE(env.VerifyGpioAndClear()); });
 }
 
 TEST_F(AmlSpiTest, VmoBadRights) {
   using fuchsia_hardware_sharedmemory::SharedVmoRight;
 
-  auto spiimpl_client = Connect<fuchsia_hardware_spiimpl::Service::Device>();
+  auto spiimpl_client = driver_test().Connect<fuchsia_hardware_spiimpl::Service::Device>();
   ASSERT_TRUE(spiimpl_client.is_ok());
 
   fdf::WireClient<fuchsia_hardware_spiimpl::SpiImpl> spiimpl(*std::move(spiimpl_client),
@@ -554,7 +567,7 @@ TEST_F(AmlSpiTest, VmoBadRights) {
         });
   }
 
-  RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
     env.ExpectGpioWrite(ZX_OK, 0);
     env.ExpectGpioWrite(ZX_OK, 1);
   });
@@ -574,11 +587,11 @@ TEST_F(AmlSpiTest, VmoBadRights) {
   spiimpl.buffer(arena)->ReceiveVmo(0, {1, 0, 128}).Then([&](auto& result) {
     ASSERT_TRUE(result.ok());
     EXPECT_EQ(result->error_value(), ZX_ERR_ACCESS_DENIED);
-    runtime().Quit();
+    driver_test().runtime().Quit();
   });
-  runtime().Run();
+  driver_test().runtime().Run();
 
-  RunInEnvironmentTypeContext(
+  driver_test().RunInEnvironmentTypeContext(
       [](BaseTestEnvironment& env) { ASSERT_NO_FATAL_FAILURE(env.VerifyGpioAndClear()); });
 }
 
@@ -592,20 +605,20 @@ TEST_F(AmlSpiTest, Exchange64BitWords) {
       0xea, 0x2b, 0x8f, 0x8f, 0xea, 0x2b, 0x8f, 0x8f, 0xea, 0x2b, 0x8f, 0x8f,
   };
 
-  auto spiimpl_client = Connect<fuchsia_hardware_spiimpl::Service::Device>();
+  auto spiimpl_client = driver_test().Connect<fuchsia_hardware_spiimpl::Service::Device>();
   ASSERT_TRUE(spiimpl_client.is_ok());
 
   fdf::WireClient<fuchsia_hardware_spiimpl::SpiImpl> spiimpl(*std::move(spiimpl_client),
                                                              fdf::Dispatcher::GetCurrent()->get());
 
   // First (and only) word of kExpectedRxData with bytes swapped.
-  driver()->mmio()[AML_SPI_RXDATA].SetReadCallback([]() { return 0xea2b'8f8f; });
+  driver_test().driver()->mmio()[AML_SPI_RXDATA].SetReadCallback([]() { return 0xea2b'8f8f; });
 
   uint64_t tx_data = 0;
-  driver()->mmio()[AML_SPI_TXDATA].SetWriteCallback(
+  driver_test().driver()->mmio()[AML_SPI_TXDATA].SetWriteCallback(
       [&tx_data](uint64_t value) { tx_data = value; });
 
-  RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
     env.ExpectGpioWrite(ZX_OK, 0);
     env.ExpectGpioWrite(ZX_OK, 1);
   });
@@ -619,14 +632,14 @@ TEST_F(AmlSpiTest, Exchange64BitWords) {
         ASSERT_EQ(result->value()->rxdata.count(), sizeof(kExpectedRxData));
         EXPECT_TRUE(
             IsBytesEqual(result->value()->rxdata.data(), kExpectedRxData, sizeof(kExpectedRxData)));
-        runtime().Quit();
+        driver_test().runtime().Quit();
       });
-  runtime().Run();
+  driver_test().runtime().Run();
 
   // Last word of kTxData with bytes swapped.
   EXPECT_EQ(tx_data, 0xbaf1'4900);
 
-  RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
     EXPECT_FALSE(env.ControllerReset());
     ASSERT_NO_FATAL_FAILURE(env.VerifyGpioAndClear());
   });
@@ -642,19 +655,19 @@ TEST_F(AmlSpiTest, Exchange64Then8BitWords) {
       0xea, 0x00, 0x00, 0x00, 0xea, 0xea, 0xea, 0xea, 0xea, 0xea,
   };
 
-  auto spiimpl_client = Connect<fuchsia_hardware_spiimpl::Service::Device>();
+  auto spiimpl_client = driver_test().Connect<fuchsia_hardware_spiimpl::Service::Device>();
   ASSERT_TRUE(spiimpl_client.is_ok());
 
   fdf::WireClient<fuchsia_hardware_spiimpl::SpiImpl> spiimpl(*std::move(spiimpl_client),
                                                              fdf::Dispatcher::GetCurrent()->get());
 
-  driver()->mmio()[AML_SPI_RXDATA].SetReadCallback([]() { return 0xea; });
+  driver_test().driver()->mmio()[AML_SPI_RXDATA].SetReadCallback([]() { return 0xea; });
 
   uint64_t tx_data = 0;
-  driver()->mmio()[AML_SPI_TXDATA].SetWriteCallback(
+  driver_test().driver()->mmio()[AML_SPI_TXDATA].SetWriteCallback(
       [&tx_data](uint64_t value) { tx_data = value; });
 
-  RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
     env.ExpectGpioWrite(ZX_OK, 0);
     env.ExpectGpioWrite(ZX_OK, 1);
   });
@@ -668,26 +681,26 @@ TEST_F(AmlSpiTest, Exchange64Then8BitWords) {
         ASSERT_EQ(result->value()->rxdata.count(), sizeof(kExpectedRxData));
         EXPECT_TRUE(
             IsBytesEqual(result->value()->rxdata.data(), kExpectedRxData, sizeof(kExpectedRxData)));
-        runtime().Quit();
+        driver_test().runtime().Quit();
       });
-  runtime().Run();
+  driver_test().runtime().Run();
 
   EXPECT_EQ(tx_data, 0xbau);
 
-  RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
     EXPECT_FALSE(env.ControllerReset());
     ASSERT_NO_FATAL_FAILURE(env.VerifyGpioAndClear());
   });
 }
 
 TEST_F(AmlSpiTest, ExchangeResetsController) {
-  auto spiimpl_client = Connect<fuchsia_hardware_spiimpl::Service::Device>();
+  auto spiimpl_client = driver_test().Connect<fuchsia_hardware_spiimpl::Service::Device>();
   ASSERT_TRUE(spiimpl_client.is_ok());
 
   fdf::WireClient<fuchsia_hardware_spiimpl::SpiImpl> spiimpl(*std::move(spiimpl_client),
                                                              fdf::Dispatcher::GetCurrent()->get());
 
-  RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
     env.ExpectGpioWrite(ZX_OK, 0);
     env.ExpectGpioWrite(ZX_OK, 1);
   });
@@ -702,13 +715,13 @@ TEST_F(AmlSpiTest, ExchangeResetsController) {
         ASSERT_TRUE(result.ok());
         ASSERT_TRUE(result->is_ok());
         EXPECT_EQ(result->value()->rxdata.count(), 17u);
-        RunInEnvironmentTypeContext(
+        driver_test().RunInEnvironmentTypeContext(
             [](BaseTestEnvironment& env) { EXPECT_FALSE(env.ControllerReset()); });
-        runtime().Quit();
+        driver_test().runtime().Quit();
       });
-  runtime().Run();
+  driver_test().runtime().Run();
 
-  RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
     env.ExpectGpioWrite(ZX_OK, 0);
     env.ExpectGpioWrite(ZX_OK, 1);
   });
@@ -721,13 +734,13 @@ TEST_F(AmlSpiTest, ExchangeResetsController) {
         ASSERT_TRUE(result.ok());
         ASSERT_TRUE(result->is_ok());
         EXPECT_EQ(result->value()->rxdata.count(), 16u);
-        RunInEnvironmentTypeContext(
+        driver_test().RunInEnvironmentTypeContext(
             [](BaseTestEnvironment& env) { EXPECT_TRUE(env.ControllerReset()); });
-        runtime().Quit();
+        driver_test().runtime().Quit();
       });
-  runtime().Run();
+  driver_test().runtime().Run();
 
-  RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
     env.ExpectGpioWrite(ZX_OK, 0);
     env.ExpectGpioWrite(ZX_OK, 1);
   });
@@ -738,13 +751,13 @@ TEST_F(AmlSpiTest, ExchangeResetsController) {
         ASSERT_TRUE(result.ok());
         ASSERT_TRUE(result->is_ok());
         EXPECT_EQ(result->value()->rxdata.count(), 3u);
-        RunInEnvironmentTypeContext(
+        driver_test().RunInEnvironmentTypeContext(
             [](BaseTestEnvironment& env) { EXPECT_FALSE(env.ControllerReset()); });
-        runtime().Quit();
+        driver_test().runtime().Quit();
       });
-  runtime().Run();
+  driver_test().runtime().Run();
 
-  RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
     env.ExpectGpioWrite(ZX_OK, 0);
     env.ExpectGpioWrite(ZX_OK, 1);
   });
@@ -755,13 +768,13 @@ TEST_F(AmlSpiTest, ExchangeResetsController) {
         ASSERT_TRUE(result.ok());
         ASSERT_TRUE(result->is_ok());
         EXPECT_EQ(result->value()->rxdata.count(), 6u);
-        RunInEnvironmentTypeContext(
+        driver_test().RunInEnvironmentTypeContext(
             [](BaseTestEnvironment& env) { EXPECT_FALSE(env.ControllerReset()); });
-        runtime().Quit();
+        driver_test().runtime().Quit();
       });
-  runtime().Run();
+  driver_test().runtime().Run();
 
-  RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
     env.ExpectGpioWrite(ZX_OK, 0);
     env.ExpectGpioWrite(ZX_OK, 1);
   });
@@ -772,20 +785,20 @@ TEST_F(AmlSpiTest, ExchangeResetsController) {
         ASSERT_TRUE(result.ok());
         ASSERT_TRUE(result->is_ok());
         EXPECT_EQ(result->value()->rxdata.count(), 8u);
-        RunInEnvironmentTypeContext(
+        driver_test().RunInEnvironmentTypeContext(
             [](BaseTestEnvironment& env) { EXPECT_TRUE(env.ControllerReset()); });
-        runtime().Quit();
+        driver_test().runtime().Quit();
       });
-  runtime().Run();
+  driver_test().runtime().Run();
 
-  RunInEnvironmentTypeContext(
+  driver_test().RunInEnvironmentTypeContext(
       [](BaseTestEnvironment& env) { ASSERT_NO_FATAL_FAILURE(env.VerifyGpioAndClear()); });
 }
 
 TEST_F(AmlSpiTest, ReleaseVmos) {
   using fuchsia_hardware_sharedmemory::SharedVmoRight;
 
-  auto spiimpl_client = Connect<fuchsia_hardware_spiimpl::Service::Device>();
+  auto spiimpl_client = driver_test().Connect<fuchsia_hardware_spiimpl::Service::Device>();
   ASSERT_TRUE(spiimpl_client.is_ok());
 
   fdf::WireClient<fuchsia_hardware_spiimpl::SpiImpl> spiimpl(*std::move(spiimpl_client),
@@ -863,17 +876,17 @@ TEST_F(AmlSpiTest, ReleaseVmos) {
         .Then([&](auto& result) {
           ASSERT_TRUE(result.ok());
           EXPECT_TRUE(result->is_ok());
-          runtime().Quit();
+          driver_test().runtime().Quit();
         });
   }
 
-  runtime().Run();
+  driver_test().runtime().Run();
 }
 
 TEST_F(AmlSpiTest, ReleaseVmosAfterClientsUnbind) {
   using fuchsia_hardware_sharedmemory::SharedVmoRight;
 
-  auto spiimpl_client1 = Connect<fuchsia_hardware_spiimpl::Service::Device>();
+  auto spiimpl_client1 = driver_test().Connect<fuchsia_hardware_spiimpl::Service::Device>();
   ASSERT_TRUE(spiimpl_client1.is_ok());
 
   fdf::WireClient<fuchsia_hardware_spiimpl::SpiImpl> spiimpl1(*std::move(spiimpl_client1),
@@ -890,13 +903,13 @@ TEST_F(AmlSpiTest, ReleaseVmosAfterClientsUnbind) {
         .Then([&](auto& result) {
           ASSERT_TRUE(result.ok());
           EXPECT_TRUE(result->is_ok());
-          runtime().Quit();
+          driver_test().runtime().Quit();
         });
-    runtime().Run();
-    runtime().ResetQuit();
+    driver_test().runtime().Run();
+    driver_test().runtime().ResetQuit();
   }
 
-  auto spiimpl_client2 = Connect<fuchsia_hardware_spiimpl::Service::Device>();
+  auto spiimpl_client2 = driver_test().Connect<fuchsia_hardware_spiimpl::Service::Device>();
   ASSERT_TRUE(spiimpl_client2.is_ok());
 
   fdf::WireClient<fuchsia_hardware_spiimpl::SpiImpl> spiimpl2(*std::move(spiimpl_client2),
@@ -906,29 +919,29 @@ TEST_F(AmlSpiTest, ReleaseVmosAfterClientsUnbind) {
   spiimpl2.buffer(arena)->UnregisterVmo(0, 1).Then([&](auto& result) {
     ASSERT_TRUE(result.ok());
     EXPECT_TRUE(result->is_ok());
-    runtime().Quit();
+    driver_test().runtime().Quit();
   });
-  runtime().Run();
-  runtime().ResetQuit();
+  driver_test().runtime().Run();
+  driver_test().runtime().ResetQuit();
 
   // Unbind the first client.
   EXPECT_TRUE(spiimpl1.UnbindMaybeGetEndpoint().is_ok());
-  runtime().RunUntilIdle();
+  driver_test().runtime().RunUntilIdle();
 
   // The VMOs registered by the first client should remain.
   spiimpl2.buffer(arena)->UnregisterVmo(0, 2).Then([&](auto& result) {
     ASSERT_TRUE(result.ok());
     EXPECT_TRUE(result->is_ok());
-    runtime().Quit();
+    driver_test().runtime().Quit();
   });
-  runtime().Run();
-  runtime().ResetQuit();
+  driver_test().runtime().Run();
+  driver_test().runtime().ResetQuit();
 
   // Unbind the second client, then connect a third client.
   EXPECT_TRUE(spiimpl2.UnbindMaybeGetEndpoint().is_ok());
-  runtime().RunUntilIdle();
+  driver_test().runtime().RunUntilIdle();
 
-  auto spiimpl_client3 = Connect<fuchsia_hardware_spiimpl::Service::Device>();
+  auto spiimpl_client3 = driver_test().Connect<fuchsia_hardware_spiimpl::Service::Device>();
   ASSERT_TRUE(spiimpl_client3.is_ok());
 
   fdf::WireClient<fuchsia_hardware_spiimpl::SpiImpl> spiimpl3(*std::move(spiimpl_client3),
@@ -938,9 +951,9 @@ TEST_F(AmlSpiTest, ReleaseVmosAfterClientsUnbind) {
   spiimpl3.buffer(arena)->UnregisterVmo(0, 3).Then([&](auto& result) {
     ASSERT_TRUE(result.ok());
     EXPECT_TRUE(result->is_error());
-    runtime().Quit();
+    driver_test().runtime().Quit();
   });
-  runtime().Run();
+  driver_test().runtime().Run();
 }
 
 class AmlSpiNoResetFragmentEnvironment : public BaseTestEnvironment {
@@ -950,26 +963,36 @@ class AmlSpiNoResetFragmentEnvironment : public BaseTestEnvironment {
 
 class AmlSpiNoResetFragmentConfig final {
  public:
-  static constexpr bool kDriverOnForeground = true;
-  static constexpr bool kAutoStartDriver = true;
-  static constexpr bool kAutoStopDriver = true;
-
   using DriverType = TestAmlSpiDriver;
   using EnvironmentType = AmlSpiNoResetFragmentEnvironment;
 };
 
-class AmlSpiNoResetFragmentTest
-    : public fdf_testing::DriverTestFixture<AmlSpiNoResetFragmentConfig>,
-      public ::testing::Test {};
+class AmlSpiNoResetFragmentTest : public ::testing::Test {
+ public:
+  void SetUp() override {
+    zx::result<> result = driver_test().StartDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
+  }
+  void TearDown() override {
+    zx::result<> result = driver_test().StopDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
+  }
+  fdf_testing::ForegroundDriverTest<AmlSpiNoResetFragmentConfig>& driver_test() {
+    return driver_test_;
+  }
+
+ private:
+  fdf_testing::ForegroundDriverTest<AmlSpiNoResetFragmentConfig> driver_test_;
+};
 
 TEST_F(AmlSpiNoResetFragmentTest, ExchangeWithNoResetFragment) {
-  auto spiimpl_client = Connect<fuchsia_hardware_spiimpl::Service::Device>();
+  auto spiimpl_client = driver_test().Connect<fuchsia_hardware_spiimpl::Service::Device>();
   ASSERT_TRUE(spiimpl_client.is_ok());
 
   fdf::WireClient<fuchsia_hardware_spiimpl::SpiImpl> spiimpl(*std::move(spiimpl_client),
                                                              fdf::Dispatcher::GetCurrent()->get());
 
-  RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
     env.ExpectGpioWrite(ZX_OK, 0);
     env.ExpectGpioWrite(ZX_OK, 1);
   });
@@ -983,11 +1006,11 @@ TEST_F(AmlSpiNoResetFragmentTest, ExchangeWithNoResetFragment) {
         ASSERT_TRUE(result.ok());
         ASSERT_TRUE(result->is_ok());
         EXPECT_EQ(result->value()->rxdata.count(), 17u);
-        RunInEnvironmentTypeContext(
+        driver_test().RunInEnvironmentTypeContext(
             [](BaseTestEnvironment& env) { EXPECT_FALSE(env.ControllerReset()); });
       });
 
-  RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
     env.ExpectGpioWrite(ZX_OK, 0);
     env.ExpectGpioWrite(ZX_OK, 1);
   });
@@ -999,11 +1022,11 @@ TEST_F(AmlSpiNoResetFragmentTest, ExchangeWithNoResetFragment) {
         ASSERT_TRUE(result.ok());
         ASSERT_TRUE(result->is_ok());
         EXPECT_EQ(result->value()->rxdata.count(), 16u);
-        RunInEnvironmentTypeContext(
+        driver_test().RunInEnvironmentTypeContext(
             [](BaseTestEnvironment& env) { EXPECT_FALSE(env.ControllerReset()); });
       });
 
-  RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
     env.ExpectGpioWrite(ZX_OK, 0);
     env.ExpectGpioWrite(ZX_OK, 1);
   });
@@ -1014,11 +1037,11 @@ TEST_F(AmlSpiNoResetFragmentTest, ExchangeWithNoResetFragment) {
         ASSERT_TRUE(result.ok());
         ASSERT_TRUE(result->is_ok());
         EXPECT_EQ(result->value()->rxdata.count(), 3u);
-        RunInEnvironmentTypeContext(
+        driver_test().RunInEnvironmentTypeContext(
             [](BaseTestEnvironment& env) { EXPECT_FALSE(env.ControllerReset()); });
       });
 
-  RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
     env.ExpectGpioWrite(ZX_OK, 0);
     env.ExpectGpioWrite(ZX_OK, 1);
   });
@@ -1029,11 +1052,11 @@ TEST_F(AmlSpiNoResetFragmentTest, ExchangeWithNoResetFragment) {
         ASSERT_TRUE(result.ok());
         ASSERT_TRUE(result->is_ok());
         EXPECT_EQ(result->value()->rxdata.count(), 6u);
-        RunInEnvironmentTypeContext(
+        driver_test().RunInEnvironmentTypeContext(
             [](BaseTestEnvironment& env) { EXPECT_FALSE(env.ControllerReset()); });
       });
 
-  RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([](BaseTestEnvironment& env) {
     env.ExpectGpioWrite(ZX_OK, 0);
     env.ExpectGpioWrite(ZX_OK, 1);
   });
@@ -1044,13 +1067,13 @@ TEST_F(AmlSpiNoResetFragmentTest, ExchangeWithNoResetFragment) {
         ASSERT_TRUE(result.ok());
         ASSERT_TRUE(result->is_ok());
         EXPECT_EQ(result->value()->rxdata.count(), 8u);
-        RunInEnvironmentTypeContext(
+        driver_test().RunInEnvironmentTypeContext(
             [](BaseTestEnvironment& env) { EXPECT_FALSE(env.ControllerReset()); });
-        runtime().Quit();
+        driver_test().runtime().Quit();
       });
-  runtime().Run();
+  driver_test().runtime().Run();
 
-  RunInEnvironmentTypeContext(
+  driver_test().RunInEnvironmentTypeContext(
       [](BaseTestEnvironment& env) { ASSERT_NO_FATAL_FAILURE(env.VerifyGpioAndClear()); });
 }
 
@@ -1060,31 +1083,36 @@ class AmlSpiNoIrqEnvironment : public BaseTestEnvironment {
 
 class AmlSpiNoIrqConfig final {
  public:
-  static constexpr bool kDriverOnForeground = true;
-  static constexpr bool kAutoStartDriver = false;
-  static constexpr bool kAutoStopDriver = true;
-
   using DriverType = TestAmlSpiDriver;
   using EnvironmentType = AmlSpiNoIrqEnvironment;
 };
 
-class AmlSpiNoIrqTest : public fdf_testing::DriverTestFixture<AmlSpiNoIrqConfig>,
-                        public ::testing::Test {};
+class AmlSpiNoIrqTest : public ::testing::Test {
+ public:
+  void TearDown() override {
+    zx::result<> result = driver_test().StopDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
+  }
+  fdf_testing::ForegroundDriverTest<AmlSpiNoIrqConfig>& driver_test() { return driver_test_; }
+
+ private:
+  fdf_testing::ForegroundDriverTest<AmlSpiNoIrqConfig> driver_test_;
+};
 
 TEST_F(AmlSpiNoIrqTest, InterruptRequired) {
   // Bind should fail if no interrupt was provided.
-  EXPECT_TRUE(StartDriver().is_error());
+  EXPECT_TRUE(driver_test().StartDriver().is_error());
 }
 
 TEST_F(AmlSpiTest, DefaultRoleMetadata) {
   constexpr char kExpectedRoleName[] = "fuchsia.devices.spi.drivers.aml-spi.transaction";
 
-  zx::result compat_client_end = Connect<fuchsia_driver_compat::Service::Device>();
+  zx::result compat_client_end = driver_test().Connect<fuchsia_driver_compat::Service::Device>();
   fidl::WireClient<fuchsia_driver_compat::Device> client(
       *std::move(compat_client_end), fdf::Dispatcher::GetCurrent()->async_dispatcher());
 
   zx::result<fuchsia_scheduler::RoleName> metadata =
-      GetSchedulerRoleName(std::move(client), runtime());
+      GetSchedulerRoleName(std::move(client), driver_test().runtime());
   ASSERT_TRUE(metadata.is_ok());
   EXPECT_EQ(metadata->role(), kExpectedRoleName);
 }
@@ -1116,25 +1144,35 @@ class AmlSpiForwardRoleMetadataEnvironment : public BaseTestEnvironment {
 
 class AmlSpiForwardRoleMetadataConfig final {
  public:
-  static constexpr bool kDriverOnForeground = true;
-  static constexpr bool kAutoStartDriver = true;
-  static constexpr bool kAutoStopDriver = true;
-
   using DriverType = TestAmlSpiDriver;
   using EnvironmentType = AmlSpiForwardRoleMetadataEnvironment;
 };
 
-class AmlSpiForwardRoleMetadataTest
-    : public fdf_testing::DriverTestFixture<AmlSpiForwardRoleMetadataConfig>,
-      public ::testing::Test {};
+class AmlSpiForwardRoleMetadataTest : public ::testing::Test {
+ public:
+  void SetUp() override {
+    zx::result<> result = driver_test().StartDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
+  }
+  void TearDown() override {
+    zx::result<> result = driver_test().StopDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
+  }
+  fdf_testing::ForegroundDriverTest<AmlSpiForwardRoleMetadataConfig>& driver_test() {
+    return driver_test_;
+  }
+
+ private:
+  fdf_testing::ForegroundDriverTest<AmlSpiForwardRoleMetadataConfig> driver_test_;
+};
 
 TEST_F(AmlSpiForwardRoleMetadataTest, Test) {
-  zx::result compat_client_end = Connect<fuchsia_driver_compat::Service::Device>();
+  zx::result compat_client_end = driver_test().Connect<fuchsia_driver_compat::Service::Device>();
   fidl::WireClient<fuchsia_driver_compat::Device> client(
       *std::move(compat_client_end), fdf::Dispatcher::GetCurrent()->async_dispatcher());
 
   zx::result<fuchsia_scheduler::RoleName> metadata =
-      GetSchedulerRoleName(std::move(client), runtime());
+      GetSchedulerRoleName(std::move(client), driver_test().runtime());
   ASSERT_TRUE(metadata.is_ok());
   EXPECT_EQ(metadata->role(), AmlSpiForwardRoleMetadataEnvironment::kExpectedRoleName);
 }

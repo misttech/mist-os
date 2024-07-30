@@ -5,8 +5,7 @@ import asyncio
 import logging
 
 import fidl.fuchsia_developer_ffx as fd_ffx
-from fuchsia_controller_py import Context
-from fuchsia_controller_py import IsolateDir
+from fuchsia_controller_py import Context, IsolateDir
 
 logging.basicConfig(level=logging.DEBUG)
 

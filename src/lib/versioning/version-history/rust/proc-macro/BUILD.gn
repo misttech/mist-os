@@ -2,14 +2,18 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/rust/rustc_embed_files.gni")
 import("//build/rust/rustc_macro.gni")
 
-rustc_macro("version-history-macro") {
+rustc_macro("proc-macro") {
+  name = "version_history_macro"
+
   edition = "2021"
   with_unit_tests = true
 
   deps = [
-    "//src/lib/versioning/version-history/rust/shared:version-history-shared",
+    ":version-history-data",
+    "//src/lib/versioning/version-history/rust",
   ]
 
   sources = [ "src/lib.rs" ]
@@ -19,7 +23,23 @@ rustc_macro("version-history-macro") {
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
 }
 
+rustc_embed_files("version-history-data") {
+  edition = "2021"
+
+  _version_history_label = "//sdk:version_history($default_toolchain)"
+  _version_history_dir =
+      get_label_info(_version_history_label, "target_out_dir")
+
+  files = [
+    {
+      constant_name = "VERSION_HISTORY"
+      source = "${_version_history_dir}/version_history.json"
+      deps = [ _version_history_label ]
+    },
+  ]
+}
+
 group("tests") {
   testonly = true
-  deps = [ ":version-history-macro_test($host_toolchain)" ]
+  deps = [ ":proc-macro_test($host_toolchain)" ]
 }

@@ -5,8 +5,10 @@ library fuchsia.wlan.ieee80211;
 
 /// 802.11 reason codes.  These values are common throughout the standard.
 /// IEEE Std 802.11-2016, 9.4.1.7, Table 9-45
-@available(added=16)
-type ReasonCode = flexible enum : uint16 {
+type ReasonCode = strict(removed=16) flexible(added=16) enum : uint16 {
+    @available(removed=16)
+    RESERVED_0 = 0;
+
     UNSPECIFIED_REASON = 1;
     INVALID_AUTHENTICATION = 2;
     LEAVING_NETWORK_DEAUTH = 3;
@@ -73,6 +75,9 @@ type ReasonCode = flexible enum : uint16 {
     MESH_CHANNEL_SWITCH_REGULATORY_REQUIREMENTS = 65;
     MESH_CHANNEL_SWITCH_UNSPECIFIED = 66;
 
+    @available(removed=16)
+    RESERVED_67_TO_127 = 67;
+
     /// -----
     /// Values 67 to 127 are reserved by the IEEE protocol, and
     /// values 128 to 65535 are reserved for platform use.
@@ -81,6 +86,9 @@ type ReasonCode = flexible enum : uint16 {
     MLME_LINK_FAILED = 128;
     /// Driver detected a stalled Rx path in FW.
     FW_RX_STALLED = 129;
+    @available(replaced=16, renamed="FW_HIGH_WME_RX_ERR_RATE")
+    RESERVED_130_TO_65535 = 130;
     /// Driver detected high wme rx error rate in FW.
+    @available(added=16)
     FW_HIGH_WME_RX_ERR_RATE = 130;
 };

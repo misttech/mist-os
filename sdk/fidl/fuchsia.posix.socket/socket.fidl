@@ -697,6 +697,7 @@ const FAST_UDP_WAIT_MANY_MAXIMUM_ITEMS uint32 = 63;
 const DATAGRAM_SOCKET_PROTOCOL_NAME string = "fuchsia.posix.socket/DatagramSocket";
 
 /// A datagram socket.
+@discoverable
 closed protocol DatagramSocket {
     compose BaseDatagramSocket;
 
@@ -802,6 +803,7 @@ const SYNCHRONOUS_DATAGRAM_SOCKET_PROTOCOL_NAME string
 /// Instead, clients should use the BSD sockets API to interact with sockets.
 /// We plan to change this protocol substantially and clients that couple
 /// directly to this protocol will make those changes more difficult.
+@discoverable
 closed protocol SynchronousDatagramSocket {
     compose BaseDatagramSocket;
 
@@ -867,6 +869,7 @@ const STREAM_SOCKET_PROTOCOL_NAME string = "fuchsia.posix.socket/StreamSocket";
 /// Instead, clients should use the BSD sockets API to interact with sockets.
 /// We plan to change this protocol substantially and clients that couple
 /// directly to this protocol will make those changes more difficult.
+@discoverable
 closed protocol StreamSocket {
     compose BaseNetworkSocket;
 

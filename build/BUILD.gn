@@ -76,6 +76,7 @@ group("non_hermetic_deps") {
   visibility += [
     "//boards/*",
     "//bundles/assembly/*",
+    "//local/*",
   ]
 
   # TODO(b/314016615): tar_to_pkg() template is not hermetic
@@ -87,10 +88,11 @@ group("non_hermetic_deps") {
     "//build/images/*",
     "//src/bringup/lib/mexec/tests/*",
     "//src/lib/elfldltl/test/*",
-    "//src/security/lib/scrutiny/plugins/*",
+    "//src/security/lib/scrutiny/collector/*",
     "//src/security/lib/scrutiny/tests/*",
     "//src/security/tests/pkg_test/tests/*",
     "//src/security/tests/scrutiny_ffx_integration/*",
+    "//src/sys/component_manager/tests/bootfs_launching_benchmark:*",
     "//src/sys/component_manager/tests/fuchsia_boot_resolver:*",
     "//src/tests/assembly/*",
     "//src/tests/kernel_cprng/*",
@@ -201,6 +203,7 @@ group("non_hermetic_deps") {
     "//products/microfuchsia:*",
     "//products/minimal:*",
     "//products/workbench:*",
+    "//src/connectivity/wlan/testing/antlion-product-bundles:*",
     "//src/power/testing/system-integration/*",
   ]
 
@@ -429,6 +432,7 @@ group("config_data_template_allowlist") {
     "//src/connectivity/weave/weavestack:config",
     "//src/connectivity/wlan/wlancfg:config",
     "//src/developer/forensics:exceptions_enable_jitd_on_startup",
+    "//src/developer/forensics:feedback_upload_config_for_eng",
     "//src/developer/forensics:feedback_user_config_for_eng",
     "//src/developer/forensics:feedback_userdebug_config_for_eng",
     "//src/developer/memory/buckets",
@@ -457,8 +461,7 @@ group("config_data_template_allowlist") {
     "//src/security/lib/scrutiny/tests/*",
     "//src/security/tests/pkg_test/config:pkg_resolver_repository_config",
     "//src/security/tests/scrutiny_ffx_integration:empty_config",
-    "//src/settings/config:workstation_eng_agent_config",
-    "//src/settings/config:workstation_eng_interface_config",
+    "//src/settings/config:*",
     "//src/sys/component_manager:component_id_index_for_debug_config-config-data",
     "//src/sys/component_manager/tests/fuchsia_boot_resolver:empty_config",
     "//src/sys/pkg/bin/omaha-client:*",
@@ -526,4 +529,8 @@ group("core_realm_shards_allowlist") {
     "//src/connectivity/lowpan/drivers/lowpan-ot-driver:lowpan_ot_driver_core_shard",
     "//src/connectivity/lowpan/service:lowpanservice_shard",
   ]
+
+  # Used to facilitate b/353560491
+  visibility +=
+      [ "//src/session/bin/session_manager:fake_session_manager_core_shard" ]
 }

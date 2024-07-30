@@ -15,7 +15,6 @@ use std::task::{Context, Poll};
 mod buffer_source {
     use fuchsia_runtime::vmar_root_self;
     use fuchsia_zircon::{self as zx, AsHandleRef};
-    use std::ffi::CString;
     use std::ops::Range;
 
     /// A buffer source backed by a VMO.
@@ -34,8 +33,8 @@ mod buffer_source {
     impl BufferSource {
         pub fn new(size: usize) -> Self {
             let vmo = zx::Vmo::create(size as u64).unwrap();
-            let cname = CString::new("transfer-buf").unwrap();
-            vmo.set_name(&cname).unwrap();
+            let name = zx::Name::new("transfer-buf").unwrap();
+            vmo.set_name(&name).unwrap();
             let flags = zx::VmarFlags::PERM_READ
                 | zx::VmarFlags::PERM_WRITE
                 | zx::VmarFlags::MAP_RANGE

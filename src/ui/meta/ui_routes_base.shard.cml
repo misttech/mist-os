@@ -116,6 +116,7 @@
                 "fuchsia.ui.DisplayPixelDensity",
                 "fuchsia.ui.IdleThresholdMs",
                 "fuchsia.ui.SupportedInputDevices",
+                "fuchsia.ui.SuspendEnabled",
                 "fuchsia.ui.ViewingDistance",
             ],
         },

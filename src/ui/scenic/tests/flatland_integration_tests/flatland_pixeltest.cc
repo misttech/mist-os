@@ -4,7 +4,6 @@
 
 #include <fuchsia/sysmem/cpp/fidl.h>
 #include <fuchsia/ui/composition/cpp/fidl.h>
-#include <lib/sys/component/cpp/testing/realm_builder.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/ui/scenic/cpp/view_creation_tokens.h>
 #include <lib/ui/scenic/cpp/view_identity.h>
@@ -16,16 +15,13 @@
 #include "src/ui/scenic/lib/allocation/buffer_collection_import_export_tokens.h"
 #include "src/ui/scenic/lib/utils/helpers.h"
 #include "src/ui/scenic/tests/utils/blocking_present.h"
-#include "src/ui/scenic/tests/utils/scenic_realm_builder.h"
+#include "src/ui/scenic/tests/utils/scenic_ctf_test_base.h"
 #include "src/ui/scenic/tests/utils/utils.h"
-#include "src/ui/testing/util/logging_event_loop.h"
 #include "src/ui/testing/util/screenshot_helper.h"
 
 namespace integration_tests {
 
 namespace fuc = fuchsia::ui::composition;
-
-using component_testing::RealmRoot;
 
 #define EXPECT_NEAR(val1, val2, eps)                                         \
   EXPECT_LE(std::abs(static_cast<double>(val1) - static_cast<double>(val2)), \
@@ -49,32 +45,23 @@ void CompareColor(utils::Pixel actual, utils::Pixel expected) {
 }
 
 // Test fixture that sets up an environment with a Scenic we can connect to.
-class FlatlandPixelTestBase : public ui_testing::LoggingEventLoop, public zxtest::Test {
+class FlatlandPixelTestBase : public ScenicCtfTest {
  public:
   void SetUp() override {
-    // Build the realm topology and route the protocols required by this test fixture from the
-    // scenic subrealm.
-    realm_ = std::make_unique<RealmRoot>(ScenicRealmBuilder({.display_rotation = 0})
-                                             .AddRealmProtocol(fuc::Flatland::Name_)
-                                             .AddRealmProtocol(fuc::FlatlandDisplay::Name_)
-                                             .AddRealmProtocol(fuc::Screenshot::Name_)
-                                             .AddRealmProtocol(fuc::Allocator::Name_)
-                                             .Build());
+    ScenicCtfTest::SetUp();
 
-    // Connect to sysmem service.
-    auto context = sys::ComponentContext::Create();
-    context->svc()->Connect(sysmem_allocator_.NewRequest());
+    LocalServiceDirectory()->Connect(sysmem_allocator_.NewRequest());
 
-    flatland_display_ = realm_->component().Connect<fuc::FlatlandDisplay>();
+    flatland_display_ = ConnectAsyncIntoRealm<fuc::FlatlandDisplay>();
     flatland_display_.set_error_handler([](zx_status_t status) {
       FX_LOGS(ERROR) << "Lost connection to Scenic: " << zx_status_get_string(status);
       FAIL();
     });
 
-    flatland_allocator_ = realm_->component().ConnectSync<fuc::Allocator>();
+    flatland_allocator_ = ConnectSyncIntoRealm<fuc::Allocator>();
 
     // Create a root view.
-    root_flatland_ = realm_->component().Connect<fuc::Flatland>();
+    root_flatland_ = ConnectAsyncIntoRealm<fuc::Flatland>();
     root_flatland_.set_error_handler([](zx_status_t status) {
       FX_LOGS(ERROR) << "Lost connection to Scenic: " << zx_status_get_string(status);
       FAIL();
@@ -100,16 +87,12 @@ class FlatlandPixelTestBase : public ui_testing::LoggingEventLoop, public zxtest
     display_width_ = info->logical_size().width;
     display_height_ = info->logical_size().height;
 
-    screenshotter_ = realm_->component().ConnectSync<fuc::Screenshot>();
+    screenshotter_ = ConnectSyncIntoRealm<fuc::Screenshot>();
   }
 
   void TearDown() override {
     root_flatland_.Unbind();
     flatland_display_.Unbind();
-
-    bool complete = false;
-    realm_->Teardown([&](fit::result<fuchsia::component::Error> result) { complete = true; });
-    RunLoopUntil([&]() { return complete; });
 
     zxtest::Test::TearDown();
   }
@@ -231,7 +214,6 @@ class FlatlandPixelTestBase : public ui_testing::LoggingEventLoop, public zxtest
   fuc::AllocatorSyncPtr flatland_allocator_;
   fuc::FlatlandPtr root_flatland_;
   fuc::ScreenshotSyncPtr screenshotter_;
-  std::unique_ptr<RealmRoot> realm_;
   uint64_t get_next_resource_id() { return resource_id_++; }
 
  private:
@@ -410,8 +392,7 @@ TEST_P(ParameterizedSRGBPixelTest, RGBTest) {
 
   if (info.settings().buffer_settings().coherency_domain() ==
       fuchsia::sysmem2::CoherencyDomain::RAM) {
-    EXPECT_EQ(ZX_OK, info.buffers()[0].vmo().op_range(ZX_VMO_OP_CACHE_CLEAN, 0, image_vmo_bytes,
-                                                      nullptr, 0));
+    EXPECT_EQ(ZX_OK, zx_cache_flush(vmo_base, image_vmo_bytes, ZX_CACHE_FLUSH_DATA));
   }
 
   // Create the image in the Flatland instance.
@@ -674,8 +655,7 @@ TEST_P(ParameterizedFlipAndOrientationTest, FlipAndOrientationRenderTest) {
 
   if (info.settings().buffer_settings().coherency_domain() ==
       fuchsia::sysmem2::CoherencyDomain::RAM) {
-    EXPECT_EQ(ZX_OK, info.buffers()[0].vmo().op_range(ZX_VMO_OP_CACHE_CLEAN, 0, image_vmo_bytes,
-                                                      nullptr, 0));
+    EXPECT_EQ(ZX_OK, zx_cache_flush(vmo_base, image_vmo_bytes, ZX_CACHE_FLUSH_DATA));
   }
 
   fuc::ImageProperties image_properties = {};
@@ -847,7 +827,7 @@ TEST_P(ParameterizedOpacityPixelTest, OpacityTest) {
 TEST_F(FlatlandPixelTestBase, ViewBoundClipping) {
   // Create a child view.
   fuc::FlatlandPtr child;
-  child = realm_->component().Connect<fuc::Flatland>();
+  child = ConnectAsyncIntoRealm<fuc::Flatland>();
   uint32_t child_width = 0, child_height = 0;
 
   auto [view_creation_token, viewport_token] = scenic::ViewCreationTokenPair::New();
@@ -1057,7 +1037,7 @@ TEST_F(FlatlandPixelTestBase, ScaleTest) {
 // This test ensures that detaching a viewport ceases rendering the view.
 TEST_F(FlatlandPixelTestBase, ViewportDetach) {
   fuc::FlatlandPtr child;
-  child = realm_->component().Connect<fuc::Flatland>();
+  child = ConnectAsyncIntoRealm<fuc::Flatland>();
 
   // Create the child view.
   auto [view_creation_token, viewport_creation_token] = scenic::ViewCreationTokenPair::New();
@@ -1111,7 +1091,7 @@ TEST_F(FlatlandPixelTestBase, ViewportDetach) {
 // as hints for clients, and they won't affect rendering of views in Scenic.
 TEST_F(FlatlandPixelTestBase, InsetNotEnforced) {
   fuc::FlatlandPtr child;
-  child = realm_->component().Connect<fuc::Flatland>();
+  child = ConnectAsyncIntoRealm<fuc::Flatland>();
 
   // Create the child view.
   auto [view_creation_token, viewport_creation_token] = scenic::ViewCreationTokenPair::New();

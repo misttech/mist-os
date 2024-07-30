@@ -19,6 +19,7 @@ use starnix_uapi::auth::{CAP_SYS_PTRACE, PTRACE_MODE_ATTACH_REALCREDS};
 use starnix_uapi::errors::{Errno, EINTR};
 use starnix_uapi::time::{duration_from_timespec, time_from_timespec};
 use starnix_uapi::user_address::{UserAddress, UserRef};
+use starnix_uapi::user_value::UserValue;
 use starnix_uapi::{
     errno, error, pid_t, robust_list_head, timespec, uapi, FUTEX_BITSET_MATCH_ANY,
     FUTEX_CLOCK_REALTIME, FUTEX_CMD_MASK, FUTEX_CMP_REQUEUE, FUTEX_LOCK_PI, FUTEX_PRIVATE_FLAG,
@@ -161,7 +162,7 @@ where
             length,
             prot_flags,
             options,
-            file.name.clone(),
+            file.name.to_passive(),
         )
     }
 }
@@ -244,9 +245,9 @@ pub fn sys_process_vm_readv(
     current_task: &CurrentTask,
     pid: pid_t,
     local_iov_addr: UserAddress,
-    local_iov_count: i32,
+    local_iov_count: UserValue<i32>,
     remote_iov_addr: UserAddress,
-    remote_iov_count: i32,
+    remote_iov_count: UserValue<i32>,
     flags: usize,
 ) -> Result<usize, Errno> {
     if flags != 0 {
@@ -296,9 +297,9 @@ pub fn sys_process_vm_writev(
     current_task: &CurrentTask,
     pid: pid_t,
     local_iov_addr: UserAddress,
-    local_iov_count: i32,
+    local_iov_count: UserValue<i32>,
     remote_iov_addr: UserAddress,
-    remote_iov_count: i32,
+    remote_iov_count: UserValue<i32>,
     flags: usize,
 ) -> Result<usize, Errno> {
     if flags != 0 {

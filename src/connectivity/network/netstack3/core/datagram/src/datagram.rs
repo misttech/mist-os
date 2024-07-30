@@ -404,9 +404,6 @@ pub struct ConnState<
     ///
     /// In that case, when the socket is disconnected, the device should be
     /// cleared since it was set as part of a `connect` call, not explicitly.
-    ///
-    /// TODO(https://fxbug.dev/42061727): Implement this by changing socket
-    /// addresses.
     pub(crate) clear_device_on_disconnect: bool,
 
     /// The extra state for the connection.

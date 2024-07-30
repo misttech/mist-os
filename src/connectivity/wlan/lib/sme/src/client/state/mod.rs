@@ -685,7 +685,7 @@ impl Associated {
 
     fn on_wmm_status_resp(
         &mut self,
-        status: zx::zx_status_t,
+        status: zx::sys::zx_status_t,
         resp: fidl_internal::WmmStatusResponse,
     ) {
         if status == zx::sys::ZX_OK {

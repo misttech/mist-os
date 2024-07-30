@@ -44,7 +44,7 @@ fuchsia_driver("msd_vsi-driver") {
 }
 
 fuchsia_driver_component("msd_vsi") {
-  info = "msd_vsi-info.json"
+  info = "meta/msd_vsi-info.json"
   component_name = "libmsd_vsi"
   deps = [ ":msd_vsi-driver" ]
   manifest = "meta/msd_vsi.cml"
@@ -62,7 +62,7 @@ fuchsia_driver("msd_vsi_test-driver") {
 }
 
 fuchsia_driver_component("msd_vsi_test") {
-  info = "msd_vsi_test-info.json"
+  info = "meta/msd_vsi_test-info.json"
   testonly = true
   component_name = "libmsd_vsi_test"
   deps = [ ":msd_vsi_test-driver" ]
@@ -70,7 +70,7 @@ fuchsia_driver_component("msd_vsi_test") {
 }
 
 driver_bind_rules("msd_vsi_bind") {
-  rules = "msd_vsi.bind"
+  rules = "meta/msd_vsi.bind"
   tests = "tests/bind_tests.json"
   deps = [
     "//src/devices/bind/fuchsia.platform",
@@ -121,7 +121,7 @@ source_set("msd_vsi_test_entry") {
 }
 
 driver_bind_rules("msd_vsi_test_bind") {
-  rules = "msd_vsi_test.bind"
+  rules = "meta/msd_vsi_test.bind"
   disable_autobind = true
   deps = [
     "//src/devices/bind/fuchsia.platform",

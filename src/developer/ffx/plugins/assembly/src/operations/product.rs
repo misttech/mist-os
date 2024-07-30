@@ -60,8 +60,11 @@ Resulting product is not supported and may misbehave!
             let AssemblyConfigWrapperForOverrides { platform, product, file_relative_paths } =
                 read_config(&product_path).context("Reading product configuration")?;
 
-            let developer_overrides =
-                read_config(&overrides_path).context("Reading developer overrides")?;
+            let developer_overrides = read_config::<DeveloperOverrides>(&overrides_path)
+                .context("Reading developer overrides")?
+                .resolve_paths_from_file(&overrides_path)
+                .context("Resolving paths in developer overrides")?;
+
             print_developer_overrides_banner(&developer_overrides, &overrides_path)
                 .context("Displaying developer overrides.")?;
 

@@ -289,7 +289,7 @@ pub async fn do_shutdown(
                 }
                 return Ok(());
             }
-            InstanceState::New | InstanceState::Unresolved(_) | InstanceState::Destroyed => {}
+            InstanceState::Unresolved(_) | InstanceState::Destroyed => {}
         }
     }
 

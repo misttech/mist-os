@@ -261,11 +261,11 @@ class TestNonHardwareMsdArmDevice {
      public:
       FakeJobScheduler(Owner* owner) : JobScheduler(owner, 3) {}
       ~FakeJobScheduler() override {}
-      Clock::duration GetCurrentTimeoutDuration() override {
+      Clock::time_point GetCurrentTimeoutPoint() override {
         if (got_timeout_check_)
-          return Clock::duration::max();
+          return Clock::time_point::max();
         got_timeout_check_ = true;
-        return Clock::duration::zero();
+        return Clock::now() - std::chrono::seconds(1);
       }
       void HandleTimedOutAtoms() override {
         // The first hang check should be aborted since the semaphore pretended to

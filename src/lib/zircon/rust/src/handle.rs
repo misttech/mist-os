@@ -5,11 +5,10 @@
 //! Type-safe bindings for Zircon handles.
 //!
 use crate::{
-    object_get_info_single, object_get_property, object_set_property, ok, ObjectQuery, Port,
+    object_get_info_single, object_get_property, object_set_property, ok, Name, ObjectQuery, Port,
     Property, PropertyQuery, Rights, Signals, Status, Time, Topic, WaitAsyncOpts,
 };
 use fuchsia_zircon_sys as sys;
-use std::ffi::{CStr, CString};
 use std::marker::PhantomData;
 use std::mem::{self, ManuallyDrop};
 
@@ -109,7 +108,9 @@ impl Handle {
 struct NameProperty();
 unsafe impl PropertyQuery for NameProperty {
     const PROPERTY: Property = Property::NAME;
-    type PropTy = [u8; sys::ZX_MAX_NAME_LEN];
+    // SAFETY: this type is correctly sized and the kernel guarantees that it will be
+    // null-terminated like the type requires.
+    type PropTy = Name;
 }
 
 /// A borrowed value of type `T`.
@@ -257,11 +258,8 @@ pub trait AsHandleRef {
     /// Wraps a call to the
     /// [zx_object_get_property](https://fuchsia.dev/fuchsia-src/reference/syscalls/object_get_property.md)
     /// syscall for the ZX_PROP_NAME property.
-    fn get_name(&self) -> Result<CString, Status> {
-        let buf = object_get_property::<NameProperty>(self.as_handle_ref())?;
-        let nul_pos = buf.iter().position(|&x| x == b'\0').ok_or(Status::INTERNAL)?;
-        // We already checked for nul bytes, so simply unwrap.
-        Ok(CString::new(&buf[..nul_pos]).unwrap())
+    fn get_name(&self) -> Result<Name, Status> {
+        object_get_property::<NameProperty>(self.as_handle_ref())
     }
 
     /// Set the [Property::NAME] property for this object.
@@ -273,15 +271,8 @@ pub trait AsHandleRef {
     /// Wraps a call to the
     /// [zx_object_get_property](https://fuchsia.dev/fuchsia-src/reference/syscalls/object_get_property.md)
     /// syscall for the ZX_PROP_NAME property.
-    fn set_name(&self, name: &CStr) -> Result<(), Status> {
-        let bytes = name.to_bytes_with_nul();
-        if bytes.len() > sys::ZX_MAX_NAME_LEN {
-            return Err(Status::INVALID_ARGS);
-        }
-
-        let mut buf = [0u8; sys::ZX_MAX_NAME_LEN];
-        buf[..bytes.len()].copy_from_slice(bytes);
-        object_set_property::<NameProperty>(self.as_handle_ref(), &buf)
+    fn set_name(&self, name: &Name) -> Result<(), Status> {
+        object_set_property::<NameProperty>(self.as_handle_ref(), &name)
     }
 
     /// Wraps the
@@ -579,7 +570,7 @@ mod tests {
     // The unit tests are built with a different crate name, but fuchsia_runtime returns a "real"
     // fuchsia_zircon::Vmar that we need to use.
     use fuchsia_zircon::{
-        AsHandleRef, Channel, Handle, HandleBased, HandleDisposition, HandleInfo, HandleOp,
+        AsHandleRef, Channel, Handle, HandleBased, HandleDisposition, HandleInfo, HandleOp, Name,
         ObjectType, Rights, Vmo,
     };
     use fuchsia_zircon_sys as sys;
@@ -637,25 +628,17 @@ mod tests {
     fn set_get_name() {
         // We need some concrete object to exercise the AsHandleRef<'_> set/get_name functions.
         let vmo = Vmo::create(1).unwrap();
-        let short_name = CStr::from_bytes_with_nul(b"v\0").unwrap();
-        assert!(vmo.set_name(short_name).is_ok());
-        assert_eq!(vmo.get_name(), Ok(short_name.to_owned()));
+        let short_name = Name::new("v").unwrap();
+        assert!(vmo.set_name(&short_name).is_ok());
+        assert_eq!(vmo.get_name().unwrap(), short_name);
     }
 
     #[test]
     fn set_get_max_len_name() {
         let vmo = Vmo::create(1).unwrap();
-        let max_len_name = CStr::from_bytes_with_nul(b"a_great_maximum_length_vmo_name\0").unwrap(); // 32 bytes
-        assert!(vmo.set_name(max_len_name).is_ok());
-        assert_eq!(vmo.get_name(), Ok(max_len_name.to_owned()));
-    }
-
-    #[test]
-    fn set_get_too_long_name() {
-        let vmo = Vmo::create(1).unwrap();
-        let too_long_name =
-            CStr::from_bytes_with_nul(b"bad_really_too_too_long_vmo_name\0").unwrap(); // 33 bytes
-        assert_eq!(vmo.set_name(too_long_name), Err(Status::INVALID_ARGS));
+        let max_len_name = Name::new("a_great_maximum_length_vmo_name").unwrap(); // 31 bytes
+        assert!(vmo.set_name(&max_len_name).is_ok());
+        assert_eq!(vmo.get_name().unwrap(), max_len_name);
     }
 
     #[test]

@@ -89,7 +89,7 @@ const device_bind_prop_t kGpioBtProperties[] = {
 };
 
 zx_status_t Sherlock::PwmInit() {
-  gpio_init_steps_.push_back(GpioSetAltFunction(GPIO_SOC_WIFI_LPO_32k768, T931_WIFI_LPO_CLK_FN));
+  gpio_init_steps_.push_back(GpioFunction(GPIO_SOC_WIFI_LPO_32k768, T931_WIFI_LPO_CLK_FN));
 
   // T931_PWM_AO_B controls VDDEE_800 which is configured by the bootloader.
   // Marked as protect so we don't try to initialize it.

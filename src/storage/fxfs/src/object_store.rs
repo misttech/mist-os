@@ -1235,22 +1235,28 @@ impl ObjectStore {
         let finished_tombstone_attribute =
             matches!(mode, TrimMode::Tombstone(TombstoneMode::Attribute))
                 && !matches!(result, TrimResult::Incomplete);
-        let mut mutation = self.txn_get_object_mutation(transaction, object_id).await?;
-        if let ObjectValue::Object { attributes: ObjectAttributes { project_id, .. }, .. } =
-            mutation.item.value
-        {
-            let nodes = if finished_tombstone_object { -1 } else { 0 };
-            if project_id != 0 && (deallocated != 0 || nodes != 0) {
-                transaction.add(
-                    self.store_object_id,
-                    Mutation::merge_object(
-                        ObjectKey::project_usage(self.root_directory_object_id(), project_id),
-                        ObjectValue::BytesAndNodes {
-                            bytes: -i64::try_from(deallocated).unwrap(),
-                            nodes,
-                        },
-                    ),
-                );
+        let mut object_mutation = None;
+        let nodes = if finished_tombstone_object { -1 } else { 0 };
+        if nodes != 0 || deallocated != 0 {
+            let mutation = self.txn_get_object_mutation(transaction, object_id).await?;
+            if let ObjectValue::Object { attributes: ObjectAttributes { project_id, .. }, .. } =
+                mutation.item.value
+            {
+                if project_id != 0 {
+                    transaction.add(
+                        self.store_object_id,
+                        Mutation::merge_object(
+                            ObjectKey::project_usage(self.root_directory_object_id(), project_id),
+                            ObjectValue::BytesAndNodes {
+                                bytes: -i64::try_from(deallocated).unwrap(),
+                                nodes,
+                            },
+                        ),
+                    );
+                }
+                object_mutation = Some(mutation);
+            } else {
+                panic!("Inconsistent object type.");
             }
         }
 
@@ -1272,6 +1278,10 @@ impl ObjectStore {
                 );
             }
             if deallocated > 0 {
+                let mut mutation = match object_mutation {
+                    Some(mutation) => mutation,
+                    None => self.txn_get_object_mutation(transaction, object_id).await?,
+                };
                 transaction.add(
                     self.store_object_id,
                     Mutation::merge_object(
@@ -2202,7 +2212,7 @@ mod tests {
     use crate::errors::FxfsError;
     use crate::filesystem::{FxFilesystem, JournalingObject, OpenFxFilesystem, SyncOptions};
     use crate::fsck::fsck;
-    use crate::lsm_tree::types::{Item, ItemRef, LayerIterator};
+    use crate::lsm_tree::types::{ItemRef, LayerIterator};
     use crate::lsm_tree::Query;
     use crate::object_handle::{
         ObjectHandle, ReadObjectHandle, WriteObjectHandle, INVALID_OBJECT_ID,
@@ -2640,11 +2650,20 @@ mod tests {
         };
 
         root_store.tombstone_object(child_id, Options::default()).await.expect("tombstone failed");
-        assert_matches!(
-            root_store.tree.find(&ObjectKey::object(child_id)).await.expect("find failed"),
-            Some(Item { value: ObjectValue::None, .. })
-        );
-
+        {
+            let layers = root_store.tree.layer_set();
+            let mut merger = layers.merger();
+            let iter = merger
+                .query(Query::FullRange(&ObjectKey::object(child_id)))
+                .await
+                .expect("seek failed");
+            // Find at least one object still in the tree.
+            match iter.get() {
+                Some(ItemRef { key: ObjectKey { object_id, .. }, .. })
+                    if *object_id == child_id => {}
+                _ => panic!("Objects should still be in the tree."),
+            }
+        }
         root_store.flush().await.expect("flush failed");
 
         // There should be no records for the object.

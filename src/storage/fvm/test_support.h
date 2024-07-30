@@ -132,25 +132,33 @@ class BlockDeviceAdapter : public DeviceRef {
 // Provides a Ramdisk device that is destroyed upon leaving the scope.
 class RamdiskRef final : public BlockDeviceAdapter {
  public:
-  // Creates a block device with the respective block count and size.
+  // Creates a block device with the respective block count and size.  If `vmo` is specified,
+  // the size of the `vmo` must be `block_size * block_count`.
   // Returns nullptr on failure.
   static std::unique_ptr<RamdiskRef> Create(const fbl::unique_fd& devfs_root, uint64_t block_size,
-                                            uint64_t block_count);
+                                            uint64_t block_count,
+                                            std::optional<zx::vmo> vmo = std::nullopt);
 
-  RamdiskRef(const fbl::unique_fd& devfs_root, const std::string& path, RamdiskClient* client)
-      : BlockDeviceAdapter(devfs_root, path), ramdisk_client_(client) {}
+  RamdiskRef(const fbl::unique_fd& devfs_root, uint64_t block_size, const std::string& path,
+             zx::vmo vmo, RamdiskClient* client)
+      : BlockDeviceAdapter(devfs_root, path),
+        ramdisk_client_(client),
+        block_size_(block_size),
+        vmo_(std::move(vmo)) {}
   RamdiskRef(const RamdiskRef&) = delete;
   RamdiskRef(RamdiskRef&&) = delete;
   RamdiskRef& operator=(const RamdiskRef&) = delete;
   RamdiskRef& operator=(RamdiskRef&&) = delete;
   ~RamdiskRef() final;
 
-  // Attempts to grow the underlying ramdisk to |target_size|.
-  zx_status_t Grow(uint64_t target_size);
+  // Clones this ramdisk into a new ram-disk with given `target_size`.
+  zx::result<std::unique_ptr<RamdiskRef>> Clone(uint64_t target_size);
 
  private:
   // Only set when a ramdisk is created.
   RamdiskClient* ramdisk_client_ = nullptr;
+  uint64_t block_size_;
+  zx::vmo vmo_;
 };
 
 // Wrapper over a VPartitionAdapter, that provides common methods using in fvm-tests.
@@ -170,7 +178,6 @@ class VPartitionAdapter final : public BlockDeviceAdapter {
   VPartitionAdapter(VPartitionAdapter&&) = delete;
   VPartitionAdapter& operator=(const VPartitionAdapter&) = delete;
   VPartitionAdapter& operator=(VPartitionAdapter&&) = delete;
-  ~VPartitionAdapter() final;
 
   // Adds |length| slices  at |offset| to the partition.
   zx_status_t Extend(uint64_t offset, uint64_t length);
@@ -178,6 +185,9 @@ class VPartitionAdapter final : public BlockDeviceAdapter {
   zx::result<fidl::ClientEnd<fuchsia_device::Controller>> GetController();
 
   Guid& guid() { return guid_; }
+
+  // Destroys the partition.
+  zx::result<> Destroy();
 
  private:
   fbl::StringBuffer<fvm::kMaxVPartitionNameLength> name_;
@@ -198,6 +208,8 @@ class FvmAdapter : public DeviceRef {
                                                     uint64_t maximum_block_count,
                                                     uint64_t slice_size, DeviceRef* device);
 
+  static std::unique_ptr<FvmAdapter> Bind(const fbl::unique_fd& devfs_root, DeviceRef* device);
+
   FvmAdapter(const fbl::unique_fd& devfs_root, const std::string& path, DeviceRef* block_device)
       : DeviceRef(devfs_root, path), block_device_(block_device) {}
   FvmAdapter(const FvmAdapter&) = delete;
@@ -209,8 +221,8 @@ class FvmAdapter : public DeviceRef {
                            const Guid& guid, const Guid& type, uint64_t slice_count,
                            std::unique_ptr<VPartitionAdapter>* out_vpartition);
 
-  // Rebinds the fvm, and waits for each vpartition to become visible.
-  zx_status_t Rebind(fbl::Vector<VPartitionAdapter*> vpartitions);
+  // Rebinds the fvm driver.
+  zx_status_t Rebind();
 
   // Queries the FVM device and sets |out_info|.
   zx_status_t Query(VolumeManagerInfo* out_info) const;

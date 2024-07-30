@@ -17,12 +17,22 @@ if (is_host) {
     ]
   }
 
+  host_test_data("merge_policies_initial_sids") {
+    sources = [ "initial_sids" ]
+    outputs = [
+      "$target_out_dir/testdata/scripts/merge_policies/{{source_file_part}}",
+    ]
+  }
+
   python_host_test("merge_policies_test") {
     enable_mypy = false
     main_source = "merge_policies_test.py"
     sources = [ "merge_policies.py" ]
     main_callable = "main"
-    test_data_deps = [ ":merge_policies_testdata" ]
+    test_data_deps = [
+      ":merge_policies_initial_sids",
+      ":merge_policies_testdata",
+    ]
     testdata_dir = "$target_out_dir/testdata/scripts/merge_policies"
     extra_args = [
       "--testdata-dir",

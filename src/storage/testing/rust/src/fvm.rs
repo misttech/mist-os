@@ -12,8 +12,8 @@ use fidl_fuchsia_hardware_block_partition::Guid as FidlGuid;
 use fidl_fuchsia_hardware_block_volume::{VolumeManagerMarker, VolumeManagerProxy};
 use fidl_fuchsia_io as fio;
 use fuchsia_component::client::connect_to_named_protocol_at_dir_root;
-use fuchsia_zircon::sys::zx_handle_t;
-use fuchsia_zircon::{self as zx, zx_status_t, AsHandleRef};
+use fuchsia_zircon::sys::{zx_handle_t, zx_status_t};
+use fuchsia_zircon::{self as zx, AsHandleRef};
 
 const FVM_DRIVER_PATH: &str = "fvm.cm";
 

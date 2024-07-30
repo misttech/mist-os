@@ -15,9 +15,9 @@ group("tests") {
 }
 
 driver_bind_rules("aml_gpu_bind") {
-  rules = "aml_gpu.bind"
+  rules = "meta/aml_gpu.bind"
   bind_output = "aml-gpu.bindbc"
-  tests = "bind_tests.json"
+  tests = "meta/bind_tests.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_bindlib",
     "//sdk/fidl/fuchsia.hardware.registers:fuchsia.hardware.registers_bindlib",
@@ -72,7 +72,7 @@ fuchsia_driver("aml-gpu-driver") {
 fuchsia_driver_component("aml-gpu") {
   component_name = "aml-gpu"
   deps = [ ":aml-gpu-driver" ]
-  info = "aml-gpu-info.json"
+  info = "meta/aml-gpu-info.json"
   manifest = "meta/aml-gpu.cml"
 }
 

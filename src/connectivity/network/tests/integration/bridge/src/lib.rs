@@ -14,6 +14,7 @@ use assert_matches::assert_matches;
 use futures::{SinkExt as _, StreamExt as _, TryFutureExt as _};
 use net_declare::{fidl_subnet, std_socket_addr_v4};
 use net_types::ip::Ipv4;
+use netstack_testing_common::interfaces::TestInterfaceExt;
 use netstack_testing_common::realms::{Netstack, TestSandboxExt as _};
 use netstack_testing_common::{
     interfaces, ping as ping_helper, ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT,
@@ -106,6 +107,7 @@ async fn test<N: Netstack>(name: &str, sub_name: &str, steps: &[Step]) {
         .join_network(&net_switch_gateway, "gateway_ep")
         .await
         .expect("failed to join network in gateway realm");
+    gateway_if.apply_nud_flake_workaround().await.expect("nud flake workaround");
     gateway_if
         .add_address_and_subnet_route(fidl_subnet!("192.168.255.1/16"))
         .await
@@ -118,6 +120,7 @@ async fn test<N: Netstack>(name: &str, sub_name: &str, steps: &[Step]) {
         .join_network(&net_switch_gateway, "switch_ep")
         .await
         .expect("failed to join network in switch realm");
+    switch_if.apply_nud_flake_workaround().await.expect("nud flake workaround");
     switch_if
         .add_address_and_subnet_route(fidl_subnet!("192.168.254.1/16"))
         .await
@@ -207,6 +210,10 @@ async fn test<N: Netstack>(name: &str, sub_name: &str, steps: &[Step]) {
                                 .await
                                 .expect("failed to join network in host realm");
                             host_if
+                                .apply_nud_flake_workaround()
+                                .await
+                                .expect("nud flake workaround");
+                            host_if
                                 .add_address_and_subnet_route(fidl_fuchsia_net::Subnet {
                                     addr: fidl_fuchsia_net::IpAddress::Ipv4(
                                         fidl_fuchsia_net::Ipv4Address {
@@ -221,6 +228,10 @@ async fn test<N: Netstack>(name: &str, sub_name: &str, steps: &[Step]) {
                                 .join_network(&net, format!("switch_ep{}", link))
                                 .await
                                 .expect("failed to join network in switch realm");
+                            switch_if
+                                .apply_nud_flake_workaround()
+                                .await
+                                .expect("nud flake workaround");
 
                             let _: &mut Host<'_> =
                                 vacant.insert(Host { realm, _net: net, host_if, switch_if });
@@ -257,6 +268,9 @@ async fn test<N: Netstack>(name: &str, sub_name: &str, steps: &[Step]) {
                             .expect("bridge interface ID does not fit into u8"),
                     ],
                 };
+                netstack_testing_common::nud::apply_nud_flake_workaround(&bridge_ref.control)
+                    .await
+                    .expect("nud flake workaround");
                 let prefix_len = 16;
                 let address_state_provider = interfaces::add_address_wait_assigned(
                     &bridge_ref.control,
@@ -354,6 +368,7 @@ async fn test_remove_bridge_interface_disabled<N: Netstack>(name: &str) {
         .join_network(&net_switch_gateway, "gateway_ep")
         .await
         .expect("failed to join network in gateway realm");
+    gateway_if.apply_nud_flake_workaround().await.expect("nud flake workaround");
     gateway_if
         .add_address_and_subnet_route(fidl_subnet!("192.168.255.1/16"))
         .await
@@ -366,6 +381,7 @@ async fn test_remove_bridge_interface_disabled<N: Netstack>(name: &str) {
         .join_network(&net_switch_gateway, "switch_ep")
         .await
         .expect("failed to join network to gateway in switch realm");
+    switch_if.apply_nud_flake_workaround().await.expect("nud flake workaround");
     switch_if
         .add_address_and_subnet_route(fidl_subnet!("192.168.254.1/16"))
         .await

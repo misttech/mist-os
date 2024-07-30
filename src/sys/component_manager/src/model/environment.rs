@@ -174,6 +174,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_from_decl() {
         let component = ComponentInstance::new_root(
+            ComponentInput::default(),
             Environment::empty(),
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
@@ -267,12 +268,12 @@ mod tests {
                         DebugRegistry::default(),
                     ),
                     top_instance,
+                    instance_registry: InstanceRegistry::new(),
                 },
-                InstanceRegistry::new(),
+                ComponentInput::default(),
             )
             .await
             .unwrap();
-            model.discover_root_component(ComponentInput::default()).await;
             assert_matches!(
                 model.root().resolve().await,
                 Err(ActionError::ResolveError {
@@ -349,12 +350,12 @@ mod tests {
                     debug_registry,
                 ),
                 top_instance,
+                instance_registry: InstanceRegistry::new(),
             },
-            InstanceRegistry::new(),
+            ComponentInput::default(),
         )
         .await
         .unwrap();
-        model.discover_root_component(ComponentInput::default()).await;
         let component = model
             .root()
             .start_instance(&vec!["a", "b"].try_into().unwrap(), &StartReason::Eager)
@@ -457,11 +458,11 @@ mod tests {
                     DebugRegistry::default(),
                 ),
                 top_instance,
+                instance_registry: InstanceRegistry::new(),
             },
-            InstanceRegistry::new(),
+            ComponentInput::default(),
         )
         .await?;
-        model.discover_root_component(ComponentInput::default()).await;
         let component = model
             .root()
             .start_instance(&vec!["a", "b"].try_into().unwrap(), &StartReason::Eager)
@@ -591,11 +592,11 @@ mod tests {
                     DebugRegistry::default(),
                 ),
                 top_instance,
+                instance_registry: InstanceRegistry::new(),
             },
-            InstanceRegistry::new(),
+            ComponentInput::default(),
         )
         .await?;
-        model.discover_root_component(ComponentInput::default()).await;
         // Add instance to collection.
         {
             let parent = model
@@ -703,12 +704,12 @@ mod tests {
                     debug_registry,
                 ),
                 top_instance,
+                instance_registry: InstanceRegistry::new(),
             },
-            InstanceRegistry::new(),
+            ComponentInput::default(),
         )
         .await
         .unwrap();
-        model.discover_root_component(ComponentInput::default()).await;
 
         let component = model
             .root()
@@ -784,11 +785,11 @@ mod tests {
                     DebugRegistry::default(),
                 ),
                 top_instance,
+                instance_registry: InstanceRegistry::new(),
             },
-            InstanceRegistry::new(),
+            ComponentInput::default(),
         )
         .await?;
-        model.discover_root_component(ComponentInput::default()).await;
         assert_matches!(
             model
                 .root()

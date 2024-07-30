@@ -8,13 +8,66 @@
 
 namespace bt::iso {
 
-IsoStream::IsoStream(uint8_t cig_id,
-                     uint8_t cis_id,
-                     hci_spec::ConnectionHandle cis_handle,
-                     CisEstablishedCallback on_established_cb,
-                     hci::CommandChannel::WeakPtr cmd_channel,
-                     pw::Callback<void()> on_closed_cb)
-    : state_(IsoStreamState::kNotEstablished),
+class IsoStreamImpl final : public IsoStream {
+ public:
+  IsoStreamImpl(uint8_t cig_id,
+                uint8_t cis_id,
+                hci_spec::ConnectionHandle cis_handle,
+                CisEstablishedCallback on_established_cb,
+                hci::CommandChannel::WeakPtr cmd_channel,
+                pw::Callback<void()> on_closed_cb);
+
+  bool OnCisEstablished(const hci::EmbossEventPacket& event) override;
+
+  void SetupDataPath(
+      pw::bluetooth::emboss::DataPathDirection direction,
+      const bt::StaticPacket<pw::bluetooth::emboss::CodecIdWriter>& codec_id,
+      std::optional<std::vector<uint8_t>> codec_configuration,
+      uint32_t controller_delay_usecs,
+      fit::function<void(SetupDataPathError)> cb) override;
+
+  void Close() override;
+
+  IsoStream::WeakPtr GetWeakPtr() override { return weak_self_.GetWeakPtr(); }
+
+ private:
+  enum class IsoStreamState {
+    kNotEstablished,
+    kEstablished,
+  } state_;
+
+  uint8_t cig_id_ __attribute__((unused));
+  uint8_t cis_id_ __attribute__((unused));
+
+  // Connection parameters, only valid after CIS is established
+  CisEstablishedParameters cis_params_;
+
+  // Handle assigned by the controller
+  hci_spec::ConnectionHandle cis_hci_handle_;
+
+  // Called after HCI_LE_CIS_Established event is received and handled
+  CisEstablishedCallback cis_established_cb_;
+
+  // Called when stream is closed
+  pw::Callback<void()> on_closed_cb_;
+
+  hci::CommandChannel::WeakPtr cmd_;
+
+  hci::CommandChannel::EventHandlerId cis_established_handler_;
+
+  WeakSelf<IsoStreamImpl> weak_self_;
+
+  BT_DISALLOW_COPY_AND_ASSIGN_ALLOW_MOVE(IsoStreamImpl);
+};
+
+IsoStreamImpl::IsoStreamImpl(uint8_t cig_id,
+                             uint8_t cis_id,
+                             hci_spec::ConnectionHandle cis_handle,
+                             CisEstablishedCallback on_established_cb,
+                             hci::CommandChannel::WeakPtr cmd_channel,
+                             pw::Callback<void()> on_closed_cb)
+    : IsoStream(),
+      state_(IsoStreamState::kNotEstablished),
       cig_id_(cig_id),
       cis_id_(cis_id),
       cis_hci_handle_(cis_handle),
@@ -22,8 +75,11 @@ IsoStream::IsoStream(uint8_t cig_id,
       on_closed_cb_(std::move(on_closed_cb)),
       cmd_(cmd_channel),
       weak_self_(this) {
-  BT_ASSERT(cmd_.is_alive());
-  auto self = GetWeakPtr();
+  auto self = weak_self_.GetWeakPtr();
+
+  if (!cmd_.is_alive()) {
+    return;
+  }
 
   cis_established_handler_ = cmd_->AddLEMetaEventHandler(
       hci_spec::kLECISEstablishedSubeventCode,
@@ -37,11 +93,10 @@ IsoStream::IsoStream(uint8_t cig_id,
         }
         return hci::CommandChannel::EventCallbackResult::kContinue;
       });
-
   BT_ASSERT(cis_established_handler_ != 0u);
 }
 
-bool IsoStream::OnCisEstablished(const hci::EmbossEventPacket& event) {
+bool IsoStreamImpl::OnCisEstablished(const hci::EmbossEventPacket& event) {
   BT_ASSERT(event.event_code() == hci_spec::kLEMetaEventCode);
   BT_ASSERT(event.view<pw::bluetooth::emboss::LEMetaEventView>()
                 .subevent_code()
@@ -106,6 +161,31 @@ bool IsoStream::OnCisEstablished(const hci::EmbossEventPacket& event) {
   return true;
 }
 
-void IsoStream::Close() { on_closed_cb_(); }
+void IsoStreamImpl::SetupDataPath(
+    pw::bluetooth::emboss::DataPathDirection direction,
+    const bt::StaticPacket<pw::bluetooth::emboss::CodecIdWriter>& codec_id,
+    std::optional<std::vector<uint8_t>> codec_configuration,
+    uint32_t controller_delay_usecs,
+    fit::function<void(IsoStream::SetupDataPathError)> cb) {
+  // TODO(http://b/311639690): implement
+  cb(kSuccess);
+}
+
+void IsoStreamImpl::Close() { on_closed_cb_(); }
+
+std::unique_ptr<IsoStream> IsoStream::Create(
+    uint8_t cig_id,
+    uint8_t cis_id,
+    hci_spec::ConnectionHandle cis_handle,
+    CisEstablishedCallback on_established_cb,
+    hci::CommandChannel::WeakPtr cmd_channel,
+    pw::Callback<void()> on_closed_cb) {
+  return std::make_unique<IsoStreamImpl>(cig_id,
+                                         cis_id,
+                                         cis_handle,
+                                         std::move(on_established_cb),
+                                         std::move(cmd_channel),
+                                         std::move(on_closed_cb));
+}
 
 }  // namespace bt::iso

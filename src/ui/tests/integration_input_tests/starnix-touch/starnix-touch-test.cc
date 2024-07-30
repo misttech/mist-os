@@ -49,6 +49,10 @@ using ChildName = std::string;
 // Maximum distance between two physical pixel coordinates so that they are considered equal.
 constexpr double kEpsilon = 0.5f;
 
+// Touch down is expressed in two `TouchEvents`s: btn_touch, Phase Add.
+// Touch up is expressed in two: btn_touch, Phase Remove.
+constexpr size_t kDownUpNumEvents = 4;
+
 struct TouchEvent {
   float local_x;  // The x-position, in the client's coordinate space.
   float local_y;  // The y-position, in the client's coordinate space.
@@ -180,70 +184,78 @@ class StarnixTouchTest : public ui_testing::PortableUITest {
         << "Got \"" << packet.data() << "\" with size " << packet.size();
   }
 
-  // Reads a sequence touch event from `touch_dump.cc`, via `local_socket_`.
-  std::vector<TouchEvent> GetTouchEventSequence() {
+  // Reads sequences of touch events from `touch_dump.cc`, via `local_socket_`
+  // until we get num_expected events.
+  //
+  // Because of the variable amount of packets read at a time, we may create
+  // varying  amounts of TouchEvents from a single call to GetEvDevPackets.
+  // Therefore we use the running size of the final result to determine whether
+  // to read more packets.
+  std::vector<TouchEvent> GetTouchEventSequenceOfLen(size_t num_expected) {
     std::vector<TouchEvent> result;
 
-    // read until sync event (end of sequence).
-    while (true) {
-      EvDevPacket pkt = GetEvDevPacket();
+    while (result.size() < num_expected) {
+      std::vector<EvDevPacket> pkts = GetEvDevPackets();
 
-      if (pkt.type == EV_SYN) {
-        return result;
-      }
-
-      if (pkt.type == EV_KEY) {
-        if (pkt.code != BTN_TOUCH) {
-          FX_LOGS(FATAL) << "unexpected key event code in touch event seq, code=" << pkt.code;
+      for (EvDevPacket pkt : pkts) {
+        if (pkt.type == EV_SYN) {
+          continue;
         }
-        result.push_back(TouchEvent{.has_btn_touch = true, .btn_touch = pkt.value});
 
-        continue;
-      }
-
-      if (pkt.type != EV_ABS) {
-        FX_LOGS(FATAL) << "unexpected event type in touch event seq, type=" << pkt.type;
-      }
-
-      switch (pkt.code) {
-        case ABS_MT_SLOT:
-          result.push_back(
-              TouchEvent{.phase = fuchsia_ui_pointer::EventPhase::kChange, .slot_id = pkt.value});
-          break;
-        case ABS_MT_TRACKING_ID:
-          if (result.empty()) {
-            FX_LOGS(FATAL) << "receive ABS_MT_TRACKING_ID out of slot";
+        if (pkt.type == EV_KEY) {
+          if (pkt.code != BTN_TOUCH) {
+            FX_LOGS(FATAL) << "unexpected key event code in touch event seq, code=" << pkt.code;
           }
+          result.push_back(TouchEvent{.has_btn_touch = true, .btn_touch = pkt.value});
 
-          if (pkt.value == -1) {
-            result[result.size() - 1].phase = fuchsia_ui_pointer::EventPhase::kRemove;
-          } else {
-            result[result.size() - 1].phase = fuchsia_ui_pointer::EventPhase::kAdd;
-            result[result.size() - 1].pointer_id = pkt.value;
-          }
+          continue;
+        }
 
-          break;
-        case ABS_MT_POSITION_X:
-          if (result.empty()) {
-            FX_LOGS(FATAL) << "receive ABS_MT_POSITION_X out of slot";
-          }
+        if (pkt.type != EV_ABS) {
+          FX_LOGS(FATAL) << "unexpected event type in touch event seq, type=" << pkt.type;
+        }
 
-          result[result.size() - 1].local_x = static_cast<float>(pkt.value);
+        switch (pkt.code) {
+          case ABS_MT_SLOT:
+            result.push_back(
+                TouchEvent{.phase = fuchsia_ui_pointer::EventPhase::kChange, .slot_id = pkt.value});
+            break;
+          case ABS_MT_TRACKING_ID:
+            if (result.empty()) {
+              FX_LOGS(FATAL) << "receive ABS_MT_TRACKING_ID out of slot";
+            }
 
-          break;
-        case ABS_MT_POSITION_Y:
-          if (result.empty()) {
-            FX_LOGS(FATAL) << "receive ABS_MT_POSITION_X out of slot";
-          }
+            if (pkt.value == -1) {
+              result[result.size() - 1].phase = fuchsia_ui_pointer::EventPhase::kRemove;
+            } else {
+              result[result.size() - 1].phase = fuchsia_ui_pointer::EventPhase::kAdd;
+              result[result.size() - 1].pointer_id = pkt.value;
+            }
 
-          result[result.size() - 1].local_y = static_cast<float>(pkt.value);
+            break;
+          case ABS_MT_POSITION_X:
+            if (result.empty()) {
+              FX_LOGS(FATAL) << "receive ABS_MT_POSITION_X out of slot";
+            }
 
-          break;
-        default:
-          FX_LOGS(FATAL) << "unexpected event code in touch event seq, code=" << pkt.code;
+            result[result.size() - 1].local_x = static_cast<float>(pkt.value);
+
+            break;
+          case ABS_MT_POSITION_Y:
+            if (result.empty()) {
+              FX_LOGS(FATAL) << "receive ABS_MT_POSITION_X out of slot";
+            }
+
+            result[result.size() - 1].local_y = static_cast<float>(pkt.value);
+
+            break;
+          default:
+            FX_LOGS(FATAL) << "unexpected event code in touch event seq, code=" << pkt.code;
+        }
       }
     }
 
+    EXPECT_EQ(result.size(), num_expected);
     return result;
   }
 
@@ -333,7 +345,7 @@ class StarnixTouchTest : public ui_testing::PortableUITest {
   // until the calling code has read the response that `touch_dump.cc`
   // sent for the first event.
   std::string BlockingReadFromTouchDump() {
-    std::string buf(relay_api::kMaxPacketLen, '\0');
+    std::string buf(relay_api::kMaxPacketLen * relay_api::kDownUpNumPackets, '\0');
     size_t n_read{};
     zx_status_t res{};
     zx_signals_t actual_signals;
@@ -352,13 +364,21 @@ class StarnixTouchTest : public ui_testing::PortableUITest {
     return buf;
   }
 
-  EvDevPacket GetEvDevPacket() {
-    std::string packet = BlockingReadFromTouchDump();
-    EvDevPacket ev_pkt{};
-    int res = sscanf(packet.data(), relay_api::kEventFormat, &ev_pkt.sec, &ev_pkt.usec,
-                     &ev_pkt.type, &ev_pkt.code, &ev_pkt.value);
-    FX_CHECK(res == 5) << "Got " << res << "fields, but wanted 5";
-    return ev_pkt;
+  std::vector<EvDevPacket> GetEvDevPackets() {
+    std::vector<EvDevPacket> ev_pkts;
+    std::string packets = BlockingReadFromTouchDump();
+    std::size_t next = packets.find(relay_api::kEventDelimiter);
+    while (next != std::string::npos) {
+      packets = packets.substr(next);
+      EvDevPacket ev_pkt{};
+      int res = sscanf(packets.data(), relay_api::kEventFormat, &ev_pkt.sec, &ev_pkt.usec,
+                       &ev_pkt.type, &ev_pkt.code, &ev_pkt.value);
+      FX_CHECK(res == 5) << "Got " << res << " fields, but wanted 5";
+      ev_pkts.push_back(ev_pkt);
+      next = packets.find(relay_api::kEventDelimiter, sizeof(relay_api::kEventDelimiter));
+    }
+
+    return ev_pkts;
   }
 
   template <typename T>
@@ -386,44 +406,26 @@ TEST_F(StarnixTouchTest, Tap) {
   InjectInput(TapLocation::kTopLeft);
 
   {
-    // down
-    auto events = GetTouchEventSequence();
-    EXPECT_EQ(events.size(), 2u);
-
+    auto events = GetTouchEventSequenceOfLen(kDownUpNumEvents);
     ExpectBtnTouch(events[0], 1);
     ExpectLocationPhaseAndSlot(events[1], static_cast<float>(display_width()) / 4.f,
                                static_cast<float>(display_height()) / 4.f,
                                fuchsia_ui_pointer::EventPhase::kAdd, 0);
-  }
-  {
-    // up
-    auto events = GetTouchEventSequence();
-    EXPECT_EQ(events.size(), 2u);
-
-    ExpectBtnTouch(events[0], 0);
-    ExpectLocationPhaseAndSlot(events[1], 0.0, 0.0, fuchsia_ui_pointer::EventPhase::kRemove, 0);
+    ExpectBtnTouch(events[2], 0);
+    ExpectLocationPhaseAndSlot(events[3], 0.0, 0.0, fuchsia_ui_pointer::EventPhase::kRemove, 0);
   }
 
   // Bottom-right.
   InjectInput(TapLocation::kBottomRight);
 
   {
-    // down
-    auto events = GetTouchEventSequence();
-    EXPECT_EQ(events.size(), 2u);
-
+    auto events = GetTouchEventSequenceOfLen(kDownUpNumEvents);
     ExpectBtnTouch(events[0], 1);
     ExpectLocationPhaseAndSlot(events[1], 3 * static_cast<float>(display_width()) / 4.f,
                                3 * static_cast<float>(display_height()) / 4.f,
                                fuchsia_ui_pointer::EventPhase::kAdd, 0);
-  }
-  {
-    // up
-    auto events = GetTouchEventSequence();
-    EXPECT_EQ(events.size(), 2u);
-
-    ExpectBtnTouch(events[0], 0);
-    ExpectLocationPhaseAndSlot(events[1], 0.0, 0.0, fuchsia_ui_pointer::EventPhase::kRemove, 0);
+    ExpectBtnTouch(events[2], 0);
+    ExpectLocationPhaseAndSlot(events[3], 0.0, 0.0, fuchsia_ui_pointer::EventPhase::kRemove, 0);
   }
 }
 

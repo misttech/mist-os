@@ -6,8 +6,8 @@
 
 import unittest
 
-from trace_processing.metrics import cpu_breakdown
 from trace_processing import trace_model, trace_time
+from trace_processing.metrics import cpu_breakdown
 
 
 class CpuBreakdownTest(unittest.TestCase):

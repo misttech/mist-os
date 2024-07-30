@@ -340,6 +340,14 @@ class PageQueues {
   void DisableAging() TA_EXCL(lock_);
   void EnableAging() TA_EXCL(lock_);
 
+  // Register an Event that will be signalled every time aging occurs. This can be used to know if
+  // if PeekReclaim might now return items (due to aging having occurred) where it had previously
+  // ceased.
+  // Only a single Event may be registered at a time and the Event is assumed to live as long as the
+  // PageQueues object. A nullptr can be passed in to unregister an Event, otherwise it is an error
+  // to attempt to register over the top of an existing event.
+  void SetAgingEvent(Event* event);
+
   // Called by the scanner to indicate the beginning of an accessed scan. This allows
   // MarkAccessedDeferredCount, and will cause the active/inactive counts returned by
   // GetActiveInactiveCounts to remain unchanged until the accessed scan is complete.
@@ -684,6 +692,12 @@ class PageQueues {
   // The lock_ is needed to protect the linked lists queues as these cannot be implemented with
   // atomics.
   DECLARE_SPINLOCK(PageQueues) mutable lock_;
+
+  // Declare a separate mutex for the aging event. This is a separate lock both because signalling
+  // the event does not need to contend with other page queues operations, and so that it can be a
+  // Mutex instead of a SpinLock allowing us to signal an event whilst holding said lock.
+  DECLARE_CRITICAL_MUTEX(PageQueues) aging_event_mutex_;
+  Event* aging_event_ TA_GUARDED(aging_event_mutex_) = nullptr;
 
   // This Event is a binary semaphore and is used to control aging. Is acquired by the aging thread
   // when it performs aging, and can be acquired separately to block aging. For this purpose it

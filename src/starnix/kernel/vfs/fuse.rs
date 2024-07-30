@@ -23,7 +23,7 @@ use starnix_lifecycle::AtomicU64Counter;
 use starnix_logging::{log_error, log_trace, log_warn, track_stub};
 use starnix_sync::{
     AtomicTime, DeviceOpen, FileOpsCore, Locked, Mutex, MutexGuard, RwLock, RwLockReadGuard,
-    RwLockWriteGuard, Unlocked, WriteOps,
+    RwLockWriteGuard, Unlocked,
 };
 use starnix_syscalls::{SyscallArg, SyscallResult};
 use starnix_uapi::auth::FsCred;
@@ -78,19 +78,21 @@ impl FileOps for DevFuse {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<'_, FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
         debug_assert!(offset == 0);
-        file.blocking_op(current_task, FdEvents::POLLIN, None, || self.connection.lock().read(data))
+        file.blocking_op(locked, current_task, FdEvents::POLLIN, None, |_| {
+            self.connection.lock().read(data)
+        })
     }
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, WriteOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         offset: usize,
@@ -102,6 +104,7 @@ impl FileOps for DevFuse {
 
     fn wait_async(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         waiter: &Waiter,
@@ -113,6 +116,7 @@ impl FileOps for DevFuse {
 
     fn query_events(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
@@ -414,7 +418,7 @@ impl FileOps for AbortFile {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, WriteOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -704,7 +708,7 @@ impl FileOps for FuseFileObject {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, WriteOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -789,6 +793,7 @@ impl FileOps for FuseFileObject {
 
     fn wait_async(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _waiter: &Waiter,
@@ -800,6 +805,7 @@ impl FileOps for FuseFileObject {
 
     fn query_events(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
@@ -1099,7 +1105,12 @@ impl FsNodeOps for Arc<FuseNode> {
             self.nodeid,
             FuseOperation::Lookup { name: name.to_owned() },
         )?;
-        self.fs_node_from_entry(current_task, node, name, response.entry().ok_or(errno!(EINVAL))?)
+        self.fs_node_from_entry(
+            current_task,
+            node,
+            name,
+            response.entry().ok_or_else(|| errno!(EINVAL))?,
+        )
     }
 
     fn mknod(
@@ -1174,7 +1185,7 @@ impl FsNodeOps for Arc<FuseNode> {
                 )?
                 .entry()
                 .copied()
-                .ok_or(errno!(EINVAL))
+                .ok_or_else(|| errno!(EINVAL))
         };
 
         let entry = get_entry()?;
@@ -1201,7 +1212,12 @@ impl FsNodeOps for Arc<FuseNode> {
                 name: name.to_owned(),
             },
         )?;
-        self.fs_node_from_entry(current_task, node, name, response.entry().ok_or(errno!(EINVAL))?)
+        self.fs_node_from_entry(
+            current_task,
+            node,
+            name,
+            response.entry().ok_or_else(|| errno!(EINVAL))?,
+        )
     }
 
     fn create_symlink(
@@ -1218,7 +1234,12 @@ impl FsNodeOps for Arc<FuseNode> {
             self.nodeid,
             FuseOperation::Symlink { target: target.to_owned(), name: name.to_owned() },
         )?;
-        self.fs_node_from_entry(current_task, node, name, response.entry().ok_or(errno!(EINVAL))?)
+        self.fs_node_from_entry(
+            current_task,
+            node,
+            name,
+            response.entry().ok_or_else(|| errno!(EINVAL))?,
+        )
     }
 
     fn readlink(&self, _node: &FsNode, current_task: &CurrentTask) -> Result<SymlinkTarget, Errno> {

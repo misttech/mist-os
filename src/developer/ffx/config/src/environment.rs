@@ -130,6 +130,9 @@ impl Environment {
     }
 
     pub fn get_user(&self) -> Option<PathBuf> {
+        if self.context.no_environment {
+            return None;
+        }
         self.files
             .user
             .as_ref()
@@ -137,13 +140,24 @@ impl Environment {
             .or_else(|| self.context.get_default_user_file_path().ok())
     }
     pub fn set_user(&mut self, to: Option<&Path>) {
+        assert!(
+            !self.context.no_environment,
+            "Cannot set user configuration with --no-environment"
+        );
         self.files.user = to.map(Path::to_owned);
     }
 
-    pub fn get_global(&self) -> Option<&Path> {
-        self.files.global.as_deref()
+    pub fn get_global(&self) -> Option<PathBuf> {
+        if self.context.no_environment {
+            return None;
+        }
+        self.files.global.as_ref().map(PathBuf::clone)
     }
     pub fn set_global(&mut self, to: Option<&Path>) {
+        assert!(
+            !self.context.no_environment,
+            "Cannot set global configuration with --no-environment"
+        );
         self.files.global = to.map(Path::to_owned);
     }
 
@@ -168,7 +182,12 @@ impl Environment {
         }
     }
 
+    /// Returns the path to the build level config file, if there is one.
+    /// If it is not explicit, the path is generated bnased on configured build_dir().
     pub fn get_build(&self) -> Option<PathBuf> {
+        if self.context.no_environment {
+            return None;
+        }
         if let Some(build_config_path) = self.context.get_build_config_file() {
             Some(build_config_path.into())
         } else {
@@ -186,6 +205,10 @@ impl Environment {
         to: &Path,
         build_override: Option<BuildOverride<'_>>,
     ) -> Result<()> {
+        assert!(
+            !self.context.no_environment,
+            "Cannot set build configuration with --no-environment"
+        );
         let build_dir = self
             .override_build_dir(build_override)
             .context("Tried to set unknown build directory")?
@@ -402,6 +425,7 @@ mod test {
             Some(build_dir_path.clone()),
             ConfigMap::default(),
             Some(env_file_path.clone()),
+            false,
         );
         assert!(!env_file_path.is_file(), "Environment file shouldn't exist yet");
         let mut env = context.load().expect("Should be able to load the environment");
@@ -432,6 +456,7 @@ mod test {
             Some(build_dir_path.clone()),
             ConfigMap::default(),
             Some(env_file_path.clone()),
+            false,
         );
 
         assert!(!env_file_path.is_file(), "Environment file shouldn't exist yet");

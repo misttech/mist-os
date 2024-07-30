@@ -19,19 +19,18 @@ For full usage, see `rustc_remote_wrapper.py -h`.
 import argparse
 import glob
 import os
-import subprocess
 import stat
+import subprocess
 import sys
+from pathlib import Path
+from typing import Any, Iterable, Optional, Sequence, Tuple
 
 import cl_utils
 import depfile
 import fuchsia
 import linker
-import rustc
 import remote_action
-
-from pathlib import Path
-from typing import Any, Iterable, Optional, Sequence, Tuple
+import rustc
 
 _SCRIPT_BASENAME = Path(__file__).name
 

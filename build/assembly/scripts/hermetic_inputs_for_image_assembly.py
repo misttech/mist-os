@@ -10,8 +10,8 @@ import json
 import os
 import sys
 
-from depfile import DepFile
 from assembly import FilePath, ImageAssemblyConfig, PackageManifest
+from depfile import DepFile
 from serialization import json_load
 
 

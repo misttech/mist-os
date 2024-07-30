@@ -15,9 +15,15 @@ struct DirHash {
   uint32_t level = 0;    // maximum level of given file name
 };
 
+struct DentryInfo;
+
 extern const unsigned char kFiletypeTable[];
 f2fs_hash_t DentryHash(std::string_view name);
 uint64_t DirBlockIndex(uint32_t level, uint8_t dir_level, uint32_t idx);
+void SetDirEntryType(DirEntry &de, VnodeF2fs &vnode);
+
+constexpr size_t kParentBitPos = 1;
+constexpr size_t kCurrentBitPos = 0;
 
 class Dir : public VnodeF2fs, public fbl::Recyclable<Dir> {
  public:
@@ -36,18 +42,17 @@ class Dir : public VnodeF2fs, public fbl::Recyclable<Dir> {
 
   zx_status_t DoLookup(std::string_view name, fbl::RefPtr<fs::Vnode> *out)
       __TA_REQUIRES_SHARED(mutex_);
-  zx::result<DirEntry> LookUpEntries(std::string_view name) __TA_REQUIRES_SHARED(mutex_);
-  std::pair<DirEntry *, DirHash> FindEntryOnDevice(std::string_view name,
-                                                   fbl::RefPtr<Page> *res_page)
+  zx::result<ino_t> LookUpEntries(std::string_view name) __TA_REQUIRES_SHARED(mutex_);
+  zx::result<DentryInfo> FindEntryOnDevice(std::string_view name, fbl::RefPtr<Page> *res_page)
       __TA_REQUIRES_SHARED(mutex_);
-  DirEntry *FindEntry(std::string_view name, fbl::RefPtr<Page> *res_page) __TA_REQUIRES(mutex_);
-  zx::result<DirEntry> FindEntry(std::string_view name) __TA_REQUIRES(mutex_);
-  DirEntry *FindInInlineDir(std::string_view name, fbl::RefPtr<Page> *res_page)
+  zx::result<DentryInfo> FindEntry(std::string_view name, fbl::RefPtr<Page> *res_page)
+      __TA_REQUIRES(mutex_);
+  zx::result<DentryInfo> FindInInlineDir(std::string_view name, fbl::RefPtr<Page> *res_page)
       __TA_REQUIRES_SHARED(mutex_);
-  DirEntry *FindInBlock(fbl::RefPtr<Page> dentry_page, std::string_view name, uint64_t *max_slots,
-                        f2fs_hash_t namehash, fbl::RefPtr<Page> *res_page);
-  DirEntry *FindInLevel(unsigned int level, std::string_view name, f2fs_hash_t namehash,
-                        bool *update_hash, fbl::RefPtr<Page> *res_page)
+  zx::result<DentryInfo> FindInBlock(fbl::RefPtr<Page> dentry_page, std::string_view name,
+                                     f2fs_hash_t namehash, fbl::RefPtr<Page> *res_page);
+  zx::result<DentryInfo> FindInLevel(unsigned int level, std::string_view name,
+                                     f2fs_hash_t namehash, fbl::RefPtr<Page> *res_page)
       __TA_REQUIRES_SHARED(mutex_);
   zx_status_t Readdir(fs::VdirCookie *cookie, void *dirents, size_t len, size_t *out_actual) final
       __TA_EXCLUDES(mutex_);
@@ -58,9 +63,9 @@ class Dir : public VnodeF2fs, public fbl::Recyclable<Dir> {
   zx_status_t Rename(fbl::RefPtr<fs::Vnode> _newdir, std::string_view oldname,
                      std::string_view newname, bool src_must_be_dir, bool dst_must_be_dir) final
       __TA_EXCLUDES(mutex_, f2fs::GetGlobalLock());
-  void SetLink(DirEntry *de, fbl::RefPtr<Page> &page, VnodeF2fs *vnode) __TA_REQUIRES(mutex_);
-  DirEntry *ParentDir(fbl::RefPtr<Page> *out) __TA_EXCLUDES(mutex_);
-  DirEntry *ParentInlineDir(fbl::RefPtr<Page> *out) __TA_REQUIRES_SHARED(mutex_);
+  void SetLink(const DentryInfo &info, fbl::RefPtr<Page> &page, VnodeF2fs *vnode)
+      __TA_REQUIRES(mutex_);
+  zx::result<DentryInfo> GetParentDentryInfo(fbl::RefPtr<Page> *out) __TA_EXCLUDES(mutex_);
 
   // create and link
   zx_status_t Link(std::string_view name, fbl::RefPtr<fs::Vnode> new_child) final
@@ -97,9 +102,9 @@ class Dir : public VnodeF2fs, public fbl::Recyclable<Dir> {
       __TA_REQUIRES_SHARED(f2fs::GetGlobalLock());
   zx_status_t DoUnlink(VnodeF2fs *vnode, std::string_view name) __TA_REQUIRES(mutex_)
       __TA_REQUIRES_SHARED(f2fs::GetGlobalLock());
-  void DeleteEntry(DirEntry *dentry, fbl::RefPtr<Page> &page, VnodeF2fs *vnode)
+  void DeleteEntry(const DentryInfo &info, fbl::RefPtr<Page> &page, VnodeF2fs *vnode)
       __TA_REQUIRES(mutex_) __TA_REQUIRES_SHARED(f2fs::GetGlobalLock());
-  void DeleteInlineEntry(DirEntry *dentry, fbl::RefPtr<Page> &page, VnodeF2fs *vnode)
+  void DeleteInlineEntry(const DentryInfo &info, fbl::RefPtr<Page> &page, VnodeF2fs *vnode)
       __TA_REQUIRES(mutex_) __TA_REQUIRES_SHARED(f2fs::GetGlobalLock());
 
   // recovery
@@ -116,11 +121,11 @@ class Dir : public VnodeF2fs, public fbl::Recyclable<Dir> {
  private:
   // helper
   size_t DirBlocks();
-  void SetDeType(DirEntry *de, VnodeF2fs *vnode);
   bool EarlyMatchName(std::string_view name, f2fs_hash_t namehash, const DirEntry &de);
   zx::result<bool> IsSubdir(Dir *possible_dir);
   bool IsEmptyDir();
   bool IsEmptyInlineDir();
+  DirEntry &GetDirEntry(const DentryInfo &info, fbl::RefPtr<Page> &page);
 
   // inline helper
   uint64_t InlineDentryBitmapSize() const;
@@ -128,17 +133,13 @@ class Dir : public VnodeF2fs, public fbl::Recyclable<Dir> {
   DirEntry *InlineDentryArray(Page *page, VnodeF2fs &vnode);
   uint8_t (*InlineDentryFilenameArray(Page *page, VnodeF2fs &vnode))[kDentrySlotLen];
 
-  // link helper to update link information in Rename()
-  DirEntry *FindEntrySafe(std::string_view name, fbl::RefPtr<Page> *res_page) __TA_EXCLUDES(mutex_);
+  // link helper to update child in Rename()
+  zx::result<DentryInfo> FindEntrySafe(std::string_view name, fbl::RefPtr<Page> *res_page)
+      __TA_EXCLUDES(mutex_);
   zx_status_t AddLinkSafe(std::string_view name, VnodeF2fs *vnode) __TA_EXCLUDES(mutex_)
       __TA_REQUIRES_SHARED(f2fs::GetGlobalLock());
-  void SetLinkSafe(DirEntry *de, fbl::RefPtr<Page> &page, VnodeF2fs *vnode) __TA_EXCLUDES(mutex_)
-      __TA_REQUIRES_SHARED(f2fs::GetGlobalLock());
-
-  DirHash cached_hash_ __TA_GUARDED(mutex_);
-
-  void SetDirHash(const DirHash &hash) __TA_REQUIRES(mutex_) { cached_hash_ = hash; }
-
+  void SetLinkSafe(const DentryInfo &info, fbl::RefPtr<Page> &page, VnodeF2fs *vnode)
+      __TA_EXCLUDES(mutex_) __TA_REQUIRES_SHARED(f2fs::GetGlobalLock());
 #if 0  // porting needed
 //   int F2fsSymlink(dentry *dentry, const char *symname);
 //   int F2fsMknod(dentry *dentry, umode_t mode, dev_t rdev);

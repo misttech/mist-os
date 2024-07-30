@@ -85,6 +85,16 @@ impl EnvironmentContext {
             _ => get_data_base_path(),
         }
     }
+
+    pub fn get_analytics_path(&self) -> Option<PathBuf> {
+        if self.has_no_environment() {
+            return None;
+        }
+        match self.env_kind().isolate_root() {
+            Some(isolate_root) => Some(isolate_root.join("metrics")),
+            _ => get_analytics_base_path().ok(),
+        }
+    }
 }
 
 fn get_runtime_base() -> Result<PathBuf> {
@@ -157,6 +167,14 @@ fn get_config_base_path() -> Result<PathBuf> {
     path.push("Fuchsia");
     path.push("ffx");
     path.push("config");
+    create_dir_all(&path)?;
+    Ok(path)
+}
+
+fn get_analytics_base_path() -> Result<PathBuf> {
+    let mut path = get_config_base()?;
+    path.push("Fuchsia");
+    path.push("metrics");
     create_dir_all(&path)?;
     Ok(path)
 }

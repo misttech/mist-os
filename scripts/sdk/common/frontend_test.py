@@ -3,10 +3,11 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import frontend
 import os
 import tempfile
 import unittest
+
+import frontend
 
 
 class TestFrontend(unittest.TestCase):

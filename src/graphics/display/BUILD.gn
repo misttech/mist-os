@@ -15,8 +15,7 @@ group("drivers") {
     "drivers/simple:simple.bochs",
     "drivers/simple:simple.intel",
     "drivers/vim3-display-detect:vim3-display-detect",
-    "drivers/virtio-guest:virtio-gpu-component-v1",
-    "drivers/virtio-guest:virtio-gpu-component-v2",
+    "drivers/virtio-gpu-display:component",
   ]
 }
 
@@ -26,7 +25,6 @@ group("tools") {
   # as `testonly` to achieve that purpose.
   testonly = true
   deps = [
-    "bin/display-png",
     "bin/display-tool",
     "bin/display-tweak",
   ]

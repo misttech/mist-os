@@ -9,7 +9,6 @@ in each row is required to be the same.
 """
 
 import sys
-
 from typing import Any, Iterable, Sequence
 
 

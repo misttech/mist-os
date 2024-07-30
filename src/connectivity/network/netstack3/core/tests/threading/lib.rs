@@ -17,9 +17,7 @@ use net_types::ethernet::Mac;
 use net_types::ip::{Ipv4, Ipv6, Subnet};
 use net_types::{SpecifiedAddr, UnicastAddr, Witness as _, ZonedAddr};
 use netstack3_core::device::{EthernetLinkDevice, RecvEthernetFrameMeta};
-use netstack3_core::device_socket::{Protocol, TargetDevice};
 use netstack3_core::routes::{AddableEntry, AddableMetric, RawMetric};
-use netstack3_core::sync::Mutex;
 use netstack3_core::testutil::{CtxPairExt as _, FakeBindingsCtx, FakeCtx, FakeCtxBuilder};
 use netstack3_core::CtxPair;
 use netstack3_ip::icmp::testutil::{
@@ -34,6 +32,7 @@ use packet_formats::ip::IpProto;
 use packet_formats::testutil::parse_ip_packet_in_ethernet_frame;
 use packet_formats::udp::{UdpPacket, UdpParseArgs};
 
+mod device_socket;
 mod tcp;
 
 /// Spawns a loom thread with a safe stack size.
@@ -83,95 +82,6 @@ fn low_preemption_bound_model() -> loom::model::Builder {
     let mut model = loom::model::Builder::new();
     model.preemption_bound = Some(3);
     model
-}
-
-#[test]
-fn packet_socket_change_device_and_protocol_atomic() {
-    const DEVICE_MAC: Mac = net_mac!("22:33:44:55:66:77");
-    const SRC_MAC: Mac = net_mac!("88:88:88:88:88:88");
-
-    let make_ethernet_frame = |ethertype| {
-        Buf::new(vec![1; 10], ..)
-            .encapsulate(EthernetFrameBuilder::new(SRC_MAC, DEVICE_MAC, ethertype, 0))
-            .serialize_vec_outer()
-            .unwrap()
-            .into_inner()
-    };
-    let first_proto: NonZeroU16 = NonZeroU16::new(EtherType::Ipv4.into()).unwrap();
-    let second_proto: NonZeroU16 = NonZeroU16::new(EtherType::Ipv6.into()).unwrap();
-
-    loom_model(Default::default(), move || {
-        let mut builder = FakeCtxBuilder::default();
-        let dev_indexes =
-            [(); 2].map(|()| builder.add_device(UnicastAddr::new(DEVICE_MAC).unwrap()));
-        let (FakeCtx { core_ctx, bindings_ctx }, indexes_to_device_ids) = builder.build();
-        let mut ctx = CtxPair { core_ctx: Arc::new(core_ctx), bindings_ctx };
-
-        let devs = dev_indexes.map(|i| indexes_to_device_ids[i].clone());
-        drop(indexes_to_device_ids);
-
-        let socket = ctx.core_api().device_socket().create(Mutex::new(Vec::new()));
-        ctx.core_api().device_socket().set_device_and_protocol(
-            &socket,
-            TargetDevice::SpecificDevice(&devs[0].clone().into()),
-            Protocol::Specific(first_proto),
-        );
-
-        let thread_vars = (ctx.clone(), devs.clone());
-        let deliver = loom_spawn(move || {
-            let (mut ctx, devs) = thread_vars;
-            let [dev_a, dev_b] = devs;
-            for (device_id, ethertype) in [
-                (dev_a.clone(), first_proto.get().into()),
-                (dev_a, second_proto.get().into()),
-                (dev_b.clone(), first_proto.get().into()),
-                (dev_b, second_proto.get().into()),
-            ] {
-                ctx.core_api().device::<EthernetLinkDevice>().receive_frame(
-                    RecvEthernetFrameMeta { device_id },
-                    make_ethernet_frame(ethertype),
-                );
-            }
-        });
-
-        let thread_vars = (ctx.clone(), devs[1].clone(), socket.clone());
-
-        let change_device = loom_spawn(move || {
-            let (mut ctx, dev, socket) = thread_vars;
-            ctx.core_api().device_socket().set_device_and_protocol(
-                &socket,
-                TargetDevice::SpecificDevice(&dev.clone().into()),
-                Protocol::Specific(second_proto),
-            );
-        });
-
-        deliver.join().unwrap();
-        change_device.join().unwrap();
-
-        // These are all the matching frames. Depending on how the threads
-        // interleave, one or both of them should be delivered.
-        let matched_frames = [
-            (
-                devs[0].downgrade().into(),
-                make_ethernet_frame(first_proto.get().into()).into_inner(),
-            ),
-            (
-                devs[1].downgrade().into(),
-                make_ethernet_frame(second_proto.get().into()).into_inner(),
-            ),
-        ];
-        let received_frames = socket.socket_state().lock();
-        match &received_frames[..] {
-            [one] => {
-                assert!(one == &matched_frames[0] || one == &matched_frames[1]);
-            }
-            [one, two] => {
-                assert_eq!(one, &matched_frames[0]);
-                assert_eq!(two, &matched_frames[1]);
-            }
-            other => panic!("unexpected received frames {other:?}"),
-        }
-    });
 }
 
 const DEVICE_MAC: Mac = net_mac!("22:33:44:55:66:77");

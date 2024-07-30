@@ -62,13 +62,13 @@ void FakeCompositeRingBuffer::NotImplemented_(const std::string& name,
 void FakeCompositeRingBuffer::GetProperties(GetPropertiesCompleter::Sync& completer) {
   ADR_LOG_METHOD(kLogFakeCompositeRingBuffer);
   fha::RingBufferProperties props;
-  if (needs_cache_flush_or_invalidate_) {
+  if (needs_cache_flush_or_invalidate_.has_value()) {
     props.needs_cache_flush_or_invalidate(*needs_cache_flush_or_invalidate_);
   }
-  if (turn_on_delay_) {
+  if (turn_on_delay_.has_value()) {
     props.turn_on_delay(turn_on_delay_->get());
   }
-  if (driver_transfer_bytes_) {
+  if (driver_transfer_bytes_.has_value()) {
     props.driver_transfer_bytes(*driver_transfer_bytes_);
   }
   completer.Reply(props);
@@ -163,17 +163,17 @@ void FakeCompositeRingBuffer::InjectDelayUpdate(std::optional<zx::duration> inte
 
 void FakeCompositeRingBuffer::MaybeCompleteWatchDelayInfo() {
   ADR_LOG_METHOD(kLogFakeCompositeRingBuffer);
-  if (delays_have_changed_ && watch_delay_info_completer_) {
+  if (delays_have_changed_ && watch_delay_info_completer_.has_value()) {
     delays_have_changed_ = false;
 
     auto completer = std::move(*watch_delay_info_completer_);
     watch_delay_info_completer_.reset();
 
     fha::DelayInfo info;
-    if (internal_delay_) {
+    if (internal_delay_.has_value()) {
       info.internal_delay(internal_delay_->get());
     }
-    if (external_delay_) {
+    if (external_delay_.has_value()) {
       info.external_delay(external_delay_->get());
     }
     completer.Reply(std::move(info));

@@ -5,17 +5,18 @@
 """Generates licenses SPDX from GN metadata."""
 
 import argparse
-import sys
 import logging
 import os
+import sys
+from pathlib import Path
+
+from collector import Collector
 from file_access import FileAccess
 from gn_label import GnLabel
-from spdx_writer import SpdxWriter
-from readme_fuchsia import ReadmesDB
-from collector import Collector
-from pathlib import Path
 from gn_license_metadata import GnLicenseMetadataDB
+from readme_fuchsia import ReadmesDB
 from spdx_comparator import SpdxComparator
+from spdx_writer import SpdxWriter
 
 
 def main() -> int:

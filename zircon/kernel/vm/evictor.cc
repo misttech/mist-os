@@ -86,7 +86,7 @@ void Evictor::EnableEviction(bool use_compression) {
     }
   }
 
-  // Set up the eviction thread to process asynchronous one-shot and continuous eviction requests.
+  // Set up the eviction thread to process asynchronous eviction requests.
   auto eviction_thread = [](void* arg) -> int {
     Evictor* evictor = reinterpret_cast<Evictor*>(arg);
     return evictor->EvictionThreadLoop();
@@ -124,11 +124,6 @@ void Evictor::DisableEviction() {
     eviction_enabled_ = false;
     eviction_thread_exiting_ = false;
   }
-}
-
-void Evictor::SetContinuousEvictionInterval(zx_time_t eviction_interval) {
-  Guard<MonitoredSpinLock, IrqSave> guard{&lock_, SOURCE_TAG};
-  default_eviction_interval_ = eviction_interval;
 }
 
 Evictor::EvictionTarget Evictor::DebugGetOneShotEvictionTarget() const {
@@ -316,7 +311,9 @@ Evictor::EvictedPageCounts Evictor::EvictPageQueues(uint64_t target_pages,
   }
 
   DEBUG_ASSERT(page_queues_);
-  while (counts.pager_backed + counts.compressed < target_pages) {
+  // Evict until we've counted enough pages to hit the target_pages. Explicitly do not consider
+  // pager_backed_loaned towards our total, as loaned pages do not go to the free memory pool.
+  while (counts.pager_backed + counts.compressed + counts.discardable < target_pages) {
     // TODO(rashaeqbal): The sequence of actions in PeekPagerBacked() and RemovePageForEviction()
     // implicitly guarantee forward progress in this loop, so that we're not stuck trying to evict
     // the same page (i.e. PeekPagerBacked keeps returning the same page). It would be nice to have
@@ -386,41 +383,9 @@ Evictor::EvictedPageCounts Evictor::EvictPageQueues(uint64_t target_pages,
   return counts;
 }
 
-void Evictor::EnableContinuousEviction(uint64_t min_mem_to_free, uint64_t free_mem_target,
-                                       EvictionLevel eviction_level, Output output) {
-  {
-    Guard<MonitoredSpinLock, IrqSave> guard{&lock_, SOURCE_TAG};
-    // Combine min target with previously outstanding min target.
-    CheckedIncrement(&continuous_eviction_target_.min_pages_to_free, min_mem_to_free / PAGE_SIZE);
-    continuous_eviction_target_.free_pages_target = free_mem_target / PAGE_SIZE;
-    continuous_eviction_target_.level = eviction_level;
-    continuous_eviction_target_.print_counts = (output == Output::Print);
-    // .pending has no relevance here since eviction is controlled by the eviction interval.
-
-    // Configure eviction to occur at intervals of |default_eviction_interval_|.
-    next_eviction_interval_ = default_eviction_interval_;
-  }
-  // Unblock the eviction thread.
-  eviction_signal_.Signal();
-}
-
-void Evictor::DisableContinuousEviction() {
-  Guard<MonitoredSpinLock, IrqSave> guard{&lock_, SOURCE_TAG};
-  continuous_eviction_target_ = {};
-  // In the next iteration of the eviction thread loop, we will see this value and block
-  // indefinitely.
-  next_eviction_interval_ = ZX_TIME_INFINITE;
-}
-
 int Evictor::EvictionThreadLoop() {
   while (!eviction_thread_exiting_) {
-    // Block until |next_eviction_interval_| is elapsed.
-    zx_time_t wait_interval;
-    {
-      Guard<MonitoredSpinLock, IrqSave> guard{&lock_, SOURCE_TAG};
-      wait_interval = next_eviction_interval_;
-    }
-    eviction_signal_.Wait(Deadline::no_slack(zx_time_add_duration(current_time(), wait_interval)));
+    eviction_signal_.Wait();
 
     if (eviction_thread_exiting_) {
       break;
@@ -428,56 +393,7 @@ int Evictor::EvictionThreadLoop() {
 
     // Process a one-shot target if there is one. This is a no-op and no pages are evicted if no
     // one-shot target is pending.
-    auto evicted = EvictOneShotFromPreloadedTarget();
-
-    // In practice either one-shot eviction or continuous eviction will be enabled at a time. We can
-    // skip the rest of the loop if we evicted something here, and go back to wait for another
-    // request. If both one-shot and continuous modes are used together, at worst we will wait for
-    // |next_eviction_interval_| before evicting as required by the continuous mode, which should
-    // still be fine.
-    if (evicted.discardable + evicted.pager_backed > 0) {
-      continue;
-    }
-
-    // Read control parameters into local variables under the lock.
-    EvictionTarget target;
-    {
-      Guard<MonitoredSpinLock, IrqSave> guard{&lock_, SOURCE_TAG};
-      target = continuous_eviction_target_;
-    }
-
-    uint64_t free_pages_before = pmm_node_->CountFreePages();
-
-    evicted =
-        EvictUntilTargetsMet(target.min_pages_to_free, target.free_pages_target, target.level);
-
-    if (target.print_counts) {
-      printf("[EVICT]: Free memory before eviction was %zuMB and after eviction is %zuMB\n",
-             free_pages_before * PAGE_SIZE / MB, pmm_node_->CountFreePages() * PAGE_SIZE / MB);
-      if (evicted.pager_backed > 0) {
-        printf("[EVICT]: Evicted %lu user pager backed pages\n", evicted.pager_backed);
-      }
-      if (evicted.discardable > 0) {
-        printf("[EVICT]: Evicted %lu pages from discardable vmos\n", evicted.discardable);
-      }
-    }
-
-    uint64_t total_evicted = evicted.discardable + evicted.pager_backed;
-    // If no pages were evicted, we don't have anything to decrement from the min pages target. Skip
-    // the rest of the loop.
-    if (total_evicted == 0) {
-      continue;
-    }
-
-    {
-      // Update min pages target based on the number of pages evicted.
-      Guard<MonitoredSpinLock, IrqSave> guard{&lock_, SOURCE_TAG};
-      if (total_evicted < continuous_eviction_target_.min_pages_to_free) {
-        continuous_eviction_target_.min_pages_to_free -= total_evicted;
-      } else {
-        continuous_eviction_target_.min_pages_to_free = 0;
-      }
-    }
+    EvictOneShotFromPreloadedTarget();
   }
   return 0;
 }

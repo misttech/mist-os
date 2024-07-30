@@ -5,13 +5,17 @@
 import("//build/components.gni")
 import("//build/rust/rustc_library.gni")
 
-rustc_library("version-history") {
+rustc_library("rust") {
+  name = "version_history"
   edition = "2021"
   with_unit_tests = true
 
   deps = [
-    "proc-macro:version-history-macro",
-    "shared:version-history-shared",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:itertools",
+    "//third_party/rust_crates:serde",
+    "//third_party/rust_crates:serde_json",
+    "//third_party/rust_crates:tracing",
   ]
 
   sources = [ "src/lib.rs" ]
@@ -22,8 +26,8 @@ rustc_library("version-history") {
 group("tests") {
   testonly = true
   deps = [
-    ":version-history_test($host_toolchain)",
+    ":rust_test($host_toolchain)",
+    "data:tests",
     "proc-macro:tests",
-    "shared:tests",
   ]
 }

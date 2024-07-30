@@ -4,11 +4,12 @@
 # found in the LICENSE file.
 """Holders for license-related GN metadata dictionaries."""
 
-import json
 import dataclasses
+import json
 import logging
 import os
 from typing import Any, Dict, List, Tuple, TypeAlias
+
 from gn_label import GnLabel
 
 AnyDict: TypeAlias = Dict[Any, Any]

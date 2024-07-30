@@ -19,7 +19,7 @@ use starnix_core::vfs::{
     self, default_ioctl, fileops_impl_noop_sync, FileObject, FileOps, FsNode, FsString,
 };
 use starnix_logging::log_warn;
-use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex, Unlocked, WriteOps};
+use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::device_type::INPUT_MAJOR;
 use starnix_uapi::errors::Errno;
@@ -360,7 +360,7 @@ impl FileOps for UinputDevice {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, WriteOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &vfs::FileObject,
         _current_task: &starnix_core::task::CurrentTask,
         _offset: usize,

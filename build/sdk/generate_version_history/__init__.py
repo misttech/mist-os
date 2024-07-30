@@ -4,6 +4,7 @@
 
 """Preprocesses version_history.json before including it in the IDK."""
 
+import datetime
 from typing import Any
 
 
@@ -31,16 +32,28 @@ def replace_special_abi_revisions_using_latest_numbered(
         value["abi_revision"] = latest_abi_revision
 
 
-def replace_special_abi_revisions_using_commit_hash(
-    version_history: Any, latest_commit_hash: str
+def replace_special_abi_revisions_using_commit_hash_and_date(
+    version_history: Any,
+    daily_commit_hash: str,
+    daily_commit_timestamp: datetime.datetime,
 ) -> None:
     """Modifies `version_history`, assigning ABI revisions for the special API
-    levels. The first 16 bits of the ABI revisions indicate whether the API
-    level is unstable or PLATFORM. The remainder is a prefix of the given git
-    hash."""
-    # Embed the first 48 bits of the git hash in the ABI. That should be
-    # plenty to look up the full commit hash in git.
-    masked_git_hash = 0x0000_FFFF_FFFF_FFFF & int(latest_commit_hash[:12], 16)
+    levels. The format is the following:
+
+        0xFF0X_YYYY_ZZZZ_ZZZZ
+
+        X: 0 if the API level is NEXT or HEAD. 1 if the API level is PLATFORM.
+        YYYY: the first 16 bits of `daily_commit_hash`. This is largely to make
+            the ABI revision unpredictable.
+        ZZZZ_ZZZZ: 32 bit encoding of the proleptic Gregorian ordinal of the day
+            *after* `daily_commit_timestamp`. In most situations, this will
+            indicate "today". We'll need to revise this encoding sometime before
+            the year 11761200.
+    """
+    # Embed the first 16 bits of the git hash in the ABI.
+    masked_git_hash = (0xFFFF & int(daily_commit_hash[:4], 16)) << 32
+
+    masked_day = 0xFFFF_FFFF & (daily_commit_timestamp.toordinal() + 1)
 
     for level, value in version_history["data"]["special_api_levels"].items():
         input_abi_revision = value["abi_revision"]
@@ -51,12 +64,12 @@ def replace_special_abi_revisions_using_commit_hash(
             # ABI revisions for unstable levels start with 0xFF00.
             # All such levels share an ABI revision.
             value["abi_revision"] = "0x{:X}".format(
-                0xFF00_0000_0000_0000 | masked_git_hash
+                0xFF00_0000_0000_0000 | masked_git_hash | masked_day
             )
         elif level == "PLATFORM":
             # ABI revisions for PLATFORM start with 0xFF01.
             value["abi_revision"] = "0x{:X}".format(
-                0xFF01_0000_0000_0000 | masked_git_hash
+                0xFF01_0000_0000_0000 | masked_git_hash | masked_day
             )
         else:
             assert False, "Unknown special API level: %s" % level

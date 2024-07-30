@@ -421,7 +421,6 @@ async fn start_tunnel(
 async fn add_repository(
     repo_name: &str,
     repo_spec: &RepositorySpec,
-    save_config: SaveConfig,
     inner: Arc<RwLock<RepoInner>>,
 ) -> Result<(), ffx::RepositoryError> {
     tracing::info!("Adding repository {} {:?}", repo_name, repo_spec);
@@ -443,14 +442,6 @@ async fn add_repository(
             _ => ffx::RepositoryError::IoError,
         }
     })?;
-
-    if save_config == SaveConfig::Save {
-        // Save the filesystem configuration.
-        pkg::config::set_repository(repo_name, repo_spec).await.map_err(|err| {
-            tracing::error!("Failed to save repository: {:#?}", err);
-            ffx::RepositoryError::IoError
-        })?;
-    }
 
     // Finally add the repository.
     let inner = inner.write().await;
@@ -603,6 +594,8 @@ impl<
         cx: &Context,
         req: ffx::RepositoryRegistryRequest,
     ) -> Result<(), anyhow::Error> {
+        // Make sure we pick up any repositories that have been added since the last request.
+        ffx_config::invalidate_global_cache().await;
         match req {
             ffx::RepositoryRegistryRequest::ServerStart { address, responder } => {
                 let res = async {
@@ -693,8 +686,7 @@ impl<
                 let res = match ffx_ext::RepositorySpec::try_from(repository) {
                     Ok(repo_spec) => {
                         let repo_spec = RepositorySpec::from(repo_spec);
-                        add_repository(&name, &repo_spec, SaveConfig::Save, Arc::clone(&self.inner))
-                            .await
+                        add_repository(&name, &repo_spec, Arc::clone(&self.inner)).await
                     }
                     Err(err) => Err(err.into()),
                 };
@@ -912,9 +904,7 @@ async fn load_repositories_from_config(inner: &Arc<RwLock<RepoInner>>) {
         }
 
         // Add the repository.
-        if let Err(err) =
-            add_repository(&name, &repo_spec, SaveConfig::DoNotSave, Arc::clone(inner)).await
-        {
+        if let Err(err) = add_repository(&name, &repo_spec, Arc::clone(inner)).await {
             tracing::warn!("failed to add the repository {:?}: {:?}", name, err);
         }
     }

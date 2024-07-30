@@ -10,8 +10,8 @@ bind_library("fuchsia.intel.e1000") {
 }
 
 driver_bind_rules("e1000_bind") {
-  rules = "e1000.bind"
-  tests = "bind-tests.json"
+  rules = "meta/e1000.bind"
+  tests = "meta/bind-tests.json"
   deps = [
     ":fuchsia.intel.e1000",
     "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_bindlib",
@@ -120,7 +120,7 @@ fuchsia_driver("e1000-driver") {
 fuchsia_driver_component("e1000") {
   component_name = "e1000"
   deps = [ ":e1000-driver" ]
-  info = "e1000-info.json"
+  info = "meta/e1000-info.json"
   manifest = "meta/e1000.cml"
 }
 

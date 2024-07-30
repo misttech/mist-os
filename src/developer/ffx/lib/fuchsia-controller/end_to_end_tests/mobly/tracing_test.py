@@ -6,16 +6,14 @@ import asyncio
 import json
 import subprocess
 
-import fidl.fuchsia_tracing_controller as tracing_controller
 import fidl.fuchsia_tracing as tracing
-from fidl import AsyncSocket
-from fuchsia_controller_py import ZxStatus, Socket
-from mobly import asserts
-from mobly import base_test
-from mobly import test_runner
+import fidl.fuchsia_tracing_controller as tracing_controller
+from fuchsia_controller_py import Socket, ZxStatus
+from mobly import asserts, base_test, test_runner
 from mobly_controller import fuchsia_device
 from mobly_controller.fuchsia_device import asynctest
 
+from fidl import AsyncSocket
 
 TRACE2JSON = "tracing_runtime_deps/trace2json"
 

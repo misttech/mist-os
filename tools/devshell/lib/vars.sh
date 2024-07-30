@@ -70,11 +70,23 @@ function fx-rbe-enabled {
   # Returns 1 to indicate that RBE is not enabled.
   fx-build-dir-if-present || return 1
 
-  # Check to see if the rbe settings indicate that the reproxy wrapper is
-  # needed.
-  needs_reproxy=($("${PREBUILT_JQ}" '-r' '.final.needs_reproxy' < "${FUCHSIA_BUILD_DIR}/rbe_settings.json"))
-  if [[ "$needs_reproxy" != "true" ]]; then
-    return 1
+  # This RBE settings file is created at GN gen time.
+  local rbe_settings_file="${FUCHSIA_BUILD_DIR}/rbe_settings.json"
+
+  if [[ -f "${rbe_settings_file}" ]]; then
+    # Check to see if the rbe settings indicate that the reproxy wrapper is
+    # needed.
+    needs_reproxy=($("${PREBUILT_JQ}" '-r' '.final.needs_reproxy' < "${rbe_settings_file}"))
+    if [[ "$needs_reproxy" != "true" ]]; then
+      return 1
+    fi
+  else
+    # If, for some reason, this file doesn't exist yet when this function is
+    # called, then proceed as if RBE is enabled (return success), which wraps
+    # the whole ninja build in ${RBE_WRAPPER} (negligible overhead).
+    # Assuming that GN is re-run automatically by the build, we can expect this
+    # file to appear and self-correct.
+    fx-warn "Did not find ${rbe_settings_file}, so conservatively assuming RBE is enabled until GN generates that file."
   fi
 }
 
@@ -938,12 +950,28 @@ function fx-run-ninja {
 
   local args=()
   local full_cmdline
+  local cpu_load
+  local concurrency
   local have_load=false
   local have_jobs=false
   while [[ $# -gt 0 ]]; do
     case "$1" in
-    -l) have_load=true ;;
-    -j) have_jobs=true ;;
+    -l)
+      have_load=true
+      cpu_load="$2"
+      ;;
+    -j)
+      have_jobs=true
+      concurrency="$2"
+      ;;
+    -l*)
+      have_load=true
+      cpu_load="${1#-l}"
+      ;;
+    -j*)
+      have_jobs=true
+      concurrency="${1#-j}"
+      ;;
     esac
     args+=("$1")
     shift
@@ -958,12 +986,15 @@ function fx-run-ninja {
       # the build, can not lock the screen, etc).
       local cpus
       cpus="$(fx-cpu-count)"
-      args=("-l" $((cpus * 20)) "${args[@]}")
+      cpu_load=$((cpus * 20))
+      args=("-l" "${cpu_load}" "${args[@]}")
     fi
+  elif [[ -z "${cpu_load}" ]]; then
+    echo "ERROR: Missing cpu load (-l) argument."
+    exit 1
   fi
 
   if ! "$have_jobs"; then
-    local concurrency
     concurrency="$(fx-choose-build-concurrency)"
     # macOS in particular has a low default for number of open file descriptors
     # per process, which is prohibitive for higher job counts. Here we raise
@@ -975,6 +1006,9 @@ function fx-run-ninja {
       ulimit -n "${min_limit}"
     fi
     args=("-j" "${concurrency}" "${args[@]}")
+  elif [[ -z "${concurrency}" ]]; then
+    echo "ERROR: Missing job count (-j) argument."
+    exit 1
   fi
 
   # Check for a bad element in $PATH.
@@ -1056,6 +1090,13 @@ function fx-run-ninja {
     ${CLICOLOR_FORCE+"CLICOLOR_FORCE=$CLICOLOR_FORCE"}
     ${FX_BUILD_RBE_STATS+"FX_BUILD_RBE_STATS=$FX_BUILD_RBE_STATS"}
   )
+
+  if [[ "${have_jobs}" ]]; then
+    # Pass any _explicit_ job count provided by the user to the Bazel
+    # launcher script through an environment variable.
+    # See https://fxbug.dev/351623259
+    envs+=("FUCHSIA_BAZEL_JOB_COUNT=${concurrency}")
+  fi
 
   full_cmdline=(
     env -i "${envs[@]}"

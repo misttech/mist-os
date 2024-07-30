@@ -47,7 +47,7 @@ class Device final : public fdf::DriverBase,
   zx::result<> Start() override;
   void PrepareStop(fdf::PrepareStopCompleter completer) override;
 
-  void InitMlme();
+  zx_status_t InitMlme();
   fdf::Logger* Logger() { return logger_.get(); }
 
   zx_status_t StartFullmac(const rust_wlan_fullmac_ifc_protocol_copy_t* ifc,

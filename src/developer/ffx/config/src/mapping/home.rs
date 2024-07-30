@@ -49,6 +49,7 @@ mod test {
             ConfigMap::default(),
             None,
             None,
+            false,
         )
         .unwrap();
         let value = home_dir("$HOME");
@@ -65,6 +66,7 @@ mod test {
             ConfigMap::default(),
             None,
             None,
+            false,
         )
         .unwrap();
         let value = home_dir("$HOME");
@@ -81,6 +83,7 @@ mod test {
             ConfigMap::default(),
             None,
             None,
+            false,
         )
         .unwrap();
         let test = Value::String("$WHATEVER".to_string());

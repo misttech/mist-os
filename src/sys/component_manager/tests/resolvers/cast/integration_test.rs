@@ -110,7 +110,10 @@ fn new_fresolution_component() -> fresolution::Component {
         url: Some(CAST_URL.to_string()),
         decl: Some(fmem::Data::Bytes(fidl::persist(&fdecl::Component::default().clone()).unwrap())),
         abi_revision: Some(
-            version_history::HISTORY.get_example_supported_version_for_tests().abi_revision.into(),
+            version_history_data::HISTORY
+                .get_example_supported_version_for_tests()
+                .abi_revision
+                .into(),
         ),
         ..Default::default()
     }

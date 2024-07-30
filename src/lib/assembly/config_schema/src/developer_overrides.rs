@@ -2,14 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use assembly_file_relative_path::SupportsFileRelativePaths;
 use serde::{Deserialize, Serialize};
 
 use crate::assembly_config::{CompiledPackageDefinition, ShellCommands};
 use crate::PackageDetails;
 
+// LINT.IfChange
+
 /// Developer Overrides struct that is similar to the AssemblyConfig struct,
 /// but has extra fields added that allow it to convey extra fields.
-#[derive(Debug, Default, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq, SupportsFileRelativePaths)]
 #[serde(deny_unknown_fields)]
 pub struct DeveloperOverrides {
     /// The label of the target used to define the overrides.
@@ -38,6 +41,7 @@ pub struct DeveloperOverrides {
 
     /// Packages to add to the build.
     #[serde(default)]
+    #[file_relative_paths]
     pub packages: Vec<PackageDetails>,
 
     /// Compiled components to add to the build
@@ -74,3 +78,5 @@ pub struct KernelOptions {
     #[serde(default)]
     pub command_line_args: Vec<String>,
 }
+
+// LINT.ThenChange(//build/assembly/scripts/developer_overrides.py)

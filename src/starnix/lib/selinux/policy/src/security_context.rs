@@ -6,6 +6,7 @@ use crate::index::PolicyIndex;
 use crate::{CategoryId, ParseStrategy, RoleId, SensitivityId, TypeId, UserId};
 
 use bstr::BString;
+use selinux_common::NullessByteStr;
 use std::cmp::Ordering;
 use thiserror::Error;
 
@@ -101,9 +102,9 @@ impl SecurityContext {
     /// Security Context string, or the fields are not valid under the current policy.
     pub(crate) fn parse<PS: ParseStrategy>(
         policy_index: &PolicyIndex<PS>,
-        security_context: &[u8],
+        security_context: NullessByteStr<'_>,
     ) -> Result<Self, SecurityContextError> {
-        let as_str = std::str::from_utf8(security_context)
+        let as_str = std::str::from_utf8(security_context.as_bytes())
             .map_err(|_| SecurityContextError::InvalidSyntax)?;
 
         // Parse the user, role, type and security level parts, to validate syntax.
@@ -435,7 +436,7 @@ mod tests {
     fn parse_security_context_single_sensitivity() {
         let policy = test_policy();
         let security_context = policy
-            .parse_security_context(b"user0:object_r:type0:s0")
+            .parse_security_context(b"user0:object_r:type0:s0".into())
             .expect("creating security context should succeed");
         assert_eq!(user_name(&policy, security_context.user), "user0");
         assert_eq!(role_name(&policy, security_context.role), "object_r");
@@ -449,7 +450,7 @@ mod tests {
     fn parse_security_context_with_sensitivity_range() {
         let policy = test_policy();
         let security_context = policy
-            .parse_security_context(b"user0:object_r:type0:s0-s1")
+            .parse_security_context(b"user0:object_r:type0:s0-s1".into())
             .expect("creating security context should succeed");
         assert_eq!(user_name(&policy, security_context.user), "user0");
         assert_eq!(role_name(&policy, security_context.role), "object_r");
@@ -465,7 +466,7 @@ mod tests {
     fn parse_security_context_with_single_sensitivity_and_categories_interval() {
         let policy = test_policy();
         let security_context = policy
-            .parse_security_context(b"user0:object_r:type0:s1:c0.c4")
+            .parse_security_context(b"user0:object_r:type0:s1:c0.c4".into())
             .expect("creating security context should succeed");
         assert_eq!(user_name(&policy, security_context.user), "user0");
         assert_eq!(role_name(&policy, security_context.role), "object_r");
@@ -482,7 +483,7 @@ mod tests {
     fn parse_security_context_with_sensitivity_range_and_category_interval() {
         let policy = test_policy();
         let security_context = policy
-            .parse_security_context(b"user0:object_r:type0:s0-s1:c0.c4")
+            .parse_security_context(b"user0:object_r:type0:s0-s1:c0.c4".into())
             .expect("creating security context should succeed");
         assert_eq!(user_name(&policy, security_context.user), "user0");
         assert_eq!(role_name(&policy, security_context.role), "object_r");
@@ -501,7 +502,7 @@ mod tests {
     fn parse_security_context_with_sensitivity_range_with_categories() {
         let policy = test_policy();
         let security_context = policy
-            .parse_security_context(b"user0:object_r:type0:s0:c0-s1:c0.c4")
+            .parse_security_context(b"user0:object_r:type0:s0:c0-s1:c0.c4".into())
             .expect("creating security context should succeed");
         assert_eq!(user_name(&policy, security_context.user), "user0");
         assert_eq!(role_name(&policy, security_context.role), "object_r");
@@ -523,7 +524,7 @@ mod tests {
     fn parse_security_context_with_single_sensitivity_and_category_list() {
         let policy = test_policy();
         let security_context = policy
-            .parse_security_context(b"user0:object_r:type0:s1:c0,c4")
+            .parse_security_context(b"user0:object_r:type0:s1:c0,c4".into())
             .expect("creating security context should succeed");
         assert_eq!(user_name(&policy, security_context.user), "user0");
         assert_eq!(role_name(&policy, security_context.role), "object_r");
@@ -540,7 +541,7 @@ mod tests {
     fn parse_security_context_with_single_sensitivity_and_category_list_and_range() {
         let policy = test_policy();
         let security_context = policy
-            .parse_security_context(b"user0:object_r:type0:s1:c0,c3.c4")
+            .parse_security_context(b"user0:object_r:type0:s1:c0,c3.c4".into())
             .expect("creating security context should succeed");
         assert_eq!(user_name(&policy, security_context.user), "user0");
         assert_eq!(role_name(&policy, security_context.role), "object_r");
@@ -564,7 +565,7 @@ mod tests {
             "user0:object_r:type0:s0:s0:s0",
         ] {
             assert_eq!(
-                policy.parse_security_context(invalid_label.as_bytes()),
+                policy.parse_security_context(invalid_label.as_bytes().into()),
                 Err(SecurityContextError::InvalidSyntax),
                 "validating {:?}",
                 invalid_label
@@ -578,7 +579,7 @@ mod tests {
         for invalid_label in ["user0:object_r:type0:s_invalid", "user0:object_r:type0:s0-s_invalid"]
         {
             assert_eq!(
-                policy.parse_security_context(invalid_label.as_bytes()),
+                policy.parse_security_context(invalid_label.as_bytes().into()),
                 Err(SecurityContextError::UnknownSensitivity { name: "s_invalid".into() }),
                 "validating {:?}",
                 invalid_label
@@ -593,7 +594,7 @@ mod tests {
             ["user0:object_r:type0:s1:c_invalid", "user0:object_r:type0:s1:c0.c_invalid"]
         {
             assert_eq!(
-                policy.parse_security_context(invalid_label.as_bytes()),
+                policy.parse_security_context(invalid_label.as_bytes().into()),
                 Err(SecurityContextError::UnknownCategory { name: "c_invalid".into() }),
                 "validating {:?}",
                 invalid_label
@@ -607,17 +608,19 @@ mod tests {
 
         // TODO(b/319232900): Should fail validation because the low security level has
         // categories that the high level does not.
-        assert!(policy.parse_security_context(b"user0:object_r:type0:s1:c0,c3.c4-s1").is_ok());
+        assert!(policy
+            .parse_security_context(b"user0:object_r:type0:s1:c0,c3.c4-s1".into())
+            .is_ok());
 
         // Fails validation because the sensitivity is not valid for the user.
-        assert!(policy.parse_security_context(b"user1:object_r:type0:s0").is_err());
+        assert!(policy.parse_security_context(b"user1:object_r:type0:s0".into()).is_err());
 
         // Fails validation because the role is not valid for the user.
-        assert!(policy.parse_security_context(b"user0:subject_r:type0:s0").is_err());
+        assert!(policy.parse_security_context(b"user0:subject_r:type0:s0".into()).is_err());
 
         // Passes validation even though the role is not explicitly allowed for the user,
         // because it is the special "object_r" role, used when labelling resources.
-        assert!(policy.parse_security_context(b"user1:object_r:type0:s1").is_ok());
+        assert!(policy.parse_security_context(b"user1:object_r:type0:s1".into()).is_ok());
     }
 
     #[test]
@@ -633,7 +636,7 @@ mod tests {
             "user0:object_r:type0:s1:c0,c3.c4-s1:c0,c2.c4",
         ] {
             let security_context =
-                policy.parse_security_context(label.as_bytes()).expect("should succeed");
+                policy.parse_security_context(label.as_bytes().into()).expect("should succeed");
             assert_eq!(policy.serialize_security_context(&security_context), label.as_bytes());
         }
     }

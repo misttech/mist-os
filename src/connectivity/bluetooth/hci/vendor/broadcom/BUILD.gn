@@ -9,9 +9,9 @@ import("//build/drivers.gni")
 import("//build/test.gni")
 
 driver_bind_rules("bcm_hci_bind") {
-  rules = "bcm_hci.bind"
+  rules = "meta/bcm_hci.bind"
   bind_output = "bt-hci-broadcom.bindbc"
-  tests = "bind_tests.json"
+  tests = "meta/bind_tests.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.bluetooth:fuchsia.hardware.bluetooth_bindlib",
   ]
@@ -64,7 +64,7 @@ fuchsia_driver("bt-hci-broadcom-driver") {
 fuchsia_driver_component("bt-hci-broadcom") {
   component_name = "bt-hci-broadcom"
   deps = [ ":bt-hci-broadcom-driver" ]
-  info = "bt-hci-broadcom-info.json"
+  info = "meta/bt-hci-broadcom-info.json"
   manifest = "meta/bt-hci-broadcom.cml"
 }
 
@@ -96,7 +96,7 @@ executable("tests_executable") {
     ":common",
     "//sdk/lib/async_patterns/testing/cpp:cpp",
     "//sdk/lib/component/outgoing/cpp",
-    "//sdk/lib/driver/testing/cpp/fixture:cpp_fixture",
+    "//sdk/lib/driver/testing/cpp:driver_testing_cpp",
     "//sdk/lib/fdio",
     "//src/devices/bus/lib/device-protocol-pdev",
     "//src/lib/fxl/test:gtest_main",

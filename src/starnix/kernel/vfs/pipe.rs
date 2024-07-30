@@ -18,7 +18,9 @@ use crate::vfs::{
     FileHandle, FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps,
     FileSystemOptions, FsNodeInfo, FsStr, SpecialNode,
 };
-use starnix_sync::{FileOpsCore, LockBefore, Locked, Mutex, MutexGuard, Unlocked, WriteOps};
+use starnix_sync::{
+    FileOpsCore, LockBefore, LockEqualOrBefore, Locked, Mutex, MutexGuard, Unlocked,
+};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::auth::CAP_SYS_RESOURCE;
 use starnix_uapi::errors::Errno;
@@ -429,14 +431,14 @@ impl FileOps for PipeFileObject {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<'_, FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
         debug_assert!(offset == 0);
-        file.blocking_op(current_task, FdEvents::POLLIN | FdEvents::POLLHUP, None, || {
+        file.blocking_op(locked, current_task, FdEvents::POLLIN | FdEvents::POLLHUP, None, |_| {
             let mut pipe = self.pipe.lock();
             let actual = pipe.read(data)?;
             if actual > 0 {
@@ -448,7 +450,7 @@ impl FileOps for PipeFileObject {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, WriteOps>,
+        locked: &mut Locked<'_, FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -457,7 +459,7 @@ impl FileOps for PipeFileObject {
         debug_assert!(offset == 0);
         debug_assert!(data.bytes_read() == 0);
 
-        let result = file.blocking_op(current_task, FdEvents::POLLOUT, None, || {
+        let result = file.blocking_op(locked, current_task, FdEvents::POLLOUT, None, |_| {
             let mut pipe = self.pipe.lock();
             let offset_before = data.bytes_read();
             let bytes_written = pipe.write(current_task, data)?;
@@ -482,6 +484,7 @@ impl FileOps for PipeFileObject {
 
     fn wait_async(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         file: &FileObject,
         _current_task: &CurrentTask,
         waiter: &Waiter,
@@ -500,6 +503,7 @@ impl FileOps for PipeFileObject {
 
     fn query_events(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         file: &FileObject,
         _current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
@@ -709,8 +713,9 @@ impl PipeFileObject {
     ///
     /// This will wait on `events` if the file is opened in blocking mode. If the file is opened in
     /// not blocking mode and `condition` is not realized, this will return EAGAIN.
-    fn wait_for_condition<'a, F, G, V>(
+    fn wait_for_condition<'a, L, F, G, V>(
         &'a self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         file: &FileHandle,
         condition: F,
@@ -718,11 +723,12 @@ impl PipeFileObject {
         events: FdEvents,
     ) -> Result<(V, MutexGuard<'a, Pipe>), Errno>
     where
+        L: LockEqualOrBefore<FileOpsCore>,
         F: Fn(&Pipe) -> bool,
-        G: Fn() -> Result<V, Errno>,
+        G: Fn(&mut Locked<'_, L>) -> Result<V, Errno>,
     {
-        file.blocking_op(current_task, events, None, || {
-            let other = pregen()?;
+        file.blocking_op(locked, current_task, events, None, |locked| {
+            let other = pregen(locked)?;
             let pipe = self.pipe.lock();
             if condition(&pipe) {
                 Ok((other, pipe))
@@ -733,18 +739,20 @@ impl PipeFileObject {
     }
 
     /// Lock the pipe for reading, after having run `pregen`.
-    fn lock_pipe_for_reading_with<'a, G, V>(
+    fn lock_pipe_for_reading_with<'a, L, G, V>(
         &'a self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         file: &FileHandle,
         pregen: G,
         non_blocking: bool,
     ) -> Result<(V, MutexGuard<'a, Pipe>), Errno>
     where
-        G: Fn() -> Result<V, Errno>,
+        L: LockEqualOrBefore<FileOpsCore>,
+        G: Fn(&mut Locked<'_, L>) -> Result<V, Errno>,
     {
         if non_blocking {
-            let other = pregen()?;
+            let other = pregen(locked)?;
             let pipe = self.pipe.lock();
             if !pipe.is_readable() {
                 return error!(EAGAIN);
@@ -752,6 +760,7 @@ impl PipeFileObject {
             Ok((other, pipe))
         } else {
             self.wait_for_condition(
+                locked,
                 current_task,
                 file,
                 |pipe| pipe.is_readable(),
@@ -761,18 +770,24 @@ impl PipeFileObject {
         }
     }
 
-    fn lock_pipe_for_reading<'a>(
+    fn lock_pipe_for_reading<'a, L>(
         &'a self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         file: &FileHandle,
         non_blocking: bool,
-    ) -> Result<MutexGuard<'a, Pipe>, Errno> {
-        self.lock_pipe_for_reading_with(current_task, file, || Ok(()), non_blocking).map(|(_, l)| l)
+    ) -> Result<MutexGuard<'a, Pipe>, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
+        self.lock_pipe_for_reading_with(locked, current_task, file, |_| Ok(()), non_blocking)
+            .map(|(_, l)| l)
     }
 
     /// Lock the pipe for writing, after having run `pregen`.
-    fn lock_pipe_for_writing_with<'a, G, V>(
+    fn lock_pipe_for_writing_with<'a, L, G, V>(
         &'a self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         file: &FileHandle,
         pregen: G,
@@ -780,10 +795,11 @@ impl PipeFileObject {
         len: usize,
     ) -> Result<(V, MutexGuard<'a, Pipe>), Errno>
     where
-        G: Fn() -> Result<V, Errno>,
+        L: LockEqualOrBefore<FileOpsCore>,
+        G: Fn(&mut Locked<'_, L>) -> Result<V, Errno>,
     {
         if non_blocking {
-            let other = pregen()?;
+            let other = pregen(locked)?;
             let pipe = self.pipe.lock();
             if !pipe.is_writable(len) {
                 return error!(EAGAIN);
@@ -791,6 +807,7 @@ impl PipeFileObject {
             Ok((other, pipe))
         } else {
             self.wait_for_condition(
+                locked,
                 current_task,
                 file,
                 |pipe| pipe.is_writable(len),
@@ -800,14 +817,18 @@ impl PipeFileObject {
         }
     }
 
-    fn lock_pipe_for_writing<'a>(
+    fn lock_pipe_for_writing<'a, L>(
         &'a self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         file: &FileHandle,
         non_blocking: bool,
         len: usize,
-    ) -> Result<MutexGuard<'a, Pipe>, Errno> {
-        self.lock_pipe_for_writing_with(current_task, file, || Ok(()), non_blocking, len)
+    ) -> Result<MutexGuard<'a, Pipe>, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
+        self.lock_pipe_for_writing_with(locked, current_task, file, |_| Ok(()), non_blocking, len)
             .map(|(_, l)| l)
     }
 
@@ -831,7 +852,8 @@ impl PipeFileObject {
         // If both ends are pipes, use `lock_pipes` and `Pipe::splice`.
         assert!(from.downcast_file::<PipeFileObject>().is_none());
 
-        let mut pipe = self.lock_pipe_for_writing(current_task, self_file, non_blocking, len)?;
+        let mut pipe =
+            self.lock_pipe_for_writing(locked, current_task, self_file, non_blocking, len)?;
         let len = std::cmp::min(len, pipe.messages.available_capacity());
         let mut buffer = SpliceOutputBuffer { pipe: &mut pipe, len, available: len };
         if let Some(offset) = maybe_offset {
@@ -856,12 +878,12 @@ impl PipeFileObject {
         non_blocking: bool,
     ) -> Result<usize, Errno>
     where
-        L: LockBefore<WriteOps>,
+        L: LockBefore<FileOpsCore>,
     {
         // If both ends are pipes, use `lock_pipes` and `Pipe::splice`.
         assert!(to.downcast_file::<PipeFileObject>().is_none());
 
-        let mut pipe = self.lock_pipe_for_reading(current_task, self_file, non_blocking)?;
+        let mut pipe = self.lock_pipe_for_reading(locked, current_task, self_file, non_blocking)?;
         let len = std::cmp::min(len, pipe.messages.len());
         let mut buffer = SpliceInputBuffer { pipe: &mut pipe, len, available: len };
         if let Some(offset) = maybe_offset {
@@ -874,13 +896,17 @@ impl PipeFileObject {
     /// Share the mappings backing the given input buffer into the pipe.
     ///
     /// Returns the number of bytes enqueued.
-    pub fn vmsplice_from(
+    pub fn vmsplice_from<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         self_file: &FileHandle,
         mut iovec: UserBuffers,
         non_blocking: bool,
-    ) -> Result<usize, Errno> {
+    ) -> Result<usize, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         let available = UserBuffer::cap_buffers_to_max_rw_count(
             current_task.maximum_valid_address(),
             &mut iovec,
@@ -888,7 +914,7 @@ impl PipeFileObject {
         let mappings = current_task.mm().get_mappings_for_vmsplice(&iovec)?;
 
         let mut pipe =
-            self.lock_pipe_for_writing(current_task, self_file, non_blocking, available)?;
+            self.lock_pipe_for_writing(locked, current_task, self_file, non_blocking, available)?;
 
         if pipe.reader_count == 0 {
             send_standard_signal(current_task, SignalInfo::default(SIGPIPE));
@@ -919,14 +945,18 @@ impl PipeFileObject {
     /// Copy data from the pipe to the given output buffer.
     ///
     /// Returns the number of bytes transferred.
-    pub fn vmsplice_to(
+    pub fn vmsplice_to<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         self_file: &FileHandle,
         iovec: UserBuffers,
         non_blocking: bool,
-    ) -> Result<usize, Errno> {
-        let mut pipe = self.lock_pipe_for_reading(current_task, self_file, non_blocking)?;
+    ) -> Result<usize, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
+        let mut pipe = self.lock_pipe_for_reading(locked, current_task, self_file, non_blocking)?;
 
         let mut data = UserBuffersOutputBuffer::unified_new(current_task, iovec)?;
         let len = std::cmp::min(data.available(), pipe.messages.len());
@@ -939,13 +969,17 @@ impl PipeFileObject {
     /// Returns EINVAL if one (or both) of the given file handles is not a pipe.
     ///
     /// Obtains the locks on the pipes in the correct order to avoid deadlocks.
-    pub fn lock_pipes<'a, 'b>(
+    pub fn lock_pipes<'a, 'b, L>(
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         file_in: &'a FileHandle,
         file_out: &'b FileHandle,
         len: usize,
         non_blocking: bool,
-    ) -> Result<PipeOperands<'a, 'b>, Errno> {
+    ) -> Result<PipeOperands<'a, 'b>, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         let pipe_in = file_in.downcast_file::<PipeFileObject>().ok_or_else(|| errno!(EINVAL))?;
         let pipe_out = file_out.downcast_file::<PipeFileObject>().ok_or_else(|| errno!(EINVAL))?;
 
@@ -956,18 +990,30 @@ impl PipeFileObject {
             Ordering::Equal => error!(EINVAL),
             Ordering::Less => {
                 let (write, read) = pipe_in.lock_pipe_for_reading_with(
+                    locked,
                     current_task,
                     file_in,
-                    || pipe_out.lock_pipe_for_writing(current_task, file_out, non_blocking, len),
+                    |locked| {
+                        pipe_out.lock_pipe_for_writing(
+                            locked,
+                            current_task,
+                            file_out,
+                            non_blocking,
+                            len,
+                        )
+                    },
                     non_blocking,
                 )?;
                 Ok(PipeOperands { read, write })
             }
             Ordering::Greater => {
                 let (read, write) = pipe_out.lock_pipe_for_writing_with(
+                    locked,
                     current_task,
                     file_out,
-                    || pipe_in.lock_pipe_for_reading(current_task, file_in, non_blocking),
+                    |locked| {
+                        pipe_in.lock_pipe_for_reading(locked, current_task, file_in, non_blocking)
+                    },
                     non_blocking,
                     len,
                 )?;

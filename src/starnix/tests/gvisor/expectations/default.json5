@@ -389,7 +389,6 @@
                 // iptables_test
                 "IPTablesBasic.GetRevision",
                 "IPTablesBasic.GetInfoErrorPrecedence",
-                "IPTablesTest.InitialState",
                 "IPTablesBasic.OriginalDstErrors",
                 "IPTablesBasic.GetEntriesErrorPrecedence",
 
@@ -492,13 +491,13 @@
                 "MountTest.LargeTreePropagationEvent",
                 "MountTest.LockedMountStopsNonRecBind",
                 "MountTest.MaxMounts",
+                "MountTest.MaxRecursiveBind",
                 "MountTest.MountInfo",
                 "MountTest.MountNamespaceSlavesNewUserNamespace",
                 "MountTest.MountNoExec",
-                "MountTest.MaxRecursiveBind",
+                "MountTest.MountProc",
                 "MountTest.MountTmpfsMagicValIgnored",
                 "MountTest.MountWithStrictAtime",
-                "MountTest.OpenFileBusy",
                 "MountTest.PropagateChildUmountEvent",
                 "MountTest.ReuseGroupIDs",
                 "MountTest.SlaveMaster",
@@ -768,7 +767,10 @@
                 // socket_ip_udp_loopback_test
                 "AllUDPSockets/AllSocketPairTest.SetSocketRecvBufForceAboveMax/*",
                 "AllUDPSockets/NonStreamSocketPairTest.RecvmsgMsghdrFlagMsgTrunc/*",
-                "AllUDPSockets/UDPSocketPairTest.PayloadTooBig/*",
+                "AllUDPSockets/UDPSocketPairTest.PayloadTooBig/0",
+                "AllUDPSockets/UDPSocketPairTest.PayloadTooBig/2",
+                "AllUDPSockets/UDPSocketPairTest.PayloadTooBig/3",
+                "AllUDPSockets/UDPSocketPairTest.PayloadTooBig/5",
 
                 // socket_netdevice_test
                 "NetdeviceTest.InterfaceName",
@@ -1185,6 +1187,15 @@
 
                 // TODO(https://fxbug.dev/339238239) Re-enable once flake is resolved.
                 "IntervalTimerTest.PeriodicGroupDirectedSignal",
+
+                // TODO(https://fxbug.dev/353534690) deflake
+                "AllInetTests/RawPacketTest.SendFromLoopback/0",
+
+                // TODO(https://fxbug.dev/356145523) deflake
+                "AllInetTests/RawPacketTest.SendFromLoopback/1",
+
+                // TODO(https://fxbug.dev/354049980) deflake
+                "RtSignalTest.InvalidCodes",
             ],
         },
     ],

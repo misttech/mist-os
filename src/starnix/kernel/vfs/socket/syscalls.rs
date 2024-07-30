@@ -15,7 +15,7 @@ use crate::vfs::socket::{
 use crate::vfs::{FdFlags, FdNumber, FileHandle, FsString, LookupContext};
 use fuchsia_zircon as zx;
 use starnix_logging::{log_trace, track_stub};
-use starnix_sync::{FileOpsCore, LockBefore, Locked, Unlocked, WriteOps};
+use starnix_sync::{FileOpsCore, LockBefore, Locked, Unlocked};
 use starnix_uapi::errors::{Errno, EEXIST, EINPROGRESS};
 use starnix_uapi::file_mode::FileMode;
 use starnix_uapi::math::round_up_to_increment;
@@ -232,7 +232,7 @@ pub fn sys_accept(
 }
 
 pub fn sys_accept4(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     user_socket_address: UserAddress,
@@ -242,7 +242,7 @@ pub fn sys_accept4(
     let file = current_task.files.get(fd)?;
     let socket = file.node().socket().ok_or_else(|| errno!(ENOTSOCK))?;
     let accepted_socket =
-        file.blocking_op(current_task, FdEvents::POLLIN | FdEvents::POLLHUP, None, || {
+        file.blocking_op(locked, current_task, FdEvents::POLLIN | FdEvents::POLLHUP, None, |_| {
             socket.accept()
         })?;
 
@@ -264,7 +264,7 @@ pub fn sys_accept4(
 }
 
 pub fn sys_connect(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     user_socket_address: UserAddress,
@@ -307,13 +307,14 @@ pub fn sys_connect(
         Err(errno) if errno.code == EINPROGRESS => {
             let waiter = Waiter::new();
             client_socket.wait_async(
+                locked,
                 current_task,
                 &waiter,
                 FdEvents::POLLOUT,
                 WaitCallback::none(),
             );
-            if !client_socket.query_events(current_task)?.contains(FdEvents::POLLOUT) {
-                waiter.wait_until(current_task, zx::Time::INFINITE)?;
+            if !client_socket.query_events(locked, current_task)?.contains(FdEvents::POLLOUT) {
+                waiter.wait(current_task)?;
             }
             client_socket.connect(current_task, peer)
         }
@@ -632,7 +633,7 @@ fn sendmsg_internal<L>(
     flags: u32,
 ) -> Result<usize, Errno>
 where
-    L: LockBefore<WriteOps>,
+    L: LockBefore<FileOpsCore>,
 {
     let message_header = current_task.read_object(user_message_header)?;
 

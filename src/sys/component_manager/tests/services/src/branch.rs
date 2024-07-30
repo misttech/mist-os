@@ -5,9 +5,13 @@
 use anyhow::{format_err, Context, Error};
 use argh::FromArgs;
 use fuchsia_component::client;
-use futures::future;
+use fuchsia_component::server::ServiceFs;
+use futures::{StreamExt, TryStreamExt};
 use tracing::*;
-use {fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl};
+use {
+    fidl_fidl_test_components as ftest, fidl_fuchsia_component as fcomponent,
+    fidl_fuchsia_component_decl as fdecl,
+};
 
 #[derive(FromArgs, Debug)]
 /// Options for the branch component.
@@ -38,10 +42,28 @@ async fn main() -> Result<(), Error> {
         }
     }
 
-    // Wait indefinitely to keep this component running.
-    future::pending::<()>().await;
+    enum IncomingRequest {
+        Trigger(ftest::TriggerRequestStream),
+    }
 
-    unreachable!();
+    // Run a Trigger service to allow the test to synchronize on the instantiation of the
+    // providers.
+    let mut fs = ServiceFs::new_local();
+    fs.dir("svc").add_fidl_service(IncomingRequest::Trigger);
+    fs.take_and_serve_directory_handle()?;
+    fs.for_each_concurrent(None, |request: IncomingRequest| async move {
+        match request {
+            IncomingRequest::Trigger(mut stream) => {
+                while let Ok(Some(request)) = stream.try_next().await {
+                    let ftest::TriggerRequest::Run { responder } = request;
+                    let _ = responder.send("done");
+                }
+            }
+        }
+    })
+    .await;
+
+    Ok(())
 }
 
 /// Creates a BankAccount provider component in `coll`.

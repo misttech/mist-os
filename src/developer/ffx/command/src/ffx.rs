@@ -2,13 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{user_error, Error, FfxContext, MetricsSession, Result};
+use crate::{analytics_command, user_error, Error, FfxContext, MetricsSession, Result};
 use argh::{ArgsInfo, FromArgs};
 use camino::Utf8PathBuf;
 use ffx_command_error::bug;
 use ffx_config::environment::ExecutableKind;
 use ffx_config::logging::LogDestination;
 use ffx_config::{EnvironmentContext, FfxConfigBacked};
+use ffx_metrics::{enhanced_analytics, sanitize};
 use ffx_writer::Format;
 use std::collections::HashMap;
 use std::fmt::Write;
@@ -97,7 +98,9 @@ impl FfxCommandLine {
         metrics: MetricsSession,
         suite: &T,
     ) -> Result<Error> {
-        metrics.print_notice(&mut std::io::stderr()).await?;
+        if !analytics_command(&self.unredacted_args_for_analytics().join(" ")) {
+            metrics.print_notice(&mut std::io::stderr()).await?;
+        }
 
         let subcmd_name = self.global.subcommand.first();
         let help_err = match subcmd_name {
@@ -118,13 +121,16 @@ impl FfxCommandLine {
                 Error::Help { command: self.command.clone(), output, code }
             }
         };
-        // construct a 'sanitized' argument list that includes an indication of whether
-        // it was just no arguments passed or an unknown subtool.
-        let redacted: Vec<_> = self
-            .redact_ffx_cmd()
-            .into_iter()
-            .chain(subcmd_name.map(|_| "<unknown-subtool>".to_owned()).into_iter())
-            .collect();
+        let args_for_analytics: Vec<_> = match enhanced_analytics().await {
+            // construct a 'sanitized' argument list that includes an indication of whether
+            // it was just no arguments passed or an unknown subtool.
+            false => self
+                .redact_ffx_cmd()
+                .into_iter()
+                .chain(subcmd_name.map(|_| "<unknown-subtool>".to_owned()).into_iter())
+                .collect(),
+            true => self.unredacted_args_for_analytics(),
+        };
 
         let error_res = match help_err.exit_code() {
             0 => Ok(ExitStatus::from_raw(0)),
@@ -135,8 +141,18 @@ impl FfxCommandLine {
             }),
         };
 
-        metrics.command_finished(&error_res, &redacted).await?;
+        metrics.command_finished(&error_res, &args_for_analytics).await?;
         Ok(help_err)
+    }
+
+    /// Creates a Vec<String> of full args from the commandline
+    /// for use in enhanced analytics.
+    pub fn unredacted_args_for_analytics(&self) -> Vec<String> {
+        let mut v: Vec<String> = self.cmd_iter().into_iter().map(|v| v.to_string()).collect();
+        let x: Vec<String> = self.ffx_args_iter().into_iter().map(|v| v.to_string()).collect();
+        v.extend(x);
+        v.extend(self.subcmd_iter().map(|v| v.to_string()));
+        v.into_iter().map(|a| sanitize(&a)).collect()
     }
 
     /// Creates the command from the args directly. This is used when building JSON help information
@@ -249,6 +265,12 @@ pub struct Ffx {
     /// for stderr. If no destination is specified, log.dir will be used. If a
     /// destination is specified, then log.dir will be ignored.
     pub log_destination: Option<LogDestination>,
+
+    #[argh(switch)]
+    /// disables loading configuration from the file system and only uses
+    /// configuration specified on the command line or the compiled in default values.
+    /// Intended for use when running ffx as part of a hermetic build.
+    pub no_environment: bool,
 }
 
 impl Ffx {
@@ -277,6 +299,7 @@ impl Ffx {
                     domain_root.clone(),
                     runtime_args,
                     Some(isolate_root.clone()),
+                    self.no_environment,
                 )
                 .map_err(Into::into)
             }
@@ -286,6 +309,7 @@ impl Ffx {
                     domain_root.clone(),
                     runtime_args,
                     isolate_root.clone(),
+                    self.no_environment,
                 )
                 .map_err(Into::into)
             }
@@ -297,11 +321,18 @@ impl Ffx {
                     runtime_args,
                     env_path,
                     Utf8PathBuf::try_from(current_dir).ok().as_deref(),
+                    self.no_environment,
                 )
                 .map_err(Into::into)
             }
-            _ => EnvironmentContext::detect(exe_kind, runtime_args, &current_dir, env_path)
-                .map_err(|e| user_error!(e)),
+            _ => EnvironmentContext::detect(
+                exe_kind,
+                runtime_args,
+                &current_dir,
+                env_path,
+                self.no_environment,
+            )
+            .map_err(|e| user_error!(e)),
         }
     }
 
@@ -338,6 +369,7 @@ impl Ffx {
             verbose: false,
             subcommand: vec![],
             log_destination: None,
+            no_environment: false,
         };
 
         let mut argv_iter = argv.iter();
@@ -396,11 +428,14 @@ impl Ffx {
                 "-v" | "--verbose" => {
                     return_val.verbose = true;
                 }
-                "-o" | "--output-file" => {
+                "-o" | "--log-output" => {
                     if let Some(val) = argv_iter.next() {
                         // Unwrap is okay because LogDestination::Err is `Infallible`
                         return_val.log_destination = Some(LogDestination::from_str(val).unwrap());
                     }
+                }
+                "--no-environment" => {
+                    return_val.no_environment = true;
                 }
                 _ => {
                     return_val.subcommand.push(opt.to_string());
@@ -571,5 +606,82 @@ mod test {
         let context =
             ffx.load_context_with_env(ExecutableKind::Test, env_vars).expect("domain context");
         assert_matches!(context.env_kind(), EnvironmentKind::ConfigDomain { isolate_root: Some(root), .. } if root == &PathBuf::from(&isolate_dir_str));
+    }
+
+    #[test]
+    // This tests that new options do not break the manual parsing of partial command lines or
+    // command lines that result in help output.
+    fn test_cmd_for_help_long_flags() {
+        let options = Ffx::get_args_info();
+        let mut all_args = vec![];
+        for opt in options.flags {
+            match opt.kind {
+                argh::FlagInfoKind::Switch => {
+                    if opt.long != "--help" {
+                        all_args.push(opt.long);
+                    }
+                }
+                argh::FlagInfoKind::Option { arg_name } => match opt.long {
+                    "--machine" => {
+                        all_args.push(opt.long);
+                        all_args.push("json");
+                    }
+                    "--timeout" => {
+                        all_args.push(opt.long);
+                        all_args.push("123");
+                    }
+                    _ => {
+                        all_args.push(opt.long);
+                        all_args.push(arg_name);
+                    }
+                },
+            }
+        }
+        let _ffx = Ffx::from_args(&["ffx"], &all_args).expect("parsing all long args");
+        let _ffx_for_help = Ffx::from_args_for_help(&all_args).expect("parsing args for help");
+        assert_eq!(_ffx, _ffx_for_help);
+    }
+
+    #[test]
+    // This tests that new options do not break the manual parsing of partial command lines or
+    // command lines that result in help output.
+    fn test_cmd_for_help_short_flags() {
+        let options = Ffx::get_args_info();
+        let mut all_arg_strings: Vec<String> = vec![];
+        for opt in options.flags {
+            match opt.kind {
+                argh::FlagInfoKind::Switch => {
+                    if opt.long != "--help" {
+                        if let Some(s) = opt.short {
+                            all_arg_strings.push(format!("-{s}"));
+                        }
+                    }
+                }
+                argh::FlagInfoKind::Option { arg_name } => match opt.long {
+                    "--machine" => {
+                        if let Some(s) = opt.short {
+                            all_arg_strings.push(format!("-{s}"));
+                        }
+                        all_arg_strings.push("json".into());
+                    }
+                    "--timeout" => {
+                        if let Some(s) = opt.short {
+                            all_arg_strings.push(format!("-{s}"));
+                        }
+                        all_arg_strings.push("123".into());
+                    }
+                    _ => {
+                        if let Some(s) = opt.short {
+                            all_arg_strings.push(format!("-{s}"));
+                        }
+                        all_arg_strings.push(arg_name.into());
+                    }
+                },
+            }
+        }
+        let all_args: Vec<&str> = all_arg_strings.iter().map(|e| e.as_str()).collect();
+        let _ffx = Ffx::from_args(&["ffx"], &all_args).expect("parsing all long args");
+        let _ffx_for_help = Ffx::from_args_for_help(&all_args).expect("parsing args for help");
+        assert_eq!(_ffx, _ffx_for_help);
     }
 }

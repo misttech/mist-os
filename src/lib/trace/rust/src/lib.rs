@@ -1505,7 +1505,7 @@ mod sys {
         pub ops: *const trace_handler_ops_t,
     }
 
-    #[link(name = "trace-engine")]
+    // From libtrace-engine.so
     extern "C" {
         // From trace-engine/context.h
 

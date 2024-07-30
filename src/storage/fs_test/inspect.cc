@@ -2,28 +2,39 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <lib/fdio/directory.h>
+#include <fcntl.h>
+#include <lib/diagnostics/reader/cpp/inspect.h>
 #include <lib/inspect/cpp/hierarchy.h>
-#include <lib/inspect/testing/cpp/inspect.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <zircon/types.h>
 
-#include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <optional>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
+#include <fbl/unique_fd.h>
+#include <gmock/gmock.h>
+#include <gtest/gtest.h>
+
+#include "src/storage/fs_test/fs_test.h"
 #include "src/storage/fs_test/fs_test_fixture.h"
+#include "src/storage/lib/vfs/cpp/inspect/inspect_data.h"
 #include "src/storage/lib/vfs/cpp/inspect/inspect_tree.h"
 
 namespace fs_test {
 namespace {
 
-using namespace ::testing;
-using namespace inspect::testing;
 using diagnostics::reader::InspectData;
-
 using inspect::BoolPropertyValue;
 using inspect::IntPropertyValue;
 using inspect::StringPropertyValue;
+using testing::IsSupersetOf;
+using testing::UnorderedElementsAreArray;
 
 // All properties we require the fs.info node to contain, excluding optional fields.
 constexpr std::string_view kRequiredInfoProperties[] = {
@@ -221,7 +232,7 @@ class InspectTest : public FilesystemTest {
 
  private:
   // Last snapshot taken of the inspect tree.
-  std::optional<InspectData> snapshot_ = {};
+  std::optional<InspectData> snapshot_;
 };
 
 // Validate values in the fs.info node.
@@ -248,7 +259,7 @@ TEST_P(InspectTest, ValidateUsageNode) {
   // Multi-volume systems will have further functionality exercised in ValidateVolumeNode (where the
   // bytes/nodes are accounted for).
   if (fs().GetTraits().is_multi_volume) {
-    return;
+    GTEST_SKIP();
   }
 
   uint64_t orig_used_bytes = usage_data.used_bytes;
@@ -278,7 +289,7 @@ TEST_P(InspectTest, ValidateUsageNode) {
 // Validate values in the fs.fvm node.
 TEST_P(InspectTest, ValidateFvmNode) {
   if (!fs().options().use_fvm) {
-    return;
+    GTEST_SKIP();
   }
   fs_inspect::FvmData fvm_data = GetFvmData();
   EXPECT_EQ(fvm_data.out_of_space_events, 0u);
@@ -303,7 +314,7 @@ TEST_P(InspectTest, ValidateFvmNode) {
 // Validate values in the fs.volumes/{name} nodes.
 TEST_P(InspectTest, ValidateVolumeNode) {
   if (!fs().GetTraits().is_multi_volume) {
-    return;
+    GTEST_SKIP();
   }
 
   fs_inspect::VolumeData volume_data = GetVolumeData("default");

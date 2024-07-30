@@ -7,6 +7,7 @@ import argparse
 import json
 import os
 import sys
+
 import yaml
 
 # The list of packages that should be pulled from a Flutter SDK instead of pub.

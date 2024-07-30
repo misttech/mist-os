@@ -324,8 +324,6 @@ zx::result<VnodeProtocol> NegotiateProtocol(fuchsia_io::Flags flags,
 // an accurate representation of the mode bits.
 uint32_t GetPosixMode(fuchsia_io::NodeProtocolKinds protocols, fuchsia_io::Abilities abilities);
 
-fuchsia_io::NodeProtocolKinds GetProtocols(const fuchsia_io::wire::ConnectionProtocols& protocols);
-
 #if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
 constexpr fuchsia_io::NodeProtocolKinds GetProtocols(fuchsia_io::Flags flags) {
   using fuchsia_io::Flags;
@@ -407,53 +405,6 @@ class NodeAttributeBuilder {
   fidl::WireTableFrame<ImmutableAttrs> immutable_frame;
   fidl::WireTableFrame<MutableAttrs> mutable_frame;
 };
-
-#if !defined(__Fuchsia__) || FUCHSIA_API_LEVEL_AT_LEAST(19)
-constexpr CreationMode CreationModeFromFidl(fuchsia_io::CreationMode mode) {
-  switch (mode) {
-    case fuchsia_io::CreationMode::kNever:
-    case fuchsia_io::CreationMode::kNeverDeprecated:
-      return CreationMode::kNever;
-    case fuchsia_io::CreationMode::kAllowExisting:
-      return CreationMode::kAllowExisting;
-    case fuchsia_io::CreationMode::kAlways:
-      return CreationMode::kAlways;
-  }
-}
-
-constexpr fuchsia_io::CreationMode CreationModeToFidl(CreationMode mode) {
-  switch (mode) {
-    case CreationMode::kNever:
-      return fuchsia_io::CreationMode::kNever;
-    case CreationMode::kAllowExisting:
-      return fuchsia_io::CreationMode::kAllowExisting;
-    case CreationMode::kAlways:
-      return fuchsia_io::CreationMode::kAlways;
-  }
-}
-#else
-constexpr CreationMode CreationModeFromFidl(fuchsia_io::OpenMode mode) {
-  switch (mode) {
-    case fuchsia_io::OpenMode::kOpenExisting:
-      return CreationMode::kNever;
-    case fuchsia_io::OpenMode::kMaybeCreate:
-      return CreationMode::kAllowExisting;
-    case fuchsia_io::OpenMode::kAlwaysCreate:
-      return CreationMode::kAlways;
-  }
-}
-
-constexpr fuchsia_io::OpenMode CreationModeToFidl(CreationMode mode) {
-  switch (mode) {
-    case CreationMode::kNever:
-      return fuchsia_io::OpenMode::kOpenExisting;
-    case CreationMode::kAllowExisting:
-      return fuchsia_io::OpenMode::kMaybeCreate;
-    case CreationMode::kAlways:
-      return fuchsia_io::OpenMode::kAlwaysCreate;
-  }
-}
-#endif
 
 constexpr CreationMode CreationModeFromFidl(fuchsia_io::OpenFlags flags) {
   if (flags & fuchsia_io::OpenFlags::kCreateIfAbsent) {

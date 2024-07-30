@@ -32,9 +32,9 @@ class LogSettingsFixture : public ::testing::Test {
 #ifndef __Fuchsia__
 TEST_F(LogSettingsFixture, SetAndGet) {
   LogSettingsBuilder builder;
-  builder.WithMinLogSeverity(-20);
+  builder.WithMinLogSeverity(5);
   builder.BuildAndInitialize();
-  EXPECT_EQ(-20, GetMinLogSeverity());
+  EXPECT_EQ(5, GetMinLogSeverity());
 }
 
 TEST_F(LogSettingsFixture, SetValidLogFile) {

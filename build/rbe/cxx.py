@@ -8,11 +8,10 @@
 import argparse
 import dataclasses
 import enum
-
-import cl_utils
-
 from pathlib import Path
 from typing import AbstractSet, Any, Iterable, Optional, Sequence, Tuple
+
+import cl_utils
 
 
 def _remove_suffix(text: str, suffix: str) -> str:

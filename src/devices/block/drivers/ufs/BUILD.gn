@@ -28,43 +28,40 @@ group("tests") {
   ]
 }
 
-source_set("shared") {
+_common_deps = [
+  ":ufs_bind",
+  "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_cpp",
+  "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_cpp",
+  "//sdk/lib/driver/compat/cpp",
+  "//sdk/lib/driver/component/cpp:cpp",
+  "//sdk/lib/driver/runtime:driver_runtime_cpp",
+  "//src/devices/bin/driver_runtime",
+  "//src/devices/block/lib/common:common",
+  "//src/devices/block/lib/scsi",
+  "//src/devices/lib/dev-operation",
+  "//src/devices/lib/dma-buffer",
+  "//src/devices/lib/mmio",
+  "//zircon/system/ulib/fzl",
+  "//zircon/system/ulib/hwreg",
+  "//zircon/system/ulib/inspect",
+  "//zircon/system/ulib/sync",
+  "//zircon/system/ulib/zircon-internal",
+  "//zircon/system/ulib/zx",
+  "//zircon/third_party/ulib/safemath",
+]
+
+fuchsia_driver("ufs-driver") {
+  output_name = "ufs"
+  configs += [ "//build/config:all_source" ]
   sources = [
     "device_manager.cc",
     "request_list.cc",
     "transfer_request_processor.cc",
+    "ufs-export.cc",
     "ufs.cc",
     "uic/uic_commands.cc",
   ]
-  configs += [ "//build/config:all_source" ]
-  deps = [
-    ":ufs_bind",
-    "//src/devices/block/lib/common:common-dfv1",
-    "//src/devices/lib/driver",
-    "//src/devices/lib/mmio",
-    "//src/lib/ddk",
-    "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/fzl",
-    "//zircon/system/ulib/inspect",
-    "//zircon/system/ulib/sync",
-    "//zircon/system/ulib/zx",
-    "//zircon/third_party/ulib/safemath",
-  ]
-  public_deps = [
-    "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_cpp",
-    "//src/devices/block/lib/scsi:scsi-dfv1",
-    "//src/devices/lib/dev-operation",
-    "//src/devices/lib/dma-buffer",
-    "//src/devices/pci/lib/device-protocol-pci",
-    "//src/devices/pci/lib/pci",
-    "//zircon/system/ulib/hwreg",
-    "//zircon/system/ulib/zircon-internal",
-  ]
-}
-
-fuchsia_driver("ufs-driver") {
-  output_name = "ufs"
-  deps = [ ":shared" ]
+  deps = _common_deps
 }
 
 fuchsia_driver_component("ufs") {
@@ -79,14 +76,14 @@ fuchsia_driver_package("pkg") {
   driver_components = [ ":ufs" ]
 }
 
-test_deps = [
+_test_deps = [
+  "//sdk/lib/async_patterns/testing/cpp",
+  "//sdk/lib/driver/testing/cpp:cpp",
   "//sdk/lib/inspect/testing/cpp:zxtest",
   "//src/devices/testing/fake-bti",
   "//src/devices/testing/fake-mmio-reg",
-  "//src/devices/testing/mock-ddk",
   "//src/lib/json_parser",
   "//src/storage/lib/block_client/cpp",
-  "//zircon/system/ulib/fbl",
   "//zircon/system/ulib/fdio-caller",
   "//zircon/system/ulib/zxtest",
   "//zircon/third_party/ulib/safemath",
@@ -94,7 +91,10 @@ test_deps = [
 
 test("ufs-unit-tests-bin") {
   output_name = "ufs-unit-tests"
+  configs += [ "//build/config:all_source" ]
   sources = [
+    "device_manager.cc",
+    "request_list.cc",
     "test/block-op-test.cc",
     "test/init-test.cc",
     "test/mock-device/fake-dma-handler.cc",
@@ -110,8 +110,11 @@ test("ufs-unit-tests-bin") {
     "test/scsi-command-test.cc",
     "test/uic-test.cc",
     "test/unit-lib.cc",
+    "transfer_request_processor.cc",
+    "ufs.cc",
+    "uic/uic_commands.cc",
   ]
-  deps = test_deps + [ ":shared" ]
+  deps = _common_deps + _test_deps
 }
 
 fuchsia_unittest_component("ufs-unit-tests") {

@@ -12,7 +12,6 @@ import shlex
 import subprocess
 import sys
 import time
-
 from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple
 
@@ -69,7 +68,7 @@ def write_file_if_changed(path: Path, content: str) -> bool:
 
 
 def command_args_to_string(
-    args: List, env: Optional[Dict[str, str]], cwd: Optional[Path | str]
+    args: list[str], env: Optional[Dict[str, str]], cwd: Optional[Path | str]
 ) -> str:
     elements = []
     if cwd:
@@ -86,11 +85,11 @@ def command_args_to_string(
 
 
 def run_command(
-    args: List,
+    args: list[str],
     capture_output: bool = False,
     env: Optional[Dict[str, str]] = None,
     cwd: Optional[Path | str] = None,
-):
+) -> subprocess.CompletedProcess:
     """Run a command.
 
     Args:
@@ -115,11 +114,11 @@ def run_command(
 
 
 def run_checked_command(
-    args: List,
+    args: list[str],
     capture_output: bool,
     env: Optional[Dict[str, str]] = None,
     cwd: Optional[Path | str] = None,
-):
+) -> bool:
     """Run a command, return True if succeeds, False otherwise.
 
     Args:
@@ -283,7 +282,7 @@ def main():
 
     if args.clean and build_dir.exists():
         logger.info(f"{build_dir}: Cleaning build directory")
-        run_command([*ninja_cmd_prefix, "-C", build_dir, "-t", "clean"])
+        run_command([*ninja_cmd_prefix, "-C", str(build_dir), "-t", "clean"])
 
     args_gn_content = _ARGS_GN_TEMPLATE.format(
         cpu=target_cpu,
@@ -307,12 +306,12 @@ def main():
 
     args_gn_content += "sdk_inside_sub_build = true\n"
 
-    # PLATFORM should be passed to GN as a string, numeric API levels are passed
-    # as ints.
-    if api_level == "PLATFORM":
-        gn_api_level = '"PLATFORM"'
+    # Special API levels are passed to GN as a string; numeric API levels are
+    # passed as ints.
+    if api_level == "NEXT" or api_level == "HEAD" or api_level == "PLATFORM":
+        gn_api_level = f'"{api_level}"'
     else:
-        gn_api_level = int(api_level)
+        gn_api_level = str(int(api_level))
 
     args_gn_content += f"current_build_target_api_level = {gn_api_level}\n"
 
@@ -327,7 +326,7 @@ def main():
                 "--root=%s" % fuchsia_dir.resolve(),
                 "--root-pattern=//:developer_universe_packages",
                 "gen",
-                build_dir,
+                str(build_dir),
             ],
             capture_output=not args.verbose,
         ):
@@ -347,7 +346,7 @@ def main():
             [
                 *ninja_cmd_prefix,
                 "-C",
-                build_dir,
+                str(build_dir),
                 "-j",
                 args.parallelism,
                 "-l",

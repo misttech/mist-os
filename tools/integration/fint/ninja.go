@@ -89,6 +89,13 @@ var (
 )
 
 const (
+	// ninjaLogPath is the path to the main ninja log relative to the build directory.
+	ninjaLogPath = ".ninja_log"
+
+	// ninjaDepsPath is the path to the log of ninja deps relative to the build
+	// directory.
+	ninjaDepsPath = ".ninja_deps"
+
 	// unrecognizedFailureMsg is the message we'll output if ninja fails but its
 	// output doesn't match any of the known failure modes.
 	unrecognizedFailureMsg = "Unrecognized failures, please check the original stdout instead."
@@ -640,4 +647,14 @@ func ninjaCompdb(ctx context.Context, r ninjaRunner, compdbPath string) error {
 	// Don't specify targets, as we want all build edges to be generated.
 	args := []string{"-t", "compdb"}
 	return r.run(ctx, args, f, os.Stderr)
+}
+
+func runNinjatrace(ctx context.Context, runner subprocessRunner, ninjatraceToolPath string, ninjaLogPath string, compdbPath string, graphPath string, traceJson string) error {
+	cmd := []string{ninjatraceToolPath, "-ninjalog", ninjaLogPath, "-compdb", compdbPath, "-graph", graphPath, "-critical-path", "-trace-json", traceJson}
+	return runner.Run(ctx, cmd, subprocess.RunOptions{})
+}
+
+func runBuildstats(ctx context.Context, runner subprocessRunner, buildstatsToolPath string, ninjaLogPath string, compdbPath string, graphPath string, statsOutput string) error {
+	cmd := []string{buildstatsToolPath, "--ninjalog", ninjaLogPath, "--compdb", compdbPath, "--graph", graphPath, "--output", statsOutput}
+	return runner.Run(ctx, cmd, subprocess.RunOptions{})
 }

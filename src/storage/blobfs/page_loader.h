@@ -9,22 +9,29 @@
 #error Fuchsia-only Header
 #endif
 
-#include <lib/async-loop/cpp/loop.h>
-#include <lib/async-loop/default.h>
-#include <lib/async/dispatcher.h>
 #include <lib/fzl/vmo-mapper.h>
-#include <lib/zx/pager.h>
+#include <lib/watchdog/watchdog.h>
+#include <lib/zx/result.h>
+#include <lib/zx/thread.h>
+#include <lib/zx/vmo.h>
+#include <zircon/compiler.h>
+#include <zircon/errors.h>
+#include <zircon/types.h>
 
+#include <cstddef>
+#include <cstdint>
 #include <functional>
 #include <memory>
+#include <mutex>
+#include <utility>
+#include <vector>
+
+#include <fbl/macros.h>
 
 #include "src/storage/blobfs/blobfs_metrics.h"
 #include "src/storage/blobfs/compression/external_decompressor.h"
 #include "src/storage/blobfs/loader_info.h"
-#include "src/storage/blobfs/transaction_manager.h"
 #include "src/storage/blobfs/transfer_buffer.h"
-#include "src/storage/lib/vfs/cpp/paged_vfs.h"
-#include "src/storage/lib/watchdog/include/lib/watchdog/watchdog.h"
 
 namespace blobfs {
 
@@ -145,31 +152,29 @@ class PageLoader {
                                                const LoaderInfo& info);
 
     // Scratch buffer for pager transfers of uncompressed data.
-    // NOTE: Per the constraints imposed by |zx_pager_supply_pages|, the VMO owned by this buffer
-    // needs to be unmapped before calling |zx_pager_supply_pages|. Map
-    // |uncompressed_transfer_buffer_.vmo()| only when an explicit address is required, e.g. for
-    // verification, and unmap it immediately after.
     std::unique_ptr<TransferBuffer> uncompressed_transfer_buffer_;
 
+    // A persistent mapping for |uncompressed_transfer_buffer_|.
+    fzl::VmoMapper uncompressed_transfer_buffer_mapper_;
+
     // Scratch buffer for pager transfers of compressed data.
-    // Unlike the above transfer buffer, this never needs to be unmapped since we will be calling
-    // |zx_pager_supply_pages| on the |decompression_buffer_|.
     std::unique_ptr<TransferBuffer> compressed_transfer_buffer_;
 
-    // This is the buffer that can be written to by the other end of the
-    // |decompressor_client_| connection. The contents are not to be trusted and
-    // may be changed at any time, so they need to be copied out prior to
-    // verification.
+    // The |decompressor_client_| decompresses data from |compressed_transfer_buffer_| into this
+    // buffer. Its contents can change at any time and shouldn't be considered reliable. To ensure
+    // data integrity before verification, pages are moved to the |decompression_buffer_|.
     zx::vmo sandbox_buffer_;
 
-    // Scratch buffer for decompression.
-    // NOTE: Per the constraints imposed by |zx_pager_supply_pages|, this needs to be unmapped
-    // before calling |zx_pager_supply_pages|.
+    // Scratch buffer for decompression. The pages from the |compressed_transfer_buffer_| are
+    // transferred here to be verified before being supplied to the blob.
     zx::vmo decompression_buffer_;
 
     // Size of |decompression_buffer_|, stashed at vmo creation time to avoid a syscall each time
     // the size needs to be queried.
     const size_t decompression_buffer_size_;
+
+    // A persistent mapping for |decompression_buffer_|.
+    fzl::VmoMapper decompression_buffer_mapper_;
 
     // Maintains a connection to the external decompressor.
     std::unique_ptr<ExternalDecompressorClient> decompressor_client_;

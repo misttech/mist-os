@@ -45,10 +45,9 @@ font_tools_path = os.path.normpath(
 sys.path.insert(0, font_tools_path)
 
 import argparse
-from typing import NamedTuple, Dict
+from typing import Dict, NamedTuple
 
 from fontTools import ttLib
-
 from range_set import RangeSet
 
 

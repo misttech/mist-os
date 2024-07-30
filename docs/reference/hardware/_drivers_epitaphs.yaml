@@ -638,3 +638,9 @@
   available_in_git: 'dd7557d95161c1e30014d441ce2df679eb1814f0'
   areas: ['Display', 'Audio']
   path: 'src/graphics/display/drivers/intel-i915/intel-i915.cc'
+- short_description: 'virtio-guest display driver v2'
+  deletion_reason: 'Obsolete, the virtio-guest display driver v1 is migrated to DFv2'
+  gerrit_change_id: '1088532'
+  available_in_git: 'ca1f1ec4dbd6132bd49a26d3996d21eb157b30e6'
+  areas: ['Display']
+  path: 'src/graphics/display/drivers/virtio-guest/v2'

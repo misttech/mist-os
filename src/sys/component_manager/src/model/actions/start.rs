@@ -413,7 +413,7 @@ pub fn should_return_early(
 ) -> Option<Result<(), StartActionError>> {
     match component {
         InstanceState::Started(_, _) => Some(Ok(())),
-        InstanceState::New | InstanceState::Unresolved(_) | InstanceState::Resolved(_) => None,
+        InstanceState::Unresolved(_) | InstanceState::Resolved(_) => None,
         InstanceState::Shutdown(_, _) => {
             Some(Err(StartActionError::InstanceShutDown { moniker: moniker.clone() }))
         }
@@ -898,7 +898,6 @@ mod tests {
         let m = Moniker::try_from(vec!["foo"]).unwrap();
 
         // Checks based on InstanceState:
-        assert!(should_return_early(&InstanceState::New, &m).is_none());
         assert!(should_return_early(
             &InstanceState::Unresolved(UnresolvedInstanceState::new(ComponentInput::default())),
             &m

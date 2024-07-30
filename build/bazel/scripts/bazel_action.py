@@ -16,7 +16,6 @@ import shutil
 import stat
 import subprocess
 import sys
-
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple, TypeAlias
 
 # Directory where to find Starlark input files.
@@ -43,7 +42,11 @@ _BAZEL_ROOT_WORKSPACE_NAME = "main"
 # files are part of Bazel's installation, their content would hardly change
 # between build invocations anyway, so this is safe.
 #
-_BAZEL_BUILTIN_REPOSITORIES = ("@bazel_tools//", "@local_config_cc//")
+_BAZEL_BUILTIN_REPOSITORIES = (
+    "@bazel_tools//",
+    "@local_config_cc//",
+    "@local_config_platform//",
+)
 
 # A list of file extensions for files that should be ignored from depfiles.
 _IGNORED_FILE_SUFFIXES = (
@@ -890,6 +893,12 @@ def main() -> int:
         help="List of bazel target patterns.",
     )
     parser.add_argument(
+        "--stamp-files",
+        default=[],
+        nargs="*",
+        help="List of stamp files to touch.",
+    )
+    parser.add_argument(
         "--file-outputs",
         action=FileOutputsAction,
         help="A list of (bazel_path, ninja_path) file paths.",
@@ -984,6 +993,13 @@ def main() -> int:
         cpus = os.cpu_count()
         if cpus:
             jobs = 10 * cpus
+
+    if jobs is None:
+        # If an explicit job count was passed to `fx build`, tell Bazel to respect it.
+        # See https://fxbug.dev/351623259
+        job_count = os.environ.get("FUCHSIA_BAZEL_JOB_COUNT")
+        if job_count:
+            jobs = int(job_count)
 
     def run_bazel_query(
         query_type: str, query_args: List[str], ignore_errors: bool
@@ -1359,6 +1375,10 @@ access when it is run.
         os.makedirs(os.path.dirname(args.depfile), exist_ok=True)
         with open(args.depfile, "w") as f:
             f.write(depfile_content)
+
+        for f in args.stamp_files:
+            with open(f, "w") as f:
+                f.write("")
 
     # Done!
     return 0

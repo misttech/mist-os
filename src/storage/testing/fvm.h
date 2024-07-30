@@ -6,7 +6,6 @@
 #define SRC_STORAGE_TESTING_FVM_H_
 
 #include <fidl/fuchsia.device/cpp/wire.h>
-#include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <lib/zx/result.h>
 
 #include <array>
@@ -19,7 +18,7 @@ struct FvmOptions {
   std::string_view name = "fs-test-partition";
 
   // If not set, a test GUID type is used.
-  std::optional<std::array<uint8_t, BLOCK_GUID_LEN>> type;
+  std::optional<std::array<uint8_t, 16>> type;
 
   uint64_t initial_fvm_slice_count = 1;
 };

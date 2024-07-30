@@ -7,8 +7,7 @@
 #include "lib/page_cache.h"
 
 #include <lib/counters.h>
-
-#include <new>
+#include <lib/crypto/global_prng.h>
 
 #include <arch/defines.h>
 #include <kernel/percpu.h>
@@ -26,12 +25,22 @@ zx::result<PageCache> PageCache::Create(size_t reserve_pages) {
   DEBUG_ASSERT(cpu_count != 0);
 
   fbl::AllocChecker alloc_checker;
-  ktl::unique_ptr<CpuCache[]> entries{new (&alloc_checker) CpuCache[cpu_count]};
+  fbl::Array<CpuCache> entries = fbl::MakeArray<CpuCache>(&alloc_checker, cpu_count);
   if (!alloc_checker.check()) {
     return zx::error_result(ZX_ERR_NO_MEMORY);
   }
   DEBUG_ASSERT(((MAX_CACHE_LINE - 1) & reinterpret_cast<uintptr_t>(entries.get())) == 0);
   return zx::ok(PageCache{reserve_pages, ktl::move(entries)});
+}
+
+void PageCache::SeedRandomShouldWait() {
+  ASSERT(per_cpu_caches_);
+  for (auto &entry : per_cpu_caches_) {
+    Guard<Mutex> guard{&entry.cache_lock};
+    uintptr_t seed = 0;
+    crypto::global_prng::GetInstance()->Draw(&seed, sizeof(seed));
+    entry.random_should_wait_state = seed;
+  }
 }
 
 void PageCache::CountHitPages(size_t page_count) {

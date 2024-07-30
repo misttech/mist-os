@@ -1004,9 +1004,9 @@ impl PeerInner {
     /// Returns whether the channel was closed, or an Error::PeerRead or Error::PeerWrite
     /// if there was a problem communicating on the socket.
     fn recv_all(&self, cx: &mut Context<'_>) -> Result<bool> {
-        let mut buf = Vec::<u8>::new();
         loop {
-            let packet_size = match self.signaling.poll_datagram(cx, &mut buf) {
+            let mut next_packet = Vec::new();
+            let packet_size = match self.signaling.poll_datagram(cx, &mut next_packet) {
                 Poll::Ready(Err(zx::Status::PEER_CLOSED)) => {
                     trace!("Signaling peer closed");
                     return Ok(true);
@@ -1021,17 +1021,15 @@ impl PeerInner {
             // Detects General Reject condition and sends the response back.
             // On other headers with errors, sends BAD_HEADER to the peer
             // and attempts to continue.
-            let header = match SignalingHeader::decode(buf.as_slice()) {
+            let header = match SignalingHeader::decode(next_packet.as_slice()) {
                 Err(Error::InvalidSignalId(label, id)) => {
                     self.send_general_reject(label, id)?;
-                    buf = buf.split_off(packet_size);
                     continue;
                 }
                 Err(_) => {
                     // Only possible other return is OutOfRange
                     // Returned only when the packet is too small, can't make a meaningful reject.
                     info!("received unrejectable message");
-                    buf = buf.split_off(packet_size);
                     continue;
                 }
                 Ok(x) => x,
@@ -1039,8 +1037,7 @@ impl PeerInner {
             // Commands from the remote get translated into requests.
             if header.is_command() {
                 let mut lock = self.incoming_requests.lock();
-                let body = buf.split_off(header.encoded_len());
-                buf.clear();
+                let body = next_packet.split_off(header.encoded_len());
                 lock.queue.push_back(UnparsedRequest::new(header, body));
                 if let RequestListener::Some(ref waker) = lock.listener {
                     waker.wake_by_ref();
@@ -1049,18 +1046,16 @@ impl PeerInner {
                 // Should be a response to a command we sent
                 let mut waiters = self.response_waiters.lock();
                 let idx = usize::from(&header.label());
-                let rest = buf.split_off(packet_size);
                 if let Some(&ResponseWaiter::Discard) = waiters.get(idx) {
                     let _ = waiters.remove(idx);
                 } else if let Some(entry) = waiters.get_mut(idx) {
-                    let old_entry = mem::replace(entry, ResponseWaiter::Received(buf));
+                    let old_entry = mem::replace(entry, ResponseWaiter::Received(next_packet));
                     if let ResponseWaiter::Waiting(waker) = old_entry {
                         waker.wake();
                     }
                 } else {
                     warn!("response for {:?} we did not send, dropping", header.label());
                 }
-                buf = rest;
                 // Note: we drop any TxLabel response we are not waiting for
             }
         }
@@ -1130,7 +1125,7 @@ impl PeerInner {
     }
 
     fn send_signal(&self, data: &[u8]) -> Result<()> {
-        let _ = self.signaling.as_ref().write(data).map_err(|x| Error::PeerWrite(x))?;
+        let _ = self.signaling.write(data).map_err(|x| Error::PeerWrite(x))?;
         Ok(())
     }
 }

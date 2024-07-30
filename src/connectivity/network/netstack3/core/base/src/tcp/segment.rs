@@ -4,13 +4,18 @@
 
 //! The definition of a TCP segment.
 
+use crate::alloc::borrow::ToOwned;
+use core::borrow::Borrow;
 use core::convert::TryFrom as _;
 use core::num::{NonZeroU16, TryFromIntError};
 use core::ops::Range;
 
 use log::info;
+use net_types::ip::IpAddress;
+use packet::records::options::OptionSequenceBuilder;
+use packet::InnerSerializer;
 use packet_formats::tcp::options::TcpOption;
-use packet_formats::tcp::TcpSegment;
+use packet_formats::tcp::{TcpSegment, TcpSegmentBuilder, TcpSegmentBuilderWithOptions};
 use thiserror::Error;
 
 use super::base::{Control, Mss, SendPayload};
@@ -18,15 +23,27 @@ use super::seqnum::{SeqNum, UnscaledWindowSize, WindowScale, WindowSize};
 
 /// A TCP segment.
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub struct Segment<P: Payload> {
+pub struct Segment<P> {
+    /// The non-payload information of the segment.
+    pub header: SegmentHeader,
+    /// The data carried by the segment.
+    ///
+    /// It is guaranteed that data.len() plus the length of the control flag
+    /// (SYN or FIN) is <= MAX_PAYLOAD_AND_CONTROL_LEN
+    pub data: P,
+}
+
+/// All non-data portions of a TCP segment.
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub struct SegmentHeader {
     /// The sequence number of the segment.
     pub seq: SeqNum,
     /// The acknowledge number of the segment. [`None`] if not present.
     pub ack: Option<SeqNum>,
     /// The advertised window size.
     pub wnd: UnscaledWindowSize,
-    /// The carried data and its control flag.
-    pub contents: Contents<P>,
+    /// The control flag of the segment.
+    pub control: Option<Control>,
     /// Options carried by this segment.
     pub options: Options,
 }
@@ -87,40 +104,6 @@ pub const MAX_PAYLOAD_AND_CONTROL_LEN: usize = 1 << 31;
 // The following `as` is sound because it is representable by `u32`.
 const MAX_PAYLOAD_AND_CONTROL_LEN_U32: u32 = MAX_PAYLOAD_AND_CONTROL_LEN as u32;
 
-/// The contents of a TCP segment that takes up some sequence number space.
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub struct Contents<P: Payload> {
-    /// The control flag of the segment.
-    pub control: Option<Control>,
-    /// The data carried by the segment; it is guaranteed that
-    /// `data.len() + control_len <= MAX_PAYLOAD_AND_CONTROL_LEN`.
-    pub data: P,
-}
-
-impl<P: Payload> Contents<P> {
-    /// Returns the length of the segment in sequence number space.
-    ///
-    /// Per RFC 793 (https://tools.ietf.org/html/rfc793#page-25):
-    ///   SEG.LEN = the number of octets occupied by the data in the segment
-    ///   (counting SYN and FIN)
-    pub fn len(&self) -> u32 {
-        let Self { data, control } = self;
-        // The following unwrap and addition are fine because:
-        // - `u32::from(has_control_len)` is 0 or 1.
-        // - `self.data.len() <= 2^31`.
-        let has_control_len = control.map(Control::has_sequence_no).unwrap_or(false);
-        u32::try_from(data.len()).unwrap() + u32::from(has_control_len)
-    }
-
-    pub fn control(&self) -> Option<Control> {
-        self.control
-    }
-
-    pub fn data(&self) -> &P {
-        &self.data
-    }
-}
-
 impl<P: Payload> Segment<P> {
     /// Creates a new segment with data and options.
     ///
@@ -139,7 +122,7 @@ impl<P: Payload> Segment<P> {
         let discarded_len =
             data.len().saturating_sub(MAX_PAYLOAD_AND_CONTROL_LEN - usize::from(has_control_len));
 
-        let contents = if discarded_len > 0 {
+        let (control, data) = if discarded_len > 0 {
             // If we have to truncate the segment, the FIN flag must be removed
             // because it is logically the last octet of the segment.
             let (control, control_len) = if control == Some(Control::FIN) {
@@ -149,12 +132,15 @@ impl<P: Payload> Segment<P> {
             };
             // The following slice will not panic because `discarded_len > 0`,
             // thus `data.len() > MAX_PAYLOAD_AND_CONTROL_LEN - control_len`.
-            Contents { control, data: data.slice(0..MAX_PAYLOAD_AND_CONTROL_LEN_U32 - control_len) }
+            (control, data.slice(0..MAX_PAYLOAD_AND_CONTROL_LEN_U32 - control_len))
         } else {
-            Contents { control, data }
+            (control, data)
         };
 
-        (Segment { seq, ack, wnd, contents, options }, discarded_len)
+        (
+            Segment { header: SegmentHeader { seq, ack, wnd, control, options }, data: data },
+            discarded_len,
+        )
     }
 
     /// Creates a new segment with data.
@@ -173,11 +159,20 @@ impl<P: Payload> Segment<P> {
 }
 
 impl<P: Payload> Segment<P> {
+    /// Returns the length of the segment in sequence number space.
+    ///
+    /// Per RFC 793 (https://tools.ietf.org/html/rfc793#page-25):
+    ///   SEG.LEN = the number of octets occupied by the data in the segment
+    ///   (counting SYN and FIN)
+    pub fn len(&self) -> u32 {
+        self.header.len(self.data.len())
+    }
+
     /// Returns the part of the incoming segment within the receive window.
     pub fn overlap(self, rnxt: SeqNum, rwnd: WindowSize) -> Option<Segment<P>> {
-        let Segment { seq, ack, wnd, contents, options } = self;
-        let len = contents.len();
-        let Contents { control, data } = contents;
+        let len = self.len();
+        let Segment { header: SegmentHeader { seq, ack, wnd, control, options }, data } = self;
+
         // RFC 793 (https://tools.ietf.org/html/rfc793#page-69):
         //   There are four cases for the acceptability test for an incoming
         //   segment:
@@ -252,12 +247,51 @@ impl<P: Payload> Segment<P> {
                 }
             };
             Segment {
-                seq: new_seq,
-                ack,
-                wnd,
-                contents: Contents { control: new_control, data: new_data },
-                options,
+                header: SegmentHeader { seq: new_seq, ack, wnd, control: new_control, options },
+                data: new_data,
             }
+        })
+    }
+}
+
+impl SegmentHeader {
+    /// Returns the length of the segment in sequence number space.
+    ///
+    /// Per RFC 793 (https://tools.ietf.org/html/rfc793#page-25):
+    ///   SEG.LEN = the number of octets occupied by the data in the segment
+    ///   (counting SYN and FIN)
+    pub fn len(&self, payload_len: usize) -> u32 {
+        // The following unwrap and addition are fine because:
+        // - `u32::from(has_control_len)` is 0 or 1.
+        // - `self.data.len() <= 2^31`.
+        let has_control_len = self.control.map(Control::has_sequence_no).unwrap_or(false);
+        u32::try_from(payload_len).unwrap() + u32::from(has_control_len)
+    }
+
+    /// Create a `SegmentHeader` from the provided builder and data length.  The
+    /// options will be set to their default values.
+    pub fn from_builder<A: IpAddress>(
+        builder: &TcpSegmentBuilder<A>,
+    ) -> Result<Self, MalformedFlags> {
+        Self::from_builder_options(builder, Options::default())
+    }
+
+    /// Create a `SegmentHeader` from the provided builder, options, and data length.
+    pub fn from_builder_options<A: IpAddress>(
+        builder: &TcpSegmentBuilder<A>,
+        options: Options,
+    ) -> Result<Self, MalformedFlags> {
+        Ok(SegmentHeader {
+            seq: SeqNum::new(builder.seq_num()),
+            ack: builder.ack_num().map(SeqNum::new),
+            control: Flags {
+                syn: builder.syn_set(),
+                fin: builder.fin_set(),
+                rst: builder.rst_set(),
+            }
+            .control()?,
+            wnd: UnscaledWindowSize::from(builder.window_size()),
+            options: options,
         })
     }
 }
@@ -314,11 +348,14 @@ impl Segment<()> {
     }
 }
 
-/// A TCP payload that operates around `u32` instead of `usize`.
-pub trait Payload: Sized {
+/// A TCP payload that only allows for getting the length of the payload.
+pub trait PayloadLen {
     /// Returns the length of the payload.
     fn len(&self) -> usize;
+}
 
+/// A TCP payload that operates around `u32` instead of `usize`.
+pub trait Payload: PayloadLen + Sized {
     /// Creates a slice of the payload, reducing it to only the bytes within
     /// `range`.
     ///
@@ -337,11 +374,13 @@ pub trait Payload: Sized {
     fn partial_copy(&self, offset: usize, dst: &mut [u8]);
 }
 
-impl Payload for &[u8] {
+impl PayloadLen for &[u8] {
     fn len(&self) -> usize {
         <[u8]>::len(self)
     }
+}
 
+impl Payload for &[u8] {
     fn slice(self, Range { start, end }: Range<u32>) -> Self {
         // The following `unwrap`s are ok because:
         // `usize::try_from(x)` fails when `x > usize::MAX`; given that
@@ -361,11 +400,13 @@ impl Payload for &[u8] {
     }
 }
 
-impl Payload for () {
+impl PayloadLen for () {
     fn len(&self) -> usize {
         0
     }
+}
 
+impl Payload for () {
     fn slice(self, Range { start, end }: Range<u32>) -> Self {
         if start != 0 {
             panic!("range start index {} out of range for slice of length 0", start);
@@ -386,15 +427,21 @@ impl Payload for () {
     }
 }
 
-impl From<Segment<()>> for Segment<&'static [u8]> {
-    fn from(
-        Segment { seq, ack, wnd, contents: Contents { control, data: () }, options }: Segment<()>,
-    ) -> Self {
-        Segment { seq, ack, wnd, contents: Contents { control, data: &[] }, options }
+impl<I: PayloadLen, B> PayloadLen for InnerSerializer<I, B> {
+    fn len(&self) -> usize {
+        PayloadLen::len(self.inner())
     }
 }
 
-#[derive(Error, Debug)]
+impl From<Segment<()>> for Segment<&'static [u8]> {
+    fn from(
+        Segment { header: SegmentHeader { seq, ack, wnd, control, options }, data: () }: Segment<()>,
+    ) -> Self {
+        Segment { header: SegmentHeader { seq, ack, wnd, control, options }, data: &[] }
+    }
+}
+
+#[derive(Error, Debug, PartialEq, Eq)]
 #[error("multiple mutually exclusive flags are set: syn: {syn}, fin: {fin}, rst: {rst}")]
 pub struct MalformedFlags {
     syn: bool,
@@ -402,22 +449,35 @@ pub struct MalformedFlags {
     rst: bool,
 }
 
+struct Flags {
+    syn: bool,
+    fin: bool,
+    rst: bool,
+}
+
+impl Flags {
+    fn control(&self) -> Result<Option<Control>, MalformedFlags> {
+        if usize::from(self.syn) + usize::from(self.fin) + usize::from(self.rst) > 1 {
+            return Err(MalformedFlags { syn: self.syn, fin: self.fin, rst: self.rst });
+        }
+
+        let syn = self.syn.then(|| Control::SYN);
+        let fin = self.fin.then(|| Control::FIN);
+        let rst = self.rst.then(|| Control::RST);
+
+        Ok(syn.or(fin).or(rst))
+    }
+}
+
 impl<'a> TryFrom<TcpSegment<&'a [u8]>> for Segment<&'a [u8]> {
     type Error = MalformedFlags;
 
     fn try_from(from: TcpSegment<&'a [u8]>) -> Result<Self, Self::Error> {
-        if usize::from(from.syn()) + usize::from(from.fin()) + usize::from(from.rst()) > 1 {
-            return Err(MalformedFlags { syn: from.syn(), fin: from.fin(), rst: from.rst() });
-        }
-        let syn = from.syn().then(|| Control::SYN);
-        let fin = from.fin().then(|| Control::FIN);
-        let rst = from.rst().then(|| Control::RST);
-        let control = syn.or(fin).or(rst);
         let options = Options::from_iter(from.iter_options());
         let (to, discarded) = Segment::with_data_options(
             from.seq_num().into(),
             from.ack_num().map(Into::into),
-            control,
+            Flags { syn: from.syn(), fin: from.fin(), rst: from.rst() }.control()?,
             UnscaledWindowSize::from(from.window_size()),
             from.into_body(),
             options,
@@ -429,15 +489,42 @@ impl<'a> TryFrom<TcpSegment<&'a [u8]>> for Segment<&'a [u8]> {
 
 impl From<Segment<()>> for Segment<SendPayload<'static>> {
     fn from(
-        Segment { seq, ack, wnd, contents: Contents { control, data: () }, options }: Segment<()>,
+        Segment { header: SegmentHeader { seq, ack, wnd, control, options }, data: () }: Segment<()>,
     ) -> Self {
         Segment {
-            seq,
-            ack,
-            wnd,
-            contents: Contents { control, data: SendPayload::Contiguous(&[]) },
-            options,
+            header: SegmentHeader { seq, ack, wnd, control, options },
+            data: SendPayload::Contiguous(&[]),
         }
+    }
+}
+
+impl<A> TryFrom<&TcpSegmentBuilder<A>> for SegmentHeader
+where
+    A: IpAddress,
+{
+    type Error = MalformedFlags;
+
+    fn try_from(from: &TcpSegmentBuilder<A>) -> Result<Self, Self::Error> {
+        SegmentHeader::from_builder(from)
+    }
+}
+
+impl<'a, A, I> TryFrom<&TcpSegmentBuilderWithOptions<A, OptionSequenceBuilder<TcpOption<'a>, I>>>
+    for SegmentHeader
+where
+    A: IpAddress,
+    I: Iterator + Clone,
+    I::Item: Borrow<TcpOption<'a>>,
+{
+    type Error = MalformedFlags;
+
+    fn try_from(
+        from: &TcpSegmentBuilderWithOptions<A, OptionSequenceBuilder<TcpOption<'a>, I>>,
+    ) -> Result<Self, Self::Error> {
+        Self::from_builder_options(
+            from.prefix_builder(),
+            Options::from_iter(from.iter_options().map(|option| option.borrow().to_owned())),
+        )
     }
 }
 
@@ -498,6 +585,12 @@ mod testutils {
 
 #[cfg(test)]
 mod test {
+    use assert_matches::assert_matches;
+    use const_unwrap::const_unwrap_option;
+    use ip_test_macro::ip_test;
+    use net_declare::{net_ip_v4, net_ip_v6};
+    use net_types::ip::{Ipv4, Ipv6};
+    use packet_formats::ip::IpExt;
     use test_case::test_case;
 
     use super::*;
@@ -519,7 +612,7 @@ mod test {
             data,
         );
         assert_eq!(truncated, 0);
-        (seg.contents.len(), seg.contents.data)
+        (seg.len(), seg.data)
     }
 
     #[test_case(&[1, 2, 3, 4, 5][..], 0..4 => [1, 2, 3, 4])]
@@ -540,11 +633,13 @@ mod test {
         }
     }
 
-    impl Payload for TestPayload {
+    impl PayloadLen for TestPayload {
         fn len(&self) -> usize {
             self.0.len()
         }
+    }
 
+    impl Payload for TestPayload {
         fn slice(self, range: Range<u32>) -> Self {
             let Self(this) = self;
             assert!(range.start >= this.start && range.end <= this.end);
@@ -594,7 +689,7 @@ mod test {
             UnscaledWindowSize::from(0),
             TestPayload::new(len),
         );
-        (seg.contents.data.len(), seg.contents.control, truncated)
+        (seg.data.len(), seg.header.control, truncated)
     }
 
     struct OverlapTestArgs {
@@ -798,13 +893,168 @@ mod test {
         );
         assert_eq!(discarded, 0);
         seg.overlap(SeqNum::new(rcv_nxt), WindowSize::new(rcv_wnd).unwrap()).map(
-            |Segment {
-                 seq,
-                 ack: _,
-                 wnd: _,
-                 contents: Contents { control, data: TestPayload(range) },
-                 options: _,
-             }| { (seq, control, range) },
+            |Segment { header: SegmentHeader { seq, control, .. }, data: TestPayload(range) }| {
+                (seq, control, range)
+            },
         )
+    }
+
+    pub trait TestIpExt: IpExt {
+        const SRC_IP: Self::Addr;
+        const DST_IP: Self::Addr;
+    }
+
+    impl TestIpExt for Ipv4 {
+        const SRC_IP: Self::Addr = net_ip_v4!("192.0.2.1");
+        const DST_IP: Self::Addr = net_ip_v4!("192.0.2.2");
+    }
+
+    impl TestIpExt for Ipv6 {
+        const SRC_IP: Self::Addr = net_ip_v6!("2001:db8::1");
+        const DST_IP: Self::Addr = net_ip_v6!("2001:db8::2");
+    }
+
+    const SRC_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(1234));
+    const DST_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(9876));
+
+    #[ip_test(I)]
+    fn from_segment_builder<I: TestIpExt>() {
+        let mut builder =
+            TcpSegmentBuilder::new(I::SRC_IP, I::DST_IP, SRC_PORT, DST_PORT, 1, Some(2), 3);
+        builder.syn(true);
+
+        let converted_header =
+            SegmentHeader::try_from(&builder).expect("failed to convert serializer");
+
+        let expected_header = SegmentHeader {
+            seq: SeqNum::new(1),
+            ack: Some(SeqNum::new(2)),
+            wnd: UnscaledWindowSize::from(3u16),
+            control: Some(Control::SYN),
+            options: Options { mss: None, window_scale: None },
+        };
+
+        assert_eq!(converted_header, expected_header);
+    }
+
+    #[ip_test(I)]
+    fn from_segment_builder_failure<I: TestIpExt>() {
+        let mut builder =
+            TcpSegmentBuilder::new(I::SRC_IP, I::DST_IP, SRC_PORT, DST_PORT, 1, Some(2), 3);
+        builder.syn(true);
+        builder.fin(true);
+
+        assert_matches!(
+            SegmentHeader::try_from(&builder),
+            Err(MalformedFlags { syn: true, fin: true, rst: false })
+        );
+    }
+
+    #[ip_test(I)]
+    fn from_segment_builder_with_options<I: TestIpExt>() {
+        let mut builder =
+            TcpSegmentBuilder::new(I::SRC_IP, I::DST_IP, SRC_PORT, DST_PORT, 1, Some(2), 3);
+        builder.syn(true);
+
+        let builder = TcpSegmentBuilderWithOptions::new(
+            builder,
+            [TcpOption::Mss(1024), TcpOption::WindowScale(10)],
+        )
+        .expect("failed to create tcp segment builder");
+
+        let converted_header =
+            SegmentHeader::try_from(&builder).expect("failed to convert serializer");
+
+        let expected_header = SegmentHeader {
+            seq: SeqNum::new(1),
+            ack: Some(SeqNum::new(2)),
+            wnd: UnscaledWindowSize::from(3u16),
+            control: Some(Control::SYN),
+            options: Options {
+                mss: Some(Mss(NonZeroU16::new(1024).unwrap())),
+                window_scale: Some(WindowScale::new(10).unwrap()),
+            },
+        };
+
+        assert_eq!(converted_header, expected_header);
+    }
+
+    #[ip_test(I)]
+    fn from_segment_builder_with_options_failure<I: TestIpExt>() {
+        let mut builder =
+            TcpSegmentBuilder::new(I::SRC_IP, I::DST_IP, SRC_PORT, DST_PORT, 1, Some(2), 3);
+        builder.syn(true);
+        builder.fin(true);
+
+        let builder = TcpSegmentBuilderWithOptions::new(
+            builder,
+            [TcpOption::Mss(1024), TcpOption::WindowScale(10)],
+        )
+        .expect("failed to create tcp segment builder");
+
+        assert_matches!(
+            SegmentHeader::try_from(&builder),
+            Err(MalformedFlags { syn: true, fin: true, rst: false })
+        );
+    }
+
+    #[test_case(Flags {
+            syn: false,
+            fin: false,
+            rst: false,
+        } => Ok(None))]
+    #[test_case(Flags {
+            syn: true,
+            fin: false,
+            rst: false,
+        } => Ok(Some(Control::SYN)))]
+    #[test_case(Flags {
+            syn: false,
+            fin: true,
+            rst: false,
+        } => Ok(Some(Control::FIN)))]
+    #[test_case(Flags {
+            syn: false,
+            fin: false,
+            rst: true,
+        } => Ok(Some(Control::RST)))]
+    #[test_case(Flags {
+            syn: true,
+            fin: true,
+            rst: false,
+        } => Err(MalformedFlags {
+            syn: true,
+            fin: true,
+            rst: false,
+        }))]
+    #[test_case(Flags {
+            syn: true,
+            fin: false,
+            rst: true,
+        } => Err(MalformedFlags {
+            syn: true,
+            fin: false,
+            rst: true,
+        }))]
+    #[test_case(Flags {
+            syn: false,
+            fin: true,
+            rst: true,
+        } => Err(MalformedFlags {
+            syn: false,
+            fin: true,
+            rst: true,
+        }))]
+    #[test_case(Flags {
+            syn: true,
+            fin: true,
+            rst: true,
+        } => Err(MalformedFlags {
+            syn: true,
+            fin: true,
+            rst: true,
+        }))]
+    fn flags_to_control(input: Flags) -> Result<Option<Control>, MalformedFlags> {
+        input.control()
     }
 }

@@ -381,11 +381,22 @@ func fuchsiaLogChecks() []FailureModeCheck {
 			// LINT.IfChange(blob_header_timeout)
 			String: "timed out waiting for http response header while downloading blob",
 			// LINT.ThenChange(/src/sys/pkg/bin/pkg-resolver/src/cache.rs:blob_header_timeout)
-			Type: syslogType,
+			Type:               syslogType,
+			SkipAllPassedTests: true,
 		},
 		&stringInLogCheck{
 			String: "Got no package for fuchsia-pkg://",
 			Type:   swarmingOutputType,
+		},
+		&stringInLogCheck{
+			String: "Exceeded safe temperature range",
+			Type:   syslogType,
+		},
+		&stringInLogCheck{
+			// LINT.IfChange(blob_write_failure)
+			String: "failed to write blob",
+			// LINT.ThenChange(/src/storage/fxfs/platform/src/fuchsia/fxblob/writer.rs:blob_write_failure)
+			Type: serialLogType,
 		},
 	}
 
@@ -667,6 +678,15 @@ func infraToolLogChecks() []FailureModeCheck {
 			// on a retry, so we should only check for this failure if ffx fails to
 			// connect after all retries and returns a fatal error.
 			SkipPassedTask:  true,
+			AttributeToTest: true,
+			AddTag:          true,
+		},
+		// For https://fxbug.dev/354707902.
+		&stringInLogCheck{
+			String:          ffxutilconstants.UnableToResolveAddressMsg,
+			Type:            swarmingOutputType,
+			SkipPassedTest:  true,
+			IgnoreFlakes:    true,
 			AttributeToTest: true,
 			AddTag:          true,
 		},

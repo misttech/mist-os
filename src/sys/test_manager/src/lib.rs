@@ -4,6 +4,7 @@
 
 mod above_root_capabilities;
 pub mod constants;
+mod debug_agent;
 mod debug_data_processor;
 mod debug_data_server;
 mod diagnostics;

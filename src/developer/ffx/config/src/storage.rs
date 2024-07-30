@@ -4,6 +4,7 @@
 
 use crate::api::query::SelectMode;
 use crate::api::value::merge_map;
+use crate::api::ConfigError;
 use crate::environment::Environment;
 use crate::nested::{nested_get, nested_remove, nested_set};
 use crate::ConfigLevel;
@@ -199,7 +200,7 @@ impl ConfigFile {
 
     pub fn remove(&mut self, key: &str) -> Result<()> {
         let key_vec: Vec<&str> = key.split('.').collect();
-        let key = *key_vec.get(0).context("Can't remove empty key")?;
+        let key = *key_vec.get(0).context(ConfigError::KeyNotFound)?;
         self.dirty = true;
         nested_remove(&mut self.contents, key, &key_vec[1..])
     }
@@ -252,8 +253,9 @@ impl Config {
     }
 
     pub(crate) fn from_env(env: &Environment) -> Result<Self> {
-        let user_conf = env.get_user();
-        let build_conf = env.get_build();
+        let user_conf: Option<PathBuf> = env.get_user();
+        let build_conf: Option<PathBuf> = env.get_build();
+        let global_conf: Option<PathBuf> = env.get_global();
         let is_isolated = env.context().env_kind().is_isolated();
         if !is_isolated {
             tracing::debug!("Non isolated context {:?}", env.context().env_kind());
@@ -262,7 +264,7 @@ impl Config {
             if is_isolated { ConfigFile::from_nonflushing_file } else { ConfigFile::from_file };
         let user = user_conf.as_deref().map(from_file).transpose()?;
         let build = build_conf.as_deref().map(from_file).transpose()?;
-        let global = env.get_global().map(from_file).transpose()?;
+        let global = global_conf.as_deref().map(from_file).transpose()?;
 
         Ok(Self::new(
             global,

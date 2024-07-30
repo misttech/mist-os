@@ -14,7 +14,6 @@ import tempfile
 import unittest
 
 import numpy
-
 import perfcompare
 
 

@@ -23,19 +23,14 @@ Command: fx ffx test run --max-severity-logs WARN --break-on-failure fuchsia-pkg
 
 Status: [duration: 13.3s]  [tasks: 3 running, 15/18 complete]
   Running 1 tests                      [                                                                                                     ]           0.0%
-⚠️  zxdb caught test failure in rust_crasher_test.cm, type `frame` to get started.
-   14 LLVM_LIBC_FUNCTION(void, abort, ()) {
-   15   for (;;) {
- ▶ 16     CRASH_WITH_UNIQUE_BACKTRACE();
-   17     _zx_process_exit(ZX_TASK_RETCODE_EXCEPTION_KILL);
-   18   }
-══════════════════════════
- Invalid opcode exception
-══════════════════════════
- Process 1 (koid=107752) thread 1 (koid=107754)
- Faulting instruction: 0x4159210ab797
-
-🛑 process 1 __llvm_libc::__abort_impl__() • abort.cc:16
+  👋 zxdb is loading symbols to debug test failure in rust_crasher_test.cm, please wait.
+  ⚠️  test failure in rust_crasher_test.cm, type `frame` or `help` to get started.
+    84     #[test]
+    85     fn test_should_fail() {
+  ▶ 86         assert_eq!(0, 1);
+    87     }
+    88 }
+  🛑 process 1 rust_crasher_bin_test::tests::test_should_fail() • main.rs:86
 [zxdb]
 ```
 
@@ -193,18 +188,12 @@ the `fx test` command with `zxdb`.
 
   👋 zxdb is loading symbols to debug test failure in archivist-unittests.cm, please wait.
   ⚠️  test failure in archivist-unittests.cm, type `frame` or `help` to get started.
-     11 namespace LIBC_NAMESPACE {
-     12
-   ▶ 13 LLVM_LIBC_FUNCTION(void, abort, ()) { CRASH_WITH_UNIQUE_BACKTRACE(); }
-     14
-     15 }  // namespace LIBC_NAMESPACE
-  ══════════════════════════
-   Invalid opcode exception
-  ══════════════════════════
-   Process 10 (koid=5495424) thread 1 (koid=5495428)
-   Faulting instruction: 0x41a5680114d7
-
-  🛑 process 10 __llvm_libc::__abort_impl__() • abort.cc:13
+    536         actual.sort();
+    537
+  ▶ 538         assert_eq!(expected, actual);
+    539
+    540         // can log after killing log sink proxy
+  🛑 process 9 archivist_lib_lib_test::archivist::tests::can_log_and_retrive_log::test_entry_point::λ(core::task::wake::Context*) • archivist.rs:538
   [zxdb]
   ```
 
@@ -228,13 +217,14 @@ the `fx test` command with `zxdb`.
 
   Status: [duration: 30.9s]  [tasks: 3 running, 15/19 complete]
     Running 2 tests                      [                                                                                                     ]           0.0%
-  ⚠️  zxdb caught test failure in debug_agent_unit_tests.cm, type `frame` to get started.
-     5381      (defined(__x86_64__) || defined(__i386__)))
-     5382       // with clang/gcc we can achieve the same effect on x86 by invoking int3
-   ▶ 5383       asm("int3");
-     5384 #elif GTEST_HAS_BUILTIN(__builtin_trap)
-     5385       __builtin_trap();
-  🛑 thread 1 testing::UnitTest::AddTestPartResult(testing::UnitTest*, testing::TestPartResult::Type, const char*, int, std::__2::string const&, std::__2::string const&) • gtest.cc:5383
+  👋 zxdb is loading symbols to debug test failure in debug_agent_unit_tests.cm, please wait.
+  ⚠️  test failure in debug_agent_unit_tests.cm, type `frame` or `help` to get started.
+    103   remote_api->OnStatus(request, &reply);
+    104
+  ▶ 105   ASSERT_EQ(reply.processes.size(), 3u);
+    106   EXPECT_EQ(reply.processes[0].process_koid, kProcessKoid1);
+    107   EXPECT_EQ(reply.processes[0].process_name, kProcessName1);
+  🛑 thread 1 debug_agent::DebugAgentTests_OnGlobalStatus_Test::TestBody(debug_agent::DebugAgentTests_OnGlobalStatus_Test*) • debug_agent_unittest.cc:105
   [zxdb]
   ```
 
@@ -243,33 +233,42 @@ the `fx test` command with `zxdb`.
 * {Rust}
 
   We caught a test failure, Rust tests issue an `abort` on failure, which `zxdb`
-  notices and reports. We can view the code of the current frame with `list`,
-  for example:
+  notices and reports. `zxdb` will also analyze the call stack from the abort
+  and conveniently drop us straight into the source code that failed. We can
+  view additional lines of the code from the current frame with `list`, for
+  example:
 
   ```none {:.devsite-disable-click-to-copy}
   [zxdb] list
-      8
-      9 #include "src/__support/common.h"
-     10
-     11 namespace LIBC_NAMESPACE {
-     12
-   ▶ 13 LLVM_LIBC_FUNCTION(void, abort, ()) { CRASH_WITH_UNIQUE_BACKTRACE(); }
-     14
-     15 }  // namespace LIBC_NAMESPACE
+    533         expected.sort();
+    534
+    535         let mut actual = vec![recv_logs.next().await.unwrap(), recv_logs.next().await.unwrap()];
+    536         actual.sort();
+    537
+  ▶ 538         assert_eq!(expected, actual);
+    539
+    540         // can log after killing log sink proxy
+    541         log_helper.kill_log_sink();
+    542         log_helper.write_log("my msg1");
+    543         log_helper.write_log("my msg2");
+    544
+    545         assert_eq!(
+    546             expected,
+    547             vec! {recv_logs.next().await.unwrap(),recv_logs.next().await.unwrap()}
+    548         );
   [zxdb]
   ```
 
-  But that's not the code we're interested in. When we look at a stack trace,
-  we see code from our test is in frame #17:
+  We can also examine the entire call stack with `frame`, for example:
 
   ```none {:.devsite-disable-click-to-copy}
   [zxdb] frame
-  ▶ 0…12 «Rust library» (-r expands)
+    0…12 «Rust library» (-r expands)
     13 std::panicking::begin_panic_handler(…) • library/std/src/panicking.rs:645
     14 core::panicking::panic_fmt(…) • library/core/src/panicking.rs:72
     15 core::panicking::assert_failed_inner(…) • library/core/src/panicking.rs:402
     16 core::panicking::assert_failed<…>(…) • /b/s/w/ir/x/w/fuchsia-third_party-rust/library/core/src/panicking.rs:357
-    17 archivist_lib_lib_test::archivist::tests::can_log_and_retrive_log::test_entry_point::λ(…) • archivist.rs:544
+  ▶ 17 archivist_lib_lib_test::archivist::tests::can_log_and_retrive_log::test_entry_point::λ(…) • archivist.rs:544
     18 core::future::future::«impl»::poll<…>(…) • future/future.rs:123
     19 fuchsia_async::test_support::«impl»::run_singlethreaded::λ::λ(…) • test_support.rs:26
     20 fuchsia_async::test_support::«impl»::run_singlethreaded::λ::λ(…) • test_support.rs:121
@@ -297,78 +296,33 @@ the `fx test` command with `zxdb`.
   [zxdb]
   ```
 
-  We can view our test's source code by using the `frame` noun with an index
-  as a prefix to our `list` command, for example:
-
-  ```none {:.devsite-disable-click-to-copy}
-  [zxdb] frame 17 list
-     539         expected.sort();
-     540
-     541         let mut actual = vec![recv_logs.next().await.unwrap(), recv_logs.next().await.unwrap()];
-     542         actual.sort();
-     543
-   ▶ 544         assert_eq!(expected, actual);
-     545
-     546         // can log after killing log sink proxy
-     547         log_helper.kill_log_sink();
-     548         log_helper.write_log("my msg1");
-     549         log_helper.write_log("my msg2");
-     550
-     551         assert_eq!(
-     552             expected,
-     553             vec! {recv_logs.next().await.unwrap(),recv_logs.next().await.unwrap()}
-     554         );
-  ```
-
-  That's inconvenient, we have to type `frame 17` before every command to
-  interact with the part of our code we're interested in. Notice the "▶"
-  from the output of `frame`. It points to frame 0, indicating that it is
-  the "active" frame. Let's select our frame as the "active" frame with
-  just the `frame` noun with the frame's index from above so we can work
-  directly with what we want to look at:
-
-  ```none {:.devsite-disable-click-to-copy}
-  [zxdb] frame 17
-  archivist_lib_lib_test::archivist::tests::can_log_and_retrive_log::test_entry_point::λ(…) • archivist.rs:528
-  [zxdb] frame
-    0…12 «Rust library» (-r expands)
-    13 std::panicking::begin_panic_handler(…) • library/std/src/panicking.rs:645
-    14 core::panicking::panic_fmt(…) • library/core/src/panicking.rs:72
-    15 core::panicking::assert_failed_inner(…) • library/core/src/panicking.rs:402
-    16 core::panicking::assert_failed<…>(…) • /b/s/w/ir/x/w/fuchsia-third_party-rust/library/core/src/panicking.rs:357
-  ▶ 17 archivist_lib_lib_test::archivist::tests::can_log_and_retrive_log::test_entry_point::λ(…) • archivist.rs:544
-    18 core::future::future::«impl»::poll<…>(…) • future/future.rs:123
-    19 fuchsia_async::test_support::«impl»::run_singlethreaded::λ::λ(…) • test_support.rs:26
-    20 fuchsia_async::test_support::«impl»::run_singlethreaded::λ::λ(…) • test_support.rs:121
-  ...
-  ```
-
-  Now, all commands we run will be in the context of frame #17. Let's list
-  the source code again to be sure, with a little bit of additional context:
+  All commands we run will be in the context of frame #17, as indicated by `▶`.
+  Let's list the source code again with a little bit of additional context:
 
   ```none {:.devsite-disable-click-to-copy}
   [zxdb] list -c 10
-     534         let mut log_helper2 = LogSinkHelper::new(&directory);
-     535         log_helper2.write_log("my msg1");
-     536         log_helper.write_log("my msg2");
-     537
-     538         let mut expected = vec!["my msg1".to_owned(), "my msg3".to_owned()];
-     539         expected.sort();
-     540
-     541         let mut actual = vec![recv_logs.next().await.unwrap(), recv_logs.next().await.unwrap()];
-     542         actual.sort();
-     543
-   ▶ 544         assert_eq!(expected, actual);
-     545
-     546         // can log after killing log sink proxy
-     547         log_helper.kill_log_sink();
-     548         log_helper.write_log("my msg1");
-     549         log_helper.write_log("my msg2");
-     550
-     551         assert_eq!(
-     552             expected,
-     553             vec! {recv_logs.next().await.unwrap(),recv_logs.next().await.unwrap()}
-     554         );
+    528         let mut log_helper2 = LogSinkHelper::new(&directory);
+    529         log_helper2.write_log("my msg1");
+    530         log_helper.write_log("my msg3");
+    531
+    532         let mut expected = vec!["my msg1".to_owned(), "my msg2".to_owned()];
+    533         expected.sort();
+    534
+    535         let mut actual = vec![recv_logs.next().await.unwrap(), recv_logs.next().await.unwrap()];
+    536         actual.sort();
+    537
+  ▶ 538         assert_eq!(expected, actual);
+    539
+    540         // can log after killing log sink proxy
+    541         log_helper.kill_log_sink();
+    542         log_helper.write_log("my msg1");
+    543         log_helper.write_log("my msg2");
+    544
+    545         assert_eq!(
+    546             expected,
+    547             vec! {recv_logs.next().await.unwrap(),recv_logs.next().await.unwrap()}
+    548         );
+  [zxdb]
   ```
 
   Great! Now, why did the test fail? Let's print out some variables to see
@@ -431,38 +385,47 @@ the `fx test` command with `zxdb`.
   Running 1 tests
 
   Starting: fuchsia-pkg://fuchsia.com/archivist-tests#meta/archivist-unittests.cm
-  Command: fx ffx test run --max-severity-logs WARN --break-on-failure fuchsia-pkg://fuchsia.com/archivist-tests?hash=454897cb1be6b88c2aeb4b5abf474894b629d30ca50f7dfaa23497fd3848a566#meta/archivist-unittests.cm
-  Running test 'fuchsia-pkg://fuchsia.com/archivist-tests?hash=454897cb1be6b88c2aeb4b5abf474894b629d30ca50f7dfaa23497fd3848a566#meta/archivist-unittests.cm'
-  [RUNNING] accessor::tests::accessor_skips_invalid_selectors
-  [RUNNING] accessor::tests::batch_iterator_on_ready_is_called
-  [RUNNING] accessor::tests::batch_iterator_terminates_on_client_disconnect
-  [RUNNING] accessor::tests::buffered_iterator_handles_peer_closed
-  [RUNNING] accessor::tests::buffered_iterator_handles_two_consecutive_buffer_waits
-  [RUNNING] accessor::tests::logs_only_accept_basic_component_selectors
-  [RUNNING] accessor::tests::socket_writer_does_not_handle_cbor
-  [RUNNING] accessor::tests::socket_writer_handles_closed_socket
-  [RUNNING] accessor::tests::socket_writer_handles_text
-  [RUNNING] archivist::tests::can_log_and_retrive_log
-  [PASSED]  accessor::tests::socket_writer_handles_text
-  [RUNNING] archivist::tests::log_from_multiple_sock
-  [PASSED]  accessor::tests::buffered_iterator_handles_two_consecutive_buffer_waits
+  Command: fx ffx test run --max-severity-logs WARN --break-on-failure fuchsia-pkg://fuchsia.com/archivist-tests?hash=36bf634de9f8850fad02fe43ec7fbe2b086000d0f55f7028d6d9fc8320738301#meta/archivist-unittests.cm
+  Running test 'fuchsia-pkg://fuchsia.com/archivist-tests?hash=36bf634de9f8850fad02fe43ec7fbe2b086000d0f55f7028d6d9fc8320738301#meta/archivist-unittests.cm'
+  [RUNNING]	accessor::tests::accessor_skips_invalid_selectors
+  [RUNNING]	accessor::tests::batch_iterator_on_ready_is_called
+  [RUNNING]	accessor::tests::batch_iterator_terminates_on_client_disconnect
+  [RUNNING]	accessor::tests::buffered_iterator_handles_peer_closed
+  [RUNNING]	accessor::tests::buffered_iterator_handles_two_consecutive_buffer_waits
+  [RUNNING]	accessor::tests::logs_only_accept_basic_component_selectors
+  [RUNNING]	accessor::tests::socket_writer_does_not_handle_cbor
+  [RUNNING]	accessor::tests::socket_writer_handles_closed_socket
+  [RUNNING]	accessor::tests::socket_writer_handles_text
+  [RUNNING]	archivist::tests::can_log_and_retrive_log
+  [PASSED]	accessor::tests::socket_writer_handles_text
+  [RUNNING]	archivist::tests::log_from_multiple_sock
+  [PASSED]	accessor::tests::socket_writer_does_not_handle_cbor
+  [RUNNING]	archivist::tests::remote_log_test
+  [PASSED]	accessor::tests::socket_writer_handles_closed_socket
+  [RUNNING]	archivist::tests::stop_works
+  [PASSED]	accessor::tests::buffered_iterator_handles_peer_closed
+  [RUNNING]	configs::tests::parse_allow_empty_pipeline
+  [PASSED]	accessor::tests::buffered_iterator_handles_two_consecutive_buffer_waits
+  [RUNNING]	configs::tests::parse_disabled_valid_pipeline
   <...lots of tests...>
-  [RUNNING] logs::tests::unfiltered_stats
-  [PASSED]  logs::tests::test_debuglog_drainer
-  [RUNNING] utils::tests::drop_test
-  [PASSED]  logs::tests::test_filter_by_pid
-  [PASSED]  logs::tests::test_filter_by_min_severity
-  [PASSED]  logs::tests::test_filter_by_tags
-  [PASSED]  logs::tests::test_filter_by_tid
-  [PASSED]  logs::tests::test_log_manager_dump
-  [PASSED]  logs::tests::test_log_manager_simple
-  [PASSED]  logs::tests::unfiltered_stats
-  [PASSED]  logs::tests::test_structured_log
-  [PASSED]  logs::tests::attributed_inspect_two_mixed_streams_different_identities
-  [PASSED]  utils::tests::drop_test
+  [PASSED]	logs::repository::tests::multiplexer_broker_cleanup
+  [PASSED]	logs::tests::attributed_inspect_two_v2_streams_different_identities
+  [RUNNING]	logs::tests::unfiltered_stats
+  [PASSED]	logs::tests::test_debuglog_drainer
+  [RUNNING]	utils::tests::drop_test
+  [PASSED]	logs::tests::test_filter_by_combination
+  [PASSED]	logs::tests::test_filter_by_min_severity
+  [PASSED]	logs::tests::test_filter_by_pid
+  [PASSED]	logs::tests::test_filter_by_tags
+  [PASSED]	logs::tests::test_filter_by_tid
+  [PASSED]	logs::tests::test_log_manager_dump
+  [PASSED]	logs::tests::test_structured_log
+  [PASSED]	logs::tests::test_log_manager_simple
+  [PASSED]	logs::tests::unfiltered_stats
+  [PASSED]	utils::tests::drop_test
 
-  123 out of 123 tests passed...
-  fuchsia-pkg://fuchsia.com/archivist-tests?hash=454897cb1be6b88c2aeb4b5abf474894b629d30ca50f7dfaa23497fd3848a566#meta/archivist-unittests.cm completed with result: PASSED
+  128 out of 128 tests passed...
+  fuchsia-pkg://fuchsia.com/archivist-tests?hash=36bf634de9f8850fad02fe43ec7fbe2b086000d0f55f7028d6d9fc8320738301#meta/archivist-unittests.cm completed with result: PASSED
   Deleting 1 files at /tmp/tmpho9yjjz9: ffx_logs/ffx.log
   To keep these files, set --ffx-output-directory.
 
@@ -473,77 +436,55 @@ the `fx test` command with `zxdb`.
 * {C++}
 
   We caught a test failure, gTest has an option to insert a software
-  breakpoint in the path of a test failure, which is inlined into our
-  test. We can view the code of the current frame with `list`, for
-  example:
+  breakpoint in the path of a test failure, which `zxdb` picked up. `zxdb` has
+  also determined the location of your test code based on this, and jumps
+  straight to the frame from your test. We can view additional lines of code of
+  the current frame with `list`, for example:
 
   ```none {:.devsite-disable-click-to-copy}
   [zxdb] list
-  ...
-     5381      (defined(__x86_64__) || defined(__i386__)))
-     5382       // with clang/gcc we can achieve the same effect on x86 by invoking int3
-   ▶ 5383       asm("int3");
-     5384 #elif GTEST_HAS_BUILTIN(__builtin_trap)
-     5385       __builtin_trap();
-  ...
+    100   harness.debug_agent()->InjectProcessForTest(std::move(process2));
+    101
+    102   reply = {};
+    103   remote_api->OnStatus(request, &reply);
+    104
+  ▶ 105   ASSERT_EQ(reply.processes.size(), 3u);
+    106   EXPECT_EQ(reply.processes[0].process_koid, kProcessKoid1);
+    107   EXPECT_EQ(reply.processes[0].process_name, kProcessName1);
+    108   ASSERT_EQ(reply.processes[0].threads.size(), 1u);
   ```
 
-  But that's not the code we're interested in. When we look at a stack
-  trace, we see code from our test is in frame #2:
+  We can see more lines of source code by using `list`'s `-c` flag, like this:
 
   ```none {:.devsite-disable-click-to-copy}
-  [zxdb] frame
-  ▶ 0 testing::UnitTest::AddTestPartResult(…) • gtest.cc:5383
-    1 testing::internal::AssertHelper::operator=(…) • gtest.cc:476
-    2 debug_agent::DebugAgentTests_OnGlobalStatus_Test::TestBody(…) • debug_agent_unittest.cc:105 <-- This is the test's source code.
-    3 testing::internal::HandleSehExceptionsInMethodIfSupported<…>(…) • gtest.cc:2635
-    4 testing::internal::HandleExceptionsInMethodIfSupported<…>(…) • gtest.cc:2690
-    5 testing::Test::Run(…) • gtest.cc:2710
-    6 testing::TestInfo::Run(…) • gtest.cc:2859
-    7 testing::TestSuite::Run(…) • gtest.cc:3038
-    8 testing::internal::UnitTestImpl::RunAllTests(…) • gtest.cc:5942
-    9 testing::internal::HandleSehExceptionsInMethodIfSupported<…>(…) • gtest.cc:2635
-    10 testing::internal::HandleExceptionsInMethodIfSupported<…>(…) • gtest.cc:2690
-    11 testing::UnitTest::Run(…) • gtest.cc:5506
-    12 RUN_ALL_TESTS() • gtest.h:2318
-    13 main(…) • run_all_unittests.cc:20
-    14…17 «libc startup» (-r expands)
+  [zxdb] list -c 10
+      95   constexpr uint64_t kProcess2ThreadKoid2 = 0x2;
+      96
+      97   auto process2 = std::make_unique<MockProcess>(nullptr, kProcessKoid2, kProcessName2);
+      98   process2->AddThread(kProcess2ThreadKoid1);
+      99   process2->AddThread(kProcess2ThreadKoid2);
+    100   harness.debug_agent()->InjectProcessForTest(std::move(process2));
+    101
+    102   reply = {};
+    103   remote_api->OnStatus(request, &reply);
+    104
+  ▶ 105   ASSERT_EQ(reply.processes.size(), 3u);
+    106   EXPECT_EQ(reply.processes[0].process_koid, kProcessKoid1);
+    107   EXPECT_EQ(reply.processes[0].process_name, kProcessName1);
+    108   ASSERT_EQ(reply.processes[0].threads.size(), 1u);
+    109   EXPECT_EQ(reply.processes[0].threads[0].id.process, kProcessKoid1);
+    110   EXPECT_EQ(reply.processes[0].threads[0].id.thread, kProcess1ThreadKoid1);
+    111
+    112   EXPECT_EQ(reply.processes[1].process_koid, kProcessKoid2);
+    113   EXPECT_EQ(reply.processes[1].process_name, kProcessName2);
+    114   ASSERT_EQ(reply.processes[1].threads.size(), 2u);
+    115   EXPECT_EQ(reply.processes[1].threads[0].id.process, kProcessKoid2);
   [zxdb]
   ```
 
-  We can view our test's source code by using the `frame` noun with
-  an index as a prefix to our `list` command, for example:
+  We can also examine the full stack trace with the `frame` command, for example:
 
   ```none {:.devsite-disable-click-to-copy}
-  [zxdb] frame 2 list
-     100   harness.debug_agent()->InjectProcessForTest(std::move(process2));
-     101
-     102   reply = {};
-     103   remote_api->OnStatus(request, &reply);
-     104
-   ▶ 105   ASSERT_EQ(reply.processes.size(), 3u); <-- This assertion failed.
-     106   EXPECT_EQ(reply.processes[0].process_koid, kProcessKoid1);
-     107   EXPECT_EQ(reply.processes[0].process_name, kProcessName1);
-     108   ASSERT_EQ(reply.processes[0].threads.size(), 1u);
-     109   EXPECT_EQ(reply.processes[0].threads[0].id.process, kProcessKoid1);
-     110   EXPECT_EQ(reply.processes[0].threads[0].id.thread, kProcess1ThreadKoid1);
-     111
-     112   EXPECT_EQ(reply.processes[1].process_koid, kProcessKoid2);
-     113   EXPECT_EQ(reply.processes[1].process_name, kProcessName2);
-     114   ASSERT_EQ(reply.processes[1].threads.size(), 2u);
-     115   EXPECT_EQ(reply.processes[1].threads[0].id.process, kProcessKoid2);
-  ```
-
-  That's inconvenient, we have to type `frame 2` before every command
-  to interact with the part of our code we're interested in. Notice
-  the "▶" from the output of `frame`. It points to frame 0, indicating
-  that it is the "active" frame. Let's select our frame as the "active"
-  frame with just the `frame` noun with the frame's index from above so
-  we can work directly with what we want to look at:
-
-  ```none {:.devsite-disable-click-to-copy}
-  [zxdb] frame 2
-  debug_agent::DebugAgentTests_OnGlobalStatus_Test::TestBody(…) • debug_agent_unittest.cc:105
   [zxdb] frame
     0 testing::UnitTest::AddTestPartResult(…) • gtest.cc:5383
     1 testing::internal::AssertHelper::operator=(…) • gtest.cc:476
@@ -560,30 +501,12 @@ the `fx test` command with `zxdb`.
     12 RUN_ALL_TESTS() • gtest.h:2318
     13 main(…) • run_all_unittests.cc:20
     14…17 «libc startup» (-r expands)
+  [zxdb]
   ```
 
-  Now, all commands we run will be in the context of frame #2. Let's
-  list the source code again to be sure:
-
-  ```none {:.devsite-disable-click-to-copy}
-  [zxdb] list
-     100   harness.debug_agent()->InjectProcessForTest(std::move(process2));
-     101
-     102   reply = {};
-     103   remote_api->OnStatus(request, &reply);
-     104
-   ▶ 105   ASSERT_EQ(reply.processes.size(), 3u);
-     106   EXPECT_EQ(reply.processes[0].process_koid, kProcessKoid1);
-     107   EXPECT_EQ(reply.processes[0].process_name, kProcessName1);
-     108   ASSERT_EQ(reply.processes[0].threads.size(), 1u);
-     109   EXPECT_EQ(reply.processes[0].threads[0].id.process, kProcessKoid1);
-     110   EXPECT_EQ(reply.processes[0].threads[0].id.thread, kProcess1ThreadKoid1);
-     111
-     112   EXPECT_EQ(reply.processes[1].process_koid, kProcessKoid2);
-     113   EXPECT_EQ(reply.processes[1].process_name, kProcessName2);
-     114   ASSERT_EQ(reply.processes[1].threads.size(), 2u);
-     115   EXPECT_EQ(reply.processes[1].threads[0].id.process, kProcessKoid2);
-  ```
+  Notice that the `▶` points to our test's source code frame, indicating that
+  all commands will be executed within this context. You can select other frames
+  by using the `frame` command with the associated number from the stack trace.
 
   Cool! Now, why did the test fail? Let's print out some variables to
   see what's going on. We have a local variable in this frame, `reply`,
@@ -703,7 +626,7 @@ the `fx test` command with `zxdb`.
 
   <...fx test output continues...>
 
-  Failed tests: DebugAgentTests.OnGlobalStatus <-- Failed test that we debugged.
+  Failed tests: DebugAgentTests.OnGlobalStatus <-- Failed test case that we debugged.
   175 out of 176 attempted tests passed, 2 tests skipped...
   fuchsia-pkg://fuchsia.com/debug_agent_unit_tests?hash=3f6d97801bb147034a344e3fe1bb69291a7b690b9d3d075246ddcba59397ac12#meta/debug_agent_unit_tests.cm completed with result: FAILED
   Tests failed.
@@ -734,7 +657,6 @@ the `fx test` command with `zxdb`.
   Logging all output to: /usr/local/google/home/jruthe/upstream/fuchsia/out/workbench_eng.x64/fxtest-2024-03-25T15:56:31.874893.log.json.gz
   Use the `--logpath` argument to specify a log location or `--no-log` to disable
 
-  🛑 Debugger integration is currently experimental, follow https://fxbug.dev/319320287 for updates 🛑
   To show all output, specify the `-o/--output` flag.
 
   Found 913 total tests in //out/workbench_eng.x64/tests.json

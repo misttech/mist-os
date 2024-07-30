@@ -11,7 +11,6 @@
 #include <zircon/rights.h>
 
 #include <fbl/alloc_checker.h>
-#include <fbl/auto_lock.h>
 #include <object/handle.h>
 #include <object/process_dispatcher.h>
 

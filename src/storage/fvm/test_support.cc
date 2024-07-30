@@ -106,7 +106,8 @@ std::unique_ptr<DeviceRef> DeviceRef::Create(const fbl::unique_fd& devfs_root,
 }
 
 std::unique_ptr<RamdiskRef> RamdiskRef::Create(const fbl::unique_fd& devfs_root,
-                                               uint64_t block_size, uint64_t block_count) {
+                                               uint64_t block_size, uint64_t block_count,
+                                               std::optional<zx::vmo> vmo) {
   if (!devfs_root.is_valid()) {
     ADD_FAILURE("Bad devfs root handle.");
     return nullptr;
@@ -125,19 +126,46 @@ std::unique_ptr<RamdiskRef> RamdiskRef::Create(const fbl::unique_fd& devfs_root,
   }
 
   RamdiskClient* client;
-  if (zx_status_t status = ramdisk_create_at(devfs_root.get(), block_size, block_count, &client);
+  if (!vmo) {
+    zx::vmo created_vmo;
+    if (zx_status_t status = zx::vmo::create(block_size * block_count, 0, &created_vmo);
+        status != ZX_OK) {
+      ADD_FAILURE("Failed to create VMO. Reason: %s", zx_status_get_string(status));
+      return nullptr;
+    }
+    vmo = std::move(created_vmo);
+  }
+  static uint8_t type_guid[16] = {0};
+  zx::vmo duplicate_vmo;
+  if (zx_status_t status = vmo->duplicate(ZX_RIGHT_SAME_RIGHTS, &duplicate_vmo); status != ZX_OK) {
+    ADD_FAILURE("Failed to duplicate VMO. Reason: %s", zx_status_get_string(status));
+    return nullptr;
+  }
+  if (zx_status_t status =
+          ramdisk_create_at_from_vmo_with_params(devfs_root.get(), duplicate_vmo.release(),
+                                                 block_size, type_guid, sizeof(type_guid), &client);
       status != ZX_OK) {
     ADD_FAILURE("Failed to create ramdisk. Reason: %s", zx_status_get_string(status));
     return nullptr;
   }
   const char* path = ramdisk_get_path(client);
-  return std::make_unique<RamdiskRef>(devfs_root, path, client);
+  return std::make_unique<RamdiskRef>(devfs_root, block_size, path, *std::move(vmo), client);
 }
 
 RamdiskRef::~RamdiskRef() { ramdisk_destroy(ramdisk_client_); }
 
-zx_status_t RamdiskRef::Grow(uint64_t target_size) {
-  return ramdisk_grow(ramdisk_client_, target_size);
+zx::result<std::unique_ptr<RamdiskRef>> RamdiskRef::Clone(uint64_t target_size) {
+  zx::vmo vmo;
+  if (zx_status_t status = vmo_.create_child(ZX_VMO_CHILD_SNAPSHOT, 0, target_size, &vmo);
+      status != ZX_OK)
+    return zx::error(status);
+
+  auto cloned =
+      RamdiskRef::Create(devfs_root_fd(), block_size_, target_size / block_size_, std::move(vmo));
+  if (cloned)
+    return zx::ok(std::move(cloned));
+  else
+    return zx::error(ZX_ERR_INTERNAL);
 }
 
 void BlockDeviceAdapter::WriteAt(const fbl::Array<uint8_t>& data, uint64_t offset) {
@@ -222,14 +250,13 @@ std::unique_ptr<VPartitionAdapter> VPartitionAdapter::Create(const fbl::unique_f
   return std::make_unique<VPartitionAdapter>(devfs_root, relative_path, name, guid, type);
 }
 
-VPartitionAdapter::~VPartitionAdapter() {
-  ASSERT_OK(
-      fs_management::DestroyPartitionWithDevfs(devfs_root_.get(),
-                                               {
-                                                   .type_guids = {uuid::Uuid(type_.data())},
-                                                   .instance_guids = {uuid::Uuid(guid_.data())},
-                                               },
-                                               false));
+zx::result<> VPartitionAdapter::Destroy() {
+  return fs_management::DestroyPartitionWithDevfs(devfs_root_.get(),
+                                                  {
+                                                      .type_guids = {uuid::Uuid(type_.data())},
+                                                      .instance_guids = {uuid::Uuid(guid_.data())},
+                                                  },
+                                                  false);
 }
 
 zx_status_t VPartitionAdapter::Extend(uint64_t offset, uint64_t length) {
@@ -276,6 +303,10 @@ std::unique_ptr<FvmAdapter> FvmAdapter::CreateGrowable(const fbl::unique_fd& dev
     }
   }
 
+  return Bind(devfs_root, device);
+}
+
+std::unique_ptr<FvmAdapter> FvmAdapter::Bind(const fbl::unique_fd& devfs_root, DeviceRef* device) {
   {
     zx::result channel = GetController(device);
     if (channel.is_error()) {
@@ -344,7 +375,7 @@ zx_status_t FvmAdapter::AddPartition(const fbl::unique_fd& devfs_root, const std
   return ZX_OK;
 }
 
-zx_status_t FvmAdapter::Rebind(fbl::Vector<VPartitionAdapter*> vpartitions) {
+zx_status_t FvmAdapter::Rebind() {
   if (zx_status_t status = RebindBlockDevice(block_device_); status != ZX_OK) {
     ADD_FAILURE("FvmAdapter block device rebind failed.");
     return status;
@@ -375,11 +406,6 @@ zx_status_t FvmAdapter::Rebind(fbl::Vector<VPartitionAdapter*> vpartitions) {
     return channel.status_value();
   }
 
-  for (auto* vpartition : vpartitions) {
-    if (zx_status_t status = vpartition->WaitUntilVisible(); status != ZX_OK) {
-      return status;
-    }
-  }
   return ZX_OK;
 }
 

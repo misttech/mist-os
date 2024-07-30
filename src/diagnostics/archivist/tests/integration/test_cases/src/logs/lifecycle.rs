@@ -64,7 +64,7 @@ async fn test_logs_lifecycle() {
 }
 
 fn check_message(expected_moniker_prefix: &str, message: Data<Logs>) {
-    assert!(message.moniker.starts_with(expected_moniker_prefix));
+    assert!(message.moniker.to_string().starts_with(expected_moniker_prefix));
     assert_data_tree!(message.payload.unwrap(), root: {
         message: {
             value: HELLO_WORLD,

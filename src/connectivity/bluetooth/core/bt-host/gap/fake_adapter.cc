@@ -175,7 +175,7 @@ void FakeAdapter::GetSupportedDelayRange(
     pw::bluetooth::emboss::DataPathDirection direction,
     const std::optional<std::vector<uint8_t>>& codec_configuration,
     GetSupportedDelayRangeCallback cb) {
-  cb(ZX_OK,
+  cb(PW_STATUS_OK,
      0,
      pw::bluetooth::emboss::
          ReadLocalSupportedControllerDelayCommandCompleteEvent::

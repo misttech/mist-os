@@ -12,6 +12,7 @@ rustc_library_with_features("netstack3-filter") {
   sources = [
     "src/api.rs",
     "src/conntrack.rs",
+    "src/conntrack/tcp.rs",
     "src/context.rs",
     "src/lib.rs",
     "src/logic.rs",

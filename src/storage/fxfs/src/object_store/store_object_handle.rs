@@ -1998,6 +1998,43 @@ mod tests {
     }
 
     #[fuchsia::test]
+    async fn extended_attribute_remove_then_create() {
+        let (fs, object) = test_filesystem_and_empty_object().await;
+        let handle = object.handle();
+
+        let test_attr = TestAttr::new(
+            vec![3u8; super::MAX_XATTR_NAME_SIZE],
+            vec![1u8; super::MAX_XATTR_VALUE_SIZE],
+        );
+
+        handle
+            .set_extended_attribute(
+                test_attr.name(),
+                test_attr.value(),
+                SetExtendedAttributeMode::Create,
+            )
+            .await
+            .unwrap();
+        fs.journal().compact().await.unwrap();
+        handle.remove_extended_attribute(test_attr.name()).await.unwrap();
+        handle
+            .set_extended_attribute(
+                test_attr.name(),
+                test_attr.value(),
+                SetExtendedAttributeMode::Create,
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(
+            handle.get_extended_attribute(test_attr.name()).await.unwrap(),
+            test_attr.value()
+        );
+
+        fs.close().await.expect("close failed");
+    }
+
+    #[fuchsia::test]
     async fn large_extended_attribute_max_number() {
         let (fs, object) = test_filesystem_and_empty_object().await;
         let handle = object.handle();

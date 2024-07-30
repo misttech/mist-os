@@ -108,7 +108,7 @@ mod tests {
     use super::*;
     use crate::testing::TEST_IDENTITY;
     use diagnostics_data::{LogsField, Severity};
-    use diagnostics_log_encoding::encode::Encoder;
+    use diagnostics_log_encoding::encode::{Encoder, EncoderOpts};
     use diagnostics_log_encoding::{Argument, Record, Severity as StreamSeverity, Value};
     use diagnostics_message::{fx_log_packet_t, METADATA_SIZE};
     use fuchsia_zircon as zx;
@@ -130,8 +130,8 @@ mod tests {
         sin.write(packet.as_bytes()).unwrap();
         let expected_p = diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
             timestamp_nanos: zx::Time::from_nanos(packet.metadata.time).into(),
-            component_url: Some(TEST_IDENTITY.url.to_string()),
-            moniker: TEST_IDENTITY.to_string(),
+            component_url: Some(TEST_IDENTITY.url.clone()),
+            moniker: TEST_IDENTITY.moniker.clone(),
             severity: Severity::Info,
         })
         .set_pid(packet.metadata.pid)
@@ -165,14 +165,14 @@ mod tests {
             ],
         };
         let mut buffer = Cursor::new(vec![0u8; 1024]);
-        let mut encoder = Encoder::new(&mut buffer);
+        let mut encoder = Encoder::new(&mut buffer, EncoderOpts::default());
         encoder.write_record(&record).unwrap();
         let encoded = &buffer.get_ref()[..buffer.position() as usize];
 
         let expected_p = diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
             timestamp_nanos: timestamp.into(),
-            component_url: Some(TEST_IDENTITY.url.to_string()),
-            moniker: TEST_IDENTITY.to_string(),
+            component_url: Some(TEST_IDENTITY.url.clone()),
+            moniker: TEST_IDENTITY.moniker.clone(),
             severity: Severity::Fatal,
         })
         .add_tag("tag-a")

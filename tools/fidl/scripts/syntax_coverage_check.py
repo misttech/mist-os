@@ -6,11 +6,11 @@
 example usage: `./tools/fidl/scripts/syntax_coverage_check.py`
 """
 
+import os
+import re
 from collections import namedtuple
 from pathlib import Path
 from pprint import pprint
-import re
-import os
 
 TestCase = namedtuple("TestCase", ["suite", "name"])
 

@@ -4,6 +4,8 @@
 
 #include "src/ui/scenic/lib/flatland/hanging_get_helper.h"
 
+#include <fuchsia/math/cpp/fidl.h>
+#include <fuchsia/ui/composition/cpp/fidl.h>
 #include <lib/syslog/cpp/macros.h>
 
 #include <gtest/gtest.h>

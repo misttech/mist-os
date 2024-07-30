@@ -1,4 +1,3 @@
-#!/usr/bin/env fuchsia-vendored-python
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
@@ -30,7 +29,7 @@ _PARAMS: dict[str, Any] = {
         "Content-Type": "application/json; charset=utf-8",
         "Content-Length": 58,  # len(json.dumps(_PARAMS["data"]))
     },
-    "timeout": http_utils._TIMEOUTS["HTTP_RESPONSE"] + 15,
+    "timeout": 15,
     "attempts": http_utils._DEFAULTS["ATTEMPTS"] + 5,
     "interval": http_utils._DEFAULTS["INTERVAL"] + 5,
     "exceptions_to_skip": [],
@@ -153,7 +152,7 @@ class HttpUtilsTests(unittest.TestCase):
     @mock.patch.object(
         urllib.request,
         "urlopen",
-        side_effect=RuntimeError("some run time error"),
+        side_effect=ConnectionError("some run time error"),
         autospec=True,
     )
     def test_send_http_request_fail_because_of_exception(

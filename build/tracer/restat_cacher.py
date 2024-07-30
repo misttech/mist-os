@@ -31,6 +31,7 @@ wrapping.
 """
 
 import argparse
+import dataclasses
 import filecmp
 import os
 import shutil
@@ -38,7 +39,6 @@ import subprocess
 import sys
 import time
 from typing import Any, Callable, Dict, FrozenSet, Iterable, Sequence
-import dataclasses
 
 _SCRIPT_BASENAME = os.path.basename(__file__)
 

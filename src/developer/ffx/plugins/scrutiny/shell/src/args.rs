@@ -11,11 +11,7 @@ use ffx_core::ffx_command;
     subcommand,
     name = "shell",
     description = "Launch the scrutiny shell",
-    example = "To start an interactive shell session:
-
-    $ ffx scrutiny shell
-
-To run commands directly:
+    example = "To run commands directly:
 
     $ ffx scrutiny shell \"tool.blobfs.extract --input <path> --output <path>\"
     ",

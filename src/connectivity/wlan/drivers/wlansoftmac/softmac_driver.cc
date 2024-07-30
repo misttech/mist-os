@@ -144,7 +144,8 @@ void SoftmacDriver::Start(fdf::StartCompleter completer) {
 
               FDF_LOG(INFO, "Successfully added ethernet device child.");
 
-              fit::callback<void(zx_status_t)> sta_shutdown_handler =
+              auto start_completer = std::move(completer);
+              fit::callback<void(zx_status_t)> shutdown_completer =
                   [node_client = node_client_.Clone()](zx_status_t status) mutable {
                     WLAN_LAMBDA_TRACE_DURATION("sta_shutdown_handler on Rust dispatcher");
                     if (status != ZX_OK) {
@@ -164,7 +165,7 @@ void SoftmacDriver::Start(fdf::StartCompleter completer) {
               {
                 std::lock_guard<std::mutex> lock(*ethernet_proxy_lock_);
                 auto softmac_bridge = SoftmacBridge::New(
-                    node_client_.Clone(), std::move(completer), std::move(sta_shutdown_handler),
+                    node_client_.Clone(), std::move(start_completer), std::move(shutdown_completer),
                     softmac_client_.Clone(), ethernet_proxy_lock_, &ethernet_proxy_,
                     &cached_ethernet_status_);
                 if (softmac_bridge.is_error()) {
@@ -325,12 +326,11 @@ void SoftmacDriver::EthernetImplQueueTx(uint32_t options, ethernet_netbuf_t* net
   // `softmac_ifc_bridge_` to the bridged wlansoftmac driver. The `SoftmacIfcBridge`
   // class is not designed to be thread-safe. Making calls to its methods from
   // different dispatchers could result in unexpected behavior.
-  async::PostTask(dispatcher(), [&, op = std::move(op), async_id]() {
-    auto result = softmac_bridge_->EthernetTx(op.get(), async_id);
+  async::PostTask(dispatcher(), [&, op = std::move(op), async_id]() mutable {
+    auto result = softmac_bridge_->EthernetTx(std::move(op), async_id);
     if (!result.is_ok()) {
       WLAN_TRACE_ASYNC_END_TX(async_id, result.status_value());
     }
-    op->Complete(result.status_value());
   });
 }
 

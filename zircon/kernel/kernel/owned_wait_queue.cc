@@ -13,7 +13,6 @@
 
 #include <arch/mp.h>
 #include <fbl/algorithm.h>
-#include <fbl/auto_lock.h>
 #include <fbl/enum_bits.h>
 #include <kernel/auto_preempt_disabler.h>
 #include <kernel/scheduler.h>

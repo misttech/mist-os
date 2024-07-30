@@ -10,5 +10,6 @@ mod init;
 mod magma;
 mod vulkan;
 
+pub use ffi::get_magma_params;
 pub use file::MagmaFile;
 pub use init::magma_device_init;

@@ -80,7 +80,7 @@ impl SendExecutor {
                     *result = Some(fut_result);
                     cvar.notify_one();
                 }),
-                true,
+                false,
             ),
         );
 

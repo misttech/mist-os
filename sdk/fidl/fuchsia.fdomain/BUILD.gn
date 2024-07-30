@@ -1,0 +1,18 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/fidl/fidl.gni")
+
+fidl("fuchsia.fdomain") {
+  sources = [
+    "channel.fidl",
+    "event.fidl",
+    "event_pair.fidl",
+    "protocol.fidl",
+    "socket.fidl",
+    "zx.fidl",
+  ]
+  excluded_checks = [ "vector-bounds-not-specified" ]
+  experimental_flags = [ "allow_arbitrary_error_types" ]
+}

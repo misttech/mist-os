@@ -13,9 +13,10 @@ use derivative::Derivative;
 use lock_order::lock::{OrderedLockAccess, OrderedLockRef};
 use net_types::ethernet::Mac;
 use net_types::ip::IpVersion;
-use netstack3_base::sync::{Mutex, PrimaryRc, RwLock, StrongRc};
+use netstack3_base::sync::{Mutex, PrimaryRc, RwLock, StrongRc, WeakRc};
 use netstack3_base::{
-    AnyDevice, ContextPair, Device, DeviceIdContext, FrameDestination, SendFrameContext,
+    AnyDevice, ContextPair, Device, DeviceIdContext, FrameDestination, ReferenceNotifiers,
+    ReferenceNotifiersExt as _, RemoveResourceResultWithContext, SendFrameContext,
     SendFrameErrorReason, StrongDeviceIdentifier as _, WeakDeviceIdentifier as _,
 };
 use packet::{BufferMut, ParsablePacket as _, Serializer};
@@ -80,22 +81,18 @@ pub trait DeviceSocketBindingsContext<DeviceId>: DeviceSocketTypes {
 ///
 /// This type strongly owns the socket state.
 #[derive(Debug)]
-pub struct PrimaryDeviceSocketId<S, D>(PrimaryRc<SocketState<S, D>>);
+pub struct PrimaryDeviceSocketId<D, BT: DeviceSocketTypes>(PrimaryRc<SocketState<D, BT>>);
 
-impl<S, D> PrimaryDeviceSocketId<S, D> {
+impl<D, BT: DeviceSocketTypes> PrimaryDeviceSocketId<D, BT> {
     /// Creates a new socket ID with `external_state`.
-    pub fn new(external_state: S) -> Self {
+    fn new(external_state: BT::SocketState) -> Self {
         Self(PrimaryRc::new(SocketState { external_state, target: Default::default() }))
     }
 
-    /// Drops this primary reference returning the internal state.
-    ///
-    /// # Panics
-    ///
-    /// Panics if there are strong [`DeviceSocketId`] clones alive.
-    pub fn unwrap(self) -> SocketState<S, D> {
-        let Self(rc) = self;
-        PrimaryRc::unwrap(rc)
+    /// Clones the primary's underlying reference and returns as a strong id.
+    fn clone_strong(&self) -> DeviceSocketId<D, BT> {
+        let PrimaryDeviceSocketId(rc) = self;
+        DeviceSocketId(PrimaryRc::clone_strong(rc))
     }
 }
 
@@ -105,29 +102,16 @@ impl<S, D> PrimaryDeviceSocketId<S, D> {
 /// backing socket.
 #[derive(Derivative)]
 #[derivative(Clone(bound = ""), Hash(bound = ""), Eq(bound = ""), PartialEq(bound = ""))]
-pub struct DeviceSocketId<S, D>(StrongRc<SocketState<S, D>>);
+pub struct DeviceSocketId<D, BT: DeviceSocketTypes>(StrongRc<SocketState<D, BT>>);
 
-impl<S, D> Debug for DeviceSocketId<S, D> {
+impl<D, BT: DeviceSocketTypes> Debug for DeviceSocketId<D, BT> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let Self(rc) = self;
         f.debug_tuple("DeviceSocketId").field(&StrongRc::debug_id(rc)).finish()
     }
 }
 
-pub trait StrongSocketId: Hash + Eq + PartialEq + Clone {
-    type Primary;
-    fn clone_strong(primary: &Self::Primary) -> Self;
-}
-
-impl<S, D> StrongSocketId for DeviceSocketId<S, D> {
-    type Primary = PrimaryDeviceSocketId<S, D>;
-    fn clone_strong(primary: &Self::Primary) -> Self {
-        let PrimaryDeviceSocketId(rc) = primary;
-        Self(PrimaryRc::clone_strong(rc))
-    }
-}
-
-impl<S, D> OrderedLockAccess<Target<D>> for DeviceSocketId<S, D> {
+impl<D, BT: DeviceSocketTypes> OrderedLockAccess<Target<D>> for DeviceSocketId<D, BT> {
     type Lock = Mutex<Target<D>>;
     fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
         let Self(rc) = self;
@@ -135,13 +119,28 @@ impl<S, D> OrderedLockAccess<Target<D>> for DeviceSocketId<S, D> {
     }
 }
 
+/// A weak reference to socket state.
+///
+/// The existence of a [`WeakSocketDeviceId`] does not attest to the liveness of
+/// the backing socket.
+#[derive(Derivative)]
+#[derivative(Clone(bound = ""), Hash(bound = ""), Eq(bound = ""), PartialEq(bound = ""))]
+pub struct WeakDeviceSocketId<D, BT: DeviceSocketTypes>(WeakRc<SocketState<D, BT>>);
+
+impl<D, BT: DeviceSocketTypes> Debug for WeakDeviceSocketId<D, BT> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let Self(rc) = self;
+        f.debug_tuple("WeakDeviceSocketId").field(&WeakRc::debug_id(rc)).finish()
+    }
+}
+
 /// Holds shared state for sockets.
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
-pub struct Sockets<Id: StrongSocketId> {
+pub struct Sockets<D, BT: DeviceSocketTypes> {
     /// Holds strong (but not owning) references to sockets that aren't
     /// targeting a particular device.
-    any_device_sockets: RwLock<AnyDeviceSockets<Id>>,
+    any_device_sockets: RwLock<AnyDeviceSockets<D, BT>>,
 
     /// Table of all sockets in the system, regardless of target.
     ///
@@ -149,24 +148,26 @@ pub struct Sockets<Id: StrongSocketId> {
     // This needs to be after `any_device_sockets` so that when an instance of
     // this type is dropped, any strong IDs get dropped before their
     // corresponding primary IDs.
-    all_sockets: Mutex<AllSockets<Id>>,
+    all_sockets: Mutex<AllSockets<D, BT>>,
 }
 
 /// The set of sockets associated with a device.
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
-pub struct AnyDeviceSockets<Id>(HashSet<Id>);
+pub struct AnyDeviceSockets<D, BT: DeviceSocketTypes>(HashSet<DeviceSocketId<D, BT>>);
 
 /// A collection of all device sockets in the system.
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
-pub struct AllSockets<Id: StrongSocketId>(HashMap<Id, Id::Primary>);
+pub struct AllSockets<D, BT: DeviceSocketTypes>(
+    HashMap<DeviceSocketId<D, BT>, PrimaryDeviceSocketId<D, BT>>,
+);
 
 /// State held by a device socket.
 #[derive(Debug)]
-pub struct SocketState<S, D> {
+pub struct SocketState<D, BT: DeviceSocketTypes> {
     /// State provided by bindings that is held in core.
-    pub external_state: S,
+    pub external_state: BT::SocketState,
     /// The socket's target device and protocol.
     // TODO(https://fxbug.dev/42077026): Consider splitting up the state here to
     // improve performance.
@@ -187,32 +188,16 @@ pub struct Target<D> {
 /// should be held in the state for each device in the system.
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
-#[cfg_attr(test, derivative(Debug, PartialEq(bound = "Id: Hash + Eq")))]
-pub struct DeviceSockets<Id>(HashSet<Id>);
+#[cfg_attr(test, derivative(Debug, PartialEq(bound = "BT::SocketState: Hash + Eq, D: Hash + Eq")))]
+pub struct DeviceSockets<D, BT: DeviceSocketTypes>(HashSet<DeviceSocketId<D, BT>>);
 
 /// Convenience alias for use in device state storage.
-pub type HeldDeviceSockets<BT> =
-    DeviceSockets<DeviceSocketId<<BT as DeviceSocketTypes>::SocketState, WeakDeviceId<BT>>>;
+pub type HeldDeviceSockets<BT> = DeviceSockets<WeakDeviceId<BT>, BT>;
 
 /// Convenience alias for use in shared storage.
 ///
 /// The type parameter is expected to implement [`DeviceSocketTypes`].
-pub type HeldSockets<BT> =
-    Sockets<DeviceSocketId<<BT as DeviceSocketTypes>::SocketState, WeakDeviceId<BT>>>;
-
-/// Common types across all core context traits for device sockets.
-pub trait DeviceSocketContextTypes<BT: DeviceSocketTypes> {
-    /// The strongly-owning socket ID type.
-    ///
-    /// This type is held in various data structures and its existence
-    /// indicates liveness of socket state, but not ownership.
-    type SocketId: Clone + Debug + Eq + Hash + StrongSocketId;
-
-    /// Creates a new primary socket ID.
-    fn new_primary(external_state: BT::SocketState) -> <Self::SocketId as StrongSocketId>::Primary;
-    /// Extracts the socket state information from a primary ID.
-    fn unwrap_primary(primary: <Self::SocketId as StrongSocketId>::Primary) -> BT::SocketState;
-}
+pub type HeldSockets<BT> = Sockets<WeakDeviceId<BT>, BT>;
 
 /// Core context for accessing socket state.
 pub trait DeviceSocketContext<BT: DeviceSocketTypes>: DeviceSocketAccessor<BT> {
@@ -221,19 +206,18 @@ pub trait DeviceSocketContext<BT: DeviceSocketTypes>: DeviceSocketAccessor<BT> {
         BT,
         DeviceId = Self::DeviceId,
         WeakDeviceId = Self::WeakDeviceId,
-        SocketId = Self::SocketId,
     >;
 
     /// Executes the provided callback with mutable access to the collection of
     /// all sockets.
-    fn with_all_device_sockets_mut<F: FnOnce(&mut AllSockets<Self::SocketId>) -> R, R>(
+    fn with_all_device_sockets_mut<F: FnOnce(&mut AllSockets<Self::WeakDeviceId, BT>) -> R, R>(
         &mut self,
         cb: F,
     ) -> R;
 
     /// Executes the provided callback with immutable access to socket state.
     fn with_any_device_sockets<
-        F: FnOnce(&AnyDeviceSockets<Self::SocketId>, &mut Self::SocketTablesCoreCtx<'_>) -> R,
+        F: FnOnce(&AnyDeviceSockets<Self::WeakDeviceId, BT>, &mut Self::SocketTablesCoreCtx<'_>) -> R,
         R,
     >(
         &mut self,
@@ -242,7 +226,10 @@ pub trait DeviceSocketContext<BT: DeviceSocketTypes>: DeviceSocketAccessor<BT> {
 
     /// Executes the provided callback with mutable access to socket state.
     fn with_any_device_sockets_mut<
-        F: FnOnce(&mut AnyDeviceSockets<Self::SocketId>, &mut Self::SocketTablesCoreCtx<'_>) -> R,
+        F: FnOnce(
+            &mut AnyDeviceSockets<Self::WeakDeviceId, BT>,
+            &mut Self::SocketTablesCoreCtx<'_>,
+        ) -> R,
         R,
     >(
         &mut self,
@@ -251,20 +238,18 @@ pub trait DeviceSocketContext<BT: DeviceSocketTypes>: DeviceSocketAccessor<BT> {
 }
 
 /// Core context for accessing the state of an individual socket.
-pub trait SocketStateAccessor<BT: DeviceSocketTypes>:
-    DeviceSocketContextTypes<BT> + DeviceIdContext<AnyDevice>
-{
+pub trait SocketStateAccessor<BT: DeviceSocketTypes>: DeviceIdContext<AnyDevice> {
     /// Provides read-only access to the state of a socket.
     fn with_socket_state<F: FnOnce(&BT::SocketState, &Target<Self::WeakDeviceId>) -> R, R>(
         &mut self,
-        socket: &Self::SocketId,
+        socket: &DeviceSocketId<Self::WeakDeviceId, BT>,
         cb: F,
     ) -> R;
 
     /// Provides mutable access to the state of a socket.
     fn with_socket_state_mut<F: FnOnce(&BT::SocketState, &mut Target<Self::WeakDeviceId>) -> R, R>(
         &mut self,
-        socket: &Self::SocketId,
+        socket: &DeviceSocketId<Self::WeakDeviceId, BT>,
         cb: F,
     ) -> R;
 }
@@ -274,7 +259,6 @@ pub trait DeviceSocketAccessor<BT: DeviceSocketTypes>: SocketStateAccessor<BT> {
     /// Core context available in callbacks to methods on this context.
     type DeviceSocketCoreCtx<'a>: SocketStateAccessor<
         BT,
-        SocketId = Self::SocketId,
         DeviceId = Self::DeviceId,
         WeakDeviceId = Self::WeakDeviceId,
     >;
@@ -282,7 +266,7 @@ pub trait DeviceSocketAccessor<BT: DeviceSocketTypes>: SocketStateAccessor<BT> {
     /// Executes the provided callback with immutable access to device-specific
     /// socket state.
     fn with_device_sockets<
-        F: FnOnce(&DeviceSockets<Self::SocketId>, &mut Self::DeviceSocketCoreCtx<'_>) -> R,
+        F: FnOnce(&DeviceSockets<Self::WeakDeviceId, BT>, &mut Self::DeviceSocketCoreCtx<'_>) -> R,
         R,
     >(
         &mut self,
@@ -293,7 +277,7 @@ pub trait DeviceSocketAccessor<BT: DeviceSocketTypes>: SocketStateAccessor<BT> {
     /// Executes the provided callback with mutable access to device-specific
     /// socket state.
     fn with_device_sockets_mut<
-        F: FnOnce(&mut DeviceSockets<Self::SocketId>, &mut Self::DeviceSocketCoreCtx<'_>) -> R,
+        F: FnOnce(&mut DeviceSockets<Self::WeakDeviceId, BT>, &mut Self::DeviceSocketCoreCtx<'_>) -> R,
         R,
     >(
         &mut self,
@@ -309,7 +293,7 @@ enum MaybeUpdate<T> {
 
 fn update_device_and_protocol<CC: DeviceSocketContext<BT>, BT: DeviceSocketTypes>(
     core_ctx: &mut CC,
-    socket: &CC::SocketId,
+    socket: &DeviceSocketId<CC::WeakDeviceId, BT>,
     new_device: TargetDevice<&CC::DeviceId>,
     protocol_update: MaybeUpdate<Protocol>,
 ) {
@@ -386,16 +370,18 @@ impl<C> DeviceSocketApi<C> {
 ///
 /// TODO(https://github.com/rust-lang/rust/issues/8995): Make this an inherent
 /// associated type.
-type ApiSocketId<C> = <<C as ContextPair>::CoreContext as DeviceSocketContextTypes<
+type ApiSocketId<C> = DeviceSocketId<
+    <<C as ContextPair>::CoreContext as DeviceIdContext<AnyDevice>>::WeakDeviceId,
     <C as ContextPair>::BindingsContext,
->>::SocketId;
+>;
 
 impl<C> DeviceSocketApi<C>
 where
     C: ContextPair,
     C::CoreContext: DeviceSocketContext<C::BindingsContext>,
-    C::BindingsContext:
-        DeviceSocketBindingsContext<<C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
+    C::BindingsContext: DeviceSocketBindingsContext<<C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>
+        + ReferenceNotifiers
+        + 'static,
 {
     fn core_ctx(&mut self) -> &mut C::CoreContext {
         let Self(pair) = self;
@@ -415,11 +401,8 @@ where
         let core_ctx = self.core_ctx();
 
         let strong = core_ctx.with_all_device_sockets_mut(|AllSockets(sockets)| {
-            let primary =
-                <C::CoreContext as DeviceSocketContextTypes<C::BindingsContext>>::new_primary(
-                    external_state,
-                );
-            let strong = <ApiSocketId<C> as StrongSocketId>::clone_strong(&primary);
+            let primary = PrimaryDeviceSocketId::new(external_state);
+            let strong = primary.clone_strong();
             assert!(sockets.insert(strong.clone(), primary).is_none());
             strong
         });
@@ -465,12 +448,13 @@ where
     }
 
     /// Removes a bound socket.
-    ///
-    /// # Panics
-    ///
-    /// If the provided `id` is not the last instance for a socket, this
-    /// method will panic.
-    pub fn remove(&mut self, id: ApiSocketId<C>) {
+    pub fn remove(
+        &mut self,
+        id: ApiSocketId<C>,
+    ) -> RemoveResourceResultWithContext<
+        <C::BindingsContext as DeviceSocketTypes>::SocketState,
+        C::BindingsContext,
+    > {
         let core_ctx = self.core_ctx();
         core_ctx.with_any_device_sockets_mut(|AnyDeviceSockets(any_device_sockets), core_ctx| {
             let old_device = core_ctx.with_socket_state_mut(&id, |_external_state, target| {
@@ -501,11 +485,12 @@ where
             // ID.
             drop(id);
 
-            let _: <C::BindingsContext as DeviceSocketTypes>::SocketState =
-                <C::CoreContext as DeviceSocketContextTypes<C::BindingsContext>>::unwrap_primary(
-                    primary,
-                );
-        });
+            let PrimaryDeviceSocketId(primary) = primary;
+            C::BindingsContext::unwrap_or_notify_with_new_reference_notifier(
+                primary,
+                |SocketState { external_state, target: _ }| external_state,
+            )
+        })
     }
 
     /// Sends a frame for the specified socket.
@@ -559,15 +544,21 @@ pub struct EthernetHeaderParams {
 ///
 /// Strongly owns the state of the socket. So long as the `SocketId` for a
 /// socket is not dropped, the socket is guaranteed to exist.
-pub type SocketId<BC> = DeviceSocketId<<BC as DeviceSocketTypes>::SocketState, WeakDeviceId<BC>>;
+pub type SocketId<BC> = DeviceSocketId<WeakDeviceId<BC>, BC>;
 
-impl<S, D> DeviceSocketId<S, D> {
+impl<D, BT: DeviceSocketTypes> DeviceSocketId<D, BT> {
     /// Provides immutable access to [`DeviceSocketTypes::SocketState`] for the
     /// socket.
-    pub fn socket_state(&self) -> &S {
+    pub fn socket_state(&self) -> &BT::SocketState {
         let Self(strong) = self;
         let SocketState { external_state, target: _ } = &**strong;
         external_state
+    }
+
+    /// Obtain a [`WeakDeviceSocketId`] from this [`DeviceSocketId`].
+    pub fn downgrade(&self) -> WeakDeviceSocketId<D, BT> {
+        let Self(inner) = self;
+        WeakDeviceSocketId(StrongRc::downgrade(inner))
     }
 }
 
@@ -791,15 +782,15 @@ where
     }
 }
 
-impl<Id: StrongSocketId> OrderedLockAccess<AnyDeviceSockets<Id>> for Sockets<Id> {
-    type Lock = RwLock<AnyDeviceSockets<Id>>;
+impl<D, BT: DeviceSocketTypes> OrderedLockAccess<AnyDeviceSockets<D, BT>> for Sockets<D, BT> {
+    type Lock = RwLock<AnyDeviceSockets<D, BT>>;
     fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
         OrderedLockRef::new(&self.any_device_sockets)
     }
 }
 
-impl<Id: StrongSocketId> OrderedLockAccess<AllSockets<Id>> for Sockets<Id> {
-    type Lock = Mutex<AllSockets<Id>>;
+impl<D, BT: DeviceSocketTypes> OrderedLockAccess<AllSockets<D, BT>> for Sockets<D, BT> {
+    type Lock = Mutex<AllSockets<D, BT>>;
     fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
         OrderedLockRef::new(&self.all_sockets)
     }
@@ -865,15 +856,15 @@ mod testutil {
 #[cfg(test)]
 mod tests {
     use alloc::collections::HashMap;
-    use alloc::rc::Rc;
     use alloc::vec;
     use alloc::vec::Vec;
-    use core::cell::RefCell;
     use core::cmp::PartialEq;
     use core::marker::PhantomData;
 
     use const_unwrap::const_unwrap_option;
+    use core::convert::Infallible as Never;
     use derivative::Derivative;
+    use netstack3_base::sync::DynDebugReferences;
     use netstack3_base::testutil::{
         FakeReferencyDeviceId, FakeStrongDeviceId, FakeWeakDeviceId, MultipleDevicesId,
     };
@@ -958,6 +949,18 @@ mod tests {
         }
     }
 
+    impl<D> ReferenceNotifiers for FakeBindingsCtx<D> {
+        type ReferenceReceiver<T: 'static> = Never;
+
+        type ReferenceNotifier<T: Send + 'static> = Never;
+
+        fn new_reference_notifier<T: Send + 'static>(
+            debug_references: DynDebugReferences,
+        ) -> (Self::ReferenceNotifier<T>, Self::ReferenceReceiver<T>) {
+            panic!("device socket removal unexpectedly deferred in test: {debug_references:?}");
+        }
+    }
+
     /// A trait providing a shortcut to instantiate a [`DeviceSocketApi`] from a
     /// context.
     trait DeviceSocketApiExt: ContextPair + Sized {
@@ -975,9 +978,9 @@ mod tests {
     #[derive(Derivative)]
     #[derivative(Default(bound = ""))]
     struct FakeSockets<D: FakeStrongDeviceId> {
-        any_device_sockets: AnyDeviceSockets<FakeStrongId<D>>,
-        device_sockets: HashMap<D, DeviceSockets<FakeStrongId<D>>>,
-        all_sockets: AllSockets<FakeStrongId<D>>,
+        any_device_sockets: AnyDeviceSockets<D::Weak, FakeBindingsCtx<D>>,
+        device_sockets: HashMap<D, DeviceSockets<D::Weak, FakeBindingsCtx<D>>>,
+        all_sockets: AllSockets<D::Weak, FakeBindingsCtx<D>>,
     }
 
     /// Tuple of references
@@ -1001,18 +1004,18 @@ mod tests {
     }
 
     impl<D: FakeStrongDeviceId> AsFakeSocketsMutRefs for FakeCoreCtx<D> {
-        type AnyDevice = AnyDeviceSockets<FakeStrongId<D>>;
-        type AllSockets = AllSockets<FakeStrongId<D>>;
-        type Devices = HashMap<D, DeviceSockets<FakeStrongId<D>>>;
+        type AnyDevice = AnyDeviceSockets<D::Weak, FakeBindingsCtx<D>>;
+        type AllSockets = AllSockets<D::Weak, FakeBindingsCtx<D>>;
+        type Devices = HashMap<D, DeviceSockets<D::Weak, FakeBindingsCtx<D>>>;
         type Device = D;
 
         fn as_sockets_ref(
             &mut self,
         ) -> FakeSocketsMutRefs<
             '_,
-            AnyDeviceSockets<FakeStrongId<D>>,
-            AllSockets<FakeStrongId<D>>,
-            HashMap<D, DeviceSockets<FakeStrongId<D>>>,
+            AnyDeviceSockets<D::Weak, FakeBindingsCtx<D>>,
+            AllSockets<D::Weak, FakeBindingsCtx<D>>,
+            HashMap<D, DeviceSockets<D::Weak, FakeBindingsCtx<D>>>,
             D,
         > {
             let FakeSockets { any_device_sockets, device_sockets, all_sockets } = &mut self.state;
@@ -1033,67 +1036,6 @@ mod tests {
         ) -> FakeSocketsMutRefs<'_, AnyDevice, AllSockets, Devices, Device> {
             let Self(any_device, all_sockets, devices, PhantomData) = self;
             FakeSocketsMutRefs(any_device, all_sockets, devices, PhantomData)
-        }
-    }
-
-    impl<As: AsFakeSocketsMutRefs<Device: FakeStrongDeviceId>>
-        DeviceSocketContextTypes<FakeBindingsCtx<As::Device>> for As
-    {
-        type SocketId = FakeStrongId<As::Device>;
-
-        fn new_primary(
-            external_state: ExternalSocketState<As::Device>,
-        ) -> FakePrimaryId<As::Device> {
-            FakePrimaryId(FakeStrongId(Rc::new(RefCell::new(FakeSocketState {
-                external_state,
-                target: Default::default(),
-            }))))
-        }
-
-        fn unwrap_primary(primary: FakePrimaryId<As::Device>) -> ExternalSocketState<As::Device> {
-            let FakePrimaryId(FakeStrongId(rc)) = primary;
-            Rc::try_unwrap(rc)
-                .unwrap_or_else(|rc| panic!("can't unwrap primary {rc:?}, strong references exist"))
-                .into_inner()
-                .external_state
-        }
-    }
-
-    #[derive(Debug)]
-    struct FakeSocketState<D: FakeStrongDeviceId> {
-        external_state: ExternalSocketState<D>,
-        target: Target<D::Weak>,
-    }
-
-    #[derive(Clone, Debug)]
-    pub struct FakeStrongId<D: FakeStrongDeviceId>(Rc<RefCell<FakeSocketState<D>>>);
-
-    impl<D: FakeStrongDeviceId> Hash for FakeStrongId<D> {
-        fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
-            let Self(rc) = self;
-            Rc::as_ptr(rc).hash(state)
-        }
-    }
-
-    impl<D: FakeStrongDeviceId> PartialEq for FakeStrongId<D> {
-        fn eq(&self, other: &Self) -> bool {
-            let Self(this) = self;
-            let Self(other) = other;
-            Rc::ptr_eq(this, other)
-        }
-    }
-
-    impl<D: FakeStrongDeviceId> core::cmp::Eq for FakeStrongId<D> {}
-
-    #[derive(Debug)]
-    pub struct FakePrimaryId<D: FakeStrongDeviceId>(FakeStrongId<D>);
-
-    impl<D: FakeStrongDeviceId> StrongSocketId for FakeStrongId<D> {
-        type Primary = FakePrimaryId<D>;
-
-        fn clone_strong(primary: &Self::Primary) -> Self {
-            let FakePrimaryId(strong) = primary;
-            strong.clone()
         }
     }
 
@@ -1123,12 +1065,9 @@ mod tests {
     impl<
             'm,
             DeviceId: FakeStrongDeviceId,
-            As: AsFakeSocketsMutRefs<AllSockets = AllSockets<FakeStrongId<DeviceId>>>
-                + DeviceIdContext<AnyDevice, DeviceId = DeviceId, WeakDeviceId = DeviceId::Weak>
-                + DeviceSocketContextTypes<
-                    FakeBindingsCtx<DeviceId>,
-                    SocketId = FakeStrongId<DeviceId>,
-                >,
+            As: AsFakeSocketsMutRefs<
+                    AllSockets = AllSockets<DeviceId::Weak, FakeBindingsCtx<DeviceId>>,
+                > + DeviceIdContext<AnyDevice, DeviceId = DeviceId, WeakDeviceId = DeviceId::Weak>,
         > SocketStateAccessor<FakeBindingsCtx<DeviceId>> for As
     {
         fn with_socket_state<
@@ -1136,13 +1075,13 @@ mod tests {
             R,
         >(
             &mut self,
-            socket: &Self::SocketId,
+            socket: &DeviceSocketId<Self::WeakDeviceId, FakeBindingsCtx<Self::DeviceId>>,
             cb: F,
         ) -> R {
-            let FakeStrongId(rc) = socket;
-            let borrow = rc.borrow();
-            let FakeSocketState { external_state, target } = &*borrow;
-            cb(external_state, target)
+            let DeviceSocketId(rc) = socket;
+            // NB: Circumvent lock ordering for tests.
+            let target = rc.target.lock();
+            cb(&rc.external_state, &target)
         }
 
         fn with_socket_state_mut<
@@ -1150,13 +1089,13 @@ mod tests {
             R,
         >(
             &mut self,
-            socket: &Self::SocketId,
+            socket: &DeviceSocketId<Self::WeakDeviceId, FakeBindingsCtx<Self::DeviceId>>,
             cb: F,
         ) -> R {
-            let FakeStrongId(rc) = socket;
-            let mut borrow = rc.borrow_mut();
-            let FakeSocketState { external_state, target } = &mut *borrow;
-            cb(external_state, target)
+            let DeviceSocketId(rc) = socket;
+            // NB: Circumvent lock ordering for tests.
+            let mut target = rc.target.lock();
+            cb(&rc.external_state, &mut target)
         }
     }
 
@@ -1164,24 +1103,26 @@ mod tests {
             'm,
             DeviceId: FakeStrongDeviceId,
             As: AsFakeSocketsMutRefs<
-                    AllSockets = AllSockets<FakeStrongId<DeviceId>>,
-                    Devices = HashMap<DeviceId, DeviceSockets<FakeStrongId<DeviceId>>>,
-                > + DeviceIdContext<AnyDevice, DeviceId = DeviceId, WeakDeviceId = DeviceId::Weak>
-                + DeviceSocketContextTypes<
-                    FakeBindingsCtx<DeviceId>,
-                    SocketId = FakeStrongId<DeviceId>,
-                >,
+                    AllSockets = AllSockets<DeviceId::Weak, FakeBindingsCtx<DeviceId>>,
+                    Devices = HashMap<
+                        DeviceId,
+                        DeviceSockets<DeviceId::Weak, FakeBindingsCtx<DeviceId>>,
+                    >,
+                > + DeviceIdContext<AnyDevice, DeviceId = DeviceId, WeakDeviceId = DeviceId::Weak>,
         > DeviceSocketAccessor<FakeBindingsCtx<DeviceId>> for As
     {
         type DeviceSocketCoreCtx<'a> = FakeSocketsMutRefs<
             'a,
             As::AnyDevice,
-            AllSockets<FakeStrongId<DeviceId>>,
+            AllSockets<DeviceId::Weak, FakeBindingsCtx<DeviceId>>,
             HashSet<DeviceId>,
             DeviceId,
         >;
         fn with_device_sockets<
-            F: FnOnce(&DeviceSockets<Self::SocketId>, &mut Self::DeviceSocketCoreCtx<'_>) -> R,
+            F: FnOnce(
+                &DeviceSockets<Self::WeakDeviceId, FakeBindingsCtx<Self::DeviceId>>,
+                &mut Self::DeviceSocketCoreCtx<'_>,
+            ) -> R,
             R,
         >(
             &mut self,
@@ -1195,7 +1136,10 @@ mod tests {
             cb(device, &mut FakeSocketsMutRefs(any_device, all_sockets, &mut devices, PhantomData))
         }
         fn with_device_sockets_mut<
-            F: FnOnce(&mut DeviceSockets<Self::SocketId>, &mut Self::DeviceSocketCoreCtx<'_>) -> R,
+            F: FnOnce(
+                &mut DeviceSockets<Self::WeakDeviceId, FakeBindingsCtx<Self::DeviceId>>,
+                &mut Self::DeviceSocketCoreCtx<'_>,
+            ) -> R,
             R,
         >(
             &mut self,
@@ -1214,26 +1158,28 @@ mod tests {
             'm,
             DeviceId: FakeStrongDeviceId,
             As: AsFakeSocketsMutRefs<
-                    AnyDevice = AnyDeviceSockets<FakeStrongId<DeviceId>>,
-                    AllSockets = AllSockets<FakeStrongId<DeviceId>>,
-                    Devices = HashMap<DeviceId, DeviceSockets<FakeStrongId<DeviceId>>>,
-                > + DeviceIdContext<AnyDevice, DeviceId = DeviceId, WeakDeviceId = DeviceId::Weak>
-                + DeviceSocketContextTypes<
-                    FakeBindingsCtx<DeviceId>,
-                    SocketId = FakeStrongId<DeviceId>,
-                >,
+                    AnyDevice = AnyDeviceSockets<DeviceId::Weak, FakeBindingsCtx<DeviceId>>,
+                    AllSockets = AllSockets<DeviceId::Weak, FakeBindingsCtx<DeviceId>>,
+                    Devices = HashMap<
+                        DeviceId,
+                        DeviceSockets<DeviceId::Weak, FakeBindingsCtx<DeviceId>>,
+                    >,
+                > + DeviceIdContext<AnyDevice, DeviceId = DeviceId, WeakDeviceId = DeviceId::Weak>,
         > DeviceSocketContext<FakeBindingsCtx<DeviceId>> for As
     {
         type SocketTablesCoreCtx<'a> = FakeSocketsMutRefs<
             'a,
             (),
-            AllSockets<FakeStrongId<DeviceId>>,
-            HashMap<DeviceId, DeviceSockets<FakeStrongId<DeviceId>>>,
+            AllSockets<DeviceId::Weak, FakeBindingsCtx<DeviceId>>,
+            HashMap<DeviceId, DeviceSockets<DeviceId::Weak, FakeBindingsCtx<DeviceId>>>,
             DeviceId,
         >;
 
         fn with_any_device_sockets<
-            F: FnOnce(&AnyDeviceSockets<Self::SocketId>, &mut Self::SocketTablesCoreCtx<'_>) -> R,
+            F: FnOnce(
+                &AnyDeviceSockets<Self::WeakDeviceId, FakeBindingsCtx<Self::DeviceId>>,
+                &mut Self::SocketTablesCoreCtx<'_>,
+            ) -> R,
             R,
         >(
             &mut self,
@@ -1247,7 +1193,10 @@ mod tests {
             )
         }
         fn with_any_device_sockets_mut<
-            F: FnOnce(&mut AnyDeviceSockets<Self::SocketId>, &mut Self::SocketTablesCoreCtx<'_>) -> R,
+            F: FnOnce(
+                &mut AnyDeviceSockets<Self::WeakDeviceId, FakeBindingsCtx<Self::DeviceId>>,
+                &mut Self::SocketTablesCoreCtx<'_>,
+            ) -> R,
             R,
         >(
             &mut self,
@@ -1261,7 +1210,10 @@ mod tests {
             )
         }
 
-        fn with_all_device_sockets_mut<F: FnOnce(&mut AllSockets<Self::SocketId>) -> R, R>(
+        fn with_all_device_sockets_mut<
+            F: FnOnce(&mut AllSockets<Self::WeakDeviceId, FakeBindingsCtx<Self::DeviceId>>) -> R,
+            R,
+        >(
             &mut self,
             cb: F,
         ) -> R {
@@ -1292,7 +1244,7 @@ mod tests {
             SocketInfo { device: TargetDevice::AnyDevice, protocol: None }
         );
 
-        api.remove(bound);
+        let ExternalSocketState(_received_frames) = api.remove(bound).into_removed();
     }
 
     #[test_case(TargetDevice::AnyDevice)]
@@ -1380,7 +1332,7 @@ mod tests {
         }
 
         for socket in sockets {
-            api.remove(socket)
+            let ExternalSocketState(_received_frames) = api.remove(socket).into_removed();
         }
     }
 
@@ -1450,7 +1402,7 @@ mod tests {
         device: TargetDevice<D>,
         protocol: Option<Protocol>,
         state: ExternalSocketState<D>,
-    ) -> FakeStrongId<D> {
+    ) -> DeviceSocketId<D::Weak, FakeBindingsCtx<D>> {
         let mut api = ctx.device_socket_api();
         let id = api.create(state);
         let device = match &device {
@@ -1468,11 +1420,13 @@ mod tests {
     /// sockets it was delivered to.
     fn deliver_one_frame(
         delivered_frame: Frame<&[u8]>,
-        FakeCtx { mut core_ctx, mut bindings_ctx }: FakeCtx<MultipleDevicesId>,
-    ) -> HashSet<FakeStrongId<MultipleDevicesId>> {
+        FakeCtx { core_ctx, bindings_ctx }: &mut FakeCtx<MultipleDevicesId>,
+    ) -> HashSet<
+        DeviceSocketId<FakeWeakDeviceId<MultipleDevicesId>, FakeBindingsCtx<MultipleDevicesId>>,
+    > {
         DeviceSocketHandler::handle_frame(
-            &mut core_ctx,
-            &mut bindings_ctx,
+            core_ctx,
+            bindings_ctx,
             &MultipleDevicesId::A,
             delivered_frame.clone(),
             TestData::BUFFER,
@@ -1482,14 +1436,13 @@ mod tests {
             all_sockets: AllSockets(all_sockets),
             any_device_sockets: _,
             device_sockets: _,
-        } = core_ctx.into_state();
+        } = &core_ctx.state;
 
         all_sockets
-            .into_iter()
+            .iter()
             .filter_map(|(id, _primary)| {
-                let FakeStrongId(rc) = &id;
-                let borrow = rc.borrow();
-                let ExternalSocketState(frames) = &borrow.external_state;
+                let DeviceSocketId(rc) = &id;
+                let ExternalSocketState(frames) = &rc.external_state;
                 let frames = frames.lock();
                 (!frames.is_empty()).then(|| {
                     assert_eq!(
@@ -1546,7 +1499,7 @@ mod tests {
                 FrameDestination::Individual { local: true },
             )
             .into(),
-            ctx,
+            &mut ctx,
         );
 
         let _ = (
@@ -1603,7 +1556,7 @@ mod tests {
         let bound_any_wrong_protocol = make_bound(AnyDevice, Some(Specific(WRONG_PROTO)));
 
         let mut sockets_with_received_frames =
-            deliver_one_frame(SentFrame::Ethernet(TestData::frame().into()).into(), ctx);
+            deliver_one_frame(SentFrame::Ethernet(TestData::frame().into()).into(), &mut ctx);
 
         let _ = (
             never_bound,
@@ -1659,10 +1612,11 @@ mod tests {
             device_sockets: _,
         } = core_ctx.into_state();
         let primary = all_sockets.remove(&socket).unwrap();
+        let PrimaryDeviceSocketId(primary) = primary;
         assert!(all_sockets.is_empty());
         drop(socket);
-        let ExternalSocketState(received) =
-            <FakeCoreCtx<_> as DeviceSocketContextTypes<_>>::unwrap_primary(primary);
+        let SocketState { external_state: ExternalSocketState(received), target: _ } =
+            PrimaryRc::unwrap(primary);
         assert_eq!(
             received.into_inner(),
             vec![

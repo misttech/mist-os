@@ -275,13 +275,22 @@ pub struct AnalyticsCommand {
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand)]
 pub enum AnalyticsControlCommand {
+    EnableEnhanced(AnalyticsEnableEnhancedCommand),
     Enable(AnalyticsEnableCommand),
     Disable(AnalyticsDisableCommand),
     Show(AnalyticsShowCommand),
 }
 
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
-#[argh(subcommand, name = "enable", description = "enable analytics")]
+#[argh(
+    subcommand,
+    name = "enable-enhanced",
+    description = "enable enhanced analytics (Googlers only)"
+)]
+pub struct AnalyticsEnableEnhancedCommand {}
+
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
+#[argh(subcommand, name = "enable", description = "enable basic (redacted) analytics")]
 pub struct AnalyticsEnableCommand {}
 
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]

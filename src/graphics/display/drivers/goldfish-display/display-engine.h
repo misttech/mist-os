@@ -29,7 +29,7 @@
 
 namespace goldfish {
 
-class DisplayEngine : public ddk::DisplayControllerImplProtocol<DisplayEngine> {
+class DisplayEngine : public ddk::DisplayEngineProtocol<DisplayEngine> {
  public:
   // `control`, `pipe`, `sysmem_allocator` must be valid.
   // `render_control` must not be null.
@@ -51,50 +51,41 @@ class DisplayEngine : public ddk::DisplayControllerImplProtocol<DisplayEngine> {
   zx::result<> Initialize();
 
   // Display controller protocol implementation.
-  void DisplayControllerImplSetDisplayControllerInterface(
-      const display_controller_interface_protocol_t* interface);
-  void DisplayControllerImplResetDisplayControllerInterface();
-  zx_status_t DisplayControllerImplImportBufferCollection(
-      uint64_t banjo_driver_buffer_collection_id, zx::channel collection_token);
-  zx_status_t DisplayControllerImplReleaseBufferCollection(
-      uint64_t banjo_driver_buffer_collection_id);
-  zx_status_t DisplayControllerImplImportImage(const image_metadata_t* image_metadata,
-                                               uint64_t banjo_driver_buffer_collection_id,
-                                               uint32_t index, uint64_t* out_image_handle);
-  zx_status_t DisplayControllerImplImportImageForCapture(uint64_t banjo_driver_buffer_collection_id,
-                                                         uint32_t index,
-                                                         uint64_t* out_capture_handle) {
+  void DisplayEngineRegisterDisplayEngineListener(
+      const display_engine_listener_protocol_t* engine_listener);
+  void DisplayEngineDeregisterDisplayEngineListener();
+  zx_status_t DisplayEngineImportBufferCollection(uint64_t banjo_driver_buffer_collection_id,
+                                                  zx::channel collection_token);
+  zx_status_t DisplayEngineReleaseBufferCollection(uint64_t banjo_driver_buffer_collection_id);
+  zx_status_t DisplayEngineImportImage(const image_metadata_t* image_metadata,
+                                       uint64_t banjo_driver_buffer_collection_id, uint32_t index,
+                                       uint64_t* out_image_handle);
+  zx_status_t DisplayEngineImportImageForCapture(uint64_t banjo_driver_buffer_collection_id,
+                                                 uint32_t index, uint64_t* out_capture_handle) {
     return ZX_ERR_NOT_SUPPORTED;
   }
-  void DisplayControllerImplReleaseImage(uint64_t image_handle);
-  config_check_result_t DisplayControllerImplCheckConfiguration(
+  void DisplayEngineReleaseImage(uint64_t image_handle);
+  config_check_result_t DisplayEngineCheckConfiguration(
       const display_config_t* display_configs, size_t display_count,
       client_composition_opcode_t* out_client_composition_opcodes_list,
       size_t client_composition_opcodes_count, size_t* out_client_composition_opcodes_actual);
-  void DisplayControllerImplApplyConfiguration(const display_config_t* display_config,
-                                               size_t display_count,
-                                               const config_stamp_t* banjo_config_stamp);
-  zx_status_t DisplayControllerImplSetBufferCollectionConstraints(
+  void DisplayEngineApplyConfiguration(const display_config_t* display_config, size_t display_count,
+                                       const config_stamp_t* banjo_config_stamp);
+  zx_status_t DisplayEngineSetBufferCollectionConstraints(
       const image_buffer_usage_t* usage, uint64_t banjo_driver_buffer_collection_id);
-  zx_status_t DisplayControllerImplSetDisplayPower(uint64_t display_id, bool power_on) {
+  zx_status_t DisplayEngineSetDisplayPower(uint64_t display_id, bool power_on) {
     return ZX_ERR_NOT_SUPPORTED;
   }
-  bool DisplayControllerImplIsCaptureSupported() { return false; }
-  zx_status_t DisplayControllerImplStartCapture(uint64_t capture_handle) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-  zx_status_t DisplayControllerImplReleaseCapture(uint64_t capture_handle) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-  bool DisplayControllerImplIsCaptureCompleted() { return false; }
-  zx_status_t DisplayControllerImplSetMinimumRgb(uint8_t minimum_rgb) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
+  bool DisplayEngineIsCaptureSupported() { return false; }
+  zx_status_t DisplayEngineStartCapture(uint64_t capture_handle) { return ZX_ERR_NOT_SUPPORTED; }
+  zx_status_t DisplayEngineReleaseCapture(uint64_t capture_handle) { return ZX_ERR_NOT_SUPPORTED; }
+  bool DisplayEngineIsCaptureCompleted() { return false; }
+  zx_status_t DisplayEngineSetMinimumRgb(uint8_t minimum_rgb) { return ZX_ERR_NOT_SUPPORTED; }
 
   void SetupPrimaryDisplayForTesting(int32_t width_px, int32_t height_px, int32_t refresh_rate_hz);
 
-  const display_controller_impl_protocol_ops_t* display_controller_impl_protocol_ops() const {
-    return &display_controller_impl_protocol_ops_;
+  const display_engine_protocol_ops_t* display_engine_protocol_ops() const {
+    return &display_engine_protocol_ops_;
   }
 
  private:
@@ -185,7 +176,7 @@ class DisplayEngine : public ddk::DisplayControllerImplProtocol<DisplayEngine> {
   std::unique_ptr<RenderControl> rc_;
   DisplayState primary_display_device_ = {};
   fbl::Mutex flush_lock_;
-  ddk::DisplayControllerInterfaceProtocolClient dc_intf_ TA_GUARDED(flush_lock_);
+  ddk::DisplayEngineListenerProtocolClient engine_listener_ TA_GUARDED(flush_lock_);
 
   async_dispatcher_t* const display_event_dispatcher_;
 };

@@ -1037,7 +1037,7 @@ zx_status_t Driver::GetProtocol(uint32_t proto_id, void* out) {
       return result.status();
     }
     if (result->is_error()) {
-      FDF_LOGL(ERROR, *logger, "Failed to get banjo protocol: %s",
+      FDF_LOGL(DEBUG, *logger, "Failed to get banjo protocol: %s",
                zx_status_get_string(result->error_value()));
       return result->error_value();
     }
@@ -1076,7 +1076,7 @@ zx_status_t Driver::GetFragmentProtocol(const char* fragment, uint32_t proto_id,
     return result.status();
   }
   if (result->is_error()) {
-    FDF_LOGL(ERROR, *logger_, "Failed to get banjo protocol: %s",
+    FDF_LOGL(DEBUG, *logger_, "Failed to get banjo protocol: %s",
              zx_status_get_string(result->error_value()));
     return result->error_value();
   }

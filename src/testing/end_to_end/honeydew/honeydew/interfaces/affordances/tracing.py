@@ -1,4 +1,3 @@
-#!/usr/bin/env fuchsia-vendored-python
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
@@ -19,12 +18,17 @@ class Tracing(abc.ABC):
         self,
         categories: list[str] | None = None,
         buffer_size: int | None = None,
+        start_timeout_milliseconds: int | None = None,
     ) -> None:
         """Initializes a trace sessions.
 
         Args:
             categories: list of categories to trace.
             buffer_size: buffer size to use in MB.
+            start_timeout_milliseconds: milliseconds to wait for trace providers
+                to acknowledge that they've started tracing. NB: trace providers
+                that don't ACK by this deadline may still emit tracing events
+                starting at some later point.
         """
 
     @abc.abstractmethod

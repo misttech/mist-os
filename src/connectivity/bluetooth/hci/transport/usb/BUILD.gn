@@ -8,9 +8,9 @@ import("//build/drivers.gni")
 import("//build/test.gni")
 
 driver_bind_rules("bt_transport_usb_bind") {
-  rules = "bt_transport_usb.bind"
+  rules = "meta/bt_transport_usb.bind"
   bind_output = "bt-transport-usb.bindbc"
-  tests = "bind_tests.json"
+  tests = "meta/bind_tests.json"
   deps = [
     "//src/devices/bind/fuchsia.usb",
     "//src/devices/bind/fuchsia.usb.wireless",
@@ -31,7 +31,7 @@ fuchsia_driver_component("bt-transport-usb") {
   visibility = [ ":*" ]
   component_name = "bt-transport-usb"
   deps = [ ":bt-transport-usb-driver" ]
-  info = "bt-transport-usb-info.json"
+  info = "meta/bt-transport-usb-info.json"
   manifest = "meta/bt-transport-usb.cml"
 }
 
@@ -53,7 +53,10 @@ source_set("common") {
     "//sdk/banjo/fuchsia.hardware.usb:fuchsia.hardware.usb_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.usb.composite:fuchsia.hardware.usb.composite_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.usb.request:fuchsia.hardware.usb.request_banjo_cpp",
+    "//sdk/fidl/fuchsia.hardware.bluetooth:fuchsia.hardware.bluetooth_cpp",
+    "//sdk/lib/component/outgoing/cpp",
     "//src/devices/lib/driver",
+    "//src/devices/lib/driver:driver_runtime",
     "//src/devices/usb/lib/usb",
     "//src/lib/listnode",
     "//zircon/system/ulib/async-loop:async-loop-cpp",

@@ -72,7 +72,6 @@ rustc_library("platform_configuration") {
     "//third_party/rust_crates:handlebars",
     "//third_party/rust_crates:serde",
     "//third_party/rust_crates:serde_json",
-    "//third_party/rust_crates:tempfile",
     "//tools/lib/cml",
   ]
   test_deps = [

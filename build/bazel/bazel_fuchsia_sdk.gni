@@ -148,8 +148,8 @@ template("generate_fuchsia_bazel_sdk") {
 #       with different target_cpu values or even IDK export directories.
 #
 #    remote_build: (optional)
-#       Override the global `enable_bazel_remote_rbe` setting for building.
-#       Set to false to prevent use of remote services for building.
+#       Set to false to prevent use of remote services for building,
+#       overriding the global `enable_bazel_remote_rbe` setting.
 #
 #    remote_build_strategy: (optional)
 #       Override the global `bazel_rbe_exec_strategy` setting for building.
@@ -222,8 +222,12 @@ template("run_fuchsia_bazel_sdk_tests") {
     deps = []
 
     _remote_build = enable_bazel_remote_rbe
-    if (defined(invoker.remote_build)) {
-      _remote_build = invoker.remote_build
+    if (_remote_build) {
+      if (defined(invoker.remote_build)) {
+        _remote_build = invoker.remote_build
+      }
+    } else {
+      not_needed(invoker, [ "remote_build" ])
     }
     _remote_build_strategy = bazel_rbe_exec_strategy
     if (defined(invoker.remote_build_strategy)) {

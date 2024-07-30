@@ -2,55 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use maplit::btreeset;
-
 use super::test::*;
-use super::Primitive::*;
 use super::*;
 use CompatibilityDegree::*;
-use Flexibility::*;
 use Optionality::*;
 use StringPattern::*;
 use Type::*;
 
 pub fn type_compatible(sender: &Type, receiver: &Type) -> CompatibilityDegree {
     compare_types(sender, receiver).compatibility_degree()
-}
-
-/// Generate incompatible types
-fn incompatible() -> (Type, Type) {
-    (
-        Enum(Path::empty(), Strict, Uint32, btreeset! { 1, 2, 3, 4 }),
-        Enum(Path::empty(), Strict, Uint32, btreeset! { 1, 2, 3 }),
-    )
-}
-
-/// Generate weakly compatible types
-fn weakly_compatible() -> (Type, Type) {
-    (
-        Enum(Path::empty(), Flexible, Uint32, btreeset! {1,2,3,4}),
-        Enum(Path::empty(), Flexible, Uint32, btreeset! {1,2,3}),
-    )
-}
-
-/// Generate strongly compatible types
-fn strongly_compatible() -> (Type, Type) {
-    (
-        Enum(Path::empty(), Flexible, Uint32, btreeset! {1,2,3}),
-        Enum(Path::empty(), Flexible, Uint32, btreeset! {1,2,3}),
-    )
-}
-
-#[test]
-fn helpers() {
-    let (send, recv) = incompatible();
-    assert_eq!(Incompatible, type_compatible(&send, &recv));
-
-    let (send, recv) = weakly_compatible();
-    assert_eq!(WeaklyCompatible, type_compatible(&send, &recv));
-
-    let (send, recv) = strongly_compatible();
-    assert_eq!(StronglyCompatible, type_compatible(&send, &recv));
 }
 
 #[test]
@@ -159,9 +119,8 @@ fn enums() {
             B = 2;
         };"
     )
-    .has_problems(vec![
-        ProblemPattern::type_error("2", "1").message("Extra strict enum members in sender(@2): 2")
-    ]));
+    .has_problems(vec![ProblemPattern::type_error("2", "1")
+        .message("Extra strict enum members in sender(@2): B=2")]));
 
     // Flexible member difference
     assert!(compare_fidl_type(
@@ -174,7 +133,7 @@ fn enums() {
                 };"
     )
     .has_problems(vec![ProblemPattern::type_warning("2", "1")
-        .message("Extra flexible enum members in sender(@2): 2")]));
+        .message("Extra flexible enum members in sender(@2): B=2")]));
 
     // Strictness difference, member difference.
     assert!(compare_fidl_type(
@@ -194,8 +153,9 @@ fn enums() {
     )
     .has_problems(vec![
         ProblemPattern::type_warning("1", "2")
-            .message("Extra flexible enum members in sender(@1): 2"),
-        ProblemPattern::type_error("2", "1").message("Extra strict enum members in sender(@2): 3")
+            .message("Extra flexible enum members in sender(@1): B=2"),
+        ProblemPattern::type_error("2", "1")
+            .message("Extra strict enum members in sender(@2): C=3")
     ]));
 
     // Primitive conversion
@@ -259,9 +219,8 @@ fn bits() {
             B = 2;
         };"
     )
-    .has_problems(vec![
-        ProblemPattern::type_error("2", "1").message("Extra strict bits members in sender(@2): 2")
-    ]));
+    .has_problems(vec![ProblemPattern::type_error("2", "1")
+        .message("Extra strict bits members in sender(@2): B=2")]));
 
     // Flexible member difference
     assert!(compare_fidl_type(
@@ -274,7 +233,7 @@ fn bits() {
                 };"
     )
     .has_problems(vec![ProblemPattern::type_warning("2", "1")
-        .message("Extra flexible bits members in sender(@2): 2")]));
+        .message("Extra flexible bits members in sender(@2): B=2")]));
 
     // Strictness difference, member difference.
     assert!(compare_fidl_type(
@@ -294,8 +253,9 @@ fn bits() {
     )
     .has_problems(vec![
         ProblemPattern::type_warning("1", "2")
-            .message("Extra flexible bits members in sender(@1): 2"),
-        ProblemPattern::type_error("2", "1").message("Extra strict bits members in sender(@2): 4")
+            .message("Extra flexible bits members in sender(@1): B=2"),
+        ProblemPattern::type_error("2", "1")
+            .message("Extra strict bits members in sender(@2): C=4")
     ]));
 
     // Primitive conversion

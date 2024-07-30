@@ -10,14 +10,14 @@ import("//build/fuzz.gni")
 import("//build/test.gni")
 
 driver_bind_rules("ihda_controller_bind") {
-  rules = "intel_hda.bind"
+  rules = "meta/intel_hda.bind"
   deps = [
     "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_bindlib",
     "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_bindlib",
     "//src/devices/bind/fuchsia.acpi",
     "//src/devices/bind/fuchsia.pci",
   ]
-  tests = "bind_test.json"
+  tests = "meta/bind_test.json"
 }
 
 firmware_path = "dsp_fw_kbl_v3420.bin"
@@ -122,7 +122,7 @@ fuchsia_driver("intel-hda-driver") {
 fuchsia_driver_component("intel-hda") {
   component_name = "intel-hda"
   deps = [ ":intel-hda-driver" ]
-  info = "intel-hda-info.json"
+  info = "meta/intel-hda-info.json"
   manifest = "meta/intel-hda.cml"
 }
 

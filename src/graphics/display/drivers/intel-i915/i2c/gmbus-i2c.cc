@@ -208,7 +208,7 @@ zx_status_t GMBusI2c::I2cImplTransact(const i2c_impl_op_t* ops, size_t size) {
                   return registers::GMBusControllerStatus::Get().ReadFrom(&mmio_space).is_waiting();
                 },
                 zx::msec(1), 10)) {
-          zxlogf(TRACE, "Transition to wait phase timed out");
+          FDF_LOG(TRACE, "Transition to wait phase timed out");
           goto fail;
         }
       } else {
@@ -230,7 +230,7 @@ zx_status_t GMBusI2c::I2cImplTransact(const i2c_impl_op_t* ops, size_t size) {
   return ZX_OK;
 fail:
   if (!I2cClearNack()) {
-    zxlogf(TRACE, "Failed to clear nack");
+    FDF_LOG(TRACE, "Failed to clear nack");
   }
   return fail_res;
 }
@@ -301,7 +301,7 @@ bool GMBusI2c::I2cFinish() {
   gmbus_clock_port_select.WriteTo(mmio_space_);
 
   if (!idle) {
-    zxlogf(TRACE, "hdmi: GMBus i2c failed to go idle");
+    FDF_LOG(TRACE, "hdmi: GMBus i2c failed to go idle");
   }
   return idle;
 }
@@ -321,11 +321,11 @@ bool GMBusI2c::I2cWaitForHwReady() {
             return gmbus_controller_status.nack_occurred() || gmbus_controller_status.is_ready();
           },
           zx::msec(1), 50)) {
-    zxlogf(TRACE, "hdmi: GMBus i2c wait for hwready timeout");
+    FDF_LOG(TRACE, "hdmi: GMBus i2c wait for hwready timeout");
     return false;
   }
   if (gmbus_controller_status.nack_occurred()) {
-    zxlogf(TRACE, "hdmi: GMBus i2c got nack");
+    FDF_LOG(TRACE, "hdmi: GMBus i2c got nack");
     return false;
   }
   return true;
@@ -345,7 +345,7 @@ bool GMBusI2c::I2cClearNack() {
             return !registers::GMBusControllerStatus::Get().ReadFrom(&mmio_space).is_active();
           },
           zx::msec(1), 10)) {
-    zxlogf(TRACE, "hdmi: GMBus i2c failed to clear active nack");
+    FDF_LOG(TRACE, "hdmi: GMBus i2c failed to clear active nack");
     return false;
   }
 

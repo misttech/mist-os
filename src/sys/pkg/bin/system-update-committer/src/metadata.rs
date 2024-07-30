@@ -40,6 +40,7 @@ pub async fn put_metadata_in_happy_state(
     verifiers: &[&dyn VerifierProxy],
     node: &finspect::Node,
     config: &Config,
+    _structured_config: &system_update_committer_structured_config::Config,
 ) -> Result<(), MetadataError> {
     let mut unblocker = Some(unblocker);
     if config.enable() {
@@ -120,6 +121,10 @@ mod tests {
         blobfs_verifier_and_call_count(Err(fidl::VerifyError::Internal))
     }
 
+    fn default_structured_config() -> system_update_committer_structured_config::Config {
+        system_update_committer_structured_config::Config { blobfs: false, netstack: false }
+    }
+
     /// When we don't support ABR, we should not update metadata.
     /// However, the FIDL server should still be unblocked.
     #[fasync::run_singlethreaded(test)]
@@ -141,6 +146,7 @@ mod tests {
             &[&blobfs_verifier],
             &finspect::Node::default(),
             &Config::builder().build(),
+            &default_structured_config(),
         )
         .await
         .unwrap();
@@ -176,6 +182,7 @@ mod tests {
             &[&blobfs_verifier],
             &finspect::Node::default(),
             &Config::builder().build(),
+            &default_structured_config(),
         )
         .await
         .unwrap();
@@ -209,6 +216,7 @@ mod tests {
             &[&blobfs_verifier],
             &finspect::Node::default(),
             &Config::builder().enable(false).build(),
+            &default_structured_config(),
         )
         .await
         .unwrap();
@@ -242,6 +250,7 @@ mod tests {
             &[&blobfs_verifier],
             &finspect::Node::default(),
             &Config::builder().build(),
+            &default_structured_config(),
         )
         .await
         .unwrap();
@@ -291,6 +300,7 @@ mod tests {
             &[&blobfs_verifier],
             &finspect::Node::default(),
             &Config::builder().build(),
+            &default_structured_config(),
         )
         .await
         .unwrap();
@@ -342,6 +352,7 @@ mod tests {
             &[&blobfs_verifier],
             &finspect::Node::default(),
             &Config::builder().blobfs(Mode::Ignore).build(),
+            &default_structured_config(),
         )
         .await
         .unwrap();
@@ -393,6 +404,7 @@ mod tests {
             &[&blobfs_verifier],
             &finspect::Node::default(),
             &Config::builder().blobfs(Mode::RebootOnFailure).build(),
+            &default_structured_config(),
         )
         .await;
 

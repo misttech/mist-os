@@ -4,11 +4,11 @@
 # found in the LICENSE file.
 """Unit tests for trace_utils.py."""
 
-from typing import Any, Dict, List
 import unittest
+from typing import Any, Dict, List
 
-from trace_processing import trace_model, trace_time, trace_utils, trace_metrics
 import test_utils
+from trace_processing import trace_metrics, trace_model, trace_time, trace_utils
 
 
 class TraceUtilsTest(unittest.TestCase):

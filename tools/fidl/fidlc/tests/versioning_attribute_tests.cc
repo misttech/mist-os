@@ -92,6 +92,30 @@ type Foo = struct {
   ASSERT_COMPILED(library);
 }
 
+TEST(VersioningAttributeTests, GoodAllArgumentsOnDeclModifier) {
+  TestLibrary library(R"FIDL(
+@available(added=1)
+library example;
+
+type Foo = resource(added=1, removed=2) struct {};
+)FIDL");
+  library.SelectVersion("example", "1");
+  ASSERT_COMPILED(library);
+}
+
+TEST(VersioningAttributeTests, GoodAllArgumentsOnMemberModifier) {
+  TestLibrary library(R"FIDL(
+@available(added=1)
+library example;
+
+protocol Foo {
+    strict(added=1, removed=2) Bar();
+};
+)FIDL");
+  library.SelectVersion("example", "1");
+  ASSERT_COMPILED(library);
+}
+
 TEST(VersioningAttributeTests, GoodAttributeOnEverything) {
   TestLibrary library(R"FIDL(
 @available(added=1)
@@ -108,45 +132,45 @@ alias Alias = string;
 // type Type = string;
 
 @available(added=1)
-type Bits = bits {
+type Bits = strict(added=1) bits {
     @available(added=1)
     MEMBER = 1;
 };
 
 @available(added=1)
-type Enum = enum {
+type Enum = flexible(added=1) enum {
     @available(added=1)
     MEMBER = 1;
 };
 
 @available(added=1)
-type Struct = struct {
+type Struct = resource(added=1) struct {
     @available(added=1)
     member string;
 };
 
 @available(added=1)
-type Table = table {
+type Table = resource(added=1) table {
     @available(added=1)
     1: member string;
 };
 
 @available(added=1)
-type Union = union {
+type Union = strict(added=1) resource(added=1) union {
     @available(added=1)
     1: member string;
 };
 
 @available(added=1)
-protocol ProtocolToCompose {};
+open(added=1) protocol ProtocolToCompose {};
 
 @available(added=1)
-protocol Protocol {
+open(added=1) protocol Protocol {
     @available(added=1)
     compose ProtocolToCompose;
 
     @available(added=1)
-    Method() -> ();
+    flexible(added=1) Method();
 };
 
 @available(added=1)
@@ -436,6 +460,22 @@ type Foo = struct {};
 )FIDL");
   library.SelectVersion("example", "HEAD");
   library.ExpectFail(ErrPlatformNotOnLibrary);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
+TEST(VersioningAttributeTests, BadInvalidArgumentOnModifier) {
+  TestLibrary library;
+  library.AddFile("bad/fi-0218.test.fidl");
+  library.SelectVersion("test", "HEAD");
+  library.ExpectFail(ErrInvalidModifierAvailableArgument, "deprecated");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
+TEST(VersioningAttributeTests, BadStrictnessTwoWayMethodWithoutError) {
+  TestLibrary library;
+  library.AddFile("bad/fi-0219.test.fidl");
+  library.SelectVersion("test", "HEAD");
+  library.ExpectFail(ErrCannotChangeMethodStrictness);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 

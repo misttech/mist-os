@@ -165,14 +165,13 @@ void MemoryWatchdog::EvictionTrigger() {
   // eviction and blocking some random thread. Therefore we use the asynchronous eviction trigger
   // that will cause the eviction thread to perform the actual eviction work.
   if (eviction_strategy_ == EvictionStrategy::Continuous) {
-    pmm_evictor()->EnableContinuousEviction(min_free_target_, free_mem_target_,
-                                            Evictor::EvictionLevel::OnlyOldest,
-                                            Evictor::Output::Print);
-  } else {
-    pmm_evictor()->EvictOneShotAsynchronous(min_free_target_, free_mem_target_,
-                                            Evictor::EvictionLevel::OnlyOldest,
-                                            Evictor::Output::Print);
+    // Under a continuous eviction strategy we must set continuous_eviction_active_ to true so that
+    // the WorkerThread knows it should bump the evictor when memory states change.
+    continuous_eviction_active_ = true;
   }
+  pmm_evictor()->EvictOneShotAsynchronous(min_free_target_, free_mem_target_,
+                                          Evictor::EvictionLevel::OnlyOldest,
+                                          Evictor::Output::Print);
 }
 
 // Helper called by the memory pressure thread when OOM state is entered.
@@ -300,8 +299,7 @@ void MemoryWatchdog::WorkerThread() {
         // Cancel any outstanding eviction trigger, so that eviction is not accidentally enabled
         // *after* we disable it here.
         eviction_trigger_.Cancel();
-        // Disable continuous eviction.
-        pmm_evictor()->DisableContinuousEviction();
+        continuous_eviction_active_ = false;
       }
 
       // Unsignal the last event that was signaled.
@@ -344,11 +342,9 @@ void MemoryWatchdog::WorkerThread() {
 void MemoryWatchdog::WaitForMemChange(const Deadline& deadline) {
   const PressureLevel prev = mem_event_idx_;
   zx_status_t status = ZX_OK;
-  int iterations = 0;
+  // This loop can iterate many times as it is woken up by both pmm state changes and, if continuous
+  // eviction is enabled, page queues state changes.
   do {
-    if (iterations++ == 10) {
-      printf("WARNING: %s has iterated %d times, possible bug\n", __FUNCTION__, iterations);
-    }
     auto [lower, upper] = FreeMemBoundsForLevel(mem_event_idx_);
     const uint64_t delay_alloc_level =
         mem_event_idx_ == PressureLevel::kOutOfMemory
@@ -367,6 +363,18 @@ void MemoryWatchdog::WaitForMemChange(const Deadline& deadline) {
       // Setting failed, must've raced. Fall through and compute the new pressure level.
     }
     mem_event_idx_ = CalculatePressureLevel();
+    // If continuous eviction is currently active then let the evictor know that it may have some
+    // work to do. This is done by requesting an asynchronous eviction to the free memory target. As
+    // we are running in the context of the WorkerThread, there is no race where active could
+    // transition from true->false, so we will not trigger eviction unnecessarily. Should there be
+    // a false->true race (due to the eviction_trigger_ callback running) then this is fine, since
+    // that callback will set the eviction target.
+    // See the documentation on EvictOneShotAsynchronous for how eviction requests combine, and why
+    // we can repeatedly perform this request correctly.
+    if (continuous_eviction_active_) {
+      pmm_evictor()->EvictOneShotAsynchronous(
+          0, free_mem_target_, Evictor::EvictionLevel::OnlyOldest, Evictor::Output::Print);
+    }
     // In the case where we raced with additional pmm actions keep looping unless the deadline was
     // reached.
   } while (mem_event_idx_ == prev && status == ZX_OK);
@@ -503,6 +511,7 @@ void MemoryWatchdog::Init(Executor* executor) {
 
     if (gBootOptions->oom_evict_continuous) {
       eviction_strategy_ = EvictionStrategy::Continuous;
+      pmm_page_queues()->SetAgingEvent(&mem_state_signal_);
       printf("memory-pressure: eviction strategy - continuous\n");
     } else {
       eviction_strategy_ = EvictionStrategy::OneShot;

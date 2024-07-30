@@ -9,14 +9,13 @@
 # TODO(dje): gdb should let us use a better command class than COMMAND_DATA.
 # TODO(dje): Add arm64 support.
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
 
+import re
 import sys
+
 import gdb
 import gdb.printing
-import re
 from gdb.unwinder import Unwinder
 
 if sys.version_info > (3,):

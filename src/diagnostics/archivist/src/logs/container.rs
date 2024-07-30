@@ -174,9 +174,9 @@ impl LogsArtifactsContainer {
                                         let data = maybe_add_rolled_out_error(
                                             rolled_out_messages,
                                             LogsDataBuilder::new(BuilderArgs {
-                                                moniker: identity.to_string(),
+                                                moniker: identity.moniker.clone(),
                                                 timestamp_nanos: (*last_timestamp).into(),
-                                                component_url: Some(identity.url.to_string()),
+                                                component_url: Some(identity.url.clone()),
                                                 severity: diagnostics_data::Severity::Warn,
                                             })
                                             .add_error(

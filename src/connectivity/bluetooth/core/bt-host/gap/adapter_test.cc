@@ -37,7 +37,8 @@ const DeviceAddress kTestAddrBrEdr(DeviceAddress::Type::kBREDR,
                                    {3, 0, 0, 0, 0, 0});
 
 constexpr FeaturesBits kDefaultFeaturesBits =
-    FeaturesBits::kHciSco | FeaturesBits::kSetAclPriorityCommand;
+    FeaturesBits::kHciSco | FeaturesBits::kHciIso |
+    FeaturesBits::kSetAclPriorityCommand;
 
 class AdapterTest : public TestingBase {
  public:
@@ -101,7 +102,7 @@ class AdapterTest : public TestingBase {
   BT_DISALLOW_COPY_AND_ASSIGN_ALLOW_MOVE(AdapterTest);
 };
 
-class AdapterScoDisabledTest : public AdapterTest {
+class AdapterScoAndIsoDisabledTest : public AdapterTest {
  public:
   void SetUp() override { AdapterTest::SetUp(FeaturesBits{0}); }
 };
@@ -1553,7 +1554,7 @@ TEST_F(AdapterTest, ScoDataChannelNotInitializedBecauseBufferInfoNotAvailable) {
   EXPECT_FALSE(transport()->sco_data_channel());
 }
 
-TEST_F(AdapterScoDisabledTest,
+TEST_F(AdapterScoAndIsoDisabledTest,
        ScoDataChannelFailsToInitializeBecauseScoDisabled) {
   // Return valid buffer information and enable LE support.
   FakeController::Settings settings;
@@ -1577,6 +1578,44 @@ TEST_F(AdapterScoDisabledTest,
   InitializeAdapter(std::move(init_cb));
   EXPECT_TRUE(success);
   EXPECT_FALSE(transport()->sco_data_channel());
+}
+
+TEST_F(AdapterTest, IsoDataChannelInitializedSuccessfully) {
+  FakeController::Settings settings;
+  settings.ApplyDualModeDefaults();
+  test_device()->set_settings(settings);
+
+  bool success = false;
+  auto init_cb = [&](bool cb_success) { success = cb_success; };
+  InitializeAdapter(std::move(init_cb));
+  EXPECT_TRUE(success);
+  EXPECT_TRUE(transport()->iso_data_channel());
+}
+
+TEST_F(AdapterTest, IsoDataChannelNotInitializedNoBufferData) {
+  FakeController::Settings settings;
+  settings.ApplyDualModeDefaults();
+  settings.iso_data_packet_length = 0;
+  settings.total_num_iso_data_packets = 0;
+  test_device()->set_settings(settings);
+
+  bool success = false;
+  auto init_cb = [&](bool cb_success) { success = cb_success; };
+  InitializeAdapter(std::move(init_cb));
+  EXPECT_TRUE(success);
+  EXPECT_FALSE(transport()->iso_data_channel());
+}
+
+TEST_F(AdapterScoAndIsoDisabledTest, IsoDataChannelNoControllerSupport) {
+  FakeController::Settings settings;
+  settings.ApplyDualModeDefaults();
+  test_device()->set_settings(settings);
+
+  bool success = false;
+  auto init_cb = [&](bool cb_success) { success = cb_success; };
+  InitializeAdapter(std::move(init_cb));
+  EXPECT_TRUE(success);
+  EXPECT_FALSE(transport()->iso_data_channel());
 }
 
 TEST_F(AdapterTest, InitializeWriteSecureConnectionsHostSupport) {
@@ -1639,12 +1678,12 @@ void AdapterTest::GetSupportedDelayRangeHelper(
   InitializeAdapter([&](bool success) { init_success = success; });
   ASSERT_TRUE(init_success);
 
-  zx_status_t cb_status =
-      ZX_ERR_NO_MEMORY;  // Error code that should never be returned
+  pw::Status cb_status =
+      PW_STATUS_DATA_LOSS;  // Error code that should never be returned
   uint32_t min_delay_us = -1;
   uint32_t max_delay_us = -1;
   Adapter::GetSupportedDelayRangeCallback cb =
-      [&](zx_status_t status, uint32_t min_delay, uint32_t max_delay) {
+      [&](pw::Status status, uint32_t min_delay, uint32_t max_delay) {
         cb_status = status;
         min_delay_us = min_delay;
         max_delay_us = max_delay;
@@ -1665,9 +1704,9 @@ void AdapterTest::GetSupportedDelayRangeHelper(
       std::move(cb));
   RunUntilIdle();
   if (!supported) {
-    EXPECT_EQ(cb_status, ZX_ERR_NOT_SUPPORTED);
+    EXPECT_EQ(cb_status, PW_STATUS_UNIMPLEMENTED);
   } else {
-    EXPECT_EQ(cb_status, ZX_OK);
+    EXPECT_TRUE(cb_status.ok());
     EXPECT_LE(min_delay_us, max_delay_us);
     EXPECT_LE(max_delay_us, 0x3D0900u);
   }

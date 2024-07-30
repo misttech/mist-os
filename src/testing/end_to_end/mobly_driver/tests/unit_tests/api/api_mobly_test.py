@@ -1,18 +1,16 @@
-#!/usr/bin/env fuchsia-vendored-python
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 """Unit tests for Mobly driver's api_mobly.py."""
 
-import unittest
 import json
+import unittest
+from tempfile import NamedTemporaryFile
 from typing import Any
 
-from tempfile import NamedTemporaryFile
 from mobly import config_parser, keys
-from parameterized import parameterized, param
-
 from mobly_driver.api import api_mobly
+from parameterized import param, parameterized
 
 
 class ApiMoblyTest(unittest.TestCase):

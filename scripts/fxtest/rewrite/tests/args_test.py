@@ -88,6 +88,14 @@ class TestArgs(unittest.TestCase):
                 "invalid environment variable formatting is checked",
                 ["-e", "abcd"],
             ),
+            (
+                "--break-on-failure and --breakpoint flags are not supported with host tests.",
+                ["--break-on-failure", "--host"],
+            ),
+            (
+                "--break-on-failure and --breakpoint flags are not supported with host tests.",
+                ["--breakpoint", "test.cc:123", "--host"],
+            ),
         ]
     )
     @mock.patch("args.termout.is_valid", return_value=False)

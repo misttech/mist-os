@@ -4,8 +4,9 @@
 
 //! Type-safe bindings for Zircon object properties.
 
-use fuchsia_zircon_sys as sys;
+use crate::{sys, HandleRef, Status};
 use std::ops::Deref;
+use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
 
 /// Object property types for use with [object_get_property()] and [object_set_property].
 #[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq, Hash)]
@@ -32,11 +33,11 @@ impl Deref for Property {
 /// It must be valid to treat `PropTy` as its corresponding property type and
 /// writing the property type to a `PropTy` must completely initialize it. That
 /// is, `PropTy` must be "transparent" over the property type.
-pub unsafe trait PropertyQuery {
+pub(crate) unsafe trait PropertyQuery {
     /// The raw `Property` value
     const PROPERTY: Property;
     /// The data type of this property
-    type PropTy;
+    type PropTy: AsBytes + FromBytes + FromZeros + NoCell;
 }
 
 assoc_values!(Property, [
@@ -58,3 +59,42 @@ assoc_values!(Property, [
     VMO_CONTENT_SIZE = sys::ZX_PROP_VMO_CONTENT_SIZE;
     STREAM_MODE_APPEND = sys::ZX_PROP_STREAM_MODE_APPEND;
 ]);
+
+/// Get a property on a zircon object
+pub(crate) fn object_get_property<P: PropertyQuery>(
+    handle: HandleRef<'_>,
+) -> Result<P::PropTy, Status>
+where
+    P::PropTy: FromBytes + FromZeros + NoCell,
+{
+    // this is safe due to the contract on the P::PropTy type in the ObjectProperty trait.
+    let mut out = ::std::mem::MaybeUninit::<P::PropTy>::uninit();
+    let status = unsafe {
+        sys::zx_object_get_property(
+            handle.raw_handle(),
+            *P::PROPERTY,
+            out.as_mut_ptr() as *mut u8,
+            std::mem::size_of::<P::PropTy>(),
+        )
+    };
+    Status::ok(status).map(|_| unsafe { out.assume_init() })
+}
+
+/// Set a property on a zircon object
+pub(crate) fn object_set_property<P: PropertyQuery>(
+    handle: HandleRef<'_>,
+    val: &P::PropTy,
+) -> Result<(), Status>
+where
+    P::PropTy: AsBytes + NoCell,
+{
+    let status = unsafe {
+        sys::zx_object_set_property(
+            handle.raw_handle(),
+            *P::PROPERTY,
+            val as *const P::PropTy as *const u8,
+            std::mem::size_of::<P::PropTy>(),
+        )
+    };
+    Status::ok(status)
+}

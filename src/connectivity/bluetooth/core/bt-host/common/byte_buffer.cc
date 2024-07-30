@@ -6,8 +6,9 @@
 
 #include <string>
 
+#include <pw_string/utf_codecs.h>
+
 #include "src/connectivity/bluetooth/lib/cpp-string/string_printf.h"
-#include "src/connectivity/bluetooth/lib/cpp-string/utf_codecs.h"
 
 namespace bt {
 
@@ -30,7 +31,7 @@ std::string ByteBuffer::Printable(size_t pos, size_t size) const {
 
   // If the region already contains only valid UTF-8 characters, it's already
   // printable
-  if (bt_lib_cpp_string::IsStringUTF8(view)) {
+  if (pw::utf8::IsStringValid(view)) {
     return std::string(view);
   }
 

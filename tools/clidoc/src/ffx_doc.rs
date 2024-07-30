@@ -243,13 +243,8 @@ fn write_subcommand_list(
     writeln!(output_writer, "----------- | ------")?;
 
     for cmd in commands {
-        writeln!(
-            output_writer,
-            "| [{}](#{}) | {}",
-            cmd.name,
-            cmd.name,
-            escape_text(&cmd.command.description)
-        )?;
+        let first_line = cmd.command.description.lines().next().unwrap_or(&cmd.command.description);
+        writeln!(output_writer, "| [{}](#{}) | {}", cmd.name, cmd.name, escape_text(first_line))?;
     }
     writeln!(output_writer, "\n")?;
     Ok(())

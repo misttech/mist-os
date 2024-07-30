@@ -5,7 +5,7 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_REGISTERS_DDI_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_REGISTERS_DDI_H_
 
-#include <lib/ddk/debug.h>
+#include <lib/driver/logging/cpp/logger.h>
 #include <zircon/assert.h>
 
 #include <cstdint>
@@ -899,7 +899,7 @@ class TypeCDdiClockSelect : public hwreg::RegisterBase<TypeCDdiClockSelect, uint
     if (IsValidClockSelect(raw)) {
       return static_cast<ClockSelect>(raw);
     }
-    zxlogf(WARNING, "Invalid clock_select field: 0x%x", raw);
+    FDF_LOG(WARNING, "Invalid clock_select field: 0x%x", raw);
     return std::nullopt;
   }
 

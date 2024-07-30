@@ -8,8 +8,8 @@ import("//build/drivers.gni")
 import("//build/test.gni")
 
 driver_bind_rules("intel-i915-bind") {
-  rules = "intel-i915.bind"
-  tests = "bind_tests.json"
+  rules = "meta/intel-i915.bind"
+  tests = "meta/bind_tests.json"
 
   deps = [
     "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_bindlib",
@@ -98,21 +98,29 @@ source_set("common_srcs") {
     "//sdk/banjo/fuchsia.hardware.display.controller:fuchsia.hardware.display.controller_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.i2cimpl:fuchsia.hardware.i2cimpl_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.intelgpucore:fuchsia.hardware.intelgpucore_banjo_cpp",
+    "//sdk/fidl/fuchsia.device.manager:fuchsia.device.manager_cpp",
     "//sdk/fidl/fuchsia.hardware.backlight:fuchsia.hardware.backlight_cpp",
     "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_cpp",
+    "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp",
     "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp",
+    "//sdk/lib/driver/compat/cpp",
     "//sdk/lib/driver/component/cpp",
+    "//sdk/lib/driver/incoming/cpp",
+    "//sdk/lib/driver/logging/cpp",
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
     "//sdk/lib/stdcompat",
     "//sdk/lib/zbi-format",
     "//src/devices/bin/driver_runtime",
+    "//src/devices/bind/fuchsia:fuchsia_cpp",
+    "//src/devices/bind/fuchsia.display:fuchsia.display_cpp",
+    "//src/devices/bind/fuchsia.intel.platform.gpucore:fuchsia.intel.platform.gpucore_cpp",
     "//src/devices/bind/fuchsia.sysmem.heap:fuchsia.sysmem.heap_cpp",
-    "//src/devices/lib/driver",
     "//src/devices/lib/mmio",
     "//src/devices/pci/lib/device-protocol-pci",
     "//src/devices/pci/lib/pci",
     "//src/graphics/display/lib/api-types-cpp",
     "//src/lib/ddk",
+    "//src/lib/ddk:ddk-hw-headers",
     "//src/lib/ddktl",
     "//src/lib/fxl",
     "//src/lib/zbitl",
@@ -126,9 +134,6 @@ source_set("common_srcs") {
     "//zircon/system/ulib/zircon-internal",
     "//zircon/system/ulib/zx",
   ]
-
-  # TODO(https://fxbug.dev/42085293): delete the below and fix compiler warnings
-  configs += [ "//build/config:Wno-vla-cxx-extension" ]
 }
 
 fuchsia_driver("intel-i915-driver") {
@@ -139,7 +144,7 @@ fuchsia_driver("intel-i915-driver") {
 fuchsia_driver_component("intel-i915") {
   component_name = "intel-i915"
   deps = [ ":intel-i915-driver" ]
-  info = "intel-i915-info.json"
+  info = "meta/intel-i915-info.json"
   manifest = "meta/intel-i915.cml"
 }
 
@@ -148,7 +153,7 @@ fuchsia_driver_package("package") {
   driver_components = [ ":intel-i915" ]
 }
 
-test("intel-i915-test") {
+test("intel-i915-tests") {
   configs += [ "//build/config:all_source" ]
   sources = [
     "acpi-memory-region-unittest.cc",
@@ -195,18 +200,28 @@ test("intel-i915-test") {
     ":common_srcs",
     "testing:fake-framebuffer",
     "testing:mock-allocator",
+    "//sdk/fidl/fuchsia.device.manager:fuchsia.device.manager_cpp",
     "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_cpp_testing",
+    "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp",
+    "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp",
     "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp_testing",
     "//sdk/lib/async-loop-testing/cpp",
     "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/component/outgoing/cpp",
+    "//sdk/lib/driver/runtime:driver_runtime_cpp",
     "//sdk/lib/driver/testing/cpp",
+    "//sdk/lib/driver/testing/cpp:scoped_global_logger",
+    "//sdk/lib/zbi-format",
     "//src/devices/bin/driver_runtime",
+    "//src/devices/bind/fuchsia:fuchsia_cpp",
+    "//src/devices/bind/fuchsia.display:fuchsia.display_cpp",
+    "//src/devices/bind/fuchsia.intel.platform.gpucore:fuchsia.intel.platform.gpucore_cpp",
     "//src/devices/lib/mmio:test_helper",
     "//src/devices/pci/testing:pci-protocol-fake",
     "//src/devices/testing/fake-mmio-reg",
-    "//src/devices/testing/mock-ddk",
+    "//src/devices/testing/fake-resource",
     "//src/devices/testing/mock-mmio-range",
+    "//src/graphics/display/lib/api-types-cpp",
     "//src/lib/fsl",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/predicates",
@@ -222,15 +237,15 @@ group("tests") {
   testonly = true
   deps = [
     ":intel-i915-bind_test",
-    ":intel-i915-test-package",
+    ":intel-i915-tests-package",
     "testing:tests",
   ]
 }
 
-fuchsia_unittest_package("intel-i915-test-package") {
-  package_name = "intel-i915-test"
-  deps = [ ":intel-i915-test" ]
-  manifest = "meta/intel-i915-test.cml"
+fuchsia_unittest_package("intel-i915-tests-package") {
+  package_name = "intel-i915-tests"
+  deps = [ ":intel-i915-tests" ]
+  manifest = "meta/intel-i915-tests.cml"
   test_specs = {
     log_settings = {
       max_severity = "ERROR"

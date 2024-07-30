@@ -25,12 +25,11 @@ import os
 import re
 import subprocess
 import sys
-
-import fuchsia
-import cl_utils
-
 from pathlib import Path
 from typing import Any, Iterable, Sequence
+
+import cl_utils
+import fuchsia
 
 _SCRIPT_BASENAME = Path(__file__).name
 

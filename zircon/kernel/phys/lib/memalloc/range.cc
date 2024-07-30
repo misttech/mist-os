@@ -4,6 +4,7 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
+#include <inttypes.h>
 #include <lib/memalloc/range.h>
 #include <lib/stdcompat/span.h>
 #include <lib/zbi-format/memory.h>
@@ -11,7 +12,19 @@
 #include <string_view>
 #include <type_traits>
 
+#include <pretty/cpp/sizes.h>
+
 namespace memalloc {
+
+namespace {
+
+// Two hex `uint64_t`s, plus "[0x", ", 0x", and ")".
+constexpr int kRangeColWidth = (2 * 16) + 3 + 4 + 1;
+
+// A rough estimate: 4 digits, a decimal point, and a letter for a size.
+constexpr int kSizeColWidth = 7;
+
+}  // namespace
 
 using namespace std::string_view_literals;
 
@@ -78,6 +91,19 @@ cpp20::span<Range> AsRanges(cpp20::span<zbi_mem_range_t> ranges) {
     range.reserved = 0;
   }
   return {reinterpret_cast<Range*>(ranges.data()), ranges.size()};
+}
+
+void internal::PrintRangeHeader(const char* prefix, FILE* f) {
+  fprintf(f, "%s: | %-*s | %-*s | Type\n", prefix, kRangeColWidth, "Physical memory range",
+          kSizeColWidth, "Size");
+}
+
+void internal::PrintOneRange(const memalloc::Range& range, const char* prefix, FILE* f) {
+  pretty::FormattedBytes size(static_cast<size_t>(range.size));
+  std::string_view type = ToString(range.type);
+  fprintf(f, "%s: | [0x%016" PRIx64 ", 0x%016" PRIx64 ") | %*s | %-.*s\n",  //
+          prefix, range.addr, range.end(),                                  //
+          kSizeColWidth, size.c_str(), static_cast<int>(type.size()), type.data());
 }
 
 }  // namespace memalloc

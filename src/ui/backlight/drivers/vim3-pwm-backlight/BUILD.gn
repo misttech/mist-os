@@ -9,9 +9,9 @@ import("//build/fidl/fidl.gni")
 import("//build/test.gni")
 
 driver_bind_rules("vim3-pwm-backlight-bind") {
-  rules = "vim3-pwm-backlight.bind"
+  rules = "meta/vim3-pwm-backlight.bind"
   bind_output = "vim3-pwm-backlight.bindbc"
-  tests = "vim3-pwm-backlight-bind-test.json"
+  tests = "meta/vim3-pwm-backlight-bind-test.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_bindlib",
     "//sdk/fidl/fuchsia.hardware.pwm:fuchsia.hardware.pwm_bindlib",
@@ -56,7 +56,7 @@ fuchsia_driver("vim3-pwm-backlight-driver") {
 fuchsia_driver_component("vim3-pwm-backlight") {
   component_name = "vim3-pwm-backlight"
   deps = [ ":vim3-pwm-backlight-driver" ]
-  info = "vim3-pwm-backlight-info.json"
+  info = "meta/vim3-pwm-backlight-info.json"
   manifest = "meta/vim3-pwm-backlight.cml"
 }
 

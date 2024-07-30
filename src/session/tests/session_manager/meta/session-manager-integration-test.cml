@@ -22,6 +22,7 @@
         {
             name: "session",
             durability: "transient",
+            allowed_offers: "static_and_dynamic",
         },
     ],
     use: [

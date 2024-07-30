@@ -80,6 +80,7 @@ class EmulatorDevice : public fidl::WireAsyncEventHandler<fuchsia_driver_framewo
                      EncodeCommandCompleter::Sync& completer) override;
   void OpenHci(OpenHciCompleter::Sync& completer) override;
   void OpenHciTransport(OpenHciTransportCompleter::Sync& completer) override;
+  void OpenSnoop(OpenSnoopCompleter::Sync& completer) override;
   void handle_unknown_method(
       fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Vendor> metadata,
       fidl::UnknownMethodCompleter::Sync& completer) override;

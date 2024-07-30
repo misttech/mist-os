@@ -180,18 +180,15 @@ impl Into<fpb::ModifyDependencyError> for ModifyDependencyError {
 }
 
 #[derive(Debug)]
-pub enum InspectError {
-    NotFound,
-}
-
-#[derive(Debug)]
 pub struct Topology {
     elements: HashMap<ElementID, Element>,
     assertive_dependencies: HashMap<ElementLevel, Vec<ElementLevel>>,
     opportunistic_dependencies: HashMap<ElementLevel, Vec<ElementLevel>>,
     unsatisfiable_element_id: ElementID,
     inspect_graph: IGraph<ElementID>,
-    _inspect_node: INode, // keeps inspect_graph alive
+    _inspect_node: INode,                       // keeps inspect_graph alive
+    synthetic_inspect_graph: IGraph<ElementID>, // holds synthetic nodes
+    _synthetic_inspect_node: INode,             // keeps synthetic_inspect_graph
 }
 
 impl Topology {
@@ -200,6 +197,7 @@ impl Topology {
         [fpb::PowerLevel::MIN, fpb::PowerLevel::MAX];
 
     pub fn new(inspect_node: INode, inspect_max_event: usize) -> Self {
+        let synthetic_inspect_node = inspect_node.create_child("fuchsia.inspect.synthetic.Graph");
         let mut topology = Topology {
             elements: HashMap::new(),
             assertive_dependencies: HashMap::new(),
@@ -210,6 +208,8 @@ impl Topology {
                 IGraphOpts::default().track_events(inspect_max_event),
             ),
             _inspect_node: inspect_node,
+            synthetic_inspect_graph: IGraph::new(&synthetic_inspect_node, IGraphOpts::default()),
+            _synthetic_inspect_node: synthetic_inspect_node,
         };
         topology.unsatisfiable_element_id = topology
             .add_element(
@@ -250,12 +250,31 @@ impl Topology {
         name: &str,
         valid_levels: Vec<fpb::PowerLevel>,
     ) -> Result<ElementID, AddElementError> {
+        self.add_element_internal(name, valid_levels, false)
+    }
+
+    pub fn add_synthetic_element(
+        &mut self,
+        name: &str,
+        valid_levels: Vec<fpb::PowerLevel>,
+    ) -> Result<ElementID, AddElementError> {
+        self.add_element_internal(name, valid_levels, true)
+    }
+
+    fn add_element_internal(
+        &mut self,
+        name: &str,
+        valid_levels: Vec<fpb::PowerLevel>,
+        synthetic: bool,
+    ) -> Result<ElementID, AddElementError> {
         let id: ElementID = if ID_DEBUG_MODE {
             ElementID::from(name)
         } else {
             ElementID::from(Uuid::new_v4().as_simple().to_string())
         };
-        let inspect_vertex = self.inspect_graph.add_vertex(
+        let inspect_graph =
+            if synthetic { &self.synthetic_inspect_graph } else { &self.inspect_graph };
+        let inspect_vertex = inspect_graph.add_vertex(
             id.clone(),
             [
                 IGraphMeta::new("name", name),
@@ -514,7 +533,7 @@ impl Topology {
             return Err(ModifyDependencyError::AlreadyExists);
         }
         required_levels.push(dep.requires.clone());
-        self.add_inspect_for_dependency(dep, true)?;
+        self.add_inspect_for_dependency(dep, true);
         Ok(())
     }
 
@@ -535,7 +554,7 @@ impl Topology {
             return Err(ModifyDependencyError::NotFound(dep.requires.element_id.clone()));
         }
         required_levels.retain(|el| el != &dep.requires);
-        self.remove_inspect_for_dependency(dep)?;
+        self.remove_inspect_for_dependency(dep);
         Ok(())
     }
 
@@ -556,7 +575,7 @@ impl Topology {
             return Err(ModifyDependencyError::AlreadyExists);
         }
         required_levels.push(dep.requires.clone());
-        self.add_inspect_for_dependency(dep, false)?;
+        self.add_inspect_for_dependency(dep, false);
         Ok(())
     }
 
@@ -577,19 +596,16 @@ impl Topology {
             return Err(ModifyDependencyError::NotFound(dep.requires.element_id.clone()));
         }
         required_levels.retain(|el| el != &dep.requires);
-        self.remove_inspect_for_dependency(dep)?;
+        self.remove_inspect_for_dependency(dep);
         Ok(())
     }
 
-    fn add_inspect_for_dependency(
-        &mut self,
-        dep: &Dependency,
-        is_assertive: bool,
-    ) -> Result<(), ModifyDependencyError> {
+    fn add_inspect_for_dependency(&mut self, dep: &Dependency, is_assertive: bool) {
         let (dp_id, rq_id) = (&dep.dependent.element_id, &dep.requires.element_id);
         let (Some(dp), Some(rq)) = (self.elements.get(dp_id), self.elements.get(rq_id)) else {
             // elements[dp_id] and elements[rq_id] guaranteed by prior validation
-            return Err(ModifyDependencyError::Invalid);
+            tracing::error!(?dep, "Failed to add inspect for dependency.");
+            return;
         };
         let (dp_level, rq_level) = (dep.dependent.level, dep.requires.level);
         dp.inspect_edges
@@ -608,27 +624,28 @@ impl Topology {
                 dp_level.to_string(),
                 format!("{}{}", rq_level, if is_assertive { "" } else { "p" }),
             );
-        Ok(())
     }
 
-    fn remove_inspect_for_dependency(
-        &mut self,
-        dep: &Dependency,
-    ) -> Result<(), ModifyDependencyError> {
+    fn remove_inspect_for_dependency(&mut self, dep: &Dependency) {
         // elements[dp_id] and elements[rq_id] guaranteed by prior validation
         let (dp_id, rq_id) = (&dep.dependent.element_id, &dep.requires.element_id);
-        let dp = self.elements.get(dp_id).ok_or(ModifyDependencyError::Invalid)?;
+        let Some(dp) = self.elements.get(dp_id) else {
+            tracing::error!(?dp_id, "Missing element for removal");
+            return;
+        };
         let mut dp_edges = dp.inspect_edges.borrow_mut();
-        let inspect = dp_edges.get_mut(rq_id).ok_or(ModifyDependencyError::Invalid)?;
+        let Some(inspect) = dp_edges.get_mut(rq_id) else {
+            tracing::error!(?rq_id, "Missing edge for removal");
+            return;
+        };
         inspect.meta().remove(&dep.dependent.level.to_string());
-        Ok(())
     }
 
     pub fn inspect_for_element<'a>(
         &self,
         element_id: &'a ElementID,
-    ) -> Result<Rc<RefCell<IGraphVertex<ElementID>>>, InspectError> {
-        Ok(Rc::clone(&self.elements.get(element_id).ok_or(InspectError::NotFound)?.inspect_vertex))
+    ) -> Option<Rc<RefCell<IGraphVertex<ElementID>>>> {
+        Some(Rc::clone(&self.elements.get(element_id)?.inspect_vertex))
     }
 }
 
@@ -664,6 +681,7 @@ mod tests {
         let v01: Vec<u64> = BINARY_POWER_LEVELS.iter().map(|&v| v as u64).collect();
         assert_data_tree!(inspect, root: {
             test: {
+                "fuchsia.inspect.synthetic.Graph": contains {},
                 "fuchsia.inspect.Graph": {
                     topology: {
                         t.get_unsatisfiable_element_id().to_string() => {
@@ -719,6 +737,7 @@ mod tests {
         .expect("add_assertive_dependency failed");
         assert_data_tree!(inspect, root: {
            test: {
+            "fuchsia.inspect.synthetic.Graph": contains {},
                 "fuchsia.inspect.Graph": {
                     topology: {
             t.get_unsatisfiable_element().id.to_string() => {
@@ -785,6 +804,7 @@ mod tests {
         .expect("remove_assertive_dependency failed");
         assert_data_tree!(inspect, root: {
            test: {
+            "fuchsia.inspect.synthetic.Graph": contains {},
                 "fuchsia.inspect.Graph": {
                     topology: {
                         t.get_unsatisfiable_element().id.to_string() => {
@@ -864,6 +884,7 @@ mod tests {
 
         assert_data_tree!(inspect, root: {
            test: {
+            "fuchsia.inspect.synthetic.Graph": contains {},
                 "fuchsia.inspect.Graph": {
                     topology: {
                         t.get_unsatisfiable_element().id.to_string() => {
@@ -913,6 +934,7 @@ mod tests {
 
         assert_data_tree!(inspect, root: {
            test: {
+            "fuchsia.inspect.synthetic.Graph": contains {},
                 "fuchsia.inspect.Graph": {
                     topology: {
                         t.get_unsatisfiable_element().id.to_string() => {
@@ -953,7 +975,9 @@ mod tests {
             requires: ElementLevel { element_id: earth.clone(), level: BINARY_POWER_LEVEL_ON },
         })
         .expect("add_assertive_dependency failed");
-        assert_data_tree!(inspect, root: { test: { "fuchsia.inspect.Graph": { "topology": {
+        assert_data_tree!(inspect, root: { test: {
+            "fuchsia.inspect.synthetic.Graph": contains {},
+            "fuchsia.inspect.Graph": { "topology": {
             t.get_unsatisfiable_element().id.to_string() => {
                 meta: {
                     name: t.get_unsatisfiable_element().name,
@@ -989,7 +1013,7 @@ mod tests {
 
         t.remove_element(&earth);
         assert_eq!(t.element_exists(&earth), false);
-        assert_data_tree!(inspect, root: { test: { "fuchsia.inspect.Graph": { "topology": {
+        assert_data_tree!(inspect, root: { test: { "fuchsia.inspect.synthetic.Graph": contains {}, "fuchsia.inspect.Graph": { "topology": {
             t.get_unsatisfiable_element().id.to_string() => {
                 meta: {
                     name: t.get_unsatisfiable_element().name,
@@ -1052,6 +1076,7 @@ mod tests {
         t.add_assertive_dependency(&cd2).expect("add_assertive_dependency failed");
         assert_data_tree!(inspect, root: {
             test: {
+                "fuchsia.inspect.synthetic.Graph": contains {},
                 "fuchsia.inspect.Graph": {
                     topology: {
                         t.get_unsatisfiable_element().id.to_string() => {
@@ -1154,6 +1179,7 @@ mod tests {
         let e = t.add_element("E", vec![0, 1]).expect("add_element failed");
         assert_data_tree!(inspect, root: {
             test: {
+                "fuchsia.inspect.synthetic.Graph": contains {},
                 "fuchsia.inspect.Graph": {
                     topology: {
                         t.get_unsatisfiable_element().id.to_string() => {
@@ -1264,6 +1290,7 @@ mod tests {
         t.add_assertive_dependency(&d1_e1).expect("add_assertive_dependency failed");
         assert_data_tree!(inspect, root: {
             test: {
+                "fuchsia.inspect.synthetic.Graph": contains {},
                 "fuchsia.inspect.Graph": {
                     topology: {
                         t.get_unsatisfiable_element().id.to_string() => {

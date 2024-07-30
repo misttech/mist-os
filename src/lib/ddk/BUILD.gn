@@ -155,7 +155,6 @@ sdk_static_library("ddk") {
     "//src/devices/block/drivers/pci-sdhci:*",
     "//src/devices/block/drivers/ramdisk:*",
     "//src/devices/block/drivers/sdhci:*",
-    "//src/devices/block/drivers/ufs:*",
     "//src/devices/block/drivers/ums-function:*",
     "//src/devices/block/drivers/usb-mass-storage:*",
     "//src/devices/block/drivers/zxcrypt:*",
@@ -240,7 +239,6 @@ sdk_static_library("ddk") {
     "//src/devices/serial/drivers/aml-uart:*",
     "//src/devices/serial/drivers/ftdi:*",
     "//src/devices/serial/drivers/ftdi/test:*",
-    "//src/devices/serial/drivers/serial:*",
     "//src/devices/serial/drivers/uart16550:*",
     "//src/devices/serial/drivers/usb-cdc-acm:*",
     "//src/devices/spi/bin/spiutil:*",
@@ -313,7 +311,6 @@ sdk_static_library("ddk") {
     "//src/graphics/display/drivers/goldfish-display:*",
     "//src/graphics/display/drivers/intel-i915:*",
     "//src/graphics/display/drivers/simple:*",
-    "//src/graphics/display/drivers/virtio-guest/v1:*",
     "//src/graphics/display/lib/designware-dsi:*",
     "//src/graphics/display/lib/designware-hdmi:*",
     "//src/graphics/display/lib/designware-hdmi/test:*",
@@ -408,7 +405,6 @@ library_headers("ddk-metadata-headers") {
     "ddk/metadata/clock.h",
     "ddk/metadata/display.h",
     "ddk/metadata/gpio.h",
-    "ddk/metadata/lights.h",
     "ddk/metadata/nand.h",
     "ddk/metadata/test.h",
   ]
@@ -511,4 +507,11 @@ sdk_source_set("ddk_metadata") {
   public = [ "include/lib/ddk/metadata.h" ]
   non_sdk_deps = [ ":ddk_metadata_only" ]
   public_deps = [ "//sdk/lib/zbi-format" ]
+}
+
+library_headers("ddk-hw-headers") {
+  headers = [
+    "lib/ddk/hw/arch_ops.h",
+    "lib/ddk/hw/inout.h",
+  ]
 }

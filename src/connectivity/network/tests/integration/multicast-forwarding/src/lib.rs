@@ -1549,6 +1549,67 @@ async fn add_multicast_route<I: Ip, N: Netstack>(
         .await;
 }
 
+/// Verify that installing a multicast route overwrites an existing route with
+/// the same src/dst address tuple.
+#[netstack_test]
+#[variant(N, Netstack)]
+#[variant(I, Ip)]
+async fn overwrite_multicast_route<I: Ip, N: Netstack>(name: &str) {
+    // Setup a network with one server and two clients.
+    // Originally, install a multicast route to forward packets to Client A, and
+    // later overwrite it with a multicast route to forward packets to Client B.
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let router_realm = create_router_realm::<N>(name, &sandbox);
+    let test_network = MulticastForwardingNetwork::new::<N>(
+        name,
+        I::VERSION,
+        &sandbox,
+        &router_realm,
+        vec![Server::A],
+        vec![Client::A, Client::B],
+        MulticastForwardingNetworkOptions::default(),
+    )
+    .await;
+
+    let addresses = test_network.create_unicast_source_and_multicast_destination(
+        test_network.get_device_address(DeviceAddress::Server(Server::A)),
+        IpAddrType::Multicast.address(I::VERSION),
+    );
+
+    // Construct a route action to forward packets to the given client.
+    let route_action_forward_to_client = |client| {
+        fnet_multicast_admin::Action::OutgoingInterfaces(vec![
+            fnet_multicast_admin::OutgoingInterfaces {
+                id: test_network.get_client(client).device.router_interface.id(),
+                min_ttl: 1,
+            },
+        ])
+    };
+
+    let controller = test_network.create_multicast_controller();
+
+    for (client_with_route, client_without_route) in
+        [(Client::A, Client::B), (Client::B, Client::A)]
+    {
+        let route = fnet_multicast_admin::Route {
+            expected_input_interface: Some(
+                test_network.get_server(Server::A).router_interface.id(),
+            ),
+            action: Some(route_action_forward_to_client(client_with_route)),
+            ..Default::default()
+        };
+        controller.add_route(addresses.clone(), route).await.expect("add route should succeed");
+        // Send & receive a multicast packet, verifying the correct client
+        // receives the packet.
+        test_network
+            .send_and_receive_multicast_packet(hashmap! {
+                client_with_route => true,
+                client_without_route => false,
+            })
+            .await;
+    }
+}
+
 #[netstack_test]
 #[variant(I, Ip)]
 #[variant(N, Netstack)]

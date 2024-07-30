@@ -7,7 +7,7 @@ import("//build/test.gni")
 
 group("tests") {
   testonly = true
-  deps = [ ":block_client_unit_test_pkg" ]
+  deps = [ ":block_client_test_pkg" ]
 }
 
 # Temporary config to allow block client headers to be included in the old <block-client/...> way.
@@ -76,7 +76,6 @@ static_library("cpp") {
   deps = [
     "//sdk/fidl/fuchsia.device:fuchsia.device_cpp",
     "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_cpp",
-    "//sdk/fidl/fuchsia.hardware.block.volume:fuchsia.hardware.block.volume_cpp",
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fdio",
@@ -154,7 +153,30 @@ test("block_client_unit_test") {
   configs += [ "//build/config:Wno-vla-cxx-extension" ]
 }
 
-fuchsia_unittest_package("block_client_unit_test_pkg") {
-  package_name = "block_client_unit_test"
+test("block_client_ramdisk_test") {
+  sources = [ "ramdisk_test.cc" ]
+  deps = [
+    ":cpp",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/storage/testing:storage_driver_test_support",
+    "//src/storage/testing/driver_test_realm",
+  ]
+}
+
+fuchsia_unittest_component("block_client_unit_test_component") {
+  component_name = "block_client_unit_test"
   deps = [ ":block_client_unit_test" ]
+}
+
+fuchsia_unittest_component("block_client_ramdisk_test_component") {
+  component_name = "block_client_ramdisk_test"
+  deps = [ ":block_client_ramdisk_test" ]
+}
+
+fuchsia_test_package("block_client_test_pkg") {
+  package_name = "block_client_tests"
+  test_components = [
+    ":block_client_unit_test_component",
+    ":block_client_ramdisk_test_component",
+  ]
 }

@@ -15,7 +15,6 @@
 #include <zircon/errors.h>
 #include <zircon/types.h>
 
-#include <fbl/auto_lock.h>
 #include <fbl/ref_ptr.h>
 #include <kernel/mutex.h>
 #include <ktl/algorithm.h>
@@ -313,11 +312,11 @@ zx_status_t VmObject::GetPageBlocking(uint64_t offset, uint pf_flags, list_node*
   zx_status_t status = ZX_OK;
   // TOOD(https://fxbug.dev/42175933): Enforce no locks held as this might wait whilst holding a
   // lock.
-  __UNINITIALIZED LazyPageRequest page_request;
+  __UNINITIALIZED MultiPageRequest page_request;
   do {
     status = GetPage(offset, pf_flags, alloc_list, &page_request, page, pa);
     if (status == ZX_ERR_SHOULD_WAIT) {
-      zx_status_t st = page_request->Wait();
+      zx_status_t st = page_request.Wait();
       if (st != ZX_OK) {
         return st;
       }

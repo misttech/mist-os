@@ -58,7 +58,7 @@ fn build_info_impl(raw_version_info: String, raw_build_version: String) -> Versi
     let hash_opt = if raw_hash.is_empty() { None } else { Some(raw_hash) };
     let timestamp_str = split.get(1).unwrap();
     let timestamp = timestamp_str.parse::<u64>().ok();
-    let vh = version_history::HISTORY.get_misleading_version_for_ffx();
+    let vh = version_history_data::HISTORY.get_misleading_version_for_ffx();
 
     return VersionInfo {
         commit_hash: hash_opt,
@@ -87,7 +87,7 @@ mod test {
         let s = format!("{}-{}", HASH, TIMESTAMP);
         let result = build_info_impl(s, FAKE_BUILD_VERSION.to_string());
 
-        let version = version_history::HISTORY.get_misleading_version_for_ffx();
+        let version = version_history_data::HISTORY.get_misleading_version_for_ffx();
         assert_eq!(
             result,
             VersionInfo {
@@ -110,7 +110,7 @@ mod test {
         let s = format!("{}-{}", HASH, TIMESTAMP);
         let result = build_info_impl(s, FAKE_BUILD_VERSION.to_string());
 
-        let version = version_history::HISTORY.get_misleading_version_for_ffx();
+        let version = version_history_data::HISTORY.get_misleading_version_for_ffx();
         assert_eq!(
             result,
             VersionInfo {
@@ -166,7 +166,7 @@ mod test {
     fn test_invalid_string_clean_missing_hash() {
         let result = build_info_impl(format!("-{}", TIMESTAMP), FAKE_BUILD_VERSION.to_string());
 
-        let version = version_history::HISTORY.get_misleading_version_for_ffx();
+        let version = version_history_data::HISTORY.get_misleading_version_for_ffx();
         assert_eq!(
             result,
             VersionInfo {

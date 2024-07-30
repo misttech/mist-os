@@ -21,9 +21,7 @@ platform_version =
 
 declare_args() {
   # If true, generate golden files for API level N+1, where N is
-  # platform_version.deprecated_highest_numbered_api_level.
-  # TODO(https://fxbug.dev/326277078): Update this comment and potentially
-  # redefine these args when switching the in-development level to "NEXT".
+  # max(platform_version.frozen_api_levels).
   bump_api_level = false
 
   freeze_api_level = false

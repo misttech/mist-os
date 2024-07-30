@@ -42,4 +42,12 @@ pub struct DevelopmentSupportConfig {
     ///   `ffx target get-time`
     #[serde(default)]
     pub include_bin_clock: bool,
+
+    /// Override netsvc inclusion on the target.
+    ///
+    /// Follows the same resolution as `enabled` if absent.
+    // TODO(https://fxbug.dev/355280494): Make this a plain boolean that
+    // defaults to false once we've audited which builds actually want it.
+    #[serde(default)]
+    pub include_netsvc: Option<bool>,
 }

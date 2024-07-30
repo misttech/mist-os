@@ -16,6 +16,8 @@
 #include "threads_impl.h"
 #include "zircon_impl.h"
 
+zx_handle_t __zircon_namespace_svc = ZX_HANDLE_INVALID;
+
 struct start_params {
   int (*main)(int, char**, char**);
   thrd_t td;

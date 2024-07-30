@@ -72,9 +72,7 @@ where
                 .await
                 .context("while calling fuchsia.power.broker.Topology/AddElement")?;
             match result {
-                Ok(_element_control_ch) => {
-                    return Ok(loop_fn(current, required).await);
-                }
+                Ok(_) => return Ok(loop_fn(current, required).await),
                 Err(e) => return Err(anyhow!("error while adding element: {:?}", e)),
             }
         }
@@ -153,7 +151,6 @@ mod tests {
     use super::*;
     use crate::Command;
     use fidl::endpoints;
-    use fidl::endpoints::Proxy;
     use fuchsia_zircon as zx;
     use tracing::debug;
 
@@ -245,17 +242,6 @@ mod tests {
         fasync::Task::local(async move {})
     }
 
-    // Get a client end for the given protocol marker T, assuming that
-    // will never get used.
-    fn dummy_client_end<T>() -> endpoints::ClientEnd<T>
-    where
-        T: fidl::endpoints::ProtocolMarker,
-        <T as fidl::endpoints::ProtocolMarker>::Proxy: std::fmt::Debug,
-    {
-        let (p, _) = endpoints::create_proxy_and_stream::<T>().expect("never fails");
-        p.into_client_end().expect("never fails")
-    }
-
     #[fuchsia::test]
     async fn test_manage_internal() {
         let (g_proxy, mut g_stream) =
@@ -293,7 +279,7 @@ mod tests {
             while let Some(request) = _t_stream.next().await {
                 match request {
                     Ok(fpb::TopologyRequest::AddElement { payload: _, responder }) => {
-                        responder.send(Ok(dummy_client_end())).expect("never fails");
+                        responder.send(Ok(())).expect("never fails");
                     }
                     Ok(_) | Err(_) => unimplemented!(),
                 }

@@ -413,7 +413,7 @@ pub struct ZombiePtraces {
     /// the zombie.  The value is a (threadgroup, zombie) pair, where the zombie
     /// has to be delivered to the threadgroup when we have delivered the zombie
     /// to the ptracer.
-    zombies: BTreeMap<ZombieProcess, Option<(Arc<ThreadGroup>, OwnedRef<ZombieProcess>)>>,
+    zombies: BTreeMap<ZombieProcess, Option<(WeakRef<ThreadGroup>, OwnedRef<ZombieProcess>)>>,
 }
 
 impl ZombiePtraces {
@@ -441,7 +441,7 @@ impl ZombiePtraces {
         &mut self,
         tracee: pid_t,
         new_zombie: Option<OwnedRef<ZombieProcess>>,
-        new_parent: Arc<ThreadGroup>,
+        new_parent: &ThreadGroup,
     ) {
         let mut zombie = None;
         for (z, _) in &self.zombies {
@@ -453,7 +453,10 @@ impl ZombiePtraces {
 
         let Some(zombie) = zombie else {
             if let Some(new_zombie) = new_zombie {
-                self.zombies.insert(new_zombie.copy_for_key(), Some((new_parent, new_zombie)));
+                self.zombies.insert(
+                    new_zombie.copy_for_key(),
+                    Some((new_parent.weak_thread_group.clone(), new_zombie)),
+                );
             }
             return;
         };
@@ -463,19 +466,19 @@ impl ZombiePtraces {
         };
 
         if let Some(new_zombie) = new_zombie {
-            self.zombies.insert(zombie, Some((new_parent, new_zombie)));
+            self.zombies.insert(zombie, Some((new_parent.weak_thread_group.clone(), new_zombie)));
             return;
         }
 
         if let Some((_, real_zombie)) = deferred {
-            self.zombies.insert(zombie, Some((new_parent, real_zombie)));
+            self.zombies.insert(zombie, Some((new_parent.weak_thread_group.clone(), real_zombie)));
         }
         return;
     }
 
     /// When a parent dies without having been notified, replace it with a given
     /// new parent.
-    pub fn reparent(pids: &PidTable, old_parent: &Arc<ThreadGroup>, new_parent: &Arc<ThreadGroup>) {
+    pub fn reparent(pids: &PidTable, old_parent: &ThreadGroup, new_parent: &ThreadGroup) {
         let mut lockless_list = vec![];
         old_parent.read().deferred_zombie_ptracers.iter().for_each(|z| lockless_list.push(*z));
 
@@ -484,11 +487,7 @@ impl ZombiePtraces {
             let Some(task) = task_ref.upgrade() else {
                 continue;
             };
-            task.thread_group.write().zombie_ptracees.set_parent_of(
-                *tracee,
-                None,
-                new_parent.clone(),
-            );
+            task.thread_group.write().zombie_ptracees.set_parent_of(*tracee, None, new_parent);
         }
         let mut new_state = new_parent.write();
         new_state.deferred_zombie_ptracers.append(&mut lockless_list);
@@ -500,7 +499,9 @@ impl ZombiePtraces {
         let mut entry = self.zombies.pop_first();
         while let Some((zombie, deferred)) = entry {
             if let Some((tg, z)) = deferred {
-                tg.do_zombie_notifications(z);
+                if let Some(tg) = tg.upgrade() {
+                    tg.do_zombie_notifications(z);
+                }
             }
             zombie.release(pids);
 
@@ -520,7 +521,7 @@ impl ZombiePtraces {
         &mut self,
         selector: ProcessSelector,
         options: &WaitingOptions,
-    ) -> Option<(ZombieProcess, Option<(Arc<ThreadGroup>, OwnedRef<ZombieProcess>)>)> {
+    ) -> Option<(ZombieProcess, Option<(WeakRef<ThreadGroup>, OwnedRef<ZombieProcess>)>)> {
         // The zombies whose pid matches the pid selector queried.
         let zombie_matches_pid_selector = |zombie: &ZombieProcess| match selector {
             ProcessSelector::Any => true,
@@ -695,7 +696,7 @@ fn ptrace_listen(tracee: &Task) -> Result<(), Errno> {
 }
 
 pub fn ptrace_detach(
-    thread_group: Arc<ThreadGroup>,
+    thread_group: &ThreadGroup,
     tracee: &Task,
     data: &UserAddress,
 ) -> Result<(), Errno> {
@@ -753,7 +754,7 @@ pub fn ptrace_dispatch(
             return Ok(starnix_syscalls::SUCCESS);
         }
         PTRACE_DETACH => {
-            ptrace_detach(current_task.thread_group.clone(), tracee.as_ref(), &data)?;
+            ptrace_detach(&current_task.thread_group, tracee.as_ref(), &data)?;
             return Ok(starnix_syscalls::SUCCESS);
         }
         _ => {}
@@ -1037,13 +1038,14 @@ pub fn ptrace_traceme(current_task: &mut CurrentTask) -> Result<SyscallResult, E
 
     let parent = current_task.thread_group.read().parent.clone();
     if let Some(parent) = parent {
+        let parent = parent.upgrade();
         // TODO: Move this check into `do_attach()` so that there is a single `ptrace_access_check(tracer, tracee)`?
         {
             let pids = current_task.kernel().pids.read();
             let parent_task = pids.get_task(parent.leader);
             security::ptrace_traceme(
                 current_task,
-                parent_task.upgrade().ok_or(errno!(EINVAL))?.as_ref(),
+                parent_task.upgrade().ok_or_else(|| errno!(EINVAL))?.as_ref(),
             )?;
         }
 
@@ -1087,6 +1089,7 @@ where
         let mut is_parent = false;
         let my_pid = current_task.thread_group.leader;
         while let Some(target) = ttg {
+            let target = target.upgrade();
             if target.as_ref().leader == my_pid {
                 is_parent = true;
                 break;

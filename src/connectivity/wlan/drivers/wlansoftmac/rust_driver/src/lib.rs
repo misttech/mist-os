@@ -12,9 +12,9 @@ use futures::channel::oneshot::{self, Canceled};
 use futures::{Future, FutureExt, StreamExt};
 use std::pin::Pin;
 use tracing::{error, info, warn};
-use wlan_ffi_transport::{BufferProvider, EthernetTx, WlanRx};
+use wlan_ffi_transport::completers::Completer;
+use wlan_ffi_transport::{EthernetTx, WlanRx};
 use wlan_fidl_ext::{ResponderExt, SendResultExt, WithName};
-use wlan_mlme::completers::StartCompleter;
 use wlan_mlme::device::DeviceOps;
 use wlan_mlme::{DriverEvent, DriverEventSink};
 use wlan_sme::serve::create_sme;
@@ -50,32 +50,25 @@ const INSPECT_VMO_SIZE_BYTES: usize = 1000 * 1024;
 /// If an error occurs during the bridge driver's initialization, `start_completer()` will not be
 /// called.
 pub async fn start_and_serve<F, D: DeviceOps + 'static>(
-    start_completer: StartCompleter<F>,
+    start_completer: Completer<F>,
     device: D,
-    buffer_provider: BufferProvider,
 ) -> Result<(), zx::Status>
 where
-    F: FnOnce(zx::zx_status_t) + 'static,
+    F: FnOnce(zx::sys::zx_status_t) + 'static,
 {
     wtrace::duration_begin_scope!(c"rust_driver::start_and_serve");
     let (driver_event_sink, driver_event_stream) = DriverEventSink::new();
 
     let (mlme_init_sender, mlme_init_receiver) = oneshot::channel();
-    let StartedDriver { softmac_ifc_bridge_request_stream, mlme, sme } = match start(
-        mlme_init_sender,
-        driver_event_sink.clone(),
-        driver_event_stream,
-        device,
-        buffer_provider,
-    )
-    .await
-    {
-        Err(status) => {
-            start_completer.reply(Err(status));
-            return Err(status);
-        }
-        Ok(x) => x,
-    };
+    let StartedDriver { softmac_ifc_bridge_request_stream, mlme, sme } =
+        match start(mlme_init_sender, driver_event_sink.clone(), driver_event_stream, device).await
+        {
+            Err(status) => {
+                start_completer.reply(Err(status));
+                return Err(status);
+            }
+            Ok(x) => x,
+        };
 
     start_completer.reply(Ok(()));
 
@@ -100,7 +93,6 @@ async fn start<D: DeviceOps + 'static>(
     driver_event_sink: DriverEventSink,
     driver_event_stream: mpsc::UnboundedReceiver<DriverEvent>,
     mut device: D,
-    buffer_provider: BufferProvider,
 ) -> Result<
     StartedDriver<
         Pin<Box<dyn Future<Output = Result<(), Error>>>>,
@@ -209,7 +201,6 @@ async fn start<D: DeviceOps + 'static>(
                 mlme_init_sender,
                 config,
                 device,
-                buffer_provider,
                 mlme_request_stream,
                 driver_event_stream,
             ))
@@ -228,7 +219,6 @@ async fn start<D: DeviceOps + 'static>(
                 mlme_init_sender,
                 config,
                 device,
-                buffer_provider,
                 mlme_request_stream,
                 driver_event_stream,
             ))
@@ -591,7 +581,6 @@ mod tests {
     use std::pin::pin;
     use test_case::test_case;
     use wlan_common::assert_variant;
-    use wlan_ffi_transport::FakeFfiBufferProvider;
     use wlan_mlme::device::test_utils::{FakeDevice, FakeDeviceConfig};
     use zx::Vmo;
 
@@ -776,7 +765,6 @@ mod tests {
         ) {
             let (mlme_init_sender, mlme_init_receiver) = oneshot::channel();
             let (driver_event_sink, driver_event_stream) = DriverEventSink::new();
-            let buffer_provider = BufferProvider::new(FakeFfiBufferProvider::new());
 
             (
                 Box::pin(start(
@@ -784,7 +772,6 @@ mod tests {
                     driver_event_sink.clone(),
                     driver_event_stream,
                     fake_device,
-                    buffer_provider,
                 )),
                 Self { mlme_init_receiver: Box::pin(mlme_init_receiver), driver_event_sink },
             )
@@ -1288,7 +1275,7 @@ mod tests {
     #[derive(Debug)]
     struct StartAndServeTestHarness<F> {
         pub start_and_serve_fut: F,
-        pub start_complete_receiver: oneshot::Receiver<zx::zx_status_t>,
+        pub start_complete_receiver: oneshot::Receiver<zx::sys::zx_status_t>,
         pub generic_sme_proxy: fidl_sme::GenericSmeProxy,
     }
 
@@ -1303,15 +1290,13 @@ mod tests {
         fake_device: FakeDevice,
     ) -> Result<StartAndServeTestHarness<impl Future<Output = Result<(), zx::Status>>>, zx::Status>
     {
-        let fake_buffer_provider = BufferProvider::new(FakeFfiBufferProvider::new());
         let (start_complete_sender, mut start_complete_receiver) =
-            oneshot::channel::<zx::zx_status_t>();
+            oneshot::channel::<zx::sys::zx_status_t>();
         let start_and_serve_fut = start_and_serve(
-            StartCompleter::new(move |status| {
+            Completer::new(move |status| {
                 start_complete_sender.send(status).expect("Failed to signal start complete.")
             }),
             fake_device.clone(),
-            fake_buffer_provider,
         );
         let mut start_and_serve_fut = Box::pin(start_and_serve_fut);
 

@@ -84,6 +84,14 @@ impl<'t> PublishOptions<'t> {
         self
     }
 
+    /// Enable to always log file/line information, otherwise only log
+    /// when severity is ERROR or above.
+    #[cfg(target_os = "fuchsia")]
+    pub fn always_log_file_line(mut self) -> Self {
+        self.publisher.always_log_file_line = true;
+        self
+    }
+
     /// Override the default string prefix for a logged panic message.
     pub fn panic_prefix(mut self, prefix: &'static str) -> Self {
         self.panic_prefix = Some(prefix);

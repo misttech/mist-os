@@ -31,6 +31,7 @@
 #include <pretty/hexdump.h>
 
 #include "src/lib/fxl/strings/string_printf.h"
+#include "src/storage/lib/block_client/cpp/remote_block_device.h"
 #include "src/storage/lib/storage-metrics/block-metrics.h"
 
 namespace fuchsia_block = fuchsia_hardware_block;
@@ -287,67 +288,22 @@ int cmd_read_blk(const char* dev, off_t offset, size_t count) {
     return -1;
   }
 
-  const fidl::WireResult result = fidl::WireCall(block.value())->GetInfo();
-  if (!result.ok()) {
-    fprintf(stderr, "Error getting block size for %s: %s\n", dev,
-            result.FormatDescription().c_str());
-    return -1;
-  }
-  const fit::result response = result.value();
-  if (response.is_error()) {
+  auto buffer = std::make_unique<uint8_t[]>(count);
+  if (zx_status_t status = block_client::SingleReadBytes(*block, buffer.get(), count, offset);
+      status != ZX_OK) {
     zx::result skip_block = component::Connect<fuchsia_skipblock::SkipBlock>(dev);
-    if (skip_block.is_error()) {
-      fprintf(stderr, "Error connecting to %s: %s\n", dev, skip_block.status_string());
-      return -1;
+    if (skip_block.is_ok()) {
+      if (try_read_skip_blk(skip_block.value(), offset, count) < 0) {
+        fprintf(stderr, "Error getting block size for %s\n", dev);
+        return -1;
+      }
+      return 0;
     }
-    if (try_read_skip_blk(skip_block.value(), offset, count) < 0) {
-      fprintf(stderr, "Error getting block size for %s\n", dev);
-      return -1;
-    }
-    return 0;
-  }
-  // Check that count and offset are aligned to block size.
-  uint64_t blksize = response.value()->info.block_size;
-  if (count % blksize) {
-    fprintf(stderr, "Bytes read must be a multiple of blksize=%" PRIu64 "\n", blksize);
-    return -1;
-  }
-  if (offset % blksize) {
-    fprintf(stderr, "Offset must be a multiple of blksize=%" PRIu64 "\n", blksize);
+    fprintf(stderr, "Error readin blocks from device: %s\n", zx_status_get_string(status));
     return -1;
   }
 
-  // Create vmo for reading, and handle clone for passing off.
-  zx::vmo in_vmo;
-  if (zx_status_t status = zx::vmo::create(count, 0u, &in_vmo); status != ZX_OK) {
-    fprintf(stderr, "Failed to create read vmo: %s.\n", zx_status_get_string(status));
-    return -1;
-  }
-  zx::vmo out_vmo;
-  if (zx_status_t status = in_vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &out_vmo); status != ZX_OK) {
-    fprintf(stderr, "Failed to duplicate vmo handle: %s.\n", zx_status_get_string(status));
-    return -1;
-  }
-  fzl::OwnedVmoMapper mapper;
-  if (zx_status_t status = mapper.Map(std::move(in_vmo), count); status != ZX_OK) {
-    fprintf(stderr, "Failed to map vmo: %s\n", zx_status_get_string(status));
-    return -1;
-  }
-
-  // read the data
-  const fidl::WireResult read_result =
-      fidl::WireCall(block.value())->ReadBlocks(std::move(out_vmo), count, offset, 0);
-  if (!read_result.ok()) {
-    fprintf(stderr, "FIDL error: %s\n", read_result.FormatDescription().c_str());
-    return -1;
-  }
-  if (read_result.value().is_error()) {
-    fprintf(stderr, "Error reading blocks from device: %s\n",
-            zx_status_get_string(read_result.value().error_value()));
-    return -1;
-  }
-
-  hexdump8_ex(mapper.start(), count, offset);
+  hexdump8_ex(buffer.get(), count, offset);
   return 0;
 }
 

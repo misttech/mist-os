@@ -36,7 +36,7 @@ use {
 
 use anyhow::{anyhow, Context as _};
 use futures::future::{FutureExt as _, LocalBoxFuture, TryFutureExt as _};
-use futures::{SinkExt as _, StreamExt as _, TryStreamExt as _};
+use futures::{SinkExt as _, TryStreamExt as _};
 use net_declare::fidl_subnet;
 use net_types::ip::{GenericOverIp, Ip};
 
@@ -584,45 +584,6 @@ impl<'a> TestRealm<'a> {
             .await
             .with_context(|| format!("failed to ping from {} to {}", self.name, addr,))?;
         Ok(())
-    }
-
-    // TODO(https://fxbug.dev/42169456): Remove this function when pinging only
-    // once is free from NUD-related issues and is guaranteed to succeed.
-    /// Sends ICMP echo requests to `addr` on a 1-second interval until a response
-    /// is received.
-    pub async fn ping<Ip: ping::FuchsiaIpExt>(&self, addr: Ip::SockAddr) -> Result {
-        let icmp_sock = self.icmp_socket::<Ip>().await?;
-
-        const MESSAGE: &'static str = "hello, world";
-        let (mut sink, stream) = ping::new_unicast_sink_and_stream::<
-            Ip,
-            _,
-            { MESSAGE.len() + ping::ICMP_HEADER_LEN },
-        >(&icmp_sock, &addr, MESSAGE.as_bytes());
-
-        let mut seq = 0;
-        let mut interval_stream =
-            fuchsia_async::Interval::new(fuchsia_async::Duration::from_seconds(1));
-        let mut stream = stream.fuse();
-        loop {
-            futures::select! {
-                opt = interval_stream.next() => {
-                    let () = opt.ok_or_else(|| anyhow!("ping interval stream ended unexpectedly"))?;
-                    seq += 1;
-                    let () = sink.send(seq).map_err(anyhow::Error::new).await?;
-                }
-                r = stream.try_next() => {
-                    return match r {
-                        Ok(Some(got)) if got <= seq => Ok(()),
-                        Ok(Some(got)) => {
-                            Err(anyhow!("unexpected echo reply; got: {}, want: {}", got, seq))
-                        }
-                        Ok(None) => Err(anyhow!("echo reply stream ended unexpectedly")),
-                        Err(e) => Err(anyhow::Error::from(e)),
-                    };
-                }
-            }
-        }
     }
 
     /// Add a static neighbor entry.

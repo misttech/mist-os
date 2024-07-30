@@ -9,7 +9,6 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
-#include <lib/ddk/platform-defs.h>
 #include <lib/driver/component/cpp/composite_node_spec.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 
@@ -52,27 +51,27 @@ static const buttons_gpio_config_t gpios[] = {
 zx_status_t Astro::ButtonsInit() {
   gpio_init_steps_.push_back(
       GpioConfigIn(GPIO_VOLUME_UP, fuchsia_hardware_gpio::GpioFlags::kPullUp));
-  gpio_init_steps_.push_back(GpioSetAltFunction(GPIO_VOLUME_UP, 0));
+  gpio_init_steps_.push_back(GpioFunction(GPIO_VOLUME_UP, 0));
 
   gpio_init_steps_.push_back(
       GpioConfigIn(GPIO_VOLUME_DOWN, fuchsia_hardware_gpio::GpioFlags::kPullUp));
-  gpio_init_steps_.push_back(GpioSetAltFunction(GPIO_VOLUME_DOWN, 0));
+  gpio_init_steps_.push_back(GpioFunction(GPIO_VOLUME_DOWN, 0));
 
   gpio_init_steps_.push_back(
       GpioConfigIn(GPIO_VOLUME_BOTH, fuchsia_hardware_gpio::GpioFlags::kNoPull));
-  gpio_init_steps_.push_back(GpioSetAltFunction(GPIO_VOLUME_BOTH, 0));
+  gpio_init_steps_.push_back(GpioFunction(GPIO_VOLUME_BOTH, 0));
 
   gpio_init_steps_.push_back(
       GpioConfigIn(GPIO_MIC_PRIVACY, fuchsia_hardware_gpio::GpioFlags::kNoPull));
-  gpio_init_steps_.push_back(GpioSetAltFunction(GPIO_MIC_PRIVACY, 0));
+  gpio_init_steps_.push_back(GpioFunction(GPIO_MIC_PRIVACY, 0));
 
   fidl::Arena<> fidl_arena;
   fdf::Arena buttons_arena('BTTN');
 
   fpbus::Node dev = {{.name = "astro-buttons",
-                      .vid = PDEV_VID_GENERIC,
-                      .pid = PDEV_PID_GENERIC,
-                      .did = PDEV_DID_BUTTONS,
+                      .vid = bind_fuchsia_platform::BIND_PLATFORM_DEV_VID_GENERIC,
+                      .pid = bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC,
+                      .did = bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_BUTTONS,
                       .metadata = std::vector<fpbus::Metadata>{
                           {{.type = DEVICE_METADATA_BUTTONS_BUTTONS,
                             .data = std::vector<uint8_t>(

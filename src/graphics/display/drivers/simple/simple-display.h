@@ -41,7 +41,7 @@ struct DisplayProperties {
 class SimpleDisplay;
 using HeapServer = fidl::WireServer<fuchsia_hardware_sysmem::Heap>;
 using BufferKey = std::pair<uint64_t, uint32_t>;
-class SimpleDisplay : public HeapServer, public ddk::DisplayControllerImplProtocol<SimpleDisplay> {
+class SimpleDisplay : public HeapServer, public ddk::DisplayEngineProtocol<SimpleDisplay> {
  public:
   SimpleDisplay(fidl::WireSyncClient<fuchsia_hardware_sysmem::Sysmem> hardware_sysmem,
                 fidl::WireSyncClient<fuchsia_sysmem2::Allocator> sysmem,
@@ -54,45 +54,36 @@ class SimpleDisplay : public HeapServer, public ddk::DisplayControllerImplProtoc
   void AllocateVmo(AllocateVmoRequestView request, AllocateVmoCompleter::Sync& completer) override;
   void DeleteVmo(DeleteVmoRequestView request, DeleteVmoCompleter::Sync& completer) override;
 
-  void DisplayControllerImplSetDisplayControllerInterface(
-      const display_controller_interface_protocol_t* intf);
-  void DisplayControllerImplResetDisplayControllerInterface();
-  zx_status_t DisplayControllerImplImportBufferCollection(
-      uint64_t banjo_driver_buffer_collection_id, zx::channel collection_token);
-  zx_status_t DisplayControllerImplReleaseBufferCollection(
-      uint64_t banjo_driver_buffer_collection_id);
-  zx_status_t DisplayControllerImplImportImage(const image_metadata_t* banjo_image_metadata,
-                                               uint64_t banjo_driver_buffer_collection_id,
-                                               uint32_t index, uint64_t* out_image_handle);
-  zx_status_t DisplayControllerImplImportImageForCapture(uint64_t banjo_driver_buffer_collection_id,
-                                                         uint32_t index,
-                                                         uint64_t* out_capture_handle) {
+  void DisplayEngineRegisterDisplayEngineListener(
+      const display_engine_listener_protocol_t* engine_listener);
+  void DisplayEngineDeregisterDisplayEngineListener();
+  zx_status_t DisplayEngineImportBufferCollection(uint64_t banjo_driver_buffer_collection_id,
+                                                  zx::channel collection_token);
+  zx_status_t DisplayEngineReleaseBufferCollection(uint64_t banjo_driver_buffer_collection_id);
+  zx_status_t DisplayEngineImportImage(const image_metadata_t* banjo_image_metadata,
+                                       uint64_t banjo_driver_buffer_collection_id, uint32_t index,
+                                       uint64_t* out_image_handle);
+  zx_status_t DisplayEngineImportImageForCapture(uint64_t banjo_driver_buffer_collection_id,
+                                                 uint32_t index, uint64_t* out_capture_handle) {
     return ZX_ERR_NOT_SUPPORTED;
   }
-  void DisplayControllerImplReleaseImage(uint64_t image_handle);
-  config_check_result_t DisplayControllerImplCheckConfiguration(
+  void DisplayEngineReleaseImage(uint64_t image_handle);
+  config_check_result_t DisplayEngineCheckConfiguration(
       const display_config_t* display_configs, size_t display_count,
       client_composition_opcode_t* out_client_composition_opcodes_list,
       size_t client_composition_opcodes_count, size_t* out_client_composition_opcodes_actual);
-  void DisplayControllerImplApplyConfiguration(const display_config_t* display_config,
-                                               size_t display_count,
-                                               const config_stamp_t* banjo_config_stamp);
-  zx_status_t DisplayControllerImplSetBufferCollectionConstraints(
+  void DisplayEngineApplyConfiguration(const display_config_t* display_config, size_t display_count,
+                                       const config_stamp_t* banjo_config_stamp);
+  zx_status_t DisplayEngineSetBufferCollectionConstraints(
       const image_buffer_usage_t* usage, uint64_t banjo_driver_buffer_collection_id);
-  zx_status_t DisplayControllerImplSetDisplayPower(uint64_t display_id, bool power_on) {
+  zx_status_t DisplayEngineSetDisplayPower(uint64_t display_id, bool power_on) {
     return ZX_ERR_NOT_SUPPORTED;
   }
-  bool DisplayControllerImplIsCaptureSupported() { return false; }
-  zx_status_t DisplayControllerImplStartCapture(uint64_t capture_handle) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-  zx_status_t DisplayControllerImplReleaseCapture(uint64_t capture_handle) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-  bool DisplayControllerImplIsCaptureCompleted() { return false; }
-  zx_status_t DisplayControllerImplSetMinimumRgb(uint8_t minimum_rgb) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
+  bool DisplayEngineIsCaptureSupported() { return false; }
+  zx_status_t DisplayEngineStartCapture(uint64_t capture_handle) { return ZX_ERR_NOT_SUPPORTED; }
+  zx_status_t DisplayEngineReleaseCapture(uint64_t capture_handle) { return ZX_ERR_NOT_SUPPORTED; }
+  bool DisplayEngineIsCaptureCompleted() { return false; }
+  zx_status_t DisplayEngineSetMinimumRgb(uint8_t minimum_rgb) { return ZX_ERR_NOT_SUPPORTED; }
 
   const std::unordered_map<display::DriverBufferCollectionId,
                            fidl::WireSyncClient<fuchsia_sysmem2::BufferCollection>>&
@@ -100,7 +91,7 @@ class SimpleDisplay : public HeapServer, public ddk::DisplayControllerImplProtoc
     return buffer_collections_;
   }
 
-  display_controller_impl_protocol_t GetProtocol();
+  display_engine_protocol_t GetProtocol();
 
  private:
   bool IsBanjoDisplayConfigSupported(const display_config_t& banjo_display_config);
@@ -139,7 +130,7 @@ class SimpleDisplay : public HeapServer, public ddk::DisplayControllerImplProtoc
 
   // Only used on the vsync thread.
   zx::time next_vsync_time_;
-  ddk::DisplayControllerInterfaceProtocolClient intf_;
+  ddk::DisplayEngineListenerProtocolClient engine_listener_;
 };
 
 }  // namespace simple_display

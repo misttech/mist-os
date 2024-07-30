@@ -22,7 +22,7 @@
 // DG1, but PBC (preserve bit content) on Ice Lake. These fields are currently
 // described as MBZ.
 
-#include <lib/ddk/debug.h>
+#include <lib/driver/logging/cpp/logger.h>
 #include <zircon/assert.h>
 
 #include <cstdint>

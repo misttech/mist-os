@@ -4,7 +4,7 @@
 
 #include "src/devices/adc/drivers/aml-saradc/aml-saradc.h"
 
-#include <lib/driver/testing/cpp/fixture/driver_test_fixture.h>
+#include <lib/driver/testing/cpp/driver_test.h>
 
 #include <fake-mmio-reg/fake-mmio-reg.h>
 #include <gtest/gtest.h>
@@ -77,28 +77,33 @@ class AmlSaradcTestEnvironment : fdf_testing::Environment {
 
 class AmlSaradcTestConfig final {
  public:
-  static constexpr bool kDriverOnForeground = false;
-  static constexpr bool kAutoStartDriver = true;
-  static constexpr bool kAutoStopDriver = true;
-
   using DriverType = aml_saradc::AmlSaradc;
   using EnvironmentType = AmlSaradcTestEnvironment;
 };
 
-class AmlSaradcTest : public fdf_testing::DriverTestFixture<AmlSaradcTestConfig>,
-                      public ::testing::Test {
+class AmlSaradcTest : public ::testing::Test {
  public:
   void SetUp() override {
-    auto connect_result =
-        Connect<fuchsia_hardware_adcimpl::Service::Device>(component::kDefaultInstance);
+    zx::result<> result = driver_test().StartDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
+    auto connect_result = driver_test().Connect<fuchsia_hardware_adcimpl::Service::Device>(
+        component::kDefaultInstance);
     ASSERT_TRUE(connect_result.is_ok());
     adc_.Bind(std::move(connect_result.value()));
     ASSERT_TRUE(adc_.is_valid());
   }
 
+  void TearDown() override {
+    zx::result<> result = driver_test().StopDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
+  }
+
   fdf::WireSyncClient<fuchsia_hardware_adcimpl::Device>& adc() { return adc_; }
 
+  fdf_testing::BackgroundDriverTest<AmlSaradcTestConfig>& driver_test() { return driver_test_; }
+
  private:
+  fdf_testing::BackgroundDriverTest<AmlSaradcTestConfig> driver_test_;
   fdf::WireSyncClient<fuchsia_hardware_adcimpl::Device> adc_;
 };
 
@@ -111,7 +116,7 @@ TEST_F(AmlSaradcTest, GetResolution) {
 }
 
 TEST_F(AmlSaradcTest, GetSample) {
-  RunInEnvironmentTypeContext([](AmlSaradcTestEnvironment& env) {
+  driver_test().RunInEnvironmentTypeContext([](AmlSaradcTestEnvironment& env) {
     env.mmio()[0].set(AO_SAR_ADC_FIFO_RD_OFFS >> 2, 0x4);
     env.irq()->trigger(0, zx::clock::get_monotonic());
   });

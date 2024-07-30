@@ -54,9 +54,17 @@ fuchsia_structured_config_values("foo_config_values") {
   values_source = "config/config_values.json5"
 }
 
+fuchsia_component("config_capability_user") {
+  testonly = true
+  component_name = "config_capability_user"
+  manifest = "meta/config_capability_user.cml"
+  deps = [ ":foo_noop" ]
+}
+
 fuchsia_test_package("component_debug_integration_tests") {
   test_components = [ ":test" ]
   deps = [
+    ":config_capability_user",
     ":foo",
     ":foo_config_values",
     "//src/sys/component_manager/testing/echo_server",

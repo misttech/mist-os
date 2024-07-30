@@ -19,7 +19,7 @@ pub trait DictExt {
         &self,
         path: &impl IterablePath,
         capability: Capability,
-    ) -> Result<(), fsandbox::DictionaryError>;
+    ) -> Result<(), fsandbox::CapabilityStoreError>;
 
     /// Removes the capability at the path, if it exists.
     fn remove_capability(&self, path: &impl IterablePath);
@@ -62,7 +62,7 @@ impl DictExt for Dict {
         &self,
         path: &impl IterablePath,
         capability: Capability,
-    ) -> Result<(), fsandbox::DictionaryError> {
+    ) -> Result<(), fsandbox::CapabilityStoreError> {
         let mut segments = path.iter_segments();
         let mut current_name = segments.next().expect("path must be non-empty");
         let mut current_dict = self.clone();
@@ -71,9 +71,9 @@ impl DictExt for Dict {
                 Some(next_name) => {
                     let sub_dict = {
                         match current_dict.get(current_name) {
-                            Ok(Some(cap)) => {
-                                cap.to_dictionary().ok_or(fsandbox::DictionaryError::NotFound)?
-                            }
+                            Ok(Some(cap)) => cap
+                                .to_dictionary()
+                                .ok_or(fsandbox::CapabilityStoreError::ItemNotFound)?,
                             Ok(None) => {
                                 let dict = Dict::new();
                                 current_dict.insert(
@@ -82,7 +82,7 @@ impl DictExt for Dict {
                                 )?;
                                 dict
                             }
-                            Err(_) => return Err(fsandbox::DictionaryError::NotFound),
+                            Err(_) => return Err(fsandbox::CapabilityStoreError::ItemNotFound),
                         }
                     };
                     current_dict = sub_dict;

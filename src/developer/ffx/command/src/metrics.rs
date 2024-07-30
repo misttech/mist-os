@@ -5,11 +5,15 @@
 use crate::Error;
 use analytics::{get_notice, opt_out_for_this_invocation};
 use ffx_config::EnvironmentContext;
-use ffx_metrics::{add_ffx_launch_event, add_ffx_overnet_proxy_drop_event, init_metrics_svc};
+use ffx_metrics::{
+    add_ffx_launch_event, add_ffx_overnet_proxy_drop_event, enhanced_analytics, init_metrics_svc,
+};
 use fuchsia_async::TimeoutExt;
 use itertools::Itertools;
+use regex::Regex;
 use std::io::Write;
 use std::process::ExitStatus;
+use std::sync::LazyLock;
 use std::time::{Duration, Instant};
 
 use crate::{FfxContext, Result};
@@ -53,12 +57,13 @@ impl MetricsSession {
         let invoker = context.get("fuchsia.analytics.ffx_invoker").unwrap_or(None);
         let build_info = context.build_info();
         let enabled = context.analytics_enabled().await;
+        let analytics_path = context.get_analytics_path();
         let sdk_version = if enabled {
             get_sdk_version(&context).await.unwrap_or_else(|| UNKNOWN_SDK.to_string())
         } else {
             UNKNOWN_SDK.to_string()
         };
-        init_metrics_svc(build_info, invoker.clone(), sdk_version).await;
+        init_metrics_svc(analytics_path, build_info, invoker.clone(), sdk_version).await;
         if !enabled {
             opt_out_for_this_invocation().await?
         }
@@ -127,9 +132,19 @@ impl MetricsSession {
     }
 }
 
+pub async fn send_enhanced_analytics() -> bool {
+    enhanced_analytics().await
+}
+
 async fn get_sdk_version(context: &EnvironmentContext) -> Option<String> {
     match context.get_sdk().await {
         Ok(sdk) => sdk.get_version_string(),
         Err(_) => None,
     }
+}
+
+pub fn analytics_command(command_str: &str) -> bool {
+    static ANALYTICS_COMMAND_RE: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(" config analytics ").unwrap());
+    ANALYTICS_COMMAND_RE.is_match(command_str)
 }

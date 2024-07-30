@@ -19,23 +19,22 @@ void AppendInitSequence(Mock& mock) {
   mock
       // Init() sequence
       .ExpectRead(uint32_t{0b0000'0001'0000'0000'0000'0001'0000'0000}, 0xdc)   // Read FIFO Depth
+      .ExpectWrite(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0010}, 0xc8)  // Write to UsiOption
+      .ExpectRead(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0000}, 0xc)    // Read from UMCON
+      .ExpectWrite(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0000}, 0xc)   // Write to UMCON
       .ExpectWrite(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'1111}, 0x38)  // Write to UINTM
-      .ExpectWrite(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0000}, 0x8)   // Write to UFCON
       // The following is a FIFO reset. Writes two bits and waits for them
       // to clear.
-      .ExpectRead(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0000}, 0x8)   // Reading back
-      .ExpectWrite(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0110}, 0x8)  // Resetting FIFOs
-      .ExpectRead(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0110}, 0x8)   // Reading back
-      .ExpectRead(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0110}, 0x8)   // Reading back
-      .ExpectRead(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0110}, 0x8)   // Reading back
-      .ExpectRead(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0000}, 0x8)   // Reading back
+      .ExpectWrite(uint32_t{0b0000'0000'0000'0000'0000'0010'0000'0110}, 0x8)  // Write to UFCON
+      .ExpectRead(uint32_t{0b0000'0000'0000'0000'0000'0010'0000'0110}, 0x8)   // Reading back
+      .ExpectRead(uint32_t{0b0000'0000'0000'0000'0000'0010'0000'0110}, 0x8)   // Reading back
+      .ExpectRead(uint32_t{0b0000'0000'0000'0000'0000'0010'0000'0110}, 0x8)   // Reading back
+      .ExpectRead(uint32_t{0b0000'0000'0000'0000'0000'0010'0000'0000}, 0x8)   // Reading back
 
       // Setting FIFO enable (bit 0)
-      .ExpectRead(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0000}, 0x8)
-      .ExpectWrite(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0001}, 0x8)
+      .ExpectWrite(uint32_t{0b0000'0000'0000'0000'0000'0010'0000'0001}, 0x8)
 
       // Enabling TX/RX
-      .ExpectRead(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0000}, 0x4)  // UCON
       .ExpectWrite(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0101}, 0x4)
       // End of Init()
       ;
@@ -64,7 +63,7 @@ TEST(MotmotTests, HelloWorld) {
   EXPECT_EQ(3, driver.Write("hi\n"));
 }
 
-TEST(MotmotTests, Read) {
+TEST(MotmotTests, ReadWrite) {
   SimpleTestDriver driver(kTestConfig);
 
   AppendInitSequence(driver.io().mock());
@@ -84,8 +83,10 @@ TEST(MotmotTests, Read) {
       // Start of Read() with 2 bytes available
       .ExpectRead(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0010}, 0x18)  // UFSTAT (2 bytes)
       .ExpectRead(uint32_t{'q'}, 0x24)                                        // URXH
+      .ExpectRead(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0000}, 0x14)  // UERSTAT (no error)
       .ExpectRead(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0001}, 0x18)  // UFSTAT (1 byte)
       .ExpectRead(uint32_t{'\r'}, 0x24)                                       // URXH
+      .ExpectRead(uint32_t{0b0000'0000'0000'0000'0000'0000'0000'0000}, 0x14)  // UERSTAT (no error)
       ;
 
   driver.Init();

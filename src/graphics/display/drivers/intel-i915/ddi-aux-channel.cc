@@ -4,7 +4,7 @@
 
 #include "src/graphics/display/drivers/intel-i915/ddi-aux-channel.h"
 
-#include <lib/ddk/debug.h>
+#include <lib/driver/logging/cpp/logger.h>
 #include <lib/mmio/mmio.h>
 #include <lib/zx/result.h>
 #include <lib/zx/time.h>
@@ -47,8 +47,8 @@ DdiAuxChannel::DdiAuxChannel(fdf::MmioBuffer* mmio_buffer, DdiId ddi_id, uint16_
   if (aux_control_.transaction_in_progress()) {
     // The boot firmware kicked off an AUX transaction and handed off control to
     // the OS without waiting for the transaction to complete.
-    zxlogf(WARNING, "DDI %u AUX channel initialization blocked by pre-existing transaction.",
-           ddi_id);
+    FDF_LOG(WARNING, "DDI %u AUX channel initialization blocked by pre-existing transaction.",
+            ddi_id);
 
     // It's tempting to consider adjusting the AUX parameters below waiting for
     // the transaction to complete. However, we're not allowed to write the AUX
@@ -56,9 +56,9 @@ DdiAuxChannel::DdiAuxChannel(fdf::MmioBuffer* mmio_buffer, DdiId ddi_id, uint16_
     if (!WaitForTransactionComplete()) {
       // All future transactions will most likely fail. Soldier on and hope the
       // DDI miraculously fixes itself.
-      zxlogf(ERROR,
-             "DDI %u AUX channel initialization wait for pre-existing transaction timed out.",
-             ddi_id);
+      FDF_LOG(ERROR,
+              "DDI %u AUX channel initialization wait for pre-existing transaction timed out.",
+              ddi_id);
     }
   }
 }
@@ -124,11 +124,11 @@ DdiAuxChannelConfig DdiAuxChannel::Config() const {
 
 void DdiAuxChannel::Log() {
   const DdiAuxChannelConfig config = Config();
-  zxlogf(TRACE, "Timeout: %d us", config.timeout_us);
-  zxlogf(TRACE, "SYNC pulses: %d standard, %d fast wake", config.sync_pulse_count,
-         config.fast_wake_sync_pulse_count);
-  zxlogf(TRACE, "Use Thunderbolt: %s", config.use_thunderbolt ? "yes" : "no");
-  zxlogf(TRACE, "DDI_AUX_CTL: %x", aux_control_.reg_value());
+  FDF_LOG(TRACE, "Timeout: %d us", config.timeout_us);
+  FDF_LOG(TRACE, "SYNC pulses: %d standard, %d fast wake", config.sync_pulse_count,
+          config.fast_wake_sync_pulse_count);
+  FDF_LOG(TRACE, "Use Thunderbolt: %s", config.use_thunderbolt ? "yes" : "no");
+  FDF_LOG(TRACE, "DDI_AUX_CTL: %x", aux_control_.reg_value());
 }
 
 void DdiAuxChannel::WriteRequestForTesting(const Request& request) {
@@ -243,8 +243,8 @@ zx::result<> DdiAuxChannel::TransactForTesting() {
   if (!WaitForTransactionComplete()) {
     // The DDI did not complete the transaction (which includes reporting an AUX
     // timeout) in the allotted time. This is most likely a hardware error.
-    zxlogf(WARNING, "DDI did not complete / fail AUX transaction in %d us",
-           kDdiTransactionTimeoutUs);
+    FDF_LOG(WARNING, "DDI did not complete / fail AUX transaction in %d us",
+            kDdiTransactionTimeoutUs);
     return zx::make_result(ZX_ERR_IO_MISSED_DEADLINE);
   }
 
@@ -259,11 +259,11 @@ zx::result<> DdiAuxChannel::TransactForTesting() {
     //
     // The 3.2ms timeout comes from the DisplayPort 2.0 standard version 2.0,
     // section 2.11.2 "AUX Trransaction Response/Reply Timeouts", page 382.
-    zxlogf(TRACE, "DDI reported AUX transaction timeout. This is normal after HPD or wakeup.");
+    FDF_LOG(TRACE, "DDI reported AUX transaction timeout. This is normal after HPD or wakeup.");
     return zx::make_result(ZX_ERR_IO_MISSED_DEADLINE);
   }
   if (aux_control_.receive_error()) {
-    zxlogf(WARNING, "DDI AUX receive error. Data corrupted or incorrect bit count.");
+    FDF_LOG(WARNING, "DDI AUX receive error. Data corrupted or incorrect bit count.");
     return zx::make_result(ZX_ERR_IO_DATA_INTEGRITY);
   }
 
@@ -273,7 +273,7 @@ zx::result<> DdiAuxChannel::TransactForTesting() {
   // AUX replies must contain at least one command byte. AUX replies can contain
   // at most 16 data bytes, asides from the header byte.
   if (reply_size == 0 || reply_size > 1 + kMaxOpSize) {
-    zxlogf(WARNING, "DDI AUX invalid reply size: %d bytes", reply_size);
+    FDF_LOG(WARNING, "DDI AUX invalid reply size: %d bytes", reply_size);
     return zx::make_result(ZX_ERR_IO_DATA_INTEGRITY);
   }
 
@@ -367,19 +367,19 @@ void DdiAuxChannel::FixConfig() {
   aux_control_.set_interrupt_on_done(true);
 
   if (aux_control_.timeout_timer_select() != registers::DdiAuxControl::kTimeoutLarge) {
-    zxlogf(TRACE, "DDI AUX channel transaction timeout select was %u. Set to maximum.",
-           aux_control_.timeout_timer_select());
+    FDF_LOG(TRACE, "DDI AUX channel transaction timeout select was %u. Set to maximum.",
+            aux_control_.timeout_timer_select());
     aux_control_.set_timeout_timer_select(registers::DdiAuxControl::kTimeoutLarge);
   }
   if (aux_control_.fast_wake_sync_pulse_count() !=
       registers::DdiAuxControl::kFastWakeSyncPulseCount) {
-    zxlogf(WARNING, "DDI AUX channel fast wake pulse count was incorrectly set to %u. Fixed.",
-           aux_control_.fast_wake_sync_pulse_count());
+    FDF_LOG(WARNING, "DDI AUX channel fast wake pulse count was incorrectly set to %u. Fixed.",
+            aux_control_.fast_wake_sync_pulse_count());
     aux_control_.set_fast_wake_sync_pulse_count(registers::DdiAuxControl::kFastWakeSyncPulseCount);
   }
   if (aux_control_.sync_pulse_count() < registers::DdiAuxControl::kMinSyncPulseCount) {
-    zxlogf(WARNING, "DDI AUX channel wake pulse count was incorrectly set to %u. Fixed.",
-           aux_control_.sync_pulse_count());
+    FDF_LOG(WARNING, "DDI AUX channel wake pulse count was incorrectly set to %u. Fixed.",
+            aux_control_.sync_pulse_count());
     aux_control_.set_sync_pulse_count(registers::DdiAuxControl::kMinSyncPulseCount);
   }
 }

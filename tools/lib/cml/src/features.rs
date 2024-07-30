@@ -44,6 +44,10 @@ pub enum Feature {
     /// Allows `dictionary` capabilities to be used
     Dictionaries,
 
+    /// Allows `dictionary` capabilities with `extends: program/...` to be defined (a.k.a.
+    /// dynamic dictionaries)
+    DynamicDictionaries,
+
     // Allows dynamic child name lengths to exceed the default limit.
     AllowLongNames,
 
@@ -68,6 +72,7 @@ impl FromStr for Feature {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "dictionaries" => Ok(Feature::Dictionaries),
+            "dynamic_dictionaries" => Ok(Feature::DynamicDictionaries),
             "allow_long_names" => Ok(Feature::AllowLongNames),
             "allow_non_hermetic_packages" => Ok(Feature::AllowNonHermeticPackages),
             "enable_allow_non_hermetic_packages_feature" => {
@@ -84,6 +89,7 @@ impl fmt::Display for Feature {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self {
             Feature::Dictionaries => "dictionaries",
+            Feature::DynamicDictionaries => "dynamic_dictionaries",
             Feature::AllowLongNames => "allow_long_names",
             Feature::AllowNonHermeticPackages => "allow_non_hermetic_packages",
             Feature::EnableAllowNonHermeticPackagesFeature => {

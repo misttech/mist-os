@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::Error;
-use async_utils::hanging_get::server::HangingGet;
+use async_utils::hanging_get::server::{HangingGet, Publisher};
 use fidl_fuchsia_input_interaction::{
     NotifierRequest, NotifierRequestStream, NotifierWatchStateResponder, State,
 };
@@ -16,15 +16,142 @@ use futures::StreamExt;
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
+struct LeaseHolder {
+    // TODO(carolineliu): Instead of (), this should hold a wake lease.
+    wake_lease: Option<()>,
+}
+
+impl LeaseHolder {
+    fn new() -> Self {
+        Self { wake_lease: Some(()) }
+    }
+
+    fn create_lease(&mut self) {
+        if self.wake_lease.is_some() {
+            tracing::warn!("LeaseHolder already held a wake lease when trying to create one, please investigate.");
+            return;
+        }
+
+        self.wake_lease = Some(());
+    }
+
+    fn drop_lease(&mut self) {
+        if let Some(lease) = self.wake_lease.take() {
+            // TODO(carolineliu): Update this to std::mem::drop(lease)
+            // once lease has a different type.
+            //
+            // std::mem::drop(lease) doesn't work for () type and complains
+            // with this compiler error:
+            // ```
+            // calls to `std::mem::drop` with a value that implements `Copy`
+            // does nothing
+            // ```
+            let _ = lease;
+        } else {
+            tracing::warn!("LeaseHolder was not holding a wake lease when trying to drop one, please investigate.");
+        }
+    }
+
+    #[cfg(test)]
+    fn is_holding_lease(&self) -> bool {
+        self.wake_lease.is_some()
+    }
+}
+
 type NotifyFn = Box<dyn Fn(&State, NotifierWatchStateResponder) -> bool>;
 type InteractionHangingGet = HangingGet<State, NotifierWatchStateResponder, NotifyFn>;
+type StatePublisher = Publisher<State, NotifierWatchStateResponder, NotifyFn>;
 
-/// An [`ActivityManager`] tracks the state of user input interaction activity.
-pub struct ActivityManager {
-    interaction_hanging_get: RefCell<InteractionHangingGet>,
+struct StateTransitioner {
     idle_threshold_ms: zx::Duration,
     idle_transition_task: Cell<Option<Task<()>>>,
     last_event_time: RefCell<zx::Time>,
+
+    // To support power management, the caller must provide `Some` value for
+    // `lease_holder`. The existence of a `LeaseHolder` implies power framework
+    // availability in the platform.
+    lease_holder: Option<Rc<RefCell<LeaseHolder>>>,
+    state_publisher: StatePublisher,
+}
+
+impl StateTransitioner {
+    pub fn new(
+        initial_timestamp: zx::Time,
+        idle_threshold_ms: zx::Duration,
+        state_publisher: StatePublisher,
+        lease_holder: Option<Rc<RefCell<LeaseHolder>>>,
+    ) -> Self {
+        let task = Self::create_idle_transition_task(
+            initial_timestamp + idle_threshold_ms,
+            state_publisher.clone(),
+            lease_holder.clone(),
+        );
+        Self {
+            idle_threshold_ms,
+            idle_transition_task: Cell::new(Some(task)),
+            last_event_time: RefCell::new(initial_timestamp),
+            lease_holder,
+            state_publisher,
+        }
+    }
+
+    pub fn transition_to_active(
+        state_publisher: &StatePublisher,
+        lease_holder: &Option<Rc<RefCell<LeaseHolder>>>,
+    ) {
+        if let Some(holder) = lease_holder {
+            holder.borrow_mut().create_lease();
+        }
+        state_publisher.set(State::Active);
+    }
+
+    pub fn create_idle_transition_task(
+        timeout: zx::Time,
+        state_publisher: StatePublisher,
+        lease_holder: Option<Rc<RefCell<LeaseHolder>>>,
+    ) -> Task<()> {
+        Task::local(async move {
+            Timer::new(timeout).await;
+            lease_holder.and_then(|holder| Some(holder.borrow_mut().drop_lease()));
+            state_publisher.set(State::Idle);
+        })
+    }
+
+    pub async fn transition_to_idle_after_new_time(&self, event_time: zx::Time) {
+        if *self.last_event_time.borrow() > event_time {
+            return;
+        }
+
+        *self.last_event_time.borrow_mut() = event_time;
+        if let Some(t) = self.idle_transition_task.take() {
+            // If the task returns a completed output, we can assume the
+            // state has transitioned to Idle.
+            if let Some(()) = t.cancel().await {
+                Self::transition_to_active(&self.state_publisher, &self.lease_holder);
+            }
+        }
+
+        self.idle_transition_task.set(Some(Self::create_idle_transition_task(
+            event_time + self.idle_threshold_ms,
+            self.state_publisher.clone(),
+            self.lease_holder.clone(),
+        )));
+    }
+
+    #[cfg(test)]
+    fn is_holding_lease(&self) -> bool {
+        if let Some(holder) = &self.lease_holder {
+            return holder.borrow().is_holding_lease();
+        }
+
+        false
+    }
+}
+
+/// An [`ActivityManager`] tracks the state of user input interaction activity.
+pub struct ActivityManager {
+    state_transitioner: StateTransitioner,
+    interaction_hanging_get: RefCell<InteractionHangingGet>,
     suspend_enabled: bool,
 }
 
@@ -47,19 +174,22 @@ impl ActivityManager {
         suspend_enabled: bool,
     ) -> Rc<Self> {
         let initial_state = State::Active;
-
         let interaction_hanging_get = ActivityManager::init_hanging_get(initial_state);
         let state_publisher = interaction_hanging_get.new_publisher();
-        let idle_transition_task = Task::local(async move {
-            Timer::new(initial_timestamp + idle_threshold_ms).await;
-            state_publisher.set(State::Idle);
-        });
+
+        let lease_holder = match suspend_enabled {
+            true => Some(Rc::new(RefCell::new(LeaseHolder::new()))),
+            false => None,
+        };
 
         Rc::new(Self {
             interaction_hanging_get: RefCell::new(interaction_hanging_get),
-            idle_threshold_ms,
-            idle_transition_task: Cell::new(Some(idle_transition_task)),
-            last_event_time: RefCell::new(initial_timestamp),
+            state_transitioner: StateTransitioner::new(
+                initial_timestamp,
+                idle_threshold_ms,
+                state_publisher,
+                lease_holder,
+            ),
             suspend_enabled,
         })
     }
@@ -84,31 +214,15 @@ impl ActivityManager {
                     let event_time = zx::Time::from_nanos(event_time)
                         .clamp(zx::Time::ZERO, fuchsia_async::Time::now().into_zx());
 
-                    if *self.last_event_time.borrow() > event_time {
-                        let _: Result<(), fidl::Error> = responder.send();
-                        continue;
-                    }
-
-                    let state_publisher = self.interaction_hanging_get.borrow().new_publisher();
-                    if let Some(t) = self.idle_transition_task.take() {
-                        // If the task returns a completed output, we can assume the
-                        // state has transitioned to Idle.
-                        if let Some(()) = t.cancel() {
-                            state_publisher.set(State::Active);
-                        }
-                    }
+                    self.state_transitioner.transition_to_idle_after_new_time(event_time).await;
 
                     let _: Result<(), fidl::Error> = responder.send();
-
-                    *self.last_event_time.borrow_mut() = event_time;
-                    let timeout = self.idle_threshold_ms + event_time;
-                    self.idle_transition_task.set(Some(Task::local(async move {
-                        Timer::new(timeout).await;
-                        state_publisher.set(State::Idle);
-                    })));
                 }
                 Ok(AggregatorRequest::HandoffWake { responder }) => {
                     if self.suspend_enabled {
+                        let event_time = fuchsia_async::Time::now().into_zx();
+                        self.state_transitioner.transition_to_idle_after_new_time(event_time).await;
+
                         if let Err(e) = responder.send(Ok(())) {
                             tracing::warn!("Error sending a response to HandoffWake: {:?}", e);
                         }
@@ -162,6 +276,11 @@ impl ActivityManager {
 
         InteractionHangingGet::new(initial_state, notify_fn)
     }
+
+    #[cfg(test)]
+    fn is_holding_lease(&self) -> bool {
+        self.state_transitioner.is_holding_lease()
+    }
 }
 
 #[cfg(test)]
@@ -175,6 +294,7 @@ mod tests {
     use fuchsia_async::TestExecutor;
     use futures::pin_mut;
     use std::task::Poll;
+    use test_case::test_case;
 
     const ACTIVITY_TIMEOUT: zx::Duration = zx::Duration::from_millis(5000);
 
@@ -215,27 +335,52 @@ mod tests {
         notifier_proxy
     }
 
+    #[test_case(true; "Suspend enabled")]
+    #[test_case(false; "Suspend disabled")]
     #[fuchsia::test]
-    async fn interaction_aggregator_reports_activity() {
-        let activity_manager = ActivityManager::new_for_test(ACTIVITY_TIMEOUT, false);
+    async fn aggregator_reports_activity(suspend_enabled: bool) {
+        let activity_manager = ActivityManager::new_for_test(ACTIVITY_TIMEOUT, suspend_enabled);
         let proxy = create_interaction_aggregator_proxy(activity_manager.clone());
         proxy.report_discrete_activity(0).await.expect("Failed to report activity");
     }
 
     #[fuchsia::test]
-    async fn interaction_notifier_listener_gets_initial_state() {
-        let activity_manager = ActivityManager::new_for_test(ACTIVITY_TIMEOUT, false);
-        let notifier_proxy = create_interaction_notifier_proxy(activity_manager.clone());
-        let state = notifier_proxy.watch_state().await.expect("Failed to get interaction state");
-        assert_eq!(state, State::Active);
+    async fn aggregator_handoff_wake_ok_when_suspend_enabled() {
+        let activity_manager =
+            ActivityManager::new_for_test(ACTIVITY_TIMEOUT, /* suspend_enabled */ true);
+        let proxy = create_interaction_aggregator_proxy(activity_manager.clone());
+        assert_matches!(proxy.handoff_wake().await, Ok(Ok(())));
+        assert_eq!(activity_manager.is_holding_lease(), true);
     }
 
     #[fuchsia::test]
-    fn interaction_notifier_listener_gets_updated_idle_state() -> Result<(), Error> {
+    async fn aggregator_handoff_wake_error_when_suspend_disabled() {
+        let activity_manager =
+            ActivityManager::new_for_test(ACTIVITY_TIMEOUT, /* suspend_enabled */ false);
+        let proxy = create_interaction_aggregator_proxy(activity_manager.clone());
+        assert_matches!(proxy.handoff_wake().await, Ok(Err(HandoffWakeError::PowerNotAvailable)));
+        assert_eq!(activity_manager.is_holding_lease(), false);
+    }
+
+    #[test_case(true; "Suspend enabled")]
+    #[test_case(false; "Suspend disabled")]
+    #[fuchsia::test]
+    async fn notifier_sends_initial_state(suspend_enabled: bool) {
+        let activity_manager = ActivityManager::new_for_test(ACTIVITY_TIMEOUT, suspend_enabled);
+        let notifier_proxy = create_interaction_notifier_proxy(activity_manager.clone());
+        let state = notifier_proxy.watch_state().await.expect("Failed to get interaction state");
+        assert_eq!(state, State::Active);
+        assert_eq!(activity_manager.is_holding_lease(), suspend_enabled);
+    }
+
+    #[test_case(true; "Suspend enabled")]
+    #[test_case(false; "Suspend disabled")]
+    #[fuchsia::test]
+    fn notifier_sends_idle_state_after_timeout(suspend_enabled: bool) -> Result<(), Error> {
         let mut executor = TestExecutor::new_with_fake_time();
         executor.set_fake_time(fuchsia_async::Time::from_nanos(0));
 
-        let activity_manager = ActivityManager::new_for_test(ACTIVITY_TIMEOUT, false);
+        let activity_manager = ActivityManager::new_for_test(ACTIVITY_TIMEOUT, suspend_enabled);
         let notifier_proxy = create_interaction_notifier_proxy(activity_manager.clone());
 
         // Initial state is active.
@@ -245,6 +390,7 @@ mod tests {
         pin_mut!(state_fut);
         let initial_state = executor.run_until_stalled(&mut state_fut);
         assert_matches!(initial_state, Poll::Ready(Some(Ok(State::Active))));
+        assert_eq!(activity_manager.is_holding_lease(), suspend_enabled);
 
         // Skip ahead by the activity timeout.
         executor.set_fake_time(fuchsia_async::Time::after(ACTIVITY_TIMEOUT));
@@ -254,16 +400,65 @@ mod tests {
         pin_mut!(idle_state_fut);
         let initial_state = executor.run_until_stalled(&mut idle_state_fut);
         assert_matches!(initial_state, Poll::Ready(Some(Ok(State::Idle))));
+        assert_eq!(activity_manager.is_holding_lease(), false);
+
+        Ok(())
+    }
+
+    #[test_case(true; "Suspend enabled")]
+    #[test_case(false; "Suspend disabled")]
+    #[fuchsia::test]
+    fn notifier_sends_active_state_with_report_discrete_activity(
+        suspend_enabled: bool,
+    ) -> Result<(), Error> {
+        let mut executor = TestExecutor::new_with_fake_time();
+        executor.set_fake_time(fuchsia_async::Time::from_nanos(0));
+
+        let activity_manager = ActivityManager::new_for_test(ACTIVITY_TIMEOUT, suspend_enabled);
+        let notifier_proxy = create_interaction_notifier_proxy(activity_manager.clone());
+
+        // Initial state is active.
+        let mut watch_state_stream =
+            HangingGetStream::new(notifier_proxy, NotifierProxy::watch_state);
+        let state_fut = watch_state_stream.next();
+        pin_mut!(state_fut);
+        let initial_state = executor.run_until_stalled(&mut state_fut);
+        assert_matches!(initial_state, Poll::Ready(Some(Ok(State::Active))));
+        assert_eq!(activity_manager.is_holding_lease(), suspend_enabled);
+
+        // Skip ahead by the activity timeout.
+        executor.set_fake_time(fuchsia_async::Time::after(ACTIVITY_TIMEOUT));
+
+        // State transitions to Idle.
+        let idle_state_fut = watch_state_stream.next();
+        pin_mut!(idle_state_fut);
+        let initial_state = executor.run_until_stalled(&mut idle_state_fut);
+        assert_matches!(initial_state, Poll::Ready(Some(Ok(State::Idle))));
+        assert_eq!(activity_manager.is_holding_lease(), false);
+
+        // Send an activity.
+        let proxy = create_interaction_aggregator_proxy(activity_manager.clone());
+        let report_fut = proxy.report_discrete_activity(ACTIVITY_TIMEOUT.into_nanos());
+        pin_mut!(report_fut);
+        assert!(executor.run_until_stalled(&mut report_fut).is_ready());
+
+        // State transitions to Active.
+        let active_state_fut = watch_state_stream.next();
+        pin_mut!(active_state_fut);
+        let initial_state = executor.run_until_stalled(&mut active_state_fut);
+        assert_matches!(initial_state, Poll::Ready(Some(Ok(State::Active))));
+        assert_eq!(activity_manager.is_holding_lease(), suspend_enabled);
 
         Ok(())
     }
 
     #[fuchsia::test]
-    fn interaction_notifier_listener_gets_updated_active_state() -> Result<(), Error> {
+    fn notifier_sends_active_state_with_handoff_wake_suspend_enabled() -> Result<(), Error> {
         let mut executor = TestExecutor::new_with_fake_time();
         executor.set_fake_time(fuchsia_async::Time::from_nanos(0));
 
-        let activity_manager = ActivityManager::new_for_test(ACTIVITY_TIMEOUT, false);
+        let activity_manager =
+            ActivityManager::new_for_test(ACTIVITY_TIMEOUT, /* suspend_enabled */ true);
         let notifier_proxy = create_interaction_notifier_proxy(activity_manager.clone());
 
         // Initial state is active.
@@ -285,9 +480,10 @@ mod tests {
 
         // Send an activity.
         let proxy = create_interaction_aggregator_proxy(activity_manager.clone());
-        let report_fut = proxy.report_discrete_activity(ACTIVITY_TIMEOUT.into_nanos());
-        pin_mut!(report_fut);
-        assert!(executor.run_until_stalled(&mut report_fut).is_ready());
+        let handoff_fut = proxy.handoff_wake();
+        pin_mut!(handoff_fut);
+        let handoff_response = executor.run_until_stalled(&mut handoff_fut);
+        assert_matches!(handoff_response, Poll::Ready(Ok(Ok(()))));
 
         // State transitions to Active.
         let active_state_fut = watch_state_stream.next();
@@ -299,7 +495,54 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn activity_manager_drops_first_timer_on_activity() -> Result<(), Error> {
+    fn notifier_sends_nothing_with_handoff_wake_suspend_disabled() -> Result<(), Error> {
+        let mut executor = TestExecutor::new_with_fake_time();
+        executor.set_fake_time(fuchsia_async::Time::from_nanos(0));
+
+        let activity_manager =
+            ActivityManager::new_for_test(ACTIVITY_TIMEOUT, /* suspend_enabled */ false);
+        let notifier_proxy = create_interaction_notifier_proxy(activity_manager.clone());
+
+        // Initial state is active.
+        let mut watch_state_stream =
+            HangingGetStream::new(notifier_proxy, NotifierProxy::watch_state);
+        let state_fut = watch_state_stream.next();
+        pin_mut!(state_fut);
+        let initial_state = executor.run_until_stalled(&mut state_fut);
+        assert_matches!(initial_state, Poll::Ready(Some(Ok(State::Active))));
+
+        // Skip ahead by the activity timeout.
+        executor.set_fake_time(fuchsia_async::Time::after(ACTIVITY_TIMEOUT));
+
+        // State transitions to Idle.
+        let idle_state_fut = watch_state_stream.next();
+        pin_mut!(idle_state_fut);
+        let initial_state = executor.run_until_stalled(&mut idle_state_fut);
+        assert_matches!(initial_state, Poll::Ready(Some(Ok(State::Idle))));
+
+        // Send an activity.
+        let proxy = create_interaction_aggregator_proxy(activity_manager.clone());
+        let handoff_fut = proxy.handoff_wake();
+        pin_mut!(handoff_fut);
+        let handoff_response = executor.run_until_stalled(&mut handoff_fut);
+        assert_matches!(
+            handoff_response,
+            Poll::Ready(Ok(Err(HandoffWakeError::PowerNotAvailable)))
+        );
+
+        // Idle state does not change.
+        let watch_state_fut = watch_state_stream.next();
+        pin_mut!(watch_state_fut);
+        let watch_state_res = executor.run_until_stalled(&mut watch_state_fut);
+        assert_matches!(watch_state_res, Poll::Pending);
+
+        Ok(())
+    }
+
+    #[test_case(true; "Suspend enabled")]
+    #[test_case(false; "Suspend disabled")]
+    #[fuchsia::test]
+    fn activity_manager_drops_first_timer_on_activity(suspend_enabled: bool) -> Result<(), Error> {
         // This test does the following:
         //   - Start an activity manager, whose initial timeout is set to
         //     ACTIVITY_TIMEOUT.
@@ -318,7 +561,7 @@ mod tests {
         let mut executor = TestExecutor::new_with_fake_time();
         executor.set_fake_time(fuchsia_async::Time::from_nanos(0));
 
-        let activity_manager = ActivityManager::new_for_test(ACTIVITY_TIMEOUT, false);
+        let activity_manager = ActivityManager::new_for_test(ACTIVITY_TIMEOUT, suspend_enabled);
         let notifier_proxy = create_interaction_notifier_proxy(activity_manager.clone());
 
         // Initial state is active.
@@ -328,6 +571,7 @@ mod tests {
         pin_mut!(state_fut);
         let initial_state = executor.run_until_stalled(&mut state_fut);
         assert_matches!(initial_state, Poll::Ready(Some(Ok(State::Active))));
+        assert_eq!(activity_manager.is_holding_lease(), suspend_enabled);
 
         // Skip ahead by half the activity timeout.
         executor.set_fake_time(fuchsia_async::Time::after(ACTIVITY_TIMEOUT / 2));
@@ -346,6 +590,7 @@ mod tests {
         pin_mut!(watch_state_fut);
         let watch_state_res = executor.run_until_stalled(&mut watch_state_fut);
         assert_matches!(watch_state_res, Poll::Pending);
+        assert_eq!(activity_manager.is_holding_lease(), suspend_enabled);
 
         // Skip ahead by half the activity timeout.
         executor.set_fake_time(fuchsia_async::Time::after(ACTIVITY_TIMEOUT / 2));
@@ -353,16 +598,19 @@ mod tests {
         // Activity state does change.
         let watch_state_res = executor.run_until_stalled(&mut watch_state_fut);
         assert_matches!(watch_state_res, Poll::Ready(Some(Ok(State::Idle))));
+        assert_eq!(activity_manager.is_holding_lease(), false);
 
         Ok(())
     }
 
+    #[test_case(true; "Suspend enabled")]
+    #[test_case(false; "Suspend disabled")]
     #[fuchsia::test]
-    fn actvity_manager_drops_late_activities() -> Result<(), Error> {
+    fn actvity_manager_drops_late_activities(suspend_enabled: bool) -> Result<(), Error> {
         let mut executor = TestExecutor::new_with_fake_time();
         executor.set_fake_time(fuchsia_async::Time::from_nanos(0));
 
-        let activity_manager = ActivityManager::new_for_test(ACTIVITY_TIMEOUT, false);
+        let activity_manager = ActivityManager::new_for_test(ACTIVITY_TIMEOUT, suspend_enabled);
         let notifier_proxy = create_interaction_notifier_proxy(activity_manager.clone());
 
         // Initial state is active.
@@ -372,6 +620,7 @@ mod tests {
         pin_mut!(state_fut);
         let watch_state_res = executor.run_until_stalled(&mut state_fut);
         assert_matches!(watch_state_res, Poll::Ready(Some(Ok(State::Active))));
+        assert_eq!(activity_manager.is_holding_lease(), suspend_enabled);
 
         // Skip ahead by half the activity timeout.
         executor.set_fake_time(fuchsia_async::Time::after(ACTIVITY_TIMEOUT / 2));
@@ -397,6 +646,7 @@ mod tests {
         pin_mut!(watch_state_fut);
         let initial_state = executor.run_until_stalled(&mut watch_state_fut);
         assert_matches!(initial_state, Poll::Pending);
+        assert_eq!(activity_manager.is_holding_lease(), suspend_enabled);
 
         // Skip ahead by half the activity timeout.
         executor.set_fake_time(fuchsia_async::Time::after(ACTIVITY_TIMEOUT / 2));
@@ -404,21 +654,8 @@ mod tests {
         // Activity state does change.
         let watch_state_res = executor.run_until_stalled(&mut watch_state_fut);
         assert_matches!(watch_state_res, Poll::Ready(Some(Ok(State::Idle))));
+        assert_eq!(activity_manager.is_holding_lease(), false);
 
         Ok(())
-    }
-
-    #[fuchsia::test]
-    async fn interaction_aggregator_handoff_wake_error_when_suspend_disabled() {
-        let activity_manager = ActivityManager::new_for_test(ACTIVITY_TIMEOUT, false);
-        let proxy = create_interaction_aggregator_proxy(activity_manager.clone());
-        assert_matches!(proxy.handoff_wake().await, Ok(Err(HandoffWakeError::PowerNotAvailable)));
-    }
-
-    #[fuchsia::test]
-    async fn interaction_aggregator_handoff_wake_ok_when_suspend_enabled() {
-        let activity_manager = ActivityManager::new_for_test(ACTIVITY_TIMEOUT, true);
-        let proxy = create_interaction_aggregator_proxy(activity_manager.clone());
-        assert_matches!(proxy.handoff_wake().await, Ok(Ok(())));
     }
 }

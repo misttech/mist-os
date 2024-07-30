@@ -8,6 +8,8 @@ use anyhow::{Context, Result};
 use serde_json::map::Entry;
 use serde_json::{Map, Value};
 
+use crate::ConfigError;
+
 /// A trait that adds a recursive mapping function to a nested json value tree.
 ///
 /// Note that implementations of this should be on value types and not references,
@@ -151,12 +153,12 @@ pub(crate) fn nested_remove(
     remaining_keys: &[&str],
 ) -> Result<()> {
     if remaining_keys.len() == 0 {
-        cur.remove(&key.to_string()).context("Config key not found").map(|_| ())
+        cur.remove(&key.to_string()).context(ConfigError::KeyNotFound).map(|_| ())
     } else {
         // Just ensured this would be the case.
         let next_map = cur
             .get_mut(key)
-            .context("Configuration key not found.")?
+            .context(ConfigError::KeyNotFound)?
             .as_object_mut()
             .context("Configuration literal found when expecting a map.")?;
         nested_remove(next_map, remaining_keys[0], &remaining_keys[1..])?;

@@ -13,7 +13,7 @@ In order to run starnix, we need to build `//src/starnix`.
 For faster iteration, configure your build with incremental compilation:
 
 ```sh
-fx set workbench.x64 --auto-dir --args 'rust_incremental="incremental"' --with //src/starnix:tests, //src/starnix/containers
+fx set workbench_eng.x64 --auto-dir --args 'rust_incremental="incremental"' --with //src/starnix:tests --with //src/starnix/containers
 fx build
 ```
 

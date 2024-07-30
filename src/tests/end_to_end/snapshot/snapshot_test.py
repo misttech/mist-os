@@ -13,12 +13,12 @@ import logging
 import os
 import tempfile
 import zipfile
+from typing import Any, Dict, List
 
 from fuchsia_base_test import fuchsia_base_test
 from honeydew.interfaces.device_classes.fuchsia_device import FuchsiaDevice
 from mobly import asserts, test_runner
 from perf_utils.utils import FuchsiaPerfResults
-from typing import Dict, Any, List
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 _SNAPSHOT_ZIP = "snapshot_test.zip"

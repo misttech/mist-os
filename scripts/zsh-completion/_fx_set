@@ -89,10 +89,6 @@ _arguments '1:arch:{_fx_set__product_board}' \
   '(:)*--fuzz-with[A sanitizer name to fuzz with]: ' \
   '(:)*--args[Arguments for GN gen]:args:{_fx_set___gn_arg_equals}' \
   '(:)--help-args[Display GN argument documentation]:arg:{_fx_set__gn_arg_name}' \
-  '(:)--goma[Use GOMA]' \
-  "(:)--no-goma[Don't use GOMA]" \
-  "(:)--no-ensure-goma[Don't make sure GOMA is running]" \
-  '(:)--goma-dir[GOMA directory to use]:directory:_files -/' \
   "(:)--ccache[Use ccache]" \
   "(:)--no-ccache[Don't use ccache]" \
   '(:)--ide[Generate files for an IDE]:ide:(eclipse vs vs2013 vs2015 vs2017 xcode qcreator json)' \

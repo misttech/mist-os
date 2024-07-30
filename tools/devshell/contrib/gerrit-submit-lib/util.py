@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import time
-
 from typing import List
 
 

@@ -6,7 +6,7 @@
 
 #include <lib/ddk/metadata.h>
 #include <lib/driver/compat/cpp/device_server.h>
-#include <lib/driver/testing/cpp/fixture/driver_test_fixture.h>
+#include <lib/driver/testing/cpp/driver_test.h>
 
 #include <gtest/gtest.h>
 
@@ -91,21 +91,23 @@ class TestEnv : public fdf_testing::Environment {
 
 class TestConfig final {
  public:
-  static constexpr bool kDriverOnForeground = false;
-  static constexpr bool kAutoStartDriver = true;
-  static constexpr bool kAutoStopDriver = true;
-
   using DriverType = adc_buttons::AdcButtons;
   using EnvironmentType = TestEnv;
 };
 
-class AdcButtonsDeviceTest : public fdf_testing::DriverTestFixture<TestConfig>,
-                             public ::testing::Test {
+class AdcButtonsDeviceTest : public ::testing::Test {
  public:
+  void TearDown() override {
+    zx::result<> result = driver_test().StopDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
+  }
+
   void SetUp() override {
+    zx::result<> result = driver_test().StartDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
     // Connect to InputDevice.
     auto connect_result =
-        RunInNodeContext<zx::result<zx::channel>>([](fdf_testing::TestNode& node) {
+        driver_test().RunInNodeContext<zx::result<zx::channel>>([](fdf_testing::TestNode& node) {
           return node.children().at("adc-buttons").ConnectToDevice();
         });
     EXPECT_EQ(ZX_OK, connect_result.status_value());
@@ -114,7 +116,8 @@ class AdcButtonsDeviceTest : public fdf_testing::DriverTestFixture<TestConfig>,
   }
 
   void FakeAdcSetSample(uint32_t sample) {
-    RunInEnvironmentTypeContext([sample](TestEnv& env) { env.FakeAdcSetSample(sample); });
+    driver_test().RunInEnvironmentTypeContext(
+        [sample](TestEnv& env) { env.FakeAdcSetSample(sample); });
   }
 
   void DrainInitialReport(fidl::WireSyncClient<fuchsia_input_report::InputReportsReader>& reader) {
@@ -135,7 +138,10 @@ class AdcButtonsDeviceTest : public fdf_testing::DriverTestFixture<TestConfig>,
 
   fidl::WireSyncClient<fuchsia_input_report::InputDevice>& client() { return client_; }
 
+  fdf_testing::BackgroundDriverTest<TestConfig>& driver_test() { return driver_test_; }
+
  private:
+  fdf_testing::BackgroundDriverTest<TestConfig> driver_test_;
   fidl::WireSyncClient<fuchsia_input_report::InputDevice> client_;
 };
 

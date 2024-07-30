@@ -8,9 +8,9 @@ import("//build/drivers.gni")
 import("//build/test.gni")
 
 driver_bind_rules("rndis_function_bind") {
-  rules = "rndis_function.bind"
+  rules = "meta/rndis_function.bind"
   bind_output = "rndis-function.bindbc"
-  tests = "bind-tests.json"
+  tests = "meta/bind-tests.json"
   deps = [
     "//src/devices/bind/fuchsia.usb",
     "//src/devices/bind/fuchsia.usb.misc",
@@ -60,7 +60,7 @@ fuchsia_driver("rndis-function-driver") {
 fuchsia_driver_component("rndis-function") {
   component_name = "rndis-function"
   deps = [ ":rndis-function-driver" ]
-  info = "rndis-function-info.json"
+  info = "meta/rndis-function-info.json"
   manifest = "meta/rndis-function.cml"
 }
 

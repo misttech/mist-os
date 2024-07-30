@@ -28,14 +28,6 @@ FAKE_VERSION_HISTORY_FILE_CONTENT = """{
 }
 """
 
-FAKE_FIDL_COMPATIBILITY_DOC_FILE_CONTENT = """
-Some docs above.
-
-{% set in_development_api_level = 1 %}
-
-Some docs below.
-"""
-
 OLD_API_LEVEL = 1
 OLD_SUPPORTED_API_LEVELS = [1]
 
@@ -54,12 +46,6 @@ class TestUpdatePlatformVersionMethods(unittest.TestCase):
         )
         with open(self.fake_version_history_file, "w") as f:
             f.write(FAKE_VERSION_HISTORY_FILE_CONTENT)
-
-        self.fake_fidl_compability_doc_file = os.path.join(
-            self.test_dir, "fidl_api_compatibility_testing.md"
-        )
-        with open(self.fake_fidl_compability_doc_file, "w") as f:
-            f.write(FAKE_FIDL_COMPATIBILITY_DOC_FILE_CONTENT)
 
     def tearDown(self) -> None:
         shutil.rmtree(self.test_dir)
@@ -89,7 +75,7 @@ class TestUpdatePlatformVersionMethods(unittest.TestCase):
                             },
                             "2": {
                                 "abi_revision": "0x0000000001234ABC",
-                                "status": "in-development",
+                                "status": "supported",
                             },
                         },
                     },
@@ -130,38 +116,13 @@ class TestUpdatePlatformVersionMethods(unittest.TestCase):
                             },
                             "2": {
                                 "abi_revision": "0x0000000004321CBA",
-                                "status": "in-development",
+                                "status": "supported",
                             },
                         },
                     },
                     "schema_id": "https://fuchsia.dev/schema/version_history-22rnd667.json",
                 },
             )
-
-    def test_update_fidl_compatibility_doc(self) -> None:
-        with open(self.fake_fidl_compability_doc_file) as f:
-            lines = f.readlines()
-        self.assertIn(
-            f"{{% set in_development_api_level = {OLD_API_LEVEL} %}}\n", lines
-        )
-        self.assertNotIn(
-            f"{{% set in_development_api_level = {NEW_API_LEVEL} %}}\n", lines
-        )
-
-        self.assertTrue(
-            update_platform_version.update_fidl_compatibility_doc(
-                NEW_API_LEVEL, self.fake_fidl_compability_doc_file
-            )
-        )
-
-        with open(self.fake_fidl_compability_doc_file) as f:
-            lines = f.readlines()
-        self.assertNotIn(
-            f"{{% set in_development_api_level = {OLD_API_LEVEL} %}}\n", lines
-        )
-        self.assertIn(
-            f"{{% set in_development_api_level = {NEW_API_LEVEL} %}}\n", lines
-        )
 
 
 if __name__ == "__main__":

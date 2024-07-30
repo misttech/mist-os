@@ -5,10 +5,11 @@
 //! Support for running FIDL request streams until stalled.
 
 use fidl::endpoints::RequestStream;
+use fuchsia_sync::Mutex;
 use futures::channel::oneshot::{self, Receiver};
 use futures::{ready, FutureExt, Stream, StreamExt};
 use std::pin::Pin;
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 use std::task::{Context, Poll};
 use zx::Duration;
 use {fuchsia_async as fasync, fuchsia_zircon as zx};
@@ -28,7 +29,7 @@ use {fuchsia_async as fasync, fuchsia_zircon as zx};
 pub fn until_stalled<RS: RequestStream>(
     request_stream: RS,
     debounce_interval: Duration,
-) -> (impl Stream<Item = <RS as Stream>::Item>, Receiver<Option<zx::Channel>>) {
+) -> (impl StreamAndControlHandle<RS, <RS as Stream>::Item>, Receiver<Option<zx::Channel>>) {
     let (sender, receiver) = oneshot::channel();
     let stream = StallableRequestStream::new(request_stream, debounce_interval, move |channel| {
         let _ = sender.send(channel);
@@ -36,9 +37,19 @@ pub fn until_stalled<RS: RequestStream>(
     (stream, receiver)
 }
 
+/// Types that implement [`StreamAndControlHandle`] can stream out FIDL request
+/// messages and vend out weak control handles which lets you manage the connection
+/// and send events.
+pub trait StreamAndControlHandle<RS, Item>: Stream<Item = Item> {
+    /// Obtain a weak control handle. Different from [`RequestStream::control_handle`],
+    /// the weak control handle will not prevent unbinding. You may hold on to the
+    /// weak control handle and the request stream can still complete when stalled.
+    fn control_handle(&self) -> WeakControlHandle<RS>;
+}
+
 /// The stream returned from [`until_stalled`].
 pub struct StallableRequestStream<RS, F> {
-    stream: Option<RS>,
+    stream: Arc<Mutex<Option<RS>>>,
     debounce_interval: Duration,
     unbind_callback: Option<F>,
     timer: Option<fasync::Timer>,
@@ -49,11 +60,50 @@ impl<RS, F> StallableRequestStream<RS, F> {
     /// stream is stalled.
     pub fn new(stream: RS, debounce_interval: Duration, unbind_callback: F) -> Self {
         Self {
-            stream: Some(stream),
+            stream: Arc::new(Mutex::new(Some(stream))),
             debounce_interval,
             unbind_callback: Some(unbind_callback),
             timer: None,
         }
+    }
+}
+
+impl<RS: RequestStream + Unpin, F: FnOnce(Option<zx::Channel>) + Unpin>
+    StreamAndControlHandle<RS, RS::Item> for StallableRequestStream<RS, F>
+{
+    fn control_handle(&self) -> WeakControlHandle<RS> {
+        WeakControlHandle { stream: Arc::downgrade(&self.stream) }
+    }
+}
+
+pub struct WeakControlHandle<RS> {
+    stream: Weak<Mutex<Option<RS>>>,
+}
+
+impl<RS> WeakControlHandle<RS>
+where
+    RS: RequestStream,
+{
+    /// If the server endpoint is not unbound, calls `user` function with the
+    /// control handle and propagates the return value. Otherwise, returns `None`.
+    ///
+    /// Typically you can use it to send an event within the closure:
+    ///
+    /// ```
+    /// let control_handle = stream.control_handle();
+    /// let result = control_handle.use_control_handle(
+    ///     |control_handle| control_handle.send_my_event());
+    /// ```
+    ///
+    pub fn use_control_handle<User, R>(&self, user: User) -> Option<R>
+    where
+        User: FnOnce(RS::ControlHandle) -> R,
+    {
+        self.stream
+            .upgrade()
+            .as_ref()
+            .map(|stream| stream.lock().as_ref().map(|stream| user(stream.control_handle())))
+            .flatten()
     }
 }
 
@@ -63,7 +113,14 @@ impl<RS: RequestStream + Unpin, F: FnOnce(Option<zx::Channel>) + Unpin> Stream
     type Item = <RS as Stream>::Item;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        match self.stream.as_mut().expect("Stream already resolved").poll_next_unpin(cx) {
+        let poll_result = self
+            .stream
+            .as_ref()
+            .lock()
+            .as_mut()
+            .expect("Stream already resolved")
+            .poll_next_unpin(cx);
+        match poll_result {
             Poll::Ready(message) => {
                 self.timer = None;
                 if message.is_none() {
@@ -81,7 +138,7 @@ impl<RS: RequestStream + Unpin, F: FnOnce(Option<zx::Channel>) + Unpin> Stream
 
                     // Try and unbind, which will fail if there are outstanding responders or
                     // control handles.
-                    let (inner, is_terminated) = self.stream.take().unwrap().into_inner();
+                    let (inner, is_terminated) = self.stream.lock().take().unwrap().into_inner();
                     match Arc::try_unwrap(inner) {
                         Ok(inner) => {
                             self.unbind_callback.take().unwrap()(Some(
@@ -92,7 +149,7 @@ impl<RS: RequestStream + Unpin, F: FnOnce(Option<zx::Channel>) + Unpin> Stream
                         Err(inner) => {
                             // We can't unbind because there are outstanding responders or control
                             // handles, so we'll try again after another debounce interval.
-                            self.stream = Some(RS::from_inner(inner, is_terminated));
+                            *self.stream.lock() = Some(RS::from_inner(inner, is_terminated));
                         }
                     }
                 }
@@ -129,6 +186,65 @@ mod tests {
             ),
             (None, Ok(Some(_)))
         );
+    }
+
+    #[fuchsia::test(allow_stalls = false)]
+    async fn strong_control_handle_blocks_stalling() {
+        let initial = fasync::Time::from_nanos(0);
+        TestExecutor::advance_to(initial).await;
+        const DURATION_NANOS: i64 = 1_000_000;
+        let idle_duration = Duration::from_nanos(DURATION_NANOS);
+
+        let (_proxy, stream) =
+            fidl::endpoints::create_proxy_and_stream::<fio::DirectoryMarker>().unwrap();
+        let (stream, mut stalled) = until_stalled(stream, idle_duration);
+
+        let strong_control_handle: fio::DirectoryControlHandle =
+            stream.control_handle().use_control_handle(|x| x).unwrap();
+
+        // The connection does not stall, because there is `strong_control_handle`.
+        TestExecutor::advance_to(initial + idle_duration * 2).await;
+        let mut stream = stream.fuse();
+        futures::select! {
+            _ = stream.next() => unreachable!(),
+            _ = stalled => unreachable!(),
+            default => {},
+        }
+
+        // Once we drop it then the connection can stall.
+        drop(strong_control_handle);
+        assert_matches!(
+            futures::join!(
+                stream.next(),
+                TestExecutor::advance_to(initial + idle_duration * 4).then(|()| stalled)
+            ),
+            (None, Ok(Some(_)))
+        );
+    }
+
+    #[fuchsia::test(allow_stalls = false)]
+    async fn weak_control_handle() {
+        let initial = fasync::Time::from_nanos(0);
+        TestExecutor::advance_to(initial).await;
+        const DURATION_NANOS: i64 = 1_000_000;
+        let idle_duration = Duration::from_nanos(DURATION_NANOS);
+
+        let (_proxy, stream) =
+            fidl::endpoints::create_proxy_and_stream::<fio::DirectoryMarker>().unwrap();
+        let (mut stream, stalled) = until_stalled(stream, idle_duration);
+
+        // Just getting a weak control handle should not block the connection from stalling.
+        let weak_control_handle = stream.control_handle();
+
+        assert_matches!(
+            futures::join!(
+                stream.next(),
+                TestExecutor::advance_to(initial + idle_duration).then(|()| stalled)
+            ),
+            (None, Ok(Some(_)))
+        );
+
+        weak_control_handle.use_control_handle(|_| unreachable!());
     }
 
     #[fuchsia::test(allow_stalls = false)]

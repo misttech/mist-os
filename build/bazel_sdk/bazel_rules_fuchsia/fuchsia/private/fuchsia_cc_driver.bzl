@@ -93,4 +93,7 @@ def fuchsia_cc_driver(name, srcs = [], output_name = None, deps = [], **kwargs):
         visibility = visibility,
         testonly = testonly,
         tags = tags,
+        # TODO(352586714) Enable this check when we understand why the symbols are getting
+        # pulled in.
+        # restricted_symbols = "@fuchsia_sdk//fuchsia/private:driver_restricted_symbols.txt",
     )

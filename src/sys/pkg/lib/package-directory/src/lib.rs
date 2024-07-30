@@ -121,10 +121,10 @@ pub trait NonMetaStorage: Send + Sync + Sized + 'static {
         server_end: ServerEnd<fio::NodeMarker>,
     ) -> Result<(), NonMetaStorageError>;
 
-    fn open2(
+    fn open3(
         &self,
         _blob: &fuchsia_hash::Hash,
-        _protocols: fio::ConnectionProtocols,
+        _flags: fio::Flags,
         _scope: ExecutionScope,
         _object_request: ObjectRequestRef<'_>,
     ) -> Result<(), zx::Status>;
@@ -155,14 +155,14 @@ impl NonMetaStorage for blobfs::Client {
         })
     }
 
-    fn open2(
+    fn open3(
         &self,
         blob: &fuchsia_hash::Hash,
-        protocols: fio::ConnectionProtocols,
+        flags: fio::Flags,
         scope: ExecutionScope,
         object_request: ObjectRequestRef<'_>,
     ) -> Result<(), zx::Status> {
-        self.open2_blob_for_read(blob, protocols, scope, object_request)
+        self.open3_blob_for_read(blob, flags, scope, object_request)
     }
 
     async fn get_blob_vmo(
@@ -200,16 +200,21 @@ impl NonMetaStorage for fio::DirectoryProxy {
         )
     }
 
-    fn open2(
+    fn open3(
         &self,
         blob: &fuchsia_hash::Hash,
-        protocols: fio::ConnectionProtocols,
+        flags: fio::Flags,
         _scope: ExecutionScope,
         object_request: ObjectRequestRef<'_>,
     ) -> Result<(), zx::Status> {
         // If the FIDL call passes, errors will be communicated via the `object_request` channel.
-        self.open2(blob.to_string().as_str(), &protocols, object_request.take().into_channel())
-            .map_err(|_fidl_error| zx::Status::PEER_CLOSED)
+        self.open3(
+            blob.to_string().as_str(),
+            flags,
+            &object_request.options(),
+            object_request.take().into_channel(),
+        )
+        .map_err(|_fidl_error| zx::Status::PEER_CLOSED)
     }
 
     async fn get_blob_vmo(

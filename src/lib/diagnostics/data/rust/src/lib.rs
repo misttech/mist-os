@@ -11,13 +11,14 @@ use anyhow::format_err;
 use chrono::{Local, TimeZone, Utc};
 use diagnostics_hierarchy::HierarchyMatcher;
 use fidl_fuchsia_diagnostics::{DataType, Selector, Severity as FidlSeverity};
+use fidl_fuchsia_inspect as finspect;
 use flyweights::FlyStr;
 use itertools::Itertools;
-use moniker::{ExtendedMoniker, MonikerError};
+use moniker::EXTENDED_MONIKER_COMPONENT_MANAGER_STR;
 use selectors::SelectorExt;
 use serde::de::{DeserializeOwned, Deserializer};
 use serde::{Deserialize, Serialize, Serializer};
-use std::borrow::Borrow;
+use std::borrow::{Borrow, Cow};
 use std::cmp::Ordering;
 use std::fmt;
 use std::hash::Hash;
@@ -28,6 +29,7 @@ use termion::{color, style};
 use thiserror::Error;
 
 pub use diagnostics_hierarchy::{hierarchy, DiagnosticsHierarchy, Property};
+pub use moniker::ExtendedMoniker;
 
 #[cfg(target_os = "fuchsia")]
 mod logs_legacy;
@@ -38,6 +40,9 @@ pub use crate::logs_legacy::*;
 const SCHEMA_VERSION: u64 = 1;
 const MICROS_IN_SEC: u128 = 1000000;
 const ROOT_MONIKER_REPR: &str = "<root>";
+
+static DEFAULT_TREE_NAME: once_cell::sync::Lazy<FlyStr> =
+    once_cell::sync::Lazy::new(|| FlyStr::new(finspect::DEFAULT_TREE_NAME));
 
 /// The possible name for a handle to inspect data. It could be a filename (being deprecated) or a
 /// name published using `fuchsia.inspect.InspectSink`.
@@ -270,12 +275,11 @@ pub struct InspectMetadata {
     pub errors: Option<Vec<InspectError>>,
 
     /// Name of diagnostics source producing data.
-    #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(flatten)]
-    pub name: Option<InspectHandleName>,
+    pub name: InspectHandleName,
 
     /// The url with which the component was launched.
-    pub component_url: String,
+    pub component_url: FlyStr,
 
     /// Monotonic time in nanos.
     pub timestamp: i64,
@@ -306,7 +310,7 @@ pub struct LogsMetadata {
 
     /// The url with which the component was launched.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub component_url: Option<String>,
+    pub component_url: Option<FlyStr>,
 
     /// Monotonic time in nanos.
     pub timestamp: i64,
@@ -488,7 +492,8 @@ pub struct Data<D: DiagnosticsData> {
     pub metadata: D::Metadata,
 
     /// Moniker of the component that generated the payload.
-    pub moniker: String,
+    #[serde(deserialize_with = "moniker_deserialize", serialize_with = "moniker_serialize")]
+    pub moniker: ExtendedMoniker,
 
     /// Payload containing diagnostics data, if the payload exists, else None.
     pub payload: Option<DiagnosticsHierarchy<D::Key>>,
@@ -496,6 +501,21 @@ pub struct Data<D: DiagnosticsData> {
     /// Schema version.
     #[serde(default)]
     pub version: u64,
+}
+
+fn moniker_deserialize<'de, D>(deserializer: D) -> Result<ExtendedMoniker, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let moniker_str = String::deserialize(deserializer)?;
+    ExtendedMoniker::parse_str(&moniker_str).map_err(serde::de::Error::custom)
+}
+
+fn moniker_serialize<S>(moniker: &ExtendedMoniker, s: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    s.collect_str(moniker)
 }
 
 impl<D> Data<D>
@@ -523,11 +543,7 @@ where
         let Some(hierarchy) = self.payload else {
             return Ok(None);
         };
-        let moniker = match ExtendedMoniker::parse_str(self.moniker.as_str()) {
-            Ok(moniker) => moniker,
-            Err(e) => return Err(Error::Moniker(e)),
-        };
-        let matching_selectors = match moniker.match_against_selectors(selectors) {
+        let matching_selectors = match self.moniker.match_against_selectors(selectors) {
             Ok(selectors) if selectors.is_empty() => return Ok(None),
             Ok(selectors) => selectors,
             Err(e) => {
@@ -556,9 +572,6 @@ where
 pub enum Error {
     #[error(transparent)]
     Internal(#[from] anyhow::Error),
-
-    #[error(transparent)]
-    Moniker(#[from] MonikerError),
 }
 
 /// A diagnostics data object containing inspect data.
@@ -575,8 +588,8 @@ pub type LogsProperty = Property<LogsField>;
 
 impl Data<Inspect> {
     /// Access the name or filename within `self.metadata`.
-    pub fn name(&self) -> Option<&str> {
-        self.metadata.name.as_ref().map(InspectHandleName::as_ref)
+    pub fn name(&self) -> &str {
+        self.metadata.name.as_ref()
     }
 }
 
@@ -585,20 +598,16 @@ pub struct InspectDataBuilder {
 }
 
 impl InspectDataBuilder {
-    pub fn new(
-        moniker: impl Into<String>,
-        component_url: impl Into<String>,
-        timestamp: i64,
-    ) -> Self {
+    pub fn new(moniker: ExtendedMoniker, component_url: impl Into<FlyStr>, timestamp: i64) -> Self {
         Self {
             data: Data {
                 data_source: DataSource::Inspect,
-                moniker: moniker.into(),
+                moniker,
                 payload: None,
                 version: 1,
                 metadata: InspectMetadata {
                     errors: None,
-                    name: None,
+                    name: InspectHandleName::name(DEFAULT_TREE_NAME.clone()),
                     component_url: component_url.into(),
                     timestamp,
                     escrowed: false,
@@ -626,7 +635,7 @@ impl InspectDataBuilder {
     }
 
     pub fn with_name(mut self, name: InspectHandleName) -> Self {
-        self.data.metadata.name = Some(name);
+        self.data.metadata.name = name;
         self
     }
 
@@ -663,11 +672,11 @@ pub struct LogsDataBuilder {
 /// Arguments used to create a new [`LogsDataBuilder`].
 pub struct BuilderArgs {
     /// The moniker for the component
-    pub moniker: String,
+    pub moniker: ExtendedMoniker,
     /// The timestamp of the message in nanoseconds
     pub timestamp_nanos: Timestamp,
     /// The component URL
-    pub component_url: Option<String>,
+    pub component_url: Option<FlyStr>,
     /// The message severity
     pub severity: Severity,
 }
@@ -842,17 +851,17 @@ impl LogsDataBuilder {
 impl Data<Logs> {
     /// Creates a new data instance for logs.
     pub fn for_logs(
-        moniker: impl Into<String>,
+        moniker: ExtendedMoniker,
         payload: Option<LogsHierarchy>,
         timestamp: impl Into<Timestamp>,
-        component_url: Option<String>,
+        component_url: Option<FlyStr>,
         severity: impl Into<Severity>,
         errors: Vec<LogError>,
     ) -> Self {
         let errors = if errors.is_empty() { None } else { Some(errors) };
 
         Data {
-            moniker: moniker.into(),
+            moniker,
             version: SCHEMA_VERSION,
             data_source: DataSource::Logs,
             payload,
@@ -1080,8 +1089,19 @@ impl Data<Logs> {
     }
 
     /// Returns the component nam. This only makes sense for v1 components.
-    pub fn component_name(&self) -> &str {
-        self.moniker.rsplit("/").next().unwrap_or("UNKNOWN")
+    pub fn component_name(&self) -> Cow<'_, str> {
+        match &self.moniker {
+            ExtendedMoniker::ComponentManager => {
+                Cow::Borrowed(EXTENDED_MONIKER_COMPONENT_MANAGER_STR)
+            }
+            ExtendedMoniker::ComponentInstance(moniker) => {
+                if moniker.is_root() {
+                    Cow::Borrowed(ROOT_MONIKER_REPR)
+                } else {
+                    Cow::Owned(moniker.path().iter().last().unwrap().to_string())
+                }
+            }
+        }
     }
 }
 
@@ -1264,21 +1284,6 @@ impl Deref for LogTextPresenter<'_> {
     }
 }
 
-fn is_root(moniker: &str) -> bool {
-    moniker == "/" || moniker == "." || moniker == "./"
-}
-
-fn strip_moniker(moniker: &str) -> &str {
-    if is_root(&moniker) {
-        return ROOT_MONIKER_REPR;
-    }
-    if let Some(last_slash) = moniker.rfind('/') {
-        &moniker[last_slash + 1..]
-    } else {
-        moniker
-    }
-}
-
 impl fmt::Display for LogTextPresenter<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.options.color.begin_record(f, self.log.severity())?;
@@ -1286,29 +1291,39 @@ impl fmt::Display for LogTextPresenter<'_> {
         self.options.time_format.write_timestamp(f, self.metadata.timestamp)?;
 
         if self.options.show_metadata {
-            write!(
-                f,
-                "[{}][{}]",
-                self.pid().map(|s| s.to_string()).unwrap_or("".to_string()),
-                self.tid().map(|s| s.to_string()).unwrap_or("".to_string()),
-            )?;
+            match self.pid() {
+                Some(pid) => write!(f, "[{pid}]")?,
+                None => write!(f, "[]")?,
+            }
+            match self.tid() {
+                Some(tid) => write!(f, "[{tid}]")?,
+                None => write!(f, "[]")?,
+            }
         }
 
         let moniker = if self.options.show_full_moniker {
-            if is_root(&self.moniker) {
-                ROOT_MONIKER_REPR
-            } else {
-                self.moniker.as_str()
+            match &self.moniker {
+                ExtendedMoniker::ComponentManager => {
+                    Cow::Borrowed(EXTENDED_MONIKER_COMPONENT_MANAGER_STR)
+                }
+                ExtendedMoniker::ComponentInstance(instance) => {
+                    if instance.is_root() {
+                        Cow::Borrowed(ROOT_MONIKER_REPR)
+                    } else {
+                        Cow::Owned(instance.to_string())
+                    }
+                }
             }
         } else {
-            strip_moniker(self.moniker.as_str())
+            self.component_name()
         };
         write!(f, "[{moniker}]")?;
 
         if self.options.show_tags {
             match &self.metadata.tags {
                 Some(tags) if !tags.is_empty() => {
-                    let mut filtered = tags.iter().filter(|tag| *tag != moniker).peekable();
+                    let mut filtered =
+                        tags.iter().filter(|tag| *tag != moniker.as_ref()).peekable();
                     if filtered.peek().is_some() {
                         write!(f, "[{}]", filtered.join(","))?;
                     }
@@ -1568,7 +1583,6 @@ impl<'de> Deserialize<'de> for InspectError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use assert_matches::assert_matches;
     use diagnostics_hierarchy::hierarchy;
     use selectors::FastError;
     use serde_json::json;
@@ -1584,10 +1598,11 @@ mod tests {
         };
 
         hierarchy.sort();
-        let json_schema = InspectDataBuilder::new("a/b/c/d", TEST_URL, 123456i64)
-            .with_hierarchy(hierarchy)
-            .with_name(InspectHandleName::filename("test_file_plz_ignore.inspect"))
-            .build();
+        let json_schema =
+            InspectDataBuilder::new("a/b/c/d".try_into().unwrap(), TEST_URL, 123456i64)
+                .with_hierarchy(hierarchy)
+                .with_name(InspectHandleName::filename("test_file_plz_ignore.inspect"))
+                .build();
 
         let result_json =
             serde_json::to_value(&json_schema).expect("serialization should succeed.");
@@ -1613,10 +1628,11 @@ mod tests {
 
     #[fuchsia::test]
     fn test_errorful_json_inspect_formatting() {
-        let json_schema = InspectDataBuilder::new("a/b/c/d", TEST_URL, 123456i64)
-            .with_name(InspectHandleName::filename("test_file_plz_ignore.inspect"))
-            .with_errors(vec![InspectError { message: "too much fun being had.".to_string() }])
-            .build();
+        let json_schema =
+            InspectDataBuilder::new("a/b/c/d".try_into().unwrap(), TEST_URL, 123456i64)
+                .with_name(InspectHandleName::filename("test_file_plz_ignore.inspect"))
+                .with_errors(vec![InspectError { message: "too much fun being had.".to_string() }])
+                .build();
 
         let result_json =
             serde_json::to_value(&json_schema).expect("serialization should succeed.");
@@ -1649,25 +1665,10 @@ mod tests {
 
     #[fuchsia::test]
     fn test_filter_returns_none_on_empty_hierarchy() {
-        let data = InspectDataBuilder::new("a/b/c/d", TEST_URL, 123456i64).build();
+        let data =
+            InspectDataBuilder::new("a/b/c/d".try_into().unwrap(), TEST_URL, 123456i64).build();
         let selectors = parse_selectors(vec!["a/b/c/d:foo"]);
         assert_eq!(data.filter(&selectors).expect("Filter OK"), None);
-    }
-
-    #[fuchsia::test]
-    fn test_filter_returns_err_on_bad_moniker() {
-        let mut hierarchy = hierarchy! {
-            root: {
-                x: "foo",
-            }
-        };
-        hierarchy.sort();
-        let data = InspectDataBuilder::new("a b c d", TEST_URL, 123456i64)
-            .with_hierarchy(hierarchy)
-            .build();
-        let selectors = parse_selectors(vec!["a/b/c/d:foo"]);
-
-        assert_matches!(data.filter(&selectors), Err(Error::Moniker(_)));
     }
 
     #[fuchsia::test]
@@ -1678,7 +1679,7 @@ mod tests {
             }
         };
         hierarchy.sort();
-        let data = InspectDataBuilder::new("b/c/d/e", TEST_URL, 123456i64)
+        let data = InspectDataBuilder::new("b/c/d/e".try_into().unwrap(), TEST_URL, 123456i64)
             .with_hierarchy(hierarchy)
             .build();
         let selectors = parse_selectors(vec!["a/b/c/d:foo"]);
@@ -1693,7 +1694,7 @@ mod tests {
             }
         };
         hierarchy.sort();
-        let data = InspectDataBuilder::new("a/b/c/d", TEST_URL, 123456i64)
+        let data = InspectDataBuilder::new("a/b/c/d".try_into().unwrap(), TEST_URL, 123456i64)
             .with_hierarchy(hierarchy)
             .build();
         let selectors = parse_selectors(vec!["a/b/c/d:foo"]);
@@ -1710,7 +1711,7 @@ mod tests {
             }
         };
         hierarchy.sort();
-        let data = InspectDataBuilder::new("a/b/c/d", TEST_URL, 123456i64)
+        let data = InspectDataBuilder::new("a/b/c/d".try_into().unwrap(), TEST_URL, 123456i64)
             .with_name(InspectHandleName::filename("test_file_plz_ignore.inspect"))
             .with_hierarchy(hierarchy)
             .build();
@@ -1741,8 +1742,8 @@ mod tests {
     #[fuchsia::test]
     fn default_builder_test() {
         let builder = LogsDataBuilder::new(BuilderArgs {
-            component_url: Some("url".to_string()),
-            moniker: String::from("moniker"),
+            component_url: Some("url".into()),
+            moniker: ExtendedMoniker::parse_str("moniker").unwrap(),
             severity: Severity::Info,
             timestamp_nanos: 0.into(),
         });
@@ -1773,8 +1774,8 @@ mod tests {
     #[fuchsia::test]
     fn regular_message_test() {
         let builder = LogsDataBuilder::new(BuilderArgs {
-            component_url: Some("url".to_string()),
-            moniker: String::from("moniker"),
+            component_url: Some("url".into()),
+            moniker: ExtendedMoniker::parse_str("moniker").unwrap(),
             severity: Severity::Info,
             timestamp_nanos: 0.into(),
         })
@@ -1826,8 +1827,8 @@ mod tests {
     fn display_for_logs() {
         let data = LogsDataBuilder::new(BuilderArgs {
             timestamp_nanos: Timestamp::from(12345678000i64).into(),
-            component_url: Some(String::from("fake-url")),
-            moniker: String::from("moniker"),
+            component_url: Some(FlyStr::from("fake-url")),
+            moniker: ExtendedMoniker::parse_str("moniker").unwrap(),
             severity: Severity::Info,
         })
         .set_pid(123)
@@ -1851,8 +1852,8 @@ mod tests {
     fn display_for_logs_with_duplicate_moniker() {
         let data = LogsDataBuilder::new(BuilderArgs {
             timestamp_nanos: Timestamp::from(12345678000i64).into(),
-            component_url: Some(String::from("fake-url")),
-            moniker: String::from("moniker"),
+            component_url: Some(FlyStr::from("fake-url")),
+            moniker: ExtendedMoniker::parse_str("moniker").unwrap(),
             severity: Severity::Info,
         })
         .set_pid(123)
@@ -1877,8 +1878,8 @@ mod tests {
     fn display_for_logs_with_duplicate_moniker_and_no_other_tags() {
         let data = LogsDataBuilder::new(BuilderArgs {
             timestamp_nanos: Timestamp::from(12345678000i64).into(),
-            component_url: Some(String::from("fake-url")),
-            moniker: String::from("moniker"),
+            component_url: Some(FlyStr::from("fake-url")),
+            moniker: ExtendedMoniker::parse_str("moniker").unwrap(),
             severity: Severity::Info,
         })
         .set_pid(123)
@@ -1902,8 +1903,8 @@ mod tests {
     fn display_for_logs_partial_moniker() {
         let data = LogsDataBuilder::new(BuilderArgs {
             timestamp_nanos: Timestamp::from(12345678000i64).into(),
-            component_url: Some(String::from("fake-url")),
-            moniker: String::from("test/moniker"),
+            component_url: Some(FlyStr::from("fake-url")),
+            moniker: ExtendedMoniker::parse_str("test/moniker").unwrap(),
             severity: Severity::Info,
         })
         .set_pid(123)
@@ -1930,8 +1931,8 @@ mod tests {
     fn display_for_logs_exclude_metadata() {
         let data = LogsDataBuilder::new(BuilderArgs {
             timestamp_nanos: Timestamp::from(12345678000i64).into(),
-            component_url: Some(String::from("fake-url")),
-            moniker: String::from("moniker"),
+            component_url: Some(FlyStr::from("fake-url")),
+            moniker: ExtendedMoniker::parse_str("moniker").unwrap(),
             severity: Severity::Info,
         })
         .set_pid(123)
@@ -1958,8 +1959,8 @@ mod tests {
     fn display_for_logs_exclude_tags() {
         let data = LogsDataBuilder::new(BuilderArgs {
             timestamp_nanos: Timestamp::from(12345678000i64).into(),
-            component_url: Some(String::from("fake-url")),
-            moniker: String::from("moniker"),
+            component_url: Some(FlyStr::from("fake-url")),
+            moniker: ExtendedMoniker::parse_str("moniker").unwrap(),
             severity: Severity::Info,
         })
         .set_pid(123)
@@ -1986,8 +1987,8 @@ mod tests {
     fn display_for_logs_exclude_file() {
         let data = LogsDataBuilder::new(BuilderArgs {
             timestamp_nanos: Timestamp::from(12345678000i64).into(),
-            component_url: Some(String::from("fake-url")),
-            moniker: String::from("moniker"),
+            component_url: Some(FlyStr::from("fake-url")),
+            moniker: ExtendedMoniker::parse_str("moniker").unwrap(),
             severity: Severity::Info,
         })
         .set_pid(123)
@@ -2014,8 +2015,8 @@ mod tests {
     fn display_for_logs_include_color_by_severity() {
         let data = LogsDataBuilder::new(BuilderArgs {
             timestamp_nanos: Timestamp::from(12345678000i64).into(),
-            component_url: Some(String::from("fake-url")),
-            moniker: String::from("moniker"),
+            component_url: Some(FlyStr::from("fake-url")),
+            moniker: ExtendedMoniker::parse_str("moniker").unwrap(),
             severity: Severity::Error,
         })
         .set_pid(123)
@@ -2042,8 +2043,8 @@ mod tests {
     fn display_for_logs_highlight_line() {
         let data = LogsDataBuilder::new(BuilderArgs {
             timestamp_nanos: Timestamp::from(12345678000i64).into(),
-            component_url: Some(String::from("fake-url")),
-            moniker: String::from("moniker"),
+            component_url: Some(FlyStr::from("fake-url")),
+            moniker: ExtendedMoniker::parse_str("moniker").unwrap(),
             severity: Severity::Info,
         })
         .set_pid(123)
@@ -2070,8 +2071,8 @@ mod tests {
     fn display_for_logs_with_wall_time() {
         let data = LogsDataBuilder::new(BuilderArgs {
             timestamp_nanos: Timestamp::from(12345678000i64).into(),
-            component_url: Some(String::from("fake-url")),
-            moniker: String::from("moniker"),
+            component_url: Some(FlyStr::from("fake-url")),
+            moniker: ExtendedMoniker::parse_str("moniker").unwrap(),
             severity: Severity::Info,
         })
         .set_pid(123)
@@ -2107,8 +2108,8 @@ mod tests {
     fn display_for_logs_with_dropped_count() {
         let data = LogsDataBuilder::new(BuilderArgs {
             timestamp_nanos: Timestamp::from(12345678000i64).into(),
-            component_url: Some(String::from("fake-url")),
-            moniker: String::from("moniker"),
+            component_url: Some(FlyStr::from("fake-url")),
+            moniker: ExtendedMoniker::parse_str("moniker").unwrap(),
             severity: Severity::Info,
         })
         .set_dropped(5)
@@ -2141,8 +2142,8 @@ mod tests {
     fn display_for_logs_with_rolled_count() {
         let data = LogsDataBuilder::new(BuilderArgs {
             timestamp_nanos: Timestamp::from(12345678000i64).into(),
-            component_url: Some(String::from("fake-url")),
-            moniker: String::from("moniker"),
+            component_url: Some(FlyStr::from("fake-url")),
+            moniker: ExtendedMoniker::parse_str("moniker").unwrap(),
             severity: Severity::Info,
         })
         .set_rolled_out(10)
@@ -2175,8 +2176,8 @@ mod tests {
     fn display_for_logs_with_dropped_and_rolled_counts() {
         let data = LogsDataBuilder::new(BuilderArgs {
             timestamp_nanos: Timestamp::from(12345678000i64).into(),
-            component_url: Some(String::from("fake-url")),
-            moniker: String::from("moniker"),
+            component_url: Some(FlyStr::from("fake-url")),
+            moniker: ExtendedMoniker::parse_str("moniker").unwrap(),
             severity: Severity::Info,
         })
         .set_dropped(5)
@@ -2210,8 +2211,8 @@ mod tests {
     fn display_for_logs_no_tags() {
         let data = LogsDataBuilder::new(BuilderArgs {
             timestamp_nanos: Timestamp::from(12345678000i64).into(),
-            component_url: Some(String::from("fake-url")),
-            moniker: String::from("moniker"),
+            component_url: Some(FlyStr::from("fake-url")),
+            moniker: ExtendedMoniker::parse_str("moniker").unwrap(),
             severity: Severity::Info,
         })
         .set_pid(123)
@@ -2242,8 +2243,8 @@ mod tests {
           }
         });
         let expected_data = LogsDataBuilder::new(BuilderArgs {
-            component_url: Some("url".to_string()),
-            moniker: String::from("a/b"),
+            component_url: Some("url".into()),
+            moniker: ExtendedMoniker::parse_str("a/b").unwrap(),
             severity: Severity::Info,
             timestamp_nanos: 123.into(),
         })
@@ -2275,8 +2276,8 @@ mod tests {
           }
         });
         let expected_data = LogsDataBuilder::new(BuilderArgs {
-            component_url: Some("url".to_string()),
-            moniker: String::from("a/b"),
+            component_url: Some("url".into()),
+            moniker: ExtendedMoniker::parse_str("a/b").unwrap(),
             severity: Severity::Info,
             timestamp_nanos: 123.into(),
         })

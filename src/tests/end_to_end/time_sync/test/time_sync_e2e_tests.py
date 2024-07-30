@@ -2,7 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-from datetime import datetime, timedelta
 import json
 import os
 import subprocess
@@ -10,6 +9,7 @@ import sys
 import time
 import unittest
 import urllib.request as request
+from datetime import datetime, timedelta
 
 MAX_HOST_DIFF = timedelta(minutes=1)
 MAX_USERSPACE_SYSTEM_DIFF = timedelta(seconds=2)

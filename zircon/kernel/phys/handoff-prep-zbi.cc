@@ -24,6 +24,7 @@
 #include <fbl/algorithm.h>
 #include <ktl/algorithm.h>
 #include <ktl/byte.h>
+#include <ktl/iterator.h>
 #include <ktl/limits.h>
 #include <ktl/span.h>
 #include <ktl/type_traits.h>
@@ -85,12 +86,26 @@ void HandoffPrep::SummarizeMiscZbiItems(ktl::span<ktl::byte> zbi) {
         handoff_->reboot_reason = *reinterpret_cast<const zbi_hw_reboot_reason_t*>(payload.data());
         break;
 
-      case ZBI_TYPE_NVRAM:
+      case ZBI_TYPE_NVRAM: {
         ZX_ASSERT(payload.size() >= sizeof(zbi_nvram_t));
-        handoff_->nvram = *reinterpret_cast<const zbi_nvram_t*>(payload.data());
+        const zbi_nvram_t& nvram = *reinterpret_cast<const zbi_nvram_t*>(payload.data());
+
+        // We may have truncated the address range (per kernel.memory-limit-mb),
+        // so be sure to truncate the NVRAM range accordingly.
+        auto back = ktl::prev(Allocation::GetPool().end());
+        while (!memalloc::IsRamType(back->type)) {
+          --back;
+        }
+        uint64_t addr_cutoff = back->end();
+        if (nvram.base >= addr_cutoff) {
+          break;
+        }
+        handoff_->nvram = nvram;
+        handoff_->nvram->length = ktl::min(nvram.length, addr_cutoff - nvram.base);
+
         SaveForMexec(*header, payload);
         break;
-
+      }
       case ZBI_TYPE_PLATFORM_ID:
         ZX_ASSERT(payload.size() >= sizeof(zbi_platform_id_t));
         handoff_->platform_id = *reinterpret_cast<const zbi_platform_id_t*>(payload.data());
@@ -230,13 +245,13 @@ void HandoffPrep::SummarizeMiscZbiItems(ktl::span<ktl::byte> zbi) {
         const uint64_t limit_mb = ktl::min(ktl::numeric_limits<uint64_t>::max() / kBytesPerMib,
                                            gBootOptions->memory_limit_mb);
         uint64_t limit_end = 0;
-        Allocation::GetPool().NormalizeRam(
-            [&limit_end, left = kBytesPerMib * limit_mb](const auto& range) mutable {
-              uint64_t keep = ktl::min(left, range.size);
-              left -= keep;
-              limit_end = range.addr + keep;
-              return left > 0;
-            });
+        auto seek_cutoff = [&limit_end, left = kBytesPerMib * limit_mb](const auto& range) mutable {
+          uint64_t keep = ktl::min(left, range.size);
+          left -= keep;
+          limit_end = range.addr + keep;
+          return left > 0;
+        };
+        memalloc::NormalizeRam(Allocation::GetPool(), seek_cutoff);
 
         // Perform the truncation in place.
         size_t w = 0;  // The write index, as opposed to `r`, the read index.

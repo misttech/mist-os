@@ -257,6 +257,8 @@ std::optional<bt::sdp::DataElement> FidlToDataElement(
 std::optional<bt::sdp::DataElement> NewFidlToDataElement(
     const fuchsia_bluetooth_bredr::DataElement& fidl);
 
+const char* DataPathDirectionToString(pw::bluetooth::emboss::DataPathDirection direction);
+
 pw::bluetooth::emboss::DataPathDirection DataPathDirectionFromFidl(
     const fuchsia::bluetooth::DataDirection& fidl_direction);
 

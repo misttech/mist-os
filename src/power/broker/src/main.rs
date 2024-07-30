@@ -4,11 +4,10 @@
 
 use anyhow::{Context as _, Error};
 use async_utils::event::Event;
-use fidl::endpoints::{create_request_stream, ControlHandle, RequestStream, ServerEnd};
-use fidl::Status;
+use fidl::endpoints::{create_request_stream, ServerEnd};
 use fidl_fuchsia_power_broker::{
-    self as fpb, CurrentLevelRequest, CurrentLevelRequestStream, ElementControlMarker,
-    ElementControlRequest, ElementControlRequestStream, LeaseControlMarker, LeaseControlRequest,
+    self as fpb, CurrentLevelRequest, CurrentLevelRequestStream, ElementControlRequest,
+    ElementControlRequestStream, LeaseControlMarker, LeaseControlRequest,
     LeaseControlRequestStream, LeaseStatus, LessorRequest, LessorRequestStream,
     RequiredLevelRequest, RequiredLevelRequestStream, StatusRequest, StatusRequestStream,
     TopologyRequest, TopologyRequestStream,
@@ -18,9 +17,9 @@ use fuchsia_async::Task;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::component;
 use fuchsia_inspect::health::Reporter;
-use fuchsia_zircon::sys::ZX_ERR_ALREADY_EXISTS;
 use futures::prelude::*;
 use futures::select;
+use inspect_format::constants::DEFAULT_VMO_SIZE_BYTES as DEFAULT_INSPECT_VMO;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -340,46 +339,35 @@ impl BrokerSvc {
                                             e.required = Some(required);
                                         });
                                 }
-                                let (element_control_client, element_control_stream_from_server) =
-                                    create_request_stream::<ElementControlMarker>()?;
-                                // Check whether the client provided its own element_control
-                                // channel.
-                                let element_control_stream = match element_control {
-                                    None => element_control_stream_from_server,
-                                    Some(element_control) => {
-                                        // Server-created RequestStream should no longer be used,
-                                        // since the client has provided its own ElementControl
-                                        // channel. Use that client-created channel instead.
-                                        element_control_stream_from_server
-                                            .control_handle()
-                                            .shutdown_with_epitaph(Status::from_raw(
-                                                ZX_ERR_ALREADY_EXISTS,
-                                            ));
-                                        // Close request stream, responders, and control_handles.
-                                        std::mem::drop(element_control_stream_from_server);
-                                        element_control.into_stream()?
-                                    }
-                                };
-                                tracing::debug!(
-                                    "Spawning element control task for {:?}",
-                                    &element_id
-                                );
-                                Task::local({
-                                    let svc = self.clone();
-                                    let element_id = element_id.clone();
-                                    async move {
-                                        if let Err(err) = svc
-                                            .run_element_control(element_id, element_control_stream)
-                                            .await
-                                        {
-                                            tracing::debug!("run_element_control err: {:?}", err);
+                                if let Some(element_control) = element_control {
+                                    let element_control_stream = element_control.into_stream()?;
+                                    tracing::debug!(
+                                        "Spawning element control task for {:?}",
+                                        &element_id
+                                    );
+                                    Task::local({
+                                        let svc = self.clone();
+                                        let element_id = element_id.clone();
+                                        async move {
+                                            if let Err(err) = svc
+                                                .run_element_control(
+                                                    element_id,
+                                                    element_control_stream,
+                                                )
+                                                .await
+                                            {
+                                                tracing::debug!(
+                                                    "run_element_control err: {:?}",
+                                                    err
+                                                );
+                                            }
                                         }
-                                    }
-                                })
-                                .detach();
+                                    })
+                                    .detach();
+                                }
                                 if let Some(lessor_channel) = lessor_channel {
                                     tracing::debug!("Spawning lessor task for {:?}", &element_id);
-                                    let lessor_stream = lessor_channel.into_stream().unwrap();
+                                    let lessor_stream = lessor_channel.into_stream()?;
                                     Task::local({
                                         let svc = self.clone();
                                         let element_id = element_id.clone();
@@ -397,7 +385,7 @@ impl BrokerSvc {
                                     })
                                     .detach();
                                 }
-                                responder.send(Ok(element_control_client)).context("send failed")
+                                responder.send(Ok(())).context("send failed")
                             }
                             Err(err) => responder.send(Err(err.into())).context("send failed"),
                         }
@@ -622,7 +610,8 @@ async fn main() -> Result<(), anyhow::Error> {
 
     // Initialize inspect
     let _inspect_server = inspect_runtime::publish(
-        component::inspector(),
+        // TODO(https://fxbug.dev/354754310): reduce to default size if possible
+        fuchsia_inspect::component::init_inspector_with_size(2 * DEFAULT_INSPECT_VMO),
         inspect_runtime::PublishOptions::default(),
     );
     component::health().set_starting_up();

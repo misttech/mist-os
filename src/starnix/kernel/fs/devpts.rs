@@ -10,15 +10,15 @@ use crate::mm::MemoryAccessorExt;
 use crate::task::{CurrentTask, EventHandler, WaitCanceler, Waiter};
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::{
-    fileops_impl_nonseekable, fileops_impl_noop_sync, fs_node_impl_dir_readonly, CacheMode,
-    DirEntryHandle, DirectoryEntryType, FileHandle, FileObject, FileOps, FileSystem,
+    fileops_impl_nonseekable, fileops_impl_noop_sync, fs_args, fs_node_impl_dir_readonly,
+    CacheMode, DirEntryHandle, DirectoryEntryType, FileHandle, FileObject, FileOps, FileSystem,
     FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo,
     FsNodeOps, FsStr, FsString, SpecialNode, VecDirectory, VecDirectoryEntry,
 };
+use bstr::B;
 use starnix_logging::{log_error, track_stub};
 use starnix_sync::{
     BeforeFsNodeAppend, DeviceOpen, FileOpsCore, LockBefore, Locked, ProcessGroupState, Unlocked,
-    WriteOps,
 };
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::auth::FsCred;
@@ -30,12 +30,12 @@ use starnix_uapi::signals::SIGWINCH;
 use starnix_uapi::user_address::{UserAddress, UserRef};
 use starnix_uapi::vfs::{default_statfs, FdEvents};
 use starnix_uapi::{
-    errno, error, ino_t, pid_t, statfs, uapi, DEVPTS_SUPER_MAGIC, FIOASYNC, FIOCLEX, FIONBIO,
-    FIONCLEX, FIONREAD, FIOQSIZE, TCFLSH, TCGETA, TCGETS, TCGETX, TCSBRK, TCSBRKP, TCSETA, TCSETAF,
-    TCSETAW, TCSETS, TCSETSF, TCSETSW, TCSETX, TCSETXF, TCSETXW, TCXONC, TIOCCBRK, TIOCCONS,
-    TIOCEXCL, TIOCGETD, TIOCGICOUNT, TIOCGLCKTRMIOS, TIOCGPGRP, TIOCGPTLCK, TIOCGPTN, TIOCGRS485,
-    TIOCGSERIAL, TIOCGSID, TIOCGSOFTCAR, TIOCGWINSZ, TIOCLINUX, TIOCMBIC, TIOCMBIS, TIOCMGET,
-    TIOCMIWAIT, TIOCMSET, TIOCNOTTY, TIOCNXCL, TIOCOUTQ, TIOCPKT, TIOCSBRK, TIOCSCTTY,
+    errno, error, gid_t, ino_t, pid_t, statfs, uapi, uid_t, DEVPTS_SUPER_MAGIC, FIOASYNC, FIOCLEX,
+    FIONBIO, FIONCLEX, FIONREAD, FIOQSIZE, TCFLSH, TCGETA, TCGETS, TCGETX, TCSBRK, TCSBRKP, TCSETA,
+    TCSETAF, TCSETAW, TCSETS, TCSETSF, TCSETSW, TCSETX, TCSETXF, TCSETXW, TCXONC, TIOCCBRK,
+    TIOCCONS, TIOCEXCL, TIOCGETD, TIOCGICOUNT, TIOCGLCKTRMIOS, TIOCGPGRP, TIOCGPTLCK, TIOCGPTN,
+    TIOCGRS485, TIOCGSERIAL, TIOCGSID, TIOCGSOFTCAR, TIOCGWINSZ, TIOCLINUX, TIOCMBIC, TIOCMBIS,
+    TIOCMGET, TIOCMIWAIT, TIOCMSET, TIOCNOTTY, TIOCNXCL, TIOCOUTQ, TIOCPKT, TIOCSBRK, TIOCSCTTY,
     TIOCSERCONFIG, TIOCSERGETLSR, TIOCSERGETMULTI, TIOCSERGSTRUCT, TIOCSERGWILD, TIOCSERSETMULTI,
     TIOCSERSWILD, TIOCSETD, TIOCSLCKTRMIOS, TIOCSPGRP, TIOCSPTLCK, TIOCSRS485, TIOCSSERIAL,
     TIOCSSOFTCAR, TIOCSTI, TIOCSWINSZ, TIOCVHANGUP,
@@ -60,7 +60,9 @@ const PTMX_NODE_ID: ino_t = 2;
 const FIRST_PTS_NODE_ID: ino_t = 3;
 
 pub fn dev_pts_fs(current_task: &CurrentTask, options: FileSystemOptions) -> &FileSystemHandle {
-    current_task.kernel().dev_pts_fs.get_or_init(|| init_devpts(current_task, options))
+    current_task.kernel().dev_pts_fs.get_or_init(|| {
+        init_devpts(current_task, options).expect("Error when creating default devpts")
+    })
 }
 
 /// Creates a terminal and returns the main pty and an associated replica pts.
@@ -90,29 +92,43 @@ where
     Ok((pty_file, pts_file))
 }
 
-fn init_devpts(current_task: &CurrentTask, options: FileSystemOptions) -> FileSystemHandle {
+fn init_devpts(
+    current_task: &CurrentTask,
+    options: FileSystemOptions,
+) -> Result<FileSystemHandle, Errno> {
     let kernel = current_task.kernel();
     let state = Arc::new(TTYState::new());
     let device = DevPtsDevice::new(state.clone());
 
     // Register /dev/pts/X device type.
     for n in 0..DEVPTS_MAJOR_COUNT {
-        kernel
-            .device_registry
-            .register_major(DEVPTS_FIRST_MAJOR + n, device.clone(), DeviceMode::Char)
-            .expect("Registering pts device");
+        kernel.device_registry.register_major(
+            DEVPTS_FIRST_MAJOR + n,
+            device.clone(),
+            DeviceMode::Char,
+        )?;
     }
     // Register tty and ptmx device types.
-    kernel.device_registry.register_major(TTY_ALT_MAJOR, device, DeviceMode::Char).unwrap();
+    kernel.device_registry.register_major(TTY_ALT_MAJOR, device, DeviceMode::Char)?;
 
-    let fs = FileSystem::new(kernel, CacheMode::Uncached, DevPtsFs, options)
+    let parsed_options = fs_args::generic_parse_mount_options(options.params.as_ref())?;
+    let uid = parsed_options
+        .get(B("uid"))
+        .map(|uid| fs_args::parse::<uid_t>(uid.as_ref()))
+        .transpose()?;
+    let gid = parsed_options
+        .get(B("gid"))
+        .map(|gid| fs_args::parse::<gid_t>(gid.as_ref()))
+        .transpose()?;
+
+    let fs = FileSystem::new(kernel, CacheMode::Uncached, DevPtsFs { uid, gid }, options)
         .expect("devpts filesystem constructed with valid options");
     let mut root = FsNode::new_root_with_properties(DevPtsRootDir { state }, |info| {
         info.ino = ROOT_NODE_ID;
     });
     root.node_id = ROOT_NODE_ID;
     fs.set_root_node(root);
-    fs
+    Ok(fs)
 }
 
 pub fn tty_device_init<L>(locked: &mut Locked<'_, L>, current_task: &CurrentTask)
@@ -148,7 +164,11 @@ where
     devtmpfs_create_symlink(locked, current_task, "ptmx".into(), "pts/ptmx".into()).unwrap();
 }
 
-struct DevPtsFs;
+struct DevPtsFs {
+    uid: Option<uid_t>,
+    gid: Option<gid_t>,
+}
+
 impl FileSystemOps for DevPtsFs {
     fn statfs(&self, _fs: &FileSystem, _current_task: &CurrentTask) -> Result<statfs, Errno> {
         Ok(default_statfs(DEVPTS_SUPER_MAGIC))
@@ -226,10 +246,13 @@ impl FsNodeOps for DevPtsRootDir {
                     );
                     info.rdev = get_device_type_for_pts(id);
                     info.blksize = BLOCK_SIZE;
-                    track_stub!(TODO("https://fxbug.dev/322873457"), "devpts set gid to tty group");
-                    info.gid = 0;
-                    let node =
-                        node.fs().create_node_with_id(current_task, SpecialNode, info.ino, info);
+                    let fs = node.fs();
+                    let devptsfs = fs
+                        .downcast_ops::<DevPtsFs>()
+                        .expect("DevPts should only handle `DevPtsFs`s");
+                    info.uid = devptsfs.uid.unwrap_or_else(|| current_task.creds().uid);
+                    info.gid = devptsfs.gid.unwrap_or_else(|| current_task.creds().gid);
+                    let node = fs.create_node_with_id(current_task, SpecialNode, info.ino, info);
                     return Ok(node);
                 }
             }
@@ -353,27 +376,36 @@ impl FileOps for DevPtmxFile {
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
         debug_assert!(offset == 0);
-        file.blocking_op(current_task, FdEvents::POLLIN | FdEvents::POLLHUP, None, || {
-            self.terminal.main_read(locked, current_task, data)
-        })
+        file.blocking_op(
+            locked,
+            current_task,
+            FdEvents::POLLIN | FdEvents::POLLHUP,
+            None,
+            |locked| self.terminal.main_read(locked, current_task, data),
+        )
     }
 
     fn write(
         &self,
-        locked: &mut Locked<'_, WriteOps>,
+        locked: &mut Locked<'_, FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         debug_assert!(offset == 0);
-        file.blocking_op(current_task, FdEvents::POLLOUT | FdEvents::POLLHUP, None, || {
-            self.terminal.main_write(locked, current_task, data)
-        })
+        file.blocking_op(
+            locked,
+            current_task,
+            FdEvents::POLLOUT | FdEvents::POLLHUP,
+            None,
+            |locked| self.terminal.main_write(locked, current_task, data),
+        )
     }
 
     fn wait_async(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         waiter: &Waiter,
@@ -385,6 +417,7 @@ impl FileOps for DevPtmxFile {
 
     fn query_events(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
@@ -452,27 +485,36 @@ impl FileOps for DevPtsFile {
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
         debug_assert!(offset == 0);
-        file.blocking_op(current_task, FdEvents::POLLIN | FdEvents::POLLHUP, None, || {
-            self.terminal.replica_read(locked, current_task, data)
-        })
+        file.blocking_op(
+            locked,
+            current_task,
+            FdEvents::POLLIN | FdEvents::POLLHUP,
+            None,
+            |locked| self.terminal.replica_read(locked, current_task, data),
+        )
     }
 
     fn write(
         &self,
-        locked: &mut Locked<'_, WriteOps>,
+        locked: &mut Locked<'_, FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         debug_assert!(offset == 0);
-        file.blocking_op(current_task, FdEvents::POLLOUT | FdEvents::POLLHUP, None, || {
-            self.terminal.replica_write(locked, current_task, data)
-        })
+        file.blocking_op(
+            locked,
+            current_task,
+            FdEvents::POLLOUT | FdEvents::POLLHUP,
+            None,
+            |locked| self.terminal.replica_write(locked, current_task, data),
+        )
     }
 
     fn wait_async(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         waiter: &Waiter,
@@ -484,6 +526,7 @@ impl FileOps for DevPtsFile {
 
     fn query_events(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
@@ -1423,8 +1466,8 @@ mod tests {
         let ptmx = open_ptmx_and_unlock(&mut locked, &task, fs).expect("ptmx");
         let pts = open_file(&mut locked, &task, fs, "0".into()).expect("open file");
 
-        let has_data_ready_to_read = |fd: &FileHandle| {
-            fd.query_events(&task).expect("query_events").contains(FdEvents::POLLIN)
+        let has_data_ready_to_read = |locked: &mut Locked<'_, Unlocked>, fd: &FileHandle| {
+            fd.query_events(locked, &task).expect("query_events").contains(FdEvents::POLLIN)
         };
 
         let write_and_assert = |locked: &mut Locked<'_, Unlocked>, fd: &FileHandle, data: &[u8]| {
@@ -1435,7 +1478,7 @@ mod tests {
         };
 
         let read_and_check = |locked: &mut Locked<'_, Unlocked>, fd: &FileHandle, data: &[u8]| {
-            assert!(has_data_ready_to_read(fd));
+            assert!(has_data_ready_to_read(locked, fd));
             let mut buffer = VecOutputBuffer::new(data.len() + 1);
             assert_eq!(fd.read(locked, &task, &mut buffer).expect("read"), data.len());
             assert_eq!(data, buffer.data());
@@ -1456,6 +1499,6 @@ mod tests {
         read_and_check(&mut locked, &ptmx, hello_transformed_buffer);
 
         // Data has not been echoed
-        assert!(!has_data_ready_to_read(&pts));
+        assert!(!has_data_ready_to_read(&mut locked, &pts));
     }
 }

@@ -5,7 +5,7 @@
 #include <fidl/fuchsia.wlan.common/cpp/fidl.h>
 #include <fidl/fuchsia.wlan.sme/cpp/fidl.h>
 #include <fidl/fuchsia.wlan.softmac/cpp/driver/fidl.h>
-#include <lib/driver/testing/cpp/fixture/driver_test_fixture.h>
+#include <lib/driver/testing/cpp/driver_test.h>
 #include <lib/fdf/dispatcher.h>
 #include <lib/fidl/cpp/client.h>
 
@@ -20,16 +20,26 @@ namespace {
 
 class FixtureConfig final {
  public:
-  static constexpr bool kDriverOnForeground = true;
-  static constexpr bool kAutoStartDriver = true;
-  static constexpr bool kAutoStopDriver = true;
-
   using DriverType = SoftmacDriver;
   using EnvironmentType = CustomEnvironment<BasicWlanSoftmacServer>;
 };
 
-class GoodSoftmacDriverTest : public fdf_testing::DriverTestFixture<FixtureConfig>,
-                              public ::testing::Test {};
+class GoodSoftmacDriverTest : public ::testing::Test {
+ public:
+  void SetUp() override {
+    zx::result<> result = driver_test().StartDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
+  }
+  void TearDown() override {
+    zx::result<> result = driver_test().StopDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
+  }
+
+  fdf_testing::ForegroundDriverTest<FixtureConfig>& driver_test() { return driver_test_; }
+
+ private:
+  fdf_testing::ForegroundDriverTest<FixtureConfig> driver_test_;
+};
 
 // Verify a clean startup and shutdown when wlansoftmac does not encounter any errors
 // while running.
@@ -37,7 +47,7 @@ TEST_F(GoodSoftmacDriverTest, CleanStartupAndShutdown) {}
 
 // Verify wlansoftmac creates a child node for an ethernet driver.
 TEST_F(GoodSoftmacDriverTest, VerifyChildNode) {
-  RunInNodeContext([](fdf_testing::TestNode& node) {
+  driver_test().RunInNodeContext([](fdf_testing::TestNode& node) {
     ASSERT_EQ(1u, node.children().size());
     ASSERT_EQ(node.children().count("wlansoftmac-ethernet"), 1ul);
 

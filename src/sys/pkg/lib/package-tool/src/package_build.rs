@@ -20,7 +20,7 @@ const META_FAR_DEPFILE_NAME: &str = "meta.far.d";
 const BLOBS_MANIFEST_NAME: &str = "blobs.manifest";
 
 pub async fn cmd_package_build(cmd: PackageBuildCommand) -> Result<()> {
-    cmd_package_build_with_history(cmd, version_history::HISTORY).await
+    cmd_package_build_with_history(cmd, version_history_data::HISTORY).await
 }
 
 pub async fn cmd_package_build_with_history(

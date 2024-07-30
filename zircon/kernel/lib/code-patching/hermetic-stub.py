@@ -9,7 +9,6 @@ import argparse
 import json
 import os
 import string
-
 from datetime import datetime
 
 STUB_CONTENTS = string.Template(

@@ -1,0 +1,31 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/host.gni")
+import("//build/python/python_binary.gni")
+
+if (is_host) {
+  # Main executable target.
+  python_binary("power-digest-bin") {
+    enable_mypy = true
+
+    # Unbuffer so output can be piped to other programs nicely.
+    unbuffered_output = true
+
+    main_source = "power_digest.py"
+    output_name = "power-digest.pyz"
+  }
+
+  # Rename the resulting .pyz for the host tool
+  copy("copy") {
+    deps = [ ":power-digest-bin" ]
+    sources = [ "${target_out_dir}/power-digest.pyz" ]
+    outputs = [ "${root_out_dir}/power-digest-tool" ]
+  }
+
+  install_host_tools("install") {
+    deps = [ ":copy" ]
+    outputs = [ "power-digest-tool" ]
+  }
+}

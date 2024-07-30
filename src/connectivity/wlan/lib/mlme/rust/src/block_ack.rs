@@ -262,10 +262,7 @@ impl BlockAckState {
 ///
 /// Note that the action header is part of the management frame body and is written by this
 /// function. The frame format is described by IEEE Std 802.11-2016, 9.6.5.2.
-pub fn write_addba_req_body<B: Appendable>(
-    buffer: &mut B,
-    dialog_token: u8,
-) -> Result<usize, Error> {
+pub fn write_addba_req_body<B: Appendable>(buffer: &mut B, dialog_token: u8) -> Result<(), Error> {
     let body = mac::AddbaReqHdr {
         action: mac::BlockAckAction::ADDBA_REQUEST,
         dialog_token,
@@ -290,7 +287,7 @@ pub fn write_addba_req_body<B: Appendable>(
             body: body.as_bytes(),
         }
     )
-    .map(|(_, n)| n)
+    .map(|_buffer| {})
 }
 
 /// Writes the body of the management frame for an `ADDBA` request to the given buffer. The
@@ -298,10 +295,7 @@ pub fn write_addba_req_body<B: Appendable>(
 ///
 /// Note that the action header is part fo the management frame body and is written by this
 /// function. The frame format is described by IEEE Std 802.11-2016, 9.6.5.3.
-pub fn write_addba_resp_body<B: Appendable>(
-    buffer: &mut B,
-    dialog_token: u8,
-) -> Result<usize, Error> {
+pub fn write_addba_resp_body<B: Appendable>(buffer: &mut B, dialog_token: u8) -> Result<(), Error> {
     let body = mac::AddbaRespHdr {
         action: mac::BlockAckAction::ADDBA_RESPONSE,
         dialog_token,
@@ -324,14 +318,14 @@ pub fn write_addba_resp_body<B: Appendable>(
             body: body.as_bytes(),
         }
     )
-    .map(|(_, n)| n)
+    .map(|_buffer| {})
 }
 
 pub fn write_delba_body<B: Appendable>(
     buffer: &mut B,
     is_initiator: bool,
     reason_code: mac::ReasonCode,
-) -> Result<usize, Error> {
+) -> Result<(), Error> {
     let body = mac::DelbaHdr {
         action: mac::BlockAckAction::DELBA,
         parameters: mac::DelbaParameters(0).with_initiator(is_initiator).with_tid(BLOCK_ACK_TID),
@@ -348,7 +342,7 @@ pub fn write_delba_body<B: Appendable>(
             body: body.as_bytes(),
         }
     )
-    .map(|(_, n)| n)
+    .map(|_buffer| {})
 }
 
 /// Reads an ADDBA request header from an ADDBA frame body.

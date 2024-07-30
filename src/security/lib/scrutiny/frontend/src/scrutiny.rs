@@ -2,71 +2,37 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::shell::Shell;
-use anyhow::Result;
-use scrutiny::engine::dispatcher::ControllerDispatcher;
-use scrutiny::engine::hook::PluginHooks;
-use scrutiny::model::model::DataModel;
-use scrutiny_config::{Config, LoggingVerbosity};
-use simplelog::{Config as SimpleLogConfig, LevelFilter, WriteLogger};
-use std::fs::File;
-use std::io::{BufRead, BufReader};
-use std::sync::{Arc, RwLock};
+use crate::scrutiny_artifacts::ScrutinyArtifacts;
 
-/// Holds a reference to core objects required by the application to run.
+use scrutiny_collector::unified_collector::UnifiedCollector;
+
+use anyhow::Result;
+use scrutiny_collection::model::DataModel;
+use scrutiny_collection::model_config::ModelConfig;
+use std::path::Path;
+use std::sync::Arc;
+
 pub struct Scrutiny {
-    #[allow(dead_code)]
-    plugin: PluginHooks,
-    #[allow(dead_code)]
-    dispatcher: Arc<RwLock<ControllerDispatcher>>,
-    shell: Shell,
-    config: Config,
+    model_config: ModelConfig,
 }
 
 impl Scrutiny {
-    /// Creates the DataModel, ControllerDispatcher, CollectorScheduler and
-    /// PluginManager.
-    pub fn new(config: Config, plugin: PluginHooks) -> Result<Self> {
-        let log_level = match config.runtime.logging.verbosity {
-            LoggingVerbosity::Error => LevelFilter::Error,
-            LoggingVerbosity::Warn => LevelFilter::Warn,
-            LoggingVerbosity::Info => LevelFilter::Info,
-            LoggingVerbosity::Debug => LevelFilter::Debug,
-            LoggingVerbosity::Trace => LevelFilter::Trace,
-            LoggingVerbosity::Off => LevelFilter::Off,
-        };
-
-        if let Ok(log_file) = File::create(config.runtime.logging.path.clone()) {
-            let _ = WriteLogger::init(log_level, SimpleLogConfig::default(), log_file);
-        }
-
-        // Collect all the data into the model.
-        let model = Arc::new(DataModel::new(config.runtime.model.clone())?);
-        plugin.collector.collect(model.clone())?;
-
-        // Register all the functions.
-        let dispatcher = Arc::new(RwLock::new(ControllerDispatcher::new(Arc::clone(&model))));
-        for (namespace, controller) in plugin.controllers.iter() {
-            let mut dispatcher = dispatcher.write().unwrap();
-            dispatcher.add(namespace.clone(), Arc::clone(&controller)).unwrap();
-        }
-
-        let shell = Shell::new(Arc::clone(&dispatcher), config.runtime.logging.silent_mode);
-        Ok(Self { plugin, dispatcher, shell, config })
+    pub fn from_product_bundle(path: impl AsRef<Path>) -> Result<Self> {
+        Ok(Self { model_config: ModelConfig::from_product_bundle(path)? })
     }
 
-    /// Schedules the DataCollectors to run and starts the REST service.
-    pub fn run(&mut self) -> Result<String> {
-        if let Some(command) = &self.config.launch.command {
-            return self.shell.execute(command.to_string());
-        } else if let Some(script) = &self.config.launch.script_path {
-            let script_file = BufReader::new(File::open(script)?);
-            let mut script_output = String::new();
-            for line in script_file.lines() {
-                script_output.push_str(&self.shell.execute(line?)?);
-            }
-            return Ok(script_output);
-        }
-        Ok(String::new())
+    pub fn from_product_bundle_recovery(path: impl AsRef<Path>) -> Result<Self> {
+        Ok(Self { model_config: ModelConfig::from_product_bundle_recovery(path)? })
+    }
+
+    pub fn set_component_tree_config_path(&mut self, path: impl AsRef<Path>) {
+        self.model_config.component_tree_config_path = Some(path.as_ref().to_path_buf());
+    }
+
+    pub fn collect(self) -> Result<ScrutinyArtifacts> {
+        let model = Arc::new(DataModel::new(self.model_config)?);
+        let collector = UnifiedCollector::default();
+        collector.collect(model.clone())?;
+        Ok(ScrutinyArtifacts { model })
     }
 }

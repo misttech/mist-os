@@ -42,9 +42,17 @@ class Union;
 
 using Alias = ::fidl::StringView;
 
+#ifdef __Fuchsia__
+
 struct Struct {
   uint32_t x = {};
+
+  void _CloseHandles();
 };
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
 
 }  // namespace wire
 }  // namespace test_versions
@@ -96,6 +104,7 @@ class Table {
 
   // Returns whether the table references unknown fields.
   bool HasUnknownData() const;
+  void _CloseHandles();
 
   // Return a builder that by defaults allocates of an arena.
   static ::fidl::WireTableBuilder<::test_versions::wire::Table> Builder(::fidl::AnyArena& arena);
@@ -250,14 +259,24 @@ inline ::fidl::WireTableExternalBuilder<::test_versions::wire::Table> Table::Ext
   return ::fidl::WireTableExternalBuilder<::test_versions::wire::Table>(std::move(frame));
 }
 
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
 class Union {
  public:
   Union() : ordinal_(::test_versions::wire::Union::Ordinal::Invalid), envelope_{} {}
 
-  Union(const Union&) = default;
-  Union& operator=(const Union&) = default;
-  Union(Union&&) = default;
-  Union& operator=(Union&&) = default;
+  ~Union();
+  Union(Union&& other) {
+    _Move(std::move(other));
+  }
+  Union& operator=(Union&& other) {
+    if (this != &other) {
+      _Move(std::move(other));
+    }
+    return *this;
+  }
 
   enum class Tag : fidl_xunion_tag_t {
     kX = 1,  // 0x1
@@ -287,18 +306,22 @@ class Union {
     return envelope_.As<uint32_t>().get_data();
   }
   ::test_versions::wire::Union::Tag Which() const;
+  void _CloseHandles();
 
  private:
   enum class Ordinal : fidl_xunion_tag_t {
     Invalid = 0,
     kX = 1,  // 0x1
   };
+  void _Move(Union&& other);
 
   static void SizeAndOffsetAssertionHelper();
   ::test_versions::wire::Union::Ordinal ordinal_;
   FIDL_ALIGNDECL
   ::fidl::UntypedEnvelope envelope_;
 };
+
+#endif  // __Fuchsia__
 
 constexpr uint32_t kConst = 0u;
 
@@ -333,6 +356,10 @@ struct internal::WireCodingTraits<::test_versions::wire::Enum, ::fidl::internal:
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
   }
 };
+
+#ifdef __Fuchsia__
+template <>
+struct IsResource<::test_versions::wire::Struct> : public std::true_type{};
 
 template <>
 struct TypeTraits<::test_versions::wire::Struct> {
@@ -379,6 +406,12 @@ struct ::fidl::internal::WireCodingTraits<::test_versions::wire::Struct, ::fidl:
     }
   }
 };
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+template <>
+struct IsResource<::test_versions::wire::Table> : public std::true_type{};
 
 template <>
 struct TypeTraits<::test_versions::wire::Table> {
@@ -466,6 +499,12 @@ struct ::fidl::internal::WireCodingTraits<::test_versions::wire::Table, ::fidl::
     }
   }
 };
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+template <>
+struct IsResource<::test_versions::wire::Union> : public std::true_type{};
 
 template <>
 struct TypeTraits<::test_versions::wire::Union> {
@@ -576,6 +615,8 @@ struct ::fidl::internal::WireCodingTraits<::test_versions::wire::Union, Constrai
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::test_versions::wire::Union, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
     : public ::fidl::internal::WireCodingTraits<::test_versions::wire::Union, ::fidl::internal::WireCodingConstraintUnion<false>, IsRecursive> {};
+
+#endif  // __Fuchsia__
 
 #pragma clang diagnostic pop
 

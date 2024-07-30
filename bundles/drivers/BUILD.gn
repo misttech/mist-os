@@ -22,6 +22,7 @@ group("drivers-not-templates") {
     "//src/devices/bundles:drivers",
     "//src/diagnostics/validator/logs/ddk/log-test-driver",
     "//src/graphics/bundles:drivers",
+    "//src/lib/ddktl:drivers",
     "//src/media/bundles:drivers",
     "//src/power:drivers",
     "//src/storage/fvm/driver:driver",

@@ -4,6 +4,7 @@
 
 #include <stdint.h>
 #include <sys/poll.h>
+#include <sys/syscall.h>
 #include <sys/timerfd.h>
 #include <time.h>
 #include <unistd.h>
@@ -90,3 +91,5 @@ TEST(TimerFD, RealtimeAlarm) {
     ASSERT_EQ(-1, fd) << errno;
   }
 }
+
+TEST(TimerFD, DeleteTimerThatDoesNotExist) { ASSERT_EQ(syscall(__NR_timer_delete, 0), -1); }

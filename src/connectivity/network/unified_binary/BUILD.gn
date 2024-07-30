@@ -19,6 +19,7 @@ rustc_binary("network_unified_binary") {
     "//src/connectivity/policy/http-client:http_client_gub_lib",
     "//src/connectivity/policy/netcfg:bin-basic_gub_lib",
     "//src/connectivity/policy/reachability:bin_gub_lib",
+    "//src/connectivity/policy/socket-proxy:socket_proxy_gub_lib",
   ]
 
   sources = [ "src/main.rs" ]

@@ -10,6 +10,8 @@
 #include <memory>
 #include <string>
 
+#include <pw_status/status.h>
+
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/assert.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/device_address.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/identifier.h"
@@ -434,8 +436,11 @@ class Adapter {
   // If the operation is successful, specifies the minimum and maximum local
   // delay (in microseconds) supported by the controller for the codec
   // specified.
+  // Returns PW_STATUS_UNIMPLEMENTED if the operation is not supported on this
+  // controller. Returns PW_STATUS_UNKNOWN if the operation fails to complete
+  // successfully.
   using GetSupportedDelayRangeCallback = fit::function<void(
-      zx_status_t status, uint32_t min_delay_us, uint32_t max_delay_us)>;
+      pw::Status status, uint32_t min_delay_us, uint32_t max_delay_us)>;
   virtual void GetSupportedDelayRange(
       const bt::StaticPacket<pw::bluetooth::emboss::CodecIdWriter>& codec_id,
       pw::bluetooth::emboss::LogicalTransportType logical_transport_type,

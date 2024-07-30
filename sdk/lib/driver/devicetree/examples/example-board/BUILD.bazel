@@ -18,7 +18,7 @@ load(
 fuchsia_driver_bind_bytecode(
     name = "example-board-bind",
     output = "example-board-bind.bindbc",
-    rules = "example-board.bind",
+    rules = "meta/example-board.bind",
     deps = [
         "@fuchsia_sdk//bind/fuchsia.devicetree",
         "@fuchsia_sdk//bind/fuchsia.test.platform",

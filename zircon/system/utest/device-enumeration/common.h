@@ -18,12 +18,10 @@ namespace device_enumeration {
 // Asynchronously wait for a path to appear, and call `callback` when the path exists.
 // The `watchers` array is needed because each directory in the path needs to allocate a
 // DeviceWatcher, and they need to be stored somewhere that can be freed later.
-void RecursiveWaitFor(const std::string& full_path, size_t slash_index,
-                      fit::function<void()> callback,
-                      std::vector<std::unique_ptr<fsl::DeviceWatcher>>& watchers,
-                      async_dispatcher_t* dispatcher);
-
-void WaitForOne(cpp20::span<const char*> device_paths);
+void RecursiveWaitForDevfs(const std::string& full_path, size_t slash_index,
+                           fit::function<void()> callback,
+                           std::vector<std::unique_ptr<fsl::DeviceWatcher>>& watchers,
+                           async_dispatcher_t* dispatcher);
 
 void WaitForClassDeviceCount(const std::string& path_in_devfs, size_t count);
 

@@ -10,10 +10,10 @@ the change will have.
 """
 
 import argparse
-import textwrap
 import json
 import os
 import sys
+import textwrap
 from typing import Any
 
 width = 4

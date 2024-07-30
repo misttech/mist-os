@@ -46,18 +46,19 @@ use starnix_uapi::{
     __user_cap_data_struct, __user_cap_header_struct, c_char, c_int, clone_args, errno, error,
     gid_t, pid_t, rlimit, rusage, sched_param, sock_filter, sock_fprog, uid_t, AT_EMPTY_PATH,
     AT_SYMLINK_NOFOLLOW, BPF_MAXINSNS, CLONE_ARGS_SIZE_VER0, CLONE_ARGS_SIZE_VER1,
-    CLONE_ARGS_SIZE_VER2, CLONE_FILES, CLONE_NEWNS, CLONE_NEWUTS, CLONE_SETTLS, CLONE_VFORK,
-    NGROUPS_MAX, PATH_MAX, PRIO_PROCESS, PR_CAPBSET_DROP, PR_CAPBSET_READ, PR_CAP_AMBIENT,
-    PR_CAP_AMBIENT_CLEAR_ALL, PR_CAP_AMBIENT_IS_SET, PR_CAP_AMBIENT_LOWER, PR_CAP_AMBIENT_RAISE,
-    PR_GET_CHILD_SUBREAPER, PR_GET_DUMPABLE, PR_GET_KEEPCAPS, PR_GET_NAME, PR_GET_NO_NEW_PRIVS,
-    PR_GET_SECCOMP, PR_GET_SECUREBITS, PR_SET_CHILD_SUBREAPER, PR_SET_DUMPABLE, PR_SET_KEEPCAPS,
-    PR_SET_NAME, PR_SET_NO_NEW_PRIVS, PR_SET_PDEATHSIG, PR_SET_PTRACER, PR_SET_SECCOMP,
-    PR_SET_SECUREBITS, PR_SET_TIMERSLACK, PR_SET_VMA, PR_SET_VMA_ANON_NAME, PTRACE_ATTACH,
-    PTRACE_SEIZE, PTRACE_TRACEME, RUSAGE_CHILDREN, SECCOMP_FILTER_FLAG_LOG,
-    SECCOMP_FILTER_FLAG_NEW_LISTENER, SECCOMP_FILTER_FLAG_SPEC_ALLOW, SECCOMP_FILTER_FLAG_TSYNC,
-    SECCOMP_FILTER_FLAG_TSYNC_ESRCH, SECCOMP_GET_ACTION_AVAIL, SECCOMP_GET_NOTIF_SIZES,
-    SECCOMP_MODE_FILTER, SECCOMP_MODE_STRICT, SECCOMP_SET_MODE_FILTER, SECCOMP_SET_MODE_STRICT,
-    _LINUX_CAPABILITY_VERSION_1, _LINUX_CAPABILITY_VERSION_2, _LINUX_CAPABILITY_VERSION_3,
+    CLONE_ARGS_SIZE_VER2, CLONE_FILES, CLONE_FS, CLONE_NEWNS, CLONE_NEWUTS, CLONE_SETTLS,
+    CLONE_VFORK, NGROUPS_MAX, PATH_MAX, PRIO_PROCESS, PR_CAPBSET_DROP, PR_CAPBSET_READ,
+    PR_CAP_AMBIENT, PR_CAP_AMBIENT_CLEAR_ALL, PR_CAP_AMBIENT_IS_SET, PR_CAP_AMBIENT_LOWER,
+    PR_CAP_AMBIENT_RAISE, PR_GET_CHILD_SUBREAPER, PR_GET_DUMPABLE, PR_GET_KEEPCAPS, PR_GET_NAME,
+    PR_GET_NO_NEW_PRIVS, PR_GET_SECCOMP, PR_GET_SECUREBITS, PR_SET_CHILD_SUBREAPER,
+    PR_SET_DUMPABLE, PR_SET_KEEPCAPS, PR_SET_NAME, PR_SET_NO_NEW_PRIVS, PR_SET_PDEATHSIG,
+    PR_SET_PTRACER, PR_SET_SECCOMP, PR_SET_SECUREBITS, PR_SET_TIMERSLACK, PR_SET_VMA,
+    PR_SET_VMA_ANON_NAME, PTRACE_ATTACH, PTRACE_SEIZE, PTRACE_TRACEME, RUSAGE_CHILDREN,
+    SECCOMP_FILTER_FLAG_LOG, SECCOMP_FILTER_FLAG_NEW_LISTENER, SECCOMP_FILTER_FLAG_SPEC_ALLOW,
+    SECCOMP_FILTER_FLAG_TSYNC, SECCOMP_FILTER_FLAG_TSYNC_ESRCH, SECCOMP_GET_ACTION_AVAIL,
+    SECCOMP_GET_NOTIF_SIZES, SECCOMP_MODE_FILTER, SECCOMP_MODE_STRICT, SECCOMP_SET_MODE_FILTER,
+    SECCOMP_SET_MODE_STRICT, _LINUX_CAPABILITY_VERSION_1, _LINUX_CAPABILITY_VERSION_2,
+    _LINUX_CAPABILITY_VERSION_3,
 };
 
 pub fn do_clone<L>(
@@ -159,7 +160,8 @@ fn read_c_string_vector(
             }
         })?;
         let cstring = CString::new(string).map_err(|_| errno!(EINVAL))?;
-        vec_size = vec_size.checked_add(cstring.as_bytes_with_nul().len()).ok_or(errno!(E2BIG))?;
+        vec_size =
+            vec_size.checked_add(cstring.as_bytes_with_nul().len()).ok_or_else(|| errno!(E2BIG))?;
         if vec_size > vec_limit {
             return error!(E2BIG);
         }
@@ -966,13 +968,13 @@ pub fn sys_prctl(
         PR_SET_NAME => {
             let addr = UserAddress::from(arg2);
             let mut name = current_task.read_memory_to_array::<16>(addr)?;
+            set_zx_name(&fuchsia_runtime::thread_self(), &name);
+
             // The name is truncated to 16 bytes (including the nul)
             name[15] = 0;
             // this will succeed, because we set 0 at end above
             let string_end = name.iter().position(|&c| c == 0).unwrap();
-
             let name_str = CString::new(&mut name[0..string_end]).map_err(|_| errno!(EINVAL))?;
-            set_zx_name(&fuchsia_runtime::thread_self(), name_str.as_bytes());
             current_task.set_command_name(name_str);
             Ok(0.into())
         }
@@ -1631,7 +1633,7 @@ pub fn sys_unshare(
     current_task: &CurrentTask,
     flags: u32,
 ) -> Result<(), Errno> {
-    const IMPLEMENTED_FLAGS: u32 = CLONE_FILES | CLONE_NEWNS | CLONE_NEWUTS;
+    const IMPLEMENTED_FLAGS: u32 = CLONE_FILES | CLONE_FS | CLONE_NEWNS | CLONE_NEWUTS;
     if flags & !IMPLEMENTED_FLAGS != 0 {
         track_stub!(TODO("https://fxbug.dev/322893372"), "unshare", flags & !IMPLEMENTED_FLAGS);
         return error!(EINVAL);
@@ -1639,6 +1641,10 @@ pub fn sys_unshare(
 
     if (flags & CLONE_FILES) != 0 {
         current_task.files.unshare();
+    }
+
+    if (flags & CLONE_FS) != 0 {
+        current_task.unshare_fs();
     }
 
     if (flags & CLONE_NEWNS) != 0 {

@@ -91,7 +91,7 @@ TEST_F(ObserverServerCodecWarningTest, WatchGainStateWrongDeviceType) {
   ASSERT_EQ(RegistryServer::count(), 1u);
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
-  ASSERT_TRUE(added_device_id);
+  ASSERT_TRUE(added_device_id.has_value());
   auto [status, added_device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   auto observer = CreateTestObserverServer(added_device);
@@ -124,7 +124,7 @@ TEST_F(ObserverServerCodecWarningTest, WatchPlugStateWhilePending) {
   ASSERT_EQ(RegistryServer::count(), 1u);
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
-  ASSERT_TRUE(added_device_id);
+  ASSERT_TRUE(added_device_id.has_value());
   auto [status, added_device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   // We'll always receive an immediate response from the first `WatchPlugState` call.
@@ -179,7 +179,7 @@ TEST_F(ObserverServerCodecWarningTest, GetReferenceClockWrongDeviceType) {
   ASSERT_EQ(RegistryServer::count(), 1u);
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
-  ASSERT_TRUE(added_device_id);
+  ASSERT_TRUE(added_device_id.has_value());
   auto [status, added_device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   auto observer = CreateTestObserverServer(added_device);
@@ -213,7 +213,7 @@ TEST_F(ObserverServerCodecWarningTest, WatchTopologyUnsupported) {
   auto registry = CreateTestRegistryServer();
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
-  ASSERT_TRUE(added_device_id);
+  ASSERT_TRUE(added_device_id.has_value());
   auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   ASSERT_FALSE(device->info()->signal_processing_topologies().has_value());
@@ -255,7 +255,7 @@ TEST_F(ObserverServerCodecWarningTest, WatchElementStateUnsupported) {
   auto registry = CreateTestRegistryServer();
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
-  ASSERT_TRUE(added_device_id);
+  ASSERT_TRUE(added_device_id.has_value());
   auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   ASSERT_FALSE(device->info()->signal_processing_topologies().has_value());
@@ -304,7 +304,7 @@ TEST_F(ObserverServerCompositeWarningTest, WatchGainStateWrongDeviceType) {
   ASSERT_EQ(RegistryServer::count(), 1u);
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
-  ASSERT_TRUE(added_device_id);
+  ASSERT_TRUE(added_device_id.has_value());
   auto [status, added_device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   auto observer = CreateTestObserverServer(added_device);
@@ -337,7 +337,7 @@ TEST_F(ObserverServerCompositeWarningTest, WatchPlugStateWrongDeviceType) {
   ASSERT_EQ(RegistryServer::count(), 1u);
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
-  ASSERT_TRUE(added_device_id);
+  ASSERT_TRUE(added_device_id.has_value());
   auto [status, added_device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   auto observer = CreateTestObserverServer(added_device);
@@ -367,7 +367,7 @@ TEST_F(ObserverServerCompositeWarningTest, WatchTopologyWhilePending) {
   auto registry = CreateTestRegistryServer();
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
-  ASSERT_TRUE(added_device_id);
+  ASSERT_TRUE(added_device_id.has_value());
   auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   auto observer = CreateTestObserverServer(device);
@@ -375,28 +375,35 @@ TEST_F(ObserverServerCompositeWarningTest, WatchTopologyWhilePending) {
   RunLoopUntilIdle();
   ASSERT_EQ(RegistryServer::count(), 1u);
   ASSERT_EQ(ObserverServer::count(), 1u);
-  auto received_callback1 = false, received_callback2 = false;
 
+  //
+  // Receive the initial Topology for this device.
+  auto received_callback = false;
   observer->client()->WatchTopology().Then(
-      [&received_callback1](fidl::Result<fad::Observer::WatchTopology>& result) {
-        received_callback1 = true;
+      [&received_callback](fidl::Result<fad::Observer::WatchTopology>& result) {
+        received_callback = true;
         EXPECT_TRUE(result.is_ok()) << result.error_value();
       });
 
   RunLoopUntilIdle();
-  EXPECT_TRUE(received_callback1);
-  received_callback1 = false;
+  EXPECT_TRUE(received_callback);
 
+  //
+  // Now call WatchTopology again, which should pend. Then call WatchTopology AGAIN. This should
+  // cause BOTH watches to fail and render the Observer unusable.
+  received_callback = false;
   observer->client()->WatchTopology().Then(
-      [&received_callback1](fidl::Result<fad::Observer::WatchTopology>& result) {
-        received_callback1 = true;
+      [&received_callback](fidl::Result<fad::Observer::WatchTopology>& result) {
+        received_callback = true;
         ASSERT_TRUE(result.is_error());
         EXPECT_EQ(result.error_value().status(), ZX_ERR_BAD_STATE);
       });
 
   RunLoopUntilIdle();
-  EXPECT_FALSE(received_callback1);
+  // This should pend, since we have not changed the device's topology.
+  EXPECT_FALSE(received_callback);
 
+  auto received_callback2 = false;
   observer->client()->WatchTopology().Then(
       [&received_callback2](fidl::Result<fad::Observer::WatchTopology>& result) {
         received_callback2 = true;
@@ -405,10 +412,10 @@ TEST_F(ObserverServerCompositeWarningTest, WatchTopologyWhilePending) {
       });
 
   RunLoopUntilIdle();
+  // This should complete with error ZX_ERR_BAD_STATE.
   EXPECT_TRUE(received_callback2);
-  // After a failing WatchTopology call, the binding should not be usable, so the previous
-  // WatchElementState will complete with a failure.
-  EXPECT_TRUE(received_callback1);
+  // After the above failure, the PREVIOUS WatchTopology should also complete with failure.
+  EXPECT_TRUE(received_callback);
 }
 
 // WatchElementState cases (without SetElementState): unknown ElementId, Watch-while-pending
@@ -417,7 +424,7 @@ TEST_F(ObserverServerCompositeWarningTest, WatchElementStateUnknownElementId) {
   auto registry = CreateTestRegistryServer();
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
-  ASSERT_TRUE(added_device_id);
+  ASSERT_TRUE(added_device_id.has_value());
   auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   auto observer = CreateTestObserverServer(device);
@@ -465,7 +472,7 @@ TEST_F(ObserverServerCompositeWarningTest, WatchElementStateWhilePending) {
   auto registry = CreateTestRegistryServer();
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
-  ASSERT_TRUE(added_device_id);
+  ASSERT_TRUE(added_device_id.has_value());
   auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   auto observer = CreateTestObserverServer(device);
@@ -474,32 +481,38 @@ TEST_F(ObserverServerCompositeWarningTest, WatchElementStateWhilePending) {
   ASSERT_EQ(RegistryServer::count(), 1u);
   ASSERT_EQ(ObserverServer::count(), 1u);
   auto& elements_from_device = element_map(device);
-
   auto element_id = elements_from_device.begin()->first;
-  auto received_callback1 = false, received_callback2 = false;
 
+  //
+  // Receive the initial ElementState for this element_id.
+  auto received_callback = false;
   observer->client()
       ->WatchElementState(element_id)
-      .Then([&received_callback1](fidl::Result<fad::Observer::WatchElementState>& result) {
-        received_callback1 = true;
+      .Then([&received_callback](fidl::Result<fad::Observer::WatchElementState>& result) {
+        received_callback = true;
         EXPECT_TRUE(result.is_ok()) << result.error_value();
       });
 
   RunLoopUntilIdle();
-  EXPECT_TRUE(received_callback1);
-  received_callback1 = false;
+  EXPECT_TRUE(received_callback);
 
+  //
+  // Now call WatchElementState again, which should pend. Then call WatchElementState AGAIN for the
+  // same element_id. This should cause BOTH watches to fail and render the Observer unusable.
+  received_callback = false;
   observer->client()
       ->WatchElementState(element_id)
-      .Then([&received_callback1](fidl::Result<fad::Observer::WatchElementState>& result) {
-        received_callback1 = true;
+      .Then([&received_callback](fidl::Result<fad::Observer::WatchElementState>& result) {
+        received_callback = true;
         ASSERT_TRUE(result.is_error());
         EXPECT_EQ(result.error_value().status(), ZX_ERR_BAD_STATE) << result.error_value();
       });
 
   RunLoopUntilIdle();
-  EXPECT_FALSE(received_callback1);
+  // This should pend, since we have not changed this element's state
+  EXPECT_FALSE(received_callback);
 
+  auto received_callback2 = false;
   observer->client()
       ->WatchElementState(element_id)
       .Then([&received_callback2](fidl::Result<fad::Observer::WatchElementState>& result) {
@@ -509,15 +522,17 @@ TEST_F(ObserverServerCompositeWarningTest, WatchElementStateWhilePending) {
       });
 
   RunLoopUntilIdle();
+  // This should complete with error ZX_ERR_BAD_STATE.
   EXPECT_TRUE(received_callback2);
-  // After a failing WatchElementState call, the binding should not be usable, so the previous
-  // WatchElementState will complete with a failure.
-  EXPECT_TRUE(received_callback1);
-  received_callback1 = false;
+  // After the above failure, the PREVIOUS WatchElementState should also complete with failure.
+  EXPECT_TRUE(received_callback);
 
+  //
+  // The observer binding should not be usable now. Try a non-signalprocessing method to confirm.
+  received_callback = false;
   observer->client()->GetReferenceClock().Then(
-      [&received_callback1](fidl::Result<fad::Observer::GetReferenceClock>& result) {
-        received_callback1 = true;
+      [&received_callback](fidl::Result<fad::Observer::GetReferenceClock>& result) {
+        received_callback = true;
         ASSERT_TRUE(result.is_error());
         ASSERT_TRUE(result.error_value().is_framework_error()) << result.error_value();
         EXPECT_EQ(result.error_value().framework_error().status(), ZX_ERR_BAD_STATE)
@@ -525,8 +540,7 @@ TEST_F(ObserverServerCompositeWarningTest, WatchElementStateWhilePending) {
       });
 
   RunLoopUntilIdle();
-  EXPECT_TRUE(received_callback1);
-  EXPECT_TRUE(observer->client().is_valid());
+  EXPECT_TRUE(received_callback);
 }
 
 /////////////////////
@@ -541,7 +555,7 @@ TEST_F(ObserverServerStreamConfigWarningTest, WatchGainStateWhilePending) {
   ASSERT_EQ(RegistryServer::count(), 1u);
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
-  ASSERT_TRUE(added_device_id);
+  ASSERT_TRUE(added_device_id.has_value());
   auto [status, added_device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   // We'll always receive an immediate response from the first `WatchGainState` call.
@@ -595,7 +609,7 @@ TEST_F(ObserverServerStreamConfigWarningTest, WatchPlugStateWhilePending) {
   ASSERT_EQ(RegistryServer::count(), 1u);
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
-  ASSERT_TRUE(added_device_id);
+  ASSERT_TRUE(added_device_id.has_value());
   auto [status, added_device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   // We'll always receive an immediate response from the first `WatchPlugState` call.
@@ -660,7 +674,7 @@ TEST_F(ObserverServerStreamConfigWarningTest, WatchTopologyUnsupported) {
   auto registry = CreateTestRegistryServer();
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
-  ASSERT_TRUE(added_device_id);
+  ASSERT_TRUE(added_device_id.has_value());
   auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   ASSERT_FALSE(device->info()->signal_processing_topologies().has_value());
@@ -702,7 +716,7 @@ TEST_F(ObserverServerStreamConfigWarningTest, WatchElementStateUnsupported) {
   auto registry = CreateTestRegistryServer();
 
   auto added_device_id = WaitForAddedDeviceTokenId(registry->client());
-  ASSERT_TRUE(added_device_id);
+  ASSERT_TRUE(added_device_id.has_value());
   auto [status, device] = adr_service()->FindDeviceByTokenId(*added_device_id);
   ASSERT_EQ(status, AudioDeviceRegistry::DevicePresence::Active);
   ASSERT_FALSE(device->info()->signal_processing_topologies().has_value());

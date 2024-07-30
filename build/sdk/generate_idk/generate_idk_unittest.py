@@ -5,6 +5,7 @@
 import pathlib
 import tempfile
 import unittest
+
 import generate_idk
 
 UNMERGABLE_TYPES = [

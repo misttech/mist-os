@@ -15,7 +15,7 @@ use fuchsia_zircon::{self as zx};
 use futures::prelude::*;
 use lazy_static::lazy_static;
 use router_error::Explain;
-use sandbox::{Dict, Receiver};
+use sandbox::Receiver;
 use tracing::warn;
 
 lazy_static! {
@@ -79,17 +79,6 @@ impl FactoryCapabilityProvider {
                 let sender = self.create_connector(receiver);
                 responder.send(sender)?;
             }
-            fsandbox::FactoryRequest::CreateDictionary { responder } => {
-                let token = self.create_dictionary();
-                responder.send(token)?;
-            }
-            fsandbox::FactoryRequest::OpenDictionary {
-                dictionary,
-                server_end,
-                control_handle: _,
-            } => {
-                self.open_dictionary(dictionary, server_end);
-            }
             fsandbox::FactoryRequest::_UnknownMethod { ordinal, .. } => {
                 warn!(%ordinal, "fuchsia.component.sandbox/Factory received unknown method");
             }
@@ -106,21 +95,6 @@ impl FactoryCapabilityProvider {
             receiver.handle_receiver(receiver_client.into_proxy().unwrap()).await;
         });
         fsandbox::Connector::from(sender)
-    }
-
-    fn create_dictionary(&self) -> fsandbox::DictionaryRef {
-        fsandbox::DictionaryRef::from(Dict::new())
-    }
-
-    fn open_dictionary(
-        &self,
-        dictionary: fsandbox::DictionaryRef,
-        server_end: ServerEnd<fsandbox::DictionaryMarker>,
-    ) {
-        let Ok(dict) = Dict::try_from(dictionary) else {
-            return;
-        };
-        dict.serve(server_end.into_stream().unwrap());
     }
 }
 
@@ -156,6 +130,7 @@ mod tests {
     use crate::model::component::ComponentInstance;
     use crate::model::context::ModelContext;
     use crate::model::environment::Environment;
+    use ::routing::bedrock::structured_dict::ComponentInput;
     use fidl::endpoints;
     use fidl_fuchsia_component_sandbox as fsandbox;
     use fuchsia_zircon::{self as zx, AsHandleRef};
@@ -163,6 +138,7 @@ mod tests {
 
     async fn new_root() -> Arc<ComponentInstance> {
         ComponentInstance::new_root(
+            ComponentInput::default(),
             Environment::empty(),
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
@@ -196,21 +172,5 @@ mod tests {
         } else {
             panic!("unexpected request");
         }
-    }
-
-    #[fuchsia::test]
-    async fn create_and_open_dictionary() {
-        let root = new_root().await;
-        let (factory_proxy, _host) = factory(&root).await;
-
-        let dict_ref = factory_proxy.create_dictionary().await.unwrap();
-        let (dict, server) = endpoints::create_proxy().unwrap();
-        factory_proxy.open_dictionary(dict_ref, server).unwrap();
-
-        // The dictionary is empty.
-        let (iterator, server_end) = endpoints::create_proxy().unwrap();
-        dict.enumerate(server_end).unwrap();
-        let items = iterator.get_next().await.unwrap();
-        assert_eq!(items.len(), 0);
     }
 }

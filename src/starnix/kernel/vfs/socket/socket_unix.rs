@@ -31,7 +31,7 @@ use starnix_uapi::{
 };
 use zerocopy::AsBytes;
 
-use starnix_sync::{FileOpsCore, Locked, Mutex, WriteOps};
+use starnix_sync::{FileOpsCore, Locked, Mutex};
 use std::sync::Arc;
 
 // From unix.go in gVisor.
@@ -509,7 +509,7 @@ impl SocketOps for UnixSocket {
 
     fn write(
         &self,
-        locked: &mut Locked<'_, WriteOps>,
+        locked: &mut Locked<'_, FileOpsCore>,
         socket: &Socket,
         current_task: &CurrentTask,
         data: &mut dyn InputBuffer,
@@ -544,6 +544,7 @@ impl SocketOps for UnixSocket {
 
     fn wait_async(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _socket: &Socket,
         _current_task: &CurrentTask,
         waiter: &Waiter,
@@ -555,6 +556,7 @@ impl SocketOps for UnixSocket {
 
     fn query_events(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _socket: &Socket,
         _current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
@@ -889,7 +891,7 @@ impl UnixSocketInner {
     /// Returns the number of bytes that were written to the socket.
     fn write(
         &mut self,
-        locked: &mut Locked<'_, WriteOps>,
+        locked: &mut Locked<'_, FileOpsCore>,
         current_task: &CurrentTask,
         data: &mut dyn InputBuffer,
         address: Option<SocketAddress>,
@@ -986,7 +988,7 @@ mod tests {
         connecting_socket
             .connect(&current_task, SocketPeer::Handle(socket.clone()))
             .expect("Failed to connect socket.");
-        assert_eq!(Ok(FdEvents::POLLIN), socket.query_events(&current_task));
+        assert_eq!(Ok(FdEvents::POLLIN), socket.query_events(&mut locked, &current_task));
         let server_socket = socket.accept().unwrap();
 
         let opt_size = std::mem::size_of::<socklen_t>();

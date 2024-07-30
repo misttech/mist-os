@@ -10,13 +10,13 @@ mod remote_client;
 use crate::ddk_converter;
 use crate::device::{self, DeviceOps};
 use crate::error::Error;
+use fdf::ArenaStaticBox;
 use ieee80211::{Bssid, MacAddr, Ssid};
 use std::fmt;
 use tracing::{debug, error, info, trace, warn};
 use wlan_common::mac::{self, CapabilityInfo};
 use wlan_common::timer::{EventId, Timer};
 use wlan_common::TimeUnit;
-use wlan_ffi_transport::{Buffer, BufferProvider};
 use zerocopy::ByteSlice;
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_minstrel as fidl_minstrel,
@@ -30,8 +30,7 @@ use remote_client::*;
 
 #[derive(Debug)]
 struct BufferedFrame {
-    buffer: Buffer,
-    written: usize,
+    buffer: ArenaStaticBox<[u8]>,
     tx_flags: fidl_softmac::WlanTxInfoFlags,
     async_id: trace::Id,
 }
@@ -130,13 +129,12 @@ impl<D: DeviceOps> crate::MlmeImpl for Ap<D> {
     async fn new(
         config: Self::Config,
         device: D,
-        buffer_provider: BufferProvider,
         timer: Timer<TimedEvent>,
     ) -> Result<Self, anyhow::Error>
     where
         Self: Sized,
     {
-        Ok(Self::new(device, buffer_provider, timer, config))
+        Ok(Self::new(device, timer, config))
     }
     async fn handle_mlme_request(
         &mut self,
@@ -173,13 +171,8 @@ impl<D: DeviceOps> crate::MlmeImpl for Ap<D> {
 }
 
 impl<D> Ap<D> {
-    pub fn new(
-        device: D,
-        buffer_provider: BufferProvider,
-        timer: Timer<TimedEvent>,
-        bssid: Bssid,
-    ) -> Self {
-        Self { ctx: Context::new(device, buffer_provider, timer, bssid), bss: None }
+    pub fn new(device: D, timer: Timer<TimedEvent>, bssid: Bssid) -> Self {
+        Self { ctx: Context::new(device, timer, bssid), bss: None }
     }
 
     fn handle_sme_list_minstrel_peers(
@@ -480,7 +473,6 @@ mod tests {
     use wlan_common::big_endian::BigEndianU16;
     use wlan_common::test_utils::fake_frames::fake_wpa2_rsne;
     use wlan_common::{assert_variant, timer};
-    use wlan_ffi_transport::FakeFfiBufferProvider;
     use wlan_frame_writer::write_frame_with_dynamic_buffer;
     use wlan_sme::responder::Responder;
     use {
@@ -500,7 +492,7 @@ mod tests {
         protocol_id: u16,
         body: &[u8],
     ) -> Vec<u8> {
-        let (mut buffer, written) = write_frame_with_dynamic_buffer!(vec![], {
+        write_frame_with_dynamic_buffer!(vec![], {
             headers: {
                 mac::EthernetIIHdr: &mac::EthernetIIHdr {
                     da: dst_addr,
@@ -510,9 +502,7 @@ mod tests {
             },
             payload: body,
         })
-        .expect("writing to vec always succeeds");
-        buffer.truncate(written);
-        buffer
+        .expect("writing to vec always succeeds")
     }
 
     // TODO(https://fxbug.dev/327499461): This function is async to ensure MLME functions will
@@ -527,11 +517,7 @@ mod tests {
                 .with_mock_sta_addr((*BSSID).to_array()),
         )
         .await;
-        (
-            Ap::new(fake_device, BufferProvider::new(FakeFfiBufferProvider::new()), timer, *BSSID),
-            fake_device_state,
-            time_stream,
-        )
+        (Ap::new(fake_device, timer, *BSSID), fake_device_state, time_stream)
     }
 
     #[fuchsia::test(allow_stalls = false)]

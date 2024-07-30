@@ -1,0 +1,12 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    children: [
+        {
+            name: "socket-proxy",
+            url: "fuchsia-pkg://fuchsia.com/network-socket-proxy#meta/network-socket-proxy.cm",
+        },
+    ],
+    expose: [],
+}

@@ -9,7 +9,6 @@ import shutil
 import subprocess
 import sys
 import tempfile
-
 from abc import ABC, abstractmethod
 from collections import namedtuple
 from functools import reduce
@@ -18,7 +17,6 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 from fuchsia_task_lib import FuchsiaTask, TaskExecutionException, Terminal
-
 
 Arguments = namedtuple(
     "WorkflowArguments",

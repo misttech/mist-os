@@ -5,7 +5,7 @@
 group("version-history") {
   deps = [
     "go:version-history",
-    "rust:version-history",
+    "rust",
   ]
 }
 

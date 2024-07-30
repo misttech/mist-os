@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::test_topology;
-use diagnostics_data::{Data, Logs};
+use diagnostics_data::{Data, ExtendedMoniker, Logs};
 use diagnostics_reader::{ArchiveReader, Subscription};
 use futures::StreamExt;
 use realm_proxy_client::RealmProxyClient;
@@ -34,13 +34,13 @@ async fn timestamp_sorting_for_batches() {
 
     // Log to tortoise
     child_tort.log(&log_message(tort_times.0)).await.expect("logged");
-    let mut expected_dump = vec![(tort_times.0, "tort".to_string())];
+    let mut expected_dump = vec![(tort_times.0, "tort".try_into().unwrap())];
     early_listener.check_next(tort_times.0, "tort").await;
     check_log_snapshot(&realm_proxy, &expected_dump).await;
 
     // Log to hare
     child_hare.log(&log_message(hare_times.0)).await.expect("logged");
-    expected_dump.push((hare_times.0, "hare".to_string()));
+    expected_dump.push((hare_times.0, "hare".try_into().unwrap()));
     expected_dump.sort_by_key(|(time, _)| *time);
 
     early_listener.check_next(hare_times.0, "hare").await;
@@ -53,7 +53,7 @@ async fn timestamp_sorting_for_batches() {
 
     // send the second tortoise message and assert it's seen
     child_tort.log(&log_message(tort_times.1)).await.expect("logged");
-    expected_dump.push((tort_times.1, "tort".to_string()));
+    expected_dump.push((tort_times.1, "tort".try_into().unwrap()));
     expected_dump.sort_by_key(|(time, _)| *time);
     early_listener.check_next(tort_times.1, "tort").await;
     middle_listener.check_next(tort_times.1, "tort").await;
@@ -61,7 +61,7 @@ async fn timestamp_sorting_for_batches() {
 
     // send the second hare message and assert it's seen
     child_hare.log(&log_message(hare_times.1)).await.expect("logged");
-    expected_dump.push((hare_times.1, "hare".to_string()));
+    expected_dump.push((hare_times.1, "hare".try_into().unwrap()));
     expected_dump.sort_by_key(|(time, _)| *time);
     early_listener.check_next(hare_times.1, "hare").await;
     middle_listener.check_next(hare_times.1, "hare").await;
@@ -94,7 +94,7 @@ impl Listener {
         let log = self.stream.next().await.unwrap().unwrap();
         assert_eq!(log.msg().unwrap(), "timing log");
         assert_eq!(log.metadata.timestamp, time);
-        assert_eq!(log.moniker, expected_moniker);
+        assert_eq!(log.moniker.to_string(), expected_moniker);
     }
 }
 
@@ -107,7 +107,10 @@ fn log_message(time: i64) -> ftest::LogPuppetLogRequest {
     }
 }
 
-async fn check_log_snapshot(realm_proxy: &RealmProxyClient, expected_dump: &Vec<(i64, String)>) {
+async fn check_log_snapshot(
+    realm_proxy: &RealmProxyClient,
+    expected_dump: &[(i64, ExtendedMoniker)],
+) {
     let accessor =
         realm_proxy.connect_to_protocol::<fdiagnostics::ArchiveAccessorMarker>().await.unwrap();
     let logs = ArchiveReader::new().with_archive(accessor).snapshot::<Logs>().await.unwrap();
@@ -115,5 +118,5 @@ async fn check_log_snapshot(realm_proxy: &RealmProxyClient, expected_dump: &Vec<
         .into_iter()
         .map(|log| (log.metadata.timestamp, log.moniker.clone()))
         .collect::<Vec<_>>();
-    assert_eq!(result, *expected_dump);
+    assert_eq!(result, expected_dump);
 }

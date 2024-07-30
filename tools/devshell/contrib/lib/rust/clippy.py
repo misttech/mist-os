@@ -9,10 +9,10 @@
 import argparse
 import json
 import os
-from pathlib import Path
 import subprocess
 import sys
 import time
+from pathlib import Path
 
 import rust
 from rust import FUCHSIA_BUILD_DIR, HOST_PLATFORM, PREBUILT_THIRD_PARTY_DIR

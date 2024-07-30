@@ -122,35 +122,35 @@ impl AncillaryData {
                 Ok(AncillaryData::Unix(UnixControlData::new(current_task, message)?))
             }
             (SOL_IP, IP_TOS) => Ok(AncillaryData::Ip(syncio::ControlMessage::IpTos(
-                u8::read_from_prefix(&message.data[..]).ok_or(errno!(EINVAL))?,
+                u8::read_from_prefix(&message.data[..]).ok_or_else(|| errno!(EINVAL))?,
             ))),
             (SOL_IP, IP_TTL) => Ok(AncillaryData::Ip(syncio::ControlMessage::IpTtl(
-                read_u8_value_from_int_cmsg(&message.data).ok_or(errno!(EINVAL))?,
+                read_u8_value_from_int_cmsg(&message.data).ok_or_else(|| errno!(EINVAL))?,
             ))),
             (SOL_IP, IP_RECVORIGDSTADDR) => {
                 Ok(AncillaryData::Ip(syncio::ControlMessage::IpRecvOrigDstAddr(
                     <[u8; size_of::<sockaddr_in>()]>::read_from_prefix(&message.data[..])
-                        .ok_or(errno!(EINVAL))?,
+                        .ok_or_else(|| errno!(EINVAL))?,
                 )))
             }
             (SOL_IPV6, IPV6_TCLASS) => Ok(AncillaryData::Ip(syncio::ControlMessage::Ipv6Tclass(
-                read_u8_value_from_int_cmsg(&message.data).ok_or(errno!(EINVAL))?,
+                read_u8_value_from_int_cmsg(&message.data).ok_or_else(|| errno!(EINVAL))?,
             ))),
             (SOL_IPV6, IPV6_HOPLIMIT) => {
                 Ok(AncillaryData::Ip(syncio::ControlMessage::Ipv6HopLimit(
-                    read_u8_value_from_int_cmsg(&message.data).ok_or(errno!(EINVAL))?,
+                    read_u8_value_from_int_cmsg(&message.data).ok_or_else(|| errno!(EINVAL))?,
                 )))
             }
             (SOL_IPV6, IPV6_PKTINFO) => {
-                let pktinfo =
-                    in6_pktinfo::read_from_prefix(&message.data[..]).ok_or(errno!(EINVAL))?;
+                let pktinfo = in6_pktinfo::read_from_prefix(&message.data[..])
+                    .ok_or_else(|| errno!(EINVAL))?;
                 Ok(AncillaryData::Ip(syncio::ControlMessage::Ipv6PacketInfo {
                     local_addr: pktinfo
                         .ipi6_addr
                         .as_bytes()
                         .try_into()
                         .ok()
-                        .ok_or(errno!(EINVAL))?,
+                        .ok_or_else(|| errno!(EINVAL))?,
                     iface: pktinfo.ipi6_ifindex as u32,
                 }))
             }

@@ -8,9 +8,9 @@ import("//build/drivers.gni")
 import("//build/test.gni")
 
 driver_bind_rules("network-device_bind") {
-  rules = "network_device.bind"
+  rules = "meta/network_device.bind"
   bind_output = "network-device.bindbc"
-  tests = "bind-tests.json"
+  tests = "meta/bind-tests.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.network.driver:fuchsia.hardware.network.driver_bindlib",
     "//src/devices/bind/fuchsia.network",
@@ -45,7 +45,7 @@ fuchsia_driver_component("network-device") {
   visibility = [ ":*" ]
   component_name = "network-device"
   deps = [ ":network-device-driver" ]
-  info = "network-device-info.json"
+  info = "meta/network-device-info.json"
   manifest = "meta/network-device.cml"
 }
 
@@ -73,7 +73,7 @@ test("driver-test") {
     "device:test_util_driver",
     "mac:test_util_driver",
     "//sdk/lib/driver/compat/cpp:cpp",
-    "//sdk/lib/driver/testing/cpp/fixture:cpp_fixture",
+    "//sdk/lib/driver/testing/cpp:driver_testing_cpp",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/predicates",
     "//zircon/system/ulib/zx",

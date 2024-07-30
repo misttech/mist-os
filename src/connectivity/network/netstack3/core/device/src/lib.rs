@@ -69,11 +69,11 @@ pub mod pure_ip {
 pub mod socket {
     pub use crate::internal::socket::{
         AllSockets, AnyDeviceSockets, DeviceSocketAccessor, DeviceSocketApi,
-        DeviceSocketBindingsContext, DeviceSocketContext, DeviceSocketContextTypes, DeviceSocketId,
-        DeviceSocketMetadata, DeviceSocketTypes, DeviceSockets, EthernetFrame,
-        EthernetHeaderParams, Frame, HeldDeviceSockets, HeldSockets, IpFrame, ParseSentFrameError,
-        PrimaryDeviceSocketId, Protocol, ReceivedFrame, SentFrame, SocketId, SocketInfo,
-        SocketState, SocketStateAccessor, Target, TargetDevice,
+        DeviceSocketBindingsContext, DeviceSocketContext, DeviceSocketId, DeviceSocketMetadata,
+        DeviceSocketTypes, DeviceSockets, EthernetFrame, EthernetHeaderParams, Frame,
+        HeldDeviceSockets, HeldSockets, IpFrame, ParseSentFrameError, PrimaryDeviceSocketId,
+        Protocol, ReceivedFrame, SentFrame, SocketId, SocketInfo, SocketState, SocketStateAccessor,
+        Target, TargetDevice, WeakDeviceSocketId,
     };
 }
 
@@ -89,7 +89,7 @@ pub mod queue {
         TransmitQueueCommon, TransmitQueueConfiguration, TransmitQueueContext,
         TransmitQueueHandler, TransmitQueueState,
     };
-    pub use crate::internal::queue::{DequeueState, ReceiveQueueFullError};
+    pub use crate::internal::queue::{BatchSize, DequeueState, ReceiveQueueFullError};
 }
 
 pub use internal::api::{DeviceAnyApi, DeviceApi};

@@ -17,6 +17,10 @@ load(
     _fuchsia_licenses_notice = "fuchsia_licenses_notice",
 )
 load(
+    "//fuchsia/private/licenses:fuchsia_licenses_preprocess.bzl",
+    _fuchsia_licenses_preprocess = "fuchsia_licenses_preprocess",
+)
+load(
     "//fuchsia/private/licenses:fuchsia_licenses_review.bzl",
     _fuchsia_licenses_review = "fuchsia_licenses_review",
 )
@@ -30,3 +34,4 @@ fuchsia_licenses_notice = _fuchsia_licenses_notice
 fuchsia_licenses_review = _fuchsia_licenses_review
 fuchsia_licenses_spdx = _fuchsia_licenses_spdx
 fuchsia_licenses_collection = _fuchsia_licenses_collection
+fuchsia_licenses_preprocess = _fuchsia_licenses_preprocess

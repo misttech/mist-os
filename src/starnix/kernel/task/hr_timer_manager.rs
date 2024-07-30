@@ -4,7 +4,7 @@
 
 use fidl_fuchsia_hardware_hrtimer as fhrtimer;
 use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased, HandleRef};
-use starnix_logging::{log_error, log_info};
+use starnix_logging::{log_debug, log_error};
 use starnix_sync::{Mutex, MutexGuard};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{errno, from_status_like_fdio};
@@ -12,10 +12,9 @@ use starnix_uapi::{errno, from_status_like_fdio};
 use std::collections::BinaryHeap;
 use std::sync::{Arc, Weak};
 
-use crate::fs::fuchsia::TimerOps;
 use crate::power::OnWakeOps;
 use crate::task::{CurrentTask, HandleWaitCanceler, WaitCanceler};
-use crate::vfs::FileObject;
+use crate::timer::TimerOps;
 
 const HRTIMER_DIRECTORY: &str = "/dev/class/hrtimer";
 const HRTIMER_DEFAULT_ID: u64 = 6;
@@ -25,7 +24,7 @@ fn connect_to_hrtimer() -> Result<fhrtimer::DeviceSynchronousProxy, Errno> {
         .map_err(|e| errno!(EINVAL, format!("Failed to open hrtimer directory: {e}")))?;
     let entry = dir
         .next()
-        .ok_or(errno!(EINVAL, format!("No entry in the hrtimer directory")))?
+        .ok_or_else(|| errno!(EINVAL, format!("No entry in the hrtimer directory")))?
         .map_err(|e| errno!(EINVAL, format!("Failed to find hrtimer device: {e}")))?;
     let path = entry
         .path()
@@ -128,13 +127,12 @@ impl HrTimerManager {
     fn start_next(
         self: &HrTimerManagerHandle,
         current_task: &CurrentTask,
-        wake_source: Option<Weak<dyn OnWakeOps>>,
         guard: &mut MutexGuard<'_, HrTimerManagerState>,
     ) -> Result<(), Errno> {
-        let _ = self.check_connection()?;
         let resolution_nsecs = self.resolution_nsecs()?;
         if let Some(node) = guard.timer_heap.peek() {
             let new_deadline = node.deadline;
+            let wake_source = node.wake_source.clone();
             // Only restart the HrTimer device when the deadline is different from the running one.
             if guard.current_deadline != Some(new_deadline) {
                 let hrtimer_ref = node.hr_timer.clone();
@@ -151,8 +149,6 @@ impl HrTimerManager {
                         match device_proxy.start_and_wait(
                             HRTIMER_DEFAULT_ID,
                             &fhrtimer::Resolution::Duration(resolution_nsecs),
-                            // TODO(https://fxbug.dev/339070144): Use the new API to start the timer
-                            // with the target deadline
                             ticks as u64,
                             zx::Time::INFINITE,
                         ) {
@@ -168,11 +164,27 @@ impl HrTimerManager {
                                     // are activated.
                                     drop(lease_channel);
                                 }
-                                // TODO(https://fxbug.dev/340234109): wait on the timer expired
-                                // signal to start the next timer in the heap.
+                                loop {
+                                    // After the front HrTimer, which has the soonest deadline, expires,
+                                    // we need to start the next one in the heap.
+                                    let mut guard = self_ref.lock();
+                                    match self_ref.start_next(current_task, &mut guard) {
+                                        Ok(_) => break,
+                                        Err(e) => log_error!(
+                                            "Failed to start the next hrtimer in the heap: {e}"
+                                        ),
+                                    }
+                                }
                             }
-                            Ok(Err(e)) => log_info!("HrTimer::Start driver error: {e:?}"),
-                            Err(e) => log_error!("HrTimer::Start fidl error: {e}"),
+                            Ok(Err(e)) => match e {
+                                fhrtimer::DriverError::Canceled => log_debug!(
+                                    "A new HrTimer with \
+                                an earlier deadline has been started. \
+                                This `StartAndWait` attempt is cancelled."
+                                ),
+                                _ => log_error!("HrTimer::StartAndWait driver error: {e:?}"),
+                            },
+                            Err(e) => log_error!("HrTimer::StartAndWait fidl error: {e}"),
                         }
                     }
                 });
@@ -207,7 +219,7 @@ impl HrTimerManager {
         deadline: zx::Time,
     ) -> Result<(), Errno> {
         let mut guard = self.lock();
-        let new_timer_node = HrTimerNode::new(deadline, new_timer.clone());
+        let new_timer_node = HrTimerNode::new(deadline, wake_source, new_timer.clone());
         // If the deadline of a timer changes, this function will be called to update the order of
         // the `timer_heap`.
         // Check if the timer already exists and remove it to ensure the `timer_heap` remains
@@ -219,7 +231,7 @@ impl HrTimerManager {
             // If the new timer is in front, it has a sooner deadline. (Re)Start the HrTimer device
             // with the new deadline.
             if Arc::ptr_eq(&running_timer.hr_timer, new_timer) {
-                return self.start_next(current_task, wake_source, &mut guard);
+                return self.start_next(current_task, &mut guard);
             }
         }
         Ok(())
@@ -229,14 +241,13 @@ impl HrTimerManager {
     pub fn remove_timer(
         self: &HrTimerManagerHandle,
         current_task: &CurrentTask,
-        wake_source: Option<Weak<dyn OnWakeOps>>,
         timer: &HrTimerHandle,
     ) -> Result<(), Errno> {
         let mut guard = self.lock();
         if let Some(running_timer_node) = guard.timer_heap.peek() {
             if Arc::ptr_eq(&running_timer_node.hr_timer, timer) {
                 guard.timer_heap.pop();
-                self.start_next(current_task, wake_source, &mut guard)?;
+                self.start_next(current_task, &mut guard)?;
                 return Ok(());
             }
         }
@@ -269,7 +280,7 @@ impl TimerOps for HrTimerHandle {
     fn start(
         &self,
         current_task: &CurrentTask,
-        file_object: &FileObject,
+        source: Option<Weak<dyn OnWakeOps>>,
         deadline: zx::Time,
     ) -> Result<(), Errno> {
         // Before (re)starting the timer, ensure the signal is cleared.
@@ -277,26 +288,17 @@ impl TimerOps for HrTimerHandle {
             .as_handle_ref()
             .signal(zx::Signals::TIMER_SIGNALED, zx::Signals::NONE)
             .map_err(|status| from_status_like_fdio!(status))?;
-        current_task.kernel().hrtimer_manager.add_timer(
-            current_task,
-            Some(file_object.weak_handle.clone()),
-            self,
-            deadline,
-        )?;
+        current_task.kernel().hrtimer_manager.add_timer(current_task, source, self, deadline)?;
         Ok(())
     }
 
-    fn stop(&self, current_task: &CurrentTask, file_object: &FileObject) -> Result<(), Errno> {
+    fn stop(&self, current_task: &CurrentTask) -> Result<(), Errno> {
         // Clear the signal when stopping the hrtimer.
         self.event
             .as_handle_ref()
             .signal(zx::Signals::TIMER_SIGNALED, zx::Signals::NONE)
             .map_err(|status| from_status_like_fdio!(status))?;
-        Ok(current_task.kernel().hrtimer_manager.remove_timer(
-            current_task,
-            Some(file_object.weak_handle.clone()),
-            self,
-        )?)
+        Ok(current_task.kernel().hrtimer_manager.remove_timer(current_task, self)?)
     }
 
     fn wait_canceler(&self, canceler: HandleWaitCanceler) -> WaitCanceler {
@@ -314,18 +316,36 @@ struct HrTimerNode {
     ///
     /// This is used to determine the order of the nodes in the heap.
     deadline: zx::Time,
+
+    /// The source where initiated this `HrTimer`.
+    ///
+    /// When the timer expires, the system will be woken up if necessary. The `on_wake` callback
+    /// will be triggered with a baton lease to prevent further suspend while Starnix handling the
+    /// wake event.
+    wake_source: Option<Weak<dyn OnWakeOps>>,
+
     hr_timer: HrTimerHandle,
 }
 
 impl HrTimerNode {
-    fn new(deadline: zx::Time, hr_timer: HrTimerHandle) -> Self {
-        Self { deadline, hr_timer }
+    fn new(
+        deadline: zx::Time,
+        wake_source: Option<Weak<dyn OnWakeOps>>,
+        hr_timer: HrTimerHandle,
+    ) -> Self {
+        Self { deadline, wake_source, hr_timer }
     }
 }
 
 impl PartialEq for HrTimerNode {
     fn eq(&self, other: &Self) -> bool {
-        self.deadline == other.deadline && Arc::ptr_eq(&self.hr_timer, &other.hr_timer)
+        self.deadline == other.deadline
+            && Arc::ptr_eq(&self.hr_timer, &other.hr_timer)
+            && match (self.wake_source.as_ref(), other.wake_source.as_ref()) {
+                (Some(this), Some(other)) => Weak::ptr_eq(this, other),
+                (None, None) => true,
+                _ => false,
+            }
     }
 }
 
@@ -465,10 +485,10 @@ mod tests {
             .add_timer(&current_task, None, &timer1, zx::Time::after(zx::Duration::from_seconds(1)))
             .is_ok());
 
-        assert!(hrtimer_manager.remove_timer(&current_task, None, &timer1).is_ok());
+        assert!(hrtimer_manager.remove_timer(&current_task, &timer1).is_ok());
         assert!(hrtimer_manager.current_deadline().is_some_and(|d| d == timer2_deadline));
 
-        assert!(hrtimer_manager.remove_timer(&current_task, None, &timer2).is_ok());
+        assert!(hrtimer_manager.remove_timer(&current_task, &timer2).is_ok());
         assert!(hrtimer_manager.current_deadline().is_some_and(|d| d == timer3_deadline));
     }
 
@@ -480,7 +500,7 @@ mod tests {
         assert!(hrtimer_manager
             .add_timer(&current_task, None, &timer, zx::Time::after(zx::Duration::from_seconds(1)))
             .is_ok());
-        assert!(hrtimer_manager.remove_timer(&current_task, None, &timer).is_ok());
+        assert!(hrtimer_manager.remove_timer(&current_task, &timer).is_ok());
         assert!(hrtimer_manager.current_deadline().is_none());
     }
 
@@ -505,9 +525,9 @@ mod tests {
     async fn hr_timer_node_cmp() {
         let time = zx::Time::after(zx::Duration::from_seconds(1));
         let timer1 = HrTimer::new();
-        let node1 = HrTimerNode::new(time, timer1.clone());
+        let node1 = HrTimerNode::new(time, None, timer1.clone());
         let timer2 = HrTimer::new();
-        let node2 = HrTimerNode::new(time, timer2.clone());
+        let node2 = HrTimerNode::new(time, None, timer2.clone());
 
         assert!(node1 != node2 && node1.cmp(&node2) != std::cmp::Ordering::Equal);
     }

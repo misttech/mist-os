@@ -5,18 +5,18 @@
 use crate::common::mac::WlanGi;
 use crate::error::Error;
 use anyhow::format_err;
+use fdf::ArenaStaticBox;
 use futures::channel::mpsc;
 use futures::Future;
 use ieee80211::MacAddr;
 use std::fmt::Display;
+use std::mem;
 use std::sync::Arc;
 use trace::Id as TraceId;
 use tracing::error;
 use wlan_common::mac::FrameControl;
 use wlan_common::{tx_vector, TimeUnit};
-use wlan_ffi_transport::{
-    EthernetRx, EthernetTx, FfiEthernetTx, FfiWlanRx, FinalizedBuffer, WlanRx, WlanTx,
-};
+use wlan_ffi_transport::{EthernetRx, EthernetTx, FfiEthernetTx, FfiWlanRx, WlanRx, WlanTx};
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_mlme as fidl_mlme,
     fidl_fuchsia_wlan_softmac as fidl_softmac, fuchsia_trace as trace, fuchsia_zircon as zx,
@@ -73,7 +73,7 @@ impl Device {
 
     fn flatten_and_log_error<T>(
         method_name: impl Display,
-        result: Result<Result<T, zx::zx_status_t>, fidl::Error>,
+        result: Result<Result<T, zx::sys::zx_status_t>, fidl::Error>,
     ) -> Result<T, zx::Status> {
         result
             .map_err(|fidl_error| {
@@ -114,11 +114,12 @@ pub trait DeviceOps {
         wlan_rx: WlanRx,
     ) -> impl Future<Output = Result<fidl::Channel, zx::Status>>;
     fn deliver_eth_frame(&mut self, packet: &[u8]) -> Result<(), zx::Status>;
-    /// Sends the given |buffer| as a frame over the air. If the caller does not pass an |async_id| to this
-    /// function, then this function will generate its own |async_id| and end the trace if an error occurs.
+    /// Sends the slice corresponding to |buffer| as a frame over the air. If the
+    /// caller does not pass an |async_id| to this function, then this function will
+    /// generate its own |async_id| and end the trace if an error occurs.
     fn send_wlan_frame(
         &mut self,
-        buffer: FinalizedBuffer,
+        buffer: ArenaStaticBox<[u8]>,
         tx_flags: fidl_softmac::WlanTxInfoFlags,
         async_id: Option<TraceId>,
     ) -> Result<(), zx::Status>;
@@ -352,7 +353,7 @@ impl DeviceOps for Device {
 
     fn send_wlan_frame(
         &mut self,
-        buffer: FinalizedBuffer,
+        buffer: ArenaStaticBox<[u8]>,
         mut tx_flags: fidl_softmac::WlanTxInfoFlags,
         async_id: Option<TraceId>,
     ) -> Result<(), zx::Status> {
@@ -364,6 +365,11 @@ impl DeviceOps for Device {
         });
         wtrace::duration!(c"Device::send_data_frame");
 
+        let (arena, mut buffer) = ArenaStaticBox::into_raw(buffer);
+
+        // Safety: buffer points to a valid allocation of a slice, and arena remains
+        // is always in scope while buffer is in use.
+        let buffer = unsafe { buffer.as_mut() };
         if buffer.len() < REQUIRED_WLAN_HEADER_LEN {
             let status = zx::Status::BUFFER_TOO_SMALL;
             if !async_id_provided {
@@ -371,7 +377,9 @@ impl DeviceOps for Device {
             }
             return Err(status);
         }
-        // Unwrap is safe since the byte slice is always the same size.
+        // Unwrap is safe because FrameControl is the correct size.
+        const _: () =
+            assert!(mem::size_of::<FrameControl>() == 2, "Size of FrameControl is not 2 bytes");
         let frame_control =
             zerocopy::Ref::<&[u8], FrameControl>::new(&buffer[0..=1]).unwrap().into_ref();
         if frame_control.protected() {
@@ -379,6 +387,7 @@ impl DeviceOps for Device {
         }
         let peer_addr: MacAddr = {
             let mut peer_addr = [0u8; 6];
+            // Safety: buffer is points to a slice of sufficient length
             peer_addr.copy_from_slice(&buffer[PEER_ADDR_OFFSET..PEER_ADDR_OFFSET + 6]);
             peer_addr.into()
         };
@@ -386,14 +395,14 @@ impl DeviceOps for Device {
 
         let tx_info = wlan_common::tx_vector::TxVector::from_idx(tx_vector_idx)
             .to_fidl_tx_info(tx_flags, self.minstrel.is_some());
-        // Safety: This call to `FinalizedBuffer::release` is safe because the `packet_address` is
-        // being sent to the C++ portion of wlansoftmac. If there is a FIDL error sending
-        // `packet_address`, indicating it was not sent, then `free(packet_address)` will be called.
-        let (packet_address, _free, packet_size) = unsafe { buffer.release() };
+        let packet_address = Some(buffer.as_ptr() as *mut u8 as u64);
+        let packet_size = Some(buffer.len() as u64);
+
         self.wlan_tx
             .transfer(&fidl_softmac::WlanTxTransferRequest {
-                packet_address: Some(packet_address as u64),
-                packet_size: Some(packet_size as u64),
+                arena: Some(arena.as_ptr() as u64),
+                packet_size,
+                packet_address,
                 packet_info: Some(tx_info),
                 async_id: Some(async_id.into()),
                 ..Default::default()
@@ -569,7 +578,6 @@ pub mod test_utils {
     use fuchsia_sync::Mutex;
     use paste::paste;
     use std::collections::VecDeque;
-    use wlan_ffi_transport::{BufferProvider, FakeFfiBufferProvider};
     use {
         fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
         fidl_fuchsia_wlan_internal as fidl_internal, fidl_fuchsia_wlan_sme as fidl_sme,
@@ -850,7 +858,7 @@ pub mod test_utils {
         pub config: FakeDeviceConfig,
         pub minstrel: Option<crate::MinstrelWrapper>,
         pub eth_queue: Vec<Vec<u8>>,
-        pub wlan_queue: Vec<(Vec<u8>, u32)>,
+        pub wlan_queue: Vec<(Vec<u8>, usize)>,
         pub wlan_softmac_ifc_bridge_proxy: Option<fidl_softmac::WlanSoftmacIfcBridgeProxy>,
         pub mlme_event_stream: Option<mpsc::UnboundedReceiver<fidl_mlme::MlmeEvent>>,
         pub mlme_request_sink: mpsc::UnboundedSender<wlan_sme::MlmeRequest>,
@@ -870,7 +878,6 @@ pub mod test_utils {
         pub beacon_config: Option<(Vec<u8>, usize, TimeUnit)>,
         pub link_status: LinkStatus,
         pub assocs: std::collections::HashMap<MacAddr, fidl_softmac::WlanAssociationConfig>,
-        pub buffer_provider: BufferProvider,
         pub install_key_results: VecDeque<Result<(), zx::Status>>,
         pub captured_update_wmm_parameters_request:
             Option<fidl_softmac::WlanSoftmacBaseUpdateWmmParametersRequest>,
@@ -919,7 +926,6 @@ pub mod test_utils {
                 beacon_config: None,
                 link_status: LinkStatus::DOWN,
                 assocs: std::collections::HashMap::new(),
-                buffer_provider: BufferProvider::new(FakeFfiBufferProvider::new()),
                 install_key_results: VecDeque::new(),
                 captured_update_wmm_parameters_request: None,
             }));
@@ -1029,7 +1035,7 @@ pub mod test_utils {
 
         fn send_wlan_frame(
             &mut self,
-            buffer: FinalizedBuffer,
+            buffer: ArenaStaticBox<[u8]>,
             _tx_flags: fidl_softmac::WlanTxInfoFlags,
             _async_id: Option<TraceId>,
         ) -> Result<(), zx::Status> {
@@ -1251,6 +1257,7 @@ pub mod test_utils {
 mod tests {
     use super::*;
     use crate::{ddk_converter, WlanTxPacketExt as _};
+    use fdf::Arena;
     use ieee80211::Ssid;
     use wlan_common::assert_variant;
     use {fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211};
@@ -1626,8 +1633,8 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn enable_disable_beaconing() {
         let (mut fake_device, fake_device_state) = FakeDevice::new().await;
-        let mut buffer =
-            fake_device_state.lock().buffer_provider.get_buffer(4).expect("error getting buffer");
+        let arena = Arena::new().expect("unable to create arena");
+        let mut buffer = arena.insert_default_slice::<u8>(4);
         buffer.copy_from_slice(&[1, 2, 3, 4][..]);
         let mac_frame = buffer.to_vec();
 

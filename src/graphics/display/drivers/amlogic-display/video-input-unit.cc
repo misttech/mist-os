@@ -632,7 +632,7 @@ void VideoInputUnit::SetMinimumRgb(uint8_t minimum_rgb) {
 
 void VideoInputUnit::ConfigAfbcDecoder(PixelGridSize2D layer_image_size) {
   // The format specifier must match the sysmem format modifier flags specified
-  // in DisplayEngine::DisplayControllerImplSetBufferCollectionConstraints().
+  // in DisplayEngine::DisplayEngineSetBufferCollectionConstraints().
   //
   // Note RGBA8888 works for both RGBA and BGRA formats. The color channels can
   // be reordered by setting MALI_UNPACK_CTRL register.

@@ -7,6 +7,7 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/loop.h>
 #include <lib/device-protocol/pci.h>
+#include <lib/driver/testing/cpp/scoped_global_logger.h>
 #include <lib/fidl/cpp/wire/channel.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <lib/stdcompat/span.h>
@@ -20,6 +21,7 @@
 #include <gtest/gtest.h>
 
 #include "src/devices/pci/testing/pci_protocol_fake.h"
+#include "src/lib/testing/predicates/status.h"
 
 namespace i915 {
 
@@ -34,6 +36,7 @@ class PciConfigOpRegionTest : public ::testing::Test {
   }
 
  protected:
+  fdf_testing::ScopedGlobalLogger logger_;
   async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
   pci::FakePciProtocol fake_pci_;
   ddk::Pci pci_;
@@ -52,7 +55,7 @@ TEST_F(PciConfigOpRegionTest, ReadMemoryOpRegionAddressUnsupported) {
   pci_.WriteConfig32(0xfc, 0);
 
   const zx::result<zx_paddr_t> address = pci_op_region_->ReadMemoryOpRegionAddress();
-  EXPECT_EQ(ZX_ERR_NOT_SUPPORTED, address.status_value()) << address.status_string();
+  EXPECT_STATUS(address, zx::error(ZX_ERR_NOT_SUPPORTED));
 }
 
 TEST_F(PciConfigOpRegionTest, ReadMemoryOpRegionAddressError) {
@@ -63,7 +66,7 @@ TEST_F(PciConfigOpRegionTest, ReadMemoryOpRegionAddressError) {
   PciConfigOpRegion disconnected_pci_op_region(disconnected_pci);
 
   const zx::result<zx_paddr_t> address = disconnected_pci_op_region.ReadMemoryOpRegionAddress();
-  EXPECT_EQ(ZX_ERR_PEER_CLOSED, address.status_value()) << address.status_string();
+  EXPECT_STATUS(address, zx::error(ZX_ERR_PEER_CLOSED));
 }
 
 TEST_F(PciConfigOpRegionTest, IsSystemControlInterruptInUse) {
@@ -85,12 +88,12 @@ TEST_F(PciConfigOpRegionTest, IsSystemControlInterruptInUseUnsupported) {
   {
     pci_.WriteConfig16(0xe8, 0x0000);
     const zx::result<bool> in_use = pci_op_region_->IsSystemControlInterruptInUse();
-    EXPECT_EQ(ZX_ERR_NOT_SUPPORTED, in_use.status_value());
+    EXPECT_STATUS(in_use, zx::error(ZX_ERR_NOT_SUPPORTED));
   }
   {
     pci_.WriteConfig16(0xe8, 0x0001);
     const zx::result<bool> in_use = pci_op_region_->IsSystemControlInterruptInUse();
-    EXPECT_EQ(ZX_ERR_NOT_SUPPORTED, in_use.status_value());
+    EXPECT_STATUS(in_use, zx::error(ZX_ERR_NOT_SUPPORTED));
   }
 }
 
@@ -102,7 +105,7 @@ TEST_F(PciConfigOpRegionTest, IsSystemControlInterruptInUseError) {
   PciConfigOpRegion disconnected_pci_op_region(disconnected_pci);
 
   const zx::result<bool> in_use = disconnected_pci_op_region.IsSystemControlInterruptInUse();
-  EXPECT_EQ(ZX_ERR_PEER_CLOSED, in_use.status_value()) << in_use.status_string();
+  EXPECT_STATUS(in_use, zx::error(ZX_ERR_PEER_CLOSED));
 }
 
 TEST_F(PciConfigOpRegionTest, TriggerSystemControlInterrupt) {
@@ -112,26 +115,26 @@ TEST_F(PciConfigOpRegionTest, TriggerSystemControlInterrupt) {
   ASSERT_TRUE(trigger_result.is_ok()) << trigger_result.status_string();
 
   uint16_t swsci_trigger_register = 0;
-  EXPECT_EQ(ZX_OK, pci_.ReadConfig16(0xe8, &swsci_trigger_register));
+  EXPECT_OK(pci_.ReadConfig16(0xe8, &swsci_trigger_register));
   EXPECT_EQ(0x8001, swsci_trigger_register);
 }
 
 TEST_F(PciConfigOpRegionTest, TriggerSystemControlInterruptInUse) {
   pci_.WriteConfig16(0xe8, 0x8001);
   const zx::result<> result = pci_op_region_->TriggerSystemControlInterrupt();
-  EXPECT_EQ(ZX_ERR_BAD_STATE, result.status_value()) << result.status_string();
+  EXPECT_STATUS(result, zx::error(ZX_ERR_BAD_STATE));
 }
 
 TEST_F(PciConfigOpRegionTest, TriggerSystemControlInterruptUnsupported) {
   {
     pci_.WriteConfig16(0xe8, 0x0000);
     const zx::result<> result = pci_op_region_->TriggerSystemControlInterrupt();
-    EXPECT_EQ(ZX_ERR_NOT_SUPPORTED, result.status_value()) << result.status_string();
+    EXPECT_STATUS(result, zx::error(ZX_ERR_NOT_SUPPORTED));
   }
   {
     pci_.WriteConfig16(0xe8, 0x0001);
     const zx::result<> result = pci_op_region_->TriggerSystemControlInterrupt();
-    EXPECT_EQ(ZX_ERR_NOT_SUPPORTED, result.status_value()) << result.status_string();
+    EXPECT_STATUS(result, zx::error(ZX_ERR_NOT_SUPPORTED));
   }
 }
 
@@ -143,7 +146,7 @@ TEST_F(PciConfigOpRegionTest, TriggerSystemControlInterruptPciError) {
   PciConfigOpRegion disconnected_pci_op_region(disconnected_pci);
 
   const zx::result<> result = disconnected_pci_op_region.TriggerSystemControlInterrupt();
-  EXPECT_EQ(ZX_ERR_PEER_CLOSED, result.status_value()) << result.status_string();
+  EXPECT_STATUS(result, zx::error(ZX_ERR_PEER_CLOSED));
 }
 
 }  // namespace

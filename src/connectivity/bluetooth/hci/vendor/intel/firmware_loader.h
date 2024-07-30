@@ -22,8 +22,9 @@ enum class SecureBootEngineType {
 class FirmwareLoader {
  public:
   // |cmd_channel| is expected to outlive this object.
-  FirmwareLoader(zx::channel* cmd_channel, zx::channel* acl_channel)
-      : hci_cmd_(cmd_channel), hci_acl_(acl_channel) {}
+  FirmwareLoader(fidl::SharedClient<fuchsia_hardware_bluetooth::HciTransport>& client,
+                 HciEventHandler& event_handler)
+      : hci_(client, event_handler) {}
   ~FirmwareLoader() = default;
 
   enum class LoadStatus {
@@ -59,9 +60,7 @@ class FirmwareLoader {
   bool ParseBseq();
 
   // The command channel from the USB transport
-  VendorHci hci_cmd_;
-  // The ACL data channel from the USB transport
-  VendorHci hci_acl_;
+  VendorHci hci_;
 };
 
 }  // namespace bt_hci_intel

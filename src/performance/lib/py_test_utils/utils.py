@@ -109,7 +109,6 @@ def single_run_test_component(
             host_output_path,
         ],
         test_component_args=test_component_args,
-        timeout=None,
         capture_output=False,
     )
     test_result_files = list(

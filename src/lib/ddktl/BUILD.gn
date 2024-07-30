@@ -9,6 +9,11 @@ group("tests") {
   deps = [ "tests" ]
 }
 
+group("drivers") {
+  testonly = true
+  deps = [ "tests:drivers" ]
+}
+
 config("include") {
   include_dirs = [ "include" ]
 }
@@ -22,6 +27,7 @@ source_set("ddktl") {
     "include/ddktl/fidl.h",
     "include/ddktl/init-txn.h",
     "include/ddktl/metadata.h",
+    "include/ddktl/metadata_server.h",
     "include/ddktl/resume-txn.h",
     "include/ddktl/suspend-txn.h",
     "include/ddktl/unbind-txn.h",
@@ -51,6 +57,12 @@ source_set("ddktl") {
 
       # <ddktl/device.h> has #include <lib/fidl_driver/cpp/transport.h>
       "//sdk/lib/fidl_driver:fidl_driver_transport",
+
+      # <ddktl/metadata_server.h> has #include <fidl/fuchsia.driver.metadata/cpp/fidl.h>
+      "//sdk/fidl/fuchsia.driver.metadata:fuchsia.driver.metadata_cpp",
+
+      # <ddktl/metadata_server.h> has #include <lib/component/outgoing/cpp/outgoing_directory.h>
+      "//sdk/lib/component/outgoing/cpp",
     ]
   }
 
@@ -195,7 +207,6 @@ source_set("ddktl") {
     "//src/devices/serial/drivers/aml-uart:*",
     "//src/devices/serial/drivers/ftdi:*",
     "//src/devices/serial/drivers/ftdi/test:*",
-    "//src/devices/serial/drivers/serial:*",
     "//src/devices/serial/drivers/uart16550:*",
     "//src/devices/serial/drivers/usb-cdc-acm:*",
     "//src/devices/serial/drivers/virtio-console:*",
@@ -270,7 +281,6 @@ source_set("ddktl") {
     "//src/graphics/display/drivers/goldfish-display:*",
     "//src/graphics/display/drivers/intel-i915:*",
     "//src/graphics/display/drivers/simple:*",
-    "//src/graphics/display/drivers/virtio-guest/v1:*",
     "//src/graphics/display/lib/driver-framework-migration-utils/*",
     "//src/graphics/display/lib/edid:*",
     "//src/graphics/drivers/aml-gpu:*",
@@ -283,7 +293,7 @@ source_set("ddktl") {
     "//src/graphics/drivers/msd-vsi-vip:*",
     "//src/graphics/lib/magma/src/sys_driver/dfv1:*",
     "//src/graphics/magma/lib/magma_service/sys_driver/dfv1:*",
-    "//src/lib/ddktl/tests:*",
+    "//src/lib/ddktl/tests/*",
     "//src/media/audio/drivers/aml-dsp:*",
     "//src/media/audio/drivers/aml-dsp/aml-g12-pdm-dsp:*",
     "//src/media/audio/drivers/aml-dsp/aml-g12-tdm-dsp:*",
@@ -320,6 +330,7 @@ source_set("ddktl") {
     "//src/ui/input/drivers/goldfish_sensor:*",
     "//src/ui/input/drivers/goodix:*",
     "//src/ui/input/drivers/gt6853:*",
+    "//src/ui/input/drivers/hid:*",
     "//src/ui/input/drivers/hid-input-report:*",
     "//src/ui/input/drivers/hidctl:*",
     "//src/ui/input/drivers/pc-ps2:*",

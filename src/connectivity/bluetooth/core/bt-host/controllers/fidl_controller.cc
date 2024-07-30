@@ -6,15 +6,14 @@
 
 #include "helpers.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/assert.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/byte_buffer.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/log.h"
-#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/trace.h"
-#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/iso/iso_common.h"
-#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/transport/slab_allocators.h"
 #include "zircon/status.h"
 
 namespace bt::controllers {
 
 namespace fhbt = fuchsia_hardware_bluetooth;
+using ReceivedPacket = fhbt::ReceivedPacket;
 
 namespace {
 pw::bluetooth::Controller::FeaturesBits VendorFeaturesToFeaturesBits(
@@ -90,8 +89,8 @@ fhbt::ScoSampleRate ScoSampleRateToFidl(pw::bluetooth::Controller::ScoSampleRate
 VendorEventHandler::VendorEventHandler(
     std::function<void(zx_status_t)> unbind_callback,
     std::function<void(fhbt::VendorFeatures)> on_vendor_connected_callback)
-    : unbind_callback_(unbind_callback),
-      on_vendor_connected_callback_(on_vendor_connected_callback) {}
+    : unbind_callback_(std::move(unbind_callback)),
+      on_vendor_connected_callback_(std::move(on_vendor_connected_callback)) {}
 
 void VendorEventHandler::handle_unknown_event(fidl::UnknownEventMetadata<fhbt::Vendor> metadata) {
   bt_log(WARN, "controllers", "Unknown event from Vendor server: %lu", metadata.event_ordinal);
@@ -106,10 +105,18 @@ void VendorEventHandler::OnFeatures(fidl::Event<fhbt::Vendor::OnFeatures>& event
   on_vendor_connected_callback_(event);
 }
 
-HciEventHandler::HciEventHandler(std::function<void(zx_status_t)> unbind_callback)
-    : unbind_callback_(unbind_callback) {}
+HciEventHandler::HciEventHandler(
+    std::function<void(zx_status_t)> unbind_callback,
+    std::function<void(fuchsia_hardware_bluetooth::ReceivedPacket)> on_receive_callback)
+    : on_receive_callback_(std::move(on_receive_callback)),
+      unbind_callback_(std::move(unbind_callback)) {}
 
-void HciEventHandler::handle_unknown_event(fidl::UnknownEventMetadata<fhbt::Hci> metadata) {
+void HciEventHandler::OnReceive(fuchsia_hardware_bluetooth::ReceivedPacket& packet) {
+  on_receive_callback_(std::move(packet));
+}
+
+void HciEventHandler::handle_unknown_event(
+    fidl::UnknownEventMetadata<fhbt::HciTransport> metadata) {
   bt_log(WARN, "controllers", "Unknown event from Hci server: %lu", metadata.event_ordinal);
 }
 
@@ -125,7 +132,10 @@ FidlController::FidlController(fidl::ClientEnd<fhbt::Vendor> vendor_client_end,
                               vendor_features_ = features;
                               ReportVendorFeaturesIfAvailable();
                             }),
-      hci_event_handler_([this](zx_status_t status) { OnError(status); }),
+      hci_event_handler_([this](zx_status_t status) { OnError(status); },
+                         [this](fhbt::ReceivedPacket packet) { OnReceive(std::move(packet)); }),
+      sco_event_handler_([this](zx_status_t status) { OnScoUnbind(status); },
+                         [this](fhbt::ScoPacket packet) { OnReceiveSco(std::move(packet)); }),
       dispatcher_(dispatcher) {
   BT_ASSERT(vendor_client_end.is_valid());
   vendor_client_end_ = std::move(vendor_client_end);
@@ -142,9 +152,9 @@ void FidlController::Initialize(PwStatusCallback complete_callback,
                                        &vendor_event_handler_);
 
   // Connect to Hci protocol
-  vendor_->OpenHci().ThenExactlyOnce([this](fidl::Result<fhbt::Vendor::OpenHci>& result) {
+  vendor_->OpenHciTransport().Then([this](fidl::Result<fhbt::Vendor::OpenHciTransport>& result) {
     if (!result.is_ok()) {
-      bt_log(ERROR, "bt-host", "Failed to open Hci: %s",
+      bt_log(ERROR, "bt-host", "Failed to open HciTransport: %s",
              result.error_value().FormatDescription().c_str());
       if (result.error_value().is_framework_error()) {
         OnError(result.error_value().framework_error().status());
@@ -158,82 +168,9 @@ void FidlController::Initialize(PwStatusCallback complete_callback,
   });
 }
 
-void FidlController::InitializeHci(fidl::ClientEnd<fhbt::Hci> hci_client_end) {
-  hci_ = fidl::Client<fhbt::Hci>(std::move(hci_client_end), dispatcher_, &hci_event_handler_);
-
-  zx::channel their_command_chan;
-  zx_status_t status = zx::channel::create(0, &command_channel_, &their_command_chan);
-  if (status != ZX_OK) {
-    bt_log(ERROR, "controllers", "Failed to create command channel");
-    OnError(status);
-    return;
-  }
-  hci_->OpenCommandChannel(std::move(their_command_chan))
-      .ThenExactlyOnce([](fidl::Result<fhbt::Hci::OpenCommandChannel>& result) {
-        if (!result.is_ok()) {
-          bt_log(ERROR, "controllers", "Failed to open command channel: %s",
-                 result.error_value().FormatDescription().c_str());
-        }
-      });
-  InitializeWait(command_wait_, command_channel_);
-
-  zx::channel their_acl_chan;
-  status = zx::channel::create(0, &acl_channel_, &their_acl_chan);
-  if (status != ZX_OK) {
-    bt_log(ERROR, "controllers", "Failed to create ACL channel");
-    OnError(status);
-    return;
-  }
-  hci_->OpenAclDataChannel(std::move(their_acl_chan))
-      .ThenExactlyOnce([](fidl::Result<fhbt::Hci::OpenAclDataChannel>& result) {
-        if (!result.is_ok()) {
-          bt_log(ERROR, "controllers", "Failed to open ACL data channel: %s",
-                 result.error_value().FormatDescription().c_str());
-        }
-      });
-  InitializeWait(acl_wait_, acl_channel_);
-
-  zx::channel their_sco_chan;
-  status = zx::channel::create(0, &sco_channel_, &their_sco_chan);
-  if (status != ZX_OK) {
-    bt_log(ERROR, "controllers", "Failed to create SCO channel");
-    OnError(status);
-    return;
-  }
-  hci_->OpenScoDataChannel(std::move(their_sco_chan))
-      .ThenExactlyOnce([this](fidl::Result<fhbt::Hci::OpenScoDataChannel>& result) {
-        if (!result.is_ok()) {
-          // Non-fatal - may simply indicate a lack of SCO data support
-          // in the driver.
-          bt_log(INFO, "controllers", "Failed to open SCO data channel: %s",
-                 result.error_value().FormatDescription().c_str());
-          sco_channel_.reset();
-        } else {
-          InitializeWait(sco_wait_, sco_channel_);
-        }
-      });
-
-  zx::channel their_iso_chan;
-  status = zx::channel::create(0, &iso_channel_, &their_iso_chan);
-  if (status != ZX_OK) {
-    bt_log(ERROR, "controllers", "Failed to create ISO channel");
-    OnError(status);
-    return;
-  }
-  hci_->OpenIsoDataChannel(std::move(their_iso_chan))
-      .ThenExactlyOnce([this](fidl::Result<fhbt::Hci::OpenIsoDataChannel>& result) {
-        if (!result.is_ok()) {
-          // Non-fatal - may simply indicate a lack of ISO data support
-          // in the driver.
-          bt_log(INFO, "controllers", "Failed to open ISO data channel: %s",
-                 result.error_value().FormatDescription().c_str());
-          iso_channel_.reset();
-        } else {
-          // Don't wait on channel signals until we have confirmation from
-          // the driver that the channel has been established. b/328504823
-          InitializeWait(iso_wait_, iso_channel_);
-        }
-      });
+void FidlController::InitializeHci(fidl::ClientEnd<fhbt::HciTransport> hci_client_end) {
+  hci_ =
+      fidl::Client<fhbt::HciTransport>(std::move(hci_client_end), dispatcher_, &hci_event_handler_);
 
   initialize_complete_cb_(PW_STATUS_OK);
 }
@@ -244,87 +181,123 @@ void FidlController::Close(PwStatusCallback callback) {
 }
 
 void FidlController::SendCommand(pw::span<const std::byte> command) {
-  zx_status_t status =
-      command_channel_.write(/*flags=*/0, command.data(), static_cast<uint32_t>(command.size()),
-                             /*handles=*/nullptr, /*num_handles=*/0);
-  if (status != ZX_OK) {
-    bt_log(ERROR, "controllers", "failed to write command channel: %s",
-           zx_status_get_string(status));
-    OnError(status);
-    return;
-  }
+  BufferView view = BufferView(command);
+  fidl::VectorView vec_view =
+      fidl::VectorView<uint8_t>::FromExternal(const_cast<uint8_t*>(view.data()), view.size());
+  fidl::ObjectView obj_view = fidl::ObjectView<fidl::VectorView<uint8_t>>::FromExternal(&vec_view);
+  // Use Wire bindings to avoid copying `command`.
+  hci_.wire()
+      ->Send(fhbt::wire::SentPacket::WithCommand(obj_view))
+      .Then([this](fidl::WireUnownedResult<fhbt::HciTransport::Send>& result) {
+        if (!result.ok()) {
+          bt_log(ERROR, "controllers", "failed to send command: %s", result.status_string());
+          OnError(result.status());
+          return;
+        }
+      });
 }
 
 void FidlController::SendAclData(pw::span<const std::byte> data) {
-  zx_status_t status =
-      acl_channel_.write(/*flags=*/0, data.data(), static_cast<uint32_t>(data.size()),
-                         /*handles=*/nullptr, /*num_handles=*/0);
-  if (status != ZX_OK) {
-    bt_log(ERROR, "controllers", "failed to write ACL channel: %s", zx_status_get_string(status));
-    OnError(status);
-    return;
-  }
+  BufferView view = BufferView(data);
+  fidl::VectorView vec_view =
+      fidl::VectorView<uint8_t>::FromExternal(const_cast<uint8_t*>(view.data()), view.size());
+  fidl::ObjectView obj_view = fidl::ObjectView<fidl::VectorView<uint8_t>>::FromExternal(&vec_view);
+  // Use Wire bindings to avoid copying `data`.
+  hci_.wire()
+      ->Send(fhbt::wire::SentPacket::WithAcl(obj_view))
+      .Then([this](fidl::WireUnownedResult<fhbt::HciTransport::Send>& result) {
+        if (!result.ok()) {
+          bt_log(ERROR, "controllers", "failed to send ACL: %s", result.status_string());
+          OnError(result.status());
+          return;
+        }
+      });
 }
 
 void FidlController::SendScoData(pw::span<const std::byte> data) {
-  zx_status_t status =
-      sco_channel_.write(/*flags=*/0, data.data(), static_cast<uint32_t>(data.size()),
-                         /*handles=*/nullptr, /*num_handles=*/0);
-
-  if (status != ZX_OK) {
-    bt_log(ERROR, "controllers", "failed to write SCO channel: %s", zx_status_get_string(status));
-    OnError(status);
+  if (!sco_connection_) {
+    bt_log(ERROR, "controllers", "SendScoData() called when SCO is not configured");
+    OnError(ZX_ERR_BAD_STATE);
     return;
   }
+  BufferView view = BufferView(data);
+  fidl::VectorView vec_view =
+      fidl::VectorView<uint8_t>::FromExternal(const_cast<uint8_t*>(view.data()), view.size());
+  // Use Wire bindings to avoid copying `data`.
+  sco_connection_.value().wire()->Send(vec_view).Then(
+      [this](fidl::WireUnownedResult<fhbt::ScoConnection::Send>& result) {
+        if (!result.ok()) {
+          bt_log(ERROR, "controllers", "failed to send SCO: %s", result.status_string());
+          OnError(result.status());
+          return;
+        }
+      });
 }
 
 void FidlController::SendIsoData(pw::span<const std::byte> data) {
-  zx_status_t status =
-      iso_channel_.write(/*flags=*/0, data.data(), static_cast<uint32_t>(data.size()),
-                         /*handles=*/nullptr, /*num_handles=*/0);
-
-  if (status != ZX_OK) {
-    bt_log(ERROR, "controllers", "failed to write ISO channel: %s", zx_status_get_string(status));
-    OnError(status);
-    return;
-  }
+  BufferView view = BufferView(data);
+  fidl::VectorView vec_view =
+      fidl::VectorView<uint8_t>::FromExternal(const_cast<uint8_t*>(view.data()), view.size());
+  fidl::ObjectView obj_view = fidl::ObjectView<fidl::VectorView<uint8_t>>::FromExternal(&vec_view);
+  // Use Wire bindings to avoid copying `data`.
+  hci_.wire()
+      ->Send(fhbt::wire::SentPacket::WithIso(obj_view))
+      .Then([this](fidl::WireUnownedResult<fhbt::HciTransport::Send>& result) {
+        if (!result.ok()) {
+          bt_log(ERROR, "controllers", "failed to send ISO: %s", result.status_string());
+          OnError(result.status());
+          return;
+        }
+      });
 }
 
 void FidlController::ConfigureSco(ScoCodingFormat coding_format, ScoEncoding encoding,
                                   ScoSampleRate sample_rate, PwStatusCallback callback) {
-  hci_->ConfigureSco({ScoCodingFormatToFidl(coding_format), ScoEncodingToFidl(encoding),
-                      ScoSampleRateToFidl(sample_rate)})
-      .ThenExactlyOnce(
-          [cb = std::move(callback)](fidl::Result<fhbt::Hci::ConfigureSco>& result) mutable {
-            if (!result.is_ok()) {
-              bt_log(ERROR, "controllers", "Failed to configure SCO: %s",
-                     result.error_value().FormatDescription().c_str());
-              if (result.error_value().is_framework_error()) {
-                cb(ZxStatusToPwStatus(result.error_value().framework_error().status()));
-              } else {
-                cb(ZxStatusToPwStatus(result.error_value().domain_error()));
-              }
-              return;
-            }
-            cb(ZxStatusToPwStatus(ZX_OK));
-          });
+  if (sco_connection_) {
+    callback(pw::Status::AlreadyExists());
+    return;
+  }
+
+  fidl::Request<fhbt::HciTransport::ConfigureSco> request;
+  request.coding_format() = ScoCodingFormatToFidl(coding_format);
+  request.encoding() = ScoEncodingToFidl(encoding);
+  request.sample_rate() = ScoSampleRateToFidl(sample_rate);
+
+  auto [client_end, server_end] = fidl::CreateEndpoints<fhbt::ScoConnection>().value();
+  request.connection() = std::move(server_end);
+  sco_connection_ = fidl::Client(std::move(client_end), dispatcher_, &sco_event_handler_);
+
+  fit::result<::fidl::OneWayError> result = hci_->ConfigureSco(std::move(request));
+
+  if (!result.is_ok()) {
+    bt_log(WARN, "controllers", "Failed to configure SCO: %s",
+           result.error_value().FormatDescription().c_str());
+    sco_connection_.reset();
+    callback(ZxStatusToPwStatus(result.error_value().status()));
+    return;
+  }
+
+  callback(ZxStatusToPwStatus(ZX_OK));
 }
 
 void FidlController::ResetSco(pw::Callback<void(pw::Status)> callback) {
-  hci_->ResetSco().ThenExactlyOnce(
-      [cb = std::move(callback)](fidl::Result<fhbt::Hci::ResetSco>& result) mutable {
-        if (!result.is_ok()) {
-          bt_log(ERROR, "controllers", "Failed to reset SCO: %s",
-                 result.error_value().FormatDescription().c_str());
-          if (result.error_value().is_framework_error()) {
-            cb(ZxStatusToPwStatus(result.error_value().framework_error().status()));
-          } else {
-            cb(ZxStatusToPwStatus(result.error_value().domain_error()));
-          }
-          return;
-        }
-        cb(ZxStatusToPwStatus(ZX_OK));
-      });
+  if (!sco_connection_) {
+    bt_log(WARN, "controllers", "ResetSco(): no SCO connection configured");
+    callback(pw::Status::FailedPrecondition());
+    return;
+  }
+  if (reset_sco_cb_) {
+    bt_log(WARN, "controllers", "ResetSco(): already pending", );
+    callback(pw::Status::AlreadyExists());
+    return;
+  }
+  reset_sco_cb_ = std::move(callback);
+
+  fit::result<fidl::OneWayError> result = sco_connection_.value()->Stop();
+  if (result.is_error()) {
+    OnError(ZX_ERR_BAD_STATE);
+    return;
+  }
 }
 
 void FidlController::GetFeatures(pw::Callback<void(FidlController::FeaturesBits)> callback) {
@@ -352,22 +325,87 @@ void FidlController::EncodeVendorCommand(
 
   auto command = fhbt::VendorCommand::WithSetAclPriority(priority_params);
 
-  vendor_->EncodeCommand(std::move(command))
-      .ThenExactlyOnce(
-          [cb = std::move(callback)](fidl::Result<fhbt::Vendor::EncodeCommand>& result) mutable {
-            if (!result.is_ok()) {
-              bt_log(ERROR, "controllers", "Failed to encode vendor command: %s",
-                     result.error_value().FormatDescription().c_str());
-              if (result.error_value().is_framework_error()) {
-                cb(ZxStatusToPwStatus(result.error_value().framework_error().status()));
-              } else {
-                cb(ZxStatusToPwStatus(result.error_value().domain_error()));
-              }
-              return;
-            }
-            auto span = pw::as_bytes(pw::span(result->encoded()));
-            cb(span);
-          });
+  vendor_->EncodeCommand(command).Then(
+      [cb = std::move(callback)](fidl::Result<fhbt::Vendor::EncodeCommand>& result) mutable {
+        if (!result.is_ok()) {
+          bt_log(ERROR, "controllers", "Failed to encode vendor command: %s",
+                 result.error_value().FormatDescription().c_str());
+          if (result.error_value().is_framework_error()) {
+            cb(ZxStatusToPwStatus(result.error_value().framework_error().status()));
+          } else {
+            cb(ZxStatusToPwStatus(result.error_value().domain_error()));
+          }
+          return;
+        }
+        auto span = pw::as_bytes(pw::span(result->encoded()));
+        cb(span);
+      });
+}
+
+void FidlController::ScoEventHandler::OnReceive(fhbt::ScoPacket& packet) {
+  on_receive_callback_(std::move(packet));
+}
+
+void FidlController::ScoEventHandler::on_fidl_error(fidl::UnbindInfo error) {
+  bt_log(DEBUG, "controllers", "SCO protocol closed: %s", error.FormatDescription().c_str());
+  unbind_callback_(ZX_ERR_PEER_CLOSED);
+}
+
+void FidlController::ScoEventHandler::handle_unknown_event(
+    fidl::UnknownEventMetadata<fhbt::ScoConnection> metadata) {
+  bt_log(WARN, "controllers", "Unknown event from ScoConnection server: %lu",
+         metadata.event_ordinal);
+}
+
+FidlController::ScoEventHandler::ScoEventHandler(
+    pw::Function<void(zx_status_t)> unbind_callback,
+    pw::Function<void(fuchsia_hardware_bluetooth::ScoPacket)> on_receive_callback)
+    : on_receive_callback_(std::move(on_receive_callback)),
+      unbind_callback_(std::move(unbind_callback)) {}
+
+void FidlController::OnReceive(ReceivedPacket packet) {
+  switch (packet.Which()) {
+    case ReceivedPacket::Tag::kEvent:
+      event_cb_(BufferView(packet.event().value()).subspan());
+      break;
+    case ReceivedPacket::Tag::kAcl:
+      acl_cb_(BufferView(packet.acl().value()).subspan());
+      break;
+    case ReceivedPacket::Tag::kIso:
+      iso_cb_(BufferView(packet.iso().value()).subspan());
+      break;
+    default:
+      bt_log(WARN, "controllers", "OnReceive: unknown packet type %lu",
+             static_cast<uint64_t>(packet.Which()));
+  }
+  fit::result<fidl::OneWayError> result = hci_->AckReceive();
+  if (result.is_error()) {
+    OnError(ZX_ERR_IO);
+  }
+}
+
+void FidlController::OnReceiveSco(fuchsia_hardware_bluetooth::ScoPacket packet) {
+  fit::result<fidl::OneWayError> result = sco_connection_.value()->AckReceive();
+  if (result.is_error()) {
+    OnError(ZX_ERR_IO);
+    return;
+  }
+  sco_cb_(BufferView(packet.packet()).subspan());
+}
+
+void FidlController::OnScoUnbind(zx_status_t status) {
+  // The server shouldn't close a ScoConnection on its own. It should only close after the host
+  // calls Stop().
+  if (!reset_sco_cb_) {
+    bt_log(ERROR, "controllers", "ScoConnection closed unexpectedly (Stop() not called): %s",
+           zx_status_get_string(status));
+    OnError(ZX_ERR_BAD_STATE);
+    return;
+  }
+  bt_log(DEBUG, "controllers", "ScoConnection closed");
+  sco_connection_.reset();
+  reset_sco_cb_(pw::OkStatus());
+  reset_sco_cb_ = nullptr;
 }
 
 void FidlController::ReportVendorFeaturesIfAvailable() {
@@ -376,9 +414,6 @@ void FidlController::ReportVendorFeaturesIfAvailable() {
   }
 
   FidlController::FeaturesBits features_bits = VendorFeaturesToFeaturesBits(*vendor_features_);
-  if (iso_channel_.is_valid()) {
-    features_bits |= FeaturesBits::kHciIso;
-  }
 
   (*get_features_callback_)(features_bits);
   get_features_callback_.reset();
@@ -388,10 +423,6 @@ void FidlController::ReportVendorFeaturesIfAvailable() {
 
 void FidlController::OnError(zx_status_t status) {
   CleanUp();
-  if (hci_.is_valid())
-    auto hci_endpoint = hci_.UnbindMaybeGetEndpoint();
-  if (vendor_.is_valid())
-    auto vendor_endpoint = vendor_.UnbindMaybeGetEndpoint();
 
   // If |initialize_complete_cb_| has already been called, then initialization is complete and we
   // use |error_cb_|
@@ -410,185 +441,16 @@ void FidlController::CleanUp() {
   }
   shutting_down_ = true;
 
-  // Waits need to be canceled before the underlying channels are destroyed.
-  acl_wait_.Cancel();
-  sco_wait_.Cancel();
-  iso_wait_.Cancel();
-  command_wait_.Cancel();
-
-  acl_channel_.reset();
-  sco_channel_.reset();
-  iso_channel_.reset();
-  command_channel_.reset();
-}
-
-void FidlController::InitializeWait(async::WaitBase& wait, zx::channel& channel) {
-  BT_ASSERT(channel.is_valid());
-  wait.Cancel();
-  wait.set_object(channel.get());
-  wait.set_trigger(ZX_CHANNEL_READABLE | ZX_CHANNEL_PEER_CLOSED);
-  BT_ASSERT(wait.Begin(dispatcher_) == ZX_OK);
-}
-
-void FidlController::OnChannelSignal(const char* chan_name, async::WaitBase* wait,
-                                     pw::span<std::byte> buffer, zx::channel& channel,
-                                     DataFunction& data_cb) {
-  uint32_t actual_size;
-  zx_status_t read_status =
-      channel.read(/*flags=*/0u, /*bytes=*/buffer.data(), /*handles=*/nullptr,
-                   /*num_bytes=*/static_cast<uint32_t>(buffer.size()), /*num_handles=*/0,
-                   /*actual_bytes=*/&actual_size,
-                   /*actual_handles=*/nullptr);
-
-  if (read_status != ZX_OK) {
-    bt_log(ERROR, "controllers", "%s channel: failed to read RX bytes: %s", chan_name,
-           zx_status_get_string(read_status));
-    OnError(read_status);
-    return;
+  if (hci_) {
+    auto hci_endpoint = hci_.UnbindMaybeGetEndpoint();
   }
-
-  if (data_cb) {
-    data_cb(buffer.subspan(0, actual_size));
-  } else {
-    bt_log(WARN, "controllers", "Dropping packet received on %s channel (no rx callback set)",
-           chan_name);
+  if (vendor_) {
+    auto vendor_endpoint = vendor_.UnbindMaybeGetEndpoint();
   }
-
-  // The data callback above may trigger the controller to shut down (e.g., if it triggers a write
-  // to a command channel as the response to a received event). Verify that the channel hasn't been
-  // closed before we attempt to wait on it.
-  if (shutting_down_) {
-    return;
+  if (sco_connection_) {
+    auto sco_endpoint = sco_connection_->UnbindMaybeGetEndpoint();
+    sco_connection_.reset();
   }
-
-  // The wait needs to be restarted after every signal.
-  zx_status_t wait_status = wait->Begin(dispatcher_);
-  if (wait_status != ZX_OK) {
-    bt_log(ERROR, "controllers", "%s wait error: %s", chan_name, zx_status_get_string(wait_status));
-    OnError(wait_status);
-    return;
-  }
-}
-
-void FidlController::OnAclSignal(async_dispatcher_t* /*dispatcher*/, async::WaitBase* wait,
-                                 zx_status_t status, const zx_packet_signal_t* signal) {
-  const char* kChannelName = "ACL";
-  TRACE_DURATION("bluetooth", "FidlController::OnAclSignal");
-
-  if (status != ZX_OK) {
-    bt_log(ERROR, "controllers", "%s channel error: %s", kChannelName,
-           zx_status_get_string(status));
-    OnError(status);
-    return;
-  }
-  if (signal->observed & ZX_CHANNEL_PEER_CLOSED) {
-    bt_log(ERROR, "controllers", "%s channel closed", kChannelName);
-    OnError(ZX_ERR_PEER_CLOSED);
-    return;
-  }
-  BT_ASSERT(signal->observed & ZX_CHANNEL_READABLE);
-
-  // Allocate a buffer for the packet. Since we don't know the size beforehand we allocate the
-  // largest possible buffer.
-  std::byte packet[hci::allocators::kLargeACLDataPacketSize];
-  OnChannelSignal(kChannelName, wait, packet, acl_channel_, acl_cb_);
-}
-
-void FidlController::OnCommandSignal(async_dispatcher_t* /*dispatcher*/, async::WaitBase* wait,
-                                     zx_status_t status, const zx_packet_signal_t* signal) {
-  const char* kChannelName = "command";
-  TRACE_DURATION("bluetooth", "FidlController::OnCommandSignal");
-
-  if (status != ZX_OK) {
-    bt_log(ERROR, "controllers", "%s channel error: %s", kChannelName,
-           zx_status_get_string(status));
-    OnError(status);
-    return;
-  }
-  if (signal->observed & ZX_CHANNEL_PEER_CLOSED) {
-    bt_log(ERROR, "controllers", "%s channel closed", kChannelName);
-    OnError(ZX_ERR_PEER_CLOSED);
-    return;
-  }
-  BT_ASSERT(signal->observed & ZX_CHANNEL_READABLE);
-
-  // Allocate a buffer for the packet. Since we don't know the size beforehand we allocate the
-  // largest possible buffer.
-  constexpr uint32_t kMaxEventPacketSize =
-      hci_spec::kMaxEventPacketPayloadSize + sizeof(hci_spec::EventHeader);
-  std::byte packet[kMaxEventPacketSize];
-  OnChannelSignal(kChannelName, wait, packet, command_channel_, event_cb_);
-}
-
-void FidlController::OnScoSignal(async_dispatcher_t* /*dispatcher*/, async::WaitBase* wait,
-                                 zx_status_t status, const zx_packet_signal_t* signal) {
-  const char* kChannelName = "SCO";
-  TRACE_DURATION("bluetooth", "FidlController::OnScoSignal");
-
-  if (status != ZX_OK) {
-    bt_log(ERROR, "controllers", "%s channel error: %s", kChannelName,
-           zx_status_get_string(status));
-    OnError(status);
-    return;
-  }
-  if (signal->observed & ZX_CHANNEL_PEER_CLOSED) {
-    bt_log(ERROR, "controllers", "%s channel closed", kChannelName);
-    OnError(ZX_ERR_PEER_CLOSED);
-    return;
-  }
-  BT_ASSERT(signal->observed & ZX_CHANNEL_READABLE);
-
-  // Allocate a buffer for the packet. Since we don't know the size beforehand we allocate the
-  // largest possible buffer.
-  constexpr uint32_t kMaxScoPacketSize =
-      hci_spec::kMaxSynchronousDataPacketPayloadSize + sizeof(hci_spec::SynchronousDataHeader);
-  std::byte packet[kMaxScoPacketSize];
-  OnChannelSignal(kChannelName, wait, packet, sco_channel_, sco_cb_);
-}
-
-void FidlController::OnIsoSignal(async_dispatcher_t* /*dispatcher*/, async::WaitBase* wait,
-                                 zx_status_t status, const zx_packet_signal_t* signal) {
-  const char* kChannelName = "ISO";
-  TRACE_DURATION("bluetooth", "FidlController::OnIsoSignal");
-
-  if (status != ZX_OK) {
-    bt_log(ERROR, "controllers", "%s channel error: %s", kChannelName,
-           zx_status_get_string(status));
-    OnError(status);
-    return;
-  }
-  if (signal->observed & ZX_CHANNEL_PEER_CLOSED) {
-    bt_log(ERROR, "controllers", "%s channel closed", kChannelName);
-    OnError(ZX_ERR_PEER_CLOSED);
-    return;
-  }
-  BT_ASSERT(signal->observed & ZX_CHANNEL_READABLE);
-
-  // Isochronous data frames can be quite large (16KB), so dynamically allocate only what is needed.
-  uint32_t read_size = 0;
-  zx_status_t read_status =
-      iso_channel_.read(/*flags=*/0u, /*bytes=*/nullptr, /*handles=*/nullptr, /*num_bytes=*/0u,
-                        /*num_handles=*/0, &read_size, /*actual_handles=*/nullptr);
-  if (read_status == ZX_OK) {
-    bt_log(WARN, "controllers", "%s channel: read 0-length packet, ignoring", kChannelName);
-    return;
-  }
-  if (read_status != ZX_ERR_BUFFER_TOO_SMALL) {
-    bt_log(ERROR, "controllers", "%s channel: failed to read packet size: %s", kChannelName,
-           zx_status_get_string(read_status));
-    OnError(read_status);
-    return;
-  }
-  if (read_size > iso::kMaxIsochronousDataPacketSize) {
-    bt_log(ERROR, "controllers", "%s channel: packet size (%d) exceeds maximum (%zu)", kChannelName,
-           read_size, iso::kMaxIsochronousDataPacketSize);
-    OnError(read_status);
-    return;
-  }
-
-  std::unique_ptr<std::byte[]> buffer_ptr = std::make_unique<std::byte[]>(read_size);
-  pw::span<std::byte> packet{buffer_ptr.get(), read_size};
-  OnChannelSignal(kChannelName, wait, packet, iso_channel_, iso_cb_);
 }
 
 }  // namespace bt::controllers

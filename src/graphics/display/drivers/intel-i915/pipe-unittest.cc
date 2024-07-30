@@ -4,6 +4,7 @@
 
 #include "src/graphics/display/drivers/intel-i915/pipe.h"
 
+#include <lib/driver/testing/cpp/scoped_global_logger.h>
 #include <lib/mmio-ptr/fake.h>
 #include <lib/mmio/mmio.h>
 #include <lib/sysmem-version/sysmem-version.h>
@@ -30,6 +31,7 @@ class PipeTest : public ::testing::Test {
 
  protected:
   constexpr static uint32_t kMinimumRegCount = 0xd0000 / sizeof(uint32_t);
+  fdf_testing::ScopedGlobalLogger logger_;
   ddk_fake::FakeMmioRegRegion reg_region_{sizeof(uint32_t), kMinimumRegCount};
   std::optional<fdf::MmioBuffer> mmio_buffer_;
 };
@@ -64,13 +66,12 @@ const GttRegion& GetGttImageHandle(const image_metadata_t& image_metadata, uint6
   return region_map.try_emplace(image_handle, image_handle).first->second;
 }
 
-layer_t CreatePrimaryLayerConfig(uint64_t handle, uint32_t z_index = 1u) {
+layer_t CreatePrimaryLayerConfig(uint64_t handle) {
   uint32_t kWidth = 1024u;
   uint32_t kHeight = 768u;
 
   layer_t layer;
   layer.type = LAYER_TYPE_PRIMARY;
-  layer.z_index = z_index;
   layer.cfg.primary = {
       .image_handle = handle,
       .image_metadata =
@@ -110,9 +111,9 @@ TEST_F(PipeTest, GetVsyncConfigStamp) {
   uint64_t kImageHandle1 = 0x1111u;
   uint64_t kImageHandle2 = 0x2222u;
   uint64_t kImageHandle3 = 0x3333u;
-  layer_t layer_1 = CreatePrimaryLayerConfig(kImageHandle1, 1u);
-  layer_t layer_2 = CreatePrimaryLayerConfig(kImageHandle2, 1u);
-  layer_t layer_3 = CreatePrimaryLayerConfig(kImageHandle3, 2u);
+  layer_t layer_1 = CreatePrimaryLayerConfig(kImageHandle1);
+  layer_t layer_2 = CreatePrimaryLayerConfig(kImageHandle2);
+  layer_t layer_3 = CreatePrimaryLayerConfig(kImageHandle3);
 
   // Applies configuration with only one layer (layer_1).
   const layer_t test_layers_1[] = {layer_1};

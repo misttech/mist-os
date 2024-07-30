@@ -8,9 +8,9 @@
 import argparse
 import json
 import os
-from pathlib import Path
 import subprocess
 import sys
+from pathlib import Path
 
 import rust
 from rust import HOST_PLATFORM, ROOT_PATH

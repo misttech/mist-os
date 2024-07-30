@@ -12,6 +12,7 @@ use async_trait::async_trait;
 use fidl_fuchsia_component_decl as fdecl;
 use hooks::Hooks;
 use moniker::Moniker;
+use routing::bedrock::structured_dict::ComponentInput;
 use routing::environment::{DebugRegistry, RunnerRegistry};
 use routing_test_helpers::instantiate_global_policy_checker_tests;
 use routing_test_helpers::policy::GlobalPolicyCheckerTest;
@@ -27,6 +28,7 @@ impl GlobalPolicyCheckerTest<ComponentInstance> for GlobalPolicyCheckerTestForCm
     async fn make_component(&self, moniker: Moniker) -> Arc<ComponentInstance> {
         let top_instance = Arc::new(ComponentManagerInstance::new(vec![], vec![]));
         ComponentInstance::new(
+            ComponentInput::default(),
             Arc::new(Environment::new_root(
                 &top_instance,
                 RunnerRegistry::default(),

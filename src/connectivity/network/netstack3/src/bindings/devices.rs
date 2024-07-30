@@ -7,25 +7,29 @@ use std::fmt::{self, Debug, Display};
 use std::num::NonZeroU64;
 use std::ops::{Deref as _, DerefMut as _};
 
+use super::util::NeedsDataWatcher;
+use super::DeviceIdExt;
 use assert_matches::assert_matches;
 use derivative::Derivative;
-use log::warn;
+use futures::future::FusedFuture;
+use futures::{FutureExt as _, StreamExt as _};
 use net_types::ethernet::Mac;
 use net_types::ip::{IpAddr, Mtu};
 use net_types::{SpecifiedAddr, UnicastAddr};
 use netstack3_core::device::{
-    DeviceClassMatcher, DeviceId, DeviceIdAndNameMatcher, DeviceProvider, DeviceSendFrameError,
-    LoopbackDeviceId,
+    BatchSize, DeviceClassMatcher, DeviceId, DeviceIdAndNameMatcher, DeviceProvider,
+    DeviceSendFrameError, EthernetLinkDevice, LoopbackDeviceId, PureIpDevice, WeakDeviceId,
 };
 use netstack3_core::sync::{Mutex as CoreMutex, RwLock as CoreRwLock};
 use netstack3_core::types::WorkQueueReport;
+
 use {
     fidl_fuchsia_hardware_network as fhardware_network,
     fidl_fuchsia_net_interfaces as fnet_interfaces, fuchsia_zircon as zx,
 };
 
 use crate::bindings::util::NeedsDataNotifier;
-use crate::bindings::{interfaces_admin, neighbor_worker, BindingsCtx, Ctx};
+use crate::bindings::{interfaces_admin, neighbor_worker, netdevice_worker, BindingsCtx, Ctx};
 
 pub(crate) const LOOPBACK_MAC: Mac = Mac::new([0, 0, 0, 0, 0, 0]);
 
@@ -110,7 +114,32 @@ impl Devices<DeviceId<BindingsCtx>> {
     }
 }
 
-/// Device specific iformation.
+/// Owned device specific information
+pub(crate) enum OwnedDeviceSpecificInfo {
+    Loopback(LoopbackInfo),
+    Ethernet(EthernetInfo),
+    PureIp(PureIpDeviceInfo),
+}
+
+impl From<LoopbackInfo> for OwnedDeviceSpecificInfo {
+    fn from(info: LoopbackInfo) -> Self {
+        Self::Loopback(info)
+    }
+}
+
+impl From<EthernetInfo> for OwnedDeviceSpecificInfo {
+    fn from(info: EthernetInfo) -> Self {
+        Self::Ethernet(info)
+    }
+}
+
+impl From<PureIpDeviceInfo> for OwnedDeviceSpecificInfo {
+    fn from(info: PureIpDeviceInfo) -> Self {
+        Self::PureIp(info)
+    }
+}
+
+/// Borrowed device specific information.
 #[derive(Debug)]
 pub(crate) enum DeviceSpecificInfo<'a> {
     Loopback(&'a LoopbackInfo),
@@ -154,51 +183,201 @@ pub(crate) fn spawn_rx_task(
     mut ctx: Ctx,
     device_id: &LoopbackDeviceId<BindingsCtx>,
 ) -> fuchsia_async::Task<()> {
-    let watcher = notifier.watcher();
+    let mut watcher = notifier.watcher();
     let device_id = device_id.downgrade();
 
-    fuchsia_async::Task::spawn(crate::bindings::util::yielding_data_notifier_loop(
-        watcher,
-        move || {
-            device_id
-                .upgrade()
-                .map(|device_id| ctx.api().receive_queue().handle_queued_frames(&device_id))
-        },
-    ))
+    fuchsia_async::Task::spawn(async move {
+        let mut yield_fut = futures::future::OptionFuture::default();
+        loop {
+            // Loop while we are woken up to handle enqueued RX packets.
+            let r = futures::select! {
+                w = watcher.next().fuse() => w,
+                y = yield_fut => Some(y.expect("OptionFuture is only selected when non-empty")),
+            };
+
+            let r = r.and_then(|()| {
+                device_id
+                    .upgrade()
+                    .map(|device_id| ctx.api().receive_queue().handle_queued_frames(&device_id))
+            });
+
+            match r {
+                Some(WorkQueueReport::AllDone) => (),
+                Some(WorkQueueReport::Pending) => {
+                    // Yield the task to the executor once.
+                    yield_fut = Some(async_utils::futures::YieldToExecutorOnce::new()).into();
+                }
+                None => break,
+            }
+        }
+    })
 }
 
-pub(crate) fn spawn_tx_task(
-    notifier: &NeedsDataNotifier,
-    mut ctx: Ctx,
-    device_id: DeviceId<BindingsCtx>,
-) -> fuchsia_async::Task<()> {
-    let watcher = notifier.watcher();
-    let device_id = device_id.downgrade();
+#[derive(thiserror::Error, Debug)]
+pub(crate) enum TxTaskError {
+    #[error("netdevice error: {0}")]
+    Netdevice(#[from] netdevice_client::Error),
+    #[error("aborted")]
+    Aborted,
+}
 
-    fuchsia_async::Task::spawn(crate::bindings::util::yielding_data_notifier_loop(
-        watcher,
-        move || {
-            // NB: We could write this function generically in terms of `D:
-            // Device`, which is the type parameter given to instantiate the
-            // transmit queue API. To do that, core would need to expose a
-            // marker for CoreContext that is generic on `D`. That is doable but
-            // not worth the extra code at this moment since bindings doesn't
-            // have meaningful amounts of code that is generic over the device
-            // type.
-            device_id.upgrade().map(|device_id| {
-                netstack3_core::for_any_device_id!(DeviceId, DeviceProvider, D, &device_id,
-                    id => ctx.api().transmit_queue::<D>().transmit_queued_frames(id)
-                )
-                .unwrap_or_else(|DeviceSendFrameError::NoBuffers| {
-                    warn!(
-                        "TODO(https://fxbug.dev/42057204): Support waiting for TX buffers to be \
-                            available, dropping packet for now on device={device_id:?}",
-                    );
-                    WorkQueueReport::AllDone
-                })
-            })
-        },
-    ))
+pub(crate) struct TxTask {
+    task: fuchsia_async::Task<Result<(), TxTaskError>>,
+    cancel: futures::future::AbortHandle,
+}
+
+impl TxTask {
+    pub(crate) fn new(
+        ctx: Ctx,
+        device_id: WeakDeviceId<BindingsCtx>,
+        watcher: NeedsDataWatcher,
+    ) -> Self {
+        let (fut, cancel) = futures::future::abortable(tx_task(ctx, device_id, watcher));
+        let fut = fut.map(|r| match r {
+            Ok(o) => o,
+            Err(futures::future::Aborted) => Err(TxTaskError::Aborted),
+        });
+        let task = fuchsia_async::Task::spawn(fut);
+        Self { task, cancel }
+    }
+
+    pub(crate) fn into_future_and_cancellation(
+        self,
+    ) -> (impl FusedFuture<Output = Result<(), TxTaskError>>, futures::future::AbortHandle) {
+        let Self { task, cancel } = self;
+        (task.fuse(), cancel)
+    }
+}
+
+#[derive(Default)]
+pub(crate) struct TxTaskState {
+    pub(crate) tx_buffers: Vec<netdevice_client::TxBuffer>,
+}
+
+impl TxTaskState {
+    /// Collects up to `count` tx buffers from `port_handler` into the task
+    /// state.
+    ///
+    /// Note: `count` is `BatchSize` since the buffers are expected to be fed
+    /// into the transmit queue API which has a limited batch size, so we avoid
+    /// over allocating.
+    async fn collect_buffers(
+        &mut self,
+        port_handler: &netdevice_worker::PortHandler,
+        count: BatchSize,
+    ) -> Result<usize, TxTaskError> {
+        let Self { tx_buffers, .. } = self;
+        let mut iter = port_handler.alloc_tx_buffers().await?.take(count.into());
+        iter.try_fold((0, tx_buffers), |(count, b), item| {
+            b.push(item?);
+            Ok((count + 1, b))
+        })
+        .map(|(count, _)| count)
+    }
+}
+
+// NB: We could write this function generically in terms of `D: Device`, which
+// is the type parameter given to instantiate the transmit queue API. To do
+// that, core would need to expose a marker for CoreContext that is generic on
+// `D`. That is doable but not worth the extra code at this moment since
+// bindings doesn't have meaningful amounts of code that is generic over the
+// device type.
+pub(crate) async fn tx_task(
+    mut ctx: Ctx,
+    device_id: WeakDeviceId<BindingsCtx>,
+    mut watcher: NeedsDataWatcher,
+) -> Result<(), TxTaskError> {
+    let mut yield_fut = futures::future::OptionFuture::default();
+    let mut task_state = TxTaskState::default();
+    loop {
+        // Loop while we are woken up to handle enqueued TX packets.
+        let r = futures::select! {
+            w = watcher.next().fuse() => w,
+            y = yield_fut => Some(y.expect("OptionFuture is only selected when non-empty")),
+        };
+
+        let device_id = match r.and_then(|()| device_id.upgrade()) {
+            Some(d) => d,
+            None => break Ok(()),
+        };
+
+        let batch_size = match device_id.external_state() {
+            DeviceSpecificInfo::Loopback(_) => {
+                unimplemented!("tx task is not supported for loopback devices")
+            }
+            DeviceSpecificInfo::Ethernet(EthernetInfo { netdevice, .. })
+            | DeviceSpecificInfo::PureIp(PureIpDeviceInfo { netdevice, .. }) => {
+                // Attempt to preallocate buffers to handle the queue.
+                let queue_len = netstack3_core::for_any_device_id!(
+                    DeviceId,
+                    DeviceProvider,
+                    D,
+                    &device_id,
+                    id => ctx.api().transmit_queue::<D>().count(id)
+                );
+
+                match queue_len {
+                    Some(queue_len) => {
+                        if queue_len != 0 {
+                            let collected = task_state
+                                .collect_buffers(
+                                    &netdevice.handler,
+                                    BatchSize::new_saturating(queue_len),
+                                )
+                                .await?;
+                            BatchSize::new_saturating(collected)
+                        } else {
+                            // We got woken up to do tx work but core says we
+                            // have zero buffers in the queue, go back to
+                            // waiting.
+                            continue;
+                        }
+                    }
+                    None => {
+                        // Queueing is not configured, go back to waiting.
+                        continue;
+                    }
+                }
+            }
+        };
+
+        let r = match &device_id {
+            DeviceId::Loopback(_) => {
+                unimplemented!("tx task is not supported for loopback devices")
+            }
+            DeviceId::Ethernet(id) => ctx
+                .api()
+                .transmit_queue::<EthernetLinkDevice>()
+                .transmit_queued_frames(id, batch_size, &mut task_state),
+            DeviceId::PureIp(id) => ctx
+                .api()
+                .transmit_queue::<PureIpDevice>()
+                .transmit_queued_frames(id, batch_size, &mut task_state),
+        }
+        .unwrap_or_else(|err| {
+            match err {
+                // Core is already keeping track of counters for this, nothing
+                // to be done in bindings.
+                DeviceSendFrameError::NoBuffers => (),
+            }
+            // If we observe an error when sending, we're not sure if the queue
+            // was drained or not, so assume we need to look at it again.
+            WorkQueueReport::Pending
+        });
+
+        let TxTaskState { tx_buffers } = &mut task_state;
+        // If for some reason we have buffers left here, return them so other
+        // interfaces on the same device can use the buffers.
+        tx_buffers.clear();
+
+        match r {
+            WorkQueueReport::AllDone => (),
+            WorkQueueReport::Pending => {
+                // Yield the task to the executor once.
+                yield_fut = Some(async_utils::futures::YieldToExecutorOnce::new()).into();
+            }
+        }
+    }
 }
 
 /// Static information common to all devices.
@@ -300,7 +479,7 @@ pub(crate) struct DynamicNetdeviceInfo {
 /// Static information common to all Netdevice backed devices.
 #[derive(Debug)]
 pub(crate) struct StaticNetdeviceInfo {
-    pub(crate) handler: super::netdevice_worker::PortHandler,
+    pub(crate) handler: netdevice_worker::PortHandler,
     pub(crate) tx_notifier: NeedsDataNotifier,
 }
 

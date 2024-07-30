@@ -4,7 +4,7 @@ The reachability component runs network health checks to determine the service
 level of networks known to the host. It exposes an API
 [`fuchsia.net.reachability`], that components can use to subscribe to changes
 in network service levels. The intricacies of the API behavior are located in
-the API's [FIDL definition].
+the API's FIDL definition.
 
 The rest of the README will outline the architecture for the reachability
 component and how it is used to calculate reachability state for different
@@ -76,6 +76,7 @@ State Machine Diagram
 [`fuchsia.net.reachability`]: https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/fidl/fuchsia.net.reachability/reachability.fidl
 [`fuchsia.net.interfaces`]: https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/fidl/fuchsia.net.interfaces/interfaces.fidl
 [`fuchsia.net.name`]: https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/fidl/fuchsia.net.name/lookup.fidl
+[`fuchsia.net.name/Lookup`]: https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/fidl/fuchsia.net.name/lookup.fidl
 [`fuchsia.net.neighbor`]: https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/fidl/fuchsia.net.neighbor/neighbor.fidl
 [`fuchsia.net.routes.ipv4`]: https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/fidl/fuchsia.net.routes/ipv4.fidl
 [`fuchsia.net.routes.ipv6`]: https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/fidl/fuchsia.net.routes/ipv6.fidl

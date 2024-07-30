@@ -123,6 +123,7 @@ class ProcSysNetTest : public ProcTestBase,
   void SetUp() override {
     ProcTestBase::SetUp();
     // Required to open the path below for writing.
+    // TODO(https://fxbug.dev/317285180) don't skip on baseline
     if (!test_helper::HasSysAdmin()) {
       GTEST_SKIP() << "Not running with sysadmin capabilities, skipping.";
     }
@@ -207,6 +208,7 @@ std::string ProcSelfDirName() {
 // This test ensures that the proc directories *are* set to be owned by the euid
 // of the task.
 TEST_F(ProcTaskDirTest, PidDirCorrectUidIsEuid) {
+  // TODO(https://fxbug.dev/317285180) don't skip on baseline
   if (!test_helper::HasSysAdmin() || !test_helper::IsStarnix()) {
     GTEST_SKIP() << "PidDirCorrectUid requires root access (to change euid), "
                  << "and currently only works on Starnix";
@@ -273,6 +275,7 @@ TEST_F(ProcTaskDirTest, PidDirCorrectUidIsEuid) {
 // setting the euid implicitly sets the fsuid. We want to check we're not
 // accidentally relying on the fsuid.
 TEST_F(ProcTaskDirTest, PidDirSetFsuidDoesntChangeOwnership) {
+  // TODO(https://fxbug.dev/317285180) don't skip on baseline
   if (!test_helper::HasSysAdmin() || !test_helper::IsStarnix()) {
     GTEST_SKIP() << "PidDirCorrectUid requires root access (to change euid), "
                  << "and currently only works on Starnix";
@@ -325,4 +328,32 @@ TEST_F(ProcTaskDirTest, PidDirCorrectIno) {
   SAFE_SYSCALL(close(fd));
 
   ASSERT_EQ(pre_stat.st_ino, post_stat.st_ino) << "Inode number incorrectly seen to change";
+}
+
+constexpr char kProcSelfFdPath[] = "/proc/self/fd/%d";
+
+TEST_F(ProcTaskDirTest, FdOpath) {
+  test_helper::ScopedTempFD temp_file;
+  ASSERT_TRUE(temp_file);
+
+  fbl::unique_fd opath_fd(SAFE_SYSCALL(open(temp_file.name().c_str(), O_RDONLY | O_PATH)));
+  ASSERT_TRUE(opath_fd.is_valid());
+
+  std::string opath_fd_path = fxl::StringPrintf(kProcSelfFdPath, opath_fd.get());
+  fbl::unique_fd regular_fd(SAFE_SYSCALL(open(opath_fd_path.c_str(), O_RDONLY)));
+  ASSERT_TRUE(regular_fd.is_valid());
+}
+
+TEST_F(ProcTaskDirTest, FdOpathSymlink) {
+  test_helper::ScopedTempFD temp_file;
+  ASSERT_TRUE(temp_file);
+
+  test_helper::ScopedTempSymlink temp_symlink(temp_file.name().c_str());
+  ASSERT_TRUE(temp_symlink);
+
+  fbl::unique_fd symlink_fd(SAFE_SYSCALL(open(temp_symlink.path().c_str(), O_PATH | O_NOFOLLOW)));
+  ASSERT_TRUE(symlink_fd.is_valid());
+
+  std::string symlink_fd_path = fxl::StringPrintf(kProcSelfFdPath, symlink_fd.get());
+  ASSERT_THAT(open(symlink_fd_path.c_str(), O_RDONLY), SyscallFailsWithErrno(ELOOP));
 }

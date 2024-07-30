@@ -3,7 +3,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 """Unit tests for the perf metric publishing code."""
-# keep-sorted start
 
 import dataclasses
 import signal
@@ -11,15 +10,10 @@ import tempfile
 import time
 import unittest
 import unittest.mock as mock
-
-# keep-sorted end
-
-# keep-sorted start
 from pathlib import Path
+
 from power_test_utils import power_test_utils
 from trace_processing import trace_model
-
-# keep-sorted end
 
 _METRIC_NAME = "M3tr1cN4m3"
 _MEASUREPOWER_PATH = "path/to/power"
@@ -199,4 +193,34 @@ class PowerSamplerTest(unittest.TestCase):
                 large_signal, large_feature
             ),
             (4666366670000, 10000),
+        )
+
+    def test_normalize(self) -> None:
+        signal = [0, 1, 2, 3, 4, 5]
+        normalized = power_test_utils.normalize(signal)
+        expected = [0, 0.2, 0.4, 0.6, 0.8, 1.0]
+        self.assertEqual(normalized, expected)
+
+    def test_normalized_xcorrelate(self) -> None:
+        signal = [5, 0, 0, 0, 0, 2, 2, 2, 2, 2]
+        feature = [10, 5, 5, 5, 5]
+
+        # If we cross correlate without normalizing, we correlate best with the 2s
+        self.assertEqual(
+            power_test_utils.cross_correlate_arg_max(signal, feature), (60, 5)
+        )
+
+        # But if we normalize first
+        # We'll have
+        #
+        # signal: [1, 0, 0, 0, 0, .4, .4, .4, .4]
+        # feature: [1, 0, 0, 0, 0]
+        #
+        # which correctly correlates best with the beginning
+        self.assertEqual(
+            power_test_utils.cross_correlate_arg_max(
+                power_test_utils.normalize(signal),
+                power_test_utils.normalize(feature),
+            ),
+            (1.0, 0),
         )

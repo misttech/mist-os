@@ -36,7 +36,6 @@
 #include <dev/psci.h>
 #include <dev/uart.h>
 #include <explicit-memory/bytes.h>
-#include <fbl/auto_lock.h>
 #include <fbl/ref_ptr.h>
 #include <kernel/cpu.h>
 #include <kernel/cpu_distance_map.h>

@@ -8,8 +8,6 @@ use fuchsia_zircon_types as sys;
 use std::ffi::NulError;
 use std::{error, fmt, io};
 
-pub use sys::zx_status_t;
-
 // Creates associated constants of TypeName of the form
 // `pub const NAME: TypeName = TypeName(path::to::value);`
 // and provides a private `assoc_const_name` method and a `Debug` implementation
@@ -76,6 +74,11 @@ impl Status {
     pub fn into_raw(self) -> sys::zx_status_t {
         self.0
     }
+}
+
+/// Convenience re-export of `Status::ok`.
+pub fn ok(raw: sys::zx_status_t) -> Result<(), Status> {
+    Status::ok(raw)
 }
 
 assoc_values!(Status, [

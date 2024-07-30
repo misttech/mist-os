@@ -162,7 +162,6 @@ fn check_transmitted_loopback(
 
 #[test_case(add_ethernet, check_transmitted_ethernet, true; "ethernet with queue")]
 #[test_case(add_ethernet, check_transmitted_ethernet, false; "ethernet without queue")]
-#[test_case(add_loopback, check_transmitted_loopback, true; "loopback with queue")]
 #[test_case(add_loopback, check_transmitted_loopback, false; "loopback without queue")]
 fn tx_queue(
     add_device: fn(&mut FakeCtx) -> DeviceId<FakeBindingsCtx>,
@@ -209,10 +208,11 @@ fn tx_queue(
             core::mem::take(&mut ctx.bindings_ctx.state_mut().tx_available),
             [device.clone()]
         );
-        let result = for_any_device_id!(
-            DeviceId, DeviceProvider, D, &device, device => {
-                ctx.core_api().transmit_queue::<D>().transmit_queued_frames(device)
-            }
+        let ethernet_id = assert_matches!(&device, DeviceId::Ethernet(e) => e);
+        let result = ctx.core_api().transmit_queue::<EthernetLinkDevice>().transmit_queued_frames(
+            &ethernet_id,
+            Default::default(),
+            &mut (),
         );
         assert_eq!(result, Ok(WorkQueueReport::AllDone));
     }

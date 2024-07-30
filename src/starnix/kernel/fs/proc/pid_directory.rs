@@ -8,7 +8,7 @@ use crate::task::{CurrentTask, Task, TaskPersistentInfo, TaskStateCode, ThreadGr
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::{
     default_seek, fileops_impl_delegate_read_and_seek, fileops_impl_directory,
-    fileops_impl_noop_sync, fs_node_impl_dir_readonly, parse_i32_file, serialize_i32_file,
+    fileops_impl_noop_sync, fs_node_impl_dir_readonly, parse_i32_file, serialize_for_file,
     BytesFile, BytesFileOps, CallbackSymlinkNode, DirectoryEntryType, DirentSink, DynamicFile,
     DynamicFileBuf, DynamicFileSource, FdNumber, FileObject, FileOps, FileSystemHandle, FsNode,
     FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString, ProcMountinfoFile, ProcMountsFile,
@@ -20,12 +20,12 @@ use itertools::Itertools;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use starnix_logging::{bug_ref, track_stub};
-use starnix_sync::{FileOpsCore, Locked, WriteOps};
+use starnix_sync::{FileOpsCore, Locked};
 use starnix_uapi::auth::{Credentials, CAP_SYS_RESOURCE};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::mode;
 use starnix_uapi::open_flags::OpenFlags;
-use starnix_uapi::ownership::{TempRef, WeakRef};
+use starnix_uapi::ownership::{OwnedRef, TempRef, WeakRef};
 use starnix_uapi::resource_limits::Resource;
 use starnix_uapi::time::duration_to_scheduler_clock;
 use starnix_uapi::user_address::UserAddress;
@@ -165,7 +165,7 @@ pub fn pid_directory(
     dir.entry(
         current_task,
         "task",
-        TaskListDirectory { thread_group: task.thread_group.clone() },
+        TaskListDirectory { thread_group: OwnedRef::downgrade(&task.thread_group) },
         mode!(IFDIR, 0o777),
     );
     TaskDirectory::new(current_task, fs, task, dir)
@@ -360,7 +360,7 @@ impl FsNodeOps for FdDirectory {
             CallbackSymlinkNode::new(move || {
                 let task = Task::from_weak(&task_reference)?;
                 let file = task.files.get_allowing_opath(fd).map_err(|_| errno!(ENOENT))?;
-                Ok(SymlinkTarget::Node(file.name.clone()))
+                Ok(SymlinkTarget::Node(file.name.to_passive()))
             }),
             FsNodeInfo::new_factory(mode!(IFLNK, 0o777), task.as_fscred()),
         ))
@@ -592,7 +592,13 @@ fn fds_to_directory_entries(fds: Vec<FdNumber>) -> Vec<VecDirectoryEntry> {
 
 /// Directory that lists the task IDs (tid) in a process. Located at `/proc/<pid>/task/`.
 struct TaskListDirectory {
-    thread_group: Arc<ThreadGroup>,
+    thread_group: WeakRef<ThreadGroup>,
+}
+
+impl TaskListDirectory {
+    fn thread_group(&self) -> Result<TempRef<'_, ThreadGroup>, Errno> {
+        self.thread_group.upgrade().ok_or_else(|| errno!(ESRCH))
+    }
 }
 
 impl FsNodeOps for TaskListDirectory {
@@ -606,7 +612,7 @@ impl FsNodeOps for TaskListDirectory {
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
         Ok(VecDirectory::new_file(
-            self.thread_group
+            self.thread_group()?
                 .read()
                 .task_ids()
                 .map(|tid| VecDirectoryEntry {
@@ -624,15 +630,16 @@ impl FsNodeOps for TaskListDirectory {
         current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
+        let thread_group = self.thread_group()?;
         let tid = std::str::from_utf8(name)
             .map_err(|_| errno!(ENOENT))?
             .parse::<pid_t>()
             .map_err(|_| errno!(ENOENT))?;
         // Make sure the tid belongs to this process.
-        if !self.thread_group.read().contains_task(tid) {
+        if !thread_group.read().contains_task(tid) {
             return error!(ENOENT);
         }
-        let pid_state = self.thread_group.kernel.pids.read();
+        let pid_state = thread_group.kernel.pids.read();
         let weak_task = pid_state.get_task(tid);
         let task = weak_task.upgrade().ok_or_else(|| errno!(ENOENT))?;
         Ok(tid_directory(current_task, &node.fs(), &task))
@@ -739,14 +746,14 @@ impl FileOps for CommFile {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, WriteOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
         _offset: usize,
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         let task = Task::from_weak(&self.task)?;
-        if !Arc::ptr_eq(&task.thread_group, &current_task.thread_group) {
+        if !OwnedRef::ptr_eq(&task.thread_group, &current_task.thread_group) {
             return error!(EINVAL);
         }
         // What happens if userspace writes to this file in multiple syscalls? We need more
@@ -892,7 +899,7 @@ impl FileOps for MemFile {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, WriteOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -1185,7 +1192,7 @@ impl BytesFileOps for OomScoreFile {
     fn read(&self, _current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
         let _task = Task::from_weak(&self.0)?;
         track_stub!(TODO("https://fxbug.dev/322873459"), "/proc/pid/oom_score");
-        Ok(serialize_i32_file(0).into())
+        Ok(serialize_for_file(0).into())
     }
 }
 
@@ -1230,7 +1237,7 @@ impl BytesFileOps for OomAdjFile {
                 (oom_score_adj - OOM_SCORE_ADJ_MIN) / (OOM_SCORE_ADJ_MAX - OOM_SCORE_ADJ_MIN);
             fraction * (OOM_ADJUST_MAX - OOM_ADJUST_MIN) + OOM_ADJUST_MIN
         };
-        Ok(serialize_i32_file(oom_adj).into())
+        Ok(serialize_for_file(oom_adj).into())
     }
 }
 
@@ -1259,6 +1266,6 @@ impl BytesFileOps for OomScoreAdjFile {
     fn read(&self, _current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
         let task = Task::from_weak(&self.0)?;
         let oom_score_adj = task.read().oom_score_adj;
-        Ok(serialize_i32_file(oom_score_adj).into())
+        Ok(serialize_for_file(oom_score_adj).into())
     }
 }

@@ -154,7 +154,7 @@ declare_args() {
 #     Default: true
 #
 #   remote_build: (optional)
-#     Set this to true to override the global default `enable_bazel_remote_rbe`
+#     Set this to false to override the global default `enable_bazel_remote_rbe`
 #     setting which controls whether the underlying bazel invocation
 #     will build remotely using RBE.
 #     Type: boolean
@@ -527,6 +527,20 @@ template("bazel_action") {
     _path_mapping = "${target_out_dir}/${target_name}.path_mapping"
     outputs += [ _path_mapping ]
 
+    # Write stamp files for every Bazel target executed by this bazel_action.
+    # Note these stamps are written to paths based on Bazel target labels.
+    # This makes sure the same Bazel target is not claimed by multiple
+    # bazel_actions in the same build graph, which breaks Ninja noop checks,
+    # see http://b/353897478. In case it happens, GN will fail complaining about
+    # multiple targets sharing the same output.
+    _dedupe_stamps = []
+    foreach(_bazel_target, _bazel_targets) {
+      _out_dir = get_label_info(_bazel_target, "target_out_dir")
+      _bazel_label = get_label_info(_bazel_target, "name")
+      _dedupe_stamps += [ "${_out_dir}/${_bazel_label}.bazel_target_can_only_be_referenced_by_one_bazel_action" ]
+    }
+    outputs += _dedupe_stamps
+
     args = [
              "--bazel-launcher",
              rebase_path(bazel_launcher, root_build_dir),
@@ -549,7 +563,11 @@ template("bazel_action") {
              rebase_path(depfile, root_build_dir),
              "--path-mapping",
              rebase_path(_path_mapping, root_build_dir),
+             "--stamp-files",
            ]
+    foreach(s, _dedupe_stamps) {
+      args += [ rebase_path(s, root_build_dir) ]
+    }
 
     if (_has_file_outputs) {
       args += [ "--file-outputs" ]
@@ -677,8 +695,12 @@ template("bazel_action") {
     }
 
     _remote_build = enable_bazel_remote_rbe
-    if (defined(invoker.remote_build)) {
-      _remote_build = invoker.remote_build
+    if (_remote_build) {
+      if (defined(invoker.remote_build)) {
+        _remote_build = invoker.remote_build
+      }
+    } else {
+      not_needed(invoker, [ "remote_build" ])
     }
     if (_remote_build) {
       if (bazel_rbe_exec_strategy == "remote") {

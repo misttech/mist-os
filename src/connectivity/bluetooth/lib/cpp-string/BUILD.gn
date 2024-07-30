@@ -10,11 +10,7 @@ pw_source_set("cpp-string") {
   sources = [
     "string_printf.cc",
     "string_printf.h",
-    "utf_codecs.cc",
-    "utf_codecs.h",
   ]
-
-  deps = [ "//src/connectivity/bluetooth/lib/third_party/icu" ]
 }
 
 pw_test("string_printf_test") {

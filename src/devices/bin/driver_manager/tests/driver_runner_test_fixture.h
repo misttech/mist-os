@@ -122,6 +122,7 @@ struct Driver {
   bool close = false;
   bool host_restart_on_crash = false;
   bool use_next_vdso = false;
+  bool use_dynamic_linker = false;
 };
 
 class TestDriver : public fidl::testing::TestBase<fdh::Driver> {
@@ -211,6 +212,9 @@ class DriverRunnerTest : public gtest::TestLoopFixture {
 
   void SetupDriverRunner(FakeDriverIndex driver_index);
 
+  void SetupDriverRunnerWithDynamicLinker(
+      std::unique_ptr<driver_manager::DriverHostRunner> driver_host_runner);
+
   void SetupDriverRunner();
 
   void PrepareRealmForDriverComponentStart(const std::string& name, const std::string& url);
@@ -218,6 +222,8 @@ class DriverRunnerTest : public gtest::TestLoopFixture {
   void PrepareRealmForSecondDriverComponentStart();
 
   void PrepareRealmForStartDriverHost(bool use_next_vdso);
+
+  void PrepareRealmForStartDriverHostDynamicLinker();
 
   void StopDriverComponent(
       fidl::ClientEnd<fuchsia_component_runner::ComponentController> component);
@@ -242,7 +248,8 @@ class DriverRunnerTest : public gtest::TestLoopFixture {
   static void ValidateProgram(std::optional<::fuchsia_data::Dictionary>& program,
                               std::string_view binary, std::string_view colocate,
                               std::string_view host_restart_on_crash,
-                              std::string_view use_next_vdso);
+                              std::string_view use_next_vdso,
+                              std::string_view use_dynamic_linker = "false");
 
   static void AssertNodeBound(const std::shared_ptr<CreatedChild>& child);
 
@@ -270,7 +277,7 @@ class DriverRunnerTest : public gtest::TestLoopFixture {
   TestDirectory driver_host_dir_{dispatcher()};
   TestDirectory driver_dir_{dispatcher()};
   TestDriverHost driver_host_;
-  std::optional<fidl::ServerBinding<fuchsia_component::Realm>> realm_binding_;
+  fidl::ServerBindingGroup<fuchsia_component::Realm> realm_bindings_;
   std::optional<fidl::ServerBinding<fdh::DriverHost>> driver_host_binding_;
 
   std::optional<Devfs> devfs_;

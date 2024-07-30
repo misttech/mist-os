@@ -29,12 +29,13 @@ struct PublishOptions final {
   /// Specify how `fuchsia.inspect.Tree` should behave.
   TreeHandlerSettings tree_handler_settings = {};
 
-  /// Provide a name to appear in the tree's Inspect Metadata. By default, it will be empty.
-  std::optional<std::string> tree_name = {};
+  /// Provide a name to appear in the tree's Inspect Metadata. By default, it will be
+  /// `fuchsia.inspect#DEFAULT_TREE_NAME
+  std::optional<std::string> tree_name = std::nullopt;
 
   /// Provide a fidl::ClientEnd, useful if `fuchsia.inspect.InspectSink` is not in the root
   /// namespace or is renamed.
-  std::optional<fidl::ClientEnd<fuchsia_inspect::InspectSink>> client_end = {};
+  std::optional<fidl::ClientEnd<fuchsia_inspect::InspectSink>> client_end = std::nullopt;
 };
 
 /// Options for publishing a VMO.
@@ -45,12 +46,13 @@ struct PublishOptions final {
 /// The only service method is a live VMO. If you prefer to have copy semantics,
 /// copy the VMO before serving. This is because copying the VMO could be expensive.
 struct VmoOptions {
-  /// Provide a name to appear in the tree's Inspect Metadata. By default, it will be empty.
-  std::optional<std::string> tree_name = {};
+  /// Provide a name to appear in the tree's Inspect Metadata. By default, it will be
+  /// `fuchsia.inspect#DEFAULT_TREE_NAME
+  std::optional<std::string> tree_name = std::nullopt;
 
   /// Provide a fidl::ClientEnd, useful if `fuchsia.inspect.InspectSink` is not in the root
   /// namespace or is renamed.
-  std::optional<fidl::ClientEnd<fuchsia_inspect::InspectSink>> client_end = {};
+  std::optional<fidl::ClientEnd<fuchsia_inspect::InspectSink>> client_end = std::nullopt;
 };
 
 /// Publish a VMO according to `opts`.

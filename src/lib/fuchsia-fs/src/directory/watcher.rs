@@ -394,11 +394,11 @@ mod tests {
             });
         }
 
-        fn open2(
+        fn open3(
             self: Arc<Self>,
             _scope: ExecutionScope,
             _path: vfs::path::Path,
-            _protocols: fio::ConnectionProtocols,
+            _flags: fio::Flags,
             _object_request: ObjectRequestRef<'_>,
         ) -> Result<(), zx::Status> {
             unimplemented!("Not implemented!");

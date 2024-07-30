@@ -21,6 +21,22 @@ source_set("test_node") {
       [ "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_cpp" ]
 }
 
+source_set("driver_testing_cpp") {
+  public_configs = [ ":includes" ]
+  sources = [
+    "include/lib/driver/testing/cpp/driver_test.h",
+    "include/lib/driver/testing/cpp/internal/internals.h",
+  ]
+  public_deps = [
+    ":cpp",
+    "//sdk/lib/async_patterns/testing/cpp",
+  ]
+}
+
+config("includes") {
+  include_dirs = [ "include" ]
+}
+
 sdk_source_set("cpp") {
   category = "partner"
   sdk_name = "driver_testing_cpp"
@@ -66,4 +82,9 @@ source_set("scoped_global_logger") {
     "//zircon/system/ulib/async:async-cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
   ]
+}
+
+source_set("minimal_compat_environment") {
+  sources = [ "minimal_compat_environment.h" ]
+  public_deps = [ "//sdk/lib/driver/compat/cpp" ]
 }

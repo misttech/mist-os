@@ -28,15 +28,15 @@ from typing import (
     Union,
 )
 
-from fidl_codec import add_ir_path
-from fidl_codec import encode_fidl_object
+from fidl_codec import add_ir_path, encode_fidl_object
 from fuchsia_controller_py import Context
 
-from ._client import EventHandlerBase
-from ._client import FidlClient
-from ._fidl_common import camel_case_to_snake_case
-from ._fidl_common import internal_kind_to_type
-from ._fidl_common import MethodInfo
+from ._client import EventHandlerBase, FidlClient
+from ._fidl_common import (
+    MethodInfo,
+    camel_case_to_snake_case,
+    internal_kind_to_type,
+)
 from ._server import ServerBase
 
 FIDL_IR_PATH_ENV: str = "FIDL_IR_PATH"

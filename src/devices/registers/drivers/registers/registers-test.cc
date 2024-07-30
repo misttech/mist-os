@@ -5,7 +5,7 @@
 #include "registers.h"
 
 #include <lib/ddk/metadata.h>
-#include <lib/driver/testing/cpp/fixture/driver_test_fixture.h>
+#include <lib/driver/testing/cpp/driver_test.h>
 
 #include <gtest/gtest.h>
 #include <mock-mmio-reg/mock-mmio-reg.h>
@@ -80,29 +80,36 @@ class RegistersDeviceTestEnvironment : fdf_testing::Environment {
 
 class RegistersDeviceTestConfig final {
  public:
-  static constexpr bool kDriverOnForeground = false;
-  static constexpr bool kAutoStartDriver = false;
-  static constexpr bool kAutoStopDriver = true;
-
   using DriverType = TestRegistersDevice;
   using EnvironmentType = RegistersDeviceTestEnvironment;
 };
 
-class RegistersDeviceTest : public fdf_testing::DriverTestFixture<RegistersDeviceTestConfig>,
-                            public ::testing::Test {
+class RegistersDeviceTest : public ::testing::Test {
  public:
   template <typename T>
   void Init(std::vector<fidl_metadata::registers::Register<T>>&& kRegisters) {
-    RunInEnvironmentTypeContext(
+    driver_test().RunInEnvironmentTypeContext(
         [&kRegisters](RegistersDeviceTestEnvironment& env) { env.Init(kRegisters); });
-    EXPECT_TRUE(StartDriver().is_ok());
+    EXPECT_TRUE(driver_test().StartDriver().is_ok());
   }
 
   fidl::ClientEnd<fuchsia_hardware_registers::Device> GetClient(std::string&& name) {
-    auto result = Connect<fuchsia_hardware_registers::Service::Device>(name);
+    auto result = driver_test().Connect<fuchsia_hardware_registers::Service::Device>(name);
     EXPECT_EQ(ZX_OK, result.status_value());
     return std::move(result.value());
   }
+
+  void TearDown() override {
+    zx::result<> result = driver_test().StopDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
+  }
+
+  fdf_testing::BackgroundDriverTest<RegistersDeviceTestConfig>& driver_test() {
+    return driver_test_;
+  }
+
+ private:
+  fdf_testing::BackgroundDriverTest<RegistersDeviceTestConfig> driver_test_;
 };
 
 TEST_F(RegistersDeviceTest, Read32Test) {
@@ -168,7 +175,7 @@ TEST_F(RegistersDeviceTest, Read32Test) {
   };
 
   // Successful
-  RunInDriverContext(
+  driver_test().RunInDriverContext(
       [](TestRegistersDevice& driver) { (*(driver.mock_mmio_[0]))[0x0].ExpectRead(0x12341234); });
   {
     auto result = test0->ReadRegister32(/* offset: */ 0x0, /* mask: */ 0xFFFFFFFF);
@@ -177,7 +184,7 @@ TEST_F(RegistersDeviceTest, Read32Test) {
     EXPECT_EQ(result->value()->value, 0x12341234U);
   };
 
-  RunInDriverContext(
+  driver_test().RunInDriverContext(
       [](TestRegistersDevice& driver) { (*(driver.mock_mmio_[2]))[0x4].ExpectRead(0x12341234); });
   {
     auto result = test1->ReadRegister32(/* offset: */ 0x4, /* mask: */ 0xFFFF0000);
@@ -186,7 +193,7 @@ TEST_F(RegistersDeviceTest, Read32Test) {
     EXPECT_EQ(result->value()->value, 0x12340000U);
   };
 
-  RunInDriverContext(
+  driver_test().RunInDriverContext(
       [](TestRegistersDevice& driver) { (*(driver.mock_mmio_[2]))[0x8].ExpectRead(0x12341234); });
   {
     auto result = test1->ReadRegister32(/* offset: */ 0x8, /* mask: */ 0xFFFF0000);
@@ -262,7 +269,7 @@ TEST_F(RegistersDeviceTest, Write32Test) {
   };
 
   // Successful
-  RunInDriverContext([](TestRegistersDevice& driver) {
+  driver_test().RunInDriverContext([](TestRegistersDevice& driver) {
     (*(driver.mock_mmio_[0]))[0x0].ExpectRead(0x00000000).ExpectWrite(0x43214321);
   });
   {
@@ -273,7 +280,7 @@ TEST_F(RegistersDeviceTest, Write32Test) {
     EXPECT_TRUE(result->is_ok());
   };
 
-  RunInDriverContext([](TestRegistersDevice& driver) {
+  driver_test().RunInDriverContext([](TestRegistersDevice& driver) {
     (*(driver.mock_mmio_[1]))[0x4].ExpectRead(0x00000000).ExpectWrite(0x43210000);
   });
   {
@@ -284,7 +291,7 @@ TEST_F(RegistersDeviceTest, Write32Test) {
     EXPECT_TRUE(result->is_ok());
   };
 
-  RunInDriverContext([](TestRegistersDevice& driver) {
+  driver_test().RunInDriverContext([](TestRegistersDevice& driver) {
     (*(driver.mock_mmio_[1]))[0x8].ExpectRead(0x00000000).ExpectWrite(0x43210000);
   });
   {
@@ -363,7 +370,7 @@ TEST_F(RegistersDeviceTest, Read64Test) {
   };
 
   // Successful
-  RunInDriverContext([](TestRegistersDevice& driver) {
+  driver_test().RunInDriverContext([](TestRegistersDevice& driver) {
     (*(driver.mock_mmio_[0]))[0x0].ExpectRead(0x1234123412341234);
   });
   {
@@ -373,7 +380,7 @@ TEST_F(RegistersDeviceTest, Read64Test) {
     EXPECT_EQ(result->value()->value, 0x1234123412341234UL);
   };
 
-  RunInDriverContext([](TestRegistersDevice& driver) {
+  driver_test().RunInDriverContext([](TestRegistersDevice& driver) {
     (*(driver.mock_mmio_[2]))[0x8].ExpectRead(0x1234123412341234);
   });
   {
@@ -456,7 +463,7 @@ TEST_F(RegistersDeviceTest, Write64Test) {
   };
 
   // Successful
-  RunInDriverContext([](TestRegistersDevice& driver) {
+  driver_test().RunInDriverContext([](TestRegistersDevice& driver) {
     (*(driver.mock_mmio_[0]))[0x0].ExpectRead(0x0000000000000000).ExpectWrite(0x4321432143214321);
   });
   {
@@ -467,7 +474,7 @@ TEST_F(RegistersDeviceTest, Write64Test) {
     EXPECT_TRUE(result->is_ok());
   };
 
-  RunInDriverContext([](TestRegistersDevice& driver) {
+  driver_test().RunInDriverContext([](TestRegistersDevice& driver) {
     (*(driver.mock_mmio_[1]))[0x8].ExpectRead(0x0000000000000000).ExpectWrite(0x0000000043210000);
   });
   {

@@ -3,7 +3,5 @@
 // found in the LICENSE file.
 
 mod file_system;
-mod selinux_contexts;
 
 pub use file_system::*;
-pub use selinux_contexts::*;

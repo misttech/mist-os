@@ -25,8 +25,8 @@ TEST(FasttimeTest, UnaccessibleTicks) {
       .version = fasttime::internal::kFasttimeVersion,
       .ticks_per_second = 100000,
       .mono_ticks_offset = 12345678,
-      .ticks_to_mono_numerator = 125000,
-      .ticks_to_mono_denominator = 300000,
+      .ticks_to_time_numerator = 125000,
+      .ticks_to_time_denominator = 300000,
       .usermode_can_access_ticks = false,
       .use_a73_errata_mitigation = false,
   };
@@ -54,8 +54,8 @@ TEST(FasttimeTest, MismatchedVersions) {
       .version = fasttime::internal::kFasttimeVersion + 1,
       .ticks_per_second = 100000,
       .mono_ticks_offset = 12345678,
-      .ticks_to_mono_numerator = 125000,
-      .ticks_to_mono_denominator = 300000,
+      .ticks_to_time_numerator = 125000,
+      .ticks_to_time_denominator = 300000,
       .usermode_can_access_ticks = true,
       .use_a73_errata_mitigation = false,
   };

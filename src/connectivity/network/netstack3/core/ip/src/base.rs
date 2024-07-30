@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use alloc::collections::HashMap;
 use core::cmp::Ordering;
 use core::fmt::Debug;
 use core::hash::Hash;
@@ -19,7 +20,7 @@ use net_types::ip::{
 };
 use net_types::{MulticastAddr, SpecifiedAddr, SpecifiedAddress as _, UnicastAddr, Witness};
 use netstack3_base::socket::SocketIpAddrExt as _;
-use netstack3_base::sync::{Mutex, RwLock};
+use netstack3_base::sync::{Mutex, PrimaryRc, RwLock, StrongRc};
 use netstack3_base::{
     AnyDevice, BroadcastIpExt, CoreTimerContext, Counter, CounterContext, DeviceIdContext,
     DeviceIdentifier as _, ErrorAndSerializer, EventContext, FrameDestination, HandleableTimer,
@@ -47,7 +48,6 @@ use crate::internal::device::{
     self, IpAddressId as _, IpDeviceAddr, IpDeviceBindingsContext, IpDeviceIpExt,
     IpDeviceSendContext,
 };
-use crate::internal::forwarding::{ForwardingTable, IpForwardingDeviceContext};
 use crate::internal::gmp::GmpQueryHandler;
 use crate::internal::icmp::{
     IcmpBindingsTypes, IcmpErrorHandler, IcmpHandlerIpExt, Icmpv4Error, Icmpv4ErrorKind,
@@ -55,6 +55,8 @@ use crate::internal::icmp::{
 };
 use crate::internal::ipv6;
 use crate::internal::ipv6::Ipv6PacketAction;
+use crate::internal::multicast_forwarding::route::MulticastRouteIpExt;
+use crate::internal::multicast_forwarding::state::MulticastForwardingState;
 use crate::internal::path_mtu::{PmtuBindingsTypes, PmtuCache, PmtuTimerId};
 use crate::internal::raw::counters::RawIpSocketCounters;
 use crate::internal::raw::{RawIpSocketHandler, RawIpSocketMap, RawIpSocketsBindingsTypes};
@@ -62,6 +64,7 @@ use crate::internal::reassembly::{
     FragmentBindingsTypes, FragmentHandler, FragmentProcessingState, FragmentTimerId,
     IpPacketFragmentCache,
 };
+use crate::internal::routing::{IpRoutingDeviceContext, RoutingTable};
 use crate::internal::socket::{IpSocketBindingsContext, IpSocketContext, IpSocketHandler};
 use crate::internal::types::{self, Destination, NextHop, ResolvedRoute, RoutableIpAddr};
 
@@ -429,9 +432,9 @@ impl<
         dst: SpecifiedAddr<I::Addr>,
         device: Option<&Self::DeviceId>,
     ) {
-        match self
-            .with_ip_routing_table(|core_ctx, routes| routes.lookup(core_ctx, device, dst.get()))
-        {
+        match self.with_main_ip_routing_table(|core_ctx, routes| {
+            routes.lookup(core_ctx, device, dst.get())
+        }) {
             Some(Destination { next_hop, device }) => {
                 let neighbor = match next_hop {
                     NextHop::RemoteAsNeighbor => dst,
@@ -614,7 +617,7 @@ pub enum Ipv6PresentAddressStatus {
 }
 
 /// An extension trait providing IP layer properties.
-pub trait IpLayerIpExt: IpExt {
+pub trait IpLayerIpExt: IpExt + MulticastRouteIpExt {
     /// IP Address status.
     type AddressStatus;
     /// IP Address state.
@@ -662,29 +665,62 @@ impl IpLayerIpExt for Ipv6 {
 pub trait IpStateContext<I: IpLayerIpExt, BC>: DeviceIdContext<AnyDevice> {
     /// The inner device id context.
     type IpDeviceIdCtx<'a>: DeviceIdContext<AnyDevice, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>
-        + IpForwardingDeviceContext<I>
+        + IpRoutingDeviceContext<I>
         + IpDeviceStateContext<I, BC>;
+
+    /// Gets the main table ID.
+    fn main_table_id(&self) -> RoutingTableId<I, Self::DeviceId>;
+
+    // TODO(https://fxbug.dev/354724171): Remove this function when we no longer
+    // make routing decisions starting from the main table.
+    /// Calls the function with an immutable reference to IP routing table.
+    fn with_main_ip_routing_table<
+        O,
+        F: FnOnce(&mut Self::IpDeviceIdCtx<'_>, &RoutingTable<I, Self::DeviceId>) -> O,
+    >(
+        &mut self,
+        cb: F,
+    ) -> O {
+        let main_table_id = self.main_table_id();
+        self.with_ip_routing_table(&main_table_id, cb)
+    }
+
+    // TODO(https://fxbug.dev/341194323): Remove this function when we no longer
+    // only update the main routing table by default.
+    /// Calls the function with a mutable reference to IP routing table.
+    fn with_main_ip_routing_table_mut<
+        O,
+        F: FnOnce(&mut Self::IpDeviceIdCtx<'_>, &mut RoutingTable<I, Self::DeviceId>) -> O,
+    >(
+        &mut self,
+        cb: F,
+    ) -> O {
+        let main_table_id = self.main_table_id();
+        self.with_ip_routing_table_mut(&main_table_id, cb)
+    }
 
     /// Calls the function with an immutable reference to IP routing table.
     fn with_ip_routing_table<
         O,
-        F: FnOnce(&mut Self::IpDeviceIdCtx<'_>, &ForwardingTable<I, Self::DeviceId>) -> O,
+        F: FnOnce(&mut Self::IpDeviceIdCtx<'_>, &RoutingTable<I, Self::DeviceId>) -> O,
     >(
         &mut self,
+        table_id: &RoutingTableId<I, Self::DeviceId>,
         cb: F,
     ) -> O;
 
     /// Calls the function with a mutable reference to IP routing table.
     fn with_ip_routing_table_mut<
         O,
-        F: FnOnce(&mut Self::IpDeviceIdCtx<'_>, &mut ForwardingTable<I, Self::DeviceId>) -> O,
+        F: FnOnce(&mut Self::IpDeviceIdCtx<'_>, &mut RoutingTable<I, Self::DeviceId>) -> O,
     >(
         &mut self,
+        table_id: &RoutingTableId<I, Self::DeviceId>,
         cb: F,
     ) -> O;
 }
 
-/// Provices access to an IP device's state for the IP layer.
+/// Provides access to an IP device's state for the IP layer.
 pub trait IpDeviceStateContext<I: IpLayerIpExt, BC>: DeviceIdContext<AnyDevice> {
     /// Calls the callback with the next packet ID.
     fn with_next_packet_id<O, F: FnOnce(&I::PacketIdState) -> O>(&self, cb: F) -> O;
@@ -1007,7 +1043,7 @@ pub fn resolve_route_to_destination<
     }
 
     core_ctx
-        .with_ip_routing_table(|core_ctx, table| {
+        .with_main_ip_routing_table(|core_ctx, table| {
             let mut matching_with_addr = table.lookup_filter_map(
                 core_ctx,
                 device,
@@ -1291,12 +1327,22 @@ impl<I: IpLayerIpExt, D: StrongDeviceIdentifier, BT: IpLayerBindingsTypes>
     }
 }
 
-impl<I: IpLayerIpExt, D: StrongDeviceIdentifier, BT: IpLayerBindingsTypes>
-    OrderedLockAccess<ForwardingTable<I, D>> for IpStateInner<I, D, BT>
+impl<I: IpLayerIpExt, D: StrongDeviceIdentifier> OrderedLockAccess<RoutingTable<I, D>>
+    for RoutingTableId<I, D>
 {
-    type Lock = RwLock<ForwardingTable<I, D>>;
+    type Lock = RwLock<RoutingTable<I, D>>;
     fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
-        OrderedLockRef::new(&self.table)
+        let Self(inner) = self;
+        OrderedLockRef::new(&*inner)
+    }
+}
+
+impl<I: IpLayerIpExt, D: StrongDeviceIdentifier, BT: IpLayerBindingsTypes>
+    OrderedLockAccess<MulticastForwardingState<I, D>> for IpStateInner<I, D, BT>
+{
+    type Lock = RwLock<MulticastForwardingState<I, D>>;
+    fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
+        OrderedLockRef::new(&self.multicast_forwarding)
     }
 }
 
@@ -1435,17 +1481,38 @@ impl<BT> IpStateBindingsTypes for BT where
 {
 }
 
+/// Identifier to a forwarding table.
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub struct RoutingTableId<I: Ip, D>(StrongRc<RwLock<RoutingTable<I, D>>>);
+
+impl<I: Ip, D> RoutingTableId<I, D> {
+    /// Provides direct access to the forwarding table.
+    #[cfg(any(test, feature = "testutils"))]
+    pub fn table(&self) -> &RwLock<RoutingTable<I, D>> {
+        let Self(inner) = self;
+        &*inner
+    }
+}
+
 /// The inner state for the IP layer for IP version `I`.
 #[derive(GenericOverIp)]
 #[generic_over_ip(I, Ip)]
 pub struct IpStateInner<I: IpLayerIpExt, D: StrongDeviceIdentifier, BT: IpStateBindingsTypes> {
-    table: RwLock<ForwardingTable<I, D>>,
+    // TODO(https://fxbug.dev/355059838): Explore the option to let Bindings create the main table.
+    main_table_id: RoutingTableId<I, D>,
+    multicast_forwarding: RwLock<MulticastForwardingState<I, D>>,
     fragment_cache: Mutex<IpPacketFragmentCache<I, BT>>,
     pmtu_cache: Mutex<PmtuCache<I, BT>>,
     counters: IpCounters<I>,
     raw_sockets: RwLock<RawIpSocketMap<I, D::Weak, BT>>,
     raw_socket_counters: RawIpSocketCounters<I>,
     filter: RwLock<filter::State<I, BT>>,
+    // Make sure the primary IDs are dropped last. Also note that the following hash map also stores
+    // the primary ID to the main table, and if the user (Bindings) attempts to remove the main
+    // table without dropping `main_table_id` first, it will panic. This serves as an assertion
+    // that the main table cannot be removed and Bindings must never attempt to remove the main
+    // routing table.
+    _tables: RwLock<HashMap<RoutingTableId<I, D>, PrimaryRc<RwLock<RoutingTable<I, D>>>>>,
 }
 
 impl<I: IpLayerIpExt, D: StrongDeviceIdentifier, BT: IpStateBindingsTypes> IpStateInner<I, D, BT> {
@@ -1459,16 +1526,15 @@ impl<I: IpLayerIpExt, D: StrongDeviceIdentifier, BT: IpStateBindingsTypes> IpSta
         &self.raw_socket_counters
     }
 
+    /// Gets the main table ID.
+    pub fn main_table_id(&self) -> &RoutingTableId<I, D> {
+        &self.main_table_id
+    }
+
     /// Provides direct access to the path MTU cache.
     #[cfg(any(test, feature = "testutils"))]
     pub fn pmtu_cache(&self) -> &Mutex<PmtuCache<I, BT>> {
         &self.pmtu_cache
-    }
-
-    /// Provides direct access to the forwarding table.
-    #[cfg(any(test, feature = "testutils"))]
-    pub fn table(&self) -> &RwLock<ForwardingTable<I, D>> {
-        &self.table
     }
 }
 
@@ -1480,8 +1546,15 @@ impl<
 {
     /// Creates a new inner IP layer state.
     pub fn new<CC: CoreTimerContext<IpLayerTimerId, BC>>(bindings_ctx: &mut BC) -> Self {
+        let main_table: PrimaryRc<RwLock<RoutingTable<I, D>>> = PrimaryRc::new(Default::default());
+        let main_table_id = RoutingTableId(PrimaryRc::clone_strong(&main_table));
         Self {
-            table: Default::default(),
+            _tables: RwLock::new(HashMap::from_iter(core::iter::once((
+                main_table_id.clone(),
+                main_table,
+            )))),
+            main_table_id,
+            multicast_forwarding: Default::default(),
             fragment_cache: Mutex::new(
                 IpPacketFragmentCache::new::<NestedIntoCoreTimerCtx<CC, _>>(bindings_ctx),
             ),
@@ -2973,7 +3046,7 @@ fn lookup_route_table<
     device: Option<&CC::DeviceId>,
     dst_ip: I::Addr,
 ) -> Option<Destination<I::Addr, CC::DeviceId>> {
-    core_ctx.with_ip_routing_table(|core_ctx, table| table.lookup(core_ctx, device, dst_ip))
+    core_ctx.with_main_ip_routing_table(|core_ctx, table| table.lookup(core_ctx, device, dst_ip))
 }
 
 /// Packed destination passed to [`IpDeviceSendContext::send_ip_frame`].

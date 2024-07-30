@@ -75,3 +75,11 @@ py_binary(
     python_version = "PY3",
     deps = [":common_types"],
 )
+
+py_binary(
+    name = "remove_license_segment",
+    srcs = ["remove_license_segment.py"],
+    main = "remove_license_segment.py",
+    python_version = "PY3",
+    deps = [],
+)

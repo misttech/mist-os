@@ -230,7 +230,7 @@ zx::result<> DsiHost::PerformPowerOpSequence(cpp20::span<const PowerOp> commands
                     zx_status_get_string(read_response.error_value()));
             return read_response.take_error();
           }
-          if (read_result.value()->value == op.value) {
+          if (read_result.value()->value == static_cast<bool>(op.value)) {
             break;
           }
           zx::nanosleep(zx::deadline_after(zx::msec(1)));

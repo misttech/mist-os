@@ -45,6 +45,7 @@ test("fake-framebuffer-tests-bin") {
     ":fake-framebuffer",
     "//sdk/lib/zbi-format",
     "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/predicates",
     "//third_party/googletest:gtest",
   ]
 }

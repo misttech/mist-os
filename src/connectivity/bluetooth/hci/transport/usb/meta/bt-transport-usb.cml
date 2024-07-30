@@ -15,4 +15,13 @@
         default_dispatcher_opts: [ "allow_sync_calls" ],
         fallback: "false",
     },
+    capabilities: [
+        { service: "fuchsia.hardware.bluetooth.HciService" },
+    ],
+    expose: [
+        {
+            service: "fuchsia.hardware.bluetooth.HciService",
+            from: "self",
+        },
+    ],
 }

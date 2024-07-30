@@ -58,8 +58,8 @@ command is run, the following steps need to be followed:
     `board_bootfs_labels` GN argument.
 4.  Include the `tests` build target in the `<PATH>:tests` build target to get
     your tests included in CQ.
-5.  Add proper bind rules in `<NAME>.bind`.
-6.  Add driver information in `<NAME>-info.json`. The file must include a
+5.  Add proper bind rules in `meta/<NAME>.bind`.
+6.  Add driver information in `meta/<NAME>-info.json`. The file must include a
     `short_description` and `areas` matching at least one of the areas listed at
     `//build/drivers/areas.txt`.
 7.  Write the functionality for the driver.
@@ -100,7 +100,7 @@ corresponding to the "using" statements in the bind file.
 
 ```
 driver_bind_rules("bind") {
-    rules = "ahci.bind"
+    rules = "meta/ahci.bind"
     bind_output = "ahci.bindbc"
     deps = [
         "//src/devices/bind/fuchsia.pci",

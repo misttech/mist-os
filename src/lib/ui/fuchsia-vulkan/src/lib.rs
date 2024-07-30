@@ -391,7 +391,7 @@ ptrs!(FuchsiaExtensionPointers, {
     ) -> vk::Result,
 });
 
-#[link(name = "vulkan")]
+// From libvulkan.so
 extern "C" {
     fn vkGetInstanceProcAddr(
         instance: vk::Instance,

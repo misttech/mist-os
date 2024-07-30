@@ -45,7 +45,10 @@ class ClockDispatcher final : public SoloDispatcher<ClockDispatcher, ZX_DEFAULT_
 
   ClockDispatcher(uint64_t options, zx_time_t backstop_time);
 
+  zx_ticks_t GetCurrentTicks() const;
+
   bool is_monotonic() const { return (options_ & ZX_CLOCK_OPT_MONOTONIC) != 0; }
+  bool is_boot() const { return (options_ & ZX_CLOCK_OPT_BOOT) != 0; }
   bool is_continuous() const { return (options_ & ZX_CLOCK_OPT_CONTINUOUS) != 0; }
   bool is_started() TA_REQ(seq_lock_) {
     // Note, we require that we hold the seq_lock_ exclusively here.  This
@@ -69,7 +72,8 @@ class ClockDispatcher final : public SoloDispatcher<ClockDispatcher, ZX_DEFAULT_
   using Payload = SeqLockPayload<T, decltype(seq_lock_)>;
   template <typename Policy>
   using SeqLockGuard = Guard<decltype(seq_lock_)::LockType, Policy>;
-  TA_GUARDED(seq_lock_) Payload<affine::Transform> ticks_to_synthetic_{0, 0, affine::Ratio{0, 1}};
+  TA_GUARDED(seq_lock_)
+  Payload<affine::Transform> ticks_to_synthetic_{0, 0, affine::Ratio{0, 1}};
   TA_GUARDED(seq_lock_) Payload<Params> params_;
 };
 

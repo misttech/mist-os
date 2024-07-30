@@ -61,8 +61,8 @@ impl FxBlob {
             handle.owner().pager().create_vmo(uncompressed_size, zx::VmoOptions::empty()).unwrap();
         let trimmed_merkle = &merkle_tree.root().to_string()[0..8];
         let name = format!("blob-{}", trimmed_merkle);
-        let cstr_name = std::ffi::CString::new(name).unwrap();
-        vmo.set_name(&cstr_name).unwrap();
+        let name = zx::Name::new(&name).unwrap();
+        vmo.set_name(&name).unwrap();
         let file = Arc::new(Self {
             handle,
             vmo,

@@ -21,7 +21,7 @@ pub struct guest_ethernet_t {
     _unused: [u8; 0], // Required for FFI safety.
 }
 
-#[link(name = "guest-ethernet")]
+// From libguest-ethernet.a
 extern "C" {
     // Heap allocates a C++ GuestEthernetContext object, initializes the minimal driver runtime and
     // dispatchers required for GuestEthernet objects to be created. If this returns an error

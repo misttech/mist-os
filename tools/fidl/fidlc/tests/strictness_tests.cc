@@ -5,7 +5,6 @@
 #include <gtest/gtest.h>
 
 #include "tools/fidl/fidlc/src/flat_ast.h"
-#include "tools/fidl/fidlc/src/source_file.h"
 #include "tools/fidl/fidlc/tests/test_library.h"
 
 namespace fidlc {
@@ -19,26 +18,24 @@ type One = strict union { 1: b bool; };
 type Two = strict strict union { 1: b bool; };
 type Three = strict strict strict union { 1: b bool; };
 )FIDL");
-  library.ExpectFail(ErrDuplicateModifier, Token::KindAndSubkind(Token::Subkind::kStrict));
-  library.ExpectFail(ErrDuplicateModifier, Token::KindAndSubkind(Token::Subkind::kStrict));
-  library.ExpectFail(ErrDuplicateModifier, Token::KindAndSubkind(Token::Subkind::kStrict));
+  library.ExpectFail(ErrDuplicateModifier, "modifier 'strict'");
+  library.ExpectFail(ErrDuplicateModifier, "modifier 'strict'");
+  library.ExpectFail(ErrDuplicateModifier, "modifier 'strict'");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(StrictnessTests, BadDuplicateModifierNonConsecutive) {
   TestLibrary library;
   library.AddFile("bad/fi-0032.noformat.test.fidl");
-  library.ExpectFail(ErrDuplicateModifier, Token::KindAndSubkind(Token::Subkind::kStrict));
+  library.ExpectFail(ErrDuplicateModifier, "modifier 'strict'");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(StrictnessTests, BadConflictingModifiers) {
   TestLibrary library;
   library.AddFile("bad/fi-0033.noformat.test.fidl");
-  library.ExpectFail(ErrConflictingModifier, Token::KindAndSubkind(Token::Subkind::kFlexible),
-                     Token::KindAndSubkind(Token::Subkind::kStrict));
-  library.ExpectFail(ErrConflictingModifier, Token::KindAndSubkind(Token::Subkind::kStrict),
-                     Token::KindAndSubkind(Token::Subkind::kFlexible));
+  library.ExpectFail(ErrConflictingModifier, "modifier 'flexible'", "modifier 'strict'");
+  library.ExpectFail(ErrConflictingModifier, "modifier 'strict'", "modifier 'flexible'");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 

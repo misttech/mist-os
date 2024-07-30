@@ -127,8 +127,8 @@ Once you have successfully connected to the `zxdb` debugger, you may want to:
 * [Control thread execution][zxdb-execution] (pausing, stepping, and resuming)
 * [Evaluate expressions][zxdb-expressions]
 * [Inspect memory][zxdb-memory]
+* [List handles and kernel objects][zxdb-kernel-objects]
 * [Work with assembly language][zxdb-assembly]
-* [Look at handles][zxdb-kernel-objects]
 * [Diagnose symbol problems][zxdb-symbols]
 * [Work with exceptions][zxdb-exceptions]
 * [See advanced zxdb topics][zxdb-advanced]

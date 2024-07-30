@@ -16,6 +16,7 @@ use {
 };
 
 pub mod async_interface;
+pub mod c_interface;
 
 #[derive(Clone)]
 pub struct PartitionInfo {
@@ -86,6 +87,7 @@ impl FifoMessageGroups {
 }
 
 /// BlockServer is an implementation of fuchsia.hardware.block.partition.Partition.
+/// cbindgen:no-export
 pub struct BlockServer<SM> {
     partition_info: PartitionInfo,
     session_manager: Arc<SM>,
@@ -160,26 +162,6 @@ impl<SM: SessionManager> BlockServer<SM> {
                         .clone()
                         .open_session(session.into_stream()?, self.partition_info.block_size),
                 ));
-            }
-            fvolume::VolumeRequest::ReadBlocks {
-                responder,
-                vmo: _,
-                length: _,
-                dev_offset: _,
-                vmo_offset: _,
-            } => {
-                // TODO(https://fxbug.dev/348077960): Implement or remove this
-                responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
-            }
-            fvolume::VolumeRequest::WriteBlocks {
-                responder,
-                vmo: _,
-                length: _,
-                dev_offset: _,
-                vmo_offset: _,
-            } => {
-                // TODO(https://fxbug.dev/348077960): Implement or remove this
-                responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
             }
             fvolume::VolumeRequest::GetTypeGuid { responder } => {
                 let mut guid = fpartition::Guid { value: [0u8; fpartition::GUID_LENGTH as usize] };
@@ -390,6 +372,46 @@ pub enum Operation {
 pub enum GroupOrRequest {
     Group(u16),
     Request(u32),
+}
+
+/// cbindgen:ignore
+const IS_GROUP: u64 = 0x8000_0000_0000_0000;
+/// cbindgen:ignore
+const USED_VMO: u64 = 0x4000_0000_0000_0000;
+#[repr(transparent)]
+#[derive(Clone, Copy, Eq, PartialEq, Hash)]
+pub struct RequestId(u64);
+
+impl RequestId {
+    /// Marks the request as having used a VMO, so that we keep the VMO alive until
+    /// the request has finished.
+    fn with_vmo(self) -> Self {
+        Self(self.0 | USED_VMO)
+    }
+
+    /// Returns whether the request ID indicates a VMO was used.
+    fn did_have_vmo(&self) -> bool {
+        self.0 & USED_VMO != 0
+    }
+}
+
+impl From<GroupOrRequest> for RequestId {
+    fn from(value: GroupOrRequest) -> Self {
+        match value {
+            GroupOrRequest::Group(group) => RequestId(group as u64 | IS_GROUP),
+            GroupOrRequest::Request(request) => RequestId(request as u64),
+        }
+    }
+}
+
+impl From<RequestId> for GroupOrRequest {
+    fn from(value: RequestId) -> Self {
+        if value.0 & IS_GROUP == 0 {
+            GroupOrRequest::Request(value.0 as u32)
+        } else {
+            GroupOrRequest::Group(value.0 as u16)
+        }
+    }
 }
 
 #[cfg(test)]

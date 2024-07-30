@@ -4,7 +4,7 @@
 
 #include "src/graphics/display/drivers/intel-i915/ddi-physical-layer-manager.h"
 
-#include <lib/ddk/debug.h>
+#include <lib/driver/logging/cpp/logger.h>
 #include <zircon/assert.h>
 
 #include "src/graphics/display/drivers/intel-i915/ddi-physical-layer.h"
@@ -75,7 +75,7 @@ DdiManagerTigerLake::DdiManagerTigerLake(Power* power, fdf::MmioBuffer* mmio_spa
                                          const IgdOpRegion& igd_opregion) {
   for (const DdiId ddi_id : DdiIds<registers::Platform::kTigerLake>()) {
     if (!igd_opregion.HasDdi(ddi_id)) {
-      zxlogf(TRACE, "DDI %d not initialized because it's omitted in VBT.", ddi_id);
+      FDF_LOG(TRACE, "DDI %d not initialized because it's omitted in VBT.", ddi_id);
       continue;
     }
 
@@ -83,7 +83,7 @@ DdiManagerTigerLake::DdiManagerTigerLake(Power* power, fdf::MmioBuffer* mmio_spa
       auto ddi = std::make_unique<ComboDdiTigerLake>(ddi_id, mmio_space);
       // TODO(https://fxbug.dev/42066037): Create an initialization API in the base class.
       if (!ddi->Initialize()) {
-        zxlogf(ERROR, "Failed to initialize DDI %d. It will remain unused.", ddi_id);
+        FDF_LOG(ERROR, "Failed to initialize DDI %d. It will remain unused.", ddi_id);
         continue;
       }
       auto [it, emplace_success] = ddi_map().try_emplace(ddi_id, std::move(ddi));

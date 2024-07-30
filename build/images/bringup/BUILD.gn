@@ -60,12 +60,6 @@ product_assembly_configuration("product_assembly_config") {
       filesystems = {
         image_name = "bringup"
         image_mode = "no_image"
-        volume = {
-          fvm = {
-            blob = {
-            }
-          }
-        }
       }
     }
   }
@@ -96,8 +90,6 @@ bringup_base = {
   include_shell_commands = false
 
   cmdline_deps = [ "//build/input:bootfs" ]
-
-  base_packages = []
 
   bootfs_labels = [
     "//build/input:bootfs",

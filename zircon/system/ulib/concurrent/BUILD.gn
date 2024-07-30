@@ -11,6 +11,7 @@ library_headers("headers") {
     "lib/concurrent/seqlock.h",
     "lib/concurrent/seqlock.inc.h",
     "lib/concurrent/chainlock.h",
+    "lib/concurrent/global_capability.h",
   ]
 }
 

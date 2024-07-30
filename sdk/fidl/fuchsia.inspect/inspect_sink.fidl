@@ -16,23 +16,15 @@ alias EscrowedVmo = zx.Handle:<VMO, zx.Rights.DUPLICATE | zx.Rights.READ | zx.Ri
 @available(added=16)
 const MAX_NAME_LENGTH uint64 = 4096;
 
-@discoverable(server="platform")
-@available(added=16, replaced=21)
-closed protocol InspectSink {
-    /// Publishes a handle to the `fuchsia.inspect.Tree` protocol that the
-    /// server can use to read Inspect data, including lazy nodes.
-    strict Publish(resource table {
-        1: tree client_end:Tree;
-        2: name string:MAX_NAME_LENGTH;
-    });
-};
+@available(added=NEXT)
+const DEFAULT_TREE_NAME string = "root";
 
 @discoverable(server="platform")
-@available(added=21)
-open protocol InspectSink {
+@available(added=16)
+closed(removed=21) open(added=21) protocol InspectSink {
     /// Publishes a handle to the `fuchsia.inspect.Tree` protocol that the
     /// server can use to read Inspect data, including lazy nodes.
-    flexible Publish(resource table {
+    strict(removed=21) flexible(added=21) Publish(resource table {
         /// The Tree that the server will use to fetch Inspect data.
         ///
         /// The connection will be closed if this isn't provided.

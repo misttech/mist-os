@@ -877,7 +877,7 @@ pub struct Task {
     ///
     /// The group of tasks in a thread group roughly corresponds to the userspace notion of a
     /// process.
-    pub thread_group: Arc<ThreadGroup>,
+    pub thread_group: OwnedRef<ThreadGroup>,
 
     /// A handle to the underlying Zircon thread object.
     ///
@@ -894,7 +894,7 @@ pub struct Task {
     mm: Option<Arc<MemoryManager>>,
 
     /// The file system for this task.
-    fs: Option<Arc<FsContext>>,
+    fs: Option<RwLock<Arc<FsContext>>>,
 
     /// The namespace for abstract AF_UNIX sockets for this task.
     pub abstract_socket_namespace: Arc<AbstractUnixSocketNamespace>,
@@ -1042,7 +1042,7 @@ impl Task {
     pub fn new(
         id: pid_t,
         command: CString,
-        thread_group: Arc<ThreadGroup>,
+        thread_group: OwnedRef<ThreadGroup>,
         thread: Option<zx::Thread>,
         files: FdTable,
         mm: Arc<MemoryManager>,
@@ -1071,7 +1071,7 @@ impl Task {
             thread: RwLock::new(thread),
             files,
             mm: Some(mm),
-            fs: Some(fs),
+            fs: Some(RwLock::new(fs)),
             abstract_socket_namespace,
             abstract_vsock_namespace,
             vfork_event,
@@ -1122,12 +1122,17 @@ impl Task {
         self.persistent_info.lock().exit_signal
     }
 
-    pub fn fs(&self) -> &Arc<FsContext> {
-        self.fs.as_ref().expect("fs must be set")
+    pub fn fs(&self) -> Arc<FsContext> {
+        self.fs.as_ref().expect("fs must be set").read().clone()
     }
 
     pub fn mm(&self) -> &Arc<MemoryManager> {
         self.mm.as_ref().expect("mm must be set")
+    }
+
+    pub fn unshare_fs(&self) {
+        let mut fs = self.fs.as_ref().expect("fs must be set").write();
+        *fs = fs.fork();
     }
 
     /// Overwrite the existing scheduler policy with a new one and update the task's thread's role.
@@ -1498,8 +1503,8 @@ impl Releasable for Task {
         let task = OwnedRef::take(&mut task).expect("task should not have been re-owned");
         let task: Self = ReleaseGuard::take(task);
 
-        // It is safe to drop the task, as it has been release by this method.
-        std::mem::drop(task);
+        // Release the ThreadGroup.
+        task.thread_group.release(());
     }
 }
 

@@ -4,14 +4,17 @@
 
 library fuchsia.driver.metadata.test;
 
-enum TEST_PARENT {
-  EXPOSE,
-  NO_EXPOSE,
+// Purpose of the driver that will bind to the node.
+enum PURPOSE {
+  RETRIEVE_METADATA,
+  SEND_METADATA,
+  FORWARD_METADATA
 };
 
-enum TEST_CHILD {
-  USE,
-  NO_USE,
-};
+// Whether or not the driver that binds to this node declares that it uses the metadata FIDL service
+// in its component manifest.
+bool USES_METADATA_FIDL_SERVICE;
 
-string TEST_GRANDCHILD;
+// Whether or not the driver that binds to this node declares that it exposes the metadata FIDL
+// service in its component manifest.
+bool EXPOSES_METADATA_FIDL_SERVICE;

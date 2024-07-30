@@ -2,8 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::fs::tmpfs::{TmpFs, TmpfsDirectory};
 use crate::mm::memory::MemoryObject;
-use crate::task::CurrentTask;
+use crate::task::{CurrentTask, Kernel};
 use crate::vfs::rw_queue::RwQueueReadGuard;
 use crate::vfs::{
     default_seek, emit_dotdot, fileops_impl_directory, fileops_impl_noop_sync,
@@ -18,7 +19,7 @@ use rand::Rng;
 use starnix_logging::{log_error, log_warn, track_stub};
 use starnix_sync::{
     BeforeFsNodeAppend, DeviceOpen, FileOpsCore, FsNodeAppend, LockBefore, LockEqualOrBefore,
-    Locked, RwLock, RwLockReadGuard, RwLockWriteGuard, Unlocked, WriteOps,
+    Locked, RwLock, RwLockReadGuard, RwLockWriteGuard, Unlocked,
 };
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::device_type::DeviceType;
@@ -28,6 +29,7 @@ use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::{errno, error, ino_t, off_t, statfs};
 use std::collections::{BTreeSet, HashMap};
 use std::sync::Arc;
+use syncio::zxio_node_attr_has_t;
 
 // Name and value for the xattr used to mark opaque directories in the upper FS.
 // See https://docs.kernel.org/filesystems/overlayfs.html#whiteouts-and-opaque-directories
@@ -277,7 +279,6 @@ impl OverlayNode {
         current_task: &CurrentTask,
     ) -> Result<&ActiveEntry, Errno>
     where
-        L: LockBefore<WriteOps>,
         L: LockEqualOrBefore<FileOpsCore>,
     {
         self.ensure_upper_maybe_copy(locked, current_task, UpperCopyMode::CopyAll)
@@ -291,7 +292,6 @@ impl OverlayNode {
         copy_mode: UpperCopyMode,
     ) -> Result<&ActiveEntry, Errno>
     where
-        L: LockBefore<WriteOps>,
         L: LockEqualOrBefore<FileOpsCore>,
     {
         self.upper.get_or_try_init(|| {
@@ -355,6 +355,11 @@ impl OverlayNode {
         })
     }
 
+    /// Checks if this node exists in the lower FS.
+    fn has_lower(&self) -> bool {
+        self.lower.is_some()
+    }
+
     /// Check that an item isn't present in the lower FS.
     fn lower_entry_exists(&self, current_task: &CurrentTask, name: &FsStr) -> Result<bool, Errno> {
         match &self.lower {
@@ -384,7 +389,6 @@ impl OverlayNode {
     ) -> Result<ActiveEntry, Errno>
     where
         F: Fn(&mut Locked<'_, L>, &ActiveEntry, &FsStr) -> Result<ActiveEntry, Errno>,
-        L: LockBefore<WriteOps>,
         L: LockEqualOrBefore<FileOpsCore>,
     {
         let upper = self.ensure_upper(locked, current_task)?;
@@ -713,6 +717,37 @@ impl FsNodeOps for Arc<OverlayNode> {
         Ok(RwLockWriteGuard::downgrade(lock))
     }
 
+    fn update_attributes(
+        &self,
+        locked: &mut Locked<'_, FileOpsCore>,
+        current_task: &CurrentTask,
+        new_info: &FsNodeInfo,
+        has: zxio_node_attr_has_t,
+    ) -> Result<(), Errno> {
+        let upper = self.ensure_upper(locked, current_task)?.entry();
+        upper.node.update_attributes(locked, current_task, |info| {
+            if has.modification_time {
+                info.time_modify = new_info.time_modify;
+            }
+            if has.access_time {
+                info.time_access = new_info.time_access;
+            }
+            if has.mode {
+                info.mode = new_info.mode;
+            }
+            if has.uid {
+                info.uid = new_info.uid;
+            }
+            if has.gid {
+                info.gid = new_info.gid;
+            }
+            if has.rdev {
+                info.rdev = new_info.rdev;
+            }
+            Ok(())
+        })
+    }
+
     fn append_lock_read<'a>(
         &'a self,
         locked: &'a mut Locked<'a, BeforeFsNodeAppend>,
@@ -908,7 +943,7 @@ impl FileOps for OverlayFile {
 
     fn write(
         &self,
-        locked: &mut Locked<'_, WriteOps>,
+        locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -990,6 +1025,35 @@ impl OverlayFs {
         let overlay_fs = Arc::new(OverlayFs { lower_fs, upper_fs, work });
         let root_node = OverlayNode::new(overlay_fs.clone(), Some(lower), Some(upper), None);
         let fs = FileSystem::new(current_task.kernel(), CacheMode::Uncached, overlay_fs, options)?;
+        fs.set_root(root_node);
+        Ok(fs)
+    }
+
+    /// Given a filesystem, wraps it in a tmpfs-backed writable overlayfs.
+    pub fn wrap_fs_in_writable_layer(
+        kernel: &Arc<Kernel>,
+        rootfs: FileSystemHandle,
+    ) -> Result<FileSystemHandle, Errno> {
+        let lower = ActiveEntry { entry: rootfs.root().clone(), mount: MountInfo::detached() };
+
+        // Create upper and work directories in an invisible tmpfs.
+        let invisible_tmp = TmpFs::new_fs(kernel);
+        let upper = ActiveEntry {
+            entry: invisible_tmp.insert_node(FsNode::new_root(TmpfsDirectory::new())),
+            mount: MountInfo::detached(),
+        };
+        let work = ActiveEntry {
+            entry: invisible_tmp.insert_node(FsNode::new_root(TmpfsDirectory::new())),
+            mount: MountInfo::detached(),
+        };
+
+        let lower_fs = rootfs.clone();
+        let upper_fs = invisible_tmp.clone();
+
+        let overlay_fs = Arc::new(OverlayFs { lower_fs, upper_fs, work });
+        let root_node = OverlayNode::new(overlay_fs.clone(), Some(lower), Some(upper), None);
+        let fs =
+            FileSystem::new(kernel, CacheMode::Uncached, overlay_fs, FileSystemOptions::default())?;
         fs.set_root(root_node);
         Ok(fs)
     }
@@ -1083,7 +1147,7 @@ impl FileSystemOps for Arc<OverlayFs> {
     ) -> Result<(), Errno> {
         let mut locked = Unlocked::new(); // TODO(https://fxbug.dev/320461648): Propagate Locked through FileSystemOps; needs to be before FileOpsCore
         let renamed = OverlayNode::from_fs_node(renamed)?;
-        if renamed.main_entry().entry().node.is_dir() {
+        if renamed.has_lower() && renamed.main_entry().entry().node.is_dir() {
             // Return EXDEV for directory renames. Potentially they may be handled with the
             // `redirect_dir` feature, but it's not implemented here yet.
             // See https://docs.kernel.org/filesystems/overlayfs.html#renaming-directories
@@ -1161,7 +1225,6 @@ fn copy_file_content<L>(
 ) -> Result<(), Errno>
 where
     L: LockEqualOrBefore<FileOpsCore>,
-    L: LockBefore<WriteOps>,
 {
     let from_file = from.entry().open_anonymous(locked, current_task, OpenFlags::RDONLY)?;
     let to_file = to.entry().open_anonymous(locked, current_task, OpenFlags::WRONLY)?;

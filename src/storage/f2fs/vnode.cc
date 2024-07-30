@@ -831,7 +831,7 @@ zx_status_t VnodeF2fs::SyncFile(bool datasync) {
     return ZX_OK;
   }
 
-  WritebackOperation op = {.bSync = true};
+  WritebackOperation op;
   Writeback(op);
 
   bool need_cp = NeedToCheckpoint();
@@ -1258,7 +1258,8 @@ pgoff_t VnodeF2fs::Writeback(WritebackOperation &operation) {
   }
   if (!pages_to_disk.is_empty() || operation.bSync) {
     sync_completion_t completion;
-    fs()->ScheduleWriter(operation.bSync ? &completion : nullptr, std::move(pages_to_disk));
+    fs()->ScheduleWriter(operation.bSync ? &completion : nullptr, std::move(pages_to_disk),
+                         operation.bSync);
     if (operation.bSync) {
       sync_completion_wait(&completion, ZX_TIME_INFINITE);
     }

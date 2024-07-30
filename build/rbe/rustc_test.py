@@ -3,18 +3,16 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import tempfile
-import unittest
 import shlex
 import sys
-from unittest import mock
+import tempfile
+import unittest
 from pathlib import Path
-
-import rustc
+from typing import Any, Collection, Sequence
+from unittest import mock
 
 import cl_utils
-
-from typing import Any, Collection, Sequence
+import rustc
 
 
 def _strs(items: Sequence[Any]) -> Sequence[str]:

@@ -5,15 +5,11 @@
 #![warn(clippy::all)]
 #![allow(unused_parens, unused_mut, unused_imports, nonstandard_style)]
 
-use {
-    bitflags::bitflags,
-    fidl::{
-        client::QueryResponseFut,
-        endpoints::{ControlHandle as _, Responder as _},
-    },
-    fuchsia_zircon_status as zx_status,
-    futures::future::{self, MaybeDone, TryFutureExt},
-};
+use bitflags::bitflags;
+use fidl::client::QueryResponseFut;
+use fidl::endpoints::{ControlHandle as _, Responder as _};
+use fuchsia_zircon_status as zx_status;
+use futures::future::{self, MaybeDone, TryFutureExt};
 
 #[cfg(target_os = "fuchsia")]
 use fuchsia_zircon as zx;
@@ -106,24 +102,24 @@ impl Enum {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[repr(C)]
 pub struct Struct {
     pub x: u32,
 }
 
-impl fidl::Persistable for Struct {}
+impl fidl::Standalone for Struct {}
 
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Debug, Default, PartialEq)]
 pub struct Table {
     pub x: Option<u32>,
     #[doc(hidden)]
     pub __source_breaking: fidl::marker::SourceBreaking,
 }
 
-impl fidl::Persistable for Table {}
+impl fidl::Standalone for Table {}
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub enum Union {
     X(u32),
     #[doc(hidden)]
@@ -173,7 +169,7 @@ impl Union {
     }
 }
 
-impl fidl::Persistable for Union {}
+impl fidl::Standalone for Union {}
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct OtherProtocolMarker;
@@ -580,7 +576,13 @@ impl futures::Stream for ProtocolEventStream {
 }
 
 #[derive(Debug)]
-pub enum ProtocolEvent {}
+pub enum ProtocolEvent {
+    #[non_exhaustive]
+    _UnknownEvent {
+        /// Ordinal of the event that was sent.
+        ordinal: u64,
+    },
+}
 
 impl ProtocolEvent {
     /// Decodes a message buffer as a [`ProtocolEvent`].
@@ -589,6 +591,9 @@ impl ProtocolEvent {
         let (tx_header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
         debug_assert_eq!(tx_header.tx_id, 0);
         match tx_header.ordinal {
+            _ if tx_header.dynamic_flags().contains(fidl::encoding::DynamicFlags::FLEXIBLE) => {
+                Ok(ProtocolEvent::_UnknownEvent { ordinal: tx_header.ordinal })
+            }
             _ => Err(fidl::Error::UnknownOrdinal {
                 ordinal: tx_header.ordinal,
                 protocol_name: <ProtocolMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME,
@@ -676,6 +681,29 @@ impl futures::Stream for ProtocolRequestStream {
                     let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
                     Ok(ProtocolRequest::Foo { control_handle })
                 }
+                _ if header.tx_id == 0
+                    && header.dynamic_flags().contains(fidl::encoding::DynamicFlags::FLEXIBLE) =>
+                {
+                    Ok(ProtocolRequest::_UnknownMethod {
+                        ordinal: header.ordinal,
+                        control_handle: ProtocolControlHandle { inner: this.inner.clone() },
+                        method_type: fidl::MethodType::OneWay,
+                    })
+                }
+                _ if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::FLEXIBLE) => {
+                    this.inner.send_framework_err(
+                        fidl::encoding::FrameworkErr::UnknownMethod,
+                        header.tx_id,
+                        header.ordinal,
+                        header.dynamic_flags(),
+                        (bytes, handles),
+                    )?;
+                    Ok(ProtocolRequest::_UnknownMethod {
+                        ordinal: header.ordinal,
+                        control_handle: ProtocolControlHandle { inner: this.inner.clone() },
+                        method_type: fidl::MethodType::TwoWay,
+                    })
+                }
                 _ => Err(fidl::Error::UnknownOrdinal {
                     ordinal: header.ordinal,
                     protocol_name: <ProtocolMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME,
@@ -687,7 +715,17 @@ impl futures::Stream for ProtocolRequestStream {
 
 #[derive(Debug)]
 pub enum ProtocolRequest {
-    Foo { control_handle: ProtocolControlHandle },
+    Foo {
+        control_handle: ProtocolControlHandle,
+    },
+    /// An interaction was received which does not match any known method.
+    #[non_exhaustive]
+    _UnknownMethod {
+        /// Ordinal of the method that was called.
+        ordinal: u64,
+        control_handle: ProtocolControlHandle,
+        method_type: fidl::MethodType,
+    },
 }
 
 impl ProtocolRequest {
@@ -704,6 +742,12 @@ impl ProtocolRequest {
     pub fn method_name(&self) -> &'static str {
         match *self {
             ProtocolRequest::Foo { .. } => "foo",
+            ProtocolRequest::_UnknownMethod { method_type: fidl::MethodType::OneWay, .. } => {
+                "unknown one-way method"
+            }
+            ProtocolRequest::_UnknownMethod { method_type: fidl::MethodType::TwoWay, .. } => {
+                "unknown two-way method"
+            }
         }
     }
 }
@@ -946,16 +990,16 @@ mod internal {
             true
         }
     }
-    impl fidl::encoding::ValueTypeMarker for Struct {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+    impl fidl::encoding::ResourceTypeMarker for Struct {
+        type Borrowed<'a> = &'a mut Self;
+        fn take_or_borrow<'a>(
+            value: &'a mut <Self as fidl::encoding::TypeMarker>::Owned,
         ) -> Self::Borrowed<'a> {
             value
         }
     }
 
-    unsafe impl fidl::encoding::Encode<Struct> for &Struct {
+    unsafe impl fidl::encoding::Encode<Struct> for &mut Struct {
         #[inline]
         unsafe fn encode(
             self,
@@ -1038,16 +1082,16 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker for Table {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+    impl fidl::encoding::ResourceTypeMarker for Table {
+        type Borrowed<'a> = &'a mut Self;
+        fn take_or_borrow<'a>(
+            value: &'a mut <Self as fidl::encoding::TypeMarker>::Owned,
         ) -> Self::Borrowed<'a> {
             value
         }
     }
 
-    unsafe impl fidl::encoding::Encode<Table> for &Table {
+    unsafe impl fidl::encoding::Encode<Table> for &mut Table {
         unsafe fn encode(
             self,
             encoder: &mut fidl::encoding::Encoder<'_>,
@@ -1194,16 +1238,16 @@ mod internal {
             16
         }
     }
-    impl fidl::encoding::ValueTypeMarker for Union {
-        type Borrowed<'a> = &'a Self;
-        fn borrow<'a>(
-            value: &'a <Self as fidl::encoding::TypeMarker>::Owned,
+    impl fidl::encoding::ResourceTypeMarker for Union {
+        type Borrowed<'a> = &'a mut Self;
+        fn take_or_borrow<'a>(
+            value: &'a mut <Self as fidl::encoding::TypeMarker>::Owned,
         ) -> Self::Borrowed<'a> {
             value
         }
     }
 
-    unsafe impl fidl::encoding::Encode<Union> for &Union {
+    unsafe impl fidl::encoding::Encode<Union> for &mut Union {
         #[inline]
         unsafe fn encode(
             self,

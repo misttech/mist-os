@@ -21,9 +21,12 @@ import tempfile
 import textwrap
 import typing
 
-import args
 import async_utils.command as command
 import async_utils.signals as signals
+import statusinfo
+import termout
+
+import args
 import config
 import console
 import dataparse
@@ -34,8 +37,6 @@ import execution
 import log
 import selection
 import selection_types
-import statusinfo
-import termout
 import test_list_file
 import tests_json_file
 
@@ -324,7 +325,9 @@ async def async_main(
         return 0
 
     # If enabled, try to build and update the selected tests.
-    if flags.build and not await do_build(selections, recorder, exec_env):
+    if flags.build and not await do_build(
+        selections, recorder, exec_env, flags.build_updates
+    ):
         recorder.emit_end("Failed to build.")
         return 1
 
@@ -388,9 +391,12 @@ async def async_main(
 
     # Finally, run all selected tests.
     if not await run_all_tests(selections, recorder, flags, exec_env):
-        if not flags.has_debugger():
+        if not flags.has_debugger() and not flags.host:
+            # Note: it is important that we put --break-on-failure before the rest of the command
+            # line arguments so that it is ensured that this fx test argument comes before any extra
+            # arguments are passed through to the test executable (e.g. after "--").
             recorder.emit_instruction_message(
-                "\nTo debug with zxdb: fx test {} --break-on-failure\n".format(
+                "\nTo debug with zxdb: fx test --break-on-failure {}\n".format(
                     " ".join(sys.argv[1:])
                 )
             )
@@ -604,6 +610,7 @@ async def do_build(
     tests: selection_types.TestSelections,
     recorder: event.EventRecorder,
     exec_env: environment.ExecutionEnvironment,
+    allow_build_updates: bool,
 ) -> bool:
     """Attempt to build the selected tests.
 
@@ -611,6 +618,7 @@ async def do_build(
         tests (selection.TestSelections): Tests to attempt to build.
         recorder (event.EventRecorder): Recorder for events.
         exec_env (environment.ExecutionEnvironment): Incoming execution environment.
+        allow_build_updates (bool): Whether to allow building updates. This is only used for e2e tests.
 
     Returns:
         bool: True only if the tests were built and published, False otherwise.
@@ -644,7 +652,7 @@ async def do_build(
             build_command_line.append(f"--toolchain={key}")
         build_command_line.extend(vals)
 
-    if tests.has_e2e_test():
+    if tests.has_e2e_test() and allow_build_updates:
         build_command_line.extend(["--default", "updates"])
 
     build_id = recorder.emit_build_start(targets=build_command_line)
@@ -896,6 +904,20 @@ async def run_all_tests(
         )
         recorder.emit_instruction_message(
             "\nYou do not seem to have a package server running, but you have selected at least one device test.\nEnsure that you have `fx serve` running and that you have selected your desired device using `fx set-device`.\n"
+        )
+        return False
+
+    # This is an error since no tests that were selected involved the device, even if the --host
+    # flag was not specified on the command line. If a test selection includes _some_ device tests,
+    # those are allowed. The existence of host tests among device tests is not a problem for the
+    # debugger integration, but users may be confused if they try to debug host tests with
+    # automatic selection.
+    if not tests.has_device_test() and flags.has_debugger():
+        recorder.emit_warning_message(
+            "\n--break-on-failure and --breakpoint flags are not supported with host tests."
+        )
+        recorder.emit_instruction_message(
+            "\nRemove the --break-on-failure and --breakpoint flags to run these host-only tests."
         )
         return False
 

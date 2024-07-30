@@ -18,7 +18,6 @@
 #include <cstdint>
 #include <optional>
 #include <string_view>
-#include <type_traits>
 
 namespace devicetree {
 namespace {

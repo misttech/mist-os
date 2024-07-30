@@ -1,4 +1,3 @@
-#!/usr/bin/env fuchsia-vendored-python
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
@@ -6,11 +5,10 @@
 
 import json
 import unittest
-from unittest.mock import patch
 from typing import Any
+from unittest.mock import patch
 
 import yaml
-
 from mobly_driver.driver import common
 
 

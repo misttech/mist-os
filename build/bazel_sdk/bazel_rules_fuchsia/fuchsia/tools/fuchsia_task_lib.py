@@ -7,11 +7,10 @@ import argparse
 import json
 import os
 import sys
-
 from abc import abstractmethod
 from contextlib import contextmanager
 from enum import Enum
-from functools import cached_property, total_ordering, reduce
+from functools import cached_property, reduce, total_ordering
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 

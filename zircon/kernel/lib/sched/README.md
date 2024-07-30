@@ -37,7 +37,11 @@ capacities, giving the total duration of execution time a thread expects within
 an activation period.
 
 All _runnable_ threads (i.e., the currently running thread or those queued and
-ready to be run) contribute both firm and flexible demand.
+ready to be run) contribute both firm and flexible demand. Further, threads that
+become blocked will contribute _firm_ demand for the remainder of the activation
+period in which that took place. This allows threads that quickly unblock to
+complete the still-accounted-for firm work they set out to do in that period and
+not be penalized.
 
 ## Thread selection
 
@@ -63,3 +67,6 @@ the following times:
   continue uninterrupted;
 * The starting time of a thread - if any - that would be eligible at the earlier
   of the above times and finish before the currently selected.
+* The earliest finish time among all threads still blocked and within their
+  current activation periods (allowing us to free up the firm demand they were
+  holding onto).

@@ -4,8 +4,8 @@
 # found in the LICENSE file.
 """Create a Driver Manifest from a list of driver paths"""
 
-import json
 import argparse
+import json
 
 
 def main():

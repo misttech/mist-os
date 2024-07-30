@@ -16,6 +16,7 @@ source_set("object-info") {
   ]
   deps = [
     "//sdk/lib/stdcompat",
+    "//src/lib/fxl",
     "//src/zircon/testing/maybe-standalone-test",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/mini-process",

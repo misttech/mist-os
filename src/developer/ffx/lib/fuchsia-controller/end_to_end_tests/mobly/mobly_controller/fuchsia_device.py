@@ -4,17 +4,15 @@
 """Mobly Controller for Fuchsia Device (controlled via Fuchsia Controller)."""
 
 import asyncio
+import ipaddress
 import logging
 import os
 import os.path
 import time
-import ipaddress
 from typing import Any, Callable, Coroutine
 
 import fidl.fuchsia_developer_ffx as ffx
-from fuchsia_controller_py import Context
-from fuchsia_controller_py import IsolateDir
-from fuchsia_controller_py import ZxStatus
+from fuchsia_controller_py import Context, IsolateDir, ZxStatus
 from mobly import base_test
 
 MOBLY_CONTROLLER_CONFIG_NAME = "FuchsiaDevice"

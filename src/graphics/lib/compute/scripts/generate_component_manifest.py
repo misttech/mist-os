@@ -5,9 +5,9 @@
 """Generate a Fuchsia component manifest for graphics compute targets."""
 from __future__ import print_function
 
-import os
 import argparse
 import json
+import os
 import sys
 
 _COMPONENT_TYPES = [

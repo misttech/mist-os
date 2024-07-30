@@ -1,5 +1,4 @@
 # mypy: ignore-errors
-#!/usr/bin/env fuchsia-vendored-python
 # Copyright 2024 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
@@ -81,9 +80,9 @@ class BluetoothCommon(bluetooth_common.BluetoothCommon):
         self.known_devices: dict[str, Any]
         self.loop = None
         self._peer_update_task: asyncio.Task[None] | None = None
-        self._peer_update_queue: asyncio.Queue[
-            f_btsys_controller.Peer
-        ] | None = None
+        self._peer_update_queue: (
+            asyncio.Queue[f_btsys_controller.Peer] | None
+        ) = None
         self._session_initialized: bool = False
         self._access_controller_proxy: (
             f_btsys_controller.Access.Client | None

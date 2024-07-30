@@ -74,7 +74,7 @@ TEST(LoopBackedDispatcher, DispatchIrq) {
   irq_handler.Begin(dispatcher->async_dispatcher());
 
   status = irq_handler_invoked.Wait(zx::sec(1));
-  EXPECT_EQ(status, ZX_ERR_TIMED_OUT);
+  EXPECT_STATUS(status, ZX_ERR_TIMED_OUT);
 
   // Manually trigger the virtual interrupt.
   static constexpr zx::time kIrqTimestamp1 = zx::time(0x12345678);

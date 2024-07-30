@@ -4,6 +4,8 @@
 
 #include "src/graphics/display/drivers/intel-i915/poll-until.h"
 
+#include <lib/driver/testing/cpp/scoped_global_logger.h>
+
 #include <gtest/gtest.h>
 
 namespace i915 {
@@ -27,7 +29,12 @@ class PredicateCounter {
   int threshold_;
 };
 
-TEST(PollUntilTest, TrueOnFirstPoll) {
+class PollUntilTest : public ::testing::Test {
+ private:
+  fdf_testing::ScopedGlobalLogger logger_;
+};
+
+TEST_F(PollUntilTest, TrueOnFirstPoll) {
   PredicateCounter always_true(0);
 
   const bool poll_result =
@@ -36,7 +43,7 @@ TEST(PollUntilTest, TrueOnFirstPoll) {
   EXPECT_EQ(1, always_true.counter());
 }
 
-TEST(PollUntilTest, TrueAfterTwoPolls) {
+TEST_F(PollUntilTest, TrueAfterTwoPolls) {
   PredicateCounter always_true(2);
 
   const bool poll_result =
@@ -45,7 +52,7 @@ TEST(PollUntilTest, TrueAfterTwoPolls) {
   EXPECT_EQ(2, always_true.counter());
 }
 
-TEST(PollUntilTest, TrueAfterMaximuPolls) {
+TEST_F(PollUntilTest, TrueAfterMaximuPolls) {
   PredicateCounter always_true(10);
 
   const bool poll_result =
@@ -54,7 +61,7 @@ TEST(PollUntilTest, TrueAfterMaximuPolls) {
   EXPECT_EQ(10, always_true.counter());
 }
 
-TEST(PollUntilTest, Timeout) {
+TEST_F(PollUntilTest, Timeout) {
   PredicateCounter always_true(100);
 
   const bool poll_result =

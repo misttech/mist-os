@@ -6,9 +6,9 @@
 #include <fidl/fuchsia.sysmem2/cpp/wire.h>
 #include <lib/ddk/platform-defs.h>
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
-#include "usage_pixel_format_cost.h"
+#include "src/devices/sysmem/drivers/sysmem/usage_pixel_format_cost.h"
 
 namespace sysmem_driver {
 namespace {
@@ -144,10 +144,10 @@ TEST(PixelFormatCost, IntelTiling) {
     }
 
     for (uint32_t i = 1; i < modifier_list.size(); ++i) {
-      EXPECT_LT(0, UsagePixelFormatCost::Compare(kUnknownVid, kUnknownPid, constraints, i - 1, i),
-                "i=%d", i);
-      EXPECT_GT(0, UsagePixelFormatCost::Compare(kUnknownVid, kUnknownPid, constraints, i, i - 1),
-                "i=%d", i);
+      EXPECT_LT(0, UsagePixelFormatCost::Compare(kUnknownVid, kUnknownPid, constraints, i - 1, i))
+          << "i=" << i;
+      EXPECT_GT(0, UsagePixelFormatCost::Compare(kUnknownVid, kUnknownPid, constraints, i, i - 1))
+          << "i=" << i;
     }
   }
 }
@@ -220,14 +220,12 @@ TEST(PixelFormatCost, AfbcWithFlags) {
     }
 
     for (uint32_t i = 1; i < modifier_list.size(); ++i) {
-      EXPECT_LT(0,
-                UsagePixelFormatCost::Compare(PDEV_VID_AMLOGIC, PDEV_PID_AMLOGIC_S912, constraints,
-                                              i - 1, i),
-                "i=%d", i);
-      EXPECT_GT(0,
-                UsagePixelFormatCost::Compare(PDEV_VID_AMLOGIC, PDEV_PID_AMLOGIC_S912, constraints,
-                                              i, i - 1),
-                "i=%d", i);
+      EXPECT_LT(0, UsagePixelFormatCost::Compare(PDEV_VID_AMLOGIC, PDEV_PID_AMLOGIC_S912,
+                                                 constraints, i - 1, i))
+          << "i=" << i;
+      EXPECT_GT(0, UsagePixelFormatCost::Compare(PDEV_VID_AMLOGIC, PDEV_PID_AMLOGIC_S912,
+                                                 constraints, i, i - 1))
+          << "i=%d" << i;
       EXPECT_EQ(0, UsagePixelFormatCost::Compare(0u, PDEV_PID_AMLOGIC_S912, constraints, i - 1, i));
       EXPECT_EQ(0, UsagePixelFormatCost::Compare(0u, PDEV_PID_AMLOGIC_S912, constraints, i, i - 1));
     }

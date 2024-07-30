@@ -11,8 +11,8 @@ fuchsia_driver_package("virtual_audio") {
 }
 
 driver_bind_rules("virtual_audio_bind") {
-  rules = "virtual_audio.bind"
-  tests = "bind_tests.json"
+  rules = "meta/virtual_audio.bind"
+  tests = "meta/bind_tests.json"
   deps = [ "//src/devices/bind/fuchsia.platform" ]
 }
 
@@ -63,7 +63,7 @@ fuchsia_driver("virtual_audio_driver-driver") {
 fuchsia_driver_component("virtual_audio_driver") {
   component_name = "virtual_audio_driver"
   deps = [ ":virtual_audio_driver-driver" ]
-  info = "virtual_audio-info.json"
+  info = "meta/virtual_audio-info.json"
   manifest = "meta/virtual_audio_driver.cml"
 }
 

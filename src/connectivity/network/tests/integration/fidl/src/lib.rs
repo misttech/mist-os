@@ -12,7 +12,7 @@ use {
 };
 
 use futures::{FutureExt as _, StreamExt as _, TryStreamExt as _};
-use net_declare::{fidl_mac, fidl_subnet, net_mac, std_ip_v4, std_ip_v6, std_socket_addr};
+use net_declare::{fidl_mac, fidl_subnet, net_ip_v4, net_ip_v6, net_mac, std_socket_addr};
 use netemul::RealmUdpSocket as _;
 use netstack_testing_common::realms::{
     constants, KnownServiceProvider, Netstack, TestSandboxExt as _,
@@ -210,11 +210,8 @@ fn test_forwarding_v4(
         iface1_addr: fidl_subnet!("192.168.1.1/24"),
         iface2_addr: fidl_subnet!("192.168.2.1/24"),
         forwarding_config,
-        // TODO(https://fxbug.dev/42157968): Use `std_ip_v4!(..).into()`.
-        // TODO(https://fxbug.dev/42158038): Use `net_declare` macros to create
-        // `net_types` addresses.
-        src_ip: net_types::ip::Ipv4Addr::new(std_ip_v4!("192.168.1.2").octets()),
-        dst_ip: net_types::ip::Ipv4Addr::new(std_ip_v4!("192.168.2.2").octets()),
+        src_ip: net_ip_v4!("192.168.1.2"),
+        dst_ip: net_ip_v4!("192.168.2.2"),
         expect_forward,
     }
 }
@@ -227,11 +224,8 @@ fn test_forwarding_v6(
         iface1_addr: fidl_subnet!("a::1/64"),
         iface2_addr: fidl_subnet!("b::1/64"),
         forwarding_config,
-        // TODO(https://fxbug.dev/42157968): Use `std_ip_v6!(..).into()`.
-        // TODO(https://fxbug.dev/42158038): Use `net_declare` macros to create
-        // `net_types` addresses.
-        src_ip: net_types::ip::Ipv6Addr::from_bytes(std_ip_v6!("a::2").octets()),
-        dst_ip: net_types::ip::Ipv6Addr::from_bytes(std_ip_v6!("b::2").octets()),
+        src_ip: net_ip_v6!("a::2"),
+        dst_ip: net_ip_v6!("b::2"),
         expect_forward,
     }
 }

@@ -29,6 +29,10 @@ declare_args() {
   # Generate a UEFI disk image
   build_uefi_disk = false
 
+  # Skip generating a UEFI disk for a product whose board defines
+  # `build_uefi_disk`
+  product_skip_uefi_disk = false
+
   # Generate installer disk image (ISO) to be flashed to a USB drive.
   # Will be located at obj/build/images/installer relative to the build directory.
   # See https://fuchsia.dev/fuchsia-src/development/hardware/installer
@@ -180,10 +184,12 @@ declare_args() {
   # exactly what you are doing.
   use_bazel_images_only = false
 
-  # bazel_product_bundle_[root|prefix|board] together identifies the
+  # bazel_product_bundle_[full|root|prefix|board] together identifies the
   # bazel_product_bundle target in GN target to use in Bazel assembly. The
   # actual target used is:
   #
+  #   ${bazel_product_bundle_full}.${bazel_product_bundle_board}
+  #   if ${bazel_product_bundle_full} is defined, else
   #   ${bazel_product_bundle_root}/${bazel_product_bundle_prefix}.${bazel_product_bundle_board}
   #
   # NOTE: bazel_product_bundle_prefix should contain the fully qualified path
@@ -200,6 +206,7 @@ declare_args() {
   #
   #   //build/bazel/assembly:minimal.x64
   #
+  bazel_product_bundle_full = false
   bazel_product_bundle_root = "//"
   bazel_product_bundle_prefix = false
   bazel_product_bundle_board = false
@@ -239,13 +246,17 @@ update_platform_epoch = 1
 # to the label of a fuchsia_product_bundle() in the Bazel graph.
 if (use_bazel_images_only) {
   assert(
-      bazel_product_bundle_prefix != false &&
-          bazel_product_bundle_board != false,
-      "Both bazel_product_bundle_prefix and bazel_product_bundle_board must be set when use_bazel_images_only=true. Seeing bazel_product_bundle_prefix=${bazel_product_bundle_prefix}, bazel_product_bundle_board=${bazel_product_bundle_board}")
+      bazel_product_bundle_full != false ||
+          (bazel_product_bundle_prefix != false &&
+               bazel_product_bundle_board != false),
+      "Either bazel_product_bundle_full must be set, or both bazel_product_bundle_prefix and bazel_product_bundle_board must be set when use_bazel_images_only=true. Seeing bazel_product_bundle_full=${bazel_product_bundle_full}, bazel_product_bundle_prefix=${bazel_product_bundle_prefix}, bazel_product_bundle_board=${bazel_product_bundle_board}")
 }
 
-if (bazel_product_bundle_prefix != false &&
-    bazel_product_bundle_board != false) {
+if (bazel_product_bundle_full != false && bazel_product_bundle_board != "") {
+  bazel_product_bundle_target =
+      bazel_product_bundle_full + "." + bazel_product_bundle_board
+} else if (bazel_product_bundle_prefix != false &&
+           bazel_product_bundle_board != false) {
   bazel_product_bundle_target =
       bazel_product_bundle_root + "/" + bazel_product_bundle_prefix + "." +
       bazel_product_bundle_board

@@ -30,13 +30,18 @@ class TimerTest : public zxtest::Test {
     ASSERT_OK(dispatcher_loop_->StartThread("test-timer-worker", nullptr));
   }
 
+  void TearDown() override {
+    dispatcher_loop_->Quit();
+    dispatcher_loop_->JoinThreads();
+  }
+
  protected:
-  std::unique_ptr<TimerInfo> CreateTimer(Timer::FunctionPtr callback) {
-    auto info = std::make_unique<TimerInfo>(dispatcher_loop_->dispatcher(), callback);
-    return info;
+  void CreateTimer(Timer::FunctionPtr callback) {
+    timer_info_ = std::make_unique<TimerInfo>(dispatcher_loop_->dispatcher(), callback);
   }
 
   std::unique_ptr<async::Loop> dispatcher_loop_;
+  std::unique_ptr<TimerInfo> timer_info_;
 };
 
 TEST(TimerTest, Constructible) { Timer timer(nullptr, nullptr, nullptr); }
@@ -61,20 +66,20 @@ TEST_F(TimerTest, OneShot) {
     sync_completion_signal(&info->completion);
   };
 
-  std::unique_ptr<TimerInfo> info = CreateTimer(callback);
+  CreateTimer(callback);
 
   zx_time_t start = zx_clock_get_monotonic();
   constexpr zx_duration_t kDelay = ZX_MSEC(5);
-  ASSERT_OK(info->timer.StartOneshot(kDelay));
+  ASSERT_OK(timer_info_->timer.StartOneshot(kDelay));
 
   // Ensure that the timer calls its callback.
-  ASSERT_OK(sync_completion_wait(&info->completion, ZX_TIME_INFINITE));
+  ASSERT_OK(sync_completion_wait(&timer_info_->completion, ZX_TIME_INFINITE));
   zx_time_t end = zx_clock_get_monotonic();
   // Ensure that at least the specified amount of time has passed.
   ASSERT_GE(end - start, kDelay);
 
   // Ensure that stopping a stopped timer works.
-  ASSERT_OK(info->timer.Stop());
+  ASSERT_OK(timer_info_->timer.Stop());
 }
 
 TEST_F(TimerTest, Periodic) {
@@ -86,17 +91,17 @@ TEST_F(TimerTest, Periodic) {
     }
   };
 
-  std::unique_ptr<TimerInfo> info = CreateTimer(callback);
+  CreateTimer(callback);
 
   constexpr zx_duration_t kInterval = ZX_MSEC(3);
 
   zx_time_t start = zx_clock_get_monotonic();
-  ASSERT_OK(info->timer.StartPeriodic(kInterval));
+  ASSERT_OK(timer_info_->timer.StartPeriodic(kInterval));
   // Ensure completion of periodic timer
-  ASSERT_OK(sync_completion_wait(&info->completion, ZX_TIME_INFINITE));
+  ASSERT_OK(sync_completion_wait(&timer_info_->completion, ZX_TIME_INFINITE));
   zx_time_t end = zx_clock_get_monotonic();
 
-  ASSERT_OK(info->timer.Stop());
+  ASSERT_OK(timer_info_->timer.Stop());
 
   // Ensure that at least two time the interval has passed.
   ASSERT_GE(end - start, 2 * kInterval);
@@ -115,12 +120,12 @@ TEST_F(TimerTest, StartTimerInCallback) {
     }
   };
 
-  std::unique_ptr<TimerInfo> info = CreateTimer(callback);
+  CreateTimer(callback);
 
   zx_time_t start = zx_clock_get_monotonic();
-  ASSERT_OK(info->timer.StartOneshot(kDelay));
+  ASSERT_OK(timer_info_->timer.StartOneshot(kDelay));
   // Ensure the completion is signaled
-  ASSERT_OK(sync_completion_wait(&info->completion, ZX_TIME_INFINITE));
+  ASSERT_OK(sync_completion_wait(&timer_info_->completion, ZX_TIME_INFINITE));
   zx_time_t end = zx_clock_get_monotonic();
 
   // The nested timer waited twice as long, ensure the total wait is at least three times the delay.
@@ -137,13 +142,13 @@ TEST_F(TimerTest, StopTimerInCallback) {
     }
   };
 
-  std::unique_ptr<TimerInfo> info = CreateTimer(callback);
+  CreateTimer(callback);
 
   constexpr zx_duration_t interval = ZX_MSEC(2);
   zx_time_t start = zx_clock_get_monotonic();
-  ASSERT_OK(info->timer.StartPeriodic(interval));
+  ASSERT_OK(timer_info_->timer.StartPeriodic(interval));
   // Ensure the completion is signaled
-  ASSERT_OK(sync_completion_wait(&info->completion, ZX_TIME_INFINITE));
+  ASSERT_OK(sync_completion_wait(&timer_info_->completion, ZX_TIME_INFINITE));
   zx_time_t end = zx_clock_get_monotonic();
 
   // The callback signaled on the second call, two intervals should have elapsed.
@@ -155,7 +160,7 @@ TEST_F(TimerTest, StopTimerInCallback) {
   zx_nanosleep(zx_deadline_after(50 * interval));
 
   // After all this time the counter should still only be two.
-  ASSERT_EQ(2, info->counter.load());
+  ASSERT_EQ(2, timer_info_->counter.load());
 }
 
 TEST_F(TimerTest, ZeroDelay) {
@@ -164,12 +169,12 @@ TEST_F(TimerTest, ZeroDelay) {
     sync_completion_signal(&info->completion);
   };
 
-  std::unique_ptr<TimerInfo> info = CreateTimer(callback);
+  CreateTimer(callback);
 
   // Starting a timer with a delay of zero should work and trigger as soon as the thread is
   // scheduled.
-  ASSERT_OK(info->timer.StartOneshot(0));
-  ASSERT_OK(sync_completion_wait(&info->completion, ZX_TIME_INFINITE));
+  ASSERT_OK(timer_info_->timer.StartOneshot(0));
+  ASSERT_OK(sync_completion_wait(&timer_info_->completion, ZX_TIME_INFINITE));
 }
 
 TEST_F(TimerTest, NegativeDelay) {
@@ -178,10 +183,10 @@ TEST_F(TimerTest, NegativeDelay) {
     sync_completion_signal(&info->completion);
   };
 
-  std::unique_ptr<TimerInfo> info = CreateTimer(callback);
+  CreateTimer(callback);
 
   // Starting a timer with a negative delay should not work.
-  ASSERT_EQ(ZX_ERR_INVALID_ARGS, info->timer.StartOneshot(-100));
+  ASSERT_EQ(ZX_ERR_INVALID_ARGS, timer_info_->timer.StartOneshot(-100));
 }
 
 TEST_F(TimerTest, MultiThreadedDispatcher) {
@@ -198,42 +203,42 @@ TEST_F(TimerTest, MultiThreadedDispatcher) {
     }
   };
 
-  std::unique_ptr<TimerInfo> info = CreateTimer(callback);
+  CreateTimer(callback);
 
   constexpr zx_duration_t kInterval = ZX_MSEC(1);
   zx_time_t start = zx_clock_get_monotonic();
-  ASSERT_OK(info->timer.StartPeriodic(kInterval));
+  ASSERT_OK(timer_info_->timer.StartPeriodic(kInterval));
 
-  ASSERT_OK(sync_completion_wait(&info->completion, ZX_TIME_INFINITE));
+  ASSERT_OK(sync_completion_wait(&timer_info_->completion, ZX_TIME_INFINITE));
   zx_time_t end = zx_clock_get_monotonic();
 
   // The callback signaled on the second call, two intervals should have elapsed.
   ASSERT_GE(end - start, kIterations * kInterval);
 
-  ASSERT_OK(info->timer.Stop());
+  ASSERT_OK(timer_info_->timer.Stop());
 
   // The counter should have been increased sufficiently before the completion signaled.
-  ASSERT_GE(info->counter.load(), kIterations);
+  ASSERT_GE(timer_info_->counter.load(), kIterations);
 }
 
 TEST_F(TimerTest, StartStopFromMultipleThreads) {
   auto callback = [](void*) {};
 
-  std::unique_ptr<TimerInfo> info = CreateTimer(callback);
+  CreateTimer(callback);
 
   std::atomic<bool> running = true;
 
   auto one = [&]() {
     while (running) {
-      ASSERT_OK(info->timer.Stop());
-      ASSERT_OK(info->timer.StartOneshot(0));
+      ASSERT_OK(timer_info_->timer.Stop());
+      ASSERT_OK(timer_info_->timer.StartOneshot(0));
       std::this_thread::yield();
     }
   };
   auto two = [&]() {
     while (running) {
-      ASSERT_OK(info->timer.StartPeriodic(ZX_MSEC(1)));
-      ASSERT_OK(info->timer.Stop());
+      ASSERT_OK(timer_info_->timer.StartPeriodic(ZX_MSEC(1)));
+      ASSERT_OK(timer_info_->timer.Stop());
     }
   };
 
@@ -252,7 +257,7 @@ TEST_F(TimerTest, StartFromCallback) {
     info->timer.StartOneshot(ZX_MSEC(5));
   };
 
-  std::unique_ptr<TimerInfo> info = CreateTimer(callback);
+  CreateTimer(callback);
 }
 
 }  // anonymous namespace

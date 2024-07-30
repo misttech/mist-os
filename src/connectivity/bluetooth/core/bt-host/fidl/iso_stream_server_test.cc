@@ -4,6 +4,7 @@
 
 #include "iso_stream_server.h"
 
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/iso/fake_iso_stream.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/loop_fixture.h"
 
 namespace bthost {
@@ -49,6 +50,7 @@ class IsoStreamServerTest : public TestingBase {
         [this](::fuchsia::bluetooth::le::IsochronousStreamOnEstablishedRequest request) {
           on_established_events_.push(std::move(request));
         };
+    fake_iso_stream_ = std::make_unique<bt::iso::testing::FakeIsoStream>();
   }
 
   void TearDown() override {
@@ -58,22 +60,43 @@ class IsoStreamServerTest : public TestingBase {
     TestingBase::TearDown();
   }
 
+  void CallSetupDataPath(fuchsia::bluetooth::DataDirection data_direction,
+                         fuchsia::bluetooth::CodecAttributes codec_attributes,
+                         std::optional<zx_status_t>* status_out);
+
  protected:
   void OnClosed() { on_closed_called_times_++; }
   void CloseProxy() { client_ = nullptr; }
   IsoStreamServer* server() const { return server_.get(); }
   std::optional<zx_status_t> epitaph() const { return epitaph_; }
+  bt::iso::testing::FakeIsoStream* fake_iso_stream() { return fake_iso_stream_.get(); }
+
   std::queue<::fuchsia::bluetooth::le::IsochronousStreamOnEstablishedRequest>
       on_established_events_;
   uint32_t on_closed_called_times_ = 0;
+  fuchsia::bluetooth::le::IsochronousStreamPtr client_;
 
  private:
   std::unique_ptr<IsoStreamServer> server_;
-  fuchsia::bluetooth::le::IsochronousStreamPtr client_;
   std::optional<zx_status_t> epitaph_;
+  std::unique_ptr<bt::iso::testing::FakeIsoStream> fake_iso_stream_;
 
   BT_DISALLOW_COPY_AND_ASSIGN_ALLOW_MOVE(IsoStreamServerTest);
 };
+
+void IsoStreamServerTest::CallSetupDataPath(fuchsia::bluetooth::DataDirection data_direction,
+                                            fuchsia::bluetooth::CodecAttributes codec_attributes,
+                                            std::optional<zx_status_t>* status_out) {
+  fuchsia::bluetooth::le::IsochronousStreamSetupDataPathRequest request;
+  request.set_data_direction(data_direction);
+  request.set_codec_attributes(std::move(codec_attributes));
+  request.set_controller_delay(0);
+  client_->SetupDataPath(std::move(request), [status_out](auto result) {
+    if (result.is_err())
+      *status_out = result.err();
+  });
+  RunLoopUntilIdle();
+}
 
 TEST_F(IsoStreamServerTest, ClosedServerSide) {
   server()->Close(ZX_ERR_WRONG_TYPE);
@@ -94,8 +117,7 @@ TEST_F(IsoStreamServerTest, ClosedClientSide) {
 // it sends the stream parameters back to the client.
 TEST_F(IsoStreamServerTest, StreamEstablishedSuccessfully) {
   EXPECT_EQ(on_established_events_.size(), (size_t)0);
-  bt::iso::IsoStream::WeakPtr null_stream_ptr;
-  server()->OnStreamEstablished(null_stream_ptr, kCisParameters);
+  server()->OnStreamEstablished(fake_iso_stream()->GetWeakPtr(), kCisParameters);
   RunLoopUntilIdle();
   ASSERT_EQ(on_established_events_.size(), (size_t)1);
 
@@ -157,6 +179,73 @@ TEST_F(IsoStreamServerTest, StreamNotEstablished) {
   EXPECT_EQ(event2.result(), ZX_ERR_INTERNAL);
   ASSERT_FALSE(event2.has_established_params());
   on_established_events_.pop();
+}
+
+fuchsia::bluetooth::CodecAttributes BuildCodecAttributes() {
+  fuchsia::bluetooth::CodecAttributes codec_attributes;
+  fuchsia::bluetooth::CodecId codec_id;
+  codec_id.set_assigned_format(fuchsia::bluetooth::AssignedCodingFormat::MSBC);
+  codec_attributes.set_codec_id(std::move(codec_id));
+  return codec_attributes;
+}
+
+TEST_F(IsoStreamServerTest, SetupDataPathInvalidDirection) {
+  fuchsia::bluetooth::CodecAttributes codec_attributes = BuildCodecAttributes();
+  std::optional<zx_status_t> status;
+  CallSetupDataPath(fuchsia::bluetooth::DataDirection::INPUT, std::move(codec_attributes), &status);
+  EXPECT_TRUE(status.has_value());
+  EXPECT_EQ(*status, ZX_ERR_NOT_SUPPORTED);
+}
+
+TEST_F(IsoStreamServerTest, SetupDataPathBeforeCisEstablished) {
+  fuchsia::bluetooth::CodecAttributes codec_attributes = BuildCodecAttributes();
+  std::optional<zx_status_t> status;
+  CallSetupDataPath(fuchsia::bluetooth::DataDirection::OUTPUT, std::move(codec_attributes),
+                    &status);
+  EXPECT_TRUE(status.has_value());
+  EXPECT_EQ(*status, ZX_ERR_BAD_STATE);
+}
+
+// Verify that return code from SetupDataPath() callback is properly translated into result of FIDL
+// call.
+TEST_F(IsoStreamServerTest, SetupDataPathStatusCodes) {
+  server()->OnStreamEstablished(fake_iso_stream()->GetWeakPtr(), kCisParameters);
+  RunLoopUntilIdle();
+  fuchsia::bluetooth::CodecAttributes codec_attributes = BuildCodecAttributes();
+
+  // kSuccess => no error
+  fake_iso_stream()->SetSetupDataPathReturnStatus(bt::iso::IsoStream::SetupDataPathError::kSuccess);
+  std::optional<zx_status_t> status1;
+  CallSetupDataPath(fuchsia::bluetooth::DataDirection::OUTPUT, std::move(codec_attributes),
+                    &status1);
+  EXPECT_FALSE(status1.has_value());
+
+  // kStreamAlreadyExists => ZX_ERR_ALREADY_EXISTS
+  fake_iso_stream()->SetSetupDataPathReturnStatus(
+      bt::iso::IsoStream::SetupDataPathError::kStreamAlreadyExists);
+  std::optional<zx_status_t> status2;
+  CallSetupDataPath(fuchsia::bluetooth::DataDirection::OUTPUT, std::move(codec_attributes),
+                    &status2);
+  EXPECT_TRUE(status2.has_value());
+  EXPECT_EQ(*status2, ZX_ERR_ALREADY_EXISTS);
+
+  // kCisNotEstablished => ZX_ERR_BAD_STATE
+  fake_iso_stream()->SetSetupDataPathReturnStatus(
+      bt::iso::IsoStream::SetupDataPathError::kCisNotEstablished);
+  status2 = std::nullopt;
+  CallSetupDataPath(fuchsia::bluetooth::DataDirection::OUTPUT, std::move(codec_attributes),
+                    &status2);
+  EXPECT_TRUE(status2.has_value());
+  EXPECT_EQ(*status2, ZX_ERR_BAD_STATE);
+
+  // kInvalidArgs => ZX_ERR_INVALID_ARGS
+  fake_iso_stream()->SetSetupDataPathReturnStatus(
+      bt::iso::IsoStream::SetupDataPathError::kInvalidArgs);
+  status2 = std::nullopt;
+  CallSetupDataPath(fuchsia::bluetooth::DataDirection::OUTPUT, std::move(codec_attributes),
+                    &status2);
+  EXPECT_TRUE(status2.has_value());
+  EXPECT_EQ(*status2, ZX_ERR_INVALID_ARGS);
 }
 
 }  // namespace

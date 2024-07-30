@@ -317,6 +317,15 @@ bool TraceManagerTest::FinishTerminateSession(controller::TerminateResult* resul
   if (fake_provider_bindings().size() > 0) {
     FX_LOGS(DEBUG) << "Loop done, expecting session terminating";
     SessionState state = GetSessionState();
+    if (state == SessionState::kStopping) {
+      // Terminate issued without stop will implicitly call stop first
+      // Loop will exit for the transition to kStopping. Mark providers
+      // as stopped and run the loop twice to transition to kStopped,
+      // then kTerminating
+      MarkAllProvidersStopped();
+      RunLoopUntilIdle();
+    }
+    state = GetSessionState();
     EXPECT_EQ(state, SessionState::kTerminating);
     if (state != SessionState::kTerminating) {
       return false;

@@ -14,7 +14,6 @@ import("//build/python/python_action.gni")
 import("//build/sdk/product_bundle.gni")
 import("//build/security.gni")
 import("//build/testing/host_test_data.gni")
-import("//src/security/bin/scrutiny_x_smoke_test/scrutiny_x_smoke_test.gni")
 import("//src/sys/core/build/core.gni")
 import("//zircon/kernel/phys/qemu.gni")
 
@@ -97,17 +96,12 @@ if (is_fuchsia) {
     cmdline_deps = [ "//build/input:bootfs" ]
 
     base_packages = [
-      "//:developer_base_driver_packages",
       "//:developer_base_packages",
       "//:legacy_base_packages",
     ]
 
     core_realm_definition = ":core_realm"
 
-    base_driver_packages = [
-      "//:developer_base_driver_packages",
-      "//:legacy_base_driver_packages",
-    ]
     cache_packages = [
       "//:developer_cache_packages",
       "//:legacy_cache_packages",
@@ -149,10 +143,9 @@ if (is_fuchsia) {
   # `package_list_from_assembly()` GN template.
   group("fuchsia") {
     testonly = fuchsia_zbi_testonly
-    public_deps = [ ":scrutiny_x_smoke_test" ]
 
     if (!use_bazel_images_only) {
-      public_deps += [
+      public_deps = [
         ":fuchsia_assembly",
         ":product_bundle",
         ":update",
@@ -355,23 +348,6 @@ if (is_fuchsia) {
   group("assembly_inputs") {
     testonly = fuchsia_zbi_testonly
     public_deps = [ ":fuchsia.legacy_input_bundle_assembly_inputs.json" ]
-  }
-
-  scrutiny_x_smoke_test("scrutiny_x_smoke_test") {
-    testonly = fuchsia_zbi_testonly
-    test_binary = "//src/security/bin/scrutiny_x_smoke_test"
-    if (use_bazel_images_only) {
-      product_bundle_target = bazel_product_bundle_target
-      product_bundle_path =
-          get_label_info(bazel_product_bundle_target, "target_out_dir") + "/" +
-          get_label_info(bazel_product_bundle_target, "name") +
-          "/product_bundle"
-    } else {
-      product_bundle_target = ":${product_bundle_label}"
-      product_bundle_path =
-          get_label_info(":${product_bundle_label}", "target_out_dir") + "/" +
-          product_bundle_label
-    }
   }
 
   generated_file("universe_config_data_entries") {

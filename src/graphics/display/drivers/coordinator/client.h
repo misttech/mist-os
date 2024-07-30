@@ -172,7 +172,10 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
 
   ~Client() override;
 
-  fpromise::result<fidl::ServerBindingRef<fuchsia_hardware_display::Coordinator>, zx_status_t> Init(
+  // Binds the `Client` to the server-side channel of the `Coordinator` protocol.
+  //
+  // Must be called exactly once in production code.
+  fidl::ServerBindingRef<fuchsia_hardware_display::Coordinator> Init(
       fidl::ServerEnd<fuchsia_hardware_display::Coordinator> server_end);
 
   void OnDisplaysChanged(cpp20::span<const DisplayId> added_display_ids,
@@ -452,14 +455,14 @@ class ClientProxy {
  private:
   friend IntegrationTest;
 
-  mtx_t mtx_;
+  fbl::Mutex mtx_;
   Controller* const controller_;
 
   Client handler_;
   bool enable_vsync_ __TA_GUARDED(&mtx_) = false;
   bool enable_capture_ __TA_GUARDED(&mtx_) = false;
 
-  mtx_t task_mtx_;
+  fbl::Mutex task_mtx_;
   std::vector<std::unique_ptr<async::Task>> client_scheduled_tasks_ __TA_GUARDED(task_mtx_);
 
   // This variable is used to limit the number of errors logged in case of channel oom error

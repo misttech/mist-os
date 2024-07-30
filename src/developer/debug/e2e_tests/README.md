@@ -64,5 +64,11 @@ directory).
   * `scripts`: scripts run by the script runner (see `script_test.cc`) these simulate a user
     interacting with the zxdb console
 
+## How to disable a specific test
+
+Specific tests may be individually disabled by prepending the file name with `DISABLED_`. For
+example, to disable the `inline_frames.script` test, rename the file to
+`DISABLED_inline_frames.script` with `git mv`. This is often preferable to disabling the entire test
+suite to maintain maximal coverage while individual failures are resolved.
 
 [ffx-isolate]: /docs/development/tools/ffx/development/integration_testing.md

@@ -5,6 +5,7 @@
 #include <fidl/fuchsia.device.manager/cpp/wire.h>
 #include <fidl/fuchsia.hardware.power.statecontrol/cpp/wire.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
+#include <fidl/fuchsia.power.broker/cpp/fidl.h>
 #include <fidl/fuchsia.power.broker/cpp/wire.h>
 #include <fidl/fuchsia.power.system/cpp/wire.h>
 #include <fidl/fuchsia.process.lifecycle/cpp/wire.h>
@@ -19,6 +20,7 @@
 #include <zircon/status.h>
 
 #include <chrono>
+#include <cstdio>
 #include <optional>
 #include <thread>
 
@@ -26,6 +28,7 @@
 #include <fbl/mutex.h>
 #include <fbl/string_printf.h>
 
+#include "lib/async/default.h"
 #include "src/storage/lib/vfs/cpp/managed_vfs.h"
 #include "src/storage/lib/vfs/cpp/pseudo_dir.h"
 #include "src/storage/lib/vfs/cpp/service.h"
@@ -165,6 +168,22 @@ class StateControlAdminServer final : public fidl::WireServer<statecontrol_fidl:
               element_control_endpoints.status_string());
       return;
     }
+    auto current_level_endpoints = fidl::CreateEndpoints<broker_fidl::CurrentLevel>();
+    if (!current_level_endpoints.is_ok()) {
+      fprintf(stderr, "[shutdown-shim]: error creating CurrentLevel endpoints: %s\n",
+              current_level_endpoints.status_string());
+      return;
+    }
+    auto required_level_endpoints = fidl::CreateEndpoints<broker_fidl::RequiredLevel>();
+    if (!required_level_endpoints.is_ok()) {
+      fprintf(stderr, "[shutdown-shim]: error creating RequiredLevel endpoints: %s\n",
+              required_level_endpoints.status_string());
+      return;
+    }
+    auto level_control_endpoints = fuchsia_power_broker::wire::LevelControlChannels{
+        .current = std::move(current_level_endpoints->server),
+        .required = std::move(required_level_endpoints->server),
+    };
 
     std::vector<uint8_t> valid_levels{
         static_cast<uint8_t>(ShutdownControlLevel::kInactive),
@@ -181,6 +200,7 @@ class StateControlAdminServer final : public fidl::WireServer<statecontrol_fidl:
                 fidl::VectorView<broker_fidl::wire::LevelDependency>::FromExternal(dependencies))
             .lessor_channel(std::move(lessor_endpoints->server))
             .element_control(std::move(element_control_endpoints->server))
+            .level_control_channels(std::move(level_control_endpoints))
             .Build();
 
     auto resp = topology_client->AddElement(std::move(shutdown_control_schema));
@@ -197,6 +217,11 @@ class StateControlAdminServer final : public fidl::WireServer<statecontrol_fidl:
 
     element_control_channel_client_end_ = std::move(element_control_endpoints->client);
     lessor_client_ = fidl::WireSyncClient{std::move(lessor_endpoints->client)};
+    current_level_client_.Bind(std::move(current_level_endpoints->client));
+    required_level_client_.Bind(std::move(required_level_endpoints->client),
+                                async_get_default_dispatcher());
+
+    WatchRequiredLevel();
   }
 
   zx_status_t ExportServices(fbl::RefPtr<fs::PseudoDir>& svc_dir, async_dispatcher* dispatcher);
@@ -214,10 +239,32 @@ class StateControlAdminServer final : public fidl::WireServer<statecontrol_fidl:
   std::optional<fidl::WireSyncClient<broker_fidl::LeaseControl>> AcquireShutdownControlLease()
       const;
 
+  void WatchRequiredLevel() {
+    required_level_client_->Watch().Then([this](fidl::Result<
+                                                fuchsia_power_broker::RequiredLevel::Watch>&
+                                                    result) {
+      if (result.is_error()) {
+        fprintf(
+            stderr,
+            "[shutdown-shim]: error watching RequiredLevel: %s, stopped monitoring required level.",
+            result.error_value().FormatDescription().c_str());
+        return;
+      }
+      auto update_result = current_level_client_->Update(result->required_level());
+      if (update_result.is_error()) {
+        fprintf(stderr, "[shutdown-shim]: error updating current level: %s.",
+                update_result.error_value().FormatDescription().c_str());
+      }
+      WatchRequiredLevel();
+    });
+  }
+
   SystemStateTransitionServer system_state_transition_server_;
   async::Loop loop_;
   fidl::ClientEnd<broker_fidl::ElementControl> element_control_channel_client_end_;
   fidl::WireSyncClient<broker_fidl::Lessor> lessor_client_;
+  fidl::SyncClient<broker_fidl::CurrentLevel> current_level_client_;
+  fidl::Client<broker_fidl::RequiredLevel> required_level_client_;
 };
 
 // Opens a service node, failing if the provider of the service does not respond

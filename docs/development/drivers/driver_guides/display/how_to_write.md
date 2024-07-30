@@ -50,9 +50,9 @@ for the new driver will live in `src/graphics/display/drivers/fancy-display/`.
 
 To begin, create:
 
- * A minimal implementation of [DisplayControllerImpl][dcimpl]
+ * A minimal implementation of [DisplayEngine][dcimpl]
  * A set of [bind rules][driver-binding]
- * A build recipe for the `DisplayControllerImpl` and the bind rules
+ * A build recipe for the `DisplayEngine` and the bind rules
 
 ### Add the driver to the build {#adding-to-build}
 
@@ -67,9 +67,9 @@ import("//build/bind/bind.gni")
 import("//build/drivers.gni")
 
 driver_bind_rules("fancy-display-bind") {
-  rules = "fancy-display.bind"
+  rules = "meta/fancy-display.bind"
   bind_output = "fancy-display.bindbc"
-  tests = "bind_tests.json"
+  tests = "meta/bind_tests.json"
   deps = [
     "//src/devices/bind/board_maker_company.platform",
   ]
@@ -108,7 +108,8 @@ Now that you have a build recipe, you can move on to creating the [bind
 rules][driver-binding], which the driver manager uses to decide whether a driver
 can be used with a device.
 
-1. In `src/graphics/display/drivers/fancy-display`, create `fancy-display.bind`:
+1. In `src/graphics/display/drivers/fancy-display`, create
+   `meta/fancy-display.bind`:
 
 ```
 // Copyright 2021 The Fuchsia Authors. All rights reserved.
@@ -162,36 +163,36 @@ class Device : public DeviceType {
   zx_status_t Bind() { return ZX_OK };
 
   // Functionality needed by the common display driver core.
-  void DisplayControllerImplSetDisplayControllerInterface(
-      const display_controller_interface_protocol* interface) {}
+  void DisplayEngineRegisterDisplayEngineListener(
+      const display_engine_listener_protocol* interface) {}
 
-  zx_status_t DisplayControllerImplImportBufferCollection(
+  zx_status_t DisplayEngineImportBufferCollection(
       uint64_t collection_id, zx::channel collection_token) {
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  zx_status_t DisplayControllerImplReleaseBufferCollection(
+  zx_status_t DisplayEngineReleaseBufferCollection(
       uint64_t collection_id) {
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  zx_status_t DisplayControllerImplImportImage(const image_metadata_t* image_metadata,
+  zx_status_t DisplayEngineImportImage(const image_metadata_t* image_metadata,
                                                uint64_t collection_id, uint32_t index,
                                                uint64_t* out_image_handle) {
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  void DisplayControllerImplReleaseImage(image_t* image) {}
+  void DisplayEngineReleaseImage(image_t* image) {}
 
-  config_check_result_t DisplayControllerImplCheckConfiguration(
+  config_check_result_t DisplayEngineCheckConfiguration(
       const display_config_t** display_configs, size_t display_count,
       client_composition_opcode_t* out_client_composition_opcodes_list, size_t client_composition_opcodes_count,
       size_t* out_client_composition_opcodes_actual);
 
-  void DisplayControllerImplApplyConfiguration(
+  void DisplayEngineApplyConfiguration(
       const display_config_t** display_config, size_t display_count) {}
 
-  zx_status_t DisplayControllerImplSetBufferCollectionConstraints(
+  zx_status_t DisplayEngineSetBufferCollectionConstraints(
       const image_buffer_usage_t* usage, uint64_t collection_id) {
     return ZX_ERR_NOT_SUPPORTED;
   }
@@ -231,7 +232,7 @@ static zx_driver_ops_t fancy_display_ops = [](){
 ZIRCON_DRIVER(fancy_display, fancy_display_ops, "zircon", "0.1");
 ```
 
-Display drivers are required to implement the `DisplayControllerImpl`
+Display drivers are required to implement the `DisplayEngine`
 [protocol][dcimpl], which exposes hardware layers and implements vsync
 notifications. A [display-coordinator][display-coordinator] driver multiplexes
 between all the device-specific drivers on the system and the display driver
@@ -285,9 +286,9 @@ basic bootloader driver. In most cases, your roadmap will be:
 [ddk-tl]: /docs/development/drivers/concepts/driver_development/using-ddktl.md
 [display-coordinator]: /src/graphics/display/drivers/coordinator/
 [driver-binding]: /docs/development/drivers/concepts/device_driver_model/driver-binding.md
-[intel-bind]: /src/graphics/display/drivers/intel-i915/intel-i915.bind
+[intel-bind]: /src/graphics/display/drivers/intel-i915/meta/intel-i915.bind
 [license-policies]: /docs/contribute/governance/policy/open-source-licensing-policies.md
 [sysmem]: https://fuchsia.dev/reference/fidl/fuchsia.sysmem
 [tearing]: https://en.wikipedia.org/wiki/Screen_tearing
-[amlogic-display-bind]: /src/graphics/display/drivers/amlogic-display/amlogic-display.bind
+[amlogic-display-bind]: /src/graphics/display/drivers/amlogic-display/meta/amlogic-display.bind
 [vim3-board]: /boards/vim3.gni

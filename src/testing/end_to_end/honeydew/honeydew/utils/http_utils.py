@@ -1,4 +1,3 @@
-#!/usr/bin/env fuchsia-vendored-python
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
@@ -7,17 +6,15 @@
 import json
 import logging
 import time
+import urllib.error
 import urllib.request
 from collections.abc import Iterable
 from typing import Any
 
 from honeydew import errors
+from honeydew.utils import decorators
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
-
-_TIMEOUTS: dict[str, float] = {
-    "HTTP_RESPONSE": 30,
-}
 
 _DEFAULTS: dict[str, int] = {
     "ATTEMPTS": 3,
@@ -25,11 +22,12 @@ _DEFAULTS: dict[str, int] = {
 }
 
 
+@decorators.liveness_check
 def send_http_request(
     url: str,
     data: dict[str, Any] | None = None,
     headers: dict[str, Any] | None = None,
-    timeout: float = _TIMEOUTS["HTTP_RESPONSE"],
+    timeout: float | None = None,
     attempts: int = _DEFAULTS["ATTEMPTS"],
     interval: int = _DEFAULTS["INTERVAL"],
     exceptions_to_skip: Iterable[type[Exception]] | None = None,
@@ -43,11 +41,12 @@ def send_http_request(
         url: URL to which HTTP request need to be sent.
         data: data that needs to be set in HTTP request.
         headers: headers that need to be included while sending HTTP request.
-        timeout: how long in sec to wait for HTTP connection attempt.
+        timeout: how long in sec to wait for HTTP connection attempt. By
+            default, timeout is not set.
         attempts: number of attempts to try in case of a failure.
         interval: wait time in sec before each retry in case of a failure.
-        exceptions_to_skip: Any non fatal exceptions for which retry will not be
-            attempted.
+        exceptions_to_skip: Any non fatal HTTP exceptions for which retry will
+            not be attempted.
     Returns:
         Returns the HTTP response received after converting into a dict.
 
@@ -84,8 +83,11 @@ def send_http_request(
             _LOGGER.debug(
                 "HTTP response received from url=%s is '%s'", url, response_body
             )
-            return json.loads(response_body)  # Revealed type is 'Any'
-        except Exception as err:  # pylint: disable=broad-except
+            return json.loads(response_body)
+        except (
+            ConnectionError,
+            urllib.error.URLError,
+        ) as err:
             for exception_to_skip in exceptions_to_skip:
                 if isinstance(err, exception_to_skip):
                     return {}

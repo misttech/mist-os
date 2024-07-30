@@ -1,4 +1,3 @@
-#!/usr/bin/env fuchsia-vendored-python
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
@@ -69,7 +68,7 @@ def create_device(
                 ffx_config,
                 device_ip_port,
             )
-    except Exception as err:
+    except errors.HoneydewError as err:
         raise errors.FuchsiaDeviceError(
             f"Failed to create device for '{device_name}': {err}"
         ) from err

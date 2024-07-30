@@ -107,6 +107,9 @@ template("rustc_test_internal") {
     if (defined(invoker.test_configs)) {
       configs += invoker.test_configs
     }
+    if (defined(invoker.test_vars)) {
+      forward_variables_from(invoker.test_vars, "*")
+    }
 
     crate_root = source_root
     clippy_crate_type = "bin"

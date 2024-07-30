@@ -2466,25 +2466,32 @@ async fn ping_self<N: Netstack>(name: &str, addr: AddrSubnetEither) {
     interface.add_address(addr.into_ext()).await.expect("add address");
 
     const UNSPECIFIED_PORT: u16 = 0;
+    const PING_SEQ: u16 = 1;
     match addr {
         AddrSubnetEither::V4(v4) => {
             realm
-                .ping::<Ipv4>(std::net::SocketAddrV4::new(v4.addr().get().into(), UNSPECIFIED_PORT))
+                .ping_once::<Ipv4>(
+                    std::net::SocketAddrV4::new(v4.addr().get().into(), UNSPECIFIED_PORT),
+                    PING_SEQ,
+                )
                 .await
         }
         AddrSubnetEither::V6(v6) => {
             let v6 = v6.addr().get();
             realm
-                .ping::<Ipv6>(std::net::SocketAddrV6::new(
-                    v6.into(),
-                    UNSPECIFIED_PORT,
-                    0,
-                    if v6.is_unicast_link_local() {
-                        u32::try_from(interface.id()).expect("interface ID should fit into u32")
-                    } else {
-                        0
-                    },
-                ))
+                .ping_once::<Ipv6>(
+                    std::net::SocketAddrV6::new(
+                        v6.into(),
+                        UNSPECIFIED_PORT,
+                        0,
+                        if v6.is_unicast_link_local() {
+                            u32::try_from(interface.id()).expect("interface ID should fit into u32")
+                        } else {
+                            0
+                        },
+                    ),
+                    PING_SEQ,
+                )
                 .await
         }
     }

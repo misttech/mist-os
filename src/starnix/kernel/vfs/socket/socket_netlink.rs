@@ -14,9 +14,8 @@ use netlink::protocol_family::route::NetlinkRouteClient;
 use netlink::{NewClientError, NETLINK_LOG_TAG};
 use netlink_packet_core::{NetlinkMessage, NetlinkSerializable};
 use netlink_packet_route::RouteNetlinkMessage;
-use netlink_packet_sock_diag::message::SockDiagMessage;
 use netlink_packet_utils::{DecodeError, Emitable as _};
-use starnix_sync::{FileOpsCore, Locked, Mutex, WriteOps};
+use starnix_sync::{FileOpsCore, Locked, Mutex};
 use std::marker::PhantomData;
 use std::num::NonZeroU32;
 use std::sync::Arc;
@@ -452,7 +451,7 @@ impl SocketOps for BaseNetlinkSocket {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, WriteOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _socket: &Socket,
         _current_task: &CurrentTask,
         data: &mut dyn InputBuffer,
@@ -479,6 +478,7 @@ impl SocketOps for BaseNetlinkSocket {
 
     fn wait_async(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _socket: &Socket,
         _current_task: &CurrentTask,
         waiter: &Waiter,
@@ -490,6 +490,7 @@ impl SocketOps for BaseNetlinkSocket {
 
     fn query_events(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _socket: &Socket,
         _current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
@@ -626,7 +627,7 @@ impl SocketOps for UEventNetlinkSocket {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, WriteOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _socket: &Socket,
         _current_task: &CurrentTask,
         _data: &mut dyn InputBuffer,
@@ -638,6 +639,7 @@ impl SocketOps for UEventNetlinkSocket {
 
     fn wait_async(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _socket: &Socket,
         _current_task: &CurrentTask,
         waiter: &Waiter,
@@ -649,6 +651,7 @@ impl SocketOps for UEventNetlinkSocket {
 
     fn query_events(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _socket: &Socket,
         _current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
@@ -897,7 +900,7 @@ impl SocketOps for RouteNetlinkSocket {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, WriteOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _socket: &Socket,
         _current_task: &CurrentTask,
         data: &mut dyn InputBuffer,
@@ -939,6 +942,7 @@ impl SocketOps for RouteNetlinkSocket {
 
     fn wait_async(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _socket: &Socket,
         _current_task: &CurrentTask,
         waiter: &Waiter,
@@ -951,6 +955,7 @@ impl SocketOps for RouteNetlinkSocket {
 
     fn query_events(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _socket: &Socket,
         _current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
@@ -1061,36 +1066,22 @@ impl SocketOps for DiagnosticNetlinkSocket {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, WriteOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _socket: &Socket,
         _current_task: &CurrentTask,
-        data: &mut dyn InputBuffer,
+        _data: &mut dyn InputBuffer,
         _dest_address: &mut Option<SocketAddress>,
         _ancillary_data: &mut Vec<AncillaryData>,
     ) -> Result<usize, Errno> {
-        // TODO(https://fxbug.dev/323590076): Replace this with `read_all`
-        // For now, we'd like to parse the SOCK_DIAG message and know the message
-        // type without handling the functionality yet. This allows us to return an
-        // error since bytes_read is 0.
-        let peeked_bytes = data.peek_all()?;
-        match NetlinkMessage::<SockDiagMessage>::deserialize(&peeked_bytes) {
-            Ok(msg) => {
-                log_debug!(?msg, "got write to NETLINK_SOCK_DIAG");
-                track_stub!(
-                    TODO("https://fxbug.dev/323590076"),
-                    "NETLINK_SOCK_DIAG handle request"
-                );
-                error!(ENOTSUP)
-            }
-            Err(err) => {
-                log_warn!(tag = NETLINK_LOG_TAG, ?err, "Failed to process write");
-                error!(EINVAL)
-            }
-        }
+        // TODO(https://fxbug.dev/323590076): Support SOCK_DIAG sockets.
+        log_debug!("got write to NETLINK_SOCK_DIAG");
+        track_stub!(TODO("https://fxbug.dev/323590076"), "NETLINK_SOCK_DIAG handle request");
+        error!(ENOTSUP)
     }
 
     fn wait_async(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _socket: &Socket,
         _current_task: &CurrentTask,
         waiter: &Waiter,
@@ -1102,6 +1093,7 @@ impl SocketOps for DiagnosticNetlinkSocket {
 
     fn query_events(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _socket: &Socket,
         _current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
@@ -1226,7 +1218,7 @@ impl SocketOps for GenericNetlinkSocket {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, WriteOps>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _socket: &Socket,
         _current_task: &CurrentTask,
         data: &mut dyn InputBuffer,
@@ -1251,6 +1243,7 @@ impl SocketOps for GenericNetlinkSocket {
 
     fn wait_async(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _socket: &Socket,
         _current_task: &CurrentTask,
         waiter: &Waiter,
@@ -1262,6 +1255,7 @@ impl SocketOps for GenericNetlinkSocket {
 
     fn query_events(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _socket: &Socket,
         _current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {

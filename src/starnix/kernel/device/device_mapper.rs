@@ -313,7 +313,7 @@ impl FileOps for DmDeviceFile {
 
     fn write(
         &self,
-        _locked: &mut starnix_sync::Locked<'_, starnix_sync::WriteOps>,
+        _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
         _file: &crate::vfs::FileObject,
         _current_task: &crate::task::CurrentTask,
         _offset: usize,

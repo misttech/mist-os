@@ -535,6 +535,7 @@ ExprParser::ParseNameResult ExprParser::ParseName(bool expand_types) {
         if (eval_context_) {
           FoundName lookup =
               eval_context_->FindName(FindNameOptions(FindNameOptions::kAllKinds), result.ident);
+
           switch (lookup.kind()) {
             case FoundName::kType:
               mode = kType;
@@ -1157,10 +1158,25 @@ fxl::RefPtr<ExprNode> ExprParser::DotOrArrowInfix(fxl::RefPtr<ExprNode> left,
     }
   }
 
-  if (!right || !right->AsIdentifier()) {
+  if (!right) {
+    SetError(token, fxl::StringPrintf("Failed to parse right hand side of \"%s\".",
+                                      token.value().c_str()));
+    return nullptr;
+  } else if (!right->AsIdentifier() && !right->AsType()) {
+    // Types are allowed in addition to identifiers here. FindName will prefer type names to
+    // identifiers, but of course using a type as the right hand side of a dot or arrow operator
+    // doesn't make sense (accessing a type declared in some other scope should be done with "::").
+    // So we try to convert the typename into an identifier so that an actual identifier isn't
+    // shadowed by a type that has the same name.
     SetError(token, fxl::StringPrintf("Expected identifier for right-hand-side of \"%s\".",
                                       token.value().c_str()));
     return nullptr;
+  }
+
+  // A type was found by the naming lookup performed by parsing the right hand side, this should be
+  // turned into an identifier.
+  if (right->AsType()) {
+    right = fxl::MakeRefCounted<IdentifierExprNode>(right->AsType()->type()->GetAssignedName());
   }
 
   // Use the name from the right-hand-side identifier, we don't need a full expression for that. If

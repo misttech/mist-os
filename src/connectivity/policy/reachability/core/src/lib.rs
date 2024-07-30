@@ -606,7 +606,7 @@ struct NetworkCheckContext {
     persistent_context: PersistentNetworkCheckContext,
     // TODO(https://fxbug.dev/42074525): Add tombstone marker to inform NetworkCheck that the interface has
     // been removed and we no longer need to run checks on this interface. This can occur when
-    // receiving an interface remote event, but a network check for that interface is still in
+    // receiving an interface removed event, but a network check for that interface is still in
     // progress.
 }
 

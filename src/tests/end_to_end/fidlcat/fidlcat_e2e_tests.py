@@ -10,9 +10,9 @@ import subprocess
 import sys
 import tempfile
 import textwrap
+import unittest
 from threading import Event, Thread
 from typing import Any
-import unittest
 
 TEST_DATA_DIR = "host_x64/test_data/fidlcat_e2e_tests"  # relative to $PWD
 FIDLCAT_TIMEOUT = 60  # timeout when invoking fidlcat

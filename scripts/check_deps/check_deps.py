@@ -6,8 +6,8 @@
 
 import argparse
 import json
-import platform
 import os.path
+import platform
 import subprocess
 import sys
 

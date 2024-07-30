@@ -4,11 +4,11 @@
 
 use crate::apply_selectors::screen::Line;
 use anyhow::Result;
-use diagnostics_data::InspectData;
+use diagnostics_data::{ExtendedMoniker, InspectData};
 use diagnostics_hierarchy::{hierarchy, HierarchyMatcher};
 use difference::Difference::{Add, Rem, Same};
 use fidl_fuchsia_diagnostics::Selector;
-use selectors::VerboseError;
+use selectors::{SelectorExt, VerboseError};
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
@@ -27,8 +27,7 @@ pub fn filter_json_schema_by_selectors(
         }
     };
 
-    let moniker: Vec<_> = schema.moniker.split("/").map(|s| s.to_owned()).collect();
-    match selectors::match_component_moniker_against_selectors(&moniker, selectors.as_slice()) {
+    match schema.moniker.match_against_selectors(selectors.as_slice()) {
         Ok(matched_selectors) => {
             if matched_selectors.is_empty() {
                 return None;
@@ -70,7 +69,7 @@ pub fn filter_json_schema_by_selectors(
 pub fn filter_data_to_lines(
     selector_file: &Path,
     data: &[InspectData],
-    moniker: &Option<String>,
+    moniker: Option<&ExtendedMoniker>,
 ) -> Result<Vec<Line>> {
     let selectors: Vec<Selector> =
         selectors::parse_selector_file::<VerboseError>(&PathBuf::from(selector_file))?
@@ -165,15 +164,18 @@ mod tests {
 
         let schemas: Vec<InspectData> =
             serde_json::from_value(source_hierarchy).expect("load schemas");
-        let filtered_data_string =
-            filter_data_to_lines(&selector_path.path(), &schemas, &requested_moniker)
-                .expect("filtering hierarchy should have succeeded.")
-                .into_iter()
-                .filter(|line| !line.removed)
-                .fold(String::new(), |mut acc, line| {
-                    acc.push_str(&line.value);
-                    acc
-                });
+        let filtered_data_string = filter_data_to_lines(
+            &selector_path.path(),
+            &schemas,
+            requested_moniker.map(|m| m.as_str().try_into().unwrap()).as_ref(),
+        )
+        .expect("filtering hierarchy should have succeeded.")
+        .into_iter()
+        .filter(|line| !line.removed)
+        .fold(String::new(), |mut acc, line| {
+            acc.push_str(&line.value);
+            acc
+        });
         let filtered_json_value: serde_json::Value = serde_json::from_str(&filtered_data_string)
             .unwrap_or_else(|e| {
                 panic!(
@@ -224,9 +226,12 @@ mod tests {
                 hierarchy.sort();
             }
         }
-        let filtered_data_string =
-            filter_data_to_lines(&selector_path.path(), &schemas, &Some("blooper".to_string()))
-                .expect("filtering hierarchy should succeed.");
+        let filtered_data_string = filter_data_to_lines(
+            &selector_path.path(),
+            &schemas,
+            Some(&"blooper".try_into().unwrap()),
+        )
+        .expect("filtering hierarchy should succeed.");
 
         let removed_lines = filtered_data_string.iter().fold(HashSet::new(), |mut acc, line| {
             if line.removed {

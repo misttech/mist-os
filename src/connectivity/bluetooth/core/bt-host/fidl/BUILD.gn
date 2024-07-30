@@ -129,14 +129,20 @@ source_set("fake_gatt_test_fixture") {
   ]
 }
 
-source_set("fake_hci_test_fixture") {
+source_set("fake_vendor_server") {
   testonly = true
 
-  sources = [ "fake_hci_server.h" ]
+  sources = [
+    "fake_hci_transport_server.cc",
+    "fake_hci_transport_server.h",
+    "fake_vendor_server.h",
+  ]
 
   deps = [
+    "$dir_pw_unit_test",
+    "//sdk/fidl/fuchsia.hardware.bluetooth:fuchsia.hardware.bluetooth_cpp",
     "//src/connectivity/bluetooth/core/bt-host/iso",
-    "//src/connectivity/bluetooth/core/bt-host/transport:transport",
+    "//src/connectivity/bluetooth/core/bt-host/transport",
   ]
 }
 

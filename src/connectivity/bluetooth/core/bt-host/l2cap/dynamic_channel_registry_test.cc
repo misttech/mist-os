@@ -389,7 +389,7 @@ TEST(DynamicChannelRegistryTest, ExhaustedChannelIds) {
   TestDynamicChannelRegistry registry(std::move(close_cb), RejectAllServices);
 
   // Open a lot of channels.
-  for (int i = 0; i < kNumChannelsAllowed; i++) {
+  for (ChannelId i = 0; i < kNumChannelsAllowed; i++) {
     registry.OpenOutbound(
         kPsm + i, kChannelParams, success_open_result_cb.share());
     registry.last_channel()->DoConnect(kRemoteCId + i);
@@ -429,7 +429,7 @@ TEST(DynamicChannelRegistryTest, ExhaustedChannelIds) {
   ChannelId last_local_cid = registry.last_channel()->local_cid();
 
   int close_cb_called = 0;
-  for (int i = 0; i < kNumChannelsAllowed; i++) {
+  for (ChannelId i = 0; i < kNumChannelsAllowed; i++) {
     registry.CloseChannel(kFirstDynamicChannelId + i,
                           [&] { close_cb_called++; });
   }
@@ -451,7 +451,7 @@ TEST(DynamicChannelRegistryTest,
       };
 
   // Open all but one of the available channels.
-  for (int i = 0; i < kNumChannelsAllowed - 1; i++) {
+  for (ChannelId i = 0; i < kNumChannelsAllowed - 1; i++) {
     registry.OpenOutbound(
         kPsm + i, kChannelParams, success_open_result_cb.share());
     registry.last_channel()->DoConnect(kRemoteCId + i);
@@ -514,7 +514,7 @@ TEST(DynamicChannelRegistryTest,
   EXPECT_TRUE(open_result_cb_called);
 
   close_cb_called = 0;
-  for (int i = 0; i < kNumChannelsAllowed; i++) {
+  for (ChannelId i = 0; i < kNumChannelsAllowed; i++) {
     registry.CloseChannel(kFirstDynamicChannelId + i,
                           [&] { close_cb_called++; });
   }

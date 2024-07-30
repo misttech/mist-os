@@ -11,7 +11,6 @@ import platform
 import shlex
 import subprocess
 import sys
-
 from enum import Enum
 
 # Special values identifying a PE (i.e., Portable Executable) image, of which

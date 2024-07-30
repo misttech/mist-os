@@ -3,7 +3,9 @@
 // found in the LICENSE file.
 
 use crate::task::CurrentTask;
-use crate::vfs::{CheckAccessReason, FileSystemHandle, Namespace, NamespaceNode};
+use crate::vfs::{
+    ActiveNamespaceNode, CheckAccessReason, FileSystemHandle, Namespace, NamespaceNode,
+};
 use starnix_logging::log_trace;
 use starnix_sync::RwLock;
 use starnix_uapi::auth::CAP_SYS_CHROOT;
@@ -26,10 +28,10 @@ struct FsContextState {
     ///
     /// Operations on the file system are typically either relative to this
     /// root or to the cwd().
-    root: NamespaceNode,
+    root: ActiveNamespaceNode,
 
     /// The current working directory.
-    cwd: NamespaceNode,
+    cwd: ActiveNamespaceNode,
 
     // See <https://man7.org/linux/man-pages/man2/umask.2.html>
     umask: FileMode,
@@ -38,13 +40,14 @@ struct FsContextState {
 impl FsContextState {
     fn set_namespace(&mut self, new_ns: Arc<Namespace>) -> Result<(), Errno> {
         log_trace!("updating namespace");
-        let new_root =
-            Namespace::translate_node(self.root.clone(), &new_ns).ok_or(errno!(EINVAL))?;
-        let new_cwd = Namespace::translate_node(self.cwd.clone(), &new_ns).ok_or(errno!(EINVAL))?;
+        let new_root = Namespace::translate_node(self.root.to_passive(), &new_ns)
+            .ok_or_else(|| errno!(EINVAL))?;
+        let new_cwd = Namespace::translate_node(self.cwd.to_passive(), &new_ns)
+            .ok_or_else(|| errno!(EINVAL))?;
 
         // Only perform a mutation if the rebased nodes both exist in the target namespace.
-        self.root = new_root;
-        self.cwd = new_cwd;
+        self.root = new_root.clone().into_active();
+        self.cwd = new_cwd.into_active();
         self.namespace = new_ns;
         log_trace!("namespace update succeeded");
         Ok(())
@@ -72,8 +75,8 @@ impl FsContext {
         Arc::new(FsContext {
             state: RwLock::new(FsContextState {
                 namespace,
-                root: root.clone(),
-                cwd: root,
+                root: root.clone().into_active(),
+                cwd: root.into_active(),
                 umask: FileMode::DEFAULT_UMASK,
             }),
         })
@@ -91,20 +94,20 @@ impl FsContext {
     /// Returns a reference to the current working directory.
     pub fn cwd(&self) -> NamespaceNode {
         let state = self.state.read();
-        state.cwd.clone()
+        state.cwd.to_passive()
     }
 
     /// Returns the root.
     pub fn root(&self) -> NamespaceNode {
         let state = self.state.read();
-        state.root.clone()
+        state.root.to_passive()
     }
 
     /// Change the current working directory.
     pub fn chdir(&self, current_task: &CurrentTask, name: NamespaceNode) -> Result<(), Errno> {
         name.check_access(current_task, Access::EXEC, CheckAccessReason::Chdir)?;
         let mut state = self.state.write();
-        state.cwd = name;
+        state.cwd = name.into_active();
         Ok(())
     }
 
@@ -117,7 +120,7 @@ impl FsContext {
         }
 
         let mut state = self.state.write();
-        state.root = name;
+        state.root = name.into_active();
         Ok(())
     }
 
@@ -192,7 +195,7 @@ mod test {
         let bin = current_task
             .open_file(&mut locked, "bin".into(), OpenFlags::RDONLY)
             .expect("missing bin directory");
-        current_task.fs().chdir(&current_task, bin.name.clone()).expect("Failed to chdir");
+        current_task.fs().chdir(&current_task, bin.name.to_passive()).expect("Failed to chdir");
         assert_eq!("/bin", current_task.fs().cwd().path_escaping_chroot());
 
         // Now that we have changed directories to bin, we're opening a file
@@ -210,7 +213,7 @@ mod test {
                     .open_file(&mut locked, "..".into(), OpenFlags::RDONLY)
                     .expect("failed to open ..")
                     .name
-                    .clone(),
+                    .to_passive(),
             )
             .expect("Failed to chdir");
         assert_eq!("/", current_task.fs().cwd().path_escaping_chroot());
@@ -227,7 +230,7 @@ mod test {
                     .open_file(&mut locked, "..".into(), OpenFlags::RDONLY)
                     .expect("failed to open ..")
                     .name
-                    .clone(),
+                    .to_passive(),
             )
             .expect("Failed to chdir");
         assert_eq!("/", current_task.fs().cwd().path_escaping_chroot());

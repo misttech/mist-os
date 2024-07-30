@@ -7,12 +7,10 @@
 #include <lib/ddk/binding.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
-#include <lib/ddk/platform-defs.h>
 #include <lib/driver/component/cpp/composite_node_spec.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 #include <zircon/syscalls/smc.h>
 
-#include <bind/fuchsia/amlogic/platform/cpp/bind.h>
 #include <bind/fuchsia/amlogic/platform/meson/cpp/bind.h>
 #include <bind/fuchsia/clock/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
@@ -92,9 +90,9 @@ static const std::vector<fpbus::Smc> astro_video_smcs{
 static const fpbus::Node video_dev = []() {
   fpbus::Node dev = {};
   dev.name() = "aml_video";
-  dev.vid() = PDEV_VID_AMLOGIC;
-  dev.pid() = PDEV_PID_AMLOGIC_S905D2;
-  dev.did() = PDEV_DID_AMLOGIC_VIDEO;
+  dev.vid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_VID_AMLOGIC;
+  dev.pid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_PID_S905D2;
+  dev.did() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_VIDEO;
   dev.mmio() = astro_video_mmios;
   dev.bti() = astro_video_btis;
   dev.irq() = astro_video_irqs;

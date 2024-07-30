@@ -8,9 +8,7 @@ import logging
 import fidl.fuchsia_bluetooth as bluetooth
 import fidl.fuchsia_bluetooth_sys as bluetooth_sys
 from fuchsia_controller_py import Channel, ZxStatus
-from mobly import asserts
-from mobly import base_test
-from mobly import test_runner
+from mobly import asserts, base_test, test_runner
 from mobly_controller import fuchsia_device
 from mobly_controller.fuchsia_device import asynctest
 

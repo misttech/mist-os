@@ -9,24 +9,16 @@
 namespace bt_hci_virtual {
 
 LoopbackDevice::LoopbackDevice()
-    : devfs_connector_(fit::bind_member<&LoopbackDevice::Connect>(this)) {}
+    : dispatcher_(fdf::Dispatcher::GetCurrent()->async_dispatcher()),
+      devfs_connector_(fit::bind_member<&LoopbackDevice::Connect>(this)) {}
 
-zx_status_t LoopbackDevice::Initialize(zx_handle_t channel, std::string_view name,
+zx_status_t LoopbackDevice::Initialize(zx::channel channel, std::string_view name,
                                        AddChildCallback callback) {
-  // Pre-populate event packet indicators
-  event_buffer_[0] = kHciEvent;
-  event_buffer_offset_ = 1;
-  acl_buffer_[0] = kHciAclData;
-  acl_buffer_offset_ = 1;
-  sco_buffer_[0] = kHciSco;
-  sco_buffer_offset_ = 1;
-
   // Setup up incoming channel waiter
-  in_channel_.reset(channel);
-  in_channel_wait_.object = in_channel_.get();
-  in_channel_wait_.trigger = ZX_CHANNEL_READABLE | ZX_CHANNEL_PEER_CLOSED;
-  ZX_ASSERT(async_begin_wait(dispatcher_, &in_channel_wait_) == ZX_OK);
-  in_channel_wait_.pending = true;
+  loopback_chan_ = std::move(channel);
+  loopback_chan_wait_.set_object(loopback_chan_.get());
+  loopback_chan_wait_.set_trigger(ZX_CHANNEL_READABLE | ZX_CHANNEL_PEER_CLOSED);
+  ZX_ASSERT(loopback_chan_wait_.Begin(dispatcher_) == ZX_OK);
 
   // Create args to add loopback as a child node on behalf of VirtualController
   zx::result connector = devfs_connector_.Bind(dispatcher_);
@@ -50,411 +42,238 @@ zx_status_t LoopbackDevice::Initialize(zx_handle_t channel, std::string_view nam
   return ZX_OK;
 }
 
-void LoopbackDevice::Shutdown() {
-  // We are now shutting down. Make sure that any pending callbacks in
-  // flight from the serial_impl are nerfed and that our thread is shut down.
-  std::atomic_store_explicit(&shutting_down_, true, std::memory_order_relaxed);
+LoopbackDevice::SnoopClient::SnoopClient(
+    fidl::ClientEnd<fuchsia_hardware_bluetooth::Snoop> client_end, LoopbackDevice* device)
+    : client_(std::move(client_end), device->dispatcher_, /*event_handler=*/this),
+      device_(device) {}
 
-  // Close the transport channels so that the host stack is notified of device
-  // removal and tasks aren't posted to work thread.
-  ChannelCleanup(&cmd_channel_);
-  ChannelCleanup(&acl_channel_);
-  ChannelCleanup(&sco_channel_);
-  ChannelCleanup(&snoop_channel_);
-  ChannelCleanup(&in_channel_);
+void LoopbackDevice::SnoopClient::QueueSnoopPacket(
+    uint8_t* buffer, size_t length, PacketIndicator indicator,
+    fuchsia_hardware_bluetooth::PacketDirection direction) {
+  uint64_t sequence = next_sequence_++;
+
+  if (sequence > acked_sequence_ + kMaxSnoopUnackedPackets) {
+    if (queued_packets_.size() >= kMaxSnoopQueueSize) {
+      // Drop oldest packet.
+      fuchsia_hardware_bluetooth::PacketDirection direction = queued_packets_.front().direction;
+      queued_packets_.pop();
+      if (direction == fuchsia_hardware_bluetooth::PacketDirection::kHostToController) {
+        dropped_sent_++;
+      } else {
+        dropped_received_++;
+      }
+    }
+    std::vector<uint8_t> packet(buffer, buffer + length);
+    queued_packets_.push(Packet{std::move(packet), sequence, indicator, direction});
+    return;
+  }
+
+  SendSnoopPacket(buffer, length, indicator, direction, sequence);
+}
+
+void LoopbackDevice::SnoopClient::SendSnoopPacket(
+    uint8_t* buffer, size_t length, PacketIndicator indicator,
+    fuchsia_hardware_bluetooth::PacketDirection direction, uint64_t sequence) {
+  fidl::VectorView vec_view = fidl::VectorView<uint8_t>::FromExternal(buffer, length);
+  fidl::ObjectView obj_view = fidl::ObjectView<fidl::VectorView<uint8_t>>::FromExternal(&vec_view);
+  fuchsia_hardware_bluetooth::wire::SnoopPacket packet;
+  switch (indicator) {
+    case PacketIndicator::kHciCommand:
+      packet = fuchsia_hardware_bluetooth::wire::SnoopPacket::WithCommand(obj_view);
+      break;
+    case PacketIndicator::kHciAclData:
+      packet = fuchsia_hardware_bluetooth::wire::SnoopPacket::WithAcl(obj_view);
+      break;
+    case PacketIndicator::kHciSco:
+      packet = fuchsia_hardware_bluetooth::wire::SnoopPacket::WithSco(obj_view);
+      break;
+    case PacketIndicator::kHciEvent:
+      packet = fuchsia_hardware_bluetooth::wire::SnoopPacket::WithEvent(obj_view);
+      break;
+    case PacketIndicator::kHciIso:
+      packet = fuchsia_hardware_bluetooth::wire::SnoopPacket::WithIso(obj_view);
+      break;
+    default:
+      FDF_LOG(WARNING, "Unknown indicator in %s", __func__);
+      return;
+  }
+
+  fidl::Arena arena;
+  fuchsia_hardware_bluetooth::wire::SnoopObservePacketRequest request =
+      fuchsia_hardware_bluetooth::wire::SnoopObservePacketRequest::Builder(arena)
+          .sequence(sequence)
+          .direction(direction)
+          .packet(packet)
+          .Build();
+
+  fidl::OneWayStatus observe_status = client_.wire()->ObservePacket(request);
+  if (!observe_status.ok()) {
+    FDF_LOG(WARNING, "Failed to send ObservePacket on Snoop: %s", observe_status.status_string());
+  }
+}
+
+void LoopbackDevice::SnoopClient::OnAcknowledgePackets(
+    fidl::Event<fuchsia_hardware_bluetooth::Snoop::OnAcknowledgePackets>& event) {
+  if (event.sequence() <= acked_sequence_) {
+    return;
+  }
+  acked_sequence_ = event.sequence();
+
+  // Send Snoop.OnDroppedPackets if necessary before sending next Snoop.ObservePacket.
+  if (dropped_sent_ != 0 || dropped_received_ != 0) {
+    ::fidl::Request<::fuchsia_hardware_bluetooth::Snoop::OnDroppedPackets> request;
+    request.sent() = dropped_sent_;
+    request.received() = dropped_received_;
+    fit::result<fidl::OneWayError> result = client_->OnDroppedPackets(request);
+    if (result.is_error()) {
+      FDF_LOG(WARNING, "Failed to send Snoop.OnDroppedPackets event: %s",
+              result.error_value().status_string());
+    }
+    dropped_sent_ = 0;
+    dropped_received_ = 0;
+  }
+
+  while (!queued_packets_.empty() &&
+         queued_packets_.front().sequence <= acked_sequence_ + kMaxSnoopUnackedPackets) {
+    Packet& packet = queued_packets_.front();
+    SendSnoopPacket(packet.packet.data(), packet.packet.size(), packet.indicator, packet.direction,
+                    packet.sequence);
+    queued_packets_.pop();
+  }
+}
+
+void LoopbackDevice::SnoopClient::on_fidl_error(fidl::UnbindInfo error) {
+  if (!error.is_user_initiated()) {
+    FDF_LOG(INFO, "Snoop closed: %s", error.status_string());
+  }
+  device_->snoop_.reset();
+}
+
+void LoopbackDevice::SnoopClient::handle_unknown_event(
+    fidl::UnknownEventMetadata<fuchsia_hardware_bluetooth::Snoop> metadata) {
+  FDF_LOG(WARNING, "Unknown Snoop event received");
 }
 
 void LoopbackDevice::Connect(fidl::ServerEnd<fuchsia_hardware_bluetooth::Vendor> request) {
+  fit::result<fidl::OneWayError> result =
+      fidl::SendEvent(request)->OnFeatures(fuchsia_hardware_bluetooth::VendorFeatures());
+  if (result.is_error()) {
+    FDF_LOG(ERROR, "Failed to send vendor features: %s", result.error_value().status_string());
+    return;
+  }
   vendor_binding_group_.AddBinding(dispatcher_, std::move(request), this,
                                    fidl::kIgnoreBindingClosure);
-
-  vendor_binding_group_.ForEachBinding(
-      [](const fidl::ServerBinding<fuchsia_hardware_bluetooth::Vendor>& binding) {
-        fidl::Arena arena;
-        auto builder = fuchsia_hardware_bluetooth::wire::VendorFeatures::Builder(arena);
-        fidl::Status status = fidl::WireSendEvent(binding)->OnFeatures(builder.Build());
-
-        if (status.status() != ZX_OK) {
-          FDF_LOG(ERROR, "Failed to send vendor features to bt-host: %s", status.status_string());
-        }
-      });
 }
 
-// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-LoopbackDevice::Wait::Wait(LoopbackDevice* uart, zx::channel* channel) {
-  this->state = ASYNC_STATE_INIT;
-  this->handler = Handler;
-  this->object = ZX_HANDLE_INVALID;
-  this->trigger = ZX_SIGNAL_NONE;
-  this->options = 0;
-  this->uart = uart;
-  this->channel = channel;
-}
-
-void LoopbackDevice::Wait::Handler(async_dispatcher_t* dispatcher, async_wait_t* async_wait,
-                                   zx_status_t status, const zx_packet_signal_t* signal) {
-  auto wait = static_cast<Wait*>(async_wait);
-  wait->uart->OnChannelSignal(wait, status, signal);
-}
-
-size_t LoopbackDevice::EventPacketLength() {
-  // payload length is in byte 2 of the packet
-  // add 3 bytes for packet indicator, event code and length byte
-  return event_buffer_offset_ > 2 ? event_buffer_[2] + 3 : 0;
-}
-
-size_t LoopbackDevice::AclPacketLength() {
-  // length is in bytes 3 and 4 of the packet
-  // add 5 bytes for packet indicator, control info and length fields
-  return acl_buffer_offset_ > 4 ? (acl_buffer_[3] | (acl_buffer_[4] << 8)) + 5 : 0;
-}
-
-size_t LoopbackDevice::ScoPacketLength() {
-  // payload length is byte 3 of the packet
-  // add 4 bytes for packet indicator, handle, and length byte
-  return sco_buffer_offset_ > 3 ? (sco_buffer_[3] + 4) : 0;
-}
-
-void LoopbackDevice::ChannelCleanup(zx::channel* channel) {
-  FDF_LOG(TRACE, "LoopbackDevice::ChannelCleanup");
-  if (!channel->is_valid()) {
+void LoopbackDevice::OnLoopbackChannelSignal(async_dispatcher_t* dispatcher, async::WaitBase* wait,
+                                             zx_status_t status, const zx_packet_signal_t* signal) {
+  if (status == ZX_ERR_CANCELED) {
+    return;
+  }
+  if (status != ZX_OK) {
+    FDF_LOG(ERROR, "Loopback channel wait error: %s", zx_status_get_string(status));
     return;
   }
 
-  if (channel == &cmd_channel_ && cmd_channel_wait_.pending) {
-    async_cancel_wait(dispatcher_, &cmd_channel_wait_);
-    cmd_channel_wait_.pending = false;
-  } else if (channel == &acl_channel_ && acl_channel_wait_.pending) {
-    async_cancel_wait(dispatcher_, &acl_channel_wait_);
-    acl_channel_wait_.pending = false;
-  } else if (channel == &sco_channel_ && sco_channel_wait_.pending) {
-    async_cancel_wait(dispatcher_, &sco_channel_wait_);
-    sco_channel_wait_.pending = false;
-  } else if (channel == &in_channel_ && in_channel_wait_.pending) {
-    async_cancel_wait(dispatcher_, &in_channel_wait_);
-    in_channel_wait_.pending = false;
+  if (signal->observed & ZX_CHANNEL_READABLE) {
+    ReadLoopbackChannel();
   }
-  channel->reset();
-}
 
-void LoopbackDevice::SnoopChannelWrite(uint8_t flags, uint8_t* bytes, size_t length) {
-  FDF_LOG(TRACE, "LoopbackDevice::SnoopChannelWrite");
-  if (!snoop_channel_.is_valid()) {
+  if (signal->observed & ZX_CHANNEL_PEER_CLOSED) {
+    FDF_LOG(ERROR, "Loopback channel peer closed");
     return;
   }
 
-  // We tack on a flags byte to the beginning of the payload.
+  loopback_chan_wait_.Begin(dispatcher_);
+}
+
+void LoopbackDevice::OnHciTransportUnbound(size_t binding_id, fidl::UnbindInfo info) {
+  hci_transport_servers_.erase(binding_id);
+}
+
+void LoopbackDevice::ReadLoopbackChannel() {
+  while (true) {
+    uint32_t actual_bytes = 0;
+    zx_status_t read_status = loopback_chan_.read(
+        /*flags=*/0, read_buffer_.data(), /*handles=*/nullptr,
+        static_cast<uint32_t>(read_buffer_.size()),
+        /*num_handles=*/0, &actual_bytes, /*actual_handles=*/nullptr);
+
+    if (read_status == ZX_ERR_SHOULD_WAIT) {
+      return;
+    }
+
+    if (read_status != ZX_OK) {
+      FDF_LOG(ERROR, "failed to read from loopback channel %s", zx_status_get_string(read_status));
+      return;
+    }
+
+    if (actual_bytes == 0) {
+      FDF_LOG(WARNING, "ignoring empty packet when reading loopback channel");
+      continue;
+    }
+
+    for (auto& [_, server] : hci_transport_servers_) {
+      server.OnReceive(read_buffer_.data(), actual_bytes);
+    }
+
+    if (snoop_.has_value()) {
+      snoop_->QueueSnoopPacket(read_buffer_.data() + 1, actual_bytes - 1,
+                               static_cast<PacketIndicator>(read_buffer_[0]),
+                               fuchsia_hardware_bluetooth::PacketDirection::kControllerToHost);
+    }
+  }
+}
+
+void LoopbackDevice::WriteLoopbackChannel(PacketIndicator indicator, uint8_t* buffer,
+                                          size_t length) {
+  // We tack on an indicator byte to the beginning of the payload.
   // Use an iovec to avoid a large allocation + copy.
   zx_channel_iovec_t iovs[2];
-  iovs[0] = {.buffer = &flags, .capacity = sizeof(flags), .reserved = 0};
-  iovs[1] = {.buffer = bytes, .capacity = static_cast<uint32_t>(length), .reserved = 0};
+  iovs[0] = {.buffer = &indicator, .capacity = sizeof(indicator), .reserved = 0};
+  iovs[1] = {.buffer = buffer, .capacity = static_cast<uint32_t>(length), .reserved = 0};
 
-  zx_status_t status =
-      snoop_channel_.write(/*flags=*/ZX_CHANNEL_WRITE_USE_IOVEC, /*bytes=*/iovs,
+  zx_status_t write_status =
+      loopback_chan_.write(/*flags=*/ZX_CHANNEL_WRITE_USE_IOVEC, /*bytes=*/iovs,
                            /*num_bytes=*/2, /*handles=*/nullptr, /*num_handles=*/0);
-
-  if (status != ZX_OK) {
-    if (status != ZX_ERR_PEER_CLOSED) {
-      FDF_LOG(ERROR, "LoopbackDevice: failed to write to snoop channel %s",
-              zx_status_get_string(status));
-    }
-
-    // It should be safe to clean up the channel right here as the work thread
-    // never waits on this channel from outside of the lock.
-    ChannelCleanup(&snoop_channel_);
-  }
-}
-
-void LoopbackDevice::HciBeginShutdown() {
-  FDF_LOG(TRACE, "LoopbackDevice::HciBeginShutdown");
-  bool was_shutting_down = shutting_down_.exchange(true, std::memory_order_relaxed);
-  if (!was_shutting_down) {
-    FDF_LOG(TRACE, "LoopbackDevice::HciBeginShutdown !was_shutting_down");
-  }
-}
-
-void LoopbackDevice::OnChannelSignal(Wait* wait, zx_status_t status,
-                                     const zx_packet_signal_t* signal) {
-  FDF_LOG(TRACE, "OnChannelSignal");
-  wait->pending = false;
-
-  if (wait->channel == &in_channel_) {
-    HciHandleIncomingChannel(wait->channel, signal->observed);
-  } else {
-    HciHandleClientChannel(wait->channel, signal->observed);
-  }
-
-  // Reset waiters and resume waiting for channel signals. If a packet was queued while the write
-  // was processing, it should be immediately signaled.
-  if (wait->channel->is_valid() && !wait->pending) {
-    ZX_ASSERT(async_begin_wait(dispatcher_, wait) == ZX_OK);
-    wait->pending = true;
-  }
-}
-
-zx_status_t LoopbackDevice::HciOpenChannel(zx::channel* in_channel, zx_handle_t in) {
-  FDF_LOG(TRACE, "LoopbackDevice::HciOpenChannel");
-  zx_status_t result = ZX_OK;
-
-  if (in_channel->is_valid()) {
-    FDF_LOG(ERROR, "LoopbackDevice: already bound, failing");
-    result = ZX_ERR_ALREADY_BOUND;
-    return result;
-  }
-
-  in_channel->reset(in);
-
-  Wait* wait = nullptr;
-  if (in_channel == &cmd_channel_) {
-    wait = &cmd_channel_wait_;
-  } else if (in_channel == &acl_channel_) {
-    wait = &acl_channel_wait_;
-  } else if (in_channel == &sco_channel_) {
-    wait = &sco_channel_wait_;
-  } else if (in_channel == &snoop_channel_) {
-    return ZX_OK;
-  }
-  ZX_ASSERT(wait);
-  wait->object = in_channel->get();
-  wait->trigger = ZX_CHANNEL_READABLE | ZX_CHANNEL_PEER_CLOSED;
-  ZX_ASSERT(async_begin_wait(dispatcher_, wait) == ZX_OK);
-  wait->pending = true;
-  return result;
-}
-
-void LoopbackDevice::HciHandleIncomingChannel(zx::channel* chan, zx_signals_t pending) {
-  FDF_LOG(TRACE, "HciHandleIncomingChannel readable:%d, closed: %d",
-          int(pending & ZX_CHANNEL_READABLE), int(pending & ZX_CHANNEL_PEER_CLOSED));
-  // If we are in the process of shutting down, we are done.
-  if (atomic_load_explicit(&shutting_down_, std::memory_order_relaxed)) {
+  if (write_status != ZX_OK) {
+    FDF_LOG(ERROR, "Failed to write to loopback channel: %s", zx_status_get_string(write_status));
     return;
   }
 
-  // Channel may have been closed since signal was received.
-  if (!chan->is_valid()) {
-    FDF_LOG(ERROR, "channel is invalid");
-    return;
-  }
-
-  // Handle the read signal first.  If we are also peer closed, we want to make
-  // sure that we have processed all of the pending messages before cleaning up.
-  if (pending & ZX_CHANNEL_READABLE) {
-    uint32_t length;
-    uint8_t read_buffer[kAclMaxFrameSize];
-    zx_status_t status;
-
-    status = zx_channel_read(chan->get(), 0, read_buffer, nullptr, kAclMaxFrameSize, 0, &length,
-                             nullptr);
-    if (status == ZX_ERR_SHOULD_WAIT) {
-      FDF_LOG(WARNING, "ignoring ZX_ERR_SHOULD_WAIT when reading incoming channel");
-      return;
-    }
-    if (status != ZX_OK) {
-      FDF_LOG(ERROR, "failed to read from incoming channel %s", zx_status_get_string(status));
-      ChannelCleanup(chan);
-      return;
-    }
-
-    const uint8_t* buf = read_buffer;
-    const uint8_t* const end = read_buffer + length;
-    while (buf < end) {
-      if (cur_uart_packet_type_ == kHciNone) {
-        // start of new packet. read packet type
-        cur_uart_packet_type_ = static_cast<BtHciPacketIndicator>(*buf++);
-      }
-
-      switch (cur_uart_packet_type_) {
-        case kHciEvent:
-          ProcessNextUartPacketFromReadBuffer(
-              event_buffer_, sizeof(event_buffer_), &event_buffer_offset_, &buf, end,
-              &LoopbackDevice::EventPacketLength, &cmd_channel_, BT_HCI_SNOOP_TYPE_EVT);
-          break;
-        case kHciAclData:
-          ProcessNextUartPacketFromReadBuffer(acl_buffer_, sizeof(acl_buffer_), &acl_buffer_offset_,
-                                              &buf, end, &LoopbackDevice::AclPacketLength,
-                                              &acl_channel_, BT_HCI_SNOOP_TYPE_ACL);
-          break;
-        case kHciSco:
-          ProcessNextUartPacketFromReadBuffer(sco_buffer_, sizeof(sco_buffer_), &sco_buffer_offset_,
-                                              &buf, end, &LoopbackDevice::ScoPacketLength,
-                                              &sco_channel_, BT_HCI_SNOOP_TYPE_SCO);
-          break;
-        default:
-          FDF_LOG(ERROR, "unsupported HCI packet type %i received. We may be out of sync",
-                  int(cur_uart_packet_type_));
-          cur_uart_packet_type_ = kHciNone;
-          return;
-      }
-    }
-  }
-
-  if (pending & ZX_CHANNEL_PEER_CLOSED) {
-    ChannelCleanup(chan);
-    HciBeginShutdown();
+  if (snoop_.has_value()) {
+    snoop_->QueueSnoopPacket(buffer, length, indicator,
+                             fuchsia_hardware_bluetooth::PacketDirection::kHostToController);
   }
 }
 
-void LoopbackDevice::ProcessNextUartPacketFromReadBuffer(
-    uint8_t* buffer, size_t buffer_size, size_t* buffer_offset, const uint8_t** uart_src,
-    const uint8_t* uart_end, PacketLengthFunction get_packet_length, zx::channel* channel,
-    bt_hci_snoop_type_t snoop_type) {
-  size_t packet_length = (this->*get_packet_length)();
-
-  while (!packet_length && *uart_src < uart_end) {
-    // read until we have enough to compute packet length
-    buffer[*buffer_offset] = **uart_src;
-    (*buffer_offset)++;
-    (*uart_src)++;
-    packet_length = (this->*get_packet_length)();
-  }
-
-  // Out of bytes, but we still don't know the packet length.  Just wait for
-  // the next packet.
-  if (!packet_length) {
-    return;
-  }
-
-  if (packet_length > buffer_size) {
-    FDF_LOG(ERROR,
-            "packet_length is too large (%zu > %zu) during packet reassembly. Dropping and "
-            "attempting to re-sync.",
-            packet_length, buffer_size);
-
-    // Reset the reassembly state machine.
-    *buffer_offset = 1;
-    cur_uart_packet_type_ = kHciNone;
-    // Consume the rest of the UART buffer to indicate that it is corrupt.
-    *uart_src = uart_end;
-    return;
-  }
-
-  size_t remaining = uart_end - *uart_src;
-  size_t copy_size = packet_length - *buffer_offset;
-  copy_size = std::min(copy_size, remaining);
-
-  ZX_ASSERT(*buffer_offset + copy_size <= buffer_size);
-  memcpy(buffer + *buffer_offset, *uart_src, copy_size);
-  *uart_src += copy_size;
-  *buffer_offset += copy_size;
-
-  if (*buffer_offset != packet_length) {
-    // The packet is incomplete, the next chunk should continue the same packet.
-    return;
-  }
-
-  // Attempt to send this packet to the channel. Do so in the lock so we don't shut down while
-  // writing.
-  if (channel->is_valid()) {
-    zx_status_t status = channel->write(/*flags=*/0, &buffer[1], packet_length - 1, nullptr, 0);
-    if (status != ZX_OK) {
-      FDF_LOG(ERROR, "failed to write packet: %s", zx_status_get_string(status));
-      ChannelCleanup(&acl_channel_);
-    }
-  }
-
-  // If the snoop channel is open then try to write the packet even if |channel| was closed.
-  SnoopChannelWrite(bt_hci_snoop_flags(snoop_type, true), &buffer[1], packet_length - 1);
-
-  // reset buffer
-  cur_uart_packet_type_ = kHciNone;
-  *buffer_offset = 1;
-}
-
-void LoopbackDevice::HciHandleClientChannel(zx::channel* chan, zx_signals_t pending) {
-  FDF_LOG(TRACE, "LoopbackDevice::HciHandleClientChannel");
-  // Channel may have been closed since signal was received.
-  if (!chan->is_valid()) {
-    FDF_LOG(ERROR, "chan invalid");
-    return;
-  }
-
-  // Figure out which channel we are dealing with and the constants which go
-  // along with it.
-  uint32_t max_buf_size;
-  BtHciPacketIndicator packet_type;
-  bt_hci_snoop_type_t snoop_type;
-  const char* chan_name = nullptr;
-
-  if (chan == &cmd_channel_) {
-    max_buf_size = kCmdBufSize;
-    packet_type = kHciCommand;
-    snoop_type = BT_HCI_SNOOP_TYPE_CMD;
-    chan_name = "command";
-  } else if (chan == &acl_channel_) {
-    max_buf_size = kAclMaxFrameSize;
-    packet_type = kHciAclData;
-    snoop_type = BT_HCI_SNOOP_TYPE_ACL;
-    chan_name = "ACL";
-  } else if (chan == &sco_channel_) {
-    max_buf_size = kScoMaxFrameSize;
-    packet_type = kHciSco;
-    snoop_type = BT_HCI_SNOOP_TYPE_SCO;
-    chan_name = "SCO";
-  } else {
-    // This should never happen, we only know about three packet types currently.
-    ZX_ASSERT(false);
-    return;
-  }
-
-  FDF_LOG(TRACE, "LoopbackDevice::HciHandleClientChannel handling %s", chan_name);
-
-  // Handle the read signal first.  If we are also peer closed, we want to make
-  // sure that we have processed all of the pending messages before cleaning up.
-  if (pending & ZX_CHANNEL_READABLE) {
-    zx_status_t status = ZX_OK;
-    uint32_t length = max_buf_size - 1;
-
-    status =
-        zx_channel_read(chan->get(), 0, write_buffer_ + 1, nullptr, length, 0, &length, nullptr);
-    if (status == ZX_ERR_SHOULD_WAIT) {
-      FDF_LOG(WARNING, "ignoring ZX_ERR_SHOULD_WAIT when reading %s channel", chan_name);
-      return;
-    }
-    if (status != ZX_OK) {
-      FDF_LOG(ERROR, "hci_read_thread: failed to read from %s channel %s", chan_name,
-              zx_status_get_string(status));
-      ChannelCleanup(chan);
-      return;
-    }
-
-    write_buffer_[0] = packet_type;
-    length++;
-
-    SnoopChannelWrite(bt_hci_snoop_flags(snoop_type, false), write_buffer_ + 1, length - 1);
-
-    if (in_channel_.is_valid()) {
-      status = in_channel_.write(/*flags=*/0, write_buffer_, length, nullptr, 0);
-      if (status != ZX_OK) {
-        FDF_LOG(ERROR, "failed to write packet: %s", zx_status_get_string(status));
-      }
-    }
-
-    if (status != ZX_OK) {
-      HciBeginShutdown();
-    }
-  }
-
-  if (pending & ZX_CHANNEL_PEER_CLOSED) {
-    FDF_LOG(DEBUG, "received closed signal for %s channel", chan_name);
-    ChannelCleanup(chan);
-  }
-}
-
-void LoopbackDevice::EncodeCommand(EncodeCommandRequestView request,
+void LoopbackDevice::EncodeCommand(EncodeCommandRequest& request,
                                    EncodeCommandCompleter::Sync& completer) {
-  // This interface is not implemented.
-  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  completer.Reply(fit::error(ZX_ERR_NOT_SUPPORTED));
 }
 
 void LoopbackDevice::OpenHci(OpenHciCompleter::Sync& completer) {
-  auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_bluetooth::Hci>();
+  completer.Reply(fit::error(ZX_ERR_NOT_SUPPORTED));
+}
+
+void LoopbackDevice::OpenHciTransport(OpenHciTransportCompleter::Sync& completer) {
+  auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_bluetooth::HciTransport>();
   if (endpoints.is_error()) {
-    FDF_LOG(ERROR, "Failed to create endpoints: %s", zx_status_get_string(endpoints.error_value()));
-    completer.ReplyError(endpoints.error_value());
+    FDF_LOG(ERROR, "Failed to create HciTransport endpoints: %s",
+            zx_status_get_string(endpoints.error_value()));
+    completer.Reply(fit::error(ZX_ERR_INTERNAL));
     return;
   }
-  fidl::BindServer(dispatcher_, std::move(endpoints->server), this);
-  completer.ReplySuccess(std::move(endpoints->client));
+
+  size_t binding_id = next_hci_transport_server_id_++;
+  auto [_, inserted] = hci_transport_servers_.try_emplace(binding_id, this, binding_id,
+                                                          std::move(endpoints->server));
+  ZX_ASSERT(inserted);
+  completer.Reply(fit::ok(std::move(endpoints->client)));
+}
+
+void LoopbackDevice::OpenSnoop(OpenSnoopCompleter::Sync& completer) {
+  completer.Reply(fit::error(ZX_ERR_NOT_SUPPORTED));
 }
 
 void LoopbackDevice::handle_unknown_method(
@@ -464,63 +283,105 @@ void LoopbackDevice::handle_unknown_method(
   completer.Close(ZX_ERR_NOT_SUPPORTED);
 }
 
-void LoopbackDevice::OpenCommandChannel(OpenCommandChannelRequestView request,
-                                        OpenCommandChannelCompleter::Sync& completer) {
-  if (zx_status_t status = HciOpenChannel(&cmd_channel_, request->channel.release());
-      status != ZX_OK) {
-    completer.ReplyError(status);
+LoopbackDevice::HciTransportServer::HciTransportServer(
+    LoopbackDevice* device, size_t binding_id,
+    fidl::ServerEnd<fuchsia_hardware_bluetooth::HciTransport> server_end)
+    : device_(device),
+      binding_id_(binding_id),
+      binding_(device_->dispatcher_, std::move(server_end), this,
+               std::mem_fn(&HciTransportServer::OnUnbound)) {}
+
+void LoopbackDevice::HciTransportServer::OnReceive(uint8_t* buffer, size_t length) {
+  if (receive_credits_ == 0 || !receive_queue_.empty()) {
+    if (receive_queue_.size() == kMaxReceiveQueueSize) {
+      FDF_LOG(ERROR, "Receive queue reached max size, dropping packet");
+      return;
+    }
+    std::vector<uint8_t> packet(buffer, buffer + length);
+    receive_queue_.push(std::move(packet));
+    return;
   }
-  completer.ReplySuccess();
+  SendOnReceive(buffer, length);
 }
 
-void LoopbackDevice::OpenAclDataChannel(OpenAclDataChannelRequestView request,
-                                        OpenAclDataChannelCompleter::Sync& completer) {
-  if (zx_status_t status = HciOpenChannel(&acl_channel_, request->channel.release());
-      status != ZX_OK) {
-    completer.ReplyError(status);
+void LoopbackDevice::HciTransportServer::OnUnbound(fidl::UnbindInfo info) {
+  device_->hci_transport_servers_.erase(binding_id_);
+}
+
+void LoopbackDevice::HciTransportServer::SendOnReceive(uint8_t* buffer, size_t length) {
+  ZX_ASSERT(receive_credits_ != 0);
+  receive_credits_--;
+
+  // Omit the indicator byte in ReceivedPacket.
+  fidl::VectorView vec_view = fidl::VectorView<uint8_t>::FromExternal(buffer + 1, length - 1);
+  fidl::ObjectView obj_view = fidl::ObjectView<fidl::VectorView<uint8_t>>::FromExternal(&vec_view);
+  fuchsia_hardware_bluetooth::wire::ReceivedPacket packet;
+  switch (static_cast<PacketIndicator>(buffer[0])) {
+    case PacketIndicator::kHciEvent:
+      packet = fuchsia_hardware_bluetooth::wire::ReceivedPacket::WithEvent(obj_view);
+      break;
+    case PacketIndicator::kHciAclData:
+      packet = fuchsia_hardware_bluetooth::wire::ReceivedPacket::WithAcl(obj_view);
+      break;
+    case PacketIndicator::kHciIso:
+      packet = fuchsia_hardware_bluetooth::wire::ReceivedPacket::WithIso(obj_view);
+      break;
+    default:
+      FDF_LOG(WARNING, "Received invalid packet indicator on loopback channel");
+      return;
   }
-  completer.ReplySuccess();
-}
-
-void LoopbackDevice::OpenScoDataChannel(OpenScoDataChannelRequestView request,
-                                        OpenScoDataChannelCompleter::Sync& completer) {
-  if (zx_status_t status = HciOpenChannel(&sco_channel_, request->channel.release());
-      status != ZX_OK) {
-    completer.ReplyError(status);
+  fidl::OneWayStatus status = fidl::WireSendEvent(binding_)->OnReceive(packet);
+  if (!status.ok()) {
+    FDF_LOG(WARNING, "Error sending OnReceive event: %s", status.status_string());
   }
-  completer.ReplySuccess();
 }
 
-void LoopbackDevice::ConfigureSco(ConfigureScoRequestView request,
-                                  ConfigureScoCompleter::Sync& completer) {
-  // UART doesn't require any SCO configuration.
-  completer.ReplySuccess();
+void LoopbackDevice::HciTransportServer::MaybeSendQueuedReceivePackets() {
+  while (receive_credits_ != 0 && !receive_queue_.empty()) {
+    SendOnReceive(receive_queue_.front().data(), receive_queue_.front().size());
+    receive_queue_.pop();
+  }
 }
 
-void LoopbackDevice::ResetSco(ResetScoCompleter::Sync& completer) {
-  // UART doesn't require any SCO configuration, so there's nothing to do.
-  completer.ReplySuccess();
+void LoopbackDevice::HciTransportServer::Send(SendRequest& request,
+                                              SendCompleter::Sync& completer) {
+  completer.Reply();
+
+  switch (request.Which()) {
+    case fuchsia_hardware_bluetooth::SentPacket::Tag::kCommand:
+      device_->WriteLoopbackChannel(PacketIndicator::kHciCommand, request.command()->data(),
+                                    request.command()->size());
+      break;
+    case fuchsia_hardware_bluetooth::SentPacket::Tag::kAcl:
+      device_->WriteLoopbackChannel(PacketIndicator::kHciAclData, request.acl()->data(),
+                                    request.acl()->size());
+      break;
+    case fuchsia_hardware_bluetooth::SentPacket::Tag::kIso:
+      device_->WriteLoopbackChannel(PacketIndicator::kHciIso, request.iso()->data(),
+                                    request.iso()->size());
+      break;
+    default:
+      FDF_LOG(WARNING, "Unknown SentPacket type");
+  }
 }
 
-void LoopbackDevice::OpenIsoDataChannel(OpenIsoDataChannelRequestView request,
-                                        OpenIsoDataChannelCompleter::Sync& completer) {
-  // This interface is not implemented.
-  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+void LoopbackDevice::HciTransportServer::AckReceive(AckReceiveCompleter::Sync& completer) {
+  receive_credits_++;
+  MaybeSendQueuedReceivePackets();
 }
 
-void LoopbackDevice::OpenSnoopChannel(OpenSnoopChannelRequestView request,
-                                      OpenSnoopChannelCompleter::Sync& completer) {
-  if (zx_status_t status = HciOpenChannel(&snoop_channel_, request->channel.release());
-      status != ZX_OK) {
-    completer.ReplyError(status);
-  };
-  completer.ReplySuccess();
+void LoopbackDevice::HciTransportServer::ConfigureSco(ConfigureScoRequest& request,
+                                                      ConfigureScoCompleter::Sync& completer) {}
+
+void LoopbackDevice::HciTransportServer::SetSnoop(SetSnoopRequest& request,
+                                                  SetSnoopCompleter::Sync& completer) {
+  device_->snoop_.emplace(std::move(request.snoop()), device_);
 }
 
-void LoopbackDevice::handle_unknown_method(
-    fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Hci> metadata,
+void LoopbackDevice::HciTransportServer::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::HciTransport> metadata,
     fidl::UnknownMethodCompleter::Sync& completer) {
-  FDF_LOG(ERROR, "Unknown method in Hci request, closing with ZX_ERR_NOT_SUPPORTED");
+  FDF_LOG(ERROR, "Unknown method in HciTransport request, closing with ZX_ERR_NOT_SUPPORTED");
   completer.Close(ZX_ERR_NOT_SUPPORTED);
 }
 

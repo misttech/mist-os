@@ -93,7 +93,7 @@ double SecondsSinceStart() {
 }  // namespace
 
 bool IsDebugLoggingActive() {
-  return fuchsia_logging::ShouldCreateLogMessage(fuchsia_logging::LOG_DEBUG);
+  return fuchsia_logging::IsSeverityEnabled(fuchsia_logging::LOG_DEBUG);
 }
 
 void SetDebugLogging(bool activate) {

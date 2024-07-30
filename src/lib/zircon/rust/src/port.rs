@@ -5,7 +5,7 @@
 //! Type-safe bindings for Zircon port objects.
 
 use crate::{
-    guest, ok, AsHandleRef, GPAddr, Handle, HandleBased, HandleRef, Packet, Signals, Status, Time,
+    guest, ok, AsHandleRef, GPAddr, Handle, HandleBased, HandleRef, Signals, Status, Time,
     VcpuContents,
 };
 use bitflags::bitflags;
@@ -77,6 +77,11 @@ pub struct GuestVcpuPacket(sys::zx_packet_guest_vcpu_t);
 /// zx_packet_page_request_t
 #[derive(Debug, Copy, Clone)]
 pub struct PagerPacket(sys::zx_packet_page_request_t);
+
+/// A packet sent through a port. This is a type-safe wrapper for
+/// [zx_port_packet_t](https://fuchsia.dev/fuchsia-src/reference/syscalls/port_wait.md).
+#[derive(PartialEq, Eq, Debug)]
+pub struct Packet(pub(crate) sys::zx_port_packet_t);
 
 impl Packet {
     /// Creates a new packet with `UserPacket` data.

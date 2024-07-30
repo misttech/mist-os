@@ -42,7 +42,7 @@ func TestToTraces(t *testing.T) {
 						CmdHash:    0x2ac7111aa1ae86af,
 						TotalFloat: 100 * time.Millisecond,
 						Command: &compdb.Command{
-							Command: "prebuilt/third_party/goma/linux-x64/gomacc some args and files",
+							Command: "prebuilt/third_party/clang/linux-x64/clang++ some args and files",
 						},
 					},
 				},
@@ -178,7 +178,7 @@ func TestToTraces(t *testing.T) {
 				},
 				{
 					Name:            "obj/third_party/pdfium/core/src/fpdfdoc/fpdfdoc.doc_formfield.o",
-					Category:        "gomacc",
+					Category:        "clang++",
 					EventType:       chrometrace.CompleteEvent,
 					TimestampMicros: 187 * 1000,
 					DurationMicros:  (21304 - 187) * 1000,
@@ -186,7 +186,7 @@ func TestToTraces(t *testing.T) {
 					ThreadID:        0,
 					Args: map[string]interface{}{
 						"outputs":     []string{"obj/third_party/pdfium/core/src/fpdfdoc/fpdfdoc.doc_formfield.o"},
-						"command":     "prebuilt/third_party/goma/linux-x64/gomacc some args and files",
+						"command":     "prebuilt/third_party/clang/linux-x64/clang++ some args and files",
 						"total float": "100ms",
 					},
 				},

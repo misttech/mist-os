@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use argh::{ArgsInfo, FromArgs};
-use component_debug::config::RawConfigOverride;
+use component_debug::config::RawConfigEntry;
 use ffx_core::ffx_command;
 use fuchsia_url::AbsoluteComponentUrl;
 use moniker::Moniker;
@@ -36,5 +36,5 @@ pub struct CreateComponentCommand {
     /// `mutability: [ "parent" ]` on the configuration field. Specified in the format
     /// `KEY=VALUE` where `VALUE` is a JSON string which can be resolved as the correct type of
     /// configuration value.
-    pub config: Vec<RawConfigOverride>,
+    pub config: Vec<RawConfigEntry>,
 }

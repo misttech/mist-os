@@ -385,6 +385,7 @@ func (r *RunCommand) dispatchTests(ctx context.Context, cancel context.CancelFun
 				if err != nil {
 					return err
 				}
+				t.GetFFX().SetTarget(addr.String())
 				// Add the target address in order to skip MDNS discovery.
 				if err := t.GetFFX().Run(ctx, "target", "add", addr.String()); err != nil {
 					return err
@@ -480,8 +481,9 @@ func (r *RunCommand) execute(ctx context.Context, args []string) error {
 			return err
 		}
 		// Attach an ffx instance for all targets. All ffx instances will use the same
-		// config and daemon, but run commands against its own specified target.
-		ffxForTarget := ffxutil.FFXWithTarget(ffx, t.Nodename())
+		// config and daemon, but run commands against its own specified target. The target
+		// will be set after starting the target, so that we can resolve the IP address.
+		ffxForTarget := ffxutil.FFXWithTarget(ffx, "")
 		t.SetFFX(&targets.FFXInstance{ffxForTarget, r.ffxExperimentLevel}, ffx.Env())
 	}
 

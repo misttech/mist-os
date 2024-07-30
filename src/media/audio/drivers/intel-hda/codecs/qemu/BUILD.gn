@@ -6,9 +6,9 @@ import("//build/bind/bind.gni")
 import("//build/drivers.gni")
 
 driver_bind_rules("ihda_codecs_qemu_bind") {
-  rules = "qemu_ihda_codec.bind"
+  rules = "meta/qemu_ihda_codec.bind"
   deps = [ "//src/devices/bind/fuchsia.audio.intelhda" ]
-  tests = "bind_test.json"
+  tests = "meta/bind_test.json"
 }
 
 group("qemu") {
@@ -45,7 +45,7 @@ fuchsia_driver("qemu-audio-codec-driver") {
 fuchsia_driver_component("qemu-audio-codec") {
   component_name = "qemu-audio-codec"
   deps = [ ":qemu-audio-codec-driver" ]
-  info = "qemu-audio-codec-info.json"
+  info = "meta/qemu-audio-codec-info.json"
   manifest = "meta/qemu-audio-codec.cml"
 }
 

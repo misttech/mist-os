@@ -18,10 +18,10 @@
 
 namespace device_enumeration {
 
-void RecursiveWaitFor(const std::string& full_path, size_t slash_index,
-                      fit::function<void()> callback,
-                      std::vector<std::unique_ptr<fsl::DeviceWatcher>>& watchers,
-                      async_dispatcher_t* dispatcher) {
+void RecursiveWaitForDevfs(const std::string& full_path, size_t slash_index,
+                           fit::function<void()> callback,
+                           std::vector<std::unique_ptr<fsl::DeviceWatcher>>& watchers,
+                           async_dispatcher_t* dispatcher) {
   if (slash_index == full_path.size()) {
     fprintf(stderr, "Found %s \n", full_path.c_str());
     callback();
@@ -40,32 +40,10 @@ void RecursiveWaitFor(const std::string& full_path, size_t slash_index,
       [file_name, full_path, next_slash, callback = std::move(callback), &watchers, dispatcher](
           const fidl::ClientEnd<fuchsia_io::Directory>& dir, const std::string& name) mutable {
         if (name == file_name) {
-          RecursiveWaitFor(full_path, next_slash, std::move(callback), watchers, dispatcher);
+          RecursiveWaitForDevfs(full_path, next_slash, std::move(callback), watchers, dispatcher);
         }
       },
       dispatcher));
-}
-
-void WaitForOne(cpp20::span<const char*> device_paths) {
-  async::Loop loop = async::Loop(&kAsyncLoopConfigNeverAttachToThread);
-
-  async::TaskClosure task([device_paths]() {
-    // stdout doesn't show up in test logs.
-    fprintf(stderr, "still waiting for device paths:\n");
-    for (const char* path : device_paths) {
-      fprintf(stderr, " %s\n", path);
-    }
-  });
-  ASSERT_OK(task.PostDelayed(loop.dispatcher(), zx::min(1)));
-
-  std::vector<std::unique_ptr<fsl::DeviceWatcher>> watchers;
-  for (const char* path : device_paths) {
-    RecursiveWaitFor(
-        std::string("/dev/") + path, 4, [&loop]() { loop.Shutdown(); }, watchers,
-        loop.dispatcher());
-  }
-
-  loop.Run();
 }
 
 void WaitForClassDeviceCount(const std::string& path_in_devfs, size_t count) {
@@ -119,7 +97,7 @@ void DeviceEnumerationTest::TestRunner(const char** device_paths, size_t paths_n
     ASSERT_OK(task.PostDelayed(loop.dispatcher(), zx::min(1)));
 
     for (const char* path : device_paths) {
-      device_enumeration::RecursiveWaitFor(
+      device_enumeration::RecursiveWaitForDevfs(
           std::string("/dev/") + path, 4,
           [&loop, &device_paths, path]() {
             ASSERT_EQ(device_paths.erase(path), 1);

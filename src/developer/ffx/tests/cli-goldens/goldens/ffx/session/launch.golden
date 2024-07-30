@@ -12,6 +12,18 @@
       "short": null,
       "description": "display usage information",
       "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "config"
+        }
+      },
+      "optionality": "repeating",
+      "long": "--config",
+      "short": null,
+      "description": "provide additional configuration capabilities to the component being run. Specified in the format `fully.qualified.Name=VALUE` where `fully.qualified.Name` is the name of the configuration capability, and `VALUE` is a JSON string which can be resolved as the correct type of configuration value.",
+      "hidden": false
     }
   ],
   "notes": [],

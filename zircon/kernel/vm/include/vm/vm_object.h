@@ -36,7 +36,7 @@
 #include <vm/vm_page_list.h>
 
 class VmMapping;
-class LazyPageRequest;
+class MultiPageRequest;
 class VmObjectPaged;
 class VmAspace;
 class VmObject;
@@ -654,7 +654,7 @@ class VmObject : public VmHierarchyBase,
   // until this returns ZX_ERR_SHOULD_WAIT. If the caller runs out of requests, it
   // should finalize the request with PageSource::FinalizeRequest.
   virtual zx_status_t GetPage(uint64_t offset, uint pf_flags, list_node* alloc_list,
-                              LazyPageRequest* page_request, vm_page_t** page, paddr_t* pa) = 0;
+                              MultiPageRequest* page_request, vm_page_t** page, paddr_t* pa) = 0;
 
   // Helper variant of GetPage that will retry the operation after waiting on a PageRequest if
   // required.

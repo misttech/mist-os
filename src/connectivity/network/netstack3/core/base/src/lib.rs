@@ -62,7 +62,7 @@ pub use resource_references::{
 };
 pub use rng::RngContext;
 pub use tcp::base::{Control, Mss, SendPayload};
-pub use tcp::segment::{Options, Payload, Segment};
+pub use tcp::segment::{Options, Payload, PayloadLen, Segment, SegmentHeader};
 pub use tcp::seqnum::{SeqNum, UnscaledWindowSize, WindowScale, WindowSize};
 pub use time::local_timer_heap::LocalTimerHeap;
 pub use time::{

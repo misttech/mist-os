@@ -146,6 +146,14 @@
       "short": "o",
       "description": "specify destination of log output. \"-\" or \"stdout\" for stdout, \"stderr\" for stderr. If no destination is specified, log.dir will be used. If a destination is specified, then log.dir will be ignored.",
       "hidden": false
+    },
+    {
+      "kind": "Switch",
+      "optionality": "optional",
+      "long": "--no-environment",
+      "short": null,
+      "description": "disables loading configuration from the file system and only uses configuration specified on the command line or the compiled in default values. Intended for use when running ffx as part of a hermetic build.",
+      "hidden": false
     }
   ],
   "notes": [],

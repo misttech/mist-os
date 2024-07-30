@@ -24,34 +24,26 @@ class MultipleProcessSvcTest : public zxtest::Test {
     static zx::channel provider_svc_server;
 
     // Prevents multiple iterations from discarding this.
-    if (!svc_stash) {
-      svc_stash = GetSvcStash();
+    if (!svc_server || !provider_svc_server) {
+      GetSvcStash(svc_stash);
       ASSERT_TRUE(svc_stash);
     }
 
     // Order matters, provider is stored first.
-    if (!provider_svc_server) {
-      ASSERT_NO_FATAL_FAILURE(GetStashedSvc(svc_stash.borrow(), provider_svc_server));
+    if (svc_stash.is_valid()) {
+      ASSERT_NO_FATAL_FAILURE(GetStashedSvc(std::move(svc_stash), provider_svc_server, svc_server));
     }
 
-    // Ours is stored second.
-    if (!svc_server) {
-      ASSERT_NO_FATAL_FAILURE(GetStashedSvc(svc_stash.borrow(), svc_server));
-    }
-
-    svc_stash_ = svc_stash.borrow();
     svc_ = standalone::GetNsDir("/svc");
     stashed_svc_ = svc_server.borrow();
     provider_svc_ = provider_svc_server.borrow();
   }
 
-  zx::unowned_channel svc_stash() { return svc_stash_->borrow(); }
   zx::unowned_channel local_svc() { return svc_->borrow(); }
   zx::unowned_channel stashed_svc() { return stashed_svc_->borrow(); }
   zx::unowned_channel provider_svc() { return provider_svc_->borrow(); }
 
  private:
-  zx::unowned_channel svc_stash_;
   zx::unowned_channel svc_;
   zx::unowned_channel stashed_svc_;
   zx::unowned_channel provider_svc_;

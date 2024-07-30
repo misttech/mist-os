@@ -90,7 +90,9 @@ impl std::fmt::Display for PackageSet {
 }
 
 /// Details about a package that contains drivers.
-#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
+#[derive(
+    Clone, Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema, SupportsFileRelativePaths,
+)]
 #[serde(deny_unknown_fields)]
 pub struct DriverDetails {
     /// The package containing the driver.

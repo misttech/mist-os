@@ -11,17 +11,15 @@ import subprocess
 import sys
 import tempfile
 import unittest
-
 from pathlib import Path
+from typing import Any, Collection, Iterable, Sequence
 from unittest import mock
 
-import rustc_remote_wrapper
-import rustc
 import cl_utils
 import fuchsia
 import remote_action
-
-from typing import Any, Collection, Iterable, Sequence
+import rustc
+import rustc_remote_wrapper
 
 
 class ImmediateExit(Exception):

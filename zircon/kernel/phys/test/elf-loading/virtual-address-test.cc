@@ -62,7 +62,7 @@ int PhysLoadTestMain(KernelStorage kernelfs) {
   printf("Verifying PT_INTERP matches test build ID...\n");
   elf.AssertInterpMatchesBuildId(kGetInt, gSymbolize->build_id());
 
-  Allocation loaded = elf.Load(kLoadAddress);
+  Allocation loaded = elf.Load(memalloc::Type::kPhysElf, kLoadAddress);
   elf.Relocate();
 
   // TODO(https://fxbug.dev/42172722): Set up C++ ABI support and map and jump into a

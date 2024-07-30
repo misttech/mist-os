@@ -4,7 +4,7 @@
 
 #include <fidl/fuchsia.wlan.sme/cpp/fidl.h>
 #include <fidl/fuchsia.wlan.softmac/cpp/driver/fidl.h>
-#include <lib/driver/testing/cpp/fixture/driver_test_fixture.h>
+#include <lib/driver/testing/cpp/driver_test.h>
 #include <lib/fidl/cpp/client.h>
 
 #include <chrono>
@@ -22,10 +22,6 @@ namespace {
 template <typename Environment>
 class FixtureConfig final {
  public:
-  static constexpr bool kDriverOnForeground = false;
-  static constexpr bool kAutoStartDriver = false;
-  static constexpr bool kAutoStopDriver = true;
-
   using DriverType = SoftmacDriver;
   using EnvironmentType = Environment;
 };
@@ -39,13 +35,26 @@ class BadStartWlanSoftmacServer : public UnimplementedWlanSoftmacServer {
   }
 };
 
-class BadStartSoftmacDriverTest : public fdf_testing::DriverTestFixture<
-                                      FixtureConfig<CustomEnvironment<BadStartWlanSoftmacServer>>>,
-                                  public ::testing::Test {};
+class BadStartSoftmacDriverTest : public ::testing::Test {
+ public:
+  void TearDown() override {
+    zx::result<> result = driver_test().StopDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
+  }
+
+  fdf_testing::BackgroundDriverTest<FixtureConfig<CustomEnvironment<BadStartWlanSoftmacServer>>>&
+  driver_test() {
+    return driver_test_;
+  }
+
+ private:
+  fdf_testing::BackgroundDriverTest<FixtureConfig<CustomEnvironment<BadStartWlanSoftmacServer>>>
+      driver_test_;
+};
 
 // Verify that a WlanSoftmac.Start failure during Start causes Start to fail.
 TEST_F(BadStartSoftmacDriverTest, StartFails) {
-  auto result = StartDriver();
+  auto result = driver_test().StartDriver();
   ASSERT_TRUE(result.is_error());
   ASSERT_EQ(result.error_value(), ZX_ERR_ADDRESS_UNREACHABLE);
 }
@@ -59,13 +68,21 @@ class BadQueryWlanSoftmacServer : public BasicWlanSoftmacServer {
   }
 };
 
-class BadQuerySoftmacDriverTest : public fdf_testing::DriverTestFixture<
-                                      FixtureConfig<CustomEnvironment<BadQueryWlanSoftmacServer>>>,
-                                  public ::testing::Test {};
+class BadQuerySoftmacDriverTest : public ::testing::Test {
+ public:
+  fdf_testing::BackgroundDriverTest<FixtureConfig<CustomEnvironment<BadQueryWlanSoftmacServer>>>&
+  driver_test() {
+    return driver_test_;
+  }
+
+ private:
+  fdf_testing::BackgroundDriverTest<FixtureConfig<CustomEnvironment<BadQueryWlanSoftmacServer>>>
+      driver_test_;
+};
 
 // Verify that a WlanSoftmac.Query failure during Start causes Start to fail.
 TEST_F(BadQuerySoftmacDriverTest, StartFails) {
-  auto result = StartDriver();
+  auto result = driver_test().StartDriver();
   ASSERT_TRUE(result.is_error());
   ASSERT_EQ(result.error_value(), ZX_ERR_ACCESS_DENIED);
 }
@@ -94,14 +111,22 @@ class BadBootstrapWlanSoftmacServer : public BasicWlanSoftmacServer {
   std::optional<zx::vmo> inspect_vmo_;
 };
 
-class BadBootstrapSoftmacDriverTest
-    : public fdf_testing::DriverTestFixture<
-          FixtureConfig<CustomEnvironment<BadBootstrapWlanSoftmacServer>>>,
-      public ::testing::Test {};
+class BadBootstrapSoftmacDriverTest : public ::testing::Test {
+ public:
+  fdf_testing::BackgroundDriverTest<
+      FixtureConfig<CustomEnvironment<BadBootstrapWlanSoftmacServer>>>&
+  driver_test() {
+    return driver_test_;
+  }
+
+ private:
+  fdf_testing::BackgroundDriverTest<FixtureConfig<CustomEnvironment<BadBootstrapWlanSoftmacServer>>>
+      driver_test_;
+};
 
 // Verify that a failure to bootstrap to GenericSme during Start causes Start to fail.
 TEST_F(BadBootstrapSoftmacDriverTest, StartFails) {
-  auto result = StartDriver();
+  auto result = driver_test().StartDriver();
   ASSERT_TRUE(result.is_error());
   ASSERT_EQ(result.error_value(), ZX_ERR_BAD_STATE);
 }
@@ -115,36 +140,51 @@ class FragileSoftmacDriverEnvironment : public CustomEnvironment<BasicWlanSoftma
   void DropGenericSmeClient() { this->GetServer().DropGenericSmeClient(); }
 };
 
-class FragileSoftmacDriverTest
-    : public fdf_testing::DriverTestFixture<FixtureConfig<FragileSoftmacDriverEnvironment>>,
-      public ::testing::Test {};
+class FragileSoftmacDriverTest : public ::testing::Test {
+ public:
+  void TearDown() override {
+    zx::result<> result = driver_test().StopDriver();
+    ASSERT_EQ(ZX_OK, result.status_value());
+  }
+
+  fdf_testing::BackgroundDriverTest<FixtureConfig<FragileSoftmacDriverEnvironment>>& driver_test() {
+    return driver_test_;
+  }
+
+ private:
+  fdf_testing::BackgroundDriverTest<FixtureConfig<FragileSoftmacDriverEnvironment>> driver_test_;
+};
 
 // Verify dropping the WlanSoftmacIfc client end causes wlansoftmac to exit.
 TEST_F(FragileSoftmacDriverTest, WlanSoftmacIfcClientDropped) {
-  ASSERT_TRUE(StartDriver().is_ok());
+  ASSERT_TRUE(driver_test().StartDriver().is_ok());
 
-  RunInNodeContext([](auto& node) { ASSERT_EQ(node.children().size(), 1ul); });
+  driver_test().RunInNodeContext([](auto& node) { ASSERT_EQ(node.children().size(), 1ul); });
 
-  RunInEnvironmentTypeContext([](auto& environment) { environment.DropWlanSoftmacIfcClient(); });
+  driver_test().RunInEnvironmentTypeContext(
+      [](auto& environment) { environment.DropWlanSoftmacIfcClient(); });
 
-  while (RunInNodeContext<size_t>([](auto& node) { return node.children().size(); }) > 0) {
+  while (driver_test().RunInNodeContext<size_t>([](auto& node) { return node.children().size(); }) >
+         0) {
     std::this_thread::sleep_for(std::chrono::milliseconds(5));
   }
-  RunInNodeContext([](auto& node) { ASSERT_EQ(node.children().size(), 0ul); });
+  driver_test().RunInNodeContext([](auto& node) { ASSERT_EQ(node.children().size(), 0ul); });
 }
 
 // Verify dropping the GenericSme client end causes wlansoftmac to exit.
 TEST_F(FragileSoftmacDriverTest, GenericSmeClientDropped) {
-  ASSERT_TRUE(StartDriver().is_ok());
+  ASSERT_TRUE(driver_test().StartDriver().is_ok());
 
-  RunInNodeContext([](auto& node) { ASSERT_EQ(node.children().size(), 1ul); });
+  driver_test().RunInNodeContext([](auto& node) { ASSERT_EQ(node.children().size(), 1ul); });
 
-  RunInEnvironmentTypeContext([](auto& environment) { environment.DropGenericSmeClient(); });
+  driver_test().RunInEnvironmentTypeContext(
+      [](auto& environment) { environment.DropGenericSmeClient(); });
 
-  while (RunInNodeContext<size_t>([](auto& node) { return node.children().size(); }) > 0) {
+  while (driver_test().RunInNodeContext<size_t>([](auto& node) { return node.children().size(); }) >
+         0) {
     std::this_thread::sleep_for(std::chrono::milliseconds(5));
   }
-  RunInNodeContext([](auto& node) { ASSERT_EQ(node.children().size(), 0ul); });
+  driver_test().RunInNodeContext([](auto& node) { ASSERT_EQ(node.children().size(), 0ul); });
 }
 
 }  // namespace

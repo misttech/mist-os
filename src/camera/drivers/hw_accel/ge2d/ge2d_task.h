@@ -27,7 +27,7 @@ class ScopedCanvasId {
   ScopedCanvasId(const ScopedCanvasId&) = delete;
 
   ScopedCanvasId& operator=(ScopedCanvasId&& other);
-  ScopedCanvasId& operator=(ScopedCanvasId&) = delete;
+  ScopedCanvasId& operator=(const ScopedCanvasId&) = delete;
 
   ~ScopedCanvasId() { Reset(); }
 

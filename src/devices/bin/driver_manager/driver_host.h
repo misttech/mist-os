@@ -11,6 +11,8 @@
 
 #include <fbl/intrusive_double_list.h>
 
+#include "src/devices/bin/driver_loader/loader.h"
+
 namespace driver_manager {
 
 class DriverHost {
@@ -60,6 +62,32 @@ class DriverHostComponent final
 zx::result<> SetEncodedConfig(
     fidl::WireTableBuilder<fuchsia_driver_framework::wire::DriverStartArgs>& args,
     fuchsia_component_runner::wire::ComponentStartInfo& start_info);
+
+// A driver host that has been loaded by dynamic linking.
+class DynamicLinkerDriverHostComponent final
+    : public DriverHost,
+      public fbl::DoublyLinkedListable<std::unique_ptr<DynamicLinkerDriverHostComponent>> {
+ public:
+  DynamicLinkerDriverHostComponent(zx::channel bootstrap_sender,
+                                   std::unique_ptr<driver_loader::Loader> loader)
+      : bootstrap_sender_(std::move(bootstrap_sender)), loader_(std::move(loader)) {}
+
+  void Start(fidl::ClientEnd<fuchsia_driver_framework::Node> client_end, std::string node_name,
+             fuchsia_driver_framework::wire::NodePropertyDictionary node_properties,
+             fidl::VectorView<fuchsia_driver_framework::wire::NodeSymbol> symbols,
+             fuchsia_component_runner::wire::ComponentStartInfo start_info,
+             fidl::ServerEnd<fuchsia_driver_host::Driver> driver, StartCallback cb) override {
+    cb(zx::error(ZX_ERR_NOT_SUPPORTED));
+  }
+
+  zx::result<uint64_t> GetProcessKoid() const override { return zx::error(ZX_ERR_NOT_SUPPORTED); }
+
+  driver_loader::Loader* loader() { return loader_.get(); }
+
+ private:
+  zx::channel bootstrap_sender_;
+  std::unique_ptr<driver_loader::Loader> loader_;
+};
 
 }  // namespace driver_manager
 

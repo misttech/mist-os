@@ -6,6 +6,7 @@ use anyhow::Error;
 use argh::FromArgs;
 use component_events::events::*;
 use component_events::matcher::*;
+use diagnostics_log_encoding::encode::EncoderOpts;
 use diagnostics_log_encoding::parse::parse_record;
 use diagnostics_log_encoding::{Argument, Record, Severity, Value};
 use fidl_fuchsia_diagnostics::Interest;
@@ -37,9 +38,6 @@ use tracing::*;
 /// this Validator program.
 #[derive(Debug, FromArgs)]
 struct Opt {
-    /// set to true if you want to use the new file/line rules (where file and line numbers are always included)
-    #[argh(switch)]
-    new_file_line_rules: bool,
     /// true if the runtime supports stopping the interest listener
     #[argh(switch)]
     test_stop_listener: bool,
@@ -53,12 +51,8 @@ struct Opt {
 
 #[fuchsia::main]
 async fn main() -> Result<(), Error> {
-    let Opt { new_file_line_rules, test_stop_listener, ignored_tags, test_invalid_unicode } =
-        argh::from_env();
-    Puppet::launch(new_file_line_rules, test_stop_listener, test_invalid_unicode, ignored_tags)
-        .await?
-        .test()
-        .await
+    let Opt { test_stop_listener, ignored_tags, test_invalid_unicode } = argh::from_env();
+    Puppet::launch(true, test_stop_listener, test_invalid_unicode, ignored_tags).await?.test().await
 }
 
 struct Puppet {
@@ -567,7 +561,9 @@ fn vector_filter(vector: &TestVector) -> bool {
     // TODO(https://fxbug.dev/42145630) avoid this overallocation by supporting growth of the vec
     let mut buf = Cursor::new(vec![0; 1_000_000]);
     {
-        diagnostics_log_encoding::encode::Encoder::new(&mut buf).write_record(&record).unwrap();
+        diagnostics_log_encoding::encode::Encoder::new(&mut buf, EncoderOpts::default())
+            .write_record(&record)
+            .unwrap();
     }
 
     buf.position() < MAX_DATAGRAM_LEN_BYTES as u64

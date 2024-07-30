@@ -95,6 +95,7 @@ zx::result<std::string> InspectDevfs::Publish(const char* name, zx::vmo vmo) {
 }
 
 InspectManager::InspectManager(async_dispatcher_t* dispatcher) : inspector_(dispatcher, {}) {
+  inspector_.inspector().CreateStatsNode();
   zx::result devfs = InspectDevfs::Create(dispatcher);
   ZX_ASSERT(devfs.is_ok());
   info_ = fbl::MakeRefCounted<Info>(root_node(), std::move(devfs.value()));

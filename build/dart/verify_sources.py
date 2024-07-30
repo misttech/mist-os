@@ -6,8 +6,8 @@
 
 import argparse
 import os
-import sys
 import pathlib
+import sys
 
 
 def main():

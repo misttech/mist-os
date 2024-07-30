@@ -4,6 +4,8 @@
 
 #include "low_energy_connection_server.h"
 
+#include <pw_status/status.h>
+
 #include "src/connectivity/bluetooth/core/bt-host/fidl/helpers.h"
 
 namespace bthost {
@@ -153,9 +155,9 @@ void LowEnergyConnectionServer::GetCodecLocalDelayRange(
 
   adapter_->GetSupportedDelayRange(
       codec_id, transport_type, direction, codec_configuration,
-      [callback = std::move(callback)](zx_status_t status, uint32_t min_delay_us,
+      [callback = std::move(callback)](pw::Status status, uint32_t min_delay_us,
                                        uint32_t max_delay_us) {
-        if (status != ZX_OK) {
+        if (!status.ok()) {
           bt_log(WARN, "fidl", "failed to get controller supported delay");
           callback(fpromise::error(ZX_ERR_INTERNAL));
           return;
