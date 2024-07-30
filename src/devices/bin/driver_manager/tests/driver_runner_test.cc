@@ -803,7 +803,7 @@ TEST_F(DriverRunnerTest, StartSecondDriver_BindOrphanToBaseDriver) {
 
   // Tell driver index to return the second driver, and wait for base drivers to load.
   base_drivers_loaded = true;
-  driver_runner().ScheduleWatchForDriverLoad();
+  driver_runner().TryBindAllAvailable();
   ASSERT_TRUE(RunLoopUntilIdle());
 
   driver_index().InvokeWatchDriverResponse();

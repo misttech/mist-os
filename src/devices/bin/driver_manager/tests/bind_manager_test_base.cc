@@ -29,10 +29,6 @@ void TestDriverIndex::MatchDriver(MatchDriverRequestView request,
   completers_[id.value()].push(completer.ToAsync());
 }
 
-void TestDriverIndex::WatchForDriverLoad(WatchForDriverLoadCompleter::Sync& completer) {
-  completer.Reply();
-}
-
 void TestDriverIndex::AddCompositeNodeSpec(AddCompositeNodeSpecRequestView request,
                                            AddCompositeNodeSpecCompleter::Sync& completer) {
   completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
@@ -42,6 +38,10 @@ void TestDriverIndex::RebindCompositeNodeSpec(RebindCompositeNodeSpecRequestView
                                               RebindCompositeNodeSpecCompleter::Sync& completer) {
   completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
 }
+
+void TestDriverIndex::SetNotifier(
+    fuchsia_driver_index::wire::DriverIndexSetNotifierRequest* request,
+    SetNotifierCompleter::Sync& completer) {}
 
 fidl::ClientEnd<fdi::DriverIndex> TestDriverIndex::Connect() {
   auto [client_end, server_end] = fidl::Endpoints<fdi::DriverIndex>::Create();

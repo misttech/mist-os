@@ -20,14 +20,6 @@ use {
     fidl_fuchsia_driver_index as fdi, fuchsia_async as fasync,
 };
 
-fn ignore_peer_closed(err: fidl::Error) -> Result<(), fidl::Error> {
-    if err.is_closed() {
-        Ok(())
-    } else {
-        Err(err)
-    }
-}
-
 pub enum BaseRepo {
     // We know that Base won't update so we can store these as resolved.
     Resolved(Vec<ResolvedDriver>),
@@ -46,8 +38,8 @@ pub struct Indexer {
     // specs are added after the driver index server has started.
     pub composite_node_spec_manager: RefCell<CompositeNodeSpecManager>,
 
-    // Clients waiting for a response when a new boot/base driver is loaded.
-    driver_load_watchers: RefCell<Vec<fdi::DriverIndexWatchForDriverLoadResponder>>,
+    // Sends a notify message out through this when new drivers are available.
+    driver_notifier: RefCell<Option<fdi::DriverNotifierProxy>>,
 
     // Used to determine if the indexer should return fallback drivers that match or
     // wait until based packaged drivers are indexed.
@@ -69,7 +61,7 @@ impl Indexer {
             boot_repo: RefCell::new(boot_repo),
             base_repo: RefCell::new(base_repo),
             composite_node_spec_manager: RefCell::new(CompositeNodeSpecManager::new()),
-            driver_load_watchers: RefCell::new(vec![]),
+            driver_notifier: RefCell::new(None),
             delay_fallback_until_base_drivers_indexed,
             ephemeral_drivers: RefCell::new(HashMap::new()),
         }
@@ -184,8 +176,15 @@ impl Indexer {
         count
     }
 
-    pub fn watch_for_driver_load(&self, responder: fdi::DriverIndexWatchForDriverLoadResponder) {
-        self.driver_load_watchers.borrow_mut().push(responder);
+    pub fn set_notifier(&self, notifier: fidl::endpoints::ClientEnd<fdi::DriverNotifierMarker>) {
+        match notifier.into_proxy() {
+            Ok(proxy) => {
+                *self.driver_notifier.borrow_mut() = Some(proxy);
+            }
+            Err(e) => {
+                tracing::warn!("Could not set the driver notifier {:?}", e)
+            }
+        }
     }
 
     pub async fn handle_add_boot_driver(
@@ -205,12 +204,14 @@ impl Indexer {
     }
 
     fn report_driver_load(&self) {
-        let mut driver_load_watchers = self.driver_load_watchers.borrow_mut();
-        while let Some(watcher) = driver_load_watchers.pop() {
-            match watcher.send().or_else(ignore_peer_closed) {
-                Err(e) => tracing::error!("Error sending to base_waiter: {:?}", e),
-                Ok(_) => continue,
+        match *self.driver_notifier.borrow() {
+            Some(ref notifier) => {
+                let result = notifier.new_driver_available();
+                if let Err(e) = result {
+                    tracing::warn!("Failed to send new_driver_available: {:?}", e);
+                }
             }
+            None => {}
         }
     }
 

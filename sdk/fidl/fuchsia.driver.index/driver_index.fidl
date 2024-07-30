@@ -28,6 +28,18 @@ type MatchDriverArgs = table {
     3: driver_url_suffix string:MAX;
 };
 
+/// This is served by the driver manager for the driver index to use to notify it of new
+/// drivers that are available on the driver index.
+///
+/// We are making this a separate protocol so that the DriverIndex protocol can be marked as
+/// delivery: on_readable. This way no matter what protocol caused the index to wake up, we can
+/// send notifications to the driver manager.
+closed protocol DriverNotifier {
+    /// One-way method called from the driver index to the driver manager to notify it of
+    /// new drivers.
+    strict NewDriverAvailable();
+};
+
 /// Protocol through which the driver index can be queried.
 @discoverable
 closed protocol DriverIndex {
@@ -35,10 +47,6 @@ closed protocol DriverIndex {
     strict MatchDriver(struct {
         args MatchDriverArgs;
     }) -> (MatchDriverResult) error zx.Status;
-
-    /// Hanging get function that replies when a boot or base driver is loaded
-    /// into the Driver Index.
-    strict WatchForDriverLoad() -> ();
 
     /// Adds a composite node spec to the driver index. The driver index stores the
     /// composite node spec and maps it by the name. The stored composite node specs are
@@ -52,4 +60,9 @@ closed protocol DriverIndex {
         spec string:MAX;
         driver_url_suffix string:<MAX, optional>;
     }) -> () error zx.Status;
+
+    /// Sets the DriverNotifier which is used for reverse communication.
+    strict SetNotifier(resource struct {
+        notifier client_end:DriverNotifier;
+    });
 };

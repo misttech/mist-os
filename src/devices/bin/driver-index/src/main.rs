@@ -273,9 +273,6 @@ async fn run_index_server(
                         send_result.context("error responding to MatchDriver.")?;
                     }
                 }
-                DriverIndexRequest::WatchForDriverLoad { responder } => {
-                    indexer.watch_for_driver_load(responder);
-                }
                 DriverIndexRequest::AddCompositeNodeSpec { payload, responder } => {
                     responder
                         .send(indexer.add_composite_node_spec(payload))
@@ -291,6 +288,9 @@ async fn run_index_server(
                         .send(indexer.rebind_composite(spec, driver_url_suffix))
                         .or_else(ignore_peer_closed)
                         .context("error responding to RebindCompositeNodeSpec")?;
+                }
+                DriverIndexRequest::SetNotifier { notifier, control_handle: _ } => {
+                    indexer.set_notifier(notifier);
                 }
             }
             Ok(())

@@ -259,6 +259,16 @@ DriverRunner::DriverRunner(fidl::ClientEnd<fcomponent::Realm> realm,
   next_driver_host_id_ = distrib(gen);
 
   bootup_tracker_ = std::make_shared<BootupTracker>(&bind_manager_, dispatcher);
+
+  // Setup the driver notifier.
+  auto [notifier_client, notifier_server] =
+      fidl::Endpoints<fuchsia_driver_index::DriverNotifier>::Create();
+  driver_notifier_bindings_.AddBinding(dispatcher_, std::move(notifier_server), this,
+                                       fidl::kIgnoreBindingClosure);
+  fidl::OneWayStatus status = driver_index_->SetNotifier(std::move(notifier_client));
+  if (!status.ok()) {
+    LOGF(WARNING, "Failed to set the driver notifier: %s", status.status_string());
+  }
 }
 
 void DriverRunner::BindNodesForCompositeNodeSpec() { TryBindAllAvailable(); }
@@ -376,22 +386,7 @@ zx::result<> DriverRunner::StartRootDriver(std::string_view url) {
   return StartDriver(*root_node_, url, package);
 }
 
-void DriverRunner::ScheduleWatchForDriverLoad() {
-  driver_index_->WatchForDriverLoad().Then(
-      [this](fidl::WireUnownedResult<fdi::DriverIndex::WatchForDriverLoad>& result) mutable {
-        if (!result.ok()) {
-          // It's possible in tests that the test can finish before WatchForDriverLoad
-          // finishes.
-          if (result.status() == ZX_ERR_PEER_CLOSED) {
-            LOGF(WARNING, "Connection to DriverIndex closed during WatchForDriverLoad.");
-          } else {
-            LOGF(ERROR, "DriverIndex::WatchForDriverLoad failed with: %s",
-                 result.error().FormatDescription().c_str());
-          }
-          return;
-        }
-        ScheduleWatchForDriverLoad();
-      });
+void DriverRunner::NewDriverAvailable(NewDriverAvailableCompleter::Sync& completer) {
   TryBindAllAvailable();
 }
 
