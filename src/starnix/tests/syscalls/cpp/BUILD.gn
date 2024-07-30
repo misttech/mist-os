@@ -51,6 +51,7 @@ syscall_tests = [
   "signal_handling_test",
   "socket_test",
   "sw_breakpoint_test",
+  "symlink_test",
   "sysfs_kernel_test",
   "sysfs_power_test",
   "syslog_test",

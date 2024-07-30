@@ -17,7 +17,7 @@ use starnix_uapi::auth::FsCred;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::mode;
 use starnix_uapi::vfs::default_statfs;
-use starnix_uapi::{statfs, SYSFS_MAGIC};
+use starnix_uapi::{ino_t, statfs, SYSFS_MAGIC};
 
 pub const SYSFS_DEVICES: &str = "devices";
 pub const SYSFS_BUS: &str = "bus";
@@ -115,12 +115,16 @@ pub trait SysfsOps: FsNodeOps {
 
 /// Creates a path to the `to` kobject in the devices tree, relative to the `from` kobject from
 /// a subsystem.
-pub fn sysfs_create_link(from: KObjectHandle, to: KObjectHandle) -> SymlinkNode {
+pub fn sysfs_create_link(
+    from: KObjectHandle,
+    to: KObjectHandle,
+    owner: FsCred,
+) -> (SymlinkNode, impl FnOnce(ino_t) -> FsNodeInfo) {
     let mut path = PathBuilder::new();
     path.prepend_element(to.path().as_ref());
     // Escape one more level from its subsystem to the root of sysfs.
     path.prepend_element("..".into());
     path.prepend_element(from.path_to_root().as_ref());
     // Build a symlink with the relative path.
-    SymlinkNode::new(path.build_relative().as_ref())
+    SymlinkNode::new(path.build_relative().as_ref(), owner)
 }
