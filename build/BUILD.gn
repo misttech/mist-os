@@ -76,6 +76,7 @@ group("non_hermetic_deps") {
   visibility += [
     "//boards/*",
     "//bundles/assembly/*",
+    "//local/*",
   ]
 
   # TODO(b/314016615): tar_to_pkg() template is not hermetic
