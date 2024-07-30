@@ -160,9 +160,9 @@ void main() {
     });
     test('handles import statements', () async {
       BasicGnParser parser = await parseFxGn(
-          'import("//products/core.gni")\nimport("//vendor/google/boards/x64.gni")');
+          'import("//products/core.gni")\nimport("//boards/x64.gni")');
       expect(parser.imports[0], '//products/core.gni');
-      expect(parser.imports[1], '//vendor/google/boards/x64.gni');
+      expect(parser.imports[1], '//boards/x64.gni');
     });
     test('correctly parses direct items', () async {
       BasicGnParser parser =
