@@ -25,6 +25,7 @@
 #include "src/storage/blobfs/format.h"
 #include "src/storage/blobfs/format_assertions.h"
 #include "src/storage/blobfs/transaction.h"
+#include "src/storage/lib/trace/trace.h"
 
 namespace blobfs {
 

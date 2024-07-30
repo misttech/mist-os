@@ -79,7 +79,6 @@ test("memfs-legacy-test") {
     "//zircon/system/ulib/fdio-caller",
     "//zircon/system/ulib/fzl",
     "//zircon/system/ulib/sync",
-    "//zircon/system/ulib/trace-engine",
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
   ]

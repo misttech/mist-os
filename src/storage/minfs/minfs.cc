@@ -26,6 +26,7 @@
 #include <fbl/alloc_checker.h>
 #include <safemath/safe_math.h>
 
+#include "src/storage/lib/trace/trace.h"
 #include "src/storage/lib/vfs/cpp/journal/format.h"
 #include "src/storage/lib/vfs/cpp/journal/initializer.h"
 #include "src/storage/minfs/allocator/allocator_reservation.h"

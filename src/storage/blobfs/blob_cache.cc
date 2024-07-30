@@ -4,7 +4,6 @@
 
 #include "src/storage/blobfs/blob_cache.h"
 
-#include <lib/trace/event.h>
 #include <zircon/assert.h>
 #include <zircon/status.h>
 
@@ -14,6 +13,7 @@
 #include <fbl/ref_ptr.h>
 
 #include "src/lib/digest/digest.h"
+#include "src/storage/lib/trace/trace.h"
 
 using digest::Digest;
 
