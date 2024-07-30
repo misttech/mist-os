@@ -6,7 +6,6 @@ use fidl::endpoints::{ClientEnd, Proxy};
 use futures::stream::{FusedStream, Stream};
 use futures::{io, Future, TryFutureExt};
 use std::fmt;
-use std::ops::Deref;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll};
@@ -307,14 +306,6 @@ impl Stream for Channel {
 impl FusedStream for Channel {
     fn is_terminated(&self) -> bool {
         self.terminated
-    }
-}
-
-impl Deref for Channel {
-    type Target = fasync::Socket;
-
-    fn deref(&self) -> &Self::Target {
-        &self.socket
     }
 }
 
