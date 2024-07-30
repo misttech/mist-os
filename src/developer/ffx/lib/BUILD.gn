@@ -20,6 +20,7 @@ libs = [
   "isolate",
   "manual_targets",
   "metrics",
+  "mdns_discovery",
   "netext",
   "pbms",
   "pkg",

@@ -864,9 +864,9 @@ fn is_fastboot_response<B: zerocopy::ByteSlice + Copy>(
 ) -> Option<ffx::FastbootInterface> {
     if m.answers.is_empty() {
         None
-    } else if m.answers[0].domain == "_fastboot._udp.local" {
+    } else if m.answers.iter().any(|a| a.domain == "_fastboot._udp.local") {
         Some(ffx::FastbootInterface::Udp)
-    } else if m.answers[0].domain == "_fastboot._tcp.local" {
+    } else if m.answers.iter().any(|a| a.domain == "_fastboot._tcp.local") {
         Some(ffx::FastbootInterface::Tcp)
     } else {
         None
@@ -1111,5 +1111,67 @@ mod tests {
                 .parse::<Message<_>>()
                 .unwrap(),
         ));
+    }
+
+    fn build_fastboot_mdns_response(ty: &'static str) -> Vec<u8> {
+        let domain = dns::DomainBuilder::from_str(&format!("_fastboot.{ty}.local")).unwrap();
+        let fastboot_record = dns::RecordBuilder::new(
+            domain,
+            dns::Type::Ptr,
+            dns::Class::Any,
+            true,
+            4500,
+            // Must contain length (3 chars) and a null terminator. Usually this is an IP address,
+            // but we don't care.
+            &[0x03, 'f' as u8, 'o' as u8, 'o' as u8, 0],
+        );
+        let nonsense_record = dns::RecordBuilder::new(
+            dns::DomainBuilder::from_str("foo._fuchsia.tcp.local").unwrap(),
+            dns::Type::Ptr,
+            dns::Class::Any,
+            true,
+            4500,
+            &[0x03, 'f' as u8, 'o' as u8, 'o' as u8, 0],
+        );
+        let mut message = MessageBuilder::new(0, true);
+        message.add_answer(nonsense_record);
+        message.add_answer(fastboot_record);
+        message
+            .into_serializer()
+            .serialize_vec_outer()
+            .unwrap_or_else(|_| panic!("couldn't serialize mdns message"))
+            .unwrap_b()
+            .as_ref()
+            .to_vec()
+    }
+
+    #[test]
+    fn test_is_fastboot_response() {
+        assert_eq!(
+            is_fastboot_response(
+                &build_fastboot_mdns_response("_tcp").as_slice().parse::<Message<_>>().unwrap(),
+            ),
+            Some(ffx::FastbootInterface::Tcp)
+        );
+        assert_eq!(
+            is_fastboot_response(
+                &build_fastboot_mdns_response("_udp").as_slice().parse::<Message<_>>().unwrap(),
+            ),
+            Some(ffx::FastbootInterface::Udp)
+        );
+        assert_eq!(
+            is_fastboot_response(
+                &build_fastboot_mdns_response("ffx").as_slice().parse::<Message<_>>().unwrap(),
+            ),
+            None
+        );
+        let message = MessageBuilder::new(0, true);
+        let mut bytes = message
+            .into_serializer()
+            .serialize_vec_outer()
+            .unwrap_or_else(|_| panic!("couldn't serialize mdns message"));
+        let message =
+            bytes.parse::<dns::Message<_>>().unwrap_or_else(|_| panic!("couldn't parse mdns"));
+        assert_eq!(is_fastboot_response(&message), None);
     }
 }

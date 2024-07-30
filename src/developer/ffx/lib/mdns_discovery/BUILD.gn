@@ -36,7 +36,11 @@ if (is_host) {
   }
 }
 
+group("mdns_discovery") {
+  public_deps = [ ":lib($host_toolchain)" ]
+}
+
 group("tests") {
   testonly = true
-  deps = [ ":lib($host_toolchain)" ]
+  deps = [ ":lib_test($host_toolchain)" ]
 }
