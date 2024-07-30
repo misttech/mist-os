@@ -45,7 +45,15 @@ impl GA4MetricsService {
         } else {
             match self.state.status {
                 MetricsStatus::GooglerNeedsNotice | MetricsStatus::GooglerOptedInAndNeedsNotice => {
-                    Some(GOOGLER_ENHANCED_NOTICE.to_string())
+                    if let Some(invoker) = &self.state.invoker {
+                        if invoker != "fx" {
+                            Some(GOOGLER_ENHANCED_NOTICE.to_string())
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
                 }
                 _ => None,
             }
