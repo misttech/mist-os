@@ -15,7 +15,7 @@ use core::hash::Hash;
 
 use net_types::ip::{GenericOverIp, Ip, IpAddr, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
 use packet::{BufferViewMut, PacketBuilder, ParsablePacket, ParseMetadata};
-use zerocopy::{ByteSlice, ByteSliceMut};
+use zerocopy::{ByteSlice, ByteSliceMut, FromBytes, FromZeros, IntoBytes, NoCell, Unaligned};
 
 use crate::error::{IpParseError, IpParseResult};
 use crate::ethernet::EthernetIpExt;
@@ -93,6 +93,60 @@ pub enum Nat64TranslationResult<S, E> {
     Err(E),
 }
 
+/// Combines Differentiated Services Code Point (DSCP) and Explicit Congestion
+/// Notification (ECN) values into one. Internally the 2 fields are stored
+/// using the same layout as the Traffic Class field in IPv6 and the Type Of
+/// Service field in IPv4: 6 higher bits for DSCP and 2 lower bits for ECN.
+#[derive(
+    Default, Debug, Clone, Copy, PartialEq, Eq, FromZeros, FromBytes, IntoBytes, NoCell, Unaligned,
+)]
+#[repr(C)]
+pub struct DscpAndEcn(u8);
+
+const DSCP_OFFSET: u8 = 2;
+const DSCP_MAX: u8 = (1 << (8 - DSCP_OFFSET)) - 1;
+const ECN_MAX: u8 = (1 << DSCP_OFFSET) - 1;
+
+impl DscpAndEcn {
+    /// Returns the default value. Implemented separately from the `Default`
+    /// trait to make it `const`.
+    pub const fn default() -> Self {
+        Self(0)
+    }
+
+    /// Creates a new `DscpAndEcn` instance with the specified DSCP and ECN
+    /// values.
+    pub const fn new(dscp: u8, ecn: u8) -> Self {
+        debug_assert!(dscp <= DSCP_MAX);
+        debug_assert!(ecn <= ECN_MAX);
+        Self((dscp << DSCP_OFFSET) + ecn)
+    }
+
+    /// Returns the Differentiated Services Code Point value.
+    pub fn dscp(self) -> u8 {
+        let Self(v) = self;
+        v >> 2
+    }
+
+    /// Returns the Explicit Congestion Notification value.
+    pub fn ecn(self) -> u8 {
+        let Self(v) = self;
+        v & 0x3
+    }
+
+    /// Returns the raw value, i.e. both fields packed into one byte.
+    pub fn raw(self) -> u8 {
+        let Self(value) = self;
+        value
+    }
+}
+
+impl From<u8> for DscpAndEcn {
+    fn from(value: u8) -> Self {
+        DscpAndEcn(value)
+    }
+}
+
 /// An IPv4 or IPv6 packet.
 ///
 /// `IpPacket` is implemented by `Ipv4Packet` and `Ipv6Packet`.
@@ -117,6 +171,10 @@ pub trait IpPacket<B: ByteSlice, I: IpExt>:
 
     /// The Time to Live (TTL) (IPv4) or Hop Limit (IPv6) field.
     fn ttl(&self) -> u8;
+
+    /// The Differentiated Services Code Point (DSCP) and the Explicit
+    /// Congestion Notification (ECN).
+    fn dscp_and_ecn(&self) -> DscpAndEcn;
 
     /// Set the Time to Live (TTL) (IPv4) or Hop Limit (IPv6) field.
     ///
@@ -172,6 +230,9 @@ impl<B: ByteSlice> IpPacket<B, Ipv4> for Ipv4Packet<B> {
     fn proto(&self) -> Ipv4Proto {
         Ipv4Header::proto(self)
     }
+    fn dscp_and_ecn(&self) -> DscpAndEcn {
+        Ipv4Header::dscp_and_ecn(self)
+    }
     fn ttl(&self) -> u8 {
         Ipv4Header::ttl(self)
     }
@@ -221,6 +282,9 @@ impl<B: ByteSlice> IpPacket<B, Ipv6> for Ipv6Packet<B> {
     }
     fn proto(&self) -> Ipv6Proto {
         Ipv6Packet::proto(self)
+    }
+    fn dscp_and_ecn(&self) -> DscpAndEcn {
+        Ipv6Header::dscp_and_ecn(self)
     }
     fn ttl(&self) -> u8 {
         Ipv6Header::hop_limit(self)
@@ -278,6 +342,9 @@ pub trait IpPacketBuilder<I: IpExt>: PacketBuilder + Clone + Debug {
 
     /// Returns the IP protocol number for the builder.
     fn proto(&self) -> I::Proto;
+
+    /// Set DSCP & ECN fields.
+    fn set_dscp_and_ecn(&mut self, dscp_and_ecn: DscpAndEcn);
 }
 
 /// An IPv4 or IPv6 protocol number.

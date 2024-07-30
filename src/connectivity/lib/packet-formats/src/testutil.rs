@@ -19,7 +19,7 @@ use packet::{ParsablePacket, ParseBuffer, SliceBufViewMut};
 use crate::error::{IpParseResult, ParseError, ParseResult};
 use crate::ethernet::{EtherType, EthernetFrame, EthernetFrameLengthCheck};
 use crate::icmp::{IcmpIpExt, IcmpMessage, IcmpPacket, IcmpParseArgs, Icmpv6PacketRaw};
-use crate::ip::{IpExt, Ipv4Proto};
+use crate::ip::{DscpAndEcn, IpExt, Ipv4Proto};
 use crate::ipv4::{Ipv4FragmentType, Ipv4Header, Ipv4Packet};
 use crate::ipv6::{Ipv6Header, Ipv6Packet};
 use crate::tcp::options::TcpOption;
@@ -40,9 +40,8 @@ pub struct EthernetFrameMetadata {
 /// Metadata of an IPv4 packet.
 #[allow(missing_docs)]
 pub struct Ipv4PacketMetadata {
-    pub dscp: u8,
-    pub ecn: u8,
     pub id: u16,
+    pub dscp_and_ecn: DscpAndEcn,
     pub dont_fragment: bool,
     pub more_fragments: bool,
     pub fragment_offset: u16,
@@ -56,8 +55,7 @@ pub struct Ipv4PacketMetadata {
 /// Metadata of an IPv6 packet.
 #[allow(missing_docs)]
 pub struct Ipv6PacketMetadata {
-    pub ds: u8,
-    pub ecn: u8,
+    pub dscp_and_ecn: DscpAndEcn,
     pub flowlabel: u32,
     pub hop_limit: u8,
     pub src_ip: Ipv6Addr,
@@ -115,8 +113,7 @@ pub fn verify_ethernet_frame(
 ///
 /// Ensures the parsed packet's header fields and body are equal to those in the test packet.
 pub fn verify_ipv4_packet(packet: &Ipv4Packet<&[u8]>, expected: TestPacket<Ipv4PacketMetadata>) {
-    assert_eq!(packet.dscp(), expected.metadata.dscp);
-    assert_eq!(packet.ecn(), expected.metadata.ecn);
+    assert_eq!(packet.dscp_and_ecn(), expected.metadata.dscp_and_ecn);
     assert_eq!(packet.id(), expected.metadata.id);
     assert_eq!(packet.df_flag(), expected.metadata.dont_fragment);
     assert_eq!(packet.mf_flag(), expected.metadata.more_fragments);
@@ -132,8 +129,7 @@ pub fn verify_ipv4_packet(packet: &Ipv4Packet<&[u8]>, expected: TestPacket<Ipv4P
 ///
 /// Ensures the parsed packet's header fields and body are equal to those in the test packet.
 pub fn verify_ipv6_packet(packet: &Ipv6Packet<&[u8]>, expected: TestPacket<Ipv6PacketMetadata>) {
-    assert_eq!(packet.ds(), expected.metadata.ds);
-    assert_eq!(packet.ecn(), expected.metadata.ecn);
+    assert_eq!(packet.dscp_and_ecn(), expected.metadata.dscp_and_ecn);
     assert_eq!(packet.flowlabel(), expected.metadata.flowlabel);
     assert_eq!(packet.hop_limit(), expected.metadata.hop_limit);
     assert_eq!(packet.src_ip(), expected.metadata.src_ip);

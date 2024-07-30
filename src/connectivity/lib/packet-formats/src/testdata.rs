@@ -50,6 +50,8 @@ pub mod arp_request {
 pub mod dns_request_v4 {
     #![allow(missing_docs)]
 
+    use crate::ip::DscpAndEcn;
+
     use super::*;
 
     pub const ETHERNET_FRAME: TestPacket<EthernetFrameMetadata> = TestPacket {
@@ -78,8 +80,7 @@ pub mod dns_request_v4 {
             0x6f, 0x6d, 0x00, 0x00, 0x01, 0x00, 0x01,
         ],
         metadata: Ipv4PacketMetadata {
-            dscp: 0,
-            ecn: 0,
+            dscp_and_ecn: DscpAndEcn::default(),
             dont_fragment: false,
             more_fragments: false,
             fragment_offset: 0,
@@ -114,6 +115,7 @@ pub mod tls_client_hello_v4 {
 
     use super::*;
 
+    use crate::ip::DscpAndEcn;
     use crate::tcp::options::TcpOption;
 
     pub const ETHERNET_FRAME: TestPacket<EthernetFrameMetadata> = TestPacket {
@@ -216,9 +218,8 @@ pub mod tls_client_hello_v4 {
             0x00, 0x01, 0x00,
         ],
         metadata: Ipv4PacketMetadata {
-            dscp: 0,
-            ecn: 0,
             id: 0,
+            dscp_and_ecn: DscpAndEcn::default(),
             dont_fragment: true,
             more_fragments: false,
             fragment_offset: 0,
@@ -299,6 +300,7 @@ pub mod dns_request_v6 {
     #![allow(missing_docs)]
 
     use super::*;
+    use crate::ip::DscpAndEcn;
 
     pub const ETHERNET_FRAME: TestPacket<EthernetFrameMetadata> = TestPacket {
         bytes: &[
@@ -332,8 +334,7 @@ pub mod dns_request_v6 {
             0x25,
         ],
         metadata: Ipv6PacketMetadata {
-            ds: 0,
-            ecn: 0,
+            dscp_and_ecn: DscpAndEcn::default(),
             flowlabel: 0xea528,
             hop_limit: 64,
             src_ip: Ipv6Addr::from_bytes([
@@ -370,6 +371,7 @@ pub mod syn_v6 {
 
     use super::*;
 
+    use crate::ip::DscpAndEcn;
     use crate::tcp::options::TcpOption;
 
     pub const ETHERNET_FRAME: TestPacket<EthernetFrameMetadata> = TestPacket {
@@ -400,8 +402,7 @@ pub mod syn_v6 {
             0x11, 0x57, 0x00, 0x00, 0x00, 0x00, 0x01, 0x03, 0x03, 0x07,
         ],
         metadata: Ipv6PacketMetadata {
-            ds: 0,
-            ecn: 0,
+            dscp_and_ecn: DscpAndEcn::default(),
             flowlabel: 0x8c55d,
             hop_limit: 64,
             src_ip: Ipv6Addr::from_bytes([

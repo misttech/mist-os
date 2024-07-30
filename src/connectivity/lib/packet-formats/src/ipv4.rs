@@ -27,7 +27,8 @@ use zerocopy::{AsBytes, ByteSlice, ByteSliceMut, FromBytes, FromZeros, NoCell, R
 
 use crate::error::{IpParseError, IpParseResult, ParseError};
 use crate::ip::{
-    IpExt, IpPacketBuilder, IpProto, Ipv4Proto, Ipv6Proto, Nat64Error, Nat64TranslationResult,
+    DscpAndEcn, IpExt, IpPacketBuilder, IpProto, Ipv4Proto, Ipv6Proto, Nat64Error,
+    Nat64TranslationResult,
 };
 use crate::ipv6::Ipv6PacketBuilder;
 use crate::tcp::{TcpParseArgs, TcpSegment};
@@ -62,7 +63,7 @@ pub enum Ipv4FragmentType {
 #[repr(C)]
 pub struct HeaderPrefix {
     version_ihl: u8,
-    dscp_ecn: u8,
+    dscp_and_ecn: DscpAndEcn,
     total_len: U16,
     id: U16,
     flags_frag_off: [u8; 2],
@@ -77,9 +78,6 @@ const IP_VERSION: u8 = 4;
 const VERSION_OFFSET: u8 = 4;
 const IHL_MASK: u8 = 0xF;
 const IHL_MAX: u8 = (1 << VERSION_OFFSET) - 1;
-const DSCP_OFFSET: u8 = 2;
-const DSCP_MAX: u8 = (1 << (8 - DSCP_OFFSET)) - 1;
-const ECN_MAX: u8 = (1 << DSCP_OFFSET) - 1;
 const FLAGS_OFFSET: u8 = 13;
 const FLAGS_MAX: u8 = (1 << (16 - FLAGS_OFFSET)) - 1;
 const FRAG_OFF_MAX: u16 = (1 << FLAGS_OFFSET) - 1;
@@ -88,8 +86,7 @@ impl HeaderPrefix {
     #[allow(clippy::too_many_arguments)]
     fn new(
         ihl: u8,
-        dscp: u8,
-        ecn: u8,
+        dscp_and_ecn: DscpAndEcn,
         total_len: u16,
         id: u16,
         flags: u8,
@@ -101,14 +98,12 @@ impl HeaderPrefix {
         dst_ip: Ipv4Addr,
     ) -> HeaderPrefix {
         debug_assert!(ihl <= IHL_MAX);
-        debug_assert!(dscp <= DSCP_MAX);
-        debug_assert!(ecn <= ECN_MAX);
         debug_assert!(flags <= FLAGS_MAX);
         debug_assert!(frag_off <= FRAG_OFF_MAX);
 
         HeaderPrefix {
             version_ihl: (IP_VERSION << VERSION_OFFSET) | ihl,
-            dscp_ecn: (dscp << DSCP_OFFSET) | ecn,
+            dscp_and_ecn,
             total_len: U16::new(total_len),
             id: U16::new(id),
             flags_frag_off: ((u16::from(flags) << FLAGS_OFFSET) | frag_off).to_be_bytes(),
@@ -147,14 +142,9 @@ pub trait Ipv4Header {
     /// Gets a reference to the IPv4 [`HeaderPrefix`].
     fn get_header_prefix(&self) -> &HeaderPrefix;
 
-    /// The Differentiated Services Code Point (DSCP).
-    fn dscp(&self) -> u8 {
-        self.get_header_prefix().dscp_ecn >> 2
-    }
-
-    /// The Explicit Congestion Notification (ECN).
-    fn ecn(&self) -> u8 {
-        self.get_header_prefix().dscp_ecn & 3
+    /// The Differentiated Services Code Point (DSCP) and the Explicit Congestion Notification (ECN).
+    fn dscp_and_ecn(&self) -> DscpAndEcn {
+        self.get_header_prefix().dscp_and_ecn
     }
 
     /// The identification.
@@ -361,9 +351,8 @@ impl<B: ByteSlice> Ipv4Packet<B> {
     /// Construct a builder with the same contents as this packet.
     pub fn builder(&self) -> Ipv4PacketBuilder {
         let mut s = Ipv4PacketBuilder {
-            dscp: self.dscp(),
-            ecn: self.ecn(),
             id: self.id(),
+            dscp_and_ecn: self.dscp_and_ecn(),
             flags: 0,
             frag_off: self.fragment_offset(),
             ttl: self.ttl(),
@@ -462,8 +451,7 @@ impl<B: ByteSlice> Ipv4Packet<B> {
         let v6_builder = |v6_proto| {
             let mut builder =
                 Ipv6PacketBuilder::new(v6_src_addr, v6_dst_addr, self.ttl(), v6_proto);
-            builder.ds(self.dscp());
-            builder.ecn(self.ecn());
+            builder.dscp_and_ecn(self.dscp_and_ecn());
             builder.flowlabel(0);
             builder
         };
@@ -616,8 +604,8 @@ where
             .field("ttl", &self.ttl())
             .field("proto", &self.proto())
             .field("frag_off", &self.fragment_offset())
-            .field("dscp", &self.dscp())
-            .field("ecn", &self.ecn())
+            .field("dscp", &self.dscp_and_ecn().dscp())
+            .field("ecn", &self.dscp_and_ecn().ecn())
             .field("mf_flag", &self.mf_flag())
             .field("df_flag", &self.df_flag())
             .field("body", &alloc::format!("<{} bytes>", self.body.len()))
@@ -822,14 +810,17 @@ where
     fn proto(&self) -> Ipv4Proto {
         self.prefix_builder.proto
     }
+
+    fn set_dscp_and_ecn(&mut self, dscp_and_ecn: DscpAndEcn) {
+        self.prefix_builder.set_dscp_and_ecn(dscp_and_ecn)
+    }
 }
 
 /// A builder for IPv4 packets.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Ipv4PacketBuilder {
-    dscp: u8,
-    ecn: u8,
     id: u16,
+    dscp_and_ecn: DscpAndEcn,
     flags: u8,
     frag_off: u16,
     ttl: u8,
@@ -847,9 +838,8 @@ impl Ipv4PacketBuilder {
         proto: Ipv4Proto,
     ) -> Ipv4PacketBuilder {
         Ipv4PacketBuilder {
-            dscp: 0,
-            ecn: 0,
             id: 0,
+            dscp_and_ecn: DscpAndEcn::default(),
             flags: 0,
             frag_off: 0,
             ttl,
@@ -859,24 +849,9 @@ impl Ipv4PacketBuilder {
         }
     }
 
-    /// Set the Differentiated Services Code Point (DSCP).
-    ///
-    /// # Panics
-    ///
-    /// `dscp` panics if `dscp` is greater than 2^6 - 1.
-    pub fn dscp(&mut self, dscp: u8) {
-        assert!(dscp <= DSCP_MAX, "invalid DSCP: {}", dscp);
-        self.dscp = dscp;
-    }
-
-    /// Set the Explicit Congestion Notification (ECN).
-    ///
-    /// # Panics
-    ///
-    /// `ecn` panics if `ecn` is greater than 3.
-    pub fn ecn(&mut self, ecn: u8) {
-        assert!(ecn <= ECN_MAX, "invalid ECN: {}", ecn);
-        self.ecn = ecn;
+    /// Sets DSCP and ECN fields.
+    pub fn dscp_and_ecn(&mut self, dscp_and_ecn: DscpAndEcn) {
+        self.dscp_and_ecn = dscp_and_ecn;
     }
 
     /// Set the ID field.
@@ -943,8 +918,7 @@ impl PacketBuilder for Ipv4PacketBuilder {
 
         let mut hdr_prefix = HeaderPrefix::new(
             ihl,
-            self.dscp,
-            self.ecn,
+            self.dscp_and_ecn,
             {
                 // The caller promises to supply a body whose length does not
                 // exceed max_body_len. Doing this as a debug_assert (rather
@@ -995,6 +969,10 @@ impl IpPacketBuilder<Ipv4> for Ipv4PacketBuilder {
 
     fn proto(&self) -> Ipv4Proto {
         self.proto
+    }
+
+    fn set_dscp_and_ecn(&mut self, dscp_and_ecn: DscpAndEcn) {
+        self.dscp_and_ecn = dscp_and_ecn;
     }
 }
 
@@ -1341,8 +1319,7 @@ mod tests {
     fn new_hdr_prefix() -> HeaderPrefix {
         HeaderPrefix::new(
             5,
-            0,
-            0,
+            DscpAndEcn::default(),
             20,
             0x0102,
             0,
@@ -1457,8 +1434,7 @@ mod tests {
     #[test]
     fn test_serialize() {
         let mut builder = new_builder();
-        builder.dscp(0x12);
-        builder.ecn(3);
+        builder.dscp_and_ecn(DscpAndEcn::new(0x12, 3));
         builder.id(0x0405);
         builder.df_flag(true);
         builder.mf_flag(true);
@@ -1477,8 +1453,8 @@ mod tests {
             ]
         );
         let packet = buf.parse::<Ipv4Packet<_>>().unwrap();
-        assert_eq!(packet.dscp(), 0x12);
-        assert_eq!(packet.ecn(), 3);
+        assert_eq!(packet.dscp_and_ecn().dscp(), 0x12);
+        assert_eq!(packet.dscp_and_ecn().ecn(), 3);
         assert_eq!(packet.id(), 0x0405);
         assert!(packet.df_flag());
         assert!(packet.mf_flag());
@@ -1591,14 +1567,12 @@ mod tests {
         proto_v4: Ipv4Proto,
         proto_v6: Ipv6Proto,
     ) -> (Ipv4PacketBuilder, Ipv6PacketBuilder) {
-        const IP_DSCP: u8 = 0x12;
-        const IP_ECN: u8 = 3;
+        const IP_DSCP_AND_ECN: DscpAndEcn = DscpAndEcn::new(0x12, 3);
         const IP_TTL: u8 = 64;
 
         let mut ipv4_builder =
             Ipv4PacketBuilder::new(DEFAULT_SRC_IP, DEFAULT_DST_IP, IP_TTL, proto_v4);
-        ipv4_builder.dscp(IP_DSCP);
-        ipv4_builder.ecn(IP_ECN);
+        ipv4_builder.dscp_and_ecn(IP_DSCP_AND_ECN);
         ipv4_builder.id(0x0405);
         ipv4_builder.df_flag(true);
         ipv4_builder.mf_flag(false);
@@ -1606,8 +1580,7 @@ mod tests {
 
         let mut ipv6_builder =
             Ipv6PacketBuilder::new(DEFAULT_V6_SRC_IP, DEFAULT_V6_DST_IP, IP_TTL, proto_v6);
-        ipv6_builder.ds(IP_DSCP);
-        ipv6_builder.ecn(IP_ECN);
+        ipv6_builder.dscp_and_ecn(IP_DSCP_AND_ECN);
         ipv6_builder.flowlabel(0);
 
         (ipv4_builder, ipv6_builder)
@@ -1665,21 +1638,6 @@ mod tests {
         (v4_pkt_buf, v6_pkt_buf)
     }
 
-    #[test]
-    #[should_panic(expected = "invalid DSCP")]
-    fn test_serialize_dscp_out_of_bounds() {
-        let mut ipv4_builder =
-            Ipv4PacketBuilder::new(DEFAULT_SRC_IP, DEFAULT_DST_IP, 64, IpProto::Tcp.into());
-        ipv4_builder.dscp(DSCP_MAX + 1);
-    }
-
-    #[test]
-    #[should_panic(expected = "invalid ECN")]
-    fn test_serialize_ecn_out_of_bounds() {
-        let mut ipv4_builder =
-            Ipv4PacketBuilder::new(DEFAULT_SRC_IP, DEFAULT_DST_IP, 64, IpProto::Tcp.into());
-        ipv4_builder.ecn(ECN_MAX + 1);
-    }
     #[test]
     fn test_nat64_translate_tcp() {
         let (mut v4_pkt_buf, expected_v6_pkt_buf) = create_tcp_ipv4_and_ipv6_pkt();
