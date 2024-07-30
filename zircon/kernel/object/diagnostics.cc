@@ -210,26 +210,35 @@ void DumpJobList() {
   GetRootJobDispatcher()->EnumerateChildrenRecursive(&walker);
 }
 
-void DumpChannelInfo(const ChannelDispatcher* chan) {
-  const uint64_t koid = chan->get_koid();
-  const uint64_t peer_koid = chan->get_related_koid();
-  const ChannelDispatcher::MessageCounts counts = chan->get_message_counts();
+void DumpPeerInfo(zx_obj_type_t type, const Dispatcher* disp) {
+  const zx_koid_t koid = disp->get_koid();
+  const zx_koid_t peer_koid = disp->get_related_koid();
 
-  printf("    chan %7" PRIu64 " %7" PRIu64 " count %" PRIu64 " max %" PRIu64 "\n", koid, peer_koid,
-         counts.current, counts.max);
-}
+  switch (type) {
+    case ZX_OBJ_TYPE_CHANNEL: {
+      auto chan = DownCastDispatcher<const ChannelDispatcher>(disp);
+      const ChannelDispatcher::MessageCounts counts = chan->get_message_counts();
 
-void DumpSocketInfo(const SocketDispatcher* sock) {
-  auto koid = sock->get_koid();
-  auto peer_koid = sock->get_related_koid();
+      printf("    chan %7" PRIu64 " %7" PRIu64 " count %" PRIu64 " max %" PRIu64 "\n", koid,
+             peer_koid, counts.current, counts.max);
+      break;
+    }
+    case ZX_OBJ_TYPE_SOCKET: {
+      auto sock = DownCastDispatcher<const SocketDispatcher>(disp);
+      zx_info_socket_t sock_info = {};
+      sock->GetInfo(&sock_info);
+      const uint32_t flags = sock_info.options;
 
-  zx_info_socket_t sock_info = {};
-  sock->GetInfo(&sock_info);
-  const uint32_t flags = sock_info.options;
-
-  const char* sock_type = (flags & ZX_SOCKET_STREAM) ? "stream\0" : "datagram\0";
-  printf("    sock %s %7" PRIu64 " %7" PRIu64 " buf_avail %" PRIu64 "\n", sock_type, koid,
-         peer_koid, sock_info.rx_buf_available);
+      const char* sock_type = (flags & ZX_SOCKET_STREAM) ? "stream\0" : "datagram\0";
+      printf("    sock %s %7" PRIu64 " %7" PRIu64 " buf_avail %" PRIu64 "\n", sock_type, koid,
+             peer_koid, sock_info.rx_buf_available);
+      break;
+    }
+    default: {
+      printf("Unexpected error, peer type not supported.\n");
+      break;
+    }
+  }
 }
 
 typedef void (*dump_peer_info)(const Dispatcher*);
@@ -256,22 +265,7 @@ void DumpProcessPeerDispatchers(zx_obj_type_t type, fbl::RefPtr<ProcessDispatche
             printed_header = true;
           }
 
-          switch (type) {
-            case ZX_OBJ_TYPE_SOCKET: {
-              auto sock = DownCastDispatcher<const SocketDispatcher>(disp);
-              DumpSocketInfo(sock);
-              break;
-            }
-            case ZX_OBJ_TYPE_CHANNEL: {
-              auto chan = DownCastDispatcher<const ChannelDispatcher>(disp);
-              DumpChannelInfo(chan);
-              break;
-            }
-            default: {
-              printf("Unexpected error, peer type not supported.\n");
-              break;
-            }
-          }
+          DumpPeerInfo(type, disp);
         }
 
         return ZX_OK;
