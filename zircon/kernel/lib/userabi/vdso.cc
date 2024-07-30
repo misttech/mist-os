@@ -11,6 +11,7 @@
 #include <lib/userabi/vdso.h>
 #include <lib/version.h>
 #include <platform.h>
+#include <trace.h>
 #include <zircon/types.h>
 
 #include <arch/quirks.h>
@@ -28,6 +29,8 @@
 
 #include <ktl/enforce.h>
 
+#define LOCAL_TRACE 0
+
 // This is defined in assembly via RODSO_IMAGE (see rodso-asm.h);
 // vdso-code.h gives details about the image's size and layout.
 extern "C" const char vdso_image[];
@@ -38,16 +41,18 @@ class VDsoMutator {
  public:
   explicit VDsoMutator(const fbl::RefPtr<VmObject>& vmo) : vmo_(vmo) {}
 
-  void RedirectSymbol(size_t idx1, size_t idx2, uintptr_t value) {
+  void RedirectSymbol(const char* from, const char* to, size_t idx1, size_t idx2, uintptr_t value) {
     auto [sym1, sym2] = ReadSymbol(idx1, idx2);
 
     // Just change the st_value of the symbol.
     sym1.value = sym2.value = value;
     WriteSymbol(idx1, sym1);
     WriteSymbol(idx2, sym2);
+
+    LTRACEF("%s -> %s @ %#" PRIxPTR "\n", from, to, value);
   }
 
-  void BlockSymbol(size_t idx1, size_t idx2) {
+  void BlockSymbol(const char* name, uintptr_t value, size_t size, size_t idx1, size_t idx2) {
     auto [sym1, sym2] = ReadSymbol(idx1, idx2);
 
     // First change the symbol to have local binding so it can't be resolved.
@@ -59,10 +64,15 @@ class VDsoMutator {
 
     // Now fill the code region (a whole function) with safely invalid code.
     // This code should never be run, and any attempt to use it should crash.
-    ASSERT(sym1.value >= VDSO_CODE_START);
-    ASSERT(sym1.value + sym1.size < VDSO_CODE_END);
-    zx_status_t status = vmo_->Write(GetTrapFill(sym1.size), sym1.value, sym1.size);
+    // This uses the compile-time st_value and st_size passed in by the
+    // BLOCK_SYSCALL macro, in case the symbol table entry's previous value was
+    // already from a previous RedirectSymbol.
+    ASSERT(value >= VDSO_CODE_START);
+    ASSERT(value + size < VDSO_CODE_END);
+    zx_status_t status = vmo_->Write(GetTrapFill(size), value, size);
     ASSERT_MSG(status == ZX_OK, "vDSO VMO Write failed: %d", status);
+
+    LTRACEF("%s @ [%#" PRIxPTR ", %#" PRIxPTR ")\n", name, value, value + size);
   }
 
  private:
@@ -137,15 +147,16 @@ class VDsoMutator {
 #define PASTE(a, b, c) PASTE_1(a, b, c)
 #define PASTE_1(a, b, c) a##b##c
 
-#define REDIRECT_SYSCALL(mutator, symbol, target)                                       \
-  mutator.RedirectSymbol(PASTE(VDSO_DYNSYM_, symbol, ), PASTE(VDSO_DYNSYM__, symbol, ), \
-                         PASTE(VDSO_CODE_, target, ))
+#define REDIRECT_SYSCALL(mutator, symbol, target)                         \
+  mutator.RedirectSymbol(#symbol, #target, PASTE(VDSO_DYNSYM_, symbol, ), \
+                         PASTE(VDSO_DYNSYM__, symbol, ), PASTE(VDSO_CODE_, target, ))
 
 // Block the named zx_* function.  The symbol table entry will
 // become invisible to runtime symbol resolution, and the code of
 // the function will be clobbered with trapping instructions.
-#define BLOCK_SYSCALL(mutator, symbol) \
-  mutator.BlockSymbol(PASTE(VDSO_DYNSYM_, symbol, ), PASTE(VDSO_DYNSYM__, symbol, ))
+#define BLOCK_SYSCALL(mutator, symbol)                                              \
+  mutator.BlockSymbol(#symbol, PASTE(VDSO_, symbol, ), PASTE(VDSO_, symbol, _SIZE), \
+                      PASTE(VDSO_DYNSYM_, symbol, ), PASTE(VDSO_DYNSYM__, symbol, ))
 
 // Random attributes in zx fidl files become "categories" of syscalls.
 // For each category, define a function block_<category> to block all the
@@ -453,22 +464,27 @@ void VDso::CreateVariant(Variant variant, KernelHandle<VmObjectDispatcher>* vmo_
   zx_status_t status = vmo()->CreateChild(ZX_VMO_CHILD_SNAPSHOT, 0, size(), false, &new_vmo);
   ASSERT(status == ZX_OK);
 
+  LTRACEF("variant %u\n", static_cast<unsigned int>(variant));
+
   VDsoMutator mutator{new_vmo};
 
   const char* name = nullptr;
   switch (variant) {
     case Variant::STABLE:
       name = "vdso/stable";
+      LTRACEF("variant %s\n", name);
       block_next_syscalls(mutator);
       break;
 
     case Variant::TEST1:
       name = "vdso/test1";
+      LTRACEF("variant %s\n", name);
       block_test_category1_syscalls(mutator);
       break;
 
     case Variant::TEST2:
       name = "vdso/test2";
+      LTRACEF("variant %s\n", name);
       block_test_category2_syscalls(mutator);
       break;
 

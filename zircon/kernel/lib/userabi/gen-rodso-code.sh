@@ -50,7 +50,7 @@ grok_code_symbols() {
   local symbol type addr size rest
   while read symbol type addr size rest; do
     case "$symbol" in
-    CODE_*|DATA_*|SYSCALL_*|_start)
+    CODE_*|DATA_*|SYSCALL_*|zx_*|_start)
       if ! [[ $symbol =~ ^[A-Za-z0-9_]*$ ]]; then
         # This check verifies that we are not matching any additional symbols
         # the compiler generates. These symbols consist of a function or
