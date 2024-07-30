@@ -132,7 +132,8 @@ class Vcpu {
   // See the comment in arch/x86/include/arch/hypervisor.h:Vcpu for why it is OK
   // to disable static analysis here.
   bool ThreadIsOurThread(Thread* thread) const TA_NO_THREAD_SAFETY_ANALYSIS {
-    return thread == ktl::atomic_ref{thread_}.load(ktl::memory_order_relaxed);
+    return thread == ktl::atomic_ref<Thread*>{const_cast<Vcpu*>(this)->thread_}.load(
+                         ktl::memory_order_relaxed);
   }
 
   void InterruptCpu();
