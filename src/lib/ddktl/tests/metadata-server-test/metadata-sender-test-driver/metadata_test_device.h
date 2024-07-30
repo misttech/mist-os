@@ -24,12 +24,12 @@ class MetadataTestDevice final : public MetadataTestDeviceType {
  public:
   static zx_status_t Create(zx_device_t* parent, const char* device_name,
                             const char* device_purpose,
-                            fidl::ClientEnd<fuchsia_io::Directory> outgoing);
+                            std::optional<fidl::ClientEnd<fuchsia_io::Directory>> outgoing);
 
   explicit MetadataTestDevice(zx_device_t* parent) : MetadataTestDeviceType(parent) {}
 
   zx_status_t Init(const char* device_name, const char* device_purpose,
-                   fidl::ClientEnd<fuchsia_io::Directory> outgoing);
+                   std::optional<fidl::ClientEnd<fuchsia_io::Directory>> outgoing);
 
   // ddk::Device mixin
   void DdkRelease();

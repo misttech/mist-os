@@ -11,9 +11,9 @@
 
 namespace ddk::test {
 
-zx_status_t MetadataTestDevice::Create(zx_device_t* parent, const char* device_name,
-                                       const char* device_purpose,
-                                       fidl::ClientEnd<fuchsia_io::Directory> outgoing) {
+zx_status_t MetadataTestDevice::Create(
+    zx_device_t* parent, const char* device_name, const char* device_purpose,
+    std::optional<fidl::ClientEnd<fuchsia_io::Directory>> outgoing) {
   auto device = std::make_unique<MetadataTestDevice>(parent);
 
   zx_status_t status = device->Init(device_name, device_purpose, std::move(outgoing));
@@ -26,17 +26,19 @@ zx_status_t MetadataTestDevice::Create(zx_device_t* parent, const char* device_n
   return ZX_OK;
 }
 
-zx_status_t MetadataTestDevice::Init(const char* device_name, const char* device_purpose,
-                                     fidl::ClientEnd<fuchsia_io::Directory> outgoing) {
+zx_status_t MetadataTestDevice::Init(
+    const char* device_name, const char* device_purpose,
+    std::optional<fidl::ClientEnd<fuchsia_io::Directory>> outgoing) {
   std::vector<zx_device_str_prop_t> device_string_properties = {
       ddk::MakeStrProperty(bind_metadata_server_test::PURPOSE, device_purpose),
   };
 
   std::array offers = {MetadataServer::kFidlServiceName};
   ddk::DeviceAddArgs args{device_name};
-  args.set_str_props(device_string_properties)
-      .set_fidl_service_offers(offers)
-      .set_outgoing_dir(outgoing.TakeChannel());
+  args.set_str_props(device_string_properties);
+  if (outgoing.has_value()) {
+    args.set_fidl_service_offers(offers).set_outgoing_dir(outgoing->TakeChannel());
+  }
 
   zx_status_t status = DdkAdd(args);
   if (status != ZX_OK) {
