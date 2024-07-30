@@ -44,8 +44,11 @@ TEST(DirectoryTest, Open) {
   ASSERT_OK(zx::channel::create(0, &h3, &h4));
   ASSERT_OK(fdio_service_connect_at(
       h2.get(), fidl::DiscoverableProtocolName<fuchsia_process::Launcher>, h3.release()));
+
+  zx::channel h5, h6;
+  ASSERT_OK(zx::channel::create(0, &h5, &h6));
   ASSERT_OK(fdio_open_at(h2.get(), fidl::DiscoverableProtocolName<fuchsia_process::Launcher>,
-                         static_cast<uint32_t>(kReadFlags), h4.release()));
+                         static_cast<uint32_t>(kReadFlags), h5.release()));
 
 // We need to test the deprecated fdio_service_clone(_to) functions, so allow use of deprecated
 // APIs here without printing any warnings.
@@ -210,6 +213,22 @@ TEST(DirectoryTest, OpenFD) {
                                   fd2.reset_and_get_address()));
     ASSERT_FALSE(fd2.is_valid());
   }
+}
+
+TEST(DirectoryTest, FdioOpenAtConsumesHandleOnFailure) {
+  zx::channel h1, h2;
+  ASSERT_OK(zx::channel::create(0, &h1, &h2));
+  ASSERT_OK(fdio_open("/svc", static_cast<uint32_t>(kReadFlags), h1.release()));
+
+  zx::channel h3, h4;
+  ASSERT_OK(zx::channel::create(0, &h3, &h4));
+  ASSERT_STATUS(ZX_ERR_INVALID_ARGS, fdio_open_at(h2.get(), /*path=*/nullptr,
+                                                  static_cast<uint32_t>(kReadFlags), h3.release()));
+
+  zx_signals_t pending;
+  ASSERT_OK(h4.wait_one(ZX_CHANNEL_PEER_CLOSED, zx::time::infinite_past(), &pending));
+  // fdio_open_at takes ownership of the request handle even when path == nullptr
+  ASSERT_TRUE((pending & ZX_CHANNEL_PEER_CLOSED) != 0);
 }
 
 }  // namespace

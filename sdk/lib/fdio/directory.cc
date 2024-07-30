@@ -86,6 +86,8 @@ zx_status_t fdio_open_at(fidl::UnownedClientEnd<fio::Directory> directory, std::
 __EXPORT
 zx_status_t fdio_open_at(zx_handle_t dir, const char* path, uint32_t flags,
                          zx_handle_t raw_request) {
+  fidl::ServerEnd<fio::Node> request((zx::channel(raw_request)));
+
   size_t length;
   zx_status_t status = fdio_validate_path(path, &length);
   if (status != ZX_OK) {
@@ -93,7 +95,6 @@ zx_status_t fdio_open_at(zx_handle_t dir, const char* path, uint32_t flags,
   }
 
   fidl::UnownedClientEnd<fio::Directory> directory(dir);
-  fidl::ServerEnd<fio::Node> request((zx::channel(raw_request)));
   auto fio_flags = static_cast<fio::wire::OpenFlags>(flags);
 
   return fdio_internal::fdio_open_at(directory, std::string_view(path, length), fio_flags,
