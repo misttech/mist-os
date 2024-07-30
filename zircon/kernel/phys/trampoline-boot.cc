@@ -121,6 +121,14 @@ static_assert(offsetof(RelocateTarget, count) ==
               "Must be contiguous for arm64 ldp instruction.");
 #endif
 
+bool RecharacterizeAllocations(uint64_t start, uint64_t size, memalloc::Type type) {
+  return Allocation::GetPool().UpdateRamSubranges(type, start, size).is_ok();
+}
+
+bool RecharacterizeAllocations(ktl::span<const ktl::byte> range, memalloc::Type type) {
+  return RecharacterizeAllocations(reinterpret_cast<uintptr_t>(range.data()), range.size(), type);
+}
+
 }  // namespace
 
 // This describes the "trampoline" area that is set up in some memory that's
@@ -432,19 +440,15 @@ fit::result<BootZbi::Error> TrampolineBoot::Load(uint32_t extra_data_capacity,
 
   // Now we know how much space the kernel image needs.
   // Reserve it at the fixed load address.
-  auto& pool = Allocation::GetPool();
-  if (auto result = pool.UpdateRamSubranges(memalloc::Type::kFixedAddressKernel,
-                                            *kernel_load_address_, KernelMemorySize());
-      result.is_error()) {
+  if (!RecharacterizeAllocations(*kernel_load_address_, KernelMemorySize(),
+                                 memalloc::Type::kKernel)) {
     return fit::error{BootZbi::Error{.zbi_error = "unable to reserve kernel's load image"sv}};
   }
 
-  if (data_load_address_) {
-    if (auto result = pool.UpdateRamSubranges(memalloc::Type::kDataZbi, *data_load_address_,
-                                              DataLoadSize() + extra_data_capacity);
-        result.is_error()) {
-      return fit::error{BootZbi::Error{.zbi_error = "unable to reserve data ZBI's load image"sv}};
-    }
+  if (data_load_address_ &&
+      !RecharacterizeAllocations(*data_load_address_, DataLoadSize() + extra_data_capacity,
+                                 memalloc::Type::kDataZbi)) {
+    return fit::error{BootZbi::Error{.zbi_error = "unable to reserve data ZBI's load image"sv}};
   }
 
   // The trampoline needs someplace safely neither in the kernel image, nor in
@@ -460,8 +464,27 @@ fit::result<BootZbi::Error> TrampolineBoot::Load(uint32_t extra_data_capacity,
     return result.take_error();
   }
 
-  auto extra_space = DataZbi().storage().subspan(DataZbi().size_bytes());
+  // Recharacterize the staging kernel and data ZBI allocations as such. This
+  // need to recharacterize the loaded images is trampoline-specific, so cleaner
+  // to do that here on the outside of BootZbi.
+  if (!RecharacterizeAllocations(KernelLoadAddress(), KernelMemorySize(),
+                                 memalloc::Type::kTrampolineStagingKernel)) {
+    return fit::error{
+        BootZbi::Error{.zbi_error = "unable to recharacterize staging trampoline kernel"sv}};
+  }
+  if (data_load_address_ &&
+      !RecharacterizeAllocations(DataZbi().storage(), memalloc::Type::kTrampolineStagingDataZbi)) {
+    return fit::error{
+        BootZbi::Error{.zbi_error = "unable to recharacterize staging trampoline data ZBI"sv}};
+  }
+
+  // Trim and recharacterize some space at the end of the data ZBI for the
+  // trampoline code.
+  ktl::span<ktl::byte> zbi_storage = DataZbi().storage();
+  auto extra_space = zbi_storage.subspan(DataZbi().size_bytes());
   auto trampoline = extra_space.subspan(extra_data_capacity);
+  DataZbi().storage() = zbi_storage.first(zbi_storage.size() - trampoline.size());
+  RecharacterizeAllocations(trampoline, memalloc::Type::kTrampolineStagingKernel);
   trampoline_ = new (trampoline.data()) Trampoline(trampoline.size());
 
   // In the x86-64 case, we set up page-tables out of the .bss, which must
