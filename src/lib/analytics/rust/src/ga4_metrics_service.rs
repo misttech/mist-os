@@ -247,7 +247,20 @@ impl GA4MetricsService {
             ("os".into(), ValueObject { value: get_os().into() }),
             ("arch".into(), ValueObject { value: get_arch().into() }),
             ("sdk_version".into(), ValueObject { value: self.state.sdk_version.clone().into() }),
+            ("internal".into(), ValueObject { value: is_googler_as_int().into() }),
+            ("metrics_level".into(), ValueObject { value: self.opted_in_metrics_level().into() }),
         ])
+    }
+
+    // This returns which level of opted in is set
+    // only when user is opted in.
+    // Used to encode level for analytics.
+    fn opted_in_metrics_level(&self) -> u64 {
+        if self.opt_in_status() == MetricsStatus::OptedInEnhanced {
+            2
+        } else {
+            1
+        }
     }
 
     fn get_url(&self) -> String {
@@ -255,6 +268,14 @@ impl GA4MetricsService {
             "https://{}{}?api_secret={}&measurement_id={}",
             DOMAIN, ENDPOINT, self.state.ga4_key, self.state.ga4_product_code
         )
+    }
+}
+
+// encode bool as 1 or 0 for analytics
+fn is_googler_as_int() -> u64 {
+    match is_googler() {
+        true => 1,
+        false => 0,
     }
 }
 
