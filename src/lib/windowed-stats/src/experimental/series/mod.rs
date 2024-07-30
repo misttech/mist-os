@@ -506,7 +506,7 @@ mod tests {
     use crate::experimental::clock::{TimedSample, Timestamp};
     use crate::experimental::series::interpolation::{Constant, LastAggregation, LastSample};
     use crate::experimental::series::statistic::{
-        ArithmeticMean, LatchMax, PostAggregation, Sum, Transform,
+        ArithmeticMean, LatchMax, Max, PostAggregation, Sum, Transform,
     };
     use crate::experimental::series::{
         Counter, Gauge, RoundRobinSampler, SamplingProfile, TimeMatrix,
@@ -576,5 +576,8 @@ mod tests {
         let _ = TimeMatrix::<Sum<Gauge<u64>>, Constant>::default();
         let _ = TimeMatrix::<Sum<Gauge<u64>>, LastSample>::default();
         let _ = TimeMatrix::<Sum<Gauge<u64>>, LastAggregation>::default();
+        let _ = TimeMatrix::<Max<Gauge<u64>>, Constant>::default();
+        let _ = TimeMatrix::<Max<Gauge<u64>>, LastSample>::default();
+        let _ = TimeMatrix::<Max<Gauge<u64>>, LastAggregation>::default();
     }
 }

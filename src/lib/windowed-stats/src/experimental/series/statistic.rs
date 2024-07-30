@@ -224,6 +224,54 @@ impl Statistic for Sum<Gauge<u64>> {
     }
 }
 
+/// Max statistic.
+#[derive(Derivative)]
+#[derivative(
+    Clone(bound = "T::Sample: Clone,"),
+    Debug(bound = "T::Sample: Debug,"),
+    Default(bound = "T::Sample: Zero,")
+)]
+pub struct Max<T>
+where
+    T: DataSemantic,
+{
+    /// The max of samples.
+    #[derivative(Default(value = "Zero::zero()"))]
+    max: T::Sample,
+}
+
+impl<T> Fill<T::Sample> for Max<T>
+where
+    Self: Sampler<T::Sample, Error = OverflowError>,
+    T: DataSemantic,
+    T::Sample: Num + NumCast,
+{
+    fn fill(&mut self, sample: T::Sample, _n: usize) -> Result<(), Self::Error> {
+        self.fold(sample)
+    }
+}
+
+impl Sampler<Sample<Gauge<u64>>> for Max<Gauge<u64>> {
+    type Error = OverflowError;
+
+    fn fold(&mut self, sample: Sample<Gauge<u64>>) -> Result<(), Self::Error> {
+        self.max = std::cmp::max(self.max, sample);
+        Ok(())
+    }
+}
+
+impl Statistic for Max<Gauge<u64>> {
+    type Semantic = Gauge<u64>;
+    type Sample = Sample<Gauge<u64>>;
+    type Aggregation = u64;
+
+    fn aggregation(&mut self) -> Option<Self::Aggregation> {
+        let max = self.max;
+        *self = Default::default();
+        Some(max)
+    }
+}
+
 /// Maximum statistic that sums non-monotonic samples into the maximum.
 ///
 /// This statistic is sensitive to overflow in the sum of samples with the non-monotonic sum.
@@ -352,7 +400,7 @@ where
 #[cfg(test)]
 mod tests {
     use crate::experimental::series::statistic::{
-        ArithmeticMean, LatchMax, OverflowError, PostAggregation, Statistic, Sum,
+        ArithmeticMean, LatchMax, Max, OverflowError, PostAggregation, Statistic, Sum,
     };
     use crate::experimental::series::{Counter, Fill, Gauge, Sampler};
 
@@ -418,6 +466,24 @@ mod tests {
         let mut sum = Sum::<Gauge<u64>> { sum: u64::MAX };
         let result = sum.fold(1);
         assert_eq!(result, Err(OverflowError));
+    }
+
+    #[test]
+    fn max_gauge_aggregation() {
+        let mut max = Max::<Gauge<u64>>::default();
+        max.fold(0).unwrap();
+        max.fold(1337).unwrap();
+        max.fold(42).unwrap();
+        let aggregation = max.aggregation().unwrap();
+        assert_eq!(aggregation, 1337);
+    }
+
+    #[test]
+    fn max_gauge_aggregation_fill() {
+        let mut max = Max::<Gauge<u64>>::default();
+        max.fill(42, 1000).unwrap();
+        let aggregation = max.aggregation().unwrap();
+        assert_eq!(aggregation, 42);
     }
 
     #[test]
