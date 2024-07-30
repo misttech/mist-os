@@ -11,15 +11,23 @@
 #include <fuchsia/media/cpp/fidl.h>
 
 #include <charconv>
+#include <memory>
 #include <optional>
 #include <unordered_set>
+#include <utility>
 
+#include "fuchsia/bluetooth/bredr/cpp/fidl.h"
+#include "fuchsia/bluetooth/cpp/fidl.h"
+#include "lib/fpromise/result.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/att/att.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/advertising_data.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/log.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/uuid.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/discovery_filter.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/gap.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sco/sco.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sdp/data_element.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sdp/sdp.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sm/types.h"
 
 using fuchsia::bluetooth::Error;
@@ -314,6 +322,99 @@ std::optional<bt::sdp::DataElement> NewFidlToDataElement(
   return out;
 }
 
+std::optional<fbredr::DataElement> DataElementToFidl(const bt::sdp::DataElement& data_element) {
+  fbredr::DataElement out;
+  switch (data_element.type()) {
+    case bt::sdp::DataElement::Type::kNull:
+      return std::nullopt;
+    case bt::sdp::DataElement::Type::kUnsignedInt:
+      switch (data_element.size()) {
+        case bt::sdp::DataElement::Size::kOneByte:
+          out.set_uint8(*data_element.Get<uint8_t>());
+          break;
+        case bt::sdp::DataElement::Size::kTwoBytes:
+          out.set_uint16(*data_element.Get<uint16_t>());
+          break;
+        case bt::sdp::DataElement::Size::kFourBytes:
+          out.set_uint32(*data_element.Get<uint32_t>());
+          break;
+        case bt::sdp::DataElement::Size::kEightBytes:
+          out.set_uint64(*data_element.Get<uint64_t>());
+          break;
+        case bt::sdp::DataElement::Size::kSixteenBytes:
+        case bt::sdp::DataElement::Size::kNextOne:
+        case bt::sdp::DataElement::Size::kNextTwo:
+        case bt::sdp::DataElement::Size::kNextFour:
+          bt_log(WARN, "fidl", "Encountered DataElementToFidl type not handled.");
+          return std::nullopt;
+      }
+      break;
+    case bt::sdp::DataElement::Type::kSignedInt:
+      switch (data_element.size()) {
+        case bt::sdp::DataElement::Size::kOneByte:
+          out.set_int8(*data_element.Get<int8_t>());
+          break;
+        case bt::sdp::DataElement::Size::kTwoBytes:
+          out.set_int16(*data_element.Get<int16_t>());
+          break;
+        case bt::sdp::DataElement::Size::kFourBytes:
+          out.set_int32(*data_element.Get<int32_t>());
+          break;
+        case bt::sdp::DataElement::Size::kEightBytes:
+          out.set_int64(*data_element.Get<int64_t>());
+          break;
+        case bt::sdp::DataElement::Size::kSixteenBytes:
+        case bt::sdp::DataElement::Size::kNextOne:
+        case bt::sdp::DataElement::Size::kNextTwo:
+        case bt::sdp::DataElement::Size::kNextFour:
+          bt_log(WARN, "fidl", "Encountered DataElementToFidl type not handled.");
+          return std::nullopt;
+      }
+      break;
+    case bt::sdp::DataElement::Type::kUuid:
+      out.set_uuid(UuidToFidl(*data_element.Get<bt::UUID>()));
+      break;
+    case bt::sdp::DataElement::Type::kString:
+      out.set_str(data_element.Get<bt::DynamicByteBuffer>()->ToVector());
+      break;
+    case bt::sdp::DataElement::Type::kBoolean:
+      out.set_b(*data_element.Get<bool>());
+      break;
+    case bt::sdp::DataElement::Type::kSequence: {
+      std::vector<std::unique_ptr<fbredr::DataElement>> seq;
+      auto data_element_sequence = data_element.Get<std::vector<bt::sdp::DataElement>>();
+      for (const auto& elem : data_element_sequence.value()) {
+        std::optional<fbredr::DataElement> fidl_elem = DataElementToFidl(elem);
+        if (!fidl_elem) {
+          bt_log(WARN, "fidl", "Encountered DataElementToFidl sequence type not handled.");
+          return std::nullopt;
+        }
+        seq.emplace_back(std::make_unique<fbredr::DataElement>(std::move(fidl_elem.value())));
+      }
+      out.set_sequence(std::move(seq));
+      break;
+    }
+    case bt::sdp::DataElement::Type::kAlternative: {
+      std::vector<std::unique_ptr<fbredr::DataElement>> alt;
+      auto data_element_alt = data_element.Get<std::vector<bt::sdp::DataElement>>();
+      for (const auto& elem : data_element_alt.value()) {
+        std::optional<fbredr::DataElement> fidl_elem = DataElementToFidl(elem);
+        if (!fidl_elem) {
+          bt_log(WARN, "fidl", "Encountered DataElementToFidl alternate type not handled.");
+          return std::nullopt;
+        }
+        alt.emplace_back(std::make_unique<fbredr::DataElement>(std::move(fidl_elem.value())));
+      }
+      out.set_alternatives(std::move(alt));
+      break;
+    }
+    case bt::sdp::DataElement::Type::kUrl:
+      out.set_url(*data_element.GetUrl());
+      break;
+  }
+  return out;
+}
+
 namespace {
 
 fbt::AddressType AddressTypeToFidl(bt::DeviceAddress::Type type) {
@@ -397,6 +498,139 @@ fbt::DeviceClass DeviceClassToFidl(bt::DeviceClass input) {
   fbt::DeviceClass output{
       static_cast<uint32_t>(bytes[0] | (bytes[1] << BIT_SHIFT_8) | (bytes[2] << BIT_SHIFT_16))};
   return output;
+}
+
+std::optional<fbredr::ServiceClassProfileIdentifier> UuidToServiceClassIdentifier(
+    const bt::UUID uuid) {
+  std::optional<uint16_t> uuid_16 = uuid.As16Bit();
+  if (!uuid_16) {
+    return std::nullopt;
+  }
+  return fbredr::ServiceClassProfileIdentifier(*uuid_16);
+}
+
+std::optional<fbredr::ProtocolIdentifier> UuidToProtocolIdentifier(const bt::UUID uuid) {
+  std::optional<uint16_t> uuid_16 = uuid.As16Bit();
+  if (!uuid_16) {
+    return std::nullopt;
+  }
+  return fbredr::ProtocolIdentifier(*uuid_16);
+}
+
+fpromise::result<std::vector<fuchsia::bluetooth::Uuid>, fuchsia::bluetooth::ErrorCode>
+DataElementToServiceUuids(const bt::sdp::DataElement& uuids_element) {
+  std::vector<fuchsia::bluetooth::Uuid> out;
+
+  const auto service_uuids_list = uuids_element.Get<std::vector<bt::sdp::DataElement>>();
+  if (!service_uuids_list) {
+    return fpromise::error(fuchsia::bluetooth::ErrorCode::INVALID_ARGUMENTS);
+  }
+
+  for (const auto& uuid_element : service_uuids_list.value()) {
+    if (uuid_element.type() != bt::sdp::DataElement::Type::kUuid) {
+      return fpromise::error(fuchsia::bluetooth::ErrorCode::INVALID_ARGUMENTS);
+    }
+    out.push_back(UuidToFidl(*uuid_element.Get<bt::UUID>()));
+  }
+
+  return fpromise::ok(std::move(out));
+}
+
+fpromise::result<std::vector<fbredr::ProtocolDescriptor>, fuchsia::bluetooth::ErrorCode>
+DataElementToProtocolDescriptorList(const bt::sdp::DataElement& protocols_element) {
+  std::vector<fbredr::ProtocolDescriptor> out;
+
+  const auto protocol_list = protocols_element.Get<std::vector<bt::sdp::DataElement>>();
+  if (!protocol_list) {
+    return fpromise::error(fuchsia::bluetooth::ErrorCode::INVALID_ARGUMENTS);
+  }
+
+  for (const auto& protocol_elt : protocol_list.value()) {
+    if (protocol_elt.type() != bt::sdp::DataElement::Type::kSequence) {
+      return fpromise::error(fuchsia::bluetooth::ErrorCode::INVALID_ARGUMENTS);
+    }
+
+    const auto protocol = protocol_elt.Get<std::vector<bt::sdp::DataElement>>().value();
+    if (protocol.size() < 1 || protocol.at(0).type() != bt::sdp::DataElement::Type::kUuid) {
+      return fpromise::error(fuchsia::bluetooth::ErrorCode::INVALID_ARGUMENTS);
+    }
+
+    fbredr::ProtocolDescriptor desc;
+    std::vector<fbredr::DataElement> params;
+    for (size_t i = 0; i < protocol.size(); i++) {
+      if (i == 0) {
+        std::optional<fbredr::ProtocolIdentifier> protocol_id =
+            UuidToProtocolIdentifier((protocol.at(i).Get<bt::UUID>()).value());
+        if (!protocol_id) {
+          return fpromise::error(fuchsia::bluetooth::ErrorCode::INVALID_ARGUMENTS);
+        }
+        desc.set_protocol(protocol_id.value());
+      } else {
+        std::optional<fbredr::DataElement> param = DataElementToFidl(protocol.at(i));
+        if (!param) {
+          return fpromise::error(fuchsia::bluetooth::ErrorCode::INVALID_ARGUMENTS);
+        }
+        params.emplace_back(std::move(*param));
+      }
+    }
+    desc.set_params(std::move(params));
+    out.emplace_back(std::move(desc));
+  }
+
+  return fpromise::ok(std::move(out));
+}
+
+// Returns the major and minor versions from a combined |version|.
+std::pair<uint8_t, uint8_t> VersionToMajorMinor(uint16_t version) {
+  const uint16_t kMajorBitmask = 0xFF00;
+  const uint16_t kMinorBitmask = 0x00FF;
+  uint8_t major =
+      static_cast<uint8_t>((version & kMajorBitmask) >> std::numeric_limits<uint8_t>::digits);
+  uint8_t minor = static_cast<uint8_t>(version & kMinorBitmask);
+  return std::make_pair(major, minor);
+}
+
+fpromise::result<std::vector<fbredr::ProfileDescriptor>, fuchsia::bluetooth::ErrorCode>
+DataElementToProfileDescriptors(const bt::sdp::DataElement& profile_element) {
+  std::vector<fbredr::ProfileDescriptor> out;
+
+  const auto profile_desc_list = profile_element.Get<std::vector<bt::sdp::DataElement>>();
+  if (!profile_desc_list) {
+    return fpromise::error(fuchsia::bluetooth::ErrorCode::INVALID_ARGUMENTS);
+  }
+
+  // [[UUID, Version]]
+  for (const auto& profile_desc_element : (*profile_desc_list)) {
+    if (profile_desc_element.type() != bt::sdp::DataElement::Type::kSequence) {
+      return fpromise::error(fuchsia::bluetooth::ErrorCode::INVALID_ARGUMENTS);
+    }
+
+    // Each profile descriptor entry contains a UUID and uint16_t version.
+    const auto profile_desc = *profile_desc_element.Get<std::vector<bt::sdp::DataElement>>();
+    if (profile_desc.size() != 2) {
+      return fpromise::error(fuchsia::bluetooth::ErrorCode::INVALID_ARGUMENTS);
+    }
+
+    std::optional<bt::UUID> profile_id = profile_desc.at(0).Get<bt::UUID>();
+    std::optional<uint16_t> version = profile_desc.at(1).Get<uint16_t>();
+    if (!profile_id || !version) {
+      return fpromise::error(fuchsia::bluetooth::ErrorCode::INVALID_ARGUMENTS);
+    }
+
+    fbredr::ProfileDescriptor desc;
+    std::optional<fbredr::ServiceClassProfileIdentifier> service_class_id =
+        UuidToServiceClassIdentifier(*profile_id);
+    if (!service_class_id) {
+      return fpromise::error(fuchsia::bluetooth::ErrorCode::INVALID_ARGUMENTS);
+    }
+    desc.set_profile_id(service_class_id.value());
+    auto [major, minor] = VersionToMajorMinor(version.value());
+    desc.set_major_version(major);
+    desc.set_minor_version(minor);
+    out.push_back(std::move(desc));
+  }
+
+  return fpromise::ok(std::move(out));
 }
 
 bool NewAddProtocolDescriptorList(
@@ -1601,6 +1835,72 @@ ServiceDefinitionToServiceRecord(const fuchsia::bluetooth::bredr::ServiceDefinit
     }
   }
   return fpromise::ok(std::move(rec));
+}
+
+fpromise::result<fuchsia::bluetooth::bredr::ServiceDefinition, fuchsia::bluetooth::ErrorCode>
+ServiceRecordToServiceDefinition(const bt::sdp::ServiceRecord& record) {
+  fuchsia::bluetooth::bredr::ServiceDefinition out;
+
+  // Service class UUIDs are mandatory
+  if (!record.HasAttribute(bt::sdp::kServiceClassIdList)) {
+    return fpromise::error(fuchsia::bluetooth::ErrorCode::INVALID_ARGUMENTS);
+  }
+  const bt::sdp::DataElement& service_uuids_element =
+      record.GetAttribute(bt::sdp::kServiceClassIdList);
+  auto service_uuids = DataElementToServiceUuids(service_uuids_element);
+  if (service_uuids.is_error()) {
+    return fpromise::error(service_uuids.error());
+  }
+  out.set_service_class_uuids(std::move(service_uuids.value()));
+
+  // Primary protocol descriptor list (optional)
+  if (record.HasAttribute(bt::sdp::kProtocolDescriptorList)) {
+    const bt::sdp::DataElement& primary_protocol_element =
+        record.GetAttribute(bt::sdp::kProtocolDescriptorList);
+    auto primary_protocol = DataElementToProtocolDescriptorList(primary_protocol_element);
+    if (primary_protocol.is_error()) {
+      return fpromise::error(primary_protocol.error());
+    }
+    out.set_protocol_descriptor_list(std::move(primary_protocol.value()));
+  }
+
+  // Additional protocol descriptor lists (optional)
+  if (record.HasAttribute(bt::sdp::kAdditionalProtocolDescriptorList)) {
+    const bt::sdp::DataElement& additional_protocols =
+        record.GetAttribute(bt::sdp::kAdditionalProtocolDescriptorList);
+    // Sequence of protocol descriptor list sequences.
+    if (additional_protocols.type() != bt::sdp::DataElement::Type::kSequence) {
+      bt_log(WARN, "fidl", "Invalid additional protocol descriptor list");
+      return fpromise::error(fuchsia::bluetooth::ErrorCode::INVALID_ARGUMENTS);
+    }
+
+    const auto additional_protocol_list =
+        additional_protocols.Get<std::vector<bt::sdp::DataElement>>();
+    for (const auto& addl_element : additional_protocol_list.value()) {
+      auto additional_protocol = DataElementToProtocolDescriptorList(addl_element);
+      if (additional_protocol.is_error()) {
+        return fpromise::error(additional_protocol.error());
+      }
+      out.mutable_additional_protocol_descriptor_lists()->emplace_back(
+          std::move(additional_protocol.value()));
+    }
+  }
+
+  // Profile descriptors (optional)
+  if (record.HasAttribute(bt::sdp::kBluetoothProfileDescriptorList)) {
+    const bt::sdp::DataElement& profile_descriptors_element =
+        record.GetAttribute(bt::sdp::kBluetoothProfileDescriptorList);
+    auto profile_descriptors = DataElementToProfileDescriptors(profile_descriptors_element);
+    if (profile_descriptors.is_error()) {
+      return fpromise::error(profile_descriptors.error());
+    }
+    out.set_profile_descriptors(std::move(profile_descriptors.value()));
+  }
+
+  // TODO(b/327758656): Populate information (optional)
+  // TODO(b/327758656): Populate additional attributes (optional)
+
+  return fpromise::ok(std::move(out));
 }
 
 bt::gap::BrEdrSecurityRequirements FidlToBrEdrSecurityRequirements(

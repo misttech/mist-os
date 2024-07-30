@@ -194,6 +194,10 @@ ServiceDefinitionToServiceRecord(const fuchsia_bluetooth_bredr::ServiceDefinitio
 fpromise::result<bt::sdp::ServiceRecord, fuchsia::bluetooth::ErrorCode>
 ServiceDefinitionToServiceRecord(const fuchsia::bluetooth::bredr::ServiceDefinition& definition);
 
+// Constructs a FIDL ServiceDefinition from a sdp::ServiceRecord
+fpromise::result<fuchsia::bluetooth::bredr::ServiceDefinition, fuchsia::bluetooth::ErrorCode>
+ServiceRecordToServiceDefinition(const bt::sdp::ServiceRecord& record);
+
 bt::gap::BrEdrSecurityRequirements FidlToBrEdrSecurityRequirements(
     const fuchsia::bluetooth::bredr::ChannelParameters& fidl);
 
