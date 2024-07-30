@@ -249,7 +249,7 @@ impl Untracked {
 ///   - FIN: Invalid
 ///   - ACK: Invalid
 /// - Reply
-///   - SYN: Invalid, force drop segment (until we support simultaneous open)
+///   - SYN: Untracked, until we support simultaneous open.
 ///   - SYN/ACK: WaitingOnOpeningAck
 ///   - RST: Delete connection
 ///   - FIN: Invalid
