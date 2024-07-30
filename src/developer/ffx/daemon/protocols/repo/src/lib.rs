@@ -25,7 +25,7 @@ use pkg::repo::{
     aliases_to_rules, create_repo_host, register_target_with_fidl_proxies, repo_spec_to_backend,
     update_repository, Registrar, RepoInner, SaveConfig, ServerState,
 };
-use pkg::{config as pkg_config, metrics};
+use pkg::{config as pkg_config, metrics, write_instance_info, PathType, ServerMode};
 use protocols::prelude::*;
 use shared_child::SharedChild;
 use std::net::SocketAddr;
@@ -854,7 +854,7 @@ impl<
             inner.server = ServerState::Stopped;
         }
 
-        // Start the server if it is enabled.
+        // Start the server if it is enabled, but always load the configured repositories.
         if pkg_config::get_repository_server_enabled().await? {
             match fetch_repo_address().await {
                 Ok(Some(last_addr)) => {
@@ -869,6 +869,8 @@ impl<
                     tracing::error!("failed to read last address used from config: {:#}", err);
                 }
             }
+        } else {
+            tracing::debug!("repository server not enabled.");
         }
 
         load_repositories_from_config(&self.inner).await;
@@ -898,14 +900,53 @@ async fn fetch_repo_address() -> anyhow::Result<Option<SocketAddr>> {
 }
 
 async fn load_repositories_from_config(inner: &Arc<RwLock<RepoInner>>) {
+    let addr = if let Some(serveraddr) = inner.read().await.server.listen_addr() {
+        serveraddr
+    } else {
+        if let Ok(Some(serveraddr)) = fetch_repo_address().await {
+            serveraddr
+        } else {
+            tracing::error!("could not determine server address.");
+            SocketAddr::new(std::net::IpAddr::V6(std::net::Ipv6Addr::UNSPECIFIED), 0)
+        }
+    };
     for (name, repo_spec) in pkg::config::get_repositories().await {
         if inner.read().await.manager.get(&name).is_some() {
             continue;
         }
 
+        let (repo_path, aliases) = match repo_spec {
+            RepositorySpec::FileSystem { ref metadata_repo_path, ref aliases, .. } => {
+                (metadata_repo_path.as_std_path().into(), aliases)
+            }
+            RepositorySpec::Pm { ref path, ref aliases } => (path.as_std_path().into(), aliases),
+            RepositorySpec::Http { ref metadata_repo_url, ref aliases, .. } => {
+                (PathType::Url(metadata_repo_url.clone()), aliases)
+            }
+            RepositorySpec::Gcs { ref metadata_repo_url, ref aliases, .. } => {
+                (PathType::Url(metadata_repo_url.clone()), aliases)
+            }
+        };
         // Add the repository.
         if let Err(err) = add_repository(&name, &repo_spec, Arc::clone(inner)).await {
             tracing::warn!("failed to add the repository {:?}: {:?}", name, err);
+        } else {
+            if let Err(e) = write_instance_info(
+                None,
+                ServerMode::Daemon,
+                &name,
+                &addr,
+                repo_path.into(),
+                aliases.into_iter().map(ToString::to_string).collect(),
+                ffx::RepositoryStorageType::Ephemeral.into(),
+                ffx::RepositoryRegistrationAliasConflictMode::Replace.into(),
+            )
+            .await
+            {
+                tracing::error!(
+                    "failed to write repo server instance information for {name}: {e:?}"
+                );
+            }
         }
     }
 }

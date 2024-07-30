@@ -6,10 +6,31 @@ use anyhow::Result;
 use ffx_config::EnvironmentContext;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::{fs, process};
 
 use crate::{RegistrationConflictMode, RepoStorageType};
+
+/// PathType is an enum encapulating filesystem and URL based paths.
+#[derive(Debug, Deserialize, Serialize, PartialEq)]
+pub enum PathType {
+    File(PathBuf),
+    Url(String),
+}
+
+impl From<&Path> for PathType {
+    fn from(value: &Path) -> Self {
+        PathType::File(value.into())
+    }
+}
+
+/// ServerMode is the execution mode of the server process.
+#[derive(Debug, Deserialize, Serialize, PartialEq)]
+pub enum ServerMode {
+    Background,
+    Foreground,
+    Daemon,
+}
 
 /// PkgServerInfo is serialized as a file that contains
 /// the startup information for a running package server.
@@ -19,11 +40,11 @@ use crate::{RegistrationConflictMode, RepoStorageType};
 pub struct PkgServerInfo {
     pub name: String,
     pub address: SocketAddr,
-    pub repo_path: PathBuf,
+    pub repo_path: PathType,
     pub registration_aliases: Vec<String>,
     pub registration_storage_type: RepoStorageType,
     pub registration_alias_conflict_mode: RegistrationConflictMode,
-    pub server_mode: String,
+    pub server_mode: ServerMode,
     pub pid: u32,
 }
 
@@ -164,10 +185,10 @@ impl PkgServerInstanceInfo for PkgServerInstances {
 
 pub async fn write_instance_info(
     env_context: Option<EnvironmentContext>,
-    server_mode: &str,
+    server_mode: ServerMode,
     name: &str,
     address: &SocketAddr,
-    repo_path: PathBuf,
+    repo_path: PathType,
     aliases: Vec<String>,
     storage_type: RepoStorageType,
     conflict_mode: RegistrationConflictMode,
@@ -186,7 +207,7 @@ pub async fn write_instance_info(
         registration_aliases: aliases.clone(),
         registration_storage_type: storage_type.into(),
         registration_alias_conflict_mode: conflict_mode.into(),
-        server_mode: server_mode.into(),
+        server_mode,
         pid: process::id(),
     };
     if let Some(existing) = mgr.get_instance(name.into())? {
@@ -208,10 +229,10 @@ mod tests {
         let addr = SocketAddr::new(std::net::IpAddr::V6(std::net::Ipv6Addr::UNSPECIFIED), 8000);
         write_instance_info(
             None,
-            "foreground",
+            ServerMode::Foreground,
             "somename",
             &addr,
-            PathBuf::new(),
+            PathBuf::new().as_path().into(),
             vec![],
             RepoStorageType::Ephemeral,
             RegistrationConflictMode::ErrorOut,
@@ -234,10 +255,10 @@ mod tests {
         let addr = SocketAddr::new(std::net::IpAddr::V6(std::net::Ipv6Addr::UNSPECIFIED), 8000);
         write_instance_info(
             Some(env.context.clone()),
-            "foreground",
+            ServerMode::Foreground,
             "somename",
             &addr,
-            PathBuf::new(),
+            PathBuf::new().as_path().into(),
             vec![],
             RepoStorageType::Ephemeral,
             RegistrationConflictMode::ErrorOut,
@@ -259,9 +280,9 @@ mod tests {
         let info = PkgServerInfo {
             name: "somename".into(),
             address: (Ipv6Addr::UNSPECIFIED, 8000).into(),
-            repo_path: PathBuf::new(),
+            repo_path: Path::new("").into(),
             registration_alias_conflict_mode: RegistrationConflictMode::ErrorOut,
-            server_mode: "foreground".into(),
+            server_mode: ServerMode::Foreground,
             pid: process::id(),
             registration_aliases: vec![],
             registration_storage_type: RepoStorageType::Ephemeral,
@@ -294,9 +315,9 @@ mod tests {
         let info = PkgServerInfo {
             name: instance_name.into(),
             address: (Ipv6Addr::UNSPECIFIED, 8000).into(),
-            repo_path: PathBuf::new(),
+            repo_path: Path::new("").into(),
             registration_alias_conflict_mode: RegistrationConflictMode::ErrorOut,
-            server_mode: "foreground".into(),
+            server_mode: ServerMode::Foreground,
             pid: process::id(),
             registration_aliases: vec![],
             registration_storage_type: RepoStorageType::Ephemeral,
@@ -314,9 +335,9 @@ mod tests {
         let mut info = PkgServerInfo {
             name: instance_name.into(),
             address: (Ipv6Addr::UNSPECIFIED, 8000).into(),
-            repo_path: PathBuf::from("path1"),
+            repo_path: PathBuf::from("path1").as_path().into(),
             registration_alias_conflict_mode: RegistrationConflictMode::ErrorOut,
-            server_mode: "foreground".into(),
+            server_mode: ServerMode::Foreground,
             pid: process::id(),
             registration_aliases: vec![],
             registration_storage_type: RepoStorageType::Ephemeral,
@@ -325,14 +346,14 @@ mod tests {
         mgr.write_instance(&info).expect("written OK");
 
         let got = mgr.get_instance(instance_name.into()).expect("get instance").unwrap();
-        assert_eq!(got.repo_path, PathBuf::from("path1"));
+        assert_eq!(got.repo_path, PathBuf::from("path1").as_path().into());
 
-        info.repo_path = PathBuf::from("path2");
+        info.repo_path = PathBuf::from("path2").as_path().into();
 
         mgr.write_instance(&info).expect("written OK");
 
         let mut got = mgr.get_instance(instance_name.into()).expect("get instance").unwrap();
-        assert_eq!(got.repo_path, PathBuf::from("path2"));
+        assert_eq!(got.repo_path, PathBuf::from("path2").as_path().into());
 
         let mut instances = mgr.list_instances().expect("list instances");
         assert_eq!(instances.len(), 1);
@@ -348,9 +369,9 @@ mod tests {
         let info = PkgServerInfo {
             name: instance_name.into(),
             address: (Ipv6Addr::UNSPECIFIED, 8000).into(),
-            repo_path: PathBuf::new(),
+            repo_path: Path::new("").into(),
             registration_alias_conflict_mode: RegistrationConflictMode::ErrorOut,
-            server_mode: "foreground".into(),
+            server_mode: ServerMode::Foreground,
             pid: process::id(),
             registration_aliases: vec![],
             registration_storage_type: RepoStorageType::Ephemeral,
@@ -372,9 +393,9 @@ mod tests {
         let info_1 = PkgServerInfo {
             name: instance_name.into(),
             address: (Ipv6Addr::UNSPECIFIED, 8000).into(),
-            repo_path: PathBuf::new(),
+            repo_path: Path::new("").into(),
             registration_alias_conflict_mode: RegistrationConflictMode::ErrorOut,
-            server_mode: "foreground".into(),
+            server_mode: ServerMode::Foreground,
             pid: process::id(),
             registration_aliases: vec![],
             registration_storage_type: RepoStorageType::Ephemeral,
@@ -384,9 +405,9 @@ mod tests {
         let info_2 = PkgServerInfo {
             name: another_instance_name.into(),
             address: (Ipv6Addr::UNSPECIFIED, 8000).into(),
-            repo_path: PathBuf::new(),
+            repo_path: Path::new("").into(),
             registration_alias_conflict_mode: RegistrationConflictMode::ErrorOut,
-            server_mode: "foreground".into(),
+            server_mode: ServerMode::Foreground,
             pid: process::id(),
             registration_aliases: vec![],
             registration_storage_type: RepoStorageType::Ephemeral,
@@ -413,9 +434,9 @@ mod tests {
         let info_1 = PkgServerInfo {
             name: instance_name.into(),
             address: (Ipv6Addr::UNSPECIFIED, 8000).into(),
-            repo_path: PathBuf::new(),
+            repo_path: Path::new("").into(),
             registration_alias_conflict_mode: RegistrationConflictMode::ErrorOut,
-            server_mode: "foreground".into(),
+            server_mode: ServerMode::Foreground,
             pid: process::id(),
             registration_aliases: vec![],
             registration_storage_type: RepoStorageType::Ephemeral,
@@ -425,9 +446,9 @@ mod tests {
         let info_2 = PkgServerInfo {
             name: another_instance_name.into(),
             address: (Ipv6Addr::UNSPECIFIED, 8000).into(),
-            repo_path: PathBuf::new(),
+            repo_path: Path::new("").into(),
             registration_alias_conflict_mode: RegistrationConflictMode::ErrorOut,
-            server_mode: "foreground".into(),
+            server_mode: ServerMode::Foreground,
             pid: 0,
             registration_aliases: vec![],
             registration_storage_type: RepoStorageType::Ephemeral,
@@ -467,9 +488,9 @@ mod tests {
         let info = PkgServerInfo {
             name: instance_name.into(),
             address: (Ipv6Addr::UNSPECIFIED, 8000).into(),
-            repo_path: PathBuf::new(),
+            repo_path: Path::new("").into(),
             registration_alias_conflict_mode: RegistrationConflictMode::ErrorOut,
-            server_mode: "foreground".into(),
+            server_mode: ServerMode::Foreground,
             pid: 0,
             registration_aliases: vec![],
             registration_storage_type: RepoStorageType::Ephemeral,
@@ -500,9 +521,9 @@ mod tests {
         let info = PkgServerInfo {
             name: instance_name.into(),
             address: (Ipv6Addr::UNSPECIFIED, 8000).into(),
-            repo_path: PathBuf::new(),
+            repo_path: Path::new("").into(),
             registration_alias_conflict_mode: RegistrationConflictMode::ErrorOut,
-            server_mode: "foreground".into(),
+            server_mode: ServerMode::Foreground,
             pid: process::id(),
             registration_aliases: vec![],
             registration_storage_type: RepoStorageType::Ephemeral,
@@ -524,9 +545,9 @@ mod tests {
         let info = PkgServerInfo {
             name: instance_name.into(),
             address: (Ipv6Addr::UNSPECIFIED, 8000).into(),
-            repo_path: PathBuf::new(),
+            repo_path: Path::new("").into(),
             registration_alias_conflict_mode: RegistrationConflictMode::ErrorOut,
-            server_mode: "foreground".into(),
+            server_mode: ServerMode::Foreground,
             pid: 0,
             registration_aliases: vec![],
             registration_storage_type: RepoStorageType::Ephemeral,
@@ -549,9 +570,9 @@ mod tests {
         let info = PkgServerInfo {
             name: instance_name.into(),
             address: (Ipv6Addr::UNSPECIFIED, 8000).into(),
-            repo_path: PathBuf::new(),
+            repo_path: Path::new("").into(),
             registration_alias_conflict_mode: RegistrationConflictMode::ErrorOut,
-            server_mode: "foreground".into(),
+            server_mode: ServerMode::Foreground,
             pid: process::id(),
             registration_aliases: vec![],
             registration_storage_type: RepoStorageType::Ephemeral,
