@@ -27,27 +27,6 @@ pub static GA4_METRICS_INSTANCE: OnceLock<Arc<Mutex<GA4MetricsService>>> = OnceL
 
 pub use env_info::get_analytics_dir;
 
-// Keep old method until dependencies in other repositories are migrated to the new API.
-pub async fn init_ga4_metrics_service(
-    app_name: String,
-    build_version: Option<String>,
-    sdk_version: String,
-    ga4_product_code: String,
-    ga4_key: String,
-    invoker: Option<String>,
-) -> Result<Arc<Mutex<GA4MetricsService>>> {
-    initialize_ga4_metrics_service(
-        app_name,
-        get_analytics_dir().ok(),
-        build_version,
-        sdk_version,
-        ga4_product_code,
-        ga4_key,
-        invoker,
-    )
-    .await
-}
-
 /// Initializes and return the G4 Metrics Service.
 /// Only call this once, but, call it before calling
 /// ga4_metrics().
