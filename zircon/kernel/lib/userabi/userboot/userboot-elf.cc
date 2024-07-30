@@ -73,8 +73,12 @@ zx_vaddr_t load(const zx::debuglog& log, std::string_view what, const zx::vmar& 
     *segments_vmar = std::move(loaded_vmar);
   }
 
-  printl(log, "userboot: loaded %.*s at %p, entry point %p\n", static_cast<int>(what.size()),
-         what.data(), (void*)base, (void*)entry);
+  char vmo_name[ZX_MAX_NAME_LEN];
+  zx_status_t status = vmo.get_property(ZX_PROP_NAME, vmo_name, sizeof(vmo_name));
+  check(log, status, "zx_object_get_property failed for ZX_PROP_NAME on vDSO VMO");
+
+  printl(log, "userboot: loaded %.*s (%.*s) at %p, entry point %p\n", static_cast<int>(what.size()),
+         what.data(), static_cast<int>(sizeof(vmo_name)), vmo_name, (void*)base, (void*)entry);
   return return_entry ? entry : base;
 }
 
