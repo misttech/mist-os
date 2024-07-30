@@ -460,8 +460,7 @@ impl SuspendResumeManager {
 /// `EPOLLWAKEUP` event in epoll.
 pub struct WakeLease {
     name: String,
-    element: OnceCell<PowerElement>,
-    lease: Mutex<Option<zx::Channel>>,
+    lease: Mutex<Option<zx::EventPair>>,
 }
 
 impl WakeLease {
@@ -469,74 +468,20 @@ impl WakeLease {
         let random_string: String =
             rand::thread_rng().sample_iter(&Alphanumeric).take(8).map(char::from).collect();
         Self {
-            name: format!("{}-{}", name, random_string),
-            element: Default::default(),
+            name: format!("starnix-wake-lock-{}-{}", name, random_string),
             lease: Default::default(),
         }
     }
 
-    fn element(&self) -> Result<&PowerElement, Errno> {
-        self.element.get_or_try_init(|| {
-            let activity_governor = connect_to_protocol_sync::<fsystem::ActivityGovernorMarker>()
-                .map_err(|_| errno!(EINVAL, "Failed to connect to SAG"))?;
-            let topology = connect_to_protocol_sync::<fbroker::TopologyMarker>()
-                .map_err(|_| errno!(EINVAL, "Failed to connect to Power Topology"))?;
-
-            let power_elements =
-                activity_governor.get_power_elements(zx::Time::INFINITE).map_err(|e| {
-                    errno!(EINVAL, format!("cannot get Activity Governor element from SAG: {e}"))
-                })?;
-            let Some(active_wake_token) = power_elements
-                .wake_handling
-                .and_then(|wake_handling| wake_handling.assertive_dependency_token)
-            else {
-                return Err(errno!(EINVAL, "No active dependency token in SAG Wake Handling PE"));
-            };
-            let power_levels: Vec<u8> =
-                (0..=fbroker::BinaryPowerLevel::On.into_primitive()).collect();
-            let (lessor_proxy, lessor_server_end) = create_sync_proxy::<fbroker::LessorMarker>();
-            let (element_proxy, element_server_end) =
-                create_sync_proxy::<fbroker::ElementControlMarker>();
-            topology
-                .add_element(
-                    fbroker::ElementSchema {
-                        element_name: Some(format!("starnix-wake-lock-{}", self.name)),
-                        initial_current_level: Some(
-                            fbroker::BinaryPowerLevel::Off.into_primitive(),
-                        ),
-                        valid_levels: Some(power_levels),
-                        dependencies: Some(vec![fbroker::LevelDependency {
-                            dependency_type: fbroker::DependencyType::Assertive,
-                            dependent_level: fbroker::BinaryPowerLevel::On.into_primitive(),
-                            requires_token: active_wake_token,
-                            requires_level_by_preference: vec![
-                                fsystem::WakeHandlingLevel::Active.into_primitive()
-                            ],
-                        }]),
-                        lessor_channel: Some(lessor_server_end),
-                        element_control: Some(element_server_end),
-                        ..Default::default()
-                    },
-                    zx::Time::INFINITE,
-                )
-                .map_err(|e| errno!(EINVAL, format!("PowerBroker::AddElement fidl error ({e:?})")))?
-                .map_err(|e| errno!(EINVAL, format!("PowerBroker::AddElementError ({e:?})")))?;
-            Ok(PowerElement { element_proxy, lessor_proxy, level_proxy: None })
-        })
-    }
-
-    /// Activate the wake lease.
     pub fn activate(&self) -> Result<(), Errno> {
-        let element = self.element()?;
         let mut guard = self.lease.lock();
         if guard.is_none() {
+            let activity_governor = connect_to_protocol_sync::<fsystem::ActivityGovernorMarker>()
+                .map_err(|_| errno!(EINVAL, "Failed to connect to SAG"))?;
             *guard = Some(
-                element
-                    .lessor_proxy
-                    .lease(fbroker::BinaryPowerLevel::On.into_primitive(), zx::Time::INFINITE)
-                    .map_err(|e| errno!(EINVAL, format!("PowerBroker::Lease fidl error ({e:?})")))?
-                    .map_err(|e| errno!(EINVAL, format!("PowerBroker::LeaseError ({e:?})")))?
-                    .into_channel(),
+                activity_governor
+                    .take_wake_lease(&self.name, zx::Time::INFINITE)
+                    .map_err(|_| errno!(EINVAL, "Failed to take wake lease"))?,
             );
         }
         Ok(())
@@ -544,7 +489,7 @@ impl WakeLease {
 }
 
 impl WakeLeaseInterlockOps for WakeLease {
-    fn take_lease(&self) -> Option<zx::Channel> {
+    fn take_lease(&self) -> Option<zx::EventPair> {
         self.lease.lock().take()
     }
 }
@@ -559,7 +504,7 @@ pub trait WakeLeaseInterlockOps {
     /// Transfer the active wake lease to the caller.
     ///
     /// Ignoring the returned Channel means dropping the wake lease.
-    fn take_lease(&self) -> Option<zx::Channel>;
+    fn take_lease(&self) -> Option<zx::EventPair>;
 }
 
 pub trait OnWakeOps: Send + Sync {

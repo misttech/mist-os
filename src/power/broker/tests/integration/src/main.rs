@@ -1025,6 +1025,23 @@ mod tests {
         });
         let mut child2_req_level_fut = child2_required.watch();
 
+        // Lower GP's current level to 90.
+        // GP's required level should remain 90 because P is still at 30.
+        // P's required level should become 0.
+        // C1's required level should remain 0.
+        // C2's required level should remain 0.
+        executor.run_singlethreaded(async {
+            grandparent_current
+                .update(90)
+                .await
+                .unwrap()
+                .expect("update_current_power_level failed");
+        });
+        assert!(executor.run_until_stalled(&mut grandparent_req_level_fut).is_pending());
+        assert!(executor.run_until_stalled(&mut parent_req_level_fut).is_pending());
+        assert!(executor.run_until_stalled(&mut child1_req_level_fut).is_pending());
+        assert!(executor.run_until_stalled(&mut child2_req_level_fut).is_pending());
+
         // Lower C2's current level to 0.
         // GP's required level should become its minimum level of 10 because P is now at 0.
         // P's required level should become 0.
@@ -1035,6 +1052,23 @@ mod tests {
             assert_eq!(parent_req_level_fut.await.unwrap(), Ok(0));
         });
         let mut parent_req_level_fut = parent_required.watch();
+        assert!(executor.run_until_stalled(&mut parent_req_level_fut).is_pending());
+        assert!(executor.run_until_stalled(&mut child1_req_level_fut).is_pending());
+        assert!(executor.run_until_stalled(&mut child2_req_level_fut).is_pending());
+
+        // Lower GP's current level to 10.
+        // GP's required level should remain 10 because P is now at 0.
+        // P's required level should remain 0.
+        // C1's required level should remain 0.
+        // C2's required level should remain 0.
+        executor.run_singlethreaded(async {
+            grandparent_current
+                .update(10)
+                .await
+                .unwrap()
+                .expect("update_current_power_level failed");
+        });
+        assert!(executor.run_until_stalled(&mut grandparent_req_level_fut).is_pending());
         assert!(executor.run_until_stalled(&mut parent_req_level_fut).is_pending());
         assert!(executor.run_until_stalled(&mut child1_req_level_fut).is_pending());
         assert!(executor.run_until_stalled(&mut child2_req_level_fut).is_pending());

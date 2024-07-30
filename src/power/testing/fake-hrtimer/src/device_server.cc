@@ -17,8 +17,6 @@
 #include <optional>
 #include <vector>
 
-#include "fidl/fuchsia.power.broker/cpp/markers.h"
-
 namespace fake_hrtimer {
 
 using fuchsia_hardware_hrtimer::DeviceGetTicksLeftResponse;
@@ -87,6 +85,7 @@ DeviceServer::DeviceServer() {
   }
 
   element_control_client_ = std::move(element_control_endpoints->client);
+  current_level_ = fidl::SyncClient(std::move(current_level_endpoints->client));
   required_level_ = fidl::SyncClient(std::move(required_level_endpoints->client));
   lessor_ = fidl::SyncClient{std::move(lessor_endpoints->client)};
 }
@@ -148,6 +147,7 @@ void DeviceServer::StartAndWait(StartAndWaitRequest& request,
             return zx::error(ZX_ERR_BAD_STATE);
           }
           level = fuchsia_power_broker::BinaryPowerLevel(result->required_level());
+          current_level_.value()->Update(result->required_level());
         } while (level != fuchsia_power_broker::BinaryPowerLevel::kOn);
 
         fuchsia_hardware_hrtimer::DeviceStartAndWaitResponse response;

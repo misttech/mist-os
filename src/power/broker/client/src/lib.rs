@@ -279,7 +279,7 @@ impl LeaseHelper {
 
         let element_context = PowerElementContext::builder(topology, name, &BINARY_POWER_LEVELS)
             .dependencies(level_dependencies)
-            .initial_current_level(BINARY_POWER_LEVELS[1])
+            .initial_current_level(BINARY_POWER_LEVELS[0])
             .build()
             .await?;
 

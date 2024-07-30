@@ -147,19 +147,23 @@ struct ElementWithLease {
 };
 
 // Adds an element with an assertive dependency on ApplicationActivity and takes a lease on that
-// element. If the required power level fails to become kPowerLevelActive this function will return
-// a fit::error with the currently required power level.
-fit::result<uint8_t, ElementWithLease> RaiseApplicationActivity() {
+// element.
+ElementWithLease RaiseApplicationActivity() {
+  // |current_level| is used later in this function to respond to required level updates, as
+  // power broker won't proceed with level updates without getting acknowledgment of level changes.
+  Endpoints<CurrentLevel> current_level_endpoints = Endpoints<CurrentLevel>::Create();
+
   // |required_level| is used later in this function to check if the lease's dependencies are
   // satisfied. Activity Governor enforces that if a RequiredLevel endpoint is specified, a
   // CurrentLevel endpoint must also specified in the schema.
-  ClientEnd<RequiredLevel> required_level;
+  Endpoints<RequiredLevel> required_level_endpoints = Endpoints<RequiredLevel>::Create();
 
   LevelControlChannels level_control_endpoints{{
-      .current = Endpoints<CurrentLevel>::Create().server,
-      .required = Endpoints<RequiredLevel>::Create(&required_level),
+      .current = std::move(current_level_endpoints.server),
+      .required = std::move(required_level_endpoints.server),
   }};
-  SyncClient<RequiredLevel> required_level_client(std::move(required_level));
+  SyncClient<CurrentLevel> current_level_client(std::move(current_level_endpoints.client));
+  SyncClient<RequiredLevel> required_level_client(std::move(required_level_endpoints.client));
 
   ASSIGN_OR_CHECK(PowerElements power_elements, Connect<ActivityGovernor>()->GetPowerElements());
   FX_CHECK(power_elements.application_activity().has_value());
@@ -183,20 +187,17 @@ fit::result<uint8_t, ElementWithLease> RaiseApplicationActivity() {
 
   ASSIGN_OR_CHECK(RequiredLevelWatchResponse required_level_result, required_level_client->Watch());
 
-  // SAG may or may not have changed the required level before we called Watch. There's only 2
-  // possible power levels so we shouldn't have to call Watch more than twice.
-  if (required_level_result.required_level() != kPowerLevelActive) {
+  // SAG may transition through some power states while raising application activity,
+  // so respond to all current level updates until it reaches the desired state.
+  while (required_level_result.required_level() != kPowerLevelActive) {
+    CHECK_RESULT(current_level_client->Update(required_level_result.required_level()));
     ASSIGN_OR_CHECK(required_level_result, required_level_client->Watch());
   }
 
-  if (required_level_result.required_level() != kPowerLevelActive) {
-    return fit::error(required_level_result.required_level());
-  }
-
-  return fit::success(ElementWithLease{
+  return ElementWithLease{
       .element_control = std::move(element_control_endpoints.client),
       .lease_control = std::move(aa_lease.lease_control()),
-  });
+  };
 }
 
 std::vector<ElementStatusEndpoint> GetStatusEndpoints() {
@@ -242,8 +243,7 @@ TEST_F(WakeLeaseIntegrationTest, AcquiresLease) {
   // suspend if it deems appropriate. After we've acquired our wake lease using the WakeLease class,
   // we'll drop the lease on ApplicationActivity and check that ExecutionState was held at the
   // kWakeHandling level (the level that WakeLease has an opportunistic dependency on).
-  fit::result<uint8_t, ElementWithLease> aa_element = RaiseApplicationActivity();
-  ASSERT_TRUE(aa_element.is_ok());
+  ElementWithLease aa_element = RaiseApplicationActivity();
   ASSERT_EQ(GetCurrentLevel(kApplicationActivity), ToUint(ApplicationActivityLevel::kActive));
 
   std::vector<ElementStatusEndpoint> status_endpoints = GetStatusEndpoints();
@@ -289,10 +289,10 @@ TEST_F(WakeLeaseIntegrationTest, AcquiresLease) {
   // Power Broker won't consider a lease dropped until the power element's power level is set to the
   // necessary level (here, 0) via the CurrentLevel protocol. For testing simplicity, we'll just
   // remove the element from the topology by resetting |element_control|.
-  aa_element->lease_control.reset();
-  ASSERT_FALSE(aa_element->lease_control.is_valid());
-  aa_element->element_control.reset();
-  ASSERT_FALSE(aa_element->element_control.is_valid());
+  aa_element.lease_control.reset();
+  ASSERT_FALSE(aa_element.lease_control.is_valid());
+  aa_element.element_control.reset();
+  ASSERT_FALSE(aa_element.element_control.is_valid());
 
   RunLoopUntilIdle();
   ASSERT_EQ(GetCurrentLevel(es_status_client), ToUint(ExecutionStateLevel::kWakeHandling));

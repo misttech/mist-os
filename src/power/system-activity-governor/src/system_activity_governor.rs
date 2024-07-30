@@ -485,7 +485,6 @@ impl SystemActivityGovernor {
                 ExecutionStateLevel::Active.into_primitive(),
             ],
         )
-        .initial_current_level(ExecutionStateLevel::Active.into_primitive())
         .build()
         .await
         .expect("PowerElementContext encountered error while building execution_state");
@@ -663,6 +662,14 @@ impl SystemActivityGovernor {
         tracing::info!("Handling power elements");
         self.execution_state_manager.set_suspend_resume_listener(self.clone());
 
+        let elements_node = self.inspect_root.create_child("power_elements");
+        let (es_suspend_tx, es_suspend_rx) = mpsc::channel(1);
+        self.run_suspend_task(es_suspend_rx);
+        self.run_execution_state(&elements_node, es_suspend_tx);
+        self.run_full_wake_handling(&elements_node);
+        self.run_wake_handling(&elements_node);
+        self.run_execution_resume_latency(&elements_node);
+
         tracing::info!("System is booting. Acquiring boot control lease.");
         let boot_control_lease = self
             .boot_control
@@ -679,28 +686,17 @@ impl SystemActivityGovernor {
             lease_status = boot_control_lease.watch_status(lease_status).await.unwrap();
         }
 
+        self.run_application_activity(
+            &elements_node,
+            &self.inspect_root,
+            boot_control_lease.into_client_end().expect("failed to convert to ClientEnd"),
+        );
+
         tracing::info!("Boot control required. Updating boot_control level to active.");
         let res = self.boot_control.current_level.update(BootControlLevel::Active.into()).await;
         if let Err(error) = res {
             tracing::warn!(?error, "failed to update boot_control level to Active");
         }
-
-        let this = self.clone();
-        self.inspect_root.atomic_update(move |node| {
-            node.record_child("power_elements", move |elements_node| {
-                let (es_suspend_tx, es_suspend_rx) = mpsc::channel(1);
-                this.run_suspend_task(es_suspend_rx);
-                this.run_execution_state(&elements_node, es_suspend_tx);
-                this.run_application_activity(
-                    &elements_node,
-                    &node,
-                    boot_control_lease.into_client_end().expect("failed to convert to ClientEnd"),
-                );
-                this.run_full_wake_handling(&elements_node);
-                this.run_wake_handling(&elements_node);
-                this.run_execution_resume_latency(elements_node);
-            });
-        });
 
         tracing::info!("Starting FIDL server");
         self.run_fidl_server().await
@@ -738,7 +734,7 @@ impl SystemActivityGovernor {
             run_power_element(
                 &element_name,
                 &required_level,
-                ExecutionStateLevel::Active.into_primitive(),
+                ExecutionStateLevel::Inactive.into_primitive(),
                 Some(execution_state_node),
                 Box::new(move |new_power_level: fbroker::PowerLevel| {
                     let sag = sag.clone();

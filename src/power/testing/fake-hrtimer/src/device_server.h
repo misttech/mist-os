@@ -27,11 +27,10 @@ class DeviceServer : public fidl::Server<fuchsia_hardware_hrtimer::Device> {
              fidl::ServerEnd<fuchsia_hardware_hrtimer::Device> server);
 
  private:
-  void WatchRequiredLevel();
-
   fidl::ServerBindingGroup<fuchsia_hardware_hrtimer::Device> bindings_;
   std::optional<zx::event> event_;
   std::optional<fidl::ClientEnd<fuchsia_power_broker::ElementControl>> element_control_client_;
+  std::optional<fidl::SyncClient<fuchsia_power_broker::CurrentLevel>> current_level_;
   std::optional<fidl::SyncClient<fuchsia_power_broker::RequiredLevel>> required_level_;
   std::optional<fidl::SyncClient<fuchsia_power_broker::Lessor>> lessor_;
 };

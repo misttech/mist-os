@@ -101,6 +101,8 @@ pub struct Broker {
     credentials: Registry,
     // The current level for each element, as reported to the broker.
     current: HashMap<ElementID, LevelAdmin<StatusWatchPowerLevelResponder>>,
+    // The level each element is transitioning to, if it is transitioning.
+    in_transition: HashMap<ElementID, IndexedPowerLevel>,
     // The level for each element required by the topology.
     required: HashMap<ElementID, LevelAdmin<RequiredLevelWatchResponder>>,
     _inspect_node: INode,
@@ -112,6 +114,7 @@ impl Broker {
             catalog: Catalog::new(&inspect),
             credentials: Registry::new(),
             current: HashMap::new(),
+            in_transition: HashMap::new(),
             required: HashMap::new(),
             _inspect_node: inspect,
         }
@@ -186,13 +189,27 @@ impl Broker {
     fn current_level_satisfies(&self, required: &ElementLevel) -> bool {
         self.get_current_level(&required.element_id)
             // If current level is unknown, required is not satisfied.
-            .is_some_and(|current| current.satisfies(required.level))
+            .is_some_and(|current| {
+                // When the element is transitioning between states, we can't assume that the
+                // current level is still a valid comparison point. Only consider the level
+                // satisfied if both the current and transition levels satisfy the required level.
+                let current_level_satisfies = current.satisfies(required.level);
+                if let Some(transit_level) = self.in_transition.get(&required.element_id) {
+                    let transit_level_satisfies = transit_level.satisfies(required.level);
+                    current_level_satisfies && transit_level_satisfies
+                } else {
+                    current_level_satisfies
+                }
+            })
     }
 
     pub fn update_current_level(&mut self, element_id: &ElementID, level: IndexedPowerLevel) {
         tracing::debug!("update_current_level({element_id}, {level:?})");
         let prev_level = self.update_current_level_internal(element_id, level);
         if prev_level.as_ref() == Some(&level) {
+            tracing::debug!(
+                "update_current_level({element_id}): level unchanged from {prev_level:?}"
+            );
             return;
         }
         if prev_level.is_none() || prev_level.unwrap() < level {
@@ -335,6 +352,15 @@ impl Broker {
         if let Some(elem_inspect) = self.catalog.topology.inspect_for_element(element_id) {
             elem_inspect.borrow_mut().meta().set("current_level", level.level);
         }
+        if let Some(transit_level) = self.in_transition.get(element_id) {
+            if *transit_level == level {
+                tracing::debug!(
+                    "update_current_level_internal({element_id}): transitioned to {level:?}"
+                );
+                self.in_transition.remove(element_id);
+                self.update_required_levels(&vec![element_id]);
+            }
+        }
         previous
     }
 
@@ -363,6 +389,9 @@ impl Broker {
         if previous == Some(level) {
             return previous;
         }
+        if self.in_transition.contains_key(element_id) {
+            return previous;
+        }
         if let Some(required_level) = self.required.get_mut(element_id) {
             required_level.publisher.set(level);
             required_level.level = level;
@@ -370,7 +399,12 @@ impl Broker {
             let level_admin = LevelAdmin::<RequiredLevelWatchResponder>::new(level);
             self.required.insert(element_id.clone(), level_admin);
         }
-
+        if let Some(current_level) = self.current.get(element_id) {
+            if current_level.level != level {
+                tracing::debug!("update_required_level({element_id}): transitioning to {level}");
+                self.in_transition.insert(element_id.clone(), level);
+            }
+        }
         if let Some(elem_inspect) = self.catalog.topology.inspect_for_element(element_id) {
             elem_inspect.borrow_mut().meta().set("required_level", level.level);
         }
@@ -751,9 +785,16 @@ impl Broker {
         let mut claims_to_drop_or_deactivate = Vec::new();
 
         for claim_to_check in claims {
+            // If the dependent element is transiting, we cannot drop or deactivate this claim as
+            // we cannot guarantee that it hasn't yet dropped to it's destination level.
+            //
             // If the dependent element of this claim is satisfied, we cannot drop or deactivate
             // this claim until the claim that requires it has been deactivated AND the level of
             // the element has dropped, regardless of whether that claim belongs to this lease.
+            if self.in_transition.contains_key(&claim_to_check.dependent().element_id) {
+                tracing::debug!("keeping {claim_to_check}, dependent is transiting");
+                continue;
+            }
             if self.current_level_satisfies(claim_to_check.dependent()) {
                 tracing::debug!("keeping {claim_to_check}, dependent is still satisfied");
                 continue;
@@ -948,9 +989,16 @@ impl Broker {
 
     pub fn remove_element(&mut self, element_id: &ElementID) {
         tracing::debug!("removing element {element_id}");
-        // Before removing the element, set it to it's minimum level, to trigger the
-        // update of any claims that still reference it.
+        // Before removing the element, clear any transiting state and simulate the
+        // downward transition from it's transiting level to it's minimum level. This
+        // ensures that all associated claims are cleared.
         let minimum_level = self.catalog.minimum_level(element_id);
+        if let Some(transition_level) = self.in_transition.get(element_id) {
+            if let Some(current_level) = self.current.get_mut(element_id) {
+                current_level.level = max(*transition_level, current_level.level);
+            }
+        }
+        self.in_transition.remove(element_id);
         self.update_current_level(element_id, minimum_level);
         // Remove all references of the element from the topology.
         self.catalog.topology.remove_element(element_id);
@@ -2079,6 +2127,9 @@ mod tests {
         assert_eq!(broker.get_current_level(&latinum), Some(TWO));
         assert_eq!(broker.get_required_level(&latinum), Some(ZERO));
 
+        // Update current level to 0 to preserve ordering.
+        broker.update_current_level(&latinum, ZERO);
+
         // Update required level to 1.
         broker.update_required_level(&latinum, ONE);
 
@@ -2086,6 +2137,8 @@ mod tests {
         broker.update_required_level(&latinum, ONE);
 
         // Update current level to 1.
+        // This should drop the current required level to ZERO, because there
+        // isn't any claim preserving the required level update.
         broker.update_current_level(&latinum, ONE);
 
         // Update current level to 1 again, should have no additional effect.
@@ -2112,7 +2165,7 @@ mod tests {
                                     name: "Latinum",
                                     valid_levels: vec![0u64, 1u64, 2u64],
                                     current_level: 1u64,
-                                    required_level: 1u64,
+                                    required_level: 0u64,
                                 },
                                 relationships: {},
                             },
@@ -2154,15 +2207,29 @@ mod tests {
                                 "@time": AnyProperty,
                                 vertex_id: latinum.to_string(),
                                 event: "update_key",
-                                key: "required_level",
-                                update: 1u64,
+                                key: "current_level",
+                                update: 0u64,
                             },
                             "5": {
                                 "@time": AnyProperty,
                                 vertex_id: latinum.to_string(),
                                 event: "update_key",
+                                key: "required_level",
+                                update: 1u64,
+                            },
+                            "6": {
+                                "@time": AnyProperty,
+                                vertex_id: latinum.to_string(),
+                                event: "update_key",
                                 key: "current_level",
                                 update: 1u64,
+                            },
+                            "7": {
+                                "@time": AnyProperty,
+                                vertex_id: latinum.to_string(),
+                                event: "update_key",
+                                key: "required_level",
+                                update: 0u64,
                             },
                         },
         }}}});
@@ -3137,6 +3204,10 @@ mod tests {
         broker_status.required_level.update(&parent, ZERO);
         broker_status.assert_matches(&broker);
 
+        // Lower GrandParent's current level to 90.
+        broker.update_current_level(&grandparent, IndexedPowerLevel { level: 90, index: 1 });
+        broker_status.assert_matches(&broker);
+
         // Lower Parent's current level to 0. Grandparent claim should now be
         // dropped and have its default required level of 10.
         broker.update_current_level(&parent, ZERO);
@@ -3346,14 +3417,14 @@ mod tests {
         broker_status.assert_matches(&broker);
 
         // Update B's current level to OFF.
-        // C's required level should now be OFF, as the active claim is dropped.
-        // Lease C should now be pending and contingent.
+        // A's required level should remain ON, until C is OFF.
+        // C's required level should remain ON, to preserve ordering.
         broker.update_current_level(&element_b, OFF);
         broker_status.assert_matches(&broker);
 
         // Drop Lease on C.
         // C's required level should be OFF because the lease was dropped.
-        // A's required level should remain ON until B is OFF.
+        // A's required level should remain ON until C is OFF.
         broker.drop_lease(&lease_c.id).expect("drop_lease failed");
         broker_status.lease.remove(&lease_c.id);
         broker_status.assert_matches(&broker);
@@ -3537,12 +3608,19 @@ mod tests {
 
         // Drop Lease on A.
         // All required levels should be OFF as there is no longer an assertive claim.
+        // B's required level should remain ON, to preserver ordering.
         // Lease C should be pending and contingent.
         broker.drop_lease(&lease_a.id).expect("drop_lease failed");
-        broker_status.required_level.update(&element_b, OFF);
         broker_status.assert_matches(&broker);
         assert_eq!(broker.get_lease_status(&lease_c.id), Some(LeaseStatus::Pending));
         assert_eq!(broker.is_lease_contingent(&lease_c.id), true);
+
+        // Update B's current level and immediately power down.
+        broker.update_current_level(&element_b, ON);
+        broker_status.required_level.update(&element_b, OFF);
+        broker_status.assert_matches(&broker);
+        broker.update_current_level(&element_b, OFF);
+        broker_status.assert_matches(&broker);
 
         // Drop Lease ON C.
         // All required levels should remain OFF.
@@ -3917,15 +3995,29 @@ mod tests {
         // Drop Lease on B.
         // A's required level should remain ON because C has not yet dropped its lease.
         // B's required level should become OFF because it is no longer leased.
-        // C's required level should remain ON because B has not yet gone to 0, so it's
-        // active claim on A is still valid.
+        // C's required level should remain ON to preserve ordering.
         // D & E's required level should remain ON.
         // Lease C should now be pending, but still not contingent.
         broker.drop_lease(&lease_b.id).expect("drop_lease failed");
         broker_status.required_level.update(&element_b, OFF);
-        broker_status.required_level.update(&element_c, OFF);
         broker_status.lease.remove(&lease_b.id);
         broker_status.lease.update(&lease_c.id, LeaseStatus::Pending, true);
+        broker_status.assert_matches(&broker);
+
+        // Update C's current level to ON to preserve order.
+        // C's required level should become OFF, because C is pending.
+        broker.update_current_level(&element_c, ON);
+        broker_status.required_level.update(&element_c, OFF);
+        broker_status.assert_matches(&broker);
+
+        // Update D's current level to ON to preserve order.
+        // Lease D should now be satisfied.
+        broker.update_current_level(&element_d, ON);
+        broker_status.lease.update(&lease_d.id, LeaseStatus::Satisfied, false);
+        broker_status.assert_matches(&broker);
+
+        // Update C's current level to OFF to preserve order.
+        broker.update_current_level(&element_c, OFF);
         broker_status.assert_matches(&broker);
 
         // Drop B's current level to OFF.
@@ -3940,12 +4032,18 @@ mod tests {
         // B's required level should remain OFF.
         // C's required level should remain OFF.
         // D's required level should become OFF because it is no longer leased.
-        // E's required level should remain ON because C has not yet dropped its lease.
+        // E's required level should remain ON, D has not yet dropped.
         // Lease C should still be pending and contingent.
         broker.drop_lease(&lease_d.id).expect("drop_lease failed");
         broker_status.required_level.update(&element_d, OFF);
-        broker_status.required_level.update(&element_e, OFF);
         broker_status.lease.remove(&lease_d.id);
+        broker_status.assert_matches(&broker);
+
+        // Drop C and D's current level to OFF.
+        // E's required level should now become OFF.
+        broker.update_current_level(&element_c, OFF);
+        broker.update_current_level(&element_d, OFF);
+        broker_status.required_level.update(&element_e, OFF);
         broker_status.assert_matches(&broker);
 
         // Drop Lease on C.
@@ -4243,6 +4341,15 @@ mod tests {
         broker_status.required_level.update(&element_c, ON);
         broker_status.assert_matches(&broker);
 
+        // Update B's current level to ON.
+        // A's required level should remain ON.
+        // B's required level should remain ON.
+        // C's required level should remain ON.
+        // Lease B & C should remain satisfied.
+        broker.update_current_level(&element_b, ON);
+        broker_status.lease.update(&lease_b.id, LeaseStatus::Satisfied, false);
+        broker_status.assert_matches(&broker);
+
         // Update C's current level to ON.
         // A's required level should remain ON.
         // B's required level should remain ON.
@@ -4264,6 +4371,14 @@ mod tests {
         broker_status.lease.update(&lease_c.id, LeaseStatus::Pending, true);
         broker_status.assert_matches(&broker);
 
+        // Update B's current level to OFF.
+        // A's required level should remain ON.
+        // B's required level should remain OFF.
+        // C's required level should remain OFF.
+        // Lease C should still be pending and contingent.
+        broker.update_current_level(&element_b, OFF);
+        broker_status.assert_matches(&broker);
+
         // Update C's current level to OFF.
         // A's required level should become OFF.
         // B's required level should remain OFF.
@@ -4271,7 +4386,6 @@ mod tests {
         // Lease C should still be pending and contingent.
         broker.update_current_level(&element_c, OFF);
         broker_status.required_level.update(&element_a, OFF);
-        broker_status.lease.remove(&lease_b.id);
         broker_status.assert_matches(&broker);
 
         // Update A's current level to OFF.
@@ -4308,17 +4422,30 @@ mod tests {
         broker_status.required_level.update(&element_c, ON);
         broker_status.assert_matches(&broker);
 
+        // Update B and C's current level to ON.
+        broker.update_current_level(&element_b, ON);
+        broker.update_current_level(&element_c, ON);
+        broker_status.lease.update(&lease_b_reacquired.id, LeaseStatus::Satisfied, false);
+        broker_status.lease.update(&lease_c.id, LeaseStatus::Satisfied, false);
+        broker_status.assert_matches(&broker);
+
         // Drop reacquired lease on B.
-        // A's required level should become OFF, B was not turned ON.
-        // B's required level should become OFF because it is no longer leased.
-        // C's required level should become OFF because it now pending and contingent.
+        // A's required level should remain ON.
+        // B's required level should become OFF.
+        // C's required level should become OFF.
         // Lease C should now be pending and contingent.
         broker.drop_lease(&lease_b_reacquired.id).expect("drop_lease failed");
-        broker_status.required_level.update(&element_a, OFF);
         broker_status.required_level.update(&element_b, OFF);
         broker_status.required_level.update(&element_c, OFF);
         broker_status.lease.remove(&lease_b_reacquired.id);
         broker_status.lease.update(&lease_c.id, LeaseStatus::Pending, true);
+        broker_status.assert_matches(&broker);
+
+        // Update B and C's current level to OFF to preserve order.
+        // A's required level should remain OFF.
+        broker.update_current_level(&element_b, OFF);
+        broker.update_current_level(&element_c, OFF);
+        broker_status.required_level.update(&element_a, OFF);
         broker_status.assert_matches(&broker);
 
         // Drop lease on C.
@@ -4528,21 +4655,19 @@ mod tests {
         broker_status.lease.update(&lease_c_reacquired.id, LeaseStatus::Pending, true);
         broker_status.assert_matches(&broker);
 
+        // Update A's current level to 0 to preserve ordering.
+        broker.update_current_level(&element_a, ZERO);
+        broker_status.assert_matches(&broker);
+
         // Acquire Lease on D.
         let lease_d = broker.acquire_lease(&element_d, ONE).expect("acquire failed");
         // A's required level should become 1, but this is not enough to
         // satisfy C's opportunistic claim.
         // B's required level should remain 0.
-        // C's required level should remain 0 even though A's current level is 2.
-        // D's required level should become 1 immediately because its dependency is already satisfied.
+        // C's required level should remain 0.
+        // D's required level should remain 0.
         broker_status.required_level.update(&element_a, ONE);
-        broker_status.required_level.update(&element_d, ONE);
         broker_status.lease.update(&lease_d.id, LeaseStatus::Pending, false);
-        broker_status.assert_matches(&broker);
-
-        // Update D's current level to 1.
-        broker.update_current_level(&element_d, ONE);
-        broker_status.lease.update(&lease_d.id, LeaseStatus::Satisfied, false);
         broker_status.assert_matches(&broker);
 
         // Update A's current level to 1.
@@ -4553,6 +4678,12 @@ mod tests {
         // D's required level should remain 1.
         // The lease on C should remain Pending.
         // The lease on D should still be satisfied.
+        broker_status.required_level.update(&element_d, ONE);
+        broker_status.assert_matches(&broker);
+
+        // Update D's current level to 1.
+        broker.update_current_level(&element_d, ONE);
+        broker_status.lease.update(&lease_d.id, LeaseStatus::Satisfied, false);
         broker_status.assert_matches(&broker);
 
         // Drop reacquired lease on C.
@@ -5013,10 +5144,10 @@ mod tests {
         broker_status.assert_matches(&broker);
 
         // Drop Lease on C.
-        // A's required level should become OFF because C has dropped its opportunistic claim.
+        // A's required level should remain ON until C is OFF.
         // B's required level should remain OFF.
         // C's required level should remain OFF.
-        // D's required level should become OFF because C has dropped its assertive claim.
+        // D's required level should remain ON until C is OFF.
         broker.drop_lease(&lease_c.id).expect("drop_lease failed");
         broker_status.lease.remove(&lease_c.id);
         broker_status.assert_matches(&broker);
@@ -5987,9 +6118,9 @@ mod tests {
 
         // Update D's current level to 0.
         //
-        // B and E's required level should drop to 0.
+        // B's required level should remain 1 to preserve ordering.
+        // E's required level should drop to 0.
         broker.update_current_level(&element_d, ZERO);
-        broker_status.required_level.update(&element_b, ZERO);
         broker_status.required_level.update(&element_e, ZERO);
         broker_status.assert_matches(&broker);
 
@@ -6181,9 +6312,8 @@ mod tests {
 
         // Update B's current level to 0.
         //
-        // C's required level should now be 0.
+        // C's required level should remain 1 to preserve ordering.
         broker.update_current_level(&element_b, ZERO);
-        broker_status.required_level.update(&element_c, ZERO);
         broker_status.assert_matches(&broker);
 
         // All leases should be cleaned up.
@@ -6355,12 +6485,19 @@ mod tests {
         broker_status.assert_matches(&broker);
 
         // Create new Lease for WOR.
-        // HW lease is immediately satisfied as both ES and HW are still ON.
+        // HW lease is pending because HW is not yet ON.
         let lease_wor2 = broker.acquire_lease(&storage_wor, ON).expect("acquire failed");
         broker_status.required_level.update(&sag_wh, ON);
-        broker_status.required_level.update(&storage_hw, ON);
-        broker_status.lease.update(&lease_hw.id, LeaseStatus::Satisfied, false);
+        broker_status.lease.update(&lease_hw.id, LeaseStatus::Pending, false);
         broker_status.lease.update(&lease_wor2.id, LeaseStatus::Pending, false);
+        broker_status.assert_matches(&broker);
+
+        // Power down and up Storage HW to preserve ordering.
+        broker.update_current_level(&storage_hw, OFF);
+        broker_status.required_level.update(&storage_hw, ON);
+        broker_status.assert_matches(&broker);
+        broker.update_current_level(&storage_hw, ON);
+        broker_status.lease.update(&lease_hw.id, LeaseStatus::Satisfied, false);
         broker_status.assert_matches(&broker);
 
         // Power up SAG: Wake Handling.
@@ -6371,11 +6508,17 @@ mod tests {
         // Drop second Lease on WOR.
         // HW lease is again pending and contingent.
         broker.drop_lease(&lease_wor2.id).expect("drop_lease failed");
-        broker_status.required_level.update(&storage_wor, OFF);
-        broker_status.required_level.update(&sag_wh, OFF);
         broker_status.required_level.update(&storage_hw, OFF);
         broker_status.lease.update(&lease_hw.id, LeaseStatus::Pending, true);
         broker_status.lease.remove(&lease_wor2.id);
+        broker_status.assert_matches(&broker);
+
+        // Power up and down WOR to preserve ordering.
+        broker.update_current_level(&storage_wor, ON);
+        broker_status.required_level.update(&storage_wor, OFF);
+        broker_status.assert_matches(&broker);
+        broker.update_current_level(&storage_wor, OFF);
+        broker_status.required_level.update(&sag_wh, OFF);
         broker_status.assert_matches(&broker);
 
         // Power down SAG: Wake Handling.
@@ -6533,6 +6676,11 @@ mod tests {
 
         // Drop lease.
         broker.drop_lease(&lease.id).expect("drop failed");
+        // Required level should stay 1, to preserve orderly transition.
+        broker_status.assert_matches(&broker);
+
+        // Update current level to 1 to finish transition.
+        broker.update_current_level(&element, ONE);
         // Required level should become 0.
         broker_status.required_level.update(&element, ZERO);
         broker_status.assert_matches(&broker);
@@ -6540,7 +6688,12 @@ mod tests {
         // Acquire and drop a level 2 lease.
         let lease = broker.acquire_lease(&element, TWO).expect("acquire failed");
         broker.drop_lease(&lease.id).expect("drop failed");
-        // Required level should still be 0. No 2 is seen.
+        // Required level should stay 0, to preserve orderly transition.
+        broker_status.assert_matches(&broker);
+
+        // Update current level to 0 to finish transition.
+        broker.update_current_level(&element, ZERO);
+        // Required level should remain 0 as the lease has been dropped.
         broker_status.assert_matches(&broker);
 
         // Acquire lease for level 1 and check required level.
@@ -6550,6 +6703,12 @@ mod tests {
 
         // Drop lease and check required level.
         broker.drop_lease(&lease.id).expect("drop failed");
+        // Required level should stay 1, to preserve orderly transition.
+        broker_status.assert_matches(&broker);
+
+        // Update current level to 1 to finish transition.
+        broker.update_current_level(&element, ONE);
+        // Required level should become 0.
         broker_status.required_level.update(&element, ZERO);
         broker_status.assert_matches(&broker);
     }
