@@ -303,6 +303,13 @@ core_tests("core-tests-stable-vdso") {
 }
 boot_tests += [ ":core-tests-stable-vdso" ]
 
+core_tests("core-tests-ticks_get_force_syscall") {
+  deps = [ ":stable-vdso.args" ]
+  args = [ "vdso.ticks_get_force_syscall=true" ]
+  environments = kernel_test_environments
+}
+boot_tests += [ ":core-tests-ticks_get_force_syscall" ]
+
 # If we are building for x64, make sure to run the core tests on a system which
 # has been configured to force selection of HPET as the timing source instead
 # of choosing TSC if possible.
