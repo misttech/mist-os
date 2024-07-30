@@ -125,6 +125,7 @@ if (is_mistos) {
       # ptysvc
       "//src/bringup/bin/ptysvc:component",
       "//src/sys/tools/component:component-binary",
+      "//src/sys/tools/starnix:component-binary",
 
       # shell
       "//zircon/third_party/uapp/dash",
