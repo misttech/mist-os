@@ -471,25 +471,88 @@ TYPED_TEST(DlTests, UniqueModules) {
 
 // Test that you can dlopen a dependency from a previously loaded module.
 
-// TODO(https://fxbug.dev/338232267): These are test scenarios that test symbol
-// resolution from just the dependency graph, ie from the local scope of the
-// dlopen-ed module.
+// These are test scenarios that test symbol resolution from just the dependency
+// graph, ie from the local scope of the dlopen-ed module.
 
 // Test that dep ordering is preserved in the dependency graph.
 // dlopen multiple-foo-deps -> calls foo()
 //  - foo-v1 -> foo() returns 2
 //  - foo-v2 -> foo() returns 7
 // call foo() from multiple-foo-deps pointer and expect 2 from foo-v1.
+TYPED_TEST(DlTests, DepOrder) {
+  constexpr const int64_t kReturnValue = 2;
+  constexpr const char* kFile = "multiple-foo-deps.DepOrder.so";
+  constexpr const char* kDepFile1 = "libld-dep-foo-v1.DepOrder.so";
+  constexpr const char* kDepFile2 = "libld-dep-foo-v2.DepOrder.so";
+
+  if constexpr (TestFixture::kSupportsNoLoadMode) {
+    if constexpr (TestFixture::kRetrievesFileWithNoLoad) {
+      this->ExpectRootModule(kFile);
+      this->Needed({kDepFile1, kDepFile2});
+    }
+    ASSERT_TRUE(this->DlOpen(kFile, RTLD_NOLOAD).is_error());
+    ASSERT_TRUE(this->DlOpen(kDepFile1, RTLD_NOLOAD).is_error());
+    ASSERT_TRUE(this->DlOpen(kDepFile2, RTLD_NOLOAD).is_error());
+  }
+
+  this->ExpectRootModule(kFile);
+  this->Needed({kDepFile1, kDepFile2});
+
+  auto res = this->DlOpen(kFile, RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(res.is_ok()) << res.error_value();
+  EXPECT_TRUE(res.value());
+
+  auto sym = this->DlSym(res.value(), "call_foo");
+  ASSERT_TRUE(sym.is_ok()) << sym.error_value();
+  ASSERT_TRUE(sym.value());
+
+  EXPECT_EQ(RunFunction<int64_t>(sym.value()), kReturnValue);
+
+  ASSERT_TRUE(this->DlClose(res.value()).is_ok());
+}
 
 // Test that transitive dep ordering is preserved the dependency graph.
-// dlopen transitive-dep-order -> calls foo()
+// dlopen transitive-foo-dep -> calls foo()
 //   - has-foo-v1:
 //     - foo-v1 -> foo() returns 2
 //   - foo-v2 -> foo() returns 7
-// call foo() from transitive-dep-order pointer and expect 7.
+// call foo() from transitive-foo-dep pointer and expect 7 from foo-v2.
+TYPED_TEST(DlTests, TransitiveDepOrder) {
+  constexpr const int64_t kReturnValue = 7;
+  constexpr const char* kFile = "transitive-foo-dep.TransitiveDepOrder.so";
+  constexpr const char* kDepFile1 = "libhas-foo-v1.TransitiveDepOrder.so";
+  constexpr const char* kDepFile2 = "libld-dep-foo-v2.TransitiveDepOrder.so";
+  constexpr const char* kDepFile3 = "libld-dep-foo-v1.TransitiveDepOrder.so";
+
+  if constexpr (TestFixture::kSupportsNoLoadMode) {
+    if constexpr (TestFixture::kRetrievesFileWithNoLoad) {
+      this->ExpectRootModule(kFile);
+      this->Needed({kDepFile1, kDepFile2, kDepFile3});
+    }
+    ASSERT_TRUE(this->DlOpen(kFile, RTLD_NOLOAD).is_error());
+    ASSERT_TRUE(this->DlOpen(kDepFile1, RTLD_NOLOAD).is_error());
+    ASSERT_TRUE(this->DlOpen(kDepFile2, RTLD_NOLOAD).is_error());
+    ASSERT_TRUE(this->DlOpen(kDepFile3, RTLD_NOLOAD).is_error());
+  }
+
+  this->ExpectRootModule(kFile);
+  this->Needed({kDepFile1, kDepFile2, kDepFile3});
+
+  auto res = this->DlOpen(kFile, RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(res.is_ok()) << res.error_value();
+  EXPECT_TRUE(res.value());
+
+  auto sym = this->DlSym(res.value(), "call_foo");
+  ASSERT_TRUE(sym.is_ok()) << sym.error_value();
+  ASSERT_TRUE(sym.value());
+
+  EXPECT_EQ(RunFunction<int64_t>(sym.value()), kReturnValue);
+
+  ASSERT_TRUE(this->DlClose(res.value()).is_ok());
+}
 
 // Test that dependency ordering is always preserved in the local symbol scope,
-// regardless if the dependency was already loaded.
+// even if a module with the same symbol was already loaded (with RTLD_LOCAL).
 // dlopen foo-v2 -> foo() returns 7
 // dlopen multiple-foo-deps:
 //   - foo-v1 -> foo() returns 2

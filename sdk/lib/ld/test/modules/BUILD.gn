@@ -74,6 +74,30 @@ shlibs = [
 ]
 
 modules = [ ":second-session-module" ]
+
+# Musl's dlclose does not unload the module, which prevents being able to reuse
+# the same test module in multiple dlopen tests that do not expect the module
+# or its deps to already be loaded. Therefore tests must use uniquely named test
+# files. `per_test_modules` includes the modules that require unique names per
+# test, and  `per_test_suffices` include test names in
+# //sdk/lib/dl/test/dl-load-tests.cc. The following foreach loop will add
+# suffixed targets for each module in `per_test_modules` to `modules`.
+per_test_modules = [
+  ":multiple-foo-deps",
+  ":transitive-foo-dep",
+]
+
+per_test_suffices = [
+  ".DepOrder",
+  ".TransitiveDepOrder",
+]
+
+foreach(module, per_test_modules) {
+  foreach(suffix, per_test_suffices) {
+    modules += [ "$module$suffix" ]
+  }
+}
+
 foreach(label, executables + in_process_executables) {
   modules += [ "$label.module" ]
 }
@@ -217,6 +241,8 @@ template("test_loadable_module") {
     # Make sure a system dlopen loading the module will look for its
     # dependencies adjacent to it.
     configs += [ ":runpath-origin" ]
+
+    exclude_toolchain_tags = [ "instrumentation-runtime" ]
 
     if (!is_fuchsia && defined(invoker.shlib_deps)) {
       # On Fuchsia, the indirect deps are all reached as resource()
@@ -472,9 +498,16 @@ template("test_dep") {
     }
 
     defines = [
+      # This is the int64_t value of the symbol defined in this file.
       "VALUE=$value",
-      "SYM=$target_name",
+
+      # This is the symbol name of the symbol defined in this file.
+      "SYM=$symbol_name",
+
+      # These are the declarations of symbols from dependencies.
       "DECLS=$decls",
+
+      # This is the list of symbol names used from dependencies.
       "DEP_SYMS=$syms",
     ]
 
@@ -582,6 +615,7 @@ test_executable("ld-dep") {
 }
 
 test_dep("a") {
+  symbol_name = "a"
   value = 13
 }
 
@@ -651,6 +685,7 @@ test_executable("symbolic-namespace") {
 #                 depended on: this is only applicable for many-deps-passive-abi)
 
 test_dep("b") {
+  symbol_name = "b"
   value = -2
   test_deps = [
     "a",
@@ -660,10 +695,12 @@ test_dep("b") {
 }
 
 test_dep("c") {
+  symbol_name = "c"
   value = 2
 }
 
 test_dep("d") {
+  symbol_name = "d"
   value = -5
   test_deps = [
     "c",
@@ -672,10 +709,12 @@ test_dep("d") {
 }
 
 test_dep("e") {
+  symbol_name = "e"
   value = -18
 }
 
 test_dep("f") {
+  symbol_name = "f"
   value = 3
 }
 
@@ -968,4 +1007,46 @@ test_executable("zygote-secondary") {
     ":zygote.lib",
     "//zircon/system/public",
   ]
+}
+
+# This loop generates a copy of each target with each suffix in
+# `per_test_suffices` appended to the target name.
+foreach(suffix, per_test_suffices) {
+  test_dep("foo-v1$suffix") {
+    symbol_name = "foo"
+    value = 2
+  }
+
+  test_dep("foo-v2$suffix") {
+    symbol_name = "foo"
+    value = 7
+  }
+
+  test_shared_library("has-foo-v1$suffix") {
+    sources = [ "foo.cc" ]
+    shlib_deps = [ ":ld-dep-foo-v1$suffix" ]
+  }
+
+  # multiple-foo-deps:
+  #  - foo-v1 -> foo() returns 2
+  #  - foo-v2 -> foo() returns 7
+  test_loadable_module("multiple-foo-deps$suffix") {
+    sources = [ "foo.cc" ]
+    shlib_deps = [
+      ":ld-dep-foo-v1$suffix",
+      ":ld-dep-foo-v2$suffix",
+    ]
+  }
+
+  # transitive-foo-dep:
+  #   - has-foo-v1:
+  #     - foo-v1 -> foo() returns 2
+  #   - foo-v2 -> foo() returns 7
+  test_loadable_module("transitive-foo-dep$suffix") {
+    sources = [ "foo.cc" ]
+    shlib_deps = [
+      ":has-foo-v1$suffix",
+      ":ld-dep-foo-v2$suffix",
+    ]
+  }
 }
