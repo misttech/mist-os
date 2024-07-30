@@ -126,7 +126,7 @@ void DWMacDevice::UpdateLinkStatus() {
     if (ethernet_client_.is_valid()) {
       ethernet_client_.Status(online_ ? ETHERNET_STATUS_ONLINE : 0u);
     } else {
-      zxlogf(ERROR, "dwmac: System not ready");
+      zxlogf(WARNING, "dwmac: System not ready");
     }
   }
   if (online_) {
@@ -458,7 +458,8 @@ zx_status_t DWMacDevice::EthernetImplStart(const ethernet_ifc_protocol_t* ifc) {
     return ZX_ERR_ALREADY_BOUND;
   } else {
     ethernet_client_ = ddk::EthernetIfcProtocolClient(ifc);
-    UpdateLinkStatus();
+    // Notify of online status immediately.
+    ethernet_client_.Status(online_ ? ETHERNET_STATUS_ONLINE : 0u);
     zxlogf(INFO, "dwmac: Started");
   }
   return ZX_OK;
