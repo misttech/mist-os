@@ -533,8 +533,7 @@ void Client::SetLayerPrimaryPosition(SetLayerPrimaryPositionRequestView request,
     TearDown();
     return;
   }
-  if (request->image_source_transformation >
-      fhdt::wire::CoordinateTransformation::kRotateCcw90ReflectY) {
+  if (request->image_source_transformation > fhdt::wire::CoordinateTransformation::kRotateCcw270) {
     zxlogf(ERROR, "Invalid transform %" PRIu8,
            static_cast<uint8_t>(request->image_source_transformation));
     TearDown();

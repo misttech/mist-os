@@ -211,11 +211,11 @@ type FrameTransform = strict enum : uint32 {
     IDENTITY = 0;
     REFLECT_X = 1;
     REFLECT_Y = 2;
-    ROT_90 = 3;
-    ROT_180 = 4;
-    ROT_270 = 5;
-    ROT_90_REFLECT_X = 6;
-    ROT_90_REFLECT_Y = 7;
+    ROT_180 = 3;
+    ROT_90 = 4;
+    ROT_90_REFLECT_X = 5;
+    ROT_90_REFLECT_Y = 6;
+    ROT_270 = 7;
 };
 
 /// Equivalent to the [`fuchsia.math/RectU`] FIDL type.

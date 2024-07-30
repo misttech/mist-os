@@ -19,10 +19,16 @@ using fuchsia.math;
 type CoordinateTransformation = strict enum : uint8 {
     /// Image pixels are passed through without any change.
     ///
-    /// This is the only value guaranteed to be supported by all display engine drivers.
+    /// This is the only value guaranteed to be supported by all display engine
+    /// drivers.
     IDENTITY = 0;
 
     /// Image pixels are reflected across a line meeting the image's center, parallel to the X axis.
+    ///
+    /// This enum member's numeric value has a single bit set to 1. Any
+    /// transformation whose value has this bit set involves an X reflection.
+    ///
+    /// This transformation is also called an "X flip".
     ///
     /// Example:
     /// |a b c d|      |i j k l|
@@ -31,6 +37,11 @@ type CoordinateTransformation = strict enum : uint8 {
     REFLECT_X = 1;
 
     /// Image pixels are reflected across a line meeting the image's center, parallel to the Y axis.
+    ///
+    /// This enum member's numeric value has a single bit set to 1. Any
+    /// transformation whose value has this bit set involves an Y reflection.
+    ///
+    /// This transformation is also called an "Y flip".
     ///
     /// Example:
     /// |a b c d|      |d c b a|
@@ -41,59 +52,73 @@ type CoordinateTransformation = strict enum : uint8 {
     // TODO(https://fxbug.dev/356385730): Switch the convention for rotations
     // from CCW (counter-clockwise) to CW (clockwise).
 
+    /// Image pixels are rotated around the image's center counter-clockwise by 180 degrees.
+    ///
+    /// This is equivalent to applying the `REFLECT_X` and `REFLECT_Y`
+    /// transforms. `REFLECT_X` and `REFLECT_Y` are commutative, so their
+    /// ordering doesn't matter.
+    ///
+    /// Example:
+    /// |a b c d|      |l k j i|
+    /// |e f g h|  ->  |h g f e|
+    /// |i j k l|      |d c b a|
+    ROTATE_CCW_180 = 3;
+
     /// Image pixels are rotated around the image's center counter-clockwise by 90 degrees.
     ///
-    /// The image produced by this transformation has different dimensions from the input image.
+    /// The image produced by this transformation has different dimensions from
+    /// the input image.
+    ///
+    /// This enum member's numeric value has a single bit set to 1. Any
+    /// transformation whose value has this bit set involves a 90-degree
+    /// counter-clockwise rotation.
     ///
     /// Example:
     /// |a b c d|      |d h l|
     /// |e f g h|  ->  |c g k|
     /// |i j k l|      |b f j|
     ///                |a e i|
-    ROTATE_CCW_90 = 3;
-
-    /// Image pixels are rotated around the image's center counter-clockwise by 180 degrees.
-    ///
-    /// This is equivalent to applying the `REFLECT_X` and `REFLECT_Y` transforms, in either order.
-    ///
-    /// Example:
-    /// |a b c d|      |l k j i|
-    /// |e f g h|  ->  |h g f e|
-    /// |i j k l|      |d c b a|
-    ROTATE_CCW_180 = 4;
-
-    /// Image pixels are rotated around the image's center counter-clockwise by 270 degrees.
-    ///
-    /// The image produced by this transformation has different dimensions from the input image.
-    ///
-    /// Example:
-    /// |a b c d|      |i e a|
-    /// |e f g h|  ->  |j f b|
-    /// |i j k l|      |k g c|
-    ///                |l h d|
-    ROTATE_CCW_270 = 5;
+    ROTATE_CCW_90 = 4;
 
     /// Image pixels are transformed using `ROTATE_CCW_90`, followed by `REFLECT_X`.
     ///
-    /// The image produced by this transformation has different dimensions from the input image.
+    /// The image produced by this transformation has different dimensions from
+    /// the input image.
     ///
     /// Example:
     /// |a b c d|      |a e i|
     /// |e f g h|  ->  |b f k|
     /// |i j k l|      |c g k|
     ///                |d h l|
-    ROTATE_CCW_90_REFLECT_X = 6;
+    ROTATE_CCW_90_REFLECT_X = 5;
 
     /// Image pixels are transformed using `ROTATE_CCW_90`, followed by `REFLECT_Y`.
     ///
-    /// The image produced by this transformation has different dimensions from the input image.
+    /// The image produced by this transformation has different dimensions from
+    /// the input image.
     ///
     /// Example:
     /// |a b c d|      |l h d|
     /// |e f g h|  ->  |k g c|
     /// |i j k l|      |j f b|
     ///                |i e a|
-    ROTATE_CCW_90_REFLECT_Y = 7;
+    ROTATE_CCW_90_REFLECT_Y = 6;
+
+    /// Image pixels are rotated around the image's center counter-clockwise by 270 degrees.
+    ///
+    /// The image produced by this transformation has different dimensions from
+    /// the input image.
+    ///
+    /// This is equivalent to applying the `ROTATE_CCW_90` transform, followed
+    /// by `REFLECT_X` and `REFLECT_Y`. `REFLECT_X` and `REFLECT_Y` are
+    /// commutative, so their ordering doesn't matter.
+    ///
+    /// Example:
+    /// |a b c d|      |i e a|
+    /// |e f g h|  ->  |j f b|
+    /// |i j k l|      |k g c|
+    ///                |l h d|
+    ROTATE_CCW_270 = 7;
 };
 
 type AlphaMode = strict enum : uint8 {
