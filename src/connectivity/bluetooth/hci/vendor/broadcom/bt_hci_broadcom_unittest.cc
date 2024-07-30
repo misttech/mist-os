@@ -48,7 +48,8 @@ const std::array<uint8_t, 6> kCommandCompleteEvent = {
 
 class FakeTransportDevice : public fidl::WireServer<fhbt::Hci>,
                             public fdf::WireServer<fuchsia_hardware_serialimpl::Device>,
-                            public fidl::Server<fhbt::HciTransport> {
+                            public fidl::Server<fhbt::HciTransport>,
+                            public fidl::Server<fhbt::Snoop2> {
  public:
   explicit FakeTransportDevice() = default;
 
@@ -63,6 +64,8 @@ class FakeTransportDevice : public fidl::WireServer<fhbt::Hci>,
         .hci = hci_binding_group_.CreateHandler(
             this, fdf::Dispatcher::GetCurrent()->async_dispatcher(), fidl::kIgnoreBindingClosure),
         .hci_transport = hci_transport_binding_group_.CreateHandler(
+            this, fdf::Dispatcher::GetCurrent()->async_dispatcher(), fidl::kIgnoreBindingClosure),
+        .snoop = snoop_binding_group_.CreateHandler(
             this, fdf::Dispatcher::GetCurrent()->async_dispatcher(), fidl::kIgnoreBindingClosure),
     });
   }
@@ -164,12 +167,20 @@ class FakeTransportDevice : public fidl::WireServer<fhbt::Hci>,
     ZX_PANIC("Unknown method in Serial requests");
   }
 
+  // fidl::Server<fhbt::Snoop2> overrides:
+  void AcknowledgePackets(AcknowledgePacketsRequest& request,
+                          AcknowledgePacketsCompleter::Sync& completer) override {}
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Snoop2> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override {}
+
  private:
   std::optional<std::vector<uint8_t>> customized_reply_;
 
   fdf::ServerBindingGroup<fuchsia_hardware_serialimpl::Device> serial_binding_group_;
   fidl::ServerBindingGroup<fhbt::Hci> hci_binding_group_;
   fidl::ServerBindingGroup<fhbt::HciTransport> hci_transport_binding_group_;
+  fidl::ServerBindingGroup<fhbt::Snoop2> snoop_binding_group_;
 };
 
 class TestEnvironment : fdf_testing::Environment {
@@ -307,6 +318,13 @@ class BtHciBroadcomInitializedTest : public BtHciBroadcomTest {
 };
 
 TEST_F(BtHciBroadcomInitializedTest, Lifecycle) {}
+
+TEST_F(BtHciBroadcomInitializedTest, OpenSnoop) {
+  ::fidl::WireResult<::fuchsia_hardware_bluetooth::Vendor::OpenSnoop> result =
+      vendor_client_->OpenSnoop();
+  ASSERT_TRUE(result.ok());
+  ASSERT_FALSE(result->is_error());
+}
 
 TEST_F(BtHciBroadcomInitializedTest, HciTransportOpenTwice) {
   // Should be able to open two copies of HciTransport.

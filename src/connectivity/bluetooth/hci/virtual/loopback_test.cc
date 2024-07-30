@@ -16,7 +16,7 @@ namespace bt_hci_virtual {
 class LoopbackTest : public ::testing::Test,
                      public fidl::AsyncEventHandler<fhb::Vendor>,
                      public fidl::AsyncEventHandler<fhb::HciTransport>,
-                     public fidl::Server<fhb::Snoop> {
+                     public fidl::AsyncEventHandler<fhb::Snoop2> {
  public:
   void SetUp() override {
     zx::channel loopback_channel_device_end;
@@ -58,11 +58,13 @@ class LoopbackTest : public ::testing::Test,
 
   fidl::Client<fhb::HciTransport>& hci_client() { return hci_client_; }
 
-  fidl::ServerBinding<fhb::Snoop>& snoop_server() { return snoop_server_.value(); }
+  fidl::Client<fhb::Snoop2>& snoop_client() { return snoop_client_; }
 
-  const std::vector<ObservePacketRequest>& snoop_packets() const { return snoop_packets_; }
+  const std::vector<fidl::Event<fhb::Snoop2::OnObservePacket>>& snoop_packets() const {
+    return snoop_packets_;
+  }
 
-  const std::vector<OnDroppedPacketsRequest>& dropped_snoop_packets() {
+  const std::vector<fidl::Event<fhb::Snoop2::OnDroppedPackets>>& dropped_snoop_packets() {
     return dropped_snoop_packets_;
   }
 
@@ -85,17 +87,14 @@ class LoopbackTest : public ::testing::Test,
   }
   void handle_unknown_event(fidl::UnknownEventMetadata<fhb::Vendor> metadata) override {}
 
-  // fidl::Server<fhb::Snoop> overrides:
-  void ObservePacket(ObservePacketRequest& request,
-                     ObservePacketCompleter::Sync& completer) override {
-    snoop_packets_.emplace_back(std::move(request));
+  // fidl::AsyncEventHandler<fhb::Snoop2> overrides:
+  void OnObservePacket(fidl::Event<fhb::Snoop2::OnObservePacket>& event) override {
+    snoop_packets_.emplace_back(std::move(event));
   }
-  void OnDroppedPackets(OnDroppedPacketsRequest& request,
-                        OnDroppedPacketsCompleter::Sync& completer) override {
-    dropped_snoop_packets_.emplace_back(std::move(request));
+  void OnDroppedPackets(fidl::Event<fhb::Snoop2::OnDroppedPackets>& event) override {
+    dropped_snoop_packets_.emplace_back(std::move(event));
   }
-  void handle_unknown_method(fidl::UnknownMethodMetadata<fhb::Snoop> metadata,
-                             fidl::UnknownMethodCompleter::Sync& completer) override {}
+  void handle_unknown_event(fidl::UnknownEventMetadata<fhb::Snoop2> metadata) override {}
 
   void OpenHciTransport() {
     auto vendor_endpoints = fidl::CreateEndpoints<fhb::Vendor>();
@@ -120,23 +119,15 @@ class LoopbackTest : public ::testing::Test,
     auto vendor_endpoints = fidl::CreateEndpoints<fhb::Vendor>();
     loopback_device_.Connect(std::move(vendor_endpoints->server));
     snoop_vendor_client_.Bind(std::move(vendor_endpoints->client), dispatcher());
-    snoop_vendor_client_->OpenHciTransport().Then(
-        [this](fidl::Result<fhb::Vendor::OpenHciTransport>& result) {
-          ASSERT_TRUE(result.is_ok());
-          snoop_hci_client_.Bind(std::move(result.value().channel()), dispatcher());
-        });
+    snoop_vendor_client_->OpenSnoop().Then([this](fidl::Result<fhb::Vendor::OpenSnoop>& result) {
+      ASSERT_TRUE(result.is_ok());
+      snoop_client_.Bind(std::move(result.value().channel()), dispatcher(), /*event_handler=*/this);
+    });
     fdf_testing_run_until_idle();
-    ASSERT_TRUE(snoop_hci_client_.is_valid());
+    ASSERT_TRUE(snoop_vendor_client_.is_valid());
 
-    auto snoop_endpoints = fidl::CreateEndpoints<fhb::Snoop>();
-    fit::result<::fidl::OneWayError> snoop_result =
-        snoop_hci_client_->SetSnoop(std::move(snoop_endpoints->client));
-    ASSERT_TRUE(snoop_result.is_ok());
-    snoop_server_.emplace(dispatcher(), std::move(snoop_endpoints->server), this,
-                          [](fidl::UnbindInfo) {});
-
-    // Simulate bt-snoop dropping the HciTransport client after getting a Snoop client.
-    auto _ = snoop_hci_client_.UnbindMaybeGetEndpoint();
+    // Simulate bt-snoop dropping the Vendor client after getting a Snoop client.
+    auto _ = snoop_vendor_client_.UnbindMaybeGetEndpoint();
   }
 
   void InitializeLogger() {
@@ -204,10 +195,9 @@ class LoopbackTest : public ::testing::Test,
   fidl::Client<fhb::HciTransport> hci_client_;
 
   fidl::Client<fhb::Vendor> snoop_vendor_client_;
-  fidl::Client<fhb::HciTransport> snoop_hci_client_;
-  std::optional<fidl::ServerBinding<fhb::Snoop>> snoop_server_;
-  std::vector<ObservePacketRequest> snoop_packets_;
-  std::vector<OnDroppedPacketsRequest> dropped_snoop_packets_;
+  fidl::Client<fhb::Snoop2> snoop_client_;
+  std::vector<fidl::Event<fhb::Snoop2::OnObservePacket>> snoop_packets_;
+  std::vector<fidl::Event<fhb::Snoop2::OnDroppedPackets>> dropped_snoop_packets_;
 
   std::vector<std::vector<uint8_t>> sent_packets_;
   std::vector<fhb::ReceivedPacket> received_packets_;
@@ -355,8 +345,7 @@ TEST_F(LoopbackTest, ReceiveAndQueueAndAckManyAclPackets) {
   }
 
   // Ack 2x so that the 2 queued packets are sent.
-  result = fidl::SendEvent(snoop_server())
-               ->OnAcknowledgePackets(fhb::SnoopOnAcknowledgePacketsRequest(2));
+  result = snoop_client()->AcknowledgePackets(fhb::Snoop2AcknowledgePacketsRequest(2));
   ASSERT_TRUE(result.is_ok());
   fdf_testing_run_until_idle();
 
@@ -388,10 +377,8 @@ TEST_F(LoopbackTest, DropSnoopPackets) {
 
   ASSERT_EQ(snoop_packets().size(), LoopbackDevice::kMaxSnoopUnackedPackets);
 
-  fit::result<fidl::OneWayError> result =
-      fidl::SendEvent(snoop_server())
-          ->OnAcknowledgePackets(
-              fhb::SnoopOnAcknowledgePacketsRequest(LoopbackDevice::kMaxSnoopUnackedPackets));
+  fit::result<fidl::OneWayError> result = snoop_client()->AcknowledgePackets(
+      fhb::Snoop2AcknowledgePacketsRequest(LoopbackDevice::kMaxSnoopUnackedPackets));
   ASSERT_TRUE(result.is_ok());
   fdf_testing_run_until_idle();
   ASSERT_EQ(snoop_packets().size(), 2 * LoopbackDevice::kMaxSnoopUnackedPackets - num_dropped);

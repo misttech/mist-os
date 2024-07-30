@@ -266,10 +266,10 @@ void BtTransportUart::ChannelCleanupLocked(zx::channel* channel) {
   channel->reset();
 }
 
-void BtTransportUart::SendSnoop(const std::vector<uint8_t>&& packet,
+void BtTransportUart::SendSnoop(std::vector<uint8_t>&& packet,
                                 fuchsia_hardware_bluetooth::SnoopPacket::Tag type,
                                 fhbt::PacketDirection direction) {
-  if (!snoop_client_.is_valid()) {
+  if (!snoop_server_.has_value()) {
     return;
   }
 
@@ -287,7 +287,7 @@ void BtTransportUart::SendSnoop(const std::vector<uint8_t>&& packet,
   // Reset log when the acked sequence number catches up.
   log_emitted = false;
 
-  fhbt::SnoopObservePacketRequest req;
+  fhbt::Snoop2OnObservePacketRequest req;
   switch (type) {
     case fhbt::SnoopPacket::Tag::kEvent:
       ZX_DEBUG_ASSERT(direction == fhbt::PacketDirection::kControllerToHost);
@@ -305,17 +305,17 @@ void BtTransportUart::SendSnoop(const std::vector<uint8_t>&& packet,
       break;
     default:
       // TODO(b/350753924): Handle ISO packets in this driver.
-      FDF_LOG(ERROR, "Unknown snoop packet type: %u", type);
+      FDF_LOG(ERROR, "Unknown snoop packet type: %lu", static_cast<fidl_xunion_tag_t>(type));
   }
   req.direction(direction);
   req.sequence(snoop_seq_++);
 
-  fit::result<::fidl::OneWayError> result = snoop_client_->ObservePacket(req);
+  fit::result<::fidl::OneWayError> result = fidl::SendEvent(*snoop_server_)->OnObservePacket(req);
   if (!result.is_ok()) {
-    FDF_LOG(ERROR, "Failed to send snoop for sent packet: %s, unbinding snoop client",
+    FDF_LOG(ERROR, "Failed to send snoop for sent packet: %s, unbinding snoop server",
             result.error_value().FormatDescription().c_str());
-
-    auto result = snoop_client_.UnbindMaybeGetEndpoint();
+    snoop_server_->Close(ZX_ERR_INTERNAL);
+    snoop_server_.reset();
   }
 }
 
@@ -411,7 +411,7 @@ void BtTransportUart::ProcessOnePacketFromSendQueue() {
   auto& buffer_entry = send_queue_.front();
   SerialWriteTransport(buffer_entry.data_, std::move(buffer_entry.callback_));
 
-  const std::vector<uint8_t> snoop_data(buffer_entry.data_.begin() + 1, buffer_entry.data_.end());
+  std::vector<uint8_t> snoop_data(buffer_entry.data_.begin() + 1, buffer_entry.data_.end());
 
   fhbt::SnoopPacket::Tag snoop_type = fhbt::SnoopPacket::Tag::kIso;
   switch (buffer_entry.data_[0]) {
@@ -944,9 +944,7 @@ void BtTransportUart::ConfigureSco(
                                      &sco_connection_server_, fidl::kIgnoreBindingClosure);
 }
 void BtTransportUart::SetSnoop(SetSnoopRequest& request, SetSnoopCompleter::Sync& completer) {
-  snoop_client_.Bind(std::move(request.snoop()), dispatcher(), this);
-  // Only useful in tests, it doesn't hurt to signal it when no one is waiting for it.
-  snoop_setup_.Signal();
+  completer.Close(ZX_ERR_NOT_SUPPORTED);
 }
 
 fit::function<void(void)> BtTransportUart::WaitforSnoopCallback() {
@@ -1014,14 +1012,15 @@ void BtTransportUart::handle_unknown_method(
   completer.Close(ZX_ERR_NOT_SUPPORTED);
 }
 
-void BtTransportUart::OnAcknowledgePackets(
-    fidl::Event<fuchsia_hardware_bluetooth::Snoop::OnAcknowledgePackets>& event) {
-  acked_snoop_seq_ = std::max(event.sequence(), acked_snoop_seq_);
+void BtTransportUart::AcknowledgePackets(AcknowledgePacketsRequest& request,
+                                         AcknowledgePacketsCompleter::Sync& completer) {
+  acked_snoop_seq_ = std::max(request.sequence(), acked_snoop_seq_);
 }
 
-void BtTransportUart::handle_unknown_event(
-    fidl::UnknownEventMetadata<fuchsia_hardware_bluetooth::Snoop> metadata) {
-  FDF_LOG(ERROR, "Unknown method in fidl::AsyncEventHandler<fuchsia_hardware_bluetooth::Snoop>");
+void BtTransportUart::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Snoop2> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {
+  FDF_LOG(ERROR, "Unknown method in fidl::Server<fuchsia_hardware_bluetooth::Snoop2>");
 }
 
 void BtTransportUart::QueueUartRead() {
@@ -1070,9 +1069,20 @@ zx_status_t BtTransportUart::ServeProtocols() {
     hci_transport_binding_.AddBinding(dispatcher_, std::move(server_end), this,
                                       fidl::kIgnoreBindingClosure);
   };
+  auto snoop_protocol = [this](fidl::ServerEnd<fhbt::Snoop2> server_end) mutable {
+    if (snoop_server_.has_value()) {
+      FDF_LOG(ERROR, "Snoop protocol connect with Snoop already active");
+      return;
+    }
+    snoop_server_.emplace(dispatcher_, std::move(server_end), this,
+                          [this](fidl::UnbindInfo) { snoop_server_.reset(); });
+    // Only useful in tests, it doesn't hurt to signal it when no one is waiting for it.
+    snoop_setup_.Signal();
+  };
 
-  fhbt::HciService::InstanceHandler hci_handler(
-      {.hci = std::move(hci_protocol), .hci_transport = std::move(hci_transport_protocol)});
+  fhbt::HciService::InstanceHandler hci_handler({.hci = std::move(hci_protocol),
+                                                 .hci_transport = std::move(hci_transport_protocol),
+                                                 .snoop = std::move(snoop_protocol)});
   auto status = outgoing()->AddService<fhbt::HciService>(std::move(hci_handler));
   if (status.is_error()) {
     FDF_LOG(ERROR, "Failed to add HCI service to outgoing directory: %s\n", status.status_string());

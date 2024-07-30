@@ -42,12 +42,13 @@ zx_status_t LoopbackDevice::Initialize(zx::channel channel, std::string_view nam
   return ZX_OK;
 }
 
-LoopbackDevice::SnoopClient::SnoopClient(
-    fidl::ClientEnd<fuchsia_hardware_bluetooth::Snoop> client_end, LoopbackDevice* device)
-    : client_(std::move(client_end), device->dispatcher_, /*event_handler=*/this),
+LoopbackDevice::SnoopServer::SnoopServer(
+    fidl::ServerEnd<fuchsia_hardware_bluetooth::Snoop2> server_end, LoopbackDevice* device)
+    : binding_(device->dispatcher_, std::move(server_end), this,
+               std::mem_fn(&LoopbackDevice::SnoopServer::OnFidlError)),
       device_(device) {}
 
-void LoopbackDevice::SnoopClient::QueueSnoopPacket(
+void LoopbackDevice::SnoopServer::QueueSnoopPacket(
     uint8_t* buffer, size_t length, PacketIndicator indicator,
     fuchsia_hardware_bluetooth::PacketDirection direction) {
   uint64_t sequence = next_sequence_++;
@@ -71,7 +72,7 @@ void LoopbackDevice::SnoopClient::QueueSnoopPacket(
   SendSnoopPacket(buffer, length, indicator, direction, sequence);
 }
 
-void LoopbackDevice::SnoopClient::SendSnoopPacket(
+void LoopbackDevice::SnoopServer::SendSnoopPacket(
     uint8_t* buffer, size_t length, PacketIndicator indicator,
     fuchsia_hardware_bluetooth::PacketDirection direction, uint64_t sequence) {
   fidl::VectorView vec_view = fidl::VectorView<uint8_t>::FromExternal(buffer, length);
@@ -99,32 +100,32 @@ void LoopbackDevice::SnoopClient::SendSnoopPacket(
   }
 
   fidl::Arena arena;
-  fuchsia_hardware_bluetooth::wire::SnoopObservePacketRequest request =
-      fuchsia_hardware_bluetooth::wire::SnoopObservePacketRequest::Builder(arena)
+  fuchsia_hardware_bluetooth::wire::Snoop2OnObservePacketRequest request =
+      fuchsia_hardware_bluetooth::wire::Snoop2OnObservePacketRequest::Builder(arena)
           .sequence(sequence)
           .direction(direction)
           .packet(packet)
           .Build();
 
-  fidl::OneWayStatus observe_status = client_.wire()->ObservePacket(request);
+  fidl::OneWayStatus observe_status = fidl::WireSendEvent(binding_)->OnObservePacket(request);
   if (!observe_status.ok()) {
-    FDF_LOG(WARNING, "Failed to send ObservePacket on Snoop: %s", observe_status.status_string());
+    FDF_LOG(WARNING, "Failed to send OnObservePacket on Snoop: %s", observe_status.status_string());
   }
 }
 
-void LoopbackDevice::SnoopClient::OnAcknowledgePackets(
-    fidl::Event<fuchsia_hardware_bluetooth::Snoop::OnAcknowledgePackets>& event) {
-  if (event.sequence() <= acked_sequence_) {
+void LoopbackDevice::SnoopServer::AcknowledgePackets(AcknowledgePacketsRequest& request,
+                                                     AcknowledgePacketsCompleter::Sync& completer) {
+  if (request.sequence() <= acked_sequence_) {
     return;
   }
-  acked_sequence_ = event.sequence();
+  acked_sequence_ = request.sequence();
 
   // Send Snoop.OnDroppedPackets if necessary before sending next Snoop.ObservePacket.
   if (dropped_sent_ != 0 || dropped_received_ != 0) {
-    ::fidl::Request<::fuchsia_hardware_bluetooth::Snoop::OnDroppedPackets> request;
+    fuchsia_hardware_bluetooth::Snoop2OnDroppedPacketsRequest request;
     request.sent() = dropped_sent_;
     request.received() = dropped_received_;
-    fit::result<fidl::OneWayError> result = client_->OnDroppedPackets(request);
+    fit::result<fidl::OneWayError> result = fidl::SendEvent(binding_)->OnDroppedPackets(request);
     if (result.is_error()) {
       FDF_LOG(WARNING, "Failed to send Snoop.OnDroppedPackets event: %s",
               result.error_value().status_string());
@@ -142,16 +143,17 @@ void LoopbackDevice::SnoopClient::OnAcknowledgePackets(
   }
 }
 
-void LoopbackDevice::SnoopClient::on_fidl_error(fidl::UnbindInfo error) {
+void LoopbackDevice::SnoopServer::OnFidlError(fidl::UnbindInfo error) {
   if (!error.is_user_initiated()) {
     FDF_LOG(INFO, "Snoop closed: %s", error.status_string());
   }
   device_->snoop_.reset();
 }
 
-void LoopbackDevice::SnoopClient::handle_unknown_event(
-    fidl::UnknownEventMetadata<fuchsia_hardware_bluetooth::Snoop> metadata) {
-  FDF_LOG(WARNING, "Unknown Snoop event received");
+void LoopbackDevice::SnoopServer::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Snoop2> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {
+  FDF_LOG(WARNING, "Unknown Snoop method received");
 }
 
 void LoopbackDevice::Connect(fidl::ServerEnd<fuchsia_hardware_bluetooth::Vendor> request) {
@@ -273,7 +275,15 @@ void LoopbackDevice::OpenHciTransport(OpenHciTransportCompleter::Sync& completer
 }
 
 void LoopbackDevice::OpenSnoop(OpenSnoopCompleter::Sync& completer) {
-  completer.Reply(fit::error(ZX_ERR_NOT_SUPPORTED));
+  auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_bluetooth::Snoop2>();
+  if (endpoints.is_error()) {
+    FDF_LOG(ERROR, "Failed to create Snoop2 endpoints: %s",
+            zx_status_get_string(endpoints.error_value()));
+    completer.Reply(fit::error(ZX_ERR_INTERNAL));
+    return;
+  }
+  snoop_.emplace(std::move(std::move(endpoints->server)), this);
+  completer.Reply(fit::ok(std::move(endpoints->client)));
 }
 
 void LoopbackDevice::handle_unknown_method(
@@ -375,7 +385,7 @@ void LoopbackDevice::HciTransportServer::ConfigureSco(ConfigureScoRequest& reque
 
 void LoopbackDevice::HciTransportServer::SetSnoop(SetSnoopRequest& request,
                                                   SetSnoopCompleter::Sync& completer) {
-  device_->snoop_.emplace(std::move(request.snoop()), device_);
+  completer.Close(ZX_ERR_NOT_SUPPORTED);
 }
 
 void LoopbackDevice::HciTransportServer::handle_unknown_method(

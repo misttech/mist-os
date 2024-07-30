@@ -56,7 +56,7 @@ using DeviceType = ddk::Device<Device, ddk::GetProtocolable, ddk::Unbindable>;
 class Device final : public DeviceType,
                      public ddk::BtHciProtocol<Device>,
                      public fidl::Server<fuchsia_hardware_bluetooth::HciTransport>,
-                     public fidl::AsyncEventHandler<fuchsia_hardware_bluetooth::Snoop> {
+                     public fidl::Server<fuchsia_hardware_bluetooth::Snoop2> {
  public:
   // If |dispatcher| is non-null, it will be used instead of a new work thread.
   // tests.
@@ -76,6 +76,11 @@ class Device final : public DeviceType,
   // protocol exposed from the driver's outgoing directory.
   // TODO(https://fxbug.dev/332333517): Remove this function after DFv2 migration.
   void ConnectHciTransport(fidl::ServerEnd<fuchsia_hardware_bluetooth::HciTransport> server_end);
+
+  // This is only for test purpose, mock_ddk doesn't provide a way for the test to connect to a fidl
+  // protocol exposed from the driver's outgoing directory.
+  // TODO(https://fxbug.dev/332333517): Remove this function after DFv2 migration.
+  void ConnectSnoop(fidl::ServerEnd<fuchsia_hardware_bluetooth::Snoop2> server_end);
 
   // Methods required by DDK mixins:
   zx_status_t DdkGetProtocol(uint32_t proto_id, void* out);
@@ -102,11 +107,12 @@ class Device final : public DeviceType,
       ::fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::HciTransport> metadata,
       ::fidl::UnknownMethodCompleter::Sync& completer) override;
 
-  // fuchsia_hardware_bluetooth::Snoop protocol overrides.
-  void OnAcknowledgePackets(
-      fidl::Event<fuchsia_hardware_bluetooth::Snoop::OnAcknowledgePackets>& event) override;
-  void handle_unknown_event(
-      fidl::UnknownEventMetadata<fuchsia_hardware_bluetooth::Snoop> metadata) override;
+  // fuchsia_hardware_bluetooth::Snoop2 protocol overrides.
+  void AcknowledgePackets(AcknowledgePacketsRequest& request,
+                          AcknowledgePacketsCompleter::Sync& completer) override;
+  void handle_unknown_method(
+      ::fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Snoop2> metadata,
+      ::fidl::UnknownMethodCompleter::Sync& completer) override;
 
   mtx_t mutex() { return mutex_; }
 
@@ -351,8 +357,6 @@ class Device final : public DeviceType,
   // this happens.
   static constexpr uint64_t kSeqNumMaxDiff = 20;
 
-  fidl::Client<fuchsia_hardware_bluetooth::Snoop> snoop_client_;
-
   // This is the sequence number of the snoop packets that this driver sends out. The receiver will
   // need to ack the packets with their sequence number, and the driver will record the highest
   // acked sequence number with |acked_snoop_seq_|.
@@ -369,6 +373,7 @@ class Device final : public DeviceType,
   std::optional<fidl::ServerBinding<fuchsia_hardware_bluetooth::ScoConnection>>
       sco_connection_binding_;
   fidl::ServerBindingGroup<fuchsia_hardware_bluetooth::HciTransport> hci_transport_binding_;
+  std::optional<fidl::ServerBinding<fuchsia_hardware_bluetooth::Snoop2>> snoop_server_;
 };
 
 }  // namespace bt_transport_usb
