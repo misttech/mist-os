@@ -197,7 +197,7 @@ fn main() -> Result<()> {
 
     match args.action {
         Action::Lint(ref lint_args) => {
-            if lint_args.dryrun || lint_args.force {
+            if !(lint_args.dryrun || lint_args.force) {
                 check_clean()?;
             }
 
