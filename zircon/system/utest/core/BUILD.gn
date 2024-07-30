@@ -141,6 +141,8 @@ foreach(test_name, all_bootfs_tests) {
     deps = [ test_name ]
 
     if (is_fuchsia) {
+      deps += [ ":needs-next-hosted" ]
+
       fdio_config = [ "//build/config/fuchsia:fdio_config" ]
       if (configs + fdio_config - fdio_config != configs) {
         configs -= fdio_config
@@ -200,6 +202,9 @@ template("core_tests") {
                              "timeout",
                              "generate_cuckoo",
                            ])
+    if (defined(invoker.deps)) {
+      deps += invoker.deps
+    }
     if (!defined(timeout)) {
       # We've observed the ASAN variant of core-tests take as long as 701
       # seconds when booted via firmware on certain types of hardware.  Leave a
@@ -215,8 +220,11 @@ if (is_fuchsia) {
   # some of the tests require the root resource handle or no system
   # services whatsoever.
   zbi_test_executable("core-tests-standalone") {
+    sources = [ "needs-next-standalone.cc" ]
     deps = [
+      ":needs-next",
       "//src/zircon/testing/standalone-test",
+      "//zircon/kernel/lib/boot-options",
       "//zircon/system/ulib/zxtest",
     ]
 
@@ -257,6 +265,24 @@ if (is_fuchsia) {
       ]
     }
   }
+
+  # This is used by tests using @next syscalls.  The implementation is provided
+  # in two separate forms for the different incarnations of the tests.
+  source_set("needs-next") {
+    testonly = true
+    visibility = [ "./*" ]
+
+    public = [ "needs-next.h" ]
+    public_deps = [ "//zircon/system/ulib/zxtest" ]
+  }
+
+  static_library("needs-next-hosted") {
+    testonly = true
+    visibility = [ ":*" ]
+
+    sources = [ "needs-next-hosted.cc" ]
+    deps = [ ":needs-next" ]
+  }
 }
 
 boot_tests = [ ":core-tests" ]
@@ -264,6 +290,18 @@ boot_tests = [ ":core-tests" ]
 core_tests("core-tests") {
   environments = kernel_test_environments
 }
+
+# Override the earlier one from core-tests-standalone.args (above)
+# by adding this later.
+kernel_cmdline("stable-vdso.args") {
+  args = [ "kernel.vdso.always_use_next=false" ]
+}
+
+core_tests("core-tests-stable-vdso") {
+  deps = [ ":stable-vdso.args" ]
+  environments = kernel_test_environments
+}
+boot_tests += [ ":core-tests-stable-vdso" ]
 
 # If we are building for x64, make sure to run the core tests on a system which
 # has been configured to force selection of HPET as the timing source instead

@@ -3,11 +3,13 @@
 # found in the LICENSE file.
 
 source_set("pager-writeback") {
+  testonly = true
+
   configs += [ "//build/config:all_source" ]
 
-  testonly = true
   sources = [ "pager-writeback.cc" ]
   deps = [
+    "..:needs-next",
     "//src/zircon/testing/maybe-standalone-test",
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",

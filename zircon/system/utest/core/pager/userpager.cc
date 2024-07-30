@@ -21,6 +21,10 @@
 #include <fbl/algorithm.h>
 #include <fbl/array.h>
 
+#include "../needs-next.h"
+
+NEEDS_NEXT_SYSCALL(zx_pager_query_dirty_ranges);
+
 namespace pager_tests {
 
 bool Vmo::CheckVmar(uint64_t offset, uint64_t len, const void* expected) const {

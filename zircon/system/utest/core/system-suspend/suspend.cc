@@ -25,6 +25,10 @@
 
 #include <zxtest/zxtest.h>
 
+#include "../needs-next.h"
+
+NEEDS_NEXT_SYSCALL(zx_system_suspend_enter);
+
 namespace {
 
 zx::result<zx::resource> GetSystemCpuResource() {
@@ -52,6 +56,8 @@ class Random {
 };
 
 TEST(SystemSuspend, ResourceValidation) {
+  NEEDS_NEXT_SKIP(zx_system_suspend_enter);
+
   const zx::result resource_result = GetSystemCpuResource();
   ASSERT_OK(resource_result.status_value());
 
@@ -69,6 +75,8 @@ TEST(SystemSuspend, ResourceValidation) {
 }
 
 TEST(SystemSuspend, TimeoutIsPast) {
+  NEEDS_NEXT_SKIP(zx_system_suspend_enter);
+
   const zx::result resource_result = GetSystemCpuResource();
   ASSERT_OK(resource_result.status_value());
 
@@ -80,6 +88,8 @@ TEST(SystemSuspend, TimeoutIsPast) {
 }
 
 TEST(SystemSuspend, SuspendAndResumeByTimer) {
+  NEEDS_NEXT_SKIP(zx_system_suspend_enter);
+
   const zx::result resource_result = GetSystemCpuResource();
   ASSERT_OK(resource_result.status_value());
 
@@ -101,6 +111,8 @@ TEST(SystemSuspend, SuspendAndResumeByTimer) {
 }
 
 TEST(SystemSuspend, ConcurrentSuspend) {
+  NEEDS_NEXT_SKIP(zx_system_suspend_enter);
+
   const zx::result resource_result = GetSystemCpuResource();
   ASSERT_OK(resource_result.status_value());
 

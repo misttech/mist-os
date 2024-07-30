@@ -10,11 +10,13 @@
 #include <lib/zx/vmo.h>
 #include <zircon/errors.h>
 #include <zircon/limits.h>
+#include <zircon/process.h>
 #include <zircon/rights.h>
 #include <zircon/syscalls-next.h>
 #include <zircon/syscalls.h>
+#include <zircon/syscalls/iob.h>
 #include <zircon/syscalls/object.h>
-#include <zircon/system/public/zircon/process.h>
+#include <zircon/threads.h>
 #include <zircon/time.h>
 #include <zircon/types.h>
 
@@ -23,14 +25,15 @@
 #include <runtime/thread.h>
 #include <zxtest/zxtest.h>
 
-#include "zircon/system/public/zircon/syscalls/iob.h"
-#include "zircon/third_party/ulib/musl/include/zircon/threads.h"
+#include "../needs-next.h"
 
 #ifdef EXPERIMENTAL_THREAD_SAMPLER_ENABLED
 constexpr bool sampler_enabled = EXPERIMENTAL_THREAD_SAMPLER_ENABLED;
 #else
 constexpr bool sampler_enabled = false;
 #endif
+
+NEEDS_NEXT_SYSCALL(zx_sampler_create);
 
 namespace {
 
@@ -45,6 +48,8 @@ void TestFn(zx::unowned_event event) {
 }
 
 TEST(ThreadSampler, StartStop) {
+  NEEDS_NEXT_SKIP(zx_sampler_create);
+
   // Start the thread sampler on a thread, wait for some time while taking samples, check to see
   // that samples were written.
   size_t buffer_size = ZX_PAGE_SIZE;
@@ -108,6 +113,8 @@ TEST(ThreadSampler, StartStop) {
 }
 
 TEST(ThreadSampler, SamplerLifetime) {
+  NEEDS_NEXT_SKIP(zx_sampler_create);
+
   // Once a sampler is created, another sampler should not be able to be created until the returned
   // buffer is release
   size_t buffer_size = ZX_PAGE_SIZE;
@@ -145,6 +152,8 @@ TEST(ThreadSampler, SamplerLifetime) {
 }
 
 TEST(ThreadSampler, DroppedSampler) {
+  NEEDS_NEXT_SKIP(zx_sampler_create);
+
   // Ensure we clean up and can create a new sampler if we drop the old one mid session
   size_t buffer_size = ZX_PAGE_SIZE;
   zx_sampler_config_t config{
@@ -217,6 +226,8 @@ TEST(ThreadSampler, DroppedSampler) {
 }
 
 TEST(ThreadSampler, BadIob) {
+  NEEDS_NEXT_SKIP(zx_sampler_create);
+
   // We should not be able to pass in any arbitrary iob
   size_t buffer_size = ZX_PAGE_SIZE;
   zx_sampler_config_t config{
@@ -277,6 +288,8 @@ TEST(ThreadSampler, BadIob) {
 }
 
 TEST(ThreadSampler, NoRights) {
+  NEEDS_NEXT_SKIP(zx_sampler_create);
+
   // We require ZX_RIGHT_APPLY_PROFILE on the returned iob in order to control sampling.
   // If a handle lacks the rights, it should be denied access.
   size_t buffer_size = ZX_PAGE_SIZE;
@@ -322,6 +335,8 @@ TEST(ThreadSampler, NoRights) {
 }
 
 TEST(ThreadSampler, ClosedHandleReadBuffers) {
+  NEEDS_NEXT_SKIP(zx_sampler_create);
+
   // Even after we close the handle, buffers we mapped from the iob should still be readable
   size_t buffer_size = ZX_PAGE_SIZE;
   zx_sampler_config_t config{

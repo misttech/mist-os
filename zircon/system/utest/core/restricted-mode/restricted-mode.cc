@@ -22,6 +22,13 @@
 #include <runtime/thread.h>
 #include <zxtest/zxtest.h>
 
+#include "../needs-next.h"
+
+NEEDS_NEXT_SYSCALL(zx_restricted_bind_state);
+NEEDS_NEXT_SYSCALL(zx_restricted_enter);
+NEEDS_NEXT_SYSCALL(zx_restricted_kick);
+NEEDS_NEXT_SYSCALL(zx_restricted_unbind_state);
+
 extern "C" void vectab();
 extern "C" void syscall_bounce();
 extern "C" void syscall_bounce_post_syscall();
@@ -383,6 +390,8 @@ class ArchRegisterState {
 
 // Verify that restricted_enter handles invalid args.
 TEST(RestrictedMode, EnterInvalidArgs) {
+  NEEDS_NEXT_SKIP(zx_restricted_enter);
+
   // Invalid options.
   EXPECT_EQ(ZX_ERR_INVALID_ARGS, zx_restricted_enter(0xffffffff, 0, 0));
 
@@ -392,6 +401,8 @@ TEST(RestrictedMode, EnterInvalidArgs) {
 }
 
 TEST(RestrictedMode, BindState) {
+  NEEDS_NEXT_SKIP(zx_restricted_bind_state);
+
   // Bad options.
   zx::vmo v_invalid;
   ASSERT_EQ(ZX_ERR_INVALID_ARGS, zx_restricted_bind_state(1, v_invalid.reset_and_get_address()));
@@ -437,6 +448,8 @@ TEST(RestrictedMode, BindState) {
 }
 
 TEST(RestrictedMode, UnbindState) {
+  NEEDS_NEXT_SKIP(zx_restricted_unbind_state);
+
   // Repeated unbind is OK.
   ASSERT_OK(zx_restricted_unbind_state(0));
   ASSERT_OK(zx_restricted_unbind_state(0));
@@ -450,6 +463,8 @@ TEST(RestrictedMode, UnbindState) {
 
 // This is the happy case.
 TEST(RestrictedMode, Basic) {
+  NEEDS_NEXT_SKIP(zx_restricted_bind_state);
+
   zx::vmo vmo;
   ASSERT_OK(zx_restricted_bind_state(0, vmo.reset_and_get_address()));
   auto cleanup = fit::defer([]() { EXPECT_OK(zx_restricted_unbind_state(0)); });
@@ -482,6 +497,8 @@ TEST(RestrictedMode, Basic) {
 
 // Verify that floating point state is saved correctly on context switch.
 TEST(RestrictedMode, FloatingPointState) {
+  NEEDS_NEXT_SKIP(zx_restricted_bind_state);
+
   const uint32_t kNumRestrictedThreads = 32;
   const uint32_t kNumFloatingPointThreads = 32;
   std::atomic_int num_threads_ready = 0;
@@ -644,6 +661,8 @@ void ReadExceptionFromChannel(const zx::channel& exception_channel,
 
 // This is a simple benchmark test that prints some rough performance numbers.
 TEST(RestrictedMode, Bench) {
+  NEEDS_NEXT_SKIP(zx_restricted_bind_state);
+
   // Run the test 5 times to help filter out noise.
   for (auto i = 0; i < 5; i++) {
     zx::vmo vmo;
@@ -740,6 +759,8 @@ TEST(RestrictedMode, Bench) {
 
 // Verify we can receive restricted exceptions via exception channels.
 TEST(RestrictedMode, ExceptionChannel) {
+  NEEDS_NEXT_SKIP(zx_restricted_bind_state);
+
   zx::vmo vmo;
   ASSERT_OK(zx_restricted_bind_state(0, vmo.reset_and_get_address()));
   auto cleanup = fit::defer([]() { EXPECT_OK(zx_restricted_unbind_state(0)); });
@@ -778,6 +799,8 @@ TEST(RestrictedMode, ExceptionChannel) {
 
 // Verify we can receive restricted exceptions using in-thread exception handlers.
 TEST(RestrictedMode, InThreadException) {
+  NEEDS_NEXT_SKIP(zx_restricted_bind_state);
+
   zx::vmo vmo;
   ASSERT_OK(zx_restricted_bind_state(0, vmo.reset_and_get_address()));
   auto cleanup = fit::defer([]() { EXPECT_OK(zx_restricted_unbind_state(0)); });
@@ -818,6 +841,8 @@ TEST(RestrictedMode, InThreadException) {
 
 // Verify that restricted_enter fails on invalid zx_restricted_state_t values.
 TEST(RestrictedMode, EnterBadStateStruct) {
+  NEEDS_NEXT_SKIP(zx_restricted_bind_state);
+
   zx::vmo vmo;
   ASSERT_OK(zx_restricted_bind_state(0, vmo.reset_and_get_address()));
   auto cleanup = fit::defer([]() { EXPECT_OK(zx_restricted_unbind_state(0)); });
@@ -862,6 +887,8 @@ TEST(RestrictedMode, EnterBadStateStruct) {
 }
 
 TEST(RestrictedMode, KickBeforeEnter) {
+  NEEDS_NEXT_SKIP(zx_restricted_bind_state);
+
   zx::vmo vmo;
   ASSERT_OK(zx_restricted_bind_state(0, vmo.reset_and_get_address()));
   auto cleanup = fit::defer([]() { EXPECT_OK(zx_restricted_unbind_state(0)); });
@@ -923,6 +950,8 @@ TEST(RestrictedMode, KickBeforeEnter) {
 }
 
 TEST(RestrictedMode, KickWhileStartingAndExiting) {
+  NEEDS_NEXT_SKIP(zx_restricted_kick);
+
   struct ExceptionChannelRegistered {
     std::condition_variable cv;
     std::mutex m;
@@ -1047,6 +1076,8 @@ TEST(RestrictedMode, KickWhileStartingAndExiting) {
 }
 
 TEST(RestrictedMode, KickWhileRunning) {
+  NEEDS_NEXT_SKIP(zx_restricted_kick);
+
   zx::vmo vmo;
   ASSERT_OK(zx_restricted_bind_state(0, vmo.reset_and_get_address()));
   auto cleanup = fit::defer([]() { EXPECT_OK(zx_restricted_unbind_state(0)); });
@@ -1109,6 +1140,8 @@ TEST(RestrictedMode, KickWhileRunning) {
 }
 
 TEST(RestrictedMode, KickJustBeforeSyscall) {
+  NEEDS_NEXT_SKIP(zx_restricted_kick);
+
   zx::vmo vmo;
   ASSERT_OK(zx_restricted_bind_state(0, vmo.reset_and_get_address()));
   auto cleanup = fit::defer([]() { EXPECT_OK(zx_restricted_unbind_state(0)); });

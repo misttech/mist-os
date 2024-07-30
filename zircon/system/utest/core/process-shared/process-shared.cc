@@ -18,6 +18,10 @@
 #include <mini-process/mini-process.h>
 #include <zxtest/zxtest.h>
 
+#include "../needs-next.h"
+
+NEEDS_NEXT_SYSCALL(zx_process_create_shared);
+
 namespace {
 
 zx::result<zx::resource> GetSystemProfileResource(zx::unowned_resource& resource) {
@@ -54,6 +58,8 @@ void SetDeadlineMemoryPriority(zx::unowned_resource& resource, zx::vmar& vmar) {
 }  // namespace
 
 TEST(ProcessShared, MapInPrototype) {
+  NEEDS_NEXT_SKIP(zx_process_create_shared);
+
   zx::process prototype_process;
   zx::vmar shared_vmar;
   constexpr const char kPrototypeName[] = "prototype_process";
@@ -92,6 +98,8 @@ TEST(ProcessShared, MapInPrototype) {
 }
 
 TEST(ProcessShared, RestrictedVmarNotShared) {
+  NEEDS_NEXT_SKIP(zx_process_create_shared);
+
   zx::process prototype_process;
   zx::vmar shared_vmar;
   constexpr const char kPrototypeName[] = "prototype_process";
@@ -127,6 +135,8 @@ TEST(ProcessShared, RestrictedVmarNotShared) {
 }
 
 TEST(ProcessShared, InvalidPrototype) {
+  NEEDS_NEXT_SKIP(zx_process_create_shared);
+
   zx::process prototype_process;
   zx::vmar prototype_vmar;
   constexpr const char kPrototypeName[] = "prototype_process";
@@ -143,6 +153,8 @@ TEST(ProcessShared, InvalidPrototype) {
 }
 
 TEST(ProcessShared, InfoProcessVmos) {
+  NEEDS_NEXT_SKIP(zx_process_create_shared);
+
   // Build a shareable process.
   static constexpr char kSharedProcessName[] = "object-info-shar-proc";
   zx::process shared_process;
@@ -226,11 +238,12 @@ TEST(ProcessShared, InfoProcessVmos) {
 //
 // See also https://fxbug.dev/42074452.
 TEST(ProcessShared, InfoTaskStats) {
+  NEEDS_NEXT_SKIP(zx_process_create_shared);
+
   // First, verify we have access to the system resource to run this test.
   zx::unowned_resource system_resource = maybe_standalone::GetSystemResource();
   if (!system_resource->is_valid()) {
-    printf("System resource not available, skipping\n");
-    return;
+    ZXTEST_SKIP("System resource not available, skipping\n");
   }
   // We're going to create 3 processes, proc1, proc2, and proc3, with a total of 4 VMARs.  proc1 and
   // proc2 will share a region (vmar_shared) and each have their own private region (vmar1 and
@@ -405,6 +418,8 @@ TEST(ProcessShared, InfoTaskStats) {
 }
 
 TEST(ProcessShared, InfoProcessMaps) {
+  NEEDS_NEXT_SKIP(zx_process_create_shared);
+
   // Create a shared process.
   zx::process shared_process;
   zx::vmar shared_vmar;

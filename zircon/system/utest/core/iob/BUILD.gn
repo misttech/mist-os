@@ -6,6 +6,7 @@ source_set("iob") {
   testonly = true
   sources = [ "iob.cc" ]
   deps = [
+    "..:needs-next",
     "//sdk/lib/iob",
     "//sdk/lib/stdcompat",
     "//src/zircon/testing/maybe-standalone-test",

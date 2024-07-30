@@ -8,9 +8,10 @@ source_set("next-vdso") {
   testonly = true
   if (!exclude_testonly_syscalls) {
     sources = [ "next-vdso.cc" ]
+    deps = [
+      "..:needs-next",
+      "//src/zircon/lib/zircon",
+      "//zircon/system/ulib/zxtest",
+    ]
   }
-  public_deps = [
-    "//src/zircon/lib/zircon",
-    "//zircon/system/ulib/zxtest",
-  ]
 }

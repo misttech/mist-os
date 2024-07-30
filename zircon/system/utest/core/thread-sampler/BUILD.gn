@@ -8,6 +8,7 @@ source_set("thread-sampler") {
   testonly = true
   sources = [ "thread-sampler.cc" ]
   deps = [
+    "..:needs-next",
     "//src/performance/lib/fxt",
     "//src/zircon/testing/standalone-test",
     "//zircon/system/ulib/runtime",

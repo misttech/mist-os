@@ -23,11 +23,15 @@
 
 #include <zxtest/zxtest.h>
 
+#include "../needs-next.h"
+
 const uint64_t kIoBufferEpRwMap = ZX_IOB_ACCESS_EP0_CAN_MAP_READ | ZX_IOB_ACCESS_EP0_CAN_MAP_WRITE |
                                   ZX_IOB_ACCESS_EP1_CAN_MAP_READ | ZX_IOB_ACCESS_EP1_CAN_MAP_WRITE;
 const uint64_t kIoBufferEp0OnlyRwMap =
     ZX_IOB_ACCESS_EP0_CAN_MAP_READ | ZX_IOB_ACCESS_EP0_CAN_MAP_WRITE;
 const uint64_t kIoBufferRdOnlyMap = ZX_IOB_ACCESS_EP0_CAN_MAP_READ | ZX_IOB_ACCESS_EP1_CAN_MAP_READ;
+
+NEEDS_NEXT_SYSCALL(zx_iob_allocate_id);
 
 namespace {
 // An RAII Helper used to make sure that we don't accidentally leak any mapped
@@ -770,6 +774,8 @@ TEST(Iob, GetInfoProcessMaps) {
 }
 
 TEST(Iob, IdAllocatorMediatedAccess) {
+  NEEDS_NEXT_SKIP(zx_iob_allocate_id);
+
   constexpr std::array<std::byte, 10> kBlob{std::byte{'a'}};
   constexpr zx_iob_allocate_id_options_t kOptions = 0;
   constexpr uint32_t kIdAllocatorIdx = 0;
@@ -817,6 +823,8 @@ TEST(Iob, IdAllocatorMediatedAccess) {
 }
 
 TEST(Iob, IdAllocatorMediatedErrors) {
+  NEEDS_NEXT_SKIP(zx_iob_allocate_id);
+
   constexpr std::array<std::byte, 10> kBlob{std::byte{'a'}};
   constexpr zx_iob_allocate_id_options_t kOptions = 0;
   constexpr uint32_t kIdAllocatorIdx = 0;
