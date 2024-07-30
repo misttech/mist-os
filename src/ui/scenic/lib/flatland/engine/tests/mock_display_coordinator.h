@@ -76,8 +76,9 @@ class MockDisplayCoordinator : public fuchsia::hardware::display::testing::Coord
                fuchsia::hardware::display::types::ImageMetadata));
 
   MOCK_METHOD(void, SetLayerPrimaryPosition,
-              (fuchsia::hardware::display::LayerId, fuchsia::hardware::display::types::Transform,
-               fuchsia::math::RectU, fuchsia::math::RectU));
+              (fuchsia::hardware::display::LayerId,
+               fuchsia::hardware::display::types::CoordinateTransformation, fuchsia::math::RectU,
+               fuchsia::math::RectU));
 
   MOCK_METHOD(void, SetLayerPrimaryAlpha,
               (fuchsia::hardware::display::LayerId, fuchsia::hardware::display::types::AlphaMode,

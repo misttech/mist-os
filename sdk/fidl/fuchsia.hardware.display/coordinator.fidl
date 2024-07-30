@@ -247,7 +247,14 @@ closed protocol Coordinator {
     /// illegal.
     strict SetLayerPrimaryPosition(struct {
         layer_id LayerId;
-        transform fuchsia.hardware.display.types.Transform;
+
+        /// Applied to the input image pixels specified by `image_source`.
+        ///
+        /// `display_destination` must account for image dimensions changes
+        /// caused by rotations. For example, rotating a 600x300 pixel image by
+        /// 90 degrees would specify 300x600 pixel dimensions in
+        /// `display_destination`.
+        image_source_transformation fuchsia.hardware.display.types.CoordinateTransformation;
 
         /// The associated image region whose pixels are drawn by the layer.
         ///

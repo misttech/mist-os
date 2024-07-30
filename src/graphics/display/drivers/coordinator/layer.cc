@@ -247,14 +247,14 @@ void Layer::SetPrimaryConfig(fhdt::wire::ImageMetadata image_metadata) {
   config_change_ = true;
 }
 
-void Layer::SetPrimaryPosition(fhdt::wire::Transform transform,
+void Layer::SetPrimaryPosition(fhdt::wire::CoordinateTransformation image_source_transformation,
                                fuchsia_math::wire::RectU image_source,
                                fuchsia_math::wire::RectU display_destination) {
   primary_layer_t& primary_layer = pending_layer_.cfg.primary;
 
   primary_layer.image_source = Rectangle::From(image_source).ToBanjo();
   primary_layer.display_destination = Rectangle::From(display_destination).ToBanjo();
-  primary_layer.transform_mode = static_cast<uint8_t>(transform);
+  primary_layer.transform_mode = static_cast<uint8_t>(image_source_transformation);
 
   config_change_ = true;
 }

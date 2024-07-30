@@ -230,16 +230,16 @@ void PrimaryLayer::StepLayout(int32_t frame_num) {
   if (rotates_) {
     switch ((frame_num / kRotationPeriod) % 4) {
       case 0:
-        rotation_ = Transform::kIdentity;
+        rotation_ = fuchsia_hardware_display_types::wire::CoordinateTransformation::kIdentity;
         break;
       case 1:
-        rotation_ = Transform::kRot90;
+        rotation_ = fuchsia_hardware_display_types::wire::CoordinateTransformation::kRotateCcw90;
         break;
       case 2:
-        rotation_ = Transform::kRot180;
+        rotation_ = fuchsia_hardware_display_types::wire::CoordinateTransformation::kRotateCcw180;
         break;
       case 3:
-        rotation_ = Transform::kRot270;
+        rotation_ = fuchsia_hardware_display_types::wire::CoordinateTransformation::kRotateCcw270;
         break;
     }
 
@@ -271,7 +271,9 @@ void PrimaryLayer::StepLayout(int32_t frame_num) {
     // Calculate the portion of the dest frame which shows up on this display
     if (compute_intersection(display, display_destination_, &layers_[i].dest)) {
       // Find the subset of the src region which shows up on this display
-      if (rotation_ == Transform::kIdentity || rotation_ == Transform::kRot180) {
+      if (rotation_ == fuchsia_hardware_display_types::wire::CoordinateTransformation::kIdentity ||
+          rotation_ ==
+              fuchsia_hardware_display_types::wire::CoordinateTransformation::kRotateCcw180) {
         if (!scaling_) {
           layers_[i].src.x = image_source_.x + (layers_[i].dest.x - display_destination_.x);
           layers_[i].src.y = image_source_.y;

@@ -43,9 +43,10 @@ class MockDisplayCoordinator : public fuchsia::hardware::display::testing::Coord
   using AcknowledgeVsyncFn = std::function<void(uint64_t cookie)>;
   using SetDisplayLayersFn = std::function<void(fuchsia::hardware::display::types::DisplayId,
                                                 std::vector<fuchsia::hardware::display::LayerId>)>;
-  using SetLayerPrimaryPositionFn = std::function<void(fuchsia::hardware::display::LayerId,
-                                                       fuchsia::hardware::display::types::Transform,
-                                                       fuchsia::math::RectU, fuchsia::math::RectU)>;
+  using SetLayerPrimaryPositionFn =
+      std::function<void(fuchsia::hardware::display::LayerId,
+                         fuchsia::hardware::display::types::CoordinateTransformation,
+                         fuchsia::math::RectU, fuchsia::math::RectU)>;
 
   using SetDisplayModeFn = std::function<void(fuchsia::hardware::display::types::DisplayId,
                                               fuchsia::hardware::display::Mode)>;
@@ -126,13 +127,14 @@ class MockDisplayCoordinator : public fuchsia::hardware::display::testing::Coord
     callback(fuchsia::hardware::display::Coordinator_ImportImage_Result::WithResponse({}));
   }
 
-  void SetLayerPrimaryPosition(fuchsia::hardware::display::LayerId layer_id,
-                               fuchsia::hardware::display::types::Transform transform,
-                               fuchsia::math::RectU image_source,
-                               fuchsia::math::RectU display_destination) override {
+  void SetLayerPrimaryPosition(
+      fuchsia::hardware::display::LayerId layer_id,
+      fuchsia::hardware::display::types::CoordinateTransformation image_source_transformation,
+      fuchsia::math::RectU image_source, fuchsia::math::RectU display_destination) override {
     ++set_layer_primary_position_count_;
     if (set_layer_primary_position_fn_) {
-      set_layer_primary_position_fn_(layer_id, transform, image_source, display_destination);
+      set_layer_primary_position_fn_(layer_id, image_source_transformation, image_source,
+                                     display_destination);
     }
   }
 

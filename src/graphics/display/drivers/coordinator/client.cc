@@ -533,12 +533,14 @@ void Client::SetLayerPrimaryPosition(SetLayerPrimaryPositionRequestView request,
     TearDown();
     return;
   }
-  if (request->transform > fhdt::wire::Transform::kRot90ReflectY) {
-    zxlogf(ERROR, "Invalid transform %hhu", static_cast<uint8_t>(request->transform));
+  if (request->image_source_transformation >
+      fhdt::wire::CoordinateTransformation::kRotateCcw90ReflectY) {
+    zxlogf(ERROR, "Invalid transform %" PRIu8,
+           static_cast<uint8_t>(request->image_source_transformation));
     TearDown();
     return;
   }
-  layer->SetPrimaryPosition(request->transform, request->image_source,
+  layer->SetPrimaryPosition(request->image_source_transformation, request->image_source,
                             request->display_destination);
   pending_config_valid_ = false;
   // no Reply defined

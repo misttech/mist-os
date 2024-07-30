@@ -57,9 +57,9 @@ struct DisplaySrcDstFrames {
 
 // Converts a flatland |Orientation| and |ImageFlip| value to the appropriate hardware display
 // transform enum.
-fuchsia::hardware::display::types::Transform GetDisplayTransformFromOrientationAndFlip(
-    fuchsia::ui::composition::Orientation orientation,
-    fuchsia::ui::composition::ImageFlip image_flip);
+fuchsia::hardware::display::types::CoordinateTransformation
+GetDisplayTransformFromOrientationAndFlip(fuchsia::ui::composition::Orientation orientation,
+                                          fuchsia::ui::composition::ImageFlip image_flip);
 
 }  // namespace flatland
 
