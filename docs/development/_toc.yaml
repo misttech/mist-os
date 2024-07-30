@@ -104,6 +104,9 @@ toc:
 - title: "Trace"
   section:
   - include: /docs/development/tracing/_toc.yaml
+- title: "Profile"
+  section:
+  - include: /docs/development/profiling/_toc.yaml
 - title: "Fuchsia Controller"
   section:
   - include: /docs/development/tools/fuchsia-controller/_toc.yaml
