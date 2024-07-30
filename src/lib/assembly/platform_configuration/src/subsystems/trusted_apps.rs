@@ -50,6 +50,11 @@ impl DefineSubsystemConfiguration<Vec<ProductTrustedApp>> for TrustedAppsConfig 
                 protocol: Some(create_name("fuchsia.logger.LogSink")?.into()),
                 ..cml::Offer::empty(cml::OfferFromRef::Parent.into(), cml::OfferToRef::All.into())
             },
+            cml::Offer {
+                protocol: Some(create_name("fuchsia.tracing.provider.Registry")?.into()),
+                availability: Some(cml::Availability::SameAsTarget),
+                ..cml::Offer::empty(cml::OfferFromRef::Parent.into(), cml::OfferToRef::All.into())
+            },
         ];
 
         // Offer all of the protocols our children require to them.
@@ -307,6 +312,12 @@ mod tests {
             "protocol": "fuchsia.logger.LogSink",
             "from": "parent",
             "to": "all"
+          },
+          {
+            "protocol": "fuchsia.tracing.provider.Registry",
+            "from": "parent",
+            "to": "all",
+            "availability": "same_as_target",
           },
           {
             "protocol": "fuchsia.baz.bang",
