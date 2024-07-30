@@ -84,6 +84,54 @@ void PageSource::OnPagesDirtied(uint64_t offset, uint64_t len) {
   ResolveRequests(page_request_type::DIRTY, offset, len);
 }
 
+void PageSource::EarlyWakeRequestLocked(PageRequest* request, uint64_t req_start,
+                                        uint64_t req_end) {
+  DEBUG_ASSERT(request);
+  DEBUG_ASSERT(req_end >= req_start);
+  DEBUG_ASSERT(req_start == request->wake_offset_);
+  // By default set the wake_offset_ to the end of the supplied range so the caller can just
+  // wait again. In practice they are likely to call GetPages first, which will reinitialize
+  // wake_offset_ to what is actually the next desired offset, which may or may not be the
+  // same as what is set here.
+  request->wake_offset_ = req_end;
+  request->event_.Signal();
+  // For simplicity convert the request relative range back into a provider (aka VMO) range.
+  const uint64_t provider_start = req_start + request->offset_;
+  const uint64_t provider_end = req_end + request->offset_;
+  for (PageRequest& overlap : request->overlap_) {
+    if (!overlap.early_wake_) {
+      continue;
+    }
+    // If the parent range has processed beyond the overlap wake offset then this is most
+    // likely a sign of pages having not been linearly supplied, so want to wake up this
+    // request anyway.
+    if (provider_start > overlap.offset_ &&
+        provider_start - overlap.offset_ > overlap.wake_offset_) {
+      // In the case that something unusual has happened we do not want to keep on waking up the
+      // request for any future completions, since it is waiting for wake_offset_ and either it
+      // already got supplied and we missed it, which will get fixed by doing this signal, or it's
+      // not been supplied and this (and any future) signal is a waste. To prevent future wakes we
+      // set the wake_offset_ to a large so that we do not continuously signal as the parent request
+      // is given more content. The largest obvious safe value, i.e. would not overflow anywhere,
+      // is the end of the parent request range.
+      overlap.wake_offset_ = request->len_;
+      overlap.event_.Signal();
+      continue;
+    }
+    // If there is otherwise no overlap, then can skip.
+    if (!overlap.RangeOverlaps(provider_start, provider_end)) {
+      continue;
+    }
+    // Get the overlapping portion and see if it intersects with the wake_offset_.
+    auto [overlap_start, overlap_end] =
+        overlap.TrimRangeToRequestSpace(provider_start, provider_end);
+    if (overlap_start <= overlap.wake_offset_ && overlap_end > overlap.wake_offset_) {
+      overlap.wake_offset_ = overlap_end;
+      overlap.event_.Signal();
+    }
+  }
+}
+
 void PageSource::ResolveRequests(page_request_type type, uint64_t offset, uint64_t len) {
   canary_.Assert();
   LTRACEF_LEVEL(2, "%p offset %lx, len %lx\n", this, offset, len);
@@ -105,32 +153,25 @@ void PageSource::ResolveRequests(page_request_type type, uint64_t offset, uint64
     auto cur = start;
     ++start;
 
+    // Because of upper_bound and our loop condition we know the range partially overlaps this
+    // request.
+    DEBUG_ASSERT(cur->RangeOverlaps(offset, end));
+
     // Calculate how many pages were resolved in this request by finding the start and
     // end offsets of the operation in this request.
-    uint64_t req_offset, req_end;
-    if (offset >= cur->offset_) {
-      // The operation started partway into this request.
-      req_offset = offset - cur->offset_;
-    } else {
-      // The operation started before this request.
-      req_offset = 0;
-    }
-    if (end < cur->GetEnd()) {
-      // The operation ended partway into this request.
-      req_end = end - cur->offset_;
+    auto [req_offset, req_end] = cur->TrimRangeToRequestSpace(offset, end);
 
-      uint64_t unused;
-      DEBUG_ASSERT(!sub_overflow(end, cur->offset_, &unused));
-    } else {
-      // The operation ended past the end of this request.
-      req_end = cur->len_;
-    }
-
-    DEBUG_ASSERT(req_end >= req_offset);
     uint64_t fulfill = req_end - req_offset;
 
     // If we're not done, continue to the next request.
     if (fulfill < cur->pending_size_) {
+      // Only Signal if the offset being supplied is exactly at the wake_offset_. The wake_offset_
+      // is the next one that the caller wants, and so waking up for anything before this is
+      // pointless. In the case where the page source supplies this offset last it does mean we will
+      // still block until the full request is provided.
+      if (req_offset == cur->wake_offset_) {
+        EarlyWakeRequestLocked(&*cur, req_offset, req_end);
+      }
       cur->pending_size_ -= fulfill;
       continue;
     } else if (fulfill > cur->pending_size_) {
@@ -205,6 +246,34 @@ bool PageSource::IsValidInternalFailureCode(zx_status_t error_status) {
   }
 }
 
+PageSource::ContinuationType PageSource::RequestContinuationTypeLocked(const PageRequest* request,
+                                                                       uint64_t offset,
+                                                                       uint64_t len,
+                                                                       page_request_type type) {
+  // Check for obvious mismatches in initialization.
+  if (!request->IsInitialized()) {
+    return ContinuationType::NotContinuation;
+  }
+  if (request->src_.get() != this) {
+    return ContinuationType::NotContinuation;
+  }
+  if (request->type_ != type) {
+    return ContinuationType::NotContinuation;
+  }
+  // If the start of the new range overlaps at all with the existing request then we can continue
+  // using the existing request. For any portion of the new range that extends beyond the existing
+  // request, this is fine as once the current request is completed that range can be re-generated
+  // a new request for just that range can be made.
+  if (offset >= request->offset_ && offset < request->offset_ + request->len_) {
+    return ContinuationType::SameRequest;
+  }
+  // The new request is for a completely different range, so we cannot keep using the current one.
+  // A typical cause for this would be racing with a operations on a clone that bypassed the need
+  // to wait for the original request. In this case we already checked that the source and type are
+  // the same above.
+  return ContinuationType::SameSource;
+}
+
 zx_status_t PageSource::PopulateRequest(PageRequest* request, uint64_t offset, uint64_t len,
                                         VmoDebugInfo vmo_debug_info, page_request_type type) {
   canary_.Assert();
@@ -224,6 +293,35 @@ zx_status_t PageSource::PopulateRequest(PageRequest* request, uint64_t offset, u
     return ZX_ERR_BAD_STATE;
   }
 
+  if (request->IsInitialized()) {
+    // The only time we should see an already initialized request is if the request was an early
+    // waking one and this new request is a valid continuation of that one, anything else is a
+    // programming error.
+    DEBUG_ASSERT(request->early_wake_);
+    switch (RequestContinuationTypeLocked(request, offset, len, type)) {
+      case ContinuationType::NotContinuation:
+        // If the request is initialized and the new request is not some kind of continuation then
+        // we consider this a hard error. Although we could just cancel the existing request and
+        // generate a new one, this case indicates a serious logic error in the page request
+        // handling code and we should not attempt to continue.
+        panic("Request at offset %" PRIx64 " len %" PRIx64 " is not any kind of continuation",
+              offset, len);
+        return ZX_ERR_INTERNAL;
+      case ContinuationType::SameRequest:
+        DEBUG_ASSERT(offset >= request->offset_);
+        // By default the wake_offset_ was previously incremented by whatever was supplied, but to
+        // accommodate a page source supply pages out of order we reset our wake offset to the next
+        // actual offset that is missing.
+        request->wake_offset_ = offset - request->offset_;
+        return ZX_ERR_SHOULD_WAIT;
+      case ContinuationType::SameSource:
+        // The requested range does not overlap the existing request, but it's for the same source
+        // so this is just a case of the original range no longer being needed and so can cancel the
+        // request and make a new one.
+        CancelRequestLocked(request);
+        break;
+    }
+  }
   return PopulateRequestLocked(request, offset, len, vmo_debug_info, type);
 }
 
@@ -320,6 +418,10 @@ void PageSource::CompleteRequestLocked(PageRequest* request, zx_status_t status)
 void PageSource::CancelRequest(PageRequest* request) {
   canary_.Assert();
   Guard<Mutex> guard{&page_source_mtx_};
+  CancelRequestLocked(request);
+}
+
+void PageSource::CancelRequestLocked(PageRequest* request) {
   LTRACEF("%p %lx\n", this, request->offset_);
 
   if (!request->IsInitialized()) {
@@ -401,11 +503,38 @@ void PageRequest::Init(fbl::RefPtr<PageRequestInterface> src, uint64_t offset,
   vmo_debug_info_ = vmo_debug_info;
   len_ = 0;
   offset_ = offset;
+  if (early_wake_) {
+    wake_offset_ = 0;
+  }
   DEBUG_ASSERT(type < page_request_type::COUNT);
   type_ = type;
   src_ = ktl::move(src);
 
   event_.Unsignal();
+}
+
+ktl::pair<uint64_t, uint64_t> PageRequest::TrimRangeToRequestSpace(uint64_t start,
+                                                                   uint64_t end) const {
+  uint64_t req_offset, req_end;
+  if (start >= offset_) {
+    // The operation started partway into this request.
+    req_offset = start - offset_;
+  } else {
+    // The operation started before this request.
+    req_offset = 0;
+  }
+  if (end < GetEnd()) {
+    // The operation ended partway into this request.
+    req_end = end - offset_;
+
+    uint64_t unused;
+    DEBUG_ASSERT(!sub_overflow(end, offset_, &unused));
+  } else {
+    // The operation ended past the end of this request.
+    req_end = len_;
+  }
+  DEBUG_ASSERT(req_end >= req_offset);
+  return {req_offset, req_end};
 }
 
 zx_status_t PageRequest::Wait() {
@@ -431,7 +560,7 @@ void PageRequest::CancelRequest() {
 
 PageRequest* LazyPageRequest::get() {
   if (!is_initialized()) {
-    request_.emplace();
+    request_.emplace(early_wake_);
   }
   return &*request_;
 }
