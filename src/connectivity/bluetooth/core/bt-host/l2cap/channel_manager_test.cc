@@ -18,9 +18,6 @@
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/test_packets.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/transport/acl_data_packet.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/transport/mock_acl_data_channel.h"
-
-#pragma clang diagnostic ignored "-Wshadow"
-
 namespace bt::l2cap {
 namespace {
 
@@ -4070,7 +4067,6 @@ TEST_F(ChannelManagerMockAclChannelTest,
 TEST_F(ChannelManagerRealAclChannelTest,
        InboundRfcommChannelFailsWithPsmNotSupported) {
   constexpr l2cap::Psm kPsm = l2cap::kRFCOMM;
-  constexpr l2cap::ChannelId kRemoteId = 0x9042;
 
   QueueAclConnection(kTestHandle1);
   RunUntilIdle();
@@ -4096,8 +4092,6 @@ TEST_F(ChannelManagerRealAclChannelTest,
 TEST_F(ChannelManagerRealAclChannelTest,
        InboundPacketQueuedAfterChannelOpenIsNotDropped) {
   constexpr l2cap::Psm kPsm = l2cap::kSDP;
-  constexpr l2cap::ChannelId kLocalId = 0x0040;
-  constexpr l2cap::ChannelId kRemoteId = 0x9042;
 
   QueueAclConnection(kTestHandle1);
   RunUntilIdle();
@@ -4177,8 +4171,6 @@ TEST_F(ChannelManagerRealAclChannelTest,
 TEST_F(ChannelManagerRealAclChannelTest,
        NegotiateChannelParametersOnOutboundL2capChannel) {
   constexpr l2cap::Psm kPsm = l2cap::kAVDTP;
-  constexpr l2cap::ChannelId kLocalId = 0x0040;
-  constexpr l2cap::ChannelId kRemoteId = 0x9042;
   constexpr uint16_t kMtu = l2cap::kMinACLMTU;
 
   l2cap::ChannelParameters chan_params;
@@ -4215,8 +4207,6 @@ TEST_F(ChannelManagerRealAclChannelTest,
 TEST_F(ChannelManagerRealAclChannelTest,
        NegotiateChannelParametersOnInboundChannel) {
   constexpr l2cap::Psm kPsm = l2cap::kAVDTP;
-  constexpr l2cap::ChannelId kLocalId = 0x0040;
-  constexpr l2cap::ChannelId kRemoteId = 0x9042;
 
   l2cap::ChannelParameters chan_params;
   chan_params.mode =
@@ -4316,8 +4306,6 @@ TEST_F(ChannelManagerRealAclChannelTest,
 
 TEST_F(ChannelManagerRealAclChannelTest, SignalingChannelAndOneDynamicChannel) {
   constexpr l2cap::Psm kPsm = l2cap::kSDP;
-  constexpr l2cap::ChannelId kLocalId = 0x0040;
-  constexpr l2cap::ChannelId kRemoteId = 0x9042;
 
   // L2CAP connection request/response, config request, config response
   constexpr size_t kChannelCreationPacketCount = 3;
@@ -4486,8 +4474,6 @@ TEST_F(ChannelManagerRealAclChannelTest,
 
 TEST_F(ChannelManagerRealAclChannelTest, ChannelMaximumQueueSize) {
   constexpr l2cap::Psm kPsm = l2cap::kSDP;
-  constexpr l2cap::ChannelId kLocalId = 0x0040;
-  constexpr l2cap::ChannelId kRemoteId = 0x9042;
 
   // L2CAP connection request/response, config request, config response
   constexpr size_t kChannelCreationPacketCount = 3;
@@ -4576,8 +4562,6 @@ TEST_P(AclPriorityTest, OutboundConnectAndSetPriority) {
                                          0x03);  // test parameter
 
   constexpr l2cap::Psm kPsm = l2cap::kAVCTP;
-  constexpr l2cap::ChannelId kLocalId = 0x0040;
-  constexpr l2cap::ChannelId kRemoteId = 0x9042;
 
   std::optional<hci_spec::ConnectionHandle> connection_handle_from_encode_cb;
   std::optional<AclPriority> priority_from_encode_cb;

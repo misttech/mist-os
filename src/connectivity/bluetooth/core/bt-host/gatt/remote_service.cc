@@ -6,9 +6,8 @@
 
 #include "lib/fit/defer.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/log.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/macros.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/slab_allocator.h"
-
-#pragma clang diagnostic ignored "-Wshadow"
 
 namespace bt::gatt {
 namespace {
@@ -752,13 +751,12 @@ void RemoteService::ReadByTypeHelper(
     BT_ASSERT(!values.empty());
 
     // Convert and accumulate values.
-    for (const auto& result : values) {
-      auto buffer = NewBuffer(result.value.size());
-      result.value.Copy(buffer.get());
-      values_accum.push_back(
-          ReadByTypeResult{CharacteristicHandle(result.handle),
-                           fit::ok(std::move(buffer)),
-                           result.maybe_truncated});
+    for (const auto& val : values) {
+      auto buffer = NewBuffer(val.value.size());
+      val.value.Copy(buffer.get());
+      values_accum.push_back(ReadByTypeResult{CharacteristicHandle(val.handle),
+                                              fit::ok(std::move(buffer)),
+                                              val.maybe_truncated});
     }
 
     // Do not attempt to read from the next handle if the last value handle is
