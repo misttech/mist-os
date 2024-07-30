@@ -359,6 +359,9 @@ cc_library(
     includes = [
         "public",
     ],
+    deps = [
+        "@pigweed//pw_preprocessor",
+    ],
 )
 
 fuchsia_cc_test(
