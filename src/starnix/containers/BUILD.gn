@@ -6,7 +6,10 @@ import("//build/components.gni")
 import("//src/starnix/kernel/starnix.gni")
 
 group("containers") {
-  deps = [ "empty_container" ]
+  deps = [
+    "empty_container",
+    "stardev",
+  ]
   if (target_cpu != "riscv64") {
     deps += [ "debian" ]
   }
