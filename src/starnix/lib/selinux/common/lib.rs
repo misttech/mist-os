@@ -266,6 +266,8 @@ class_permission_enum! {
         GetRlimit("getrlimit"),
         /// Permission to set the resource limits on a process.
         SetRlimit("setrlimit"),
+        /// Permission to dynamically transition a process to a different security domain.
+        DynTransition("dyntransition"),
     }
 }
 

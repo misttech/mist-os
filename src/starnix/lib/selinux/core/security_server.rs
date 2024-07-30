@@ -194,7 +194,7 @@ impl SecurityServer {
 
     /// Converts a shared pointer to [`SecurityServer`] to a [`PermissionCheck`] without consuming
     /// the pointer.
-    pub fn as_permission_check<'a>(self: &'a Arc<Self>) -> impl PermissionCheck + 'a {
+    pub fn as_permission_check<'a>(self: &'a Self) -> impl PermissionCheck + 'a {
         PermissionCheckImpl::new(self, self.avc_manager.get_shared_cache())
     }
 

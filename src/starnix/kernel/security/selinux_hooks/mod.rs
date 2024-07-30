@@ -329,8 +329,17 @@ pub fn set_procattr(
     match attr {
         ProcAttr::Current => {
             check_permission(ProcessPermission::SetCurrent)?;
-            // TODO(b/322849067): Verify the `source` has `dyntransition` permission to the new SID.
-            target.current_sid = sid.ok_or_else(|| errno!(EINVAL))?
+
+            // Permission to dynamically transition to the new Context is also required.
+            let new_sid = sid.ok_or_else(|| errno!(EINVAL))?;
+            check_permissions(
+                &security_server.as_permission_check(),
+                target.current_sid,
+                new_sid,
+                &[ProcessPermission::DynTransition],
+            )?;
+
+            target.current_sid = new_sid
         }
         ProcAttr::Previous => {
             return error!(EINVAL);
