@@ -16,13 +16,13 @@
 
 use crate::error::Error;
 use tracing::error;
-use wlan_common::appendable::Appendable;
+use wlan_common::append::Append;
 use wlan_common::buffer_reader::BufferReader;
 use wlan_common::buffer_writer::BufferWriter;
 use wlan_common::{frame_len, mac};
-use wlan_frame_writer::write_frame_with_dynamic_buffer;
+use wlan_frame_writer::append_frame_to;
 use wlan_statemachine::*;
-use zerocopy::{AsBytes, ByteSlice, Ref};
+use zerocopy::{ByteSlice, Ref};
 use {fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fuchsia_zircon as zx};
 
 pub const ADDBA_REQ_FRAME_LEN: usize = frame_len!(mac::MgmtHdr, mac::ActionHdr, mac::AddbaReqHdr);
@@ -262,7 +262,7 @@ impl BlockAckState {
 ///
 /// Note that the action header is part of the management frame body and is written by this
 /// function. The frame format is described by IEEE Std 802.11-2016, 9.6.5.2.
-pub fn write_addba_req_body<B: Appendable>(buffer: &mut B, dialog_token: u8) -> Result<(), Error> {
+pub fn write_addba_req_body<B: Append>(buffer: &mut B, dialog_token: u8) -> Result<(), Error> {
     let body = mac::AddbaReqHdr {
         action: mac::BlockAckAction::ADDBA_REQUEST,
         dialog_token,
@@ -276,7 +276,7 @@ pub fn write_addba_req_body<B: Appendable>(buffer: &mut B, dialog_token: u8) -> 
             .with_fragment_number(0) // Always zero. See IEEE Std 802.11-2016, 9.6.5.2.
             .with_starting_sequence_number(1), // TODO(https://fxbug.dev/42104687): Determine a better value.
     };
-    write_frame_with_dynamic_buffer!(
+    Ok(append_frame_to!(
         buffer,
         {
             headers: {
@@ -287,7 +287,7 @@ pub fn write_addba_req_body<B: Appendable>(buffer: &mut B, dialog_token: u8) -> 
             body: body.as_bytes(),
         }
     )
-    .map(|_buffer| {})
+    .map(|_buffer| {})?)
 }
 
 /// Writes the body of the management frame for an `ADDBA` request to the given buffer. The
@@ -295,7 +295,7 @@ pub fn write_addba_req_body<B: Appendable>(buffer: &mut B, dialog_token: u8) -> 
 ///
 /// Note that the action header is part fo the management frame body and is written by this
 /// function. The frame format is described by IEEE Std 802.11-2016, 9.6.5.3.
-pub fn write_addba_resp_body<B: Appendable>(buffer: &mut B, dialog_token: u8) -> Result<(), Error> {
+pub fn write_addba_resp_body<B: Append>(buffer: &mut B, dialog_token: u8) -> Result<(), Error> {
     let body = mac::AddbaRespHdr {
         action: mac::BlockAckAction::ADDBA_RESPONSE,
         dialog_token,
@@ -307,7 +307,7 @@ pub fn write_addba_resp_body<B: Appendable>(buffer: &mut B, dialog_token: u8) ->
             .with_buffer_size(BLOCK_ACK_BUFFER_SIZE),
         timeout: 0, // TODO(https://fxbug.dev/42104687): No timeout. Determina a better value.
     };
-    write_frame_with_dynamic_buffer!(
+    Ok(append_frame_to!(
         buffer,
         {
             headers: {
@@ -318,10 +318,10 @@ pub fn write_addba_resp_body<B: Appendable>(buffer: &mut B, dialog_token: u8) ->
             body: body.as_bytes(),
         }
     )
-    .map(|_buffer| {})
+    .map(|_buffer| {})?)
 }
 
-pub fn write_delba_body<B: Appendable>(
+pub fn write_delba_body<B: Append>(
     buffer: &mut B,
     is_initiator: bool,
     reason_code: mac::ReasonCode,
@@ -331,7 +331,7 @@ pub fn write_delba_body<B: Appendable>(
         parameters: mac::DelbaParameters(0).with_initiator(is_initiator).with_tid(BLOCK_ACK_TID),
         reason_code,
     };
-    write_frame_with_dynamic_buffer!(
+    Ok(append_frame_to!(
         buffer,
         {
             headers: {
@@ -342,7 +342,7 @@ pub fn write_delba_body<B: Appendable>(
             body: body.as_bytes(),
         }
     )
-    .map(|_buffer| {})
+    .map(|_buffer| {})?)
 }
 
 /// Reads an ADDBA request header from an ADDBA frame body.
@@ -409,6 +409,7 @@ fn read_delba_hdr<B: ByteSlice>(body: B) -> Result<Ref<B, mac::DelbaHdr>, Error>
 #[cfg(test)]
 mod tests {
     use super::*;
+    use wlan_common::append::TrackedAppend;
     use wlan_common::assert_variant;
     use {fuchsia_zircon as zx, wlan_statemachine as statemachine};
 
@@ -439,7 +440,7 @@ mod tests {
         let mut body = [0u8; ADDBA_RESP_FRAME_LEN];
         let mut writer = BufferWriter::new(&mut body[..]);
         super::write_addba_req_body(&mut writer, dialog_token).unwrap();
-        (writer.bytes_written(), body)
+        (writer.bytes_appended(), body)
     }
 
     /// Creates an ADDBA response body.
@@ -450,7 +451,7 @@ mod tests {
         let mut body = [0u8; ADDBA_RESP_FRAME_LEN];
         let mut writer = BufferWriter::new(&mut body[..]);
         super::write_addba_resp_body(&mut writer, dialog_token).unwrap();
-        (writer.bytes_written(), body)
+        (writer.bytes_appended(), body)
     }
 
     /// Creates a DELBA body.
@@ -463,7 +464,7 @@ mod tests {
         let mut body = [0u8; DELBA_FRAME_LEN];
         let mut writer = BufferWriter::new(&mut body[..]);
         super::write_delba_body(&mut writer, is_initiator, reason_code).unwrap();
-        (writer.bytes_written(), body)
+        (writer.bytes_appended(), body)
     }
 
     #[test]

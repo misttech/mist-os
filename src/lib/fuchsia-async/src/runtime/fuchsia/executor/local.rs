@@ -4,8 +4,8 @@
 
 use super::super::timer::TimerHeap;
 use super::common::{with_local_timer_heap, EHandle, Executor, ExecutorTime, MAIN_TASK_ID};
+use super::scope::ScopeRef;
 use super::time::Time;
-use super::ScopeRef;
 use crate::atomic_future::AtomicFuture;
 use futures::future::{self, Either};
 use futures::task::AtomicWaker;

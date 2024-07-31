@@ -12,13 +12,7 @@
 namespace fdf_metadata::test {
 
 zx::result<> MetadataSenderTestDriver::Start() {
-  zx_status_t status = metadata_server_.Serve(*outgoing(), dispatcher());
-  if (status != ZX_OK) {
-    FDF_SLOG(ERROR, "Failed to serve metadata.", KV("status", zx_status_get_string(status)));
-    return zx::error(status);
-  }
-
-  status = InitControllerNode();
+  zx_status_t status = InitControllerNode();
   if (status != ZX_OK) {
     FDF_SLOG(ERROR, "Failed to initialize controller node.",
              KV("status", zx_status_get_string(status)));
@@ -31,6 +25,17 @@ zx::result<> MetadataSenderTestDriver::Start() {
 void MetadataSenderTestDriver::Serve(
     fidl::ServerEnd<fuchsia_hardware_test::MetadataSender> request) {
   bindings_.AddBinding(dispatcher(), std::move(request), this, fidl::kIgnoreBindingClosure);
+}
+
+void MetadataSenderTestDriver::ServeMetadata(ServeMetadataCompleter::Sync& completer) {
+  zx_status_t status = metadata_server_.Serve(*outgoing(), dispatcher());
+  if (status != ZX_OK) {
+    FDF_SLOG(ERROR, "Failed to serve metadata.", KV("status", zx_status_get_string(status)));
+    completer.Reply(fit::error(status));
+    return;
+  }
+  offer_metadata_to_child_nodes_ = true;
+  completer.Reply(fit::ok());
 }
 
 void MetadataSenderTestDriver::SetMetadata(SetMetadataRequest& request,
@@ -89,8 +94,11 @@ void MetadataSenderTestDriver::AddMetadataForwarderNode(
 zx_status_t MetadataSenderTestDriver::AddMetadataNode(
     std::string_view node_name,
     const fuchsia_driver_framework::NodePropertyVector& node_properties) {
-  zx::result result =
-      AddChild(node_name, node_properties, std::vector{metadata_server_.MakeOffer()});
+  std::vector<fuchsia_driver_framework::Offer> offers;
+  if (offer_metadata_to_child_nodes_) {
+    offers.emplace_back(metadata_server_.MakeOffer());
+  }
+  zx::result result = AddChild(node_name, node_properties, offers);
   if (result.is_error()) {
     FDF_SLOG(ERROR, "Failed to add child.", KV("status", result.status_string()));
     return result.status_value();

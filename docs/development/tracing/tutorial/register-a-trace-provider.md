@@ -105,7 +105,8 @@ include the following field in the component manifest (`.cml`):
 
 This allows your component to communicate with the trace manager using the
 `fuchsia.tracing.provider.Registry` protocol as well as forward the offer to
-its children.
+its direct children. If your component is a child of another component, you'll
+need to include the `client.shard.cml` in each of the parents' cmls as well.
 
 If your component uses a Chromium-based `fuchsia.web` service and you want
 to be able to collect trace data from it, both the

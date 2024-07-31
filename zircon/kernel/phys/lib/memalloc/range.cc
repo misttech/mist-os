@@ -48,12 +48,14 @@ std::string_view ToString(Type type) {
       return "phys log file"sv;
     case Type::kKernel:
       return "kernel image"sv;
-    case Type::kFixedAddressKernel:
-      return "fixed-address kernel image"sv;
     case Type::kKernelStorage:
       return "decompressed kernel payload"sv;
     case Type::kDataZbi:
       return "data ZBI"sv;
+    case Type::kTrampolineStagingKernel:
+      return "trampoline staging kernel image"sv;
+    case Type::kTrampolineStagingDataZbi:
+      return "trampoline staging data ZBI";
     case Type::kLegacyBootData:
       return "legacy boot data";
     case Type::kTemporaryIdentityPageTables:

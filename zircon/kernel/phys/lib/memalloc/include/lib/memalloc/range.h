@@ -59,14 +59,19 @@ enum class Type : uint64_t {
   // The kernel memory image.
   kKernel,
 
-  // The kernel memory image at a fixed address of 1MiB.
-  kFixedAddressKernel,
-
   // A (decompressed) STORAGE_KERNEL ZBI payload.
   kKernelStorage,
 
   // The data ZBI, as placed by the bootloader.
   kDataZbi,
+
+  // The intermediate kernel memory image used to trampoline into the same image
+  // loaded at a fixed address (i.e., as used by TrampolineBoot).
+  kTrampolineStagingKernel,
+
+  // The intermediate data ZBI used to trampoline into the same image
+  // loaded at a fixed address (i.e., as used by TrampolineBoot).
+  kTrampolineStagingDataZbi,
 
   // Data structures related to legacy boot protocols.
   kLegacyBootData,

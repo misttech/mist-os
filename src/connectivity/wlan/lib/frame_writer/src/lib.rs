@@ -3,10 +3,11 @@
 // found in the LICENSE file.
 
 pub use wlan_frame_writer_macro::{
-    write_frame, write_frame_with_dynamic_buffer, write_frame_with_fixed_slice,
+    append_frame_to, write_frame, write_frame_to_vec, write_frame_with_fixed_slice,
 };
 
 pub use fdf::Arena as __Arena;
+pub use {wlan_common as __wlan_common, zerocopy as __zerocopy};
 
 #[cfg(test)]
 extern crate self as wlan_frame_writer;
@@ -15,48 +16,15 @@ extern crate self as wlan_frame_writer;
 mod tests {
     use super::*;
     use fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211;
-    use fuchsia_zircon::Status;
     use ieee80211::MacAddr;
-    use std::fmt;
-    use thiserror::Error;
-    use wlan_common::appendable::BufferTooSmall;
+    use wlan_common::append::VecCursor;
+    use wlan_common::error::FrameWriteError;
     use wlan_common::ie::rsn::akm::{Akm, PSK};
     use wlan_common::ie::rsn::cipher::{Cipher, CCMP_128, TKIP};
     use wlan_common::ie::rsn::rsne;
     use wlan_common::ie::{self, wpa};
     use wlan_common::mac::*;
     use wlan_common::organization::Oui;
-    use wlan_common::{self as common};
-
-    #[derive(Debug, Error, PartialEq, Eq, Ord, PartialOrd, Hash)]
-    pub enum Error {
-        FrameWriteError,
-        BufferTooSmall,
-    }
-
-    impl fmt::Display for Error {
-        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-            write!(f, "{:?}", self)
-        }
-    }
-
-    impl From<BufferTooSmall> for Error {
-        fn from(_: BufferTooSmall) -> Self {
-            Error::BufferTooSmall
-        }
-    }
-
-    impl From<common::error::FrameWriteError> for Error {
-        fn from(_: common::error::FrameWriteError) -> Self {
-            Error::FrameWriteError
-        }
-    }
-
-    impl From<Status> for Error {
-        fn from(_: Status) -> Self {
-            Error::FrameWriteError
-        }
-    }
 
     fn make_mgmt_hdr() -> MgmtHdr {
         MgmtHdr {
@@ -83,9 +51,55 @@ mod tests {
     }
 
     #[test]
-    fn write_emit_offset_buffer() {
+    fn write_emit_offset_fixed_buffer() {
+        let mut buffer = [0u8; 30];
         let mut offset = 0;
-        write_frame_with_dynamic_buffer!(vec![], {
+        let (frame_start, frame_end) = write_frame_with_fixed_slice!(&mut buffer[..], {
+            ies: {
+                supported_rates: &[1u8, 2, 3, 4, 5, 6, 7, 8],
+                offset @ extended_supported_rates: &[1u8, 2, 3, 4]
+            }
+        })
+        .expect("frame construction failed");
+        assert_eq!(frame_start, 0);
+        assert_eq!(frame_end, 16);
+        assert_eq!(offset, 10);
+    }
+
+    #[test]
+    fn write_emit_offset_fixed_buffer_fill_zeroes() {
+        let mut buffer = [0u8; 30];
+        let mut offset = 0;
+        let (frame_start, frame_end) = write_frame_with_fixed_slice!(&mut buffer[..], {
+            fill_zeroes: (),
+            ies: {
+                supported_rates: &[1u8, 2, 3, 4, 5, 6, 7, 8],
+                offset @ extended_supported_rates: &[1u8, 2, 3, 4]
+            }
+        })
+        .expect("frame construction failed");
+        assert_eq!(frame_start, 14);
+        assert_eq!(frame_end, 30);
+        assert_eq!(offset, 24);
+    }
+
+    #[test]
+    fn write_emit_offset_tracked_append() {
+        let mut offset = 0;
+        append_frame_to!(VecCursor::new(), {
+            ies: {
+                supported_rates: &[1u8, 2, 3, 4, 5, 6, 7, 8],
+                offset @ extended_supported_rates: &[1u8, 2, 3, 4]
+            }
+        })
+        .expect("frame construction failed");
+        assert_eq!(offset, 10);
+    }
+
+    #[test]
+    fn write_emit_offset_vec() {
+        let mut offset = 0;
+        write_frame_to_vec!({
             ies: {
                 supported_rates: &[1u8, 2, 3, 4, 5, 6, 7, 8],
                 offset @ extended_supported_rates: &[1u8, 2, 3, 4]
@@ -97,7 +111,7 @@ mod tests {
 
     #[test]
     fn write_buf_empty_vec() {
-        let buffer = write_frame_with_dynamic_buffer!(vec![], {
+        let buffer = write_frame_to_vec!({
             ies: { ssid: &b"foobar"[..] }
         })
         .expect("frame construction failed");
@@ -174,16 +188,17 @@ mod tests {
 
     #[test]
     fn write_ssid_too_large() {
-        let err = write_frame!({
-            ies: { ssid: [2u8; 33] }
-        })
-        .expect_err("frame construction succeeded");
-        assert_eq!(err, Error::FrameWriteError);
+        assert!(matches!(
+            write_frame!({
+                ies: { ssid: [2u8; 33] }
+            }),
+            Err(FrameWriteError::InvalidData(_))
+        ));
     }
 
     #[test]
     fn write_tim() {
-        let buffer = write_frame_with_dynamic_buffer!(vec![], {
+        let buffer = write_frame_to_vec!({
             ies: {
                 tim: ie::TimView {
                     header: ie::TimHeader {
@@ -195,45 +210,47 @@ mod tests {
                 }
             }
         })
-        .expect("frame construction failed");
+        .expect("failed to write frame");
         assert_eq!(buffer.len(), 8);
         assert_eq!(&[5, 6, 1, 2, 3, 4, 5, 6][..], &buffer[..]);
     }
 
     #[test]
     fn write_tim_empty_bitmap() {
-        let err = write_frame_with_dynamic_buffer!(vec![], {
-            ies: {
-                tim: ie::TimView {
-                    header: ie::TimHeader {
-                        dtim_count: 1,
-                        dtim_period: 2,
-                        bmp_ctrl: ie::BitmapControl(3)
-                    },
-                    bitmap: &[][..],
+        assert!(matches!(
+            write_frame_to_vec!({
+                ies: {
+                    tim: ie::TimView {
+                        header: ie::TimHeader {
+                            dtim_count: 1,
+                            dtim_period: 2,
+                            bmp_ctrl: ie::BitmapControl(3)
+                        },
+                        bitmap: &[][..],
+                    }
                 }
-            }
-        })
-        .expect_err("frame construction succeeded");
-        assert_eq!(err, Error::FrameWriteError);
+            }),
+            Err(FrameWriteError::InvalidData(_))
+        ));
     }
 
     #[test]
     fn write_tim_bitmap_too_long() {
-        let err = write_frame_with_dynamic_buffer!(vec![], {
-            ies: {
-                tim: ie::TimView {
-                    header: ie::TimHeader {
-                        dtim_count: 1,
-                        dtim_period: 2,
-                        bmp_ctrl: ie::BitmapControl(3)
-                    },
-                    bitmap: &[0xFF_u8; 252][..],
+        assert!(matches!(
+            write_frame_to_vec!({
+                ies: {
+                    tim: ie::TimView {
+                        header: ie::TimHeader {
+                            dtim_count: 1,
+                            dtim_period: 2,
+                            bmp_ctrl: ie::BitmapControl(3)
+                        },
+                        bitmap: &[0xFF_u8; 252][..],
+                    }
                 }
-            }
-        })
-        .expect_err("frame construction succeeded");
-        assert_eq!(err, Error::FrameWriteError);
+            }),
+            Err(FrameWriteError::InvalidData(_))
+        ));
     }
 
     #[test]
@@ -258,35 +275,38 @@ mod tests {
 
     #[test]
     fn write_rates_empty() {
-        let err = write_frame!({
-            ies: { supported_rates: &[] }
-        })
-        .expect_err("frame construction succeeded");
-        assert_eq!(err, Error::FrameWriteError);
+        assert!(matches!(
+            write_frame!({
+                ies: { supported_rates: &[] }
+            }),
+            Err(FrameWriteError::InvalidData(_))
+        ));
     }
 
     #[test]
     fn write_extended_supported_rates_too_few_rates() {
-        let err = write_frame!({
-            ies: {
-                supported_rates: &[1u8, 2, 3, 4, 5, 6],
-                extended_supported_rates: &[1u8, 2, 3, 4]
-            }
-        })
-        .expect_err("frame construction succeeded");
-        assert_eq!(err, Error::FrameWriteError);
+        assert!(matches!(
+            write_frame!({
+                ies: {
+                    supported_rates: &[1u8, 2, 3, 4, 5, 6],
+                    extended_supported_rates: &[1u8, 2, 3, 4]
+                }
+            }),
+            Err(FrameWriteError::InvalidData(_))
+        ));
     }
 
     #[test]
     fn write_extended_supported_rates_too_many_rates() {
-        let err = write_frame!({
-            ies: {
-                supported_rates: &[1u8, 2, 3, 4, 5, 6, 7, 8, 9],
-                extended_supported_rates: &[1u8, 2, 3, 4]
-            }
-        })
-        .expect_err("frame construction succeeded");
-        assert_eq!(err, Error::FrameWriteError);
+        assert!(matches!(
+            write_frame!({
+                ies: {
+                    supported_rates: &[1u8, 2, 3, 4, 5, 6, 7, 8, 9],
+                    extended_supported_rates: &[1u8, 2, 3, 4]
+                }
+            }),
+            Err(FrameWriteError::InvalidData(_))
+        ));
     }
 
     #[test]

@@ -5,9 +5,10 @@
 import("//build/cpp/library_headers.gni")
 
 source_set("pager") {
+  testonly = true
+
   configs += [ "//build/config:all_source" ]
 
-  testonly = true
   sources = [
     "pager.cc",
     "snapshot.cc",
@@ -25,6 +26,8 @@ source_set("pager") {
 }
 
 library_headers("userpager_headers") {
+  testonly = true
+
   include_dir = "."
   headers = [
     "test_thread.h",
@@ -34,14 +37,18 @@ library_headers("userpager_headers") {
 }
 
 source_set("userpager") {
+  testonly = true
+
   configs += [ "//build/config:all_source" ]
 
-  testonly = true
   sources = [
     "test_thread.cc",
     "userpager.cc",
   ]
-  deps = [ "//zircon/system/ulib/inspector" ]
+  deps = [
+    "..:needs-next",
+    "//zircon/system/ulib/inspector",
+  ]
   public_deps = [
     ":userpager_headers",
     "//zircon/system/ulib/fbl",

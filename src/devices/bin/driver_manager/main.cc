@@ -140,7 +140,7 @@ int main(int argc, char** argv) {
   driver_manager::DriverDevelopmentService driver_development_service(driver_runner,
                                                                       loop.dispatcher());
   driver_development_service.Publish(outgoing);
-  driver_runner.ScheduleWatchForDriverLoad();
+  driver_runner.TryBindAllAvailable();
 
   driver_manager::ShutdownManager shutdown_manager(&driver_runner, loop.dispatcher());
   shutdown_manager.Publish(outgoing);

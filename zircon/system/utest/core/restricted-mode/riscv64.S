@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+.weak zx_restricted_enter
+
 // Do something to all the registers so we can read the state on the way out.
 .macro twiddle_registers
   addi ra, ra, 1

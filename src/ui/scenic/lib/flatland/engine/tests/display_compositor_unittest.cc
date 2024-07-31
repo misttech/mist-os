@@ -36,6 +36,7 @@ using flatland::TransformGraph;
 using flatland::TransformHandle;
 using flatland::UberStruct;
 using flatland::UberStructSystem;
+using fuchsia::sysmem::BufferUsage;
 using fuchsia::ui::composition::ChildViewStatus;
 using fuchsia::ui::composition::ChildViewWatcher;
 using fuchsia::ui::composition::ImageFlip;
@@ -43,8 +44,6 @@ using fuchsia::ui::composition::LayoutInfo;
 using fuchsia::ui::composition::ParentViewportWatcher;
 using fuchsia::ui::views::ViewCreationToken;
 using fuchsia::ui::views::ViewportCreationToken;
-using fhd_Transform = fuchsia::hardware::display::types::Transform;
-using fuchsia::sysmem::BufferUsage;
 
 namespace flatland::test {
 
@@ -204,9 +203,9 @@ class DisplayCompositorTest : public DisplayCompositorTestBase {
   // thread.
   fuchsia::sysmem2::AllocatorSyncPtr sysmem_allocator_;
 
-  void HardwareFrameCorrectnessWithRotationTester(glm::mat3 transform_matrix, ImageFlip image_flip,
-                                                  fuchsia::math::RectU expected_dst,
-                                                  fhd_Transform expected_transform);
+  void HardwareFrameCorrectnessWithRotationTester(
+      glm::mat3 transform_matrix, ImageFlip image_flip, fuchsia::math::RectU expected_dst,
+      fuchsia::hardware::display::types::CoordinateTransformation expected_transform);
 };
 
 // TODO(https://fxbug.dev/324688770): Dispatch all DisplayCompositor methods
@@ -1127,11 +1126,14 @@ TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessTest) {
     EXPECT_CALL(*mock_display_coordinator_, SetLayerPrimaryConfig(FidlEquals(layers[i]), _))
         .Times(1);
     EXPECT_CALL(*mock_display_coordinator_,
-                SetLayerPrimaryPosition(FidlEquals(layers[i]), fhd_Transform::IDENTITY, _, _))
+                SetLayerPrimaryPosition(
+                    FidlEquals(layers[i]),
+                    fuchsia::hardware::display::types::CoordinateTransformation::IDENTITY, _, _))
         .Times(1)
         .WillOnce(testing::Invoke([image_sources, display_destinations, index = i](
                                       fuchsia::hardware::display::LayerId layer_id,
-                                      fuchsia::hardware::display::types::Transform transform,
+                                      fuchsia::hardware::display::types::CoordinateTransformation
+                                          image_source_transformation,
                                       fuchsia::math::RectU image_source,
                                       fuchsia::math::RectU display_destination) {
           EXPECT_TRUE(fidl::Equals(image_source, image_sources[index]));
@@ -1195,7 +1197,7 @@ TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessTest) {
 
 void DisplayCompositorTest::HardwareFrameCorrectnessWithRotationTester(
     glm::mat3 transform_matrix, ImageFlip image_flip, fuchsia::math::RectU expected_dst,
-    fhd_Transform expected_transform) {
+    fuchsia::hardware::display::types::CoordinateTransformation expected_transform) {
   const uint64_t kGlobalBufferCollectionId = allocation::GenerateUniqueBufferCollectionId();
   const fuchsia::hardware::display::BufferCollectionId kDisplayBufferCollectionId =
       allocation::ToDisplayBufferCollectionId(kGlobalBufferCollectionId);
@@ -1321,14 +1323,15 @@ void DisplayCompositorTest::HardwareFrameCorrectnessWithRotationTester(
   EXPECT_CALL(*mock_display_coordinator_,
               SetLayerPrimaryPosition(FidlEquals(layers[0]), expected_transform, _, _))
       .Times(1)
-      .WillOnce(testing::Invoke(
-          [expected_source, expected_dst](fuchsia::hardware::display::LayerId layer_id,
-                                          fuchsia::hardware::display::types::Transform transform,
-                                          fuchsia::math::RectU image_source,
-                                          fuchsia::math::RectU display_destination) {
-            EXPECT_TRUE(fidl::Equals(image_source, expected_source));
-            EXPECT_TRUE(fidl::Equals(display_destination, expected_dst));
-          }));
+      .WillOnce(testing::Invoke([expected_source, expected_dst](
+                                    fuchsia::hardware::display::LayerId layer_id,
+                                    fuchsia::hardware::display::types::CoordinateTransformation
+                                        image_source_transformation,
+                                    fuchsia::math::RectU image_source,
+                                    fuchsia::math::RectU display_destination) {
+        EXPECT_TRUE(fidl::Equals(image_source, expected_source));
+        EXPECT_TRUE(fidl::Equals(display_destination, expected_dst));
+      }));
   EXPECT_CALL(*mock_display_coordinator_, SetLayerPrimaryAlpha(FidlEquals(layers[0]), _, _))
       .Times(1);
   EXPECT_CALL(*mock_display_coordinator_,
@@ -1393,8 +1396,9 @@ TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessWith90DegreeRotationTest) 
 
   fuchsia::math::RectU expected_dst = {.x = 0u, .y = 0u, .width = 20u, .height = 10u};
 
-  HardwareFrameCorrectnessWithRotationTester(matrix, ImageFlip::NONE, expected_dst,
-                                             fhd_Transform::ROT_90);
+  HardwareFrameCorrectnessWithRotationTester(
+      matrix, ImageFlip::NONE, expected_dst,
+      fuchsia::hardware::display::types::CoordinateTransformation::ROTATE_CCW_90);
 }
 
 TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessWith180DegreeRotationTest) {
@@ -1406,8 +1410,9 @@ TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessWith180DegreeRotationTest)
 
   fuchsia::math::RectU expected_dst = {.x = 0u, .y = 0u, .width = 10u, .height = 20u};
 
-  HardwareFrameCorrectnessWithRotationTester(matrix, ImageFlip::NONE, expected_dst,
-                                             fhd_Transform::ROT_180);
+  HardwareFrameCorrectnessWithRotationTester(
+      matrix, ImageFlip::NONE, expected_dst,
+      fuchsia::hardware::display::types::CoordinateTransformation::ROTATE_CCW_180);
 }
 
 TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessWith270DegreeRotationTest) {
@@ -1419,8 +1424,9 @@ TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessWith270DegreeRotationTest)
 
   fuchsia::math::RectU expected_dst = {.x = 0u, .y = 0u, .width = 20u, .height = 10u};
 
-  HardwareFrameCorrectnessWithRotationTester(matrix, ImageFlip::NONE, expected_dst,
-                                             fhd_Transform::ROT_270);
+  HardwareFrameCorrectnessWithRotationTester(
+      matrix, ImageFlip::NONE, expected_dst,
+      fuchsia::hardware::display::types::CoordinateTransformation::ROTATE_CCW_270);
 }
 
 TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessWithLeftRightFlipTest) {
@@ -1428,8 +1434,9 @@ TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessWithLeftRightFlipTest) {
 
   fuchsia::math::RectU expected_dst = {.x = 0u, .y = 0u, .width = 10u, .height = 20u};
 
-  HardwareFrameCorrectnessWithRotationTester(matrix, ImageFlip::LEFT_RIGHT, expected_dst,
-                                             fhd_Transform::REFLECT_Y);
+  HardwareFrameCorrectnessWithRotationTester(
+      matrix, ImageFlip::LEFT_RIGHT, expected_dst,
+      fuchsia::hardware::display::types::CoordinateTransformation::REFLECT_Y);
 }
 
 TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessWithUpDownFlipTest) {
@@ -1437,8 +1444,9 @@ TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessWithUpDownFlipTest) {
 
   fuchsia::math::RectU expected_dst = {.x = 0u, .y = 0u, .width = 10u, .height = 20u};
 
-  HardwareFrameCorrectnessWithRotationTester(matrix, ImageFlip::UP_DOWN, expected_dst,
-                                             fhd_Transform::REFLECT_X);
+  HardwareFrameCorrectnessWithRotationTester(
+      matrix, ImageFlip::UP_DOWN, expected_dst,
+      fuchsia::hardware::display::types::CoordinateTransformation::REFLECT_X);
 }
 
 TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessWithLeftRightFlip90DegreeRotationTest) {
@@ -1451,8 +1459,9 @@ TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessWithLeftRightFlip90DegreeR
   fuchsia::math::RectU expected_dst = {.x = 0u, .y = 0u, .width = 20u, .height = 10u};
 
   // The expected display coordinator transform performs rotation before reflection.
-  HardwareFrameCorrectnessWithRotationTester(matrix, ImageFlip::LEFT_RIGHT, expected_dst,
-                                             fhd_Transform::ROT_90_REFLECT_X);
+  HardwareFrameCorrectnessWithRotationTester(
+      matrix, ImageFlip::LEFT_RIGHT, expected_dst,
+      fuchsia::hardware::display::types::CoordinateTransformation::ROTATE_CCW_90_REFLECT_X);
 }
 
 TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessWithUpDownFlip90DegreeRotationTest) {
@@ -1465,8 +1474,9 @@ TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessWithUpDownFlip90DegreeRota
   fuchsia::math::RectU expected_dst = {.x = 0u, .y = 0u, .width = 20u, .height = 10u};
 
   // The expected display coordinator transform performs rotation before reflection.
-  HardwareFrameCorrectnessWithRotationTester(matrix, ImageFlip::UP_DOWN, expected_dst,
-                                             fhd_Transform::ROT_90_REFLECT_Y);
+  HardwareFrameCorrectnessWithRotationTester(
+      matrix, ImageFlip::UP_DOWN, expected_dst,
+      fuchsia::hardware::display::types::CoordinateTransformation::ROTATE_CCW_90_REFLECT_Y);
 }
 
 TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessWithLeftRightFlip180DegreeRotationTest) {
@@ -1479,8 +1489,9 @@ TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessWithLeftRightFlip180Degree
   fuchsia::math::RectU expected_dst = {.x = 0u, .y = 0u, .width = 10u, .height = 20u};
 
   // The expected display coordinator transform performs rotation before reflection.
-  HardwareFrameCorrectnessWithRotationTester(matrix, ImageFlip::LEFT_RIGHT, expected_dst,
-                                             fhd_Transform::REFLECT_X);
+  HardwareFrameCorrectnessWithRotationTester(
+      matrix, ImageFlip::LEFT_RIGHT, expected_dst,
+      fuchsia::hardware::display::types::CoordinateTransformation::REFLECT_X);
 }
 
 TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessWithUpDownFlip180DegreeRotationTest) {
@@ -1493,8 +1504,9 @@ TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessWithUpDownFlip180DegreeRot
   fuchsia::math::RectU expected_dst = {.x = 0u, .y = 0u, .width = 10u, .height = 20u};
 
   // The expected display coordinator transform performs rotation before reflection.
-  HardwareFrameCorrectnessWithRotationTester(matrix, ImageFlip::UP_DOWN, expected_dst,
-                                             fhd_Transform::REFLECT_Y);
+  HardwareFrameCorrectnessWithRotationTester(
+      matrix, ImageFlip::UP_DOWN, expected_dst,
+      fuchsia::hardware::display::types::CoordinateTransformation::REFLECT_Y);
 }
 
 TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessWithLeftRightFlip270DegreeRotationTest) {
@@ -1507,8 +1519,9 @@ TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessWithLeftRightFlip270Degree
   fuchsia::math::RectU expected_dst = {.x = 0u, .y = 0u, .width = 20u, .height = 10u};
 
   // The expected display coordinator transform performs rotation before reflection.
-  HardwareFrameCorrectnessWithRotationTester(matrix, ImageFlip::LEFT_RIGHT, expected_dst,
-                                             fhd_Transform::ROT_90_REFLECT_Y);
+  HardwareFrameCorrectnessWithRotationTester(
+      matrix, ImageFlip::LEFT_RIGHT, expected_dst,
+      fuchsia::hardware::display::types::CoordinateTransformation::ROTATE_CCW_90_REFLECT_Y);
 }
 
 TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessWithUpDownFlip270DegreeRotationTest) {
@@ -1521,8 +1534,9 @@ TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessWithUpDownFlip270DegreeRot
   fuchsia::math::RectU expected_dst = {.x = 0u, .y = 0u, .width = 20u, .height = 10u};
 
   // The expected display coordinator transform performs rotation before reflection.
-  HardwareFrameCorrectnessWithRotationTester(matrix, ImageFlip::UP_DOWN, expected_dst,
-                                             fhd_Transform::ROT_90_REFLECT_X);
+  HardwareFrameCorrectnessWithRotationTester(
+      matrix, ImageFlip::UP_DOWN, expected_dst,
+      fuchsia::hardware::display::types::CoordinateTransformation::ROTATE_CCW_90_REFLECT_X);
 }
 
 TEST_F(DisplayCompositorTest, ChecksDisplayImageSignalFences) {

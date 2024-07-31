@@ -2,5 +2,5 @@
 IfsVersion:      3.0
 SoName:          libld-dep-a.so
 Symbols:
-  - { Name: b, Type: Func }
+  - { Name: c, Type: Func }
 ...

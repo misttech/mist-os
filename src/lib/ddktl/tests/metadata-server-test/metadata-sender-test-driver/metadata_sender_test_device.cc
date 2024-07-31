@@ -73,9 +73,10 @@ void MetadataSenderTestDevice::SetMetadata(SetMetadataRequestView request,
 }
 
 void MetadataSenderTestDevice::AddMetadataRetrieverDevice(
+    AddMetadataRetrieverDeviceRequestView request,
     AddMetadataRetrieverDeviceCompleter::Sync& completer) {
-  zx::result device_name =
-      AddMetadataDevice(bind_metadata_server_test::PURPOSE_RETRIEVE_METADATA.c_str());
+  zx::result device_name = AddMetadataDevice(
+      bind_metadata_server_test::PURPOSE_RETRIEVE_METADATA.c_str(), request->expose_metadata);
   if (device_name.is_error()) {
     zxlogf(ERROR, "Failed to add metadata device: %s", device_name.status_string());
     completer.ReplyError(device_name.status_value());
@@ -87,7 +88,7 @@ void MetadataSenderTestDevice::AddMetadataRetrieverDevice(
 void MetadataSenderTestDevice::AddMetadataForwarderDevice(
     AddMetadataForwarderDeviceCompleter::Sync& completer) {
   zx::result device_name =
-      AddMetadataDevice(bind_metadata_server_test::PURPOSE_FORWARD_METADATA.c_str());
+      AddMetadataDevice(bind_metadata_server_test::PURPOSE_FORWARD_METADATA.c_str(), true);
   if (device_name.is_error()) {
     zxlogf(ERROR, "Failed to add metadata device: %s", device_name.status_string());
     completer.ReplyError(device_name.status_value());
@@ -96,19 +97,24 @@ void MetadataSenderTestDevice::AddMetadataForwarderDevice(
   completer.ReplySuccess(fidl::StringView::FromExternal(device_name.value()));
 }
 
-zx::result<std::string> MetadataSenderTestDevice::AddMetadataDevice(const char* device_purpose) {
+zx::result<std::string> MetadataSenderTestDevice::AddMetadataDevice(const char* device_purpose,
+                                                                    bool expose_metadata) {
   std::stringstream device_name_builder;
   device_name_builder << "metadata_" << num_metadata_devices_;
   std::string device_name = device_name_builder.str();
 
-  zx::result outgoing = ServeOutgoing();
-  if (outgoing.is_error()) {
-    zxlogf(ERROR, "Failed to initialize outgoing directory: %s", outgoing.status_string());
-    return outgoing.take_error();
+  std::optional<fidl::ClientEnd<fuchsia_io::Directory>> outgoing;
+  if (expose_metadata) {
+    zx::result result = ServeOutgoing();
+    if (result.is_error()) {
+      zxlogf(ERROR, "Failed to initialize outgoing directory: %s", result.status_string());
+      return result.take_error();
+    }
+    outgoing.emplace(std::move(result.value()));
   }
 
-  zx_status_t status = MetadataTestDevice::Create(zxdev(), device_name.c_str(), device_purpose,
-                                                  std::move(outgoing.value()));
+  zx_status_t status =
+      MetadataTestDevice::Create(zxdev(), device_name.c_str(), device_purpose, std::move(outgoing));
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to create metadata device: %s", zx_status_get_string(status));
     return zx::error(status);

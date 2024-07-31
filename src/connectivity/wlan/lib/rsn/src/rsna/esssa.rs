@@ -1108,8 +1108,7 @@ mod tests {
         let s_rsne_data = get_rsn_ie_bytes(&s_rsne);
         assert_eq!({ msg2.eapol_fields.version }, eapol::ProtocolVersion::IEEE802DOT1X2001);
         assert_eq!({ msg2.eapol_fields.packet_type }, eapol::PacketType::KEY);
-        let mut buf = vec![];
-        msg2.write_into(false, &mut buf).expect("error converting message to bytes");
+        let buf = msg2.to_bytes(false);
         assert_eq!(msg2.eapol_fields.packet_body_len.to_native() as usize, buf.len() - 4);
         assert_eq!({ msg2.key_frame_fields.descriptor_type }, eapol::KeyDescriptor::IEEE802DOT11);
         assert_eq!(msg2.key_frame_fields.key_info(), eapol::KeyInformation(0x010A));

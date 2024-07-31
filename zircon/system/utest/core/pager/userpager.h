@@ -107,6 +107,23 @@ class Vmo : public fbl::DoublyLinkedListable<std::unique_ptr<Vmo>> {
   const zx::vmo& vmo() const { return vmo_; }
   uint64_t key() const { return key_; }
 
+  // Set the limit of the range that may be automatically supplied to this VMO from the
+  // UserPager::StartTaggedPageFaultHandler thread. Changing this limit is intended to allow for
+  // tests that will re-inspect supplied regions and want to be resilient against eviction, but do
+  // not want the page fault handler from spuriously succeeding the test by accidentally handling
+  // requests it is not supposed to. To ensure a lack of races this method must be called *before*
+  // initially supplying the range that you then want to have auto supplied.
+  void SetPageFaultSupplyLimit(uint64_t pages_limit) {
+    std::lock_guard guard(mutex_);
+    page_fault_supply_limit_ = pages_limit * zx_system_get_page_size();
+  }
+
+  // Retrieve the current page fault supply limit in pages.
+  uint64_t GetPageFaultSupplyLimit() const {
+    std::lock_guard guard(mutex_);
+    return page_fault_supply_limit_;
+  }
+
  private:
   Vmo(zx::vmo vmo, uint64_t size, uint64_t base_addr, uint64_t key)
       : size_(size), base_addr_(base_addr), vmo_(std::move(vmo)), key_(key) {}
@@ -126,6 +143,8 @@ class Vmo : public fbl::DoublyLinkedListable<std::unique_ptr<Vmo>> {
   // are responsible for unmapping it on destruction.
   uint64_t size_ __TA_GUARDED(&mutex_);
   uintptr_t base_addr_ __TA_GUARDED(&mutex_);
+
+  uint64_t page_fault_supply_limit_ __TA_GUARDED(&mutex_) = UINT64_MAX;
 
   // vmo_ and key_ are set in the ctor.
   const zx::vmo vmo_;
@@ -204,6 +223,10 @@ class UserPager {
   // page tagged data as per SupplyPages. This function is not thread safe, and should only be
   // called once. After starting a pager thread it is an error to create or destroy VMOs, as this
   // could lead to data races.
+  // The individual VMOs can, optionally, have the maximum offset of a fault that will be handled
+  // through their respective SetPageFaultSupplyLimit methods. Any page request outside these limits
+  // will be dropped and ignored, and cannot be retrieved through any of the GetPageRequest or
+  // similar methods.
   bool StartTaggedPageFaultHandler();
 
   const zx::pager& pager() const { return pager_; }

@@ -11,9 +11,9 @@ use paste::paste;
 use zerocopy::{ByteSlice, Ref};
 
 macro_rules! validate {
-    ( $condition:expr, $debug_message:expr ) => {
+    ( $condition:expr, $message:expr ) => {
         if !$condition {
-            return Err($crate::error::FrameParseError::new($debug_message));
+            return Err($crate::error::FrameParseError(format!($message)));
         }
     };
 }
@@ -25,10 +25,10 @@ macro_rules! simple_parse_func {
                 raw_body: B,
             ) -> FrameParseResult<Ref<B, [<$ie_snake_case:camel>]>> {
                 Ref::new(raw_body)
-                    .ok_or(FrameParseError::new(
-                        concat!(
+                    .ok_or(FrameParseError(
+                        format!(concat!(
                             "Invalid length or alignment for ",
-                            stringify!([<$ie_snake_case:camel>]))))
+                            stringify!([<$ie_snake_case:camel>])))))
             }
         }
     };
@@ -78,7 +78,7 @@ pub fn parse_extended_supported_rates<B: ByteSlice>(
 
 pub fn parse_tim<B: ByteSlice>(raw_body: B) -> FrameParseResult<TimView<B>> {
     let (header, bitmap) = Ref::<B, TimHeader>::new_unaligned_from_prefix(raw_body)
-        .ok_or(FrameParseError::new("Element body is too short to include a TIM header"))?;
+        .ok_or(FrameParseError(format!("Element body is too short to include a TIM header")))?;
     validate!(!bitmap.is_empty(), "Bitmap in TIM is empty");
     validate!(bitmap.len() <= TIM_MAX_BITMAP_LEN, "Bitmap in TIM is too long");
     Ok(TimView { header: *header, bitmap })
@@ -88,10 +88,10 @@ pub fn parse_country<B: ByteSlice>(raw_body: B) -> FrameParseResult<CountryView<
     let mut reader = BufferReader::new(raw_body);
     let country_code = reader
         .read::<[u8; 2]>()
-        .ok_or(FrameParseError::new("Element body is too short to include a country code"))?;
-    let environment = reader.read_byte().ok_or(FrameParseError::new(
-        "Element body is too short to include the whole country string",
-    ))?;
+        .ok_or(FrameParseError(format!("Element body is too short to include a country code")))?;
+    let environment = reader.read_byte().ok_or(FrameParseError(format!(
+        "Element body is too short to include the whole country string"
+    )))?;
     Ok(CountryView {
         country_code: *country_code,
         environment: CountryEnvironment(environment),
@@ -115,7 +115,7 @@ pub fn parse_ext_capabilities<B: ByteSlice>(raw_body: B) -> ExtCapabilitiesView<
 pub fn parse_wpa_ie<B: ByteSlice>(raw_body: B) -> FrameParseResult<wpa::WpaIe> {
     wpa::from_bytes(&raw_body[..])
         .map(|(_, r)| r)
-        .map_err(|_| FrameParseError::new("Failed to parse WPA IE"))
+        .map_err(|_| FrameParseError(format!("Failed to parse WPA IE")))
 }
 
 pub fn parse_transmit_power_envelope<B: ByteSlice>(
@@ -124,21 +124,21 @@ pub fn parse_transmit_power_envelope<B: ByteSlice>(
     let mut reader = BufferReader::new(raw_body);
     let transmit_power_info = reader
         .read::<TransmitPowerInfo>()
-        .ok_or(FrameParseError::new("Transmit Power Envelope element too short"))?;
+        .ok_or(FrameParseError(format!("Transmit Power Envelope element too short")))?;
     if transmit_power_info.max_transmit_power_count() > 3 {
-        return FrameParseResult::Err(FrameParseError::new(
-            "Invalid transmit power count for Transmit Power Envelope element",
-        ));
+        return FrameParseResult::Err(FrameParseError(format!(
+            "Invalid transmit power count for Transmit Power Envelope element"
+        )));
     }
     let expected_bytes_remaining = transmit_power_info.max_transmit_power_count() as usize + 1;
     if reader.bytes_remaining() < expected_bytes_remaining {
-        return FrameParseResult::Err(FrameParseError::new(
-            "Transmit Power Envelope element too short",
-        ));
+        return FrameParseResult::Err(FrameParseError(format!(
+            "Transmit Power Envelope element too short"
+        )));
     } else if reader.bytes_remaining() > expected_bytes_remaining {
-        return FrameParseResult::Err(FrameParseError::new(
-            "Transmit Power Envelope element too long",
-        ));
+        return FrameParseResult::Err(FrameParseError(format!(
+            "Transmit Power Envelope element too long"
+        )));
     }
     // Unwrap safe due to checks above.
     let max_transmit_power_20 = reader.read().unwrap();
@@ -177,9 +177,9 @@ pub fn parse_channel_switch_wrapper<B: ByteSlice>(
                 result.new_transmit_power_envelope.replace(parse_transmit_power_envelope(ie_body)?);
             }
             _ => {
-                return Err(FrameParseError::new(
-                    "Unexpected sub-element Id in Channel Switch Wrapper",
-                ));
+                return Err(FrameParseError(format!(
+                    "Unexpected sub-element Id in Channel Switch Wrapper"
+                )));
             }
         }
     }
@@ -188,7 +188,7 @@ pub fn parse_channel_switch_wrapper<B: ByteSlice>(
 
 pub fn parse_vendor_ie<B: ByteSlice>(raw_body: B) -> FrameParseResult<VendorIe<B>> {
     let mut reader = BufferReader::new(raw_body);
-    let oui = *reader.read::<Oui>().ok_or(FrameParseError::new("Failed to read vendor OUI"))?;
+    let oui = *reader.read::<Oui>().ok_or(FrameParseError(format!("Failed to read vendor OUI")))?;
     let vendor_ie = match oui {
         Oui::MSFT => {
             let ie_type = reader.peek_byte();
@@ -210,7 +210,7 @@ pub fn parse_vendor_ie<B: ByteSlice>(raw_body: B) -> FrameParseResult<VendorIe<B
                     // The version byte is 0x01 for both WMM Information and Parameter elements
                     // as of WFA WMM v1.2.0.
                     if body[2] != 0x01 {
-                        return Err(FrameParseError::new("Unexpected WMM Version byte"));
+                        return Err(FrameParseError(format!("Unexpected WMM Version byte")));
                     }
                     match subtype {
                         // Safe to split because we already checked that there are at least 3
@@ -250,9 +250,15 @@ mod tests {
     #[test]
     pub fn simple_parse_func_wrong_size() {
         let err_too_short = parse_some_ie(&[0xfa][..]).err().unwrap();
-        assert_eq!("Invalid length or alignment for SomeIe", err_too_short.debug_message());
+        assert_eq!(
+            "Error parsing frame: Invalid length or alignment for SomeIe",
+            &err_too_short.to_string()
+        );
         let err_too_long = parse_some_ie(&[0xfa, 0xde, 0xed][..]).err().unwrap();
-        assert_eq!("Invalid length or alignment for SomeIe", err_too_long.debug_message());
+        assert_eq!(
+            "Error parsing frame: Invalid length or alignment for SomeIe",
+            &err_too_long.to_string()
+        );
     }
 
     #[test]
@@ -267,7 +273,10 @@ mod tests {
         assert_eq!(buf_slice.len(), std::mem::size_of::<SomeIe>());
 
         let err_not_aligned = parse_some_ie(buf_slice).err().unwrap();
-        assert_eq!("Invalid length or alignment for SomeIe", err_not_aligned.debug_message());
+        assert_eq!(
+            "Error parsing frame: Invalid length or alignment for SomeIe",
+            &err_not_aligned.to_string()
+        );
     }
 
     #[test]
@@ -278,7 +287,7 @@ mod tests {
 
     #[test]
     pub fn ssid_too_long() {
-        assert_eq!(Err(FrameParseError::new("SSID is too long")), parse_ssid(&[0u8; 33][..]));
+        assert_eq!(Err(FrameParseError(format!("SSID is too long"))), parse_ssid(&[0u8; 33][..]));
     }
 
     #[test]
@@ -290,7 +299,7 @@ mod tests {
     #[test]
     pub fn supported_rates_empty() {
         let err = parse_supported_rates(&[][..]).expect_err("expected Err");
-        assert_eq!("Empty Supported Rates IE", err.debug_message());
+        assert_eq!("Error parsing frame: Empty Supported Rates IE", &err.to_string());
     }
 
     // This test expects to pass despite IEEE Std 802.11-2016, 9.2.4.3 specifying a limit of eight
@@ -313,19 +322,22 @@ mod tests {
     #[test]
     pub fn tim_too_short_for_header() {
         let err = parse_tim(&[1, 2][..]).err().expect("expected Err");
-        assert_eq!("Element body is too short to include a TIM header", err.debug_message());
+        assert_eq!(
+            "Error parsing frame: Element body is too short to include a TIM header",
+            &err.to_string()
+        );
     }
 
     #[test]
     pub fn tim_empty_bitmap() {
         let err = parse_tim(&[1, 2, 3][..]).err().expect("expected Err");
-        assert_eq!("Bitmap in TIM is empty", err.debug_message());
+        assert_eq!("Error parsing frame: Bitmap in TIM is empty", &err.to_string());
     }
 
     #[test]
     pub fn tim_bitmap_too_long() {
         let err = parse_tim(&[0u8; 255][..]).err().expect("expected Err");
-        assert_eq!("Bitmap in TIM is too long", err.debug_message());
+        assert_eq!("Error parsing frame: Bitmap in TIM is too long", &err.to_string());
     }
 
     #[test]
@@ -352,8 +364,8 @@ mod tests {
     pub fn country_too_short() {
         let err = parse_country(&[0x55, 0x53][..]).err().expect("expected Err");
         assert_eq!(
-            "Element body is too short to include the whole country string",
-            err.debug_message()
+            "Error parsing frame: Element body is too short to include the whole country string",
+            &err.to_string()
         );
     }
 
@@ -439,7 +451,10 @@ mod tests {
             20, 40, 80, 160
         ];
         let err = parse_transmit_power_envelope(&raw_tpe[..]).err().expect("expected Err");
-        assert_eq!("Transmit Power Envelope element too long", err.debug_message());
+        assert_eq!(
+            "Error parsing frame: Transmit Power Envelope element too long",
+            &err.to_string()
+        );
     }
 
     #[test]
@@ -451,7 +466,10 @@ mod tests {
             20,
         ];
         let err = parse_transmit_power_envelope(&raw_tpe[..]).err().expect("expected Err");
-        assert_eq!("Transmit Power Envelope element too short", err.debug_message());
+        assert_eq!(
+            "Error parsing frame: Transmit Power Envelope element too short",
+            &err.to_string()
+        );
     }
 
     #[test]
@@ -464,8 +482,8 @@ mod tests {
         ];
         let err = parse_transmit_power_envelope(&raw_tpe[..]).err().expect("expected Err");
         assert_eq!(
-            "Invalid transmit power count for Transmit Power Envelope element",
-            err.debug_message()
+            "Error parsing frame: Invalid transmit power count for Transmit Power Envelope element",
+            &err.to_string()
         );
     }
 
@@ -519,7 +537,10 @@ mod tests {
             Id::HT_OPERATION.0, 3, 1, 2, 3,
         ];
         let err = parse_channel_switch_wrapper(&raw_csw[..]).err().expect("expected Err");
-        assert_eq!("Unexpected sub-element Id in Channel Switch Wrapper", err.debug_message());
+        assert_eq!(
+            "Error parsing frame: Unexpected sub-element Id in Channel Switch Wrapper",
+            &err.to_string()
+        );
     }
 
     #[test]
@@ -589,7 +610,7 @@ mod tests {
     #[test]
     pub fn extended_supported_rates_empty() {
         let err = parse_extended_supported_rates(&[][..]).expect_err("expected Err");
-        assert_eq!("Empty Extended Supported Rates IE", err.debug_message());
+        assert_eq!("Error parsing frame: Empty Extended Supported Rates IE", &err.to_string());
     }
 
     #[test]

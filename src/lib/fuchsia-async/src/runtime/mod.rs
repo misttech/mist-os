@@ -30,9 +30,16 @@ pub use task_group::*;
 // Fuchsia specific exports.
 #[cfg(target_os = "fuchsia")]
 pub use self::fuchsia::{
-    executor::{EHandle, PacketReceiver, ReceiverRegistration, Scope, ScopeRef, WeakScopeRef},
+    executor::{scope::Scope, EHandle, PacketReceiver, ReceiverRegistration},
     timer::Interval,
 };
+
+#[cfg(target_os = "fuchsia")]
+// TODO(https://fxbug.dev/339724492): Make this API available for general use.
+#[doc(hidden)]
+pub mod scope {
+    pub use super::fuchsia::executor::scope::{Join, Scope, ScopeRef, WeakScopeRef};
+}
 
 use futures::prelude::*;
 use pin_project_lite::pin_project;

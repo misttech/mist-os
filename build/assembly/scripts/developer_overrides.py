@@ -99,6 +99,7 @@ def main() -> int:
     # subdirectory.
     if os.path.exists(args.outdir):
         shutil.rmtree(args.outdir)
+        os.makedirs(args.outdir)
 
     overrides_from_gn = json_load(DeveloperOverridesFromGN, args.input)
     deps.add(args.input.name)

@@ -7,7 +7,6 @@
 #include <inttypes.h>
 #include <lib/fzl/resizeable-vmo-mapper.h>
 #include <lib/syslog/cpp/macros.h>
-#include <lib/trace/event.h>
 #include <lib/zx/result.h>
 #include <lib/zx/vmo.h>
 #include <zircon/compiler.h>
@@ -28,6 +27,7 @@
 #include "src/storage/blobfs/allocator/base_allocator.h"
 #include "src/storage/blobfs/common.h"
 #include "src/storage/blobfs/format.h"
+#include "src/storage/lib/trace/trace.h"
 #include "src/storage/lib/vfs/cpp/transaction/device_transaction_handler.h"
 
 namespace blobfs {
@@ -43,8 +43,8 @@ zx::result<InodePtr> Allocator::GetNode(uint32_t node_index) __TA_NO_THREAD_SAFE
   if (node_index >= node_map_.size() / kBlobfsInodeSize) {
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
-  // TODO(https://fxbug.dev/42160756): Calling lock_shared from a thread that already holds the lock is
-  // undefined behaviour.
+  // TODO(https://fxbug.dev/42160756): Calling lock_shared from a thread that already holds the lock
+  // is undefined behaviour.
   node_map_grow_mutex_.lock_shared();
   return zx::ok(
       InodePtr(&reinterpret_cast<Inode*>(node_map_.start())[node_index], InodePtrDeleter(this)));
@@ -187,8 +187,8 @@ zx_status_t Allocator::GrowNodeMap(size_t size) {
   return node_map_.Grow(size);
 }
 
-// TODO(https://fxbug.dev/42080556): change this to __TA_RELEASE_SHARED(node_map_grow_mutex_) after clang
-// roll.
+// TODO(https://fxbug.dev/42080556): change this to __TA_RELEASE_SHARED(node_map_grow_mutex_) after
+// clang roll.
 void Allocator::DropInodePtr() __TA_NO_THREAD_SAFETY_ANALYSIS {
   node_map_grow_mutex_.unlock_shared();
 }

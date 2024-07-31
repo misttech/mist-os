@@ -2,43 +2,33 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::appendable;
+use crate::append;
+use fuchsia_zircon as zx;
 use thiserror::Error;
 
 #[derive(Error, Debug, PartialEq, Eq)]
 pub enum FrameWriteError {
     #[error("Buffer is too small")]
     BufferTooSmall,
-    #[error("Attempted to write an invalid frame: {}", debug_message)]
-    InvalidData { debug_message: String },
+    #[error("Attempted to write an invalid frame: {0}")]
+    InvalidData(String),
+    #[error("Write failed: {0}")]
+    BadWrite(String),
 }
 
-impl FrameWriteError {
-    pub fn new_invalid_data<S: Into<String>>(debug_message: S) -> Self {
-        FrameWriteError::InvalidData { debug_message: debug_message.into() }
-    }
-}
-
-impl From<appendable::BufferTooSmall> for FrameWriteError {
-    fn from(_error: appendable::BufferTooSmall) -> Self {
+impl From<append::BufferTooSmall> for FrameWriteError {
+    fn from(_error: append::BufferTooSmall) -> Self {
         FrameWriteError::BufferTooSmall
     }
 }
 
+impl From<zx::Status> for FrameWriteError {
+    fn from(status: zx::Status) -> Self {
+        FrameWriteError::BadWrite(status.to_string())
+    }
+}
 #[derive(Error, Debug, PartialEq, Eq)]
-#[error("Error parsing frame: {}", debug_message)]
-pub struct FrameParseError {
-    debug_message: &'static str,
-}
-
-impl FrameParseError {
-    pub fn new(debug_message: &'static str) -> Self {
-        return FrameParseError { debug_message };
-    }
-
-    pub fn debug_message(&self) -> &str {
-        self.debug_message
-    }
-}
+#[error("Error parsing frame: {0}")]
+pub struct FrameParseError(pub(crate) String);
 
 pub type FrameParseResult<T> = Result<T, FrameParseError>;

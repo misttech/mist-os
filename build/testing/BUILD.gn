@@ -9,7 +9,10 @@ import("//src/sys/core/build/core.gni")
 # Core realm definition to be used only instances of cuckoo_kernel_zbi_test()
 core_realm_definition("cuckoo-core-realm") {
   testonly = true
-  deps = board_core_realm_shards
+
+  # TODO(b/353560491): remove this extra core realm shard.
+  deps = board_core_realm_shards +
+         [ "//src/session/bin/session_manager:fake_session_manager_core_shard" ]
 }
 
 # Generates a product_assembly_configuration for a cukoo tests with a set of

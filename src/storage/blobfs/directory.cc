@@ -21,6 +21,7 @@
 #include "src/storage/blobfs/blob.h"
 #include "src/storage/blobfs/blobfs.h"
 #include "src/storage/blobfs/delivery_blob.h"
+#include "src/storage/lib/trace/trace.h"
 
 namespace blobfs {
 

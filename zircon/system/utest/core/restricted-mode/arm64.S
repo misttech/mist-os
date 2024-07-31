@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+.weak zx_restricted_enter
+
 // do something to all the registers so we can read the state on the way out
 .macro twiddle_registers
   add x0, x0, #1
@@ -116,7 +118,7 @@ restricted_enter_wrapper:
   // Pass the stack pointer as the context argument to the syscall.
   mov x2, sp
 
-  bl zx_restricted_enter
+  bl zx_restricted_enter@PLT
 
   // if we got here it must have failed
   add  sp, sp, #(14*8) // pop the previous state on the stack

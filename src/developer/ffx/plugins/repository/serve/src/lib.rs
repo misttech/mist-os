@@ -30,6 +30,7 @@ use futures::executor::block_on;
 use futures::{SinkExt, StreamExt};
 use package_tool::{cmd_repo_publish, RepoPublishCommand};
 use pkg::repo::register_target_with_fidl_proxies;
+use pkg::{write_instance_info, ServerMode};
 use signal_hook::consts::signal::{SIGHUP, SIGINT, SIGTERM};
 use signal_hook::iterator::Signals;
 use std::fs;
@@ -387,12 +388,29 @@ $ ffx doctor --restart-daemon"#,
                     format!("getting repositories from product bundle {product_bundle}")
                 })?;
             for repository in repositories {
-                let repo_name = repository.aliases().first().unwrap().clone();
+                let aliases = repository.aliases().clone();
+                let repo_name = aliases.first().unwrap().clone();
 
                 let repo_client = RepoClient::from_trusted_remote(Box::new(repository) as Box<_>)
                     .await
                     .with_context(|| format!("Creating a repo client for {repo_name}"))?;
-                repo_manager.add(repo_name, repo_client);
+                repo_manager.add(&repo_name, repo_client);
+                if let Err(e) = write_instance_info(
+                    None,
+                    ServerMode::Foreground,
+                    &repo_name,
+                    &cmd.address,
+                    product_bundle.as_std_path().into(),
+                    aliases.into_iter().collect(),
+                    cmd.storage_type.unwrap_or(RepositoryStorageType::Ephemeral).into(),
+                    cmd.alias_conflict_mode.into(),
+                )
+                .await
+                {
+                    tracing::error!(
+                        "failed to write repo server instance information for {repo_name}: {e:?}"
+                    );
+                }
             }
 
             if cmd.refresh_metadata {
@@ -430,12 +448,28 @@ $ ffx doctor --restart-daemon"#,
             repo_client.update().await.context("updating the repository metadata")?;
 
             let repo_name = cmd.repository.clone().unwrap_or_else(|| DEFAULT_REPO_NAME.to_string());
-            repo_manager.add(repo_name, repo_client);
+            repo_manager.add(&repo_name, repo_client);
 
             if cmd.refresh_metadata {
                 refresh_repository_metadata(&repo_path).await?;
             }
 
+            if let Err(e) = write_instance_info(
+                None,
+                ServerMode::Foreground,
+                &repo_name,
+                &cmd.address,
+                repo_path.as_std_path().into(),
+                cmd.alias.clone(),
+                cmd.storage_type.unwrap_or(RepositoryStorageType::Ephemeral).into(),
+                cmd.alias_conflict_mode.into(),
+            )
+            .await
+            {
+                tracing::error!(
+                    "failed to write repo server instance information for {repo_name}: {e:?}"
+                );
+            }
             repo_path
         }
     };

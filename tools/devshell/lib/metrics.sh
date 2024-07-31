@@ -879,7 +879,7 @@ function metrics-init {
 
   local subcommand="$1"
   local hide_init_warning=0
-  if [[ "$subcommand" == "metrics" ]]; then
+  if [[ "$subcommand" == "metrics" || "$subcommand" == "ffx" ]]; then
     hide_init_warning=1
   fi
   metrics-read-and-validate "${hide_init_warning}"

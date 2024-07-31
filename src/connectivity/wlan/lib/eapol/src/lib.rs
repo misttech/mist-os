@@ -8,7 +8,7 @@ use core::mem;
 use thiserror::Error;
 use tracing::warn;
 use wlan_bitfield::bitfield;
-use wlan_common::appendable::{Appendable, BufferTooSmall};
+use wlan_common::append::{Append, BufferTooSmall};
 use wlan_common::big_endian::{BigEndianU16, BigEndianU64};
 use wlan_common::buffer_reader::BufferReader;
 use zerocopy::{AsBytes, ByteSlice, FromBytes, FromZeros, NoCell, Ref, Unaligned};
@@ -91,11 +91,17 @@ impl<B: ByteSlice> KeyFrameRx<B> {
         }
     }
 
+    pub fn to_bytes(&self, clear_mic: bool) -> Vec<u8> {
+        let mut buf = Vec::new();
+        self.write_into(clear_mic, &mut buf).unwrap(); // Write to Vec never fails
+        buf.into()
+    }
+
     /// Populates buf with the underlying bytes of this keyframe.
     ///
     /// If clear_mic is true, the MIC field will be populated with zeroes. This should be used when
     /// recalculating the frame MIC during a key exchange.
-    pub fn write_into<A: Appendable>(&self, clear_mic: bool, buf: &mut A) -> Result<(), Error> {
+    pub fn write_into<A: Append>(&self, clear_mic: bool, buf: &mut A) -> Result<(), Error> {
         let required_size =
             self.eapol_fields.packet_body_len.to_native() as usize + mem::size_of::<EapolFields>();
         if !buf.can_append(required_size) {
@@ -163,7 +169,7 @@ impl KeyFrameTxFinalizer {
             mem::size_of::<KeyFrameFields>() + mic_len + KEY_DATA_LEN_BYTES + key_data.len();
         let size = mem::size_of::<EapolFields>() + packet_body_len;
         let packet_body_len = BigEndianU16::from_native(packet_body_len as u16);
-        // The Vec implementation of Appendable will never fail to append, so none of the expects
+        // The Vec implementation of Append will never fail to append, so none of the expects
         // here should ever trigger.
         let mut buf = Vec::with_capacity(size);
         buf.append_value(&EapolFields { version, packet_type: PacketType::KEY, packet_body_len })
@@ -178,7 +184,7 @@ impl KeyFrameTxFinalizer {
         buf.append_value(&BigEndianU16::from_native(key_data.len() as u16))
             .expect("bad eapol allocation");
         buf.append_bytes(&key_data[..]).expect("bad eapol allocation");
-        KeyFrameTxFinalizer { buf, mic_offset, mic_len }
+        KeyFrameTxFinalizer { buf: buf.into(), mic_offset, mic_len }
     }
 
     /// Access a key frame buffer that may still need to have its MIC field populated. This should
@@ -232,7 +238,7 @@ impl KeyFrameBuf {
     /// instead populates the passed buffer with the keyframe contents. Panics if the parse somehow
     /// fails.
     pub fn copy_keyframe_mut<'a>(&self, buf: &'a mut Vec<u8>) -> KeyFrameRx<&'a mut [u8]> {
-        buf.append_bytes(&self.buf[..]).expect("failed to append to vector! um!");
+        buf.extend_from_slice(&self.buf[..]);
         KeyFrameRx::parse(self.mic_len, &mut buf[..])
             .expect("finalized eapol keyframe buffer failed to parse")
     }

@@ -47,9 +47,9 @@ class LoopbackDevice : public fidl::Server<fuchsia_hardware_bluetooth::Vendor> {
     kHciIso = 5,
   };
 
-  class SnoopClient : public fidl::AsyncEventHandler<fuchsia_hardware_bluetooth::Snoop> {
+  class SnoopServer : public fidl::Server<fuchsia_hardware_bluetooth::Snoop2> {
    public:
-    SnoopClient(fidl::ClientEnd<fuchsia_hardware_bluetooth::Snoop> client_end,
+    SnoopServer(fidl::ServerEnd<fuchsia_hardware_bluetooth::Snoop2> server_end,
                 LoopbackDevice* device);
 
     // `buffer` should NOT have an indicator byte.
@@ -67,14 +67,16 @@ class LoopbackDevice : public fidl::Server<fuchsia_hardware_bluetooth::Vendor> {
     void SendSnoopPacket(uint8_t* buffer, size_t length, PacketIndicator indicator,
                          fuchsia_hardware_bluetooth::PacketDirection direction, uint64_t sequence);
 
-    // fidl::AsyncEventHandler<fuchsia_hardware_bluetooth::Snoop> overrides:
-    void OnAcknowledgePackets(
-        fidl::Event<fuchsia_hardware_bluetooth::Snoop::OnAcknowledgePackets>& event) override;
-    void on_fidl_error(fidl::UnbindInfo error) override;
-    void handle_unknown_event(
-        fidl::UnknownEventMetadata<fuchsia_hardware_bluetooth::Snoop> metadata) override;
+    // fidl::Server<fuchsia_hardware_bluetooth::Snoop2> overrides:
+    void AcknowledgePackets(AcknowledgePacketsRequest& request,
+                            AcknowledgePacketsCompleter::Sync& completer) override;
+    void handle_unknown_method(
+        fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Snoop2> metadata,
+        fidl::UnknownMethodCompleter::Sync& completer) override;
 
-    fidl::Client<fuchsia_hardware_bluetooth::Snoop> client_;
+    void OnFidlError(fidl::UnbindInfo error);
+
+    fidl::ServerBinding<fuchsia_hardware_bluetooth::Snoop2> binding_;
     uint64_t next_sequence_ = 1u;
     uint64_t acked_sequence_ = 0u;
     uint32_t dropped_sent_ = 0u;
@@ -144,7 +146,7 @@ class LoopbackDevice : public fidl::Server<fuchsia_hardware_bluetooth::Vendor> {
   size_t next_hci_transport_server_id_ = 0u;
 
   // Only support 1 Snoop binding at a time.
-  std::optional<SnoopClient> snoop_;
+  std::optional<SnoopServer> snoop_;
 
   async_dispatcher_t* dispatcher_;
 

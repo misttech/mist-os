@@ -60,7 +60,7 @@ function fx-flash {
           let num_gb_devices=$num_gb_devices+1
           gb_device_ip=${elements[0]}
         fi
-      done < <(fx-command-run host-tool --check-firewall ffx target list --format s)
+      done < <(fx-command-run host-tool --check-firewall ffx --config fuchsia.analytics.ffx_invoker=fx target list --format s)
 
       if [[ ! -z "${gb_device_ip}" ]]; then
         fastboot_args+=("-s" "udp:${gb_device_ip}")
@@ -112,6 +112,6 @@ function fx-flash {
     return 1
   fi
 
-  fx-info "Running fx ffx ${ffx_args[@]} target flash ${flash_manifest_args[@]} ${ffx_flash_args[@]}"
-  fx-command-run host-tool --check-firewall ffx "${ffx_args[@]}" target flash "${flash_manifest_args[@]}" "${ffx_flash_args[@]}"
+  fx-info "Running fx ffx --config fuchsia.analytics.ffx_invoker=fx ${ffx_args[@]} target flash ${flash_manifest_args[@]} ${ffx_flash_args[@]}"
+  fx-command-run host-tool --check-firewall ffx --config fuchsia.analytics.ffx_invoker=fx "${ffx_args[@]}" target flash "${flash_manifest_args[@]}" "${ffx_flash_args[@]}"
 }

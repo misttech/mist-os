@@ -258,7 +258,7 @@ and library name of `fuchsia.gizmo.protocol`. The generated source for the bind 
 #### child-driver.bind
 
 ```none {:.devsite-disable-click-to-copy}
-{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/drivers/bind/fidl_bindlib_codegen/child_driver.bind" exclude_regexp="// Copyright.*|// Use of.*|// found in.*" %}
+{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/drivers/bind/fidl_bindlib_codegen/meta/child_driver.bind" exclude_regexp="// Copyright.*|// Use of.*|// found in.*" %}
 ```
 
 When a driver is creating children nodes, they are automatically assigned a property for each of

@@ -56,4 +56,4 @@ fi
 FFX_WRAPPER_INVOKE=${FFX_WRAPPER_INVOKE:-ffx}
 export FFX_WRAPPER_INVOKE
 
-exec "${fuchsia_dir}"/scripts/fx ffx "$@"
+exec "${fuchsia_dir}"/scripts/fx ffx --config fuchsia.analytics.ffx_invoker=fx "$@"

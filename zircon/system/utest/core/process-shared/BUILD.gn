@@ -8,6 +8,7 @@ source_set("process-shared") {
   testonly = true
   sources = [ "process-shared.cc" ]
   deps = [
+    "..:needs-next",
     "//src/zircon/testing/maybe-standalone-test",
     "//zircon/system/ulib/mini-process",
     "//zircon/system/ulib/zx",

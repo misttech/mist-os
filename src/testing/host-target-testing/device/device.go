@@ -524,32 +524,13 @@ func (c *Client) RegisterPackageRepository(
 	createRewriteRule bool,
 	rewritePackages []string,
 ) error {
-	// Test if `pkgctl repo add url` is supported on this build.
 	cmd := []string{"pkgctl", "repo", "add", "url"}
 	var b bytes.Buffer
 	stdoutTee := io.MultiWriter(&b, os.Stdout)
 	c.Run(ctx, cmd, stdoutTee, os.Stderr)
-	useLegacyAmberctl := strings.Contains(b.String(), "Unrecognized argument: url")
 
 	logger.Infof(ctx, "registering package repository: %s", repo.Dir)
 
-	// TODO(https://fxbug.dev/42154181): Remove amberctl path after the oldest supported build has
-	// moved beyond commit 99fb3d62a991ecc19919f67201fee1d208be7f32.
-	//
-	// amberctl path - before pkgctl gained the 'url' argument.
-	if useLegacyAmberctl {
-		var subcmd string
-		if createRewriteRule {
-			subcmd = "add_src"
-		} else {
-			subcmd = "add_repo_cfg"
-		}
-		cmd := []string{"amberctl", subcmd, "-f", repo.URL, "-h", repo.Hash}
-		return c.Run(ctx, cmd, os.Stdout, os.Stderr)
-	}
-
-	// pkgctl path - after commit 99fb3d62a991ecc19919f67201fee1d208be7f32
-	// where pkgctl gained the 'url' argument.
 	if createRewriteRule {
 		cmd := []string{"pkgctl", "repo", "add", "url", "-n", repoName, "-f", "1", repo.URL}
 		if err := c.Run(ctx, cmd, os.Stdout, os.Stderr); err != nil {

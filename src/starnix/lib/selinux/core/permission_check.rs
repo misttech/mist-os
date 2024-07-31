@@ -8,7 +8,7 @@ use super::SecurityId;
 
 use selinux_common::{AbstractObjectClass, ClassPermission, ObjectClass, Permission};
 use selinux_policy::{AccessVector, AccessVectorComputer};
-use std::sync::{Arc, Weak};
+use std::sync::Weak;
 
 /// Private module for sealed traits with tightly controlled implementations.
 mod private {
@@ -100,13 +100,13 @@ impl<QM: AccessVectorComputer + QueryMut> private::PermissionCheckMut for QM {}
 impl<QM: AccessVectorComputer + QueryMut> PermissionCheckMut for QM {}
 
 pub struct PermissionCheckImpl<'a> {
-    security_server: &'a Arc<SecurityServer>,
+    security_server: &'a SecurityServer,
     access_vector_cache: &'a Locked<Fixed<Weak<SecurityServer>, DEFAULT_SHARED_SIZE>>,
 }
 
 impl<'a> PermissionCheckImpl<'a> {
     pub(crate) fn new(
-        security_server: &'a Arc<SecurityServer>,
+        security_server: &'a SecurityServer,
         access_vector_cache: &'a Locked<Fixed<Weak<SecurityServer>, DEFAULT_SHARED_SIZE>>,
     ) -> Self {
         Self { security_server, access_vector_cache }

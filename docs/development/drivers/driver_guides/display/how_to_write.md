@@ -129,7 +129,7 @@ accept fuchsia.BIND_PCI_DID {
 }
 ```
 
-For PC devices, the [intel-i915 bind rules][intel-bind] are a good example. For
+For PC devices, the [intel-display bind rules][intel-bind] are a good example. For
 fixed-hardware SoCs, see the [Amlogic display rules][amlogic-display-bind].
 
 
@@ -286,7 +286,7 @@ basic bootloader driver. In most cases, your roadmap will be:
 [ddk-tl]: /docs/development/drivers/concepts/driver_development/using-ddktl.md
 [display-coordinator]: /src/graphics/display/drivers/coordinator/
 [driver-binding]: /docs/development/drivers/concepts/device_driver_model/driver-binding.md
-[intel-bind]: /src/graphics/display/drivers/intel-i915/meta/intel-i915.bind
+[intel-bind]: /src/graphics/display/drivers/intel-display/meta/intel-display.bind
 [license-policies]: /docs/contribute/governance/policy/open-source-licensing-policies.md
 [sysmem]: https://fuchsia.dev/reference/fidl/fuchsia.sysmem
 [tearing]: https://en.wikipedia.org/wiki/Screen_tearing

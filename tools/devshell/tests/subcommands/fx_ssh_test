@@ -75,7 +75,7 @@ TEST_ssh_resolve_addr_port() {
 
   cat >> "${ffx}.mock_side_effects" << EOF
 
-  if [ "\$2" == "target" ]; then
+  if [ "\$4" == "target" ]; then
      echo $ipv6
   else
      echo "/path/to/ssh.priv"

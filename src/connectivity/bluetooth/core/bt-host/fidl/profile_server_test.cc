@@ -105,6 +105,78 @@ fidlbredr::ServiceDefinition MakeFIDLServiceDefinition() {
   return def;
 }
 
+fidlbredr::ServiceDefinition MakeMapMceServiceDefinition() {
+  // MAP MCE service definition requires RFCOMM and OBEX.
+  fidlbredr::ServiceDefinition def;
+  def.mutable_service_class_uuids()->emplace_back(
+      fidl_helpers::UuidToFidl(bt::sdp::profile::kMessageNotificationServer));
+
+  // [[L2CAP], [RFCOMM, Channel#], [OBEX]]
+  fidlbredr::ProtocolDescriptor l2cap_proto;
+  l2cap_proto.set_protocol(fidlbredr::ProtocolIdentifier::L2CAP);
+  std::vector<fidlbredr::DataElement> l2cap_params;
+  l2cap_proto.set_params(std::move(l2cap_params));
+  def.mutable_protocol_descriptor_list()->emplace_back(std::move(l2cap_proto));
+  fidlbredr::ProtocolDescriptor rfcomm_proto;
+  rfcomm_proto.set_protocol(fidlbredr::ProtocolIdentifier::RFCOMM);
+  fidlbredr::DataElement rfcomm_data_el;
+  rfcomm_data_el.set_uint8(5);  // Random RFCOMM channel
+  std::vector<fidlbredr::DataElement> rfcomm_params;
+  rfcomm_params.emplace_back(std::move(rfcomm_data_el));
+  rfcomm_proto.set_params(std::move(rfcomm_params));
+  def.mutable_protocol_descriptor_list()->emplace_back(std::move(rfcomm_proto));
+  fidlbredr::ProtocolDescriptor obex_proto;
+  obex_proto.set_protocol(fidlbredr::ProtocolIdentifier::OBEX);
+  std::vector<fidlbredr::DataElement> obex_params;
+  obex_proto.set_params(std::move(obex_params));
+  def.mutable_protocol_descriptor_list()->emplace_back(std::move(obex_proto));
+
+  // Additional protocols. NOTE: This is fictional and not part of a real MCE definition.
+  std::vector<fidlbredr::ProtocolDescriptor> additional_proto;
+  fidlbredr::ProtocolDescriptor additional_l2cap_proto;
+  additional_l2cap_proto.set_protocol(fidlbredr::ProtocolIdentifier::L2CAP);
+  fidlbredr::DataElement additional_l2cap_data_el;
+  additional_l2cap_data_el.set_uint16(fidlbredr::PSM_DYNAMIC);
+  std::vector<fidlbredr::DataElement> additional_l2cap_params;
+  additional_l2cap_params.emplace_back(std::move(additional_l2cap_data_el));
+  additional_l2cap_proto.set_params(std::move(additional_l2cap_params));
+  additional_proto.emplace_back(std::move(additional_l2cap_proto));
+  fidlbredr::ProtocolDescriptor additional_obex_proto;
+  additional_obex_proto.set_protocol(fidlbredr::ProtocolIdentifier::OBEX);
+  std::vector<fidlbredr::DataElement> additional_obex_params;
+  additional_obex_proto.set_params(std::move(additional_obex_params));
+  additional_proto.emplace_back(std::move(additional_obex_proto));
+  def.mutable_additional_protocol_descriptor_lists()->emplace_back(std::move(additional_proto));
+
+  fidlbredr::Information info;
+  info.set_language("en");
+  info.set_name("foo_test");
+  def.mutable_information()->emplace_back(std::move(info));
+
+  fidlbredr::ProfileDescriptor prof_desc;
+  prof_desc.set_profile_id(fidlbredr::ServiceClassProfileIdentifier::MESSAGE_ACCESS_PROFILE);
+  prof_desc.set_major_version(1);
+  prof_desc.set_minor_version(4);
+  def.mutable_profile_descriptors()->emplace_back(std::move(prof_desc));
+
+  // Additional attributes - one requests a dynamic PSM.
+  fidlbredr::Attribute goep_attr;
+  goep_attr.set_id(0x200);  // GoepL2capPsm
+  fidlbredr::DataElement goep_el;
+  goep_el.set_uint16(fidlbredr::PSM_DYNAMIC);
+  goep_attr.set_element(std::move(goep_el));
+  def.mutable_additional_attributes()->emplace_back(std::move(goep_attr));
+
+  fidlbredr::Attribute addl_attr;
+  addl_attr.set_id(0x317);  // MAP supported features
+  fidlbredr::DataElement addl_el;
+  addl_el.set_uint32(1);  // Random features
+  addl_attr.set_element(std::move(addl_el));
+  def.mutable_additional_attributes()->emplace_back(std::move(addl_attr));
+
+  return def;
+}
+
 // Returns a basic protocol list element with a protocol descriptor list that only contains an L2CAP
 // descriptor.
 bt::sdp::DataElement MakeL2capProtocolListElement() {
@@ -290,7 +362,6 @@ TEST_F(ProfileServerTest, ErrorOnMultipleAdvertiseRequests) {
   auto cb1 = [&](fidlbredr::Profile_Advertise_Result result) {
     cb1_count++;
     EXPECT_TRUE(result.is_response());
-    // TODO(https://fxbug.dev/330590954): Verify the services that were registered
   };
 
   fidlbredr::ProfileAdvertiseRequest adv_request1;
@@ -372,6 +443,48 @@ TEST_F(ProfileServerTest, ErrorOnInvalidConnectParametersRfcomm) {
   RunLoopUntilIdle();
 }
 
+TEST_F(ProfileServerTest, DynamicPsmAdvertisementIsUpdated) {
+  fidlbredr::ConnectionReceiverHandle receiver_handle;
+  fidl::InterfaceRequest<fidlbredr::ConnectionReceiver> request = receiver_handle.NewRequest();
+
+  std::vector<fidlbredr::ServiceDefinition> services;
+  services.emplace_back(MakeMapMceServiceDefinition());
+
+  size_t cb_count = 0;
+  auto cb = [&](fidlbredr::Profile_Advertise_Result result) {
+    cb_count++;
+    EXPECT_TRUE(result.is_response());
+    EXPECT_EQ(result.response().services().size(), 1u);
+    const auto registered_def = std::move(result.response().mutable_services()->front());
+    const auto original_def = MakeMapMceServiceDefinition();
+    // The UUIDs, primary protocol list, & profile descriptors should be unchanged.
+    ASSERT_TRUE(
+        ::fidl::Equals(registered_def.service_class_uuids(), original_def.service_class_uuids()));
+    ASSERT_TRUE(::fidl::Equals(registered_def.protocol_descriptor_list(),
+                               original_def.protocol_descriptor_list()));
+    ASSERT_TRUE(
+        ::fidl::Equals(registered_def.profile_descriptors(), original_def.profile_descriptors()));
+    // The additional protocol list should be updated with a randomly assigned dynamic PSM.
+    EXPECT_EQ(registered_def.additional_protocol_descriptor_lists().size(), 1u);
+    EXPECT_NE(registered_def.additional_protocol_descriptor_lists()
+                  .front()
+                  .front()
+                  .params()
+                  .front()
+                  .uint16(),
+              fidlbredr::PSM_DYNAMIC);
+    // TODO(b/327758656): Verify information and additional attributes once implemented.
+  };
+
+  fidlbredr::ProfileAdvertiseRequest adv_request;
+  adv_request.set_services(std::move(services));
+  adv_request.set_receiver(std::move(receiver_handle));
+  client()->Advertise(std::move(adv_request), std::move(cb));
+
+  RunLoopUntilIdle();
+  EXPECT_EQ(cb_count, 1u);
+}
+
 TEST_F(ProfileServerTest, RevokeConnectionReceiverUnregistersAdvertisement) {
   fidlbredr::ConnectionReceiverHandle receiver_handle;
   FakeConnectionReceiver connect_receiver(receiver_handle.NewRequest(), dispatcher());
@@ -383,7 +496,6 @@ TEST_F(ProfileServerTest, RevokeConnectionReceiverUnregistersAdvertisement) {
   auto cb = [&](fidlbredr::Profile_Advertise_Result result) {
     cb_count++;
     EXPECT_TRUE(result.is_response());
-    // TODO(https://fxbug.dev/330590954): Verify the services that were registered
   };
 
   fidlbredr::ProfileAdvertiseRequest adv_request;
@@ -1687,7 +1799,6 @@ TEST_F(ProfileServerTestFakeAdapter, ClientClosesAdvertisement) {
   auto cb = [&](fidlbredr::Profile_Advertise_Result result) {
     cb_count++;
     EXPECT_TRUE(result.is_response());
-    // TODO(https://fxbug.dev/330590954): Verify the services that were registered
   };
 
   fidlbredr::ProfileAdvertiseRequest adv_request;

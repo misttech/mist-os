@@ -9,6 +9,7 @@ use crate::compare::{Platform, Protocol, Type};
 use crate::convert::{Context, ConvertType};
 use crate::ir::IR;
 use flyweights::FlyStr;
+use std::collections::HashMap;
 use std::rc::Rc;
 
 // API levels of interest
@@ -120,25 +121,53 @@ pub(super) fn compare_fidl_library(
 
     let external = lib.compile(versions.external);
     let platform = lib.compile(versions.platform);
-    super::compatible(&external.get_platform(), &platform.get_platform()).unwrap_or_else(|_| {
-        panic!("Comparing {:?} and {:?}:\n{}", versions.external, versions.platform, lib.source)
-    })
+    super::compatible(&external.get_platform(), &platform.get_platform(), &Default::default())
+        .unwrap_or_else(|_| {
+            panic!("Comparing {:?} and {:?}:\n{}", versions.external, versions.platform, lib.source)
+        })
+}
+
+#[derive(Clone, Copy)]
+pub struct TypeVersions {
+    pub send: &'static str,
+    pub recv: &'static str,
+}
+
+pub(super) fn compare_fidl_type_between(
+    name: &str,
+    versions: &[TypeVersions],
+    source_fragment: &str,
+) -> CompatibilityProblems {
+    let lib = TestLibrary::new(source_fragment);
+    let name = lib.scope_name(name);
+    let mut problems = CompatibilityProblems::default();
+
+    let mut type_versions: HashMap<&'static str, Type> = HashMap::new();
+
+    for v in versions {
+        if !type_versions.contains_key(v.send) {
+            type_versions.insert(v.send, lib.compile(v.send).get_type(&name));
+        }
+        if !type_versions.contains_key(v.recv) {
+            type_versions.insert(v.recv, lib.compile(v.recv).get_type(&name));
+        }
+
+        problems.append(super::compare_types(
+            type_versions.get(v.send).unwrap(),
+            type_versions.get(v.recv).unwrap(),
+            &Default::default(),
+        ));
+    }
+
+    problems
 }
 
 pub(super) fn compare_fidl_type(name: &str, source_fragment: &str) -> CompatibilityProblems {
-    let lib = TestLibrary::new(source_fragment);
-    let name = lib.scope_name(name);
-
-    let ir1 = lib.compile(V1);
-    let ir2 = lib.compile(V2);
-
-    let t1 = ir1.get_type(&name);
-    let t2 = ir2.get_type(&name);
-
-    use super::compare_types;
-    let mut problems = compare_types(&t1, &t2);
-    problems.append(compare_types(&t2, &t1));
-    problems
+    compare_fidl_type_between(
+        name,
+        &[TypeVersions { send: V1, recv: V2 }, TypeVersions { send: V2, recv: V1 }],
+        source_fragment,
+    )
 }
 
 pub(super) fn compare_fidl_protocol(name: &str, source_fragment: &str) -> CompatibilityProblems {
@@ -148,10 +177,5 @@ pub(super) fn compare_fidl_protocol(name: &str, source_fragment: &str) -> Compat
     let external = lib.compile(V1).get_protocol(&name);
     let platform = lib.compile(PLATFORM).get_protocol(&name);
 
-    Protocol::compatible(&external, &platform).unwrap_or_else(|_| {
-        panic!(
-            "Protocol compatibility for {:?} between {:?} and {:?}:\n{}",
-            name, V1, PLATFORM, lib.source
-        )
-    })
+    Protocol::compatible(&external, &platform, &Default::default())
 }

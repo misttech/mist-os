@@ -8,9 +8,9 @@ use anyhow::{format_err, Context};
 use zerocopy::ByteSlice;
 
 macro_rules! validate {
-    ( $condition:expr, $debug_message:expr ) => {
+    ( $condition:expr, $message:expr ) => {
         if !$condition {
-            return Err($crate::error::FrameParseError::new($debug_message));
+            return Err($crate::error::FrameParseError(format!($message)));
         }
     };
 }
@@ -110,7 +110,7 @@ pub fn parse_bool(raw_body: &[u8]) -> FrameParseResult<bool> {
 pub fn parse_selected_reg_config_methods(raw_body: &[u8]) -> FrameParseResult<[u8; 2]> {
     raw_body
         .try_into()
-        .map_err(|_| FrameParseError::new("Failed to parse selected registrar config methods"))
+        .map_err(|_| FrameParseError(format!("Failed to parse selected registrar config methods")))
 }
 
 pub fn parse_response_type(raw_body: &[u8]) -> FrameParseResult<u8> {
@@ -119,7 +119,7 @@ pub fn parse_response_type(raw_body: &[u8]) -> FrameParseResult<u8> {
 }
 
 pub fn parse_uuid_e(raw_body: &[u8]) -> FrameParseResult<[u8; 16]> {
-    raw_body.try_into().map_err(|_| FrameParseError::new("Failed to parse UUID IE"))
+    raw_body.try_into().map_err(|_| FrameParseError(format!("Failed to parse UUID IE")))
 }
 
 pub fn parse_manufacturer<B: ByteSlice>(raw_body: B) -> FrameParseResult<B> {
@@ -143,7 +143,7 @@ pub fn parse_serial_number<B: ByteSlice>(raw_body: B) -> FrameParseResult<B> {
 }
 
 pub fn parse_primary_device_type(raw_body: &[u8]) -> FrameParseResult<[u8; 8]> {
-    raw_body.try_into().map_err(|_| FrameParseError::new("Failed to parse primary device type"))
+    raw_body.try_into().map_err(|_| FrameParseError(format!("Failed to parse primary device type")))
 }
 
 pub fn parse_device_name<B: ByteSlice>(raw_body: B) -> FrameParseResult<B> {
@@ -152,7 +152,7 @@ pub fn parse_device_name<B: ByteSlice>(raw_body: B) -> FrameParseResult<B> {
 }
 
 pub fn parse_config_methods(raw_body: &[u8]) -> FrameParseResult<[u8; 2]> {
-    raw_body.try_into().map_err(|_| FrameParseError::new("Failed to parse config methods"))
+    raw_body.try_into().map_err(|_| FrameParseError(format!("Failed to parse config methods")))
 }
 
 pub fn parse_rf_bands(raw_body: &[u8]) -> FrameParseResult<u8> {

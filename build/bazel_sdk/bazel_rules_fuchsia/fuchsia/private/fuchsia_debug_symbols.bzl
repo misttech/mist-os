@@ -11,7 +11,7 @@ load(
     "FuchsiaPackageResourcesInfo",
     "FuchsiaUnstrippedBinaryInfo",
 )
-load(":utils.bzl", "find_cc_toolchain", "flatten", "make_resource_struct")
+load(":utils.bzl", "find_cc_toolchain", "flatten", "get_target_deps_from_attributes", "make_resource_struct")
 
 FUCHSIA_DEBUG_SYMBOLS_ATTRS = {
     "_elf_strip_tool": attr.label(
@@ -277,36 +277,7 @@ _KNOWN_RULE_KINDS_TO_DEP_ATTR_NAMES = {
 }
 
 def _get_target_deps_from_attributes(rule_attr, rule_kind = None):
-    """Return all dependencies from a given target context during analysis.
-
-    Args:
-        rule_attr: The ctx.attr value for the current target.
-        rule_kind: Optional string for the rule kind (this is aspect_ctx.rule.kind
-             when called from an aspect implementation function). If provided,
-             this can speed up the computation for a few known target kinds.
-    Returns:
-        A list of Target values corresponding to the dependencies of the current
-        target.
-    """
-    attr_names = _KNOWN_RULE_KINDS_TO_DEP_ATTR_NAMES.get(rule_kind)
-    if not attr_names:
-        # For unknown rule kinds, parse all attributes and filter
-        # those that are Targets or lists of Targets to the result.
-        attr_names = dir(rule_attr)
-
-    result = []
-    for attr_name in attr_names:
-        attr_value = getattr(rule_attr, attr_name, None)
-        if not attr_value:
-            continue
-        if type(attr_value) == "Target":
-            result.append(attr_value)
-            continue
-        if type(attr_value) == "list" and type(attr_value[0]) == "Target":
-            result.extend(attr_value)
-            continue
-
-    return depset(result).to_list()
+    return get_target_deps_from_attributes(rule_attr, rule_kind, known_rule_kinds = _KNOWN_RULE_KINDS_TO_DEP_ATTR_NAMES)
 
 def _fuchsia_collect_unstripped_binaries_aspect_impl(target, aspect_ctx):
     return _collect_unstripped_binaries_info(

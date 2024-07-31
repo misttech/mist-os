@@ -535,7 +535,7 @@ class BtTransportUsbTest : public ::gtest::TestLoopFixture {
 
 class BtTransportUsbHciTransportProtocolTest
     : public BtTransportUsbTest,
-      public fidl::Server<fhbt::Snoop>,
+      public fidl::AsyncEventHandler<fhbt::Snoop2>,
       public fidl::WireAsyncEventHandler<fhbt::HciTransport>,
       public fidl::WireAsyncEventHandler<fhbt::ScoConnection> {
  public:
@@ -549,12 +549,9 @@ class BtTransportUsbHciTransportProtocolTest
     dut()->GetDeviceContext<bt_transport_usb::Device>()->ConnectHciTransport(
         std::move(hci_transport_server_end));
 
-    auto [snoop_client_end, snoop_server_end] = fidl::CreateEndpoints<fhbt::Snoop>().value();
-    auto set_snoop_result = hci_transport_client_->SetSnoop(std::move(snoop_client_end));
-    ASSERT_EQ(set_snoop_result.status(), ZX_OK);
-
-    snoop_binding_.AddBinding(dispatcher(), std::move(snoop_server_end), this,
-                              fidl::kIgnoreBindingClosure);
+    auto [snoop_client_end, snoop_server_end] = fidl::CreateEndpoints<fhbt::Snoop2>().value();
+    snoop_client_.Bind(std::move(snoop_client_end), dispatcher(), this);
+    dut()->GetDeviceContext<bt_transport_usb::Device>()->ConnectSnoop(std::move(snoop_server_end));
 
     RunLoopUntilIdle();
   }
@@ -563,32 +560,29 @@ class BtTransportUsbHciTransportProtocolTest
 
   void AckSnoop() {
     // Acknowledge the snoop packet with |current_snoop_seq_|.
-    snoop_binding_.ForEachBinding([&](const fidl::ServerBinding<fhbt::Snoop>& binding) {
-      fit::result<fidl::OneWayError> result =
-          fidl::SendEvent(binding)->OnAcknowledgePackets(current_snoop_seq_);
-      ASSERT_FALSE(result.is_error());
-    });
+    fit::result<fidl::OneWayError> result = snoop_client_->AcknowledgePackets(current_snoop_seq_);
+    ASSERT_FALSE(result.is_error());
   }
 
   // fhbt::Snoop request handlers
-  void ObservePacket(ObservePacketRequest& request,
-                     ObservePacketCompleter::Sync& completer) override {
-    ASSERT_TRUE(request.sequence().has_value());
-    ASSERT_TRUE(request.direction().has_value());
-    ASSERT_TRUE(request.packet().has_value());
+  void OnObservePacket(
+      ::fidl::Event<::fuchsia_hardware_bluetooth::Snoop2::OnObservePacket>& event) override {
+    ASSERT_TRUE(event.sequence().has_value());
+    ASSERT_TRUE(event.direction().has_value());
+    ASSERT_TRUE(event.packet().has_value());
 
-    current_snoop_seq_ = request.sequence().value();
+    current_snoop_seq_ = event.sequence().value();
 
-    if (request.direction().value() == fhbt::PacketDirection::kHostToController) {
-      switch (request.packet()->Which()) {
+    if (event.direction().value() == fhbt::PacketDirection::kHostToController) {
+      switch (event.packet()->Which()) {
         case fhbt::SnoopPacket::Tag::kAcl:
-          snoop_sent_acl_packets_.push_back(request.packet()->acl().value());
+          snoop_sent_acl_packets_.push_back(event.packet()->acl().value());
           break;
         case fhbt::SnoopPacket::Tag::kCommand:
-          snoop_sent_command_packets_.push_back(request.packet()->command().value());
+          snoop_sent_command_packets_.push_back(event.packet()->command().value());
           break;
         case fhbt::SnoopPacket::Tag::kSco:
-          snoop_sent_sco_packets_.push_back(request.packet()->sco().value());
+          snoop_sent_sco_packets_.push_back(event.packet()->sco().value());
           break;
         case fhbt::SnoopPacket::Tag::kIso:
           // No Iso data should be sent.
@@ -597,16 +591,16 @@ class BtTransportUsbHciTransportProtocolTest
           // Unknown packet type sent.
           FAIL();
       };
-    } else if (request.direction().value() == fhbt::PacketDirection::kControllerToHost) {
-      switch (request.packet()->Which()) {
+    } else if (event.direction().value() == fhbt::PacketDirection::kControllerToHost) {
+      switch (event.packet()->Which()) {
         case fhbt::SnoopPacket::Tag::kEvent:
-          snoop_received_event_packets_.push_back(request.packet()->event().value());
+          snoop_received_event_packets_.push_back(event.packet()->event().value());
           break;
         case fhbt::SnoopPacket::Tag::kAcl:
-          snoop_received_acl_packets_.push_back(request.packet()->acl().value());
+          snoop_received_acl_packets_.push_back(event.packet()->acl().value());
           break;
         case fhbt::SnoopPacket::Tag::kSco:
-          snoop_received_sco_packets_.push_back(request.packet()->sco().value());
+          snoop_received_sco_packets_.push_back(event.packet()->sco().value());
           break;
         case fhbt::SnoopPacket::Tag::kIso:
           // No Iso data should be received.
@@ -622,15 +616,14 @@ class BtTransportUsbHciTransportProtocolTest
     }
   }
 
-  void OnDroppedPackets(OnDroppedPacketsRequest& request,
-                        OnDroppedPacketsCompleter::Sync& completer) override {
+  void OnDroppedPackets(
+      ::fidl::Event<::fuchsia_hardware_bluetooth::Snoop2::OnDroppedPackets>&) override {
     // Do nothing, the driver shouldn't drop any packet for now.
     FAIL();
   }
 
-  void handle_unknown_method(::fidl::UnknownMethodMetadata<fhbt::Snoop> metadata,
-                             ::fidl::UnknownMethodCompleter::Sync& completer) override {
-    // Shouldn't receive unknown request from fhbt::Snoop protocol.
+  void handle_unknown_event(::fidl::UnknownEventMetadata<fhbt::Snoop2> metadata) override {
+    // Shouldn't receive unknown event from fhbt::Snoop protocol.
     FAIL();
   }
 
@@ -732,9 +725,10 @@ class BtTransportUsbHciTransportProtocolTest
     return received_sco_packets_;
   }
 
+  fidl::Client<fhbt::Snoop2>& snoop_client() { return snoop_client_; }
+
   fidl::WireClient<fhbt::HciTransport> hci_transport_client_;
   std::optional<fidl::WireClient<fhbt::ScoConnection>> sco_client_;
-  fidl::ServerBindingGroup<fhbt::Snoop> snoop_binding_;
 
  private:
   std::shared_ptr<fdf_testing::DriverRuntime> runtime_ = mock_ddk::GetDriverRuntime();
@@ -742,6 +736,7 @@ class BtTransportUsbHciTransportProtocolTest
       runtime_->StartBackgroundDispatcher();
 
   std::optional<fidl::ServerBindingRef<fhbt::HciTransport>> hci_transport_server_;
+  fidl::Client<fhbt::Snoop2> snoop_client_;
 
   std::vector<std::vector<uint8_t>> received_event_packets_;
   std::vector<std::vector<uint8_t>> received_acl_packets_;

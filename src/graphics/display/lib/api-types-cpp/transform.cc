@@ -7,12 +7,10 @@
 #include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
 #include <zircon/assert.h>
 
-#include <limits>
-#include <type_traits>
-
 namespace display {
 
-Transform ToTransform(fuchsia_hardware_display_types::wire::Transform transform_fidl) {
+Transform ToTransform(
+    fuchsia_hardware_display_types::wire::CoordinateTransformation transform_fidl) {
   return transform_fidl;
 }
 
@@ -25,15 +23,15 @@ Transform ToTransform(frame_transform_t frame_transform_banjo) {
     case FRAME_TRANSFORM_REFLECT_Y:
       return Transform::kReflectY;
     case FRAME_TRANSFORM_ROT_90:
-      return Transform::kRot90;
+      return Transform::kRotateCcw90;
     case FRAME_TRANSFORM_ROT_180:
-      return Transform::kRot180;
+      return Transform::kRotateCcw180;
     case FRAME_TRANSFORM_ROT_270:
-      return Transform::kRot270;
+      return Transform::kRotateCcw270;
     case FRAME_TRANSFORM_ROT_90_REFLECT_X:
-      return Transform::kRot90ReflectX;
+      return Transform::kRotateCcw90ReflectX;
     case FRAME_TRANSFORM_ROT_90_REFLECT_Y:
-      return Transform::kRot90ReflectY;
+      return Transform::kRotateCcw90ReflectY;
     default:
       ZX_DEBUG_ASSERT_MSG(false, "Invalid banjo Transform %u",
                           static_cast<int>(frame_transform_banjo));
@@ -41,7 +39,8 @@ Transform ToTransform(frame_transform_t frame_transform_banjo) {
   }
 }
 
-fuchsia_hardware_display_types::wire::Transform ToFidlTransform(Transform transform) {
+fuchsia_hardware_display_types::wire::CoordinateTransformation ToFidlTransform(
+    Transform transform) {
   return transform;
 }
 
@@ -53,15 +52,15 @@ frame_transform_t ToBanjoFrameTransform(Transform transform) {
       return FRAME_TRANSFORM_REFLECT_X;
     case Transform::kReflectY:
       return FRAME_TRANSFORM_REFLECT_Y;
-    case Transform::kRot90:
+    case Transform::kRotateCcw90:
       return FRAME_TRANSFORM_ROT_90;
-    case Transform::kRot180:
+    case Transform::kRotateCcw180:
       return FRAME_TRANSFORM_ROT_180;
-    case Transform::kRot270:
+    case Transform::kRotateCcw270:
       return FRAME_TRANSFORM_ROT_270;
-    case Transform::kRot90ReflectX:
+    case Transform::kRotateCcw90ReflectX:
       return FRAME_TRANSFORM_ROT_90_REFLECT_X;
-    case Transform::kRot90ReflectY:
+    case Transform::kRotateCcw90ReflectY:
       return FRAME_TRANSFORM_ROT_90_REFLECT_Y;
     default:
       ZX_DEBUG_ASSERT_MSG(false, "Invalid Transform %d", static_cast<int>(transform));

@@ -14,16 +14,16 @@
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/platform-defs.h>
+#include <lib/driver/testing/cpp/driver_runtime.h>
+#include <lib/fdf/cpp/dispatcher.h>
+#include <lib/sync/cpp/completion.h>
 
 #include <memory>
-#include <optional>
 
-#include "lib/fdf/cpp/dispatcher.h"
-#include "lib/sync/cpp/completion.h"
-#include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
+#include "src/devices/testing/mock-ddk/mock-device.h"
 #include "src/graphics/display/drivers/coordinator/controller.h"
 #include "src/graphics/display/drivers/fake/fake-display.h"
-#include "src/graphics/display/drivers/fake/sysmem-device-wrapper.h"
+#include "src/graphics/display/drivers/fake/sysmem-service-provider.h"
 
 namespace display {
 
@@ -32,11 +32,7 @@ namespace display {
 // the fake display device and clients can connect to.
 class FakeDisplayStack {
  public:
-  // |sysmem| allows the caller to customize the sysmem implementation used by the
-  // FakeDisplayStack.  See SysmemDeviceWrapper for more details, as well as existing
-  // specializations of GenericSysmemDeviceWrapper<>.
-  FakeDisplayStack(std::shared_ptr<zx_device> mock_root,
-                   std::unique_ptr<SysmemDeviceWrapper> sysmem,
+  FakeDisplayStack(std::unique_ptr<SysmemServiceProvider> sysmem_service_provider,
                    const fake_display::FakeDisplayDeviceConfig& device_config);
   ~FakeDisplayStack();
 
@@ -51,19 +47,8 @@ class FakeDisplayStack {
   void SyncShutdown();
 
  private:
-  void SetUpOutgoingServices();
-  fidl::ClientEnd<fuchsia_io::Directory> ConnectToOutgoingServiceDirectory();
-
-  std::shared_ptr<zx_device> mock_root_;
-
-  fake_pdev::FakePDevFidl pdev_fidl_;
-
-  std::unique_ptr<SysmemDeviceWrapper> sysmem_;
-
-  // Fake devices created as descendents of the root MockDevice.
-  // All the devices have transferred their ownership to `mock_root_` and will
-  // be torn down on `SyncShutdown()`.
-  zx_device_t* sysmem_device_;
+  std::shared_ptr<fdf_testing::DriverRuntime> driver_runtime_ = mock_ddk::GetDriverRuntime();
+  std::unique_ptr<SysmemServiceProvider> sysmem_service_provider_;
 
   fdf::SynchronizedDispatcher coordinator_client_dispatcher_;
   libsync::Completion coordinator_client_dispatcher_is_shut_down_;
@@ -73,23 +58,10 @@ class FakeDisplayStack {
 
   bool shutdown_ = false;
 
-  const fuchsia_hardware_sysmem::Metadata sysmem_metadata_ = [] {
-    fuchsia_hardware_sysmem::Metadata metadata;
-    metadata.vid() = PDEV_VID_QEMU;
-    metadata.pid() = PDEV_PID_QEMU;
-    return metadata;
-  }();
-
   // Runs services provided by the fake display and display coordinator driver.
   // Must be torn down before `display_` and `coordinator_controller_` is
   // removed.
   async::Loop display_loop_{&kAsyncLoopConfigNeverAttachToThread};
-  // Runs services provided by the fake platform device (pdev). Must be torn
-  // down before `pdev_fidl_`.
-  async::Loop pdev_loop_{&kAsyncLoopConfigNeverAttachToThread};
-  // Serves the `outgoing_` service directory. Must outlive `outgoing_`.
-  async::Loop service_loop_{&kAsyncLoopConfigNeverAttachToThread};
-  std::optional<component::OutgoingDirectory> outgoing_;
 
   fidl::WireSyncClient<fuchsia_hardware_display::Provider> display_provider_client_;
 };

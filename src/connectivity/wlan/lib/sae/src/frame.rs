@@ -5,7 +5,7 @@
 use super::{AuthFrameRx, AuthFrameTx};
 use anyhow::{anyhow, bail, Error};
 use fidl_fuchsia_wlan_ieee80211::StatusCode;
-use wlan_common::appendable::Appendable;
+use wlan_common::append::Append;
 use wlan_common::buffer_reader::BufferReader;
 
 /// IEEE Std 802.11-2016, 12.4.6
@@ -112,8 +112,7 @@ pub fn write_commit(
     element: &[u8],
     anti_clogging_token: &[u8],
 ) -> AuthFrameTx {
-    let mut body = vec![];
-    body.reserve(2 + scalar.len() + element.len() + anti_clogging_token.len());
+    let mut body = Vec::with_capacity(2 + scalar.len() + element.len() + anti_clogging_token.len());
     body.append_value(&group_id);
     body.append_bytes(anti_clogging_token);
     body.append_bytes(scalar);
@@ -126,8 +125,7 @@ pub fn write_commit(
 // This function is currently unused, but planned for future use
 #[allow(dead_code)]
 pub fn write_token(group_id: u16, token: &[u8]) -> AuthFrameTx {
-    let mut body = vec![];
-    body.reserve(2 + token.len());
+    let mut body = Vec::with_capacity(2 + token.len());
     body.append_value(&group_id);
     body.append_bytes(token);
     AuthFrameTx { seq: 1, status_code: StatusCode::AntiCloggingTokenRequired, body }
@@ -136,8 +134,7 @@ pub fn write_token(group_id: u16, token: &[u8]) -> AuthFrameTx {
 // Allow skipping checks on append_bytes() and append_value()
 #[allow(unused_must_use)]
 pub fn write_confirm(send_confirm: u16, confirm: &[u8]) -> AuthFrameTx {
-    let mut body = vec![];
-    body.reserve(2 + confirm.len());
+    let mut body = Vec::with_capacity(2 + confirm.len());
     body.append_value(&send_confirm);
     body.append_bytes(confirm);
     AuthFrameTx { seq: 2, status_code: StatusCode::Success, body }

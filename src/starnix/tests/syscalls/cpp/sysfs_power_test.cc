@@ -91,7 +91,8 @@ TEST_F(SysfsPowerTest, SuspendStatsFilesContainDefaultsLastFailedErrno) {
   std::string last_failed_errno_str;
   EXPECT_TRUE(files::ReadFileToString("/sys/power/suspend_stats/last_failed_errno",
                                       &last_failed_errno_str));
-  EXPECT_THAT(last_failed_errno_str, ContainsRegex("^(-[0-9]+|0)?\n"));
+  // These tests always run in an environment where suspends don't fail.
+  EXPECT_EQ(last_failed_errno_str, "0\n");
 }
 
 TEST_F(SysfsPowerTest, WakeupCountFileContainsExpectedContents) {

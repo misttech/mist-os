@@ -995,10 +995,11 @@ closed protocol Object {
     /// ```
     /// typedef struct zx_info_job {
     ///     // The job's return code; only valid if |exited| is true.
-    ///     // If the job was killed, it will be one of the ZX_TASK_RETCODE values.
+    ///     // If the code is valid, it will be one of the ZX_TASK_RETCODE values.
     ///     int64_t return_code;
     ///
     ///     // If true, the job has exited and |return_code| is valid.
+    ///     // Killing a job is the only way for a job to exit.
     ///     bool exited;
     ///
     ///     // True if the ZX_PROP_JOB_KILL_ON_OOM property was set.

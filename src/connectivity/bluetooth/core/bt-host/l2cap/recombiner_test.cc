@@ -13,8 +13,6 @@
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/pdu.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/transport/packet.h"
 
-#pragma clang diagnostic ignored "-Wshadow"
-
 namespace bt::l2cap {
 namespace {
 
@@ -294,10 +292,12 @@ TEST(RecombinerTest, RecombinationDroppedForFrameWithMaxSize) {
   constexpr size_t kRxSize = kFrameSize + 1;
 
   Recombiner recombiner(kTestHandle);
-  const auto result =
-      recombiner.ConsumeFragment(FirstFragment("", {kFrameSize}));
-  EXPECT_FALSE(result.frames_dropped);
-  EXPECT_FALSE(result.pdu);
+  {
+    const auto result =
+        recombiner.ConsumeFragment(FirstFragment("", {kFrameSize}));
+    EXPECT_FALSE(result.frames_dropped);
+    EXPECT_FALSE(result.pdu);
+  }
 
   // Split the rest of the frame into multiple fragments (this is because
   // Fuchsia's bt-hci layer currently requires ACL data payloads to be no larger
@@ -328,10 +328,12 @@ TEST(RecombinerTest, RecombinationSucceedsForFrameWithMaxSize) {
   constexpr size_t kFrameSize = std::numeric_limits<uint16_t>::max();
 
   Recombiner recombiner(kTestHandle);
-  const auto result =
-      recombiner.ConsumeFragment(FirstFragment("", {kFrameSize}));
-  EXPECT_FALSE(result.frames_dropped);
-  EXPECT_FALSE(result.pdu);
+  {
+    const auto result =
+        recombiner.ConsumeFragment(FirstFragment("", {kFrameSize}));
+    EXPECT_FALSE(result.frames_dropped);
+    EXPECT_FALSE(result.pdu);
+  }
 
   // Split the rest of the frame into multiple fragments (this is because
   // Fuchsia's bt-hci layer currently requires ACL data payloads to be no larger

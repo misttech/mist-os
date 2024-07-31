@@ -41,6 +41,7 @@
 namespace driver_manager {
 
 class DriverRunner : public fidl::WireServer<fuchsia_driver_framework::CompositeNodeManager>,
+                     public fidl::WireServer<fuchsia_driver_index::DriverNotifier>,
                      public BindManagerBridge,
                      public CompositeManagerBridge,
                      public NodeManager,
@@ -66,6 +67,9 @@ class DriverRunner : public fidl::WireServer<fuchsia_driver_framework::Composite
 
   // fidl::WireServer<fuchsia_driver_framework::CompositeNodeManager> interface
   void AddSpec(AddSpecRequestView request, AddSpecCompleter::Sync& completer) override;
+
+  // fidl::WireServer<fuchsia_driver_index::DriverNotifier>
+  void NewDriverAvailable(NewDriverAvailableCompleter::Sync& completer) override;
 
   void handle_unknown_method(
       fidl::UnknownMethodMetadata<fuchsia_driver_framework::CompositeNodeManager> metadata,
@@ -107,9 +111,6 @@ class DriverRunner : public fidl::WireServer<fuchsia_driver_framework::Composite
   void PublishComponentRunner(component::OutgoingDirectory& outgoing);
   void PublishCompositeNodeManager(component::OutgoingDirectory& outgoing);
   zx::result<> StartRootDriver(std::string_view url);
-
-  // Schedules a hanging get call that watches for a new boot/base driver in the Driver Index.
-  void ScheduleWatchForDriverLoad();
 
   // Goes through the orphan list and attempts the bind them again. Sends nodes that are still
   // orphaned back to the orphan list. Tracks the result of the bindings and then when finished
@@ -186,6 +187,7 @@ class DriverRunner : public fidl::WireServer<fuchsia_driver_framework::Composite
   LoaderServiceFactory loader_service_factory_;
   fidl::ServerBindingGroup<fuchsia_component_runner::ComponentRunner> runner_bindings_;
   fidl::ServerBindingGroup<fuchsia_driver_framework::CompositeNodeManager> manager_bindings_;
+  fidl::ServerBindingGroup<fuchsia_driver_index::DriverNotifier> driver_notifier_bindings_;
   async_dispatcher_t* const dispatcher_;
   std::shared_ptr<Node> root_node_;
 

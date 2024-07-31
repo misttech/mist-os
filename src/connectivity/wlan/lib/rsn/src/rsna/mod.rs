@@ -196,8 +196,7 @@ impl<B: ByteSlice> WithUnverifiedMic<B> {
         rsn_ensure!(self.0.key_mic.len() == mic_bytes as usize, Error::InvalidMicSize);
 
         // If a MIC is set but the PTK was not yet derived, the MIC cannot be verified.
-        let mut buf = vec![];
-        self.0.write_into(true, &mut buf)?;
+        let buf = self.0.to_bytes(true);
         let valid_mic =
             protection.integrity_algorithm()?.verify(kck, &buf[..], &self.0.key_mic[..]);
         rsn_ensure!(valid_mic, Error::InvalidMic);

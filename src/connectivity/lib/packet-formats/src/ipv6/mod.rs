@@ -29,7 +29,7 @@ use zerocopy::{AsBytes, ByteSlice, ByteSliceMut, FromBytes, FromZeros, NoCell, R
 use crate::error::{IpParseError, IpParseErrorAction, IpParseResult, ParseError};
 use crate::icmp::Icmpv6ParameterProblemCode;
 use crate::ip::{
-    IpExt, IpPacketBuilder, IpProto, Ipv4Proto, Ipv6ExtHdrType, Ipv6Proto, Nat64Error,
+    DscpAndEcn, IpExt, IpPacketBuilder, IpProto, Ipv4Proto, Ipv6ExtHdrType, Ipv6Proto, Nat64Error,
     Nat64TranslationResult,
 };
 use crate::ipv4::{Ipv4PacketBuilder, HDR_PREFIX_LEN};
@@ -185,16 +185,12 @@ pub struct FixedHeader {
 
 const IP_VERSION: u8 = 6;
 const VERSION_OFFSET: u8 = 4;
-const DS_OFFSET: u8 = 2;
-const DS_MAX: u8 = (1 << (8 - DS_OFFSET)) - 1;
-const ECN_MAX: u8 = (1 << DS_OFFSET) - 1;
 const FLOW_LABEL_MAX: u32 = (1 << 20) - 1;
 
 impl FixedHeader {
     #[allow(clippy::too_many_arguments)]
     fn new(
-        ds: u8,
-        ecn: u8,
+        dscp_and_ecn: DscpAndEcn,
         flow_label: u32,
         payload_len: u16,
         next_hdr: u8,
@@ -202,11 +198,9 @@ impl FixedHeader {
         src_ip: Ipv6Addr,
         dst_ip: Ipv6Addr,
     ) -> FixedHeader {
-        debug_assert!(ds <= DS_MAX);
-        debug_assert!(ecn <= ECN_MAX);
         debug_assert!(flow_label <= FLOW_LABEL_MAX);
 
-        let traffic_class = (ds << DS_OFFSET) | ecn;
+        let traffic_class = dscp_and_ecn.raw();
         FixedHeader {
             version_tc_flowlabel: [
                 IP_VERSION << VERSION_OFFSET | traffic_class >> 4,
@@ -226,12 +220,8 @@ impl FixedHeader {
         self.version_tc_flowlabel[0] >> 4
     }
 
-    fn ds(&self) -> u8 {
-        (self.version_tc_flowlabel[0] & 0xF) << 2 | self.version_tc_flowlabel[1] >> 6
-    }
-
-    fn ecn(&self) -> u8 {
-        (self.version_tc_flowlabel[1] & 0x30) >> 4
+    fn dscp_and_ecn(&self) -> DscpAndEcn {
+        ((self.version_tc_flowlabel[0] & 0xF) << 4 | self.version_tc_flowlabel[1] >> 4).into()
     }
 
     fn flowlabel(&self) -> u32 {
@@ -267,6 +257,12 @@ pub trait Ipv6Header {
     /// The destination IP address.
     fn dst_ip(&self) -> Ipv6Addr {
         self.get_fixed_header().dst_ip
+    }
+
+    /// The Differentiated Services Code Point (DSCP) and the Explicit
+    /// Congestion Notification (ECN).
+    fn dscp_and_ecn(&self) -> DscpAndEcn {
+        self.get_fixed_header().dscp_and_ecn()
     }
 }
 
@@ -389,14 +385,10 @@ impl<B: ByteSlice> Ipv6Packet<B> {
         &self.body
     }
 
-    /// The Differentiated Services (DS) field.
-    pub fn ds(&self) -> u8 {
-        self.fixed_hdr.ds()
-    }
-
-    /// The Explicit Congestion Notification (ECN).
-    pub fn ecn(&self) -> u8 {
-        self.fixed_hdr.ecn()
+    /// The Differentiated Services Code Point (DSCP) and the Explicit
+    /// Congestion Notification (ECN).
+    pub fn dscp_and_ecn(&self) -> DscpAndEcn {
+        self.fixed_hdr.dscp_and_ecn()
     }
 
     /// The flow label.
@@ -541,8 +533,7 @@ impl<B: ByteSlice> Ipv6Packet<B> {
     /// Construct a builder with the same contents as this packet.
     pub fn builder(&self) -> Ipv6PacketBuilder {
         Ipv6PacketBuilder {
-            ds: self.ds(),
-            ecn: self.ecn(),
+            dscp_and_ecn: self.dscp_and_ecn(),
             flowlabel: self.flowlabel(),
             hop_limit: self.hop_limit(),
             proto: self.proto(),
@@ -643,8 +634,7 @@ impl<B: ByteSlice> Ipv6Packet<B> {
         let v4_builder = |v4_proto| {
             let mut builder =
                 Ipv4PacketBuilder::new(v4_src_addr, v4_dst_addr, self.hop_limit(), v4_proto);
-            builder.dscp(self.ds());
-            builder.ecn(self.ecn());
+            builder.dscp_and_ecn(self.dscp_and_ecn());
 
             // The IPv4 header length is 20 bytes (so IHL field value is 5), as
             // no header options are present in translated IPv4 packet.
@@ -824,8 +814,8 @@ impl<B: ByteSlice> Debug for Ipv6Packet<B> {
             .field("dst_ip", &self.dst_ip())
             .field("hop_limit", &self.hop_limit())
             .field("proto", &self.proto())
-            .field("ds", &self.ds())
-            .field("ecn", &self.ecn())
+            .field("dscp", &self.dscp_and_ecn().dscp())
+            .field("ecn", &self.dscp_and_ecn().ecn())
             .field("flowlabel", &self.flowlabel())
             .field("extension headers", &"TODO")
             .field("body", &alloc::format!("<{} bytes>", self.body.len()))
@@ -1010,8 +1000,7 @@ impl<B: ByteSliceMut> Ipv6PacketRaw<B> {
 /// A builder for IPv6 packets.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Ipv6PacketBuilder {
-    ds: u8,
-    ecn: u8,
+    dscp_and_ecn: DscpAndEcn,
     flowlabel: u32,
     hop_limit: u8,
     // The protocol number of the upper layer protocol, not the Next Header
@@ -1034,8 +1023,7 @@ impl Ipv6PacketBuilder {
         proto: Ipv6Proto,
     ) -> Ipv6PacketBuilder {
         Ipv6PacketBuilder {
-            ds: 0,
-            ecn: 0,
+            dscp_and_ecn: DscpAndEcn::default(),
             flowlabel: 0,
             hop_limit,
             proto,
@@ -1044,24 +1032,10 @@ impl Ipv6PacketBuilder {
         }
     }
 
-    /// Set the Differentiated Services (DS).
-    ///
-    /// # Panics
-    ///
-    /// `ds` panics if `ds` is greater than 2^6 - 1.
-    pub fn ds(&mut self, ds: u8) {
-        assert!(ds <= 1 << 6, "invalid DS: {}", ds);
-        self.ds = ds;
-    }
-
-    /// Set the Explicit Congestion Notification (ECN).
-    ///
-    /// # Panics
-    ///
-    /// `ecn` panics if `ecn` is greater than 3.
-    pub fn ecn(&mut self, ecn: u8) {
-        assert!(ecn <= 0b11, "invalid ECN: {}", ecn);
-        self.ecn = ecn
+    /// Set the Differentiated Services Code Point (DSCP) and the Explicit
+    /// Congestion Notification (ECN).
+    pub fn dscp_and_ecn(&mut self, dscp_and_ecn: DscpAndEcn) {
+        self.dscp_and_ecn = dscp_and_ecn;
     }
 
     /// Set the flowlabel.
@@ -1131,8 +1105,7 @@ impl Ipv6PacketBuilder {
     ) {
         buffer
             .write_obj_front(&FixedHeader::new(
-                self.ds,
-                self.ecn,
+                self.dscp_and_ecn,
                 self.flowlabel,
                 {
                     // The caller promises to supply a body whose length
@@ -1187,6 +1160,10 @@ impl IpPacketBuilder<Ipv6> for Ipv6PacketBuilder {
 
     fn proto(&self) -> Ipv6Proto {
         self.proto
+    }
+
+    fn set_dscp_and_ecn(&mut self, dscp_and_ecn: DscpAndEcn) {
+        self.dscp_and_ecn = dscp_and_ecn;
     }
 }
 
@@ -1257,6 +1234,10 @@ where
 
     fn proto(&self) -> Ipv6Proto {
         self.prefix_builder.proto
+    }
+
+    fn set_dscp_and_ecn(&mut self, dscp_and_ecn: DscpAndEcn) {
+        self.prefix_builder.set_dscp_and_ecn(dscp_and_ecn)
     }
 }
 
@@ -1409,15 +1390,23 @@ mod tests {
 
     // Return a new FixedHeader with reasonable defaults.
     fn new_fixed_hdr() -> FixedHeader {
-        FixedHeader::new(0, 2, 0x77, 0, IpProto::Tcp.into(), 64, DEFAULT_SRC_IP, DEFAULT_DST_IP)
+        FixedHeader::new(
+            DscpAndEcn::new(0, 2),
+            0x77,
+            0,
+            IpProto::Tcp.into(),
+            64,
+            DEFAULT_SRC_IP,
+            DEFAULT_DST_IP,
+        )
     }
 
     #[test]
     fn test_parse() {
         let mut buf = &fixed_hdr_to_bytes(new_fixed_hdr())[..];
         let packet = buf.parse::<Ipv6Packet<_>>().unwrap();
-        assert_eq!(packet.ds(), 0);
-        assert_eq!(packet.ecn(), 2);
+        assert_eq!(packet.dscp_and_ecn().dscp(), 0);
+        assert_eq!(packet.dscp_and_ecn().ecn(), 2);
         assert_eq!(packet.flowlabel(), 0x77);
         assert_eq!(packet.hop_limit(), 64);
         assert_eq!(packet.fixed_hdr.next_hdr, IpProto::Tcp.into());
@@ -1470,8 +1459,8 @@ mod tests {
         buf[..IPV6_FIXED_HDR_LEN].copy_from_slice(&fixed_hdr_buf);
         let mut buf = &buf[..];
         let packet = buf.parse::<Ipv6Packet<_>>().unwrap();
-        assert_eq!(packet.ds(), 0);
-        assert_eq!(packet.ecn(), 2);
+        assert_eq!(packet.dscp_and_ecn().dscp(), 0);
+        assert_eq!(packet.dscp_and_ecn().ecn(), 2);
         assert_eq!(packet.flowlabel(), 0x77);
         assert_eq!(packet.hop_limit(), 64);
         assert_eq!(packet.fixed_hdr.next_hdr, Ipv6ExtHdrType::HopByHopOptions.into());
@@ -1526,8 +1515,8 @@ mod tests {
         buf[..IPV6_FIXED_HDR_LEN].copy_from_slice(&fixed_hdr_buf);
         let mut buf = &buf[..];
         let packet = buf.parse::<Ipv6Packet<_>>().unwrap();
-        assert_eq!(packet.ds(), 0);
-        assert_eq!(packet.ecn(), 2);
+        assert_eq!(packet.dscp_and_ecn().dscp(), 0);
+        assert_eq!(packet.dscp_and_ecn().ecn(), 2);
         assert_eq!(packet.flowlabel(), 0x77);
         assert_eq!(packet.hop_limit(), 64);
         assert_eq!(packet.fixed_hdr.next_hdr, Ipv6ExtHdrType::HopByHopOptions.into());
@@ -1805,8 +1794,7 @@ mod tests {
     #[test]
     fn test_serialize() {
         let mut builder = new_builder();
-        builder.ds(0x12);
-        builder.ecn(3);
+        builder.dscp_and_ecn(DscpAndEcn::new(0x12, 3));
         builder.flowlabel(0x10405);
         let mut buf = (&[0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
             .into_serializer()
@@ -1826,8 +1814,8 @@ mod tests {
         let packet = buf.parse::<Ipv6Packet<_>>().unwrap();
         // assert that when we parse those bytes, we get the values we set in
         // the builder
-        assert_eq!(packet.ds(), 0x12);
-        assert_eq!(packet.ecn(), 3);
+        assert_eq!(packet.dscp_and_ecn().dscp(), 0x12);
+        assert_eq!(packet.dscp_and_ecn().ecn(), 3);
         assert_eq!(packet.flowlabel(), 0x10405);
     }
 
@@ -2272,22 +2260,19 @@ mod tests {
         proto_v4: Ipv4Proto,
         proto_v6: Ipv6Proto,
     ) -> (Ipv4PacketBuilder, Ipv6PacketBuilder) {
-        const IP_DSCP: u8 = 0x12;
-        const IP_ECN: u8 = 3;
+        const IP_DSCP_AND_ECN: DscpAndEcn = DscpAndEcn::new(0x12, 3);
         const IP_TTL: u8 = 64;
 
         let mut ipv4_builder =
             Ipv4PacketBuilder::new(DEFAULT_V4_SRC_IP, DEFAULT_V4_DST_IP, IP_TTL, proto_v4);
-        ipv4_builder.dscp(IP_DSCP);
-        ipv4_builder.ecn(IP_ECN);
+        ipv4_builder.dscp_and_ecn(IP_DSCP_AND_ECN);
         ipv4_builder.df_flag(false);
         ipv4_builder.mf_flag(false);
         ipv4_builder.fragment_offset(0);
 
         let mut ipv6_builder =
             Ipv6PacketBuilder::new(DEFAULT_SRC_IP, DEFAULT_DST_IP, IP_TTL, proto_v6);
-        ipv6_builder.ds(IP_DSCP);
-        ipv6_builder.ecn(IP_ECN);
+        ipv6_builder.dscp_and_ecn(IP_DSCP_AND_ECN);
         ipv6_builder.flowlabel(0x456);
 
         (ipv4_builder, ipv6_builder)

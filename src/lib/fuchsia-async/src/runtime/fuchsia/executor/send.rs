@@ -4,7 +4,7 @@
 
 use super::super::timer::TimerHeap;
 use super::common::{with_local_timer_heap, Executor, ExecutorTime};
-use super::ScopeRef;
+use super::scope::ScopeRef;
 use crate::atomic_future::AtomicFuture;
 use fuchsia_sync::{Condvar, Mutex};
 use futures::FutureExt;

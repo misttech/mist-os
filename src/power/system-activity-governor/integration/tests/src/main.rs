@@ -1175,12 +1175,10 @@ async fn test_activity_governor_suspends_after_listener_hanging_on_resume() -> R
         .unwrap();
 
     let (on_suspend_started_tx, mut on_suspend_started_rx) = mpsc::channel(1);
-    let (on_suspend_tx, mut on_suspend_rx) = mpsc::channel(1);
     let (on_resume_tx, mut on_resume_rx) = mpsc::channel(1);
 
     fasync::Task::local(async move {
         let mut on_suspend_started_tx = on_suspend_started_tx;
-        let mut on_suspend_tx = on_suspend_tx;
         let mut on_resume_tx = on_resume_tx;
 
         while let Some(Ok(req)) = listener_stream.next().await {
@@ -1190,9 +1188,6 @@ async fn test_activity_governor_suspends_after_listener_hanging_on_resume() -> R
                     responder.send().unwrap();
                     fasync::Timer::new(fasync::Duration::from_millis(50)).await;
                     on_resume_tx.try_send(()).unwrap();
-                }
-                fsystem::ActivityGovernorListenerRequest::OnSuspend { .. } => {
-                    on_suspend_tx.try_send(()).unwrap();
                 }
                 fsystem::ActivityGovernorListenerRequest::OnSuspendStarted { responder } => {
                     responder.send().unwrap();
@@ -1215,8 +1210,7 @@ async fn test_activity_governor_suspends_after_listener_hanging_on_resume() -> R
         lease(&suspend_controller, 1).await?;
     }
 
-    // OnSuspend and OnResume should have been called once.
-    on_suspend_rx.next().await.unwrap();
+    // OnSuspendStarted and OnResume should have been called once.
     on_suspend_started_rx.next().await.unwrap();
 
     assert_eq!(0, suspend_device.await_suspend().await.unwrap().unwrap().state_index.unwrap());
@@ -1323,7 +1317,6 @@ async fn test_activity_governor_does_not_suspend_while_on_suspend_started_hangs(
                 fsystem::ActivityGovernorListenerRequest::OnResume { responder } => {
                     responder.send().unwrap();
                 }
-                fsystem::ActivityGovernorListenerRequest::OnSuspend { .. } => (),
                 fsystem::ActivityGovernorListenerRequest::OnSuspendStarted { responder } => {
                     _on_suspend_started_responder = responder;
                     on_suspend_started_tx.try_send(()).unwrap();
@@ -1383,12 +1376,10 @@ async fn test_activity_governor_handles_listener_raising_power_levels() -> Resul
         .unwrap();
 
     let (on_suspend_started_tx, mut on_suspend_started_rx) = mpsc::channel(1);
-    let (on_suspend_tx, mut on_suspend_rx) = mpsc::channel(1);
     let (on_resume_tx, mut on_resume_rx) = mpsc::channel(1);
 
     fasync::Task::local(async move {
         let mut on_suspend_started_tx = on_suspend_started_tx;
-        let mut on_suspend_tx = on_suspend_tx;
         let mut on_resume_tx = on_resume_tx;
 
         while let Some(Ok(req)) = listener_stream.next().await {
@@ -1397,9 +1388,6 @@ async fn test_activity_governor_handles_listener_raising_power_levels() -> Resul
                     let suspend_lease = lease(&suspend_controller, 1).await.unwrap();
                     on_resume_tx.try_send(suspend_lease).unwrap();
                     responder.send().unwrap();
-                }
-                fsystem::ActivityGovernorListenerRequest::OnSuspend { .. } => {
-                    on_suspend_tx.try_send(()).unwrap();
                 }
                 fsystem::ActivityGovernorListenerRequest::OnSuspendStarted { responder } => {
                     responder.send().unwrap();
@@ -1418,8 +1406,7 @@ async fn test_activity_governor_handles_listener_raising_power_levels() -> Resul
 
     drop(suspend_lease);
 
-    // OnSuspend should have been called.
-    on_suspend_rx.next().await.unwrap();
+    // OnSuspendStarted should have been called.
     on_suspend_started_rx.next().await.unwrap();
 
     assert_eq!(0, suspend_device.await_suspend().await.unwrap().unwrap().state_index.unwrap());
@@ -1481,8 +1468,7 @@ async fn test_activity_governor_handles_listener_raising_power_levels() -> Resul
     // Drop the lease and wait for suspend,
     on_resume_rx.next().await.unwrap();
 
-    // OnSuspend should be called again.
-    on_suspend_rx.next().await.unwrap();
+    // OnSuspendStarted should be called again.
     on_suspend_started_rx.next().await.unwrap();
 
     assert_eq!(0, suspend_device.await_suspend().await.unwrap().unwrap().state_index.unwrap());
@@ -1573,21 +1559,16 @@ async fn test_activity_governor_handles_suspend_failure() -> Result<()> {
         .unwrap();
 
     let (on_suspend_started_tx, mut on_suspend_started_rx) = mpsc::channel(1);
-    let (on_suspend_tx, mut on_suspend_rx) = mpsc::channel(1);
     let (on_suspend_fail_tx, mut on_suspend_fail_rx) = mpsc::channel(1);
 
     fasync::Task::local(async move {
         let mut on_suspend_started_tx = on_suspend_started_tx;
-        let mut on_suspend_tx = on_suspend_tx;
         let mut on_suspend_fail_tx = on_suspend_fail_tx;
 
         while let Some(Ok(req)) = listener_stream.next().await {
             match req {
                 fsystem::ActivityGovernorListenerRequest::OnResume { responder } => {
                     responder.send().unwrap();
-                }
-                fsystem::ActivityGovernorListenerRequest::OnSuspend { .. } => {
-                    on_suspend_tx.try_send(()).unwrap();
                 }
                 fsystem::ActivityGovernorListenerRequest::OnSuspendStarted { responder } => {
                     responder.send().unwrap();
@@ -1608,8 +1589,7 @@ async fn test_activity_governor_handles_suspend_failure() -> Result<()> {
 
     drop(suspend_lease);
 
-    // OnSuspend should have been called.
-    on_suspend_rx.next().await.unwrap();
+    // OnSuspendStarted should have been called.
     on_suspend_started_rx.next().await.unwrap();
 
     assert_eq!(0, suspend_device.await_suspend().await.unwrap().unwrap().state_index.unwrap());
@@ -1670,8 +1650,7 @@ async fn test_activity_governor_handles_suspend_failure() -> Result<()> {
     // Drop the lease and wait for suspend,
     on_suspend_fail_rx.next().await.unwrap();
 
-    // OnSuspend should be called again.
-    on_suspend_rx.next().await.unwrap();
+    // OnSuspendStarted should be called again.
     on_suspend_started_rx.next().await.unwrap();
 
     assert_eq!(0, suspend_device.await_suspend().await.unwrap().unwrap().state_index.unwrap());
@@ -1737,7 +1716,6 @@ async fn test_activity_governor_blocks_lease_while_suspend_in_progress() -> Resu
                 fsystem::ActivityGovernorListenerRequest::OnSuspendFail { responder } => {
                     responder.send().unwrap();
                 }
-                fsystem::ActivityGovernorListenerRequest::OnSuspend { .. } => {}
                 fsystem::ActivityGovernorListenerRequest::_UnknownMethod { ordinal, .. } => {
                     panic!("Unexpected method: {}", ordinal);
                 }

@@ -153,12 +153,10 @@ void HandoffPrep::SetMemory() {
       case memalloc::Type::kTestRamReserve:
         return ktl::nullopt;
 
-      case memalloc::Type::kPeripheral:
-        [[fallthrough]];
-
       // The allocations that should survive into the hand-off.
-      //
-      // TODO(https://fxbug.dev/42164859): Add more!
+      case memalloc::Type::kDataZbi:
+      case memalloc::Type::kKernel:
+      case memalloc::Type::kPeripheral:
       case memalloc::Type::kReservedLow:
         return type;
 

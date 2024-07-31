@@ -196,7 +196,7 @@ impl BufferWrite for IeDefinition {
                     // rates were specified.
                     quote!(
                         if rates.len() != SUPPORTED_RATES_MAX_LEN {
-                            return Err(FrameWriteError::new_invalid_data(format!(
+                            return Err(FrameWriteError::InvalidData(format!(
                                 "attempt to write extended_supported_rates without specifying the \
                                 maximum allowed supported_rates: {}", rates.len()
                             )).into());
@@ -238,7 +238,9 @@ impl BufferWrite for IeDefinition {
 
         let emit_offset = match &self.emit_offset {
             None => quote!(),
-            Some(ident) => quote!(#ident = w.bytes_written();),
+            Some(ident) => {
+                quote!(#ident = w.bytes_appended();)
+            }
         };
         Ok(quote!(
             #emit_offset

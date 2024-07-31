@@ -22,21 +22,20 @@ namespace display {
 // static
 zx::result<std::unique_ptr<SysmemServiceForwarder>> SysmemServiceForwarder::Create() {
   fbl::AllocChecker alloc_checker;
-  auto component_sysmem_service_forwarder =
-      fbl::make_unique_checked<SysmemServiceForwarder>(&alloc_checker);
+  auto sysmem_service_forwarder = fbl::make_unique_checked<SysmemServiceForwarder>(&alloc_checker);
   if (!alloc_checker.check()) {
-    FX_LOGS(ERROR) << "Failed to allocate memory for ComponentSysmemServiceForwarder";
+    FX_LOGS(ERROR) << "Failed to allocate memory for SysmemServiceForwarder";
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
-  zx::result<> initialize_result = component_sysmem_service_forwarder->Initialize();
+  zx::result<> initialize_result = sysmem_service_forwarder->Initialize();
   if (initialize_result.is_error()) {
-    FX_LOGS(ERROR) << "Failed to initialize ComponentSysmemServiceForwarder: "
+    FX_LOGS(ERROR) << "Failed to initialize SysmemServiceForwarder: "
                    << initialize_result.status_string();
     return initialize_result.take_error();
   }
 
-  return zx::ok(std::move(component_sysmem_service_forwarder));
+  return zx::ok(std::move(sysmem_service_forwarder));
 }
 
 SysmemServiceForwarder::SysmemServiceForwarder() : loop_(&kAsyncLoopConfigNeverAttachToThread) {

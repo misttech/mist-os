@@ -117,11 +117,11 @@ impl FsNodeOps for BusDevicesDirectory {
     ) -> Result<FsNodeHandle, Errno> {
         let kobject = self.kobject();
         match kobject.get_child(name) {
-            Some(child_kobject) => Ok(node.fs().create_node(
-                current_task,
-                sysfs_create_link(kobject.clone(), child_kobject),
-                FsNodeInfo::new_factory(mode!(IFLNK, 0o777), FsCred::root()),
-            )),
+            Some(child_kobject) => {
+                let (link, info) =
+                    sysfs_create_link(kobject.clone(), child_kobject, FsCred::root());
+                Ok(node.fs().create_node(current_task, link, info))
+            }
             None => error!(ENOENT),
         }
     }

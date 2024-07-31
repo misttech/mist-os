@@ -62,7 +62,7 @@ use crate::internal::raw::counters::RawIpSocketCounters;
 use crate::internal::raw::{RawIpSocketHandler, RawIpSocketMap, RawIpSocketsBindingsTypes};
 use crate::internal::reassembly::{
     FragmentBindingsTypes, FragmentHandler, FragmentProcessingState, FragmentTimerId,
-    IpPacketFragmentCache,
+    FragmentablePacket, IpPacketFragmentCache,
 };
 use crate::internal::routing::{IpRoutingDeviceContext, RoutingTable};
 use crate::internal::socket::{IpSocketBindingsContext, IpSocketContext, IpSocketHandler};
@@ -1956,112 +1956,117 @@ macro_rules! drop_packet_and_undo_parse {
 /// Attempts to process a potential fragment packet and reassemble if we are
 /// ready to do so. If the packet isn't fragmented, or a packet was reassembled,
 /// attempt to dispatch the packet.
-macro_rules! process_fragment {
-    ($core_ctx:expr, $bindings_ctx:expr, $dispatch:ident, $device:ident, $frame_dst:expr, $buffer:expr, $packet:expr, $ip:ident, $packet_metadata:expr, $receive_meta:ident) => {{
-        match FragmentHandler::<$ip, _>::process_fragment::<&mut [u8]>(
-            $core_ctx,
-            $bindings_ctx,
-            $packet,
-        ) {
-            // Handle the packet right away since reassembly is not needed.
-            FragmentProcessingState::NotNeeded(packet) => {
-                trace!("receive_ip_packet: not fragmented");
-                // TODO(joshlf):
-                // - Check for already-expired TTL?
-                $dispatch(
-                    $core_ctx,
-                    $bindings_ctx,
-                    $device,
-                    $frame_dst,
-                    packet,
-                    $packet_metadata,
-                    $receive_meta,
-                ).unwrap_or_else(|err| {
-                    err.respond_with_icmp_error($core_ctx, $bindings_ctx, $buffer, $device)
-                })
-            }
-            // Ready to reassemble a packet.
-            FragmentProcessingState::Ready { key, packet_len } => {
-                trace!("receive_ip_packet: fragmented, ready for reassembly");
-                // Allocate a buffer of `packet_len` bytes.
-                let mut buffer = Buf::new(alloc::vec![0; packet_len], ..);
-                // The packet metadata associated with this last fragment will
-                // be dropped and a new metadata struct created for the
-                // reassembled packet.
-                $packet_metadata.acknowledge_drop();
+fn process_fragment<I, CC, BC, F>(
+    core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
+    mut dispatch: F,
+    device: &CC::DeviceId,
+    frame_dst: Option<FrameDestination>,
+    packet: I::Packet<&mut [u8]>,
+    mut packet_metadata: IpLayerPacketMetadata<I, BC>,
+    receive_meta: ReceiveIpPacketMeta<I>,
+) -> Result<(), DispatchIpPacketError<I>>
+where
+    I: IpLayerIpExt + IcmpHandlerIpExt,
+    for<'a> I::Packet<&'a mut [u8]>: FragmentablePacket,
+    CC: IpLayerIngressContext<I, BC> + CounterContext<IpCounters<I>>,
+    BC: IpLayerBindingsContext<I, CC::DeviceId>,
+    F: FnMut(
+        &mut CC,
+        &mut BC,
+        &CC::DeviceId,
+        Option<FrameDestination>,
+        I::Packet<&mut [u8]>,
+        IpLayerPacketMetadata<I, BC>,
+        ReceiveIpPacketMeta<I>,
+    ) -> Result<(), DispatchIpPacketError<I>>,
+{
+    match FragmentHandler::<I, _>::process_fragment::<&mut [u8]>(core_ctx, bindings_ctx, packet) {
+        // Handle the packet right away since reassembly is not needed.
+        FragmentProcessingState::NotNeeded(packet) => {
+            trace!("receive_ip_packet: not fragmented");
+            // TODO(joshlf):
+            // - Check for already-expired TTL?
+            dispatch(
+                core_ctx,
+                bindings_ctx,
+                device,
+                frame_dst,
+                packet,
+                packet_metadata,
+                receive_meta,
+            )
+        }
+        // Ready to reassemble a packet.
+        FragmentProcessingState::Ready { key, packet_len } => {
+            trace!("receive_ip_packet: fragmented, ready for reassembly");
+            // Allocate a buffer of `packet_len` bytes.
+            let mut buffer = Buf::new(alloc::vec![0; packet_len], ..);
+            // The packet metadata associated with this last fragment will
+            // be dropped and a new metadata struct created for the
+            // reassembled packet.
+            packet_metadata.acknowledge_drop();
 
-                // Attempt to reassemble the packet.
-                match FragmentHandler::<$ip, _>::reassemble_packet(
-                    $core_ctx,
-                    $bindings_ctx,
-                    &key,
-                    buffer.buffer_view_mut(),
-                ) {
-                    // Successfully reassembled the packet, handle it.
-                    Ok(packet) => {
-                        trace!("receive_ip_packet: fragmented, reassembled packet: {:?}", packet);
-                        // TODO(joshlf):
-                        // - Check for already-expired TTL?
-                        // Since each fragment had its own packet metadata, it's
-                        // not clear what metadata to use for the reassembled
-                        // packet. Resetting the metadata is the safest bet,
-                        // though it means downstream consumers must be aware of
-                        // this case.
-                        let packet_metadata = IpLayerPacketMetadata::default();
-                        $dispatch::<_, _,>(
-                            $core_ctx,
-                            $bindings_ctx,
-                            $device,
-                            $frame_dst,
-                            packet,
-                            packet_metadata,
-                            $receive_meta,
-                        ).unwrap_or_else(|err| {
-                            err.respond_with_icmp_error($core_ctx, $bindings_ctx, $buffer, $device)
-                        })
-                    }
-                    // TODO(ghanan): Handle reassembly errors, remove
-                    // `allow(unreachable_patterns)` when complete.
-                    _ => {
-                        $packet_metadata.acknowledge_drop();
-                        return;
-                    },
-                    #[allow(unreachable_patterns)]
-                    Err(e) => {
-                        $core_ctx.increment(|counters: &IpCounters<$ip>| {
-                            &counters.fragment_reassembly_error
-                        });
-                        $packet_metadata.acknowledge_drop();
-                        trace!("receive_ip_packet: fragmented, failed to reassemble: {:?}", e);
-                    }
+            // Attempt to reassemble the packet.
+            let reassemble_result = match FragmentHandler::<I, _>::reassemble_packet(
+                core_ctx,
+                bindings_ctx,
+                &key,
+                buffer.buffer_view_mut(),
+            ) {
+                // Successfully reassembled the packet, handle it.
+                Ok(packet) => {
+                    trace!("receive_ip_packet: fragmented, reassembled packet: {:?}", packet);
+                    // TODO(joshlf):
+                    // - Check for already-expired TTL?
+                    // Since each fragment had its own packet metadata, it's
+                    // not clear what metadata to use for the reassembled
+                    // packet. Resetting the metadata is the safest bet,
+                    // though it means downstream consumers must be aware of
+                    // this case.
+                    let packet_metadata = IpLayerPacketMetadata::default();
+                    dispatch(
+                        core_ctx,
+                        bindings_ctx,
+                        device,
+                        frame_dst,
+                        packet,
+                        packet_metadata,
+                        receive_meta,
+                    )
                 }
-            }
-            // Cannot proceed since we need more fragments before we
-            // can reassemble a packet.
-            FragmentProcessingState::NeedMoreFragments => {
-                $packet_metadata.acknowledge_drop();
-                $core_ctx.increment(|counters: &IpCounters<$ip>| {
-                    &counters.need_more_fragments
-                });
-                trace!("receive_ip_packet: fragmented, need more before reassembly")
-            }
-            // TODO(ghanan): Handle invalid fragments.
-            FragmentProcessingState::InvalidFragment => {
-                $packet_metadata.acknowledge_drop();
-                $core_ctx.increment(|counters: &IpCounters<$ip>| {
-                    &counters.invalid_fragment
-                });
-                trace!("receive_ip_packet: fragmented, invalid")
-            }
-            FragmentProcessingState::OutOfMemory => {
-                $packet_metadata.acknowledge_drop();
-                $core_ctx.increment(|counters: &IpCounters<$ip>| {
-                    &counters.fragment_cache_full
-                });
-                trace!("receive_ip_packet: fragmented, dropped because OOM")
-            }
-        };
-    }};
+                Err(e) => {
+                    core_ctx
+                        .increment(|counters: &IpCounters<I>| &counters.fragment_reassembly_error);
+                    packet_metadata.acknowledge_drop();
+                    debug!("receive_ip_packet: fragmented, failed to reassemble: {:?}", e);
+                    Ok(())
+                }
+            };
+            reassemble_result
+        }
+        // Cannot proceed since we need more fragments before we
+        // can reassemble a packet.
+        FragmentProcessingState::NeedMoreFragments => {
+            packet_metadata.acknowledge_drop();
+            core_ctx.increment(|counters: &IpCounters<I>| &counters.need_more_fragments);
+            trace!("receive_ip_packet: fragmented, need more before reassembly");
+            Ok(())
+        }
+        // TODO(ghanan): Handle invalid fragments.
+        FragmentProcessingState::InvalidFragment => {
+            packet_metadata.acknowledge_drop();
+            core_ctx.increment(|counters: &IpCounters<I>| &counters.invalid_fragment);
+            trace!("receive_ip_packet: fragmented, invalid");
+            Ok(())
+        }
+        FragmentProcessingState::OutOfMemory => {
+            packet_metadata.acknowledge_drop();
+            core_ctx.increment(|counters: &IpCounters<I>| &counters.fragment_cache_full);
+            trace!("receive_ip_packet: fragmented, dropped because OOM");
+            Ok(())
+        }
+    }
 }
 
 // TODO(joshlf): Can we turn `try_parse_ip_packet` into a function? So far, I've
@@ -2275,18 +2280,19 @@ pub fn receive_ipv4_packet<
             // panic because the fragment data is in the fixed header so it is
             // always present (even if the fragment data has values that implies
             // that the packet is not fragmented).
-            process_fragment!(
+            process_fragment(
                 core_ctx,
                 bindings_ctx,
                 dispatch_receive_ipv4_packet,
                 device,
                 frame_dst,
-                buffer,
                 packet,
-                Ipv4,
                 packet_metadata,
-                meta
-            );
+                meta,
+            )
+            .unwrap_or_else(|err| {
+                err.respond_with_icmp_error(core_ctx, bindings_ctx, buffer, device)
+            })
         }
         ReceivePacketAction::Forward { dst: Destination { device: dst_device, next_hop } } => {
             let destination = IpPacketDestination::from_next_hop(next_hop, dst_ip);
@@ -2640,18 +2646,19 @@ pub fn receive_ipv6_packet<
                     // TODO(ghanan): Handle extension headers again since there
                     //               could be some more in a reassembled packet
                     //               (after the fragment header).
-                    process_fragment!(
+                    process_fragment(
                         core_ctx,
                         bindings_ctx,
                         dispatch_receive_ipv6_packet,
                         device,
                         frame_dst,
-                        buffer,
                         packet,
-                        Ipv6,
                         packet_metadata,
-                        meta
-                    );
+                        meta,
+                    )
+                    .unwrap_or_else(|err| {
+                        err.respond_with_icmp_error(core_ctx, bindings_ctx, buffer, device)
+                    })
                 }
             }
         }

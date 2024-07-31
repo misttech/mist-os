@@ -605,6 +605,19 @@ void ProfileServer::Advertise(fuchsia::bluetooth::bredr::ProfileAdvertiseRequest
     return;
   };
 
+  const auto registered_records = adapter()->bredr()->GetRegisteredServices(registration_handle);
+  std::vector<fuchsia::bluetooth::bredr::ServiceDefinition> registered_definitions;
+  for (auto& record : registered_records) {
+    auto def = fidl_helpers::ServiceRecordToServiceDefinition(record);
+    // Shouldn't fail in practice; the records are all well-formed and validated earlier in this
+    // function.
+    if (def.is_error()) {
+      bt_log(WARN, "fidl", "Failed to construct service definition from record: %lu", def.error());
+      continue;
+    }
+    registered_definitions.emplace_back(std::move(def.value()));
+  }
+
   fidlbredr::ConnectionReceiverPtr receiver = request.mutable_receiver()->Bind();
   // Monitor events on the `ConnectionReceiver`. Remove the service if the FIDL client revokes the
   // service registration.
@@ -622,9 +635,7 @@ void ProfileServer::Advertise(fuchsia::bluetooth::bredr::ProfileAdvertiseRequest
 
   current_advertised_.try_emplace(next, std::move(receiver), registration_handle);
   advertised_total_ = next;
-  // TODO(https://fxbug.dev/330590954): Return the services that were registered by the SDP server.
   fuchsia::bluetooth::bredr::Profile_Advertise_Response result;
-  std::vector<fuchsia::bluetooth::bredr::ServiceDefinition> registered_definitions;
   result.set_services(std::move(registered_definitions));
   callback(fuchsia::bluetooth::bredr::Profile_Advertise_Result::WithResponse(std::move(result)));
 }

@@ -33,6 +33,7 @@ cc_library(
         "permissions.cc",
         "write_queue.cc",
     ],
+    copts = ["-Wswitch-enum"],
     deps = [
         ":definitions",
         "//src/connectivity/bluetooth/core/bt-host/l2cap",

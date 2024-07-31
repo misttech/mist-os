@@ -112,18 +112,16 @@ template("product_bundle") {
 
     # If virtual devices were not specified by the invoker, add
     # the "default" devices if the board type supports the emulator.
-    # Also, only add these in the Fuchsia toolchain, since //build/images/*
-    # are only valid in the Fuchsia toolchain.
-  } else if (board_is_emu && current_toolchain == default_toolchain) {
+  } else if (board_is_emu) {
     virtual_devices = [
       "$root_build_dir/virtual_device_recommended.json",
       "$root_build_dir/virtual_device_min.json",
       "$root_build_dir/virtual_device_large.json",
     ]
     bundle_deps += [
-      "//build/images/flash:virtual_device_specification_large",
-      "//build/images/flash:virtual_device_specification_min",
-      "//build/images/flash:virtual_device_specification_recommended",
+      "//build/virtual-devices:virtual_device_specification_large",
+      "//build/virtual-devices:virtual_device_specification_min",
+      "//build/virtual-devices:virtual_device_specification_recommended",
     ]
     default_virtual_device = "virtual_device_recommended"
   }

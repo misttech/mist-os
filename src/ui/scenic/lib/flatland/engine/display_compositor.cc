@@ -29,8 +29,6 @@ namespace flatland {
 
 namespace {
 
-using fhd_Transform = fuchsia::hardware::display::types::Transform;
-
 // Debugging color used to highlight images that have gone through the GPU rendering path.
 const std::array<float, 4> kGpuRenderingDebugColor = {0.9f, 0.5f, 0.5f, 1.f};
 
@@ -596,7 +594,7 @@ void DisplayCompositor::ApplyLayerColor(const fuchsia::hardware::display::LayerI
 
   const auto [src, dst] = DisplaySrcDstFrames::New(rectangle, image);
 
-  const fhd_Transform transform =
+  const fuchsia::hardware::display::types::CoordinateTransformation transform =
       GetDisplayTransformFromOrientationAndFlip(rectangle.orientation, image.flip);
 
   (*display_coordinator_)->SetLayerPrimaryPosition(layer_id, transform, src, dst);
@@ -615,7 +613,7 @@ void DisplayCompositor::ApplyLayerImage(const fuchsia::hardware::display::LayerI
   const auto [src, dst] = DisplaySrcDstFrames::New(rectangle, image);
   FX_DCHECK(src.width && src.height) << "Source frame cannot be empty.";
   FX_DCHECK(dst.width && dst.height) << "Destination frame cannot be empty.";
-  const fhd_Transform transform =
+  const fuchsia::hardware::display::types::CoordinateTransformation transform =
       GetDisplayTransformFromOrientationAndFlip(rectangle.orientation, image.flip);
   const auto alpha_mode = GetAlphaMode(image.blend_mode);
 

@@ -851,13 +851,9 @@ mod tests {
 
     #[test]
     fn test_wpa_ie() {
-        let mut buf = vec![];
-        fake_bss_description!(Wpa1)
-            .wpa_ie()
-            .expect("failed to find WPA1 IE")
-            .write_into(&mut buf)
-            .expect("failed to serialize WPA1 IE");
-        assert_eq!(fake_wpa1_ie_body(false), buf);
+        let buf =
+            fake_bss_description!(Wpa1).wpa_ie().expect("failed to find WPA1 IE").into_bytes();
+        assert_eq!(&fake_wpa1_ie_body(false)[..], &buf[..]);
         fake_bss_description!(Wpa2).wpa_ie().expect_err("found unexpected WPA1 IE");
     }
 

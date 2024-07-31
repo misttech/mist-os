@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::appendable::BufferTooSmall;
+use crate::append::BufferTooSmall;
 use crate::ie::rsn::rsne::Rsne;
 use crate::ie::rsn::{akm, cipher};
 use crate::ie::wpa::WpaIe;

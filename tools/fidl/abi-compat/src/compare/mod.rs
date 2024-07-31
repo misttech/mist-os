@@ -13,6 +13,7 @@ use anyhow::Result;
 use flyweights::FlyStr;
 
 use crate::ir::Openness;
+use crate::Configuration;
 
 mod types;
 pub use types::*;
@@ -153,7 +154,11 @@ impl Method {
         matches!(self.payload, MethodPayload::OneWay(_))
     }
 
-    pub fn compatible(client: &Self, server: &Self) -> Result<CompatibilityProblems> {
+    pub fn compatible(
+        client: &Self,
+        server: &Self,
+        config: &Configuration,
+    ) -> CompatibilityProblems {
         let mut problems = CompatibilityProblems::default();
         if client.kind() != server.kind() {
             problems.protocol(
@@ -167,13 +172,13 @@ impl Method {
                     server.kind()
                 ),
             );
-            return Ok(problems);
+            return problems;
         }
         use MethodPayload::*;
         match (&client.payload, &server.payload) {
             (TwoWay(c_request, c_response), TwoWay(s_request, s_response)) => {
                 // Request
-                let compat = compare_types(c_request, s_request);
+                let compat = compare_types(c_request, s_request, &config);
                 if compat.is_incompatible() {
                     problems.protocol(
                         &client.path,
@@ -187,7 +192,7 @@ impl Method {
                 }
                 problems.append(compat);
                 // Response
-                let compat = compare_types(s_response, c_response);
+                let compat = compare_types(s_response, c_response, &config);
                 if compat.is_incompatible() {
                     problems.protocol(
                         &client.path,
@@ -202,7 +207,7 @@ impl Method {
                 problems.append(compat);
             }
             (OneWay(c_request), OneWay(s_request)) => {
-                let compat = compare_types(c_request, s_request);
+                let compat = compare_types(c_request, s_request, &config);
                 if compat.is_incompatible() {
                     problems.protocol(
                         &client.path,
@@ -217,7 +222,7 @@ impl Method {
                 problems.append(compat);
             }
             (Event(c_payload), Event(s_payload)) => {
-                let compat = compare_types(s_payload, c_payload);
+                let compat = compare_types(s_payload, c_payload, &config);
                 if compat.is_incompatible() {
                     problems.protocol(
                         &client.path,
@@ -234,7 +239,7 @@ impl Method {
             _ => (), // Interaction kind mismatch handled elsewhere.
         }
 
-        Ok(problems)
+        problems
     }
 }
 
@@ -262,7 +267,11 @@ pub struct Protocol {
 }
 
 impl Protocol {
-    fn compatible(external: &Self, platform: &Self) -> Result<CompatibilityProblems> {
+    fn compatible(
+        external: &Self,
+        platform: &Self,
+        config: &Configuration,
+    ) -> CompatibilityProblems {
         let mut problems = CompatibilityProblems::default();
 
         // Look at discoverable to identify the pairs of client/server interactions
@@ -288,13 +297,17 @@ impl Protocol {
         for (client, server) in
             clients.into_iter().flat_map(|c| servers.iter().map(move |s| (c, s)))
         {
-            problems.append(Protocol::client_server_compatible(client, server)?);
+            problems.append(Protocol::client_server_compatible(client, server, &config));
         }
 
-        Ok(problems)
+        problems
     }
 
-    fn client_server_compatible(client: &Self, server: &Self) -> Result<CompatibilityProblems> {
+    fn client_server_compatible(
+        client: &Self,
+        server: &Self,
+        config: &Configuration,
+    ) -> CompatibilityProblems {
         let mut problems = CompatibilityProblems::default();
         let client_ordinals: BTreeSet<u64> = client.methods.keys().cloned().collect();
         let server_ordinals: BTreeSet<u64> = server.methods.keys().cloned().collect();
@@ -304,7 +317,8 @@ impl Protocol {
             problems.append(Method::compatible(
                 client.methods.get(ordinal).expect("Unexpectedly missing client method"),
                 server.methods.get(ordinal).expect("Unexpectedly missing server method"),
-            )?);
+                &config,
+            ));
         }
 
         // Only on client.
@@ -357,7 +371,7 @@ impl Protocol {
             }
         }
 
-        Ok(problems)
+        problems
     }
 }
 
@@ -368,7 +382,11 @@ pub struct Platform {
     pub tear_off: HashMap<String, Protocol>,
 }
 
-pub fn compatible(external: &Platform, platform: &Platform) -> Result<CompatibilityProblems> {
+pub fn compatible(
+    external: &Platform,
+    platform: &Platform,
+    config: &Configuration,
+) -> Result<CompatibilityProblems> {
     let mut problems = CompatibilityProblems::default();
 
     let external_discoverable: HashSet<String> = external.discoverable.keys().cloned().collect();
@@ -389,8 +407,11 @@ pub fn compatible(external: &Platform, platform: &Platform) -> Result<Compatibil
     }
 
     for p in external_discoverable.intersection(&platform_discoverable) {
-        problems
-            .append(Protocol::compatible(&external.discoverable[p], &platform.discoverable[p])?);
+        problems.append(Protocol::compatible(
+            &external.discoverable[p],
+            &platform.discoverable[p],
+            &config,
+        ));
     }
 
     problems.sort();

@@ -389,7 +389,7 @@ fn create_message_3(
     key_replay_counter: AuthenticatorKeyReplayCounter,
 ) -> Result<eapol::KeyFrameBuf, anyhow::Error> {
     // Construct key data which contains the Beacon's RSNE and a GTK KDE.
-    let mut w = kde::Writer::new(vec![]);
+    let mut w = kde::Writer::new();
     w.write_protection(&cfg.a_protection)?;
     w.write_gtk(&kde::Gtk::new(gtk.key_id(), kde::GtkInfoTx::BothRxTx, gtk.tk()))?;
     if let Some(igtk) = igtk.as_ref() {

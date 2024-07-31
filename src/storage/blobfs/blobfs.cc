@@ -49,6 +49,7 @@
 #include "src/storage/blobfs/transfer_buffer.h"
 #include "src/storage/lib/block_client/cpp/pass_through_read_only_device.h"
 #include "src/storage/lib/block_client/cpp/reader.h"
+#include "src/storage/lib/trace/trace.h"
 #include "src/storage/lib/vfs/cpp/journal/journal.h"
 #include "src/storage/lib/vfs/cpp/journal/replay.h"
 #include "src/storage/lib/vfs/cpp/journal/superblock.h"

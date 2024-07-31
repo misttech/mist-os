@@ -14,8 +14,6 @@
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/mock_channel_test.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/test_helpers.h"
 
-#pragma clang diagnostic ignored "-Wshadow"
-
 namespace bt::gatt {
 namespace {
 
@@ -1146,12 +1144,11 @@ TEST_F(ServerTest, ReadByTypeDynamicValueError) {
 }
 
 TEST_F(ServerTest, ReadByTypeSingle) {
-  const StaticByteBuffer kTestValue1('f', 'o', 'o');
-  const StaticByteBuffer kTestValue2('t', 'e', 's', 't');
+  const StaticByteBuffer kTestValue('t', 'e', 's', 't');
 
   auto* grp = db()->NewGrouping(types::kPrimaryService, 1, kTestValue1);
   grp->AddAttribute(kTestType16, AllowedNoSecurity(), att::AccessRequirements())
-      ->SetValue(kTestValue2);
+      ->SetValue(kTestValue);
   grp->set_active(true);
 
   // clang-format off
@@ -1176,13 +1173,12 @@ TEST_F(ServerTest, ReadByTypeSingle) {
 }
 
 TEST_F(ServerTest, ReadByTypeSingle128) {
-  const StaticByteBuffer kTestValue1('f', 'o', 'o');
-  const StaticByteBuffer kTestValue2('t', 'e', 's', 't');
+  const StaticByteBuffer kTestValue('t', 'e', 's', 't');
 
   auto* grp = db()->NewGrouping(types::kPrimaryService, 1, kTestValue1);
   grp->AddAttribute(
          kTestType128, AllowedNoSecurity(), att::AccessRequirements())
-      ->SetValue(kTestValue2);
+      ->SetValue(kTestValue);
   grp->set_active(true);
 
   // clang-format off

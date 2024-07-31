@@ -155,15 +155,18 @@ impl RepoInner {
         })?;
 
         if !server_enabled {
+            tracing::debug!("repo server not enabled, not starting.");
             return Ok(None);
         }
 
         // Exit early if we're already running on this address.
         let listen_addr = match &self.server {
             ServerState::Disabled => {
+                tracing::debug!("repo server state is disabled, not starting.");
                 return Ok(None);
             }
             ServerState::Running(info) => {
+                tracing::debug!("repo server state is running, not starting.");
                 return Ok(Some(info.server.local_addr()));
             }
             ServerState::Stopped => match {

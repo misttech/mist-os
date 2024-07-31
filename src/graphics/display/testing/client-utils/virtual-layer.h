@@ -5,6 +5,7 @@
 #ifndef SRC_GRAPHICS_DISPLAY_TESTING_CLIENT_UTILS_VIRTUAL_LAYER_H_
 #define SRC_GRAPHICS_DISPLAY_TESTING_CLIENT_UTILS_VIRTUAL_LAYER_H_
 
+#include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
 #include <fidl/fuchsia.images2/cpp/wire.h>
 #include <fidl/fuchsia.math/cpp/wire.h>
@@ -180,8 +181,8 @@ class PrimaryLayer : public VirtualLayer {
 
   fuchsia_math::wire::RectU image_source_ = {};
   fuchsia_math::wire::RectU display_destination_ = {};
-  typedef fuchsia_hardware_display_types::wire::Transform Transform;
-  Transform rotation_ = Transform::kIdentity;
+  fuchsia_hardware_display_types::wire::CoordinateTransformation rotation_ =
+      fuchsia_hardware_display_types::wire::CoordinateTransformation::kIdentity;
   bool layer_flipping_ = false;
   bool pan_src_ = false;
   bool pan_dest_ = false;

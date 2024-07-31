@@ -28,12 +28,9 @@
                 source_name: "fuchsia.kernel.CpuResource",
                 capability: "protocol",
                 target_monikers: [
+                    "/core/sshd-host/shell:**",
                     "/core/testing/system-tests:**",
                     "/core/test_manager/system-tests:**",
-
-                    // TODO(https://fxbug.dev/42080863): Remove once the shell tools that use this capability
-                    // no longer run in the sshd realm.
-                    "/core/sshd-host/shell:**",
                 ],
             },
             {
@@ -42,12 +39,9 @@
                 source_name: "fuchsia.kernel.DebugResource",
                 capability: "protocol",
                 target_monikers: [
+                    "/core/sshd-host/shell:**",
                     "/core/testing/system-tests:**",
                     "/core/test_manager/system-tests:**",
-
-                    // TODO(https://fxbug.dev/42080863): Remove once the shell tools that use this capability
-                    // no longer run in the sshd realm.
-                    "/core/sshd-host/shell:**",
                 ],
             },
             {
@@ -67,12 +61,9 @@
                 capability: "protocol",
                 target_monikers: [
                     "/bootstrap/boot-drivers:dev",
+                    "/core/sshd-host/shell:**",
                     "/core/testing/system-tests:**",
                     "/core/test_manager/system-tests:**",
-
-                    // TODO(https://fxbug.dev/42080863): Remove once the shell tools that use this capability
-                    // no longer run in the sshd realm.
-                    "/core/sshd-host/shell:**",
                 ],
             },
             {
@@ -85,11 +76,8 @@
                     "/core/debian-guest-manager/vmm",
                     "/core/termina-guest-manager/vmm",
                     "/core/testing/system-tests:**",
-                    "/core/test_manager/system-tests:**",
-
-                    // TODO(https://fxbug.dev/42080863): Remove once the shell tools that use this capability
-                    // no longer run in the sshd realm.
                     "/core/sshd-host/shell:**",
+                    "/core/test_manager/system-tests:**",
                 ],
             },
             {
@@ -101,12 +89,9 @@
                     "/bootstrap/boot-drivers:**",
                     "/bootstrap/pkg-drivers:**",
                     "/bootstrap/full-pkg-drivers:**",
+                    "/core/sshd-host/shell:**",
                     "/core/testing/system-tests:**",
                     "/core/test_manager/system-tests:**",
-
-                    // TODO(https://fxbug.dev/42080863): Remove once the shell tools that use this capability
-                    // no longer run in the sshd realm.
-                    "/core/sshd-host/shell:**",
                 ],
             },
             {
@@ -116,12 +101,9 @@
                 capability: "protocol",
                 target_monikers: [
                     "/bootstrap/boot-drivers:dev",
+                    "/core/sshd-host/shell:**",
                     "/core/testing/system-tests:**",
                     "/core/test_manager/system-tests:**",
-
-                    // TODO(https://fxbug.dev/42080863): Remove once the shell tools that use this capability
-                    // no longer run in the sshd realm.
-                    "/core/sshd-host/shell:**",
                 ],
             },
             {
@@ -131,12 +113,9 @@
                 capability: "protocol",
                 target_monikers: [
                     "/bootstrap/boot-drivers:dev",
+                    "/core/sshd-host/shell:**",
                     "/core/testing/system-tests:**",
                     "/core/test_manager/system-tests:**",
-
-                    // TODO(https://fxbug.dev/42080863): Remove once the shell tools that use this capability
-                    // no longer run in the sshd realm.
-                    "/core/sshd-host/shell:**",
                 ],
             },
             {
@@ -146,12 +125,9 @@
                 capability: "protocol",
                 target_monikers: [
                     "/bootstrap/boot-drivers:dev",
+                    "/core/sshd-host/shell:**",
                     "/core/testing/system-tests:**",
                     "/core/test_manager/system-tests:**",
-
-                    // TODO(https://fxbug.dev/42080863): Remove once the shell tools that use this capability
-                    // no longer run in the sshd realm.
-                    "/core/sshd-host/shell:**",
                 ],
             },
             {
@@ -163,12 +139,9 @@
                     "/core/process_explorer",
                     "/core/profiler",
                     "/core/debugger/agents:**",
+                    "/core/sshd-host/shell:**",
                     "/core/testing/system-tests:**",
                     "/core/test_manager/system-tests:**",
-
-                    // TODO(https://fxbug.dev/42080863): Remove once the shell tools that use this capability
-                    // no longer run in the sshd realm.
-                    "/core/sshd-host/shell:**",
                 ],
             },
             {
@@ -177,12 +150,9 @@
                 source_name: "fuchsia.kernel.RootJobForInspect",
                 capability: "protocol",
                 target_monikers: [
+                    "/core/sshd-host/shell:**",
                     "/core/testing/system-tests:**",
                     "/core/test_manager/system-tests:**",
-
-                    // TODO(https://fxbug.dev/42080863): Remove once the shell tools that use this capability
-                    // no longer run in the sshd realm.
-                    "/core/sshd-host/shell:**",
                 ],
             },
             {
@@ -202,15 +172,13 @@
                 capability: "protocol",
                 target_monikers: [
                     "/bootstrap/boot-drivers:dev",
+                    "/core/sshd-host/shell:**",
+                    "/core/test_manager/system-tests:**",
+
                     "/core/zircon-guest-manager/vmm",
                     "/core/debian-guest-manager/vmm",
                     "/core/termina-guest-manager/vmm",
                     "/core/testing/system-tests:**",
-                    "/core/test_manager/system-tests:**",
-
-                    // TODO(https://fxbug.dev/42080863): Remove once the shell tools that use this capability
-                    // no longer run in the sshd realm.
-                    "/core/sshd-host/shell:**",
                 ],
             },
             {
@@ -220,12 +188,9 @@
                 capability: "protocol",
                 target_monikers: [
                     "/bootstrap/boot-drivers:dev",
+                    "/core/sshd-host/shell:**",
                     "/core/testing/system-tests:**",
                     "/core/test_manager/system-tests:**",
-
-                    // TODO(https://fxbug.dev/42080863): Remove once the shell tools that use this capability
-                    // no longer run in the sshd realm.
-                    "/core/sshd-host/shell:**",
                 ],
             },
             {
@@ -234,12 +199,9 @@
                 source_name: "fuchsia.kernel.PowerResource",
                 capability: "protocol",
                 target_monikers: [
+                    "/core/sshd-host/shell:**",
                     "/core/testing/system-tests:**",
                     "/core/test_manager/system-tests:**",
-
-                    // TODO(https://fxbug.dev/42080863): Remove once the shell tools that use this capability
-                    // no longer run in the sshd realm.
-                    "/core/sshd-host/shell:**",
                 ],
             },
             {
@@ -249,12 +211,9 @@
                 capability: "protocol",
                 target_monikers: [
                     "/bootstrap/boot-drivers:dev",
+                    "/core/sshd-host/shell:**",
                     "/core/testing/system-tests:**",
                     "/core/test_manager/system-tests:**",
-
-                    // TODO(https://fxbug.dev/42080863): Remove once the shell tools that use this capability
-                    // no longer run in the sshd realm.
-                    "/core/sshd-host/shell:**",
                 ],
             },
             {
@@ -263,9 +222,7 @@
                 source_name: "fuchsia.kernel.VmexResource",
                 capability: "protocol",
                 target_monikers: [
-                    "/core/zircon-guest-manager/vmm",
-                    "/core/debian-guest-manager/vmm",
-                    "/core/termina-guest-manager/vmm",
+                    "/core/sshd-host/shell:**",
                     "/core/testing/starnix-tests:**",
                     "/core/testing/system-tests:**",
                     "/core/test_manager/system-tests:**",
@@ -273,14 +230,14 @@
                     "/core/test_manager/chromium-tests:**",
                     "/core/testing/chromium-tests:**",
 
+                    "/core/zircon-guest-manager/vmm",
+                    "/core/debian-guest-manager/vmm",
+                    "/core/termina-guest-manager/vmm",
+
                     // debug-dash-launcher is used in engineering builds to launch dash shells.
                     // It uses PackageResolver to add tool package directories into the dash
                     // environment.
                     "/core/debug-dash-launcher",
-
-                    // TODO(https://fxbug.dev/42080863): Remove once the shell tools that use this capability
-                    // no longer run in the sshd realm.
-                    "/core/sshd-host/shell:**",
                 ],
             },
             {
@@ -308,8 +265,6 @@
                 source_name: "blob",
                 capability: "directory",
                 target_monikers: [
-                    // TODO(https://fxbug.dev/42080863): Remove once the shell tools that use this capability
-                    // no longer run in the sshd realm.
                     "/core/sshd-host/shell:**",
                 ],
             },
@@ -330,6 +285,7 @@
                 target_monikers: [
                     "/core/ssh-key-manager",
                     "/core/sshd-host",
+                    "/core/sshd-host/shell:**",
 
                     // TODO(https://fxbug.dev/42181129): Remove once fixed.
                     "/core/sl4f",
@@ -337,10 +293,6 @@
                     // TODO(https://fxbug.dev/42077029): Remove once session_manager gets autolaunch
                     // override from structured configuration.
                     "/core/session-manager",
-
-                    // TODO(https://fxbug.dev/42080863): Remove once the shell tools that use this capability
-                    // no longer run in the sshd realm.
-                    "/core/sshd-host/shell:**",
                 ],
             },
             {
@@ -351,13 +303,11 @@
                 target_monikers: [
                     "/bootstrap/netsvc",
                     "/core",
+                    "/core/sshd-host/shell:**",
 
                     // TODO(https://fxbug.dev/42181123): Remove once https://fxbug.dev/42167600 is fixed.
                     "/core/sl4f",
 
-                    // TODO(https://fxbug.dev/42080863): Remove once the shell tools that use this capability
-                    // no longer run in the sshd realm.
-                    "/core/sshd-host/shell:**",
                 ],
             },
             {
@@ -373,15 +323,13 @@
                     "/bootstrap/full_resolver",
                     "/bootstrap/netsvc",
 
+                    "/core/sshd-host/shell:**",
+
                     // debug-dash-launcher is used in engineering builds to launch
                     // dash shells. It uses PackageResolver to add tool package directories
                     // into the dash environment.
                     "/core/debug-dash-launcher",
                     "/core/process_resolver",
-
-                    // TODO(https://fxbug.dev/42080863): Remove once the shell tools that use this capability
-                    // no longer run in the sshd realm.
-                    "/core/sshd-host/shell:**",
                 ],
             },
             {
@@ -392,8 +340,6 @@
                 source_name: "fuchsia.process.Resolver",
                 capability: "protocol",
                 target_monikers: [
-                    // TODO(https://fxbug.dev/42080863): Remove once the shell tools that use this capability
-                    // no longer run in the sshd realm.
                     "/core/sshd-host/shell:**",
 
                     // This protocol is available in the serial console
@@ -460,11 +406,8 @@
                 capability: "protocol",
                 target_monikers: [
                     "/core/pkg-resolver",
-                    "/core/system-update/system-updater",
-
-                    // TODO(https://fxbug.dev/42080863): Remove once the shell tools that use this capability
-                    // no longer run in the sshd realm.
                     "/core/sshd-host/shell:**",
+                    "/core/system-update/system-updater",
                 ],
             },
             {
@@ -488,9 +431,6 @@
                 capability: "directory",
                 target_monikers: [
                     "/bootstrap/console-launcher",
-
-                    // TODO(https://fxbug.dev/42080863): Remove once the shell tools that use this capability
-                    // no longer run in the sshd realm.
                     "/core/sshd-host/shell:**",
                 ],
             },
@@ -502,6 +442,7 @@
                 target_monikers: [
                     "/core/build-info",
                     "/core/feedback",
+                    "/core/sshd-host/shell:**",
                     "/core/system-update/omaha-client-service",
                     "/core/system-update/system-update-checker",
                     "/core/system-update/system-updater",
@@ -513,10 +454,6 @@
                     "/core/test_manager/chromium-system-tests:**",
                     "/core/test_manager/chromium-tests:**",
                     "/core/testing/chromium-tests:**",
-
-                    // TODO(https://fxbug.dev/42080863): Remove once the shell tools that use this capability
-                    // no longer run in the sshd realm.
-                    "/core/sshd-host/shell:**",
                 ],
             },
             {
@@ -528,9 +465,6 @@
                 capability: "directory",
                 target_monikers: [
                     "/bootstrap/console-launcher",
-
-                    // TODO(https://fxbug.dev/42080863): Remove once the shell tools that use this capability
-                    // no longer run in the sshd realm.
                     "/core/sshd-host/shell:**",
                 ],
             },
@@ -554,13 +488,10 @@
                     "/bootstrap",
                     "/bootstrap/console-launcher",
                     "/bootstrap/driver_manager",
+                    "/core/sshd-host/shell:**",
                     "/core/system-update/omaha-client-service",
                     "/core/system-update/system-update-checker",
                     "/core/system-update/system-updater",
-
-                    // TODO(https://fxbug.dev/42080863): Remove once the shell tools that use this capability
-                    // no longer run in the sshd realm.
-                    "/core/sshd-host/shell:**",
                 ],
             },
 
@@ -587,9 +518,6 @@
                 target_monikers: [
                     "/bootstrap",
                     "/bootstrap/cr50_agent",
-
-                    // TODO(https://fxbug.dev/42080863): Remove once the shell tools that use this capability
-                    // no longer run in the sshd realm.
                     "/core/sshd-host/shell:**",
                 ],
             },
@@ -605,9 +533,6 @@
                     "/bootstrap/cr50_agent",
                     "/bootstrap/console-launcher",
                     "/bootstrap/paver",
-
-                    // TODO(https://fxbug.dev/42080863): Remove once the shell tools that use this capability
-                    // no longer run in the sshd realm.
                     "/core/sshd-host/shell:**",
                 ],
             },
@@ -617,8 +542,6 @@
                 source_name: "fuchsia.factory.lowpan.FactoryLookup",
                 capability: "protocol",
                 target_monikers: [
-                    // TODO(https://fxbug.dev/42080863): Remove once the shell tools that use this capability
-                    // no longer run in the sshd realm.
                     "/core/sshd-host/shell:**",
                 ],
             },
@@ -628,13 +551,11 @@
                 source_name: "fuchsia.lowpan.device.DeviceExtraConnector",
                 capability: "protocol",
                 target_monikers: [
+                    "/core/sshd-host/shell:**",
+
                     // TODO(https://fxbug.dev/42059298): Create explicit security policies for
                     // out-of-tree product variants.
                     "/core/factory/realm_builder:**",
-
-                    // TODO(https://fxbug.dev/42080863): Remove once the shell tools that use this capability
-                    // no longer run in the sshd realm.
-                    "/core/sshd-host/shell:**",
                 ],
             },
             {
@@ -643,8 +564,6 @@
                 source_name: "fuchsia.lowpan.device.DeviceRouterExtraConnector",
                 capability: "protocol",
                 target_monikers: [
-                    // TODO(https://fxbug.dev/42080863): Remove once the shell tools that use this capability
-                    // no longer run in the sshd realm.
                     "/core/sshd-host/shell:**",
                 ],
             },
@@ -692,6 +611,7 @@
                     "/core/pre-migration-service",
                     "/core/reverse-migration",
                     "/core/sl4f",
+                    "/core/sshd-host/shell:**",
                     "/core/termina-guest-manager",
                     "/core/test_manager/google-tests:**",
                     "/core/test_manager/system-tests:**",
@@ -700,10 +620,6 @@
                     "/core/testing/system-tests:**",
                     "/core/testing/system-validation-tests:**",
                     "/core/trace_manager/cpuperf_provider",
-
-                    // TODO(https://fxbug.dev/42080863): Remove once the shell tools that use this capability
-                    // no longer run in the sshd realm.
-                    "/core/sshd-host/shell:**",
                 ],
             },
             {

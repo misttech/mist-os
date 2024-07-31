@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::appendable::Appendable;
+use crate::append::Append;
 use crate::error::FrameWriteError;
 use crate::ie::{
     write_extended_supported_rates, write_supported_rates, EXTENDED_SUPPORTED_RATES_MAX_LEN,
@@ -15,21 +15,21 @@ pub struct RatesWriter<S>(S);
 impl<S: ByteSlice> RatesWriter<S> {
     pub fn try_new(rates: S) -> Result<RatesWriter<S>, FrameWriteError> {
         if rates.len() == 0 {
-            Err(FrameWriteError::new_invalid_data("no rates to write"))
+            Err(FrameWriteError::InvalidData(format!("no rates to write")))
         } else if rates.len() > SUPPORTED_RATES_MAX_LEN + EXTENDED_SUPPORTED_RATES_MAX_LEN {
-            Err(FrameWriteError::new_invalid_data("rates will not fit in elements"))
+            Err(FrameWriteError::InvalidData(format!("rates will not fit in elements")))
         } else {
             Ok(RatesWriter(rates))
         }
     }
 
-    pub fn write_supported_rates<B: Appendable>(&self, buf: &mut B) {
+    pub fn write_supported_rates<B: Append>(&self, buf: &mut B) {
         let num_rates = std::cmp::min(self.0.len(), SUPPORTED_RATES_MAX_LEN);
         // safe to unwrap because we truncated the slice
         write_supported_rates(&mut *buf, &self.0[..num_rates]).unwrap();
     }
 
-    pub fn write_extended_supported_rates<B: Appendable>(&self, buf: &mut B) {
+    pub fn write_extended_supported_rates<B: Append>(&self, buf: &mut B) {
         if self.0.len() > SUPPORTED_RATES_MAX_LEN {
             // safe to unwrap because it is guaranteed to fit.
             write_extended_supported_rates(&mut *buf, &self.0[SUPPORTED_RATES_MAX_LEN..]).unwrap();

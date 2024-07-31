@@ -58,8 +58,7 @@ impl<'a> Arbitrary<'a> for Fuzzed<Ipv4PacketBuilder> {
         let proto = u8::arbitrary(u)?.into();
 
         let mut builder = Ipv4PacketBuilder::new(src, dst, ttl, proto);
-        builder.dscp(u.int_in_range(0..=(1 << 6 - 1))?);
-        builder.ecn(u.int_in_range(0..=3)?);
+        builder.dscp_and_ecn(u.arbitrary::<u8>()?.into());
         builder.df_flag(u.arbitrary()?);
         builder.mf_flag(u.arbitrary()?);
         builder.fragment_offset(u.int_in_range(0..=(1 << 13) - 1)?);
@@ -76,8 +75,7 @@ impl<'a> Arbitrary<'a> for Fuzzed<Ipv6PacketBuilder> {
         let proto = u8::arbitrary(u)?.into();
 
         let mut builder = Ipv6PacketBuilder::new(src, dst, ttl, proto);
-        builder.ds(u.int_in_range(0..=(1 << 6 - 1))?);
-        builder.ecn(u.int_in_range(0..=3)?);
+        builder.dscp_and_ecn(u.arbitrary::<u8>()?.into());
         builder.flowlabel(u.int_in_range(0..=(1 << 20 - 1))?);
 
         Ok(Self(builder))

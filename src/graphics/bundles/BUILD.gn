@@ -7,8 +7,6 @@ group("drivers") {
   testonly = true
   deps = [
     "//src/graphics/display:drivers",
-    "//src/graphics/display/drivers/simple:simple.bochs",
-    "//src/graphics/display/drivers/simple:simple.intel",
     "//src/graphics/drivers/aml-gpu",
     "//src/graphics/drivers/misc/goldfish:goldfish_driver",
     "//src/graphics/drivers/misc/goldfish_address_space:address_space_driver",

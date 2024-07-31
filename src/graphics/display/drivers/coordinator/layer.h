@@ -103,9 +103,9 @@ class Layer : public IdMappable<std::unique_ptr<Layer>, DriverLayerId> {
   bool AppendToConfig(fbl::DoublyLinkedList<LayerNode*>* list);
 
   void SetPrimaryConfig(fuchsia_hardware_display_types::wire::ImageMetadata image_metadata);
-  void SetPrimaryPosition(fuchsia_hardware_display_types::wire::Transform transform,
-                          fuchsia_math::wire::RectU image_source,
-                          fuchsia_math::wire::RectU display_destination);
+  void SetPrimaryPosition(
+      fuchsia_hardware_display_types::wire::CoordinateTransformation image_source_transformation,
+      fuchsia_math::wire::RectU image_source, fuchsia_math::wire::RectU display_destination);
   void SetPrimaryAlpha(fuchsia_hardware_display_types::wire::AlphaMode mode, float val);
   void SetColorConfig(fuchsia_images2::wire::PixelFormat pixel_format,
                       ::fidl::VectorView<uint8_t> color_bytes);

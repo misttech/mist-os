@@ -62,6 +62,29 @@ void MetadataRetrieverTestDriver::GetMetadata(GetMetadataCompleter::Sync& comple
   completer.Reply(fit::ok(std::move(metadata.value())));
 }
 
+void MetadataRetrieverTestDriver::GetMetadataIfExists(
+    GetMetadataIfExistsCompleter::Sync& completer) {
+  zx::result result =
+      fdf_metadata::GetMetadataIfExists<fuchsia_hardware_test::Metadata>(incoming());
+  if (result.is_error()) {
+    FDF_SLOG(ERROR, "Failed to get metadata.", KV("status", result.status_string()));
+    completer.Reply(fit::error(result.status_value()));
+    return;
+  }
+
+  std::optional metadata = std::move(result.value());
+  if (!metadata.has_value()) {
+    fuchsia_hardware_test::MetadataRetrieverGetMetadataIfExistsResponse response{
+        {.metadata = {}, .retrieved_metadata = false}};
+    completer.Reply(fit::ok(std::move(response)));
+    return;
+  }
+
+  fuchsia_hardware_test::MetadataRetrieverGetMetadataIfExistsResponse response{
+      {.metadata = std::move(metadata.value()), .retrieved_metadata = true}};
+  completer.Reply(fit::ok(std::move(response)));
+}
+
 }  // namespace fdf_metadata::test
 
 FUCHSIA_DRIVER_EXPORT(fdf_metadata::test::MetadataRetrieverTestDriver);

@@ -4,9 +4,7 @@
 
 #include "src/storage/lib/vfs/cpp/transaction/device_transaction_handler.h"
 
-#include <lib/trace/event.h>
-
-#include "trace.h"
+#include "src/storage/lib/trace/trace.h"
 
 namespace fs {
 
@@ -69,7 +67,7 @@ zx_status_t DeviceTransactionHandler::RunRequests(
         // Client provided an explicit flow ID, no need to begin a new flow.
         request.trace_flow_id = operation.trace_flow_id;
       } else {
-        request.trace_flow_id = GenerateTraceId();
+        request.trace_flow_id = storage::trace::GenerateTraceId();
         TRACE_FLOW_BEGIN("storage", "BlockOp", request.trace_flow_id);
         trace_flow_ids.push_back(request.trace_flow_id);
       }

@@ -29,6 +29,7 @@ enum Services {
 
 #[fuchsia::main(logging_tags = ["starnix_runner"])]
 async fn main() -> Result<(), Error> {
+    fuchsia_trace_provider::trace_provider_create_with_fdio();
     let config = starnix_runner_config::Config::take_from_startup_handle();
     if config.enable_data_collection {
         info!("Attempting to set user data sharing consent.");
@@ -95,26 +96,37 @@ async fn serve_starnix_manager(
     while let Some(event) = stream.try_next().await? {
         match event {
             fstarnixrunner::ManagerRequest::Suspend { responder, .. } => {
-                debug!("suspending processes...");
-                for job in kernels.all_jobs() {
-                    suspended_processes.lock().append(&mut suspend_kernel(&job).await);
-                }
-                debug!("...done suspending processes");
-
-                if let Err(e) = responder.send() {
-                    warn!("error replying to suspend request: {e}");
-                }
+                suspend_kernels(kernels, &suspended_processes, responder).await
             }
-            fstarnixrunner::ManagerRequest::Resume { .. } => {
-                debug!("requesting resume...");
-                // Drop all the suspend handles to resume the kernel.
-                *suspended_processes.lock() = vec![];
-                debug!("...requested resume (completes asynchronously)");
-            }
+            fstarnixrunner::ManagerRequest::Resume { .. } => resume_kernels(&suspended_processes),
             _ => {}
         }
     }
     Ok(())
+}
+
+async fn suspend_kernels(
+    kernels: &Kernels,
+    suspended_processes: &Mutex<Vec<zx::Handle>>,
+    responder: fstarnixrunner::ManagerSuspendResponder,
+) {
+    fuchsia_trace::duration!(c"starnix_runner", c"suspend_kernels");
+
+    debug!("suspending processes...");
+    for job in kernels.all_jobs() {
+        suspended_processes.lock().append(&mut suspend_kernel(&job).await);
+    }
+    debug!("...done suspending processes");
+    if let Err(e) = responder.send() {
+        warn!("error replying to suspend request: {e}");
+    }
+}
+
+fn resume_kernels(suspended_processes: &Mutex<Vec<zx::Handle>>) {
+    debug!("requesting resume...");
+    // Drop all the suspend handles to resume the kernel.
+    *suspended_processes.lock() = vec![];
+    debug!("...requested resume (completes asynchronously)");
 }
 
 async fn serve_attribution_provider(

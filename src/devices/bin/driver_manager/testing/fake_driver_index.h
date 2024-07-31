@@ -50,10 +50,6 @@ class FakeDriverIndex final : public fidl::WireServer<fuchsia_driver_index::Driv
     completer.ReplySuccess(GetMatchedDriver(arena, match.value()));
   }
 
-  void WatchForDriverLoad(WatchForDriverLoadCompleter::Sync& completer) override {
-    watch_completer_ = completer.ToAsync();
-  }
-
   void AddCompositeNodeSpec(AddCompositeNodeSpecRequestView request,
                             AddCompositeNodeSpecCompleter::Sync& completer) override {
     completer.ReplySuccess();
@@ -64,9 +60,14 @@ class FakeDriverIndex final : public fidl::WireServer<fuchsia_driver_index::Driv
     completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
   }
 
+  void SetNotifier(fuchsia_driver_index::wire::DriverIndexSetNotifierRequest* request,
+                   SetNotifierCompleter::Sync& completer) override {
+    notifer_.Bind(std::move(request->notifier), dispatcher_);
+  }
+
   void InvokeWatchDriverResponse() {
-    ZX_ASSERT(watch_completer_.has_value());
-    watch_completer_->Reply();
+    fidl::OneWayStatus status = notifer_->NewDriverAvailable();
+    ZX_ASSERT(status.ok());
   }
 
   void set_match_callback(MatchCallback match_callback) {
@@ -105,7 +106,7 @@ class FakeDriverIndex final : public fidl::WireServer<fuchsia_driver_index::Driv
   async_dispatcher_t* dispatcher_;
   MatchCallback match_callback_;
 
-  std::optional<WatchForDriverLoadCompleter::Async> watch_completer_;
+  fidl::WireClient<fuchsia_driver_index::DriverNotifier> notifer_;
 
   std::unordered_set<std::string> disabled_driver_urls_;
 };

@@ -266,11 +266,8 @@ impl FsNodeOps for TmpfsDirectory {
         owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
         *self.child_count.lock() += 1;
-        Ok(node.fs().create_node(
-            current_task,
-            SymlinkNode::new(target),
-            FsNodeInfo::new_factory(mode!(IFLNK, 0o777), owner),
-        ))
+        let (link, info) = SymlinkNode::new(target, owner);
+        Ok(node.fs().create_node(current_task, link, info))
     }
 
     fn create_tmpfile(

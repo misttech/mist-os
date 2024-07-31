@@ -9,11 +9,10 @@
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/att/att.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/assert.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/log.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/macros.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/slab_allocator.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/trace.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gatt/gatt_defs.h"
-
-#pragma clang diagnostic ignored "-Wshadow"
 
 using bt::HostError;
 
@@ -108,10 +107,10 @@ class Impl final : public Client {
 
       // Auto-confirm indications.
       if (is_ind) {
-        auto pdu = NewPDU(0u);
-        if (pdu) {
-          att::PacketWriter(att::kConfirmation, pdu.get());
-          att_->Reply(txn_id, std::move(pdu));
+        auto confirmation_pdu = NewPDU(0u);
+        if (confirmation_pdu) {
+          att::PacketWriter(att::kConfirmation, confirmation_pdu.get());
+          att_->Reply(txn_id, std::move(confirmation_pdu));
         } else {
           att_->ReplyWithError(
               txn_id, handle, att::ErrorCode::kInsufficientResources);
@@ -801,12 +800,12 @@ class Impl final : public Client {
         callback(fit::ok(), rsp.payload_data(), maybe_truncated);
         return;
       }
-      const auto& [error, handle] = result.error_value();
+      const auto& [error, err_handle] = result.error_value();
       bt_log(DEBUG,
              "gatt",
              "read request failed: %s, handle %#.4x",
              bt_str(error),
-             handle);
+             err_handle);
       callback(fit::error(error), BufferView(), /*maybe_truncated=*/false);
     };
 
@@ -974,12 +973,12 @@ class Impl final : public Client {
         callback(fit::ok(), rsp.payload_data(), maybe_truncated);
         return;
       }
-      const auto& [error, handle] = result.error_value();
+      const auto& [error, err_handle] = result.error_value();
       bt_log(DEBUG,
              "gatt",
              "read blob request failed: %s, handle: %#.4x",
              bt_str(error),
-             handle);
+             err_handle);
       callback(fit::error(error), BufferView(), /*maybe_truncated=*/false);
     };
 
@@ -1013,12 +1012,12 @@ class Impl final : public Client {
     auto rsp_cb = [this, callback = std::move(callback)](
                       att::Bearer::TransactionResult result) {
       if (result.is_error()) {
-        const auto& [error, handle] = result.error_value();
+        const auto& [error, err_handle] = result.error_value();
         bt_log(DEBUG,
                "gatt",
                "write request failed: %s, handle: %#.2x",
                bt_str(error),
-               handle);
+               err_handle);
         callback(fit::error(error));
         return;
       }
@@ -1189,13 +1188,13 @@ class Impl final : public Client {
         callback(fit::ok(), rsp.payload_data());
         return;
       }
-      const auto& [error, handle] = result.error_value();
+      const auto& [error, err_handle] = result.error_value();
       bt_log(DEBUG,
              "gatt",
              "prepare write request failed: %s, handle:"
              "%#.4x",
              bt_str(error),
-             handle);
+             err_handle);
       callback(fit::error(error), BufferView());
     };
 

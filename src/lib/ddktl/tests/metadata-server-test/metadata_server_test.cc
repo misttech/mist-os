@@ -42,14 +42,15 @@ class MetadataServerTest : public gtest::TestLoopFixture {
   // bind to. Returns a connection to the metadata_sender driver and metadata_retriever driver.
   std::pair<fidl::SyncClient<fuchsia_hardware_test::MetadataSender>,
             fidl::SyncClient<fuchsia_hardware_test::MetadataRetriever>>
-  CreateMetadataSenderAndRetriever() {
+  CreateMetadataSenderAndRetriever(bool expose_metadata_to_retriever) {
     fidl::SyncClient metadata_sender =
         ConnectToDevice<fuchsia_hardware_test::MetadataSender>("metadata_sender");
 
     // Create a child device for the metadata_retriever driver to bind to.
     fidl::SyncClient<fuchsia_hardware_test::MetadataRetriever> metadata_retriever;
     {
-      fidl::Result device_name = metadata_sender->AddMetadataRetrieverDevice();
+      fidl::Result device_name = metadata_sender->AddMetadataRetrieverDevice(
+          {{.expose_metadata = expose_metadata_to_retriever}});
       EXPECT_TRUE(device_name.is_ok()) << device_name.error_value();
       std::string metadata_retriever_path = std::string{"metadata_sender/"}
                                                 .append(device_name->child_device_name())
@@ -121,7 +122,7 @@ class MetadataServerTest : public gtest::TestLoopFixture {
 TEST_F(MetadataServerTest, GetMetadata) {
   const char* kMetadataPropertyValue = "test property value";
 
-  auto [metadata_sender, metadata_retriever] = CreateMetadataSenderAndRetriever();
+  auto [metadata_sender, metadata_retriever] = CreateMetadataSenderAndRetriever(true);
 
   // Set the metadata provided by the metadata_sender driver.
   {
@@ -143,10 +144,46 @@ TEST_F(MetadataServerTest, GetMetadata) {
 // Verify that `ddk::GetMetadata()` fails if the parent driver does not serve metadata to the
 // calling driver.
 TEST_F(MetadataServerTest, FailGetMetadata) {
-  auto [metadata_sender, metadata_retriever] = CreateMetadataSenderAndRetriever();
+  auto [metadata_sender, metadata_retriever] = CreateMetadataSenderAndRetriever(true);
 
   fidl::Result result = metadata_retriever->GetMetadata();
   ASSERT_TRUE(result.is_error());
+}
+
+// Verify that a driver can retrieve that metadata with `ddk::GetMetadataIfExists()`.
+TEST_F(MetadataServerTest, GetMetadataIfExists) {
+  const char* kMetadataPropertyValue = "test property value";
+
+  auto [metadata_sender, metadata_retriever] = CreateMetadataSenderAndRetriever(true);
+
+  // Set the metadata provided by the metadata_sender driver.
+  {
+    fuchsia_hardware_test::Metadata metadata{{.test_property = kMetadataPropertyValue}};
+    fidl::Result result = metadata_sender->SetMetadata(std::move(metadata));
+    ASSERT_TRUE(result.is_ok()) << result.error_value();
+  }
+
+  // Make the metadata_retriever driver retrieve the metadata from its parent, the metadata_sender
+  // driver, using `ddk::GetMetadata()`.
+  {
+    fidl::Result result = metadata_retriever->GetMetadataIfExists();
+    ASSERT_TRUE(result.is_ok()) << result.error_value();
+    ASSERT_TRUE(result.value().retrieved_metadata());
+    fuchsia_hardware_test::Metadata metadata = std::move(result.value().metadata());
+    ASSERT_EQ(metadata.test_property(), kMetadataPropertyValue);
+  }
+}
+
+// Verify that `ddk::GetMetadataIfExists()` will return std::nullopt instead of an error when there
+// are no metadata servers exposed in the calling driver's incoming namespace.
+TEST_F(MetadataServerTest, GetMetadataIfExistsNullopt) {
+  auto [metadata_sender, metadata_retriever] = CreateMetadataSenderAndRetriever(false);
+
+  // Verify that the metadata_retriever driver's call to `ddk::GetMetadataIfExists()` returns a
+  // std::nullopt and not an error or actual metadata.
+  fidl::Result result = metadata_retriever->GetMetadataIfExists();
+  ASSERT_TRUE(result.is_ok()) << result.error_value();
+  ASSERT_FALSE(result.value().retrieved_metadata());
 }
 
 // Verify that a driver can forward metadata using `ddk::MetadataServer::ForwardMetadata()`.

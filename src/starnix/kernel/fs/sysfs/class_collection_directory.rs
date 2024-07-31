@@ -6,14 +6,13 @@ use crate::device::kobject::{KObject, KObjectHandle};
 use crate::fs::sysfs::{sysfs_create_link, SysfsOps};
 use crate::task::CurrentTask;
 use crate::vfs::{
-    fs_node_impl_dir_readonly, DirectoryEntryType, FileOps, FsNode, FsNodeHandle, FsNodeInfo,
-    FsNodeOps, FsStr, VecDirectory, VecDirectoryEntry,
+    fs_node_impl_dir_readonly, DirectoryEntryType, FileOps, FsNode, FsNodeHandle, FsNodeOps, FsStr,
+    VecDirectory, VecDirectoryEntry,
 };
 use starnix_sync::{FileOpsCore, Locked};
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::error;
 use starnix_uapi::errors::Errno;
-use starnix_uapi::file_mode::mode;
 use starnix_uapi::open_flags::OpenFlags;
 use std::sync::Weak;
 
@@ -64,11 +63,11 @@ impl FsNodeOps for ClassCollectionDirectory {
     ) -> Result<FsNodeHandle, Errno> {
         let kobject = self.kobject();
         match kobject.get_child(name) {
-            Some(child_kobject) => Ok(node.fs().create_node(
-                current_task,
-                sysfs_create_link(kobject.clone(), child_kobject),
-                FsNodeInfo::new_factory(mode!(IFLNK, 0o777), FsCred::root()),
-            )),
+            Some(child_kobject) => {
+                let (link, info) =
+                    sysfs_create_link(kobject.clone(), child_kobject, FsCred::root());
+                Ok(node.fs().create_node(current_task, link, info))
+            }
             None => error!(ENOENT),
         }
     }

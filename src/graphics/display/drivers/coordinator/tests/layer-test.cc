@@ -72,7 +72,8 @@ TEST_F(LayerTest, PrimaryBasic) {
                                               .tiling_type = fhdt::wire::kImageTilingTypeLinear};
   fuchsia_math::wire::RectU display_area = {.width = kDisplayWidth, .height = kDisplayHeight};
   layer.SetPrimaryConfig(image_metadata);
-  layer.SetPrimaryPosition(fhdt::wire::Transform::kIdentity, display_area, display_area);
+  layer.SetPrimaryPosition(fhdt::wire::CoordinateTransformation::kIdentity, display_area,
+                           display_area);
   layer.SetPrimaryAlpha(fhdt::wire::AlphaMode::kDisable, 0);
   auto image = CreateReadyImage();
   layer.SetImage(image, kInvalidEventId, kInvalidEventId);
@@ -86,7 +87,8 @@ TEST_F(LayerTest, CleanUpImage) {
                                               .tiling_type = fhdt::wire::kImageTilingTypeLinear};
   fuchsia_math::wire::RectU display_area = {.width = kDisplayWidth, .height = kDisplayHeight};
   layer.SetPrimaryConfig(image_metadata);
-  layer.SetPrimaryPosition(fhdt::wire::Transform::kIdentity, display_area, display_area);
+  layer.SetPrimaryPosition(fhdt::wire::CoordinateTransformation::kIdentity, display_area,
+                           display_area);
   layer.SetPrimaryAlpha(fhdt::wire::AlphaMode::kDisable, 0);
 
   auto displayed_image = CreateReadyImage();
@@ -160,7 +162,8 @@ TEST_F(LayerTest, CleanUpImage_CheckConfigChange) {
                                               .tiling_type = fhdt::wire::kImageTilingTypeLinear};
   fuchsia_math::wire::RectU display_area = {.width = kDisplayWidth, .height = kDisplayHeight};
   layer.SetPrimaryConfig(image_metadata);
-  layer.SetPrimaryPosition(fhdt::wire::Transform::kIdentity, display_area, display_area);
+  layer.SetPrimaryPosition(fhdt::wire::CoordinateTransformation::kIdentity, display_area,
+                           display_area);
   layer.SetPrimaryAlpha(fhdt::wire::AlphaMode::kDisable, 0);
 
   // Clean up images, which doesn't change the current config.
@@ -208,7 +211,8 @@ TEST_F(LayerTest, CleanUpAllImages) {
                                               .tiling_type = fhdt::wire::kImageTilingTypeLinear};
   fuchsia_math::wire::RectU display_area = {.width = kDisplayWidth, .height = kDisplayHeight};
   layer.SetPrimaryConfig(image_metadata);
-  layer.SetPrimaryPosition(fhdt::wire::Transform::kIdentity, display_area, display_area);
+  layer.SetPrimaryPosition(fhdt::wire::CoordinateTransformation::kIdentity, display_area,
+                           display_area);
   layer.SetPrimaryAlpha(fhdt::wire::AlphaMode::kDisable, 0);
 
   auto displayed_image = CreateReadyImage();
@@ -259,7 +263,8 @@ TEST_F(LayerTest, CleanUpAllImages_CheckConfigChange) {
                                             .tiling_type = fhdt::wire::kImageTilingTypeLinear};
   fuchsia_math::wire::RectU display_area = {.width = kDisplayWidth, .height = kDisplayHeight};
   layer.SetPrimaryConfig(image_config);
-  layer.SetPrimaryPosition(fhdt::wire::Transform::kIdentity, display_area, display_area);
+  layer.SetPrimaryPosition(fhdt::wire::CoordinateTransformation::kIdentity, display_area,
+                           display_area);
   layer.SetPrimaryAlpha(fhdt::wire::AlphaMode::kDisable, 0);
 
   // Clean up all images, which doesn't change the current config.

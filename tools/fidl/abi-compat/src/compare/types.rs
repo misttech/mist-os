@@ -6,6 +6,8 @@ use super::{
     CompatibilityProblems, Flexibility, HandleRights, HandleType, Optionality, Path, Primitive,
     Protocol, Transport,
 };
+use crate::Configuration;
+
 use flyweights::FlyStr;
 use itertools::Itertools;
 use std::collections::{BTreeMap, BTreeSet};
@@ -106,7 +108,11 @@ impl Display for Type {
     }
 }
 
-pub fn compare_types(sender: &Type, receiver: &Type) -> CompatibilityProblems {
+pub fn compare_types(
+    sender: &Type,
+    receiver: &Type,
+    config: &Configuration,
+) -> CompatibilityProblems {
     use Flexibility::*;
     use Optionality::*;
     use Type::*;
@@ -289,7 +295,7 @@ pub fn compare_types(sender: &Type, receiver: &Type) -> CompatibilityProblems {
                     ),
                 );
             }
-            problems.append(compare_types(send_type, recv_type));
+            problems.append(compare_types(send_type, recv_type, config));
         }
         (
             Vector(send_path, send_size, send_type, send_opt),
@@ -308,7 +314,7 @@ pub fn compare_types(sender: &Type, receiver: &Type) -> CompatibilityProblems {
             if send_size > recv_size {
                 problems.type_error(send_path, recv_path, format!("Sender vector is larger than receiver vector, sender(@{send_level}):{send_size}, receiver(@{recv_level}):{recv_size}"));
             }
-            problems.append(compare_types(send_type, recv_type));
+            problems.append(compare_types(send_type, recv_type, config));
         }
         (Struct(send_path, send_members), Struct(recv_path, recv_members)) => {
             if send_members.len() != recv_members.len() {
@@ -325,7 +331,7 @@ pub fn compare_types(sender: &Type, receiver: &Type) -> CompatibilityProblems {
                 )
             }
             for (send, recv) in send_members.iter().zip(recv_members.iter()) {
-                problems.append(compare_types(send, recv));
+                problems.append(compare_types(send, recv, config));
             }
         }
         (Table(send_path, send_members), Table(recv_path, recv_members)) => {
@@ -335,7 +341,7 @@ pub fn compare_types(sender: &Type, receiver: &Type) -> CompatibilityProblems {
             let send_only = BTreeSet::from_iter(send_ordinals.difference(&recv_ordinals));
 
             for o in common_ordinals {
-                problems.append(compare_types(&send_members[o], &recv_members[o]));
+                problems.append(compare_types(&send_members[o], &recv_members[o], config));
             }
 
             if !send_only.is_empty() {
@@ -358,7 +364,7 @@ pub fn compare_types(sender: &Type, receiver: &Type) -> CompatibilityProblems {
             let send_only = BTreeSet::from_iter(send_ordinals.difference(&recv_ordinals));
 
             for o in common_ordinals {
-                problems.append(compare_types(&send_members[o], &recv_members[o]));
+                problems.append(compare_types(&send_members[o], &recv_members[o], config));
             }
 
             if !send_only.is_empty() {
@@ -383,24 +389,23 @@ pub fn compare_types(sender: &Type, receiver: &Type) -> CompatibilityProblems {
         }
 
         (
-            ClientEnd(send_path, send_name, send_transport, send_optional, _send_protocol),
-            ClientEnd(recv_path, recv_name, recv_transport, recv_optional, _recv_protocol),
+            ClientEnd(send_path, _send_name, send_transport, send_optional, send_protocol),
+            ClientEnd(recv_path, _recv_name, recv_transport, recv_optional, recv_protocol),
         ) => {
             let send_level = send_path.api_level();
             let recv_level = recv_path.api_level();
             if send_transport != recv_transport {
                 problems.type_error(send_path, recv_path, format!("client_end transports don't match sender(@{send_level}):{send_transport}, receiver(@{recv_level}):{recv_transport}"))
             }
-            if send_name != recv_name {
-                // TODO: do a structural rather than name comparison
-                problems.type_error(
-                    send_path,
-                    recv_path,
-                    format!(
-                        "client_end protocol names don't match sender(@{send_level}):{send_name}, receiver(@{recv_level}):{recv_name}"
-                    ),
-                )
+
+            if config.tear_off {
+                problems.append(Protocol::client_server_compatible(
+                    recv_protocol,
+                    send_protocol,
+                    &config,
+                ));
             }
+
             if send_optional == &Optionality::Optional && recv_optional == &Optionality::Required {
                 // TODO: reword
                 problems.type_error(
@@ -411,18 +416,23 @@ pub fn compare_types(sender: &Type, receiver: &Type) -> CompatibilityProblems {
             }
         }
         (
-            ServerEnd(send_path, send_protocol, send_transport, send_optional, _),
-            ServerEnd(recv_path, recv_protocol, recv_transport, recv_optional, _),
+            ServerEnd(send_path, _send_name, send_transport, send_optional, send_protocol),
+            ServerEnd(recv_path, _recv_name, recv_transport, recv_optional, recv_protocol),
         ) => {
             let send_level = send_path.api_level();
             let recv_level = recv_path.api_level();
             if send_transport != recv_transport {
                 problems.type_error(send_path, recv_path, format!("server_end transports don't match sender(@{send_level}):{send_transport}, receiver(@{recv_level}):{recv_transport}"))
             }
-            if send_protocol != recv_protocol {
-                // TODO: do a structural rather than name comparison
-                problems.type_error(send_path, recv_path, format!("server_end protocols don't match sender(@{send_level}):{send_protocol}, receiver(@{recv_level}):{recv_protocol}"))
+
+            if config.tear_off {
+                problems.append(Protocol::client_server_compatible(
+                    send_protocol,
+                    recv_protocol,
+                    &config,
+                ));
             }
+
             if send_optional == &Optionality::Optional && recv_optional == &Optionality::Required {
                 // TODO: reword
                 problems.type_error(
@@ -443,7 +453,7 @@ pub fn compare_types(sender: &Type, receiver: &Type) -> CompatibilityProblems {
             }
         }
 
-        (Box(_, send), Box(_, recv)) => problems.append(compare_types(send, recv)),
+        (Box(_, send), Box(_, recv)) => problems.append(compare_types(send, recv, &config)),
 
         (send, recv) => {
             let send_level = send.path().api_level();

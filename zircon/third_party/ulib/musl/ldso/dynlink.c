@@ -71,6 +71,18 @@ static void loader_svc_config(const char* config);
 #define NO_UBSAN_RISCV64
 #endif
 
+#ifdef __aarch64__
+#define ARCH EM_AARCH64;
+#elif defined(__i386__)
+#define ARCH EM_386;
+#elif defined(__x86_64__)
+#define ARCH EM_X86_64;
+#elif defined(__riscv)
+#define ARCH 243;
+#else
+#error unsupported architecture
+#endif
+
 struct dso {
   // Must be first.
   struct link_map l_map;
@@ -848,6 +860,40 @@ LIBC_NO_SAFESTACK void _dl_log_unlogged(void) {
   }
 }
 
+LIBC_NO_SAFESTACK NO_ASAN static bool valid_machine(uint16_t machine) { return machine == ARCH; }
+
+LIBC_NO_SAFESTACK NO_ASAN static bool valid_magic(const unsigned char* e_ident) {
+  return e_ident[EI_MAG0] == ELFMAG0 && e_ident[EI_MAG1] == ELFMAG1 &&
+         e_ident[EI_MAG2] == ELFMAG2 && e_ident[EI_MAG3] == ELFMAG3;
+}
+
+// Only 64-bit ELF allowed.
+LIBC_NO_SAFESTACK NO_ASAN static bool valid_class(const unsigned char class) {
+  return class == ELFCLASS64;
+}
+
+LIBC_NO_SAFESTACK NO_ASAN static bool valid_data(const unsigned char data) {
+#if BYTE_ORDER == LITTLE_ENDIAN
+  return data == ELFDATA2LSB;
+#else
+  return data == ELFDATA2MSB;
+#endif
+}
+
+LIBC_NO_SAFESTACK NO_ASAN static bool valid_version(const Ehdr* eh) {
+  return eh->e_ident[EI_VERSION] == EV_CURRENT && eh->e_version == EV_CURRENT;
+}
+
+LIBC_NO_SAFESTACK NO_ASAN static bool valid_size(const Ehdr* eh) {
+  return eh->e_ehsize == sizeof(*eh);
+}
+
+LIBC_NO_SAFESTACK NO_ASAN static bool is_valid(const Ehdr* eh) {
+  return valid_machine(eh->e_machine) && valid_magic(eh->e_ident) &&
+         valid_class(eh->e_ident[EI_CLASS]) && valid_data(eh->e_ident[EI_DATA]) &&
+         valid_version(eh) && valid_size(eh);
+}
+
 LIBC_NO_SAFESTACK NO_ASAN static zx_status_t map_library(zx_handle_t vmo, struct dso* dso) {
   struct {
     Ehdr ehdr;
@@ -873,6 +919,8 @@ LIBC_NO_SAFESTACK NO_ASAN static zx_status_t map_library(zx_handle_t vmo, struct
   status = _zx_vmo_read(vmo, &buf, 0, sizeof(buf) < l ? sizeof(buf) : l);
   if (status != ZX_OK)
     return status;
+  if (!is_valid(eh))
+    goto noexec;
   // We cannot support ET_EXEC in the general case, because its fixed
   // addresses might conflict with where the dynamic linker has already
   // been loaded.  It's also policy in Fuchsia that all executables are

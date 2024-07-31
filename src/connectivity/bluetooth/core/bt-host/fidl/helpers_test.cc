@@ -25,7 +25,9 @@
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/gap.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/iso/iso_common.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sco/sco.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sdp/data_element.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sdp/sdp.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sdp/service_record.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sm/types.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/loop_fixture.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/test_helpers.h"
@@ -1030,10 +1032,7 @@ TEST(HelpersTest, ReliableModeFromFidl) {
   EXPECT_EQ(bt::gatt::ReliableMode::kDisabled, ReliableModeFromFidl(options));
 }
 
-// TODO: Set information w/o setting language, set a FIDL type that cannot be converted
-// - make sure the expected attributes are set and have the correct type
-// - make sure the profile descriptor sets the right attributes
-TEST(HelpersTest, ServiceDefinitionToServiceRecord) {
+TEST(HelpersTest, InvalidServiceDefinitionToServiceRecordIsError) {
   fuchsia::bluetooth::bredr::ServiceDefinition def_should_fail;
   // Should fail to convert without service class UUIDs.
   auto rec_no_uuids = ServiceDefinitionToServiceRecord(def_should_fail);
@@ -1045,8 +1044,11 @@ TEST(HelpersTest, ServiceDefinitionToServiceRecord) {
   def_should_fail.mutable_information()->emplace_back(std::move(info_no_language));
   auto rec_no_language = ServiceDefinitionToServiceRecord(def_should_fail);
   EXPECT_FALSE(rec_no_language.is_ok());
+}
 
-  // Create definition for successful conversion.
+// - make sure the expected attributes are set and have the correct type
+// - make sure the profile descriptor sets the right attributes
+TEST(HelpersTest, ServiceDefinitionToServiceRecordRoundtrip) {
   fuchsia::bluetooth::bredr::ServiceDefinition def;
   def.mutable_service_class_uuids()->emplace_back(
       fidl_helpers::UuidToFidl(bt::sdp::profile::kAudioSink));
@@ -1164,9 +1166,14 @@ TEST(HelpersTest, ServiceDefinitionToServiceRecord) {
   EXPECT_TRUE(rec.value().HasAttribute(valid_att_id));
   EXPECT_TRUE(rec.value().HasAttribute(url_attr_id));
   EXPECT_EQ(*rec.value().GetAttribute(url_attr_id).GetUrl(), "foobar.dev");
+
+  // Can go back to the original FIDL service definition.
+  auto fidl_def = ServiceRecordToServiceDefinition(rec.value());
+  ASSERT_TRUE(fidl_def.is_ok());
+  ASSERT_TRUE(::fidl::Equals(fidl_def.value(), def));
 }
 
-TEST(HelpersTest, ObexServiceDefinitionToServiceRecord) {
+TEST(HelpersTest, ObexServiceDefinitionToServiceRecordRoundtrip) {
   // Create an OBEX definition for a successful conversion. MAP MSE uses both L2CAP and RFCOMM.
   fuchsia::bluetooth::bredr::ServiceDefinition def;
   def.mutable_service_class_uuids()->emplace_back(
@@ -1231,7 +1238,7 @@ TEST(HelpersTest, ObexServiceDefinitionToServiceRecord) {
   def.mutable_additional_attributes()->emplace_back(std::move(features_attribute));
 
   // Confirm converted ServiceRecord fields match ServiceDefinition
-  auto rec = ServiceDefinitionToServiceRecord(def);
+  const auto rec = ServiceDefinitionToServiceRecord(def);
   ASSERT_TRUE(rec.is_ok());
 
   // Confirm UUIDs match
@@ -1310,6 +1317,45 @@ TEST(HelpersTest, ObexServiceDefinitionToServiceRecord) {
   // The GoepL2capPsm value should be saved.
   EXPECT_EQ(*rec.value().GetAttribute(bt::sdp::kGoepL2capPsm).Get<uint16_t>(),
             fuchsia::bluetooth::bredr::PSM_DYNAMIC);
+
+  // Can go back to the original FIDL service definition.
+  auto fidl_def = ServiceRecordToServiceDefinition(rec.value());
+  ASSERT_TRUE(fidl_def.is_ok());
+  ASSERT_TRUE(::fidl::Equals(fidl_def.value(), def));
+}
+
+TEST(HelpersTest, MinimalServiceRecordToServiceDefinition) {
+  // Minimal record has only service UUIDs. Everything else is optional.
+  bt::sdp::ServiceRecord minimal;
+  const std::vector<bt::UUID> uuids = {bt::sdp::profile::kSerialPort};
+  minimal.SetServiceClassUUIDs(uuids);
+  auto minimal_rec = ServiceRecordToServiceDefinition(minimal);
+  EXPECT_TRUE(minimal_rec.is_ok());
+}
+
+TEST(HelpersTest, InvalidServiceRecordToServiceDefinitionIsError) {
+  const bt::sdp::ServiceRecord empty_record;
+  // Should fail to convert without service class UUIDs.
+  auto rec_no_uuids = ServiceRecordToServiceDefinition(empty_record);
+  EXPECT_FALSE(rec_no_uuids.is_ok());
+
+  bt::sdp::ServiceRecord invalid_record;
+  const std::vector<bt::UUID> uuids = {bt::sdp::profile::kAudioSink};
+  invalid_record.SetServiceClassUUIDs(uuids);
+  // Invalid profile descriptor
+  bt::sdp::DataElement invalid_profile_descriptors;
+  invalid_record.SetAttribute(bt::sdp::kBluetoothProfileDescriptorList,
+                              std::move(invalid_profile_descriptors));
+  auto invalid_profile_rec = ServiceRecordToServiceDefinition(invalid_record);
+  EXPECT_FALSE(invalid_profile_rec.is_ok());
+  invalid_record.RemoveAttribute(bt::sdp::kBluetoothProfileDescriptorList);
+
+  // Invalid protocol descriptor
+  bt::sdp::DataElement invalid_protocol_descriptor;
+  invalid_record.SetAttribute(bt::sdp::kProtocolDescriptorList,
+                              std::move(invalid_protocol_descriptor));
+  auto invalid_protocol_rec = ServiceRecordToServiceDefinition(invalid_record);
+  EXPECT_FALSE(invalid_protocol_rec.is_ok());
 }
 
 TEST(HelpersTest, FidlToBrEdrSecurityRequirements) {

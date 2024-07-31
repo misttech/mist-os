@@ -36,10 +36,8 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include "src/devices/sysmem/drivers/sysmem/device.h"
-#include "src/devices/testing/mock-ddk/mock-device.h"
 #include "src/graphics/display/drivers/fake/fake-display-stack.h"
-#include "src/graphics/display/drivers/fake/sysmem-device-wrapper.h"
+#include "src/graphics/display/drivers/fake/fake-sysmem-device-hierarchy.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
@@ -54,11 +52,11 @@ class FakeDisplayTest : public testing::Test {
   FakeDisplayTest() = default;
 
   void SetUp() override {
-    mock_root_ = MockDevice::FakeRootParent();
-    auto sysmem = std::make_unique<display::GenericSysmemDeviceWrapper<sysmem_driver::Device>>(
-        mock_root_.get());
-    tree_ = std::make_unique<display::FakeDisplayStack>(mock_root_, std::move(sysmem),
-                                                        GetFakeDisplayDeviceConfig());
+    zx::result<std::unique_ptr<display::FakeSysmemDeviceHierarchy>> create_sysmem_provider_result =
+        display::FakeSysmemDeviceHierarchy::Create();
+    ASSERT_OK(create_sysmem_provider_result);
+    tree_ = std::make_unique<display::FakeDisplayStack>(
+        std::move(create_sysmem_provider_result).value(), GetFakeDisplayDeviceConfig());
   }
 
   void TearDown() override {
@@ -79,10 +77,7 @@ class FakeDisplayTest : public testing::Test {
     return fidl::WireSyncClient(tree_->ConnectToSysmemAllocatorV2());
   }
 
-  MockDevice* mock_root() const { return mock_root_.get(); }
-
  private:
-  std::shared_ptr<MockDevice> mock_root_;
   std::unique_ptr<display::FakeDisplayStack> tree_;
 };
 

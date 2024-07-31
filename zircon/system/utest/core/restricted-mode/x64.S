@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+.weak zx_restricted_enter
+
 // do something to all the registers so we can read the state on the way out
 .macro twiddle_registers
   inc  %rax
@@ -92,7 +94,7 @@ restricted_enter_wrapper:
   mov   %rsp,%rdx
 
   // call the syscall
-  call  zx_restricted_enter
+  call  zx_restricted_enter@PLT
 
   // if we got here it must have failed
   add   $(8*8),%rsp // pop the previous state on the stack

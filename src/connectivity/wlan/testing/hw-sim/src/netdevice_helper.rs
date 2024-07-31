@@ -6,7 +6,7 @@ use fidl::endpoints::{create_proxy, Proxy};
 use fuchsia_component::client::connect_to_named_protocol_at_dir_root;
 use futures::{FutureExt as _, StreamExt as _, TryStreamExt as _};
 use std::pin::pin;
-use wlan_common::appendable::Appendable;
+use wlan_common::append::Append;
 use wlan_common::big_endian::BigEndianU16;
 use wlan_common::mac;
 
@@ -132,12 +132,8 @@ pub async fn recv(session: &netdevice_client::Session) -> Vec<u8> {
     buffer
 }
 
-pub fn write_fake_frame<B: Appendable>(
-    da: ieee80211::MacAddr,
-    sa: ieee80211::MacAddr,
-    payload: &[u8],
-    buf: &mut B,
-) {
+pub fn write_fake_frame(da: ieee80211::MacAddr, sa: ieee80211::MacAddr, payload: &[u8]) -> Vec<u8> {
+    let mut buf = vec![];
     buf.append_value(&mac::EthernetIIHdr {
         da,
         sa,
@@ -145,4 +141,5 @@ pub fn write_fake_frame<B: Appendable>(
     })
     .expect("error creating fake ethernet header");
     buf.append_bytes(payload).expect("buffer too small for ethernet payload");
+    buf
 }

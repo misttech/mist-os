@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "src/storage/minfs/file.h"
+
 #include <lib/fit/defer.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/result.h>
@@ -11,6 +13,7 @@
 #include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
+#include <zircon/assert.h>
 #include <zircon/time.h>
 
 #include <algorithm>
@@ -19,8 +22,8 @@
 #include <fbl/algorithm.h>
 #include <safemath/checked_math.h>
 
+#include "src/storage/lib/trace/trace.h"
 #include "src/storage/lib/vfs/cpp/vfs_types.h"
-#include "zircon/assert.h"
 
 #ifdef __Fuchsia__
 #include <zircon/syscalls.h>

@@ -38,7 +38,6 @@
                 "*selinux_capable_file*",
                 "*selinux_capable_net*",
                 "*selinux_capable_sys*",
-                "*selinux_dyntrans*",
                 "*selinux_dyntrace*",
                 "*selinux_bounds*",
                 "*selinux_nnp_nosuid*",

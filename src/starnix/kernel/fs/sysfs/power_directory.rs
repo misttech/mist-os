@@ -82,7 +82,8 @@ pub fn sysfs_power_directory(current_task: &CurrentTask, dir: &mut StaticDirecto
                         .suspend_stats()
                         .last_failed_errno
                         .map(|e| format!("-{}", e.code.error_code().to_string()))
-                        .unwrap_or_default()
+                        // This matches local linux behavior when no suspends have failed.
+                        .unwrap_or_else(|| "0".to_string())
                 }),
                 read_only_file_mode,
             );

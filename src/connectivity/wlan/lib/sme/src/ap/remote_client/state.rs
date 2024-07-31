@@ -1346,7 +1346,7 @@ mod tests {
             &[SupportedRate(0b11111000)][..],
             &[SupportedRate(0b11111000)][..],
             &None,
-            Some(s_rsne_vec),
+            Some(s_rsne_vec.into()),
         );
 
         let (_, Authenticating) = match state {
@@ -1411,7 +1411,7 @@ mod tests {
             &[SupportedRate(0b11111000)][..],
             &[SupportedRate(0b11111000)][..],
             &Some(rsn_cfg),
-            Some(s_rsne_vec),
+            Some(s_rsne_vec.into()),
         );
 
         let (_, Authenticating) = match state {
@@ -1464,7 +1464,7 @@ mod tests {
             &[SupportedRate(0b11111000)][..],
             &[SupportedRate(0b11111000)][..],
             &Some(rsn_cfg),
-            Some(s_rsne_vec),
+            Some(s_rsne_vec.into()),
         );
 
         let (_, Associated { rsna_link_state, aid }) = match state {
@@ -1520,7 +1520,7 @@ mod tests {
             &[SupportedRate(0b11111000)][..],
             &[SupportedRate(0b11111000)][..],
             &Some(rsn_cfg),
-            Some(s_rsne_vec),
+            Some(s_rsne_vec.into()),
         );
 
         let (_, Associated { rsna_link_state, aid }) = match state {

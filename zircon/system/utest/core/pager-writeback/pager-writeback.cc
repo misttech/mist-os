@@ -12,11 +12,17 @@
 
 #include <zxtest/zxtest.h>
 
+#include "../needs-next.h"
+#include "../vmo/helpers.h"
 #include "test_thread.h"
 #include "userpager.h"
-#include "zircon/system/utest/core/vmo/helpers.h"
+
+NEEDS_NEXT_SYSCALL(zx_pager_query_dirty_ranges);
 
 namespace pager_tests {
+
+// This value corresponds to `VmObjectPaged::ReadWriteInternalLocked::kMaxWriteWaitPages`
+static constexpr uint64_t kMaxWriteWaitPages = 16;
 
 // Convenience macro for tests that want to create VMOs both with and without the ZX_VMO_TRAP_DIRTY
 // flag. |base_create_option| specifies the common create options to be used for both cases. The
@@ -30,6 +36,8 @@ namespace pager_tests {
 // Tests that a VMO created with TRAP_DIRTY can be supplied, and generates VMO_DIRTY requests when
 // written to.
 VMO_VMAR_TEST(PagerWriteback, SimpleTrapDirty) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -93,6 +101,8 @@ VMO_VMAR_TEST(PagerWriteback, SimpleTrapDirty) {
 
 // Tests that OP_DIRTY dirties pages even without a write to the VMO.
 TEST(PagerWriteback, OpDirtyNoWrite) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -123,6 +133,8 @@ TEST(PagerWriteback, OpDirtyNoWrite) {
 
 // Tests that writing to the VMO with zx_vmo_write generates DIRTY requests as expected.
 TEST(PagerWriteback, DirtyRequestsOnVmoWrite) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -185,6 +197,8 @@ TEST(PagerWriteback, DirtyRequestsOnVmoWrite) {
 
 // Tests that writing to the VMO through a VM mapping generates DIRTY requests as expected.
 TEST(PagerWriteback, DirtyRequestsViaMapping) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -261,6 +275,8 @@ TEST(PagerWriteback, DirtyRequestsViaMapping) {
 
 // Tests that no DIRTY requests are generated on a read.
 TEST(PagerWriteback, NoDirtyRequestsOnRead) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -323,6 +339,8 @@ TEST(PagerWriteback, NoDirtyRequestsOnRead) {
 
 // Tests that DIRTY requests are generated only on the first write.
 TEST(PagerWriteback, DirtyRequestsRepeatedWrites) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -390,6 +408,8 @@ TEST(PagerWriteback, DirtyRequestsRepeatedWrites) {
 
 // Tests that DIRTY requests are generated on a write to a page that was previously read from.
 TEST(PagerWriteback, DirtyRequestsOnWriteAfterRead) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -457,6 +477,8 @@ TEST(PagerWriteback, DirtyRequestsOnWriteAfterRead) {
 
 // Tests that no DIRTY requests are generated for clones of pager-backed VMOs.
 TEST(PagerWriteback, NoDirtyRequestsForClones) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -530,6 +552,8 @@ TEST(PagerWriteback, NoDirtyRequestsForClones) {
 
 // Tests that writes for overlapping ranges generate the expected DIRTY requests.
 TEST(PagerWriteback, DirtyRequestsOverlap) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   // This test cannot run as a component due to its usage of WaitForBlocked() which will return true
   // if the test thread is blocked on pagers outside of the test. WaitForBlocked() can only be
   // relied upon in a non-component environment. The pager-writeback tests cannot run as standalone
@@ -537,8 +561,7 @@ TEST(PagerWriteback, DirtyRequestsOverlap) {
   // test is unified mode, where the system resource will be available.
   zx::unowned_resource system_resource = maybe_standalone::GetSystemResource();
   if (!system_resource->is_valid()) {
-    printf("System resource not available, skipping\n");
-    return;
+    ZXTEST_SKIP("System resource not available, skipping\n");
   }
 
   UserPager pager;
@@ -661,6 +684,8 @@ TEST(PagerWriteback, DirtyRequestsOverlap) {
 // Tests that DIRTY requests are generated as expected for a VMO that has random offsets in various
 // page states: {Empty, Clean, Dirty}.
 TEST(PagerWriteback, DirtyRequestsRandomOffsets) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -758,6 +783,8 @@ TEST(PagerWriteback, DirtyRequestsRandomOffsets) {
 
 // Tests that ZX_PAGER_OP_FAIL can fail DIRTY page requests and propagate the failure up.
 TEST(PagerWriteback, FailDirtyRequests) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -827,6 +854,8 @@ TEST(PagerWriteback, FailDirtyRequests) {
 
 // Tests that DIRTY requests are generated when offsets with zero page markers are written to.
 TEST(PagerWriteback, DirtyRequestsForZeroPages) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -920,6 +949,8 @@ TEST(PagerWriteback, DirtyRequestsForZeroPages) {
 
 // Tests that ZX_PAGER_OP_DIRTY works for a mix of zero and non-zero pages.
 TEST(PagerWriteback, DirtyZeroAndNonZeroPages) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -975,6 +1006,8 @@ TEST(PagerWriteback, DirtyZeroAndNonZeroPages) {
 
 // Tests that ZX_PAGER_OP_FAIL can fail DIRTY page requests for zero pages.
 TEST(PagerWriteback, FailDirtyRequestsForZeroPages) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -1028,6 +1061,8 @@ TEST(PagerWriteback, FailDirtyRequestsForZeroPages) {
 
 // Tests that DIRTY requests are generated for ranges including zero pages as expected.
 TEST(PagerWriteback, DirtyRequestsForZeroRanges) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -1139,6 +1174,8 @@ TEST(PagerWriteback, DirtyRequestsForZeroRanges) {
 
 // Tests that no DIRTY requests are generated on a commit.
 TEST(PagerWriteback, NoDirtyRequestsOnCommit) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -1175,6 +1212,8 @@ TEST(PagerWriteback, NoDirtyRequestsOnCommit) {
 
 // Tests that no DIRTY requests are generated when a mapping is created with MAP_RANGE.
 TEST(PagerWriteback, NoDirtyRequestsOnMapRange) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -1271,6 +1310,8 @@ TEST(PagerWriteback, NoDirtyRequestsOnMapRange) {
 
 // Tests that no DIRTY requests are generated when previously dirty pages are mapped and written to.
 TEST(PagerWriteback, NoDirtyRequestsMapExistingDirty) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -1338,6 +1379,8 @@ TEST(PagerWriteback, NoDirtyRequestsMapExistingDirty) {
 
 // Tests that dirty ranges cannot be queried on a clone.
 TEST_WITH_AND_WITHOUT_TRAP_DIRTY(NoQueryOnClone, 0) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -1394,6 +1437,8 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(NoQueryOnClone, 0) {
 
 // Tests that WRITEBACK_BEGIN/END clean pages as expected.
 TEST_WITH_AND_WITHOUT_TRAP_DIRTY(SimpleWriteback, 0) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -1466,6 +1511,8 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(SimpleWriteback, 0) {
 
 // Tests that a write after WRITEBACK_BEGIN but before WRITEBACK_END is handled correctly.
 TEST(PagerWriteback, DirtyDuringWriteback) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   // This test cannot run as a component due to its usage of WaitForBlocked() which will return true
   // if the test thread is blocked on pagers outside of the test. WaitForBlocked() can only be
   // relied upon in a non-component environment. The pager-writeback tests cannot run as standalone
@@ -1473,8 +1520,7 @@ TEST(PagerWriteback, DirtyDuringWriteback) {
   // test is unified mode, where the system resource will be available.
   zx::unowned_resource system_resource = maybe_standalone::GetSystemResource();
   if (!system_resource->is_valid()) {
-    printf("System resource not available, skipping\n");
-    return;
+    ZXTEST_SKIP("System resource not available, skipping");
   }
 
   UserPager pager;
@@ -1572,6 +1618,8 @@ TEST(PagerWriteback, DirtyDuringWriteback) {
 
 // Tests that mapping write permissions are cleared as expected on writeback.
 TEST(PagerWriteback, WritebackWithMapping) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -1683,6 +1731,8 @@ TEST(PagerWriteback, WritebackWithMapping) {
 // Tests that the zero page marker cannot be overwritten by another page, unless written to at which
 // point it is forked.
 TEST_WITH_AND_WITHOUT_TRAP_DIRTY(CannotOverwriteZeroPage, 0) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -1757,6 +1807,8 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(CannotOverwriteZeroPage, 0) {
 
 // Tests that VMOs created without the ZX_VMO_TRAP_DIRTY flag track dirty pages as expected.
 TEST(PagerWriteback, SimpleDirtyNoTrap) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -1828,6 +1880,8 @@ TEST(PagerWriteback, SimpleDirtyNoTrap) {
 // Tests that VMOs created without the ZX_VMO_TRAP_DIRTY flag track dirty pages as expected for a
 // random mix of zero and non-zero pages.
 TEST(PagerWriteback, DirtyNoTrapRandomOffsets) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -1889,6 +1943,8 @@ TEST(PagerWriteback, DirtyNoTrapRandomOffsets) {
 // Tests that adding the WRITE permission with zx_vmar_protect does not override read-only mappings
 // required in order to track dirty transitions.
 TEST_WITH_AND_WITHOUT_TRAP_DIRTY(DirtyAfterMapProtect, 0) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -1953,6 +2009,8 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(DirtyAfterMapProtect, 0) {
 // Tests that zero pages are supplied by the kernel for the newly extended range after a resize, and
 // are not overwritten by a pager supply.
 TEST_WITH_AND_WITHOUT_TRAP_DIRTY(ResizeSupplyZero, ZX_VMO_RESIZABLE) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   static constexpr uint64_t kNumPages = 2;
   static constexpr uint64_t kNumPagesAfterResize = 4;
   UserPager pager;
@@ -2030,6 +2088,8 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(ResizeSupplyZero, ZX_VMO_RESIZABLE) {
 // Tests that writing to the newly extended range after a resize can generate DIRTY requests as
 // expected.
 TEST(PagerWriteback, ResizeDirtyRequest) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   // This test cannot run as a component due to its usage of WaitForBlocked() which will return true
   // if the test thread is blocked on pagers outside of the test. WaitForBlocked() can only be
   // relied upon in a non-component environment. The pager-writeback tests cannot run as standalone
@@ -2037,8 +2097,7 @@ TEST(PagerWriteback, ResizeDirtyRequest) {
   // test is unified mode, where the system resource will be available.
   zx::unowned_resource system_resource = maybe_standalone::GetSystemResource();
   if (!system_resource->is_valid()) {
-    printf("System resource not available, skipping\n");
-    return;
+    ZXTEST_SKIP("System resource not available, skipping");
   }
 
   UserPager pager;
@@ -2156,6 +2215,8 @@ TEST(PagerWriteback, ResizeDirtyRequest) {
 
 // Tests that writeback on a resized VMO works as expected.
 TEST_WITH_AND_WITHOUT_TRAP_DIRTY(ResizeWriteback, ZX_VMO_RESIZABLE) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -2213,6 +2274,8 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(ResizeWriteback, ZX_VMO_RESIZABLE) {
 
 // Tests that a resize down unblocks outstanding DIRTY requests that are out-of-bounds.
 TEST(PagerWriteback, ResizeWithOutstandingDirtyRequests) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -2307,6 +2370,8 @@ TEST(PagerWriteback, ResizeWithOutstandingDirtyRequests) {
 // Tests that a resize down unblocks outstanding DIRTY requests that are out-of-bounds when the
 // out-of-bounds range is in the process of being written back.
 TEST(PagerWriteback, ResizeWritebackWithOutstandingDirtyRequests) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -2395,6 +2460,8 @@ TEST(PagerWriteback, ResizeWritebackWithOutstandingDirtyRequests) {
 
 // Tests that writing again to resized range that is being written back triggers new DIRTY requests.
 TEST(PagerWriteback, ResizeWritebackNewDirtyRequestsInterleaved) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -2485,6 +2552,8 @@ TEST(PagerWriteback, ResizeWritebackNewDirtyRequestsInterleaved) {
 
 // Tests that writing again to a written back resized range triggers new DIRTY requests.
 TEST(PagerWriteback, ResizeWritebackNewDirtyRequests) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -2566,6 +2635,8 @@ TEST(PagerWriteback, ResizeWritebackNewDirtyRequests) {
 // Tests that a write interleaved with a writeback retains the dirtied page that falls in the zero
 // range being written back.
 TEST_WITH_AND_WITHOUT_TRAP_DIRTY(ResizeWritebackIntersectingWrite, ZX_VMO_RESIZABLE) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -2634,6 +2705,8 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(ResizeWritebackIntersectingWrite, ZX_VMO_RESIZA
 
 // Tests that a write outside of an awaiting clean zero range does not affect it.
 TEST_WITH_AND_WITHOUT_TRAP_DIRTY(ResizeWritebackNonIntersectingWrite, ZX_VMO_RESIZABLE) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -2718,6 +2791,8 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(ResizeWritebackNonIntersectingWrite, ZX_VMO_RES
 // Tests extending the VMO, starting a writeback on the extended range, and then writing to random
 // pages in the extended range before ending the writeback.
 TEST_WITH_AND_WITHOUT_TRAP_DIRTY(ResizeWritebackIntersectingRandomWrites, ZX_VMO_RESIZABLE) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -2812,6 +2887,8 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(ResizeWritebackIntersectingRandomWrites, ZX_VMO
 // Tests extending the VMO, starting a writeback on only a portion of the extended range, and then
 // writing to random pages in the extended range before ending the writeback.
 TEST_WITH_AND_WITHOUT_TRAP_DIRTY(ResizePartialWritebackIntersectingRandomWrites, ZX_VMO_RESIZABLE) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -2922,6 +2999,8 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(ResizePartialWritebackIntersectingRandomWrites,
 // Tests that a resize interleaved with a writeback trims / resets an awaiting clean zero range if
 // it intersects it.
 TEST_WITH_AND_WITHOUT_TRAP_DIRTY(ResizeWritebackIntersectingResize, ZX_VMO_RESIZABLE) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -3037,6 +3116,8 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(ResizeWritebackIntersectingResize, ZX_VMO_RESIZ
 
 // Tests that a resize beyond an awaiting clean zero range does not affect it.
 TEST_WITH_AND_WITHOUT_TRAP_DIRTY(ResizeWritebackNonIntersectingResize, ZX_VMO_RESIZABLE) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -3076,6 +3157,8 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(ResizeWritebackNonIntersectingResize, ZX_VMO_RE
 
 // Tests that writeback on a resized range that starts after a gap (zero range) is handled.
 TEST_WITH_AND_WITHOUT_TRAP_DIRTY(ResizeWritebackAfterGap, ZX_VMO_RESIZABLE) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -3151,6 +3234,8 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(ResizeWritebackAfterGap, ZX_VMO_RESIZABLE) {
 
 // Tests that writeback on a resized range with multiple zero ranges (gaps) can clean all the gaps.
 TEST_WITH_AND_WITHOUT_TRAP_DIRTY(ResizeWritebackMulipleGaps, ZX_VMO_RESIZABLE) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -3236,6 +3321,8 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(ResizeWritebackMulipleGaps, ZX_VMO_RESIZABLE) {
 
 // Tests starting multiple sequential writebacks on the resized range, both for gaps and pages.
 TEST_WITH_AND_WITHOUT_TRAP_DIRTY(ResizeWritebackSequential, ZX_VMO_RESIZABLE) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -3310,6 +3397,8 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(ResizeWritebackSequential, ZX_VMO_RESIZABLE) {
 // Tests that a WritebackBegin on a resized range followed by a partial WritebackEnd works as
 // expected.
 TEST_WITH_AND_WITHOUT_TRAP_DIRTY(ResizeWritebackPartialEnd, ZX_VMO_RESIZABLE) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -3355,6 +3444,8 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(ResizeWritebackPartialEnd, ZX_VMO_RESIZABLE) {
 
 // Tests repeated writebacks on a resized range.
 TEST_WITH_AND_WITHOUT_TRAP_DIRTY(ResizeWritebackRepeated, ZX_VMO_RESIZABLE) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -3436,6 +3527,8 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(ResizeWritebackRepeated, ZX_VMO_RESIZABLE) {
 
 // Tests that a resized range that has mappings can be written back as expected.
 TEST_WITH_AND_WITHOUT_TRAP_DIRTY(ResizeWritebackWithMapping, ZX_VMO_RESIZABLE) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -3523,6 +3616,8 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(ResizeWritebackWithMapping, ZX_VMO_RESIZABLE) {
 // Tests that a resized range that has mappings and is in the process of being written back is
 // dirtied again on a write.
 TEST_WITH_AND_WITHOUT_TRAP_DIRTY(ResizeWritebackInterleavedWriteWithMapping, ZX_VMO_RESIZABLE) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -3648,6 +3743,8 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(ResizeWritebackInterleavedWriteWithMapping, ZX_
 // Tests that writing a page after a dirty zero range is queried but before it is written back is
 // left dirty.
 TEST_WITH_AND_WITHOUT_TRAP_DIRTY(ResizeWritebackDirtyAfterQuery, ZX_VMO_RESIZABLE) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -3693,6 +3790,8 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(ResizeWritebackDirtyAfterQuery, ZX_VMO_RESIZABL
 
 // Verifies that multiple dirty ranges (zero and non-zero) can be written back together.
 TEST_WITH_AND_WITHOUT_TRAP_DIRTY(WritebackCombined, ZX_VMO_RESIZABLE) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -3754,6 +3853,8 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(WritebackCombined, ZX_VMO_RESIZABLE) {
 
 // Verifies that writing back dirty ranges (both zero and non-zero) out of order cleans everything.
 TEST_WITH_AND_WITHOUT_TRAP_DIRTY(WritebackOutOfOrder, ZX_VMO_RESIZABLE) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -3822,6 +3923,8 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(WritebackOutOfOrder, ZX_VMO_RESIZABLE) {
 
 // Verifies starting writeback on ranges out of order and ending all together.
 TEST_WITH_AND_WITHOUT_TRAP_DIRTY(WritebackOutOfOrderCombinedEnd, ZX_VMO_RESIZABLE) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -3887,6 +3990,8 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(WritebackOutOfOrderCombinedEnd, ZX_VMO_RESIZABL
 
 // Verifies starting writeback on ranges all together and ending out of order.
 TEST_WITH_AND_WITHOUT_TRAP_DIRTY(WritebackOutOfOrderCombinedBegin, ZX_VMO_RESIZABLE) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -3952,6 +4057,8 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(WritebackOutOfOrderCombinedBegin, ZX_VMO_RESIZA
 
 // Test that OP_ZERO writes zeros in a pager-backed VMO.
 TEST(PagerWriteback, OpZero) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -4015,6 +4122,8 @@ TEST(PagerWriteback, OpZero) {
 
 // Test OP_ZERO on a pager-backed VMO created with ZX_VMO_TRAP_DIRTY.
 TEST(PagerWriteback, OpZeroTrapDirty) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -4074,6 +4183,8 @@ TEST(PagerWriteback, OpZeroTrapDirty) {
 
 // Test that OP_ZERO is a no-op over a newly extended (but not written back yet) uncommitted range.
 TEST_WITH_AND_WITHOUT_TRAP_DIRTY(OpZeroTail, ZX_VMO_RESIZABLE) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -4117,6 +4228,8 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(OpZeroTail, ZX_VMO_RESIZABLE) {
 // Test that OP_ZERO can decommit committed pages in a newly extended (but not written back yet)
 // range.
 TEST_WITH_AND_WITHOUT_TRAP_DIRTY(OpZeroDecommit, ZX_VMO_RESIZABLE) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -4190,6 +4303,8 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(OpZeroDecommit, ZX_VMO_RESIZABLE) {
 
 // Test OP_ZERO on a clone of a pager-backed VMO.
 TEST_WITH_AND_WITHOUT_TRAP_DIRTY(OpZeroClone, 0) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -4286,6 +4401,8 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(OpZeroClone, 0) {
 
 // Test OP_ZERO that conflicts with a simultaneous resize.
 TEST_WITH_AND_WITHOUT_TRAP_DIRTY(OpZeroResize, ZX_VMO_RESIZABLE) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -4340,6 +4457,8 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(OpZeroResize, ZX_VMO_RESIZABLE) {
 
 // Test OP_ZERO on partial pages.
 TEST_WITH_AND_WITHOUT_TRAP_DIRTY(OpZeroPartialPage, ZX_VMO_RESIZABLE) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -4399,6 +4518,8 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(OpZeroPartialPage, ZX_VMO_RESIZABLE) {
 
 // Tests that OP_ZERO just before the tail can efficiently expand the tail and avoid page requests.
 TEST_WITH_AND_WITHOUT_TRAP_DIRTY(OpZeroExpandsTail, ZX_VMO_RESIZABLE) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -4470,6 +4591,8 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(OpZeroExpandsTail, ZX_VMO_RESIZABLE) {
 
 // Tests OP_ZERO with interleaved writeback.
 TEST_WITH_AND_WITHOUT_TRAP_DIRTY(OpZeroWriteback, ZX_VMO_RESIZABLE) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -4521,6 +4644,8 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(OpZeroWriteback, ZX_VMO_RESIZABLE) {
 
 // Tests OP_ZERO over zero page markers.
 TEST_WITH_AND_WITHOUT_TRAP_DIRTY(OpZeroWithMarkers, 0) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -4573,6 +4698,8 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(OpZeroWithMarkers, 0) {
 
 // Tests that zeroing across a pinned page clips expansion of the tail.
 TEST_WITH_AND_WITHOUT_TRAP_DIRTY(OpZeroPinned, ZX_VMO_RESIZABLE) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   zx::unowned_resource system_resource = maybe_standalone::GetSystemResource();
   if (!system_resource->is_valid()) {
     printf("System resource not available, skipping\n");
@@ -4648,6 +4775,8 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(OpZeroPinned, ZX_VMO_RESIZABLE) {
 
 // Tests that zeroing the tail unblocks any previous read requests.
 TEST_WITH_AND_WITHOUT_TRAP_DIRTY(OpZeroUnblocksReadRequest, 0) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -4698,6 +4827,8 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(OpZeroUnblocksReadRequest, 0) {
 
 // Tests that dirty pages can be written back after detach.
 TEST_WITH_AND_WITHOUT_TRAP_DIRTY(WritebackDirtyPagesAfterDetach, 0) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -4758,6 +4889,8 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(WritebackDirtyPagesAfterDetach, 0) {
 
 // Tests that a newly resized range can be written back after detach.
 TEST_WITH_AND_WITHOUT_TRAP_DIRTY(WritebackResizedRangeAfterDetach, ZX_VMO_RESIZABLE) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -4820,6 +4953,8 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(WritebackResizedRangeAfterDetach, ZX_VMO_RESIZA
 
 // Tests that clean pages are decommitted on detach.
 TEST_WITH_AND_WITHOUT_TRAP_DIRTY(DecommitCleanOnDetach, 0) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -4854,6 +4989,8 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(DecommitCleanOnDetach, 0) {
 
 // Tests that DIRTY requests cannot be generated after detach.
 VMO_VMAR_TEST(PagerWriteback, NoDirtyRequestsAfterDetach) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -4939,6 +5076,8 @@ VMO_VMAR_TEST(PagerWriteback, NoDirtyRequestsAfterDetach) {
 
 // Tests that detach with a pending DIRTY request fails the request.
 VMO_VMAR_TEST(PagerWriteback, DetachWithPendingDirtyRequest) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -4992,6 +5131,8 @@ VMO_VMAR_TEST(PagerWriteback, DetachWithPendingDirtyRequest) {
 
 // Tests that resolving (or failing) a DIRTY request after the VMO is detached fails.
 TEST(PagerWriteback, ResolveDirtyRequestAfterDetach) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -5036,6 +5177,8 @@ TEST(PagerWriteback, ResolveDirtyRequestAfterDetach) {
 
 // Tests that a VMO is marked modified on a zx_vmo_write.
 TEST_WITH_AND_WITHOUT_TRAP_DIRTY(ModifiedOnVmoWrite, 0) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -5079,6 +5222,8 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(ModifiedOnVmoWrite, 0) {
 
 // Tests that a VMO is marked modified when written through a mapping.
 TEST_WITH_AND_WITHOUT_TRAP_DIRTY(ModifiedOnMappingWrite, 0) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -5133,6 +5278,8 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(ModifiedOnMappingWrite, 0) {
 
 // Tests that a VMO is marked modified on resize.
 TEST_WITH_AND_WITHOUT_TRAP_DIRTY(ModifiedOnResize, ZX_VMO_RESIZABLE) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -5181,6 +5328,8 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(ModifiedOnResize, ZX_VMO_RESIZABLE) {
 
 // Tests that a VMO is marked modified on a ZX_VMO_OP_ZERO.
 TEST_WITH_AND_WITHOUT_TRAP_DIRTY(ModifiedOnOpZero, 0) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -5223,6 +5372,8 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(ModifiedOnOpZero, 0) {
 
 // Tests that a VMO is not marked modified on a zx_vmo_read.
 TEST_WITH_AND_WITHOUT_TRAP_DIRTY(NotModifiedOnVmoRead, 0) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -5257,6 +5408,8 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(NotModifiedOnVmoRead, 0) {
 
 // Tests that a VMO is not marked modified when read through a mapping.
 TEST_WITH_AND_WITHOUT_TRAP_DIRTY(NotModifiedOnMappingRead, 0) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -5302,6 +5455,8 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(NotModifiedOnMappingRead, 0) {
 
 // Tests that a VMO is not marked modified when a write is failed by failing a DIRTY request.
 TEST(PagerWriteback, NotModifiedOnFailedDirtyRequest) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -5376,6 +5531,8 @@ TEST(PagerWriteback, NotModifiedOnFailedDirtyRequest) {
 
 // Tests that a VMO is not marked modified on a failed zx_vmo_write.
 TEST_WITH_AND_WITHOUT_TRAP_DIRTY(NotModifiedOnFailedVmoWrite, 0) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -5443,10 +5600,11 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(NotModifiedOnFailedVmoWrite, 0) {
 
 // Tests that a VMO is not marked modified on a failed resize.
 TEST_WITH_AND_WITHOUT_TRAP_DIRTY(NotModifiedOnFailedResize, ZX_VMO_RESIZABLE) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   zx::unowned_resource system_resource = maybe_standalone::GetSystemResource();
   if (!system_resource->is_valid()) {
-    printf("System resource not available, skipping\n");
-    return;
+    ZXTEST_SKIP("System resource not available");
   }
 
   zx::result<zx::resource> result =
@@ -5505,6 +5663,8 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(NotModifiedOnFailedResize, ZX_VMO_RESIZABLE) {
 
 // Tests that a VMO is marked modified when a zx_vmo_write partially succeeds.
 TEST_WITH_AND_WITHOUT_TRAP_DIRTY(ModifiedOnPartialVmoWrite, 0) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -5612,6 +5772,8 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(ModifiedOnPartialVmoWrite, 0) {
 
 // Tests that a clone cannot be marked modified.
 TEST_WITH_AND_WITHOUT_TRAP_DIRTY(NotModifiedCloneWrite, 0) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -5660,6 +5822,8 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(NotModifiedCloneWrite, 0) {
 
 // Tests that querying the modified state without the reset option does not reset.
 TEST_WITH_AND_WITHOUT_TRAP_DIRTY(ModifiedNoReset, 0) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -5709,10 +5873,11 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(ModifiedNoReset, 0) {
 
 // Tests that pinning a page for read does not dirty it and does not mark the VMO modified.
 TEST_WITH_AND_WITHOUT_TRAP_DIRTY(PinForRead, 0) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   zx::unowned_resource system_resource = maybe_standalone::GetSystemResource();
   if (!system_resource->is_valid()) {
-    printf("System resource not available, skipping\n");
-    return;
+    ZXTEST_SKIP("System resource not available");
   }
 
   zx::result<zx::resource> result =
@@ -5767,10 +5932,11 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(PinForRead, 0) {
 
 // Tests that pinning a page for write dirties it and marks the VMO modified.
 TEST_WITH_AND_WITHOUT_TRAP_DIRTY(PinForWrite, 0) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   zx::unowned_resource system_resource = maybe_standalone::GetSystemResource();
   if (!system_resource->is_valid()) {
-    printf("System resource not available, skipping\n");
-    return;
+    ZXTEST_SKIP("System resource not available");
   }
 
   zx::result<zx::resource> result =
@@ -5845,10 +6011,11 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(PinForWrite, 0) {
 
 // Tests that a page cannot be marked clean while it is pinned.
 TEST_WITH_AND_WITHOUT_TRAP_DIRTY(PinnedWriteback, 0) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   zx::unowned_resource system_resource = maybe_standalone::GetSystemResource();
   if (!system_resource->is_valid()) {
-    printf("System resource not available, skipping\n");
-    return;
+    ZXTEST_SKIP("System resource not available");
   }
 
   zx::result<zx::resource> result =
@@ -5944,10 +6111,11 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(PinnedWriteback, 0) {
 
 // Tests pinned read with interleaved writeback.
 TEST_WITH_AND_WITHOUT_TRAP_DIRTY(ReadPinAwaitingClean, 0) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   zx::unowned_resource system_resource = maybe_standalone::GetSystemResource();
   if (!system_resource->is_valid()) {
-    printf("System resource not available, skipping\n");
-    return;
+    ZXTEST_SKIP("System resource not available");
   }
 
   zx::result<zx::resource> result =
@@ -6030,10 +6198,11 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(ReadPinAwaitingClean, 0) {
 
 // Tests pinned write with interleaved writeback.
 TEST_WITH_AND_WITHOUT_TRAP_DIRTY(WritePinAwaitingClean, 0) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   zx::unowned_resource system_resource = maybe_standalone::GetSystemResource();
   if (!system_resource->is_valid()) {
-    printf("System resource not available, skipping\n");
-    return;
+    ZXTEST_SKIP("System resource not available");
   }
 
   zx::result<zx::resource> result =
@@ -6151,10 +6320,11 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(WritePinAwaitingClean, 0) {
 
 // Tests delayed pinned write with interleaved writeback.
 TEST(PagerWriteback, DelayedPinAwaitingClean) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   zx::unowned_resource system_resource = maybe_standalone::GetSystemResource();
   if (!system_resource->is_valid()) {
-    printf("System resource not available, skipping\n");
-    return;
+    ZXTEST_SKIP("System resource not available");
   }
 
   zx::result<zx::resource> result =
@@ -6262,10 +6432,11 @@ TEST(PagerWriteback, DelayedPinAwaitingClean) {
 
 // Tests failed pin with interleaved writeback.
 TEST(PagerWriteback, FailedPinAwaitingClean) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   zx::unowned_resource system_resource = maybe_standalone::GetSystemResource();
   if (!system_resource->is_valid()) {
-    printf("System resource not available, skipping\n");
-    return;
+    ZXTEST_SKIP("System resource not available");
   }
 
   zx::result<zx::resource> result =
@@ -6366,10 +6537,11 @@ TEST(PagerWriteback, FailedPinAwaitingClean) {
 
 // Tests that writing to a page after pinning does not generate additional DIRTY requests.
 TEST(PagerWriteback, DirtyAfterPin) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   zx::unowned_resource system_resource = maybe_standalone::GetSystemResource();
   if (!system_resource->is_valid()) {
-    printf("System resource not available, skipping\n");
-    return;
+    ZXTEST_SKIP("System resource not available");
   }
 
   zx::result<zx::resource> result =
@@ -6455,10 +6627,11 @@ TEST(PagerWriteback, DirtyAfterPin) {
 
 // Tests that pinning an already dirty page does not generate additional DIRTY requests.
 TEST(PagerWriteback, PinAfterDirty) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   zx::unowned_resource system_resource = maybe_standalone::GetSystemResource();
   if (!system_resource->is_valid()) {
-    printf("System resource not available, skipping\n");
-    return;
+    ZXTEST_SKIP("System resource not available");
   }
 
   zx::result<zx::resource> result =
@@ -6541,10 +6714,11 @@ TEST(PagerWriteback, PinAfterDirty) {
 // Tests that both READ and DIRTY requests are generated as expected when pinning an unpopulated
 // range for write.
 TEST_WITH_AND_WITHOUT_TRAP_DIRTY(PinForWriteUnpopulated, 0) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   zx::unowned_resource system_resource = maybe_standalone::GetSystemResource();
   if (!system_resource->is_valid()) {
-    printf("System resource not available, skipping\n");
-    return;
+    ZXTEST_SKIP("System resource not available");
   }
 
   zx::result<zx::resource> result =
@@ -6631,10 +6805,11 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(PinForWriteUnpopulated, 0) {
 
 // Tests that a failed pin write does not mark the VMO modified.
 TEST(PagerWriteback, NotModifiedFailedPinWrite) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   zx::unowned_resource system_resource = maybe_standalone::GetSystemResource();
   if (!system_resource->is_valid()) {
-    printf("System resource not available, skipping\n");
-    return;
+    ZXTEST_SKIP("System resource not available");
   }
 
   zx::result<zx::resource> result =
@@ -6705,10 +6880,11 @@ TEST(PagerWriteback, NotModifiedFailedPinWrite) {
 
 // Tests that a pin write that fails part of the way does not mark the VMO modified.
 TEST(PagerWriteback, NotModifiedPartialFailedPinWrite) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   zx::unowned_resource system_resource = maybe_standalone::GetSystemResource();
   if (!system_resource->is_valid()) {
-    printf("System resource not available, skipping\n");
-    return;
+    ZXTEST_SKIP("System resource not available");
   }
 
   zx::result<zx::resource> result =
@@ -6781,10 +6957,11 @@ TEST(PagerWriteback, NotModifiedPartialFailedPinWrite) {
 
 // Tests pinning for write through a slice.
 TEST_WITH_AND_WITHOUT_TRAP_DIRTY(SlicePinWrite, 0) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   zx::unowned_resource system_resource = maybe_standalone::GetSystemResource();
   if (!system_resource->is_valid()) {
-    printf("System resource not available, skipping\n");
-    return;
+    ZXTEST_SKIP("System resource not available");
   }
 
   zx::result<zx::resource> result =
@@ -6873,6 +7050,8 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(SlicePinWrite, 0) {
 
 // Tests writing to a VMO through a slice.
 TEST_WITH_AND_WITHOUT_TRAP_DIRTY(SliceWrite, 0) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -6983,6 +7162,8 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(SliceWrite, 0) {
 
 // Tests OP_ZERO on a slice.
 TEST_WITH_AND_WITHOUT_TRAP_DIRTY(SliceOpZero, 0) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -7040,6 +7221,8 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(SliceOpZero, 0) {
 
 // Tests a racing resize while a commit is blocked on a page request.
 TEST_WITH_AND_WITHOUT_TRAP_DIRTY(CommitResizeRace, ZX_VMO_RESIZABLE) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -7089,6 +7272,8 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(CommitResizeRace, ZX_VMO_RESIZABLE) {
 // by requiring a large number of pages to be allocated at once, we increase the likelihood of
 // falling back to single page allocations and gradually accumulating the required number of pages.
 TEST(PagerWriteback, DirtyLargeRange) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -7125,6 +7310,8 @@ TEST(PagerWriteback, DirtyLargeRange) {
 
 // Tests that committing both actual pages and zero page markers does not dirty the pages.
 TEST_WITH_AND_WITHOUT_TRAP_DIRTY(NoDirtyOnCommit, 0) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -7160,6 +7347,8 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(NoDirtyOnCommit, 0) {
 
 // Tests that committing pages in the newly extended tail does not lose dirtiness.
 TEST_WITH_AND_WITHOUT_TRAP_DIRTY(CommitExtendedTail, ZX_VMO_RESIZABLE) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -7210,6 +7399,8 @@ TEST_WITH_AND_WITHOUT_TRAP_DIRTY(CommitExtendedTail, ZX_VMO_RESIZABLE) {
 
 // Tests a race between resolving a DIRTY request for a zero range and marking the zero range clean.
 TEST(PagerWriteback, DelayedDirtyNotFound) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -7270,6 +7461,8 @@ TEST(PagerWriteback, DelayedDirtyNotFound) {
 
 // Tests zeroing a range and then marking it clean with an outstanding READ request.
 TEST(PagerWriteback, DelayedReadZeroRange) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -7322,6 +7515,8 @@ TEST(PagerWriteback, DelayedReadZeroRange) {
 
 // Tests zeroing a range and then marking it clean with an outstanding DIRTY request.
 TEST(PagerWriteback, DelayedDirtyZeroRange) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -7379,6 +7574,8 @@ TEST(PagerWriteback, DelayedDirtyZeroRange) {
 
 // Tests attributed counts for a child created against a pager-backed parent.
 TEST(PagerWriteback, ChildAttributedCounts) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   UserPager pager;
   ASSERT_TRUE(pager.Init());
 
@@ -7424,6 +7621,8 @@ TEST(PagerWriteback, ChildAttributedCounts) {
 
 // Tests API violations for zx_pager_op_range.
 TEST(PagerWriteback, InvalidPagerOpRange) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   constexpr uint32_t kNumValidOpCodes = 4;
   const uint32_t opcodes[kNumValidOpCodes] = {
       ZX_PAGER_OP_FAIL, ZX_PAGER_OP_DIRTY, ZX_PAGER_OP_WRITEBACK_BEGIN, ZX_PAGER_OP_WRITEBACK_END};
@@ -7527,6 +7726,8 @@ TEST(PagerWriteback, InvalidPagerOpRange) {
 
 // Tests API violations for zx_pager_query_vmo_stats and zx_pager_query_dirty_ranges.
 TEST(PagerWriteback, InvalidQuery) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   zx::pager pager;
   ASSERT_OK(zx::pager::create(0, &pager));
 
@@ -7613,6 +7814,8 @@ TEST(PagerWriteback, InvalidQuery) {
 // redundantly calculating an additional range prior to terminating if the user did not provide a
 // large enough buffer.
 TEST(PagerWriteback, QueryEarlyTermination) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
   zx::pager pager;
   ASSERT_OK(zx::pager::create(0, &pager));
 
@@ -7660,6 +7863,53 @@ TEST(PagerWriteback, QueryEarlyTermination) {
   EXPECT_EQ(dirty_range.offset, 0);
   EXPECT_EQ(dirty_range.length, zx_system_get_page_size());
   EXPECT_EQ(actual, 2);
+}
+
+// Test that a large write absent pages generates correct requests.
+TEST(PagerWriteback, LargeWriteBatched) {
+  UserPager pager;
+  ASSERT_TRUE(pager.Init());
+
+  constexpr size_t kNumPages = 128;
+  constexpr size_t kPageSteps = 8;
+  static_assert(kNumPages % kPageSteps == 0);
+  static_assert(kPageSteps < kMaxWriteWaitPages);
+  static_assert(kMaxWriteWaitPages % kPageSteps == 0);
+  // Start the read at an offset to ensure there is a difference between the page requests VMO
+  // offset, and the offset from the start of the request.
+  constexpr size_t kStartOffset = 2;
+  constexpr size_t kVmoPages = kNumPages + kStartOffset;
+
+  Vmo* vmo;
+  ASSERT_TRUE(pager.CreateVmoWithOptions(kVmoPages, ZX_VMO_TRAP_DIRTY, &vmo));
+
+  std::vector<uint8_t> expected(kNumPages * zx_system_get_page_size(), 0);
+  vmo->GenerateBufferContents(expected.data(), kNumPages, kStartOffset);
+
+  TestThread t([&vmo, &expected] {
+    return vmo->vmo().write(expected.data(), kStartOffset * zx_system_get_page_size(),
+                            kNumPages * zx_system_get_page_size()) == ZX_OK;
+  });
+
+  ASSERT_TRUE(t.Start());
+
+  for (size_t i = 0; i < kNumPages; i += kMaxWriteWaitPages) {
+    // Expect to see a read request for the batch range.
+    ASSERT_TRUE(pager.WaitForPageRead(vmo, i + kStartOffset, kMaxWriteWaitPages, ZX_TIME_INFINITE));
+    // Supply the read request in pieces.
+    for (size_t j = 0; j < kMaxWriteWaitPages; j += kPageSteps) {
+      ASSERT_TRUE(pager.SupplyPages(vmo, i + j + kStartOffset, kPageSteps));
+    }
+    // Now there should be a dirty request for the batch range.
+    ASSERT_TRUE(
+        pager.WaitForPageDirty(vmo, i + kStartOffset, kMaxWriteWaitPages, ZX_TIME_INFINITE));
+    // Dirty the range in pieces.
+    for (size_t j = 0; j < kMaxWriteWaitPages; j += kPageSteps) {
+      ASSERT_TRUE(pager.DirtyPages(vmo, i + j + kStartOffset, kPageSteps));
+    }
+  }
+  ASSERT_TRUE(t.Wait());
+  ASSERT_TRUE(vmo->CheckVmo(kStartOffset, kNumPages));
 }
 
 TEST(PagerWriteback, Unbounded) {

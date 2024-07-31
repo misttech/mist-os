@@ -740,12 +740,15 @@
             to: "#session-manager",
             source_availability: "unknown",
         },
-        {
-            protocol: [ "fuchsia.media.drm.Widevine" ],
-            from: "#widevine_cdm",
-            to: "#session-manager",
-            source_availability: "unknown",
-        },
+
+        // TODO(b/353560491) reenable widevine routing from session manager
+        // when it comes from trusted-apps
+        //{
+        //    protocol: [ "fuchsia.media.drm.Widevine" ],
+        //    from: "#widevine_cdm",
+        //    to: "#session-manager",
+        //    source_availability: "unknown",
+        //},
         {
             protocol: [
                 "fuchsia.wlan.policy.AccessPointProvider",

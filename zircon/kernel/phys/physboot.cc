@@ -129,6 +129,12 @@ ChainBoot LoadZirconZbi(KernelStorage::Bootfs kernelfs, const ArchPatchInfo& pat
   return boot;
 }
 
+void FreeDataZbi(BootZbi& boot) {
+  ktl::span zbi = boot.DataZbi().storage();
+  ZX_ASSERT(
+      Allocation::GetPool().Free(reinterpret_cast<uintptr_t>(zbi.data()), zbi.size()).is_ok());
+}
+
 }  // namespace
 
 [[noreturn]] void BootZircon(UartDriver& uart, KernelStorage kernel_storage) {
@@ -140,7 +146,9 @@ ChainBoot LoadZirconZbi(KernelStorage::Bootfs kernelfs, const ArchPatchInfo& pat
   KernelStorage::Zbi::iterator handoff_item = kernel_storage.item();
 
   // `boot`'s data ZBI at this point is the tail of the decompressed kernel
-  // ZBI; overwrite that with the original data ZBI.
+  // ZBI; overwrite that with the original data ZBI, making sure to free any
+  // previous allocation as well.
+  FreeDataZbi(boot);
   boot.DataZbi() = kernel_storage.zbi();
 
   Allocation relocated_zbi;
@@ -176,6 +184,11 @@ ChainBoot LoadZirconZbi(KernelStorage::Bootfs kernelfs, const ArchPatchInfo& pat
     ZX_ASSERT(it != relocated_image.end());
     ZX_ASSERT(relocated_image.take_error().is_ok());
 
+    // In the trampoline boot case we would have already recharacterized the old
+    // data ZBI within TrampolineBoot::Load().
+#ifndef __x86_64__
+    FreeDataZbi(boot);
+#endif
     boot.DataZbi() = ktl::move(relocated_image);
     handoff_item = it;
   }

@@ -40,6 +40,28 @@ void MetadataRetrieverTestDevice::GetMetadata(GetMetadataCompleter::Sync& comple
   completer.ReplySuccess(wire);
 }
 
+void MetadataRetrieverTestDevice::GetMetadataIfExists(
+    GetMetadataIfExistsCompleter::Sync& completer) {
+  zx::result result = ddk::GetMetadataIfExists<fuchsia_hardware_test::Metadata>(parent_);
+  if (result.is_error()) {
+    zxlogf(ERROR, "Failed to get metadata: %s", result.status_string());
+    completer.ReplyError(result.status_value());
+    return;
+  }
+
+  fidl::Arena arena;
+  std::optional natural = result.value();
+  if (!natural.has_value()) {
+    auto empty = fuchsia_hardware_test::wire::Metadata::Builder(arena).Build();
+    completer.ReplySuccess(empty, false);
+    return;
+  }
+
+  auto wire = fidl::ToWire(arena, natural.value());
+
+  completer.ReplySuccess(wire, true);
+}
+
 static constexpr zx_driver_ops_t metadata_retriever_test_driver_ops = []() {
   zx_driver_ops_t ops = {};
   ops.version = DRIVER_OPS_VERSION;

@@ -329,11 +329,8 @@ pub(crate) fn build_protection_ie(protection: &Protection) -> Result<Option<Prot
                 ProtectionInfo::LegacyWpa(wpa) => wpa,
             };
             let mut buf = vec![];
-            // Writing an RSNE into a Vector can never fail as a Vector can be grown when more
-            // space is required. If this panic ever triggers, something is clearly broken
-            // somewhere else.
-            ie::write_wpa1_ie(&mut buf, &s_wpa).unwrap();
-            Ok(Some(ProtectionIe::VendorIes(buf)))
+            ie::write_wpa1_ie(&mut buf, &s_wpa).unwrap(); // Writing to a Vec never fails
+            Ok(Some(ProtectionIe::VendorIes(buf.into())))
         }
         Protection::Rsna(rsna) => {
             let s_protection = rsna.negotiated_protection.to_full_protection();
@@ -348,7 +345,7 @@ pub(crate) fn build_protection_ie(protection: &Protection) -> Result<Option<Prot
             // space is required. If this panic ever triggers, something is clearly broken
             // somewhere else.
             let () = s_rsne.write_into(&mut buf).unwrap();
-            Ok(Some(ProtectionIe::Rsne(buf)))
+            Ok(Some(ProtectionIe::Rsne(buf.into())))
         }
     }
 }

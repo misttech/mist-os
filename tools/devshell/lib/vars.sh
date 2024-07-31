@@ -455,7 +455,7 @@ function get-device-pair {
 }
 
 function get-global-default-device {
-  local ffx_global_device=$(fx-command-run host-tool ffx target default get --build-dir "${FUCHSIA_BUILD_DIR}")
+  local ffx_global_device=$(fx-command-run host-tool ffx --config fuchsia.analytics.ffx_invoker=fx target default get --build-dir "${FUCHSIA_BUILD_DIR}")
   if [[ -n ${ffx_global_device} ]] ; then
     echo "${ffx_global_device}"
     return 0
@@ -619,7 +619,7 @@ function _get-ssh-key {
 # directory locations to the ffx tool as needed to provide a seamless fx/ffx
 # integration.
 function ffx {
-  fx-command-run ffx "$@"
+  fx-command-run ffx --config fuchsia.analytics.ffx_invoker=fx "$@"
 }
 
 # Prints path to the default SSH key. These credentials are created
@@ -627,13 +627,13 @@ function ffx {
 #
 # The corresponding public key is stored in "$(get-ssh-privkey).pub".
 function get-ssh-privkey {
-  init="$(fx-command-run ffx config check-ssh-keys)"
+  init="$(fx-command-run ffx --config fuchsia.analytics.ffx_invoker=fx config check-ssh-keys)"
   RESULT=$?
   if [ $RESULT -ne 0 ]; then
     fx-error "$init"
     return 1
   fi
-  val="$(fx-command-run ffx config get --process file ssh.priv)"
+  val="$(fx-command-run ffx --config fuchsia.analytics.ffx_invoker=fx config get --process file ssh.priv)"
   temp="${val%\"}"
   authkeys="${temp#\"}"
   echo "${authkeys}"
@@ -641,13 +641,13 @@ function get-ssh-privkey {
 
 # Prints path to the default authorized_keys to include on Fuchsia devices.
 function get-ssh-authkeys {
-  init="$(fx-command-run ffx config check-ssh-keys)"
+  init="$(fx-command-run ffx --config fuchsia.analytics.ffx_invoker=fx config check-ssh-keys)"
   RESULT=$?
   if [ $RESULT -ne 0 ]; then
     fx-error "$init"
     return 1
   fi
-  val="$(fx-command-run ffx config get --process file ssh.pub)"
+  val="$(fx-command-run ffx --config fuchsia.analytics.ffx_invoker=fx config get --process file ssh.pub)"
   temp="${val%\"}"
   authkeys="${temp#\"}"
   echo "${authkeys}"
@@ -672,19 +672,19 @@ function fx-target-finder-resolve {
     fx-error "Invalid arguments to fx-target-finder-resolve: [$*]"
     return 1
   fi
-  ffx target list --format a "$1"
+  ffx --config fuchsia.analytics.ffx_invoker=fx target list --format a "$1"
 }
 
 function fx-target-finder-list {
-  ffx target list --format a
+  ffx --config fuchsia.analytics.ffx_invoker=fx target list --format a
 }
 
 function fx-target-finder-info {
-  ffx target list --format s
+  ffx --config fuchsia.analytics.ffx_invoker=fx target list --format s
 }
 
 function fx-target-ssh-address {
-  ffx target get-ssh-address
+  ffx --config fuchsia.analytics.ffx_invoker=fx target get-ssh-address
 }
 
 function multi-device-fail {

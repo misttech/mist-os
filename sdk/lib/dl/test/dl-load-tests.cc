@@ -301,14 +301,14 @@ TYPED_TEST(DlTests, MissingSymbol) {
   auto result = this->DlOpen(kFile, RTLD_NOW | RTLD_LOCAL);
   ASSERT_TRUE(result.is_error());
   if constexpr (TestFixture::kCanMatchExactError) {
-    EXPECT_EQ(result.error_value().take_str(), "missing-sym.module.so: undefined symbol: b");
+    EXPECT_EQ(result.error_value().take_str(), "missing-sym.module.so: undefined symbol: c");
   } else {
     EXPECT_THAT(result.error_value().take_str(),
                 MatchesRegex(
                     // emitted by Fuchsia-musl
-                    "Error relocating missing-sym.module.so: b: symbol not found"
+                    "Error relocating missing-sym.module.so: c: symbol not found"
                     // emitted by Linux-glibc
-                    "|.*missing-sym.module.so: undefined symbol: b"));
+                    "|.*missing-sym.module.so: undefined symbol: c"));
   }
 }
 
@@ -421,9 +421,7 @@ TYPED_TEST(DlTests, BasicModuleReuse) {
 // pointers or resolved symbols.
 TYPED_TEST(DlTests, UniqueModules) {
   constexpr const char* kFile1 = "ret17.module.so";
-  constexpr int64_t kReturnValue17 = 17;
   constexpr const char* kFile2 = "ret23.module.so";
-  constexpr int64_t kReturnValue23 = 23;
 
   if constexpr (TestFixture::kSupportsNoLoadMode) {
     if constexpr (TestFixture::kRetrievesFileWithNoLoad) {
@@ -462,55 +460,331 @@ TYPED_TEST(DlTests, UniqueModules) {
 
   EXPECT_NE(sym17_ptr, sym23_ptr);
 
-  EXPECT_EQ(RunFunction<int64_t>(sym17_ptr), kReturnValue17);
-  EXPECT_EQ(RunFunction<int64_t>(sym23_ptr), kReturnValue23);
+  EXPECT_EQ(RunFunction<int64_t>(sym17_ptr), 17);
+  EXPECT_EQ(RunFunction<int64_t>(sym23_ptr), 23);
 
   ASSERT_TRUE(this->DlClose(ret17_ptr).is_ok());
   ASSERT_TRUE(this->DlClose(ret23_ptr).is_ok());
 }
 
 // Test that you can dlopen a dependency from a previously loaded module.
+TYPED_TEST(DlTests, OpenDepDirectly) {
+  constexpr const char* kFile = "libhas-foo-v1.OpenDepDirectly.so";
+  constexpr const char* kDepFile = "libld-dep-foo-v1.OpenDepDirectly.so";
 
-// TODO(https://fxbug.dev/338232267): These are test scenarios that test symbol
-// resolution from just the dependency graph, ie from the local scope of the
-// dlopen-ed module.
+  if constexpr (!TestFixture::kCanReuseLoadedDeps) {
+    GTEST_SKIP() << "test requires that fixture can reuse loaded modules for dependencies";
+  }
+
+  if constexpr (TestFixture::kSupportsNoLoadMode) {
+    if constexpr (TestFixture::kRetrievesFileWithNoLoad) {
+      this->Needed({kFile, kDepFile});
+    }
+    ASSERT_TRUE(this->DlOpen(kFile, RTLD_NOLOAD).is_error());
+    ASSERT_TRUE(this->DlOpen(kDepFile, RTLD_NOLOAD).is_error());
+  }
+
+  this->Needed({kFile, kDepFile});
+
+  auto res1 = this->DlOpen(kFile, RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(res1.is_ok()) << res1.error_value();
+  EXPECT_TRUE(res1.value());
+
+  // dlopen kDepFile expecting it to already be loaded.
+  auto res2 = this->DlOpen(kDepFile, RTLD_NOW | RTLD_LOCAL | RTLD_NOLOAD);
+  ASSERT_TRUE(res2.is_ok()) << res2.error_value();
+  EXPECT_TRUE(res2.value());
+
+  // Test that dlsym will resolve the same symbol pointer from the shared
+  // dependency between kFile (res1) and kDepFile (res2).
+  auto sym1 = this->DlSym(res1.value(), "foo");
+  ASSERT_TRUE(sym1.is_ok()) << sym1.error_value();
+  ASSERT_TRUE(sym1.value());
+
+  auto sym2 = this->DlSym(res2.value(), "foo");
+  ASSERT_TRUE(sym2.is_ok()) << sym2.error_value();
+  ASSERT_TRUE(sym2.value());
+
+  EXPECT_EQ(sym1.value(), sym2.value());
+
+  EXPECT_EQ(RunFunction<int64_t>(sym1.value()), RunFunction<int64_t>(sym2.value()));
+
+  ASSERT_TRUE(this->DlClose(res1.value()).is_ok());
+  ASSERT_TRUE(this->DlClose(res2.value()).is_ok());
+}
+
+// These are test scenarios that test symbol resolution from just the dependency
+// graph, ie from the local scope of the dlopen-ed module.
 
 // Test that dep ordering is preserved in the dependency graph.
 // dlopen multiple-foo-deps -> calls foo()
 //  - foo-v1 -> foo() returns 2
 //  - foo-v2 -> foo() returns 7
 // call foo() from multiple-foo-deps pointer and expect 2 from foo-v1.
+TYPED_TEST(DlTests, DepOrder) {
+  constexpr const int64_t kReturnValue = 2;
+  constexpr const char* kFile = "multiple-foo-deps.DepOrder.so";
+  constexpr const char* kDepFile1 = "libld-dep-foo-v1.DepOrder.so";
+  constexpr const char* kDepFile2 = "libld-dep-foo-v2.DepOrder.so";
+
+  if constexpr (TestFixture::kSupportsNoLoadMode) {
+    if constexpr (TestFixture::kRetrievesFileWithNoLoad) {
+      this->ExpectRootModule(kFile);
+      this->Needed({kDepFile1, kDepFile2});
+    }
+    ASSERT_TRUE(this->DlOpen(kFile, RTLD_NOLOAD).is_error());
+    ASSERT_TRUE(this->DlOpen(kDepFile1, RTLD_NOLOAD).is_error());
+    ASSERT_TRUE(this->DlOpen(kDepFile2, RTLD_NOLOAD).is_error());
+  }
+
+  this->ExpectRootModule(kFile);
+  this->Needed({kDepFile1, kDepFile2});
+
+  auto res = this->DlOpen(kFile, RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(res.is_ok()) << res.error_value();
+  EXPECT_TRUE(res.value());
+
+  auto sym = this->DlSym(res.value(), "call_foo");
+  ASSERT_TRUE(sym.is_ok()) << sym.error_value();
+  ASSERT_TRUE(sym.value());
+
+  EXPECT_EQ(RunFunction<int64_t>(sym.value()), kReturnValue);
+
+  ASSERT_TRUE(this->DlClose(res.value()).is_ok());
+}
 
 // Test that transitive dep ordering is preserved the dependency graph.
-// dlopen transitive-dep-order -> calls foo()
+// dlopen transitive-foo-dep -> calls foo()
 //   - has-foo-v1:
 //     - foo-v1 -> foo() returns 2
 //   - foo-v2 -> foo() returns 7
-// call foo() from transitive-dep-order pointer and expect 7.
+// call foo() from transitive-foo-dep pointer and expect 7 from foo-v2.
+TYPED_TEST(DlTests, TransitiveDepOrder) {
+  constexpr const int64_t kReturnValue = 7;
+  constexpr const char* kFile = "transitive-foo-dep.TransitiveDepOrder.so";
+  constexpr const char* kDepFile1 = "libhas-foo-v1.TransitiveDepOrder.so";
+  constexpr const char* kDepFile2 = "libld-dep-foo-v2.TransitiveDepOrder.so";
+  constexpr const char* kDepFile3 = "libld-dep-foo-v1.TransitiveDepOrder.so";
+
+  if constexpr (TestFixture::kSupportsNoLoadMode) {
+    if constexpr (TestFixture::kRetrievesFileWithNoLoad) {
+      this->ExpectRootModule(kFile);
+      this->Needed({kDepFile1, kDepFile2, kDepFile3});
+    }
+    ASSERT_TRUE(this->DlOpen(kFile, RTLD_NOLOAD).is_error());
+    ASSERT_TRUE(this->DlOpen(kDepFile1, RTLD_NOLOAD).is_error());
+    ASSERT_TRUE(this->DlOpen(kDepFile2, RTLD_NOLOAD).is_error());
+    ASSERT_TRUE(this->DlOpen(kDepFile3, RTLD_NOLOAD).is_error());
+  }
+
+  this->ExpectRootModule(kFile);
+  this->Needed({kDepFile1, kDepFile2, kDepFile3});
+
+  auto res = this->DlOpen(kFile, RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(res.is_ok()) << res.error_value();
+  EXPECT_TRUE(res.value());
+
+  auto sym = this->DlSym(res.value(), "call_foo");
+  ASSERT_TRUE(sym.is_ok()) << sym.error_value();
+  ASSERT_TRUE(sym.value());
+
+  EXPECT_EQ(RunFunction<int64_t>(sym.value()), kReturnValue);
+
+  ASSERT_TRUE(this->DlClose(res.value()).is_ok());
+}
 
 // Test that dependency ordering is always preserved in the local symbol scope,
-// regardless if the dependency was already loaded.
+// even if a module with the same symbol was already loaded (with RTLD_LOCAL).
 // dlopen foo-v2 -> foo() returns 7
 // dlopen multiple-foo-deps:
 //   - foo-v1 -> foo() returns 2
 //   - foo-v2 -> foo() returns 7
 // call foo() from multiple-foo-deps and expect 2 from foo-v1 because it is
 // first in multiple-foo-deps local scope.
+TYPED_TEST(DlTests, LocalPrecedence) {
+  constexpr const char* kFile = "multiple-foo-deps.LocalPrecedence.so";
+  constexpr const char* kDepFile1 = "libld-dep-foo-v1.LocalPrecedence.so";
+  constexpr const char* kDepFile2 = "libld-dep-foo-v2.LocalPrecedence.so";
+  constexpr int64_t kReturnValueFromFooV1 = 2;
+  constexpr int64_t kReturnValueFromFooV2 = 7;
 
-// TODO(https://fxbug.dev/338233824): These are test scenarios that test symbol
-// resolution with RTLD_GLOBAL.
+  if constexpr (!TestFixture::kCanReuseLoadedDeps) {
+    GTEST_SKIP() << "test requires that fixture can reuse loaded modules for dependencies";
+  }
+
+  if constexpr (TestFixture::kSupportsNoLoadMode) {
+    if constexpr (TestFixture::kRetrievesFileWithNoLoad) {
+      this->ExpectRootModule(kFile);
+      this->Needed({kDepFile1, kDepFile2});
+    }
+    ASSERT_TRUE(this->DlOpen(kFile, RTLD_NOLOAD).is_error());
+    ASSERT_TRUE(this->DlOpen(kDepFile1, RTLD_NOLOAD).is_error());
+    ASSERT_TRUE(this->DlOpen(kDepFile2, RTLD_NOLOAD).is_error());
+  }
+
+  this->Needed({kDepFile2});
+
+  auto res1 = this->DlOpen(kDepFile2, RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(res1.is_ok()) << res1.error_value();
+  EXPECT_TRUE(res1.value());
+
+  auto sym1 = this->DlSym(res1.value(), "foo");
+  ASSERT_TRUE(sym1.is_ok()) << sym1.error_value();
+  ASSERT_TRUE(sym1.value());
+
+  EXPECT_EQ(RunFunction<int64_t>(sym1.value()), kReturnValueFromFooV2);
+
+  this->ExpectRootModule(kFile);
+
+  this->Needed({kDepFile1});
+
+  auto res2 = this->DlOpen(kFile, RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(res2.is_ok()) << res2.error_value();
+  EXPECT_TRUE(res2.value());
+
+  // Test the `foo` value that is used by the root module's `call_foo()` function.
+  auto sym2 = this->DlSym(res2.value(), "call_foo");
+  ASSERT_TRUE(sym2.is_ok()) << sym2.error_value();
+  ASSERT_TRUE(sym2.value());
+
+  if constexpr (TestFixture::kStrictLoadOrderPriority) {
+    // Musl will prioritize the symbol that was loaded first (from libfoo-v2),
+    // even though the file does not have global scope.
+    EXPECT_EQ(RunFunction<int64_t>(sym2.value()), kReturnValueFromFooV2);
+  } else {
+    // Glibc & libdl will use the symbol that is first encountered in the
+    // module's local scope, from libfoo-v1.
+    EXPECT_EQ(RunFunction<int64_t>(sym2.value()), kReturnValueFromFooV1);
+  }
+
+  // dlsym will always use dependency ordering from the local scope when looking
+  // up a symbol. Unlike `call_foo()`, `foo()` is provided by a dependency, and
+  // both musl and glibc will only look for this symbol in the root module's
+  // local-scope dependency set.
+  auto sym3 = this->DlSym(res2.value(), "foo");
+  ASSERT_TRUE(sym3.is_ok()) << sym3.error_value();
+  ASSERT_TRUE(sym3.value());
+
+  EXPECT_EQ(RunFunction<int64_t>(sym3.value()), kReturnValueFromFooV1);
+
+  ASSERT_TRUE(this->DlClose(res1.value()).is_ok());
+  ASSERT_TRUE(this->DlClose(res2.value()).is_ok());
+}
+
+// These are test scenarios that test symbol resolution with RTLD_GLOBAL.
 
 // Test that a previously loaded global module symbol won't affect relative
 // relocations in dlopen-ed module.
 // dlopen RTLD_GLOBAL foo-v1 -> foo() returns 2
 // dlopen relative-reloc-foo -> foo() returns 17
 // call foo() from relative-reloc-foo and expect 17.
+TYPED_TEST(DlTests, RelativeRelocPrecedence) {
+  constexpr const char* kFile1 = "libld-dep-foo-v1.RelativeRelocPrecedence.so";
+  constexpr const char* kFile2 = "relative-reloc-foo.RelativeRelocPrecedence.so";
+  constexpr int64_t kReturnValueFromGlobal = 2;
+  constexpr int64_t kReturnValueFromRelativeReloc = 17;
+
+  if constexpr (!TestFixture::kSupportsGlobalMode) {
+    GTEST_SKIP() << "test requires that fixture supports RTLD_GLOBAL";
+  }
+
+  if constexpr (TestFixture::kSupportsNoLoadMode) {
+    if constexpr (TestFixture::kRetrievesFileWithNoLoad) {
+      this->Needed({kFile1});
+      this->ExpectRootModule(kFile2);
+    }
+    ASSERT_TRUE(this->DlOpen(kFile1, RTLD_NOLOAD).is_error());
+    ASSERT_TRUE(this->DlOpen(kFile2, RTLD_NOLOAD).is_error());
+  }
+
+  this->Needed({kFile1});
+
+  auto res1 = this->DlOpen(kFile1, RTLD_NOW | RTLD_GLOBAL);
+  ASSERT_TRUE(res1.is_ok()) << res1.error_value();
+  EXPECT_TRUE(res1.value());
+
+  auto sym1 = this->DlSym(res1.value(), "foo");
+  ASSERT_TRUE(sym1.is_ok()) << sym1.error_value();
+  ASSERT_TRUE(sym1.value());
+
+  EXPECT_EQ(RunFunction<int64_t>(sym1.value()), kReturnValueFromGlobal);
+
+  this->ExpectRootModule(kFile2);
+
+  auto res2 = this->DlOpen(kFile2, RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(res2.is_ok()) << res2.error_value();
+  EXPECT_TRUE(res2.value());
+
+  auto sym2 = this->DlSym(res2.value(), "foo");
+  ASSERT_TRUE(sym2.is_ok()) << sym2.error_value();
+  ASSERT_TRUE(sym2.value());
+
+  EXPECT_EQ(RunFunction<int64_t>(sym2.value()), kReturnValueFromRelativeReloc);
+
+  ASSERT_TRUE(this->DlClose(res1.value()).is_ok());
+  ASSERT_TRUE(this->DlClose(res2.value()).is_ok());
+}
 
 // Test that loaded global module will take precedence over dependency ordering.
 // dlopen RTLD_GLOBAL foo-v2 -> foo() returns 7
 // dlopen has-foo-v1:
 //    - foo-v1 -> foo() returns 2
-// call foo() from has-foo-v1 and expect foo() to return 7.
+// call foo() from has-foo-v1 and expect foo() to return 7 (from previously
+// loaded RTLD_GLOBAL foo-v2).
+TYPED_TEST(DlTests, GlobalPrecedence) {
+  constexpr const char* kFile1 = "libld-dep-foo-v2.GlobalPrecedence.so";
+  constexpr const char* kFile2 = "libhas-foo-v1.GlobalPrecedence.so";
+  constexpr const char* kDepFile = "libld-dep-foo-v1.GlobalPrecedence.so";
+  constexpr int64_t kReturnValueFromFooV1 = 2;
+  constexpr int64_t kReturnValueFromFooV2 = 7;
+
+  if constexpr (!TestFixture::kSupportsGlobalMode) {
+    GTEST_SKIP() << "test requires that fixture supports RTLD_GLOBAL";
+  }
+
+  if constexpr (TestFixture::kSupportsNoLoadMode) {
+    if constexpr (TestFixture::kRetrievesFileWithNoLoad) {
+      this->Needed({kFile1, kFile2});
+    }
+    ASSERT_TRUE(this->DlOpen(kFile1, RTLD_NOLOAD).is_error());
+    ASSERT_TRUE(this->DlOpen(kFile2, RTLD_NOLOAD).is_error());
+  }
+
+  this->Needed({kFile1});
+
+  auto res1 = this->DlOpen(kFile1, RTLD_NOW | RTLD_GLOBAL);
+  ASSERT_TRUE(res1.is_ok()) << res1.error_value();
+  EXPECT_TRUE(res1.value());
+
+  auto sym1 = this->DlSym(res1.value(), "foo");
+  ASSERT_TRUE(sym1.is_ok()) << sym1.error_value();
+  ASSERT_TRUE(sym1.value());
+
+  EXPECT_EQ(RunFunction<int64_t>(sym1.value()), kReturnValueFromFooV2);
+
+  this->Needed({kFile2, kDepFile});
+
+  auto res2 = this->DlOpen(kFile2, RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(res2.is_ok()) << res2.error_value();
+  EXPECT_TRUE(res2.value());
+
+  auto sym2 = this->DlSym(res2.value(), "call_foo");
+  ASSERT_TRUE(sym2.is_ok()) << sym2.error_value();
+  ASSERT_TRUE(sym2.value());
+
+  EXPECT_EQ(RunFunction<int64_t>(sym2.value()), kReturnValueFromFooV2);
+
+  // dlsym will always use dependency ordering from the local scope when looking
+  // up a symbol
+  auto sym3 = this->DlSym(res2.value(), "foo");
+  ASSERT_TRUE(sym3.is_ok()) << sym3.error_value();
+  ASSERT_TRUE(sym3.value());
+
+  EXPECT_EQ(RunFunction<int64_t>(sym3.value()), kReturnValueFromFooV1);
+
+  ASSERT_TRUE(this->DlClose(res1.value()).is_ok());
+  ASSERT_TRUE(this->DlClose(res2.value()).is_ok());
+}
 
 // Test that RTLD_GLOBAL applies to deps and load order will take precedence in
 // subsequent symbol lookups:
@@ -519,11 +793,136 @@ TYPED_TEST(DlTests, UniqueModules) {
 // dlopen RTLD_GLOBAL has-foo-v2:
 //   - foo-v2 -> foo() returns 7
 // call foo from has-foo-v2 and expect 2.
+TYPED_TEST(DlTests, GlobalPrecedenceDeps) {
+  constexpr const char* kFile1 = "libhas-foo-v1.GlobalPrecedenceDeps.so";
+  constexpr const char* kDepFile1 = "libld-dep-foo-v1.GlobalPrecedenceDeps.so";
+  constexpr const char* kFile2 = "libhas-foo-v2.GlobalPrecedenceDeps.so";
+  constexpr const char* kDepFile2 = "libld-dep-foo-v2.GlobalPrecedenceDeps.so";
+  constexpr int64_t kReturnValueFromFooV1 = 2;
+  constexpr int64_t kReturnValueFromFooV2 = 7;
+
+  if constexpr (!TestFixture::kSupportsGlobalMode) {
+    GTEST_SKIP() << "test requires that fixture supports RTLD_GLOBAL";
+  }
+
+  if constexpr (TestFixture::kSupportsNoLoadMode) {
+    if constexpr (TestFixture::kRetrievesFileWithNoLoad) {
+      this->Needed({kFile1, kFile2});
+    }
+    ASSERT_TRUE(this->DlOpen(kFile1, RTLD_NOLOAD).is_error());
+    ASSERT_TRUE(this->DlOpen(kFile2, RTLD_NOLOAD).is_error());
+  }
+
+  this->Needed({kFile1, kDepFile1});
+
+  auto res1 = this->DlOpen(kFile1, RTLD_NOW | RTLD_GLOBAL);
+  ASSERT_TRUE(res1.is_ok()) << res1.error_value();
+  EXPECT_TRUE(res1.value());
+
+  auto sym1 = this->DlSym(res1.value(), "call_foo");
+  ASSERT_TRUE(sym1.is_ok()) << sym1.error_value();
+  ASSERT_TRUE(sym1.value());
+
+  EXPECT_EQ(RunFunction<int64_t>(sym1.value()), kReturnValueFromFooV1);
+
+  this->Needed({kFile2, kDepFile2});
+
+  auto res2 = this->DlOpen(kFile2, RTLD_NOW | RTLD_GLOBAL);
+  ASSERT_TRUE(res2.is_ok()) << res2.error_value();
+  EXPECT_TRUE(res2.value());
+
+  auto sym2 = this->DlSym(res2.value(), "call_foo");
+  ASSERT_TRUE(sym2.is_ok()) << sym2.error_value();
+  ASSERT_TRUE(sym2.value());
+
+  EXPECT_EQ(RunFunction<int64_t>(sym2.value()), kReturnValueFromFooV1);
+
+  // dlsym will always use dependency ordering from the local scope when looking
+  // up a symbol
+  auto sym3 = this->DlSym(res2.value(), "foo");
+  ASSERT_TRUE(sym3.is_ok()) << sym3.error_value();
+  ASSERT_TRUE(sym3.value());
+
+  EXPECT_EQ(RunFunction<int64_t>(sym3.value()), kReturnValueFromFooV2);
+
+  ASSERT_TRUE(this->DlClose(res1.value()).is_ok());
+  ASSERT_TRUE(this->DlClose(res2.value()).is_ok());
+}
 
 // Test that missing dep will use global symbol if there's a loaded global
 // module with the same symbol
-// dlopen RTLD global foo-v1 -> foo() returns 2
-// dlopen missing-foo:
-// call foo() from missing-foo and expect 2.
+// dlopen RTLD global dep-c -> c() returns 2
+// dlopen missing-sym -> TestStart() returns 2 + c():
+//  - dep-a (does not have c())
+// call c() from missing-sym and expect 6 (4 + 2 from previously loaded module).
+TYPED_TEST(DlTests, GlobalSatisfiesMissingSymbol) {
+  constexpr const char* kFile1 = "libld-dep-c.so";
+  constexpr const char* kFile2 = "missing-sym.module.so";
+  constexpr const char* kDepFile = "libld-dep-a.so";
+  constexpr int64_t kReturnValue = 6;
+
+  if constexpr (!TestFixture::kSupportsGlobalMode) {
+    GTEST_SKIP() << "test requires that fixture supports RTLD_GLOBAL";
+  }
+
+  if constexpr (TestFixture::kSupportsNoLoadMode) {
+    if constexpr (TestFixture::kRetrievesFileWithNoLoad) {
+      this->Needed({kFile1});
+      this->ExpectRootModule({kFile2});
+    }
+    ASSERT_TRUE(this->DlOpen(kFile1, RTLD_NOLOAD).is_error());
+    ASSERT_TRUE(this->DlOpen(kFile2, RTLD_NOLOAD).is_error());
+  }
+
+  this->Needed({kFile1});
+
+  auto res1 = this->DlOpen(kFile1, RTLD_NOW | RTLD_GLOBAL);
+  ASSERT_TRUE(res1.is_ok()) << res1.error_value();
+  EXPECT_TRUE(res1.value());
+
+  this->ExpectRootModule(kFile2);
+  this->Needed({kDepFile});
+
+  auto res2 = this->DlOpen(kFile2, RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(res2.is_ok()) << res2.error_value();
+  EXPECT_TRUE(res2.value());
+
+  auto sym2 = this->DlSym(res2.value(), "TestStart");
+  ASSERT_TRUE(sym2.is_ok()) << sym2.error_value();
+  ASSERT_TRUE(sym2.value());
+
+  EXPECT_EQ(RunFunction<int64_t>(sym2.value()), kReturnValue);
+
+  // dlsym will not be able to find the global symbol from the local scope
+  auto sym3 = this->DlSym(res2.value(), "c");
+  ASSERT_TRUE(sym3.is_error()) << sym3.error_value();
+  if constexpr (TestFixture::kCanMatchExactError || TestFixture::kEmitsSymbolNotFound) {
+    EXPECT_EQ(sym3.error_value().take_str(), "Symbol not found: c");
+  } else {
+    // emitted by Linux-glibc
+    EXPECT_THAT(sym3.error_value().take_str(),
+                // only the module name is captured from the full test path
+                MatchesRegex("|.*missing-sym.module.so: undefined symbol: c"));
+  }
+
+  ASSERT_TRUE(this->DlClose(res1.value()).is_ok());
+  ASSERT_TRUE(this->DlClose(res2.value()).is_ok());
+}
+
+// TODO(https://fxbug.dev/338232267)
+// Test that changing mode to RTLD_GLOBAL will change how a symbol is resolved
+// by subsequent modules.
+// dlopen foo-v1 -> foo() returns 2
+// dlopen RTLD_GLOBAL foo-v2 -> foo() returns 7
+// dlopen has-foo-v1
+//   - foo-v1 -> foo() returns 2
+// call foo() from has-foo-v1 and expect 2 from previously loaded global foo-v2
+// dlopen RTLD_GLOBAL foo-v1
+// call foo() from has-foo-v1 and still expect 2 because it does not get
+// re-resolved.
+// dlopen has-foo-v2
+//  - foo-v2 -> foo() returns 7
+// call foo() from has-foo-v2 and expect 2 from foo-v1, because foo-v1 is now
+// the first loaded global module with the symbol.
 
 }  // namespace

@@ -473,7 +473,7 @@ mod tests {
     use wlan_common::big_endian::BigEndianU16;
     use wlan_common::test_utils::fake_frames::fake_wpa2_rsne;
     use wlan_common::{assert_variant, timer};
-    use wlan_frame_writer::write_frame_with_dynamic_buffer;
+    use wlan_frame_writer::write_frame_to_vec;
     use wlan_sme::responder::Responder;
     use {
         fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
@@ -492,7 +492,7 @@ mod tests {
         protocol_id: u16,
         body: &[u8],
     ) -> Vec<u8> {
-        write_frame_with_dynamic_buffer!(vec![], {
+        write_frame_to_vec!({
             headers: {
                 mac::EthernetIIHdr: &mac::EthernetIIHdr {
                     da: dst_addr,
@@ -502,7 +502,7 @@ mod tests {
             },
             payload: body,
         })
-        .expect("writing to vec always succeeds")
+        .unwrap() // This frame construction never fails
     }
 
     // TODO(https://fxbug.dev/327499461): This function is async to ensure MLME functions will

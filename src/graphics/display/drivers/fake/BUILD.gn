@@ -11,6 +11,7 @@ group("tests") {
   testonly = true
   deps = [
     ":fake-display-unittests",
+    ":fake-sysmem-device-hierarchy-tests",
     ":sysmem-service-forwarder-tests",
   ]
 }
@@ -48,26 +49,6 @@ source_set("fake-lib") {
   ]
 }
 
-static_library("sysmem-proxy-device") {
-  testonly = true
-
-  sources = [
-    "sysmem-proxy-device.cc",
-    "sysmem-proxy-device.h",
-  ]
-
-  public_deps = [
-    "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp",
-    "//src/devices/sysmem/drivers/sysmem:sysmem_common_srcs",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-  ]
-
-  deps = [
-    "//sdk/lib/fdio",
-    "//zircon/system/ulib/sysmem-version",
-  ]
-}
-
 static_library("fake-display-stack") {
   testonly = true
 
@@ -76,19 +57,17 @@ static_library("fake-display-stack") {
   sources = [
     "fake-display-stack.cc",
     "fake-display-stack.h",
-    "sysmem-device-wrapper.h",
   ]
   public_deps = [
     ":fake-lib",
+    ":sysmem-service-provider",
     "//sdk/fidl/fuchsia.hardware.display:fuchsia.hardware.display_cpp",
     "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_cpp",
     "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp",
-    "//src/devices/bus/testing/fake-pdev",
     "//src/devices/sysmem/drivers/sysmem:sysmem_common_srcs",
     "//src/devices/testing/mock-ddk",
     "//src/graphics/display/drivers/coordinator:shared",
     "//src/graphics/display/lib/driver-framework-migration-utils/logging:logging-dfv1",
-    "//src/lib/ddktl",
     "//zircon/system/ulib/sync:sync-cpp",
   ]
 }
@@ -99,6 +78,7 @@ test("fake-display-unittests-bin") {
 
   deps = [
     ":fake-display-stack",
+    ":fake-sysmem-device-hierarchy",
     "//src/devices/testing/mock-ddk",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/predicates",
@@ -168,4 +148,49 @@ fuchsia_unittest_package("sysmem-service-forwarder-tests") {
   # The test type must be "vulkan" in order to use the system-provided
   # sysmem allocators.
   test_type = "vulkan"
+}
+
+source_set("fake-sysmem-device-hierarchy") {
+  testonly = true
+  sources = [
+    "fake-sysmem-device-hierarchy.cc",
+    "fake-sysmem-device-hierarchy.h",
+  ]
+  public_deps = [
+    ":sysmem-service-provider",
+    "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_cpp",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
+    "//sdk/lib/component/outgoing/cpp",
+    "//src/devices/bus/testing/fake-pdev",
+    "//src/devices/sysmem/drivers/sysmem:sysmem_common_srcs",
+    "//src/devices/testing/mock-ddk",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
+  ]
+  deps = [
+    "//sdk/lib/component/incoming/cpp",
+    "//sdk/lib/syslog/cpp",
+    "//zircon/system/ulib/async:async-cpp",
+    "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/sync:sync-cpp",
+  ]
+}
+
+test("fake-sysmem-device-hierarchy-unittest") {
+  sources = [ "fake-sysmem-device-hierarchy-unittest.cc" ]
+  deps = [
+    ":fake-sysmem-device-hierarchy",
+    "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_cpp",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
+    "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp",
+    "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp",
+    "//sdk/lib/component/incoming/cpp",
+    "//sdk/lib/device-watcher/cpp",
+    "//sdk/lib/fdio",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/predicates",
+  ]
+}
+
+fuchsia_unittest_package("fake-sysmem-device-hierarchy-tests") {
+  deps = [ ":fake-sysmem-device-hierarchy-unittest" ]
 }

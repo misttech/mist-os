@@ -7,7 +7,7 @@ use super::cipher::{self, CIPHER_CCMP_128};
 use super::suite_filter::DEFAULT_GROUP_MGMT_CIPHER;
 use super::{pmkid, suite_selector};
 
-use crate::appendable::{Appendable, BufferTooSmall};
+use crate::append::{Append, BufferTooSmall};
 use crate::organization::Oui;
 use bytes::Bytes;
 use fidl_fuchsia_wlan_common as fidl_common;
@@ -406,7 +406,7 @@ impl Rsne {
         buf
     }
 
-    pub fn write_into<A: Appendable>(&self, buf: &mut A) -> Result<(), BufferTooSmall> {
+    pub fn write_into<A: Append>(&self, buf: &mut A) -> Result<(), BufferTooSmall> {
         if !buf.can_append(self.len()) {
             return Err(BufferTooSmall);
         }
@@ -603,6 +603,7 @@ mod tests {
     use super::akm::{AKM_EAP, AKM_FT_PSK};
     use super::cipher::{CIPHER_BIP_CMAC_256, CIPHER_GCMP_256, CIPHER_TKIP};
     use super::*;
+    use crate::append::TrackedAppend;
     use crate::test_utils::fake_features::fake_security_support_empty;
     use crate::test_utils::FixedSizedTestBuffer;
     use test_case::test_case;
@@ -632,10 +633,10 @@ mod tests {
             0x05, 0x06, 0x07, 0x08, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x00, 0x0f,
             0xac, 0x04,
         ];
-        let mut buf = Vec::with_capacity(128);
         let result = from_bytes(&frame);
         assert!(result.is_ok());
         let rsne = result.unwrap().1;
+        let mut buf = Vec::with_capacity(128);
         rsne.write_into(&mut buf).expect("failed writing RSNE");
         let rsne_len = buf.len();
         let left_over = buf.split_off(rsne_len);
@@ -656,7 +657,7 @@ mod tests {
         assert!(result.is_ok());
         let rsne = result.unwrap().1;
         rsne.write_into(&mut buf).expect_err("expected writing RSNE to fail");
-        assert_eq!(buf.bytes_written(), 0);
+        assert_eq!(buf.bytes_appended(), 0);
     }
 
     #[test]
@@ -1325,9 +1326,7 @@ mod tests {
             0x02, // length
             0x01, 0x00, // version
         ];
-        let rsne = Rsne { version: VERSION, ..Default::default() };
-        let mut buf = vec![];
-        rsne.write_into(&mut buf).expect("Failed to write rsne");
+        let buf = Rsne { version: VERSION, ..Default::default() }.into_bytes();
         assert_eq!(&buf[..], &expected_frame[..]);
     }
 
@@ -1339,13 +1338,12 @@ mod tests {
             0x01, 0x00, // version
             0x00, 0x0f, 0xac, 0x04, // group data cipher suite
         ];
-        let rsne = Rsne {
+        let buf = Rsne {
             version: VERSION,
             group_data_cipher_suite: Some(cipher::Cipher::new_dot11(cipher::CCMP_128)),
             ..Default::default()
-        };
-        let mut buf = vec![];
-        rsne.write_into(&mut buf).expect("Failed to write rsne");
+        }
+        .into_bytes();
         assert_eq!(&buf[..], &expected_frame[..]);
     }
 
@@ -1359,14 +1357,13 @@ mod tests {
             0x01, 0x00, // pairwise suite count
             0x00, 0x0f, 0xac, 0x04, // pairwise cipher suite
         ];
-        let rsne = Rsne {
+        let buf = Rsne {
             version: VERSION,
             group_data_cipher_suite: Some(cipher::Cipher::new_dot11(cipher::CCMP_128)),
             pairwise_cipher_suites: vec![cipher::Cipher::new_dot11(cipher::CCMP_128)],
             ..Default::default()
-        };
-        let mut buf = vec![];
-        rsne.write_into(&mut buf).expect("Failed to write rsne");
+        }
+        .into_bytes();
         assert_eq!(&buf[..], &expected_frame[..]);
     }
 
@@ -1381,14 +1378,13 @@ mod tests {
             0x01, 0x00, // pairwise suite count
             0x00, 0x0f, 0xac, 0x02, // pairwise cipher suite
         ];
-        let rsne = Rsne {
+        let buf = Rsne {
             version: VERSION,
             group_data_cipher_suite: Some(cipher::Cipher::new_dot11(cipher::CCMP_128)),
             akm_suites: vec![akm::Akm::new_dot11(akm::PSK)],
             ..Default::default()
-        };
-        let mut buf = vec![];
-        rsne.write_into(&mut buf).expect("Failed to write rsne");
+        }
+        .into_bytes();
         assert_eq!(&buf[..], &expected_frame[..]);
     }
 
@@ -1403,14 +1399,13 @@ mod tests {
             0x00, 0x00, // akm suite count
             0xcd, 0xab, // rsn capabilities
         ];
-        let rsne = Rsne {
+        let buf = Rsne {
             version: VERSION,
             group_data_cipher_suite: Some(cipher::Cipher::new_dot11(cipher::CCMP_128)),
             rsn_capabilities: Some(RsnCapabilities(0xabcd)),
             ..Default::default()
-        };
-        let mut buf = vec![];
-        rsne.write_into(&mut buf).expect("Failed to write rsne");
+        }
+        .into_bytes();
         assert_eq!(&buf[..], &expected_frame[..]);
     }
 
@@ -1429,15 +1424,14 @@ mod tests {
             0x01, 0x00, // pmkid count
             1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, // pmkid
         ];
-        let rsne = Rsne {
+        let buf = Rsne {
             version: VERSION,
             group_data_cipher_suite: Some(cipher::Cipher::new_dot11(cipher::CCMP_128)),
             rsn_capabilities: Some(RsnCapabilities(0xabcd)),
             pmkids: vec![Bytes::from_static(&PMKID_VAL[..])],
             ..Default::default()
-        };
-        let mut buf = vec![];
-        rsne.write_into(&mut buf).expect("Failed to write rsne");
+        }
+        .into_bytes();
         assert_eq!(&buf[..], &expected_frame[..]);
     }
 
@@ -1454,15 +1448,14 @@ mod tests {
             0x00, 0x00, // pmkids count
             0x00, 0x0f, 0xac, 0x06, // group management cipher suite
         ];
-        let rsne = Rsne {
+        let buf = Rsne {
             version: VERSION,
             group_data_cipher_suite: Some(cipher::Cipher::new_dot11(cipher::CCMP_128)),
             rsn_capabilities: Some(RsnCapabilities(0xabcd)),
             group_mgmt_cipher_suite: Some(cipher::Cipher::new_dot11(cipher::BIP_CMAC_128)),
             ..Default::default()
-        };
-        let mut buf = vec![];
-        rsne.write_into(&mut buf).expect("Failed to write rsne");
+        }
+        .into_bytes();
         assert_eq!(&buf[..], &expected_frame[..]);
     }
 
@@ -1476,15 +1469,14 @@ mod tests {
             0x04, // group data cipher suite
                   // We don't write group management suite because caps are missing.
         ];
-        let rsne = Rsne {
+        let buf = Rsne {
             version: VERSION,
             group_data_cipher_suite: Some(cipher::Cipher::new_dot11(cipher::CCMP_128)),
             rsn_capabilities: None,
             group_mgmt_cipher_suite: Some(cipher::Cipher::new_dot11(cipher::BIP_CMAC_128)),
             ..Default::default()
-        };
-        let mut buf = vec![];
-        rsne.write_into(&mut buf).expect("Failed to write rsne");
+        }
+        .into_bytes();
         assert_eq!(&buf[..], &expected_frame[..]);
     }
 }

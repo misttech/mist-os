@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::appendable::{Appendable, BufferTooSmall};
+use crate::append::{Append, BufferTooSmall, TrackedAppend, VecCursor};
 use fuchsia_async::{DurationExt, OnTimeout, TimeoutExt};
 use fuchsia_zircon as zx;
 use futures::Future;
@@ -26,13 +26,14 @@ pub trait ExpectWithin: Future + Sized {
 
 impl<F: Future + Sized> ExpectWithin for F {}
 
-pub struct FixedSizedTestBuffer(Vec<u8>);
+pub struct FixedSizedTestBuffer(VecCursor);
 impl FixedSizedTestBuffer {
     pub fn new(capacity: usize) -> Self {
-        Self(Vec::with_capacity(capacity))
+        Self(VecCursor::with_capacity(capacity))
     }
 }
-impl Appendable for FixedSizedTestBuffer {
+
+impl Append for FixedSizedTestBuffer {
     fn append_bytes(&mut self, bytes: &[u8]) -> Result<(), BufferTooSmall> {
         if !self.can_append(bytes.len()) {
             return Err(BufferTooSmall);
@@ -47,12 +48,14 @@ impl Appendable for FixedSizedTestBuffer {
         self.0.append_bytes_zeroed(len)
     }
 
-    fn bytes_written(&self) -> usize {
-        self.0.len()
-    }
-
     fn can_append(&self, bytes: usize) -> bool {
         self.0.len() + bytes <= self.0.capacity()
+    }
+}
+
+impl TrackedAppend for FixedSizedTestBuffer {
+    fn bytes_appended(&self) -> usize {
+        self.0.bytes_appended()
     }
 }
 

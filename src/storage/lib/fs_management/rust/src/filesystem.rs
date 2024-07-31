@@ -7,7 +7,7 @@
 use crate::error::{QueryError, ShutdownError};
 use crate::{ComponentType, FSConfig, Options};
 use anyhow::{anyhow, bail, ensure, Context, Error};
-use fidl::endpoints::{create_endpoints, create_proxy, ClientEnd, ServerEnd};
+use fidl::endpoints::{create_endpoints, create_proxy, ClientEnd, Proxy as _, ServerEnd};
 use fidl_fuchsia_component::{self as fcomponent, RealmMarker};
 use fidl_fuchsia_fs::AdminMarker;
 use fidl_fuchsia_fs_startup::{CheckOptions, StartupMarker};
@@ -22,6 +22,58 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio};
 
+/// An abstract connector for things that speak fuchsia.hardware.block.Block and similar protocols.
+pub trait BlockConnector: Send + Sync {
+    fn connect_volume(
+        &self,
+    ) -> Result<ClientEnd<fidl_fuchsia_hardware_block_volume::VolumeMarker>, Error>;
+    fn connect_partition(
+        &self,
+    ) -> Result<ClientEnd<fidl_fuchsia_hardware_block_partition::PartitionMarker>, Error> {
+        self.connect_volume().map(|v| ClientEnd::new(v.into_channel()))
+    }
+    fn connect_block(&self) -> Result<ClientEnd<fidl_fuchsia_hardware_block::BlockMarker>, Error> {
+        self.connect_volume().map(|v| ClientEnd::new(v.into_channel()))
+    }
+}
+
+/// Implements `BlockConnector` based on a path in the local namespace to a service node
+/// implementing the relevant Block protocols.
+// TODO(https://fxbug.dev/339491886): Use fuchsia.io Node when we get rid of get_topological_path.
+#[derive(Clone, Debug)]
+pub struct PathBasedBlockConnector(String);
+
+impl PathBasedBlockConnector {
+    pub fn new(path: String) -> Self {
+        Self(path)
+    }
+
+    pub fn path(&self) -> &str {
+        &self.0
+    }
+}
+
+impl BlockConnector for PathBasedBlockConnector {
+    fn connect_volume(
+        &self,
+    ) -> Result<ClientEnd<fidl_fuchsia_hardware_block_volume::VolumeMarker>, Error> {
+        fuchsia_component::client::connect_to_protocol_at_path::<
+            fidl_fuchsia_hardware_block_volume::VolumeMarker,
+        >(&self.0)
+        .map(|p| p.into_client_end().unwrap())
+    }
+}
+
+impl BlockConnector for fidl_fuchsia_device::ControllerProxy {
+    fn connect_volume(
+        &self,
+    ) -> Result<ClientEnd<fidl_fuchsia_hardware_block_volume::VolumeMarker>, Error> {
+        let (client, server) = fidl::endpoints::create_endpoints();
+        let () = self.connect_to_device_fidl(server.into_channel())?;
+        Ok(client)
+    }
+}
+
 /// Asynchronously manages a block device for filesystem operations.
 pub struct Filesystem {
     /// The filesystem struct keeps the FSConfig in a Box<dyn> instead of holding it directly for
@@ -31,7 +83,7 @@ pub struct Filesystem {
     /// generic over config. Clients that want to be generic over filesystem type also pay the
     /// monomorphization cost, with some, like fshost, paying a lot.
     config: Box<dyn FSConfig>,
-    block_device: fidl_fuchsia_device::ControllerProxy,
+    block_connector: Box<dyn BlockConnector>,
     component: Option<Arc<DynamicComponentInstance>>,
 }
 
@@ -48,19 +100,19 @@ impl Filesystem {
     }
 
     /// Creates a new `Filesystem`.
-    pub fn new<FSC: FSConfig + 'static>(
-        block_device: fidl_fuchsia_device::ControllerProxy,
+    pub fn new<B: BlockConnector + 'static, FSC: FSConfig>(
+        block_connector: B,
         config: FSC,
     ) -> Self {
-        Self::from_boxed_config(block_device, Box::new(config))
+        Self::from_boxed_config(Box::new(block_connector), Box::new(config))
     }
 
-    /// Creates a new `Filesystem`. Takes a boxed config.
+    /// Creates a new `Filesystem`.
     pub fn from_boxed_config(
-        block_device: fidl_fuchsia_device::ControllerProxy,
+        block_connector: Box<dyn BlockConnector>,
         config: Box<dyn FSConfig>,
     ) -> Self {
-        Self { config, block_device, component: None }
+        Self { config, block_connector, component: None }
     }
 
     /// If the filesystem is a currently running component, returns its (relative) moniker.
@@ -72,14 +124,6 @@ impl Filesystem {
                 format!("{}:{}", component.collection, component.name)
             }
         })
-    }
-
-    fn device_channel(
-        &self,
-    ) -> Result<ClientEnd<fidl_fuchsia_hardware_block::BlockMarker>, fidl::Error> {
-        let (client, server) = fidl::endpoints::create_endpoints();
-        let () = self.block_device.connect_to_device_fidl(server.into_channel())?;
-        Ok(client)
     }
 
     async fn get_component_exposed_dir(&mut self) -> Result<fio::DirectoryProxy, Error> {
@@ -171,7 +215,7 @@ impl Filesystem {
     /// not found, if it couldn't launch or find the filesystem component, or if it couldn't get
     /// the block device channel.
     pub async fn format(&mut self) -> Result<(), Error> {
-        let channel = self.device_channel()?;
+        let channel = self.block_connector.connect_block()?;
 
         let exposed_dir = self.get_component_exposed_dir().await?;
         let proxy = connect_to_protocol_at_dir_root::<StartupMarker>(&exposed_dir)?;
@@ -196,7 +240,7 @@ impl Filesystem {
     /// not found, if it couldn't launch or find the filesystem component, or if it couldn't get
     /// the block device channel.
     pub async fn fsck(&mut self) -> Result<(), Error> {
-        let channel = self.device_channel()?;
+        let channel = self.block_connector.connect_block()?;
         let exposed_dir = self.get_component_exposed_dir().await?;
         let proxy = connect_to_protocol_at_dir_root::<StartupMarker>(&exposed_dir)?;
         proxy.check(channel, CheckOptions).await?.map_err(Status::from_raw)?;
@@ -217,7 +261,10 @@ impl Filesystem {
 
         let exposed_dir = self.get_component_exposed_dir().await?;
         let proxy = connect_to_protocol_at_dir_root::<StartupMarker>(&exposed_dir)?;
-        proxy.start(self.device_channel()?, start_options).await?.map_err(Status::from_raw)?;
+        proxy
+            .start(self.block_connector.connect_block()?, start_options)
+            .await?
+            .map_err(Status::from_raw)?;
 
         let (root_dir, server_end) = create_endpoints::<fio::NodeMarker>();
         exposed_dir.open(
@@ -256,7 +303,7 @@ impl Filesystem {
         let exposed_dir = self.get_component_exposed_dir().await?;
         let proxy = connect_to_protocol_at_dir_root::<StartupMarker>(&exposed_dir)?;
         proxy
-            .start(self.device_channel()?, self.config.options().start_options)
+            .start(self.block_connector.connect_block()?, self.config.options().start_options)
             .await?
             .map_err(Status::from_raw)?;
 

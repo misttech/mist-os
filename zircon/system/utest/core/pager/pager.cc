@@ -28,9 +28,6 @@
 
 namespace pager_tests {
 
-// This value corresponds to `VmObject::LookupInfo::kMaxPages`
-static constexpr uint64_t kMaxPagesBatch = 16;
-
 // Simple test that checks that a single thread can access a single page.
 VMO_VMAR_TEST(Pager, SinglePageTest) {
   UserPager pager;
@@ -146,12 +143,8 @@ VMO_VMAR_TEST(Pager, SequentialMultipageTest) {
       ASSERT_TRUE(pager.SupplyPages(vmo, i, 1));
     }
   } else {
-    for (uint64_t i = 0; i < kNumPages; i += kMaxPagesBatch) {
-      // When doing direct reads, the software faults will be batched.
-      uint64_t page_count = std::min(kMaxPagesBatch, kNumPages - i);
-      ASSERT_TRUE(pager.WaitForPageRead(vmo, i, page_count, ZX_TIME_INFINITE));
-      ASSERT_TRUE(pager.SupplyPages(vmo, i, page_count));
-    }
+    ASSERT_TRUE(pager.WaitForPageRead(vmo, 0, kNumPages, ZX_TIME_INFINITE));
+    ASSERT_TRUE(pager.SupplyPages(vmo, 0, kNumPages));
   }
 
   ASSERT_TRUE(t.Wait());
@@ -3570,6 +3563,337 @@ TEST(Pager, PageRequestBatchingChecksAncestorPages) {
   ASSERT_TRUE(pager.SupplyPages(root_vmo, 3, 2));
 
   ASSERT_TRUE(t3.Wait());
+}
+
+// After supply the pages the target thread remains logically blocked on a page request until it
+// actually gets scheduled and makes progress out of the pager code. As such we cannot wait for
+// it to block again, since we do not know whether it is in the previous or next block event.
+// Therefore we just spin waiting to see the data.
+void WaitForData(const void* expected, const void* data, size_t size) {
+  while (memcmp(expected, data, size) != 0) {
+    zx_nanosleep(zx_deadline_after(ZX_MSEC(10)));
+  }
+  EXPECT_BYTES_EQ(expected, data, size);
+}
+
+TEST(Pager, EarlyWakeOnSupply) {
+  UserPager pager;
+  ASSERT_TRUE(pager.Init());
+
+  constexpr size_t kNumPages = 128;
+  constexpr size_t kPageSteps = 32;
+  static_assert(kNumPages % kPageSteps == 0);
+  // Start the read at an offset to ensure there is a difference between the page requests VMO
+  // offset, and the offset from the start of the request.
+  constexpr size_t kStartOffset = 2;
+  constexpr size_t kVmoPages = kNumPages + kStartOffset;
+
+  Vmo* vmo;
+  ASSERT_TRUE(pager.CreateVmo(kVmoPages, &vmo));
+
+  std::vector<uint8_t> expected(kNumPages * zx_system_get_page_size(), 0);
+  vmo->GenerateBufferContents(expected.data(), kNumPages, kStartOffset);
+  std::vector<uint8_t> data(kNumPages * zx_system_get_page_size(), 0);
+
+  TestThread t([&vmo, &data] {
+    return vmo->vmo().read(data.data(), kStartOffset * zx_system_get_page_size(),
+                           kNumPages * zx_system_get_page_size()) == ZX_OK;
+  });
+
+  ASSERT_TRUE(t.Start());
+
+  // Expect a request for all the pages.
+  ASSERT_TRUE(pager.WaitForPageRead(vmo, kStartOffset, kNumPages, ZX_TIME_INFINITE));
+
+  // Gradually supply all the pages, validating that data gets populated.
+  for (size_t i = 0; i < kNumPages; i += kPageSteps) {
+    // Thread should be blocked waiting.
+    ASSERT_TRUE(t.WaitForBlocked());
+    ASSERT_TRUE(pager.SupplyPages(vmo, i + kStartOffset, kPageSteps));
+
+    WaitForData(&expected.data()[i * zx_system_get_page_size()],
+                &data.data()[i * zx_system_get_page_size()],
+                kPageSteps * zx_system_get_page_size());
+  }
+  ASSERT_TRUE(t.Wait());
+  ASSERT_BYTES_EQ(expected.data(), data.data(), kNumPages * zx_system_get_page_size());
+}
+
+TEST(Pager, EarlyWakeNonLinearSupply) {
+  UserPager pager;
+  ASSERT_TRUE(pager.Init());
+
+  constexpr size_t kNumPages = 128;
+
+  Vmo* vmo;
+  ASSERT_TRUE(pager.CreateVmo(kNumPages, &vmo));
+
+  std::vector<uint8_t> expected(kNumPages * zx_system_get_page_size(), 0);
+  vmo->GenerateBufferContents(expected.data(), kNumPages, 0);
+  std::vector<uint8_t> data(kNumPages * zx_system_get_page_size(), 0);
+
+  TestThread t([&vmo, &data] {
+    return vmo->vmo().read(data.data(), 0, kNumPages * zx_system_get_page_size()) == ZX_OK;
+  });
+
+  ASSERT_TRUE(t.Start());
+
+  // Expect a request for all the pages.
+  ASSERT_TRUE(pager.WaitForPageRead(vmo, 0, kNumPages, ZX_TIME_INFINITE));
+
+  // To account for pages potentially getting evicted start a page fault handler to re-supply
+  // anything.
+  vmo->SetPageFaultSupplyLimit(0);
+  ASSERT_TRUE(pager.StartTaggedPageFaultHandler());
+
+  // Supply some blocks of pages not at the start of the request.
+  ASSERT_TRUE(pager.SupplyPages(vmo, 16, 16));
+  ASSERT_TRUE(pager.SupplyPages(vmo, 48, 16));
+
+  // Now supply the first pages.
+  vmo->SetPageFaultSupplyLimit(32);
+  ASSERT_TRUE(pager.SupplyPages(vmo, 0, 16));
+
+  // Expect everything to get copied all the way till the gap.
+  WaitForData(expected.data(), data.data(), 32 * zx_system_get_page_size());
+
+  // Supply the gap.
+  vmo->SetPageFaultSupplyLimit(64);
+  ASSERT_TRUE(pager.SupplyPages(vmo, 32, 16));
+
+  // Expect everything till the next gap to be supplied.
+  WaitForData(expected.data(), data.data(), 64 * zx_system_get_page_size());
+
+  // Finally supply the rest of the data.
+  vmo->SetPageFaultSupplyLimit(kNumPages);
+  ASSERT_TRUE(pager.SupplyPages(vmo, 64, kNumPages - 64));
+  ASSERT_TRUE(t.Wait());
+  // No more page requests.
+  uint64_t offset, length;
+  ASSERT_FALSE(pager.GetPageReadRequest(vmo, 0, &offset, &length));
+  ASSERT_BYTES_EQ(expected.data(), data.data(), kNumPages * zx_system_get_page_size());
+}
+
+TEST(Pager, EarlyWakeOverlappingRequests) {
+  UserPager pager;
+  ASSERT_TRUE(pager.Init());
+
+  constexpr size_t kVmoSize = 128;
+  Vmo* vmo;
+  ASSERT_TRUE(pager.CreateVmo(kVmoSize, &vmo));
+
+  // Setup a collection of requests that overlap in different ways. The ranges listed here cannot
+  // actually be changed arbitrarily, as the test code below hard codes various interesting values
+  // and so while the test would not 'break', it would lose a lot of the desired coverage.
+  struct {
+    const uint64_t start;
+    const uint64_t end;
+    std::vector<uint8_t> data;
+    std::optional<TestThread> thread;
+  } requests[] = {{0, 92}, {16, 42}, {0, 32}, {48, 64}, {82, 128}};
+  std::vector<uint8_t> expected(kVmoSize * zx_system_get_page_size(), 0);
+  vmo->GenerateBufferContents(expected.data(), kVmoSize, 0);
+  for (auto& req : requests) {
+    req.data.resize((req.end - req.start) * zx_system_get_page_size(), 0);
+    fit::function<bool()> start_method = [request = &req, &vmo] {
+      return vmo->vmo().read(request->data.data(), request->start * zx_system_get_page_size(),
+                             (request->end - request->start) * zx_system_get_page_size()) == ZX_OK;
+    };
+    req.thread.emplace(std::move(start_method));
+  }
+  // Start the first request and wait for it to generate the page request.
+  ASSERT_TRUE(requests[0].thread->Start());
+  ASSERT_TRUE(pager.WaitForPageRead(vmo, 0, requests[0].end - requests[0].start, ZX_TIME_INFINITE));
+
+  // Start all the other requests, should not see any additional page requests.
+  for (size_t i = 1; i < sizeof(requests) / sizeof(requests[0]); i++) {
+    ASSERT_TRUE(requests[i].thread->Start());
+  }
+  {
+    // No more requests.
+    uint64_t offset, length;
+    ASSERT_FALSE(pager.GetPageReadRequest(vmo, 0, &offset, &length));
+  }
+
+  auto validate_requests = [&](uint64_t max_page, uint64_t cutoff = UINT64_MAX) {
+    for (auto& req : requests) {
+      if (max_page < req.start || req.start >= cutoff) {
+        continue;
+      }
+      WaitForData(&expected[req.start * zx_system_get_page_size()], req.data.data(),
+                  (std::min(max_page, req.end) - req.start) * zx_system_get_page_size());
+      // If the whole range has been supplied, also check that the thread has completed, unless we
+      // already checked.
+      if (max_page >= req.end && req.thread.has_value()) {
+        ASSERT_TRUE(req.thread->Wait());
+        req.thread.reset();
+      }
+    }
+  };
+
+  // To account for pages potentially getting evicted, and the fact that the validate_requests will
+  // be re-scanning the entire VMO start a page fault handler to re-supply anything.
+  vmo->SetPageFaultSupplyLimit(0);
+  ASSERT_TRUE(pager.StartTaggedPageFaultHandler());
+
+  // Supply some early pages.
+  vmo->SetPageFaultSupplyLimit(8);
+  ASSERT_TRUE(pager.SupplyPages(vmo, 0, 8));
+  validate_requests(8);
+
+  // Pre-supply a later page at the start of an overlap.
+  ASSERT_TRUE(pager.SupplyPages(vmo, 16, 1));
+
+  // Supply the missing pages.
+  vmo->SetPageFaultSupplyLimit(17);
+  ASSERT_TRUE(pager.SupplyPages(vmo, 8, 8));
+  // Everything up till page 16 should be visible, but some of the overlap requests may not have
+  // woken up due to the pre-supply.
+  validate_requests(17, 16);
+
+  // Supply the next page in the line, finally waking up the overlap.
+  vmo->SetPageFaultSupplyLimit(18);
+  ASSERT_TRUE(pager.SupplyPages(vmo, 17, 1));
+  validate_requests(18);
+
+  // Pre-supply a later page in this range before the end of an overlapping request.
+  ASSERT_TRUE(pager.SupplyPages(vmo, 30, 2));
+
+  // Supply the gap.
+  vmo->SetPageFaultSupplyLimit(32);
+  ASSERT_TRUE(pager.SupplyPages(vmo, 18, 30 - 18));
+  validate_requests(32);
+
+  // Supply into the range of the start of the next overlap.
+  vmo->SetPageFaultSupplyLimit(50);
+  ASSERT_TRUE(pager.SupplyPages(vmo, 32, 50 - 32));
+  validate_requests(50);
+
+  // Supply all the way beyond the first request, completing the original sent page request.
+  vmo->SetPageFaultSupplyLimit(100);
+  ASSERT_TRUE(pager.SupplyPages(vmo, 50, 100 - 50));
+  validate_requests(100);
+
+  // Should have another page request for the remaining portion. Unfortunately this request gets
+  // received by the page fault handler we started previously. What we can do instead is expect that
+  // any thread that did not complete, should end up waiting for a page request.
+  for (auto& req : requests) {
+    if (req.thread.has_value()) {
+      ASSERT_TRUE(req.thread->WaitForBlocked());
+    }
+  }
+
+  // Supply the remaining pages.
+  vmo->SetPageFaultSupplyLimit(kVmoSize);
+  ASSERT_TRUE(pager.SupplyPages(vmo, 100, kVmoSize - 100));
+
+  validate_requests(kVmoSize);
+}
+
+TEST(Pager, EarlyWakeWithResize) {
+  UserPager pager;
+  ASSERT_TRUE(pager.Init());
+
+  constexpr size_t kNumPages = 16;
+
+  Vmo* vmo;
+  ASSERT_TRUE(pager.CreateVmoWithOptions(kNumPages, ZX_VMO_RESIZABLE, &vmo));
+
+  std::vector<uint8_t> data(kNumPages * zx_system_get_page_size(), 0);
+
+  TestThread t([&vmo, &data] {
+    return vmo->vmo().read(data.data(), 0, kNumPages * zx_system_get_page_size()) == ZX_OK;
+  });
+
+  ASSERT_TRUE(t.Start());
+
+  // Expect a request for all the pages.
+  ASSERT_TRUE(pager.WaitForPageRead(vmo, 0, kNumPages, ZX_TIME_INFINITE));
+
+  // Supply one page of the request.
+  ASSERT_TRUE(pager.SupplyPages(vmo, 0, 1));
+
+  // Wait for the data to appear and then for the thread to block again.
+  std::vector<uint8_t> expected(kNumPages * zx_system_get_page_size(), 0);
+  vmo->GenerateBufferContents(expected.data(), kNumPages, 0);
+  WaitForData(expected.data(), data.data(), zx_system_get_page_size());
+  // Wait for blocked again.
+  ASSERT_TRUE(t.WaitForBlocked());
+
+  // Resize the VMO smaller.
+  ASSERT_TRUE(vmo->Resize(kNumPages / 2));
+
+  // Supply the missing pages.
+  ASSERT_TRUE(pager.SupplyPages(vmo, 1, kNumPages / 2 - 1));
+
+  // Should end with failure.
+  ASSERT_TRUE(t.WaitForFailure());
+}
+
+TEST(Pager, EarlyWakeCloneRace) {
+  UserPager pager;
+
+  ASSERT_TRUE(pager.Init());
+
+  constexpr size_t kNumPages = 1025;
+  constexpr size_t kMiddlePage = kNumPages / 2;
+  constexpr size_t kNumOverwritePages = 257;
+  constexpr size_t kOvewritePagesStart = kMiddlePage - kNumOverwritePages / 2;
+
+  Vmo* vmo;
+  ASSERT_TRUE(pager.CreateVmo(kNumPages, &vmo));
+
+  std::unique_ptr<Vmo> clone = vmo->Clone();
+  ASSERT_TRUE(clone);
+
+  std::vector<uint8_t> expected(kNumPages * zx_system_get_page_size(), 0);
+  vmo->GenerateBufferContents(expected.data(), kNumPages, 0);
+  std::vector<uint8_t> data(kNumPages * zx_system_get_page_size(), 0);
+
+  TestThread t([&clone, &data] {
+    return clone->vmo().read(data.data(), 0, kNumPages * zx_system_get_page_size()) == ZX_OK;
+  });
+
+  // Before starting the test thread, supply an initial page in the middle of the range.
+  ASSERT_TRUE(pager.SupplyPages(vmo, kMiddlePage, 1));
+  ASSERT_TRUE(t.Start());
+
+  // Expect to see a request just for the first empty run.
+  ASSERT_TRUE(pager.WaitForPageRead(vmo, 0, kMiddlePage, ZX_TIME_INFINITE));
+
+  // Zero some pages in the clone. As it operates on whole pages this does not generate a page
+  // request.
+  EXPECT_OK(clone->vmo().op_range(ZX_VMO_OP_ZERO, kOvewritePagesStart * zx_system_get_page_size(),
+                                  kNumOverwritePages * zx_system_get_page_size(), nullptr, 0));
+
+  // Now that they are defined as being zero, we can write to the cloned pages without causing an
+  // allocation.
+  for (size_t page = kOvewritePagesStart; page < kOvewritePagesStart + kNumOverwritePages; page++) {
+    const size_t offset = page * zx_system_get_page_size();
+    // Manipulate the data that we expect at this page to detect whether the test thread ends up
+    // reading from the root or the forked page.
+    memset(&expected[offset], 0, zx_system_get_page_size() / 2);
+    EXPECT_OK(clone->vmo().write(&expected[offset], offset, zx_system_get_page_size()));
+  }
+
+  // Supply all but 1 of the pages in the original range. As the last page of the range has been
+  // allocated in the clone, when the early wake happens for the content we have supplied it should
+  // find the forked page and use it instead of continuing to wait for the redundant page in the
+  // root.
+  ASSERT_TRUE(pager.SupplyPages(vmo, 0, kMiddlePage - 1));
+
+  // Expect to get a page request for the missing range in the combination of clone and parent.
+  ASSERT_TRUE(pager.WaitForPageRead(vmo, kOvewritePagesStart + kNumOverwritePages,
+                                    kNumPages - (kOvewritePagesStart + kNumOverwritePages),
+                                    ZX_TIME_INFINITE));
+
+  ASSERT_TRUE(pager.SupplyPages(vmo, kOvewritePagesStart + kNumOverwritePages,
+                                kNumPages - (kOvewritePagesStart + kNumOverwritePages)));
+
+  // Validate everything completes and is correct.
+  ASSERT_TRUE(t.Wait());
+
+  EXPECT_BYTES_EQ(expected.data(), data.data(), kNumPages * zx_system_get_page_size());
 }
 
 TEST(Pager, Prefetch) {

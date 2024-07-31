@@ -212,12 +212,6 @@ open protocol ActivityGovernorListener {
     /// required to keep the system awake, if needed.
     strict OnResume() -> ();
 
-    /// Called when the activity governor detects a system suspension.
-    ///
-    /// There is no guarantee the server will receive this message before
-    /// suspension is triggered by the platform.
-    flexible OnSuspend();
-
     /// Called before the activity governor initiates a system suspension.
     ///
     /// The server is expected to respond once it has performed the operations

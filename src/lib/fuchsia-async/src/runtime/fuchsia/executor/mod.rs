@@ -6,13 +6,12 @@ mod common;
 mod instrumentation;
 mod local;
 mod packets;
-mod scope;
+pub mod scope;
 mod send;
 mod time;
 
 pub use common::EHandle;
 pub use local::{LocalExecutor, TestExecutor};
 pub use packets::{PacketReceiver, ReceiverRegistration};
-pub use scope::{Scope, ScopeRef, WeakScopeRef};
 pub use send::SendExecutor;
 pub use time::{Duration, Time};

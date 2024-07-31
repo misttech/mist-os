@@ -16,7 +16,6 @@
 #include <fidl/fuchsia.hardware.block/cpp/wire.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <lib/fzl/resizeable-vmo-mapper.h>
-#include <lib/trace/event.h>
 #include <lib/zx/resource.h>
 #include <lib/zx/result.h>
 #include <lib/zx/vmo.h>
@@ -104,9 +103,9 @@ class Blobfs : public TransactionManager, public BlockIteratorProvider {
 
   fs_inspect::NodeOperations& node_operations() { return inspect_tree_.node_operations(); }
 
-  // TODO(https://fxbug.dev/42160612): Move ownership of metrics_ to inspect_tree_, and remove use of shared
-  // ownership (all uses of this function take mutable pointers to this object already, or bypass
-  // the use of shared ownership entirely by calling |get()| on the shared_ptr.
+  // TODO(https://fxbug.dev/42160612): Move ownership of metrics_ to inspect_tree_, and remove use
+  // of shared ownership (all uses of this function take mutable pointers to this object already, or
+  // bypass the use of shared ownership entirely by calling |get()| on the shared_ptr.
   const std::shared_ptr<BlobfsMetrics>& GetMetrics() const { return metrics_; }
 
   // TransactionManager interface.

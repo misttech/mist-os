@@ -3,12 +3,12 @@
 // found in the LICENSE file.
 
 use anyhow::{format_err, Context as _, Error};
-use fidl::endpoints::Proxy;
+use fidl::endpoints::{ClientEnd, Proxy};
 use fidl_fuchsia_bluetooth_snoop::{PacketFormat, SnoopPacket as FidlSnoopPacket};
 use fidl_fuchsia_hardware_bluetooth::{
-    PacketDirection as Direction, SnoopMarker as HardwareSnoopMarker, SnoopObservePacketRequest,
-    SnoopPacket as HardwareSnoopPacket, SnoopRequest as HardwareSnoopRequest,
-    SnoopRequestStream as HardwareSnoopRequestStream, VendorMarker as HardwareVendorMarker,
+    PacketDirection as Direction, Snoop2Event, Snoop2EventStream, Snoop2Marker,
+    Snoop2OnObservePacketRequest, Snoop2Proxy, SnoopPacket as HardwareSnoopPacket,
+    VendorMarker as HardwareVendorMarker,
 };
 use fidl_fuchsia_io::DirectoryProxy;
 use fuchsia_async as fasync;
@@ -69,7 +69,8 @@ impl CreatedAt for SnoopPacket {
 /// stream can be polled for packets.
 pub(crate) struct Snooper {
     pub device_name: String,
-    pub stream: HardwareSnoopRequestStream,
+    pub proxy: Snoop2Proxy,
+    pub event_stream: Snoop2EventStream,
     pub is_terminated: bool,
 }
 
@@ -94,35 +95,29 @@ impl Snooper {
         let client_end_vendor = vendor.into_client_end().unwrap();
         let vendor_sync = client_end_vendor.into_sync_proxy();
 
-        let client_end = vendor_sync
-            .open_hci_transport(fasync::Time::after(3.seconds()).into())?
-            .map_err(|e| format_err!("Failed opening the HCI with {e:?}"))?;
-        let sync_hci = client_end.into_sync_proxy();
+        let snoop_client = vendor_sync
+            .open_snoop(fasync::Time::after(3.seconds()).into())?
+            .map_err(|e| format_err!("Failed opening Snoop with {e:?}"))?;
 
-        let (snoop_client, snoop_stream) =
-            fidl::endpoints::create_request_stream::<HardwareSnoopMarker>()?;
-        let res = sync_hci.set_snoop(snoop_client);
-
-        match res {
-            Ok(()) => Snooper::from_stream(snoop_stream, path),
-            Err(e) => Err(format_err!("Failed to open snoop channel {:?}", e)),
-        }
+        Ok(Snooper::from_client(snoop_client, path))
     }
 
-    /// Take a channel and wrap it in a `Snooper`.
-    pub fn from_stream(stream: HardwareSnoopRequestStream, path: &str) -> Result<Snooper, Error> {
+    pub fn from_client(client: ClientEnd<Snoop2Marker>, path: &str) -> Snooper {
         let device_name = path.to_owned();
-        Ok(Snooper { device_name, stream, is_terminated: false })
+        let proxy = client.into_proxy().unwrap();
+        let event_stream = proxy.take_event_stream();
+        Snooper { device_name, proxy, event_stream, is_terminated: false }
     }
 }
 
-impl TryFrom<SnoopObservePacketRequest> for SnoopPacket {
+impl TryFrom<Snoop2OnObservePacketRequest> for SnoopPacket {
     type Error = Error;
 
-    fn try_from(value: SnoopObservePacketRequest) -> Result<Self, Self::Error> {
+    fn try_from(value: Snoop2OnObservePacketRequest) -> Result<Self, Self::Error> {
         let time = zx::Time::get_monotonic();
-        let SnoopObservePacketRequest { packet: Some(packet), direction: Some(direction), .. } =
-            value
+        let Snoop2OnObservePacketRequest {
+            packet: Some(packet), direction: Some(direction), ..
+        } = value
         else {
             return Err(format_err!("Missing required fields"));
         };
@@ -163,7 +158,7 @@ impl Stream for Snooper {
             return Poll::Ready(None);
         }
         loop {
-            let result = ready!(self.stream.poll_next_unpin(cx)).transpose();
+            let result = ready!(self.event_stream.poll_next_unpin(cx)).transpose();
             if let Err(e) = result {
                 warn!("error polling SnoopRequestStream: {e:?}");
                 self.is_terminated = true;
@@ -175,14 +170,14 @@ impl Stream for Snooper {
             };
 
             match req {
-                HardwareSnoopRequest::ObservePacket { payload, control_handle } => {
+                Snoop2Event::OnObservePacket { payload } => {
                     let Some(sequence) = payload.sequence else {
                         warn!("ObservePacket missing sequence number");
                         continue;
                     };
-                    let result = control_handle.send_on_acknowledge_packets(sequence);
+                    let result = self.proxy.acknowledge_packets(sequence);
                     if let Err(err) = result {
-                        warn!("send_on_acknowledge_packets error: {:?}", err);
+                        warn!("acknowledge_packets error: {:?}", err);
                         self.is_terminated = true;
                         return Poll::Ready(None);
                     }
@@ -208,16 +203,16 @@ impl Stream for Snooper {
 mod tests {
     use super::*;
 
-    use fidl_fuchsia_hardware_bluetooth::SnoopEvent as HardwareSnoopEvent;
+    use fidl::endpoints::RequestStream;
+    use fidl_fuchsia_hardware_bluetooth::Snoop2Request;
     use fuchsia_async as fasync;
     use futures::StreamExt;
 
     #[test]
-    fn test_from_channel() {
+    fn test_from_proxy() {
         let _exec = fasync::TestExecutor::new();
-        let (_snoop_client, snoop_stream) =
-            fidl::endpoints::create_request_stream::<HardwareSnoopMarker>().unwrap();
-        let snooper = Snooper::from_stream(snoop_stream, "c").unwrap();
+        let (client, _stream) = fidl::endpoints::create_request_stream::<Snoop2Marker>().unwrap();
+        let snooper = Snooper::from_client(client, "c");
         assert_eq!(snooper.device_name, "c");
     }
 
@@ -231,7 +226,7 @@ mod tests {
 
     #[test]
     fn test_try_from() {
-        let req = SnoopObservePacketRequest {
+        let req = Snoop2OnObservePacketRequest {
             sequence: Some(0),
             direction: Some(Direction::ControllerToHost),
             packet: Some(HardwareSnoopPacket::Event(vec![])),
@@ -243,7 +238,7 @@ mod tests {
         assert!(pkt.timestamp.into_nanos() > 0);
         assert_eq!(pkt.format, PacketFormat::Event);
 
-        let req = SnoopObservePacketRequest {
+        let req = Snoop2OnObservePacketRequest {
             sequence: Some(0),
             direction: Some(Direction::HostToController),
             packet: Some(HardwareSnoopPacket::Acl(vec![0, 1, 2])),
@@ -257,7 +252,7 @@ mod tests {
 
     #[test]
     fn test_try_from_missing_payload() {
-        let req = SnoopObservePacketRequest {
+        let req = Snoop2OnObservePacketRequest {
             sequence: Some(0),
             direction: Some(Direction::ControllerToHost),
             packet: None,
@@ -269,7 +264,7 @@ mod tests {
 
     #[test]
     fn test_try_from_missing_direction() {
-        let req = SnoopObservePacketRequest {
+        let req = Snoop2OnObservePacketRequest {
             sequence: Some(0),
             direction: None,
             packet: Some(HardwareSnoopPacket::Event(vec![0, 1, 2])),
@@ -282,23 +277,24 @@ mod tests {
     #[test]
     fn test_snoop_stream() {
         let mut exec = fasync::TestExecutor::new();
-        let (snoop_proxy, snoop_stream) =
-            fidl::endpoints::create_proxy_and_stream::<HardwareSnoopMarker>().unwrap();
-        let mut snooper = Snooper::from_stream(snoop_stream, "c").unwrap();
-        let req_0 = SnoopObservePacketRequest {
+        let (snoop_client, mut req_stream) =
+            fidl::endpoints::create_request_stream::<Snoop2Marker>().unwrap();
+        let snoop_control = req_stream.control_handle();
+        let mut snooper = Snooper::from_client(snoop_client, "c");
+        let req_0 = Snoop2OnObservePacketRequest {
             sequence: Some(0),
             direction: Some(Direction::ControllerToHost),
             packet: Some(HardwareSnoopPacket::Event(vec![0, 1, 2])),
             ..Default::default()
         };
-        let req_1 = SnoopObservePacketRequest {
+        let req_1 = Snoop2OnObservePacketRequest {
             sequence: Some(1),
             direction: Some(Direction::HostToController),
             packet: Some(HardwareSnoopPacket::Command(vec![3, 4, 5])),
             ..Default::default()
         };
-        snoop_proxy.observe_packet(&req_0).unwrap();
-        snoop_proxy.observe_packet(&req_1).unwrap();
+        snoop_control.send_on_observe_packet(&req_0).unwrap();
+        snoop_control.send_on_observe_packet(&req_1).unwrap();
 
         let item_1 = exec.run_until_stalled(&mut snooper.next());
         assert!(item_1.is_ready());
@@ -315,51 +311,51 @@ mod tests {
         let item_3 = exec.run_until_stalled(&mut snooper.next());
         assert!(item_3.is_pending());
 
-        let mut event_stream = snoop_proxy.take_event_stream();
-        let event_1 = exec.run_until_stalled(&mut event_stream.next());
-        assert!(event_1.is_ready());
-        match event_1 {
-            Poll::Ready(Some(Ok(HardwareSnoopEvent::OnAcknowledgePackets { sequence }))) => {
+        let req_1 = exec.run_until_stalled(&mut req_stream.next());
+        assert!(req_1.is_ready());
+        match req_1 {
+            Poll::Ready(Some(Ok(Snoop2Request::AcknowledgePackets { sequence, .. }))) => {
                 assert_eq!(sequence, 0);
             }
             _ => panic!("failed to send OnAcknowledgePackets"),
         }
-        let event_2 = exec.run_until_stalled(&mut event_stream.next());
-        assert!(event_2.is_ready());
-        match event_2 {
-            Poll::Ready(Some(Ok(HardwareSnoopEvent::OnAcknowledgePackets { sequence }))) => {
+        let req_2 = exec.run_until_stalled(&mut req_stream.next());
+        assert!(req_2.is_ready());
+        match req_2 {
+            Poll::Ready(Some(Ok(Snoop2Request::AcknowledgePackets { sequence, .. }))) => {
                 assert_eq!(sequence, 1);
             }
             _ => panic!("failed to send OnAcknowledgePackets"),
         }
-        let event_3 = exec.run_until_stalled(&mut event_stream.next());
-        assert!(event_3.is_pending());
+        let req_3 = exec.run_until_stalled(&mut req_stream.next());
+        assert!(req_3.is_pending());
     }
 
     #[test]
     fn test_snoop_stream_missing_sequence() {
         let mut exec = fasync::TestExecutor::new();
-        let (snoop_proxy, snoop_stream) =
-            fidl::endpoints::create_proxy_and_stream::<HardwareSnoopMarker>().unwrap();
-        let mut snooper = Snooper::from_stream(snoop_stream, "c").unwrap();
+        let (snoop_client, snoop_stream) =
+            fidl::endpoints::create_request_stream::<Snoop2Marker>().unwrap();
+        let snoop_control = snoop_stream.control_handle();
+        let mut snooper = Snooper::from_client(snoop_client, "c");
 
-        let req_0 = SnoopObservePacketRequest {
+        let req_0 = Snoop2OnObservePacketRequest {
             sequence: None, // Missing sequence!
             direction: Some(Direction::ControllerToHost),
             packet: Some(HardwareSnoopPacket::Event(vec![0, 1, 2])),
             ..Default::default()
         };
-        snoop_proxy.observe_packet(&req_0).unwrap();
+        snoop_control.send_on_observe_packet(&req_0).unwrap();
         let item = exec.run_until_stalled(&mut snooper.next());
         assert!(item.is_pending());
 
-        let req_1 = SnoopObservePacketRequest {
+        let req_1 = Snoop2OnObservePacketRequest {
             sequence: Some(1),
             direction: Some(Direction::HostToController),
             packet: Some(HardwareSnoopPacket::Command(vec![3, 4, 5])),
             ..Default::default()
         };
-        snoop_proxy.observe_packet(&req_1).unwrap();
+        snoop_control.send_on_observe_packet(&req_1).unwrap();
         let item = exec.run_until_stalled(&mut snooper.next());
         assert!(item.is_ready());
     }
@@ -367,14 +363,13 @@ mod tests {
     #[test]
     fn test_snoop_stream_lifecycle() {
         let mut exec = fasync::TestExecutor::new();
-        let (snoop_proxy, snoop_stream) =
-            fidl::endpoints::create_proxy_and_stream::<HardwareSnoopMarker>().unwrap();
-        let mut snooper = Snooper::from_stream(snoop_stream, "c").unwrap();
+        let (snoop_client, snoop_server) = fidl::endpoints::create_endpoints::<Snoop2Marker>();
+        let mut snooper = Snooper::from_client(snoop_client, "c");
 
         let item = exec.run_until_stalled(&mut snooper.next());
         assert!(item.is_pending());
 
-        drop(snoop_proxy);
+        drop(snoop_server);
         let item = exec.run_until_stalled(&mut snooper.next());
         let Poll::Ready(None) = item else {
             panic!("Expected None");

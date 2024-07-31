@@ -213,4 +213,24 @@ group("starnix_vim3_staging_tests") {
     ":starnix_vim3_unstable_tests",
   ]
 }
+
+# smart_display.nelson
+group_with_no_dir_target_deps("smart_display_nelson_stable_tests") {
+  testonly = true
+  public_deps = []
+}
+
+group_with_no_dir_target_deps("smart_display_nelson_unstable_tests") {
+  testonly = true
+  public_deps =
+      [ "examples/test_soft_reboot:soft_reboot_test_fc($host_toolchain)" ]
+}
+
+group("smart_display_nelson_staging_tests") {
+  testonly = true
+  public_deps = [
+    ":smart_display_nelson_stable_tests",
+    ":smart_display_nelson_unstable_tests",
+  ]
+}
 ############################## Test groups - End ###############################

@@ -343,6 +343,39 @@ def alias(*, name, executable, testonly = False, **kwargs):
         **kwargs
     )
 
+def get_target_deps_from_attributes(rule_attr, rule_kind = None, known_rule_kinds = {}):
+    """Return all dependencies from a given target context during analysis.
+
+    Args:
+        rule_attr: The ctx.attr value for the current target.
+        rule_kind: Optional string for the rule kind (this is aspect_ctx.rule.kind
+             when called from an aspect implementation function). If provided,
+             this can speed up the computation for a few known target kinds.
+        known_rule_kinds: Optional dictionary contianing known rule kinds and their attributes to check
+    Returns:
+        A list of Target values corresponding to the dependencies of the current
+        target.
+    """
+    attr_names = known_rule_kinds.get(rule_kind)
+    if not attr_names:
+        # For unknown rule kinds, parse all attributes and filter
+        # those that are Targets or lists of Targets to the result.
+        attr_names = dir(rule_attr)
+
+    result = []
+    for attr_name in attr_names:
+        attr_value = getattr(rule_attr, attr_name, None)
+        if not attr_value:
+            continue
+        if type(attr_value) == "Target":
+            result.append(attr_value)
+            continue
+        if type(attr_value) == "list" and type(attr_value[0]) == "Target":
+            result.extend(attr_value)
+            continue
+
+    return depset(result).to_list()
+
 def filter(obj, value = None, exclude = True):
     # buildifier: disable=function-docstring-args
     # buildifier: disable=function-docstring-return

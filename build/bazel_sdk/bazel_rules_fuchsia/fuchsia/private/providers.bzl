@@ -173,6 +173,17 @@ FuchsiaPackageResourcesInfo = provider(
     },
 )
 
+FuchsiaCollectedPackageResourcesInfo = provider(
+    """A provider which represents a package resource and all of its transitive resources.
+
+    This provider should not be directly created. If a rule wants to expose a set
+    of resources it should create a FuchsiaPackageResourcesInfo provider instead.
+    """,
+    fields = {
+        "collected_resources": "A depset containing the direct and transitive resources",
+    },
+)
+
 FuchsiaPackageGroupInfo = provider(
     doc = "The raw files that make up a set of fuchsia packages.",
     fields = {

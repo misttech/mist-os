@@ -15,7 +15,7 @@ use tracing::{error, warn};
 use wlan_common::mac::{self, CapabilityInfo};
 use wlan_common::mgmt_writer;
 use wlan_common::time::TimeUnit;
-use wlan_frame_writer::write_frame_with_dynamic_buffer;
+use wlan_frame_writer::write_frame_to_vec;
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
     fidl_fuchsia_wlan_internal as fidl_internal, fidl_fuchsia_wlan_mlme as fidl_mlme,
@@ -241,7 +241,7 @@ impl<'a, D: DeviceOps> BoundScanner<'a, D> {
     ) -> Result<OngoingScan, Error> {
         let ssids_list = req.ssid_list.iter().map(cssid_from_ssid_unchecked).collect::<Vec<_>>();
 
-        let mac_header = write_frame_with_dynamic_buffer!(vec![], {
+        let mac_header = write_frame_to_vec!({
             headers: {
                 mac::MgmtHdr: &self.probe_request_mac_header(),
             },
@@ -498,7 +498,7 @@ fn active_scan_request_series(
             ssids: Some(ssids.clone()),
             mac_header: Some(mac_header.clone()),
             // Exclude the SSID IE because the device driver will generate using ssids_list.
-            ies: Some(write_frame_with_dynamic_buffer!(vec![], {
+            ies: Some(write_frame_to_vec!({
                 ies: {
                     supported_rates: supported_rates,
                     extended_supported_rates: {/* continue rates */},

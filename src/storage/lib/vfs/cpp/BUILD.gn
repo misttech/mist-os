@@ -157,8 +157,6 @@ test("fs-vnode-test") {
     "//zircon/system/ulib/async-testing",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/sync:sync-cpp",
-    "//zircon/system/ulib/trace",
-    "//zircon/system/ulib/trace-engine",
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
   ]

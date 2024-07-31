@@ -11,7 +11,9 @@ pub mod metrics;
 pub mod repo;
 mod tunnel;
 
-pub use instance::{write_instance_info, PkgServerInstanceInfo, PkgServerInstances};
+pub use instance::{
+    write_instance_info, PathType, PkgServerInstanceInfo, PkgServerInstances, ServerMode,
+};
 
 /// Type of registration of the repository on the target device.
 /// This mirrors the fidl type RepositoryStorageType, since

@@ -6,4 +6,12 @@
 
 #include <zxtest/zxtest.h>
 
-TEST(NextVdsoTest, BasicTest) { ASSERT_OK(zx_syscall_next_1(7)); }
+#include "../needs-next.h"
+
+NEEDS_NEXT_SYSCALL(zx_syscall_next_1);
+
+TEST(NextVdsoTest, BasicTest) {
+  NEEDS_NEXT_SKIP(zx_syscall_next_1);
+
+  ASSERT_OK(zx_syscall_next_1(7));
+}

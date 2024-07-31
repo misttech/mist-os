@@ -17,7 +17,8 @@ use std::ffi::CString;
 use std::fmt::Debug;
 use std::sync::Arc;
 use thiserror::Error;
-use tracing::{error, warn};
+use tracing::{error, info, warn};
+use zx::sys;
 use {fidl_fuchsia_process as fproc, fuchsia_async as fasync};
 
 /// Internal error type for ProcessLauncher which conveniently wraps errors that might
@@ -103,7 +104,7 @@ impl ProcessLauncher {
                             responder.send(zx::Status::OK.into_raw(), Some(process))?;
                         }
                         Err(err) => {
-                            Self::log_launcher_error(&err, "launch", job, name);
+                            log_launcher_error(&err, "launch", job, name);
                             responder.send(err.as_zx_status().into_raw(), None)?;
                         }
                     }
@@ -131,7 +132,7 @@ impl ProcessLauncher {
                             responder.send(zx::Status::OK.into_raw(), Some(process_data))?;
                         }
                         Err(err) => {
-                            Self::log_launcher_error(&err, "create", job, name);
+                            log_launcher_error(&err, "create", job, name);
                             responder.send(err.as_zx_status().into_raw(), None)?;
                         }
                     }
@@ -159,60 +160,6 @@ impl ProcessLauncher {
             }
         }
         Ok(())
-    }
-
-    fn log_launcher_error(err: &LauncherError, op: &str, job: Arc<zx::Job>, name: String) {
-        enum LogLevel {
-            Warn,
-            Error,
-        }
-        let mut log_level = LogLevel::Warn;
-
-        // Special case BAD_STATE errors to check the job's exited status and log more info.
-        // BAD_STATE errors are expected if the job has exited for reasons outside our control, like
-        // another process killing the job or the parent job exiting, while a new process is being
-        // created in it.
-        let mut job_message = format!("");
-        match err {
-            LauncherError::BuilderError(err) if err.as_zx_status() == zx::Status::BAD_STATE => {
-                match job.info() {
-                    Ok(job_info) => {
-                        if job_info.exited {
-                            job_message =
-                                format!(", job has exited (retcode {})", job_info.return_code);
-                        } else if job_info.return_code != 0 {
-                            job_message =
-                                format!(", job is exiting (retcode {})", job_info.return_code);
-                        } else {
-                            // If the job has not exited, then the BAD_STATE error was unexpected
-                            // and indicates a bug somewhere.
-                            log_level = LogLevel::Error;
-                            job_message = format!(", job has not exited (retcode 0)");
-                        }
-                    }
-                    Err(status) => {
-                        log_level = LogLevel::Error;
-                        job_message = format!(" (error {} getting job state)", status);
-                    }
-                }
-            }
-            _ => {}
-        }
-
-        let job_koid =
-            job.get_koid().map(|j| j.raw_koid().to_string()).unwrap_or("<unknown>".to_string());
-
-        // Repeat ourselves slightly here because tracing does not support runtime levels in macros.
-        match log_level {
-            LogLevel::Warn => warn!(
-                %op, process_name=%name, %job_koid, %job_message, error=%err,
-                "Process operation failed",
-            ),
-            LogLevel::Error => error!(
-                %op, process_name=%name, %job_koid, %job_message, error=%err,
-                "Process operation failed",
-            ),
-        }
     }
 
     async fn launch_process(
@@ -295,6 +242,112 @@ impl ProcessLauncher {
     }
 }
 
+#[derive(Debug, PartialEq)]
+enum LogStyle {
+    JobKilled,
+    Warn,
+    Error,
+}
+
+#[derive(Debug, PartialEq)]
+struct LogInfo {
+    style: LogStyle,
+    job_info: String,
+    message: &'static str,
+}
+
+fn log_launcher_error(err: &LauncherError, op: &str, job: Arc<zx::Job>, name: String) {
+    let job_koid =
+        job.get_koid().map(|j| j.raw_koid().to_string()).unwrap_or("<unknown>".to_string());
+    let LogInfo { style, job_info, message } = describe_error(err, job.as_handle_ref().cast());
+
+    // Repeat ourselves slightly here because tracing does not support runtime levels in macros.
+    match style {
+        LogStyle::JobKilled => info!(
+            %op, process_name=%name, %job_koid, %job_info, error=%err,
+            "{}",
+            message,
+        ),
+        LogStyle::Warn => warn!(
+            %op, process_name=%name, %job_koid, %job_info, error=%err,
+            "{}",
+            message,
+        ),
+        LogStyle::Error => error!(
+            %op, process_name=%name, %job_koid, %job_info, error=%err,
+            "{}",
+            message,
+        ),
+    }
+}
+
+/// Describes the process launching error.
+///
+/// Special case BAD_STATE errors to check the job's exited status and log more info.
+/// BAD_STATE errors are expected if the job has exited for reasons outside our control, like
+/// another process killing the job or the parent job exiting, while a new process is being
+/// created in it.
+fn describe_error<'a>(err: &LauncherError, job: zx::Unowned<'a, zx::Job>) -> LogInfo {
+    let log_level: LogStyle;
+    let job_message: String;
+    match err {
+        LauncherError::BuilderError(err) if err.as_zx_status() == zx::Status::BAD_STATE => {
+            match job.info() {
+                Ok(job_info) => {
+                    match job_info.exited {
+                        true => {
+                            log_level = match job_info.return_code {
+                                sys::ZX_TASK_RETCODE_SYSCALL_KILL => LogStyle::JobKilled,
+                                _ => LogStyle::Warn,
+                            };
+                            let return_code_str = match job_info.return_code {
+                                sys::ZX_TASK_RETCODE_SYSCALL_KILL => "killed",
+                                sys::ZX_TASK_RETCODE_OOM_KILL => "killed on oom",
+                                sys::ZX_TASK_RETCODE_POLICY_KILL => {
+                                    "killed due to policy violation"
+                                }
+                                sys::ZX_TASK_RETCODE_VDSO_KILL => {
+                                    "killed due to breaking vdso API contract"
+                                }
+                                sys::ZX_TASK_RETCODE_EXCEPTION_KILL => "killed due to exception",
+                                _ => "exited for unknown reason",
+                            };
+                            job_message = format!(
+                                "job was {} (retcode {})",
+                                return_code_str, job_info.return_code
+                            );
+                        }
+                        false => {
+                            // If the job has not exited, then the BAD_STATE error was unexpected
+                            // and indicates a bug somewhere.
+                            log_level = LogStyle::Error;
+                            job_message = "job is running".to_string();
+                        }
+                    }
+                }
+                Err(status) => {
+                    log_level = LogStyle::Error;
+                    job_message = format!(" (error {} getting job state)", status);
+                }
+            }
+        }
+        _ => {
+            // Errors other than process builder error do not concern the job's status.
+            log_level = LogStyle::Error;
+            job_message = "".to_string();
+        }
+    }
+
+    let message = match log_level {
+        LogStyle::JobKilled => {
+            "Process operation failed because the parent job was killed. This is expected."
+        }
+        LogStyle::Warn | LogStyle::Error => "Process operation failed",
+    };
+
+    LogInfo { style: log_level, job_info: job_message, message }
+}
+
 pub type Connector = Box<dyn Connect<Proxy = fproc::LauncherProxy> + Send + Sync>;
 
 /// A protocol connector for `fuchsia.process.Launcher` that serves the protocol with the
@@ -341,5 +394,68 @@ impl Connect for NamespaceConnector {
         })?;
         fuchsia_component::client::connect_to_protocol_at_dir_root::<fproc::LauncherMarker>(svc)
             .context("failed to connect to external launcher service")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use fuchsia_runtime::job_default;
+    use zx::Task;
+
+    use super::*;
+
+    #[test]
+    fn describe_expected_error_in_killed_job() {
+        // Create a child job then kill it.
+        let job = job_default().create_child_job().unwrap();
+        job.kill().unwrap();
+        let err =
+            LauncherError::BuilderError(ProcessBuilderError::CreateProcess(zx::Status::BAD_STATE));
+        let description = describe_error(&err, job.as_handle_ref().cast());
+        assert_eq!(
+            description,
+            LogInfo {
+                style: LogStyle::JobKilled,
+                job_info: "job was killed (retcode -1024)".to_string(),
+                message:
+                    "Process operation failed because the parent job was killed. This is expected."
+            }
+        );
+    }
+
+    #[test]
+    fn describe_unexpected_error_in_killed_job() {
+        // Create a child job then kill it.
+        let job = job_default().create_child_job().unwrap();
+        job.kill().unwrap();
+        let expected_err = LauncherError::BuilderError(ProcessBuilderError::CreateProcess(
+            zx::Status::ACCESS_DENIED,
+        ));
+        let description = describe_error(&expected_err, job.as_handle_ref().cast());
+        assert_eq!(
+            description,
+            LogInfo {
+                style: LogStyle::Error,
+                job_info: "".to_string(),
+                message: "Process operation failed"
+            }
+        );
+    }
+
+    #[test]
+    fn describe_error_in_running_job() {
+        // Use our own job which must be running.
+        let job = job_default();
+        let err =
+            LauncherError::BuilderError(ProcessBuilderError::CreateProcess(zx::Status::BAD_STATE));
+        let description = describe_error(&err, job.clone());
+        assert_eq!(
+            description,
+            LogInfo {
+                style: LogStyle::Error,
+                job_info: "job is running".to_string(),
+                message: "Process operation failed"
+            }
+        );
     }
 }

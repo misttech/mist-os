@@ -12,7 +12,6 @@
 #include <lib/fzl/owned-vmo-mapper.h>
 #include <lib/scheduler/role.h>
 #include <lib/syslog/cpp/macros.h>
-#include <lib/trace/event.h>
 #include <lib/zx/fifo.h>
 #include <lib/zx/result.h>
 #include <lib/zx/thread.h>
@@ -38,6 +37,7 @@
 #include "src/storage/blobfs/compression/decompressor.h"
 #include "src/storage/blobfs/compression/external_decompressor.h"
 #include "src/storage/blobfs/compression_settings.h"
+#include "src/storage/lib/trace/trace.h"
 
 namespace blobfs {
 namespace {

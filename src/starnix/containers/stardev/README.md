@@ -8,35 +8,39 @@ Currently, only very basic software development is possible in `stardev`.
 
 ## Getting started
 
-
-### Build Fuchia
-
-In order to get reasonable performance in `stardev`, you should build Fuchsia using `--release`:
-
-```sh
-$ fx set workbench_eng.x64 --release --with //src/starnix/tools
-$ fx build
-```
-
 ### Create the image
 
-These commands use the `Dockerfile` in this directory to create the disk image for the container.
-The image is stored in the `//local` directory as a Fuchsia Archive, called `stardev.far`:
+These commands use the `Dockerfile` in this directory to create the disk image for the container,
+which is exported into the `//local` directory.
 
 ```sh
 $ docker build -t stardev src/starnix/containers/stardev
 $ docker save stardev:latest -o local/stardev.tar
-$ fx host-tool convert_tarball_to_starnix_container --features rootfs_rw --input-format docker-archive local/stardev.tar local/stardev.far
 ```
+
+### Build Fuchsia
+
+Configure the Fuchsia build to include the `stardev` container:
+
+```sh
+$ fx set workbench_eng.x64 --release --with //src/starnix/containers/stardev --args 'stardev_path = "//local/stardev.tar"'
+$ fx build
+```
+
+The `--release` flag is necessary to get reasonable performance for self-hosted development workloads.
 
 ### Run the container
 
-After building Fuchsia, you can add the `stardev` package to your local package repository and
-then run the container in the Starnix playground:
+After building and running Fuchsia, you can run `stardev` in the Starnix playground:
 
 ```sh
-$ ffx repository publish "$(fx get-build-dir)/amber-files" --package-archive local/stardev.far
-$ ffx component run /core/starnix_runner/playground:stardev fuchsia-pkg://fuchsia.com/stardev#meta/container.cm
+$ src/starnix/containers/stardev/start.sh
+```
+
+Later, if you want to stop the container, you can run the following command:
+
+```sh
+$ src/starnix/containers/stardev/stop.sh
 ```
 
 ### Get a shell
@@ -44,7 +48,7 @@ $ ffx component run /core/starnix_runner/playground:stardev fuchsia-pkg://fuchsi
 Once you have the container running, you can connect to the container via the console:
 
 ```sh
-$ ffx starnix console --moniker /core/starnix_runner/playground:stardev /bin/bash -l
+$ src/starnix/containers/stardev/shell.sh
 ```
 
 ### Installing software

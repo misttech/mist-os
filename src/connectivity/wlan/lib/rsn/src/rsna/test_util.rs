@@ -195,7 +195,7 @@ pub fn get_wpa1_4whs_msg3(ptk: &Ptk, anonce: &[u8]) -> eapol::KeyFrameBuf {
             [0u8; 16],
             0,
         ),
-        wpa_ie_buf,
+        wpa_ie_buf.into(),
         16,
     )
     .serialize();
@@ -302,7 +302,7 @@ where
             fake_wpa3_s_rsne(),
         ),
     };
-    let mut w = kde::Writer::new(vec![]);
+    let mut w = kde::Writer::new();
     w.write_gtk(&kde::Gtk::new(2, kde::GtkInfoTx::BothRxTx, gtk)).expect("error writing GTK KDE");
     if let Some(igtk) = igtk {
         w.write_igtk(&kde::Igtk::new(4, &[0u8; 6], igtk)).expect("error writing IGTK KDE");
@@ -377,7 +377,7 @@ pub fn get_group_key_hs_msg1(
     key_id: u8,
     key_replay_counter: u64,
 ) -> eapol::KeyFrameBuf {
-    let mut w = kde::Writer::new(vec![]);
+    let mut w = kde::Writer::new();
     w.write_gtk(&kde::Gtk::new(key_id, kde::GtkInfoTx::BothRxTx, gtk))
         .expect("error writing GTK KDE");
     let key_data = w.finalize_for_encryption().expect("error finalizing key data");

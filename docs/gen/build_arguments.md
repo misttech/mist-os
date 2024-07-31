@@ -5635,7 +5635,7 @@ Example:
 
 **Current value (from the default):** `[]`
 
-From //build/assembly/developer_overrides.gni:336
+From //build/assembly/developer_overrides.gni:352
 
 ### product_bootfs_packages
 
@@ -8012,7 +8012,7 @@ Whether or not tracing is enabled for storage.
 
 **Current value (from the default):** `false`
 
-From //src/storage/lib/trace/BUILD.gn:10
+From //src/storage/lib/trace/BUILD.gn:11
 
 ### target_cpu
 

@@ -308,9 +308,21 @@ zx_status_t Device::Bind() {
   auto* dispatcher = fdf::Dispatcher::GetCurrent()->async_dispatcher();
   outgoing_ = component::OutgoingDirectory(dispatcher);
 
+  auto snoop_handler = [this](fidl::ServerEnd<fhbt::Snoop2> server_end) mutable {
+    if (snoop_server_.has_value()) {
+      zxlogf(ERROR, "Snoop already active");
+      return;
+    }
+    snoop_server_.emplace(dispatcher_, std::move(server_end), this, [this](fidl::UnbindInfo) {
+      snoop_server_->Close(ZX_OK);
+      snoop_server_.reset();
+    });
+  };
+
   fuchsia_hardware_bluetooth::HciService::InstanceHandler handler({
       .hci_transport =
           hci_transport_binding_.CreateHandler(this, dispatcher, fidl::kIgnoreBindingClosure),
+      .snoop = std::move(snoop_handler),
   });
   auto result = outgoing_->AddService<fuchsia_hardware_bluetooth::HciService>(std::move(handler));
   if (result.is_error()) {
@@ -362,6 +374,10 @@ void Device::ConnectHciTransport(
     fidl::ServerEnd<fuchsia_hardware_bluetooth::HciTransport> server_end) {
   hci_transport_binding_.AddBinding(dispatcher_, std::move(server_end), this,
                                     fidl::kIgnoreBindingClosure);
+}
+
+void Device::ConnectSnoop(fidl::ServerEnd<fuchsia_hardware_bluetooth::Snoop2> server_end) {
+  snoop_server_.emplace(dispatcher_, std::move(server_end), this, fidl::kIgnoreBindingClosure);
 }
 
 zx_status_t Device::DdkGetProtocol(uint32_t proto_id, void* out) {
@@ -717,7 +733,7 @@ void Device::SnoopChannelWriteLocked(bt_hci_snoop_type_t type, bool is_received,
       }
       snoop_channel_.CleanUp();
     }
-  } else if (snoop_client_.is_valid()) {
+  } else if (snoop_server_.has_value()) {
     if ((snoop_seq_ - acked_snoop_seq_) > kSeqNumMaxDiff) {
       if (!snoop_warning_emitted_) {
         zxlogf(
@@ -731,44 +747,46 @@ void Device::SnoopChannelWriteLocked(bt_hci_snoop_type_t type, bool is_received,
     // Reset log when the acked sequence number catches up.
     snoop_warning_emitted_ = false;
 
-    fhbt::SnoopObservePacketRequest req;
-    auto fidl_vec = std::vector<uint8_t>(bytes, bytes + length);
-    req.direction(is_received ? fhbt::PacketDirection::kControllerToHost
-                              : fhbt::PacketDirection::kHostToController);
+    fidl::Arena arena;
+    auto builder = fhbt::wire::Snoop2OnObservePacketRequest::Builder(arena);
+    // auto fidl_vec = std::vector<uint8_t>(bytes, bytes + length);
+    builder.direction(is_received ? fhbt::PacketDirection::kControllerToHost
+                                  : fhbt::PacketDirection::kHostToController);
 
     switch (type) {
       case BT_HCI_SNOOP_TYPE_EVT: {
         ZX_DEBUG_ASSERT(is_received);
-        req.packet(fhbt::SnoopPacket::WithEvent(fidl_vec));
+        builder.packet(fhbt::wire::SnoopPacket::WithEvent(
+            arena, fidl::VectorView<uint8_t>::FromExternal(const_cast<uint8_t*>(bytes), length)));
         break;
       }
       case BT_HCI_SNOOP_TYPE_CMD: {
         ZX_DEBUG_ASSERT(!is_received);
-        req.packet(fhbt::SnoopPacket::WithCommand(fidl_vec));
+        builder.packet(fhbt::wire::SnoopPacket::WithCommand(
+            arena, fidl::VectorView<uint8_t>::FromExternal(const_cast<uint8_t*>(bytes), length)));
         break;
       }
       case BT_HCI_SNOOP_TYPE_ACL: {
-        req.packet(fhbt::SnoopPacket::WithAcl(fidl_vec));
+        builder.packet(fhbt::wire::SnoopPacket::WithAcl(
+            arena, fidl::VectorView<uint8_t>::FromExternal(const_cast<uint8_t*>(bytes), length)));
         break;
       }
       case BT_HCI_SNOOP_TYPE_SCO:
-        req.packet(fhbt::SnoopPacket::WithSco(fidl_vec));
+        builder.packet(fhbt::wire::SnoopPacket::WithSco(
+            arena, fidl::VectorView<uint8_t>::FromExternal(const_cast<uint8_t*>(bytes), length)));
         break;
       default:
         zxlogf(ERROR, "Snoop: Unknown snoop packet type: %u", type);
     }
 
-    req.sequence(snoop_seq_++);
-    fit::result<::fidl::OneWayError> result = snoop_client_->ObservePacket(req);
-    if (!result.is_ok()) {
-      zxlogf(ERROR, "Failed to send snoop packet: %s, unbinding snoop client",
-             result.error_value().FormatDescription().c_str());
-
-      auto snoop_client = snoop_client_.UnbindMaybeGetEndpoint();
-      if (!snoop_client.error_value().ok()) {
-        zxlogf(ERROR, "Failed to unbind snoop client: %s",
-               result.error_value().FormatDescription().c_str());
-      }
+    builder.sequence(snoop_seq_++);
+    fidl::OneWayStatus result =
+        fidl::WireSendEvent(*snoop_server_)->OnObservePacket(builder.Build());
+    if (!result.ok()) {
+      zxlogf(ERROR, "Failed to send snoop packet: %s, unbinding snoop server",
+             result.error().status_string());
+      snoop_server_->Close(ZX_ERR_INTERNAL);
+      snoop_server_.reset();
     }
   }
 }
@@ -791,7 +809,8 @@ void Device::HciEventComplete(usb_request_t* req) {
   }
 
   // Handle the interrupt as long as either the command channel or the snoop channel is open.
-  if (!cmd_channel_.IsOpen() && !snoop_channel_.IsOpen() && hci_transport_binding_.size() == 0) {
+  if (!cmd_channel_.IsOpen() && !snoop_channel_.IsOpen() && hci_transport_binding_.size() == 0 &&
+      !snoop_server_.has_value()) {
     zxlogf(DEBUG,
            "bt-transport-usb: received hci event while command channel and snoop channel are "
            "closed");
@@ -1001,7 +1020,7 @@ void Device::HciAclWriteComplete(usb_request_t* req) {
     acl_completer_queue_.pop();
   }
 
-  if (snoop_channel_.IsOpen() || snoop_client_.is_valid()) {
+  if (snoop_channel_.IsOpen() || snoop_server_.has_value()) {
     void* buffer;
     zx_status_t status = usb_request_mmap(req, &buffer);
     if (status != ZX_OK) {
@@ -1108,7 +1127,7 @@ void Device::HciScoWriteComplete(usb_request_t* req) {
     sco_callback_queue_.pop();
   }
 
-  if (snoop_channel_.IsOpen() || snoop_client_.is_valid()) {
+  if (snoop_channel_.IsOpen() || snoop_server_.has_value()) {
     void* buffer;
     zx_status_t status = usb_request_mmap(req, &buffer);
     if (status != ZX_OK) {
@@ -1670,7 +1689,7 @@ void Device::ConfigureSco(ConfigureScoRequest& request, ConfigureScoCompleter::S
 }
 
 void Device::SetSnoop(SetSnoopRequest& request, SetSnoopCompleter::Sync& completer) {
-  snoop_client_.Bind(std::move(request.snoop()), dispatcher_, this);
+  completer.Close(ZX_ERR_NOT_SUPPORTED);
 }
 
 void Device::handle_unknown_method(
@@ -1680,14 +1699,16 @@ void Device::handle_unknown_method(
   completer.Close(ZX_ERR_NOT_SUPPORTED);
 }
 
-void Device::OnAcknowledgePackets(
-    fidl::Event<fuchsia_hardware_bluetooth::Snoop::OnAcknowledgePackets>& event) {
-  acked_snoop_seq_ = std::max(event.sequence(), acked_snoop_seq_);
+void Device::AcknowledgePackets(AcknowledgePacketsRequest& request,
+                                AcknowledgePacketsCompleter::Sync& completer) {
+  acked_snoop_seq_ = std::max(request.sequence(), acked_snoop_seq_);
 }
 
-void Device::handle_unknown_event(
-    fidl::UnknownEventMetadata<fuchsia_hardware_bluetooth::Snoop> metadata) {
-  zxlogf(ERROR, "Unknown method in fidl::AsyncEventHandler<fuchsia_hardware_bluetooth::Snoop>");
+void Device::handle_unknown_method(
+
+    ::fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Snoop2> metadata,
+    ::fidl::UnknownMethodCompleter::Sync& completer) {
+  zxlogf(ERROR, "Unknown method in fidl::Server<fuchsia_hardware_bluetooth::Snoop2>");
 }
 
 void Device::Wait::Handler(async_dispatcher_t* dispatcher, async_wait_t* async_wait,

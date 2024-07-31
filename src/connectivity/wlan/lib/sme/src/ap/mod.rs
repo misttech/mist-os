@@ -834,7 +834,7 @@ fn create_start_request(
         if let Err(e) = rsne.write_into(&mut buf) {
             error!("error writing RSNE into MLME-START.request: {}", e);
         }
-        buf
+        buf.into()
     });
 
     let (channel_bandwidth, _secondary80) = op_radio_cfg.channel.cbw.to_fidl();

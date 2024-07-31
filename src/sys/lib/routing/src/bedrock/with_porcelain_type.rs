@@ -9,6 +9,10 @@ use cm_rust::CapabilityTypeName;
 use router_error::RouterError;
 use sandbox::{Capability, Data, Request, Routable, Router};
 
+pub fn is_supported(porcelain_type: &CapabilityTypeName) -> bool {
+    matches!(porcelain_type, CapabilityTypeName::Protocol)
+}
+
 pub trait WithPorcelainType {
     /// Returns a router that ensures the capability request has a porcelain
     /// type that is the same as the type of the capability returned by the
@@ -18,6 +22,10 @@ pub trait WithPorcelainType {
 
 impl WithPorcelainType for Router {
     fn with_porcelain_type(self, porcelain_type: CapabilityTypeName) -> Router {
+        if !is_supported(&porcelain_type) {
+            return self;
+        }
+
         #[derive(Debug, Clone)]
         struct RouterWithPorcelainType {
             router: Router,
