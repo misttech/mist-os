@@ -1,5 +1,5 @@
 {
-    "short_description": "Simple PCI Bochs display driver",
+    "short_description": "PCI Bochs framebuffer display driver",
     "manufacturer": "",
     "families": [],
     "models": [],

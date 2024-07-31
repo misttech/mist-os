@@ -12,11 +12,11 @@
 
 #include <fbl/alloc_checker.h>
 
-#include "src/graphics/display/drivers/simple-bochs/bochs-vbe-registers.h"
+#include "src/graphics/display/drivers/framebuffer-bochs-display/bochs-vbe-registers.h"
 #include "src/graphics/display/lib/simple-display/simple-display-driver.h"
 #include "src/graphics/display/lib/simple-display/simple-display.h"
 
-namespace simple_display {
+namespace framebuffer_display {
 
 namespace {
 
@@ -114,34 +114,35 @@ void LogBochsDisplayEngineRegisters(fdf::MmioView mmio_space) {
 }
 
 // Driver for the QEMU Bochs-compatible display engine.
-class SimpleBochsDisplayDriver final : public SimpleDisplayDriver {
+class FramebufferBochsDisplayDriver final : public simple_display::SimpleDisplayDriver {
  public:
-  explicit SimpleBochsDisplayDriver(fdf::DriverStartArgs start_args,
-                                    fdf::UnownedSynchronizedDispatcher driver_dispatcher);
+  explicit FramebufferBochsDisplayDriver(fdf::DriverStartArgs start_args,
+                                         fdf::UnownedSynchronizedDispatcher driver_dispatcher);
 
-  SimpleBochsDisplayDriver(const SimpleBochsDisplayDriver&) = delete;
-  SimpleBochsDisplayDriver(SimpleBochsDisplayDriver&&) = delete;
-  SimpleBochsDisplayDriver& operator=(const SimpleBochsDisplayDriver&) = delete;
-  SimpleBochsDisplayDriver& operator=(SimpleBochsDisplayDriver&&) = delete;
+  FramebufferBochsDisplayDriver(const FramebufferBochsDisplayDriver&) = delete;
+  FramebufferBochsDisplayDriver(FramebufferBochsDisplayDriver&&) = delete;
+  FramebufferBochsDisplayDriver& operator=(const FramebufferBochsDisplayDriver&) = delete;
+  FramebufferBochsDisplayDriver& operator=(FramebufferBochsDisplayDriver&&) = delete;
 
-  ~SimpleBochsDisplayDriver() override;
+  ~FramebufferBochsDisplayDriver() override;
 
   // SimpleDisplayDriver:
   zx::result<> ConfigureHardware() override;
   zx::result<fdf::MmioBuffer> GetFrameBufferMmioBuffer() override;
-  zx::result<DisplayProperties> GetDisplayProperties() override;
+  zx::result<simple_display::DisplayProperties> GetDisplayProperties() override;
 
  private:
   zx::result<ddk::Pci> GetPciClient();
 };
 
-SimpleBochsDisplayDriver::SimpleBochsDisplayDriver(
+FramebufferBochsDisplayDriver::FramebufferBochsDisplayDriver(
     fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher)
-    : SimpleDisplayDriver("bochs-vbe", std::move(start_args), std::move(driver_dispatcher)) {}
+    : SimpleDisplayDriver("framebuffer-bochs-display", std::move(start_args),
+                          std::move(driver_dispatcher)) {}
 
-SimpleBochsDisplayDriver::~SimpleBochsDisplayDriver() = default;
+FramebufferBochsDisplayDriver::~FramebufferBochsDisplayDriver() = default;
 
-zx::result<ddk::Pci> SimpleBochsDisplayDriver::GetPciClient() {
+zx::result<ddk::Pci> FramebufferBochsDisplayDriver::GetPciClient() {
   zx::result<fidl::ClientEnd<fuchsia_hardware_pci::Device>> pci_result =
       incoming()->Connect<fuchsia_hardware_pci::Service::Device>("pci");
   if (pci_result.is_error()) {
@@ -153,7 +154,7 @@ zx::result<ddk::Pci> SimpleBochsDisplayDriver::GetPciClient() {
   return zx::ok(std::move(pci));
 }
 
-zx::result<> SimpleBochsDisplayDriver::ConfigureHardware() {
+zx::result<> FramebufferBochsDisplayDriver::ConfigureHardware() {
   zx::result<ddk::Pci> pci_result = GetPciClient();
   if (pci_result.is_error()) {
     return pci_result.take_error();
@@ -200,7 +201,7 @@ zx::result<> SimpleBochsDisplayDriver::ConfigureHardware() {
   return setup_result;
 }
 
-zx::result<fdf::MmioBuffer> SimpleBochsDisplayDriver::GetFrameBufferMmioBuffer() {
+zx::result<fdf::MmioBuffer> FramebufferBochsDisplayDriver::GetFrameBufferMmioBuffer() {
   zx::result<ddk::Pci> pci_result = GetPciClient();
   if (pci_result.is_error()) {
     return pci_result.take_error();
@@ -227,8 +228,9 @@ zx::result<fdf::MmioBuffer> SimpleBochsDisplayDriver::GetFrameBufferMmioBuffer()
   return zx::ok(std::move(framebuffer_mmio).value());
 }
 
-zx::result<DisplayProperties> SimpleBochsDisplayDriver::GetDisplayProperties() {
-  static constexpr DisplayProperties kDisplayProperties = {
+zx::result<simple_display::DisplayProperties>
+FramebufferBochsDisplayDriver::GetDisplayProperties() {
+  static constexpr simple_display::DisplayProperties kDisplayProperties = {
       .width_px = kDisplayWidth,
       .height_px = kDisplayHeight,
       .row_stride_px = kDisplayWidth,
@@ -239,6 +241,6 @@ zx::result<DisplayProperties> SimpleBochsDisplayDriver::GetDisplayProperties() {
 
 }  // namespace
 
-}  // namespace simple_display
+}  // namespace framebuffer_display
 
-FUCHSIA_DRIVER_EXPORT(simple_display::SimpleBochsDisplayDriver);
+FUCHSIA_DRIVER_EXPORT(framebuffer_display::FramebufferBochsDisplayDriver);

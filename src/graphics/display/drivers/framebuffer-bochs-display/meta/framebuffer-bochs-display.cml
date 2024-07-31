@@ -9,8 +9,8 @@
     ],
     program: {
         runner: "driver",
-        binary: "driver/simple.bochs.so",
-        bind: "meta/bind/simple-bochs-bind.bindbc",
+        binary: "driver/framebuffer-bochs-display.so",
+        bind: "meta/bind/framebuffer-bochs-display-bind.bindbc",
     },
     use: [
         { service: "fuchsia.hardware.pci.Service" },

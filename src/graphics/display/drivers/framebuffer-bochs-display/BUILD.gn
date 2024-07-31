@@ -7,9 +7,9 @@ import("//build/components.gni")
 import("//build/drivers.gni")
 import("//build/test.gni")
 
-driver_bind_rules("simple-bochs-bind") {
-  rules = "meta/simple-bochs.bind"
-  tests = "meta/bochs_bind_tests.json"
+driver_bind_rules("framebuffer-bochs-display-bind") {
+  rules = "meta/framebuffer-bochs-display.bind"
+  tests = "meta/framebuffer-bochs-display-bind-tests.json"
 
   deps = [
     "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_bindlib",
@@ -19,8 +19,8 @@ driver_bind_rules("simple-bochs-bind") {
   ]
 }
 
-fuchsia_driver("simple.bochs-driver") {
-  output_name = "simple.bochs"
+fuchsia_driver("driver") {
+  output_name = "framebuffer-bochs-display"
   configs += [
     "//build/config:all_source",
     "//build/config/fuchsia:enable_zircon_asserts",
@@ -28,10 +28,10 @@ fuchsia_driver("simple.bochs-driver") {
 
   sources = [
     "bochs-vbe-registers.h",
-    "simple-bochs.cc",
+    "framebuffer-bochs-display.cc",
   ]
   deps = [
-    ":simple-bochs-bind",
+    ":framebuffer-bochs-display-bind",
     "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_cpp",
     "//sdk/lib/driver/component/cpp",
     "//sdk/lib/driver/logging/cpp",
@@ -43,19 +43,19 @@ fuchsia_driver("simple.bochs-driver") {
   ]
 }
 
-fuchsia_driver_component("simple.bochs") {
-  component_name = "simple.bochs"
-  deps = [ ":simple.bochs-driver" ]
-  info = "meta/simple.bochs-info.json"
-  manifest = "meta/bochs.cml"
+fuchsia_driver_component("framebuffer-bochs-display") {
+  component_name = "framebuffer-bochs-display"
+  deps = [ ":driver" ]
+  info = "meta/framebuffer-bochs-display-info.json"
+  manifest = "meta/framebuffer-bochs-display.cml"
 }
 
-fuchsia_driver_package("simple-bochs-package") {
-  package_name = "simple.bochs"
-  driver_components = [ ":simple.bochs" ]
+fuchsia_driver_package("package") {
+  package_name = "framebuffer-bochs-display"
+  driver_components = [ ":framebuffer-bochs-display" ]
 }
 
 group("tests") {
   testonly = true
-  deps = [ ":simple-bochs-bind_test" ]
+  deps = [ ":framebuffer-bochs-display-bind_test" ]
 }
