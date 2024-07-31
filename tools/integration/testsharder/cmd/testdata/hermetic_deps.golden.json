@@ -59,10 +59,10 @@
         },
         "deps": [
             "images.json",
+            "product_bundle/zbi",
             "product_bundles.json",
             "repo_AEMU",
-            "sdk/manifest/core",
-            "zbi"
+            "sdk/manifest/core"
         ],
         "pkg_repo": "repo_AEMU",
         "timeout_secs": 0,
