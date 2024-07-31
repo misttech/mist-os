@@ -29,6 +29,7 @@ class ArchiveReader {
  public:
   // Create a new ArchiveReader.
   ArchiveReader(async_dispatcher_t* dispatcher, std::vector<std::string> selectors);
+  explicit ArchiveReader(async_dispatcher_t* dispatcher) : ArchiveReader(dispatcher, {}) {}
 
   // Creates a new ArchiveReader using the specified client.
   ArchiveReader(async_dispatcher_t* dispatcher, std::vector<std::string> selectors,
@@ -38,6 +39,18 @@ class ArchiveReader {
   //
   // Returns an error if the ArchiveAccessorPtr is not bound.
   fpromise::promise<std::vector<InspectData>, std::string> GetInspectSnapshot();
+
+  // Set the ArchiveReader's selectors to this exact list, overwriting any previously supplied.
+  ArchiveReader& SetSelectors(std::vector<std::string> selectors) {
+    selectors_ = std::move(selectors);
+    return *this;
+  }
+
+  // Add these selectors to the ArchiveReader's current set of selectors.
+  ArchiveReader& AddSelectors(std::vector<std::string> selectors) {
+    selectors_.insert(selectors_.end(), selectors.begin(), selectors.end());
+    return *this;
+  }
 
   // Gets a snapshot of the Inspect data at the point in time in which all listed component
   // names are present.
@@ -75,6 +88,21 @@ class ArchiveReader {
 };
 
 void EmplaceInspect(rapidjson::Document document, std::vector<InspectData>* out);
+
+// Construct a selector from the provided values:
+// 1) moniker: this should be an unsanitized moniker like "core/simple" or "core/less:simple".
+// 2) inspect_tree_names: if nullopt, uses the default tree name. If a list of names, puts them
+//                        in the name filter list. If "...", constructs a filter list that matches
+//                        any inspect tree name.
+// 3) hierarchy: the node path hierarchy. These should be sanitized, so asterisks and colons in
+//               the values need to be escaped (ie "\\*" or "\\:"). If an empty vector is provided,
+//               the root node will be inserted. If a non-empty vector is provided, note that it
+//               should start at the root node.
+// 4) property: the property to select. If nullopt, no property is inserted (ie the final node
+//              in `hierarchy` is used).
+std::string MakeSelector(std::string_view moniker,
+                         std::optional<std::vector<std::string>> inspect_tree_names,
+                         std::vector<std::string> hierarchy, std::optional<std::string> property);
 
 std::string SanitizeMonikerForSelectors(std::string_view moniker);
 

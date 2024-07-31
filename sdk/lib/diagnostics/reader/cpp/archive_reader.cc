@@ -1,6 +1,7 @@
 // Copyright 2020 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+#include <fidl/fuchsia.inspect/cpp/natural_types.h>
 #include <lib/async/cpp/task.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/diagnostics/reader/cpp/archive_reader.h>
@@ -267,4 +268,45 @@ std::string SanitizeMonikerForSelectors(std::string_view moniker) {
   return result;
 }
 
+std::string MakeSelector(std::string_view moniker,
+                         std::optional<std::vector<std::string>> inspect_tree_names,
+                         std::vector<std::string> hierarchy, std::optional<std::string> property) {
+  std::string selector =
+      SanitizeMonikerForSelectors(moniker) + ":";  // going to add at least the root node
+  if (inspect_tree_names.has_value() && !inspect_tree_names.value().empty()) {
+    if (inspect_tree_names.value()[0] == "...") {
+      // syntax to match any name
+      selector += "[...]";
+    } else {
+      selector += "[";
+      for (auto i = 0ul; i < inspect_tree_names->size(); i++) {
+        selector += "name=\"" + std::move(inspect_tree_names.value()[i]) + "\"";
+        if (i < inspect_tree_names->size() - 1) {
+          selector += ", ";
+        }
+      }
+      selector += "]";
+    }
+  } else {
+    selector += std::string{"[name=\""} + fuchsia_inspect::kDefaultTreeName + "\"]";
+  }
+
+  if (hierarchy.empty()) {
+    selector += "root";
+  } else {
+    for (auto i = 0ul; i < hierarchy.size(); i++) {
+      selector += std::move(hierarchy[i]);
+      // all but the last element are separated by slashes; the last is separated colon
+      if (i < hierarchy.size() - 1) {
+        selector += "/";
+      }
+    }
+  }
+
+  if (property.has_value()) {
+    selector += ":" + std::move(property.value());
+  }
+
+  return selector;
+}
 }  // namespace diagnostics::reader

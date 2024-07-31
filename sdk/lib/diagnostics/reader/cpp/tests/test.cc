@@ -145,7 +145,7 @@ class ArchiveReaderTest : public gtest::RealLoopFixture {
 using InspectResult = fpromise::result<std::vector<diagnostics::reader::InspectData>, std::string>;
 using LogsResult = fpromise::result<std::optional<diagnostics::reader::LogsData>, std::string>;
 
-TEST_F(ArchiveReaderTest, ReadHierarchy) {
+TEST_F(ArchiveReaderTest, ReadHierarchyAPI1) {
   diagnostics::reader::ArchiveReader reader(executor().dispatcher(),
                                             {cm1_selector(), cm2_selector()});
 
@@ -164,6 +164,68 @@ TEST_F(ArchiveReaderTest, ReadHierarchy) {
 
   EXPECT_STREQ("v1", value[0].content()["root"]["version"].GetString());
   EXPECT_STREQ("v1", value[1].content()["root"]["version"].GetString());
+}
+
+TEST_F(ArchiveReaderTest, ReadHierarchyAPI2) {
+  diagnostics::reader::ArchiveReader reader(executor().dispatcher());
+
+  {
+    InspectResult result;
+    executor().schedule_task(reader.SetSelectors({cm1_selector()})
+                                 .SnapshotInspectUntilPresent({cm1_moniker()})
+                                 .then([&](InspectResult& r) { result = std::move(r); }));
+    RunLoopUntil([&] { return !!result; });
+
+    ASSERT_TRUE(result.is_ok()) << "Error: " << result.error();
+
+    auto value = result.take_value();
+
+    EXPECT_EQ(1ul, value.size());
+    EXPECT_EQ(cm1_moniker(), value[0].moniker());
+    EXPECT_STREQ("v1", value[0].content()["root"]["version"].GetString());
+  }
+
+  {
+    InspectResult result;
+
+    // reset selectors to only cm2
+    executor().schedule_task(reader.SetSelectors({cm2_selector()})
+                                 .SnapshotInspectUntilPresent({cm2_moniker()})
+                                 .then([&](InspectResult& r) { result = std::move(r); }));
+    RunLoopUntil([&] { return !!result; });
+
+    ASSERT_TRUE(result.is_ok()) << "Error: " << result.error();
+
+    auto value = result.take_value();
+
+    EXPECT_EQ(1ul, value.size());
+    EXPECT_EQ(cm2_moniker(), value[0].moniker());
+    EXPECT_STREQ("v1", value[0].content()["root"]["version"].GetString());
+  }
+
+  {
+    InspectResult result;
+
+    // last set only cm2 selector, this adds cm1
+    executor().schedule_task(reader.AddSelectors({cm1_selector()})
+                                 .SnapshotInspectUntilPresent({cm1_moniker(), cm2_moniker()})
+                                 .then([&](InspectResult& r) { result = std::move(r); }));
+    RunLoopUntil([&] { return !!result; });
+
+    ASSERT_TRUE(result.is_ok()) << "Error: " << result.error();
+
+    auto value = result.take_value();
+    std::sort(value.begin(), value.end(),
+              [](auto& a, auto& b) { return a.moniker() < b.moniker(); });
+
+    EXPECT_EQ(2ul, value.size());
+
+    EXPECT_EQ(cm1_moniker(), value[0].moniker());
+    EXPECT_EQ(cm2_moniker(), value[1].moniker());
+
+    EXPECT_STREQ("v1", value[0].content()["root"]["version"].GetString());
+    EXPECT_STREQ("v1", value[1].content()["root"]["version"].GetString());
+  }
 }
 
 TEST_F(ArchiveReaderTest, ReadHierarchyWithAlternativeDispatcher) {
