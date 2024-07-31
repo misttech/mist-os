@@ -7,9 +7,9 @@ import("//build/components.gni")
 import("//build/drivers.gni")
 import("//build/test.gni")
 
-driver_bind_rules("simple-intel-bind") {
-  rules = "meta/simple-intel.bind"
-  tests = "meta/intel_bind_tests.json"
+driver_bind_rules("framebuffer-intel-display-bind") {
+  rules = "meta/framebuffer-intel-display.bind"
+  tests = "meta/framebuffer-intel-display-bind-tests.json"
 
   deps = [
     "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_bindlib",
@@ -19,16 +19,16 @@ driver_bind_rules("simple-intel-bind") {
   ]
 }
 
-fuchsia_driver("simple.intel-driver") {
-  output_name = "simple.intel"
+fuchsia_driver("driver") {
+  output_name = "framebuffer-intel-display"
   configs += [
     "//build/config:all_source",
     "//build/config/fuchsia:enable_zircon_asserts",
   ]
 
-  sources = [ "simple-intel.cc" ]
+  sources = [ "framebuffer-intel-display.cc" ]
   deps = [
-    ":simple-intel-bind",
+    ":framebuffer-intel-display-bind",
     "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp",
     "//sdk/lib/driver/component/cpp",
     "//sdk/lib/driver/logging/cpp",
@@ -39,19 +39,19 @@ fuchsia_driver("simple.intel-driver") {
   ]
 }
 
-fuchsia_driver_component("simple.intel") {
-  component_name = "simple.intel"
-  deps = [ ":simple.intel-driver" ]
-  info = "meta/simple.intel-info.json"
-  manifest = "meta/intel.cml"
+fuchsia_driver_component("framebuffer-intel-display") {
+  component_name = "framebuffer-intel-display"
+  deps = [ ":driver" ]
+  info = "meta/framebuffer-intel-display-info.json"
+  manifest = "meta/framebuffer-intel-display.cml"
 }
 
-fuchsia_driver_package("simple-intel-package") {
-  package_name = "simple.intel"
-  driver_components = [ ":simple.intel" ]
+fuchsia_driver_package("package") {
+  package_name = "framebuffer-intel-display"
+  driver_components = [ ":framebuffer-intel-display" ]
 }
 
 group("tests") {
   testonly = true
-  deps = [ ":simple-intel-bind_test" ]
+  deps = [ ":framebuffer-intel-display-bind_test" ]
 }

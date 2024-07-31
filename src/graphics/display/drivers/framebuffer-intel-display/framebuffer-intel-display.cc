@@ -15,40 +15,41 @@
 #include "src/graphics/display/lib/simple-display/simple-display-driver.h"
 #include "src/graphics/display/lib/simple-display/simple-display.h"
 
-namespace simple_display {
+namespace framebuffer_display {
 
 namespace {
 
-class SimpleIntelDisplayDriver final : public SimpleDisplayDriver {
+class FramebufferIntelDisplayDriver final : public simple_display::SimpleDisplayDriver {
  public:
-  explicit SimpleIntelDisplayDriver(fdf::DriverStartArgs start_args,
-                                    fdf::UnownedSynchronizedDispatcher driver_dispatcher);
+  explicit FramebufferIntelDisplayDriver(fdf::DriverStartArgs start_args,
+                                         fdf::UnownedSynchronizedDispatcher driver_dispatcher);
 
-  SimpleIntelDisplayDriver(const SimpleIntelDisplayDriver&) = delete;
-  SimpleIntelDisplayDriver(SimpleIntelDisplayDriver&&) = delete;
-  SimpleIntelDisplayDriver& operator=(const SimpleIntelDisplayDriver&) = delete;
-  SimpleIntelDisplayDriver& operator=(SimpleIntelDisplayDriver&&) = delete;
+  FramebufferIntelDisplayDriver(const FramebufferIntelDisplayDriver&) = delete;
+  FramebufferIntelDisplayDriver(FramebufferIntelDisplayDriver&&) = delete;
+  FramebufferIntelDisplayDriver& operator=(const FramebufferIntelDisplayDriver&) = delete;
+  FramebufferIntelDisplayDriver& operator=(FramebufferIntelDisplayDriver&&) = delete;
 
-  ~SimpleIntelDisplayDriver() override;
+  ~FramebufferIntelDisplayDriver() override;
 
   // SimpleDisplayDriver:
   zx::result<> ConfigureHardware() override;
   zx::result<fdf::MmioBuffer> GetFrameBufferMmioBuffer() override;
-  zx::result<DisplayProperties> GetDisplayProperties() override;
+  zx::result<simple_display::DisplayProperties> GetDisplayProperties() override;
 
  private:
   zx::result<zx::resource> GetFramebufferResource();
 };
 
-SimpleIntelDisplayDriver::SimpleIntelDisplayDriver(
+FramebufferIntelDisplayDriver::FramebufferIntelDisplayDriver(
     fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher)
-    : SimpleDisplayDriver("intel", std::move(start_args), std::move(driver_dispatcher)) {}
+    : SimpleDisplayDriver("framebuffer-intel-display", std::move(start_args),
+                          std::move(driver_dispatcher)) {}
 
-SimpleIntelDisplayDriver::~SimpleIntelDisplayDriver() = default;
+FramebufferIntelDisplayDriver::~FramebufferIntelDisplayDriver() = default;
 
-zx::result<> SimpleIntelDisplayDriver::ConfigureHardware() { return zx::ok(); }
+zx::result<> FramebufferIntelDisplayDriver::ConfigureHardware() { return zx::ok(); }
 
-zx::result<fdf::MmioBuffer> SimpleIntelDisplayDriver::GetFrameBufferMmioBuffer() {
+zx::result<fdf::MmioBuffer> FramebufferIntelDisplayDriver::GetFrameBufferMmioBuffer() {
   zx::result<fidl::ClientEnd<fuchsia_hardware_pci::Device>> pci_result =
       incoming()->Connect<fuchsia_hardware_pci::Service::Device>("pci");
   if (pci_result.is_error()) {
@@ -72,7 +73,7 @@ zx::result<fdf::MmioBuffer> SimpleIntelDisplayDriver::GetFrameBufferMmioBuffer()
   return zx::ok(std::move(framebuffer_mmio).value());
 }
 
-zx::result<zx::resource> SimpleIntelDisplayDriver::GetFramebufferResource() {
+zx::result<zx::resource> FramebufferIntelDisplayDriver::GetFramebufferResource() {
   zx::result framebuffer_resource_result =
       incoming()->Connect<fuchsia_kernel::FramebufferResource>();
   if (framebuffer_resource_result.is_error()) {
@@ -91,7 +92,8 @@ zx::result<zx::resource> SimpleIntelDisplayDriver::GetFramebufferResource() {
   return zx::ok(std::move(std::move(get_result).value()).resource);
 }
 
-zx::result<DisplayProperties> SimpleIntelDisplayDriver::GetDisplayProperties() {
+zx::result<simple_display::DisplayProperties>
+FramebufferIntelDisplayDriver::GetDisplayProperties() {
   zx::result<zx::resource> framebuffer_resource_result = GetFramebufferResource();
   if (framebuffer_resource_result.is_error()) {
     return framebuffer_resource_result.take_error();
@@ -119,7 +121,7 @@ zx::result<DisplayProperties> SimpleIntelDisplayDriver::GetDisplayProperties() {
   }
   fuchsia_images2::wire::PixelFormat sysmem2_format = sysmem2_format_type_result.take_value();
 
-  const DisplayProperties properties = {
+  const simple_display::DisplayProperties properties = {
       .width_px = static_cast<int32_t>(width),
       .height_px = static_cast<int32_t>(height),
       .row_stride_px = static_cast<int32_t>(stride),
@@ -130,6 +132,6 @@ zx::result<DisplayProperties> SimpleIntelDisplayDriver::GetDisplayProperties() {
 
 }  // namespace
 
-}  // namespace simple_display
+}  // namespace framebuffer_display
 
-FUCHSIA_DRIVER_EXPORT(simple_display::SimpleIntelDisplayDriver);
+FUCHSIA_DRIVER_EXPORT(framebuffer_display::FramebufferIntelDisplayDriver);

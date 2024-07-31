@@ -11,9 +11,9 @@ group("drivers") {
     "drivers/amlogic-display",
     "drivers/coordinator",
     "drivers/framebuffer-bochs-display",
+    "drivers/framebuffer-intel-display",
     "drivers/goldfish-display",
     "drivers/intel-i915",
-    "drivers/simple-intel:simple.intel",
     "drivers/vim3-display-detect:vim3-display-detect",
     "drivers/virtio-gpu-display:component",
   ]

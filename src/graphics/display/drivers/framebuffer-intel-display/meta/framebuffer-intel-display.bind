@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-composite simple_intel;
+composite framebuffer_intel_display;
 
 using fuchsia.acpi;
 using fuchsia.hardware.pci;
@@ -15,8 +15,8 @@ primary node "pci" {
   fuchsia.BIND_PCI_CLASS == fuchsia.pci.BIND_PCI_CLASS.DISPLAY;
 
   // Reject all device IDs that i915 binds to as well. This is necessary
-  // because the simple-intel driver binds to the FIDL node published by PCI,
-  // but i915 binds to the banjo node.
+  // because the framebuffer-intel-display driver binds to the FIDL node
+  // published by PCI, but i915 binds to the banjo node.
   // TODO(https://fxbug.dev/42171012): Remove this once i915 uses FIDL as well.
   fuchsia.BIND_PCI_DID != 0x191b;
   fuchsia.BIND_PCI_DID != 0x1912;

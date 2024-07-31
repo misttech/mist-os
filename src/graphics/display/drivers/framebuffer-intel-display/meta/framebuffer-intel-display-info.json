@@ -1,5 +1,5 @@
 {
-    "short_description": "Simple PCI Intel display driver",
+    "short_description": "PCI Intel framebuffer display driver",
     "manufacturer": "Intel",
     "families": [],
     "models": [],

@@ -9,8 +9,8 @@
     ],
     program: {
         runner: "driver",
-        binary: "driver/simple.intel.so",
-        bind: "meta/bind/simple-intel-bind.bindbc",
+        binary: "driver/framebuffer-intel-display.so",
+        bind: "meta/bind/framebuffer-intel-display-bind.bindbc",
     },
     use: [
         { protocol: "fuchsia.kernel.FramebufferResource" },
