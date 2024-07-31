@@ -44,9 +44,7 @@ impl TryFrom<fsandbox::Capability> for Capability {
                 let any = try_from_handle_in_registry(connector.token.as_handle_ref())?;
                 match &any {
                     Capability::Connector(_) => (),
-                    _ => panic!(
-                        "BUG: registry has a non-Connector capability under a Connector koid"
-                    ),
+                    _ => return Err(RemoteError::BadCapability),
                 };
                 Ok(any)
             }
@@ -57,7 +55,7 @@ impl TryFrom<fsandbox::Capability> for Capability {
                 let any = try_from_handle_in_registry(client_end.as_handle_ref())?;
                 match &any {
                     Capability::Router(_) => (),
-                    _ => panic!("BUG: registry has a non-Router capability under a Router koid"),
+                    _ => return Err(RemoteError::BadCapability),
                 };
                 Ok(any)
             }
@@ -65,9 +63,7 @@ impl TryFrom<fsandbox::Capability> for Capability {
                 let any = try_from_handle_in_registry(dir_entry.token.as_handle_ref())?;
                 match &any {
                     Capability::DirEntry(_) => (),
-                    _ => {
-                        panic!("BUG: registry has a non-DirEntry capability under a DirEntry koid")
-                    }
+                    _ => return Err(RemoteError::BadCapability),
                 };
                 Ok(any)
             }

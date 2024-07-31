@@ -216,6 +216,11 @@ open protocol CapabilityStore {
     ///
     /// This is a legacy API to support backward compatibility with APIs that take a [Dictionary]
     /// channel.
+    ///
+    /// Errors:
+    ///
+    /// - `ID_ALREADY_EXISTS` if a capability with `id` already exists in this store.
+    /// - `BAD_CAPABILITY` if `client_end` was not a valid dictionary channel.
     flexible DictionaryLegacyImport(resource struct {
         id NewCapabilityId;
         client_end zx.Handle:CHANNEL;
@@ -226,6 +231,10 @@ open protocol CapabilityStore {
     ///
     /// This is a legacy API to support backward compatibility with APIs that take a [Dictionary]
     /// channel.
+    ///
+    /// Errors:
+    ///
+    /// - `ID_NOT_FOUND` if `id` was not a valid capability id in this store.
     flexible DictionaryLegacyExport(resource struct {
         id CapabilityId;
         server_end zx.Handle:CHANNEL;

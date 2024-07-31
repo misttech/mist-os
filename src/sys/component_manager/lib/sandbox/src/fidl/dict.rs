@@ -84,7 +84,6 @@ mod tests {
     use super::*;
     use crate::dict::Key;
     use crate::{serve_capability_store, Data, Dict, DirEntry, Directory, Handle, Unit};
-    use anyhow::{Error, Result};
     use assert_matches::assert_matches;
     use fidl::endpoints::{
         create_endpoints, create_proxy, create_proxy_and_stream, ClientEnd, Proxy, ServerEnd,
@@ -124,10 +123,7 @@ mod tests {
         let value = 10;
         store.import(value, Unit::default().into()).await.unwrap().unwrap();
         store
-            .dictionary_insert(
-                dict_id,
-                &fsandbox::DictionaryItem { key: CAP_KEY.to_string(), value },
-            )
+            .dictionary_insert(dict_id, &fsandbox::DictionaryItem { key: "k".into(), value })
             .await
             .unwrap()
             .unwrap();
@@ -137,7 +133,20 @@ mod tests {
         store.dictionary_keys(dict_id, server_end).await.unwrap().unwrap();
         let keys = iterator.get_next().await.unwrap();
         assert!(iterator.get_next().await.unwrap().is_empty());
-        assert_eq!(keys, ["cap"]);
+        assert_eq!(keys, ["k"]);
+    }
+
+    #[fuchsia::test]
+    async fn create_error() {
+        let (store, stream) = create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>().unwrap();
+        let _server = fasync::Task::spawn(serve_capability_store(stream));
+
+        let cap = Capability::Data(Data::Int64(42));
+        assert_matches!(store.import(1, cap.into()).await.unwrap(), Ok(()));
+        assert_matches!(
+            store.dictionary_create(1).await.unwrap(),
+            Err(fsandbox::CapabilityStoreError::IdAlreadyExists)
+        );
     }
 
     #[fuchsia::test]
@@ -155,10 +164,7 @@ mod tests {
         let value = 10;
         store.import(value, Unit::default().into()).await.unwrap().unwrap();
         store
-            .dictionary_insert(
-                dict_id,
-                &fsandbox::DictionaryItem { key: CAP_KEY.to_string(), value },
-            )
+            .dictionary_insert(dict_id, &fsandbox::DictionaryItem { key: "k".into(), value })
             .await
             .unwrap()
             .unwrap();
@@ -174,17 +180,50 @@ mod tests {
         store.dictionary_keys(dict_id, server_end).await.unwrap().unwrap();
         let keys = iterator.get_next().await.unwrap();
         assert!(iterator.get_next().await.unwrap().is_empty());
-        assert_eq!(keys, ["cap"]);
+        assert_eq!(keys, ["k"]);
     }
 
-    /// Tests that the `Dict` contains an entry for a capability inserted via `Dict.Insert`,
-    /// and that the value is the same capability.
     #[fuchsia::test]
-    async fn serve_insert() -> Result<()> {
-        let dict = Dict::new();
-
+    async fn legacy_import_error() {
         let (store, stream) = create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>().unwrap();
         let _server = fasync::Task::spawn(serve_capability_store(stream));
+
+        store.dictionary_create(10).await.unwrap().unwrap();
+        let (dict_ch, server) = fidl::Channel::create();
+        store.dictionary_legacy_export(10, server).await.unwrap().unwrap();
+
+        let cap1 = Capability::Data(Data::Int64(42));
+        store.import(1, cap1.into()).await.unwrap().unwrap();
+        assert_matches!(
+            store.dictionary_legacy_import(1, dict_ch).await.unwrap(),
+            Err(fsandbox::CapabilityStoreError::IdAlreadyExists)
+        );
+
+        let (ch, _) = fidl::Channel::create();
+        assert_matches!(
+            store.dictionary_legacy_import(2, ch.into()).await.unwrap(),
+            Err(fsandbox::CapabilityStoreError::BadCapability)
+        );
+    }
+
+    #[fuchsia::test]
+    async fn legacy_export_error() {
+        let (store, stream) = create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>().unwrap();
+        let _server = fasync::Task::spawn(serve_capability_store(stream));
+
+        let (_dict_ch, server) = fidl::Channel::create();
+        assert_matches!(
+            store.dictionary_legacy_export(1, server).await.unwrap(),
+            Err(fsandbox::CapabilityStoreError::IdNotFound)
+        );
+    }
+
+    #[fuchsia::test]
+    async fn insert() {
+        let (store, stream) = create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>().unwrap();
+        let _server = fasync::Task::spawn(serve_capability_store(stream));
+
+        let dict = Dict::new();
         let dict_ref = Capability::Dictionary(dict.clone()).into();
         let dict_id = 1;
         store.import(dict_id, dict_ref).await.unwrap().unwrap();
@@ -210,22 +249,72 @@ mod tests {
         let cap = dict.entries.remove(&*CAP_KEY).expect("not in entries after insert");
         let Capability::Unit(unit) = cap else { panic!("Bad capability type: {:#?}", cap) };
         assert_eq!(unit, Unit::default());
-
-        Ok(())
     }
 
-    /// Tests that removing an entry from the `Dict` via `Dict.Remove` yields the same capability
-    /// that was previously inserted.
     #[fuchsia::test]
-    async fn serve_remove() -> Result<(), Error> {
+    async fn insert_error() {
+        let (store, stream) = create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>().unwrap();
+        let _server = fasync::Task::spawn(serve_capability_store(stream));
+
+        let unit = Unit::default().into();
+        let value = 2;
+        store.import(value, unit).await.unwrap().unwrap();
+
+        assert_matches!(
+            store
+                .dictionary_insert(1, &fsandbox::DictionaryItem { key: "k".into(), value })
+                .await
+                .unwrap(),
+            Err(fsandbox::CapabilityStoreError::IdNotFound)
+        );
+        assert_matches!(
+            store
+                .dictionary_insert(2, &fsandbox::DictionaryItem { key: "k".into(), value })
+                .await
+                .unwrap(),
+            Err(fsandbox::CapabilityStoreError::WrongType)
+        );
+
+        store.dictionary_create(1).await.unwrap().unwrap();
+        assert_matches!(
+            store
+                .dictionary_insert(1, &fsandbox::DictionaryItem { key: "^bad".into(), value })
+                .await
+                .unwrap(),
+            Err(fsandbox::CapabilityStoreError::InvalidKey)
+        );
+
+        assert_matches!(
+            store
+                .dictionary_insert(1, &fsandbox::DictionaryItem { key: "k".into(), value })
+                .await
+                .unwrap(),
+            Ok(())
+        );
+
+        let unit = Unit::default().into();
+        let value = 3;
+        store.import(value, unit).await.unwrap().unwrap();
+        assert_matches!(
+            store
+                .dictionary_insert(1, &fsandbox::DictionaryItem { key: "k".into(), value })
+                .await
+                .unwrap(),
+            Err(fsandbox::CapabilityStoreError::ItemAlreadyExists)
+        );
+    }
+
+    #[fuchsia::test]
+    async fn remove() {
+        let (store, stream) = create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>().unwrap();
+        let _server = fasync::Task::spawn(serve_capability_store(stream));
+
         let dict = Dict::new();
 
         // Insert a Unit into the Dict.
         dict.insert(CAP_KEY.clone(), Capability::Unit(Unit::default())).unwrap();
         assert_eq!(dict.lock().entries.len(), 1);
 
-        let (store, stream) = create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>().unwrap();
-        let _server = fasync::Task::spawn(serve_capability_store(stream));
         let dict_ref = Capability::Dictionary(dict.clone()).into();
         let dict_id = 1;
         store.import(dict_id, dict_ref).await.unwrap().unwrap();
@@ -234,7 +323,7 @@ mod tests {
         store
             .dictionary_remove(
                 dict_id,
-                CAP_KEY.as_str(),
+                &CAP_KEY.to_string(),
                 Some(&fsandbox::WrappedNewCapabilityId { id: dest_id }),
             )
             .await
@@ -246,24 +335,62 @@ mod tests {
 
         // Removing the entry with Remove should remove it from `entries`.
         assert!(dict.lock().entries.is_empty());
-
-        Ok(())
     }
 
-    /// Tests that `Dict.Get` yields the same capability that was previously inserted.
     #[fuchsia::test]
-    async fn serve_get() {
+    async fn remove_error() {
+        let (store, stream) = create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>().unwrap();
+        let _server = fasync::Task::spawn(serve_capability_store(stream));
+
+        assert_matches!(
+            store.dictionary_remove(1, "k".into(), None).await.unwrap(),
+            Err(fsandbox::CapabilityStoreError::IdNotFound)
+        );
+
+        store.dictionary_create(1).await.unwrap().unwrap();
+
+        let unit = Unit::default().into();
+        store.import(2, unit).await.unwrap().unwrap();
+
+        assert_matches!(
+            store.dictionary_remove(2, "k".into(), None).await.unwrap(),
+            Err(fsandbox::CapabilityStoreError::WrongType)
+        );
+        store
+            .dictionary_insert(1, &fsandbox::DictionaryItem { key: "k".into(), value: 2 })
+            .await
+            .unwrap()
+            .unwrap();
+        assert_matches!(
+            store
+                .dictionary_remove(1, "k".into(), Some(&fsandbox::WrappedNewCapabilityId { id: 1 }))
+                .await
+                .unwrap(),
+            Err(fsandbox::CapabilityStoreError::IdAlreadyExists)
+        );
+        assert_matches!(
+            store.dictionary_remove(1, "^bad".into(), None).await.unwrap(),
+            Err(fsandbox::CapabilityStoreError::InvalidKey)
+        );
+        assert_matches!(
+            store.dictionary_remove(1, "not_found".into(), None).await.unwrap(),
+            Err(fsandbox::CapabilityStoreError::ItemNotFound)
+        );
+    }
+
+    #[fuchsia::test]
+    async fn get() {
+        let (store, stream) = create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>().unwrap();
+        let _server = fasync::Task::spawn(serve_capability_store(stream));
+
         let dict = Dict::new();
 
-        // Insert a Unit and a Handle into the Dict.
         dict.insert(CAP_KEY.clone(), Capability::Unit(Unit::default())).unwrap();
         assert_eq!(dict.lock().entries.len(), 1);
         let (ch, _) = fidl::Channel::create();
         let handle = Handle::from(ch.into_handle());
         dict.insert("h".parse().unwrap(), Capability::Handle(handle)).unwrap();
 
-        let (store, stream) = create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>().unwrap();
-        let _server = fasync::Task::spawn(serve_capability_store(stream));
         let dict_ref = Capability::Dictionary(dict.clone()).into();
         let dict_id = 1;
         store.import(dict_id, dict_ref).await.unwrap().unwrap();
@@ -271,131 +398,159 @@ mod tests {
         let dest_id = 2;
         store.dictionary_get(dict_id, CAP_KEY.as_str(), dest_id).await.unwrap().unwrap();
         let cap = store.export(dest_id).await.unwrap().unwrap();
-        // The value should be the same one that was previously inserted.
         assert_eq!(cap, Unit::default().into());
-
-        // Trying to get the handle capability should return NOT_CLONEABLE.
-        let dest_id = 3;
-        assert_matches!(
-            store.dictionary_get(dict_id, "h", dest_id).await.unwrap(),
-            Err(fsandbox::CapabilityStoreError::NotDuplicatable)
-        );
-
-        // The capability should remain in the Dict.
-        assert_eq!(dict.lock().entries.len(), 2);
     }
 
-    /// Tests that `Dict.Insert` returns `ALREADY_EXISTS` when there is already an item with
-    /// the same key.
     #[fuchsia::test]
-    async fn insert_already_exists() -> Result<(), Error> {
-        let dict = Dict::new();
-
+    async fn get_error() {
         let (store, stream) = create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>().unwrap();
         let _server = fasync::Task::spawn(serve_capability_store(stream));
-        let dict_ref = Capability::Dictionary(dict.clone()).into();
-        let dict_id = 1;
-        store.import(dict_id, dict_ref).await.unwrap().unwrap();
 
-        // Insert an entry.
-        let unit = Unit::default().into();
-        let value = 2;
-        store.import(value, unit).await.unwrap().unwrap();
+        assert_matches!(
+            store.dictionary_get(1, "k".into(), 2).await.unwrap(),
+            Err(fsandbox::CapabilityStoreError::IdNotFound)
+        );
+
+        store.dictionary_create(1).await.unwrap().unwrap();
+
+        store.import(2, Unit::default().into()).await.unwrap().unwrap();
+
+        assert_matches!(
+            store.dictionary_get(2, "k".into(), 3).await.unwrap(),
+            Err(fsandbox::CapabilityStoreError::WrongType)
+        );
         store
-            .dictionary_insert(
-                dict_id,
-                &fsandbox::DictionaryItem { key: CAP_KEY.to_string(), value },
-            )
+            .dictionary_insert(1, &fsandbox::DictionaryItem { key: "k".into(), value: 2 })
             .await
             .unwrap()
             .unwrap();
 
-        // Inserting again should return an error.
-        let unit = Unit::default().into();
-        let value = 3;
-        store.import(value, unit).await.unwrap().unwrap();
-        let result = store
-            .dictionary_insert(
-                dict_id,
-                &fsandbox::DictionaryItem { key: CAP_KEY.to_string(), value },
-            )
-            .await
-            .unwrap();
-        assert_matches!(result, Err(fsandbox::CapabilityStoreError::ItemAlreadyExists));
+        store.import(2, Unit::default().into()).await.unwrap().unwrap();
+        assert_matches!(
+            store.dictionary_get(1, "k".into(), 2).await.unwrap(),
+            Err(fsandbox::CapabilityStoreError::IdAlreadyExists)
+        );
+        assert_matches!(
+            store.dictionary_get(1, "^bad".into(), 3).await.unwrap(),
+            Err(fsandbox::CapabilityStoreError::InvalidKey)
+        );
+        assert_matches!(
+            store.dictionary_get(1, "not_found".into(), 3).await.unwrap(),
+            Err(fsandbox::CapabilityStoreError::ItemNotFound)
+        );
 
-        Ok(())
+        // Can't duplicate a channel handle.
+        let (ch, _) = fidl::Channel::create();
+        let handle = Handle::from(ch.into_handle());
+        store.import(3, handle.into()).await.unwrap().unwrap();
+        store
+            .dictionary_insert(1, &fsandbox::DictionaryItem { key: "h".into(), value: 3 })
+            .await
+            .unwrap()
+            .unwrap();
+        assert_matches!(
+            store.dictionary_get(1, "h".into(), 3).await.unwrap(),
+            Err(fsandbox::CapabilityStoreError::NotDuplicatable)
+        );
     }
 
-    /// Tests that the `Dict.Remove` returns `NOT_FOUND` when there is no item with the given key.
-    #[fuchsia::test]
-    async fn remove_not_found() -> Result<(), Error> {
-        let dict = Dict::new();
-
-        let (store, stream) = create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>().unwrap();
-        let _server = fasync::Task::spawn(serve_capability_store(stream));
-        let dict_ref = Capability::Dictionary(dict.clone()).into();
-        let dict_id = 1;
-        store.import(dict_id, dict_ref).await.unwrap().unwrap();
-
-        // Removing an item from an empty dict should fail.
-        let dest_id = 2;
-        let result = store
-            .dictionary_remove(
-                dict_id,
-                CAP_KEY.as_str(),
-                Some(&fsandbox::WrappedCapabilityId { id: dest_id }),
-            )
-            .await
-            .unwrap();
-        assert_matches!(result, Err(fsandbox::CapabilityStoreError::ItemNotFound));
-
-        Ok(())
-    }
-
-    /// Tests that `copy` produces a new Dict with cloned entries.
     #[fuchsia::test]
     async fn copy() {
+        let (store, stream) = create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>().unwrap();
+        let _server = fasync::Task::spawn(serve_capability_store(stream));
+
         // Create a Dict with a Unit inside, and copy the Dict.
         let dict = Dict::new();
         dict.insert("unit1".parse().unwrap(), Capability::Unit(Unit::default())).unwrap();
-
-        let copy = dict.shallow_copy().unwrap();
+        store.import(1, dict.clone().into()).await.unwrap().unwrap();
+        store.dictionary_copy(1, 2).await.unwrap().unwrap();
 
         // Insert a Unit into the copy.
-        copy.insert("unit2".parse().unwrap(), Capability::Unit(Unit::default())).unwrap();
+        store.import(3, Unit::default().into()).await.unwrap().unwrap();
+        store
+            .dictionary_insert(2, &fsandbox::DictionaryItem { key: "k".into(), value: 3 })
+            .await
+            .unwrap()
+            .unwrap();
 
         // The copy should have two Units.
-        let copy = copy.lock();
-        assert_eq!(copy.entries.len(), 2);
-        assert!(copy.entries.values().all(|value| matches!(value, Capability::Unit(_))));
+        let copy = store.export(2).await.unwrap().unwrap();
+        let copy = Capability::try_from(copy).unwrap();
+        let Capability::Dictionary(copy) = copy else { panic!() };
+        {
+            let copy = copy.lock();
+            assert_eq!(copy.entries.len(), 2);
+            assert!(copy.entries.values().all(|value| matches!(value, Capability::Unit(_))));
+        }
 
         // The original Dict should have only one Unit.
-        let this = dict.lock();
-        assert_eq!(this.entries.len(), 1);
-        assert!(this.entries.values().all(|value| matches!(value, Capability::Unit(_))));
-        drop(this);
-
-        // Non-cloneable handle results in error
-        let (ch, _) = fidl::Channel::create();
-        let handle = Handle::from(ch.into_handle());
-        dict.insert("h".parse().unwrap(), Capability::Handle(handle)).unwrap();
-        assert_matches!(dict.shallow_copy(), Err(()));
+        {
+            let dict = dict.lock();
+            assert_eq!(dict.entries.len(), 1);
+            assert!(dict.entries.values().all(|value| matches!(value, Capability::Unit(_))));
+        }
     }
 
-    /// Tests that cloning a Dict results in a Dict that shares the same entries.
     #[fuchsia::test]
-    async fn clone_by_reference() -> Result<()> {
-        let dict = Dict::new();
-        let dict_clone = dict.clone();
+    async fn copy_error() {
+        let (store, stream) = create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>().unwrap();
+        let _server = fasync::Task::spawn(serve_capability_store(stream));
 
-        // Add a Unit into the clone.
-        dict_clone.insert(CAP_KEY.clone(), Capability::Unit(Unit::default())).unwrap();
-        assert_eq!(dict_clone.lock().entries.len(), 1);
+        assert_matches!(
+            store.dictionary_copy(1, 2).await.unwrap(),
+            Err(fsandbox::CapabilityStoreError::IdNotFound)
+        );
+
+        store.dictionary_create(1).await.unwrap().unwrap();
+        store.import(2, Unit::default().into()).await.unwrap().unwrap();
+        assert_matches!(
+            store.dictionary_copy(1, 2).await.unwrap(),
+            Err(fsandbox::CapabilityStoreError::IdAlreadyExists)
+        );
+
+        assert_matches!(
+            store.dictionary_copy(2, 3).await.unwrap(),
+            Err(fsandbox::CapabilityStoreError::WrongType)
+        );
+
+        // Can't duplicate a channel handle.
+        let (ch, _) = fidl::Channel::create();
+        let handle = Handle::from(ch.into_handle());
+        store.import(3, handle.into()).await.unwrap().unwrap();
+        store
+            .dictionary_insert(1, &fsandbox::DictionaryItem { key: "h".into(), value: 3 })
+            .await
+            .unwrap()
+            .unwrap();
+        assert_matches!(
+            store.dictionary_copy(1, 3).await.unwrap(),
+            Err(fsandbox::CapabilityStoreError::NotDuplicatable)
+        );
+    }
+
+    #[fuchsia::test]
+    async fn duplicate() {
+        let (store, stream) = create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>().unwrap();
+        let _server = fasync::Task::spawn(serve_capability_store(stream));
+
+        let dict = Dict::new();
+        store.import(1, dict.clone().into()).await.unwrap().unwrap();
+        store.duplicate(1, 2).await.unwrap().unwrap();
+
+        // Add a Unit into the duplicate.
+        store.import(3, Unit::default().into()).await.unwrap().unwrap();
+        store
+            .dictionary_insert(2, &fsandbox::DictionaryItem { key: "k".into(), value: 3 })
+            .await
+            .unwrap()
+            .unwrap();
+        let dict_dup = store.export(2).await.unwrap().unwrap();
+        let dict_dup = Capability::try_from(dict_dup).unwrap();
+        let Capability::Dictionary(dict_dup) = dict_dup else { panic!() };
+        assert_eq!(dict_dup.lock().entries.len(), 1);
 
         // The original dict should now have an entry because it shares entries with the clone.
         assert_eq!(dict.lock().entries.len(), 1);
-
-        Ok(())
     }
 
     /// Tests basic functionality of read APIs.
@@ -705,6 +860,107 @@ mod tests {
 
         // Dictionary should now be empty.
         assert_eq!(dict.keys().count(), 0);
+    }
+
+    #[fuchsia::test]
+    async fn read_error() {
+        let (store, stream) = create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>().unwrap();
+        let _server = fasync::Task::spawn(serve_capability_store(stream));
+
+        store.import(2, Unit::default().into()).await.unwrap().unwrap();
+
+        let (_, server_end) = create_proxy().unwrap();
+        assert_matches!(
+            store.dictionary_keys(1, server_end).await.unwrap(),
+            Err(fsandbox::CapabilityStoreError::IdNotFound)
+        );
+        let (_, server_end) = create_proxy().unwrap();
+        assert_matches!(
+            store.dictionary_enumerate(1, server_end).await.unwrap(),
+            Err(fsandbox::CapabilityStoreError::IdNotFound)
+        );
+        assert_matches!(
+            store.dictionary_drain(1, None).await.unwrap(),
+            Err(fsandbox::CapabilityStoreError::IdNotFound)
+        );
+
+        let (_, server_end) = create_proxy().unwrap();
+        assert_matches!(
+            store.dictionary_keys(2, server_end).await.unwrap(),
+            Err(fsandbox::CapabilityStoreError::WrongType)
+        );
+        let (_, server_end) = create_proxy().unwrap();
+        assert_matches!(
+            store.dictionary_enumerate(2, server_end).await.unwrap(),
+            Err(fsandbox::CapabilityStoreError::WrongType)
+        );
+        assert_matches!(
+            store.dictionary_drain(2, None).await.unwrap(),
+            Err(fsandbox::CapabilityStoreError::WrongType)
+        );
+    }
+
+    #[fuchsia::test]
+    async fn read_iterator_error() {
+        let (store, stream) = create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>().unwrap();
+        let _server = fasync::Task::spawn(serve_capability_store(stream));
+
+        store.dictionary_create(1).await.unwrap().unwrap();
+
+        {
+            let (iterator, server_end) = create_proxy().unwrap();
+            store.dictionary_enumerate(1, server_end).await.unwrap().unwrap();
+            assert_matches!(
+                iterator.get_next(2, fsandbox::MAX_DICTIONARY_ITERATOR_CHUNK + 1).await.unwrap(),
+                Err(fsandbox::CapabilityStoreError::InvalidArgs)
+            );
+            let (iterator, server_end) = create_proxy().unwrap();
+            store.dictionary_enumerate(1, server_end).await.unwrap().unwrap();
+            assert_matches!(
+                iterator.get_next(2, 0).await.unwrap(),
+                Err(fsandbox::CapabilityStoreError::InvalidArgs)
+            );
+
+            let (iterator, server_end) = create_proxy().unwrap();
+            store.dictionary_drain(1, Some(server_end)).await.unwrap().unwrap();
+            assert_matches!(
+                iterator.get_next(2, fsandbox::MAX_DICTIONARY_ITERATOR_CHUNK + 1).await.unwrap(),
+                Err(fsandbox::CapabilityStoreError::InvalidArgs)
+            );
+            let (iterator, server_end) = create_proxy().unwrap();
+            store.dictionary_drain(1, Some(server_end)).await.unwrap().unwrap();
+            assert_matches!(
+                iterator.get_next(2, 0).await.unwrap(),
+                Err(fsandbox::CapabilityStoreError::InvalidArgs)
+            );
+        }
+
+        store.import(4, Unit::default().into()).await.unwrap().unwrap();
+        for i in 0..3 {
+            store.import(2, Unit::default().into()).await.unwrap().unwrap();
+            store
+                .dictionary_insert(1, &fsandbox::DictionaryItem { key: format!("k{i}"), value: 2 })
+                .await
+                .unwrap()
+                .unwrap();
+        }
+
+        // Range overlaps with id 4
+        {
+            let (iterator, server_end) = create_proxy().unwrap();
+            store.dictionary_enumerate(1, server_end).await.unwrap().unwrap();
+            assert_matches!(
+                iterator.get_next(2, 3).await.unwrap(),
+                Err(fsandbox::CapabilityStoreError::IdAlreadyExists)
+            );
+
+            let (iterator, server_end) = create_proxy().unwrap();
+            store.dictionary_drain(1, Some(server_end)).await.unwrap().unwrap();
+            assert_matches!(
+                iterator.get_next(2, 3).await.unwrap(),
+                Err(fsandbox::CapabilityStoreError::IdAlreadyExists)
+            );
+        }
     }
 
     #[fuchsia::test]

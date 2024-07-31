@@ -61,6 +61,9 @@ pub enum RemoteError {
 
     #[error("unregistered capability; only capabilities created by sandbox are allowed")]
     Unregistered,
+
+    #[error("registered capability had the wrong type")]
+    BadCapability,
 }
 
 impl Explain for RemoteError {
@@ -68,6 +71,7 @@ impl Explain for RemoteError {
         match self {
             RemoteError::UnknownVariant => zx_status::Status::NOT_SUPPORTED,
             RemoteError::Unregistered => zx_status::Status::INVALID_ARGS,
+            RemoteError::BadCapability => zx_status::Status::INVALID_ARGS,
         }
     }
 }
