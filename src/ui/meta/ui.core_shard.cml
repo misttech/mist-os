@@ -43,5 +43,12 @@
             to: "#ui",
             source_availability: "unknown",
         },
+        {
+            protocol: [ "fuchsia.power.system.ActivityGovernor" ],
+            from: "parent",
+            to: "#ui",
+            source_availability: "unknown",
+            availability: "optional",
+        },
     ],
 }
