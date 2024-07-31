@@ -71,6 +71,7 @@ impl TryFrom<String> for RadioRegion {
     }
 }
 
+#[allow(clippy::to_string_trait_impl)]
 impl ToString for RadioRegion {
     fn to_string(&self) -> String {
         if self.0 == 0 {

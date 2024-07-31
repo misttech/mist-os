@@ -387,6 +387,7 @@ impl QueuedResolver {
 #[cfg(test)]
 /// Creates a mocked PackageResolver that resolves any url using the given callback.
 pub struct MockResolver {
+    #[allow(clippy::type_complexity)]
     queue: work_queue::WorkSender<
         (AbsolutePackageUrl, fpkg::GcProtection),
         (),

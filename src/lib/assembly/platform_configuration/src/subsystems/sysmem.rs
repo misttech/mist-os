@@ -78,12 +78,7 @@ impl DefineSubsystemConfiguration<PlatformSysmemConfig> for SysmemConfig {
                     .set_config_capability(
                         fixed_capability.as_str(),
                         if let Some(MemorySize::Fixed(fixed_memory_size)) = &field_reference {
-                            Config::new(
-                                ConfigValueType::Int64,
-                                (*fixed_memory_size)
-                                    .try_into()
-                                    .with_context(|| fixed_capability.clone())?,
-                            )
+                            Config::new(ConfigValueType::Int64, (*fixed_memory_size).into())
                         } else {
                             Config::new_void()
                         },

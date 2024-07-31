@@ -26,6 +26,7 @@ pub(crate) async fn assert_logs_sequence<S: LogStream>(
     messages: Vec<LogMessage>,
 ) {
     let mut m = 0; // the number of matches so far.
+    #[allow(clippy::explicit_counter_loop)]
     for (expected_severity, expected_message) in &messages {
         let data = logs.next().await.expect("got log response").expect("log isn't an error");
         if !logs_data_matches(data, component_moniker, expected_severity, expected_message) {

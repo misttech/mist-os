@@ -61,8 +61,7 @@ pub fn bytes_from_data(data: &fmem::Data) -> Result<Cow<'_, [u8]>, DataError> {
     Ok(match data {
         fmem::Data::Buffer(buf) => {
             let size = buf.size as usize;
-            let mut raw_bytes = Vec::with_capacity(size);
-            raw_bytes.resize(size, 0);
+            let mut raw_bytes = vec![0; size];
             buf.vmo.read(&mut raw_bytes, 0).map_err(DataError::VmoReadError)?;
             Cow::Owned(raw_bytes)
         }

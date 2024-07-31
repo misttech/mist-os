@@ -546,10 +546,13 @@ mod tests {
 
     struct DirectoryInterceptorInner {
         sync_notifier: Option<futures::channel::mpsc::UnboundedSender<()>>,
+        #[allow(clippy::type_complexity)]
         open_interceptor: Box<dyn Fn(&str, bool) -> Option<Status>>,
     }
 
     impl DirectoryInterceptor {
+        // TODO(b/356474618): re-enable and fix existing occurance
+        #[allow(clippy::arc_with_non_send_sync)]
         fn new(real_dir: fio::DirectoryProxy) -> (Arc<Self>, fio::DirectoryProxy) {
             let (proxy, requests) =
                 fidl::endpoints::create_proxy_and_stream::<fio::DirectoryMarker>().unwrap();
@@ -575,6 +578,7 @@ mod tests {
         /// Sets a callback to be called on every Open request. If the callback returns an error,
         /// then the request will be failed with that error instead of being forwarded to the real
         /// directory.
+        #[allow(clippy::type_complexity)]
         fn set_open_interceptor(&self, interceptor: Box<dyn Fn(&str, bool) -> Option<Status>>) {
             self.inner.lock().unwrap().open_interceptor = interceptor;
         }

@@ -230,7 +230,7 @@ impl TryPackAs<str> for str {
         let bytes = self.as_bytes();
         let len = bytes.len() + 1;
 
-        if len > std::u16::MAX as usize {
+        if len > u16::MAX as usize {
             Err(io::ErrorKind::InvalidInput.into())
         } else if buffer.write(bytes)? != bytes.len() || buffer.write(&[0u8; 1])? != 1 {
             Err(io::ErrorKind::Other.into())

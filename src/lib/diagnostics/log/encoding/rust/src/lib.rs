@@ -140,6 +140,7 @@ impl<'a> From<StringRef<'a>> for String {
     }
 }
 
+#[allow(clippy::to_string_trait_impl)]
 impl<'a> ToString for StringRef<'a> {
     fn to_string(&self) -> String {
         self.clone().into()

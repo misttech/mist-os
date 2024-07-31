@@ -184,7 +184,7 @@ impl RepositoryManager {
             Self::save(&self.data_proxy, dynamic_configs_path, &mut self.dynamic_configs).await;
             return Ok(Some(Arc::clone(&*config)));
         }
-        if self.static_configs.get(repo_url).is_some() {
+        if self.static_configs.contains_key(repo_url) {
             Err(RemoveError::CannotRemoveStaticRepositories)
         } else {
             Ok(None)

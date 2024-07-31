@@ -525,6 +525,7 @@ fn open_meta_as_file<'a>(flags_or_protocols: impl Into<FlagsOrProtocols<'a>>) ->
     }
 }
 
+#[allow(clippy::type_complexity)]
 fn load_package_metadata(
     meta_far_vmo: &zx::Vmo,
 ) -> Result<(HashMap<String, MetaFileLocation>, HashMap<String, fuchsia_hash::Hash>), Error> {

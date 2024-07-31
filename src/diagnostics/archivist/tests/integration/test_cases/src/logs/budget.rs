@@ -31,7 +31,7 @@ async fn test_budget() {
     spammer_puppet.wait_for_interest_change().await.unwrap();
     victim_puppet.wait_for_interest_change().await.unwrap();
 
-    let letters = ('A'..'Z').map(|c| c.to_string()).collect::<Vec<_>>();
+    let letters = ('A'..='Z').map(|c| c.to_string()).collect::<Vec<_>>();
     let mut letters_iter = letters.iter().cycle();
     let expected = letters_iter.next().unwrap().repeat(50);
     victim_puppet

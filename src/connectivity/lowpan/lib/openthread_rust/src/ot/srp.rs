@@ -629,7 +629,7 @@ impl SrpServer for Instance {
         // This helper func is just to allow us to get the type of the
         // wrapper closure (`f_wrapped`) so we can pass that type
         // as a type argument to `_ot_srp_server_service_update_handler`.
-        fn get_service_update_handler<'a, X: 'a>(_: &X) -> otSrpServerServiceUpdateHandler
+        fn get_service_update_handler<'a, X>(_: &X) -> otSrpServerServiceUpdateHandler
         where
             X: FnMut(SrpServerServiceUpdateId, &'a SrpServerHost, u32) + 'a,
         {
