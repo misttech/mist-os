@@ -5,6 +5,7 @@
 use super::super::timer::{TimeWaker, TimerHandle, TimerHeap};
 use super::instrumentation::{Collector, LocalCollector, WakeupReason};
 use super::packets::{PacketReceiver, PacketReceiverMap, ReceiverRegistration};
+use super::scope::ScopeWaker;
 use super::time::Time;
 use super::ScopeRef;
 use crate::atomic_future::{AtomicFuture, AttemptPollResult};
@@ -166,12 +167,10 @@ impl Executor {
     pub fn spawn(self: &Arc<Self>, scope: &ScopeRef, future: AtomicFuture<'static>) -> usize {
         let next_id = self.task_count.fetch_add(1, Ordering::Relaxed);
         let task = {
-            let mut scope_state = scope.lock();
-            if scope_state.cancelled {
+            let task = Task::new(next_id, scope.clone(), future);
+            if !scope.lock().insert_task(next_id, task.clone()) {
                 return usize::MAX;
             }
-            let task = Task::new(next_id, scope.clone(), future);
-            scope_state.all_tasks.insert(next_id, task.clone());
             task
         };
         self.collector.task_created(next_id, task.source());
@@ -202,10 +201,9 @@ impl Executor {
     pub fn spawn_main(self: &Arc<Self>, root_scope: &ScopeRef, future: AtomicFuture<'static>) {
         let task = Task::new(MAIN_TASK_ID, root_scope.clone(), future);
         self.collector.task_created(MAIN_TASK_ID, task.source());
-        assert!(
-            root_scope.lock().all_tasks.insert(MAIN_TASK_ID, task.clone()).is_none(),
-            "Existing main task"
-        );
+        if !root_scope.lock().insert_task(MAIN_TASK_ID, task.clone()) {
+            panic!("Could not spawn main task");
+        }
         task.wake();
     }
 
@@ -537,13 +535,16 @@ impl Executor {
     ///
     /// The caller must guarantee that the executor isn't running.
     pub(super) unsafe fn drop_main_task(&self, root_scope: &ScopeRef) {
-        if let Some(task) = root_scope.lock().all_tasks.remove(&MAIN_TASK_ID) {
+        let mut root_scope = root_scope.lock();
+        let (task, scope_waker) = root_scope.take_task(MAIN_TASK_ID);
+        if let Some(task) = task {
             // Even though we've removed the task from active tasks, it could still be in
             // pending_tasks, so we have to drop the future here. At time of writing, this is only
             // used by the local executor and there could only be something in ready_tasks if
             // there's a panic.
             task.future.drop_future_unchecked();
         }
+        scope_waker.wake_and_release(root_scope);
     }
 
     fn try_poll(&self, task: &Arc<Task>) -> bool {
@@ -557,26 +558,25 @@ impl Executor {
                 false
             }
             AttemptPollResult::IFinished => {
-                let mut waker = None;
-                {
-                    let mut tasks = task.scope.lock();
-                    if task.future.is_detached() {
-                        tasks.all_tasks.remove(&task.id);
-                    } else {
-                        waker = tasks.join_wakers.remove(&task.id);
-                    }
+                let mut task_waker = None;
+                let mut scope_waker = ScopeWaker::empty();
+                let mut scope = task.scope.lock();
+                if !task.future.is_detached() {
+                    task_waker = scope.join_wakers.remove(&task.id);
+                } else {
+                    scope_waker = scope.remove_task(task.id);
                 }
-                if let Some(waker) = waker {
+                scope_waker.wake_and_release(scope);
+                // Call task waker once the scope lock is released so we don't risk a deadlock.
+                if let Some(waker) = task_waker {
                     waker.wake();
                 }
                 true
             }
             AttemptPollResult::Cancelled => {
-                let waker = {
-                    let mut tasks = task.scope.lock();
-                    tasks.all_tasks.remove(&task.id);
-                    tasks.join_wakers.remove(&task.id)
-                };
+                let mut scope = task.scope.lock();
+                let waker = scope.join_wakers.remove(&task.id);
+                scope.remove_task(task.id).wake_and_release(scope);
                 if let Some(waker) = waker {
                     waker.wake();
                 }
@@ -956,7 +956,7 @@ mod tests {
             let scope = ehandle.root_scope();
 
             // The only way of testing for this is to poll.
-            while scope.lock().all_tasks.len() > 1 || scope.lock().join_wakers.len() > 0 {
+            while scope.lock().all_tasks().len() > 1 || scope.lock().join_wakers.len() > 0 {
                 Timer::new(std::time::Duration::from_millis(1)).await;
             }
 
