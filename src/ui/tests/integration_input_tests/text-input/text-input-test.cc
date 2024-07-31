@@ -26,7 +26,6 @@
 #include <fuchsia/ui/app/cpp/fidl.h>
 #include <fuchsia/ui/input/cpp/fidl.h>
 #include <fuchsia/ui/input3/cpp/fidl.h>
-#include <fuchsia/ui/scenic/cpp/fidl.h>
 #include <fuchsia/ui/test/input/cpp/fidl.h>
 #include <fuchsia/ui/test/scene/cpp/fidl.h>
 #include <fuchsia/vulkan/loader/cpp/fidl.h>
@@ -210,7 +209,6 @@ class ChromiumInputBase : public gtest::RealLoopFixture {
         fuchsia::ui::composition::Flatland::Name_,
         fuchsia::ui::input3::Keyboard::Name_,
         fuchsia::ui::input::ImeService::Name_,
-        fuchsia::ui::scenic::Scenic::Name_,
     };
     ui_test_manager_.emplace(std::move(config));
     AssembleRealm(GetTestComponents(), GetTestRoutes());
@@ -519,9 +517,6 @@ class ChromiumInputTest : public ChromiumInputBase {
         {.capabilities = {Config{kNormalCaptureDelay}},
          .source = VoidRef(),
          .targets = {ChildRef{kMemoryPressureProvider}}},
-        {.capabilities = {Protocol{fuchsia::ui::scenic::Scenic::Name_}},
-         .source = ParentRef(),
-         .targets = {target}},
         {.capabilities = {Protocol{fuchsia::buildinfo::Provider::Name_}},
          .source = ChildRef{kBuildInfoProvider},
          .targets = {target}},

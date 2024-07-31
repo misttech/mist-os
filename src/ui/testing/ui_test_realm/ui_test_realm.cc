@@ -28,7 +28,6 @@
 #include <fuchsia/ui/pointerinjector/configuration/cpp/fidl.h>
 #include <fuchsia/ui/pointerinjector/cpp/fidl.h>
 #include <fuchsia/ui/policy/cpp/fidl.h>
-#include <fuchsia/ui/scenic/cpp/fidl.h>
 #include <fuchsia/ui/views/cpp/fidl.h>
 #include <fuchsia/vulkan/loader/cpp/fidl.h>
 #include <lib/sys/component/cpp/testing/realm_builder.h>
@@ -107,8 +106,7 @@ std::vector<std::string> ScenicServices(const UITestRealm::Config& config) {
           fuchsia::ui::pointer::augment::LocalHit::Name_,
           fuchsia::ui::composition::Allocator::Name_,
           fuchsia::ui::composition::Flatland::Name_,
-          fuchsia::ui::composition::FlatlandDisplay::Name_,
-          fuchsia::ui::scenic::Scenic::Name_};
+          fuchsia::ui::composition::FlatlandDisplay::Name_};
 }
 
 // List of a11y services available in the test realm.
