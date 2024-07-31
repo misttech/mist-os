@@ -422,6 +422,28 @@ impl Interpreter {
         (interpreter, executor)
     }
 
+    /// Create a new interpreter with the given inner state.
+    ///
+    /// This is used to fork the interpreter for hygienic imports.
+    pub(crate) async fn new_with_inner(
+        inner: Arc<InterpreterInner>,
+        fs_root: Value,
+        pwd: Value,
+    ) -> Self {
+        let mut global_variables = GlobalVariables::default();
+        global_variables.define("fs_root".to_owned(), Ok(fs_root), Mutability::Mutable);
+        global_variables.define("pwd".to_owned(), Ok(pwd), Mutability::Mutable);
+        let interpreter = Interpreter { inner, global_variables: Mutex::new(global_variables) };
+        interpreter.add_builtins(&mut futures::future::pending()).await;
+
+        interpreter
+    }
+
+    /// Destroy this interpreter and return the contents of its global namespace.
+    pub(crate) fn to_globals(self) -> GlobalVariables {
+        self.global_variables.into_inner().unwrap()
+    }
+
     /// Take a [`ReplayableIterator`], which is how the playground [`Value`]
     /// type represents iterators, and convert it to a [`futures::Stream`],
     /// which is easier to work with directly in Rust.
@@ -516,7 +538,7 @@ impl Interpreter {
 
             Err(error!(s))
         } else {
-            let mut visitor = Visitor::new();
+            let mut visitor = Visitor::new(None, None);
             let compiled = visitor.visit(program.tree);
             let (mut frame, invalid_ids) = {
                 let mut global_variables = self.global_variables.lock().unwrap();

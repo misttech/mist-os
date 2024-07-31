@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::anyhow;
+use fidl::endpoints::Proxy;
 use fidl_codec::Value as FidlValue;
 use futures::channel::oneshot::channel as oneshot_channel;
 use futures::future::{ready, BoxFuture};
@@ -16,7 +17,7 @@ use std::sync::{Arc, Mutex};
 
 use crate::error::{Error, Result};
 use crate::frame::{CaptureMapEntry, CaptureSet, Frame};
-use crate::interpreter::InterpreterInner;
+use crate::interpreter::{Interpreter, InterpreterInner};
 use crate::parser::{Mutability, Node, ParameterList, Span};
 use crate::value::{
     playground_semantic_compare, Invocable, PlaygroundValue, RangeCursor, ReplayableIterator,
@@ -62,11 +63,13 @@ pub struct Visitor {
     allocated_slots: HashMap<(String, usize), usize>,
     captured_slots: HashMap<String, usize>,
     constant_slots: Vec<usize>,
+    global_fs_root: Option<usize>,
+    global_pwd: Option<usize>,
 }
 
 impl Visitor {
     /// Constructs a new visitor.
-    pub fn new() -> Self {
+    pub fn new(global_fs_root: Option<usize>, global_pwd: Option<usize>) -> Self {
         Visitor {
             next_slot: 0,
             next_scope_id: 1,
@@ -75,6 +78,8 @@ impl Visitor {
             allocated_slots: HashMap::new(),
             captured_slots: HashMap::new(),
             constant_slots: Vec::new(),
+            global_fs_root,
+            global_pwd,
         }
     }
 
@@ -187,14 +192,21 @@ impl Visitor {
             return capture;
         }
 
-        (
-            *self.captured_slots.entry(name.to_owned()).or_insert_with(|| {
-                let slot = self.next_slot;
-                self.next_slot += 1;
-                slot
-            }),
-            Mutability::Mutable,
-        )
+        let slot = *self.captured_slots.entry(name.to_owned()).or_insert_with(|| {
+            let slot = self.next_slot;
+            self.next_slot += 1;
+            slot
+        });
+
+        if name == "fs_root" && self.global_fs_root.is_none() {
+            self.global_fs_root = Some(slot)
+        }
+
+        if name == "pwd" && self.global_pwd.is_none() {
+            self.global_pwd = Some(slot)
+        }
+
+        (slot, Mutability::Mutable)
     }
 
     /// Given another visitor which compiled some sub-scope beneath this one,
@@ -236,6 +248,9 @@ impl Visitor {
             Node::Identifier(s) => Arc::new(self.visit_identifier(*s.fragment())),
             Node::If { condition, body, else_ } => {
                 Arc::new(self.visit_if(*condition, *body, else_.map(|x| *x)))
+            }
+            Node::Import(a, b) => {
+                Arc::new(self.visit_import(*a.fragment(), b.map(|x| *x.fragment())))
             }
             Node::Integer(s) => Arc::new(self.visit_integer(*s.fragment())),
             Node::Invocation(n, a) => Arc::new(self.visit_invocation(*n.fragment(), a)),
@@ -431,7 +446,7 @@ impl Visitor {
         let ret = if let Node::VariableDecl { identifier, value, mutability } = child {
             Ret::A(self.visit_variable_decl_async(*identifier.fragment(), *value, mutability))
         } else {
-            let mut visitor = Visitor::new();
+            let mut visitor = Visitor::new(self.global_fs_root.clone(), self.global_pwd.clone());
             let task = visitor.visit(child);
             let capture_map = self.capture_map_for(&visitor);
             let slots_needed = visitor.slots_needed();
@@ -585,6 +600,57 @@ impl Visitor {
         }
     }
 
+    fn visit_import(
+        &mut self,
+        path: &str,
+        name: Option<&str>,
+    ) -> impl for<'f> Fn(&Arc<InterpreterInner>, &'f Mutex<Frame>) -> BoxFuture<'f, Result<Value>>
+    {
+        let path = path.to_owned();
+        let name = name.map(|name| self.allocate_slot(name, Mutability::Constant));
+        let fs_root = self.global_fs_root.clone().unwrap_or_else(|| self.fetch_slot("fs_root").0);
+        let pwd = self.global_pwd.clone().unwrap_or_else(|| self.fetch_slot("pwd").0);
+
+        move |inner, frame| {
+            let name = name.clone();
+            let path = path.clone();
+            let inner = Arc::clone(inner);
+
+            async move {
+                let Some(name) = name else {
+                    return Err(error!("Imports without identifiers unsupported."));
+                };
+                let (fs_root, pwd) = {
+                    let frame = frame.lock().unwrap();
+                    (frame.get(fs_root), frame.get(pwd))
+                };
+
+                let fs_root = fs_root.await?;
+                let pwd = pwd.await?;
+
+                let fut = async move {
+                    let interpreter =
+                        Interpreter::new_with_inner(Arc::clone(&inner), fs_root, pwd).await;
+                    let file = interpreter.open(path.clone()).await?;
+                    let file = file
+                        .try_client_channel(inner.lib_namespace(), "fuchsia.io/File")
+                        .map_err(|_| error!("Tried to import {path} which is not a file"))?;
+                    let file = fidl_fuchsia_io::FileProxy::from_channel(
+                        fuchsia_async::Channel::from_channel(file),
+                    );
+                    let file = fuchsia_fs::file::read_to_string(&file).await?;
+                    interpreter.run(file.as_str()).await?;
+                    let globals = interpreter.to_globals();
+                    globals.to_object().await
+                };
+                let fut = frame.lock().unwrap().assign_future_ignore_const(name, fut);
+                fut.await;
+                Ok(Value::Null)
+            }
+            .boxed()
+        }
+    }
+
     fn visit_integer(
         &mut self,
         string: &str,
@@ -640,7 +706,7 @@ impl Visitor {
     {
         let a = self.visit(a);
         self.enter_scope();
-        let mut body_visitor = Visitor::new();
+        let mut body_visitor = Visitor::new(self.global_fs_root.clone(), self.global_pwd.clone());
         let underscore_arg_id = body_visitor.allocate_slot("_", Mutability::Mutable);
         let b = body_visitor.visit(b);
         let capture_map = self.capture_map_for(&body_visitor);
@@ -683,7 +749,7 @@ impl Visitor {
         body: Node<'a>,
     ) -> impl for<'f> Fn(&Arc<InterpreterInner>, &'f Mutex<Frame>) -> BoxFuture<'f, Result<Value>>
     {
-        let mut body_visitor = Visitor::new();
+        let mut body_visitor = Visitor::new(self.global_fs_root.clone(), self.global_pwd.clone());
         let underscore_slot = body_visitor.allocate_slot("_", Mutability::Mutable);
         let required_params_count = parameters.len();
         let params: Vec<_> = parameters
@@ -1249,7 +1315,7 @@ impl Visitor {
         value: Node<'_>,
         mutability: Mutability,
     ) -> impl Fn(&Arc<InterpreterInner>, &Mutex<Frame>) {
-        let mut value_visitor = Visitor::new();
+        let mut value_visitor = Visitor::new(self.global_fs_root.clone(), self.global_pwd.clone());
         let value = value_visitor.visit(value);
         let capture_map = self.capture_map_for(&value_visitor);
         let slots_needed = value_visitor.slots_needed();

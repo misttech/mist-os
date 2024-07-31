@@ -157,6 +157,7 @@ pub enum Node<'a> {
     GT(Box<Node<'a>>, Box<Node<'a>>),
     Identifier(Span<'a>),
     If { condition: Box<Node<'a>>, body: Box<Node<'a>>, else_: Option<Box<Node<'a>>> },
+    Import(Span<'a>, Option<Span<'a>>),
     Integer(Span<'a>),
     Invocation(Span<'a>, Vec<Node<'a>>),
     Iterate(Box<Node<'a>>, Box<Node<'a>>),
@@ -280,6 +281,16 @@ impl<'a> Node<'a> {
                     && mutability_a == mutability_b
             }
             (Error, Error) => true,
+            (Import(path_a, ident_a), Import(path_b, ident_b)) => {
+                path_a.fragment() == path_b.fragment()
+                    && ident_a
+                        .map(|ident_a| {
+                            ident_b
+                                .map(|ident_b| ident_b.fragment() == ident_a.fragment())
+                                .unwrap_or(false)
+                        })
+                        .unwrap_or(ident_b.is_none())
+            }
             _ => false,
         }
     }
@@ -548,7 +559,8 @@ fn lassoc_choice<
     })
 }
 
-const KEYWORDS: [&str; 8] = ["let", "const", "def", "if", "else", "true", "false", "null"];
+const KEYWORDS: [&str; 9] =
+    ["let", "const", "def", "if", "else", "true", "false", "null", "import"];
 
 /// Match a keyword.
 fn kw<'s>(kw: &'s str) -> impl for<'a> Fn(ESpan<'a>) -> IResult<'a, ESpan<'a>> + 's {
@@ -1262,10 +1274,35 @@ fn negate<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
     })(input)
 }
 
+/// We allow bare strings in a few places in the grammar, most notably as invocation arguments.
+///
+/// Bare strings are defined as:
+///
+/// ```
+/// BareString ← ( !⊔ ![@{}|&;()] . )+
+/// ```
+///
+/// Bare strings look like:
+///
+/// ```
+/// /foo/bar
+/// taco
+/// 123abc
+/// some.kinda.thing
+/// ```
+fn bare_string<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
+    map(
+        recognize(many1(preceded(
+            not(alt((recognize(whitespace), recognize(one_of("@{}|&;()"))))),
+            anychar,
+        ))),
+        |x| Node::BareString(x.strip_parse_state()),
+    )(input)
+}
+
 /// Invocation is defined as:
 ///
 /// ```
-/// BareString ← ( !⊔ . )+
 /// Invocation ←⊔ Identifier ( SimpleExpression / BareString )* / SimpleExpression
 /// ```
 ///
@@ -1277,16 +1314,6 @@ fn negate<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
 /// do_thing --my_arg 3
 /// ```
 fn invocation<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
-    fn bare_string<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
-        map(
-            recognize(many1(preceded(
-                not(alt((recognize(whitespace), recognize(one_of("@{}|&;()"))))),
-                anychar,
-            ))),
-            |x| Node::BareString(x.strip_parse_state()),
-        )(input)
-    }
-
     alt((
         map(
             pair(
@@ -1396,10 +1423,42 @@ fn simple_expression<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
     range(input)
 }
 
+/// Import statemets are defined as follows:
+///
+/// ```
+/// Import ←⊔ 'import' BareString ( 'as' ( Identifier / '$' UnescapedIdentifier ) )?
+/// ```
+///
+/// Import statements look like:
+///
+/// ```
+/// import /foo/bar
+/// import /foo/bar/baz as baz_module
+/// import /foo/bar/123abc as $123abc
+/// ```
+fn import<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
+    map(
+        pair(
+            preceded(kw("import"), ws_before(bare_string)),
+            opt(preceded(
+                ws_around(tag("as")),
+                alt((identifier, preceded(ex_tag("$"), unescaped_identifier))),
+            )),
+        ),
+        |(path, name)| {
+            let Node::BareString(path) = path else {
+                unreachable!();
+            };
+            Node::Import(path, name.map(|x| x.strip_parse_state()))
+        },
+    )(input)
+}
+
 /// A program is defined as:
 ///
 /// ```
-/// Program ←⊔ ( ( FunctionDecl Program? ) / ( ( VariableDecl / ShortFunctionDecl / Expression ) ( [;&] Program )? ) )?
+/// Program ←⊔ ( ( ( Import / FunctionDecl ) ( [;&]? Program )? ) /
+///     ( ( VariableDecl / ShortFunctionDecl / Expression ) ( [;&] Program )? ) )?
 /// ```
 fn program<'a>(input: ESpan<'a>) -> IResult<'a, Vec<Node<'a>>> {
     let mut input_next = input;
@@ -1408,7 +1467,10 @@ fn program<'a>(input: ESpan<'a>) -> IResult<'a, Vec<Node<'a>>> {
     while let Ok((tail, (node, terminator))) = preceded(
         cond(!vec.is_empty(), opt(whitespace)),
         alt((
-            pair(function_decl, map(opt(ws_before(one_of(";&"))), |x| x.or(Some(';')))),
+            pair(
+                alt((import, function_decl)),
+                map(opt(ws_before(one_of(";&"))), |x| x.or(Some(';'))),
+            ),
             pair(
                 alt((variable_decl, short_function_decl, expression)),
                 opt(ws_before(one_of(";&"))),

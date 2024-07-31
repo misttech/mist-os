@@ -152,6 +152,17 @@ impl GlobalVariables {
             }
         }
     }
+
+    /// Convert this set of global variables to a `Value::Object` where the keys
+    /// are variable names and the values are the values of those variables.
+    pub async fn to_object(self) -> Result<Value> {
+        let mut ret = Vec::with_capacity(self.entries.len());
+        for (name, (value, _)) in self.entries.into_iter() {
+            let value = Arc::clone(&value.lock().unwrap());
+            ret.push((name, FrameValue::get(value).await?));
+        }
+        Ok(Value::Object(ret))
+    }
 }
 
 /// A slot in a [`Frame`]. Each slot in a frame has a numerical ID and
