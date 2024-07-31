@@ -524,21 +524,24 @@ where
     }
 
     // Create a layered fs to handle /container and /container/component
-    // /container will mount the container pkg
-    // /container/component will be a tmpfs where component using the starnix kernel will have their
-    // package mounted.
-    let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE;
-    let container_fs = LayeredFs::new_fs(
-        kernel,
-        create_remotefs_filesystem(
+    let mut mappings = vec![];
+    if features.container {
+        // /container will mount the container pkg
+        // /container/component will be a tmpfs where component using the starnix kernel will have their
+        // package mounted.
+        let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE;
+        let container_fs = LayeredFs::new_fs(
             kernel,
-            pkg_dir_proxy,
-            rights,
-            FileSystemOptions { source: "data".into(), ..Default::default() },
-        )?,
-        BTreeMap::from([("component".into(), TmpFs::new_fs(kernel))]),
-    );
-    let mut mappings = vec![("container".into(), container_fs)];
+            create_remotefs_filesystem(
+                kernel,
+                pkg_dir_proxy,
+                rights,
+                FileSystemOptions { source: "data".into(), ..Default::default() },
+            )?,
+            BTreeMap::from([("component".into(), TmpFs::new_fs(kernel))]),
+        );
+        mappings.push(("container".into(), container_fs));
+    }
     if features.custom_artifacts {
         mappings.push(("custom_artifacts".into(), TmpFs::new_fs(kernel)));
     }
@@ -546,6 +549,8 @@ where
         mappings.push(("test_data".into(), TmpFs::new_fs(kernel)));
     }
 
+    // TODO(https://fxbug.dev/356684424): Can we remove this layeredfs if the container
+    // does not need any of these directories?
     let mut root_fs = LayeredFs::new_fs(kernel, root_fs, mappings.into_iter().collect());
     if features.rootfs_rw {
         root_fs = OverlayFs::wrap_fs_in_writable_layer(kernel, root_fs)?;
