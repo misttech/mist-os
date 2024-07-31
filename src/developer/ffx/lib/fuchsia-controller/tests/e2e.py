@@ -229,7 +229,8 @@ class EndToEnd(unittest.IsolatedAsyncioTestCase):
             "--isolate-dir",
             isolate_dir.directory(),
             "daemon",
-            "echo",
+            "start",
+            "--background",
         ]
         subprocess.check_call(ffx_cmd)
         ctx = Context(
