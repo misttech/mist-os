@@ -4,6 +4,8 @@
 
 """Utilities related to Clang repositories. See README.md for details."""
 
+load("@bazel_skylib//lib:paths.bzl", "paths")
+
 # Note: This is not a self-reference as //tools/clang is not a package, so we're
 # actually loading //:repository_utils.bzl.
 load(":repository_utils.bzl", "get_fuchsia_host_arch", "get_fuchsia_host_os")
@@ -50,7 +52,7 @@ def prepare_clang_repository(repo_ctx, clang_install_dir):
     # Symlink top-level items from Clang prebuilt install to repository directory
     # Note that this is possible because our C++ toolchain configuration redefine
     # the "dependency_file" feature to use relative file paths.
-    clang_install_path = repo_ctx.path(workspace_dir + "/" + clang_install_dir)
+    clang_install_path = repo_ctx.path(clang_install_dir) if paths.is_absolute(clang_install_dir) else repo_ctx.path(workspace_dir + "/" + clang_install_dir)
     for f in clang_install_path.readdir():
         repo_ctx.symlink(f, f.basename)
 
