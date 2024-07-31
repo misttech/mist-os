@@ -312,6 +312,12 @@
   FXT_EVENT_COMMON(true, ktrace_category_enabled, ktrace::EmitDurationBegin, category, label_ref, \
                    ktrace_timestamp(), TraceContext::Thread, ktrace::Unused{}, ##__VA_ARGS__)
 
+// Similar to KTRACE_DURATION_BEGIN, but accepts an expression to use for the event timestamp.
+#define KTRACE_DURATION_BEGIN_TIMESTAMP(category, label, timestamp, ...)                        \
+  FXT_EVENT_COMMON(true, ktrace_category_enabled, ktrace::EmitDurationBegin, category,          \
+                   FXT_INTERN_STRING(label), timestamp, TraceContext::Thread, ktrace::Unused{}, \
+                   ##__VA_ARGS__)
+
 //
 // ## DURATION_END
 //
@@ -355,6 +361,12 @@
 #define KTRACE_DURATION_END_LABEL_REF(category, label, ...)                                 \
   FXT_EVENT_COMMON(true, ktrace_category_enabled, ktrace::EmitDurationEnd, category, label, \
                    ktrace_timestamp(), TraceContext::Thread, ktrace::Unused{}, ##__VA_ARGS__)
+
+// Similar to KTRACE_DURATION_END, but accepts an expression to use for the event timestamp.
+#define KTRACE_DURATION_END_TIMESTAMP(category, label, timestamp, ...)                          \
+  FXT_EVENT_COMMON(true, ktrace_category_enabled, ktrace::EmitDurationEnd, category,            \
+                   FXT_INTERN_STRING(label), timestamp, TraceContext::Thread, ktrace::Unused{}, \
+                   ##__VA_ARGS__)
 
 //
 // ## COMPLETE
@@ -473,6 +485,12 @@
                    FXT_INTERN_STRING(label), ktrace_timestamp(), TraceContext::Cpu, flow_id,    \
                    ##__VA_ARGS__)
 
+// Similar to KTRACE_FLOW_BEGIN, but accepts an expression to use for the event timestamp.
+#define KTRACE_FLOW_BEGIN_TIMESTAMP(category, label, timestamp, flow_id, ...)          \
+  FXT_EVENT_COMMON(true, ktrace_category_enabled, ktrace::EmitFlowBegin, category,     \
+                   FXT_INTERN_STRING(label), timestamp, TraceContext::Thread, flow_id, \
+                   ##__VA_ARGS__)
+
 //
 // ## FLOW_STEP
 //
@@ -547,6 +565,12 @@
 #define KTRACE_CPU_FLOW_END_ENABLE(constexpr_enabled, category, label, flow_id, ...)          \
   FXT_EVENT_COMMON(constexpr_enabled, ktrace_category_enabled, ktrace::EmitFlowEnd, category, \
                    FXT_INTERN_STRING(label), ktrace_timestamp(), TraceContext::Cpu, flow_id,  \
+                   ##__VA_ARGS__)
+
+// Similar to KTRACE_FLOW_END, but accepts an expression to use for the event timestamp.
+#define KTRACE_FLOW_END_TIMESTAMP(category, label, timestamp, flow_id, ...)            \
+  FXT_EVENT_COMMON(true, ktrace_category_enabled, ktrace::EmitFlowEnd, category,       \
+                   FXT_INTERN_STRING(label), timestamp, TraceContext::Thread, flow_id, \
                    ##__VA_ARGS__)
 
 //

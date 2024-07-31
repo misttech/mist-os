@@ -82,16 +82,45 @@ enum class MessageOp : uint8_t {
 
 inline void TraceMessage(const MessagePacketPtr& msg, const ChannelDispatcher& channel,
                          MessageOp message_op) {
-  ktrace::Scope scope = KTRACE_BEGIN_SCOPE("kernel:ipc", "ChannelMessage",
-                                           ("ordinal", msg ? msg->fidl_header().ordinal : 0u));
+  // We emit these trace events non-standardly to work around some compatibility issues:
+  //
+  // 1) We partially inline the trace macro so that we can purposely emit 0-length durations.
+  //
+  //    chrome://tracing requires flow events to be contained in a duration. Perfetto requires flows
+  //    events to be attached to a "slice". However, the Perfetto viewer treats instant events as
+  //    0-length slices. This means that we can assign flows to them, and they get a special easy to
+  //    click on arrow instead of a tiny duration bar. Using a 0-length duration gets us nice
+  //    instant events in the Perfetto viewer, while still supporting flows in chrome://tracing.
+  //
+  // 2) Even though we know exactly when the duration ends, we emit a Begin/End pair instead of
+  //    using a duration-complete event.
+  //
+  //    Because we do so little work between creating the duration-complete scope and then emitting
+  //    the flow event, if we emit a duration-complete event, the two events may be created with the
+  //    same timestamp. Since the duration-complete event is only written when the scope ends, it is
+  //    written _after_ the flow event in the trace, causing the flow to not be associated with the
+  //    previous event, not it. By using a Begin/End pair, we ensure that though the events have the
+  //    same timestamp, they will be read in the correct order and the flow events will be
+  //    associated correctly.
+
+  uint64_t ts;
+  const auto get_timestamp = [&ts] { return ts = ktrace_timestamp(); };
+
+  KTRACE_DURATION_BEGIN_TIMESTAMP("kernel:ipc", "ChannelMessage", get_timestamp(),
+                                  ("ordinal", msg ? msg->fidl_header().ordinal : 0u));
+
   switch (message_op) {
     case MessageOp::Write:
-      KTRACE_FLOW_BEGIN("kernel:ipc", "ChannelFlow", ChannelMessageFlowId(msg, channel));
+      KTRACE_FLOW_BEGIN_TIMESTAMP("kernel:ipc", "ChannelFlow", ts,
+                                  ChannelMessageFlowId(msg, channel));
       break;
     case MessageOp::Read:
-      KTRACE_FLOW_END("kernel:ipc", "ChannelFlow", ChannelMessageFlowId(msg, channel));
+      KTRACE_FLOW_END_TIMESTAMP("kernel:ipc", "ChannelFlow", ts,
+                                ChannelMessageFlowId(msg, channel));
       break;
   }
+
+  KTRACE_DURATION_END_TIMESTAMP("kernel:ipc", "ChannelMessage", ts);
 }
 
 void record_recv_msg_sz(uint32_t size) {
