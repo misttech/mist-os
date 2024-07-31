@@ -36,8 +36,6 @@ pub async fn cmd_package_build_with_history(
 
     let abi_revision = match history.check_api_level_for_build(cmd.api_level) {
         Ok(abi_revision) => abi_revision,
-        // TODO(https://fxbug.dev/337904808): Remove this case and return an
-        // error whenever check_api_level_for_build fails.
         Err(err) => return Err(err.into()),
     };
 
