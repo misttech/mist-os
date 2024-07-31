@@ -86,6 +86,7 @@ per_test_modules = [
   ":multiple-foo-deps",
   ":transitive-foo-dep",
   ":global-precedence-tests",
+  ":relative-reloc-foo",
 ]
 
 per_test_suffices = [
@@ -95,6 +96,7 @@ per_test_suffices = [
   ".LocalPrecedence",
   ".GlobalPrecedence",
   ".GlobalPrecedenceDeps",
+  ".RelativeRelocPrecedence",
 ]
 
 foreach(module, per_test_modules) {
@@ -1069,5 +1071,9 @@ foreach(suffix, per_test_suffices) {
       ":has-foo-v1$suffix",
       ":has-foo-v2$suffix",
     ]
+  }
+
+  test_loadable_module("relative-reloc-foo$suffix") {
+    sources = [ "relative-reloc-foo.cc" ]
   }
 }
