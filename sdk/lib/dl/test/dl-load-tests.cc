@@ -684,7 +684,62 @@ TYPED_TEST(DlTests, LocalPrecedence) {
 // dlopen RTLD_GLOBAL foo-v2 -> foo() returns 7
 // dlopen has-foo-v1:
 //    - foo-v1 -> foo() returns 2
-// call foo() from has-foo-v1 and expect foo() to return 7.
+// call foo() from has-foo-v1 and expect foo() to return 7 (from previously
+// loaded RTLD_GLOBAL foo-v2).
+TYPED_TEST(DlTests, GlobalPrecedence) {
+  constexpr const char* kFile1 = "libld-dep-foo-v2.GlobalPrecedence.so";
+  constexpr const char* kFile2 = "libhas-foo-v1.GlobalPrecedence.so";
+  constexpr const char* kDepFile = "libld-dep-foo-v1.GlobalPrecedence.so";
+  constexpr int64_t kReturnValueFromFooV1 = 2;
+  constexpr int64_t kReturnValueFromFooV2 = 7;
+
+  if constexpr (!TestFixture::kSupportsGlobalMode) {
+    GTEST_SKIP() << "test requires that fixture supports RTLD_GLOBAL";
+  }
+
+  if constexpr (TestFixture::kSupportsNoLoadMode) {
+    if constexpr (TestFixture::kRetrievesFileWithNoLoad) {
+      this->Needed({kFile1, kFile2});
+    }
+    ASSERT_TRUE(this->DlOpen(kFile1, RTLD_NOLOAD).is_error());
+    ASSERT_TRUE(this->DlOpen(kFile2, RTLD_NOLOAD).is_error());
+  }
+
+  this->Needed({kFile1});
+
+  auto res1 = this->DlOpen(kFile1, RTLD_NOW | RTLD_GLOBAL);
+  ASSERT_TRUE(res1.is_ok()) << res1.error_value();
+  EXPECT_TRUE(res1.value());
+
+  auto sym1 = this->DlSym(res1.value(), "foo");
+  ASSERT_TRUE(sym1.is_ok()) << sym1.error_value();
+  ASSERT_TRUE(sym1.value());
+
+  EXPECT_EQ(RunFunction<int64_t>(sym1.value()), kReturnValueFromFooV2);
+
+  this->Needed({kFile2, kDepFile});
+
+  auto res2 = this->DlOpen(kFile2, RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(res2.is_ok()) << res2.error_value();
+  EXPECT_TRUE(res2.value());
+
+  auto sym2 = this->DlSym(res2.value(), "call_foo");
+  ASSERT_TRUE(sym2.is_ok()) << sym2.error_value();
+  ASSERT_TRUE(sym2.value());
+
+  EXPECT_EQ(RunFunction<int64_t>(sym2.value()), kReturnValueFromFooV2);
+
+  // dlsym will always use dependency ordering from the local scope when looking
+  // up a symbol
+  auto sym3 = this->DlSym(res2.value(), "foo");
+  ASSERT_TRUE(sym3.is_ok()) << sym3.error_value();
+  ASSERT_TRUE(sym3.value());
+
+  EXPECT_EQ(RunFunction<int64_t>(sym3.value()), kReturnValueFromFooV1);
+
+  ASSERT_TRUE(this->DlClose(res1.value()).is_ok());
+  ASSERT_TRUE(this->DlClose(res2.value()).is_ok());
+}
 
 // Test that RTLD_GLOBAL applies to deps and load order will take precedence in
 // subsequent symbol lookups:
@@ -693,6 +748,61 @@ TYPED_TEST(DlTests, LocalPrecedence) {
 // dlopen RTLD_GLOBAL has-foo-v2:
 //   - foo-v2 -> foo() returns 7
 // call foo from has-foo-v2 and expect 2.
+TYPED_TEST(DlTests, GlobalPrecedenceDeps) {
+  constexpr const char* kFile1 = "libhas-foo-v1.GlobalPrecedenceDeps.so";
+  constexpr const char* kDepFile1 = "libld-dep-foo-v1.GlobalPrecedenceDeps.so";
+  constexpr const char* kFile2 = "libhas-foo-v2.GlobalPrecedenceDeps.so";
+  constexpr const char* kDepFile2 = "libld-dep-foo-v2.GlobalPrecedenceDeps.so";
+  constexpr int64_t kReturnValueFromFooV1 = 2;
+  constexpr int64_t kReturnValueFromFooV2 = 7;
+
+  if constexpr (!TestFixture::kSupportsGlobalMode) {
+    GTEST_SKIP() << "test requires that fixture supports RTLD_GLOBAL";
+  }
+
+  if constexpr (TestFixture::kSupportsNoLoadMode) {
+    if constexpr (TestFixture::kRetrievesFileWithNoLoad) {
+      this->Needed({kFile1, kFile2});
+    }
+    ASSERT_TRUE(this->DlOpen(kFile1, RTLD_NOLOAD).is_error());
+    ASSERT_TRUE(this->DlOpen(kFile2, RTLD_NOLOAD).is_error());
+  }
+
+  this->Needed({kFile1, kDepFile1});
+
+  auto res1 = this->DlOpen(kFile1, RTLD_NOW | RTLD_GLOBAL);
+  ASSERT_TRUE(res1.is_ok()) << res1.error_value();
+  EXPECT_TRUE(res1.value());
+
+  auto sym1 = this->DlSym(res1.value(), "call_foo");
+  ASSERT_TRUE(sym1.is_ok()) << sym1.error_value();
+  ASSERT_TRUE(sym1.value());
+
+  EXPECT_EQ(RunFunction<int64_t>(sym1.value()), kReturnValueFromFooV1);
+
+  this->Needed({kFile2, kDepFile2});
+
+  auto res2 = this->DlOpen(kFile2, RTLD_NOW | RTLD_GLOBAL);
+  ASSERT_TRUE(res2.is_ok()) << res2.error_value();
+  EXPECT_TRUE(res2.value());
+
+  auto sym2 = this->DlSym(res2.value(), "call_foo");
+  ASSERT_TRUE(sym2.is_ok()) << sym2.error_value();
+  ASSERT_TRUE(sym2.value());
+
+  EXPECT_EQ(RunFunction<int64_t>(sym2.value()), kReturnValueFromFooV1);
+
+  // dlsym will always use dependency ordering from the local scope when looking
+  // up a symbol
+  auto sym3 = this->DlSym(res2.value(), "foo");
+  ASSERT_TRUE(sym3.is_ok()) << sym3.error_value();
+  ASSERT_TRUE(sym3.value());
+
+  EXPECT_EQ(RunFunction<int64_t>(sym3.value()), kReturnValueFromFooV2);
+
+  ASSERT_TRUE(this->DlClose(res1.value()).is_ok());
+  ASSERT_TRUE(this->DlClose(res2.value()).is_ok());
+}
 
 // Test that missing dep will use global symbol if there's a loaded global
 // module with the same symbol

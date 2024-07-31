@@ -85,6 +85,7 @@ modules = [ ":second-session-module" ]
 per_test_modules = [
   ":multiple-foo-deps",
   ":transitive-foo-dep",
+  ":global-precedence-tests",
 ]
 
 per_test_suffices = [
@@ -92,6 +93,8 @@ per_test_suffices = [
   ".TransitiveDepOrder",
   ".OpenDepDirectly",
   ".LocalPrecedence",
+  ".GlobalPrecedence",
+  ".GlobalPrecedenceDeps",
 ]
 
 foreach(module, per_test_modules) {
@@ -1029,6 +1032,11 @@ foreach(suffix, per_test_suffices) {
     shlib_deps = [ ":ld-dep-foo-v1$suffix" ]
   }
 
+  test_shared_library("has-foo-v2$suffix") {
+    sources = [ "foo.cc" ]
+    shlib_deps = [ ":ld-dep-foo-v2$suffix" ]
+  }
+
   # multiple-foo-deps:
   #  - foo-v1 -> foo() returns 2
   #  - foo-v2 -> foo() returns 7
@@ -1049,6 +1057,17 @@ foreach(suffix, per_test_suffices) {
     shlib_deps = [
       ":has-foo-v1$suffix",
       ":ld-dep-foo-v2$suffix",
+    ]
+  }
+
+  # TODO(caslyn): This can be deleted when another test module is introduced that
+  # uses `has-foo-v2` as a dep.
+  # This module is not used directly, but will generate .host-test-data subtargets
+  # for its shlib_deps, which are used directly by tests.
+  test_loadable_module("global-precedence-tests$suffix") {
+    shlib_deps = [
+      ":has-foo-v1$suffix",
+      ":has-foo-v2$suffix",
     ]
   }
 }
