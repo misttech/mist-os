@@ -29,8 +29,7 @@ class Tracer {
   using ErrorHandler = trace::TraceReader::ErrorHandler;
 
   // Called when tracing has completed starting.
-  using StartCallback =
-      fit::callback<void(fidl::Result<controller::Controller::StartTracing> result)>;
+  using StartCallback = fit::callback<void(fidl::Result<controller::Session::StartTracing> result)>;
 
   // This is called when there's a failure and trace processing must stop.
   using FailCallback = fit::callback<void()>;
@@ -42,7 +41,7 @@ class Tracer {
   // This is called when an alert is received.
   using AlertCallback = fit::function<void(std::string)>;
 
-  explicit Tracer(fidl::Client<controller::Controller> controller);
+  explicit Tracer(fidl::Client<controller::Provisioner> controller);
   ~Tracer();
 
   // Initialize tracing.
@@ -80,7 +79,8 @@ class Tracer {
 
   void BeginWatchAlert();
 
-  fidl::Client<controller::Controller> const controller_;
+  fidl::Client<controller::Session> controller_;
+  fidl::Client<controller::Provisioner> const provisioner_;
 
   State state_ = State::kReady;
 

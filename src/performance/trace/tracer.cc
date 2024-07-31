@@ -18,9 +18,9 @@
 
 namespace tracing {
 
-Tracer::Tracer(fidl::Client<controller::Controller> controller)
-    : controller_(std::move(controller)), dispatcher_(nullptr), wait_(this) {
-  FX_DCHECK(controller_);
+Tracer::Tracer(fidl::Client<controller::Provisioner> provisioner)
+    : provisioner_(std::move(provisioner)), dispatcher_(nullptr), wait_(this) {
+  FX_DCHECK(provisioner_);
   wait_.set_trigger(ZX_SOCKET_READABLE | ZX_SOCKET_PEER_CLOSED);
 }
 
@@ -40,13 +40,17 @@ void Tracer::Initialize(controller::TraceConfig config, bool binary, BytesConsum
     return;
   }
 
-  auto res = controller_->InitializeTracing(
-      {{.config = std::move(config), .output = std::move(outgoing_socket)}});
+  auto [client_end, server_end] = fidl::Endpoints<controller::Session>::Create();
+  auto res = provisioner_->InitializeTracing({{.controller = std::move(server_end),
+                                               .config = std::move(config),
+                                               .output = std::move(outgoing_socket)}});
   if (res.is_error()) {
     FX_LOGS(ERROR) << "Failed to initialize tracing: " << res.error_value();
     Fail();
     return;
   }
+  controller_ =
+      fidl::Client<controller::Session>{std::move(client_end), async_get_default_dispatcher()};
   BeginWatchAlert();
 
   binary_ = binary;
@@ -75,22 +79,21 @@ void Tracer::Start(StartCallback start_callback) {
   // starting tracing so the buffer is already empty, so there's nothing to
   // pass for |StartOptions| here.
   controller_->StartTracing({}).Then(
-      [this](fidl::Result<controller::Controller::StartTracing> result) {
-        start_callback_(result);
-      });
+      [this](fidl::Result<controller::Session::StartTracing> result) { start_callback_(result); });
 
   state_ = State::kStarted;
 }
 
 void Tracer::Terminate() {
-  // Note: The controller will close the consumer socket when finished.
   FX_DCHECK(state_ != State::kReady);
   state_ = State::kTerminating;
-  controller::TerminateOptions terminate_options{{.write_results = true}};
-  controller_->TerminateTracing(std::move(terminate_options))
-      .Then([](const fidl::Result<controller::Controller::TerminateTracing>& result) {
+  controller::StopOptions stop_options{{.write_results = true}};
+  controller_->StopTracing(std::move(stop_options))
+      .Then([](const fidl::Result<controller::Session::StopTracing>& result) {
         // TODO(dje): Print provider stats.
       });
+  // We're done. Close the fidl connection.
+  controller_ = fidl::Client<controller::Session>();
 }
 
 void Tracer::OnHandleReady(async_dispatcher_t* dispatcher, async::WaitBase* wait,
@@ -191,7 +194,12 @@ void Tracer::Done() {
 }
 
 void Tracer::BeginWatchAlert() {
-  controller_->WatchAlert().Then([this](fidl::Result<controller::Controller::WatchAlert> result) {
+  if (!controller_) {
+    FX_LOGS(ERROR) << "Session not initalized.";
+    return;
+  }
+
+  controller_->WatchAlert().Then([this](fidl::Result<controller::Session::WatchAlert> result) {
     if (result.is_error()) {
       FX_LOGS(ERROR) << "Failed to watch alert: " << result.error_value();
       return;

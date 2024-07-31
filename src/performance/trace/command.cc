@@ -46,18 +46,18 @@ void Command::on_fidl_error(fidl::UnbindInfo error) {
   Done(EXIT_FAILURE);
 }
 
-void Command::handle_unknown_event(fidl::UnknownEventMetadata<controller::Controller> metadata) {
+void Command::handle_unknown_event(fidl::UnknownEventMetadata<controller::Provisioner> metadata) {
   FX_LOGS(ERROR) << "Unknown event: " << metadata.event_ordinal;
 }
 
 CommandWithController::CommandWithController() {
-  zx::result client_end = component::Connect<controller::Controller>();
+  zx::result client_end = component::Connect<controller::Provisioner>();
   if (client_end.is_error()) {
     FX_PLOGS(ERROR, client_end.error_value()) << "Trace Controller failed to connect";
     Done(EXIT_FAILURE);
   }
-  controller_ = fidl::Client<controller::Controller>{*std::move(client_end),
-                                                     async_get_default_dispatcher(), this};
+  provisioner_ = fidl::Client<controller::Provisioner>{*std::move(client_end),
+                                                       async_get_default_dispatcher(), this};
 }
 
 }  // namespace tracing

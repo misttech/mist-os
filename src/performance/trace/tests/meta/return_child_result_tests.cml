@@ -19,7 +19,8 @@
     use: [
         {
             protocol: [
-                "fuchsia.tracing.controller.Controller",
+                "fuchsia.tracing.controller.Provisioner",
+                "fuchsia.tracing.controller.Session",
                 "fuchsia.tracing.provider.Registry",
             ],
             from: "#trace_manager",

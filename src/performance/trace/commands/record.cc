@@ -289,7 +289,7 @@ void RecordCommand::Start(const fxl::CommandLine& command_line) {
     error_handler = [](fbl::String error) { FX_LOGS(ERROR) << error.c_str(); };
   }
 
-  tracer_ = std::make_unique<Tracer>(take_controller());
+  tracer_ = std::make_unique<Tracer>(take_provisioner());
 
   tracing_ = true;
 
@@ -308,7 +308,7 @@ void RecordCommand::Start(const fxl::CommandLine& command_line) {
       },  // TODO(https://fxbug.dev/42113074): For now preserve existing behaviour.
       [this] { DoneTrace(); }, fit::bind_member(this, &RecordCommand::OnAlert));
 
-  tracer_->Start([this](fidl::Result<controller::Controller::StartTracing> result) {
+  tracer_->Start([this](fidl::Result<controller::Session::StartTracing> result) {
     if (result.is_error()) {
       FX_LOGS(ERROR) << "Unable to start trace: " << result.error_value();
       tracing_ = false;
