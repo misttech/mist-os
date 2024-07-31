@@ -85,7 +85,7 @@ modules = [ ":second-session-module" ]
 per_test_modules = [
   ":multiple-foo-deps",
   ":transitive-foo-dep",
-  ":global-precedence-tests",
+  ":multiple-transitive-foo-deps",
   ":relative-reloc-foo",
   ":root-precedence-in-dep-resolution",
   ":precedence-in-dep-resolution",
@@ -94,8 +94,10 @@ per_test_modules = [
 per_test_suffices = [
   ".DepOrder",
   ".TransitiveDepOrder",
+  ".LoadedTransitiveDepOrder",
   ".OpenDepDirectly",
   ".LocalPrecedence",
+  ".LocalPrecedenceTransitiveDeps",
   ".GlobalPrecedence",
   ".GlobalPrecedenceDeps",
   ".RelativeRelocPrecedence",
@@ -1080,11 +1082,12 @@ foreach(suffix, per_test_suffices) {
     ]
   }
 
-  # TODO(caslyn): This can be deleted when another test module is introduced that
-  # uses `has-foo-v2` as a dep.
-  # This module is not used directly, but will generate .host-test-data subtargets
-  # for its shlib_deps, which are used directly by tests.
-  test_loadable_module("global-precedence-tests$suffix") {
+  # multiple-transitive-foo-deps:
+  #   - has-foo-v1:
+  #     - foo-v1 -> foo() returns 2
+  #   - has-foo-v2:
+  #    - foo-v2 -> foo() returns 7
+  test_loadable_module("multiple-transitive-foo-deps$suffix") {
     shlib_deps = [
       ":has-foo-v1$suffix",
       ":has-foo-v2$suffix",

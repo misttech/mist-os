@@ -554,6 +554,10 @@ TYPED_TEST(DlTests, TransitiveDepOrder) {
   ASSERT_TRUE(this->DlClose(res.value()).is_ok());
 }
 
+// These are test scenarios that test symbol resolution from the local scope
+// of the dlopen-ed module, when some (or all) of its dependencies have already
+// been loaded.
+
 // Test that dependency ordering is always preserved in the local symbol scope,
 // even if a module with the same symbol was already loaded (with RTLD_LOCAL).
 // dlopen foo-v2 -> foo() returns 7
@@ -624,6 +628,143 @@ TYPED_TEST(DlTests, LocalPrecedence) {
 
   ASSERT_TRUE(this->DlClose(res1.value()).is_ok());
   ASSERT_TRUE(this->DlClose(res2.value()).is_ok());
+}
+
+// Test the local symbol scope precedence is not affected by transitive
+// dependencies that were already loaded.
+// dlopen has-foo-v1:
+//  - foo-v1 -> foo() returns 2
+// dlopen transitive-foo-dep:
+//   - has-foo-v1:
+//     - foo-v1 -> foo() returns 2
+//   - foo-v2 -> foo() returns 7
+// call foo() from multiple-transitive-foo-deps and expect 7 from foo-v2 because
+// it is first in multiple-transitive-foo-dep's local scope.
+TYPED_TEST(DlTests, LocalPrecedenceTransitiveDeps) {
+  constexpr const char* kFile = "transitive-foo-dep.LocalPrecedenceTransitiveDeps.so";
+  constexpr const char* kDepFile1 = "libhas-foo-v1.LocalPrecedenceTransitiveDeps.so";
+  constexpr const char* kDepFile2 = "libld-dep-foo-v1.LocalPrecedenceTransitiveDeps.so";
+  constexpr const char* kDepFile3 = "libld-dep-foo-v2.LocalPrecedenceTransitiveDeps.so";
+  constexpr int64_t kReturnValueFromFooV1 = 2;
+  constexpr int64_t kReturnValueFromFooV2 = 7;
+
+  if (!TestFixture::kCanReuseLoadedDeps) {
+    GTEST_SKIP() << "test requires that fixture can reuse loaded dependencies";
+  }
+
+  // TODO(https://fxbug.dev/354043838): Fold into ExpectRootModule/Needed API.
+  this->ExpectRootModuleNotLoaded(kFile);
+  this->ExpectNeededNotLoaded({kDepFile1, kDepFile2, kDepFile3});
+
+  this->Needed({kDepFile1, kDepFile2});
+
+  auto res1 = this->DlOpen(kDepFile1, RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(res1.is_ok()) << res1.error_value();
+  EXPECT_TRUE(res1.value());
+
+  auto sym1 = this->DlSym(res1.value(), "call_foo");
+  ASSERT_TRUE(sym1.is_ok()) << sym1.error_value();
+  ASSERT_TRUE(sym1.value());
+
+  EXPECT_EQ(RunFunction<int64_t>(sym1.value()), kReturnValueFromFooV1);
+
+  this->ExpectRootModule(kFile);
+  this->Needed({kDepFile3});
+
+  auto res2 = this->DlOpen(kFile, RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(res2.is_ok()) << res2.error_value();
+  EXPECT_TRUE(res2.value());
+
+  auto sym2 = this->DlSym(res2.value(), "call_foo");
+  ASSERT_TRUE(sym2.is_ok()) << sym2.error_value();
+  ASSERT_TRUE(sym2.value());
+
+  if (TestFixture::kStrictLoadOrderPriority) {
+    // Musl will prioritize the symbol that was loaded first (from has-foo-v1 +
+    // foo-v1), even though the file does not have global scope.
+    EXPECT_EQ(RunFunction<int64_t>(sym2.value()), kReturnValueFromFooV1);
+  } else {
+    // Glibc & libdl will use the symbol that is first encountered in the
+    // module's local scope, from foo-v2.
+    EXPECT_EQ(RunFunction<int64_t>(sym2.value()), kReturnValueFromFooV2);
+  }
+
+  ASSERT_TRUE(this->DlClose(res1.value()).is_ok());
+  ASSERT_TRUE(this->DlClose(res2.value()).is_ok());
+}
+
+// The following tests will test dlopen-ing a module and resolving symbols from
+// transitive dependency modules, all of which have already been loaded.
+// dlopen has-foo-v2:
+//  - foo-v2 -> foo() returns 7
+// dlopen has-foo-v1:
+//  - foo-v1 -> foo() returns 2
+// dlopen multiple-transitive-foo-deps:
+//   - has-foo-v1:
+//     - foo-v1 -> foo() returns 2
+//   - has-foo-v2:
+//     - foo-v2 -> foo() returns 7
+// Call foo() from multiple-transitive-foo-deps and expect 2 from foo-v1,
+// because it is first in multiple-transitive-foo-dep's local scope.
+TYPED_TEST(DlTests, LoadedTransitiveDepOrder) {
+  constexpr const char* kFile = "multiple-transitive-foo-deps.LoadedTransitiveDepOrder.so";
+  constexpr const char* kDepFile1 = "libhas-foo-v2.LoadedTransitiveDepOrder.so";
+  constexpr const char* kDepFile2 = "libld-dep-foo-v2.LoadedTransitiveDepOrder.so";
+  constexpr const char* kDepFile3 = "libhas-foo-v1.LoadedTransitiveDepOrder.so";
+  constexpr const char* kDepFile4 = "libld-dep-foo-v1.LoadedTransitiveDepOrder.so";
+  constexpr int64_t kReturnValueFromFooV1 = 2;
+  constexpr int64_t kReturnValueFromFooV2 = 7;
+
+  if constexpr (!TestFixture::kCanReuseLoadedDeps) {
+    GTEST_SKIP() << "test requires that fixture can reuse loaded modules for dependencies";
+  }
+
+  // TODO(https://fxbug.dev/354043838): Fold into ExpectRootModule/Needed API.
+  this->ExpectRootModuleNotLoaded(kFile);
+  this->ExpectNeededNotLoaded({kDepFile1, kDepFile2, kDepFile3, kDepFile4});
+
+  this->Needed({kDepFile1, kDepFile2});
+
+  auto res1 = this->DlOpen(kDepFile1, RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(res1.is_ok()) << res1.error_value();
+  EXPECT_TRUE(res1.value());
+
+  auto sym1 = this->DlSym(res1.value(), "call_foo");
+  ASSERT_TRUE(sym1.is_ok()) << sym1.error_value();
+  ASSERT_TRUE(sym1.value());
+
+  EXPECT_EQ(RunFunction<int64_t>(sym1.value()), kReturnValueFromFooV2);
+
+  this->Needed({kDepFile3, kDepFile4});
+
+  auto res2 = this->DlOpen(kDepFile3, RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(res2.is_ok()) << res2.error_value();
+  EXPECT_TRUE(res2.value());
+
+  auto sym2 = this->DlSym(res2.value(), "call_foo");
+  ASSERT_TRUE(sym2.is_ok()) << sym2.error_value();
+  ASSERT_TRUE(sym2.value());
+
+  EXPECT_EQ(RunFunction<int64_t>(sym2.value()), kReturnValueFromFooV1);
+
+  this->ExpectRootModule(kFile);
+
+  auto res3 = this->DlOpen(kFile, RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(res3.is_ok()) << res3.error_value();
+  EXPECT_TRUE(res3.value());
+
+  auto sym3 = this->DlSym(res3.value(), "call_foo");
+  ASSERT_TRUE(sym3.is_ok()) << sym3.error_value();
+  ASSERT_TRUE(sym3.value());
+
+  // Both Glibc & Musl's agree on the resolved symbol here here, because
+  // has-foo-v1 is looked up first (and it is already loaded), so its symbols
+  // take precedence.
+  EXPECT_EQ(RunFunction<int64_t>(sym3.value()), kReturnValueFromFooV1);
+
+  ASSERT_TRUE(this->DlClose(res1.value()).is_ok());
+  ASSERT_TRUE(this->DlClose(res2.value()).is_ok());
+  ASSERT_TRUE(this->DlClose(res3.value()).is_ok());
 }
 
 // Whereas the above tests test how symbols are resolved for the root module,
