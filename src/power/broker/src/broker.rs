@@ -669,10 +669,14 @@ impl Broker {
             if let Some(elem_inspect) =
                 self.catalog.topology.inspect_for_element(&underlying_element_id)
             {
-                elem_inspect
-                    .borrow_mut()
-                    .meta()
-                    .set_and_track(format!("lease_status_{lease_id}"), format!("{status:?}"));
+                let level = match self.catalog.leases.get(lease_id) {
+                    Some(lease) => lease.underlying_element_level,
+                    None => unreachable!("The lease must be present when updating the status."),
+                };
+                elem_inspect.borrow_mut().meta().set_and_track(
+                    format!("lease_status_{lease_id}@level_{level}"),
+                    format!("{status:?}"),
+                );
             }
         }
         // If the lease is contingent, we know that it must be pending and must have
@@ -1072,6 +1076,7 @@ pub struct Lease {
     // The ElementID of the element this lease actually targets.
     pub underlying_element_id: ElementID,
     pub level: IndexedPowerLevel,
+    pub underlying_element_level: IndexedPowerLevel,
 }
 
 impl Lease {
@@ -1079,6 +1084,7 @@ impl Lease {
         synthetic_element_id: &ElementID,
         underlying_element_id: &ElementID,
         level: IndexedPowerLevel,
+        underlying_element_level: IndexedPowerLevel,
     ) -> Self {
         let uuid = LeaseID::from(Uuid::new_v4().as_simple().to_string());
         let id =
@@ -1088,6 +1094,7 @@ impl Lease {
             synthetic_element_id: synthetic_element_id.clone(),
             underlying_element_id: underlying_element_id.clone(),
             level: level.clone(),
+            underlying_element_level: underlying_element_level.clone(),
         }
     }
 }
@@ -1323,6 +1330,7 @@ impl Catalog {
             &lease_element_id,
             &element_id,
             IndexedPowerLevel { level: LeasePowerLevel::Satisfied as u8, index: 1 },
+            level,
         );
         if let Some(elem_inspect) = self.topology.inspect_for_element(&element_id) {
             let elem_readable_name = self.topology.element_name(&element_id);
@@ -1375,7 +1383,10 @@ impl Catalog {
                 .borrow_mut()
                 .meta()
                 .remove_and_track(format!("lease_{}", lease.id).as_str());
-            elem_inspect.borrow_mut().meta().remove(format!("lease_status_{}", lease.id).as_str());
+            elem_inspect.borrow_mut().meta().remove(
+                format!("lease_status_{}@level_{}", lease.id, lease.underlying_element_level)
+                    .as_str(),
+            );
             // lease_ drop events are useful as part of understanding lifecycle.
             // lease_status_ drop events are redundant with lease_ drops, so we don't record them.
         }
@@ -2812,7 +2823,7 @@ mod tests {
                                     current_level: ON.level as u64,
                                     required_level: ON.level as u64,
                                     format!("lease_{}", lease.id.clone()) => "level_1@C",
-                                    format!("lease_status_{}", lease.id.clone()) => "Satisfied",
+                                    format!("lease_status_{}@level_1", lease.id.clone()) => "Satisfied",
                                 },
                                 relationships: {
                                     parent1.to_string() => {
@@ -3376,7 +3387,7 @@ mod tests {
                                     current_level: ON.level as u64,
                                     required_level: ON.level as u64,
                                     format!("lease_{}", lease_b.id) => "level_1@B",
-                                    format!("lease_status_{}", lease_b.id) => "Satisfied",
+                                    format!("lease_status_{}@level_1", lease_b.id) => "Satisfied",
                                 },
                                 relationships: {
                                     element_a.to_string() => {
@@ -3392,7 +3403,7 @@ mod tests {
                                     current_level: ON.level as u64,
                                     required_level: ON.level as u64,
                                     format!("lease_{}", lease_c.id) => "level_1@C",
-                                    format!("lease_status_{}", lease_c.id) => "Satisfied",
+                                    format!("lease_status_{}@level_1", lease_c.id) => "Satisfied",
                                 },
                                 relationships: {
                                     element_a.to_string() => {
