@@ -154,6 +154,9 @@ const auto kWritePageScanTypeRsp =
 const auto kWritePageTimeoutRsp =
     COMMAND_COMPLETE_RSP(hci_spec::kWritePageTimeout);
 
+const auto kWritePinTypeRsp =
+    testing::CommandCompletePacket(hci_spec::kWritePinType);
+
 const auto kConnectionRequest = testing::ConnectionRequestPacket(kTestDevAddr);
 
 const auto kAcceptConnectionRequest =
@@ -551,6 +554,10 @@ class BrEdrConnectionManagerTest : public TestingBase {
                           testing::WritePageTimeoutPacket(static_cast<uint16_t>(
                               pw::bluetooth::emboss::PageTimeout::DEFAULT)),
                           &kWritePageTimeoutRsp);
+    EXPECT_CMD_PACKET_OUT(test_device(),
+                          testing::WritePinTypePacket(static_cast<uint8_t>(
+                              pw::bluetooth::emboss::PinType::VARIABLE)),
+                          &kWritePinTypeRsp);
 
     connection_manager_ = std::make_unique<BrEdrConnectionManager>(
         transport()->GetWeakPtr(),
