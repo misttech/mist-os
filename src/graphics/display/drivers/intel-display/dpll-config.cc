@@ -11,7 +11,7 @@
 #include <cstdlib>
 #include <limits>
 
-namespace i915 {
+namespace intel_display {
 
 cpp20::span<const int8_t> DpllSupportedFrequencyDividersKabyLake() {
   // This list merges the odd and even dividers in  the "Pseudocode to Find HDMI
@@ -338,4 +338,4 @@ DpllFrequencyDividerConfig CreateDpllFrequencyDividerConfigTigerLake(int8_t dco_
       .p0_p_divider = static_cast<int8_t>(dco_divider / 3), .p1_q_divider = 1, .p2_k_divider = 3};
 }
 
-}  // namespace i915
+}  // namespace intel_display

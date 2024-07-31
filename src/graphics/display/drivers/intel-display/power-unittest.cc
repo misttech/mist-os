@@ -17,7 +17,7 @@
 #include "src/graphics/display/drivers/intel-display/hardware-common.h"
 #include "src/graphics/display/drivers/intel-display/registers.h"
 
-namespace i915 {
+namespace intel_display {
 
 class PowerTest : public ::testing::Test {
  public:
@@ -268,4 +268,4 @@ TEST_F(PowerTest, TigerLake_PowerWell) {
   EXPECT_FALSE(pg_status[PowerWellId::PG5]);
 }
 
-}  // namespace i915
+}  // namespace intel_display

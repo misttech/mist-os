@@ -14,7 +14,7 @@
 #include "src/graphics/display/drivers/intel-display/igd.h"
 #include "src/graphics/display/drivers/intel-display/power.h"
 
-namespace i915 {
+namespace intel_display {
 
 class DdiManager;
 
@@ -107,6 +107,6 @@ class DdiManagerTigerLake : public DdiManager {
   DdiManagerTigerLake(Power* power, fdf::MmioBuffer* mmio_space, const IgdOpRegion& igd_opregion);
 };
 
-}  // namespace i915
+}  // namespace intel_display
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_DISPLAY_DDI_PHYSICAL_LAYER_MANAGER_H_

@@ -10,7 +10,7 @@
 #include <gtest/gtest.h>
 #include <mock-mmio-range/mock-mmio-range.h>
 
-namespace i915 {
+namespace intel_display {
 
 namespace {
 
@@ -2318,4 +2318,4 @@ TEST_F(PchEnginePanelPowerStateTest, WaitForPanelPowerStateTimeoutRounding) {
 
 }  // namespace
 
-}  // namespace i915
+}  // namespace intel_display

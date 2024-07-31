@@ -6,7 +6,7 @@
 
 #include <gtest/gtest.h>
 
-namespace i915 {
+namespace intel_display {
 
 namespace {
 
@@ -183,4 +183,4 @@ TEST(ScopedValueChange, MoveAssignmentDoesRestoreResetDestination) {
 
 }  // namespace
 
-}  // namespace i915
+}  // namespace intel_display

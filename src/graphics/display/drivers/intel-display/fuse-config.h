@@ -7,7 +7,7 @@
 
 #include <lib/mmio/mmio.h>
 
-namespace i915 {
+namespace intel_display {
 
 // Device configuration that is immutable for the driver's lifetime.
 //
@@ -39,6 +39,6 @@ struct FuseConfig {
   bool display_power_savings_enabled = false;
 };
 
-}  // namespace i915
+}  // namespace intel_display
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_DISPLAY_FUSE_CONFIG_H_

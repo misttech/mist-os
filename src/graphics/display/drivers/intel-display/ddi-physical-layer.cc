@@ -23,7 +23,7 @@
 #include "src/graphics/display/drivers/intel-display/registers-ddi-phy-tiger-lake.h"
 #include "src/graphics/display/drivers/intel-display/registers-typec.h"
 
-namespace i915 {
+namespace intel_display {
 
 namespace {
 
@@ -813,4 +813,4 @@ bool TypeCDdiTigerLake::UnblockTypeCColdPowerState() {
   }
 }
 
-}  // namespace i915
+}  // namespace intel_display

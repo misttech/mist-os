@@ -11,7 +11,7 @@
 #include "src/graphics/display/drivers/intel-display/pci-ids.h"
 #include "src/graphics/display/drivers/intel-display/registers.h"
 
-namespace i915 {
+namespace intel_display {
 
 namespace {
 
@@ -118,4 +118,4 @@ void FuseConfig::Log() {
   FDF_LOG(TRACE, "Maximum clock: %d kHz", core_clock_limit_khz);
 }
 
-}  // namespace i915
+}  // namespace intel_display

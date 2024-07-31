@@ -23,7 +23,7 @@
 // * Whiskey Lake: IHD-OS-WHL-Vol 1-1.20 page 7
 // * Comet Lake: IHD-OS-CML-Vol 1-4.20 pages 9-10
 
-namespace i915 {
+namespace intel_display {
 
 constexpr bool is_skl(uint16_t device_id) { return (device_id & 0xff00) == 0x1900; }
 
@@ -70,6 +70,6 @@ constexpr registers::Platform GetPlatform(uint16_t device_id) {
   ZX_ASSERT_MSG(false, "device id %u not supported", device_id);
 }
 
-}  // namespace i915
+}  // namespace intel_display
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_DISPLAY_PCI_IDS_H_

@@ -11,11 +11,11 @@
 
 #include "src/graphics/display/drivers/intel-display/registers-ddi.h"
 
-namespace i915 {
+namespace intel_display {
 
 // Get the list of DDIs supported by the device of |device_id|.
 cpp20::span<const DdiId> GetDdiIds(uint16_t device_id);
 
-}  // namespace i915
+}  // namespace intel_display
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_DISPLAY_DDI_H_

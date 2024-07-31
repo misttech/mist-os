@@ -70,7 +70,7 @@
 #include "src/graphics/display/lib/api-types-cpp/driver-image-id.h"
 #include "src/lib/fxl/strings/string_printf.h"
 
-namespace i915 {
+namespace intel_display {
 
 namespace {
 
@@ -2396,4 +2396,4 @@ zx::result<std::unique_ptr<Controller>> Controller::Create(
   return zx::ok(std::move(controller));
 }
 
-}  // namespace i915
+}  // namespace intel_display

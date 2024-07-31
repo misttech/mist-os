@@ -371,14 +371,19 @@ class PowerWellControl : public hwreg::RegisterBase<PowerWellControl, uint32_t> 
     return hwreg::BitfieldRef<uint32_t>(reg_value_ptr(), i, i);
   }
 
-  hwreg::BitfieldRef<uint32_t> ddi_io_power_request_skylake(i915::DdiId ddi_id) {
-    int bit =
-        2 + ((ddi_id == i915::DdiId::DDI_A || ddi_id == i915::DdiId::DDI_E) ? 0 : ddi_id * 2) + 1;
+  hwreg::BitfieldRef<uint32_t> ddi_io_power_request_skylake(intel_display::DdiId ddi_id) {
+    int bit = 2 +
+              ((ddi_id == intel_display::DdiId::DDI_A || ddi_id == intel_display::DdiId::DDI_E)
+                   ? 0
+                   : ddi_id * 2) +
+              1;
     return hwreg::BitfieldRef<uint32_t>(reg_value_ptr(), bit, bit);
   }
 
-  hwreg::BitfieldRef<uint32_t> ddi_io_power_state_skylake(i915::DdiId ddi_id) {
-    int bit = 2 + ((ddi_id == i915::DdiId::DDI_A || ddi_id == i915::DdiId::DDI_E) ? 0 : ddi_id * 2);
+  hwreg::BitfieldRef<uint32_t> ddi_io_power_state_skylake(intel_display::DdiId ddi_id) {
+    int bit = 2 + ((ddi_id == intel_display::DdiId::DDI_A || ddi_id == intel_display::DdiId::DDI_E)
+                       ? 0
+                       : ddi_id * 2);
     return hwreg::BitfieldRef<uint32_t>(reg_value_ptr(), bit, bit);
   }
 
@@ -459,35 +464,35 @@ class PowerWellControlAux : public hwreg::RegisterBase<PowerWellControlAux, uint
   DEF_BIT(1, power_on_request_a);
   DEF_BIT(0, powered_on_a);
 
-  SelfType& set_power_on_request_combo_or_usb_c(i915::DdiId ddi_id, bool enabled) {
-    ZX_DEBUG_ASSERT(ddi_id >= i915::DdiId::DDI_A);
-    ZX_DEBUG_ASSERT(ddi_id <= i915::DdiId::DDI_TC_6);
+  SelfType& set_power_on_request_combo_or_usb_c(intel_display::DdiId ddi_id, bool enabled) {
+    ZX_DEBUG_ASSERT(ddi_id >= intel_display::DdiId::DDI_A);
+    ZX_DEBUG_ASSERT(ddi_id <= intel_display::DdiId::DDI_TC_6);
     const uint32_t bit = ddi_id * 2 + 1;
     hwreg::BitfieldRef<uint32_t>(reg_value_ptr(), bit, bit).set(enabled);
     return *this;
   }
 
-  bool powered_on_combo_or_usb_c(i915::DdiId ddi_id) const {
-    ZX_DEBUG_ASSERT(ddi_id >= i915::DdiId::DDI_A);
-    ZX_DEBUG_ASSERT(ddi_id <= i915::DdiId::DDI_TC_6);
+  bool powered_on_combo_or_usb_c(intel_display::DdiId ddi_id) const {
+    ZX_DEBUG_ASSERT(ddi_id >= intel_display::DdiId::DDI_A);
+    ZX_DEBUG_ASSERT(ddi_id <= intel_display::DdiId::DDI_TC_6);
     const uint32_t bit = ddi_id * 2;
     return hwreg::BitfieldRef<const uint32_t>(reg_value_ptr(), bit, bit).get();
   }
 
-  SelfType& set_power_on_request_thunderbolt(i915::DdiId ddi_id, bool enabled) {
-    ZX_DEBUG_ASSERT(ddi_id >= i915::DdiId::DDI_TC_1);
-    ZX_DEBUG_ASSERT(ddi_id <= i915::DdiId::DDI_TC_6);
+  SelfType& set_power_on_request_thunderbolt(intel_display::DdiId ddi_id, bool enabled) {
+    ZX_DEBUG_ASSERT(ddi_id >= intel_display::DdiId::DDI_TC_1);
+    ZX_DEBUG_ASSERT(ddi_id <= intel_display::DdiId::DDI_TC_6);
     // The request_thunderbolt_* bits start from bit 19.
-    const uint32_t bit = (ddi_id - i915::DdiId::DDI_TC_1) * 2 + 19;
+    const uint32_t bit = (ddi_id - intel_display::DdiId::DDI_TC_1) * 2 + 19;
     hwreg::BitfieldRef<uint32_t>(reg_value_ptr(), bit, bit).set(enabled);
     return *this;
   }
 
-  bool powered_on_thunderbolt(i915::DdiId ddi_id) const {
-    ZX_DEBUG_ASSERT(ddi_id >= i915::DdiId::DDI_TC_1);
-    ZX_DEBUG_ASSERT(ddi_id <= i915::DdiId::DDI_TC_6);
+  bool powered_on_thunderbolt(intel_display::DdiId ddi_id) const {
+    ZX_DEBUG_ASSERT(ddi_id >= intel_display::DdiId::DDI_TC_1);
+    ZX_DEBUG_ASSERT(ddi_id <= intel_display::DdiId::DDI_TC_6);
     // The state_thunderbolt_* bits start from bit 18.
-    const uint32_t bit = (ddi_id - i915::DdiId::DDI_TC_1) * 2 + 18;
+    const uint32_t bit = (ddi_id - intel_display::DdiId::DDI_TC_1) * 2 + 18;
     return hwreg::BitfieldRef<const uint32_t>(reg_value_ptr(), bit, bit).get();
   }
 
@@ -503,13 +508,13 @@ class PowerWellControlAux : public hwreg::RegisterBase<PowerWellControlAux, uint
 // Tiger Lake: IHD-OS-TGL-Vol 2c-12.21 Part 2 pages 1072-1075
 class PowerWellControlDdi2 : public hwreg::RegisterBase<PowerWellControlDdi2, uint32_t> {
  public:
-  hwreg::BitfieldRef<uint32_t> ddi_io_power_request_tiger_lake(i915::DdiId ddi_id) {
+  hwreg::BitfieldRef<uint32_t> ddi_io_power_request_tiger_lake(intel_display::DdiId ddi_id) {
     // DDI A-C: bits 1/3/5. DDI TC1-6: bits 7/9/11/13/15/17.
     int bit = ddi_id * 2 + 1;
     return hwreg::BitfieldRef<uint32_t>(reg_value_ptr(), bit, bit);
   }
 
-  hwreg::BitfieldRef<uint32_t> ddi_io_power_state_tiger_lake(i915::DdiId ddi_id) {
+  hwreg::BitfieldRef<uint32_t> ddi_io_power_state_tiger_lake(intel_display::DdiId ddi_id) {
     int bit = ddi_id * 2;  // DDI A-C: bits 0/2/4. DDI TC1-6: bits 6/8/10/12/14/16.
     return hwreg::BitfieldRef<uint32_t>(reg_value_ptr(), bit, bit);
   }

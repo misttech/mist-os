@@ -13,7 +13,7 @@
 #include "src/graphics/display/drivers/intel-display/dp-display.h"
 #include "src/graphics/display/drivers/intel-display/fake-dpcd-channel.h"
 
-namespace i915 {
+namespace intel_display {
 
 namespace {
 
@@ -311,4 +311,4 @@ TEST_F(DpCapabilitiesTest, Inspect) {
 
 }  // namespace
 
-}  // namespace i915
+}  // namespace intel_display

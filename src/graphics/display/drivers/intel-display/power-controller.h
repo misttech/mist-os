@@ -12,7 +12,7 @@
 
 #include "src/graphics/display/drivers/intel-display/scoped-value-change.h"
 
-namespace i915 {
+namespace intel_display {
 
 // Command sent to the PCU (power controller)'s firmware.
 struct PowerControllerCommand {
@@ -261,6 +261,6 @@ class PowerController {
   fdf::MmioBuffer* mmio_buffer_;
 };
 
-}  // namespace i915
+}  // namespace intel_display
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_DISPLAY_POWER_CONTROLLER_H_

@@ -48,7 +48,7 @@
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-image-id.h"
 
-namespace i915 {
+namespace intel_display {
 
 typedef struct buffer_allocation {
   uint16_t start;
@@ -369,6 +369,6 @@ class Controller : public ddk::DisplayEngineProtocol<Controller>,
   inspect::Node root_node_;
 };
 
-}  // namespace i915
+}  // namespace intel_display
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_DISPLAY_INTEL_DISPLAY_H_

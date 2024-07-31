@@ -20,7 +20,7 @@
 #include "src/graphics/display/drivers/intel-display/registers-typec.h"
 #include "src/graphics/display/drivers/intel-display/registers.h"
 
-namespace i915 {
+namespace intel_display {
 
 bool DdiPllConfig::IsValid() const {
   if (ddi_clock_khz <= 0) {
@@ -1115,4 +1115,4 @@ DisplayPll* DpllManagerTigerLake::FindPllFor(DdiId ddi_id, bool is_edp,
   return nullptr;
 }
 
-}  // namespace i915
+}  // namespace intel_display

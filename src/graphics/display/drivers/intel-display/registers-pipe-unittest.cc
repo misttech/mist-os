@@ -7,7 +7,7 @@
 #include <gtest/gtest.h>
 #include <hwreg/bitfields.h>
 
-namespace i915 {
+namespace intel_display {
 
 namespace {
 
@@ -72,4 +72,4 @@ TEST(PlaneControlTest, DecompressMediaCompressedSurfacesTigerLake) {
 
 }  // namespace
 
-}  // namespace i915
+}  // namespace intel_display

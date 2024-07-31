@@ -79,7 +79,7 @@ uint32_t encode_pipe_color_component(uint8_t component) {
 
 }  // namespace
 
-namespace i915 {
+namespace intel_display {
 
 Pipe::Pipe(fdf::MmioBuffer* mmio_space, registers::Platform platform, PipeId pipe_id,
            PowerWellRef pipe_power)
@@ -793,4 +793,4 @@ void Pipe::SetColorConversionOffsets(bool preoffsets, const float vals[3]) {
   }
 }
 
-}  // namespace i915
+}  // namespace intel_display

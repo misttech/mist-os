@@ -29,7 +29,7 @@
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-image-id.h"
 
-namespace i915 {
+namespace intel_display {
 
 namespace {
 
@@ -234,4 +234,4 @@ raw_display_info_t DisplayDevice::CreateRawDisplayInfo() {
   // HDMI to DVI, based on EDID information.
 }
 
-}  // namespace i915
+}  // namespace intel_display

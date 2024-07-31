@@ -14,7 +14,7 @@
 
 #include "src/graphics/display/drivers/intel-display/registers.h"
 
-namespace i915 {
+namespace intel_display {
 
 namespace {
 
@@ -118,4 +118,4 @@ TEST_F(FuseConfigTest, KabyLakeAllFusesBlown) {
 
 }  // namespace
 
-}  // namespace i915
+}  // namespace intel_display

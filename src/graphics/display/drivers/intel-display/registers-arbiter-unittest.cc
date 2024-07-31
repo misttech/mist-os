@@ -9,7 +9,7 @@
 
 #include "src/graphics/display/drivers/intel-display/hardware-common.h"
 
-namespace i915 {
+namespace intel_display {
 
 namespace {
 
@@ -427,4 +427,4 @@ TEST(PipeArbiterControlTest, GetForPipe) {
 
 }  // namespace
 
-}  // namespace i915
+}  // namespace intel_display

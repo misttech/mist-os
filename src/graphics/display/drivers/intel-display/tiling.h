@@ -12,7 +12,7 @@
 
 #include <fbl/algorithm.h>
 
-namespace i915 {
+namespace intel_display {
 
 constexpr int get_tile_byte_width(image_tiling_type_t tiling) {
   switch (tiling) {
@@ -51,6 +51,6 @@ constexpr uint32_t height_in_tiles(image_tiling_type_t tiling, int height) {
   return (height + tile_height - 1) / tile_height;
 }
 
-}  // namespace i915
+}  // namespace intel_display
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_DISPLAY_TILING_H_

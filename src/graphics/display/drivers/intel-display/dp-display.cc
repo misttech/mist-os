@@ -45,7 +45,7 @@
 #include "src/graphics/display/drivers/intel-display/registers.h"
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 
-namespace i915 {
+namespace intel_display {
 namespace {
 
 constexpr uint32_t kBitsPerPixel = 24;  // kPixelFormat
@@ -2299,4 +2299,4 @@ int32_t DpDisplay::LoadPixelRateForTranscoderKhz(TranscoderId transcoder_id) {
   return static_cast<int32_t>(round(pixel_clock_rate_khz));
 }
 
-}  // namespace i915
+}  // namespace intel_display

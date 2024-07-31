@@ -14,7 +14,7 @@
 #include "src/graphics/display/drivers/intel-display/pci-ids.h"
 #include "src/graphics/display/drivers/intel-display/poll-until.h"
 #include "src/graphics/display/drivers/intel-display/registers.h"
-namespace i915 {
+namespace intel_display {
 
 namespace {
 
@@ -426,4 +426,4 @@ std::unique_ptr<Power> Power::New(fdf::MmioBuffer* mmio_space, uint16_t device_i
   return nullptr;
 }
 
-}  // namespace i915
+}  // namespace intel_display

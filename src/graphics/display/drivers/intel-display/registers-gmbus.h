@@ -135,7 +135,7 @@ class GMBusClockPortSelect : public hwreg::RegisterBase<GMBusClockPortSelect, ui
   DEF_FIELD(4, 0, pin_pair_select);
 
   // Helper to select typed `pin_pair` for GMBUS communication.
-  GMBusClockPortSelect& SetPinPair(const i915::GMBusPinPair& pin_pair) {
+  GMBusClockPortSelect& SetPinPair(const intel_display::GMBusPinPair& pin_pair) {
     return set_pin_pair_select(pin_pair.number());
   }
 
@@ -625,7 +625,7 @@ class GpioPinPairControl : public hwreg::RegisterBase<GpioPinPairControl, uint32
   DEF_BIT(0, write_clock_direction_is_output);
 
   // Get the DDC GPIO pin control register for port `gpio_port`.
-  static auto GetForPort(const i915::GpioPort& gpio_port) {
+  static auto GetForPort(const intel_display::GpioPort& gpio_port) {
     int gpio_port_id = gpio_port.number();
     return hwreg::RegisterAddr<GpioPinPairControl>(0xc5010 + 4 * gpio_port_id);
   }

@@ -19,7 +19,7 @@
 #include "src/graphics/display/drivers/intel-display/registers-pipe.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 
-namespace i915 {
+namespace intel_display {
 
 class PipeTest : public ::testing::Test {
  public:
@@ -173,4 +173,4 @@ TEST_F(PipeTest, GetVsyncConfigStamp) {
   EXPECT_EQ(vsync_config_stamp_4, display::kInvalidConfigStamp);
 }
 
-}  // namespace i915
+}  // namespace intel_display

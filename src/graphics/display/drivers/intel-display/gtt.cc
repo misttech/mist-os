@@ -36,7 +36,7 @@ inline uint32_t get_pte_offset(uint32_t idx) {
 
 }  // namespace
 
-namespace i915 {
+namespace intel_display {
 
 Gtt::Gtt()
     : region_allocator_(RegionAllocator::RegionPool::Create(std::numeric_limits<size_t>::max())) {}
@@ -286,4 +286,4 @@ void GttRegionImpl::SetRotation(uint32_t rotation, const image_metadata_t& image
   }
 }
 
-}  // namespace i915
+}  // namespace intel_display

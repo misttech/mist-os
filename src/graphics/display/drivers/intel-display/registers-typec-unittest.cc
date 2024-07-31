@@ -11,7 +11,7 @@
 
 #include "src/graphics/display/drivers/intel-display/hardware-common.h"
 
-namespace i915 {
+namespace intel_display {
 
 class RegisterTypeCTest : public ::testing::Test {
  protected:
@@ -531,4 +531,4 @@ TEST_F(RegisterTypeCTest, DekelLaneRegister) {
   }
 }
 
-}  // namespace i915
+}  // namespace intel_display

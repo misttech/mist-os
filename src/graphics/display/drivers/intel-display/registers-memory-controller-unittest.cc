@@ -7,7 +7,7 @@
 #include <gtest/gtest.h>
 #include <hwreg/bitfields.h>
 
-namespace i915 {
+namespace intel_display {
 
 namespace {
 
@@ -878,4 +878,4 @@ TEST(MemoryControllerBiosDataSkylakeTest, ControllerQuadClockFrequencyHz) {
 
 }  // namespace
 
-}  // namespace i915
+}  // namespace intel_display

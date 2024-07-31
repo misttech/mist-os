@@ -15,7 +15,7 @@
 #include "src/graphics/display/drivers/intel-display/hardware-common.h"
 #include "src/graphics/display/drivers/intel-display/registers-typec.h"
 
-namespace i915 {
+namespace intel_display {
 
 namespace {
 
@@ -1123,4 +1123,4 @@ TEST_F(ComboDdiTigerLakeTest, InitializeDdiBNuc11) {
 
 }  // namespace
 
-}  // namespace i915
+}  // namespace intel_display

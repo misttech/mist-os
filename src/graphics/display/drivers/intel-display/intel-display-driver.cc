@@ -27,7 +27,7 @@
 
 #include "src/graphics/display/drivers/intel-display/intel-display.h"
 
-namespace i915 {
+namespace intel_display {
 
 namespace {
 
@@ -298,6 +298,6 @@ zx::result<> IntelDisplayDriver::InitGpuCoreNode() {
   return zx::ok();
 }
 
-}  // namespace i915
+}  // namespace intel_display
 
-FUCHSIA_DRIVER_EXPORT(i915::IntelDisplayDriver);
+FUCHSIA_DRIVER_EXPORT(intel_display::IntelDisplayDriver);

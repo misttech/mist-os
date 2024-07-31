@@ -12,7 +12,7 @@
 #include "src/graphics/display/drivers/intel-display/registers-ddi.h"
 #include "src/graphics/display/drivers/intel-display/registers-pipe.h"
 
-namespace i915 {
+namespace intel_display {
 
 class Power;
 class PowerTest;
@@ -115,6 +115,6 @@ class Power {
   friend PowerWellRef;
 };
 
-}  // namespace i915
+}  // namespace intel_display
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_DISPLAY_POWER_H_

@@ -11,7 +11,7 @@
 
 #include <gtest/gtest.h>
 
-namespace i915 {
+namespace intel_display {
 
 // Used by `FakeBufferCollection`.
 struct FakeBufferCollectionConfig {
@@ -72,6 +72,6 @@ class FakeBufferCollection : public fidl::testing::WireTestBase<fuchsia_sysmem2:
   fuchsia_sysmem2::BufferCollectionConstraints constraints_;
 };
 
-}  // namespace i915
+}  // namespace intel_display
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_DISPLAY_TESTING_FAKE_BUFFER_COLLECTION_H_

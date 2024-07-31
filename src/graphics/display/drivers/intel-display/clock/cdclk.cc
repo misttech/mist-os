@@ -16,7 +16,7 @@
 #include "src/graphics/display/drivers/intel-display/registers-dpll.h"
 #include "src/graphics/display/drivers/intel-display/registers.h"
 
-namespace i915 {
+namespace intel_display {
 
 CoreDisplayClockSkylake::CoreDisplayClockSkylake(fdf::MmioBuffer* mmio_space)
     : mmio_space_(mmio_space) {
@@ -506,4 +506,4 @@ int CoreDisplayClockTigerLake::VoltageLevelForFrequency(uint32_t frequency_khz) 
   return 0x0;
 }
 
-}  // namespace i915
+}  // namespace intel_display

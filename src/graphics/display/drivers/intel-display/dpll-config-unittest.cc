@@ -13,7 +13,7 @@
 #include "src/graphics/display/drivers/intel-display/hardware-common.h"
 #include "src/graphics/display/drivers/intel-display/registers-dpll.h"
 
-namespace i915 {
+namespace intel_display {
 
 namespace {
 
@@ -252,4 +252,4 @@ TEST(CreateDpllOscillatorConfigForDisplayPortTigerLakeTest, DisplayPortTable) {
 
 }  // namespace
 
-}  // namespace i915
+}  // namespace intel_display

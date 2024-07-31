@@ -24,7 +24,7 @@
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 
-namespace i915 {
+namespace intel_display {
 
 class PipeManagerTest : public ::testing::Test {
  public:
@@ -142,4 +142,4 @@ TEST_F(PipeManagerTest, SkylakeReclaimUsedPipe) {
   }
 }
 
-}  // namespace i915
+}  // namespace intel_display

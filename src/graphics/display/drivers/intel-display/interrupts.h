@@ -22,7 +22,7 @@
 #include "src/graphics/display/drivers/intel-display/registers-ddi.h"
 #include "src/graphics/display/drivers/intel-display/registers-pipe.h"
 
-namespace i915 {
+namespace intel_display {
 
 class Interrupts {
  public:
@@ -108,6 +108,6 @@ class Interrupts {
   uint32_t gpu_interrupt_mask_ __TA_GUARDED(lock_) = 0;
 };
 
-}  // namespace i915
+}  // namespace intel_display
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_DISPLAY_INTERRUPTS_H_

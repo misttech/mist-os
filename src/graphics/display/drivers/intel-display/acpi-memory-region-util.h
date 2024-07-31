@@ -14,7 +14,7 @@
 #include <limits>
 #include <utility>
 
-namespace i915 {
+namespace intel_display {
 
 template <typename T>
 std::pair<T, size_t> RoundToPageBoundaries(T region_start_address, size_t region_size) {
@@ -38,6 +38,6 @@ std::pair<T, size_t> RoundToPageBoundaries(T region_start_address, size_t region
   return {first_page_address, page_region_size};
 }
 
-}  // namespace i915
+}  // namespace intel_display
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_DISPLAY_ACPI_MEMORY_REGION_UTIL_H_

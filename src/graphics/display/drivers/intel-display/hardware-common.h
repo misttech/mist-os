@@ -20,7 +20,7 @@ enum class Platform {
 
 }  // namespace registers
 
-namespace i915 {
+namespace intel_display {
 
 enum DdiId {
   DDI_A = 0,
@@ -184,6 +184,6 @@ constexpr cpp20::span<const PllId> PllIds() {
 // Not all display engines can support this exact number of displays.
 constexpr int kMaximumConnectedDisplayCount = 4;
 
-}  // namespace i915
+}  // namespace intel_display
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_DISPLAY_HARDWARE_COMMON_H_

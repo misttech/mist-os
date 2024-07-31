@@ -8,7 +8,7 @@
 #include <lib/zx/time.h>
 #include <zircon/assert.h>
 
-namespace i915 {
+namespace intel_display {
 
 // Polls a predicate periodically, until it becomes true or we time out.
 //
@@ -35,6 +35,6 @@ bool PollUntil(Lambda predicate, zx::duration poll_interval, int max_intervals) 
   return predicate();
 }
 
-}  // namespace i915
+}  // namespace intel_display
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_DISPLAY_POLL_UNTIL_H_

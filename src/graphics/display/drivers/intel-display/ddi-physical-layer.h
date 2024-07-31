@@ -12,7 +12,7 @@
 #include "src/graphics/display/drivers/intel-display/hardware-common.h"
 #include "src/graphics/display/drivers/intel-display/power.h"
 
-namespace i915 {
+namespace intel_display {
 
 class DdiReference;
 
@@ -365,6 +365,6 @@ class TypeCDdiTigerLake : public DdiPhysicalLayer {
   PhysicalLayerInfo physical_layer_info_;
 };
 
-}  // namespace i915
+}  // namespace intel_display
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_DISPLAY_DDI_PHYSICAL_LAYER_H_

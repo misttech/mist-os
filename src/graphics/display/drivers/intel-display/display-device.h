@@ -24,7 +24,7 @@
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 
-namespace i915 {
+namespace intel_display {
 
 class Controller;
 class DisplayDevice {
@@ -157,6 +157,6 @@ class DisplayDevice {
   Type type_;
 };
 
-}  // namespace i915
+}  // namespace intel_display
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_DISPLAY_DISPLAY_DEVICE_H_

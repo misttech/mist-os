@@ -22,7 +22,7 @@
 #include "src/graphics/display/drivers/intel-display/registers-ddi.h"
 #include "src/graphics/display/drivers/intel-display/registers-pch.h"
 
-namespace i915 {
+namespace intel_display {
 
 namespace {
 
@@ -1013,4 +1013,4 @@ void PchEngine::Log() {
   }
 }
 
-}  // namespace i915
+}  // namespace intel_display

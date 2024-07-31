@@ -689,11 +689,11 @@ class MbusPipeDataBoxControl : public hwreg::RegisterBase<MbusPipeDataBoxControl
   // Control Surface, described in Vol 5).
   DEF_FIELD(3, 0, arbiter_read_credits);
 
-  static auto GetForPipe(i915::PipeId pipe_id) {
+  static auto GetForPipe(intel_display::PipeId pipe_id) {
     // TODO(https://fxbug.dev/42060657): Accept pipe D, once we support it.
-    ZX_ASSERT(pipe_id >= i915::PipeId::PIPE_A);
-    ZX_ASSERT(pipe_id <= i915::PipeId::PIPE_C);
-    const int pipe_index = pipe_id - i915::PipeId::PIPE_A;
+    ZX_ASSERT(pipe_id >= intel_display::PipeId::PIPE_A);
+    ZX_ASSERT(pipe_id <= intel_display::PipeId::PIPE_C);
+    const int pipe_index = pipe_id - intel_display::PipeId::PIPE_A;
     return hwreg::RegisterAddr<MbusPipeDataBoxControl>(0x7003c + 0x1000 * pipe_index);
   }
 };
@@ -853,11 +853,11 @@ class PipeArbiterControl : public hwreg::RegisterBase<PipeArbiterControl, uint32
     return set_display_buffer_requests_per_streamer_request_bits(raw_display_buffer_requests);
   }
 
-  static auto GetForPipe(i915::PipeId pipe_id) {
+  static auto GetForPipe(intel_display::PipeId pipe_id) {
     // TODO(https://fxbug.dev/42060657): Accept pipe D, once we support it.
-    ZX_ASSERT(pipe_id >= i915::PipeId::PIPE_A);
-    ZX_ASSERT(pipe_id <= i915::PipeId::PIPE_C);
-    const int pipe_index = pipe_id - i915::PipeId::PIPE_A;
+    ZX_ASSERT(pipe_id >= intel_display::PipeId::PIPE_A);
+    ZX_ASSERT(pipe_id <= intel_display::PipeId::PIPE_C);
+    const int pipe_index = pipe_id - intel_display::PipeId::PIPE_A;
     return hwreg::RegisterAddr<PipeArbiterControl>(0x70028 + 0x1000 * pipe_index);
   }
 };

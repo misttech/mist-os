@@ -6,7 +6,7 @@
 
 #include <gtest/gtest.h>
 
-namespace i915 {
+namespace intel_display {
 
 namespace {
 
@@ -186,4 +186,4 @@ TEST(DataBufferControl2Test, GetForSlice) {
 
 }  // namespace
 
-}  // namespace i915
+}  // namespace intel_display

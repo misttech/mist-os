@@ -11,7 +11,7 @@
 
 #include "src/graphics/display/drivers/intel-display/registers-pch.h"
 
-namespace i915 {
+namespace intel_display {
 
 // PCH display engine clocking.
 //
@@ -427,6 +427,6 @@ class PchEngine {
   registers::PchPanelPowerControl panel_power_control_;
 };
 
-}  // namespace i915
+}  // namespace intel_display
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_DISPLAY_PCH_ENGINE_H_

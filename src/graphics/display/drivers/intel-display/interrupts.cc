@@ -26,7 +26,7 @@
 #include "src/graphics/display/drivers/intel-display/registers-pipe.h"
 #include "src/graphics/display/drivers/intel-display/registers.h"
 
-namespace i915 {
+namespace intel_display {
 
 namespace {
 
@@ -443,4 +443,4 @@ void Interrupts::Resume() {
   }
 }
 
-}  // namespace i915
+}  // namespace intel_display

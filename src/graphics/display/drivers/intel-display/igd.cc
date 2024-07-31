@@ -18,7 +18,7 @@
 #include "src/graphics/display/drivers/intel-display/acpi-memory-region.h"
 #include "src/graphics/display/drivers/intel-display/firmware-bridge.h"
 
-namespace i915 {
+namespace intel_display {
 
 namespace {
 
@@ -480,4 +480,4 @@ zx_status_t IgdOpRegion::Init(zx::unowned_resource mmio_resource, ddk::Pci& pci)
   return ZX_OK;
 }
 
-}  // namespace i915
+}  // namespace intel_display

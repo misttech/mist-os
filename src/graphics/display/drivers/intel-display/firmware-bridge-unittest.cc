@@ -23,7 +23,7 @@
 #include "src/devices/pci/testing/pci_protocol_fake.h"
 #include "src/lib/testing/predicates/status.h"
 
-namespace i915 {
+namespace intel_display {
 
 namespace {
 
@@ -151,4 +151,4 @@ TEST_F(PciConfigOpRegionTest, TriggerSystemControlInterruptPciError) {
 
 }  // namespace
 
-}  // namespace i915
+}  // namespace intel_display

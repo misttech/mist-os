@@ -23,7 +23,7 @@
 #include "src/graphics/display/drivers/intel-display/pci-ids.h"
 #include "src/lib/testing/predicates/status.h"
 
-namespace i915 {
+namespace intel_display {
 
 namespace {
 
@@ -136,4 +136,4 @@ TEST_F(InterruptTest, SetInterruptCallback) {
 
 }  // namespace
 
-}  // namespace i915
+}  // namespace intel_display

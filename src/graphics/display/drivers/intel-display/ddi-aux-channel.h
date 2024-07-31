@@ -14,7 +14,7 @@
 
 #include "src/graphics/display/drivers/intel-display/registers-ddi.h"
 
-namespace i915 {
+namespace intel_display {
 
 // Low-level channel configuration.
 struct DdiAuxChannelConfig {
@@ -206,6 +206,6 @@ class DdiAuxChannel {
 #endif  // ZX_DEBUG_ASSERT_IMPLEMENTED
 };
 
-}  // namespace i915
+}  // namespace intel_display
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_DISPLAY_DDI_AUX_CHANNEL_H_

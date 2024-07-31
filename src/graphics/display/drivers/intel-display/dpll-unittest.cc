@@ -14,7 +14,7 @@
 
 #include "src/graphics/display/drivers/intel-display/scoped-value-change.h"
 
-namespace i915 {
+namespace intel_display {
 
 namespace {
 
@@ -123,4 +123,4 @@ TEST_F(DisplayPllTigerLakeTest, EnableDisplayPort) {
 
 }  // namespace
 
-}  // namespace i915
+}  // namespace intel_display

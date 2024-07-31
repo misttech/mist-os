@@ -12,7 +12,7 @@
 #include "src/graphics/display/drivers/intel-display/poll-until.h"
 #include "src/graphics/display/drivers/intel-display/registers-gmbus.h"
 
-namespace i915 {
+namespace intel_display {
 
 namespace {
 
@@ -370,4 +370,4 @@ GMBusI2c::GMBusI2c(DdiId ddi_id, registers::Platform platform, fdf::MmioBuffer* 
   ZX_ASSERT(mtx_init(&lock_, mtx_plain) == thrd_success);
 }
 
-}  // namespace i915
+}  // namespace intel_display

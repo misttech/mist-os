@@ -13,7 +13,7 @@
 #include "src/graphics/display/drivers/intel-display/hardware-common.h"
 #include "src/graphics/display/drivers/intel-display/i2c/gmbus-gpio.h"
 
-namespace i915 {
+namespace intel_display {
 
 class GMBusI2c : public ddk::I2cImplProtocol<GMBusI2c> {
  public:
@@ -45,6 +45,6 @@ class GMBusI2c : public ddk::I2cImplProtocol<GMBusI2c> {
   bool GMBusWrite(uint8_t addr, const uint8_t* buf, uint8_t size) __TA_REQUIRES(lock_);
 };
 
-}  // namespace i915
+}  // namespace intel_display
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_DISPLAY_I2C_GMBUS_I2C_H_

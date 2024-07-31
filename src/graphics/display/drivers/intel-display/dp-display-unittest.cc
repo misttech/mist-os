@@ -27,7 +27,7 @@
 #include "src/graphics/display/drivers/intel-display/registers-dpll.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 
-namespace i915 {
+namespace intel_display {
 
 namespace {
 
@@ -340,4 +340,4 @@ TEST_F(DpDisplayTest, GetBacklightBrightnessUsesDpcd) {
 
 }  // namespace
 
-}  // namespace i915
+}  // namespace intel_display

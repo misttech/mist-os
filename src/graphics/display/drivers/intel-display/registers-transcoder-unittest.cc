@@ -14,7 +14,7 @@
 #include "src/graphics/display/drivers/intel-display/hardware-common.h"
 #include "src/graphics/display/drivers/intel-display/registers-ddi.h"
 
-namespace i915 {
+namespace intel_display {
 
 namespace {
 
@@ -817,4 +817,4 @@ TEST(TranscoderChickenTest, GetForTigerLakeTranscoder) {
 
 }  // namespace
 
-}  // namespace i915
+}  // namespace intel_display

@@ -11,7 +11,7 @@
 
 #include "src/graphics/display/drivers/intel-display/hardware-common.h"
 
-namespace i915 {
+namespace intel_display {
 
 // The GMBUS controller has multiple GPIO pin pairs used as I2C clock and
 // data lines connected to DDIs for I2C-based data transfer protocol like
@@ -382,6 +382,6 @@ class GpioPort {
   registers::Platform platform_;
 };
 
-}  // namespace i915
+}  // namespace intel_display
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_DISPLAY_I2C_GMBUS_GPIO_H_

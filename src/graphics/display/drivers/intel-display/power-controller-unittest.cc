@@ -20,7 +20,7 @@
 #include "src/graphics/display/drivers/intel-display/scoped-value-change.h"
 #include "src/lib/testing/predicates/status.h"
 
-namespace i915 {
+namespace intel_display {
 
 namespace {
 
@@ -1349,4 +1349,4 @@ TEST_F(PowerControllerTest, GetMemorySubsystemInfoTigerLakePointTwoTimeout) {
 
 }  // namespace
 
-}  // namespace i915
+}  // namespace intel_display

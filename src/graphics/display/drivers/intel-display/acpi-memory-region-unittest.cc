@@ -17,7 +17,7 @@
 
 #include <gtest/gtest.h>
 
-namespace i915 {
+namespace intel_display {
 
 namespace {
 
@@ -120,4 +120,4 @@ TEST_F(AcpiMemoryRegionTest, MoveAssignmentSwapsRhs) {
 
 }  // namespace
 
-}  // namespace i915
+}  // namespace intel_display

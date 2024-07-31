@@ -15,7 +15,7 @@
 #include "src/graphics/display/drivers/intel-display/hardware-common.h"
 #include "src/graphics/display/drivers/intel-display/igd.h"
 
-namespace i915 {
+namespace intel_display {
 
 namespace {
 
@@ -397,4 +397,4 @@ TEST_F(DdiManagerTigerLakeTest, ParseVbtTable_NUC11PAHi5) {
 
 }  // namespace
 
-}  // namespace i915
+}  // namespace intel_display

@@ -18,7 +18,7 @@
 #include "src/graphics/display/drivers/intel-display/registers-pipe.h"
 #include "src/graphics/display/drivers/intel-display/registers-transcoder.h"
 
-namespace i915 {
+namespace intel_display {
 
 PipeManager::PipeManager(std::vector<std::unique_ptr<Pipe>> pipes) : pipes_(std::move(pipes)) {}
 
@@ -203,4 +203,4 @@ std::vector<std::unique_ptr<Pipe>> PipeManagerTigerLake::GetPipes(fdf::MmioBuffe
   return pipes;
 }
 
-}  // namespace i915
+}  // namespace intel_display

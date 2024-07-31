@@ -16,7 +16,7 @@
 #include "src/graphics/display/drivers/intel-display/testing/fake-buffer-collection.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
 
-namespace i915 {
+namespace intel_display {
 
 MockAllocator::MockAllocator(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {
   ZX_ASSERT(dispatcher_);
@@ -86,4 +86,4 @@ void MockAllocator::NotImplemented_(const std::string& name, fidl::CompleterBase
   ZX_PANIC("Not implemented: %s", name.c_str());
 }
 
-}  // namespace i915
+}  // namespace intel_display

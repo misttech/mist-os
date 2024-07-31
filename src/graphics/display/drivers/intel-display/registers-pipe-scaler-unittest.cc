@@ -15,7 +15,7 @@
 
 #include "src/graphics/display/drivers/intel-display/hardware-common.h"
 
-namespace i915 {
+namespace intel_display {
 
 namespace {
 
@@ -550,4 +550,4 @@ TEST(PipeScalerCoefficients, Read) {
 
 }  // namespace
 
-}  // namespace i915
+}  // namespace intel_display

@@ -9,7 +9,7 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-namespace i915 {
+namespace intel_display {
 
 class HardwareCommonTest : public ::testing::Test {
  private:
@@ -91,4 +91,4 @@ TEST_F(HardwareCommonTest, TigerLake) {
   EXPECT_THAT(transcoders, testing::Contains(TranscoderId::TRANSCODER_A));
 }
 
-}  // namespace i915
+}  // namespace intel_display

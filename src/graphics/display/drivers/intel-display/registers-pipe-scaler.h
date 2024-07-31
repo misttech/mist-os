@@ -1135,7 +1135,7 @@ class PipeScalerWindowSize : public hwreg::RegisterBase<PipeScalerWindowSize, ui
 // scaler.
 class PipeScalerRegs {
  public:
-  explicit PipeScalerRegs(i915::PipeId pipe_id, int scaler_index)
+  explicit PipeScalerRegs(intel_display::PipeId pipe_id, int scaler_index)
       : pipe_id_(pipe_id), scaler_index_(scaler_index) {}
 
   hwreg::RegisterAddr<PipeScalerControlSkylake> PipeScalerControlSkylake() {
@@ -1204,7 +1204,7 @@ class PipeScalerRegs {
   }
 
  private:
-  i915::PipeId pipe_id_;
+  intel_display::PipeId pipe_id_;
   int scaler_index_;
 };
 

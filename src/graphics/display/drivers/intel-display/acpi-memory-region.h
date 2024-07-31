@@ -14,7 +14,7 @@
 #include <cstddef>
 #include <cstdint>
 
-namespace i915 {
+namespace intel_display {
 
 // A subset of an ACPI custom Operation Region mapped into this process.
 class AcpiMemoryRegion {
@@ -77,6 +77,6 @@ class AcpiMemoryRegion {
   zx::vmo region_vmo_;
 };
 
-}  // namespace i915
+}  // namespace intel_display
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_DISPLAY_ACPI_MEMORY_REGION_H_

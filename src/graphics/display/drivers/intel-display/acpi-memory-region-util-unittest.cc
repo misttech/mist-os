@@ -13,7 +13,7 @@
 
 #include <gtest/gtest.h>
 
-namespace i915 {
+namespace intel_display {
 
 namespace {
 
@@ -64,4 +64,4 @@ TEST(RoundToPageBoundariesTest, PageStraddlingRegion) {
 
 }  // namespace
 
-}  // namespace i915
+}  // namespace intel_display

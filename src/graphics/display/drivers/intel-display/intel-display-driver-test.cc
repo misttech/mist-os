@@ -43,7 +43,7 @@ constexpr uint32_t kBytesPerRowDivisor = 1024;
 
 }  // namespace
 
-namespace i915 {
+namespace intel_display {
 
 namespace {
 
@@ -610,4 +610,4 @@ TEST_F(IntegrationTest, SysmemRotated) {
 
 }  // namespace
 
-}  // namespace i915
+}  // namespace intel_display

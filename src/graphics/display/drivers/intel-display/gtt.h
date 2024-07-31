@@ -17,7 +17,7 @@
 #include <hwreg/mmio.h>
 #include <region-alloc/region-alloc.h>
 
-namespace i915 {
+namespace intel_display {
 
 // The offset into the MMIO space (at BAR 0) where the GTT is stored.
 constexpr uint32_t GTT_BASE_OFFSET = 0x800000;
@@ -107,6 +107,6 @@ class Gtt {
   uint64_t min_contiguity_;
 };
 
-}  // namespace i915
+}  // namespace intel_display
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_DISPLAY_GTT_H_

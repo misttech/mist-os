@@ -849,7 +849,7 @@ class PipeRegs {
     kEnable = 0x4440c,
   };
 
-  explicit PipeRegs(i915::PipeId pipe_id) : pipe_id_(pipe_id) {}
+  explicit PipeRegs(intel_display::PipeId pipe_id) : pipe_id_(pipe_id) {}
 
   hwreg::RegisterAddr<registers::PipeSourceSize> PipeSourceSize() {
     return GetReg<registers::PipeSourceSize>();
@@ -955,7 +955,7 @@ class PipeRegs {
     return hwreg::RegisterAddr<RegType>(base + 0x100 * pipe_id_);
   }
 
-  i915::PipeId pipe_id_;
+  intel_display::PipeId pipe_id_;
 };
 
 // Struct of registers which arm double buffered registers

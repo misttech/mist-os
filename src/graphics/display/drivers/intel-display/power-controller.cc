@@ -20,7 +20,7 @@
 #include "src/graphics/display/drivers/intel-display/registers-gt-mailbox.h"
 #include "src/graphics/display/drivers/intel-display/scoped-value-change.h"
 
-namespace i915 {
+namespace intel_display {
 
 namespace {
 
@@ -482,4 +482,4 @@ ScopedValueChange<int> PowerController::OverrideGetMemoryLatencyReplyTimeoutUsFo
   return ScopedValueChange(g_get_memory_latency_reply_timeout_us, timeout_us);
 }
 
-}  // namespace i915
+}  // namespace intel_display

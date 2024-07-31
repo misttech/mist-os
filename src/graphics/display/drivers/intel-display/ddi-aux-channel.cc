@@ -21,7 +21,7 @@
 #include "src/graphics/display/drivers/intel-display/poll-until.h"
 #include "src/graphics/display/drivers/intel-display/registers-ddi.h"
 
-namespace i915 {
+namespace intel_display {
 
 DdiAuxChannel::DdiAuxChannel(fdf::MmioBuffer* mmio_buffer, DdiId ddi_id, uint16_t device_id)
     : mmio_buffer_(mmio_buffer), large_timeout_us_(0) {
@@ -384,4 +384,4 @@ void DdiAuxChannel::FixConfig() {
   }
 }
 
-}  // namespace i915
+}  // namespace intel_display

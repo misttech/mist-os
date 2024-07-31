@@ -36,7 +36,7 @@
 #include "src/graphics/display/drivers/intel-display/registers.h"
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 
-namespace i915 {
+namespace intel_display {
 
 // I2c functions
 
@@ -294,4 +294,4 @@ bool HdmiDisplay::CheckPixelRate(int64_t pixel_rate_hz) {
   return dco_config.frequency_khz != 0;
 }
 
-}  // namespace i915
+}  // namespace intel_display

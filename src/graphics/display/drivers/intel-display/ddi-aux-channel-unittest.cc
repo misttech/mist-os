@@ -19,7 +19,7 @@
 #include "src/graphics/display/drivers/intel-display/registers-ddi.h"
 #include "src/lib/testing/predicates/status.h"
 
-namespace i915 {
+namespace intel_display {
 
 namespace {
 
@@ -843,4 +843,4 @@ TEST_F(DdiAuxChannelTest, DoTransactWrite7BytesNack) {
 
 }  // namespace
 
-}  // namespace i915
+}  // namespace intel_display

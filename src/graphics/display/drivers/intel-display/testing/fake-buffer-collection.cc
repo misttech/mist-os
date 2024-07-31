@@ -16,7 +16,7 @@
 #include <fbl/algorithm.h>
 #include <gtest/gtest.h>
 
-namespace i915 {
+namespace intel_display {
 
 FakeBufferCollection::FakeBufferCollection(const FakeBufferCollectionConfig& config)
     : config_(config) {}
@@ -109,4 +109,4 @@ void FakeBufferCollection::NotImplemented_(const std::string& name,
   ZX_PANIC("Not implemented: %s", name.c_str());
 }
 
-}  // namespace i915
+}  // namespace intel_display

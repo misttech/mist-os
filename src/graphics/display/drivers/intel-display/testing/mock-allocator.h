@@ -14,7 +14,7 @@
 #include "src/graphics/display/drivers/intel-display/testing/fake-buffer-collection.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
 
-namespace i915 {
+namespace intel_display {
 
 class MockAllocator : public fidl::testing::WireTestBase<fuchsia_sysmem2::Allocator> {
  public:
@@ -60,6 +60,6 @@ class MockAllocator : public fidl::testing::WireTestBase<fuchsia_sysmem2::Alloca
   async_dispatcher_t* dispatcher_ = nullptr;
 };
 
-}  // namespace i915
+}  // namespace intel_display
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_DISPLAY_TESTING_MOCK_ALLOCATOR_H_

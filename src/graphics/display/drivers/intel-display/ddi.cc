@@ -10,7 +10,7 @@
 #include "src/graphics/display/drivers/intel-display/hardware-common.h"
 #include "src/graphics/display/drivers/intel-display/pci-ids.h"
 
-namespace i915 {
+namespace intel_display {
 
 cpp20::span<const DdiId> GetDdiIds(uint16_t device_id) {
   if (is_skl(device_id)) {
@@ -28,4 +28,4 @@ cpp20::span<const DdiId> GetDdiIds(uint16_t device_id) {
   ZX_ASSERT_MSG(false, "Device id (%04x) not supported", device_id);
 }
 
-}  // namespace i915
+}  // namespace intel_display

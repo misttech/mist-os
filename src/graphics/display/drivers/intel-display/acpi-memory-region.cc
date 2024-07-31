@@ -21,7 +21,7 @@
 
 #include "src/graphics/display/drivers/intel-display/acpi-memory-region-util.h"
 
-namespace i915 {
+namespace intel_display {
 
 // static
 zx::result<AcpiMemoryRegion> AcpiMemoryRegion::Create(zx::unowned_resource mmio_resource,
@@ -90,4 +90,4 @@ AcpiMemoryRegion::~AcpiMemoryRegion() {
   }
 }
 
-}  // namespace i915
+}  // namespace intel_display

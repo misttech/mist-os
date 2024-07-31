@@ -10,7 +10,7 @@
 
 #include "src/graphics/display/drivers/intel-display/hardware-common.h"
 
-namespace i915 {
+namespace intel_display {
 
 namespace {
 
@@ -251,4 +251,4 @@ TEST_F(GpioPortTest, HasValidPort_Skylake) {
 
 }  // namespace
 
-}  // namespace i915
+}  // namespace intel_display

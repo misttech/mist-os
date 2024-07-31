@@ -19,7 +19,7 @@
 
 #include "src/graphics/display/drivers/intel-display/intel-display.h"
 
-namespace i915 {
+namespace intel_display {
 
 // Driver instance that binds to the intel-display PCI device.
 //
@@ -67,6 +67,6 @@ class IntelDisplayDriver : public fdf::DriverBase {
   fidl::WireSyncClient<fuchsia_driver_framework::NodeController> gpu_core_node_controller_;
 };
 
-}  // namespace i915
+}  // namespace intel_display
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_DISPLAY_INTEL_DISPLAY_DRIVER_H_
