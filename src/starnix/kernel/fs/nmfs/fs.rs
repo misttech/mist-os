@@ -12,9 +12,8 @@ use crate::vfs::{
     BytesFile, BytesFileOps, CacheMode, FileOps, FileSystem, FileSystemHandle, FileSystemOps,
     FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, MemoryDirectoryFile,
 };
-use bstr::BString;
 use serde::{Deserialize, Serialize};
-use starnix_sync::{FileOpsCore, Locked, Mutex};
+use starnix_sync::{FileOpsCore, Locked};
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
@@ -23,58 +22,28 @@ use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::vfs::default_statfs;
 use starnix_uapi::{errno, error, statfs};
 use std::borrow::Cow;
-use std::collections::HashMap;
 use std::net::{Ipv4Addr, Ipv6Addr};
-use std::sync::Arc;
-
-type NetworksHandle = Arc<Mutex<Networks>>;
 
 const DEFAULT_NETWORK_FILE_NAME: &str = "default";
 
-/// Keeps track of networks and their [`NetworkMessage`].
-#[derive(Default)]
-pub struct Networks {
-    default_id: Option<u32>,
-    networks: HashMap<u32, Option<NetworkMessage>>,
-}
-
-impl Networks {
-    pub fn get_default_id_as_bytes(&self) -> BString {
-        let default_id = match self.default_id {
-            Some(id) => id.to_string(),
-            None => "".to_string(),
-        };
-        default_id.into_bytes().into()
-    }
-
-    pub fn get_network_by_id_as_bytes(&self, id: u32) -> BString {
-        let network_info = match self.networks.get(&id) {
-            Some(network) => serde_json::to_string(network).unwrap_or("{}".to_string()),
-            // A network with that was created but hasn't yet
-            // been populated with network properties.
-            None => "{}".to_string(),
-        };
-        network_info.into_bytes().into()
-    }
-}
-
-#[derive(Deserialize, Serialize)]
-struct NetworkMessage {
-    netid: u32,
-    mark: u32,
-    handle: u64,
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+pub(crate) struct NetworkMessage {
+    pub(crate) netid: u32,
+    pub(crate) mark: u32,
+    pub(crate) handle: u64,
     #[serde(with = "addr_list")]
-    dnsv4: Vec<Ipv4Addr>,
+    pub(crate) dnsv4: Vec<Ipv4Addr>,
     #[serde(with = "addr_list")]
-    dnsv6: Vec<Ipv6Addr>,
+    pub(crate) dnsv6: Vec<Ipv6Addr>,
 
     #[serde(flatten)]
-    versioned_properties: VersionedProperties,
+    pub(crate) versioned_properties: VersionedProperties,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Serialize)]
 #[serde(tag = "version")]
-enum VersionedProperties {
+pub(crate) enum VersionedProperties {
+    #[default]
     V1,
 }
 
@@ -85,9 +54,7 @@ impl Nmfs {
         let fs = FileSystem::new(kernel, CacheMode::Permanent, Nmfs, options)
             .expect("nmfs constructed with valid options");
 
-        let networks = Arc::new(Mutex::new(Networks::default()));
-
-        let node = FsNode::new_root(NetworkDirectoryNode::new(networks.clone()));
+        let node = FsNode::new_root(NetworkDirectoryNode::new());
         fs.set_root_node(node);
         fs
     }
@@ -110,13 +77,11 @@ pub fn nmfs(current_task: &CurrentTask, options: FileSystemOptions) -> &FileSyst
     current_task.kernel().nmfs.get_or_init(|| Nmfs::new_fs(current_task, options))
 }
 
-pub struct NetworkDirectoryNode {
-    networks: NetworksHandle,
-}
+pub struct NetworkDirectoryNode;
 
 impl NetworkDirectoryNode {
-    pub fn new(networks: Arc<Mutex<Networks>>) -> Self {
-        Self { networks }
+    pub fn new() -> Self {
+        Self
     }
 }
 
@@ -160,12 +125,15 @@ impl FsNodeOps for NetworkDirectoryNode {
         let ops: Box<dyn FsNodeOps> = if name == DEFAULT_NETWORK_FILE_NAME {
             // The node with DEFAULT_NETWORK_FILE_NAME is special and can
             // only be written to with network ids.
-            Box::new(DefaultNetworkIdFile::new_node(self.networks.clone()))
+            Box::new(DefaultNetworkIdFile::new_node())
         } else {
             let id: u32 = parse(name).map_err(|_| errno!(EINVAL))?;
             // Insert a new network entry, but don't populate any fields.
-            let _ = self.networks.lock().networks.insert(id, None);
-            Box::new(NetworkFile::new_node(id, self.networks.clone()))
+            let network_manager = &current_task.kernel().network_manager.0;
+            // This call should only occur on the first node with this name,
+            // so this call isn't expected to fail.
+            network_manager.add_empty_network(id)?;
+            Box::new(NetworkFile::new_node(id))
         };
 
         let child =
@@ -178,28 +146,21 @@ impl FsNodeOps for NetworkDirectoryNode {
         &self,
         _locked: &mut Locked<'_, FileOpsCore>,
         _node: &FsNode,
-        _current_task: &CurrentTask,
+        current_task: &CurrentTask,
         name: &FsStr,
         _child: &FsNodeHandle,
     ) -> Result<(), Errno> {
+        let network_manager = &current_task.kernel().network_manager.0;
+
         // Note: direct equality comparisons are easier using FsStr
         // than using a match block.
         if name == DEFAULT_NETWORK_FILE_NAME {
             // Reset the default network when the associated
             // network file with the same id is unlinked.
-            self.networks.lock().default_id = None;
+            network_manager.set_default_network_id(None);
         } else {
-            let mut binding = self.networks.lock();
             let id: u32 = parse(name)?;
-            // The unlinked network must not be the current default network.
-            if binding.default_id == Some(id) {
-                return error!(EPERM);
-            }
-
-            // Remove the network from the HashMap when the associated file is unlinked.
-            if let None = binding.networks.remove(&id) {
-                return error!(ENOENT);
-            }
+            network_manager.remove_network(id)?;
         }
 
         Ok(())
@@ -220,66 +181,70 @@ impl FsNodeOps for NetworkDirectoryNode {
 
 pub struct NetworkFile {
     network_id: u32,
-    networks: NetworksHandle,
 }
 
 impl NetworkFile {
-    pub fn new_node(network_id: u32, networks: NetworksHandle) -> impl FsNodeOps {
-        BytesFile::new_node(Self { network_id, networks: networks.clone() })
+    pub fn new_node(network_id: u32) -> impl FsNodeOps {
+        BytesFile::new_node(Self { network_id })
     }
 }
 
 impl BytesFileOps for NetworkFile {
-    fn write(&self, _current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
-        let json: NetworkMessage = serde_json::from_slice(&data).map_err(|_| errno!(EINVAL))?;
+    fn write(&self, current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
+        let network: NetworkMessage = serde_json::from_slice(&data).map_err(|_| errno!(EINVAL))?;
 
-        let new_netid = json.netid;
+        let new_netid = network.netid;
 
         // The network id must be the same as the id listed in the JSON.
         if new_netid != self.network_id {
             return error!(EINVAL);
         }
 
-        // Override the network if one existed previously for this id.
-        let _network = self.networks.lock().networks.insert(self.network_id, Some(json));
+        let network_manager = &current_task.kernel().network_manager.0;
+        match network_manager.get_network(&new_netid) {
+            None | Some(None) => {
+                network_manager.add_network(network)?;
+            }
+            Some(Some(_old_network)) => {
+                network_manager.update_network(network)?;
+            }
+        }
 
         Ok(())
     }
 
-    fn read(&self, _current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
-        {
-            // Verify whether the network exists before reading.
-            let binding = self.networks.lock();
-            if let None = binding.networks.get(&self.network_id) {
-                return error!(ENOENT);
-            }
+    fn read(&self, current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
+        let network_manager = &current_task.kernel().network_manager.0;
+        // Verify whether the network exists before reading.
+        if let None = network_manager.get_network(&self.network_id) {
+            return error!(ENOENT);
         }
 
-        Ok(self.networks.lock().get_network_by_id_as_bytes(self.network_id).to_vec().into())
+        Ok(network_manager.get_network_by_id_as_bytes(self.network_id).to_vec().into())
     }
 }
 
-pub struct DefaultNetworkIdFile {
-    networks: NetworksHandle,
-}
+pub struct DefaultNetworkIdFile {}
 
 impl DefaultNetworkIdFile {
-    pub fn new_node(networks: NetworksHandle) -> impl FsNodeOps {
-        BytesFile::new_node(Self { networks: networks.clone() })
+    pub fn new_node() -> impl FsNodeOps {
+        BytesFile::new_node(Self {})
     }
 }
 
 impl BytesFileOps for DefaultNetworkIdFile {
-    fn write(&self, _current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
+    fn write(&self, current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
         let id_string = std::str::from_utf8(&data).map_err(|_| errno!(EINVAL))?;
         let id: u32 = id_string.parse().map_err(|_| errno!(EINVAL))?;
 
         {
-            let mut binding = self.networks.lock();
-            match binding.networks.get(&id) {
+            let network_manager = &current_task.kernel().network_manager.0;
+            match network_manager.get_network(&id) {
                 // A network with the provided id must already
                 // exist to become the default network.
-                Some(Some(_)) => binding.default_id = Some(id),
+                Some(Some(_)) => {
+                    network_manager.set_default_network_id(Some(id));
+                }
                 // The network properties must be provided for
                 // a network before it can become the default.
                 Some(None) | None => return error!(ENOENT),
@@ -288,12 +253,13 @@ impl BytesFileOps for DefaultNetworkIdFile {
         Ok(())
     }
 
-    fn read(&self, _current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
-        if self.networks.lock().default_id.is_none() {
+    fn read(&self, current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
+        let network_manager = &current_task.kernel().network_manager.0;
+        if let None = network_manager.get_default_network_id() {
             return error!(ENOENT);
         }
 
-        Ok(self.networks.lock().get_default_id_as_bytes().to_vec().into())
+        Ok(network_manager.get_default_id_as_bytes().to_vec().into())
     }
 }
 
