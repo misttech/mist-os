@@ -4,8 +4,6 @@
 
 import("//build/components.gni")
 import("//build/test.gni")
-import("//build/testing/bootfs_test.gni")
-import("//build/zircon/zx_library.gni")
 
 group("tests") {
   testonly = true
@@ -33,45 +31,30 @@ test("watchdog_unittest") {
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
   ]
-
-  include_dirs = [ ".." ]
-}
-
-bootfs_test("watchdog-unit-bootfs-test") {
-  name = "watchdog-unittest"
-  deps = [ ":watchdog-unittest" ]
 }
 
 fuchsia_unittest_package("watchdog-unittest") {
   deps = [ ":watchdog_unittest" ]
 }
 
-zx_library("watchdog") {
-  sdk = "source"
-  sdk_headers = [
-    "lib/watchdog/watchdog.h",
-    "lib/watchdog/operations.h",
+source_set("watchdog") {
+  public = [
+    "operations.h",
+    "watchdog.h",
   ]
-  public_deps = [ "//sdk/lib/syslog/cpp" ]
+  sources = [ "watchdog.cc" ]
   deps = [
-    "//sdk/lib/fit",
-    "//src/storage/lib/vfs/cpp",
-    "//zircon/system/ulib/fbl",
+    "//sdk/lib/syslog/cpp",
+    "//zircon/system/ulib/inspector",
+    "//zircon/system/ulib/sync",
     "//zircon/system/ulib/zx",
   ]
-
-  if (is_fuchsia) {
-    sources = [ "watchdog.cc" ]
-    public_deps += [
-      "//zircon/system/ulib/fzl",
-      "//zircon/system/ulib/zx",
-    ]
-    deps += [
-      "//sdk/lib/fdio",
-      "//zircon/system/ulib/fbl",
-      "//zircon/system/ulib/inspector",
-    ]
-  } else {
-    sources = [ "watchdog_host.cc" ]
-  }
+  public_deps = [
+    "//sdk/lib/syslog/cpp",
+    "//zircon/system/ulib/zx",
+  ]
+  visibility = [
+    ":*",
+    "//src/storage/blobfs:*",
+  ]
 }

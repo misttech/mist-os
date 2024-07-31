@@ -2,19 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_STORAGE_LIB_WATCHDOG_INCLUDE_LIB_WATCHDOG_OPERATIONS_H_
-#define SRC_STORAGE_LIB_WATCHDOG_INCLUDE_LIB_WATCHDOG_OPERATIONS_H_
+#ifndef SRC_STORAGE_LIB_WATCHDOG_OPERATIONS_H_
+#define SRC_STORAGE_LIB_WATCHDOG_OPERATIONS_H_
 
-#include <lib/syslog/cpp/macros.h>
-#include <lib/watchdog/watchdog.h>
 #include <lib/zx/result.h>
 #include <zircon/assert.h>
 
+#include <atomic>
 #include <chrono>
 #include <cstdio>
 #include <string_view>
 
-#include <fbl/macros.h>
+#include "src/storage/lib/watchdog/watchdog.h"
 
 namespace fs_watchdog {
 
@@ -57,7 +56,7 @@ class FsOperationType : public OperationBase {
   FsOperationType& operator=(const FsOperationType&) = delete;
   FsOperationType& operator=(FsOperationType&&) = delete;
 
-  // Returns name of the opertation
+  // Returns name of the operation.
   std::string_view Name() const final { return OperationName(type_); }
 
   // Returns operation timeout.
@@ -179,4 +178,5 @@ class FsOperationTracker : public OperationTracker {
 };
 
 }  // namespace fs_watchdog
-#endif  // SRC_STORAGE_LIB_WATCHDOG_INCLUDE_LIB_WATCHDOG_OPERATIONS_H_
+
+#endif  // SRC_STORAGE_LIB_WATCHDOG_OPERATIONS_H_
