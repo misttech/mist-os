@@ -106,7 +106,6 @@ source_set("ddktl") {
     "//src/camera/drivers/hw_accel/ge2d:*",
     "//src/camera/drivers/test_utils:*",
     "//src/camera/drivers/usb_video:*",
-    "//src/connectivity/bluetooth/core/bt-host/controllers:*",
     "//src/connectivity/bluetooth/hci/passthrough:*",
     "//src/connectivity/bluetooth/hci/vendor/atheros:*",
     "//src/connectivity/bluetooth/hci/vendor/broadcom:*",
