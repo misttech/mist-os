@@ -1,0 +1,30 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [
+        "driver_component/driver.shard.cml",
+        "inspect/client.shard.cml",
+        "syslog/client.shard.cml",
+    ],
+    program: {
+        runner: "driver",
+        binary: "driver/intel-display.so",
+        bind: "meta/bind/intel-display-bind.bindbc",
+        colocate: "false",
+    },
+    use: [
+        {
+            protocol: [
+                "fuchsia.device.manager.SystemStateTransition",
+                "fuchsia.kernel.FramebufferResource",
+                "fuchsia.kernel.IoportResource",
+                "fuchsia.kernel.MmioResource",
+                "fuchsia.scheduler.RoleManager",
+                "fuchsia.sysmem.Allocator",
+                "fuchsia.sysmem2.Allocator",
+            ],
+        },
+        { service: "fuchsia.hardware.pci.Service" },
+    ],
+}

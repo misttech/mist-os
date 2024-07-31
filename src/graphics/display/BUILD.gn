@@ -13,7 +13,7 @@ group("drivers") {
     "drivers/framebuffer-bochs-display",
     "drivers/framebuffer-intel-display",
     "drivers/goldfish-display",
-    "drivers/intel-i915",
+    "drivers/intel-display",
     "drivers/vim3-display-detect:vim3-display-detect",
     "drivers/virtio-gpu-display:component",
   ]

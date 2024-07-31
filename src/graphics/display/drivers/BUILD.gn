@@ -13,7 +13,7 @@ group("tests") {
     "framebuffer-bochs-display:tests",
     "framebuffer-intel-display:tests",
     "goldfish-display:tests",
-    "intel-i915:tests",
+    "intel-display:tests",
     "vim3-display-detect:tests",
     "virtio-gpu-display:tests",
   ]

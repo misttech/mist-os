@@ -19,7 +19,7 @@ group("pci") {
     "//src/devices/usb/drivers/xhci:xhci",
     "//src/graphics/display/drivers/framebuffer-bochs-display",
     "//src/graphics/display/drivers/framebuffer-intel-display",
-    "//src/graphics/display/drivers/intel-i915:intel-i915",
+    "//src/graphics/display/drivers/intel-display:intel-display",
     "//src/graphics/display/drivers/virtio-gpu-display:component",
     "//src/graphics/drivers/misc/goldfish_address_space:address_space_driver",
     "//src/media/audio/drivers/intel-hda/controller:intel-hda",

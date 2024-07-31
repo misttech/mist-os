@@ -165,9 +165,9 @@ board_input_bundle("x64_common") {
       driver_components = [ "meta/xhci.cm" ]
     },
     {
-      package_target = "//src/graphics/display/drivers/intel-i915:package"
+      package_target = "//src/graphics/display/drivers/intel-display:package"
       package_set = "bootfs"
-      driver_components = [ "meta/intel-i915.cm" ]
+      driver_components = [ "meta/intel-display.cm" ]
     },
     {
       package_target = "//src/media/audio/drivers/codecs/alc5514:package"

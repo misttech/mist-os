@@ -91,7 +91,7 @@ console before disk access is possible. The display controller should expose
 a hardware-specific [banjo][banjo] interface and the MSD can bind to the
 display driver.
 
-See [msd-intel-gen][msd-intel-gen] and [intel-i915][intel-i915] for an
+See [msd-intel-gen][msd-intel-gen] and [intel-display][intel-display] for an
 example of a PCI driver that's split into two parts.
 
 ## Powering on
@@ -347,7 +347,7 @@ the system driver using the Zircon DDK.
 [msd-arm-mali]: /src/graphics/drivers/msd-arm-mali
 [aml-gpu]: /src/graphics/drivers/aml-gpu
 [msd-intel-gen]: /src/graphics/drivers/msd-intel-gen
-[intel-i915]: /src/graphics/display/drivers/intel-i915
+[intel-display]: /src/graphics/display/drivers/intel-display
 [driverdir]: /src/graphics/drivers
 [vkcube]: /src/graphics/examples/vkcube
 [vulkan_icd_load]: /sdk/ctf/tests/pkg/vulkan
