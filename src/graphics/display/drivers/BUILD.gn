@@ -12,7 +12,8 @@ group("tests") {
     "fake:tests",
     "goldfish-display:tests",
     "intel-i915:tests",
-    "simple:tests",
+    "simple-bochs:tests",
+    "simple-intel:tests",
     "vim3-display-detect:tests",
     "virtio-gpu-display:tests",
   ]

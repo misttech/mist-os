@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/graphics/display/drivers/simple/simple-display.h"
+#include "src/graphics/display/lib/simple-display/simple-display.h"
 
 #include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
 #include <fidl/fuchsia.hardware.sysmem/cpp/wire_test_base.h>

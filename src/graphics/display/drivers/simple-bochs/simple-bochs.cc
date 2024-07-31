@@ -12,9 +12,9 @@
 
 #include <fbl/alloc_checker.h>
 
-#include "src/graphics/display/drivers/simple/bochs-vbe-registers.h"
-#include "src/graphics/display/drivers/simple/simple-display-driver.h"
-#include "src/graphics/display/drivers/simple/simple-display.h"
+#include "src/graphics/display/drivers/simple-bochs/bochs-vbe-registers.h"
+#include "src/graphics/display/lib/simple-display/simple-display-driver.h"
+#include "src/graphics/display/lib/simple-display/simple-display.h"
 
 namespace simple_display {
 

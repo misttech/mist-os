@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/graphics/display/drivers/simple/simple-display-driver.h"
+#include "src/graphics/display/lib/simple-display/simple-display-driver.h"
 
 #include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
 #include <fidl/fuchsia.sysmem2/cpp/wire.h>
@@ -15,7 +15,7 @@
 #include <bind/fuchsia/display/cpp/bind.h>
 #include <fbl/alloc_checker.h>
 
-#include "src/graphics/display/drivers/simple/simple-display.h"
+#include "src/graphics/display/lib/simple-display/simple-display.h"
 
 namespace simple_display {
 

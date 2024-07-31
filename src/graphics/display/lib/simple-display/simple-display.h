@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_SIMPLE_SIMPLE_DISPLAY_H_
-#define SRC_GRAPHICS_DISPLAY_DRIVERS_SIMPLE_SIMPLE_DISPLAY_H_
+#ifndef SRC_GRAPHICS_DISPLAY_LIB_SIMPLE_DISPLAY_SIMPLE_DISPLAY_H_
+#define SRC_GRAPHICS_DISPLAY_LIB_SIMPLE_DISPLAY_SIMPLE_DISPLAY_H_
 
 #include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
 #include <fidl/fuchsia.images2/cpp/wire.h>
@@ -135,4 +135,4 @@ class SimpleDisplay : public HeapServer, public ddk::DisplayEngineProtocol<Simpl
 
 }  // namespace simple_display
 
-#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_SIMPLE_SIMPLE_DISPLAY_H_
+#endif  // SRC_GRAPHICS_DISPLAY_LIB_SIMPLE_DISPLAY_SIMPLE_DISPLAY_H_

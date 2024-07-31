@@ -11,5 +11,6 @@ group("tests") {
     "driver-framework-migration-utils:tests",
     "edid:tests",
     "rust:tests",
+    "simple-display:tests",
   ]
 }
