@@ -142,12 +142,10 @@ async fn test_fsystem_activity_governor_listener_and_get_power_element() -> Resu
         .unwrap();
 
     let (on_suspend_started_tx, mut on_suspend_started_rx) = mpsc::channel(1);
-    let (on_suspend_tx, mut on_suspend_rx) = mpsc::channel(1);
     let (on_resume_tx, mut on_resume_rx) = mpsc::channel(1);
 
     fasync::Task::local(async move {
         let mut on_suspend_started_tx = on_suspend_started_tx;
-        let mut on_suspend_tx = on_suspend_tx;
         let mut on_resume_tx = on_resume_tx;
 
         while let Some(Ok(req)) = listener_stream.next().await {
@@ -155,9 +153,6 @@ async fn test_fsystem_activity_governor_listener_and_get_power_element() -> Resu
                 fsystem::ActivityGovernorListenerRequest::OnResume { responder } => {
                     responder.send().unwrap();
                     on_resume_tx.try_send(()).unwrap();
-                }
-                fsystem::ActivityGovernorListenerRequest::OnSuspend { .. } => {
-                    on_suspend_tx.try_send(()).unwrap();
                 }
                 fsystem::ActivityGovernorListenerRequest::OnSuspendStarted { responder } => {
                     responder.send().unwrap();
@@ -206,9 +201,8 @@ async fn test_fsystem_activity_governor_listener_and_get_power_element() -> Resu
     current_state.execution_state_level.replace(ExecutionStateLevel::Inactive);
     assert_eq!(sag_ctrl_state.watch().await.unwrap(), current_state);
 
-    // OnSuspend and OnResume should have been called once.
+    // OnSuspendStarted and OnResume should have been called once.
     on_suspend_started_rx.next().await.unwrap();
-    on_suspend_rx.next().await.unwrap();
     on_resume_rx.next().await.unwrap();
 
     let lease_control = test_driver_controller

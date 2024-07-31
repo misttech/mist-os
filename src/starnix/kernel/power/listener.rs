@@ -86,9 +86,6 @@ fn init_sag_listener(
                     fsystem::ActivityGovernorListenerRequest::OnResume { responder } => {
                         handle_on_resume(&power_manager, || responder.send())
                     }
-                    fsystem::ActivityGovernorListenerRequest::OnSuspend { .. } => {
-                        handle_on_suspend()
-                    }
                     fsystem::ActivityGovernorListenerRequest::OnSuspendStarted { responder } => {
                         handle_on_suspend();
                         if let Err(e) = responder.send() {

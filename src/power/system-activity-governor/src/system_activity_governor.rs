@@ -1077,7 +1077,6 @@ impl SuspendResumeListener for SystemActivityGovernor {
         // mutable borrow of listeners. Clone the listeners to prevent this.
         let listeners: Vec<_> = self.listeners.borrow_mut().clone();
         for l in listeners {
-            let _ = l.on_suspend();
             let _ = l.on_suspend_started().await;
         }
     }
