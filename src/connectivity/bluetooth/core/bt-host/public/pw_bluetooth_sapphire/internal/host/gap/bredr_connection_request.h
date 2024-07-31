@@ -8,10 +8,10 @@
 #include <lib/fit/function.h>
 
 #include <list>
-#include <optional>
 
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/identifier.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/inspectable.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/legacy_pairing_state.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/peer.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci/bredr_connection_request.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/transport/error.h"
@@ -97,6 +97,17 @@ class BrEdrConnectionRequest final {
     return role_change_;
   }
 
+  void set_legacy_pairing_state(
+      std::unique_ptr<LegacyPairingState> legacy_pairing_state) {
+    legacy_pairing_state_ = std::move(legacy_pairing_state);
+  }
+  LegacyPairingState* legacy_pairing_state() {
+    return legacy_pairing_state_.get();
+  }
+  std::unique_ptr<LegacyPairingState> take_legacy_pairing_state() {
+    return std::move(legacy_pairing_state_);
+  }
+
   Peer::InitializingConnectionToken take_peer_init_token() {
     BT_ASSERT(peer_init_conn_token_);
     return std::exchange(peer_init_conn_token_, std::nullopt).value();
@@ -108,6 +119,8 @@ class BrEdrConnectionRequest final {
   UintInspectable<std::list<OnComplete>> callbacks_;
   BoolInspectable<bool> has_incoming_{false};
   std::optional<pw::bluetooth::emboss::ConnectionRole> role_change_;
+  std::unique_ptr<LegacyPairingState> legacy_pairing_state_;
+
   // Used to determine whether an outbound connection request should be retried.
   // If empty, no HCI Create Connection Requests associated with this object
   // have been made, otherwise stores the time at which the first HCI request

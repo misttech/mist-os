@@ -11,6 +11,8 @@
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/peer.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/secure_simple_pairing_state.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/types.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/constants.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/link_key.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/protocol.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci/bredr_connection.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sm/types.h"
@@ -62,7 +64,22 @@ class LegacyPairingState final {
                      bool outgoing_connection,
                      fit::closure auth_cb,
                      StatusCallback status_cb);
+  // Constructs a LegacyPairingState to handle pairing protocols, commands, and
+  // events to the |peer|, prior to the ACL connection being established. We
+  // cannot populate |link_|, |send_auth_request_callback_|, and
+  // |status_callback_| until the ACL connection is complete.
+  LegacyPairingState(Peer::WeakPtr peer, bool outgoing_connection);
   ~LegacyPairingState();
+
+  // Sets the |link|'s callbacks fields when the ACL connection is complete
+  // (i.e. after HCI_Connection_Complete event). |auth_cb| and |status_cb| are
+  // passed in from either the LegacyPairingState or PairingStateManager
+  // constructor, depending on which object is first created due to the ordering
+  // of legacy pairing events (which may occur before or after the ACL
+  // connection is created).
+  void BuildEstablishedLink(WeakPtr<hci::BrEdrConnection> link,
+                            fit::closure auth_cb,
+                            StatusCallback status_cb);
 
   // Set a handler for user-interactive authentication challenges. If not set or
   // set to nullptr, all pairing requests will be rejected. This does not cause
@@ -113,7 +130,18 @@ class LegacyPairingState final {
     return is_pairing() ? current_pairing_->initiator : false;
   }
 
+  Peer::WeakPtr peer() { return peer_; }
+
+  bool outgoing_connection() const { return outgoing_connection_; }
+
+  sm::SecurityProperties& security_properties() { return bredr_security_; }
+
   std::optional<hci_spec::LinkKey> link_key() { return link_key_; }
+
+  void set_link_ltk() {
+    link_->set_link_key(link_key_.value(), hci_spec::LinkKeyType::kCombination);
+  }
+  std::optional<hci_spec::LinkKey> link_ltk() const { return link_->ltk(); }
 
  private:
   enum class State : uint8_t {
