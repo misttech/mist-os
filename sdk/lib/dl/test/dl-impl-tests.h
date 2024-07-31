@@ -57,6 +57,11 @@ class DlImplTests : public Base {
     return dynamic_linker_.LookupSymbol(static_cast<ModuleHandle*>(module), ref);
   }
 
+  // TODO(https://fxbug.dev/354043838): Remove these when these functions can
+  // become pure wrappers in the DlSystemTests fixture.
+  void ExpectRootModuleNotLoaded(std::string_view name) {}
+  void ExpectNeededNotLoaded(std::initializer_list<std::string_view> names) {}
+
  private:
   RuntimeDynamicLinker dynamic_linker_;
 };

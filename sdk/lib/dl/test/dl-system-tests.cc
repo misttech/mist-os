@@ -70,4 +70,32 @@ void* DlSystemTests::CallDlOpen(const char* file, int mode) {
 }
 #endif
 
+void DlSystemTests::ExpectRootModuleNotLoaded(std::string_view name) {
+  // DlOpen `name` with `RTLD_NOLOAD` to ensure this will be the first time the
+  // file is loaded from the filesystem.
+  if constexpr (kRetrievesFileWithNoLoad) {
+    DlSystemLoadTestsBase::ExpectRootModule(name);
+  }
+  ASSERT_TRUE(DlOpen(std::string{name}.c_str(), RTLD_NOLOAD).is_error());
+  // TODO(https://fxbug.dev/354043838): Uncomment when this function becomes a
+  // wrapper for ExpectRootModule.
+  // Now add the expectation that the file will be loaded from the filesystem.
+  // DlSystemLoadTestsBase::ExpectRootModule(name);
+}
+
+void DlSystemTests::ExpectNeededNotLoaded(std::initializer_list<std::string_view> names) {
+  // DlOpen each "Needed" dep  with `RTLD_NOLOAD` to ensure this will be the
+  // first time the file is loaded from the filesystem.
+  for (auto name : names) {
+    if constexpr (kRetrievesFileWithNoLoad) {
+      DlSystemLoadTestsBase::Needed({name});
+    }
+    ASSERT_TRUE(DlOpen(std::string{name}.c_str(), RTLD_NOLOAD).is_error());
+  }
+  // TODO(https://fxbug.dev/354043838): Uncomment when this function becomes a
+  // wrapper for ExpectRootModule.
+  // Now add the expectation that the deps will be loaded from the filesystem.
+  // DlSystemLoadTestsBase::Needed(names);
+}
+
 }  // namespace dl::testing

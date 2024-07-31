@@ -45,6 +45,17 @@ class DlSystemTests : public DlSystemLoadTestsBase {
 
   static fit::result<Error, void*> DlSym(void* module, const char* ref);
 
+  // TODO(https://fxbug.dev/354043838): We can convert these functions to be
+  // wrappers around ExpectLoadModule/Needed when we create stamped executables
+  // in //sdk/lib/ld/test/modules/BUILD.gn.
+  // ExpectRootModule or Needed are called by tests when a file is expected to
+  // be loaded from the file system for the first time. The following functions
+  // will call DlOpen(file, RTLD_NOLOAD) to ensure that `file` is not already
+  // loaded (e.g. by a previous test).
+  void ExpectRootModuleNotLoaded(std::string_view name);
+
+  void ExpectNeededNotLoaded(std::initializer_list<std::string_view> names);
+
  private:
   // This will call the system dlopen in an OS-specific context. This method is
   // defined directly on this test fixture rather than its OS-tailored base

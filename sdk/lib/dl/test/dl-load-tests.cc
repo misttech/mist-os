@@ -108,14 +108,8 @@ TYPED_TEST(DlTests, Basic) {
   constexpr int64_t kReturnValue = 17;
   constexpr const char* kFile = "ret17.module.so";
 
-  // TODO(https://fxbug.dev/354043838): Move these checks from tests and into
-  // the test fixture.
-  if constexpr (TestFixture::kSupportsNoLoadMode) {
-    if constexpr (TestFixture::kRetrievesFileWithNoLoad) {
-      this->ExpectRootModule(kFile);
-    }
-    ASSERT_TRUE(this->DlOpen(kFile, RTLD_NOLOAD).is_error());
-  }
+  // TODO(https://fxbug.dev/354043838): Fold into ExpectRootModule/Needed API.
+  this->ExpectRootModuleNotLoaded(kFile);
 
   this->ExpectRootModule(kFile);
 
@@ -139,12 +133,8 @@ TYPED_TEST(DlTests, Relative) {
   constexpr int64_t kReturnValue = 17;
   constexpr const char* kFile = "relative-reloc.module.so";
 
-  if constexpr (TestFixture::kSupportsNoLoadMode) {
-    if constexpr (TestFixture::kRetrievesFileWithNoLoad) {
-      this->ExpectRootModule(kFile);
-    }
-    ASSERT_TRUE(this->DlOpen(kFile, RTLD_NOLOAD).is_error());
-  }
+  // TODO(https://fxbug.dev/354043838): Fold into ExpectRootModule/Needed API.
+  this->ExpectRootModuleNotLoaded(kFile);
 
   this->ExpectRootModule(kFile);
 
@@ -167,12 +157,8 @@ TYPED_TEST(DlTests, Symbolic) {
   constexpr int64_t kReturnValue = 17;
   constexpr const char* kFile = "symbolic-reloc.module.so";
 
-  if constexpr (TestFixture::kSupportsNoLoadMode) {
-    if constexpr (TestFixture::kRetrievesFileWithNoLoad) {
-      this->ExpectRootModule(kFile);
-    }
-    ASSERT_TRUE(this->DlOpen(kFile, RTLD_NOLOAD).is_error());
-  }
+  // TODO(https://fxbug.dev/354043838): Fold into ExpectRootModule/Needed API.
+  this->ExpectRootModuleNotLoaded(kFile);
 
   this->ExpectRootModule(kFile);
 
@@ -195,12 +181,9 @@ TYPED_TEST(DlTests, BasicDep) {
   constexpr const char* kFile = "basic-dep.module.so";
   constexpr const char* kDepFile = "libld-dep-a.so";
 
-  if constexpr (TestFixture::kSupportsNoLoadMode) {
-    if constexpr (TestFixture::kRetrievesFileWithNoLoad) {
-      this->ExpectRootModule(kFile);
-    }
-    ASSERT_TRUE(this->DlOpen(kFile, RTLD_NOLOAD).is_error());
-  }
+  // TODO(https://fxbug.dev/354043838): Fold into ExpectRootModule/Needed API.
+  this->ExpectRootModuleNotLoaded(kFile);
+  this->ExpectNeededNotLoaded({kDepFile});
 
   this->ExpectRootModule(kFile);
   this->Needed({kDepFile});
@@ -229,12 +212,9 @@ TYPED_TEST(DlTests, IndirectDeps) {
   constexpr const char* kDepFile2 = "libindirect-deps-b.so";
   constexpr const char* kDepFile3 = "libindirect-deps-c.so";
 
-  if constexpr (TestFixture::kSupportsNoLoadMode) {
-    if constexpr (TestFixture::kRetrievesFileWithNoLoad) {
-      this->ExpectRootModule(kFile);
-    }
-    ASSERT_TRUE(this->DlOpen(kFile, RTLD_NOLOAD).is_error());
-  }
+  // TODO(https://fxbug.dev/354043838): Fold into ExpectRootModule/Needed API.
+  this->ExpectRootModuleNotLoaded(kFile);
+  this->ExpectNeededNotLoaded({kDepFile1, kDepFile2, kDepFile3});
 
   this->ExpectRootModule(kFile);
   this->Needed({kDepFile1, kDepFile2, kDepFile3});
@@ -265,12 +245,9 @@ TYPED_TEST(DlTests, ManyDeps) {
   constexpr const char* kDepFile5 = "libld-dep-d.so";
   constexpr const char* kDepFile6 = "libld-dep-e.so";
 
-  if constexpr (TestFixture::kSupportsNoLoadMode) {
-    if constexpr (TestFixture::kRetrievesFileWithNoLoad) {
-      this->ExpectRootModule(kFile);
-    }
-    ASSERT_TRUE(this->DlOpen(kFile, RTLD_NOLOAD).is_error());
-  }
+  // TODO(https://fxbug.dev/354043838): Fold into ExpectRootModule/Needed API.
+  this->ExpectRootModuleNotLoaded(kFile);
+  this->ExpectNeededNotLoaded({kDepFile1, kDepFile2, kDepFile3, kDepFile4, kDepFile5, kDepFile6});
 
   this->ExpectRootModule(kFile);
   this->Needed({kDepFile1, kDepFile2, kDepFile3, kDepFile4, kDepFile5, kDepFile6});
@@ -294,6 +271,10 @@ TYPED_TEST(DlTests, ManyDeps) {
 TYPED_TEST(DlTests, MissingSymbol) {
   constexpr const char* kFile = "missing-sym.module.so";
   constexpr const char* kDepFile = "libld-dep-a.so";
+
+  // TODO(https://fxbug.dev/354043838): Fold into ExpectRootModule/Needed API.
+  this->ExpectRootModuleNotLoaded(kFile);
+  this->ExpectNeededNotLoaded({kDepFile});
 
   this->ExpectRootModule(kFile);
   this->Needed({kDepFile});
@@ -324,6 +305,9 @@ TYPED_TEST(DlTests, MissingDependency) {
   constexpr const char* kFile = "missing-dep.module.so";
   constexpr const char* kDepFile = "libmissing-dep-dep.so";
 
+  // TODO(https://fxbug.dev/354043838): Fold into ExpectRootModule/Needed API.
+  this->ExpectRootModuleNotLoaded(kFile);
+
   this->ExpectRootModule(kFile);
   this->Needed({NotFound(kDepFile)});
 
@@ -353,6 +337,10 @@ TYPED_TEST(DlTests, MissingTransitiveDependency) {
   constexpr const char* kDepFile1 = "libhas-missing-dep.so";
   constexpr const char* kDepFile2 = "libmissing-dep-dep.so";
 
+  // TODO(https://fxbug.dev/354043838): Fold into ExpectRootModule/Needed API.
+  this->ExpectRootModuleNotLoaded(kFile);
+  this->ExpectNeededNotLoaded({kDepFile1});
+
   this->ExpectRootModule(kFile);
   this->Needed({Found(kDepFile1), NotFound(kDepFile2)});
 
@@ -380,12 +368,8 @@ TYPED_TEST(DlTests, MissingTransitiveDependency) {
 TYPED_TEST(DlTests, BasicModuleReuse) {
   constexpr const char* kFile = "ret17.module.so";
 
-  if constexpr (TestFixture::kSupportsNoLoadMode) {
-    if constexpr (TestFixture::kRetrievesFileWithNoLoad) {
-      this->ExpectRootModule(kFile);
-    }
-    ASSERT_TRUE(this->DlOpen(kFile, RTLD_NOLOAD).is_error());
-  }
+  // TODO(https://fxbug.dev/354043838): Fold into ExpectRootModule/Needed API.
+  this->ExpectRootModuleNotLoaded(kFile);
 
   this->ExpectRootModule(kFile);
 
@@ -423,14 +407,9 @@ TYPED_TEST(DlTests, UniqueModules) {
   constexpr const char* kFile1 = "ret17.module.so";
   constexpr const char* kFile2 = "ret23.module.so";
 
-  if constexpr (TestFixture::kSupportsNoLoadMode) {
-    if constexpr (TestFixture::kRetrievesFileWithNoLoad) {
-      this->ExpectRootModule(kFile1);
-      this->ExpectRootModule(kFile2);
-    }
-    ASSERT_TRUE(this->DlOpen(kFile1, RTLD_NOLOAD).is_error());
-    ASSERT_TRUE(this->DlOpen(kFile2, RTLD_NOLOAD).is_error());
-  }
+  // TODO(https://fxbug.dev/354043838): Fold into ExpectRootModule/Needed API.
+  this->ExpectRootModuleNotLoaded(kFile1);
+  this->ExpectRootModuleNotLoaded(kFile2);
 
   this->ExpectRootModule(kFile1);
 
@@ -476,13 +455,8 @@ TYPED_TEST(DlTests, OpenDepDirectly) {
     GTEST_SKIP() << "test requires that fixture can reuse loaded modules for dependencies";
   }
 
-  if constexpr (TestFixture::kSupportsNoLoadMode) {
-    if constexpr (TestFixture::kRetrievesFileWithNoLoad) {
-      this->Needed({kFile, kDepFile});
-    }
-    ASSERT_TRUE(this->DlOpen(kFile, RTLD_NOLOAD).is_error());
-    ASSERT_TRUE(this->DlOpen(kDepFile, RTLD_NOLOAD).is_error());
-  }
+  // TODO(https://fxbug.dev/354043838): Fold into ExpectRootModule/Needed API.
+  this->ExpectNeededNotLoaded({kFile, kDepFile});
 
   this->Needed({kFile, kDepFile});
 
@@ -527,15 +501,9 @@ TYPED_TEST(DlTests, DepOrder) {
   constexpr const char* kDepFile1 = "libld-dep-foo-v1.DepOrder.so";
   constexpr const char* kDepFile2 = "libld-dep-foo-v2.DepOrder.so";
 
-  if constexpr (TestFixture::kSupportsNoLoadMode) {
-    if constexpr (TestFixture::kRetrievesFileWithNoLoad) {
-      this->ExpectRootModule(kFile);
-      this->Needed({kDepFile1, kDepFile2});
-    }
-    ASSERT_TRUE(this->DlOpen(kFile, RTLD_NOLOAD).is_error());
-    ASSERT_TRUE(this->DlOpen(kDepFile1, RTLD_NOLOAD).is_error());
-    ASSERT_TRUE(this->DlOpen(kDepFile2, RTLD_NOLOAD).is_error());
-  }
+  // TODO(https://fxbug.dev/354043838): Fold into ExpectRootModule/Needed API.
+  this->ExpectRootModuleNotLoaded(kFile);
+  this->ExpectNeededNotLoaded({kDepFile1, kDepFile2});
 
   this->ExpectRootModule(kFile);
   this->Needed({kDepFile1, kDepFile2});
@@ -566,16 +534,9 @@ TYPED_TEST(DlTests, TransitiveDepOrder) {
   constexpr const char* kDepFile2 = "libld-dep-foo-v2.TransitiveDepOrder.so";
   constexpr const char* kDepFile3 = "libld-dep-foo-v1.TransitiveDepOrder.so";
 
-  if constexpr (TestFixture::kSupportsNoLoadMode) {
-    if constexpr (TestFixture::kRetrievesFileWithNoLoad) {
-      this->ExpectRootModule(kFile);
-      this->Needed({kDepFile1, kDepFile2, kDepFile3});
-    }
-    ASSERT_TRUE(this->DlOpen(kFile, RTLD_NOLOAD).is_error());
-    ASSERT_TRUE(this->DlOpen(kDepFile1, RTLD_NOLOAD).is_error());
-    ASSERT_TRUE(this->DlOpen(kDepFile2, RTLD_NOLOAD).is_error());
-    ASSERT_TRUE(this->DlOpen(kDepFile3, RTLD_NOLOAD).is_error());
-  }
+  // TODO(https://fxbug.dev/354043838): Fold into ExpectRootModule/Needed API.
+  this->ExpectRootModuleNotLoaded(kFile);
+  this->ExpectNeededNotLoaded({kDepFile1, kDepFile2, kDepFile3});
 
   this->ExpectRootModule(kFile);
   this->Needed({kDepFile1, kDepFile2, kDepFile3});
@@ -612,15 +573,9 @@ TYPED_TEST(DlTests, LocalPrecedence) {
     GTEST_SKIP() << "test requires that fixture can reuse loaded modules for dependencies";
   }
 
-  if constexpr (TestFixture::kSupportsNoLoadMode) {
-    if constexpr (TestFixture::kRetrievesFileWithNoLoad) {
-      this->ExpectRootModule(kFile);
-      this->Needed({kDepFile1, kDepFile2});
-    }
-    ASSERT_TRUE(this->DlOpen(kFile, RTLD_NOLOAD).is_error());
-    ASSERT_TRUE(this->DlOpen(kDepFile1, RTLD_NOLOAD).is_error());
-    ASSERT_TRUE(this->DlOpen(kDepFile2, RTLD_NOLOAD).is_error());
-  }
+  // TODO(https://fxbug.dev/354043838): Fold into ExpectRootModule/Needed API.
+  this->ExpectRootModuleNotLoaded(kFile);
+  this->ExpectNeededNotLoaded({kDepFile1, kDepFile2});
 
   this->Needed({kDepFile2});
 
@@ -688,14 +643,9 @@ TYPED_TEST(DlTests, RelativeRelocPrecedence) {
     GTEST_SKIP() << "test requires that fixture supports RTLD_GLOBAL";
   }
 
-  if constexpr (TestFixture::kSupportsNoLoadMode) {
-    if constexpr (TestFixture::kRetrievesFileWithNoLoad) {
-      this->Needed({kFile1});
-      this->ExpectRootModule(kFile2);
-    }
-    ASSERT_TRUE(this->DlOpen(kFile1, RTLD_NOLOAD).is_error());
-    ASSERT_TRUE(this->DlOpen(kFile2, RTLD_NOLOAD).is_error());
-  }
+  // TODO(https://fxbug.dev/354043838): Fold into ExpectRootModule/Needed API.
+  this->ExpectNeededNotLoaded({kFile1});
+  this->ExpectRootModuleNotLoaded(kFile2);
 
   this->Needed({kFile1});
 
@@ -742,13 +692,8 @@ TYPED_TEST(DlTests, GlobalPrecedence) {
     GTEST_SKIP() << "test requires that fixture supports RTLD_GLOBAL";
   }
 
-  if constexpr (TestFixture::kSupportsNoLoadMode) {
-    if constexpr (TestFixture::kRetrievesFileWithNoLoad) {
-      this->Needed({kFile1, kFile2});
-    }
-    ASSERT_TRUE(this->DlOpen(kFile1, RTLD_NOLOAD).is_error());
-    ASSERT_TRUE(this->DlOpen(kFile2, RTLD_NOLOAD).is_error());
-  }
+  // TODO(https://fxbug.dev/354043838): Fold into ExpectRootModule/Needed API.
+  this->ExpectNeededNotLoaded({kFile1, kFile2, kDepFile});
 
   this->Needed({kFile1});
 
@@ -805,13 +750,8 @@ TYPED_TEST(DlTests, GlobalPrecedenceDeps) {
     GTEST_SKIP() << "test requires that fixture supports RTLD_GLOBAL";
   }
 
-  if constexpr (TestFixture::kSupportsNoLoadMode) {
-    if constexpr (TestFixture::kRetrievesFileWithNoLoad) {
-      this->Needed({kFile1, kFile2});
-    }
-    ASSERT_TRUE(this->DlOpen(kFile1, RTLD_NOLOAD).is_error());
-    ASSERT_TRUE(this->DlOpen(kFile2, RTLD_NOLOAD).is_error());
-  }
+  // TODO(https://fxbug.dev/354043838): Fold into ExpectRootModule/Needed API.
+  this->ExpectNeededNotLoaded({kFile1, kDepFile1, kFile2, kDepFile2});
 
   this->Needed({kFile1, kDepFile1});
 
@@ -865,14 +805,9 @@ TYPED_TEST(DlTests, GlobalSatisfiesMissingSymbol) {
     GTEST_SKIP() << "test requires that fixture supports RTLD_GLOBAL";
   }
 
-  if constexpr (TestFixture::kSupportsNoLoadMode) {
-    if constexpr (TestFixture::kRetrievesFileWithNoLoad) {
-      this->Needed({kFile1});
-      this->ExpectRootModule({kFile2});
-    }
-    ASSERT_TRUE(this->DlOpen(kFile1, RTLD_NOLOAD).is_error());
-    ASSERT_TRUE(this->DlOpen(kFile2, RTLD_NOLOAD).is_error());
-  }
+  // TODO(https://fxbug.dev/354043838): Fold into ExpectRootModule/Needed API.
+  this->ExpectNeededNotLoaded({kFile1, kDepFile});
+  this->ExpectRootModuleNotLoaded({kFile2});
 
   this->Needed({kFile1});
 
