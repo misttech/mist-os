@@ -255,11 +255,9 @@ where
                     return Poll::Ready(Some(Ok(data)));
                 }
                 Poll::Ready(Some(Ok(SpinelDeviceEvent::OnError { error, .. }))) => {
-                    return Poll::Ready(Some(Err(error).map_err(SpinelError).map_err(Error::from)))
+                    return Poll::Ready(Some(Err(SpinelError(error)).map_err(Error::from)))
                 }
-                Poll::Ready(Some(Err(error))) => {
-                    return Poll::Ready(Some(Err(error).map_err(Error::from)))
-                }
+                Poll::Ready(Some(Err(error))) => return Poll::Ready(Some(Err(Error::from(error)))),
                 Poll::Ready(None) => return Poll::Ready(None),
                 Poll::Pending => return Poll::Pending,
             }

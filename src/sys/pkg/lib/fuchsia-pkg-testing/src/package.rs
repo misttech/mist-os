@@ -117,8 +117,7 @@ impl Package {
         for entry in WalkDir::new(root) {
             let entry = entry?;
             let path = entry.path();
-            if !entry.file_type().is_file() || is_generated_file(&path.strip_prefix(root).unwrap())
-            {
+            if !entry.file_type().is_file() || is_generated_file(path.strip_prefix(root).unwrap()) {
                 continue;
             }
 
@@ -595,11 +594,11 @@ impl PackageBuilder {
 
         if path.starts_with("meta/") {
             self.builder
-                .add_contents_to_far(&path_str, &data, &self.artifacts.join("contents"))
+                .add_contents_to_far(path_str, &data, self.artifacts.join("contents"))
                 .expect("adding meta blob to succeed");
         } else {
             self.builder
-                .add_contents_as_blob(&path_str, &data, &self.artifacts.join("contents"))
+                .add_contents_as_blob(path_str, &data, self.artifacts.join("contents"))
                 .expect("adding blob to succeed");
         }
 

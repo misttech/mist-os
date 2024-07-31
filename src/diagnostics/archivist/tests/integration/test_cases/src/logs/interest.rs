@@ -54,7 +54,7 @@ async fn set_interest() {
 
     assert_logs_sequence(
         &mut logs,
-        &*PUPPET_MONIKER,
+        &PUPPET_MONIKER,
         vec![
             (Severity::Info, "A1"),
             (Severity::Info, "C1"),
@@ -84,7 +84,7 @@ async fn set_interest() {
 
     assert_logs_sequence(
         &mut logs,
-        &*PUPPET_MONIKER,
+        &PUPPET_MONIKER,
         vec![
             (Severity::Debug, "A2"),
             (Severity::Info, "B2"),
@@ -109,7 +109,7 @@ async fn set_interest() {
 
     assert_logs_sequence(
         &mut logs,
-        &*PUPPET_MONIKER,
+        &PUPPET_MONIKER,
         vec![(Severity::Warn, "C3"), (Severity::Error, "D3")],
     )
     .await;
@@ -127,7 +127,7 @@ async fn set_interest() {
         ])
         .await;
 
-    assert_logs_sequence(&mut logs, &*PUPPET_MONIKER, vec![(Severity::Error, "D4")]).await;
+    assert_logs_sequence(&mut logs, &PUPPET_MONIKER, vec![(Severity::Error, "D4")]).await;
 
     // Disconnecting the protocol, brings back an EMPTY interest, which defaults to Severity::Info.
     drop(log_settings);
@@ -148,7 +148,7 @@ async fn set_interest() {
 
     assert_logs_sequence(
         &mut logs,
-        &*PUPPET_MONIKER,
+        &PUPPET_MONIKER,
         vec![
             (Severity::Info, "B5"),
             (Severity::Info, "C5"),
@@ -200,7 +200,7 @@ async fn set_interest_before_startup() {
 
     assert_logs_sequence(
         &mut logs,
-        &*PUPPET_MONIKER,
+        &PUPPET_MONIKER,
         vec![(Severity::Debug, "debugging world"), (Severity::Info, "Hello, world!")],
     )
     .await;

@@ -127,8 +127,8 @@ impl PackageIndex {
                 if let Some(this) = this.upgrade() {
                     let index: Self = (*this.read().await).clone();
                     let root = inspector.root();
-                    let () = root.record_child("retained", |n| index.retained.record_inspect(&n));
-                    let () = root.record_child("writing", |n| index.writing.record_inspect(&n));
+                    let () = root.record_child("retained", |n| index.retained.record_inspect(n));
+                    let () = root.record_child("writing", |n| index.writing.record_inspect(n));
                 } else {
                     inspector.root().record_string("error", "the package index was dropped");
                 }

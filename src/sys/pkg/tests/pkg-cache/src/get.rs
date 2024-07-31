@@ -595,14 +595,14 @@ async fn get_with_specific_blobfs_implementation(
 
     let (meta_far, _) = pkg.contents();
     let meta_blob = needed_blobs.open_meta_blob().await.unwrap().unwrap().unwrap();
-    let () = blob_type_verifier(&*meta_blob);
+    let () = blob_type_verifier(&meta_blob);
     let () = compress_and_write_blob(&meta_far.contents, *meta_blob).await.unwrap();
     let () = blob_written(&needed_blobs, meta_far.merkle).await;
 
     let [missing_blob]: [_; 1] = get_missing_blobs(&needed_blobs).await.try_into().unwrap();
     let content_blob =
         needed_blobs.open_blob(&missing_blob.blob_id).await.unwrap().unwrap().unwrap();
-    let () = blob_type_verifier(&*content_blob);
+    let () = blob_type_verifier(&content_blob);
     let () = compress_and_write_blob(b"content-blob-contents", *content_blob).await.unwrap();
     let () = blob_written(&needed_blobs, BlobId::from(missing_blob.blob_id).into()).await;
 
@@ -847,7 +847,7 @@ async fn bootfs_used_to_serve_package_directories_but_not_prevent_fetching() {
     let pkg_cache = env.client();
     let mut get = pkg_cache
         .get(
-            fpkg_ext::BlobInfo { blob_id: BlobId::from(*base_package.hash()).into(), length: 0 },
+            fpkg_ext::BlobInfo { blob_id: BlobId::from(*base_package.hash()), length: 0 },
             // Retained protection prevents the short-circuiting from the package being in base.
             fpkg::GcProtection::Retained,
         )

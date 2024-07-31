@@ -21,15 +21,13 @@ static CHANNEL_PACKAGE_MAP: &str = "channel_package_map.json";
 pub async fn build_current_channel_manager<S: ServiceConnect>(
     service_connector: S,
 ) -> Result<CurrentChannelManager, anyhow::Error> {
-    let current_channel = if let Some(channel) =
-        lookup_channel_from_vbmeta(&service_connector).await.unwrap_or_else(|e| {
+    let current_channel = lookup_channel_from_vbmeta(&service_connector)
+        .await
+        .unwrap_or_else(|e| {
             warn!("Failed to read current_channel from vbmeta: {:#}", anyhow!(e));
             None
-        }) {
-        channel
-    } else {
-        String::new()
-    };
+        })
+        .unwrap_or_default();
 
     Ok(CurrentChannelManager::new(current_channel))
 }

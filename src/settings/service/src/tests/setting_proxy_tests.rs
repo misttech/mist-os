@@ -204,9 +204,8 @@ impl SettingHandlerFactory for FakeFactory {
             .handlers
             .get(&setting_type)
             .copied()
-            .map(|signature| {
+            .inspect(|_signature| {
                 *self.request_counts.entry(setting_type).or_insert(0) += 1;
-                signature
             })
             .unwrap())
     }

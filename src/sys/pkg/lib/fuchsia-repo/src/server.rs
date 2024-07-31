@@ -905,8 +905,8 @@ mod tests {
         let content_len = end.map(|end| end + 1).unwrap_or(total_len) - start.unwrap_or(0);
         assert_eq!(response.headers()["Content-Length"], content_len.to_string());
 
-        let start_str = start.map(|i| i.to_string()).unwrap_or_else(String::new);
-        let end_str = end.map(|i| i.to_string()).unwrap_or_else(String::new);
+        let start_str = start.map(|i| i.to_string()).unwrap_or_default();
+        let end_str = end.map(|i| i.to_string()).unwrap_or_default();
         assert_eq!(
             response.headers()["Content-Range"],
             format!("bytes {start_str}-{end_str}/{total_len}")

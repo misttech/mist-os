@@ -21,6 +21,12 @@ pub struct Experiments {
     experiments: HashMap<ExperimentType, ExperimentId>,
 }
 
+impl Default for Experiments {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Experiments {
     pub fn new() -> Self {
         let mut experiments = HashMap::new();

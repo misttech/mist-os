@@ -165,7 +165,7 @@ impl PackageManifest {
             blobs_dir_root.to_path_buf()
         };
         let meta_far_path = blobs_dir.join(meta_far_hash.to_string());
-        let (meta_far_blob, meta_far_size) = if let Some(_) = delivery_blob_type {
+        let (meta_far_blob, meta_far_size) = if delivery_blob_type.is_some() {
             let meta_far_delivery_blob = std::fs::read(&meta_far_path).map_err(|e| {
                 PackageManifestError::IoErrorWithPath { cause: e, path: meta_far_path.clone() }
             })?;
@@ -254,7 +254,7 @@ impl PackageManifest {
                 });
             }
 
-            let size = if let Some(_) = delivery_blob_type {
+            let size = if delivery_blob_type.is_some() {
                 let file = File::open(&source_path)?;
                 delivery_blob::decompressed_size_from_reader(file).map_err(|e| {
                     PackageManifestError::DecompressDeliveryBlob {
@@ -624,7 +624,7 @@ impl PackageManifestV1 {
             };
 
             serde_json::to_writer(&mut tmp, &versioned_manifest)?;
-            tmp.persist_if_changed(&manifest_path)
+            tmp.persist_if_changed(manifest_path)
                 .with_context(|| format!("failed to persist package manifest: {manifest_path}"))?;
 
             Ok(manifest)

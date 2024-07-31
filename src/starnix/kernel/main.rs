@@ -126,7 +126,7 @@ async fn build_container(
 async fn main() -> Result<(), Error> {
     // Make sure that if this process panics in normal mode that the whole kernel's job is killed.
     fruntime::job_default()
-        .set_critical(zx::JobCriticalOptions::RETCODE_NONZERO, &*fruntime::process_self())
+        .set_critical(zx::JobCriticalOptions::RETCODE_NONZERO, &fruntime::process_self())
         .context("ensuring main process panics kill whole kernel")?;
 
     let _inspect_server_task = inspect_runtime::publish(
@@ -186,12 +186,12 @@ async fn main() -> Result<(), Error> {
                 }
             }
             KernelServices::ComponentRunner(stream) => {
-                serve_component_runner(stream, &container.wait().await.system_task())
+                serve_component_runner(stream, container.wait().await.system_task())
                     .await
                     .expect("failed to start component runner");
             }
             KernelServices::ContainerController(stream) => {
-                serve_container_controller(stream, &container.wait().await.system_task())
+                serve_container_controller(stream, container.wait().await.system_task())
                     .await
                     .expect("failed to start container controller");
             }

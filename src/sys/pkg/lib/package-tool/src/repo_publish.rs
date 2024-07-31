@@ -12,7 +12,7 @@ use fuchsia_lockfile::Lockfile;
 use fuchsia_pkg::{PackageManifest, PackageManifestError, PackageManifestList};
 use fuchsia_repo::package_manifest_watcher::PackageManifestWatcher;
 use fuchsia_repo::repo_builder::RepoBuilder;
-use fuchsia_repo::repo_client::{RepoClient, RepositoryPackage};
+use fuchsia_repo::repo_client::RepoClient;
 use fuchsia_repo::repo_keys::RepoKeys;
 use fuchsia_repo::repository::{Error as RepoError, PmRepository, RepoProvider as _};
 use futures::{AsyncReadExt as _, StreamExt as _};
@@ -108,14 +108,13 @@ async fn lock_repository(dir: &Utf8Path) -> Result<Lockfile> {
 
     Ok(Lockfile::lock_for(&lock_path, std::time::Duration::from_secs(LOCK_TIMEOUT_SEC))
         .await
-        .map_err(|e| {
+        .inspect_err(|e| {
             error!(
                 "Failed to aquire a lockfile. Check that {lockpath} doesn't exist and \
                  can be written to. Ownership information: {owner:#?}",
                 lockpath = e.lock_path.display(),
                 owner = e.owner
             );
-            e
         })?)
 }
 
@@ -159,7 +158,7 @@ pub async fn repo_package_manifest_list(
         } else {
             RepoClient::from_trusted_remote(&src_repo)
                 .await
-                .with_context(|| format!("creating RepoClient from trusted remote"))?
+                .with_context(|| "creating RepoClient from trusted remote".to_string())?
         };
 
         client.update().await.context("updating the src repo metadata")?;
@@ -167,8 +166,6 @@ pub async fn repo_package_manifest_list(
         let packages = client.list_packages().await.context("listing packages")?;
 
         for package in packages {
-            let package = RepositoryPackage::from(package);
-
             let package_manifest_path =
                 manifests_dir.join(format!("{}_package_manifest.json", package.hash));
 
@@ -1326,7 +1323,7 @@ mod tests {
         // Make an empty repo in a subdir of wrkdir
         let repo_dir = wrkdir.join("repo_dir");
         let mut repo_client =
-            test_utils::make_writable_empty_repository(repo_dir.clone().into()).await.unwrap();
+            test_utils::make_writable_empty_repository(repo_dir.clone()).await.unwrap();
         let pkg_list = repo_client.list_packages().await.unwrap();
 
         assert_eq!(pkg_list, vec![]);
@@ -1384,7 +1381,7 @@ mod tests {
             pb_client.list_packages().await.unwrap().sort(),
         );
 
-        for entry in std::fs::read_dir(&pb_blobs_dir.join("1")).unwrap() {
+        for entry in std::fs::read_dir(pb_blobs_dir.join("1")).unwrap() {
             let entry = entry.unwrap();
             let blob = entry.file_name().into_string().unwrap();
             let repo_blob_path = repo_dir.join("repository/blobs/1").join(blob);

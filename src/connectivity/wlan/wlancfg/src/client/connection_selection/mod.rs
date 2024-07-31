@@ -57,8 +57,7 @@ impl ConnectionSelectionRequester {
         reason: types::ConnectReason,
     ) -> Result<Option<types::ScannedCandidate>, anyhow::Error> {
         let (sender, receiver) = oneshot::channel();
-        let _ = self
-            .sender
+        self.sender
             .try_send(ConnectionSelectionRequest::NewConnectionSelection {
                 network_id,
                 reason,
@@ -73,8 +72,7 @@ impl ConnectionSelectionRequester {
         credential: network_config::Credential,
     ) -> Result<Option<types::ScannedCandidate>, anyhow::Error> {
         let (sender, receiver) = oneshot::channel();
-        let _ = self
-            .sender
+        self.sender
             .try_send(ConnectionSelectionRequest::RoamSelection {
                 network_id,
                 credential,
@@ -127,13 +125,13 @@ pub async fn serve_connection_selection_request_loop(
                 match request {
                     ConnectionSelectionRequest::NewConnectionSelection { network_id, reason, responder} => {
                         let selected = connection_selector.find_and_select_connection_candidate(network_id, reason).await;
-                        if let Err(..) = responder.send(selected) {
+                        if responder.send(selected).is_err() {
                             error!("Unexpected error returning selected connection candidate.");
                         }
                     }
                     ConnectionSelectionRequest::RoamSelection { network_id, credential, responder } => {
                         let selected = connection_selector.find_and_select_roam_candidate(network_id, &credential).await;
-                        if let Err(..) = responder.send(selected) {
+                        if responder.send(selected).is_err() {
                             error!("Unexpected error returning selected roam candidate.");
                         }
                     }
@@ -244,7 +242,8 @@ impl ConnectionSelector {
         };
 
         let scan_results = scan_for_candidates().await;
-        let candidates = match scan_results {
+
+        match scan_results {
             Err(e) => {
                 warn!("Failed to get available BSSs, {:?}", e);
                 vec![]
@@ -259,8 +258,7 @@ impl ConnectionSelector {
                 }
                 candidates
             }
-        };
-        candidates
+        }
     }
 
     /// If a BSS was discovered via a passive scan, we need to perform an active scan on it to
@@ -372,7 +370,8 @@ impl ConnectionSelectorApi for ConnectionSelector {
             .collect();
 
         // BSS selection.
-        let selection = match bss_selection::select_bss(
+
+        match bss_selection::select_bss(
             allowed_candidate_list,
             reason,
             self.inspect_node_for_connection_selection.clone(),
@@ -396,9 +395,7 @@ impl ConnectionSelectorApi for ConnectionSelector {
                 }
             }
             None => None,
-        };
-
-        selection
+        }
     }
 
     /// Return the "best" AP to connect to from the current network. It may be the same AP that is
@@ -546,7 +543,7 @@ impl types::ScannedCandidate {
             "{}({:4}), {}({:6}), {:>4}dBm, channel {:8}, score {:4}{}{}{}{}",
             self.network.ssid,
             self.saved_security_type_to_string(),
-            self.bss.bssid.to_string(),
+            self.bss.bssid,
             self.scanned_security_type_to_string(),
             rssi,
             channel,
@@ -652,7 +649,7 @@ fn merge_config_and_scan_data(
         };
         merged_networks.push(scanned_candidate)
     }
-    return merged_networks;
+    merged_networks
 }
 
 /// Merge the saved networks and scan results into a vector of BSS candidates that correspond to a
@@ -920,7 +917,7 @@ mod tests {
             .real_saved_network_manager
             .lookup(&test_id_1.clone())
             .await
-            .get(0)
+            .first()
             .expect("failed to get config")
             .perf_stats
             .connect_failures

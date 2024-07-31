@@ -609,7 +609,7 @@ fn evict_if_needed(configs: &mut Vec<NetworkConfig>) -> Option<NetworkConfig> {
         }
     }
     // If all saved networks have connected, remove the first network
-    return Some(configs.remove(0));
+    Some(configs.remove(0))
 }
 
 #[cfg(test)]
@@ -760,35 +760,26 @@ mod tests {
 
         // Remove a network with the same NetworkIdentifier but differenct credential and verify
         // that the saved network is unaffected.
-        assert_eq!(
-            false,
-            saved_networks
-                .remove(network_id.clone(), Credential::Password(b"diff-password".to_vec()))
-                .await
-                .expect("removing 'foo' failed")
-        );
+        assert!(!saved_networks
+            .remove(network_id.clone(), Credential::Password(b"diff-password".to_vec()))
+            .await
+            .expect("removing 'foo' failed"));
         assert_eq!(1, saved_networks.known_network_count().await);
 
         // Remove the network and check it is gone
-        assert_eq!(
-            true,
-            saved_networks
-                .remove(network_id.clone(), credential.clone())
-                .await
-                .expect("removing 'foo' failed")
-        );
+        assert!(saved_networks
+            .remove(network_id.clone(), credential.clone())
+            .await
+            .expect("removing 'foo' failed"));
         assert_eq!(0, saved_networks.known_network_count().await);
         // Check that the key in the saved networks manager's internal hashmap was removed.
         assert!(saved_networks.saved_networks.lock().await.get(&network_id).is_none());
 
         // If we try to remove the network again, we won't get an error and nothing happens
-        assert_eq!(
-            false,
-            saved_networks
-                .remove(network_id.clone(), credential)
-                .await
-                .expect("removing 'foo' failed")
-        );
+        assert!(!saved_networks
+            .remove(network_id.clone(), credential)
+            .await
+            .expect("removing 'foo' failed"));
 
         // Check that removal persists.
         let (telemetry_sender, _telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
@@ -956,7 +947,7 @@ mod tests {
         // The network should be saved with the connection recorded. We should not have recorded
         // that the network was connected to passively or actively.
         assert_variant!(saved_networks.lookup(&network_id).await.as_slice(), [config] => {
-            assert_eq!(config.has_ever_connected, true);
+            assert!(config.has_ever_connected);
             assert_eq!(config.hidden_probability, PROB_HIDDEN_DEFAULT);
         });
 
@@ -971,7 +962,7 @@ mod tests {
             .await;
         // We should now see that we connected to the network after an active scan.
         assert_variant!(saved_networks.lookup(&network_id).await.as_slice(), [config] => {
-            assert_eq!(config.has_ever_connected, true);
+            assert!(config.has_ever_connected);
             assert_eq!(config.hidden_probability, PROB_HIDDEN_IF_CONNECT_ACTIVE);
         });
 
@@ -986,7 +977,7 @@ mod tests {
             .await;
         // The config should have a lower hidden probability after connecting after a passive scan.
         assert_variant!(saved_networks.lookup(&network_id).await.as_slice(), [config] => {
-            assert_eq!(config.has_ever_connected, true);
+            assert!(config.has_ever_connected);
             assert_eq!(config.hidden_probability, PROB_HIDDEN_IF_CONNECT_PASSIVE);
         });
 
@@ -997,7 +988,7 @@ mod tests {
             SavedNetworksManager::new_with_storage(store, TelemetrySender::new(telemetry_sender))
                 .await;
         assert_variant!(saved_networks.lookup(&network_id).await.as_slice(), [config] => {
-            assert_eq!(config.has_ever_connected, true);
+            assert!(config.has_ever_connected);
         });
     }
 
@@ -1527,7 +1518,7 @@ mod tests {
         // check that everything left has been connected to before, only one removed is
         // the one that has never been connected to
         for config in network_configs.iter() {
-            assert_eq!(true, config.has_ever_connected);
+            assert!(config.has_ever_connected);
         }
     }
 

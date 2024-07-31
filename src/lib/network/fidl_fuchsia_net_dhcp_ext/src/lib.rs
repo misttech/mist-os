@@ -119,7 +119,7 @@ pub async fn apply_new_routers(
         }
     }
 
-    for router in new_routers.difference(&configured_routers) {
+    for router in new_routers.difference(configured_routers) {
         let added: bool = route_set
             .add_route(
                 &route(router)
@@ -426,7 +426,7 @@ pub fn merged_configuration_stream(
             }
         }))
     })
-    .filter_map(|x| futures::future::ready(x))
+    .filter_map(futures::future::ready)
 }
 
 /// Contains types used when testing the DHCP client.
@@ -509,14 +509,9 @@ pub mod testutil {
                                                 .expect("add address should succeed");
                                         }
 
-                                        apply_new_routers(
-                                            id,
-                                            &route_set,
-                                            &mut routers,
-                                            new_routers,
-                                        )
-                                        .await
-                                        .expect("applying new routers should succeed");
+                                        apply_new_routers(id, route_set, &mut routers, new_routers)
+                                            .await
+                                            .expect("applying new routers should succeed");
                                         Ok(routers)
                                     }
                                 },

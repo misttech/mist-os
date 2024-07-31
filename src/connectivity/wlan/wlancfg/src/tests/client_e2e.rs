@@ -1056,7 +1056,7 @@ fn test_fail_to_save(
     let mut test_values = test_setup(&mut exec, RECOVERY_PROFILE_EMPTY_STRING, false);
 
     // Generate network ID
-    let network_id = fidl_policy::NetworkIdentifier { ssid: ssid, type_: saved_security };
+    let network_id = fidl_policy::NetworkIdentifier { ssid, type_: saved_security };
     let network_config = fidl_policy::NetworkConfig {
         id: Some(network_id.clone()),
         credential: Some(saved_credential),
@@ -1849,7 +1849,7 @@ fn expect_destroy_iface_request_and_reply(
     let destroy_iface_req = run_while(
         exec,
         &mut test_values.internal_objects.internal_futures,
-        &mut test_values.external_interfaces.monitor_service_stream.next(),
+        test_values.external_interfaces.monitor_service_stream.next(),
     );
     assert_variant!(
         destroy_iface_req,
@@ -1886,7 +1886,7 @@ fn inform_watcher_of_client_iface_removal_and_expect_iface_recovery(
     let iface_creation_req = run_while(
         exec,
         &mut test_values.internal_objects.internal_futures,
-        &mut test_values.external_interfaces.monitor_service_stream.next(),
+        test_values.external_interfaces.monitor_service_stream.next(),
     );
     assert_variant!(
         iface_creation_req,
@@ -1908,7 +1908,7 @@ fn inform_watcher_of_client_iface_removal_and_expect_iface_recovery(
     let feature_support_req = run_while(
         exec,
         &mut test_values.internal_objects.internal_futures,
-        &mut test_values.external_interfaces.monitor_service_stream.next(),
+        test_values.external_interfaces.monitor_service_stream.next(),
     );
     assert_variant!(
         feature_support_req,
@@ -1959,7 +1959,7 @@ fn inform_watcher_of_client_iface_removal_and_expect_iface_recovery(
     let feature_support_req = run_while(
         exec,
         &mut test_values.internal_objects.internal_futures,
-        &mut test_values.external_interfaces.monitor_service_stream.next(),
+        test_values.external_interfaces.monitor_service_stream.next(),
     );
     assert_variant!(
         feature_support_req,

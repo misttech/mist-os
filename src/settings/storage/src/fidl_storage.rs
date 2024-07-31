@@ -499,7 +499,7 @@ mod tests {
         let value_to_get = LibTestStruct { value: VALUE1 };
         let tempdir = tempfile::tempdir().expect("failed to create tempdir");
         let content = persist(&value_to_get.to_storable()).unwrap();
-        std::fs::write(&tempdir.path().join("xyz.pfidl"), content).expect("failed to write file");
+        std::fs::write(tempdir.path().join("xyz.pfidl"), content).expect("failed to write file");
         let storage_dir = open_tempdir(&tempdir);
 
         let (storage, sync_tasks) = FidlStorage::with_file_proxy(
@@ -663,7 +663,7 @@ mod tests {
                             .send(response.0, response.1)
                             .expect("failed to respond to GetToken request");
                     }
-                    request @ _ => unimplemented!("request: {:?}", request),
+                    request => unimplemented!("request: {:?}", request),
                 }
             }
         }

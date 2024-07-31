@@ -720,7 +720,7 @@ impl CompletionResponder {
             | state_machine::State::CheckingForUpdates(_) => return,
         }
         match self {
-            CompletionResponder::Satisfied => return,
+            CompletionResponder::Satisfied => (),
             CompletionResponder::Waiting(responders) => {
                 for responder in responders.drain(..) {
                     let _ = responder.send();

@@ -180,10 +180,10 @@ impl AccessPoint {
                     };
 
                     let fut = async move {
-                        let result = receiver.await?;
+                        receiver.await?;
                         Ok(Response::StartResponse(StartParameters {
                             config: ap_config,
-                            result: Ok(result),
+                            result: Ok(()),
                         }))
                     };
                     if let Err(e) = internal_msg_sink.send(fut.boxed()).await {

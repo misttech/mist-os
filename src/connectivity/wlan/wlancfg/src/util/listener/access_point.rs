@@ -66,8 +66,8 @@ impl From<ApStatesUpdate> for Vec<fidl_policy::AccessPointState> {
             .map(|ap| fidl_policy::AccessPointState {
                 id: Some(fidl_policy::NetworkIdentifier::from(ap.id.clone())),
                 state: Some(fidl_policy::OperatingState::from(ap.state)),
-                mode: ap.mode.map(|mode| fidl_policy::ConnectivityMode::from(mode)),
-                band: ap.band.map(|band| fidl_policy::OperatingBand::from(band)),
+                mode: ap.mode.map(fidl_policy::ConnectivityMode::from),
+                band: ap.band.map(fidl_policy::OperatingBand::from),
                 frequency: ap.frequency,
                 clients: ap.clients.map(|c| c.into()),
                 ..Default::default()
@@ -85,9 +85,7 @@ impl CurrentStateCache for ApStatesUpdate {
         self.access_points = update.access_points;
     }
 
-    fn purge(&mut self) {
-        return;
-    }
+    fn purge(&mut self) {}
 }
 
 impl Listener<Vec<fidl_policy::AccessPointState>> for fidl_policy::AccessPointStateUpdatesProxy {

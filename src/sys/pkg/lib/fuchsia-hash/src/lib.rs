@@ -99,7 +99,7 @@ impl<T> TryFrom<String> for GenericDigest<T> {
 
 impl<T> From<GenericDigest<T>> for String {
     fn from(h: GenericDigest<T>) -> Self {
-        hex::encode(&h.digest)
+        hex::encode(h.digest)
     }
 }
 

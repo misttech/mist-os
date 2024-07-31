@@ -66,7 +66,7 @@ mod tests {
             out_omaha_client_config: location_of(&omaha_out),
             out_pkg_resolver_config: location_of(&pkgresolver_out),
             key_config_file: location_of(&keyconfig_file),
-            eager_package_config_files: input_files.iter().map(|file| location_of(file)).collect(),
+            eager_package_config_files: input_files.iter().map(location_of).collect(),
         })
         .unwrap();
 

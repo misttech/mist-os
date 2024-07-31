@@ -193,7 +193,10 @@ impl DhcpV6Pd {
         inner.prefix_watch = Some(watcher);
 
         // Make sure our `poll()` method gets called.
-        inner.waker.take().and_then(|waker| Some(waker.wake()));
+        inner.waker.take().and_then(|waker| {
+            waker.wake();
+            Some(())
+        });
 
         let inner_clone = self.inner.clone();
         inner.refresh_task = Some(Task::spawn(async move {
@@ -215,7 +218,10 @@ impl DhcpV6Pd {
                 info!(tag = "dhcp_v6_pd", "Refreshing DHCPv6-PD RA for OpenThread");
 
                 // Make sure our `poll()` method gets called by waking up the waker.
-                inner.waker.take().and_then(|waker| Some(waker.wake()));
+                inner.waker.take().and_then(|waker| {
+                    waker.wake();
+                    Some(())
+                });
             }
         }));
 
@@ -230,7 +236,10 @@ impl DhcpV6Pd {
         if let Some(_) = inner.prefix_control.take() {
             info!(tag = "dhcp_v6_pd", "STOPPING attempt to lease a prefix via DHCPv6-PD.");
             // Make sure our `poll()` method gets called.
-            inner.waker.take().and_then(|waker| Some(waker.wake()));
+            inner.waker.take().and_then(|waker| {
+                waker.wake();
+                Some(())
+            });
         }
 
         inner.refresh_task = None;

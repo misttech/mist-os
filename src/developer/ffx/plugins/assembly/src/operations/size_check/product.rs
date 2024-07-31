@@ -39,7 +39,7 @@ pub async fn verify_product_budgets(args: ProductSizeCheckArgs) -> Result<bool> 
     };
 
     let max_contents_size = blobfs_contents.maximum_contents_size;
-    let breakdown = SizeBreakdown::from_contents(&blobfs_contents);
+    let breakdown = SizeBreakdown::from_contents(blobfs_contents);
     let size = breakdown.calculate_size();
     let contents_fit = match max_contents_size {
         None => true,
@@ -73,7 +73,7 @@ pub async fn verify_product_budgets(args: ProductSizeCheckArgs) -> Result<bool> 
                     base_assembly_manifest
                 )
             })?;
-        let other_breakdown = SizeBreakdown::from_contents(&other_blobfs_contents);
+        let other_breakdown = SizeBreakdown::from_contents(other_blobfs_contents);
         let diff = breakdown.diff(&other_breakdown);
         diff.print();
     } else if args.verbose {

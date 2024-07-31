@@ -368,7 +368,7 @@ fn default_false() -> bool {
 }
 
 fn bool_is_false(b: &bool) -> bool {
-    *b == false
+    !(*b)
 }
 
 #[derive(Clone, Serialize, Deserialize)]

@@ -80,9 +80,7 @@ impl RecoveryAction {
                 Some(telemetry::PhyRecoveryMechanism::PhyReset)
             }
             RecoveryAction::IfaceRecovery(..)
-            | RecoveryAction::PhyRecovery(PhyRecoveryOperation::DestroyIface { .. }) => {
-                return None
-            }
+            | RecoveryAction::PhyRecovery(PhyRecoveryOperation::DestroyIface { .. }) => None,
         }
     }
 
@@ -97,9 +95,7 @@ impl RecoveryAction {
             RecoveryAction::IfaceRecovery(IfaceRecoveryOperation::StopAp { .. }) => {
                 Some(telemetry::ApRecoveryMechanism::StopAp)
             }
-            RecoveryAction::IfaceRecovery(IfaceRecoveryOperation::Disconnect { .. }) => {
-                return None
-            }
+            RecoveryAction::IfaceRecovery(IfaceRecoveryOperation::Disconnect { .. }) => None,
         }
     }
 
@@ -114,7 +110,7 @@ impl RecoveryAction {
             RecoveryAction::IfaceRecovery(IfaceRecoveryOperation::Disconnect { .. }) => {
                 Some(telemetry::ClientRecoveryMechanism::Disconnect)
             }
-            RecoveryAction::IfaceRecovery(IfaceRecoveryOperation::StopAp { .. }) => return None,
+            RecoveryAction::IfaceRecovery(IfaceRecoveryOperation::StopAp { .. }) => None,
         }
     }
 }

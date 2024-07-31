@@ -11,7 +11,7 @@ use std::collections::{BTreeMap, HashSet};
 /// These are resources supplied by the platform that the product does not need to be specifically
 /// aware of. We will calculate the space consumed by these resources and subtract that space from
 /// the total space allowed in blobfs.
-const RESOURCES: &'static [&'static str] = &[
+const RESOURCES: &'static [&str] = &[
     "lib/VkLayer_image_pipe_swapchain.so",
     "lib/ld.so.1",
     "lib/libasync-default.so",
@@ -75,7 +75,7 @@ impl SizeBreakdown {
                 lines.push(format!(
                     "{: <3}{: <40}{: >10}{: >10}{: >10}{: >10}",
                     "",
-                    wrap_text(3, 40, &path),
+                    wrap_text(3, 40, path),
                     &blob.hash[..6],
                     blob.size,
                     blob.psize,
@@ -159,7 +159,7 @@ impl BlobBreakdown {
                 return true;
             }
         }
-        return false;
+        false
     }
 
     fn diff(&self, before: &Self) -> BlobDiff {
@@ -167,9 +167,9 @@ impl BlobBreakdown {
         let psize_delta = self.psize as i64 - before.psize as i64;
 
         let before_references: HashSet<PackageReference> =
-            HashSet::from_iter(before.references.clone().into_iter());
+            HashSet::from_iter(before.references.clone());
         let after_references: HashSet<PackageReference> =
-            HashSet::from_iter(self.references.clone().into_iter());
+            HashSet::from_iter(self.references.clone());
         let references_added: Vec<PackageReferenceDiff> = after_references
             .difference(&before_references)
             .cloned()
@@ -284,7 +284,7 @@ impl SizeBreakdown {
             // The blob has been modified and has a new merkle, but still exists in one of the same
             // packages.
             let after_blob =
-                before_blob.references.iter().find_map(|r| self.find_blob_by_reference(&r));
+                before_blob.references.iter().find_map(|r| self.find_blob_by_reference(r));
             if let Some(after_blob) = after_blob {
                 updated_blobs.insert(after_blob.hash.clone());
                 diff.blob(after_blob.diff(before_blob));
@@ -331,12 +331,9 @@ impl SizeBreakdown {
         &'a self,
         reference: &PackageReference,
     ) -> Option<&'a BlobBreakdown> {
-        self.packages
-            .get(&reference.name)
-            .map(|p| {
-                p.blobs.iter().find(|(path, _)| **path == reference.path).map(|(_, blob)| blob)
-            })
-            .flatten()
+        self.packages.get(&reference.name).and_then(|p| {
+            p.blobs.iter().find(|(path, _)| **path == reference.path).map(|(_, blob)| blob)
+        })
     }
 }
 

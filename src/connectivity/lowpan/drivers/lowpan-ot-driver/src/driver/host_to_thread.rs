@@ -131,8 +131,7 @@ where
                 || driver_state
                     .ot_instance
                     .ip6_get_unicast_addresses()
-                    .find(|entry| *entry.addr() == subnet.addr)
-                    .is_some()
+                    .any(|entry| *entry.addr() == subnet.addr)
         };
 
         if !should_skip {
@@ -159,8 +158,7 @@ where
             if driver_state
                 .ot_instance
                 .ip6_get_unicast_addresses()
-                .find(|entry| *entry.addr() == subnet_addr)
-                .is_some()
+                .any(|entry| *entry.addr() == subnet_addr)
             {
                 srp_discovery_proxy.add_local_address(subnet_addr);
             }

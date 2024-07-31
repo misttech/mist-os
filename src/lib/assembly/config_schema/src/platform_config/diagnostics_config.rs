@@ -61,7 +61,7 @@ impl Serialize for PipelineType {
     {
         match self {
             Self::Feedback => serializer.serialize_str("feedback"),
-            Self::Custom(s) => serializer.serialize_str(&s),
+            Self::Custom(s) => serializer.serialize_str(s),
         }
     }
 }

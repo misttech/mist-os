@@ -62,7 +62,7 @@ impl From<u8> for Priority {
 
 impl From<Priority> for u8 {
     fn from(x: Priority) -> Self {
-        x.try_into().unwrap()
+        x.into()
     }
 }
 

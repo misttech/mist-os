@@ -660,10 +660,9 @@ mod tests {
     #[fuchsia::test]
     async fn if_migration_file_and_up_to_date_no_migrations_run() {
         let tempdir = tempfile::tempdir().expect("failed to create tempdir");
-        std::fs::write(&tempdir.path().join(MIGRATION_FILE_NAME), ID.to_string())
+        std::fs::write(tempdir.path().join(MIGRATION_FILE_NAME), ID.to_string())
             .expect("failed to write migration file");
-        std::fs::write(&tempdir.path().join(DATA_FILE_NAME), "")
-            .expect("failed to write data file");
+        std::fs::write(tempdir.path().join(DATA_FILE_NAME), "").expect("failed to write data file");
         let directory = open_tempdir(&tempdir);
         let mut builder = MigrationManagerBuilder::new();
         let migration_ran = Arc::new(AtomicBool::new(false));
@@ -698,7 +697,7 @@ mod tests {
     #[fuchsia::test]
     async fn migration_file_exists_but_missing_data() {
         let tempdir = tempfile::tempdir().expect("failed to create tempdir");
-        std::fs::write(&tempdir.path().join(MIGRATION_FILE_NAME), ID.to_string())
+        std::fs::write(tempdir.path().join(MIGRATION_FILE_NAME), ID.to_string())
             .expect("failed to write migration file");
         let directory = open_tempdir(&tempdir);
         let mut builder = MigrationManagerBuilder::new();
@@ -755,10 +754,9 @@ mod tests {
     #[fuchsia::test]
     async fn migration_file_exists_and_newer_migrations_should_update() {
         let tempdir = tempfile::tempdir().expect("failed to create tempdir");
-        std::fs::write(&tempdir.path().join(MIGRATION_FILE_NAME), ID.to_string())
+        std::fs::write(tempdir.path().join(MIGRATION_FILE_NAME), ID.to_string())
             .expect("failed to write migration file");
-        std::fs::write(&tempdir.path().join(DATA_FILE_NAME), "")
-            .expect("failed to write data file");
+        std::fs::write(tempdir.path().join(DATA_FILE_NAME), "").expect("failed to write data file");
         let directory = open_tempdir(&tempdir);
         let mut builder = MigrationManagerBuilder::new();
         let migration_ran = Arc::new(AtomicBool::new(false));
@@ -840,10 +838,9 @@ mod tests {
         const LIGHT_MIGRATION: u64 = 1653667210;
         const UNKNOWN_ID: u64 = u64::MAX;
         let tempdir = tempfile::tempdir().expect("failed to create tempdir");
-        std::fs::write(&tempdir.path().join(MIGRATION_FILE_NAME), UNKNOWN_ID.to_string())
+        std::fs::write(tempdir.path().join(MIGRATION_FILE_NAME), UNKNOWN_ID.to_string())
             .expect("failed to write migration file");
-        std::fs::write(&tempdir.path().join(DATA_FILE_NAME), "")
-            .expect("failed to write data file");
+        std::fs::write(tempdir.path().join(DATA_FILE_NAME), "").expect("failed to write data file");
         let directory = open_tempdir(&tempdir);
         let mut builder = MigrationManagerBuilder::new();
         let migration_ran = Arc::new(AtomicBool::new(false));

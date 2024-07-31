@@ -112,7 +112,7 @@ impl<'a> RepositoryBuilder<'a> {
                 tuf::client::Config::default(),
                 tuf::metadata::MetadataVersion::None,
                 keys.root_keys().len() as u32,
-                keys.root_keys().into_iter().map(|key| key.public()),
+                keys.root_keys().iter().map(|key| key.public()),
                 local,
                 &pm_repo,
             )
@@ -123,7 +123,7 @@ impl<'a> RepositoryBuilder<'a> {
             client
         };
         let database = client.database();
-        let mut repo = RepoBuilder::from_database(&pm_repo, &keys, &database);
+        let mut repo = RepoBuilder::from_database(&pm_repo, &keys, database);
 
         repo = repo
             .add_packages(

@@ -49,7 +49,7 @@ impl DefineSubsystemConfiguration<PlatformMediaConfig> for MediaSubsystem {
 
         if let Some(url) = &media_config.multizone_leader.component_url {
             util::add_platform_declared_product_provided_component(
-                &url,
+                url,
                 "multizone_leader.core_shard.cml.template",
                 context,
                 builder,

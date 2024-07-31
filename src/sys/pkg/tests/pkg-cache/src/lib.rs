@@ -48,7 +48,7 @@ mod space;
 mod startup;
 mod sync;
 
-static SHELL_COMMANDS_BIN_PATH: &'static str = "shell-commands-bin";
+static SHELL_COMMANDS_BIN_PATH: &str = "shell-commands-bin";
 // Sleep duration while waiting for pkg-cache to update inspect state. Chosen arbitrarily.
 // Do not just sleep once and assume good, loop until expected state occurs.
 const INSPECT_WAIT: std::time::Duration = std::time::Duration::from_millis(10);
@@ -115,7 +115,7 @@ async fn compress_and_write_blob(
     blob: fpkg::BlobWriter,
 ) -> Result<(), WriteBlobError> {
     write_blob(
-        &delivery_blob::Type1Blob::generate(&contents, delivery_blob::CompressionMode::Attempt),
+        &delivery_blob::Type1Blob::generate(contents, delivery_blob::CompressionMode::Attempt),
         blob,
     )
     .await
@@ -1008,6 +1008,6 @@ impl<B: Blobfs> TestEnv<B> {
     }
 
     fn take_reboot_reasons(&self) -> Vec<RebootReason> {
-        std::mem::replace(&mut *self.reboot_reasons.lock(), vec![])
+        std::mem::take(&mut *self.reboot_reasons.lock())
     }
 }

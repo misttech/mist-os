@@ -105,7 +105,7 @@ pub fn construct_zbi(
 
     // Add the BootFS files.
     for bootfs_entry in &product.bootfs_files {
-        zbi_builder.add_bootfs_file(&bootfs_entry.source, &bootfs_entry.destination.to_string());
+        zbi_builder.add_bootfs_file(&bootfs_entry.source, &bootfs_entry.destination);
     }
 
     // Add the ramdisk image in the ZBI if necessary.

@@ -606,9 +606,8 @@ where
     }
 
     let provider = provider_fn().context("while connecting to commit status provider")?;
-    query_commit_status(&provider).await.map(|status| {
+    query_commit_status(&provider).await.inspect(|&status| {
         engine_commit_status.replace(status);
-        status
     })
 }
 

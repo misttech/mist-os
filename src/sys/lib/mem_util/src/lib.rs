@@ -57,7 +57,7 @@ pub enum FileError {
 
 /// Retrieve the bytes in `data`, returning a reference if it's a `Data::Bytes` and a copy of
 /// the bytes read from the VMO if it's a `Data::Buffer`.
-pub fn bytes_from_data<'d>(data: &'d fmem::Data) -> Result<Cow<'d, [u8]>, DataError> {
+pub fn bytes_from_data(data: &fmem::Data) -> Result<Cow<'_, [u8]>, DataError> {
     Ok(match data {
         fmem::Data::Buffer(buf) => {
             let size = buf.size as usize;

@@ -37,7 +37,7 @@ impl DefineSubsystemConfiguration<ICUConfig> for IcuSubsystem {
                 .context(format!("Providing zoneinfo64.res to {}", package))?
                 .config_data(FileEntry {
                     source: context.get_resource("revision.txt"),
-                    destination: format!("tzdata/revision.txt"),
+                    destination: "tzdata/revision.txt".to_string(),
                 })
                 .context(format!("Providing revision.txt to {}", package))?;
         }

@@ -72,6 +72,12 @@ impl LookupCompatibleResponse {
     }
 }
 
+impl Default for FakeSavedNetworksManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl FakeSavedNetworksManager {
     pub fn new() -> Self {
         Self {
@@ -314,6 +320,12 @@ pub struct FakeScanRequester {
     >,
 }
 
+impl Default for FakeScanRequester {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl FakeScanRequester {
     pub fn new() -> Self {
         FakeScanRequester {
@@ -362,6 +374,12 @@ pub struct FakeRoamMonitor {
     pub response_to_should_roam_scan: bool,
     pub response_to_should_send_roam_request: bool,
     pub response_to_get_roam_data: RoamingConnectionData,
+}
+
+impl Default for FakeRoamMonitor {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl FakeRoamMonitor {

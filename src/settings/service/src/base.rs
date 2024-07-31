@@ -206,6 +206,7 @@ impl From<&SettingInfo> for SettingType {
 /// can be used for this purpose.
 #[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
 #[cfg(test)]
+#[derive(Default)]
 pub struct UnknownInfo(pub bool);
 
 /// The `Merge` trait allows merging two structs.
@@ -257,12 +258,6 @@ mod testing {
     impl DeviceStorageCompatible for UnknownInfo {
         type Loader = NoneT;
         const KEY: &'static str = "unknown_info";
-    }
-
-    impl Default for UnknownInfo {
-        fn default() -> Self {
-            Self(false)
-        }
     }
 
     impl From<UnknownInfo> for SettingInfo {

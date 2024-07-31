@@ -672,7 +672,7 @@ mod test {
         );
 
         // Make sure the depfile is correct.
-        let expected = vec![
+        let expected = [
             convert_to_depfile_filepath(subpackages_build_manifest_path.as_str()),
             convert_to_depfile_filepath(empty_file_path.as_str()),
             convert_to_depfile_filepath(meta_package_path.as_str()),

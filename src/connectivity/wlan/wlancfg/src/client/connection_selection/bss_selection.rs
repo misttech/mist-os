@@ -127,7 +127,7 @@ mod test {
     ) -> types::ScannedCandidate {
         let bss = types::Bss {
             signal: types::Signal { rssi_dbm: rssi, snr_db },
-            channel: channel,
+            channel,
             bss_description: fidl_internal::BssDescription {
                 rssi_dbm: rssi,
                 snr_db,

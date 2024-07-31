@@ -37,7 +37,7 @@ impl DefineSubsystemConfiguration<PlatformSysmemConfig> for SysmemConfig {
         // board_info and platform config have been applied, the config capability will be
         // absent and the default value of the field will be as specified in
         // src/devices/sysmem/drivers/sysmem/BUILD.gn.
-        let settings = vec![&context.board_info.platform.sysmem_defaults, platform_sysmem_config]
+        let settings = [&context.board_info.platform.sysmem_defaults, platform_sysmem_config]
             .iter()
             .fold(PlatformSysmemConfig::default(), apply_overrides);
 

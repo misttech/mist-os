@@ -91,7 +91,7 @@ pub fn scan_result_to_policy_scan_result(
         })
         .collect();
 
-    return scan_results;
+    scan_results
 }
 
 /// Send batches of results to the output iterator when getNext() is called on it.

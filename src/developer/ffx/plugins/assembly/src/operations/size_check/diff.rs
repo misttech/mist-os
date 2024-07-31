@@ -44,13 +44,13 @@ impl SizeDiff {
                 }
             }
         }
-        lines.push(format!("TOTAL SIZE"));
+        lines.push("TOTAL SIZE".to_string());
         lines.push(format!("{:-<117}", ""));
         lines.push(format!("before: {: >10}", total_before));
         lines.push(format!("after:  {: >10}", total_after));
         lines.push(format!("diff:   {: >+10}", total_after - total_before));
-        lines.push(format!(""));
-        lines.push(format!(""));
+        lines.push(String::new());
+        lines.push(String::new());
 
         // Print packages that have been added or removed.
         let changed_packages: BTreeSet<&PackageDiff> =
@@ -61,8 +61,8 @@ impl SizeDiff {
             for package in &changed_packages {
                 lines.extend(package.get_print_lines());
             }
-            lines.push(format!(""));
-            lines.push(format!(""));
+            lines.push(String::new());
+            lines.push(String::new());
         }
 
         // Print blobs that have been added, removed, or updated.
@@ -101,7 +101,7 @@ impl PackageDiff {
     }
 
     pub fn removed(name: String, size: u64) -> Self {
-        Self { mode: PackageDiffMode::Removed, name, size, size_delta: -1 * size as i64 }
+        Self { mode: PackageDiffMode::Removed, name, size, size_delta: -(size as i64) }
     }
 
     pub fn updated(name: String, size: u64, size_delta: i64) -> Self {
@@ -144,8 +144,8 @@ impl<'a> Ord for PackageDiff {
     fn cmp(&self, other: &Self) -> Ordering {
         // We multiply the sizes by -1 in order to sort the largest sizes up at the top while
         // keeping the modes sorted normally.
-        let one = (self.size_delta * -1, &self.name, self.mode);
-        let two = (other.size_delta * -1, &other.name, other.mode);
+        let one = (-self.size_delta, &self.name, self.mode);
+        let two = (-other.size_delta, &other.name, other.mode);
         one.cmp(&two)
     }
 }
@@ -239,11 +239,11 @@ impl BlobDiff {
             hash,
             old_hash: None,
             size,
-            size_delta: -1 * size as i64,
+            size_delta: -(size as i64),
             psize,
-            psize_delta: -1 * psize as i64,
+            psize_delta: -(psize as i64),
             share: references.len() as u64,
-            share_delta: -1 * references.len() as i64,
+            share_delta: -(references.len() as i64),
             references,
         }
     }
@@ -407,8 +407,8 @@ impl Ord for BlobDiff {
     fn cmp(&self, other: &Self) -> Ordering {
         // We multiply the sizes by -1 in order to sort the largest sizes up at the top while
         // keeping the modes/hashes sorted normally.
-        let one = (self.size_delta * -1, self.psize_delta * -1, self.mode, &self.hash);
-        let two = (other.size_delta * -1, other.psize_delta * -1, other.mode, &other.hash);
+        let one = (-self.size_delta, -self.psize_delta, self.mode, &self.hash);
+        let two = (-other.size_delta, -other.psize_delta, other.mode, &other.hash);
         one.cmp(&two)
     }
 }

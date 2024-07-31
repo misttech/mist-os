@@ -13,7 +13,7 @@ pub fn try_merge_into<T: DeserializeOwned>(base: Value, overrides: Value) -> Res
 
 fn merge(base: Value, value: Value) -> Value {
     match (base, value) {
-        (base @ _, Value::Null) => {
+        (base, Value::Null) => {
             // Override value is nothing, so nothing to do.
             base
         }

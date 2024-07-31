@@ -81,7 +81,7 @@ impl Repository {
     ) -> Result<Self, anyhow::Error> {
         let mirror_config = config
             .mirrors()
-            .get(0)
+            .first()
             .ok_or_else(|| anyhow!("cannot create repository, no mirrors {config:?}"))?;
         let local = get_local_repo(data_proxy, persisted_repos_dir, config).await?;
         let local = RWRepository::new(local);

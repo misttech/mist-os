@@ -91,7 +91,7 @@ impl Nat64 {
             if let Some(addr) = active_cidr {
                 self.delete_route(net_if, addr.get_address_bytes(), addr.get_length());
             }
-            let _ = self.active_cidr_addr.set(translator_cidr);
+            self.active_cidr_addr.set(translator_cidr);
             info!("NAT64: CIDR updated to {:?}", self.active_cidr_addr.get());
         }
 

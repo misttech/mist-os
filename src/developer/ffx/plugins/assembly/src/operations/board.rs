@@ -196,7 +196,7 @@ fn write_depfile(
     for_output: &Utf8PathBuf,
     inputs: impl IntoIterator<Item = Utf8PathBuf>,
 ) -> Result<()> {
-    let mut depfile_writer = std::io::BufWriter::new(std::fs::File::create(&depfile)?);
+    let mut depfile_writer = std::io::BufWriter::new(std::fs::File::create(depfile)?);
 
     write!(depfile_writer, "{}:", for_output)?;
 

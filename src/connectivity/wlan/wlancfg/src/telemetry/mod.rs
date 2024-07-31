@@ -196,6 +196,12 @@ pub struct ScanEventInspectData {
     pub unknown_protection_ies: Vec<String>,
 }
 
+impl Default for ScanEventInspectData {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ScanEventInspectData {
     pub fn new() -> Self {
         Self { unknown_protection_ies: vec![] }
@@ -654,7 +660,7 @@ fn inspect_record_connection_status(inspect_node: &InspectNode, telemetry_sender
                             model_number: String::from_utf8_lossy(&wsc.model_number[..]).to_string(),
                         )),
                     is_wmm_assoc: ap_state.original().find_wmm_param().is_some(),
-                    wmm_param?: ap_state.original().find_wmm_param().map(|bytes| InspectBytes(bytes)),
+                    wmm_param?: ap_state.original().find_wmm_param().map(InspectBytes),
                 });
             }
             Ok(inspector)
@@ -1505,7 +1511,7 @@ impl Telemetry {
                         model_number: String::from_utf8_lossy(&wsc.model_number[..]).to_string(),
                     )),
                 is_wmm_assoc: info.ap_state.original().find_wmm_param().is_some(),
-                wmm_param?: info.ap_state.original().find_wmm_param().map(|bytes| InspectBytes(bytes)),
+                wmm_param?: info.ap_state.original().find_wmm_param().map(InspectBytes),
             }
         });
         inspect_log!(self.external_inspect_node.disconnect_events.lock(), {
@@ -1864,41 +1870,41 @@ impl StatsLogger {
         self.last_1d_detailed_stats
             .connect_per_is_multi_bss
             .entry(is_multi_bss_dim)
-            .or_insert(ConnectAttemptsCounter::default())
+            .or_default()
             .increment(code);
 
         let security_type_dim = convert::convert_security_type(&ap_state.original().protection());
         self.last_1d_detailed_stats
             .connect_per_security_type
             .entry(security_type_dim)
-            .or_insert(ConnectAttemptsCounter::default())
+            .or_default()
             .increment(code);
 
         self.last_1d_detailed_stats
             .connect_per_primary_channel
             .entry(ap_state.tracked.channel.primary)
-            .or_insert(ConnectAttemptsCounter::default())
+            .or_default()
             .increment(code);
 
         let channel_band_dim = convert::convert_channel_band(ap_state.tracked.channel.primary);
         self.last_1d_detailed_stats
             .connect_per_channel_band
             .entry(channel_band_dim)
-            .or_insert(ConnectAttemptsCounter::default())
+            .or_default()
             .increment(code);
 
         let rssi_bucket_dim = convert::convert_rssi_bucket(ap_state.tracked.signal.rssi_dbm);
         self.last_1d_detailed_stats
             .connect_per_rssi_bucket
             .entry(rssi_bucket_dim)
-            .or_insert(ConnectAttemptsCounter::default())
+            .or_default()
             .increment(code);
 
         let snr_bucket_dim = convert::convert_snr_bucket(ap_state.tracked.signal.snr_db);
         self.last_1d_detailed_stats
             .connect_per_snr_bucket
             .entry(snr_bucket_dim)
-            .or_insert(ConnectAttemptsCounter::default())
+            .or_default()
             .increment(code);
     }
 
@@ -2967,7 +2973,7 @@ impl StatsLogger {
             .rssi_hist
             .entry(index)
             .or_insert(fidl_fuchsia_metrics::HistogramBucket { index, count: 0 });
-        entry.count = entry.count + 1;
+        entry.count += 1;
     }
 
     async fn log_signal_velocity_metrics(&mut self, rssi_velocity: f64) {
@@ -2983,7 +2989,7 @@ impl StatsLogger {
             .rssi_velocity_hist
             .entry(index)
             .or_insert(fidl_fuchsia_metrics::HistogramBucket { index, count: 0 });
-        entry.count = entry.count + 1;
+        entry.count += 1;
     }
 
     async fn log_iface_creation_result(&mut self, result: Result<(), ()>) {
@@ -4593,12 +4599,12 @@ mod tests {
         test_helper.advance_by(25.seconds(), test_fut.as_mut());
         let time_series = test_helper.get_time_series(&mut test_fut);
         let total_duration_sec: Vec<_> =
-            time_series.lock().total_duration_sec.minutely_iter().map(|v| *v).collect();
+            time_series.lock().total_duration_sec.minutely_iter().copied().collect();
         assert_eq!(total_duration_sec, vec![15]);
 
         test_helper.advance_to_next_telemetry_checkpoint(test_fut.as_mut());
         let total_duration_sec: Vec<_> =
-            time_series.lock().total_duration_sec.minutely_iter().map(|v| *v).collect();
+            time_series.lock().total_duration_sec.minutely_iter().copied().collect();
         assert_eq!(total_duration_sec, vec![30]);
     }
 
@@ -5005,9 +5011,9 @@ mod tests {
         test_helper.drain_cobalt_events(&mut test_fut);
         let time_series = test_helper.get_time_series(&mut test_fut);
         let connect_attempt_count: Vec<_> =
-            time_series.lock().connect_attempt_count.minutely_iter().map(|v| *v).collect();
+            time_series.lock().connect_attempt_count.minutely_iter().copied().collect();
         let connect_successful_count: Vec<_> =
-            time_series.lock().connect_successful_count.minutely_iter().map(|v| *v).collect();
+            time_series.lock().connect_successful_count.minutely_iter().copied().collect();
         assert_eq!(connect_attempt_count, vec![11]);
         assert_eq!(connect_successful_count, vec![1]);
     }
@@ -5121,7 +5127,7 @@ mod tests {
 
         let time_series = test_helper.get_time_series(&mut test_fut);
         let disconnect_count: Vec<_> =
-            time_series.lock().disconnect_count.minutely_iter().map(|v| *v).collect();
+            time_series.lock().disconnect_count.minutely_iter().copied().collect();
         assert_eq!(disconnect_count, vec![0]);
 
         let info = DisconnectInfo {
@@ -5138,7 +5144,7 @@ mod tests {
 
         let time_series = test_helper.get_time_series(&mut test_fut);
         let disconnect_count: Vec<_> =
-            time_series.lock().disconnect_count.minutely_iter().map(|v| *v).collect();
+            time_series.lock().disconnect_count.minutely_iter().copied().collect();
         assert_eq!(disconnect_count, vec![1]);
     }
 
@@ -5151,7 +5157,7 @@ mod tests {
 
         let time_series = test_helper.get_time_series(&mut test_fut);
         let connected_duration_sec: Vec<_> =
-            time_series.lock().connected_duration_sec.minutely_iter().map(|v| *v).collect();
+            time_series.lock().connected_duration_sec.minutely_iter().copied().collect();
         assert_eq!(connected_duration_sec, vec![45, 45]);
     }
 
@@ -5325,13 +5331,13 @@ mod tests {
 
         let time_series = test_helper.get_time_series(&mut test_fut);
         let rx_unicast_drop_count: Vec<_> =
-            time_series.lock().rx_unicast_drop_count.minutely_iter().map(|v| *v).collect();
+            time_series.lock().rx_unicast_drop_count.minutely_iter().copied().collect();
         let rx_unicast_total_count: Vec<_> =
-            time_series.lock().rx_unicast_total_count.minutely_iter().map(|v| *v).collect();
+            time_series.lock().rx_unicast_total_count.minutely_iter().copied().collect();
         let tx_drop_count: Vec<_> =
-            time_series.lock().tx_drop_count.minutely_iter().map(|v| *v).collect();
+            time_series.lock().tx_drop_count.minutely_iter().copied().collect();
         let tx_total_count: Vec<_> =
-            time_series.lock().tx_total_count.minutely_iter().map(|v| *v).collect();
+            time_series.lock().tx_total_count.minutely_iter().copied().collect();
 
         // Note: Packets from the first 15 seconds are not accounted because we
         //       we did not take packet measurement at 0th second mark.
@@ -5399,7 +5405,7 @@ mod tests {
         test_helper.advance_by(150.seconds(), test_fut.as_mut());
         let time_series = test_helper.get_time_series(&mut test_fut);
         let no_rx_duration_sec: Vec<_> =
-            time_series.lock().no_rx_duration_sec.minutely_iter().map(|v| *v).collect();
+            time_series.lock().no_rx_duration_sec.minutely_iter().copied().collect();
         assert_eq!(no_rx_duration_sec, vec![30, 60, 45]);
     }
 
@@ -5659,7 +5665,7 @@ mod tests {
     fn test_log_daily_rx_tx_ratio_cobalt_metrics() {
         let (mut test_helper, mut test_fut) = setup_test();
         test_helper.set_counter_stats_resp(Box::new(|| {
-            let seed = fasync::Time::now().into_nanos() as u64 / 1000_000_000;
+            let seed = fasync::Time::now().into_nanos() as u64 / 1_000_000_000;
             Ok(fidl_fuchsia_wlan_stats::IfaceCounterStats {
                 tx_total: 10 * seed,
                 // TX drop rate stops increasing at 1 hour + TELEMETRY_QUERY_INTERVAL mark.
@@ -5856,7 +5862,7 @@ mod tests {
     fn test_log_hourly_fleetwide_rx_tx_cobalt_metrics() {
         let (mut test_helper, mut test_fut) = setup_test();
         test_helper.set_counter_stats_resp(Box::new(|| {
-            let seed = fasync::Time::now().into_nanos() as u64 / 1000_000_000;
+            let seed = fasync::Time::now().into_nanos() as u64 / 1_000_000_000;
             Ok(fidl_fuchsia_wlan_stats::IfaceCounterStats {
                 tx_total: 10 * seed,
                 // TX drop rate stops increasing at 10 min + TELEMETRY_QUERY_INTERVAL mark.
@@ -8669,7 +8675,7 @@ mod tests {
                 time: connect_time + zx::Duration::from_seconds(20),
             },
         ]);
-        let signals = HistoricalList { 0: signals_deque };
+        let signals = HistoricalList(signals_deque);
         let signal_at_connect = client::types::Signal { rssi_dbm: -90, snr_db: 0 };
 
         test_helper.telemetry_sender.send(TelemetryEvent::PostConnectionSignals {
@@ -8774,7 +8780,7 @@ mod tests {
                 time: final_score_time,
             },
         ]);
-        let signals = HistoricalList { 0: signals_deque };
+        let signals = HistoricalList(signals_deque);
 
         let disconnect_info = DisconnectInfo {
             connected_duration: AVERAGE_SCORE_DELTA_MINIMUM_DURATION,
@@ -9090,7 +9096,7 @@ mod tests {
 
         test_helper.telemetry_sender.send(TelemetryEvent::BssSelectionResult {
             reason: client::types::ConnectReason::FidlConnectRequest,
-            scored_candidates: scored_candidates,
+            scored_candidates,
             // Report that the selected candidate was not the highest scoring candidate.
             selected_candidate: Some((generate_random_scanned_candidate(), 60)),
         });

@@ -265,7 +265,7 @@ fn perform_manual_request(
         }
         Some(ManualRequest::Stop(responder)) => Ok(stopping_state(deps, responder).into_state()),
         Some(ManualRequest::Exit(responder)) => {
-            responder.send(()).unwrap_or_else(|_| ());
+            responder.send(()).unwrap_or(());
             Err(ExitReason(Ok(())))
         }
         None => {
@@ -276,9 +276,7 @@ fn perform_manual_request(
                 .update_operating_state(types::OperatingState::Failed)
                 .map_err(|e| ExitReason(Err(e)))?;
 
-            return Err(ExitReason(Err(format_err!(
-                "The stream of user requests ended unexpectedly"
-            ))));
+            Err(ExitReason(Err(format_err!("The stream of user requests ended unexpectedly"))))
         }
     }
 }
@@ -427,14 +425,14 @@ async fn starting_state(
     })?;
 
     match responder {
-        Some(responder) => responder.send(()).unwrap_or_else(|_| ()),
+        Some(responder) => responder.send(()).unwrap_or(()),
         None => {}
     }
 
     deps.state_tracker
         .update_operating_state(types::OperatingState::Active)
         .map_err(|e| ExitReason(Err(e)))?;
-    return Ok(started_state(deps, req).into_state());
+    Ok(started_state(deps, req).into_state())
 }
 
 /// In the stopping state, an ApSmeProxy::Stop is requested.  Once the stop request has been
@@ -465,7 +463,7 @@ async fn stopping_state(
     result.map_err(|e| ExitReason(Err(e)))?;
 
     // Ack the request to stop the AP.
-    responder.send(()).unwrap_or_else(|_| ());
+    responder.send(()).unwrap_or(());
 
     Ok(stopped_state(deps).into_state())
 }
@@ -477,7 +475,7 @@ async fn stopped_state(mut deps: CommonStateDependencies) -> Result<State, ExitR
         match req {
             // Immediately reply to stop requests indicating that the AP is already stopped
             Some(ManualRequest::Stop(responder)) => {
-                responder.send(()).unwrap_or_else(|_| ());
+                responder.send(()).unwrap_or(());
             }
             // All other requests are handled manually
             other => return perform_manual_request(deps, other),

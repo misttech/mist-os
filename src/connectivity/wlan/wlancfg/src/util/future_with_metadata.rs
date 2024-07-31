@@ -63,14 +63,14 @@ mod tests {
         let mut test_future = pin!(test_future);
 
         // Ensure the initial value is as expected
-        assert_eq!(test_future.metadata.has_been_written, false);
+        assert!(!test_future.metadata.has_been_written);
 
         // Mutate the metadata
         test_future.metadata.has_been_written = true;
 
         // The future should resolve with the metadata
         assert_variant!(exec.run_until_stalled(&mut test_future), Poll::Ready((fut_result, metadata)) => {
-            assert_eq!(metadata.has_been_written, true);
+            assert!(metadata.has_been_written);
             assert_eq!(fut_result, "future result");
         });
     }

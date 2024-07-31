@@ -402,7 +402,7 @@ impl BlobfsRamdisk {
             ServingFilesystem::SingleVolume(_) => {
                 use std::io::Write as _;
                 let mut file =
-                    match self.root_dir().unwrap().new_file(delivery_blob_path(&merkle), 0o600) {
+                    match self.root_dir().unwrap().new_file(delivery_blob_path(merkle), 0o600) {
                         Ok(file) => file,
                         Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
                             // blob is being written or already written

@@ -9,7 +9,7 @@ use tracing::error;
 /// Update a weighted average with a new measurement
 fn calculate_ewma_update(current: f64, next: f64, weighting_factor: f64) -> f64 {
     let weight = 2.0 / (1.0 + weighting_factor);
-    return weight * next + (1.0 - weight) * current;
+    weight * next + (1.0 - weight) * current
 }
 
 /// Struct for maintaining a dB or dBm exponentially weighted moving average. Differs from

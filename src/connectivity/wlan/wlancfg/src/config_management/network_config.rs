@@ -74,6 +74,12 @@ pub struct PerformanceStats {
     pub past_connections: HistoricalListsByBssid<PastConnectionData>,
 }
 
+impl Default for PerformanceStats {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PerformanceStats {
     pub fn new() -> Self {
         Self {
@@ -168,6 +174,15 @@ impl Default for PastConnectionList {
 /// Struct for map from BSSID to HistoricalList
 #[derive(Clone, Debug, PartialEq)]
 pub struct HistoricalListsByBssid<T: Timestamped>(HashMap<client_types::Bssid, HistoricalList<T>>);
+
+impl<T> Default for HistoricalListsByBssid<T>
+where
+    T: Timestamped + Clone,
+{
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl<T> HistoricalListsByBssid<T>
 where
@@ -1104,12 +1119,12 @@ mod tests {
         // Verify get_list_for_bss retrieves correct connect failures
         assert_eq!(
             connect_failures.get_list_for_bss(&bssid_1),
-            HistoricalList { 0: VecDeque::from_iter([failure_1_bssid_1, failure_2_bssid_1]) }
+            HistoricalList(VecDeque::from_iter([failure_1_bssid_1, failure_2_bssid_1]))
         );
 
         assert_eq!(
             connect_failures.get_list_for_bss(&bssid_2),
-            HistoricalList { 0: VecDeque::from_iter([failure_1_bssid_2]) }
+            HistoricalList(VecDeque::from_iter([failure_1_bssid_2]))
         );
     }
 

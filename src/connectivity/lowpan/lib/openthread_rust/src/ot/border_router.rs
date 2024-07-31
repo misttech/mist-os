@@ -335,7 +335,7 @@ impl BorderRouter for Instance {
             move |pd_state: BorderRoutingDhcp6PdState| {
                 let mut borrowed = state_copy.lock();
                 borrowed.0 = Some(pd_state);
-                borrowed.1.clone().wake();
+                borrowed.1.wake_by_ref();
             },
         ));
 

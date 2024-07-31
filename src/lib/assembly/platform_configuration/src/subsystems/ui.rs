@@ -65,7 +65,7 @@ impl DefineSubsystemConfiguration<PlatformUiConfig> for UiSubsystem {
             "fuchsia.scenic.Renderer",
             Config::new(
                 ConfigValueType::String { max_size: 16 },
-                serde_json::to_value(ui_config.renderer.clone())?.into(),
+                serde_json::to_value(ui_config.renderer.clone())?,
             ),
         )?;
         builder.set_config_capability(

@@ -225,7 +225,7 @@ impl DefineSubsystemConfiguration<DiagnosticsConfig> for DiagnosticsSubsystem {
         // Optionally, add the product buckets.
         if let Some(buckets_path) = &memory_monitor.buckets {
             let mut product_buckets: Vec<serde_json::Value> =
-                read_config(&buckets_path).context("reading product memory buckets config")?;
+                read_config(buckets_path).context("reading product memory buckets config")?;
             buckets.append(&mut product_buckets);
         }
 

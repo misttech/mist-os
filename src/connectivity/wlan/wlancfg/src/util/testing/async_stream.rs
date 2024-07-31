@@ -40,7 +40,7 @@ where
     let mut select_fut = futures::future::select(background_fut, result_fut_with_timeout);
     match exec.run_singlethreaded(&mut select_fut) {
         Either::Left(_) => panic!("Background future finished"),
-        Either::Right((result, _background_fut)) => return result,
+        Either::Right((result, _background_fut)) => result,
     }
 }
 

@@ -32,9 +32,9 @@ impl PuppetDeclBuilder {
     }
 }
 
-impl Into<ftest::PuppetDecl> for PuppetDeclBuilder {
-    fn into(self) -> ftest::PuppetDecl {
-        ftest::PuppetDecl { name: Some(self.name), ..Default::default() }
+impl From<PuppetDeclBuilder> for ftest::PuppetDecl {
+    fn from(val: PuppetDeclBuilder) -> Self {
+        ftest::PuppetDecl { name: Some(val.name), ..Default::default() }
     }
 }
 

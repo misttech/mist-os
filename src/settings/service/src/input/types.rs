@@ -101,7 +101,7 @@ impl InputState {
         state: DeviceState,
     ) {
         // Ensure the category has an entry in the categories map.
-        let category = self.input_categories.entry(device_type).or_insert_with(InputCategory::new);
+        let category = self.input_categories.entry(device_type).or_default();
 
         // Ensure the device has an entry in the devices map.
         let input_device = category
@@ -190,7 +190,7 @@ impl From<InputConfiguration> for InputState {
         devices.iter().for_each(|device_config| {
             // Ensure the category has an entry in the categories map.
             let input_device_type = device_config.device_type;
-            let category = categories.entry(input_device_type).or_insert_with(InputCategory::new);
+            let category = categories.entry(input_device_type).or_default();
 
             // Ensure the device has an entry in the devices map.
             let device_name = device_config.device_name.clone();
@@ -201,8 +201,7 @@ impl From<InputConfiguration> for InputState {
 
             // Set the entry on the source states map.
             device_config.source_states.iter().for_each(|source_state| {
-                let value =
-                    DeviceState::from_bits(source_state.state).unwrap_or_else(DeviceState::new);
+                let value = DeviceState::from_bits(source_state.state).unwrap_or_default();
                 // Ignore the old value.
                 let _ = device.source_states.insert(source_state.source, value);
             });
@@ -221,12 +220,6 @@ pub struct InputCategory {
     // representation of the device type if there is only one input
     // device in this category.
     pub devices: HashMap<String, InputDevice>,
-}
-
-impl InputCategory {
-    fn new() -> Self {
-        Self { devices: HashMap::<String, InputDevice>::new() }
-    }
 }
 
 #[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]

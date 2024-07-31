@@ -56,8 +56,8 @@ impl ContextAuthenticator {
             self.hmac.verify_slice(tag).map_err(ContextAuthenticatorError::AuthenticationFailed)?;
         // This will never fail, but need a way to infallibly split an array reference into two
         // array references to communicate that to the type system.
-        Ok(fuchsia_hash::Hash::try_from(hash)
-            .map_err(|_| ContextAuthenticatorError::InvalidLength(context.len()))?)
+        fuchsia_hash::Hash::try_from(hash)
+            .map_err(|_| ContextAuthenticatorError::InvalidLength(context.len()))
     }
 }
 

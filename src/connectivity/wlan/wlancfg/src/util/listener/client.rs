@@ -62,7 +62,7 @@ impl CurrentStateCache for ClientStateUpdate {
             .networks
             .iter()
             .filter(|n| !update.networks.iter().any(|u| u.id == n.id))
-            .map(|n| n.clone())
+            .cloned()
             .collect();
         // Push in all the networks from the update
         for network in update.networks.iter() {
@@ -81,7 +81,7 @@ impl CurrentStateCache for ClientStateUpdate {
                 fidl_policy::ConnectionState::Connecting => true,
                 fidl_policy::ConnectionState::Connected => true,
             })
-            .map(|n| n.clone())
+            .cloned()
             .collect();
     }
 }

@@ -67,26 +67,23 @@ pub async fn serve_roam_monitor(
     loop {
         select! {
             // Handle incoming trigger data, queueing a roam search request if necessary.
-            trigger_data = trigger_data_receiver.next() => match trigger_data {
-                Some(data) => {
-                    if roam_monitor.should_roam_search(data).unwrap_or_else(|e| {
-                        error!("error handling roam trigger data: {}", e);
-                        false
-                    }) {
-                        if let Ok(roam_data) = roam_monitor.get_roam_data() {
-                            telemetry_sender.send(TelemetryEvent::RoamingScan);
-                            info!("Performing scan to find proactive local roaming candidates.");
-                            let roam_search_fut = get_roaming_connection_selection_future(
-                                connection_selection_requester.clone(),
-                                roam_data
-                            );
-                            roam_search_result_futs.push(roam_search_fut.boxed());
-                        } else {
-                            error!("Unexpected error getting roam data");
-                        }
+            trigger_data = trigger_data_receiver.next() => if let Some(data) = trigger_data {
+                if roam_monitor.should_roam_search(data).unwrap_or_else(|e| {
+                    error!("error handling roam trigger data: {}", e);
+                    false
+                }) {
+                    if let Ok(roam_data) = roam_monitor.get_roam_data() {
+                        telemetry_sender.send(TelemetryEvent::RoamingScan);
+                        info!("Performing scan to find proactive local roaming candidates.");
+                        let roam_search_fut = get_roaming_connection_selection_future(
+                            connection_selection_requester.clone(),
+                            roam_data
+                        );
+                        roam_search_result_futs.push(roam_search_fut.boxed());
+                    } else {
+                        error!("Unexpected error getting roam data");
                     }
                 }
-                _ => {}
             },
             // Handle the result of a completed roam search, sending recommentation to roam if
             // necessary.
