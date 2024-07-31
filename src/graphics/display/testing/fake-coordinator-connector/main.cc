@@ -8,7 +8,6 @@
 #include <lib/syslog/cpp/macros.h>
 #include <lib/trace-provider/provider.h>
 
-#include "src/devices/testing/mock-ddk/mock-device.h"
 #include "src/graphics/display/drivers/fake/fake-display.h"
 #include "src/graphics/display/testing/fake-coordinator-connector/service.h"
 
@@ -31,8 +30,7 @@ int main(int argc, const char** argv) {
       .no_buffer_access = false,
   };
 
-  display::FakeDisplayCoordinatorConnector connector(MockDevice::FakeRootParent(),
-                                                     loop.dispatcher(), kFakeDisplayDeviceConfig);
+  display::FakeDisplayCoordinatorConnector connector(loop.dispatcher(), kFakeDisplayDeviceConfig);
 
   zx::result<> publish_service_result =
       outgoing.AddUnmanagedProtocol<fuchsia_hardware_display::Provider>(

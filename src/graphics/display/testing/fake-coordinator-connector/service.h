@@ -29,7 +29,7 @@ class FakeDisplayCoordinatorConnector : public fidl::Server<fuchsia_hardware_dis
   // Callers are responsible for binding incoming FIDL clients to it.
   // Callers must guarantee that all FIDL methods run on `dispatcher`.
   FakeDisplayCoordinatorConnector(
-      std::shared_ptr<zx_device> mock_root, async_dispatcher_t* dispatcher,
+      async_dispatcher_t* dispatcher,
       const fake_display::FakeDisplayDeviceConfig& fake_display_device_config);
   ~FakeDisplayCoordinatorConnector() override;
 

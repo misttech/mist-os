@@ -12,21 +12,23 @@
 #include <memory>
 
 #include "src/graphics/display/drivers/coordinator/client-priority.h"
-#include "src/graphics/display/drivers/fake/sysmem-proxy-device.h"
+#include "src/graphics/display/drivers/fake/sysmem-service-forwarder.h"
 
 namespace display {
 
 FakeDisplayCoordinatorConnector::FakeDisplayCoordinatorConnector(
-    std::shared_ptr<zx_device> mock_root, async_dispatcher_t* dispatcher,
+    async_dispatcher_t* dispatcher,
     const fake_display::FakeDisplayDeviceConfig& fake_display_device_config) {
   FX_DCHECK(dispatcher);
 
-  auto sysmem = std::make_unique<display::GenericSysmemDeviceWrapper<display::SysmemProxyDevice>>(
-      mock_root.get());
+  zx::result<std::unique_ptr<SysmemServiceForwarder>> sysmem_service_forwarder_result =
+      display::SysmemServiceForwarder::Create();
+  FX_CHECK(sysmem_service_forwarder_result.is_ok());
+
+  auto fake_display_stack = std::make_unique<display::FakeDisplayStack>(
+      std::move(sysmem_service_forwarder_result).value(), fake_display_device_config);
   state_ = std::shared_ptr<State>(
-      new State{.dispatcher = dispatcher,
-                .fake_display_stack = std::make_unique<display::FakeDisplayStack>(
-                    std::move(mock_root), std::move(sysmem), fake_display_device_config)});
+      new State{.dispatcher = dispatcher, .fake_display_stack = std::move(fake_display_stack)});
 }
 
 FakeDisplayCoordinatorConnector::~FakeDisplayCoordinatorConnector() {

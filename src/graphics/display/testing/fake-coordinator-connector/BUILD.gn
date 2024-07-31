@@ -32,7 +32,7 @@ source_set("service") {
     "service.h",
   ]
 
-  deps = [ "//src/graphics/display/drivers/fake:sysmem-proxy-device" ]
+  deps = [ "//src/graphics/display/drivers/fake:sysmem-service-forwarder" ]
 
   public_deps = [
     "//sdk/fidl/fuchsia.hardware.display:fuchsia.hardware.display_cpp",

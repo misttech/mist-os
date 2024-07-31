@@ -15,24 +15,27 @@
 #include <fbl/condition_variable.h>
 #include <fbl/mutex.h>
 
-#include "src/devices/sysmem/drivers/sysmem/device.h"
-#include "src/devices/testing/mock-ddk/mock-device.h"
 #include "src/graphics/display/drivers/coordinator/post-display-task.h"
 #include "src/graphics/display/drivers/fake/fake-display.h"
+#include "src/graphics/display/drivers/fake/fake-sysmem-device-hierarchy.h"
+#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
+#include "src/lib/testing/predicates/status.h"
 
 namespace display {
 
 void TestBase::SetUp() {
-  std::shared_ptr<zx_device> mock_root = MockDevice::FakeRootParent();
   loop_.StartThread("display::TestBase::loop_", &loop_thrd_);
-  auto sysmem =
-      std::make_unique<GenericSysmemDeviceWrapper<sysmem_driver::Device>>(mock_root.get());
+
+  zx::result<std::unique_ptr<display::FakeSysmemDeviceHierarchy>> create_sysmem_provider_result =
+      display::FakeSysmemDeviceHierarchy::Create();
+  ASSERT_OK(create_sysmem_provider_result);
+
   static constexpr fake_display::FakeDisplayDeviceConfig kDeviceConfig = {
       .manual_vsync_trigger = true,
       .no_buffer_access = false,
   };
-  tree_ =
-      std::make_unique<FakeDisplayStack>(std::move(mock_root), std::move(sysmem), kDeviceConfig);
+  tree_ = std::make_unique<FakeDisplayStack>(std::move(create_sysmem_provider_result).value(),
+                                             kDeviceConfig);
 }
 
 void TestBase::TearDown() {

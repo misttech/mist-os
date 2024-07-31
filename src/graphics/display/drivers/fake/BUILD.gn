@@ -49,26 +49,6 @@ source_set("fake-lib") {
   ]
 }
 
-static_library("sysmem-proxy-device") {
-  testonly = true
-
-  sources = [
-    "sysmem-proxy-device.cc",
-    "sysmem-proxy-device.h",
-  ]
-
-  public_deps = [
-    "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp",
-    "//src/devices/sysmem/drivers/sysmem:sysmem_common_srcs",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-  ]
-
-  deps = [
-    "//sdk/lib/fdio",
-    "//zircon/system/ulib/sysmem-version",
-  ]
-}
-
 static_library("fake-display-stack") {
   testonly = true
 
@@ -77,19 +57,17 @@ static_library("fake-display-stack") {
   sources = [
     "fake-display-stack.cc",
     "fake-display-stack.h",
-    "sysmem-device-wrapper.h",
   ]
   public_deps = [
     ":fake-lib",
+    ":sysmem-service-provider",
     "//sdk/fidl/fuchsia.hardware.display:fuchsia.hardware.display_cpp",
     "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_cpp",
     "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp",
-    "//src/devices/bus/testing/fake-pdev",
     "//src/devices/sysmem/drivers/sysmem:sysmem_common_srcs",
     "//src/devices/testing/mock-ddk",
     "//src/graphics/display/drivers/coordinator:shared",
     "//src/graphics/display/lib/driver-framework-migration-utils/logging:logging-dfv1",
-    "//src/lib/ddktl",
     "//zircon/system/ulib/sync:sync-cpp",
   ]
 }
@@ -100,6 +78,7 @@ test("fake-display-unittests-bin") {
 
   deps = [
     ":fake-display-stack",
+    ":fake-sysmem-device-hierarchy",
     "//src/devices/testing/mock-ddk",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/predicates",
