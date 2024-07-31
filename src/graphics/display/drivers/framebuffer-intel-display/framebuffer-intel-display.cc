@@ -12,8 +12,8 @@
 
 #include <fbl/alloc_checker.h>
 
-#include "src/graphics/display/lib/simple-display/simple-display-driver.h"
-#include "src/graphics/display/lib/simple-display/simple-display.h"
+#include "src/graphics/display/lib/framebuffer-display/framebuffer-display-driver.h"
+#include "src/graphics/display/lib/framebuffer-display/framebuffer-display.h"
 
 namespace framebuffer_display {
 

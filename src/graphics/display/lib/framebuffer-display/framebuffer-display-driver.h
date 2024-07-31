@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_GRAPHICS_DISPLAY_LIB_SIMPLE_DISPLAY_SIMPLE_DISPLAY_DRIVER_H_
-#define SRC_GRAPHICS_DISPLAY_LIB_SIMPLE_DISPLAY_SIMPLE_DISPLAY_DRIVER_H_
+#ifndef SRC_GRAPHICS_DISPLAY_LIB_FRAMEBUFFER_DISPLAY_FRAMEBUFFER_DISPLAY_DRIVER_H_
+#define SRC_GRAPHICS_DISPLAY_LIB_FRAMEBUFFER_DISPLAY_FRAMEBUFFER_DISPLAY_DRIVER_H_
 
 #include <lib/driver/compat/cpp/banjo_server.h>
 #include <lib/driver/compat/cpp/device_server.h>
@@ -13,7 +13,7 @@
 #include <memory>
 #include <optional>
 
-#include "src/graphics/display/lib/simple-display/simple-display.h"
+#include "src/graphics/display/lib/framebuffer-display/framebuffer-display.h"
 
 namespace simple_display {
 
@@ -56,4 +56,4 @@ class SimpleDisplayDriver : public fdf::DriverBase {
 
 }  // namespace simple_display
 
-#endif  // SRC_GRAPHICS_DISPLAY_LIB_SIMPLE_DISPLAY_SIMPLE_DISPLAY_DRIVER_H_
+#endif  // SRC_GRAPHICS_DISPLAY_LIB_FRAMEBUFFER_DISPLAY_FRAMEBUFFER_DISPLAY_DRIVER_H_

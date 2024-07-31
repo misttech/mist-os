@@ -37,7 +37,7 @@ fuchsia_driver("driver") {
     "//sdk/lib/driver/logging/cpp",
     "//src/devices/lib/mmio",
     "//src/devices/pci/lib/device-protocol-pci",
-    "//src/graphics/display/lib/simple-display",
+    "//src/graphics/display/lib/framebuffer-display",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/hwreg",
   ]

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/graphics/display/lib/simple-display/simple-display.h"
+#include "src/graphics/display/lib/framebuffer-display/framebuffer-display.h"
 
 #include <fidl/fuchsia.hardware.pci/cpp/wire.h>
 #include <fidl/fuchsia.images2/cpp/wire.h>

@@ -10,7 +10,7 @@ group("tests") {
     "designware-hdmi:tests",
     "driver-framework-migration-utils:tests",
     "edid:tests",
+    "framebuffer-display:tests",
     "rust:tests",
-    "simple-display:tests",
   ]
 }
