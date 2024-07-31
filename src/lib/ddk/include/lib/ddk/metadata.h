@@ -36,22 +36,9 @@ static_assert(DEVICE_METADATA_PARTITION_MAP == ZBI_TYPE_DRV_PARTITION_MAP, "");
 #define DEVICE_METADATA_SERIAL_NUMBER 0x4e4c5253  // SRLN
 static_assert(DEVICE_METADATA_SERIAL_NUMBER == ZBI_TYPE_SERIAL_NUMBER, "");
 
-// Board-specific USB configuration
-// type: UsbConfig
-// fidl: usb-peripheral.fidl
-#define DEVICE_METADATA_USB_CONFIG 0x4D425356  // USBC
-
 // Serial port info
 // type: fuchsia.hardware.serial.SerialPortInfo
 #define DEVICE_METADATA_SERIAL_PORT_INFO 0x4D524553  // SERM
-
-// Platform board name (for sysinfo driver)
-// type: char[ZBI_BOARD_NAME_LEN]
-#define DEVICE_METADATA_BOARD_NAME 0x4E524F42  // BORN
-
-// Platform board revision (for sysinfo driver)
-// type: char[ZBI_BOARD_REVISION_LEN]
-#define DEVICE_METADATA_BOARD_REVISION 0x52524F42  // BORR
 
 // Platform board private data (for board driver)
 // type: ???
@@ -114,9 +101,6 @@ static_assert(DEVICE_METADATA_BOARD_PRIVATE == ZBI_TYPE_DRV_BOARD_PRIVATE, "");
 
 // type: FIDL fuchsia.hardware.spi.SpiBusMetadata
 #define DEVICE_METADATA_SPI_CHANNELS 0x43495053  // SPIC
-
-// type: display_driver_t
-#define DEVICE_METADATA_DISPLAY_DEVICE 0x4C505344  // DSPL
 
 // type: display_panel_t (defined in //src/graphics/display/lib/
 // device-protocol-display/include/lib/device-protocol/display-panel.h)
