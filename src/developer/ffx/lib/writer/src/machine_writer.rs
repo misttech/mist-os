@@ -40,6 +40,12 @@ impl<T> MachineWriter<T> {
     pub fn new_test(format: Option<Format>, test_buffers: &TestBuffers) -> Self {
         Self::new_buffers(format, test_buffers.stdout.clone(), test_buffers.stderr.clone())
     }
+
+    /// Allow using this writer as a SimpleWriter.
+    /// This is useful for calling other tools that do not use MachineWriter.
+    pub fn simple_writer(self) -> SimpleWriter {
+        self.simple_writer
+    }
 }
 
 impl<T> MachineWriter<T>

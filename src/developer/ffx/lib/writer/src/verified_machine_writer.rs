@@ -1,7 +1,7 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use crate::{format_output, Format, MachineWriter, Result, TestBuffers, ToolIO};
+use crate::{format_output, Format, MachineWriter, Result, SimpleWriter, TestBuffers, ToolIO};
 use serde::Serialize;
 use serde_json::Value;
 use std::fmt::Display;
@@ -68,6 +68,12 @@ where
         R: Display,
     {
         self.machine_writer.machine_or_else(value, f)
+    }
+
+    /// Allow using this writer as a SimpleWriter.
+    /// This is useful for calling other tools that do not use MachineWriter.
+    pub fn simple_writer(self) -> SimpleWriter {
+        self.machine_writer.simple_writer()
     }
 
     /// Validates the passed in data object against the schema
