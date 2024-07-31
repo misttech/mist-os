@@ -4,11 +4,11 @@
 
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/supplement_data.h"
 
+#include <pw_preprocessor/compiler.h>
+
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/assert.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/byte_buffer.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/log.h"
-
-#pragma clang diagnostic ignored "-Wswitch-enum"
 
 namespace bt {
 
@@ -34,6 +34,8 @@ bool ParseUuids(const BufferView& data,
 }
 
 UUIDElemSize SizeForType(DataType type) {
+  PW_MODIFY_DIAGNOSTICS_PUSH();
+  PW_MODIFY_DIAGNOSTIC(ignored, "-Wswitch-enum");
   switch (type) {
     case DataType::kIncomplete16BitServiceUuids:
     case DataType::kComplete16BitServiceUuids:
@@ -50,6 +52,7 @@ UUIDElemSize SizeForType(DataType type) {
     default:
       break;
   };
+  PW_MODIFY_DIAGNOSTICS_POP();
 
   BT_PANIC("called SizeForType with non-UUID DataType %du",
            static_cast<uint8_t>(type));

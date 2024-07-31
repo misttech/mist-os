@@ -30,6 +30,7 @@ cc_library(
         "supplement_data.cc",
         "uuid.cc",
     ],
+    copts = ["-Wswitch-enum"],
     deps = [
         "//src/connectivity/bluetooth/core/bt-host:config",
         "//src/connectivity/bluetooth/core/bt-host:public",
