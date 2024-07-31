@@ -4,11 +4,10 @@
 
 #include <stdint.h>
 
-// This template is useful for providing a function that calls foo from a
-// a dependency.
+// Similar to foo.cc, except exports a different function name that calls foo().
 
-extern "C" [[gnu::visibility("default")]] int64_t call_foo();
+extern "C" [[gnu::visibility("default")]] int64_t bar_v1();
 
 extern "C" int64_t foo();
 
-extern "C" int64_t call_foo() { return foo(); }
+extern "C" int64_t bar_v1() { return foo(); }

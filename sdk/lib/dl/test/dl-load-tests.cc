@@ -626,6 +626,149 @@ TYPED_TEST(DlTests, LocalPrecedence) {
   ASSERT_TRUE(this->DlClose(res2.value()).is_ok());
 }
 
+// Whereas the above tests test how symbols are resolved for the root module,
+// the following tests will test how symbols are resolved for dependencies of
+// the root module.
+
+// Test that the load-order of the local scope has precedence in the symbol
+// resolution for symbols used by dependencies (i.e. a sibling's symbol is used
+// used when it's earlier in the load-order set).
+// dlopen precedence-in-dep-resolution:
+//   - bar-v1 -> bar_v1() calls foo().
+//      - foo-v1 -> foo() returns 2
+//   - bar-v2 -> bar_v2() calls foo().
+//      - foo-v2 -> foo() returns 7
+// bar_v1() from precedence-in-dep-resolution and expect 2.
+// bar_v2() from precedence-in-dep-resolution and expect 2 from foo-v1.
+TYPED_TEST(DlTests, PrecedenceInDepResolution) {
+  constexpr const char* kFile = "precedence-in-dep-resolution.PrecedenceInDepResolution.so";
+  constexpr const char* kDepFile1 = "libbar-v1.PrecedenceInDepResolution.so";
+  constexpr const char* kDepFile2 = "libbar-v2.PrecedenceInDepResolution.so";
+  constexpr const char* kDepFile3 = "libld-dep-foo-v1.PrecedenceInDepResolution.so";
+  constexpr const char* kDepFile4 = "libld-dep-foo-v2.PrecedenceInDepResolution.so";
+  constexpr int64_t kReturnValueFromFooV1 = 2;
+
+  // TODO(https://fxbug.dev/354043838): Fold into ExpectRootModule/Needed API.
+  this->ExpectRootModuleNotLoaded(kFile);
+  this->ExpectNeededNotLoaded({kDepFile1, kDepFile2, kDepFile3, kDepFile4});
+
+  this->ExpectRootModule(kFile);
+  this->Needed({kDepFile1, kDepFile2, kDepFile3, kDepFile4});
+
+  auto res1 = this->DlOpen(kFile, RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(res1.is_ok()) << res1.error_value();
+  EXPECT_TRUE(res1.value());
+
+  if constexpr (TestFixture::kDlSymSupportsDeps) {
+    auto bar_v1 = this->DlSym(res1.value(), "bar_v1");
+    ASSERT_TRUE(bar_v1.is_ok()) << bar_v1.error_value();
+    ASSERT_TRUE(bar_v1.value());
+
+    EXPECT_EQ(RunFunction<int64_t>(bar_v1.value()), kReturnValueFromFooV1);
+
+    auto bar_v2 = this->DlSym(res1.value(), "bar_v2");
+    ASSERT_TRUE(bar_v2.is_ok()) << bar_v2.error_value();
+    ASSERT_TRUE(bar_v2.value());
+
+    EXPECT_EQ(RunFunction<int64_t>(bar_v2.value()), kReturnValueFromFooV1);
+  }
+
+  ASSERT_TRUE(this->DlClose(res1.value()).is_ok());
+}
+
+// Test that the root module symbols have precedence in the symbol resolution
+// for symbols used by dependencies.
+// dlopen root-precedence-in-dep-resolution: foo() returns 17
+//   - bar-v1 -> bar_v1() calls foo().
+//      - foo-v1 -> foo() returns 2
+//   - bar-v2 -> bar_v2() calls foo().
+//      - foo-v2 -> foo() returns 7
+// call foo() from root-precedence-in-dep-resolution and expect 17.
+// bar_v1() from root-precedence-in-dep-resolution and expect 17.
+// bar_v2() from root-precedence-in-dep-resolution and expect 17.
+TYPED_TEST(DlTests, RootPrecedenceInDepResolution) {
+  constexpr const char* kFile =
+      "root-precedence-in-dep-resolution.RootPrecedenceInDepResolution.so";
+  constexpr const char* kDepFile1 = "libbar-v1.RootPrecedenceInDepResolution.so";
+  constexpr const char* kDepFile2 = "libbar-v2.RootPrecedenceInDepResolution.so";
+  constexpr const char* kDepFile3 = "libld-dep-foo-v1.RootPrecedenceInDepResolution.so";
+  constexpr const char* kDepFile4 = "libld-dep-foo-v2.RootPrecedenceInDepResolution.so";
+  constexpr int64_t kReturnValueFromRootModule = 17;
+  constexpr int64_t kReturnValueFromFooV1 = 2;
+  constexpr int64_t kReturnValueFromFooV2 = 7;
+
+  // TODO(https://fxbug.dev/354043838): Fold into ExpectRootModule/Needed API.
+  this->ExpectRootModuleNotLoaded(kFile);
+  this->ExpectNeededNotLoaded({kDepFile1, kDepFile2, kDepFile3, kDepFile4});
+
+  this->ExpectRootModule(kFile);
+  this->Needed({kDepFile1, kDepFile2, kDepFile3, kDepFile4});
+
+  auto res1 = this->DlOpen(kFile, RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(res1.is_ok()) << res1.error_value();
+  EXPECT_TRUE(res1.value());
+
+  auto foo = this->DlSym(res1.value(), "foo");
+  ASSERT_TRUE(foo.is_ok()) << foo.error_value();
+  ASSERT_TRUE(foo.value());
+
+  EXPECT_EQ(RunFunction<int64_t>(foo.value()), kReturnValueFromRootModule);
+
+  if constexpr (TestFixture::kDlSymSupportsDeps) {
+    auto bar_v1 = this->DlSym(res1.value(), "bar_v1");
+    ASSERT_TRUE(bar_v1.is_ok()) << bar_v1.error_value();
+    ASSERT_TRUE(bar_v1.value());
+
+    EXPECT_EQ(RunFunction<int64_t>(bar_v1.value()), kReturnValueFromRootModule);
+
+    auto bar_v2 = this->DlSym(res1.value(), "bar_v2");
+    ASSERT_TRUE(bar_v2.is_ok()) << bar_v2.error_value();
+    ASSERT_TRUE(bar_v2.value());
+
+    EXPECT_EQ(RunFunction<int64_t>(bar_v2.value()), kReturnValueFromRootModule);
+
+    // Test that when we dlopen the dep directly, foo is resolved to the
+    // transitive dependency, while bar_v1/bar_v2 continue to use the root
+    // module's foo symbol.
+    auto dep_file1 = this->DlOpen(kDepFile1, RTLD_NOW | RTLD_LOCAL);
+    ASSERT_TRUE(dep_file1.is_ok()) << dep_file1.error_value();
+    EXPECT_TRUE(dep_file1.value());
+
+    auto foo1 = this->DlSym(dep_file1.value(), "foo");
+    ASSERT_TRUE(foo1.is_ok()) << foo1.error_value();
+    ASSERT_TRUE(foo1.value());
+
+    EXPECT_EQ(RunFunction<int64_t>(foo1.value()), kReturnValueFromFooV1);
+
+    auto dep_bar_v1 = this->DlSym(dep_file1.value(), "bar_v1");
+    ASSERT_TRUE(dep_bar_v1.is_ok()) << dep_bar_v1.error_value();
+    ASSERT_TRUE(dep_bar_v1.value());
+
+    EXPECT_EQ(RunFunction<int64_t>(dep_bar_v1.value()), kReturnValueFromRootModule);
+
+    auto dep_file2 = this->DlOpen(kDepFile2, RTLD_NOW | RTLD_LOCAL);
+    ASSERT_TRUE(dep_file2.is_ok()) << dep_file2.error_value();
+    EXPECT_TRUE(dep_file2.value());
+
+    auto foo2 = this->DlSym(dep_file2.value(), "foo");
+    ASSERT_TRUE(foo2.is_ok()) << foo2.error_value();
+    ASSERT_TRUE(foo2.value());
+
+    EXPECT_EQ(RunFunction<int64_t>(foo2.value()), kReturnValueFromFooV2);
+
+    auto dep_bar_v2 = this->DlSym(dep_file2.value(), "bar_v2");
+    ASSERT_TRUE(dep_bar_v2.is_ok()) << dep_bar_v2.error_value();
+    ASSERT_TRUE(dep_bar_v2.value());
+
+    EXPECT_EQ(RunFunction<int64_t>(dep_bar_v2.value()), kReturnValueFromRootModule);
+
+    ASSERT_TRUE(this->DlClose(dep_file1.value()).is_ok());
+    ASSERT_TRUE(this->DlClose(dep_file2.value()).is_ok());
+  }
+
+  ASSERT_TRUE(this->DlClose(res1.value()).is_ok());
+}
+
 // These are test scenarios that test symbol resolution with RTLD_GLOBAL.
 
 // Test that a previously loaded global module symbol won't affect relative

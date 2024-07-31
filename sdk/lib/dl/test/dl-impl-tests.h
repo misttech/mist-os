@@ -32,6 +32,8 @@ class DlImplTests : public Base {
   static constexpr bool kSupportsGlobalMode = false;
   // TODO(https://fxbug.dev/338229987): Reuse loaded modules for dependencies.
   static constexpr bool kCanReuseLoadedDeps = false;
+  // TODO(https://fxbug.dev/354786114): dlsym should lookup symbols in deps.
+  static constexpr bool kDlSymSupportsDeps = false;
 
   fit::result<Error, void*> DlOpen(const char* file, int mode) {
     // Check that all Needed/Expect* expectations for loaded objects were

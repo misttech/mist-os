@@ -44,6 +44,9 @@ class DlTestsBase : public ::testing::Test {
   // Whether the test fixture will always prioritize a loaded module in symbol
   // resolution, regardless of whether it is a global module.
   static constexpr bool kStrictLoadOrderPriority = false;
+  // TODO(https://fxbug.dev/354786114): Remove this flag when DlImplTests can
+  // test DlSym with dependencies.
+  static constexpr bool kDlSymSupportsDeps = true;
 
   // Test fixtures are expected to provide definitions for the following API:
   fit::result<Error, void*> DlOpen(const char* file, int mode);
