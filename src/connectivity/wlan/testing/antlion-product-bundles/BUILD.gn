@@ -7,9 +7,14 @@ import("//build/bazel/assembly/bazel_product_bundle.gni")
 # A GN target to perform system assembly in Bazel exclusively, using
 # Ninja-generated inputs.
 
+assert(
+    is_fuchsia,
+    "Product definitions and assemblies should only be defined in the fuchsia toolchain")
+
 bazel_product_bundle("antlion_testing_wlanix.vim3") {
   testonly = true
   allow_eng_platform_bundle_use = true
+  generate_product_bundle_metadata = true
   product_bundle_name = "antlion_testing_wlanix.vim3"
   bazel_product_bundle_target = ":antlion_testing_wlanix_product_bundle.vim3"
   bazel_product_image_target = ":antlion_testing_wlanix_image.vim3"
