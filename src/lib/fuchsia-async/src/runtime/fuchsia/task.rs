@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use crate::atomic_future::AtomicFuture;
-use crate::{EHandle, ScopeRef};
+use crate::scope::ScopeRef;
+use crate::EHandle;
 use futures::prelude::*;
 use std::marker::PhantomData;
 use std::pin::Pin;

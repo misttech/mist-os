@@ -5,9 +5,8 @@
 use super::super::timer::{TimeWaker, TimerHandle, TimerHeap};
 use super::instrumentation::{Collector, LocalCollector, WakeupReason};
 use super::packets::{PacketReceiver, PacketReceiverMap, ReceiverRegistration};
-use super::scope::ScopeWaker;
+use super::scope::{ScopeRef, ScopeWaker};
 use super::time::Time;
-use super::ScopeRef;
 use crate::atomic_future::{AtomicFuture, AttemptPollResult};
 use crossbeam::queue::SegQueue;
 use fuchsia_sync::Mutex;
