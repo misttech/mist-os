@@ -83,6 +83,6 @@ open protocol Vendor {
     /// Open the Snoop protocol to the transport driver.
     /// Returns ALREADY_BOUND if another client has already connected.
     flexible OpenSnoop() -> (resource struct {
-        channel client_end:Snoop2;
+        channel client_end:Snoop;
     }) error zx.Status;
 };

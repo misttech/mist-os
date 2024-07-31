@@ -6,8 +6,8 @@ use anyhow::{format_err, Context as _, Error};
 use fidl::endpoints::{ClientEnd, Proxy};
 use fidl_fuchsia_bluetooth_snoop::{PacketFormat, SnoopPacket as FidlSnoopPacket};
 use fidl_fuchsia_hardware_bluetooth::{
-    PacketDirection as Direction, Snoop2Event, Snoop2EventStream, Snoop2Marker,
-    Snoop2OnObservePacketRequest, Snoop2Proxy, SnoopPacket as HardwareSnoopPacket,
+    PacketDirection as Direction, SnoopEvent, SnoopEventStream, SnoopMarker,
+    SnoopOnObservePacketRequest, SnoopPacket as HardwareSnoopPacket, SnoopProxy,
     VendorMarker as HardwareVendorMarker,
 };
 use fidl_fuchsia_io::DirectoryProxy;
@@ -69,8 +69,8 @@ impl CreatedAt for SnoopPacket {
 /// stream can be polled for packets.
 pub(crate) struct Snooper {
     pub device_name: String,
-    pub proxy: Snoop2Proxy,
-    pub event_stream: Snoop2EventStream,
+    pub proxy: SnoopProxy,
+    pub event_stream: SnoopEventStream,
     pub is_terminated: bool,
 }
 
@@ -102,7 +102,7 @@ impl Snooper {
         Ok(Snooper::from_client(snoop_client, path))
     }
 
-    pub fn from_client(client: ClientEnd<Snoop2Marker>, path: &str) -> Snooper {
+    pub fn from_client(client: ClientEnd<SnoopMarker>, path: &str) -> Snooper {
         let device_name = path.to_owned();
         let proxy = client.into_proxy().unwrap();
         let event_stream = proxy.take_event_stream();
@@ -110,12 +110,12 @@ impl Snooper {
     }
 }
 
-impl TryFrom<Snoop2OnObservePacketRequest> for SnoopPacket {
+impl TryFrom<SnoopOnObservePacketRequest> for SnoopPacket {
     type Error = Error;
 
-    fn try_from(value: Snoop2OnObservePacketRequest) -> Result<Self, Self::Error> {
+    fn try_from(value: SnoopOnObservePacketRequest) -> Result<Self, Self::Error> {
         let time = zx::Time::get_monotonic();
-        let Snoop2OnObservePacketRequest {
+        let SnoopOnObservePacketRequest {
             packet: Some(packet), direction: Some(direction), ..
         } = value
         else {
@@ -170,7 +170,7 @@ impl Stream for Snooper {
             };
 
             match req {
-                Snoop2Event::OnObservePacket { payload } => {
+                SnoopEvent::OnObservePacket { payload } => {
                     let Some(sequence) = payload.sequence else {
                         warn!("ObservePacket missing sequence number");
                         continue;
@@ -204,14 +204,14 @@ mod tests {
     use super::*;
 
     use fidl::endpoints::RequestStream;
-    use fidl_fuchsia_hardware_bluetooth::Snoop2Request;
+    use fidl_fuchsia_hardware_bluetooth::SnoopRequest;
     use fuchsia_async as fasync;
     use futures::StreamExt;
 
     #[test]
     fn test_from_proxy() {
         let _exec = fasync::TestExecutor::new();
-        let (client, _stream) = fidl::endpoints::create_request_stream::<Snoop2Marker>().unwrap();
+        let (client, _stream) = fidl::endpoints::create_request_stream::<SnoopMarker>().unwrap();
         let snooper = Snooper::from_client(client, "c");
         assert_eq!(snooper.device_name, "c");
     }
@@ -226,7 +226,7 @@ mod tests {
 
     #[test]
     fn test_try_from() {
-        let req = Snoop2OnObservePacketRequest {
+        let req = SnoopOnObservePacketRequest {
             sequence: Some(0),
             direction: Some(Direction::ControllerToHost),
             packet: Some(HardwareSnoopPacket::Event(vec![])),
@@ -238,7 +238,7 @@ mod tests {
         assert!(pkt.timestamp.into_nanos() > 0);
         assert_eq!(pkt.format, PacketFormat::Event);
 
-        let req = Snoop2OnObservePacketRequest {
+        let req = SnoopOnObservePacketRequest {
             sequence: Some(0),
             direction: Some(Direction::HostToController),
             packet: Some(HardwareSnoopPacket::Acl(vec![0, 1, 2])),
@@ -252,7 +252,7 @@ mod tests {
 
     #[test]
     fn test_try_from_missing_payload() {
-        let req = Snoop2OnObservePacketRequest {
+        let req = SnoopOnObservePacketRequest {
             sequence: Some(0),
             direction: Some(Direction::ControllerToHost),
             packet: None,
@@ -264,7 +264,7 @@ mod tests {
 
     #[test]
     fn test_try_from_missing_direction() {
-        let req = Snoop2OnObservePacketRequest {
+        let req = SnoopOnObservePacketRequest {
             sequence: Some(0),
             direction: None,
             packet: Some(HardwareSnoopPacket::Event(vec![0, 1, 2])),
@@ -278,16 +278,16 @@ mod tests {
     fn test_snoop_stream() {
         let mut exec = fasync::TestExecutor::new();
         let (snoop_client, mut req_stream) =
-            fidl::endpoints::create_request_stream::<Snoop2Marker>().unwrap();
+            fidl::endpoints::create_request_stream::<SnoopMarker>().unwrap();
         let snoop_control = req_stream.control_handle();
         let mut snooper = Snooper::from_client(snoop_client, "c");
-        let req_0 = Snoop2OnObservePacketRequest {
+        let req_0 = SnoopOnObservePacketRequest {
             sequence: Some(0),
             direction: Some(Direction::ControllerToHost),
             packet: Some(HardwareSnoopPacket::Event(vec![0, 1, 2])),
             ..Default::default()
         };
-        let req_1 = Snoop2OnObservePacketRequest {
+        let req_1 = SnoopOnObservePacketRequest {
             sequence: Some(1),
             direction: Some(Direction::HostToController),
             packet: Some(HardwareSnoopPacket::Command(vec![3, 4, 5])),
@@ -314,7 +314,7 @@ mod tests {
         let req_1 = exec.run_until_stalled(&mut req_stream.next());
         assert!(req_1.is_ready());
         match req_1 {
-            Poll::Ready(Some(Ok(Snoop2Request::AcknowledgePackets { sequence, .. }))) => {
+            Poll::Ready(Some(Ok(SnoopRequest::AcknowledgePackets { sequence, .. }))) => {
                 assert_eq!(sequence, 0);
             }
             _ => panic!("failed to send OnAcknowledgePackets"),
@@ -322,7 +322,7 @@ mod tests {
         let req_2 = exec.run_until_stalled(&mut req_stream.next());
         assert!(req_2.is_ready());
         match req_2 {
-            Poll::Ready(Some(Ok(Snoop2Request::AcknowledgePackets { sequence, .. }))) => {
+            Poll::Ready(Some(Ok(SnoopRequest::AcknowledgePackets { sequence, .. }))) => {
                 assert_eq!(sequence, 1);
             }
             _ => panic!("failed to send OnAcknowledgePackets"),
@@ -335,11 +335,11 @@ mod tests {
     fn test_snoop_stream_missing_sequence() {
         let mut exec = fasync::TestExecutor::new();
         let (snoop_client, snoop_stream) =
-            fidl::endpoints::create_request_stream::<Snoop2Marker>().unwrap();
+            fidl::endpoints::create_request_stream::<SnoopMarker>().unwrap();
         let snoop_control = snoop_stream.control_handle();
         let mut snooper = Snooper::from_client(snoop_client, "c");
 
-        let req_0 = Snoop2OnObservePacketRequest {
+        let req_0 = SnoopOnObservePacketRequest {
             sequence: None, // Missing sequence!
             direction: Some(Direction::ControllerToHost),
             packet: Some(HardwareSnoopPacket::Event(vec![0, 1, 2])),
@@ -349,7 +349,7 @@ mod tests {
         let item = exec.run_until_stalled(&mut snooper.next());
         assert!(item.is_pending());
 
-        let req_1 = Snoop2OnObservePacketRequest {
+        let req_1 = SnoopOnObservePacketRequest {
             sequence: Some(1),
             direction: Some(Direction::HostToController),
             packet: Some(HardwareSnoopPacket::Command(vec![3, 4, 5])),
@@ -363,7 +363,7 @@ mod tests {
     #[test]
     fn test_snoop_stream_lifecycle() {
         let mut exec = fasync::TestExecutor::new();
-        let (snoop_client, snoop_server) = fidl::endpoints::create_endpoints::<Snoop2Marker>();
+        let (snoop_client, snoop_server) = fidl::endpoints::create_endpoints::<SnoopMarker>();
         let mut snooper = Snooper::from_client(snoop_client, "c");
 
         let item = exec.run_until_stalled(&mut snooper.next());

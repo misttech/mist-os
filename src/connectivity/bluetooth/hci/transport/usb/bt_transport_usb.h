@@ -56,7 +56,7 @@ using DeviceType = ddk::Device<Device, ddk::GetProtocolable, ddk::Unbindable>;
 class Device final : public DeviceType,
                      public ddk::BtHciProtocol<Device>,
                      public fidl::Server<fuchsia_hardware_bluetooth::HciTransport>,
-                     public fidl::Server<fuchsia_hardware_bluetooth::Snoop2> {
+                     public fidl::Server<fuchsia_hardware_bluetooth::Snoop> {
  public:
   // If |dispatcher| is non-null, it will be used instead of a new work thread.
   // tests.
@@ -80,7 +80,7 @@ class Device final : public DeviceType,
   // This is only for test purpose, mock_ddk doesn't provide a way for the test to connect to a fidl
   // protocol exposed from the driver's outgoing directory.
   // TODO(https://fxbug.dev/332333517): Remove this function after DFv2 migration.
-  void ConnectSnoop(fidl::ServerEnd<fuchsia_hardware_bluetooth::Snoop2> server_end);
+  void ConnectSnoop(fidl::ServerEnd<fuchsia_hardware_bluetooth::Snoop> server_end);
 
   // Methods required by DDK mixins:
   zx_status_t DdkGetProtocol(uint32_t proto_id, void* out);
@@ -106,11 +106,11 @@ class Device final : public DeviceType,
       ::fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::HciTransport> metadata,
       ::fidl::UnknownMethodCompleter::Sync& completer) override;
 
-  // fuchsia_hardware_bluetooth::Snoop2 protocol overrides.
+  // fuchsia_hardware_bluetooth::Snoop protocol overrides.
   void AcknowledgePackets(AcknowledgePacketsRequest& request,
                           AcknowledgePacketsCompleter::Sync& completer) override;
   void handle_unknown_method(
-      ::fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Snoop2> metadata,
+      ::fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Snoop> metadata,
       ::fidl::UnknownMethodCompleter::Sync& completer) override;
 
   mtx_t mutex() { return mutex_; }
@@ -372,7 +372,7 @@ class Device final : public DeviceType,
   std::optional<fidl::ServerBinding<fuchsia_hardware_bluetooth::ScoConnection>>
       sco_connection_binding_;
   fidl::ServerBindingGroup<fuchsia_hardware_bluetooth::HciTransport> hci_transport_binding_;
-  std::optional<fidl::ServerBinding<fuchsia_hardware_bluetooth::Snoop2>> snoop_server_;
+  std::optional<fidl::ServerBinding<fuchsia_hardware_bluetooth::Snoop>> snoop_server_;
 };
 
 }  // namespace bt_transport_usb

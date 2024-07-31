@@ -287,7 +287,7 @@ void BtTransportUart::SendSnoop(std::vector<uint8_t>&& packet,
   // Reset log when the acked sequence number catches up.
   log_emitted = false;
 
-  fhbt::Snoop2OnObservePacketRequest req;
+  fhbt::SnoopOnObservePacketRequest req;
   switch (type) {
     case fhbt::SnoopPacket::Tag::kEvent:
       ZX_DEBUG_ASSERT(direction == fhbt::PacketDirection::kControllerToHost);
@@ -1015,9 +1015,9 @@ void BtTransportUart::AcknowledgePackets(AcknowledgePacketsRequest& request,
 }
 
 void BtTransportUart::handle_unknown_method(
-    fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Snoop2> metadata,
+    fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Snoop> metadata,
     fidl::UnknownMethodCompleter::Sync& completer) {
-  FDF_LOG(ERROR, "Unknown method in fidl::Server<fuchsia_hardware_bluetooth::Snoop2>");
+  FDF_LOG(ERROR, "Unknown method in fidl::Server<fuchsia_hardware_bluetooth::Snoop>");
 }
 
 void BtTransportUart::QueueUartRead() {
@@ -1066,7 +1066,7 @@ zx_status_t BtTransportUart::ServeProtocols() {
     hci_transport_binding_.AddBinding(dispatcher_, std::move(server_end), this,
                                       fidl::kIgnoreBindingClosure);
   };
-  auto snoop_protocol = [this](fidl::ServerEnd<fhbt::Snoop2> server_end) mutable {
+  auto snoop_protocol = [this](fidl::ServerEnd<fhbt::Snoop> server_end) mutable {
     if (snoop_server_.has_value()) {
       FDF_LOG(ERROR, "Snoop protocol connect with Snoop already active");
       return;

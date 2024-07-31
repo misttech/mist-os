@@ -68,7 +68,7 @@ class BtTransportUart
       public fidl::WireServer<fuchsia_hardware_bluetooth::Hci>,
       public fidl::Server<fuchsia_hardware_bluetooth::HciTransport>,
       public fdf::WireServer<fuchsia_hardware_serialimpl::Device>,
-      public fidl::Server<fuchsia_hardware_bluetooth::Snoop2> {
+      public fidl::Server<fuchsia_hardware_bluetooth::Snoop> {
  public:
   // If |dispatcher| is non-null, it will be used instead of a new work thread.
   // tests.
@@ -127,11 +127,11 @@ class BtTransportUart
       fidl::UnknownMethodMetadata<fuchsia_hardware_serialimpl::Device> metadata,
       fidl::UnknownMethodCompleter::Sync& completer) override;
 
-  // fidl::Server<fuchsia_hardware_bluetooth::Snoop2> overrides:
+  // fidl::Server<fuchsia_hardware_bluetooth::Snoop> overrides:
   void AcknowledgePackets(AcknowledgePacketsRequest& request,
                           AcknowledgePacketsCompleter::Sync& completer) override;
   void handle_unknown_method(
-      fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Snoop2> metadata,
+      fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Snoop> metadata,
       fidl::UnknownMethodCompleter::Sync& completer) override;
 
   // Used by tests only.
@@ -333,7 +333,7 @@ class BtTransportUart
   fidl::WireClient<fuchsia_driver_framework::Node> node_;
   fidl::WireClient<fuchsia_driver_framework::NodeController> node_controller_;
 
-  std::optional<fidl::ServerBinding<fuchsia_hardware_bluetooth::Snoop2>> snoop_server_;
+  std::optional<fidl::ServerBinding<fuchsia_hardware_bluetooth::Snoop>> snoop_server_;
 
   // When |snoop_seq_| - |acked_snoop_seq_| > |kSeqNumMaxDiff|, it means that the receiver of
   // snoop packets can't catch up the speed that the driver sends packets. Drop snoop packets if

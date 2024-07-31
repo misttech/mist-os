@@ -43,7 +43,7 @@ zx_status_t LoopbackDevice::Initialize(zx::channel channel, std::string_view nam
 }
 
 LoopbackDevice::SnoopServer::SnoopServer(
-    fidl::ServerEnd<fuchsia_hardware_bluetooth::Snoop2> server_end, LoopbackDevice* device)
+    fidl::ServerEnd<fuchsia_hardware_bluetooth::Snoop> server_end, LoopbackDevice* device)
     : binding_(device->dispatcher_, std::move(server_end), this,
                std::mem_fn(&LoopbackDevice::SnoopServer::OnFidlError)),
       device_(device) {}
@@ -100,8 +100,8 @@ void LoopbackDevice::SnoopServer::SendSnoopPacket(
   }
 
   fidl::Arena arena;
-  fuchsia_hardware_bluetooth::wire::Snoop2OnObservePacketRequest request =
-      fuchsia_hardware_bluetooth::wire::Snoop2OnObservePacketRequest::Builder(arena)
+  fuchsia_hardware_bluetooth::wire::SnoopOnObservePacketRequest request =
+      fuchsia_hardware_bluetooth::wire::SnoopOnObservePacketRequest::Builder(arena)
           .sequence(sequence)
           .direction(direction)
           .packet(packet)
@@ -122,7 +122,7 @@ void LoopbackDevice::SnoopServer::AcknowledgePackets(AcknowledgePacketsRequest& 
 
   // Send Snoop.OnDroppedPackets if necessary before sending next Snoop.ObservePacket.
   if (dropped_sent_ != 0 || dropped_received_ != 0) {
-    fuchsia_hardware_bluetooth::Snoop2OnDroppedPacketsRequest request;
+    fuchsia_hardware_bluetooth::SnoopOnDroppedPacketsRequest request;
     request.sent() = dropped_sent_;
     request.received() = dropped_received_;
     fit::result<fidl::OneWayError> result = fidl::SendEvent(binding_)->OnDroppedPackets(request);
@@ -151,7 +151,7 @@ void LoopbackDevice::SnoopServer::OnFidlError(fidl::UnbindInfo error) {
 }
 
 void LoopbackDevice::SnoopServer::handle_unknown_method(
-    fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Snoop2> metadata,
+    fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Snoop> metadata,
     fidl::UnknownMethodCompleter::Sync& completer) {
   FDF_LOG(WARNING, "Unknown Snoop method received");
 }
@@ -275,9 +275,9 @@ void LoopbackDevice::OpenHciTransport(OpenHciTransportCompleter::Sync& completer
 }
 
 void LoopbackDevice::OpenSnoop(OpenSnoopCompleter::Sync& completer) {
-  auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_bluetooth::Snoop2>();
+  auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_bluetooth::Snoop>();
   if (endpoints.is_error()) {
-    FDF_LOG(ERROR, "Failed to create Snoop2 endpoints: %s",
+    FDF_LOG(ERROR, "Failed to create Snoop endpoints: %s",
             zx_status_get_string(endpoints.error_value()));
     completer.Reply(fit::error(ZX_ERR_INTERNAL));
     return;

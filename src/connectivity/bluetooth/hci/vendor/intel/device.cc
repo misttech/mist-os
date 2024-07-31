@@ -324,10 +324,10 @@ void Device::OpenHciTransport(OpenHciTransportCompleter::Sync& completer) {
 }
 
 void Device::OpenSnoop(OpenSnoopCompleter::Sync& completer) {
-  zx::result<fidl::ClientEnd<fhbt::Snoop2>> client_end =
+  zx::result<fidl::ClientEnd<fhbt::Snoop>> client_end =
       incoming()->Connect<fhbt::HciService::Snoop>();
   if (client_end.is_error()) {
-    errorf("Connect to fhbt::Snoop2 protocol failed: %s", client_end.status_string());
+    errorf("Connect to fhbt::Snoop protocol failed: %s", client_end.status_string());
     completer.ReplyError(client_end.status_value());
     return;
   }

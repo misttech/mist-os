@@ -535,7 +535,7 @@ class BtTransportUsbTest : public ::gtest::TestLoopFixture {
 
 class BtTransportUsbHciTransportProtocolTest
     : public BtTransportUsbTest,
-      public fidl::AsyncEventHandler<fhbt::Snoop2>,
+      public fidl::AsyncEventHandler<fhbt::Snoop>,
       public fidl::WireAsyncEventHandler<fhbt::HciTransport>,
       public fidl::WireAsyncEventHandler<fhbt::ScoConnection> {
  public:
@@ -549,7 +549,7 @@ class BtTransportUsbHciTransportProtocolTest
     dut()->GetDeviceContext<bt_transport_usb::Device>()->ConnectHciTransport(
         std::move(hci_transport_server_end));
 
-    auto [snoop_client_end, snoop_server_end] = fidl::CreateEndpoints<fhbt::Snoop2>().value();
+    auto [snoop_client_end, snoop_server_end] = fidl::CreateEndpoints<fhbt::Snoop>().value();
     snoop_client_.Bind(std::move(snoop_client_end), dispatcher(), this);
     dut()->GetDeviceContext<bt_transport_usb::Device>()->ConnectSnoop(std::move(snoop_server_end));
 
@@ -566,7 +566,7 @@ class BtTransportUsbHciTransportProtocolTest
 
   // fhbt::Snoop request handlers
   void OnObservePacket(
-      ::fidl::Event<::fuchsia_hardware_bluetooth::Snoop2::OnObservePacket>& event) override {
+      ::fidl::Event<::fuchsia_hardware_bluetooth::Snoop::OnObservePacket>& event) override {
     ASSERT_TRUE(event.sequence().has_value());
     ASSERT_TRUE(event.direction().has_value());
     ASSERT_TRUE(event.packet().has_value());
@@ -617,12 +617,12 @@ class BtTransportUsbHciTransportProtocolTest
   }
 
   void OnDroppedPackets(
-      ::fidl::Event<::fuchsia_hardware_bluetooth::Snoop2::OnDroppedPackets>&) override {
+      ::fidl::Event<::fuchsia_hardware_bluetooth::Snoop::OnDroppedPackets>&) override {
     // Do nothing, the driver shouldn't drop any packet for now.
     FAIL();
   }
 
-  void handle_unknown_event(::fidl::UnknownEventMetadata<fhbt::Snoop2> metadata) override {
+  void handle_unknown_event(::fidl::UnknownEventMetadata<fhbt::Snoop> metadata) override {
     // Shouldn't receive unknown event from fhbt::Snoop protocol.
     FAIL();
   }
@@ -725,7 +725,7 @@ class BtTransportUsbHciTransportProtocolTest
     return received_sco_packets_;
   }
 
-  fidl::Client<fhbt::Snoop2>& snoop_client() { return snoop_client_; }
+  fidl::Client<fhbt::Snoop>& snoop_client() { return snoop_client_; }
 
   fidl::WireClient<fhbt::HciTransport> hci_transport_client_;
   std::optional<fidl::WireClient<fhbt::ScoConnection>> sco_client_;
@@ -736,7 +736,7 @@ class BtTransportUsbHciTransportProtocolTest
       runtime_->StartBackgroundDispatcher();
 
   std::optional<fidl::ServerBindingRef<fhbt::HciTransport>> hci_transport_server_;
-  fidl::Client<fhbt::Snoop2> snoop_client_;
+  fidl::Client<fhbt::Snoop> snoop_client_;
 
   std::vector<std::vector<uint8_t>> received_event_packets_;
   std::vector<std::vector<uint8_t>> received_acl_packets_;

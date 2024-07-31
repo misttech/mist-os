@@ -47,9 +47,9 @@ class LoopbackDevice : public fidl::Server<fuchsia_hardware_bluetooth::Vendor> {
     kHciIso = 5,
   };
 
-  class SnoopServer : public fidl::Server<fuchsia_hardware_bluetooth::Snoop2> {
+  class SnoopServer : public fidl::Server<fuchsia_hardware_bluetooth::Snoop> {
    public:
-    SnoopServer(fidl::ServerEnd<fuchsia_hardware_bluetooth::Snoop2> server_end,
+    SnoopServer(fidl::ServerEnd<fuchsia_hardware_bluetooth::Snoop> server_end,
                 LoopbackDevice* device);
 
     // `buffer` should NOT have an indicator byte.
@@ -67,16 +67,16 @@ class LoopbackDevice : public fidl::Server<fuchsia_hardware_bluetooth::Vendor> {
     void SendSnoopPacket(uint8_t* buffer, size_t length, PacketIndicator indicator,
                          fuchsia_hardware_bluetooth::PacketDirection direction, uint64_t sequence);
 
-    // fidl::Server<fuchsia_hardware_bluetooth::Snoop2> overrides:
+    // fidl::Server<fuchsia_hardware_bluetooth::Snoop> overrides:
     void AcknowledgePackets(AcknowledgePacketsRequest& request,
                             AcknowledgePacketsCompleter::Sync& completer) override;
     void handle_unknown_method(
-        fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Snoop2> metadata,
+        fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Snoop> metadata,
         fidl::UnknownMethodCompleter::Sync& completer) override;
 
     void OnFidlError(fidl::UnbindInfo error);
 
-    fidl::ServerBinding<fuchsia_hardware_bluetooth::Snoop2> binding_;
+    fidl::ServerBinding<fuchsia_hardware_bluetooth::Snoop> binding_;
     uint64_t next_sequence_ = 1u;
     uint64_t acked_sequence_ = 0u;
     uint32_t dropped_sent_ = 0u;
