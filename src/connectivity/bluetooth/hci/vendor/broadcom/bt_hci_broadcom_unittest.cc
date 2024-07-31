@@ -128,7 +128,6 @@ class FakeTransportDevice : public fidl::WireServer<fhbt::Hci>,
   void ConfigureSco(
       fidl::Server<fhbt::HciTransport>::ConfigureScoRequest& request,
       fidl::Server<fhbt::HciTransport>::ConfigureScoCompleter::Sync& completer) override {}
-  void SetSnoop(SetSnoopRequest& request, SetSnoopCompleter::Sync& completer) override {}
   void handle_unknown_method(::fidl::UnknownMethodMetadata<fhbt::HciTransport> metadata,
                              ::fidl::UnknownMethodCompleter::Sync& completer) override {
     ZX_PANIC("Unknown method in HciTransport requests");

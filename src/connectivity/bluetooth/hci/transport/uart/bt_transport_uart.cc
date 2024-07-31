@@ -943,9 +943,6 @@ void BtTransportUart::ConfigureSco(
   sco_connection_binding_.AddBinding(dispatcher_, std::move(request.connection().value()),
                                      &sco_connection_server_, fidl::kIgnoreBindingClosure);
 }
-void BtTransportUart::SetSnoop(SetSnoopRequest& request, SetSnoopCompleter::Sync& completer) {
-  completer.Close(ZX_ERR_NOT_SUPPORTED);
-}
 
 fit::function<void(void)> BtTransportUart::WaitforSnoopCallback() {
   return [this]() { snoop_setup_.Wait(); };

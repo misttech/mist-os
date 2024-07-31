@@ -133,12 +133,6 @@ void PassthroughDevice::ConfigureSco(
   }
 }
 
-void PassthroughDevice::SetSnoop(
-    ::fuchsia_hardware_bluetooth::wire::HciTransportSetSnoopRequest* request,
-    SetSnoopCompleter::Sync& completer) {
-  completer.Close(ZX_ERR_NOT_SUPPORTED);
-}
-
 void PassthroughDevice::handle_unknown_method(
     fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::HciTransport> metadata,
     fidl::UnknownMethodCompleter::Sync& completer) {

@@ -109,7 +109,6 @@ class BtTransportUart
       fidl::Server<fuchsia_hardware_bluetooth::HciTransport>::ConfigureScoRequest& request,
       fidl::Server<fuchsia_hardware_bluetooth::HciTransport>::ConfigureScoCompleter::Sync&
           completer) override;
-  void SetSnoop(SetSnoopRequest& request, SetSnoopCompleter::Sync& completer) override;
   void handle_unknown_method(
       ::fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::HciTransport> metadata,
       ::fidl::UnknownMethodCompleter::Sync& completer) override;

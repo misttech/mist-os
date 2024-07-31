@@ -1688,10 +1688,6 @@ void Device::ConfigureSco(ConfigureScoRequest& request, ConfigureScoCompleter::S
   QueueScoReadRequestsLocked();
 }
 
-void Device::SetSnoop(SetSnoopRequest& request, SetSnoopCompleter::Sync& completer) {
-  completer.Close(ZX_ERR_NOT_SUPPORTED);
-}
-
 void Device::handle_unknown_method(
     ::fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::HciTransport> metadata,
     ::fidl::UnknownMethodCompleter::Sync& completer) {

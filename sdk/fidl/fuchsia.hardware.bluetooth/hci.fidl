@@ -74,31 +74,6 @@ open protocol ScoConnection {
     flexible Stop();
 };
 
-open protocol Snoop {
-    /// A packet has been transmitted/received. Some number of packets can be observed before the
-    /// client stalls. The client is allowed to drop packets if the server takes too long to
-    /// acknowledge packets.
-    flexible ObservePacket(table {
-        /// Monotonically increasing packet count. Used for flow control in conjunction with
-        /// `OnAcknowledgePackets`.
-        1: sequence uint64;
-        2: direction PacketDirection;
-        3: packet SnoopPacket;
-    });
-
-    /// Acknowledge packets have been received up to `sequence`.
-    flexible -> OnAcknowledgePackets(struct {
-        sequence uint64;
-    });
-
-    /// Sent by the client after `OnAcknowledgePackets` is received if packets were dropped since
-    /// the last `ObservePacket`.
-    flexible OnDroppedPackets(table {
-        1: sent uint32;
-        2: received uint32;
-    });
-};
-
 open protocol Snoop2 {
     /// A packet has been transmitted/received. Some number of packets can be observed before the
     /// server stalls. The server is allowed to drop packets if the client takes too long to
@@ -148,11 +123,6 @@ open protocol HciTransport {
         3: sample_rate ScoSampleRate;
         /// Required.
         4: connection server_end:ScoConnection;
-    });
-
-    /// Set a `Snoop` client that will be notified of all sent and received packets.
-    flexible SetSnoop(resource struct {
-        snoop client_end:Snoop;
     });
 };
 

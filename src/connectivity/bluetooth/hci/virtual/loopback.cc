@@ -383,11 +383,6 @@ void LoopbackDevice::HciTransportServer::AckReceive(AckReceiveCompleter::Sync& c
 void LoopbackDevice::HciTransportServer::ConfigureSco(ConfigureScoRequest& request,
                                                       ConfigureScoCompleter::Sync& completer) {}
 
-void LoopbackDevice::HciTransportServer::SetSnoop(SetSnoopRequest& request,
-                                                  SetSnoopCompleter::Sync& completer) {
-  completer.Close(ZX_ERR_NOT_SUPPORTED);
-}
-
 void LoopbackDevice::HciTransportServer::handle_unknown_method(
     fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::HciTransport> metadata,
     fidl::UnknownMethodCompleter::Sync& completer) {
