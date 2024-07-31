@@ -49,6 +49,7 @@ test("isolateddevmgr") {
   deps = [
     ":fuchsia.device.manager.test_cpp",
     "//sdk/lib/fdio",
+    "//src/devices/board/drivers/integration-test:fuchsia.board.test_cpp",
     "//src/devices/testing/driver-integration-test-shim",
     "//src/lib/ddk",
     "//zircon/system/ulib/fbl",

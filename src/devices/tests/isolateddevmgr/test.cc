@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.board.test/cpp/wire.h>
 #include <fidl/fuchsia.device.manager.test/cpp/wire.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
@@ -57,7 +58,8 @@ class IsolatedDevMgrTest : public zxtest::Test {
 
   static void CheckMetadata(fidl::WireSyncClient<fuchsia_device_manager_test::Metadata>& client,
                             const std::vector<uint8_t>& expected_metadata) {
-    fidl::WireResult result = client->GetMetadata(DEVICE_METADATA_TEST);
+    fidl::WireResult result =
+        client->GetMetadata(fuchsia_board_test::wire::kPdevMetadataTypeIdentifier);
     ASSERT_OK(result.status());
     fidl::VectorView<uint8_t> received_metadata = std::move(result->data);
     ASSERT_EQ(received_metadata.count(), expected_metadata.size());

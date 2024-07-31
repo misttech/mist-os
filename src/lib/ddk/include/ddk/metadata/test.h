@@ -22,7 +22,8 @@ struct DeviceEntry {
   // BIND_PLATFORM_DEV_DID`
   uint32_t did;
 
-  // Below metadata is passed on to the device in DEVICE_METADATA_TEST.
+  // Below metadata is passed on to the device with the
+  // fuchsia.board.test/PdevMetadataTypeIdentifier FIDL metadata type identifier.
   size_t metadata_size;
   const uint8_t* metadata;
 };
