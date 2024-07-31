@@ -40,19 +40,6 @@ namespace fbg2 = fuchsia::bluetooth::gatt2;
 namespace fbredr = fuchsia::bluetooth::bredr;
 namespace faudio = fuchsia::hardware::audio;
 
-// TODO(b/327758656): Remove this when all fields of the ServiceDefinition are translated.
-bool ExpectServiceDefinitionsEqual(const fbredr::ServiceDefinition& def1,
-                                   const fbredr::ServiceDefinition& def2) {
-  // TODO(b/327758656): Use the ServiceDefinition equality function instead.
-  // ASSERT_TRUE(::fidl::Equals(def1, def2));
-  // For now, we compare specific fields as conversions for some fields aren't implemented.
-  bool uuids_equal = ::fidl::Equals(def1.service_class_uuids(), def2.service_class_uuids());
-  bool protocols_equal =
-      ::fidl::Equals(def1.protocol_descriptor_list(), def2.protocol_descriptor_list());
-  bool profiles_equal = ::fidl::Equals(def1.profile_descriptors(), def2.profile_descriptors());
-  return uuids_equal && protocols_equal && profiles_equal;
-}
-
 namespace fuchsia::bluetooth {
 // Make UUIDs equality comparable for advanced testing matchers. ADL rules mandate the namespace.
 bool operator==(const Uuid& a, const Uuid& b) { return fidl::Equals(a, b); }
@@ -1045,10 +1032,7 @@ TEST(HelpersTest, ReliableModeFromFidl) {
   EXPECT_EQ(bt::gatt::ReliableMode::kDisabled, ReliableModeFromFidl(options));
 }
 
-// TODO: Set information w/o setting language, set a FIDL type that cannot be converted
-// - make sure the expected attributes are set and have the correct type
-// - make sure the profile descriptor sets the right attributes
-TEST(HelpersTest, ServiceDefinitionToServiceRecordRoundtrip) {
+TEST(HelpersTest, InvalidServiceDefinitionToServiceRecordIsError) {
   fuchsia::bluetooth::bredr::ServiceDefinition def_should_fail;
   // Should fail to convert without service class UUIDs.
   auto rec_no_uuids = ServiceDefinitionToServiceRecord(def_should_fail);
@@ -1060,8 +1044,11 @@ TEST(HelpersTest, ServiceDefinitionToServiceRecordRoundtrip) {
   def_should_fail.mutable_information()->emplace_back(std::move(info_no_language));
   auto rec_no_language = ServiceDefinitionToServiceRecord(def_should_fail);
   EXPECT_FALSE(rec_no_language.is_ok());
+}
 
-  // Create definition for successful conversion.
+// - make sure the expected attributes are set and have the correct type
+// - make sure the profile descriptor sets the right attributes
+TEST(HelpersTest, ServiceDefinitionToServiceRecordRoundtrip) {
   fuchsia::bluetooth::bredr::ServiceDefinition def;
   def.mutable_service_class_uuids()->emplace_back(
       fidl_helpers::UuidToFidl(bt::sdp::profile::kAudioSink));
@@ -1183,7 +1170,7 @@ TEST(HelpersTest, ServiceDefinitionToServiceRecordRoundtrip) {
   // Can go back to the original FIDL service definition.
   auto fidl_def = ServiceRecordToServiceDefinition(rec.value());
   ASSERT_TRUE(fidl_def.is_ok());
-  ASSERT_TRUE(ExpectServiceDefinitionsEqual(fidl_def.value(), def));
+  ASSERT_TRUE(::fidl::Equals(fidl_def.value(), def));
 }
 
 TEST(HelpersTest, ObexServiceDefinitionToServiceRecordRoundtrip) {
@@ -1334,7 +1321,7 @@ TEST(HelpersTest, ObexServiceDefinitionToServiceRecordRoundtrip) {
   // Can go back to the original FIDL service definition.
   auto fidl_def = ServiceRecordToServiceDefinition(rec.value());
   ASSERT_TRUE(fidl_def.is_ok());
-  ASSERT_TRUE(ExpectServiceDefinitionsEqual(fidl_def.value(), def));
+  ASSERT_TRUE(::fidl::Equals(fidl_def.value(), def));
 }
 
 TEST(HelpersTest, MinimalServiceRecordToServiceDefinition) {

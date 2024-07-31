@@ -28,6 +28,7 @@
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sco/sco.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sdp/data_element.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sdp/sdp.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sdp/service_record.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sm/types.h"
 
 using fuchsia::bluetooth::Error;
@@ -515,6 +516,21 @@ std::optional<fbredr::ProtocolIdentifier> UuidToProtocolIdentifier(const bt::UUI
     return std::nullopt;
   }
   return fbredr::ProtocolIdentifier(*uuid_16);
+}
+
+fbredr::Information InformationToFidl(const bt::sdp::ServiceRecord::Information& info) {
+  fbredr::Information out;
+  out.set_language(info.language_code);
+  if (info.name) {
+    out.set_name(info.name.value());
+  }
+  if (info.description) {
+    out.set_description(info.description.value());
+  }
+  if (info.provider) {
+    out.set_provider(info.provider.value());
+  }
+  return out;
 }
 
 fpromise::result<std::vector<fuchsia::bluetooth::Uuid>, fuchsia::bluetooth::ErrorCode>
@@ -1897,9 +1913,29 @@ ServiceRecordToServiceDefinition(const bt::sdp::ServiceRecord& record) {
     out.set_profile_descriptors(std::move(profile_descriptors.value()));
   }
 
-  // TODO(b/327758656): Populate information (optional)
-  // TODO(b/327758656): Populate additional attributes (optional)
+  // Human-readable information (optional)
+  const std::vector<bt::sdp::ServiceRecord::Information> information = record.GetInfo();
+  for (const auto& info : information) {
+    fbredr::Information fidl_info = InformationToFidl(info);
+    out.mutable_information()->emplace_back(std::move(fidl_info));
+  }
 
+  // Additional attributes (optional)
+  const bt::sdp::AttributeId kMinAdditionalAttribute = 0x200;
+  const std::set<bt::sdp::AttributeId> additional_attribute_ids =
+      record.GetAttributesInRange(kMinAdditionalAttribute, 0xffff);
+  for (const auto additional_attr_id : additional_attribute_ids) {
+    const bt::sdp::DataElement& additional_attr_elt = record.GetAttribute(additional_attr_id);
+    std::optional<fbredr::DataElement> element = DataElementToFidl(additional_attr_elt);
+    if (!element) {
+      bt_log(WARN, "fidl", "Invalid additional attribute data element");
+      return fpromise::error(fuchsia::bluetooth::ErrorCode::INVALID_ARGUMENTS);
+    }
+    fbredr::Attribute attr;
+    attr.set_id(additional_attr_id);
+    attr.set_element(std::move(element.value()));
+    out.mutable_additional_attributes()->emplace_back(std::move(attr));
+  }
   return fpromise::ok(std::move(out));
 }
 
