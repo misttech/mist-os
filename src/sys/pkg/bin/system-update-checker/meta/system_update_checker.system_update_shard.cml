@@ -66,6 +66,7 @@
             protocol: [
                 "fuchsia.update.channel.Provider",
                 "fuchsia.update.channelcontrol.ChannelControl",
+                "fuchsia.update.Listener",
                 "fuchsia.update.Manager",
             ],
             from: "#system-update-checker",
