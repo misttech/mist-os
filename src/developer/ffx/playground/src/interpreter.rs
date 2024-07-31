@@ -19,7 +19,7 @@ use std::sync::{Arc, Mutex, OnceLock};
 use crate::compiler::Visitor;
 use crate::error::{Error, Result};
 use crate::frame::GlobalVariables;
-use crate::parser::{Mutability, ParseResult, TabHint};
+use crate::parser::{Mutability, Node, ParseResult, TabHint};
 use crate::value::{InUseHandle, Invocable, PlaygroundValue, ReplayableIterator, Value, ValueExt};
 
 macro_rules! error {
@@ -554,41 +554,110 @@ impl Interpreter {
 
             Err(error!(s))
         } else {
-            let mut visitor = Visitor::new(None, None);
-            let compiled = visitor.visit(program.tree);
-            let (mut frame, invalid_ids) = {
-                let mut global_variables = self.global_variables.lock().unwrap();
-                // TODO: There's a complicated bug here where only the last
-                // declaration of a variable determines the mutability for the
-                // whole run of this compilation unit. We could fix it by not
-                // reusing slots for multiple declarations.
-                for (name, mutability) in visitor.get_top_level_variable_decls() {
-                    global_variables.ensure_defined(
-                        name,
-                        || Err(error!("'{name}' undeclared")),
-                        mutability,
-                    )
-                }
-                let slots_needed = visitor.slots_needed();
-                let (mut captured_ids, allocated_ids) = visitor.into_slot_data();
-                (
-                    global_variables.as_frame(slots_needed, |ident| {
-                        if let Some(id) = captured_ids.remove(ident) {
-                            Some(id)
-                        } else {
-                            allocated_ids.get(ident).copied()
-                        }
-                    }),
-                    captured_ids,
-                )
-            };
-
-            for (name, slot) in invalid_ids {
-                frame.assign(slot, Err(error!("'{name}' undeclared")));
+            enum Section<'a> {
+                Statements(Vec<Node<'a>>),
+                Imports(Vec<String>),
             }
 
-            let frame = Mutex::new(frame);
-            compiled(&self.inner, &frame).await
+            let Node::Program(statements) = program.tree else {
+                unreachable!("Parse tree was not rooted in a program node!");
+            };
+
+            let mut sections = Vec::new();
+
+            for node in statements.into_iter() {
+                if let Node::Import(path, None) = node {
+                    let path = (*path.fragment()).to_owned();
+                    if let Some(Section::Imports(paths)) = sections.last_mut() {
+                        paths.push(path);
+                    } else {
+                        sections.push(Section::Imports(vec![path]));
+                    }
+                } else if let Some(Section::Statements(statements)) = sections.last_mut() {
+                    statements.push(node);
+                } else {
+                    sections.push(Section::Statements(vec![node]));
+                }
+            }
+
+            let mut ret = Value::Null;
+
+            for section in sections {
+                match section {
+                    Section::Statements(s) => {
+                        let mut visitor = Visitor::new(None, None);
+                        let compiled = visitor.visit(Node::Program(s));
+                        let (mut frame, invalid_ids) = {
+                            let mut global_variables = self.global_variables.lock().unwrap();
+                            // TODO: There's a complicated bug here where only the last
+                            // declaration of a variable determines the mutability for the
+                            // whole run of this compilation unit. We could fix it by not
+                            // reusing slots for multiple declarations.
+                            for (name, mutability) in visitor.get_top_level_variable_decls() {
+                                global_variables.ensure_defined(
+                                    name,
+                                    || Err(error!("'{name}' undeclared")),
+                                    mutability,
+                                )
+                            }
+                            let slots_needed = visitor.slots_needed();
+                            let (mut captured_ids, allocated_ids) = visitor.into_slot_data();
+                            (
+                                global_variables.as_frame(slots_needed, |ident| {
+                                    if let Some(id) = captured_ids.remove(ident) {
+                                        Some(id)
+                                    } else {
+                                        allocated_ids.get(ident).copied()
+                                    }
+                                }),
+                                captured_ids,
+                            )
+                        };
+
+                        for (name, slot) in invalid_ids {
+                            frame.assign(slot, Err(error!("'{name}' undeclared")));
+                        }
+
+                        let frame = Mutex::new(frame);
+                        ret = compiled(&self.inner, &frame).await?;
+                    }
+                    Section::Imports(imports) => {
+                        fn boxed_run_import(
+                            inner: Arc<InterpreterInner>,
+                            fs_root: Value,
+                            pwd: Value,
+                            import: String,
+                        ) -> futures::future::BoxFuture<'static, Result<GlobalVariables>>
+                        {
+                            async move {
+                                let interpreter =
+                                    Interpreter::new_with_inner(inner, fs_root, pwd).await;
+                                interpreter.run_isolated_import(import).await
+                            }
+                            .boxed()
+                        }
+                        for import in imports {
+                            let (fs_root, pwd) = {
+                                let g = self.global_variables.lock().unwrap();
+                                (g.get("fs_root"), g.get("pwd"))
+                            };
+
+                            let fs_root = fs_root
+                                .await
+                                .unwrap_or_else(|| Err(error!("`fs_root` undefined")))?;
+                            let pwd =
+                                pwd.await.unwrap_or_else(|| Err(error!("`pwd` undefined")))?;
+                            let inner = Arc::clone(&self.inner);
+
+                            let got = boxed_run_import(inner, fs_root, pwd, import).await?;
+                            self.global_variables.lock().unwrap().merge(got);
+                        }
+                        ret = Value::Null;
+                    }
+                }
+            }
+
+            Ok(ret)
         }
     }
 

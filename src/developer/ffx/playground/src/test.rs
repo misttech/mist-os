@@ -79,12 +79,21 @@ pub const TEST_SCRIPT_A: &'static [u8] = br#"
     }
     "#;
 
-/// A test script.
+/// A test script that imports another test script into a variable.
 pub const TEST_SCRIPT_B: &'static [u8] = br#"
     import /imports/test_script_a as foo
 
     def imported_command_alias {
         $foo.imported_command | _
+    }
+    "#;
+
+/// A test script that imports another test script into global scope.
+pub const TEST_SCRIPT_C: &'static [u8] = br#"
+    import /imports/test_script_a
+
+    def imported_command_alias {
+        imported_command
     }
     "#;
 
@@ -133,6 +142,7 @@ impl<T: AsRef<str>> Test<T> {
         let test_file = vfs::file::read_only(NEILS_PHILOSOPHY);
         let test_script_a = vfs::file::read_only(TEST_SCRIPT_A);
         let test_script_b = vfs::file::read_only(TEST_SCRIPT_B);
+        let test_script_c = vfs::file::read_only(TEST_SCRIPT_C);
         foo_subdir
             .add_entry("relative_symlink", Arc::new(TestSymlink("../neils_philosophy".to_owned())))
             .unwrap();
@@ -143,6 +153,7 @@ impl<T: AsRef<str>> Test<T> {
         test_subdir.add_entry("neils_philosophy", test_file).unwrap();
         import_subdir.add_entry("test_script_a", test_script_a).unwrap();
         import_subdir.add_entry("test_script_b", test_script_b).unwrap();
+        import_subdir.add_entry("test_script_c", test_script_c).unwrap();
         simple.add_entry("test", test_subdir).unwrap();
         simple.add_entry("imports", import_subdir).unwrap();
         assert!(
@@ -997,10 +1008,8 @@ async fn import_as_nesting() {
 async fn import() {
     Test::test(
         r#"
-    {
     import /imports/test_script_a
     imported_command
-    }
     "#,
     )
     .with_fidl()
@@ -1019,7 +1028,6 @@ async fn import() {
 async fn import_hermeticity() {
     Test::test(
         r#"
-    {
     def imported_command {
         "ran shadowed local command"
     }
@@ -1027,7 +1035,6 @@ async fn import_hermeticity() {
     let a = imported_command_alias;
     let b = imported_command;
     $a + " " + $b
-    }
     "#,
     )
     .with_fidl()
@@ -1043,10 +1050,34 @@ async fn import_hermeticity() {
 }
 
 #[fuchsia::test]
+async fn import_hermeticity_global_imports() {
+    Test::test(
+        r#"
+    def imported_command {
+        "ran shadowed local command"
+    }
+    import /imports/test_script_c
+    let a = imported_command_alias;
+    let b = imported_command;
+    $a + " " + $b
+    "#,
+    )
+    .with_fidl()
+    .with_standard_test_dirs()
+    .check(|value| {
+        let Value::String(value) = value else {
+            panic!();
+        };
+
+        assert_eq!("ran imported command ran imported command", &value);
+    })
+    .await;
+}
+
+#[fuchsia::test]
 async fn import_nesting() {
     Test::test(
         r#"
-    {
     def imported_command { "ran shadowed local command" }
     let a = {
         import /imports/test_script_a
@@ -1054,7 +1085,6 @@ async fn import_nesting() {
     };
     let b = imported_command;
     $a + " " + $b
-    }
     "#,
     )
     .with_fidl()
