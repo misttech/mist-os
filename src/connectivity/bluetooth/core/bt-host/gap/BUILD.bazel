@@ -50,6 +50,7 @@ cc_library(
         "secure_simple_pairing_state.cc",
         "types.cc",
     ],
+    copts = ["-Wswitch-enum"],
     deps = [
         ":definitions",
         "//src/connectivity/bluetooth/core/bt-host:public",
