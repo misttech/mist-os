@@ -77,6 +77,13 @@ int main(int argc, char** argv) {
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
   auto outgoing = component::OutgoingDirectory(loop.dispatcher());
   driver_manager::InspectManager inspect_manager(loop.dispatcher());
+  zx::result result = outgoing.AddUnmanagedProtocol<fuchsia_inspect::InspectSink>(
+      [dispatcher = loop.dispatcher()](fidl::ServerEnd<fuchsia_inspect::InspectSink> server_end) {
+        driver_manager::InspectSinkForDrivers::BindSelfManagedServer(dispatcher,
+                                                                     std::move(server_end));
+      });
+
+  ZX_ASSERT(result.is_ok());
 
   // Launch DriverRunner for DFv2 drivers.
   auto realm_result = component::Connect<fuchsia_component::Realm>();

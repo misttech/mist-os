@@ -63,11 +63,13 @@
             source_availability: "unknown",
         },
         {
-            protocol: [
-                "fuchsia.inspect.InspectSink",
-                "fuchsia.logger.LogSink",
-            ],
+            protocol: [ "fuchsia.logger.LogSink" ],
             from: "#archivist",
+            to: "#pkg-drivers",
+        },
+        {
+            protocol: [ "fuchsia.inspect.InspectSink" ],
+            from: "#driver_manager",
             to: "#pkg-drivers",
         },
         {

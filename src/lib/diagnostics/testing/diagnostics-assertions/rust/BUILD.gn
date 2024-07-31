@@ -40,3 +40,7 @@ group("tests") {
   testonly = true
   deps = [ ":diagnostics-assertions-tests" ]
 }
+
+group("rust") {
+  public_deps = [ ":diagnostics-assertions" ]
+}

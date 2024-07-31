@@ -70,44 +70,73 @@ class PowerSystemIntegration : public gtest::RealLoopFixture {
   }
 
   void MatchInspectData(diagnostics::reader::ArchiveReader& reader, const std::string& moniker,
+                        const std::optional<std::string>& inspect_tree_name,
                         const std::vector<std::string>& inspect_path,
                         std::variant<bool, uint64_t> value) {
+    const auto selector = diagnostics::reader::MakeSelector(
+        moniker,
+        inspect_tree_name.has_value()
+            ? std::optional<std::vector<std::string>>{{inspect_tree_name.value()}}
+            : std::nullopt,
+        std::vector<std::string>(inspect_path.begin(), inspect_path.end() - 1),
+        inspect_path[inspect_path.size() - 1]);
+
     std::cout << "Matching inspect data for moniker = " << moniker << ", path = ";
     for (const auto& path : inspect_path) {
       std::cout << "[" << path << "]";
     }
-    std::cout << std::endl;
+    std::cout << ", selector = " << selector << std::endl;
 
     bool match = false;
     do {
-      auto result = RunPromise(reader.SnapshotInspectUntilPresent({moniker}));
+      auto result =
+          RunPromise(reader.SetSelectors({selector}).SnapshotInspectUntilPresent({moniker}));
       auto data = result.take_value();
       for (const auto& datum : data) {
-        if (datum.moniker() == moniker) {
-          bool* bool_value = std::get_if<bool>(&value);
-          if (bool_value != nullptr) {
-            bool actual_value = datum.GetByPath(inspect_path).GetBool();
-            if (actual_value == *bool_value) {
-              match = true;
-              std::cout << "Got expected value " << *bool_value << std::endl;
-              break;
-            } else {
-              std::cout << "Expected value " << *bool_value << ", but got " << actual_value
-                        << ". Taking another snapshot." << std::endl;
-            }
+        bool* bool_value = std::get_if<bool>(&value);
+        if (bool_value != nullptr) {
+          const auto& actual_value = datum.GetByPath(inspect_path);
+          // IsBool will return false if the value at inspect_path doesn't exist yet,
+          // whereas GetBool will crash the test
+          if (!actual_value.IsBool()) {
+            std::cout << std::boolalpha << moniker << ": Expected value " << *bool_value
+                      << ", but got nothing for selector " << selector
+                      << ". Taking another snapshot." << std::endl;
+            // look through all the trees
+            continue;
           }
+          if (actual_value.GetBool() == *bool_value) {
+            match = true;
+            std::cout << std::boolalpha << moniker << ": Got expected value " << *bool_value
+                      << " for selector " << selector << std::endl;
+            break;
+          } else {
+            std::cout << std::boolalpha << moniker << ": Expected value " << *bool_value
+                      << ", but got " << actual_value.GetBool() << ". Taking another snapshot."
+                      << std::endl;
+          }
+        }
 
-          uint64_t* uint64_value = std::get_if<uint64_t>(&value);
-          if (uint64_value != nullptr) {
-            uint64_t actual_value = datum.GetByPath(inspect_path).GetUint64();
-            if (actual_value == *uint64_value) {
-              match = true;
-              std::cout << "Got expected value " << *uint64_value << std::endl;
-              break;
-            } else {
-              std::cout << "Expected value " << *uint64_value << ", but got " << actual_value
-                        << ". Taking another snapshot." << std::endl;
-            }
+        uint64_t* uint64_value = std::get_if<uint64_t>(&value);
+        if (uint64_value != nullptr) {
+          const auto& actual_value = datum.GetByPath(inspect_path);
+          // IsUint64 will return false if the value at inspect_path doesn't exist yet,
+          // whereas GetUint64 will crash the test
+          if (!actual_value.IsUint64()) {
+            std::cout << moniker << ": Expected value " << *uint64_value
+                      << ", but got nothing for selector " << selector
+                      << ". Taking another snapshot." << std::endl;
+            // look through all the trees
+            continue;
+          }
+          if (actual_value.GetUint64() == *uint64_value) {
+            match = true;
+            std::cout << moniker << ": Got expected value " << *uint64_value << " for selector "
+                      << selector << std::endl;
+            break;
+          } else {
+            std::cout << moniker << ": Expected value " << *uint64_value << ", but got "
+                      << actual_value.GetUint64() << ". Taking another snapshot." << std::endl;
           }
         }
       }
@@ -160,7 +189,7 @@ TEST_F(PowerSystemIntegration, StorageSuspendResumeTest) {
 
   auto result = component::Connect<fuchsia_diagnostics::ArchiveAccessor>();
   ASSERT_EQ(ZX_OK, result.status_value());
-  diagnostics::reader::ArchiveReader reader(dispatcher(), {}, std::move(result.value()));
+  diagnostics::reader::ArchiveReader reader(dispatcher());
 
   const std::string sag_moniker = "bootstrap/system-activity-governor/system-activity-governor";
   const std::vector<std::string> sag_exec_state_level = {"root", "power_elements",
@@ -192,27 +221,32 @@ TEST_F(PowerSystemIntegration, StorageSuspendResumeTest) {
       "topology", core_sdmmc_element_id.value(),
       "meta",     "current_level"};
 
-  const std::string aml_sdmmc_moniker =
-      "bootstrap/boot-drivers:dev.sys.platform.mmc-ffe07000.mmc-ffe07000_group";
+  // All drivers expose their Inspect under driver manager
+  const std::string aml_sdmmc_inspect_tree_name = "aml-sd-emmc";
+  const std::string aml_sdmmc_moniker = "bootstrap/driver_manager";
   // TODO(b/344044167): Fix inspect node names in aml-sdmmc driver.
   const std::vector<std::string> aml_sdmmc_suspended = {"root", "aml-sdmmc-port-unknown",
                                                         "power_suspended"};
 
-  const std::string core_sdmmc_moniker =
-      "bootstrap/boot-drivers:dev.sys.platform.mmc-ffe07000.mmc-ffe07000_group.aml-sd-emmc";
+  // All drivers expose their Inspect under driver manager
+  const std::string core_sdmmc_moniker = "bootstrap/driver_manager";
+  const std::string sdmmc_root_device_inspect_tree_name = "sdmmc";
   const std::vector<std::string> core_sdmmc_suspended = {"root", "sdmmc_core", "power_suspended"};
 
   // Verify boot complete state using inspect data:
   // - SAG: exec state level active
   // - Power Broker: aml-sdmmc's power element on.
   // - aml-sdmmc, core sdmmc: not suspended
-  MatchInspectData(reader, sag_moniker, sag_exec_state_level, uint64_t{2});      // kActive
-  MatchInspectData(reader, pb_moniker, aml_sdmmc_required_level, uint64_t{1});   // On
-  MatchInspectData(reader, pb_moniker, aml_sdmmc_current_level, uint64_t{1});    // On
-  MatchInspectData(reader, pb_moniker, core_sdmmc_required_level, uint64_t{1});  // On
-  MatchInspectData(reader, pb_moniker, core_sdmmc_current_level, uint64_t{1});   // On
-  MatchInspectData(reader, aml_sdmmc_moniker, aml_sdmmc_suspended, false);
-  MatchInspectData(reader, core_sdmmc_moniker, core_sdmmc_suspended, false);
+  MatchInspectData(reader, sag_moniker, std::nullopt, sag_exec_state_level,
+                   uint64_t{2});  // kActive
+  MatchInspectData(reader, pb_moniker, std::nullopt, aml_sdmmc_required_level, uint64_t{1});   // On
+  MatchInspectData(reader, pb_moniker, std::nullopt, aml_sdmmc_current_level, uint64_t{1});    // On
+  MatchInspectData(reader, pb_moniker, std::nullopt, core_sdmmc_required_level, uint64_t{1});  // On
+  MatchInspectData(reader, pb_moniker, std::nullopt, core_sdmmc_current_level, uint64_t{1});   // On
+  MatchInspectData(reader, aml_sdmmc_moniker, aml_sdmmc_inspect_tree_name, aml_sdmmc_suspended,
+                   false);
+  MatchInspectData(reader, core_sdmmc_moniker, sdmmc_root_device_inspect_tree_name,
+                   core_sdmmc_suspended, false);
 
   // Emulate system suspend.
   state.execution_state_level(fuchsia_power_system::ExecutionStateLevel::kInactive);
@@ -223,13 +257,17 @@ TEST_F(PowerSystemIntegration, StorageSuspendResumeTest) {
   // - SAG: exec state level inactive
   // - Power Broker: aml-sdmmc's power element off.
   // - aml-sdmmc, core sdmmc: suspended
-  MatchInspectData(reader, sag_moniker, sag_exec_state_level, uint64_t{0});      // kInactive
-  MatchInspectData(reader, pb_moniker, aml_sdmmc_required_level, uint64_t{0});   // Off
-  MatchInspectData(reader, pb_moniker, aml_sdmmc_current_level, uint64_t{0});    // Off
-  MatchInspectData(reader, pb_moniker, core_sdmmc_required_level, uint64_t{0});  // Off
-  MatchInspectData(reader, pb_moniker, core_sdmmc_current_level, uint64_t{0});   // Off
-  MatchInspectData(reader, aml_sdmmc_moniker, aml_sdmmc_suspended, true);
-  MatchInspectData(reader, core_sdmmc_moniker, core_sdmmc_suspended, true);
+  MatchInspectData(reader, sag_moniker, std::nullopt, sag_exec_state_level,
+                   uint64_t{0});  // kInactive
+  MatchInspectData(reader, pb_moniker, std::nullopt, aml_sdmmc_required_level, uint64_t{0});  // Off
+  MatchInspectData(reader, pb_moniker, std::nullopt, aml_sdmmc_current_level, uint64_t{0});   // Off
+  MatchInspectData(reader, pb_moniker, std::nullopt, core_sdmmc_required_level,
+                   uint64_t{0});                                                              // Off
+  MatchInspectData(reader, pb_moniker, std::nullopt, core_sdmmc_current_level, uint64_t{0});  // Off
+  MatchInspectData(reader, aml_sdmmc_moniker, aml_sdmmc_inspect_tree_name, aml_sdmmc_suspended,
+                   true);
+  MatchInspectData(reader, core_sdmmc_moniker, sdmmc_root_device_inspect_tree_name,
+                   core_sdmmc_suspended, true);
 
   // Emulate system resume.
   state.execution_state_level(fuchsia_power_system::ExecutionStateLevel::kActive);
@@ -240,11 +278,14 @@ TEST_F(PowerSystemIntegration, StorageSuspendResumeTest) {
   // - SAG: exec state level active
   // - Power Broker: aml-sdmmc's power element on.
   // - aml-sdmmc, core sdmmc: not suspended
-  MatchInspectData(reader, sag_moniker, sag_exec_state_level, uint64_t{2});      // kActive
-  MatchInspectData(reader, pb_moniker, aml_sdmmc_required_level, uint64_t{1});   // On
-  MatchInspectData(reader, pb_moniker, aml_sdmmc_current_level, uint64_t{1});    // On
-  MatchInspectData(reader, pb_moniker, core_sdmmc_required_level, uint64_t{1});  // On
-  MatchInspectData(reader, pb_moniker, core_sdmmc_current_level, uint64_t{1});   // On
-  MatchInspectData(reader, aml_sdmmc_moniker, aml_sdmmc_suspended, false);
-  MatchInspectData(reader, core_sdmmc_moniker, core_sdmmc_suspended, false);
+  MatchInspectData(reader, sag_moniker, std::nullopt, sag_exec_state_level,
+                   uint64_t{2});  // kActive
+  MatchInspectData(reader, pb_moniker, std::nullopt, aml_sdmmc_required_level, uint64_t{1});   // On
+  MatchInspectData(reader, pb_moniker, std::nullopt, aml_sdmmc_current_level, uint64_t{1});    // On
+  MatchInspectData(reader, pb_moniker, std::nullopt, core_sdmmc_required_level, uint64_t{1});  // On
+  MatchInspectData(reader, pb_moniker, std::nullopt, core_sdmmc_current_level, uint64_t{1});   // On
+  MatchInspectData(reader, aml_sdmmc_moniker, aml_sdmmc_inspect_tree_name, aml_sdmmc_suspended,
+                   false);
+  MatchInspectData(reader, core_sdmmc_moniker, sdmmc_root_device_inspect_tree_name,
+                   core_sdmmc_suspended, false);
 }

@@ -5,6 +5,8 @@
 #ifndef SRC_DEVICES_BIN_DRIVER_MANAGER_INSPECT_H_
 #define SRC_DEVICES_BIN_DRIVER_MANAGER_INSPECT_H_
 
+#include <fidl/fuchsia.inspect/cpp/markers.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/ddk/binding_driver.h>
 #include <lib/inspect/component/cpp/component.h>
 #include <lib/zx/channel.h>
@@ -18,6 +20,47 @@
 #include "src/storage/lib/vfs/cpp/pseudo_dir.h"
 
 namespace driver_manager {
+
+/// InspectSinkForDrivers is the fuchsia.inspect.InspectSink routed to drivers. It
+/// provides a default name for drivers if one isn't present, and has all driver Inspect
+/// attributed to Driver Manager. This provides stable monikers against which to select.
+class InspectSinkForDrivers : public fidl::Server<fuchsia_inspect::InspectSink> {
+ public:
+  ~InspectSinkForDrivers() = default;
+  InspectSinkForDrivers(InspectSinkForDrivers&&) = delete;
+  InspectSinkForDrivers& operator=(InspectSinkForDrivers&&) = delete;
+  InspectSinkForDrivers(const InspectSinkForDrivers&) = delete;
+
+  /// Respond to fuchisa.inspect.InspectSink#Publish. Forwards calls to the InspectSink
+  /// routed to Driver Manager.
+  void Publish(PublishRequest& request, PublishCompleter::Sync& completer) override;
+
+  /// Respond to fuchisa.inspect.InspectSink#Escrow. Forwards calls to the InspectSink
+  /// routed to Driver Manager.
+  void Escrow(EscrowRequest& request, EscrowCompleter::Sync& completer) override;
+
+  /// Respond to fuchisa.inspect.InspectSink#FetchEscrow. Forwards calls to the InspectSink
+  /// routed to Driver Manager.
+  void FetchEscrow(FetchEscrowRequest& request, FetchEscrowCompleter::Sync& completer) override;
+
+  /// Does nothing on receipt of unknown method.
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_inspect::InspectSink> metadata,
+                             fidl::UnknownMethodCompleter::Sync& completer) override;
+
+  /// Start the server.
+  static void BindSelfManagedServer(async_dispatcher_t* dispatcher,
+                                    fidl::ServerEnd<fuchsia_inspect::InspectSink> server_end);
+
+ private:
+  explicit InspectSinkForDrivers(async_dispatcher_t* dispatcher)
+      : external_connection_(component::Connect<fuchsia_inspect::InspectSink>().value(),
+                             dispatcher) {}
+
+  /// Connection to the Driver Manager's InspectSink, used to forward driver connections.
+  fidl::Client<fuchsia_inspect::InspectSink> external_connection_;
+  std::optional<fidl::ServerBindingRef<fuchsia_inspect::InspectSink>> binding_ref_;
+};
+
 struct ProtocolInfo {
   const char* name;
   fbl::RefPtr<fs::PseudoDir> devnode;

@@ -229,6 +229,7 @@
             protocol: [
                 "fuchsia.device.manager.Administrator",
                 "fuchsia.driver.development.Manager",
+                "fuchsia.inspect.InspectSink",
             ],
             from: "#driver_manager",
         },

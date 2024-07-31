@@ -1,0 +1,69 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/component/config.gni")
+import("//build/components.gni")
+import("//build/fidl/fidl.gni")
+import("//build/rust/rustc_binary.gni")
+
+group("tests") {
+  testonly = true
+  deps = [ ":driver-manager-inspect-sink-test" ]
+}
+
+rustc_test("bin") {
+  testonly = true
+  edition = "2021"
+  source_root = "src/main.rs"
+  sources = [ source_root ]
+  name = "driver_manager_inspect_sink_test"
+  deps = [
+    "../testing/fidl:test.drivermanager_rust",
+    "//sdk/fidl/fuchsia.inspect:fuchsia.inspect_rust",
+
+    # unchecked_includes because the InspectSink used in this test suite
+    # comes from the driver_test_realm, so the client shard is not needed
+    # and could be confusing to a future reader. It wouldn't actually cause
+    # a problem, but it would be unused.
+    "//src/lib/diagnostics/inspect/runtime/rust:unchecked_includes",
+    "//src/lib/diagnostics/inspect/rust",
+    "//src/lib/diagnostics/reader/rust",
+    "//src/lib/diagnostics/testing/diagnostics-assertions/rust:rust",
+    "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia",
+    "//src/lib/fuchsia-component",
+    "//src/testing/realm_proxy/client",
+    "//third_party/rust_crates:anyhow",
+  ]
+}
+
+fuchsia_component("test-suite-component") {
+  testonly = true
+  component_name = "test-suite"
+  manifest = "meta/test-suite.cml"
+  deps = [ ":bin" ]
+}
+
+fuchsia_package("test-suite") {
+  testonly = true
+  deps = [ ":test-suite-component" ]
+}
+
+fuchsia_component("test-root") {
+  testonly = true
+  manifest = "meta/test-root.cml"
+}
+
+fuchsia_test_package("driver-manager-inspect-sink-test") {
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
+  test_components = [ ":test-root" ]
+  subpackages = [
+    "../testing/realm-factory",
+    ":test-suite",
+  ]
+}
