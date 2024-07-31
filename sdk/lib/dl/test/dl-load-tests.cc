@@ -909,4 +909,20 @@ TYPED_TEST(DlTests, GlobalSatisfiesMissingSymbol) {
   ASSERT_TRUE(this->DlClose(res2.value()).is_ok());
 }
 
+// TODO(https://fxbug.dev/338232267)
+// Test that changing mode to RTLD_GLOBAL will change how a symbol is resolved
+// by subsequent modules.
+// dlopen foo-v1 -> foo() returns 2
+// dlopen RTLD_GLOBAL foo-v2 -> foo() returns 7
+// dlopen has-foo-v1
+//   - foo-v1 -> foo() returns 2
+// call foo() from has-foo-v1 and expect 2 from previously loaded global foo-v2
+// dlopen RTLD_GLOBAL foo-v1
+// call foo() from has-foo-v1 and still expect 2 because it does not get
+// re-resolved.
+// dlopen has-foo-v2
+//  - foo-v2 -> foo() returns 7
+// call foo() from has-foo-v2 and expect 2 from foo-v1, because foo-v1 is now
+// the first loaded global module with the symbol.
+
 }  // namespace
