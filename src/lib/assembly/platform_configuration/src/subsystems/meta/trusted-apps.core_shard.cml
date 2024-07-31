@@ -68,9 +68,7 @@
             to: "#trusted-apps",
         },
         {
-            protocol: [
-                "widevine.oemcrypto.Provider",
-            ],
+            protocol: [ "widevine.oemcrypto.Provider" ],
             from: "#oemcrypto",
             to: "#trusted-apps",
             source_availability: "unknown",

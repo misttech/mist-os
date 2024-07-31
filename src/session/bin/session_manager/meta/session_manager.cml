@@ -127,7 +127,6 @@
                 "fuchsia.location.namedplace.RegulatoryRegionWatcher",
                 "fuchsia.lowpan.bootstrap.Thread",
                 "fuchsia.media.drm.PlayReady",
-                "fuchsia.media.drm.Widevine",
                 "fuchsia.media.SessionAudioConsumerFactory",
                 "fuchsia.media.sessions2.ActiveSession",
                 "fuchsia.media.sessions2.Discovery",
@@ -191,6 +190,7 @@
             protocol: [
                 "fuchsia.castauth.CastCertificateRetriever",
                 "fuchsia.castauth.CastKeySigner",
+                "fuchsia.media.drm.Widevine",
                 "fuchsia.weave.FactoryDataManager",
                 "fuchsia.weave.Provisioner",
                 "fuchsia.weave.Signer",
