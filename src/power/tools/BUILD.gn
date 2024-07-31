@@ -18,14 +18,37 @@ if (is_host) {
   }
 
   # Rename the resulting .pyz for the host tool
-  copy("copy") {
+  copy("power-digest-copy") {
     deps = [ ":power-digest-bin" ]
     sources = [ "${target_out_dir}/power-digest.pyz" ]
     outputs = [ "${root_out_dir}/power-digest-tool" ]
   }
 
+  python_binary("power-viz-bin") {
+    enable_mypy = true
+
+    # Unbuffer so output can be piped to other programs nicely.
+    unbuffered_output = true
+
+    main_source = "power_viz.py"
+    output_name = "power-viz.pyz"
+  }
+
+  # Rename the resulting .pyz for the host tool
+  copy("power-viz-copy") {
+    deps = [ ":power-viz-bin" ]
+    sources = [ "${target_out_dir}/power-viz.pyz" ]
+    outputs = [ "${root_out_dir}/power-viz-tool" ]
+  }
+
   install_host_tools("install") {
-    deps = [ ":copy" ]
-    outputs = [ "power-digest-tool" ]
+    deps = [
+      ":power-digest-copy",
+      ":power-viz-copy",
+    ]
+    outputs = [
+      "power-digest-tool",
+      "power-viz-tool",
+    ]
   }
 }

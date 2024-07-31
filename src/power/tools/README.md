@@ -8,11 +8,19 @@ This prototype tool takes Power Broker's Inspect data, along with
 that from System Activity Governor and Fuchsia Suspend HAL,
 and renders them in a denser format for human consumption.
 
+## `fx power-viz`
+
+This prototype tool takes Power Broker's Inspect data, along with
+that from System Activity Governor and Fuchsia Suspend HAL,
+and renders them in a visual format as an HTML page using SVG.
+
+## Python tool maintenance
+
 ### Written in Python
 
-For easier text processing, this prototype tool has been written
-in Python. Expect it to change frequently until it settles. A form
-of this tool may be reimplemented as a production quality tool, with
+For easier implementation, these prototype tools have been written
+in Python. Expect them to change frequently until each settles. A form
+of each tool may be reimplemented as a production quality tool, with
 tests etc, in FFX or FSV in future.
 
 ### BUILD structure
@@ -20,7 +28,7 @@ tests etc, in FFX or FSV in future.
 To keep ownership clear, the Python file itself is placed in
 `src/power/tools`. However, some helper files like `tools/devshell/BUILD.gn`
 `tools/devshell/contrib/power-digest` provide the structure to run it
-from the command line as `fx power-digest`.
+from the command line as `fx power-digest` or `fx power-viz`.
 
 ### Standalone
 
@@ -29,6 +37,7 @@ first obtaining a copy of it, and running it like so:
 
 ```
 $ python3 power_digest.py
+$ python3 power_viz.py
 ```
 
 ### Testing scenarios
