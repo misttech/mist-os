@@ -70,6 +70,14 @@ impl DefineSubsystemConfiguration<PlatformKernelConfig> for KernelSubsystem {
             builder.platform_bundle("kernel_contiguous_physical_pages");
         }
 
+        if context.board_info.kernel.quiet_early_boot {
+            anyhow::ensure!(
+                context.build_type == &BuildType::Eng,
+                "'quiet_early_boot' can only be enabled in 'eng' builds"
+            );
+            builder.kernel_arg("kernel.phys.verbose=false".to_owned())
+        }
+
         if let Some(aslr_entropy_bits) = kernel_config.aslr_entropy_bits {
             let kernek_arg = format!("aslr.entropy_bits={}", aslr_entropy_bits);
             builder.kernel_arg(kernek_arg);
