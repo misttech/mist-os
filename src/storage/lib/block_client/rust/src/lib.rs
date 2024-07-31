@@ -274,10 +274,7 @@ pub trait BlockClient: Send + Sync {
     ) -> Result<(), Error>;
 
     /// Trims the given range on the block device.
-    async fn trim(&self, _device_range: Range<u64>) -> Result<(), Error> {
-        // TODO(b/293964968): Implement for OOT clients and remove default implementation.
-        Ok(())
-    }
+    async fn trim(&self, device_range: Range<u64>) -> Result<(), Error>;
 
     /// Sends a flush request to the underlying block device.
     async fn flush(&self) -> Result<(), Error>;
@@ -292,10 +289,7 @@ pub trait BlockClient: Send + Sync {
     fn block_count(&self) -> u64;
 
     /// Returns the block flags reported by the device.
-    fn block_flags(&self) -> BlockFlags {
-        // TODO(b/293964968): Implement for OOT clients and remove default implementation.
-        BlockFlags::default()
-    }
+    fn block_flags(&self) -> BlockFlags;
 
     /// Returns true if the remote fifo is still connected.
     fn is_connected(&self) -> bool;
