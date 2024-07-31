@@ -35,7 +35,7 @@ type PortId = struct {
 ///
 /// Replaced by `PortClass`. Scheduled for removal in 2025.
 // TODO(https://fxbug.dev/42157740): Remove this type.
-@available(deprecated=NEXT)
+@available(deprecated=22)
 type DeviceClass = strict enum : uint16 {
     VIRTUAL = 0;
     ETHERNET = 1;
@@ -50,7 +50,7 @@ type DeviceClass = strict enum : uint16 {
 /// *Note*: Device implementers are encouraged to propose additions to this
 /// enumeration to avoid using ill-fitting variants if there's not a good match
 /// available.
-@available(added=NEXT)
+@available(added=22)
 type PortClass = flexible enum : uint16 {
     ETHERNET = 1;
     WLAN_CLIENT = 2;

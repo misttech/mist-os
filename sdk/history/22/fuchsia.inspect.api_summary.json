@@ -1,5 +1,11 @@
 [
     {
+        "kind": "const",
+        "name": "fuchsia.inspect/DEFAULT_TREE_NAME",
+        "type": "string",
+        "value": "root"
+    },
+    {
         "kind": "protocol/member",
         "name": "fuchsia.inspect/InspectSink.Publish",
         "strictness": "flexible",

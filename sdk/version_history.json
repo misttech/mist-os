@@ -77,7 +77,7 @@
             },
             "22": {
                 "abi_revision": "0xEE3BE92BE27C6DEB",
-                "status": "in-development"
+                "status": "supported"
             }
         },
         "special_api_levels": {

@@ -132,7 +132,7 @@ type Properties = table {
     ///
     /// Replaced by `port_class`. Scheduled for removal in 2025.
     // TODO(https://fxbug.dev/42157740): Remove this type.
-    @available(deprecated=NEXT)
+    @available(deprecated=22)
     4: device_class strict union {
         /// The interface is loopback.
         1: loopback Empty;
@@ -145,12 +145,12 @@ type Properties = table {
     /// The name of the interface. Immutable.
     7: name Name;
     /// The port class of the interface. Immutable.
-    @available(added=NEXT)
+    @available(added=22)
     8: port_class PortClass;
 };
 
 /// The port class of an interface.
-@available(added=NEXT)
+@available(added=22)
 type PortClass = flexible union {
     /// The interface is loopback.
     1: loopback Empty;

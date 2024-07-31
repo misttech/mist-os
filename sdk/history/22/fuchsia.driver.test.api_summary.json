@@ -81,6 +81,18 @@
     },
     {
         "kind": "table/member",
+        "name": "fuchsia.driver.test/RealmArgs.dtr_exposes",
+        "ordinal": "15",
+        "type": "vector<fuchsia.component.test/Capability>"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.driver.test/RealmArgs.dtr_offers",
+        "ordinal": "14",
+        "type": "vector<fuchsia.component.test/Capability>"
+    },
+    {
+        "kind": "table/member",
         "name": "fuchsia.driver.test/RealmArgs.root_driver",
         "ordinal": "2",
         "type": "string"

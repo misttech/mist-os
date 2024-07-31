@@ -71,7 +71,7 @@ type EventPayload = flexible resource union {
     3: directory_ready DirectoryReadyPayload;
 
     /// Payload for Discovered events.
-    @available(deprecated=NEXT)
+    @available(deprecated=22)
     4: discovered DiscoveredPayload;
 
     /// Payload for Destroyed events.

@@ -16,7 +16,7 @@ alias EscrowedVmo = zx.Handle:<VMO, zx.Rights.DUPLICATE | zx.Rights.READ | zx.Ri
 @available(added=16)
 const MAX_NAME_LENGTH uint64 = 4096;
 
-@available(added=NEXT)
+@available(added=22)
 const DEFAULT_TREE_NAME string = "root";
 
 @discoverable(server="platform")

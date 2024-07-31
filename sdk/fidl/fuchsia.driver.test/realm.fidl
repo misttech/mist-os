@@ -119,13 +119,13 @@ type RealmArgs = resource table {
     /// Specify offers from the test to the driver test realm.
     /// The driver test realm will forward these to the driver collections.
     /// Default: empty
-    @available(added=NEXT)
+    @available(added=22)
     14: dtr_offers vector<fuchsia.component.test.Capability>:MAX;
 
     /// Specify exposes from the driver test realm to the test.
     /// The driver test realm will forward these from the driver collections.
     /// Default: empty
-    @available(added=NEXT)
+    @available(added=22)
     15: dtr_exposes vector<fuchsia.component.test.Capability>:MAX;
 };
 
