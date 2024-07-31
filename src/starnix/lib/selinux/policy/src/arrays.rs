@@ -856,8 +856,10 @@ pub(crate) type FsUses<PS> = Vec<FsUse<PS>>;
 impl<PS: ParseStrategy> Validate for FsUses<PS> {
     type Error = anyhow::Error;
 
-    /// TODO: Validate sequence of [`FsUse`] objects.
     fn validate(&self) -> Result<(), Self::Error> {
+        for fs_use in self {
+            fs_use.validate()?;
+        }
         Ok(())
     }
 }
@@ -866,6 +868,17 @@ impl<PS: ParseStrategy> Validate for FsUses<PS> {
 pub(crate) struct FsUse<PS: ParseStrategy> {
     behavior_and_name: Array<PS, PS::Output<FsUseMetadata>, PS::Slice<u8>>,
     context: Context<PS>,
+}
+
+impl<PS: ParseStrategy> FsUse<PS> {
+    #[allow(dead_code)]
+    pub(crate) fn behavior(&self) -> FsUseType {
+        FsUseType::try_from(PS::deref(&self.behavior_and_name.metadata).behavior).unwrap()
+    }
+
+    pub(crate) fn context(&self) -> &Context<PS> {
+        &self.context
+    }
 }
 
 impl<PS: ParseStrategy> Parse<PS> for FsUse<PS>
@@ -891,16 +904,50 @@ where
     }
 }
 
+impl<PS: ParseStrategy> Validate for FsUse<PS> {
+    type Error = anyhow::Error;
+
+    fn validate(&self) -> Result<(), Self::Error> {
+        FsUseType::try_from(PS::deref(&self.behavior_and_name.metadata).behavior)?;
+
+        Ok(())
+    }
+}
+
 #[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
 pub(crate) struct FsUseMetadata {
+    /// The type of `fs_use` statement.
     behavior: le::U32,
-    length: le::U32,
+    /// The length of the name in the name_and_behavior field of FsUse.
+    name_length: le::U32,
 }
 
 impl Counted for FsUseMetadata {
     fn count(&self) -> u32 {
-        self.length.get()
+        self.name_length.get()
+    }
+}
+
+pub(crate) enum FsUseType {
+    /// Corresponds to the `fs_use_xatrr` statement.
+    FsUseXattr = 1,
+    /// Corresponds to the `fs_use_trans` statement.
+    FsUseTrans = 2,
+    /// Corresponds to the `fs_use_task` statement.
+    FsUseTask = 3,
+}
+
+impl TryFrom<le::U32> for FsUseType {
+    type Error = anyhow::Error;
+
+    fn try_from(value: le::U32) -> Result<Self, Self::Error> {
+        match value.get() {
+            1 => Ok(FsUseType::FsUseXattr),
+            2 => Ok(FsUseType::FsUseTrans),
+            3 => Ok(FsUseType::FsUseTask),
+            _ => Err(ValidateError::InvalidFsUseType { value: value.get() }.into()),
+        }
     }
 }
 
