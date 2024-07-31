@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use anyhow::anyhow;
-use fidl::endpoints::Proxy;
 use fidl_codec::Value as FidlValue;
 use futures::channel::oneshot::channel as oneshot_channel;
 use futures::future::{ready, BoxFuture};
@@ -250,7 +249,8 @@ impl Visitor {
                 Arc::new(self.visit_if(*condition, *body, else_.map(|x| *x)))
             }
             Node::Import(a, b) => {
-                Arc::new(self.visit_import(*a.fragment(), b.map(|x| *x.fragment())))
+                let b = b.expect("Top level visitor should not handle import statements!");
+                Arc::new(self.visit_import(*a.fragment(), b.fragment()))
             }
             Node::Integer(s) => Arc::new(self.visit_integer(*s.fragment())),
             Node::Invocation(n, a) => Arc::new(self.visit_invocation(*n.fragment(), a)),
@@ -603,23 +603,19 @@ impl Visitor {
     fn visit_import(
         &mut self,
         path: &str,
-        name: Option<&str>,
+        name: &str,
     ) -> impl for<'f> Fn(&Arc<InterpreterInner>, &'f Mutex<Frame>) -> BoxFuture<'f, Result<Value>>
     {
         let path = path.to_owned();
-        let name = name.map(|name| self.allocate_slot(name, Mutability::Constant));
+        let name = self.allocate_slot(name, Mutability::Constant);
         let fs_root = self.global_fs_root.clone().unwrap_or_else(|| self.fetch_slot("fs_root").0);
         let pwd = self.global_pwd.clone().unwrap_or_else(|| self.fetch_slot("pwd").0);
 
         move |inner, frame| {
-            let name = name.clone();
             let path = path.clone();
             let inner = Arc::clone(inner);
 
             async move {
-                let Some(name) = name else {
-                    return Err(error!("Imports without identifiers unsupported."));
-                };
                 let (fs_root, pwd) = {
                     let frame = frame.lock().unwrap();
                     (frame.get(fs_root), frame.get(pwd))
@@ -631,16 +627,7 @@ impl Visitor {
                 let fut = async move {
                     let interpreter =
                         Interpreter::new_with_inner(Arc::clone(&inner), fs_root, pwd).await;
-                    let file = interpreter.open(path.clone()).await?;
-                    let file = file
-                        .try_client_channel(inner.lib_namespace(), "fuchsia.io/File")
-                        .map_err(|_| error!("Tried to import {path} which is not a file"))?;
-                    let file = fidl_fuchsia_io::FileProxy::from_channel(
-                        fuchsia_async::Channel::from_channel(file),
-                    );
-                    let file = fuchsia_fs::file::read_to_string(&file).await?;
-                    interpreter.run(file.as_str()).await?;
-                    let globals = interpreter.to_globals();
+                    let globals = interpreter.run_isolated_import(path).await?;
                     globals.to_object().await
                 };
                 let fut = frame.lock().unwrap().assign_future_ignore_const(name, fut);
@@ -1122,17 +1109,48 @@ impl Visitor {
         nodes: Vec<Node<'a>>,
     ) -> impl for<'f> Fn(&Arc<InterpreterInner>, &'f Mutex<Frame>) -> BoxFuture<'f, Result<Value>>
     {
+        // We split the run of statements in the program into three sets:
+        // * Some statements, none of which are imports.
+        // * Some import statements.
+        // * Some more statements which are imports.
+        //
+        // The reason is we have to do some special stuff with visitors to deal
+        // with the latter two parts. So the first part we'll visit in a pretty
+        // normal way, and the second two parts we'll hand to a special visitor
+        // which will give us a separate callback to run that portion.
+        //
+        // Also, note that `import foo as bar` doesn't count as an import here;
+        // the `as bar` part lets us process in a simpler way, so we don't need
+        // to do this little dance.
         let mut statements = Vec::new();
+        let mut trailer_imports = Vec::new();
+        let mut trailer_import_statements = Vec::new();
 
         for node in nodes.into_iter() {
-            statements.push(self.visit(node));
+            if !trailer_import_statements.is_empty() {
+                trailer_import_statements.push(node);
+            } else if let Node::Import(path, None) = node {
+                trailer_imports.push(path)
+            } else if !trailer_imports.is_empty() {
+                trailer_import_statements.push(node);
+            } else {
+                statements.push(self.visit(node));
+            }
         }
 
         let statements = Arc::new(statements.into_boxed_slice());
+        let trailer = if !trailer_imports.is_empty() {
+            Some(Arc::new(
+                self.visit_program_with_imports(trailer_imports, trailer_import_statements),
+            ))
+        } else {
+            None
+        };
 
         move |inner, frame| {
             let statements = Arc::clone(&statements);
             let inner = Arc::clone(&inner);
+            let trailer = trailer.as_ref().map(Arc::clone);
 
             async move {
                 let mut ret = Value::Null;
@@ -1141,7 +1159,89 @@ impl Visitor {
                     ret = statement(&inner, frame).await?;
                 }
 
-                Ok(ret)
+                if let Some(trailer) = trailer {
+                    trailer(&inner, frame).await
+                } else {
+                    Ok(ret)
+                }
+            }
+            .boxed()
+        }
+    }
+
+    /// Special visitor for program nodes that begin with imports that import directly in to their scope.
+    fn visit_program_with_imports<'a>(
+        &mut self,
+        imports: Vec<Span<'a>>,
+        nodes: Vec<Node<'a>>,
+    ) -> impl for<'f> Fn(&Arc<InterpreterInner>, &'f Mutex<Frame>) -> BoxFuture<'f, Result<Value>>
+    {
+        let mut continuation_visitor =
+            Visitor::new(self.global_fs_root.clone(), self.global_pwd.clone());
+        let program = Arc::new(continuation_visitor.visit(Node::Program(nodes)));
+        let imports = imports.into_iter().map(|x| (*x.fragment()).to_owned()).collect::<Vec<_>>();
+
+        let capture_map = self.capture_map_for(&continuation_visitor);
+        let slots_needed = continuation_visitor.slots_needed();
+        let (captured_ids, allocated_ids) = continuation_visitor.into_slot_data();
+
+        let fs_root = self.global_fs_root.clone().unwrap_or_else(|| self.fetch_slot("fs_root").0);
+        let pwd = self.global_pwd.clone().unwrap_or_else(|| self.fetch_slot("pwd").0);
+
+        move |inner, frame| {
+            let program = Arc::clone(&program);
+            let inner = Arc::clone(&inner);
+            let imports = imports.clone();
+            let mut captured_ids = captured_ids.clone();
+            let allocated_ids = allocated_ids.clone();
+            let capture_map = capture_map.clone();
+
+            async move {
+                // TODO: If we import in a nested block this will do the whole
+                // import including file loading every single time we loop
+                // through that block. Not ideal?
+                let (fs_root, pwd) = {
+                    let frame = frame.lock().unwrap();
+                    (frame.get(fs_root), frame.get(pwd))
+                };
+
+                let mut fs_root = fs_root.await?;
+                let mut pwd = pwd.await?;
+
+                let mut globals: Option<crate::frame::GlobalVariables> = None;
+                for import in imports {
+                    let interpreter = Interpreter::new_with_inner(
+                        Arc::clone(&inner),
+                        fs_root.duplicate(),
+                        pwd.duplicate(),
+                    )
+                    .await;
+                    let new_globals = interpreter.run_isolated_import(import).await?;
+
+                    if let Some(globals) = &mut globals {
+                        globals.merge(new_globals);
+                    } else {
+                        globals = Some(new_globals);
+                    }
+                }
+
+                let globals = globals.unwrap();
+
+                let capture_set = {
+                    let mut frame = frame.lock().unwrap();
+                    CaptureSet::new(&mut frame, &capture_map)
+                };
+
+                let mut continuation_frame = Frame::new(slots_needed);
+                continuation_frame.apply_capture(&capture_set);
+                globals.apply_to_frame(&mut continuation_frame, |ident| {
+                    if let Some(id) = captured_ids.remove(ident) {
+                        Some(id)
+                    } else {
+                        allocated_ids.get(ident).copied()
+                    }
+                });
+                program(&inner, &Mutex::new(continuation_frame)).await
             }
             .boxed()
         }

@@ -439,9 +439,25 @@ impl Interpreter {
         interpreter
     }
 
-    /// Destroy this interpreter and return the contents of its global namespace.
-    pub(crate) fn to_globals(self) -> GlobalVariables {
-        self.global_variables.into_inner().unwrap()
+    /// Looks up the given `path` in this namespace, then tries to load it as a
+    /// text file, and, if successful, runs the contents as code in a new
+    /// interpreter.
+    pub fn run_isolated_import(
+        self,
+        path: String,
+    ) -> impl Future<Output = Result<GlobalVariables>> + Send + 'static {
+        async move {
+            let file = self.open(path.clone()).await?;
+            let file = file
+                .try_client_channel(self.inner.lib_namespace(), "fuchsia.io/File")
+                .map_err(|_| error!("Tried to import {path} which is not a file"))?;
+            let file = fidl_fuchsia_io::FileProxy::from_channel(
+                fuchsia_async::Channel::from_channel(file),
+            );
+            let file = fuchsia_fs::file::read_to_string(&file).await?;
+            self.run(file.as_str()).await?;
+            Ok(self.global_variables.into_inner().unwrap())
+        }
     }
 
     /// Take a [`ReplayableIterator`], which is how the playground [`Value`]

@@ -992,3 +992,79 @@ async fn import_as_nesting() {
     })
     .await;
 }
+
+#[fuchsia::test]
+async fn import() {
+    Test::test(
+        r#"
+    {
+    import /imports/test_script_a
+    imported_command
+    }
+    "#,
+    )
+    .with_fidl()
+    .with_standard_test_dirs()
+    .check(|value| {
+        let Value::String(value) = value else {
+            panic!();
+        };
+
+        assert_eq!("ran imported command", &value);
+    })
+    .await;
+}
+
+#[fuchsia::test]
+async fn import_hermeticity() {
+    Test::test(
+        r#"
+    {
+    def imported_command {
+        "ran shadowed local command"
+    }
+    import /imports/test_script_b
+    let a = imported_command_alias;
+    let b = imported_command;
+    $a + " " + $b
+    }
+    "#,
+    )
+    .with_fidl()
+    .with_standard_test_dirs()
+    .check(|value| {
+        let Value::String(value) = value else {
+            panic!();
+        };
+
+        assert_eq!("ran imported command ran shadowed local command", &value);
+    })
+    .await;
+}
+
+#[fuchsia::test]
+async fn import_nesting() {
+    Test::test(
+        r#"
+    {
+    def imported_command { "ran shadowed local command" }
+    let a = {
+        import /imports/test_script_a
+        imported_command
+    };
+    let b = imported_command;
+    $a + " " + $b
+    }
+    "#,
+    )
+    .with_fidl()
+    .with_standard_test_dirs()
+    .check(|value| {
+        let Value::String(value) = value else {
+            panic!();
+        };
+
+        assert_eq!("ran imported command ran shadowed local command", &value);
+    })
+    .await;
+}
