@@ -224,7 +224,7 @@ async fn main_connect_loop(
             connect_timeout,
             rcs_proxy.try_connect(|target| {
                 tracing::info!(
-                    "Waiting for target '{}' to return",
+                    "RCS proxy: Waiting for target '{}' to return",
                     match target {
                         Some(s) => s,
                         _ => "None",
@@ -249,7 +249,7 @@ async fn main_connect_loop(
         let target_proxy = target_proxy
             .try_connect(|target| {
                 tracing::info!(
-                    "Waiting for target '{}' to return",
+                    "Target proxy: Waiting for target '{}' to return",
                     match target {
                         Some(s) => s,
                         _ => "None",
