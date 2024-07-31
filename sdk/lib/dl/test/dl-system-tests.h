@@ -26,6 +26,8 @@ class DlSystemTests : public DlSystemLoadTestsBase {
   static constexpr bool kCanMatchExactError = false;
 
 #ifdef __Fuchsia__
+  // Fuchisa's musl will always prioritize a loaded module for symbol lookup.
+  static constexpr bool kStrictLoadOrderPriority = true;
   // Fuchsia's musl implementation of dlopen does not validate flag values for
   // the mode argument.
   static constexpr bool kCanValidateMode = false;

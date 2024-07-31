@@ -421,9 +421,7 @@ TYPED_TEST(DlTests, BasicModuleReuse) {
 // pointers or resolved symbols.
 TYPED_TEST(DlTests, UniqueModules) {
   constexpr const char* kFile1 = "ret17.module.so";
-  constexpr int64_t kReturnValue17 = 17;
   constexpr const char* kFile2 = "ret23.module.so";
-  constexpr int64_t kReturnValue23 = 23;
 
   if constexpr (TestFixture::kSupportsNoLoadMode) {
     if constexpr (TestFixture::kRetrievesFileWithNoLoad) {
@@ -462,8 +460,8 @@ TYPED_TEST(DlTests, UniqueModules) {
 
   EXPECT_NE(sym17_ptr, sym23_ptr);
 
-  EXPECT_EQ(RunFunction<int64_t>(sym17_ptr), kReturnValue17);
-  EXPECT_EQ(RunFunction<int64_t>(sym23_ptr), kReturnValue23);
+  EXPECT_EQ(RunFunction<int64_t>(sym17_ptr), 17);
+  EXPECT_EQ(RunFunction<int64_t>(sym23_ptr), 23);
 
   ASSERT_TRUE(this->DlClose(ret17_ptr).is_ok());
   ASSERT_TRUE(this->DlClose(ret23_ptr).is_ok());
@@ -603,6 +601,75 @@ TYPED_TEST(DlTests, TransitiveDepOrder) {
 //   - foo-v2 -> foo() returns 7
 // call foo() from multiple-foo-deps and expect 2 from foo-v1 because it is
 // first in multiple-foo-deps local scope.
+TYPED_TEST(DlTests, LocalPrecedence) {
+  constexpr const char* kFile = "multiple-foo-deps.LocalPrecedence.so";
+  constexpr const char* kDepFile1 = "libld-dep-foo-v1.LocalPrecedence.so";
+  constexpr const char* kDepFile2 = "libld-dep-foo-v2.LocalPrecedence.so";
+  constexpr int64_t kReturnValueFromFooV1 = 2;
+  constexpr int64_t kReturnValueFromFooV2 = 7;
+
+  if constexpr (!TestFixture::kCanReuseLoadedDeps) {
+    GTEST_SKIP() << "test requires that fixture can reuse loaded modules for dependencies";
+  }
+
+  if constexpr (TestFixture::kSupportsNoLoadMode) {
+    if constexpr (TestFixture::kRetrievesFileWithNoLoad) {
+      this->ExpectRootModule(kFile);
+      this->Needed({kDepFile1, kDepFile2});
+    }
+    ASSERT_TRUE(this->DlOpen(kFile, RTLD_NOLOAD).is_error());
+    ASSERT_TRUE(this->DlOpen(kDepFile1, RTLD_NOLOAD).is_error());
+    ASSERT_TRUE(this->DlOpen(kDepFile2, RTLD_NOLOAD).is_error());
+  }
+
+  this->Needed({kDepFile2});
+
+  auto res1 = this->DlOpen(kDepFile2, RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(res1.is_ok()) << res1.error_value();
+  EXPECT_TRUE(res1.value());
+
+  auto sym1 = this->DlSym(res1.value(), "foo");
+  ASSERT_TRUE(sym1.is_ok()) << sym1.error_value();
+  ASSERT_TRUE(sym1.value());
+
+  EXPECT_EQ(RunFunction<int64_t>(sym1.value()), kReturnValueFromFooV2);
+
+  this->ExpectRootModule(kFile);
+
+  this->Needed({kDepFile1});
+
+  auto res2 = this->DlOpen(kFile, RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(res2.is_ok()) << res2.error_value();
+  EXPECT_TRUE(res2.value());
+
+  // Test the `foo` value that is used by the root module's `call_foo()` function.
+  auto sym2 = this->DlSym(res2.value(), "call_foo");
+  ASSERT_TRUE(sym2.is_ok()) << sym2.error_value();
+  ASSERT_TRUE(sym2.value());
+
+  if constexpr (TestFixture::kStrictLoadOrderPriority) {
+    // Musl will prioritize the symbol that was loaded first (from libfoo-v2),
+    // even though the file does not have global scope.
+    EXPECT_EQ(RunFunction<int64_t>(sym2.value()), kReturnValueFromFooV2);
+  } else {
+    // Glibc & libdl will use the symbol that is first encountered in the
+    // module's local scope, from libfoo-v1.
+    EXPECT_EQ(RunFunction<int64_t>(sym2.value()), kReturnValueFromFooV1);
+  }
+
+  // dlsym will always use dependency ordering from the local scope when looking
+  // up a symbol. Unlike `call_foo()`, `foo()` is provided by a dependency, and
+  // both musl and glibc will only look for this symbol in the root module's
+  // local-scope dependency set.
+  auto sym3 = this->DlSym(res2.value(), "foo");
+  ASSERT_TRUE(sym3.is_ok()) << sym3.error_value();
+  ASSERT_TRUE(sym3.value());
+
+  EXPECT_EQ(RunFunction<int64_t>(sym3.value()), kReturnValueFromFooV1);
+
+  ASSERT_TRUE(this->DlClose(res1.value()).is_ok());
+  ASSERT_TRUE(this->DlClose(res2.value()).is_ok());
+}
 
 // TODO(https://fxbug.dev/338233824): These are test scenarios that test symbol
 // resolution with RTLD_GLOBAL.

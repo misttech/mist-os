@@ -91,6 +91,7 @@ per_test_suffices = [
   ".DepOrder",
   ".TransitiveDepOrder",
   ".OpenDepDirectly",
+  ".LocalPrecedence",
 ]
 
 foreach(module, per_test_modules) {

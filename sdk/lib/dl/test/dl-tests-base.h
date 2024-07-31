@@ -37,6 +37,9 @@ class DlTestsBase : public ::testing::Test {
   // TODO(https://fxbug.dev/338229987): Remove this flag when DlImplTests
   // can supports this feature.
   static constexpr bool kCanReuseLoadedDeps = true;
+  // Whether the test fixture will always prioritize a loaded module in symbol
+  // resolution, regardless of whether it is a global module.
+  static constexpr bool kStrictLoadOrderPriority = false;
 
   // Test fixtures are expected to provide definitions for the following API:
   fit::result<Error, void*> DlOpen(const char* file, int mode);
