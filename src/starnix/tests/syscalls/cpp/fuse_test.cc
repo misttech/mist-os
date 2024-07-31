@@ -55,7 +55,7 @@ class FuseTest : public ::testing::Test {
 
   void TearDown() override {
     if (base_dir_) {
-      if (umount(GetMountDir().c_str()) != 0) {
+      if (umount2(GetMountDir().c_str(), MNT_DETACH) != 0) {
         FAIL() << "Unable to umount: " << strerror(errno);
       }
       base_dir_.reset();
@@ -735,7 +735,7 @@ class FuseServerTest : public ::testing::Test {
 
   void TearDown() override {
     if (mount_dir_) {
-      if (umount(mount_dir_->c_str()) != 0) {
+      if (umount2(mount_dir_->c_str(), MNT_DETACH) != 0) {
         FAIL() << "Unable to umount: " << strerror(errno);
       }
       mount_dir_.reset();
@@ -1929,7 +1929,7 @@ TEST_F(FuseServerTest, InvalidateMountDir) {
     }
   });
   auto cleanup_child_mount = fit::defer([&]() {
-    umount(child_mount_dir.c_str());
+    umount2(child_mount_dir.c_str(), MNT_DETACH);
     child_mount_thread.join();
   });
   const std::string node_path = child_mount_dir + "/node";
@@ -1943,6 +1943,6 @@ TEST_F(FuseServerTest, InvalidateMountDir) {
   ASSERT_EQ(open(node_path.c_str(), O_RDONLY), -1);
   EXPECT_EQ(errno, ENOENT);
 
-  ASSERT_EQ(umount(child_mount_dir.c_str()), -1);
+  ASSERT_EQ(umount2(child_mount_dir.c_str(), MNT_DETACH), -1);
   EXPECT_EQ(errno, EINVAL);
 }
