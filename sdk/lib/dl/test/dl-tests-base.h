@@ -27,6 +27,8 @@ class DlTestsBase : public ::testing::Test {
   // expected error occurred without needing to adhere to the exact error
   // verbiage.
   static constexpr bool kCanMatchExactError = true;
+  // A "Symbol not found" error is emitted for any undefined symbol error.
+  static constexpr bool kEmitsSymbolNotFound = false;
   // Whether the dlopen implementation validates the mode argument.
   static constexpr bool kCanValidateMode = true;
   // Whether the test fixture's implementation supports `RTLD_NOLOAD`

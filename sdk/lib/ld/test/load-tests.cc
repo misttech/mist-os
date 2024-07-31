@@ -567,7 +567,7 @@ TYPED_TEST(LdLoadFailureTests, MissingSymbol) {
       this->LoadAndFail("missing-sym", ExpectedErrorList{
                                            ExpectReport{
                                                "undefined symbol: ",
-                                               "b",
+                                               "c",
                                            },
                                        }));
 }
