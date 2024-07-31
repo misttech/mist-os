@@ -315,7 +315,7 @@ pub mod tests {
     use router_error::DowncastErrorForTest;
     use routing::bedrock::structured_dict::ComponentInput;
     use routing::{DictExt, LazyGet};
-    use sandbox::{Data, Dict, Receiver, RemotableCapability, WeakInstanceToken};
+    use sandbox::{Data, Dict, RemotableCapability, WeakInstanceToken};
     use std::pin::pin;
     use std::sync::Weak;
     use std::task::Poll;
@@ -326,7 +326,7 @@ pub mod tests {
         sub_dict
             .insert("bar".parse().unwrap(), Capability::Dictionary(Dict::new()))
             .expect("dict entry already exists");
-        let (_, sender) = Receiver::new();
+        let (_, sender) = Connector::new();
         sub_dict.insert("baz".parse().unwrap(), sender.into()).expect("dict entry already exists");
 
         let test_dict = Dict::new();
@@ -350,7 +350,7 @@ pub mod tests {
             .is_ok());
         assert!(test_dict.get_capability(&RelativePath::new("foo/bar").unwrap()).is_some());
 
-        let (_, sender) = Receiver::new();
+        let (_, sender) = Connector::new();
         assert!(test_dict
             .insert_capability(&RelativePath::new("foo/baz").unwrap(), sender.into())
             .is_ok());
@@ -515,7 +515,7 @@ pub mod tests {
 
     #[fuchsia::test(allow_stalls = false)]
     async fn router_on_readable_client_writes() {
-        let (receiver, sender) = Receiver::new();
+        let (receiver, sender) = Connector::new();
         let scope = ExecutionScope::new();
         let (client_end, server_end) = zx::Channel::create();
 
@@ -569,7 +569,7 @@ pub mod tests {
 
     #[fuchsia::test(allow_stalls = false)]
     async fn router_on_readable_client_closes() {
-        let (receiver, sender) = Receiver::new();
+        let (receiver, sender) = Connector::new();
         let scope = ExecutionScope::new();
         let (client_end, server_end) = zx::Channel::create();
 

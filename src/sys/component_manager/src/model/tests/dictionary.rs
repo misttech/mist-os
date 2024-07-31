@@ -4,7 +4,6 @@
 
 use crate::capability;
 use crate::framework::capability_store::CapabilityStore;
-use crate::framework::factory::Factory;
 use crate::model::testing::out_dir::OutDir;
 use crate::model::testing::routing_test_helpers::*;
 use cm_rust::*;
@@ -1412,10 +1411,6 @@ async fn extend_from_program() {
     ];
     let test = RoutingTestBuilder::new("root", components).build().await;
 
-    let factory_host = Factory::new();
-    let (factory, server) = endpoints::create_proxy::<fsandbox::FactoryMarker>().unwrap();
-    capability::open_framework(&factory_host, test.model.root(), server.into()).await.unwrap();
-
     let host = CapabilityStore::new();
     let (store, server) = endpoints::create_proxy::<fsandbox::CapabilityStoreMarker>().unwrap();
     capability::open_framework(&host, test.model.root(), server.into()).await.unwrap();
@@ -1425,9 +1420,8 @@ async fn extend_from_program() {
     store.dictionary_create(dict_id).await.unwrap().unwrap();
     let (receiver_client, mut receiver_stream) =
         endpoints::create_request_stream::<fsandbox::ReceiverMarker>().unwrap();
-    let connector = factory.create_connector(receiver_client).await.unwrap();
     let connector_id = 10;
-    store.import(connector_id, fsandbox::Capability::Connector(connector)).await.unwrap().unwrap();
+    store.connector_create(connector_id, receiver_client).await.unwrap().unwrap();
     store
         .dictionary_insert(
             dict_id,

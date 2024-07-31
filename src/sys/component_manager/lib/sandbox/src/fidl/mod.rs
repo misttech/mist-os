@@ -10,6 +10,7 @@ mod dir_entry;
 mod directory;
 mod handle;
 mod instance_token;
+pub(crate) mod receiver;
 pub(crate) mod registry;
 mod router;
 pub(crate) mod store;

@@ -188,7 +188,7 @@ mod test_util {
     use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
     pub fn multishot() -> (Connector, Receiver) {
-        let (receiver, sender) = Receiver::new();
+        let (receiver, sender) = Connector::new();
         (sender, receiver)
     }
 

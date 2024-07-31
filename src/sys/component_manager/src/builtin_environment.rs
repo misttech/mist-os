@@ -25,7 +25,6 @@ use crate::builtin::time::{create_utc_clock, UtcTimeMaintainer};
 use crate::capability::{self, BuiltinCapability, CapabilitySource, FrameworkCapability};
 use crate::framework::binder::BinderFrameworkCapability;
 use crate::framework::capability_store::CapabilityStore;
-use crate::framework::factory::Factory;
 use crate::framework::introspector::IntrospectorFrameworkCapability;
 use crate::framework::lifecycle_controller::LifecycleController;
 use crate::framework::namespace::Namespace;
@@ -496,7 +495,7 @@ pub struct BuiltinEnvironment {
     #[allow(dead_code)]
     pub event_registry: Arc<EventRegistry>,
     pub event_source_factory: Arc<EventSourceFactory>,
-    pub factory: Factory,
+    pub capability_store: CapabilityStore,
     pub stop_notifier: Arc<RootStopNotifier>,
     // TODO(https://fxbug.dev/332389972): Remove or explain #[allow(dead_code)].
     #[allow(dead_code)]
@@ -1155,15 +1154,14 @@ impl BuiltinEnvironment {
         model.root().hooks.install(event_registry.hooks()).await;
         model.root().hooks.install(event_stream_provider.hooks()).await;
 
-        let factory = Factory::new();
+        let capability_store = CapabilityStore::new();
         let mut framework_capabilities: Vec<Box<dyn FrameworkCapability>> = vec![
             Box::new(Realm::new(Arc::downgrade(&model), runtime_config.clone())),
             Box::new(IntrospectorFrameworkCapability {
                 instance_registry: model.context().instance_registry().clone(),
             }),
             Box::new(BinderFrameworkCapability::new()),
-            Box::new(factory.clone()),
-            Box::new(CapabilityStore::new()),
+            Box::new(capability_store.clone()),
             Box::new(Namespace::new()),
             Box::new(PkgDirectoryFrameworkCapability::new()),
             Box::new(EventSourceFactoryCapability::new(event_source_factory.clone())),
@@ -1238,7 +1236,7 @@ impl BuiltinEnvironment {
             lifecycle_controller,
             event_registry,
             event_source_factory,
-            factory,
+            capability_store,
             stop_notifier,
             inspect_sink_provider,
             event_stream_provider,
@@ -1267,9 +1265,9 @@ impl BuiltinEnvironment {
             &mut service_fs,
             self.realm_query.as_ref(),
         );
-        self.add_exposed_framework_protocol::<_, fsandbox::FactoryMarker>(
+        self.add_exposed_framework_protocol::<_, fsandbox::CapabilityStoreMarker>(
             &mut service_fs,
-            Some(&self.factory),
+            Some(&self.capability_store),
         );
 
         let scope = self.model.top_instance().task_group().clone();

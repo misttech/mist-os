@@ -1073,7 +1073,7 @@ async fn create_child_with_dict() {
     // Create a dictionary with a sender for the `hippo` protocol.
     let dict = sandbox::Dict::new();
 
-    let (receiver, sender) = sandbox::Receiver::new();
+    let (receiver, sender) = sandbox::Connector::new();
 
     // Serve the `fidl.examples.routing.echo.Echo` protocol on the receiver.
     let _task = fasync::Task::spawn(async move {

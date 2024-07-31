@@ -62,20 +62,21 @@ async fn launch_elf_component() {
 /// Build a dictionary with an echo protocol capability and return the receiver stream
 /// to handle connection requests.
 async fn build_echo_dictionary() -> (fsandbox::DictionaryRef, fsandbox::ReceiverRequestStream) {
-    let factory = client::connect_to_protocol::<fsandbox::FactoryMarker>().unwrap();
     let store = client::connect_to_protocol::<fsandbox::CapabilityStoreMarker>().unwrap();
     let dict_id = 1;
     store.dictionary_create(dict_id).await.unwrap().unwrap();
 
     let (echo_receiver_client, echo_receiver_stream) =
         endpoints::create_request_stream::<fsandbox::ReceiverMarker>().unwrap();
-    let echo_connector = factory.create_connector(echo_receiver_client).await.unwrap();
-    let value = 100;
-    store.import(value, fsandbox::Capability::Connector(echo_connector)).await.unwrap().unwrap();
+    let connector_id = 100;
+    store.connector_create(connector_id, echo_receiver_client).await.unwrap().unwrap();
     store
         .dictionary_insert(
             dict_id,
-            &fsandbox::DictionaryItem { key: fecho::EchoMarker::PROTOCOL_NAME.into(), value },
+            &fsandbox::DictionaryItem {
+                key: fecho::EchoMarker::PROTOCOL_NAME.into(),
+                value: connector_id,
+            },
         )
         .await
         .unwrap()

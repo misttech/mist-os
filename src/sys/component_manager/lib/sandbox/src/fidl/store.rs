@@ -4,7 +4,7 @@
 
 use crate::dict::Key;
 use crate::fidl::registry;
-use crate::{Capability, Dict};
+use crate::{Capability, Connector, Dict, Message};
 use fidl::handle::Signals;
 use fidl::AsHandleRef;
 use futures::{FutureExt, TryStreamExt};
@@ -56,6 +56,21 @@ pub async fn serve_capability_store(
                         .try_into()
                         .map_err(|_| fsandbox::CapabilityStoreError::BadCapability)?;
                     insert_capability(&mut store, id, capability)
+                })();
+                responder.send(result)?;
+            }
+            fsandbox::CapabilityStoreRequest::ConnectorCreate { id, receiver, responder } => {
+                let result = (|| {
+                    let connector = Connector::new_with_owned_receiver(receiver);
+                    insert_capability(&mut store, id, Capability::Connector(connector))
+                })();
+                responder.send(result)?;
+            }
+            fsandbox::CapabilityStoreRequest::ConnectorOpen { id, server_end, responder } => {
+                let result = (|| {
+                    let this = get_connector(&store, id)?;
+                    let _ = this.send(Message { channel: server_end });
+                    Ok(())
                 })();
                 responder.send(result)?;
             }
@@ -384,6 +399,18 @@ fn get_next_chunk(
         }
     }
     Ok(chunk)
+}
+
+fn get_connector(
+    store: &HashMap<u64, Capability>,
+    id: u64,
+) -> Result<&Connector, fsandbox::CapabilityStoreError> {
+    let conn = store.get(&id).ok_or_else(|| fsandbox::CapabilityStoreError::IdNotFound)?;
+    if let Capability::Connector(conn) = conn {
+        Ok(conn)
+    } else {
+        Err(fsandbox::CapabilityStoreError::WrongType)
+    }
 }
 
 fn get_dictionary(

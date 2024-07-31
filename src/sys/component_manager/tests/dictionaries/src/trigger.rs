@@ -24,7 +24,6 @@ enum IncomingRequest {
 #[fasync::run_singlethreaded]
 async fn main() {
     info!("trigger.cm started");
-    let factory = client::connect_to_protocol::<fsandbox::FactoryMarker>().unwrap();
     let store = client::connect_to_protocol::<fsandbox::CapabilityStoreMarker>().unwrap();
     let dict_id = 1;
     store.dictionary_create(dict_id).await.unwrap().unwrap();
@@ -32,17 +31,15 @@ async fn main() {
     // Dynamically add trigger-d to the dictionary
     let (trigger_receiver_client, trigger_receiver_stream) =
         endpoints::create_request_stream::<fsandbox::ReceiverMarker>().unwrap();
-    let trigger_sender_client = factory.create_connector(trigger_receiver_client).await.unwrap();
-    let value = 100;
-    store
-        .import(value, fsandbox::Capability::Connector(trigger_sender_client))
-        .await
-        .unwrap()
-        .unwrap();
+    let connector_id = 100;
+    store.connector_create(connector_id, trigger_receiver_client).await.unwrap().unwrap();
     store
         .dictionary_insert(
             dict_id,
-            &fsandbox::DictionaryItem { key: "fidl.test.components.Trigger-d".into(), value },
+            &fsandbox::DictionaryItem {
+                key: "fidl.test.components.Trigger-d".into(),
+                value: connector_id,
+            },
         )
         .await
         .unwrap()

@@ -146,7 +146,7 @@ impl Routable for RouterError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Message, Receiver};
+    use crate::{Connector, Message};
     use fidl::handle::Channel;
 
     #[derive(Debug)]
@@ -168,7 +168,7 @@ mod tests {
     async fn route_and_use_connector_with_dropped_receiver() {
         // We want to test vending a sender with a router, dropping the associated receiver, and
         // then using the sender. The objective is to observe an error, and not panic.
-        let (receiver, sender) = Receiver::new();
+        let (receiver, sender) = Connector::new();
         let router = Router::new_ok(sender.clone());
 
         let capability = router

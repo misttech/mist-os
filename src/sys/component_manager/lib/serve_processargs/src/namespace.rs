@@ -416,7 +416,7 @@ mod tests {
     async fn test_not_directory() {
         let (not_found_sender, _) = unbounded();
         let mut namespace = NamespaceBuilder::new(ExecutionScope::new(), not_found_sender);
-        let (_, sender) = sandbox::Receiver::new();
+        let (_, sender) = sandbox::Connector::new();
         assert_matches!(
             namespace.add_entry(sender.into(), &ns_path("/a")),
             Err(BuildNamespaceError::NamespaceError(NamespaceError::EntryError(

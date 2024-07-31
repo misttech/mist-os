@@ -119,7 +119,7 @@ fn from_cm_type(value: cm_types::Availability) -> fsandbox::Availability {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Dict, Receiver, WeakInstanceToken};
+    use crate::{Connector, Dict, WeakInstanceToken};
     use assert_matches::assert_matches;
     use std::sync::Arc;
 
@@ -145,7 +145,7 @@ mod tests {
         let koid = server.basic_info().unwrap().related_koid;
         component.register(koid, server);
 
-        let (_, sender) = Receiver::new();
+        let (_, sender) = Connector::new();
         let router = Router::new_ok(sender);
         let (client, stream) =
             fidl::endpoints::create_proxy_and_stream::<fsandbox::RouterMarker>().unwrap();
@@ -166,7 +166,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn serve_router_bad_arguments() {
-        let (_, sender) = Receiver::new();
+        let (_, sender) = Connector::new();
         let router = Router::new_ok(sender);
         let (client, stream) =
             fidl::endpoints::create_proxy_and_stream::<fsandbox::RouterMarker>().unwrap();
@@ -202,7 +202,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn serve_router_bad_token() {
-        let (_, sender) = Receiver::new();
+        let (_, sender) = Connector::new();
         let router = Router::new_ok(sender);
         let (client, stream) =
             fidl::endpoints::create_proxy_and_stream::<fsandbox::RouterMarker>().unwrap();

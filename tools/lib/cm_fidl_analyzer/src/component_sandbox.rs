@@ -95,7 +95,7 @@ pub fn build_framework_dictionary(component: &Arc<ComponentInstanceForAnalyzer>)
     let framework_dict = Dict::new();
     for protocol_name in &[
         fcomponent::BinderMarker::PROTOCOL_NAME,
-        fsandbox::FactoryMarker::PROTOCOL_NAME,
+        fsandbox::CapabilityStoreMarker::PROTOCOL_NAME,
         fcomponent::IntrospectorMarker::PROTOCOL_NAME,
         fsys::LifecycleControllerMarker::PROTOCOL_NAME,
         fcomponent::NamespaceMarker::PROTOCOL_NAME,

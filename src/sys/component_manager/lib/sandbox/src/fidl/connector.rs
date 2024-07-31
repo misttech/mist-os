@@ -3,15 +3,27 @@
 // found in the LICENSE file.
 
 use crate::fidl::registry;
-use crate::{Connector, ConversionError, Message};
+use crate::{Connector, ConversionError, Message, Receiver};
+use fidl::endpoints::ClientEnd;
 use fidl::handle::Channel;
-use fidl_fuchsia_component_sandbox as fsandbox;
+use futures::channel::mpsc;
 use std::sync::Arc;
 use vfs::directory::entry::DirectoryEntry;
+use {fidl_fuchsia_component_sandbox as fsandbox, fuchsia_async as fasync};
 
 impl Connector {
     pub(crate) fn send_channel(&self, channel: Channel) -> Result<(), ()> {
         self.send(Message { channel })
+    }
+
+    pub(crate) fn new_with_owned_receiver(
+        receiver_client: ClientEnd<fsandbox::ReceiverMarker>,
+    ) -> Self {
+        let (sender, receiver) = mpsc::unbounded();
+        let receiver = Receiver::new(receiver);
+        let receiver_task =
+            fasync::Task::spawn(receiver.handle_receiver(receiver_client.into_proxy().unwrap()));
+        Self::new_internal(sender, Some(Arc::new(receiver_task)))
     }
 }
 
@@ -38,7 +50,6 @@ impl From<Connector> for fsandbox::Capability {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Receiver;
     use assert_matches::assert_matches;
     use fidl::endpoints::ClientEnd;
     use fidl::handle::Status;
@@ -50,7 +61,7 @@ mod tests {
     #[fuchsia::test]
     async fn unwrap_server_end_or_serve_node_node_reference_and_describe() {
         let receiver = {
-            let (receiver, sender) = Receiver::new();
+            let (receiver, sender) = Connector::new();
             let open: crate::DirEntry = sender.into();
             let (client_end, server_end) = Channel::create();
             let scope = ExecutionScope::new();
@@ -82,7 +93,7 @@ mod tests {
     // TODO(340891837): This test only runs on host because of the reliance on Open
     #[fuchsia::test]
     async fn unwrap_server_end_or_serve_node_describe() {
-        let (receiver, sender) = Receiver::new();
+        let (receiver, sender) = Connector::new();
         let open: crate::DirEntry = sender.into();
 
         let (client_end, server_end) = Channel::create();
@@ -107,7 +118,7 @@ mod tests {
     // TODO(340891837): This test only runs on host because of the reliance on Open
     #[fuchsia::test]
     async fn unwrap_server_end_or_serve_node_empty() {
-        let (receiver, sender) = Receiver::new();
+        let (receiver, sender) = Connector::new();
         let open: crate::DirEntry = sender.into();
 
         let (client_end, server_end) = Channel::create();

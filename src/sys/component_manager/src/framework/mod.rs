@@ -16,7 +16,6 @@ use {
 pub mod binder;
 pub mod capability_store;
 pub mod controller;
-pub mod factory;
 pub mod introspector;
 pub mod lifecycle_controller;
 pub mod namespace;
@@ -30,7 +29,6 @@ pub mod route_validator;
 pub fn build_framework_dictionary(component: &Arc<ComponentInstance>) -> Dict {
     let mut framework_dictionary = Dict::new();
     add_hook_protocol::<fcomponent::BinderMarker>(component, &mut framework_dictionary);
-    add_hook_protocol::<fsandbox::FactoryMarker>(component, &mut framework_dictionary);
     add_hook_protocol::<fsandbox::CapabilityStoreMarker>(component, &mut framework_dictionary);
     add_hook_protocol::<fcomponent::IntrospectorMarker>(component, &mut framework_dictionary);
     add_hook_protocol::<fsys::LifecycleControllerMarker>(component, &mut framework_dictionary);
