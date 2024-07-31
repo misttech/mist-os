@@ -470,6 +470,50 @@ TYPED_TEST(DlTests, UniqueModules) {
 }
 
 // Test that you can dlopen a dependency from a previously loaded module.
+TYPED_TEST(DlTests, OpenDepDirectly) {
+  constexpr const char* kFile = "libhas-foo-v1.OpenDepDirectly.so";
+  constexpr const char* kDepFile = "libld-dep-foo-v1.OpenDepDirectly.so";
+
+  if constexpr (!TestFixture::kCanReuseLoadedDeps) {
+    GTEST_SKIP() << "test requires that fixture can reuse loaded modules for dependencies";
+  }
+
+  if constexpr (TestFixture::kSupportsNoLoadMode) {
+    if constexpr (TestFixture::kRetrievesFileWithNoLoad) {
+      this->Needed({kFile, kDepFile});
+    }
+    ASSERT_TRUE(this->DlOpen(kFile, RTLD_NOLOAD).is_error());
+    ASSERT_TRUE(this->DlOpen(kDepFile, RTLD_NOLOAD).is_error());
+  }
+
+  this->Needed({kFile, kDepFile});
+
+  auto res1 = this->DlOpen(kFile, RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(res1.is_ok()) << res1.error_value();
+  EXPECT_TRUE(res1.value());
+
+  // dlopen kDepFile expecting it to already be loaded.
+  auto res2 = this->DlOpen(kDepFile, RTLD_NOW | RTLD_LOCAL | RTLD_NOLOAD);
+  ASSERT_TRUE(res2.is_ok()) << res2.error_value();
+  EXPECT_TRUE(res2.value());
+
+  // Test that dlsym will resolve the same symbol pointer from the shared
+  // dependency between kFile (res1) and kDepFile (res2).
+  auto sym1 = this->DlSym(res1.value(), "foo");
+  ASSERT_TRUE(sym1.is_ok()) << sym1.error_value();
+  ASSERT_TRUE(sym1.value());
+
+  auto sym2 = this->DlSym(res2.value(), "foo");
+  ASSERT_TRUE(sym2.is_ok()) << sym2.error_value();
+  ASSERT_TRUE(sym2.value());
+
+  EXPECT_EQ(sym1.value(), sym2.value());
+
+  EXPECT_EQ(RunFunction<int64_t>(sym1.value()), RunFunction<int64_t>(sym2.value()));
+
+  ASSERT_TRUE(this->DlClose(res1.value()).is_ok());
+  ASSERT_TRUE(this->DlClose(res2.value()).is_ok());
+}
 
 // These are test scenarios that test symbol resolution from just the dependency
 // graph, ie from the local scope of the dlopen-ed module.

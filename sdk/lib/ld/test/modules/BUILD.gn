@@ -90,6 +90,7 @@ per_test_modules = [
 per_test_suffices = [
   ".DepOrder",
   ".TransitiveDepOrder",
+  ".OpenDepDirectly",
 ]
 
 foreach(module, per_test_modules) {

@@ -28,6 +28,8 @@ class DlImplTests : public Base {
   static constexpr bool kCanMatchExactError = true;
   // TODO(https://fxbug.dev/348727901): Implement RTLD_NOLOAD
   static constexpr bool kSupportsNoLoadMode = false;
+  // TODO(https://fxbug.dev/338229987): Reuse loaded modules for dependencies.
+  static constexpr bool kCanReuseLoadedDeps = false;
 
   fit::result<Error, void*> DlOpen(const char* file, int mode) {
     // Check that all Needed/Expect* expectations for loaded objects were

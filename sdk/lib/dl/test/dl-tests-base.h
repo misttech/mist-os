@@ -34,6 +34,9 @@ class DlTestsBase : public ::testing::Test {
   // TODO(https://fxbug.dev/348722959): A test fixture may still retrieve the
   // file with RTLD_NOLOAD mode.
   static constexpr bool kRetrievesFileWithNoLoad = false;
+  // TODO(https://fxbug.dev/338229987): Remove this flag when DlImplTests
+  // can supports this feature.
+  static constexpr bool kCanReuseLoadedDeps = true;
 
   // Test fixtures are expected to provide definitions for the following API:
   fit::result<Error, void*> DlOpen(const char* file, int mode);
