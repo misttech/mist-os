@@ -94,7 +94,6 @@ fuchsia_cc_test(
     deps = [
         "//sdk/fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
         "//sdk/lib/driver/compat/cpp",
-        "//sdk/lib/driver/testing/cpp:driver_testing_cpp",
         "//src/devices/lib/amlogic",
         "//src/lib/ddk:ddk_metadata",
         "@com_google_googletest//:gtest",
@@ -108,6 +107,7 @@ fuchsia_cc_test(
         "@fuchsia_sdk//pkg/driver_component_cpp",
         "@fuchsia_sdk//pkg/driver_devfs_cpp",
         "@fuchsia_sdk//pkg/driver_runtime_cpp",
+        "@fuchsia_sdk//pkg/driver_testing_cpp",
         "@fuchsia_sdk//pkg/hwreg",
         "@fuchsia_sdk//pkg/mmio",
         "@internal_sdk//pkg/mmio-test-helper",

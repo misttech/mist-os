@@ -50,15 +50,18 @@ class Environment {
   virtual zx::result<> Serve(fdf::OutgoingDirectory& to_driver_vfs) = 0;
 };
 
+namespace internal {
 // Common logic for both background and foreground driver tests.
 //
 // Both foreground and background test classes inherit from this common class and provide
 // workflows for their specific threading-model.
+//
+// This class is not meant for direct use so its in the internal namespace.
 template <typename Configuration>
 class DriverTestCommon {
  public:
-  using DriverType = typename internal::ConfigurationExtractor<Configuration>::DriverType;
-  using EnvironmentType = typename internal::ConfigurationExtractor<Configuration>::EnvironmentType;
+  using DriverType = typename ConfigurationExtractor<Configuration>::DriverType;
+  using EnvironmentType = typename ConfigurationExtractor<Configuration>::EnvironmentType;
 
   DriverTestCommon()
       : env_dispatcher_(runtime_.StartBackgroundDispatcher()),
@@ -95,7 +98,7 @@ class DriverTestCommon {
   template <typename T>
   T RunInEnvironmentTypeContext(fit::callback<T(EnvironmentType&)> task) {
     return env_wrapper_.SyncCall(
-        [env_task = std::move(task)](internal::EnvWrapper<EnvironmentType>* env_ptr) mutable {
+        [env_task = std::move(task)](EnvWrapper<EnvironmentType>* env_ptr) mutable {
           return env_task(env_ptr->user_env());
         });
   }
@@ -107,7 +110,7 @@ class DriverTestCommon {
   // Returns when the given task has completed.
   void RunInEnvironmentTypeContext(fit::callback<void(EnvironmentType&)> task) {
     env_wrapper_.SyncCall(
-        [env_task = std::move(task)](internal::EnvWrapper<EnvironmentType>* env_ptr) mutable {
+        [env_task = std::move(task)](EnvWrapper<EnvironmentType>* env_ptr) mutable {
           env_task(env_ptr->user_env());
         });
   }
@@ -120,7 +123,7 @@ class DriverTestCommon {
   template <typename T>
   T RunInNodeContext(fit::callback<T(fdf_testing::TestNode&)> task) {
     return env_wrapper_.SyncCall(
-        [node_task = std::move(task)](internal::EnvWrapper<EnvironmentType>* env_ptr) mutable {
+        [node_task = std::move(task)](EnvWrapper<EnvironmentType>* env_ptr) mutable {
           return node_task(env_ptr->node_server());
         });
   }
@@ -132,7 +135,7 @@ class DriverTestCommon {
   // Returns when the given task has completed.
   void RunInNodeContext(fit::callback<void(fdf_testing::TestNode&)> task) {
     env_wrapper_.SyncCall(
-        [node_task = std::move(task)](internal::EnvWrapper<EnvironmentType>* env_ptr) mutable {
+        [node_task = std::move(task)](EnvWrapper<EnvironmentType>* env_ptr) mutable {
           node_task(env_ptr->node_server());
         });
   }
@@ -155,7 +158,7 @@ class DriverTestCommon {
       std::vector<std::string> devfs_node_name_path) {
     zx::result<zx::channel> raw_channel_result =
         env_wrapper_.SyncCall([devfs_node_name_path = std::move(devfs_node_name_path)](
-                                  internal::EnvWrapper<EnvironmentType>* env_ptr) mutable {
+                                  EnvWrapper<EnvironmentType>* env_ptr) mutable {
           fdf_testing::TestNode* current = &env_ptr->node_server();
           for (auto& node : devfs_node_name_path) {
             current = &current->children().at(node);
@@ -177,10 +180,9 @@ class DriverTestCommon {
         "Cannot call |StartDriver| multiple times in a row. If multiple starts are needed, "
         "ensure to go through |StopDriver| and |ShutdownAndDestroyDriver| first.");
 
-    fdf::DriverStartArgs start_args =
-        env_wrapper_.SyncCall(&internal::EnvWrapper<EnvironmentType>::Init);
+    fdf::DriverStartArgs start_args = env_wrapper_.SyncCall(&EnvWrapper<EnvironmentType>::Init);
     outgoing_directory_client_ =
-        env_wrapper_.SyncCall(&internal::EnvWrapper<EnvironmentType>::TakeOutgoingClient);
+        env_wrapper_.SyncCall(&EnvWrapper<EnvironmentType>::TakeOutgoingClient);
 
     start_result_ = StartDriverInner(std::move(start_args));
     return *start_result_;
@@ -196,10 +198,9 @@ class DriverTestCommon {
         "Cannot call |StartDriver| multiple times in a row. If multiple starts are needed, "
         "ensure to go through |StopDriver| and |ShutdownAndDestroyDriver| first.");
 
-    fdf::DriverStartArgs start_args =
-        env_wrapper_.SyncCall(&internal::EnvWrapper<EnvironmentType>::Init);
+    fdf::DriverStartArgs start_args = env_wrapper_.SyncCall(&EnvWrapper<EnvironmentType>::Init);
     outgoing_directory_client_ =
-        env_wrapper_.SyncCall(&internal::EnvWrapper<EnvironmentType>::TakeOutgoingClient);
+        env_wrapper_.SyncCall(&EnvWrapper<EnvironmentType>::TakeOutgoingClient);
     args_modifier(start_args);
 
     start_result_ = StartDriverInner(std::move(start_args));
@@ -267,12 +268,14 @@ class DriverTestCommon {
   fdf_testing::DriverRuntime runtime_;
   fdf::UnownedSynchronizedDispatcher env_dispatcher_;
 
-  async_patterns::TestDispatcherBound<internal::EnvWrapper<EnvironmentType>> env_wrapper_;
+  async_patterns::TestDispatcherBound<EnvWrapper<EnvironmentType>> env_wrapper_;
 
   fidl::ClientEnd<fuchsia_io::Directory> outgoing_directory_client_;
   std::optional<zx::result<>> start_result_;
   std::optional<zx::result<>> prepare_stop_result_;
 };
+
+}  // namespace internal
 
 // Background driver tests have the driver-under-test executing on a background driver dispatcher.
 // This allows for tests to use sync FIDL clients directly from their main test thread.
@@ -282,7 +285,7 @@ class DriverTestCommon {
 // The test can run tasks on the driver context using the |RunInDriverContext()| methods, but sync
 // client tasks can be run directly on the main test thread.
 template <typename Configuration>
-class BackgroundDriverTest : public DriverTestCommon<Configuration> {
+class BackgroundDriverTest final : public internal::DriverTestCommon<Configuration> {
   using DriverType = typename Configuration::DriverType;
 
  public:
@@ -357,7 +360,7 @@ class BackgroundDriverTest : public DriverTestCommon<Configuration> {
 // The test can access the driver under test using the |driver()| method and directly make calls
 // into it, but sync client tasks must go through |RunOnBackgroundDispatcherSync()|.
 template <typename Configuration>
-class ForegroundDriverTest : public DriverTestCommon<Configuration> {
+class ForegroundDriverTest final : public internal::DriverTestCommon<Configuration> {
   using DriverType = typename Configuration::DriverType;
 
  public:

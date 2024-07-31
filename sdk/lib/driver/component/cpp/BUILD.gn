@@ -98,7 +98,7 @@ executable("cpp_test") {
     "//sdk/lib/driver/compat/cpp",
     "//sdk/lib/driver/devfs/cpp",
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
-    "//sdk/lib/driver/testing/cpp:driver_testing_cpp",
+    "//sdk/lib/driver/testing/cpp",
     "//sdk/lib/driver/testing/cpp:minimal_compat_environment",
     "//sdk/lib/fidl/cpp",
     "//src/devices/lib/driver:driver_runtime",

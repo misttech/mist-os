@@ -74,7 +74,7 @@ test("aml-hrtimer-test") {
   sources = [ "unit-tests.cc" ]
   deps = [
     ":common",
-    "//sdk/lib/driver/testing/cpp:driver_testing_cpp",
+    "//sdk/lib/driver/testing/cpp",
     "//src/devices/testing/fake-bti",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",

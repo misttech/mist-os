@@ -70,7 +70,7 @@ test("hid-test") {
     ":driver-internals",
     ":hid_bind",
     "//sdk/fidl/fuchsia.hardware.hidbus:fuchsia.hardware.hidbus_cpp_testing",
-    "//sdk/lib/driver/testing/cpp:driver_testing_cpp",
+    "//sdk/lib/driver/testing/cpp",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/predicates",
   ]
