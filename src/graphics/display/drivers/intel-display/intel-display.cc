@@ -606,7 +606,7 @@ void Controller::InitDisplays() {
   }
 
   if (display_devices_.size() == 0) {
-    FDF_LOG(INFO, "intel-i915: No displays detected.");
+    FDF_LOG(INFO, "intel-display: No displays detected.");
   }
 
   // Make a note of what needs to be reset, so we can finish querying the hardware state
@@ -2089,7 +2089,7 @@ zx_status_t Controller::IntelGpuCoreGttInsert(uint64_t addr, zx::vmo buffer, uin
 // Ddk methods
 
 void Controller::Start(fdf::StartCompleter completer) {
-  FDF_LOG(TRACE, "i915: initializing displays");
+  FDF_LOG(TRACE, "intel-display: initializing displays");
 
   {
     fbl::AutoLock lock(&display_lock_);
@@ -2121,7 +2121,7 @@ void Controller::Start(fdf::StartCompleter completer) {
 
   interrupts_.FinishInit();
 
-  FDF_LOG(TRACE, "i915: display initialization done");
+  FDF_LOG(TRACE, "intel-display: display initialization done");
   completer(zx::ok());
 }
 

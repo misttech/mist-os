@@ -346,8 +346,8 @@ func fuchsiaLogChecks() []FailureModeCheck {
 		&stringInLogCheck{String: " in fx_logger::GetSeverity() ", Type: swarmingOutputType},
 		// For https://fxbug.dev/42151173. Do not check for this in swarming output as this does not indicate
 		// an error if logged by unit tests.
-		&stringInLogCheck{String: "intel-i915: No displays detected.", Type: serialLogType},
-		&stringInLogCheck{String: "intel-i915: No displays detected.", Type: syslogType},
+		&stringInLogCheck{String: "intel-display: No displays detected.", Type: serialLogType},
+		&stringInLogCheck{String: "intel-display: No displays detected.", Type: syslogType},
 		// for https://fxbug.dev/42082278. Broken HDMI emulator on vim3.
 		&stringInLogCheck{String: "Failed to parse edid (0 bytes) \"Failed to validate base edid\"", Type: serialLogType},
 		&stringInLogCheck{String: "Failed to parse edid (0 bytes) \"Failed to validate base edid\"", Type: syslogType},
