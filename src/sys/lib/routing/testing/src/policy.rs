@@ -246,7 +246,7 @@ where
                 subdir: Default::default(),
                 storage_id: fdecl::StorageId::StaticInstanceIdOrMoniker,
             }),
-            component: component.as_weak(),
+            moniker: component.moniker().clone(),
         };
         let valid_path_0 = Moniker::try_from(vec!["root", "bootstrap"]).unwrap();
         let valid_path_1 = Moniker::try_from(vec!["root", "core"]).unwrap();

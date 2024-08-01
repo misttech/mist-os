@@ -650,7 +650,7 @@ impl Use {
             UseSource::Capability(_) => {
                 sources.capability_source()?;
                 Ok(UseResult::Source(CapabilitySource::<C>::Capability {
-                    component: target.as_weak(),
+                    moniker: target.moniker().clone(),
                     source_capability: ComponentCapability::Use(use_.into()),
                 }))
             }
@@ -1052,7 +1052,7 @@ impl Offer {
                 sources.capability_source()?;
                 OfferSegment::Done(OfferResult::Source(CapabilitySource::<C>::Capability {
                     source_capability: ComponentCapability::Offer(offer.into()),
-                    component: target.as_weak(),
+                    moniker: target.moniker().clone(),
                 }))
             }
             OfferSource::Parent => {
@@ -1433,7 +1433,7 @@ impl Expose {
                 sources.capability_source()?;
                 ExposeSegment::Done(ExposeResult::Source(CapabilitySource::<C>::Capability {
                     source_capability: ComponentCapability::Expose(expose.into()),
-                    component: target.as_weak(),
+                    moniker: target.moniker().clone(),
                 }))
             }
             ExposeSource::Child(child) => {

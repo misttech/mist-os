@@ -91,14 +91,14 @@ mod tests {
     #[test]
     fn config_from_capability() {
         let test_value: cm_rust::ConfigValue = cm_rust::ConfigSingleValue::Uint8(5).into();
-        let void_source = CapabilitySource::Capability {
+        let void_source = CapabilitySource::<TestComponent>::Capability {
             source_capability: crate::capability_source::ComponentCapability::Config(
                 cm_rust::ConfigurationDecl {
                     name: "test".parse().unwrap(),
                     value: test_value.clone(),
                 },
             ),
-            component: WeakComponentInstanceInterface::<TestComponent>::invalid(),
+            moniker: Moniker::root(),
         };
         assert_eq!(Ok(Some(test_value)), source_to_value(&None, void_source));
     }

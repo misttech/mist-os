@@ -1084,8 +1084,9 @@ impl ComponentModelForAnalyzer {
                 self.check_executable(&source_component)
             }
             CapabilitySource::Namespace { .. } => Ok(()),
-            CapabilitySource::Capability { source_capability, component: weak } => {
-                self.check_capability_source(&weak.upgrade()?, &source_capability)
+            CapabilitySource::Capability { source_capability, moniker } => {
+                let source_component = target.find_absolute(&moniker).await?;
+                self.check_capability_source(&source_component, &source_capability)
             }
             CapabilitySource::Builtin { .. } => Ok(()),
             CapabilitySource::Framework { .. } => Ok(()),

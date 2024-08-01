@@ -399,7 +399,7 @@ pub fn build_storage_admin_dictionary(
     }) {
         let capability_source = CapabilitySource::Capability {
             source_capability: ComponentCapability::Storage(storage_decl.clone()),
-            component: component.into(),
+            moniker: component.moniker.clone(),
         };
         let storage_decl = storage_decl.clone();
         let weak_component = WeakComponentInstance::new(component);

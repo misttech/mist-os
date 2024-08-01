@@ -127,7 +127,7 @@ pub fn build_capability_sourced_capabilities_dictionary(
                     &storage_decl.name,
                     new_debug_only_router(CapabilitySource::Capability {
                         source_capability: ComponentCapability::Storage(storage_decl.clone()),
-                        component: WeakComponentInstanceInterface::new(component),
+                        moniker: component.moniker().clone(),
                     })
                     .into(),
                 )

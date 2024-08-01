@@ -111,17 +111,15 @@ impl GlobalPolicyChecker {
                 source: CapabilityAllowlistSource::Void,
                 capability: capability.type_name(),
             },
-            CapabilitySource::Capability { source_capability, component } => {
-                CapabilityAllowlistKey {
-                    source_moniker: ExtendedMoniker::ComponentInstance(component.moniker.clone()),
-                    source_name: source_capability
-                        .source_name()
-                        .ok_or(PolicyError::InvalidCapabilitySource)?
-                        .clone(),
-                    source: CapabilityAllowlistSource::Capability,
-                    capability: source_capability.type_name(),
-                }
-            }
+            CapabilitySource::Capability { source_capability, moniker } => CapabilityAllowlistKey {
+                source_moniker: ExtendedMoniker::ComponentInstance(moniker.clone()),
+                source_name: source_capability
+                    .source_name()
+                    .ok_or(PolicyError::InvalidCapabilitySource)?
+                    .clone(),
+                source: CapabilityAllowlistSource::Capability,
+                capability: source_capability.type_name(),
+            },
             CapabilitySource::AnonymizedAggregate { capability, component, .. }
             | CapabilitySource::FilteredAggregate { capability, component, .. } => {
                 CapabilityAllowlistKey {
