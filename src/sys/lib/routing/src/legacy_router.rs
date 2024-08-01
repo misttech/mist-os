@@ -665,7 +665,6 @@ impl Use {
                         )? {
                             return Ok(UseResult::Source(CapabilitySource::<C>::Namespace {
                                 capability,
-                                top_instance: Arc::downgrade(&top_instance),
                             }));
                         }
                     }
@@ -810,10 +809,7 @@ where
                             mapper,
                         )? {
                             return Ok(RegistrationResult::Source(
-                                CapabilitySource::<C>::Namespace {
-                                    capability,
-                                    top_instance: Arc::downgrade(&top_instance),
-                                },
+                                CapabilitySource::<C>::Namespace { capability },
                             ));
                         }
                     }
@@ -1070,10 +1066,7 @@ impl Offer {
                                 mapper,
                             )? {
                                 return Ok(OfferSegment::Done(OfferResult::Source(
-                                    CapabilitySource::<C>::Namespace {
-                                        capability,
-                                        top_instance: Arc::downgrade(&top_instance),
-                                    },
+                                    CapabilitySource::<C>::Namespace { capability },
                                 )));
                             }
                         }

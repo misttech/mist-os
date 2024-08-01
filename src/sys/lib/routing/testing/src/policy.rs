@@ -18,7 +18,7 @@ use routing::capability_source::{CapabilitySource, ComponentCapability, Internal
 use routing::component_instance::ComponentInstanceInterface;
 use routing::policy::GlobalPolicyChecker;
 use std::collections::{HashMap, HashSet};
-use std::sync::{Arc, Weak};
+use std::sync::Arc;
 
 /// These GlobalPolicyChecker tests are run under multiple contexts, e.g. both on Fuchsia under
 /// component_manager and on the build host under cm_fidl_analyzer. This macro helps ensure that all
@@ -134,7 +134,6 @@ where
                 source_path: Some("/svc/fuchsia.kernel.MmioResource".parse().unwrap()),
                 delivery: Default::default(),
             }),
-            top_instance: Weak::new(),
         };
         let valid_path_0 = Moniker::try_from(vec!["root"]).unwrap();
         let valid_path_2 = Moniker::try_from(vec!["root", "core"]).unwrap();
@@ -589,7 +588,6 @@ where
                 source_path: Some("/svc/fuchsia.kernel.MmioResource".parse().unwrap()),
                 delivery: Default::default(),
             }),
-            top_instance: Weak::new(),
         };
 
         macro_rules! can_route {
@@ -638,7 +636,6 @@ where
                 source_path: Some("/svc/fuchsia.kernel.MmioResource".parse().unwrap()),
                 delivery: Default::default(),
             }),
-            top_instance: Weak::new(),
         };
 
         macro_rules! can_route {

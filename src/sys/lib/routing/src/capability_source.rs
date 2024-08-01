@@ -3,9 +3,7 @@
 // found in the LICENSE file.
 
 use crate::bedrock::dict_ext::DictExt;
-use crate::component_instance::{
-    ComponentInstanceInterface, WeakComponentInstanceInterface, WeakExtendedInstanceInterface,
-};
+use crate::component_instance::{ComponentInstanceInterface, WeakComponentInstanceInterface};
 use crate::error::RoutingError;
 use async_trait::async_trait;
 use cm_rust::{
@@ -28,7 +26,6 @@ use futures::future::BoxFuture;
 use moniker::{ChildName, ExtendedMoniker, Moniker};
 use sandbox::{Capability, Data, Dict};
 use std::fmt;
-use std::sync::Weak;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -83,11 +80,7 @@ pub enum CapabilitySource<C: ComponentInstanceInterface + 'static> {
     /// This capability originates from the parent of the root component, and is offered from
     /// component manager's namespace. `top_instance` is the instance at the top of the tree, i.e.
     /// the instance representing component manager.
-    Namespace {
-        capability: ComponentCapability,
-        #[derivative(PartialEq = "ignore")]
-        top_instance: Weak<C::TopInstance>,
-    },
+    Namespace { capability: ComponentCapability },
     /// This capability is provided by the framework based on some other capability.
     Capability {
         source_capability: ComponentCapability,
@@ -289,18 +282,6 @@ impl<C: ComponentInstanceInterface + 'static> TryFrom<CapabilitySource<C>> for D
             )
             .unwrap();
         }
-        fn insert_top_instance_token<C: ComponentInstanceInterface + 'static>(
-            dict: &Dict,
-            top_instance: Weak<C::TopInstance>,
-        ) {
-            dict.insert_capability(
-                &Name::new(COMPONENT_STR).unwrap(),
-                Capability::Instance(
-                    WeakExtendedInstanceInterface::<C>::AboveRoot(top_instance).into(),
-                ),
-            )
-            .unwrap();
-        }
         fn insert_moniker(dict: &Dict, moniker: Moniker) {
             dict.insert_capability(
                 &Name::new(MONIKER_STR).unwrap(),
@@ -325,10 +306,9 @@ impl<C: ComponentInstanceInterface + 'static> TryFrom<CapabilitySource<C>> for D
                 insert_key(&output, BUILTIN_STR);
                 insert_capability_dict(&output, capability)?;
             }
-            CapabilitySource::Namespace { capability, top_instance } => {
+            CapabilitySource::Namespace { capability } => {
                 insert_key(&output, NAMESPACE_STR);
                 insert_capability_dict(&output, capability)?;
-                insert_top_instance_token::<C>(&output, top_instance);
             }
             CapabilitySource::Capability { source_capability, component } => {
                 insert_key(&output, CAPABILITY_STR);
@@ -381,24 +361,6 @@ impl<C: ComponentInstanceInterface + 'static> TryFrom<Dict> for CapabilitySource
                 .try_into()
                 .expect("unexpected type in weak component token"))
         }
-        fn get_top_instance<C: ComponentInstanceInterface + 'static>(
-            dict: &Dict,
-        ) -> Result<Weak<C::TopInstance>, fidl::Error> {
-            let component = dict
-                .get(&Name::new(COMPONENT_STR).unwrap())
-                .map_err(|_| fidl::Error::InvalidEnumValue)?;
-            let Some(Capability::Instance(weak_instance_token)) = component else {
-                return Err(fidl::Error::InvalidEnumValue);
-            };
-            let weak_extended: WeakExtendedInstanceInterface<C> = weak_instance_token
-                .clone()
-                .try_into()
-                .expect("unexpected type in weak component token");
-            match weak_extended {
-                WeakExtendedInstanceInterface::Component(_) => Err(fidl::Error::InvalidEnumValue),
-                WeakExtendedInstanceInterface::AboveRoot(top_instance) => Ok(top_instance),
-            }
-        }
         fn get_moniker(dict: &Dict) -> Result<Moniker, fidl::Error> {
             let data = dict
                 .get(&Name::new(MONIKER_STR).unwrap())
@@ -427,10 +389,9 @@ impl<C: ComponentInstanceInterface + 'static> TryFrom<Dict> for CapabilitySource
             BUILTIN_STR => {
                 CapabilitySource::Builtin { capability: get_capability_dict(&dict)?.try_into()? }
             }
-            NAMESPACE_STR => CapabilitySource::Namespace {
-                capability: get_capability_dict(&dict)?.try_into()?,
-                top_instance: get_top_instance::<C>(&dict)?,
-            },
+            NAMESPACE_STR => {
+                CapabilitySource::Namespace { capability: get_capability_dict(&dict)?.try_into()? }
+            }
             CAPABILITY_STR => CapabilitySource::Capability {
                 source_capability: get_capability_dict(&dict)?.try_into()?,
                 component: get_weak_component(&dict)?,

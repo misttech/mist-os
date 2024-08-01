@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::component_instance::{ComponentInstanceForAnalyzer, TopInstanceForAnalyzer};
+use crate::component_instance::ComponentInstanceForAnalyzer;
 use ::routing::bedrock::structured_dict::ComponentInput;
 use ::routing::bedrock::with_policy_check::WithPolicyCheck;
 use ::routing::capability_source::{CapabilitySource, ComponentCapability, InternalCapability};
@@ -42,7 +42,6 @@ fn new_debug_only_router(source: CapabilitySource<ComponentInstanceForAnalyzer>)
 }
 
 pub fn build_root_component_input(
-    top_instance: &Arc<TopInstanceForAnalyzer>,
     runtime_config: &Arc<RuntimeConfig>,
     policy: &GlobalPolicyChecker,
 ) -> ComponentInput {
@@ -55,7 +54,6 @@ pub fn build_root_component_input(
                 protocol_decl.name.clone(),
                 CapabilitySource::<ComponentInstanceForAnalyzer>::Namespace {
                     capability: ComponentCapability::Protocol(protocol_decl.clone()),
-                    top_instance: Arc::downgrade(top_instance),
                 },
             )),
             _ => None,

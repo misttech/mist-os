@@ -434,10 +434,8 @@ impl RootComponentInputBuilder {
 
     fn add_namespace_protocol(&mut self, protocol: &cm_rust::ProtocolDecl) {
         let path = protocol.source_path.as_ref().unwrap().to_string();
-        let top_instance = Arc::downgrade(&self.top_instance);
         let capability_source = CapabilitySource::Namespace {
             capability: ComponentCapability::Protocol(protocol.clone()),
-            top_instance: top_instance.clone(),
         };
         let launch = LaunchTaskOnReceive::new(
             capability_source,
