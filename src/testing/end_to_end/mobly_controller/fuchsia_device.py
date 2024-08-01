@@ -81,13 +81,16 @@ def create(
     fuchsia_devices: list[fuchsia_device_interface.FuchsiaDevice] = []
     for config in configs:
         device_config: dict[str, Any] = _parse_device_config(config)
+
         fuchsia_devices.append(
             honeydew.create_device(
-                device_name=device_config["name"],
+                device_info=custom_types.DeviceInfo(
+                    name=device_config["name"],
+                    ip_port=device_config.get("device_ip_port"),
+                    serial_socket=device_config.get("serial_socket"),
+                ),
                 transport=device_config["transport"],
                 ffx_config=_FFX_CONFIG_OBJ.get_config(),
-                device_ip_port=device_config.get("device_ip_port"),
-                device_serial_socket=device_config.get("serial_socket"),
             )
         )
     return fuchsia_devices

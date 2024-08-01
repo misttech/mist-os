@@ -4,7 +4,6 @@
 """Provides methods for Host-(Fuchsia)Target interactions via Fastboot."""
 
 import atexit
-import ipaddress
 import logging
 import os
 import shutil
@@ -77,7 +76,6 @@ class Fastboot(fastboot_interface.Fastboot):
         device_name: Fuchsia device name.
         reboot_affordance: Object to RebootCapableDevice implementation.
         ffx_transport: Object to FFX transport interface implementation.
-        device_ip: Fuchsia device IP Address.
         fastboot_node_id: Fastboot Node ID.
 
     Raises:
@@ -89,13 +87,9 @@ class Fastboot(fastboot_interface.Fastboot):
         device_name: str,
         reboot_affordance: affordances_capable.RebootCapableDevice,
         ffx_transport: ffx_interface.FFX,
-        device_ip: ipaddress.IPv4Address | ipaddress.IPv6Address | None = None,
         fastboot_node_id: str | None = None,
     ) -> None:
         self._device_name: str = device_name
-        self._device_ip: (
-            ipaddress.IPv4Address | ipaddress.IPv6Address | None
-        ) = device_ip
         self._reboot_affordance: affordances_capable.RebootCapableDevice = (
             reboot_affordance
         )

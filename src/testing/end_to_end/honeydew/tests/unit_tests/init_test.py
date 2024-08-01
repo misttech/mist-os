@@ -71,7 +71,11 @@ class InitTests(unittest.TestCase):
         Fuchsia-Controller based fuchsia device object."""
         self.assertIsInstance(
             honeydew.create_device(
-                device_name=_INPUT_ARGS["target_name"],
+                device_info=custom_types.DeviceInfo(
+                    name=_INPUT_ARGS["target_name"],
+                    ip_port=None,
+                    serial_socket=None,
+                ),
                 transport=custom_types.TRANSPORT.FUCHSIA_CONTROLLER,
                 ffx_config=_INPUT_ARGS["ffx_config"],
             ),
@@ -120,10 +124,13 @@ class InitTests(unittest.TestCase):
         from an IpPort."""
         self.assertIsInstance(
             honeydew.create_device(
-                device_name=_INPUT_ARGS["target_name"],
+                custom_types.DeviceInfo(
+                    name=_INPUT_ARGS["target_name"],
+                    ip_port=_INPUT_ARGS["target_ip_port"],
+                    serial_socket=None,
+                ),
                 transport=custom_types.TRANSPORT.FUCHSIA_CONTROLLER,
                 ffx_config=_INPUT_ARGS["ffx_config"],
-                device_ip_port=_INPUT_ARGS["target_ip_port"],
             ),
             fc_fuchsia_device.FuchsiaDevice,
         )
@@ -154,9 +161,12 @@ class InitTests(unittest.TestCase):
         """Test case for honeydew.create_device() where it raises an error."""
         with self.assertRaises(errors.FuchsiaDeviceError):
             honeydew.create_device(
-                device_name=_INPUT_ARGS["target_name"],
+                custom_types.DeviceInfo(
+                    name=_INPUT_ARGS["target_name"],
+                    ip_port=_INPUT_ARGS["target_ip_port"],
+                    serial_socket=None,
+                ),
                 transport=custom_types.TRANSPORT.FUCHSIA_CONTROLLER,
-                device_ip_port=_INPUT_ARGS["target_ip_port"],
                 ffx_config=_INPUT_ARGS["ffx_config"],
             )
 
