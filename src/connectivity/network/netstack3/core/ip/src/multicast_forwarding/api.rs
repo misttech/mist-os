@@ -299,8 +299,8 @@ mod tests {
     impl ConstantsIpExt for Ipv4 {
         const SRC1: Ipv4Addr = net_ip_v4!("192.0.2.1");
         const SRC2: Ipv4Addr = net_ip_v4!("192.0.2.2");
-        const DST1: Ipv4Addr = net_ip_v4!("224.0.0.1");
-        const DST2: Ipv4Addr = net_ip_v4!("224.0.0.2");
+        const DST1: Ipv4Addr = net_ip_v4!("224.0.1.1");
+        const DST2: Ipv4Addr = net_ip_v4!("224.0.1.2");
     }
 
     impl ConstantsIpExt for Ipv6 {
