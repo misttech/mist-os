@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "payload-streamer.h"
+#include "src/storage/bin/disk-pave/payload-streamer.h"
 
 #include <fcntl.h>
 #include <lib/async-loop/cpp/loop.h>

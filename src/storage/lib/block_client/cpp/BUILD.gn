@@ -10,11 +10,6 @@ group("tests") {
   deps = [ ":block_client_test_pkg" ]
 }
 
-# Temporary config to allow block client headers to be included in the old <block-client/...> way.
-config("migration") {
-  include_dirs = [ "include" ]
-}
-
 # Contains just the BlockDevice interface, but not the concrete implementation (RemoteBlockDevice).
 # This also includes Reader and Writer which are simple wrappers around the interface.
 source_set("interface") {
@@ -55,8 +50,6 @@ static_library("cpp") {
     "client.cc",
     "remote_block_device.cc",
   ]
-
-  public_configs = [ ":migration" ]
 
   public_deps = [
     ":interface",
@@ -129,8 +122,6 @@ test("block_client_unit_test") {
     "remote_block_device_unittest.cc",
     "writer_unittest.cc",
   ]
-
-  public_configs = [ ":migration" ]
 
   deps = [
     ":cpp",

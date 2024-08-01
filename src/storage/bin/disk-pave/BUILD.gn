@@ -53,7 +53,6 @@ test("install-disk-image-test") {
     "payload-streamer.cc",
     "test/payload-streamer-test.cc",
   ]
-  include_dirs = [ "." ]
   deps = [
     "//sdk/fidl/fuchsia.paver:fuchsia.paver_cpp",
     "//sdk/lib/fdio",

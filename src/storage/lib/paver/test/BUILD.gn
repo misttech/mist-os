@@ -115,11 +115,6 @@ fuchsia_library_fuzzer("paver-validation-fuzzer") {
     "//zircon/system/ulib/sysconfig-client:sysconfig-sync-client",
     "//zircon/system/ulib/zx",
   ]
-
-  include_dirs = [
-    "//src/storage/lib/paver",
-    "..",
-  ]
 }
 
 fuchsia_fuzzer_component("paver-validation-fuzzer-component") {
