@@ -91,13 +91,22 @@ pub enum CapabilitySource<C: ComponentInstanceInterface + 'static> {
         members: Vec<AggregateMember>,
         sources: Sources,
     },
-    /// This capability is an aggregate of capabilities over a set of children with filters
-    /// The instances in the aggregate service are the union of these filters.
-    FilteredAggregate {
+    /// This capability is a filtered service capability from a single source, such as self or a
+    /// child.
+    FilteredProvider {
         capability: AggregateCapability,
-        #[derivative(PartialEq = "ignore")]
-        capability_provider: Box<dyn FilteredAggregateCapabilityProvider<C>>,
         moniker: Moniker,
+        service_capability: ComponentCapability,
+        offer_service_decl: OfferServiceDecl,
+    },
+    /// This capability is a filtered service capability with multiple sources, such as all of the
+    /// dynamic children in a collection. The instances in the aggregate service are the union of
+    /// the filters.
+    FilteredAggregateProvider {
+        capability: AggregateCapability,
+        moniker: Moniker,
+        offer_service_decls: Vec<OfferServiceDecl>,
+        sources: Sources,
     },
     /// This capability originates from "environment". It's implemented by a component instance.
     Environment { capability: ComponentCapability, moniker: Moniker },
@@ -117,7 +126,10 @@ impl<C: ComponentInstanceInterface> CapabilitySource<C> {
             Self::Namespace { capability, .. } => capability.can_be_in_namespace(),
             Self::Capability { .. } => true,
             Self::AnonymizedAggregate { capability, .. } => capability.can_be_in_namespace(),
-            Self::FilteredAggregate { capability, .. } => capability.can_be_in_namespace(),
+            Self::FilteredProvider { capability, .. }
+            | Self::FilteredAggregateProvider { capability, .. } => {
+                capability.can_be_in_namespace()
+            }
             Self::Environment { capability, .. } => capability.can_be_in_namespace(),
             Self::Void { capability, .. } => capability.can_be_in_namespace(),
         }
@@ -131,7 +143,8 @@ impl<C: ComponentInstanceInterface> CapabilitySource<C> {
             Self::Namespace { capability, .. } => capability.source_name(),
             Self::Capability { .. } => None,
             Self::AnonymizedAggregate { capability, .. } => Some(capability.source_name()),
-            Self::FilteredAggregate { capability, .. } => Some(capability.source_name()),
+            Self::FilteredProvider { capability, .. }
+            | Self::FilteredAggregateProvider { capability, .. } => Some(capability.source_name()),
             Self::Environment { capability, .. } => capability.source_name(),
             Self::Void { capability, .. } => Some(capability.source_name()),
         }
@@ -145,7 +158,8 @@ impl<C: ComponentInstanceInterface> CapabilitySource<C> {
             Self::Namespace { capability, .. } => capability.type_name(),
             Self::Capability { source_capability, .. } => source_capability.type_name(),
             Self::AnonymizedAggregate { capability, .. } => capability.type_name(),
-            Self::FilteredAggregate { capability, .. } => capability.type_name(),
+            Self::FilteredProvider { capability, .. }
+            | Self::FilteredAggregateProvider { capability, .. } => capability.type_name(),
             Self::Environment { capability, .. } => capability.type_name(),
             Self::Void { capability, .. } => capability.type_name(),
         }
@@ -159,7 +173,8 @@ impl<C: ComponentInstanceInterface> CapabilitySource<C> {
             | Self::Environment { moniker, .. }
             | Self::Void { moniker, .. }
             | Self::AnonymizedAggregate { moniker, .. }
-            | Self::FilteredAggregate { moniker, .. } => {
+            | Self::FilteredProvider { moniker, .. }
+            | Self::FilteredAggregateProvider { moniker, .. } => {
                 ExtendedMoniker::ComponentInstance(moniker.clone())
             }
             Self::Builtin { .. } | Self::Namespace { .. } => ExtendedMoniker::ComponentManager,
@@ -179,7 +194,8 @@ impl<C: ComponentInstanceInterface> fmt::Display for CapabilitySource<C> {
                 Self::Framework { capability, .. } => capability.to_string(),
                 Self::Builtin { capability, .. } => capability.to_string(),
                 Self::Namespace { capability, .. } => capability.to_string(),
-                Self::FilteredAggregate { capability, .. } => capability.to_string(),
+                Self::FilteredProvider { capability, .. }
+                | Self::FilteredAggregateProvider { capability, .. } => capability.to_string(),
                 Self::Capability { source_capability, .. } => format!("{}", source_capability),
                 Self::AnonymizedAggregate { capability, members, moniker, .. } => {
                     format!(
@@ -310,10 +326,11 @@ impl<C: ComponentInstanceInterface + 'static> TryFrom<CapabilitySource<C>> for D
                 insert_capability_dict(&output, capability)?;
                 insert_moniker(&output, moniker)
             }
-            // The following two are only relevant for service capabilities, which are currently
+            // The following three are only relevant for service capabilities, which are currently
             // unsupported in the bedrock layer of routing.
             CapabilitySource::AnonymizedAggregate { .. } => unimplemented!(),
-            CapabilitySource::FilteredAggregate { .. } => unimplemented!(),
+            CapabilitySource::FilteredProvider { .. } => unimplemented!(),
+            CapabilitySource::FilteredAggregateProvider { .. } => unimplemented!(),
         }
         Ok(output)
     }

@@ -121,7 +121,8 @@ impl GlobalPolicyChecker {
                 capability: source_capability.type_name(),
             },
             CapabilitySource::AnonymizedAggregate { capability, moniker, .. }
-            | CapabilitySource::FilteredAggregate { capability, moniker, .. } => {
+            | CapabilitySource::FilteredProvider { capability, moniker, .. }
+            | CapabilitySource::FilteredAggregateProvider { capability, moniker, .. } => {
                 CapabilityAllowlistKey {
                     source_moniker: ExtendedMoniker::ComponentInstance(moniker.clone()),
                     source_name: capability.source_name().clone(),

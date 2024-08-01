@@ -23,7 +23,9 @@ use router_error::Explain;
 use routing::capability_source::{
     AggregateInstance, AggregateMember, FilteredAggregateCapabilityProvider,
 };
-use routing::collection::AnonymizedAggregateServiceProvider;
+use routing::collection::{
+    new_filtered_aggregate_from_capability_source, AnonymizedAggregateServiceProvider,
+};
 use routing::component_instance::ComponentInstanceInterface;
 use routing::error::RoutingError;
 use routing::legacy_router::NoopVisitor;
@@ -62,6 +64,21 @@ impl FilteredAggregateServiceProvider {
     ) -> Result<FilteredAggregateServiceProvider, ModelError> {
         let dir = FilteredAggregateServiceDir::new(parent, target, provider).await?;
         Ok(FilteredAggregateServiceProvider { dir })
+    }
+
+    pub async fn new_from_capability_source(
+        source: CapabilitySource,
+        target: WeakComponentInstance,
+    ) -> Result<Self, ModelError> {
+        let aggregation_component = match source.source_moniker() {
+            ExtendedMoniker::ComponentInstance(moniker) => {
+                target.upgrade()?.find_absolute(&moniker).await?
+            }
+            ExtendedMoniker::ComponentManager => panic!("unexpected source: {:?}", source),
+        };
+        let provider =
+            new_filtered_aggregate_from_capability_source(source, aggregation_component.as_weak());
+        Self::new(aggregation_component.as_weak(), target, provider).await
     }
 }
 

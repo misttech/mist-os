@@ -169,18 +169,14 @@ impl<'a> CapabilityOpenRequest<'a> {
                 }))),
                 _ => Ok(None),
             },
-            CapabilitySource::FilteredAggregate { capability_provider, moniker, .. } => {
-                let component = target.upgrade()?.find_absolute(moniker).await?;
-                // TODO(https://fxbug.dev/42124541): This should cache the directory
-                Ok(Some(Box::new(
-                    FilteredAggregateServiceProvider::new(
-                        component.as_weak(),
-                        target,
-                        capability_provider.clone(),
-                    )
-                    .await?,
-                )))
-            }
+            CapabilitySource::FilteredProvider { .. }
+            | CapabilitySource::FilteredAggregateProvider { .. } => Ok(Some(Box::new(
+                FilteredAggregateServiceProvider::new_from_capability_source(
+                    source.clone(),
+                    target,
+                )
+                .await?,
+            ))),
             CapabilitySource::AnonymizedAggregate { capability, moniker, members, sources: _ } => {
                 let source_component_instance = target.upgrade()?.find_absolute(moniker).await?;
 

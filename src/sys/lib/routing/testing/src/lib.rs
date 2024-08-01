@@ -26,6 +26,7 @@ use routing::capability_source::{
     AggregateCapability, AggregateMember, CapabilitySource, ComponentCapability,
     FilteredAggregateCapabilityRouteData, InternalCapability,
 };
+use routing::collection::new_filtered_aggregate_from_capability_source;
 use routing::component_instance::ComponentInstanceInterface;
 use routing::error::RoutingError;
 use routing::mapper::NoopRouteMapper;
@@ -1754,7 +1755,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 source:
                     CapabilitySource::<
                         <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
-                    >::FilteredAggregate {
+                    >::FilteredAggregateProvider {
                         capability: AggregateCapability::Service(name),
                         ..
                     },
@@ -3314,6 +3315,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let model = T::new("a", components).build().await;
         let b_component =
             model.look_up_instance(&vec!["b"].try_into().unwrap()).await.expect("b instance");
+        let c_component =
+            model.look_up_instance(&vec!["c"].try_into().unwrap()).await.expect("c instance");
         let UseDecl::Service(use_decl) = use_decl else { unreachable!() };
         let source = route_capability(
             RouteRequest::UseService(use_decl),
@@ -3324,47 +3327,39 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         .expect("failed to route service");
 
         // Verify this source comes from `c`.
-        match source {
-            RouteSource {
-                source:
-                    CapabilitySource::<
-                        <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
-                    >::FilteredAggregate {
-                        capability: AggregateCapability::Service(name),
-                        moniker,
-                        capability_provider,
-                    },
-                relative_path,
-            } if relative_path.is_dot() => {
-                assert_eq!(name, "foo");
-                assert_eq!(moniker, "c".parse().unwrap());
-                let mut data = capability_provider.route_instances();
-                assert_eq!(data.len(), 1);
-                let data = data.remove(0).await.unwrap();
-                assert_matches!(
-                    data,
-                    FilteredAggregateCapabilityRouteData {
-                        capability_source: CapabilitySource::Component {
-                            moniker,
-                            capability,
-                        },
-                        instance_filter,
+        let RouteSource { source, relative_path } = source;
+        assert!(relative_path.is_dot(), "unexpected capability path");
+        assert_eq!(source.source_name(), Some(&"foo".parse().unwrap()));
+        assert_eq!(
+            source.source_moniker(),
+            ExtendedMoniker::ComponentInstance("c".parse().unwrap())
+        );
+        let capability_provider =
+            new_filtered_aggregate_from_capability_source(source, c_component.as_weak());
+        let mut data = capability_provider.route_instances();
+        assert_eq!(data.len(), 1);
+        let data = data.remove(0).await.unwrap();
+        assert_matches!(
+            data,
+            FilteredAggregateCapabilityRouteData {
+                capability_source: CapabilitySource::Component {
+                    moniker,
+                    capability,
+                },
+                instance_filter,
+            }
+            if moniker == "c".parse().unwrap() &&
+                capability == ComponentCapability::Service(ServiceDecl {
+                    name: "foo".parse().unwrap(),
+                    source_path: Some("/svc/foo".parse().unwrap()),
+                }) &&
+                instance_filter == vec![
+                    NameMapping {
+                        source_name: "service_instance_0".parse().unwrap(),
+                        target_name: "service_instance_0".parse().unwrap(),
                     }
-                    if moniker == "c".parse().unwrap() &&
-                        capability == ComponentCapability::Service(ServiceDecl {
-                            name: "foo".parse().unwrap(),
-                            source_path: Some("/svc/foo".parse().unwrap()),
-                        }) &&
-                        instance_filter == vec![
-                            NameMapping {
-                                source_name: "service_instance_0".parse().unwrap(),
-                                target_name: "service_instance_0".parse().unwrap(),
-                            }
-                        ]
-                );
-           }
-            _ => panic!("bad capability source"),
-        };
+                ]
+        );
     }
 
     ///   a
@@ -3404,6 +3399,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let model = T::new("a", components).build().await;
         let b_component =
             model.look_up_instance(&vec!["b"].try_into().unwrap()).await.expect("b instance");
+        let c_component =
+            model.look_up_instance(&vec!["c"].try_into().unwrap()).await.expect("c instance");
         let UseDecl::Service(use_decl) = use_decl else { unreachable!() };
         let source = route_capability(
             RouteRequest::UseService(use_decl),
@@ -3414,47 +3411,39 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         .expect("failed to route service");
 
         // Verify this source comes from `c`.
-        match source {
-            RouteSource {
-                source:
-                    CapabilitySource::<
-                        <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
-                    >::FilteredAggregate {
-                        capability: AggregateCapability::Service(name),
-                        moniker,
-                        capability_provider,
-                    },
-                relative_path,
-            } if relative_path.is_dot() => {
-                assert_eq!(name, "foo");
-                assert_eq!(moniker, "c".parse().unwrap());
-                let mut data = capability_provider.route_instances();
-                assert_eq!(data.len(), 1);
-                let data = data.remove(0).await.unwrap();
-                assert_matches!(
-                    data,
-                    FilteredAggregateCapabilityRouteData {
-                        capability_source: CapabilitySource::Component {
-                            moniker,
-                            capability,
-                        },
-                        instance_filter,
-                    }
-                    if moniker == "c".parse().unwrap() &&
-                        capability == ComponentCapability::Service(ServiceDecl {
-                            name: "foo".parse().unwrap(),
-                            source_path: Some("/svc/foo".parse().unwrap()),
-                        }) &&
-                        instance_filter == vec![
-                            NameMapping {
-                                source_name: "instance_0".parse().unwrap(),
-                                target_name: "renamed_instance_0".parse().unwrap(),
-                            }
-                        ]
-                );
+        let RouteSource { source, relative_path } = source;
+        assert!(relative_path.is_dot(), "unexpected capability path");
+        assert_eq!(source.source_name(), Some(&"foo".parse().unwrap()));
+        assert_eq!(
+            source.source_moniker(),
+            ExtendedMoniker::ComponentInstance("c".parse().unwrap())
+        );
+        let capability_provider =
+            new_filtered_aggregate_from_capability_source(source, c_component.as_weak());
+        let mut data = capability_provider.route_instances();
+        assert_eq!(data.len(), 1);
+        let data = data.remove(0).await.unwrap();
+        assert_matches!(
+            data,
+            FilteredAggregateCapabilityRouteData {
+                capability_source: CapabilitySource::Component {
+                    moniker,
+                    capability,
+                },
+                instance_filter,
             }
-            _ => panic!("bad capability source"),
-        };
+            if moniker == "c".parse().unwrap() &&
+                capability == ComponentCapability::Service(ServiceDecl {
+                    name: "foo".parse().unwrap(),
+                    source_path: Some("/svc/foo".parse().unwrap()),
+                }) &&
+                instance_filter == vec![
+                    NameMapping {
+                        source_name: "instance_0".parse().unwrap(),
+                        target_name: "renamed_instance_0".parse().unwrap(),
+                    }
+                ]
+        );
     }
 
     ///  a

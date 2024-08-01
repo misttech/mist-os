@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 //! Each routing method's name begins with `route_*`, and is an async function that returns
-//! [Result<CapabilitySource<C>, RoutingError>], i.e. finds the capability source by walking the
+//! [Result<CapabilitySource, RoutingError>], i.e. finds the capability source by walking the
 //! route declarations and resolving components if necessary. Routing always walks in the direction
 //! from the consuming side to the providing side.
 //!
@@ -18,7 +18,6 @@
 use crate::capability_source::{
     AggregateCapability, AggregateMember, CapabilitySource, ComponentCapability, InternalCapability,
 };
-use crate::collection::{OfferAggregateServiceProvider, OfferFilteredServiceProvider};
 use crate::component_instance::{
     ComponentInstanceInterface, ExtendedInstanceInterface, ResolvedInstanceInterface,
     TopInstanceInterface,
@@ -168,16 +167,11 @@ where
                     // TODO(https://fxbug.dev/42179343) support collection sources as well.
                     if let CapabilitySource::Component { capability, moniker } = capability_source {
                         let source_name = offer_service_decl.source_name.clone();
-                        let component = offer_target.find_absolute(&moniker).await?;
-                        let capability_provider = Box::new(OfferFilteredServiceProvider::new(
-                            offer_service_decl,
-                            component.as_weak(),
-                            capability,
-                        ));
-                        return Ok(CapabilitySource::<C>::FilteredAggregate {
+                        return Ok(CapabilitySource::<C>::FilteredProvider {
                             capability: AggregateCapability::Service(source_name),
-                            moniker: component.moniker().clone(),
-                            capability_provider,
+                            moniker: moniker,
+                            service_capability: capability,
+                            offer_service_decl,
                         });
                     }
                 }
@@ -261,15 +255,11 @@ where
             );
             // TODO(https://fxbug.dev/42151281) Make the Collection CapabilitySource type generic
             // for other types of aggregations.
-            Ok(CapabilitySource::<C>::FilteredAggregate {
+            Ok(CapabilitySource::<C>::FilteredAggregateProvider {
                 capability: AggregateCapability::Service(source_name),
                 moniker: aggregation_component.moniker().clone(),
-                capability_provider: Box::new(OfferAggregateServiceProvider::new(
-                    offer_service_decls,
-                    aggregation_component.as_weak(),
-                    sources.clone(),
-                    visitor.clone(),
-                )),
+                offer_service_decls,
+                sources: sources.clone(),
             })
         }
     }
@@ -1003,15 +993,11 @@ impl Offer {
                             || offer_service_decl.renamed_instances.is_some()
                         {
                             let source_name = offer_service_decl.source_name.clone();
-                            let capability_provider = Box::new(OfferFilteredServiceProvider::new(
-                                offer_service_decl,
-                                component,
-                                capability,
-                            ));
-                            OfferResult::Source(CapabilitySource::<C>::FilteredAggregate {
+                            OfferResult::Source(CapabilitySource::<C>::FilteredProvider {
                                 capability: AggregateCapability::Service(source_name),
                                 moniker,
-                                capability_provider,
+                                service_capability: capability,
+                                offer_service_decl,
                             })
                         } else {
                             OfferResult::Source(CapabilitySource::<C>::Component {

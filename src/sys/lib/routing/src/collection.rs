@@ -16,6 +16,7 @@ use crate::legacy_router::{
     OfferVisitor, RouteBundle, Sources,
 };
 use crate::mapper::NoopRouteMapper;
+use crate::NoopVisitor;
 use cm_rust::{ExposeDecl, NameMapping, OfferDecl, OfferServiceDecl};
 use cm_types::Name;
 use derivative::Derivative;
@@ -289,9 +290,48 @@ where
     }
 }
 
+pub fn new_filtered_aggregate_from_capability_source<C>(
+    source: CapabilitySource<C>,
+    aggregation_component: WeakComponentInstanceInterface<C>,
+) -> Box<dyn FilteredAggregateCapabilityProvider<C>>
+where
+    C: ComponentInstanceInterface + 'static,
+{
+    match source {
+        CapabilitySource::FilteredProvider {
+            capability: _,
+            moniker,
+            service_capability,
+            offer_service_decl,
+        } => {
+            assert_eq!(&moniker, &aggregation_component.moniker);
+            Box::new(OfferFilteredServiceProvider::new(
+                offer_service_decl,
+                aggregation_component,
+                service_capability,
+            ))
+        }
+        CapabilitySource::FilteredAggregateProvider {
+            capability: _,
+            moniker,
+            offer_service_decls,
+            sources,
+        } => {
+            assert_eq!(&moniker, &aggregation_component.moniker);
+            Box::new(OfferAggregateServiceProvider::new(
+                offer_service_decls,
+                aggregation_component,
+                sources,
+                NoopVisitor {},
+            ))
+        }
+        other_source => panic!("unexpected capability source: {}", other_source),
+    }
+}
+
 #[derive(Derivative)]
 #[derivative(Clone(bound = ""))]
-pub(super) struct OfferFilteredServiceProvider<C: ComponentInstanceInterface> {
+pub struct OfferFilteredServiceProvider<C: ComponentInstanceInterface> {
     /// Component that offered the filtered service
     component: WeakComponentInstanceInterface<C>,
     /// The service capability
@@ -304,7 +344,7 @@ impl<C> OfferFilteredServiceProvider<C>
 where
     C: ComponentInstanceInterface + 'static,
 {
-    pub(super) fn new(
+    pub fn new(
         offer_decl: OfferServiceDecl,
         component: WeakComponentInstanceInterface<C>,
         capability: ComponentCapability,
@@ -320,7 +360,7 @@ where
     fn route_instances(
         &self,
     ) -> Vec<BoxFuture<'_, Result<FilteredAggregateCapabilityRouteData<C>, RoutingError>>> {
-        let capability_source = CapabilitySource::Component {
+        let capability_source = CapabilitySource::<C>::Component {
             capability: self.capability.clone(),
             moniker: self.component.moniker.clone(),
         };
@@ -383,7 +423,7 @@ fn get_instance_filter(offer_decl: &OfferServiceDecl) -> Vec<NameMapping> {
 
 #[derive(Derivative)]
 #[derivative(Clone(bound = "V: Clone"))]
-pub(super) struct OfferAggregateServiceProvider<C: ComponentInstanceInterface, V> {
+pub struct OfferAggregateServiceProvider<C: ComponentInstanceInterface, V> {
     /// Component that offered the aggregate service
     component: WeakComponentInstanceInterface<C>,
 
@@ -400,7 +440,7 @@ where
     V: OfferVisitor + ExposeVisitor + CapabilityVisitor,
     V: Send + Sync + Clone + 'static,
 {
-    pub(super) fn new(
+    pub fn new(
         offer_decls: Vec<OfferServiceDecl>,
         component: WeakComponentInstanceInterface<C>,
         sources: Sources,
