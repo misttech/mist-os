@@ -1276,7 +1276,7 @@ impl Routable for CapabilityRequestedHook {
         });
         source.hooks.dispatch(&event).await;
         let capability = if request.debug {
-            CapabilitySource::<ComponentInstance>::Component {
+            CapabilitySource::Component {
                 capability: self.capability_decl.clone().into(),
                 moniker: self.source.moniker.clone(),
             }
@@ -1301,7 +1301,7 @@ struct ProgramRouter {
 impl Routable for ProgramRouter {
     async fn route(&self, request: Request) -> Result<Capability, RouterError> {
         if request.debug {
-            let source = CapabilitySource::<ComponentInstance>::Component {
+            let source = CapabilitySource::Component {
                 capability: self.capability.clone(),
                 moniker: self.component.moniker.clone(),
             };

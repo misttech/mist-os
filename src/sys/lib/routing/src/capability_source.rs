@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::bedrock::dict_ext::DictExt;
-use crate::component_instance::ComponentInstanceInterface;
 use crate::error::RoutingError;
 use crate::legacy_router::Sources;
 use cm_rust::{
@@ -66,7 +65,7 @@ impl fmt::Display for AggregateMember {
 /// Describes the source of a capability, as determined by `find_capability_source`
 #[derive(Debug, Derivative)]
 #[derivative(Clone(bound = ""), PartialEq)]
-pub enum CapabilitySource<C: ComponentInstanceInterface + 'static> {
+pub enum CapabilitySource {
     /// This capability originates from the component instance for the given Realm.
     /// point.
     Component { capability: ComponentCapability, moniker: Moniker },
@@ -76,7 +75,7 @@ pub enum CapabilitySource<C: ComponentInstanceInterface + 'static> {
     /// This capability originates from the parent of the root component, and is built in to
     /// component manager. `top_instance` is the instance at the top of the tree, i.e.  the
     /// instance representing component manager.
-    Builtin { capability: InternalCapability, _phantom_data: std::marker::PhantomData<C> },
+    Builtin { capability: InternalCapability },
     /// This capability originates from the parent of the root component, and is offered from
     /// component manager's namespace. `top_instance` is the instance at the top of the tree, i.e.
     /// the instance representing component manager.
@@ -115,15 +114,15 @@ pub enum CapabilitySource<C: ComponentInstanceInterface + 'static> {
     Void { capability: InternalCapability, moniker: Moniker },
 }
 
-impl<C: ComponentInstanceInterface> CapabilitySource<C> {
+impl CapabilitySource {
     /// Returns whether the given CapabilitySourceInterface can be available in a component's
     /// namespace.
     pub fn can_be_in_namespace(&self) -> bool {
         match self {
             Self::Component { capability, .. } => capability.can_be_in_namespace(),
             Self::Framework { capability, .. } => capability.can_be_in_namespace(),
-            Self::Builtin { capability, .. } => capability.can_be_in_namespace(),
-            Self::Namespace { capability, .. } => capability.can_be_in_namespace(),
+            Self::Builtin { capability } => capability.can_be_in_namespace(),
+            Self::Namespace { capability } => capability.can_be_in_namespace(),
             Self::Capability { .. } => true,
             Self::AnonymizedAggregate { capability, .. } => capability.can_be_in_namespace(),
             Self::FilteredProvider { capability, .. }
@@ -139,8 +138,8 @@ impl<C: ComponentInstanceInterface> CapabilitySource<C> {
         match self {
             Self::Component { capability, .. } => capability.source_name(),
             Self::Framework { capability, .. } => Some(capability.source_name()),
-            Self::Builtin { capability, .. } => Some(capability.source_name()),
-            Self::Namespace { capability, .. } => capability.source_name(),
+            Self::Builtin { capability } => Some(capability.source_name()),
+            Self::Namespace { capability } => capability.source_name(),
             Self::Capability { .. } => None,
             Self::AnonymizedAggregate { capability, .. } => Some(capability.source_name()),
             Self::FilteredProvider { capability, .. }
@@ -154,8 +153,8 @@ impl<C: ComponentInstanceInterface> CapabilitySource<C> {
         match self {
             Self::Component { capability, .. } => capability.type_name(),
             Self::Framework { capability, .. } => capability.type_name(),
-            Self::Builtin { capability, .. } => capability.type_name(),
-            Self::Namespace { capability, .. } => capability.type_name(),
+            Self::Builtin { capability } => capability.type_name(),
+            Self::Namespace { capability } => capability.type_name(),
             Self::Capability { source_capability, .. } => source_capability.type_name(),
             Self::AnonymizedAggregate { capability, .. } => capability.type_name(),
             Self::FilteredProvider { capability, .. }
@@ -182,7 +181,7 @@ impl<C: ComponentInstanceInterface> CapabilitySource<C> {
     }
 }
 
-impl<C: ComponentInstanceInterface> fmt::Display for CapabilitySource<C> {
+impl fmt::Display for CapabilitySource {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
@@ -192,8 +191,8 @@ impl<C: ComponentInstanceInterface> fmt::Display for CapabilitySource<C> {
                     format!("{} '{}'", capability, moniker)
                 }
                 Self::Framework { capability, .. } => capability.to_string(),
-                Self::Builtin { capability, .. } => capability.to_string(),
-                Self::Namespace { capability, .. } => capability.to_string(),
+                Self::Builtin { capability } => capability.to_string(),
+                Self::Namespace { capability } => capability.to_string(),
                 Self::FilteredProvider { capability, .. }
                 | Self::FilteredAggregateProvider { capability, .. } => capability.to_string(),
                 Self::Capability { source_capability, .. } => format!("{}", source_capability),
@@ -242,15 +241,15 @@ const USE_STR: &'static str = "use";
 const VALUE_STR: &'static str = "value";
 const VOID_STR: &'static str = "void";
 
-impl<C: ComponentInstanceInterface + 'static> TryFrom<CapabilitySource<C>> for Capability {
+impl TryFrom<CapabilitySource> for Capability {
     type Error = fidl::Error;
 
-    fn try_from(capability_source: CapabilitySource<C>) -> Result<Self, Self::Error> {
+    fn try_from(capability_source: CapabilitySource) -> Result<Self, Self::Error> {
         Ok(Capability::Dictionary(capability_source.try_into()?))
     }
 }
 
-impl<C: ComponentInstanceInterface + 'static> TryFrom<Capability> for CapabilitySource<C> {
+impl TryFrom<Capability> for CapabilitySource {
     type Error = fidl::Error;
 
     fn try_from(capability: Capability) -> Result<Self, Self::Error> {
@@ -261,10 +260,10 @@ impl<C: ComponentInstanceInterface + 'static> TryFrom<Capability> for Capability
     }
 }
 
-impl<C: ComponentInstanceInterface + 'static> TryFrom<CapabilitySource<C>> for Dict {
+impl TryFrom<CapabilitySource> for Dict {
     type Error = fidl::Error;
 
-    fn try_from(capability_source: CapabilitySource<C>) -> Result<Self, Self::Error> {
+    fn try_from(capability_source: CapabilitySource) -> Result<Self, Self::Error> {
         fn insert_key(dict: &Dict, key: &str) {
             dict.insert_capability(
                 &Name::new(CAPABILITY_SOURCE_KEY_STR).unwrap(),
@@ -303,7 +302,7 @@ impl<C: ComponentInstanceInterface + 'static> TryFrom<CapabilitySource<C>> for D
                 insert_capability_dict(&output, capability)?;
                 insert_moniker(&output, moniker)
             }
-            CapabilitySource::Builtin { capability, .. } => {
+            CapabilitySource::Builtin { capability } => {
                 insert_key(&output, BUILTIN_STR);
                 insert_capability_dict(&output, capability)?;
             }
@@ -336,7 +335,7 @@ impl<C: ComponentInstanceInterface + 'static> TryFrom<CapabilitySource<C>> for D
     }
 }
 
-impl<C: ComponentInstanceInterface + 'static> TryFrom<Dict> for CapabilitySource<C> {
+impl TryFrom<Dict> for CapabilitySource {
     type Error = fidl::Error;
 
     fn try_from(dict: Dict) -> Result<Self, Self::Error> {
@@ -374,10 +373,9 @@ impl<C: ComponentInstanceInterface + 'static> TryFrom<Dict> for CapabilitySource
                 capability: get_capability_dict(&dict)?.try_into()?,
                 moniker: get_moniker(&dict)?,
             },
-            BUILTIN_STR => CapabilitySource::Builtin {
-                capability: get_capability_dict(&dict)?.try_into()?,
-                _phantom_data: std::marker::PhantomData,
-            },
+            BUILTIN_STR => {
+                CapabilitySource::Builtin { capability: get_capability_dict(&dict)?.try_into()? }
+            }
             NAMESPACE_STR => {
                 CapabilitySource::Namespace { capability: get_capability_dict(&dict)?.try_into()? }
             }
@@ -426,12 +424,9 @@ impl fmt::Display for AggregateInstance {
 /// `FilteredAggregateCapabilityProvider::route_instances`, which contains information about the
 /// source of the route.
 #[derive(Debug)]
-pub struct FilteredAggregateCapabilityRouteData<C>
-where
-    C: ComponentInstanceInterface + 'static,
-{
+pub struct FilteredAggregateCapabilityRouteData {
     /// The source of the capability.
-    pub capability_source: CapabilitySource<C>,
+    pub capability_source: CapabilitySource,
     /// The filter to apply to service instances, as defined by
     /// [`fuchsia.component.decl/OfferService.renamed_instances`](https://fuchsia.dev/reference/fidl/fuchsia.component.decl#OfferService).
     pub instance_filter: Vec<NameMapping>,
@@ -441,24 +436,24 @@ where
 /// capability, with filters.
 ///
 /// This trait type-erases the capability type, so it can be handled and hosted generically.
-pub trait FilteredAggregateCapabilityProvider<C: ComponentInstanceInterface>: Send + Sync {
+pub trait FilteredAggregateCapabilityProvider: Send + Sync {
     /// Return a list of futures to route every instance in the aggregate to its source. Each
     /// result is paired with the list of instances to include in the source.
     fn route_instances(
         &self,
-    ) -> Vec<BoxFuture<'_, Result<FilteredAggregateCapabilityRouteData<C>, RoutingError>>>;
+    ) -> Vec<BoxFuture<'_, Result<FilteredAggregateCapabilityRouteData, RoutingError>>>;
 
     /// Trait-object compatible clone.
-    fn clone_boxed(&self) -> Box<dyn FilteredAggregateCapabilityProvider<C>>;
+    fn clone_boxed(&self) -> Box<dyn FilteredAggregateCapabilityProvider>;
 }
 
-impl<C: ComponentInstanceInterface> Clone for Box<dyn FilteredAggregateCapabilityProvider<C>> {
+impl Clone for Box<dyn FilteredAggregateCapabilityProvider> {
     fn clone(&self) -> Self {
         self.clone_boxed()
     }
 }
 
-impl<C> fmt::Debug for Box<dyn FilteredAggregateCapabilityProvider<C>> {
+impl fmt::Debug for Box<dyn FilteredAggregateCapabilityProvider> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Box<dyn FilteredAggregateCapabilityProvider>").finish()
     }

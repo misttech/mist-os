@@ -10,11 +10,11 @@
 //! direct access to the backing directory, with the goal of making it easier for clients to work
 //! with isolated storage without needing to understand component_manager's storage layout.
 
-use crate::capability::CapabilitySource;
 use crate::model::component::{ComponentInstance, WeakComponentInstance};
-use crate::model::routing::{Route, RouteSource};
+use crate::model::routing::Route;
 use crate::model::storage::{self, BackingDirectoryInfo};
 use ::routing::capability_source::ComponentCapability;
+use ::routing::RouteSource;
 use anyhow::{format_err, Context, Error};
 use cm_rust::{StorageDecl, UseDecl};
 use component_id_index::InstanceId;
@@ -24,6 +24,7 @@ use fuchsia_fs::directory as ffs_dir;
 use futures::stream::{FuturesUnordered, StreamExt};
 use futures::{Future, TryFutureExt, TryStreamExt};
 use moniker::Moniker;
+use routing::capability_source::CapabilitySource;
 use routing::component_instance::ComponentInstanceInterface;
 use routing::RouteRequest;
 use std::path::PathBuf;

@@ -16,8 +16,6 @@ use vfs::execution_scope::ExecutionScope;
 use vfs::ToObjectRequest;
 use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
-pub type CapabilitySource = ::routing::capability_source::CapabilitySource<ComponentInstance>;
-
 /// The server-side of a capability implements this trait.
 /// Multiple `CapabilityProvider` objects can compose with one another for a single
 /// capability request. For example, a `CapabilityProvider` can be interposed

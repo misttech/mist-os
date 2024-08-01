@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::capability::CapabilitySource;
 use crate::model::component::{
     ComponentInstance, ExtendedInstance, WeakComponentInstance, WeakExtendedInstance,
 };
 use crate::model::routing::router_ext::{RouterExt, WeakInstanceTokenExt};
+use ::routing::capability_source::CapabilitySource;
 use ::routing::component_instance::ComponentInstanceInterface;
 use ::routing::error::{ComponentInstanceError, RoutingError};
 use ::routing::policy::GlobalPolicyChecker;

@@ -57,7 +57,7 @@ where
     /// moniker that matches the moniker value in the source. None is returned if source is not a
     /// `CapabilitySource::AnonymizedAggregate`.
     pub async fn new_from_capability_source(
-        source: &CapabilitySource<C>,
+        source: &CapabilitySource,
         source_component_instance: &Arc<C>,
     ) -> Option<Self> {
         let CapabilitySource::AnonymizedAggregate { capability, moniker, members, sources } =
@@ -163,7 +163,7 @@ where
         &self,
         instance: &AggregateInstance,
         visitor: &mut V,
-    ) -> Result<CapabilitySource<C>, RoutingError>
+    ) -> Result<CapabilitySource, RoutingError>
     where
         V: OfferVisitor,
         V: ExposeVisitor,
@@ -181,7 +181,7 @@ where
         &self,
         instance: &ChildName,
         visitor: &mut V,
-    ) -> Result<CapabilitySource<C>, RoutingError>
+    ) -> Result<CapabilitySource, RoutingError>
     where
         V: OfferVisitor,
         V: ExposeVisitor,
@@ -224,7 +224,7 @@ where
     async fn route_parent_instance<V>(
         &self,
         visitor: &mut V,
-    ) -> Result<CapabilitySource<C>, RoutingError>
+    ) -> Result<CapabilitySource, RoutingError>
     where
         V: OfferVisitor,
         V: ExposeVisitor,
@@ -271,7 +271,7 @@ where
     async fn route_self_instance<V>(
         &self,
         visitor: &mut V,
-    ) -> Result<CapabilitySource<C>, RoutingError>
+    ) -> Result<CapabilitySource, RoutingError>
     where
         V: OfferVisitor,
         V: ExposeVisitor,
@@ -291,9 +291,9 @@ where
 }
 
 pub fn new_filtered_aggregate_from_capability_source<C>(
-    source: CapabilitySource<C>,
+    source: CapabilitySource,
     aggregation_component: WeakComponentInstanceInterface<C>,
-) -> Box<dyn FilteredAggregateCapabilityProvider<C>>
+) -> Box<dyn FilteredAggregateCapabilityProvider>
 where
     C: ComponentInstanceInterface + 'static,
 {
@@ -353,14 +353,14 @@ where
     }
 }
 
-impl<C> FilteredAggregateCapabilityProvider<C> for OfferFilteredServiceProvider<C>
+impl<C> FilteredAggregateCapabilityProvider for OfferFilteredServiceProvider<C>
 where
     C: ComponentInstanceInterface + 'static,
 {
     fn route_instances(
         &self,
-    ) -> Vec<BoxFuture<'_, Result<FilteredAggregateCapabilityRouteData<C>, RoutingError>>> {
-        let capability_source = CapabilitySource::<C>::Component {
+    ) -> Vec<BoxFuture<'_, Result<FilteredAggregateCapabilityRouteData, RoutingError>>> {
+        let capability_source = CapabilitySource::Component {
             capability: self.capability.clone(),
             moniker: self.component.moniker.clone(),
         };
@@ -370,13 +370,13 @@ where
         };
         // Without the explicit type, this does not compile
         let mut out: Vec<
-            BoxFuture<'_, Result<FilteredAggregateCapabilityRouteData<C>, RoutingError>>,
+            BoxFuture<'_, Result<FilteredAggregateCapabilityRouteData, RoutingError>>,
         > = vec![];
         out.push(Box::pin(fut));
         out
     }
 
-    fn clone_boxed(&self) -> Box<dyn FilteredAggregateCapabilityProvider<C>> {
+    fn clone_boxed(&self) -> Box<dyn FilteredAggregateCapabilityProvider> {
         Box::new(self.clone())
     }
 }
@@ -450,7 +450,7 @@ where
     }
 }
 
-impl<C, V> FilteredAggregateCapabilityProvider<C> for OfferAggregateServiceProvider<C, V>
+impl<C, V> FilteredAggregateCapabilityProvider for OfferAggregateServiceProvider<C, V>
 where
     C: ComponentInstanceInterface + 'static,
     V: OfferVisitor + ExposeVisitor + CapabilityVisitor,
@@ -458,10 +458,10 @@ where
 {
     fn route_instances(
         &self,
-    ) -> Vec<BoxFuture<'_, Result<FilteredAggregateCapabilityRouteData<C>, RoutingError>>> {
+    ) -> Vec<BoxFuture<'_, Result<FilteredAggregateCapabilityRouteData, RoutingError>>> {
         // Without the explicit type, this does not compile
         let mut out: Vec<
-            BoxFuture<'_, Result<FilteredAggregateCapabilityRouteData<C>, RoutingError>>,
+            BoxFuture<'_, Result<FilteredAggregateCapabilityRouteData, RoutingError>>,
         > = vec![];
         for offer_decl in &self.offer_decls {
             let instance_filter = get_instance_filter(offer_decl);
@@ -494,7 +494,7 @@ where
         out
     }
 
-    fn clone_boxed(&self) -> Box<dyn FilteredAggregateCapabilityProvider<C>> {
+    fn clone_boxed(&self) -> Box<dyn FilteredAggregateCapabilityProvider> {
         Box::new(self.clone())
     }
 }

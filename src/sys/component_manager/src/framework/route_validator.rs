@@ -2,18 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::capability::{
-    CapabilityProvider, CapabilitySource, FrameworkCapability, InternalCapabilityProvider,
-};
+use crate::capability::{CapabilityProvider, FrameworkCapability, InternalCapabilityProvider};
 use crate::model::component::instance::ResolvedInstanceState;
 use crate::model::component::{ComponentInstance, WeakComponentInstance};
 use crate::model::model::Model;
 use crate::model::routing::service::AnonymizedServiceRoute;
-use crate::model::routing::{
-    self, BedrockRouteRequest, Route, RouteRequest as LegacyRouteRequest, RoutingError,
-};
-use ::routing::capability_source::InternalCapability;
+use crate::model::routing::{self, BedrockRouteRequest, Route, RoutingError};
+use ::routing::capability_source::{CapabilitySource, InternalCapability};
 use ::routing::component_instance::ComponentInstanceInterface;
+use ::routing::RouteRequest as LegacyRouteRequest;
 use async_trait::async_trait;
 use cm_rust::{ExposeDecl, SourceName, UseDecl};
 use cm_types::Name;

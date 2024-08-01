@@ -3,9 +3,10 @@
 // found in the LICENSE file.
 
 use crate::model::component::{ComponentInstance, WeakComponentInstance};
-use crate::model::routing::{open_capability, RouteRequest};
+use crate::model::routing::open_capability;
 use ::routing::component_instance::ComponentInstanceInterface;
 use ::routing::resolving::{ComponentAddress, ResolvedComponent, ResolverError};
+use ::routing::RouteRequest;
 use async_trait::async_trait;
 use cm_rust::{ConfigValueSource, FidlIntoNative, ResolverRegistration};
 use std::collections::HashMap;

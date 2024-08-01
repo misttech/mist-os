@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::capability::{CapabilityProvider, CapabilitySource};
+use crate::capability::CapabilityProvider;
 use crate::model::component::{
     ComponentInstance, ExtendedInstance, StartReason, WeakComponentInstance,
 };
@@ -13,10 +13,11 @@ use crate::model::routing::providers::{
 use crate::model::routing::service::{
     AnonymizedAggregateServiceDir, AnonymizedServiceRoute, FilteredAggregateServiceProvider,
 };
-use crate::model::routing::RouteSource;
 use crate::model::start::Start;
 use crate::model::storage::{self, BackingDirectoryInfo};
+use ::routing::capability_source::CapabilitySource;
 use ::routing::component_instance::ComponentInstanceInterface;
+use ::routing::RouteSource;
 use errors::{CapabilityProviderError, ModelError, OpenError};
 use fidl_fuchsia_io as fio;
 use moniker::ExtendedMoniker;

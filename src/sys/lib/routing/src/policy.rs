@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::capability_source::CapabilitySource;
-use crate::component_instance::ComponentInstanceInterface;
 use cm_config::{
     AllowlistEntry, AllowlistMatcher, CapabilityAllowlistKey, CapabilityAllowlistSource,
     DebugCapabilityKey, SecurityPolicy,
@@ -68,12 +67,9 @@ impl GlobalPolicyChecker {
         Self { policy }
     }
 
-    fn get_policy_key<'a, C>(
-        capability_source: &'a CapabilitySource<C>,
-    ) -> Result<CapabilityAllowlistKey, PolicyError>
-    where
-        C: ComponentInstanceInterface,
-    {
+    fn get_policy_key(
+        capability_source: &CapabilitySource,
+    ) -> Result<CapabilityAllowlistKey, PolicyError> {
         Ok(match &capability_source {
             CapabilitySource::Namespace { capability, .. } => CapabilityAllowlistKey {
                 source_moniker: ExtendedMoniker::ComponentManager,
@@ -144,14 +140,11 @@ impl GlobalPolicyChecker {
 
     /// Returns Ok(()) if the provided capability source can be routed to the
     /// given target_moniker, else a descriptive PolicyError.
-    pub fn can_route_capability<'a, C>(
+    pub fn can_route_capability<'a>(
         &self,
-        capability_source: &'a CapabilitySource<C>,
+        capability_source: &'a CapabilitySource,
         target_moniker: &'a Moniker,
-    ) -> Result<(), PolicyError>
-    where
-        C: ComponentInstanceInterface,
-    {
+    ) -> Result<(), PolicyError> {
         let policy_key = Self::get_policy_key(capability_source).map_err(|e| {
             error!("Security policy could not generate a policy key for `{}`", capability_source);
             e

@@ -2,11 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::capability::{
-    BuiltinCapability, CapabilityProvider, CapabilitySource, FrameworkCapability,
-};
+use crate::capability::{BuiltinCapability, CapabilityProvider, FrameworkCapability};
 use crate::model::component::WeakComponentInstance;
 use crate::model::token::InstanceRegistry;
+use ::routing::capability_source::CapabilitySource;
 use ::routing::component_instance::ComponentInstanceInterface;
 use ::routing::policy::GlobalPolicyChecker;
 use cm_config::{AbiRevisionPolicy, RuntimeConfig};

@@ -13,27 +13,22 @@
 /// However, tests of behavior that is out-of-scope for the static analyzer (e.g. routing to/from
 /// dynamic component instances) should be defined here.
 use {
-    crate::{
-        capability::CapabilitySource,
-        model::{
-            actions::{
-                ActionsManager, DestroyAction, ShutdownAction, ShutdownType, StartAction,
-                StopAction,
-            },
-            component::{IncomingCapabilities, StartReason},
-            routing::{
-                router_ext::WeakInstanceTokenExt, Route, RouteRequest, RouteSource, RoutingError,
-            },
-            testing::{
-                echo_service::EchoProtocol, mocks::ControllerActionResponse, out_dir::OutDir,
-                routing_test_helpers::*, test_helpers::*,
-            },
+    crate::model::{
+        actions::{
+            ActionsManager, DestroyAction, ShutdownAction, ShutdownType, StartAction, StopAction,
+        },
+        component::{IncomingCapabilities, StartReason},
+        routing::{router_ext::WeakInstanceTokenExt, Route, RoutingError},
+        testing::{
+            echo_service::EchoProtocol, mocks::ControllerActionResponse, out_dir::OutDir,
+            routing_test_helpers::*, test_helpers::*,
         },
     },
     ::routing::{
         bedrock::request_metadata::protocol_metadata,
         capability_source::{
-            AggregateCapability, AggregateInstance, AggregateMember, ComponentCapability,
+            AggregateCapability, AggregateInstance, AggregateMember, CapabilitySource,
+            ComponentCapability,
         },
         error::ComponentInstanceError,
         resolving::ResolverError,
@@ -66,6 +61,7 @@ use {
     routing::collection::AnonymizedAggregateServiceProvider,
     routing::component_instance::ComponentInstanceInterface,
     routing::legacy_router::NoopVisitor,
+    routing::{RouteRequest, RouteSource},
     routing_test_helpers::{
         default_service_capability, instantiate_common_routing_tests, RoutingTestModel,
     },

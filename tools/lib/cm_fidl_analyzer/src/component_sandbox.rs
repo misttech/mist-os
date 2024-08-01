@@ -26,7 +26,7 @@ use {
     fidl_fuchsia_sys2 as fsys,
 };
 
-fn new_debug_only_router(source: CapabilitySource<ComponentInstanceForAnalyzer>) -> Router {
+fn new_debug_only_router(source: CapabilitySource) -> Router {
     let cap: Capability =
         source.try_into().expect("failed to convert capability source to dictionary");
     Router::new(move |request: Request| {
@@ -52,7 +52,7 @@ pub fn build_root_component_input(
         .filter_map(|capability_decl| match capability_decl {
             cm_rust::CapabilityDecl::Protocol(protocol_decl) => Some((
                 protocol_decl.name.clone(),
-                CapabilitySource::<ComponentInstanceForAnalyzer>::Namespace {
+                CapabilitySource::Namespace {
                     capability: ComponentCapability::Protocol(protocol_decl.clone()),
                 },
             )),
@@ -62,9 +62,8 @@ pub fn build_root_component_input(
             match capability_decl {
                 cm_rust::CapabilityDecl::Protocol(protocol_decl) => Some((
                     protocol_decl.name.clone(),
-                    CapabilitySource::<ComponentInstanceForAnalyzer>::Builtin {
+                    CapabilitySource::Builtin {
                         capability: InternalCapability::Protocol(protocol_decl.name.clone()),
-                        _phantom_data: std::marker::PhantomData,
                     },
                 )),
                 _ => None,
@@ -81,7 +80,10 @@ pub fn build_root_component_input(
                         .try_into()
                         .expect("failed to convert builtin capability to dicttionary"),
                 ))
-                .with_policy_check(capability_source, policy.clone())
+                .with_policy_check::<ComponentInstanceForAnalyzer>(
+                    capability_source,
+                    policy.clone(),
+                )
                 .into(),
             )
             .expect("failed to insert builtin capability into dictionary");
@@ -143,10 +145,8 @@ pub fn new_program_router(
     _relative_path: RelativePath,
     capability: ComponentCapability,
 ) -> Router {
-    let capability_source = CapabilitySource::<ComponentInstanceForAnalyzer>::Component {
-        capability,
-        moniker: component.moniker.clone(),
-    };
+    let capability_source =
+        CapabilitySource::Component { capability, moniker: component.moniker.clone() };
     Router::new_ok(
         Capability::try_from(capability_source)
             .expect("failed to convert capability source to dictionary"),

@@ -274,20 +274,17 @@ impl std::fmt::Display for RouteRequest {
 
 /// The data returned after successfully routing a capability to its source.
 #[derive(Debug)]
-pub struct RouteSource<C: ComponentInstanceInterface + 'static> {
-    pub source: CapabilitySource<C>,
+pub struct RouteSource {
+    pub source: CapabilitySource,
     pub relative_path: RelativePath,
 }
 
-impl<C: ComponentInstanceInterface> RouteSource<C> {
-    pub fn new(source: CapabilitySource<C>) -> Self {
+impl RouteSource {
+    pub fn new(source: CapabilitySource) -> Self {
         Self { source, relative_path: Default::default() }
     }
 
-    pub fn new_with_relative_path(
-        source: CapabilitySource<C>,
-        relative_path: RelativePath,
-    ) -> Self {
+    pub fn new_with_relative_path(source: CapabilitySource, relative_path: RelativePath) -> Self {
         Self { source, relative_path }
     }
 }
@@ -303,7 +300,7 @@ pub async fn route_capability<C>(
     request: RouteRequest,
     target: &Arc<C>,
     mapper: &mut dyn DebugRouteMapper,
-) -> Result<RouteSource<C>, RoutingError>
+) -> Result<RouteSource, RoutingError>
 where
     C: ComponentInstanceInterface + 'static,
 {
@@ -393,7 +390,7 @@ async fn route_protocol_from_offer<C>(
     offer_decl: OfferProtocolDecl,
     target: &Arc<C>,
     mapper: &mut dyn DebugRouteMapper,
-) -> Result<RouteSource<C>, RoutingError>
+) -> Result<RouteSource, RoutingError>
 where
     C: ComponentInstanceInterface + 'static,
 {
@@ -422,7 +419,7 @@ async fn route_directory_from_offer<C>(
     offer_decl: OfferDirectoryDecl,
     target: &Arc<C>,
     mapper: &mut dyn DebugRouteMapper,
-) -> Result<RouteSource<C>, RoutingError>
+) -> Result<RouteSource, RoutingError>
 where
     C: ComponentInstanceInterface + 'static,
 {
@@ -450,7 +447,7 @@ async fn route_service_from_offer<C>(
     offer_bundle: RouteBundle<OfferServiceDecl>,
     target: &Arc<C>,
     mapper: &mut dyn DebugRouteMapper,
-) -> Result<RouteSource<C>, RoutingError>
+) -> Result<RouteSource, RoutingError>
 where
     C: ComponentInstanceInterface + 'static,
 {
@@ -476,7 +473,7 @@ async fn route_event_stream_from_offer<C>(
     offer_decl: OfferEventStreamDecl,
     target: &Arc<C>,
     mapper: &mut dyn DebugRouteMapper,
-) -> Result<RouteSource<C>, RoutingError>
+) -> Result<RouteSource, RoutingError>
 where
     C: ComponentInstanceInterface + 'static,
 {
@@ -498,7 +495,7 @@ async fn route_storage_from_offer<C>(
     offer_decl: OfferStorageDecl,
     target: &Arc<C>,
     mapper: &mut dyn DebugRouteMapper,
-) -> Result<RouteSource<C>, RoutingError>
+) -> Result<RouteSource, RoutingError>
 where
     C: ComponentInstanceInterface + 'static,
 {
@@ -519,7 +516,7 @@ async fn route_runner_from_offer<C>(
     offer_decl: OfferRunnerDecl,
     target: &Arc<C>,
     mapper: &mut dyn DebugRouteMapper,
-) -> Result<RouteSource<C>, RoutingError>
+) -> Result<RouteSource, RoutingError>
 where
     C: ComponentInstanceInterface + 'static,
 {
@@ -540,7 +537,7 @@ async fn route_resolver_from_offer<C>(
     offer_decl: OfferResolverDecl,
     target: &Arc<C>,
     mapper: &mut dyn DebugRouteMapper,
-) -> Result<RouteSource<C>, RoutingError>
+) -> Result<RouteSource, RoutingError>
 where
     C: ComponentInstanceInterface + 'static,
 {
@@ -561,7 +558,7 @@ async fn route_config_from_offer<C>(
     offer_decl: OfferConfigurationDecl,
     target: &Arc<C>,
     mapper: &mut dyn DebugRouteMapper,
-) -> Result<RouteSource<C>, RoutingError>
+) -> Result<RouteSource, RoutingError>
 where
     C: ComponentInstanceInterface + 'static,
 {
@@ -583,7 +580,7 @@ async fn route_protocol<C>(
     use_decl: UseProtocolDecl,
     target: &Arc<C>,
     mapper: &mut dyn DebugRouteMapper,
-) -> Result<RouteSource<C>, RoutingError>
+) -> Result<RouteSource, RoutingError>
 where
     C: ComponentInstanceInterface + 'static,
 {
@@ -679,7 +676,7 @@ async fn route_protocol_from_expose<C>(
     expose_decl: ExposeProtocolDecl,
     target: &Arc<C>,
     mapper: &mut dyn DebugRouteMapper,
-) -> Result<RouteSource<C>, RoutingError>
+) -> Result<RouteSource, RoutingError>
 where
     C: ComponentInstanceInterface + 'static,
 {
@@ -707,7 +704,7 @@ async fn route_runner_from_expose<C>(
     expose_decl: ExposeRunnerDecl,
     target: &Arc<C>,
     mapper: &mut dyn DebugRouteMapper,
-) -> Result<RouteSource<C>, RoutingError>
+) -> Result<RouteSource, RoutingError>
 where
     C: ComponentInstanceInterface + 'static,
 {
@@ -734,7 +731,7 @@ async fn route_resolver_from_expose<C>(
     expose_decl: ExposeResolverDecl,
     target: &Arc<C>,
     mapper: &mut dyn DebugRouteMapper,
-) -> Result<RouteSource<C>, RoutingError>
+) -> Result<RouteSource, RoutingError>
 where
     C: ComponentInstanceInterface + 'static,
 {
@@ -761,7 +758,7 @@ async fn route_config_from_expose<C>(
     expose_decl: ExposeConfigurationDecl,
     target: &Arc<C>,
     mapper: &mut dyn DebugRouteMapper,
-) -> Result<RouteSource<C>, RoutingError>
+) -> Result<RouteSource, RoutingError>
 where
     C: ComponentInstanceInterface + 'static,
 {
@@ -784,7 +781,7 @@ async fn route_service<C>(
     use_decl: UseServiceDecl,
     target: &Arc<C>,
     mapper: &mut dyn DebugRouteMapper,
-) -> Result<RouteSource<C>, RoutingError>
+) -> Result<RouteSource, RoutingError>
 where
     C: ComponentInstanceInterface + 'static,
 {
@@ -826,7 +823,7 @@ async fn route_service_from_expose<C>(
     expose_bundle: RouteBundle<ExposeServiceDecl>,
     target: &Arc<C>,
     mapper: &mut dyn DebugRouteMapper,
-) -> Result<RouteSource<C>, RoutingError>
+) -> Result<RouteSource, RoutingError>
 where
     C: ComponentInstanceInterface + 'static,
 {
@@ -939,7 +936,7 @@ async fn route_directory<C>(
     use_decl: UseDirectoryDecl,
     target: &Arc<C>,
     mapper: &mut dyn DebugRouteMapper,
-) -> Result<RouteSource<C>, RoutingError>
+) -> Result<RouteSource, RoutingError>
 where
     C: ComponentInstanceInterface + 'static,
 {
@@ -993,7 +990,7 @@ async fn route_directory_from_expose<C>(
     expose_decl: ExposeDirectoryDecl,
     target: &Arc<C>,
     mapper: &mut dyn DebugRouteMapper,
-) -> Result<RouteSource<C>, RoutingError>
+) -> Result<RouteSource, RoutingError>
 where
     C: ComponentInstanceInterface + 'static,
 {
@@ -1023,7 +1020,7 @@ where
 /// - On success, Ok(()) is returned
 /// - RoutingError::ComponentNotInIndex is returned on failure.
 pub async fn verify_instance_in_component_id_index<C>(
-    source: &CapabilitySource<C>,
+    source: &CapabilitySource,
     instance: &Arc<C>,
 ) -> Result<(), RoutingError>
 where
@@ -1055,7 +1052,7 @@ pub async fn route_to_storage_decl<C>(
     use_decl: UseStorageDecl,
     target: &Arc<C>,
     mapper: &mut dyn DebugRouteMapper,
-) -> Result<CapabilitySource<C>, RoutingError>
+) -> Result<CapabilitySource, RoutingError>
 where
     C: ComponentInstanceInterface + 'static,
 {
@@ -1078,7 +1075,7 @@ async fn route_storage<C>(
     use_decl: UseStorageDecl,
     target: &Arc<C>,
     mapper: &mut dyn DebugRouteMapper,
-) -> Result<RouteSource<C>, RoutingError>
+) -> Result<RouteSource, RoutingError>
 where
     C: ComponentInstanceInterface + 'static,
 {
@@ -1094,7 +1091,7 @@ async fn route_storage_backing_directory<C>(
     storage_decl: StorageDecl,
     target: &Arc<C>,
     mapper: &mut dyn DebugRouteMapper,
-) -> Result<RouteSource<C>, RoutingError>
+) -> Result<RouteSource, RoutingError>
 where
     C: ComponentInstanceInterface + 'static,
 {
@@ -1123,7 +1120,7 @@ async fn route_runner_from_environment<C>(
     runner: &Name,
     target: &Arc<C>,
     mapper: &mut dyn DebugRouteMapper,
-) -> Result<RouteSource<C>, RoutingError>
+) -> Result<RouteSource, RoutingError>
 where
     C: ComponentInstanceInterface + 'static,
 {
@@ -1153,10 +1150,7 @@ where
                 .ok_or(RoutingError::register_from_component_manager_not_found(
                     reg.source_name().to_string(),
                 ))?;
-            Ok(CapabilitySource::Builtin {
-                capability: internal_capability,
-                _phantom_data: std::marker::PhantomData,
-            })
+            Ok(CapabilitySource::Builtin { capability: internal_capability })
         }
         None => Err(RoutingError::UseFromEnvironmentNotFound {
             moniker: target.moniker().clone(),
@@ -1174,7 +1168,7 @@ async fn route_runner<C>(
     use_decl: UseRunnerDecl,
     target: &Arc<C>,
     mapper: &mut dyn DebugRouteMapper,
-) -> Result<RouteSource<C>, RoutingError>
+) -> Result<RouteSource, RoutingError>
 where
     C: ComponentInstanceInterface + 'static,
 {
@@ -1209,7 +1203,7 @@ async fn route_config<C>(
     use_decl: UseConfigurationDecl,
     target: &Arc<C>,
     mapper: &mut dyn DebugRouteMapper,
-) -> Result<RouteSource<C>, RoutingError>
+) -> Result<RouteSource, RoutingError>
 where
     C: ComponentInstanceInterface + 'static,
 {
@@ -1251,7 +1245,7 @@ async fn route_resolver<C>(
     registration: ResolverRegistration,
     target: &Arc<C>,
     mapper: &mut dyn DebugRouteMapper,
-) -> Result<RouteSource<C>, RoutingError>
+) -> Result<RouteSource, RoutingError>
 where
     C: ComponentInstanceInterface + 'static,
 {
@@ -1278,7 +1272,7 @@ pub async fn route_event_stream<C>(
     use_decl: UseEventStreamDecl,
     target: &Arc<C>,
     mapper: &mut dyn DebugRouteMapper,
-) -> Result<RouteSource<C>, RoutingError>
+) -> Result<RouteSource, RoutingError>
 where
     C: ComponentInstanceInterface + 'static,
 {

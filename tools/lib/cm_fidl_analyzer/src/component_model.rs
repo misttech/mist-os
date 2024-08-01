@@ -521,7 +521,7 @@ impl ComponentModelForAnalyzer {
         self: &Arc<Self>,
         offer_decl: &OfferDecl,
         target: &Arc<ComponentInstanceForAnalyzer>,
-    ) -> Vec<VerifyRouteResult<ComponentInstanceForAnalyzer>> {
+    ) -> Vec<VerifyRouteResult> {
         let target_moniker = target.moniker();
 
         let offer_target = offer_decl.target();
@@ -555,7 +555,7 @@ impl ComponentModelForAnalyzer {
         self: &Arc<Self>,
         offer_decl: &OfferDecl,
         target: &Arc<ComponentInstanceForAnalyzer>,
-    ) -> Vec<VerifyRouteResult<ComponentInstanceForAnalyzer>> {
+    ) -> Vec<VerifyRouteResult> {
         let mut results = Vec::new();
         let (capability, route_request) = match offer_decl.clone() {
             OfferDecl::Protocol(offer_decl) => {
@@ -707,7 +707,7 @@ impl ComponentModelForAnalyzer {
         self: &Arc<Self>,
         target: &Arc<ComponentInstanceForAnalyzer>,
         capability_types: &HashSet<CapabilityTypeName>,
-    ) -> HashMap<CapabilityTypeName, Vec<VerifyRouteResult<ComponentInstanceForAnalyzer>>> {
+    ) -> HashMap<CapabilityTypeName, Vec<VerifyRouteResult>> {
         let mut results = HashMap::new();
         for capability_type in capability_types.iter() {
             results.insert(capability_type.clone(), vec![]);
@@ -775,7 +775,7 @@ impl ComponentModelForAnalyzer {
         self: &Arc<Self>,
         use_decl: &UseDecl,
         target: &Arc<ComponentInstanceForAnalyzer>,
-    ) -> Vec<VerifyRouteResult<ComponentInstanceForAnalyzer>> {
+    ) -> Vec<VerifyRouteResult> {
         let mut results = Vec::new();
         let route_result = match use_decl.clone() {
             UseDecl::Directory(use_directory_decl) => {
@@ -916,7 +916,7 @@ impl ComponentModelForAnalyzer {
         self: &Arc<Self>,
         expose_decl: &ExposeDecl,
         target: &Arc<ComponentInstanceForAnalyzer>,
-    ) -> Option<VerifyRouteResult<ComponentInstanceForAnalyzer>> {
+    ) -> Option<VerifyRouteResult> {
         match self.request_from_expose(expose_decl) {
             Some(request) => {
                 let (result, route) = Self::route_capability_sync(request, target);
@@ -945,7 +945,7 @@ impl ComponentModelForAnalyzer {
         self: &Arc<Self>,
         program_decl: &ProgramDecl,
         target: &Arc<ComponentInstanceForAnalyzer>,
-    ) -> Option<VerifyRouteResult<ComponentInstanceForAnalyzer>> {
+    ) -> Option<VerifyRouteResult> {
         match program_decl.runner {
             Some(ref runner) => {
                 let (result, route) = Self::route_capability_sync(
@@ -983,7 +983,7 @@ impl ComponentModelForAnalyzer {
     pub fn check_resolver(
         self: &Arc<Self>,
         target: &Arc<ComponentInstanceForAnalyzer>,
-    ) -> VerifyRouteResult<ComponentInstanceForAnalyzer> {
+    ) -> VerifyRouteResult {
         let scheme = target.url().scheme().expect("all urls are absolute");
 
         match target.environment.get_registered_resolver(&scheme) {
@@ -1022,7 +1022,6 @@ impl ComponentModelForAnalyzer {
                                 capability: InternalCapability::Resolver(
                                     Name::new(scheme).unwrap(),
                                 ),
-                                _phantom_data: std::marker::PhantomData,
                             }),
                         }
                     }
@@ -1076,7 +1075,7 @@ impl ComponentModelForAnalyzer {
     // and that are possible to verify statically.
     async fn check_use_source(
         &self,
-        route_source: &RouteSource<ComponentInstanceForAnalyzer>,
+        route_source: &RouteSource,
         target: &Arc<ComponentInstanceForAnalyzer>,
     ) -> Result<(), AnalyzerModelError> {
         match &route_source.source {
@@ -1165,7 +1164,7 @@ impl ComponentModelForAnalyzer {
     pub fn route_capability_sync(
         request: RouteRequest,
         target: &Arc<ComponentInstanceForAnalyzer>,
-    ) -> (Result<RouteSource<ComponentInstanceForAnalyzer>, RoutingError>, Vec<RouteSegment>) {
+    ) -> (Result<RouteSource, RoutingError>, Vec<RouteSegment>) {
         let mut mapper = RouteMapper::new();
         let result = route_capability(request, target, &mut mapper)
             .now_or_never()
@@ -1176,7 +1175,7 @@ impl ComponentModelForAnalyzer {
     pub fn route_event_stream_sync(
         request: UseEventStreamDecl,
         target: &Arc<ComponentInstanceForAnalyzer>,
-    ) -> (Result<RouteSource<ComponentInstanceForAnalyzer>, RoutingError>, Vec<RouteSegment>) {
+    ) -> (Result<RouteSource, RoutingError>, Vec<RouteSegment>) {
         let mut mapper = RouteMapper::new();
         let result = route_event_stream(request, target, &mut mapper)
             .now_or_never()
@@ -1193,11 +1192,7 @@ impl ComponentModelForAnalyzer {
     async fn route_storage_and_backing_directory_sync(
         use_decl: UseStorageDecl,
         target: &Arc<ComponentInstanceForAnalyzer>,
-    ) -> (
-        Result<RouteSource<ComponentInstanceForAnalyzer>, RoutingError>,
-        Vec<RouteSegment>,
-        Vec<RouteSegment>,
-    ) {
+    ) -> (Result<RouteSource, RoutingError>, Vec<RouteSegment>, Vec<RouteSegment>) {
         let mut storage_mapper = RouteMapper::new();
         let mut backing_dir_mapper = RouteMapper::new();
         let result = async {
@@ -1237,11 +1232,7 @@ impl ComponentModelForAnalyzer {
     async fn route_storage_and_backing_directory_from_offer_sync(
         offer_decl: OfferStorageDecl,
         target: &Arc<ComponentInstanceForAnalyzer>,
-    ) -> (
-        Result<RouteSource<ComponentInstanceForAnalyzer>, RoutingError>,
-        Vec<RouteSegment>,
-        Vec<RouteSegment>,
-    ) {
+    ) -> (Result<RouteSource, RoutingError>, Vec<RouteSegment>, Vec<RouteSegment>) {
         let mut storage_mapper = RouteMapper::new();
         let mut backing_dir_mapper = RouteMapper::new();
         let result = async {

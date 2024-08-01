@@ -1534,9 +1534,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         assert_matches!(
         route_capability(RouteRequest::ExposeProtocol(expose_decl), &root_instance, &mut NoopRouteMapper).await,
             Ok(RouteSource {
-                source: CapabilitySource::<
-                    <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C
-                    >::Component {
+                source: CapabilitySource::Component {
                         capability: ComponentCapability::Protocol(capability_decl),
                         moniker,
                     },
@@ -1753,9 +1751,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         match source {
             RouteSource {
                 source:
-                    CapabilitySource::<
-                        <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
-                    >::FilteredAggregateProvider {
+                    CapabilitySource::FilteredAggregateProvider {
                         capability: AggregateCapability::Service(name),
                         ..
                     },
@@ -1849,9 +1845,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         match source {
             RouteSource {
                 source:
-                    CapabilitySource::<
-                        <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
-                    >::AnonymizedAggregate {
+                    CapabilitySource::AnonymizedAggregate {
                         capability: AggregateCapability::Service(name),
                         members,
                         ..
@@ -1860,8 +1854,11 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             } if relative_path.is_dot() => {
                 assert_eq!(name, "foo");
                 assert_eq!(members.len(), 3);
-                for c in [AggregateMember::Child("c".try_into().unwrap()), AggregateMember::Parent,
-                AggregateMember::Self_] {
+                for c in [
+                    AggregateMember::Child("c".try_into().unwrap()),
+                    AggregateMember::Parent,
+                    AggregateMember::Self_,
+                ] {
                     assert!(members.contains(&c));
                 }
             }
@@ -3138,9 +3135,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         match source {
             RouteSource {
                 source:
-                    CapabilitySource::<
-                        <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
-                    >::Component {
+                    CapabilitySource::Component {
                         capability: ComponentCapability::Service(ServiceDecl { name, source_path }),
                         moniker,
                     },
@@ -3190,9 +3185,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         match source {
             RouteSource {
                 source:
-                    CapabilitySource::<
-                        <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
-                    >::Component {
+                    CapabilitySource::Component {
                         capability: ComponentCapability::Service(ServiceDecl { name, source_path }),
                         moniker,
                     },
@@ -3259,9 +3252,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         match source {
             RouteSource {
                 source:
-                    CapabilitySource::<
-                        <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
-                    >::Component {
+                    CapabilitySource::Component {
                         capability: ComponentCapability::Service(ServiceDecl { name, source_path }),
                         moniker,
                     },
@@ -3490,9 +3481,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         match source {
             RouteSource {
                 source:
-                    CapabilitySource::<
-                        <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
-                    >::Component {
+                    CapabilitySource::Component {
                         capability: ComponentCapability::Runner(RunnerDecl { name, source_path }),
                         moniker,
                     },
@@ -3501,7 +3490,9 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 assert_eq!(name, "elf");
                 assert_eq!(
                     source_path.expect("missing source path"),
-                    format!("/svc/{}", fcrunner::ComponentRunnerMarker::DEBUG_NAME).parse::<cm_types::Path>().unwrap()
+                    format!("/svc/{}", fcrunner::ComponentRunnerMarker::DEBUG_NAME)
+                        .parse::<cm_types::Path>()
+                        .unwrap()
                 );
                 assert_eq!(&moniker, a_component.moniker());
             }
@@ -3569,9 +3560,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         match source {
             RouteSource {
                 source:
-                    CapabilitySource::<
-                        <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
-                    >::Component {
+                    CapabilitySource::Component {
                         capability: ComponentCapability::Runner(RunnerDecl { name, source_path }),
                         moniker,
                     },
@@ -3580,7 +3569,9 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 assert_eq!(name, "elf");
                 assert_eq!(
                     source_path.expect("missing source path"),
-                    format!("/svc/{}", fcrunner::ComponentRunnerMarker::DEBUG_NAME).parse::<cm_types::Path>().unwrap()
+                    format!("/svc/{}", fcrunner::ComponentRunnerMarker::DEBUG_NAME)
+                        .parse::<cm_types::Path>()
+                        .unwrap()
                 );
                 assert_eq!(&moniker, a_component.moniker());
             }
@@ -3645,9 +3636,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         match source {
             RouteSource {
                 source:
-                    CapabilitySource::<
-                        <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
-                    >::Component {
+                    CapabilitySource::Component {
                         capability: ComponentCapability::Runner(RunnerDecl { name, source_path }),
                         moniker,
                     },
@@ -3656,7 +3645,9 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 assert_eq!(name, "elf");
                 assert_eq!(
                     source_path.expect("missing source path"),
-                    format!("/svc/{}", fcrunner::ComponentRunnerMarker::DEBUG_NAME).parse::<cm_types::Path>().unwrap()
+                    format!("/svc/{}", fcrunner::ComponentRunnerMarker::DEBUG_NAME)
+                        .parse::<cm_types::Path>()
+                        .unwrap()
                 );
                 assert_eq!(&moniker, b_component.moniker());
             }
@@ -3718,9 +3709,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         match source {
             RouteSource {
                 source:
-                    CapabilitySource::<
-                        <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
-                    >::Component {
+                    CapabilitySource::Component {
                         capability: ComponentCapability::Runner(RunnerDecl { name, source_path }),
                         moniker,
                     },
@@ -3729,7 +3718,9 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 assert_eq!(name, "elf");
                 assert_eq!(
                     source_path.expect("missing source path"),
-                    format!("/svc/{}", fcrunner::ComponentRunnerMarker::DEBUG_NAME).parse::<cm_types::Path>().unwrap()
+                    format!("/svc/{}", fcrunner::ComponentRunnerMarker::DEBUG_NAME)
+                        .parse::<cm_types::Path>()
+                        .unwrap()
                 );
                 assert_eq!(&moniker, a_component.moniker());
             }
@@ -3837,12 +3828,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         match source {
             RouteSource {
                 source:
-                    CapabilitySource::<
-                        <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
-                    >::Builtin {
-                        capability: InternalCapability::Runner(name),
-                        ..
-                    },
+                    CapabilitySource::Builtin { capability: InternalCapability::Runner(name), .. },
                 relative_path,
             } if relative_path.is_dot() => {
                 assert_eq!(name, "elf");
@@ -3882,12 +3868,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         match source {
             RouteSource {
                 source:
-                    CapabilitySource::<
-                        <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
-                    >::Builtin {
-                        capability: InternalCapability::Runner(name),
-                        ..
-                    },
+                    CapabilitySource::Builtin { capability: InternalCapability::Runner(name), .. },
                 relative_path,
             } if relative_path.is_dot() => {
                 assert_eq!(name, "elf");
@@ -4036,9 +4017,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         match source {
             RouteSource {
                 source:
-                    CapabilitySource::<
-                        <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
-                    >::Component {
+                    CapabilitySource::Component {
                         capability: ComponentCapability::Runner(RunnerDecl { name, source_path }),
                         moniker,
                     },
@@ -4047,7 +4026,9 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 assert_eq!(name, "elf");
                 assert_eq!(
                     source_path.expect("missing source path"),
-                    format!("/svc/{}", fcrunner::ComponentRunnerMarker::DEBUG_NAME).parse::<cm_types::Path>().unwrap()
+                    format!("/svc/{}", fcrunner::ComponentRunnerMarker::DEBUG_NAME)
+                        .parse::<cm_types::Path>()
+                        .unwrap()
                 );
                 assert_eq!(&moniker, b_component.moniker());
             }
@@ -4100,9 +4081,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         match source {
             RouteSource {
                 source:
-                    CapabilitySource::<
-                        <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
-                    >::Component {
+                    CapabilitySource::Component {
                         capability: ComponentCapability::Runner(RunnerDecl { name, source_path }),
                         moniker,
                     },
@@ -4111,7 +4090,9 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 assert_eq!(name, "elf");
                 assert_eq!(
                     source_path.expect("missing source path"),
-                    format!("/svc/{}", fcrunner::ComponentRunnerMarker::DEBUG_NAME).parse::<cm_types::Path>().unwrap()
+                    format!("/svc/{}", fcrunner::ComponentRunnerMarker::DEBUG_NAME)
+                        .parse::<cm_types::Path>()
+                        .unwrap()
                 );
                 assert_eq!(&moniker, a_component.moniker());
             }
@@ -4168,9 +4149,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         match source {
             RouteSource {
                 source:
-                    CapabilitySource::<
-                        <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
-                    >::Component {
+                    CapabilitySource::Component {
                         capability: ComponentCapability::Runner(RunnerDecl { name, source_path }),
                         moniker,
                     },
@@ -4179,7 +4158,9 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 assert_eq!(name, "elf");
                 assert_eq!(
                     source_path.expect("missing source path"),
-                    format!("/svc/{}", fcrunner::ComponentRunnerMarker::DEBUG_NAME).parse::<cm_types::Path>().unwrap()
+                    format!("/svc/{}", fcrunner::ComponentRunnerMarker::DEBUG_NAME)
+                        .parse::<cm_types::Path>()
+                        .unwrap()
                 );
                 assert_eq!(&moniker, a_component.moniker());
             }

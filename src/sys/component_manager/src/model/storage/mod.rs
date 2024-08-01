@@ -3,16 +3,15 @@
 // found in the LICENSE file.
 
 pub mod admin_protocol;
-use crate::capability::CapabilitySource;
 use crate::model::component::{ComponentInstance, StartReason, WeakComponentInstance};
-use crate::model::routing::{Route, RouteSource};
+use crate::model::routing::Route;
 use crate::model::start::Start;
 use crate::model::storage::admin_protocol::StorageAdmin;
 use crate::sandbox_util::LaunchTaskOnReceive;
-use ::routing::capability_source::ComponentCapability;
+use ::routing::capability_source::{CapabilitySource, ComponentCapability};
 use ::routing::component_instance::ComponentInstanceInterface;
 use ::routing::error::RoutingError;
-use ::routing::RouteRequest;
+use ::routing::{RouteRequest, RouteSource};
 use cm_types::RelativePath;
 use component_id_index::InstanceId;
 use derivative::Derivative;

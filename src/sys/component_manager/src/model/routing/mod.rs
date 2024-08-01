@@ -11,11 +11,12 @@ pub mod service;
 pub use ::routing::error::RoutingError;
 pub use open::*;
 
-use crate::capability::CapabilitySource;
 use crate::model::component::{ComponentInstance, WeakComponentInstance};
 use crate::model::storage;
+use ::routing::capability_source::CapabilitySource;
 use ::routing::component_instance::ComponentInstanceInterface;
 use ::routing::mapper::NoopRouteMapper;
+use ::routing::{RouteRequest, RouteSource};
 use async_trait::async_trait;
 use cm_rust::{ExposeDecl, ExposeDeclCommon, UseStorageDecl};
 use cm_types::{Availability, Name};
@@ -30,8 +31,6 @@ use vfs::directory::entry::OpenRequest;
 use vfs::path::Path;
 use vfs::ToObjectRequest;
 
-pub type RouteRequest = ::routing::RouteRequest;
-pub type RouteSource = ::routing::RouteSource<ComponentInstance>;
 pub use bedrock::{RouteRequest as BedrockRouteRequest, UseRouteRequest as BedrockUseRouteRequest};
 
 #[async_trait]

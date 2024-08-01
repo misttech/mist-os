@@ -5,7 +5,7 @@
 use crate::capability::CapabilityProvider;
 use crate::model::component::{ComponentInstance, WeakComponentInstance, WeakExtendedInstance};
 use crate::model::mutable_directory::MutableDirectory;
-use crate::model::routing::{CapabilityOpenRequest, CapabilitySource, RouteSource};
+use crate::model::routing::{CapabilityOpenRequest, RouteSource};
 use async_trait::async_trait;
 use cm_rust::{CapabilityTypeName, ComponentDecl, ExposeDecl, ExposeDeclCommon};
 use cm_types::{IterablePath, Name, RelativePath};
@@ -21,7 +21,7 @@ use hooks::{Event, EventPayload, EventType, Hook, HooksRegistration};
 use moniker::{ExtendedMoniker, Moniker};
 use router_error::Explain;
 use routing::capability_source::{
-    AggregateInstance, AggregateMember, FilteredAggregateCapabilityProvider,
+    AggregateInstance, AggregateMember, CapabilitySource, FilteredAggregateCapabilityProvider,
 };
 use routing::collection::{
     new_filtered_aggregate_from_capability_source, AnonymizedAggregateServiceProvider,
@@ -60,7 +60,7 @@ impl FilteredAggregateServiceProvider {
     pub async fn new(
         parent: WeakComponentInstance,
         target: WeakComponentInstance,
-        provider: Box<dyn FilteredAggregateCapabilityProvider<ComponentInstance>>,
+        provider: Box<dyn FilteredAggregateCapabilityProvider>,
     ) -> Result<FilteredAggregateServiceProvider, ModelError> {
         let dir = FilteredAggregateServiceDir::new(parent, target, provider).await?;
         Ok(FilteredAggregateServiceProvider { dir })
@@ -108,7 +108,7 @@ impl FilteredAggregateServiceDir {
     pub async fn new(
         parent: WeakComponentInstance,
         target: WeakComponentInstance,
-        provider: Box<dyn FilteredAggregateCapabilityProvider<ComponentInstance>>,
+        provider: Box<dyn FilteredAggregateCapabilityProvider>,
     ) -> Result<Arc<SimpleImmutableDir>, ModelError> {
         let futs: Vec<_> = provider
             .route_instances()
@@ -1089,15 +1089,11 @@ mod tests {
     }
 
     #[async_trait]
-    impl FilteredAggregateCapabilityProvider<ComponentInstance> for MockOfferCapabilityProvider {
+    impl FilteredAggregateCapabilityProvider for MockOfferCapabilityProvider {
         fn route_instances(
             &self,
-        ) -> Vec<
-            BoxFuture<
-                '_,
-                Result<FilteredAggregateCapabilityRouteData<ComponentInstance>, RoutingError>,
-            >,
-        > {
+        ) -> Vec<BoxFuture<'_, Result<FilteredAggregateCapabilityRouteData, RoutingError>>>
+        {
             let capability_source = CapabilitySource::Component {
                 capability: ComponentCapability::Service(ServiceDecl {
                     name: "my.service.Service".parse().unwrap(),
@@ -1105,7 +1101,7 @@ mod tests {
                 }),
                 moniker: self.component.moniker.clone(),
             };
-            let data = FilteredAggregateCapabilityRouteData::<ComponentInstance> {
+            let data = FilteredAggregateCapabilityRouteData {
                 capability_source,
                 instance_filter: self.instance_filter.clone(),
             };
@@ -1113,7 +1109,7 @@ mod tests {
             vec![Box::pin(fut)]
         }
 
-        fn clone_boxed(&self) -> Box<dyn FilteredAggregateCapabilityProvider<ComponentInstance>> {
+        fn clone_boxed(&self) -> Box<dyn FilteredAggregateCapabilityProvider> {
             Box::new(self.clone())
         }
     }

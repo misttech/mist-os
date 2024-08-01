@@ -4,7 +4,6 @@
 
 use crate::builtin::runner::BuiltinRunnerFactory;
 use crate::builtin_environment::{BuiltinEnvironment, BuiltinEnvironmentBuilder};
-use crate::capability::CapabilitySource;
 use crate::model::component::instance::InstanceState;
 use crate::model::component::{ComponentInstance, StartReason};
 use crate::model::model::Model;
@@ -13,7 +12,7 @@ use crate::model::testing::mocks::*;
 use crate::model::testing::out_dir::OutDir;
 use crate::model::testing::test_helpers::*;
 use crate::sandbox_util::LaunchTaskOnReceive;
-use ::routing::capability_source::InternalCapability;
+use ::routing::capability_source::{CapabilitySource, InternalCapability};
 use ::routing::component_instance::ComponentInstanceInterface;
 use ::routing_test_helpers::{generate_storage_path, RoutingTestModel, RoutingTestModelBuilder};
 use anyhow::anyhow;
@@ -329,7 +328,6 @@ impl RoutingTest {
             };
             let capability_source = CapabilitySource::Builtin {
                 capability: InternalCapability::Protocol(name.clone()),
-                _phantom_data: std::marker::PhantomData,
             };
 
             let launch = LaunchTaskOnReceive::new(

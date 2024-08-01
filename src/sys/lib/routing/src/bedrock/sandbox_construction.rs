@@ -718,7 +718,7 @@ impl<C: ComponentInstanceInterface + 'static> sandbox::Routable for UnitRouter<C
     async fn route(&self, request: Request) -> Result<Capability, RouterError> {
         if request.debug {
             return Ok(Capability::Dictionary(
-                CapabilitySource::<C>::Void {
+                CapabilitySource::Void {
                     capability: self.capability.clone(),
                     moniker: self.component.moniker.clone(),
                 }

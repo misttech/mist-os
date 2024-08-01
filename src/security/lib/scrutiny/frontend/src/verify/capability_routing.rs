@@ -28,8 +28,8 @@ enum ResultBySeverity {
     Ok(OkResult),
 }
 
-impl From<VerifyRouteResult<ComponentInstanceForAnalyzer>> for ResultBySeverity {
-    fn from(verify_route_result: VerifyRouteResult<ComponentInstanceForAnalyzer>) -> Self {
+impl From<VerifyRouteResult> for ResultBySeverity {
+    fn from(verify_route_result: VerifyRouteResult) -> Self {
         match verify_route_result.error {
             None => OkResult {
                 using_node: verify_route_result.using_node,
@@ -137,7 +137,7 @@ impl FromArgValue for ResponseLevel {
 struct CapabilityRouteVisitor {
     model: Arc<ComponentModelForAnalyzer>,
     capability_types: HashSet<CapabilityTypeName>,
-    results: HashMap<CapabilityTypeName, Vec<VerifyRouteResult<ComponentInstanceForAnalyzer>>>,
+    results: HashMap<CapabilityTypeName, Vec<VerifyRouteResult>>,
 }
 
 impl CapabilityRouteVisitor {

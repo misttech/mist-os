@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::capability::CapabilitySource;
 use ::routing::capability_source::InternalCapability;
 use async_trait::async_trait;
 use cm_config::SecurityPolicy;
@@ -15,6 +14,7 @@ use fuchsia_zircon::{self as zx, Clock};
 use futures::future::BoxFuture;
 use futures::{Future, FutureExt, TryStreamExt};
 use namespace::{Namespace, NamespaceError};
+use routing::capability_source::CapabilitySource;
 use routing::policy::ScopedPolicyChecker;
 use runner::component::{ChannelEpitaph, Controllable, Controller};
 use sandbox::{Capability, Dict, DirEntry, RemotableCapability};
@@ -236,7 +236,6 @@ impl ElfRunnerProgram {
         let elf_runner = Arc::new(LaunchTaskOnReceive::new(
             CapabilitySource::Builtin {
                 capability: InternalCapability::Runner(Name::new("elf").unwrap()),
-                _phantom_data: std::marker::PhantomData,
             },
             task_group.as_weak(),
             fcrunner::ComponentRunnerMarker::PROTOCOL_NAME,
@@ -257,7 +256,6 @@ impl ElfRunnerProgram {
                 capability: InternalCapability::Protocol(
                     Name::new(fattribution::ProviderMarker::PROTOCOL_NAME).unwrap(),
                 ),
-                _phantom_data: std::marker::PhantomData,
             },
             task_group.as_weak(),
             fattribution::ProviderMarker::PROTOCOL_NAME,

@@ -19,13 +19,10 @@ pub fn get_use_config_from_key<'a>(
     })
 }
 
-fn source_to_value<C>(
+fn source_to_value(
     default: &Option<cm_rust::ConfigValue>,
-    source: CapabilitySource<C>,
-) -> Result<Option<cm_rust::ConfigValue>, RoutingError>
-where
-    C: ComponentInstanceInterface + 'static,
-{
+    source: CapabilitySource,
+) -> Result<Option<cm_rust::ConfigValue>, RoutingError> {
     let cap = match source {
         CapabilitySource::Void { .. } => {
             return Ok(default.clone());
@@ -73,12 +70,11 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::component_instance::tests::TestComponent;
     use moniker::Moniker;
 
     #[test]
     fn config_from_void() {
-        let void_source = CapabilitySource::<TestComponent>::Void {
+        let void_source = CapabilitySource::Void {
             capability: crate::capability_source::InternalCapability::Config(
                 "test".parse().unwrap(),
             ),
@@ -90,7 +86,7 @@ mod tests {
     #[test]
     fn config_from_capability() {
         let test_value: cm_rust::ConfigValue = cm_rust::ConfigSingleValue::Uint8(5).into();
-        let void_source = CapabilitySource::<TestComponent>::Capability {
+        let void_source = CapabilitySource::Capability {
             source_capability: crate::capability_source::ComponentCapability::Config(
                 cm_rust::ConfigurationDecl {
                     name: "test".parse().unwrap(),
@@ -105,7 +101,7 @@ mod tests {
     #[test]
     fn config_from_component() {
         let test_value: cm_rust::ConfigValue = cm_rust::ConfigSingleValue::Uint8(5).into();
-        let void_source = CapabilitySource::<TestComponent>::Component {
+        let void_source = CapabilitySource::Component {
             capability: crate::capability_source::ComponentCapability::Config(
                 cm_rust::ConfigurationDecl {
                     name: "test".parse().unwrap(),

@@ -82,7 +82,7 @@ where
         let global_policy_checker = GlobalPolicyChecker::new(Arc::new(policy_builder.build()));
         let component = self.make_component(vec!["foo:0", "bar:0"].try_into().unwrap()).await;
 
-        let protocol_capability = CapabilitySource::<C>::Framework {
+        let protocol_capability = CapabilitySource::Framework {
             capability: InternalCapability::Protocol("fuchsia.component.Realm".parse().unwrap()),
             moniker: component.moniker().clone(),
         };
@@ -128,7 +128,7 @@ where
         );
         let global_policy_checker = GlobalPolicyChecker::new(Arc::new(policy_builder.build()));
 
-        let protocol_capability = CapabilitySource::<C>::Namespace {
+        let protocol_capability = CapabilitySource::Namespace {
             capability: ComponentCapability::Protocol(ProtocolDecl {
                 name: "fuchsia.kernel.MmioResource".parse().unwrap(),
                 source_path: Some("/svc/fuchsia.kernel.MmioResource".parse().unwrap()),
@@ -185,7 +185,7 @@ where
         let global_policy_checker = GlobalPolicyChecker::new(Arc::new(policy_builder.build()));
         let component = self.make_component(vec!["foo:0"].try_into().unwrap()).await;
 
-        let protocol_capability = CapabilitySource::<C>::Component {
+        let protocol_capability = CapabilitySource::Component {
             capability: ComponentCapability::Protocol(ProtocolDecl {
                 name: "fuchsia.foo.FooBar".parse().unwrap(),
                 source_path: Some("/svc/fuchsia.foo.FooBar".parse().unwrap()),
@@ -238,7 +238,7 @@ where
         let global_policy_checker = GlobalPolicyChecker::new(Arc::new(policy_builder.build()));
         let component = self.make_component(vec!["foo:0"].try_into().unwrap()).await;
 
-        let protocol_capability = CapabilitySource::<C>::Capability {
+        let protocol_capability = CapabilitySource::Capability {
             source_capability: ComponentCapability::Storage(StorageDecl {
                 backing_dir: "cache".parse().unwrap(),
                 name: "cache".parse().unwrap(),
@@ -536,9 +536,8 @@ where
         );
         let global_policy_checker = GlobalPolicyChecker::new(Arc::new(policy_builder.build()));
 
-        let dir_capability = CapabilitySource::<C>::Builtin {
+        let dir_capability = CapabilitySource::Builtin {
             capability: InternalCapability::Directory("test".parse().unwrap()),
-            _phantom_data: std::marker::PhantomData,
         };
         let valid_path_0 = Moniker::try_from(vec!["root"]).unwrap();
         let valid_path_1 = Moniker::try_from(vec!["root", "core"]).unwrap();
@@ -583,7 +582,7 @@ where
             ],
         );
         let global_policy_checker = GlobalPolicyChecker::new(Arc::new(policy_builder.build()));
-        let protocol_capability = CapabilitySource::<C>::Namespace {
+        let protocol_capability = CapabilitySource::Namespace {
             capability: ComponentCapability::Protocol(ProtocolDecl {
                 name: "fuchsia.kernel.MmioResource".parse().unwrap(),
                 source_path: Some("/svc/fuchsia.kernel.MmioResource".parse().unwrap()),
@@ -631,7 +630,7 @@ where
             ],
         );
         let global_policy_checker = GlobalPolicyChecker::new(Arc::new(policy_builder.build()));
-        let protocol_capability = CapabilitySource::<C>::Namespace {
+        let protocol_capability = CapabilitySource::Namespace {
             capability: ComponentCapability::Protocol(ProtocolDecl {
                 name: "fuchsia.kernel.MmioResource".parse().unwrap(),
                 source_path: Some("/svc/fuchsia.kernel.MmioResource".parse().unwrap()),

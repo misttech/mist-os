@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, Context, Error, Result};
-use cm_fidl_analyzer::component_instance::ComponentInstanceForAnalyzer;
 use cm_fidl_analyzer::component_model::{AnalyzerModelError, ComponentModelForAnalyzer};
 use cm_fidl_analyzer::route::VerifyRouteResult;
 use cm_rust::{CapabilityDecl, CapabilityTypeName, ComponentDecl, ExposeDecl, OfferDecl, UseDecl};
@@ -475,7 +474,7 @@ fn check_pkg_source(
 }
 
 fn process_verify_result<'a>(
-    verify_result: VerifyRouteResult<ComponentInstanceForAnalyzer>,
+    verify_result: VerifyRouteResult,
     route: &Binding<'a>,
     component_model: &Arc<ComponentModelForAnalyzer>,
     components: &Vec<Component>,

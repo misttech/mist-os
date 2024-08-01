@@ -22,7 +22,7 @@ use crate::builtin::runner::{BuiltinRunner, BuiltinRunnerFactory};
 use crate::builtin::svc_stash_provider::SvcStashCapability;
 use crate::builtin::system_controller::SystemController;
 use crate::builtin::time::{create_utc_clock, UtcTimeMaintainer};
-use crate::capability::{self, BuiltinCapability, CapabilitySource, FrameworkCapability};
+use crate::capability::{self, BuiltinCapability, FrameworkCapability};
 use crate::framework::binder::BinderFrameworkCapability;
 use crate::framework::capability_store::CapabilityStore;
 use crate::framework::introspector::IntrospectorFrameworkCapability;
@@ -49,7 +49,7 @@ use crate::sandbox_util::LaunchTaskOnReceive;
 use ::diagnostics::lifecycle::ComponentLifecycleTimeStats;
 use ::diagnostics::task_metrics::ComponentTreeStats;
 use ::routing::bedrock::structured_dict::ComponentInput;
-use ::routing::capability_source::{ComponentCapability, InternalCapability};
+use ::routing::capability_source::{CapabilitySource, ComponentCapability, InternalCapability};
 use ::routing::component_instance::{ComponentInstanceInterface, TopInstanceInterface};
 use ::routing::environment::{DebugRegistry, RunnerRegistry};
 use ::routing::policy::GlobalPolicyChecker;
@@ -410,10 +410,8 @@ impl RootComponentInputBuilder {
             return;
         }
 
-        let capability_source = CapabilitySource::Builtin {
-            capability: InternalCapability::Protocol(name.clone()),
-            _phantom_data: std::marker::PhantomData,
-        };
+        let capability_source =
+            CapabilitySource::Builtin { capability: InternalCapability::Protocol(name.clone()) };
 
         let launch = LaunchTaskOnReceive::new(
             capability_source,
