@@ -12,19 +12,11 @@ executable("default_init") {
   disable_syslog_backend = true
   exclude_toolchain_tags = [ "instrumented" ]
 
-  if (is_mistos) {
-    configs += [
-      "//build/config/mistos:no_cpp_standard_library",
-      "//build/config/mistos:static-pie-config",
-      ":config",
-    ]
-  } else {
-    configs += [
-      "//build/config/fuchsia:no_cpp_standard_library",
-      "//build/config/fuchsia:static-pie-config",
-      ":config",
-    ]
-  }
+  configs += [
+    "//build/config/mistos:no_cpp_standard_library",
+    "//build/config/mistos:static-pie-config",
+    ":config",
+  ]
 
   configs -= [ "//build/config/linux:implicit-host-libs" ]
 }
