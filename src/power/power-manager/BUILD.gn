@@ -19,11 +19,6 @@ metrics_registry("power_manager_metrics") {
   generate_rust = true
 }
 
-source_set("fake_syscalls") {
-  testonly = true
-  sources = [ "testing/fake_syscalls.cc" ]
-}
-
 power_manager_deps = [
   ":power-manager-config-lib",
   ":power_manager_metrics_rustlib",
@@ -112,7 +107,6 @@ rustc_binary("bin") {
   deps = power_manager_deps
   sources = power_manager_sources
   test_deps = [
-    ":fake_syscalls",
     "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
     "//third_party/rust_crates:assert_matches",
   ]

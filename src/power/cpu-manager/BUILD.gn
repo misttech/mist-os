@@ -55,6 +55,11 @@ cpu_manager_sources = [
   "src/utils.rs",
 ]
 
+source_set("fake_syscalls") {
+  testonly = true
+  sources = [ "src/test/fake_syscalls.cc" ]
+}
+
 rustc_binary("bin") {
   name = "cpu_manager"
   edition = "2021"
@@ -63,6 +68,7 @@ rustc_binary("bin") {
   deps = cpu_manager_deps
   sources = cpu_manager_sources
   test_deps = [
+    ":fake_syscalls",
     "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/test_util",
