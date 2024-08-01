@@ -1121,7 +1121,10 @@ pub(crate) enum Service {
     Neighbor(fidl_fuchsia_net_neighbor::ViewRequestStream),
     PacketSocket(fidl_fuchsia_posix_socket_packet::ProviderRequestStream),
     RawSocket(fidl_fuchsia_posix_socket_raw::ProviderRequestStream),
+    RootFilter(fidl_fuchsia_net_root::FilterRequestStream),
     RootInterfaces(fidl_fuchsia_net_root::InterfacesRequestStream),
+    RootRoutesV4(fidl_fuchsia_net_root::RoutesV4RequestStream),
+    RootRoutesV6(fidl_fuchsia_net_root::RoutesV6RequestStream),
     RoutesState(fidl_fuchsia_net_routes::StateRequestStream),
     RoutesStateV4(fidl_fuchsia_net_routes::StateV4RequestStream),
     RoutesStateV6(fidl_fuchsia_net_routes::StateV6RequestStream),
@@ -1131,8 +1134,6 @@ pub(crate) enum Service {
     RouteTableProviderV6(fnet_routes_admin::RouteTableProviderV6RequestStream),
     RuleTableV4(fnet_routes_admin::RuleTableV4RequestStream),
     RuleTableV6(fnet_routes_admin::RuleTableV6RequestStream),
-    RootRoutesV4(fidl_fuchsia_net_root::RoutesV4RequestStream),
-    RootRoutesV6(fidl_fuchsia_net_root::RoutesV6RequestStream),
     Socket(fidl_fuchsia_posix_socket::ProviderRequestStream),
     Stack(fidl_fuchsia_net_stack::StackRequestStream),
     Verifier(fidl_fuchsia_update_verify::NetstackVerifierRequestStream),
@@ -1398,6 +1399,17 @@ impl NetstackSeed {
                                 .serve_with(|rs| {
                                     root_fidl_worker::serve_interfaces(netstack.clone(), rs)
                                 })
+                                .await
+                        }
+                        Service::RootFilter(root_filter) => {
+                            root_filter
+                                .serve_with(|rs|
+                                    filter::serve_root(
+                                        rs,
+                                        &filter_update_dispatcher,
+                                        &netstack.ctx,
+                                    )
+                                )
                                 .await
                         }
                         Service::RoutesState(rs) => {

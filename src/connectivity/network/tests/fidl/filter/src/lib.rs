@@ -7,6 +7,7 @@
 mod ip_hooks;
 mod matchers;
 mod nat;
+mod root;
 
 use std::collections::{HashMap, HashSet};
 use std::num::NonZeroU16;

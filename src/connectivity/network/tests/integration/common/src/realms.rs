@@ -100,6 +100,7 @@ impl NetstackVersion {
             NetstackVersion::Netstack3 | NetstackVersion::ProdNetstack3 => &common_services_and!(
                 fnet_filter::ControlMarker::PROTOCOL_NAME,
                 fnet_filter::StateMarker::PROTOCOL_NAME,
+                fnet_root::FilterMarker::PROTOCOL_NAME,
                 fnet_routes_admin::RouteTableProviderV4Marker::PROTOCOL_NAME,
                 fnet_routes_admin::RouteTableProviderV6Marker::PROTOCOL_NAME,
                 fnet_routes_admin::RuleTableV4Marker::PROTOCOL_NAME,

@@ -27,7 +27,7 @@ use thiserror::Error;
 use {
     fidl_fuchsia_net as fnet, fidl_fuchsia_net_filter as fnet_filter,
     fidl_fuchsia_net_interfaces as fnet_interfaces,
-    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext,
+    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_net_root as fnet_root,
 };
 
 /// Conversion errors from `fnet_filter` FIDL types to the
@@ -1563,6 +1563,23 @@ pub struct Controller {
 }
 
 impl Controller {
+    pub async fn new_root(
+        root: &fnet_root::FilterProxy,
+        ControllerId(id): &ControllerId,
+    ) -> Result<Self, ControllerCreationError> {
+        let (controller, server_end) =
+            fidl::endpoints::create_proxy().map_err(ControllerCreationError::CreateProxy)?;
+        root.open_controller(id, server_end).map_err(ControllerCreationError::OpenController)?;
+
+        let fnet_filter::NamespaceControllerEvent::OnIdAssigned { id } = controller
+            .take_event_stream()
+            .next()
+            .await
+            .ok_or(ControllerCreationError::NoIdAssigned)?
+            .map_err(ControllerCreationError::IdAssignment)?;
+        Ok(Self { controller, id: ControllerId(id), pending_changes: Vec::new() })
+    }
+
     /// Creates a new `Controller`.
     ///
     /// Note that the provided `ControllerId` may need to be modified server-
