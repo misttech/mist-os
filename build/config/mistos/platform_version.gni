@@ -5,7 +5,7 @@
 # This file should only be imported by build files that need to know the current
 # set of API levels or to update that set. This includes IDK, SDK, and FIDL.
 # For the target API level of the current build, see
-# //build/config/fuchsia/target_api_level.gni.
+# //build/config/mistos/target_api_level.gni.
 
 _script = "get_platform_version.py"
 version_history_path = "//sdk/version_history.json"

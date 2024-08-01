@@ -2,8 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/config/fuchsia/platform_version.gni")
-import("//build/config/fuchsia/target_api_level.gni")
+import("//build/config/mistos/platform_version.gni")
+import("//build/config/mistos/target_api_level.gni")
 
 # `current_build_target_api_level` may be a string or integer. If it is not one
 # of the special named API levels defined in
