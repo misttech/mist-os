@@ -104,7 +104,7 @@ impl ModelContext {
         target: WeakComponentInstance,
     ) -> Option<Box<dyn CapabilityProvider>> {
         match source {
-            CapabilitySource::Builtin { capability } => {
+            CapabilitySource::Builtin { capability, .. } => {
                 let builtin_capabilities = self.builtin_capabilities.lock().await;
                 for c in builtin_capabilities.as_ref().expect("not initialized") {
                     if c.matches(capability) {

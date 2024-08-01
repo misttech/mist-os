@@ -410,8 +410,10 @@ impl RootComponentInputBuilder {
             return;
         }
 
-        let capability_source =
-            CapabilitySource::Builtin { capability: InternalCapability::Protocol(name.clone()) };
+        let capability_source = CapabilitySource::Builtin {
+            capability: InternalCapability::Protocol(name.clone()),
+            _phantom_data: std::marker::PhantomData,
+        };
 
         let launch = LaunchTaskOnReceive::new(
             capability_source,

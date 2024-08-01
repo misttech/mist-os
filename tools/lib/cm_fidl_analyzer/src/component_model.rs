@@ -1022,6 +1022,7 @@ impl ComponentModelForAnalyzer {
                                 capability: InternalCapability::Resolver(
                                     Name::new(scheme).unwrap(),
                                 ),
+                                _phantom_data: std::marker::PhantomData,
                             }),
                         }
                     }

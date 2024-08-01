@@ -236,6 +236,7 @@ impl ElfRunnerProgram {
         let elf_runner = Arc::new(LaunchTaskOnReceive::new(
             CapabilitySource::Builtin {
                 capability: InternalCapability::Runner(Name::new("elf").unwrap()),
+                _phantom_data: std::marker::PhantomData,
             },
             task_group.as_weak(),
             fcrunner::ComponentRunnerMarker::PROTOCOL_NAME,
@@ -256,6 +257,7 @@ impl ElfRunnerProgram {
                 capability: InternalCapability::Protocol(
                     Name::new(fattribution::ProviderMarker::PROTOCOL_NAME).unwrap(),
                 ),
+                _phantom_data: std::marker::PhantomData,
             },
             task_group.as_weak(),
             fattribution::ProviderMarker::PROTOCOL_NAME,

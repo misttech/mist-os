@@ -373,6 +373,7 @@ impl EventRegistry {
                 source:
                     CapabilitySource::Builtin {
                         capability: InternalCapability::EventStream(source_name),
+                        _phantom_data: std::marker::PhantomData,
                     },
                 relative_path: _,
             } => Ok((source_name, ExtendedMoniker::ComponentManager, route)),

@@ -76,7 +76,7 @@ pub enum CapabilitySource<C: ComponentInstanceInterface + 'static> {
     /// This capability originates from the parent of the root component, and is built in to
     /// component manager. `top_instance` is the instance at the top of the tree, i.e.  the
     /// instance representing component manager.
-    Builtin { capability: InternalCapability },
+    Builtin { capability: InternalCapability, _phantom_data: std::marker::PhantomData<C> },
     /// This capability originates from the parent of the root component, and is offered from
     /// component manager's namespace. `top_instance` is the instance at the top of the tree, i.e.
     /// the instance representing component manager.
@@ -287,7 +287,7 @@ impl<C: ComponentInstanceInterface + 'static> TryFrom<CapabilitySource<C>> for D
                 insert_capability_dict(&output, capability)?;
                 insert_moniker(&output, moniker)
             }
-            CapabilitySource::Builtin { capability } => {
+            CapabilitySource::Builtin { capability, .. } => {
                 insert_key(&output, BUILTIN_STR);
                 insert_capability_dict(&output, capability)?;
             }
@@ -357,9 +357,10 @@ impl<C: ComponentInstanceInterface + 'static> TryFrom<Dict> for CapabilitySource
                 capability: get_capability_dict(&dict)?.try_into()?,
                 moniker: get_moniker(&dict)?,
             },
-            BUILTIN_STR => {
-                CapabilitySource::Builtin { capability: get_capability_dict(&dict)?.try_into()? }
-            }
+            BUILTIN_STR => CapabilitySource::Builtin {
+                capability: get_capability_dict(&dict)?.try_into()?,
+                _phantom_data: std::marker::PhantomData,
+            },
             NAMESPACE_STR => {
                 CapabilitySource::Namespace { capability: get_capability_dict(&dict)?.try_into()? }
             }

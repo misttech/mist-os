@@ -64,6 +64,7 @@ pub fn build_root_component_input(
                     protocol_decl.name.clone(),
                     CapabilitySource::<ComponentInstanceForAnalyzer>::Builtin {
                         capability: InternalCapability::Protocol(protocol_decl.name.clone()),
+                        _phantom_data: std::marker::PhantomData,
                     },
                 )),
                 _ => None,

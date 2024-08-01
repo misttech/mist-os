@@ -1153,7 +1153,10 @@ where
                 .ok_or(RoutingError::register_from_component_manager_not_found(
                     reg.source_name().to_string(),
                 ))?;
-            Ok(CapabilitySource::Builtin { capability: internal_capability })
+            Ok(CapabilitySource::Builtin {
+                capability: internal_capability,
+                _phantom_data: std::marker::PhantomData,
+            })
         }
         None => Err(RoutingError::UseFromEnvironmentNotFound {
             moniker: target.moniker().clone(),
