@@ -17,6 +17,7 @@ cc_library(
         "packet.cc",
         "types.cc",
     ],
+    copts = ["-Wswitch-enum"],
     deps = [
         "//src/connectivity/bluetooth/core/bt-host:public",
         "//src/connectivity/bluetooth/core/bt-host/common",

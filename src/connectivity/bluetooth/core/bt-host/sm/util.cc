@@ -10,6 +10,7 @@
 #include <openssl/aes.h>
 #include <openssl/cmac.h>
 #include <pw_bytes/endian.h>
+#include <pw_preprocessor/compiler.h>
 
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/assert.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/byte_buffer.h"
@@ -20,8 +21,6 @@
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sm/error.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sm/smp.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sm/types.h"
-
-#pragma clang diagnostic ignored "-Wswitch-enum"
 
 namespace bt::sm::util {
 namespace {
