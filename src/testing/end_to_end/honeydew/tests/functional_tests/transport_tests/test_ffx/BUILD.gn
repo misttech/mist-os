@@ -14,7 +14,11 @@ if (is_host) {
     ]
     test_data_deps = [ "//src/developer/ffx/tools/power:ffx_power_test_data" ]
     transport = "fuchsia-controller"
-    params_source = "params_x64.yaml"
+    params = {
+      expected_values = {
+        board = "x64"
+      }
+    }
     environments = [
       # Only enable for AEMU-x64 as host-tests aren't supported on QEMU-arm64.
       aemu_env,
@@ -30,8 +34,28 @@ if (is_host) {
     ]
     test_data_deps = [ "//src/developer/ffx/tools/power:ffx_power_test_data" ]
     transport = "fuchsia-controller"
-    params_source = "params_vim3.yaml"
+    params = {
+      expected_values = {
+        board = "vim3"
+      }
+    }
     environments = [ vim3_env ]
+  }
+
+  python_mobly_test("ffx_test_on_nelson_fc") {
+    main_source = "test_ffx.py"
+    libraries = [
+      "//src/testing/end_to_end/honeydew",
+      "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
+    ]
+    test_data_deps = [ "//src/developer/ffx/tools/power:ffx_power_test_data" ]
+    transport = "fuchsia-controller"
+    params = {
+      expected_values = {
+        board = "nelson"
+      }
+    }
+    environments = [ nelson_env ]
   }
 
   python_mobly_test("ffx_wait_for_rcs_disconnection_test_fc") {
@@ -68,11 +92,20 @@ group("test_ffx_on_vim3") {
   ]
 }
 
+group("test_ffx_on_nelson") {
+  testonly = true
+  public_deps = [
+    ":ffx_test_on_nelson_fc($host_toolchain)",
+    ":packages",
+  ]
+}
+
 # Group containing all of the FFX transport functional test cases and their dependencies.
 group("tests") {
   testonly = true
   public_deps = [
     ":ffx_wait_for_rcs_disconnection_test_fc($host_toolchain)",
+    ":test_ffx_on_nelson",
     ":test_ffx_on_vim3",
     ":test_ffx_on_x64",
   ]

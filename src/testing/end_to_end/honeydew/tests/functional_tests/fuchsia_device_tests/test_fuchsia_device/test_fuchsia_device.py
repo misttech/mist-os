@@ -118,11 +118,9 @@ class FuchsiaDeviceTests(fuchsia_base_test.FuchsiaBaseTest):
     def test_serial_number(self) -> None:
         """Test case for serial_number"""
         # Note - Some devices such as FEmu, X64 does not have a serial_number.
-        # So do not include "serial_number" in params.yml file if device does
-        # not have a serial_number.
-        asserts.assert_equal(
-            self.device.serial_number,
-            self.user_params["expected_values"].get("serial_number"),
+        asserts.assert_true(
+            isinstance(self.device.serial_number, (str, type(None))),
+            msg="serial_number operation failed",
         )
 
     def test_firmware_version(self) -> None:

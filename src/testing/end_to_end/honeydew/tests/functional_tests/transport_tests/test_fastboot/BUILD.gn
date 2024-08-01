@@ -15,7 +15,10 @@ if (is_host) {
     ]
     transport = "fuchsia-controller"
     params_source = "params.yaml"
-    environments = [ vim3_env ]
+    environments = [
+      vim3_env,
+      nelson_env,
+    ]
   }
 }
 

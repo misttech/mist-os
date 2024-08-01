@@ -80,8 +80,7 @@ device and if your host has only that one device connected.
   # start the emulator with networking enabled
   $ ffx emu stop ; ffx emu start -H --net tap
 
-  # TODO (b/338249539): Update the path to not include 'host_x64/obj'
-  $ fx test --exact host_x64/obj/src/testing/end_to_end/honeydew/tests/functional_tests/fuchsia_device_tests/test_fuchsia_device/x64_emu_test_fc.sh --e2e --output
+  $ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/fuchsia_device_tests/test_fuchsia_device:x64_emu_test_fc --e2e --output
   ```
 
 ## How to add a new test to run in infra
