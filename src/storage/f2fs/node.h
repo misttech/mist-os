@@ -118,6 +118,7 @@ class NodeManager {
 
   zx_status_t BuildNodeManager();
   zx_status_t GetNodePage(nid_t nid, LockedPage *out);
+  zx::result<std::vector<LockedPage>> GetNodePages(const std::vector<nid_t> &nids);
 
   // If it fails to find a node at |path|, it creates and returns a new node.
   zx::result<LockedPage> GetLockedDnodePage(NodePath &path, bool is_dir);

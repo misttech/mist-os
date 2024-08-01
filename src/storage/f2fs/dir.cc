@@ -88,24 +88,41 @@ bool Dir::EarlyMatchName(std::string_view name, f2fs_hash_t namehash, const DirE
 }
 
 zx::result<DentryInfo> Dir::FindInBlock(fbl::RefPtr<Page> dentry_page, std::string_view name,
-                                        f2fs_hash_t namehash, fbl::RefPtr<Page> *res_page) {
+                                        f2fs_hash_t namehash) {
   DentryBlock *dentry_blk = dentry_page->GetAddress<DentryBlock>();
   auto bits = GetBitmap(dentry_page);
   ZX_DEBUG_ASSERT(bits.is_ok());
   size_t bit_pos = bits->FindNextBit(0);
+  size_t n = 0;
+  DentryInfo info;
+  std::vector<nid_t> nids;
   while (bit_pos < kNrDentryInBlock) {
     const DirEntry &de = dentry_blk->dentry[bit_pos];
-    size_t slots = GetDentrySlots(LeToCpu(de.name_len));
-    if (EarlyMatchName(name, namehash, de) &&
+    nid_t ino = LeToCpu(de.ino);
+    GetDirEntryCache().UpdateDirEntry(
+        std::string_view(reinterpret_cast<char *>(dentry_blk->filename[bit_pos]),
+                         LeToCpu(de.name_len)),
+        {ino, dentry_page->GetKey(), bit_pos});
+    if (!info.ino && EarlyMatchName(name, namehash, de) &&
         !memcmp(dentry_blk->filename[bit_pos], name.data(), name.length())) {
-      DentryInfo info = {LeToCpu(de.ino), dentry_page->GetKey(), bit_pos};
-      GetDirEntryCache().UpdateDirEntry(name, info);
-      *res_page = std::move(dentry_page);
-      return zx::ok(info);
+      info = {ino, dentry_page->GetKey(), bit_pos};
     }
-    bit_pos = bits->FindNextBit(bit_pos + slots);
+    if (info.ino) {
+      nids.push_back(ino);
+      if (kDefaultNodeReadSize <= ++n) {
+        break;
+      }
+    }
+    ZX_DEBUG_ASSERT(de.name_len > 0);
+    bit_pos = bits->FindNextBit(bit_pos + GetDentrySlots(LeToCpu(de.name_len)));
   }
-  return zx::error(ZX_ERR_NOT_FOUND);
+  if (!info.ino) {
+    return zx::error(ZX_ERR_NOT_FOUND);
+  }
+  if (nids.size() > 1) {
+    ZX_ASSERT(fs()->GetNodeManager().GetNodePages(nids).is_ok());
+  }
+  return zx::ok(info);
 }
 
 zx::result<DentryInfo> Dir::FindInLevel(unsigned int level, std::string_view name,
@@ -127,8 +144,8 @@ zx::result<DentryInfo> Dir::FindInLevel(unsigned int level, std::string_view nam
     if (dentry_page_or.is_error()) {
       continue;
     }
-    if (auto info = FindInBlock(dentry_page_or.value().release(), name, namehash, res_page);
-        info.is_ok()) {
+    if (auto info = FindInBlock((*dentry_page_or).CopyRefPtr(), name, namehash); info.is_ok()) {
+      *res_page = (*dentry_page_or).release();
       return info;
     }
   }
