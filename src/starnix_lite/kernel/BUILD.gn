@@ -74,6 +74,8 @@ rustc_binary("starnix_lite_kernel_bin") {
     "//third_party/rust_crates:tracing-mutex",
   ]
 
+  test_deps = [ "//src/lib/fuchsia" ]
+
   non_rust_deps = [ ":restricted_trampoline" ]
 
   sources = [
@@ -124,7 +126,6 @@ rustc_library("starnix_lite_core") {
     "device/mod.rs",
     "device/registry.rs",
     "device/remote_block_device.rs",
-    "device/sync_fence_registry.rs",
     "device/sync_file.rs",
     "device/terminal.rs",
     "device/tun.rs",
@@ -179,9 +180,11 @@ rustc_library("starnix_lite_core") {
     "mm/memory_manager.rs",
     "mm/mod.rs",
     "mm/syscalls.rs",
+    "mm/vmar.rs",
     "mm/vmex_resource.rs",
     "mm/vmsplice.rs",
     "mutable_state.rs",
+    "power/listener.rs",
     "power/manager.rs",
     "power/mod.rs",
     "power/state.rs",
@@ -246,7 +249,6 @@ rustc_library("starnix_lite_core") {
     "vfs/file_server.rs",
     "vfs/file_system/file_system.rs",
     "vfs/file_system/mod.rs",
-    "vfs/file_system/selinux_contexts.rs",
     "vfs/file_write_guard.rs",
     "vfs/fs_args.rs",
     "vfs/fs_context.rs",
@@ -373,7 +375,6 @@ rustc_library("starnix_lite_core") {
     "//third_party/rust_crates:netlink-packet-core",
     "//third_party/rust_crates:netlink-packet-generic",
     "//third_party/rust_crates:netlink-packet-route",
-    "//third_party/rust_crates:netlink-packet-sock-diag",
     "//third_party/rust_crates:netlink-packet-utils",
     "//third_party/rust_crates:nom",
     "//third_party/rust_crates:num-derive",
@@ -410,7 +411,10 @@ rustc_library("starnix_lite_core") {
     "//third_party/rust_crates:tracing-mutex",
   ]
 
-  features = [ "starnix_lite" ]
+  features = []
+  if (is_mistos) {
+    features += [ "starnix_lite" ]
+  }
   if (starnix_syscall_stats) {
     features += [ "syscall_stats" ]
   }
@@ -476,13 +480,6 @@ static_library("restricted_trampoline") {
   sources = [ "execution/trampoline_${current_cpu}.S" ]
 }
 
-resource("starnix_lite-test-files") {
-  sources = [
-    "data/testfile.txt",
-    "data/testfile2.txt",
-  ]
-  outputs = [ "data/{{source_file_part}}" ]
-}
 
 # Components
 
@@ -542,7 +539,7 @@ mistos_unittest_zbi("starnix_lite-tests") {
   executable_path = "bin/starnix_core_lib_test"
   test_target_label = ":starnix_lite_core_test"
   deps = [
-    ":starnix_lite-test-files",
+    "//src/starnix/kernel:starnix-test-files",
     "//src/starnix/examples/hello_starnix:bin",
   ]
 }

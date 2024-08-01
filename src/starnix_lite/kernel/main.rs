@@ -17,15 +17,20 @@ use crate::builtin::svc_controller::SvcController;
 use crate::builtin::time::create_utc_clock;
 use anyhow::{Context, Error};
 use builtins::vmex_resource::VmexResource;
+use fidl::endpoints::RequestStream;
+use fuchsia_boot::UserbootRequest;
 use fuchsia_component::server::*;
-use fuchsia_runtime::swap_utc_clock_handle;
+use fuchsia_runtime::{swap_utc_clock_handle, take_startup_handle, HandleInfo, HandleType};
 use futures::prelude::*;
 use mistos_logger::klog;
 use starnix_core::mm::{init_usercopy, zxio_maybe_faultable_copy_impl};
 use starnix_lite_kernel_config::Config;
 use starnix_lite_kernel_runner::{create_container_from_config, Container, ContainerServiceConfig};
-use starnix_logging::{log_info, log_warn};
-use {fuchsia_async as fasync, fuchsia_runtime as fruntime, fuchsia_zircon as zx};
+use starnix_logging::{log_error, log_info, log_warn};
+use {
+    fidl_fuchsia_boot as fuchsia_boot, fuchsia_async as fasync, fuchsia_runtime as fruntime,
+    fuchsia_zircon as zx,
+};
 
 mod bootfs;
 mod builtin;
@@ -107,13 +112,33 @@ fn main() -> Result<(), Error> {
 
 async fn async_main(config: Config) -> Result<(), Error> {
     let system_resource_handle =
-        fruntime::take_startup_handle(fruntime::HandleType::SystemResource.into())
-            .map(zx::Resource::from);
+        take_startup_handle(HandleType::SystemResource.into()).map(zx::Resource::from);
 
-    let svc_stash_channel =
-        fruntime::take_startup_handle(fruntime::HandleInfo::new(fruntime::HandleType::User0, 0))
-            .map(zx::Channel::from)
-            .expect("Failed to get svc server channel");
+    // Drain messages from `fuchsia.boot.Userboot`, and expose appropriate capabilities.
+    let userboot = take_startup_handle(HandleInfo::new(HandleType::User0, 0))
+        .map(zx::Channel::from)
+        .map(fasync::Channel::from_channel)
+        .map(fuchsia_boot::UserbootRequestStream::from_channel);
+
+    let mut svc_stash_provider = None;
+    if let Some(userboot) = userboot {
+        let messages = userboot.try_collect::<Vec<UserbootRequest>>().await;
+
+        if let Ok(mut messages) = messages {
+            while let Some(request) = messages.pop() {
+                match request {
+                    UserbootRequest::PostStashSvc { stash_svc_endpoint, control_handle: _ } => {
+                        if svc_stash_provider.is_some() {
+                            log_warn!("Expected at most a single SvcStash, but more were found. Last entry will be preserved.");
+                        }
+                        svc_stash_provider = Some(stash_svc_endpoint.into_channel());
+                    }
+                }
+            }
+        } else if let Err(err) = messages {
+            log_error!("Error extracting 'fuchsia.boot.Userboot' messages:  {err}");
+        }
+    }
 
     let bootfs_svc = BootfsSvc::new().expect("Failed to create bootfs");
     let bootfs_svc = Some(bootfs_svc);
@@ -123,16 +148,6 @@ async fn async_main(config: Config) -> Result<(), Error> {
     // own process, this won't interact with other running tests.
     let _ = swap_utc_clock_handle(clock).expect("failed to swap clocks");
 
-    let bootfs_svc = bootfs_svc
-        .unwrap()
-        .ingest_bootfs_vmo_with_system_resource(&system_resource_handle)
-        .expect("Failed to ingest bootfs");
-
-    let _ = bootfs_svc.create_and_bind_vfs().expect("failed to bind");
-
-    let mut service_fs = ServiceFs::new();
-
-    // Set up the VmexResource service.
     let vmex_resource = system_resource_handle
         .as_ref()
         .and_then(|handle| {
@@ -150,6 +165,16 @@ async fn async_main(config: Config) -> Result<(), Error> {
         .and_then(Result::ok)
         .unwrap();
 
+    let bootfs_svc = bootfs_svc
+        .unwrap()
+        .ingest_bootfs_vmo_with_system_resource(&system_resource_handle)
+        .expect("Failed to ingest bootfs");
+
+    let _ = bootfs_svc.create_and_bind_vfs().expect("failed to bind");
+
+    let mut service_fs = ServiceFs::new();
+
+    // Set up the VmexResource service.
     service_fs.add_fidl_service(move |stream| {
         let vmex = vmex_resource.clone();
         fasync::Task::spawn(async move {
@@ -161,7 +186,7 @@ async fn async_main(config: Config) -> Result<(), Error> {
         .detach();
     });
 
-    let svc_stash = SvcController::new(svc_stash_channel);
+    let svc_stash = SvcController::new(svc_stash_provider.unwrap());
     svc_stash.wait_for_epitaph().await;
 
     // Bind to the channel
