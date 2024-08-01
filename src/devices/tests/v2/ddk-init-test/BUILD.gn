@@ -19,7 +19,7 @@ group("drivers") {
 }
 
 driver_bind_rules("bind") {
-  rules = "init-test.bind"
+  rules = "meta/init-test.bind"
   bind_output = "init-test.bindbc"
   deps = [ "//src/devices/bind/fuchsia.test" ]
 }
@@ -41,7 +41,7 @@ fuchsia_driver("driver") {
 fuchsia_driver_component("component") {
   component_name = "init-test"
   deps = [ ":driver" ]
-  info = "init-test-info.json"
+  info = "meta/init-test-info.json"
   manifest = "meta/component.cml"
 }
 

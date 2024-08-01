@@ -8,9 +8,9 @@ import("//build/drivers.gni")
 import("//build/test.gni")
 
 driver_bind_rules("aml_nna_bind") {
-  rules = "aml_nna.bind"
+  rules = "meta/aml_nna.bind"
   bind_output = "aml-nna.bindbc"
-  tests = "bind_tests.json"
+  tests = "meta/bind_tests.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.registers:fuchsia.hardware.registers_bindlib",
     "//src/devices/bind/fuchsia.amlogic.platform",
@@ -43,7 +43,7 @@ fuchsia_driver("aml-nna-driver") {
 fuchsia_driver_component("aml-nna") {
   component_name = "aml-nna"
   deps = [ ":aml-nna-driver" ]
-  info = "aml-nna-info.json"
+  info = "meta/aml-nna-info.json"
   manifest = "meta/aml-nna.cml"
 }
 

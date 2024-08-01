@@ -17,9 +17,9 @@ group("tests") {
 }
 
 driver_bind_rules("aml_uart_bind") {
-  rules = "aml_uart.bind"
+  rules = "meta/aml_uart.bind"
   bind_output = "aml-uart.bindbc"
-  tests = "bind_tests.json"
+  tests = "meta/bind_tests.json"
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.devicetree",
@@ -76,7 +76,7 @@ fuchsia_driver("aml-uart-driver") {
 }
 
 fuchsia_driver_component("aml-uart") {
-  info = "aml-uart-info.json"
+  info = "meta/aml-uart-info.json"
   component_name = "aml-uart"
   deps = [
     ":aml-uart-driver",
@@ -166,7 +166,7 @@ fuchsia_component_manifest("aml-uart-dfv2-manifest") {
 
 fuchsia_driver_component("aml-uart-dfv2") {
   cm_label = ":aml-uart-dfv2-manifest"
-  info = "aml-uart-info.json"
+  info = "meta/aml-uart-info.json"
   deps = [
     ":aml-uart-dfv2-driver",
     ":aml_uart_bind",

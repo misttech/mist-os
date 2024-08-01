@@ -13,7 +13,7 @@ group("tests") {
 }
 
 driver_bind_rules("bind") {
-  rules = "acpi_battery.bind"
+  rules = "meta/acpi_battery.bind"
   bind_output = "acpi_battery.bindbc"
   deps = [
     "//sdk/fidl/fuchsia.hardware.interrupt:fuchsia.hardware.interrupt_bindlib",
@@ -45,7 +45,7 @@ fuchsia_driver("driver") {
 fuchsia_driver_component("component") {
   component_name = "acpi-battery"
   deps = [ ":driver" ]
-  info = "component-info.json"
+  info = "meta/component-info.json"
   manifest = "meta/acpi-battery.cml"
 }
 

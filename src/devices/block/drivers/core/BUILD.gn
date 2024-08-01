@@ -24,7 +24,7 @@ fuchsia_driver_component("core") {
   visibility = [ ":*" ]
   component_name = "block.core"
   deps = [ ":core-driver" ]
-  info = "core-info.json"
+  info = "meta/core-info.json"
   manifest = "meta/core.cml"
 }
 
@@ -70,9 +70,9 @@ fuchsia_unittest_package("core-unittest") {
 }
 
 driver_bind_rules("block-core-bind") {
-  rules = "block-core.bind"
+  rules = "meta/block-core.bind"
   bind_output = "block.bindbc"
-  tests = "bind-tests.json"
+  tests = "meta/bind-tests.json"
   deps = [ "//src/devices/bind/fuchsia.block" ]
 }
 

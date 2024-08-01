@@ -6,7 +6,7 @@ import("//build/bind/bind.gni")
 import("//build/drivers.gni")
 
 driver_bind_rules("serial_bind") {
-  rules = "serial.bind"
+  rules = "meta/serial.bind"
   bind_output = "serial.bindbc"
   tests = "tests/tests.json"
   deps = [ "//sdk/fidl/fuchsia.hardware.serialimpl:fuchsia.hardware.serialimpl_bindlib" ]
@@ -23,7 +23,7 @@ fuchsia_driver("serial-driver") {
 
 fuchsia_driver_component("serial") {
   visibility = [ ":*" ]
-  info = "serial-info.json"
+  info = "meta/serial-info.json"
   component_name = "serial"
   deps = [ ":serial-driver" ]
   manifest = "meta/serial.cml"

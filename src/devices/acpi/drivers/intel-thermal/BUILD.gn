@@ -13,7 +13,7 @@ group("tests") {
 }
 
 driver_bind_rules("bind") {
-  rules = "intel_thermal.bind"
+  rules = "meta/intel_thermal.bind"
   bind_output = "intel_thermal.bindbc"
   deps = [
     "//sdk/fidl/fuchsia.hardware.interrupt:fuchsia.hardware.interrupt_bindlib",
@@ -43,7 +43,7 @@ fuchsia_driver("driver") {
 fuchsia_driver_component("component") {
   component_name = "intel-thermal"
   deps = [ ":driver" ]
-  info = "component-info.json"
+  info = "meta/component-info.json"
   manifest = "meta/intel-thermal.cml"
 }
 

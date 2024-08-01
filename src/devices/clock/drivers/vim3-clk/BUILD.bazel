@@ -16,7 +16,7 @@ load(
 fuchsia_driver_bind_bytecode(
     name = "vim3-clk-bind",
     output = "vim3-clk.bindbc",
-    rules = "vim3-clk.bind",
+    rules = "meta/vim3-clk.bind",
     deps = [
         "@fuchsia_sdk//bind/fuchsia.amlogic.platform",
         "@fuchsia_sdk//bind/fuchsia.devicetree",

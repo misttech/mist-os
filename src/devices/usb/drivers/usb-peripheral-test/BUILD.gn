@@ -6,8 +6,8 @@ import("//build/bind/bind.gni")
 import("//build/drivers.gni")
 
 driver_bind_rules("usb_peripheral_test-bind") {
-  rules = "usb_peripheral_test.bind"
-  tests = "tests.json"
+  rules = "meta/usb_peripheral_test.bind"
+  tests = "meta/tests.json"
   deps = [
     "//src/devices/bind/fuchsia.google.platform.usb",
     "//src/devices/bind/fuchsia.usb",
@@ -41,7 +41,7 @@ if (is_fuchsia) {
 
   fuchsia_driver_component("usb-peripheral-test") {
     visibility = [ ":*" ]
-    info = "usb-peripheral-test-info.json"
+    info = "meta/usb-peripheral-test-info.json"
     component_name = "usb-peripheral-test"
     deps = [ ":usb-peripheral-test-driver" ]
     manifest = "meta/usb-peripheral-test.cml"

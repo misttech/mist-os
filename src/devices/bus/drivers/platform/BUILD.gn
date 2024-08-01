@@ -56,7 +56,7 @@ fuchsia_driver_component("platform-bus") {
   visibility = [ ":*" ]
   component_name = "platform-bus"
   deps = [ ":platform-bus-driver" ]
-  info = "platform-bus-info.json"
+  info = "meta/platform-bus-info.json"
   manifest = "meta/platform-bus.cml"
 }
 

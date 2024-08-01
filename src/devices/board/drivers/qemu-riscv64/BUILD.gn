@@ -7,8 +7,8 @@ import("//build/drivers.gni")
 import("//src/devices/bus/drivers/pci/pci.gni")
 
 driver_bind_rules("qemu-riscv64_bind") {
-  rules = "qemu-riscv64.bind"
-  tests = "bind_tests.json"
+  rules = "meta/qemu-riscv64.bind"
+  tests = "meta/bind_tests.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_bindlib",
     "//src/devices/bind/fuchsia.platform",
@@ -55,7 +55,7 @@ fuchsia_driver("qemu-riscv64-driver") {
 fuchsia_driver_component("qemu-riscv64") {
   component_name = "qemu-riscv64"
   deps = [ ":qemu-riscv64-driver" ]
-  info = "qemu-riscv64-info.json"
+  info = "meta/qemu-riscv64-info.json"
   manifest = "meta/qemu-riscv64.cml"
 }
 

@@ -7,7 +7,7 @@ import("//build/drivers.gni")
 import("//build/fidl/fidl.gni")
 
 driver_bind_rules("mock-device-bind") {
-  rules = "mock-device.bind"
+  rules = "meta/mock-device.bind"
   deps = [ "//src/devices/bind/fuchsia.test" ]
 }
 
@@ -38,7 +38,7 @@ fuchsia_driver_component("mock-device") {
   testonly = true
   component_name = "mock-device"
   deps = [ ":mock-device-driver" ]
-  info = "mock-device-info.json"
+  info = "meta/mock-device-info.json"
   manifest = "meta/mock-device.cml"
 }
 

@@ -31,7 +31,7 @@ fidl("fuchsia.basicdriver.ctftest") {
 }
 
 driver_bind_rules("bind") {
-  rules = "src/basic.bind"
+  rules = "meta/basic.bind"
   bind_output = "basic.bindbc"
   deps = [ "//src/devices/bind/fuchsia.test" ]
 }
@@ -53,7 +53,7 @@ fuchsia_driver_component("basic-driver-component") {
   manifest = "meta/basic-driver.cml"
   component_name = "basic-driver"
   deps = [ ":basic-driver" ]
-  info = "info.json"
+  info = "meta/info.json"
 }
 
 rustc_test("bin") {

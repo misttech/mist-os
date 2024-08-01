@@ -11,7 +11,7 @@ fuchsia_driver_component("component") {
   manifest = "meta/target_1_no_colocate.cml"
   component_name = "target_1_no_colocate"
   deps = [ "//src/devices/tests/v2/reload-driver/target-1:driver" ]
-  info = "info.json"
+  info = "meta/info.json"
 }
 
 group("tests") {

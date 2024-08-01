@@ -7,7 +7,7 @@ import("//build/drivers.gni")
 
 driver_bind_rules("parent_driver_bind") {
   testonly = true
-  rules = "parent_driver.bind"
+  rules = "meta/parent_driver.bind"
   bind_output = "parent_driver.bindbc"
   deps = [ "//src/devices/bind/fuchsia.test" ]
 }
@@ -32,6 +32,6 @@ fuchsia_driver_component("parent-driver") {
   testonly = true
   component_name = "fidl-bindlib-generation-parent"
   deps = [ ":driver" ]
-  info = "component-info.json"
+  info = "meta/component-info.json"
   manifest = "meta/parent-driver.cml"
 }

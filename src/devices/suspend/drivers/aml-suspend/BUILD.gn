@@ -7,9 +7,9 @@ import("//build/components.gni")
 import("//build/drivers.gni")
 
 driver_bind_rules("aml-suspend-bind") {
-  rules = "aml-suspend.bind"
+  rules = "meta/aml-suspend.bind"
   bind_output = "aml-suspend.bindbc"
-  tests = "aml-suspend-bind-test.json"
+  tests = "meta/aml-suspend-bind-test.json"
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.devicetree",
@@ -48,7 +48,7 @@ fuchsia_driver("aml-suspend-driver") {
 fuchsia_driver_component("aml-suspend") {
   component_name = "aml-suspend"
   deps = [ ":aml-suspend-driver" ]
-  info = "aml-suspend-info.json"
+  info = "meta/aml-suspend-info.json"
   manifest = "meta/aml-suspend.cml"
 }
 

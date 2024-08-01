@@ -16,7 +16,7 @@ load(
 fuchsia_driver_bind_bytecode(
     name = "aml-i2c-bind",
     output = "aml-i2c.bindbc",
-    rules = "aml_i2c.bind",
+    rules = "meta/aml_i2c.bind",
     deps = [
         "@fuchsia_sdk//bind/fuchsia.amlogic.platform",
         "@fuchsia_sdk//bind/fuchsia.devicetree",

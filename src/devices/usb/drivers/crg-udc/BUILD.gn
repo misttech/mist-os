@@ -8,9 +8,9 @@ import("//build/drivers.gni")
 import("//build/test.gni")
 
 driver_bind_rules("crg_udc_bind") {
-  rules = "crg_udc.bind"
+  rules = "meta/crg_udc.bind"
   bind_output = "crg_udc.bindbc"
-  tests = "tests.json"
+  tests = "meta/tests.json"
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.platform",
@@ -48,7 +48,7 @@ fuchsia_driver("crg-udc-driver") {
 }
 
 fuchsia_driver_component("crg-udc") {
-  info = "crg-udc-info.json"
+  info = "meta/crg-udc-info.json"
   component_name = "crg-udc"
   deps = [ ":crg-udc-driver" ]
   manifest = "meta/crg-udc.cml"

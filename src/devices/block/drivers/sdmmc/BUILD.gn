@@ -9,9 +9,9 @@ import("//build/test.gni")
 import("//tools/power_config/build/config.gni")
 
 driver_bind_rules("sdmmc-bind") {
-  rules = "sdmmc.bind"
+  rules = "meta/sdmmc.bind"
   bind_output = "sdmmc.bindbc"
-  tests = "sdmmc-bind-test.json"
+  tests = "meta/sdmmc-bind-test.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_bindlib",
     "//src/devices/bind/fuchsia.sdmmc",
@@ -90,7 +90,7 @@ fuchsia_driver_component("sdmmc") {
   visibility = [ ":*" ]
   cm_label = ":sdmmc-manifest"
   deps = [ ":sdmmc-driver" ]
-  info = "sdmmc-info.json"
+  info = "meta/sdmmc-info.json"
 }
 
 fuchsia_structured_config_cpp_elf_lib("sdmmc-config") {

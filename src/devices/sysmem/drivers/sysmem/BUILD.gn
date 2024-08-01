@@ -17,9 +17,9 @@ group("tests") {
 }
 
 driver_bind_rules("sysmem_bind") {
-  rules = "sysmem.bind"
+  rules = "meta/sysmem.bind"
   bind_output = "sysmem.bindbc"
-  tests = "bind_tests.json"
+  tests = "meta/bind_tests.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_bindlib",
     "//src/devices/bind/fuchsia.devicetree",
@@ -153,7 +153,7 @@ fuchsia_driver("sysmem-driver") {
 
 fuchsia_driver_component("sysmem") {
   visibility = [ ":*" ]
-  info = "sysmem-info.json"
+  info = "meta/sysmem-info.json"
   component_name = "sysmem"
   deps = [ ":sysmem-driver" ]
   cm_label = ":manifest"

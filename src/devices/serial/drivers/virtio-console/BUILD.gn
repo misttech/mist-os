@@ -7,8 +7,8 @@ import("//build/drivers.gni")
 import("//build/test.gni")
 
 driver_bind_rules("virtio_console_bind") {
-  rules = "virtio_console.bind"
-  tests = "bind_tests.json"
+  rules = "meta/virtio_console.bind"
+  tests = "meta/bind_tests.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_bindlib",
     "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_bindlib",
@@ -43,7 +43,7 @@ fuchsia_driver("virtio_console-driver") {
 }
 
 fuchsia_driver_component("virtio_console") {
-  info = "virtio_console-info.json"
+  info = "meta/virtio_console-info.json"
   component_name = "virtio_console"
   deps = [ ":virtio_console-driver" ]
   manifest = "meta/virtio_console.cml"

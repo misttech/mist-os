@@ -8,9 +8,9 @@ import("//build/drivers.gni")
 import("//build/test.gni")
 
 driver_bind_rules("optee-bind") {
-  rules = "optee.bind"
+  rules = "meta/optee.bind"
   bind_output = "optee.bindbc"
-  tests = "optee-bind-test.json"
+  tests = "meta/optee-bind-test.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.rpmb:fuchsia.hardware.rpmb_bindlib",
     "//src/devices/bind/fuchsia.platform",
@@ -76,7 +76,7 @@ fuchsia_driver("optee-driver") {
 }
 
 fuchsia_driver_component("optee") {
-  info = "optee-info.json"
+  info = "meta/optee-info.json"
   component_name = "optee"
   deps = [ ":optee-driver" ]
   manifest = "meta/optee.cml"

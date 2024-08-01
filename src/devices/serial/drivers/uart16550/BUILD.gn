@@ -71,8 +71,8 @@ define_common_lib("uart16550_lib_for_testing") {
 }
 
 driver_bind_rules("uart16550_bind") {
-  rules = "uart16550.bind"
-  tests = "bind_tests.json"
+  rules = "meta/uart16550.bind"
+  tests = "meta/bind_tests.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.interrupt:fuchsia.hardware.interrupt_bindlib",
     "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_bindlib",
@@ -90,7 +90,7 @@ fuchsia_driver("uart16550-driver") {
 }
 
 fuchsia_driver_component("uart16550") {
-  info = "uart16550-info.json"
+  info = "meta/uart16550-info.json"
   component_name = "uart16550"
   deps = [ ":uart16550-driver" ]
   manifest = "meta/uart16550.cml"

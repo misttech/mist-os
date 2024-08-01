@@ -18,7 +18,7 @@ group("drivers") {
 }
 
 driver_bind_rules("bind") {
-  rules = "nonbindable.bind"
+  rules = "meta/nonbindable.bind"
   bind_output = "nonbindable.bindbc"
   deps = [
     "//src/devices/bind/fuchsia.pci",
@@ -41,7 +41,7 @@ fuchsia_driver("driver") {
 fuchsia_driver_component("component") {
   component_name = "test-nonbindable"
   deps = [ ":driver" ]
-  info = "component-info.json"
+  info = "meta/component-info.json"
   manifest = "meta/component.cml"
 }
 

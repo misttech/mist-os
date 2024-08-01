@@ -6,8 +6,8 @@ import("//build/bind/bind.gni")
 import("//build/drivers.gni")
 
 driver_bind_rules("test_bind") {
-  rules = "test.bind"
-  tests = "bind_tests.json"
+  rules = "meta/test.bind"
+  tests = "meta/bind_tests.json"
   deps = [
     "//src/devices/bind/fuchsia.test",
     "//src/devices/bind/fuchsia.test.platform",
@@ -42,6 +42,6 @@ fuchsia_driver_component("test") {
   visibility = [ ":*" ]
   component_name = "test"
   deps = [ ":test-driver" ]
-  info = "test-info.json"
+  info = "meta/test-info.json"
   manifest = "meta/test.cml"
 }

@@ -8,9 +8,9 @@ import("//build/drivers.gni")
 import("//build/test.gni")
 
 driver_bind_rules("aml-cpu-bind") {
-  rules = "aml-cpu.bind"
+  rules = "meta/aml-cpu.bind"
   bind_output = "aml-cpu.bindbc"
-  tests = "bind-tests.json"
+  tests = "meta/bind-tests.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_bindlib",
     "//sdk/fidl/fuchsia.hardware.power:fuchsia.hardware.power_bindlib",
@@ -50,7 +50,7 @@ fuchsia_driver_component("aml-cpu") {
     ":aml-cpu-driver",
   ]
   manifest = "meta/aml-cpu.cml"
-  info = "aml-cpu-info.json"
+  info = "meta/aml-cpu-info.json"
 }
 
 fuchsia_driver_package("package") {

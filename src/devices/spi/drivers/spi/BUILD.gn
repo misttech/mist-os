@@ -8,9 +8,9 @@ import("//build/drivers.gni")
 import("//build/test.gni")
 
 driver_bind_rules("spi_bind") {
-  rules = "spi.bind"
+  rules = "meta/spi.bind"
   bind_output = "spi.bindbc"
-  tests = "tests.json"
+  tests = "meta/tests.json"
   deps =
       [ "//sdk/fidl/fuchsia.hardware.spiimpl:fuchsia.hardware.spiimpl_bindlib" ]
 }
@@ -59,7 +59,7 @@ fuchsia_driver("spi-driver") {
 
 fuchsia_driver_component("spi") {
   visibility = [ ":*" ]
-  info = "spi-info.json"
+  info = "meta/spi-info.json"
   component_name = "spi"
   manifest = "meta/spi.cml"
   deps = [ ":spi-driver" ]

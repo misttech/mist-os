@@ -116,14 +116,14 @@ test("config-test") {
 
 driver_bind_rules("bind") {
   disable_autobind = true
-  rules = "block-verity.bind"
+  rules = "meta/block-verity.bind"
   bind_output = "block-verity.bindbc"
   deps = [ "//src/devices/bind/fuchsia.block" ]
 }
 
 bind_test("block-verity-bind-test") {
-  rules = "block-verity.bind"
-  tests = "bind-tests.json"
+  rules = "meta/block-verity.bind"
+  tests = "meta/bind-tests.json"
   deps = [ "//src/devices/bind/fuchsia.block" ]
 }
 
@@ -162,7 +162,7 @@ fuchsia_driver("block-verity-driver") {
 fuchsia_driver_component("block-verity") {
   component_name = "block-verity"
   deps = [ ":block-verity-driver" ]
-  info = "block-verity-info.json"
+  info = "meta/block-verity-info.json"
   manifest = "meta/block-verity.cml"
 }
 

@@ -8,8 +8,8 @@ import("//build/drivers.gni")
 import("//build/test.gni")
 
 driver_bind_rules("ahci_bind") {
-  rules = "ahci.bind"
-  tests = "tests.json"
+  rules = "meta/ahci.bind"
+  tests = "meta/tests.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_bindlib",
     "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_bindlib",
@@ -32,7 +32,7 @@ fuchsia_driver("ahci-driver") {
 fuchsia_driver_component("ahci") {
   component_name = "ahci"
   deps = [ ":ahci-driver" ]
-  info = "ahci-info.json"
+  info = "meta/ahci-info.json"
   manifest = "meta/ahci.cml"
 }
 

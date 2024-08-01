@@ -8,9 +8,9 @@ import("//build/drivers.gni")
 import("//build/test.gni")
 
 driver_bind_rules("aml-meson-power-bind") {
-  rules = "aml-power.bind"
+  rules = "meta/aml-power.bind"
   bind_output = "aml-meson-power.bindbc"
-  tests = "bind-tests.json"
+  tests = "meta/bind-tests.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.pwm:fuchsia.hardware.pwm_bindlib",
     "//sdk/fidl/fuchsia.hardware.vreg:fuchsia.hardware.vreg_bindlib",
@@ -49,7 +49,7 @@ fuchsia_driver("aml-meson-power-driver") {
 }
 
 fuchsia_driver_component("aml-meson-power") {
-  info = "aml-meson-power-info.json"
+  info = "meta/aml-meson-power-info.json"
   component_name = "aml-meson-power"
   deps = [ ":aml-meson-power-driver" ]
   manifest = "meta/aml-meson-power.cml"

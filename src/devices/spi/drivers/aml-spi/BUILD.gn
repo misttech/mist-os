@@ -8,9 +8,9 @@ import("//build/drivers.gni")
 import("//build/test.gni")
 
 driver_bind_rules("aml_spi_bind") {
-  rules = "aml_spi.bind"
+  rules = "meta/aml_spi.bind"
   bind_output = "aml-spi.bindbc"
-  tests = "bind_tests.json"
+  tests = "meta/bind_tests.json"
 
   deps = [
     "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_bindlib",
@@ -104,7 +104,7 @@ fuchsia_driver("aml-spi-driver") {
 }
 
 fuchsia_driver_component("aml-spi") {
-  info = "aml-spi-info.json"
+  info = "meta/aml-spi-info.json"
   component_name = "aml-spi"
   deps = [ ":aml-spi-driver" ]
   manifest = "meta/aml-spi.cml"

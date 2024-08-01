@@ -8,8 +8,8 @@ import("//build/drivers.gni")
 import("//build/test.gni")
 
 driver_bind_rules("ti-tca6408a-bind") {
-  rules = "ti-tca6408a.bind"
-  tests = "ti-tca6408a-bind-test.json"
+  rules = "meta/ti-tca6408a.bind"
+  tests = "meta/ti-tca6408a-bind-test.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c_bindlib",
     "//src/devices/bind/fuchsia.devicetree",
@@ -40,7 +40,7 @@ fuchsia_driver("ti-tca6408a-driver") {
 }
 
 fuchsia_driver_component("ti-tca6408a") {
-  info = "ti-tca6408a-info.json"
+  info = "meta/ti-tca6408a-info.json"
   deps = [ ":ti-tca6408a-driver" ]
   manifest = "meta/ti-tca6408a.cml"
 }

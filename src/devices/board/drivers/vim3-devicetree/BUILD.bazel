@@ -19,7 +19,7 @@ load(
 fuchsia_driver_bind_bytecode(
     name = "vim3-devicetree-bind",
     output = "vim3-devicetree-bind.bindbc",
-    rules = "vim3-devicetree.bind",
+    rules = "meta/vim3-devicetree.bind",
     deps = [
         "@fuchsia_sdk//bind/fuchsia.devicetree",
         "@fuchsia_sdk//bind/fuchsia.khadas.platform",

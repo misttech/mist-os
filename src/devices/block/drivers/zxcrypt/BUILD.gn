@@ -73,7 +73,7 @@ fuchsia_driver_component("zxcrypt") {
   visibility = [ ":*" ]
   component_name = "zxcrypt"
   deps = [ ":zxcrypt-driver" ]
-  info = "zxcrypt-info.json"
+  info = "meta/zxcrypt-info.json"
   manifest = "meta/zxcrypt.cml"
 }
 
@@ -83,14 +83,14 @@ fuchsia_driver_package("package") {
 }
 
 driver_bind_rules("bind") {
-  rules = "zxcrypt.bind"
+  rules = "meta/zxcrypt.bind"
   bind_output = "zxcrypt.bindbc"
   deps = [ "//src/devices/bind/fuchsia.block" ]
 }
 
 bind_test("zxcrypt-bind-test") {
-  rules = "zxcrypt.bind"
-  tests = "bind-tests.json"
+  rules = "meta/zxcrypt.bind"
+  tests = "meta/bind-tests.json"
   deps = [ "//src/devices/bind/fuchsia.block" ]
 }
 

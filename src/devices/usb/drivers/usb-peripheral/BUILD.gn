@@ -8,9 +8,9 @@ import("//build/drivers.gni")
 import("//build/test.gni")
 
 driver_bind_rules("usb_peripheral_bind") {
-  rules = "usb_peripheral.bind"
+  rules = "meta/usb_peripheral.bind"
   bind_output = "usb-peripheral.bindbc"
-  tests = "tests.json"
+  tests = "meta/tests.json"
   deps = [ "//src/devices/bind/fuchsia.usb" ]
 }
 
@@ -67,7 +67,7 @@ fuchsia_structured_config_values("default_values") {
 }
 
 fuchsia_driver_component("driver") {
-  info = "usb-peripheral-info.json"
+  info = "meta/usb-peripheral-info.json"
   cm_label = ":manifest"
   deps = [ ":usb-peripheral-driver" ]
 }

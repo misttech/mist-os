@@ -13,7 +13,7 @@ group("tests") {
 }
 
 driver_bind_rules("bind") {
-  rules = "chromiumos_ec_lpc.bind"
+  rules = "meta/chromiumos_ec_lpc.bind"
   bind_output = "chromiumos_ec_lpc.bindbc"
   deps = [
     "//sdk/fidl/fuchsia.hardware.interrupt:fuchsia.hardware.interrupt_bindlib",
@@ -46,7 +46,7 @@ fuchsia_driver("driver") {
 }
 
 fuchsia_driver_component("component") {
-  info = "component-info.json"
+  info = "meta/component-info.json"
   component_name = "chromiumos-ec-lpc"
   deps = [ ":driver" ]
   manifest = "meta/chromiumos-ec-lpc.cml"

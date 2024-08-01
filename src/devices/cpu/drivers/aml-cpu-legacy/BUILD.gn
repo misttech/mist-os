@@ -8,9 +8,9 @@ import("//build/drivers.gni")
 import("//build/test.gni")
 
 driver_bind_rules("aml-cpu-legacy-bind") {
-  rules = "aml-cpu-legacy.bind"
+  rules = "meta/aml-cpu-legacy.bind"
   bind_output = "aml-cpu-legacy.bindbc"
-  tests = "bind-tests.json"
+  tests = "meta/bind-tests.json"
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.google.platform",
@@ -53,7 +53,7 @@ fuchsia_driver("aml-cpu-legacy-driver") {
 fuchsia_driver_component("aml-cpu-legacy") {
   component_name = "aml-cpu-legacy"
   deps = [ ":aml-cpu-legacy-driver" ]
-  info = "aml-cpu-legacy-info.json"
+  info = "meta/aml-cpu-legacy-info.json"
   manifest = "meta/aml-cpu-legacy.cml"
 }
 

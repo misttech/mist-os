@@ -8,9 +8,9 @@ import("//build/drivers.gni")
 import("//build/test.gni")
 
 driver_bind_rules("adc_bind") {
-  rules = "adc.bind"
+  rules = "meta/adc.bind"
   bind_output = "adc.bindbc"
-  tests = "test_bind.json"
+  tests = "meta/test_bind.json"
   deps =
       [ "//sdk/fidl/fuchsia.hardware.adcimpl:fuchsia.hardware.adcimpl_bindlib" ]
 }
@@ -45,7 +45,7 @@ fuchsia_driver("adc-driver") {
 }
 
 fuchsia_driver_component("adc") {
-  info = "adc-info.json"
+  info = "meta/adc-info.json"
   component_name = "adc"
   deps = [ ":adc-driver" ]
   manifest = "meta/adc.cml"

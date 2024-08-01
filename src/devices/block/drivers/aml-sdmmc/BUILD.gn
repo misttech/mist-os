@@ -14,9 +14,9 @@ bazel_driver_package("aml-sdmmc-no-banjo-bazel-package") {
 }
 
 driver_bind_rules("aml-sdmmc-bind") {
-  rules = "aml-sdmmc.bind"
+  rules = "meta/aml-sdmmc.bind"
   bind_output = "aml-sdmmc.bindbc"
-  tests = "aml-sdmmc-bind-test.json"
+  tests = "meta/aml-sdmmc-bind-test.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_bindlib",
     "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_bindlib",
@@ -84,7 +84,7 @@ fuchsia_component_manifest("aml-sdmmc-manifest") {
 fuchsia_driver_component("aml-sdmmc") {
   cm_label = ":aml-sdmmc-manifest"
   deps = [ ":aml-sdmmc-driver" ]
-  info = "aml-sdmmc-info.json"
+  info = "meta/aml-sdmmc-info.json"
 }
 
 fuchsia_structured_config_cpp_elf_lib("aml-sdmmc-config") {

@@ -8,9 +8,9 @@ import("//build/drivers.gni")
 import("//build/test.gni")
 
 driver_bind_rules("usb_bus_bind") {
-  rules = "usb_bus.bind"
+  rules = "meta/usb_bus.bind"
   bind_output = "usb-bus.bindbc"
-  tests = "tests.json"
+  tests = "meta/tests.json"
   deps = [ "//src/devices/bind/fuchsia.usb" ]
 }
 
@@ -31,7 +31,7 @@ fuchsia_driver("usb-bus-driver") {
 
 fuchsia_driver_component("usb-bus") {
   visibility = [ ":*" ]
-  info = "usb-bus-info.json"
+  info = "meta/usb-bus-info.json"
   component_name = "usb-bus"
   deps = [ ":usb-bus-driver" ]
   manifest = "meta/usb-bus.cml"

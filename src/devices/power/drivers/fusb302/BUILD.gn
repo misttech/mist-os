@@ -8,8 +8,8 @@ import("//build/drivers.gni")
 import("//build/test.gni")
 
 driver_bind_rules("fusb302-bind") {
-  rules = "fusb302.bind"
-  tests = "bind-tests.json"
+  rules = "meta/fusb302.bind"
+  tests = "meta/bind-tests.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_bindlib",
     "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c_bindlib",
@@ -61,7 +61,7 @@ fuchsia_driver("fusb302-driver") {
 }
 
 fuchsia_driver_component("fusb302") {
-  info = "fusb302-info.json"
+  info = "meta/fusb302-info.json"
   component_name = "fusb302"
   deps = [ ":fusb302-driver" ]
   manifest = "meta/fusb302.cml"

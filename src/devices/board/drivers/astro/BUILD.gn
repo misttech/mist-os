@@ -15,9 +15,9 @@ if (internal_access) {
 }
 
 driver_bind_rules("astro-bind") {
-  rules = "astro.bind"
+  rules = "meta/astro.bind"
   bind_output = "astro.bindbc"
-  tests = "bind-tests.json"
+  tests = "meta/bind-tests.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_bindlib",
     "//src/devices/bind/fuchsia.google.platform",
@@ -146,7 +146,7 @@ fuchsia_driver("astro-driver") {
 fuchsia_driver_component("astro-component") {
   component_name = "astro"
   deps = [ ":astro-driver" ]
-  info = "astro-info.json"
+  info = "meta/astro-info.json"
   manifest = "meta/astro.cml"
 }
 

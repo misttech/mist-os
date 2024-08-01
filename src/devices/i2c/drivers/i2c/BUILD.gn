@@ -8,9 +8,9 @@ import("//build/drivers.gni")
 import("//build/test.gni")
 
 driver_bind_rules("i2c_bind") {
-  rules = "i2c.bind"
+  rules = "meta/i2c.bind"
   bind_output = "i2c.bindbc"
-  tests = "tests.json"
+  tests = "meta/tests.json"
   deps =
       [ "//sdk/fidl/fuchsia.hardware.i2cimpl:fuchsia.hardware.i2cimpl_bindlib" ]
 }
@@ -48,7 +48,7 @@ fuchsia_driver_component("i2c") {
   visibility = [ ":*" ]
   component_name = "i2c"
   deps = [ ":i2c-driver" ]
-  info = "i2c-info.json"
+  info = "meta/i2c-info.json"
   manifest = "meta/i2c.cml"
 }
 

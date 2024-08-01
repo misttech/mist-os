@@ -8,9 +8,9 @@ import("//build/drivers.gni")
 import("//build/test.gni")
 
 driver_bind_rules("registers_bind") {
-  rules = "registers.bind"
+  rules = "meta/registers.bind"
   bind_output = "registers.bindbc"
-  tests = "tests.json"
+  tests = "meta/tests.json"
   deps = [
     "//src/devices/bind/fuchsia.devicetree",
     "//src/devices/bind/fuchsia.platform",
@@ -27,7 +27,7 @@ fuchsia_driver("registers-driver") {
 }
 
 fuchsia_driver_component("registers") {
-  info = "registers-info.json"
+  info = "meta/registers-info.json"
   component_name = "registers"
   deps = [ ":registers-driver" ]
   manifest = "meta/registers.cml"

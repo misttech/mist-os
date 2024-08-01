@@ -16,7 +16,7 @@ fidl("fuchsia.device.lifecycle.test") {
 
 driver_bind_rules("test-lifecycle-bind") {
   testonly = true
-  rules = "test-lifecycle.bind"
+  rules = "meta/test-lifecycle.bind"
   deps = [ "//src/devices/bind/fuchsia.test.platform" ]
 }
 
@@ -47,7 +47,7 @@ fuchsia_driver_component("ddk-lifecycle-test-driver-component") {
   testonly = true
   component_name = "ddk-lifecycle-test"
   deps = [ ":ddk-lifecycle-test-driver" ]
-  info = "ddk-lifecycle-test-info.json"
+  info = "meta/ddk-lifecycle-test-info.json"
   manifest = "meta/ddk-lifecycle-test.cml"
 }
 

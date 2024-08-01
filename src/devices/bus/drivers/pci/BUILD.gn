@@ -73,8 +73,8 @@ source_set("user_pci") {
 }
 
 driver_bind_rules("pci_bind") {
-  rules = "pci.bind"
-  tests = "pci_bind_tests.json"
+  rules = "meta/pci.bind"
+  tests = "meta/pci_bind_tests.json"
   deps = [
     "//src/devices/bind/fuchsia.pci",
     "//src/devices/bind/fuchsia.platform",
@@ -103,7 +103,7 @@ if (platform_enable_user_pci) {
   fuchsia_driver_component("bus-pci") {
     component_name = "bus-pci"
     deps = [ ":bus-pci-driver" ]
-    info = "bus-pci-info.json"
+    info = "meta/bus-pci-info.json"
     manifest = "meta/pci.cml"
   }
 
@@ -151,7 +151,7 @@ if (platform_enable_user_pci) {
   fuchsia_driver_component("bus-pci") {
     component_name = "bus-pci"
     deps = [ ":bus-pci-driver" ]
-    info = "bus-pci-info.json"
+    info = "meta/bus-pci-info.json"
     manifest = "meta/kpci.cml"
   }
 

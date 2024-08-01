@@ -8,9 +8,9 @@ import("//build/drivers.gni")
 import("//build/test.gni")
 
 driver_bind_rules("nandpart-bind") {
-  rules = "nandpart.bind"
+  rules = "meta/nandpart.bind"
   bind_output = "nandpart.bindbc"
-  tests = "bind-tests.json"
+  tests = "meta/bind-tests.json"
   deps = [ "//src/devices/bind/fuchsia.nand" ]
 }
 
@@ -44,7 +44,7 @@ fuchsia_driver("nandpart-driver") {
 }
 
 fuchsia_driver_component("nandpart") {
-  info = "nandpart-info.json"
+  info = "meta/nandpart-info.json"
   component_name = "nandpart"
   deps = [ ":nandpart-driver" ]
   manifest = "meta/nandpart.cml"

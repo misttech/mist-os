@@ -16,9 +16,9 @@ group("tests") {
 }
 
 driver_bind_rules("power-bind") {
-  rules = "power.bind"
+  rules = "meta/power.bind"
   bind_output = "power.bindbc"
-  tests = "bind-tests.json"
+  tests = "meta/bind-tests.json"
   deps = [
     "//src/devices/bind/fuchsia.platform",
     "//src/devices/bind/fuchsia.power",
@@ -49,7 +49,7 @@ fuchsia_driver("power-driver") {
 
 fuchsia_driver_component("power") {
   visibility = [ ":*" ]
-  info = "power-info.json"
+  info = "meta/power-info.json"
   component_name = "power"
   deps = [ ":power-driver" ]
   manifest = "meta/power.cml"

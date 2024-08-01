@@ -18,7 +18,7 @@ group("drivers") {
 }
 
 driver_bind_rules("bind") {
-  rules = "autobind.bind"
+  rules = "meta/autobind.bind"
   bind_output = "autobind.bindbc"
   deps = [
     "//src/devices/bind/fuchsia.pci",
@@ -42,7 +42,7 @@ fuchsia_driver("driver") {
 fuchsia_driver_component("component") {
   component_name = "test-autobind"
   deps = [ ":driver" ]
-  info = "component-info.json"
+  info = "meta/component-info.json"
   manifest = "meta/component.cml"
 }
 

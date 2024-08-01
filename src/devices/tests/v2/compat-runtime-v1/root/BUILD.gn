@@ -9,7 +9,7 @@ import("//build/test.gni")
 
 driver_bind_rules("bind") {
   testonly = true
-  rules = "root.bind"
+  rules = "meta/root.bind"
   bind_output = "root.bindbc"
   deps = [ "//src/devices/bind/fuchsia.test" ]
 }
@@ -39,6 +39,6 @@ fuchsia_driver_component("component") {
   testonly = true
   component_name = "root"
   deps = [ ":driver" ]
-  info = "root-info.json"
+  info = "meta/root-info.json"
   manifest = "meta/root.cml"
 }

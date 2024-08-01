@@ -8,9 +8,9 @@ import("//build/drivers.gni")
 import("//build/test.gni")
 
 driver_bind_rules("dwc3_bind") {
-  rules = "dwc3.bind"
+  rules = "meta/dwc3.bind"
   bind_output = "dwc3.bindbc"
-  tests = "tests.json"
+  tests = "meta/tests.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.usb.phy:fuchsia.hardware.usb.phy_bindlib",
     "//src/devices/bind/fuchsia.designware.platform",
@@ -49,7 +49,7 @@ fuchsia_driver("dwc3-driver") {
 }
 
 fuchsia_driver_component("dwc3") {
-  info = "dwc3-info.json"
+  info = "meta/dwc3-info.json"
   component_name = "dwc3"
   deps = [ ":dwc3-driver" ]
   manifest = "meta/dwc3.cml"

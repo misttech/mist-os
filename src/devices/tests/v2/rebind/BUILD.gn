@@ -16,7 +16,7 @@ fidl("fuchsia.rebind.test") {
 
 driver_bind_rules("child_bind") {
   testonly = true
-  rules = "rebind_child.bind"
+  rules = "meta/rebind_child.bind"
   bind_output = "rebind_child.bindbc"
 }
 
@@ -41,12 +41,12 @@ fuchsia_driver_component("child_driver_component") {
   component_name = "rebind_child"
   manifest = "meta/rebind_child.cml"
   deps = [ ":child_driver" ]
-  info = "component-info.json"
+  info = "meta/component-info.json"
 }
 
 driver_bind_rules("parent_bind") {
   testonly = true
-  rules = "rebind_parent.bind"
+  rules = "meta/rebind_parent.bind"
   bind_output = "rebind_parent.bindbc"
   deps = [ "//src/devices/bind/fuchsia.test" ]
 }
@@ -73,7 +73,7 @@ fuchsia_driver_component("parent_driver_component") {
   component_name = "rebind_parent"
   manifest = "meta/rebind_parent.cml"
   deps = [ ":parent_driver" ]
-  info = "component-info.json"
+  info = "meta/component-info.json"
 }
 
 group("drivers") {

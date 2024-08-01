@@ -29,7 +29,7 @@ bind_library("fuchsia.nodegroupbind.test") {
 }
 
 driver_bind_rules("root_bind") {
-  rules = "root.bind"
+  rules = "meta/root.bind"
   deps = [ "//src/devices/bind/fuchsia.test" ]
   bind_output = "root.bindbc"
 }
@@ -53,11 +53,11 @@ fuchsia_driver_component("root") {
   testonly = true
   manifest = "meta/root.cml"
   deps = [ ":root_driver" ]
-  info = "root-info.json"
+  info = "meta/root-info.json"
 }
 
 driver_bind_rules("nodegroup_leaf_bind") {
-  rules = "leaf.bind"
+  rules = "meta/leaf.bind"
   bind_output = "leaf.bindbc"
   deps = [ ":fuchsia.nodegroupbind.test" ]
 }
@@ -79,7 +79,7 @@ fuchsia_driver_component("leaf") {
   testonly = true
   manifest = "meta/leaf.cml"
   deps = [ ":leaf_driver" ]
-  info = "leaf-info.json"
+  info = "meta/leaf-info.json"
 }
 
 rustc_test("bin") {

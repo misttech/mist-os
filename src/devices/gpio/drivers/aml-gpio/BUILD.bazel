@@ -16,7 +16,7 @@ load(
 fuchsia_driver_bind_bytecode(
     name = "aml-gpio-bind",
     output = "aml-gpio.bindbc",
-    rules = "aml-gpio.bind",
+    rules = "meta/aml-gpio.bind",
     deps = [
         "@fuchsia_sdk//bind/fuchsia.amlogic.platform",
         "@fuchsia_sdk//bind/fuchsia.devicetree",

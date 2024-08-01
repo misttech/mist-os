@@ -54,13 +54,13 @@ fuchsia_driver_component("root") {
   testonly = true
   manifest = "meta/root.cml"
   deps = [ ":root-driver" ]
-  info = "root-info.json"
+  info = "meta/root-info.json"
 }
 
 driver_bind_rules("compat-runtime-v1-bind") {
-  rules = "v1.bind"
+  rules = "meta/v1.bind"
   bind_output = "v1.bindbc"
-  tests = "v1.bind-tests.json"
+  tests = "meta/v1.bind-tests.json"
   deps = [ "//src/devices/bind/fuchsia.test" ]
 }
 
@@ -91,7 +91,7 @@ fuchsia_driver_component("v1") {
     ":v1-driver",
     "//src/devices/misc/drivers/compat:driver",
   ]
-  info = "v1-info.json"
+  info = "meta/v1-info.json"
 }
 
 rustc_test("bin") {

@@ -14,16 +14,16 @@ fuchsia_driver("aml-spinand-driver") {
 }
 
 fuchsia_driver_component("aml-spinand") {
-  info = "aml-spinand-info.json"
+  info = "meta/aml-spinand-info.json"
   component_name = "aml-spinand"
   deps = [ ":aml-spinand-driver" ]
   manifest = "meta/aml-spinand.cml"
 }
 
 driver_bind_rules("aml-spinand-bind") {
-  rules = "aml-spinand.bind"
+  rules = "meta/aml-spinand.bind"
   bind_output = "aml-spinand.bindbc"
-  tests = "bind-tests.json"
+  tests = "meta/bind-tests.json"
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.platform",

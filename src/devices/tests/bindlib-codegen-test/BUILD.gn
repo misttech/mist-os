@@ -68,7 +68,7 @@ bind_library("bindlib.codegen.testlib") {
 }
 
 driver_bind_rules("parent-driver-bind") {
-  rules = "parent-driver.bind"
+  rules = "meta/parent-driver.bind"
   deps = [ "//src/devices/bind/fuchsia.test" ]
 }
 
@@ -92,12 +92,12 @@ fuchsia_driver("parent-driver-driver") {
 fuchsia_driver_component("parent-driver") {
   component_name = "bindlib-codegen-parent"
   deps = [ ":parent-driver-driver" ]
-  info = "parent-driver-info.json"
+  info = "meta/parent-driver-info.json"
   manifest = "meta/parent-driver.cml"
 }
 
 driver_bind_rules("child-driver-bind") {
-  rules = "child-driver.bind"
+  rules = "meta/child-driver.bind"
   deps = [
     ":bindlib.codegen.testlib",
     ":bindlibparent.codegen.testlib",
@@ -122,7 +122,7 @@ fuchsia_driver("child-driver-driver") {
 fuchsia_driver_component("child-driver") {
   component_name = "bindlib-codegen-child"
   deps = [ ":child-driver-driver" ]
-  info = "child-driver-info.json"
+  info = "meta/child-driver-info.json"
   manifest = "meta/child-driver.cml"
 }
 

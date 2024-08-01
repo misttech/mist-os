@@ -21,7 +21,7 @@ bind_library("multibind.test") {
 }
 
 driver_bind_rules("root-driver-bind") {
-  rules = "root-driver.bind"
+  rules = "meta/root-driver.bind"
   bind_output = "root-driver.bindbc"
   deps = [ "//src/devices/bind/fuchsia.test" ]
 }
@@ -42,12 +42,12 @@ fuchsia_driver("root-driver") {
 fuchsia_driver_component("root") {
   component_name = "root-driver"
   deps = [ ":root-driver" ]
-  info = "root-driver-info.json"
+  info = "meta/root-driver-info.json"
   manifest = "meta/root.cml"
 }
 
 driver_bind_rules("spec-composite-1-bind") {
-  rules = "spec-composite-1.bind"
+  rules = "meta/spec-composite-1.bind"
   bind_output = "spec-composite-1.bindbc"
   deps = [ ":multibind.test" ]
 }
@@ -66,12 +66,12 @@ fuchsia_driver("spec-composite-1-driver") {
 fuchsia_driver_component("spec-composite-1") {
   component_name = "spec-composite-1-driver"
   deps = [ ":spec-composite-1-driver" ]
-  info = "composite-info.json"
+  info = "meta/composite-info.json"
   manifest = "meta/spec-composite-1.cml"
 }
 
 driver_bind_rules("spec-composite-2-bind") {
-  rules = "spec-composite-2.bind"
+  rules = "meta/spec-composite-2.bind"
   bind_output = "spec-composite-2.bindbc"
   deps = [ ":multibind.test" ]
 }
@@ -90,6 +90,6 @@ fuchsia_driver("spec-composite-2-driver") {
 fuchsia_driver_component("spec-composite-2") {
   component_name = "spec-composite-2"
   deps = [ ":spec-composite-2-driver" ]
-  info = "composite-info.json"
+  info = "meta/composite-info.json"
   manifest = "meta/spec-composite-2.cml"
 }

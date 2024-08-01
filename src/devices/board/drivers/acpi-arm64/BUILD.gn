@@ -7,7 +7,7 @@ import("//build/drivers.gni")
 import("//src/devices/bus/drivers/pci/pci.gni")
 
 driver_bind_rules("acpi-arm64-bind") {
-  rules = "acpi-arm64.bind"
+  rules = "meta/acpi-arm64.bind"
   deps = [
     "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_bindlib",
     "//src/devices/bind/fuchsia.arm.platform",
@@ -45,7 +45,7 @@ fuchsia_driver("acpi-arm64-driver") {
 fuchsia_driver_component("acpi-arm64") {
   component_name = "acpi-arm64"
   deps = [ ":acpi-arm64-driver" ]
-  info = "acpi-arm64-info.json"
+  info = "meta/acpi-arm64-info.json"
   manifest = "meta/acpi-arm64.cml"
 }
 
