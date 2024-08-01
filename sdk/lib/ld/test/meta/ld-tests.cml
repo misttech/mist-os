@@ -5,13 +5,9 @@
     include: [
         "//sdk/lib/syslog/client.shard.cml",
         "//src/sys/test_runners/elf/create_raw_processes.shard.cml",
+        "//src/sys/test_runners/gtest/death_test.shard.cml",
     ],
     program: {
         binary: "test/ld-unittests",
     },
-    use: [
-        {
-            protocol: [ "fuchsia.process.Launcher" ],
-        },
-    ],
 }

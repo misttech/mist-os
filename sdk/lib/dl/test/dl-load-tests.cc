@@ -361,6 +361,28 @@ TYPED_TEST(DlTests, MissingTransitiveDependency) {
   }
 }
 
+// Test loading a module with relro protections.
+TYPED_TEST(DlTests, Relro) {
+  constexpr const char* kFile = "relro.module.so";
+
+  // TODO(https://fxbug.dev/354043838): Fold into ExpectRootModule/Needed API.
+  this->ExpectRootModuleNotLoaded(kFile);
+
+  this->ExpectRootModule(kFile);
+
+  auto result = this->DlOpen(kFile, RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(result.is_ok()) << result.error_value();
+  ASSERT_TRUE(result.value());
+
+  auto sym = this->DlSym(result.value(), "TestStart");
+  ASSERT_TRUE(sym.is_ok()) << sym.error_value();
+  ASSERT_TRUE(sym.value());
+
+  EXPECT_DEATH(RunFunction<int64_t>(sym.value()), "");
+
+  ASSERT_TRUE(this->DlClose(result.value()).is_ok());
+}
+
 // Test that calling dlopen twice on a file will return the same pointer,
 // indicating that the dynamic linker is storing the module in its bookkeeping.
 // dlsym() should return a pointer to the same symbol from the same module as
