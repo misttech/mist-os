@@ -669,11 +669,12 @@ function _add-fx-set-hit {
 function track-command-finished {
   exec 1>/dev/null
   exec 2>/dev/null
-  local timing=$1
-  local exit_status=$2
-  local subcommand=$3
-  local is_remote=$4
-  shift 4
+  local start_time="$1"
+  local end_time="$2"
+  local exit_status="$3"
+  local subcommand="$4"
+  local is_remote="$5"
+  shift 5
   local args="$*"
 
   metrics-read-config
@@ -695,6 +696,7 @@ function track-command-finished {
     args_truncated=1
   fi
 
+  local timing=$(( (end_time - start_time)/1000 ))
 
   event_params=$(fx-command-run jq -c -n \
     --arg subcommand "${subcommand}" \
@@ -704,6 +706,8 @@ function track-command-finished {
     --arg exit_status "${exit_status}" \
     --arg is_remote "${is_remote}" \
     --argjson timing "${timing}" \
+    --argjson start_time_micros "${start_time}" \
+    --argjson end_time_micros "${end_time}" \
     '$ARGS.named')
 
   _add-to-analytics-batch "finish" "${event_params}"
