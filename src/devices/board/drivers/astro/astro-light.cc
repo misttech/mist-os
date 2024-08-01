@@ -131,7 +131,7 @@ zx_status_t Astro::LightInit() {
   light_node.did() = bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_GPIO_LIGHT;
   light_node.metadata() = {
       {{
-          .type = fuchsia_hardware_light::kMetadataType,
+          .type = fuchsia_hardware_light::kPdevMetadataTypeIdentifier,
           .data = std::move(metadata.value()),
       }},
   };

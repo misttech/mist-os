@@ -4,10 +4,10 @@
 
 library fuchsia.hardware.light;
 
-/// adcimpl driver metadata type used by the gpio-light platform device. See
-/// also [`fuchsia.hardware.light/Metadata`].
+/// Identifies the [`fuchsia.hardware.light/Metadata`] instance provided by the light platform
+/// device.
 @available(added=HEAD)
-const METADATA_TYPE uint32 = 0x5448474C;
+const PDEV_METADATA_TYPE_IDENTIFIER uint32 = 0x5448474C;
 
 @available(added=HEAD)
 type Config = table {
