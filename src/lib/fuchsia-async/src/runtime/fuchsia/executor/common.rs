@@ -589,7 +589,9 @@ impl Executor {
 /// A handle to an executor.
 #[derive(Clone)]
 pub struct EHandle {
+    // LINT.IfChange
     pub(super) root_scope: ScopeRef,
+    // LINT.ThenChange(//src/developer/debug/zxdb/console/commands/verb_async_backtrace.cc)
 }
 
 impl fmt::Debug for EHandle {

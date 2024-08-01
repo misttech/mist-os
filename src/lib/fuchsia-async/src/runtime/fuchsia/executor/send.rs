@@ -27,8 +27,10 @@ use std::{fmt, mem, thread, usize};
 pub struct SendExecutor {
     /// The inner executor state.
     inner: Arc<Executor>,
+    // LINT.IfChange
     /// The root scope.
     root_scope: ScopeRef,
+    // LINT.ThenChange(//src/developer/debug/zxdb/console/commands/verb_async_backtrace.cc)
     /// Worker thread handles
     threads: Vec<thread::JoinHandle<()>>,
 }

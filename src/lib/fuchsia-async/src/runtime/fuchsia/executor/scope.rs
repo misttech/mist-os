@@ -26,7 +26,9 @@ use std::{fmt, hash};
 ///
 /// When this handle is dropped, the scope is cancelled.
 pub struct Scope {
+    // LINT.IfChange
     pub(super) inner: ScopeRef,
+    // LINT.ThenChange(//src/developer/debug/zxdb/console/commands/verb_async_backtrace.cc)
 }
 
 impl Scope {
@@ -110,7 +112,9 @@ impl Deref for Scope {
 /// A reference to a scope, which may be used to spawn tasks.
 #[derive(Clone)]
 pub struct ScopeRef {
+    // LINT.IfChange
     pub(super) inner: Arc<ScopeInner>,
+    // LINT.ThenChange(//src/developer/debug/zxdb/console/commands/verb_async_backtrace.cc)
 }
 
 impl ScopeRef {
@@ -199,15 +203,19 @@ mod state {
     use super::*;
 
     pub(in super::super) struct ScopeState {
-        scope_waker: Option<Waker>,
-        all_tasks: HashMap<usize, Arc<Task>>,
-        pub(crate) join_wakers: HashMap<usize, Waker>,
         pub(crate) parent: Option<ScopeRef>,
+        // LINT.IfChange
         children: HashSet<WeakScopeRef>,
-        status: Status,
+        all_tasks: HashMap<usize, Arc<Task>>,
+        // LINT.ThenChange(//src/developer/debug/zxdb/console/commands/verb_async_backtrace.cc)
+        /// Wakers for joining each task.
+        pub(crate) join_wakers: HashMap<usize, Waker>,
+        /// Waker for joining the scope.
+        scope_waker: Option<Waker>,
         /// The number of children that transitively contain tasks, plus one for
         /// this scope if it directly contains tasks.
         subscopes_with_tasks: u32,
+        status: Status,
     }
 
     #[repr(u8)] // So zxdb can read the status.
@@ -231,13 +239,13 @@ mod state {
     impl ScopeState {
         pub(super) fn new(parent: Option<ScopeRef>, status: Status) -> Self {
             Self {
-                scope_waker: None,
-                all_tasks: Default::default(),
-                join_wakers: Default::default(),
                 parent,
                 children: Default::default(),
-                status,
+                all_tasks: Default::default(),
+                join_wakers: Default::default(),
+                scope_waker: None,
                 subscopes_with_tasks: 0,
+                status,
             }
         }
 
