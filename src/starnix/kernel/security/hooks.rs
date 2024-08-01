@@ -356,15 +356,6 @@ pub fn sb_umount(
     })
 }
 
-/// Clears the `ptrace_sid` for `tracee_task`.
-// TODO(b/352535794): Fix ptrace checks to rely on `Task::ptrace` state, and remove this.
-pub fn clear_ptracer_sid(tracee_task: &Task) {
-    run_if_selinux(tracee_task, |_| {
-        let mut task_state = tracee_task.write();
-        task_state.security_state.0.ptracer_sid = None;
-    });
-}
-
 /// Attempts to update the security ID (SID) associated with `fs_node` when
 /// `name="security.selinux"` and `value` is a valid security context according to the current
 /// policy.
@@ -862,18 +853,6 @@ mod tests {
     async fn task_prlimit_access_allowed_for_permissive_mode() {
         let (tracer_task, tracee_task) = create_task_pair_with_permissive_selinux();
         assert_eq!(task_prlimit(&tracer_task, &tracee_task, true, true), Ok(()));
-    }
-
-    #[fuchsia::test]
-    async fn ptracer_sid_is_cleared() {
-        let security_server = security_server_with_policy(Mode::Enable);
-        security_server.set_enforcing(true);
-        let (_kernel, tracee_task) = create_kernel_and_task_with_selinux(security_server);
-        tracee_task.write().security_state.0.ptracer_sid =
-            Some(SecurityId::initial(InitialSid::Unlabeled));
-
-        clear_ptracer_sid(tracee_task.as_ref());
-        assert!(tracee_task.read().security_state.0.ptracer_sid.is_none());
     }
 
     #[fuchsia::test]

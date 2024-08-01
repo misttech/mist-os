@@ -1118,6 +1118,19 @@ impl Task {
         self.persistent_info.lock().creds.clone()
     }
 
+    pub fn ptracer_task(&self) -> WeakRef<Task> {
+        let ptracer = {
+            let state = self.read();
+            state.ptrace.as_ref().map(|p| p.core_state.pid)
+        };
+
+        let Some(ptracer) = ptracer else {
+            return WeakRef::default();
+        };
+
+        self.get_task(ptracer)
+    }
+
     pub fn exit_signal(&self) -> Option<Signal> {
         self.persistent_info.lock().exit_signal
     }
