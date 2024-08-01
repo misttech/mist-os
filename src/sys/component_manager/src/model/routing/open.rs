@@ -99,8 +99,10 @@ impl<'a> CapabilityOpenRequest<'a> {
                 .ok_or(OpenError::CapabilityProviderNotFound)?
         };
 
-        let source_instance =
-            source.source_instance().upgrade().map_err(CapabilityProviderError::from)?;
+        let source_instance = target
+            .find_extended_instance(&source.source_moniker())
+            .await
+            .map_err(|err| CapabilityProviderError::ComponentInstanceError { err })?;
         let task_group = match source_instance {
             ExtendedInstance::AboveRoot(top) => top.task_group(),
             ExtendedInstance::Component(component) => {
@@ -144,12 +146,12 @@ impl<'a> CapabilityOpenRequest<'a> {
         source: &CapabilitySource,
     ) -> Result<Option<Box<dyn CapabilityProvider>>, ModelError> {
         match source {
-            CapabilitySource::Component { capability, component } => {
+            CapabilitySource::Component { capability, moniker } => {
                 // Route normally for a component capability with a source path
                 Ok(match capability.source_path() {
                     Some(_) => Some(Box::new(DefaultComponentCapabilityProvider::new(
                         target,
-                        component.clone(),
+                        moniker.clone(),
                         capability
                             .source_name()
                             .expect("capability with source path should have a name")

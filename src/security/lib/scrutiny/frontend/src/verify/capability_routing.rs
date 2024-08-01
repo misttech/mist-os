@@ -13,6 +13,7 @@ use cm_fidl_analyzer::component_model::{AnalyzerModelError, ComponentModelForAna
 use cm_fidl_analyzer::route::{CapabilityRouteError, VerifyRouteResult};
 use cm_fidl_analyzer::{BreadthFirstModelWalker, ComponentInstanceVisitor, ComponentModelWalker};
 use cm_rust::CapabilityTypeName;
+use futures::FutureExt;
 use routing::error::{ComponentInstanceError, RoutingError};
 use scrutiny_collection::model::DataModel;
 use scrutiny_collection::v2_component_model::V2ComponentModel;
@@ -209,7 +210,11 @@ impl CapabilityRouteVisitor {
 
 impl ComponentInstanceVisitor for CapabilityRouteVisitor {
     fn visit_instance(&mut self, instance: &Arc<ComponentInstanceForAnalyzer>) -> Result<()> {
-        let check_results = self.model.check_routes_for_instance(instance, &self.capability_types);
+        let check_results = self
+            .model
+            .check_routes_for_instance(instance, &self.capability_types)
+            .now_or_never()
+            .unwrap();
         for (type_name, results) in check_results.into_iter() {
             let type_results =
                 self.results.get_mut(&type_name).expect("expected results for capability type");

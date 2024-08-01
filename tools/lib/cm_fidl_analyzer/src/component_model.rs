@@ -517,7 +517,7 @@ impl ComponentModelForAnalyzer {
     /// attempt to route it and report any errors.
     ///
     /// In other words, this will only verify offer decls that terminate the route chain.
-    fn try_check_offer_capability(
+    async fn try_check_offer_capability(
         self: &Arc<Self>,
         offer_decl: &OfferDecl,
         target: &Arc<ComponentInstanceForAnalyzer>,
@@ -544,14 +544,14 @@ impl ComponentModelForAnalyzer {
         };
 
         if should_check_offer {
-            self.check_offer_capability(offer_decl, target)
+            self.check_offer_capability(offer_decl, target).await
         } else {
             // This offer decl doesn't need to be checked.
             vec![]
         }
     }
 
-    pub fn check_offer_capability(
+    pub async fn check_offer_capability(
         self: &Arc<Self>,
         offer_decl: &OfferDecl,
         target: &Arc<ComponentInstanceForAnalyzer>,
@@ -597,7 +597,8 @@ impl ComponentModelForAnalyzer {
             OfferDecl::Storage(offer_decl) => {
                 let capability = offer_decl.source_name.clone();
                 let (result, storage_route, dir_route) =
-                    Self::route_storage_and_backing_directory_from_offer_sync(offer_decl, target);
+                    Self::route_storage_and_backing_directory_from_offer_sync(offer_decl, target)
+                        .await;
 
                 // Ignore any valid routes to void.
                 if let Ok(ref source) = result {
@@ -611,30 +612,32 @@ impl ComponentModelForAnalyzer {
                     vec![storage_route, dir_route],
                     capability,
                 ) {
-                    (Ok(source), routes, capability) => match self.check_use_source(&source) {
-                        Ok(()) => {
-                            for route in routes.into_iter() {
-                                results.push(VerifyRouteResult {
-                                    using_node: target.moniker().clone(),
-                                    capability: Some(capability.clone()),
-                                    error: None,
-                                    route,
-                                    source: Some(source.source.clone()),
-                                });
+                    (Ok(source), routes, capability) => {
+                        match self.check_use_source(&source, &target).await {
+                            Ok(()) => {
+                                for route in routes.into_iter() {
+                                    results.push(VerifyRouteResult {
+                                        using_node: target.moniker().clone(),
+                                        capability: Some(capability.clone()),
+                                        error: None,
+                                        route,
+                                        source: Some(source.source.clone()),
+                                    });
+                                }
+                            }
+                            Err(err) => {
+                                for route in routes.into_iter() {
+                                    results.push(VerifyRouteResult {
+                                        using_node: target.moniker().clone(),
+                                        capability: Some(capability.clone()),
+                                        error: Some(err.clone()),
+                                        route,
+                                        source: Some(source.source.clone()),
+                                    });
+                                }
                             }
                         }
-                        Err(err) => {
-                            for route in routes.into_iter() {
-                                results.push(VerifyRouteResult {
-                                    using_node: target.moniker().clone(),
-                                    capability: Some(capability.clone()),
-                                    error: Some(err.clone()),
-                                    route,
-                                    source: Some(source.source.clone()),
-                                });
-                            }
-                        }
-                    },
+                    }
                     (Err(err), routes, capability) => {
                         for route in routes.into_iter() {
                             results.push(VerifyRouteResult {
@@ -675,7 +678,7 @@ impl ComponentModelForAnalyzer {
             return vec![];
         }
 
-        match self.check_use_source(&source) {
+        match self.check_use_source(&source, &target).await {
             Ok(()) => {
                 results.push(VerifyRouteResult {
                     using_node: target.moniker().clone(),
@@ -700,7 +703,7 @@ impl ComponentModelForAnalyzer {
     }
 
     /// Checks the routing for all capabilities of the specified types that are `used` by `target`.
-    pub fn check_routes_for_instance(
+    pub async fn check_routes_for_instance(
         self: &Arc<Self>,
         target: &Arc<ComponentInstanceForAnalyzer>,
         capability_types: &HashSet<CapabilityTypeName>,
@@ -714,7 +717,7 @@ impl ComponentModelForAnalyzer {
             let type_results = results
                 .get_mut(&CapabilityTypeName::from(use_decl))
                 .expect("expected results for capability type");
-            for result in self.check_use_capability(use_decl, &target) {
+            for result in self.check_use_capability(use_decl, &target).await {
                 type_results.push(result);
             }
         }
@@ -725,7 +728,7 @@ impl ComponentModelForAnalyzer {
             let type_results = results
                 .get_mut(&CapabilityTypeName::from(expose_decl))
                 .expect("expected results for capability type");
-            if let Some(result) = self.check_use_exposed_capability(expose_decl, &target) {
+            if let Some(result) = self.check_use_exposed_capability(expose_decl, &target).await {
                 type_results.push(result);
             }
         }
@@ -736,7 +739,7 @@ impl ComponentModelForAnalyzer {
             let type_results = results
                 .get_mut(&CapabilityTypeName::from(offer_decl))
                 .expect("expected results for capability type");
-            for result in self.try_check_offer_capability(offer_decl, &target) {
+            for result in self.try_check_offer_capability(offer_decl, &target).await {
                 type_results.push(result);
             }
         }
@@ -768,7 +771,7 @@ impl ComponentModelForAnalyzer {
     /// This returns a vector of route results because some capabilities (storage) cause
     /// multiple route verifications (route storage + backing directory) and both results
     /// are relevant.
-    pub fn check_use_capability(
+    pub async fn check_use_capability(
         self: &Arc<Self>,
         use_decl: &UseDecl,
         target: &Arc<ComponentInstanceForAnalyzer>,
@@ -826,7 +829,7 @@ impl ComponentModelForAnalyzer {
             UseDecl::Storage(use_storage_decl) => {
                 let capability = use_storage_decl.source_name.clone();
                 let (result, storage_route, dir_route) =
-                    Self::route_storage_and_backing_directory_sync(use_storage_decl, target);
+                    Self::route_storage_and_backing_directory_sync(use_storage_decl, target).await;
 
                 // Ignore any valid routes to void.
                 if let Ok(ref source) = result {
@@ -866,7 +869,8 @@ impl ComponentModelForAnalyzer {
             }
         };
         match route_result {
-            (Ok(source), routes, capability) => match self.check_use_source(&source) {
+            (Ok(source), routes, capability) => match self.check_use_source(&source, &target).await
+            {
                 Ok(()) => {
                     for route in routes.into_iter() {
                         results.push(VerifyRouteResult {
@@ -908,7 +912,7 @@ impl ComponentModelForAnalyzer {
     /// Given a `ExposeDecl` for a capability at an instance `target`, checks whether the capability
     /// can be used from an expose declaration. If so, routes the capability to its source and then
     /// validates the source.
-    pub fn check_use_exposed_capability(
+    pub async fn check_use_exposed_capability(
         self: &Arc<Self>,
         expose_decl: &ExposeDecl,
         target: &Arc<ComponentInstanceForAnalyzer>,
@@ -918,7 +922,9 @@ impl ComponentModelForAnalyzer {
                 let (result, route) = Self::route_capability_sync(request, target);
                 let (error, source) = match result {
                     Err(e) => (Some(e.into()), None),
-                    Ok(source) => (self.check_use_source(&source).err(), Some(source.source)),
+                    Ok(source) => {
+                        (self.check_use_source(&source, &target).await.err(), Some(source.source))
+                    }
                 };
 
                 Some(VerifyRouteResult {
@@ -1068,13 +1074,15 @@ impl ComponentModelForAnalyzer {
 
     // Checks properties of a capability source that are necessary to use the capability
     // and that are possible to verify statically.
-    fn check_use_source(
+    async fn check_use_source(
         &self,
         route_source: &RouteSource<ComponentInstanceForAnalyzer>,
+        target: &Arc<ComponentInstanceForAnalyzer>,
     ) -> Result<(), AnalyzerModelError> {
         match &route_source.source {
-            CapabilitySource::Component { component: weak, .. } => {
-                self.check_executable(&weak.upgrade()?)
+            CapabilitySource::Component { moniker, .. } => {
+                let source_component = target.find_absolute(&moniker).await?;
+                self.check_executable(&source_component)
             }
             CapabilitySource::Namespace { .. } => Ok(()),
             CapabilitySource::Capability { source_capability, component: weak } => {
@@ -1181,7 +1189,7 @@ impl ComponentModelForAnalyzer {
     //
     // TODO(https://fxbug.dev/42168300): Remove this function and use `route_capability` directly when Scrutiny's
     // `DataController`s allow async function calls.
-    fn route_storage_and_backing_directory_sync(
+    async fn route_storage_and_backing_directory_sync(
         use_decl: UseStorageDecl,
         target: &Arc<ComponentInstanceForAnalyzer>,
     ) -> (
@@ -1198,9 +1206,12 @@ impl ComponentModelForAnalyzer {
             let (storage_decl, storage_component) = match result.source {
                 CapabilitySource::Component {
                     capability: ComponentCapability::Storage(storage_decl),
-                    component,
+                    moniker,
                     ..
-                } => (storage_decl, component.upgrade()?),
+                } => {
+                    let source_component = target.find_absolute(&moniker).await?;
+                    (storage_decl, source_component)
+                }
                 CapabilitySource::Void { .. } => return Ok(result),
                 _ => unreachable!("unexpected storage source"),
             };
@@ -1222,7 +1233,7 @@ impl ComponentModelForAnalyzer {
     //
     // TODO(https://fxbug.dev/42168300): Remove this function and use `route_capability` directly when Scrutiny's
     // `DataController`s allow async function calls.
-    fn route_storage_and_backing_directory_from_offer_sync(
+    async fn route_storage_and_backing_directory_from_offer_sync(
         offer_decl: OfferStorageDecl,
         target: &Arc<ComponentInstanceForAnalyzer>,
     ) -> (
@@ -1242,9 +1253,12 @@ impl ComponentModelForAnalyzer {
             let (storage_decl, storage_component) = match result.source {
                 CapabilitySource::Component {
                     capability: ComponentCapability::Storage(storage_decl),
-                    component,
+                    moniker,
                     ..
-                } => (storage_decl, component.upgrade()?),
+                } => {
+                    let source_component = target.find_absolute(&moniker).await?;
+                    (storage_decl, source_component)
+                }
                 CapabilitySource::Void { .. } => return Ok(result),
                 _ => unreachable!("unexpected storage source"),
             };
@@ -1514,7 +1528,7 @@ mod tests {
     // be reviewed to make sure that this property holds; otherwise, `ComponentModelForAnalyzer`'s
     // sync methods may panic.
     #[fuchsia::test]
-    fn route_storage_and_backing_directory_is_sync() {
+    async fn route_storage_and_backing_directory_is_sync() {
         let components = vec![("root", ComponentDeclBuilder::new().build())];
 
         let config = Arc::new(RuntimeConfig::default());
@@ -1541,7 +1555,8 @@ mod tests {
                 availability: Availability::Required,
             },
             &root_instance,
-        );
+        )
+        .await;
     }
 
     #[fuchsia::test]

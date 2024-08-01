@@ -145,7 +145,10 @@ pub fn new_program_router(
     _relative_path: RelativePath,
     capability: ComponentCapability,
 ) -> Router {
-    let capability_source = CapabilitySource::Component { capability, component };
+    let capability_source = CapabilitySource::<ComponentInstanceForAnalyzer>::Component {
+        capability,
+        moniker: component.moniker.clone(),
+    };
     Router::new_ok(
         Capability::try_from(capability_source)
             .expect("failed to convert capability source to dictionary"),
@@ -159,7 +162,7 @@ pub fn new_outgoing_dir_router(
 ) -> Router {
     new_debug_only_router(CapabilitySource::Component {
         capability: ComponentCapability::from(capability.clone()),
-        component: WeakComponentInstanceInterface::new(component),
+        moniker: component.moniker().clone(),
     })
 }
 

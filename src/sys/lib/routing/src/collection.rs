@@ -287,7 +287,7 @@ where
     ) -> Vec<BoxFuture<'_, Result<FilteredAggregateCapabilityRouteData<C>, RoutingError>>> {
         let capability_source = CapabilitySource::Component {
             capability: self.capability.clone(),
-            component: self.component.clone(),
+            moniker: self.component.moniker.clone(),
         };
         let instance_filter = get_instance_filter(&self.offer_decl);
         let fut = async move {

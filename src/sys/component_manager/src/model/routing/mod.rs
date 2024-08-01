@@ -74,7 +74,8 @@ pub(super) async fn route_and_open_capability(
 
     match route_request {
         RouteRequest::UseStorage(_) | RouteRequest::OfferStorage(_) => {
-            let backing_dir_info = storage::route_backing_directory(source.source.clone()).await?;
+            let backing_dir_info =
+                storage::route_backing_directory(target, source.source.clone()).await?;
             CapabilityOpenRequest::new_from_storage_source(backing_dir_info, target, open_request)
                 .open()
                 .await?;
@@ -162,7 +163,7 @@ pub(super) async fn route_storage(
     target: &Arc<ComponentInstance>,
 ) -> Result<RoutedStorage, ModelError> {
     let storage_source = RouteRequest::UseStorage(use_storage_decl.clone()).route(target).await?;
-    let backing_dir_info = storage::route_backing_directory(storage_source.source).await?;
+    let backing_dir_info = storage::route_backing_directory(target, storage_source.source).await?;
     Ok(RoutedStorage { backing_dir_info, target: WeakComponentInstance::new(target) })
 }
 

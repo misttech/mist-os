@@ -154,7 +154,7 @@ where
             return Err(RoutingError::DictionariesNotSupported { cap_type });
         }
     }
-    match Offer::route(offer, offer_target, &sources, visitor, mapper).await? {
+    match Offer::route(offer, offer_target.clone(), &sources, visitor, mapper).await? {
         OfferResult::Source(source) => return Ok(source),
         OfferResult::OfferFromChild(offer, component) => {
             let offer_decl: OfferDecl = offer.clone().into();
@@ -168,17 +168,17 @@ where
                     || offer_service_decl.renamed_instances.is_some()
                 {
                     // TODO(https://fxbug.dev/42179343) support collection sources as well.
-                    if let CapabilitySource::Component { capability, component } = capability_source
-                    {
+                    if let CapabilitySource::Component { capability, moniker } = capability_source {
                         let source_name = offer_service_decl.source_name.clone();
+                        let component = offer_target.find_absolute(&moniker).await?;
                         let capability_provider = Box::new(OfferFilteredServiceProvider::new(
                             offer_service_decl,
-                            component.clone(),
+                            component.as_weak(),
                             capability,
                         ));
                         return Ok(CapabilitySource::<C>::FilteredAggregate {
                             capability: AggregateCapability::Service(source_name),
-                            component,
+                            component: component.as_weak(),
                             capability_provider,
                         });
                     }
@@ -402,7 +402,7 @@ where
             visitor,
             mapper,
         )?,
-        component: target.as_weak(),
+        moniker: target.moniker().clone(),
     })
 }
 
@@ -736,7 +736,7 @@ impl Use {
                             visitor,
                             mapper,
                         )?,
-                        component: target.as_weak(),
+                        moniker: target.moniker().clone(),
                     }));
                 }
                 return Err(RoutingError::unsupported_route_source("self"));
@@ -798,7 +798,7 @@ where
                         visitor,
                         mapper,
                     )?,
-                    component: target.as_weak(),
+                    moniker: target.moniker().clone(),
                 }))
             }
             RegistrationSource::Parent => match target.try_get_parent()? {
@@ -1037,13 +1037,13 @@ impl Offer {
                         } else {
                             OfferResult::Source(CapabilitySource::<C>::Component {
                                 capability,
-                                component,
+                                moniker: component.moniker.clone(),
                             })
                         }
                     }
                     _ => OfferResult::Source(CapabilitySource::<C>::Component {
                         capability,
-                        component,
+                        moniker: component.moniker.clone(),
                     }),
                 };
                 OfferSegment::Done(res)
@@ -1432,7 +1432,7 @@ impl Expose {
                         visitor,
                         mapper,
                     )?,
-                    component: target.as_weak(),
+                    moniker: target.moniker().clone(),
                 }))
             }
             ExposeSource::Framework => {

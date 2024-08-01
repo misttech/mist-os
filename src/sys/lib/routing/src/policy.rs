@@ -84,8 +84,8 @@ impl GlobalPolicyChecker {
                 source: CapabilityAllowlistSource::Self_,
                 capability: capability.type_name(),
             },
-            CapabilitySource::Component { capability, component } => CapabilityAllowlistKey {
-                source_moniker: ExtendedMoniker::ComponentInstance(component.moniker.clone()),
+            CapabilitySource::Component { capability, moniker } => CapabilityAllowlistKey {
+                source_moniker: ExtendedMoniker::ComponentInstance(moniker.clone()),
                 source_name: capability
                     .source_name()
                     .ok_or(PolicyError::InvalidCapabilitySource)?

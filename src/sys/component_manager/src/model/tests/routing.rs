@@ -2848,14 +2848,14 @@ async fn list_service_instances_from_collections() {
     match source {
         CapabilitySource::Component {
             capability: ComponentCapability::Service(ServiceDecl { name, source_path }),
-            component,
+            moniker,
         } => {
             assert_eq!(name, "foo");
             assert_eq!(
                 source_path.expect("source path"),
                 "/svc/foo.service".parse::<cm_types::Path>().unwrap()
             );
-            assert_eq!(component.moniker, vec!["coll1:service_child_a"].try_into().unwrap());
+            assert_eq!(moniker, vec!["coll1:service_child_a"].try_into().unwrap());
         }
         _ => panic!("bad child capability source"),
     }

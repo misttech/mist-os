@@ -131,13 +131,17 @@ async fn open_storage_root(
 ///
 /// REQUIRES: `storage_source` is `ComponentCapability::Storage`.
 pub async fn route_backing_directory(
+    target: &Arc<ComponentInstance>,
     storage_source: CapabilitySource,
 ) -> Result<BackingDirectoryInfo, RoutingError> {
     let (storage_decl, storage_component) = match storage_source {
         CapabilitySource::Component {
             capability: ComponentCapability::Storage(storage_decl),
-            component,
-        } => (storage_decl, component.upgrade()?),
+            moniker,
+        } => {
+            let component = target.find_absolute(&moniker).await?;
+            (storage_decl, component)
+        }
         r => unreachable!("unexpected storage source: {:?}", r),
     };
 
@@ -147,13 +151,16 @@ pub async fn route_backing_directory(
 
     let (dir_source_path, dir_source_instance, dir_subdir) = match source {
         RouteSource {
-            source: CapabilitySource::Component { capability, component },
+            source: CapabilitySource::Component { capability, moniker },
             relative_path,
-        } => (
-            capability.source_path().expect("directory has no source path?").clone(),
-            Some(component.upgrade()?),
-            relative_path,
-        ),
+        } => {
+            let dir_source_instance = storage_component.find_absolute(&moniker).await?;
+            (
+                capability.source_path().expect("directory has no source path?").clone(),
+                Some(dir_source_instance),
+                relative_path,
+            )
+        }
         RouteSource { source: CapabilitySource::Namespace { capability, .. }, relative_path } => (
             capability.source_path().expect("directory has no source path?").clone(),
             None,

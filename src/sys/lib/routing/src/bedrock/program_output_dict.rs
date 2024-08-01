@@ -70,9 +70,9 @@ fn extend_dict_with_capability<C: ComponentInstanceInterface + 'static>(
         | cm_rust::CapabilityDecl::Resolver(_) => {
             let router = new_outgoing_dir_router(component, decl, capability);
             let router = router.with_policy_check(
-                CapabilitySource::Component {
+                CapabilitySource::<C>::Component {
                     capability: ComponentCapability::from(capability.clone()),
-                    component: component.as_weak(),
+                    moniker: component.moniker().clone(),
                 },
                 component.policy_checker().clone(),
             );
@@ -161,9 +161,9 @@ fn extend_dict_with_dictionary<C: ComponentInstanceInterface + 'static>(
         router = make_dict_extending_router(
             dict.clone(),
             source_dict_router,
-            CapabilitySource::Component {
+            CapabilitySource::<C>::Component {
                 capability: ComponentCapability::Dictionary(decl.clone()),
-                component: component.as_weak(),
+                moniker: component.moniker().clone(),
             },
         );
     } else {

@@ -1022,18 +1022,18 @@ where
 /// Verifies that the given component is in the index if its `storage_id` is StaticInstanceId.
 /// - On success, Ok(()) is returned
 /// - RoutingError::ComponentNotInIndex is returned on failure.
-pub fn verify_instance_in_component_id_index<C>(
+pub async fn verify_instance_in_component_id_index<C>(
     source: &CapabilitySource<C>,
     instance: &Arc<C>,
 ) -> Result<(), RoutingError>
 where
     C: ComponentInstanceInterface + 'static,
 {
-    let (storage_decl, source_component) = match source {
+    let (storage_decl, source_moniker) = match source {
         CapabilitySource::Component {
             capability: ComponentCapability::Storage(storage_decl),
-            component,
-        } => (storage_decl, component),
+            moniker,
+        } => (storage_decl, moniker.clone()),
         CapabilitySource::Void { .. } => return Ok(()),
         _ => unreachable!("unexpected storage source"),
     };
@@ -1042,7 +1042,7 @@ where
         && instance.component_id_index().id_for_moniker(instance.moniker()).is_none()
     {
         return Err(RoutingError::ComponentNotInIdIndex {
-            source_moniker: source_component.moniker.clone(),
+            source_moniker,
             target_moniker: instance.moniker().clone(),
         });
     }
@@ -1083,7 +1083,7 @@ where
     C: ComponentInstanceInterface + 'static,
 {
     let source = route_to_storage_decl(use_decl, &target, mapper).await?;
-    verify_instance_in_component_id_index(&source, target)?;
+    verify_instance_in_component_id_index(&source, target).await?;
     target.policy_checker().can_route_capability(&source, target.moniker())?;
     Ok(RouteSource::new(source))
 }

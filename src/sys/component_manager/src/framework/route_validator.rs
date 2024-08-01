@@ -314,7 +314,7 @@ impl RouteRequest {
     ) -> Result<(Option<ExtendedMoniker>, Option<Vec<fsys::ServiceInstance>>), RoutingError> {
         let source = route_request.route(&instance).await?;
         let source = source.source;
-        let source_moniker = source.source_instance().extended_moniker();
+        let source_moniker = source.source_moniker();
         let service_info = match source {
             CapabilitySource::AnonymizedAggregate { capability, component, members, .. } => {
                 let component = component.upgrade()?;
@@ -375,8 +375,10 @@ impl RouteRequest {
             let capability_source = CapabilitySource::try_from(capability)
                 .expect("failed to convert capability to capability source");
             match capability_source {
-                CapabilitySource::Component { component, .. }
-                | CapabilitySource::Framework { component, .. } => {
+                CapabilitySource::Component { moniker, .. } => {
+                    (Some(ExtendedMoniker::ComponentInstance(moniker)), None)
+                }
+                CapabilitySource::Framework { component, .. } => {
                     (Some(ExtendedMoniker::ComponentInstance(component.moniker.clone())), None)
                 }
                 CapabilitySource::Builtin { .. } | CapabilitySource::Namespace { .. } => {

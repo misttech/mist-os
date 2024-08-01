@@ -25,7 +25,7 @@ use fidl::{persist, unpersist};
 use fidl_fuchsia_component_decl as fdecl;
 use from_enum::FromEnum;
 use futures::future::BoxFuture;
-use moniker::ChildName;
+use moniker::{ChildName, ExtendedMoniker, Moniker};
 use sandbox::{Capability, Data, Dict};
 use std::fmt;
 use std::sync::Weak;
@@ -72,7 +72,7 @@ impl fmt::Display for AggregateMember {
 pub enum CapabilitySource<C: ComponentInstanceInterface + 'static> {
     /// This capability originates from the component instance for the given Realm.
     /// point.
-    Component { capability: ComponentCapability, component: WeakComponentInstanceInterface<C> },
+    Component { capability: ComponentCapability, moniker: Moniker },
     /// This capability originates from "framework". It's implemented by component manager and is
     /// scoped to the realm of the source.
     Framework { capability: InternalCapability, component: WeakComponentInstanceInterface<C> },
@@ -166,20 +166,18 @@ impl<C: ComponentInstanceInterface> CapabilitySource<C> {
         }
     }
 
-    pub fn source_instance(&self) -> WeakExtendedInstanceInterface<C> {
+    pub fn source_moniker(&self) -> ExtendedMoniker {
         match self {
-            Self::Component { component, .. }
-            | Self::Framework { component, .. }
+            Self::Component { moniker, .. } => ExtendedMoniker::ComponentInstance(moniker.clone()),
+            Self::Framework { component, .. }
             | Self::Capability { component, .. }
             | Self::AnonymizedAggregate { component, .. }
             | Self::FilteredAggregate { component, .. }
             | Self::Void { component, .. }
             | Self::Environment { component, .. } => {
-                WeakExtendedInstanceInterface::Component(component.clone())
+                ExtendedMoniker::ComponentInstance(component.moniker.clone())
             }
-            Self::Builtin { top_instance, .. } | Self::Namespace { top_instance, .. } => {
-                WeakExtendedInstanceInterface::AboveRoot(top_instance.clone())
-            }
+            Self::Builtin { .. } | Self::Namespace { .. } => ExtendedMoniker::ComponentManager,
         }
     }
 }
@@ -190,8 +188,8 @@ impl<C: ComponentInstanceInterface> fmt::Display for CapabilitySource<C> {
             f,
             "{}",
             match self {
-                Self::Component { capability, component } => {
-                    format!("{} '{}'", capability, component.moniker)
+                Self::Component { capability, moniker } => {
+                    format!("{} '{}'", capability, moniker)
                 }
                 Self::Framework { capability, .. } => capability.to_string(),
                 Self::Builtin { capability, .. } => capability.to_string(),
@@ -229,6 +227,7 @@ const EVENT_STREAM_STR: &'static str = "event_stream";
 const EXPOSE_STR: &'static str = "expose";
 const FRAMEWORK_STR: &'static str = "framework";
 const INTERNAL_CAPABILITY_KEY_STR: &'static str = "internal_capability_key";
+const MONIKER_STR: &'static str = "moniker";
 const NAMESPACE_STR: &'static str = "namespace";
 const OFFER_STR: &'static str = "offer";
 const PROTOCOL_STR: &'static str = "protocol";
@@ -305,13 +304,20 @@ impl<C: ComponentInstanceInterface + 'static> TryFrom<CapabilitySource<C>> for D
             )
             .unwrap();
         }
+        fn insert_moniker(dict: &Dict, moniker: Moniker) {
+            dict.insert_capability(
+                &Name::new(MONIKER_STR).unwrap(),
+                Data::String(moniker.to_string()).into(),
+            )
+            .unwrap();
+        }
 
         let output = Dict::new();
         match capability_source {
-            CapabilitySource::Component { capability, component } => {
+            CapabilitySource::Component { capability, moniker } => {
                 insert_key(&output, COMPONENT_STR);
                 insert_capability_dict(&output, capability)?;
-                insert_component_token(&output, component);
+                insert_moniker(&output, moniker)
             }
             CapabilitySource::Framework { capability, component } => {
                 insert_key(&output, FRAMEWORK_STR);
@@ -397,6 +403,15 @@ impl<C: ComponentInstanceInterface + 'static> TryFrom<Dict> for CapabilitySource
                 WeakExtendedInstanceInterface::AboveRoot(top_instance) => Ok(top_instance),
             }
         }
+        fn get_moniker(dict: &Dict) -> Result<Moniker, fidl::Error> {
+            let data = dict
+                .get(&Name::new(MONIKER_STR).unwrap())
+                .map_err(|_| fidl::Error::InvalidEnumValue)?;
+            let Some(Capability::Data(Data::String(moniker_str))) = data else {
+                return Err(fidl::Error::InvalidEnumValue);
+            };
+            moniker_str.as_str().try_into().map_err(|_| fidl::Error::InvalidEnumValue)
+        }
 
         let key = dict
             .get(&Name::new(CAPABILITY_SOURCE_KEY_STR).unwrap())
@@ -407,7 +422,7 @@ impl<C: ComponentInstanceInterface + 'static> TryFrom<Dict> for CapabilitySource
         Ok(match key.as_str() {
             COMPONENT_STR => CapabilitySource::Component {
                 capability: get_capability_dict(&dict)?.try_into()?,
-                component: get_weak_component(&dict)?,
+                moniker: get_moniker(&dict)?,
             },
             FRAMEWORK_STR => CapabilitySource::Framework {
                 capability: get_capability_dict(&dict)?.try_into()?,

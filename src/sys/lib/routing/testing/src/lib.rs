@@ -1537,10 +1537,10 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C
                     >::Component {
                         capability: ComponentCapability::Protocol(capability_decl),
-                        component,
+                        moniker,
                     },
                 relative_path,
-            }) if capability_decl == expected_protocol_decl && component.moniker == expected_source_moniker && relative_path.is_dot()
+            }) if capability_decl == expected_protocol_decl && moniker == expected_source_moniker && relative_path.is_dot()
         );
     }
 
@@ -3141,7 +3141,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
                     >::Component {
                         capability: ComponentCapability::Service(ServiceDecl { name, source_path }),
-                        component,
+                        moniker,
                     },
                 relative_path,
             } if relative_path.is_dot() => {
@@ -3150,7 +3150,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     source_path.expect("missing source path"),
                     "/svc/foo".parse::<cm_types::Path>().unwrap()
                 );
-                assert!(Arc::ptr_eq(&component.upgrade().unwrap(), &a_component));
+                assert_eq!(&moniker, a_component.moniker());
             }
             _ => panic!("bad capability source"),
         };
@@ -3193,7 +3193,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
                     >::Component {
                         capability: ComponentCapability::Service(ServiceDecl { name, source_path }),
-                        component,
+                        moniker,
                     },
                 relative_path,
             } if relative_path.is_dot() => {
@@ -3202,7 +3202,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     source_path.expect("missing source path"),
                     "/svc/foo".parse::<cm_types::Path>().unwrap()
                 );
-                assert!(Arc::ptr_eq(&component.upgrade().unwrap(), &b_component));
+                assert_eq!(&moniker, b_component.moniker());
             }
             _ => panic!("bad capability source"),
         };
@@ -3262,7 +3262,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
                     >::Component {
                         capability: ComponentCapability::Service(ServiceDecl { name, source_path }),
-                        component,
+                        moniker,
                     },
                 relative_path,
             } if relative_path.is_dot() => {
@@ -3271,7 +3271,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     source_path.expect("missing source path"),
                     "/svc/foo".parse::<cm_types::Path>().unwrap()
                 );
-                assert!(Arc::ptr_eq(&component.upgrade().unwrap(), &c_component));
+                assert_eq!(&moniker, c_component.moniker());
             }
             _ => panic!("bad capability source"),
         };
@@ -3345,12 +3345,12 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     data,
                     FilteredAggregateCapabilityRouteData {
                         capability_source: CapabilitySource::Component {
-                            component,
+                            moniker,
                             capability,
                         },
                         instance_filter,
                     }
-                    if component.moniker == "c".parse().unwrap() &&
+                    if moniker == "c".parse().unwrap() &&
                         capability == ComponentCapability::Service(ServiceDecl {
                             name: "foo".parse().unwrap(),
                             source_path: Some("/svc/foo".parse().unwrap()),
@@ -3435,12 +3435,12 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     data,
                     FilteredAggregateCapabilityRouteData {
                         capability_source: CapabilitySource::Component {
-                            component,
+                            moniker,
                             capability,
                         },
                         instance_filter,
                     }
-                    if component.moniker == "c".parse().unwrap() &&
+                    if moniker == "c".parse().unwrap() &&
                         capability == ComponentCapability::Service(ServiceDecl {
                             name: "foo".parse().unwrap(),
                             source_path: Some("/svc/foo".parse().unwrap()),
@@ -3505,7 +3505,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
                     >::Component {
                         capability: ComponentCapability::Runner(RunnerDecl { name, source_path }),
-                        component,
+                        moniker,
                     },
                 relative_path,
             } if relative_path.is_dot() => {
@@ -3514,7 +3514,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     source_path.expect("missing source path"),
                     format!("/svc/{}", fcrunner::ComponentRunnerMarker::DEBUG_NAME).parse::<cm_types::Path>().unwrap()
                 );
-                assert!(Arc::ptr_eq(&component.upgrade().unwrap(), &a_component));
+                assert_eq!(&moniker, a_component.moniker());
             }
             _ => panic!("bad capability source"),
         };
@@ -3584,7 +3584,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
                     >::Component {
                         capability: ComponentCapability::Runner(RunnerDecl { name, source_path }),
-                        component,
+                        moniker,
                     },
                 relative_path,
             } if relative_path.is_dot() => {
@@ -3593,7 +3593,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     source_path.expect("missing source path"),
                     format!("/svc/{}", fcrunner::ComponentRunnerMarker::DEBUG_NAME).parse::<cm_types::Path>().unwrap()
                 );
-                assert!(Arc::ptr_eq(&component.upgrade().unwrap(), &a_component));
+                assert_eq!(&moniker, a_component.moniker());
             }
             _ => panic!("bad capability source"),
         };
@@ -3660,7 +3660,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
                     >::Component {
                         capability: ComponentCapability::Runner(RunnerDecl { name, source_path }),
-                        component,
+                        moniker,
                     },
                 relative_path,
             } if relative_path.is_dot() => {
@@ -3669,7 +3669,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     source_path.expect("missing source path"),
                     format!("/svc/{}", fcrunner::ComponentRunnerMarker::DEBUG_NAME).parse::<cm_types::Path>().unwrap()
                 );
-                assert!(Arc::ptr_eq(&component.upgrade().unwrap(), &b_component));
+                assert_eq!(&moniker, b_component.moniker());
             }
             _ => panic!("bad capability source"),
         };
@@ -3733,7 +3733,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
                     >::Component {
                         capability: ComponentCapability::Runner(RunnerDecl { name, source_path }),
-                        component,
+                        moniker,
                     },
                 relative_path,
             } if relative_path.is_dot() => {
@@ -3742,7 +3742,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     source_path.expect("missing source path"),
                     format!("/svc/{}", fcrunner::ComponentRunnerMarker::DEBUG_NAME).parse::<cm_types::Path>().unwrap()
                 );
-                assert!(Arc::ptr_eq(&component.upgrade().unwrap(), &a_component));
+                assert_eq!(&moniker, a_component.moniker());
             }
             _ => panic!("bad capability source"),
         };
@@ -4051,7 +4051,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
                     >::Component {
                         capability: ComponentCapability::Runner(RunnerDecl { name, source_path }),
-                        component,
+                        moniker,
                     },
                 relative_path,
             } if relative_path.is_dot() => {
@@ -4060,7 +4060,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     source_path.expect("missing source path"),
                     format!("/svc/{}", fcrunner::ComponentRunnerMarker::DEBUG_NAME).parse::<cm_types::Path>().unwrap()
                 );
-                assert!(Arc::ptr_eq(&component.upgrade().unwrap(), &b_component));
+                assert_eq!(&moniker, b_component.moniker());
             }
             _ => panic!("bad capability source"),
         };
@@ -4115,7 +4115,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
                     >::Component {
                         capability: ComponentCapability::Runner(RunnerDecl { name, source_path }),
-                        component,
+                        moniker,
                     },
                 relative_path,
             } if relative_path.is_dot() => {
@@ -4124,7 +4124,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     source_path.expect("missing source path"),
                     format!("/svc/{}", fcrunner::ComponentRunnerMarker::DEBUG_NAME).parse::<cm_types::Path>().unwrap()
                 );
-                assert!(Arc::ptr_eq(&component.upgrade().unwrap(), &a_component));
+                assert_eq!(&moniker, a_component.moniker());
             }
             _ => panic!("bad capability source"),
         };
@@ -4183,7 +4183,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
                     >::Component {
                         capability: ComponentCapability::Runner(RunnerDecl { name, source_path }),
-                        component,
+                        moniker,
                     },
                 relative_path,
             } if relative_path.is_dot() => {
@@ -4192,7 +4192,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     source_path.expect("missing source path"),
                     format!("/svc/{}", fcrunner::ComponentRunnerMarker::DEBUG_NAME).parse::<cm_types::Path>().unwrap()
                 );
-                assert!(Arc::ptr_eq(&component.upgrade().unwrap(), &a_component));
+                assert_eq!(&moniker, a_component.moniker());
             }
             _ => panic!("bad capability source"),
         };

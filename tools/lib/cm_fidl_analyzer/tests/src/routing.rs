@@ -411,7 +411,7 @@ impl RoutingTestModel for RoutingTestForAnalyzer {
                 return;
             }
             Ok(use_decl) => {
-                for result in self.model.check_use_capability(use_decl, &target).iter() {
+                for result in self.model.check_use_capability(use_decl, &target).await.iter() {
                     match result.error {
                         Some(ref err) => match expected {
                             ExpectedResult::Ok => {
@@ -464,6 +464,7 @@ impl RoutingTestModel for RoutingTestForAnalyzer {
                 match self
                     .model
                     .check_use_exposed_capability(expose_decl, &target)
+                    .await
                     .expect("expected result for exposed directory")
                     .error
                 {
@@ -1138,7 +1139,7 @@ mod tests {
         let test = RoutingTestBuilderForAnalyzer::new("a", components).build().await;
         let b_component =
             test.look_up_instance(&vec!["b"].try_into().unwrap()).await.expect("b instance");
-        let route_result = test.model.check_use_capability(&use_decl, &b_component);
+        let route_result = test.model.check_use_capability(&use_decl, &b_component).await;
         assert_eq!(route_result.len(), 1);
         let route_result = &route_result[0];
         assert!(route_result.error.is_none());
@@ -1187,7 +1188,7 @@ mod tests {
         ];
         let test = RoutingTestBuilderForAnalyzer::new("a", components).build().await;
         let a_component = test.look_up_instance(&Moniker::root()).await.expect("a instance");
-        let route_results = test.model.check_use_capability(&use_decl, &a_component);
+        let route_results = test.model.check_use_capability(&use_decl, &a_component).await;
         assert_eq!(route_results.len(), 1);
         let route_result = &route_results[0];
         assert_matches!(route_result.error, None);
@@ -1224,7 +1225,7 @@ mod tests {
 
         let test = RoutingTestBuilderForAnalyzer::new("a", components).build().await;
         let a_component = test.look_up_instance(&Moniker::root()).await.expect("a instance");
-        let route_results = test.model.check_use_capability(&use_decl, &a_component);
+        let route_results = test.model.check_use_capability(&use_decl, &a_component).await;
         assert_eq!(route_results.len(), 1);
         let route_result = &route_results[0];
         assert_matches!(route_result.error, None);
@@ -1302,7 +1303,7 @@ mod tests {
         let test = RoutingTestBuilderForAnalyzer::new("a", components).build().await;
         let c_component =
             test.look_up_instance(&vec!["c"].try_into().unwrap()).await.expect("c instance");
-        let route_results = test.model.check_use_capability(&use_decl, &c_component);
+        let route_results = test.model.check_use_capability(&use_decl, &c_component).await;
         assert_eq!(route_results.len(), 1);
         let route_result = &route_results[0];
         assert!(route_result.error.is_none());
@@ -1437,7 +1438,7 @@ mod tests {
         let test = RoutingTestBuilderForAnalyzer::new("a", components).build().await;
         let b_component =
             test.look_up_instance(&vec!["b"].try_into().unwrap()).await.expect("b instance");
-        let route_results = test.model.check_use_capability(&use_storage_decl, &b_component);
+        let route_results = test.model.check_use_capability(&use_storage_decl, &b_component).await;
         assert_eq!(route_results.len(), 2);
 
         let storage_route_result = &route_results[0];
@@ -1506,7 +1507,8 @@ mod tests {
 
         let b_component =
             test.look_up_instance(&vec!["b"].try_into().unwrap()).await.expect("b instance");
-        let realm_route_results = test.model.check_use_capability(&use_realm_decl, &b_component);
+        let realm_route_results =
+            test.model.check_use_capability(&use_realm_decl, &b_component).await;
         assert_eq!(realm_route_results.len(), 1);
         let realm_route_result = &realm_route_results[0];
         assert_matches!(realm_route_result.error, None);
@@ -1560,7 +1562,7 @@ mod tests {
 
         let b_component =
             test.look_up_instance(&vec!["b"].try_into().unwrap()).await.expect("b instance");
-        let route_results = test.model.check_use_capability(&use_decl, &b_component);
+        let route_results = test.model.check_use_capability(&use_decl, &b_component).await;
         assert_eq!(route_results.len(), 1);
         let route_result = &route_results[0];
         assert!(route_result.error.is_none());
@@ -1607,7 +1609,7 @@ mod tests {
 
         let b_component =
             test.look_up_instance(&vec!["b"].try_into().unwrap()).await.expect("b instance");
-        let route_results = test.model.check_use_capability(&use_decl, &b_component);
+        let route_results = test.model.check_use_capability(&use_decl, &b_component).await;
         assert_eq!(route_results.len(), 1);
         let route_result = &route_results[0];
         assert!(route_result.error.is_none());
@@ -1979,18 +1981,21 @@ mod tests {
             test.look_up_instance(&vec!["b"].try_into().unwrap()).await.expect("b instance");
         let root_component = test.look_up_instance(&Moniker::root()).await.expect("root instance");
 
-        let route_maps = test.model.check_routes_for_instance(
-            &b_component,
-            &HashSet::from_iter(
-                vec![
-                    CapabilityTypeName::Resolver,
-                    CapabilityTypeName::Runner,
-                    CapabilityTypeName::Directory,
-                    CapabilityTypeName::Protocol,
-                ]
-                .into_iter(),
-            ),
-        );
+        let route_maps = test
+            .model
+            .check_routes_for_instance(
+                &b_component,
+                &HashSet::from_iter(
+                    vec![
+                        CapabilityTypeName::Resolver,
+                        CapabilityTypeName::Runner,
+                        CapabilityTypeName::Directory,
+                        CapabilityTypeName::Protocol,
+                    ]
+                    .into_iter(),
+                ),
+            )
+            .await;
         assert_eq!(route_maps.len(), 4);
 
         let directories =
@@ -2020,7 +2025,7 @@ mod tests {
                         CapabilityDecl::Directory(decl) => decl,
                         _ => panic!("unexpected capability variant"),
                     }),
-                    component: root_component.as_weak(),
+                    moniker: root_component.moniker().clone(),
                 }),
             }]
         );
@@ -2047,7 +2052,7 @@ mod tests {
                         CapabilityDecl::Runner(decl) => decl,
                         _ => panic!("unexpected capability variant"),
                     }),
-                    component: root_component.as_weak(),
+                    moniker: root_component.moniker().clone(),
                 }),
             }]
         );
@@ -2075,7 +2080,7 @@ mod tests {
                         CapabilityDecl::Resolver(decl) => decl,
                         _ => panic!("unexpected capability variant"),
                     }),
-                    component: root_component.as_weak(),
+                    moniker: root_component.moniker().clone(),
                 }),
             }]
         );
@@ -2147,10 +2152,13 @@ mod tests {
         let b_component =
             test.look_up_instance(&vec!["b"].try_into().unwrap()).await.expect("b instance");
 
-        let route_maps = test.model.check_routes_for_instance(
-            &b_component,
-            &HashSet::from_iter(vec![CapabilityTypeName::Protocol].into_iter()),
-        );
+        let route_maps = test
+            .model
+            .check_routes_for_instance(
+                &b_component,
+                &HashSet::from_iter(vec![CapabilityTypeName::Protocol].into_iter()),
+            )
+            .await;
         assert_eq!(route_maps.len(), 1);
         let protocols =
             route_maps.get(&CapabilityTypeName::Protocol).expect("expected protocol results");
@@ -2188,10 +2196,13 @@ mod tests {
             RoutingTestBuilderForAnalyzer::new_with_custom_urls(a_url, components).build().await;
         let root_component = test.look_up_instance(&Moniker::root()).await.expect("a instance");
 
-        let route_maps = test.model.check_routes_for_instance(
-            &root_component,
-            &HashSet::from_iter(vec![CapabilityTypeName::Protocol].into_iter()),
-        );
+        let route_maps = test
+            .model
+            .check_routes_for_instance(
+                &root_component,
+                &HashSet::from_iter(vec![CapabilityTypeName::Protocol].into_iter()),
+            )
+            .await;
         assert_eq!(route_maps.len(), 1);
         let protocols =
             route_maps.get(&CapabilityTypeName::Protocol).expect("expected protocol results");

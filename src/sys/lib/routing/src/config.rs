@@ -75,6 +75,7 @@ mod tests {
     use super::*;
     use crate::component_instance::tests::TestComponent;
     use crate::component_instance::WeakComponentInstanceInterface;
+    use moniker::Moniker;
 
     #[test]
     fn config_from_void() {
@@ -105,14 +106,14 @@ mod tests {
     #[test]
     fn config_from_component() {
         let test_value: cm_rust::ConfigValue = cm_rust::ConfigSingleValue::Uint8(5).into();
-        let void_source = CapabilitySource::Component {
+        let void_source = CapabilitySource::<TestComponent>::Component {
             capability: crate::capability_source::ComponentCapability::Config(
                 cm_rust::ConfigurationDecl {
                     name: "test".parse().unwrap(),
                     value: test_value.clone(),
                 },
             ),
-            component: WeakComponentInstanceInterface::<TestComponent>::invalid(),
+            moniker: Moniker::root(),
         };
         assert_eq!(Ok(Some(test_value)), source_to_value(&None, void_source));
     }

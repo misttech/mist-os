@@ -138,13 +138,14 @@ impl StorageAdmin {
         let storage_source = RouteSource {
             source: CapabilitySource::Component {
                 capability: ComponentCapability::Storage(storage_decl.clone()),
-                component: component.clone(),
+                moniker: component.moniker.clone(),
             },
             relative_path: Default::default(),
         };
-        let backing_dir_source_info = storage::route_backing_directory(storage_source.source)
-            .await
-            .context("could not serve storage protocol, routing backing directory failed")?;
+        let backing_dir_source_info =
+            storage::route_backing_directory(&component.upgrade()?, storage_source.source)
+                .await
+                .context("could not serve storage protocol, routing backing directory failed")?;
 
         let component = component.upgrade().map_err(|e| {
             format_err!(
@@ -617,7 +618,8 @@ impl StorageAdmin {
                     };
 
                 let backing_dir_info =
-                    match storage::route_backing_directory(storage_source.source).await {
+                    match storage::route_backing_directory(&component, storage_source.source).await
+                    {
                         Ok(s) => s,
                         Err(_) => continue,
                     };

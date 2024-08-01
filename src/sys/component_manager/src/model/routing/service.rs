@@ -24,6 +24,7 @@ use routing::capability_source::{
     AggregateInstance, AggregateMember, AnonymizedAggregateCapabilityProvider,
     FilteredAggregateCapabilityProvider,
 };
+use routing::component_instance::ComponentInstanceInterface;
 use std::collections::HashMap;
 use std::fmt;
 use std::sync::{Arc, Weak};
@@ -111,6 +112,26 @@ impl FilteredAggregateServiceDir {
                     }
                 };
                 let capability_source = Arc::new(route_data.capability_source);
+                let source_instance = match capability_source.source_moniker() {
+                    ExtendedMoniker::ComponentInstance(moniker) => {
+                        let Ok(parent) = parent.upgrade() else {
+                            return vec![];
+                        };
+                        let Ok(source_instance) = parent.find_absolute(&moniker).await else {
+                            return vec![];
+                        };
+                        WeakExtendedInstance::Component(source_instance.as_weak())
+                    }
+                    ExtendedMoniker::ComponentManager => {
+                        let Ok(parent) = parent.upgrade() else {
+                            return vec![];
+                        };
+                        let Ok(above_root) = parent.find_above_root() else {
+                            return vec![];
+                        };
+                        WeakExtendedInstance::AboveRoot(Arc::downgrade(&above_root))
+                    }
+                };
                 let entries: Vec<_> = route_data
                     .instance_filter
                     .into_iter()
@@ -118,6 +139,7 @@ impl FilteredAggregateServiceDir {
                         Arc::new(ServiceInstanceDirectoryEntry::<FlyStr> {
                             name: mapping.target_name.into(),
                             capability_source: capability_source.clone(),
+                            source_instance: source_instance.clone(),
                             source_id: mapping.source_name.clone().into(),
                             service_instance: mapping.source_name.into(),
                         })
@@ -431,23 +453,23 @@ impl AnonymizedAggregateServiceDir {
         source: &CapabilitySource,
     ) -> Result<(), ModelError> {
         match source {
-            CapabilitySource::Component { capability, component } => {
+            CapabilitySource::Component { capability, moniker } => {
                 let target = self
                     .parent
                     .upgrade()
                     .map_err(|err| ModelError::ComponentInstanceError { err })?;
+                let source_component = target.find_absolute(moniker).await?;
 
                 let mut cur_path = RelativePath::dot();
                 for segment in capability.source_path().unwrap().iter_segments() {
-                    let component = component.upgrade()?;
                     let (proxy, server_end) =
                         fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
                             .expect("failed to create proxy");
                     let flags = fio::OpenFlags::DIRECTORY;
                     let mut object_request = flags.to_object_request(server_end);
-                    component
+                    source_component
                         .open_outgoing(OpenRequest::new(
-                            component.execution_scope.clone(),
+                            source_component.execution_scope.clone(),
                             flags,
                             cur_path.to_string().try_into().map_err(|_| ModelError::BadPath)?,
                             &mut object_request,
@@ -649,9 +671,18 @@ impl AnonymizedAggregateServiceDir {
                             return Ok(());
                         }
                         let name = Self::generate_instance_id(&mut rand::thread_rng());
+                        let source_instance = (&self
+                            .parent
+                            .upgrade()
+                            .map_err(|_| None)?
+                            .find_extended_instance(&source_borrow.source_moniker())
+                            .await
+                            .map_err(|_| None)?)
+                            .into();
                         let entry = Arc::new(ServiceInstanceDirectoryEntry::<AggregateInstance> {
                             name: name.clone().into(),
                             capability_source: source_borrow.clone(),
+                            source_instance,
                             source_id: instance_key.source_id.clone(),
                             service_instance: instance_key.service_instance.clone(),
                         });
@@ -840,6 +871,9 @@ pub struct ServiceInstanceDirectoryEntry<T> {
     /// The source of the service capability instance to route.
     capability_source: Arc<CapabilitySource>,
 
+    /// The source instance referred to in `capability_source`
+    source_instance: WeakExtendedInstance,
+
     /// An identifier that can be used to find the child component that serves the service
     /// instance.
     /// This is a generic type because it varies between aggregated directory types. For example,
@@ -887,7 +921,7 @@ impl<T: Send + Sync + 'static> DirectoryEntryAsync for ServiceInstanceDirectoryE
         self: Arc<Self>,
         mut request: OpenRequest<'_>,
     ) -> Result<(), zx::Status> {
-        let source_component = match self.capability_source.source_instance() {
+        let source_component = match &self.source_instance {
             WeakExtendedInstance::Component(c) => c,
             WeakExtendedInstance::AboveRoot(_) => {
                 unreachable!(
@@ -965,7 +999,7 @@ mod tests {
                     name: "my.service.Service".parse().unwrap(),
                     source_path: Some("/svc/my.service.Service".parse().unwrap()),
                 }),
-                component: self
+                moniker: self
                     .instances
                     .lock()
                     .await
@@ -986,6 +1020,7 @@ mod tests {
                             panic!("not expected");
                         }
                     })?
+                    .moniker
                     .clone(),
             })
         }
@@ -1020,7 +1055,7 @@ mod tests {
                     name: "my.service.Service".parse().unwrap(),
                     source_path: Some("/svc/my.service.Service".parse().unwrap()),
                 }),
-                component: self.component.clone(),
+                moniker: self.component.moniker.clone(),
             };
             let data = FilteredAggregateCapabilityRouteData::<ComponentInstance> {
                 capability_source,

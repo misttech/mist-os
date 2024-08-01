@@ -1276,9 +1276,9 @@ impl Routable for CapabilityRequestedHook {
         });
         source.hooks.dispatch(&event).await;
         let capability = if request.debug {
-            CapabilitySource::Component {
+            CapabilitySource::<ComponentInstance>::Component {
                 capability: self.capability_decl.clone().into(),
-                component: self.source.clone(),
+                moniker: self.source.moniker.clone(),
             }
             .try_into()
             .expect("failed to convert capability source to dictionary")
@@ -1301,9 +1301,9 @@ struct ProgramRouter {
 impl Routable for ProgramRouter {
     async fn route(&self, request: Request) -> Result<Capability, RouterError> {
         if request.debug {
-            let source = CapabilitySource::Component {
+            let source = CapabilitySource::<ComponentInstance>::Component {
                 capability: self.capability.clone(),
-                component: self.component.clone(),
+                moniker: self.component.moniker.clone(),
             };
             return Ok(source
                 .try_into()

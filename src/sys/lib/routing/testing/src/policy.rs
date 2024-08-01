@@ -192,7 +192,7 @@ where
                 source_path: Some("/svc/fuchsia.foo.FooBar".parse().unwrap()),
                 delivery: Default::default(),
             }),
-            component: component.as_weak(),
+            moniker: component.moniker().clone(),
         };
         let valid_path_0 = Moniker::try_from(vec!["root", "bootstrap"]).unwrap();
         let valid_path_1 = Moniker::try_from(vec!["root", "core"]).unwrap();
