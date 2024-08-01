@@ -163,6 +163,16 @@ func (p *Package) ReadFile(ctx context.Context, path string) ([]byte, error) {
 }
 
 func (p *Package) Expand(ctx context.Context, dir string) error {
+	// Prefetch all the package blobs, so we can download them in a single batch.
+	merkles := []build.MerkleRoot{}
+	for _, merkle := range p.contents {
+		merkles = append(merkles, merkle)
+	}
+
+	if err := p.repo.PrefetchUncompressedBlobs(ctx, merkles); err != nil {
+		return err
+	}
+
 	for path := range p.contents {
 		data, err := p.ReadFile(ctx, path)
 		if err != nil {

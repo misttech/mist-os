@@ -38,6 +38,12 @@ const (
 
 	// Product Bundle manifest which is used to locate VBmeta
 	ProductBundleManifest = "product_bundle.json"
+
+	relativeBootserverPath = "tools/linux-x64/bootserver"
+
+	relativeFfxPath = "tools/linux-x64/ffx"
+
+	relativeFlashManifest = "images/flash.json"
 )
 
 type Build interface {
@@ -81,14 +87,16 @@ type Build interface {
 type ArtifactsBuild struct {
 	id            string
 	archive       *Archive
-	dir           string
+	blobsDir      string
+	buildDir      string
 	packages      *packages.Repository
 	buildImageDir string
 	srcs          map[string]struct{}
 }
 
 func (b *ArtifactsBuild) GetBootserver(ctx context.Context) (string, error) {
-	buildImageDir, err := b.GetBuildImages(ctx)
+	// We need build images to flash, so lets download them.
+	_, err := b.GetBuildImages(ctx)
 	if err != nil {
 		return "", err
 	}
@@ -99,8 +107,14 @@ func (b *ArtifactsBuild) GetBootserver(ctx context.Context) (string, error) {
 		currentBuildId = b.id
 	}
 
-	bootserverPath := filepath.Join(buildImageDir, "bootserver")
-	if err := b.archive.download(ctx, currentBuildId, false, bootserverPath, []string{"tools/linux-x64/bootserver"}); err != nil {
+	bootserverPath := filepath.Join(b.buildDir, relativeBootserverPath)
+	if err := b.archive.download(
+		ctx,
+		currentBuildId,
+		false,
+		b.buildDir,
+		[]string{relativeBootserverPath},
+	); err != nil {
 		return "", fmt.Errorf("failed to download bootserver: %w", err)
 	}
 
@@ -116,14 +130,16 @@ func (b *ArtifactsBuild) GetFfx(
 	ctx context.Context,
 	ffxIsolateDir ffx.IsolateDir,
 ) (*ffx.FFXTool, error) {
-	buildImageDir, err := b.GetBuildImages(ctx)
-	if err != nil {
-		return nil, err
-	}
-
 	// Use the latest ffx
-	ffxPath := filepath.Join(buildImageDir, "ffx")
-	if err := b.archive.download(ctx, b.id, false, ffxPath, []string{"tools/linux-x64/ffx"}); err != nil {
+	ffxPath := filepath.Join(b.buildDir, relativeFfxPath)
+
+	if err := b.archive.download(
+		ctx,
+		b.id,
+		false,
+		b.buildDir,
+		[]string{relativeFfxPath},
+	); err != nil {
 		return nil, fmt.Errorf("failed to download ffxPath: %w", err)
 	}
 
@@ -136,13 +152,20 @@ func (b *ArtifactsBuild) GetFfx(
 }
 
 func (b *ArtifactsBuild) GetFlashManifest(ctx context.Context) (string, error) {
-	buildImageDir, err := b.GetBuildImages(ctx)
+	// We need build images to flash.
+	_, err := b.GetBuildImages(ctx)
 	if err != nil {
 		return "", err
 	}
 
-	flashManifest := filepath.Join(buildImageDir, "flash.json")
-	if err := b.archive.download(ctx, b.id, false, flashManifest, []string{"images/flash.json"}); err != nil {
+	flashManifest := filepath.Join(b.buildDir, relativeFlashManifest)
+	if err := b.archive.download(
+		ctx,
+		b.id,
+		false,
+		b.buildDir,
+		[]string{relativeFlashManifest},
+	); err != nil {
 		return "", fmt.Errorf("failed to download flash.json for flasher: %w", err)
 	}
 
@@ -176,8 +199,14 @@ func (b *ArtifactsBuild) GetPackageRepository(
 		}
 	}
 
-	packagesDir := filepath.Join(b.dir, b.id, "packages")
-	if err := b.archive.download(ctx, b.id, false, filepath.Dir(packagesDir), packageSrcs); err != nil {
+	packagesDir := filepath.Join(b.buildDir, "packages")
+	if err := b.archive.download(
+		ctx,
+		b.id,
+		false,
+		b.buildDir,
+		packageSrcs,
+	); err != nil {
 		logger.Errorf(ctx, "failed to download packages for build %s to %s: %v", packagesDir, b.id, err)
 		return nil, fmt.Errorf("failed to download packages for build %s to %s: %w", packagesDir, b.id, err)
 	}
@@ -195,23 +224,27 @@ func (b *ArtifactsBuild) GetPackageRepository(
 	}
 
 	deliveryBlobConfigPath := filepath.Join(packagesDir, "delivery_blob_config.json")
-	blobsDir, err := build.GetBlobsDir(deliveryBlobConfigPath)
+	relativeBlobsDir, err := build.GetBlobsDir(deliveryBlobConfigPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get blobs dir: %w", err)
 	}
 
 	var blobsList []string
 	for _, blob := range blobs {
-		blobsList = append(blobsList, filepath.Join(blobsDir, blob.Merkle))
+		blobsList = append(blobsList, filepath.Join(relativeBlobsDir, blob.Merkle))
 	}
 	logger.Infof(ctx, "all_blobs contains %d blobs", len(blobs))
 
-	blobsDir = filepath.Join(b.dir, "blobs")
-
 	if fetchMode == PrefetchBlobs {
-		if err := b.archive.download(ctx, b.id, true, filepath.Dir(blobsDir), blobsList); err != nil {
-			logger.Errorf(ctx, "failed to download blobs to %s: %v", blobsDir, err)
-			return nil, fmt.Errorf("failed to download blobs to %s: %w", blobsDir, err)
+		if err := b.archive.download(
+			ctx,
+			b.id,
+			true,
+			filepath.Join(b.blobsDir),
+			blobsList,
+		); err != nil {
+			logger.Errorf(ctx, "failed to download blobs to %s: %v", b.blobsDir, err)
+			return nil, fmt.Errorf("failed to download blobs to %s: %w", b.blobsDir, err)
 		}
 	}
 
@@ -225,7 +258,16 @@ func (b *ArtifactsBuild) GetPackageRepository(
 		return nil, fmt.Errorf("failed to get delivery blob type: %w", err)
 	}
 
-	p, err := packages.NewRepository(ctx, packagesDir, &proxyBlobStore{b, blobsDir}, ffx, blobType)
+	p, err := packages.NewRepository(
+		ctx,
+		packagesDir,
+		&proxyBlobStore{
+			b:        b,
+			blobsDir: b.blobsDir,
+		},
+		ffx,
+		blobType,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -235,16 +277,52 @@ func (b *ArtifactsBuild) GetPackageRepository(
 }
 
 type proxyBlobStore struct {
-	b   *ArtifactsBuild
-	dir string
+	b        *ArtifactsBuild
+	blobsDir string
+}
+
+func (fs *proxyBlobStore) PrefetchBlobs(
+	ctx context.Context,
+	deliveryBlobType *int,
+	merkles []pmBuild.MerkleRoot,
+) error {
+	if len(merkles) == 0 {
+		return nil
+	}
+
+	var relativeBlobsDir string
+
+	if deliveryBlobType == nil {
+		relativeBlobsDir = "blobs"
+	} else {
+		deliveryBlobType := strconv.Itoa(*deliveryBlobType)
+		relativeBlobsDir = filepath.Join("blobs", deliveryBlobType)
+	}
+
+	srcs := []string{}
+	for _, merkle := range merkles {
+		src := filepath.Join(relativeBlobsDir, merkle.String())
+		srcs = append(srcs, src)
+	}
+
+	// Start downloading the blobs. The package resolver will only fetch a blob
+	// once, so we don't need to deduplicate requests on our side.
+
+	return fs.b.archive.download(
+		ctx,
+		fs.b.id,
+		true,
+		filepath.Dir(fs.blobsDir),
+		srcs,
+	)
 }
 
 func (fs *proxyBlobStore) BlobPath(ctx context.Context, deliveryBlobType *int, merkle pmBuild.MerkleRoot) (string, error) {
 	var path string
 	if deliveryBlobType == nil {
-		path = filepath.Join(fs.dir, merkle.String())
+		path = filepath.Join(fs.blobsDir, merkle.String())
 	} else {
-		path = filepath.Join(fs.dir, strconv.Itoa(*deliveryBlobType), merkle.String())
+		path = filepath.Join(fs.blobsDir, strconv.Itoa(*deliveryBlobType), merkle.String())
 	}
 
 	// First, try to read the blob from the directory
@@ -252,19 +330,7 @@ func (fs *proxyBlobStore) BlobPath(ctx context.Context, deliveryBlobType *int, m
 		return path, nil
 	}
 
-	// Otherwise, start downloading the blob. The package resolver will only
-	// fetch a blob once, so we don't need to deduplicate requests on our side.
-
-	var src string
-	if deliveryBlobType == nil {
-		src = filepath.Join("blobs", merkle.String())
-	} else {
-		src = filepath.Join("blobs", strconv.Itoa(*deliveryBlobType), merkle.String())
-	}
-
-	logger.Infof(ctx, "downloading %s from build %s", src, fs.b.id)
-
-	if err := fs.b.archive.download(ctx, fs.b.id, true, path, []string{src}); err != nil {
+	if err := fs.PrefetchBlobs(ctx, deliveryBlobType, []pmBuild.MerkleRoot{merkle}); err != nil {
 		return "", err
 	}
 
@@ -298,7 +364,7 @@ func (fs *proxyBlobStore) BlobSize(ctx context.Context, deliveryBlobType *int, m
 }
 
 func (fs *proxyBlobStore) Dir() string {
-	return fs.dir
+	return fs.blobsDir
 }
 
 // GetBuildImages downloads the build images for a specific build id.
@@ -311,8 +377,14 @@ func (b *ArtifactsBuild) GetBuildImages(ctx context.Context) (string, error) {
 
 	logger.Infof(ctx, "downloading build images")
 
-	imageDir := filepath.Join(b.dir, b.id, "images")
-	if err := b.archive.download(ctx, b.id, false, filepath.Join(imageDir, paver.ImageManifest), []string{path.Join("images", paver.ImageManifest)}); err != nil {
+	imageDir := filepath.Join(b.buildDir, "images")
+	if err := b.archive.download(
+		ctx,
+		b.id,
+		false,
+		b.buildDir,
+		[]string{path.Join("images", paver.ImageManifest)},
+	); err != nil {
 		return "", fmt.Errorf("failed to download image manifest: %w", err)
 	}
 	imagesJSON := filepath.Join(imageDir, paver.ImageManifest)
@@ -343,7 +415,13 @@ func (b *ArtifactsBuild) GetBuildImages(ctx context.Context) (string, error) {
 		}
 	}
 
-	if err := b.archive.download(ctx, b.id, false, filepath.Dir(imageDir), imageSrcs); err != nil {
+	if err := b.archive.download(
+		ctx,
+		b.id,
+		false,
+		b.buildDir,
+		imageSrcs,
+	); err != nil {
 		return "", fmt.Errorf("failed to download images to %s: %w", imageDir, err)
 	}
 
