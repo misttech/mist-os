@@ -45,7 +45,6 @@
                 "fuchsia.ui.PowerOffDelayMillis",
                 "fuchsia.ui.PowerOnDelayMillis",
                 "fuchsia.ui.SupportedInputDevices",
-                "fuchsia.ui.SuspendEnabled",
                 "fuchsia.ui.ViewingDistance",
                 "fuchsia.wlan.RecoveryEnabled",
                 "fuchsia.wlan.RecoveryProfile",

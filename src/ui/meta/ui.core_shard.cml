@@ -11,6 +11,12 @@
         },
     ],
     offer: [
+        {
+            from: "parent",
+            to: "#ui",
+            config: [ "fuchsia.power.SuspendEnabled" ],
+        },
+
         // Routes from optional shards.
         // All of these routes should be marked `source_availability: "unknown"`
         //

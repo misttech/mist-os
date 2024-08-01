@@ -97,7 +97,8 @@
             max_size: 8,
         },
         {
-            config: "fuchsia.ui.SuspendEnabled",
+            from: "parent",
+            config: "fuchsia.power.SuspendEnabled",
             key: "suspend_enabled",
             type: "bool",
         },

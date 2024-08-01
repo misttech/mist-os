@@ -90,11 +90,11 @@
             from: "parent",
             to: [ "#scene_manager" ],
             config: [
+                "fuchsia.power.SuspendEnabled",
                 "fuchsia.scenic.DisplayRotation",
                 "fuchsia.ui.DisplayPixelDensity",
                 "fuchsia.ui.IdleThresholdMs",
                 "fuchsia.ui.SupportedInputDevices",
-                "fuchsia.ui.SuspendEnabled",
                 "fuchsia.ui.ViewingDistance",
             ],
         },
