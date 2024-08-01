@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//build/config.gni")
 import("//build/rust/rustc_library.gni")
 
 rustc_library("lib") {
@@ -17,8 +16,8 @@ rustc_library("lib") {
   ]
 
   deps = [
-    ":persistence-component-config",
     "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust",
+    "//sdk/fidl/fuchsia.update:fuchsia.update_rust",
     "//src/diagnostics/lib/persistence:lib",
     "//src/diagnostics/persistence/fidl:persist_rust",
     "//src/lib/diagnostics/data/rust",
@@ -65,10 +64,6 @@ fuchsia_component_manifest("persistence-manifest") {
   manifest = "meta/persistence-for-production.cml"
 }
 
-fuchsia_structured_config_rust_lib("persistence-component-config") {
-  cm_label = ":persistence-manifest"
-}
-
 fuchsia_component("diagnostics-persistence-component") {
   cm_label = ":persistence-manifest"
   deps = [
@@ -77,16 +72,8 @@ fuchsia_component("diagnostics-persistence-component") {
   ]
 }
 
-fuchsia_structured_config_values("production-structured-config") {
-  values_source = "structured-config/production.json5"
-  cm_label = ":persistence-manifest"
-}
-
 fuchsia_package("diagnostics-persistence") {
-  deps = [
-    ":diagnostics-persistence-component",
-    ":production-structured-config",
-  ]
+  deps = [ ":diagnostics-persistence-component" ]
 }
 
 fuchsia_unittest_package("diagnostics-persistence-unittests") {

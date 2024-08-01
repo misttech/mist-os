@@ -8,6 +8,7 @@ use fidl_fuchsia_diagnostics_persist::{
     DataPersistenceMarker, DataPersistenceProxy, PersistResult,
 };
 use fidl_fuchsia_samplertestcontroller::{SamplerTestControllerMarker, SamplerTestControllerProxy};
+use fidl_test_persistence_factory::{ControllerMarker, ControllerProxy};
 use fuchsia_component_test::RealmInstance;
 use fuchsia_zircon::{Duration, Time};
 use serde_json::Value;
@@ -17,6 +18,7 @@ use std::mem::take;
 use std::{thread, time};
 use tracing::*;
 
+mod mock_fidl;
 mod mock_filesystems;
 mod test_topology;
 
@@ -45,7 +47,8 @@ pub(crate) const TEST_PERSISTENCE_SERVICE_NAME: &str =
     "fuchsia.diagnostics.persist.DataPersistence-test-service";
 
 enum Published {
-    Nothing,
+    Waiting,
+    Empty,
     Int(i32),
     SizeError,
 }
@@ -69,6 +72,7 @@ struct TestRealm {
     instance: RealmInstance,
     persistence: DataPersistenceProxy,
     inspect: SamplerTestControllerProxy,
+    controller: ControllerProxy,
 }
 
 /// Runs Persistence and a test component that can have its inspect properties
@@ -93,7 +97,6 @@ async fn diagnostics_persistence_integration() {
     let realm = TestRealm::create().await;
     realm.set_inspect(Some(19i64)).await;
     wait_for_inspect_source().await;
-
     assert_eq!(realm.request_persistence("wrong_component_metric").await, PersistResult::BadName);
 
     expect_file_change(FileChange {
@@ -133,10 +136,12 @@ async fn diagnostics_persistence_integration() {
     });
 
     // The persisted data shouldn't be published until Diagnostics Persistence is killed and
-    // restarted.
-    verify_diagnostics_persistence_publication(Published::Nothing).await;
+    // restarted, and the update has completed.
+    verify_diagnostics_persistence_publication(Published::Waiting).await;
 
     let realm = realm.restart().await;
+    verify_diagnostics_persistence_publication(Published::Waiting).await;
+    realm.set_update_completed().await;
     verify_diagnostics_persistence_publication(Published::Int(42)).await;
     expect_file_change(FileChange {
         old: FileState::None,
@@ -145,9 +150,12 @@ async fn diagnostics_persistence_integration() {
         after: None,
     });
 
-    // After another restart, no data should be published.
+    // After another restart, no data should be published before or after
+    // update is completed.
     let realm = realm.restart().await;
-    verify_diagnostics_persistence_publication(Published::Nothing).await;
+    verify_diagnostics_persistence_publication(Published::Waiting).await;
+    realm.set_update_completed().await;
+    verify_diagnostics_persistence_publication(Published::Empty).await;
 
     // The "too-big" tag should save a short error string instead of the data.
     assert_eq!(realm.request_persistence("test-component-too-big").await, PersistResult::Queued);
@@ -159,6 +167,7 @@ async fn diagnostics_persistence_integration() {
     });
 
     let realm = realm.restart().await;
+    realm.set_update_completed().await;
     verify_diagnostics_persistence_publication(Published::SizeError).await;
 
     // Tests for multiple-tag persistence.
@@ -290,7 +299,14 @@ impl TestRealm {
                 TEST_PERSISTENCE_SERVICE_NAME,
             )
             .unwrap();
-        TestRealm { instance, persistence, inspect }
+        // `controller` is the connection to send control signals to the test's update-checker mock.
+        let controller =
+            instance.root.connect_to_protocol_at_exposed_dir::<ControllerMarker>().unwrap();
+        TestRealm { instance, persistence, inspect, controller }
+    }
+
+    async fn set_update_completed(&self) {
+        self.controller.set_update_completed().await.expect("This should never fail");
     }
 
     /// Set the `optional` value to a given number, or remove it from the Inspect tree.
@@ -545,9 +561,14 @@ async fn verify_diagnostics_persistence_publication(published: Published) {
     inspect_fetcher.retry(RetryConfig::never());
     inspect_fetcher.add_selector("realm_builder*/persistence:root");
     loop {
+        thread::sleep(time::Duration::from_millis(100));
         let published_inspect =
             inspect_fetcher.snapshot_raw::<Inspect, serde_json::Value>().await.unwrap().to_string();
-        if published_inspect.contains(PUBLISHED_TIME_KEY) {
+        if matches!(published, Published::Waiting)
+            && published_inspect.contains(r#""status":"STARTING_UP""#)
+        {
+            break;
+        } else if published_inspect.contains(PUBLISHED_TIME_KEY) {
             assert!(json_strings_match(
                 &collapse_realm_builder_strings(
                     &unbrittle_too_big_message(Some(zero_and_test_timestamps(&published_inspect)),)
@@ -558,7 +579,6 @@ async fn verify_diagnostics_persistence_publication(published: Published) {
             ));
             break;
         }
-        thread::sleep(time::Duration::from_millis(100));
     }
 }
 
@@ -596,34 +616,41 @@ fn expected_size_error() -> String {
 
 fn expected_diagnostics_persistence_inspect(published: Published) -> String {
     let variant = match published {
-        Published::Nothing => "".to_string(),
+        Published::Waiting => "".to_string(),
+        Published::Empty => r#""published":0,"persist":{}"#.to_string(),
         Published::SizeError => r#"
-            "test-service": {
-                "test-component-too-big": %SIZE_ERROR%
+            "published":0,
+            "persist": {
+                "test-service": {
+                    "test-component-too-big": %SIZE_ERROR%
+                }
             }
             "#
         .replace("%SIZE_ERROR%", &expected_size_error()),
         Published::Int(number) => {
             let number_str = number.to_string();
             r#"
-                "test-service": {
-                    "test-component-metric": {
-                        "@timestamps": {
-                            "before_utc":0,
-                            "after_utc":0,
-                            "before_monotonic":0,
-                            "after_monotonic":0
-                        },
-                        "@persist_size": 98,
-                        "realm_builder/single_counter": {
-                            "samples": {
-                                "optional": %NUMBER%,
-                                "integer_1": 10
+                "published":0,
+                "persist": {
+                    "test-service": {
+                        "test-component-metric": {
+                            "@timestamps": {
+                                "before_utc":0,
+                                "after_utc":0,
+                                "before_monotonic":0,
+                                "after_monotonic":0
+                            },
+                            "@persist_size": 98,
+                            "realm_builder/single_counter": {
+                                "samples": {
+                                    "optional": %NUMBER%,
+                                    "integer_1": 10
+                                }
                             }
                         }
                     }
                 }
-                "#
+            "#
             .replace("%NUMBER%", &number_str)
         }
     };
@@ -638,9 +665,7 @@ fn expected_diagnostics_persistence_inspect(published: Published) -> String {
     "moniker": "realm_builder/persistence",
     "payload": {
       "root": {
-        "published":0,
-        "persist":{%VARIANT%},
-        "startup_delay_seconds": 1
+        %VARIANT%
       }
     },
     "version": 1

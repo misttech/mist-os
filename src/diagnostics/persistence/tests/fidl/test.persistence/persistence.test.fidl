@@ -1,0 +1,12 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+library test.persistence.factory;
+
+/// This protocol is used to send control signals into the test realm.
+@discoverable
+open protocol Controller {
+    /// Signals that the update listener should signal that the update check is done.
+    flexible SetUpdateCompleted() -> ();
+};

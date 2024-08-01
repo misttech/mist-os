@@ -36,7 +36,4 @@
 
         // Persistence exposes services declared in "-for-production" and "-for-test" CML files.
     ],
-    config: {
-        startup_delay_seconds: { type: "int64" },
-    },
 }

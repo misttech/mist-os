@@ -5,6 +5,9 @@
 use std::sync::atomic::{AtomicU16, Ordering};
 
 use anyhow::Error;
+use fidl::endpoints::DiscoverableProtocolMarker;
+use fidl_fuchsia_update::ListenerMarker;
+use fidl_test_persistence_factory::ControllerMarker;
 use fuchsia_component_test::{
     Capability, ChildOptions, RealmBuilder, RealmBuilderParams, RealmInstance, Ref, Route,
 };
@@ -62,6 +65,24 @@ pub async fn create() -> Result<RealmInstance, Error> {
                 )
                 .from(&cache_server)
                 .to(&persistence),
+        )
+        .await?;
+
+    let update_server = crate::mock_fidl::handle_update_check_services(&builder).await?;
+    builder
+        .add_route(
+            Route::new()
+                .capability(Capability::protocol_by_name(ListenerMarker::PROTOCOL_NAME))
+                .from(&update_server)
+                .to(&persistence),
+        )
+        .await?;
+    builder
+        .add_route(
+            Route::new()
+                .capability(Capability::protocol_by_name(ControllerMarker::PROTOCOL_NAME))
+                .from(&update_server)
+                .to(Ref::parent()),
         )
         .await?;
 

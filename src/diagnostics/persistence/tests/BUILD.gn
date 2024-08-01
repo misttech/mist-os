@@ -13,13 +13,17 @@ rustc_test("integration-bin") {
   deps = [
     "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+    "//sdk/fidl/fuchsia.update:fuchsia.update_rust",
     "//src/diagnostics/persistence/fidl:persist_rust",
+    "//src/diagnostics/persistence/tests/fidl/test.persistence:fidl_rust",
     "//src/diagnostics/sampler/tests/fidl:fuchsia.samplertestcontroller_rust",
     "//src/lib/diagnostics/reader/rust",
+    "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-component-test",
     "//src/lib/fuchsia-fs",
+    "//src/lib/fuchsia-sync",
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/storage/lib/vfs/rust:vfs",
     "//third_party/rust_crates:anyhow",
@@ -34,21 +38,17 @@ rustc_test("integration-bin") {
 
   sources = [
     "lib.rs",
+    "mock_fidl.rs",
     "mock_filesystems.rs",
     "test_topology.rs",
   ]
+
   inputs = [ "test_data/config/test_config.persist" ]
 }
 
 fuchsia_unittest_component("persistence-integration-test") {
   manifest = "meta/integration-test.cml"
   deps = [ ":integration-bin" ]
-}
-
-fuchsia_structured_config_values("persistence-test-config") {
-  values_source = "config/integration-test-persistence.json5"
-  component_name = "persistence"
-  cm_label = ":persistence-manifest-for-test"
 }
 
 # Rules defining the Persistence component.
@@ -69,7 +69,6 @@ fuchsia_test_package("persistence-integration-tests") {
   ]
   deps = [
     ":persistence-component-for-test",
-    ":persistence-test-config",
     "//src/diagnostics/sampler/tests/test_component:single_counter_test_component",
   ]
 }

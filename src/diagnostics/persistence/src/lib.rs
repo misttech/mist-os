@@ -14,16 +14,15 @@ mod scheduler;
 use anyhow::{bail, Error};
 use argh::FromArgs;
 use fetcher::Fetcher;
-use fuchsia_async::{self as fasync, TaskGroup};
+use fuchsia_async::TaskGroup;
 use fuchsia_component::server::{ServiceFs, ServiceObj};
 use fuchsia_inspect::component;
 use fuchsia_inspect::health::Reporter;
 use fuchsia_sync::Mutex;
-use fuchsia_zircon::{Duration, Time};
+use fuchsia_zircon::Time;
 use futures::future::join;
-use futures::{FutureExt, StreamExt};
+use futures::StreamExt;
 use persist_server::PersistServer;
-use persistence_component_config::Config as ComponentConfig;
 use persistence_config::Config;
 use scheduler::Scheduler;
 use std::sync::Arc;
@@ -59,9 +58,6 @@ pub async fn main(_args: CommandLine) -> Result<(), Error> {
     let inspector = component::inspector();
     let _inspect_server_task =
         inspect_runtime::publish(inspector, inspect_runtime::PublishOptions::default());
-    let component_config = ComponentConfig::take_from_startup_handle();
-    component_config.record_inspect(inspector.root());
-    let startup_delay_duration = Duration::from_seconds(component_config.startup_delay_seconds);
 
     info!("Rotating directories");
     file_handler::shuffle_at_boot();
@@ -80,33 +76,42 @@ pub async fn main(_args: CommandLine) -> Result<(), Error> {
     let _server_tasks = spawn_persist_services(config, &mut fs, scheduler);
     fs.take_and_serve_directory_handle()?;
 
-    // Before serving previous data, wait the arg-provided seconds for the /cache directory to
-    // stabilize. Note: We're already accepting persist requess. If we receive a request, store
+    // Before serving previous data, wait until the post-boot system update check has finished.
+    // Note: We're already accepting persist requess. If we receive a request, store
     // some data, and then cache is cleared after data is persisted, that data will be lost. This
     // is correct behavior - we don't want to remember anything from before the cache was cleared.
-    info!(
-        "Diagnostics Persistence Service delaying startup for {} seconds...",
-        component_config.startup_delay_seconds
-    );
-    let publish_fut = fasync::Timer::new(fasync::Time::after(startup_delay_duration)).then(|_| {
-        async move {
-            // Start serving previous boot data
-            info!("...done delay, publishing previous boot data");
-            inspector.root().record_child(PERSIST_NODE_NAME, |node| {
-                inspect_server::serve_persisted_data(node).unwrap_or_else(|e| {
-                    error!(
-                        "{} {} {:?}",
-                        "Serving persisted data experienced critical failure.",
-                        "No data available:",
-                        e,
-                    )
-                });
-                component::health().set_ok();
-                info!("Diagnostics Persistence Service ready");
-            });
-            inspector.root().record_int(PUBLISHED_TIME_KEY, Time::get_monotonic().into_nanos());
+    let publish_fut = async move {
+        info!("Waiting for post-boot update check...");
+        match fuchsia_component::client::connect_to_protocol::<fidl_fuchsia_update::ListenerMarker>(
+        ) {
+            Ok(proxy) => match proxy.wait_for_first_update_check_to_complete().await {
+                Ok(()) => {}
+                Err(e) => {
+                    warn!(?e, "Error waiting for first update check; not publishing.");
+                    return;
+                }
+            },
+            Err(e) => {
+                warn!(
+                    ?e,
+                    "Unable to connect to fuchsia.update.Listener; will publish immediately."
+                );
+            }
         }
-    });
+        // Start serving previous boot data
+        info!("...Update check has completed; publishing previous boot data");
+        inspector.root().record_child(PERSIST_NODE_NAME, |node| {
+            inspect_server::serve_persisted_data(node).unwrap_or_else(|e| {
+                error!(
+                    "{} {} {:?}",
+                    "Serving persisted data experienced critical failure.", "No data available:", e,
+                )
+            });
+            component::health().set_ok();
+            info!("Diagnostics Persistence Service ready");
+        });
+        inspector.root().record_int(PUBLISHED_TIME_KEY, Time::get_monotonic().into_nanos());
+    };
 
     join(fs.collect::<()>(), publish_fut).await;
     Ok(())
