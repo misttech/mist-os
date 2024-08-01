@@ -10,8 +10,8 @@
 namespace fxt {
 
 // Forward declarations.
-struct InternedCategory;
-struct InternedString;
+class InternedCategory;
+class InternedString;
 
 }  // namespace fxt
 

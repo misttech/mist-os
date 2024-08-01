@@ -180,26 +180,7 @@ zx_status_t sys_ktrace_control(zx_handle_t handle, uint32_t action, uint32_t opt
 
 // zx_status_t zx_ktrace_write
 zx_status_t sys_ktrace_write(zx_handle_t handle, uint32_t event_id, uint32_t arg0, uint32_t arg1) {
-  // See also ktrace_init() in zircon/kernel/lib/ktrace/ktrace.cc.
-  if (!gBootOptions->enable_debugging_syscalls) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-
-  zx_status_t status;
-  if ((status = validate_ranged_resource(handle, ZX_RSRC_KIND_SYSTEM, ZX_RSRC_SYSTEM_DEBUG_BASE,
-                                         1)) != ZX_OK) {
-    return status;
-  }
-
-  if (event_id > 0x7FF) {
-    return ZX_ERR_INVALID_ARGS;
-  }
-
-  ktrace_thunks::fxt_instant(
-      "kernel:probe"_category, ktrace_timestamp(), ThreadRefFromContext(TraceContext::Cpu),
-      fxt::StringRef{static_cast<uint16_t>(event_id | 0x4000)}, fxt::Argument{"arg0"_intern, arg0},
-      fxt::Argument{"arg1"_intern, arg1});
-  return ZX_OK;
+  return ZX_ERR_NOT_SUPPORTED;
 }
 
 // zx_status_t zx_mtrace_control

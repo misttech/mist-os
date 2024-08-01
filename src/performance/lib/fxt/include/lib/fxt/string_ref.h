@@ -104,7 +104,7 @@ class StringRef<RefType::kId> {
 
   constexpr explicit StringRef(uint16_t id) : id_(id) {}
 
-  StringRef(const InternedString& interned_string) : StringRef{interned_string.GetId()} {}
+  constexpr StringRef(const InternedString& interned_string) : StringRef{interned_string.id()} {}
 
   constexpr StringRef(const StringRef&) = default;
   constexpr StringRef& operator=(const StringRef&) = default;

@@ -59,17 +59,17 @@ static_assert((sizeof(vcpu_exit) / sizeof(vcpu_exit[0])) == VCPU_EXIT_COUNT,
 void ktrace_vcpu(VcpuBlockOp block_op, VcpuMeta meta) {
   const fxt::StringRef name = meta < VCPU_META_COUNT ? vcpu_meta[meta] : "vcpu meta"_intern;
   if (block_op == VCPU_BLOCK) {
-    KTRACE_DURATION_BEGIN_LABEL_REF("kernel:vcpu", name, ("meta #", meta));
+    KTRACE_DURATION_BEGIN_LABEL_REF("kernel:arch", name, ("meta #", meta));
   } else if (block_op == VCPU_UNBLOCK) {
-    KTRACE_DURATION_END_LABEL_REF("kernel:vcpu", name);
+    KTRACE_DURATION_END_LABEL_REF("kernel:arch", name);
   }
 }
 
 void ktrace_vcpu_exit(VcpuExit exit, uint64_t exit_address) {
   if (exit < VCPU_EXIT_COUNT) {
-    KTRACE_DURATION_END("kernel:vcpu", "vcpu", ("exit_address", exit_address),
+    KTRACE_DURATION_END("kernel:arch", "vcpu", ("exit_address", exit_address),
                         ("exit_type", vcpu_exit[exit]));
   } else {
-    KTRACE_DURATION_END("kernel:vcpu", "vcpu", ("exit_address", exit_address), ("exit_type", exit));
+    KTRACE_DURATION_END("kernel:arch", "vcpu", ("exit_address", exit_address), ("exit_type", exit));
   }
 }

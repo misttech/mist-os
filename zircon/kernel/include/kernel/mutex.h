@@ -34,7 +34,7 @@ class TA_CAP("mutex") Mutex
  public:
   constexpr Mutex() = default;
   explicit Mutex(const fxt::InternedString& name_stringref)
-      : LockNameStorage(name_stringref.GetId()) {}
+      : LockNameStorage(name_stringref.id()) {}
 
   ~Mutex();
 

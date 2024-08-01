@@ -157,7 +157,7 @@ template <>
 class CltTraceAccounting<true> {
  public:
   CltTraceAccounting(const fxt::InternedString& func, int line)
-      : func_{func.string}, encoded_id_{EncodeId(func.GetId(), line)} {}
+      : func_{func.string()}, encoded_id_{EncodeId(func.id(), line)} {}
 
   const char* func() const { return func_; }
   int line() const { return static_cast<int>(encoded_id_ & 0xFFFFFFFF); }

@@ -322,7 +322,7 @@ zx::result<> Vcpu::Enter(zx_port_packet_t& packet) {
         return zx::error(ZX_ERR_CANCELED);
       }
 
-      KTRACE_DURATION_BEGIN("kernel:vcpu", "vcpu");
+      KTRACE_DURATION_BEGIN("kernel:arch", "vcpu");
 
       GUEST_STATS_INC(vm_entries);
       status = arm64_el2_enter(vttbr, el2_state_.PhysicalAddress(), hcr_);

@@ -38,7 +38,7 @@ namespace {
 using fxt::operator""_category;
 
 struct CategoryEntry {
-  uint32_t bit_number;
+  uint32_t index;
   const fxt::InternedCategory& category;
 };
 
@@ -58,32 +58,12 @@ const CategoryEntry kCategories[] = {
 
 void SetupCategoryBits() {
   for (const CategoryEntry& entry : kCategories) {
-    const uint32_t bit_number = entry.category.bit_number;
-    if (bit_number == fxt::InternedCategory::kInvalidBitNumber) {
-      entry.category.bit_number = entry.bit_number;
-      fxt::InternedCategory::RegisterInitialized(entry.category);
+    if (entry.category.index() == fxt::InternedCategory::kInvalidIndex) {
+      entry.category.SetIndex(entry.index);
     } else {
       dprintf(INFO, "Found category \"%s\" already initialized to 0x%04x!\n",
-              entry.category.string(), bit_number);
+              entry.category.string(), (1u << entry.category.index()));
     }
-  }
-}
-
-const fxt::InternedString* ktrace_find_probe(const char* name) {
-  for (const fxt::InternedString& interned_string : fxt::InternedString::IterateList) {
-    if (!strcmp(name, interned_string.string)) {
-      return &interned_string;
-    }
-  }
-  return nullptr;
-}
-
-void ktrace_add_probe(const fxt::InternedString& interned_string) { interned_string.GetId(); }
-
-void ktrace_report_probes() {
-  for (const fxt::InternedString& interned_string : fxt::InternedString::IterateList) {
-    fxt_string_record(interned_string.id, interned_string.string,
-                      strnlen(interned_string.string, fxt::InternedString::kMaxStringLength));
   }
 }
 
@@ -204,8 +184,8 @@ zx_status_t KTraceState::Start(uint32_t groups, StartMode mode) {
 
   DiagsPrintf(INFO, "Enabled category mask: 0x%03x\n", groups);
   DiagsPrintf(INFO, "Trace category states:\n");
-  for (const fxt::InternedCategory& category : fxt::InternedCategory::IterateList) {
-    DiagsPrintf(INFO, "  %-20s : 0x%03x : %s\n", category.string(), (1u << category.bit_number),
+  for (const fxt::InternedCategory& category : fxt::InternedCategory::Iterate()) {
+    DiagsPrintf(INFO, "  %-20s : 0x%03x : %s\n", category.string(), (1u << category.index()),
                 ktrace_category_enabled(category) ? "enabled" : "disabled");
   }
 
@@ -455,7 +435,7 @@ ssize_t KTraceState::ReadUser(user_out_ptr<void> ptr, uint32_t off, size_t len) 
 }
 
 void KTraceState::ReportStaticNames() {
-  ktrace_report_probes();
+  fxt::InternedString::RegisterStrings();
   ktrace_report_cpu_pseudo_threads();
 }
 
@@ -630,32 +610,8 @@ zx_status_t ktrace_control(uint32_t action, uint32_t options, void* ptr) {
     case KTRACE_ACTION_REWIND:
       return KTRACE_STATE.Rewind();
 
-    case KTRACE_ACTION_NEW_PROBE: {
-      const char* const string_in = static_cast<const char*>(ptr);
-
-      const fxt::InternedString* ref = ktrace_find_probe(string_in);
-      if (ref != nullptr) {
-        return ref->id;
-      }
-
-      struct DynamicStringRef {
-        explicit DynamicStringRef(const char* string) { memcpy(storage, string, sizeof(storage)); }
-
-        char storage[ZX_MAX_NAME_LEN];
-        fxt::InternedString string_ref{storage};
-      };
-
-      // TODO(eieio,dje): Figure out how to constrain this to prevent abuse by
-      // creating huge numbers of unique probes.
-      fbl::AllocChecker alloc_checker;
-      DynamicStringRef* dynamic_ref = new (&alloc_checker) DynamicStringRef{string_in};
-      if (!alloc_checker.check()) {
-        return ZX_ERR_NO_MEMORY;
-      }
-
-      ktrace_add_probe(dynamic_ref->string_ref);
-      return dynamic_ref->string_ref.id;
-    }
+    case KTRACE_ACTION_NEW_PROBE:
+      return ZX_ERR_NOT_SUPPORTED;
 
     default:
       return ZX_ERR_INVALID_ARGS;
@@ -676,27 +632,17 @@ static void ktrace_init(unsigned level) {
   dprintf(INFO, "ktrace_init: syscalls_enabled=%d bufsize=%u grpmask=%x\n", syscalls_enabled,
           bufsize, initial_grpmask);
 
-  //
-  // BEGIN CAREFUL BLOCK
-  //
-  // Regardless of whether tracing is enabled at boot, the following setup
-  // ensures that trace points do not take runtime initialization branches and
-  // incur unnecessary overhead.
-  //
-  // TODO(https://fxbug.dev/42101573): The runtime initialization branches in trace points
-  // can be removed when GCC properly supports section attributes on static
-  // template members.
-  //
-
-  fxt::InternedString::SetMapStringCallback(fxt_string_record);
-  fxt::InternedString::PreRegister();
-
+  // Coerce the category ids to match the pre-defined bit mapptings of aged ktrace interface.
+  // TODO(eieio): Remove this when kernel migrates to IOB-based tracing with extensible categories.
   SetupCategoryBits();
-  fxt::InternedCategory::PreRegister();
 
-  //
-  // END CAREFUL BLOCK
-  //
+  // Set the callback to emit fxt string records for the set of interned strings when
+  // fxt::InternedString::RegisterStrings() is called at the beginning of a trace session.
+  // TODO(eieio): Replace this with id allocator allocations when IOB-based tracing is implemented.
+  fxt::InternedString::SetRegisterCallback([](const fxt::InternedString& interned_string) {
+    fxt_string_record(interned_string.id(), interned_string.string(),
+                      strnlen(interned_string.string(), fxt::InternedString::kMaxStringLength));
+  });
 
   if (!bufsize) {
     dprintf(INFO, "ktrace: disabled\n");
@@ -707,8 +653,8 @@ static void ktrace_init(unsigned level) {
   ktrace::CpuContextMap::Init();
 
   dprintf(INFO, "Trace categories: \n");
-  for (const fxt::InternedCategory& category : fxt::InternedCategory::IterateList) {
-    dprintf(INFO, "  %-20s : 0x%03x\n", category.string(), (1u << category.bit_number));
+  for (const fxt::InternedCategory& category : fxt::InternedCategory::Iterate()) {
+    dprintf(INFO, "  %-20s : 0x%03x\n", category.string(), (1u << category.index()));
   }
 
   KTRACE_STATE.Init(bufsize, initial_grpmask);

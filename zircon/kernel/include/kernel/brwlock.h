@@ -100,7 +100,7 @@ class TA_CAP("mutex") BrwLock
  public:
   BrwLock() = default;
   explicit BrwLock(const fxt::InternedString& name_stringref)
-      : LockNameStorage(name_stringref.GetId()) {}
+      : LockNameStorage(name_stringref.id()) {}
 
   ~BrwLock();
 

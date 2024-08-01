@@ -70,7 +70,7 @@ class LockNameStorage<kLockType, true> : public LockIdGenerator {
       // case scenario.  It is possible for a lock to go unnamed, but at least
       // we won't crash during early boot.
       if (name != nullptr) {
-        encoded_lock_id_.SetLockClassId(name->GetId());
+        encoded_lock_id_.SetLockClassId(name->id());
       }
     }
   }

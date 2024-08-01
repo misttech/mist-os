@@ -53,7 +53,7 @@ class Tracer<true> {
               SpinTracingTimestamp<true> end_time = SpinTracingTimestamp<true>{}) const {
     const uint16_t class_name = static_cast<uint16_t>(
         (elid.class_name() != fxt::InternedString::kInvalidId) ? elid.class_name()
-                                                               : "<unknown>"_intern.GetId());
+                                                               : "<unknown>"_intern.id());
 
     if constexpr (!kSchedulerLockSpinTracingCompressed) {
       const uint64_t lock_id = elid.id();

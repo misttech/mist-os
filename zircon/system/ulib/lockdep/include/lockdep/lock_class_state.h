@@ -72,7 +72,7 @@ class MetadataLockClassState : public LockClassState {
   static const char* GetName(LockClassId id) { return Get(id)->name(); }
 
   // Returns the name of this lock class.
-  const char* name() const { return name_.string; }
+  const char* name() const { return name_.string(); }
   const fxt::InternedString& interned_name() { return name_; }
 
  private:
