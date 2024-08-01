@@ -4,6 +4,8 @@
 
 #include <lib/syslog/cpp/macros.h>
 
+#include <cmath>
+
 #include <gmock/gmock.h>
 
 #include "src/media/audio/audio_core/testing/integration/hermetic_audio_test.h"
@@ -153,35 +155,46 @@ TEST_F(AudioDeviceEnumeratorTest, OnDeviceGainChangedIgnoresInvalidTokensInSets)
 }
 
 // TODO(https://fxbug.dev/42075702): Reenable after fixing this test flaky behavior.
-TEST_F(AudioDeviceEnumeratorTest, DISABLED_SetDeviceGain_Input) {
+TEST_F(AudioDeviceEnumeratorTest, DISABLED_SetDeviceGainInput) {
   TestSetDeviceGain(CreateInput({0xff, 0x00}, kFormat, kFrameRate));
 }
 
-TEST_F(AudioDeviceEnumeratorTest, SetDeviceGain_Output) {
+TEST_F(AudioDeviceEnumeratorTest, SetDeviceGainOutput) {
   TestSetDeviceGain(CreateOutput({0xff, 0x00}, kFormat, kFrameRate));
 }
 
-TEST_F(AudioDeviceEnumeratorTest, DeviceInitializesToUnityGain_Input) {
+TEST_F(AudioDeviceEnumeratorTest, SetDeviceGainInvalid) {
+  auto device = CreateOutput({0xff, 0x00}, kFormat, kFrameRate);
+  device->fidl().events().OnSetGain = nullptr;
+
+  audio_dev_enum_.events().OnDeviceGainChanged = AddUnexpectedCallback("OnDeviceGainChanged3 NAN");
+  audio_dev_enum_->SetDeviceGain(device->token(), AudioGainInfo{.gain_db = NAN},
+                                 AudioGainValidFlags::GAIN_VALID);
+  audio_dev_enum_->GetDevices(AddCallback("GetDevices3"));
+  ExpectCallbacks();
+}
+
+TEST_F(AudioDeviceEnumeratorTest, DeviceInitializesToUnityGainInput) {
   TestDeviceInitializesToUnityGain(CreateInput({0xff, 0x00}, kFormat, kFrameRate));
 }
 
-TEST_F(AudioDeviceEnumeratorTest, DeviceInitializesToUnityGain_Output) {
+TEST_F(AudioDeviceEnumeratorTest, DeviceInitializesToUnityGainOutput) {
   TestDeviceInitializesToUnityGain(CreateOutput({0xff, 0x00}, kFormat, kFrameRate));
 }
 
-TEST_F(AudioDeviceEnumeratorTest, AddRemoveDevice_Input) {
+TEST_F(AudioDeviceEnumeratorTest, AddRemoveDeviceInput) {
   // Internally, this exercises OnDeviceAdded, and TearDown exercises OnDeviceRemoved,
   // and both exercise OnDefaultDeviceChanged.
   CreateInput({0xff, 0x00}, kFormat, kFrameRate);
 }
 
-TEST_F(AudioDeviceEnumeratorTest, AddRemoveDevice_Output) {
+TEST_F(AudioDeviceEnumeratorTest, AddRemoveDeviceOutput) {
   // Internally, this exercises OnDeviceAdded, and TearDown exercises OnDeviceRemoved.
   // and both exercise OnDefaultDeviceChanged.
   CreateOutput({0xff, 0x00}, kFormat, kFrameRate);
 }
 
-TEST_F(AudioDeviceEnumeratorTest, RemoveDeviceUnplugged_Input) {
+TEST_F(AudioDeviceEnumeratorTest, RemoveDeviceUnpluggedInput) {
   auto device = CreateInput({0xff, 0x00}, kFormat, kFrameRate);
   device->fidl()->ChangePlugState(zx::clock::get_monotonic().get(), false,
                                   [](fuchsia::virtualaudio::Device_ChangePlugState_Result result) {
@@ -190,7 +203,7 @@ TEST_F(AudioDeviceEnumeratorTest, RemoveDeviceUnplugged_Input) {
   RunLoopUntilIdle();
 }
 
-TEST_F(AudioDeviceEnumeratorTest, RemoveDeviceUnplugged_Output) {
+TEST_F(AudioDeviceEnumeratorTest, RemoveDeviceUnpluggedOutput) {
   auto device = CreateOutput({0xff, 0x00}, kFormat, kFrameRate);
   device->fidl()->ChangePlugState(zx::clock::get_monotonic().get(), false,
                                   [](fuchsia::virtualaudio::Device_ChangePlugState_Result result) {
@@ -204,28 +217,28 @@ TEST_F(AudioDeviceEnumeratorTest, RemoveDeviceUnplugged_Output) {
 // do no exist when the tests are DISABLED.
 #if 0
 
-TEST_F(AudioDeviceEnumeratorTest, PlugUnplugDurability_Input) {
+TEST_F(AudioDeviceEnumeratorTest, PlugUnplugDurabilityInput) {
   // In the following expression, C++ insists that we explicitly name the current class,
   // i.e. typeof(this). This name is created by the TEST_F macro.
   TestPlugUnplugDurability(
       &AudioDeviceEnumeratorTest_PlugUnplugDurability_Input_Test::CreateInput<ASF::SIGNED_16>);
 }
 
-TEST_F(AudioDeviceEnumeratorTest, PlugUnplugDurability_Output) {
+TEST_F(AudioDeviceEnumeratorTest, PlugUnplugDurabilityOutput) {
   // In the following expression, C++ insists that we explicitly name the current class,
   // i.e. typeof(this). This name is created by the TEST_F macro.
   TestPlugUnplugDurability(
       &AudioDeviceEnumeratorTest_PlugUnplugDurability_Output_Test::CreateOutput<ASF::SIGNED_16>);
 }
 
-TEST_F(AudioDeviceEnumeratorTest, AddRemoveMany_Input) {
+TEST_F(AudioDeviceEnumeratorTest, AddRemoveManyInput) {
   // In the following expression, C++ insists that we explicitly name the current class,
   // i.e. typeof(this). This name is created by the TEST_F macro.
   TestAddRemoveMany(
       &AudioDeviceEnumeratorTest_AddRemoveMany_Input_Test::CreateInput<ASF::SIGNED_16>);
 }
 
-TEST_F(AudioDeviceEnumeratorTest, AddRemoveMany_Output) {
+TEST_F(AudioDeviceEnumeratorTest, AddRemoveManyOutput) {
   // In the following expression, C++ insists that we explicitly name the current class,
   // i.e. typeof(this). This name is created by the TEST_F macro.
   TestAddRemoveMany(

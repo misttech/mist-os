@@ -383,52 +383,72 @@ TEST_F(OutputProducerTest, SilenceFloat32DontOverwriteExtraDestFrames) {
   EXPECT_THAT(dest, testing::Each(testing::Eq(0.0f)));
 }
 
-// Mixer objects produce normal data, but arbitrary pipeline effects may not.
+// Mixer objects produce normal data, but arbitrary pipeline effects may emit out-of-bounds data.
 //
-// Currently OutputProducer clamps +/-INF to [-1.0, 1.0].
+// OutputProducer clamps values outside the [-1.0f,+1.0f] range to -1.0 or +1.0.
+TEST_F(OutputProducerTest, OutOfRangeFloat32) {
+  float source, output;
+  auto output_producer = SelectOutputProducer(fuchsia::media::AudioSampleFormat::FLOAT, 1);
+  ASSERT_NE(nullptr, output_producer);
+
+  source = -2.0f;  // will be clamped up to -1.0f.
+  output_producer->ProduceOutput(&source, &output, 1);
+  EXPECT_FLOAT_EQ(output, -1.0f);
+  EXPECT_TRUE(std::isfinite(output));
+
+  source = 1.5f;  // will be clamped down to +1.0f.
+  output_producer->ProduceOutput(&source, &output, 1);
+  EXPECT_FLOAT_EQ(output, 1.0f);
+  EXPECT_TRUE(std::isfinite(output));
+}
+
+// OutputProducer clamps +/-INF to [-1.0, 1.0].
 TEST_F(OutputProducerTest, InfinitiesFloat32) {
   float source, output;
   auto output_producer = SelectOutputProducer(fuchsia::media::AudioSampleFormat::FLOAT, 1);
   ASSERT_NE(nullptr, output_producer);
 
-  source = -INFINITY;  // will be clamped
+  source = -INFINITY;  // will be clamped up to -1.0f.
   output_producer->ProduceOutput(&source, &output, 1);
   EXPECT_FLOAT_EQ(output, -1);
-  EXPECT_TRUE(std::isnormal(output));
+  EXPECT_TRUE(std::isfinite(output));
 
-  source = INFINITY;  // will be clamped
+  source = INFINITY;  // will be clamped down to +1.0f.
   output_producer->ProduceOutput(&source, &output, 1);
   EXPECT_FLOAT_EQ(output, 1);
-  EXPECT_TRUE(std::isnormal(output));
+  EXPECT_TRUE(std::isfinite(output));
 }
 
-// Currently OutputProducer makes no explicit effort to detect and prevent NAN output.
-// TODO(https://fxbug.dev/42165029): Consider a mode where we eliminate NANs (presumably emitting 0 instead).
+// Currently OutputProducer makes no explicit effort to detect and prevent NAN.
+// TODO(https://fxbug.dev/42165029): Consider eliminating NANs (presumably emitting 0 instead).
 TEST_F(OutputProducerTest, DISABLED_NanFloat32) {
   float source, output;
   auto output_producer = SelectOutputProducer(fuchsia::media::AudioSampleFormat::FLOAT, 1);
   ASSERT_NE(nullptr, output_producer);
 
-  source = NAN;  // should be changed to zero
+  source = NAN;
   output_producer->ProduceOutput(&source, &output, 1);
   EXPECT_FALSE(isnan(output));
-  EXPECT_FLOAT_EQ(output, 0.0f);
+
+  // Ideally we'd change NAN to 0. At least bound it to [-1, +1].
+  EXPECT_GE(output, -1.0f);
+  EXPECT_LE(output, +1.0f);
 }
 
 // Currently OutputProducer makes no explicit effort to detect and prevent subnormal output.
-// TODO(https://fxbug.dev/42165029): Consider a mode where we detect subnormals and round to zero.
-TEST_F(OutputProducerTest, DISABLED_SubnormalsFloat32) {
+// TODO(https://fxbug.dev/42165029): Consider detecting subnormals and rounding to zero.
+TEST_F(OutputProducerTest, SubnormalsFloat32) {
   float source, output;
   auto output_producer = SelectOutputProducer(fuchsia::media::AudioSampleFormat::FLOAT, 1);
   ASSERT_NE(nullptr, output_producer);
 
-  source = -FLT_MIN / 2.0;  // subnormal; should be rounded to zero
+  source = -FLT_MIN / 2.0;  // subnormal
   output_producer->ProduceOutput(&source, &output, 1);
-  EXPECT_FLOAT_EQ(output, 0.0f);
+  EXPECT_FLOAT_EQ(output, source);
 
-  source = FLT_MIN / 2.0;  // subnormal; should be rounded to zero
+  source = FLT_MIN / 2.0;  // subnormal
   output_producer->ProduceOutput(&source, &output, 1);
-  EXPECT_FLOAT_EQ(output, 0.0f);
+  EXPECT_FLOAT_EQ(output, source);
 }
 
 }  // namespace

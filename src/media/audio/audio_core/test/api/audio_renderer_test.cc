@@ -6,6 +6,7 @@
 #include <lib/zx/clock.h>
 #include <zircon/syscalls.h>
 
+#include <limits>
 #include <utility>
 
 #include <gtest/gtest.h>
@@ -353,7 +354,7 @@ TEST_F(AudioRendererClockTest, SetRefClockAfterAddBuffer) {
 
 // Validate MinLeadTime events, when enabled. After enabling MinLeadTime events, we expect an
 // initial notification. Because we have not yet set the format, we expect MinLeadTime to be 0.
-TEST_F(AudioRendererPtsLeadTimeTest, EnableMinLeadTimeEventsBeforeFormat) {
+TEST_F(AudioRendererLeadTimeTest, EnableMinLeadTimeEventsBeforeFormat) {
   int64_t min_lead_time = -1;
   audio_renderer().events().OnMinLeadTimeChanged = AddCallback(
       "OnMinLeadTimeChanged",
@@ -372,7 +373,7 @@ TEST_F(AudioRendererPtsLeadTimeTest, EnableMinLeadTimeEventsBeforeFormat) {
 // (and no additional OnMinLeadTimeChanged event is generated). We don't test that behavior here.
 //
 // In this case, post-SetPcmStreamType lead time > 0 (RendererShim includes an AudioOutput).
-TEST_F(AudioRendererPtsLeadTimeTest, EnableMinLeadTimeEventsAfterFormat) {
+TEST_F(AudioRendererLeadTimeTest, EnableMinLeadTimeEventsAfterFormat) {
   audio_renderer().events().OnMinLeadTimeChanged = AddCallback("OnMinLeadTimeChanged1");
   audio_renderer()->EnableMinLeadTimeEvents(true);
   ExpectCallbacks();
@@ -388,7 +389,7 @@ TEST_F(AudioRendererPtsLeadTimeTest, EnableMinLeadTimeEventsAfterFormat) {
 }
 
 // Validate no MinLeadTime events when disabled (nor should we Disconnect).
-TEST_F(AudioRendererPtsLeadTimeTest, DisableMinLeadTimeEvents) {
+TEST_F(AudioRendererLeadTimeTest, DisableMinLeadTimeEvents) {
   audio_renderer().events().OnMinLeadTimeChanged = AddUnexpectedCallback("OnMinLeadTimeChanged");
 
   audio_renderer()->EnableMinLeadTimeEvents(false);
@@ -399,7 +400,7 @@ TEST_F(AudioRendererPtsLeadTimeTest, DisableMinLeadTimeEvents) {
 }
 
 // Before SetPcmStreamType is called, MinLeadTime should equal zero.
-TEST_F(AudioRendererPtsLeadTimeTest, GetMinLeadTimeBeforeFormat) {
+TEST_F(AudioRendererLeadTimeTest, GetMinLeadTimeBeforeFormat) {
   int64_t min_lead_time = -1;
   audio_renderer()->GetMinLeadTime(AddCallback(
       "GetMinLeadTime",
@@ -410,7 +411,7 @@ TEST_F(AudioRendererPtsLeadTimeTest, GetMinLeadTimeBeforeFormat) {
 }
 
 // EnableMinLeadTimeEvents can be called at any time, regardless of the renderer's state.
-TEST_F(AudioRendererPtsLeadTimeTest, EnableMinLeadTimeEventsCanAlwaysBeCalled) {
+TEST_F(AudioRendererLeadTimeTest, EnableMinLeadTimeEventsCanAlwaysBeCalled) {
   audio_renderer()->EnableMinLeadTimeEvents(true);
 
   audio_renderer()->SetPcmStreamType(kTestStreamType);
@@ -442,7 +443,7 @@ TEST_F(AudioRendererPtsLeadTimeTest, EnableMinLeadTimeEventsCanAlwaysBeCalled) {
 }
 
 // Verify that GetMinLeadTime can be called at any time, regardless of the renderer's state.
-TEST_F(AudioRendererPtsLeadTimeTest, GetMinLeadTimeCanAlwaysBeCalled) {
+TEST_F(AudioRendererLeadTimeTest, GetMinLeadTimeCanAlwaysBeCalled) {
   audio_renderer()->GetMinLeadTime(AddCallback("GetMinLeadTime1"));
   ExpectCallbacks();
 
@@ -477,7 +478,7 @@ TEST_F(AudioRendererPtsLeadTimeTest, GetMinLeadTimeCanAlwaysBeCalled) {
 // SetPtsUnits accepts uint numerator and denominator that must be within certain range
 //
 // Ensure that the max and min PTS-unit values are accepted.
-TEST_F(AudioRendererPtsLeadTimeTest, SetPtsUnitsLimits) {
+TEST_F(AudioRendererPtsTest, SetPtsUnitsLimits) {
   audio_renderer()->SetPtsUnits(1, 60);
   audio_renderer()->GetMinLeadTime(AddCallback("GetMinLeadTime after SetPtsUnit(max)"));
   ExpectCallbacks();
@@ -488,7 +489,7 @@ TEST_F(AudioRendererPtsLeadTimeTest, SetPtsUnitsLimits) {
 }
 
 // SetPtsUnits can be called at any time, except when active packets are outstanding
-TEST_F(AudioRendererPtsLeadTimeTest, SetPtsUnitsWhileNotOperating) {
+TEST_F(AudioRendererPtsTest, SetPtsUnitsWhileNotOperating) {
   audio_renderer()->SetPtsUnits(kTestStreamType.frames_per_second, 1);
 
   audio_renderer()->SetPcmStreamType(kTestStreamType);
@@ -510,8 +511,10 @@ TEST_F(AudioRendererPtsLeadTimeTest, SetPtsUnitsWhileNotOperating) {
   ExpectConnected();  // Demonstrate we haven't disconnected
 }
 
-// SetPtsContinuityThreshold is callable at any time, except when active packets are outstanding
-TEST_F(AudioRendererPtsLeadTimeTest, SetPtsContThresholdWhileNotOperating) {
+// SetPtsContinuityThreshold is callable at any time, except when active packets are outstanding.
+// SetPtsContinuityThreshold parameter must be in the non-negative range.
+// Subnormal values such as std::numeric_limits<float>::min()/2 are OK.
+TEST_F(AudioRendererPtsTest, SetPtsContThresholdWhileNotOperating) {
   audio_renderer()->SetPtsContinuityThreshold(0.0f);
 
   audio_renderer()->SetPcmStreamType(kTestStreamType);
@@ -524,17 +527,17 @@ TEST_F(AudioRendererPtsLeadTimeTest, SetPtsContThresholdWhileNotOperating) {
   audio_renderer()->SetPtsContinuityThreshold(0.03f);
 
   ExpectCallbacks();
-  audio_renderer()->SetPtsContinuityThreshold(0.04f);
+  audio_renderer()->SetPtsContinuityThreshold(std::numeric_limits<float>::min());
 
   audio_renderer()->SendPacket(kTestPacket, AddCallback("SendPacket"));
   ExpectCallbacks();  // Send a packet and allow it to drain out.
-  audio_renderer()->SetPtsContinuityThreshold(0.05f);
+  audio_renderer()->SetPtsContinuityThreshold(60.0f);
 
   audio_renderer()->Pause(AddCallback("Pause"));
-  audio_renderer()->SetPtsContinuityThreshold(0.06f);
+  audio_renderer()->SetPtsContinuityThreshold(std::numeric_limits<float>::min());
 
   ExpectCallbacks();
-  audio_renderer()->SetPtsContinuityThreshold(0.07f);
+  audio_renderer()->SetPtsContinuityThreshold(0.0f);
 
   ExpectConnected();  // Demonstrate we haven't disconnected
 }
@@ -737,20 +740,23 @@ TEST_F(AudioRendererTransportTest, CommandsSerializedAfterPause) {
       .payload_offset = 0,
       .payload_size = kDefaultPacketSize,
   };
+
+  audio_renderer()->Play(fuchsia::media::NO_TIMESTAMP, 0, AddCallback("Play1"));
+  ExpectCallbacks();  // Ensure we are playing before proceeding
+
+  audio_renderer()->Pause(AddCallback("Pause1"));
+  audio_renderer()->SendPacket(packet1, AddCallback("SendPacket1"));
+  audio_renderer()->DiscardAllPackets(AddCallback("DiscardAllPackets1"));
+
+  // {Add,Remove}PayloadBuffer don't have callbacks, however they will crash
+  // if not invoked in the correct order: Add will crash if the packet queue
+  // is not empty (not called after the above discard) and Remove will crash
+  // if not called after Add.
   static constexpr fuchsia::media::StreamPacket packet2{
       .payload_buffer_id = 2,
       .payload_offset = 0,
       .payload_size = kDefaultPacketSize,
   };
-
-  audio_renderer()->Play(fuchsia::media::NO_TIMESTAMP, 0, AddCallback("Play1"));
-  audio_renderer()->Pause(AddCallback("Pause1"));
-  audio_renderer()->SendPacket(packet1, AddCallback("SendPacket1"));
-  audio_renderer()->DiscardAllPackets(AddCallback("DiscardAllPackets1"));
-  // {Add,Remove}PayloadBuffer don't have callbacks, however they will crash
-  // if not invoked in the correct order: Add will crash if the packet queue
-  // is not empty (not called after the above discard) and Remove will crash
-  // if not called after Add.
   CreateAndAddPayloadBuffer(2);
   audio_renderer()->SendPacket(packet2, AddCallback("SendPacket2"));
   // Queue must be empty before removing the payload buffer.

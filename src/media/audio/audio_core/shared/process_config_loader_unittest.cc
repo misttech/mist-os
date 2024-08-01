@@ -1075,7 +1075,7 @@ TEST(ProcessConfigLoaderTest, RejectConfigWithoutLoopbackPointSpecified) {
             "loopback point specified");
 }
 
-TEST(ProcessConfigLoaderTest, RejectConfigWithInvalidChannelCount) {
+TEST(ProcessConfigLoaderTest, RejectConfigsWithInvalidChannelCount) {
   const auto& CreateConfig = [](int mix_stage_chans, int effect_chans) {
     std::ostringstream oss;
     oss << R"JSON({
@@ -1404,7 +1404,7 @@ TEST(ProcessConfigLoaderTest, MalformedThermalConfigs) {
         << "case " << idx << " (" << bad_case_name << ") could not write file" << std::endl;
 
     auto result = ProcessConfigLoader::LoadProcessConfig(kTestAudioCoreConfigFilename);
-    EXPECT_TRUE(result.is_error()) << "'" << bad_case_name << "': " << result.error();
+    EXPECT_TRUE(result.is_error()) << "'" << bad_case_name << "'";
   }
 }
 
@@ -1571,6 +1571,344 @@ TEST(ProcessConfigLoaderTest, LoadOutputDevicePolicyVolumeCurve) {
   EXPECT_FLOAT_EQ(curve.VolumeToDb(0.25), result_curve.VolumeToDb(0.25));
   EXPECT_FLOAT_EQ(curve.VolumeToDb(0.5), result_curve.VolumeToDb(0.5));
   EXPECT_FLOAT_EQ(curve.VolumeToDb(0.75), result_curve.VolumeToDb(0.75));
+}
+
+// Output driver_gain_db, input driver_gain_db, input software_gain_db
+TEST(ProcessConfigLoaderTest, RejectConfigsWithIndefiniteDeviceGainDb) {
+  std::vector<std::pair<std::string, std::string>> kMalformedDeviceGainDbs{
+      {"Output driver_gain_db INF",
+       R"JSON({
+        "volume_curve": [ { "level": 0.0, "db": -160.0 }, { "level": 1.0, "db": 0.0 } ],
+        "output_devices": [
+          {
+            "device_id": "34384e7da9d52c8062a9765baeb6053a",
+            "supported_stream_types": [
+              "render:media",
+              "render:interruption",
+              "render:background",
+              "render:communications",
+              "render:system_agent",
+              "capture:loopback"
+            ],
+            "driver_gain_db": Infinity
+          }
+        ]
+      })JSON"},
+      {"Output driver_gain_db -INF",
+       R"JSON({
+        "volume_curve": [ { "level": 0.0, "db": -160.0 }, { "level": 1.0, "db": 0.0 } ],
+        "output_devices": [
+          {
+            "device_id": "34384e7da9d52c8062a9765baeb6053a",
+            "supported_stream_types": [
+              "render:media",
+              "render:interruption",
+              "render:background",
+              "render:communications",
+              "render:system_agent",
+              "capture:loopback"
+            ],
+            "driver_gain_db": -Infinity
+          }
+        ]
+      })JSON"},
+      {"Output driver_gain_db NAN",
+       R"JSON({
+        "volume_curve": [ { "level": 0.0, "db": -160.0 }, { "level": 1.0, "db": 0.0 } ],
+        "output_devices": [
+          {
+            "device_id": "34384e7da9d52c8062a9765baeb6053a",
+            "supported_stream_types": [
+              "render:media",
+              "render:interruption",
+              "render:background",
+              "render:communications",
+              "render:system_agent",
+              "capture:loopback"
+            ],
+            "driver_gain_db": NaN
+          }
+        ]
+      })JSON"},
+      {"Input driver_gain_db INF",
+       R"JSON({
+        "volume_curve": [ { "level": 0.0, "db": -160.0 }, { "level": 1.0, "db": 0.0 } ],
+        "input_devices": [
+          {
+            "device_id": "34384e7da9d52c8062a9765baeb6053a",
+            "supported_stream_types": [ "capture:background" ],
+            "rate": 96000
+            "driver_gain_db": Infinity,
+            "software_gain_db": -8.0
+          },
+        ]
+      })JSON"},
+      {"Input driver_gain_db -INF",
+       R"JSON({
+        "volume_curve": [ { "level": 0.0, "db": -160.0 }, { "level": 1.0, "db": 0.0 } ],
+        "input_devices": [
+          {
+            "device_id": "34384e7da9d52c8062a9765baeb6053a",
+            "supported_stream_types": [ "capture:background" ],
+            "rate": 96000
+            "driver_gain_db": -Infinity,
+            "software_gain_db": -8.0
+          },
+        ]
+      })JSON"},
+      {"Input driver_gain_db NAN",
+       R"JSON({
+        "volume_curve": [ { "level": 0.0, "db": -160.0 }, { "level": 1.0, "db": 0.0 } ],
+        "input_devices": [
+          {
+            "device_id": "34384e7da9d52c8062a9765baeb6053a",
+            "supported_stream_types": [ "capture:background" ],
+            "rate": 96000
+            "driver_gain_db": NaN,
+            "software_gain_db": -8.0
+          },
+        ]
+      })JSON"},
+      {"Input software_gain_db INF",
+       R"JSON({
+        "volume_curve": [ { "level": 0.0, "db": -160.0 }, { "level": 1.0, "db": 0.0 } ],
+        "input_devices": [
+          {
+            "device_id": "34384e7da9d52c8062a9765baeb6053a",
+            "supported_stream_types": [ "capture:background" ],
+            "rate": 96000
+            "driver_gain_db": -6.0,
+            "software_gain_db": Infinity,
+          },
+        ]
+      })JSON"},
+      {"Input software_gain_db -INF",
+       R"JSON({
+        "volume_curve": [ { "level": 0.0, "db": -160.0 }, { "level": 1.0, "db": 0.0 } ],
+        "input_devices": [
+          {
+            "device_id": "34384e7da9d52c8062a9765baeb6053a",
+            "supported_stream_types": [ "capture:background" ],
+            "rate": 96000
+            "driver_gain_db": -6.0,
+            "software_gain_db": -Infinity,
+          },
+        ]
+      })JSON"},
+      {"Input software_gain_db NAN",
+       R"JSON({
+        "volume_curve": [ { "level": 0.0, "db": -160.0 }, { "level": 1.0, "db": 0.0 } ],
+        "input_devices": [
+          {
+            "device_id": "34384e7da9d52c8062a9765baeb6053a",
+            "supported_stream_types": [ "capture:background" ],
+            "rate": 96000
+            "driver_gain_db": -6.0,
+            "software_gain_db": NaN,
+          },
+        ]
+      })JSON"},
+  };
+
+  for (auto idx = 0u; idx < kMalformedDeviceGainDbs.size(); ++idx) {
+    const auto [bad_case_name, bad_config] = kMalformedDeviceGainDbs[idx];
+    ASSERT_TRUE(
+        files::WriteFile(kTestAudioCoreConfigFilename, bad_config.data(), bad_config.size()))
+        << "case " << idx << " (" << bad_case_name << ") could not write file" << std::endl;
+
+    auto result = ProcessConfigLoader::LoadProcessConfig(kTestAudioCoreConfigFilename);
+    EXPECT_TRUE(result.is_error()) << "'" << bad_case_name << "'";
+  }
+}
+
+// input_device_profile 'rate' <= 0
+TEST(ProcessConfigLoaderTest, RejectConfigWithNonPositiveInputDeviceRate) {
+  std::string kMalformedDeviceRate{
+      R"JSON({
+        "volume_curve": [ { "level": 0.0, "db": -160.0 }, { "level": 1.0, "db": 0.0 } ],
+        "input_devices": [
+          {
+            "device_id": "34384e7da9d52c8062a9765baeb6053a",
+            "supported_stream_types": [ "capture:background" ],
+            "rate": 0
+          },
+        ]
+      })JSON"};
+
+  ASSERT_TRUE(files::WriteFile(kTestAudioCoreConfigFilename, kMalformedDeviceRate.data(),
+                               kMalformedDeviceRate.size()))
+      << "Could not write file" << std::endl;
+  auto result = ProcessConfigLoader::LoadProcessConfig(kTestAudioCoreConfigFilename);
+  EXPECT_TRUE(result.is_error()) << "Non-positive device rate";
+}
+
+// For these invalid values, we actually expect to intentionally CHECK.
+TEST(ProcessConfigLoaderTest, RejectConfigsWithInvalidMixGroupGainValues) {
+  std::vector<std::pair<std::string, std::string>> kInvalidMixGroupGains{
+      {"max_gain_db > 24",
+       R"JSON({
+      "volume_curve": [ { "level": 0.0, "db": -160.0 }, { "level": 1.0, "db": 0.0 } ],
+      "output_devices": [
+        {
+          "device_id": "34384e7da9d52c8062a9765baeb6053a",
+          "supported_stream_types": [ "render:background", "render:communications",
+              "render:interruption",  "render:media",      "render:system_agent" ],
+          "pipeline": {
+            "name": "default",
+            "streams": [               "render:background", "render:communications",
+                "render:interruption", "render:media",      "render:system_agent" ],
+            "max_gain_db": 25.0
+          }
+        }
+      ]
+    })JSON"},
+      {"max_gain_db for ultrasound",
+       R"JSON({
+      "volume_curve": [ { "level": 0.0, "db": -160.0 }, { "level": 1.0, "db": 0.0 } ],
+      "output_devices": [
+        {
+          "device_id": "34384e7da9d52c8062a9765baeb6053a",
+          "supported_stream_types": [ "render:background", "render:communications",
+              "render:interruption",  "render:media",      "render:system_agent",
+              "render:ultrasound" ],
+          "pipeline": {
+            "name": "default",
+            "streams": [               "render:background", "render:communications",
+                "render:interruption", "render:media",      "render:system_agent",
+                "render:ultrasound" ],
+            "max_gain_db": -6.0
+          }
+        }
+      ]
+    })JSON"},
+      {"min_gain_db < -160",
+       R"JSON({
+      "volume_curve": [ { "level": 0.0, "db": -160.0 }, { "level": 1.0, "db": 0.0 } ],
+      "output_devices": [
+        {
+          "device_id": "34384e7da9d52c8062a9765baeb6053a",
+          "supported_stream_types": [ "render:background", "render:communications",
+              "render:interruption",  "render:media",      "render:system_agent" ],
+          "pipeline": {
+            "name": "default",
+            "streams": [               "render:background", "render:communications",
+                "render:interruption", "render:media",      "render:system_agent" ],
+            "min_gain_db": -161
+          }
+        }
+      ]
+    })JSON"},
+      {"min_gain_db for ultrasound",
+       R"JSON({
+      "volume_curve": [ { "level": 0.0, "db": -160.0 }, { "level": 1.0, "db": 0.0 } ],
+      "output_devices": [
+        {
+          "device_id": "34384e7da9d52c8062a9765baeb6053a",
+          "supported_stream_types": [ "render:background", "render:communications",
+              "render:interruption",  "render:media",      "render:system_agent",
+                "render:ultrasound" ],
+          "pipeline": {
+            "name": "default",
+            "streams": [               "render:background", "render:communications",
+                "render:interruption", "render:media",      "render:system_agent",
+                "render:ultrasound" ],
+            "min_gain_db": -6
+          }
+        }
+      ]
+    })JSON"},
+  };
+
+  for (auto idx = 0u; idx < kInvalidMixGroupGains.size(); ++idx) {
+    const auto [bad_case_name, bad_config] = kInvalidMixGroupGains[idx];
+    ASSERT_TRUE(
+        files::WriteFile(kTestAudioCoreConfigFilename, bad_config.data(), bad_config.size()))
+        << "case " << idx << " (" << bad_case_name << ") could not write file" << std::endl;
+    ASSERT_DEATH(ProcessConfigLoader::LoadProcessConfig(kTestAudioCoreConfigFilename), "")
+        << bad_case_name;
+  }
+}
+
+// Attempt bad volume curves of various types. All should return an error result.
+TEST(ProcessConfigLoaderTest, RejectConfigsWithInvalidVolumeCurves) {
+  std::vector<std::pair<std::string, std::string>> kInvalidVolumeCurves{
+      {"level < 0",
+       R"JSON({
+        "volume_curve": [ { "level": -0.01, "db": -160.0 }, { "level": 1.0, "db": 0.0 } ]
+        })JSON"},
+      {"level not increasing",
+       R"JSON({
+        "volume_curve": [
+          { "level": 0.0, "db": -160.0 },
+          { "level": 0.5, "db": -80.0 },
+          { "level": 0.5, "db": -75.0 },
+          { "level": 1.0, "db": 0.0 } ]
+        })JSON"},
+      {"level > 1",
+       R"JSON({
+        "volume_curve": [ { "level": 0.0, "db": -160.0 }, { "level": 1.001, "db": 0.0 } ]
+        })JSON"},
+      {"level +INF",
+       R"JSON({
+        "volume_curve": [ { "level": 0.0, "db": -160.0 }, { "level": Infinity, "db": 0.0 } ]
+        })JSON"},
+      {"level -INF",
+       R"JSON({
+        "volume_curve": [ { "level": -Infinity, "db": -160.0 }, { "level": 1.0, "db": 0.0 } ]
+        })JSON"},
+      {"level NAN",
+       R"JSON({
+        "volume_curve": [
+          { "level": 0.0, "db": -160.0 },
+          { "level": NAN, "db": -80.0 },
+          { "level": 1.0, "db": 0.0 } ]
+        })JSON"},
+      {"db < MUTED_GAIN_DB",
+       R"JSON({
+        "volume_curve": [ { "level": 0.0, "db": -161.0 }, { "level": 1.0, "db": 0.0 } ]
+        })JSON"},
+      {"db not increasing",
+       R"JSON({
+        "volume_curve": [
+          { "level": 0.0, "db": -160.0 },
+          { "level": 0.5, "db": -80.0 },
+          { "level": 0.6, "db": -80.0 },
+          { "level": 1.0, "db": 0.0 } ]
+        })JSON"},
+      {"db > 0",
+       R"JSON({
+        "volume_curve": [ { "level": 0.0, "db": -160.0 }, { "level": 1.0, "db": 1.0 } ]
+        })JSON"},
+      {"db > MAX_GAIN_DB",
+       R"JSON({
+        "volume_curve": [ { "level": 0.0, "db": -160.0 }, { "level": 1.0, "db": 25.0 } ]
+        })JSON"},
+      {"db -INF",
+       R"JSON({
+        "volume_curve": [ { "level": 0.0, "db": -Infinity }, { "level": 1.0, "db": 0.0 } ]
+        })JSON"},
+      {"db INF",
+       R"JSON({
+        "volume_curve": [ { "level": 0.0, "db": -160.0 }, { "level": 1.0, "db": Infinity } ]
+        })JSON"},
+      {"db NAN",
+       R"JSON({
+        "volume_curve": [
+          { "level": 0.0, "db": -160.0 },
+          { "level": 0.5, "db": NAN },
+          { "level": 1.0, "db": 0.0 } ]
+        })JSON"},
+  };
+
+  for (auto idx = 0u; idx < kInvalidVolumeCurves.size(); ++idx) {
+    const auto [bad_case_name, bad_config] = kInvalidVolumeCurves[idx];
+    ASSERT_TRUE(
+        files::WriteFile(kTestAudioCoreConfigFilename, bad_config.data(), bad_config.size()))
+        << "case " << idx << " (" << bad_case_name << ") could not write file" << std::endl;
+
+    auto result = ProcessConfigLoader::LoadProcessConfig(kTestAudioCoreConfigFilename);
+    EXPECT_TRUE(result.is_error()) << "'" << bad_case_name << "'";
+  }
 }
 
 }  // namespace
