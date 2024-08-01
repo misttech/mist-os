@@ -63,33 +63,7 @@ To download the latest IDK, you can use the following:
 ```bash
 # For Linux
 cipd install fuchsia/sdk/core/linux-amd64 latest -root ${IDK_DIR}
-
-#### Generating RISC-V Libraries and Sysroot for the Fuchsia IDK
-
-To build RISC-V LLVM runtime libraries for Fuchsia, you need to generate
-RISC-V libraries and sysroot for Fuchsia IDK.
-
-Since the script is going to change the content of
-`${IDK_DIR}/pkg/sysroot/meta.json`, we need to make this file writable:
-
-```bash
-chmod 644 "${IDK_DIR}/pkg/sysroot/meta.json"
 ```
-
-The next step is to run the script to generate the RISC-V libraries and sysroot:
-
-
-```bash
-python3 ${FUCHSIA_DIR}/scripts/clang/generate_sysroot.py --sdk-dir=${IDK_DIR} \
-  --arch=riscv64 \
-  --ifs-path=${FUCHSIA_DIR}/prebuilt/third_party/clang/${platform}/bin/llvm-ifs
-```
-
-For Linux x64 platform, the `${platform}` should be `linux-x64` and on Mac x64
-platform, the `${platform}` should be `mac-x64`.
-
-Note: This is just temporary until IDK contains the RISC-V libraries and
-sysroot, at which point this step will not be needed.
 
 ### Sysroot for Linux
 
@@ -97,13 +71,7 @@ To include compiler runtimes and C++ library for Linux, download the sysroot.
 It must be located in the directory pointed by the `${SYSROOT_DIR}` variable.
 
 ```bash
-SYSROOT_DIR=${HOME}/fuchsia-sysroot/
-```
-
-To download the sysroot, you can use the following:
-
-```bash
-cipd install fuchsia/third_party/sysroot/linux integration -root ${SYSROOT_DIR}
+SYSROOT_DIR=${FUCHSIA_DIR}/prebuilt/third_party/sysroot
 ```
 
 ## Building a Clang Toolchain for Fuchsia
@@ -145,8 +113,9 @@ incremental development, without having to manually specify all options:
 cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug \
   -DCMAKE_TOOLCHAIN_FILE=${FUCHSIA_DIR}/scripts/clang/ToolChain.cmake \
   -DLLVM_ENABLE_LTO=OFF \
-  -DLINUX_x86_64-unknown-linux-gnu_SYSROOT=${SYSROOT_DIR} \
-  -DLINUX_aarch64-unknown-linux-gnu_SYSROOT=${SYSROOT_DIR} \
+  -DLINUX_x86_64-unknown-linux-gnu_SYSROOT=${SYSROOT_DIR}/linux \
+  -DLINUX_aarch64-unknown-linux-gnu_SYSROOT=${SYSROOT_DIR}/linux \
+  -DLINUX_riscv64-unknown-linux-gnu_SYSROOT=${SYSROOT_DIR}/ubuntu20.04 \
   -DFUCHSIA_SDK=${IDK_DIR} \
   -DCMAKE_INSTALL_PREFIX= \
   -C ${LLVM_SRCDIR}/clang/cmake/caches/Fuchsia-stage2.cmake \
@@ -177,8 +146,9 @@ a toolchain that Fuchsia ships to users.
 cmake -GNinja \
   -DCMAKE_TOOLCHAIN_FILE=${FUCHSIA_DIR}/scripts/clang/ToolChain.cmake \
   -DCMAKE_INSTALL_PREFIX= \
-  -DSTAGE2_LINUX_aarch64-unknown-linux-gnu_SYSROOT=${SYSROOT_DIR} \
-  -DSTAGE2_LINUX_x86_64-unknown-linux-gnu_SYSROOT=${SYSROOT_DIR} \
+  -DSTAGE2_LINUX_x86_64-unknown-linux-gnu_SYSROOT=${SYSROOT_DIR}/linux \
+  -DSTAGE2_LINUX_aarch64-unknown-linux-gnu_SYSROOT=${SYSROOT_DIR}/linux \
+  -DSTAGE2_LINUX_riscv64-unknown-linux-gnu_SYSROOT=${SYSROOT_DIR}/ubuntu20.04 \
   -DSTAGE2_FUCHSIA_SDK=${IDK_DIR} \
   -C ${LLVM_SRCDIR}/clang/cmake/caches/Fuchsia.cmake \
   ${LLVM_SRCDIR}/llvm
@@ -216,19 +186,19 @@ cd ${LLVM_BUILD_DIR}  # The directory your toolchain will be installed in
 FUCHSIA_DIR=${HOME}/fuchsia/  # Replace with wherever Fuchsia lives
 LLVM_SRCDIR=${HOME}/llvm/llvm-project  # Replace with wherever llvm-project lives
 IDK_DIR=${HOME}/fuchsia-idk/
-SYSROOT_DIR=${HOME}/fuchsia-sysroot/
+SYSROOT_DIR=${FUCHSIA_DIR}/prebuilt/third_party/sysroot
 CLANG_TOOLCHAIN_PREFIX=${FUCHSIA_DIR}/prebuilt/third_party/clang/linux-x64/bin/
 
 # Download necessary dependencies
 cipd install fuchsia/sdk/core/linux-amd64 latest -root ${IDK_DIR}
-cipd install fuchsia/third_party/sysroot/linux integration -root ${SYSROOT_DIR}
 
 # CMake invocation
 cmake -G Ninja -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_TOOLCHAIN_FILE=${FUCHSIA_DIR}/scripts/clang/ToolChain.cmake \
   -DLLVM_ENABLE_LTO=OFF \
-  -DLINUX_x86_64-unknown-linux-gnu_SYSROOT=${SYSROOT_DIR} \
-  -DLINUX_aarch64-unknown-linux-gnu_SYSROOT=${SYSROOT_DIR} \
+  -DLINUX_x86_64-unknown-linux-gnu_SYSROOT=${SYSROOT_DIR}/linux \
+  -DLINUX_aarch64-unknown-linux-gnu_SYSROOT=${SYSROOT_DIR}/linux \
+  -DLINUX_riscv64-unknown-linux-gnu_SYSROOT=${SYSROOT_DIR}/ubuntu20.04 \
   -DFUCHSIA_SDK=${IDK_DIR} \
   -DCMAKE_INSTALL_PREFIX= \
   -C ${LLVM_SRCDIR}/clang/cmake/caches/Fuchsia-stage2.cmake \
