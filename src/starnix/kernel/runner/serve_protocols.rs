@@ -107,6 +107,7 @@ async fn spawn_console(
         )?;
         let (sender, receiver) = oneshot::channel();
         let pty = execute_task_with_prerun_result(
+            kernel.kthreads.unlocked_for_async().deref_mut(),
             current_task,
             move |locked, current_task| {
                 let executable = current_task.open_file(

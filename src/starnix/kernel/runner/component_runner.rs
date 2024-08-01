@@ -168,6 +168,7 @@ pub async fn start_component(
     )?;
 
     let weak_task = execute_task_with_prerun_result(
+        system_task.kernel().kthreads.unlocked_for_async().deref_mut(),
         current_task,
         {
             let mount_record = mount_record.clone();

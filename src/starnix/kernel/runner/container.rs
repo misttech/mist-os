@@ -479,6 +479,7 @@ async fn create_container(
     .with_source_context(|| format!("creating init task: {:?}", &config.init))?;
 
     execute_task_with_prerun_result(
+        kernel.kthreads.unlocked_for_async().deref_mut(),
         init_task,
         move |locked, init_task| {
             init_task.exec(locked, executable, argv[0].clone(), argv.clone(), vec![])

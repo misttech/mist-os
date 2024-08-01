@@ -106,7 +106,7 @@ where
 
     let tid = new_task.task.id;
     let task_ref = WeakRef::from(&new_task.task);
-    execute_task(new_task, |_, _| Ok(()), |_| {}, ptrace_state);
+    execute_task(locked, new_task, |_, _| Ok(()), |_| {}, ptrace_state)?;
 
     current_task.ptrace_event(trace_kind, tid as u64);
 
