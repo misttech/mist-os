@@ -2378,8 +2378,7 @@ pub trait MemoryAccessorExt: MemoryAccessor {
     /// Read `len` bytes from `start` and parse the region as null-delimited CStrings, for example
     /// how `argv` is stored.
     ///
-    /// There can be an arbitrary number of null bytes in between `start` and `end`, but `end` must
-    /// point to a null byte.
+    /// There can be an arbitrary number of null bytes in between `start` and `end`.
     fn read_nul_delimited_c_string_list(
         &self,
         start: UserAddress,
@@ -2390,13 +2389,19 @@ pub trait MemoryAccessorExt: MemoryAccessor {
 
         let mut list = vec![];
         while !buf.is_empty() {
-            let len_consumed = {
-                let segment = CStr::from_bytes_until_nul(buf).map_err(|e| errno!(EINVAL, e))?;
-
-                // Return the string without the null to match our other APIs, but advance the
-                // "cursor" of the buf variable past the null byte.
-                list.push(segment.to_bytes().into());
-                segment.to_bytes_with_nul().len()
+            let len_consumed = match CStr::from_bytes_until_nul(buf) {
+                Ok(segment) => {
+                    // Return the string without the null to match our other APIs, but advance the
+                    // "cursor" of the buf variable past the null byte.
+                    list.push(segment.to_bytes().into());
+                    segment.to_bytes_with_nul().len()
+                }
+                Err(_) => {
+                    // If we didn't find a null byte, then the whole rest of the buffer is the
+                    // last string.
+                    list.push(buf.into());
+                    buf.len()
+                }
             };
             buf = &buf[len_consumed..];
         }
@@ -4338,9 +4343,6 @@ mod tests {
         let mut expected_parses = vec![];
         ma.write_memory(addr, &payload).unwrap();
 
-        // Expect error if the string is not terminated.
-        assert_eq!(ma.read_nul_delimited_c_string_list(addr, payload.len()), error!(EINVAL));
-
         // Expect success if the string is terminated.
         expected_parses.push(payload.clone());
         payload.push(0);
@@ -4365,6 +4367,25 @@ mod tests {
         assert_eq!(
             ma.read_nul_delimited_c_string_list(addr, payload.len()).unwrap(),
             expected_parses,
+        );
+    }
+
+    #[::fuchsia::test]
+    async fn truncate_argv_like_regions() {
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let ma = current_task.deref();
+
+        // Map a page.
+        let page_size = *PAGE_SIZE;
+        let addr = map_memory_anywhere(&mut locked, &current_task, page_size);
+        assert!(!addr.is_null());
+
+        let payload = b"first\0second\0third\0";
+        ma.write_memory(addr, payload).unwrap();
+        assert_eq!(
+            ma.read_nul_delimited_c_string_list(addr, payload.len() - 3).unwrap(),
+            vec![b"first".to_vec(), b"second".to_vec(), b"thi".to_vec()],
+            "Skipping last three bytes of payload should skip last two bytes of 3rd string"
         );
     }
 
