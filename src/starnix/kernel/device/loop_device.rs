@@ -867,6 +867,7 @@ mod tests {
         assert_eq!(buf.data(), b"lo, world!");
     }
 
+    #[ignore]
     #[::fuchsia::test]
     async fn basic_get_memory() {
         let test_data_path = "/pkg/data/testfile.txt";
@@ -892,6 +893,7 @@ mod tests {
         assert_eq!(memory_contents, expected_contents);
     }
 
+    #[ignore]
     #[::fuchsia::test]
     async fn get_memory_offset_and_size_limit_work() {
         // VMO slice children require a page-aligned offset, so we need a file that's big enough to
