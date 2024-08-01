@@ -11,6 +11,7 @@ fidl("fuchsia.power.broker") {
 
   # This is still experimental, so restricting visibility for now.
   visibility = [
+    "//examples/power/*",
     "//sdk:*",
     "//sdk/fidl/fuchsia.hardware.hrtimer/*:*",
     "//sdk/fidl/fuchsia.power.system/*:*",
