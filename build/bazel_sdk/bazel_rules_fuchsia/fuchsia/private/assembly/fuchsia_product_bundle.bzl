@@ -648,9 +648,13 @@ def _build_fuchsia_product_bundle_impl(ctx):
         ffx_invocation.append("--recommended-device")
         ffx_invocation.append(ctx.attr.default_virtual_device[FuchsiaVirtualDeviceInfo].device_name)
 
+    build_id_dirs = []
+    build_id_dirs += ctx.attr.main[FuchsiaProductImageInfo].build_id_dirs
+
     # If recovery is supplied, add it to the product bundle.
     if ctx.attr.recovery != None:
         system_r_out = ctx.attr.recovery[FuchsiaProductImageInfo].images_out
+        build_id_dirs += ctx.attr.recovery[FuchsiaProductImageInfo].build_id_dirs
         ffx_invocation.append("--system-r $SYSTEM_R_MANIFEST")
         env["SYSTEM_R_MANIFEST"] = system_r_out.path + "/images.json"
         inputs.extend(ctx.files.recovery)
@@ -724,6 +728,7 @@ def _build_fuchsia_product_bundle_impl(ctx):
             product_bundle = pb_out_dir,
             product_name = product_name,
             product_version = product_version,
+            build_id_dirs = build_id_dirs,
         ),
         FuchsiaSizeCheckerInfo(
             size_report = size_report,

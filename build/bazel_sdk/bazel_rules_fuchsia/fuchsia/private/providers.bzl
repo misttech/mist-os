@@ -200,7 +200,7 @@ FuchsiaPackageInfo = provider(
         "far_file": "The far archive",
         "meta_far": "The meta.far file",
         "files": "all files that compose this package, including the manifest and meta.far",
-        "build_id_dir": "Directory containing the debug symbols",
+        "build_id_dirs": "Directories containing the debug symbols",
         "packaged_components": "A list of all the components in the form of FuchsiaPackagedComponentInfo structs",
         "package_resources": "A list of resources added to this package",
     },
@@ -298,6 +298,7 @@ FuchsiaProductBundleInfo = provider(
         "product_name": "The name of the product to be used if product_bundle is empty.",
         "product_version": "The version of the product to use.",
         "repository": "The name of the repository to host extra packages in the product bundle.",
+        "build_id_dirs": "Directories containing the debug symbols",
     },
 )
 
