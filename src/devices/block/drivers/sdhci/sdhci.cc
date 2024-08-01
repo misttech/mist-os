@@ -22,12 +22,11 @@
 #include <lib/zx/clock.h>
 #include <lib/zx/pmt.h>
 #include <lib/zx/time.h>
+#include <threads.h>
 
 #include <bind/fuchsia/hardware/sdmmc/cpp/bind.h>
 #include <fbl/algorithm.h>
 #include <fbl/alloc_checker.h>
-
-#include "sdhci-reg.h"
 
 namespace {
 
