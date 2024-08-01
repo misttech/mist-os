@@ -40,12 +40,6 @@ typedef struct {
 zx_status_t boot_reserve_range_search(paddr_t range_pa, size_t range_len, size_t alloc_len,
                                       reserve_range_t* alloc_range);
 
-// Call |cb| for each reserve range registered. Exit if the callback returns false. This
-// function does not lock the region structure.
-//
-// Returns the same value the callback |cb| returns.
-bool boot_reserve_foreach(const fit::inline_function<bool(reserve_range_t)>& cb);
-
 // Unwires |page| and leaves it in an ALLOC state.
 void boot_reserve_unwire_page(struct vm_page* page);
 

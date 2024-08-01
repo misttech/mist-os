@@ -137,14 +137,3 @@ retry:
   *alloc_range = {alloc_pa, alloc_len};
   return ZX_OK;
 }
-
-// Returns false and exits early if the callback returns false, true otherwise.
-bool boot_reserve_foreach(const fit::inline_function<bool(const reserve_range_t)>& cb) {
-  for (size_t i = 0; i < res_idx; i++) {
-    if (!cb(res[i])) {
-      return false;
-    }
-  }
-
-  return true;
-}

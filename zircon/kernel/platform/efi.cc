@@ -5,6 +5,7 @@
 // https://opensource.org/licenses/MIT
 
 #include <lib/fit/defer.h>
+#include <lib/memalloc/range.h>
 
 #include <arch/interrupt.h>
 #include <efi/boot-services.h>
@@ -14,7 +15,6 @@
 #include <lk/init.h>
 #include <phys/handoff.h>
 #include <platform/efi.h>
-#include <vm/bootreserve.h>
 #include <vm/vm.h>
 #include <vm/vm_address_region.h>
 #include <vm/vm_aspace.h>
@@ -54,21 +54,29 @@ LK_INIT_HOOK(efi_init, EfiInitHook, LK_INIT_LEVEL_PLATFORM - 1)
 // Helper function that maps the region with size |size| at |base| into the given aspace.
 zx_status_t MapUnalignedRegion(VmAspace* aspace, paddr_t base, size_t size, const char* name,
                                uint arch_mmu_flags) {
-  auto vmar = aspace->RootVmar();
-
-  bool is_reserved = !boot_reserve_foreach([base, size](reserve_range_t range) {
-    if (base >= range.pa && (base + size) <= (range.pa + range.len)) {
-      // Found the range, return false to early exit.
+  // Check that the given region does not intersect with any RAM.
+  {
+    zx_paddr_t end = base + size;
+    bool reserved = true;
+    auto check_intersection_with_ram = [base, end, &reserved](const memalloc::Range& ram) {
+      // We need only check for intersection with the first RAM range ending
+      // after the beginning the region.
+      if (ram.end() <= base) {
+        return true;
+      }
+      reserved = end <= ram.addr;
       return false;
+    };
+    memalloc::NormalizeRam(gPhysHandoff->memory.get(), check_intersection_with_ram);
+    if (!reserved) {
+      printf(
+          "ERROR: Attempted to map EFI region [0x%lx, 0x%zx) (%s), which is not a reserved region.\n",
+          base, end, name);
+      return ZX_ERR_INVALID_ARGS;
     }
-    return true;
-  });
-  if (!is_reserved) {
-    printf("ERROR: Attempted to map EFI region [0x%lx, 0x%zx), which is not a reserved region.\n",
-           base, base + size);
-    return ZX_ERR_INVALID_ARGS;
   }
 
+  auto vmar = aspace->RootVmar();
   fbl::RefPtr<VmObjectPhysical> vmo;
   paddr_t aligned_base = ROUNDDOWN(base, PAGE_SIZE);
   size_t aligned_size = PAGE_ALIGN(size + (base - aligned_base));
