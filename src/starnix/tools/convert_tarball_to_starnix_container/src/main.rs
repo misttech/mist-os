@@ -85,6 +85,11 @@ async fn main() -> Result<()> {
     };
     package_builder.add_contents_as_blob("data/init", default_init, temp_dir.path())?;
 
+    let mut features = cmd.features.clone();
+    // TODO(https://fxbug.dev/356684424): Do we always want this feature in these containers?
+    // We might because we use the starnix_container runner to run the default command.
+    features.push("container".to_string());
+
     // Add the container's manifest.
     package_builder.add_contents_to_far(
         "meta/container.cm",
@@ -99,7 +104,7 @@ async fn main() -> Result<()> {
                 "/sys:sysfs",
                 "/tmp:tmpfs",
             ],
-            &cmd.features,
+            &features,
         ),
         temp_dir.path(),
     )?;
