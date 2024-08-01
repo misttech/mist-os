@@ -7,7 +7,7 @@ use ffx_package_archive_list_args::ListCommand;
 use ffx_package_archive_utils::{read_file_entries, ArchiveEntry, FarArchiveReader, FarListReader};
 use fho::{FfxMain, FfxTool, MachineWriter, ToolIO};
 use humansize::{file_size_opts, FileSize as _};
-use prettytable::format::TableFormat;
+use prettytable::format::FormatBuilder;
 use prettytable::{cell, row, Row, Table};
 
 #[derive(FfxTool)]
@@ -23,8 +23,7 @@ impl FfxMain for ArchiveListTool {
     type Writer = MachineWriter<Vec<ArchiveEntry>>;
     async fn main(self, mut writer: <Self as fho::FfxMain>::Writer) -> fho::Result<()> {
         let mut archive_reader = FarArchiveReader::new(&self.cmd.archive)?;
-        list_implementation(self.cmd, /*table_format=*/ None, &mut writer, &mut archive_reader)
-            .map_err(Into::into)
+        list_implementation(self.cmd, &mut writer, &mut archive_reader).map_err(Into::into)
     }
 }
 
@@ -32,7 +31,6 @@ impl FfxMain for ArchiveListTool {
 // archive reader.
 fn list_implementation(
     cmd: ListCommand,
-    table_format: Option<TableFormat>,
     writer: &mut <ArchiveListTool as FfxMain>::Writer,
     reader: &mut dyn FarListReader,
 ) -> Result<()> {
@@ -46,8 +44,7 @@ fn list_implementation(
             .machine(&entries)
             .context("writing machine representation of archive contents list")?;
     } else {
-        print_list_table(&cmd, &entries, table_format, writer)
-            .context("printing archive contents table")?;
+        print_list_table(&cmd, &entries, writer).context("printing archive contents table")?;
     }
     Ok(())
 }
@@ -56,7 +53,6 @@ fn list_implementation(
 fn print_list_table(
     cmd: &ListCommand,
     entries: &Vec<ArchiveEntry>,
-    table_format: Option<TableFormat>,
     writer: &mut <ArchiveListTool as FfxMain>::Writer,
 ) -> Result<()> {
     if entries.is_empty() {
@@ -64,14 +60,18 @@ fn print_list_table(
         return Ok(());
     }
     let mut table = Table::new();
-    let mut header = row!("NAME");
+
+    // long format requires right padding
+    let padl = 0;
+    let padr = if cmd.long_format { 1 } else { 0 };
+    let table_format = FormatBuilder::new().padding(padl, padr).build();
+    table.set_format(table_format);
+
     if cmd.long_format {
+        let mut header = row!("NAME");
         header.add_cell(cell!("PATH"));
         header.add_cell(cell!("LENGTH"));
-    }
-    table.set_titles(header);
-    if let Some(fmt) = table_format {
-        table.set_format(fmt);
+        table.set_titles(header);
     }
 
     for entry in entries {
@@ -113,7 +113,7 @@ mod test {
 
         let buffers = TestBuffers::default();
         let mut writer = <ArchiveListTool as FfxMain>::Writer::new_test(None, &buffers);
-        list_implementation(cmd, None, &mut writer, &mut mockreader)?;
+        list_implementation(cmd, &mut writer, &mut mockreader)?;
 
         assert_eq!(buffers.into_stdout_str(), "\n".to_string());
         Ok(())
@@ -149,18 +149,12 @@ mod test {
 
         let buffers = TestBuffers::default();
         let mut writer = <ArchiveListTool as FfxMain>::Writer::new_test(None, &buffers);
-        list_implementation(cmd, None, &mut writer, &mut mockreader)?;
+        list_implementation(cmd, &mut writer, &mut mockreader)?;
 
         let expected = r#"
-+-----------------------+
-| NAME                  |
-+=======================+
-| meta/contents         |
-+-----------------------+
-| meta/package          |
-+-----------------------+
-| meta/the_component.cm |
-+-----------------------+
+meta/contents
+meta/package
+meta/the_component.cm
 "#[1..]
             .to_string();
 
@@ -174,28 +168,17 @@ mod test {
 
         let buffers = TestBuffers::default();
         let mut writer = <ArchiveListTool as FfxMain>::Writer::new_test(None, &buffers);
-        list_implementation(cmd, None, &mut writer, &mut create_mockreader())?;
+        list_implementation(cmd, &mut writer, &mut create_mockreader())?;
 
         let expected = r#"
-+-----------------------+
-| NAME                  |
-+=======================+
-| data/missing_blob     |
-+-----------------------+
-| data/some_file        |
-+-----------------------+
-| lib/run.so            |
-+-----------------------+
-| meta.far              |
-+-----------------------+
-| meta/contents         |
-+-----------------------+
-| meta/package          |
-+-----------------------+
-| meta/the_component.cm |
-+-----------------------+
-| run_me                |
-+-----------------------+
+data/missing_blob
+data/some_file
+lib/run.so
+meta.far
+meta/contents
+meta/package
+meta/the_component.cm
+run_me
 "#[1..]
             .to_string();
 
@@ -209,29 +192,18 @@ mod test {
 
         let buffers = TestBuffers::default();
         let mut writer = <ArchiveListTool as FfxMain>::Writer::new_test(None, &buffers);
-        list_implementation(cmd, None, &mut writer, &mut create_mockreader())?;
+        list_implementation(cmd, &mut writer, &mut create_mockreader())?;
 
-        let expected = "\
-+-----------------------+------------------------------------------------------------------+----------------------+
-| NAME                  | PATH                                                             | LENGTH               |
-+=======================+==================================================================+======================+
-| data/missing_blob     | acfe18f46d86a6d0848ce02320acb455b17f2df9fe5806dc52465b3d74cf2fd9 | missing from archive |
-+-----------------------+------------------------------------------------------------------+----------------------+
-| data/some_file        | 4ef082296b26108697e851e0b40f8d8d31f96f934d7076f3bad37d5103be172c | 292.97 KB            |
-+-----------------------+------------------------------------------------------------------+----------------------+
-| lib/run.so            | 892d655f2c841030d1b5556f9f124a753b5e32948471be76e72d330c6b6ba1db | 4 KB                 |
-+-----------------------+------------------------------------------------------------------+----------------------+
-| meta.far              | meta.far                                                         | 16 KB                |
-+-----------------------+------------------------------------------------------------------+----------------------+
-| meta/contents         | meta/contents                                                    | 55 B                 |
-+-----------------------+------------------------------------------------------------------+----------------------+
-| meta/package          | meta/package                                                     | 25 B                 |
-+-----------------------+------------------------------------------------------------------+----------------------+
-| meta/the_component.cm | meta/the_component.cm                                            | 100 B                |
-+-----------------------+------------------------------------------------------------------+----------------------+
-| run_me                | 1f487b576253664f9de1a940ad3a350ca47316b5cdb65254fbf267367fd77c62 | 4 KB                 |
-+-----------------------+------------------------------------------------------------------+----------------------+
-".to_owned();
+        let expected = concat!(
+"NAME                  PATH                                                             LENGTH \n" ,
+"data/missing_blob     acfe18f46d86a6d0848ce02320acb455b17f2df9fe5806dc52465b3d74cf2fd9 missing from archive \n" ,
+"data/some_file        4ef082296b26108697e851e0b40f8d8d31f96f934d7076f3bad37d5103be172c 292.97 KB \n" ,
+"lib/run.so            892d655f2c841030d1b5556f9f124a753b5e32948471be76e72d330c6b6ba1db 4 KB \n" ,
+"meta.far              meta.far                                                         16 KB \n",
+"meta/contents         meta/contents                                                    55 B \n" ,
+"meta/package          meta/package                                                     25 B \n" ,
+"meta/the_component.cm meta/the_component.cm                                            100 B \n",
+"run_me                1f487b576253664f9de1a940ad3a350ca47316b5cdb65254fbf267367fd77c62 4 KB \n").to_owned();
 
         assert_eq!(buffers.into_stdout_str(), expected);
         Ok(())
@@ -244,7 +216,7 @@ mod test {
         let buffers = TestBuffers::default();
         let mut writer =
             <ArchiveListTool as FfxMain>::Writer::new_test(Some(Format::JsonPretty), &buffers);
-        list_implementation(cmd, None, &mut writer, &mut create_mockreader())?;
+        list_implementation(cmd, &mut writer, &mut create_mockreader())?;
 
         let expected = r#"
 [
