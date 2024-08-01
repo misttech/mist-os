@@ -1,3 +1,4 @@
+// Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
@@ -12,13 +13,16 @@ use crate::security;
 use crate::signals::{
     send_signal_first, send_standard_signal, RunState, SignalActions, SignalInfo,
 };
-use crate::task::{
-    ExitStatus, Kernel, PidTable, ProcessGroup, PtraceCoreState, PtraceEvent, PtraceEventData,
-    PtraceOptions, StopState, Task, TaskFlags, ThreadGroup, Waiter,
-};
 #[cfg(not(feature = "starnix_lite"))]
 use crate::task::{
-    SeccompFilter, SeccompFilterContainer, SeccompNotifierHandle, SeccompState, SeccompStateValue,
+    ExitStatus, Kernel, PidTable, ProcessGroup, PtraceCoreState, PtraceEvent, PtraceEventData,
+    PtraceOptions, SeccompFilter, SeccompFilterContainer, SeccompNotifierHandle, SeccompState,
+    SeccompStateValue, StopState, Task, TaskFlags, ThreadGroup, ThreadGroupParent, Waiter,
+};
+#[cfg(feature = "starnix_lite")]
+use crate::task::{
+    ExitStatus, Kernel, PidTable, ProcessGroup, PtraceCoreState, PtraceEvent, PtraceEventData,
+    PtraceOptions, StopState, Task, TaskFlags, ThreadGroup, ThreadGroupParent, Waiter,
 };
 use crate::vfs::{
     CheckAccessReason, FdNumber, FdTable, FileHandle, FsContext, FsStr, LookupContext,

@@ -12,7 +12,7 @@ use crate::mm::{
 #[cfg(not(feature = "starnix_lite"))]
 use crate::mm::{
     DesiredAddress, MappingName, MappingOptions, MemoryAccessor, MemoryManager, ProtectionFlags,
-    PAGE_SIZE,
+    PAGE_SIZE, VMEX_RESOURCE,
 };
 use crate::security;
 use crate::task::CurrentTask;
@@ -538,10 +538,10 @@ pub fn load_executable(
             .map_err(|status| from_status_like_fdio!(status))?;
 
         let vdso_executable = Arc::new(
-        vdso_clone
+            vdso_clone
                 .replace_as_executable(&VMEX_RESOURCE)
                 .map_err(|status| from_status_like_fdio!(status))?,
-    );
+        );
 
         // Overwrite the second part of the vvar mapping with starnix's vvar.
         let vvar_map_result = current_task.mm().map_memory(

@@ -1,3 +1,4 @@
+// Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
 // Copyright 2022 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
@@ -20,7 +21,11 @@ use crate::mm::MemoryManager;
 use crate::signals::{dequeue_signal, prepare_to_restart_syscall};
 use crate::syscalls::table::dispatch_syscall;
 #[cfg(not(feature = "starnix_lite"))]
-use crate::task::SeccompStateValue;
+use crate::task::{
+    ptrace_syscall_enter, ptrace_syscall_exit, CurrentTask, ExitStatus, Kernel, SeccompStateValue,
+    TaskFlags, ThreadGroup,
+};
+#[cfg(feature = "starnix_lite")]
 use crate::task::{
     ptrace_syscall_enter, ptrace_syscall_exit, CurrentTask, ExitStatus, Kernel, TaskFlags,
     ThreadGroup,

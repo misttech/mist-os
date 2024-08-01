@@ -6,14 +6,21 @@ use crate::mm::{DumpPolicy, MemoryAccessor, MemoryAccessorExt, MemoryManager, Ta
 use crate::mutable_state::{state_accessor, state_implementation};
 use crate::security;
 use crate::signals::{RunState, SignalInfo, SignalState};
+#[cfg(not(feature = "starnix_lite"))]
+use crate::task::{
+    set_thread_role, AbstractUnixSocketNamespace, AbstractVsockSocketNamespace, CurrentTask,
+    EventHandler, Kernel, ProcessEntryRef, ProcessExitInfo, PtraceEvent, PtraceEventData,
+    PtraceState, PtraceStatus, SchedulerPolicy, SeccompFilterContainer, SeccompState,
+    SeccompStateValue, ThreadGroup, ThreadState, UtsNamespaceHandle, WaitCanceler, Waiter,
+    ZombieProcess,
+};
+#[cfg(feature = "starnix_lite")]
 use crate::task::{
     set_thread_role, AbstractUnixSocketNamespace, AbstractVsockSocketNamespace, CurrentTask,
     EventHandler, Kernel, ProcessEntryRef, ProcessExitInfo, PtraceEvent, PtraceEventData,
     PtraceState, PtraceStatus, SchedulerPolicy, ThreadGroup, ThreadState, UtsNamespaceHandle,
     WaitCanceler, Waiter, ZombieProcess,
 };
-#[cfg(not(feature = "starnix_lite"))]
-use crate::task::{SeccompFilterContainer, SeccompState, SeccompStateValue};
 use crate::vfs::{FdFlags, FdNumber, FdTable, FileHandle, FsContext, FsNodeHandle, FsString};
 use bitflags::bitflags;
 use fuchsia_inspect_contrib::profile_duration;
@@ -1061,10 +1068,8 @@ impl Task {
         scheduler_policy: SchedulerPolicy,
         uts_ns: UtsNamespaceHandle,
         no_new_privs: bool,
-        #[cfg(not(feature = "starnix_lite"))]
-        seccomp_filter_state: SeccompState,
-        #[cfg(not(feature = "starnix_lite"))]
-        seccomp_filters: SeccompFilterContainer,
+        #[cfg(not(feature = "starnix_lite"))] seccomp_filter_state: SeccompState,
+        #[cfg(not(feature = "starnix_lite"))] seccomp_filters: SeccompFilterContainer,
         robust_list_head: UserRef<robust_list_head>,
         timerslack_ns: u64,
         security_state: security::TaskState,

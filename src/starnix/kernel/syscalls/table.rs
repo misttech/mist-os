@@ -1,3 +1,4 @@
+// Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
 // Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
@@ -73,8 +74,19 @@ pub fn dispatch_syscall(
         sys_timer_getoverrun, sys_timer_gettime, sys_timer_settime, sys_times,
     };
     #[cfg(not(feature = "starnix_lite"))]
-    use crate::task::syscalls::sys_seccomp;
-
+    use crate::task::syscalls::{
+        sys_capget, sys_capset, sys_clone3, sys_execve, sys_execveat, sys_exit, sys_exit_group,
+        sys_getcpu, sys_getegid, sys_geteuid, sys_getgid, sys_getgroups, sys_getpgid, sys_getpid,
+        sys_getppid, sys_getpriority, sys_getresgid, sys_getresuid, sys_getrlimit, sys_getrusage,
+        sys_getsid, sys_gettid, sys_getuid, sys_ioprio_set, sys_kcmp, sys_prctl, sys_prlimit64,
+        sys_ptrace, sys_quotactl, sys_sched_get_priority_max, sys_sched_get_priority_min,
+        sys_sched_getaffinity, sys_sched_getparam, sys_sched_getscheduler, sys_sched_setaffinity,
+        sys_sched_setparam, sys_sched_setscheduler, sys_seccomp, sys_set_tid_address, sys_setfsgid,
+        sys_setfsuid, sys_setgid, sys_setgroups, sys_setns, sys_setpgid, sys_setpriority,
+        sys_setregid, sys_setresgid, sys_setresuid, sys_setreuid, sys_setrlimit, sys_setsid,
+        sys_setuid, sys_swapoff, sys_swapon, sys_syslog, sys_unshare, sys_vhangup,
+    };
+    #[cfg(feature = "starnix_lite")]
     use crate::task::syscalls::{
         sys_capget, sys_capset, sys_clone3, sys_execve, sys_execveat, sys_exit, sys_exit_group,
         sys_getcpu, sys_getegid, sys_geteuid, sys_getgid, sys_getgroups, sys_getpgid, sys_getpid,

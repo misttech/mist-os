@@ -35,7 +35,6 @@ use futures::channel::oneshot;
 use futures::{FutureExt, StreamExt, TryStreamExt};
 #[cfg(not(feature = "starnix_lite"))]
 use magma_device::get_magma_params;
-#[cfg(not(feature = "starnix_lite"))]
 use runner::{get_program_string, get_program_strvec};
 use selinux::security_server::SecurityServer;
 use starnix_core::device::init_common_devices;
@@ -387,6 +386,7 @@ async fn create_container(
             Err(err) => log_warn!("could not get serial number: {err:?}"),
         }
     }
+    #[cfg(not(feature = "starnix_lite"))]
     if features.magma {
         kernel_cmdline.extend(b" ");
         let params = get_magma_params();

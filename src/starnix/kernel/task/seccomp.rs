@@ -1,3 +1,4 @@
+// Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
@@ -26,14 +27,20 @@ use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::signals::{SIGKILL, SIGSYS};
 use starnix_uapi::user_address::{UserAddress, UserRef};
 use starnix_uapi::vfs::FdEvents;
+#[cfg(not(feature = "starnix_lite"))]
+use starnix_uapi::{
+    __NR_exit, __NR_read, __NR_write, errno, errno_from_code, error, seccomp_data, seccomp_notif,
+    seccomp_notif_resp, sock_filter, BPF_ABS, BPF_LD, BPF_ST, SECCOMP_IOCTL_NOTIF_ADDFD,
+    SECCOMP_IOCTL_NOTIF_ID_VALID, SECCOMP_IOCTL_NOTIF_RECV, SECCOMP_IOCTL_NOTIF_SEND,
+    SECCOMP_RET_ACTION_FULL, SECCOMP_RET_DATA, SECCOMP_USER_NOTIF_FLAG_CONTINUE, SYS_SECCOMP,
+};
+#[cfg(feature = "starnix_lite")]
 use starnix_uapi::{
     __NR_exit, __NR_read, __NR_write, errno, errno_from_code, error, seccomp_data, seccomp_notif,
     seccomp_notif_resp, sock_filter, SECCOMP_IOCTL_NOTIF_ADDFD, SECCOMP_IOCTL_NOTIF_ID_VALID,
     SECCOMP_IOCTL_NOTIF_RECV, SECCOMP_IOCTL_NOTIF_SEND, SECCOMP_RET_ACTION_FULL, SECCOMP_RET_DATA,
     SECCOMP_USER_NOTIF_FLAG_CONTINUE, SYS_SECCOMP,
 };
-#[cfg(not(feature = "starnix_lite"))]
-use starnix_uapi::{BPF_ABS, BPF_LD, BPF_ST};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::Arc;

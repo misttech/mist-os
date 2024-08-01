@@ -1,3 +1,4 @@
+// Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
 // Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
@@ -15,14 +16,18 @@ use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
 use crate::execution::execute_task;
 use crate::mm::{DumpPolicy, MemoryAccessor, MemoryAccessorExt, PAGE_SIZE};
 use crate::security;
+#[cfg(not(feature = "starnix_lite"))]
+use crate::task::{
+    max_priority_for_sched_policy, min_priority_for_sched_policy, ptrace_attach, ptrace_dispatch,
+    ptrace_traceme, CurrentTask, ExitStatus, PtraceAllowedPtracers, PtraceAttachType,
+    PtraceOptions, SchedulerPolicy, SeccompAction, SeccompStateValue, Task, PR_SET_PTRACER_ANY,
+};
+#[cfg(feature = "starnix_lite")]
 use crate::task::{
     max_priority_for_sched_policy, min_priority_for_sched_policy, ptrace_attach, ptrace_dispatch,
     ptrace_traceme, CurrentTask, ExitStatus, PtraceAllowedPtracers, PtraceAttachType,
     PtraceOptions, SchedulerPolicy, Task, PR_SET_PTRACER_ANY,
 };
-
-#[cfg(not(feature = "starnix_lite"))]
-use crate::task::{SeccompAction, SeccompStateValue};
 use crate::vfs::{
     FdNumber, FileHandle, MountNamespaceFile, PidFdFileObject, UserBuffersOutputBuffer,
     VecOutputBuffer,
@@ -68,15 +73,15 @@ use starnix_uapi::{
 use starnix_uapi::{
     __user_cap_data_struct, __user_cap_header_struct, c_char, c_int, clone_args, errno, error,
     gid_t, pid_t, rlimit, rusage, sched_param, uid_t, AT_EMPTY_PATH, AT_SYMLINK_NOFOLLOW,
-    CLONE_ARGS_SIZE_VER0, CLONE_ARGS_SIZE_VER1, CLONE_ARGS_SIZE_VER2, CLONE_FILES, CLONE_NEWNS,
-    CLONE_NEWUTS, CLONE_SETTLS, CLONE_VFORK, NGROUPS_MAX, PATH_MAX, PRIO_PROCESS, PR_CAPBSET_DROP,
-    PR_CAPBSET_READ, PR_CAP_AMBIENT, PR_CAP_AMBIENT_CLEAR_ALL, PR_CAP_AMBIENT_IS_SET,
-    PR_CAP_AMBIENT_LOWER, PR_CAP_AMBIENT_RAISE, PR_GET_CHILD_SUBREAPER, PR_GET_DUMPABLE,
-    PR_GET_KEEPCAPS, PR_GET_NAME, PR_GET_NO_NEW_PRIVS, PR_GET_SECUREBITS, PR_SET_CHILD_SUBREAPER,
-    PR_SET_DUMPABLE, PR_SET_KEEPCAPS, PR_SET_NAME, PR_SET_NO_NEW_PRIVS, PR_SET_PDEATHSIG,
-    PR_SET_PTRACER, PR_SET_SECUREBITS, PR_SET_TIMERSLACK, PR_SET_VMA, PR_SET_VMA_ANON_NAME,
-    PTRACE_ATTACH, PTRACE_SEIZE, PTRACE_TRACEME, RUSAGE_CHILDREN, _LINUX_CAPABILITY_VERSION_1,
-    _LINUX_CAPABILITY_VERSION_2, _LINUX_CAPABILITY_VERSION_3,
+    CLONE_ARGS_SIZE_VER0, CLONE_ARGS_SIZE_VER1, CLONE_ARGS_SIZE_VER2, CLONE_FILES, CLONE_FS,
+    CLONE_NEWNS, CLONE_NEWUTS, CLONE_SETTLS, CLONE_VFORK, NGROUPS_MAX, PATH_MAX, PRIO_PROCESS,
+    PR_CAPBSET_DROP, PR_CAPBSET_READ, PR_CAP_AMBIENT, PR_CAP_AMBIENT_CLEAR_ALL,
+    PR_CAP_AMBIENT_IS_SET, PR_CAP_AMBIENT_LOWER, PR_CAP_AMBIENT_RAISE, PR_GET_CHILD_SUBREAPER,
+    PR_GET_DUMPABLE, PR_GET_KEEPCAPS, PR_GET_NAME, PR_GET_NO_NEW_PRIVS, PR_GET_SECUREBITS,
+    PR_SET_CHILD_SUBREAPER, PR_SET_DUMPABLE, PR_SET_KEEPCAPS, PR_SET_NAME, PR_SET_NO_NEW_PRIVS,
+    PR_SET_PDEATHSIG, PR_SET_PTRACER, PR_SET_SECUREBITS, PR_SET_TIMERSLACK, PR_SET_VMA,
+    PR_SET_VMA_ANON_NAME, PTRACE_ATTACH, PTRACE_SEIZE, PTRACE_TRACEME, RUSAGE_CHILDREN,
+    _LINUX_CAPABILITY_VERSION_1, _LINUX_CAPABILITY_VERSION_2, _LINUX_CAPABILITY_VERSION_3,
 };
 
 pub fn do_clone<L>(

@@ -8,10 +8,13 @@ use bstr::ByteSlice;
 use fuchsia_component::client::connect_to_protocol_sync;
 use linux_uapi::LINUX_REBOOT_CMD_POWER_OFF;
 use starnix_sync::{Locked, Unlocked};
+#[cfg(feature = "starnix_lite")]
 use {fidl_fuchsia_buildinfo as buildinfo, fidl_fuchsia_hardware_power_statecontrol as fpower};
-
 #[cfg(not(feature = "starnix_lite"))]
-use fidl_fuchsia_recovery as frecovery;
+use {
+    fidl_fuchsia_buildinfo as buildinfo, fidl_fuchsia_hardware_power_statecontrol as fpower,
+    fidl_fuchsia_recovery as frecovery,
+};
 
 use crate::arch::ARCH_NAME;
 #[cfg(not(feature = "starnix_lite"))]

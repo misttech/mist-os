@@ -3,9 +3,12 @@
 // found in the LICENSE file.
 
 use crate::mm::PAGE_SIZE;
-#[cfg(not(feature = "starnix_lite"))]
-use crate::task::SeccompAction;
+#[cfg(feature = "starnix_lite")]
 use crate::task::{ptrace_get_scope, ptrace_set_scope, CurrentTask, NetstackDevicesDirectory};
+#[cfg(not(feature = "starnix_lite"))]
+use crate::task::{
+    ptrace_get_scope, ptrace_set_scope, CurrentTask, NetstackDevicesDirectory, SeccompAction,
+};
 use crate::vfs::inotify::InotifyLimits;
 use crate::vfs::{
     fs_args, inotify, BytesFile, BytesFileOps, FileSystemHandle, FsNodeHandle, FsNodeInfo,
