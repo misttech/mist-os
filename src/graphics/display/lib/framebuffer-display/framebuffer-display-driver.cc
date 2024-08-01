@@ -17,30 +17,30 @@
 
 #include "src/graphics/display/lib/framebuffer-display/framebuffer-display.h"
 
-namespace simple_display {
+namespace framebuffer_display {
 
-SimpleDisplayDriver::SimpleDisplayDriver(std::string_view device_name,
-                                         fdf::DriverStartArgs start_args,
-                                         fdf::UnownedSynchronizedDispatcher driver_dispatcher)
+FramebufferDisplayDriver::FramebufferDisplayDriver(
+    std::string_view device_name, fdf::DriverStartArgs start_args,
+    fdf::UnownedSynchronizedDispatcher driver_dispatcher)
     : fdf::DriverBase(device_name, std::move(start_args), std::move(driver_dispatcher)) {}
 
-SimpleDisplayDriver::~SimpleDisplayDriver() = default;
+FramebufferDisplayDriver::~FramebufferDisplayDriver() = default;
 
-zx::result<> SimpleDisplayDriver::Start() {
+zx::result<> FramebufferDisplayDriver::Start() {
   zx::result<> configure_hardware_result = ConfigureHardware();
   if (configure_hardware_result.is_error()) {
     FDF_LOG(ERROR, "Failed to configure hardware: %s", configure_hardware_result.status_string());
     return configure_hardware_result.take_error();
   }
 
-  zx::result<std::unique_ptr<SimpleDisplay>> simple_display_result =
-      CreateAndInitializeSimpleDisplay();
-  if (simple_display_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to create and initialize SimpleDisplay: %s",
-            simple_display_result.status_string());
-    return simple_display_result.take_error();
+  zx::result<std::unique_ptr<FramebufferDisplay>> framebuffer_display_result =
+      CreateAndInitializeFramebufferDisplay();
+  if (framebuffer_display_result.is_error()) {
+    FDF_LOG(ERROR, "Failed to create and initialize FramebufferDisplay: %s",
+            framebuffer_display_result.status_string());
+    return framebuffer_display_result.take_error();
   }
-  simple_display_ = std::move(simple_display_result).value();
+  framebuffer_display_ = std::move(framebuffer_display_result).value();
 
   zx::result<> add_banjo_server_node_result = InitializeBanjoServerNode();
   if (add_banjo_server_node_result.is_error()) {
@@ -52,9 +52,10 @@ zx::result<> SimpleDisplayDriver::Start() {
   return zx::ok();
 }
 
-void SimpleDisplayDriver::Stop() {}
+void FramebufferDisplayDriver::Stop() {}
 
-zx::result<std::unique_ptr<SimpleDisplay>> SimpleDisplayDriver::CreateAndInitializeSimpleDisplay() {
+zx::result<std::unique_ptr<FramebufferDisplay>>
+FramebufferDisplayDriver::CreateAndInitializeFramebufferDisplay() {
   zx::result<fdf::MmioBuffer> frame_buffer_mmio_result = GetFrameBufferMmioBuffer();
   if (frame_buffer_mmio_result.is_error()) {
     FDF_LOG(ERROR, "Failed to get frame buffer mmio buffer: %s",
@@ -90,27 +91,27 @@ zx::result<std::unique_ptr<SimpleDisplay>> SimpleDisplayDriver::CreateAndInitial
   fidl::WireSyncClient sysmem(std::move(sysmem_result).value());
 
   fbl::AllocChecker alloc_checker;
-  auto simple_display = fbl::make_unique_checked<SimpleDisplay>(
+  auto framebuffer_display = fbl::make_unique_checked<FramebufferDisplay>(
       &alloc_checker, std::move(hardware_sysmem), std::move(sysmem), std::move(frame_buffer_mmio),
       std::move(display_properties));
   if (!alloc_checker.check()) {
-    FDF_LOG(ERROR, "Failed to allocate memory for SimpleDisplay");
+    FDF_LOG(ERROR, "Failed to allocate memory for FramebufferDisplay");
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
-  zx::result<> simple_display_initialize_result = simple_display->Initialize();
-  if (simple_display_initialize_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to initialize SimpleDisplay: %s",
-            simple_display_initialize_result.status_string());
-    return simple_display_initialize_result.take_error();
+  zx::result<> framebuffer_display_initialize_result = framebuffer_display->Initialize();
+  if (framebuffer_display_initialize_result.is_error()) {
+    FDF_LOG(ERROR, "Failed to initialize FramebufferDisplay: %s",
+            framebuffer_display_initialize_result.status_string());
+    return framebuffer_display_initialize_result.take_error();
   }
 
-  return zx::ok(std::move(simple_display));
+  return zx::ok(std::move(framebuffer_display));
 }
 
-zx::result<> SimpleDisplayDriver::InitializeBanjoServerNode() {
-  ZX_DEBUG_ASSERT(simple_display_ != nullptr);
-  display_engine_protocol_t protocol = simple_display_->GetProtocol();
+zx::result<> FramebufferDisplayDriver::InitializeBanjoServerNode() {
+  ZX_DEBUG_ASSERT(framebuffer_display_ != nullptr);
+  display_engine_protocol_t protocol = framebuffer_display_->GetProtocol();
 
   // Serves the [`fuchsia.hardware.display.controller/ControllerImpl`] protocol
   // over the compatibility server.
@@ -140,4 +141,4 @@ zx::result<> SimpleDisplayDriver::InitializeBanjoServerNode() {
   return zx::ok();
 }
 
-}  // namespace simple_display
+}  // namespace framebuffer_display

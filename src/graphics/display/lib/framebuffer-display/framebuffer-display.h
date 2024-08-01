@@ -29,7 +29,7 @@
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
 
-namespace simple_display {
+namespace framebuffer_display {
 
 struct DisplayProperties {
   int32_t width_px;
@@ -38,15 +38,16 @@ struct DisplayProperties {
   fuchsia_images2::wire::PixelFormat pixel_format;
 };
 
-class SimpleDisplay;
+class FramebufferDisplay;
 using HeapServer = fidl::WireServer<fuchsia_hardware_sysmem::Heap>;
 using BufferKey = std::pair<uint64_t, uint32_t>;
-class SimpleDisplay : public HeapServer, public ddk::DisplayEngineProtocol<SimpleDisplay> {
+class FramebufferDisplay : public HeapServer,
+                           public ddk::DisplayEngineProtocol<FramebufferDisplay> {
  public:
-  SimpleDisplay(fidl::WireSyncClient<fuchsia_hardware_sysmem::Sysmem> hardware_sysmem,
-                fidl::WireSyncClient<fuchsia_sysmem2::Allocator> sysmem,
-                fdf::MmioBuffer framebuffer_mmio, const DisplayProperties& properties);
-  ~SimpleDisplay() = default;
+  FramebufferDisplay(fidl::WireSyncClient<fuchsia_hardware_sysmem::Sysmem> hardware_sysmem,
+                     fidl::WireSyncClient<fuchsia_sysmem2::Allocator> sysmem,
+                     fdf::MmioBuffer framebuffer_mmio, const DisplayProperties& properties);
+  ~FramebufferDisplay() = default;
 
   // Initialization logic not suitable in the constructor.
   zx::result<> Initialize();
@@ -133,6 +134,6 @@ class SimpleDisplay : public HeapServer, public ddk::DisplayEngineProtocol<Simpl
   ddk::DisplayEngineListenerProtocolClient engine_listener_;
 };
 
-}  // namespace simple_display
+}  // namespace framebuffer_display
 
 #endif  // SRC_GRAPHICS_DISPLAY_LIB_FRAMEBUFFER_DISPLAY_FRAMEBUFFER_DISPLAY_H_

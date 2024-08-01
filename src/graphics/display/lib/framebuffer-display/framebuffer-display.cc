@@ -34,7 +34,7 @@
 #include "src/graphics/display/lib/api-types-cpp/image-metadata.h"
 #include "src/graphics/display/lib/api-types-cpp/rectangle.h"
 
-namespace simple_display {
+namespace framebuffer_display {
 
 namespace {
 
@@ -67,7 +67,7 @@ void OnHeapServerClose(fidl::UnbindInfo info, zx::channel channel) {
   if (info.is_dispatcher_shutdown()) {
     // Pending wait is canceled because the display device that the heap belongs
     // to has been destroyed.
-    FDF_LOG(INFO, "Simple display destroyed: status: %s", info.status_string());
+    FDF_LOG(INFO, "Framebuffer display destroyed: status: %s", info.status_string());
     return;
   }
 
@@ -91,7 +91,7 @@ zx_koid_t GetCurrentProcessKoid() {
 
 // implement display controller protocol:
 
-void SimpleDisplay::DisplayEngineRegisterDisplayEngineListener(
+void FramebufferDisplay::DisplayEngineRegisterDisplayEngineListener(
     const display_engine_listener_protocol_t* engine_listener) {
   engine_listener_ = ddk::DisplayEngineListenerProtocolClient(engine_listener);
 
@@ -134,11 +134,11 @@ void SimpleDisplay::DisplayEngineRegisterDisplayEngineListener(
   engine_listener_.OnDisplayAdded(&banjo_display_info);
 }
 
-void SimpleDisplay::DisplayEngineDeregisterDisplayEngineListener() {
+void FramebufferDisplay::DisplayEngineDeregisterDisplayEngineListener() {
   engine_listener_ = ddk::DisplayEngineListenerProtocolClient();
 }
 
-zx_status_t SimpleDisplay::DisplayEngineImportBufferCollection(
+zx_status_t FramebufferDisplay::DisplayEngineImportBufferCollection(
     uint64_t banjo_driver_buffer_collection_id, zx::channel collection_token) {
   const display::DriverBufferCollectionId driver_buffer_collection_id =
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
@@ -173,7 +173,7 @@ zx_status_t SimpleDisplay::DisplayEngineImportBufferCollection(
   return ZX_OK;
 }
 
-zx_status_t SimpleDisplay::DisplayEngineReleaseBufferCollection(
+zx_status_t FramebufferDisplay::DisplayEngineReleaseBufferCollection(
     uint64_t banjo_driver_buffer_collection_id) {
   const display::DriverBufferCollectionId driver_buffer_collection_id =
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
@@ -188,9 +188,9 @@ zx_status_t SimpleDisplay::DisplayEngineReleaseBufferCollection(
   return ZX_OK;
 }
 
-zx_status_t SimpleDisplay::DisplayEngineImportImage(const image_metadata_t* banjo_image_metadata,
-                                                    uint64_t banjo_driver_buffer_collection_id,
-                                                    uint32_t index, uint64_t* out_image_handle) {
+zx_status_t FramebufferDisplay::DisplayEngineImportImage(
+    const image_metadata_t* banjo_image_metadata, uint64_t banjo_driver_buffer_collection_id,
+    uint32_t index, uint64_t* out_image_handle) {
   const display::DriverBufferCollectionId driver_buffer_collection_id =
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
   const auto it = buffer_collections_.find(driver_buffer_collection_id);
@@ -292,11 +292,11 @@ zx_status_t SimpleDisplay::DisplayEngineImportImage(const image_metadata_t* banj
   return ZX_OK;
 }
 
-void SimpleDisplay::DisplayEngineReleaseImage(uint64_t image_handle) {
+void FramebufferDisplay::DisplayEngineReleaseImage(uint64_t image_handle) {
   // noop
 }
 
-config_check_result_t SimpleDisplay::DisplayEngineCheckConfiguration(
+config_check_result_t FramebufferDisplay::DisplayEngineCheckConfiguration(
     const display_config_t* display_configs, size_t display_count,
     client_composition_opcode_t* out_client_composition_opcodes_list,
     size_t client_composition_opcodes_count, size_t* out_client_composition_opcodes_actual) {
@@ -328,7 +328,8 @@ config_check_result_t SimpleDisplay::DisplayEngineCheckConfiguration(
   return CONFIG_CHECK_RESULT_OK;
 }
 
-bool SimpleDisplay::IsBanjoDisplayConfigSupported(const display_config_t& banjo_display_config) {
+bool FramebufferDisplay::IsBanjoDisplayConfigSupported(
+    const display_config_t& banjo_display_config) {
   if (banjo_display_config.layer_count != 1) {
     return false;
   }
@@ -377,9 +378,9 @@ bool SimpleDisplay::IsBanjoDisplayConfigSupported(const display_config_t& banjo_
   return true;
 }
 
-void SimpleDisplay::DisplayEngineApplyConfiguration(const display_config_t* display_config,
-                                                    size_t display_count,
-                                                    const config_stamp_t* banjo_config_stamp) {
+void FramebufferDisplay::DisplayEngineApplyConfiguration(const display_config_t* display_config,
+                                                         size_t display_count,
+                                                         const config_stamp_t* banjo_config_stamp) {
   ZX_DEBUG_ASSERT(banjo_config_stamp != nullptr);
   has_image_ = display_count != 0 && display_config[0].layer_count != 0;
   {
@@ -388,7 +389,7 @@ void SimpleDisplay::DisplayEngineApplyConfiguration(const display_config_t* disp
   }
 }
 
-zx_status_t SimpleDisplay::DisplayEngineSetBufferCollectionConstraints(
+zx_status_t FramebufferDisplay::DisplayEngineSetBufferCollectionConstraints(
     const image_buffer_usage_t* usage, uint64_t banjo_driver_buffer_collection_id) {
   const display::DriverBufferCollectionId driver_buffer_collection_id =
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
@@ -448,8 +449,8 @@ zx_status_t SimpleDisplay::DisplayEngineSetBufferCollectionConstraints(
 
 // implement sysmem heap protocol:
 
-void SimpleDisplay::AllocateVmo(AllocateVmoRequestView request,
-                                AllocateVmoCompleter::Sync& completer) {
+void FramebufferDisplay::AllocateVmo(AllocateVmoRequestView request,
+                                     AllocateVmoCompleter::Sync& completer) {
   BufferKey buffer_key(request->buffer_collection_id, request->buffer_index);
 
   zx_info_handle_count handle_count;
@@ -485,7 +486,8 @@ void SimpleDisplay::AllocateVmo(AllocateVmoRequestView request,
   completer.ReplySuccess(std::move(vmo));
 }
 
-void SimpleDisplay::DeleteVmo(DeleteVmoRequestView request, DeleteVmoCompleter::Sync& completer) {
+void FramebufferDisplay::DeleteVmo(DeleteVmoRequestView request,
+                                   DeleteVmoCompleter::Sync& completer) {
   {
     fbl::AutoLock lock(&framebuffer_key_mtx_);
     framebuffer_key_.reset();
@@ -501,7 +503,7 @@ void SimpleDisplay::DeleteVmo(DeleteVmoRequestView request, DeleteVmoCompleter::
 
 // implement driver object:
 
-zx::result<> SimpleDisplay::Initialize() {
+zx::result<> FramebufferDisplay::Initialize() {
   auto [heap_client, heap_server] = fidl::Endpoints<fuchsia_hardware_sysmem::Heap>::Create();
 
   auto result = hardware_sysmem_->RegisterHeap(
@@ -519,7 +521,7 @@ zx::result<> SimpleDisplay::Initialize() {
                            heap_properties = std::move(heap_properties), this]() mutable {
         auto binding =
             fidl::BindServer(loop_.dispatcher(), std::move(server_end), this,
-                             [](SimpleDisplay* self, fidl::UnbindInfo info,
+                             [](FramebufferDisplay* self, fidl::UnbindInfo info,
                                 fidl::ServerEnd<fuchsia_hardware_sysmem::Heap> server_end) {
                                OnHeapServerClose(info, server_end.TakeChannel());
                              });
@@ -540,9 +542,10 @@ zx::result<> SimpleDisplay::Initialize() {
   return zx::ok();
 }
 
-SimpleDisplay::SimpleDisplay(fidl::WireSyncClient<fuchsia_hardware_sysmem::Sysmem> hardware_sysmem,
-                             fidl::WireSyncClient<fuchsia_sysmem2::Allocator> sysmem,
-                             fdf::MmioBuffer framebuffer_mmio, const DisplayProperties& properties)
+FramebufferDisplay::FramebufferDisplay(
+    fidl::WireSyncClient<fuchsia_hardware_sysmem::Sysmem> hardware_sysmem,
+    fidl::WireSyncClient<fuchsia_sysmem2::Allocator> sysmem, fdf::MmioBuffer framebuffer_mmio,
+    const DisplayProperties& properties)
     : hardware_sysmem_(std::move(hardware_sysmem)),
       sysmem_(std::move(sysmem)),
       loop_(&kAsyncLoopConfigNoAttachToCurrentThread),
@@ -553,11 +556,11 @@ SimpleDisplay::SimpleDisplay(fidl::WireSyncClient<fuchsia_hardware_sysmem::Sysme
   // Start thread. Heap server must be running on a separate
   // thread as sysmem might be making synchronous allocation requests
   // from the main thread.
-  loop_.StartThread("simple-display");
+  loop_.StartThread("framebuffer-display");
 
   if (sysmem_) {
     zx_koid_t current_process_koid = GetCurrentProcessKoid();
-    std::string debug_name = "simple-display[" + std::to_string(current_process_koid) + "]";
+    std::string debug_name = "framebuffer-display[" + std::to_string(current_process_koid) + "]";
     fidl::Arena arena;
     auto set_debug_request =
         fuchsia_sysmem2::wire::AllocatorSetDebugClientInfoRequest::Builder(arena);
@@ -571,7 +574,7 @@ SimpleDisplay::SimpleDisplay(fidl::WireSyncClient<fuchsia_hardware_sysmem::Sysme
   }
 }
 
-void SimpleDisplay::OnPeriodicVSync() {
+void FramebufferDisplay::OnPeriodicVSync() {
   if (engine_listener_.is_valid()) {
     fbl::AutoLock lock(&mtx_);
     const uint64_t banjo_display_id = display::ToBanjoDisplayId(kDisplayId);
@@ -582,11 +585,11 @@ void SimpleDisplay::OnPeriodicVSync() {
   async::PostTaskForTime(loop_.dispatcher(), [this]() { OnPeriodicVSync(); }, next_vsync_time_);
 }
 
-display_engine_protocol_t SimpleDisplay::GetProtocol() {
+display_engine_protocol_t FramebufferDisplay::GetProtocol() {
   return {
       .ops = &display_engine_protocol_ops_,
       .ctx = this,
   };
 }
 
-}  // namespace simple_display
+}  // namespace framebuffer_display
