@@ -25,6 +25,15 @@
 #define shadow_call_sp gp
 
 #define DWARF_REGNO_shadow_call_sp 3 // x3 == gp
+#define DWARF_REGNO_ra 1 // x1 == ra
+#define DWARF_REGNO_t0 5 // x5 == t0
+
+#define DWARF_REGNO_V(n) ((n) + 96)
+
+#define DWARF_REGNO_CSR(n) (4096 + (n))
+#define VLENB_REGNO 3106
+
+#define DWARF_REGNO_VLENB DWARF_REGNO_CSR(VLENB_REGNO)
 
 .macro assert.fail
   unimp
@@ -50,46 +59,59 @@
 .endm
 
 // Standard prologue sequence for FP setup, with CFI.
-.macro .prologue.fp frame_extra_size=0
+.macro .prologue.fp frame_extra_size=0, rareg=ra
   add sp, sp, -(16 + \frame_extra_size)
   // The CFA is still computed relative to the SP so code will
   // continue to use .cfi_adjust_cfa_offset for pushes and pops.
   .cfi_adjust_cfa_offset 16 + \frame_extra_size
   sd s0, 0(sp)
   .cfi_offset s0, 0 - (16 + \frame_extra_size)
-  sd ra, 8(sp)
-  .cfi_offset ra, 8 - (16 + \frame_extra_size)
+  sd \rareg, 8(sp)
+  .cfi_offset \rareg, 8 - (16 + \frame_extra_size)
   mv s0, sp
 .endm
 
 // Epilogue sequence to match .prologue.fp with the same argument.
-.macro .epilogue.fp frame_extra_size=0
+.macro .epilogue.fp frame_extra_size=0, rareg=ra
   ld s0, 0(sp)
   .cfi_same_value s0
-  ld ra, 8(sp)
-  .cfi_same_value ra
+  ld \rareg, 8(sp)
+  .cfi_same_value \rareg
   add sp, sp, 16 + \frame_extra_size
   .cfi_adjust_cfa_offset -(16 + \frame_extra_size)
 .endm
 
+// Helper defining the encoding for setting rules requiring
+//   DW_OP_breg3(-8) as a 2 byte sequence
+#define CFI_SCS_BREG(op, regno) .cfi_escape op, regno, 2, \
+  DW_OP_breg(DWARF_REGNO_shadow_call_sp), (-8) & 0x7f
+
 // Standard prologue sequence for shadow call stack, with CFI.
-.macro .prologue.shadow_call_sp
+.macro .prologue.shadow_call_sp rareg=ra
 #if __has_feature(shadow_call_stack)
-  sd ra, (shadow_call_sp)
+  sd \rareg, (shadow_call_sp)
   // Set the ra (x1) rule to DW_CFA_expression{DW_OP_breg3(-8)}.
-  .cfi_escape 0x0f, 1, 2, 0x70 + DWARF_REGNO_shadow_call_sp, (-8) & 0x7f
+  .ifc \rareg, ra
+    CFI_SCS_BREG(DW_CFA_expression, DWARF_REGNO_ra)
+  .else
+    .ifc \rareg, t0
+      CFI_SCS_BREG(DW_CFA_expression, DWARF_REGNO_t0)
+    .else
+      .error "Return address must be `ra` or `t0`"
+    .endif
+  .endif
   add shadow_call_sp, shadow_call_sp, 8
   // Set the x3 (gp) rule to DW_CFA_val_expression{DW_OP_breg3(-8)} to
   // compensate for the increment just done.
-  .cfi_escape 0x16, DWARF_REGNO_shadow_call_sp, 2, 0x70 + DWARF_REGNO_shadow_call_sp, (-8) & 0x7f
+  CFI_SCS_BREG(DW_CFA_val_expression, DWARF_REGNO_shadow_call_sp)
 #endif
 .endm
 
 // Epilogue sequence to match .prologue.shadow_call_sp.
-.macro .epilogue.shadow_call_sp
+.macro .epilogue.shadow_call_sp rareg=ra
 #if __has_feature(shadow_call_stack)
-  ld ra, -8(shadow_call_sp)
-  .cfi_same_value ra
+  ld \rareg, -8(shadow_call_sp)
+  .cfi_same_value \rareg
   add shadow_call_sp, shadow_call_sp, -8
   .cfi_same_value shadow_call_sp
 #endif
