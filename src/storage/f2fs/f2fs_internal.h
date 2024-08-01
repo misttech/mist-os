@@ -47,7 +47,6 @@ constexpr block_t kInvalidNodeOffset = std::numeric_limits<block_t>::max();
 
 // For readahead
 constexpr block_t kDefaultReadaheadSize = 32;
-constexpr block_t kDefaultNodeReadSize = 16;
 
 // CountType for monitoring
 //

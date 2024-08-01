@@ -28,12 +28,12 @@ DirEntry *Dir::InlineDentryArray(Page *page, VnodeF2fs &vnode) {
   return reinterpret_cast<DirEntry *>(base + reserved);
 }
 
-char (*Dir::InlineDentryFilenameArray(Page *page, VnodeF2fs &vnode))[kDentrySlotLen] {
+uint8_t (*Dir::InlineDentryFilenameArray(Page *page, VnodeF2fs &vnode))[kDentrySlotLen] {
   uint8_t *base = InlineDentryBitmap(page);
   size_t reserved = safemath::checked_cast<uint32_t>(
       (vnode.MaxInlineData() - safemath::CheckMul(vnode.MaxInlineDentry(), kDentrySlotLen))
           .ValueOrDie());
-  return reinterpret_cast<char(*)[kDentrySlotLen]>(base + reserved);
+  return reinterpret_cast<uint8_t(*)[kDentrySlotLen]>(base + reserved);
 }
 
 zx::result<DentryInfo> Dir::FindInInlineDir(std::string_view name, fbl::RefPtr<Page> *res_page) {
@@ -42,45 +42,25 @@ zx::result<DentryInfo> Dir::FindInInlineDir(std::string_view name, fbl::RefPtr<P
     return zx::error(ZX_ERR_NOT_FOUND);
   }
 
-  std::vector<nid_t> nids;
-  size_t n = 0;
   f2fs_hash_t namehash = DentryHash(name);
   auto bits = GetBitmap(ipage.CopyRefPtr());
   ZX_DEBUG_ASSERT(bits.is_ok());
-  DentryInfo ret = {kNullIno, kCachedInlineDirEntryPageIndex, 0};
-  res_page->reset();
   for (size_t bit_pos = 0; (bit_pos = bits->FindNextBit(bit_pos)) < MaxInlineDentry();) {
-    const DirEntry &de = InlineDentryArray(ipage.get(), *this)[bit_pos];
-    std::string_view entry_name(InlineDentryFilenameArray(ipage.get(), *this)[bit_pos],
-                                LeToCpu(de.name_len));
-    nid_t ino = LeToCpu(de.ino);
-    GetDirEntryCache().UpdateDirEntry(entry_name, {ino, kCachedInlineDirEntryPageIndex, bit_pos});
-    if (!*res_page) {
-      if (EarlyMatchName(name, namehash, de) &&
-          !memcmp(entry_name.data(), name.data(), name.length())) {
-        ret = {ino, kCachedInlineDirEntryPageIndex, bit_pos};
-        *res_page = ipage.CopyRefPtr();
-      }
-    }
-    if (*res_page) {
-      nids.push_back(ino);
-      if (kDefaultNodeReadSize <= ++n) {
-        break;
-      }
+    DirEntry &de = InlineDentryArray(ipage.get(), *this)[bit_pos];
+    if (EarlyMatchName(name, namehash, de) &&
+        !memcmp(InlineDentryFilenameArray(ipage.get(), *this)[bit_pos], name.data(),
+                name.length())) {
+      *res_page = ipage.release();
+      DentryInfo ret = {LeToCpu(de.ino), kCachedInlineDirEntryPageIndex, bit_pos};
+      GetDirEntryCache().UpdateDirEntry(name, ret);
+      return zx::ok(ret);
     }
     // For the most part, it should be a bug when name_len is zero.
     // We stop here for figuring out where the bugs are occurred.
     ZX_DEBUG_ASSERT(de.name_len > 0);
     bit_pos += GetDentrySlots(LeToCpu(de.name_len));
   }
-  if (!*res_page) {
-    return zx::error(ZX_ERR_NOT_FOUND);
-  }
-  ipage.reset();
-  if (nids.size() > 1) {
-    ZX_ASSERT(fs()->GetNodeManager().GetNodePages(nids).is_ok());
-  }
-  return zx::ok(ret);
+  return zx::error(ZX_ERR_NOT_FOUND);
 }
 
 zx_status_t Dir::MakeEmptyInlineDir(VnodeF2fs *vnode) {
@@ -332,8 +312,9 @@ zx_status_t Dir::ReadInlineDir(fs::VdirCookie *cookie, void *dirents, size_t len
     if (de->file_type < static_cast<uint8_t>(FileType::kFtMax))
       d_type = types[de->file_type];
 
-    std::string_view name(InlineDentryFilenameArray(ipage.get(), *this)[bit_pos],
-                          LeToCpu(de->name_len));
+    std::string_view name(
+        reinterpret_cast<char *>(InlineDentryFilenameArray(ipage.get(), *this)[bit_pos]),
+        LeToCpu(de->name_len));
 
     if (de->ino && name != "..") {
       if (zx_status_t ret = df.Next(name, d_type, LeToCpu(de->ino)); ret != ZX_OK) {

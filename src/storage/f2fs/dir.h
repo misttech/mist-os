@@ -50,7 +50,7 @@ class Dir : public VnodeF2fs, public fbl::Recyclable<Dir> {
   zx::result<DentryInfo> FindInInlineDir(std::string_view name, fbl::RefPtr<Page> *res_page)
       __TA_REQUIRES_SHARED(mutex_);
   zx::result<DentryInfo> FindInBlock(fbl::RefPtr<Page> dentry_page, std::string_view name,
-                                     f2fs_hash_t namehash);
+                                     f2fs_hash_t namehash, fbl::RefPtr<Page> *res_page);
   zx::result<DentryInfo> FindInLevel(unsigned int level, std::string_view name,
                                      f2fs_hash_t namehash, fbl::RefPtr<Page> *res_page)
       __TA_REQUIRES_SHARED(mutex_);
@@ -131,7 +131,7 @@ class Dir : public VnodeF2fs, public fbl::Recyclable<Dir> {
   uint64_t InlineDentryBitmapSize() const;
   uint8_t *InlineDentryBitmap(Page *page);
   DirEntry *InlineDentryArray(Page *page, VnodeF2fs &vnode);
-  char (*InlineDentryFilenameArray(Page *page, VnodeF2fs &vnode))[kDentrySlotLen];
+  uint8_t (*InlineDentryFilenameArray(Page *page, VnodeF2fs &vnode))[kDentrySlotLen];
 
   // link helper to update child in Rename()
   zx::result<DentryInfo> FindEntrySafe(std::string_view name, fbl::RefPtr<Page> *res_page)
