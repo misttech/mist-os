@@ -320,7 +320,8 @@ fn generate_component_path<L>(
 where
     L: LockBefore<FileOpsCore>,
 {
-    // Checking container directory already exists
+    // Checking container directory already exists.
+    // If this lookup fails, the container might not have the "container" feature enabled.
     let mount_point = system_task.lookup_path_from_root("/container/component/".into())?;
 
     // Find /container/component/{random} that doesn't already exist
