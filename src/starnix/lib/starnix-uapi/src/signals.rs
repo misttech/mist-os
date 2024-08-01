@@ -157,11 +157,11 @@ impl fmt::Display for Signal {
                 uapi::SIGIO => "SIGIO",
                 uapi::SIGPWR => "SIGPWR",
                 uapi::SIGSYS => "SIGSYS",
-                _ => panic!("invalid signal number!"),
+                _ => "unknown signal",
             };
-            write!(f, "signal {}: {}", self.number, name)
+            write!(f, "{}({})", name, self.number)
         } else {
-            write!(f, "signal {}: SIGRTMIN+{}", self.number, self.number - super::SIGRTMIN)
+            write!(f, "SIGRTMIN+{}({})", self.number - super::SIGRTMIN, self.number)
         }
     }
 }

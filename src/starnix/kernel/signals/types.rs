@@ -604,10 +604,10 @@ mod test {
         assert!(Signal::try_from(UncheckedSignal::from(uapi::SIGRTMIN + 12))
             .unwrap()
             .is_real_time());
-        assert_eq!(format!("{SIGPWR}"), "signal 30: SIGPWR");
+        assert_eq!(format!("{SIGPWR}"), "SIGPWR(30)");
         assert_eq!(
             format!("{}", Signal::try_from(UncheckedSignal::from(uapi::SIGRTMIN + 10)).unwrap()),
-            "signal 42: SIGRTMIN+10"
+            "SIGRTMIN+10(42)"
         );
     }
 
