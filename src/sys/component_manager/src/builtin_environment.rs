@@ -210,7 +210,6 @@ impl BuiltinEnvironmentBuilder {
                 crash_records: self.crash_records.clone(),
                 instance_registry: self.instance_registry.clone(),
             },
-            Arc::downgrade(&top_instance),
         ));
         Ok(self.add_runner("builtin".parse().unwrap(), runner))
     }
@@ -411,11 +410,8 @@ impl RootComponentInputBuilder {
             return;
         }
 
-        let top_instance = Arc::downgrade(&self.top_instance);
-        let capability_source = CapabilitySource::Builtin {
-            capability: InternalCapability::Protocol(name.clone()),
-            top_instance: top_instance.clone(),
-        };
+        let capability_source =
+            CapabilitySource::Builtin { capability: InternalCapability::Protocol(name.clone()) };
 
         let launch = LaunchTaskOnReceive::new(
             capability_source,

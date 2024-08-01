@@ -373,7 +373,6 @@ impl EventRegistry {
                 source:
                     CapabilitySource::Builtin {
                         capability: InternalCapability::EventStream(source_name),
-                        ..
                     },
                 relative_path: _,
             } => Ok((source_name, ExtendedMoniker::ComponentManager, route)),

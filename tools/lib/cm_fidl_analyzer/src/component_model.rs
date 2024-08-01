@@ -1009,7 +1009,7 @@ impl ComponentModelForAnalyzer {
                     },
                 }
             }
-            Ok(Some((ExtendedInstanceInterface::AboveRoot(top_instance), resolver))) => {
+            Ok(Some((ExtendedInstanceInterface::AboveRoot(_), resolver))) => {
                 match self.get_builtin_resolver_decl(&resolver) {
                     Ok(decl) => {
                         let route = vec![RouteSegment::ProvideAsBuiltin { capability: decl }];
@@ -1022,7 +1022,6 @@ impl ComponentModelForAnalyzer {
                                 capability: InternalCapability::Resolver(
                                     Name::new(scheme).unwrap(),
                                 ),
-                                top_instance: Arc::downgrade(&top_instance),
                             }),
                         }
                     }

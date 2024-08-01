@@ -539,7 +539,6 @@ where
 
         let dir_capability = CapabilitySource::<C>::Builtin {
             capability: InternalCapability::Directory("test".parse().unwrap()),
-            top_instance: Weak::new(),
         };
         let valid_path_0 = Moniker::try_from(vec!["root"]).unwrap();
         let valid_path_1 = Moniker::try_from(vec!["root", "core"]).unwrap();

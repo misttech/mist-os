@@ -677,7 +677,6 @@ impl Use {
                     )? {
                         return Ok(UseResult::Source(CapabilitySource::<C>::Builtin {
                             capability,
-                            top_instance: Arc::downgrade(&top_instance),
                         }));
                     }
                     Err(RoutingError::use_from_component_manager_not_found(
@@ -826,7 +825,6 @@ where
                     )? {
                         return Ok(RegistrationResult::Source(CapabilitySource::<C>::Builtin {
                             capability,
-                            top_instance: Arc::downgrade(&top_instance),
                         }));
                     }
                     Err(RoutingError::register_from_component_manager_not_found(
@@ -1086,10 +1084,7 @@ impl Offer {
                             mapper,
                         )? {
                             return Ok(OfferSegment::Done(OfferResult::Source(
-                                CapabilitySource::<C>::Builtin {
-                                    capability,
-                                    top_instance: Arc::downgrade(&top_instance),
-                                },
+                                CapabilitySource::<C>::Builtin { capability },
                             )));
                         }
                         return Err(RoutingError::offer_from_component_manager_not_found(

@@ -79,11 +79,7 @@ pub enum CapabilitySource<C: ComponentInstanceInterface + 'static> {
     /// This capability originates from the parent of the root component, and is built in to
     /// component manager. `top_instance` is the instance at the top of the tree, i.e.  the
     /// instance representing component manager.
-    Builtin {
-        capability: InternalCapability,
-        #[derivative(PartialEq = "ignore")]
-        top_instance: Weak<C::TopInstance>,
-    },
+    Builtin { capability: InternalCapability },
     /// This capability originates from the parent of the root component, and is offered from
     /// component manager's namespace. `top_instance` is the instance at the top of the tree, i.e.
     /// the instance representing component manager.
@@ -325,10 +321,9 @@ impl<C: ComponentInstanceInterface + 'static> TryFrom<CapabilitySource<C>> for D
                 insert_capability_dict(&output, capability)?;
                 insert_moniker(&output, moniker)
             }
-            CapabilitySource::Builtin { capability, top_instance } => {
+            CapabilitySource::Builtin { capability } => {
                 insert_key(&output, BUILTIN_STR);
                 insert_capability_dict(&output, capability)?;
-                insert_top_instance_token::<C>(&output, top_instance);
             }
             CapabilitySource::Namespace { capability, top_instance } => {
                 insert_key(&output, NAMESPACE_STR);
@@ -429,10 +424,9 @@ impl<C: ComponentInstanceInterface + 'static> TryFrom<Dict> for CapabilitySource
                 capability: get_capability_dict(&dict)?.try_into()?,
                 moniker: get_moniker(&dict)?,
             },
-            BUILTIN_STR => CapabilitySource::Builtin {
-                capability: get_capability_dict(&dict)?.try_into()?,
-                top_instance: get_top_instance::<C>(&dict)?,
-            },
+            BUILTIN_STR => {
+                CapabilitySource::Builtin { capability: get_capability_dict(&dict)?.try_into()? }
+            }
             NAMESPACE_STR => CapabilitySource::Namespace {
                 capability: get_capability_dict(&dict)?.try_into()?,
                 top_instance: get_top_instance::<C>(&dict)?,

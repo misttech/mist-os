@@ -1153,10 +1153,7 @@ where
                 .ok_or(RoutingError::register_from_component_manager_not_found(
                     reg.source_name().to_string(),
                 ))?;
-            Ok(CapabilitySource::Builtin {
-                capability: internal_capability,
-                top_instance: Arc::downgrade(&top_instance),
-            })
+            Ok(CapabilitySource::Builtin { capability: internal_capability })
         }
         None => Err(RoutingError::UseFromEnvironmentNotFound {
             moniker: target.moniker().clone(),

@@ -66,7 +66,6 @@ pub fn build_root_component_input(
                     protocol_decl.name.clone(),
                     CapabilitySource::<ComponentInstanceForAnalyzer>::Builtin {
                         capability: InternalCapability::Protocol(protocol_decl.name.clone()),
-                        top_instance: Arc::downgrade(top_instance),
                     },
                 )),
                 _ => None,

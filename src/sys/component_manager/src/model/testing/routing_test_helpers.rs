@@ -329,7 +329,6 @@ impl RoutingTest {
             };
             let capability_source = CapabilitySource::Builtin {
                 capability: InternalCapability::Protocol(name.clone()),
-                top_instance: Arc::downgrade(top_instance),
             };
 
             let launch = LaunchTaskOnReceive::new(
