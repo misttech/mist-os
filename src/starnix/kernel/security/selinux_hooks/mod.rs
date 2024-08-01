@@ -4,7 +4,7 @@
 
 pub(super) mod fs;
 
-use super::{FsNodeSecurityXattr, FsNodeState, ProcAttr};
+use super::{FsNodeSecurityXattr, FsNodeState, ProcAttr, ResolvedElfState};
 
 use crate::task::CurrentTask;
 use crate::vfs::{FsNode, FsNodeHandle, FsStr, FsString, NamespaceNode, ValueOrSize};
@@ -44,13 +44,17 @@ pub(super) fn check_task_create_access(
 pub(super) fn check_exec_access(
     security_server: &Arc<SecurityServer>,
     current_task: &CurrentTask,
-    security_state: &TaskState,
     executable_node: &FsNodeHandle,
-) -> Result<Option<SecurityId>, Errno> {
+) -> Result<ResolvedElfState, Errno> {
+    let (current_sid, exec_sid, ptracer_sid) = {
+        let state = &current_task.read().security_state.0;
+        (state.current_sid, state.exec_sid, state.ptracer_sid)
+    };
+
     let executable_sid =
         get_effective_fs_node_security_id(security_server, current_task, executable_node);
-    let current_sid = security_state.current_sid;
-    let new_sid = if let Some(exec_sid) = security_state.exec_sid {
+
+    let new_sid = if let Some(exec_sid) = exec_sid {
         // Use the proc exec SID if set.
         exec_sid
     } else {
@@ -85,27 +89,35 @@ pub(super) fn check_exec_access(
         }
         // Check that ptrace permission is allowed if the process is traced.
         // TODO(b/352535794): Perform this check based on the `Task::ptrace` state.
-        if let Some(ptracer_sid) = security_state.ptracer_sid {
+        if let Some(ptracer_sid) = ptracer_sid {
             if !security_server.has_permissions(ptracer_sid, new_sid, &[ProcessPermission::Ptrace])
             {
                 return error!(EACCES);
             }
         }
     }
-    Ok(Some(new_sid))
+    Ok(ResolvedElfState(Some(new_sid)))
 }
 
 /// Updates the SELinux thread group state on exec, using the security ID associated with the
 /// resolved elf.
 pub(super) fn update_state_on_exec(
-    security_state: &mut TaskState,
-    elf_security_state: Option<SecurityId>,
+    current_task: &CurrentTask,
+    elf_security_state: &ResolvedElfState,
 ) {
-    // TODO(http://b/316181721): check if the previous state needs to be updated regardless.
-    if let Some(elf_security_state) = elf_security_state {
-        security_state.previous_sid = security_state.current_sid;
-        security_state.current_sid = elf_security_state;
-    }
+    let security_state = &mut current_task.write().security_state.0;
+    let previous_sid = security_state.current_sid;
+    let ptracer_sid = security_state.ptracer_sid;
+
+    *security_state = TaskState {
+        current_sid: elf_security_state.0.expect("SELinux enabled but missing resolved elf state"),
+        previous_sid,
+        ptracer_sid,
+        exec_sid: None,
+        fscreate_sid: None,
+        keycreate_sid: None,
+        sockcreate_sid: None,
+    };
 }
 
 /// Checks if source with `source_sid` may exercise the "getsched" permission on target with
@@ -602,7 +614,10 @@ pub(super) mod testing {
 mod tests {
     use super::testing::get_cached_sid;
     use super::*;
-    use crate::testing::{create_kernel_task_and_unlocked_with_selinux, AutoReleasableTask};
+    use crate::testing::{
+        create_kernel_and_task_with_selinux, create_kernel_task_and_unlocked_with_selinux,
+        AutoReleasableTask,
+    };
     use crate::vfs::{NamespaceNode, XattrOp};
     use selinux::security_server::Mode;
     use starnix_sync::{Locked, Unlocked};
@@ -708,7 +723,7 @@ mod tests {
             create_test_executable(&mut locked, &current_task, executable_security_context);
         let executable_fs_node = &executable.entry.node;
 
-        let security_state = TaskState {
+        current_task.write().security_state.0 = TaskState {
             current_sid: current_sid,
             exec_sid: Some(exec_sid),
             fscreate_sid: None,
@@ -719,8 +734,8 @@ mod tests {
         };
 
         assert_eq!(
-            check_exec_access(&security_server, &current_task, &security_state, executable_fs_node),
-            Ok(Some(exec_sid))
+            check_exec_access(&security_server, &current_task, executable_fs_node),
+            Ok(ResolvedElfState(Some(exec_sid)))
         );
     }
 
@@ -745,7 +760,7 @@ mod tests {
             create_test_executable(&mut locked, &current_task, executable_security_context);
         let executable_fs_node = &executable.entry.node;
 
-        let security_state = TaskState {
+        current_task.write().security_state.0 = TaskState {
             current_sid: current_sid,
             exec_sid: Some(exec_sid),
             fscreate_sid: None,
@@ -756,7 +771,7 @@ mod tests {
         };
 
         assert_eq!(
-            check_exec_access(&security_server, &current_task, &security_state, executable_fs_node),
+            check_exec_access(&security_server, &current_task, executable_fs_node),
             error!(EACCES)
         );
     }
@@ -784,7 +799,7 @@ mod tests {
             create_test_executable(&mut locked, &current_task, executable_security_context);
         let executable_fs_node = &executable.entry.node;
 
-        let security_state = TaskState {
+        current_task.write().security_state.0 = TaskState {
             current_sid: current_sid,
             exec_sid: Some(exec_sid),
             fscreate_sid: None,
@@ -795,7 +810,7 @@ mod tests {
         };
 
         assert_eq!(
-            check_exec_access(&security_server, &current_task, &security_state, executable_fs_node),
+            check_exec_access(&security_server, &current_task, executable_fs_node),
             error!(EACCES)
         );
     }
@@ -819,7 +834,7 @@ mod tests {
             create_test_executable(&mut locked, &current_task, executable_security_context);
         let executable_fs_node = &executable.entry.node;
 
-        let security_state = TaskState {
+        current_task.write().security_state.0 = TaskState {
             current_sid: current_sid,
             exec_sid: None,
             fscreate_sid: None,
@@ -830,8 +845,8 @@ mod tests {
         };
 
         assert_eq!(
-            check_exec_access(&security_server, &current_task, &security_state, executable_fs_node),
-            Ok(Some(current_sid))
+            check_exec_access(&security_server, &current_task, executable_fs_node),
+            Ok(ResolvedElfState(Some(current_sid)))
         );
     }
 
@@ -855,7 +870,7 @@ mod tests {
             create_test_executable(&mut locked, &current_task, executable_security_context);
         let executable_fs_node = &executable.entry.node;
 
-        let security_state = TaskState {
+        current_task.write().security_state.0 = TaskState {
             current_sid: current_sid,
             exec_sid: None,
             fscreate_sid: None,
@@ -868,45 +883,48 @@ mod tests {
         // There is no `execute_no_trans` allow statement from `current_sid` to `executable_sid`,
         // expect access denied.
         assert_eq!(
-            check_exec_access(&security_server, &current_task, &security_state, executable_fs_node),
+            check_exec_access(&security_server, &current_task, executable_fs_node),
             error!(EACCES)
         );
     }
 
     #[fuchsia::test]
-    fn no_state_update_if_no_elf_state() {
-        let initial_state = TaskState::for_kernel();
-        let mut security_state = initial_state.clone();
-        update_state_on_exec(&mut security_state, None);
-        assert_eq!(security_state, initial_state);
-    }
-
-    #[fuchsia::test]
-    fn state_is_updated_on_exec() {
+    async fn state_is_updated_on_exec() {
         let security_server = security_server_with_policy();
+        let (_kernel, current_task) = create_kernel_and_task_with_selinux(security_server.clone());
 
-        let mut initial_state = TaskState::for_kernel();
-        // Set previous SID to a different value from current, to allow verification
-        // of the pre-exec "current" being moved into "previous".
-        initial_state.previous_sid = SecurityId::initial(InitialSid::Unlabeled);
+        let initial_state = {
+            let state = &mut current_task.write().security_state.0;
 
+            // Set previous SID to a different value from current, to allow verification
+            // of the pre-exec "current" being moved into "previous".
+            state.previous_sid = SecurityId::initial(InitialSid::Unlabeled);
+
+            // Set the other optional SIDs to a value, to verify that it is cleared on exec update.
+            state.sockcreate_sid = Some(SecurityId::initial(InitialSid::Unlabeled));
+            state.fscreate_sid = Some(SecurityId::initial(InitialSid::Unlabeled));
+            state.keycreate_sid = Some(SecurityId::initial(InitialSid::Unlabeled));
+
+            state.clone()
+        };
+
+        // Ensure that the ELF binary SID differs from the task's current SID before exec.
         let elf_sid = security_server
             .security_context_to_sid(b"u:object_r:test_valid_t:s0".into())
             .expect("invalid security context");
         assert_ne!(elf_sid, initial_state.current_sid);
 
-        let mut security_state = initial_state.clone();
-        update_state_on_exec(&mut security_state, Some(elf_sid));
+        update_state_on_exec(&current_task, &ResolvedElfState(Some(elf_sid)));
         assert_eq!(
-            security_state,
+            current_task.read().security_state.0,
             TaskState {
                 current_sid: elf_sid,
-                exec_sid: initial_state.exec_sid,
-                fscreate_sid: initial_state.fscreate_sid,
-                keycreate_sid: initial_state.keycreate_sid,
+                exec_sid: None,
+                fscreate_sid: None,
+                keycreate_sid: None,
                 previous_sid: initial_state.current_sid,
-                sockcreate_sid: initial_state.sockcreate_sid,
-                ptracer_sid: initial_state.ptracer_sid,
+                sockcreate_sid: None,
+                ptracer_sid: None,
             }
         );
     }
