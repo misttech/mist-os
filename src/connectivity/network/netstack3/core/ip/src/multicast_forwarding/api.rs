@@ -36,7 +36,7 @@ where
     C: ContextPair,
     C::CoreContext: MulticastForwardingStateContext<I>,
 {
-    fn core_ctx(&mut self) -> &mut C::CoreContext {
+    pub(crate) fn core_ctx(&mut self) -> &mut C::CoreContext {
         let Self { ctx, _ip_mark } = self;
         ctx.core_ctx()
     }
@@ -83,12 +83,7 @@ where
         MulticastForwardingDisabledError,
     > {
         self.core_ctx().with_state_mut(|state, ctx| {
-            let state = match state {
-                MulticastForwardingState::Disabled => {
-                    return Err(MulticastForwardingDisabledError {})
-                }
-                MulticastForwardingState::Enabled(state) => state,
-            };
+            let state = state.enabled().ok_or(MulticastForwardingDisabledError {})?;
             ctx.with_route_table_mut(state, |route_table, ctx| {
                 let orig_route = route_table.insert(key, route);
                 // NB: Only try to send pending packets if the route was newly
@@ -126,12 +121,7 @@ where
         MulticastForwardingDisabledError,
     > {
         self.core_ctx().with_state_mut(|state, ctx| {
-            let state = match state {
-                MulticastForwardingState::Disabled => {
-                    return Err(MulticastForwardingDisabledError {})
-                }
-                MulticastForwardingState::Enabled(state) => state,
-            };
+            let state = state.enabled().ok_or(MulticastForwardingDisabledError {})?;
             ctx.with_route_table_mut(state, |route_table, _ctx| Ok(route_table.remove(key)))
         })
     }
@@ -150,10 +140,9 @@ where
         dev: &<C::CoreContext as DeviceIdContext<AnyDevice>>::WeakDeviceId,
     ) {
         self.core_ctx().with_state_mut(|state, ctx| {
-            let state = match state {
+            let Some(state) = state.enabled() else {
                 // There's no state to update if forwarding is disabled.
-                MulticastForwardingState::Disabled => return,
-                MulticastForwardingState::Enabled(state) => state,
+                return;
             };
             ctx.with_route_table_mut(state, |route_table, _ctx| {
                 route_table.retain(|_route_key, MulticastRoute { action, input_interface }| {
@@ -179,140 +168,21 @@ where
 mod tests {
     use super::*;
 
-    use core::cell::RefCell;
+    use alloc::vec;
     use core::ops::Deref;
 
-    use alloc::rc::Rc;
-    use alloc::vec;
     use assert_matches::assert_matches;
-    use derivative::Derivative;
     use ip_test_macro::ip_test;
-    use net_declare::{net_ip_v4, net_ip_v6};
-    use net_types::ip::{Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
-    use netstack3_base::testutil::{FakeStrongDeviceId, MultipleDevicesId};
-    use netstack3_base::{CtxPair, StrongDeviceIdentifier};
+    use netstack3_base::testutil::MultipleDevicesId;
+    use netstack3_base::StrongDeviceIdentifier;
 
-    use crate::multicast_forwarding::{
-        MulticastForwardingEnabledState, MulticastForwardingPendingPackets,
-        MulticastForwardingPendingPacketsContext, MulticastRoute, MulticastRouteKey,
-        MulticastRouteTable, MulticastRouteTableContext, MulticastRouteTarget,
-    };
-
-    #[derive(Derivative)]
-    #[derivative(Default(bound = ""))]
-    struct FakeCoreCtxState<I: IpLayerIpExt, D: FakeStrongDeviceId> {
-        // NB: Hold in an `Rc<RefCell<...>>` to switch to runtime borrow
-        // checking. This allows us to borrow the multicast forwarding state at
-        // the same time as the outer `FakeCoreCtx` is mutably borrowed.
-        multicast_forwarding: Rc<RefCell<MulticastForwardingState<I, D>>>,
-    }
-
-    type FakeBindingsCtx = netstack3_base::testutil::FakeBindingsCtx<(), (), (), ()>;
-    type FakeCoreCtx<I, D> = netstack3_base::testutil::FakeCoreCtx<FakeCoreCtxState<I, D>, (), D>;
-
-    impl<I: IpLayerIpExt, D: FakeStrongDeviceId> MulticastForwardingStateContext<I>
-        for FakeCoreCtx<I, D>
-    {
-        type Ctx<'a> = FakeCoreCtx<I, D>;
-        fn with_state<
-            O,
-            F: FnOnce(&MulticastForwardingState<I, Self::DeviceId>, &mut Self::Ctx<'_>) -> O,
-        >(
-            &mut self,
-            cb: F,
-        ) -> O {
-            let state = self.state.multicast_forwarding.clone();
-            let borrow = state.borrow();
-            cb(&borrow, self)
-        }
-        fn with_state_mut<
-            O,
-            F: FnOnce(&mut MulticastForwardingState<I, Self::DeviceId>, &mut Self::Ctx<'_>) -> O,
-        >(
-            &mut self,
-            cb: F,
-        ) -> O {
-            let state = self.state.multicast_forwarding.clone();
-            let mut borrow = state.borrow_mut();
-            cb(&mut borrow, self)
-        }
-    }
-
-    impl<I: IpLayerIpExt, D: FakeStrongDeviceId> MulticastRouteTableContext<I> for FakeCoreCtx<I, D> {
-        type Ctx<'a> = FakeCoreCtx<I, D>;
-        fn with_route_table<
-            O,
-            F: FnOnce(&MulticastRouteTable<I, Self::DeviceId>, &mut Self::Ctx<'_>) -> O,
-        >(
-            &mut self,
-            state: &MulticastForwardingEnabledState<I, Self::DeviceId>,
-            cb: F,
-        ) -> O {
-            let route_table = state.route_table().read();
-            cb(&route_table, self)
-        }
-        fn with_route_table_mut<
-            O,
-            F: FnOnce(&mut MulticastRouteTable<I, Self::DeviceId>, &mut Self::Ctx<'_>) -> O,
-        >(
-            &mut self,
-            state: &MulticastForwardingEnabledState<I, Self::DeviceId>,
-            cb: F,
-        ) -> O {
-            let mut route_table = state.route_table().write();
-            cb(&mut route_table, self)
-        }
-    }
-
-    impl<I: IpLayerIpExt, D: FakeStrongDeviceId> MulticastForwardingPendingPacketsContext<I>
-        for FakeCoreCtx<I, D>
-    {
-        fn with_pending_table_mut<
-            O,
-            F: FnOnce(&mut MulticastForwardingPendingPackets<I, Self::DeviceId>) -> O,
-        >(
-            &mut self,
-            state: &MulticastForwardingEnabledState<I, Self::DeviceId>,
-            cb: F,
-        ) -> O {
-            let mut pending_table = state.pending_table().lock();
-            cb(&mut pending_table)
-        }
-    }
-
-    fn new_multicast_forwarding_api<I: IpLayerIpExt>(
-    ) -> MulticastForwardingApi<I, CtxPair<FakeCoreCtx<I, MultipleDevicesId>, FakeBindingsCtx>>
-    {
-        MulticastForwardingApi::new(CtxPair::with_core_ctx(FakeCoreCtx::with_state(
-            Default::default(),
-        )))
-    }
-
-    /// An IP extension trait providing constants for various IP addresses.
-    trait ConstantsIpExt: Ip {
-        const SRC1: Self::Addr;
-        const SRC2: Self::Addr;
-        const DST1: Self::Addr;
-        const DST2: Self::Addr;
-    }
-
-    impl ConstantsIpExt for Ipv4 {
-        const SRC1: Ipv4Addr = net_ip_v4!("192.0.2.1");
-        const SRC2: Ipv4Addr = net_ip_v4!("192.0.2.2");
-        const DST1: Ipv4Addr = net_ip_v4!("224.0.1.1");
-        const DST2: Ipv4Addr = net_ip_v4!("224.0.1.2");
-    }
-
-    impl ConstantsIpExt for Ipv6 {
-        const SRC1: Ipv6Addr = net_ip_v6!("2001:0DB8::1");
-        const SRC2: Ipv6Addr = net_ip_v6!("2001:0DB8::2");
-        const DST1: Ipv6Addr = net_ip_v6!("ff0e::1");
-        const DST2: Ipv6Addr = net_ip_v6!("ff0e::2");
-    }
+    use crate::internal::multicast_forwarding;
+    use crate::internal::multicast_forwarding::testutil::TestIpExt;
+    use crate::multicast_forwarding::{MulticastRoute, MulticastRouteKey, MulticastRouteTarget};
 
     #[ip_test(I)]
     fn enable_disable<I: IpLayerIpExt>() {
-        let mut api = new_multicast_forwarding_api::<I>();
+        let mut api = multicast_forwarding::testutil::new_api::<I>();
 
         assert_matches!(
             api.core_ctx().state.multicast_forwarding.borrow().deref(),
@@ -333,7 +203,7 @@ mod tests {
     }
 
     #[ip_test(I)]
-    fn add_remove_route<I: IpLayerIpExt + ConstantsIpExt>() {
+    fn add_remove_route<I: TestIpExt>() {
         let key1 = MulticastRouteKey::new(I::SRC1, I::DST1).unwrap();
         let key2 = MulticastRouteKey::new(I::SRC2, I::DST2).unwrap();
         let forward_to_b = MulticastRoute::new_forward(
@@ -347,7 +217,7 @@ mod tests {
         )
         .unwrap();
 
-        let mut api = new_multicast_forwarding_api::<I>();
+        let mut api = multicast_forwarding::testutil::new_api::<I>();
 
         // Adding/removing routes before multicast forwarding is enabled should
         // fail.
@@ -382,7 +252,7 @@ mod tests {
     }
 
     #[ip_test(I)]
-    fn remove_references_to_device<I: IpLayerIpExt + ConstantsIpExt>() {
+    fn remove_references_to_device<I: TestIpExt>() {
         // NB: 4 arbitrary keys, that are unique from each other.
         let key1 = MulticastRouteKey::new(I::SRC1, I::DST1).unwrap();
         let key2 = MulticastRouteKey::new(I::SRC2, I::DST1).unwrap();
@@ -407,7 +277,7 @@ mod tests {
 
         // Verify that removing device references is a no-op when multicast
         // forwarding is disabled.
-        let mut api = new_multicast_forwarding_api::<I>();
+        let mut api = multicast_forwarding::testutil::new_api::<I>();
         api.remove_references_to_device(&BAD_DEV.downgrade());
         assert!(api.enable());
 

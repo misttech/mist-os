@@ -29,6 +29,15 @@ pub enum MulticastForwardingState<I: IpLayerIpExt, D: StrongDeviceIdentifier> {
     Enabled(MulticastForwardingEnabledState<I, D>),
 }
 
+impl<I: IpLayerIpExt, D: StrongDeviceIdentifier> MulticastForwardingState<I, D> {
+    pub(crate) fn enabled(&self) -> Option<&MulticastForwardingEnabledState<I, D>> {
+        match self {
+            MulticastForwardingState::Disabled => None,
+            MulticastForwardingState::Enabled(state) => Some(state),
+        }
+    }
+}
+
 /// State held by the netstack when multicast forwarding is enabled for `I`.
 #[derive(Debug, Derivative)]
 #[derivative(Default(bound = ""))]
@@ -97,8 +106,6 @@ pub trait MulticastForwardingStateContext<I: IpLayerIpExt>: DeviceIdContext<AnyD
         WeakDeviceId = Self::WeakDeviceId,
     >;
     /// Provides immutable access to the state.
-    // TODO(https://fxbug.dev/353329136): Use this.
-    #[allow(unused)]
     fn with_state<
         O,
         F: FnOnce(&MulticastForwardingState<I, Self::DeviceId>, &mut Self::Ctx<'_>) -> O,
@@ -125,8 +132,6 @@ pub trait MulticastRouteTableContext<I: IpLayerIpExt>: DeviceIdContext<AnyDevice
         WeakDeviceId = Self::WeakDeviceId,
     >;
     /// Provides immutable access to the route table.
-    // TODO(https://fxbug.dev/353329136): Use this.
-    #[allow(unused)]
     fn with_route_table<
         O,
         F: FnOnce(&MulticastRouteTable<I, Self::DeviceId>, &mut Self::Ctx<'_>) -> O,

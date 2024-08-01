@@ -152,11 +152,11 @@ pub struct MulticastRoute<D: StrongDeviceIdentifier> {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum Action<D: StrongDeviceIdentifier> {
     /// Forward the packet out of each provided [`Target`].
-    Forward(Targets<D>),
+    Forward(MulticastRouteTargets<D>),
 }
 
 /// The collection of targets out of which to forward a multicast packet.
-type Targets<D> = Vec<MulticastRouteTarget<D>>;
+pub(crate) type MulticastRouteTargets<D> = Vec<MulticastRouteTarget<D>>;
 
 /// The target out of which to forward a multicast packet.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -185,7 +185,7 @@ impl<D: StrongDeviceIdentifier> MulticastRoute<D> {
     /// Construct a new [`MulticastRoute`] with [`Action::Forward`].
     pub fn new_forward(
         input_interface: D,
-        targets: Targets<D>,
+        targets: MulticastRouteTargets<D>,
     ) -> Result<Self, ForwardMulticastRouteError> {
         if targets.is_empty() {
             return Err(ForwardMulticastRouteError::EmptyTargetList);
