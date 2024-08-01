@@ -39,10 +39,17 @@ args: ## Set up build dir and arguments file
 
 debug: args ## Set debug arguments
 	$(NOECHO)echo "is_debug = true" >> $(OUTPUT)/args.gn
+.PHONY: debug
+
+gdb: args ## Set debug arguments
 	$(NOECHO)echo "compress_debuginfo = \"none\"" >> $(OUTPUT)/args.gn
 	$(NOECHO)echo "optimize = \"debug\"" >> $(OUTPUT)/args.gn
 	$(NOECHO)echo "zircon_optimize = \"debug\"" >> $(OUTPUT)/args.gn
 	$(NOECHO)echo "kernel_extra_defines = [ \"DISABLE_KASLR\" ]" >> $(OUTPUT)/args.gn
+.PHONY: gdb
+
+release: args ## Set release arguments
+	$(NOECHO)echo "is_debug = false" >> $(OUTPUT)/args.gn
 .PHONY: debug
 
 kasan: args ## Compile with Kernel Address Sanitazier enabled
