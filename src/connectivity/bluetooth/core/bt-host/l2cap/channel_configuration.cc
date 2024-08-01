@@ -10,14 +10,13 @@
 #include <optional>
 
 #include <pw_bytes/endian.h>
+#include <pw_preprocessor/compiler.h>
 
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/byte_buffer.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/log.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/packet_view.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/l2cap_defs.h"
 #include "src/connectivity/bluetooth/lib/cpp-string/string_printf.h"
-
-#pragma clang diagnostic ignored "-Wswitch-enum"
 
 namespace bt::l2cap::internal {
 
@@ -91,6 +90,8 @@ size_t ChannelConfiguration::ReadNextOption(const ByteBuffer& options) {
     return 0;
   }
 
+  PW_MODIFY_DIAGNOSTICS_PUSH();
+  PW_MODIFY_DIAGNOSTIC(ignored, "-Wswitch-enum");
   switch (option.header().type) {
     case OptionType::kMTU:
       if (!CheckHeaderLengthField<MtuOption>(option)) {
@@ -132,6 +133,7 @@ size_t ChannelConfiguration::ReadNextOption(const ByteBuffer& options) {
 
       return option_size;
   }
+  PW_MODIFY_DIAGNOSTICS_POP();
 }
 
 // MtuOption implementation

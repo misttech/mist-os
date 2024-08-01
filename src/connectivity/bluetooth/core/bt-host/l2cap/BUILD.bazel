@@ -49,6 +49,7 @@ cc_library(
         "signaling_channel.cc",
         "types.cc",
     ],
+    copts = ["-Wswitch-enum"],
     deps = [
         ":definitions",
         "//src/connectivity/bluetooth/core/bt-host:public",

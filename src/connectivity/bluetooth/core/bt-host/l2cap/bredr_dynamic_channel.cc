@@ -4,12 +4,12 @@
 
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/bredr_dynamic_channel.h"
 
+#include <pw_preprocessor/compiler.h>
+
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/assert.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/log.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/channel_configuration.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/l2cap_defs.h"
-
-#pragma clang diagnostic ignored "-Wswitch-enum"
 
 namespace bt::l2cap::internal {
 namespace {
@@ -1015,6 +1015,9 @@ ChannelConfiguration BrEdrDynamicChannel::CheckForUnacceptableConfigReqOptions(
           : RetransmissionAndFlowControlMode::kBasic;
   const auto local_mode =
       local_config().retransmission_flow_control_option()->mode();
+
+  PW_MODIFY_DIAGNOSTICS_PUSH();
+  PW_MODIFY_DIAGNOSTIC(ignored, "-Wswitch-enum");
   switch (req_mode) {
     case RetransmissionAndFlowControlMode::kBasic:
       // Local device must accept, as basic mode has highest precedence.
@@ -1075,6 +1078,7 @@ ChannelConfiguration BrEdrDynamicChannel::CheckForUnacceptableConfigReqOptions(
             local_config().retransmission_flow_control_option());
       }
   }
+  PW_MODIFY_DIAGNOSTICS_POP();
 
   return unacceptable;
 }
