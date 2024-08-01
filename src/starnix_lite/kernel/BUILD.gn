@@ -480,7 +480,6 @@ static_library("restricted_trampoline") {
   sources = [ "execution/trampoline_${current_cpu}.S" ]
 }
 
-
 # Components
 
 # The starnix kernel manifest, used by all containers.
@@ -509,9 +508,11 @@ zbi("starnix_lite_kernel_zbi") {
     ":starnix_lite-zbi-cmdline",
     ":starnix_lite_kernel_bin",
     "//build/info/bootfs:minimum_utc_stamp",
+
+    #"//src/starnix/examples/hello_starnix:bin",
+    "//examples/nolibc:linux-bin",
     "//src/starnix/containers:default_init",
     "//src/starnix/containers/mistos:container_resources",
-    "//src/starnix/examples/hello_starnix:bin",
   ]
 
   output_name = "starnix_lite_kernel"
@@ -539,8 +540,8 @@ mistos_unittest_zbi("starnix_lite-tests") {
   executable_path = "bin/starnix_core_lib_test"
   test_target_label = ":starnix_lite_core_test"
   deps = [
-    "//src/starnix/kernel:starnix-test-files",
     "//src/starnix/examples/hello_starnix:bin",
+    "//src/starnix/kernel:starnix-test-files",
   ]
 }
 

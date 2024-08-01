@@ -94,10 +94,19 @@ fn main() -> Result<(), Error> {
     }
 
     let config = Config {
-        features: Default::default(),
-        init: vec!["/bin/hello_starnix".to_owned()],
+        features: vec!["container".to_owned()],
+        init: vec!["/bin/nolibc-test".to_owned()],
         kernel_cmdline: Default::default(),
-        mounts: vec!["/:remotefs".to_owned()],
+        mounts: vec![
+            "/:remotefs".to_owned(),
+            "/dev:devtmpfs".to_owned(),
+            "/dev/pts:devpts".to_owned(),
+            "/dev/shm:tmpfs".to_owned(),
+            "/proc:proc".to_owned(),
+            "/sys:sysfs".to_owned(),
+            "/tmp:tmpfs".to_owned(),
+        ],
+
         rlimits: Default::default(),
         name: "starnix_lite".to_owned(),
         startup_file_path: Default::default(),
