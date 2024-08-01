@@ -21,8 +21,9 @@ use ::cm_logger::klog;
 use builtins::vmex_resource::VmexResource;
 use elf_runner::process_launcher::ProcessLauncher;
 use elf_runner::vdso_vmo::{get_next_vdso_vmo, get_stable_vdso_vmo};
-use fidl::endpoints::{ClientEnd, Proxy};
+use fidl::endpoints::{ClientEnd, Proxy, RequestStream};
 use fidl::HandleBased;
+use fuchsia_boot::UserbootRequest;
 use fuchsia_component::server::*;
 use fuchsia_runtime::{job_default, process_self, take_startup_handle, HandleInfo, HandleType};
 use fuchsia_zircon::JobCriticalOptions;
@@ -34,10 +35,10 @@ use std::io::{self, Write};
 use std::process::{self, Command};
 use std::sync::Arc;
 use std::{env, thread};
-use tracing::{info, warn};
+use tracing::{error, info, warn};
 use {
-    fidl_fuchsia_io as fio, fidl_fuchsia_ldsvc as fldsvc, fuchsia_async as fasync,
-    fuchsia_zircon as zx,
+    fidl_fuchsia_boot as fuchsia_boot, fidl_fuchsia_io as fio, fidl_fuchsia_ldsvc as fldsvc,
+    fuchsia_async as fasync, fuchsia_zircon as zx,
 };
 
 mod bootfs;
@@ -115,10 +116,6 @@ fn main() {
     let system_resource_handle =
         take_startup_handle(HandleType::SystemResource.into()).map(zx::Resource::from);
 
-    let svc_stash_channel = take_startup_handle(HandleInfo::new(HandleType::User0, 0))
-        .map(zx::Channel::from)
-        .expect("Failed to get svc server channel");
-
     let mut executor = fasync::SendExecutor::new(1);
 
     let run_root_fut = async move {
@@ -172,7 +169,33 @@ fn main() {
             fuchsia_zircon::Handle::from_raw(dl_set_loader_service(ldsvc_hnd.into_raw()));
         };
 
-        let svc_stash = SvcController::new(svc_stash_channel);
+        // Drain messages from `fuchsia.boot.Userboot`, and expose appropriate capabilities.
+        let userboot = take_startup_handle(HandleInfo::new(HandleType::User0, 0))
+            .map(zx::Channel::from)
+            .map(fasync::Channel::from_channel)
+            .map(fuchsia_boot::UserbootRequestStream::from_channel);
+
+        let mut svc_stash_provider = None;
+        if let Some(userboot) = userboot {
+            let messages = userboot.try_collect::<Vec<UserbootRequest>>().await;
+
+            if let Ok(mut messages) = messages {
+                while let Some(request) = messages.pop() {
+                    match request {
+                        UserbootRequest::PostStashSvc { stash_svc_endpoint, control_handle: _ } => {
+                            if svc_stash_provider.is_some() {
+                                warn!("Expected at most a single SvcStash, but more were found. Last entry will be preserved.");
+                            }
+                            svc_stash_provider = Some(stash_svc_endpoint.into_channel());
+                        }
+                    }
+                }
+            } else if let Err(err) = messages {
+                error!("Error extracting 'fuchsia.boot.Userboot' messages:  {err}");
+            }
+        }
+
+        let svc_stash = SvcController::new(svc_stash_provider.unwrap());
         svc_stash.wait_for_epitaph().await;
 
         let mut service_fs = ServiceFs::new();
@@ -318,13 +341,14 @@ fn main() {
                     bin_path.as_str(),
                     fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
                 )
-                .expect("");
-                let vmo = fdio::get_vmo_exec_from_file(&file).expect("");
+                .expect("Failed to open");
+                let vmo = fdio::get_vmo_exec_from_file(&file).expect("Failed to get vmo");
 
                 // Create a new child job of this process's (this process that this code is running in) own 'default job'.
-                let job = job_default().create_child_job().expect("");
+                let job = job_default().create_child_job().expect("Failed to create job");
 
-                let procname = CString::new(bin_path.as_bytes()).expect("");
+                let procname: CString =
+                    CString::new(bin_path.as_bytes()).expect("Failed to generate procname");
                 let mut builder = ProcessBuilder::new(
                     &procname,
                     &job,
