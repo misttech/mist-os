@@ -16,10 +16,14 @@ export NINJA_STATUS_REFRESH_MILLIS=100
 export NINJA_PERSISTENT_MODE=0
 export NINJA_STATUS=[%f/%t](%r)
 
+# Some tools depends on this env var.
+export FUCHSIA_BUILD_DIR=$(MISTOSROOT)/$(OUTPUT)
+
 info: ## Print build info
 	@echo "HOST_OS=$(HOST_OS)"
 	@echo "HOST_ARCH=$(HOST_ARCH)"
 	@cat $(OUTPUT)/args.gn
+	@echo "FUCHSIA_BUILD_DIR=$(MISTOSROOT)"
 .PHONY: info
 
 args: ## Set up build dir and arguments file
