@@ -33,7 +33,7 @@ class LowEnergyConnector final {
   // established with the parameters specified in |options|.
   LowEnergyConnector(PeerId peer_id,
                      LowEnergyConnectionOptions options,
-                     hci::CommandChannel::WeakPtr cmd_channel,
+                     hci::Transport::WeakPtr hci,
                      PeerCache* peer_cache,
                      WeakSelf<LowEnergyConnectionManager>::WeakPtr conn_mgr,
                      l2cap::ChannelManager* l2cap,
@@ -184,6 +184,8 @@ class LowEnergyConnector final {
   LowEnergyDiscoveryManager::WeakPtr discovery_manager_;
 
   hci::CommandChannel::WeakPtr cmd_;
+
+  hci::Transport::WeakPtr hci_;
 
   // Only used to construct a LowEnergyConnection.
   WeakSelf<LowEnergyConnectionManager>::WeakPtr le_connection_manager_;
