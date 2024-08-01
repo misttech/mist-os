@@ -718,9 +718,9 @@ impl<C: ComponentInstanceInterface + 'static> sandbox::Routable for UnitRouter<C
     async fn route(&self, request: Request) -> Result<Capability, RouterError> {
         if request.debug {
             return Ok(Capability::Dictionary(
-                CapabilitySource::Void {
+                CapabilitySource::<C>::Void {
                     capability: self.capability.clone(),
-                    component: self.component.clone(),
+                    moniker: self.component.moniker.clone(),
                 }
                 .try_into()
                 .expect("failed to convert capability source to dictionary"),

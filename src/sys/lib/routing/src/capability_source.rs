@@ -104,7 +104,7 @@ pub enum CapabilitySource<C: ComponentInstanceInterface + 'static> {
     Environment { capability: ComponentCapability, moniker: Moniker },
     /// This capability originates from "void". This is only a valid origination for optional
     /// capabilities.
-    Void { capability: InternalCapability, component: WeakComponentInstanceInterface<C> },
+    Void { capability: InternalCapability, moniker: Moniker },
 }
 
 impl<C: ComponentInstanceInterface> CapabilitySource<C> {
@@ -157,12 +157,10 @@ impl<C: ComponentInstanceInterface> CapabilitySource<C> {
             Self::Component { moniker, .. }
             | Self::Framework { moniker, .. }
             | Self::Capability { moniker, .. }
-            | Self::Environment { moniker, .. } => {
-                ExtendedMoniker::ComponentInstance(moniker.clone())
-            }
+            | Self::Environment { moniker, .. }
+            | Self::Void { moniker, .. } => ExtendedMoniker::ComponentInstance(moniker.clone()),
             Self::AnonymizedAggregate { component, .. }
-            | Self::FilteredAggregate { component, .. }
-            | Self::Void { component, .. } => {
+            | Self::FilteredAggregate { component, .. } => {
                 ExtendedMoniker::ComponentInstance(component.moniker.clone())
             }
             Self::Builtin { .. } | Self::Namespace { .. } => ExtendedMoniker::ComponentManager,
@@ -270,16 +268,6 @@ impl<C: ComponentInstanceInterface + 'static> TryFrom<CapabilitySource<C>> for D
             .unwrap();
             Ok(())
         }
-        fn insert_component_token<C: ComponentInstanceInterface + 'static>(
-            dict: &Dict,
-            component: WeakComponentInstanceInterface<C>,
-        ) {
-            dict.insert_capability(
-                &Name::new(COMPONENT_STR).unwrap(),
-                Capability::Instance(component.clone().into()),
-            )
-            .unwrap();
-        }
         fn insert_moniker(dict: &Dict, moniker: Moniker) {
             dict.insert_capability(
                 &Name::new(MONIKER_STR).unwrap(),
@@ -318,10 +306,10 @@ impl<C: ComponentInstanceInterface + 'static> TryFrom<CapabilitySource<C>> for D
                 insert_capability_dict(&output, capability)?;
                 insert_moniker(&output, moniker)
             }
-            CapabilitySource::Void { capability, component } => {
+            CapabilitySource::Void { capability, moniker } => {
                 insert_key(&output, VOID_STR);
                 insert_capability_dict(&output, capability)?;
-                insert_component_token(&output, component);
+                insert_moniker(&output, moniker)
             }
             // The following two are only relevant for service capabilities, which are currently
             // unsupported in the bedrock layer of routing.
@@ -344,20 +332,6 @@ impl<C: ComponentInstanceInterface + 'static> TryFrom<Dict> for CapabilitySource
                 return Err(fidl::Error::InvalidEnumValue);
             };
             Ok(capability_dict)
-        }
-        fn get_weak_component<C: ComponentInstanceInterface + 'static>(
-            dict: &Dict,
-        ) -> Result<WeakComponentInstanceInterface<C>, fidl::Error> {
-            let component = dict
-                .get(&Name::new(COMPONENT_STR).unwrap())
-                .map_err(|_| fidl::Error::InvalidEnumValue)?;
-            let Some(Capability::Instance(weak_instance_token)) = component else {
-                return Err(fidl::Error::InvalidEnumValue);
-            };
-            Ok(weak_instance_token
-                .clone()
-                .try_into()
-                .expect("unexpected type in weak component token"))
         }
         fn get_moniker(dict: &Dict) -> Result<Moniker, fidl::Error> {
             let data = dict
@@ -400,7 +374,7 @@ impl<C: ComponentInstanceInterface + 'static> TryFrom<Dict> for CapabilitySource
             },
             VOID_STR => CapabilitySource::Void {
                 capability: get_capability_dict(&dict)?.try_into()?,
-                component: get_weak_component(&dict)?,
+                moniker: get_moniker(&dict)?,
             },
             _ => return Err(fidl::Error::InvalidEnumValue),
         })

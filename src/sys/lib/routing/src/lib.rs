@@ -1231,7 +1231,7 @@ where
             {
                 CapabilitySource::Void {
                     capability: InternalCapability::Config(use_decl.source_name),
-                    component: target.as_weak(),
+                    moniker: target.moniker().clone(),
                 }
             } else {
                 return Err(e);

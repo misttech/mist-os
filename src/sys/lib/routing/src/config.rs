@@ -74,16 +74,15 @@ where
 mod tests {
     use super::*;
     use crate::component_instance::tests::TestComponent;
-    use crate::component_instance::WeakComponentInstanceInterface;
     use moniker::Moniker;
 
     #[test]
     fn config_from_void() {
-        let void_source = CapabilitySource::Void {
+        let void_source = CapabilitySource::<TestComponent>::Void {
             capability: crate::capability_source::InternalCapability::Config(
                 "test".parse().unwrap(),
             ),
-            component: WeakComponentInstanceInterface::<TestComponent>::invalid(),
+            moniker: Moniker::root(),
         };
         assert_eq!(Ok(None), source_to_value(&None, void_source));
     }

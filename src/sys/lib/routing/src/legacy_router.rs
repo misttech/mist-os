@@ -998,7 +998,7 @@ impl Offer {
                         (&offer).into(),
                         offer.source_name().clone(),
                     ),
-                    component: target.as_weak(),
+                    moniker: target.moniker().clone(),
                 }))
             }
             OfferSource::Self_ => {
@@ -1407,7 +1407,7 @@ impl Expose {
                         (&expose).into(),
                         expose.source_name().clone(),
                     ),
-                    component: target.as_weak(),
+                    moniker: target.moniker().clone(),
                 }))
             }
             ExposeSource::Self_ => {
