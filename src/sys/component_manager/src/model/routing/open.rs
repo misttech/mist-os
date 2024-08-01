@@ -181,11 +181,11 @@ impl<'a> CapabilityOpenRequest<'a> {
             }
             CapabilitySource::AnonymizedAggregate {
                 capability,
-                component,
+                moniker,
                 aggregate_capability_provider,
                 members,
             } => {
-                let source_component_instance = component.upgrade()?;
+                let source_component_instance = target.upgrade()?.find_absolute(moniker).await?;
 
                 let route = AnonymizedServiceRoute {
                     source_moniker: source_component_instance.moniker.clone(),
@@ -218,7 +218,7 @@ impl<'a> CapabilityOpenRequest<'a> {
                     }
 
                     service_dir = Arc::new(AnonymizedAggregateServiceDir::new(
-                        component.clone(),
+                        source_component_instance.as_weak(),
                         route.clone(),
                         aggregate_capability_provider.clone_boxed(),
                     ));

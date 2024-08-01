@@ -316,8 +316,8 @@ impl RouteRequest {
         let source = source.source;
         let source_moniker = source.source_moniker();
         let service_info = match source {
-            CapabilitySource::AnonymizedAggregate { capability, component, members, .. } => {
-                let component = component.upgrade()?;
+            CapabilitySource::AnonymizedAggregate { capability, moniker, members, .. } => {
+                let component = instance.find_absolute(&moniker).await?;
                 let route = AnonymizedServiceRoute {
                     source_moniker: component.moniker.clone(),
                     members: members.clone(),

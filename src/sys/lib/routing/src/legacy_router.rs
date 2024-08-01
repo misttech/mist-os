@@ -216,7 +216,7 @@ where
             let capability_type = CapabilityTypeName::from(first_offer);
             Ok(CapabilitySource::<C>::AnonymizedAggregate {
                 capability: AggregateCapability::Service(first_offer.source_name().clone()),
-                component: aggregation_component.as_weak(),
+                moniker: aggregation_component.moniker().clone(),
                 aggregate_capability_provider: Box::new(AnonymizedAggregateServiceProvider {
                     members: members.clone(),
                     containing_component: aggregation_component.as_weak(),
@@ -336,7 +336,7 @@ where
             let capability_type = CapabilityTypeName::from(first_expose);
             Ok(CapabilitySource::<C>::AnonymizedAggregate {
                 capability: AggregateCapability::Service(first_expose.source_name().clone()),
-                component: aggregation_component.as_weak(),
+                moniker: aggregation_component.moniker().clone(),
                 aggregate_capability_provider: Box::new(AnonymizedAggregateServiceProvider {
                     members: members.clone(),
                     containing_component: aggregation_component.as_weak(),

@@ -2325,7 +2325,7 @@ async fn verify_service_route(
     let source = RouteRequest::UseService(use_decl).route(&target_component).await.unwrap();
     match source {
         RouteSource {
-            source: CapabilitySource::AnonymizedAggregate { members, capability, component, .. },
+            source: CapabilitySource::AnonymizedAggregate { members, capability, moniker, .. },
             relative_path: _,
         } => {
             let collections: Vec<_> = members
@@ -2342,7 +2342,7 @@ async fn verify_service_route(
             assert_eq!(collections, unique_colls);
             assert_matches!(capability, AggregateCapability::Service(_));
             assert_eq!(*capability.source_name(), "foo");
-            assert!(Arc::ptr_eq(&component.upgrade().unwrap(), &agg_component));
+            assert_eq!(&moniker, &agg_component.moniker);
         }
         _ => panic!("wrong capability source"),
     };

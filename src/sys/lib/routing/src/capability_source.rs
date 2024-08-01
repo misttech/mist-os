@@ -87,7 +87,7 @@ pub enum CapabilitySource<C: ComponentInstanceInterface + 'static> {
     /// children. The instance names in the aggregate service will be anonymized.
     AnonymizedAggregate {
         capability: AggregateCapability,
-        component: WeakComponentInstanceInterface<C>,
+        moniker: Moniker,
         #[derivative(PartialEq = "ignore")]
         aggregate_capability_provider: Box<dyn AnonymizedAggregateCapabilityProvider<C>>,
         members: Vec<AggregateMember>,
@@ -158,9 +158,11 @@ impl<C: ComponentInstanceInterface> CapabilitySource<C> {
             | Self::Framework { moniker, .. }
             | Self::Capability { moniker, .. }
             | Self::Environment { moniker, .. }
-            | Self::Void { moniker, .. } => ExtendedMoniker::ComponentInstance(moniker.clone()),
-            Self::AnonymizedAggregate { component, .. }
-            | Self::FilteredAggregate { component, .. } => {
+            | Self::Void { moniker, .. }
+            | Self::AnonymizedAggregate { moniker, .. } => {
+                ExtendedMoniker::ComponentInstance(moniker.clone())
+            }
+            Self::FilteredAggregate { component, .. } => {
                 ExtendedMoniker::ComponentInstance(component.moniker.clone())
             }
             Self::Builtin { .. } | Self::Namespace { .. } => ExtendedMoniker::ComponentManager,
@@ -182,11 +184,11 @@ impl<C: ComponentInstanceInterface> fmt::Display for CapabilitySource<C> {
                 Self::Namespace { capability, .. } => capability.to_string(),
                 Self::FilteredAggregate { capability, .. } => capability.to_string(),
                 Self::Capability { source_capability, .. } => format!("{}", source_capability),
-                Self::AnonymizedAggregate { capability, members, component, .. } => {
+                Self::AnonymizedAggregate { capability, members, moniker, .. } => {
                     format!(
                         "{} from component '{}' aggregated from {}",
                         capability,
-                        &component.moniker,
+                        moniker,
                         members.iter().map(|s| format!("{s}")).collect::<Vec<_>>().join(","),
                     )
                 }
