@@ -396,10 +396,10 @@ zx_status_t Interrupts::Init(PipeVsyncCallback pipe_vsync_callback,
   }
   irq_handler_.set_object(irq_.get());
 
-  const char* kRoleName = "fuchsia.graphics.display.drivers.intel-i915.interrupt";
+  const char* kRoleName = "fuchsia.graphics.display.drivers.intel-display.interrupt";
   zx::result<fdf::SynchronizedDispatcher> create_dispatcher_result =
       fdf::SynchronizedDispatcher::Create(
-          fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "i915-irq-thread",
+          fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "intel-display-irq-thread",
           /*shutdown_handler=*/
           [this](fdf_dispatcher_t*) { irq_handler_dispatcher_shutdown_completed_.Signal(); },
           kRoleName);
