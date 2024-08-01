@@ -61,8 +61,9 @@ impl From<u8> for Priority {
 }
 
 impl From<Priority> for u8 {
+    #[allow(clippy::unnecessary_fallible_conversions)]
     fn from(x: Priority) -> Self {
-        x.into()
+        x.try_into().unwrap()
     }
 }
 

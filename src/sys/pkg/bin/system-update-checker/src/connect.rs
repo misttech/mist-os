@@ -20,6 +20,9 @@ impl ServiceConnect for ServiceConnector {
 }
 
 #[cfg(test)]
+pub(crate) use test::*;
+
+#[cfg(test)]
 mod test {
     use super::*;
     use anyhow::{format_err, Context};
@@ -58,6 +61,3 @@ mod test {
         }
     }
 }
-
-#[cfg(test)]
-pub(crate) use test::*;

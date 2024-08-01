@@ -291,6 +291,7 @@ impl Thread for Instance {
             .into_result()
     }
 
+    #[allow(clippy::unnecessary_cast)]
     fn get_network_name_as_slice(&self) -> &[u8] {
         unsafe {
             let slice = std::slice::from_raw_parts(

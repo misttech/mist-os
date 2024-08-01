@@ -99,7 +99,7 @@ impl<Marker: Send + Sync + 'static> FrozenIndex<Marker> {
     ) -> Result<Self, anyhow::Error> {
         let (packages, blobs) = Self::load_packages_and_blobs(
             blobfs,
-            root_package_urls_and_hashes.values().map(|h| *h),
+            root_package_urls_and_hashes.values().copied(),
             on_package_load_error,
         )
         .await
