@@ -178,7 +178,7 @@ where
                         ));
                         return Ok(CapabilitySource::<C>::FilteredAggregate {
                             capability: AggregateCapability::Service(source_name),
-                            component: component.as_weak(),
+                            moniker: component.moniker().clone(),
                             capability_provider,
                         });
                     }
@@ -273,7 +273,7 @@ where
             // for other types of aggregations.
             Ok(CapabilitySource::<C>::FilteredAggregate {
                 capability: AggregateCapability::Service(source_name),
-                component: aggregation_component.as_weak(),
+                moniker: aggregation_component.moniker().clone(),
                 capability_provider: Box::new(OfferAggregateServiceProvider::new(
                     offer_service_decls,
                     aggregation_component.as_weak(),
@@ -1012,6 +1012,7 @@ impl Offer {
                 )?;
                 // if offerdecl is for a filtered service return the associated filtered source.
                 let component = target.as_weak();
+                let moniker = target.moniker().clone();
                 let res = match offer.into() {
                     OfferDecl::Service(offer_service_decl) => {
                         if offer_service_decl.source_instance_filter.is_some()
@@ -1020,12 +1021,12 @@ impl Offer {
                             let source_name = offer_service_decl.source_name.clone();
                             let capability_provider = Box::new(OfferFilteredServiceProvider::new(
                                 offer_service_decl,
-                                component.clone(),
+                                component,
                                 capability,
                             ));
                             OfferResult::Source(CapabilitySource::<C>::FilteredAggregate {
                                 capability: AggregateCapability::Service(source_name),
-                                component,
+                                moniker,
                                 capability_provider,
                             })
                         } else {

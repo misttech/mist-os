@@ -168,11 +168,12 @@ impl<'a> CapabilityOpenRequest<'a> {
                 }))),
                 _ => Ok(None),
             },
-            CapabilitySource::FilteredAggregate { capability_provider, component, .. } => {
+            CapabilitySource::FilteredAggregate { capability_provider, moniker, .. } => {
+                let component = target.upgrade()?.find_absolute(moniker).await?;
                 // TODO(https://fxbug.dev/42124541): This should cache the directory
                 Ok(Some(Box::new(
                     FilteredAggregateServiceProvider::new(
-                        component.clone(),
+                        component.as_weak(),
                         target,
                         capability_provider.clone(),
                     )

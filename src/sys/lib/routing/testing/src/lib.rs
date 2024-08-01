@@ -3331,13 +3331,13 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
                     >::FilteredAggregate {
                         capability: AggregateCapability::Service(name),
-                        component,
+                        moniker,
                         capability_provider,
                     },
                 relative_path,
             } if relative_path.is_dot() => {
                 assert_eq!(name, "foo");
-                assert_eq!(component.moniker, "c".parse().unwrap());
+                assert_eq!(moniker, "c".parse().unwrap());
                 let mut data = capability_provider.route_instances();
                 assert_eq!(data.len(), 1);
                 let data = data.remove(0).await.unwrap();
@@ -3421,13 +3421,13 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
                     >::FilteredAggregate {
                         capability: AggregateCapability::Service(name),
-                        component,
+                        moniker,
                         capability_provider,
                     },
                 relative_path,
             } if relative_path.is_dot() => {
                 assert_eq!(name, "foo");
-                assert_eq!(component.moniker, "c".parse().unwrap());
+                assert_eq!(moniker, "c".parse().unwrap());
                 let mut data = capability_provider.route_instances();
                 assert_eq!(data.len(), 1);
                 let data = data.remove(0).await.unwrap();

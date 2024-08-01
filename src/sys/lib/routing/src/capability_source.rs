@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::bedrock::dict_ext::DictExt;
-use crate::component_instance::{ComponentInstanceInterface, WeakComponentInstanceInterface};
+use crate::component_instance::ComponentInstanceInterface;
 use crate::error::RoutingError;
 use async_trait::async_trait;
 use cm_rust::{
@@ -98,7 +98,7 @@ pub enum CapabilitySource<C: ComponentInstanceInterface + 'static> {
         capability: AggregateCapability,
         #[derivative(PartialEq = "ignore")]
         capability_provider: Box<dyn FilteredAggregateCapabilityProvider<C>>,
-        component: WeakComponentInstanceInterface<C>,
+        moniker: Moniker,
     },
     /// This capability originates from "environment". It's implemented by a component instance.
     Environment { capability: ComponentCapability, moniker: Moniker },
@@ -159,11 +159,9 @@ impl<C: ComponentInstanceInterface> CapabilitySource<C> {
             | Self::Capability { moniker, .. }
             | Self::Environment { moniker, .. }
             | Self::Void { moniker, .. }
-            | Self::AnonymizedAggregate { moniker, .. } => {
+            | Self::AnonymizedAggregate { moniker, .. }
+            | Self::FilteredAggregate { moniker, .. } => {
                 ExtendedMoniker::ComponentInstance(moniker.clone())
-            }
-            Self::FilteredAggregate { component, .. } => {
-                ExtendedMoniker::ComponentInstance(component.moniker.clone())
             }
             Self::Builtin { .. } | Self::Namespace { .. } => ExtendedMoniker::ComponentManager,
         }
