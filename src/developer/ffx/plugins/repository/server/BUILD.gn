@@ -10,6 +10,7 @@ ffx_plugin("ffx_repository_server") {
   with_unit_tests = true
 
   plugin_deps = [
+    "list:ffx_repository_server_list",
     "start:ffx_repository_server_start",
     "status:ffx_repository_server_status",
     "stop:ffx_repository_server_stop",

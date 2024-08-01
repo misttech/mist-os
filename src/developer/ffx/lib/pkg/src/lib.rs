@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use fidl_fuchsia_developer_ffx::{RepositoryRegistrationAliasConflictMode, RepositoryStorageType};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 pub mod config;
@@ -12,14 +13,15 @@ pub mod repo;
 mod tunnel;
 
 pub use instance::{
-    write_instance_info, PathType, PkgServerInstanceInfo, PkgServerInstances, ServerMode,
+    write_instance_info, PathType, PkgServerInfo, PkgServerInstanceInfo, PkgServerInstances,
+    ServerMode,
 };
 
 /// Type of registration of the repository on the target device.
 /// This mirrors the fidl type RepositoryStorageType, since
 /// we need JSON serialization.
 ///
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, JsonSchema)]
 pub enum RepoStorageType {
     Ephemeral,
     Persistent,
@@ -39,7 +41,7 @@ impl From<RepositoryStorageType> for RepoStorageType {
 /// This mirrors the fidl type RepositoryRegistrationAliasConflictMode, since
 /// we need JSON serialization.
 ///
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, JsonSchema)]
 pub enum RegistrationConflictMode {
     ErrorOut,
     Replace,

@@ -2,17 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::{RegistrationConflictMode, RepoStorageType};
 use anyhow::Result;
 use ffx_config::EnvironmentContext;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use std::fmt::Display;
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use std::{fs, process};
 
-use crate::{RegistrationConflictMode, RepoStorageType};
-
 /// PathType is an enum encapulating filesystem and URL based paths.
-#[derive(Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
+#[serde(rename_all = "lowercase")]
 pub enum PathType {
     File(PathBuf),
     Url(String),
@@ -24,19 +26,43 @@ impl From<&Path> for PathType {
     }
 }
 
+impl Display for PathType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PathType::File(p) => write!(f, "{}", p.display()),
+            PathType::Url(s) => write!(f, "{s}"),
+        }
+    }
+}
+
 /// ServerMode is the execution mode of the server process.
-#[derive(Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
+#[serde(rename_all = "lowercase")]
 pub enum ServerMode {
     Background,
     Foreground,
     Daemon,
 }
 
+impl Display for ServerMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                ServerMode::Background => "background",
+                ServerMode::Foreground => "foreground",
+                ServerMode::Daemon => "daemon",
+            }
+        )
+    }
+}
+
 /// PkgServerInfo is serialized as a file that contains
 /// the startup information for a running package server.
 /// This includes the process id, which is intended for
 /// use to troubleshoot and stop running instances.
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, JsonSchema, Deserialize, Serialize)]
 pub struct PkgServerInfo {
     pub name: String,
     pub address: SocketAddr,
