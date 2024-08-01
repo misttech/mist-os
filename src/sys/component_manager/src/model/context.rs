@@ -7,6 +7,7 @@ use crate::capability::{
 };
 use crate::model::component::WeakComponentInstance;
 use crate::model::token::InstanceRegistry;
+use ::routing::component_instance::ComponentInstanceInterface;
 use ::routing::policy::GlobalPolicyChecker;
 use cm_config::{AbiRevisionPolicy, RuntimeConfig};
 use errors::ModelError;
@@ -112,11 +113,13 @@ impl ModelContext {
                 }
                 None
             }
-            CapabilitySource::Framework { capability, component } => {
+            CapabilitySource::Framework { capability, moniker } => {
                 let framework_capabilities = self.framework_capabilities.lock().await;
                 for c in framework_capabilities.as_ref().expect("not initialized") {
                     if c.matches(capability) {
-                        return Some(c.new_provider(component.clone(), target));
+                        let source_component =
+                            target.upgrade().ok()?.find_absolute(moniker).await.ok()?.as_weak();
+                        return Some(c.new_provider(source_component, target));
                     }
                 }
                 None

@@ -49,7 +49,7 @@ fn add_hook_protocol<P: DiscoverableProtocolMarker>(
             component,
             CapabilitySource::Framework {
                 capability: InternalCapability::Protocol(P::PROTOCOL_NAME.parse().unwrap()),
-                component: component.into(),
+                moniker: component.moniker.clone(),
             },
         )
         .into_router()

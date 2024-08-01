@@ -365,10 +365,10 @@ impl EventRegistry {
                 source:
                     CapabilitySource::Framework {
                         capability: InternalCapability::EventStream(source_name),
-                        component,
+                        moniker,
                     },
                 relative_path: _,
-            } => Ok((source_name, component.moniker.into(), route)),
+            } => Ok((source_name, moniker.into(), route)),
             RouteSource {
                 source:
                     CapabilitySource::Builtin {

@@ -75,7 +75,7 @@ pub enum CapabilitySource<C: ComponentInstanceInterface + 'static> {
     Component { capability: ComponentCapability, moniker: Moniker },
     /// This capability originates from "framework". It's implemented by component manager and is
     /// scoped to the realm of the source.
-    Framework { capability: InternalCapability, component: WeakComponentInstanceInterface<C> },
+    Framework { capability: InternalCapability, moniker: Moniker },
     /// This capability originates from the parent of the root component, and is built in to
     /// component manager. `top_instance` is the instance at the top of the tree, i.e.  the
     /// instance representing component manager.
@@ -168,9 +168,10 @@ impl<C: ComponentInstanceInterface> CapabilitySource<C> {
 
     pub fn source_moniker(&self) -> ExtendedMoniker {
         match self {
-            Self::Component { moniker, .. } => ExtendedMoniker::ComponentInstance(moniker.clone()),
-            Self::Framework { component, .. }
-            | Self::Capability { component, .. }
+            Self::Component { moniker, .. } | Self::Framework { moniker, .. } => {
+                ExtendedMoniker::ComponentInstance(moniker.clone())
+            }
+            Self::Capability { component, .. }
             | Self::AnonymizedAggregate { component, .. }
             | Self::FilteredAggregate { component, .. }
             | Self::Void { component, .. }
@@ -319,10 +320,10 @@ impl<C: ComponentInstanceInterface + 'static> TryFrom<CapabilitySource<C>> for D
                 insert_capability_dict(&output, capability)?;
                 insert_moniker(&output, moniker)
             }
-            CapabilitySource::Framework { capability, component } => {
+            CapabilitySource::Framework { capability, moniker } => {
                 insert_key(&output, FRAMEWORK_STR);
                 insert_capability_dict(&output, capability)?;
-                insert_component_token(&output, component);
+                insert_moniker(&output, moniker)
             }
             CapabilitySource::Builtin { capability, top_instance } => {
                 insert_key(&output, BUILTIN_STR);
@@ -426,7 +427,7 @@ impl<C: ComponentInstanceInterface + 'static> TryFrom<Dict> for CapabilitySource
             },
             FRAMEWORK_STR => CapabilitySource::Framework {
                 capability: get_capability_dict(&dict)?.try_into()?,
-                component: get_weak_component(&dict)?,
+                moniker: get_moniker(&dict)?,
             },
             BUILTIN_STR => CapabilitySource::Builtin {
                 capability: get_capability_dict(&dict)?.try_into()?,

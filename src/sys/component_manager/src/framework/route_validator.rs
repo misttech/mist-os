@@ -375,11 +375,9 @@ impl RouteRequest {
             let capability_source = CapabilitySource::try_from(capability)
                 .expect("failed to convert capability to capability source");
             match capability_source {
-                CapabilitySource::Component { moniker, .. } => {
+                CapabilitySource::Component { moniker, .. }
+                | CapabilitySource::Framework { moniker, .. } => {
                     (Some(ExtendedMoniker::ComponentInstance(moniker)), None)
-                }
-                CapabilitySource::Framework { component, .. } => {
-                    (Some(ExtendedMoniker::ComponentInstance(component.moniker.clone())), None)
                 }
                 CapabilitySource::Builtin { .. } | CapabilitySource::Namespace { .. } => {
                     (Some(ExtendedMoniker::ComponentManager), None)

@@ -645,7 +645,7 @@ impl Use {
         match use_.source() {
             UseSource::Framework => Ok(UseResult::Source(CapabilitySource::<C>::Framework {
                 capability: sources.framework_source(use_.source_name().clone(), mapper)?,
-                component: target.as_weak(),
+                moniker: target.moniker().clone(),
             })),
             UseSource::Capability(_) => {
                 sources.capability_source()?;
@@ -1051,7 +1051,7 @@ impl Offer {
             OfferSource::Framework => {
                 OfferSegment::Done(OfferResult::Source(CapabilitySource::<C>::Framework {
                     capability: sources.framework_source(offer.source_name().clone(), mapper)?,
-                    component: target.as_weak(),
+                    moniker: target.moniker().clone(),
                 }))
             }
             OfferSource::Capability(_) => {
@@ -1438,7 +1438,7 @@ impl Expose {
             ExposeSource::Framework => {
                 ExposeSegment::Done(ExposeResult::Source(CapabilitySource::<C>::Framework {
                     capability: sources.framework_source(expose.source_name().clone(), mapper)?,
-                    component: target.as_weak(),
+                    moniker: target.moniker().clone(),
                 }))
             }
             ExposeSource::Capability(_) => {

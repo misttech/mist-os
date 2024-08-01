@@ -84,7 +84,7 @@ where
 
         let protocol_capability = CapabilitySource::<C>::Framework {
             capability: InternalCapability::Protocol("fuchsia.component.Realm".parse().unwrap()),
-            component: component.as_weak(),
+            moniker: component.moniker().clone(),
         };
         let valid_path_0 = Moniker::try_from(vec!["foo", "bar"]).unwrap();
         let valid_path_1 = Moniker::try_from(vec!["foo", "bar", "baz"]).unwrap();

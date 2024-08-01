@@ -109,7 +109,7 @@ pub fn build_framework_dictionary(component: &Arc<ComponentInstanceForAnalyzer>)
                 &name,
                 new_debug_only_router(CapabilitySource::Framework {
                     capability: InternalCapability::Protocol(name.clone()),
-                    component: WeakComponentInstanceInterface::new(component),
+                    moniker: component.moniker().clone(),
                 })
                 .into(),
             )
