@@ -15,6 +15,7 @@
             protocol: [
                 "fuchsia.update.channel.Provider",
                 "fuchsia.update.channelcontrol.ChannelControl",
+                "fuchsia.update.Listener",
                 "fuchsia.update.Manager",
             ],
         },
@@ -57,6 +58,10 @@
         },
         {
             protocol: "fuchsia.update.Manager",
+            from: "self",
+        },
+        {
+            protocol: "fuchsia.update.Listener",
             from: "self",
         },
     ],

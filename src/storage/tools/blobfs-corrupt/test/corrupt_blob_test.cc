@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "corrupt_blob.h"
+#include "src/storage/tools/blobfs-corrupt/corrupt_blob.h"
 
 #include <iterator>
 

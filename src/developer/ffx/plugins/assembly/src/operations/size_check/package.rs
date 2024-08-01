@@ -234,7 +234,7 @@ fn load_blob_info(
         result.append(&mut blobs);
     }
 
-    let found_blobs = result.iter().map(|blob| blob.merkle.clone()).collect::<HashSet<Hash>>();
+    let found_blobs = result.iter().map(|blob| blob.merkle).collect::<HashSet<Hash>>();
 
     // Select packages for which one or more blob is missing.
     let incomplete_packages: Vec<&Utf8Path> = blob_usages
@@ -324,7 +324,7 @@ fn compute_budget_results(
     let mut result = vec![];
     for budget_usage in budget_usages.iter() {
         let single_budget_usage = vec![budget_usage.clone()];
-        let blob_count_by_hash = count_blobs(&blob_sizes, &single_budget_usage)?;
+        let blob_count_by_hash = count_blobs(blob_sizes, &single_budget_usage)?;
 
         let mut used_bytes = budget_usage.budget.used_bytes;
         let filtered_blobs = budget_usage.blobs.iter().collect::<Vec<&BlobInstance>>();

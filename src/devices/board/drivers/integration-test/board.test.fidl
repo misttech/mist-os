@@ -17,3 +17,6 @@ closed protocol Board {
         entry Entry;
     }) -> ();
 };
+
+/// Metadata type identifier associated with [`fuchsia.board.test/Entry::metadata`].
+const PDEV_METADATA_TYPE_IDENTIFIER uint32 = 0x54534554;

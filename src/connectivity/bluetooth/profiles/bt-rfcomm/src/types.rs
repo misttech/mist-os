@@ -5,11 +5,11 @@
 use anyhow::Error;
 use bt_rfcomm::ServerChannel;
 use fidl::endpoints::ClientEnd;
-use fidl_fuchsia_bluetooth::PeerId;
 use fidl_fuchsia_bluetooth_bredr as bredr;
 use fuchsia_bluetooth::profile::{
     combine_channel_parameters, ChannelParameters, Psm, ServiceDefinition,
 };
+use fuchsia_bluetooth::types::PeerId;
 use slab::Slab;
 use std::collections::HashSet;
 
@@ -57,6 +57,15 @@ impl Services {
         self.0.iter().map(|(id, data)| (ServiceGroupHandle(id), data))
     }
 
+    /// Returns all the service definitions in the collection.
+    pub fn service_definitions(&self) -> Vec<ServiceDefinition> {
+        let mut services = Vec::new();
+        for (_, data) in self.iter() {
+            services.extend(data.service_defs().clone());
+        }
+        services
+    }
+
     /// Returns currently registered PSMs.
     pub fn psms(&self) -> HashSet<Psm> {
         self.iter().map(|(_, data)| data.allocated_psms()).fold(
@@ -99,12 +108,7 @@ impl AdvertiseParams {
         self,
         receiver: ClientEnd<bredr::ConnectionReceiverMarker>,
     ) -> bredr::ProfileAdvertiseRequest {
-        let fidl_services = self
-            .services
-            .iter()
-            .map(bredr::ServiceDefinition::try_from)
-            .collect::<Result<Vec<_>, _>>()
-            .unwrap();
+        let fidl_services = ServiceDefinition::try_into_fidl(&self.services).unwrap();
 
         bredr::ProfileAdvertiseRequest {
             services: Some(fidl_services),
@@ -178,7 +182,7 @@ impl ServiceGroup {
         channel: bredr::Channel,
         protocol: Vec<bredr::ProtocolDescriptor>,
     ) -> Result<(), Error> {
-        self.receiver.connected(&peer_id, channel, &protocol).map_err(|e| e.into())
+        self.receiver.connected(&peer_id.into(), channel, &protocol).map_err(|e| e.into())
     }
 
     /// Sets the ServiceDefinitions for this group.
@@ -199,7 +203,7 @@ pub(crate) mod tests {
     };
     use fuchsia_async as fasync;
     use fuchsia_bluetooth::profile::{Attribute, DataElement, ProtocolDescriptor};
-    use fuchsia_bluetooth::types::{PeerId, Uuid};
+    use fuchsia_bluetooth::types::Uuid;
     use futures::stream::StreamExt;
     use futures::task::Poll;
 
@@ -268,6 +272,14 @@ pub(crate) mod tests {
             }],
             ..ServiceDefinition::default()
         }
+    }
+
+    pub fn l2cap_protocol(psm: Psm) -> Vec<bredr::ProtocolDescriptor> {
+        vec![bredr::ProtocolDescriptor {
+            protocol: Some(bredr::ProtocolIdentifier::L2Cap),
+            params: Some(vec![bredr::DataElement::Uint16(psm.into())]),
+            ..Default::default()
+        }]
     }
 
     fn build_service_group() -> (ServiceGroup, bredr::ConnectionReceiverRequestStream) {
@@ -376,7 +388,7 @@ pub(crate) mod tests {
         let id = PeerId(123);
         let channel = Channel::default();
         let protocol = vec![];
-        let res = service_group.relay_connected(id.into(), channel, protocol);
+        let res = service_group.relay_connected(id, channel, protocol);
         assert_matches!(res, Ok(()));
 
         // We expect the connected request to be relayed to the client.

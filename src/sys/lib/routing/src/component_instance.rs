@@ -69,6 +69,70 @@ pub trait ComponentInstanceInterface: Sized + Send + Sync {
     async fn component_sandbox(
         self: &Arc<Self>,
     ) -> Result<ComponentSandbox, ComponentInstanceError>;
+
+    /// Attempts to walk the component tree (up and/or down) from the current component to find the
+    /// extended instance represented by the given extended moniker. Intermediate components will
+    /// be resolved as needed. Functionally this calls into `find_absolute` or `find_above_root`
+    /// depending on the extended moniker.
+    async fn find_extended_instance(
+        self: &Arc<Self>,
+        moniker: &ExtendedMoniker,
+    ) -> Result<ExtendedInstanceInterface<Self>, ComponentInstanceError> {
+        match moniker {
+            ExtendedMoniker::ComponentInstance(moniker) => {
+                Ok(ExtendedInstanceInterface::Component(self.find_absolute(moniker).await?))
+            }
+            ExtendedMoniker::ComponentManager => {
+                Ok(ExtendedInstanceInterface::AboveRoot(self.find_above_root()?))
+            }
+        }
+    }
+
+    /// Attempts to walk the component tree (up and/or down) from the current component to find the
+    /// component instance represented by the given moniker. Intermediate components will be
+    /// resolved as needed.
+    async fn find_absolute(
+        self: &Arc<Self>,
+        target_moniker: &Moniker,
+    ) -> Result<Arc<Self>, ComponentInstanceError> {
+        let mut current = self.clone();
+        while !target_moniker.has_prefix(current.moniker()) {
+            match current.try_get_parent()? {
+                ExtendedInstanceInterface::AboveRoot(_) => panic!(
+                    "the current component ({}) must be root, but it's not a prefix for {}",
+                    current.moniker(),
+                    &target_moniker
+                ),
+                ExtendedInstanceInterface::Component(parent) => current = parent,
+            }
+        }
+        while current.moniker() != target_moniker {
+            let remaining_path = target_moniker.strip_prefix(current.moniker()).expect(
+                "previous loop will only exit when current.moniker() is a prefix of target_moniker",
+            );
+            for moniker_part in remaining_path.path().iter() {
+                let child = current.lock_resolved_state().await?.get_child(moniker_part).ok_or(
+                    ComponentInstanceError::InstanceNotFound {
+                        moniker: current.moniker().child(moniker_part.clone()),
+                    },
+                )?;
+                current = child;
+            }
+        }
+        Ok(current)
+    }
+
+    /// Attempts to walk the component tree up to the above root instance. Intermediate components
+    /// will be resolved as needed.
+    fn find_above_root(self: &Arc<Self>) -> Result<Arc<Self::TopInstance>, ComponentInstanceError> {
+        let mut current = self.clone();
+        loop {
+            match current.try_get_parent()? {
+                ExtendedInstanceInterface::AboveRoot(top_instance) => return Ok(top_instance),
+                ExtendedInstanceInterface::Component(parent) => current = parent,
+            }
+        }
+    }
 }
 
 /// A trait providing a representation of a resolved component instance.

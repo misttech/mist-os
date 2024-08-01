@@ -572,6 +572,10 @@ func TestExecute(t *testing.T) {
 				testSpecs:           tc.testSpecs,
 				testDurations:       tc.testDurations,
 				packageRepositories: tc.packageRepos,
+				productBundles: []build.ProductBundle{
+					{Name: "core.x64", Path: "product_bundle"},
+					{Name: "boot-test_product_bundle", Path: "boot-test_product_bundle"},
+				},
 			}
 			if err := execute(ctx, tc.flags, m); err != nil {
 				t.Fatal(err)

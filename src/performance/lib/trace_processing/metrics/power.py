@@ -7,7 +7,7 @@
 import dataclasses
 import itertools
 import logging
-from typing import Sequence
+from typing import Callable, Sequence
 
 from trace_processing import trace_metrics, trace_model, trace_time, trace_utils
 from trace_processing.metrics import suspend as suspend_metrics
@@ -121,6 +121,18 @@ class AggregatePowerMetrics:
 class PowerMetricsProcessor(trace_metrics.MetricsProcessor):
     """Computes power consumption metrics."""
 
+    def __init__(
+        self,
+        good_suspend_pred: Callable[[trace_time.Window], bool] | None = None,
+    ) -> None:
+        """
+        Args:
+            good_suspend_pred: Optional predicate for which suspend windows should be included
+                in metrics calculation. If provided, must return True for any window the caller
+                wishes to take into account, False for those that should be ignored.
+        """
+        self._good_suspend_pred = good_suspend_pred
+
     def process_metrics(
         self, model: trace_model.Model
     ) -> Sequence[trace_metrics.TestCaseResult]:
@@ -152,7 +164,11 @@ class PowerMetricsProcessor(trace_metrics.MetricsProcessor):
             type=trace_model.CounterEvent,
         )
 
-        suspend_windows = _find_suspend_windows(post_sync_model)
+        suspend_windows = [
+            window
+            for window in _find_suspend_windows(post_sync_model)
+            if self.is_good_suspend_window(window)
+        ]
         _LOGGER.info(f"Identified suspend windows: {suspend_windows}")
 
         power_metrics = AggregatePowerMetrics()
@@ -196,6 +212,11 @@ class PowerMetricsProcessor(trace_metrics.MetricsProcessor):
             )
 
         return results
+
+    def is_good_suspend_window(self, window: trace_time.Window) -> bool:
+        return self._good_suspend_pred is None or self._good_suspend_pred(
+            window
+        )
 
 
 def _find_test_start(model: trace_model.Model) -> trace_time.TimePoint | None:

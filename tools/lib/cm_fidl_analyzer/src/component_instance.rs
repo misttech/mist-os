@@ -66,8 +66,7 @@ impl ComponentInstanceForAnalyzer {
         let environment =
             EnvironmentForAnalyzer::new_root(runner_registry, &runtime_config, &top_instance);
         let moniker = Moniker::root();
-        let root_component_input =
-            build_root_component_input(&top_instance, &runtime_config, &policy);
+        let root_component_input = build_root_component_input(&runtime_config, &policy);
         let parent = WeakExtendedInstanceInterface::from(&ExtendedInstanceInterface::AboveRoot(
             top_instance,
         ));

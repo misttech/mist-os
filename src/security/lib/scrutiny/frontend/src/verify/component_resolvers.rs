@@ -7,6 +7,8 @@ use cm_fidl_analyzer::component_instance::ComponentInstanceForAnalyzer;
 use cm_fidl_analyzer::component_model::ComponentModelForAnalyzer;
 use cm_fidl_analyzer::{BreadthFirstModelWalker, ComponentInstanceVisitor, ComponentModelWalker};
 use cm_rust::UseDecl;
+use futures::FutureExt;
+use moniker::ExtendedMoniker;
 use routing::component_instance::{ComponentInstanceInterface, ExtendedInstanceInterface};
 use scrutiny_collection::model::DataModel;
 use scrutiny_collection::v2_component_model::V2ComponentModel;
@@ -73,11 +75,13 @@ impl ComponentResolversVisitor {
                 routing::RouteRequest::Resolver(resolver),
                 &resolver_register_instance,
             ) {
-                (Ok(s), _route) => match s.source.source_instance().upgrade()? {
-                    routing::component_instance::ExtendedInstanceInterface::Component(
-                        component,
-                    ) => component,
-                    routing::component_instance::ExtendedInstanceInterface::AboveRoot(..) => {
+                (Ok(s), _route) => match s.source.source_moniker() {
+                    ExtendedMoniker::ComponentInstance(moniker) => instance
+                        .find_absolute(&moniker)
+                        .now_or_never()
+                        .expect("now_or_never failed to produce a result")
+                        .expect("failed to walk to other component instance"),
+                    ExtendedMoniker::ComponentManager => {
                         return Err(anyhow!(
                             "The plugin is unable to verify resolvers declared above the root."
                         ));

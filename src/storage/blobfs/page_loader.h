@@ -10,7 +10,6 @@
 #endif
 
 #include <lib/fzl/vmo-mapper.h>
-#include <lib/watchdog/watchdog.h>
 #include <lib/zx/result.h>
 #include <lib/zx/thread.h>
 #include <lib/zx/vmo.h>
@@ -32,6 +31,7 @@
 #include "src/storage/blobfs/compression/external_decompressor.h"
 #include "src/storage/blobfs/loader_info.h"
 #include "src/storage/blobfs/transfer_buffer.h"
+#include "src/storage/lib/watchdog/watchdog.h"
 
 namespace blobfs {
 

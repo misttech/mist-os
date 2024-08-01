@@ -12,7 +12,7 @@ test("serial-unittest-bin") {
   deps = [
     "..:common",
     "//sdk/lib/async_patterns/testing/cpp",
-    "//sdk/lib/driver/testing/cpp:driver_testing_cpp",
+    "//sdk/lib/driver/testing/cpp",
     "//sdk/lib/fit",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/predicates",

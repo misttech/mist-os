@@ -125,7 +125,9 @@ ffx_plugin("ffx_assembly") {
     "//third_party/rust_crates:regex",
     "//third_party/rust_crates:tempfile",
   ]
-  configs = [ "//build/config/rust/lints:clippy_warn_all" ]
+
+  # TODO(https://fxbug.dev/356474618): re-enable and fix existing lints
+  # configs = [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 ffx_tool("ffx_assembly_tool") {

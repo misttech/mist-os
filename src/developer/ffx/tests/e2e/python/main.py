@@ -31,11 +31,7 @@ class FfxTest(fuchsia_base_test.FuchsiaBaseTest):
         # daemon was automatically restarted by `ffx target wait`, but this is
         # now no longer the case because the command does not use the daemon
         # anymore.
-        # TODO(b/352380489): This non-explicit command relying on daemon
-        # autostart working should be replaced with an explicit background
-        # daemon starting command (currently `ffx daemon start` runs
-        # in the foreground). This also affects honeydew.
-        self.dut.ffx.run(["daemon", "echo"])
+        self.dut.ffx.run(["daemon", "start", "--background"])
         super().teardown_test()
 
     def test_component_list(self) -> None:

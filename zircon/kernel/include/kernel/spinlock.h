@@ -39,7 +39,7 @@ class TA_CAP("mutex") SpinLockBase
  public:
   constexpr SpinLockBase() = default;
   explicit SpinLockBase(const fxt::InternedString& lock_name_string_ref)
-      : LockNameStorage{lock_name_string_ref.GetId()} {}
+      : LockNameStorage{lock_name_string_ref.id()} {}
 
   // Acquire the spinlock.
   //

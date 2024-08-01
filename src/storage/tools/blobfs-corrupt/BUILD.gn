@@ -21,7 +21,6 @@ executable("blobfs-corrupt-test") {
   testonly = true
   output_name = "blobfs-corrupt-test"
   sources = [ "test/corrupt_blob_test.cc" ]
-  include_dirs = [ "." ]
   deps = [
     ":common",
     "//src/lib/digest",

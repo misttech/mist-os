@@ -110,9 +110,8 @@ fn get_parameters_from_advertise_request(
     Ok((receiver, parameters))
 }
 
-/// TODO(https://fxbug.dev/330590954): Remove once advertise response is implemented.
-fn empty_advertise_response() -> bredr::ProfileAdvertiseResponse {
-    bredr::ProfileAdvertiseResponse { services: Some(vec![]), ..Default::default() }
+fn advertise_response(services: Vec<bredr::ServiceDefinition>) -> bredr::ProfileAdvertiseResponse {
+    bredr::ProfileAdvertiseResponse { services: Some(services), ..Default::default() }
 }
 
 /// The ProfileRegistrar handles requests over the `fidl.fuchsia.bluetooth.bredr.Profile` service.
@@ -169,12 +168,7 @@ impl ProfileRegistrar {
 
     /// Returns true if the requested `new_psms` do not overlap with the currently registered PSMs.
     fn is_disjoint_psms(&self, new_psms: &HashSet<Psm>) -> bool {
-        let current = self.registered_services.psms();
-        let common: HashSet<_> = current.intersection(new_psms).collect();
-
-        // There should be no overlapping PSMs - Dynamic PSMs are exempt as they are assigned later
-        // by the downstream host stack.
-        common.is_empty() || common == HashSet::from([&Psm::DYNAMIC])
+        self.registered_services.psms().is_disjoint(new_psms)
     }
 
     /// Unregisters all the active services advertised by this server.
@@ -198,8 +192,8 @@ impl ProfileRegistrar {
         let service_info = self.registered_services.remove(handle);
         self.rfcomm_server.free_server_channels(service_info.allocated_server_channels()).await;
 
-        // Attempt to re-advertise - the returned services are ignored as the `ProfileRegistrar`
-        // already has an updated view of the world.
+        // Attempt to re-advertise - the returned services can be ignored since the registrar
+        // has evicted the entry for this `handle`.
         let _advertised_services =
             self.refresh_advertisement().await.map_err(|e| format_err!("{e:?}"))?;
         Ok(())
@@ -222,13 +216,11 @@ impl ProfileRegistrar {
             .iter()
             .map(|p| ProtocolDescriptor::try_from(p))
             .collect::<Result<Vec<_>, _>>()?;
-        // TODO(https://fxbug.dev/327758656): Support forwarding dynamic L2CAP connections to the
-        // correct client.
         match psm_from_protocol(&local).ok_or(format_err!("No PSM provided"))? {
             Psm::RFCOMM => self.rfcomm_server.new_l2cap_connection(peer_id, channel.try_into()?),
             psm => {
                 match self.registered_services.iter().find(|(_, client)| client.contains_psm(psm)) {
-                    Some((_, client)) => client.relay_connected(peer_id.into(), channel, protocol),
+                    Some((_, client)) => client.relay_connected(peer_id, channel, protocol),
                     None => Err(format_err!("Connection request for non-advertised PSM {psm:?}")),
                 }
             }
@@ -308,9 +300,7 @@ impl ProfileRegistrar {
     /// Refreshes the current advertisement with the upstream `Profile` service.
     /// Returns the new set of services that is currently advertising. This list can be empty if
     /// there are no services to advertise or we are not advertising.
-    async fn refresh_advertisement(
-        &mut self,
-    ) -> Result<Vec<bredr::ServiceDefinition>, fidl_fuchsia_bluetooth::ErrorCode> {
+    async fn refresh_advertisement(&mut self) -> Result<Vec<ServiceDefinition>, Error> {
         let status =
             std::mem::replace(&mut self.active_registration, AdvertiseStatus::NotAdvertising);
         if let AdvertiseStatus::Advertising(ManagedAdvertisement {
@@ -345,14 +335,16 @@ impl ProfileRegistrar {
         let advertise_result = self
             .profile_upstream
             .advertise(advertise_request)
-            .await
-            .unwrap_or(Err(fidl_fuchsia_bluetooth::ErrorCode::ProtocolError))?;
+            .await?
+            .map_err(|e| format_err!("{e:?}"))?;
+        let advertised_services = ServiceDefinition::try_from_fidl(
+            &advertise_result.services.expect("included in response"),
+        )?;
         self.active_registration = AdvertiseStatus::Advertising(ManagedAdvertisement {
             id,
             connection_receiver_handle,
             connection_relay: connect_requests.with_epitaph(id),
         });
-        let advertised_services = advertise_result.services.expect("included in response");
         info!(?id, ?advertised_services, "Advertising via the upstream `Profile` server");
         Ok(advertised_services)
     }
@@ -382,8 +374,7 @@ impl ProfileRegistrar {
             return Err(format_err!("PSMs already allocated"));
         }
 
-        let next_handle =
-            self.registered_services.insert(ServiceGroup::new(receiver.clone(), parameters));
+        let current_services = self.registered_services.service_definitions();
 
         // If the RfcommServer has enough free Server Channels, allocate and update
         // the RFCOMM-requesting services.
@@ -402,17 +393,25 @@ impl ProfileRegistrar {
             update_svc_def_with_server_channel(&mut service, server_channel)?;
         }
 
-        let service_info = self.registered_services.get_mut(next_handle).expect("just inserted");
-        service_info.set_service_defs(services);
-
-        // Re-register the services as a single group.
-        // TODO(https://fxbug.dev/327758656): Use `advertised_services` to update the PSM cache for
-        // dynamic PSMs.
-        let _advertised_services = self.refresh_advertisement().await;
-        // TODO(https://fxbug.dev/330590954): Reply with a combined version of `services` and
-        // `advertised_services` since both Dynamic PSMs and RFCOMM ServerChannel #s are assigned
-        // after this step.
-        let _ = responder.send(Ok(&empty_advertise_response()));
+        // Save the services for the new FIDL client and refresh the advertisement.
+        let mut entry = ServiceGroup::new(receiver.clone(), parameters);
+        entry.set_service_defs(services);
+        let next_handle = self.registered_services.insert(entry);
+        let advertised_services = self.refresh_advertisement().await?;
+        // The returned `advertised_services` contains entries for all FIDL clients. The diff only
+        // contains the services requested by this FIDL client.
+        let new_advertised_services =
+            service_def_difference(&current_services, &advertised_services);
+        let new_advertised_services_fidl =
+            ServiceDefinition::try_into_fidl(&new_advertised_services)
+                .expect("valid local definitions");
+        // Update the local cache with the "new" view of the FIDL client's advertised services. This
+        // is a no-op if no dynamic PSMs were requested.
+        self.registered_services
+            .get_mut(next_handle)
+            .expect("just inserted")
+            .set_service_defs(new_advertised_services);
+        let _ = responder.send(Ok(&advertise_response(new_advertised_services_fidl)));
 
         let client_event_stream =
             receiver.take_event_stream().tagged(next_handle).with_epitaph(next_handle);
@@ -429,15 +428,7 @@ impl ProfileRegistrar {
             .advertise(request)
             .await
             .unwrap_or(Err(fidl_fuchsia_bluetooth::ErrorCode::ProtocolError));
-
-        match result {
-            Ok(response) => {
-                let _ = responder.send(Ok(&response));
-            }
-            Err(e) => {
-                let _ = responder.send(Err(e));
-            }
-        }
+        let _ = responder.send(result.as_ref().map_err(|e| *e));
     }
 
     /// Handles a request over the `bredr.Profile` protocol.
@@ -457,13 +448,8 @@ impl ProfileRegistrar {
                     },
                 responder,
             } => {
-                let Ok(services_local) = original_payload
-                    .services
-                    .as_ref()
-                    .unwrap()
-                    .iter()
-                    .map(ServiceDefinition::try_from)
-                    .collect::<Result<Vec<_>, _>>()
+                let Ok(services_local) =
+                    ServiceDefinition::try_from_fidl(original_payload.services.as_ref().unwrap())
                 else {
                     let _ =
                         responder.send(Err(fidl_fuchsia_bluetooth::ErrorCode::InvalidArguments));
@@ -636,7 +622,8 @@ mod tests {
     use super::*;
 
     use crate::types::tests::{
-        obex_service_definition, other_service_definition, rfcomm_service_definition,
+        l2cap_protocol, obex_service_definition, other_service_definition,
+        rfcomm_service_definition,
     };
 
     use assert_matches::assert_matches;
@@ -721,7 +708,7 @@ mod tests {
         services: Vec<bredr::ServiceDefinition>,
     ) -> (
         bredr::ConnectionReceiverRequestStream,
-        impl Future<Output = Result<Result<Vec<bredr::ServiceDefinition>, ErrorCode>, fidl::Error>>,
+        impl Future<Output = Result<Vec<bredr::ServiceDefinition>, ErrorCode>>,
     ) {
         let (connection, connection_stream) =
             create_request_stream::<bredr::ConnectionReceiverMarker>().unwrap();
@@ -730,10 +717,30 @@ mod tests {
             receiver: Some(connection),
             ..Default::default()
         };
-        let adv_fut = client.advertise(request).map(|fidl_result| {
-            fidl_result.map(|advertise_result| advertise_result.map(|res| res.services.unwrap()))
-        });
+        let adv_fut = client
+            .advertise(request)
+            .map(|fidl_result| fidl_result.unwrap().map(|r| r.services.unwrap()));
         (connection_stream, adv_fut)
+    }
+
+    /// Expects a `Profile::Advertise` request in the `profile_requests` stream.
+    /// Responds to the request with the unmodified set of services provided in the payload.
+    #[track_caller]
+    fn expect_advertise_request(
+        exec: &mut fasync::TestExecutor,
+        profile_requests: &mut bredr::ProfileRequestStream,
+    ) -> bredr::ConnectionReceiverProxy {
+        match expect_stream_item(exec, profile_requests) {
+            Ok(bredr::ProfileRequest::Advertise {
+                payload: bredr::ProfileAdvertiseRequest { services, receiver, .. },
+                responder,
+                ..
+            }) => {
+                let _ = responder.send(Ok(&advertise_response(services.unwrap())));
+                receiver.unwrap().into_proxy().unwrap()
+            }
+            x => panic!("Expected advertise request, got: {x:?}"),
+        }
     }
 
     /// Creates a Profile::Connect request for an L2cap channel.
@@ -809,17 +816,14 @@ mod tests {
             Ok(bredr::ProfileRequest::Advertise { payload, responder }) => {
                 assert_eq!(payload.services, Some(vec![]));
                 // Upstream responds with an empty set of services.
-                let _ = responder.send(Ok(&empty_advertise_response()));
+                let _ = responder.send(Ok(&advertise_response(vec![])));
             }
             x => panic!("Expected advertise request, got: {:?}", x),
         };
 
         exec.run_until_stalled(&mut handler_fut).expect_pending("server active");
         // Client should be notified that the advertisement was successful.
-        let result = exec
-            .run_until_stalled(&mut adv_fut)
-            .expect("advertisement ready")
-            .expect("fidl success");
+        let result = exec.run_until_stalled(&mut adv_fut).expect("advertisement ready");
         assert_eq!(result, Ok(vec![]));
     }
 
@@ -847,11 +851,16 @@ mod tests {
 
         // The advertisement request should be relayed directly upstream.
         match expect_stream_item(&mut exec, &mut upstream_requests) {
-            Ok(bredr::ProfileRequest::Advertise { payload, .. }) => {
-                assert_eq!(payload.services, Some(vec![service]));
+            Ok(bredr::ProfileRequest::Advertise { payload, responder }) => {
+                let services = payload.services.unwrap();
+                assert_eq!(services, vec![service]);
+                let _ = responder.send(Ok(&advertise_response(services)));
             }
             x => panic!("Expected advertise request, got: {x:?}"),
         };
+        let (adv_result, _handler_fut) = run_while(&mut exec, &mut handler_fut, &mut adv_fut);
+        let advertised_services = adv_result.expect("successful advertisement");
+        assert_eq!(advertised_services.len(), 1);
     }
 
     /// Exercises connecting l2cap channels while advertising.
@@ -877,19 +886,9 @@ mod tests {
         exec.run_until_stalled(&mut handler_fut).expect_pending("server active");
 
         // The advertisement request should be relayed directly upstream.
-        match expect_stream_item(&mut exec, &mut upstream_requests) {
-            Ok(bredr::ProfileRequest::Advertise { responder, .. }) => {
-                let _ = responder.send(Ok(&bredr::ProfileAdvertiseResponse {
-                    services: Some(vec![service]),
-                    ..Default::default()
-                }));
-            }
-            x => panic!("Expected advertise request, got: {x:?}"),
-        };
-
-        exec.run_until_stalled(&mut handler_fut).expect_pending("server active");
-        let _advertised_services =
-            exec.run_until_stalled(&mut adv_fut).expect("got advertise response");
+        let _upstream_receiver_client = expect_advertise_request(&mut exec, &mut upstream_requests);
+        let (_advertised_services, mut handler_fut) =
+            run_while(&mut exec, &mut handler_fut, &mut adv_fut);
 
         // Client requests to make an outgoing L2CAP connection. The request should be forwarded
         // directly to the upstream Profile server.
@@ -959,7 +958,7 @@ mod tests {
                 let services = payload.services.unwrap();
                 assert_eq!(services.len(), 1);
                 assert!(service_def_has_assigned_server_channel(&services[0]));
-                let _ = responder.send(Ok(&empty_advertise_response())); // Reply not important
+                let _ = responder.send(Ok(&advertise_response(services)));
             }
             x => panic!("Expected advertise request, got: {x:?}"),
         }
@@ -1000,17 +999,19 @@ mod tests {
                 let services = payload.services.unwrap();
                 assert_eq!(services.len(), n);
                 let res = services
-                    .into_iter()
-                    .filter(|service| {
+                    .iter()
+                    .filter(|&service| {
                         is_rfcomm_service_definition(&ServiceDefinition::try_from(service).unwrap())
                     })
                     .map(|service| service_def_has_assigned_server_channel(&service))
                     .fold(true, |acc, elt| acc || elt);
                 assert!(res);
-                let _ = responder.send(Ok(&empty_advertise_response()));
+                let _ = responder.send(Ok(&advertise_response(services)));
             }
             x => panic!("Expected advertise request, got: {x:?}"),
         }
+        let (_advertised_services, _handler_fut) =
+            run_while(&mut exec, &mut handler_fut, &mut adv_fut);
     }
 
     /// Tests handling two advertise requests with overlapping PSMs. The first one
@@ -1039,13 +1040,7 @@ mod tests {
         exec.run_until_stalled(&mut handler_fut).expect_pending("server active");
 
         // First request should be received by upstream and handled successfully.
-        let _adv_req1 = match expect_stream_item(&mut exec, &mut upstream_requests) {
-            Ok(bredr::ProfileRequest::Advertise { payload, responder }) => {
-                let _ = responder.send(Ok(&empty_advertise_response()));
-                payload
-            }
-            x => panic!("Expected advertise request, got: {x:?}"),
-        };
+        let _adv_req1 = expect_advertise_request(&mut exec, &mut upstream_requests);
         let (_advertised_services1, mut handler_fut) =
             run_while(&mut exec, &mut handler_fut, &mut adv_fut1);
 
@@ -1057,12 +1052,12 @@ mod tests {
         ];
         let (mut connection_stream2, adv_fut2) = make_advertise_request(&client2, services2);
         let mut adv_fut2 = pin!(adv_fut2);
-        exec.run_until_stalled(&mut adv_fut2).expect_pending("should should be advertising");
+        exec.run_until_stalled(&mut adv_fut2).expect_pending("waiting for advertise response");
 
-        // Advertise request #2 should fail with an error code.
+        // The second advertise request shouldn't make it to the upstream Profile server as
+        // `bt-rfcomm` should reject it.
         let (result, _handler_fut) = run_while(&mut exec, &mut handler_fut, &mut adv_fut2);
-        assert_matches!(result, Ok(Err(ErrorCode::Failed)));
-        // The second advertise request shouldn't be propagated to the upstream.
+        assert_matches!(result, Err(ErrorCode::Failed));
         // The first client should still have an active connection receiver. The second client's
         // connection receiver should be closed due to failure.
         expect_stream_pending(&mut exec, &mut upstream_requests);
@@ -1095,18 +1090,20 @@ mod tests {
         // First advertisement request should be relayed upstream with the 2 services.
         let receiver1 = match expect_stream_item(&mut exec, &mut upstream_requests) {
             Ok(bredr::ProfileRequest::Advertise {
-                payload: bredr::ProfileAdvertiseRequest { services, receiver, .. },
+                payload: bredr::ProfileAdvertiseRequest { services: Some(services), receiver, .. },
                 responder,
                 ..
             }) => {
-                assert_eq!(services.unwrap().len(), n1);
-                let _ = responder.send(Ok(&empty_advertise_response()));
+                assert_eq!(services.len(), n1);
+                let _ = responder.send(Ok(&advertise_response(services)));
                 receiver.unwrap().into_proxy().unwrap()
             }
             x => panic!("Expected advertise request, got: {:?}", x),
         };
-        // Client #1's advertisement should be active and connection receiver open.
-        let (_adv_result1, mut handler_fut) = run_while(&mut exec, &mut handler_fut, &mut adv_fut1);
+        // Client #1's advertisement should be active and connection receiver open. The advertise
+        // result should contain the two services in `services1`.
+        let (adv_result1, mut handler_fut) = run_while(&mut exec, &mut handler_fut, &mut adv_fut1);
+        assert_eq!(adv_result1.expect("success").len(), 2);
         expect_stream_pending(&mut exec, &mut connection_stream1);
 
         // A different client connects to bt-rfcomm and advertises 1 RFCOMM and 2 other services.
@@ -1136,24 +1133,43 @@ mod tests {
         exec.run_until_stalled(&mut handler_fut).expect_pending("server active");
 
         // We expect a new advertisement upstream with the combined set of services.
-        let _receiver2 = match expect_stream_item(&mut exec, &mut upstream_requests) {
+        let receiver2 = match expect_stream_item(&mut exec, &mut upstream_requests) {
             Ok(bredr::ProfileRequest::Advertise {
-                payload: bredr::ProfileAdvertiseRequest { services, receiver, .. },
+                payload: bredr::ProfileAdvertiseRequest { services: Some(services), receiver, .. },
                 responder,
                 ..
             }) => {
-                assert_eq!(services.unwrap().len(), n1 + n2);
-                let _ = responder.send(Ok(&empty_advertise_response()));
-                receiver.unwrap()
+                assert_eq!(services.len(), n1 + n2);
+                let _ = responder.send(Ok(&advertise_response(services)));
+                receiver.unwrap().into_proxy().unwrap()
             }
             x => panic!("Expected advertise request, got: {x:?}"),
         };
         exec.run_until_stalled(&mut handler_fut).expect_pending("server active");
 
         // Both Client #1 and Client #2 should be advertising with their connection receivers open.
-        let (_adv_result2, _handler_fut) = run_while(&mut exec, &mut handler_fut, &mut adv_fut2);
+        // The response to Client #2's advertise request should only contain `services2`.
+        let (adv_result2, _handler_fut) = run_while(&mut exec, &mut handler_fut, &mut adv_fut2);
+        assert_eq!(adv_result2.expect("successful advertisement").len(), n2);
         expect_stream_pending(&mut exec, &mut connection_stream1);
         expect_stream_pending(&mut exec, &mut connection_stream2);
+        // Can receive L2CAP connections on any of the registered PSMs.
+        receiver2
+            .connected(&PeerId(12).into(), bredr::Channel::default(), &l2cap_protocol(psm1))
+            .expect("valid FIDL request");
+
+        // `bt-rfcomm` should receive, parse, and pass to FIDL client #1 since it registered `psm1`.
+        exec.run_until_stalled(&mut handler_fut).expect_pending("server active");
+        let event = expect_stream_item(&mut exec, &mut connection_stream1);
+        assert_matches!(event, Ok(bredr::ConnectionReceiverRequest::Connected { .. }));
+
+        // Should be passed to FIDL client #2 since it registered `psm3`.
+        receiver2
+            .connected(&PeerId(12).into(), bredr::Channel::default(), &l2cap_protocol(psm3))
+            .expect("valid FIDL request");
+        exec.run_until_stalled(&mut handler_fut).expect_pending("server active");
+        let event = expect_stream_item(&mut exec, &mut connection_stream2);
+        assert_matches!(event, Ok(bredr::ConnectionReceiverRequest::Connected { .. }));
     }
 
     #[fuchsia::test]
@@ -1173,17 +1189,7 @@ mod tests {
         exec.run_until_stalled(&mut adv_fut).expect_pending("waiting for advertise response");
         exec.run_until_stalled(&mut handler_fut).expect_pending("server active");
 
-        let receiver = match expect_stream_item(&mut exec, &mut upstream_requests) {
-            Ok(bredr::ProfileRequest::Advertise {
-                payload: bredr::ProfileAdvertiseRequest { receiver, .. },
-                responder,
-                ..
-            }) => {
-                let _ = responder.send(Ok(&empty_advertise_response()));
-                receiver.unwrap().into_proxy().unwrap()
-            }
-            x => panic!("Expected advertise request, got: {x:?}"),
-        };
+        let receiver = expect_advertise_request(&mut exec, &mut upstream_requests);
         // Client advertisement should be active.
         let (_adv_result, mut handler_fut) = run_while(&mut exec, &mut handler_fut, &mut adv_fut);
         expect_stream_pending(&mut exec, &mut connection_stream);
@@ -1225,17 +1231,7 @@ mod tests {
         exec.run_until_stalled(&mut adv_fut).expect_pending("waiting for advertise response");
         exec.run_until_stalled(&mut handler_fut).expect_pending("server active");
 
-        let receiver = match expect_stream_item(&mut exec, &mut upstream_requests) {
-            Ok(bredr::ProfileRequest::Advertise {
-                payload: bredr::ProfileAdvertiseRequest { receiver, .. },
-                responder,
-                ..
-            }) => {
-                let _ = responder.send(Ok(&empty_advertise_response()));
-                receiver.unwrap().into_proxy().unwrap()
-            }
-            x => panic!("Expected advertise request, got: {x:?}"),
-        };
+        let receiver = expect_advertise_request(&mut exec, &mut upstream_requests);
         // Client advertisement should be active.
         let (_adv_result, mut handler_fut) = run_while(&mut exec, &mut handler_fut, &mut adv_fut);
         expect_stream_pending(&mut exec, &mut connection_stream);
@@ -1279,13 +1275,7 @@ mod tests {
         exec.run_until_stalled(&mut adv_fut).expect_pending("waiting for advertise response");
         exec.run_until_stalled(&mut handler_fut).expect_pending("server active");
 
-        let receiver = match expect_stream_item(&mut exec, &mut upstream_requests) {
-            Ok(bredr::ProfileRequest::Advertise { payload, responder, .. }) => {
-                let _ = responder.send(Ok(&empty_advertise_response()));
-                payload.receiver.unwrap().into_proxy().unwrap()
-            }
-            x => panic!("Expected advertise request, got: {x:?}"),
-        };
+        let receiver = expect_advertise_request(&mut exec, &mut upstream_requests);
         // Client advertisement should be active.
         let (_adv_result, mut handler_fut) = run_while(&mut exec, &mut handler_fut, &mut adv_fut);
         expect_stream_pending(&mut exec, &mut connection_stream);
@@ -1299,7 +1289,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn advertise_and_connect_to_obex_service() {
+    fn advertise_and_connect_to_obex_dynamic_psm() {
         let (mut exec, server, mut upstream_requests) = setup_server();
 
         let (service_sender, handler_fut) = setup_handler_fut(server);
@@ -1308,42 +1298,130 @@ mod tests {
 
         // A new client connection to bt-rfcomm and advertises an OBEX service.
         let client = new_client(&mut exec, service_sender.clone(), &mut handler_fut);
-
-        let obex_psm = Psm::new(0x1003);
-        let services =
-            vec![bredr::ServiceDefinition::try_from(&obex_service_definition(obex_psm)).unwrap()];
-        let (mut connection_stream, adv_fut) = make_advertise_request(&client, services);
-        let mut adv_fut = pin!(adv_fut);
-        exec.run_until_stalled(&mut adv_fut).expect_pending("still advertising");
+        let service1 =
+            bredr::ServiceDefinition::try_from(&obex_service_definition(Psm::DYNAMIC)).unwrap();
+        let (mut connection_stream1, adv_fut1) = make_advertise_request(&client, vec![service1]);
+        let mut adv_fut1 = pin!(adv_fut1);
+        exec.run_until_stalled(&mut adv_fut1).expect_pending("still advertising");
         exec.run_until_stalled(&mut handler_fut).expect_pending("server active");
 
         // The advertisement request should be relayed upstream.
-        let receiver = match expect_stream_item(&mut exec, &mut upstream_requests) {
-            Ok(bredr::ProfileRequest::Advertise { payload, responder, .. }) => {
-                let _ = responder.send(Ok(&empty_advertise_response()));
-                payload.receiver.unwrap().into_proxy().unwrap()
+        let assigned_psm1 = Psm::new(0x6789);
+        let receiver1 = match expect_stream_item(&mut exec, &mut upstream_requests) {
+            Ok(bredr::ProfileRequest::Advertise {
+                payload:
+                    bredr::ProfileAdvertiseRequest { services: Some(mut services), receiver, .. },
+                responder,
+                ..
+            }) => {
+                assert_eq!(services.len(), 1);
+                // Assign a random dynamic PSM for the GOEP L2CAP attribute.
+                services[0].additional_attributes.as_mut().unwrap()[0] = bredr::Attribute {
+                    id: Some(0x0200),
+                    element: Some(bredr::DataElement::Uint16(assigned_psm1.into())),
+                    ..Default::default()
+                };
+                let _ = responder.send(Ok(&advertise_response(services)));
+                receiver.unwrap().into_proxy().unwrap()
             }
-            x => panic!("Expected advertise request, got: {:?}", x),
+            x => panic!("Expected advertise request, got: {x:?}"),
         };
-        let (_adv_result, mut handler_fut) = run_while(&mut exec, &mut handler_fut, &mut adv_fut);
+        let (adv_result1, mut handler_fut) = run_while(&mut exec, &mut handler_fut, &mut adv_fut1);
+        // FIDL client should get the updated version of their definition.
+        let advertised_services1 =
+            ServiceDefinition::try_from_fidl(&adv_result1.expect("successful")).unwrap();
+        assert_eq!(advertised_services1[0].psm_set(), HashSet::from([assigned_psm1]));
 
-        // Simulate an incoming L2CAP connection over the L2CAP PSM of the OBEX service.
-        let id = PeerId(123);
-        let l2cap_protocol = [bredr::ProtocolDescriptor {
-            protocol: Some(bredr::ProtocolIdentifier::L2Cap),
-            params: Some(vec![bredr::DataElement::Uint16(obex_psm.into())]),
-            ..Default::default()
-        }];
-        receiver
-            .connected(&id.into(), bredr::Channel::default(), &l2cap_protocol)
-            .expect("valid FIDL request");
+        // Trying to advertise again with the recently assigned dynamic PSM should fail immediately.
+        let duplicate_service =
+            bredr::ServiceDefinition::try_from(&obex_service_definition(assigned_psm1)).unwrap();
+        let (_duplicate_stream, duplicate_adv_fut) =
+            make_advertise_request(&client, vec![duplicate_service]);
+        let mut duplicate_adv_fut = pin!(duplicate_adv_fut);
+        exec.run_until_stalled(&mut duplicate_adv_fut)
+            .expect_pending("waiting for advertise response");
+        // The second advertise request shouldn't make it to the upstream Profile server as
+        // `bt-rfcomm` should reject it.
+        let (duplicate_adv_result, mut handler_fut) =
+            run_while(&mut exec, &mut handler_fut, &mut duplicate_adv_fut);
+        assert_matches!(duplicate_adv_result, Err(ErrorCode::Failed));
 
-        // bt-rfcomm server should receive, parse, and pass to upstream FIDL client.
+        // Trying to advertise another dynamic PSM service should be OK.
+        let service2 =
+            bredr::ServiceDefinition::try_from(&obex_service_definition(Psm::DYNAMIC)).unwrap();
+        let (mut connection_stream2, adv_fut2) = make_advertise_request(&client, vec![service2]);
+        let mut adv_fut2 = pin!(adv_fut2);
+        exec.run_until_stalled(&mut adv_fut2).expect_pending("still advertising");
         exec.run_until_stalled(&mut handler_fut).expect_pending("server active");
-        match expect_stream_item(&mut exec, &mut connection_stream) {
+
+        // We expect the registrar to unregister the current advertisement by issuing a `Revoke`
+        // event to the upstream Profile server.
+        {
+            let mut event_stream1 = receiver1.take_event_stream();
+            let revoke1 = expect_stream_item(&mut exec, &mut event_stream1);
+            assert_matches!(revoke1, Ok(bredr::ConnectionReceiverEvent::OnRevoke {}));
+        }
+        // Simulate the upstream Profile server acknowledging it by terminating the advertisement.
+        drop(receiver1);
+        exec.run_until_stalled(&mut handler_fut).expect_pending("server active");
+
+        // The refreshed advertisement request should be relayed upstream (contains both services).
+        let assigned_psm2 = Psm::new(0x8080);
+        let new_receiver = match expect_stream_item(&mut exec, &mut upstream_requests) {
+            Ok(bredr::ProfileRequest::Advertise {
+                payload:
+                    bredr::ProfileAdvertiseRequest { services: Some(mut services), receiver, .. },
+                responder,
+                ..
+            }) => {
+                assert_eq!(services.len(), 2);
+                // Assign a different dynamic PSM for the second service's GOEP L2CAP attribute.
+                services[1].additional_attributes.as_mut().unwrap()[0] = bredr::Attribute {
+                    id: Some(0x0200),
+                    element: Some(bredr::DataElement::Uint16(assigned_psm2.into())),
+                    ..Default::default()
+                };
+                let _ = responder.send(Ok(&advertise_response(services)));
+                receiver.unwrap().into_proxy().unwrap()
+            }
+            x => panic!("Expected advertise request, got: {x:?}"),
+        };
+        let (adv_result2, mut handler_fut) = run_while(&mut exec, &mut handler_fut, &mut adv_fut2);
+        // FIDL client should get the updated version of only their definition.
+        let advertised_services2 =
+            ServiceDefinition::try_from_fidl(&adv_result2.expect("successful")).unwrap();
+        assert_eq!(advertised_services2.len(), 1);
+        assert_eq!(advertised_services2[0].psm_set(), HashSet::from([assigned_psm2]));
+
+        // Simulate an incoming L2CAP connection over the dynamic L2CAP PSM of the first OBEX
+        // service.
+        let id = PeerId(123);
+        let protocol: Vec<bredr::ProtocolDescriptor> = l2cap_protocol(assigned_psm1);
+        new_receiver
+            .connected(&id.into(), bredr::Channel::default(), &protocol)
+            .expect("valid FIDL request");
+        // bt-rfcomm should receive and route the connection to the correct upstream FIDL client.
+        exec.run_until_stalled(&mut handler_fut).expect_pending("server active");
+        match expect_stream_item(&mut exec, &mut connection_stream1) {
             Ok(bredr::ConnectionReceiverRequest::Connected { peer_id, protocol, .. }) => {
                 assert_eq!(peer_id, id.into());
-                assert_eq!(protocol, l2cap_protocol);
+                assert_eq!(protocol, protocol);
+            }
+            x => panic!("Expected incoming L2CAP request. got: {x:?}"),
+        };
+
+        // Second dynamic L2CAP PSM should be connectable as well.
+        let id2 = PeerId(123);
+        let protocol2 = l2cap_protocol(assigned_psm2);
+        new_receiver
+            .connected(&id2.into(), bredr::Channel::default(), &protocol2)
+            .expect("valid FIDL request");
+        // bt-rfcomm should receive and route the connection to the correct upstream FIDL client.
+        exec.run_until_stalled(&mut handler_fut).expect_pending("server active");
+        match expect_stream_item(&mut exec, &mut connection_stream2) {
+            Ok(bredr::ConnectionReceiverRequest::Connected { peer_id, protocol, .. }) => {
+                assert_eq!(peer_id, id.into());
+                assert_eq!(protocol, protocol2);
             }
             x => panic!("Expected incoming L2CAP request. got: {x:?}"),
         };

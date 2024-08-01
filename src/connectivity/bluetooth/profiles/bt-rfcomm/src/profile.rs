@@ -33,6 +33,24 @@ pub fn update_svc_def_with_server_channel(
     Ok(())
 }
 
+/// Returns the service definitions that are in `new` but not in `current`.
+pub fn service_def_difference(
+    current: &Vec<ServiceDefinition>,
+    new: &Vec<ServiceDefinition>,
+) -> Vec<ServiceDefinition> {
+    // TODO(b/327758656): This is not ideal as we're looping through both lists O(N^2).
+    // Probably not a big deal since both lists will typically be <5 definitions. Can improve by
+    // implementing Hash for `ServiceDefinition`.
+    let mut out = Vec::new();
+    for definition in new {
+        let mut current_iter = current.iter();
+        if current_iter.find(|&s| s == definition).is_none() {
+            out.push(definition.clone());
+        }
+    }
+    out
+}
+
 /// Returns true if the provided `service` requests RFCOMM.
 pub fn is_rfcomm_service_definition(service: &ServiceDefinition) -> bool {
     is_rfcomm_protocol(&service.protocol_descriptor_list)
@@ -162,6 +180,41 @@ mod tests {
             ..ServiceDefinition::default()
         };
         assert_eq!(def, expected);
+    }
+
+    #[test]
+    fn service_definition_difference() {
+        let mut current = vec![];
+        let mut new = vec![];
+        assert_eq!(service_def_difference(&current, &new), vec![]);
+
+        let def1 = ServiceDefinition {
+            protocol_descriptor_list: vec![
+                ProtocolDescriptor { protocol: bredr::ProtocolIdentifier::L2Cap, params: vec![] },
+                ProtocolDescriptor { protocol: bredr::ProtocolIdentifier::Rfcomm, params: vec![] },
+            ],
+            ..ServiceDefinition::default()
+        };
+
+        new = vec![def1.clone()];
+        assert_eq!(service_def_difference(&current, &new), vec![def1.clone()]);
+
+        let def2 = ServiceDefinition {
+            protocol_descriptor_list: vec![
+                ProtocolDescriptor { protocol: bredr::ProtocolIdentifier::L2Cap, params: vec![] },
+                ProtocolDescriptor { protocol: bredr::ProtocolIdentifier::Rfcomm, params: vec![] },
+                ProtocolDescriptor { protocol: bredr::ProtocolIdentifier::Obex, params: vec![] },
+            ],
+            ..ServiceDefinition::default()
+        };
+        new.push(def2.clone());
+        assert_eq!(service_def_difference(&current, &new), vec![def1.clone(), def2.clone()]);
+
+        current.push(def1);
+        assert_eq!(service_def_difference(&current, &new), vec![def2.clone()]);
+
+        current.push(def2);
+        assert_eq!(service_def_difference(&current, &new), vec![]);
     }
 
     #[test]

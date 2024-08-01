@@ -22,6 +22,7 @@
 #include <ktl/algorithm.h>
 #include <ktl/tuple.h>
 #include <phys/allocation.h>
+#include <phys/arch/arch-handoff.h>
 #include <phys/elf-image.h>
 #include <phys/handoff.h>
 #include <phys/kernel-package.h>
@@ -145,6 +146,25 @@ void HandoffPrep::FinishVmos() {
 }
 
 void HandoffPrep::SetMemory() {
+  // TODO(https://fxbug.dev/355731771): Bootloaders and boot shims should be
+  // providing a PERIPHERAL range that already covers UART MMIO, but there is
+  // currently a gap in that coverage.
+  if constexpr (kArchHandoffGenerateUartPeripheralRanges) {
+    uart::internal::Visit(
+        [](const auto& uart) {
+          using dcfg_type = ktl::decay_t<decltype(uart.config())>;
+          if constexpr (ktl::is_same_v<dcfg_type, zbi_dcfg_simple_t>) {
+            memalloc::Range uart_mmio = {
+                .addr = fbl::round_down(uart.config().mmio_phys, ZX_PAGE_SIZE),
+                .size = ZX_PAGE_SIZE,
+                .type = memalloc::Type::kPeripheral,
+            };
+            ZX_ASSERT(Allocation::GetPool().MarkAsPeripheral(uart_mmio).is_ok());
+          }
+        },
+        gBootOptions->serial);
+  }
+
   // Normalizes types so that only those that are of interest to the kernel
   // remain.
   auto normed_type = [](memalloc::Type type) -> ktl::optional<memalloc::Type> {

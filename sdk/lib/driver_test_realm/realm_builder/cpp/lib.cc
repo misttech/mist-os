@@ -44,6 +44,11 @@ void Setup(component_testing::RealmBuilder& realm_builder) {
       .targets = {ParentRef()},
   });
   realm_builder.AddRoute(Route{
+      .capabilities = {Protocol{"fuchsia.inspect.InspectSink"}},
+      .source = {ChildRef{"driver_test_realm"}},
+      .targets = {ParentRef()},
+  });
+  realm_builder.AddRoute(Route{
       .capabilities = {Directory{.name = "dev-topological", .rights = fuchsia::io::R_STAR_DIR}},
       .source = {ChildRef{"driver_test_realm"}},
       .targets = {ParentRef()},

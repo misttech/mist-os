@@ -471,7 +471,8 @@ void AudioDriver::RequestRingBufferProperties() {
     OBTAIN_EXECUTION_DOMAIN_TOKEN(token, &owner_->mix_domain());
     turn_on_delay_ = zx::nsec(props.has_turn_on_delay() ? props.turn_on_delay() : 0);
 
-    // TODO(https://fxbug.dev/42065000): obey the flag when it is false. We behave as if it is always true.
+    // TODO(https://fxbug.dev/42065000): obey the flag when it is false. We behave as if it is
+    // always true.
     needs_cache_flush_or_invalidate_ = props.has_needs_cache_flush_or_invalidate()
                                            ? props.needs_cache_flush_or_invalidate()
                                            : true;
@@ -479,8 +480,8 @@ void AudioDriver::RequestRingBufferProperties() {
     driver_transfer_bytes_ = props.has_driver_transfer_bytes() ? props.driver_transfer_bytes() : 0;
     if constexpr (kLogDriverDelayProperties) {
       FX_LOGS(INFO) << "Audio " << (owner_->is_input() ? " Input" : "Output")
-                    << " received turn_on_delay  " << std::setw(5) << turn_on_delay_.to_usecs()
-                    << " usec, driver_transfer_bytes " << driver_transfer_bytes_;
+                    << " received turn_on_delay  " << std::setw(8) << turn_on_delay_.to_nsecs()
+                    << " ns, driver_transfer_bytes " << driver_transfer_bytes_;
     }
 
     RequestDelayInfo();
@@ -504,9 +505,9 @@ void AudioDriver::RequestDelayInfo() {
 
     if constexpr (kLogDriverDelayProperties) {
       FX_LOGS(INFO) << "Audio " << (owner_->is_input() ? " Input" : "Output")
-                    << " received external_delay " << std::setw(5) << external_delay_.to_usecs()
-                    << " usec, internal_delay " << std::setw(5) << internal_delay_.to_usecs()
-                    << " usec";
+                    << " received external_delay " << std::setw(8) << external_delay_.to_nsecs()
+                    << " ns, internal_delay " << std::setw(8) << internal_delay_.to_nsecs()
+                    << " ns";
     }
 
     auto format = GetFormat();
@@ -777,13 +778,13 @@ zx_status_t AudioDriver::Start() {
       if constexpr (kLogDriverDelayProperties) {
         FX_LOGS(INFO)
             << "Setting OUTPUT ref_time_to_frac_presentation_frame_, based on 0 first frac-frame, "
-            << ref_start_time_.get() / 1000 << "-usec ref_start_time + " << std::setw(5)
-            << internal_delay_.to_usecs() << "-usec internal delay + " << std::setw(5)
-            << external_delay_.to_usecs() << "-usec external delay, and frac-fps "
+            << ref_start_time_.get() << "-ns ref_start_time + " << std::setw(8)
+            << internal_delay_.to_nsecs() << "-ns internal delay + " << std::setw(8)
+            << external_delay_.to_nsecs() << "-ns external delay, and frac-fps "
             << frac_fps.subject_delta() << "/" << frac_fps.reference_delta();
         FX_LOGS(INFO) << "Setting ref_time_to_frac_safe_read_or_write_frame_, based on "
                       << raw_driver_transfer_frames << " first frac-frame, "
-                      << ref_start_time_.get() / 1000 << "-usec ref_start_time, and frac-fps "
+                      << ref_start_time_.get() << "-ns ref_start_time, and frac-fps "
                       << frac_fps.subject_delta() << "/" << frac_fps.reference_delta();
       }
     } else {
@@ -826,13 +827,13 @@ zx_status_t AudioDriver::Start() {
       if constexpr (kLogDriverDelayProperties) {
         FX_LOGS(INFO)
             << "Setting INPUT ref_time_to_frac_presentation_frame_, based on 0 first frac-frame, "
-            << ref_start_time_.get() / 1000 << "-usec ref_start_time - " << std::setw(5)
-            << external_delay_.to_usecs() << "-usec external delay, " << std::setw(5)
-            << internal_delay_.to_usecs() << "-usec internal delay, and frac-fps "
+            << ref_start_time_.get() << "-ns ref_start_time - " << std::setw(8)
+            << external_delay_.to_nsecs() << "-ns external delay, " << std::setw(8)
+            << internal_delay_.to_nsecs() << "-ns internal delay, and frac-fps "
             << frac_fps.subject_delta() << "/" << frac_fps.reference_delta();
         FX_LOGS(INFO) << "Setting ref_time_to_frac_safe_read_or_write_frame_, based on "
                       << -raw_driver_transfer_frames << " first frac-frame, "
-                      << ref_start_time_.get() / 1000 << "-usec ref_start_time, and frac-fps "
+                      << ref_start_time_.get() << "-ns ref_start_time, and frac-fps "
                       << frac_fps.subject_delta() << "/" << frac_fps.reference_delta();
       }
     }
@@ -861,10 +862,11 @@ zx_status_t AudioDriver::Stop() {
   OBTAIN_EXECUTION_DOMAIN_TOKEN(token, &owner_->mix_domain());
 
   // In order to stop, we must be in the Started state.
-  // TODO(https://fxbug.dev/42086316): make Stop idempotent. Allow Stop when Configured/Stopping; disallow if
-  // Shutdown; consider what to do if Uninitialized/MissingDriverInfo/Unconfigured/Configuring. Most
-  // importantly, if driver is Starting, queue the request until Start completes (as we cannot
-  // cancel driver commands). Finally, handle multiple Stop calls to be in-flight concurrently.
+  // TODO(https://fxbug.dev/42086316): make Stop idempotent. Allow Stop when Configured/Stopping;
+  // disallow if Shutdown; consider what to do if
+  // Uninitialized/MissingDriverInfo/Unconfigured/Configuring. Most importantly, if driver is
+  // Starting, queue the request until Start completes (as we cannot cancel driver commands).
+  // Finally, handle multiple Stop calls to be in-flight concurrently.
   if (state_ != State::Started) {
     FX_LOGS(ERROR) << "Bad state while attempting stop (state = " << static_cast<uint32_t>(state_)
                    << ")";
@@ -1005,9 +1007,9 @@ void AudioDriver::SetUpClocks() {
   auto backing_clock = owner_->clock_factory()->CreateDeviceAdjustable(
       audio::clock::AdjustableCloneOfMonotonic(), clock_domain_);
 
-  // TODO(https://fxbug.dev/42123306): If this clock domain is discovered to be hardware-tunable, we should
-  // support a mode where the RecoveredClock is optionally recovered OR tuned depending on how it
-  // is used in the mix graph.
+  // TODO(https://fxbug.dev/42123306): If this clock domain is discovered to be hardware-tunable, we
+  // should support a mode where the RecoveredClock is optionally recovered OR tuned depending on
+  // how it is used in the mix graph.
   recovered_clock_ = RecoveredClock::Create(
       fxl::StringPrintf("recovered_clock_for_%s",
                         (owner_->is_output() ? "output_device" : "input_device")),
@@ -1106,8 +1108,9 @@ zx_status_t AudioDriver::SetActiveChannels(uint64_t chan_bit_mask) {
           (void)chan_bit_mask;  // avoid "unused lambda capture" compiler complaint
         }
 
-        // TODO(https://fxbug.dev/42162988): assuming this might change the clients' minimum lead time, here we
-        // should potentially kick off a notification -- including the set_active_channels_time.
+        // TODO(https://fxbug.dev/42162988): assuming this might change the clients' minimum lead
+        // time, here we should potentially kick off a notification -- including the
+        // set_active_channels_time.
       });
 
   return ZX_OK;

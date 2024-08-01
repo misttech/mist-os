@@ -198,11 +198,6 @@ BaseStream::TimelineFunctionSnapshot MixStage::ref_time_to_frac_presentation_fra
 void MixStage::SetPresentationDelay(zx::duration external_delay) {
   TRACE_DURATION("audio", "MixStage::SetPresentationDelay");
 
-  if constexpr (kLogPresentationDelay) {
-    FX_LOGS(INFO) << "    (" << this << ") " << __FUNCTION__ << " given external_delay "
-                  << external_delay.to_nsecs() << "ns";
-  }
-
   ReadableStream::SetPresentationDelay(external_delay);
 
   // Propagate time to our sources.
@@ -214,11 +209,11 @@ void MixStage::SetPresentationDelay(zx::duration external_delay) {
     const zx::duration mixer_lead_time = LeadTimeForMixer(holder.stream->format(), *holder.mixer);
 
     if constexpr (kLogPresentationDelay) {
-      FX_LOGS(INFO) << "Adding LeadTimeForMixer " << mixer_lead_time.to_nsecs()
-                    << "ns to external_delay " << external_delay.to_nsecs() << "ns";
-      FX_LOGS(INFO) << "    (" << this << ") " << __FUNCTION__
-                    << " setting child stream total delay "
-                    << (external_delay + mixer_lead_time).to_nsecs() << "ns";
+      FX_LOGS(INFO) << "        (" << this << ") " << __FUNCTION__ << "("
+                    << external_delay.to_nsecs()
+                    << " ns); for this input LeadTimeForMixer returned "
+                    << mixer_lead_time.to_nsecs() << " ns, calling SetPresentationDelay("
+                    << (external_delay + mixer_lead_time).to_nsecs() << " ns)";
     }
 
     holder.stream->SetPresentationDelay(external_delay + mixer_lead_time);
@@ -516,8 +511,8 @@ std::optional<ReadableStream::Buffer> MixStage::NextSourceBuffer(Mixer& mixer,
     if (source_frames <= Fixed(0)) {
       // This shouldn't happen: the source should not be ahead of state.next_source_frame by
       // more than pos_filter_width and our initial source_frames should > pos_filter_width.
-      FX_LOGS(WARNING) << ffl::String::DecRational << "Unexpectedly small source request" << " ["
-                       << state.next_source_frame() << ", " << source_end << ")"
+      FX_LOGS(WARNING) << ffl::String::DecRational << "Unexpectedly small source request"
+                       << " [" << state.next_source_frame() << ", " << source_end << ")"
                        << " is entirely before next available frame (" << (*next_available) << ")";
       return std::nullopt;
     }

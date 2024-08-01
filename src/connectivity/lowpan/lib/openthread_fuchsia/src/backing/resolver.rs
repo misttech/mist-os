@@ -285,7 +285,10 @@ impl Resolver {
         }
 
         // Trigger the waker so that our poll method gets called by the executor
-        self.waker.replace(None).and_then(|waker| Some(waker.wake()));
+        self.waker.replace(None).and_then(|waker| {
+            waker.wake();
+            Some(())
+        });
     }
 
     // Cancel the pending query

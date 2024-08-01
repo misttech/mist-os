@@ -26,7 +26,7 @@ var tcpAdvancedV6ExpectationsNS3 map[AnvlCaseNumber]outcome.Outcome = map[AnvlCa
 	{1, 17}: Fail,
 	{1, 18}: Fail,
 	{2, 18}: Fail,
-	{2, 19}: Pass,
+	{2, 19}: Flaky, // TODO(https://fxbug.dev/356692923): This should be a consistent failure.
 	{2, 20}: Fail,
 	{2, 21}: Fail,
 	{2, 22}: Fail,

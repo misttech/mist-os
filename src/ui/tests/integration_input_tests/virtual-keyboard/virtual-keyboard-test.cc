@@ -22,7 +22,6 @@
 #include <fuchsia/tracing/provider/cpp/fidl.h>
 #include <fuchsia/ui/app/cpp/fidl.h>
 #include <fuchsia/ui/input/cpp/fidl.h>
-#include <fuchsia/ui/scenic/cpp/fidl.h>
 #include <fuchsia/web/cpp/fidl.h>
 #include <lib/async/cpp/task.h>
 #include <lib/fidl/cpp/binding_set.h>
@@ -159,7 +158,6 @@ class VirtualKeyboardBase : public gtest::RealLoopFixture {
         fuchsia::ui::composition::Flatland::Name_,
         fuchsia::ui::input3::Keyboard::Name_,
         fuchsia::ui::input::ImeService::Name_,
-        fuchsia::ui::scenic::Scenic::Name_,
     };
     config.passthrough_capabilities = {{
         Protocol{fuchsia::kernel::VmexResource::Name_},
@@ -454,9 +452,6 @@ class WebEngineTest : public VirtualKeyboardBase {
         {.capabilities = {Config{kNormalCaptureDelay}},
          .source = VoidRef(),
          .targets = {ChildRef{kMemoryPressureProvider}}},
-        {.capabilities = {Protocol{fuchsia::ui::scenic::Scenic::Name_}},
-         .source = ParentRef(),
-         .targets = {target}},
         {.capabilities = {Protocol{fuchsia::ui::composition::Allocator::Name_},
                           Protocol{fuchsia::ui::composition::Flatland::Name_}},
          .source = ParentRef(),

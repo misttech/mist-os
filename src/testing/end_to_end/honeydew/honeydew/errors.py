@@ -42,6 +42,10 @@ class Sl4fError(TransportError):
     """Exception for errors raised by SL4F requests."""
 
 
+class SerialError(TransportError):
+    """Exception for errors raised by host-target communication over serial."""
+
+
 class FfxCommandError(TransportError):
     """Exception for errors raised by ffx commands running on host machine."""
 
@@ -60,10 +64,6 @@ class TransportConnectionError(HoneydewError):
 
 class Sl4fConnectionError(TransportConnectionError):
     """Raised when FFX transport's check_connection fails."""
-
-
-class SshConnectionError(TransportConnectionError):
-    """Raised when SSH transport's check_connection fails."""
 
 
 class FfxConnectionError(TransportConnectionError):

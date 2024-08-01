@@ -308,7 +308,7 @@ zx_status_t Device::Bind() {
   auto* dispatcher = fdf::Dispatcher::GetCurrent()->async_dispatcher();
   outgoing_ = component::OutgoingDirectory(dispatcher);
 
-  auto snoop_handler = [this](fidl::ServerEnd<fhbt::Snoop2> server_end) mutable {
+  auto snoop_handler = [this](fidl::ServerEnd<fhbt::Snoop> server_end) mutable {
     if (snoop_server_.has_value()) {
       zxlogf(ERROR, "Snoop already active");
       return;
@@ -376,7 +376,7 @@ void Device::ConnectHciTransport(
                                     fidl::kIgnoreBindingClosure);
 }
 
-void Device::ConnectSnoop(fidl::ServerEnd<fuchsia_hardware_bluetooth::Snoop2> server_end) {
+void Device::ConnectSnoop(fidl::ServerEnd<fuchsia_hardware_bluetooth::Snoop> server_end) {
   snoop_server_.emplace(dispatcher_, std::move(server_end), this, fidl::kIgnoreBindingClosure);
 }
 
@@ -748,7 +748,7 @@ void Device::SnoopChannelWriteLocked(bt_hci_snoop_type_t type, bool is_received,
     snoop_warning_emitted_ = false;
 
     fidl::Arena arena;
-    auto builder = fhbt::wire::Snoop2OnObservePacketRequest::Builder(arena);
+    auto builder = fhbt::wire::SnoopOnObservePacketRequest::Builder(arena);
     // auto fidl_vec = std::vector<uint8_t>(bytes, bytes + length);
     builder.direction(is_received ? fhbt::PacketDirection::kControllerToHost
                                   : fhbt::PacketDirection::kHostToController);
@@ -1688,10 +1688,6 @@ void Device::ConfigureSco(ConfigureScoRequest& request, ConfigureScoCompleter::S
   QueueScoReadRequestsLocked();
 }
 
-void Device::SetSnoop(SetSnoopRequest& request, SetSnoopCompleter::Sync& completer) {
-  completer.Close(ZX_ERR_NOT_SUPPORTED);
-}
-
 void Device::handle_unknown_method(
     ::fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::HciTransport> metadata,
     ::fidl::UnknownMethodCompleter::Sync& completer) {
@@ -1706,9 +1702,9 @@ void Device::AcknowledgePackets(AcknowledgePacketsRequest& request,
 
 void Device::handle_unknown_method(
 
-    ::fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Snoop2> metadata,
+    ::fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Snoop> metadata,
     ::fidl::UnknownMethodCompleter::Sync& completer) {
-  zxlogf(ERROR, "Unknown method in fidl::Server<fuchsia_hardware_bluetooth::Snoop2>");
+  zxlogf(ERROR, "Unknown method in fidl::Server<fuchsia_hardware_bluetooth::Snoop>");
 }
 
 void Device::Wait::Handler(async_dispatcher_t* dispatcher, async_wait_t* async_wait,

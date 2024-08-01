@@ -43,7 +43,7 @@ pub struct Cache;
 ///   * is_package returning false for the package
 ///   * list_blobs not returning any of the package's blobs (unless the blobs happen to be
 ///     referenced by another package)
-/// root_package_urls_and_hashes will still return the URLs and hashes of dropped packages.
+///   * root_package_urls_and_hashes will still return the URLs and hashes of dropped packages.
 pub type CachePackages = FrozenIndex<Cache>;
 
 #[derive(Debug, Clone, Copy)]
@@ -99,7 +99,7 @@ impl<Marker: Send + Sync + 'static> FrozenIndex<Marker> {
     ) -> Result<Self, anyhow::Error> {
         let (packages, blobs) = Self::load_packages_and_blobs(
             blobfs,
-            root_package_urls_and_hashes.iter().map(|(_, h)| *h),
+            root_package_urls_and_hashes.values().map(|h| *h),
             on_package_load_error,
         )
         .await

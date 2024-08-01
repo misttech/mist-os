@@ -90,13 +90,24 @@
             from: "parent",
             to: [ "#scene_manager" ],
             config: [
+                "fuchsia.power.SuspendEnabled",
                 "fuchsia.scenic.DisplayRotation",
                 "fuchsia.ui.DisplayPixelDensity",
                 "fuchsia.ui.IdleThresholdMs",
                 "fuchsia.ui.SupportedInputDevices",
-                "fuchsia.ui.SuspendEnabled",
                 "fuchsia.ui.ViewingDistance",
             ],
+        },
+
+        // Routes below may only be present on certain products.
+        // We communicate this expectation to component framework
+        // with the `source_availability: "unknown"` attribute.
+        {
+            protocol: [ "fuchsia.power.system.ActivityGovernor" ],
+            from: "parent",
+            to: "#scene_manager",
+            source_availability: "unknown",
+            availability: "optional",
         },
     ],
     expose: [

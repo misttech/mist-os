@@ -305,10 +305,6 @@ template("fidl_library") {
       }
 
       api_levels += [ next_numbered_api_level ]
-    } else {
-      # In-development API level 22 is temporarily supported alongside "NEXT".
-      # TODO(https://fxbug.dev/326277078): Remove API level 22 and this line.
-      api_levels += [ 22 ]
     }
 
     api_levels += [ _in_development_api_level ]
@@ -355,9 +351,6 @@ template("fidl_library") {
             # from scratch. See https://fxbug.dev/324481114#comment5.
             policy = "update_golden"
           } else if (level == _in_development_api_level) {
-            policy = "ack_changes"
-          } else if (level == 22) {
-            # TODO(https://fxbug.dev/326277078): Remove API level 22 and this.
             policy = "ack_changes"
           } else {
             policy = "no_changes"

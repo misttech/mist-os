@@ -4,6 +4,7 @@
 """FuchsiaDevice abstract base class implementation using Fuchsia-Controller
 preferred transport."""
 
+import ipaddress
 import logging
 
 from honeydew.affordances.sl4f.bluetooth.profiles import (
@@ -43,9 +44,8 @@ class FuchsiaDevice(fc_fuchsia_device.FuchsiaDevice):
     use it. Otherwise use SL4F based implementation.
 
     Args:
-        device_name: Device name returned by `ffx target list`.
+        device_info: Fuchsia device information.
         ffx_config: Config that need to be used while running FFX commands.
-        device_ip_port: IP Address and port of the device.
 
     Raises:
         errors.FFXCommandError: if FFX connection check fails.
@@ -55,15 +55,17 @@ class FuchsiaDevice(fc_fuchsia_device.FuchsiaDevice):
 
     def __init__(
         self,
-        device_name: str,
+        device_info: custom_types.DeviceInfo,
         ffx_config: custom_types.FFXConfig,
-        device_ip_port: custom_types.IpPort | None = None,
     ) -> None:
         _LOGGER.debug(
             "Initializing Fuchsia-Controller-Preferred based FuchsiaDevice"
         )
 
-        super().__init__(device_name, ffx_config, device_ip_port)
+        super().__init__(
+            device_info,
+            ffx_config,
+        )
 
         _LOGGER.debug(
             "Initialized Fuchsia-Controller-Preferred based FuchsiaDevice"
@@ -80,9 +82,13 @@ class FuchsiaDevice(fc_fuchsia_device.FuchsiaDevice):
         Raises:
             errors.Sl4fError: Failed to instantiate.
         """
+        device_ip: ipaddress.IPv4Address | ipaddress.IPv6Address | None = None
+        if self._device_info.ip_port:
+            device_ip = self._device_info.ip_port.ip
+
         sl4f_obj: sl4f_transport_interface.SL4F = sl4f_transport.SL4F(
             device_name=self.device_name,
-            device_ip=self._ip_address,
+            device_ip=device_ip,
             ffx_transport=self.ffx,
         )
         return sl4f_obj

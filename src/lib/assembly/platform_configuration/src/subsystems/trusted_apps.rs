@@ -128,7 +128,7 @@ impl DefineSubsystemConfiguration<Vec<ProductTrustedApp>> for TrustedAppsConfig 
 
                 for (key, value) in config_data {
                     builder
-                        .package(&package_name.to_string())
+                        .package(package_name.as_ref())
                         .config_data(FileEntry { source: value.into(), destination: key.into() })
                         .context(format!(
                             "Adding config data file {} to package {}",

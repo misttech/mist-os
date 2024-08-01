@@ -59,6 +59,11 @@ def _collect_file_deps(dep):
 
     return dep[FuchsiaAssembledPackageInfo].files
 
+def _collect_debug_symbols(dep):
+    if FuchsiaPackageInfo in dep:
+        return getattr(dep[FuchsiaPackageInfo], "build_id_dirs", [])
+    return getattr(dep[FuchsiaAssembledPackageInfo], "build_id_dirs", [])
+
 def _fuchsia_product_configuration_impl(ctx):
     product_config = json.decode(ctx.attr.product_config)
     product_config_file = ctx.actions.declare_file(ctx.label.name + "_product_config.json")
@@ -80,16 +85,19 @@ def _fuchsia_product_configuration_impl(ctx):
     packages = {}
 
     output_files = []
+    build_id_dirs = []
     base_pkg_details = []
     for dep in ctx.attr.base_packages:
         base_pkg_details.append(_create_pkg_detail(dep, relative_base))
         output_files += _collect_file_deps(dep)
+        build_id_dirs += _collect_debug_symbols(dep)
     packages["base"] = base_pkg_details
 
     cache_pkg_details = []
     for dep in ctx.attr.cache_packages:
         cache_pkg_details.append(_create_pkg_detail(dep, relative_base))
         output_files += _collect_file_deps(dep)
+        build_id_dirs += _collect_debug_symbols(dep)
     packages["cache"] = cache_pkg_details
     product["packages"] = packages
 
@@ -136,6 +144,7 @@ def _fuchsia_product_configuration_impl(ctx):
         FuchsiaProductConfigInfo(
             product_config = product_config_file,
             build_type = build_type,
+            build_id_dirs = build_id_dirs,
         ),
     ]
 
@@ -145,6 +154,7 @@ def _fuchsia_prebuilt_product_configuration_impl(ctx):
         FuchsiaProductConfigInfo(
             product_config = ctx.file.product_config,
             build_type = ctx.attr.build_type,
+            build_id_dirs = [],
         ),
     ]
 

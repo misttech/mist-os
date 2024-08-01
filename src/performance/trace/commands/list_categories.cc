@@ -24,8 +24,8 @@ void ListCategoriesCommand::Start(const fxl::CommandLine& command_line) {
     return;
   }
 
-  take_controller()->GetKnownCategories().Then(
-      [this](fidl::Result<controller::Controller::GetKnownCategories> result) {
+  take_provisioner()->GetKnownCategories().Then(
+      [this](fidl::Result<controller::Provisioner::GetKnownCategories> result) {
         if (result.is_error()) {
           FX_LOGS(ERROR) << "Failed to get known categories: " << result.error_value() << "\n";
         }

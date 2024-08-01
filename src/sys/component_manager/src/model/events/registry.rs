@@ -2,19 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::capability::CapabilitySource;
 use crate::model::component::instance::InstanceState;
 use crate::model::component::manager::ComponentManagerInstance;
 use crate::model::component::{ComponentInstance, ExtendedInstance, WeakExtendedInstance};
 use crate::model::events::dispatcher::{EventDispatcher, EventDispatcherScope};
 use crate::model::events::stream::EventStream;
 use crate::model::events::synthesizer::{ComponentManagerEventSynthesisProvider, EventSynthesizer};
-use crate::model::routing::RouteSource;
-use ::routing::capability_source::InternalCapability;
+use ::routing::capability_source::{CapabilitySource, InternalCapability};
 use ::routing::component_instance::ComponentInstanceInterface;
 use ::routing::event::EventFilter;
 use ::routing::mapper::{RouteMapper, RouteSegment};
-use ::routing::route_event_stream;
+use ::routing::{route_event_stream, RouteSource};
 use async_trait::async_trait;
 use cm_rust::{ChildRef, EventScope, OfferDecl, UseDecl, UseEventStreamDecl};
 use cm_types::Name;
@@ -365,15 +363,14 @@ impl EventRegistry {
                 source:
                     CapabilitySource::Framework {
                         capability: InternalCapability::EventStream(source_name),
-                        component,
+                        moniker,
                     },
                 relative_path: _,
-            } => Ok((source_name, component.moniker.into(), route)),
+            } => Ok((source_name, moniker.into(), route)),
             RouteSource {
                 source:
                     CapabilitySource::Builtin {
                         capability: InternalCapability::EventStream(source_name),
-                        ..
                     },
                 relative_path: _,
             } => Ok((source_name, ExtendedMoniker::ComponentManager, route)),

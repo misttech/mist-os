@@ -292,13 +292,13 @@ impl Client {
             return Ok(());
         }
         // Use blob reader protocol if available, otherwise fallback to fuchsia.io/Directory.Open.
-        return if let Some(reader) = &self.reader {
+        if let Some(reader) = &self.reader {
             let object_request = flags.to_object_request(server_end);
             let () = open_blob_with_reader(reader.clone(), *blob, scope, flags, object_request);
             Ok(())
         } else {
             self.dir.open(flags, fio::ModeType::empty(), &blob.to_string(), server_end)
-        };
+        }
     }
 
     /// Open a blob for read using open3. `scope` will only be used if the client was configured to

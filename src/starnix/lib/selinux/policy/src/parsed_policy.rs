@@ -336,6 +336,10 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
         &self.conditional_booleans.data
     }
 
+    pub(crate) fn fs_uses(&self) -> &FsUses<PS> {
+        &self.fs_uses.data
+    }
+
     #[allow(dead_code)]
     // TODO(http://b/334968228): fn to be used again when checking role allow rules separately from
     // SID calculation.
@@ -752,6 +756,19 @@ impl<PS: ParseStrategy> Validate for ParsedPolicy<PS> {
         // TODO(b/329221265): Validate category Ids in MlsRanges.
         for initial_sid in &self.initial_sids.data {
             let context = initial_sid.context();
+            validate_id(&user_ids, context.user_id(), "user")?;
+            validate_id(&role_ids, context.role_id(), "role")?;
+            validate_id(&type_ids, context.type_id(), "type")?;
+            validate_id(&sensitivity_ids, context.low_level().sensitivity(), "sensitivity")?;
+            if let Some(high) = context.high_level() {
+                validate_id(&sensitivity_ids, high.sensitivity(), "sensitivity")?;
+            }
+        }
+
+        // Validate that contexts specified in filesystem labeling rules only use
+        // policy-defined Ids for their fields.
+        for fs_use in &self.fs_uses.data {
+            let context = fs_use.context();
             validate_id(&user_ids, context.user_id(), "user")?;
             validate_id(&role_ids, context.role_id(), "role")?;
             validate_id(&type_ids, context.type_id(), "type")?;

@@ -330,13 +330,22 @@
             source_availability: "unknown",
         },
         {
+            protocol: [ "fuchsia.inspect.InspectSink" ],
+            from: "#driver_manager",
+            to: "#boot-drivers",
+        },
+        {
+            protocol: [ "fuchsia.logger.LogSink" ],
+            from: "#archivist",
+            to: "#boot-drivers",
+        },
+        {
             protocol: [
                 "fuchsia.inspect.InspectSink",
                 "fuchsia.logger.LogSink",
             ],
             from: "#archivist",
             to: [
-                "#boot-drivers",
                 "#devfs",
                 "#devfs-with-pkg",
                 "#driver-hosts",

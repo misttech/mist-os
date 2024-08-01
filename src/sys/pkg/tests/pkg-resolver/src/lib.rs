@@ -470,7 +470,7 @@ where
 
     pub async fn build(self) -> TestEnv<ConcreteBlobfs> {
         let blob_implementation =
-            self.blob_implementation.unwrap_or_else(|| blobfs_ramdisk::Implementation::CppBlobfs);
+            self.blob_implementation.unwrap_or(blobfs_ramdisk::Implementation::CppBlobfs);
         let (blobfs, system_image) = (self.blobfs_and_system_image)(blob_implementation).await;
         let mounts = (self.mounts)();
 

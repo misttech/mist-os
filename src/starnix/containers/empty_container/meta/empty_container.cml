@@ -5,7 +5,7 @@
     include: [ "//src/starnix/containers/container.shard.cml" ],
     program: {
         runner: "starnix",
-        features: [],
+        features: [ "container" ],
         init: [],
         kernel_cmdline: "",
         mounts: [ "/:remotefs" ],

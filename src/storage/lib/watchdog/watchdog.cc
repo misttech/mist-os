@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "src/storage/lib/watchdog/watchdog.h"
+
 #include <lib/sync/completion.h>
 #include <lib/syslog/cpp/macros.h>
-#include <lib/watchdog/operations.h>
-#include <lib/watchdog/watchdog.h>
 #include <lib/zx/process.h>
 #include <lib/zx/result.h>
 #include <lib/zx/time.h>
@@ -14,8 +14,10 @@
 #include <zircon/assert.h>
 #include <zircon/compiler.h>
 #include <zircon/errors.h>
+#include <zircon/process.h>
 #include <zircon/time.h>
 
+#include <chrono>
 #include <cstdio>
 #include <map>
 #include <memory>
@@ -23,6 +25,7 @@
 #include <sstream>
 #include <string>
 #include <thread>
+#include <utility>
 
 #include <inspector/inspector.h>
 

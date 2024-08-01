@@ -119,7 +119,7 @@ void BaseRenderer::RecomputeMinLeadTime() {
 
   if constexpr (kLogPresentationDelay) {
     FX_LOGS(INFO) << "    (" << this << ") " << __FUNCTION__ << " calculated "
-                  << cur_lead_time.to_nsecs() << "ns";
+                  << cur_lead_time.to_nsecs() << " ns";
   }
 
   if (min_lead_time_ != cur_lead_time) {
@@ -645,10 +645,10 @@ void BaseRenderer::SendPacketInternal(fuchsia::media::StreamPacket packet,
 
   // Snap the starting pts to an input frame boundary.
   //
-  // TODO(https://fxbug.dev/42083626): Don't do this. If a user wants to write an explicit timestamp on a
-  // source packet which schedules the packet to start at a fractional position on the source time
-  // line, we should probably permit this. We need to make sure that the mixer cores are ready to
-  // handle this case before proceeding, however.
+  // TODO(https://fxbug.dev/42083626): Don't do this. If a user wants to write an explicit timestamp
+  // on a source packet which schedules the packet to start at a fractional position on the source
+  // time line, we should probably permit this. We need to make sure that the mixer cores are ready
+  // to handle this case before proceeding, however.
   start_pts = Fixed(start_pts.Floor());
 
   // Create the packet.
@@ -1056,7 +1056,7 @@ void BaseRenderer::ReportNewMinLeadTime() {
     if constexpr (kLogPresentationDelay) {
       // This need not be logged every time since we also log this in RecomputeMinLeadTime.
       FX_LOGS(DEBUG) << "    (" << this << ") " << __FUNCTION__ << " reported "
-                     << min_lead_time_.to_nsecs() << "ns";
+                     << min_lead_time_.to_nsecs() << " ns";
     }
   }
 }

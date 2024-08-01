@@ -340,7 +340,7 @@ impl Info {
         let store = self
             .execution_type
             .get_signature()
-            .map(|signature| stores.entry(*signature).or_insert_with(Default::default).clone());
+            .map(|signature| stores.entry(*signature).or_default().clone());
 
         async move {
             let id = fuchsia_trace::Id::new();

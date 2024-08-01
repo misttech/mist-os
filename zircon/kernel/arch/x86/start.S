@@ -86,7 +86,21 @@ FUNCTION_LABEL(_start)
     mov PHYS(__data_end), %ecx
     mov $PHYS(__data_end+4), %esi
     mov $PHYS(_end), %edi
-    rep movsb // while (ecx-- > 0) *edi++ = *esi++;
+
+    // We are copying the relocation code right after the bss.
+    // It is possible that the code is larger than the bss, so we have to
+    // take into account the possibility of src and dst overlapping.
+    mov %edi, %eax
+    sub %esi, %eax
+    cmp %ecx, %eax
+    jnb .Lcopy
+    // There's an overlap. Reverse the copy direction.
+    lea -1(%edi, %ecx), %edi // edi = edi + ecx - 1;
+    lea -1(%esi, %ecx), %esi // esi = esi + ecx - 1;
+    std
+.Lcopy:
+    rep movsb
+    cld
 
     // Now it's safe to zero the bss.
     movl $PHYS(__bss_start), %edi

@@ -170,7 +170,7 @@ impl CompiledPackageBuilder {
         }
 
         for entry in &self.contents {
-            package_builder.add_file_as_blob(entry.destination.to_string(), &entry.source)?;
+            package_builder.add_file_as_blob(&entry.destination, &entry.source)?;
         }
 
         let package_manifest_path = outdir.join("package_manifest.json");

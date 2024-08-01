@@ -197,6 +197,28 @@ class FFXConfig:
 
 
 @dataclass(frozen=True)
+class DeviceInfo:
+    """Dataclass that holds Fuchsia device information.
+
+    Args:
+        name: Device name returned by `ffx target list`.
+        serial_socket: Device serial socket path.
+        ip_port: IP Address and port of the device.
+    """
+
+    name: str
+    ip_port: IpPort | None
+    serial_socket: str | None
+
+    def __str__(self) -> str:
+        return (
+            f"name={self.name}, "
+            f"ip_port={self.ip_port}, "
+            f"serial_socket={self.serial_socket}, "
+        )
+
+
+@dataclass(frozen=True)
 class FidlEndpoint:
     """Dataclass that holds FIDL end point information.
 

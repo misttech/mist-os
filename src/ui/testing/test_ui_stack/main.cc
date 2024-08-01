@@ -13,7 +13,6 @@
 #include <fidl/fuchsia.ui.input3/cpp/fidl.h>
 #include <fidl/fuchsia.ui.pointerinjector/cpp/fidl.h>
 #include <fidl/fuchsia.ui.policy/cpp/fidl.h>
-#include <fidl/fuchsia.ui.scenic/cpp/fidl.h>
 #include <fidl/fuchsia.ui.test.input/cpp/fidl.h>
 #include <fidl/fuchsia.ui.test.scene/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
@@ -73,7 +72,6 @@ int run_test_ui_stack(int argc, const char** argv) {
                                                                       realm_exposed_services.get());
   AddPublicService<fuchsia_ui_composition::Allocator>(context.get(), realm_exposed_services.get());
   AddPublicService<fuchsia_ui_composition::Flatland>(context.get(), realm_exposed_services.get());
-  AddPublicService<fuchsia_ui_scenic::Scenic>(context.get(), realm_exposed_services.get());
   AddPublicService<fuchsia_ui_focus::FocusChainListenerRegistry>(context.get(),
                                                                  realm_exposed_services.get());
   AddPublicService<fuchsia_ui_input::ImeService>(context.get(), realm_exposed_services.get());

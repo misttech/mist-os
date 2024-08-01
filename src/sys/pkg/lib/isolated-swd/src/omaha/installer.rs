@@ -37,6 +37,8 @@ impl Installer for IsolatedInstaller {
     type Error = IsolatedInstallError;
     type InstallResult = ();
 
+    // TODO(b/356474618): re-enable and fix existing occurances
+    #[allow(clippy::let_underscore_future)]
     fn perform_install<'a>(
         &'a mut self,
         install_plan: &'a FuchsiaInstallPlan,

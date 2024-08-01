@@ -109,7 +109,7 @@ impl ValidatePath for &str {
 mod tests {
     use super::*;
     use crate::fidl::RemotableCapability;
-    use crate::{Capability, Dict, Receiver};
+    use crate::{Capability, Dict};
     use assert_matches::assert_matches;
     use fidl::endpoints::ClientEnd;
     use fidl::AsHandleRef;
@@ -118,7 +118,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_connector_into_open() {
-        let (receiver, sender) = Receiver::new();
+        let (receiver, sender) = Connector::new();
         let dir_entry = DirEntry::new(sender.try_into_directory_entry().unwrap());
         let (client_end, server_end) = Channel::create();
         let scope = ExecutionScope::new();
@@ -134,7 +134,7 @@ mod tests {
     fn test_connector_into_open_extra_path() {
         let mut ex = fasync::TestExecutor::new();
 
-        let (receiver, sender) = Receiver::new();
+        let (receiver, sender) = Connector::new();
         let dir_entry = DirEntry::new(sender.try_into_directory_entry().unwrap());
         let (client_end, server_end) = Channel::create();
         let scope = ExecutionScope::new();
@@ -156,7 +156,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_connector_into_open_via_dict() {
         let dict = Dict::new();
-        let (receiver, sender) = Receiver::new();
+        let (receiver, sender) = Connector::new();
         dict.insert("echo".parse().unwrap(), Capability::Connector(sender))
             .expect("dict entry already exists");
 
@@ -177,7 +177,7 @@ mod tests {
         let mut ex = fasync::TestExecutor::new();
 
         let dict = Dict::new();
-        let (receiver, sender) = Receiver::new();
+        let (receiver, sender) = Connector::new();
         dict.insert("echo".parse().unwrap(), Capability::Connector(sender))
             .expect("dict entry already exists");
 

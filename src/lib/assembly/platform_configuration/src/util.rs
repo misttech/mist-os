@@ -30,7 +30,7 @@ pub(crate) fn add_build_type_config_data(
     file.write_all(build_type.as_bytes()).with_context(|| format!("Writing {}", &filepath))?;
     builder
         .package(package)
-        .config_data(FileEntry { source: filepath.into(), destination: "build/type".into() })?;
+        .config_data(FileEntry { source: filepath, destination: "build/type".into() })?;
     Ok(())
 }
 
@@ -64,7 +64,7 @@ fn render_cml_template(
     template_contents: &str,
 ) -> anyhow::Result<String> {
     // Gather the data to render the cml template.
-    let url = AbsoluteComponentUrl::parse(&product_component_url)
+    let url = AbsoluteComponentUrl::parse(product_component_url)
         .with_context(|| format!("Parsing component_url: {}", product_component_url))?;
     let package_name = match url.package_url() {
         Unpinned(unpinned) => unpinned.name(),
@@ -76,7 +76,7 @@ fn render_cml_template(
 
     let handlebars = Handlebars::new();
     handlebars
-        .render_template(&template_contents, &data)
+        .render_template(template_contents, &data)
         .with_context(|| format!("Rendering the core shard template for: {product_component_url}"))
 }
 

@@ -49,8 +49,6 @@ class PassthroughDevice
   void AckReceive(AckReceiveCompleter::Sync& completer) override;
   void ConfigureSco(::fuchsia_hardware_bluetooth::wire::HciTransportConfigureScoRequest* request,
                     ConfigureScoCompleter::Sync& completer) override;
-  void SetSnoop(::fuchsia_hardware_bluetooth::wire::HciTransportSetSnoopRequest* request,
-                SetSnoopCompleter::Sync& completer) override;
   void handle_unknown_method(
       fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::HciTransport> metadata,
       fidl::UnknownMethodCompleter::Sync& completer) override;

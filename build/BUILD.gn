@@ -314,8 +314,6 @@ group("deprecated_zx_wrapper_allowlist") {
     "//src/media/audio/lib/simple-codec:*",
     "//src/storage/gpt:*",
     "//src/storage/lib/disk_inspector:*",
-    "//src/storage/lib/paver:*",
-    "//src/storage/lib/watchdog:*",
     "//third_party/android/platform/external/avb:*",
     "//zircon/kernel/arch/x86/phys:*",
     "//zircon/kernel/dev/coresight:*",
@@ -532,8 +530,4 @@ group("core_realm_shards_allowlist") {
     "//src/connectivity/lowpan/drivers/lowpan-ot-driver:lowpan_ot_driver_core_shard",
     "//src/connectivity/lowpan/service:lowpanservice_shard",
   ]
-
-  # Used to facilitate b/353560491
-  visibility +=
-      [ "//src/session/bin/session_manager:fake_session_manager_core_shard" ]
 }

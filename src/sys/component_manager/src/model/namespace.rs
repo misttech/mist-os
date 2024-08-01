@@ -118,6 +118,7 @@ async fn add_use_decls(
                 route_to_storage_decl(decl.clone(), component, &mut NoopRouteMapper).await
             {
                 verify_instance_in_component_id_index(&source, component)
+                    .await
                     .map_err(CreateNamespaceError::InstanceNotInInstanceIdIndex)?;
             }
         }

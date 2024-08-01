@@ -48,6 +48,7 @@ impl DriverTestRealmBuilder for RealmBuilder {
                     "fuchsia.driver.registrar.DriverRegistrar",
                 ))
                 .capability(Capability::protocol_by_name("fuchsia.driver.test.Realm"))
+                .capability(Capability::protocol_by_name("fuchsia.inspect.InspectSink"))
                 .capability(Capability::directory("dev-topological"))
                 .capability(Capability::directory("dev-class"))
                 .from(&driver_realm)

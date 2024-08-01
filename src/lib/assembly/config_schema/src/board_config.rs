@@ -167,9 +167,14 @@ pub struct BoardKernelConfig {
     /// when a significant contiguous memory size is required.
     #[serde(default)]
     pub contiguous_physical_pages: bool,
+
     /// Where to print serial logs.
     #[serde(default)]
     pub serial_mode: SerialMode,
+
+    /// Disable printing to the console during early boot (ie, make it quiet)
+    #[serde(default)]
+    pub quiet_early_boot: bool,
 }
 
 /// This struct defines platform configurations specified by board.
@@ -319,6 +324,7 @@ mod test {
             kernel: BoardKernelConfig {
                 contiguous_physical_pages: true,
                 serial_mode: SerialMode::NoOutput,
+                quiet_early_boot: false,
             },
             platform: PlatformConfig {
                 connectivity: ConnectivityConfig::default(),

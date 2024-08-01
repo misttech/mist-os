@@ -6,8 +6,8 @@
 
 use alloc::fmt::Debug;
 use alloc::vec::Vec;
-use net_types::ip::{GenericOverIp, Ip, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
-use net_types::{MulticastAddr, MulticastAddress as _, SpecifiedAddress as _, UnicastAddr};
+use net_types::ip::{GenericOverIp, Ip, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6Scope};
+use net_types::{MulticastAddress as _, ScopeableAddress as _, SpecifiedAddress as _, UnicastAddr};
 use netstack3_base::StrongDeviceIdentifier;
 
 /// A witness type wrapping [`Ipv4Addr`], proving the following properties:
@@ -36,59 +36,82 @@ impl Ipv4SourceAddr {
     }
 }
 
-impl<I: MulticastRouteIpExt> GenericOverIp<I> for Ipv4SourceAddr {
-    type Type = I::SourceAddress;
+/// A witness type wrapping [`Ipv4Addr`], proving the following properties:
+/// * the inner address is multicast, and
+/// * the inner address's scope is greater than link local.
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub struct Ipv4DestinationAddr {
+    addr: Ipv4Addr,
 }
 
-/// A witness type wrapping [`Ipv6Addr`], proving the following properties:
-/// * the inner address is unicast.
-// NB: Use a new-type around `UnicastAddr` so that we can re-implement
-// [`GenericOverIp`] in a way that's compatible with [`MulticastRouteIpExt`].
-#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
-pub struct Ipv6SourceAddr(UnicastAddr<Ipv6Addr>);
-
-impl Ipv6SourceAddr {
-    /// Construct a new [`Ipv6SourceAddr`].
+impl Ipv4DestinationAddr {
+    /// Construct a new [`Ipv4DestinationAddr`].
     ///
     /// `None` if the provided address does not have the required properties.
-    fn new(addr: Ipv6Addr) -> Option<Self> {
-        UnicastAddr::new(addr).map(Ipv6SourceAddr)
+    fn new(addr: Ipv4Addr) -> Option<Self> {
+        // As per RFC 5771 Section 4:
+        //   Addresses in the Local Network Control Block are used for protocol
+        //   control traffic that is not forwarded off link.
+        if addr.is_multicast() && !Ipv4::LINK_LOCAL_MULTICAST_SUBNET.contains(&addr) {
+            Some(Ipv4DestinationAddr { addr })
+        } else {
+            None
+        }
     }
 }
 
-impl<I: MulticastRouteIpExt> GenericOverIp<I> for Ipv6SourceAddr {
-    type Type = I::SourceAddress;
+/// A witness type wrapping [`Ipv6Addr`], proving the following properties:
+/// * the inner address is multicast, and
+/// * the inner address's scope is greater than link local.
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub struct Ipv6DestinationAddr {
+    addr: Ipv6Addr,
+}
+
+impl Ipv6DestinationAddr {
+    /// Construct a new [`Ipv6DestinationAddr`].
+    ///
+    /// `None` if the provided address does not have the required properties.
+    fn new(addr: Ipv6Addr) -> Option<Self> {
+        // As per RFC 4291 Section 2.7:
+        //   Routers must not forward any multicast packets beyond of the scope
+        //   indicated by the scop field in the destination multicast address.
+        if addr.is_multicast()
+            && addr.scope().multicast_scope_id() > Ipv6Scope::MULTICAST_SCOPE_ID_LINK_LOCAL
+        {
+            Some(Ipv6DestinationAddr { addr })
+        } else {
+            None
+        }
+    }
 }
 
 /// IP extension trait for multicast routes.
 pub trait MulticastRouteIpExt: Ip {
     /// The type of source address used in [`MulticastRouteKey`].
-    type SourceAddress: Clone
-        + Debug
-        + Eq
-        + Ord
-        + PartialEq
-        + PartialOrd
-        + GenericOverIp<Self, Type = Self::SourceAddress>
-        + GenericOverIp<Ipv4, Type = Ipv4SourceAddr>
-        + GenericOverIp<Ipv6, Type = Ipv6SourceAddr>;
+    type SourceAddress: Clone + Debug + Eq + Ord + PartialEq + PartialOrd;
+    /// The type of destination address used in [`MulticastRouteKey`].
+    type DestinationAddress: Clone + Debug + Eq + Ord + PartialEq + PartialOrd;
 }
 
 impl MulticastRouteIpExt for Ipv4 {
     type SourceAddress = Ipv4SourceAddr;
+    type DestinationAddress = Ipv4DestinationAddr;
 }
 
 impl MulticastRouteIpExt for Ipv6 {
-    type SourceAddress = Ipv6SourceAddr;
+    type SourceAddress = UnicastAddr<Ipv6Addr>;
+    type DestinationAddress = Ipv6DestinationAddr;
 }
 
 /// The attributes of a multicast route that uniquely identify it.
-#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Eq, GenericOverIp, Ord, PartialEq, PartialOrd)]
+#[generic_over_ip(I, Ip)]
 pub struct MulticastRouteKey<I: MulticastRouteIpExt> {
     /// The source address packets must have in order to use this route.
     src_addr: I::SourceAddress,
     /// The destination address packets must have in order to use this route.
-    dst_addr: MulticastAddr<I::Addr>,
+    dst_addr: I::DestinationAddress,
 }
 
 impl<I: MulticastRouteIpExt> MulticastRouteKey<I> {
@@ -96,13 +119,21 @@ impl<I: MulticastRouteIpExt> MulticastRouteKey<I> {
     ///
     /// `None` if the provided addresses do not have the required properties.
     pub fn new(src_addr: I::Addr, dst_addr: I::Addr) -> Option<MulticastRouteKey<I>> {
-        let dst_addr = MulticastAddr::new(dst_addr)?;
-        let src_addr = I::map_ip::<_, Option<I::SourceAddress>>(
-            src_addr,
-            Ipv4SourceAddr::new,
-            Ipv6SourceAddr::new,
-        )?;
-        Some(MulticastRouteKey { src_addr, dst_addr })
+        I::map_ip(
+            (src_addr, dst_addr),
+            |(src_addr, dst_addr)| {
+                Some(MulticastRouteKey {
+                    src_addr: Ipv4SourceAddr::new(src_addr)?,
+                    dst_addr: Ipv4DestinationAddr::new(dst_addr)?,
+                })
+            },
+            |(src_addr, dst_addr)| {
+                Some(MulticastRouteKey {
+                    src_addr: UnicastAddr::new(src_addr)?,
+                    dst_addr: Ipv6DestinationAddr::new(dst_addr)?,
+                })
+            },
+        )
     }
 }
 
@@ -196,15 +227,18 @@ mod tests {
     use test_case::test_case;
 
     const UNICAST_V4: Ipv4Addr = net_ip_v4!("192.0.2.1");
-    const MULTICAST_V4: Ipv4Addr = net_ip_v4!("224.0.0.1");
+    const MULTICAST_V4: Ipv4Addr = net_ip_v4!("224.0.1.1");
+    const LL_MULTICAST_V4: Ipv4Addr = net_ip_v4!("224.0.0.1");
     const UNICAST_V6: Ipv6Addr = net_ip_v6!("2001:0DB8::1");
-    const MULTICAST_V6: Ipv6Addr = net_ip_v6!("ff0e::2");
+    const MULTICAST_V6: Ipv6Addr = net_ip_v6!("ff0e::1");
+    const LL_MULTICAST_V6: Ipv6Addr = net_ip_v6!("ff02::1");
 
     #[test_case(UNICAST_V4, MULTICAST_V4 => true; "success")]
     #[test_case(UNICAST_V4, UNICAST_V4 => false; "unicast_dst")]
     #[test_case(UNICAST_V4, Ipv4::UNSPECIFIED_ADDRESS => false; "unspecified_dst")]
     #[test_case(MULTICAST_V4, MULTICAST_V4 => false; "multicast_src")]
     #[test_case(Ipv4::UNSPECIFIED_ADDRESS, MULTICAST_V4 => false; "unspecified_src")]
+    #[test_case(UNICAST_V4, LL_MULTICAST_V4 => false; "ll_multicast_dst")]
     fn new_ipv4_route_key(src_addr: Ipv4Addr, dst_addr: Ipv4Addr) -> bool {
         MulticastRouteKey::<Ipv4>::new(src_addr, dst_addr).is_some()
     }
@@ -214,6 +248,7 @@ mod tests {
     #[test_case(UNICAST_V6, Ipv6::UNSPECIFIED_ADDRESS => false; "unspecified_dst")]
     #[test_case(MULTICAST_V6, MULTICAST_V6 => false; "multicast_src")]
     #[test_case(Ipv6::UNSPECIFIED_ADDRESS, MULTICAST_V6 => false; "unspecified_src")]
+    #[test_case(UNICAST_V6, LL_MULTICAST_V6 => false; "ll_multicast_dst")]
     fn new_ipv6_route_key(src_addr: Ipv6Addr, dst_addr: Ipv6Addr) -> bool {
         MulticastRouteKey::<Ipv6>::new(src_addr, dst_addr).is_some()
     }

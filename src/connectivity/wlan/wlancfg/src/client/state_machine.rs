@@ -179,7 +179,7 @@ pub type ConnectionStatsSender = mpsc::UnboundedSender<fidl_internal::SignalRepo
 pub type ConnectionStatsReceiver = mpsc::UnboundedReceiver<fidl_internal::SignalReportIndication>;
 
 fn handle_none_request() -> Result<State, ExitReason> {
-    return Err(ExitReason(Err(format_err!("The stream of requests ended unexpectedly"))));
+    Err(ExitReason(Err(format_err!("The stream of requests ended unexpectedly"))))
 }
 
 // These functions were introduced to resolve the following error:
@@ -257,7 +257,7 @@ async fn disconnecting_state(
     // been sent.  This ensures that there will not be a race when the IfaceManager sends out a
     // ConnectionsDisabled update.
     match options.disconnect_responder {
-        Some(responder) => responder.send(()).unwrap_or_else(|_| ()),
+        Some(responder) => responder.send(()).unwrap_or(()),
         None => (),
     }
 
@@ -300,7 +300,7 @@ async fn handle_connecting_error_and_retry(
                 status: Some(types::DisconnectStatus::ConnectionFailed),
             }),
         );
-        return Err(ExitReason(Ok(())));
+        Err(ExitReason(Ok(())))
     } else {
         // Limit not exceeded, retry after backing off.
         let backoff_time = 400_i64 * i64::from(new_attempt_count);
@@ -320,7 +320,7 @@ async fn handle_connecting_error_and_retry(
             next_network: Some(next_connecting_options),
             reason: types::DisconnectReason::FailedToConnect,
         };
-        return Ok(to_disconnecting_state(common_options, disconnecting_options));
+        Ok(to_disconnecting_state(common_options, disconnecting_options))
     }
 }
 
@@ -477,7 +477,7 @@ async fn connecting_state<'a>(
                 time_to_connect: fasync::Time::now() - start_time,
                 network_is_likely_hidden,
             };
-            return Ok(connected_state(common_options, connected_options).into_state());
+            Ok(connected_state(common_options, connected_options).into_state())
         }
         (code, true) => {
             info!("Failed to connect: {:?}. Will not retry because of credential error.", code);
@@ -489,7 +489,7 @@ async fn connecting_state<'a>(
                     status: Some(types::DisconnectStatus::CredentialsFailed),
                 }),
             );
-            return Err(ExitReason(Ok(())));
+            Err(ExitReason(Ok(())))
         }
         (code, _) => {
             info!("Failed to connect: {:?}", code);
@@ -502,9 +502,9 @@ async fn connecting_state<'a>(
                 warn!("Failed to log connection failure: {}", e);
             }
 
-            return handle_connecting_error_and_retry(common_options, options).await;
+            handle_connecting_error_and_retry(common_options, options).await
         }
-    };
+    }
 }
 
 struct ConnectedOptions {
@@ -947,7 +947,7 @@ mod tests {
         let saved_networks = exec.run_singlethreaded(
             test_values.saved_networks_manager.lookup(&connect_selection.target.network.clone()),
         );
-        assert_eq!(false, saved_networks[0].has_ever_connected);
+        assert!(!saved_networks[0].has_ever_connected);
         assert!(saved_networks[0].hidden_probability > 0.0);
 
         let connecting_options =
@@ -1498,7 +1498,7 @@ mod tests {
                  id: connect_selection.target.network.clone(),
                  credential: connect_selection.target.credential.clone(),
                  bssid: types::Bssid::from(bss_description.bssid),
-                 connect_result: connect_result,
+                 connect_result,
                  scan_type: connect_selection.target.bss.observation,
             };
             assert_eq!(data, &expected_connect_result);
@@ -1593,7 +1593,7 @@ mod tests {
                  id: connect_selection.target.network.clone(),
                  credential: connect_selection.target.credential.clone(),
                  bssid: types::Bssid::from(bss_description.bssid),
-                 connect_result: connect_result,
+                 connect_result,
                  scan_type: connect_selection.target.bss.observation,
             };
             assert_eq!(data, &expected_connect_result);

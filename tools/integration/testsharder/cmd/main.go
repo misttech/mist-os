@@ -332,6 +332,9 @@ func execute(ctx context.Context, flags testsharderFlags, m buildModules) error 
 			return fmt.Errorf("-product-bundle-name must be provided")
 		}
 		pbPath := build.GetPbPathByName(m.ProductBundles(), productBundle)
+		if pbPath == "" {
+			return fmt.Errorf("product bundle %s is not included in the product_bundles.json manifest", productBundle)
+		}
 		platform, err := getHostPlatform()
 		if err != nil {
 			return err

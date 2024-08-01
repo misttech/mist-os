@@ -1,5 +1,9 @@
 [
     {
+        "kind": "struct",
+        "name": "fuchsia.diagnostics/All"
+    },
+    {
         "kind": "protocol/member",
         "name": "fuchsia.diagnostics/ArchiveAccessor.StreamDiagnostics",
         "strictness": "flexible",
@@ -278,6 +282,12 @@
     },
     {
         "kind": "table/member",
+        "name": "fuchsia.diagnostics/Selector.tree_names",
+        "ordinal": "3",
+        "type": "fuchsia.diagnostics/TreeNames"
+    },
+    {
+        "kind": "table/member",
         "name": "fuchsia.diagnostics/Selector.tree_selector",
         "ordinal": "2",
         "type": "fuchsia.diagnostics/TreeSelector"
@@ -426,6 +436,23 @@
     {
         "kind": "struct",
         "name": "fuchsia.diagnostics/SubtreeSelector"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.diagnostics/TreeNames.all",
+        "ordinal": "2",
+        "type": "fuchsia.diagnostics/All"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.diagnostics/TreeNames.some",
+        "ordinal": "1",
+        "type": "vector<string:100>"
+    },
+    {
+        "kind": "union",
+        "name": "fuchsia.diagnostics/TreeNames",
+        "strictness": "flexible"
     },
     {
         "kind": "union/member",

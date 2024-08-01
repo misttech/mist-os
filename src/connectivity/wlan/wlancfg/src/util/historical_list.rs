@@ -84,14 +84,12 @@ mod tests {
 
     const EARLIEST_TIME: fasync::Time = fasync::Time::from_nanos(1_000_000_000);
     fn create_test_list(earlist_time: fasync::Time) -> HistoricalList<fasync::Time> {
-        HistoricalList {
-            0: VecDeque::from_iter([
-                earlist_time,
-                earlist_time + Duration::from_seconds(1),
-                earlist_time + Duration::from_seconds(3),
-                earlist_time + Duration::from_seconds(5),
-            ]),
-        }
+        HistoricalList(VecDeque::from_iter([
+            earlist_time,
+            earlist_time + Duration::from_seconds(1),
+            earlist_time + Duration::from_seconds(3),
+            earlist_time + Duration::from_seconds(5),
+        ]))
     }
 
     #[fuchsia::test]

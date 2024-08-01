@@ -11,6 +11,7 @@ use std::num::NonZeroUsize;
 use std::pin::pin;
 use std::sync::Arc;
 
+use assert_matches::assert_matches;
 use fidl::endpoints::{ControlHandle as _, ProtocolMarker as _};
 use futures::channel::mpsc;
 use futures::future::FusedFuture as _;
@@ -21,7 +22,7 @@ use log::{error, info, warn};
 use thiserror::Error;
 use {
     fidl_fuchsia_net_filter as fnet_filter, fidl_fuchsia_net_filter_ext as fnet_filter_ext,
-    fuchsia_zircon as zx,
+    fidl_fuchsia_net_root as fnet_root, fuchsia_zircon as zx,
 };
 
 use controller::{CommitResult, Controller};
@@ -75,6 +76,12 @@ impl UpdateDispatcherInner {
                         counter.checked_add(1).expect("should find a unique ID before overflowing");
                 }
             }
+        }
+    }
+
+    fn connect_or_create_new_controller(&mut self, id: fnet_filter_ext::ControllerId) {
+        if !self.resources.contains_key(&id) {
+            assert_matches!(self.resources.insert(id, Controller::default()), None);
         }
     }
 
@@ -345,6 +352,36 @@ async fn serve_watcher(
     dispatcher.lock().await.disconnect_client(watcher);
 
     result
+}
+
+pub(crate) async fn serve_root(
+    stream: fnet_root::FilterRequestStream,
+    dispatcher: &UpdateDispatcher,
+    ctx: &crate::bindings::Ctx,
+) -> Result<(), fidl::Error> {
+    use fnet_root::FilterRequest;
+
+    stream
+        .try_for_each_concurrent(None, |request| async {
+            match request {
+                FilterRequest::OpenController { id, request, control_handle: _ } => {
+                    let UpdateDispatcher(inner) = dispatcher;
+                    let id = fnet_filter_ext::ControllerId(id);
+                    inner.lock().await.connect_or_create_new_controller(id.clone());
+
+                    let (stream, control_handle) = request.into_stream_and_control_handle()?;
+                    serve_controller(&id, stream, control_handle, dispatcher, ctx.clone())
+                        .await
+                        .unwrap_or_else(|e| warn!("error serving namespace controller: {e:?}"));
+
+                    // NB: we do not remove the controller on channel closure, because this is a
+                    // connection made through fuchsia.net.root/Filter, so it has auto-detach
+                    // behavior.
+                    Ok(())
+                }
+            }
+        })
+        .await
 }
 
 pub(crate) async fn serve_control(

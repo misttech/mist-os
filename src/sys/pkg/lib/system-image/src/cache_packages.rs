@@ -36,14 +36,12 @@ impl CachePackages {
     }
 
     /// Iterator over the contents of the mapping.
-    pub fn contents(&self) -> impl Iterator<Item = &PinnedAbsolutePackageUrl> + ExactSizeIterator {
+    pub fn contents(&self) -> impl ExactSizeIterator<Item = &PinnedAbsolutePackageUrl> {
         self.contents.iter()
     }
 
     /// Iterator over the contents of the mapping, consuming self.
-    pub fn into_contents(
-        self,
-    ) -> impl Iterator<Item = PinnedAbsolutePackageUrl> + ExactSizeIterator {
+    pub fn into_contents(self) -> impl ExactSizeIterator<Item = PinnedAbsolutePackageUrl> {
         self.contents.into_iter()
     }
 

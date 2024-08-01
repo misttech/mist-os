@@ -4,9 +4,9 @@
 
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci/legacy_low_energy_scanner.h"
 
-#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci/advertising_report_parser.h"
+#include <pw_preprocessor/compiler.h>
 
-#pragma clang diagnostic ignored "-Wswitch-enum"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci/advertising_report_parser.h"
 
 namespace bt::hci {
 namespace pwemb = pw::bluetooth::emboss;
@@ -214,6 +214,8 @@ void LegacyLowEnergyScanner::OnAdvertisingReportEvent(
     bool connectable = false;
     bool directed = false;
 
+    PW_MODIFY_DIAGNOSTICS_PUSH();
+    PW_MODIFY_DIAGNOSTIC(ignored, "-Wswitch-enum");
     switch (report.event_type().Read()) {
       case pwemb::LEAdvertisingEventType::CONNECTABLE_DIRECTED: {
         directed = true;
@@ -242,6 +244,7 @@ void LegacyLowEnergyScanner::OnAdvertisingReportEvent(
         break;
       }
     }
+    PW_MODIFY_DIAGNOSTICS_POP();
 
     LowEnergyScanResult result(address, resolved, connectable);
     result.AppendData(BufferView(report.data().BackingStorage().data(),

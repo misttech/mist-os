@@ -3,11 +3,8 @@
 // found in the LICENSE file.
 
 use crate::bedrock::dict_ext::DictExt;
-use crate::component_instance::{
-    ComponentInstanceInterface, WeakComponentInstanceInterface, WeakExtendedInstanceInterface,
-};
 use crate::error::RoutingError;
-use async_trait::async_trait;
+use crate::legacy_router::Sources;
 use cm_rust::{
     CapabilityDecl, CapabilityTypeName, ConfigurationDecl, DictionaryDecl, DirectoryDecl,
     EventStreamDecl, ExposeConfigurationDecl, ExposeDecl, ExposeDictionaryDecl,
@@ -25,10 +22,9 @@ use fidl::{persist, unpersist};
 use fidl_fuchsia_component_decl as fdecl;
 use from_enum::FromEnum;
 use futures::future::BoxFuture;
-use moniker::ChildName;
+use moniker::{ChildName, ExtendedMoniker, Moniker};
 use sandbox::{Capability, Data, Dict};
 use std::fmt;
-use std::sync::Weak;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -69,70 +65,70 @@ impl fmt::Display for AggregateMember {
 /// Describes the source of a capability, as determined by `find_capability_source`
 #[derive(Debug, Derivative)]
 #[derivative(Clone(bound = ""), PartialEq)]
-pub enum CapabilitySource<C: ComponentInstanceInterface + 'static> {
+pub enum CapabilitySource {
     /// This capability originates from the component instance for the given Realm.
     /// point.
-    Component { capability: ComponentCapability, component: WeakComponentInstanceInterface<C> },
+    Component { capability: ComponentCapability, moniker: Moniker },
     /// This capability originates from "framework". It's implemented by component manager and is
     /// scoped to the realm of the source.
-    Framework { capability: InternalCapability, component: WeakComponentInstanceInterface<C> },
+    Framework { capability: InternalCapability, moniker: Moniker },
     /// This capability originates from the parent of the root component, and is built in to
     /// component manager. `top_instance` is the instance at the top of the tree, i.e.  the
     /// instance representing component manager.
-    Builtin {
-        capability: InternalCapability,
-        #[derivative(PartialEq = "ignore")]
-        top_instance: Weak<C::TopInstance>,
-    },
+    Builtin { capability: InternalCapability },
     /// This capability originates from the parent of the root component, and is offered from
     /// component manager's namespace. `top_instance` is the instance at the top of the tree, i.e.
     /// the instance representing component manager.
-    Namespace {
-        capability: ComponentCapability,
-        #[derivative(PartialEq = "ignore")]
-        top_instance: Weak<C::TopInstance>,
-    },
+    Namespace { capability: ComponentCapability },
     /// This capability is provided by the framework based on some other capability.
-    Capability {
-        source_capability: ComponentCapability,
-        component: WeakComponentInstanceInterface<C>,
-    },
+    Capability { source_capability: ComponentCapability, moniker: Moniker },
     /// This capability is an aggregate of capabilities over a set of collections and static
     /// children. The instance names in the aggregate service will be anonymized.
     AnonymizedAggregate {
         capability: AggregateCapability,
-        component: WeakComponentInstanceInterface<C>,
-        #[derivative(PartialEq = "ignore")]
-        aggregate_capability_provider: Box<dyn AnonymizedAggregateCapabilityProvider<C>>,
+        moniker: Moniker,
         members: Vec<AggregateMember>,
+        sources: Sources,
     },
-    /// This capability is an aggregate of capabilities over a set of children with filters
-    /// The instances in the aggregate service are the union of these filters.
-    FilteredAggregate {
+    /// This capability is a filtered service capability from a single source, such as self or a
+    /// child.
+    FilteredProvider {
         capability: AggregateCapability,
-        #[derivative(PartialEq = "ignore")]
-        capability_provider: Box<dyn FilteredAggregateCapabilityProvider<C>>,
-        component: WeakComponentInstanceInterface<C>,
+        moniker: Moniker,
+        service_capability: ComponentCapability,
+        offer_service_decl: OfferServiceDecl,
+    },
+    /// This capability is a filtered service capability with multiple sources, such as all of the
+    /// dynamic children in a collection. The instances in the aggregate service are the union of
+    /// the filters.
+    FilteredAggregateProvider {
+        capability: AggregateCapability,
+        moniker: Moniker,
+        offer_service_decls: Vec<OfferServiceDecl>,
+        sources: Sources,
     },
     /// This capability originates from "environment". It's implemented by a component instance.
-    Environment { capability: ComponentCapability, component: WeakComponentInstanceInterface<C> },
+    Environment { capability: ComponentCapability, moniker: Moniker },
     /// This capability originates from "void". This is only a valid origination for optional
     /// capabilities.
-    Void { capability: InternalCapability, component: WeakComponentInstanceInterface<C> },
+    Void { capability: InternalCapability, moniker: Moniker },
 }
 
-impl<C: ComponentInstanceInterface> CapabilitySource<C> {
+impl CapabilitySource {
     /// Returns whether the given CapabilitySourceInterface can be available in a component's
     /// namespace.
     pub fn can_be_in_namespace(&self) -> bool {
         match self {
             Self::Component { capability, .. } => capability.can_be_in_namespace(),
             Self::Framework { capability, .. } => capability.can_be_in_namespace(),
-            Self::Builtin { capability, .. } => capability.can_be_in_namespace(),
-            Self::Namespace { capability, .. } => capability.can_be_in_namespace(),
+            Self::Builtin { capability } => capability.can_be_in_namespace(),
+            Self::Namespace { capability } => capability.can_be_in_namespace(),
             Self::Capability { .. } => true,
             Self::AnonymizedAggregate { capability, .. } => capability.can_be_in_namespace(),
-            Self::FilteredAggregate { capability, .. } => capability.can_be_in_namespace(),
+            Self::FilteredProvider { capability, .. }
+            | Self::FilteredAggregateProvider { capability, .. } => {
+                capability.can_be_in_namespace()
+            }
             Self::Environment { capability, .. } => capability.can_be_in_namespace(),
             Self::Void { capability, .. } => capability.can_be_in_namespace(),
         }
@@ -142,11 +138,12 @@ impl<C: ComponentInstanceInterface> CapabilitySource<C> {
         match self {
             Self::Component { capability, .. } => capability.source_name(),
             Self::Framework { capability, .. } => Some(capability.source_name()),
-            Self::Builtin { capability, .. } => Some(capability.source_name()),
-            Self::Namespace { capability, .. } => capability.source_name(),
+            Self::Builtin { capability } => Some(capability.source_name()),
+            Self::Namespace { capability } => capability.source_name(),
             Self::Capability { .. } => None,
             Self::AnonymizedAggregate { capability, .. } => Some(capability.source_name()),
-            Self::FilteredAggregate { capability, .. } => Some(capability.source_name()),
+            Self::FilteredProvider { capability, .. }
+            | Self::FilteredAggregateProvider { capability, .. } => Some(capability.source_name()),
             Self::Environment { capability, .. } => capability.source_name(),
             Self::Void { capability, .. } => Some(capability.source_name()),
         }
@@ -156,53 +153,54 @@ impl<C: ComponentInstanceInterface> CapabilitySource<C> {
         match self {
             Self::Component { capability, .. } => capability.type_name(),
             Self::Framework { capability, .. } => capability.type_name(),
-            Self::Builtin { capability, .. } => capability.type_name(),
-            Self::Namespace { capability, .. } => capability.type_name(),
+            Self::Builtin { capability } => capability.type_name(),
+            Self::Namespace { capability } => capability.type_name(),
             Self::Capability { source_capability, .. } => source_capability.type_name(),
             Self::AnonymizedAggregate { capability, .. } => capability.type_name(),
-            Self::FilteredAggregate { capability, .. } => capability.type_name(),
+            Self::FilteredProvider { capability, .. }
+            | Self::FilteredAggregateProvider { capability, .. } => capability.type_name(),
             Self::Environment { capability, .. } => capability.type_name(),
             Self::Void { capability, .. } => capability.type_name(),
         }
     }
 
-    pub fn source_instance(&self) -> WeakExtendedInstanceInterface<C> {
+    pub fn source_moniker(&self) -> ExtendedMoniker {
         match self {
-            Self::Component { component, .. }
-            | Self::Framework { component, .. }
-            | Self::Capability { component, .. }
-            | Self::AnonymizedAggregate { component, .. }
-            | Self::FilteredAggregate { component, .. }
-            | Self::Void { component, .. }
-            | Self::Environment { component, .. } => {
-                WeakExtendedInstanceInterface::Component(component.clone())
+            Self::Component { moniker, .. }
+            | Self::Framework { moniker, .. }
+            | Self::Capability { moniker, .. }
+            | Self::Environment { moniker, .. }
+            | Self::Void { moniker, .. }
+            | Self::AnonymizedAggregate { moniker, .. }
+            | Self::FilteredProvider { moniker, .. }
+            | Self::FilteredAggregateProvider { moniker, .. } => {
+                ExtendedMoniker::ComponentInstance(moniker.clone())
             }
-            Self::Builtin { top_instance, .. } | Self::Namespace { top_instance, .. } => {
-                WeakExtendedInstanceInterface::AboveRoot(top_instance.clone())
-            }
+            Self::Builtin { .. } | Self::Namespace { .. } => ExtendedMoniker::ComponentManager,
         }
     }
 }
 
-impl<C: ComponentInstanceInterface> fmt::Display for CapabilitySource<C> {
+impl fmt::Display for CapabilitySource {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
             "{}",
             match self {
-                Self::Component { capability, component } => {
-                    format!("{} '{}'", capability, component.moniker)
+                Self::Component { capability, moniker } => {
+                    format!("{} '{}'", capability, moniker)
                 }
                 Self::Framework { capability, .. } => capability.to_string(),
-                Self::Builtin { capability, .. } => capability.to_string(),
-                Self::Namespace { capability, .. } => capability.to_string(),
-                Self::FilteredAggregate { capability, .. } => capability.to_string(),
+                Self::Builtin { capability } => capability.to_string(),
+                Self::Namespace { capability } => capability.to_string(),
+                Self::FilteredProvider { capability, .. }
+                | Self::FilteredAggregateProvider { capability, .. } => capability.to_string(),
                 Self::Capability { source_capability, .. } => format!("{}", source_capability),
-                Self::AnonymizedAggregate { capability, members, component, .. } => {
+                Self::AnonymizedAggregate { capability, members, moniker, .. } => {
                     format!(
                         "{} from component '{}' aggregated from {}",
                         capability,
-                        &component.moniker,
+                        moniker,
                         members.iter().map(|s| format!("{s}")).collect::<Vec<_>>().join(","),
                     )
                 }
@@ -229,6 +227,7 @@ const EVENT_STREAM_STR: &'static str = "event_stream";
 const EXPOSE_STR: &'static str = "expose";
 const FRAMEWORK_STR: &'static str = "framework";
 const INTERNAL_CAPABILITY_KEY_STR: &'static str = "internal_capability_key";
+const MONIKER_STR: &'static str = "moniker";
 const NAMESPACE_STR: &'static str = "namespace";
 const OFFER_STR: &'static str = "offer";
 const PROTOCOL_STR: &'static str = "protocol";
@@ -242,15 +241,15 @@ const USE_STR: &'static str = "use";
 const VALUE_STR: &'static str = "value";
 const VOID_STR: &'static str = "void";
 
-impl<C: ComponentInstanceInterface + 'static> TryFrom<CapabilitySource<C>> for Capability {
+impl TryFrom<CapabilitySource> for Capability {
     type Error = fidl::Error;
 
-    fn try_from(capability_source: CapabilitySource<C>) -> Result<Self, Self::Error> {
+    fn try_from(capability_source: CapabilitySource) -> Result<Self, Self::Error> {
         Ok(Capability::Dictionary(capability_source.try_into()?))
     }
 }
 
-impl<C: ComponentInstanceInterface + 'static> TryFrom<Capability> for CapabilitySource<C> {
+impl TryFrom<Capability> for CapabilitySource {
     type Error = fidl::Error;
 
     fn try_from(capability: Capability) -> Result<Self, Self::Error> {
@@ -261,10 +260,10 @@ impl<C: ComponentInstanceInterface + 'static> TryFrom<Capability> for Capability
     }
 }
 
-impl<C: ComponentInstanceInterface + 'static> TryFrom<CapabilitySource<C>> for Dict {
+impl TryFrom<CapabilitySource> for Dict {
     type Error = fidl::Error;
 
-    fn try_from(capability_source: CapabilitySource<C>) -> Result<Self, Self::Error> {
+    fn try_from(capability_source: CapabilitySource) -> Result<Self, Self::Error> {
         fn insert_key(dict: &Dict, key: &str) {
             dict.insert_capability(
                 &Name::new(CAPABILITY_SOURCE_KEY_STR).unwrap(),
@@ -283,76 +282,60 @@ impl<C: ComponentInstanceInterface + 'static> TryFrom<CapabilitySource<C>> for D
             .unwrap();
             Ok(())
         }
-        fn insert_component_token<C: ComponentInstanceInterface + 'static>(
-            dict: &Dict,
-            component: WeakComponentInstanceInterface<C>,
-        ) {
+        fn insert_moniker(dict: &Dict, moniker: Moniker) {
             dict.insert_capability(
-                &Name::new(COMPONENT_STR).unwrap(),
-                Capability::Instance(component.clone().into()),
-            )
-            .unwrap();
-        }
-        fn insert_top_instance_token<C: ComponentInstanceInterface + 'static>(
-            dict: &Dict,
-            top_instance: Weak<C::TopInstance>,
-        ) {
-            dict.insert_capability(
-                &Name::new(COMPONENT_STR).unwrap(),
-                Capability::Instance(
-                    WeakExtendedInstanceInterface::<C>::AboveRoot(top_instance).into(),
-                ),
+                &Name::new(MONIKER_STR).unwrap(),
+                Data::String(moniker.to_string()).into(),
             )
             .unwrap();
         }
 
         let output = Dict::new();
         match capability_source {
-            CapabilitySource::Component { capability, component } => {
+            CapabilitySource::Component { capability, moniker } => {
                 insert_key(&output, COMPONENT_STR);
                 insert_capability_dict(&output, capability)?;
-                insert_component_token(&output, component);
+                insert_moniker(&output, moniker)
             }
-            CapabilitySource::Framework { capability, component } => {
+            CapabilitySource::Framework { capability, moniker } => {
                 insert_key(&output, FRAMEWORK_STR);
                 insert_capability_dict(&output, capability)?;
-                insert_component_token(&output, component);
+                insert_moniker(&output, moniker)
             }
-            CapabilitySource::Builtin { capability, top_instance } => {
+            CapabilitySource::Builtin { capability } => {
                 insert_key(&output, BUILTIN_STR);
                 insert_capability_dict(&output, capability)?;
-                insert_top_instance_token::<C>(&output, top_instance);
             }
-            CapabilitySource::Namespace { capability, top_instance } => {
+            CapabilitySource::Namespace { capability } => {
                 insert_key(&output, NAMESPACE_STR);
                 insert_capability_dict(&output, capability)?;
-                insert_top_instance_token::<C>(&output, top_instance);
             }
-            CapabilitySource::Capability { source_capability, component } => {
+            CapabilitySource::Capability { source_capability, moniker } => {
                 insert_key(&output, CAPABILITY_STR);
                 insert_capability_dict(&output, source_capability)?;
-                insert_component_token(&output, component);
+                insert_moniker(&output, moniker)
             }
-            CapabilitySource::Environment { capability, component } => {
+            CapabilitySource::Environment { capability, moniker } => {
                 insert_key(&output, ENVIRONMENT_STR);
                 insert_capability_dict(&output, capability)?;
-                insert_component_token(&output, component);
+                insert_moniker(&output, moniker)
             }
-            CapabilitySource::Void { capability, component } => {
+            CapabilitySource::Void { capability, moniker } => {
                 insert_key(&output, VOID_STR);
                 insert_capability_dict(&output, capability)?;
-                insert_component_token(&output, component);
+                insert_moniker(&output, moniker)
             }
-            // The following two are only relevant for service capabilities, which are currently
+            // The following three are only relevant for service capabilities, which are currently
             // unsupported in the bedrock layer of routing.
             CapabilitySource::AnonymizedAggregate { .. } => unimplemented!(),
-            CapabilitySource::FilteredAggregate { .. } => unimplemented!(),
+            CapabilitySource::FilteredProvider { .. } => unimplemented!(),
+            CapabilitySource::FilteredAggregateProvider { .. } => unimplemented!(),
         }
         Ok(output)
     }
 }
 
-impl<C: ComponentInstanceInterface + 'static> TryFrom<Dict> for CapabilitySource<C> {
+impl TryFrom<Dict> for CapabilitySource {
     type Error = fidl::Error;
 
     fn try_from(dict: Dict) -> Result<Self, Self::Error> {
@@ -365,37 +348,14 @@ impl<C: ComponentInstanceInterface + 'static> TryFrom<Dict> for CapabilitySource
             };
             Ok(capability_dict)
         }
-        fn get_weak_component<C: ComponentInstanceInterface + 'static>(
-            dict: &Dict,
-        ) -> Result<WeakComponentInstanceInterface<C>, fidl::Error> {
-            let component = dict
-                .get(&Name::new(COMPONENT_STR).unwrap())
+        fn get_moniker(dict: &Dict) -> Result<Moniker, fidl::Error> {
+            let data = dict
+                .get(&Name::new(MONIKER_STR).unwrap())
                 .map_err(|_| fidl::Error::InvalidEnumValue)?;
-            let Some(Capability::Instance(weak_instance_token)) = component else {
+            let Some(Capability::Data(Data::String(moniker_str))) = data else {
                 return Err(fidl::Error::InvalidEnumValue);
             };
-            Ok(weak_instance_token
-                .clone()
-                .try_into()
-                .expect("unexpected type in weak component token"))
-        }
-        fn get_top_instance<C: ComponentInstanceInterface + 'static>(
-            dict: &Dict,
-        ) -> Result<Weak<C::TopInstance>, fidl::Error> {
-            let component = dict
-                .get(&Name::new(COMPONENT_STR).unwrap())
-                .map_err(|_| fidl::Error::InvalidEnumValue)?;
-            let Some(Capability::Instance(weak_instance_token)) = component else {
-                return Err(fidl::Error::InvalidEnumValue);
-            };
-            let weak_extended: WeakExtendedInstanceInterface<C> = weak_instance_token
-                .clone()
-                .try_into()
-                .expect("unexpected type in weak component token");
-            match weak_extended {
-                WeakExtendedInstanceInterface::Component(_) => Err(fidl::Error::InvalidEnumValue),
-                WeakExtendedInstanceInterface::AboveRoot(top_instance) => Ok(top_instance),
-            }
+            moniker_str.as_str().try_into().map_err(|_| fidl::Error::InvalidEnumValue)
         }
 
         let key = dict
@@ -407,31 +367,29 @@ impl<C: ComponentInstanceInterface + 'static> TryFrom<Dict> for CapabilitySource
         Ok(match key.as_str() {
             COMPONENT_STR => CapabilitySource::Component {
                 capability: get_capability_dict(&dict)?.try_into()?,
-                component: get_weak_component(&dict)?,
+                moniker: get_moniker(&dict)?,
             },
             FRAMEWORK_STR => CapabilitySource::Framework {
                 capability: get_capability_dict(&dict)?.try_into()?,
-                component: get_weak_component(&dict)?,
+                moniker: get_moniker(&dict)?,
             },
-            BUILTIN_STR => CapabilitySource::Builtin {
-                capability: get_capability_dict(&dict)?.try_into()?,
-                top_instance: get_top_instance::<C>(&dict)?,
-            },
-            NAMESPACE_STR => CapabilitySource::Namespace {
-                capability: get_capability_dict(&dict)?.try_into()?,
-                top_instance: get_top_instance::<C>(&dict)?,
-            },
+            BUILTIN_STR => {
+                CapabilitySource::Builtin { capability: get_capability_dict(&dict)?.try_into()? }
+            }
+            NAMESPACE_STR => {
+                CapabilitySource::Namespace { capability: get_capability_dict(&dict)?.try_into()? }
+            }
             CAPABILITY_STR => CapabilitySource::Capability {
                 source_capability: get_capability_dict(&dict)?.try_into()?,
-                component: get_weak_component(&dict)?,
+                moniker: get_moniker(&dict)?,
             },
             ENVIRONMENT_STR => CapabilitySource::Environment {
                 capability: get_capability_dict(&dict)?.try_into()?,
-                component: get_weak_component(&dict)?,
+                moniker: get_moniker(&dict)?,
             },
             VOID_STR => CapabilitySource::Void {
                 capability: get_capability_dict(&dict)?.try_into()?,
-                component: get_weak_component(&dict)?,
+                moniker: get_moniker(&dict)?,
             },
             _ => return Err(fidl::Error::InvalidEnumValue),
         })
@@ -462,52 +420,13 @@ impl fmt::Display for AggregateInstance {
     }
 }
 
-/// A provider of a capability from an aggregation of one or more collections and static children.
-/// The instance names in the aggregate will be anonymized.
-///
-/// This trait type-erases the capability type, so it can be handled and hosted generically.
-#[async_trait]
-pub trait AnonymizedAggregateCapabilityProvider<C: ComponentInstanceInterface>:
-    Send + Sync
-{
-    /// Lists the instances of the capability.
-    ///
-    /// The instance is an opaque identifier that is only meaningful for a subsequent
-    /// call to `route_instance`.
-    async fn list_instances(&self) -> Result<Vec<AggregateInstance>, RoutingError>;
-
-    /// Route the given `instance` of the capability to its source.
-    async fn route_instance(
-        &self,
-        instance: &AggregateInstance,
-    ) -> Result<CapabilitySource<C>, RoutingError>;
-
-    /// Trait-object compatible clone.
-    fn clone_boxed(&self) -> Box<dyn AnonymizedAggregateCapabilityProvider<C>>;
-}
-
-impl<C: ComponentInstanceInterface> Clone for Box<dyn AnonymizedAggregateCapabilityProvider<C>> {
-    fn clone(&self) -> Self {
-        self.clone_boxed()
-    }
-}
-
-impl<C> fmt::Debug for Box<dyn AnonymizedAggregateCapabilityProvider<C>> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Box<dyn AnonymizedAggregateCapabilityProvider>").finish()
-    }
-}
-
 /// The return value of the routing future returned by
 /// `FilteredAggregateCapabilityProvider::route_instances`, which contains information about the
 /// source of the route.
 #[derive(Debug)]
-pub struct FilteredAggregateCapabilityRouteData<C>
-where
-    C: ComponentInstanceInterface + 'static,
-{
+pub struct FilteredAggregateCapabilityRouteData {
     /// The source of the capability.
-    pub capability_source: CapabilitySource<C>,
+    pub capability_source: CapabilitySource,
     /// The filter to apply to service instances, as defined by
     /// [`fuchsia.component.decl/OfferService.renamed_instances`](https://fuchsia.dev/reference/fidl/fuchsia.component.decl#OfferService).
     pub instance_filter: Vec<NameMapping>,
@@ -517,24 +436,24 @@ where
 /// capability, with filters.
 ///
 /// This trait type-erases the capability type, so it can be handled and hosted generically.
-pub trait FilteredAggregateCapabilityProvider<C: ComponentInstanceInterface>: Send + Sync {
+pub trait FilteredAggregateCapabilityProvider: Send + Sync {
     /// Return a list of futures to route every instance in the aggregate to its source. Each
     /// result is paired with the list of instances to include in the source.
     fn route_instances(
         &self,
-    ) -> Vec<BoxFuture<'_, Result<FilteredAggregateCapabilityRouteData<C>, RoutingError>>>;
+    ) -> Vec<BoxFuture<'_, Result<FilteredAggregateCapabilityRouteData, RoutingError>>>;
 
     /// Trait-object compatible clone.
-    fn clone_boxed(&self) -> Box<dyn FilteredAggregateCapabilityProvider<C>>;
+    fn clone_boxed(&self) -> Box<dyn FilteredAggregateCapabilityProvider>;
 }
 
-impl<C: ComponentInstanceInterface> Clone for Box<dyn FilteredAggregateCapabilityProvider<C>> {
+impl Clone for Box<dyn FilteredAggregateCapabilityProvider> {
     fn clone(&self) -> Self {
         self.clone_boxed()
     }
 }
 
-impl<C> fmt::Debug for Box<dyn FilteredAggregateCapabilityProvider<C>> {
+impl fmt::Debug for Box<dyn FilteredAggregateCapabilityProvider> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Box<dyn FilteredAggregateCapabilityProvider>").finish()
     }

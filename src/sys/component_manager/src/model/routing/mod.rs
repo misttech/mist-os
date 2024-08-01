@@ -11,11 +11,12 @@ pub mod service;
 pub use ::routing::error::RoutingError;
 pub use open::*;
 
-use crate::capability::CapabilitySource;
 use crate::model::component::{ComponentInstance, WeakComponentInstance};
 use crate::model::storage;
+use ::routing::capability_source::CapabilitySource;
 use ::routing::component_instance::ComponentInstanceInterface;
 use ::routing::mapper::NoopRouteMapper;
+use ::routing::{RouteRequest, RouteSource};
 use async_trait::async_trait;
 use cm_rust::{ExposeDecl, ExposeDeclCommon, UseStorageDecl};
 use cm_types::{Availability, Name};
@@ -30,8 +31,6 @@ use vfs::directory::entry::OpenRequest;
 use vfs::path::Path;
 use vfs::ToObjectRequest;
 
-pub type RouteRequest = ::routing::RouteRequest;
-pub type RouteSource = ::routing::RouteSource<ComponentInstance>;
 pub use bedrock::{RouteRequest as BedrockRouteRequest, UseRouteRequest as BedrockUseRouteRequest};
 
 #[async_trait]
@@ -74,7 +73,8 @@ pub(super) async fn route_and_open_capability(
 
     match route_request {
         RouteRequest::UseStorage(_) | RouteRequest::OfferStorage(_) => {
-            let backing_dir_info = storage::route_backing_directory(source.source.clone()).await?;
+            let backing_dir_info =
+                storage::route_backing_directory(target, source.source.clone()).await?;
             CapabilityOpenRequest::new_from_storage_source(backing_dir_info, target, open_request)
                 .open()
                 .await?;
@@ -162,7 +162,7 @@ pub(super) async fn route_storage(
     target: &Arc<ComponentInstance>,
 ) -> Result<RoutedStorage, ModelError> {
     let storage_source = RouteRequest::UseStorage(use_storage_decl.clone()).route(target).await?;
-    let backing_dir_info = storage::route_backing_directory(storage_source.source).await?;
+    let backing_dir_info = storage::route_backing_directory(target, storage_source.source).await?;
     Ok(RoutedStorage { backing_dir_info, target: WeakComponentInstance::new(target) })
 }
 

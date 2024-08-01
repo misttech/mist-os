@@ -292,10 +292,13 @@ mod tests {
             .await
             .expect("storage_provider instance");
 
-        let route_maps = test.model.check_routes_for_instance(
-            &storage_provider,
-            &HashSet::from_iter(vec![CapabilityTypeName::Storage].into_iter()),
-        );
+        let route_maps = test
+            .model
+            .check_routes_for_instance(
+                &storage_provider,
+                &HashSet::from_iter(vec![CapabilityTypeName::Storage].into_iter()),
+            )
+            .await;
         assert_eq!(route_maps.len(), 1);
 
         let storage = route_maps
@@ -327,7 +330,7 @@ mod tests {
                             CapabilityDecl::Directory(decl) => decl,
                             _ => panic!("unexpected capability variant"),
                         }),
-                        component: root.as_weak(),
+                        moniker: root.moniker().clone(),
                     }),
                 },
                 VerifyRouteResult {
@@ -353,7 +356,7 @@ mod tests {
                             CapabilityDecl::Directory(decl) => decl,
                             _ => panic!("unexpected capability variant"),
                         }),
-                        component: root.as_weak(),
+                        moniker: root.moniker().clone(),
                     }),
                 }
             ]

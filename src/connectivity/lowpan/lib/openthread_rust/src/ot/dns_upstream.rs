@@ -28,6 +28,7 @@ impl<T: DnsUpstream + ot::Boxable> DnsUpstream for ot::Box<T> {
 // SAFETY: this call will be called only once for each &mut PlatDnsUpstreamQuery passed to lowpan,
 //         and the reference will be removed right after the call. It is ok to transmute it to
 //         mutable reference.
+#[allow(clippy::useless_transmute)]
 unsafe fn dns_upstream_query_context_get_mut(
     original: &PlatDnsUpstreamQuery,
 ) -> *mut otPlatDnsUpstreamQuery {

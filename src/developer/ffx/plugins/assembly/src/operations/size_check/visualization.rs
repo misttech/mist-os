@@ -68,7 +68,7 @@ pub fn generate_visualization(
         visualization_dir.join("data.js"),
         format!(
             "var tree_data={}",
-            serde_json::to_string(&generate_visualization_tree(&breakdown))?
+            serde_json::to_string(&generate_visualization_tree(breakdown))?
         ),
     )
     .context("creating data.js for visualization")

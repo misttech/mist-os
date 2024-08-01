@@ -12,7 +12,7 @@ async fn component_manager_namespace() {
         "/svc/fuchsia.component.Binder",
         "/svc/fuchsia.component.Namespace",
         "/svc/fuchsia.component.Realm",
-        "/svc/fuchsia.component.sandbox.Factory",
+        "/svc/fuchsia.component.sandbox.CapabilityStore",
         "/svc/fuchsia.sys2.LifecycleController",
         "/svc/fuchsia.sys2.RouteValidator",
         "/svc/fuchsia.sys2.StorageAdmin",

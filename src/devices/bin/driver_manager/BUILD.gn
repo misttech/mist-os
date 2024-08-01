@@ -35,12 +35,12 @@ source_set("inspect") {
     "inspect.h",
   ]
   public_deps = [
+    "//sdk/fidl/fuchsia.inspect:fuchsia.inspect_cpp",
     "//sdk/lib/inspect/component/cpp",
     "//src/lib/ddk",
     "//src/storage/lib/vfs/cpp",
     "//zircon/system/ulib/fbl",
   ]
-  deps = [ "//sdk/lib/inspect/component/cpp" ]
 }
 
 source_set("driver_host_loader_service") {

@@ -43,7 +43,7 @@ impl WritingIndex {
     pub fn add_blobs(&mut self, pkg: &Hash, blobs: &HashSet<Hash>) -> Result<(), AddBlobsError> {
         self.pkg_to_refcount_and_blobs
             .get_mut(pkg)
-            .ok_or_else(|| AddBlobsError::UnknownPackage { pkg: *pkg })?
+            .ok_or(AddBlobsError::UnknownPackage { pkg: *pkg })?
             .1
             .extend(blobs);
         Ok(())

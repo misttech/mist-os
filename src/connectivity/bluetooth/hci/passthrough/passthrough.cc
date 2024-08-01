@@ -82,10 +82,10 @@ void PassthroughDevice::OpenHciTransport(OpenHciTransportCompleter::Sync& comple
 }
 
 void PassthroughDevice::OpenSnoop(OpenSnoopCompleter::Sync& completer) {
-  zx::result<fidl::ClientEnd<fuchsia_hardware_bluetooth::Snoop2>> client_end =
+  zx::result<fidl::ClientEnd<fuchsia_hardware_bluetooth::Snoop>> client_end =
       incoming()->Connect<fuchsia_hardware_bluetooth::HciService::Snoop>();
   if (client_end.is_error()) {
-    FDF_LOG(ERROR, "Connect to Snoop2 protocol failed: %s", client_end.status_string());
+    FDF_LOG(ERROR, "Connect to Snoop protocol failed: %s", client_end.status_string());
     completer.ReplyError(client_end.error_value());
     return;
   }
@@ -131,12 +131,6 @@ void PassthroughDevice::ConfigureSco(
     completer.Close(status.status());
     return;
   }
-}
-
-void PassthroughDevice::SetSnoop(
-    ::fuchsia_hardware_bluetooth::wire::HciTransportSetSnoopRequest* request,
-    SetSnoopCompleter::Sync& completer) {
-  completer.Close(ZX_ERR_NOT_SUPPORTED);
 }
 
 void PassthroughDevice::handle_unknown_method(

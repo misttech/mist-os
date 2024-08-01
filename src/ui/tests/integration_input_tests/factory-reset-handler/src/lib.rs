@@ -130,7 +130,7 @@ async fn assemble_realm(
             .capability(Capability::configuration("fuchsia.ui.IdleThresholdMs"))
             .capability(Capability::configuration("fuchsia.ui.SupportedInputDevices"))
             .capability(Capability::configuration("fuchsia.ui.ViewingDistance"))
-            .capability(Capability::configuration("fuchsia.ui.SuspendEnabled"))
+            .capability(Capability::configuration("fuchsia.power.SuspendEnabled"))
             .from(scene_manager_config.ref_())
             .to(scene_manager.ref_()),
     )

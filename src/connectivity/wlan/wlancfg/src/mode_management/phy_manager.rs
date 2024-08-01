@@ -530,7 +530,7 @@ impl PhyManagerApi for PhyManager {
 
         // Find the first PHY with any client interfaces and return its first client interface.
         let phy = self.phys.get_mut(&client_capable_phys[0])?;
-        phy.client_ifaces.keys().next().map(|iface_id| *iface_id)
+        phy.client_ifaces.keys().next().copied()
     }
 
     fn get_wpa3_capable_client(&mut self) -> Option<u16> {
@@ -618,11 +618,8 @@ impl PhyManagerApi for PhyManager {
             }
         }
 
-        match (result.as_ref(), failing_phy) {
-            (Err(_), Some(phy_id)) => {
-                self.record_defect(Defect::Phy(PhyFailure::IfaceDestructionFailure { phy_id }))
-            }
-            _ => {}
+        if let (Err(_), Some(phy_id)) = (result.as_ref(), failing_phy) {
+            self.record_defect(Defect::Phy(PhyFailure::IfaceDestructionFailure { phy_id }))
         }
 
         result
@@ -3619,7 +3616,7 @@ mod tests {
         let _ = phy_manager.phys.insert(fake_phy_id, phy_container);
 
         // Check that has_wpa3_client_iface recognizes that WPA3 is supported
-        assert_eq!(phy_manager.has_wpa3_client_iface(), true);
+        assert!(phy_manager.has_wpa3_client_iface());
 
         // Add another phy that does not support WPA3.
         let fake_phy_id = 1;
@@ -3627,7 +3624,7 @@ mod tests {
         let _ = phy_manager.phys.insert(fake_phy_id, phy_container);
 
         // Phy manager has at least one WPA3 capable iface, so has_wpa3_iface should still be true.
-        assert_eq!(phy_manager.has_wpa3_client_iface(), true);
+        assert!(phy_manager.has_wpa3_client_iface());
     }
 
     #[fuchsia::test]
@@ -3649,7 +3646,7 @@ mod tests {
         );
         let _ = phy_manager.phys.insert(fake_phy_id, phy_container);
 
-        assert_eq!(phy_manager.has_wpa3_client_iface(), false);
+        assert!(!phy_manager.has_wpa3_client_iface());
     }
 
     /// Tests reporting of client connections status when client connections are enabled.

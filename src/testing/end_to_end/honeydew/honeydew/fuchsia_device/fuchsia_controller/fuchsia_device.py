@@ -4,7 +4,6 @@
 """FuchsiaDevice abstract base class implementation using Fuchsia-Controller."""
 
 import asyncio
-import ipaddress
 import logging
 import os
 from collections.abc import Callable
@@ -64,12 +63,14 @@ from honeydew.interfaces.transports import ffx as ffx_transport_interface
 from honeydew.interfaces.transports import (
     fuchsia_controller as fuchsia_controller_transport_interface,
 )
+from honeydew.interfaces.transports import serial as serial_transport_interface
 from honeydew.interfaces.transports import sl4f as sl4f_transport_interface
 from honeydew.transports import fastboot as fastboot_transport
 from honeydew.transports import ffx as ffx_transport
 from honeydew.transports import (
     fuchsia_controller as fuchsia_controller_transport,
 )
+from honeydew.transports import serial_using_unix_socket
 from honeydew.typing import custom_types
 from honeydew.utils import properties
 
@@ -112,9 +113,8 @@ class FuchsiaDevice(
     Fuchsia-Controller.
 
     Args:
-        device_name: Device name returned by `ffx target list`.
+        device_info: Fuchsia device information.
         ffx_config: Config that need to be used while running FFX commands.
-        device_ip_port: IP Address and port of the device.
 
     Raises:
         errors.FFXCommandError: if FFX connection check fails.
@@ -123,23 +123,14 @@ class FuchsiaDevice(
 
     def __init__(
         self,
-        device_name: str,
+        device_info: custom_types.DeviceInfo,
         ffx_config: custom_types.FFXConfig,
-        device_ip_port: custom_types.IpPort | None = None,
     ) -> None:
         _LOGGER.debug("Initializing Fuchsia-Controller based FuchsiaDevice")
 
-        self._name: str = device_name
+        self._device_info: custom_types.DeviceInfo = device_info
 
         self._ffx_config: custom_types.FFXConfig = ffx_config
-
-        self._ip_address_port: custom_types.IpPort | None = device_ip_port
-
-        self._ip_address: (
-            ipaddress.IPv4Address | ipaddress.IPv6Address | None
-        ) = None
-        if self._ip_address_port:
-            self._ip_address = self._ip_address_port.ip
 
         self._on_device_boot_fns: list[Callable[[], None]] = []
 
@@ -167,7 +158,7 @@ class FuchsiaDevice(
         Returns:
             Name of the device.
         """
-        return self._name
+        return self._device_info.name
 
     @properties.PersistentProperty
     def manufacturer(self) -> str:
@@ -224,7 +215,7 @@ class FuchsiaDevice(
         Returns:
             Serial number of the device.
         """
-        return self._device_info["serial_number"]
+        return self._device_info_from_fidl["serial_number"]
 
     # List all the dynamic properties
     @properties.DynamicProperty
@@ -250,7 +241,7 @@ class FuchsiaDevice(
         ffx_obj: ffx_transport_interface.FFX = ffx_transport.FFX(
             target_name=self.device_name,
             config=self._ffx_config,
-            target_ip_port=self._ip_address_port,
+            target_ip_port=self._device_info.ip_port,
         )
         return ffx_obj
 
@@ -271,7 +262,7 @@ class FuchsiaDevice(
         ) = fuchsia_controller_transport.FuchsiaController(
             target_name=self.device_name,
             config=self._ffx_config,
-            target_ip_port=self._ip_address_port,
+            target_ip_port=self._device_info.ip_port,
         )
         return fuchsia_controller_obj
 
@@ -288,12 +279,31 @@ class FuchsiaDevice(
         fastboot_obj: fastboot_transport_interface.Fastboot = (
             fastboot_transport.Fastboot(
                 device_name=self.device_name,
-                device_ip=self._ip_address,
                 reboot_affordance=self,
                 ffx_transport=self.ffx,
             )
         )
         return fastboot_obj
+
+    @properties.Transport
+    def serial(self) -> serial_transport_interface.Serial:
+        """Returns the Serial transport object.
+
+        Returns:
+            Serial transport object.
+        """
+        if self._device_info.serial_socket is None:
+            raise errors.FuchsiaDeviceError(
+                "'device_serial_socket' arg need to be provided during the init to use Serial affordance"
+            )
+
+        serial_obj: serial_transport_interface.Serial = (
+            serial_using_unix_socket.Serial(
+                device_name=self.device_name,
+                socket_path=self._device_info.serial_socket,
+            )
+        )
+        return serial_obj
 
     @properties.Transport
     def sl4f(self) -> sl4f_transport_interface.SL4F:
@@ -657,7 +667,7 @@ class FuchsiaDevice(
             ) from status
 
     @property
-    def _device_info(self) -> dict[str, Any]:
+    def _device_info_from_fidl(self) -> dict[str, Any]:
         """Returns the device information of the device.
 
         Returns:

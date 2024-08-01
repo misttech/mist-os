@@ -64,31 +64,16 @@ def get_gn_variables(version_history_path: Path) -> Dict[str, Any]:
         for level in api_levels
         if api_levels[level]["status"] == "supported"
     ]
-    # In-development API level 22 is temporarily supported alongside "NEXT".
-    # TODO(https://fxbug.dev/326277078): Remove 22 and this block.
-    in_development_api_levels: list[int] = [
-        int(level)
-        for level in api_levels
-        if api_levels[level]["status"] == "in-development"
-    ]
-    assert len(in_development_api_levels) == 1
-    assert api_levels["22"]["status"] == "in-development"
 
     assert len(api_levels) == (
         len(retired_api_levels)
         + len(sunset_api_levels)
         + len(supported_api_levels)
-        + len(in_development_api_levels)
     ), '"api_levels" contains a level with an unexpected "status".'
 
     # Special API levels are added below.
     runtime_supported_api_levels = sunset_api_levels + supported_api_levels
     idk_buildable_api_levels = supported_api_levels.copy()
-
-    # In-development API level 22 is temporarily still supported alongside
-    # "NEXT", but it was never in the IDK.
-    # TODO(https://fxbug.dev/326277078): Remove API level 22 and this line.
-    runtime_supported_api_levels += in_development_api_levels
 
     # Explicitly add concrete special API levels.
     # "HEAD" is not supported in the IDK - see https://fxbug.dev/334936990.

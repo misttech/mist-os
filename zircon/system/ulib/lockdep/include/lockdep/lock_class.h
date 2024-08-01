@@ -70,23 +70,16 @@ class LockClassStateStorage {
   static constexpr LockClassId id() { return lock_class_state_.id(); }
 
  private:
-  // Returns the name of this lock class.
-  constexpr static const char* GetName() { return internal::LockNameHelper<Class, Index>::Name(); }
-
   // Select whether to generate full validation state or only metadata.
   using LockClassStateType =
       IfLockValidationEnabled<ValidatorLockClassState, MetadataLockClassState>;
-
-  // The name of this lock class is deduced from its template parameters, and the interned structure
-  // storage is a member of the templated class, the LockClassState will simply hold a pointer back
-  // to this storage..
-  static inline fxt::InternedString interned_name_ FXT_INTERNED_STRING_SECTION{GetName()};
 
   // This static member serves a dual role:
   //  1. It generates storage for the lock class metadata and validation state.
   //  2. The address of this member serves as the unique id for this lock class.
   inline static LockClassStateType lock_class_state_{
-      interned_name_, static_cast<LockFlags>(LockTraits<LockType>::Flags | Flags)};
+      internal::LockNameHelper<Class, Index>::GetInternedString(),
+      static_cast<LockFlags>(LockTraits<LockType>::Flags | Flags)};
 };
 
 // Empty storage case that does not generate runtime validation or metadata

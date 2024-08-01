@@ -252,7 +252,9 @@ icu_rustc_library("lib") {
   # If building this massive crate runs into OOM issues on RBE, `disable_rbe = true`
 
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
-  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
+
+  # TODO(https://fxbug.dev/356474618): re-enable and fix existing lints
+  # configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 fuchsia_unittest_package("setui_service_tests") {

@@ -37,7 +37,7 @@ impl DefineSubsystemConfiguration<PlatformSysmemConfig> for SysmemConfig {
         // board_info and platform config have been applied, the config capability will be
         // absent and the default value of the field will be as specified in
         // src/devices/sysmem/drivers/sysmem/BUILD.gn.
-        let settings = vec![&context.board_info.platform.sysmem_defaults, platform_sysmem_config]
+        let settings = [&context.board_info.platform.sysmem_defaults, platform_sysmem_config]
             .iter()
             .fold(PlatformSysmemConfig::default(), apply_overrides);
 
@@ -78,12 +78,7 @@ impl DefineSubsystemConfiguration<PlatformSysmemConfig> for SysmemConfig {
                     .set_config_capability(
                         fixed_capability.as_str(),
                         if let Some(MemorySize::Fixed(fixed_memory_size)) = &field_reference {
-                            Config::new(
-                                ConfigValueType::Int64,
-                                (*fixed_memory_size)
-                                    .try_into()
-                                    .with_context(|| fixed_capability.clone())?,
-                            )
+                            Config::new(ConfigValueType::Int64, (*fixed_memory_size).into())
                         } else {
                             Config::new_void()
                         },

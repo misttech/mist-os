@@ -134,7 +134,7 @@ pub async fn cmd_package_archive_add(cmd: PackageArchiveAddCommand) -> Result<()
         repository: None,
         blobs_json: true,
         namespace: false,
-        archive: cmd.archive.clone().into(),
+        archive: cmd.archive.clone(),
     })
     .await?;
 
@@ -184,7 +184,7 @@ pub async fn cmd_package_archive_remove(cmd: PackageArchiveRemoveCommand) -> Res
         repository: None,
         blobs_json: true,
         namespace: false,
-        archive: cmd.archive.clone().into(),
+        archive: cmd.archive.clone(),
     })
     .await?;
 
@@ -223,7 +223,7 @@ async fn populate_namespace(far_file: PathBuf, output_dir: PathBuf) -> Result<()
     let blobs_dir = output_dir.join("blobs");
     let output_dir = output_dir.join("pkg");
 
-    let far_content_paths: Vec<_> = reader.list().into_iter().map(|e| e.path()).collect();
+    let far_content_paths: Vec<_> = reader.list().map(|e| e.path()).collect();
     if far_content_paths.contains(&"meta.far") {
         // Extract the meta.far from the package
         let mut path_map = HashMap::new();
@@ -231,12 +231,12 @@ async fn populate_namespace(far_file: PathBuf, output_dir: PathBuf) -> Result<()
         extract_far_to_dir(&mut reader, &output_dir, &blobs_dir, Some(path_map)).await?;
         // Extract the meta.far itself
         let meta_far_file =
-            File::open(&output_dir.join("meta.far")).with_context(|| "failed to open meta.far")?;
+            File::open(output_dir.join("meta.far")).with_context(|| "failed to open meta.far")?;
         let mut meta_far_reader =
             far::Utf8Reader::new(meta_far_file).with_context(|| "failed to parse meta.far")?;
         extract_far_to_dir(&mut meta_far_reader, &output_dir, &blobs_dir, None).await?;
         // Remove the meta.far now that it is extracted
-        fs::remove_file(&output_dir.join("meta.far"))
+        fs::remove_file(output_dir.join("meta.far"))
             .with_context(|| "failed to remove the temporary meta.far")?;
         // Extract the hash-to-path mapping
         let hash_path_map =
@@ -258,7 +258,7 @@ async fn extract_far_to_dir(
     path_map: Option<HashMap<String, String>>,
 ) -> Result<()> {
     let src_paths: Vec<Utf8PathBuf> = if let Some(ref m) = path_map {
-        m.keys().map(|e| Utf8PathBuf::from(e)).collect()
+        m.keys().map(Utf8PathBuf::from).collect()
     } else {
         reader.list().map(|e| Utf8PathBuf::from(e.path())).collect()
     };
@@ -300,7 +300,7 @@ async fn extract_mapping_from_contents(path: &PathBuf) -> Result<HashMap<String,
         if m.len() != 2 {
             return Err(anyhow!("meta/contents contains invalid entry: {line}"));
         } else {
-            if m[0] == "" || m[1] == "" {
+            if m[0].is_empty() || m[1].is_empty() {
                 return Err(anyhow!("meta/contents contains invalid entry: {line}"));
             }
             map.insert(m[1].to_owned(), m[0].to_owned());
@@ -593,7 +593,7 @@ mod tests {
             file_to_add: host_path_to_add.clone().into(),
             path_of_file_in_archive: path_to_add.clone().into(),
             output: archive_path.clone().into(),
-            overwrite: overwrite,
+            overwrite,
         })
         .await?;
 
@@ -810,7 +810,7 @@ mod tests {
             ]),
         );
 
-        let expected_deps = vec![
+        let expected_deps = [
             convert_to_depfile_filepath(root.join("pkg/meta.far").as_str()),
             convert_to_depfile_filepath(root.join("pkg/bin").as_str()),
             convert_to_depfile_filepath(root.join("pkg/lib").as_str()),
@@ -931,7 +931,7 @@ mod tests {
 
         let archive_path = srcdir.path().join("archive.far");
         cmd_package_archive_create(PackageArchiveCreateCommand {
-            out: archive_path.clone().into(),
+            out: archive_path.clone(),
             root_dir: Utf8PathBuf::from_path_buf(srcdir.path().to_path_buf()).unwrap(),
             package_manifest: pkg.manifest_path,
             depfile: None,

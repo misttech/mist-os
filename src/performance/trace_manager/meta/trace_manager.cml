@@ -36,6 +36,8 @@
         {
             protocol: [
                 "fuchsia.tracing.controller.Controller",
+                "fuchsia.tracing.controller.Provisioner",
+                "fuchsia.tracing.controller.Session",
                 "fuchsia.tracing.provider.Registry",
             ],
         },
@@ -84,6 +86,14 @@
     expose: [
         {
             protocol: "fuchsia.tracing.controller.Controller",
+            from: "self",
+        },
+        {
+            protocol: "fuchsia.tracing.controller.Provisioner",
+            from: "self",
+        },
+        {
+            protocol: "fuchsia.tracing.controller.Session",
             from: "self",
         },
         {

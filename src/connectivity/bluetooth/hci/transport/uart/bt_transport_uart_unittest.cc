@@ -211,7 +211,7 @@ class BtTransportUartTest : public ::testing::Test {
 
 class BtTransportUartHciTransportProtocolTest
     : public BtTransportUartTest,
-      public fidl::AsyncEventHandler<fhbt::Snoop2>,
+      public fidl::AsyncEventHandler<fhbt::Snoop>,
       public fidl::WireAsyncEventHandler<fuchsia_hardware_bluetooth::HciTransport>,
       public fidl::WireAsyncEventHandler<fuchsia_hardware_bluetooth::ScoConnection> {
  public:
@@ -254,9 +254,9 @@ class BtTransportUartHciTransportProtocolTest
     }
   }
 
-  // fidl::AsyncEventHandler<fhbt::Snoop2> overrides:
+  // fidl::AsyncEventHandler<fhbt::Snoop> overrides:
   void OnObservePacket(
-      ::fidl::Event<::fuchsia_hardware_bluetooth::Snoop2::OnObservePacket>& event) override {
+      ::fidl::Event<::fuchsia_hardware_bluetooth::Snoop::OnObservePacket>& event) override {
     ASSERT_TRUE(event.sequence().has_value());
     current_snoop_seq_ = event.sequence().value();
     ASSERT_TRUE(event.direction().has_value());
@@ -300,12 +300,11 @@ class BtTransportUartHciTransportProtocolTest
       };
     }
   }
-  void OnDroppedPackets(
-      ::fidl::Event<::fuchsia_hardware_bluetooth::Snoop2::OnDroppedPackets>&) override {
+  void OnDroppedPackets(::fidl::Event<fhbt::Snoop::OnDroppedPackets>&) override {
     // Do nothing, the driver shouldn't drop any packet for now.
     FAIL();
   }
-  void handle_unknown_event(fidl::UnknownEventMetadata<fhbt::Snoop2> metadata) override { FAIL(); }
+  void handle_unknown_event(fidl::UnknownEventMetadata<fhbt::Snoop> metadata) override { FAIL(); }
 
   // fuchsia_hardware_bluetooth::HciTransport event handler overrides
   void OnReceive(fhbt::wire::ReceivedPacket* packet) override {
@@ -380,7 +379,7 @@ class BtTransportUartHciTransportProtocolTest
     return received_sco_packets_;
   }
 
-  fidl::Client<fhbt::Snoop2>& snoop_client() { return snoop_client_; }
+  fidl::Client<fhbt::Snoop>& snoop_client() { return snoop_client_; }
 
   const uint64_t& snoop_seq() { return current_snoop_seq_; }
 
@@ -388,7 +387,7 @@ class BtTransportUartHciTransportProtocolTest
   fidl::WireClient<fhbt::ScoConnection> sco_client_;
 
  private:
-  fidl::Client<fhbt::Snoop2> snoop_client_;
+  fidl::Client<fhbt::Snoop> snoop_client_;
 
   uint64_t current_snoop_seq_ = 0;
   std::vector<std::vector<uint8_t>> received_event_packets_;

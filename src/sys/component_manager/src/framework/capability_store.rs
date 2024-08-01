@@ -41,6 +41,7 @@ impl CapabilityStoreCapabilityProvider {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct CapabilityStore {}
 
 impl CapabilityStore {

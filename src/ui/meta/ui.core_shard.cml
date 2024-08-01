@@ -11,6 +11,12 @@
         },
     ],
     offer: [
+        {
+            from: "parent",
+            to: "#ui",
+            config: [ "fuchsia.power.SuspendEnabled" ],
+        },
+
         // Routes from optional shards.
         // All of these routes should be marked `source_availability: "unknown"`
         //
@@ -42,6 +48,13 @@
             from: "#soundplayer",
             to: "#ui",
             source_availability: "unknown",
+        },
+        {
+            protocol: [ "fuchsia.power.system.ActivityGovernor" ],
+            from: "parent",
+            to: "#ui",
+            source_availability: "unknown",
+            availability: "optional",
         },
     ],
 }

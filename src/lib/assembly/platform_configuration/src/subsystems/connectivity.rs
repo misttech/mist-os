@@ -173,9 +173,8 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
             // Add the networking test collection on all eng builds. The test
             // collection allows components to be launched inside the network
             // realm with access to all networking related capabilities.
-            match context.build_type {
-                BuildType::Eng => builder.platform_bundle("networking_test_collection"),
-                _ => {}
+            if context.build_type == &BuildType::Eng {
+                builder.platform_bundle("networking_test_collection")
             }
 
             let has_fullmac = context.board_info.provides_feature("fuchsia::wlan_fullmac");
@@ -199,11 +198,10 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
                         }
 
                         // Ensure we don't have invalid roaming settings
-                        match connectivity_config.wlan.roaming_policy {
-                            WlanRoamingPolicy::Enabled { .. } => bail!(
-                                "wlan.roaming_policy is invalid with wlan.policy_layer ViaWlanix"
-                            ),
-                            _ => {}
+                        if let WlanRoamingPolicy::Enabled { .. } =
+                            connectivity_config.wlan.roaming_policy
+                        {
+                            bail!("wlan.roaming_policy is invalid with wlan.policy_layer ViaWlanix")
                         }
                     }
                     WlanPolicyLayer::Platform => {
@@ -220,7 +218,7 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
                             "fuchsia.wlan.RecoveryEnabled",
                             Config::new(
                                 ConfigValueType::Bool,
-                                connectivity_config.wlan.recovery_enabled.clone().into(),
+                                connectivity_config.wlan.recovery_enabled.into(),
                             ),
                         )?;
                         builder.set_config_capability(

@@ -13,7 +13,10 @@
     },
     use: [
         {
-            protocol: "fuchsia.diagnostics.FeedbackArchiveAccessor",
+            protocol: [
+                "fuchsia.diagnostics.FeedbackArchiveAccessor",
+                "fuchsia.update.Listener",
+            ],
             from: "parent",
         },
         {
@@ -33,7 +36,4 @@
 
         // Persistence exposes services declared in "-for-production" and "-for-test" CML files.
     ],
-    config: {
-        startup_delay_seconds: { type: "int64" },
-    },
 }

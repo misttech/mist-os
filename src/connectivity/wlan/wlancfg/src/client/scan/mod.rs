@@ -150,7 +150,7 @@ pub async fn serve_scanning_loop(
                             .update_scan_results(results.clone())
                             .on_timeout(zx::Duration::from_seconds(SCAN_CONSUMER_MAX_SECONDS_ALLOWED), || {
                                 error!("Timed out waiting for location sensor to get results");
-                                ()
+
                             })
                         );
                     }
@@ -373,7 +373,7 @@ fn bss_to_network_map(
                 ssid: scan_result.bss_description.ssid.clone(),
                 security_type,
             })
-            .or_insert(vec![]);
+            .or_default();
 
         // Check if this BSSID is already in the hashmap
         if !entry.iter().any(|existing_bss| existing_bss.bssid == scan_result.bss_description.bssid)
@@ -423,7 +423,7 @@ fn network_map_to_scan_result(
         .collect();
 
     scan_results.sort_by(|a, b| a.ssid.cmp(&b.ssid));
-    return scan_results;
+    scan_results
 }
 
 fn log_metric_for_scan_error(reason: &fidl_sme::ScanErrorCode, scan_defects: &mut Vec<ScanIssue>) {
@@ -688,7 +688,7 @@ mod tests {
                         signal: types::Signal { rssi_dbm: 0, snr_db: 1 },
                         timestamp: zx::Time::from_nanos(sme_result_1.timestamp_nanos),
                         channel: types::WlanChan::new(1, types::Cbw::Cbw20),
-                        observation: observation,
+                        observation,
                         compatibility: Compatibility::expect_some([
                             SecurityDescriptor::WPA3_PERSONAL,
                         ]),
@@ -699,7 +699,7 @@ mod tests {
                         signal: types::Signal { rssi_dbm: 13, snr_db: 3 },
                         timestamp: zx::Time::from_nanos(sme_result_3.timestamp_nanos),
                         channel: types::WlanChan::new(11, types::Cbw::Cbw20),
-                        observation: observation,
+                        observation,
                         compatibility: None,
                         bss_description: sme_result_3.bss_description.clone().into(),
                     },
@@ -714,7 +714,7 @@ mod tests {
                     signal: types::Signal { rssi_dbm: 7, snr_db: 2 },
                     timestamp: zx::Time::from_nanos(sme_result_2.timestamp_nanos),
                     channel: types::WlanChan::new(8, types::Cbw::Cbw20),
-                    observation: observation,
+                    observation,
                     compatibility: Compatibility::expect_some([SecurityDescriptor::WPA2_PERSONAL]),
                     bss_description: sme_result_2.bss_description.clone().into(),
                 }],
@@ -1090,7 +1090,7 @@ mod tests {
         let mut recorded_ids = scan_result_record_guard[0]
             .1
             .keys()
-            .map(|id| id.clone())
+            .cloned()
             .collect::<Vec<types::NetworkIdentifierDetailed>>();
 
         recorded_ids.sort();

@@ -96,20 +96,36 @@ impl GlobalVariables {
             .map(|x| x.0)
     }
 
-    /// Create a [`Frame`] that contains the values of some of the global
-    /// variables in this structure. The `mapping` function can dictate what IDs
-    /// the values receive, and can return `None` to skip certain values. The
-    /// slots in the resulting frame capture from this structure, meaning you
-    /// can assign to the values in the frame and update this structure.
-    pub fn as_frame(&self, size: usize, mut mapping: impl FnMut(&str) -> Option<usize>) -> Frame {
+    /// Merge another [`GlobalVariables`] with this one. Overwrite keys in this
+    /// instance in case of collisions.
+    pub fn merge(&mut self, other: GlobalVariables) {
+        self.entries.extend(other.entries.into_iter());
+    }
+
+    /// Create a new frame of the given `size` containing these global variables
+    /// where needed. See [`apply_to_frame`].
+    pub fn as_frame(&self, size: usize, mapping: impl FnMut(&str) -> Option<usize>) -> Frame {
         let mut frame = Frame::new(size);
+        self.apply_to_frame(&mut frame, mapping);
+        frame
+    }
+
+    /// Fill [`Frame`] with the values of some of the global variables in this
+    /// structure. Overwrite existing values where necessary. The `mapping`
+    /// function can dictate what IDs the values receive, and can return `None`
+    /// to skip certain values. The slots in the resulting frame capture from
+    /// this structure, meaning you can assign to the values in the frame and
+    /// update this structure.
+    pub fn apply_to_frame(
+        &self,
+        frame: &mut Frame,
+        mut mapping: impl FnMut(&str) -> Option<usize>,
+    ) {
         for (id, (entry, is_const)) in self.entries.iter().filter_map(|(name, value)| {
             mapping(name).map(|id| (id, (Arc::clone(&value.0), value.1)))
         }) {
             frame.slots[id] = Slot::Captured(entry, is_const);
         }
-
-        frame
     }
 
     /// If a variable with the given name is defined in this structure, update
@@ -151,6 +167,17 @@ impl GlobalVariables {
                 None
             }
         }
+    }
+
+    /// Convert this set of global variables to a `Value::Object` where the keys
+    /// are variable names and the values are the values of those variables.
+    pub async fn to_object(self) -> Result<Value> {
+        let mut ret = Vec::with_capacity(self.entries.len());
+        for (name, (value, _)) in self.entries.into_iter() {
+            let value = Arc::clone(&value.lock().unwrap());
+            ret.push((name, FrameValue::get(value).await?));
+        }
+        Ok(Value::Object(ret))
     }
 }
 
@@ -328,7 +355,7 @@ pub struct CaptureSet {
 
 impl CaptureSet {
     /// Construct a new capture set.
-    pub fn new<'a>(
+    pub(crate) fn new<'a>(
         frame: &mut Frame,
         entries: impl IntoIterator<Item = &'a CaptureMapEntry>,
     ) -> Self {

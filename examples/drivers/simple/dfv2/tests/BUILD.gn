@@ -14,7 +14,7 @@ test("simple-driver-test") {
   deps = [
     "//sdk/fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
     "//sdk/lib/driver/compat/cpp",
-    "//sdk/lib/driver/testing/cpp:driver_testing_cpp",
+    "//sdk/lib/driver/testing/cpp",
     "//src/devices/bind/fuchsia.test:fuchsia.test_cpp",
     "//src/lib/fxl/test:gtest_main",
   ]

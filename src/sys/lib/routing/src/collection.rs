@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use crate::capability_source::{
-    AggregateInstance, AggregateMember, AnonymizedAggregateCapabilityProvider, CapabilitySource,
-    ComponentCapability, FilteredAggregateCapabilityProvider, FilteredAggregateCapabilityRouteData,
+    AggregateInstance, AggregateMember, CapabilitySource, ComponentCapability,
+    FilteredAggregateCapabilityProvider, FilteredAggregateCapabilityRouteData,
 };
 use crate::component_instance::{
     ComponentInstanceInterface, ExtendedInstanceInterface, ResolvedInstanceInterface,
@@ -16,13 +16,14 @@ use crate::legacy_router::{
     OfferVisitor, RouteBundle, Sources,
 };
 use crate::mapper::NoopRouteMapper;
-use async_trait::async_trait;
+use crate::NoopVisitor;
 use cm_rust::{ExposeDecl, NameMapping, OfferDecl, OfferServiceDecl};
 use cm_types::Name;
 use derivative::Derivative;
 use futures::future::BoxFuture;
 use moniker::ChildName;
 use std::collections::HashSet;
+use std::sync::Arc;
 
 /// Provides capabilities exposed by an anonymized aggregates.
 ///
@@ -31,9 +32,8 @@ use std::collections::HashSet;
 /// child's exposed capability with that name.
 ///
 /// This is used during collection routing from anonymized aggregate service instances.
-#[derive(Derivative)]
-#[derivative(Clone(bound = "V: Clone"))]
-pub(super) struct AnonymizedAggregateServiceProvider<C: ComponentInstanceInterface, V> {
+#[derive(Clone)]
+pub struct AnonymizedAggregateServiceProvider<C: ComponentInstanceInterface> {
     /// Component that defines the aggregate.
     pub containing_component: WeakComponentInstanceInterface<C>,
 
@@ -46,23 +46,40 @@ pub(super) struct AnonymizedAggregateServiceProvider<C: ComponentInstanceInterfa
     pub capability_type: cm_rust::CapabilityTypeName,
 
     pub sources: Sources,
-    pub visitor: V,
 }
 
-#[async_trait]
-impl<C, V> AnonymizedAggregateCapabilityProvider<C> for AnonymizedAggregateServiceProvider<C, V>
+impl<C> AnonymizedAggregateServiceProvider<C>
 where
     C: ComponentInstanceInterface + 'static,
-    V: OfferVisitor,
-    V: ExposeVisitor,
-    V: CapabilityVisitor,
-    V: Clone + Send + Sync + 'static,
 {
+    /// Creates a new `AnonymizedAggregateServiceProvider` from a
+    /// `CapabilitySource::AnonymizedAggregate`. The `source_component_instance` must have a
+    /// moniker that matches the moniker value in the source. None is returned if source is not a
+    /// `CapabilitySource::AnonymizedAggregate`.
+    pub async fn new_from_capability_source(
+        source: &CapabilitySource,
+        source_component_instance: &Arc<C>,
+    ) -> Option<Self> {
+        let CapabilitySource::AnonymizedAggregate { capability, moniker, members, sources } =
+            source
+        else {
+            return None;
+        };
+        assert_eq!(&moniker, &source_component_instance.moniker(), "the provided source_component_instance does not match the moniker in the capability source");
+        Some(Self {
+            containing_component: source_component_instance.as_weak(),
+            members: members.clone(),
+            capability_name: capability.source_name().clone(),
+            capability_type: capability.type_name(),
+            sources: sources.clone(),
+        })
+    }
+
     /// Returns a list of instances contributing capabilities to this provider.
     ///
     /// In the case of service capabilities, they are *not* instances inside that service, but
     /// rather service capabilities with the same name that are exposed by different components.
-    async fn list_instances(&self) -> Result<Vec<AggregateInstance>, RoutingError> {
+    pub async fn list_instances(&self) -> Result<Vec<AggregateInstance>, RoutingError> {
         let mut instances = Vec::new();
         let component = self.containing_component.upgrade()?;
         let mut child_components = vec![];
@@ -142,34 +159,35 @@ where
     ///
     /// `instance` is the name of the child that exposes the capability, as returned by
     /// `list_instances`.
-    async fn route_instance(
+    pub async fn route_instance<V>(
         &self,
         instance: &AggregateInstance,
-    ) -> Result<CapabilitySource<C>, RoutingError> {
+        visitor: &mut V,
+    ) -> Result<CapabilitySource, RoutingError>
+    where
+        V: OfferVisitor,
+        V: ExposeVisitor,
+        V: CapabilityVisitor,
+        V: Clone + Send + Sync + 'static,
+    {
         match instance {
-            AggregateInstance::Child(name) => self.route_child_instance(&name).await,
-            AggregateInstance::Parent => self.route_parent_instance().await,
-            AggregateInstance::Self_ => self.route_self_instance().await,
+            AggregateInstance::Child(name) => self.route_child_instance(&name, visitor).await,
+            AggregateInstance::Parent => self.route_parent_instance(visitor).await,
+            AggregateInstance::Self_ => self.route_self_instance(visitor).await,
         }
     }
 
-    fn clone_boxed(&self) -> Box<dyn AnonymizedAggregateCapabilityProvider<C>> {
-        Box::new(self.clone())
-    }
-}
-
-impl<C, V> AnonymizedAggregateServiceProvider<C, V>
-where
-    C: ComponentInstanceInterface + 'static,
-    V: OfferVisitor,
-    V: ExposeVisitor,
-    V: CapabilityVisitor,
-    V: Clone + Send + Sync + 'static,
-{
-    async fn route_child_instance(
+    async fn route_child_instance<V>(
         &self,
         instance: &ChildName,
-    ) -> Result<CapabilitySource<C>, RoutingError> {
+        visitor: &mut V,
+    ) -> Result<CapabilitySource, RoutingError>
+    where
+        V: OfferVisitor,
+        V: ExposeVisitor,
+        V: CapabilityVisitor,
+        V: Clone + Send + Sync + 'static,
+    {
         let containing_component = self.containing_component.upgrade()?;
         let child_component =
             containing_component.lock_resolved_state().await?.get_child(instance).ok_or_else(
@@ -197,13 +215,22 @@ where
             child_exposes,
             child_component,
             self.sources.clone(),
-            &mut self.visitor.clone(),
+            visitor,
             &mut NoopRouteMapper,
         )
         .await
     }
 
-    async fn route_parent_instance(&self) -> Result<CapabilitySource<C>, RoutingError> {
+    async fn route_parent_instance<V>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<CapabilitySource, RoutingError>
+    where
+        V: OfferVisitor,
+        V: ExposeVisitor,
+        V: CapabilityVisitor,
+        V: Clone + Send + Sync + 'static,
+    {
         let containing_component = self.containing_component.upgrade()?;
         let parent = match containing_component.try_get_parent().map_err(|_| {
             RoutingError::OfferFromParentNotFound {
@@ -235,28 +262,76 @@ where
             parent_offers,
             parent,
             self.sources.clone(),
-            &mut self.visitor.clone(),
+            visitor,
             &mut NoopRouteMapper,
         )
         .await
     }
 
-    async fn route_self_instance(&self) -> Result<CapabilitySource<C>, RoutingError> {
+    async fn route_self_instance<V>(
+        &self,
+        visitor: &mut V,
+    ) -> Result<CapabilitySource, RoutingError>
+    where
+        V: OfferVisitor,
+        V: ExposeVisitor,
+        V: CapabilityVisitor,
+        V: Clone + Send + Sync + 'static,
+    {
         let containing_component = self.containing_component.upgrade()?;
         legacy_router::route_from_self_by_name(
             &self.capability_name,
             containing_component,
             self.sources.clone(),
-            &mut self.visitor.clone(),
+            visitor,
             &mut NoopRouteMapper,
         )
         .await
     }
 }
 
+pub fn new_filtered_aggregate_from_capability_source<C>(
+    source: CapabilitySource,
+    aggregation_component: WeakComponentInstanceInterface<C>,
+) -> Box<dyn FilteredAggregateCapabilityProvider>
+where
+    C: ComponentInstanceInterface + 'static,
+{
+    match source {
+        CapabilitySource::FilteredProvider {
+            capability: _,
+            moniker,
+            service_capability,
+            offer_service_decl,
+        } => {
+            assert_eq!(&moniker, &aggregation_component.moniker);
+            Box::new(OfferFilteredServiceProvider::new(
+                offer_service_decl,
+                aggregation_component,
+                service_capability,
+            ))
+        }
+        CapabilitySource::FilteredAggregateProvider {
+            capability: _,
+            moniker,
+            offer_service_decls,
+            sources,
+        } => {
+            assert_eq!(&moniker, &aggregation_component.moniker);
+            Box::new(OfferAggregateServiceProvider::new(
+                offer_service_decls,
+                aggregation_component,
+                sources,
+                NoopVisitor {},
+            ))
+        }
+        other_source => panic!("unexpected capability source: {}", other_source),
+    }
+}
+
 #[derive(Derivative)]
 #[derivative(Clone(bound = ""))]
-pub(super) struct OfferFilteredServiceProvider<C: ComponentInstanceInterface> {
+pub struct OfferFilteredServiceProvider<C: ComponentInstanceInterface> {
     /// Component that offered the filtered service
     component: WeakComponentInstanceInterface<C>,
     /// The service capability
@@ -269,7 +344,7 @@ impl<C> OfferFilteredServiceProvider<C>
 where
     C: ComponentInstanceInterface + 'static,
 {
-    pub(super) fn new(
+    pub fn new(
         offer_decl: OfferServiceDecl,
         component: WeakComponentInstanceInterface<C>,
         capability: ComponentCapability,
@@ -278,16 +353,16 @@ where
     }
 }
 
-impl<C> FilteredAggregateCapabilityProvider<C> for OfferFilteredServiceProvider<C>
+impl<C> FilteredAggregateCapabilityProvider for OfferFilteredServiceProvider<C>
 where
     C: ComponentInstanceInterface + 'static,
 {
     fn route_instances(
         &self,
-    ) -> Vec<BoxFuture<'_, Result<FilteredAggregateCapabilityRouteData<C>, RoutingError>>> {
+    ) -> Vec<BoxFuture<'_, Result<FilteredAggregateCapabilityRouteData, RoutingError>>> {
         let capability_source = CapabilitySource::Component {
             capability: self.capability.clone(),
-            component: self.component.clone(),
+            moniker: self.component.moniker.clone(),
         };
         let instance_filter = get_instance_filter(&self.offer_decl);
         let fut = async move {
@@ -295,13 +370,13 @@ where
         };
         // Without the explicit type, this does not compile
         let mut out: Vec<
-            BoxFuture<'_, Result<FilteredAggregateCapabilityRouteData<C>, RoutingError>>,
+            BoxFuture<'_, Result<FilteredAggregateCapabilityRouteData, RoutingError>>,
         > = vec![];
         out.push(Box::pin(fut));
         out
     }
 
-    fn clone_boxed(&self) -> Box<dyn FilteredAggregateCapabilityProvider<C>> {
+    fn clone_boxed(&self) -> Box<dyn FilteredAggregateCapabilityProvider> {
         Box::new(self.clone())
     }
 }
@@ -348,7 +423,7 @@ fn get_instance_filter(offer_decl: &OfferServiceDecl) -> Vec<NameMapping> {
 
 #[derive(Derivative)]
 #[derivative(Clone(bound = "V: Clone"))]
-pub(super) struct OfferAggregateServiceProvider<C: ComponentInstanceInterface, V> {
+pub struct OfferAggregateServiceProvider<C: ComponentInstanceInterface, V> {
     /// Component that offered the aggregate service
     component: WeakComponentInstanceInterface<C>,
 
@@ -365,7 +440,7 @@ where
     V: OfferVisitor + ExposeVisitor + CapabilityVisitor,
     V: Send + Sync + Clone + 'static,
 {
-    pub(super) fn new(
+    pub fn new(
         offer_decls: Vec<OfferServiceDecl>,
         component: WeakComponentInstanceInterface<C>,
         sources: Sources,
@@ -375,7 +450,7 @@ where
     }
 }
 
-impl<C, V> FilteredAggregateCapabilityProvider<C> for OfferAggregateServiceProvider<C, V>
+impl<C, V> FilteredAggregateCapabilityProvider for OfferAggregateServiceProvider<C, V>
 where
     C: ComponentInstanceInterface + 'static,
     V: OfferVisitor + ExposeVisitor + CapabilityVisitor,
@@ -383,10 +458,10 @@ where
 {
     fn route_instances(
         &self,
-    ) -> Vec<BoxFuture<'_, Result<FilteredAggregateCapabilityRouteData<C>, RoutingError>>> {
+    ) -> Vec<BoxFuture<'_, Result<FilteredAggregateCapabilityRouteData, RoutingError>>> {
         // Without the explicit type, this does not compile
         let mut out: Vec<
-            BoxFuture<'_, Result<FilteredAggregateCapabilityRouteData<C>, RoutingError>>,
+            BoxFuture<'_, Result<FilteredAggregateCapabilityRouteData, RoutingError>>,
         > = vec![];
         for offer_decl in &self.offer_decls {
             let instance_filter = get_instance_filter(offer_decl);
@@ -419,7 +494,7 @@ where
         out
     }
 
-    fn clone_boxed(&self) -> Box<dyn FilteredAggregateCapabilityProvider<C>> {
+    fn clone_boxed(&self) -> Box<dyn FilteredAggregateCapabilityProvider> {
         Box::new(self.clone())
     }
 }

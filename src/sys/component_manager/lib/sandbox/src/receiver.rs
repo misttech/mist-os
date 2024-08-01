@@ -1,18 +1,17 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use crate::{Connector, Message};
+
+use crate::Message;
 use derivative::Derivative;
-use fidl::endpoints::Proxy;
-use fidl_fuchsia_component_sandbox as fsandbox;
 use futures::channel::mpsc::{self, UnboundedReceiver};
-use futures::future::{self, Either};
 use futures::lock::Mutex;
 use futures::StreamExt;
-use std::pin::pin;
 use std::sync::Arc;
 
-/// A capability that transfers another capability to a [Sender].
+/// Type that represents the receiving end of a [Connector]. Every [Connector] is coupled to
+/// some [Receiver] to which connection requests to that [Connector] (or any of its clones) are
+/// delivered.
 #[derive(Derivative)]
 #[derivative(Debug)]
 pub struct Receiver {
@@ -28,10 +27,8 @@ impl Clone for Receiver {
 }
 
 impl Receiver {
-    pub fn new() -> (Self, Connector) {
-        let (sender, receiver) = mpsc::unbounded();
-        let receiver = Self { inner: Arc::new(Mutex::new(receiver)) };
-        (receiver, Connector::new(sender))
+    pub fn new(receiver: mpsc::UnboundedReceiver<crate::Message>) -> Self {
+        Self { inner: Arc::new(Mutex::new(receiver)) }
     }
 
     /// Waits to receive a message, or return `None` if there are no more messages and all
@@ -40,26 +37,6 @@ impl Receiver {
         let mut receiver_guard = self.inner.lock().await;
         receiver_guard.next().await
     }
-
-    pub async fn handle_receiver(&self, receiver_proxy: fsandbox::ReceiverProxy) {
-        let mut on_closed = receiver_proxy.on_closed();
-        loop {
-            match future::select(pin!(self.receive()), on_closed).await {
-                Either::Left((msg, fut)) => {
-                    on_closed = fut;
-                    let Some(msg) = msg else {
-                        return;
-                    };
-                    if let Err(_) = receiver_proxy.receive(msg.channel) {
-                        return;
-                    }
-                }
-                Either::Right((_, _)) => {
-                    return;
-                }
-            }
-        }
-    }
 }
 
 // These tests do not run on host because the `wait_handle` function below is not supported in the
@@ -67,16 +44,19 @@ impl Receiver {
 #[cfg(target_os = "fuchsia")]
 #[cfg(test)]
 mod tests {
+    use crate::Connector;
     use assert_matches::assert_matches;
-    use fuchsia_async as fasync;
     use fuchsia_zircon::{self as zx, AsHandleRef};
+    use futures::future::{self, Either};
+    use std::pin::pin;
     use zx::Peered;
+    use {fidl_fuchsia_component_sandbox as fsandbox, fuchsia_async as fasync};
 
     use super::*;
 
     #[fuchsia::test]
     async fn send_and_receive() {
-        let (receiver, sender) = Receiver::new();
+        let (receiver, sender) = Connector::new();
 
         let (ch1, ch2) = zx::Channel::create();
         sender.send_channel(ch1).unwrap();
@@ -90,7 +70,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn send_fail_when_receiver_dropped() {
-        let (receiver, sender) = Receiver::new();
+        let (receiver, sender) = Connector::new();
 
         drop(receiver);
 
@@ -101,7 +81,7 @@ mod tests {
     #[test]
     fn receive_blocks_while_connector_alive() {
         let mut ex = fasync::TestExecutor::new();
-        let (receiver, sender) = Receiver::new();
+        let (receiver, sender) = Connector::new();
 
         {
             let mut fut = std::pin::pin!(receiver.receive());
@@ -118,7 +98,7 @@ mod tests {
     /// It should be possible to conclusively ensure that no more messages will arrive.
     #[fuchsia::test]
     async fn drain_receiver() {
-        let (receiver, sender) = Receiver::new();
+        let (receiver, sender) = Connector::new();
 
         let (ch1, _ch2) = zx::Channel::create();
         sender.send_channel(ch1).unwrap();
@@ -136,7 +116,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn receiver_fidl() {
-        let (receiver, sender) = Receiver::new();
+        let (receiver, sender) = Connector::new();
 
         let (ch1, ch2) = zx::Channel::create();
         sender.send_channel(ch1).unwrap();

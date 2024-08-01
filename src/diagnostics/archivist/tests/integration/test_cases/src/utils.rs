@@ -78,7 +78,7 @@ impl LogSettingsExt for fdiagnostics::LogSettingsProxy {
         let component_selector = parse_component_selector::<VerboseError>(selector)?;
         let interests = [fdiagnostics::LogInterestSelector {
             selector: component_selector,
-            interest: Interest { min_severity: Some(severity.into()), ..Default::default() },
+            interest: Interest { min_severity: Some(severity), ..Default::default() },
         }];
         self.set_interest(&interests).await.context("set interest")?;
         Ok(())

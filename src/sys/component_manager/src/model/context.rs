@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::capability::{
-    BuiltinCapability, CapabilityProvider, CapabilitySource, FrameworkCapability,
-};
+use crate::capability::{BuiltinCapability, CapabilityProvider, FrameworkCapability};
 use crate::model::component::WeakComponentInstance;
 use crate::model::token::InstanceRegistry;
+use ::routing::capability_source::CapabilitySource;
+use ::routing::component_instance::ComponentInstanceInterface;
 use ::routing::policy::GlobalPolicyChecker;
 use cm_config::{AbiRevisionPolicy, RuntimeConfig};
 use errors::ModelError;
@@ -103,7 +103,7 @@ impl ModelContext {
         target: WeakComponentInstance,
     ) -> Option<Box<dyn CapabilityProvider>> {
         match source {
-            CapabilitySource::Builtin { capability, top_instance: _ } => {
+            CapabilitySource::Builtin { capability, .. } => {
                 let builtin_capabilities = self.builtin_capabilities.lock().await;
                 for c in builtin_capabilities.as_ref().expect("not initialized") {
                     if c.matches(capability) {
@@ -112,11 +112,13 @@ impl ModelContext {
                 }
                 None
             }
-            CapabilitySource::Framework { capability, component } => {
+            CapabilitySource::Framework { capability, moniker } => {
                 let framework_capabilities = self.framework_capabilities.lock().await;
                 for c in framework_capabilities.as_ref().expect("not initialized") {
                     if c.matches(capability) {
-                        return Some(c.new_provider(component.clone(), target));
+                        let source_component =
+                            target.upgrade().ok()?.find_absolute(moniker).await.ok()?.as_weak();
+                        return Some(c.new_provider(source_component, target));
                     }
                 }
                 None

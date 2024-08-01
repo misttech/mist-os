@@ -103,8 +103,8 @@ async fn read_same_named_trees_from_single_component() {
         .into_proxy()
         .unwrap();
 
-    writer1.record_string("prop1".into(), "val1".into()).await.unwrap();
-    writer2.record_string("prop2".into(), "val2".into()).await.unwrap();
+    writer1.record_string("prop1", "val1").await.unwrap();
+    writer2.record_string("prop2", "val2").await.unwrap();
 
     let accessor = realm_proxy.connect_to_protocol::<ArchiveAccessorMarker>().await.unwrap();
     let data = ArchiveReader::new()

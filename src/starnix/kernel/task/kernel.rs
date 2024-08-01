@@ -8,6 +8,7 @@ use crate::device::framebuffer::{AspectRatio, Framebuffer};
 use crate::device::loop_device::LoopDeviceRegistry;
 use crate::device::remote_block_device::RemoteBlockDeviceRegistry;
 use crate::device::{BinderDevice, DeviceMode, DeviceRegistry};
+use crate::fs::nmfs::NetworkManagerHandle;
 use crate::fs::proc::SystemLimits;
 use crate::memory_attribution::MemoryAttributionManager;
 use crate::mm::{FutexTable, SharedFutexKey};
@@ -200,6 +201,10 @@ pub struct Kernel {
     /// The manager for suspend/resume.
     pub suspend_resume_manager: SuspendResumeManagerHandle,
 
+    /// The manager for communicating network property updates
+    /// to the network policy proxy.
+    pub network_manager: NetworkManagerHandle,
+
     /// Unique IDs for new mounts and mount namespaces.
     pub next_mount_id: AtomicU64Counter,
     pub next_peer_group_id: AtomicU64Counter,
@@ -308,6 +313,7 @@ impl Kernel {
             Framebuffer::new(framebuffer_aspect_ratio).expect("Failed to create framebuffer");
 
         let core_dumps = CoreDumpList::new(inspect_node.create_child("coredumps"));
+        let network_manager = NetworkManagerHandle::new_with_inspect(&inspect_node);
 
         let this = Arc::new_cyclic(|kernel| Kernel {
             kthreads: KernelThreads::new(kernel.clone()),
@@ -351,6 +357,7 @@ impl Kernel {
             core_dumps,
             actions_logged: AtomicU16::new(0),
             suspend_resume_manager: Default::default(),
+            network_manager,
             next_mount_id: AtomicU64Counter::new(1),
             next_peer_group_id: AtomicU64Counter::new(1),
             next_namespace_id: AtomicU64Counter::new(1),

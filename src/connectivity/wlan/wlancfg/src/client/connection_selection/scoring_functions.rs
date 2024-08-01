@@ -63,10 +63,10 @@ pub fn score_bss_scanned_candidate(bss_candidate: types::ScannedCandidate) -> i1
     let short_connection_score: i16 = bss_candidate
         .recent_short_connections()
         .try_into()
-        .unwrap_or_else(|_| i16::MAX)
+        .unwrap_or(i16::MAX)
         .saturating_mul(SCORE_PENALTY_FOR_SHORT_CONNECTION);
 
-    return score.saturating_sub(short_connection_score);
+    score.saturating_sub(short_connection_score)
 }
 
 // Calculate a score bonus for 5GHz BSSs, based on the RSSI.
@@ -166,8 +166,8 @@ pub fn score_current_connection_signal_data(
         _ => 100,
     };
 
-    return ((rssi_velocity_score as f32 * RSSI_AND_VELOCITY_SCORE_WEIGHT)
-        + (snr_score as f32 * SNR_SCORE_WEIGHT)) as u8;
+    ((rssi_velocity_score as f32 * RSSI_AND_VELOCITY_SCORE_WEIGHT)
+        + (snr_score as f32 * SNR_SCORE_WEIGHT)) as u8
 }
 
 #[cfg(test)]

@@ -19,7 +19,6 @@ async fn main() {
     info!("Started");
 
     // [START init]
-    let factory = client::connect_to_protocol::<fsandbox::FactoryMarker>().unwrap();
     let store = client::connect_to_protocol::<fsandbox::CapabilityStoreMarker>().unwrap();
     let id_gen = sandbox::CapabilityIdGenerator::new();
 
@@ -33,8 +32,7 @@ async fn main() {
         let (receiver, receiver_stream) =
             endpoints::create_request_stream::<fsandbox::ReceiverMarker>().unwrap();
         let connector_id = id_gen.next();
-        let sender = factory.create_connector(receiver).await.unwrap();
-        store.import(connector_id, fsandbox::Capability::Connector(sender)).await.unwrap().unwrap();
+        store.connector_create(connector_id, receiver).await.unwrap().unwrap();
         store
             .dictionary_insert(
                 dict_id,

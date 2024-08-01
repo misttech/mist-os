@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+#### CATEGORY=Run, inspect and debug
+### Summarize Inspect power events from Power Broker
+
+## usage: fx power-viz [-o OUTPUT_FILE] [--natural] [INPUT_FILE]
+##
+## [flags]
+## -o: output file path
+## --natural: plot events against "1 second/second" timeline
+##
+## [examples]
+## fx power-viz -o output.txt
+##   (Loads the snapshot from an attached Fuchsia device and creates HTML output)
+##
+## fx power-viz -o output.txt /tmp/snapshot.zip
+##   (Loads the snapshot from given file and creates HTML output)
+##
+## fx power-viz -o output.txt /tmp/bugreport.zip
+##   (Loads the snapshot from given file and creates HTML output)
+##
+## fx power-viz -o output.txt /tmp/inspect.json
+##   (Loads the snapshot from given file and creates HTML output)
+
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/../lib/vars.sh || exit $?
+
+fx-command-run power-viz-tool "$@"
+

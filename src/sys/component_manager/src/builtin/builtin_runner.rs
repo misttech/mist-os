@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::capability::CapabilitySource;
-use crate::model::component::manager::ComponentManagerInstance;
 use ::routing::capability_source::InternalCapability;
 use async_trait::async_trait;
 use cm_config::SecurityPolicy;
@@ -16,10 +14,11 @@ use fuchsia_zircon::{self as zx, Clock};
 use futures::future::BoxFuture;
 use futures::{Future, FutureExt, TryStreamExt};
 use namespace::{Namespace, NamespaceError};
+use routing::capability_source::CapabilitySource;
 use routing::policy::ScopedPolicyChecker;
 use runner::component::{ChannelEpitaph, Controllable, Controller};
 use sandbox::{Capability, Dict, DirEntry, RemotableCapability};
-use std::sync::{Arc, Weak};
+use std::sync::Arc;
 use thiserror::Error;
 use tracing::warn;
 use vfs::directory::entry::OpenRequest;
@@ -55,7 +54,6 @@ pub struct BuiltinRunner {
     root_job: zx::Unowned<'static, zx::Job>,
     task_group: TaskGroup,
     elf_runner_resources: Arc<ElfRunnerResources>,
-    top_instance: Weak<ComponentManagerInstance>,
 }
 
 /// Pure data type holding some resources needed by the ELF runner.
@@ -109,18 +107,9 @@ impl From<BuiltinRunnerError> for zx::Status {
 impl BuiltinRunner {
     /// Creates a builtin runner with its required resources.
     /// - `task_group`: The tasks associated with the builtin runner.
-    pub fn new(
-        task_group: TaskGroup,
-        elf_runner_resources: ElfRunnerResources,
-        top_instance: Weak<ComponentManagerInstance>,
-    ) -> Self {
+    pub fn new(task_group: TaskGroup, elf_runner_resources: ElfRunnerResources) -> Self {
         let root_job = fuchsia_runtime::job_default();
-        BuiltinRunner {
-            root_job,
-            task_group,
-            elf_runner_resources: Arc::new(elf_runner_resources),
-            top_instance,
-        }
+        BuiltinRunner { root_job, task_group, elf_runner_resources: Arc::new(elf_runner_resources) }
     }
 
     /// Starts a builtin component.
@@ -144,7 +133,6 @@ impl BuiltinRunner {
                     job.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap(),
                     namespace,
                     self.elf_runner_resources.clone(),
-                    self.top_instance.clone(),
                 );
                 program.serve_outgoing(outgoing_dir);
                 Ok((program, Box::pin(wait_for_job_termination(job))))
@@ -231,12 +219,7 @@ impl ElfRunnerProgram {
     /// Creates an ELF runner program.
     /// - `job`: Each ELF component run by this runner will live inside a job that is a
     ///   child of the provided job.
-    fn new(
-        job: zx::Job,
-        namespace: Namespace,
-        resources: Arc<ElfRunnerResources>,
-        top_instance: Weak<ComponentManagerInstance>,
-    ) -> Self {
+    fn new(job: zx::Job, namespace: Namespace, resources: Arc<ElfRunnerResources>) -> Self {
         let namespace = Arc::new(namespace);
         let connector = NamespaceConnector { namespace: namespace.clone() };
         let elf_runner = elf_runner::ElfRunner::new(
@@ -253,7 +236,6 @@ impl ElfRunnerProgram {
         let elf_runner = Arc::new(LaunchTaskOnReceive::new(
             CapabilitySource::Builtin {
                 capability: InternalCapability::Runner(Name::new("elf").unwrap()),
-                top_instance: top_instance.clone(),
             },
             task_group.as_weak(),
             fcrunner::ComponentRunnerMarker::PROTOCOL_NAME,
@@ -274,7 +256,6 @@ impl ElfRunnerProgram {
                 capability: InternalCapability::Protocol(
                     Name::new(fattribution::ProviderMarker::PROTOCOL_NAME).unwrap(),
                 ),
-                top_instance: top_instance.clone(),
             },
             task_group.as_weak(),
             fattribution::ProviderMarker::PROTOCOL_NAME,
@@ -421,7 +402,7 @@ mod tests {
             crash_records,
             instance_registry,
         };
-        Arc::new(BuiltinRunner::new(task_group, elf_runner_resources, Weak::new()))
+        Arc::new(BuiltinRunner::new(task_group, elf_runner_resources))
     }
 
     fn make_start_info(

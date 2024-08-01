@@ -5,7 +5,7 @@
 use crate::capability::CapabilityProvider;
 use crate::model::component::{ComponentInstance, WeakComponentInstance, WeakExtendedInstance};
 use crate::model::mutable_directory::MutableDirectory;
-use crate::model::routing::{CapabilityOpenRequest, CapabilitySource, RouteSource};
+use crate::model::routing::{CapabilityOpenRequest, RouteSource};
 use async_trait::async_trait;
 use cm_rust::{CapabilityTypeName, ComponentDecl, ExposeDecl, ExposeDeclCommon};
 use cm_types::{IterablePath, Name, RelativePath};
@@ -21,9 +21,14 @@ use hooks::{Event, EventPayload, EventType, Hook, HooksRegistration};
 use moniker::{ExtendedMoniker, Moniker};
 use router_error::Explain;
 use routing::capability_source::{
-    AggregateInstance, AggregateMember, AnonymizedAggregateCapabilityProvider,
-    FilteredAggregateCapabilityProvider,
+    AggregateInstance, AggregateMember, CapabilitySource, FilteredAggregateCapabilityProvider,
 };
+use routing::collection::{
+    new_filtered_aggregate_from_capability_source, AnonymizedAggregateServiceProvider,
+};
+use routing::component_instance::ComponentInstanceInterface;
+use routing::error::RoutingError;
+use routing::legacy_router::NoopVisitor;
 use std::collections::HashMap;
 use std::fmt;
 use std::sync::{Arc, Weak};
@@ -55,10 +60,25 @@ impl FilteredAggregateServiceProvider {
     pub async fn new(
         parent: WeakComponentInstance,
         target: WeakComponentInstance,
-        provider: Box<dyn FilteredAggregateCapabilityProvider<ComponentInstance>>,
+        provider: Box<dyn FilteredAggregateCapabilityProvider>,
     ) -> Result<FilteredAggregateServiceProvider, ModelError> {
         let dir = FilteredAggregateServiceDir::new(parent, target, provider).await?;
         Ok(FilteredAggregateServiceProvider { dir })
+    }
+
+    pub async fn new_from_capability_source(
+        source: CapabilitySource,
+        target: WeakComponentInstance,
+    ) -> Result<Self, ModelError> {
+        let aggregation_component = match source.source_moniker() {
+            ExtendedMoniker::ComponentInstance(moniker) => {
+                target.upgrade()?.find_absolute(&moniker).await?
+            }
+            ExtendedMoniker::ComponentManager => panic!("unexpected source: {:?}", source),
+        };
+        let provider =
+            new_filtered_aggregate_from_capability_source(source, aggregation_component.as_weak());
+        Self::new(aggregation_component.as_weak(), target, provider).await
     }
 }
 
@@ -88,7 +108,7 @@ impl FilteredAggregateServiceDir {
     pub async fn new(
         parent: WeakComponentInstance,
         target: WeakComponentInstance,
-        provider: Box<dyn FilteredAggregateCapabilityProvider<ComponentInstance>>,
+        provider: Box<dyn FilteredAggregateCapabilityProvider>,
     ) -> Result<Arc<SimpleImmutableDir>, ModelError> {
         let futs: Vec<_> = provider
             .route_instances()
@@ -111,6 +131,26 @@ impl FilteredAggregateServiceDir {
                     }
                 };
                 let capability_source = Arc::new(route_data.capability_source);
+                let source_instance = match capability_source.source_moniker() {
+                    ExtendedMoniker::ComponentInstance(moniker) => {
+                        let Ok(parent) = parent.upgrade() else {
+                            return vec![];
+                        };
+                        let Ok(source_instance) = parent.find_absolute(&moniker).await else {
+                            return vec![];
+                        };
+                        WeakExtendedInstance::Component(source_instance.as_weak())
+                    }
+                    ExtendedMoniker::ComponentManager => {
+                        let Ok(parent) = parent.upgrade() else {
+                            return vec![];
+                        };
+                        let Ok(above_root) = parent.find_above_root() else {
+                            return vec![];
+                        };
+                        WeakExtendedInstance::AboveRoot(Arc::downgrade(&above_root))
+                    }
+                };
                 let entries: Vec<_> = route_data
                     .instance_filter
                     .into_iter()
@@ -118,6 +158,7 @@ impl FilteredAggregateServiceDir {
                         Arc::new(ServiceInstanceDirectoryEntry::<FlyStr> {
                             name: mapping.target_name.into(),
                             capability_source: capability_source.clone(),
+                            source_instance: source_instance.clone(),
                             source_id: mapping.source_name.clone().into(),
                             service_instance: mapping.source_name.into(),
                         })
@@ -218,6 +259,41 @@ struct AnonymizedAggregateServiceDirInner {
     watchers_spawned: HashMap<AggregateInstance, WatcherEntry>,
 }
 
+/// A provider of a capability from an aggregation of one or more collections and static children.
+/// The instance names in the aggregate will be anonymized.
+///
+/// This trait type-erases the capability type, so it can be handled and hosted generically.
+#[async_trait]
+pub trait AnonymizedAggregateCapabilityProvider: Send + Sync {
+    /// Lists the instances of the capability.
+    ///
+    /// The instance is an opaque identifier that is only meaningful for a subsequent
+    /// call to `route_instance`.
+    async fn list_instances(&self) -> Result<Vec<AggregateInstance>, RoutingError>;
+
+    /// Route the given `instance` of the capability to its source.
+    async fn route_instance(
+        &self,
+        instance: &AggregateInstance,
+    ) -> Result<CapabilitySource, RoutingError>;
+}
+
+#[async_trait]
+impl AnonymizedAggregateCapabilityProvider
+    for AnonymizedAggregateServiceProvider<ComponentInstance>
+{
+    async fn list_instances(&self) -> Result<Vec<AggregateInstance>, RoutingError> {
+        AnonymizedAggregateServiceProvider::list_instances(&self).await
+    }
+    async fn route_instance(
+        &self,
+        instance: &AggregateInstance,
+    ) -> Result<CapabilitySource, RoutingError> {
+        AnonymizedAggregateServiceProvider::route_instance(&self, instance, &mut NoopVisitor {})
+            .await
+    }
+}
+
 pub struct AnonymizedAggregateServiceDir {
     /// The parent component of the collection and aggregated service.
     parent: WeakComponentInstance,
@@ -229,8 +305,7 @@ pub struct AnonymizedAggregateServiceDir {
     ///
     /// This returns routed `CapabilitySourceInterface`s to a service capability for a
     /// component instance in the collection.
-    aggregate_capability_provider:
-        Box<dyn AnonymizedAggregateCapabilityProvider<ComponentInstance>>,
+    aggregate_capability_provider: Box<dyn AnonymizedAggregateCapabilityProvider>,
 
     inner: Mutex<AnonymizedAggregateServiceDirInner>,
 }
@@ -239,9 +314,7 @@ impl AnonymizedAggregateServiceDir {
     pub fn new(
         parent: WeakComponentInstance,
         route: AnonymizedServiceRoute,
-        aggregate_capability_provider: Box<
-            dyn AnonymizedAggregateCapabilityProvider<ComponentInstance>,
-        >,
+        aggregate_capability_provider: Box<dyn AnonymizedAggregateCapabilityProvider>,
     ) -> Self {
         AnonymizedAggregateServiceDir {
             parent,
@@ -431,23 +504,23 @@ impl AnonymizedAggregateServiceDir {
         source: &CapabilitySource,
     ) -> Result<(), ModelError> {
         match source {
-            CapabilitySource::Component { capability, component } => {
+            CapabilitySource::Component { capability, moniker } => {
                 let target = self
                     .parent
                     .upgrade()
                     .map_err(|err| ModelError::ComponentInstanceError { err })?;
+                let source_component = target.find_absolute(moniker).await?;
 
                 let mut cur_path = RelativePath::dot();
                 for segment in capability.source_path().unwrap().iter_segments() {
-                    let component = component.upgrade()?;
                     let (proxy, server_end) =
                         fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
                             .expect("failed to create proxy");
                     let flags = fio::OpenFlags::DIRECTORY;
                     let mut object_request = flags.to_object_request(server_end);
-                    component
+                    source_component
                         .open_outgoing(OpenRequest::new(
-                            component.execution_scope.clone(),
+                            source_component.execution_scope.clone(),
                             flags,
                             cur_path.to_string().try_into().map_err(|_| ModelError::BadPath)?,
                             &mut object_request,
@@ -649,9 +722,18 @@ impl AnonymizedAggregateServiceDir {
                             return Ok(());
                         }
                         let name = Self::generate_instance_id(&mut rand::thread_rng());
+                        let source_instance = (&self
+                            .parent
+                            .upgrade()
+                            .map_err(|_| None)?
+                            .find_extended_instance(&source_borrow.source_moniker())
+                            .await
+                            .map_err(|_| None)?)
+                            .into();
                         let entry = Arc::new(ServiceInstanceDirectoryEntry::<AggregateInstance> {
                             name: name.clone().into(),
                             capability_source: source_borrow.clone(),
+                            source_instance,
                             source_id: instance_key.source_id.clone(),
                             service_instance: instance_key.service_instance.clone(),
                         });
@@ -840,6 +922,9 @@ pub struct ServiceInstanceDirectoryEntry<T> {
     /// The source of the service capability instance to route.
     capability_source: Arc<CapabilitySource>,
 
+    /// The source instance referred to in `capability_source`
+    source_instance: WeakExtendedInstance,
+
     /// An identifier that can be used to find the child component that serves the service
     /// instance.
     /// This is a generic type because it varies between aggregated directory types. For example,
@@ -887,7 +972,7 @@ impl<T: Send + Sync + 'static> DirectoryEntryAsync for ServiceInstanceDirectoryE
         self: Arc<Self>,
         mut request: OpenRequest<'_>,
     ) -> Result<(), zx::Status> {
-        let source_component = match self.capability_source.source_instance() {
+        let source_component = match &self.source_instance {
             WeakExtendedInstance::Component(c) => c,
             WeakExtendedInstance::AboveRoot(_) => {
                 unreachable!(
@@ -930,6 +1015,7 @@ impl<T: Send + Sync + 'static> DirectoryEntryAsync for ServiceInstanceDirectoryE
 mod tests {
     use super::*;
     use crate::model::component::StartReason;
+    use crate::model::routing::service::AnonymizedAggregateServiceDir;
     use crate::model::routing::RoutingError;
     use crate::model::start::Start;
     use crate::model::testing::out_dir::OutDir;
@@ -955,7 +1041,7 @@ mod tests {
     }
 
     #[async_trait]
-    impl AnonymizedAggregateCapabilityProvider<ComponentInstance> for MockAnonymizedCapabilityProvider {
+    impl AnonymizedAggregateCapabilityProvider for MockAnonymizedCapabilityProvider {
         async fn route_instance(
             &self,
             instance: &AggregateInstance,
@@ -965,7 +1051,7 @@ mod tests {
                     name: "my.service.Service".parse().unwrap(),
                     source_path: Some("/svc/my.service.Service".parse().unwrap()),
                 }),
-                component: self
+                moniker: self
                     .instances
                     .lock()
                     .await
@@ -986,16 +1072,13 @@ mod tests {
                             panic!("not expected");
                         }
                     })?
+                    .moniker
                     .clone(),
             })
         }
 
         async fn list_instances(&self) -> Result<Vec<AggregateInstance>, RoutingError> {
             Ok(self.instances.lock().await.keys().cloned().collect())
-        }
-
-        fn clone_boxed(&self) -> Box<dyn AnonymizedAggregateCapabilityProvider<ComponentInstance>> {
-            Box::new(self.clone())
         }
     }
 
@@ -1006,23 +1089,19 @@ mod tests {
     }
 
     #[async_trait]
-    impl FilteredAggregateCapabilityProvider<ComponentInstance> for MockOfferCapabilityProvider {
+    impl FilteredAggregateCapabilityProvider for MockOfferCapabilityProvider {
         fn route_instances(
             &self,
-        ) -> Vec<
-            BoxFuture<
-                '_,
-                Result<FilteredAggregateCapabilityRouteData<ComponentInstance>, RoutingError>,
-            >,
-        > {
+        ) -> Vec<BoxFuture<'_, Result<FilteredAggregateCapabilityRouteData, RoutingError>>>
+        {
             let capability_source = CapabilitySource::Component {
                 capability: ComponentCapability::Service(ServiceDecl {
                     name: "my.service.Service".parse().unwrap(),
                     source_path: Some("/svc/my.service.Service".parse().unwrap()),
                 }),
-                component: self.component.clone(),
+                moniker: self.component.moniker.clone(),
             };
-            let data = FilteredAggregateCapabilityRouteData::<ComponentInstance> {
+            let data = FilteredAggregateCapabilityRouteData {
                 capability_source,
                 instance_filter: self.instance_filter.clone(),
             };
@@ -1030,7 +1109,7 @@ mod tests {
             vec![Box::pin(fut)]
         }
 
-        fn clone_boxed(&self) -> Box<dyn FilteredAggregateCapabilityProvider<ComponentInstance>> {
+        fn clone_boxed(&self) -> Box<dyn FilteredAggregateCapabilityProvider> {
             Box::new(self.clone())
         }
     }

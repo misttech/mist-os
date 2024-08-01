@@ -538,7 +538,7 @@ impl RepoStorage for FileSystemRepository {
 }
 
 async fn path_exists(path: &Utf8Path) -> std::io::Result<bool> {
-    match fs::File::open(&path) {
+    match fs::File::open(path) {
         Ok(_) => Ok(true),
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(false),
         Err(err) => Err(err),

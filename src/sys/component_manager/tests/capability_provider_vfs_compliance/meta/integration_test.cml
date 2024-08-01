@@ -62,7 +62,7 @@
                 "fuchsia.component.Binder",
                 "fuchsia.component.Namespace",
                 "fuchsia.component.Realm",
-                "fuchsia.component.sandbox.Factory",
+                "fuchsia.component.sandbox.CapabilityStore",
                 "fuchsia.sys2.LifecycleController",
                 "fuchsia.sys2.RealmQuery",
                 "fuchsia.sys2.RouteValidator",

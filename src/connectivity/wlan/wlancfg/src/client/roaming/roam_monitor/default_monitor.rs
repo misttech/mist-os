@@ -9,6 +9,12 @@ use anyhow::format_err;
 
 pub struct DefaultRoamMonitor {}
 
+impl Default for DefaultRoamMonitor {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DefaultRoamMonitor {
     pub fn new() -> Self {
         Self {}

@@ -143,9 +143,9 @@ async fn main_inner() -> Result<(), Error> {
             join!(BasePackages::new(&blobfs, &system_image), async {
                 let cache_packages =
                     system_image.cache_packages().await.context("reading cache_packages")?;
-                Ok(CachePackages::new(&blobfs, &cache_packages)
+                CachePackages::new(&blobfs, &cache_packages)
                     .await
-                    .context("creating CachePackages index")?)
+                    .context("creating CachePackages index")
             });
         let base_packages = base_packages_res.context("loading base packages")?;
         let cache_packages = cache_packages_res.unwrap_or_else(|e: anyhow::Error| {

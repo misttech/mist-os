@@ -17,6 +17,12 @@ pub struct Iface {
 
 #[derive(Clone)]
 pub struct IfaceRef(Arc<Mutex<Option<Iface>>>);
+impl Default for IfaceRef {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl IfaceRef {
     pub fn new() -> Self {
         IfaceRef(Arc::new(Mutex::new(None)))

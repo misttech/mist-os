@@ -258,13 +258,14 @@ class RuntimeDynamicLinker {
   // if relocations succeeded on all modules.
   template <class Loader>
   bool Relocate(Diagnostics& diag, LoadModuleList<Loader>& modules) {
-    // Scope diagnostics to the root module so that its name will prefix error
-    // messages.
-    auto relocate = [&](auto& module) -> bool {
+    auto relocate_and_relro = [&](auto& module) -> bool {
+      // TODO(https://fxbug.dev/339662473): this doesn't use the root module's
+      // name in the scoped diagnostics. Add test for missing transitive symbol
+      // and make sure the correct name is used in the error message.
       ld::ScopedModuleDiagnostics root_module_diag{diag, module.name().str()};
-      return module.Relocate(diag, modules);
+      return module.Relocate(diag, modules) && module.ProtectRelro(diag);
     };
-    return std::all_of(std::begin(modules), std::end(modules), relocate);
+    return std::all_of(std::begin(modules), std::end(modules), relocate_and_relro);
   }
 
   // The RuntimeDynamicLinker owns the list of all 'live' modules that have been

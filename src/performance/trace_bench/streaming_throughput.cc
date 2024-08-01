@@ -53,15 +53,15 @@ bool StreamingModeThroughput(perftest::RepeatState* state) {
   state->DeclareStep("read_data");
   state->DeclareStep("cleanup");
 
-  zx::result client_end = component::Connect<fuchsia_tracing_controller::Controller>();
-  if (client_end.is_error()) {
+  zx::result provisioner_client = component::Connect<fuchsia_tracing_controller::Provisioner>();
+  if (provisioner_client.is_error()) {
     return false;
   }
 
-  auto client = fidl::SyncClient{std::move(*client_end)};
+  auto provisioner = fidl::SyncClient{std::move(*provisioner_client)};
   // Wait for the tracee to connect if needed.
   for (;;) {
-    auto res = client->GetProviders();
+    auto res = provisioner->GetProviders();
     FX_CHECK(res.is_ok());
     if (res.value().providers().size() == 1) {
       break;
@@ -77,24 +77,29 @@ bool StreamingModeThroughput(perftest::RepeatState* state) {
     std::thread drainer{
         [socket = in_socket.borrow(), &drained]() { Drain<amount>(socket, drained); }};
 
+    auto [client_end, server_end] = fidl::Endpoints<fuchsia_tracing_controller::Session>::Create();
     FX_CHECK(
-        client
-            ->InitializeTracing({{{
+        provisioner
+            ->InitializeTracing({std::move(server_end),
+                                 {{
                                      .categories = std::vector<std::string>{"benchmark"},
                                      .buffer_size_megabytes_hint = uint32_t{64},
                                      .buffering_mode = fuchsia_tracing::BufferingMode::kStreaming,
                                  }},
                                  std::move(outgoing_socket)})
             .is_ok());
+    {
+      auto client = fidl::SyncClient{std::move(client_end)};
 
-    FX_CHECK(client->StartTracing({}).is_ok());
-    state->NextStep();
+      FX_CHECK(client->StartTracing({}).is_ok());
+      state->NextStep();
 
-    drained.wait();
-    state->NextStep();
+      drained.wait();
+      state->NextStep();
 
-    FX_CHECK(client->StopTracing({{{.write_results = {false}}}}).is_ok());
-    FX_CHECK(client->TerminateTracing({{{.write_results = {false}}}}).is_ok());
+      FX_CHECK(client->StopTracing({{{.write_results = {false}}}}).is_ok());
+    }
+
     drainer.join();
   }
 

@@ -4,7 +4,7 @@
 
 use crate::dict::Key;
 use crate::fidl::registry;
-use crate::{Capability, Dict};
+use crate::{Capability, Connector, Dict, Message};
 use fidl::handle::Signals;
 use fidl::AsHandleRef;
 use futures::{FutureExt, TryStreamExt};
@@ -56,6 +56,21 @@ pub async fn serve_capability_store(
                         .try_into()
                         .map_err(|_| fsandbox::CapabilityStoreError::BadCapability)?;
                     insert_capability(&mut store, id, capability)
+                })();
+                responder.send(result)?;
+            }
+            fsandbox::CapabilityStoreRequest::ConnectorCreate { id, receiver, responder } => {
+                let result = (|| {
+                    let connector = Connector::new_with_owned_receiver(receiver);
+                    insert_capability(&mut store, id, Capability::Connector(connector))
+                })();
+                responder.send(result)?;
+            }
+            fsandbox::CapabilityStoreRequest::ConnectorOpen { id, server_end, responder } => {
+                let result = (|| {
+                    let this = get_connector(&store, id)?;
+                    let _ = this.send(Message { channel: server_end });
+                    Ok(())
                 })();
                 responder.send(result)?;
             }
@@ -386,6 +401,18 @@ fn get_next_chunk(
     Ok(chunk)
 }
 
+fn get_connector(
+    store: &HashMap<u64, Capability>,
+    id: u64,
+) -> Result<&Connector, fsandbox::CapabilityStoreError> {
+    let conn = store.get(&id).ok_or_else(|| fsandbox::CapabilityStoreError::IdNotFound)?;
+    if let Capability::Connector(conn) = conn {
+        Ok(conn)
+    } else {
+        Err(fsandbox::CapabilityStoreError::WrongType)
+    }
+}
+
 fn get_dictionary(
     store: &HashMap<u64, Capability>,
     id: u64,
@@ -409,5 +436,176 @@ fn insert_capability(
             entry.insert(cap);
             Ok(())
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::Data;
+    use assert_matches::assert_matches;
+    use fidl::{endpoints, HandleBased};
+
+    #[fuchsia::test]
+    async fn import_export() {
+        let (store, stream) =
+            endpoints::create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>().unwrap();
+        let _server = fasync::Task::spawn(serve_capability_store(stream));
+
+        let (ch, _) = fidl::Channel::create();
+        let handle = ch.into_handle();
+        let handle_koid = handle.get_koid().unwrap();
+        let cap1 = Capability::Handle(handle.into());
+        let cap2 = Capability::Data(Data::Int64(42));
+        store.import(1, cap1.into()).await.unwrap().unwrap();
+        store.import(2, cap2.into()).await.unwrap().unwrap();
+
+        let cap1 = store.export(1).await.unwrap().unwrap();
+        let cap2 = store.export(2).await.unwrap().unwrap();
+        assert_matches!(
+            cap1,
+            fsandbox::Capability::Handle(h) if h.get_koid().unwrap() == handle_koid
+        );
+        assert_matches!(
+            cap2,
+            fsandbox::Capability::Data(fsandbox::Data::Int64(i)) if i == 42
+        );
+    }
+
+    #[fuchsia::test]
+    async fn import_error() {
+        let (store, stream) =
+            endpoints::create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>().unwrap();
+        let _server = fasync::Task::spawn(serve_capability_store(stream));
+
+        let cap1 = Capability::Data(Data::Int64(42));
+        store.import(1, cap1.try_clone().unwrap().into()).await.unwrap().unwrap();
+        assert_matches!(
+            store.import(1, cap1.into()).await.unwrap(),
+            Err(fsandbox::CapabilityStoreError::IdAlreadyExists)
+        );
+
+        let (token, _) = fidl::EventPair::create();
+        let bad_connector = fsandbox::Capability::Connector(fsandbox::Connector { token });
+        assert_matches!(
+            store.import(2, bad_connector).await.unwrap(),
+            Err(fsandbox::CapabilityStoreError::BadCapability)
+        );
+    }
+
+    #[fuchsia::test]
+    async fn export_error() {
+        let (store, stream) =
+            endpoints::create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>().unwrap();
+        let _server = fasync::Task::spawn(serve_capability_store(stream));
+
+        let cap1 = Capability::Data(Data::Int64(42));
+        store.import(1, cap1.try_clone().unwrap().into()).await.unwrap().unwrap();
+
+        assert_matches!(
+            store.export(2).await.unwrap(),
+            Err(fsandbox::CapabilityStoreError::IdNotFound)
+        );
+    }
+
+    #[fuchsia::test]
+    async fn drop() {
+        let (store, stream) =
+            endpoints::create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>().unwrap();
+        let _server = fasync::Task::spawn(serve_capability_store(stream));
+
+        let (ch, _) = fidl::Channel::create();
+        let handle = ch.into_handle();
+        let handle_koid = handle.get_koid().unwrap();
+        let cap1 = Capability::Handle(handle.into());
+        let cap2 = Capability::Data(Data::Int64(42));
+        store.import(1, cap1.into()).await.unwrap().unwrap();
+        store.import(2, cap2.into()).await.unwrap().unwrap();
+
+        // Drop capability 2. It's no longer in the store.
+        store.drop(2).await.unwrap().unwrap();
+        assert_matches!(
+            store.export(1).await.unwrap(),
+            Ok(fsandbox::Capability::Handle(h)) if h.get_koid().unwrap() == handle_koid
+        );
+        assert_matches!(
+            store.export(2).await.unwrap(),
+            Err(fsandbox::CapabilityStoreError::IdNotFound)
+        );
+
+        // Id 2 can be reused.
+        let cap2 = Capability::Data(Data::Int64(84));
+        store.import(2, cap2.into()).await.unwrap().unwrap();
+        assert_matches!(
+            store.export(2).await.unwrap(),
+            Ok(fsandbox::Capability::Data(fsandbox::Data::Int64(i))) if i == 84
+        );
+    }
+
+    #[fuchsia::test]
+    async fn drop_error() {
+        let (store, stream) =
+            endpoints::create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>().unwrap();
+        let _server = fasync::Task::spawn(serve_capability_store(stream));
+
+        let cap1 = Capability::Data(Data::Int64(42));
+        store.import(1, cap1.into()).await.unwrap().unwrap();
+
+        assert_matches!(
+            store.drop(2).await.unwrap(),
+            Err(fsandbox::CapabilityStoreError::IdNotFound)
+        );
+    }
+
+    #[fuchsia::test]
+    async fn duplicate() {
+        let (store, stream) =
+            endpoints::create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>().unwrap();
+        let _server = fasync::Task::spawn(serve_capability_store(stream));
+
+        let (event, _) = fidl::EventPair::create();
+        let handle = event.into_handle();
+        let handle_koid = handle.get_koid().unwrap();
+        let cap1 = Capability::Handle(handle.into());
+        store.import(1, cap1.into()).await.unwrap().unwrap();
+        store.duplicate(1, 2).await.unwrap().unwrap();
+        store.drop(1).await.unwrap().unwrap();
+
+        let cap1 = store.export(2).await.unwrap().unwrap();
+        assert_matches!(
+            cap1,
+            fsandbox::Capability::Handle(h) if h.get_koid().unwrap() == handle_koid
+        );
+    }
+
+    #[fuchsia::test]
+    async fn duplicate_error() {
+        let (store, stream) =
+            endpoints::create_proxy_and_stream::<fsandbox::CapabilityStoreMarker>().unwrap();
+        let _server = fasync::Task::spawn(serve_capability_store(stream));
+
+        assert_matches!(
+            store.duplicate(1, 2).await.unwrap(),
+            Err(fsandbox::CapabilityStoreError::IdNotFound)
+        );
+
+        let cap1 = Capability::Data(Data::Int64(42));
+        let cap2 = Capability::Data(Data::Int64(84));
+        store.import(1, cap1.into()).await.unwrap().unwrap();
+        store.import(2, cap2.into()).await.unwrap().unwrap();
+        assert_matches!(
+            store.duplicate(1, 2).await.unwrap(),
+            Err(fsandbox::CapabilityStoreError::IdAlreadyExists)
+        );
+
+        // Channels do not support duplication.
+        let (ch, _) = fidl::Channel::create();
+        let handle = ch.into_handle();
+        let cap1 = Capability::Handle(handle.into());
+        store.import(3, cap1.into()).await.unwrap().unwrap();
+        assert_matches!(
+            store.duplicate(3, 4).await.unwrap(),
+            Err(fsandbox::CapabilityStoreError::NotDuplicatable)
+        );
     }
 }

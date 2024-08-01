@@ -408,7 +408,7 @@ impl IfaceManagerService {
 
         let fut = async move {
             match receiver.await {
-                Ok(()) => return Ok(()),
+                Ok(()) => Ok(()),
                 error => {
                     Err(format_err!("failed to disconnect client iface {}: {:?}", iface_id, error))
                 }
@@ -511,13 +511,10 @@ impl IfaceManagerService {
                 // Check if the state machine has exited.  If it has not, then another call to
                 // connect has replaced the state machine already and this interface should be left
                 // alone.
-                match client.client_state_machine.as_ref() {
-                    Some(state_machine) => {
-                        if state_machine.is_alive() {
-                            return;
-                        }
+                if let Some(state_machine) = client.client_state_machine.as_ref() {
+                    if state_machine.is_alive() {
+                        return;
                     }
-                    None => {}
                 }
                 client.config = None;
                 client.client_state_machine = None;
@@ -879,9 +876,9 @@ impl IfaceManagerService {
             }
 
             if failed_iface_deletions == 0 {
-                return Ok(());
+                Ok(())
             } else {
-                return Err(format_err!("failed to delete {} ifaces", failed_iface_deletions));
+                Err(format_err!("failed to delete {} ifaces", failed_iface_deletions))
             }
         };
 
@@ -893,7 +890,7 @@ impl IfaceManagerService {
     /// in case it is aware of an iface that IfaceManager is not tracking.
     pub async fn has_wpa3_capable_client(&self) -> bool {
         let guard = self.phy_manager.lock().await;
-        return guard.has_wpa3_client_iface();
+        guard.has_wpa3_client_iface()
     }
 }
 
@@ -924,7 +921,7 @@ async fn initiate_automatic_connection_selection(iface_manager: &mut IfaceManage
                 )
                 .await
                 .map_err(|e| format_err!("Error sending connection selection request: {}.", e))
-                .map(|candidate| ConnectionSelectionResponse::Autoconnect(candidate))
+                .map(ConnectionSelectionResponse::Autoconnect)
         };
         iface_manager.connection_selection_futures.push(fut.boxed());
     }
@@ -1050,9 +1047,7 @@ async fn handle_terminated_state_machine(
             // destroyed the interface.  If not, then the state machine exited because it could not
             // communicate with the SME and the interface is likely unusable.
             let mut phy_manager = iface_manager.phy_manager.lock().await;
-            if phy_manager.destroy_ap_iface(terminated_fsm.iface_id).await.is_err() {
-                return;
-            }
+            if phy_manager.destroy_ap_iface(terminated_fsm.iface_id).await.is_err() {}
         }
         fidl_fuchsia_wlan_common::WlanMacRole::Client => {
             iface_manager.record_idle_client(terminated_fsm.iface_id);
@@ -1701,15 +1696,12 @@ mod tests {
         }
 
         async fn perform_recovery(&mut self, summary: RecoverySummary) {
-            match self.recovery_sender.as_mut() {
-                Some(recovery_sender) => {
-                    let (sender, receiver) = oneshot::channel();
-                    recovery_sender
-                        .try_send((summary, sender))
-                        .expect("Failed to send recovery summary");
-                    receiver.await.expect("Failed waiting for recovery response");
-                }
-                None => {}
+            if let Some(recovery_sender) = self.recovery_sender.as_mut() {
+                let (sender, receiver) = oneshot::channel();
+                recovery_sender
+                    .try_send((summary, sender))
+                    .expect("Failed to send recovery summary");
+                receiver.await.expect("Failed waiting for recovery response");
             }
         }
     }
@@ -5182,7 +5174,7 @@ mod tests {
         // Simulate multiple failed scan attempts and ensure that the timer interval backs off as
         // expected.
         let expected_wait_times =
-            vec![2, 4, 8, MAX_AUTO_CONNECT_RETRY_SECONDS, MAX_AUTO_CONNECT_RETRY_SECONDS];
+            [2, 4, 8, MAX_AUTO_CONNECT_RETRY_SECONDS, MAX_AUTO_CONNECT_RETRY_SECONDS];
 
         for i in 0..5 {
             {
@@ -6024,23 +6016,20 @@ mod tests {
         // mocking out the state machine interactions.  For SetCountry, instead make it look as if
         // client connections are disabled and there are no APs.  This ensures that the second half
         // of the operations which restores interfaces does not trigger.
-        match &req {
-            &IfaceManagerRequest::AtomicOperation(AtomicOperation::SetCountry(_)) => {
-                let phy_manager = Arc::new(Mutex::new(FakePhyManager {
-                    create_iface_ok: false,
-                    destroy_iface_ok: false,
-                    wpa3_iface: None,
-                    set_country_ok: false,
-                    country_code: None,
-                    client_connections_enabled: false,
-                    client_ifaces: vec![],
-                    defects: vec![],
-                    recovery_sender: None,
-                }));
-                iface_manager.phy_manager = phy_manager;
-                let _ = iface_manager.aps.drain(..);
-            }
-            _ => {}
+        if let &IfaceManagerRequest::AtomicOperation(AtomicOperation::SetCountry(_)) = &req {
+            let phy_manager = Arc::new(Mutex::new(FakePhyManager {
+                create_iface_ok: false,
+                destroy_iface_ok: false,
+                wpa3_iface: None,
+                set_country_ok: false,
+                country_code: None,
+                client_connections_enabled: false,
+                client_ifaces: vec![],
+                defects: vec![],
+                recovery_sender: None,
+            }));
+            iface_manager.phy_manager = phy_manager;
+            let _ = iface_manager.aps.drain(..);
         }
 
         // Start the service loop

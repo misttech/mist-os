@@ -83,7 +83,6 @@ static_library("blobfs") {
     "//src/storage/lib/vfs/cpp",
     "//src/storage/lib/vfs/cpp/journal",
     "//src/storage/lib/vfs/cpp/transaction",
-    "//src/storage/lib/watchdog",
     "//zircon/system/ulib/bitmap",
     "//zircon/system/ulib/id_allocator",
     "//zircon/system/ulib/range",
@@ -168,6 +167,7 @@ static_library("blobfs") {
       "//src/storage/fidl/fuchsia.fs.startup:fuchsia.fs.startup_cpp",
       "//src/storage/lib/block_client/cpp",
       "//src/storage/lib/vfs/cpp/inspect",
+      "//src/storage/lib/watchdog",
       "//src/sys/pkg/fidl/fuchsia.update.verify:fuchsia.update.verify_cpp",
       "//zircon/system/ulib/async-loop:async-loop-cpp",
     ]

@@ -35,7 +35,7 @@ pub trait WithPolicyCheck {
     /// policy in [`GlobalPolicyChecker`].
     fn with_policy_check<C: ComponentInstanceInterface + 'static>(
         self,
-        capability_source: CapabilitySource<C>,
+        capability_source: CapabilitySource,
         policy_checker: GlobalPolicyChecker,
     ) -> Self;
 }
@@ -43,26 +43,32 @@ pub trait WithPolicyCheck {
 impl WithPolicyCheck for Router {
     fn with_policy_check<C: ComponentInstanceInterface + 'static>(
         self,
-        capability_source: CapabilitySource<C>,
+        capability_source: CapabilitySource,
         policy_checker: GlobalPolicyChecker,
     ) -> Self {
-        Router::new(PolicyCheckRouter::new(capability_source, policy_checker, self))
+        Router::new(PolicyCheckRouter::<C>::new(capability_source, policy_checker, self))
     }
 }
 
 pub struct PolicyCheckRouter<C: ComponentInstanceInterface + 'static> {
-    capability_source: CapabilitySource<C>,
+    capability_source: CapabilitySource,
     policy_checker: GlobalPolicyChecker,
     router: Router,
+    _phantom_data: std::marker::PhantomData<C>,
 }
 
 impl<C: ComponentInstanceInterface + 'static> PolicyCheckRouter<C> {
     pub fn new(
-        capability_source: CapabilitySource<C>,
+        capability_source: CapabilitySource,
         policy_checker: GlobalPolicyChecker,
         router: Router,
     ) -> Self {
-        PolicyCheckRouter { capability_source, policy_checker, router }
+        PolicyCheckRouter {
+            capability_source,
+            policy_checker,
+            router,
+            _phantom_data: std::marker::PhantomData::<C>,
+        }
     }
 }
 

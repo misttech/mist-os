@@ -329,9 +329,9 @@ async fn handle_client_request_save_network(
     // The FIDL network config fields are defined as Options, and we consider it an error if either
     // field is missing (ie None) here.
     let net_id: client_types::NetworkIdentifier =
-        network_config.id.ok_or_else(|| NetworkConfigError::ConfigMissingId)?.into();
+        network_config.id.ok_or(NetworkConfigError::ConfigMissingId)?.into();
     let credential = Credential::try_from(
-        network_config.credential.ok_or_else(|| NetworkConfigError::ConfigMissingCredential)?,
+        network_config.credential.ok_or(NetworkConfigError::ConfigMissingCredential)?,
     )?;
     let evicted_config = saved_networks.store(net_id.clone(), credential.clone()).await?;
 
@@ -380,11 +380,10 @@ async fn handle_client_request_remove_network(
 ) -> Result<(), NetworkConfigError> {
     // The FIDL network config fields are defined as Options, and we consider it an error if either
     // field is missing (ie None) here.
-    let net_id = NetworkIdentifier::from(
-        network_config.id.ok_or_else(|| NetworkConfigError::ConfigMissingId)?,
-    );
+    let net_id =
+        NetworkIdentifier::from(network_config.id.ok_or(NetworkConfigError::ConfigMissingId)?);
     let credential = Credential::try_from(
-        network_config.credential.ok_or_else(|| NetworkConfigError::ConfigMissingCredential)?,
+        network_config.credential.ok_or(NetworkConfigError::ConfigMissingCredential)?,
     )?;
     if saved_networks.remove(net_id.clone(), credential.clone()).await? {
         match iface_manager
@@ -716,7 +715,7 @@ mod tests {
             },
             fidl_policy::NetworkConfig {
                 id: Some(net_id_wpa2_w_psk.clone()),
-                credential: Some(fidl_policy::Credential::Psk(vec![64; WPA_PSK_BYTE_LEN].to_vec())),
+                credential: Some(fidl_policy::Credential::Psk([64; WPA_PSK_BYTE_LEN].to_vec())),
                 ..Default::default()
             },
         ];
@@ -1116,7 +1115,7 @@ mod tests {
 
         // Check that a scan request was sent to the scan module, including an active scan for the
         // potentially-hidden networks.
-        let expected_active_ssids = vec![
+        let expected_active_ssids = [
             test_values.net_id_wpa2_w_password,
             test_values.net_id_wpa2_w_psk,
             test_values.net_id_open,

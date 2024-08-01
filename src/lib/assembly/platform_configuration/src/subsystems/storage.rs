@@ -82,9 +82,9 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
             .package("sampler")
             .config_data(FileEntry {
                 source: index_path.clone(),
-                destination: format!("component_id_index"),
+                destination: "component_id_index".to_string(),
             })
-            .context(format!("Adding component id index to sampler"))?;
+            .context("Adding component id index to sampler".to_string())?;
 
         if *context.feature_set_level == FeatureSupportLevel::Embeddable {
             // We don't need fshost in embeddable.

@@ -3,11 +3,11 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, Context, Error, Result};
-use cm_fidl_analyzer::component_instance::ComponentInstanceForAnalyzer;
 use cm_fidl_analyzer::component_model::{AnalyzerModelError, ComponentModelForAnalyzer};
 use cm_fidl_analyzer::route::VerifyRouteResult;
 use cm_rust::{CapabilityDecl, CapabilityTypeName, ComponentDecl, ExposeDecl, OfferDecl, UseDecl};
 use cm_types::{Name, Path, RelativePath};
+use futures::FutureExt;
 use moniker::Moniker;
 use routing::component_instance::ComponentInstanceInterface;
 use routing::mapper::RouteSegment;
@@ -474,7 +474,7 @@ fn check_pkg_source(
 }
 
 fn process_verify_result<'a>(
-    verify_result: VerifyRouteResult<ComponentInstanceForAnalyzer>,
+    verify_result: VerifyRouteResult,
     route: &Binding<'a>,
     component_model: &Arc<ComponentModelForAnalyzer>,
     components: &Vec<Component>,
@@ -573,8 +573,10 @@ impl RouteSourcesController {
                 // For some capabilities, a single use declaration can result in 2 route verifications
                 // (e.g. for storage capabilities, we check routing for both the storage capability itself
                 // and for its backing directory capability.)
-                for verify_result in
-                    component_model.check_use_capability(route.use_decl, &target_instance)
+                for verify_result in component_model
+                    .check_use_capability(route.use_decl, &target_instance)
+                    .now_or_never()
+                    .unwrap()
                 {
                     let result =
                         process_verify_result(verify_result, &route, component_model, components)?;

@@ -5,9 +5,13 @@
 use fuchsia_async as fasync;
 use futures::FutureExt;
 
+use std::future::IntoFuture;
+
 #[fasync::run_singlethreaded]
 async fn main() {
     let _task = fasync::Task::spawn(async {});
+    let scope = fasync::EHandle::local().root_scope().new_child();
+    let _scope_task = scope.spawn(baz(19));
     let block = async {
         fasync::Task::spawn(baz(20)).detach();
         let task = fasync::Task::spawn(baz(21));
@@ -23,7 +27,21 @@ async fn main() {
 }
 
 async fn foo() {
-    futures::join!(baz(10).boxed(), baz(11).boxed_local());
+    let scope = fasync::EHandle::local().root_scope().new_child();
+    scope.spawn(baz(7)).detach();
+    scope
+        .spawn(async {
+            baz(8).await;
+        })
+        .detach();
+    let child = scope.new_child();
+    child.spawn(baz(9)).detach();
+    futures::join!(
+        baz(10).boxed(),
+        baz(11).boxed_local(),
+        scope.into_future(),
+        child.into_future(),
+    );
 }
 
 async fn bar() {

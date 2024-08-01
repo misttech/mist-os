@@ -243,10 +243,11 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
       }
     }
 
-    const std::array<std::string, 3> kProtocols = {
+    const std::array<std::string, 4> kProtocols = {
         "fuchsia.device.manager.Administrator",
         "fuchsia.driver.development.Manager",
         "fuchsia.driver.registrar.DriverRegistrar",
+        "fuchsia.inspect.InspectSink",
     };
     for (const auto& protocol : kProtocols) {
       auto result = outgoing_->AddUnmanagedProtocol(

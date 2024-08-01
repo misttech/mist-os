@@ -32,6 +32,8 @@ class DlImplTests : public Base {
   static constexpr bool kSupportsGlobalMode = false;
   // TODO(https://fxbug.dev/338229987): Reuse loaded modules for dependencies.
   static constexpr bool kCanReuseLoadedDeps = false;
+  // TODO(https://fxbug.dev/354786114): dlsym should lookup symbols in deps.
+  static constexpr bool kDlSymSupportsDeps = false;
 
   fit::result<Error, void*> DlOpen(const char* file, int mode) {
     // Check that all Needed/Expect* expectations for loaded objects were
@@ -56,6 +58,11 @@ class DlImplTests : public Base {
   fit::result<Error, void*> DlSym(void* module, const char* ref) {
     return dynamic_linker_.LookupSymbol(static_cast<ModuleHandle*>(module), ref);
   }
+
+  // TODO(https://fxbug.dev/354043838): Remove these when these functions can
+  // become pure wrappers in the DlSystemTests fixture.
+  void ExpectRootModuleNotLoaded(std::string_view name) {}
+  void ExpectNeededNotLoaded(std::initializer_list<std::string_view> names) {}
 
  private:
   RuntimeDynamicLinker dynamic_linker_;

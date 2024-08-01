@@ -393,7 +393,28 @@ before accessing the `inspector()` method.
 
 DFv2 inspect does not require passing the VMO of `inspect::Inspector` to the driver framework.
 
-<!-- TODO(b/324637276): explain where to find Driver's Inspect -->
+Under DFv2, Inspect from drivers and nodes will be under `bootstrap/driver_manager` and the name
+provided to `fdf::DriverBase`. For example, if a driver did:
+
+```cpp
+// Driver constructor
+MyDriver(...) : fdf::DriverBase("example", ...) {
+  inspector().root().RecordString("my_driver", "is_awesome");
+}
+```
+
+The matching selector for the property in the Inspect hierarchy would be
+`bootstrap/driver_manager:[name=example]root:my_driver`.
+
+`bootstrap/driver_manager:[...]root:my_driver` would also work, but also snapshots every other
+driver and Driver Manager. It is less efficient and should only be used as needed.
+
+<!-- TODO(https://fxbug.dev/355732696): Remove this comment about the soft transition -->
+
+Today, `bootstrap/driver_manager:root:my_driver` is equivalent to
+`bootstrap/driver_manager:[...]root:my_driver`. However, this behavior is changing in a soft
+transition. When writing new selectors, use one of the more explicit spellings.
+
 
 ## (Optional) Implement your own load_firmware method {:#implement-your-own-load-firmware-method}
 

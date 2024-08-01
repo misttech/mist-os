@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use super::arrays::FsUseType;
 use super::extensible_bitmap::{MAP_NODE_BITS, MAX_BITMAP_ITEMS};
 use super::metadata::{
     CONFIG_HANDLE_UNKNOWN_MASK, CONFIG_MLS_FLAG, POLICYDB_SIGNATURE, POLICYDB_STRING_MAX_LENGTH,
@@ -82,6 +83,13 @@ pub enum ValidateError {
     InvalidClassDefaultRange { value: u32 },
     #[error("missing initial SID {initial_sid:?}")]
     MissingInitialSid { initial_sid: sc::InitialSid },
+    #[error(
+        "invalid SELinux fs_use type; expected one of {:?}, but found {value}",
+        [FsUseType::FsUseXattr as u32,
+        FsUseType::FsUseTrans as u32,
+        FsUseType::FsUseTask as u32]
+    )]
+    InvalidFsUseType { value: u32 },
     #[error("non-optional Id field is zero")]
     NonOptionalIdIsZero,
     #[error("required validation routine not implemented")]

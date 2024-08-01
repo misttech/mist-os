@@ -631,6 +631,10 @@ BaseStream::TimelineFunctionSnapshot EffectsStageV2::ref_time_to_frac_presentati
   // Our effects shift incoming audio into the future by `output_shift_frames_`.
   // So input frame[N] corresponds to output frame[N + output_shift_frames_].
   auto delay_frac_frames = Fixed(output_shift_frames_);
+  if constexpr (kLogPresentationDelay) {
+    FX_LOGS(INFO) << "(" << this << ") " << __FUNCTION__ << " output_shift_frames_ is "
+                  << delay_frac_frames << " frames";
+  }
 
   auto source_frac_frame_to_dest_frac_frame =
       TimelineFunction(delay_frac_frames.raw_value(), 0, TimelineRate(1, 1));
@@ -645,10 +649,9 @@ void EffectsStageV2::SetPresentationDelay(zx::duration external_delay) {
   zx::duration total_delay = external_delay + intrinsic_lead_time;
 
   if constexpr (kLogPresentationDelay) {
-    FX_LOGS(WARNING) << "(" << this << ") " << __FUNCTION__ << " given external_delay "
-                     << external_delay.to_nsecs() << "ns";
-    FX_LOGS(WARNING) << "Adding it to our intrinsic_lead_time " << intrinsic_lead_time.to_nsecs()
-                     << "ns; setting our total_delay " << total_delay.to_nsecs() << "ns";
+    FX_LOGS(INFO) << "(" << this << ") " << __FUNCTION__ << "(" << external_delay.to_nsecs()
+                  << " ns), adding our intrinsic_lead_time " << intrinsic_lead_time.to_nsecs()
+                  << "ns; calling SetPresentationDelay(" << total_delay.to_nsecs() << " ns)";
   }
 
   // Apply the total lead time to us and propagate that value to our source.

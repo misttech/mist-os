@@ -416,7 +416,7 @@ where
                         for (relative_url, hash) in subpackages.subpackages() {
                             let subpackage = match subpackage {
                                 None => Some(relative_url.to_string()),
-                                Some(p) => Some(format!("{}/{}", p, relative_url.to_string())),
+                                Some(p) => Some(format!("{}/{}", p, relative_url)),
                             };
                             entries.extend(
                                 self.walk_meta_package(
@@ -787,7 +787,7 @@ mod tests {
         let bin_modified = get_modtime(blob_dir.join(PKG1_BIN_HASH));
         let lib_modified = get_modtime(blob_dir.join(PKG1_LIB_HASH));
 
-        let mut entries = repo.show_package("package1/0".into(), true).await.unwrap().unwrap();
+        let mut entries = repo.show_package("package1/0", true).await.unwrap().unwrap();
 
         // show_packages returns contents out of order. Sort the entries so they are consistent.
         entries.sort_unstable_by(|lhs, rhs| lhs.path.cmp(&rhs.path));

@@ -85,6 +85,23 @@
     },
     {
         "kind": "union/member",
+        "name": "fuchsia.net.interfaces/PortClass.device",
+        "ordinal": "2",
+        "type": "fuchsia.hardware.network/PortClass"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.net.interfaces/PortClass.loopback",
+        "ordinal": "1",
+        "type": "fuchsia.net.interfaces/Empty"
+    },
+    {
+        "kind": "union",
+        "name": "fuchsia.net.interfaces/PortClass",
+        "strictness": "flexible"
+    },
+    {
+        "kind": "union/member",
         "name": "fuchsia.net.interfaces/PreferredLifetimeInfo.deprecated",
         "ordinal": "2",
         "type": "fuchsia.net.interfaces/Empty"
@@ -141,6 +158,12 @@
         "name": "fuchsia.net.interfaces/Properties.online",
         "ordinal": "3",
         "type": "bool"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.net.interfaces/Properties.port_class",
+        "ordinal": "8",
+        "type": "fuchsia.net.interfaces/PortClass"
     },
     {
         "kind": "table",

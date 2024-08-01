@@ -67,16 +67,14 @@ impl DefineSubsystemConfiguration<PowerConfig> for PowerManagementSubsystem {
             Config::new(ConfigValueType::Bool, config.suspend_enabled.into()),
         )?;
 
-        match (&context.board_info.configuration.power_metrics_recorder, &context.feature_set_level)
+        if let (Some(config), FeatureSupportLevel::Standard) =
+            (&context.board_info.configuration.power_metrics_recorder, &context.feature_set_level)
         {
-            (Some(config), FeatureSupportLevel::Standard) => {
-                builder.platform_bundle("power_metrics_recorder");
-                builder.package("metrics-logger-standalone").config_data(FileEntry {
-                    source: config.as_utf8_pathbuf().into(),
-                    destination: "config.json".to_string(),
-                })?;
-            }
-            _ => {} // do nothing
+            builder.platform_bundle("power_metrics_recorder");
+            builder.package("metrics-logger-standalone").config_data(FileEntry {
+                source: config.as_utf8_pathbuf().into(),
+                destination: "config.json".to_string(),
+            })?;
         }
 
         Ok(())

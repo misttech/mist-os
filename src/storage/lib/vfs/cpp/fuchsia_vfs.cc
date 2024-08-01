@@ -97,10 +97,13 @@ FuchsiaVfs::SharedPtr& FuchsiaVfs::SharedPtr::operator=(const FuchsiaVfs::Shared
 
 void FuchsiaVfs::SharedPtr::Reset() {
   if (vfs_) {
-    if (vfs_->ref_->strong_count.fetch_sub(1) == 1) {
+    Ref* ref = vfs_->ref_;
+    if (ref->strong_count.fetch_sub(1) == 1) {
+      // NOTE: After this, vfs_ can be destroyed.
       sync_completion_signal(&vfs_->done_);
+
       // And now drop the implicit weak reference.
-      WeakPtr weak(vfs_->ref_);
+      WeakPtr weak(ref);
     }
     vfs_ = nullptr;
   }

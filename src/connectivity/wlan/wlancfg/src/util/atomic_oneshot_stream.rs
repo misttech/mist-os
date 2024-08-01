@@ -147,10 +147,10 @@ mod tests {
         let fut = async move {
             select! {
                 integer = futs.select_next_some() => {
-                    return SelectResult::IntegerFutureReady(integer)
+                    SelectResult::IntegerFutureReady(integer)
                 },
                 (_token, ()) = oneshot_stream.select_next_some() => {
-                    return SelectResult::StreamReady
+                    SelectResult::StreamReady
                 }
             }
         };

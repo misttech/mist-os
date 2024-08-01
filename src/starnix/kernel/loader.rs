@@ -251,8 +251,8 @@ pub struct ResolvedElf {
     pub argv: Vec<CString>,
     /// The environment to initialize for the new process.
     pub environ: Vec<CString>,
-    /// The SELinux state for the new process. None if SELinux is disabled.
-    pub security_state: Option<security::ResolvedElfState>,
+    /// Used by Linux Security Modules to store security module state for the new process.
+    pub security_state: security::ResolvedElfState,
     /// Exec/write lock.
     pub file_write_guard: FileWriteGuardRef,
 }
@@ -281,7 +281,7 @@ pub fn resolve_executable<L>(
     path: CString,
     argv: Vec<CString>,
     environ: Vec<CString>,
-    security_state: Option<security::ResolvedElfState>,
+    security_state: security::ResolvedElfState,
 ) -> Result<ResolvedElf, Errno>
 where
     L: LockBefore<FileOpsCore>,
@@ -301,7 +301,7 @@ fn resolve_executable_impl<L>(
     argv: Vec<CString>,
     environ: Vec<CString>,
     recursion_depth: usize,
-    security_state: Option<security::ResolvedElfState>,
+    security_state: security::ResolvedElfState,
 ) -> Result<ResolvedElf, Errno>
 where
     L: LockBefore<FileOpsCore>,
@@ -346,7 +346,7 @@ fn resolve_script<L>(
     argv: Vec<CString>,
     environ: Vec<CString>,
     recursion_depth: usize,
-    security_state: Option<security::ResolvedElfState>,
+    security_state: security::ResolvedElfState,
 ) -> Result<ResolvedElf, Errno>
 where
     L: LockBefore<FileOpsCore>,
@@ -431,7 +431,7 @@ fn resolve_elf<L>(
     memory: Arc<MemoryObject>,
     argv: Vec<CString>,
     environ: Vec<CString>,
-    security_state: Option<security::ResolvedElfState>,
+    security_state: security::ResolvedElfState,
 ) -> Result<ResolvedElf, Errno>
 where
     L: LockBefore<FileOpsCore>,

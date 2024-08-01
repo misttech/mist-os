@@ -354,7 +354,10 @@ func (f *FFXInstance) WaitForDaemon(ctx context.Context) error {
 	defer func() {
 		f.stderr = origStderr
 	}()
-	err := retry.Retry(ctx, retry.WithMaxAttempts(retry.NewConstantBackoff(time.Second), 3), func() error {
+	// Normally trying 10 times would be overkill, but we know that the arm64 emulator sometimes
+	// has delays (b/330228364), so let's keep trying for 10 seconds instead of just 3, in order
+	// to address an occasional failure when the daemon doesn't respond quickly (b/316626057)
+	err := retry.Retry(ctx, retry.WithMaxAttempts(retry.NewConstantBackoff(time.Second), 10), func() error {
 		return f.RunWithTimeout(ctx, 0, "daemon", "echo")
 	}, nil)
 	if err != nil {

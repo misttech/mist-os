@@ -1,0 +1,42 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [
+        "//sdk/lib/sys/component/realm_builder.shard.cml",
+        "syslog/client.shard.cml",
+    ],
+    children: [
+        {
+            name: "test_realm_factory",
+            url: "driver_manager-realm-factory#meta/realm-factory.cm",
+        },
+        {
+            name: "test_suite",
+            url: "test-suite#meta/test-suite.cm",
+        },
+    ],
+    offer: [
+        {
+            protocol: "test.drivermanager.RealmFactory",
+            from: "#test_realm_factory",
+            to: "#test_suite",
+        },
+        {
+            protocol: "fuchsia.inspect.InspectSink",
+            from: "parent",
+            to: "#test_realm_factory",
+        },
+        {
+            protocol: "fuchsia.diagnostics.ArchiveAccessor",
+            from: "parent",
+            to: "#test_suite",
+        },
+    ],
+    expose: [
+        {
+            protocol: "fuchsia.test.Suite",
+            from: "#test_suite",
+        },
+    ],
+}

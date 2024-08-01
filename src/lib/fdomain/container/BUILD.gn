@@ -1,0 +1,69 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/rust/rustc_library.gni")
+import("//build/rust/rustc_macro.gni")
+import("//build/rust/rustc_test.gni")
+
+rustc_library("container") {
+  name = "fdomain_container"
+  edition = "2021"
+  with_unit_tests = true
+
+  deps = [
+    ":fdomain_macros",
+    "//sdk/fidl/fuchsia.fdomain:fuchsia.fdomain_rust",
+    "//sdk/fidl/fuchsia.fdomain($fidl_toolchain)",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+    "//src/lib/fdomain/fidl_fuchsia_fdomain_ext",
+    "//src/lib/fidl/rust/fidl",
+    "//src/lib/fidl/rust/fidl_message",
+    "//src/lib/fuchsia-async",
+    "//src/lib/replace-with",
+    "//src/lib/zircon/rust:fuchsia-zircon",
+    "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:pin-project",
+    "//third_party/rust_crates:rand",
+  ]
+
+  inputs = [ "${root_build_dir}/fidling/gen/sdk/fidl/fuchsia.fdomain/fuchsia.fdomain.fidl.json" ]
+  rustenv = [ "FDOMAIN_FIDL_PATH=" +
+              "fidling/gen/sdk/fidl/fuchsia.fdomain/fuchsia.fdomain.fidl.json" ]
+
+  test_deps = [ "//src/lib/fuchsia" ]
+
+  sources = [
+    "src/handles.rs",
+    "src/lib.rs",
+    "src/test.rs",
+    "src/wire.rs",
+  ]
+}
+
+rustc_macro("fdomain_macros") {
+  source_root = "src/macros.rs"
+  version = "0.1.0"
+  edition = "2021"
+  with_unit_tests = true
+  deps = [
+    "//third_party/rust_crates:proc-macro2",
+    "//third_party/rust_crates:quote",
+    "//third_party/rust_crates:serde_json",
+    "//third_party/rust_crates:syn",
+  ]
+
+  sources = [ "src/macros.rs" ]
+
+  configs -= [ "//build/config/rust/lints:allow_unused_results" ]
+}
+
+fuchsia_unittest_package("fdomain-container-tests") {
+  deps = [ ":container_test" ]
+}
+
+group("tests") {
+  public_deps = [ ":fdomain-container-tests" ]
+  testonly = true
+}

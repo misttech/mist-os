@@ -65,7 +65,7 @@ impl DefineSubsystemConfiguration<PlatformUiConfig> for UiSubsystem {
             "fuchsia.scenic.Renderer",
             Config::new(
                 ConfigValueType::String { max_size: 16 },
-                serde_json::to_value(ui_config.renderer.clone())?.into(),
+                serde_json::to_value(ui_config.renderer.clone())?,
             ),
         )?;
         builder.set_config_capability(
@@ -207,14 +207,6 @@ impl DefineSubsystemConfiguration<PlatformUiConfig> for UiSubsystem {
                 }
                 .into()
             }),
-        )?;
-
-        // TODO(https://fxbug.dev/343256679): Remove this and replace with
-        // complete routing for fuchsia.power.SuspendEnabled when we are ready
-        // to enable the feature.
-        builder.set_config_capability(
-            "fuchsia.ui.SuspendEnabled",
-            Config::new(ConfigValueType::Bool, false.into()),
         )?;
 
         let config_dir = builder

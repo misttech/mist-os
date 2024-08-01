@@ -21,22 +21,6 @@ source_set("test_node") {
       [ "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_cpp" ]
 }
 
-source_set("driver_testing_cpp") {
-  public_configs = [ ":includes" ]
-  sources = [
-    "include/lib/driver/testing/cpp/driver_test.h",
-    "include/lib/driver/testing/cpp/internal/internals.h",
-  ]
-  public_deps = [
-    ":cpp",
-    "//sdk/lib/async_patterns/testing/cpp",
-  ]
-}
-
-config("includes") {
-  include_dirs = [ "include" ]
-}
-
 sdk_source_set("cpp") {
   category = "partner"
   sdk_name = "driver_testing_cpp"
@@ -49,12 +33,16 @@ sdk_source_set("cpp") {
     "driver_lifecycle.h",
     "driver_runtime.cc",
     "driver_runtime.h",
+    "driver_test.h",
     "environment_variables.cc",
+    "internal/internals.h",
     "test_environment.cc",
     "test_environment.h",
     "test_node.cc",
     "test_node.h",
   ]
+
+  sdk_headers_for_internal_use = [ "internal/internals.h" ]
 
   deps = [
     "//sdk/lib/driver/runtime/testing/cpp",
@@ -62,6 +50,7 @@ sdk_source_set("cpp") {
   ]
 
   public_deps = [
+    "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/driver/component/cpp",
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
     "//sdk/lib/driver/runtime:driver_runtime_env_cpp",

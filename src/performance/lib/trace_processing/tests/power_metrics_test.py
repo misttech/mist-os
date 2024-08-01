@@ -6,7 +6,7 @@
 
 import collections.abc
 import unittest
-from typing import Any, Iterable
+from typing import Any, Iterable, Sequence
 
 from trace_processing import trace_metrics, trace_model, trace_time
 from trace_processing.metrics import power, suspend
@@ -398,44 +398,19 @@ class PowerMetricsTest(unittest.TestCase):
         """Find periods during which device was suspended."""
         threads = (1, 2)
         model = self.construct_trace_model(threads)
-        suspender = trace_model.Process(
-            pid=5555,
-            name=f"{power._SAG}.cm",
-            threads=[
-                trace_model.Thread(
-                    tid=6666,
-                    name="initial-thread",
-                    events=[
-                        suspend.make_synthetic_event(
-                            timestamp_usec=900000,
-                            pid=5555,
-                            tid=6666,
-                            duration_usec=200000,
-                        ),
-                        suspend.make_synthetic_event(
-                            timestamp_usec=1150000,
-                            pid=5555,
-                            tid=6666,
-                            duration_usec=200000,
-                        ),
-                    ],
-                )
-            ],
-        )
+        windows = [
+            trace_time.Window(
+                trace_time.TimePoint(900_000_000),
+                trace_time.TimePoint(1_100_000_000),
+            ),
+            trace_time.Window(
+                trace_time.TimePoint(1_150_000_000),
+                trace_time.TimePoint(1_350_000_000),
+            ),
+        ]
+        suspender = _build_suspender(windows)
         model.processes.append(suspender)
-        self.assertCountEqual(
-            power._find_suspend_windows(model),
-            [
-                trace_time.Window(
-                    trace_time.TimePoint(900_000_000),
-                    trace_time.TimePoint(1_100_000_000),
-                ),
-                trace_time.Window(
-                    trace_time.TimePoint(1_150_000_000),
-                    trace_time.TimePoint(1_350_000_000),
-                ),
-            ],
-        )
+        self.assertCountEqual(power._find_suspend_windows(model), windows)
 
     def test_suspended_power_metrics(self) -> None:
         """Power measurements during a suspend are captured, aggregated."""
@@ -463,23 +438,13 @@ class PowerMetricsTest(unittest.TestCase):
                 {},
             ),
         ]
-        suspender = trace_model.Process(
-            pid=5555,
-            name=f"{power._SAG}.cm",
-            threads=[
-                trace_model.Thread(
-                    tid=6666,
-                    name="initial-thread",
-                    events=[
-                        suspend.make_synthetic_event(
-                            timestamp_usec=900000,
-                            pid=5555,
-                            tid=6666,
-                            duration_usec=200000,
-                        ),
-                    ],
-                )
-            ],
+        suspender = _build_suspender(
+            [
+                trace_time.Window(
+                    trace_time.TimePoint(900_000_000),
+                    trace_time.TimePoint(1_100_000_000),
+                ),
+            ]
         )
         model.scheduling_records = {0: records_0}
         model.processes.append(suspender)
@@ -489,6 +454,39 @@ class PowerMetricsTest(unittest.TestCase):
                 TCR(label="MinPower_suspend", unit=U.watts, values=[1.2]),
                 TCR(label="MeanPower_suspend", unit=U.watts, values=[1.2]),
                 TCR(label="MaxPower_suspend", unit=U.watts, values=[1.2]),
+                TCR(label="MinPower_running", unit=U.watts, values=[7.2]),
+                TCR(label="MeanPower_running", unit=U.watts, values=[7.2]),
+                TCR(label="MaxPower_running", unit=U.watts, values=[7.2]),
             )
         )
         self.assertEmpty(expected_results - set(results))
+        results = power.PowerMetricsProcessor(lambda w: False).process_metrics(
+            model
+        )
+        self.assertEmpty(expected_results & set(results))
+
+
+def _build_suspender(
+    windows: Sequence[trace_time.Window],
+) -> trace_model.Process:
+    pid = 5555
+    tid = 6666
+    return trace_model.Process(
+        pid=pid,
+        name=f"{power._SAG}.cm",
+        threads=[
+            trace_model.Thread(
+                tid=tid,
+                name="initial-thread",
+                events=[
+                    suspend.make_synthetic_event(
+                        timestamp_usec=w.start.to_epoch_delta().to_microseconds(),
+                        pid=pid,
+                        tid=tid,
+                        duration_usec=(w.end - w.start).to_microseconds(),
+                    )
+                    for w in windows
+                ],
+            ),
+        ],
+    )

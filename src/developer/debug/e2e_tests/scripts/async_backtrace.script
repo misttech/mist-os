@@ -15,18 +15,32 @@ Task(id = 0)
                └─ fuchsia_async::runtime::fuchsia::timer::Timer
             └─ async_rust::baz • async_rust.rs:??
                └─ fuchsia_async::runtime::fuchsia::timer::Timer
+            └─ fuchsia_async::scope::Join(0x??)
+            └─ fuchsia_async::scope::Join(0x??)
       └─ async_rust::bar • async_rust.rs:??
          └─ async_rust::baz • async_rust.rs:??
             └─ fuchsia_async::runtime::fuchsia::timer::Timer
       └─ async_rust::main::func::λ • async_rust.rs:??
-         └─ fuchsia_async::runtime::fuchsia::task::Task
+         └─ fuchsia_async::Task(id = 4)
 Task(id = 1)
 └─ Finished
-Task(id = 2)
-└─ async_rust::baz • async_rust.rs:??
-   └─ fuchsia_async::runtime::fuchsia::timer::Timer
 Task(id = 3)
+└─ async_rust::baz • async_rust.rs:55
+   └─ fuchsia_async::runtime::fuchsia::timer::Timer
+Task(id = 4)
 └─ async_rust::baz (Unresumed) • async_rust.rs:??
+Scope(0x??)
+└─ Task(id = 2)
+   └─ async_rust::baz • async_rust.rs:??
+      └─ fuchsia_async::runtime::fuchsia::timer::Timer
+Scope(0x??)
+└─ Task(id = 5)
+   └─ async_rust::baz (Unresumed) • async_rust.rs:??
+└─ Task(id = 6)
+   └─ async_rust::foo::λ (Unresumed) • async_rust.rs:??
+└─ Scope(0x??)
+   └─ Task(id = 7)
+      └─ async_rust::baz (Unresumed) • async_rust.rs:??
 
 [zxdb] kill
 Process 1 killed.

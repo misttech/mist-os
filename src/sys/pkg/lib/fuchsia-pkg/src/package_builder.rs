@@ -226,7 +226,6 @@ impl PackageBuilder {
     }
 
     fn validate_ok_to_modify(&self, at_path: &str) -> Result<()> {
-        let at_path = at_path.as_ref();
         if RESERVED_PATHS.contains(&at_path) {
             bail!("Cannot add '{}', it will be created by the PackageBuilder", at_path);
         }

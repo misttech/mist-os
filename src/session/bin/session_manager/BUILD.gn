@@ -117,16 +117,6 @@ fuchsia_package("session_manager") {
   deps = [ ":session_manager_comp" ]
 }
 
-# TODO(b/353560491): delete the fake session manager
-core_shard("fake_session_manager_core_shard") {
-  shard_file = "//src/session/bin/session_manager/meta/fake_session_manager.core_shard.cml"
-}
-
-fuchsia_package_with_single_component("fake_session_manager") {
-  manifest = "meta/fake_session_manager.cml"
-  component_name = "session_manager"
-}
-
 fuchsia_unittest_package("session_manager_tests") {
   deps = [ ":lib_test" ]
 

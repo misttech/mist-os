@@ -4,6 +4,7 @@
 use crate::capability::CapabilityProvider;
 use crate::model::component::WeakComponentInstance;
 use crate::model::routing::router_ext::WeakInstanceTokenExt;
+use ::routing::component_instance::ComponentInstanceInterface;
 use ::routing::DictExt;
 use async_trait::async_trait;
 use clonable_error::ClonableError;
@@ -11,6 +12,7 @@ use cm_rust::{Availability, CapabilityTypeName};
 use cm_types::{Name, OPEN_FLAGS_MAX_POSSIBLE_RIGHTS};
 use cm_util::TaskGroup;
 use errors::{CapabilityProviderError, OpenError};
+use moniker::Moniker;
 use router_error::RouterError;
 use routing::bedrock::request_metadata::METADATA_KEY_TYPE;
 use routing::error::{ComponentInstanceError, RoutingError};
@@ -26,12 +28,12 @@ use vfs::remote::remote_dir;
 /// `path` under the source component's outgoing namespace.
 pub struct DefaultComponentCapabilityProvider {
     target: WeakComponentInstance,
-    source: WeakComponentInstance,
+    source: Moniker,
     name: Name,
 }
 
 impl DefaultComponentCapabilityProvider {
-    pub fn new(target: WeakComponentInstance, source: WeakComponentInstance, name: Name) -> Self {
+    pub fn new(target: WeakComponentInstance, source: Moniker, name: Name) -> Self {
         DefaultComponentCapabilityProvider { target, source, name }
     }
 }
@@ -43,7 +45,7 @@ impl CapabilityProvider for DefaultComponentCapabilityProvider {
         _task_group: TaskGroup,
         open_request: OpenRequest<'_>,
     ) -> Result<(), CapabilityProviderError> {
-        let source = self.source.upgrade()?;
+        let source = self.target.upgrade()?.find_absolute(&self.source).await?;
         let caps_with_metadata: HashMap<Name, CapabilityTypeName> = source
             .lock_resolved_state()
             .await

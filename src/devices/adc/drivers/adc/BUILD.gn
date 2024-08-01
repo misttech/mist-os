@@ -61,7 +61,7 @@ test("adc-test-bin") {
   sources = [ "adc-test.cc" ]
   deps = [
     ":common",
-    "//sdk/lib/driver/testing/cpp:driver_testing_cpp",
+    "//sdk/lib/driver/testing/cpp",
     "//src/devices/adc/metadata",
     "//src/lib/fxl/test:gtest_main",
   ]

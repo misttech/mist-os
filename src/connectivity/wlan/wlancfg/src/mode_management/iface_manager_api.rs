@@ -348,14 +348,11 @@ mod tests {
         mut receiver: mpsc::Receiver<IfaceManagerRequest>,
         failure_mode: NegativeTestFailureMode,
     ) -> BoxFuture<'static, ()> {
-        match failure_mode {
-            NegativeTestFailureMode::RequestFailure => {
-                // Drop the receiver so that no requests can be made.
-                drop(receiver);
-                let fut = async move {};
-                return Box::pin(fut);
-            }
-            _ => {}
+        if let NegativeTestFailureMode::RequestFailure = failure_mode {
+            // Drop the receiver so that no requests can be made.
+            drop(receiver);
+            let fut = async move {};
+            return Box::pin(fut);
         }
 
         let fut = async move {

@@ -604,14 +604,16 @@ function track-command-execution {
   # Limit to the first 100 characters of arguments.
   # The GA4 API supports up to 100 characters for parameter values
   local args_truncated=0
-  if [[ "${#args}" -gt 100 ]]; then
-    args="${args:0:100}"
+  local args1="${args:0:100}"
+  local args2="${args:100:100}"
+  if [[ "${#args}" -gt 200 ]]; then
     args_truncated=1
   fi
 
   event_params=$(fx-command-run jq -c -n \
     --arg subcommand "${subcommand}" \
-    --arg args "${args}" \
+    --arg args "${args1}" \
+    --arg args2 "${args2}" \
     --arg args_truncated "${args_truncated}" \
     '$ARGS.named')
 
@@ -667,12 +669,12 @@ function _add-fx-set-hit {
 function track-command-finished {
   exec 1>/dev/null
   exec 2>/dev/null
-  timing=$1
-  exit_status=$2
-  subcommand=$3
-  is_remote=$4
+  local timing=$1
+  local exit_status=$2
+  local subcommand=$3
+  local is_remote=$4
   shift 4
-  args="$*"
+  local args="$*"
 
   metrics-read-config
   if [[ "${METRICS_LEVEL}" -eq 0 ]]; then
@@ -687,15 +689,17 @@ function track-command-finished {
   fi
 
   local args_truncated=0
-  if [[ "${#args}" -gt 100 ]]; then
-    args="${args:0:100}"
+  local args1="${args:0:100}"
+  local args2="${args:100:100}"
+  if [[ "${#args}" -gt 200 ]]; then
     args_truncated=1
   fi
 
 
   event_params=$(fx-command-run jq -c -n \
     --arg subcommand "${subcommand}" \
-    --arg args "${args}" \
+    --arg args "${args1}" \
+    --arg args2 "${args2}" \
     --arg args_truncated "${args_truncated}" \
     --arg exit_status "${exit_status}" \
     --arg is_remote "${is_remote}" \

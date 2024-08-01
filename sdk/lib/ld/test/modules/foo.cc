@@ -4,8 +4,8 @@
 
 #include <stdint.h>
 
-// This module is useful for returning the value of a symbol that may be
-// resolved by any number of its dependencies.
+// This template is useful for providing a function that calls foo from a
+// a dependency.
 
 extern "C" [[gnu::visibility("default")]] int64_t call_foo();
 

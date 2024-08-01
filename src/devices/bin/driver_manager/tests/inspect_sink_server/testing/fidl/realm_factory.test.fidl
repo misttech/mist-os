@@ -1,0 +1,15 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+library test.drivermanager;
+
+using fuchsia.testing.harness;
+
+@discoverable
+open protocol RealmFactory {
+    /// Creates a new realm and binds the given RealmProxy server end to it.
+    flexible CreateRealm(resource struct {
+        realm_server server_end:fuchsia.testing.harness.RealmProxy;
+    }) -> () error fuchsia.testing.harness.OperationError;
+};

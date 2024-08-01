@@ -446,6 +446,7 @@ where
         Ok(())
     }
 
+    #[allow(clippy::await_holding_refcell_ref)]
     async fn handle_on_update_check_completion_request(
         server: Rc<RefCell<Self>>,
         request: ListenerRequest,
@@ -587,6 +588,7 @@ where
     }
 
     /// The state change callback from StateMachine.
+    #[allow(clippy::await_holding_refcell_ref)]
     pub async fn on_state_change(server: Rc<RefCell<Self>>, state: state_machine::State) {
         server.borrow_mut().state.manager_state = state;
 
@@ -720,7 +722,7 @@ impl CompletionResponder {
             | state_machine::State::CheckingForUpdates(_) => return,
         }
         match self {
-            CompletionResponder::Satisfied => return,
+            CompletionResponder::Satisfied => (),
             CompletionResponder::Waiting(responders) => {
                 for responder in responders.drain(..) {
                     let _ = responder.send();

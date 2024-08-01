@@ -13,27 +13,22 @@
 /// However, tests of behavior that is out-of-scope for the static analyzer (e.g. routing to/from
 /// dynamic component instances) should be defined here.
 use {
-    crate::{
-        capability::CapabilitySource,
-        model::{
-            actions::{
-                ActionsManager, DestroyAction, ShutdownAction, ShutdownType, StartAction,
-                StopAction,
-            },
-            component::{IncomingCapabilities, StartReason},
-            routing::{
-                router_ext::WeakInstanceTokenExt, Route, RouteRequest, RouteSource, RoutingError,
-            },
-            testing::{
-                echo_service::EchoProtocol, mocks::ControllerActionResponse, out_dir::OutDir,
-                routing_test_helpers::*, test_helpers::*,
-            },
+    crate::model::{
+        actions::{
+            ActionsManager, DestroyAction, ShutdownAction, ShutdownType, StartAction, StopAction,
+        },
+        component::{IncomingCapabilities, StartReason},
+        routing::{router_ext::WeakInstanceTokenExt, Route, RoutingError},
+        testing::{
+            echo_service::EchoProtocol, mocks::ControllerActionResponse, out_dir::OutDir,
+            routing_test_helpers::*, test_helpers::*,
         },
     },
     ::routing::{
         bedrock::request_metadata::protocol_metadata,
         capability_source::{
-            AggregateCapability, AggregateInstance, AggregateMember, ComponentCapability,
+            AggregateCapability, AggregateInstance, AggregateMember, CapabilitySource,
+            ComponentCapability,
         },
         error::ComponentInstanceError,
         resolving::ResolverError,
@@ -63,7 +58,10 @@ use {
     maplit::btreemap,
     moniker::{ChildName, ExtendedMoniker, Moniker},
     router_error::{DowncastErrorForTest, RouterError},
+    routing::collection::AnonymizedAggregateServiceProvider,
     routing::component_instance::ComponentInstanceInterface,
+    routing::legacy_router::NoopVisitor,
+    routing::{RouteRequest, RouteSource},
     routing_test_helpers::{
         default_service_capability, instantiate_common_routing_tests, RoutingTestModel,
     },
@@ -1073,7 +1071,7 @@ async fn create_child_with_dict() {
     // Create a dictionary with a sender for the `hippo` protocol.
     let dict = sandbox::Dict::new();
 
-    let (receiver, sender) = sandbox::Receiver::new();
+    let (receiver, sender) = sandbox::Connector::new();
 
     // Serve the `fidl.examples.routing.echo.Echo` protocol on the receiver.
     let _task = fasync::Task::spawn(async move {
@@ -2325,7 +2323,7 @@ async fn verify_service_route(
     let source = RouteRequest::UseService(use_decl).route(&target_component).await.unwrap();
     match source {
         RouteSource {
-            source: CapabilitySource::AnonymizedAggregate { members, capability, component, .. },
+            source: CapabilitySource::AnonymizedAggregate { members, capability, moniker, .. },
             relative_path: _,
         } => {
             let collections: Vec<_> = members
@@ -2342,7 +2340,7 @@ async fn verify_service_route(
             assert_eq!(collections, unique_colls);
             assert_matches!(capability, AggregateCapability::Service(_));
             assert_eq!(*capability.source_name(), "foo");
-            assert!(Arc::ptr_eq(&component.upgrade().unwrap(), &agg_component));
+            assert_eq!(&moniker, &agg_component.moniker);
         }
         _ => panic!("wrong capability source"),
     };
@@ -2817,11 +2815,19 @@ async fn list_service_instances_from_collections() {
         .route(&client_component)
         .await
         .expect("failed to route service");
-    let aggregate_capability_provider = match source {
+    let aggregate_capability_provider = match &source {
         RouteSource {
-            source: CapabilitySource::AnonymizedAggregate { aggregate_capability_provider, .. },
+            source: source @ CapabilitySource::AnonymizedAggregate { moniker, .. },
             relative_path: _,
-        } => aggregate_capability_provider,
+        } => {
+            let source_component_instance = client_component.find_absolute(moniker).await.unwrap();
+            AnonymizedAggregateServiceProvider::new_from_capability_source(
+                source,
+                &source_component_instance,
+            )
+            .await
+            .unwrap()
+        }
         _ => panic!("bad capability source"),
     };
 
@@ -2842,20 +2848,23 @@ async fn list_service_instances_from_collections() {
 
     // Try routing to one of the instances.
     let source = aggregate_capability_provider
-        .route_instance(&AggregateInstance::Child("coll1:service_child_a".try_into().unwrap()))
+        .route_instance(
+            &AggregateInstance::Child("coll1:service_child_a".try_into().unwrap()),
+            &mut NoopVisitor {},
+        )
         .await
         .expect("failed to route to child");
     match source {
         CapabilitySource::Component {
             capability: ComponentCapability::Service(ServiceDecl { name, source_path }),
-            component,
+            moniker,
         } => {
             assert_eq!(name, "foo");
             assert_eq!(
                 source_path.expect("source path"),
                 "/svc/foo.service".parse::<cm_types::Path>().unwrap()
             );
-            assert_eq!(component.moniker, vec!["coll1:service_child_a"].try_into().unwrap());
+            assert_eq!(moniker, vec!["coll1:service_child_a"].try_into().unwrap());
         }
         _ => panic!("bad child capability source"),
     }

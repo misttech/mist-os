@@ -18,7 +18,7 @@ use routing::capability_source::{CapabilitySource, ComponentCapability, Internal
 use routing::component_instance::ComponentInstanceInterface;
 use routing::policy::GlobalPolicyChecker;
 use std::collections::{HashMap, HashSet};
-use std::sync::{Arc, Weak};
+use std::sync::Arc;
 
 /// These GlobalPolicyChecker tests are run under multiple contexts, e.g. both on Fuchsia under
 /// component_manager and on the build host under cm_fidl_analyzer. This macro helps ensure that all
@@ -82,9 +82,9 @@ where
         let global_policy_checker = GlobalPolicyChecker::new(Arc::new(policy_builder.build()));
         let component = self.make_component(vec!["foo:0", "bar:0"].try_into().unwrap()).await;
 
-        let protocol_capability = CapabilitySource::<C>::Framework {
+        let protocol_capability = CapabilitySource::Framework {
             capability: InternalCapability::Protocol("fuchsia.component.Realm".parse().unwrap()),
-            component: component.as_weak(),
+            moniker: component.moniker().clone(),
         };
         let valid_path_0 = Moniker::try_from(vec!["foo", "bar"]).unwrap();
         let valid_path_1 = Moniker::try_from(vec!["foo", "bar", "baz"]).unwrap();
@@ -128,13 +128,12 @@ where
         );
         let global_policy_checker = GlobalPolicyChecker::new(Arc::new(policy_builder.build()));
 
-        let protocol_capability = CapabilitySource::<C>::Namespace {
+        let protocol_capability = CapabilitySource::Namespace {
             capability: ComponentCapability::Protocol(ProtocolDecl {
                 name: "fuchsia.kernel.MmioResource".parse().unwrap(),
                 source_path: Some("/svc/fuchsia.kernel.MmioResource".parse().unwrap()),
                 delivery: Default::default(),
             }),
-            top_instance: Weak::new(),
         };
         let valid_path_0 = Moniker::try_from(vec!["root"]).unwrap();
         let valid_path_2 = Moniker::try_from(vec!["root", "core"]).unwrap();
@@ -186,13 +185,13 @@ where
         let global_policy_checker = GlobalPolicyChecker::new(Arc::new(policy_builder.build()));
         let component = self.make_component(vec!["foo:0"].try_into().unwrap()).await;
 
-        let protocol_capability = CapabilitySource::<C>::Component {
+        let protocol_capability = CapabilitySource::Component {
             capability: ComponentCapability::Protocol(ProtocolDecl {
                 name: "fuchsia.foo.FooBar".parse().unwrap(),
                 source_path: Some("/svc/fuchsia.foo.FooBar".parse().unwrap()),
                 delivery: Default::default(),
             }),
-            component: component.as_weak(),
+            moniker: component.moniker().clone(),
         };
         let valid_path_0 = Moniker::try_from(vec!["root", "bootstrap"]).unwrap();
         let valid_path_1 = Moniker::try_from(vec!["root", "core"]).unwrap();
@@ -239,7 +238,7 @@ where
         let global_policy_checker = GlobalPolicyChecker::new(Arc::new(policy_builder.build()));
         let component = self.make_component(vec!["foo:0"].try_into().unwrap()).await;
 
-        let protocol_capability = CapabilitySource::<C>::Capability {
+        let protocol_capability = CapabilitySource::Capability {
             source_capability: ComponentCapability::Storage(StorageDecl {
                 backing_dir: "cache".parse().unwrap(),
                 name: "cache".parse().unwrap(),
@@ -247,7 +246,7 @@ where
                 subdir: Default::default(),
                 storage_id: fdecl::StorageId::StaticInstanceIdOrMoniker,
             }),
-            component: component.as_weak(),
+            moniker: component.moniker().clone(),
         };
         let valid_path_0 = Moniker::try_from(vec!["root", "bootstrap"]).unwrap();
         let valid_path_1 = Moniker::try_from(vec!["root", "core"]).unwrap();
@@ -537,9 +536,8 @@ where
         );
         let global_policy_checker = GlobalPolicyChecker::new(Arc::new(policy_builder.build()));
 
-        let dir_capability = CapabilitySource::<C>::Builtin {
+        let dir_capability = CapabilitySource::Builtin {
             capability: InternalCapability::Directory("test".parse().unwrap()),
-            top_instance: Weak::new(),
         };
         let valid_path_0 = Moniker::try_from(vec!["root"]).unwrap();
         let valid_path_1 = Moniker::try_from(vec!["root", "core"]).unwrap();
@@ -584,13 +582,12 @@ where
             ],
         );
         let global_policy_checker = GlobalPolicyChecker::new(Arc::new(policy_builder.build()));
-        let protocol_capability = CapabilitySource::<C>::Namespace {
+        let protocol_capability = CapabilitySource::Namespace {
             capability: ComponentCapability::Protocol(ProtocolDecl {
                 name: "fuchsia.kernel.MmioResource".parse().unwrap(),
                 source_path: Some("/svc/fuchsia.kernel.MmioResource".parse().unwrap()),
                 delivery: Default::default(),
             }),
-            top_instance: Weak::new(),
         };
 
         macro_rules! can_route {
@@ -633,13 +630,12 @@ where
             ],
         );
         let global_policy_checker = GlobalPolicyChecker::new(Arc::new(policy_builder.build()));
-        let protocol_capability = CapabilitySource::<C>::Namespace {
+        let protocol_capability = CapabilitySource::Namespace {
             capability: ComponentCapability::Protocol(ProtocolDecl {
                 name: "fuchsia.kernel.MmioResource".parse().unwrap(),
                 source_path: Some("/svc/fuchsia.kernel.MmioResource".parse().unwrap()),
                 delivery: Default::default(),
             }),
-            top_instance: Weak::new(),
         };
 
         macro_rules! can_route {

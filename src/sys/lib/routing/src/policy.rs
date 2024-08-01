@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::capability_source::CapabilitySource;
-use crate::component_instance::ComponentInstanceInterface;
 use cm_config::{
     AllowlistEntry, AllowlistMatcher, CapabilityAllowlistKey, CapabilityAllowlistSource,
     DebugCapabilityKey, SecurityPolicy,
@@ -68,12 +67,9 @@ impl GlobalPolicyChecker {
         Self { policy }
     }
 
-    fn get_policy_key<'a, C>(
-        capability_source: &'a CapabilitySource<C>,
-    ) -> Result<CapabilityAllowlistKey, PolicyError>
-    where
-        C: ComponentInstanceInterface,
-    {
+    fn get_policy_key(
+        capability_source: &CapabilitySource,
+    ) -> Result<CapabilityAllowlistKey, PolicyError> {
         Ok(match &capability_source {
             CapabilitySource::Namespace { capability, .. } => CapabilityAllowlistKey {
                 source_moniker: ExtendedMoniker::ComponentManager,
@@ -84,8 +80,8 @@ impl GlobalPolicyChecker {
                 source: CapabilityAllowlistSource::Self_,
                 capability: capability.type_name(),
             },
-            CapabilitySource::Component { capability, component } => CapabilityAllowlistKey {
-                source_moniker: ExtendedMoniker::ComponentInstance(component.moniker.clone()),
+            CapabilitySource::Component { capability, moniker } => CapabilityAllowlistKey {
+                source_moniker: ExtendedMoniker::ComponentInstance(moniker.clone()),
                 source_name: capability
                     .source_name()
                     .ok_or(PolicyError::InvalidCapabilitySource)?
@@ -99,33 +95,32 @@ impl GlobalPolicyChecker {
                 source: CapabilityAllowlistSource::Self_,
                 capability: capability.type_name(),
             },
-            CapabilitySource::Framework { capability, component } => CapabilityAllowlistKey {
-                source_moniker: ExtendedMoniker::ComponentInstance(component.moniker.clone()),
+            CapabilitySource::Framework { capability, moniker } => CapabilityAllowlistKey {
+                source_moniker: ExtendedMoniker::ComponentInstance(moniker.clone()),
                 source_name: capability.source_name().clone(),
                 source: CapabilityAllowlistSource::Framework,
                 capability: capability.type_name(),
             },
-            CapabilitySource::Void { capability, component } => CapabilityAllowlistKey {
-                source_moniker: ExtendedMoniker::ComponentInstance(component.moniker.clone()),
+            CapabilitySource::Void { capability, moniker } => CapabilityAllowlistKey {
+                source_moniker: ExtendedMoniker::ComponentInstance(moniker.clone()),
                 source_name: capability.source_name().clone(),
                 source: CapabilityAllowlistSource::Void,
                 capability: capability.type_name(),
             },
-            CapabilitySource::Capability { source_capability, component } => {
+            CapabilitySource::Capability { source_capability, moniker } => CapabilityAllowlistKey {
+                source_moniker: ExtendedMoniker::ComponentInstance(moniker.clone()),
+                source_name: source_capability
+                    .source_name()
+                    .ok_or(PolicyError::InvalidCapabilitySource)?
+                    .clone(),
+                source: CapabilityAllowlistSource::Capability,
+                capability: source_capability.type_name(),
+            },
+            CapabilitySource::AnonymizedAggregate { capability, moniker, .. }
+            | CapabilitySource::FilteredProvider { capability, moniker, .. }
+            | CapabilitySource::FilteredAggregateProvider { capability, moniker, .. } => {
                 CapabilityAllowlistKey {
-                    source_moniker: ExtendedMoniker::ComponentInstance(component.moniker.clone()),
-                    source_name: source_capability
-                        .source_name()
-                        .ok_or(PolicyError::InvalidCapabilitySource)?
-                        .clone(),
-                    source: CapabilityAllowlistSource::Capability,
-                    capability: source_capability.type_name(),
-                }
-            }
-            CapabilitySource::AnonymizedAggregate { capability, component, .. }
-            | CapabilitySource::FilteredAggregate { capability, component, .. } => {
-                CapabilityAllowlistKey {
-                    source_moniker: ExtendedMoniker::ComponentInstance(component.moniker.clone()),
+                    source_moniker: ExtendedMoniker::ComponentInstance(moniker.clone()),
                     source_name: capability.source_name().clone(),
                     source: CapabilityAllowlistSource::Self_,
                     capability: capability.type_name(),
@@ -145,14 +140,11 @@ impl GlobalPolicyChecker {
 
     /// Returns Ok(()) if the provided capability source can be routed to the
     /// given target_moniker, else a descriptive PolicyError.
-    pub fn can_route_capability<'a, C>(
+    pub fn can_route_capability<'a>(
         &self,
-        capability_source: &'a CapabilitySource<C>,
+        capability_source: &'a CapabilitySource,
         target_moniker: &'a Moniker,
-    ) -> Result<(), PolicyError>
-    where
-        C: ComponentInstanceInterface,
-    {
+    ) -> Result<(), PolicyError> {
         let policy_key = Self::get_policy_key(capability_source).map_err(|e| {
             error!("Security policy could not generate a policy key for `{}`", capability_source);
             e

@@ -26,8 +26,10 @@ use std::task::{Context, Poll};
 /// `LocalExecutor` will panic on drop if any zircon objects attached to it are still alive. In
 /// other words, zircon objects backed by a `LocalExecutor` must be dropped before it.
 pub struct LocalExecutor {
+    // LINT.IfChange
     /// The inner executor state.
     pub(crate) ehandle: EHandle,
+    // LINT.ThenChange(//src/developer/debug/zxdb/console/commands/verb_async_backtrace.cc)
 }
 
 impl fmt::Debug for LocalExecutor {

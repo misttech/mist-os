@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::capability::{CapabilityProvider, CapabilitySource};
+use crate::capability::CapabilityProvider;
 use crate::model::component::{
     ComponentInstance, ExtendedInstance, StartReason, WeakComponentInstance,
 };
@@ -13,13 +13,15 @@ use crate::model::routing::providers::{
 use crate::model::routing::service::{
     AnonymizedAggregateServiceDir, AnonymizedServiceRoute, FilteredAggregateServiceProvider,
 };
-use crate::model::routing::RouteSource;
 use crate::model::start::Start;
 use crate::model::storage::{self, BackingDirectoryInfo};
+use ::routing::capability_source::CapabilitySource;
 use ::routing::component_instance::ComponentInstanceInterface;
+use ::routing::RouteSource;
 use errors::{CapabilityProviderError, ModelError, OpenError};
 use fidl_fuchsia_io as fio;
 use moniker::ExtendedMoniker;
+use routing::collection::AnonymizedAggregateServiceProvider;
 use std::sync::Arc;
 use vfs::directory::entry::OpenRequest;
 use vfs::remote::remote_dir;
@@ -99,8 +101,10 @@ impl<'a> CapabilityOpenRequest<'a> {
                 .ok_or(OpenError::CapabilityProviderNotFound)?
         };
 
-        let source_instance =
-            source.source_instance().upgrade().map_err(CapabilityProviderError::from)?;
+        let source_instance = target
+            .find_extended_instance(&source.source_moniker())
+            .await
+            .map_err(|err| CapabilityProviderError::ComponentInstanceError { err })?;
         let task_group = match source_instance {
             ExtendedInstance::AboveRoot(top) => top.task_group(),
             ExtendedInstance::Component(component) => {
@@ -144,12 +148,12 @@ impl<'a> CapabilityOpenRequest<'a> {
         source: &CapabilitySource,
     ) -> Result<Option<Box<dyn CapabilityProvider>>, ModelError> {
         match source {
-            CapabilitySource::Component { capability, component } => {
+            CapabilitySource::Component { capability, moniker } => {
                 // Route normally for a component capability with a source path
                 Ok(match capability.source_path() {
                     Some(_) => Some(Box::new(DefaultComponentCapabilityProvider::new(
                         target,
-                        component.clone(),
+                        moniker.clone(),
                         capability
                             .source_name()
                             .expect("capability with source path should have a name")
@@ -166,24 +170,16 @@ impl<'a> CapabilityOpenRequest<'a> {
                 }))),
                 _ => Ok(None),
             },
-            CapabilitySource::FilteredAggregate { capability_provider, component, .. } => {
-                // TODO(https://fxbug.dev/42124541): This should cache the directory
-                Ok(Some(Box::new(
-                    FilteredAggregateServiceProvider::new(
-                        component.clone(),
-                        target,
-                        capability_provider.clone(),
-                    )
-                    .await?,
-                )))
-            }
-            CapabilitySource::AnonymizedAggregate {
-                capability,
-                component,
-                aggregate_capability_provider,
-                members,
-            } => {
-                let source_component_instance = component.upgrade()?;
+            CapabilitySource::FilteredProvider { .. }
+            | CapabilitySource::FilteredAggregateProvider { .. } => Ok(Some(Box::new(
+                FilteredAggregateServiceProvider::new_from_capability_source(
+                    source.clone(),
+                    target,
+                )
+                .await?,
+            ))),
+            CapabilitySource::AnonymizedAggregate { capability, moniker, members, sources: _ } => {
+                let source_component_instance = target.upgrade()?.find_absolute(moniker).await?;
 
                 let route = AnonymizedServiceRoute {
                     source_moniker: source_component_instance.moniker.clone(),
@@ -215,10 +211,18 @@ impl<'a> CapabilityOpenRequest<'a> {
                         return Ok(Some(Box::new(provider)));
                     }
 
+                    let aggregate_capability_provider =
+                        AnonymizedAggregateServiceProvider::new_from_capability_source(
+                            source,
+                            &source_component_instance,
+                        )
+                        .await
+                        .expect("failed to create AnonymizedAggregateServiceProvider");
+
                     service_dir = Arc::new(AnonymizedAggregateServiceDir::new(
-                        component.clone(),
+                        source_component_instance.as_weak(),
                         route.clone(),
-                        aggregate_capability_provider.clone_boxed(),
+                        Box::new(aggregate_capability_provider),
                     ));
 
                     let entry = service_dir.dir_entry().await;

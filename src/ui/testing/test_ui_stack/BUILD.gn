@@ -23,7 +23,6 @@ executable("bin") {
     "//sdk/fidl/fuchsia.ui.input3:fuchsia.ui.input3_cpp",
     "//sdk/fidl/fuchsia.ui.pointerinjector:fuchsia.ui.pointerinjector_cpp",
     "//sdk/fidl/fuchsia.ui.policy:fuchsia.ui.policy_cpp",
-    "//sdk/fidl/fuchsia.ui.scenic:fuchsia.ui.scenic_cpp",
     "//sdk/fidl/fuchsia.ui.test.input:fuchsia.ui.test.input_cpp",
     "//sdk/fidl/fuchsia.ui.test.scene:fuchsia.ui.test.scene_cpp",
     "//sdk/lib/sys/cpp",

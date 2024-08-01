@@ -139,8 +139,17 @@ void AudioInput::OnDriverConfigComplete() {
 
   // We have all the info needed to compute the presentation delay for this input.
   FX_CHECK(driver()->driver_transfer_delay());
-  SetPresentationDelay(driver()->external_delay() + driver()->internal_delay() +
-                       *driver()->driver_transfer_delay());
+  auto presentation_delay =
+      driver()->external_delay() + driver()->internal_delay() + *driver()->driver_transfer_delay();
+  if constexpr (kLogPresentationDelay) {
+    FX_LOGS(INFO) << "      (" << this << ") reported ext_delay "
+                  << driver()->external_delay().to_nsecs() << " ns, int_delay "
+                  << driver()->internal_delay().to_nsecs() << " ns, driver_transfer_delay "
+                  << driver()->driver_transfer_delay()->to_nsecs()
+                  << " ns, calling SetPresentationDelay(" << presentation_delay.to_nsecs()
+                  << " ns)";
+  }
+  SetPresentationDelay(presentation_delay);
 }
 
 void AudioInput::OnDriverStartComplete() {

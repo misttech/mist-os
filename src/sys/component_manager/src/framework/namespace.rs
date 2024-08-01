@@ -181,7 +181,7 @@ mod tests {
     use fidl::endpoints::{ProtocolMarker, Proxy};
     use fuchsia_component::client;
     use futures::TryStreamExt;
-    use sandbox::{Dict, Receiver};
+    use sandbox::{Connector, Dict};
     use std::sync::{Arc, Weak};
     use {
         fidl_fidl_examples_routing_echo as fecho, fidl_fuchsia_component_sandbox as fsandbox,
@@ -232,7 +232,7 @@ mod tests {
         let mut next_id = 1;
         for (path, response) in [("/svc", "first"), ("/zzz/svc", "second")] {
             // Initialize the host and sender/receiver pair.
-            let (receiver, sender) = Receiver::new();
+            let (receiver, sender) = Connector::new();
 
             // Serve an Echo request handler on the Receiver.
             tasks.add(fasync::Task::spawn(async move {
@@ -300,7 +300,7 @@ mod tests {
         let mut next_id = 1;
         for path in ["/svc", "/svc/shadow"] {
             // Initialize the host and sender/receiver pair.
-            let (receiver, sender) = Receiver::new();
+            let (receiver, sender) = Connector::new();
 
             // Serve an Echo request handler on the Receiver.
             tasks.add(fasync::Task::spawn(async move {

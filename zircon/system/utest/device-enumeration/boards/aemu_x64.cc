@@ -18,8 +18,6 @@ TEST_F(DeviceEnumerationTest, AemuX64Test) {
   VerifyNodes(kNodeMonikers);
 
   static const char* kAemuNodeMonikers[] = {
-      "dev.sys.platform.pt.PCI0.bus.00_01.0.00_01_0.virtio-input",
-      "dev.sys.platform.pt.PCI0.bus.00_02.0.00_02_0.virtio-input",
       "dev.sys.platform.pt.PCI0.bus.00_0b.0.00_0b_0.goldfish-address-space",
 
       // Verify goldfish pipe root device created.

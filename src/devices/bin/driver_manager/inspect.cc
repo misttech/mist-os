@@ -74,6 +74,42 @@ const char* BindParamName(uint32_t param_num) {
 }
 }  // namespace
 
+void InspectSinkForDrivers::Publish(PublishRequest& request, PublishCompleter::Sync& completer) {
+  const auto result = external_connection_->Publish(
+      {{.tree = std::move(request.tree().value()),
+        .name = request.name().has_value() ? std::optional{std::move(request.name().value())}
+                                           : "driver-unknown"}});
+  ZX_ASSERT(result.is_ok());
+}
+
+void InspectSinkForDrivers::Escrow(EscrowRequest& request, EscrowCompleter::Sync& completer) {
+  const auto result = external_connection_->Escrow(std::move(request));
+  ZX_ASSERT(result.is_ok());
+}
+
+void InspectSinkForDrivers::FetchEscrow(FetchEscrowRequest& request,
+                                        FetchEscrowCompleter::Sync& completer) {
+  external_connection_->FetchEscrow(std::move(request))
+      .ThenExactlyOnce([&](fidl::Result<fuchsia_inspect::InspectSink::FetchEscrow>& result) {
+        ZX_ASSERT(result.is_ok());
+        completer.Reply(fidl::Response<fuchsia_inspect::InspectSink::FetchEscrow>{
+            {std::move(result.value().vmo())}});
+      });
+}
+
+void InspectSinkForDrivers::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_inspect::InspectSink> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {}
+
+void InspectSinkForDrivers::BindSelfManagedServer(
+    async_dispatcher_t* dispatcher, fidl::ServerEnd<fuchsia_inspect::InspectSink> server_end) {
+  std::unique_ptr<InspectSinkForDrivers> impl{new InspectSinkForDrivers(dispatcher)};
+  auto* impl_ptr = impl.get();
+  fidl::ServerBindingRef binding_ref =
+      fidl::BindServer(dispatcher, std::move(server_end), std::move(impl));
+  impl_ptr->binding_ref_.emplace(std::move(binding_ref));
+}
+
 zx::result<InspectDevfs> InspectDevfs::Create(async_dispatcher_t* dispatcher) {
   InspectDevfs devfs(dispatcher);
 
@@ -85,13 +121,10 @@ zx::result<std::string> InspectDevfs::Publish(const char* name, zx::vmo vmo) {
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
-  std::string inspect_name = "driver-" + std::to_string(InspectDevfs::inspect_dev_counter_++) +
-                             (name != nullptr ? "-" + std::string{name} : "");
-
   // TODO(b/324637276): this is the export point for duplicated data from driver components.
-  inspect::PublishVmo(dispatcher_, std::move(vmo), {.tree_name = inspect_name});
+  inspect::PublishVmo(dispatcher_, std::move(vmo), {.tree_name = name});
 
-  return zx::ok(std::move(inspect_name));
+  return zx::ok(std::move(name));
 }
 
 InspectManager::InspectManager(async_dispatcher_t* dispatcher) : inspector_(dispatcher, {}) {

@@ -1,24 +1,31 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-
-#include <stdint.h>
-
-#include <memory>
-#include <string_view>
-
 #ifndef LOCKDEP_LOCK_NAME_HELPER_H_
 #define LOCKDEP_LOCK_NAME_HELPER_H_
+
+#include <lib/fxt/interned_string.h>
+#include <stddef.h>
+
+#include <string_view>
 
 namespace lockdep::internal {
 
 template <typename Class, int Line>
-class LockNameHelperStorage {
+class LockNameHelper {
  public:
-  constexpr LockNameHelperStorage() : LockNameHelperStorage(std::make_index_sequence<Size>{}) {}
-  constexpr const char* Name() const { return name_; }
+  static constexpr const fxt::InternedString& GetInternedString() {
+    return GetInternedString(std::make_index_sequence<Size>{});
+  }
+
+  static constexpr const char* Name() { return GetInternedString().string(); }
 
  private:
+  template <size_t... Is>
+  static constexpr const fxt::InternedString& GetInternedString(std::index_sequence<Is...>) {
+    return fxt::internal::InternedStringStorage<GetChar(Is)...>::interned_string;
+  }
+
   struct Range {
     const size_t size;
     const size_t offset;
@@ -97,21 +104,6 @@ class LockNameHelperStorage {
     // the null terminator.
     return '\0';
   }
-
-  template <size_t... ndx>
-  explicit constexpr LockNameHelperStorage(std::index_sequence<ndx...>)
-      : name_{(GetChar(ndx))...} {}
-
-  const char name_[Size];
-};
-
-template <typename Class, int Line>
-class LockNameHelper {
- public:
-  static constexpr const char* Name() { return storage_.Name(); }
-
- private:
-  static constexpr LockNameHelperStorage<Class, Line> storage_{};
 };
 
 }  // namespace lockdep::internal

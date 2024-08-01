@@ -144,7 +144,7 @@ impl State for Instance {
         self.set_state_changed_fn(Some(move |flags: ChangedFlags| {
             let mut borrowed = state_copy.lock();
             borrowed.0 |= flags;
-            borrowed.1.clone().wake();
+            borrowed.1.wake_by_ref();
         }));
 
         StateChangedStream(state)

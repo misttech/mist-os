@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use super::arrays::Context;
 use super::extensible_bitmap::ExtensibleBitmapSpan;
 use super::metadata::HandleUnknown;
 use super::parser::ParseStrategy;
@@ -95,7 +96,12 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
 
         // Verify that the initial Security Contexts are all defined, and valid.
         for id in sc::InitialSid::all_variants() {
-            let _ = index.resolve_initial_context(id).map_err(anyhow::Error::from)?;
+            index.resolve_initial_context(id)?;
+        }
+
+        // Validate the contexts used in fs_use statements.
+        for fs_use in index.parsed_policy.fs_uses() {
+            index.security_context_from_policy_context(fs_use.context())?;
         }
 
         Ok(index)
@@ -265,7 +271,14 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
         &self,
         id: sc::InitialSid,
     ) -> Result<SecurityContext, SecurityContextError> {
-        let context = self.parsed_policy().initial_context(id);
+        self.security_context_from_policy_context(self.parsed_policy().initial_context(id))
+    }
+
+    /// Returns a [`SecurityContext`] based on the supplied policy-defined `context`.
+    fn security_context_from_policy_context(
+        &self,
+        context: &Context<PS>,
+    ) -> Result<SecurityContext, SecurityContextError> {
         let low_level = self.security_level(context.low_level());
         let high_level = context.high_level().as_ref().map(|x| self.security_level(x));
 

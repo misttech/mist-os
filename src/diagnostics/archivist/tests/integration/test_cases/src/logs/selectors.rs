@@ -11,7 +11,7 @@ use futures::{FutureExt, StreamExt};
 use realm_proxy_client::RealmProxyClient;
 use {fidl_fuchsia_archivist_test as ftest, fuchsia_async as fasync};
 
-const HELLO_WORLD: &'static str = "Hello, world!!!";
+const HELLO_WORLD: &str = "Hello, world!!!";
 
 #[fuchsia::test]
 async fn component_selectors_filter_logs() {
@@ -68,7 +68,7 @@ async fn component_selectors_filter_logs() {
 }
 
 async fn log_and_exit(realm: &RealmProxyClient, puppet_name: String) {
-    let puppet = test_topology::connect_to_puppet(&realm, &puppet_name).await.unwrap();
+    let puppet = test_topology::connect_to_puppet(realm, &puppet_name).await.unwrap();
     let request = LogPuppetLogRequest {
         severity: Some(Severity::Info),
         message: Some(HELLO_WORLD.to_string()),

@@ -9,5 +9,7 @@
 //! Fuchsia Network Policy socket proxy.
 
 mod fs;
+mod manager;
 
 pub use fs::*;
+pub use manager::*;

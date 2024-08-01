@@ -138,11 +138,6 @@ void FakeHciTransportServer::ConfigureSco(ConfigureScoRequest& request,
   }
 }
 
-void FakeHciTransportServer::SetSnoop(SetSnoopRequest& request,
-                                      SetSnoopCompleter::Sync& completer) {
-  FAIL();
-}
-
 void FakeHciTransportServer::handle_unknown_method(
     ::fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::HciTransport> metadata,
     ::fidl::UnknownMethodCompleter::Sync& completer) {

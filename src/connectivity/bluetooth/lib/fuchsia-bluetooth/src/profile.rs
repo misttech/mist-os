@@ -516,6 +516,14 @@ pub struct ServiceDefinition {
 }
 
 impl ServiceDefinition {
+    pub fn try_into_fidl(this: &Vec<Self>) -> Result<Vec<fidl_bredr::ServiceDefinition>, Error> {
+        this.iter().map(fidl_bredr::ServiceDefinition::try_from).collect::<Result<Vec<_>, _>>()
+    }
+
+    pub fn try_from_fidl(src: &Vec<fidl_bredr::ServiceDefinition>) -> Result<Vec<Self>, Error> {
+        src.iter().map(Self::try_from).collect::<Result<Vec<_>, _>>()
+    }
+
     /// Returns the primary PSM associated with this ServiceDefinition.
     pub fn primary_psm(&self) -> Option<Psm> {
         psm_from_protocol(&self.protocol_descriptor_list)

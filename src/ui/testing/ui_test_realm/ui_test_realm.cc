@@ -28,7 +28,6 @@
 #include <fuchsia/ui/pointerinjector/configuration/cpp/fidl.h>
 #include <fuchsia/ui/pointerinjector/cpp/fidl.h>
 #include <fuchsia/ui/policy/cpp/fidl.h>
-#include <fuchsia/ui/scenic/cpp/fidl.h>
 #include <fuchsia/ui/views/cpp/fidl.h>
 #include <fuchsia/vulkan/loader/cpp/fidl.h>
 #include <lib/sys/component/cpp/testing/realm_builder.h>
@@ -107,8 +106,7 @@ std::vector<std::string> ScenicServices(const UITestRealm::Config& config) {
           fuchsia::ui::pointer::augment::LocalHit::Name_,
           fuchsia::ui::composition::Allocator::Name_,
           fuchsia::ui::composition::Flatland::Name_,
-          fuchsia::ui::composition::FlatlandDisplay::Name_,
-          fuchsia::ui::scenic::Scenic::Name_};
+          fuchsia::ui::composition::FlatlandDisplay::Name_};
 }
 
 // List of a11y services available in the test realm.
@@ -410,7 +408,7 @@ void UITestRealm::ConfigureSceneOwner() {
       .value = ConfigValue::Uint64(config_.idle_threshold_ms),
   });
   configurations.push_back({
-      .name = "fuchsia.ui.SuspendEnabled",
+      .name = "fuchsia.power.SuspendEnabled",
       .value = ConfigValue::Bool(config_.suspend_enabled),
   });
   realm_builder_.AddConfiguration(std::move(configurations));
@@ -419,7 +417,7 @@ void UITestRealm::ConfigureSceneOwner() {
           {
               component_testing::Config{.name = "fuchsia.ui.DisplayPixelDensity"},
               component_testing::Config{.name = "fuchsia.scenic.DisplayRotation"},
-              component_testing::Config{.name = "fuchsia.ui.SuspendEnabled"},
+              component_testing::Config{.name = "fuchsia.power.SuspendEnabled"},
               component_testing::Config{.name = "fuchsia.ui.IdleThresholdMs"},
           },
       .source = component_testing::SelfRef{},

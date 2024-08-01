@@ -945,7 +945,7 @@ mod tests {
 
         let inspector = fuchsia_inspect::Inspector::default();
         inspector.root().record_lazy_child("queue", processor.record_lazy_inspect());
-        fuchsia_async::Task::spawn(async move { while let Some(_) = processor.next().await {} })
+        fuchsia_async::Task::spawn(async move { while (processor.next().await).is_some() {} })
             .detach();
 
         // Inspect empty before queue is used.

@@ -154,10 +154,10 @@ void BtHciBroadcom::OpenHciTransport(OpenHciTransportCompleter::Sync& completer)
 }
 
 void BtHciBroadcom::OpenSnoop(OpenSnoopCompleter::Sync& completer) {
-  zx::result<fidl::ClientEnd<fhbt::Snoop2>> client_end =
+  zx::result<fidl::ClientEnd<fhbt::Snoop>> client_end =
       incoming()->Connect<fhbt::HciService::Snoop>();
   if (client_end.is_error()) {
-    FDF_LOG(ERROR, "Connect to Snoop2 protocol failed: %s", client_end.status_string());
+    FDF_LOG(ERROR, "Connect to Snoop protocol failed: %s", client_end.status_string());
     completer.ReplyError(client_end.status_value());
     return;
   }

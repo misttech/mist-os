@@ -1278,7 +1278,7 @@ impl Routable for CapabilityRequestedHook {
         let capability = if request.debug {
             CapabilitySource::Component {
                 capability: self.capability_decl.clone().into(),
-                component: self.source.clone(),
+                moniker: self.source.moniker.clone(),
             }
             .try_into()
             .expect("failed to convert capability source to dictionary")
@@ -1303,7 +1303,7 @@ impl Routable for ProgramRouter {
         if request.debug {
             let source = CapabilitySource::Component {
                 capability: self.capability.clone(),
-                component: self.component.clone(),
+                moniker: self.component.moniker.clone(),
             };
             return Ok(source
                 .try_into()

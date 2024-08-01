@@ -2,9 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::Receiver;
 use fidl_fuchsia_component_sandbox as fsandbox;
 use futures::channel::mpsc;
+use std::any::Any;
 use std::fmt::Debug;
+use std::sync::Arc;
 
 #[derive(Debug)]
 pub struct Message {
@@ -32,16 +35,32 @@ impl Connectable for mpsc::UnboundedSender<crate::Message> {
 /// A capability that transfers another capability to a [Receiver].
 #[derive(Debug, Clone)]
 pub struct Connector {
-    inner: std::sync::Arc<dyn Connectable>,
+    inner: Arc<dyn Connectable>,
+
+    // This exists to keep the receiver server task alive as long as any clone of this Connector is
+    // alive. This is set when creating a Connector through CapabilityStore. The inner type is
+    // `fuchsia_async::Task` but libsandbox can't depend on fuchsia-async so we type-erase it to
+    // Any.
+    _receiver_task: Option<Arc<dyn Any + Send + Sync>>,
 }
 
 impl Connector {
-    pub fn new_sendable(connector: impl Connectable + 'static) -> Self {
-        Self { inner: std::sync::Arc::new(connector) }
+    pub fn new() -> (Receiver, Self) {
+        let (sender, receiver) = mpsc::unbounded();
+        let receiver = Receiver::new(receiver);
+        let this = Self::new_sendable(sender);
+        (receiver, this)
     }
 
-    pub(crate) fn new(sender: mpsc::UnboundedSender<Message>) -> Self {
-        Self { inner: std::sync::Arc::new(sender) }
+    pub fn new_sendable(connector: impl Connectable + 'static) -> Self {
+        Self::new_internal(connector, None)
+    }
+
+    pub(crate) fn new_internal(
+        connector: impl Connectable + 'static,
+        receiver_task: Option<Arc<dyn Any + Send + Sync>>,
+    ) -> Self {
+        Self { inner: Arc::new(connector), _receiver_task: receiver_task }
     }
 
     pub fn send(&self, msg: Message) -> Result<(), ()> {
@@ -58,7 +77,6 @@ impl Connectable for Connector {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Receiver;
     use fidl::handle::{Channel, HandleBased, Rights};
 
     // NOTE: sending-and-receiving tests are written in `receiver.rs`.
@@ -67,7 +85,7 @@ mod tests {
     /// and capabilities sent to the original and clone arrive at the same Receiver.
     #[fuchsia::test]
     async fn fidl_clone() {
-        let (receiver, sender) = Receiver::new();
+        let (receiver, sender) = Connector::new();
 
         // Send a channel through the Connector.
         let (ch1, _ch2) = Channel::create();

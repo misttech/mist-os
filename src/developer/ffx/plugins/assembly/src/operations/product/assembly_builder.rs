@@ -130,7 +130,7 @@ impl ImageAssemblyConfigBuilder {
         self.developer_only_options = Some(developer_only_options);
 
         // Add the kernel command line args from the developer
-        self.kernel_args.extend(kernel.command_line_args.into_iter());
+        self.kernel_args.extend(kernel.command_line_args);
 
         // Add packages specified by the developer
         for package_details in packages {
@@ -521,7 +521,7 @@ impl ImageAssemblyConfigBuilder {
                 // TODO(tbd): Switch FileEntry to use TypedPathBuf instead of String and
                 // PathBuf.
                 self.add_config_data_entry(
-                    &manifest.name().to_string(),
+                    manifest.name(),
                     FileEntry { source: source.into(), destination: destination.to_string() },
                 )?;
             }
@@ -615,7 +615,7 @@ impl ImageAssemblyConfigBuilder {
         package: PackageSetDestination,
         config: DomainConfig,
     ) -> Result<()> {
-        if self.domain_configs.insert(package.into(), config).is_none() {
+        if self.domain_configs.insert(package, config).is_none() {
             Ok(())
         } else {
             Err(anyhow::format_err!("duplicate domain config"))
@@ -746,7 +746,7 @@ impl ImageAssemblyConfigBuilder {
                 .find_map(|d| packages.remove(&d).map(|entry| (d, entry)))
                 {
                     // Create the new package
-                    let outdir = outdir.join("repackaged").join(&package);
+                    let outdir = outdir.join("repackaged").join(package);
                     let mut repackager = Repackager::new(entry.manifest, outdir)
                         .with_context(|| format!("reading existing manifest for {package}"))?;
 
@@ -994,7 +994,7 @@ impl PackageEntry {
             .with_context(|| format!("parsing {path} as a package manifest"))?;
 
         let name = manifest.name().to_string();
-        if name == "" {
+        if name.is_empty() {
             bail!("Package with no name {path}");
         }
 
@@ -1462,7 +1462,7 @@ mod tests {
 
         // and get the metafar path.
         let blobs = config_data_manifest.into_blobs();
-        let metafar_blobinfo = blobs.get(0).unwrap();
+        let metafar_blobinfo = blobs.first().unwrap();
         assert_eq!(metafar_blobinfo.path, "meta/");
 
         // 2. Read the metafar.
@@ -1849,7 +1849,7 @@ mod tests {
 
         // Clone the first item in the first AIB into the same list in the
         // second AIB to create a duplicate item across the two AIBs.
-        let value = first_list.get(0).unwrap();
+        let value = first_list.first().unwrap();
         second_list.push(value.clone());
 
         let mut builder = ImageAssemblyConfigBuilder::new(BuildType::Eng);

@@ -99,6 +99,7 @@
             from: "parent",
             to: [ "#ui" ],
             config: [
+                "fuchsia.power.SuspendEnabled",
                 "fuchsia.scenic.DisplayComposition",
                 "fuchsia.scenic.DisplayRotation",
                 "fuchsia.scenic.FrameSchedulerMinPredictedFrameDurationInUs",
@@ -116,7 +117,6 @@
                 "fuchsia.ui.DisplayPixelDensity",
                 "fuchsia.ui.IdleThresholdMs",
                 "fuchsia.ui.SupportedInputDevices",
-                "fuchsia.ui.SuspendEnabled",
                 "fuchsia.ui.ViewingDistance",
             ],
         },

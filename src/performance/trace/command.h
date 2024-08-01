@@ -19,7 +19,7 @@ namespace tracing {
 
 namespace controller = fuchsia_tracing_controller;
 
-class Command : public fidl::AsyncEventHandler<controller::Controller> {
+class Command : public fidl::AsyncEventHandler<controller::Provisioner> {
  public:
   // OnDoneCallback is the callback type invoked when a command finished
   // running. It takes as argument the return code to exit the process with.
@@ -34,7 +34,7 @@ class Command : public fidl::AsyncEventHandler<controller::Controller> {
   };
 
   void on_fidl_error(fidl::UnbindInfo error) override;
-  void handle_unknown_event(fidl::UnknownEventMetadata<controller::Controller> metadata) override;
+  void handle_unknown_event(fidl::UnknownEventMetadata<controller::Provisioner> metadata) override;
 
   ~Command() override;
 
@@ -64,11 +64,10 @@ class Command : public fidl::AsyncEventHandler<controller::Controller> {
 class CommandWithController : public Command {
  protected:
   explicit CommandWithController();
-
-  fidl::Client<controller::Controller>&& take_controller() { return std::move(controller_); }
+  fidl::Client<controller::Provisioner>&& take_provisioner() { return std::move(provisioner_); }
 
  private:
-  fidl::Client<controller::Controller> controller_;
+  fidl::Client<controller::Provisioner> provisioner_;
 
   CommandWithController(const CommandWithController&) = delete;
   CommandWithController(CommandWithController&&) = delete;

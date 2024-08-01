@@ -193,7 +193,7 @@ impl CapabilityReceiver {
     /// Creates a [`CapabilityReceiver`] that receives connection requests sent via the
     /// [`Sender`] capability.
     pub fn new() -> (Self, Connector) {
-        let (receiver, sender) = Receiver::new();
+        let (receiver, sender) = Connector::new();
         let inner = Arc::new(StdMutex::new(Some(receiver)));
         (Self { inner }, sender)
     }

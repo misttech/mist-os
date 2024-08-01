@@ -310,7 +310,7 @@ async fn blobs_protected_from_gc_during_get(gc_protection: fpkg::GcProtection) {
                 .unwrap()
                 .unwrap();
             let () = compress_and_write_blob(&to_be_fetched[i].1, *blob).await.unwrap();
-            let () = blob_written(&needed_blobs, to_be_fetched[i].0).await;
+            let () = blob_written(needed_blobs, to_be_fetched[i].0).await;
         }
     };
 
@@ -457,8 +457,8 @@ async fn writing_index_clears_on_get_error() {
         get_missing_blobs(&needed_blobs).await,
         Vec::from_iter(
             content_blobs
-                .into_iter()
-                .map(|(h, _)| fpkg::BlobInfo { blob_id: BlobId::from(h).into(), length: 0 })
+                .into_keys()
+                .map(|h| fpkg::BlobInfo { blob_id: BlobId::from(h).into(), length: 0 })
         )
     );
 

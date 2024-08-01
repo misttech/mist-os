@@ -149,30 +149,20 @@ pub fn check_task_create_access(current_task: &CurrentTask) -> Result<(), Errno>
 pub fn check_exec_access(
     current_task: &CurrentTask,
     executable_node: &FsNodeHandle,
-) -> Result<Option<ResolvedElfState>, Errno> {
-    check_if_selinux(current_task, |security_server| {
-        let group_state = current_task.read();
-        selinux_hooks::check_exec_access(
-            &security_server,
-            current_task,
-            &group_state.security_state.0,
-            executable_node,
-        )
-        .map(|s| s.map(|s| ResolvedElfState(s)))
-    })
+) -> Result<ResolvedElfState, Errno> {
+    check_if_selinux_else(
+        current_task,
+        |security_server| {
+            selinux_hooks::check_exec_access(&security_server, current_task, executable_node)
+        },
+        || Ok(ResolvedElfState(None)),
+    )
 }
 
 /// Updates the SELinux thread group state on exec.
-pub fn update_state_on_exec(
-    current_task: &mut CurrentTask,
-    elf_security_state: &Option<ResolvedElfState>,
-) {
+pub fn update_state_on_exec(current_task: &CurrentTask, elf_security_state: &ResolvedElfState) {
     run_if_selinux(current_task, |_| {
-        let mut task_state = current_task.write();
-        selinux_hooks::update_state_on_exec(
-            &mut task_state.security_state.0,
-            elf_security_state.as_ref().map(|s| s.0),
-        );
+        selinux_hooks::update_state_on_exec(current_task, elf_security_state);
     });
 }
 
@@ -617,7 +607,7 @@ mod tests {
         let (kernel, task, mut locked) = create_kernel_task_and_unlocked();
         assert!(kernel.security_server.is_none());
         let executable_node = &create_test_file(&mut locked, &task).entry.node;
-        assert_eq!(check_exec_access(&task, executable_node), Ok(None));
+        assert_eq!(check_exec_access(&task, executable_node), Ok(ResolvedElfState(None)));
     }
 
     #[fuchsia::test]
@@ -626,10 +616,9 @@ mod tests {
         let (_kernel, task, mut locked) =
             create_kernel_task_and_unlocked_with_selinux(security_server);
         let executable_node = &create_test_file(&mut locked, &task).entry.node;
-        // Expect that access is granted, and a `ResolvedElfState` is returned.
+        // Expect that access is granted, and a `SecurityId` is returned in the `ResolvedElfState`.
         let result = check_exec_access(&task, executable_node);
-        assert!(result.is_ok());
-        assert!(result.unwrap().is_some());
+        assert!(result.expect("Exec check should succeed").0.is_some());
     }
 
     #[fuchsia::test]
@@ -639,26 +628,24 @@ mod tests {
         let (_kernel, task, mut locked) =
             create_kernel_task_and_unlocked_with_selinux(security_server);
         let executable_node = &create_test_file(&mut locked, &task).entry.node;
-        // Expect that access is granted, and a `ResolvedElfState` is returned.
+        // Expect that access is granted, and a `SecurityId` is returned in the `ResolvedElfState`.
         let result = check_exec_access(&task, executable_node);
-        assert!(result.is_ok());
-        assert!(result.unwrap().is_some());
+        assert!(result.expect("Exec check should succeed").0.is_some());
     }
 
     #[fuchsia::test]
     async fn no_state_update_for_selinux_disabled() {
         let (_kernel, task) = create_kernel_and_task();
-        let mut task = task;
 
         // Without SELinux enabled and a policy loaded, only `InitialSid` values exist
         // in the system.
         let target_sid = SecurityId::initial(InitialSid::Unlabeled);
-        let elf_state = ResolvedElfState(target_sid);
+        let elf_state = ResolvedElfState(Some(target_sid));
 
         assert!(task.read().security_state.0.current_sid != target_sid);
 
         let before_hook_sid = task.read().security_state.0.current_sid;
-        update_state_on_exec(&mut task, &Some(elf_state));
+        update_state_on_exec(&task, &elf_state);
         assert_eq!(task.read().security_state.0.current_sid, before_hook_sid);
     }
 
@@ -666,15 +653,14 @@ mod tests {
     async fn no_state_update_for_selinux_without_policy() {
         let security_server = SecurityServer::new(Mode::Enable);
         let (_kernel, task) = create_kernel_and_task_with_selinux(security_server);
-        let mut task = task;
 
         // Without SELinux enabled and a policy loaded, only `InitialSid` values exist
         // in the system.
         let initial_state = task.read().security_state.0.clone();
         let elf_sid = SecurityId::initial(InitialSid::Unlabeled);
-        let elf_state = ResolvedElfState(elf_sid);
+        let elf_state = ResolvedElfState(Some(elf_sid));
         assert_ne!(elf_sid, initial_state.current_sid);
-        update_state_on_exec(&mut task, &Some(elf_state));
+        update_state_on_exec(&task, &elf_state);
         assert_eq!(task.read().security_state.0, initial_state);
     }
 
@@ -683,7 +669,6 @@ mod tests {
         let security_server = security_server_with_policy(Mode::Fake);
         let initial_state = selinux_hooks::TaskState::for_kernel();
         let (kernel, task) = create_kernel_and_task_with_selinux(security_server);
-        let mut task = task;
         task.write().security_state.0 = initial_state.clone();
 
         let elf_sid = kernel
@@ -692,9 +677,9 @@ mod tests {
             .expect("missing security server")
             .security_context_to_sid(b"u:object_r:fork_no_t:s0".into())
             .expect("invalid security context");
-        let elf_state = ResolvedElfState(elf_sid);
+        let elf_state = ResolvedElfState(Some(elf_sid));
         assert_ne!(elf_sid, initial_state.current_sid);
-        update_state_on_exec(&mut task, &Some(elf_state));
+        update_state_on_exec(&task, &elf_state);
         assert_eq!(task.read().security_state.0.current_sid, elf_sid);
     }
 
@@ -704,7 +689,6 @@ mod tests {
         security_server.set_enforcing(false);
         let initial_state = selinux_hooks::TaskState::for_kernel();
         let (kernel, task) = create_kernel_and_task_with_selinux(security_server);
-        let mut task = task;
         task.write().security_state.0 = initial_state.clone();
         let elf_sid = kernel
             .security_server
@@ -712,9 +696,9 @@ mod tests {
             .expect("missing security server")
             .security_context_to_sid(b"u:object_r:fork_no_t:s0".into())
             .expect("invalid security context");
-        let elf_state = ResolvedElfState(elf_sid);
+        let elf_state = ResolvedElfState(Some(elf_sid));
         assert_ne!(elf_sid, initial_state.current_sid);
-        update_state_on_exec(&mut task, &Some(elf_state));
+        update_state_on_exec(&task, &elf_state);
         assert_eq!(task.read().security_state.0.current_sid, elf_sid);
     }
 

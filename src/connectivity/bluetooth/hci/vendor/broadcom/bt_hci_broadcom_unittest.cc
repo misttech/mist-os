@@ -49,7 +49,7 @@ const std::array<uint8_t, 6> kCommandCompleteEvent = {
 class FakeTransportDevice : public fidl::WireServer<fhbt::Hci>,
                             public fdf::WireServer<fuchsia_hardware_serialimpl::Device>,
                             public fidl::Server<fhbt::HciTransport>,
-                            public fidl::Server<fhbt::Snoop2> {
+                            public fidl::Server<fhbt::Snoop> {
  public:
   explicit FakeTransportDevice() = default;
 
@@ -128,7 +128,6 @@ class FakeTransportDevice : public fidl::WireServer<fhbt::Hci>,
   void ConfigureSco(
       fidl::Server<fhbt::HciTransport>::ConfigureScoRequest& request,
       fidl::Server<fhbt::HciTransport>::ConfigureScoCompleter::Sync& completer) override {}
-  void SetSnoop(SetSnoopRequest& request, SetSnoopCompleter::Sync& completer) override {}
   void handle_unknown_method(::fidl::UnknownMethodMetadata<fhbt::HciTransport> metadata,
                              ::fidl::UnknownMethodCompleter::Sync& completer) override {
     ZX_PANIC("Unknown method in HciTransport requests");
@@ -167,11 +166,11 @@ class FakeTransportDevice : public fidl::WireServer<fhbt::Hci>,
     ZX_PANIC("Unknown method in Serial requests");
   }
 
-  // fidl::Server<fhbt::Snoop2> overrides:
+  // fidl::Server<fhbt::Snoop> overrides:
   void AcknowledgePackets(AcknowledgePacketsRequest& request,
                           AcknowledgePacketsCompleter::Sync& completer) override {}
   void handle_unknown_method(
-      fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Snoop2> metadata,
+      fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Snoop> metadata,
       fidl::UnknownMethodCompleter::Sync& completer) override {}
 
  private:
@@ -180,7 +179,7 @@ class FakeTransportDevice : public fidl::WireServer<fhbt::Hci>,
   fdf::ServerBindingGroup<fuchsia_hardware_serialimpl::Device> serial_binding_group_;
   fidl::ServerBindingGroup<fhbt::Hci> hci_binding_group_;
   fidl::ServerBindingGroup<fhbt::HciTransport> hci_transport_binding_group_;
-  fidl::ServerBindingGroup<fhbt::Snoop2> snoop_binding_group_;
+  fidl::ServerBindingGroup<fhbt::Snoop> snoop_binding_group_;
 };
 
 class TestEnvironment : fdf_testing::Environment {

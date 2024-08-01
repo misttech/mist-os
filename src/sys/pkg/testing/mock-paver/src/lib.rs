@@ -534,7 +534,7 @@ impl MockPaverServiceBuilder {
     }
 
     /// Adds a Hook. Hooks are called in order of insertion.
-    pub fn insert_hook(mut self, hook: impl Hook + Send + Sync + 'static) -> Self {
+    pub fn insert_hook(mut self, hook: impl Hook + Send + 'static) -> Self {
         self.hooks.push(Box::new(hook));
         self
     }

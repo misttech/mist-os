@@ -30,6 +30,7 @@ cc_library(
         "sco_connection.cc",
         "sequential_command_runner.cc",
     ],
+    copts = ["-Wswitch-enum"],
     deps = [
         "//src/connectivity/bluetooth/core/bt-host:public",
         "//src/connectivity/bluetooth/core/bt-host/transport",

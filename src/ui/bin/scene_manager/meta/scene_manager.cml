@@ -60,6 +60,11 @@
             availability: "optional",
         },
         {
+            // Used for power integration if configured.
+            protocol: [ "fuchsia.power.system.ActivityGovernor" ],
+            availability: "optional",
+        },
+        {
             config: "fuchsia.ui.IdleThresholdMs",
             key: "idle_threshold_ms",
             type: "uint64",
@@ -92,7 +97,8 @@
             max_size: 8,
         },
         {
-            config: "fuchsia.ui.SuspendEnabled",
+            from: "parent",
+            config: "fuchsia.power.SuspendEnabled",
             key: "suspend_enabled",
             type: "bool",
         },

@@ -69,10 +69,10 @@ fn extend_dict_with_capability<C: ComponentInstanceInterface + 'static>(
         | cm_rust::CapabilityDecl::Runner(_)
         | cm_rust::CapabilityDecl::Resolver(_) => {
             let router = new_outgoing_dir_router(component, decl, capability);
-            let router = router.with_policy_check(
+            let router = router.with_policy_check::<C>(
                 CapabilitySource::Component {
                     capability: ComponentCapability::from(capability.clone()),
-                    component: component.as_weak(),
+                    moniker: component.moniker().clone(),
                 },
                 component.policy_checker().clone(),
             );
@@ -163,7 +163,7 @@ fn extend_dict_with_dictionary<C: ComponentInstanceInterface + 'static>(
             source_dict_router,
             CapabilitySource::Component {
                 capability: ComponentCapability::Dictionary(decl.clone()),
-                component: component.as_weak(),
+                moniker: component.moniker().clone(),
             },
         );
     } else {
@@ -183,10 +183,10 @@ fn extend_dict_with_dictionary<C: ComponentInstanceInterface + 'static>(
 /// [Dict] returned by `source_dict_router`.
 ///
 /// This algorithm returns a new [Dict] each time, leaving `dict` unmodified.
-fn make_dict_extending_router<C: ComponentInstanceInterface + 'static>(
+fn make_dict_extending_router(
     dict: Dict,
     source_dict_router: Router,
-    source: CapabilitySource<C>,
+    source: CapabilitySource,
 ) -> Router {
     let route_fn = move |request: Request| {
         if request.debug {

@@ -607,7 +607,7 @@ where
                 mac_address: Some(MacAddress { octets: x.ext_address().into_array() }),
                 short_address: Some(x.rloc16()),
                 age: Some(
-                    fuchsia_async::Duration::from_seconds(x.age().try_into().unwrap())
+                    fuchsia_async::Duration::from_seconds(x.age().into())
                         .into_nanos()
                         .try_into()
                         .unwrap(),
@@ -1066,7 +1066,7 @@ where
             uptime: Some(ot.get_uptime().into_nanos()),
             trel_counters: ot.trel_get_counters().map(|x| x.into_ext()),
             trel_peers_info: Some(fidl_fuchsia_lowpan_experimental::TrelPeersInfo {
-                num_trel_peers: Some(ot.trel_get_number_of_peers().into()),
+                num_trel_peers: Some(ot.trel_get_number_of_peers()),
                 ..Default::default()
             }),
             nat64_info: Some(nat64_info),

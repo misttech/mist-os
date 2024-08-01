@@ -541,8 +541,17 @@ void DriverOutput::OnDriverConfigComplete() {
 
   // Driver is configured, we have what we need to compute the presentation delay for this output.
   FX_CHECK(driver()->driver_transfer_delay());
-  SetPresentationDelay(driver()->external_delay() + driver()->internal_delay() +
-                       *driver()->driver_transfer_delay() + high_water_duration_);
+  auto presentation_delay = driver()->external_delay() + driver()->internal_delay() +
+                            *driver()->driver_transfer_delay() + high_water_duration_;
+  if constexpr (kLogPresentationDelay) {
+    FX_LOGS(INFO) << "    (" << this << ") reported ext_delay "
+                  << driver()->external_delay().to_nsecs() << " ns, int_delay "
+                  << driver()->internal_delay().to_nsecs() << " ns, driver_transfer_delay "
+                  << driver()->driver_transfer_delay()->to_nsecs() << " ns, mixer_lead_time "
+                  << high_water_duration_.to_nsecs() << " ns, calling SetPresentationDelay("
+                  << presentation_delay.to_nsecs() << " ns)";
+  }
+  SetPresentationDelay(presentation_delay);
 
   // Fill our brand new ring buffer with silence
   FX_DCHECK(driver_writable_ring_buffer() != nullptr);
@@ -553,8 +562,8 @@ void DriverOutput::OnDriverConfigComplete() {
 
   // Start the ring buffer running
   //
-  // TODO(https://fxbug.dev/42082937) : Don't actually start things up here. We should start only when
-  // we have clients with work to do, and we should stop when we have no work to do.
+  // TODO(https://fxbug.dev/42082937) : Don't actually start things up here. We should start only
+  // when we have clients with work to do, and we should stop when we have no work to do.
   zx_status_t res = driver()->Start();
   if (res != ZX_OK) {
     FX_PLOGS(ERROR, res) << "Failed to start ring buffer";

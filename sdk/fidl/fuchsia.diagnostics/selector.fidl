@@ -131,7 +131,7 @@ type TreeSelector = flexible union {
 /// TreeNames are the set of names of fuchsia.inspect.Trees for a component that
 /// were parsed out of a selector. The hierarchy and property selector portions
 /// will only be applied to trees that match this set.
-@available(added=NEXT)
+@available(added=22)
 type TreeNames = flexible union {
     /// A specified subset of tree names.
     1: some vector<string:MAX_STRING_SELECTOR_LENGTH>:MAX;
@@ -171,6 +171,6 @@ type Selector = table {
     /// is a soft transition; eventually it will be equivalent to
     /// TreeNames::some(["root"]), where "root" is the default tree name.
     /// https://fxbug.dev/355732696 tracks this transition.
-    @available(added=NEXT)
+    @available(added=22)
     3: tree_names TreeNames;
 };

@@ -48,6 +48,7 @@ impl Validation {
             error!(total = missing.len(), "base package blobs are missing");
         }
 
+        #[allow(clippy::format_collect)]
         missing.into_iter().map(|hash| format!("{hash}\n")).collect::<String>().into_bytes()
     }
 }

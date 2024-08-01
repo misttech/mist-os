@@ -7,6 +7,8 @@
 #include <optional>
 #include <vector>
 
+#include <pw_preprocessor/compiler.h>
+
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/assert.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/gap.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/generic_access_client.h"
@@ -28,8 +30,6 @@
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/transport/transport.h"
 #include "src/connectivity/bluetooth/lib/cpp-string/string_printf.h"
 
-#pragma clang diagnostic ignored "-Wswitch-enum"
-
 using bt::sm::BondableMode;
 
 namespace bt::gap {
@@ -43,6 +43,8 @@ namespace {
 // these other errors based on their descriptions in v5.2 Vol. 1 Part F
 // Section 2.
 bool ShouldStopAlwaysAutoConnecting(pw::bluetooth::emboss::StatusCode err) {
+  PW_MODIFY_DIAGNOSTICS_PUSH();
+  PW_MODIFY_DIAGNOSTIC(ignored, "-Wswitch-enum");
   switch (err) {
     case pw::bluetooth::emboss::StatusCode::CONNECTION_TIMEOUT:
     case pw::bluetooth::emboss::StatusCode::CONNECTION_REJECTED_SECURITY:
@@ -53,6 +55,7 @@ bool ShouldStopAlwaysAutoConnecting(pw::bluetooth::emboss::StatusCode err) {
     default:
       return false;
   }
+  PW_MODIFY_DIAGNOSTICS_POP();
 }
 
 // During the initial connection to a peripheral we use the initial high

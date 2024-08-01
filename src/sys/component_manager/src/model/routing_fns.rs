@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use crate::model::component::WeakComponentInstance;
-use crate::model::routing::{self, RouteRequest};
+use crate::model::routing::{self};
+use ::routing::RouteRequest;
 use router_error::Explain;
 use std::sync::Arc;
 use tracing::error;

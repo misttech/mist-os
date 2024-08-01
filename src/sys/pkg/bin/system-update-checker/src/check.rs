@@ -105,7 +105,7 @@ async fn check_for_system_update_impl(
     let images = images.fuchsia().ok_or(errors::UpdatePackage::MissingFuchsiaImages)?;
 
     let (asset_reader, current_config) =
-        get_asset_reader(&paver).await.map_err(Error::GetAssetReader)?;
+        get_asset_reader(paver).await.map_err(Error::GetAssetReader)?;
     // When present, checking vbmeta is sufficient, but vbmeta isn't supported on all devices.
     for (asset, metadata) in
         [(Asset::VerifiedBootMetadata, images.vbmeta()), (Asset::Kernel, Some(images.zbi()))]

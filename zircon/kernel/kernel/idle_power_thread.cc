@@ -44,8 +44,8 @@ constexpr const fxt::InternedString& ToInternedString(IdlePowerThread::State sta
   }
 }
 
-[[maybe_unused]] constexpr const char* ToString(IdlePowerThread::State state) {
-  return ToInternedString(state).string;
+constexpr const char* ToString(IdlePowerThread::State state) {
+  return ToInternedString(state).string();
 }
 
 }  // anonymous namespace
@@ -81,8 +81,7 @@ int IdlePowerThread::Run(void* arg) {
       ktrace::Scope trace = KTRACE_CPU_BEGIN_SCOPE_ENABLE(
           kEnableRunloopTracing, "kernel:sched", "transition",
           ("from", ToInternedString(state.current)), ("to", ToInternedString(state.target)));
-      dprintf(INFO, "CPU %u: %s -> %s\n", cpu_num, ToInternedString(state.current).string,
-              ToInternedString(state.target).string);
+      dprintf(INFO, "CPU %u: %s -> %s\n", cpu_num, ToString(state.current), ToString(state.target));
 
       switch (state.target) {
         case State::Offline: {

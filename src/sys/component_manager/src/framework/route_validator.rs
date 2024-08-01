@@ -2,18 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::capability::{
-    CapabilityProvider, CapabilitySource, FrameworkCapability, InternalCapabilityProvider,
-};
+use crate::capability::{CapabilityProvider, FrameworkCapability, InternalCapabilityProvider};
 use crate::model::component::instance::ResolvedInstanceState;
 use crate::model::component::{ComponentInstance, WeakComponentInstance};
 use crate::model::model::Model;
 use crate::model::routing::service::AnonymizedServiceRoute;
-use crate::model::routing::{
-    self, BedrockRouteRequest, Route, RouteRequest as LegacyRouteRequest, RoutingError,
-};
-use ::routing::capability_source::InternalCapability;
+use crate::model::routing::{self, BedrockRouteRequest, Route, RoutingError};
+use ::routing::capability_source::{CapabilitySource, InternalCapability};
 use ::routing::component_instance::ComponentInstanceInterface;
+use ::routing::RouteRequest as LegacyRouteRequest;
 use async_trait::async_trait;
 use cm_rust::{ExposeDecl, SourceName, UseDecl};
 use cm_types::Name;
@@ -314,10 +311,10 @@ impl RouteRequest {
     ) -> Result<(Option<ExtendedMoniker>, Option<Vec<fsys::ServiceInstance>>), RoutingError> {
         let source = route_request.route(&instance).await?;
         let source = source.source;
-        let source_moniker = source.source_instance().extended_moniker();
+        let source_moniker = source.source_moniker();
         let service_info = match source {
-            CapabilitySource::AnonymizedAggregate { capability, component, members, .. } => {
-                let component = component.upgrade()?;
+            CapabilitySource::AnonymizedAggregate { capability, moniker, members, .. } => {
+                let component = instance.find_absolute(&moniker).await?;
                 let route = AnonymizedServiceRoute {
                     source_moniker: component.moniker.clone(),
                     members: members.clone(),
@@ -375,9 +372,9 @@ impl RouteRequest {
             let capability_source = CapabilitySource::try_from(capability)
                 .expect("failed to convert capability to capability source");
             match capability_source {
-                CapabilitySource::Component { component, .. }
-                | CapabilitySource::Framework { component, .. } => {
-                    (Some(ExtendedMoniker::ComponentInstance(component.moniker.clone())), None)
+                CapabilitySource::Component { moniker, .. }
+                | CapabilitySource::Framework { moniker, .. } => {
+                    (Some(ExtendedMoniker::ComponentInstance(moniker)), None)
                 }
                 CapabilitySource::Builtin { .. } | CapabilitySource::Namespace { .. } => {
                     (Some(ExtendedMoniker::ComponentManager), None)

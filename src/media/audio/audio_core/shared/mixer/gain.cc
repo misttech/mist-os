@@ -17,8 +17,8 @@ void Gain::Control::SetGainWithRamp(float target_gain_db, zx::duration duration,
 
   if (duration <= zx::nsec(0)) {
     FX_LOGS(WARNING) << "Gain::Control(" << this << "): " << name_
-                     << ".SetGainWithRamp non-positive duration (" << duration.to_usecs()
-                     << " usec); calling SetGain(" << target_gain_db << " dB)";
+                     << ".SetGainWithRamp non-positive duration (" << duration.to_nsecs()
+                     << " ns); calling SetGain(" << target_gain_db << " dB)";
     SetGain(target_gain_db);
     return;
   }
@@ -27,7 +27,7 @@ void Gain::Control::SetGainWithRamp(float target_gain_db, zx::duration duration,
     if constexpr (kLogGainSetRamp) {
       FX_LOGS(WARNING) << "Gain::Control(" << this << "): " << name_
                        << ".SetSourceGainWithRamp is no-change (already " << target_gain_db
-                       << " dB); " << duration.to_usecs() << "-usec ramp is ignored";
+                       << " dB); " << duration.to_nsecs() << "-ns ramp is ignored";
     }
     ramp_duration_ = zx::nsec(0);
     return;
@@ -38,7 +38,7 @@ void Gain::Control::SetGainWithRamp(float target_gain_db, zx::duration duration,
       FX_LOGS(WARNING) << "Gain::Control(" << this << "): " << name_
                        << ".SetSourceGainWithRamp starts at (" << gain_db_ << " dB) and ends at ("
                        << target_gain_db << " dB), below min gain (" << media_audio::kMinGainDb
-                       << " dB); " << duration.to_usecs() << "-usec ramp is ignored";
+                       << " dB); " << duration.to_nsecs() << "-ns ramp is ignored";
     }
     SetGain(target_gain_db);
     return;
@@ -46,7 +46,7 @@ void Gain::Control::SetGainWithRamp(float target_gain_db, zx::duration duration,
 
   if constexpr (kLogGainSetRamp) {
     FX_LOGS(WARNING) << "Gain::Control(" << this << "): " << name_ << ".SetSourceGainWithRamp("
-                     << target_gain_db << " dB, " << duration.to_usecs() << " usec)";
+                     << target_gain_db << " dB, " << duration.to_nsecs() << " ns)";
   }
 
   // Start ramping.
@@ -80,9 +80,9 @@ void Gain::Control::Advance(int64_t num_frames,
   if constexpr (kLogGainRampAdvance) {
     FX_LOGS(WARNING) << "Gain::Control(" << this << "): " << name_ << ".Advance for ramp ["
                      << ramp_start_gain_db_ << "dB -> " << ramp_end_gain_db_ << "dB for "
-                     << ramp_duration_.to_usecs() << " usec];"
+                     << ramp_duration_.to_nsecs() << " ns];"
                      << " advancing " << num_frames << " frames to "
-                     << duration_ramped_so_far.to_usecs() << " usec; total frames ramped is "
+                     << duration_ramped_so_far.to_nsecs() << " ns; total frames ramped is "
                      << frames_ramped_so_far_;
   }
 

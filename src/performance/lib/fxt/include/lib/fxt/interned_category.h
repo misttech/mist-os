@@ -5,147 +5,83 @@
 #ifndef SRC_PERFORMANCE_LIB_FXT_INCLUDE_LIB_FXT_INTERNED_CATEGORY_H_
 #define SRC_PERFORMANCE_LIB_FXT_INCLUDE_LIB_FXT_INTERNED_CATEGORY_H_
 
+#include <lib/fit/function.h>
 #include <lib/fxt/interned_string.h>
 #include <lib/fxt/section_symbols.h>
-#include <zircon/assert.h>
+#include <lib/stdcompat/span.h>
 #include <zircon/types.h>
 
 #include <atomic>
 
 namespace fxt {
 
-// Represents an internalized tracing category and its associated bit in the enabled categories
-// bitmap. This type does not define constructors or a destructor and contains trivially
-// constructible members so that it may be aggregate-initialized to avoid static initializers and
-// guards.
+// Represents an internalized tracing category and its associated index in the enabled categories
+// vector.
 //
 // This type uses the same linker section collection method as InternedString. See
 // lib/fxt/interned_string.h for more details.
 //
-struct InternedCategory {
-  static constexpr uint32_t kInvalidBitNumber = -1;
+class InternedCategory {
+ public:
+  static constexpr uint32_t kInvalidIndex = -1;
 
-  const InternedString& label;
-  mutable std::atomic<uint32_t> bit_number{kInvalidBitNumber};
-  mutable InternedCategory* next{nullptr};
+  constexpr explicit InternedCategory(const InternedString& label) : label_{label} {}
 
-  const char* string() const { return label.string; }
+  constexpr const InternedString& label() const { return label_; }
+  constexpr const char* string() const { return label_.string(); }
+  uint32_t index() const { return index_.load(std::memory_order_acquire); }
 
-  uint32_t GetBit() const {
-    const uint32_t bit = bit_number.load(std::memory_order_relaxed);
-    return bit == kInvalidBitNumber ? Register(*this) : bit;
+  // Sets the index for the category if it has the expected previous value. This provides a simple
+  // way to prevent re-initialization if RegisterCategories() is called more than once, while also
+  // providing a way to override the value. This can be removed once the index can be automatically
+  // derived from the section offset when the kernel supports extensible categories.
+  void SetIndex(uint32_t index, uint32_t expected = kInvalidIndex) const {
+    index_.compare_exchange_strong(expected, index, std::memory_order_acq_rel);
   }
-
-  // Returns the head of the global category linked list.
-  static const InternedCategory* head() { return head_.load(std::memory_order_acquire); }
 
   // Returns the begin and end pointers of the interned category section.
   static constexpr const InternedCategory* section_begin() {
     return __start___fxt_interned_category_table;
   }
   static constexpr const InternedCategory* section_end() {
+#ifdef __clang__
     return __stop___fxt_interned_category_table;
+#else
+    // GCC 14.1 fixes the problem where section attributes are dropped from members of templates
+    // with static storage duration. However, it appears the GCC now emits the wrong sections
+    // sometimes. Make the section appear empty to avoid crashes until that bug is resolved.
+    // TODO(https://fxbug.dev/42101573): Enable section iteration when correct sections are emitted.
+    return section_begin();
+#endif
   }
 
-  // Forward iterator over the set of registered categories using the linked list.
-  class ListIterator {
-   public:
-    ListIterator() = default;
-    ListIterator(const ListIterator&) = default;
-    ListIterator& operator=(const ListIterator&) = default;
-
-    const InternedCategory& operator*() { return *node_; }
-
-    ListIterator operator++() {
-      node_ = node_->next;
-      return *this;
-    }
-
-    bool operator!=(const ListIterator& other) { return node_ != other.node_; }
-
-    struct Iterable {
-      ListIterator begin() const { return ListIterator{head()}; }
-      ListIterator end() const { return ListIterator{nullptr}; }
-    };
-
-   private:
-    explicit ListIterator(const InternedCategory* node) : node_{node} {}
-
-    const InternedCategory* node_{nullptr};
-  };
-
-  // Forward iterator over the set of categories collected using the compile-time linker section.
-  class SectionIterator {
-   public:
-    SectionIterator() = default;
-    SectionIterator(const SectionIterator&) = default;
-    SectionIterator& operator=(const SectionIterator&) = default;
-
-    const InternedCategory& operator*() { return *node_; }
-
-    SectionIterator operator++() {
-      node_++;
-      return *this;
-    }
-
-    bool operator!=(const SectionIterator& other) { return node_ != other.node_; }
-
-    struct Iterable {
-      SectionIterator begin() const { return SectionIterator{section_begin()}; }
-      SectionIterator end() const { return SectionIterator{section_end()}; }
-    };
-
-   private:
-    explicit SectionIterator(const InternedCategory* node) : node_{node} {}
-    const InternedCategory* node_{nullptr};
-  };
-
-  // Utility constexpr instances of the respective iterables.
-  static constexpr ListIterator::Iterable IterateList{};
-  static constexpr SectionIterator::Iterable IterateSection{};
-
-  static void PreRegister() {
-    for (const InternedCategory& interned_category : IterateSection) {
-      Register(interned_category);
-    }
+  static constexpr cpp20::span<const InternedCategory> Iterate() {
+    return {section_begin(), section_end()};
   }
 
-  using RegisterCategoryCallback = uint32_t (*)(const InternedCategory& category);
+  using RegisterCallbackSignature = uint32_t(const InternedCategory& category);
+  using RegisterCallback = fit::inline_function<RegisterCallbackSignature, sizeof(void*) * 4>;
 
   // Sets the callback to register categories in the host trace environment.
-  static void SetRegisterCategoryCallback(RegisterCategoryCallback callback) {
-    register_category_callback_ = callback;
+  static void SetRegisterCallback(RegisterCallback callback) {
+    register_callback_ = std::move(callback);
   }
 
-  // Register an already initialized category.
-  static void RegisterInitialized(const InternedCategory& interned_category) {
-    ZX_DEBUG_ASSERT(interned_category.next == nullptr);
-    interned_category.next = head_.load(std::memory_order_relaxed);
-    while (!head_.compare_exchange_weak(interned_category.next,
-                                        const_cast<InternedCategory*>(&interned_category),
-                                        std::memory_order_release, std::memory_order_relaxed)) {
+  // Registers categories in the host trace environment. May be called more than once (e.g. when
+  // loading shared libraries that provide interned categories). The host callback is expected to
+  // handle categories that are already registered.
+  static void RegisterCategories() {
+    for (const InternedCategory& category : Iterate()) {
+      if (register_callback_) {
+        register_callback_(category);
+      }
     }
   }
 
  private:
-  [[gnu::noinline]] static uint32_t Register(const InternedCategory& interned_category) {
-    uint32_t bit_number = interned_category.bit_number.load(std::memory_order_relaxed);
-    if (bit_number != kInvalidBitNumber) {
-      return bit_number;
-    }
-
-    if (register_category_callback_) {
-      bit_number = register_category_callback_(interned_category);
-      if (bit_number != kInvalidBitNumber) {
-        RegisterInitialized(interned_category);
-      }
-    }
-
-    return bit_number;
-  }
-
-  inline static std::atomic<InternedCategory*> head_{nullptr};
-  inline static RegisterCategoryCallback register_category_callback_{nullptr};
+  const InternedString& label_;
+  mutable std::atomic<uint32_t> index_{kInvalidIndex};
+  inline static RegisterCallback register_callback_;
 };
 
 namespace internal {

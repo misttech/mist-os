@@ -252,7 +252,7 @@ void Service::Launch(fbl::unique_fd conn) {
 
 void Service::OnStop(zx_status_t status, Controller* ptr) {
   if (status != ZX_OK) {
-    FX_PLOGS(WARNING, status) << "sshd component stopped with error";
+    FX_PLOGS(INFO, status) << "sshd component stopped with status";
   }
 
   // Destroy the component.

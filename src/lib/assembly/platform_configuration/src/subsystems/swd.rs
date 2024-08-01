@@ -75,8 +75,8 @@ impl DefineSubsystemConfiguration<SwdConfig> for SwdSubsystemConfig {
         match &subsystem_config.update_checker {
             // The product set a specific update checker. Use that one.
             Some(update_checker) => {
-                Self::set_update_checker(&update_checker, context.build_type, builder)?;
-                Self::set_policy_by_build_type(&context.build_type, context, builder)?;
+                Self::set_update_checker(update_checker, context.build_type, builder)?;
+                Self::set_policy_by_build_type(context.build_type, context, builder)?;
             }
             // The product does not specify. Set based on feature set level.
             None => {
@@ -86,7 +86,7 @@ impl DefineSubsystemConfiguration<SwdConfig> for SwdSubsystemConfig {
                         let update_checker =
                             UpdateChecker::default_by_build_type(context.build_type);
                         Self::set_update_checker(&update_checker, context.build_type, builder)?;
-                        Self::set_policy_by_build_type(&context.build_type, context, builder)?;
+                        Self::set_policy_by_build_type(context.build_type, context, builder)?;
                     }
                     // Utility has no update checker
                     FeatureSupportLevel::Utility => {

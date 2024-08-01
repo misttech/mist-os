@@ -204,9 +204,9 @@ class LoadModule : public ld::LoadModule<ld::DecodedModuleInMemory<>>,
     }
 
     // After successfully loading the file, finalize the module's mapping by
-    // calling `Commit` on the loader. Save the returned relro capability
-    // that will be used to apply relro protections later.
-    loader_relro_ = std::move(loader).Commit(decoded().relro_bounds());
+    // calling `Commit` on the loader. Save the returned relro capability that
+    // will be used to apply relro protections later.
+    relro_ = decoded().CommitLoader(std::move(loader));
 
     // TODO(https://fxbug.dev/324136435): The code that parses the names from
     // the symbol table be shared with <lib/ld/remote-decoded-module.h>.
@@ -240,6 +240,9 @@ class LoadModule : public ld::LoadModule<ld::DecodedModuleInMemory<>>,
                                       resolver);
   }
 
+  // Apply relro protections. `relro_` cannot be used after this call.
+  bool ProtectRelro(Diagnostics& diag) { return std::move(relro_).Commit(diag); }
+
  private:
   // A LoadModule can only be created with LoadModule::Create...).
   explicit LoadModule(ModuleHandle& module) : module_(module) {}
@@ -250,7 +253,9 @@ class LoadModule : public ld::LoadModule<ld::DecodedModuleInMemory<>>,
   // will get destroyed at the end of `dlopen`, its `module_` will live as long
   // as the file is loaded in the RuntimeDynamicLinker's `modules_` list.
   ModuleHandle& module_;
-  Relro loader_relro_;
+  // The relro capability that is provided when the module is decoded and is
+  // used to apply relro protections after the module is relocated.
+  Relro relro_;
 };
 
 }  // namespace dl

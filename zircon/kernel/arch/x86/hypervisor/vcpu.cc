@@ -967,7 +967,7 @@ zx::result<> Vcpu::EnterInternal(PreEnterFn pre_enter, PostExitFn post_exit,
       mds_buff_overwrite();
     }
 
-    KTRACE_DURATION_BEGIN("kernel:vcpu", "vcpu");
+    KTRACE_DURATION_BEGIN("kernel:arch", "vcpu");
 
     GUEST_STATS_INC(vm_entries);
     result = vmx_enter(&vmx_state_);

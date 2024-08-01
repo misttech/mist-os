@@ -10,6 +10,7 @@
 #include <lib/component/incoming/cpp/clone.h>
 #include <lib/fdio/cpp/caller.h>
 #include <lib/zx/vmo.h>
+#include <zircon/types.h>
 
 namespace block_client {
 
@@ -228,7 +229,7 @@ zx_status_t ReadWriteBlocks(fidl::UnownedClientEnd<fuchsia_hardware_block::Block
 
   block_fifo_response_t fifo_response;
   zx_signals_t signals;
-  fifo.wait_one(ZX_FIFO_READABLE, zx::time::infinite(), &signals);
+  fifo.wait_one(ZX_FIFO_READABLE | ZX_FIFO_PEER_CLOSED, zx::time::infinite(), &signals);
   if (zx_status_t status = fifo.read(sizeof(block_fifo_response_t), &fifo_response, 1, &actual);
       status != ZX_OK) {
     return status;

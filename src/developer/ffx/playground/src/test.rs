@@ -68,6 +68,35 @@ impl vfs::node::Node for TestSymlink {
 pub const NEILS_PHILOSOPHY: &'static [u8] =
     b"It's not about the walls, Max, it's about what's outside of them.";
 
+/// A test script.
+pub const TEST_SCRIPT_A: &'static [u8] = br#"
+    def imported_command {
+        "ran imported command"
+    }
+
+    def imported_command_2 {
+        "ran other imported command"
+    }
+    "#;
+
+/// A test script that imports another test script into a variable.
+pub const TEST_SCRIPT_B: &'static [u8] = br#"
+    import /imports/test_script_a as foo
+
+    def imported_command_alias {
+        $foo.imported_command | _
+    }
+    "#;
+
+/// A test script that imports another test script into global scope.
+pub const TEST_SCRIPT_C: &'static [u8] = br#"
+    import /imports/test_script_a
+
+    def imported_command_alias {
+        imported_command
+    }
+    "#;
+
 impl vfs::directory::entry::DirectoryEntry for TestSymlink {
     fn open_entry(
         self: Arc<Self>,
@@ -109,7 +138,11 @@ impl<T: AsRef<str>> Test<T> {
         let proxy = vfs::directory::spawn_directory(Arc::clone(&simple));
         let test_subdir = vfs::directory::immutable::simple();
         let foo_subdir = vfs::directory::immutable::simple();
+        let import_subdir = vfs::directory::immutable::simple();
         let test_file = vfs::file::read_only(NEILS_PHILOSOPHY);
+        let test_script_a = vfs::file::read_only(TEST_SCRIPT_A);
+        let test_script_b = vfs::file::read_only(TEST_SCRIPT_B);
+        let test_script_c = vfs::file::read_only(TEST_SCRIPT_C);
         foo_subdir
             .add_entry("relative_symlink", Arc::new(TestSymlink("../neils_philosophy".to_owned())))
             .unwrap();
@@ -118,7 +151,11 @@ impl<T: AsRef<str>> Test<T> {
             .unwrap();
         test_subdir.add_entry("foo", foo_subdir).unwrap();
         test_subdir.add_entry("neils_philosophy", test_file).unwrap();
+        import_subdir.add_entry("test_script_a", test_script_a).unwrap();
+        import_subdir.add_entry("test_script_b", test_script_b).unwrap();
+        import_subdir.add_entry("test_script_c", test_script_c).unwrap();
         simple.add_entry("test", test_subdir).unwrap();
+        simple.add_entry("imports", import_subdir).unwrap();
         assert!(
             self.with_dirs.replace(proxy.into_client_end().unwrap()).is_none(),
             "Set directory root twice!"
@@ -893,4 +930,171 @@ async fn complex_global_usage_interleaving() {
 
     let value = interpreter.run("c").await.unwrap();
     assert_eq!(7, value.try_usize().unwrap());
+}
+
+#[fuchsia::test]
+async fn import_as() {
+    Test::test(
+        r#"
+    import /imports/test_script_a as foo
+    $foo.imported_command | _
+    "#,
+    )
+    .with_fidl()
+    .with_standard_test_dirs()
+    .check(|value| {
+        let Value::String(value) = value else {
+            panic!();
+        };
+
+        assert_eq!("ran imported command", &value);
+    })
+    .await;
+}
+
+#[fuchsia::test]
+async fn import_as_hermeticity() {
+    Test::test(
+        r#"
+    def imported_command {
+        "ran shadowed local command"
+    }
+    import /imports/test_script_b as foo
+    let a = $foo.imported_command_alias | _;
+    let b = imported_command;
+    $a + " " + $b
+    "#,
+    )
+    .with_fidl()
+    .with_standard_test_dirs()
+    .check(|value| {
+        let Value::String(value) = value else {
+            panic!();
+        };
+
+        assert_eq!("ran imported command ran shadowed local command", &value);
+    })
+    .await;
+}
+
+#[fuchsia::test]
+async fn import_as_nesting() {
+    Test::test(
+        r#"
+    const foo = { 
+        imported_command: \() { "ran shadowed local command" }
+    };
+    let a = {
+        import /imports/test_script_a as foo
+        $foo.imported_command | _
+    };
+    let b = $foo.imported_command | _;
+    $a + " " + $b
+    "#,
+    )
+    .with_fidl()
+    .with_standard_test_dirs()
+    .check(|value| {
+        let Value::String(value) = value else {
+            panic!();
+        };
+
+        assert_eq!("ran imported command ran shadowed local command", &value);
+    })
+    .await;
+}
+
+#[fuchsia::test]
+async fn import() {
+    Test::test(
+        r#"
+    import /imports/test_script_a
+    imported_command
+    "#,
+    )
+    .with_fidl()
+    .with_standard_test_dirs()
+    .check(|value| {
+        let Value::String(value) = value else {
+            panic!();
+        };
+
+        assert_eq!("ran imported command", &value);
+    })
+    .await;
+}
+
+#[fuchsia::test]
+async fn import_hermeticity() {
+    Test::test(
+        r#"
+    def imported_command {
+        "ran shadowed local command"
+    }
+    import /imports/test_script_b
+    let a = imported_command_alias;
+    let b = imported_command;
+    $a + " " + $b
+    "#,
+    )
+    .with_fidl()
+    .with_standard_test_dirs()
+    .check(|value| {
+        let Value::String(value) = value else {
+            panic!();
+        };
+
+        assert_eq!("ran imported command ran shadowed local command", &value);
+    })
+    .await;
+}
+
+#[fuchsia::test]
+async fn import_hermeticity_global_imports() {
+    Test::test(
+        r#"
+    def imported_command {
+        "ran shadowed local command"
+    }
+    import /imports/test_script_c
+    let a = imported_command_alias;
+    let b = imported_command;
+    $a + " " + $b
+    "#,
+    )
+    .with_fidl()
+    .with_standard_test_dirs()
+    .check(|value| {
+        let Value::String(value) = value else {
+            panic!();
+        };
+
+        assert_eq!("ran imported command ran imported command", &value);
+    })
+    .await;
+}
+
+#[fuchsia::test]
+async fn import_nesting() {
+    Test::test(
+        r#"
+    def imported_command { "ran shadowed local command" }
+    let a = {
+        import /imports/test_script_a
+        imported_command
+    };
+    let b = imported_command;
+    $a + " " + $b
+    "#,
+    )
+    .with_fidl()
+    .with_standard_test_dirs()
+    .check(|value| {
+        let Value::String(value) = value else {
+            panic!();
+        };
+
+        assert_eq!("ran imported command ran shadowed local command", &value);
+    })
+    .await;
 }

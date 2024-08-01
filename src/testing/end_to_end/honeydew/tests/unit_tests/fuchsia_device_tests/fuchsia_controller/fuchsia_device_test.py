@@ -44,17 +44,20 @@ from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.interfaces.device_classes import (
     fuchsia_device as fuchsia_device_interface,
 )
+from honeydew.interfaces.transports import serial as serial_interface
 from honeydew.transports import fastboot as fastboot_transport
 from honeydew.transports import ffx as ffx_transport
 from honeydew.transports import (
     fuchsia_controller as fuchsia_controller_transport,
 )
+from honeydew.transports import serial_using_unix_socket
 from honeydew.typing import custom_types
 
 # pylint: disable=protected-access
 
 _INPUT_ARGS: dict[str, Any] = {
     "device_name": "fuchsia-emulator",
+    "device_serial_socket": "/tmp/socket",
     "ffx_config": custom_types.FFXConfig(
         isolate_dir=fuchsia_controller.IsolateDir("/tmp/isolate"),
         logs_dir="/tmp/logs",
@@ -75,7 +78,7 @@ _MOCK_DEVICE_PROPERTIES: dict[str, dict[str, Any]] = {
     "build_info": {
         "version": "123456",
     },
-    "device_info": {
+    "device_info_from_fidl": {
         "serial_number": "123456",
     },
     "product_info": {
@@ -149,7 +152,11 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
             ) as mock_fc_check_connection,
         ):
             self.fd_obj = fc_fuchsia_device.FuchsiaDevice(
-                device_name=_INPUT_ARGS["device_name"],
+                device_info=custom_types.DeviceInfo(
+                    name=_INPUT_ARGS["device_name"],
+                    ip_port=None,
+                    serial_socket=_INPUT_ARGS["device_serial_socket"],
+                ),
                 ffx_config=_INPUT_ARGS["ffx_config"],
             )
 
@@ -203,6 +210,33 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
             self.fd_obj.fuchsia_controller,
             fuchsia_controller_transport.FuchsiaController,
         )
+
+    def test_serial_transport(self) -> None:
+        """Test case to make sure fc_fuchsia_device supports serial transport."""
+        self.assertIsInstance(
+            self.fd_obj.serial,
+            serial_using_unix_socket.Serial,
+        )
+
+    def test_serial_transport_error(self) -> None:
+        """Test case to make sure fc_fuchsia_device raises error when we try to
+        access "serial" transport without device_serial_socket."""
+
+        device_info: custom_types.DeviceInfo = self.fd_obj._device_info
+
+        self.fd_obj._device_info = custom_types.DeviceInfo(
+            name=_INPUT_ARGS["device_name"],
+            ip_port=None,
+            serial_socket=None,
+        )
+
+        with self.assertRaisesRegex(
+            errors.FuchsiaDeviceError,
+            "'device_serial_socket' arg need to be provided during the init to use Serial affordance",
+        ):
+            _: serial_interface.Serial = self.fd_obj.serial
+
+        self.fd_obj._device_info = device_info
 
     # List all the tests related to affordances
     def test_session(self) -> None:
@@ -304,7 +338,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         )
         bt_gap_fc_init.assert_called_once_with(
             self.fd_obj.bluetooth_gap,
-            device_name=self.fd_obj._name,
+            device_name=self.fd_obj._device_info.name,
             fuchsia_controller=self.fd_obj.fuchsia_controller,
             reboot_affordance=self.fd_obj,
         )
@@ -388,7 +422,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
 
     @mock.patch.object(
         fc_fuchsia_device.FuchsiaDevice,
-        "_device_info",
+        "_device_info_from_fidl",
         return_value={
             "serial_number": "default-serial-number",
         },
@@ -810,7 +844,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         "get_info",
         new_callable=mock.AsyncMock,
         return_value=f_hwinfo.DeviceGetInfoResponse(
-            info=_MOCK_DEVICE_PROPERTIES["device_info"]
+            info=_MOCK_DEVICE_PROPERTIES["device_info_from_fidl"]
         ),
     )
     @mock.patch.object(
@@ -818,7 +852,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         "connect_device_proxy",
         autospec=True,
     )
-    def test_device_info(
+    def test_device_info_from_fidl(
         self,
         mock_fc_connect_device_proxy: mock.Mock,
         mock_hwinfo_device: mock.Mock,
@@ -826,7 +860,8 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         """Testcase for FuchsiaDevice._device_info property"""
         # pylint: disable=protected-access
         self.assertEqual(
-            self.fd_obj._device_info, _MOCK_DEVICE_PROPERTIES["device_info"]
+            self.fd_obj._device_info_from_fidl,
+            _MOCK_DEVICE_PROPERTIES["device_info_from_fidl"],
         )
 
         mock_fc_connect_device_proxy.assert_called_once()
@@ -837,7 +872,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         "get_info",
         new_callable=mock.AsyncMock,
         return_value=f_hwinfo.DeviceGetInfoResponse(
-            info=_MOCK_DEVICE_PROPERTIES["device_info"]
+            info=_MOCK_DEVICE_PROPERTIES["device_info_from_fidl"]
         ),
     )
     @mock.patch.object(
@@ -845,7 +880,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         "connect_device_proxy",
         autospec=True,
     )
-    def test_device_info_error(
+    def test_device_info_from_fidl_error(
         self,
         mock_fc_connect_device_proxy: mock.Mock,
         mock_hwinfo_device: mock.Mock,
@@ -858,7 +893,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         )
         with self.assertRaises(errors.FuchsiaControllerError):
             # pylint: disable=protected-access
-            _ = self.fd_obj._device_info
+            _: dict[str, Any] = self.fd_obj._device_info_from_fidl
 
         mock_fc_connect_device_proxy.assert_called_once()
 

@@ -21,6 +21,7 @@
                 "fuchsia.driver.development.Manager",
                 "fuchsia.driver.registrar.DriverRegistrar",
                 "fuchsia.driver.test.Realm",
+                "fuchsia.inspect.InspectSink",
             ],
         },
         {
@@ -97,6 +98,7 @@
                 "fuchsia.driver.development.Manager",
                 "fuchsia.driver.registrar.DriverRegistrar",
                 "fuchsia.driver.test.Realm",
+                "fuchsia.inspect.InspectSink",
             ],
             from: "self",
         },

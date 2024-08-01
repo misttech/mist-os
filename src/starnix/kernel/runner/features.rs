@@ -19,6 +19,7 @@ use starnix_core::device::remote_block_device::remote_block_device_init;
 use starnix_core::device::touch_power_policy_device::TouchPowerPolicyDevice;
 use starnix_core::task::{CurrentTask, Kernel, KernelFeatures};
 use starnix_core::vfs::FsString;
+use starnix_logging::log_error;
 use starnix_sync::{Locked, Unlocked};
 use starnix_uapi::error;
 use starnix_uapi::errors::Errno;
@@ -50,8 +51,13 @@ pub struct Features {
 
     pub gfxstream: bool,
 
+    /// Include the /container directory in the root file system.
+    pub container: bool,
+
+    /// Include the /test_data directory in the root file system.
     pub test_data: bool,
 
+    /// Include the /custom_artifacts directory in the root file system.
     pub custom_artifacts: bool,
 
     pub android_serialno: bool,
@@ -65,6 +71,8 @@ pub struct Features {
     pub android_fdr: bool,
 
     pub rootfs_rw: bool,
+
+    pub network_manager: bool,
 }
 
 /// Parses all the featurse in `entries`.
@@ -72,6 +80,10 @@ pub struct Features {
 /// Returns an error if parsing fails, or if an unsupported feature is present in `features`.
 pub fn parse_features(entries: &Vec<String>) -> Result<Features, Error> {
     let mut features = Features::default();
+    // TODO(https://fxbug.dev/356684424): Remove once all CML files are explicit
+    // about wanting this process.
+    features.container = true;
+
     for entry in entries {
         let (raw_flag, raw_args) =
             entry.split_once(':').map(|(f, a)| (f, Some(a.to_string()))).unwrap_or((entry, None));
@@ -93,12 +105,14 @@ pub fn parse_features(entries: &Vec<String>) -> Result<Features, Error> {
                     "Aspect ratio feature must contain the aspect ratio in the format: aspect_ratio:w:h"
                 ))
             }
+            ("container", _) => features.container = true,
             ("custom_artifacts", _) => features.custom_artifacts = true,
             ("ashmem", _) => features.ashmem = true,
             ("framebuffer", _) => features.framebuffer = true,
             ("framebuffer2", _) => features.framebuffer2 = true,
             ("gralloc", _) => features.gralloc = true,
             ("magma", _) => features.magma = true,
+            ("network_manager", _) => features.network_manager = true,
             ("gfxstream", _) => features.gfxstream = true,
             ("bpf", Some(version)) => features.kernel.bpf_v2 = version == "v2",
             ("perfetto", Some(socket_path)) => {
@@ -236,6 +250,11 @@ pub fn run_container_features(
     if features.android_fdr {
         android_bootloader_message_store_init(locked, system_task);
         remote_block_device_init(locked, system_task);
+    }
+    if features.network_manager {
+        if let Err(e) = kernel.network_manager.init() {
+            log_error!("Network manager initialization failed: ({e:?})");
+        }
     }
 
     Ok(())

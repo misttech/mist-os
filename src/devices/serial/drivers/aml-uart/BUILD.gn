@@ -201,7 +201,7 @@ test("aml-uart-dfv2-test-bin") {
     ":aml-uart-dfv2-source",
     "//sdk/fidl/fuchsia.hardware.serial:fuchsia.hardware.serial_cpp",
     "//sdk/fidl/fuchsia.power.system:fuchsia.power.system_cpp",
-    "//sdk/lib/driver/testing/cpp:driver_testing_cpp",
+    "//sdk/lib/driver/testing/cpp",
     "//src/devices/bind/fuchsia.broadcom.platform:fuchsia.broadcom.platform_cpp",
     "//src/devices/bus/testing/fake-pdev",
     "//src/devices/testing/fake-mmio-reg",

@@ -12,6 +12,7 @@ rustc_library("fidl_fuchsia_net_filter_ext") {
     "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
     "//sdk/fidl/fuchsia.net.filter:fuchsia.net.filter_rust",
     "//sdk/fidl/fuchsia.net.interfaces:fuchsia.net.interfaces_rust",
+    "//sdk/fidl/fuchsia.net.root:fuchsia.net.root_rust",
     "//src/connectivity/lib/net-types",
     "//src/lib/async-utils",
     "//src/lib/fidl/rust/fidl",

@@ -94,12 +94,12 @@ pub(crate) async fn serve(
                         &node,
                     )
                     .await;
-                    guard.map(|o| {
+                    if let Some(o) = guard {
                         o.end(&[ftrace::ArgValue::of(
                             "status",
                             Status::from(response).to_string().as_str(),
                         )])
-                    });
+                    }
                     drop(node);
                     responder.send(response.map_err(|status| status.into_raw()))?;
                 }

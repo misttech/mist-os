@@ -148,6 +148,7 @@ rustc_library("starnix_core") {
     "fs/layeredfs.rs",
     "fs/mod.rs",
     "fs/nmfs/fs.rs",
+    "fs/nmfs/manager.rs",
     "fs/nmfs/mod.rs",
     "fs/overlayfs.rs",
     "fs/proc/fs.rs",
@@ -341,6 +342,7 @@ rustc_library("starnix_core") {
     "//src/lib/dense-map",
     "//src/lib/diagnostics/data/rust",
     "//src/lib/diagnostics/inspect/contrib/rust",
+    "//src/lib/diagnostics/inspect/derive",
     "//src/lib/diagnostics/inspect/rust",
     "//src/lib/fdio/rust:fdio",
     "//src/lib/fidl/rust/fidl",
@@ -424,6 +426,7 @@ rustc_library("starnix_core") {
   test_deps = [
     "//src/connectivity/lib/net-declare",
     "//src/lib/const-unwrap",
+    "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-fs",
     "//src/lib/test_util",

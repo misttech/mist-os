@@ -144,9 +144,7 @@ Resulting product is not supported and may misbehave!
     // the bundles that are providing a Some() value, and reporting them all in the error.
     let board_configuration_files = board_input_bundles
         .iter()
-        .filter_map(
-            |(path, bib)| if let Some(cfg) = &bib.configuration { Some((path, cfg)) } else { None },
-        )
+        .filter_map(|(path, bib)| bib.configuration.as_ref().map(|cfg| (path, cfg)))
         .collect::<Vec<_>>();
 
     let board_provided_config = if board_configuration_files.len() > 1 {
@@ -178,7 +176,7 @@ Resulting product is not supported and may misbehave!
 
     // Now that all the configuration has been determined, create the builder
     // and start doing the work of creating the image assembly config.
-    let mut builder = ImageAssemblyConfigBuilder::new(platform.build_type.clone());
+    let mut builder = ImageAssemblyConfigBuilder::new(platform.build_type);
 
     // Set the developer overrides, if any.
     if let Some(developer_overrides) = developer_overrides {

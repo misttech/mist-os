@@ -10,11 +10,11 @@
 //! direct access to the backing directory, with the goal of making it easier for clients to work
 //! with isolated storage without needing to understand component_manager's storage layout.
 
-use crate::capability::CapabilitySource;
 use crate::model::component::{ComponentInstance, WeakComponentInstance};
-use crate::model::routing::{Route, RouteSource};
+use crate::model::routing::Route;
 use crate::model::storage::{self, BackingDirectoryInfo};
 use ::routing::capability_source::ComponentCapability;
+use ::routing::RouteSource;
 use anyhow::{format_err, Context, Error};
 use cm_rust::{StorageDecl, UseDecl};
 use component_id_index::InstanceId;
@@ -24,6 +24,7 @@ use fuchsia_fs::directory as ffs_dir;
 use futures::stream::{FuturesUnordered, StreamExt};
 use futures::{Future, TryFutureExt, TryStreamExt};
 use moniker::Moniker;
+use routing::capability_source::CapabilitySource;
 use routing::component_instance::ComponentInstanceInterface;
 use routing::RouteRequest;
 use std::path::PathBuf;
@@ -138,13 +139,14 @@ impl StorageAdmin {
         let storage_source = RouteSource {
             source: CapabilitySource::Component {
                 capability: ComponentCapability::Storage(storage_decl.clone()),
-                component: component.clone(),
+                moniker: component.moniker.clone(),
             },
             relative_path: Default::default(),
         };
-        let backing_dir_source_info = storage::route_backing_directory(storage_source.source)
-            .await
-            .context("could not serve storage protocol, routing backing directory failed")?;
+        let backing_dir_source_info =
+            storage::route_backing_directory(&component.upgrade()?, storage_source.source)
+                .await
+                .context("could not serve storage protocol, routing backing directory failed")?;
 
         let component = component.upgrade().map_err(|e| {
             format_err!(
@@ -617,7 +619,8 @@ impl StorageAdmin {
                     };
 
                 let backing_dir_info =
-                    match storage::route_backing_directory(storage_source.source).await {
+                    match storage::route_backing_directory(&component, storage_source.source).await
+                    {
                         Ok(s) => s,
                         Err(_) => continue,
                     };

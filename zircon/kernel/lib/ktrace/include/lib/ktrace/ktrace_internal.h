@@ -103,9 +103,9 @@ class KTraceState {
   }
 
   bool IsCategoryEnabled(const fxt::InternedCategory& category) const {
-    const uint32_t bit_number = category.GetBit();
+    const uint32_t bit_number = category.index();
     const uint32_t bitmask =
-        bit_number != fxt::InternedCategory::kInvalidBitNumber ? 1u << bit_number : 0;
+        bit_number != fxt::InternedCategory::kInvalidIndex ? 1u << bit_number : 0;
     return (bitmask & grpmask()) != 0;
   }
 

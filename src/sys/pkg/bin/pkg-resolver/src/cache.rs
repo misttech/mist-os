@@ -603,7 +603,7 @@ async fn fetch_blob(
     blob_fetch_params: BlobFetchParams,
 ) -> Result<(), FetchError> {
     // TODO try the other mirrors depending on the errors encountered trying this one.
-    let mirror = context.mirrors.get(0).ok_or(FetchError::NoMirrors)?;
+    let mirror = context.mirrors.first().ok_or(FetchError::NoMirrors)?;
     let trace_id = ftrace::Id::random();
     let guard = ftrace::async_enter!(
         trace_id,
@@ -618,7 +618,7 @@ async fn fetch_blob(
     let res = fetch_blob_http(
         &inspect,
         http_client,
-        &mirror,
+        mirror,
         merkle,
         &context.opener,
         blob_fetch_params,
@@ -627,7 +627,9 @@ async fn fetch_blob(
         trace_id,
     )
     .await;
-    guard.map(|o| o.end(&[ftrace::ArgValue::of("result", format!("{res:?}").as_str())]));
+    if let Some(o) = guard {
+        o.end(&[ftrace::ArgValue::of("result", format!("{res:?}").as_str())])
+    }
     res
 }
 
@@ -697,12 +699,12 @@ async fn fetch_blob_http(
                         Ok(size) => (size.to_string(), "success".to_string()),
                         Err(e) => ("no size because download failed".to_string(), e.to_string()),
                     };
-                    guard.map(|o| {
+                    if let Some(o) = guard {
                         o.end(&[
                             ftrace::ArgValue::of("size", size_str.as_str()),
                             ftrace::ArgValue::of("status", status_str.as_str()),
                         ])
-                    });
+                    }
                     inspect.state(inspect::Http::CloseBlob);
                     blob_closer.close().await;
                     res?;

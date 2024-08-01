@@ -98,7 +98,7 @@ async fn resolve(
         fidl::endpoints::create_proxy().map_err(ResolverError::CreateEndpoints)?;
     let context = super::package::resolve_impl(
         match url.package_url() {
-            fuchsia_url::PackageUrl::Absolute(url) => &url,
+            fuchsia_url::PackageUrl::Absolute(url) => url,
             fuchsia_url::PackageUrl::Relative(_) => Err(ResolverError::AbsoluteUrlRequired)?,
         },
         server_end,
@@ -152,7 +152,7 @@ async fn load_config(
     };
 
     Ok(Some(
-        mem_util::open_file_data(&package, &config_path)
+        mem_util::open_file_data(package, config_path)
             .await
             .map_err(ResolverError::ConfigValuesNotFound)?,
     ))
@@ -163,7 +163,7 @@ async fn resolve_from_package(
     package: fio::DirectoryProxy,
     outgoing_context: fcomponent_resolution::Context,
 ) -> Result<fcomponent_resolution::Component, ResolverError> {
-    let data = mem_util::open_file_data(&package, &url.resource())
+    let data = mem_util::open_file_data(&package, url.resource())
         .await
         .map_err(ResolverError::ComponentNotFound)?;
     let decl: fcomponent_decl::Component = fidl::unpersist(

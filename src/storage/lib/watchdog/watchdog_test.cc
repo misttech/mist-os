@@ -2,42 +2,24 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fuchsia/diagnostics/cpp/fidl.h>
-#include <fuchsia/logger/cpp/fidl.h>
-#include <lib/async-loop/cpp/loop.h>
-#include <lib/async/dispatcher.h>
-#include <lib/async/wait.h>
-#include <lib/fidl/cpp/binding_set.h>
-#include <lib/fpromise/promise.h>
-#include <lib/syslog/cpp/log_settings.h>
-#include <lib/syslog/cpp/macros.h>
-#include <lib/watchdog/operations.h>
-#include <lib/watchdog/watchdog.h>
-#include <unistd.h>
+#include "src/storage/lib/watchdog/watchdog.h"
+
+#include <zircon/errors.h>
 
 #include <atomic>
 #include <chrono>
-#include <cinttypes>
 #include <cstddef>
 #include <cstdio>
-#include <memory>
-#include <sstream>
+#include <functional>
 #include <string>
 #include <string_view>
 #include <thread>
-#include <type_traits>
 #include <utility>
 
-#include <fbl/unique_fd.h>
-#include <src/diagnostics/lib/cpp-log-decoder/log_decoder.h>
 #include <src/diagnostics/lib/cpp-log-tester/log_tester.h>
-#include <src/lib/diagnostics/accessor2logger/log_message.h>
-#include <src/lib/fsl/vmo/sized_vmo.h>
-#include <src/lib/fsl/vmo/strings.h>
-#include <src/lib/fxl/strings/join_strings.h>
-#include <src/lib/fxl/strings/string_printf.h>
-#include <src/lib/uuid/uuid.h>
 #include <zxtest/zxtest.h>
+
+#include "src/storage/lib/watchdog/operations.h"
 
 namespace fs_watchdog {
 namespace {

@@ -6178,7 +6178,7 @@ launcher). Example for ccache:
 
 **Current value (from the default):** `""`
 
-From //third_party/pigweed/src/pw_toolchain/generate_toolchain.gni:29
+From //third_party/pigweed/src/pw_toolchain/toolchain_args.gni:24
 
 ### pw_compilation_testing_NEGATIVE_COMPILATION_ENABLED
 
@@ -6403,6 +6403,22 @@ From //third_party/pigweed/src/pw_toolchain/rbe.gni:30
 **Current value (from the default):** `""`
 
 From //third_party/pigweed/src/pw_toolchain/rbe.gni:29
+
+### pw_rust_ENABLE_EXPERIMENTAL_BUILD
+
+Enables compiling Pigweed's Rust libraries.
+
+WARNING: This is experimental and *not* guaranteed to work.
+
+**Current value (from the default):** `false`
+
+From //third_party/pigweed/src/pw_rust/rust.gni:19
+
+### pw_rust_USE_STD
+
+**Current value (from the default):** `true`
+
+From //third_party/pigweed/src/pw_rust/rust.gni:21
 
 ### pw_span_CONFIG
 
@@ -6820,7 +6836,7 @@ by the generate_toolchain template. This should NOT be manually modified.
 
 **Current value (from the default):** `{ }`
 
-From //third_party/pigweed/src/pw_toolchain/generate_toolchain.gni:23
+From //third_party/pigweed/src/pw_toolchain/toolchain_args.gni:18
 
 ### pw_toolchain_STATIC_ANALYSIS_SKIP_INCLUDE_PATHS
 

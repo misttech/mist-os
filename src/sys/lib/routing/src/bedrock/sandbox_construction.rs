@@ -720,7 +720,7 @@ impl<C: ComponentInstanceInterface + 'static> sandbox::Routable for UnitRouter<C
             return Ok(Capability::Dictionary(
                 CapabilitySource::Void {
                     capability: self.capability.clone(),
-                    component: self.component.clone(),
+                    moniker: self.component.moniker.clone(),
                 }
                 .try_into()
                 .expect("failed to convert capability source to dictionary"),

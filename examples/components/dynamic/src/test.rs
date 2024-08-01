@@ -35,13 +35,11 @@ async fn send_single_response_and_exit(
 async fn create_dictionary_with_receiver(
     store: &fsandbox::CapabilityStoreProxy,
     id_gen: &sandbox::CapabilityIdGenerator,
-    connector: fsandbox::Connector,
+    connector_id: u64,
 ) -> fsandbox::DictionaryRef {
     let dict_id = id_gen.next();
-    let connector_id = id_gen.next();
 
     store.dictionary_create(dict_id).await.unwrap().unwrap();
-    store.import(connector_id, fsandbox::Capability::Connector(connector)).await.unwrap().unwrap();
     store
         .dictionary_insert(
             dict_id,
@@ -63,7 +61,6 @@ async fn create_dictionary_with_receiver(
 
 async fn create_child_with_specialized_name(
     store: &fsandbox::CapabilityStoreProxy,
-    factory: &fsandbox::FactoryProxy,
     realm: &fidl_fuchsia_component::RealmProxy,
     id_gen: &sandbox::CapabilityIdGenerator,
     name: String,
@@ -71,10 +68,11 @@ async fn create_child_with_specialized_name(
     // Create our connector.
     let (receiver, receiver_stream) =
         endpoints::create_request_stream::<fsandbox::ReceiverMarker>().unwrap();
-    let connector = factory.create_connector(receiver).await.unwrap();
+    let connector_id = id_gen.next();
+    store.connector_create(connector_id, receiver).await.unwrap().unwrap();
 
     // Create our dictionary
-    let dict_ref = create_dictionary_with_receiver(&store, id_gen, connector).await;
+    let dict_ref = create_dictionary_with_receiver(&store, id_gen, connector_id).await;
     tracing::info!("Populated the dictionary");
 
     // Create our child and supply it with the protocol in the form of a
@@ -103,11 +101,10 @@ async fn create_child_with_specialized_name(
 // We then verify that we receive the one call to echo.
 #[fuchsia::test]
 async fn create_child() {
-    let factory = client::connect_to_protocol::<fsandbox::FactoryMarker>().unwrap();
     let store = client::connect_to_protocol::<fsandbox::CapabilityStoreMarker>().unwrap();
     let realm = client::connect_to_protocol::<fidl_fuchsia_component::RealmMarker>().unwrap();
     let id_gen = sandbox::CapabilityIdGenerator::new();
 
-    create_child_with_specialized_name(&store, &factory, &realm, &id_gen, "child-a".into()).await;
-    create_child_with_specialized_name(&store, &factory, &realm, &id_gen, "child-b".into()).await;
+    create_child_with_specialized_name(&store, &realm, &id_gen, "child-a".into()).await;
+    create_child_with_specialized_name(&store, &realm, &id_gen, "child-b".into()).await;
 }

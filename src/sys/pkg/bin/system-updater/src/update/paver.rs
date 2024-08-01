@@ -28,14 +28,15 @@ async fn paver_write_firmware(
         .write_firmware(configuration, type_, buffer)
         .await
         .context("DataSink.WriteFirmware FIDL error")?;
-    Ok(match res {
+    match res {
         fpaver::WriteFirmwareResult::Status(status) => {
             zx::Status::ok(status).context("firmware failed to write")?;
         }
         fpaver::WriteFirmwareResult::Unsupported(_) => {
             info!("skipping unsupported firmware type: {type_}");
         }
-    })
+    };
+    Ok(())
 }
 
 async fn paver_write_asset(
@@ -91,7 +92,7 @@ async fn write_asset_to_configurations(
     asset: fpaver::Asset,
     buffer: fmem::Buffer,
 ) -> anyhow::Result<()> {
-    Ok(match configuration {
+    match configuration {
         TargetConfiguration::Single(configuration) => {
             // Devices supports ABR and/or a specific configuration (ex. Recovery) was requested.
             paver_write_asset(data_sink, configuration, asset, buffer).await?
@@ -119,7 +120,8 @@ async fn write_asset_to_configurations(
                 Err(e) => Err(e)?,
             }
         }
-    })
+    };
+    Ok(())
 }
 
 async fn write_firmware_to_configurations(
@@ -128,7 +130,7 @@ async fn write_firmware_to_configurations(
     type_: &str,
     buffer: fmem::Buffer,
 ) -> anyhow::Result<()> {
-    Ok(match configuration {
+    match configuration {
         TargetConfiguration::Single(configuration) => {
             // Device supports ABR or a specific configuration (ex. Recovery) was requested.
             paver_write_firmware(data_sink, configuration, type_, buffer).await?
@@ -149,7 +151,8 @@ async fn write_firmware_to_configurations(
             // skipped.
             paver_write_firmware(data_sink, fpaver::Configuration::B, type_, buffer).await?
         }
-    })
+    };
+    Ok(())
 }
 
 pub async fn write_image(

@@ -203,6 +203,31 @@ open protocol CapabilityStore {
         capability Capability;
     }) -> () error CapabilityStoreError;
 
+    /// Creates a [Connector] from a [Receiver]. Incoming connections to the [Connector] will be
+    /// dispatched to this [Receiver].
+    ///
+    /// Errors:
+    ///
+    /// - `ID_ALREADY_EXISTS` if a capability with `id` already exists in this store.
+    flexible ConnectorCreate(resource struct {
+        id NewCapabilityId;
+        receiver client_end:Receiver;
+    }) -> () error CapabilityStoreError;
+
+    /// Open a connection from the provided [Connector] capability that will be dispatched to
+    /// the [Receiver] on the other end.
+    ///
+    /// If there is an error, it will be reported as a zx.Status epitaph on `server_end`.
+    ///
+    /// Errors:
+    ///
+    /// - `ID_NOT_FOUND` if `id` was not a valid capability id in this store.
+    /// - `WRONG_TYPE` if `id` was not a connector capability.
+    flexible ConnectorOpen(resource struct {
+        id CapabilityId;
+        server_end zx.Handle:CHANNEL;
+    }) -> () error CapabilityStoreError;
+
     /// Creates a new empty dictionary in this [`CapabilityStore`] with client-assigned `id`.
     ///
     /// Errors:
@@ -216,6 +241,11 @@ open protocol CapabilityStore {
     ///
     /// This is a legacy API to support backward compatibility with APIs that take a [Dictionary]
     /// channel.
+    ///
+    /// Errors:
+    ///
+    /// - `ID_ALREADY_EXISTS` if a capability with `id` already exists in this store.
+    /// - `BAD_CAPABILITY` if `client_end` was not a valid dictionary channel.
     flexible DictionaryLegacyImport(resource struct {
         id NewCapabilityId;
         client_end zx.Handle:CHANNEL;
@@ -226,6 +256,10 @@ open protocol CapabilityStore {
     ///
     /// This is a legacy API to support backward compatibility with APIs that take a [Dictionary]
     /// channel.
+    ///
+    /// Errors:
+    ///
+    /// - `ID_NOT_FOUND` if `id` was not a valid capability id in this store.
     flexible DictionaryLegacyExport(resource struct {
         id CapabilityId;
         server_end zx.Handle:CHANNEL;
@@ -484,40 +518,4 @@ open protocol Receiver {
 @available(added=HEAD)
 type ProtocolPayload = resource struct {
     channel zx.Handle:CHANNEL;
-};
-
-@available(added=HEAD)
-type FactoryError = flexible enum : uint32 {
-    /// An invalid argument was passed.
-    INVALID_ARGS = 1;
-
-    /// The requested resource was unavailable.
-    UNAVAILABLE = 2;
-};
-
-/// The [`Factory`] protocol handles:
-///
-/// - Instantiation of sandbox types.
-/// - Controlling sandbox objects given tokens.
-///
-@discoverable
-@available(added=HEAD)
-open protocol Factory {
-    /// Open a connection from the provided [Connector] capability.
-    ///
-    /// If there is an error, it will be reported as a zx.Status epitaph on `server_end`.
-    /// Errors:
-    ///
-    /// - `INVALID_ARGS`: `capability` is not a recognized [Connector].
-    flexible OpenConnector(resource struct {
-        capability Connector;
-        server_end zx.Handle:CHANNEL;
-    });
-
-    /// Creates a `Connector` from a client served `Receiver`.
-    flexible CreateConnector(resource struct {
-        receiver client_end:Receiver;
-    }) -> (resource struct {
-        capability Connector;
-    });
 };

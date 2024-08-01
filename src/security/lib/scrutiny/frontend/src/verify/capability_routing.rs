@@ -13,6 +13,7 @@ use cm_fidl_analyzer::component_model::{AnalyzerModelError, ComponentModelForAna
 use cm_fidl_analyzer::route::{CapabilityRouteError, VerifyRouteResult};
 use cm_fidl_analyzer::{BreadthFirstModelWalker, ComponentInstanceVisitor, ComponentModelWalker};
 use cm_rust::CapabilityTypeName;
+use futures::FutureExt;
 use routing::error::{ComponentInstanceError, RoutingError};
 use scrutiny_collection::model::DataModel;
 use scrutiny_collection::v2_component_model::V2ComponentModel;
@@ -27,8 +28,8 @@ enum ResultBySeverity {
     Ok(OkResult),
 }
 
-impl From<VerifyRouteResult<ComponentInstanceForAnalyzer>> for ResultBySeverity {
-    fn from(verify_route_result: VerifyRouteResult<ComponentInstanceForAnalyzer>) -> Self {
+impl From<VerifyRouteResult> for ResultBySeverity {
+    fn from(verify_route_result: VerifyRouteResult) -> Self {
         match verify_route_result.error {
             None => OkResult {
                 using_node: verify_route_result.using_node,
@@ -136,7 +137,7 @@ impl FromArgValue for ResponseLevel {
 struct CapabilityRouteVisitor {
     model: Arc<ComponentModelForAnalyzer>,
     capability_types: HashSet<CapabilityTypeName>,
-    results: HashMap<CapabilityTypeName, Vec<VerifyRouteResult<ComponentInstanceForAnalyzer>>>,
+    results: HashMap<CapabilityTypeName, Vec<VerifyRouteResult>>,
 }
 
 impl CapabilityRouteVisitor {
@@ -209,7 +210,11 @@ impl CapabilityRouteVisitor {
 
 impl ComponentInstanceVisitor for CapabilityRouteVisitor {
     fn visit_instance(&mut self, instance: &Arc<ComponentInstanceForAnalyzer>) -> Result<()> {
-        let check_results = self.model.check_routes_for_instance(instance, &self.capability_types);
+        let check_results = self
+            .model
+            .check_routes_for_instance(instance, &self.capability_types)
+            .now_or_never()
+            .unwrap();
         for (type_name, results) in check_results.into_iter() {
             let type_results =
                 self.results.get_mut(&type_name).expect("expected results for capability type");

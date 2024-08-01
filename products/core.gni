@@ -32,14 +32,7 @@ core_realm_shards = []
 legacy_cache_package_labels += [
   "//src/media/codec/bundles:services",
   "//src/media/sessions/bundles:services",
-
-  # TODO(b/353560491): delete this
-  "//src/session/bin/session_manager:fake_session_manager",
 ]
-
-# TODO(b/353560491): delete this
-core_realm_shards +=
-    [ "//src/session/bin/session_manager:fake_session_manager_core_shard" ]
 
 discoverable_package_labels = [ "//bundles/tools" ]
 

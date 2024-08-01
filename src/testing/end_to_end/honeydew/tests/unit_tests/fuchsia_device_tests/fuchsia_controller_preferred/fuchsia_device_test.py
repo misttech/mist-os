@@ -79,7 +79,11 @@ class FuchsiaDeviceFCPreferredTests(unittest.TestCase):
             ) as mock_sl4f_check_connection,
         ):
             self.fd_obj = fc_preferred_fuchsia_device.FuchsiaDevice(
-                device_name=_INPUT_ARGS["device_name"],
+                device_info=custom_types.DeviceInfo(
+                    name=_INPUT_ARGS["device_name"],
+                    ip_port=None,
+                    serial_socket=None,
+                ),
                 ffx_config=_INPUT_ARGS["ffx_config"],
             )
 

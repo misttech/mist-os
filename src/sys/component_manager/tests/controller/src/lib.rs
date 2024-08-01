@@ -455,12 +455,6 @@ async fn start_with_numbered_handles() {
 async fn start_with_dict() {
     let mut spawned_child = spawn_local_child_controller_from_create_child().await;
 
-    // Connect to `fuchsia.component.sandbox.Factory` exposed by the nested component manager.
-    let factory = spawned_child
-        .cm_realm_instance
-        .root
-        .connect_to_protocol_at_exposed_dir::<fsandbox::FactoryMarker>()
-        .expect("failed to connect to fuchsia.component.sandbox.Factory");
     let store = spawned_child
         .cm_realm_instance
         .root
@@ -493,17 +487,11 @@ async fn start_with_dict() {
     });
 
     // Create a sender from our receiver.
-    let connector_client =
-        factory.create_connector(receiver_client).await.expect("failed to call CreateOpen");
+    let connector_id = 10;
+    store.connector_create(connector_id, receiver_client).await.unwrap().unwrap();
 
     let dict_id = 1;
     store.dictionary_create(dict_id).await.unwrap().unwrap();
-    let connector_id = 10;
-    store
-        .import(connector_id, fsandbox::Capability::Connector(connector_client))
-        .await
-        .unwrap()
-        .unwrap();
     store
         .dictionary_insert(
             dict_id,
