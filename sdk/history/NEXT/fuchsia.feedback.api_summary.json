@@ -532,6 +532,18 @@
     },
     {
         "kind": "const",
+        "name": "fuchsia.feedback/MAX_ANNOTATION_KEY_LENGTH",
+        "type": "uint64",
+        "value": "128"
+    },
+    {
+        "kind": "const",
+        "name": "fuchsia.feedback/MAX_ANNOTATION_VALUE_LENGTH",
+        "type": "uint64",
+        "value": "1024"
+    },
+    {
+        "kind": "const",
         "name": "fuchsia.feedback/MAX_CRASH_SIGNATURE_LENGTH",
         "type": "uint32",
         "value": "128"
