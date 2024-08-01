@@ -105,16 +105,24 @@ class ArmArchVmAspace final : public ArchVmAspaceInterface {
   zx_status_t AllocPageTable(paddr_t* paddrp) TA_REQ(lock_);
 
   enum class Reclaim : bool { No = false, Yes = true };
-  void FreePageTable(void* vaddr, paddr_t paddr, ConsistencyManager& cm,
-                     Reclaim reclaim = Reclaim::No) TA_REQ(lock_);
+  void FreePageTable(void* vaddr, paddr_t paddr, ConsistencyManager& cm, Reclaim reclaim)
+      TA_REQ(lock_);
 
   zx_status_t MapPageTable(pte_t attrs, bool ro, uint index_shift, volatile pte_t* page_table,
                            ExistingEntryAction existing_action, MappingCursor& cursor,
                            ConsistencyManager& cm) TA_REQ(lock_);
 
-  ssize_t UnmapPageTable(vaddr_t vaddr, vaddr_t vaddr_rel, size_t size, EnlargeOperation enlarge,
-                         uint index_shift, volatile pte_t* page_table, ConsistencyManager& cm,
-                         Reclaim reclaim = Reclaim::No) TA_REQ(lock_);
+  // Used by callers of UnmapPageTable to indicate whether there might be empty page tables in the
+  // tree that need to be checked for. Empty page tables are normally not allowed, but might be
+  // there due to cleaning up a failed attempt at mapping.
+  enum class CheckForEmptyPt : bool { No, Yes };
+
+  // Unmaps the range of |cursor| from the |page_table| and returns whether or not the caller needs
+  // to scan the page table to check if it is empty.
+  zx::result<bool> UnmapPageTable(MappingCursor& cursor, EnlargeOperation enlarge,
+                                  CheckForEmptyPt pt_check, uint index_shift,
+                                  volatile pte_t* page_table, ConsistencyManager& cm,
+                                  Reclaim reclaim) TA_REQ(lock_);
 
   zx_status_t ProtectPageTable(vaddr_t vaddr_in, vaddr_t vaddr_rel_in, size_t size_in, pte_t attrs,
                                EnlargeOperation enlarge, uint index_shift,
@@ -139,9 +147,6 @@ class ArmArchVmAspace final : public ArchVmAspaceInterface {
                              volatile pte_t* page_table, ConsistencyManager& cm) TA_REQ(lock_);
 
   pte_t MmuParamsFromFlags(uint mmu_flags);
-
-  ssize_t UnmapPages(vaddr_t vaddr, size_t size, EnlargeOperation enlarge, vaddr_t vaddr_base,
-                     ConsistencyManager& cm) TA_REQ(lock_);
 
   zx_status_t ProtectPages(vaddr_t vaddr, size_t size, pte_t attrs, EnlargeOperation enlarge,
                            vaddr_t vaddr_base, ConsistencyManager& cm) TA_REQ(lock_);
