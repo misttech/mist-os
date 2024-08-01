@@ -19,10 +19,10 @@ using Transform = fuchsia_hardware_display_types::wire::CoordinateTransformation
 
 Transform ToTransform(
     fuchsia_hardware_display_types::wire::CoordinateTransformation transform_fidl);
-Transform ToTransform(frame_transform_t frame_transform_banjo);
+Transform ToTransform(coordinate_transformation_t transform_banjo);
 
 fuchsia_hardware_display_types::wire::CoordinateTransformation ToFidlTransform(Transform transform);
-frame_transform_t ToBanjoFrameTransform(Transform transform);
+coordinate_transformation_t ToBanjoFrameTransform(Transform transform);
 
 }  // namespace display
 

@@ -206,16 +206,17 @@ type Alpha = strict enum : uint8 {
     HW_MULTIPLY = 2;
 };
 
-/// Rotations are applied counter-clockwise, and are applied before reflections.
-type FrameTransform = strict enum : uint32 {
+/// Equivalent to the
+/// ['fuchsia.hardware.display.types/CoordinateTransformation'] FIDL type.
+type CoordinateTransformation = strict enum : uint32 {
     IDENTITY = 0;
     REFLECT_X = 1;
     REFLECT_Y = 2;
-    ROT_180 = 3;
-    ROT_90 = 4;
-    ROT_90_REFLECT_X = 5;
-    ROT_90_REFLECT_Y = 6;
-    ROT_270 = 7;
+    ROTATE_CCW_180 = 3;
+    ROTATE_CCW_90 = 4;
+    ROTATE_CCW_90_REFLECT_X = 5;
+    ROTATE_CCW_90_REFLECT_Y = 6;
+    ROTATE_CCW_270 = 7;
 };
 
 /// Equivalent to the [`fuchsia.math/RectU`] FIDL type.
@@ -249,7 +250,12 @@ type PrimaryLayer = struct {
     alpha_mode Alpha;
     alpha_layer_val float32;
 
-    transform_mode FrameTransform;
+    /// Applied to the input image pixels specified by `image_source`.
+    ///
+    /// `display_destination` must account for image dimensions changes caused
+    /// by rotations. For example, rotating a 600x300 pixel image by 90 degrees
+    /// would specify 300x600 pixel dimensions in `display_destination`.
+    image_source_transformation CoordinateTransformation;
 
     /// The associated image region whose pixels are drawn by the layer.
     ///

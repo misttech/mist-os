@@ -338,7 +338,7 @@ bool SimpleDisplay::IsBanjoDisplayConfigSupported(const display_config_t& banjo_
   }
 
   const primary_layer_t& banjo_layer = banjo_display_config.layer_list[0].cfg.primary;
-  if (banjo_layer.transform_mode != FRAME_TRANSFORM_IDENTITY) {
+  if (banjo_layer.image_source_transformation != COORDINATE_TRANSFORMATION_IDENTITY) {
     return false;
   }
 

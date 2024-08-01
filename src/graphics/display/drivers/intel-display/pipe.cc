@@ -518,16 +518,16 @@ void Pipe::ConfigurePrimaryPlane(uint32_t plane_num, const primary_layer_t* prim
       .set_double_buffer_update_disabling_allowed(true);
 
   const image_metadata_t& image_metadata = primary->image_metadata;
-  const GttRegion& region =
-      setup_gtt_image(primary->image_metadata, primary->image_handle, primary->transform_mode);
+  const GttRegion& region = setup_gtt_image(primary->image_metadata, primary->image_handle,
+                                            primary->image_source_transformation);
   uint32_t base_address = static_cast<uint32_t>(region.base());
   uint32_t plane_width;
   uint32_t plane_height;
   uint32_t stride;
   uint32_t x_offset;
   uint32_t y_offset;
-  if (primary->transform_mode == FRAME_TRANSFORM_IDENTITY ||
-      primary->transform_mode == FRAME_TRANSFORM_ROT_180) {
+  if (primary->image_source_transformation == COORDINATE_TRANSFORMATION_IDENTITY ||
+      primary->image_source_transformation == COORDINATE_TRANSFORMATION_ROTATE_CCW_180) {
     plane_width = primary->image_source.width;
     plane_height = primary->image_source.height;
     stride =
@@ -700,14 +700,14 @@ void Pipe::ConfigurePrimaryPlane(uint32_t plane_num, const primary_layer_t* prim
     }
     plane_ctrl.set_surface_tiling(registers::PlaneControl::SurfaceTiling::kTilingYFKabyLake);
   }
-  if (primary->transform_mode == FRAME_TRANSFORM_IDENTITY) {
+  if (primary->image_source_transformation == COORDINATE_TRANSFORMATION_IDENTITY) {
     plane_ctrl.set_rotation(registers::PlaneControl::Rotation::kIdentity);
-  } else if (primary->transform_mode == FRAME_TRANSFORM_ROT_90) {
+  } else if (primary->image_source_transformation == COORDINATE_TRANSFORMATION_ROTATE_CCW_90) {
     plane_ctrl.set_rotation(registers::PlaneControl::Rotation::k90degrees);
-  } else if (primary->transform_mode == FRAME_TRANSFORM_ROT_180) {
+  } else if (primary->image_source_transformation == COORDINATE_TRANSFORMATION_ROTATE_CCW_180) {
     plane_ctrl.set_rotation(registers::PlaneControl::Rotation::k180degrees);
   } else {
-    ZX_ASSERT(primary->transform_mode == FRAME_TRANSFORM_ROT_270);
+    ZX_ASSERT(primary->image_source_transformation == COORDINATE_TRANSFORMATION_ROTATE_CCW_270);
     plane_ctrl.set_rotation(registers::PlaneControl::Rotation::k270degrees);
   }
   plane_ctrl.WriteTo(mmio_space_);

@@ -324,7 +324,7 @@ config_check_result_t DisplayEngine::CheckConfiguration(
         .height = current_display_.scanout_info.geometry.height,
     };
     success = display_configs[0].layer_list[0].type == LAYER_TYPE_PRIMARY &&
-              layer->transform_mode == FRAME_TRANSFORM_IDENTITY &&
+              layer->image_source_transformation == COORDINATE_TRANSFORMATION_IDENTITY &&
               layer->image_metadata.width == current_display_.scanout_info.geometry.width &&
               layer->image_metadata.height == current_display_.scanout_info.geometry.height &&
               memcmp(&layer->display_destination, &display_area, sizeof(rect_u_t)) == 0 &&
