@@ -5,7 +5,7 @@
 //! Declares types and functionality related to multicast routes.
 
 use alloc::fmt::Debug;
-use alloc::vec::Vec;
+use alloc::sync::Arc;
 use net_types::ip::{GenericOverIp, Ip, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6Scope};
 use net_types::{MulticastAddress as _, ScopeableAddress as _, SpecifiedAddress as _, UnicastAddr};
 use netstack3_base::StrongDeviceIdentifier;
@@ -156,7 +156,17 @@ pub(crate) enum Action<D: StrongDeviceIdentifier> {
 }
 
 /// The collection of targets out of which to forward a multicast packet.
-pub(crate) type MulticastRouteTargets<D> = Vec<MulticastRouteTarget<D>>;
+///
+/// Note, storing the targets behind an `Arc` allows us to return a reference
+/// to the targets, to contexts that are not protected by the multicast route
+/// table lock, without cloning the underlying data. Here, an `Arc<Mutex<...>>`
+/// is unnecessary, because the underlying targets list is never modified. This
+/// is not to say that a route's targets are never modified (e.g. device removal
+/// prunes the list of targets); in such cases the route's target list is
+/// *replaced* with a new allocation. This strategy allows us to avoid
+/// additional locking on the hot path, at the cost of extra allocations for
+/// certain control operations.
+pub(crate) type MulticastRouteTargets<D> = Arc<[MulticastRouteTarget<D>]>;
 
 /// The target out of which to forward a multicast packet.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]

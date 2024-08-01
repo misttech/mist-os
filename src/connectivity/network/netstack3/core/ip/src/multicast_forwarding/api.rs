@@ -151,9 +151,19 @@ where
                     }
                     match action {
                         Action::Forward(ref mut targets) => {
-                            targets.retain(|target| dev != &target.output_interface);
-                            if targets.is_empty() {
+                            // If all targets reference the device, we should
+                            // discard the route entirely.
+                            if targets.iter().all(|target| dev == &target.output_interface) {
                                 return false;
+                            }
+                            // Otherwise, if any target references the device,
+                            // we should remove it from the set of targets.
+                            if targets.iter().any(|target| dev == &target.output_interface) {
+                                *targets = targets
+                                    .iter()
+                                    .filter(|target| dev != &target.output_interface)
+                                    .cloned()
+                                    .collect();
                             }
                         }
                     }
@@ -168,7 +178,6 @@ where
 mod tests {
     use super::*;
 
-    use alloc::vec;
     use core::ops::Deref;
 
     use assert_matches::assert_matches;
@@ -208,12 +217,12 @@ mod tests {
         let key2 = MulticastRouteKey::new(I::SRC2, I::DST2).unwrap();
         let forward_to_b = MulticastRoute::new_forward(
             MultipleDevicesId::A,
-            vec![MulticastRouteTarget { output_interface: MultipleDevicesId::B, min_ttl: 0 }],
+            [MulticastRouteTarget { output_interface: MultipleDevicesId::B, min_ttl: 0 }].into(),
         )
         .unwrap();
         let forward_to_c = MulticastRoute::new_forward(
             MultipleDevicesId::A,
-            vec![MulticastRouteTarget { output_interface: MultipleDevicesId::C, min_ttl: 0 }],
+            [MulticastRouteTarget { output_interface: MultipleDevicesId::C, min_ttl: 0 }].into(),
         )
         .unwrap();
 
@@ -269,11 +278,12 @@ mod tests {
             MulticastRouteTarget { output_interface: GOOD_DEV2, min_ttl: 0 };
         const BAD_TARGET: MulticastRouteTarget<MultipleDevicesId> =
             MulticastRouteTarget { output_interface: BAD_DEV, min_ttl: 0 };
-        let dev_is_input = MulticastRoute::new_forward(BAD_DEV, vec![GOOD_TARGET1]).unwrap();
-        let dev_is_only_output = MulticastRoute::new_forward(GOOD_DEV1, vec![BAD_TARGET]).unwrap();
+        let dev_is_input = MulticastRoute::new_forward(BAD_DEV, [GOOD_TARGET1].into()).unwrap();
+        let dev_is_only_output =
+            MulticastRoute::new_forward(GOOD_DEV1, [BAD_TARGET].into()).unwrap();
         let dev_is_one_output =
-            MulticastRoute::new_forward(GOOD_DEV1, vec![GOOD_TARGET2, BAD_TARGET]).unwrap();
-        let no_ref_to_dev = MulticastRoute::new_forward(GOOD_DEV1, vec![GOOD_TARGET2]).unwrap();
+            MulticastRoute::new_forward(GOOD_DEV1, [GOOD_TARGET2, BAD_TARGET].into()).unwrap();
+        let no_ref_to_dev = MulticastRoute::new_forward(GOOD_DEV1, [GOOD_TARGET2].into()).unwrap();
 
         // Verify that removing device references is a no-op when multicast
         // forwarding is disabled.
@@ -296,7 +306,7 @@ mod tests {
         // NB: Equal to `dev_is_one_output`, but with `BAD_TARGET` removed.
         assert_eq!(
             api.remove_multicast_route(&key3),
-            Ok(Some(MulticastRoute::new_forward(GOOD_DEV1, vec![GOOD_TARGET2]).unwrap()))
+            Ok(Some(MulticastRoute::new_forward(GOOD_DEV1, [GOOD_TARGET2].into()).unwrap()))
         );
         assert_eq!(api.remove_multicast_route(&key4), Ok(Some(no_ref_to_dev)));
     }

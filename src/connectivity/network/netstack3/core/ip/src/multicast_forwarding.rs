@@ -40,6 +40,9 @@ use crate::{IpDeviceContext, IpLayerIpExt};
 /// In the latter case, the packet is stashed in the
 /// [`MulticastForwardingPendingPackets`] table, and a relevant event is
 /// dispatched to bindings.
+///
+/// Note that the returned targets are not synchronized with the multicast route
+/// table and may grow stale if the table is updated.
 // TODO(https://fxbug.dev/353329136): Call this function from IP RX.
 #[allow(unused)]
 pub(crate) fn lookup_multicast_route_for_packet<I, B, CC, BC>(
@@ -78,8 +81,6 @@ where
                 }
                 match action {
                     // TODO(https://fxbug.dev/352570820): Increment a counter.
-                    // TODO(https://fxbug.dev/353329136): Avoid this clone
-                    // because it triggers an allocation on the hot path.
                     Action::Forward(targets) => return Some(targets.clone()),
                 }
             }
@@ -303,8 +304,6 @@ mod testutil {
 mod tests {
     use super::*;
 
-    use alloc::vec;
-
     use ip_test_macro::ip_test;
     use netstack3_base::testutil::MultipleDevicesId;
     use packet::{InnerPacketBuilder, ParseBuffer, Serializer};
@@ -373,10 +372,11 @@ mod tests {
                     key,
                     MulticastRoute::new_forward(
                         dev,
-                        vec![MulticastRouteTarget {
+                        [MulticastRouteTarget {
                             output_interface: MultipleDevicesId::C,
                             min_ttl: 0
                         }]
+                        .into()
                     )
                     .unwrap()
                 ),
