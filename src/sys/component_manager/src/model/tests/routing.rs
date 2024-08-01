@@ -63,7 +63,9 @@ use {
     maplit::btreemap,
     moniker::{ChildName, ExtendedMoniker, Moniker},
     router_error::{DowncastErrorForTest, RouterError},
+    routing::collection::AnonymizedAggregateServiceProvider,
     routing::component_instance::ComponentInstanceInterface,
+    routing::legacy_router::NoopVisitor,
     routing_test_helpers::{
         default_service_capability, instantiate_common_routing_tests, RoutingTestModel,
     },
@@ -2817,11 +2819,19 @@ async fn list_service_instances_from_collections() {
         .route(&client_component)
         .await
         .expect("failed to route service");
-    let aggregate_capability_provider = match source {
+    let aggregate_capability_provider = match &source {
         RouteSource {
-            source: CapabilitySource::AnonymizedAggregate { aggregate_capability_provider, .. },
+            source: source @ CapabilitySource::AnonymizedAggregate { moniker, .. },
             relative_path: _,
-        } => aggregate_capability_provider,
+        } => {
+            let source_component_instance = client_component.find_absolute(moniker).await.unwrap();
+            AnonymizedAggregateServiceProvider::new_from_capability_source(
+                source,
+                &source_component_instance,
+            )
+            .await
+            .unwrap()
+        }
         _ => panic!("bad capability source"),
     };
 
@@ -2842,7 +2852,10 @@ async fn list_service_instances_from_collections() {
 
     // Try routing to one of the instances.
     let source = aggregate_capability_provider
-        .route_instance(&AggregateInstance::Child("coll1:service_child_a".try_into().unwrap()))
+        .route_instance(
+            &AggregateInstance::Child("coll1:service_child_a".try_into().unwrap()),
+            &mut NoopVisitor {},
+        )
         .await
         .expect("failed to route to child");
     match source {

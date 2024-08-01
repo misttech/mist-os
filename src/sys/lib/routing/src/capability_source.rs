@@ -5,7 +5,7 @@
 use crate::bedrock::dict_ext::DictExt;
 use crate::component_instance::ComponentInstanceInterface;
 use crate::error::RoutingError;
-use async_trait::async_trait;
+use crate::legacy_router::Sources;
 use cm_rust::{
     CapabilityDecl, CapabilityTypeName, ConfigurationDecl, DictionaryDecl, DirectoryDecl,
     EventStreamDecl, ExposeConfigurationDecl, ExposeDecl, ExposeDictionaryDecl,
@@ -88,9 +88,8 @@ pub enum CapabilitySource<C: ComponentInstanceInterface + 'static> {
     AnonymizedAggregate {
         capability: AggregateCapability,
         moniker: Moniker,
-        #[derivative(PartialEq = "ignore")]
-        aggregate_capability_provider: Box<dyn AnonymizedAggregateCapabilityProvider<C>>,
         members: Vec<AggregateMember>,
+        sources: Sources,
     },
     /// This capability is an aggregate of capabilities over a set of children with filters
     /// The instances in the aggregate service are the union of these filters.
@@ -402,42 +401,6 @@ impl fmt::Display for AggregateInstance {
                 write!(f, "self")
             }
         }
-    }
-}
-
-/// A provider of a capability from an aggregation of one or more collections and static children.
-/// The instance names in the aggregate will be anonymized.
-///
-/// This trait type-erases the capability type, so it can be handled and hosted generically.
-#[async_trait]
-pub trait AnonymizedAggregateCapabilityProvider<C: ComponentInstanceInterface>:
-    Send + Sync
-{
-    /// Lists the instances of the capability.
-    ///
-    /// The instance is an opaque identifier that is only meaningful for a subsequent
-    /// call to `route_instance`.
-    async fn list_instances(&self) -> Result<Vec<AggregateInstance>, RoutingError>;
-
-    /// Route the given `instance` of the capability to its source.
-    async fn route_instance(
-        &self,
-        instance: &AggregateInstance,
-    ) -> Result<CapabilitySource<C>, RoutingError>;
-
-    /// Trait-object compatible clone.
-    fn clone_boxed(&self) -> Box<dyn AnonymizedAggregateCapabilityProvider<C>>;
-}
-
-impl<C: ComponentInstanceInterface> Clone for Box<dyn AnonymizedAggregateCapabilityProvider<C>> {
-    fn clone(&self) -> Self {
-        self.clone_boxed()
-    }
-}
-
-impl<C> fmt::Debug for Box<dyn AnonymizedAggregateCapabilityProvider<C>> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Box<dyn AnonymizedAggregateCapabilityProvider>").finish()
     }
 }
 

@@ -18,9 +18,7 @@
 use crate::capability_source::{
     AggregateCapability, AggregateMember, CapabilitySource, ComponentCapability, InternalCapability,
 };
-use crate::collection::{
-    AnonymizedAggregateServiceProvider, OfferAggregateServiceProvider, OfferFilteredServiceProvider,
-};
+use crate::collection::{OfferAggregateServiceProvider, OfferFilteredServiceProvider};
 use crate::component_instance::{
     ComponentInstanceInterface, ExtendedInstanceInterface, ResolvedInstanceInterface,
     TopInstanceInterface,
@@ -213,18 +211,10 @@ where
                 }
             }
             let first_offer = offers.iter().next().unwrap();
-            let capability_type = CapabilityTypeName::from(first_offer);
             Ok(CapabilitySource::<C>::AnonymizedAggregate {
                 capability: AggregateCapability::Service(first_offer.source_name().clone()),
                 moniker: aggregation_component.moniker().clone(),
-                aggregate_capability_provider: Box::new(AnonymizedAggregateServiceProvider {
-                    members: members.clone(),
-                    containing_component: aggregation_component.as_weak(),
-                    capability_name: first_offer.source_name().clone(),
-                    capability_type,
-                    sources: sources.clone(),
-                    visitor: visitor.clone(),
-                }),
+                sources: sources.clone(),
                 members,
             })
         }
@@ -333,18 +323,10 @@ where
                 }
             }
             let first_expose = expose.iter().next().expect("empty bundle");
-            let capability_type = CapabilityTypeName::from(first_expose);
             Ok(CapabilitySource::<C>::AnonymizedAggregate {
                 capability: AggregateCapability::Service(first_expose.source_name().clone()),
                 moniker: aggregation_component.moniker().clone(),
-                aggregate_capability_provider: Box::new(AnonymizedAggregateServiceProvider {
-                    members: members.clone(),
-                    containing_component: aggregation_component.as_weak(),
-                    capability_name: first_expose.source_name().clone(),
-                    capability_type,
-                    sources: sources.clone(),
-                    visitor: visitor.clone(),
-                }),
+                sources: sources.clone(),
                 members,
             })
         }
@@ -407,7 +389,7 @@ where
 }
 
 /// Defines which capability source types are supported.
-#[derive(Derivative)]
+#[derive(Debug, PartialEq, Derivative)]
 #[derivative(Clone(bound = ""))]
 pub struct AllowedSourcesBuilder {
     framework: Option<fn(Name) -> InternalCapability>,
@@ -471,7 +453,7 @@ impl AllowedSourcesBuilder {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Sources(AllowedSourcesBuilder);
 
 // Implementation of `Sources` that allows namespace, component, and/or built-in source

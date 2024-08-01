@@ -20,6 +20,7 @@ use ::routing::component_instance::ComponentInstanceInterface;
 use errors::{CapabilityProviderError, ModelError, OpenError};
 use fidl_fuchsia_io as fio;
 use moniker::ExtendedMoniker;
+use routing::collection::AnonymizedAggregateServiceProvider;
 use std::sync::Arc;
 use vfs::directory::entry::OpenRequest;
 use vfs::remote::remote_dir;
@@ -180,12 +181,7 @@ impl<'a> CapabilityOpenRequest<'a> {
                     .await?,
                 )))
             }
-            CapabilitySource::AnonymizedAggregate {
-                capability,
-                moniker,
-                aggregate_capability_provider,
-                members,
-            } => {
+            CapabilitySource::AnonymizedAggregate { capability, moniker, members, sources: _ } => {
                 let source_component_instance = target.upgrade()?.find_absolute(moniker).await?;
 
                 let route = AnonymizedServiceRoute {
@@ -218,10 +214,18 @@ impl<'a> CapabilityOpenRequest<'a> {
                         return Ok(Some(Box::new(provider)));
                     }
 
+                    let aggregate_capability_provider =
+                        AnonymizedAggregateServiceProvider::new_from_capability_source(
+                            source,
+                            &source_component_instance,
+                        )
+                        .await
+                        .expect("failed to create AnonymizedAggregateServiceProvider");
+
                     service_dir = Arc::new(AnonymizedAggregateServiceDir::new(
                         source_component_instance.as_weak(),
                         route.clone(),
-                        aggregate_capability_provider.clone_boxed(),
+                        Box::new(aggregate_capability_provider),
                     ));
 
                     let entry = service_dir.dir_entry().await;

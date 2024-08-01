@@ -21,10 +21,12 @@ use hooks::{Event, EventPayload, EventType, Hook, HooksRegistration};
 use moniker::{ExtendedMoniker, Moniker};
 use router_error::Explain;
 use routing::capability_source::{
-    AggregateInstance, AggregateMember, AnonymizedAggregateCapabilityProvider,
-    FilteredAggregateCapabilityProvider,
+    AggregateInstance, AggregateMember, FilteredAggregateCapabilityProvider,
 };
+use routing::collection::AnonymizedAggregateServiceProvider;
 use routing::component_instance::ComponentInstanceInterface;
+use routing::error::RoutingError;
+use routing::legacy_router::NoopVisitor;
 use std::collections::HashMap;
 use std::fmt;
 use std::sync::{Arc, Weak};
@@ -240,6 +242,41 @@ struct AnonymizedAggregateServiceDirInner {
     watchers_spawned: HashMap<AggregateInstance, WatcherEntry>,
 }
 
+/// A provider of a capability from an aggregation of one or more collections and static children.
+/// The instance names in the aggregate will be anonymized.
+///
+/// This trait type-erases the capability type, so it can be handled and hosted generically.
+#[async_trait]
+pub trait AnonymizedAggregateCapabilityProvider: Send + Sync {
+    /// Lists the instances of the capability.
+    ///
+    /// The instance is an opaque identifier that is only meaningful for a subsequent
+    /// call to `route_instance`.
+    async fn list_instances(&self) -> Result<Vec<AggregateInstance>, RoutingError>;
+
+    /// Route the given `instance` of the capability to its source.
+    async fn route_instance(
+        &self,
+        instance: &AggregateInstance,
+    ) -> Result<CapabilitySource, RoutingError>;
+}
+
+#[async_trait]
+impl AnonymizedAggregateCapabilityProvider
+    for AnonymizedAggregateServiceProvider<ComponentInstance>
+{
+    async fn list_instances(&self) -> Result<Vec<AggregateInstance>, RoutingError> {
+        AnonymizedAggregateServiceProvider::list_instances(&self).await
+    }
+    async fn route_instance(
+        &self,
+        instance: &AggregateInstance,
+    ) -> Result<CapabilitySource, RoutingError> {
+        AnonymizedAggregateServiceProvider::route_instance(&self, instance, &mut NoopVisitor {})
+            .await
+    }
+}
+
 pub struct AnonymizedAggregateServiceDir {
     /// The parent component of the collection and aggregated service.
     parent: WeakComponentInstance,
@@ -251,8 +288,7 @@ pub struct AnonymizedAggregateServiceDir {
     ///
     /// This returns routed `CapabilitySourceInterface`s to a service capability for a
     /// component instance in the collection.
-    aggregate_capability_provider:
-        Box<dyn AnonymizedAggregateCapabilityProvider<ComponentInstance>>,
+    aggregate_capability_provider: Box<dyn AnonymizedAggregateCapabilityProvider>,
 
     inner: Mutex<AnonymizedAggregateServiceDirInner>,
 }
@@ -261,9 +297,7 @@ impl AnonymizedAggregateServiceDir {
     pub fn new(
         parent: WeakComponentInstance,
         route: AnonymizedServiceRoute,
-        aggregate_capability_provider: Box<
-            dyn AnonymizedAggregateCapabilityProvider<ComponentInstance>,
-        >,
+        aggregate_capability_provider: Box<dyn AnonymizedAggregateCapabilityProvider>,
     ) -> Self {
         AnonymizedAggregateServiceDir {
             parent,
@@ -964,6 +998,7 @@ impl<T: Send + Sync + 'static> DirectoryEntryAsync for ServiceInstanceDirectoryE
 mod tests {
     use super::*;
     use crate::model::component::StartReason;
+    use crate::model::routing::service::AnonymizedAggregateServiceDir;
     use crate::model::routing::RoutingError;
     use crate::model::start::Start;
     use crate::model::testing::out_dir::OutDir;
@@ -989,7 +1024,7 @@ mod tests {
     }
 
     #[async_trait]
-    impl AnonymizedAggregateCapabilityProvider<ComponentInstance> for MockAnonymizedCapabilityProvider {
+    impl AnonymizedAggregateCapabilityProvider for MockAnonymizedCapabilityProvider {
         async fn route_instance(
             &self,
             instance: &AggregateInstance,
@@ -1027,10 +1062,6 @@ mod tests {
 
         async fn list_instances(&self) -> Result<Vec<AggregateInstance>, RoutingError> {
             Ok(self.instances.lock().await.keys().cloned().collect())
-        }
-
-        fn clone_boxed(&self) -> Box<dyn AnonymizedAggregateCapabilityProvider<ComponentInstance>> {
-            Box::new(self.clone())
         }
     }
 
