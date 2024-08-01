@@ -101,7 +101,7 @@ pub enum CapabilitySource<C: ComponentInstanceInterface + 'static> {
         component: WeakComponentInstanceInterface<C>,
     },
     /// This capability originates from "environment". It's implemented by a component instance.
-    Environment { capability: ComponentCapability, component: WeakComponentInstanceInterface<C> },
+    Environment { capability: ComponentCapability, moniker: Moniker },
     /// This capability originates from "void". This is only a valid origination for optional
     /// capabilities.
     Void { capability: InternalCapability, component: WeakComponentInstanceInterface<C> },
@@ -156,13 +156,13 @@ impl<C: ComponentInstanceInterface> CapabilitySource<C> {
         match self {
             Self::Component { moniker, .. }
             | Self::Framework { moniker, .. }
-            | Self::Capability { moniker, .. } => {
+            | Self::Capability { moniker, .. }
+            | Self::Environment { moniker, .. } => {
                 ExtendedMoniker::ComponentInstance(moniker.clone())
             }
             Self::AnonymizedAggregate { component, .. }
             | Self::FilteredAggregate { component, .. }
-            | Self::Void { component, .. }
-            | Self::Environment { component, .. } => {
+            | Self::Void { component, .. } => {
                 ExtendedMoniker::ComponentInstance(component.moniker.clone())
             }
             Self::Builtin { .. } | Self::Namespace { .. } => ExtendedMoniker::ComponentManager,
@@ -313,10 +313,10 @@ impl<C: ComponentInstanceInterface + 'static> TryFrom<CapabilitySource<C>> for D
                 insert_capability_dict(&output, source_capability)?;
                 insert_moniker(&output, moniker)
             }
-            CapabilitySource::Environment { capability, component } => {
+            CapabilitySource::Environment { capability, moniker } => {
                 insert_key(&output, ENVIRONMENT_STR);
                 insert_capability_dict(&output, capability)?;
-                insert_component_token(&output, component);
+                insert_moniker(&output, moniker)
             }
             CapabilitySource::Void { capability, component } => {
                 insert_key(&output, VOID_STR);
@@ -396,7 +396,7 @@ impl<C: ComponentInstanceInterface + 'static> TryFrom<Dict> for CapabilitySource
             },
             ENVIRONMENT_STR => CapabilitySource::Environment {
                 capability: get_capability_dict(&dict)?.try_into()?,
-                component: get_weak_component(&dict)?,
+                moniker: get_moniker(&dict)?,
             },
             VOID_STR => CapabilitySource::Void {
                 capability: get_capability_dict(&dict)?.try_into()?,
