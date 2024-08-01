@@ -1368,6 +1368,10 @@ impl<I: IpLayerIpExt, D: StrongDeviceIdentifier, BT: IpLayerBindingsTypes>
 #[derive(Default, GenericOverIp)]
 #[generic_over_ip(I, Ip)]
 pub struct IpCounters<I: IpLayerIpExt> {
+    /// Count of incoming IP unicast packets delivered.
+    pub deliver_unicast: Counter,
+    /// Count of incoming IP multicast packets delivered.
+    pub deliver_multicast: Counter,
     /// Count of incoming IP packets that are dispatched to the appropriate protocol.
     pub dispatch_receive_ip_packet: Counter,
     /// Count of incoming IP packets destined to another host.
@@ -1421,24 +1425,20 @@ pub struct IpCounters<I: IpLayerIpExt> {
 /// IPv4-specific Rx counters.
 #[derive(Default)]
 pub struct Ipv4RxCounters {
-    /// Count of incoming IPv4 packets delivered.
-    pub deliver: Counter,
+    /// Count of incoming broadcast IPv4 packets delivered.
+    pub deliver_broadcast: Counter,
 }
 
 impl Inspectable for Ipv4RxCounters {
     fn record<I: Inspector>(&self, inspector: &mut I) {
-        let Self { deliver } = self;
-        inspector.record_counter("Delivered", deliver);
+        let Self { deliver_broadcast } = self;
+        inspector.record_counter("DeliveredBroadcast", deliver_broadcast);
     }
 }
 
 /// IPv6-specific Rx counters.
 #[derive(Default)]
 pub struct Ipv6RxCounters {
-    /// Count of incoming IPv6 multicast packets delivered.
-    pub deliver_multicast: Counter,
-    /// Count of incoming IPv6 unicast packets delivered.
-    pub deliver_unicast: Counter,
     /// Count of incoming IPv6 packets dropped because the destination address
     /// is only tentatively assigned to the device.
     pub drop_for_tentative: Counter,
@@ -1455,15 +1455,11 @@ pub struct Ipv6RxCounters {
 impl Inspectable for Ipv6RxCounters {
     fn record<I: Inspector>(&self, inspector: &mut I) {
         let Self {
-            deliver_multicast,
-            deliver_unicast,
             drop_for_tentative,
             non_unicast_source,
             extension_header_discard,
             drop_looped_back_dad_probe,
         } = self;
-        inspector.record_counter("DeliveredMulticast", deliver_multicast);
-        inspector.record_counter("DeliveredUnicast", deliver_unicast);
         inspector.record_counter("DroppedTentativeDst", drop_for_tentative);
         inspector.record_counter("DroppedNonUnicastSrc", non_unicast_source);
         inspector.record_counter("DroppedExtensionHeader", extension_header_discard);
@@ -2880,13 +2876,21 @@ pub fn receive_ipv4_packet_action<
     };
     match first_status {
         Some(
-            address_status @ (Ipv4PresentAddressStatus::Multicast
-            | Ipv4PresentAddressStatus::Unicast
-            | Ipv4PresentAddressStatus::LoopbackSubnet
-            | Ipv4PresentAddressStatus::LimitedBroadcast
+            address_status @ (Ipv4PresentAddressStatus::Unicast
+            | Ipv4PresentAddressStatus::LoopbackSubnet),
+        ) => {
+            core_ctx.increment(|counters| &counters.deliver_unicast);
+            ReceivePacketAction::Deliver { address_status }
+        }
+        Some(address_status @ Ipv4PresentAddressStatus::Multicast) => {
+            core_ctx.increment(|counters| &counters.deliver_multicast);
+            ReceivePacketAction::Deliver { address_status }
+        }
+        Some(
+            address_status @ (Ipv4PresentAddressStatus::LimitedBroadcast
             | Ipv4PresentAddressStatus::SubnetBroadcast),
         ) => {
-            core_ctx.increment(|counters| &counters.version_rx.deliver);
+            core_ctx.increment(|counters| &counters.version_rx.deliver_broadcast);
             ReceivePacketAction::Deliver { address_status }
         }
         None => {
@@ -2953,11 +2957,11 @@ pub fn receive_ipv6_packet_action<
     };
     match highest_priority {
         Some(address_status @ Ipv6PresentAddressStatus::Multicast) => {
-            core_ctx.increment(|counters| &counters.version_rx.deliver_multicast);
+            core_ctx.increment(|counters| &counters.deliver_multicast);
             ReceivePacketAction::Deliver { address_status }
         }
         Some(address_status @ Ipv6PresentAddressStatus::UnicastAssigned) => {
-            core_ctx.increment(|counters| &counters.version_rx.deliver_unicast);
+            core_ctx.increment(|counters| &counters.deliver_unicast);
             ReceivePacketAction::Deliver { address_status }
         }
         Some(Ipv6PresentAddressStatus::UnicastTentative) => {
