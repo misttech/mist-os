@@ -95,6 +95,10 @@ class OutputPipelineImpl : public OutputPipeline {
     return state_.stream->ref_time_to_frac_presentation_frame();
   }
   void SetPresentationDelay(zx::duration external_delay) override {
+    if constexpr (kLogPresentationDelay) {
+      FX_LOGS(INFO) << "    (" << this << ") " << __FUNCTION__ << "(" << external_delay.to_nsecs()
+                    << " ns)";
+    }
     ReadableStream::SetPresentationDelay(external_delay);
     state_.stream->SetPresentationDelay(external_delay);
   }
