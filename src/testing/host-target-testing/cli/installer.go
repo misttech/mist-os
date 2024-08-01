@@ -149,7 +149,11 @@ func (c *InstallerConfig) NeedsInitialization() bool {
 }
 
 // ConfigureBuild configures a build for the updater.
-func (c *InstallerConfig) ConfigureBuild(ctx context.Context, device *device.Client, build artifacts.Build) (artifacts.Build, error) {
+func (c *InstallerConfig) ConfigureBuild(
+	ctx context.Context,
+	device *device.Client,
+	build artifacts.Build,
+) (artifacts.Build, error) {
 	switch c.installerMode {
 	case Omaha:
 		if c.omahaTool == nil {
@@ -170,7 +174,12 @@ func (c *InstallerConfig) ConfigureBuild(ctx context.Context, device *device.Cli
 			return nil, err
 		}
 
-		return artifacts.NewOmahaBuild(build, c.omahaTool, avbTool, zbiTool), nil
+		return artifacts.NewOmahaBuild(
+			build,
+			c.omahaTool,
+			avbTool,
+			zbiTool,
+		), nil
 
 	case SystemUpdateChecker:
 		return build, nil

@@ -432,6 +432,84 @@ type ImageFirmware struct {
 	Url  string `json:"url"`
 }
 
+type ProductBundle struct {
+	Version            string                    `json:"version"`
+	ProductName        string                    `json:"product_name"`
+	ProductVersion     string                    `json:"product_version"`
+	Partitions         json.RawMessage           `json:"partitions"`
+	SdkVersion         *string                   `json:"sdk_version"`
+	SystemA            []ProductBundleImage      `json:"system_a"`
+	SystemB            []ProductBundleImage      `json:"system_b"`
+	SystemR            []ProductBundleImage      `json:"system_r"`
+	Repositories       []ProductBundleRepository `json:"repositories"`
+	UpdatePackageHash  *string                   `json:"update_package_hash"`
+	VirtualDevicesPath *string                   `json:"virtual_devices_path"`
+}
+
+type ProductBundleImage struct {
+	Type     string          `json:"type"`
+	Name     string          `json:"name"`
+	Path     string          `json:"path"`
+	Signed   *bool           `json:"signed,omitempty"`
+	Contents json.RawMessage `json:"contents,omitempty"`
+}
+
+type ProductBundleRepository struct {
+	Name                    string `json:"name"`
+	MetadataPath            string `json:"metadata_path"`
+	BlobsPath               string `json:"blobs_path"`
+	DeliveryBlobPath        uint   `json:"delivery_blob_type"`
+	RootPrivateKeyPath      string `json:"root_private_key_path"`
+	TargetsPrivateKeyPath   string `json:"targets_private_key_path"`
+	SnapshotPrivateKeyPath  string `json:"snapshot_private_key_path"`
+	TimestampPrivateKeyPath string `json:"timestamp_private_key_path"`
+}
+
+func (pb *ProductBundle) GetSystemAImage(imageType string, imageName string) (string, error) {
+	for _, image := range pb.SystemA {
+		if image.Type == imageType && image.Name == imageName {
+			return image.Path, nil
+		}
+	}
+
+	return "", fmt.Errorf("failed to find system_a %s %s", imageType, imageName)
+}
+
+func ParseProductBundle(path string) (ProductBundle, error) {
+	// We need to create a new product bundle that points at our modified
+	// vbmeta.
+	productBundlePath := filepath.Join(path, "product_bundle.json")
+	f, err := os.Open(productBundlePath)
+	if err != nil {
+		return ProductBundle{}, fmt.Errorf("failed to open %s: %w", productBundlePath, err)
+	}
+	defer f.Close()
+
+	var productBundle ProductBundle
+
+	decoder := json.NewDecoder(f)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&productBundle); err != nil {
+		return ProductBundle{}, fmt.Errorf("failed to parse %s: %w", productBundlePath, err)
+	}
+
+	if productBundle.Version != "2" {
+		return ProductBundle{}, fmt.Errorf("Unknown product bundle version %s", productBundle.Version)
+	}
+
+	return productBundle, nil
+}
+
+func UpdateProductBundle(productBundleDir string, productBundle ProductBundle) error {
+	return AtomicallyWriteFile(
+		filepath.Join(productBundleDir, "product_bundle.json"),
+		0600,
+		func(f *os.File) error {
+			return json.NewEncoder(f).Encode(productBundle)
+		},
+	)
+}
+
 func AtomicallyWriteFile(path string, mode os.FileMode, writeFileFunc func(*os.File) error) error {
 	dir := filepath.Dir(path)
 	basename := filepath.Base(path)
@@ -512,4 +590,64 @@ func AddSuffixToPackageName(packagePath string, suffix string) string {
 	} else {
 		return fmt.Sprintf("%s_%s", before, suffix)
 	}
+}
+
+func CopyDir(ctx context.Context, dst string, src string) error {
+	logger.Infof(ctx, "copying %s into %s", src, dst)
+
+	return filepath.WalkDir(src, func(path string, info os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if path == src {
+			return nil
+		}
+
+		relPath, err := filepath.Rel(src, path)
+		if err != nil {
+			return err
+		}
+		dstPath := filepath.Join(dst, relPath)
+
+		if info.IsDir() {
+			return os.MkdirAll(dstPath, os.ModePerm)
+		}
+
+		if fi, err := os.Stat(dstPath); err == nil {
+			if fi.IsDir() {
+				// If dstPath already exists and is a directory, then return nil so
+				// we can walk the contents of the directory and move over the
+				// individual files.
+				return nil
+			}
+		}
+		if err = os.MkdirAll(filepath.Dir(dstPath), os.ModePerm); err != nil {
+			return err
+		}
+
+		return linkOrCopy(ctx, dstPath, path)
+	})
+}
+
+func linkOrCopy(ctx context.Context, dstPath string, srcPath string) error {
+	if err := os.Link(srcPath, dstPath); err != nil {
+		src, err := os.Open(srcPath)
+		if err != nil {
+			return err
+		}
+		defer src.Close()
+
+		stat, err := src.Stat()
+		if err != nil {
+			return err
+		}
+
+		return AtomicallyWriteFile(dstPath, stat.Mode(), func(f *os.File) error {
+			_, err := io.Copy(f, src)
+			return err
+		})
+	}
+
+	return nil
 }

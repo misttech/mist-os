@@ -684,15 +684,27 @@ func (c *Client) Flash(
 	build artifacts.Build,
 	publicKey ssh.PublicKey,
 ) error {
-	manifest, err := build.GetFlashManifest(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get flash manifest from build: %w", err)
-	}
-
 	flasher := ffx.Flasher()
 	flasher.SetSSHPublicKey(publicKey)
-	flasher.SetManifest(manifest)
 	flasher.SetTarget(c.Name())
+
+	if productBundleDir, err := build.GetProductBundleDir(ctx); err == nil {
+		logger.Infof(ctx, "Flashing with the product bundle %s", productBundleDir)
+
+		flasher.SetProductBundle(productBundleDir)
+	} else {
+		logger.Warningf(ctx, "Failed to download the product bundle, trying to fall back to the flash manifest: %v", err)
+
+		manifest, err := build.GetFlashManifest(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to get flash manifest from build: %w", err)
+		}
+
+		logger.Infof(ctx, "Flashing with the flash manifest %s", manifest)
+		flasher.SetManifest(manifest)
+	}
+
+	var err error
 
 	// FIXME(https://fxbug.dev/326658880): We can remove this retry logic after the next stepping stone.
 	for i := 0; i < 3; i++ {
