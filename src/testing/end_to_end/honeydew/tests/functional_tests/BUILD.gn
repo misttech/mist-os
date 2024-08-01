@@ -62,7 +62,7 @@ group_with_no_dir_target_deps("core_x64_stable_tests") {
 
 group_with_no_dir_target_deps("core_x64_unstable_tests") {
   testonly = true
-  public_deps = []
+  public_deps = [ "transport_tests/test_serial:serial_test($host_toolchain)" ]
 }
 
 # workbench.x64
@@ -84,7 +84,7 @@ group_with_no_dir_target_deps("workbench_x64_stable_tests") {
 
 group_with_no_dir_target_deps("workbench_x64_unstable_tests") {
   testonly = true
-  public_deps = []
+  public_deps = [ "transport_tests/test_serial:serial_test($host_toolchain)" ]
 }
 
 # core.vim3
@@ -104,6 +104,7 @@ group_with_no_dir_target_deps("core_vim3_unstable_tests") {
   public_deps = [
     "affordance_tests/test_tracing:tracing_test_fc($host_toolchain)",
     "auxiliary_device_tests/test_power_switch_dmc:power_switch_dmc_test_fc($host_toolchain)",
+    "transport_tests/test_serial:serial_test($host_toolchain)",
   ]
 }
 
@@ -126,8 +127,10 @@ group_with_no_dir_target_deps("workbench_vim3_stable_tests") {
 
 group_with_no_dir_target_deps("workbench_vim3_unstable_tests") {
   testonly = true
-  public_deps =
-      [ "transport_tests/test_fastboot:fastboot_test_fc($host_toolchain)" ]
+  public_deps = [
+    "transport_tests/test_fastboot:fastboot_test_fc($host_toolchain)",
+    "transport_tests/test_serial:serial_test($host_toolchain)",
+  ]
 }
 
 # starnix.vim3
@@ -146,6 +149,7 @@ group_with_no_dir_target_deps("starnix_vim3_unstable_tests") {
     "auxiliary_device_tests/test_power_switch_dmc:power_switch_dmc_test_fc($host_toolchain)",
     "transport_tests/test_fastboot:fastboot_test_fc($host_toolchain)",
     "transport_tests/test_ffx:test_ffx_on_vim3",
+    "transport_tests/test_serial:serial_test($host_toolchain)",
   ]
 }
 

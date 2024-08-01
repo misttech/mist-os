@@ -87,6 +87,7 @@ def create(
                 transport=device_config["transport"],
                 ffx_config=_FFX_CONFIG_OBJ.get_config(),
                 device_ip_port=device_config.get("device_ip_port"),
+                device_serial_socket=device_config.get("serial_socket"),
             )
         )
     return fuchsia_devices

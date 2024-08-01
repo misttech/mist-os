@@ -44,17 +44,20 @@ from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.interfaces.device_classes import (
     fuchsia_device as fuchsia_device_interface,
 )
+from honeydew.interfaces.transports import serial as serial_interface
 from honeydew.transports import fastboot as fastboot_transport
 from honeydew.transports import ffx as ffx_transport
 from honeydew.transports import (
     fuchsia_controller as fuchsia_controller_transport,
 )
+from honeydew.transports import serial_using_unix_socket
 from honeydew.typing import custom_types
 
 # pylint: disable=protected-access
 
 _INPUT_ARGS: dict[str, Any] = {
     "device_name": "fuchsia-emulator",
+    "device_serial_socket": "/tmp/socket",
     "ffx_config": custom_types.FFXConfig(
         isolate_dir=fuchsia_controller.IsolateDir("/tmp/isolate"),
         logs_dir="/tmp/logs",
@@ -151,6 +154,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
             self.fd_obj = fc_fuchsia_device.FuchsiaDevice(
                 device_name=_INPUT_ARGS["device_name"],
                 ffx_config=_INPUT_ARGS["ffx_config"],
+                device_serial_socket=_INPUT_ARGS["device_serial_socket"],
             )
 
             mock_fc_create_context.assert_called_once_with(
@@ -203,6 +207,28 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
             self.fd_obj.fuchsia_controller,
             fuchsia_controller_transport.FuchsiaController,
         )
+
+    def test_serial_transport(self) -> None:
+        """Test case to make sure fc_fuchsia_device supports serial transport."""
+        self.assertIsInstance(
+            self.fd_obj.serial,
+            serial_using_unix_socket.Serial,
+        )
+
+    def test_serial_transport_erroor(self) -> None:
+        """Test case to make sure fc_fuchsia_device raises error when we try to
+        access "serial" transport without device_serial_socket."""
+
+        device_serial_socket: str | None = self.fd_obj._device_serial_socket
+        self.fd_obj._device_serial_socket = None
+
+        with self.assertRaisesRegex(
+            errors.FuchsiaDeviceError,
+            "'device_serial_socket' arg need to be provided during the init to use Serial affordance",
+        ):
+            _: serial_interface.Serial = self.fd_obj.serial
+
+        self.fd_obj._device_serial_socket = device_serial_socket
 
     # List all the tests related to affordances
     def test_session(self) -> None:

@@ -58,12 +58,18 @@ class FuchsiaDevice(fc_fuchsia_device.FuchsiaDevice):
         device_name: str,
         ffx_config: custom_types.FFXConfig,
         device_ip_port: custom_types.IpPort | None = None,
+        device_serial_socket: str | None = None,
     ) -> None:
         _LOGGER.debug(
             "Initializing Fuchsia-Controller-Preferred based FuchsiaDevice"
         )
 
-        super().__init__(device_name, ffx_config, device_ip_port)
+        super().__init__(
+            device_name,
+            ffx_config,
+            device_ip_port,
+            device_serial_socket,
+        )
 
         _LOGGER.debug(
             "Initialized Fuchsia-Controller-Preferred based FuchsiaDevice"

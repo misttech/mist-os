@@ -26,6 +26,7 @@ def create_device(
     transport: custom_types.TRANSPORT,
     ffx_config: custom_types.FFXConfig,
     device_ip_port: custom_types.IpPort | None = None,
+    device_serial_socket: str | None = None,
 ) -> fuchsia_device_interface.FuchsiaDevice:
     """Factory method that creates and returns the device class.
 
@@ -36,6 +37,8 @@ def create_device(
 
         ffx_config: Ffx configuration that need to be used while running ffx
             commands.
+
+        device_serial_socket: Device serial socket path.
 
         device_ip_port: IP Address and port of the device.
 
@@ -61,12 +64,14 @@ def create_device(
                 device_name,
                 ffx_config,
                 device_ip_port,
+                device_serial_socket,
             )
         else:  # transport == custom_types.TRANSPORT.FUCHSIA_CONTROLLER_PREFERRED:
             return fc_preferred_fuchsia_device.FuchsiaDevice(
                 device_name,
                 ffx_config,
                 device_ip_port,
+                device_serial_socket,
             )
     except errors.HoneydewError as err:
         raise errors.FuchsiaDeviceError(

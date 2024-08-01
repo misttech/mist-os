@@ -64,12 +64,14 @@ from honeydew.interfaces.transports import ffx as ffx_transport_interface
 from honeydew.interfaces.transports import (
     fuchsia_controller as fuchsia_controller_transport_interface,
 )
+from honeydew.interfaces.transports import serial as serial_transport_interface
 from honeydew.interfaces.transports import sl4f as sl4f_transport_interface
 from honeydew.transports import fastboot as fastboot_transport
 from honeydew.transports import ffx as ffx_transport
 from honeydew.transports import (
     fuchsia_controller as fuchsia_controller_transport,
 )
+from honeydew.transports import serial_using_unix_socket
 from honeydew.typing import custom_types
 from honeydew.utils import properties
 
@@ -126,12 +128,15 @@ class FuchsiaDevice(
         device_name: str,
         ffx_config: custom_types.FFXConfig,
         device_ip_port: custom_types.IpPort | None = None,
+        device_serial_socket: str | None = None,
     ) -> None:
         _LOGGER.debug("Initializing Fuchsia-Controller based FuchsiaDevice")
 
         self._name: str = device_name
 
         self._ffx_config: custom_types.FFXConfig = ffx_config
+
+        self._device_serial_socket: str | None = device_serial_socket
 
         self._ip_address_port: custom_types.IpPort | None = device_ip_port
 
@@ -294,6 +299,26 @@ class FuchsiaDevice(
             )
         )
         return fastboot_obj
+
+    @properties.Transport
+    def serial(self) -> serial_transport_interface.Serial:
+        """Returns the Serial transport object.
+
+        Returns:
+            Serial transport object.
+        """
+        if self._device_serial_socket is None:
+            raise errors.FuchsiaDeviceError(
+                "'device_serial_socket' arg need to be provided during the init to use Serial affordance"
+            )
+
+        serial_obj: serial_transport_interface.Serial = (
+            serial_using_unix_socket.Serial(
+                device_name=self.device_name,
+                socket_path=self._device_serial_socket,
+            )
+        )
+        return serial_obj
 
     @properties.Transport
     def sl4f(self) -> sl4f_transport_interface.SL4F:

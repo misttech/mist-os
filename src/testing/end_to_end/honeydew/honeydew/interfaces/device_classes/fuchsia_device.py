@@ -27,6 +27,7 @@ from honeydew.interfaces.transports import ffx as ffx_transport
 from honeydew.interfaces.transports import (
     fuchsia_controller as fuchsia_controller_transport,
 )
+from honeydew.interfaces.transports import serial as serial_transport
 from honeydew.interfaces.transports import sl4f as sl4f_transport
 from honeydew.typing import custom_types
 from honeydew.utils import properties
@@ -150,6 +151,15 @@ class FuchsiaDevice(abc.ABC):
 
         Raises:
             errors.FuchsiaControllerError: Failed to instantiate.
+        """
+
+    @properties.Transport
+    @abc.abstractmethod
+    def serial(self) -> serial_transport.Serial:
+        """Returns the Serial transport object.
+
+        Returns:
+            Serial transport object.
         """
 
     @properties.Transport
