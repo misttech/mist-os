@@ -398,6 +398,15 @@ func fuchsiaLogChecks() []FailureModeCheck {
 			// LINT.ThenChange(/src/storage/fxfs/platform/src/fuchsia/fxblob/writer.rs:blob_write_failure)
 			Type: serialLogType,
 		},
+		// For https://fxbug.dev/328273002.
+		// This detects critical process failures for tests that depend on mexec.
+		&stringInLogCheck{
+			String: "critical to root job killed with",
+			Type:   swarmingOutputType,
+			ExceptBlocks: []*logBlock{
+				{startString: "=== RUN   TestKillCriticalProcess", endString: "--- PASS: TestKillCriticalProcess (3.80s)"},
+			},
+		},
 	}
 
 	oopsExceptBlocks := []*logBlock{
