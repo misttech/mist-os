@@ -456,20 +456,15 @@ pub fn sys_setuid(
     if !new_uid_allowed(&creds, uid) {
         return error!(EPERM);
     }
-
-    let prev_uid = creds.uid;
-    let prev_euid = creds.euid;
-    let prev_fsuid = creds.fsuid;
-    let prev_saved_uid = creds.saved_uid;
-    let has_cap_setuid = creds.has_capability(CAP_SETUID);
+    let prev = creds.copy_user_credentials();
     creds.euid = uid;
     creds.fsuid = uid;
-    if has_cap_setuid {
+    if creds.has_capability(CAP_SETUID) {
         creds.uid = uid;
         creds.saved_uid = uid;
     }
 
-    creds.update_capabilities(prev_uid, prev_euid, prev_fsuid, prev_saved_uid);
+    creds.update_capabilities(prev);
     current_task.set_creds(creds);
     Ok(())
 }
@@ -516,18 +511,14 @@ pub fn sys_setfsuid(
     fsuid: uid_t,
 ) -> Result<uid_t, Errno> {
     let mut creds = current_task.creds();
-    let prev_uid = creds.uid;
-    let prev_euid = creds.euid;
-    let prev_fsuid = creds.fsuid;
-    let prev_saved_uid = creds.saved_uid;
-
+    let prev = creds.copy_user_credentials();
     if fsuid != u32::MAX && new_uid_allowed(&creds, fsuid) {
         creds.fsuid = fsuid;
-        creds.update_capabilities(prev_uid, prev_euid, prev_fsuid, prev_saved_uid);
+        creds.update_capabilities(prev);
         current_task.set_creds(creds);
     }
 
-    Ok(prev_fsuid)
+    Ok(prev.fsuid)
 }
 
 pub fn sys_setfsgid(
@@ -536,16 +527,12 @@ pub fn sys_setfsgid(
     fsgid: gid_t,
 ) -> Result<gid_t, Errno> {
     let mut creds = current_task.creds();
-    let prev_uid = creds.uid;
-    let prev_euid = creds.euid;
-    let prev_fsuid = creds.fsuid;
-    let prev_saved_uid = creds.saved_uid;
-
+    let prev = creds.copy_user_credentials();
     let prev_fsgid = creds.fsgid;
 
     if fsgid != u32::MAX && new_gid_allowed(&creds, fsgid) {
         creds.fsgid = fsgid;
-        creds.update_capabilities(prev_uid, prev_euid, prev_fsuid, prev_saved_uid);
+        creds.update_capabilities(prev);
         current_task.set_creds(creds);
     }
 
@@ -592,10 +579,7 @@ pub fn sys_setreuid(
         return error!(EPERM);
     }
 
-    let prev_ruid = creds.uid;
-    let prev_euid = creds.euid;
-    let prev_fsuid = creds.fsuid;
-    let prev_saved_uid = creds.saved_uid;
+    let prev = creds.copy_user_credentials();
     let mut is_ruid_set = false;
     if ruid != u32::MAX {
         creds.uid = ruid;
@@ -606,11 +590,11 @@ pub fn sys_setreuid(
         creds.fsuid = euid;
     }
 
-    if is_ruid_set || prev_ruid != euid {
+    if is_ruid_set || prev.uid != euid {
         creds.saved_uid = creds.euid;
     }
 
-    creds.update_capabilities(prev_ruid, prev_euid, prev_fsuid, prev_saved_uid);
+    creds.update_capabilities(prev);
     current_task.set_creds(creds);
     Ok(())
 }
@@ -658,10 +642,7 @@ pub fn sys_setresuid(
         return error!(EPERM);
     }
 
-    let prev_ruid = creds.uid;
-    let prev_euid = creds.euid;
-    let prev_fsuid = creds.fsuid;
-    let prev_saved_uid = creds.saved_uid;
+    let prev = creds.copy_user_credentials();
     if ruid != u32::MAX {
         creds.uid = ruid;
     }
@@ -672,7 +653,7 @@ pub fn sys_setresuid(
     if suid != u32::MAX {
         creds.saved_uid = suid;
     }
-    creds.update_capabilities(prev_ruid, prev_euid, prev_fsuid, prev_saved_uid);
+    creds.update_capabilities(prev);
     current_task.set_creds(creds);
     Ok(())
 }
