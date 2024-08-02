@@ -396,7 +396,7 @@ where
 {
     let mut availability_visitor = offer_decl.availability;
     let allowed_sources = AllowedSourcesBuilder::new(CapabilityTypeName::Protocol)
-        .framework(InternalCapability::Protocol)
+        .framework()
         .builtin()
         .namespace()
         .component()
@@ -429,7 +429,7 @@ where
         availability_state: offer_decl.availability.into(),
     };
     let allowed_sources = AllowedSourcesBuilder::new(CapabilityTypeName::Directory)
-        .framework(InternalCapability::Directory)
+        .framework()
         .namespace()
         .component();
     let source = legacy_router::route_from_offer(
@@ -585,7 +585,7 @@ where
     C: ComponentInstanceInterface + 'static,
 {
     let allowed_sources = AllowedSourcesBuilder::new(CapabilityTypeName::Protocol)
-        .framework(InternalCapability::Protocol)
+        .framework()
         .builtin()
         .namespace()
         .component()
@@ -682,7 +682,7 @@ where
 {
     let mut availability_visitor = expose_decl.availability;
     let allowed_sources = AllowedSourcesBuilder::new(CapabilityTypeName::Protocol)
-        .framework(InternalCapability::Protocol)
+        .framework()
         .builtin()
         .namespace()
         .component()
@@ -709,7 +709,7 @@ where
     C: ComponentInstanceInterface + 'static,
 {
     let allowed_sources = AllowedSourcesBuilder::new(CapabilityTypeName::Runner)
-        .framework(InternalCapability::Runner)
+        .framework()
         .builtin()
         .namespace()
         .component()
@@ -736,7 +736,7 @@ where
     C: ComponentInstanceInterface + 'static,
 {
     let allowed_sources = AllowedSourcesBuilder::new(CapabilityTypeName::Resolver)
-        .framework(InternalCapability::Resolver)
+        .framework()
         .builtin()
         .namespace()
         .component()
@@ -965,7 +965,7 @@ where
                 state.finalize(fio::RW_STAR_DIR, Default::default())?;
             }
             let allowed_sources = AllowedSourcesBuilder::new(CapabilityTypeName::Directory)
-                .framework(InternalCapability::Directory)
+                .framework()
                 .namespace()
                 .component();
             let source = legacy_router::route_from_use(
@@ -1000,7 +1000,7 @@ where
         availability_state: expose_decl.availability.into(),
     };
     let allowed_sources = AllowedSourcesBuilder::new(CapabilityTypeName::Directory)
-        .framework(InternalCapability::Directory)
+        .framework()
         .namespace()
         .component();
     let source = legacy_router::route_from_expose(
@@ -1178,7 +1178,7 @@ where
         }
         _ => {
             let allowed_sources = AllowedSourcesBuilder::new(CapabilityTypeName::Runner)
-                .framework(InternalCapability::Runner)
+                .framework()
                 .builtin()
                 .capability()
                 .component();

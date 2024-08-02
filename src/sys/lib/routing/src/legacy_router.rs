@@ -382,7 +382,7 @@ where
 #[derive(Debug, PartialEq, Derivative)]
 #[derivative(Clone(bound = ""))]
 pub struct AllowedSourcesBuilder {
-    framework: Option<fn(Name) -> InternalCapability>,
+    framework: bool,
     builtin: bool,
     capability: bool,
     collection: bool,
@@ -395,7 +395,7 @@ impl AllowedSourcesBuilder {
     /// Creates a new [`AllowedSourcesBuilder`] that does not allow any capability source types.
     pub fn new(capability: CapabilityTypeName) -> Self {
         Self {
-            framework: None,
+            framework: false,
             builtin: false,
             capability: false,
             collection: false,
@@ -405,9 +405,9 @@ impl AllowedSourcesBuilder {
         }
     }
 
-    /// Allows framework capability source types (`from: "framework"` in `CML`).
-    pub fn framework(self, builder: fn(Name) -> InternalCapability) -> Self {
-        Self { framework: Some(builder), ..self }
+    /// Allows framework capability sources of the given type (`from: "framework"` in `CML`).
+    pub fn framework(self) -> Self {
+        Self { framework: true, ..self }
     }
 
     /// Allows capability source types that originate from other capabilities (`from: "#storage"` in
@@ -460,14 +460,13 @@ impl Sources {
         name: Name,
         mapper: &mut dyn DebugRouteMapper,
     ) -> Result<InternalCapability, RoutingError> {
-        let source = self
-            .0
-            .framework
-            .as_ref()
-            .map(|b| b(name.clone()))
-            .ok_or_else(|| RoutingError::unsupported_route_source("framework"));
-        mapper.add_framework_capability(name);
-        source
+        if self.0.framework {
+            let capability = InternalCapability::new(self.0.capability_type, name.clone());
+            mapper.add_framework_capability(name);
+            Ok(capability)
+        } else {
+            Err(RoutingError::unsupported_route_source("framework"))
+        }
     }
 
     /// Checks whether capability sources are supported, returning [`RoutingError::UnsupportedRouteSource`]
