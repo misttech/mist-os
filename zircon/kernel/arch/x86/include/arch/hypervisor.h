@@ -153,7 +153,9 @@ class Vcpu {
   // need is a relaxed atomic load to deal with case 1 (above).
   //
   bool ThreadIsOurThread(Thread* thread) const TA_NO_THREAD_SAFETY_ANALYSIS {
-    return thread == ktl::atomic_ref{thread_}.load(ktl::memory_order_relaxed);
+    // TODO(https://fxbug.dev/355287217): Remove workaround for const/volatile qualified atomic_ref.
+    return thread ==
+           ktl::atomic_ref{const_cast<Vcpu*>(this)->thread_}.load(ktl::memory_order_relaxed);
   }
 
   void InterruptCpu();
