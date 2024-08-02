@@ -34,6 +34,7 @@
 #include "src/media/audio/services/device_registry/observer_notify.h"
 #include "src/media/audio/services/device_registry/signal_processing_utils.h"
 #include "src/media/audio/services/device_registry/validate.h"
+#include "zircon/rights.h"
 
 namespace media_audio {
 
@@ -1807,7 +1808,7 @@ std::optional<fha::Format> Device::SupportedDriverFormatForClientFormat(
     return {};
   }
 
-  ADR_LOG_METHOD(kLogRingBufferFidlResponseValues)
+  ADR_LOG_METHOD(kLogRingBufferMethods)
       << "successful match for client format: " << channel_count << "-chan " << frame_rate << "hz "
       << client_sample_type << " (valid_bits " << static_cast<uint16_t>(best_valid_bits) << ")";
 
@@ -2411,8 +2412,6 @@ fad::ControlCreateRingBufferError Device::ConnectRingBufferFidl(ElementId elemen
       return;
     }
     if (result.status_value() == ZX_ERR_NOT_SUPPORTED) {
-      ADR_LOG_OBJECT(kLogRingBufferFidlResponses)
-          << "RingBuffer/SetActiveChannels IS NOT supported";
       return;
     }
     ADR_WARN_OBJECT() << "RingBuffer/SetActiveChannels returned error: " << result.status_string();
@@ -2515,8 +2514,17 @@ void Device::GetVmo(ElementId element_id, uint32_t min_frames,
         }
         ADR_LOG_OBJECT(kLogRingBufferFidlResponses) << "RingBuffer/GetVmo: success";
 
+        bool vmo_is_incoming;
+        if (current_topology_id_.has_value()) {
+          vmo_is_incoming =
+              ElementHasIncomingEdges(sig_proc_topology_map_.at(*current_topology_id_), element_id);
+        } else {
+          vmo_is_incoming = info()->is_input().value_or(true);
+        }
+        zx_rights_t required_rights =
+            vmo_is_incoming ? kRequiredIncomingVmoRights : kRequiredOutgoingVmoRights;
         if (!ValidateRingBufferVmo(result->ring_buffer(), result->num_frames(),
-                                   *ring_buffer.driver_format)) {
+                                   *ring_buffer.driver_format, required_rights)) {
           FX_PLOGS(ERROR, ZX_ERR_INVALID_ARGS) << "Error in RingBuffer/GetVmo response";
           OnError(ZX_ERR_INVALID_ARGS);
           return;
@@ -2529,11 +2537,11 @@ void Device::GetVmo(ElementId element_id, uint32_t min_frames,
 
 // RingBuffer FIDL successful-response handlers.
 void Device::CheckForRingBufferReady(ElementId element_id) {
-  ADR_LOG_METHOD(kLogRingBufferFidlResponses);
   if (has_error()) {
     ADR_WARN_METHOD() << "device already has an error";
     return;
   }
+  ADR_LOG_METHOD(kLogRingBufferState);
 
   auto& ring_buffer = ring_buffer_map_.find(element_id)->second;
   // Check whether we are tearing down, or conversely have already set up the ring buffer.
@@ -2604,7 +2612,7 @@ bool Device::SetActiveChannels(
     return false;
   }
   FX_CHECK(is_operational());
-  ADR_LOG_METHOD(kLogRingBufferFidlCalls);
+  ADR_LOG_METHOD(kLogRingBufferFidlCalls) << "(0x" << std::hex << channel_bitmask << ")";
 
   auto& ring_buffer = ring_buffer_map_.find(element_id)->second;
   FX_CHECK(ring_buffer.ring_buffer_client.has_value() &&

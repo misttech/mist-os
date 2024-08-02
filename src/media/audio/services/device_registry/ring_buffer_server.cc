@@ -45,7 +45,6 @@ RingBufferServer::~RingBufferServer() {
 
 // Called when the client drops the connection first.
 void RingBufferServer::OnShutdown(fidl::UnbindInfo info) {
-  ADR_LOG_METHOD(kLogObjectLifetimes);
   if (!info.is_peer_closed() && !info.is_user_initiated()) {
     ADR_WARN_METHOD() << "shutdown with unexpected status: " << info;
   } else {
@@ -262,7 +261,7 @@ void RingBufferServer::WatchDelayInfo(WatchDelayInfoCompleter::Sync& completer) 
 }
 
 void RingBufferServer::DelayInfoIsChanged(const fad::DelayInfo& delay_info) {
-  ADR_LOG_METHOD(kLogRingBufferFidlResponses || kLogNotifyMethods);
+  ADR_LOG_METHOD(kLogNotifyMethods);
 
   new_delay_info_to_notify_ = delay_info;
   MaybeCompleteWatchDelayInfo();

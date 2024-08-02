@@ -9,6 +9,7 @@
 #include <lib/zx/clock.h>
 #include <lib/zx/time.h>
 #include <zircon/errors.h>
+#include <zircon/rights.h>
 
 #include <cmath>
 #include <cstdint>
@@ -29,6 +30,20 @@ namespace {
 
 namespace fha = fuchsia_hardware_audio;
 namespace fhasp = fuchsia_hardware_audio_signalprocessing;
+
+constexpr uint64_t kVmoContentSize = 8192;
+constexpr uint8_t kChannelCount = 1;
+constexpr uint8_t kSampleSize = 2;
+const fha::Format kRingBufferFormat{{
+    .pcm_format = fha::PcmFormat{{
+        .number_of_channels = kChannelCount,
+        .sample_format = fha::SampleFormat::kPcmSigned,
+        .bytes_per_sample = kSampleSize,
+        .valid_bits_per_sample = 16,
+        .frame_rate = 48000,
+    }},
+}};
+uint32_t kNumFrames = static_cast<uint32_t>(kVmoContentSize / kChannelCount / kSampleSize);
 
 // Negative-test ValidateStreamProperties
 fha::StreamProperties ValidStreamProperties() {
@@ -725,42 +740,70 @@ TEST(ValidateWarningTest, FormatIncompatibility) {
   }
 }
 
-// Negative-test ValidateRingBufferVmo
+// Negative-test ValidateRingBufferVmo with invalid VMO objects
 TEST(ValidateWarningTest, RingBufferVmoInvalid) {
-  constexpr uint64_t kVmoContentSize = 8192;
   zx::vmo vmo;
   auto status = zx::vmo::create(kVmoContentSize, 0, &vmo);
   ASSERT_EQ(status, ZX_OK) << "could not create VMO for test input";
 
-  constexpr uint8_t kChannelCount = 1;
-  constexpr uint8_t kSampleSize = 2;
-  fha::Format format{{
-      .pcm_format = fha::PcmFormat{{
-          .number_of_channels = kChannelCount,
-          .sample_format = fha::SampleFormat::kPcmSigned,
-          .bytes_per_sample = kSampleSize,
-          .valid_bits_per_sample = 16,
-          .frame_rate = 48000,
-      }},
-  }};
-  uint32_t num_frames = static_cast<uint32_t>(kVmoContentSize / kChannelCount / kSampleSize);
-
   // Bad VMO (get_size failed)
-  EXPECT_FALSE(ValidateRingBufferVmo(zx::vmo(), num_frames, format));
+  EXPECT_FALSE(
+      ValidateRingBufferVmo(zx::vmo(), kNumFrames, kRingBufferFormat, kRequiredIncomingVmoRights))
+      << "invalid VMO";
+
+  // VMO has insufficient rights (incoming)
+  zx::vmo cannot_map;
+  status = vmo.duplicate(kRequiredIncomingVmoRights & ~ZX_RIGHT_MAP, &cannot_map);
+  ASSERT_EQ(status, ZX_OK) << "Could not change rights for vmo";
+  EXPECT_FALSE(
+      ValidateRingBufferVmo(cannot_map, kNumFrames, kRingBufferFormat, kRequiredIncomingVmoRights))
+      << "invalid VMO cannot MAP";
+  zx::vmo cannot_read;
+  status = vmo.duplicate(kRequiredIncomingVmoRights & ~ZX_RIGHT_READ, &cannot_read);
+  ASSERT_EQ(status, ZX_OK) << "Could not change rights for vmo";
+  EXPECT_FALSE(
+      ValidateRingBufferVmo(cannot_read, kNumFrames, kRingBufferFormat, kRequiredIncomingVmoRights))
+      << "invalid VMO cannot READ";
+
+  // VMO has insufficient rights (outgoing)
+  zx::vmo cannot_write;
+  status = vmo.duplicate(kRequiredOutgoingVmoRights & ~ZX_RIGHT_WRITE, &cannot_write);
+  ASSERT_EQ(status, ZX_OK) << "Could not change rights for vmo";
+  EXPECT_FALSE(ValidateRingBufferVmo(cannot_write, kNumFrames, kRingBufferFormat,
+                                     kRequiredOutgoingVmoRights))
+      << "invalid VMO cannot WRITE";
+  zx::vmo cannot_duplicate;
+  status = vmo.replace(kRequiredIncomingVmoRights & ~ZX_RIGHT_DUPLICATE, &cannot_duplicate);
+  ASSERT_EQ(status, ZX_OK) << "Could not change rights for vmo";
+  EXPECT_FALSE(ValidateRingBufferVmo(cannot_duplicate, kNumFrames, kRingBufferFormat,
+                                     kRequiredOutgoingVmoRights))
+      << "invalid VMO cannot DUPLICATE";
+}
+
+// Negative-test ValidateRingBufferVmo with bad parameters
+TEST(ValidateWarningTest, RingBufferVmoParamsInvalid) {
+  zx::vmo vmo;
+  auto status = zx::vmo::create(kVmoContentSize, 0, &vmo);
+  ASSERT_EQ(status, ZX_OK) << "could not create VMO for test input";
 
   // bad num_frames (too large for VMO)
-  EXPECT_FALSE(ValidateRingBufferVmo(vmo, num_frames + 1, format));
+  EXPECT_FALSE(
+      ValidateRingBufferVmo(vmo, kNumFrames + 1, kRingBufferFormat, kRequiredIncomingVmoRights))
+      << "num_frames too large";
 
   // Bad format (flagged by the encapsulated ValidateRingBufferFormat)
-  format.pcm_format()->frame_rate() = 999;
-  EXPECT_FALSE(ValidateRingBufferVmo(vmo, num_frames, format));
-  format.pcm_format()->frame_rate() = 192001;
-  EXPECT_FALSE(ValidateRingBufferVmo(vmo, num_frames, format));
+  fha::Format mutable_format = kRingBufferFormat;
+  mutable_format.pcm_format()->frame_rate() = kMinSupportedRingBufferFrameRate - 1;
+  EXPECT_FALSE(ValidateRingBufferVmo(vmo, kNumFrames, mutable_format, kRequiredIncomingVmoRights))
+      << "frame_rate too low";
+  mutable_format.pcm_format()->frame_rate() = kMaxSupportedRingBufferFrameRate + 1;
+  EXPECT_FALSE(ValidateRingBufferVmo(vmo, kNumFrames, mutable_format, kRequiredIncomingVmoRights))
+      << "frame_rate too high";
 
   // Bad format (flagged by the encapsulated ValidateSampleFormatCompatibility)
-  format.pcm_format()->frame_rate() = 48000;
-  format.pcm_format()->sample_format() = fha::SampleFormat::kPcmFloat;
-  EXPECT_FALSE(ValidateRingBufferVmo(vmo, num_frames, format));
+  mutable_format.pcm_format()->frame_rate() = 48000;
+  mutable_format.pcm_format()->sample_format() = fha::SampleFormat::kPcmFloat;
+  EXPECT_FALSE(ValidateRingBufferVmo(vmo, kNumFrames, mutable_format, kRequiredIncomingVmoRights));
 }
 
 // Negative-test ValidateDelayInfo for internal_delay

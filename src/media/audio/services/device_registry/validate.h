@@ -9,6 +9,7 @@
 #include <fidl/fuchsia.audio.device/cpp/natural_types.h>
 #include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/natural_types.h>
 #include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
+#include <zircon/rights.h>
 
 #include <unordered_map>
 
@@ -25,6 +26,9 @@ constexpr uint8_t kMaxSupportedDaiFormatBitsPerSlot = 64;
 // TODO(https://fxbug.dev/42068183): official frame-rate limits/expectations for audio devices.
 const uint32_t kMinSupportedRingBufferFrameRate = 1000;
 const uint32_t kMaxSupportedRingBufferFrameRate = 192000;
+
+constexpr zx_rights_t kRequiredIncomingVmoRights = ZX_RIGHT_TRANSFER | ZX_RIGHT_READ | ZX_RIGHT_MAP;
+constexpr zx_rights_t kRequiredOutgoingVmoRights = kRequiredIncomingVmoRights | ZX_RIGHT_WRITE;
 
 // Utility functions to validate direct responses from audio drivers.
 bool ClientIsValidForDeviceType(const fuchsia_audio_device::DeviceType& device_type,
@@ -117,7 +121,8 @@ bool ValidateDaiFormat(const fuchsia_hardware_audio::DaiFormat& dai_format);
 
 bool ValidateRingBufferProperties(const fuchsia_hardware_audio::RingBufferProperties& rb_props);
 bool ValidateRingBufferVmo(const zx::vmo& vmo, uint32_t num_frames,
-                           const fuchsia_hardware_audio::Format& format);
+                           const fuchsia_hardware_audio::Format& format,
+                           zx_rights_t required_rights);
 bool ValidateDelayInfo(const fuchsia_hardware_audio::DelayInfo& delay_info);
 
 }  // namespace media_audio
