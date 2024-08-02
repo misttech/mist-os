@@ -32,7 +32,8 @@ use starnix_sync::{
 };
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::auth::{
-    CAP_BLOCK_SUSPEND, CAP_DAC_READ_SEARCH, CAP_LEASE, CAP_SYS_ADMIN, PTRACE_MODE_ATTACH_REALCREDS,
+    CAP_BLOCK_SUSPEND, CAP_DAC_READ_SEARCH, CAP_LEASE, CAP_SYS_ADMIN, CAP_WAKE_ALARM,
+    PTRACE_MODE_ATTACH_REALCREDS,
 };
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::{Errno, ErrnoResultExt, EFAULT, EINTR, ENAMETOOLONG, ETIMEDOUT};
@@ -1905,7 +1906,12 @@ pub fn sys_timerfd_create(
     };
     let timer_type = match clock_id {
         CLOCK_MONOTONIC | CLOCK_BOOTTIME | CLOCK_REALTIME => TimerWakeup::Regular,
-        CLOCK_BOOTTIME_ALARM | CLOCK_REALTIME_ALARM => TimerWakeup::Alarm,
+        CLOCK_BOOTTIME_ALARM | CLOCK_REALTIME_ALARM => {
+            if !current_task.creds().has_capability(CAP_WAKE_ALARM) {
+                return error!(EPERM);
+            }
+            TimerWakeup::Alarm
+        }
         _ => return error!(EINVAL),
     };
     if flags & !(TFD_NONBLOCK | TFD_CLOEXEC) != 0 {
