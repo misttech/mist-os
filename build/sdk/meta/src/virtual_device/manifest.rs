@@ -56,7 +56,8 @@ impl VirtualDeviceManifest {
         }
         let parent = path.parent().with_context(|| format!("path '{}' has no parent", path))?;
         let file = File::open(&path).with_context(|| format!("open '{}'", path))?;
-        match serde_json::from_reader::<File, VirtualDeviceManifest>(file).map_err(|e| e.into()) {
+        let file = std::io::BufReader::new(file);
+        match serde_json::from_reader::<_, VirtualDeviceManifest>(file).map_err(|e| e.into()) {
             Ok(mut manifest) => {
                 manifest.parent_dir_path = parent.into();
                 Ok(manifest)

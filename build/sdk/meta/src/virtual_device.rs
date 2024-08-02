@@ -40,6 +40,7 @@ impl VirtualDevice {
         })?;
         let file = File::open(path.as_ref())
             .with_context(|| format!("opening virtual device: {:?}", path.as_ref()))?;
+        let file = std::io::BufReader::new(file);
         let helper: SerializationHelper =
             serde_json::from_reader(file).context("parsing virtual device")?;
         let device = match helper {

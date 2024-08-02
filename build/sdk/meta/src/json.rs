@@ -5,7 +5,7 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use serde_json::{from_reader, from_str, to_string, to_value};
-use std::io::Read;
+use std::io::BufRead;
 use thiserror::Error;
 use url::Url;
 use valico::common::error::ValicoError;
@@ -64,7 +64,7 @@ fn format_missing_refs(url: &Url) -> String {
 /// their contents.
 pub trait JsonObject: for<'a> Deserialize<'a> + Serialize + Sized {
     /// Creates a new instance from its raw data.
-    fn new<R: Read>(source: R) -> Result<Self> {
+    fn new<R: BufRead>(source: R) -> Result<Self> {
         Ok(from_reader(source)?)
     }
 

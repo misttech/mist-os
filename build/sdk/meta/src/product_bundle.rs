@@ -12,14 +12,14 @@ use camino::{Utf8Path, Utf8PathBuf};
 use fuchsia_repo::repository::FileSystemRepository;
 use serde::{Deserialize, Serialize};
 use std::fs::File;
-use std::io::Read;
+use std::io::BufRead;
 use std::ops::Deref;
 use v2::Canonicalizer;
 use zip::read::ZipArchive;
 
 pub use v2::{ProductBundleV2, Repository, Type};
 
-fn try_load_product_bundle(r: impl Read) -> Result<ProductBundle> {
+fn try_load_product_bundle(r: impl BufRead) -> Result<ProductBundle> {
     let helper: SerializationHelper =
         serde_json::from_reader(r).context("parsing product bundle")?;
     match helper {
@@ -60,6 +60,7 @@ impl ZipLoadedProductBundle {
         let product_bundle_manifest = zip
             .by_name(&product_bundle_manifest_name)
             .with_context(|| format!("getting 'product_bundle.json' in zip archive"))?;
+        let product_bundle_manifest = std::io::BufReader::new(product_bundle_manifest);
         // Still need to canonicalize paths as the path to the product bundle'suffix
         // parent directory may be arbitrarily deep in the zip file
         match try_load_product_bundle(product_bundle_manifest)? {
@@ -142,6 +143,7 @@ impl LoadedProductBundle {
         let product_bundle_path = path.as_ref().join("product_bundle.json");
         let file = File::open(&product_bundle_path)
             .map_err(|e| anyhow!("{e}: {product_bundle_path:?}"))?;
+        let file = std::io::BufReader::new(file);
 
         match try_load_product_bundle(file)? {
             ProductBundle::V2(data) => {
