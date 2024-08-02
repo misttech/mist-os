@@ -74,6 +74,12 @@ impl From<cm_rust::ChildRef> for ChildName {
     }
 }
 
+impl From<ChildName> for cm_rust::ChildRef {
+    fn from(child_name: ChildName) -> Self {
+        Self { name: child_name.name, collection: child_name.collection }
+    }
+}
+
 impl Ord for ChildName {
     fn cmp(&self, other: &Self) -> Ordering {
         (&self.collection, &self.name).cmp(&(&other.collection, &other.name))
