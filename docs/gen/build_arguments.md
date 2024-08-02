@@ -1061,6 +1061,19 @@ should only be used to collect stats about clippy lints in our source tree.
 
 From //build/rust/config.gni:61
 
+### clippy_ignore_rustc
+
+By default building clippy targets prints lints as well as any rustc diagnostics
+that were emitted by check-building the crate. This flag makes the output in the
+build only contain lints to avoid duplicating the diagnostics from rustc
+(which will be emitted when the actual target is built). Note that `fx clippy`
+will still emit rustc diagnostics alongside clippy lints, they just wont show
+up in ninja's stderr
+
+**Current value (from the default):** `false`
+
+From //build/rust/config.gni:77
+
 ### clippy_warn_all
 
 Set the lint level for all clippy lints to "warn".
@@ -7959,7 +7972,7 @@ Whether to use an alternate strategy for anonymous memory allocations.
 
 **Current value (from the default):** `false`
 
-From //src/starnix/kernel/args.gni:27
+From //src/starnix/kernel/args.gni:32
 
 ### starnix_enable_console_tool
 
@@ -7975,12 +7988,17 @@ From //src/developer/ffx/tools/starnix/BUILD.gn:15
 ### starnix_enable_trace_and_debug_logs_in_release
 
 Compiles-in trace and debug logging in release builds. By default, these
-logs are compiled-out for performance reasons. For more information, see
+logs are compiled-out for performance reasons.
+
+This option does not affect usage of the `fuchsia_trace` crate, which is
+independent of Rust's tracing library.
+
+For more information, see
 https://fuchsia-review.googlesource.com/c/fuchsia/+/929995.
 
 **Current value (from the default):** `false`
 
-From //src/starnix/kernel/args.gni:18
+From //src/starnix/kernel/args.gni:23
 
 ### starnix_enable_tracing
 
@@ -8004,7 +8022,7 @@ Whether to log writes to `/dev/null` at the INFO level.
 
 **Current value (from the default):** `false`
 
-From //src/starnix/kernel/args.gni:30
+From //src/starnix/kernel/args.gni:35
 
 ### starnix_syscall_stats
 
@@ -8012,7 +8030,7 @@ Whether or not syscall status inspect is enabled globally.
 
 **Current value (from the default):** `false`
 
-From //src/starnix/kernel/args.gni:21
+From //src/starnix/kernel/args.gni:26
 
 ### starnix_unified_aspace
 
@@ -8020,7 +8038,7 @@ Whether or not unified address spaces are leveraged.
 
 **Current value (from the default):** `true`
 
-From //src/starnix/kernel/args.gni:24
+From //src/starnix/kernel/args.gni:29
 
 ### storage_enable_tracing
 
