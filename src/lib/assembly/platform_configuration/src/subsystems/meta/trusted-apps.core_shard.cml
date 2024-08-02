@@ -70,10 +70,12 @@
             to: "#trusted-apps",
         },
         {
+            // Re-expose this protocol back for the widevine component
             protocol: [ "widevine.oemcrypto.Provider" ],
-            from: "#oemcrypto",
+            from: "#trusted-apps/trusted-app-capabilities",
             to: "#trusted-apps",
-            source_availability: "unknown",
+            dependency: "weak",
+            availability: "same_as_target",
         },
         {
             directory: "config-data",
