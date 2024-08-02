@@ -514,7 +514,7 @@ where
     // point doesn't exist in a previous mount. The root must be first so other mounts can be
     // applied on top of it.
     let mut mounts_iter = config.mounts.iter();
-    let (root_point, root_fs) = create_filesystem_from_spec(
+    let (root_point, mut root_fs) = create_filesystem_from_spec(
         locked,
         kernel,
         pkg_dir_proxy,
@@ -550,9 +550,11 @@ where
         mappings.push(("test_data".into(), TmpFs::new_fs(kernel)));
     }
 
-    // TODO(https://fxbug.dev/356684424): Can we remove this layeredfs if the container
-    // does not need any of these directories?
-    let mut root_fs = LayeredFs::new_fs(kernel, root_fs, mappings.into_iter().collect());
+    if !mappings.is_empty() {
+        // If this container has enabled any features that mount directories that might not exist
+        // in the root file system, we add a LayeredFs to hold these mappings.
+        root_fs = LayeredFs::new_fs(kernel, root_fs, mappings.into_iter().collect());
+    }
     if features.rootfs_rw {
         root_fs = OverlayFs::wrap_fs_in_writable_layer(kernel, root_fs)?;
     }
