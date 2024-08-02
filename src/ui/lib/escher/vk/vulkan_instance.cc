@@ -87,13 +87,8 @@ vk::Result VulkanInstance::Initialize() {
   info.ppEnabledLayerNames = layer_names.data();
   info.enabledExtensionCount = static_cast<uint32_t>(extension_names.size());
   info.ppEnabledExtensionNames = extension_names.data();
-  bool supports_initial_debug_utils_message = true;
-#if defined(__x86_64__)
-  // Chaining VkDebugUtilsMessengerCreateInfoEXT onto VkInstanceCreateInfo can crash AEMU.
-  // TODO(https://fxbug.dev/42158772): Fix.
-  supports_initial_debug_utils_message = false;
-#endif
-  if (HasDebugUtilsExt() && supports_initial_debug_utils_message) {
+
+  if (HasDebugUtilsExt()) {
     info.setPNext(&create_info);
   }
 
