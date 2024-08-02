@@ -166,5 +166,11 @@
             type: "string",
             max_size: 64,
         },
+        {
+            // storage-host.
+            config: "fuchsia.fshost.StorageHost",
+            key: "storage_host",
+            type: "bool",
+        },
     ],
 }

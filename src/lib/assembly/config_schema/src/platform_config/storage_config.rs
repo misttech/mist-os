@@ -25,6 +25,10 @@ pub struct StorageConfig {
 
     #[serde(default)]
     pub filesystems: ProductFilesystemConfig,
+
+    /// Enables storage-host.  See RFC (https://fxrev.dev/1077832) for details.
+    #[serde(default)]
+    pub storage_host_enabled: bool,
 }
 
 /// Platform configuration options for the component id index which describes

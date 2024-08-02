@@ -76,6 +76,7 @@ template("generated_fshost_config") {
       format_data_on_corruption = true
       nand = false
       use_disk_migration = false
+      storage_host = false
 
       if (defined(invoker.options)) {
         forward_variables_from(invoker.options, "*")

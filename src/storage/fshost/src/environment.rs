@@ -16,7 +16,7 @@ use crate::inspect::register_migration_status;
 use anyhow::{anyhow, bail, Context, Error};
 use async_trait::async_trait;
 use device_watcher::{recursive_wait, recursive_wait_and_open};
-use fidl::endpoints::{create_proxy, ServerEnd};
+use fidl::endpoints::{create_proxy, Proxy as _, ServerEnd};
 use fidl_fuchsia_fxfs::MountOptions;
 use fidl_fuchsia_hardware_block_partition::Guid;
 use fidl_fuchsia_hardware_block_volume::{VolumeManagerMarker, VolumeMarker};
@@ -47,6 +47,9 @@ pub enum ServeFilesystemStatus {
 pub trait Environment: Send + Sync {
     /// Attaches the specified driver to the device.
     async fn attach_driver(&self, device: &mut dyn Device, driver_path: &str) -> Result<(), Error>;
+
+    /// Binds storage-host to the given device.
+    async fn launch_storage_host(&self, device: &mut dyn Device) -> Result<(), Error>;
 
     /// Binds the fvm driver and returns a list of the names of the child partitions.
     async fn bind_and_enumerate_fvm(
@@ -582,6 +585,10 @@ impl Environment for FshostEnvironment {
         self.launcher.attach_driver(device, driver_path).await
     }
 
+    async fn launch_storage_host(&self, device: &mut dyn Device) -> Result<(), Error> {
+        self.launcher.launch_storage_host(device).await.context("Failed to launch storage-host")
+    }
+
     async fn bind_and_enumerate_fvm(
         &mut self,
         device: &mut dyn Device,
@@ -901,6 +908,16 @@ impl FilesystemLauncher {
         }
     }
 
+    pub async fn launch_storage_host(&self, device: &mut dyn Device) -> Result<(), Error> {
+        tracing::info!(path = %device.path(), "Binding storage-host to device");
+        let proxy = connect_to_protocol::<fidl_fuchsia_storagehost::StorageHostMarker>()?;
+        proxy
+            .start(device.device_controller()?.into_client_end().unwrap())
+            .await?
+            .map_err(zx::Status::from_raw)?;
+        Ok(())
+    }
+
     /// This helper method returns true if the given device is a ramdisk.
     /// We want to enforce partition limits and use zxcrypt only on non-ramdisk devices.
     pub fn is_ramdisk_device(&self, device: &dyn Device) -> bool {
@@ -942,10 +959,13 @@ impl FilesystemLauncher {
             component_type: fs_management::ComponentType::StaticChild,
             ..self.get_blobfs_config()
         };
-        let fs = fs_management::filesystem::Filesystem::new(device.reopen_controller()?, config)
-            .serve()
-            .await
-            .context("serving blobfs")?;
+        let fs = fs_management::filesystem::Filesystem::from_boxed_config(
+            device.block_connector()?,
+            Box::new(config),
+        )
+        .serve()
+        .await
+        .context("serving blobfs")?;
 
         Ok(Filesystem::Serving(fs))
     }
@@ -955,7 +975,10 @@ impl FilesystemLauncher {
         device: &mut dyn Device,
         config: FSC,
     ) -> Result<ServeFilesystemStatus, Error> {
-        let fs = fs_management::filesystem::Filesystem::new(device.reopen_controller()?, config);
+        let fs = fs_management::filesystem::Filesystem::from_boxed_config(
+            device.block_connector()?,
+            Box::new(config),
+        );
         self.serve_data_from(device, fs).await
     }
 
@@ -1108,13 +1131,13 @@ impl FilesystemLauncher {
         &self,
         device: &mut dyn Device,
     ) -> Result<ServingMultiVolumeFilesystem, Error> {
-        let mut fs = fs_management::filesystem::Filesystem::new(
-            device.reopen_controller()?,
-            Fxfs {
+        let mut fs = fs_management::filesystem::Filesystem::from_boxed_config(
+            device.block_connector()?,
+            Box::new(Fxfs {
                 component_type: ComponentType::StaticChild,
                 startup_profiling_seconds: Some(60),
                 ..Default::default()
-            },
+            }),
         );
         if self.config.check_filesystems {
             tracing::info!("fsck started for fxblob");
@@ -1224,7 +1247,10 @@ impl FilesystemLauncher {
         device: &mut dyn Device,
         config: FSC,
     ) -> Result<Filesystem, Error> {
-        let fs = fs_management::filesystem::Filesystem::new(device.reopen_controller()?, config);
+        let fs = fs_management::filesystem::Filesystem::from_boxed_config(
+            device.block_connector()?,
+            Box::new(config),
+        );
         self.format_data_from(device, fs).await
     }
 

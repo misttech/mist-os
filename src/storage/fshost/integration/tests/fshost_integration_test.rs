@@ -538,7 +538,26 @@ async fn fvm_within_gpt() {
     fixture.tear_down().await;
 }
 
+// Test that fshost handles the case where Fxblob is within a GPT partition.
 #[fuchsia::test]
+#[cfg(feature = "fxblob")]
+async fn fxblob_within_gpt() {
+    let mut builder = new_builder();
+    builder.with_disk().format_volumes(volumes_spec()).with_gpt().format_data(data_fs_spec());
+    let fixture = builder.build().await;
+
+    // Make sure we can access the blob/data partitions within the FVM.
+    fixture.check_fs_type("blob", blob_fs_type()).await;
+    fixture.check_fs_type("data", data_fs_type()).await;
+    fixture.check_test_data_file().await;
+    fixture.check_test_blob(DATA_FILESYSTEM_VARIANT == "fxblob").await;
+
+    fixture.tear_down().await;
+}
+
+// TODO(https://fxbug.dev/339491886): port to storage-host
+#[fuchsia::test]
+#[cfg_attr(feature = "storage-host", ignore)]
 async fn pausing_block_watcher_ignores_devices() {
     // The first disk has a blank data filesystem
     let mut disk_builder1 = fshost_test_fixture::disk_builder::DiskBuilder::new();

@@ -38,7 +38,7 @@ rustc_library("fs_management") {
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-fs",
     "//src/storage/fs_test:crypt_service",
-    "//src/storage/lib/block_server:fake_server",
+    "//src/storage/lib/block_server:fake_block_server",
     "//src/storage/lib/ramdevice_client",
     "//third_party/rust_crates:futures",
   ]

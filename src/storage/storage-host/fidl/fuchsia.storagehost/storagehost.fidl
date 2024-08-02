@@ -1,0 +1,23 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+library fuchsia.storagehost;
+
+using fuchsia.device;
+using zx;
+
+/// Interface for controlling storage-host.
+@discoverable
+closed protocol StorageHost {
+    /// Binds the storage-host to the block device driver managed by `device_controller`.
+    /// storage-host will connect to the fuchsia.hardware.block.volume.Volume protocol offered by
+    /// the driver, and attempt to load the partitions from the block device.  The block device
+    /// must be formatted in a supported format (e.g. GPT).
+    /// Each partition will have an entry added to the `partitions` directory of storage-host.
+    /// A service node named `block` can be used to connect to the
+    /// fuchsia.hardware.block.volume.Volume service for that partition.
+    strict Start(resource struct {
+        device_controller client_end:fuchsia.device.Controller;
+    }) -> () error zx.Status;
+};

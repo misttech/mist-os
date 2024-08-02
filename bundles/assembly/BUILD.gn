@@ -2536,6 +2536,35 @@ assembly_input_bundle("fshost_fxfs") {
   ]
 }
 
+# AIB containing the fshost with storage_host.
+#
+# optional: product must specify its inclusion
+# valid feature_set_levels: all
+# valid build-types: all
+#
+assembly_input_bundle("fshost_storage_host") {
+  compiled_packages = [
+    {
+      bootfs_package = true
+      name = "fshost"
+      components = [
+        {
+          component_name = "fshost"
+          shards = [
+            "//src/storage/fshost/meta/fxfs_gpt_fshost.cml",
+            "//src/storage/fshost/meta/fxfs_gpt_fshost_base.shard.cml",
+          ]
+        },
+      ]
+    },
+  ]
+  bootfs_packages = [
+    "//src/storage/storage-host:package",
+    "//src/storage/fxfs:package",
+    "//src/storage/fxfs-crypt:package",
+  ]
+}
+
 # AIB containing fshost with an fvm and blobfs only.
 #
 # optional: product must specify its inclusion

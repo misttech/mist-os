@@ -1,0 +1,32 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [
+        "inspect/client.shard.cml",
+        "syslog/client.shard.cml",
+    ],
+    program: {
+        runner: "elf",
+        binary: "bin/storage_host",
+        lifecycle: { stop_event: "notify" },
+    },
+    capabilities: [
+        { protocol: "fuchsia.storagehost.StorageHost" },
+        {
+            directory: "partitions",
+            rights: [ "rw*" ],
+            path: "/partitions",
+        },
+    ],
+    expose: [
+        {
+            directory: [ "partitions" ],
+            from: "self",
+        },
+        {
+            protocol: "fuchsia.storagehost.StorageHost",
+            from: "self",
+        },
+    ],
+}

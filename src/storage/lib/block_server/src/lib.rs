@@ -93,13 +93,18 @@ pub struct BlockServer<SM> {
     session_manager: Arc<SM>,
 }
 
+// Methods take Arc rather than &self because of https://github.com/rust-lang/rust/issues/42940.
 pub trait SessionManager {
-    // This is Arc rather than &self because of https://github.com/rust-lang/rust/issues/42940.
+    fn on_attach_vmo(
+        self: Arc<Self>,
+        vmo: &Arc<zx::Vmo>,
+    ) -> impl Future<Output = Result<(), zx::Status>> + Send;
+
     fn open_session(
         self: Arc<Self>,
         stream: fblock::SessionRequestStream,
         block_size: u32,
-    ) -> impl Future<Output = Result<(), Error>>;
+    ) -> impl Future<Output = Result<(), Error>> + Send;
 }
 
 pub trait IntoSessionManager {
@@ -127,7 +132,7 @@ impl<SM: SessionManager> BlockServer<SM> {
             futures::select! {
                 request = requests.next() => {
                     if let Some(request) = request {
-                        if let Some(session) = self.handle_request(request?).await? {
+                        if let Some(session) = self.handle_request(request?)? {
                             sessions.push(session);
                         }
                     }
@@ -139,10 +144,10 @@ impl<SM: SessionManager> BlockServer<SM> {
     }
 
     /// Processes a partition request.
-    async fn handle_request(
+    fn handle_request(
         &self,
         request: fvolume::VolumeRequest,
-    ) -> Result<Option<impl Future<Output = Result<(), Error>>>, Error> {
+    ) -> Result<Option<impl Future<Output = Result<(), Error>> + Send>, Error> {
         match request {
             fvolume::VolumeRequest::GetInfo { responder } => {
                 responder.send(Ok(&fblock::BlockInfo {
@@ -200,18 +205,20 @@ impl<SM: SessionManager> BlockServer<SM> {
     }
 }
 
-struct SessionHelper {
+struct SessionHelper<SM: SessionManager> {
+    session_manager: Arc<SM>,
     block_size: u32,
     peer_fifo: zx::Fifo,
     vmos: Mutex<BTreeMap<u16, Arc<zx::Vmo>>>,
     message_groups: FifoMessageGroups,
 }
 
-impl SessionHelper {
-    fn new(block_size: u32) -> Result<(Self, zx::Fifo), zx::Status> {
+impl<SM: SessionManager> SessionHelper<SM> {
+    fn new(session_manager: Arc<SM>, block_size: u32) -> Result<(Self, zx::Fifo), zx::Status> {
         let (peer_fifo, fifo) = zx::Fifo::create(16, std::mem::size_of::<BlockFifoRequest>())?;
         Ok((
             Self {
+                session_manager,
                 block_size,
                 peer_fifo,
                 vmos: Mutex::default(),
@@ -221,7 +228,7 @@ impl SessionHelper {
         ))
     }
 
-    fn handle_request(&self, request: fblock::SessionRequest) -> Result<(), Error> {
+    async fn handle_request(&self, request: fblock::SessionRequest) -> Result<(), Error> {
         match request {
             fblock::SessionRequest::GetFifo { responder } => {
                 let rights = zx::Rights::TRANSFER
@@ -236,29 +243,35 @@ impl SessionHelper {
                 Ok(())
             }
             fblock::SessionRequest::AttachVmo { vmo, responder } => {
-                let mut vmos = self.vmos.lock().unwrap();
-                if vmos.len() == u16::MAX as usize {
-                    responder.send(Err(zx::Status::NO_RESOURCES.into_raw()))?;
-                } else {
-                    let vmo_id = match vmos.last_entry() {
-                        None => 1,
-                        Some(o) => {
-                            o.key().checked_add(1).unwrap_or_else(|| {
-                                let mut vmo_id = 1;
-                                // Find the first gap...
-                                for (&id, _) in &*vmos {
-                                    if id > vmo_id {
-                                        break;
+                let vmo = Arc::new(vmo);
+                let vmo_id = {
+                    let mut vmos = self.vmos.lock().unwrap();
+                    if vmos.len() == u16::MAX as usize {
+                        responder.send(Err(zx::Status::NO_RESOURCES.into_raw()))?;
+                        return Ok(());
+                    } else {
+                        let vmo_id = match vmos.last_entry() {
+                            None => 1,
+                            Some(o) => {
+                                o.key().checked_add(1).unwrap_or_else(|| {
+                                    let mut vmo_id = 1;
+                                    // Find the first gap...
+                                    for (&id, _) in &*vmos {
+                                        if id > vmo_id {
+                                            break;
+                                        }
+                                        vmo_id = id + 1;
                                     }
-                                    vmo_id = id + 1;
-                                }
-                                vmo_id
-                            })
-                        }
-                    };
-                    vmos.insert(vmo_id, Arc::new(vmo));
-                    responder.send(Ok(&fblock::VmoId { id: vmo_id }))?;
-                }
+                                    vmo_id
+                                })
+                            }
+                        };
+                        vmos.insert(vmo_id, vmo.clone());
+                        vmo_id
+                    }
+                };
+                self.session_manager.clone().on_attach_vmo(&vmo).await?;
+                responder.send(Ok(&fblock::VmoId { id: vmo_id }))?;
                 Ok(())
             }
             fblock::SessionRequest::Close { responder } => {
@@ -445,6 +458,10 @@ mod tests {
     }
 
     impl super::async_interface::Interface for MockInterface {
+        async fn on_attach_vmo(&self, _vmo: &zx::Vmo) -> Result<(), zx::Status> {
+            Ok(())
+        }
+
         async fn read(
             &self,
             device_block_offset: u64,
@@ -675,6 +692,10 @@ mod tests {
     }
 
     impl super::async_interface::Interface for IoMockInterface {
+        async fn on_attach_vmo(&self, _vmo: &zx::Vmo) -> Result<(), zx::Status> {
+            Ok(())
+        }
+
         async fn read(
             &self,
             device_block_offset: u64,

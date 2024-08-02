@@ -108,6 +108,7 @@ impl FshostBuilder {
             ),
             ("fxfs_blob", "fuchsia.fshost.FxfsBlob"),
             ("fxfs_crypt_url", "fuchsia.fshost.FxfsCryptUrl"),
+            ("storage_host", "fuchsia.fshost.StorageHost"),
         ]);
 
         // Add the overrides as capabilities and route them.
@@ -161,7 +162,9 @@ impl FshostBuilder {
                     .capability(Capability::protocol::<BlobReaderMarker>())
                     .capability(Capability::directory("blob").rights(fio::RW_STAR_DIR))
                     .capability(Capability::directory("data").rights(fio::RW_STAR_DIR))
+                    .capability(Capability::directory("partitions").rights(fio::RW_STAR_DIR))
                     .capability(Capability::directory("tmp").rights(fio::RW_STAR_DIR))
+                    .capability(Capability::directory("volumes").rights(fio::RW_STAR_DIR))
                     .from(&fshost)
                     .to(Ref::parent()),
             )
@@ -175,16 +178,6 @@ impl FshostBuilder {
                     .capability(Capability::protocol::<fprocess::LauncherMarker>())
                     .from(Ref::parent())
                     .to(&fshost),
-            )
-            .await
-            .unwrap();
-
-        realm_builder
-            .add_route(
-                Route::new()
-                    .capability(Capability::directory("volumes").rights(fio::RW_STAR_DIR))
-                    .from(&fshost)
-                    .to(Ref::parent()),
             )
             .await
             .unwrap();

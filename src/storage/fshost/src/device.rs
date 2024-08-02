@@ -12,6 +12,7 @@ use fidl_fuchsia_hardware_block::{BlockMarker, BlockProxy};
 use fidl_fuchsia_hardware_block_partition::{PartitionMarker, PartitionProxy};
 use fidl_fuchsia_hardware_block_volume::{VolumeMarker, VolumeProxy};
 use fidl_fuchsia_io::OpenFlags;
+use fs_management::filesystem::{BlockConnector, PathBasedBlockConnector};
 use fs_management::format::{detect_disk_format, DiskFormat};
 use fuchsia_component::client::connect_to_protocol_at_path;
 use fuchsia_zircon as zx;
@@ -31,7 +32,7 @@ pub trait Device: Send + Sync {
     /// Returns the topological path.
     fn topological_path(&self) -> &str;
 
-    /// Returns the path in /dev/class. This path is absolute and includes the /dev/class prefix.
+    /// Returns the path in the local namespace. This path is absolute, e.g. /dev/class/block/000.
     fn path(&self) -> &str;
 
     /// If this device is a partition, this returns the label. Otherwise, an error is returned.
@@ -56,11 +57,20 @@ pub trait Device: Send + Sync {
         Err(anyhow!("Unimplemented"))
     }
 
-    /// Returns the Controller interface for the device.
-    fn controller(&self) -> &ControllerProxy;
+    /// Returns the connection to the Controller interface of the device.  Panics if the device
+    /// isn't a DF-managed device.
+    fn controller(&self) -> &ControllerProxy {
+        panic!("Device isn't managed by Driver Framework.")
+    }
 
-    /// Establish a new connection to the Controller interface for the device.
-    fn reopen_controller(&self) -> Result<ControllerProxy, Error>;
+    /// Establishes a new connection to the Controller interface of the device.  Panics if the
+    /// device isn't a DF-managed device.
+    fn device_controller(&self) -> Result<ControllerProxy, Error> {
+        panic!("Device isn't managed by Driver Framework.")
+    }
+
+    /// Returns a new controller for the block device.
+    fn block_connector(&self) -> Result<Box<dyn BlockConnector>, Error>;
 
     /// Establish a new connection to the Block interface of the device.
     fn block_proxy(&self) -> Result<BlockProxy, Error>;
@@ -83,7 +93,7 @@ pub trait Device: Send + Sync {
 }
 
 /// A nand device.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct NandDevice {
     block_device: BlockDevice,
 }
@@ -158,8 +168,12 @@ impl Device for NandDevice {
         self.block_device.controller()
     }
 
-    fn reopen_controller(&self) -> Result<ControllerProxy, Error> {
-        self.block_device.reopen_controller()
+    fn device_controller(&self) -> Result<ControllerProxy, Error> {
+        self.block_device.device_controller()
+    }
+
+    fn block_connector(&self) -> Result<Box<dyn BlockConnector>, Error> {
+        self.block_device.block_connector()
     }
 
     fn block_proxy(&self) -> Result<BlockProxy, Error> {
@@ -172,7 +186,7 @@ impl Device for NandDevice {
 }
 
 /// A block device.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct BlockDevice {
     // The canonical path of the device in /dev. Most of the time it's from /dev/class/, but it
     // just needs to be able to be opened as a fuchsia.device/Controller.
@@ -302,11 +316,15 @@ impl Device for BlockDevice {
         &self.controller_proxy
     }
 
-    fn reopen_controller(&self) -> Result<ControllerProxy, Error> {
+    fn device_controller(&self) -> Result<ControllerProxy, Error> {
         Ok(connect_to_protocol_at_path::<ControllerMarker>(&format!(
             "{}/device_controller",
             self.path
         ))?)
+    }
+
+    fn block_connector(&self) -> Result<Box<dyn BlockConnector>, Error> {
+        self.device_controller().map(|c| Box::new(c) as Box<dyn BlockConnector>)
     }
 
     fn block_proxy(&self) -> Result<BlockProxy, Error> {
@@ -338,5 +356,122 @@ impl Device for BlockDevice {
 
         let block_device = BlockDevice::new(child_path).await?;
         Ok(Box::new(block_device))
+    }
+}
+
+/// A block device running out of the storage-host component.
+#[derive(Debug)]
+pub struct StorageHostDevice {
+    connector: Box<PathBasedBlockConnector>,
+
+    // Cache a proxy to the device's Partition interface so we can use it internally.  (This assumes
+    // that devices speak Partition, which is currently always true).
+    partition_proxy: PartitionProxy,
+
+    // Memoized fields.
+    content_format: Option<DiskFormat>,
+    partition_label: Option<String>,
+    partition_type: Option<[u8; 16]>,
+    partition_instance: Option<[u8; 16]>,
+}
+
+impl StorageHostDevice {
+    pub fn new(path: impl ToString) -> Result<Self, Error> {
+        let connector = Box::new(PathBasedBlockConnector::new(path.to_string() + "/block"));
+        let partition_proxy = connector.connect_partition()?.into_proxy()?;
+        Ok(Self {
+            connector,
+            partition_proxy,
+            content_format: None,
+            partition_label: None,
+            partition_type: None,
+            partition_instance: None,
+        })
+    }
+}
+
+#[async_trait]
+impl Device for StorageHostDevice {
+    async fn get_block_info(&self) -> Result<fidl_fuchsia_hardware_block::BlockInfo, Error> {
+        let block_proxy = self.block_proxy()?;
+        let info = block_proxy.get_info().await?.map_err(zx::Status::from_raw)?;
+        Ok(info)
+    }
+
+    fn is_nand(&self) -> bool {
+        false
+    }
+
+    async fn content_format(&mut self) -> Result<DiskFormat, Error> {
+        if let Some(format) = self.content_format {
+            return Ok(format);
+        }
+        let block = self.block_proxy()?;
+        return Ok(detect_disk_format(&block).await);
+    }
+
+    fn path(&self) -> &str {
+        self.connector.path()
+    }
+
+    fn topological_path(&self) -> &str {
+        self.connector.path()
+    }
+
+    async fn partition_label(&mut self) -> Result<&str, Error> {
+        if self.partition_label.is_none() {
+            let (status, name) = self.partition_proxy.get_name().await?;
+            zx::Status::ok(status)?;
+            self.partition_label = Some(name.ok_or(anyhow!("Expected name"))?);
+        }
+        Ok(self.partition_label.as_ref().unwrap())
+    }
+
+    async fn partition_type(&mut self) -> Result<&[u8; 16], Error> {
+        if self.partition_type.is_none() {
+            let (status, partition_type) = self.partition_proxy.get_type_guid().await?;
+            zx::Status::ok(status)?;
+            self.partition_type = Some(partition_type.ok_or(anyhow!("Expected type"))?.value);
+        }
+        Ok(self.partition_type.as_ref().unwrap())
+    }
+
+    async fn partition_instance(&mut self) -> Result<&[u8; 16], Error> {
+        if self.partition_instance.is_none() {
+            let (status, instance_guid) = self
+                .partition_proxy
+                .get_instance_guid()
+                .await
+                .context("Transport error get_instance_guid")?;
+            zx::Status::ok(status).context("get_instance_guid failed")?;
+            self.partition_instance =
+                Some(instance_guid.ok_or(anyhow!("Expected instance guid"))?.value);
+        }
+        Ok(self.partition_instance.as_ref().unwrap())
+    }
+
+    async fn resize(&mut self, target_size_bytes: u64) -> Result<u64, Error> {
+        let volume_proxy = self.volume_proxy()?;
+        crate::volume::resize_volume(&volume_proxy, target_size_bytes).await
+    }
+
+    async fn set_partition_max_bytes(&mut self, max_bytes: u64) -> Result<(), Error> {
+        crate::volume::set_partition_max_bytes(self, max_bytes).await
+    }
+
+    fn block_connector(&self) -> Result<Box<dyn BlockConnector>, Error> {
+        Ok(self.connector.clone())
+    }
+
+    fn block_proxy(&self) -> Result<BlockProxy, Error> {
+        self.connector.connect_block().and_then(|c| Ok(c.into_proxy()?))
+    }
+
+    fn volume_proxy(&self) -> Result<VolumeProxy, Error> {
+        unimplemented!()
+    }
+
+    async fn get_child(&self, _suffix: &str) -> Result<Box<dyn Device>, Error> {
+        unimplemented!()
     }
 }
