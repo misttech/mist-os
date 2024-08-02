@@ -8,7 +8,7 @@ use fidl_fuchsia_net_stack_ext::{self as fstack_ext, FidlReturn as _};
 use filter::{IpRoutines, NatRoutines};
 use fnet_filter_ext::{ControllerId, Rule};
 use futures::{FutureExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _};
-use net_types::ip::{Ipv4, Ipv6};
+use net_types::ip::{GenericOverIp, Ip, Ipv4, Ipv6};
 use netfilter::FidlReturn as _;
 use prettytable::{cell, format, row, Row, Table};
 use ser::AddressAssignmentState;
@@ -30,8 +30,9 @@ use {
     fidl_fuchsia_net_interfaces_ext as finterfaces_ext, fidl_fuchsia_net_name as fname,
     fidl_fuchsia_net_neighbor as fneighbor, fidl_fuchsia_net_neighbor_ext as fneighbor_ext,
     fidl_fuchsia_net_root as froot, fidl_fuchsia_net_routes as froutes,
-    fidl_fuchsia_net_routes_ext as froutes_ext, fidl_fuchsia_net_stack as fstack,
-    fidl_fuchsia_net_stackmigrationdeprecated as fnet_migration, fuchsia_zircon_status as zx,
+    fidl_fuchsia_net_routes_admin as froutes_admin, fidl_fuchsia_net_routes_ext as froutes_ext,
+    fidl_fuchsia_net_stack as fstack, fidl_fuchsia_net_stackmigrationdeprecated as fnet_migration,
+    fuchsia_zircon_status as zx,
 };
 
 mod opts;
@@ -68,6 +69,8 @@ pub trait ServiceConnector<S: fidl::endpoints::ProtocolMarker> {
 pub trait NetCliDepsConnector:
     ServiceConnector<fdebug::InterfacesMarker>
     + ServiceConnector<froot::InterfacesMarker>
+    + ServiceConnector<froot::RoutesV4Marker>
+    + ServiceConnector<froot::RoutesV6Marker>
     + ServiceConnector<fdhcp::Server_Marker>
     + ServiceConnector<ffilter_deprecated::FilterMarker>
     + ServiceConnector<finterfaces::StateMarker>
@@ -87,6 +90,8 @@ pub trait NetCliDepsConnector:
 impl<O> NetCliDepsConnector for O where
     O: ServiceConnector<fdebug::InterfacesMarker>
         + ServiceConnector<froot::InterfacesMarker>
+        + ServiceConnector<froot::RoutesV4Marker>
+        + ServiceConnector<froot::RoutesV6Marker>
         + ServiceConnector<fdhcp::Server_Marker>
         + ServiceConnector<ffilter_deprecated::FilterMarker>
         + ServiceConnector<finterfaces::StateMarker>
@@ -836,6 +841,55 @@ async fn do_if<C: NetCliDepsConnector>(
     Ok(())
 }
 
+async fn get_authorization_for_interface<C: NetCliDepsConnector>(
+    connector: &C,
+    nicid: u32,
+) -> Result<finterfaces_admin::GrantForInterfaceAuthorization, Error> {
+    let control = get_control(connector, nicid.into()).await?;
+    control.get_authorization_for_interface().await.context("failed to get interface authorization")
+}
+
+async fn get_global_route_set_with_authenticated_interface<
+    I: froutes_ext::admin::FidlRouteAdminIpExt + froutes_ext::FidlRouteIpExt,
+    C: NetCliDepsConnector,
+>(
+    connector: &C,
+    authenticate_nicid: u32,
+) -> Result<<I::RouteSetMarker as fidl::endpoints::ProtocolMarker>::Proxy, Error> {
+    let root_routes_v4 = connect_with_context::<froot::RoutesV4Marker, _>(connector).await?;
+    let root_routes_v6 = connect_with_context::<froot::RoutesV6Marker, _>(connector).await?;
+
+    #[derive(GenericOverIp)]
+    #[generic_over_ip(I, Ip)]
+    struct Out<I: froutes_ext::admin::FidlRouteAdminIpExt>(
+        Result<
+            <I::RouteSetMarker as fidl::endpoints::ProtocolMarker>::Proxy,
+            froutes_ext::admin::RouteSetCreationError,
+        >,
+    );
+
+    let Out(route_set) = I::map_ip_out::<_, Out<I>>(
+        (root_routes_v4, root_routes_v6),
+        |(root_routes, _)| Out(froutes_ext::admin::new_global_route_set::<Ipv4>(&root_routes)),
+        |(_, root_routes)| Out(froutes_ext::admin::new_global_route_set::<Ipv6>(&root_routes)),
+    );
+    let route_set = route_set.context("failed to get route set")?;
+
+    let finterfaces_admin::GrantForInterfaceAuthorization { interface_id, token } =
+        get_authorization_for_interface(connector, authenticate_nicid).await?;
+    froutes_ext::admin::authenticate_for_interface::<I>(
+        &route_set,
+        finterfaces_admin::ProofOfInterfaceAuthorization { interface_id, token },
+    )
+    .await
+    .context("FIDL error while authenticating route set for interface")?
+    .map_err(|e: froutes_admin::AuthenticateForInterfaceError| {
+        anyhow::anyhow!("error while authenticating route set for interface: {e:?}")
+    })?;
+
+    Ok(route_set)
+}
+
 async fn do_route<C: NetCliDepsConnector>(
     out: &mut ffx_writer::MachineWriter<serde_json::Value>,
     cmd: opts::RouteEnum,
@@ -844,22 +898,82 @@ async fn do_route<C: NetCliDepsConnector>(
     match cmd {
         opts::RouteEnum::List(opts::RouteList {}) => do_route_list(out, connector).await?,
         opts::RouteEnum::Add(route) => {
-            let stack = connect_with_context::<fstack::StackMarker, _>(connector).await?;
             let nicid = route.interface.find_u32_nicid(connector).await?;
-            let entry = route.into_route_table_entry(nicid);
-            let () = fstack_ext::exec_fidl!(
-                stack.add_forwarding_entry(&entry),
-                "error adding next-hop forwarding entry"
-            )?;
+            let route_set_v4 =
+                get_global_route_set_with_authenticated_interface::<Ipv4, _>(connector, nicid)
+                    .await?;
+            let route_set_v6 =
+                get_global_route_set_with_authenticated_interface::<Ipv6, _>(connector, nicid)
+                    .await?;
+
+            let route = route.try_into_route(nicid).map_err(anyhow::Error::msg)?;
+            match route {
+                opts::RouteEither::V4(route) => {
+                    let added = froutes_ext::admin::add_route::<Ipv4>(
+                        &route_set_v4,
+                        &route.try_into().context("convert to FIDL route")?,
+                    )
+                    .await
+                    .context("FIDL error adding route")?
+                    .map_err(|e| anyhow::anyhow!("error adding route: {e:?}"))?;
+
+                    if !added {
+                        info!("Route {route:?} already exists, skipping add");
+                    }
+                }
+                opts::RouteEither::V6(route) => {
+                    let added = froutes_ext::admin::add_route::<Ipv6>(
+                        &route_set_v6,
+                        &route.try_into().context("convert to FIDL route")?,
+                    )
+                    .await
+                    .context("FIDL error adding route")?
+                    .map_err(|e| anyhow::anyhow!("error adding route: {e:?}"))?;
+
+                    if !added {
+                        info!("Route {route:?} already exists, skipping add");
+                    }
+                }
+            }
         }
         opts::RouteEnum::Del(route) => {
-            let stack = connect_with_context::<fstack::StackMarker, _>(connector).await?;
             let nicid = route.interface.find_u32_nicid(connector).await?;
-            let entry = route.into_route_table_entry(nicid);
-            let () = fstack_ext::exec_fidl!(
-                stack.del_forwarding_entry(&entry),
-                "error removing forwarding entry"
-            )?;
+            let route_set_v4 =
+                get_global_route_set_with_authenticated_interface::<Ipv4, _>(connector, nicid)
+                    .await?;
+            let route_set_v6 =
+                get_global_route_set_with_authenticated_interface::<Ipv6, _>(connector, nicid)
+                    .await?;
+
+            let route = route.try_into_route(nicid).map_err(anyhow::Error::msg)?;
+            match route {
+                opts::RouteEither::V4(route) => {
+                    let removed = froutes_ext::admin::remove_route::<Ipv4>(
+                        &route_set_v4,
+                        &route.try_into().context("convert to FIDL route")?,
+                    )
+                    .await
+                    .context("FIDL error removing route")?
+                    .map_err(|e| anyhow::anyhow!("error removing route: {e:?}"))?;
+
+                    if !removed {
+                        info!("Route {route:?} does not exist, skipping remove");
+                    }
+                }
+                opts::RouteEither::V6(route) => {
+                    let removed = froutes_ext::admin::remove_route::<Ipv6>(
+                        &route_set_v6,
+                        &route.try_into().context("convert to FIDL route")?,
+                    )
+                    .await
+                    .context("FIDL error removing route")?
+                    .map_err(|e| anyhow::anyhow!("error removing route: {e:?}"))?;
+
+                    if !removed {
+                        info!("Route {route:?} does not exist, skipping remove");
+                    }
+                }
+            }
         }
     }
     Ok(())
@@ -1730,6 +1844,8 @@ mod tests {
         interfaces_state: Option<finterfaces::StateProxy>,
         stack: Option<fstack::StackProxy>,
         root_interfaces: Option<froot::InterfacesProxy>,
+        root_routes_v4: Option<froot::RoutesV4Proxy>,
+        root_routes_v6: Option<froot::RoutesV6Proxy>,
         routes_v4: Option<froutes::StateV4Proxy>,
         routes_v6: Option<froutes::StateV6Proxy>,
         name_lookup: Option<fname::LookupProxy>,
@@ -1757,6 +1873,26 @@ mod tests {
                 .as_ref()
                 .cloned()
                 .ok_or(anyhow::anyhow!("connector has no root interfaces instance"))
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl ServiceConnector<froot::RoutesV4Marker> for TestConnector {
+        async fn connect(&self) -> Result<<froot::RoutesV4Marker as ProtocolMarker>::Proxy, Error> {
+            self.root_routes_v4
+                .as_ref()
+                .cloned()
+                .ok_or(anyhow::anyhow!("connector has no root routes V4 instance"))
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl ServiceConnector<froot::RoutesV6Marker> for TestConnector {
+        async fn connect(&self) -> Result<<froot::RoutesV6Marker as ProtocolMarker>::Proxy, Error> {
+            self.root_routes_v6
+                .as_ref()
+                .cloned()
+                .ok_or(anyhow::anyhow!("connector has no root routes V6 instance"))
         }
     }
 
@@ -2983,92 +3119,6 @@ mac               -
     #[fasync::run_singlethreaded(test)]
     async fn dhcp_stop() {
         let () = test_do_dhcp(opts::DhcpEnum::Stop(opts::DhcpStop { interface: 1.into() })).await;
-    }
-
-    async fn test_modify_route(cmd: opts::RouteEnum) {
-        let expected_interface = match &cmd {
-            opts::RouteEnum::List(_) => panic!("test_modify_route should not take a List command"),
-            opts::RouteEnum::Add(opts::RouteAdd { interface, .. }) => interface,
-            opts::RouteEnum::Del(opts::RouteDel { interface, .. }) => interface,
-        }
-        .clone();
-        let expected_id = match expected_interface {
-            opts::InterfaceIdentifier::Id(ref id) => *id,
-            opts::InterfaceIdentifier::Name(_) => {
-                panic!("expected test to work only with ids")
-            }
-        };
-
-        let (stack, mut requests) =
-            fidl::endpoints::create_proxy_and_stream::<fstack::StackMarker>().unwrap();
-        let connector = TestConnector { stack: Some(stack), ..Default::default() };
-        let buffers = ffx_writer::TestBuffers::default();
-        let mut out = ffx_writer::MachineWriter::new_test(None, &buffers);
-        let op = do_route(&mut out, cmd.clone(), &connector);
-        let op_succeeds = async move {
-            let () = match cmd {
-                opts::RouteEnum::List(opts::RouteList {}) => {
-                    panic!("test_modify_route should not take a List command")
-                }
-                opts::RouteEnum::Add(route) => {
-                    let expected_entry = route.into_route_table_entry(
-                        expected_id.try_into().expect("nicid does not fit in u32"),
-                    );
-                    let (entry, responder) = requests
-                        .try_next()
-                        .await
-                        .expect("add route FIDL error")
-                        .expect("request stream should not have ended")
-                        .into_add_forwarding_entry()
-                        .expect("request should be of type AddRoute");
-                    assert_eq!(entry, expected_entry);
-                    responder.send(Ok(()))
-                }
-                opts::RouteEnum::Del(route) => {
-                    let expected_entry = route.into_route_table_entry(
-                        expected_id.try_into().expect("nicid does not fit in u32"),
-                    );
-                    let (entry, responder) = requests
-                        .try_next()
-                        .await
-                        .expect("del route FIDL error")
-                        .expect("request stream should not have ended")
-                        .into_del_forwarding_entry()
-                        .expect("request should be of type DelRoute");
-                    assert_eq!(entry, expected_entry);
-                    responder.send(Ok(()))
-                }
-            }?;
-            Ok(())
-        };
-        let ((), ()) =
-            futures::future::try_join(op, op_succeeds).await.expect("dhcp command should succeed");
-    }
-
-    #[fasync::run_singlethreaded(test)]
-    async fn route_add() {
-        // Test arguments have been arbitrarily selected.
-        let () = test_modify_route(opts::RouteEnum::Add(opts::RouteAdd {
-            destination: std::net::IpAddr::V4(std::net::Ipv4Addr::new(192, 168, 1, 0)),
-            prefix_len: 24,
-            gateway: None,
-            interface: 2.into(),
-            metric: 100,
-        }))
-        .await;
-    }
-
-    #[fasync::run_singlethreaded(test)]
-    async fn route_del() {
-        // Test arguments have been arbitrarily selected.
-        let () = test_modify_route(opts::RouteEnum::Del(opts::RouteDel {
-            destination: std::net::IpAddr::V4(std::net::Ipv4Addr::new(192, 168, 1, 0)),
-            prefix_len: 24,
-            gateway: None,
-            interface: 2.into(),
-            metric: 100,
-        }))
-        .await;
     }
 
     fn wanted_route_list_json() -> String {

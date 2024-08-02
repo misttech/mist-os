@@ -4,6 +4,7 @@
 
 use anyhow::Context as _;
 use argh::{ArgsInfo, FromArgs};
+use net_types::ip::{Ipv4, Ipv6, Subnet};
 use std::collections::HashMap;
 use std::convert::{TryFrom as _, TryInto as _};
 use std::num::NonZeroU64;
@@ -11,7 +12,8 @@ use {
     fidl_fuchsia_net as fnet, fidl_fuchsia_net_ext as fnet_ext,
     fidl_fuchsia_net_interfaces as finterfaces,
     fidl_fuchsia_net_interfaces_admin as finterfaces_admin,
-    fidl_fuchsia_net_interfaces_ext as finterfaces_ext, fidl_fuchsia_net_stack as fnet_stack,
+    fidl_fuchsia_net_interfaces_ext as finterfaces_ext, fidl_fuchsia_net_routes as froutes,
+    fidl_fuchsia_net_routes_ext as froutes_ext,
     fidl_fuchsia_net_stackmigrationdeprecated as fnet_migration,
 };
 
@@ -618,6 +620,82 @@ fn subnet_mask_to_prefix_length(addr: std::net::IpAddr) -> u8 {
 /// lists devices (supports ffx machine output)
 pub struct RouteList {}
 
+/// Contains either an Ipv4 or Ipv6 version of [`froutes_ext::Route`].
+#[derive(Debug, PartialEq)]
+pub enum RouteEither {
+    /// An Ipv4 route.
+    V4(froutes_ext::Route<Ipv4>),
+    /// An Ipv6 route.
+    V6(froutes_ext::Route<Ipv6>),
+}
+
+impl RouteEither {
+    fn new(
+        nicid: u32,
+        destination: std::net::IpAddr,
+        prefix_len: u8,
+        gateway: Option<std::net::IpAddr>,
+        metric: u32,
+    ) -> Result<Self, &'static str> {
+        match destination {
+            std::net::IpAddr::V4(destination) => {
+                let next_hop = match gateway {
+                    None => Ok(None),
+                    Some(gateway) => match gateway {
+                        std::net::IpAddr::V4(gateway) => Ok(Some(
+                            net_types::SpecifiedAddr::new(net_types::ip::Ipv4Addr::from(gateway))
+                                .ok_or("invalid gateway: unspecified address")?,
+                        )),
+                        std::net::IpAddr::V6(_) => {
+                            Err("invalid gateway: Ipv4 destination but Ipv6 gateway")
+                        }
+                    },
+                }?;
+                Ok(RouteEither::V4(froutes_ext::Route {
+                    destination: Subnet::new(destination.into(), prefix_len)
+                        .map_err(|_| "invalid destination")?,
+                    action: froutes_ext::RouteAction::Forward(froutes_ext::RouteTarget {
+                        outbound_interface: nicid.into(),
+                        next_hop,
+                    }),
+                    properties: froutes_ext::RouteProperties {
+                        specified_properties: froutes_ext::SpecifiedRouteProperties {
+                            metric: froutes::SpecifiedMetric::ExplicitMetric(metric),
+                        },
+                    },
+                }))
+            }
+            std::net::IpAddr::V6(destination) => {
+                let next_hop = match gateway {
+                    None => Ok(None),
+                    Some(gateway) => match gateway {
+                        std::net::IpAddr::V6(gateway) => Ok(Some(
+                            net_types::SpecifiedAddr::new(net_types::ip::Ipv6Addr::from(gateway))
+                                .ok_or("invalid gateway: unspecified address")?,
+                        )),
+                        std::net::IpAddr::V4(_) => {
+                            Err("invalid gateway: Ipv6 destination but Ipv4 gateway")
+                        }
+                    },
+                }?;
+                Ok(RouteEither::V6(froutes_ext::Route {
+                    destination: Subnet::new(destination.into(), prefix_len)
+                        .map_err(|_| "invalid destination")?,
+                    action: froutes_ext::RouteAction::Forward(froutes_ext::RouteTarget {
+                        outbound_interface: nicid.into(),
+                        next_hop,
+                    }),
+                    properties: froutes_ext::RouteProperties {
+                        specified_properties: froutes_ext::SpecifiedRouteProperties {
+                            metric: froutes::SpecifiedMetric::ExplicitMetric(metric),
+                        },
+                    },
+                }))
+            }
+        }
+    }
+}
+
 macro_rules! route_struct {
     ($ty_name:ident, $name:literal, $comment:expr) => {
         #[derive(ArgsInfo, FromArgs, Clone, Debug, PartialEq)]
@@ -652,17 +730,9 @@ macro_rules! route_struct {
         }
 
         impl $ty_name {
-            pub fn into_route_table_entry(self, nicid: u32) -> fnet_stack::ForwardingEntry {
+            pub fn try_into_route(self, nicid: u32) -> Result<RouteEither, &'static str> {
                 let Self { destination, prefix_len, gateway, interface: _, metric } = self;
-                fnet_stack::ForwardingEntry {
-                    subnet: fnet_ext::apply_subnet_mask(fnet::Subnet {
-                        addr: fnet_ext::IpAddress(destination).into(),
-                        prefix_len,
-                    }),
-                    device_id: nicid.into(),
-                    next_hop: gateway.map(|gateway| Box::new(fnet_ext::IpAddress(gateway).into())),
-                    metric,
-                }
+                RouteEither::new(nicid, destination, prefix_len, gateway, metric)
             }
         }
     };
@@ -786,33 +856,38 @@ mod tests {
     }
 
     #[test]
-    fn into_route_table_entry_applies_subnet_mask() {
+    fn try_into_route() {
         // Leave off last two 16-bit segments.
         const PREFIX_LEN: u8 = 128 - 32;
         const ORIGINAL_NICID: u32 = 1;
         const NICID_TO_OVERWRITE_WITH: u32 = 2;
         assert_eq!(
             RouteAdd {
-                destination: std::net::IpAddr::V6(std::net::Ipv6Addr::new(
-                    0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff
-                )),
+                destination: net_declare::std_ip!("ffff:ffff:ffff:ffff:ffff:ffff:0:0"),
                 prefix_len: PREFIX_LEN,
                 gateway: None,
                 interface: u64::from(ORIGINAL_NICID).into(),
                 metric: 100,
             }
-            .into_route_table_entry(NICID_TO_OVERWRITE_WITH),
-            fnet_stack::ForwardingEntry {
-                subnet: fnet::Subnet {
-                    addr: net_declare::fidl_ip!("ffff:ffff:ffff:ffff:ffff:ffff:0:0"),
-                    prefix_len: PREFIX_LEN,
-                },
-                // The interface ID in the RouteAdd struct should be overwritten by the NICID
-                // parameter passed to `into_route_table_entry`.
-                device_id: NICID_TO_OVERWRITE_WITH.into(),
-                next_hop: None,
-                metric: 100,
-            }
+            .try_into_route(NICID_TO_OVERWRITE_WITH),
+            Ok(RouteEither::V6(froutes_ext::Route {
+                destination: Subnet::new(
+                    net_declare::net_ip_v6!("ffff:ffff:ffff:ffff:ffff:ffff:0:0"),
+                    PREFIX_LEN
+                )
+                .unwrap(),
+                action: froutes_ext::RouteAction::Forward(froutes_ext::RouteTarget {
+                    // The interface ID in the RouteAdd struct should be overwritten by the NICID
+                    // parameter passed to `try_into_route`.
+                    outbound_interface: u64::from(NICID_TO_OVERWRITE_WITH).into(),
+                    next_hop: None,
+                }),
+                properties: froutes_ext::RouteProperties {
+                    specified_properties: froutes_ext::SpecifiedRouteProperties {
+                        metric: froutes::SpecifiedMetric::ExplicitMetric(100)
+                    }
+                }
+            }))
         )
     }
 

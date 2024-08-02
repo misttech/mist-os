@@ -98,6 +98,20 @@ impl net_cli::ServiceConnector<froot::InterfacesMarker> for Connector {
 }
 
 #[async_trait::async_trait]
+impl net_cli::ServiceConnector<froot::RoutesV4Marker> for Connector {
+    async fn connect(&self) -> Result<<froot::RoutesV4Marker as ProtocolMarker>::Proxy, Error> {
+        self.connect_to_exposed_protocol::<froot::RoutesV4Marker>(NETSTACK_MONIKER).await
+    }
+}
+
+#[async_trait::async_trait]
+impl net_cli::ServiceConnector<froot::RoutesV6Marker> for Connector {
+    async fn connect(&self) -> Result<<froot::RoutesV6Marker as ProtocolMarker>::Proxy, Error> {
+        self.connect_to_exposed_protocol::<froot::RoutesV6Marker>(NETSTACK_MONIKER).await
+    }
+}
+
+#[async_trait::async_trait]
 impl net_cli::ServiceConnector<fdhcp::Server_Marker> for Connector {
     async fn connect(&self) -> Result<<fdhcp::Server_Marker as ProtocolMarker>::Proxy, Error> {
         self.connect_to_exposed_protocol::<fdhcp::Server_Marker>(DHCPD_MONIKER).await
