@@ -82,6 +82,7 @@ pub fn request_context_del_routes<
 /// local network) able to route IP packets to those subnets.
 #[derive(GenericOverIp)]
 #[generic_over_ip(I, Ip)]
+#[derive(Debug)]
 pub struct RoutingTable<I: Ip, D> {
     /// All the routes available to route a packet.
     ///

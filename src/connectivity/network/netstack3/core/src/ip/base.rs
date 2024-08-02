@@ -4,6 +4,7 @@
 
 //! The integrations for protocols built on top of IP.
 
+use alloc::collections::HashMap;
 use core::sync::atomic::AtomicU16;
 
 use lock_order::lock::{DelegatedOrderedLockAccess, LockLevelFor, UnlockedAccess};
@@ -36,6 +37,8 @@ use netstack3_ip::{
     ReceiveIpPacketMeta, ResolveRouteError, ResolvedRoute, RoutingTable, RoutingTableId,
     TransportReceiveError,
 };
+use netstack3_sync::rc::Primary;
+use netstack3_sync::RwLock;
 use netstack3_tcp::TcpIpTransportContext;
 use netstack3_udp::UdpIpTransportContext;
 use packet::BufferMut;
@@ -226,13 +229,29 @@ impl<I, BC, L> IpStateContext<I, BC> for CoreCtx<'_, BC, L>
 where
     I: IpLayerIpExt,
     BC: BindingsContext,
-    L: LockBefore<crate::lock_ordering::IpStateRoutingTable<I>>,
+    L: LockBefore<crate::lock_ordering::IpStateRoutingTables<I>>,
 {
     type IpDeviceIdCtx<'a> =
         CoreCtx<'a, BC, WrapLockLevel<crate::lock_ordering::IpStateRoutingTable<I>>>;
 
     fn main_table_id(&self) -> RoutingTableId<I, Self::DeviceId> {
         self.unlocked_access::<crate::lock_ordering::IpMainTableId<I>>().clone()
+    }
+
+    fn with_ip_routing_tables_mut<
+        O,
+        F: FnOnce(
+            &mut HashMap<
+                RoutingTableId<I, Self::DeviceId>,
+                Primary<RwLock<RoutingTable<I, Self::DeviceId>>>,
+            >,
+        ) -> O,
+    >(
+        &mut self,
+        cb: F,
+    ) -> O {
+        let mut tables = self.lock::<crate::lock_ordering::IpStateRoutingTables<I>>();
+        cb(&mut *tables)
     }
 
     fn with_ip_routing_table<
@@ -678,6 +697,24 @@ impl<I: IpLayerIpExt, BT: BindingsTypes> LockLevelFor<StackState<BT>>
     for crate::lock_ordering::IpStatePmtuCache<I>
 {
     type Data = PmtuCache<I, BT>;
+}
+
+impl<I: IpLayerIpExt, BT: BindingsTypes> LockLevelFor<StackState<BT>>
+    for crate::lock_ordering::IpStateRoutingTables<I>
+{
+    type Data =
+        HashMap<RoutingTableId<I, DeviceId<BT>>, Primary<RwLock<RoutingTable<I, DeviceId<BT>>>>>;
+}
+
+impl<I: IpLayerIpExt, BT: BindingsTypes>
+    DelegatedOrderedLockAccess<
+        HashMap<RoutingTableId<I, DeviceId<BT>>, Primary<RwLock<RoutingTable<I, DeviceId<BT>>>>>,
+    > for StackState<BT>
+{
+    type Inner = IpStateInner<I, DeviceId<BT>, BT>;
+    fn delegate_ordered_lock_access(&self) -> &Self::Inner {
+        self.inner_ip_state()
+    }
 }
 
 impl<I: IpLayerIpExt, BT: BindingsTypes> LockLevelFor<RoutingTableId<I, DeviceId<BT>>>

@@ -391,6 +391,11 @@ pub(crate) type WeakUserRouteSet<I> = netstack3_core::sync::WeakRc<UserRouteSetI
 pub(crate) type StrongUserRouteSet<I> = netstack3_core::sync::StrongRc<UserRouteSetId<I>>;
 
 impl<I: Ip> UserRouteSetId<I> {
+    #[cfg(test)]
+    pub(crate) fn new(table_id: TableId<I>) -> Self {
+        Self { table_id }
+    }
+
     pub(super) fn table(&self) -> TableId<I> {
         self.table_id
     }

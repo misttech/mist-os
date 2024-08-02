@@ -5,23 +5,28 @@
 //! Defines the public API exposed to bindings by the IP module.
 
 use alloc::vec::Vec;
+use assert_matches::assert_matches;
 use net_types::ip::{Ip, IpAddr, IpVersionMarker, Ipv4, Ipv6};
 use net_types::{SpecifiedAddr, Witness as _};
 
+use netstack3_base::sync::{PrimaryRc, RwLock};
 use netstack3_base::{
-    AnyDevice, ContextPair, DeviceIdContext, Inspector, InspectorDeviceExt, StrongDeviceIdentifier,
-    WrapBroadcastMarker,
+    AnyDevice, ContextPair, DeferredResourceRemovalContext, DeviceIdContext, Inspector,
+    InspectorDeviceExt, ReferenceNotifiersExt as _, RemoveResourceResultWithContext,
+    StrongDeviceIdentifier, WrapBroadcastMarker,
 };
 
 use crate::internal::base::{
     self, IpLayerBindingsContext, IpLayerContext, IpLayerIpExt, IpStateContext, ResolveRouteError,
+    RoutingTableId,
 };
 use crate::internal::device::{
     IpDeviceBindingsContext, IpDeviceConfigurationContext, IpDeviceIpExt,
 };
+use crate::internal::routing::RoutingTable;
 use crate::internal::types::{
-    Destination, Entry, EntryAndGeneration, EntryEither, Metric, NextHop, OrderedEntry,
-    ResolvedRoute, RoutableIpAddr,
+    Destination, Entry, EntryAndGeneration, Metric, NextHop, OrderedEntry, ResolvedRoute,
+    RoutableIpAddr,
 };
 
 /// The routes API for a specific IP version `I`.
@@ -48,8 +53,60 @@ where
         pair.core_ctx()
     }
 
-    /// Collects all the routes into `target`.
+    /// Allocates a new table in Core.
+    pub fn new_table(
+        &mut self,
+    ) -> RoutingTableId<I, <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId> {
+        self.core_ctx().with_ip_routing_tables_mut(|tables| {
+            let new_table = PrimaryRc::new(RwLock::new(RoutingTable::default()));
+            let table_id = RoutingTableId::new(PrimaryRc::clone_strong(&new_table));
+            assert_matches!(tables.insert(table_id.clone(), new_table), None);
+            table_id
+        })
+    }
+
+    /// Removes a table in Core.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `id` is the main table id.
+    pub fn remove_table(
+        &mut self,
+        id: RoutingTableId<I, <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
+    ) -> RemoveResourceResultWithContext<(), C::BindingsContext> {
+        assert!(id != self.main_table_id(), "main table should never be removed");
+        self.core_ctx().with_ip_routing_tables_mut(|tables| {
+            let table = assert_matches!(
+                tables.remove(&id),
+                Some(removed) => removed
+            );
+            C::BindingsContext::unwrap_or_notify_with_new_reference_notifier(table, |_| ())
+        })
+    }
+
+    /// Gets the core ID of the main table.
+    pub fn main_table_id(
+        &mut self,
+    ) -> RoutingTableId<I, <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId> {
+        self.core_ctx().main_table_id()
+    }
+
+    /// Collects all the routes in the specified table into `target`.
     pub fn collect_routes_into<
+        X: From<Entry<I::Addr, <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>>,
+        T: Extend<X>,
+    >(
+        &mut self,
+        table_id: &RoutingTableId<I, <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
+        target: &mut T,
+    ) {
+        self.core_ctx().with_ip_routing_table(table_id, |_core_ctx, table| {
+            target.extend(table.iter_table().cloned().map(Into::into))
+        })
+    }
+
+    /// Collects all the routes in the main table into `target`.
+    pub fn collect_main_table_routes_into<
         X: From<Entry<I::Addr, <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>>,
         T: Extend<X>,
     >(
@@ -141,6 +198,7 @@ where
     /// future.
     pub fn set_routes(
         &mut self,
+        table_id: &RoutingTableId<I, <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
         mut entries: Vec<
             EntryAndGeneration<I::Addr, <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
         >,
@@ -149,9 +207,17 @@ where
         entries.sort_unstable_by(|a, b| {
             OrderedEntry::<'_, _, _>::from(a).cmp(&OrderedEntry::<'_, _, _>::from(b))
         });
-        self.core_ctx().with_main_ip_routing_table_mut(|_core_ctx, table| {
+        self.core_ctx().with_ip_routing_table_mut(table_id, |_core_ctx, table| {
             table.table = entries;
         });
+    }
+
+    /// Gets all table IDs.
+    #[cfg(feature = "testutils")]
+    pub fn list_table_ids(
+        &mut self,
+    ) -> Vec<RoutingTableId<I, <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>> {
+        self.core_ctx().with_ip_routing_tables_mut(|tables| tables.keys().cloned().collect())
     }
 }
 
@@ -179,13 +245,18 @@ where
         RoutesApi::new(pair)
     }
 
+    #[cfg(feature = "testutils")]
     /// Gets all the installed routes.
-    pub fn get_all_routes(
+    pub fn get_all_routes_in_main_table(
         &mut self,
-    ) -> Vec<EntryEither<<C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>> {
+    ) -> Vec<
+        crate::internal::types::EntryEither<
+            <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId,
+        >,
+    > {
         let mut vec = Vec::new();
-        self.ip::<Ipv4>().collect_routes_into(&mut vec);
-        self.ip::<Ipv6>().collect_routes_into(&mut vec);
+        self.ip::<Ipv4>().collect_main_table_routes_into(&mut vec);
+        self.ip::<Ipv6>().collect_main_table_routes_into(&mut vec);
         vec
     }
 
@@ -204,7 +275,7 @@ where
 /// A marker trait for all the bindings context traits required to fulfill the
 /// [`RoutesApi`].
 pub trait RoutesApiBindingsContext<I, D>:
-    IpDeviceBindingsContext<I, D> + IpLayerBindingsContext<I, D>
+    IpDeviceBindingsContext<I, D> + IpLayerBindingsContext<I, D> + DeferredResourceRemovalContext
 where
     D: StrongDeviceIdentifier,
     I: IpLayerIpExt + IpDeviceIpExt,
@@ -215,7 +286,9 @@ impl<I, D, BC> RoutesApiBindingsContext<I, D> for BC
 where
     D: StrongDeviceIdentifier,
     I: IpLayerIpExt + IpDeviceIpExt,
-    BC: IpDeviceBindingsContext<I, D> + IpLayerBindingsContext<I, D>,
+    BC: IpDeviceBindingsContext<I, D>
+        + IpLayerBindingsContext<I, D>
+        + DeferredResourceRemovalContext,
 {
 }
 

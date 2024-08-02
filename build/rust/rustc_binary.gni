@@ -60,6 +60,12 @@ import("//build/toolchain/rbe.gni")
 #   test_deps (optional)
 #     List of rust_library GN targets on which this crate's tests depend.
 #
+#   non_test_deps (optional)
+#     List of rust_library GN targets on which this crate depends but not its
+#     tests. This can be used to replace a dependency between the test and
+#     library targets. It's an error to provide this when with_unit_tests is
+#     false.
+#
 #   non_rust_deps (optional)
 #     List of non-rust_library GN targets on which this crate depends.
 #     Obsolete. Please use deps instead.
@@ -242,6 +248,7 @@ template("rustc_binary") {
                                "output_name",
                                "source_root",
                                "test_disable_rbe",
+                               "non_test_deps",
                              ])
       if (defined(invoker.test_disable_rbe)) {
         disable_rbe = invoker.test_disable_rbe
@@ -312,6 +319,12 @@ template("rustc_binary") {
     deps = []
     if (defined(invoker.deps)) {
       deps += invoker.deps
+    }
+
+    if (defined(invoker.non_test_deps)) {
+      assert(defined(invoker.with_unit_tests) && invoker.with_unit_tests,
+             "use deps if not generating unit tests")
+      deps += invoker.non_test_deps
     }
 
     # TODO(https://fxbug.dev/42120123) remove "non_rust_deps" as a concept

@@ -55,17 +55,29 @@ template("network_unified_binary") {
     _source_root = invoker.source_root
   }
 
+  _library_deps = invoker.deps
+  if (defined(invoker.non_test_deps)) {
+    _library_deps += invoker.non_test_deps
+  }
   library_target_name = target_name + "_gub_lib"
   rustc_library(library_target_name) {
-    forward_variables_from(invoker,
-                           "*",
-                           [
-                             "name",
-                             "source_root",
+    forward_variables_from(
+        invoker,
+        "*",
+        [
+          "name",
+          "source_root",
 
-                             # Let only the binary unit tests be generated.
-                             "with_unit_tests",
-                           ])
+          # Let only the binary unit tests be generated. Because
+          # we force the unit tests to not build for the library
+          # target, so we cannot pass down `non_test_deps`. We
+          # instead calculate the `_library_deps` and pass that
+          # as `deps` directly.
+          "with_unit_tests",
+          "non_test_deps",
+          "deps",
+        ])
+    deps = _library_deps
     name = output_name
     source_root = _source_root
     configs += _add_configs
