@@ -12,6 +12,7 @@ group("tests") {
     "devfs:tests",
     "devicetree:tests",
     "metadata/cpp:tests",
+    "platform-device/cpp:tests",
     "power/cpp:tests",
   ]
 }

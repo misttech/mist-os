@@ -13,6 +13,7 @@ source_set("fake-pdev") {
     "//zircon/system/ulib/async-default",
   ]
   deps = [
+    "//sdk/lib/driver/platform-device/cpp",
     "//src/devices/testing/fake-bti",
     "//src/devices/testing/fake-resource",
   ]
