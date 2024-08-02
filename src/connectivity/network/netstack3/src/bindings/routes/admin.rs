@@ -300,7 +300,7 @@ pub(crate) struct UserRouteTable<I: Ip> {
     // API.
     _name: Option<String>,
     table_id: TableId<I>,
-    route_work_sink: mpsc::UnboundedSender<RouteWorkItem<I::Addr>>,
+    route_work_sink: mpsc::UnboundedSender<RouteWorkItem<I>>,
     cancel_event: Event,
     detached: bool,
 }
@@ -311,7 +311,7 @@ impl<I: Ip> UserRouteTable<I> {
         token: Arc<zx::Event>,
         name: Option<String>,
         table_id: TableId<I>,
-        route_work_sink: mpsc::UnboundedSender<RouteWorkItem<I::Addr>>,
+        route_work_sink: mpsc::UnboundedSender<RouteWorkItem<I>>,
     ) -> Self {
         Self {
             ctx,
@@ -405,7 +405,7 @@ impl<I: Ip> UserRouteSetId<I> {
 pub(crate) struct UserRouteSet<I: Ip> {
     ctx: Ctx,
     set: Option<netstack3_core::sync::PrimaryRc<UserRouteSetId<I>>>,
-    route_work_sink: mpsc::UnboundedSender<RouteWorkItem<I::Addr>>,
+    route_work_sink: mpsc::UnboundedSender<RouteWorkItem<I>>,
     authorization_set: HashSet<WeakDeviceId>,
 }
 
@@ -422,7 +422,7 @@ impl<I: FidlRouteAdminIpExt> UserRouteSet<I> {
     pub(crate) fn new(
         ctx: Ctx,
         table: TableId<I>,
-        route_work_sink: mpsc::UnboundedSender<RouteWorkItem<I::Addr>>,
+        route_work_sink: mpsc::UnboundedSender<RouteWorkItem<I>>,
     ) -> Self {
         let set = netstack3_core::sync::PrimaryRc::new(UserRouteSetId { table_id: table });
         Self { ctx, set: Some(set), authorization_set: HashSet::new(), route_work_sink }
@@ -493,7 +493,7 @@ impl<I: Ip + FidlRouteAdminIpExt> RouteSet<I> for UserRouteSet<I> {
         &mut self.authorization_set
     }
 
-    fn route_work_sink(&self) -> &mpsc::UnboundedSender<RouteWorkItem<<I>::Addr>> {
+    fn route_work_sink(&self) -> &mpsc::UnboundedSender<RouteWorkItem<I>> {
         &self.route_work_sink
     }
 }
@@ -529,7 +529,7 @@ impl<I: FidlRouteAdminIpExt> RouteSet<I> for GlobalRouteSet {
         &mut self.authorization_set
     }
 
-    fn route_work_sink(&self) -> &mpsc::UnboundedSender<RouteWorkItem<<I>::Addr>> {
+    fn route_work_sink(&self) -> &mpsc::UnboundedSender<RouteWorkItem<I>> {
         // TODO(https://fxbug.dev/339567592): GlobalRouteSet should be aware of
         // the route table as well.
         &self.ctx.bindings_ctx().routes.main_table_route_work_sink::<I>()
@@ -551,7 +551,7 @@ pub(crate) trait RouteSet<I: FidlRouteAdminIpExt>: Send + Sync {
     fn ctx(&self) -> &Ctx;
     fn authorization_set(&self) -> &HashSet<WeakDeviceId>;
     fn authorization_set_mut(&mut self) -> &mut HashSet<WeakDeviceId>;
-    fn route_work_sink(&self) -> &mpsc::UnboundedSender<RouteWorkItem<I::Addr>>;
+    fn route_work_sink(&self) -> &mpsc::UnboundedSender<RouteWorkItem<I>>;
 
     async fn handle_request(&mut self, request: RouteSetRequest<I>) -> Result<(), fidl::Error> {
         debug!("RouteSet::handle_request {request:?}");
@@ -608,7 +608,7 @@ pub(crate) trait RouteSet<I: FidlRouteAdminIpExt>: Send + Sync {
 
     async fn apply_route_change(
         &self,
-        change: routes::Change<I::Addr>,
+        change: routes::Change<I>,
     ) -> Result<routes::ChangeOutcome, routes::ChangeError> {
         let sender = self.route_work_sink();
         let (responder, receiver) = oneshot::channel();
