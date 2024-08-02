@@ -18,6 +18,12 @@ impl TraceCategoryContext {
     pub fn acquire(_category: &'static CStr) -> Option<Self> {
         None
     }
+    pub fn acquire_cached(
+        _category: &'static CStr,
+        _site: &std::sync::atomic::AtomicU64,
+    ) -> Option<Self> {
+        None
+    }
 }
 
 pub struct DurationScope<'a>(PhantomData<&'a ()>);
