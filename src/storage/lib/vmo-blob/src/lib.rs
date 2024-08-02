@@ -5,7 +5,6 @@
 use anyhow::{anyhow, Error};
 use std::sync::{Arc, OnceLock};
 use tracing::error;
-use vfs::common::rights_to_posix_mode_bits;
 use vfs::directory::entry::{EntryInfo, GetEntryInfo};
 use vfs::file::{File, FileOptions, GetVmo, SyncMode};
 use vfs::immutable_attributes;
@@ -46,21 +45,6 @@ impl GetEntryInfo for VmoBlob {
 }
 
 impl vfs::node::Node for VmoBlob {
-    async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
-        let content_size = self.get_size().await?;
-        Ok(fio::NodeAttributes {
-            mode: fio::MODE_TYPE_FILE
-                | rights_to_posix_mode_bits(/*r*/ true, /*w*/ false, /*x*/ true),
-            id: fio::INO_UNKNOWN,
-            content_size,
-            // TODO(https://fxbug.dev/295550170): Get storage_size from fxblob.
-            storage_size: ((content_size + BLOCK_SIZE - 1) / BLOCK_SIZE) * BLOCK_SIZE,
-            link_count: 1,
-            creation_time: 0,
-            modification_time: 0,
-        })
-    }
-
     async fn get_attributes(
         &self,
         requested_attributes: fio::NodeAttributesQuery,
@@ -76,8 +60,6 @@ impl vfs::node::Node for VmoBlob {
                 content_size: content_size,
                 // TODO(https://fxbug.dev/295550170): Get storage_size from fxblob.
                 storage_size: ((content_size + BLOCK_SIZE - 1) / BLOCK_SIZE) * BLOCK_SIZE,
-                link_count: 1,
-                id: fio::INO_UNKNOWN,
             }
         ))
     }
@@ -130,14 +112,6 @@ impl File for VmoBlob {
         }
 
         Ok(child_vmo)
-    }
-
-    async fn set_attrs(
-        &self,
-        _flags: fio::NodeAttributeFlags,
-        _attrs: fio::NodeAttributes,
-    ) -> Result<(), zx::Status> {
-        Err(zx::Status::ACCESS_DENIED)
     }
 
     async fn update_attributes(

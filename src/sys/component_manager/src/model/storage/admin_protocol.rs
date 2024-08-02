@@ -1006,10 +1006,6 @@ mod tests {
     }
 
     impl vfs::node::Node for FakeDir {
-        async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
-            Err(zx::Status::INTERNAL)
-        }
-
         async fn get_attributes(
             &self,
             _requested_attributes: fio::NodeAttributesQuery,

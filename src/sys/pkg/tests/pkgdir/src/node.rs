@@ -2,16 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{dirs_to_test, Mode, PackageSource};
+use crate::{dirs_to_test, PackageSource};
 use anyhow::{anyhow, Context as _, Error};
 use fidl::endpoints::Proxy as _;
 use fidl::AsHandleRef as _;
 use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
 #[fuchsia::test]
-async fn get_attr() {
+async fn get_attributes() {
     for source in dirs_to_test().await {
-        get_attr_per_package_source(source).await
+        get_attributes_per_package_source(source).await
     }
 }
 
@@ -32,139 +32,141 @@ impl U64Verifier for AnyU64 {
     fn verify(&self, _num: u64) {}
 }
 
-async fn get_attr_per_package_source(source: PackageSource) {
+async fn get_attributes_per_package_source(source: PackageSource) {
     let root_dir = &source.dir;
     #[derive(Debug)]
     struct Args {
         open_flags: fio::OpenFlags,
-        expected_mode_type: u32,
-        // TODO(https://fxbug.dev/355034859): Remove multiple mode protections. Nodes should only
-        // have a single protection mode. Multiple protection modes are supported to transition
-        // from io1 GetAttr to io2 GetAttributes. When we transition, we should not verify the
-        // POSIX mode bits, but instead use the node's protocols/abilities.
-        expected_mode_protections: Vec<u32>,
-        id_verifier: Box<dyn U64Verifier>,
-        expected_content_size: u64,
-        storage_size_verifier: Box<dyn U64Verifier>,
-        time_verifier: Box<dyn U64Verifier>,
+        expected_protocols: fio::NodeProtocolKinds,
+        expected_abilities: fio::Abilities,
+        id_verifier: Option<Box<dyn U64Verifier>>,
+        expected_content_size: Option<u64>,
+        storage_size_verifier: Option<Box<dyn U64Verifier>>,
     }
 
     impl Default for Args {
         fn default() -> Self {
             Self {
-                open_flags: fio::OpenFlags::empty(),
-                expected_mode_type: 0,
-                expected_mode_protections: vec![],
-                id_verifier: Box::new(1),
-                expected_content_size: 0,
-                storage_size_verifier: Box::new(AnyU64),
-                time_verifier: Box::new(0),
+                open_flags: Default::default(),
+                expected_protocols: Default::default(),
+                expected_abilities: Default::default(),
+                id_verifier: Some(Box::new(1)),
+                expected_content_size: None,
+                storage_size_verifier: None,
             }
         }
     }
 
-    async fn verify_get_attrs(root_dir: &fio::DirectoryProxy, path: &str, args: Args) {
+    async fn verify_get_attributes(root_dir: &fio::DirectoryProxy, path: &str, args: Args) {
         let node = fuchsia_fs::directory::open_node(root_dir, path, args.open_flags).await.unwrap();
-        let (status, attrs) = node.get_attr().await.unwrap();
-        let () = zx::Status::ok(status).unwrap();
-        assert_eq!(Mode(attrs.mode & fio::MODE_TYPE_MASK), Mode(args.expected_mode_type));
-        assert!(
-            args.expected_mode_protections.contains(&(attrs.mode & fio::MODE_PROTECTION_MASK)),
-            "expected {:o} to be one of {:?}",
-            attrs.mode & fio::MODE_PROTECTION_MASK,
-            args.expected_mode_protections.iter().map(|n| format!("{:o}", n)).collect::<Vec<_>>()
-        );
-        args.id_verifier.verify(attrs.id);
-        assert_eq!(attrs.content_size, args.expected_content_size);
-        args.storage_size_verifier.verify(attrs.storage_size);
-        assert_eq!(attrs.link_count, 1);
-        args.time_verifier.verify(attrs.creation_time);
-        args.time_verifier.verify(attrs.modification_time);
+        let (_, immut_attrs) = node
+            .get_attributes(fio::NodeAttributesQuery::all())
+            .await
+            .unwrap()
+            .expect("fuchsia.io/Node.GetAttributes failed");
+        assert_eq!(immut_attrs.protocols.unwrap(), args.expected_protocols);
+        assert_eq!(immut_attrs.abilities.unwrap(), args.expected_abilities);
+        if let Some(verifier) = args.id_verifier {
+            verifier.verify(immut_attrs.id.unwrap());
+        }
+        assert_eq!(immut_attrs.content_size, args.expected_content_size);
+        if let Some(verifier) = args.storage_size_verifier {
+            verifier.verify(immut_attrs.storage_size.unwrap());
+        } else {
+            assert!(immut_attrs.storage_size.is_none());
+        }
     }
 
-    verify_get_attrs(
+    verify_get_attributes(
         root_dir,
         ".",
         Args {
             open_flags: fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
-            expected_mode_type: fio::MODE_TYPE_DIRECTORY,
-            expected_mode_protections: vec![0o500, 0o700],
-            time_verifier: Box::new(0),
+            expected_protocols: fio::NodeProtocolKinds::DIRECTORY,
+            expected_abilities: fio::Abilities::GET_ATTRIBUTES
+                | fio::Abilities::ENUMERATE
+                | fio::Abilities::TRAVERSE,
             ..Default::default()
         },
     )
     .await;
-    verify_get_attrs(
+    verify_get_attributes(
         root_dir,
         "dir",
         Args {
-            expected_mode_type: fio::MODE_TYPE_DIRECTORY,
-            expected_mode_protections: vec![0o500, 0o700],
-            time_verifier: Box::new(0),
+            expected_protocols: fio::NodeProtocolKinds::DIRECTORY,
+            expected_abilities: fio::Abilities::GET_ATTRIBUTES
+                | fio::Abilities::ENUMERATE
+                | fio::Abilities::TRAVERSE,
             ..Default::default()
         },
     )
     .await;
-    verify_get_attrs(
+    verify_get_attributes(
         root_dir,
         "file",
         Args {
             open_flags: fio::OpenFlags::RIGHT_READABLE,
-            expected_mode_type: fio::MODE_TYPE_FILE,
-            expected_mode_protections: vec![0o500],
-            id_verifier: Box::new(AnyU64),
-            expected_content_size: 4,
-            time_verifier: Box::new(0),
-            ..Default::default()
+            expected_protocols: fio::NodeProtocolKinds::FILE,
+            expected_abilities: fio::Abilities::GET_ATTRIBUTES
+                | fio::Abilities::READ_BYTES
+                | fio::Abilities::EXECUTE,
+            id_verifier: None,
+            expected_content_size: Some(4),
+            storage_size_verifier: Some(Box::new(AnyU64)),
         },
     )
     .await;
-    verify_get_attrs(
+    verify_get_attributes(
         root_dir,
         "meta",
         Args {
             open_flags: fio::OpenFlags::NOT_DIRECTORY,
-            expected_mode_type: fio::MODE_TYPE_FILE,
-            expected_mode_protections: vec![0o400],
-            expected_content_size: 64,
-            time_verifier: Box::new(0),
+            expected_protocols: fio::NodeProtocolKinds::FILE,
+            expected_abilities: fio::Abilities::GET_ATTRIBUTES | fio::Abilities::READ_BYTES,
+            expected_content_size: Some(64),
+            storage_size_verifier: Some(Box::new(AnyU64)),
             ..Default::default()
         },
     )
     .await;
-    verify_get_attrs(
+    verify_get_attributes(
         root_dir,
         "meta",
         Args {
             open_flags: fio::OpenFlags::DIRECTORY,
-            expected_mode_type: fio::MODE_TYPE_DIRECTORY,
-            expected_mode_protections: vec![0o500, 0o700],
-            expected_content_size: 75,
-            time_verifier: Box::new(0),
+            expected_protocols: fio::NodeProtocolKinds::DIRECTORY,
+            expected_abilities: fio::Abilities::GET_ATTRIBUTES
+                | fio::Abilities::ENUMERATE
+                | fio::Abilities::TRAVERSE,
+            expected_content_size: Some(75),
+            storage_size_verifier: Some(Box::new(AnyU64)),
             ..Default::default()
         },
     )
     .await;
-    verify_get_attrs(
+    verify_get_attributes(
         root_dir,
         "meta/dir",
         Args {
-            expected_mode_type: fio::MODE_TYPE_DIRECTORY,
-            expected_mode_protections: vec![0o500, 0o700],
-            expected_content_size: 75,
-            time_verifier: Box::new(0),
+            expected_protocols: fio::NodeProtocolKinds::DIRECTORY,
+            expected_abilities: fio::Abilities::GET_ATTRIBUTES
+                | fio::Abilities::ENUMERATE
+                | fio::Abilities::TRAVERSE,
+            expected_content_size: Some(75),
+            storage_size_verifier: Some(Box::new(AnyU64)),
             ..Default::default()
         },
     )
     .await;
-    verify_get_attrs(
+    verify_get_attributes(
         root_dir,
         "meta/file",
         Args {
-            expected_mode_type: fio::MODE_TYPE_FILE,
-            expected_mode_protections: vec![0o400],
-            expected_content_size: 9,
-            time_verifier: Box::new(0),
+            expected_protocols: fio::NodeProtocolKinds::FILE,
+            expected_abilities: fio::Abilities::GET_ATTRIBUTES | fio::Abilities::READ_BYTES,
+            expected_content_size: Some(9),
+            storage_size_verifier: Some(Box::new(AnyU64)),
             ..Default::default()
         },
     )

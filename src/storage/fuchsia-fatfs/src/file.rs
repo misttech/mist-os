@@ -10,7 +10,6 @@ use crate::types::File;
 use crate::util::{dos_to_unix_time, fatfs_error_to_status, unix_to_dos_time};
 use fidl_fuchsia_io as fio;
 use fuchsia_zircon::{self as zx, Status};
-use libc::{S_IRUSR, S_IWUSR};
 use std::cell::UnsafeCell;
 use std::fmt::Debug;
 use std::io::{Read, Seek, Write};
@@ -204,29 +203,6 @@ impl Node for FatFile {
 }
 
 impl vfs::node::Node for FatFile {
-    async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
-        let fs_lock = self.filesystem.lock().unwrap();
-        let file = self.borrow_file(&fs_lock)?;
-        let content_size = file.len() as u64;
-        let creation_time = dos_to_unix_time(file.created());
-        let modification_time = dos_to_unix_time(file.modified());
-
-        // Figure out the storage size by rounding content_size up to the nearest
-        // multiple of cluster_size.
-        let cluster_size = fs_lock.cluster_size() as u64;
-        let storage_size = ((content_size + cluster_size - 1) / cluster_size) * cluster_size;
-
-        Ok(fio::NodeAttributes {
-            mode: fio::MODE_TYPE_FILE | S_IRUSR | S_IWUSR,
-            id: fio::INO_UNKNOWN,
-            content_size,
-            storage_size,
-            link_count: 1,
-            creation_time,
-            modification_time,
-        })
-    }
-
     // TODO(https://fxbug.dev/324112547): add new io2 attributes, e.g. change time, access time.
     async fn get_attributes(
         &self,
@@ -245,14 +221,7 @@ impl vfs::node::Node for FatFile {
 
         Ok(attributes!(
             requested_attributes,
-            Mutable {
-                creation_time: creation_time,
-                modification_time: modification_time,
-                mode: 0,
-                uid: 0,
-                gid: 0,
-                rdev: 0
-            },
+            Mutable { creation_time: creation_time, modification_time: modification_time },
             Immutable {
                 protocols: fio::NodeProtocolKinds::FILE,
                 abilities: fio::Operations::GET_ATTRIBUTES
@@ -261,8 +230,6 @@ impl vfs::node::Node for FatFile {
                     | fio::Operations::WRITE_BYTES,
                 content_size: content_size,
                 storage_size: storage_size,
-                link_count: 1,
-                id: fio::INO_UNKNOWN,
             }
         ))
     }
@@ -313,21 +280,20 @@ impl VfsFile for FatFile {
     // use a TimeProvider to change the creation/modification time of a file after the fact,
     // so we need to use the deprecated methods.
     #[allow(deprecated)]
-    async fn set_attrs(
+    async fn update_attributes(
         &self,
-        flags: fio::NodeAttributeFlags,
-        attrs: fio::NodeAttributes,
+        attributes: fio::MutableNodeAttributes,
     ) -> Result<(), Status> {
         let fs_lock = self.filesystem.lock().unwrap();
         let file = self.borrow_file_mut(&fs_lock).ok_or(Status::BAD_HANDLE)?;
-
+        // TODO(https://fxbug.dev/353768723): Reject unsupported attributes.
         let mut needs_flush = false;
-        if flags.contains(fio::NodeAttributeFlags::CREATION_TIME) {
-            file.set_created(unix_to_dos_time(attrs.creation_time));
+        if let Some(creation_time) = attributes.creation_time {
+            file.set_created(unix_to_dos_time(creation_time));
             needs_flush = true;
         }
-        if flags.contains(fio::NodeAttributeFlags::MODIFICATION_TIME) {
-            file.set_modified(unix_to_dos_time(attrs.modification_time));
+        if let Some(modification_time) = attributes.modification_time {
+            file.set_modified(unix_to_dos_time(modification_time));
             needs_flush = true;
         }
 
@@ -336,13 +302,6 @@ impl VfsFile for FatFile {
             self.filesystem.mark_dirty();
         }
         Ok(())
-    }
-
-    async fn update_attributes(
-        &self,
-        _attributes: fio::MutableNodeAttributes,
-    ) -> Result<(), Status> {
-        Err(Status::NOT_SUPPORTED)
     }
 
     async fn get_size(&self) -> Result<u64, Status> {
@@ -462,13 +421,23 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn test_get_attrs() {
+    async fn test_get_attributes() {
         let file = TestFile::new();
-        let attrs = vfs::node::Node::get_attrs(&**file).await.expect("get_attrs succeeds");
-        assert_eq!(attrs.mode, fio::MODE_TYPE_FILE | S_IRUSR | S_IWUSR);
-        assert_eq!(attrs.id, fio::INO_UNKNOWN);
-        assert_eq!(attrs.content_size, TEST_FILE_CONTENT.len() as u64);
-        assert!(attrs.storage_size > TEST_FILE_CONTENT.len() as u64);
-        assert_eq!(attrs.link_count, 1);
+        let fio::NodeAttributes2 { mutable_attributes, immutable_attributes } =
+            vfs::node::Node::get_attributes(&**file, fio::NodeAttributesQuery::all())
+                .await
+                .unwrap();
+        assert_eq!(immutable_attributes.content_size.unwrap(), TEST_FILE_CONTENT.len() as u64);
+        assert!(immutable_attributes.storage_size.unwrap() > TEST_FILE_CONTENT.len() as u64);
+        assert_eq!(immutable_attributes.protocols.unwrap(), fio::NodeProtocolKinds::FILE);
+        assert_eq!(
+            immutable_attributes.abilities.unwrap(),
+            fio::Abilities::GET_ATTRIBUTES
+                | fio::Abilities::UPDATE_ATTRIBUTES
+                | fio::Abilities::READ_BYTES
+                | fio::Abilities::WRITE_BYTES
+        );
+        assert!(mutable_attributes.creation_time.is_some());
+        assert!(mutable_attributes.modification_time.is_some());
     }
 }

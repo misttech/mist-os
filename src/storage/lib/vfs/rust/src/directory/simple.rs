@@ -6,7 +6,7 @@
 //! Use [`crate::directory::immutable::Simple::new()`]
 //! to construct actual instances.  See [`Simple`] for details.
 
-use crate::common::{rights_to_posix_mode_bits, CreationMode};
+use crate::common::CreationMode;
 use crate::directory::dirents_sink;
 use crate::directory::entry::{DirectoryEntry, EntryInfo, FlagsOrProtocols, OpenRequest};
 use crate::directory::entry_container::{Directory, DirectoryWatcher};
@@ -183,19 +183,6 @@ impl DirectoryEntry for Simple {
 }
 
 impl Node for Simple {
-    async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
-        Ok(fio::NodeAttributes {
-            mode: fio::MODE_TYPE_DIRECTORY
-                | rights_to_posix_mode_bits(/*r*/ true, /*w*/ false, /*x*/ true),
-            id: self.inode,
-            content_size: 0,
-            storage_size: 0,
-            link_count: 1,
-            creation_time: 0,
-            modification_time: 0,
-        })
-    }
-
     async fn get_attributes(
         &self,
         requested_attributes: fio::NodeAttributesQuery,
@@ -205,13 +192,8 @@ impl Node for Simple {
             Immutable {
                 protocols: fio::NodeProtocolKinds::DIRECTORY,
                 abilities: fio::Operations::GET_ATTRIBUTES
-                    | fio::Operations::UPDATE_ATTRIBUTES
                     | fio::Operations::ENUMERATE
-                    | fio::Operations::TRAVERSE
-                    | fio::Operations::MODIFY_DIRECTORY,
-                content_size: 0,
-                storage_size: 0,
-                link_count: 1,
+                    | fio::Operations::TRAVERSE,
                 id: self.inode,
             }
         ))

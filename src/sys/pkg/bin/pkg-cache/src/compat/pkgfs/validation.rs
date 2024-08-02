@@ -66,18 +66,6 @@ impl vfs::directory::entry::GetEntryInfo for Validation {
 }
 
 impl vfs::node::Node for Validation {
-    async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
-        Ok(fio::NodeAttributes {
-            mode: fio::MODE_TYPE_DIRECTORY,
-            id: 1,
-            content_size: 1,
-            storage_size: 1,
-            link_count: 1,
-            creation_time: 0,
-            modification_time: 0,
-        })
-    }
-
     async fn get_attributes(
         &self,
         requested_attributes: fio::NodeAttributesQuery,
@@ -91,7 +79,6 @@ impl vfs::node::Node for Validation {
                     | fio::Operations::TRAVERSE,
                 content_size: 1,
                 storage_size: 1,
-                link_count: 1,
                 id: 1,
             }
         ))
@@ -447,24 +434,6 @@ mod tests {
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
-    async fn directory_get_attrs() {
-        let (_env, validation) = TestEnv::new().await;
-
-        assert_eq!(
-            validation.get_attrs().await.unwrap(),
-            fio::NodeAttributes {
-                mode: fio::MODE_TYPE_DIRECTORY,
-                id: 1,
-                content_size: 1,
-                storage_size: 1,
-                link_count: 1,
-                creation_time: 0,
-                modification_time: 0,
-            }
-        );
-    }
-
-    #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_get_attributes() {
         let (_env, validation) = TestEnv::new().await;
 
@@ -479,7 +448,6 @@ mod tests {
                         | fio::Operations::TRAVERSE,
                     content_size: 1,
                     storage_size: 1,
-                    link_count: 1,
                     id: 1,
                 }
             )

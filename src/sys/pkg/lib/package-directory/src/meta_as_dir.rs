@@ -32,23 +32,6 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry::GetEntryInfo for MetaAsDir
 }
 
 impl<S: crate::NonMetaStorage> vfs::node::Node for MetaAsDir<S> {
-    async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
-        Ok(fio::NodeAttributes {
-            mode: fio::MODE_TYPE_DIRECTORY
-                | vfs::common::rights_to_posix_mode_bits(
-                    true, // read
-                    true, // write
-                    true, // execute
-                ),
-            id: 1,
-            content_size: usize_to_u64_safe(self.root_dir.meta_files.len()),
-            storage_size: usize_to_u64_safe(self.root_dir.meta_files.len()),
-            link_count: 1,
-            creation_time: 0,
-            modification_time: 0,
-        })
-    }
-
     async fn get_attributes(
         &self,
         requested_attributes: fio::NodeAttributesQuery,
@@ -57,12 +40,9 @@ impl<S: crate::NonMetaStorage> vfs::node::Node for MetaAsDir<S> {
             requested_attributes,
             Immutable {
                 protocols: fio::NodeProtocolKinds::DIRECTORY,
-                abilities: fio::Operations::GET_ATTRIBUTES
-                    | fio::Operations::ENUMERATE
-                    | fio::Operations::TRAVERSE,
+                abilities: crate::DIRECTORY_ABILITIES,
                 content_size: usize_to_u64_safe(self.root_dir.meta_files.len()),
                 storage_size: usize_to_u64_safe(self.root_dir.meta_files.len()),
-                link_count: 1,
                 id: 1,
             }
         ))
@@ -408,24 +388,6 @@ mod tests {
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
-    async fn directory_get_attrs() {
-        let (_env, meta_as_dir) = TestEnv::new().await;
-
-        assert_eq!(
-            Node::get_attrs(meta_as_dir.as_ref()).await.unwrap(),
-            fio::NodeAttributes {
-                mode: fio::MODE_TYPE_DIRECTORY | 0o700,
-                id: 1,
-                content_size: 4,
-                storage_size: 4,
-                link_count: 1,
-                creation_time: 0,
-                modification_time: 0,
-            }
-        );
-    }
-
-    #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_get_attributes() {
         let (_env, meta_as_dir) = TestEnv::new().await;
 
@@ -437,12 +399,9 @@ mod tests {
                 fio::NodeAttributesQuery::all(),
                 Immutable {
                     protocols: fio::NodeProtocolKinds::DIRECTORY,
-                    abilities: fio::Operations::GET_ATTRIBUTES
-                        | fio::Operations::ENUMERATE
-                        | fio::Operations::TRAVERSE,
+                    abilities: crate::DIRECTORY_ABILITIES,
                     content_size: 4,
                     storage_size: 4,
-                    link_count: 1,
                     id: 1,
                 }
             )

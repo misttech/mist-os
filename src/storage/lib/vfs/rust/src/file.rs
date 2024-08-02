@@ -154,9 +154,9 @@ pub trait File: Node {
     /// the file's client.
     fn open_file(&self, options: &FileOptions) -> impl Future<Output = Result<(), Status>> + Send;
 
-    /// Truncate the file to |length|.
-    /// If there are pending attributes to update (see set_attrs), they should also be flushed at
-    /// this time.  Otherwise, no attributes should be updated, other than size as needed.
+    /// Truncate the file to `length`.
+    /// If there are pending attributes to update (see `update_attributes`), they should also be
+    /// flushed at this time. Otherwise, no attributes should be updated, other than size as needed.
     fn truncate(&self, length: u64) -> impl Future<Output = Result<(), Status>> + Send;
 
     /// Get a VMO representing this file.
@@ -170,13 +170,6 @@ pub trait File: Node {
     /// Get the size of this file.
     /// This is used to calculate seek offset relative to the end.
     fn get_size(&self) -> impl Future<Output = Result<u64, Status>> + Send;
-
-    /// Set the attributes of this file based on the values in `attrs`.
-    fn set_attrs(
-        &self,
-        flags: fio::NodeAttributeFlags,
-        attrs: fio::NodeAttributes,
-    ) -> impl Future<Output = Result<(), Status>> + Send;
 
     /// Set the attributes of this file based on the values in `attributes`.
     fn update_attributes(
@@ -264,8 +257,10 @@ pub trait FileIo: Send + Sync {
 
     /// Write |content| starting at |offset|, returning the number of bytes that were successfully
     /// written.
-    /// If there are pending attributes to update (see set_attrs), they should also be flushed at
-    /// this time.  Otherwise, no attributes should be updated, other than size as needed.
+    ///
+
+    /// If there are pending attributes to update (see `update_attributes`), they should also be
+    /// flushed at this time. Otherwise, no attributes should be updated, other than size as needed.
     fn write_at(
         &self,
         offset: u64,
@@ -276,8 +271,9 @@ pub trait FileIo: Send + Sync {
     /// after writing.  Implementations should make the writes atomic, so in the event that multiple
     /// requests to append are in-flight, it should appear that the two writes are applied in
     /// sequence.
-    /// If there are pending attributes to update (see set_attrs), they should also be flushed at
-    /// this time.  Otherwise, no attributes should be updated, other than size as needed.
+    ///
+    /// If there are pending attributes to update (see `update_attributes`), they should also be
+    /// flushed at this time. Otherwise, no attributes should be updated, other than size as needed.
     fn append(&self, content: &[u8]) -> impl Future<Output = Result<(u64, u64), Status>> + Send;
 }
 

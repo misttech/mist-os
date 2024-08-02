@@ -306,15 +306,29 @@ template("generate_fuchsia-hwinfo-tests") {
   }
 }
 
+# NOTE: Versions 16/17 are disabled as we no longer provide builds for these
+# versions. These tests were updated in https://fxbug.dev/355034859.
 template("generate_pkgdir-tests") {
   forward_variables_from(invoker, [ "test_info" ])
-  fuchsia_package_with_test(target_name) {
-    subpackages = [
-      test_info.target_label,
-      "//src/sys/pkg/tests/pkgdir/test_realm_proxy",
-    ]
-    test_component = "//src/sys/pkg/tests/pkgdir:test-root"
-    test_component_name = "test-root.cm"
+  _disabled_versions = [
+    "16",
+    "17",
+  ]
+  if (defined(invoker.api_level) &&
+      _disabled_versions + [ invoker.api_level ] - [ invoker.api_level ] !=
+      _disabled_versions) {
+    not_needed([ "test_info" ])
+    group(target_name) {
+    }
+  } else {
+    fuchsia_package_with_test(target_name) {
+      subpackages = [
+        test_info.target_label,
+        "//src/sys/pkg/tests/pkgdir/test_realm_proxy",
+      ]
+      test_component = "//src/sys/pkg/tests/pkgdir:test-root"
+      test_component_name = "test-root.cm"
+    }
   }
 }
 

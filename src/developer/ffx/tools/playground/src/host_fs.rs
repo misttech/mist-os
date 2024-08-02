@@ -24,20 +24,7 @@ use vfs::node::Node;
 use vfs::path::Path as VfsPath;
 use vfs::{ObjectRequestRef, ProtocolsExt, ToObjectRequest};
 
-/// Convert a Rust [`Metadata`] struct to a `fuchsia.io.NodeAttributes` FIDL struct.
-fn metadata_to_node_attributes(metadata: std::fs::Metadata) -> fio::NodeAttributes {
-    fio::NodeAttributes {
-        mode: metadata.mode(),
-        id: metadata.ino(),
-        content_size: metadata.size(),
-        storage_size: metadata.size(),
-        link_count: metadata.nlink(),
-        creation_time: metadata.ctime_nsec().try_into().unwrap_or(0),
-        modification_time: metadata.mtime_nsec().try_into().unwrap_or(0),
-    }
-}
-
-/// Convert a Rust [`Metadata`] struct to a `fuchsia.io.NodeAttributes2` FIDL struct.
+/// Convert a Rust [`std::fs::Metadata`] to a [`fio::NodeAttributes2`] FIDL struct.
 fn metadata_to_node_attributes2(
     metadata: std::fs::Metadata,
     abilities: fio::Operations,
@@ -66,7 +53,7 @@ fn metadata_to_node_attributes2(
     }
 }
 
-/// Convert a Rust [`FileType`] struct to a `fuchsia.io.DirentType` FIDL struct.
+/// Convert a Rust [`std::fs::FileType`] to a [`fio::DirentType`] FIDL struct.
 fn file_type_to_dirent_type(file_type: std::fs::FileType) -> fio::DirentType {
     if file_type.is_block_device() {
         fio::DirentType::BlockDevice
@@ -150,16 +137,6 @@ impl File for HostFile {
 
     async fn get_size(&self) -> Result<u64, Status> {
         Ok(std::fs::metadata(&self.path)?.size())
-    }
-
-    async fn set_attrs(
-        &self,
-        _flags: fio::NodeAttributeFlags,
-        _attrs: fio::NodeAttributes,
-    ) -> Result<(), Status> {
-        // TODO(https://fxbug.dev/333800380) we won't need these until
-        // playground has commands that modify file attributes.
-        Err(Status::NOT_SUPPORTED)
     }
 
     async fn update_attributes(
@@ -252,10 +229,6 @@ impl Node for HostFile {
         ))
     }
 
-    async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
-        Ok(metadata_to_node_attributes(std::fs::metadata(&self.path)?))
-    }
-
     async fn link_into(
         self: Arc<Self>,
         _destination_dir: Arc<dyn MutableDirectory>,
@@ -344,10 +317,6 @@ impl Node for HostDirectory {
                 | fio::Operations::TRAVERSE
                 | fio::Operations::MODIFY_DIRECTORY,
         ))
-    }
-
-    async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
-        Ok(metadata_to_node_attributes(std::fs::metadata(&self.0)?))
     }
 
     async fn link_into(
@@ -457,17 +426,6 @@ impl MutableDirectory for HostDirectory {
         _source_name: &'a str,
     ) -> BoxFuture<'a, Result<(), Status>> {
         Box::pin(ready(Err(Status::NOT_SUPPORTED)))
-    }
-
-    /// Set the attributes of this directory based on the values in `attrs`.
-    async fn set_attrs(
-        &self,
-        _flags: fio::NodeAttributeFlags,
-        _attributes: fio::NodeAttributes,
-    ) -> Result<(), Status> {
-        // TODO(https://fxbug.dev/333800380) we won't need these until
-        // playground has commands that modify file attributes.
-        Err(Status::NOT_SUPPORTED)
     }
 
     /// Set the mutable attributes of this directory based on the values in `attributes`.

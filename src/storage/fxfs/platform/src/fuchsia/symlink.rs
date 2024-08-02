@@ -17,7 +17,6 @@ use fxfs::object_store::{
 use fxfs_macros::ToWeakNode;
 use std::sync::Arc;
 use vfs::attributes;
-use vfs::common::rights_to_posix_mode_bits;
 use vfs::directory::entry::{EntryInfo, GetEntryInfo};
 use vfs::directory::entry_container::MutableDirectory;
 use vfs::name::Name;
@@ -125,10 +124,10 @@ impl Node for FxSymlink {
             Mutable {
                 creation_time: props.creation_time.as_nanos(),
                 modification_time: props.modification_time.as_nanos(),
-                mode: props.posix_attributes.map(|a| a.mode).unwrap_or(0),
-                uid: props.posix_attributes.map(|a| a.uid).unwrap_or(0),
-                gid: props.posix_attributes.map(|a| a.gid).unwrap_or(0),
-                rdev: props.posix_attributes.map(|a| a.rdev).unwrap_or(0),
+                mode: props.posix_attributes.map(|a| a.mode),
+                uid: props.posix_attributes.map(|a| a.uid),
+                gid: props.posix_attributes.map(|a| a.gid),
+                rdev: props.posix_attributes.map(|a| a.rdev),
             },
             Immutable {
                 protocols: fio::NodeProtocolKinds::SYMLINK,
@@ -140,20 +139,6 @@ impl Node for FxSymlink {
                 verity_enabled: false,
             }
         ))
-    }
-
-    async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
-        let props = self.get_properties().await.map_err(map_to_status)?;
-        Ok(fio::NodeAttributes {
-            mode: fio::MODE_TYPE_SYMLINK
-                | rights_to_posix_mode_bits(/*r*/ true, /*w*/ false, /*x*/ false),
-            id: self.object_id(),
-            content_size: props.data_attribute_size,
-            storage_size: props.allocated_size,
-            link_count: props.refs,
-            creation_time: props.creation_time.as_nanos(),
-            modification_time: props.modification_time.as_nanos(),
-        })
     }
 
     async fn link_into(

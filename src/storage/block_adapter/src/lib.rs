@@ -12,14 +12,13 @@ use anyhow::Error;
 use fidl::endpoints::{create_endpoints, ServerEnd};
 use remote_block_device::{BlockClient as _, BufferSlice, MutableBufferSlice, RemoteBlockClient};
 use std::sync::Arc;
-use vfs::common::rights_to_posix_mode_bits;
 use vfs::directory::entry::{DirectoryEntry, EntryInfo, GetEntryInfo, OpenRequest};
 use vfs::directory::entry_container::Directory;
 use vfs::execution_scope::ExecutionScope;
 use vfs::file::{FidlIoConnection, File, FileIo, FileLike, FileOptions, SyncMode};
 use vfs::node::Node;
 use vfs::path::Path;
-use vfs::{attributes, pseudo_directory, ObjectRequestRef};
+use vfs::{immutable_attributes, pseudo_directory, ObjectRequestRef};
 use {
     fidl_fuchsia_hardware_block as fhardware_block, fidl_fuchsia_io as fio,
     fuchsia_async as fasync, fuchsia_zircon as zx,
@@ -52,22 +51,6 @@ impl GetEntryInfo for BlockFile {
 }
 
 impl Node for BlockFile {
-    async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
-        let block_size = self.block_client.block_size();
-        let block_count = self.block_client.block_count();
-        let device_size = block_count.checked_mul(block_size.into()).unwrap();
-        Ok(fio::NodeAttributes {
-            mode: fio::MODE_TYPE_FILE
-                | rights_to_posix_mode_bits(/*r*/ true, /*w*/ true, /*x*/ false),
-            id: 0,
-            content_size: device_size,
-            storage_size: device_size,
-            link_count: 1,
-            creation_time: 0,
-            modification_time: 0,
-        })
-    }
-
     async fn get_attributes(
         &self,
         requested_attributes: fio::NodeAttributesQuery,
@@ -75,9 +58,8 @@ impl Node for BlockFile {
         let block_size = self.block_client.block_size();
         let block_count = self.block_client.block_count();
         let device_size = block_count.checked_mul(block_size.into()).unwrap();
-        Ok(attributes!(
+        Ok(immutable_attributes!(
             requested_attributes,
-            Mutable { creation_time: 0, modification_time: 0, mode: 0, uid: 0, gid: 0, rdev: 0 },
             Immutable {
                 protocols: fio::NodeProtocolKinds::FILE,
                 abilities: fio::Operations::GET_ATTRIBUTES
@@ -86,8 +68,6 @@ impl Node for BlockFile {
                     | fio::Operations::WRITE_BYTES,
                 content_size: device_size,
                 storage_size: device_size,
-                link_count: 1,
-                id: 0,
             }
         ))
     }
@@ -114,14 +94,6 @@ impl File for BlockFile {
         let block_size = self.block_client.block_size();
         let block_count = self.block_client.block_count();
         Ok(block_count.checked_mul(block_size.into()).unwrap())
-    }
-
-    async fn set_attrs(
-        &self,
-        _flags: fio::NodeAttributeFlags,
-        _attrs: fio::NodeAttributes,
-    ) -> Result<(), zx::Status> {
-        Err(zx::Status::NOT_SUPPORTED)
     }
 
     async fn update_attributes(

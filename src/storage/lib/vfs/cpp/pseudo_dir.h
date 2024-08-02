@@ -68,6 +68,7 @@ class PseudoDir : public Vnode {
 
   // |Vnode| implementation:
   fuchsia_io::NodeProtocolKinds GetProtocols() const final;
+  fuchsia_io::Abilities GetAbilities() const final;
   zx::result<fs::VnodeAttributes> GetAttributes() const final;
   zx_status_t Lookup(std::string_view name, fbl::RefPtr<fs::Vnode>* out) override;
   void Notify(std::string_view name, fuchsia_io::wire::WatchEvent event) final;

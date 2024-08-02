@@ -17,7 +17,6 @@ use fxfs::object_store::{
 };
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex, Weak};
-use vfs::common::rights_to_posix_mode_bits;
 use vfs::directory::dirents_sink::{self, AppendResult};
 use vfs::directory::entry::{DirectoryEntry, GetEntryInfo, OpenRequest};
 use vfs::directory::entry_container::Directory;
@@ -26,7 +25,7 @@ use vfs::directory::traversal_position::TraversalPosition;
 use vfs::execution_scope::ExecutionScope;
 use vfs::file::{FidlIoConnection, File, FileIo, FileLike, FileOptions, SyncMode};
 use vfs::node::Node;
-use vfs::{attributes, ObjectRequestRef, ToObjectRequest};
+use vfs::{attributes, immutable_attributes, ObjectRequestRef, ToObjectRequest};
 
 // To avoid dependency cycles, FxfsDebug stores weak references back to internal structures.  This
 // convenience method returns an appropriate error when these internal structures are dropped.
@@ -73,20 +72,6 @@ impl GetEntryInfo for InternalFile {
 }
 
 impl vfs::node::Node for InternalFile {
-    async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
-        let props = self.handle().await?.get_properties().await.map_err(map_to_status)?;
-        Ok(fio::NodeAttributes {
-            mode: fio::MODE_TYPE_FILE
-                | rights_to_posix_mode_bits(/*r*/ true, /*w*/ true, /*x*/ false),
-            id: self.object_id,
-            content_size: props.data_attribute_size,
-            storage_size: props.allocated_size,
-            link_count: props.refs,
-            creation_time: props.creation_time.as_nanos(),
-            modification_time: props.modification_time.as_nanos(),
-        })
-    }
-
     async fn get_attributes(
         &self,
         requested_attributes: fio::NodeAttributesQuery,
@@ -94,7 +79,10 @@ impl vfs::node::Node for InternalFile {
         let props = self.handle().await?.get_properties().await.map_err(map_to_status)?;
         Ok(attributes!(
             requested_attributes,
-            Mutable { creation_time: 0, modification_time: 0, mode: 0, uid: 0, gid: 0, rdev: 0 },
+            Mutable {
+                creation_time: props.creation_time.as_nanos(),
+                modification_time: props.modification_time.as_nanos()
+            },
             Immutable {
                 protocols: fio::NodeProtocolKinds::FILE,
                 abilities: fio::Operations::GET_ATTRIBUTES
@@ -131,14 +119,6 @@ impl File for InternalFile {
     async fn get_size(&self) -> Result<u64, Status> {
         // TODO(ripper): Look up size in LSMTree on every request.
         Ok(self.handle().await?.get_size())
-    }
-
-    async fn set_attrs(
-        &self,
-        _flags: fio::NodeAttributeFlags,
-        _attrs: fio::NodeAttributes,
-    ) -> Result<(), Status> {
-        Err(zx::Status::NOT_SUPPORTED)
     }
 
     async fn update_attributes(
@@ -305,28 +285,13 @@ impl GetEntryInfo for ObjectDirectory {
 }
 
 impl Node for ObjectDirectory {
-    async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
-        let id = upgrade_weak(&self.store)?.store_object_id();
-        Ok(fio::NodeAttributes {
-            mode: fio::MODE_TYPE_DIRECTORY
-                | rights_to_posix_mode_bits(/*r*/ true, /*w*/ false, /*x*/ false),
-            id,
-            content_size: 0,
-            storage_size: 0,
-            link_count: 1,
-            creation_time: 0,
-            modification_time: 0,
-        })
-    }
-
     async fn get_attributes(
         &self,
         requested_attributes: fio::NodeAttributesQuery,
     ) -> Result<fio::NodeAttributes2, Status> {
         let id = upgrade_weak(&self.store)?.store_object_id();
-        Ok(attributes!(
+        Ok(immutable_attributes!(
             requested_attributes,
-            Mutable { creation_time: 0, modification_time: 0, mode: 0, uid: 0, gid: 0, rdev: 0 },
             Immutable {
                 protocols: fio::NodeProtocolKinds::DIRECTORY,
                 abilities: fio::Operations::GET_ATTRIBUTES
@@ -334,9 +299,6 @@ impl Node for ObjectDirectory {
                     | fio::Operations::ENUMERATE
                     | fio::Operations::TRAVERSE
                     | fio::Operations::MODIFY_DIRECTORY,
-                content_size: 0,
-                storage_size: 0,
-                link_count: 1,
                 id: id
             }
         ))

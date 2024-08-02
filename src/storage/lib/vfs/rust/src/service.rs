@@ -11,17 +11,13 @@ use crate::directory::entry::{DirectoryEntry, EntryInfo, GetEntryInfo, OpenReque
 use crate::execution_scope::ExecutionScope;
 use crate::node::Node;
 use crate::object_request::{ObjectRequestRef, ObjectRequestSend};
-use crate::ProtocolsExt;
+use crate::{immutable_attributes, ProtocolsExt};
 use fidl::endpoints::RequestStream;
 use fidl_fuchsia_io as fio;
 use fuchsia_async::Channel;
 use fuchsia_zircon_status::Status;
 use futures::future::Future;
 use std::sync::Arc;
-
-// Redefine these constants as a u32 as in macos they are u16
-const S_IRUSR: u32 = libc::S_IRUSR as u32;
-const S_IWUSR: u32 = libc::S_IWUSR as u32;
 
 /// Objects that behave like services should implement this trait.
 pub trait ServiceLike: Node {
@@ -123,32 +119,15 @@ impl DirectoryEntry for Service {
 }
 
 impl Node for Service {
-    async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
-        Ok(fio::NodeAttributes {
-            mode: fio::MODE_TYPE_SERVICE | S_IRUSR | S_IWUSR,
-            id: fio::INO_UNKNOWN,
-            content_size: 0,
-            storage_size: 0,
-            link_count: 1,
-            creation_time: 0,
-            modification_time: 0,
-        })
-    }
-
     async fn get_attributes(
         &self,
         requested_attributes: fio::NodeAttributesQuery,
     ) -> Result<fio::NodeAttributes2, Status> {
-        Ok(attributes!(
+        Ok(immutable_attributes!(
             requested_attributes,
-            Mutable { creation_time: 0, modification_time: 0, mode: 0, uid: 0, gid: 0, rdev: 0 },
             Immutable {
                 protocols: fio::NodeProtocolKinds::CONNECTOR,
                 abilities: fio::Operations::GET_ATTRIBUTES | fio::Operations::CONNECT,
-                content_size: 0,
-                storage_size: 0,
-                link_count: 1,
-                id: fio::INO_UNKNOWN,
             }
         ))
     }

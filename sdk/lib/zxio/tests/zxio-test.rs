@@ -218,10 +218,6 @@ async fn test_read_link_error() {
         ) -> Result<fio::NodeAttributes2, zx::Status> {
             unreachable!();
         }
-
-        async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
-            unreachable!();
-        }
     }
 
     impl RemoteLike for ErrorSymlink {
@@ -494,9 +490,6 @@ impl FileIo for AllocateFile {
 }
 
 impl vfs::node::Node for AllocateFile {
-    async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
-        unimplemented!()
-    }
     async fn get_attributes(
         &self,
         _query: fio::NodeAttributesQuery,
@@ -519,13 +512,6 @@ impl File for AllocateFile {
         unimplemented!()
     }
     async fn get_size(&self) -> Result<u64, Status> {
-        unimplemented!()
-    }
-    async fn set_attrs(
-        &self,
-        _flags: fio::NodeAttributeFlags,
-        _attrs: fio::NodeAttributes,
-    ) -> Result<(), Status> {
         unimplemented!()
     }
     async fn update_attributes(

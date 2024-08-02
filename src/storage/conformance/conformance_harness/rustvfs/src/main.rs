@@ -83,7 +83,6 @@ async fn run(mut stream: Io1HarnessRequestStream) -> Result<(), Error> {
                         | fio::NodeAttributesQuery::ABILITIES
                         | fio::NodeAttributesQuery::CONTENT_SIZE
                         | fio::NodeAttributesQuery::STORAGE_SIZE
-                        | fio::NodeAttributesQuery::LINK_COUNT
                         | fio::NodeAttributesQuery::ID,
                     // Unsupported options:
                     supports_link_into: false,

@@ -58,19 +58,6 @@ pub struct Connection<T> {
 
 pub struct SymlinkOptions;
 
-// Returns null attributes that can be used in error cases.
-fn null_node_attributes() -> fio::NodeAttributes {
-    fio::NodeAttributes {
-        mode: 0,
-        id: fio::INO_UNKNOWN,
-        content_size: 0,
-        storage_size: 0,
-        link_count: 0,
-        creation_time: 0,
-        modification_time: 0,
-    }
-}
-
 impl<T: Symlink> Connection<T> {
     /// Returns a new connection object.
     pub fn new(scope: ExecutionScope, symlink: Arc<T>) -> Self {
@@ -126,7 +113,7 @@ impl<T: Symlink> Connection<T> {
                 )?;
             }
             fio::SymlinkRequest::GetConnectionInfo { responder } => {
-                // TODO(https://fxbug.dev/42157659): Restrict GET_ATTRIBUTES.
+                // TODO(https://fxbug.dev/293947862): Restrict GET_ATTRIBUTES.
                 let rights = fio::Operations::GET_ATTRIBUTES;
                 responder
                     .send(fio::ConnectionInfo { rights: Some(rights), ..Default::default() })?;
@@ -134,16 +121,27 @@ impl<T: Symlink> Connection<T> {
             fio::SymlinkRequest::Sync { responder } => {
                 responder.send(Ok(()))?;
             }
-            fio::SymlinkRequest::GetAttr { responder } => match self.symlink.get_attrs().await {
-                Ok(attrs) => responder.send(Status::OK.into_raw(), &attrs)?,
-                Err(status) => responder.send(status.into_raw(), &null_node_attributes())?,
-            },
+            fio::SymlinkRequest::GetAttr { responder } => {
+                // TODO(https://fxbug.dev/293947862): Restrict GET_ATTRIBUTES.
+                let (status, attrs) = crate::common::io2_to_io1_attrs(
+                    self.symlink.as_ref(),
+                    fio::Rights::GET_ATTRIBUTES,
+                )
+                .await;
+                responder.send(status.into_raw(), &attrs)?;
+            }
             fio::SymlinkRequest::SetAttr { responder, .. } => {
                 responder.send(Status::ACCESS_DENIED.into_raw())?;
             }
-            fio::SymlinkRequest::GetAttributes { query: _, responder } => {
-                // TODO(https://fxbug.dev/42157659): Handle unimplemented io2 method.
-                responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
+            fio::SymlinkRequest::GetAttributes { query, responder } => {
+                // TODO(https://fxbug.dev/293947862): Restrict GET_ATTRIBUTES.
+                let attrs = self.symlink.get_attributes(query).await;
+                responder.send(
+                    attrs
+                        .as_ref()
+                        .map(|attrs| (&attrs.mutable_attributes, &attrs.immutable_attributes))
+                        .map_err(|status| status.into_raw()),
+                )?;
             }
             fio::SymlinkRequest::UpdateAttributes { payload: _, responder } => {
                 responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
@@ -322,7 +320,7 @@ mod tests {
     use crate::directory::entry::{EntryInfo, GetEntryInfo};
     use crate::execution_scope::ExecutionScope;
     use crate::node::Node;
-    use crate::ToObjectRequest;
+    use crate::{immutable_attributes, ToObjectRequest};
     use assert_matches::assert_matches;
     use fidl::endpoints::create_proxy;
     use fidl_fuchsia_io as fio;
@@ -377,24 +375,17 @@ mod tests {
     impl Node for TestSymlink {
         async fn get_attributes(
             &self,
-            _requested_attributes: fio::NodeAttributesQuery,
+            requested_attributes: fio::NodeAttributesQuery,
         ) -> Result<fio::NodeAttributes2, Status> {
-            unreachable!();
-        }
-
-        async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
-            Ok(fio::NodeAttributes {
-                mode: fio::MODE_TYPE_SYMLINK
-                    | rights_to_posix_mode_bits(
-                        /*r*/ true, /*w*/ false, /*x*/ false,
-                    ),
-                id: fio::INO_UNKNOWN,
-                content_size: TARGET.len() as u64,
-                storage_size: TARGET.len() as u64,
-                link_count: 1,
-                creation_time: 0,
-                modification_time: 0,
-            })
+            Ok(immutable_attributes!(
+                requested_attributes,
+                Immutable {
+                    content_size: TARGET.len() as u64,
+                    storage_size: TARGET.len() as u64,
+                    protocols: fio::NodeProtocolKinds::SYMLINK,
+                    abilities: fio::Abilities::GET_ATTRIBUTES,
+                }
+            ))
         }
     }
 

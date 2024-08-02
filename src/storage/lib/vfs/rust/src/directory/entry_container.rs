@@ -158,16 +158,10 @@ pub trait MutableDirectory: Directory + Send + Sync {
         Box::pin(ready(Err(Status::NOT_SUPPORTED)))
     }
 
-    /// Set the attributes of this directory based on the values in `attrs`.
-    fn set_attrs(
-        &self,
-        flags: fio::NodeAttributeFlags,
-        attributes: fio::NodeAttributes,
-    ) -> impl Future<Output = Result<(), Status>> + Send
-    where
-        Self: Sized;
-
     /// Set the mutable attributes of this directory based on the values in `attributes`.
+    // TODO(https://fxbug.dev/353768723): Ensure that implementations reject unsupported attributes
+    // when new ones are added to `attributes`. This might require that implementations report the
+    // specific set of attributes they support before calling this function.
     fn update_attributes(
         &self,
         attributes: fio::MutableNodeAttributes,

@@ -12,7 +12,6 @@ use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_io as fio;
 use fuchsia_zircon::Status;
 use futures::future::BoxFuture;
-use libc::{S_IRUSR, S_IWUSR};
 use std::borrow::Borrow;
 use std::cell::UnsafeCell;
 use std::collections::HashMap;
@@ -751,30 +750,22 @@ impl MutableDirectory for FatDirectory {
         Ok(())
     }
 
-    async fn set_attrs(
+    async fn update_attributes(
         &self,
-        flags: fio::NodeAttributeFlags,
-        attrs: fio::NodeAttributes,
+        attributes: fio::MutableNodeAttributes,
     ) -> Result<(), Status> {
         let fs_lock = self.filesystem.lock().unwrap();
         let dir = self.borrow_dir_mut(&fs_lock).ok_or(Status::BAD_HANDLE)?;
-
-        if flags.contains(fio::NodeAttributeFlags::CREATION_TIME) {
-            dir.set_created(unix_to_dos_time(attrs.creation_time));
+        // TODO(https://fxbug.dev/353768723): Reject unsupported attributes.
+        if let Some(creation_time) = attributes.creation_time {
+            dir.set_created(unix_to_dos_time(creation_time));
         }
-        if flags.contains(fio::NodeAttributeFlags::MODIFICATION_TIME) {
-            dir.set_modified(unix_to_dos_time(attrs.modification_time));
+        if let Some(modification_time) = attributes.modification_time {
+            dir.set_modified(unix_to_dos_time(modification_time));
         }
 
         self.filesystem.mark_dirty();
         Ok(())
-    }
-
-    async fn update_attributes(
-        &self,
-        _attributes: fio::MutableNodeAttributes,
-    ) -> Result<(), Status> {
-        Err(Status::NOT_SUPPORTED)
     }
 
     async fn sync(&self) -> Result<(), Status> {
@@ -836,23 +827,6 @@ impl GetEntryInfo for FatDirectory {
 }
 
 impl vfs::node::Node for FatDirectory {
-    async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
-        let fs_lock = self.filesystem.lock().unwrap();
-        let dir = self.borrow_dir(&fs_lock)?;
-
-        let creation_time = dos_to_unix_time(dir.created());
-        let modification_time = dos_to_unix_time(dir.modified());
-        Ok(fio::NodeAttributes {
-            mode: fio::MODE_TYPE_DIRECTORY | S_IRUSR | S_IWUSR,
-            id: fio::INO_UNKNOWN,
-            content_size: 0,
-            storage_size: 0,
-            link_count: 1,
-            creation_time,
-            modification_time,
-        })
-    }
-
     // TODO(https://fxbug.dev/324112547): add new io2 attributes, e.g. change time, access time.
     async fn get_attributes(
         &self,
@@ -866,14 +840,7 @@ impl vfs::node::Node for FatDirectory {
 
         Ok(attributes!(
             requested_attributes,
-            Mutable {
-                creation_time: creation_time,
-                modification_time: modification_time,
-                mode: 0,
-                uid: 0,
-                gid: 0,
-                rdev: 0
-            },
+            Mutable { creation_time: creation_time, modification_time: modification_time },
             Immutable {
                 protocols: fio::NodeProtocolKinds::DIRECTORY,
                 abilities: fio::Operations::GET_ATTRIBUTES
@@ -881,10 +848,6 @@ impl vfs::node::Node for FatDirectory {
                     | fio::Operations::ENUMERATE
                     | fio::Operations::TRAVERSE
                     | fio::Operations::MODIFY_DIRECTORY,
-                content_size: 0,
-                storage_size: 0,
-                link_count: 1,
-                id: fio::INO_UNKNOWN,
             }
         ))
     }

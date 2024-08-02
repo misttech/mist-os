@@ -44,7 +44,7 @@ constexpr fuchsia_io::Rights ReadOnly() { return fuchsia_io::kRStarDir; }
 
 // Alias for commonly used write-only directory rights.
 constexpr fuchsia_io::Rights WriteOnly() {
-  // TODO(https://fxbug.dev/42157659): Restrict GET_ATTRIBUTES.
+  // TODO(https://fxbug.dev/293947862): Restrict GET_ATTRIBUTES.
   return fuchsia_io::Rights::kGetAttributes | fuchsia_io::kWStarDir;
 }
 

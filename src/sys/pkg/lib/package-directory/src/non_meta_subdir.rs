@@ -38,23 +38,6 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry::GetEntryInfo for NonMetaSu
 }
 
 impl<S: crate::NonMetaStorage> vfs::node::Node for NonMetaSubdir<S> {
-    async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
-        Ok(fio::NodeAttributes {
-            mode: fio::MODE_TYPE_DIRECTORY
-                | vfs::common::rights_to_posix_mode_bits(
-                    true, // read
-                    true, // write
-                    true, // execute
-                ),
-            id: 1,
-            content_size: 0,
-            storage_size: 0,
-            link_count: 1,
-            creation_time: 0,
-            modification_time: 0,
-        })
-    }
-
     async fn get_attributes(
         &self,
         requested_attributes: fio::NodeAttributesQuery,
@@ -63,12 +46,7 @@ impl<S: crate::NonMetaStorage> vfs::node::Node for NonMetaSubdir<S> {
             requested_attributes,
             Immutable {
                 protocols: fio::NodeProtocolKinds::DIRECTORY,
-                abilities: fio::Operations::GET_ATTRIBUTES
-                    | fio::Operations::ENUMERATE
-                    | fio::Operations::TRAVERSE,
-                content_size: 0,
-                storage_size: 0,
-                link_count: 1,
+                abilities: crate::DIRECTORY_ABILITIES,
                 id: 1,
             }
         ))
@@ -248,29 +226,6 @@ mod tests {
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
-    async fn directory_get_attrs() {
-        let (_env, sub_dir) = TestEnv::new().await;
-
-        assert_eq!(
-            Node::get_attrs(sub_dir.as_ref()).await.unwrap(),
-            fio::NodeAttributes {
-                mode: fio::MODE_TYPE_DIRECTORY
-                    | vfs::common::rights_to_posix_mode_bits(
-                        true, // read
-                        true, // write
-                        true, // execute
-                    ),
-                id: 1,
-                content_size: 0,
-                storage_size: 0,
-                link_count: 1,
-                creation_time: 0,
-                modification_time: 0,
-            }
-        );
-    }
-
-    #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_get_attributes() {
         let (_env, sub_dir) = TestEnv::new().await;
 
@@ -280,12 +235,7 @@ mod tests {
                 fio::NodeAttributesQuery::all(),
                 Immutable {
                     protocols: fio::NodeProtocolKinds::DIRECTORY,
-                    abilities: fio::Operations::GET_ATTRIBUTES
-                        | fio::Operations::ENUMERATE
-                        | fio::Operations::TRAVERSE,
-                    content_size: 0,
-                    storage_size: 0,
-                    link_count: 1,
+                    abilities: crate::DIRECTORY_ABILITIES,
                     id: 1,
                 }
             )

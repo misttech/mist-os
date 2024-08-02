@@ -42,11 +42,6 @@ pub trait Node: GetEntryInfo + IntoAny + Send + Sync + 'static {
     where
         Self: Sized;
 
-    /// Get this node's attributes.
-    fn get_attrs(&self) -> impl Future<Output = Result<fio::NodeAttributes, Status>> + Send
-    where
-        Self: Sized;
-
     /// Called when the node is about to be opened as the node protocol.  Implementers can use this
     /// to perform any initialization or reference counting.  Errors here will result in the open
     /// failing.  By default, this forwards to the infallible will_clone.
@@ -183,29 +178,11 @@ impl<N: Node> Connection<N> {
             fio::NodeRequest::Sync { responder } => {
                 responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
             }
-            fio::NodeRequest::GetAttr { responder } => match {
-                if !self.options.rights.contains(fio::Operations::GET_ATTRIBUTES) {
-                    Err(Status::BAD_HANDLE)
-                } else {
-                    self.node.get_attrs().await
-                }
-            } {
-                Ok(attr) => responder.send(Status::OK.into_raw(), &attr)?,
-                Err(status) => {
-                    responder.send(
-                        status.into_raw(),
-                        &fio::NodeAttributes {
-                            mode: 0,
-                            id: fio::INO_UNKNOWN,
-                            content_size: 0,
-                            storage_size: 0,
-                            link_count: 0,
-                            creation_time: 0,
-                            modification_time: 0,
-                        },
-                    )?;
-                }
-            },
+            fio::NodeRequest::GetAttr { responder } => {
+                let (status, attrs) =
+                    crate::common::io2_to_io1_attrs(self.node.as_ref(), self.options.rights).await;
+                responder.send(status.into_raw(), &attrs)?;
+            }
             fio::NodeRequest::SetAttr { flags: _, attributes: _, responder } => {
                 responder.send(Status::BAD_HANDLE.into_raw())?;
             }
@@ -214,14 +191,8 @@ impl<N: Node> Connection<N> {
                 responder.send(
                     result
                         .as_ref()
-                        .map(|a| {
-                            let fio::NodeAttributes2 {
-                                mutable_attributes: m,
-                                immutable_attributes: i,
-                            } = a;
-                            (m, i)
-                        })
-                        .map_err(|status| Status::into_raw(*status)),
+                        .map(|attrs| (&attrs.mutable_attributes, &attrs.immutable_attributes))
+                        .map_err(|status| status.into_raw()),
                 )?;
             }
             fio::NodeRequest::UpdateAttributes { payload: _, responder } => {
