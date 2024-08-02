@@ -36,7 +36,6 @@ rustc_test("netstack_proxy_test") {
     "//sdk/fidl/fuchsia.process:fuchsia.process_rust",
     "//src/connectivity/network/testing/netemul/fidl:fuchsia.netemul_rust",
     "//src/connectivity/network/testing/netemul/rust:lib",
-    "//src/lib/async-utils",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",

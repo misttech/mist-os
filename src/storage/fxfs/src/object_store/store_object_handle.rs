@@ -1000,7 +1000,7 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
             let (head, tail) = buf.split_at_mut(device_range_len as usize);
             buf = tail;
 
-            writes.push(async move {
+            writes.push_back(async move {
                 let len = head.len() as u64;
                 Result::<_, Error>::Ok((
                     device_range.start,

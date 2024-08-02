@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use anyhow::{Context as _, Error, Result};
-use async_utils::stream::FlattenUnorderedExt as _;
 use fidl::prelude::*;
 use fidl_fuchsia_net_dhcp_ext::{self as fnet_dhcp_ext, ClientProviderExt};
 use fuchsia_async::{self as fasync, TimeoutExt as _};
@@ -1479,7 +1478,7 @@ async fn main() -> Result<(), Error> {
 
     let mut controller = Controller::new();
 
-    let mut requests = fs.fuse().flatten_unordered();
+    let mut requests = fs.fuse().flatten_unordered(None);
 
     enum Event {
         ControllerRequest(Option<Result<fntr::ControllerRequest, fidl::Error>>),

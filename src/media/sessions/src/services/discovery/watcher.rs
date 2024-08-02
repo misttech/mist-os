@@ -53,7 +53,7 @@ impl Sink<(SessionId, PlayerProxyEvent)> for FlowControlledProxySink {
             PlayerProxyEvent::Updated(delta) => self.proxy.session_updated(id, &delta()),
             PlayerProxyEvent::Removed => self.proxy.session_removed(id),
         };
-        self.acks.push(ack_fut);
+        self.acks.push_back(ack_fut);
 
         Ok(())
     }

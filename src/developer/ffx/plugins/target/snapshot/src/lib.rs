@@ -115,7 +115,7 @@ pub async fn read_data(file: &fio::FileProxy) -> Result<Vec<u8>> {
     let mut queue = FuturesOrdered::new();
 
     for _ in 0..CONCURRENCY {
-        queue.push(file.read(fio::MAX_BUF));
+        queue.push_back(file.read(fio::MAX_BUF));
     }
 
     loop {
@@ -131,7 +131,7 @@ pub async fn read_data(file: &fio::FileProxy) -> Result<Vec<u8>> {
         }
 
         while queue.len() < CONCURRENCY.try_into().unwrap() {
-            queue.push(file.read(fio::MAX_BUF));
+            queue.push_back(file.read(fio::MAX_BUF));
         }
     }
 

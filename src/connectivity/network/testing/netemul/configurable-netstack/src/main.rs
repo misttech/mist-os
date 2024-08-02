@@ -4,7 +4,6 @@
 
 use anyhow::{anyhow, Context as _};
 use async_utils::hanging_get::client::HangingGetStream;
-use async_utils::stream::FlattenUnorderedExt as _;
 use fidl::endpoints::Proxy as _;
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_component::server::{ServiceFs, ServiceFsDir};
@@ -28,7 +27,7 @@ async fn main() {
         fs.dir("svc").add_fidl_service(|s: fnetemul::ConfigurableNetstackRequestStream| s);
     let _: &mut ServiceFs<_> = fs.take_and_serve_directory_handle().expect("take startup handle");
     fs.fuse()
-        .flatten_unordered()
+        .flatten_unordered(None)
         .and_then(handle_request)
         .for_each_concurrent(None, |r| async {
             r.unwrap_or_else(|e| error!("failed to handle configurable netstack request: {:?}", e))

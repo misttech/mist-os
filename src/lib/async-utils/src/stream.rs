@@ -16,15 +16,11 @@ use futures::stream::{FusedStream, Stream};
 use futures::Future;
 use pin_project::pin_project;
 
-mod flatten_unordered;
 mod future_map;
 mod one_or_many;
 mod short_circuit;
 mod stream_map;
 
-pub use flatten_unordered::{
-    FlattenUnordered, FlattenUnorderedExt, TryFlattenUnordered, TryFlattenUnorderedExt,
-};
 pub use future_map::FutureMap;
 pub use one_or_many::OneOrMany;
 pub use short_circuit::ShortCircuit;

@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use async_utils::stream::FlattenUnorderedExt as _;
 use cobalt_client::traits::AsEventCode as _;
 use fuchsia_component::server::{ServiceFs, ServiceFsDir};
 use fuchsia_inspect::Property as _;
@@ -374,7 +373,7 @@ pub async fn main() {
         futures::stream::once(futures::future::ready(()))
             .chain(fuchsia_async::Interval::new(metrics_logging_interval))
             .map(|()| Action::LogMetrics),
-        fs.fuse().flatten_unordered().map(Action::ServiceRequest),
+        fs.fuse().flatten_unordered(None).map(Action::ServiceRequest),
     );
 
     while let Some(action) = stream.next().await {

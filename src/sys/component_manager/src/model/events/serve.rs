@@ -5,7 +5,6 @@
 use crate::model::events::event::Event;
 use crate::model::events::registry::ComponentEventRoute;
 use crate::model::events::stream::EventStream;
-use async_utils::stream::FlattenUnorderedExt;
 use cm_rust::{ChildRef, EventScope};
 use cm_types::{LongName, Name};
 use cm_util::io::clone_dir;
@@ -323,7 +322,7 @@ pub async fn serve_event_stream(
         .filter_map(filter_event)
         .map(create_event_fidl_objects)
         .fuse()
-        .flatten_unordered()
+        .flatten_unordered(None)
         .filter_map(filter_log_errors);
     let event_stream = event_stream.boxed().peekable();
     let mut event_stream = std::pin::pin!(event_stream);

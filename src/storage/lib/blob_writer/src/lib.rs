@@ -117,7 +117,7 @@ impl BlobWriter {
             }
 
             let write_fut = self.blob_writer_proxy.bytes_ready(bytes_to_send_len);
-            self.outstanding_writes.push(
+            self.outstanding_writes.push_back(
                 async move {
                     write_fut
                         .await
