@@ -8,7 +8,8 @@ use diagnostics_reader::{ArchiveReader, Inspect, Logs};
 use fidl::Socket;
 use fidl_fuchsia_component::BinderMarker;
 use fidl_fuchsia_tracing_controller::{
-    ControllerMarker as TracingControllerMarker, StartOptions, TerminateOptions, TraceConfig,
+    ProvisionerMarker, SessionMarker as TracingSessionMarker, StartOptions, StopOptions,
+    TraceConfig,
 };
 use fuchsia_async::{Socket as AsyncSocket, Task};
 use fuchsia_component::client::connect_to_protocol;
@@ -20,11 +21,14 @@ use tracing::info;
 #[fuchsia::main]
 async fn main() {
     info!("initializing tracing...");
-    let tracing_controller = connect_to_protocol::<TracingControllerMarker>().unwrap();
+    let trace_provisioner = connect_to_protocol::<ProvisionerMarker>().unwrap();
     let (tracing_socket, tracing_socket_write) = Socket::create_stream();
     let mut tracing_socket = AsyncSocket::from_socket(tracing_socket);
-    tracing_controller
+    let (tracing_session, server_end) =
+        fidl::endpoints::create_proxy::<TracingSessionMarker>().unwrap();
+    trace_provisioner
         .initialize_tracing(
+            server_end,
             &TraceConfig {
                 categories: Some(vec!["starnix".to_string()]),
                 // Since oneshot mode is used, set the buffer size as large
@@ -47,7 +51,7 @@ async fn main() {
     });
 
     info!("starting tracing...");
-    tracing_controller
+    tracing_session
         .start_tracing(&StartOptions::default())
         .await
         .expect("starting tracing FIDL")
@@ -70,11 +74,14 @@ async fn main() {
         ExitStatus::Crash(11),
     );
 
-    info!("terminating trace...");
-    tracing_controller
-        .terminate_tracing(&TerminateOptions { write_results: Some(true), ..Default::default() })
+    info!("stopping trace...");
+    let _ = tracing_session
+        .stop_tracing(&StopOptions { write_results: Some(true), ..Default::default() })
         .await
         .unwrap();
+
+    info!("dropping trace controller...");
+    drop(tracing_session);
 
     info!("waiting for socket collection to complete...");
     let trace = collect_trace.await;
