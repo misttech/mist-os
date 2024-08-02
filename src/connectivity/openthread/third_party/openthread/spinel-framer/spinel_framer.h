@@ -19,7 +19,7 @@ class SpinelFramer {
             uint16_t spi_rx_align_allowance = 0);
   void HandleInterrupt();
   uint32_t GetTimeoutMs(void);
-  zx_status_t SendPacketToRadio(uint8_t* packet, uint16_t length);
+  zx_status_t TryBufferTxPacket(uint8_t* packet, uint16_t length);
   void ReceivePacketFromRadio(uint8_t* rxPacket, uint16_t* length);
   bool IsPacketPresent(void);
   void TrySpiTransaction(void);
@@ -37,10 +37,14 @@ class SpinelFramer {
 
   fidl::WireSyncClient<fuchsia_hardware_spi::Device>* spi_;
   bool interrupt_fired_ = false;
+  // The SPI RX frame length to be received.
+  // If the length is 0, no RX frame is pending receiving.
   uint16_t spi_rx_payload_size_ = 0;
   uint8_t spi_rx_frame_buffer_[kMaxFrameSize + kSpiRxAllignAllowanceMax];
+  // The SPI TX frame length to be sent out.
   uint16_t spi_tx_payload_size_ = 0;
   uint8_t spi_tx_frame_buffer_[kMaxFrameSize + kSpiRxAllignAllowanceMax];
+  // There is a frame in `spi_tx_frame_buffer_` and ready to be sent out.
   bool spi_tx_is_ready_ = false;
   int spi_tx_refused_count_ = 0;
   bool radio_data_rx_pending_ = false;
