@@ -18,6 +18,7 @@ group("tests") {
   deps = [
     "brightness_manager:tests",
     "scene_manager:scene_manager_tests",
+    "system_monitor:tests",
     "terminal:tests",
     "text:tests",
     "virtual_keyboard_manager:tests",
