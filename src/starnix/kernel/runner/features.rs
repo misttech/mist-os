@@ -133,10 +133,6 @@ pub fn parse_features(entries: &Vec<String>) -> Result<Features, Error> {
             }
         };
     }
-    // TODO(https://fxbug.dev/356684424): All containers should be explicitly requesting this
-    // feature now. Once this change lands cleanly through the automate tests, we can remove
-    // this assert.
-    assert!(features.container);
 
     Ok(features)
 }
