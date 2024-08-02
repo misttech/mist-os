@@ -152,17 +152,20 @@ class BootTest(object):
 
     # Attempts to ensure that the associated product bundle is built, returning
     # a boolean indicating success.
-    def ensure_product_bundle(self):
-        if self._state != self.ProductBundle.NOT_BUILT:
+    def ensure_product_bundle(self, rebuild):
+        assert (
+            self._state == self.ProductBundle.BUILT
+            or self._state == self.ProductBundle.NOT_BUILT
+        ), f"unexpected state {self._state}"
+        if self._state != self.ProductBundle.NOT_BUILT and not rebuild:
             return self._state == self.ProductBundle.BUILT
-        info("building %s..." % self._product_bundle["json"])
-        ret = subprocess.run(
-            ["fx", "build", self._product_bundle["json"]], cwd=self.build_dir
-        ).returncode
-        if ret == 0:
+        build_command = ["fx", "build", self.label]
+        info("Rebuilidng: " + " ".join(build_command))
+        if subprocess.run(build_command, cwd=self.build_dir).returncode == 0:
             self._state = self.ProductBundle.BUILT
             self._set_images_if_built()
-        return ret == 0
+            return True
+        return False
 
     def print(self, command=None):
         kinds = []
@@ -270,6 +273,12 @@ def main():
         metavar="ARCH",
         default=os.getenv("FUCHSIA_ARCH"),
     )
+    parser.add_argument(
+        "--build",
+        action=argparse.BooleanOptionalAction,
+        help="Use `fx build` to update images before running them.",
+        default=False,
+    )
     args = parser.parse_args()
 
     build_dir = os.path.relpath(os.getenv("FUCHSIA_BUILD_DIR"))
@@ -329,7 +338,7 @@ def main():
         return 1
 
     test = matches[0]
-    assert test.ensure_product_bundle(), (
+    assert test.ensure_product_bundle(args.build), (
         "unable to build product bundle %s" % test.product_bundle_name()
     )
     if args.boot:
