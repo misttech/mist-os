@@ -1538,7 +1538,7 @@ impl FileOps for RemoteFileObject {
             return sync_file.ioctl(locked, file, current_task, request, arg);
         }
 
-        default_ioctl(file, current_task, request, arg)
+        default_ioctl(file, locked, current_task, request, arg)
     }
 }
 

@@ -360,7 +360,7 @@ impl FileOps for DevTun {
 
     fn ioctl(
         &self,
-        _locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<'_, Unlocked>,
         file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
@@ -442,7 +442,7 @@ impl FileOps for DevTun {
 
                 Ok(starnix_syscalls::SUCCESS)
             }
-            _ => default_ioctl(file, current_task, request, arg),
+            _ => default_ioctl(file, locked, current_task, request, arg),
         }
     }
 }

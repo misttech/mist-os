@@ -391,7 +391,7 @@ impl FileOps for LoopDeviceFile {
 
     fn ioctl(
         &self,
-        _locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<'_, Unlocked>,
         file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
@@ -562,7 +562,7 @@ impl FileOps for LoopDeviceFile {
                 current_task.write_object(user_info, &info)?;
                 Ok(SUCCESS)
             }
-            _ => default_ioctl(file, current_task, request, arg),
+            _ => default_ioctl(file, locked, current_task, request, arg),
         }
     }
 }
@@ -744,7 +744,7 @@ impl FileOps for LoopControlDevice {
                 self.registry.remove(locked, current_task, k_device, minor)?;
                 Ok(minor.into())
             }
-            _ => default_ioctl(file, current_task, request, arg),
+            _ => default_ioctl(file, locked, current_task, request, arg),
         }
     }
 }

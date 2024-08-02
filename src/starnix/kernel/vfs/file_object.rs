@@ -342,13 +342,13 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
 
     fn ioctl(
         &self,
-        _locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<'_, Unlocked>,
         file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
         arg: SyscallArg,
     ) -> Result<SyscallResult, Errno> {
-        default_ioctl(file, current_task, request, arg)
+        default_ioctl(file, locked, current_task, request, arg)
     }
 
     fn fcntl(
@@ -804,6 +804,7 @@ pub use {
 
 pub fn default_ioctl(
     file: &FileObject,
+    _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     request: u32,
     arg: SyscallArg,

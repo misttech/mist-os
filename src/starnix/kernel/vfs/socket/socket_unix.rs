@@ -31,7 +31,7 @@ use starnix_uapi::{
 };
 use zerocopy::AsBytes;
 
-use starnix_sync::{FileOpsCore, Locked, Mutex};
+use starnix_sync::{FileOpsCore, Locked, Mutex, Unlocked};
 use std::sync::Arc;
 
 // From unix.go in gVisor.
@@ -779,6 +779,7 @@ impl SocketOps for UnixSocket {
     fn ioctl(
         &self,
         socket: &Socket,
+        locked: &mut Locked<'_, Unlocked>,
         file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
@@ -792,7 +793,7 @@ impl SocketOps for UnixSocket {
                 current_task.write_object(UserRef::<i32>::new(user_addr), &length)?;
                 Ok(SUCCESS)
             }
-            _ => default_ioctl(file, current_task, request, arg),
+            _ => default_ioctl(file, locked, current_task, request, arg),
         }
     }
 }
