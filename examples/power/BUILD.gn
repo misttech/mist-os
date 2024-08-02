@@ -5,15 +5,9 @@
 group("power") {
   testonly = true
   deps = [
-    "cpp",
-    "rust",
-  ]
-}
-
-group("hermetic_tests") {
-  testonly = true
-  deps = [
-    "cpp:tests",
-    "rust:tests",
+    "//examples/power/cpp",
+    "//examples/power/cpp:tests",
+    "//examples/power/rust",
+    "//examples/power/rust:tests",
   ]
 }

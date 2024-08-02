@@ -5,7 +5,7 @@ Examples that demonstrate power concepts.
 Get started by adding power examples to your `fx args`:
 
 ```
-fx set core.x64 --with //examples/power --with-test //examples/power:hermetic_tests
+fx set core.x64 --with //examples/power
 ```
 
 Make sure to run `fx build` and `fx serve` if it's your first time setting up these examples.
