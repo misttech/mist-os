@@ -31,7 +31,6 @@ use fxfs::object_store::directory::{replace_child_with_object, Directory};
 use fxfs::object_store::transaction::{lock_keys, LockKey, Options};
 use fxfs::object_store::{HandleOptions, HandleOwner, ObjectDescriptor, ObjectStore, Timestamp};
 use std::future::Future;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, Weak};
 use std::time::Duration;
 use vfs::directory::entry::DirectoryEntry;
@@ -137,10 +136,6 @@ pub struct FxVolume {
     dirent_cache: DirentCache,
 
     profile_state: Mutex<Option<ProfileHolder>>,
-
-    // TODO(https://fxbug.dev/342837879): Remove this after resolving the flake.
-    /// To help track down a flake in https://fxbug.dev/342837879. See `unwrap_or_poison()`.
-    poisoned: AtomicBool,
 }
 
 #[fxfs_trace::trace]
@@ -162,7 +157,6 @@ impl FxVolume {
             scope,
             dirent_cache: DirentCache::new(DIRENT_CACHE_LIMIT),
             profile_state: Mutex::new(None),
-            poisoned: AtomicBool::new(false),
         })
     }
 
@@ -188,24 +182,6 @@ impl FxVolume {
 
     pub fn scope(&self) -> &ExecutionScope {
         &self.scope
-    }
-
-    /// Returns an unwrapping of the Arc if this is the last reference, or sets the `poison` field
-    /// to true. This helps examine a flake in https://fxbug.dev/342837879 where there is an
-    /// unexpected Arc reference remaining to this FxVolume. Poisoning this FxVolume will result in
-    /// a panic when the last reference is actually dropped, to provide a stack trace to the
-    /// remaining reference.
-    pub fn unwrap_or_poison(self: Arc<Self>) -> Option<Self> {
-        // First poison the instance, then clear the poison if the unwrap is successful. This
-        // avoids a race where the poison flag may not be set in time before the actual last
-        // reference gets dropped, while using `Arc::into_inner` means that we know if the last
-        // Arc reference was dropped here or not.
-        self.poisoned.store(true, Ordering::Release);
-        let mut inner = Arc::into_inner(self);
-        if let Some(inner) = &mut inner {
-            inner.poisoned.store(false, Ordering::Release);
-        }
-        inner
     }
 
     async fn place_file(self: &Arc<Self>, name: &str, object_id: u64) -> Result<(), Error> {
@@ -631,15 +607,6 @@ impl HandleOwner for FxVolume {}
 impl AsRef<ObjectStore> for FxVolume {
     fn as_ref(&self) -> &ObjectStore {
         &self.store
-    }
-}
-
-impl Drop for FxVolume {
-    fn drop(&mut self) {
-        // To analyze a flake in https://fxbug.dev/342837879. See `unwrap_or_poison` for details.
-        if self.poisoned.load(Ordering::Acquire) {
-            panic!("Dropped final FxVolume reference after shutdown");
-        }
     }
 }
 
