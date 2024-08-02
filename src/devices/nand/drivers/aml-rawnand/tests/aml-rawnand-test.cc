@@ -4,19 +4,33 @@
 
 #include "src/devices/nand/drivers/aml-rawnand/aml-rawnand.h"
 
-#include <lib/ddk/io-buffer.h>
+#include <lib/ddk/device.h>
 #include <lib/fake-bti/bti.h>
+#include <lib/fit/function.h>
+#include <lib/mmio/mmio-buffer.h>
 #include <lib/zx/bti.h>
-#include <lib/zx/interrupt.h>
+#include <lib/zx/time.h>
+#include <zircon/errors.h>
+#include <zircon/syscalls/object.h>
+#include <zircon/types.h>
 
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
 #include <map>
 #include <memory>
+#include <optional>
 #include <queue>
+#include <utility>
+#include <vector>
 
+#include <ddktl/suspend-txn.h>
 #include <mock-mmio-reg/mock-mmio-reg.h>
 #include <soc/aml-common/aml-rawnand.h>
+#include <zxtest/base/test.h>
 #include <zxtest/zxtest.h>
 
+#include "src/devices/nand/drivers/aml-rawnand/onfi.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 
 namespace amlrawnand {
@@ -71,7 +85,7 @@ struct NandPage {
   bool ecc_fail = false;
 
   // Initializes in a valid state to allow successful reads.
-  NandPage(size_t ecc_pages) : data(kTestNandWriteSize), info(ecc_pages) {
+  explicit NandPage(size_t ecc_pages) : data(kTestNandWriteSize), info(ecc_pages) {
     for (auto& info_block : info) {
       info_block.ecc.completed = 1;
     }
@@ -84,7 +98,7 @@ struct NandPage {
 // Returns a NandPage that looks like a 0-page. Optionally enable rand_mode.
 NandPage NandPage0(bool rand_mode) {
   NandPage page0(kPage0NumEccPages);
-  memcpy(&page0.data[0], kPage0Data, sizeof(kPage0Data));
+  memcpy(page0.data.data(), kPage0Data, sizeof(kPage0Data));
   if (rand_mode) {
     page0.data[2] |= 0x08;
   }
@@ -148,18 +162,13 @@ class FakeAmlRawNand : public AmlRawNand {
     if (!bti.is_valid()) {
       return nullptr;
     }
-    zx::interrupt interrupt;
-    EXPECT_OK(zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &interrupt));
-    if (!interrupt.is_valid()) {
-      return nullptr;
-    }
 
     // We need to create these before the AmlRawNand object but also ensure that
     // the buffers don't move around so put them on the heap.
-    auto mock_nand_reg_region = std::make_unique<ddk_mock::MockMmioRegRegion>(
-        kNandRegSize, kNandRegCount);
-    auto mock_clock_reg_region = std::make_unique<ddk_mock::MockMmioRegRegion>(
-        kClockRegSize, kClockRegCount);
+    auto mock_nand_reg_region =
+        std::make_unique<ddk_mock::MockMmioRegRegion>(kNandRegSize, kNandRegCount);
+    auto mock_clock_reg_region =
+        std::make_unique<ddk_mock::MockMmioRegRegion>(kClockRegSize, kClockRegCount);
 
     // The AmlRawNand object owns the Onfi, but we retain a raw pointer to it
     // so we can interact with it during tests.
@@ -167,9 +176,8 @@ class FakeAmlRawNand : public AmlRawNand {
     auto stub_onfi_raw = stub_onfi.get();
 
     auto nand = std::unique_ptr<FakeAmlRawNand>(
-        new FakeAmlRawNand(parent, std::move(bti), std::move(interrupt),
-                           std::move(mock_nand_reg_region), std::move(mock_clock_reg_region),
-                           std::move(stub_onfi), rand_mode));
+        new FakeAmlRawNand(parent, std::move(bti), std::move(mock_nand_reg_region),
+                           std::move(mock_clock_reg_region), std::move(stub_onfi), rand_mode));
     nand->stub_onfi_ = stub_onfi_raw;
 
     // Initialize the AmlRawNand with some parameters taken from a real device.
@@ -195,7 +203,6 @@ class FakeAmlRawNand : public AmlRawNand {
 
   // On test exit, make sure we met all the expectations we had.
   ~FakeAmlRawNand() override {
-    CleanUpIrq();
     EXPECT_TRUE(fake_read_bytes_.empty());
     mock_nand_reg_region_->VerifyAll();
     mock_clock_reg_region_->VerifyAll();
@@ -281,13 +288,13 @@ class FakeAmlRawNand : public AmlRawNand {
   }
 
  private:
-  FakeAmlRawNand(zx_device_t* parent, zx::bti bti, zx::interrupt interrupt,
+  FakeAmlRawNand(zx_device_t* parent, zx::bti bti,
                  std::unique_ptr<ddk_mock::MockMmioRegRegion> mock_nand_reg_region,
                  std::unique_ptr<ddk_mock::MockMmioRegRegion> mock_clock_reg_region,
                  std::unique_ptr<Onfi> onfi, bool rand_mode)
       : AmlRawNand(parent, fdf::MmioBuffer(mock_nand_reg_region->GetMmioBuffer()),
                    fdf::MmioBuffer(mock_clock_reg_region->GetMmioBuffer()), std::move(bti),
-                   std::move(interrupt), std::move(onfi)),
+                   std::move(onfi)),
         rand_mode_(rand_mode),
         mock_nand_reg_region_(std::move(mock_nand_reg_region)),
         mock_clock_reg_region_(std::move(mock_clock_reg_region)) {}
@@ -351,8 +358,8 @@ class FakeAmlRawNand : public AmlRawNand {
       }
     }
 
-    memcpy(data_buffer().virt(), &page.data[0], data_bytes);
-    memcpy(info_buffer().virt(), &page.info[0], info_bytes);
+    memcpy(data_buffer().virt(), page.data.data(), data_bytes);
+    memcpy(info_buffer().virt(), page.info.data(), info_bytes);
 
     return ZX_OK;
   }
@@ -376,7 +383,7 @@ class FakeAmlRawNand : public AmlRawNand {
       return ZX_ERR_BUFFER_TOO_SMALL;
     }
 
-    memcpy(&page.data[0], data_buffer().virt(), data_bytes);
+    memcpy(page.data.data(), data_buffer().virt(), data_bytes);
     // Since AmlInfoFormat isn't trivially copyable, we can't memcpy() directly
     // into it but have to copy each field individually instead.
     const uint8_t* buffer = reinterpret_cast<const uint8_t*>(info_buffer().virt());
@@ -544,7 +551,7 @@ TEST_F(AmlRawnand, ReadErasedPage) {
   ASSERT_NOT_NULL(nand);
 
   NandPage page;
-  memset(&page.data[0], 0xff, kTestNandWriteSize);
+  memset(page.data.data(), 0xff, kTestNandWriteSize);
   for (auto& info : page.info) {
     info.info_bytes = 0xffff;
     info.ecc.eccerr_cnt = AML_ECC_UNCORRECTABLE_CNT;
@@ -589,14 +596,14 @@ TEST_F(AmlRawnand, PartialErasedPage) {
   ASSERT_NOT_NULL(nand);
 
   NandPage page;
-  memset(&page.data[0], 0xff, kTestNandWriteSize);
+  memset(page.data.data(), 0xff, kTestNandWriteSize);
   for (auto& info : page.info) {
     info.info_bytes = 0xffff;
     info.ecc.eccerr_cnt = AML_ECC_UNCORRECTABLE_CNT;
     info.zero_bits = 0;
   }
   // Make the first page be not an erased page.
-  memset(&page.data[0], 0xA5, kDefaultEccPageSize);
+  memset(page.data.data(), 0xA5, kDefaultEccPageSize);
   page.info.front().info_bytes = 0x5A5A;
   page.info.front().ecc.eccerr_cnt = 0;
   page.info.front().zero_bits = AML_ECC_UNCORRECTABLE_CNT;
@@ -626,7 +633,7 @@ TEST_F(AmlRawnand, ErasedPageAllOnes) {
   ASSERT_NOT_NULL(nand);
 
   NandPage page;
-  memset(&page.data[0], 0xff, kTestNandWriteSize);
+  memset(page.data.data(), 0xff, kTestNandWriteSize);
   for (auto& info : page.info) {
     info.info_bytes = 0xffff;
     info.ecc.eccerr_cnt = AML_ECC_UNCORRECTABLE_CNT;

@@ -4,15 +4,38 @@
 
 #include "src/devices/nand/drivers/aml-rawnand/aml-rawnand.h"
 
-#include <assert.h>
+#include <fuchsia/hardware/nandinfo/c/banjo.h>
 #include <lib/ddk/binding_driver.h>
+#include <lib/ddk/debug.h>
+#include <lib/ddk/device.h>
+#include <lib/ddk/driver.h>
+#include <lib/ddk/io-buffer.h>
 #include <lib/ddk/metadata.h>
+#include <lib/device-protocol/pdev-fidl.h>
+#include <lib/mmio/mmio-buffer.h>
+#include <lib/zx/bti.h>
+#include <lib/zx/time.h>
+#include <strings.h>
+#include <zircon/assert.h>
+#include <zircon/errors.h>
+#include <zircon/types.h>
 
 #include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
 #include <memory>
+#include <optional>
+#include <utility>
 
+#include <ddktl/device.h>
+#include <ddktl/suspend-txn.h>
+#include <ddktl/unbind-txn.h>
 #include <fbl/alloc_checker.h>
 #include <fbl/auto_lock.h>
+#include <soc/aml-common/aml-rawnand.h>
+
+#include "src/devices/nand/drivers/aml-rawnand/onfi.h"
 
 namespace amlrawnand {
 
@@ -214,10 +237,9 @@ zx_status_t AmlRawNand::AmlWaitCmdQueueEmpty(zx::duration timeout, zx::duration 
 
 zx_status_t AmlRawNand::AmlWaitCmdFinish(zx::duration timeout, zx::duration first_interval,
                                          zx::duration polling_interval) {
-  // TODO(https://fxbug.dev/42176641): We don't need to wait for the queue to be empty here, just for enough space
-  // available for the two idle commands below.
-  // The queue could be full when this is called, so wait for it to be empty before writing the idle
-  // commands.
+  // TODO(https://fxbug.dev/42176641): We don't need to wait for the queue to be empty here, just
+  // for enough space available for the two idle commands below. The queue could be full when this
+  // is called, so wait for it to be empty before writing the idle commands.
   zx_status_t status = AmlWaitCmdQueueEmpty(timeout, first_interval, polling_interval);
   if (status != ZX_OK) {
     return status;
@@ -435,10 +457,11 @@ void AmlRawNand::AmlCmdCtrl(int32_t cmd, uint32_t ctrl) {
     return;
   }
 
-  if (ctrl & NAND_CLE)
+  if (ctrl & NAND_CLE) {
     cmd = chip_select_ | AML_CMD_CLE | (cmd & 0xff);
-  else
+  } else {
     cmd = chip_select_ | AML_CMD_ALE | (cmd & 0xff);
+  }
   mmio_nandreg_.Write32(cmd, P_NAND_CMD);
 }
 
@@ -503,12 +526,13 @@ void AmlRawNand::AmlAdjustTimings(uint32_t tRC_min, uint32_t tREA_max, uint32_t 
     tREA_max = TreaMaxDefault;
   if (!RHOH_min)
     RHOH_min = RhohMinDefault;
-  if (tREA_max > 30)
+  if (tREA_max > 30) {
     sys_clk_rate_mhz = 112;
-  else if (tREA_max > 16)
+  } else if (tREA_max > 16) {
     sys_clk_rate_mhz = 200;
-  else
+  } else {
     sys_clk_rate_mhz = 250;
+  }
   AmlSetClockRate(sys_clk_rate_mhz);
   bus_cycle = 6;
   bus_timing = bus_cycle + 1;
@@ -554,7 +578,6 @@ constexpr bool PageRequiresMagicOob(uint32_t nand_page) {
 zx_status_t AmlRawNand::RawNandReadPageHwecc(uint32_t nand_page, uint8_t* data, size_t data_size,
                                              size_t* data_actual, uint8_t* oob, size_t oob_size,
                                              size_t* oob_actual, uint32_t* ecc_correct) {
-  zx_status_t status;
   uint32_t ecc_pagesize;
   uint32_t ecc_pages;
   bool erased = false;
@@ -573,8 +596,9 @@ zx_status_t AmlRawNand::RawNandReadPageHwecc(uint32_t nand_page, uint8_t* data, 
     return ZX_ERR_CANCELED;
   }
 
-  if ((status = AmlRawNandAllocBufs()) != ZX_OK)
+  if (zx_status_t status = AmlRawNandAllocBufs(); status != ZX_OK) {
     return status;
+  }
 
   // Zero out the ECC page descriptors in case the completed bit is still set from a previous
   // operation.
@@ -618,13 +642,12 @@ zx_status_t AmlRawNand::RawNandReadPageHwecc(uint32_t nand_page, uint8_t* data, 
   // Waiting for the command queue to be empty here does not work. The controller seems to continue
   // processing ECC after the N2M command is off the queue, so poll the completed bit here to find
   // out when DMA is really done.
-  status = AmlCheckECCPages(ecc_pages, ecc_pagesize);
-  if (status != ZX_OK) {
+  if (zx_status_t status = AmlCheckECCPages(ecc_pages, ecc_pagesize); status != ZX_OK) {
     zxlogf(ERROR, "%s: AmlCheckECCPages failed %d", __func__, status);
     return status;
   }
 
-  status = AmlGetECCCorrections(ecc_pages, nand_page, ecc_correct, &erased);
+  const zx_status_t status = AmlGetECCCorrections(ecc_pages, nand_page, ecc_correct, &erased);
   if (status != ZX_OK) {
     zxlogf(WARNING, "%s: Uncorrectable ECC error on read", __func__);
     *ecc_correct = controller_params_.ecc_strength + 1;
@@ -846,10 +869,11 @@ zx_status_t AmlRawNand::RawNandGetNandInfo(nand_info_t* nand_info) {
   nand_info->nand_class = NAND_CLASS_PARTMAP;
   memset(&nand_info->partition_guid, 0, sizeof(nand_info->partition_guid));
 
-  if (controller_params_.user_mode == 2)
+  if (controller_params_.user_mode == 2) {
     nand_info->oob_size = (writesize_ / AmlGetEccPageSize(controller_params_.bch_mode)) * 2;
-  else
+  } else {
     status = ZX_ERR_NOT_SUPPORTED;
+  }
   return status;
 }
 
@@ -972,18 +996,12 @@ zx_status_t AmlRawNand::AmlNandInit() {
 }
 
 void AmlRawNand::DdkRelease() {
-  // This should result in the dtors of all members to be
-  // called (so the MmioBuffers, bti, irq handle should get
-  // cleaned up).
+  // This should result in the dtors of all members to be called (so the MmioBuffers, and bti should
+  // get cleaned up).
   delete this;
 }
 
-void AmlRawNand::CleanUpIrq() { irq_.destroy(); }
-
-void AmlRawNand::DdkUnbind(ddk::UnbindTxn txn) {
-  CleanUpIrq();
-  txn.Reply();
-}
+void AmlRawNand::DdkUnbind(ddk::UnbindTxn txn) { txn.Reply(); }
 
 void AmlRawNand::DdkSuspend(ddk::SuspendTxn txn) {
   const uint8_t suspend_reason = txn.suspend_reason() & DEVICE_MASK_SUSPEND_REASON;
@@ -1003,7 +1021,6 @@ zx_status_t AmlRawNand::Init() {
   zx_status_t status = AmlNandInit();
   if (status != ZX_OK) {
     zxlogf(ERROR, "aml_raw_nand: AmlNandInit() failed - This is FATAL");
-    CleanUpIrq();
   }
   return status;
 }
@@ -1014,14 +1031,11 @@ zx_status_t AmlRawNand::Bind() {
                                   .forward_metadata(parent(), DEVICE_METADATA_PARTITION_MAP));
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s: DdkAdd failed", __FILE__);
-    CleanUpIrq();
   }
   return status;
 }
 
 zx_status_t AmlRawNand::Create(void* ctx, zx_device_t* parent) {
-  zx_status_t status;
-
   ddk::PDevFidl pdev(parent);
   if (!pdev.is_valid()) {
     zxlogf(ERROR, "%s: ZX_PROTOCOL_PDEV not available", __FILE__);
@@ -1029,7 +1043,7 @@ zx_status_t AmlRawNand::Create(void* ctx, zx_device_t* parent) {
   }
 
   zx::bti bti;
-  if ((status = pdev.GetBti(0, &bti)) != ZX_OK) {
+  if (zx_status_t status = pdev.GetBti(0, &bti); status != ZX_OK) {
     zxlogf(ERROR, "%s: pdev_get_bti failed", __FILE__);
     return status;
   }
@@ -1037,39 +1051,32 @@ zx_status_t AmlRawNand::Create(void* ctx, zx_device_t* parent) {
   static constexpr uint32_t NandRegWindow = 0;
   static constexpr uint32_t ClockRegWindow = 1;
   std::optional<fdf::MmioBuffer> mmio_nandreg;
-  status = pdev.MapMmio(NandRegWindow, &mmio_nandreg);
-  if (status != ZX_OK) {
+  if (zx_status_t status = pdev.MapMmio(NandRegWindow, &mmio_nandreg); status != ZX_OK) {
     zxlogf(ERROR, "%s: pdev.MapMmio nandreg failed", __FILE__);
     return status;
   }
 
   std::optional<fdf::MmioBuffer> mmio_clockreg;
-  status = pdev.MapMmio(ClockRegWindow, &mmio_clockreg);
-  if (status != ZX_OK) {
+  if (zx_status_t status = pdev.MapMmio(ClockRegWindow, &mmio_clockreg); status != ZX_OK) {
     zxlogf(ERROR, "%s: pdev.MapMmio clockreg failed", __FILE__);
     return status;
   }
 
-  zx::interrupt irq;
-  if ((status = pdev.GetInterrupt(0, &irq)) != ZX_OK) {
-    zxlogf(ERROR, "%s: Failed to map interrupt", __FILE__);
-    return status;
-  }
   fbl::AllocChecker ac;
-  std::unique_ptr<AmlRawNand> device(
-      new (&ac) AmlRawNand(parent, *std::move(mmio_nandreg), *std::move(mmio_clockreg),
-                           std::move(bti), std::move(irq), std::make_unique<Onfi>()));
+  std::unique_ptr<AmlRawNand> device(new (&ac) AmlRawNand(parent, *std::move(mmio_nandreg),
+                                                          *std::move(mmio_clockreg), std::move(bti),
+                                                          std::make_unique<Onfi>()));
 
   if (!ac.check()) {
     zxlogf(ERROR, "%s: AmlRawNand alloc failed", __FILE__);
     return ZX_ERR_NO_MEMORY;
   }
 
-  if ((status = device->Init()) != ZX_OK) {
+  if (zx_status_t status = device->Init(); status != ZX_OK) {
     return status;
   }
 
-  if ((status = device->Bind()) != ZX_OK) {
+  if (zx_status_t status = device->Bind(); status != ZX_OK) {
     return status;
   }
 
