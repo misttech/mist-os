@@ -251,16 +251,19 @@ void VirtualAudioDai::GetVmo(GetVmoRequest& request, GetVmoCompleter::Sync& comp
       min_frames, fbl::round_up<uint32_t, uint32_t>(num_ring_buffer_frames_, modulo_frames));
 
   zx_status_t status = ring_buffer_mapper_.CreateAndMap(
-      num_ring_buffer_frames_ * frame_size_, ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, nullptr,
-      &ring_buffer_vmo_,
-      ZX_RIGHT_READ | ZX_RIGHT_WRITE | ZX_RIGHT_MAP | ZX_RIGHT_DUPLICATE | ZX_RIGHT_TRANSFER);
+      static_cast<uint64_t>(num_ring_buffer_frames_) * frame_size_,
+      ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, nullptr, &ring_buffer_vmo_,
+      ZX_RIGHT_TRANSFER | ZX_RIGHT_DUPLICATE | ZX_RIGHT_READ | ZX_RIGHT_WRITE | ZX_RIGHT_MAP);
 
   ZX_ASSERT_MSG(status == ZX_OK, "failed to create ring buffer VMO: %s",
                 zx_status_get_string(status));
 
   zx::vmo out_vmo;
-  status = ring_buffer_vmo_.duplicate(
-      ZX_RIGHT_TRANSFER | ZX_RIGHT_READ | ZX_RIGHT_WRITE | ZX_RIGHT_MAP, &out_vmo);
+  zx_rights_t required_rights = ZX_RIGHT_TRANSFER | ZX_RIGHT_READ | ZX_RIGHT_MAP;
+  if (dai_config().is_input().has_value() && !*dai_config().is_input()) {
+    required_rights |= ZX_RIGHT_WRITE;
+  }
+  status = ring_buffer_vmo_.duplicate(required_rights, &out_vmo);
   ZX_ASSERT_MSG(status == ZX_OK, "failed to duplicate VMO handle for out param: %s",
                 zx_status_get_string(status));
 

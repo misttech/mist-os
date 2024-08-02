@@ -99,6 +99,7 @@ class VirtualAudioComposite
   static constexpr size_t kNumberOfElements = 2;
   static constexpr fuchsia_hardware_audio::ElementId kRingBufferId = 123;
   static constexpr fuchsia_hardware_audio::ElementId kDaiId = 456;
+  bool ring_buffer_is_outgoing_;
 
   void ResetRingBuffer();
   void OnRingBufferClosed(fidl::UnbindInfo info);
@@ -121,12 +122,17 @@ class VirtualAudioComposite
   uint32_t num_ring_buffer_frames_ = 0;
   uint32_t frame_size_ = 4;
   zx::vmo ring_buffer_vmo_;
-  bool watch_delay_replied_ = false;
+
+  bool watch_delay_info_needs_reply_ = true;
   std::optional<WatchDelayInfoCompleter::Async> delay_info_completer_;
-  bool watch_position_replied_ = false;
+  bool watch_position_info_needs_reply_ = true;
   std::optional<WatchClockRecoveryPositionInfoCompleter::Async> position_info_completer_;
-  bool watch_element_replied_[kNumberOfElements] = {};
-  std::optional<WatchElementStateCompleter::Async> element_state_completer_[kNumberOfElements];
+
+  bool watch_element_state_needs_reply_[kNumberOfElements] = {true, true};
+  std::optional<WatchElementStateCompleter::Async>
+      watch_element_state_completers_[kNumberOfElements];
+  bool watch_topology_needs_reply_ = true;
+  std::optional<WatchTopologyCompleter::Async> watch_topology_completer_;
 
   bool ring_buffer_vmo_fetched_ = false;
   bool ring_buffer_started_ = false;
@@ -139,9 +145,6 @@ class VirtualAudioComposite
   std::optional<fidl::ServerBinding<fuchsia_hardware_audio::RingBuffer>> ring_buffer_;
   std::optional<fidl::ServerBinding<fuchsia_hardware_audio_signalprocessing::SignalProcessing>>
       signal_;
-
-  bool responded_to_watch_topology_ = false;
-  std::optional<WatchTopologyCompleter::Async> topology_completer_;
 };
 
 }  // namespace virtual_audio
