@@ -176,6 +176,7 @@ void HandoffPrep::SetMemory() {
       // The allocations that should survive into the hand-off.
       case memalloc::Type::kDataZbi:
       case memalloc::Type::kKernel:
+      case memalloc::Type::kNvram:
       case memalloc::Type::kPeripheral:
       case memalloc::Type::kReservedLow:
         return type;
