@@ -10,7 +10,6 @@
 #include "src/lib/files/file.h"
 #include "src/lib/files/path.h"
 #include "src/lib/fxl/strings/concatenate.h"
-#include "src/lib/fxl/strings/trim.h"
 #include "src/lib/json_parser/json_parser.h"
 #include "third_party/cobalt/src/lib/util/file_util.h"
 #include "third_party/cobalt/src/public/cobalt_service_interface.h"
@@ -118,9 +117,13 @@ config::Environment ParseEnvironment(std::string environment,
                                      config::Environment default_environment) {
   if (environment == "LOCAL") {
     return config::Environment::LOCAL;
-  } else if (environment == "PROD") {
+  }
+
+  if (environment == "PROD") {
     return config::Environment::PROD;
-  } else if (environment == "DEVEL") {
+  }
+
+  if (environment == "DEVEL") {
     return config::Environment::DEVEL;
   }
   FX_LOGS(ERROR) << "Failed to parse the cobalt environment: " << environment
@@ -135,7 +138,7 @@ config::Environment LookupCobaltEnvironment(const JSONHelper& json_helper,
   config::Environment cobalt_environment;
   StatusOr<std::string> statusor = json_helper.GetString(kDefaultEnvironmentKey);
   if (!statusor.ok()) {
-    Status status = statusor.status();
+    const Status& status = statusor.status();
     if (status.error_details().empty()) {
       FX_LOGS(ERROR) << "Failed to read default environment from config. " << status.error_message()
                      << ". Using hardcoded default.";
@@ -181,9 +184,9 @@ std::string LookupApiKeyOrDefault(const std::string& config_dir) {
   ASSIGN_OR_RETURN_DEFAULT_IMPL(_status_or_value##__COUNTER__, lhs, def, rexpr)
 
 #define ASSIGN_OR_RETURN_DEFAULT_IMPL(statusor, lhs, def, rexpr)                         \
-  auto statusor = (rexpr);                                                               \
-  if (!statusor.ok()) {                                                                  \
-    auto status = statusor.status();                                                     \
+  auto(statusor) = (rexpr);                                                              \
+  if (!(statusor).ok()) {                                                                \
+    const auto& status = (statusor).status();                                            \
     if (status.error_details().empty()) {                                                \
       FX_LOGS(ERROR) << "Failed to read from config. " << status.error_message()         \
                      << ". Using default.";                                              \
@@ -193,7 +196,7 @@ std::string LookupApiKeyOrDefault(const std::string& config_dir) {
     }                                                                                    \
     return def;                                                                          \
   }                                                                                      \
-  lhs = std::move(statusor.ValueOrDie())
+  lhs = std::move((statusor).ValueOrDie())
 
 cobalt::ReleaseStage LookupReleaseStage(const JSONHelper& json_helper) {
   ASSIGN_OR_RETURN_DEFAULT(auto release_stage, kDefaultReleaseStage,
@@ -202,11 +205,17 @@ cobalt::ReleaseStage LookupReleaseStage(const JSONHelper& json_helper) {
   FX_LOGS(INFO) << "Loaded Cobalt release stage from config file: " << release_stage;
   if (release_stage == "DEBUG") {
     return cobalt::ReleaseStage::DEBUG;
-  } else if (release_stage == "FISHFOOD") {
+  }
+
+  if (release_stage == "FISHFOOD") {
     return cobalt::ReleaseStage::FISHFOOD;
-  } else if (release_stage == "DOGFOOD") {
+  }
+
+  if (release_stage == "DOGFOOD") {
     return cobalt::ReleaseStage::DOGFOOD;
-  } else if (release_stage == "GA") {
+  }
+
+  if (release_stage == "GA") {
     return cobalt::ReleaseStage::GA;
   }
 
@@ -224,9 +233,13 @@ cobalt::CobaltServiceInterface::DataCollectionPolicy LookupDataCollectionPolicy(
                 << data_collection_policy;
   if (data_collection_policy == "DO_NOT_COLLECT") {
     return cobalt::CobaltServiceInterface::DataCollectionPolicy::DO_NOT_COLLECT;
-  } else if (data_collection_policy == "DO_NOT_UPLOAD") {
+  }
+
+  if (data_collection_policy == "DO_NOT_UPLOAD") {
     return cobalt::CobaltServiceInterface::DataCollectionPolicy::DO_NOT_UPLOAD;
-  } else if (data_collection_policy == "COLLECT_AND_UPLOAD") {
+  }
+
+  if (data_collection_policy == "COLLECT_AND_UPLOAD") {
     return cobalt::CobaltServiceInterface::DataCollectionPolicy::COLLECT_AND_UPLOAD;
   }
 

@@ -16,13 +16,10 @@
 
 #include <chrono>
 #include <memory>
-#include <thread>
 #include <unordered_map>
-#include <vector>
 
 #include "src/cobalt/bin/system-metrics/activity_listener.h"
 #include "src/cobalt/bin/system-metrics/cpu_stats_fetcher.h"
-#include "src/cobalt/bin/system-metrics/metrics_registry.cb.h"
 #include "src/cobalt/bin/utils/clock.h"
 #include "third_party/cobalt/src/lib/client/cpp/buckets_config.h"
 
@@ -121,7 +118,7 @@ class SystemMetricsDaemon {
   void RepeatedlyLogActiveTime();
 
   // Create linear bucket config with the bucket_floor, number of buckets and step size.
-  std::unique_ptr<cobalt::config::IntegerBucketConfig> InitializeLinearBucketConfig(
+  static std::unique_ptr<cobalt::config::IntegerBucketConfig> InitializeLinearBucketConfig(
       int64_t bucket_floor, int32_t num_buckets, int32_t step_size);
 
   // Returns the amount of time since SystemMetricsDaemon started.

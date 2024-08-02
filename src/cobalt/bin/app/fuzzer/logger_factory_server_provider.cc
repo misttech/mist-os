@@ -6,12 +6,9 @@
 #include <lib/fidl/cpp/fuzzing/server_provider.h>
 
 #include <chrono>
-#include <fstream>
 
-#include "lib/async/default.h"
 #include "src/cobalt/bin/app/metric_event_logger_factory_impl.h"
 #include "src/cobalt/bin/utils/base64.h"
-#include "src/cobalt/bin/utils/fuchsia_http_client.h"
 #include "third_party/cobalt/src/lib/util/posix_file_system.h"
 #include "third_party/cobalt/src/public/cobalt_service.h"
 

@@ -4,15 +4,14 @@
 
 #include "src/cobalt/bin/app/user_consent_watcher.h"
 
+#include <lib/async/cpp/task.h>
 #include <lib/fpromise/result.h>
 #include <lib/syslog/cpp/macros.h>
 #include <zircon/types.h>
 
-#include <optional>
+#include <utility>
 
 #include <src/lib/fostr/fidl/fuchsia/settings/formatting.h>
-
-#include "lib/async/cpp/task.h"
 
 namespace cobalt {
 
@@ -22,8 +21,8 @@ UserConsentWatcher::UserConsentWatcher(
     std::function<void(const CobaltServiceInterface::DataCollectionPolicy &)> callback)
     : dispatcher_(dispatcher),
       inspect_node_(std::move(inspect_node)),
-      services_(services),
-      callback_(callback),
+      services_(std::move(services)),
+      callback_(std::move(callback)),
       backoff_(/*initial_delay=*/zx::msec(100), /*retry_factor=*/2u, /*max_delay=*/zx::hour(1)) {
   watch_successes_ = inspect_node_.CreateInt("successful_watches", 0);
   watch_errors_ = inspect_node_.CreateInt("watch_errors", 0);

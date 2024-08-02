@@ -15,7 +15,7 @@ FuchsiaSystemClock::FuchsiaSystemClock(async_dispatcher_t* dispatcher, inspect::
     : FuchsiaSystemClock(dispatcher, std::move(node), zx::unowned_clock(zx_utc_reference_get())) {}
 
 FuchsiaSystemClock::FuchsiaSystemClock(async_dispatcher_t* dispatcher, inspect::Node node,
-                                       zx::unowned_clock clock)
+                                       const zx::unowned_clock& clock)
     : dispatcher_(dispatcher),
       system_clock_node_(std::move(node)),
       system_clock_accurate_(system_clock_node_.CreateBool("is_accurate", false)),

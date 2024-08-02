@@ -10,24 +10,21 @@
 #include <fuchsia/process/lifecycle/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async/cpp/task.h>
+#include <lib/fidl/cpp/binding_set.h>
+#include <lib/fidl/cpp/interface_request.h>
 #include <lib/inspect/cpp/inspect.h>
+#include <lib/sys/cpp/component_context.h>
 #include <stdlib.h>
 
-#include <chrono>
-#include <fstream>
 #include <memory>
 #include <string>
 
-#include "lib/fidl/cpp/binding_set.h"
-#include "lib/fidl/cpp/interface_request.h"
-#include "lib/sys/cpp/component_context.h"
 #include "src/cobalt/bin/app/aggregate_and_upload_impl.h"
 #include "src/cobalt/bin/app/cobalt_controller_impl.h"
 #include "src/cobalt/bin/app/configuration_data.h"
 #include "src/cobalt/bin/app/current_channel_provider.h"
 #include "src/cobalt/bin/app/diagnostics_impl.h"
 #include "src/cobalt/bin/app/process_lifecycle_impl.h"
-#include "src/cobalt/bin/app/system_data_updater_impl.h"
 #include "src/cobalt/bin/app/user_consent_watcher.h"
 #include "src/cobalt/bin/utils/clock.h"
 #include "src/cobalt/bin/utils/fuchsia_http_client.h"
@@ -103,8 +100,7 @@ class CobaltApp {
 
   static CobaltConfig CreateCobaltConfig(
       async_dispatcher_t* dispatcher, const std::string& global_metrics_registry_path,
-      const FuchsiaConfigurationData& configuration_data,
-      FuchsiaSystemClockInterface* validated_clock,
+      const FuchsiaConfigurationData& configuration_data, FuchsiaSystemClockInterface* system_clock,
       utils::FuchsiaHTTPClient::LoaderFactory http_loader_factory,
       UploadScheduleConfig upload_schedule_cfg, size_t event_aggregator_backfill_days,
       bool test_dont_backfill_empty_reports, bool use_memory_observation_store,

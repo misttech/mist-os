@@ -4,10 +4,11 @@
 
 #include "src/cobalt/bin/testing/stub_metric_event_logger.h"
 
+#include <fuchsia/metrics/cpp/fidl.h>
+#include <lib/fpromise/result.h>
+
 #include <vector>
 
-#include "fuchsia/metrics/cpp/fidl.h"
-#include "lib/fpromise/result.h"
 #include "src/cobalt/bin/testing/log_metric_method.h"
 
 namespace cobalt {

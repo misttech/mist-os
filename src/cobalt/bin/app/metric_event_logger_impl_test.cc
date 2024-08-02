@@ -4,11 +4,12 @@
 
 #include "src/cobalt/bin/app/metric_event_logger_impl.h"
 
+#include <fuchsia/metrics/cpp/fidl.h>
+
 #include <memory>
 
 #include <gtest/gtest.h>
 
-#include "fuchsia/metrics/cpp/fidl.h"
 #include "src/lib/cobalt/cpp/metric_event_builder.h"
 #include "third_party/cobalt/src/logger/fake_logger.h"
 

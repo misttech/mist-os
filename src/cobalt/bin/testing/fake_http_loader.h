@@ -15,7 +15,7 @@ namespace cobalt {
 
 class FakeHTTPLoader : public fuchsia::net::http::Loader {
  public:
-  FakeHTTPLoader(async_dispatcher_t *dispatcher)
+  explicit FakeHTTPLoader(async_dispatcher_t *dispatcher)
       : dispatcher_(dispatcher), task_runner_(dispatcher_) {}
 
   fidl::InterfaceRequestHandler<fuchsia::net::http::Loader> GetHandler() {

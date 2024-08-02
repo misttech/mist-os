@@ -7,13 +7,11 @@
 
 #include <lib/inspect/cpp/inspect.h>
 
-#include <iostream>
 #include <string>
 
 #include "src/lib/json_parser/json_parser.h"
 #include "third_party/cobalt/src/public/cobalt_service_interface.h"
 #include "third_party/cobalt/src/public/lib/statusor/statusor.h"
-#include "third_party/cobalt/src/registry/metric_definition.pb.h"
 #include "third_party/cobalt/src/system_data/configuration_data.h"
 
 namespace cobalt {
@@ -21,7 +19,7 @@ namespace cobalt {
 // A class for handling parsing and reading values from config.json
 class JSONHelper {
  public:
-  JSONHelper(const std::string& path);
+  explicit JSONHelper(const std::string& path);
 
   lib::statusor::StatusOr<std::string> GetString(const std::string& key) const;
   lib::statusor::StatusOr<bool> GetBool(const std::string& key) const;

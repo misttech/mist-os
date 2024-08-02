@@ -6,6 +6,7 @@
 #define SRC_COBALT_BIN_APP_USER_CONSENT_WATCHER_H_
 
 #include <fuchsia/settings/cpp/fidl.h>
+#include <lib/async/dispatcher.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/sys/cpp/service_directory.h>
 
@@ -15,7 +16,6 @@
 #include "src/lib/fxl/functional/cancelable_callback.h"
 #include "src/lib/fxl/macros.h"
 #include "third_party/cobalt/src/public/cobalt_service_interface.h"
-#include "zircon/system/ulib/async/include/lib/async/dispatcher.h"
 
 namespace cobalt {
 

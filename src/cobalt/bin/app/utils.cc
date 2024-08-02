@@ -7,7 +7,6 @@
 #include <lib/fpromise/result.h>
 #include <lib/syslog/cpp/macros.h>
 
-#include "third_party/cobalt/src/lib/util/file_util.h"
 #include "third_party/cobalt/src/lib/util/pem_util.h"
 #include "third_party/cobalt/src/public/lib/status.h"
 

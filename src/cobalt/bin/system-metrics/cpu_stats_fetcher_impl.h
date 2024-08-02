@@ -9,11 +9,8 @@
 #include <lib/zx/resource.h>
 
 #include <chrono>
-#include <vector>
 
 #include "src/cobalt/bin/system-metrics/cpu_stats_fetcher.h"
-
-using cobalt::CpuStatsFetcher;
 
 namespace cobalt {
 

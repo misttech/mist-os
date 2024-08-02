@@ -10,13 +10,11 @@
 #include <lib/syslog/cpp/macros.h>
 #include <zircon/status.h>
 
-#include "src/lib/fsl/socket/strings.h"
 #include "src/lib/fsl/vmo/strings.h"
 
 namespace cobalt {
 namespace utils {
 
-using lib::HTTPClient;
 using lib::HTTPRequest;
 using lib::HTTPResponse;
 using lib::statusor::StatusOr;
@@ -91,7 +89,7 @@ StatusOr<HTTPResponse> ReadResponse(fuchsia::net::http::Response fx_response, zx
   }
 
   if (fx_response.has_body()) {
-    std::vector<char> buffer(64 * 1024);
+    std::vector<char> buffer(static_cast<size_t>(64 * 1024));
     size_t num_bytes = 0;
     bool more_data = true;
     while (more_data) {
@@ -104,7 +102,7 @@ StatusOr<HTTPResponse> ReadResponse(fuchsia::net::http::Response fx_response, zx
           // Wait until there is more to read.
           status = fx_response.mutable_body()->wait_one(
               ZX_SOCKET_READABLE | ZX_SOCKET_PEER_WRITE_DISABLED | ZX_SOCKET_PEER_CLOSED, deadline,
-              /*observed_signals=*/nullptr);
+              /*pending=*/nullptr);
           if (status != ZX_OK) {
             switch (status) {
               case ZX_ERR_TIMED_OUT:
@@ -149,7 +147,7 @@ StatusOr<HTTPResponse> FuchsiaHTTPClient::PostSync(HTTPRequest request,
                                           .count()));
 
   fuchsia::net::http::Response fx_response;
-  auto status = loader_->Fetch(MakeRequest(std::move(request), zx_deadline), &fx_response);
+  auto status = loader_->Fetch(MakeRequest(request, zx_deadline), &fx_response);
 
   if (status != ZX_OK) {
     std::ostringstream ss;

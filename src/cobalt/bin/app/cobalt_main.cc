@@ -11,6 +11,7 @@
 #include <lib/fdio/directory.h>
 #include <lib/fdio/fd.h>
 #include <lib/fdio/fdio.h>
+#include <lib/fidl/cpp/interface_request.h>
 #include <lib/inspect/component/cpp/component.h>
 #include <lib/scheduler/role.h>
 #include <lib/syslog/cpp/macros.h>
@@ -24,19 +25,13 @@
 #include <zircon/utc.h>
 
 #include <chrono>
-#include <fstream>
 #include <memory>
 #include <string>
-#include <thread>
 #include <utility>
 
-#include "lib/fidl/cpp/interface_request.h"
 #include "src/cobalt/bin/app/cobalt_app.h"
-#include "src/lib/files/file.h"
 #include "src/lib/fxl/command_line.h"
 #include "src/lib/fxl/log_settings_command_line.h"
-#include "src/lib/fxl/strings/join_strings.h"
-#include "src/lib/fxl/strings/split_string.h"
 #include "src/public/cobalt_config.h"
 
 // Command-line flags
@@ -256,8 +251,9 @@ int main(int argc, const char** argv) {
 
   bool test_dont_backfill_empty_reports = command_line.HasOption(kTestDontBackfillEmptyReports);
 
-  FX_LOGS(INFO) << "Cobalt is starting with the following parameters: " << "schedule_interval="
-                << schedule_interval.count() << " seconds, min_interval=" << min_interval.count()
+  FX_LOGS(INFO) << "Cobalt is starting with the following parameters: "
+                << "schedule_interval=" << schedule_interval.count()
+                << " seconds, min_interval=" << min_interval.count()
                 << " seconds, initial_interval=" << initial_interval.count()
                 << " seconds, upload_jitter=" << (upload_jitter * 100) << "%"
                 << ", max_bytes_per_observation_store=" << max_bytes_per_observation_store
