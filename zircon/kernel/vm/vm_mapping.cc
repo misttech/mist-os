@@ -439,16 +439,6 @@ void VmMapping::AspaceUnmapLockedObject(uint64_t offset, uint64_t len) const {
   LTRACEF("region %p obj_offset %#" PRIx64 " size %zu, offset %#" PRIx64 " len %#" PRIx64 "\n",
           this, object_offset_locked_object(), size_, offset, len);
 
-  // If we're currently faulting and are responsible for the vmo code to be calling
-  // back to us, detect the recursion and abort here.
-  // The specific path we're avoiding is if the VMO calls back into us during
-  // a VmCowPages::LookupCursor call via AspaceUnmapLockedObject(). If we set this flag we're short
-  // circuiting the unmap operation so that we don't do extra work.
-  if (unlikely(currently_faulting_)) {
-    LTRACEF("recursing to ourself, abort\n");
-    return;
-  }
-
   // See if there's an intersect.
   vaddr_t base;
   uint64_t new_len;
@@ -722,14 +712,6 @@ zx_status_t VmMapping::MapRange(size_t offset, size_t len, bool commit, bool ign
   // Cache whether the object is dirty tracked, we need to know this when computing mmu flags later.
   const bool dirty_tracked = object_->is_dirty_tracked_locked();
 
-  // set the currently faulting flag for any recursive calls the vmo may make back into us.
-  DEBUG_ASSERT(!currently_faulting_);
-  currently_faulting_ = true;
-  auto cleanup = fit::defer([&]() {
-    assert_object_lock();
-    currently_faulting_ = false;
-  });
-
   // Trim our range to the current VMO size. Our mapping might exceed the VMO in the case where the
   // VMO is resizable, and this should not be considered an error.
   len = TrimmedObjectRangeLocked(offset, len);
@@ -981,17 +963,6 @@ zx_status_t VmMapping::PageFaultLocked(vaddr_t va, const uint pf_flags,
 
   // grab the lock for the vmo
   Guard<CriticalMutex> guard{object_->lock()};
-
-  // set the currently faulting flag for any recursive calls the vmo may make back into us
-  // The specific path we're avoiding is if the VMO calls back into us during
-  // a VmCowPages::LookupCursor call via AspaceUnmapLockedObject(). Since we're responsible for
-  // that page, signal to ourself to skip the unmap operation.
-  DEBUG_ASSERT(!currently_faulting_);
-  currently_faulting_ = true;
-  auto cleanup = fit::defer([&]() {
-    assert_object_lock();
-    currently_faulting_ = false;
-  });
 
   // Determine how far to the end of the page table so we do not cause extra allocations.
   const uint64_t next_pt_base = ArchVmAspace::NextUserPageTableOffset(va);
