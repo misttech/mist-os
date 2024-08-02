@@ -17,6 +17,7 @@
 #include <arch/defines.h>
 #include <kernel/deadline.h>
 #include <ktl/span.h>
+#include <object/fifo_dispatcher.h>
 #include <object/handle.h>
 #include <object/io_buffer_dispatcher.h>
 #include <object/job_dispatcher.h>
@@ -234,6 +235,24 @@ void DumpPeerInfo(zx_obj_type_t type, const Dispatcher* disp) {
              peer_koid, sock_info.rx_buf_available);
       break;
     }
+
+    case ZX_OBJ_TYPE_FIFO: {
+      printf("    fifo %7" PRIu64 " %7" PRIu64 "\n", koid, peer_koid);
+      break;
+    }
+    case ZX_OBJ_TYPE_EVENTPAIR: {
+      printf("    eventpair %7" PRIu64 " %7" PRIu64 "\n", koid, peer_koid);
+      break;
+    }
+    case ZX_OBJ_TYPE_IOB: {
+      auto iobuf = DownCastDispatcher<const IoBufferDispatcher>(disp);
+
+      auto region_count = iobuf->RegionCount();
+      printf("    iob %7" PRIu64 " %7" PRIu64 " region count %" PRIu64 "\n", koid, peer_koid,
+             region_count);
+      break;
+    }
+
     default: {
       printf("Unexpected error, peer type not supported.\n");
       break;
@@ -1285,10 +1304,6 @@ int cmd_diagnostics(int argc, const cmd_args* argv, uint32_t flags) {
     printf("%s jobpol <koid>     : print policies for given job\n", argv[0].str);
     printf("%s mwd  <mb>         : memory watchdog\n", argv[0].str);
     printf("%s ht   <pid>        : dump process handles\n", argv[0].str);
-    printf("%s ch   <koid>       : dump channels for pid or for all processes,\n", argv[0].str);
-    printf("                       or processes for channel koid\n");
-    printf("%s sock <koid>       : dump sockets for pid or for all processes,\n", argv[0].str);
-    printf("                       or processes for socket koid\n");
     printf("%s hwd  <count>      : handle watchdog\n", argv[0].str);
     printf("%s vmos <pid>|all|hidden [-u?]\n", argv[0].str);
     printf("                     : dump process/all/hidden VMOs\n");
@@ -1299,6 +1314,16 @@ int cmd_diagnostics(int argc, const cmd_args* argv, uint32_t flags) {
     printf("%s htinfo            : handle table info\n", argv[0].str);
     printf("%s koid <koid>       : list all handles for a koid\n", argv[0].str);
     printf("%s koid help         : print header label descriptions for 'koid'\n", argv[0].str);
+    printf("%s ch   <koid>       : dump channels for pid or for all processes,\n", argv[0].str);
+    printf("                       or processes for channel koid\n");
+    printf("%s sock <koid>       : dump sockets for pid or for all processes,\n", argv[0].str);
+    printf("                       or processes for socket koid\n");
+    printf("%s fifo <koid>       : dump fifos for pid or for all processes,\n", argv[0].str);
+    printf("                       or processes for fifo koid\n");
+    printf("%s eventpair <koid>  : dump event pairs for pid or for all processes,\n", argv[0].str);
+    printf("                       or processes for eventpair koid\n");
+    printf("%s iob <koid>        : dump io buffers for pid or for all processes,\n", argv[0].str);
+    printf("                       or processes for io buffer koid\n");
     return -1;
   }
 
@@ -1351,6 +1376,24 @@ int cmd_diagnostics(int argc, const cmd_args* argv, uint32_t flags) {
       DumpPeerDispatchersByKoid(ZX_OBJ_TYPE_SOCKET, argv[2].u);
     } else {
       DumpAllPeerDispatchers(ZX_OBJ_TYPE_SOCKET);
+    }
+  } else if (strcmp(argv[1].str, "fifo") == 0) {
+    if (argc == 3) {
+      DumpPeerDispatchersByKoid(ZX_OBJ_TYPE_FIFO, argv[2].u);
+    } else {
+      DumpAllPeerDispatchers(ZX_OBJ_TYPE_FIFO);
+    }
+  } else if (strcmp(argv[1].str, "eventpair") == 0) {
+    if (argc == 3) {
+      DumpPeerDispatchersByKoid(ZX_OBJ_TYPE_EVENTPAIR, argv[2].u);
+    } else {
+      DumpAllPeerDispatchers(ZX_OBJ_TYPE_EVENTPAIR);
+    }
+  } else if (strcmp(argv[1].str, "iob") == 0) {
+    if (argc == 3) {
+      DumpPeerDispatchersByKoid(ZX_OBJ_TYPE_IOB, argv[2].u);
+    } else {
+      DumpAllPeerDispatchers(ZX_OBJ_TYPE_IOB);
     }
   } else if (strcmp(argv[1].str, "vmos") == 0) {
     if (argc < 3)
