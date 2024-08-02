@@ -199,6 +199,7 @@ dmsg "compiler type: $compiler_type"
 save_temps=0
 output=
 depfile=
+target=
 crash_diagnostics_dir=
 
 prev_opt=
@@ -221,6 +222,8 @@ do
   case "$opt" in
     -save-temps | --save-temps) save_temps=1 ;;
     -MF ) prev_opt=depfile ;;
+    --target ) prev_opt=target ;;
+    --target=* ) target="$optarg" ;;
     -fcrash-diagnostics-dir) prev_opt=crash_diagnostics_dir ;;
     -fcrash-diagnostics-dir=*) crash_diagnostics_dir="$optarg" ;;
     -o) prev_opt=output ;;
@@ -344,8 +347,71 @@ then
     "${_gcc_lib_base#"$exec_root_rel/"}"/"crtbegin.o"
   )
 
-else  # clang, doesn't need any command transformations
+else  # clang
   remote_compile_cmd=( "${local_compile_cmd[@]}" )
+
+  # Workaround for b/354016617:
+  # clang's compiler driver now chooses internal include paths based on the *existence*
+  # of target lib directories.  None of the libraries or objects inside these directories
+  # are actually used (according to file access traces), because this wrapper is only used
+  # for compiling, not linking.  To force the existence of these linker
+  # directories in the remote environment, we choose one arbitrary file in each
+  # critical directory to include as a remote input.
+  _compiler_bin_dir="${compiler%/*}"  # dirname, assumed to end with 'bin'
+  _compiler_install_dir="${_compiler_bin_dir%/bin}"
+  _compiler_install_dir_rel="${_compiler_install_dir#${exec_root_rel}/}"
+
+  # Map --target to a target lib dir.
+  # In most cases, the dir name is the same as the target.
+  # see def clang_target_to_libdir() in build/rbe/fuchsia.py.
+  target_libdir="$target"
+  case "$target" in
+    *-pc-windows-*) ;;
+    *-windows-*) target_libdir="${target/-windows-/-pc-windows-}" ;;
+    *-unknown-fuchsia) ;;
+    *-fuchsia) target_libdir="${target/-fuchsia/-unknown-fuchsia}" ;;
+  esac
+
+  # Choose any lib that is guaranteed to exist in the $target_libdir.
+  case "$target" in
+    *-windows-*)
+      _clangrt_lib="clang_rt.builtins.lib"
+      _cxx_lib="libc++.lib" ;;
+    *)
+      _clangrt_lib="libclang_rt.builtins.a"
+      _cxx_lib="libc++.a" ;;
+  esac
+
+  # Assumptions about the toolchain install dir structure:
+  #   - There is one dir under lib/clang: that is the clang major version number.
+  _libclang_dir="$_compiler_install_dir_rel"/lib/clang
+  _clang_version="$(cd "$exec_root_rel" && ls "$_libclang_dir" )"
+  _libclang_target_libdir="$_libclang_dir/$_clang_version/lib/$target_libdir"
+  # This target libdir doesn't exist for every target, e.g. aarch64-pc-windows-msvc
+  if [[ -f "$exec_root_rel/$_libclang_target_libdir/$_clangrt_lib" ]]
+  then
+    _libclang_rt_files=( "$_libclang_target_libdir/$_clangrt_lib" )
+else
+    _libclang_rt_files=()
+  fi
+
+  # Assumptions about the toolchain target lib install structure:
+  #   - Under $target_libdir there may be multiple variants like {asan,noexcept,...}.
+  #     Traces have shown that all variant subdirs are probed for existence, so we must
+  #     include all of them to be safe.
+  _libcxx_target_libdir="$_compiler_install_dir_rel/lib/$target_libdir"
+  if [[ -d "$exec_root_rel/$_libcxx_target_libdir" ]]
+  then
+    _libcxx_files=($(cd "$exec_root_rel" && find "$_libcxx_target_libdir" -name "$_cxx_lib" -type f ))
+  else
+    _libcxx_files=()
+  fi
+
+  # files listed need to be relative to exec_root
+  remote_input_files+=(
+    "${_libclang_rt_files[@]}"
+    "${_libcxx_files[@]}"
+  )
 fi
 
 remote_input_files_opt=()
