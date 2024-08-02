@@ -1889,7 +1889,7 @@ impl ObjectStore {
     /// Returns the link of a symlink object.
     pub async fn read_symlink(&self, object_id: u64) -> Result<Vec<u8>, Error> {
         match self.tree.find(&ObjectKey::object(object_id)).await? {
-            None | Some(Item { value: ObjectValue::None, .. }) => bail!(FxfsError::NotFound),
+            None => bail!(FxfsError::NotFound),
             Some(Item {
                 value: ObjectValue::Object { kind: ObjectKind::Symlink { link, .. }, .. },
                 ..

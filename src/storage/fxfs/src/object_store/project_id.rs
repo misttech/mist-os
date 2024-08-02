@@ -91,7 +91,6 @@ impl ObjectStore {
         let (kind, mut attributes) =
             match self.tree().find(&object_key).await?.ok_or(FxfsError::NotFound)?.value {
                 ObjectValue::Object { kind, attributes } => (kind, attributes),
-                ObjectValue::None => return Err(FxfsError::NotFound.into()),
                 _ => return Err(FxfsError::Inconsistent.into()),
             };
         // Prevent updating this if it is already set.
@@ -137,7 +136,6 @@ impl ObjectStore {
             ObjectValue::Object { attributes, .. } => match attributes.project_id {
                 id => Ok(id),
             },
-            ObjectValue::None => return Err(FxfsError::NotFound.into()),
             _ => return Err(FxfsError::Inconsistent.into()),
         }
     }
@@ -158,7 +156,6 @@ impl ObjectStore {
         let (kind, mut attributes) =
             match self.tree().find(&object_key).await?.ok_or(FxfsError::NotFound)?.value {
                 ObjectValue::Object { kind, attributes } => (kind, attributes),
-                ObjectValue::None => return Err(FxfsError::NotFound.into()),
                 _ => return Err(FxfsError::Inconsistent.into()),
             };
         if attributes.project_id == 0 {

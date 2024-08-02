@@ -131,7 +131,6 @@ impl<S: HandleOwner> Directory<S> {
                 value: ObjectValue::Object { kind: ObjectKind::Directory { .. }, .. },
                 ..
             } => Ok(Directory::new(owner.clone(), object_id)),
-            ObjectItem { value: ObjectValue::None, .. } => bail!(FxfsError::NotFound),
             _ => bail!(FxfsError::NotDir),
         }
     }
