@@ -70,6 +70,20 @@ zx_status_t UsbPeripheral::Create(void* ctx, zx_device_t* parent) {
 }
 
 zx_status_t UsbPeripheral::UsbDciCancelAll(uint8_t ep_address) {
+  fidl::Arena arena;
+  auto result = dci_new_.buffer(arena)->CancelAll(ep_address);
+
+  if (!result.ok()) {
+    zxlogf(DEBUG, "(framework) CancelAll(): %s", result.status_string());
+  } else if (result->is_error() && result->error_value() == ZX_ERR_NOT_SUPPORTED) {
+    zxlogf(DEBUG, "CancelAll(): %s", result.status_string());
+  } else if (result->is_error() && result->error_value() != ZX_ERR_NOT_SUPPORTED) {
+    return result->error_value();
+  } else {
+    return ZX_OK;
+  }
+
+  zxlogf(DEBUG, "could not CancelAll() over FIDL, falling back to banjo");
   return dci_.CancelAll(ep_address);
 }
 
@@ -413,9 +427,11 @@ zx_status_t UsbPeripheral::SetInterfaceOnParent() {
   auto result = dci_new_.buffer(arena)->SetInterface(intf_srv_cli_.TakeClientEnd());
 
   if (!result.ok()) {
-    zxlogf(WARNING, "(framework) SetInterface(): %s", result.status_string());
-  } else if (result->is_error()) {
-    zxlogf(WARNING, "SetInterface(): %s", zx_status_get_string(result->error_value()));
+    zxlogf(DEBUG, "(framework) SetInterface(): %s", result.status_string());
+  } else if (result->is_error() && result->error_value() == ZX_ERR_NOT_SUPPORTED) {
+    zxlogf(DEBUG, "SetInterface(): %s", result.status_string());
+  } else if (result->is_error() && result->error_value() != ZX_ERR_NOT_SUPPORTED) {
+    return result->error_value();
   } else {
     return ZX_OK;
   }
@@ -648,7 +664,7 @@ void UsbPeripheral::ClearFunctions() {
     }
     shutting_down_ = true;
     for (size_t i = 0; i < 256; i++) {
-      dci_.CancelAll(static_cast<uint8_t>(i));
+      UsbDciCancelAll(static_cast<uint8_t>(i));
     }
     for (auto& configuration : configurations_) {
       auto& functions = configuration->functions;

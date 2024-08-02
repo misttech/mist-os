@@ -139,6 +139,10 @@ class UsbPeripheral : public UsbPeripheralType,
   zx_status_t SetInterfaceOnParent() __TA_REQUIRES(lock_);
 
   inline const ddk::UsbDciProtocolClient& dci() const { return dci_; }
+  inline const fidl::WireSyncClient<fuchsia_hardware_usb_dci::UsbDci>& dci_new() const {
+    return dci_new_;
+  }
+
   inline size_t ParentRequestSize() const { return parent_request_size_; }
   void UsbPeripheralRequestQueue(usb_request_t* usb_request,
                                  const usb_request_complete_callback_t* complete_cb);
