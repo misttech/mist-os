@@ -38,10 +38,13 @@ class InternedString {
 #ifdef __clang__
     return __stop___fxt_interned_string_table;
 #else
-    // GCC 14.1 fixes the problem where section attributes are dropped from members of templates
-    // with static storage duration. However, it appears the GCC now emits the wrong sections
-    // sometimes. Make the section appear empty to avoid crashes until that bug is resolved.
-    // TODO(https://fxbug.dev/42101573): Enable section iteration when correct sections are emitted.
+    // GCC 14.1 fixes the problem where section attributes are dropped from
+    // members of templates with static storage duration. However, it appears
+    // the GCC now emits the wrong sections sometimes. Make the section appear
+    // empty to avoid crashes until the GCC bug is resolved and rolled in.
+    // https://gcc.gnu.org/bugzilla/show_bug.cgi?id=116184 tracks the GCC bug.
+    // TODO(https://fxbug.dev/42101573): Enable section iteration when correct
+    // sections are emitted.
     return section_begin();
 #endif
   }
@@ -108,7 +111,16 @@ struct InternedStringStorage {
 template <typename T, T... chars>
 constexpr const InternedString& operator""_intern() {
   static_assert(std::is_same_v<T, char>);
+#ifdef __clang__
   return internal::InternedStringStorage<chars...>::interned_string;
+#else
+  return internal::InternedStringStorage<
+      // TODO(https://fxbug.dev/42101573): See InternedString::section_end.
+      // Make sure there's just one actual InternedStringStorage<...>
+      // instantiation anywhere so GCC can't wrongly emit invalid ones.
+      'T', 'O', 'D', 'O', '(', 'h', 't', 't', 'p', 's', ':', '/', '/', 'f', 'x', 'b', 'u', 'g', '.',
+      'd', 'e', 'v', '/', '4', '2', '1', '0', '1', '5', '7', '3', ')'>::interned_string;
+#endif
 }
 
 }  // namespace fxt
