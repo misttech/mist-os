@@ -558,7 +558,8 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
                         store.get_keys(self.object_id),
                         false,
                     )
-                    .await?,
+                    .await?
+                    .ok_or(anyhow!(FxfsError::Inconsistent).context("Missing encryption key"))?,
             ),
             Encryption::PermanentKeys => {
                 Some(store.key_manager.get(self.object_id).await?.unwrap())
@@ -582,17 +583,15 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
                 // Next, see if the keys are already created.
                 if let Some(item) = store.tree.find(&ObjectKey::keys(self.object_id)).await? {
                     if let ObjectValue::Keys(EncryptionKeys::AES256XTS(keys)) = item.value {
-                        return Ok(Some(
-                            store
-                                .key_manager
-                                .get_or_insert(
-                                    self.object_id,
-                                    store.crypt().ok_or_else(|| anyhow!("No crypt!"))?,
-                                    async { Ok(keys) },
-                                    false,
-                                )
-                                .await?,
-                        ));
+                        return Ok(store
+                            .key_manager
+                            .get_or_insert(
+                                self.object_id,
+                                store.crypt().ok_or_else(|| anyhow!("No crypt!"))?,
+                                async { Ok(Some(keys)) },
+                                false,
+                            )
+                            .await?);
                     } else {
                         return Err(anyhow!(FxfsError::Inconsistent).context("get_or_create_keys"));
                     }
