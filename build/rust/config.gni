@@ -67,6 +67,14 @@ declare_args() {
   # causes clippy targets to get included in the build. This gets enabled by default with
   # `fx set`, but is defaulted off in GN so it won't be on in infra.
   include_clippy = false
+
+  # By default building clippy targets prints lints as well as any rustc diagnostics
+  # that were emitted by check-building the crate. This flag makes the output in the
+  # build only contain lints to avoid duplicating the diagnostics from rustc
+  # (which will be emitted when the actual target is built). Note that `fx clippy`
+  # will still emit rustc diagnostics alongside clippy lints, they just wont show
+  # up in ninja's stderr
+  clippy_ignore_rustc = false
 }
 
 if (rustc_prefix == default_rustc_prefix &&

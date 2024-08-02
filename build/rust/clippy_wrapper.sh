@@ -23,6 +23,7 @@ jq=
 driver_options=()
 fail=0
 quiet=0
+ignore_rustc=0
 
 # Extract options before --
 prev_opt=
@@ -48,6 +49,7 @@ do
     --jq=*) jq="$optarg" ;;
     --fail) fail=1 ;;
     --quiet) quiet=1 ;;
+    --clippy-only) ignore_rustc=1 ;;
     # stop option processing
     --) shift; break ;;
     # Forward all other options to clippy-driver
@@ -125,9 +127,14 @@ result="$?"
   rm -f "$deps_rspfile.alt"
 }
 
+filter=
+if [[ $ignore_rustc = 1 ]]; then
+  filter='(.code.code//"" | startswith("clippy::")) and '
+fi
+
 # Print any detected lints if --quiet wasn't passed
 if [[ "$quiet" = 0 ]]; then
-  "$jq" -sre '.[] | select((.level == "error") or (.level == "warning")) | .rendered' "$output" || cat "$output" >&2
+  "$jq" -sr ".[] | select($filter(.level == \"error\" or .level == \"warning\")) | .rendered" "$output" || cat "$output" >&2
 fi
 
 # Only fail the build with a nonzero exit code if --fail was passed

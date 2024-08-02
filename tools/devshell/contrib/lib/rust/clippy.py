@@ -94,6 +94,8 @@ def main():
                     continue
                 lints[fingerprint_diagnostic(lint)] = lint
 
+    if not args.raw:
+        print("\nClippy Diagnostics\n==================\n")
     for lint in lints.values():
         print(json.dumps(fix_paths(lint)) if args.raw else lint["rendered"])
     if not args.raw:

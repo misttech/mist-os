@@ -69,6 +69,10 @@ template("clippy") {
       args += [ "--fail" ]
     }
 
+    if (clippy_ignore_rustc) {
+      args += [ "--clippy-only" ]
+    }
+
     args += [
       "--",
       "env",
