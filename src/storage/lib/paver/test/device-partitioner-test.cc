@@ -251,7 +251,7 @@ class GptDevicePartitionerTests : public zxtest::Test {
       : block_size_(block_size) {
     paver::g_wipe_timeout = 0;
     IsolatedDevmgr::Args args;
-    args.disable_block_watcher = false;
+    args.disable_block_watcher = true;
 
     args.board_name = std::move(board_name);
     ASSERT_OK(IsolatedDevmgr::Create(&args, &devmgr_));
