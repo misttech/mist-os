@@ -716,3 +716,13 @@
 	url = https://fuchsia.googlesource.com/shac-project/generic-checks
 	name = third_party/shac-project/generic-checks
 	ignore = all
+[submodule "third_party/pylibs/autoflake/src"]
+	path = third_party/pylibs/autoflake/src
+	url = https://fuchsia.googlesource.com/third_party/github.com/PyCQA/autoflake
+	name = third_party/pylibs/autoflake
+	ignore = all
+[submodule "third_party/pylibs/pyflakes/src"]
+	path = third_party/pylibs/pyflakes/src
+	url = https://fuchsia.googlesource.com/third_party/github.com/PyCQA/pyflakes
+	name = third_party/pylibs/pyflakes
+	ignore = all
