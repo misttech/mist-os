@@ -81,3 +81,7 @@ class Errors(unittest.TestCase):
     def test_wrong_handle_type_event(self):
         with self.assertRaises(HandleTypeError):
             _ = Event("woops")
+
+    def test_raw_value_matches(self):
+        err = ZxStatus(ZxStatus.ZX_ERR_NEXT)
+        self.assertEqual(err.raw(), ZxStatus.ZX_ERR_NEXT)
