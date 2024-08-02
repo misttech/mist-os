@@ -77,7 +77,7 @@ fn create_netstack_realm<'a>(
     // the system's Netstack as needed.
     sandbox.create_netstack_realm_with::<Netstack2, _, _>(
         name,
-        &[KnownServiceProvider::NetworkTestRealm],
+        &[KnownServiceProvider::NetworkTestRealm { require_outer_netstack: true }],
     )
 }
 

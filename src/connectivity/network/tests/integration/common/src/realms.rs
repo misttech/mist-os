@@ -219,7 +219,9 @@ pub enum KnownServiceProvider {
     Reachability {
         eager: bool,
     },
-    NetworkTestRealm,
+    NetworkTestRealm {
+        require_outer_netstack: bool,
+    },
     FakeClock,
 }
 
@@ -626,32 +628,50 @@ impl<'a> From<&'a KnownServiceProvider> for fnetemul::ChildDef {
                 eager: Some(*eager),
                 ..Default::default()
             },
-            KnownServiceProvider::NetworkTestRealm => fnetemul::ChildDef {
-                name: Some(constants::network_test_realm::COMPONENT_NAME.to_string()),
-                source: Some(fnetemul::ChildSource::Component(
-                    constants::network_test_realm::COMPONENT_URL.to_string(),
-                )),
-                exposes: Some(vec![
-                    fntr::ControllerMarker::PROTOCOL_NAME.to_string(),
-                    fcomponent::RealmMarker::PROTOCOL_NAME.to_string(),
-                ]),
-                uses: Some(fnetemul::ChildUses::Capabilities(vec![
-                    fnetemul::Capability::LogSink(fnetemul::Empty {}),
-                    fnetemul::Capability::ChildDep(protocol_dep::<fnet_stack::StackMarker>(
-                        constants::netstack::COMPONENT_NAME,
+            KnownServiceProvider::NetworkTestRealm { require_outer_netstack } => {
+                fnetemul::ChildDef {
+                    name: Some(constants::network_test_realm::COMPONENT_NAME.to_string()),
+                    source: Some(fnetemul::ChildSource::Component(
+                        constants::network_test_realm::COMPONENT_URL.to_string(),
                     )),
-                    fnetemul::Capability::ChildDep(protocol_dep::<fnet_debug::InterfacesMarker>(
-                        constants::netstack::COMPONENT_NAME,
+                    exposes: Some(vec![
+                        fntr::ControllerMarker::PROTOCOL_NAME.to_string(),
+                        fcomponent::RealmMarker::PROTOCOL_NAME.to_string(),
+                    ]),
+                    uses: Some(fnetemul::ChildUses::Capabilities(
+                        std::iter::once(fnetemul::Capability::LogSink(fnetemul::Empty {}))
+                            .chain(
+                                require_outer_netstack
+                                    .then_some([
+                                        fnetemul::Capability::ChildDep(protocol_dep::<
+                                            fnet_stack::StackMarker,
+                                        >(
+                                            constants::netstack::COMPONENT_NAME,
+                                        )),
+                                        fnetemul::Capability::ChildDep(protocol_dep::<
+                                            fnet_debug::InterfacesMarker,
+                                        >(
+                                            constants::netstack::COMPONENT_NAME,
+                                        )),
+                                        fnetemul::Capability::ChildDep(protocol_dep::<
+                                            fnet_root::InterfacesMarker,
+                                        >(
+                                            constants::netstack::COMPONENT_NAME,
+                                        )),
+                                        fnetemul::Capability::ChildDep(protocol_dep::<
+                                            fnet_interfaces::StateMarker,
+                                        >(
+                                            constants::netstack::COMPONENT_NAME,
+                                        )),
+                                    ])
+                                    .into_iter()
+                                    .flatten(),
+                            )
+                            .collect::<Vec<_>>(),
                     )),
-                    fnetemul::Capability::ChildDep(protocol_dep::<fnet_root::InterfacesMarker>(
-                        constants::netstack::COMPONENT_NAME,
-                    )),
-                    fnetemul::Capability::ChildDep(protocol_dep::<fnet_interfaces::StateMarker>(
-                        constants::netstack::COMPONENT_NAME,
-                    )),
-                ])),
-                ..Default::default()
-            },
+                    ..Default::default()
+                }
+            }
             KnownServiceProvider::FakeClock => fnetemul::ChildDef {
                 name: Some(constants::fake_clock::COMPONENT_NAME.to_string()),
                 source: Some(fnetemul::ChildSource::Component(

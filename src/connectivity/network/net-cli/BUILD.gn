@@ -123,5 +123,6 @@ group("tests") {
   deps = [
     ":lib_test($host_toolchain)",
     ":net-cli-tests",
+    "tests",
   ]
 }
