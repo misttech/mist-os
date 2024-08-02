@@ -6,6 +6,25 @@ import("//build/components.gni")
 import("//build/test.gni")
 
 source_set("zxtest") {
+  #  ________  _________  ________  ________
+  # |\   ____\|\___   ___\\   __  \|\   __  \
+  # \ \  \___|\|___ \  \_\ \  \|\  \ \  \|\  \
+  #  \ \_____  \   \ \  \ \ \  \\\  \ \   ____\
+  #   \|____|\  \   \ \  \ \ \  \\\  \ \  \___|
+  #     ____\_\  \   \ \__\ \ \_______\ \__\
+  #    |\_________\   \|__|  \|_______|\|__|
+  #    \|_________|
+  #
+  # This library is deprecated and should not be used for new tests.
+  visibility = [
+    ":*",
+    "//sdk/lib/driver/runtime:*",
+    "//sdk/lib/fidl_driver/tests/transport:*",
+    "//src/connectivity/wlan/drivers/lib/fidl-bridge/cpp/test:*",
+    "//src/devices/block/bin/sdio:*",
+    "//src/devices/bus/drivers/platform:*",
+    "//src/lib/fidl/llcpp/tests/integration:*",
+  ]
   testonly = true
   sources = [ "zxtest.cc" ]
   deps = [
@@ -19,6 +38,25 @@ source_set("zxtest") {
 }
 
 source_set("gtest") {
+  #  ________  _________  ________  ________
+  # |\   ____\|\___   ___\\   __  \|\   __  \
+  # \ \  \___|\|___ \  \_\ \  \|\  \ \  \|\  \
+  #  \ \_____  \   \ \  \ \ \  \\\  \ \   ____\
+  #   \|____|\  \   \ \  \ \ \  \\\  \ \  \___|
+  #     ____\_\  \   \ \__\ \ \_______\ \__\
+  #    |\_________\   \|__|  \|_______|\|__|
+  #    \|_________|
+  #
+  # This library is deprecated and should not be used for new tests.
+  visibility = [
+    ":*",
+    "//sdk/lib/driver/runtime:*",
+    "//sdk/lib/fidl_driver/tests/transport:*",
+    "//src/connectivity/wlan/drivers/lib/fidl-bridge/cpp/test:*",
+    "//src/devices/block/bin/sdio:*",
+    "//src/devices/bus/drivers/platform:*",
+    "//src/lib/fidl/llcpp/tests/integration:*",
+  ]
   testonly = true
   sources = [ "gtest.cc" ]
   deps = [
