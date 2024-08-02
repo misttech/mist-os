@@ -22,6 +22,7 @@ fuchsia_driver("usb-peripheral-driver") {
   ]
   sources = [
     "config-parser.cc",
+    "usb-dci-interface-server.cc",
     "usb-function.cc",
     "usb-peripheral.cc",
   ]
@@ -88,6 +89,7 @@ fuchsia_driver_package("package") {
 test("usb-peripheral-unittest-bin") {
   sources = [
     "config-parser.cc",
+    "usb-dci-interface-server.cc",
     "usb-function.cc",
     "usb-peripheral-test.cc",
     "usb-peripheral.cc",
@@ -98,13 +100,16 @@ test("usb-peripheral-unittest-bin") {
     ":usb_peripheral_bind",
     "//sdk/banjo/fuchsia.hardware.usb:fuchsia.hardware.usb_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.usb.dci:fuchsia.hardware.usb.dci_banjo_cpp",
+    "//sdk/banjo/fuchsia.hardware.usb.descriptor:fuchsia.hardware.usb.descriptor_cpp",
     "//sdk/banjo/fuchsia.hardware.usb.function:fuchsia.hardware.usb.function_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.usb.phy:fuchsia.hardware.usb.phy_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.usb.request:fuchsia.hardware.usb.request_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.usb.dci:fuchsia.hardware.usb.dci_cpp",
     "//sdk/fidl/fuchsia.hardware.usb.function:fuchsia.hardware.usb.function_cpp",
     "//sdk/fidl/fuchsia.hardware.usb.peripheral:fuchsia.hardware.usb.peripheral_cpp",
+    "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/component/outgoing/cpp",
+    "//sdk/lib/driver/testing/cpp",
     "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/lib/amlogic",
     "//src/devices/lib/driver",

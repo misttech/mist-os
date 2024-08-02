@@ -4,6 +4,8 @@
 
 #include "src/devices/usb/drivers/usb-peripheral/usb-peripheral.h"
 
+#include <fidl/fuchsia.hardware.usb.dci/cpp/wire.h>
+#include <fidl/fuchsia.hardware.usb.descriptor/cpp/wire.h>
 #include <fuchsia/hardware/usb/dci/c/banjo.h>
 #include <fuchsia/hardware/usb/dci/cpp/banjo.h>
 #include <lib/ddk/device.h>
@@ -16,26 +18,37 @@
 
 #include <cstring>
 #include <memory>
+#include <vector>
 
 #include <usb/usb.h>
 #include <zxtest/zxtest.h>
 
+#include "sdk/lib/async_patterns/testing/cpp/dispatcher_bound.h"
+#include "sdk/lib/component/outgoing/cpp/outgoing_directory.h"
+#include "sdk/lib/driver/testing/cpp/driver_runtime.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 #include "src/devices/usb/drivers/usb-peripheral/usb-function.h"
 
-class FakeDevice : public ddk::UsbDciProtocol<FakeDevice, ddk::base_protocol> {
+namespace fdci = fuchsia_hardware_usb_dci;
+namespace fdescriptor = fuchsia_hardware_usb_descriptor;
+
+class FakeDevice : public ddk::UsbDciProtocol<FakeDevice, ddk::base_protocol>,
+                   public fidl::WireServer<fdci::UsbDci> {
  public:
   FakeDevice() : proto_({&usb_dci_protocol_ops_, this}) {}
 
-  // USB DCI protocol implementation.
-  void UsbDciRequestQueue(usb_request_t* req, const usb_request_complete_callback_t* cb) {}
-
-  zx_status_t UsbDciSetInterface(const usb_dci_interface_protocol_t* interface) {
-    interface_ = *interface;
-    sync_completion_signal(&set_interface_called_);
-    return ZX_OK;
+  fdci::UsbDciService::InstanceHandler GetHandler() {
+    return fdci::UsbDciService::InstanceHandler({
+        .device = bindings_.CreateHandler(this, fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+                                          fidl::kIgnoreBindingClosure)
+    });
   }
 
+  // USB DCI protocol implementation (No longer used).
+  void UsbDciRequestQueue(usb_request_t* req, const usb_request_complete_callback_t* cb) {}
+  zx_status_t UsbDciSetInterface(const usb_dci_interface_protocol_t* interface) {
+    return ZX_ERR_NOT_SUPPORTED;
+  }
   zx_status_t UsbDciConfigEp(const usb_endpoint_descriptor_t* ep_desc,
                              const usb_ss_ep_comp_descriptor_t* ss_comp_desc) {
     return ZX_ERR_NOT_SUPPORTED;
@@ -47,31 +60,77 @@ class FakeDevice : public ddk::UsbDciProtocol<FakeDevice, ddk::base_protocol> {
 
   zx_status_t UsbDciCancelAll(uint8_t ep_address) { return ZX_OK; }
 
+  // fuchsia_hardware_usb_dci::UsbDci protocol.
+  void ConnectToEndpoint(ConnectToEndpointRequestView req,
+                         ConnectToEndpointCompleter::Sync& completer) override {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  void SetInterface(SetInterfaceRequestView req,
+                    SetInterfaceCompleter::Sync& completer) override {
+    fidl::Arena arena;
+    client_.Bind(std::move(req->interface));
+    completer.buffer(arena).ReplySuccess();
+    sync_completion_signal(&set_interface_called_);
+  }
+
+  void ConfigureEndpoint(ConfigureEndpointRequestView req,
+                         ConfigureEndpointCompleter::Sync& completer) override {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  void DisableEndpoint(DisableEndpointRequestView req,
+                       DisableEndpointCompleter::Sync& completer) override {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  void EndpointSetStall(EndpointSetStallRequestView req,
+                        EndpointSetStallCompleter::Sync& completer) override {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  void EndpointClearStall(EndpointClearStallRequestView req,
+                          EndpointClearStallCompleter::Sync& completer) override {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  void CancelAll(CancelAllRequestView req, CancelAllCompleter::Sync& completer) override {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_hardware_usb_dci::UsbDci> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override {}
+
   usb_dci_protocol_t* proto() { return &proto_; }
 
-  usb_dci_interface_protocol_t* interface() {
+  fidl::WireSyncClient<fdci::UsbDciInterface>& client() {
     sync_completion_wait(&set_interface_called_, ZX_TIME_INFINITE);
-    return &interface_;
+    return client_;
   }
 
  private:
-  sync_completion_t set_interface_called_;
-
-  usb_dci_interface_protocol_t interface_;
   usb_dci_protocol_t proto_;
+  sync_completion_t set_interface_called_;
+  fidl::ServerBindingGroup<fdci::UsbDci> bindings_;
+  fidl::WireSyncClient<fdci::UsbDciInterface> client_;
 };
 
 class UsbPeripheralHarness : public zxtest::Test {
  public:
   void SetUp() override {
-    root_device_ = MockDevice::FakeRootParent();
     dci_ = std::make_unique<FakeDevice>();
     root_device_->SetMetadata(DEVICE_METADATA_SERIAL_NUMBER, &kSerialNumber, sizeof(kSerialNumber));
     root_device_->AddProtocol(ZX_PROTOCOL_USB_DCI, dci_->proto()->ops, dci_->proto()->ctx);
     auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
     ASSERT_OK(endpoints);
-    root_device_->AddFidlService(fuchsia_hardware_usb_dci::UsbDciService::Name,
-                                 std::move(endpoints->client));
+
+    namespace_.SyncCall([&](Namespace* ns) {
+      EXPECT_TRUE(ns->outgoing.AddService<fdci::UsbDciService>(ns->dci.GetHandler()).is_ok());
+      EXPECT_TRUE(ns->outgoing.Serve(std::move(endpoints->server)).is_ok());
+    });
+
+    root_device_->AddFidlService(fdci::UsbDciService::Name, std::move(endpoints->client));
 
     usb_peripheral_config::Config fake_config;
     fake_config.functions() = {};
@@ -80,49 +139,81 @@ class UsbPeripheralHarness : public zxtest::Test {
     ASSERT_OK(usb_peripheral::UsbPeripheral::Create(nullptr, root_device_.get()));
     ASSERT_EQ(1, root_device_->child_count());
     mock_dev_ = root_device_->GetLatestChild();
-    client_ = ddk::UsbDciInterfaceProtocolClient(dci_->interface());
+
+    namespace_.SyncCall([&](Namespace* ns) {
+      client_.Bind(ns->dci.client().TakeClientEnd());
+    });
+    ASSERT_TRUE(client_.is_valid());
   }
 
-  void TearDown() override {
-    mock_dev_->UnbindOp();
-    mock_dev_->WaitUntilUnbindReplyCalled();
+  // Because this test is using a fidl::WireSyncClient, we need to run any ops on the client on
+  // their own thread because the testing thread is shared with the client end.
+  static void RunSyncClientTask(fit::closure task) {
+    async::Loop loop{&kAsyncLoopConfigNeverAttachToThread};
+    loop.StartThread();
+    zx::result result = fdf::RunOnDispatcherSync(loop.dispatcher(), std::move(task));
+    ASSERT_OK(result);
   }
 
  protected:
+  struct Namespace {
+    FakeDevice dci;
+    component::OutgoingDirectory outgoing{fdf::Dispatcher::GetCurrent()->async_dispatcher()};
+  };
+
   std::unique_ptr<FakeDevice> dci_;
-  std::shared_ptr<MockDevice> root_device_;
+  std::shared_ptr<MockDevice> root_device_{MockDevice::FakeRootParent()};
   MockDevice* mock_dev_;
-  ddk::UsbDciInterfaceProtocolClient client_;
+
+  fdf::UnownedSynchronizedDispatcher dispatcher_{
+      fdf_testing::DriverRuntime::GetInstance()->StartBackgroundDispatcher()};
+
+  async_patterns::TestDispatcherBound<Namespace> namespace_{
+      dispatcher_->async_dispatcher(), std::in_place};
 
   static constexpr char kSerialNumber[] = "Test serial number";
+
+  fidl::WireSyncClient<fdci::UsbDciInterface> client_;
 };
 
 TEST_F(UsbPeripheralHarness, AddsCorrectSerialNumberMetadata) {
-  char serial[256];
-  usb_setup_t setup;
-  setup.w_length = sizeof(serial);
+  fdescriptor::wire::UsbSetup setup;
+  setup.w_length = 256;
   setup.w_value = 0x3 | (USB_DT_STRING << 8);
   setup.bm_request_type = USB_DIR_IN | USB_RECIP_DEVICE | USB_TYPE_STANDARD;
   setup.b_request = USB_REQ_GET_DESCRIPTOR;
-  size_t actual;
-  ASSERT_OK(client_.Control(&setup, nullptr, 0, reinterpret_cast<uint8_t*>(&serial), sizeof(serial),
-                            &actual));
-  ASSERT_EQ(serial[0], sizeof(kSerialNumber) * 2);
-  ASSERT_EQ(serial[1], USB_DT_STRING);
-  for (size_t i = 0; i < sizeof(kSerialNumber) - 1; i++) {
-    ASSERT_EQ(serial[2 + (i * 2)], kSerialNumber[i]);
-  }
+
+  fidl::Arena arena;
+  RunSyncClientTask([&]() {
+    std::vector<uint8_t> unused;
+    auto result = client_.buffer(arena)->Control(
+        setup, fidl::VectorView<uint8_t>::FromExternal(unused));
+
+    ASSERT_TRUE(result->is_ok());
+
+    auto& serial = result.value()->read;
+
+    EXPECT_EQ(serial[0], sizeof(kSerialNumber) * 2);
+    EXPECT_EQ(serial[1], USB_DT_STRING);
+    for (size_t i = 0; i < sizeof(kSerialNumber) - 1; i++) {
+      EXPECT_EQ(serial[2 + (i * 2)], kSerialNumber[i]);
+    }
+  });
 }
 
 TEST_F(UsbPeripheralHarness, WorksWithVendorSpecificCommandWhenConfigurationIsZero) {
-  char serial[256];
-  usb_setup_t setup;
-  setup.w_length = sizeof(serial);
+  fdescriptor::wire::UsbSetup setup;
+  setup.w_length = 256;
   setup.w_value = 0x3 | (USB_DT_STRING << 8);
   setup.bm_request_type = USB_DIR_IN | USB_RECIP_DEVICE | USB_TYPE_VENDOR;
   setup.b_request = USB_REQ_GET_DESCRIPTOR;
-  size_t actual;
-  ASSERT_EQ(client_.Control(&setup, nullptr, 0, reinterpret_cast<uint8_t*>(&serial), sizeof(serial),
-                            &actual),
-            ZX_ERR_BAD_STATE);
+
+  fidl::Arena arena;
+  RunSyncClientTask([&]() {
+    std::vector<uint8_t> unused;
+    auto result = client_.buffer(arena)->Control(
+        setup, fidl::VectorView<uint8_t>::FromExternal(unused));
+    ASSERT_TRUE(result->is_error());
+    ASSERT_EQ(ZX_ERR_BAD_STATE, result->error_value());
+  });
 }
