@@ -117,18 +117,66 @@ zx_boot_time_t current_boot_time(void) { return gTicksToTime.Scale(current_boot_
 
 zx_ticks_t ticks_per_second(void) { return gTicksPerSecond; }
 
+ktl::optional<zx_ticks_t> TimerQueue::ConvertMonotonicTimeToRawTicks(zx_time_t mono) {
+  // Do not attempt to convert the sentinel value of ZX_TIME_INFINITE.
+  if (mono == ZX_TIME_INFINITE) {
+    return ZX_TIME_INFINITE;
+  }
+  const zx_ticks_t deadline_mono_ticks =
+      timer_get_ticks_to_time_ratio().Inverse().Scale<affine::Ratio::Round::Up>(mono);
+  return timer_convert_mono_to_raw_ticks(deadline_mono_ticks);
+}
+
+zx_ticks_t TimerQueue::ConvertBootTimeToRawTicks(zx_boot_time_t boot) {
+  // Do not attempt to convert the sentinel value of ZX_TIME_INFINITE.
+  if (boot == ZX_TIME_INFINITE) {
+    return ZX_TIME_INFINITE;
+  }
+  const zx_ticks_t deadline_boot_ticks =
+      timer_get_ticks_to_time_ratio().Inverse().Scale<affine::Ratio::Round::Up>(boot);
+  return deadline_boot_ticks - timer_get_boot_ticks_offset();
+}
+
+void TimerQueue::UpdatePlatformTimer() {
+  DEBUG_ASSERT(arch_ints_disabled());
+
+  // The monotonic deadline should be the minimum of the preemption timer and the front of the
+  // monotonic timer list.
+  zx_time_t mono_time_deadline = preempt_timer_deadline_;
+  if (!monotonic_timer_list_.is_empty()) {
+    mono_time_deadline =
+        ktl::min(mono_time_deadline, monotonic_timer_list_.front().scheduled_time_);
+  }
+  zx_ticks_t timer_deadline = ZX_TIME_INFINITE;
+  const ktl::optional<zx_ticks_t> mono_ticks_deadline =
+      ConvertMonotonicTimeToRawTicks(mono_time_deadline);
+  if (mono_ticks_deadline.has_value()) {
+    timer_deadline = mono_ticks_deadline.value();
+  }
+
+  // Check if we have a boot timer with a sooner scheduled time and update the timer deadline
+  // accordingly.
+  if (!boot_timer_list_.is_empty()) {
+    const zx_ticks_t boot_deadline =
+        ConvertBootTimeToRawTicks(boot_timer_list_.front().scheduled_time_);
+    timer_deadline = ktl::min(timer_deadline, boot_deadline);
+  }
+
+  // Update the platform oneshot timer to the resulting timer deadline.
+  LTRACEF("rescheduling timer for %" PRIi64 " ticks from UpdatePlatformTimer\n", timer_deadline);
+  platform_set_oneshot_timer(timer_deadline);
+  next_timer_deadline_ = timer_deadline;
+}
+
 void TimerQueue::UpdatePlatformTimerBoot(zx_boot_time_t new_deadline) {
   DEBUG_ASSERT(arch_ints_disabled());
 
+  // Do not set the platform timer if we were passed an infinite deadline.
   if (new_deadline == ZX_TIME_INFINITE) {
     return;
   }
 
-  // Convert from boot time to a raw ticks value to set the platform timer to.
-  const zx_ticks_t deadline_boot_ticks =
-      timer_get_ticks_to_time_ratio().Inverse().Scale<affine::Ratio::Round::Up>(new_deadline);
-  const zx_ticks_t deadline_raw_ticks = deadline_boot_ticks - timer_get_boot_ticks_offset();
-
+  const zx_ticks_t deadline_raw_ticks = ConvertBootTimeToRawTicks(new_deadline);
   if (deadline_raw_ticks < next_timer_deadline_) {
     LTRACEF("rescheduling timer for %" PRIi64 " ticks from UpdatePlatformTimerBoot, next: %" PRIi64
             " \n",
@@ -141,17 +189,14 @@ void TimerQueue::UpdatePlatformTimerBoot(zx_boot_time_t new_deadline) {
 void TimerQueue::UpdatePlatformTimerMono(zx_time_t new_deadline) {
   DEBUG_ASSERT(arch_ints_disabled());
 
+  // Do not set the platform timer if we were passed an infinite deadline.
   if (new_deadline == ZX_TIME_INFINITE) {
     return;
   }
 
   // Convert from monotonic time to a raw ticks value to set the platform timer to.
-  const zx_ticks_t deadline_mono_ticks =
-      timer_get_ticks_to_time_ratio().Inverse().Scale<affine::Ratio::Round::Up>(new_deadline);
-  const ktl::optional<zx_ticks_t> deadline_raw_ticks =
-      timer_convert_mono_to_raw_ticks(deadline_mono_ticks);
-
-  // If the conversion function returned no value, the monotonic clock is paused, so return early.
+  const ktl::optional<zx_ticks_t> deadline_raw_ticks = ConvertMonotonicTimeToRawTicks(new_deadline);
+  // Return early if the monotonic clock is paused.
   if (!deadline_raw_ticks.has_value()) {
     return;
   }
@@ -409,14 +454,7 @@ bool Timer::Cancel() {
       // The Timer we're canceling was at head of this queue, so see if we should update platform
       // timer.
       if (!timer_list.is_empty()) {
-        switch (timeline_) {
-          case Timer::ReferenceTimeline::kMono:
-            timer_queue.UpdatePlatformTimerMono(timer_list.front().scheduled_time_);
-            break;
-          case Timer::ReferenceTimeline::kBoot:
-            timer_queue.UpdatePlatformTimerBoot(timer_list.front().scheduled_time_);
-            break;
-        }
+        timer_queue.UpdatePlatformTimer();
       } else if (timer_queue.next_timer_deadline_ == ZX_TIME_INFINITE) {
         LTRACEF("clearing old hw timer, preempt timer not set, nothing in the queue\n");
         platform_stop_timer();
@@ -465,16 +503,16 @@ void TimerQueue::Tick(cpu_num_t cpu) {
   }
 
   // Tick both of the timer lists.
-  const zx_time_t deadline_mono = TickInternal(now, cpu, monotonic_timer_list_);
-  UpdatePlatformTimerMono(ktl::min(deadline_mono, preempt_timer_deadline_));
+  TickInternal(now, cpu, monotonic_timer_list_);
+  TickInternal(boot_now, cpu, boot_timer_list_);
 
-  const zx_boot_time_t deadline_boot = TickInternal(boot_now, cpu, boot_timer_list_);
-  UpdatePlatformTimerBoot(deadline_boot);
+  // Update the platform timer.
+  UpdatePlatformTimer();
 }
 
 template <typename TimestampType>
-TimestampType TimerQueue::TickInternal(TimestampType now, cpu_num_t cpu,
-                                       fbl::DoublyLinkedList<Timer*>& timer_list) {
+void TimerQueue::TickInternal(TimestampType now, cpu_num_t cpu,
+                              fbl::DoublyLinkedList<Timer*>& timer_list) {
   Guard<MonitoredSpinLock, NoIrqSave> guard{TimerLock::Get(), SOURCE_TAG};
 
   for (;;) {
@@ -522,14 +560,10 @@ TimestampType TimerQueue::TickInternal(TimestampType now, cpu_num_t cpu,
     arch::DeviceMemoryBarrier();
   }
 
-  // Get the deadline of the event at the head of the queue (if any).
-  zx_time_t deadline = ZX_TIME_INFINITE;
+  // Verify that the head of the timer queue has a scheduled time after now.
   if (!timer_list.is_empty()) {
-    deadline = timer_list.front().scheduled_time_;
-    // This has to be the case or it would have fired already.
-    DEBUG_ASSERT(deadline > now);
+    DEBUG_ASSERT(timer_list.front().scheduled_time_ > now);
   }
-  return deadline;
 }
 
 zx_status_t Timer::TrylockOrCancel(MonitoredSpinLock* lock) {

@@ -165,6 +165,14 @@ class TimerQueue {
   // periodically by some hardware timer.
   void Tick(cpu_num_t cpu);
 
+  // UpdatePlatformTimer updates the platform's oneshot timer to the minimum of:
+  // 1. The scheduled time of the head of the monotonic timer queue.
+  // 2. The scheduled time of the head of the boot timer queue.
+  // 3. The preemption timer deadline.
+  //
+  // This can only be called when interrupts are disabled.
+  void UpdatePlatformTimer();
+
  private:
   // Timers can directly call Insert and Cancel.
   friend class Timer;
@@ -193,16 +201,26 @@ class TimerQueue {
   // minimum of the existing deadline (stored in next_timer_deadline_) and the given new_deadline.
   // The two separate variations of this method are provided for convenience, so that callers can
   // provide either a montonic or a boot timestamp depending on the context they're operating in.
+  // Using one of these functions is a bit more efficient than calling UpdatePlatformTimer(), as
+  // they do not need to check the head of both the boot and monotonic timer queues before updating
+  // the platform oneshot timer.
   //
   // These can only be called when interrupts are disabled.
   void UpdatePlatformTimerMono(zx_time_t new_deadline);
   void UpdatePlatformTimerBoot(zx_boot_time_t new_deadline);
 
+  // Converts the given monotonic timestamp to the raw ticks value it corresponds to.
+  // Returns nullopt if the monotonic clock is paused.
+  static ktl::optional<zx_ticks_t> ConvertMonotonicTimeToRawTicks(zx_time_t mono);
+
+  // Converts the given boot timestamp to the raw ticks value it corresponds to.
+  static zx_ticks_t ConvertBootTimeToRawTicks(zx_boot_time_t boot);
+
   // This is called by Tick(), and processes all timers with scheduled times less than now.
   // Once it's done, the scheduled time of the timer at the front of the queue is returned.
   template <typename TimestampType>
-  static TimestampType TickInternal(TimestampType now, cpu_num_t cpu,
-                                    fbl::DoublyLinkedList<Timer*>& timer_list);
+  static void TickInternal(TimestampType now, cpu_num_t cpu,
+                           fbl::DoublyLinkedList<Timer*>& timer_list);
 
   // Timers on the monotonic timeline are placed in this list.
   fbl::DoublyLinkedList<Timer*> monotonic_timer_list_;
