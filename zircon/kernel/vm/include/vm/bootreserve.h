@@ -15,14 +15,13 @@
 // a platform to mark certain ranges of physical space as occupied by something
 // prior to adding arenas to the PMM.
 //
-// boot_reserve_init() must be called before adding the first pmm arena and
-// boot_reserve_wire() should be called after the last arena is added to mark
-// pages the reserved ranges intersect as WIRED.
+// All boot_reserve_add_range() calls must be made before adding the first pmm
+// arena and boot_reserve_wire() should be called after the last arena is added
+// to mark pages the reserved ranges intersect as WIRED.
 //
 // As the PMM arenas are added, the boot reserved ranges are consulted to make
 // sure the pmm data structures do not overlap with any reserved ranges.
 
-void boot_reserve_init();
 void boot_reserve_wire();
 
 zx_status_t boot_reserve_add_range(paddr_t pa, size_t len);

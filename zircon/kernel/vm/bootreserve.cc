@@ -23,11 +23,6 @@ static size_t res_idx;
 // Used directly by boot_reserve_wire, and implicitly by boot_reserve_unwire_page
 static list_node reserved_page_list = LIST_INITIAL_VALUE(reserved_page_list);
 
-void boot_reserve_init() {
-  // add the kernel to the boot reserve list
-  boot_reserve_add_range(get_kernel_base_phys(), get_kernel_size());
-}
-
 zx_status_t boot_reserve_add_range(paddr_t pa, size_t len) {
   dprintf(INFO, "PMM: boot reserve add [%#" PRIxPTR ", %#" PRIxPTR "]\n", pa, pa + len - 1);
 

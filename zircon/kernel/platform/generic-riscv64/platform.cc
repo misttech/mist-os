@@ -14,6 +14,7 @@
 #include <lib/crashlog.h>
 #include <lib/debuglog.h>
 #include <lib/jtrace/jtrace.h>
+#include <lib/memalloc/range.h>
 #include <lib/persistent-debuglog.h>
 #include <lib/system-topology.h>
 #include <lib/zbi-format/memory.h>
@@ -50,7 +51,6 @@
 #include <platform/ram_mappable_crashlog.h>
 #include <platform/timer.h>
 #include <platform/uart.h>
-#include <vm/bootreserve.h>
 #include <vm/kstack.h>
 #include <vm/physmap.h>
 #include <vm/vm.h>
@@ -416,15 +416,11 @@ void platform_early_init() {
   // is the cmdline option to bypass dlog set ?
   dlog_bypass_init();
 
-  // initialize the boot memory reservation system
-  boot_reserve_init();
-
   if (gPhysHandoff->nvram) {
     const zbi_nvram_t& nvram = gPhysHandoff->nvram.value();
-    dprintf(INFO, "boot reserve NVRAM range: phys base %#" PRIx64 " length %#" PRIx64 "\n",
-            nvram.base, nvram.length);
+    dprintf(INFO, "NVRAM range: phys base %#" PRIx64 " length %#" PRIx64 "\n", nvram.base,
+            nvram.length);
     allocate_persistent_ram(nvram.base, nvram.length);
-    boot_reserve_add_range(nvram.base, nvram.length);
   }
 
   // Check if serial should be enabled
@@ -435,15 +431,7 @@ void platform_early_init() {
   // Initialize the PmmChecker now that the cmdline has been parsed.
   pmm_checker_init_from_cmdline();
 
-  // Add the data ZBI ramdisk to the boot reserve memory list.
-  ktl::span zbi = ZbiInPhysmap();
-  paddr_t ramdisk_start_phys = physmap_to_paddr(zbi.data());
-  paddr_t ramdisk_end_phys = ramdisk_start_phys + ROUNDUP_PAGE_SIZE(zbi.size_bytes());
-  dprintf(INFO, "reserving ramdisk phys range [%#" PRIx64 ", %#" PRIx64 "]\n", ramdisk_start_phys,
-          ramdisk_end_phys - 1);
-  boot_reserve_add_range(ramdisk_start_phys, ramdisk_end_phys - ramdisk_start_phys);
-
-  ASSERT(pmm_init(gPhysHandoff->mem_config.get()) == ZX_OK);
+  ASSERT(pmm_init(gPhysHandoff->mem_config.get(), gPhysHandoff->memory.get()) == ZX_OK);
 }
 
 void platform_prevm_init() {}

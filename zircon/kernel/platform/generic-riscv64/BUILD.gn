@@ -35,6 +35,7 @@ source_set("generic-riscv64") {
     "//zircon/kernel/lib/topology",
     "//zircon/kernel/object",
     "//zircon/kernel/phys:handoff",
+    "//zircon/kernel/phys/lib/memalloc:range",
     "//zircon/kernel/platform:headers",
     "//zircon/kernel/vm",
     "//zircon/system/ulib/explicit-memory",

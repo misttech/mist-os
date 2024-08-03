@@ -74,17 +74,29 @@ void mark_pio_region_to_reserve(uint64_t base, size_t len) {
   reserved_pio_count++;
 }
 
-#define DEFAULT_MEMEND (16UL * 1024 * 1024)
+// Discover the basic memory map.
+void pc_mem_init(ktl::span<const zbi_mem_range_t> unnormalized,
+                 ktl::span<const memalloc::Range> normalized) {
+  pmm_checker_init_from_cmdline();
 
-// Populate global memory arenas from the given memory ranges.
-static zx_status_t mem_arena_init(ktl::span<const zbi_mem_range_t> ranges) {
   // We don't want RAM under 1MiB to feature in to any arenas, so normalize that
   // here.
+  ktl::span<const memalloc::Range> low_reserved;
+  {
+    size_t low_reserved_end = 0;
+    while (low_reserved_end < normalized.size() &&
+           normalized[low_reserved_end].type == memalloc::Type::kReservedLow) {
+      ++low_reserved_end;
+    }
+    low_reserved = normalized.first(low_reserved_end);
+    normalized = normalized.last(normalized.size() - low_reserved.size());
+  }
+
+  // ...And do so for our "unnormalized" ranges as well.
   //
-  // TODO(https://fxbug.dev/347766366): Once PMM initialization deals in a span
-  // of normalized memory, we can just pass in the subspan of ranges that
-  // excludes RAM under 1 MiB and forgo this.
-  for (const zbi_mem_range_t& range : ranges) {
+  // TODO(https://fxbug.dev/347766366): This will go away once PMM
+  // initialization can just deal in `normalized`.
+  for (const zbi_mem_range_t& range : unnormalized) {
     if (range.type != ZBI_MEM_TYPE_RAM) {
       continue;
     }
@@ -97,52 +109,20 @@ static zx_status_t mem_arena_init(ktl::span<const zbi_mem_range_t> ranges) {
     ram.length = ram.paddr < end ? end - ram.paddr : 0;
   }
 
-  if (zx_status_t status = pmm_init(ranges); status != ZX_OK) {
-    return status;
-  }
-
-  zbitl::MemRangeMerger merged(ranges.begin(), ranges.end());
-  for (const zbi_mem_range_t& range : merged) {
-    if (range.type == ZBI_MEM_TYPE_RAM) {
-      mark_mmio_region_to_reserve(range.paddr, static_cast<size_t>(range.length));
-    }
-  }
-
-  return ZX_OK;
-}
-
-// Discover the basic memory map.
-void pc_mem_init(ktl::span<const zbi_mem_range_t> ranges) {
-  pmm_checker_init_from_cmdline();
-
-  // If no ranges were provided, use a fixed-size fallback range.
-  if (ranges.empty()) {
-    printf("MEM: no arena range source: falling back to fixed size\n");
-    static zbi_mem_range_t entry = {};
-    entry.paddr = 0;
-    entry.length = DEFAULT_MEMEND;
-    entry.type = ZBI_MEM_TYPE_RAM;
-    ranges = ktl::span<zbi_mem_range_t>(&entry, 1);
-  }
-
-  // Initialize memory from the ranges provided in the ZBI.
-  if (zx_status_t status = mem_arena_init(ranges); status != ZX_OK) {
+  if (zx_status_t status = pmm_init(unnormalized, normalized); status != ZX_OK) {
     TRACEF("Error adding arenas from provided memory tables: error = %d\n", status);
   }
+
+  memalloc::NormalizeRam(normalized, [](const memalloc::Range& range) {
+    mark_mmio_region_to_reserve(range.addr, static_cast<size_t>(range.size));
+    return true;
+  });
 
   // Find an area that we can use for 16 bit bootstrapping of other SMP cores.
   constexpr uint64_t kAllocSize = k_x86_bootstrap16_buffer_size;
   constexpr uint64_t kMinBase = 2UL * PAGE_SIZE;
-
-  // TODO(https://fxbug.dev/347766366): Eventually gPhysHandoff->memory will be
-  // what is effectively passed to this function, and the subspan past the
-  // kReservedLow ranges is what will be passed to mem_arena_init().
-  for (const memalloc::Range& range : gPhysHandoff->memory.get()) {
-    if (range.type != memalloc::Type::kReservedLow) {
-      TRACEF("WARNING - Failed to assign bootstrap16 region, SMP won't work\n");
-      break;
-    }
-
+  bool bootstrap16 = false;
+  for (const memalloc::Range& range : low_reserved) {
     uint64_t base = ktl::max(range.addr, kMinBase);
     if (base >= range.end() || range.end() - base < kAllocSize) {
       continue;
@@ -151,7 +131,11 @@ void pc_mem_init(ktl::span<const zbi_mem_range_t> ranges) {
     // We have a valid range.
     LTRACEF("Selected %" PRIxPTR " as bootstrap16 region\n", base);
     x86_bootstrap16_init(base);
+    bootstrap16 = true;
     break;
+  }
+  if (!bootstrap16) {
+    TRACEF("WARNING - Failed to assign bootstrap16 region, SMP won't work\n");
   }
 }
 
