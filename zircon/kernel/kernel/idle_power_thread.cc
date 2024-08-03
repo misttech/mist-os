@@ -202,11 +202,11 @@ IdlePowerThread::TransitionResult IdlePowerThread::TransitionFromTo(State expect
   return {ZX_OK, expected_state};
 }
 
-zx_status_t IdlePowerThread::TransitionAllActiveToSuspend(zx_time_t resume_at) {
+zx_status_t IdlePowerThread::TransitionAllActiveToSuspend(zx_boot_time_t resume_at) {
   // Prevent re-entrant calls to suspend.
   Guard<Mutex> guard{TransitionLock::Get()};
 
-  if (resume_at < current_time()) {
+  if (resume_at < current_boot_time()) {
     return ZX_ERR_TIMED_OUT;
   }
 
@@ -466,7 +466,7 @@ static int cmd_suspend(int argc, const cmd_args* argv, uint32_t flags) {
       goto badunits;
     }
 
-    const zx_time_t resume_at = zx_time_add_duration(current_time(), delay);
+    const zx_time_t resume_at = zx_time_add_duration(current_boot_time(), delay);
     return IdlePowerThread::TransitionAllActiveToSuspend(resume_at);
   }
 

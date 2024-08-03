@@ -111,7 +111,7 @@ bool TestPendingWakeEventBlocksSuspend() {
   ASSERT_EQ(0u, IdlePowerThread::pending_wake_events());
 
   // Make sure suspend entry works before testing suspend abort due to pending wake events.
-  zx_time_t resume_at = current_time() + ZX_SEC(5);
+  zx_time_t resume_at = current_boot_time() + ZX_SEC(5);
   zx_status_t status = IdlePowerThread::TransitionAllActiveToSuspend(resume_at);
   ASSERT_EQ(ZX_OK, status);
 
@@ -121,7 +121,7 @@ bool TestPendingWakeEventBlocksSuspend() {
   ASSERT_EQ(1u, IdlePowerThread::pending_wake_events());
 
   // Suspend entry should fail due to pending wake events.
-  resume_at = current_time() + ZX_SEC(5);
+  resume_at = current_boot_time() + ZX_SEC(5);
   status = IdlePowerThread::TransitionAllActiveToSuspend(resume_at);
   ASSERT_EQ(ZX_ERR_BAD_STATE, status);
   ASSERT_EQ(1u, IdlePowerThread::pending_wake_events());
@@ -138,7 +138,7 @@ bool TestPendingWakeEventBlocksSuspend() {
   ASSERT_EQ(0u, IdlePowerThread::pending_wake_events());
 
   // Suspend entry should succeed again.
-  resume_at = current_time() + ZX_SEC(5);
+  resume_at = current_boot_time() + ZX_SEC(5);
   status = IdlePowerThread::TransitionAllActiveToSuspend(resume_at);
   ASSERT_EQ(ZX_OK, status);
 
@@ -148,7 +148,7 @@ bool TestPendingWakeEventBlocksSuspend() {
   ASSERT_EQ(1u, IdlePowerThread::pending_wake_events());
 
   // Suspend entry should fail due to pending wake events.
-  resume_at = current_time() + ZX_SEC(5);
+  resume_at = current_boot_time() + ZX_SEC(5);
   status = IdlePowerThread::TransitionAllActiveToSuspend(resume_at);
   ASSERT_EQ(ZX_ERR_BAD_STATE, status);
 
@@ -156,7 +156,7 @@ bool TestPendingWakeEventBlocksSuspend() {
   ASSERT_EQ(0u, IdlePowerThread::pending_wake_events());
 
   // Suspend entry should succeed.
-  resume_at = current_time() + ZX_SEC(5);
+  resume_at = current_boot_time() + ZX_SEC(5);
   status = IdlePowerThread::TransitionAllActiveToSuspend(resume_at);
   ASSERT_EQ(ZX_OK, status);
 #endif

@@ -97,7 +97,7 @@ class IdlePowerThread final {
   //  - ZX_OK if active CPU suspend succeeded and then resumed.
   //  - ZX_ERR_TIMED_OUT when resume_at is in the past before transitioning to suspend.
   //  - ZX_ERR_BAD_STATE if there is a pending wake event when attempting to transition to suspend.
-  static zx_status_t TransitionAllActiveToSuspend(zx_time_t resume_at = ZX_TIME_INFINITE)
+  static zx_status_t TransitionAllActiveToSuspend(zx_boot_time_t resume_at = ZX_TIME_INFINITE)
       TA_EXCL(TransitionLock::Get());
 
   // The result of a request to wake up the system.
@@ -265,7 +265,8 @@ class IdlePowerThread final {
   };
 
   inline static ktl::atomic<uint64_t> system_suspend_state_{SystemSuspendStateActive};
-  inline static Timer resume_timer_ TA_GUARDED(TransitionLock::Get()){};
+  inline static Timer resume_timer_ TA_GUARDED(TransitionLock::Get()){
+      Timer::ReferenceTimeline::kBoot};
 };
 
 #endif  // ZIRCON_KERNEL_INCLUDE_KERNEL_IDLE_POWER_THREAD_H_
