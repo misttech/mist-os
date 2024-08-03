@@ -113,10 +113,20 @@ void pc_mem_init(ktl::span<const zbi_mem_range_t> unnormalized,
     TRACEF("Error adding arenas from provided memory tables: error = %d\n", status);
   }
 
-  memalloc::NormalizeRam(normalized, [](const memalloc::Range& range) {
-    mark_mmio_region_to_reserve(range.addr, static_cast<size_t>(range.size));
-    return true;
-  });
+  auto filter_for_ram = [](memalloc::Type type) -> ktl::optional<memalloc::Type> {
+    // Treat reserved test RAM as MMIO.
+    if (type == memalloc::Type::kTestRamReserve || !memalloc::IsRamType(type)) {
+      return {};
+    }
+    return memalloc::Type::kFreeRam;
+  };
+  memalloc::NormalizeRanges(
+      normalized,
+      [](const memalloc::Range& range) {
+        mark_mmio_region_to_reserve(range.addr, static_cast<size_t>(range.size));
+        return true;
+      },
+      filter_for_ram);
 
   // Find an area that we can use for 16 bit bootstrapping of other SMP cores.
   constexpr uint64_t kAllocSize = k_x86_bootstrap16_buffer_size;
