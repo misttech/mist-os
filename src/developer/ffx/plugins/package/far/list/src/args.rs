@@ -8,7 +8,7 @@ use std::path::PathBuf;
 
 #[ffx_command()]
 #[derive(ArgsInfo, FromArgs, Debug, Eq, PartialEq)]
-#[argh(subcommand, name = "list", description = "List the entries contained in a FAR file")]
+#[argh(subcommand, name = "list", description = "List the entry paths contained in a FAR file")]
 pub struct ListCommand {
     #[argh(positional)]
     pub far_file: PathBuf,

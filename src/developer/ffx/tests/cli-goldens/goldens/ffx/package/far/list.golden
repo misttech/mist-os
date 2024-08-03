@@ -1,6 +1,6 @@
 {
   "name": "list",
-  "description": "List the entries contained in a FAR file",
+  "description": "List the entry paths contained in a FAR file",
   "examples": [],
   "flags": [
     {
