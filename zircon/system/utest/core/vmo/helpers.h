@@ -52,6 +52,24 @@ static inline size_t VmoNumChildren(const zx::vmo& vmo) {
   return info.num_children;
 }
 
+// Repeatedly poll |vmo| until the |expected_num_children| is observed.
+//
+// Returns true on success, false on error.
+static inline bool PollVmoNumChildren(const zx::vmo& vmo, size_t expected_num_children) {
+  zx_info_vmo_t info;
+  while (true) {
+    if (vmo.get_info(ZX_INFO_VMO, &info, sizeof(info), nullptr, nullptr) != ZX_OK) {
+      return false;
+    }
+    if (info.num_children == expected_num_children) {
+      return true;
+    }
+    printf("polling again. actual num children %zu; expected num children %zu\n", info.num_children,
+           expected_num_children);
+    zx::nanosleep(zx::deadline_after(zx::msec(50)));
+  }
+}
+
 static inline size_t VmoPopulatedBytes(const zx::vmo& vmo) {
   zx_info_vmo_t info;
   if (vmo.get_info(ZX_INFO_VMO, &info, sizeof(info), nullptr, nullptr) != ZX_OK) {
@@ -60,18 +78,21 @@ static inline size_t VmoPopulatedBytes(const zx::vmo& vmo) {
   return info.populated_bytes;
 }
 
-static inline bool PollVmoPopulatedBytes(const zx::vmo& vmo, size_t expected_bytes) {
+// Repeatedly poll |vmo| until the |expected_populated_bytes| is observed.
+//
+// Returns true on success, false on error.
+static inline bool PollVmoPopulatedBytes(const zx::vmo& vmo, size_t expected_populated_bytes) {
   zx_info_vmo_t info;
   while (true) {
     if (vmo.get_info(ZX_INFO_VMO, &info, sizeof(info), nullptr, nullptr) != ZX_OK) {
       return false;
     }
-    if (info.populated_bytes == expected_bytes) {
+    if (info.populated_bytes == expected_populated_bytes) {
       return true;
     }
     printf("polling again. actual bytes %zu (%zu pages); expected bytes %zu (%zu pages)\n",
-           info.populated_bytes, info.populated_bytes / zx_system_get_page_size(), expected_bytes,
-           expected_bytes / zx_system_get_page_size());
+           info.populated_bytes, info.populated_bytes / zx_system_get_page_size(),
+           expected_populated_bytes, expected_populated_bytes / zx_system_get_page_size());
     zx::nanosleep(zx::deadline_after(zx::msec(50)));
   }
 }
