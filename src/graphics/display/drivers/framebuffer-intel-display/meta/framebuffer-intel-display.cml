@@ -14,7 +14,7 @@
     },
     use: [
         { protocol: "fuchsia.kernel.FramebufferResource" },
+        { protocol: "fuchsia.sysmem2.Allocator" },
         { service: "fuchsia.hardware.pci.Service" },
-        { service: "fuchsia.hardware.sysmem.Service" },
     ],
 }
