@@ -21,7 +21,6 @@ def main():
     parser.add_argument(
         "--api-level",
         "-l",
-        type=int,
         help="The API level to use. If not supplied the current in-tree levels will be used.",
     )
     parser.add_argument(
@@ -62,14 +61,14 @@ def main():
         )
     ]
 
-    def patch_path(path: str, api_level: int) -> str:
+    def patch_path(path: str, api_level: str) -> str:
         """Modify a path a the platform build FIDL IR to be the one for a specific API level."""
         d, f = os.path.split(path)
         new_ending = f"_compile_{api_level}.fidl.json"
         f = f.replace(".fidl.json", new_ending, 1)
         # Make sure that worked as expected
         assert f.endswith(new_ending)
-        return os.path.join(d, str(api_level), f)
+        return os.path.join(d, api_level, f)
 
     # If we're targeting a stable API level, tinker with the paths
     if args.api_level:
