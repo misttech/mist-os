@@ -1146,8 +1146,7 @@ zx_status_t DisplayEngine::GetCommonProtocolsAndResources() {
     return ZX_ERR_INTERNAL;
   }
 
-  zx::result<fidl::ClientEnd<fuchsia_sysmem2::Allocator>> sysmem_client_result =
-      incoming_->Connect<fuchsia_hardware_sysmem::Service::AllocatorV2>("sysmem");
+  zx::result sysmem_client_result = incoming_->Connect<fuchsia_sysmem2::Allocator>();
   if (sysmem_client_result.is_error()) {
     FDF_LOG(ERROR, "Failed to get sysmem protocol: %s", sysmem_client_result.status_string());
     return sysmem_client_result.status_value();
