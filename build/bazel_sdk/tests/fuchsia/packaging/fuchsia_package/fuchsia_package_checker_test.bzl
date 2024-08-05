@@ -41,8 +41,11 @@ def _fuchsia_package_checker_test_impl(ctx):
         else:
             fail("Expected blob {} not in resources {}".format(dest, dest_to_resource))
 
-    # apped the components
+    # append the components
     args.extend(["--manifests={}".format(m) for m in ctx.attr.manifests])
+
+    # append the cvf files
+    args.extend(["--structured_config_files={}".format(f) for f in ctx.attr.structured_config_files])
 
     # append the bind bytecode
     if ctx.attr.bind_bytecode:
@@ -83,6 +86,10 @@ fuchsia_package_checker_test = rule(
         "manifests": attr.string_list(
             doc = "A list of expected manifests in meta/foo.cm form",
             mandatory = True,
+        ),
+        "structured_config_files": attr.string_list(
+            doc = "A list of expected structured config files in meta/foo.cvf form",
+            mandatory = False,
         ),
         "bind_bytecode": attr.string(
             doc = "A path to the bind bytecode for the driver in meta/bind/foo.bindbc form",

@@ -508,3 +508,10 @@ def fuchsia_cc_test(
         tags = tags,
         visibility = visibility,
     )
+
+#TODO: do not couple the generated component with the the native_cc component.
+# Rather the "name" should remain on the native.cc_test target and we should
+# establish a convention for the fuchsia_unittest_package that the unittests
+# that are passed in must create a target called <name>.unittest_component which
+# it then pulls in. This way, if a user wants to create their own test component
+# they can use fuchsia_test_package and the generated target will be ignored.

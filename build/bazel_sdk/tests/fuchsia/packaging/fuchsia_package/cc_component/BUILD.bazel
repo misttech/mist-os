@@ -14,6 +14,7 @@ load(
     "fuchsia_structured_config_values",
     "fuchsia_test_component",
     "fuchsia_test_package",
+    "fuchsia_unittest_package",
 )
 load("//test_utils:make_file.bzl", "make_file")
 
@@ -51,6 +52,16 @@ fuchsia_test_package(
     resources = [":simple_file_resource"],
     test_components = [
         ":cc_test_component",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+fuchsia_unittest_package(
+    name = "unittest_pkg",
+    package_name = "unittest_pkg_for_test",
+    fuchsia_api_level = "HEAD",
+    unit_tests = [
+        ":cc_test",
     ],
     visibility = ["//visibility:public"],
 )
@@ -97,6 +108,22 @@ fuchsia_component_manifest(
             mutability: [ "parent" ],
         },
     },
+}""",
+)
+
+fuchsia_component_manifest(
+    name = "test_component_manifest",
+    component_name = "cc_test",
+    content = """{
+    include: [
+        "syslog/client.shard.cml",
+        "sys/testing/elf_test_runner.shard.cml",
+    ],
+    program: {
+        binary: 'bin/cc_test',
+    },
+    use: [
+    ],
 }""",
 )
 
@@ -147,7 +174,7 @@ fuchsia_cc_test(
 
 fuchsia_test_component(
     name = "cc_test_component",
-    manifest = ":manifest",
+    manifest = ":test_component_manifest",
     deps = [
         ":cc_test",
     ],
