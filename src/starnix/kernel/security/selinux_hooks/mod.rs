@@ -7,7 +7,8 @@ pub(super) mod fs;
 use super::{FsNodeSecurityXattr, FsNodeState, ProcAttr, ResolvedElfState};
 
 use crate::task::CurrentTask;
-use crate::vfs::{FsNode, FsNodeHandle, FsStr, FsString, NamespaceNode, ValueOrSize};
+use crate::vfs::{FsNode, FsNodeHandle, FsStr, FsString, NamespaceNode, ValueOrSize, XattrOp};
+
 use linux_uapi::XATTR_NAME_SELINUX;
 use selinux::permission_check::PermissionCheck;
 use selinux::security_server::SecurityServer;
@@ -270,20 +271,45 @@ pub(super) fn ptrace_access_check(
     )
 }
 
-/// Attempts to update the security ID (SID) associated with `fs_node` to the context encoded by
-/// `security_selinux_xattr_value`.
-pub(super) fn post_setxattr(
+/// Returns the Security Context corresponding to the SID with which `FsNode`
+/// is labelled, otherwise delegates to the node's [`crate::vfs::FsNodeOps`].
+pub(super) fn fs_node_getsecurity(
     security_server: &SecurityServer,
+    current_task: &CurrentTask,
     fs_node: &FsNode,
-    security_selinux_xattr_value: &FsStr,
-) {
-    match security_server.security_context_to_sid(security_selinux_xattr_value.into()) {
-        // Update node SID value if a SID is found to be associated with new security context
-        // string.
-        Ok(sid) => set_cached_sid(fs_node, sid),
-        // Clear any existing node SID if none is associated with new security context string.
-        Err(_) => clear_cached_sid(fs_node),
+    name: &FsStr,
+    max_size: usize,
+) -> Result<ValueOrSize<FsString>, Errno> {
+    if name == FsStr::new(XATTR_NAME_SELINUX.to_bytes()) {
+        if let Some(sid) = fs_node.info().security_state.0 {
+            if let Some(context) = security_server.sid_to_security_context(sid) {
+                return Ok(ValueOrSize::Value(context.into()));
+            }
+        }
     }
+    fs_node.ops().get_xattr(fs_node, current_task, name, max_size)
+}
+
+/// Sets the `name`d security attribute on `fs_node` and updates internal
+/// kernel state.
+pub(super) fn fs_node_setsecurity(
+    security_server: &SecurityServer,
+    current_task: &CurrentTask,
+    fs_node: &FsNode,
+    name: &FsStr,
+    value: &FsStr,
+    op: XattrOp,
+) -> Result<(), Errno> {
+    fs_node.ops().set_xattr(fs_node, current_task, name, value, op)?;
+    if name == FsStr::new(XATTR_NAME_SELINUX.to_bytes()) {
+        // Update or remove the SID from `fs_node`, dependent whether the new value
+        // represents a valid Security Context.
+        match security_server.security_context_to_sid(value.into()) {
+            Ok(sid) => set_cached_sid(fs_node, sid),
+            Err(_) => clear_cached_sid(fs_node),
+        }
+    }
+    Ok(())
 }
 
 /// Returns the Security Context associated with the `name`ed entry for the specified `target` task.

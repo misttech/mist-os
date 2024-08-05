@@ -4,7 +4,7 @@
 
 use crate::device::DeviceMode;
 use crate::mm::PAGE_SIZE;
-use crate::security::{post_setxattr, FsNodeState};
+use crate::security;
 use crate::signals::{send_standard_signal, SignalInfo};
 use crate::task::{CurrentTask, Kernel, WaitQueue, Waiter};
 use crate::time::utc;
@@ -20,6 +20,7 @@ use crate::vfs::{
 };
 use bitflags::bitflags;
 use fuchsia_zircon as zx;
+use linux_uapi::XATTR_SECURITY_PREFIX;
 use once_cell::sync::OnceCell;
 use starnix_logging::{log_error, track_stub};
 #[cfg(any(test, debug_assertions))]
@@ -205,7 +206,7 @@ pub struct FsNodeInfo {
     pub time_status_change: zx::Time,
     pub time_access: zx::Time,
     pub time_modify: zx::Time,
-    pub security_state: FsNodeState,
+    pub security_state: security::FsNodeState,
 }
 
 impl FsNodeInfo {
@@ -454,7 +455,7 @@ pub enum SymlinkTarget {
     Node(NamespaceNode),
 }
 
-#[derive(PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum XattrOp {
     /// Set the value of the extended attribute regardless of whether it exists.
     Set,
@@ -475,7 +476,7 @@ impl XattrOp {
 }
 
 /// Returns a value, or the size required to contains it.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ValueOrSize<T> {
     Value(T),
     Size(usize),
@@ -2081,7 +2082,11 @@ impl FsNode {
             CheckAccessReason::InternalPermissionChecks,
         )?;
         self.check_trusted_attribute_access(current_task, name, || errno!(ENODATA))?;
-        self.ops().get_xattr(self, current_task, name, max_size)
+        if name.starts_with(XATTR_SECURITY_PREFIX.to_bytes()) {
+            security::fs_node_getsecurity(current_task, self, name, max_size)
+        } else {
+            self.ops().get_xattr(self, current_task, name, max_size)
+        }
     }
 
     pub fn set_xattr(
@@ -2099,8 +2104,11 @@ impl FsNode {
             CheckAccessReason::InternalPermissionChecks,
         )?;
         self.check_trusted_attribute_access(current_task, name, || errno!(EPERM))?;
-        self.ops().set_xattr(self, current_task, name, value, op)?;
-        post_setxattr(current_task, self, name, value);
+        if name.starts_with(XATTR_SECURITY_PREFIX.to_bytes()) {
+            security::fs_node_setsecurity(current_task, self, name, value, op)?;
+        } else {
+            self.ops().set_xattr(self, current_task, name, value, op)?;
+        }
         Ok(())
     }
 
