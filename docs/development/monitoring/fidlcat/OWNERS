@@ -1,4 +1,1 @@
-dangyi@google.com
-jeremymanson@google.com
-
-# Component: Tools>fidlcat
+include /tools/fidlcat/OWNERS
