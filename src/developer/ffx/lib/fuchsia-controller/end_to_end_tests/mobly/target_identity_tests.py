@@ -12,12 +12,12 @@ import fidl.fuchsia_feedback as feedback
 import fidl.fuchsia_hwinfo as hwinfo
 import fidl.fuchsia_io as io
 from fuchsia_controller_py import Channel, ZxStatus
+from fuchsia_controller_py.wrappers import AsyncAdapter, asyncmethod
 from mobly import asserts, base_test, test_runner
 from mobly_controller import fuchsia_device
-from mobly_controller.fuchsia_device import asynctest
 
 
-class FuchsiaControllerTests(base_test.BaseTestClass):
+class FuchsiaControllerTests(AsyncAdapter, base_test.BaseTestClass):
     def setup_class(self) -> None:
         self.fuchsia_devices: List[
             fuchsia_device.FuchsiaDevice
@@ -25,7 +25,7 @@ class FuchsiaControllerTests(base_test.BaseTestClass):
         self.device = self.fuchsia_devices[0]
         self.device.set_ctx(self)
 
-    @asynctest
+    @asyncmethod
     async def test_get_nodename(self) -> None:
         """Test that gets the nodename using the Target daemon protocol.
 
@@ -40,7 +40,7 @@ class FuchsiaControllerTests(base_test.BaseTestClass):
         target_info = res.target_info
         asserts.assert_equal(target_info.nodename, self.device.config["name"])
 
-    @asynctest
+    @asyncmethod
     async def test_get_device_info(self) -> None:
         """Gets target device info, compares to internal fuchsia_device config.
 
@@ -59,7 +59,7 @@ class FuchsiaControllerTests(base_test.BaseTestClass):
         name = res.response.name
         asserts.assert_equal(name, self.device.config["name"])
 
-    @asynctest
+    @asyncmethod
     async def test_get_device_info_and_hwinfo(self) -> None:
         """Gets two different component infos in parallel.
 
@@ -107,7 +107,7 @@ class FuchsiaControllerTests(base_test.BaseTestClass):
             extras=str(product_res),
         )
 
-    @asynctest
+    @asyncmethod
     async def test_get_fuchsia_snapshot(self) -> None:
         """Gets Fuchsia Snapshot info.
 

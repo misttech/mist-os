@@ -8,9 +8,9 @@ import logging
 import fidl.fuchsia_bluetooth as bluetooth
 import fidl.fuchsia_bluetooth_sys as bluetooth_sys
 from fuchsia_controller_py import Channel, ZxStatus
-from mobly import asserts, base_test, test_runner
+from fuchsia_controller_py.wrappers import AsyncAdapter, asyncmethod
+from mobly import base_test, test_runner
 from mobly_controller import fuchsia_device
-from mobly_controller.fuchsia_device import asynctest
 
 PEER_MATCH_TIMEOUT_SECONDS: int = 120
 
@@ -108,7 +108,7 @@ class BluetoothDevice(object):
         self.peer_update_task = None
 
 
-class MultiDeviceTest(base_test.BaseTestClass):
+class MultiDeviceTest(AsyncAdapter, base_test.BaseTestClass):
     def _setup_device(
         self, device: fuchsia_device.FuchsiaDevice
     ) -> BluetoothDevice:
@@ -123,7 +123,7 @@ class MultiDeviceTest(base_test.BaseTestClass):
             for x in self.register_controller(fuchsia_device)
         ]
         if len(self.fuchsia_devices) < 2:
-            raise MutipleFuchsiaDevicesNotFound(  # type: ignore
+            raise MultipleFuchsiaDevicesNotFound(
                 "Two fuchsia devices are required to run this test."
             )
         self.initiator = self.fuchsia_devices[0]
@@ -142,7 +142,7 @@ class MultiDeviceTest(base_test.BaseTestClass):
             ):
                 break
 
-    @asynctest
+    @asyncmethod
     async def test_discovery(self) -> None:
         for device in self.fuchsia_devices:
             await device.start_listeners()
@@ -153,7 +153,7 @@ class MultiDeviceTest(base_test.BaseTestClass):
         async with asyncio.timeout(PEER_MATCH_TIMEOUT_SECONDS):
             await self._wait_for_matching_peer(receiver_address)
 
-    @asynctest
+    @asyncmethod
     async def teardown_test(self) -> None:
         for device in self.fuchsia_devices:
             device.stop_listeners()

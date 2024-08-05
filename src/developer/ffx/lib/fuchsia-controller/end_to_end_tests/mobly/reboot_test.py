@@ -7,12 +7,12 @@ import typing
 
 import fidl.fuchsia_hardware_power_statecontrol as power_statecontrol
 from fuchsia_controller_py import ZxStatus
+from fuchsia_controller_py.wrappers import AsyncAdapter, asyncmethod
 from mobly import base_test, test_runner
 from mobly_controller import fuchsia_device
-from mobly_controller.fuchsia_device import asynctest
 
 
-class FuchsiaControllerTests(base_test.BaseTestClass):
+class FuchsiaControllerTests(AsyncAdapter, base_test.BaseTestClass):
     def setup_class(self) -> None:
         self.fuchsia_devices: typing.List[
             fuchsia_device.FuchsiaDevice
@@ -20,7 +20,7 @@ class FuchsiaControllerTests(base_test.BaseTestClass):
         self.device = self.fuchsia_devices[0]
         self.device.set_ctx(self)
 
-    @asynctest
+    @asyncmethod
     async def test_fuchsia_device_reboot(self) -> None:
         """Attempts to reboot a device."""
         if self.device.ctx is None:

@@ -149,7 +149,10 @@ python_library("fuchsia_controller_py") {
     ":fidl_codec",
     ":fuchsia_controller_internal",
   ]
-  sources = [ "__init__.py" ]
+  sources = [
+    "__init__.py",
+    "wrappers.py",
+  ]
 }
 
 python_library("fidl_bindings") {
