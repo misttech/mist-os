@@ -35,20 +35,7 @@ impl<'a> Into<Segment<'a>> for &'a str {
         if !self.contains('\\') {
             return Segment::ExactMatch(Cow::from(self));
         }
-        let mut result = String::with_capacity(self.len());
-        let mut iter = self.chars();
-        while let Some(c) = iter.next() {
-            match c {
-                '\\' => {
-                    // push unescaped character since we are constructing an exact match.
-                    if let Some(c) = iter.next() {
-                        result.push(c);
-                    }
-                }
-                c => result.push(c),
-            }
-        }
-        Segment::ExactMatch(Cow::from(result))
+        Segment::ExactMatch(Cow::Owned(unescape(self)))
     }
 }
 
@@ -62,27 +49,33 @@ impl<'a> Into<TreeNames<'a>> for Vec<&'a str> {
     fn into(self) -> TreeNames<'a> {
         let mut payload = vec![];
         for name in self {
-            if !name.contains('\\') {
+            if name.contains('\\') {
+                payload.push(Cow::Owned(unescape(name)));
+            } else {
                 payload.push(Cow::Borrowed(name));
-                continue;
             }
-            let mut result = String::with_capacity(name.len());
-            let mut iter = name.chars();
-            while let Some(c) = iter.next() {
-                match c {
-                    '\\' => {
-                        // push unescaped character since we are constructing an exact match.
-                        if let Some(c) = iter.next() {
-                            result.push(c);
-                        }
-                    }
-                    c => result.push(c),
-                }
-            }
-            payload.push(Cow::Owned(result));
         }
         TreeNames::Some(payload)
     }
+}
+
+// Given a escaped string, removes all the escaped characters (`\\`) and returns a new string
+// without them.
+fn unescape(value: &str) -> String {
+    let mut result = String::with_capacity(value.len());
+    let mut iter = value.chars();
+    while let Some(c) = iter.next() {
+        match c {
+            '\\' => {
+                // push unescaped character since we are constructing an exact match.
+                if let Some(c) = iter.next() {
+                    result.push(c);
+                }
+            }
+            c => result.push(c),
+        }
+    }
+    result
 }
 
 #[derive(Debug, Eq, PartialEq)]
