@@ -179,7 +179,7 @@ async fn detect_disk_format_res(block_proxy: impl AsBlockProxy) -> Result<DiskFo
 mod tests {
     use super::{constants, detect_disk_format_res, DiskFormat};
     use anyhow::Error;
-    use fake_server::FakeServer;
+    use fake_block_server::FakeServer;
     use fidl::endpoints::create_proxy_and_stream;
     use fidl_fuchsia_hardware_block_volume::VolumeMarker;
     use futures::{select, FutureExt};

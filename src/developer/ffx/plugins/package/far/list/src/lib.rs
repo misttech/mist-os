@@ -8,6 +8,7 @@ use ffx_package_far_list_args::ListCommand;
 use fho::{FfxMain, FfxTool, MachineWriter, ToolIO as _};
 use fuchsia_archive as far;
 use humansize::{file_size_opts, FileSize};
+use prettytable::format::FormatBuilder;
 use prettytable::{cell, row, Table};
 use serde::{Deserialize, Serialize};
 use std::fs::File;
@@ -74,26 +75,30 @@ pub async fn cmd_list(
 fn format_table(entries: &[FarEntry], display_lengths: bool) -> Table {
     let mut table = Table::new();
 
+    // display_lengths requires right padding
+    let padl = 0;
+    let padr = if display_lengths { 1 } else { 0 };
+    let table_format = FormatBuilder::new().padding(padl, padr).build();
+    table.set_format(table_format);
+
     if display_lengths {
-        table.set_titles(row!["path", "length"]);
+        table.set_titles(row!["PATH", "OFFSET", "LENGTH"]);
 
         for entry in entries {
             let path = &entry.path;
+            let offset = &entry.offset;
             let length = entry
                 .length
                 .file_size(file_size_opts::CONVENTIONAL)
                 .expect("length is non-negative");
 
-            table.add_row(row![path, length]);
+            table.add_row(row![path, offset, length]);
         }
     } else {
-        table.set_titles(row!["path"]);
-
         for entry in entries {
             table.add_row(row![entry.path]);
         }
     }
-
     table
 }
 
@@ -131,7 +136,14 @@ mod tests {
         let writer = <FarListTool as FfxMain>::Writer::new_test(None, &buffers);
         cmd_list(cmd, writer).await?;
         let (stdout, stderr) = buffers.into_strings();
-        assert_eq!(stdout, "+------+\n| path |\n+======+\n| bar  |\n+------+\n| baz  |\n+------+\n| foo  |\n+------+\n");
+        let expected = r#"
+bar
+baz
+foo
+"#[1..]
+            .to_string();
+
+        assert_eq!(stdout, expected);
         assert_eq!(stderr, "");
         Ok(())
     }
@@ -145,7 +157,15 @@ mod tests {
         let writer = <FarListTool as FfxMain>::Writer::new_test(None, &buffers);
         cmd_list(cmd, writer).await?;
         let (stdout, stderr) = buffers.into_strings();
-        assert_eq!(stdout, "+-------+--------+\n| path  | length |\n+=======+========+\n| alpha | 5 B    |\n+-------+--------+\n| beta  | 4 B    |\n+-------+--------+\n| gamma | 5 B    |\n+-------+--------+\n");
+        let expected = concat!(
+            "PATH  OFFSET LENGTH \n",
+            "alpha 4096   5 B \n",
+            "beta  8192   4 B \n",
+            "gamma 12288  5 B \n"
+        )
+        .to_owned();
+
+        assert_eq!(stdout, expected);
         assert_eq!(stderr, "");
         Ok(())
     }

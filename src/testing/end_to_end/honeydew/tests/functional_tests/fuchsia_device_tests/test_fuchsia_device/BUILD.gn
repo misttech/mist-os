@@ -12,7 +12,14 @@ if (is_host) {
       "//src/testing/end_to_end/honeydew",
       "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
     ]
-    params_source = "params_x64.yaml"
+    params = {
+      expected_values = {
+        board = "x64"
+        manufacturer = "default-manufacturer"
+        model = "default-model"
+        product_name = "default-fuchsia"
+      }
+    }
     transport = "fuchsia-controller"
 
     # Only enable for AEMU-x64 as host-tests aren't supported on QEMU-arm64.
@@ -26,7 +33,14 @@ if (is_host) {
       "//src/testing/end_to_end/honeydew",
       "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
     ]
-    params_source = "params_x64.yaml"
+    params = {
+      expected_values = {
+        board = "x64"
+        manufacturer = "default-manufacturer"
+        model = "default-model"
+        product_name = "default-fuchsia"
+      }
+    }
     transport = "fuchsia-controller-preferred"
   }
 
@@ -36,7 +50,14 @@ if (is_host) {
       "//src/testing/end_to_end/honeydew",
       "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
     ]
-    params_source = "params_x64.yaml"
+    params = {
+      expected_values = {
+        board = "x64"
+        manufacturer = "default-manufacturer"
+        model = "default-model"
+        product_name = "default-fuchsia"
+      }
+    }
     transport = "fuchsia-controller"
     environments = [ nuc11_env ]
   }
@@ -48,7 +69,14 @@ if (is_host) {
       "//src/testing/end_to_end/honeydew",
       "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
     ]
-    params_source = "params_x64.yaml"
+    params = {
+      expected_values = {
+        board = "x64"
+        manufacturer = "default-manufacturer"
+        model = "default-model"
+        product_name = "default-fuchsia"
+      }
+    }
     transport = "fuchsia-controller-preferred"
   }
 
@@ -58,7 +86,14 @@ if (is_host) {
       "//src/testing/end_to_end/honeydew",
       "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
     ]
-    params_source = "params_vim3.yaml"
+    params = {
+      expected_values = {
+        board = "vim3"
+        manufacturer = "default-manufacturer"
+        model = "default-model"
+        product_name = "default-fuchsia"
+      }
+    }
     transport = "fuchsia-controller"
     environments = [ vim3_env ]
   }
@@ -70,7 +105,50 @@ if (is_host) {
       "//src/testing/end_to_end/honeydew",
       "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
     ]
-    params_source = "params_vim3.yaml"
+    params = {
+      expected_values = {
+        board = "vim3"
+        manufacturer = "default-manufacturer"
+        model = "default-model"
+        product_name = "default-fuchsia"
+      }
+    }
+    transport = "fuchsia-controller-preferred"
+  }
+
+  python_mobly_test("nelson_test_fc") {
+    main_source = "test_fuchsia_device.py"
+    libraries = [
+      "//src/testing/end_to_end/honeydew",
+      "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
+    ]
+    params = {
+      expected_values = {
+        board = "nelson"
+        manufacturer = "Google Inc."
+        model = "Google Nest Hub"
+        product_name = "elaine"
+      }
+    }
+    transport = "fuchsia-controller"
+    environments = [ nelson_env ]
+  }
+
+  # For local runs to test "fuchsia-controller-preferred" class
+  python_mobly_test("nelson_test_fc_preferred") {
+    main_source = "test_fuchsia_device.py"
+    libraries = [
+      "//src/testing/end_to_end/honeydew",
+      "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
+    ]
+    params = {
+      expected_values = {
+        board = "nelson"
+        manufacturer = "Google Inc."
+        model = "Google Nest Hub"
+        product_name = "elaine"
+      }
+    }
     transport = "fuchsia-controller-preferred"
   }
 }
@@ -79,6 +157,8 @@ if (is_host) {
 group("tests") {
   testonly = true
   public_deps = [
+    ":nelson_test_fc($host_toolchain)",
+    ":nelson_test_fc_preferred($host_toolchain)",
     ":vim3_test_fc($host_toolchain)",
     ":vim3_test_fc_preferred($host_toolchain)",
     ":x64_emu_test_fc($host_toolchain)",

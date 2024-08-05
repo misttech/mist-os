@@ -5,6 +5,25 @@
 import("//build/cpp/library_headers.gni")
 
 library_headers("devmgr-integration-test-shim-headers") {
+  #  ________  _________  ________  ________
+  # |\   ____\|\___   ___\\   __  \|\   __  \
+  # \ \  \___|\|___ \  \_\ \  \|\  \ \  \|\  \
+  #  \ \_____  \   \ \  \ \ \  \\\  \ \   ____\
+  #   \|____|\  \   \ \  \ \ \  \\\  \ \  \___|
+  #     ____\_\  \   \ \__\ \ \_______\ \__\
+  #    |\_________\   \|__|  \|_______|\|__|
+  #    \|_________|
+  #
+  # This library is deprecated and should not be used for new tests.
+  visibility = [
+    ":*",
+    "//src/bringup/bin/netsvc:*",
+    "//src/devices/bus/drivers/platform/test:*",
+    "//src/devices/tests/bind-fail-test:*",
+    "//src/devices/tests/ddk-metadata-test:*",
+    "//src/devices/tests/libdriver-integration-test:*",
+    "//src/lib/ddk:*",
+  ]
   testonly = true
   headers = [ "lib/devmgr-integration-test/fixture.h" ]
   public_deps = [
@@ -23,6 +42,25 @@ library_headers("devmgr-integration-test-shim-headers") {
 }
 
 source_set("devmgr-integration-test-shim") {
+  #  ________  _________  ________  ________
+  # |\   ____\|\___   ___\\   __  \|\   __  \
+  # \ \  \___|\|___ \  \_\ \  \|\  \ \  \|\  \
+  #  \ \_____  \   \ \  \ \ \  \\\  \ \   ____\
+  #   \|____|\  \   \ \  \ \ \  \\\  \ \  \___|
+  #     ____\_\  \   \ \__\ \ \_______\ \__\
+  #    |\_________\   \|__|  \|_______|\|__|
+  #    \|_________|
+  #
+  # This library is deprecated and should not be used for new tests.
+  visibility = [
+    ":*",
+    "//src/bringup/bin/netsvc:*",
+    "//src/devices/bus/drivers/platform/test:*",
+    "//src/devices/tests/bind-fail-test:*",
+    "//src/devices/tests/ddk-metadata-test:*",
+    "//src/devices/tests/libdriver-integration-test:*",
+    "//src/lib/ddk:*",
+  ]
   testonly = true
 
   sources = [ "fixture.cc" ]

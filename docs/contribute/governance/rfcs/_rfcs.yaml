@@ -3309,3 +3309,16 @@
   reviewers: ['adamperry@google.com', 'adanis@google.com', 'dworsham@google.com', 'mcgrathr@google.com']
   submitted: '2024-07-19'
   reviewed: '2024-07-17'
+
+- name: 'RFC-0254'
+  title: 'Changing Attribution for Copy-on-Write Pages'
+  short_description: 'Change the APIs and semantics Zircon exposes for attributing copy-on-write pages.'
+  authors: ['dworsham@google.com']
+  file: '0254_changing_attribution_for_copy_on_write_pages.md'
+  area: ['Kernel']
+  issue: ['338300808']
+  gerrit_change_id: ['1044572']
+  status: 'Accepted'
+  reviewers: ['adanis@google.com', 'etiennej@google.com', 'jamesr@google.com', 'wez@google.com']
+  submitted: '2024-08-02'
+  reviewed: '2024-07-29'

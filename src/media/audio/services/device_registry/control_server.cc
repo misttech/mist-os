@@ -57,7 +57,6 @@ ControlServer::~ControlServer() {
 
 // Called when the client shuts down first.
 void ControlServer::OnShutdown(fidl::UnbindInfo info) {
-  ADR_LOG_METHOD(kLogObjectLifetimes);
   if (!info.is_peer_closed() && !info.is_user_initiated()) {
     ADR_WARN_METHOD() << "shutdown with unexpected status: " << info;
   } else {

@@ -54,7 +54,7 @@ fidl("driver.multiname.test") {
 
 driver_bind_rules("parent_device_bind") {
   testonly = true
-  rules = "parent_device.bind"
+  rules = "meta/parent_device.bind"
   bind_output = "parent_device.bindbc"
   deps = [ "//src/devices/bind/fuchsia.test" ]
 }
@@ -81,6 +81,6 @@ fuchsia_driver_component("parent_device_component") {
   testonly = true
   component_name = "parent_device"
   deps = [ ":parent_device" ]
-  info = "parent_device-info.json"
+  info = "meta/parent_device-info.json"
   manifest = "meta/parent_device_component.cml"
 }

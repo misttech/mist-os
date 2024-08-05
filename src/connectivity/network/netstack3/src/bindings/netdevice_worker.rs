@@ -611,7 +611,7 @@ async fn add_initial_routes(bindings_ctx: &BindingsCtx, device: &DeviceId<Bindin
         AddableMetric::MetricTracksInterface,
     ))
     .map(|entry| {
-        routes::Change::RouteOp(
+        routes::Change::<Ipv4>::RouteOp(
             routes::RouteOp::Add(entry),
             routes::SetMembership::InitialDeviceRoutes,
         )
@@ -632,7 +632,7 @@ async fn add_initial_routes(bindings_ctx: &BindingsCtx, device: &DeviceId<Bindin
     ]
     .into_iter()
     .map(|entry| {
-        routes::Change::RouteOp(
+        routes::Change::<Ipv6>::RouteOp(
             routes::RouteOp::Add(entry),
             routes::SetMembership::InitialDeviceRoutes,
         )

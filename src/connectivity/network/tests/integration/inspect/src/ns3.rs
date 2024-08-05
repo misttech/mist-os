@@ -877,7 +877,9 @@ async fn inspect_counters(name: &str) {
                 "PacketRx": {
                     Received: 1u64,
                     Dispatched: 1u64,
-                    Delivered: 1u64,
+                    DeliveredUnicast: 1u64,
+                    DeliveredMulticast: 0u64,
+                    DeliveredBroadcast: 0u64,
                     OtherHost: 0u64,
                     ParameterProblem: 0u64,
                     UnspecifiedDst: 0u64,

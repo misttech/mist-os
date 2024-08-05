@@ -13,7 +13,7 @@ namespace fdf_metadata {
 
 template <>
 struct ObjectDetails<fuchsia_hardware_adcimpl::Metadata> {
-  inline static const char* Name = fuchsia_hardware_adcimpl::kMetadataService;
+  inline static const char* Name = fuchsia_hardware_adcimpl::kMetadataTypeName;
 };
 
 }  // namespace fdf_metadata

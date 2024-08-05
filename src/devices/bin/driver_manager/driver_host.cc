@@ -202,4 +202,11 @@ zx::result<> DriverHostComponent::InstallLoader(
   return zx::ok();
 }
 
+void DynamicLinkerDriverHostComponent::StartWithDynamicLinker(
+    std::string_view driver_soname, zx::vmo driver, fidl::ClientEnd<fuchsia_io::Directory> lib_dir,
+    fidl::ServerEnd<fuchsia_driver_host::Driver> driver_server_end, StartCallback cb) {
+  // TODO(https://fxbug.dev/341998660): call dynamic linker.
+  cb(zx::error(ZX_ERR_NOT_SUPPORTED));
+}
+
 }  // namespace driver_manager

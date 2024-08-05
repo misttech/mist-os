@@ -14,7 +14,7 @@ fuchsia_driver("aml-rawnand-driver") {
 }
 
 fuchsia_driver_component("aml-rawnand") {
-  info = "aml-rawnand-info.json"
+  info = "meta/aml-rawnand-info.json"
   component_name = "aml-rawnand"
   deps = [ ":aml-rawnand-driver" ]
   manifest = "meta/aml-rawnand.cml"
@@ -26,9 +26,9 @@ fuchsia_driver_package("package") {
 }
 
 driver_bind_rules("aml-rawnand-bind") {
-  rules = "aml-rawnand.bind"
+  rules = "meta/aml-rawnand.bind"
   bind_output = "aml-rawnand.bindbc"
-  tests = "bind-tests.json"
+  tests = "meta/bind-tests.json"
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.gpio",

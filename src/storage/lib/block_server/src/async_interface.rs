@@ -14,6 +14,11 @@ use std::sync::Arc;
 use {fidl_fuchsia_hardware_block as fblock, fuchsia_zircon as zx};
 
 pub trait Interface: Send + Sync + Unpin + 'static {
+    /// Called whenever a VMO is attached, prior to the VMO's usage in any other methods.
+    fn on_attach_vmo(&self, _vmo: &zx::Vmo) -> impl Future<Output = Result<(), zx::Status>> + Send {
+        async { Ok(()) }
+    }
+
     /// Called for a request to read bytes.
     fn read(
         &self,
@@ -47,13 +52,23 @@ pub struct SessionManager<I> {
     interface: Arc<I>,
 }
 
+impl<I: Interface> SessionManager<I> {
+    pub fn new(interface: Arc<I>) -> Self {
+        Self { interface }
+    }
+}
+
 impl<I: Interface> super::SessionManager for SessionManager<I> {
+    async fn on_attach_vmo(self: Arc<Self>, vmo: &Arc<zx::Vmo>) -> Result<(), zx::Status> {
+        self.interface.on_attach_vmo(vmo).await
+    }
+
     async fn open_session(
         self: Arc<Self>,
         stream: fblock::SessionRequestStream,
         block_size: u32,
     ) -> Result<(), Error> {
-        let (helper, fifo) = SessionHelper::new(block_size)?;
+        let (helper, fifo) = SessionHelper::new(self.clone(), block_size)?;
         let interface = self.interface.clone();
         let mut inflight_requests = FuturesUnordered::new();
         let mut stream = stream.fuse();
@@ -64,7 +79,7 @@ impl<I: Interface> super::SessionManager for SessionManager<I> {
             futures::select! {
                 req = stream.next() => {
                     let Some(req) = req else { return Ok(()) };
-                    helper.handle_request(req?)?;
+                    helper.handle_request(req?).await?;
                 }
                 result = fifo.read_entries(&mut requests[..]).fuse() => {
                     let count = result?;

@@ -246,6 +246,8 @@ fn inspect_ndp_rx_counters(inspector: &mut impl Inspector, counters: &NdpRxCount
 
 fn inspect_ip_counters<I: IpLayerIpExt>(inspector: &mut impl Inspector, counters: &IpCounters<I>) {
     let IpCounters {
+        deliver_unicast,
+        deliver_multicast,
         dispatch_receive_ip_packet,
         dispatch_receive_ip_packet_other_host,
         receive_ip_packet,
@@ -279,6 +281,8 @@ fn inspect_ip_counters<I: IpLayerIpExt>(inspector: &mut impl Inspector, counters
         inspector.record_counter("UnspecifiedDst", unspecified_destination);
         inspector.record_counter("UnspecifiedSrc", unspecified_source);
         inspector.record_counter("Dropped", dropped);
+        inspector.record_counter("DeliveredUnicast", deliver_unicast);
+        inspector.record_counter("DeliveredMulticast", deliver_multicast);
         inspector.delegate_inspectable(version_rx);
     });
     inspector.record_child("Forwarding", |inspector| {

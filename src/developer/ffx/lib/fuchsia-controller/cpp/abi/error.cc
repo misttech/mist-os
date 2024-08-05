@@ -7,10 +7,12 @@
 
 #include <sstream>
 
+#include "src/developer/ffx/lib/fuchsia-controller/cpp/raii/py_wrapper.h"
+
 namespace error {
 
-// TODO(https://fxbug.dev/42077810): This has been copied from zircon code, as vdso doesn't build this for
-// host.
+// TODO(https://fxbug.dev/42077810): This has been copied from zircon code, as vdso doesn't build
+// this for host.
 const char *zx_status_get_string(zx_status_t status) {
   switch (status) {
     case ZX_OK:
@@ -140,6 +142,26 @@ PyObject *ZxStatus_str(PyObject *self) {
   return PyUnicode_FromString(ss.str().c_str());
 }
 
+PyObject *ZxStatus_raw(PyObject *self) {
+  auto args = py::Object(PyObject_GetAttrString(self, "args"));
+  if (args == nullptr) {
+    return nullptr;
+  }
+  if (PyTuple_Size(args.get()) < 1) {
+    PyErr_Format(PyExc_RuntimeError, "class does not have any arguments set. This is a BUG.");
+    return nullptr;
+  }
+  PyObject *i = PyTuple_GetItem(args.get(), 0);
+  if (!PyLong_Check(i)) {
+    PyErr_Format(PyExc_RuntimeError, "class does not have an integer argument set. This is a BUG");
+    return nullptr;
+  }
+  // This is a BORROWED reference. Need to increment it so it doesn't get garbage collected by
+  // accident.
+  Py_INCREF(i);
+  return i;
+}
+
 PyMethodDef ZxStatus_repr_def = {
     "__repr__",
     reinterpret_cast<PyCFunction>(ZxStatus_repr),
@@ -150,6 +172,13 @@ PyMethodDef ZxStatus_repr_def = {
 PyMethodDef ZxStatus_str_def = {
     "__str__",
     reinterpret_cast<PyCFunction>(ZxStatus_str),
+    METH_METHOD | METH_FASTCALL | METH_KEYWORDS,
+    nullptr,
+};
+
+PyMethodDef ZxStatus_raw_def = {
+    "raw",
+    reinterpret_cast<PyCFunction>(ZxStatus_raw),
     METH_METHOD | METH_FASTCALL | METH_KEYWORDS,
     nullptr,
 };
@@ -237,6 +266,10 @@ PyTypeObject *ZxStatusType_Create() {
     return nullptr;
   }
   if (PyObject_SetAttrString(PyObjCast(res), "__repr__", repr) < 0) {
+    return nullptr;
+  }
+  auto raw = PyDescr_NewMethod(res, &ZxStatus_raw_def);
+  if (PyObject_SetAttrString(PyObjCast(res), "raw", raw) < 0) {
     return nullptr;
   }
   auto str = PyDescr_NewMethod(res, &ZxStatus_str_def);

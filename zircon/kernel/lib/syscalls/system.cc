@@ -26,6 +26,7 @@
 #include <zircon/syscalls-next.h>
 #include <zircon/syscalls/resource.h>
 #include <zircon/syscalls/system.h>
+#include <zircon/time.h>
 #include <zircon/types.h>
 
 #include <cstddef>

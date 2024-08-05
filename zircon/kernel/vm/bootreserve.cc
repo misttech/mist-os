@@ -23,11 +23,6 @@ static size_t res_idx;
 // Used directly by boot_reserve_wire, and implicitly by boot_reserve_unwire_page
 static list_node reserved_page_list = LIST_INITIAL_VALUE(reserved_page_list);
 
-void boot_reserve_init() {
-  // add the kernel to the boot reserve list
-  boot_reserve_add_range(get_kernel_base_phys(), get_kernel_size());
-}
-
 zx_status_t boot_reserve_add_range(paddr_t pa, size_t len) {
   dprintf(INFO, "PMM: boot reserve add [%#" PRIxPTR ", %#" PRIxPTR "]\n", pa, pa + len - 1);
 
@@ -136,15 +131,4 @@ retry:
 
   *alloc_range = {alloc_pa, alloc_len};
   return ZX_OK;
-}
-
-// Returns false and exits early if the callback returns false, true otherwise.
-bool boot_reserve_foreach(const fit::inline_function<bool(const reserve_range_t)>& cb) {
-  for (size_t i = 0; i < res_idx; i++) {
-    if (!cb(res[i])) {
-      return false;
-    }
-  }
-
-  return true;
 }

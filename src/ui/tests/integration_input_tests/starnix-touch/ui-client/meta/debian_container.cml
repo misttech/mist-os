@@ -8,7 +8,10 @@
     ],
     program: {
         runner: "starnix",
-        features: [ "framebuffer2" ],
+        features: [
+            "container",
+            "framebuffer2",
+        ],
         init: [],
         mounts: [
             "/:remote_bundle:data/system",

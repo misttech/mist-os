@@ -24,7 +24,7 @@ use starnix_logging::{
     CATEGORY_STARNIX, MAX_ARGV_LENGTH, NAME_EXECUTE_SYSCALL, NAME_HANDLE_EXCEPTION,
     NAME_READ_RESTRICTED_STATE, NAME_RESTRICTED_KICK, NAME_RUN_TASK, NAME_WRITE_RESTRICTED_STATE,
 };
-use starnix_sync::{LockBefore, Locked, ProcessGroupState, Unlocked};
+use starnix_sync::{LockBefore, Locked, ProcessGroupState, TaskRelease, Unlocked};
 use starnix_syscalls::decls::SyscallDecl;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::ownership::{ReleaseGuard, WeakRef};
@@ -457,13 +457,15 @@ where
     Ok(TaskInfo { thread: None, thread_group, memory_manager }.into())
 }
 
-pub fn execute_task_with_prerun_result<F, R, G>(
+pub fn execute_task_with_prerun_result<L, F, R, G>(
+    locked: &mut Locked<'_, L>,
     task_builder: TaskBuilder,
     pre_run: F,
     task_complete: G,
     ptrace_state: Option<PtraceCoreState>,
 ) -> Result<R, Errno>
 where
+    L: LockBefore<TaskRelease>,
     F: FnOnce(&mut Locked<'_, Unlocked>, &mut CurrentTask) -> Result<R, Errno>
         + Send
         + Sync
@@ -473,6 +475,7 @@ where
 {
     let (sender, receiver) = sync_channel::<Result<R, Errno>>(1);
     execute_task(
+        locked,
         task_builder,
         move |current_task, locked| match pre_run(current_task, locked) {
             Err(errno) => {
@@ -486,19 +489,22 @@ where
         },
         task_complete,
         ptrace_state,
-    );
+    )?;
     receiver.recv().map_err(|e| {
         log_error!("Unable to retrieve result from `pre_run`: {e:?}");
         errno!(EINVAL)
     })?
 }
 
-pub fn execute_task<F, G>(
+pub fn execute_task<L, F, G>(
+    locked: &mut Locked<'_, L>,
     task_builder: TaskBuilder,
     pre_run: F,
     task_complete: G,
     ptrace_state: Option<PtraceCoreState>,
-) where
+) -> Result<(), Errno>
+where
+    L: LockBefore<TaskRelease>,
     F: FnOnce(&mut Locked<'_, Unlocked>, &mut CurrentTask) -> Result<(), Errno>
         + Send
         + Sync
@@ -521,44 +527,61 @@ pub fn execute_task<F, G>(
 
     // Spawn the process' thread. Note, this closure ends up executing in the process referred to by
     // `process_handle`.
-    let join_handle = std::thread::Builder::new()
-        .name("user-thread".to_string())
-        .spawn(move || {
-            let mut current_task: CurrentTask = task_builder.into();
-            let pre_run_result = {
-                let mut locked = Unlocked::new();
-                pre_run(&mut locked, &mut current_task)
-            };
-            if pre_run_result.is_err() {
-                log_error!("Pre run failed from {pre_run_result:?}. The task will not be run.");
-
-                // Drop the task_complete callback to ensure that the closure isn't holding any
-                // releasables.
-                std::mem::drop(task_complete);
-            } else {
-                let run_result = match run_task(&mut current_task) {
-                    Err(error) => {
-                        log_warn!("Died unexpectedly from {error:?}! treating as SIGKILL");
-                        let exit_status = ExitStatus::Kill(SignalInfo::default(SIGKILL));
-
-                        current_task.write().set_exit_status(exit_status.clone());
-                        Ok(exit_status)
-                    }
-                    ok => ok,
-                };
-
-                task_complete(run_result);
-            }
-
-            // `release` must be called as the absolute last action on this thread to ensure that
-            // any deferred release are done before it.
+    let (sender, receiver) = sync_channel::<TaskBuilder>(1);
+    let result = std::thread::Builder::new().name("user-thread".to_string()).spawn(move || {
+        let mut current_task: CurrentTask = receiver
+            .recv()
+            .expect("caller should always send task builder before disconnecting")
+            .into();
+        let pre_run_result = {
             let mut locked = Unlocked::new();
-            current_task.release(&mut locked);
+            pre_run(&mut locked, &mut current_task)
+        };
+        if pre_run_result.is_err() {
+            log_error!("Pre run failed from {pre_run_result:?}. The task will not be run.");
 
-            // Ensure that no releasables are registered after this point as we unwind the stack.
-            DelayedReleaser::finalize();
-        })
-        .expect("able to spawn threads");
+            // Drop the task_complete callback to ensure that the closure isn't holding any
+            // releasables.
+            std::mem::drop(task_complete);
+        } else {
+            let run_result = match run_task(&mut current_task) {
+                Err(error) => {
+                    log_warn!("Died unexpectedly from {error:?}! treating as SIGKILL");
+                    let exit_status = ExitStatus::Kill(SignalInfo::default(SIGKILL));
+
+                    current_task.write().set_exit_status(exit_status.clone());
+                    Ok(exit_status)
+                }
+                ok => ok,
+            };
+
+            task_complete(run_result);
+        }
+
+        // `release` must be called as the absolute last action on this thread to ensure that
+        // any deferred release are done before it.
+        let mut locked = Unlocked::new();
+        current_task.release(&mut locked);
+
+        // Ensure that no releasables are registered after this point as we unwind the stack.
+        DelayedReleaser::finalize();
+    });
+    let join_handle = match result {
+        Ok(handle) => handle,
+        Err(e) => {
+            task_builder.release(locked);
+            match e.kind() {
+                std::io::ErrorKind::WouldBlock => return Err(errno!(EAGAIN)),
+                other => panic!("unexpected error on thread spawn: {other}"),
+            }
+        }
+    };
+    // Wait to send the `TaskBuilder` to the spawned thread until we know that it
+    // spawned successfully, as we need to ensure the builder is always explicitly
+    // released.
+    sender
+        .send(task_builder)
+        .expect("receiver should not be disconnected because thread spawned successfully");
 
     // Set the task's thread handle
     let pthread = join_handle.as_pthread_t();
@@ -576,6 +599,8 @@ pub fn execute_task<F, G>(
     if let Err(err) = ref_task.sync_scheduler_policy_to_role() {
         log_warn!(?err, "Couldn't update freshly spawned thread's profile.");
     }
+
+    Ok(())
 }
 
 fn process_completed_exception(current_task: &mut CurrentTask, exception_result: ExceptionResult) {

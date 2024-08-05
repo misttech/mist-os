@@ -120,6 +120,9 @@ bootstrap_eng_platform_aib_names = [
 
   # Power Framework
   "power_framework_testing_sag",
+
+  # Storage
+  "fshost_storage_host",
 ]
 
 # The names of all of the platform's 'testonly=false' Assembly Input Bundles
@@ -378,6 +381,7 @@ required_userdebug_aib_names = required_user_aib_names + [
 experimental_aib_names = [
   "adb_support",
   "bootstrap_realm_vsock_development_access",
+  "fshost_storage_host",
   "paravirtualization_support_bootstrap",
   "power_framework",
   "power_framework_sag",

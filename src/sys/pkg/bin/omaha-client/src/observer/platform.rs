@@ -110,7 +110,7 @@ use mock::make_session_id;
 mod mock {
     use std::cell::RefCell;
 
-    thread_local!(static MOCK_SESSION_ID: RefCell<u64> = RefCell::new(0));
+    thread_local!(static MOCK_SESSION_ID: RefCell<u64> = const { RefCell::new(0) });
 
     pub fn make_session_id() -> u64 {
         MOCK_SESSION_ID.with(|id| *id.borrow())

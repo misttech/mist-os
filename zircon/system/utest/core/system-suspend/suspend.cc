@@ -105,8 +105,10 @@ TEST(SystemSuspend, SuspendAndResumeByTimer) {
 
   EXPECT_OK(suspend_status);
 
-  // TODO(eieio): This test observes that CLOCK_MONOTONIC advances past the resume_at time before
-  // the suspend call exits. When freezing CLOCK_MONOTONIC is implemented this test should fail.
+  // TODO(https://fxbug.dev/328306129): This test observes that CLOCK_MONOTONIC advances past the
+  // resume_at time before the suspend call exits. When freezing CLOCK_MONOTONIC is implemented
+  // this test should fail, at which point this should be replaced with the equivalent CLOCK_BOOT
+  // call.
   EXPECT_GT(zx::clock::get_monotonic(), resume_at);
 }
 

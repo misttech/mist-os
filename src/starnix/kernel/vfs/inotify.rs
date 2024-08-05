@@ -242,7 +242,7 @@ impl FileOps for InotifyFileObject {
 
     fn ioctl(
         &self,
-        _locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<'_, Unlocked>,
         file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
@@ -255,7 +255,7 @@ impl FileOps for InotifyFileObject {
                 let size = i32::try_from(self.available()).unwrap_or(i32::MAX);
                 current_task.write_object(addr, &size).map(|_| SUCCESS)
             }
-            _ => default_ioctl(file, current_task, request, arg),
+            _ => default_ioctl(file, locked, current_task, request, arg),
         }
     }
 

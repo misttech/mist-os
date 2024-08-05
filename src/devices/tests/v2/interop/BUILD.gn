@@ -48,13 +48,13 @@ fuchsia_driver_component("root") {
   testonly = true
   manifest = "meta/root.cml"
   deps = [ ":root_driver" ]
-  info = "root-info.json"
+  info = "meta/root-info.json"
 }
 
 driver_bind_rules("interop_v1_bind") {
-  rules = "v1.bind"
+  rules = "meta/v1.bind"
   bind_output = "v1.bindbc"
-  tests = "v1.bind_tests.json"
+  tests = "meta/v1.bind_tests.json"
   deps = [ "//src/devices/bind/fuchsia.test" ]
 }
 
@@ -76,14 +76,14 @@ fuchsia_driver_component("v1") {
     ":v1_driver",
     "//src/devices/misc/drivers/compat:driver",
   ]
-  info = "v1-info.json"
+  info = "meta/v1-info.json"
   manifest = "meta/v1.cml"
 }
 
 driver_bind_rules("interop_leaf_bind") {
-  rules = "leaf.bind"
+  rules = "meta/leaf.bind"
   bind_output = "leaf.bindbc"
-  tests = "leaf.bind_tests.json"
+  tests = "meta/leaf.bind_tests.json"
   deps = [ "//src/devices/bind/fuchsia.test" ]
 }
 
@@ -103,7 +103,7 @@ fuchsia_driver_component("leaf") {
   testonly = true
   manifest = "meta/leaf.cml"
   deps = [ ":leaf_driver" ]
-  info = "leaf-info.json"
+  info = "meta/leaf-info.json"
 }
 
 rustc_test("bin") {

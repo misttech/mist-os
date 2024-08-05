@@ -80,10 +80,6 @@ pub struct Features {
 /// Returns an error if parsing fails, or if an unsupported feature is present in `features`.
 pub fn parse_features(entries: &Vec<String>) -> Result<Features, Error> {
     let mut features = Features::default();
-    // TODO(https://fxbug.dev/356684424): Remove once all CML files are explicit
-    // about wanting this process.
-    features.container = true;
-
     for entry in entries {
         let (raw_flag, raw_args) =
             entry.split_once(':').map(|(f, a)| (f, Some(a.to_string()))).unwrap_or((entry, None));
@@ -115,6 +111,7 @@ pub fn parse_features(entries: &Vec<String>) -> Result<Features, Error> {
             ("network_manager", _) => features.network_manager = true,
             ("gfxstream", _) => features.gfxstream = true,
             ("bpf", Some(version)) => features.kernel.bpf_v2 = version == "v2",
+            ("enable_suid", _) => features.kernel.enable_suid = true,
             ("perfetto", Some(socket_path)) => {
                 features.perfetto = Some(socket_path.into());
             }
@@ -137,6 +134,7 @@ pub fn parse_features(entries: &Vec<String>) -> Result<Features, Error> {
             }
         };
     }
+
     Ok(features)
 }
 

@@ -23,6 +23,13 @@ std::unordered_set<ElementId> ring_buffers(
 std::unordered_map<TopologyId, std::vector<fuchsia_hardware_audio_signalprocessing::EdgePair>>
 MapTopologies(const std::vector<fuchsia_hardware_audio_signalprocessing::Topology>& topologies);
 
+bool ElementHasOutgoingEdges(
+    const std::vector<fuchsia_hardware_audio_signalprocessing::EdgePair>& topology,
+    ElementId element_id);
+bool ElementHasIncomingEdges(
+    const std::vector<fuchsia_hardware_audio_signalprocessing::EdgePair>& topology,
+    ElementId element_id);
+
 }  // namespace media_audio
 
 #endif  // SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_SIGNAL_PROCESSING_UTILS_H_

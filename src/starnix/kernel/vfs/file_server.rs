@@ -314,26 +314,6 @@ impl StarnixNodeConnection {
         Ok(())
     }
 
-    /// Implementation of `vfs::directory::entry_container::Directory::get_attrs` and
-    /// `vfs::File::get_attrs`.
-    fn get_attrs(&self) -> fio::NodeAttributes {
-        let info = self.file.node().info();
-
-        // This cast is necessary depending on the architecture.
-        #[allow(clippy::unnecessary_cast)]
-        let link_count = info.link_count as u64;
-
-        fio::NodeAttributes {
-            mode: info.mode.bits(),
-            id: self.file.fs.dev_id.bits(),
-            content_size: info.size as u64,
-            storage_size: info.storage_size() as u64,
-            link_count,
-            creation_time: info.time_status_change.into_nanos() as u64,
-            modification_time: info.time_modify.into_nanos() as u64,
-        }
-    }
-
     fn get_attributes(
         &self,
         requested_attributes: fio::NodeAttributesQuery,
@@ -384,19 +364,6 @@ impl StarnixNodeConnection {
         )
     }
 
-    /// Implementation of `vfs::directory::entry_container::MutableDirectory::set_attrs` and
-    /// `vfs::File::set_attrs`.
-    fn set_attrs(&self, flags: fio::NodeAttributeFlags, attributes: fio::NodeAttributes) {
-        self.file.node().update_info(|info| {
-            if flags.contains(fio::NodeAttributeFlags::CREATION_TIME) {
-                info.time_status_change = zx::Time::from_nanos(attributes.creation_time as i64);
-            }
-            if flags.contains(fio::NodeAttributeFlags::MODIFICATION_TIME) {
-                info.time_modify = zx::Time::from_nanos(attributes.modification_time as i64);
-            }
-        });
-    }
-
     fn update_attributes(&self, attributes: fio::MutableNodeAttributes) {
         self.file.node().update_info(|info| {
             if let Some(time) = attributes.creation_time {
@@ -422,10 +389,6 @@ impl StarnixNodeConnection {
 }
 
 impl vfs::node::Node for StarnixNodeConnection {
-    async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
-        Ok(StarnixNodeConnection::get_attrs(self))
-    }
-
     async fn get_attributes(
         &self,
         requested_attributes: fio::NodeAttributesQuery,
@@ -495,14 +458,6 @@ impl directory::entry_container::Directory for StarnixNodeConnection {
 }
 
 impl directory::entry_container::MutableDirectory for StarnixNodeConnection {
-    async fn set_attrs(
-        &self,
-        flags: fio::NodeAttributeFlags,
-        attributes: fio::NodeAttributes,
-    ) -> Result<(), zx::Status> {
-        StarnixNodeConnection::set_attrs(self, flags, attributes);
-        Ok(())
-    }
     async fn update_attributes(
         &self,
         attributes: fio::MutableNodeAttributes,
@@ -603,14 +558,6 @@ impl file::File for StarnixNodeConnection {
 
     async fn get_size(&self) -> Result<u64, zx::Status> {
         Ok(self.file.node().info().size as u64)
-    }
-    async fn set_attrs(
-        &self,
-        flags: fio::NodeAttributeFlags,
-        attributes: fio::NodeAttributes,
-    ) -> Result<(), zx::Status> {
-        StarnixNodeConnection::set_attrs(self, flags, attributes);
-        Ok(())
     }
     async fn update_attributes(
         &self,

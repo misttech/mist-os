@@ -7,7 +7,6 @@
 #[cfg(test)]
 mod tests;
 
-use crate::common::rights_to_posix_mode_bits;
 use crate::directory::entry::{DirectoryEntry, EntryInfo, GetEntryInfo, OpenRequest};
 use crate::execution_scope::ExecutionScope;
 use crate::file::common::vmo_flags_to_rights;
@@ -145,27 +144,13 @@ impl DirectoryEntry for VmoFile {
 }
 
 impl Node for VmoFile {
-    async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
-        let content_size = self.vmo.get_content_size()?;
-        Ok(fio::NodeAttributes {
-            mode: fio::MODE_TYPE_FILE
-                | rights_to_posix_mode_bits(self.readable, self.writable, self.executable),
-            id: self.inode,
-            content_size,
-            storage_size: content_size,
-            link_count: 1,
-            creation_time: 0,
-            modification_time: 0,
-        })
-    }
-
     async fn get_attributes(
         &self,
         requested_attributes: fio::NodeAttributesQuery,
     ) -> Result<fio::NodeAttributes2, Status> {
         let content_size = self.vmo.get_content_size()?;
 
-        let mut abilities = fio::Operations::GET_ATTRIBUTES | fio::Operations::UPDATE_ATTRIBUTES;
+        let mut abilities = fio::Operations::GET_ATTRIBUTES;
         if self.readable {
             abilities |= fio::Operations::READ_BYTES
         }
@@ -182,7 +167,6 @@ impl Node for VmoFile {
                 abilities: abilities,
                 content_size: content_size,
                 storage_size: content_size,
-                link_count: 1,
                 id: self.inode,
             }
         ))
@@ -242,15 +226,6 @@ impl File for VmoFile {
 
     async fn get_size(&self) -> Result<u64, Status> {
         Ok(self.vmo.get_content_size()?)
-    }
-
-    // TODO(https://fxbug.dev/42152303)
-    async fn set_attrs(
-        &self,
-        _flags: fio::NodeAttributeFlags,
-        _attrs: fio::NodeAttributes,
-    ) -> Result<(), Status> {
-        Err(Status::NOT_SUPPORTED)
     }
 
     // TODO(https://fxbug.dev/42152303)

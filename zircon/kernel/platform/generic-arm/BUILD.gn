@@ -47,6 +47,7 @@ source_set("generic-arm") {
     "//zircon/kernel/lib/topology",
     "//zircon/kernel/object",
     "//zircon/kernel/phys:handoff",
+    "//zircon/kernel/phys/lib/memalloc:range",
     "//zircon/kernel/platform:headers",
     "//zircon/kernel/vm",
     "//zircon/system/ulib/explicit-memory",

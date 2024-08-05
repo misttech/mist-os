@@ -14,7 +14,7 @@ group("tests") {
 
 driver_bind_rules("test-driver-bind") {
   bind_output = "test-driver-bind.bindbc"
-  rules = "test-driver.bind"
+  rules = "meta/test-driver.bind"
   deps = [ "//src/devices/bind/fuchsia.test" ]
 }
 
@@ -33,7 +33,7 @@ fuchsia_driver("ddk-fallback-test-driver-module") {
 
 fuchsia_driver_component("ddk-fallback-test-driver") {
   deps = [ ":ddk-fallback-test-driver-module" ]
-  info = "ddk-fallback-test-driver-info.json"
+  info = "meta/ddk-fallback-test-driver-info.json"
   manifest = "meta/ddk-fallback-test-driver.cml"
 }
 

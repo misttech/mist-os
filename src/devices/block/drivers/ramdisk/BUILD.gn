@@ -6,9 +6,9 @@ import("//build/bind/bind.gni")
 import("//build/drivers.gni")
 
 driver_bind_rules("ramdisk_bind") {
-  rules = "ramdisk.bind"
+  rules = "meta/ramdisk.bind"
   bind_output = "ramdisk.bindbc"
-  tests = "bind_tests.json"
+  tests = "meta/bind_tests.json"
   deps = [ "//src/devices/bind/fuchsia.platform" ]
 }
 
@@ -45,7 +45,7 @@ fuchsia_driver_component("ramdisk") {
   visibility = [ ":*" ]
   component_name = "ramdisk"
   deps = [ ":ramdisk-driver" ]
-  info = "ramdisk-info.json"
+  info = "meta/ramdisk-info.json"
   manifest = "meta/ramdisk.cml"
 }
 

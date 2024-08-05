@@ -18,13 +18,14 @@ use std::pin::pin;
 use fidl::endpoints::ProtocolMarker;
 use fidl_fuchsia_net_dhcp_ext::{self as fnet_dhcp_ext, ClientProviderExt};
 use fidl_fuchsia_net_ext::{self as fnet_ext};
+use fidl_fuchsia_net_interfaces_ext::admin::Control;
+use fidl_fuchsia_net_interfaces_ext::{self as fnet_interfaces_ext};
 use fidl_fuchsia_net_stack_ext::FidlReturn as _;
 use fnet_interfaces_admin::GrantForInterfaceAuthorization;
 use {
     fidl_fuchsia_hardware_network as fnetwork, fidl_fuchsia_io as fio, fidl_fuchsia_net as fnet,
     fidl_fuchsia_net_dhcp as fnet_dhcp, fidl_fuchsia_net_interfaces as fnet_interfaces,
     fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
-    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext,
     fidl_fuchsia_net_neighbor as fnet_neighbor, fidl_fuchsia_net_root as fnet_root,
     fidl_fuchsia_net_routes_admin as fnet_routes_admin,
     fidl_fuchsia_net_routes_ext as fnet_routes_ext, fidl_fuchsia_net_stack as fnet_stack,
@@ -372,28 +373,81 @@ impl<'a> TestRealm<'a> {
         ep_config: fnetemul_network::EndpointConfig,
         if_config: InterfaceConfig<'a>,
     ) -> Result<TestInterface<'a>> {
+        let installer = self
+            .connect_to_protocol::<fnet_interfaces_admin::InstallerMarker>()
+            .context("failed to connect to fuchsia.net.interfaces.admin.Installer")?;
+        let interface_state = self
+            .connect_to_protocol::<fnet_interfaces::StateMarker>()
+            .context("failed to connect to fuchsia.net.interfaces.State")?;
+        let (endpoint, id, control, device_control) = self
+            .join_network_with_installer(
+                network,
+                installer,
+                interface_state,
+                ep_name,
+                ep_config,
+                if_config,
+            )
+            .await?;
+
+        Ok(TestInterface {
+            endpoint,
+            id,
+            realm: self.clone(),
+            control,
+            device_control: Some(device_control),
+            dhcp_client_task: futures::lock::Mutex::default(),
+        })
+    }
+
+    /// Joins `network` by creating an endpoint with `ep_config` and installing it with
+    /// `installer` and `if_config`.
+    ///
+    /// This inherits the lifetime of `self`, so there's an assumption that `installer` is served
+    /// by something in this [`TestRealm`], but there's nothing enforcing this.
+    ///
+    /// Returns the created endpoint, the interface ID, and the associated interface
+    /// [`Control`] and [`fnet_interfaces_admin::DeviceControlProxy`].
+    ///
+    /// Characters may be dropped from the front of `ep_name` if it exceeds the maximum length.
+    pub async fn join_network_with_installer(
+        &self,
+        network: &TestNetwork<'a>,
+        installer: fnet_interfaces_admin::InstallerProxy,
+        interface_state: fnet_interfaces::StateProxy,
+        ep_name: impl Into<Cow<'a, str>>,
+        ep_config: fnetemul_network::EndpointConfig,
+        if_config: InterfaceConfig<'a>,
+    ) -> Result<(TestEndpoint<'a>, u64, Control, fnet_interfaces_admin::DeviceControlProxy)> {
         let endpoint = network
             .create_endpoint_with(ep_name, ep_config)
             .await
             .context("failed to create endpoint")?;
-        self.install_endpoint(endpoint, if_config).await
+        let (id, control, device_control) = self
+            .install_endpoint_with_installer(installer, interface_state, &endpoint, if_config)
+            .await?;
+        Ok((endpoint, id, control, device_control))
     }
 
-    /// Installs and configures the endpoint in this realm.
+    /// Installs and configures the endpoint as an interface. Uses `interface_state` to observe that
+    /// the interface is up after it is installed.
+    ///
+    /// This inherits the lifetime of `self`, so there's an assumption that `installer` is served
+    /// by something in this [`TestRealm`], but there's nothing enforcing this.
     ///
     /// Note that if `name` is not `None`, the string must fit within interface name limits.
-    pub async fn install_endpoint(
+    pub async fn install_endpoint_with_installer(
         &self,
-        endpoint: TestEndpoint<'a>,
+        installer: fnet_interfaces_admin::InstallerProxy,
+        interface_state: fnet_interfaces::StateProxy,
+        endpoint: &TestEndpoint<'a>,
         if_config: InterfaceConfig<'a>,
-    ) -> Result<TestInterface<'a>> {
-        let interface = endpoint
-            .into_interface_in_realm_with_name(self, if_config)
-            .await
-            .context("failed to add endpoint")?;
-        let () = interface.set_link_up(true).await.context("failed to start endpoint")?;
-        let _did_enable: bool = interface
-            .control()
+    ) -> Result<(u64, Control, fnet_interfaces_admin::DeviceControlProxy)> {
+        let (id, control, device_control) =
+            endpoint.install(installer, if_config).await.context("failed to add endpoint")?;
+
+        let () = endpoint.set_link_up(true).await.context("failed to start endpoint")?;
+        let _did_enable: bool = control
             .enable()
             .await
             .map_err(anyhow::Error::new)
@@ -406,21 +460,45 @@ impl<'a> TestRealm<'a> {
 
         // Wait for Netstack to observe interface up so callers can safely
         // assume the state of the world on return.
-        let interface_state = self
-            .connect_to_protocol::<fnet_interfaces::StateMarker>()
-            .context("failed to connect to fuchsia.net.interfaces/State")?;
         let () = fnet_interfaces_ext::wait_interface_with_id(
             fnet_interfaces_ext::event_stream_from_state(
                 &interface_state,
                 fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
             )?,
-            &mut fnet_interfaces_ext::InterfaceState::<()>::Unknown(interface.id()),
+            &mut fnet_interfaces_ext::InterfaceState::<()>::Unknown(id),
             |properties_and_state| properties_and_state.properties.online.then_some(()),
         )
         .await
         .context("failed to observe interface up")?;
 
-        Ok(interface)
+        Ok((id, control, device_control))
+    }
+
+    /// Installs and configures the endpoint in this realm.
+    ///
+    /// Note that if `name` is not `None`, the string must fit within interface name limits.
+    pub async fn install_endpoint(
+        &self,
+        endpoint: TestEndpoint<'a>,
+        if_config: InterfaceConfig<'a>,
+    ) -> Result<TestInterface<'a>> {
+        let installer = self
+            .connect_to_protocol::<fnet_interfaces_admin::InstallerMarker>()
+            .context("failed to connect to fuchsia.net.interfaces.admin.Installer")?;
+        let interface_state = self
+            .connect_to_protocol::<fnet_interfaces::StateMarker>()
+            .context("failed to connect to fuchsia.net.interfaces.State")?;
+        let (id, control, device_control) = self
+            .install_endpoint_with_installer(installer, interface_state, &endpoint, if_config)
+            .await?;
+        Ok(TestInterface {
+            endpoint,
+            id,
+            realm: self.clone(),
+            control,
+            device_control: Some(device_control),
+            dhcp_client_task: futures::lock::Mutex::default(),
+        })
     }
 
     /// Adds a raw device connector to the realm's devfs.
@@ -863,27 +941,21 @@ impl<'a> TestEndpoint<'a> {
         to_netdevice_inner(port).await
     }
 
-    /// Adds the [`TestEndpoint`] to the provided `realm` with an optional
-    /// interface name.
+    /// Installs the [`TestEndpoint`] via the provided [`fnet_interfaces_admin::InstallerProxy`].
     ///
-    /// Returns the interface ID and control protocols on success.
-    pub async fn add_to_stack(
+    /// Returns the interface ID, and the associated interface
+    /// [`Control`] and [`fnet_interfaces_admin::DeviceControlProxy`] on
+    /// success.
+    pub async fn install(
         &self,
-        realm: &TestRealm<'a>,
-        InterfaceConfig { name, metric, dad_transmits }: InterfaceConfig<'a>,
-    ) -> Result<(
-        u64,
-        fnet_interfaces_ext::admin::Control,
-        Option<fnet_interfaces_admin::DeviceControlProxy>,
-    )> {
+        installer: fnet_interfaces_admin::InstallerProxy,
+        InterfaceConfig { name, metric, dad_transmits }: InterfaceConfig<'_>,
+    ) -> Result<(u64, Control, fnet_interfaces_admin::DeviceControlProxy)> {
         let name = name.map(|n| {
             truncate_dropping_front(n.into(), fnet_interfaces::INTERFACE_NAME_LENGTH.into())
                 .to_string()
         });
         let (device, port_id) = self.get_netdevice().await?;
-        let installer = realm
-            .connect_to_protocol::<fnet_interfaces_admin::InstallerMarker>()
-            .context("connect to protocol")?;
         let device_control = {
             let (control, server_end) =
                 fidl::endpoints::create_proxy::<fnet_interfaces_admin::DeviceControlMarker>()
@@ -891,8 +963,7 @@ impl<'a> TestEndpoint<'a> {
             let () = installer.install_device(device, server_end).context("install device")?;
             control
         };
-        let (control, server_end) =
-            fnet_interfaces_ext::admin::Control::create_endpoints().context("create endpoints")?;
+        let (control, server_end) = Control::create_endpoints().context("create endpoints")?;
         let () = device_control
             .create_interface(
                 &port_id,
@@ -906,7 +977,23 @@ impl<'a> TestEndpoint<'a> {
         }
 
         let id = control.get_id().await.context("get id")?;
-        Ok((id, control, Some(device_control)))
+        Ok((id, control, device_control))
+    }
+
+    /// Adds the [`TestEndpoint`] to the provided `realm` with an optional
+    /// interface name.
+    ///
+    /// Returns the interface ID and control protocols on success.
+    pub async fn add_to_stack(
+        &self,
+        realm: &TestRealm<'a>,
+        config: InterfaceConfig<'a>,
+    ) -> Result<(u64, Control, fnet_interfaces_admin::DeviceControlProxy)> {
+        let installer = realm
+            .connect_to_protocol::<fnet_interfaces_admin::InstallerMarker>()
+            .context("connect to protocol")?;
+
+        self.install(installer, config).await
     }
 
     /// Like `into_interface_realm_with_name` but with default parameters.
@@ -921,16 +1008,19 @@ impl<'a> TestEndpoint<'a> {
         realm: &TestRealm<'a>,
         config: InterfaceConfig<'a>,
     ) -> Result<TestInterface<'a>> {
-        let (id, control, device_control) = self
-            .add_to_stack(realm, config)
-            .await
-            .with_context(|| format!("failed to add {} to realm {}", self.name, realm.name))?;
+        let installer = realm
+            .connect_to_protocol::<fnet_interfaces_admin::InstallerMarker>()
+            .context("connect to protocol")?;
+
+        let (id, control, device_control) =
+            self.install(installer, config).await.context("failed to install")?;
+
         Ok(TestInterface {
             endpoint: self,
             id,
             realm: realm.clone(),
             control,
-            device_control,
+            device_control: Some(device_control),
             dhcp_client_task: futures::lock::Mutex::default(),
         })
     }
@@ -975,7 +1065,7 @@ pub struct TestInterface<'a> {
     endpoint: TestEndpoint<'a>,
     realm: TestRealm<'a>,
     id: u64,
-    control: fnet_interfaces_ext::admin::Control,
+    control: Control,
     device_control: Option<fnet_interfaces_admin::DeviceControlProxy>,
     dhcp_client_task: futures::lock::Mutex<Option<fnet_dhcp_ext::testutil::DhcpClientTask>>,
 }
@@ -1011,7 +1101,7 @@ impl<'a> TestInterface<'a> {
     }
 
     /// Returns the interface's control handle.
-    pub fn control(&self) -> &fnet_interfaces_ext::admin::Control {
+    pub fn control(&self) -> &Control {
         &self.control
     }
 
@@ -1515,10 +1605,7 @@ impl<'a> TestInterface<'a> {
     /// Consumes this [`TestInterface`] and removes the underlying device. The
     /// Netstack will implicitly remove the interface and clients can expect to
     /// observe a `PEER_CLOSED` event on the returned control channel.
-    pub fn remove_device(
-        self,
-    ) -> (fnet_interfaces_ext::admin::Control, Option<fnet_interfaces_admin::DeviceControlProxy>)
-    {
+    pub fn remove_device(self) -> (Control, Option<fnet_interfaces_admin::DeviceControlProxy>) {
         let Self {
             endpoint: TestEndpoint { endpoint, name: _, _sandbox: _ },
             id: _,
@@ -1559,10 +1646,7 @@ impl<'a> TestInterface<'a> {
     }
 }
 
-async fn set_dad_transmits(
-    control: &fnet_interfaces_ext::admin::Control,
-    dad_transmits: u16,
-) -> Result<Option<u16>> {
+async fn set_dad_transmits(control: &Control, dad_transmits: u16) -> Result<Option<u16>> {
     control
         .set_configuration(&fnet_interfaces_admin::Configuration {
             ipv6: Some(fnet_interfaces_admin::Ipv6Configuration {

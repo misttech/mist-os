@@ -6,8 +6,8 @@ import("//build/bind/bind.gni")
 import("//build/drivers.gni")
 
 driver_bind_rules("pci-sdhci-bind") {
-  rules = "pci-sdhci.bind"
-  tests = "pci-sdhci-bind-test.json"
+  rules = "meta/pci-sdhci.bind"
+  tests = "meta/pci-sdhci-bind-test.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_bindlib",
     "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_bindlib",
@@ -39,7 +39,7 @@ fuchsia_driver_component("pci-sdhci") {
     ":pci-sdhci-bind",
     ":pci-sdhci-driver",
   ]
-  info = "pci-sdhci-info.json"
+  info = "meta/pci-sdhci-info.json"
   manifest = "meta/pci-sdhci.cml"
 }
 

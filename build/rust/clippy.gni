@@ -69,6 +69,10 @@ template("clippy") {
       args += [ "--fail" ]
     }
 
+    if (clippy_ignore_rustc) {
+      args += [ "--clippy-only" ]
+    }
+
     args += [
       "--",
       "env",
@@ -82,7 +86,6 @@ template("clippy") {
       rebase_path(invoker.crate_root, root_build_dir),
       "--sysroot=$rebased_rustc_prefix",
       "--crate-type=${invoker.clippy_crate_type}",
-      "{{rustflags}}",
     ]
 
     if (clippy_force_warn_all) {
@@ -105,6 +108,7 @@ template("clippy") {
       "-Wclippy::unnecessary_mut_passed",
     ]
     args += invoker.rustflags
+    args += [ "{{rustflags}}" ]
 
     if (invoker.clippy_crate_type == "proc-macro") {
       args += [ "--extern=proc_macro" ]

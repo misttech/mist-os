@@ -6,10 +6,9 @@
 #define SRC_COBALT_BIN_APP_METRIC_EVENT_LOGGER_FACTORY_IMPL_H_
 
 #include <fuchsia/metrics/cpp/fidl.h>
+#include <lib/fidl/cpp/binding_set.h>
 #include <stdlib.h>
 
-#include "lib/fidl/cpp/binding_set.h"
-#include "src/cobalt/bin/app/metric_event_logger_impl.h"
 #include "src/lib/fxl/macros.h"
 #include "third_party/cobalt/src/public/cobalt_service_interface.h"
 

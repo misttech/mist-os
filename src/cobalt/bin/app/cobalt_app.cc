@@ -4,18 +4,20 @@
 
 #include "src/cobalt/bin/app/cobalt_app.h"
 
+#include <fuchsia/process/lifecycle/cpp/fidl.h>
 #include <lib/component/incoming/cpp/protocol.h>
+#include <lib/fidl/cpp/interface_request.h>
 #include <lib/inspect/cpp/inspect.h>
+#include <lib/sys/cpp/component_context.h>
 
+#include <fstream>
 #include <memory>
 
-#include "fuchsia/process/lifecycle/cpp/fidl.h"
-#include "lib/fidl/cpp/interface_request.h"
-#include "lib/sys/cpp/component_context.h"
 #include "src/cobalt/bin/app/aggregate_and_upload_impl.h"
 #include "src/cobalt/bin/app/current_channel_provider.h"
 #include "src/cobalt/bin/app/diagnostics_impl.h"
 #include "src/cobalt/bin/app/metric_event_logger_factory_impl.h"
+#include "src/cobalt/bin/app/system_data_updater_impl.h"
 #include "src/cobalt/bin/app/utils.h"
 #include "src/cobalt/bin/utils/fuchsia_http_client.h"
 #include "src/public/lib/statusor/statusor.h"

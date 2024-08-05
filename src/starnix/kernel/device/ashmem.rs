@@ -89,7 +89,7 @@ impl FileOps for Ashmem {
 
     fn ioctl(
         &self,
-        _locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<'_, Unlocked>,
         file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
@@ -150,7 +150,7 @@ impl FileOps for Ashmem {
                 track_stub!(TODO("https://fxbug.dev/322873958"), "ASHMEM_GET_FILE_ID");
                 error!(ENOSYS)
             }
-            _ => default_ioctl(file, current_task, request, arg),
+            _ => default_ioctl(file, locked, current_task, request, arg),
         }
     }
 }

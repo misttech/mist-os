@@ -7,7 +7,6 @@ const NETSTACK_PROXY_NAME: &'static str = "netstack";
 
 const MOCK_SERVICES_NAME: &'static str = "mock";
 
-use async_utils::stream::FlattenUnorderedExt as _;
 use fidl::prelude::*;
 use fidl_fuchsia_net_stackmigrationdeprecated as fnet_migration;
 use futures::{FutureExt as _, StreamExt as _};
@@ -81,7 +80,7 @@ async fn run_with_proxy_realm<
     let _: &mut fuchsia_component::server::ServiceFs<_> =
         fs.serve_connection(server_end).expect("serve connection");
 
-    let mut fs_fut = fs.fuse().flatten_unordered().for_each(|req| {
+    let mut fs_fut = fs.fuse().flatten_unordered(None).for_each(|req| {
         match req.expect("error receiving migration request") {
             fnet_migration::StateRequest::GetNetstackVersion { responder } => {
                 responder

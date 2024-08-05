@@ -33,6 +33,7 @@ const DEFAULT_CATEGORIES: &[&'static str] = &[
     "magma",
     "minfs",
     "modular",
+    "net",
     "system_metrics",
     "view",
     "flutter",

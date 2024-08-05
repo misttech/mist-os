@@ -7,8 +7,8 @@ import("//build/drivers.gni")
 import("//src/devices/bus/drivers/pci/pci.gni")
 
 driver_bind_rules("qemu-arm64_bind") {
-  rules = "qemu-arm64.bind"
-  tests = "bind_tests.json"
+  rules = "meta/qemu-arm64.bind"
+  tests = "meta/bind_tests.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_bindlib",
     "//src/devices/bind/fuchsia.platform",
@@ -63,7 +63,7 @@ fuchsia_driver("qemu-arm64-driver") {
 fuchsia_driver_component("qemu-arm64") {
   component_name = "qemu-arm64"
   deps = [ ":qemu-arm64-driver" ]
-  info = "qemu-arm64-info.json"
+  info = "meta/qemu-arm64-info.json"
   manifest = "meta/qemu-arm64.cml"
 }
 

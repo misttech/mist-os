@@ -19,8 +19,10 @@ TCR = trace_metrics.TestCaseResult
 class PowerMetricsTest(unittest.TestCase):
     """Power metrics tests."""
 
-    def assertEmpty(self, c: collections.abc.Container[Any]) -> None:
-        self.assertFalse(c)
+    def assertEmpty(
+        self, c: collections.abc.Container[Any], msg: Any = None
+    ) -> None:
+        self.assertFalse(c, msg)
 
     def construct_trace_model(
         self,

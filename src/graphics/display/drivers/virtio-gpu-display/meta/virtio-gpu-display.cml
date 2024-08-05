@@ -17,9 +17,8 @@
         { service: "fuchsia.gpu.virtio.Service" },
     ],
     use: [
+        { protocol: "fuchsia.sysmem2.Allocator" },
         { service: "fuchsia.hardware.pci.Service" },
-        { service: "fuchsia.hardware.sysmem.Service" },
-        { service: "fuchsia.hardware.sysmem2.Service" },
     ],
     expose: [
         {

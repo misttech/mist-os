@@ -66,19 +66,29 @@ impl TestHarness {
 
     /// Returns the abilities [`io_test::File`] objects should have for the harness.
     pub fn supported_file_abilities(&self) -> fio::Abilities {
-        fio::Abilities::READ_BYTES
-            | fio::Abilities::WRITE_BYTES
-            | fio::Abilities::GET_ATTRIBUTES
-            | fio::Abilities::UPDATE_ATTRIBUTES
+        if self.supports_mutable_attrs() {
+            fio::Abilities::READ_BYTES
+                | fio::Abilities::WRITE_BYTES
+                | fio::Abilities::GET_ATTRIBUTES
+                | fio::Abilities::UPDATE_ATTRIBUTES
+        } else {
+            fio::Abilities::READ_BYTES
+                | fio::Abilities::WRITE_BYTES
+                | fio::Abilities::GET_ATTRIBUTES
+        }
     }
 
     /// Returns the abilities [`io_test::Directory`] objects should have for the harness.
     pub fn supported_dir_abilities(&self) -> fio::Abilities {
-        fio::Abilities::GET_ATTRIBUTES
-            | fio::Abilities::UPDATE_ATTRIBUTES
-            | fio::Abilities::ENUMERATE
-            | fio::Abilities::TRAVERSE
-            | fio::Abilities::MODIFY_DIRECTORY
+        if self.config.supports_modify_directory {
+            fio::Abilities::GET_ATTRIBUTES
+                | fio::Abilities::UPDATE_ATTRIBUTES
+                | fio::Abilities::ENUMERATE
+                | fio::Abilities::TRAVERSE
+                | fio::Abilities::MODIFY_DIRECTORY
+        } else {
+            fio::Abilities::GET_ATTRIBUTES | fio::Abilities::ENUMERATE | fio::Abilities::TRAVERSE
+        }
     }
 
     /// Returns true if the harness supports at least one mutable attribute, false otherwise.

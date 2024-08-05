@@ -507,7 +507,7 @@ config_check_result_t DisplayEngine::DisplayEngineCheckConfiguration(
       client_composition_opcodes[0] |= CLIENT_COMPOSITION_OPCODE_ALPHA;
     }
     success = display_configs[0].layer_list[0].type == LAYER_TYPE_PRIMARY &&
-              layer.transform_mode == FRAME_TRANSFORM_IDENTITY &&
+              layer.image_source_transformation == COORDINATE_TRANSFORMATION_IDENTITY &&
               layer.image_metadata.width == width && layer.image_metadata.height == height &&
               memcmp(&layer.display_destination, &display_area, sizeof(rect_u_t)) == 0 &&
               memcmp(&layer.image_source, &display_area, sizeof(rect_u_t)) == 0;
@@ -1146,8 +1146,7 @@ zx_status_t DisplayEngine::GetCommonProtocolsAndResources() {
     return ZX_ERR_INTERNAL;
   }
 
-  zx::result<fidl::ClientEnd<fuchsia_sysmem2::Allocator>> sysmem_client_result =
-      incoming_->Connect<fuchsia_hardware_sysmem::Service::AllocatorV2>("sysmem");
+  zx::result sysmem_client_result = incoming_->Connect<fuchsia_sysmem2::Allocator>();
   if (sysmem_client_result.is_error()) {
     FDF_LOG(ERROR, "Failed to get sysmem protocol: %s", sysmem_client_result.status_string());
     return sysmem_client_result.status_value();

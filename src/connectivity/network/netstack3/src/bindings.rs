@@ -683,13 +683,13 @@ impl<I: Ip> EventContext<netstack3_core::ip::IpLayerEvent<DeviceId<BindingsCtx>,
         // observing the result, so we just discard the result receiver.
         match event {
             netstack3_core::ip::IpLayerEvent::AddRoute(entry) => {
-                self.routes.fire_main_table_route_change_and_forget(routes::Change::RouteOp(
+                self.routes.fire_main_table_route_change_and_forget::<I>(routes::Change::RouteOp(
                     routes::RouteOp::Add(entry.map_device_id(|d| d.downgrade())),
                     routes::SetMembership::CoreNdp,
                 ))
             }
             netstack3_core::ip::IpLayerEvent::RemoveRoutes { subnet, device, gateway } => {
-                self.routes.fire_main_table_route_change_and_forget(routes::Change::RouteOp(
+                self.routes.fire_main_table_route_change_and_forget::<I>(routes::Change::RouteOp(
                     routes::RouteOp::RemoveMatching {
                         subnet,
                         device: device.downgrade(),
@@ -851,7 +851,7 @@ impl BindingsCtx {
 
     pub(crate) async fn apply_route_change<I: Ip>(
         &self,
-        change: routes::Change<I::Addr>,
+        change: routes::Change<I>,
     ) -> Result<routes::ChangeOutcome, routes::ChangeError> {
         self.routes.send_main_table_route_change(change).await
     }
@@ -936,7 +936,10 @@ async fn add_loopback_routes(bindings_ctx: &BindingsCtx, loopback: &DeviceId<Bin
     ]
     .into_iter()
     .map(|entry| {
-        routes::Change::RouteOp(routes::RouteOp::Add(entry), routes::SetMembership::Loopback)
+        routes::Change::<Ipv4>::RouteOp(
+            routes::RouteOp::Add(entry),
+            routes::SetMembership::Loopback,
+        )
     })
     .map(Into::into);
 
@@ -954,7 +957,10 @@ async fn add_loopback_routes(bindings_ctx: &BindingsCtx, loopback: &DeviceId<Bin
     ]
     .into_iter()
     .map(|entry| {
-        routes::Change::RouteOp(routes::RouteOp::Add(entry), routes::SetMembership::Loopback)
+        routes::Change::<Ipv6>::RouteOp(
+            routes::RouteOp::Add(entry),
+            routes::SetMembership::Loopback,
+        )
     })
     .map(Into::into);
 

@@ -226,7 +226,7 @@ pub async fn fvm_allocate_partition(
 mod tests {
     use super::{partition_matches_with_proxy, PartitionMatcher};
     use crate::format::{constants, DiskFormat};
-    use fake_server::FakeServer;
+    use fake_block_server::FakeServer;
     use fidl::endpoints::{create_proxy_and_stream, RequestStream as _};
     use fidl_fuchsia_device::{ControllerMarker, ControllerRequest};
     use fidl_fuchsia_hardware_block_volume::VolumeRequestStream;
@@ -234,9 +234,9 @@ mod tests {
     use futures::{pin_mut, select, FutureExt, StreamExt};
     use std::sync::Arc;
 
-    const VALID_TYPE_GUID: [u8; 16] = fake_server::TYPE_GUID;
+    const VALID_TYPE_GUID: [u8; 16] = fake_block_server::TYPE_GUID;
 
-    const VALID_INSTANCE_GUID: [u8; 16] = fake_server::INSTANCE_GUID;
+    const VALID_INSTANCE_GUID: [u8; 16] = fake_block_server::INSTANCE_GUID;
 
     const INVALID_GUID_1: [u8; 16] = [
         0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2a, 0x2b, 0x2c, 0x2d, 0x2e,
@@ -248,7 +248,7 @@ mod tests {
         0x3f,
     ];
 
-    const VALID_LABEL: &str = fake_server::PARTITION_NAME;
+    const VALID_LABEL: &str = fake_block_server::PARTITION_NAME;
     const INVALID_LABEL_1: &str = "TheWrongLabel";
     const INVALID_LABEL_2: &str = "StillTheWrongLabel";
     const PARENT_DEVICE_PATH: &str = "/fake/block/device/1";
@@ -258,7 +258,7 @@ mod tests {
     async fn check_partition_matches(matcher: &PartitionMatcher) -> bool {
         let (proxy, mut stream) = create_proxy_and_stream::<ControllerMarker>().unwrap();
 
-        let fake_server = Arc::new(FakeServer::new(1000, 512, &constants::FVM_MAGIC));
+        let fake_block_server = Arc::new(FakeServer::new(1000, 512, &constants::FVM_MAGIC));
 
         let mock_controller = async {
             while let Some(request) = stream.next().await {
@@ -267,9 +267,9 @@ mod tests {
                         responder.send(Ok(DEFAULT_PATH)).unwrap();
                     }
                     Ok(ControllerRequest::ConnectToDeviceFidl { server, .. }) => {
-                        let fake_server = fake_server.clone();
+                        let fake_block_server = fake_block_server.clone();
                         fasync::Task::spawn(async move {
-                            if let Err(e) = fake_server
+                            if let Err(e) = fake_block_server
                                 .serve(VolumeRequestStream::from_channel(
                                     fasync::Channel::from_channel(server),
                                 ))

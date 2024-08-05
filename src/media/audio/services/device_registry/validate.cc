@@ -10,6 +10,7 @@
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/clock.h>
 #include <zircon/errors.h>
+#include <zircon/rights.h>
 
 #include <algorithm>
 #include <cmath>
@@ -860,7 +861,8 @@ bool ValidateSampleFormatCompatibility(uint8_t bytes_per_sample, fha::SampleForm
   return false;
 }
 
-bool ValidateRingBufferVmo(const zx::vmo& vmo, uint32_t num_frames, const fha::Format& rb_format) {
+bool ValidateRingBufferVmo(const zx::vmo& vmo, uint32_t num_frames, const fha::Format& rb_format,
+                           zx_rights_t required_rights) {
   ADR_LOG(kLogDeviceMethods);
   LogRingBufferVmo(vmo, num_frames, rb_format);
 
@@ -873,7 +875,19 @@ bool ValidateRingBufferVmo(const zx::vmo& vmo, uint32_t num_frames, const fha::F
     return false;
   }
 
-  auto status = vmo.get_size(&size);
+  zx_info_handle_basic_t info;
+  auto status = vmo.get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
+  if (status != ZX_OK) {
+    FX_PLOGS(WARNING, status) << "vmo.get_info returned error";
+    return false;
+  }
+  if ((info.rights & required_rights) != required_rights) {
+    FX_LOGS(WARNING) << "VMO rights 0x" << std::hex << info.rights << " are insufficient (0x"
+                     << required_rights << " are required)";
+    return false;
+  }
+
+  status = vmo.get_size(&size);
   if (status != ZX_OK) {
     FX_LOGS(WARNING) << "get_size returned size " << size << " and error " << status;
     return false;
@@ -1837,6 +1851,8 @@ bool ValidateElements(const std::vector<fhasp::Element>& elements) {
 bool ValidateTopology(const fhasp::Topology& topology,
                       const std::unordered_map<ElementId, ElementRecord>& element_map) {
   LogTopology(topology);
+
+  // Verify the TopologyId and vector<EdgePair> are present and non-empty.
   if (!topology.id().has_value()) {
     FX_LOGS(WARNING) << "SignalProcessing.topology.id is missing";
     return false;
@@ -1845,14 +1861,14 @@ bool ValidateTopology(const fhasp::Topology& topology,
     FX_LOGS(WARNING) << "SignalProcessing.topology.processing_elements_edge_pairs is missing";
     return false;
   }
-  if (topology.processing_elements_edge_pairs()->empty()) {
+  const auto& edge_pairs = *topology.processing_elements_edge_pairs();
+  if (edge_pairs.empty()) {
     FX_LOGS(WARNING) << "SignalProcessing.topology.processing_elements_edge_pairs[] is empty";
     return false;
   }
 
-  std::unordered_set<ElementId> source_elements, destination_elements;
-  for (const auto& edge_pair : *topology.processing_elements_edge_pairs()) {
-    // Check that all the mentioned element_ids are contained in the elements set.
+  // An EdgePair cannot refer to an unknown ElementId, nor describe a single-element loop.
+  for (const auto& edge_pair : edge_pairs) {
     if (element_map.find(edge_pair.processing_element_id_from()) == element_map.end()) {
       FX_LOGS(WARNING) << "Element_id_from " << edge_pair.processing_element_id_from()
                        << " not found in element list";
@@ -1863,42 +1879,58 @@ bool ValidateTopology(const fhasp::Topology& topology,
                        << " not found in element list";
       return false;
     }
-    // Check that no EdgePair is self-referential.
+
     if (edge_pair.processing_element_id_from() == edge_pair.processing_element_id_to()) {
       FX_LOGS(WARNING) << "Edge_pair connects element_id " << edge_pair.processing_element_id_to()
                        << " to itself";
       return false;
     }
-
-    source_elements.insert(edge_pair.processing_element_id_from());
-    destination_elements.insert(edge_pair.processing_element_id_to());
   }
 
-  // Check that only DaiInterconnect or RingBuffer elements are terminal
-  for (auto& [id, element_record] : element_map) {
-    if (source_elements.find(id) != source_elements.end() &&
-        destination_elements.find(id) == destination_elements.end()) {
-      if (*element_record.element.type() != fhasp::ElementType::kDaiInterconnect &&
-          *element_record.element.type() != fhasp::ElementType::kRingBuffer) {
-        FX_LOGS(WARNING) << "Element " << id
-                         << " has no incoming edges but is not a DaiInterconnect or RingBuffer! Is "
-                         << *element_record.element.type();
+  // Check for topology "violations" based on element type.
+  return std::all_of(element_map.begin(), element_map.end(), [edge_pairs](const auto& entry) {
+    auto id = entry.first;
+
+    if (!entry.second.element.type().has_value()) {
+      FX_LOGS(WARNING) << "Element " << id << " has no type";
+      return false;
+    }
+
+    const auto& element_type = *entry.second.element.type();
+    bool has_outgoing_edges = ElementHasOutgoingEdges(edge_pairs, id);
+    bool has_incoming_edges = ElementHasIncomingEdges(edge_pairs, id);
+
+    if (has_outgoing_edges && has_incoming_edges) {
+      // If an element has incoming AND outgoing edges, then it cannot be RingBuffer.
+      // Interestingly, this IS allowed for DAI elements.
+      if (element_type == fhasp::ElementType::kRingBuffer) {
+        FX_LOGS(WARNING) << "RingBuffer element " << id
+                         << " has both incoming edges and outgoing edges!";
         return false;
       }
     }
-    if (source_elements.find(id) == source_elements.end() &&
-        destination_elements.find(id) != destination_elements.end()) {
-      if (*element_record.element.type() != fhasp::ElementType::kDaiInterconnect &&
-          *element_record.element.type() != fhasp::ElementType::kRingBuffer) {
-        FX_LOGS(WARNING) << "Element " << id
-                         << " has no outgoing edges but is not a DaiInterconnect or RingBuffer! Is "
-                         << *element_record.element.type();
+    if (has_outgoing_edges && !has_incoming_edges) {
+      // If the element has no incoming edges, then it must be a DAI or RingBuffer.
+      if (element_type != fhasp::ElementType::kDaiInterconnect &&
+          element_type != fhasp::ElementType::kRingBuffer) {
+        FX_LOGS(WARNING) << "Element " << id << " (" << element_type << ") has no incoming edges!";
         return false;
       }
     }
-  }
+    if (!has_outgoing_edges && has_incoming_edges) {
+      // If the element has no outgoing edges, then it must be a DAI or RingBuffer.
+      if (element_type != fhasp::ElementType::kDaiInterconnect &&
+          element_type != fhasp::ElementType::kRingBuffer) {
+        FX_LOGS(WARNING) << "Element " << id << " (" << element_type << ") has no outgoing edges!";
+        return false;
+      }
+    }
+    // if !has_outgoing_edges && !has_incoming_edges for this particular topology, that's OK.
+    // (If an element isn't mentioned in ANY topology, ValidateTopologies will fail.)
 
-  return true;
+    // No topology violations were found for this element.
+    return true;
+  });
 }
 
 bool ValidateTopologies(const std::vector<fhasp::Topology>& topologies,
@@ -1934,7 +1966,8 @@ bool ValidateTopologies(const std::vector<fhasp::Topology>& topologies,
     }
   }
   if (!elements_remaining.empty()) {
-    FX_LOGS(WARNING) << "topologies did not cover all elements. Example: element_id "
+    FX_LOGS(WARNING) << "topologies did not cover all elements. " << elements_remaining.size()
+                     << " elements were not included in any topology. Example: element_id "
                      << *elements_remaining.begin();
     return false;
   }

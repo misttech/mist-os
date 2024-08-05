@@ -14,10 +14,6 @@ use std::sync::{Arc, Mutex};
 #[cfg(test)]
 mod tests;
 
-// Redefine these constants as a u32 as in macos they are u16
-const S_IRUSR: u32 = libc::S_IRUSR as u32;
-const S_IWUSR: u32 = libc::S_IWUSR as u32;
-
 /// A file with a byte array for content, useful for testing.
 pub struct SimpleFile {
     data: Mutex<Vec<u8>>,
@@ -49,19 +45,6 @@ impl GetEntryInfo for SimpleFile {
 }
 
 impl Node for SimpleFile {
-    async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
-        let content_size = self.data.lock().unwrap().len().try_into().unwrap();
-        Ok(fio::NodeAttributes {
-            mode: fio::MODE_TYPE_FILE | S_IRUSR | if self.writable { S_IWUSR } else { 0 },
-            id: fio::INO_UNKNOWN,
-            content_size,
-            storage_size: content_size,
-            link_count: 1,
-            creation_time: 0,
-            modification_time: 0,
-        })
-    }
-
     async fn get_attributes(
         &self,
         requested_attributes: fio::NodeAttributesQuery,
@@ -72,7 +55,6 @@ impl Node for SimpleFile {
             Immutable {
                 protocols: fio::NodeProtocolKinds::FILE,
                 abilities: fio::Operations::GET_ATTRIBUTES
-                    | fio::Operations::UPDATE_ATTRIBUTES
                     | fio::Operations::READ_BYTES
                     | if self.writable {
                         fio::Operations::WRITE_BYTES
@@ -81,8 +63,6 @@ impl Node for SimpleFile {
                     },
                 content_size: content_size,
                 storage_size: content_size,
-                link_count: 1,
-                id: fio::INO_UNKNOWN,
             }
         ))
     }
@@ -158,14 +138,6 @@ impl File for SimpleFile {
 
     #[cfg(target_os = "fuchsia")]
     async fn get_backing_memory(&self, _flags: fio::VmoFlags) -> Result<fidl::Vmo, Status> {
-        Err(Status::NOT_SUPPORTED)
-    }
-
-    async fn set_attrs(
-        &self,
-        _flags: fio::NodeAttributeFlags,
-        _attrs: fio::NodeAttributes,
-    ) -> Result<(), Status> {
         Err(Status::NOT_SUPPORTED)
     }
 

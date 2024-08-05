@@ -8,7 +8,7 @@ import("//build/drivers.gni")
 import("//build/test.gni")
 
 driver_bind_rules("metadata-test-bind") {
-  rules = "metadata-test.bind"
+  rules = "meta/metadata-test.bind"
 }
 
 fuchsia_driver("fuchsia_driver") {
@@ -37,7 +37,7 @@ fuchsia_driver("fuchsia_driver") {
 fuchsia_driver_component("driver") {
   component_name = "ddk-metadata-test-driver"
   deps = [ ":fuchsia_driver" ]
-  info = "driver-info.json"
+  info = "meta/driver-info.json"
   manifest = "meta/driver.cml"
 }
 

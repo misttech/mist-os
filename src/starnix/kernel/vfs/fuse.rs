@@ -911,14 +911,14 @@ impl FileOps for FuseFileObject {
 
     fn ioctl(
         &self,
-        _locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<'_, Unlocked>,
         file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
         arg: SyscallArg,
     ) -> Result<SyscallResult, Errno> {
         track_stub!(TODO("https://fxbug.dev/322875259"), "fuse ioctl");
-        default_ioctl(file, current_task, request, arg)
+        default_ioctl(file, locked, current_task, request, arg)
     }
 
     fn fcntl(

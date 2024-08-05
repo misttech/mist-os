@@ -33,7 +33,10 @@
     use: [
         { protocol: "fuchsia.diagnostics.ArchiveAccessor" },
         {
-            protocol: "fuchsia.tracing.controller.Controller",
+            protocol: [
+                "fuchsia.tracing.controller.Provisioner",
+                "fuchsia.tracing.controller.Session",
+            ],
             from: "#trace_manager",
         },
         {

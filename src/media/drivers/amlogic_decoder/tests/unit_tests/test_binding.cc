@@ -4,7 +4,7 @@
 
 #include <fidl/fuchsia.hardware.amlogiccanvas/cpp/wire_test_base.h>
 #include <fidl/fuchsia.hardware.clock/cpp/wire_test_base.h>
-#include <fidl/fuchsia.hardware.sysmem/cpp/wire_test_base.h>
+#include <fidl/fuchsia.sysmem2/cpp/wire_test_base.h>
 #include <lib/async-loop/default.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
@@ -20,7 +20,7 @@
 namespace amlogic_decoder {
 namespace test {
 
-class FakeSysmem : public fidl::testing::WireTestBase<fuchsia_hardware_sysmem::Sysmem> {
+class FakeSysmem : public fidl::testing::WireTestBase<fuchsia_sysmem2::Allocator> {
  public:
   FakeSysmem() {}
 
@@ -98,21 +98,10 @@ class BindingTest : public testing::Test {
                           std::move(outgoing_endpoints.client), "pdev");
   }
   void InitSysmem() {
-    auto outgoing_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
-    incoming_.SyncCall([server = std::move(outgoing_endpoints.server)](
-                           IncomingNamespace* infra) mutable {
-      ASSERT_EQ(
-          ZX_OK,
-          infra->outgoing_sysmem
-              .AddService<fuchsia_hardware_platform_device::Service>(
-                  fuchsia_hardware_sysmem::Service::InstanceHandler(
-                      {.sysmem = infra->fake_sysmem.bind_handler(async_get_default_dispatcher())}))
-              .status_value());
-
-      ASSERT_EQ(ZX_OK, infra->outgoing_sysmem.Serve(std::move(server)).status_value());
-    });
-    root_->AddFidlService(fuchsia_hardware_sysmem::Service::Name,
-                          std::move(outgoing_endpoints.client), "sysmem");
+    root_->AddNsProtocol<fuchsia_sysmem2::Allocator>(
+        incoming_.SyncCall([](IncomingNamespace* infra) mutable {
+          return infra->fake_sysmem.bind_handler(async_get_default_dispatcher());
+        }));
   }
 
   void InitCanvas() {

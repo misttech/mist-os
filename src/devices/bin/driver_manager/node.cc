@@ -15,6 +15,7 @@
 #include <bind/fuchsia/platform/cpp/bind.h>
 
 #include "src/devices/bin/driver_manager/controller_allowlist_passthrough.h"
+#include "src/devices/bin/driver_manager/pkg_utils.h"
 #include "src/devices/bin/driver_manager/shutdown/node_removal_tracker.h"
 #include "src/devices/lib/log/log.h"
 #include "src/lib/fxl/strings/join_strings.h"
@@ -184,6 +185,11 @@ fit::result<fdf::wire::NodeError> ValidateSymbols(std::vector<fdf::NodeSymbol>& 
     }
   }
   return fit::ok();
+}
+
+std::string_view GetFilename(std::string_view path) {
+  size_t index = path.rfind('/');
+  return index == std::string_view::npos ? path : path.substr(index + 1);
 }
 
 }  // namespace
@@ -1111,19 +1117,38 @@ void Node::StartDriver(fuchsia_component_runner::wire::ComponentStartInfo start_
     symbols = this->symbols();
   }
 
+  std::optional<DriverDynamicLinkerArgs> dynamic_linker_args;
+  if (use_dynamic_linker) {
+    auto result = DriverDynamicLinkerArgs::Create(start_info);
+    if (result.is_error()) {
+      cb(result.take_error());
+      return;
+    }
+    dynamic_linker_args = std::move(*result);
+  }
+
   // Launch a driver host if we are not colocated.
   if (!colocate) {
     if (use_dynamic_linker) {
       (*node_manager_)
           ->CreateDriverHostDynamicLinker(
-              [this, cb = std::move(cb)](zx::result<DriverHost*> driver_host) mutable {
+              [weak_self = weak_from_this(), name = name_, args = std::move(*dynamic_linker_args),
+               url = std::string(url), controller = std::move(controller),
+               cb = std::move(cb)](zx::result<DriverHost*> driver_host) mutable {
+                auto node_ptr = weak_self.lock();
+                if (!node_ptr) {
+                  LOGF(WARNING, "Node '%s' freed before it is used", name.c_str());
+                  cb(zx::error(ZX_ERR_BAD_STATE));
+                  return;
+                }
+
                 if (driver_host.is_error()) {
                   cb(driver_host.take_error());
                   return;
                 }
-                driver_host_ = driver_host.value();
-                // TODO(https://fxbug.dev/341998660): load the driver.
-                cb(zx::error(ZX_ERR_NOT_SUPPORTED));
+                node_ptr->driver_host_ = driver_host.value();
+                node_ptr->StartDriverWithDynamicLinker(std::move(args), url, std::move(controller),
+                                                       std::move(cb));
               });
       return;
     }
@@ -1136,8 +1161,8 @@ void Node::StartDriver(fuchsia_component_runner::wire::ComponentStartInfo start_
   }
 
   if (use_dynamic_linker) {
-    // TODO(https://fxbug.dev/341998660): load the driver.
-    cb(zx::error(ZX_ERR_NOT_SUPPORTED));
+    StartDriverWithDynamicLinker(std::move(*dynamic_linker_args), url, std::move(controller),
+                                 std::move(cb));
     return;
   }
   // Bind the Node associated with the driver.
@@ -1200,6 +1225,50 @@ void Node::StartDriver(fuchsia_component_runner::wire::ComponentStartInfo start_
 
                                 // If the node set in the process of shutting down, shut down now.
                               });
+}
+
+// static
+zx::result<Node::DriverDynamicLinkerArgs> Node::DriverDynamicLinkerArgs::Create(
+    fuchsia_component_runner::wire::ComponentStartInfo start_info) {
+  fuchsia_data::wire::Dictionary wire_program = start_info.program();
+  zx::result<std::string> binary = fdf_internal::ProgramValue(wire_program, "binary");
+  if (binary.is_error()) {
+    LOGF(ERROR, "Failed to start driver, missing 'binary' argument: %s", binary.status_string());
+    return binary.take_error();
+  }
+
+  auto pkg = fdf_internal::NsValue(start_info.ns(), "/pkg");
+  if (pkg.is_error()) {
+    LOGF(ERROR, "Failed to start driver, missing '/pkg' directory: %s", pkg.status_string());
+    return pkg.take_error();
+  }
+
+  auto driver_file = pkg_utils::OpenPkgFile(*pkg, *binary);
+  if (driver_file.is_error()) {
+    LOGF(ERROR, "Failed to open driver file: %s", driver_file.status_string());
+    return driver_file.take_error();
+  }
+
+  auto lib_dir = pkg_utils::OpenLibDir(*pkg);
+  if (lib_dir.is_error()) {
+    LOGF(ERROR, "Failed to open driver libs dir: %s", lib_dir.status_string());
+    return lib_dir.take_error();
+  }
+
+  return zx::ok(DriverDynamicLinkerArgs(std::string(GetFilename(*binary)), std::move(*driver_file),
+                                        std::move(*lib_dir)));
+}
+
+void Node::StartDriverWithDynamicLinker(
+    DriverDynamicLinkerArgs args, std::string_view url,
+    fidl::ServerEnd<fuchsia_component_runner::ComponentController> controller,
+    fit::callback<void(zx::result<>)> cb) {
+  auto driver_endpoints = fidl::Endpoints<fuchsia_driver_host::Driver>::Create();
+  driver_component_.emplace(*this, std::string(url), std::move(controller),
+                            std::move(driver_endpoints.client));
+  driver_host_.value()->StartWithDynamicLinker(args.driver_soname, std::move(args.driver_file),
+                                               std::move(args.lib_dir),
+                                               std::move(driver_endpoints.server), std::move(cb));
 }
 
 bool Node::EvaluateRematchFlags(fuchsia_driver_development::RestartRematchFlags rematch_flags,

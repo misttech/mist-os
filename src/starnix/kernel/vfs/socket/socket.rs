@@ -22,7 +22,7 @@ use netlink_packet_route::address::{AddressAttribute, AddressMessage};
 use netlink_packet_route::link::{LinkAttribute, LinkFlags, LinkMessage};
 use netlink_packet_route::{AddressFamily, RouteNetlinkMessage};
 use starnix_logging::{log_warn, track_stub};
-use starnix_sync::{FileOpsCore, LockBefore, LockEqualOrBefore, Locked, Mutex};
+use starnix_sync::{FileOpsCore, LockBefore, LockEqualOrBefore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::as_any::AsAny;
 use starnix_uapi::auth::CAP_NET_RAW;
@@ -207,12 +207,13 @@ pub trait SocketOps: Send + Sync + AsAny {
     fn ioctl(
         &self,
         _socket: &Socket,
+        locked: &mut Locked<'_, Unlocked>,
         file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
         arg: SyscallArg,
     ) -> Result<SyscallResult, Errno> {
-        default_ioctl(file, current_task, request, arg)
+        default_ioctl(file, locked, current_task, request, arg)
     }
 }
 
@@ -422,18 +423,14 @@ impl Socket {
         self.state.lock().send_timeout
     }
 
-    pub fn ioctl<L>(
+    pub fn ioctl(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<'_, Unlocked>,
         file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
         arg: SyscallArg,
-    ) -> Result<SyscallResult, Errno>
-    where
-        L: LockBefore<FileOpsCore>,
-        L: LockBefore<FileOpsCore>,
-    {
+    ) -> Result<SyscallResult, Errno> {
         let user_addr = UserAddress::from(arg);
 
         // TODO(https://fxbug.dev/42079507): Share this implementation with `fdio`
@@ -697,7 +694,7 @@ impl Socket {
                 let in_ifreq: ifreq = current_task.read_object(UserRef::new(user_addr))?;
                 set_netlink_interface_flags(locked, current_task, &in_ifreq).map(|()| SUCCESS)
             }
-            _ => self.ops.ioctl(self, file, current_task, request, arg),
+            _ => self.ops.ioctl(self, locked, file, current_task, request, arg),
         }
     }
 

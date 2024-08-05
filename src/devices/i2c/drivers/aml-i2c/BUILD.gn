@@ -7,9 +7,9 @@ import("//build/bazel/wrappers.gni")
 import("//build/bind/bind.gni")
 
 driver_bind_rules("aml_i2c_bind") {
-  rules = "aml_i2c.bind"
+  rules = "meta/aml_i2c.bind"
   bind_output = "aml-i2c.bindbc"
-  tests = "bind_tests.json"
+  tests = "meta/bind_tests.json"
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.devicetree",

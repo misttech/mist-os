@@ -277,6 +277,8 @@ This [bug](https://fxbug.dev/355732696) tracks making an omitted name filter lis
 There is no character restriction on the values in a name filter list, but `:`, `*`, and spaces
 must be escaped. If the name contains values other than `[a-zA-Z0-9-_]`, the name must be quoted.
 
+Name filters are case-insensitive.
+
 ## Property selector {#property_selector}
 
 ### Syntax  {#syntax}

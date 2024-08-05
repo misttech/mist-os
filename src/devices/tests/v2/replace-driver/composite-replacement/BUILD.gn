@@ -5,7 +5,7 @@
 import("//build/drivers.gni")
 
 driver_bind_rules("bind") {
-  rules = "composite.bind"
+  rules = "meta/composite.bind"
   deps = [ "//src/devices/tests/v2/reload-driver/bindlib:fuchsia.reloaddriverbind.test" ]
   bind_output = "composite_replacement.bindbc"
 }
@@ -26,5 +26,5 @@ fuchsia_driver_component("component") {
   manifest = "meta/composite.cml"
   component_name = "composite_replacement"
   deps = [ ":driver" ]
-  info = "info.json"
+  info = "meta/info.json"
 }

@@ -235,8 +235,11 @@ class DriverRunnerTest : public gtest::TestLoopFixture {
 
   using StartDriverHandler = fit::function<void(TestDriver*, fdfw::DriverStartArgs)>;
 
-  StartDriverResult StartDriver(Driver driver,
-                                std::optional<StartDriverHandler> start_handler = std::nullopt);
+  // If |ns_pkg| is set, it will be provided as the /pkg directory in the driver component's
+  // namespace.
+  StartDriverResult StartDriver(
+      Driver driver, std::optional<StartDriverHandler> start_handler = std::nullopt,
+      fidl::ClientEnd<fuchsia_io::Directory> ns_pkg = fidl::ClientEnd<fuchsia_io::Directory>());
 
   zx::result<StartDriverResult> StartRootDriver();
 

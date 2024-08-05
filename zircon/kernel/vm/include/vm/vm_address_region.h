@@ -1205,9 +1205,6 @@ class VmMapping final : public VmAddressRegionOrMapping,
     return ktl::min(vmo_size - vmo_offset, len);
   }
 
-  // used to detect recursions through the vmo fault path
-  bool currently_faulting_ TA_GUARDED(object_->lock()) = false;
-
   // Whether this mapping may be merged with other adjacent mappings. A mergeable mapping is just a
   // region that can be represented by any VmMapping object, not specifically this one.
   Mergeable mergeable_ TA_GUARDED(lock()) = Mergeable::NO;

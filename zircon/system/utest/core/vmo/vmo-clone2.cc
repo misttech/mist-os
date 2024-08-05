@@ -1131,18 +1131,18 @@ void ManyChildrenTestHelper(bool reverse_close) {
 
   for (unsigned i = 0; i < kCloneCount; i++) {
     ASSERT_OK(vmo.create_child(ZX_VMO_CHILD_SNAPSHOT, 0, zx_system_get_page_size(), clones + i));
-    ASSERT_EQ(VmoNumChildren(vmo), i + 1);
+    ASSERT_TRUE(PollVmoNumChildren(vmo, i + 1));
   }
 
   if (reverse_close) {
     for (unsigned i = kCloneCount - 1; i != UINT32_MAX; i--) {
       clones[i].reset();
-      ASSERT_EQ(VmoNumChildren(vmo), i);
+      ASSERT_TRUE(PollVmoNumChildren(vmo, i));
     }
   } else {
     for (unsigned i = 0; i < kCloneCount; i++) {
       clones[i].reset();
-      ASSERT_EQ(VmoNumChildren(vmo), kCloneCount - (i + 1));
+      ASSERT_TRUE(PollVmoNumChildren(vmo, kCloneCount - (i + 1)));
     }
   }
 

@@ -155,12 +155,12 @@ impl StackFidlWorker {
         if let Ok(subnet) = subnet.try_into_core() {
             bindings_ctx
                 .apply_route_change_either(match subnet {
-                    net_types::ip::SubnetEither::V4(subnet) => routes::Change::RouteOp(
+                    net_types::ip::SubnetEither::V4(subnet) => routes::Change::<Ipv4>::RouteOp(
                         routes::RouteOp::RemoveToSubnet(subnet),
                         routes::SetMembership::Global,
                     )
                     .into(),
-                    net_types::ip::SubnetEither::V6(subnet) => routes::Change::RouteOp(
+                    net_types::ip::SubnetEither::V6(subnet) => routes::Change::<Ipv6>::RouteOp(
                         routes::RouteOp::RemoveToSubnet(subnet),
                         routes::SetMembership::Global,
                     )

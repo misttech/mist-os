@@ -13,7 +13,6 @@ import unittest.mock as mock
 from pathlib import Path
 
 from power_test_utils import power_test_utils
-from trace_processing import trace_model
 
 _METRIC_NAME = "M3tr1cN4m3"
 _MEASUREPOWER_PATH = "path/to/power"
@@ -51,9 +50,8 @@ class PowerSamplerTest(unittest.TestCase):
         with mock.patch.object(time, "time", return_value=10):
             sampler.stop()
 
-        self.assertEqual(
-            sampler.metrics_processor().process_metrics(trace_model.Model()), []
-        )
+        self.assertFalse(sampler.has_samples())
+        self.assertFalse(sampler.extract_samples())
 
     def test_sampler_with_measurepower(self) -> None:
         """Tests PowerSampler when given a path to a measurepower binary.

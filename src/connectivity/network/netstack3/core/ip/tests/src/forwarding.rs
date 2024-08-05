@@ -195,7 +195,7 @@ fn test_route_tracks_interface_metric<I: TestIpExt>() {
         Ok(())
     );
     assert_eq!(
-        ctx.core_api().routes_any().get_all_routes(),
+        ctx.core_api().routes_any().get_all_routes_in_main_table(),
         &[Entry {
             subnet: I::TEST_ADDRS.subnet,
             device: device_id.clone().into(),

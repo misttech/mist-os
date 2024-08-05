@@ -114,7 +114,7 @@ void LogBochsDisplayEngineRegisters(fdf::MmioView mmio_space) {
 }
 
 // Driver for the QEMU Bochs-compatible display engine.
-class FramebufferBochsDisplayDriver final : public simple_display::SimpleDisplayDriver {
+class FramebufferBochsDisplayDriver final : public FramebufferDisplayDriver {
  public:
   explicit FramebufferBochsDisplayDriver(fdf::DriverStartArgs start_args,
                                          fdf::UnownedSynchronizedDispatcher driver_dispatcher);
@@ -126,10 +126,10 @@ class FramebufferBochsDisplayDriver final : public simple_display::SimpleDisplay
 
   ~FramebufferBochsDisplayDriver() override;
 
-  // SimpleDisplayDriver:
+  // FramebufferDisplayDriver:
   zx::result<> ConfigureHardware() override;
   zx::result<fdf::MmioBuffer> GetFrameBufferMmioBuffer() override;
-  zx::result<simple_display::DisplayProperties> GetDisplayProperties() override;
+  zx::result<DisplayProperties> GetDisplayProperties() override;
 
  private:
   zx::result<ddk::Pci> GetPciClient();
@@ -137,8 +137,8 @@ class FramebufferBochsDisplayDriver final : public simple_display::SimpleDisplay
 
 FramebufferBochsDisplayDriver::FramebufferBochsDisplayDriver(
     fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher)
-    : SimpleDisplayDriver("framebuffer-bochs-display", std::move(start_args),
-                          std::move(driver_dispatcher)) {}
+    : FramebufferDisplayDriver("framebuffer-intel-display", std::move(start_args),
+                               std::move(driver_dispatcher)) {}
 
 FramebufferBochsDisplayDriver::~FramebufferBochsDisplayDriver() = default;
 
@@ -228,9 +228,8 @@ zx::result<fdf::MmioBuffer> FramebufferBochsDisplayDriver::GetFrameBufferMmioBuf
   return zx::ok(std::move(framebuffer_mmio).value());
 }
 
-zx::result<simple_display::DisplayProperties>
-FramebufferBochsDisplayDriver::GetDisplayProperties() {
-  static constexpr simple_display::DisplayProperties kDisplayProperties = {
+zx::result<DisplayProperties> FramebufferBochsDisplayDriver::GetDisplayProperties() {
+  static constexpr DisplayProperties kDisplayProperties = {
       .width_px = kDisplayWidth,
       .height_px = kDisplayHeight,
       .row_stride_px = kDisplayWidth,

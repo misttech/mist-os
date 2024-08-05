@@ -1179,7 +1179,7 @@ impl FileOps for DeviceMapper {
             | DM_DEV_SET_GEOMETRY
             | DM_DEV_ARM_POLL
             | DM_GET_TARGET_VERSION => return error!(ENOTSUP),
-            _ => default_ioctl(file, current_task, request, arg),
+            _ => default_ioctl(file, locked, current_task, request, arg),
         }
     }
 }

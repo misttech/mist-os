@@ -4,17 +4,16 @@
 
 #include "src/cobalt/bin/app/aggregate_and_upload_impl.h"
 
+#include <fuchsia/cobalt/cpp/fidl.h>
+#include <zircon/third_party/ulib/musl/include/unistd.h>
+
 #include <chrono>
 #include <cmath>
 #include <future>
-#include <memory>
 
-#include "fuchsia/cobalt/cpp/fidl.h"
 #include "src/lib/util/datetime_util.h"
 #include "src/public/lib/status.h"
 #include "src/public/lib/status_codes.h"
-#include "zircon/system/public/zircon/time.h"
-#include "zircon/third_party/ulib/musl/include/unistd.h"
 
 namespace cobalt {
 

@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, Context as _};
-use async_utils::stream::FlattenUnorderedExt as _;
 use component_events::events::{self};
 use fidl::endpoints::{ControlHandle as _, Proxy as _, RequestStream as _};
 use fuchsia_component::client::{
@@ -30,7 +29,7 @@ async fn main() -> Result<(), anyhow::Error> {
         fs.dir("svc").add_fidl_service(|s: frunner::ComponentRunnerRequestStream| s);
     let _: &mut ServiceFs<_> = fs.take_and_serve_directory_handle()?;
     fs.fuse()
-        .flatten_unordered()
+        .flatten_unordered(None)
         .map(|r| r.context("error reading request stream"))
         .and_then(handle_runner_request)
         .for_each_concurrent(None, |r| async {

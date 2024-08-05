@@ -8,8 +8,8 @@ import("//build/drivers.gni")
 import("//build/test.gni")
 
 driver_bind_rules("tpm_bind") {
-  rules = "tpm.bind"
-  tests = "bind_tests.json"
+  rules = "meta/tpm.bind"
+  tests = "meta/bind_tests.json"
   deps = [ "//src/devices/bind/fuchsia.tpm" ]
 }
 
@@ -36,7 +36,7 @@ fuchsia_driver("fuchsia_driver") {
 }
 
 fuchsia_driver_component("tpm-driver") {
-  info = "tpm-driver-info.json"
+  info = "meta/tpm-driver-info.json"
   deps = [ ":fuchsia_driver" ]
   manifest = "meta/tpm-driver.cml"
 }

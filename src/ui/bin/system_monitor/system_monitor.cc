@@ -5,7 +5,6 @@
 #include "src/ui/bin/system_monitor/system_monitor.h"
 
 #include <fuchsia/diagnostics/cpp/fidl.h>
-#include <fuchsia/logger/cpp/fidl.h>
 #include <lib/async/cpp/task.h>
 #include <lib/async/default.h>
 #include <lib/sys/cpp/service_directory.h>
@@ -15,8 +14,6 @@
 #include <iostream>
 #include <iterator>
 #include <string>
-
-#include <src/lib/diagnostics/accessor2logger/log_message.h>
 
 #include "src/lib/fsl/vmo/strings.h"
 
@@ -38,31 +35,49 @@ SystemMonitor::SystemMonitor() {
 }
 
 void SystemMonitor::UpdateRecentDiagnostic() {
-  recent_diagnostics_.clear();
   accessor_->StreamDiagnostics(std::move(params_), iterator_.NewRequest());
-  fuchsia::diagnostics::BatchIterator_GetNext_Result iterator_result;
-  iterator_->GetNext(&iterator_result);
-  for (auto& content : iterator_result.response().batch) {
+  iterator_->GetNext(&iterator_result_);
+}
+
+std::vector<std::string> SystemMonitor::ParseBatch(
+    const std::vector<fuchsia::diagnostics::FormattedContent>& batch) {
+  std::vector<std::string> recent_diagnostics;
+  for (auto& content : batch) {
     if (!content.is_json()) {
       FX_LOGS(WARNING) << "Invalid JSON Inspect content, skipping";
       continue;
     }
     if (std::string json; fsl::StringFromVmo(content.json(), &json)) {
-      recent_diagnostics_.push_back(std::move(json));
+      recent_diagnostics.push_back(std::move(json));
     } else {
       FX_LOGS(WARNING) << "Failed to convert Inspect content to string, skipping";
     }
   }
+  return recent_diagnostics;
+}
+
+std::string SystemMonitor::GetTargetFromDiagnostics(std::vector<std::string> recent_diagnostics) {
+  std::string cpu_data;
+  for (auto& content : recent_diagnostics) {
+    if (content.find(kTarget) != std::string::npos) {
+      cpu_data = content;
+    }
+  }
+  return cpu_data;
+}
+
+std::string SystemMonitor::GetCPUData() {
+  auto& batch = iterator_result_.response().batch;
+  if (batch.empty()) {
+    return "";
+  }
+  return GetTargetFromDiagnostics(ParseBatch(std::move(batch)));
 }
 
 void SystemMonitor::PrintRecentDiagnostic() {
   UpdateRecentDiagnostic();
-  for (auto& content : recent_diagnostics_) {
-    std::size_t found = content.find(kTarget);
-    if (found != std::string::npos) {
-      FX_LOGS(INFO) << "Recent Diagnostics: " << content;
-    }
-  }
+  FX_LOGS(INFO) << "Recent Diagnostics: " << GetCPUData();
+
   async::PostDelayedTask(
       async_get_default_dispatcher(), [&] { PrintRecentDiagnostic(); }, kPrintFrequency);
 }

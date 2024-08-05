@@ -189,9 +189,9 @@ impl KeyManager {
         &self,
         object_id: u64,
         crypt: Arc<dyn Crypt>,
-        wrapped_keys: impl Future<Output = Result<WrappedKeys, Error>>,
+        wrapped_keys: impl Future<Output = Result<Option<WrappedKeys>, Error>>,
         permanent: bool,
-    ) -> impl Future<Output = Result<Arc<XtsCipherSet>, Error>> {
+    ) -> impl Future<Output = Result<Option<Arc<XtsCipherSet>>, Error>> {
         let inner = self.inner.clone();
         async move {
             let mut wrapped_keys = pin!(future::maybe_done(wrapped_keys));
@@ -201,7 +201,7 @@ impl KeyManager {
                     let mut inner = inner.lock().unwrap();
 
                     if let Some(keys) = inner.keys.get(object_id) {
-                        return Ok(keys.clone());
+                        return Ok(Some(keys.clone()));
                     }
 
                     match inner.unwrapping.entry(object_id) {
@@ -233,16 +233,17 @@ impl KeyManager {
 
                     wrapped_keys.as_mut().await;
                     let error = match wrapped_keys.as_mut().output_mut().unwrap() {
-                        Ok(wrapped_keys) => {
+                        Ok(Some(wrapped_keys)) => {
                             match crypt.unwrap_keys(wrapped_keys, object_id).await {
                                 Ok(unwrapped_keys) => {
                                     let keys = unwrapped_keys.to_cipher_set();
                                     *result = Ok(Some(keys.clone()));
-                                    return Ok(keys);
+                                    return Ok(Some(keys));
                                 }
                                 Err(e) => e,
                             }
                         }
+                        Ok(None) => return Ok(None),
                         Err(_) => wrapped_keys.take_output().unwrap().unwrap_err(),
                     };
                     *result = Err(error);
@@ -375,9 +376,10 @@ mod tests {
         let task1 = fasync::Task::spawn(async move {
             let mut buf = cipher_text(0);
             manager1
-                .get_or_insert(1, crypt1, async { Ok(wrapped_keys()) }, false)
+                .get_or_insert(1, crypt1, async { Ok(Some(wrapped_keys())) }, false)
                 .await
                 .expect("get_or_insert failed")
+                .expect("missing key")
                 .decrypt(0, 0, &mut buf)
                 .expect("decrypt failed");
             assert_eq!(&buf, PLAIN_TEXT);
@@ -385,9 +387,10 @@ mod tests {
         let task2 = fasync::Task::spawn(async move {
             let mut buf = cipher_text(0);
             manager2
-                .get_or_insert(1, crypt2, async { Ok(wrapped_keys()) }, false)
+                .get_or_insert(1, crypt2, async { Ok(Some(wrapped_keys())) }, false)
                 .await
                 .expect("get_or_insert failed")
+                .expect("missing key")
                 .decrypt(0, 0, &mut buf)
                 .expect("decrypt failed");
             assert_eq!(&buf, PLAIN_TEXT);
@@ -504,13 +507,13 @@ mod tests {
 
         let task1 = fasync::Task::spawn(async move {
             assert!(manager1
-                .get_or_insert(1, crypt1, async { Ok(wrapped_keys()) }, false,)
+                .get_or_insert(1, crypt1, async { Ok(Some(wrapped_keys())) }, false,)
                 .await
                 .is_err());
         });
         let task2 = fasync::Task::spawn(async move {
             assert!(manager2
-                .get_or_insert(1, crypt2, async { Ok(wrapped_keys()) }, false,)
+                .get_or_insert(1, crypt2, async { Ok(Some(wrapped_keys())) }, false,)
                 .await
                 .is_err());
         });

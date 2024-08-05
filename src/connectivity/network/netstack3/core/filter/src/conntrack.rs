@@ -239,7 +239,13 @@ impl<I: IpExt, BC: FilterBindingsContext, E: Default> Table<I, BC, E> {
             Ok(ConnectionUpdateAction::RemoveEntry) => match connection {
                 Connection::Exclusive(_) => Ok(None),
                 Connection::Shared(_) => {
-                    let _ = self.inner.lock().table.remove(&packet.tuple);
+                    // RACE: It's possible that GC already removed the
+                    // connection from the table, since we released the table
+                    // lock while updating the connection.
+                    let mut guard = self.inner.lock();
+                    let _ = guard.table.remove(connection.original_tuple());
+                    let _ = guard.table.remove(connection.reply_tuple());
+
                     Ok(None)
                 }
             },

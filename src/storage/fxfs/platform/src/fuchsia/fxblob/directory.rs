@@ -18,10 +18,7 @@ use fidl_fuchsia_fxfs::{
     BlobCreatorRequest, BlobCreatorRequestStream, BlobReaderRequest, BlobReaderRequestStream,
     BlobWriterMarker, CreateBlobError,
 };
-use fidl_fuchsia_io::{
-    self as fio, FilesystemInfo, MutableNodeAttributes, NodeAttributeFlags, NodeAttributes,
-    NodeMarker, WatchMask,
-};
+use fidl_fuchsia_io::{self as fio, FilesystemInfo, NodeMarker, WatchMask};
 use fuchsia_hash::Hash;
 use fuchsia_merkle::{MerkleTree, MerkleTreeBuilder};
 use fuchsia_zircon::Status;
@@ -395,15 +392,10 @@ impl MutableDirectory for BlobDirectory {
         self.directory.clone().unlink(name, must_be_directory).await
     }
 
-    async fn set_attrs(
+    async fn update_attributes(
         &self,
-        flags: NodeAttributeFlags,
-        attrs: NodeAttributes,
+        attributes: fio::MutableNodeAttributes,
     ) -> Result<(), Status> {
-        self.directory.set_attrs(flags, attrs).await
-    }
-
-    async fn update_attributes(&self, attributes: MutableNodeAttributes) -> Result<(), Status> {
         self.directory.update_attributes(attributes).await
     }
 
@@ -426,10 +418,6 @@ impl GetEntryInfo for BlobDirectory {
 }
 
 impl vfs::node::Node for BlobDirectory {
-    async fn get_attrs(&self) -> Result<NodeAttributes, Status> {
-        self.directory.get_attrs().await
-    }
-
     async fn get_attributes(
         &self,
         requested_attributes: fio::NodeAttributesQuery,

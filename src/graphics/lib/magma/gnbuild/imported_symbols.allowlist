@@ -66,6 +66,7 @@ close
 closedir
 dup
 dup2
+ferror
 fstat
 fstatvfs
 futimens

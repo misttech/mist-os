@@ -269,16 +269,6 @@ async fn get_attributes_directory_query_all() {
     assert!(immutable_attrs.abilities.is_some());
 
     // Other attributes have conditional support.
-    if supported_attrs.contains(fio::NodeAttributesQuery::CONTENT_SIZE) {
-        assert_matches!(immutable_attrs.content_size, Some(..));
-    } else {
-        assert_matches!(immutable_attrs.content_size, None);
-    }
-    if supported_attrs.contains(fio::NodeAttributesQuery::STORAGE_SIZE) {
-        assert_matches!(immutable_attrs.storage_size, Some(..));
-    } else {
-        assert_matches!(immutable_attrs.storage_size, None);
-    }
     if supported_attrs.contains(fio::NodeAttributesQuery::LINK_COUNT) {
         assert_matches!(immutable_attrs.link_count, Some(..));
     } else {

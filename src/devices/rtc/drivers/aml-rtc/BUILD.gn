@@ -6,8 +6,8 @@ import("//build/bind/bind.gni")
 import("//build/drivers.gni")
 
 driver_bind_rules("aml_rtc_bind") {
-  rules = "aml_rtc.bind"
-  tests = "bind-tests.json"
+  rules = "meta/aml_rtc.bind"
+  tests = "meta/bind-tests.json"
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.platform",
@@ -34,7 +34,7 @@ fuchsia_driver("aml-rtc-driver") {
 }
 
 fuchsia_driver_component("aml-rtc") {
-  info = "aml-rtc-info.json"
+  info = "meta/aml-rtc-info.json"
   component_name = "aml-rtc"
   deps = [ ":aml-rtc-driver" ]
   manifest = "meta/aml-rtc.cml"

@@ -12,6 +12,7 @@ use fidl_fuchsia_device::ControllerProxy;
 use fidl_fuchsia_hardware_block::BlockProxy;
 use fidl_fuchsia_hardware_block_encrypted::{DeviceManagerMarker, DeviceManagerProxy};
 use fidl_fuchsia_hardware_block_volume::VolumeProxy;
+use fs_management::filesystem::BlockConnector;
 use fs_management::format::DiskFormat;
 use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
@@ -173,12 +174,12 @@ impl Device for ZxcryptDevice {
         self.inner_device.set_partition_max_bytes(max_bytes + extra_bytes).await
     }
 
-    fn controller(&self) -> &ControllerProxy {
-        self.inner_device.controller()
+    fn device_controller(&self) -> Result<ControllerProxy, Error> {
+        self.inner_device.device_controller()
     }
 
-    fn reopen_controller(&self) -> Result<ControllerProxy, Error> {
-        self.inner_device.reopen_controller()
+    fn block_connector(&self) -> Result<Box<dyn BlockConnector>, Error> {
+        self.inner_device.block_connector()
     }
 
     fn block_proxy(&self) -> Result<BlockProxy, Error> {

@@ -15,20 +15,20 @@
 
 #include "src/graphics/display/lib/framebuffer-display/framebuffer-display.h"
 
-namespace simple_display {
+namespace framebuffer_display {
 
 // Integration between display drivers and the Driver Framework (v1).
-class SimpleDisplayDriver : public fdf::DriverBase {
+class FramebufferDisplayDriver : public fdf::DriverBase {
  public:
-  explicit SimpleDisplayDriver(std::string_view device_name, fdf::DriverStartArgs start_args,
-                               fdf::UnownedSynchronizedDispatcher driver_dispatcher);
+  explicit FramebufferDisplayDriver(std::string_view device_name, fdf::DriverStartArgs start_args,
+                                    fdf::UnownedSynchronizedDispatcher driver_dispatcher);
 
-  SimpleDisplayDriver(const SimpleDisplayDriver&) = delete;
-  SimpleDisplayDriver(SimpleDisplayDriver&&) = delete;
-  SimpleDisplayDriver& operator=(const SimpleDisplayDriver&) = delete;
-  SimpleDisplayDriver& operator=(SimpleDisplayDriver&&) = delete;
+  FramebufferDisplayDriver(const FramebufferDisplayDriver&) = delete;
+  FramebufferDisplayDriver(FramebufferDisplayDriver&&) = delete;
+  FramebufferDisplayDriver& operator=(const FramebufferDisplayDriver&) = delete;
+  FramebufferDisplayDriver& operator=(FramebufferDisplayDriver&&) = delete;
 
-  virtual ~SimpleDisplayDriver();
+  virtual ~FramebufferDisplayDriver();
 
   // fdf::DriverBase:
   zx::result<> Start() override;
@@ -42,18 +42,18 @@ class SimpleDisplayDriver : public fdf::DriverBase {
   virtual zx::result<DisplayProperties> GetDisplayProperties() = 0;
 
  private:
-  zx::result<std::unique_ptr<SimpleDisplay>> CreateAndInitializeSimpleDisplay();
+  zx::result<std::unique_ptr<FramebufferDisplay>> CreateAndInitializeFramebufferDisplay();
 
-  // Must be called after `simple_display_` is initialized.
+  // Must be called after `framebuffer_display_` is initialized.
   zx::result<> InitializeBanjoServerNode();
 
-  std::unique_ptr<SimpleDisplay> simple_display_;
+  std::unique_ptr<FramebufferDisplay> framebuffer_display_;
 
   std::optional<compat::BanjoServer> banjo_server_;
   compat::SyncInitializedDeviceServer compat_server_;
   fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_;
 };
 
-}  // namespace simple_display
+}  // namespace framebuffer_display
 
 #endif  // SRC_GRAPHICS_DISPLAY_LIB_FRAMEBUFFER_DISPLAY_FRAMEBUFFER_DISPLAY_DRIVER_H_

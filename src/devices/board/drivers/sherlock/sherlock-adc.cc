@@ -61,7 +61,7 @@ zx::result<> Sherlock::AdcInit() {
   }
   node.metadata() = std::vector<fuchsia_hardware_platform_bus::Metadata>{
       {{
-          .type = fuchsia_hardware_adcimpl::kPdevMetadataType,
+          .type = fuchsia_hardware_adcimpl::kPdevMetadataTypeIdentifier,
           .data = metadata_bytes.value(),
       }},
   };

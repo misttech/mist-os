@@ -6,14 +6,13 @@
 #define SRC_COBALT_BIN_SYSTEM_METRICS_ACTIVITY_LISTENER_H_
 
 #include <fuchsia/ui/activity/cpp/fidl.h>
-
-#include "sdk/lib/fidl/cpp/binding.h"
+#include <lib/fidl/cpp/binding.h>
 
 namespace cobalt {
 
 class ActivityListener : public fuchsia::ui::activity::Listener {
  public:
-  ActivityListener(fit::function<void(fuchsia::ui::activity::State)> callback)
+  explicit ActivityListener(fit::function<void(fuchsia::ui::activity::State)> callback)
       : state_update_callback_(std::move(callback)) {}
 
   // Creates a new handle which can be passed to fuchsia.ui.activity.Provider.WatchState

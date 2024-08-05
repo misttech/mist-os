@@ -32,7 +32,14 @@ RootResourceFilter g_root_resource_filter;
 
 void RootResourceFilter::Finalize() {
   // Add all (normalized) RAM ranges to the set of regions to deny,
-  memalloc::NormalizeRam(gPhysHandoff->memory.get(), [this](const memalloc::Range& range) {
+  auto filter_for_ram = [](memalloc::Type type) -> ktl::optional<memalloc::Type> {
+    // Treat reserved test RAM as MMIO.
+    if (type == memalloc::Type::kTestRamReserve || !memalloc::IsRamType(type)) {
+      return {};
+    }
+    return memalloc::Type::kFreeRam;
+  };
+  auto add_region = [this](const memalloc::Range& range) {
     // If we cannot add the range to our set of regions to deny, it can only be
     // because we failed a heap allocation which should be impossible at this
     // point. If it does happen, panic. We cannot run if we cannot enforce the
@@ -41,7 +48,8 @@ void RootResourceFilter::Finalize() {
                                               RegionAllocator::AllowOverlap::No);
     ASSERT(status == ZX_OK);
     return true;
-  });
+  };
+  memalloc::NormalizeRanges(gPhysHandoff->memory.get(), add_region, filter_for_ram);
 
   // Dump the deny list at spew level for debugging purposes.
   if (DPRINTF_ENABLED_FOR_LEVEL(SPEW)) {

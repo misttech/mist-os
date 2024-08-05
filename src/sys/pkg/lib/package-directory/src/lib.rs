@@ -26,6 +26,9 @@ pub use root_dir_cache::RootDirCache;
 pub use vfs::execution_scope::ExecutionScope;
 pub use vfs::path::Path as VfsPath;
 
+pub(crate) const DIRECTORY_ABILITIES: fio::Abilities =
+    fio::Abilities::GET_ATTRIBUTES.union(fio::Abilities::ENUMERATE).union(fio::Abilities::TRAVERSE);
+
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     #[error("the meta.far was not found")]

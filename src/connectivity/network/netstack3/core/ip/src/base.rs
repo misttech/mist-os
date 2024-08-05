@@ -20,7 +20,7 @@ use net_types::ip::{
 };
 use net_types::{MulticastAddr, SpecifiedAddr, SpecifiedAddress as _, UnicastAddr, Witness};
 use netstack3_base::socket::SocketIpAddrExt as _;
-use netstack3_base::sync::{Mutex, PrimaryRc, RwLock, StrongRc};
+use netstack3_base::sync::{Mutex, PrimaryRc, RwLock, StrongRc, WeakRc};
 use netstack3_base::{
     AnyDevice, BroadcastIpExt, CoreTimerContext, Counter, CounterContext, DeviceIdContext,
     DeviceIdentifier as _, ErrorAndSerializer, EventContext, FrameDestination, HandleableTimer,
@@ -670,6 +670,20 @@ pub trait IpStateContext<I: IpLayerIpExt, BC>: DeviceIdContext<AnyDevice> {
 
     /// Gets the main table ID.
     fn main_table_id(&self) -> RoutingTableId<I, Self::DeviceId>;
+
+    /// Gets mutable access to all the routing tables that currently exist.
+    fn with_ip_routing_tables_mut<
+        O,
+        F: FnOnce(
+            &mut HashMap<
+                RoutingTableId<I, Self::DeviceId>,
+                PrimaryRc<RwLock<RoutingTable<I, Self::DeviceId>>>,
+            >,
+        ) -> O,
+    >(
+        &mut self,
+        cb: F,
+    ) -> O;
 
     // TODO(https://fxbug.dev/354724171): Remove this function when we no longer
     // make routing decisions starting from the main table.
@@ -1327,6 +1341,16 @@ impl<I: IpLayerIpExt, D: StrongDeviceIdentifier, BT: IpLayerBindingsTypes>
     }
 }
 
+impl<I: IpLayerIpExt, D: StrongDeviceIdentifier, BT: IpLayerBindingsTypes>
+    OrderedLockAccess<HashMap<RoutingTableId<I, D>, PrimaryRc<RwLock<RoutingTable<I, D>>>>>
+    for IpStateInner<I, D, BT>
+{
+    type Lock = Mutex<HashMap<RoutingTableId<I, D>, PrimaryRc<RwLock<RoutingTable<I, D>>>>>;
+    fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
+        OrderedLockRef::new(&self.tables)
+    }
+}
+
 impl<I: IpLayerIpExt, D: StrongDeviceIdentifier> OrderedLockAccess<RoutingTable<I, D>>
     for RoutingTableId<I, D>
 {
@@ -1368,6 +1392,10 @@ impl<I: IpLayerIpExt, D: StrongDeviceIdentifier, BT: IpLayerBindingsTypes>
 #[derive(Default, GenericOverIp)]
 #[generic_over_ip(I, Ip)]
 pub struct IpCounters<I: IpLayerIpExt> {
+    /// Count of incoming IP unicast packets delivered.
+    pub deliver_unicast: Counter,
+    /// Count of incoming IP multicast packets delivered.
+    pub deliver_multicast: Counter,
     /// Count of incoming IP packets that are dispatched to the appropriate protocol.
     pub dispatch_receive_ip_packet: Counter,
     /// Count of incoming IP packets destined to another host.
@@ -1421,24 +1449,20 @@ pub struct IpCounters<I: IpLayerIpExt> {
 /// IPv4-specific Rx counters.
 #[derive(Default)]
 pub struct Ipv4RxCounters {
-    /// Count of incoming IPv4 packets delivered.
-    pub deliver: Counter,
+    /// Count of incoming broadcast IPv4 packets delivered.
+    pub deliver_broadcast: Counter,
 }
 
 impl Inspectable for Ipv4RxCounters {
     fn record<I: Inspector>(&self, inspector: &mut I) {
-        let Self { deliver } = self;
-        inspector.record_counter("Delivered", deliver);
+        let Self { deliver_broadcast } = self;
+        inspector.record_counter("DeliveredBroadcast", deliver_broadcast);
     }
 }
 
 /// IPv6-specific Rx counters.
 #[derive(Default)]
 pub struct Ipv6RxCounters {
-    /// Count of incoming IPv6 multicast packets delivered.
-    pub deliver_multicast: Counter,
-    /// Count of incoming IPv6 unicast packets delivered.
-    pub deliver_unicast: Counter,
     /// Count of incoming IPv6 packets dropped because the destination address
     /// is only tentatively assigned to the device.
     pub drop_for_tentative: Counter,
@@ -1455,15 +1479,11 @@ pub struct Ipv6RxCounters {
 impl Inspectable for Ipv6RxCounters {
     fn record<I: Inspector>(&self, inspector: &mut I) {
         let Self {
-            deliver_multicast,
-            deliver_unicast,
             drop_for_tentative,
             non_unicast_source,
             extension_header_discard,
             drop_looped_back_dad_probe,
         } = self;
-        inspector.record_counter("DeliveredMulticast", deliver_multicast);
-        inspector.record_counter("DeliveredUnicast", deliver_unicast);
         inspector.record_counter("DroppedTentativeDst", drop_for_tentative);
         inspector.record_counter("DroppedNonUnicastSrc", non_unicast_source);
         inspector.record_counter("DroppedExtensionHeader", extension_header_discard);
@@ -1481,16 +1501,45 @@ impl<BT> IpStateBindingsTypes for BT where
 {
 }
 
-/// Identifier to a forwarding table.
+/// Identifier to a routing table.
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct RoutingTableId<I: Ip, D>(StrongRc<RwLock<RoutingTable<I, D>>>);
 
+impl<I: Ip, D> Debug for RoutingTableId<I, D> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let Self(rc) = self;
+        f.debug_tuple("RoutingTabeId").field(&StrongRc::debug_id(rc)).finish()
+    }
+}
+
 impl<I: Ip, D> RoutingTableId<I, D> {
+    /// Creates a new table ID.
+    pub(crate) fn new(rc: StrongRc<RwLock<RoutingTable<I, D>>>) -> Self {
+        Self(rc)
+    }
+
     /// Provides direct access to the forwarding table.
     #[cfg(any(test, feature = "testutils"))]
     pub fn table(&self) -> &RwLock<RoutingTable<I, D>> {
         let Self(inner) = self;
         &*inner
+    }
+
+    /// Downgrades the strong ID into a weak one.
+    pub fn downgrade(&self) -> WeakRoutingTableId<I, D> {
+        let Self(rc) = self;
+        WeakRoutingTableId(StrongRc::downgrade(rc))
+    }
+}
+
+/// Weak Identifier to a routing table.
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub struct WeakRoutingTableId<I: Ip, D>(WeakRc<RwLock<RoutingTable<I, D>>>);
+
+impl<I: Ip, D> Debug for WeakRoutingTableId<I, D> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let Self(rc) = self;
+        f.debug_tuple("WeakRoutingTabeId").field(&WeakRc::debug_id(rc)).finish()
     }
 }
 
@@ -1512,7 +1561,7 @@ pub struct IpStateInner<I: IpLayerIpExt, D: StrongDeviceIdentifier, BT: IpStateB
     // table without dropping `main_table_id` first, it will panic. This serves as an assertion
     // that the main table cannot be removed and Bindings must never attempt to remove the main
     // routing table.
-    _tables: RwLock<HashMap<RoutingTableId<I, D>, PrimaryRc<RwLock<RoutingTable<I, D>>>>>,
+    tables: Mutex<HashMap<RoutingTableId<I, D>, PrimaryRc<RwLock<RoutingTable<I, D>>>>>,
 }
 
 impl<I: IpLayerIpExt, D: StrongDeviceIdentifier, BT: IpStateBindingsTypes> IpStateInner<I, D, BT> {
@@ -1545,11 +1594,11 @@ impl<
     > IpStateInner<I, D, BC>
 {
     /// Creates a new inner IP layer state.
-    pub fn new<CC: CoreTimerContext<IpLayerTimerId, BC>>(bindings_ctx: &mut BC) -> Self {
+    fn new<CC: CoreTimerContext<IpLayerTimerId, BC>>(bindings_ctx: &mut BC) -> Self {
         let main_table: PrimaryRc<RwLock<RoutingTable<I, D>>> = PrimaryRc::new(Default::default());
         let main_table_id = RoutingTableId(PrimaryRc::clone_strong(&main_table));
         Self {
-            _tables: RwLock::new(HashMap::from_iter(core::iter::once((
+            tables: Mutex::new(HashMap::from_iter(core::iter::once((
                 main_table_id.clone(),
                 main_table,
             )))),
@@ -2880,13 +2929,21 @@ pub fn receive_ipv4_packet_action<
     };
     match first_status {
         Some(
-            address_status @ (Ipv4PresentAddressStatus::Multicast
-            | Ipv4PresentAddressStatus::Unicast
-            | Ipv4PresentAddressStatus::LoopbackSubnet
-            | Ipv4PresentAddressStatus::LimitedBroadcast
+            address_status @ (Ipv4PresentAddressStatus::Unicast
+            | Ipv4PresentAddressStatus::LoopbackSubnet),
+        ) => {
+            core_ctx.increment(|counters| &counters.deliver_unicast);
+            ReceivePacketAction::Deliver { address_status }
+        }
+        Some(address_status @ Ipv4PresentAddressStatus::Multicast) => {
+            core_ctx.increment(|counters| &counters.deliver_multicast);
+            ReceivePacketAction::Deliver { address_status }
+        }
+        Some(
+            address_status @ (Ipv4PresentAddressStatus::LimitedBroadcast
             | Ipv4PresentAddressStatus::SubnetBroadcast),
         ) => {
-            core_ctx.increment(|counters| &counters.version_rx.deliver);
+            core_ctx.increment(|counters| &counters.version_rx.deliver_broadcast);
             ReceivePacketAction::Deliver { address_status }
         }
         None => {
@@ -2953,11 +3010,11 @@ pub fn receive_ipv6_packet_action<
     };
     match highest_priority {
         Some(address_status @ Ipv6PresentAddressStatus::Multicast) => {
-            core_ctx.increment(|counters| &counters.version_rx.deliver_multicast);
+            core_ctx.increment(|counters| &counters.deliver_multicast);
             ReceivePacketAction::Deliver { address_status }
         }
         Some(address_status @ Ipv6PresentAddressStatus::UnicastAssigned) => {
-            core_ctx.increment(|counters| &counters.version_rx.deliver_unicast);
+            core_ctx.increment(|counters| &counters.deliver_unicast);
             ReceivePacketAction::Deliver { address_status }
         }
         Some(Ipv6PresentAddressStatus::UnicastTentative) => {

@@ -101,7 +101,7 @@ mod tests {
         loop {
             select! {
                 x = stream.next() => if let Some(x) = x {
-                    queue.get_mut().push(future::ok::<_, ()>(x));
+                    queue.get_mut().push_back(future::ok::<_, ()>(x));
                 },
                 x = queue.next() => if let Some(x) = x {
                     return x;
@@ -116,7 +116,7 @@ mod tests {
         loop {
             select! {
                 x = stream.next() => if let Some(x) = x {
-                    queue.push(future::ok::<_, ()>(x));
+                    queue.push_back(future::ok::<_, ()>(x));
                 },
                 x = queue.next() => if let Some(x) = x {
                     return x;

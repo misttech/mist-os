@@ -7,14 +7,14 @@
 //! overhead.
 
 use anyhow::Context as _;
-use async_utils::stream::{Tagged, TryFlattenUnorderedExt as _, WithTag as _};
+use async_utils::stream::{Tagged, WithTag as _};
 use const_unwrap::const_unwrap_option;
 use fidl::endpoints::{ControlHandle as _, RequestStream as _};
 use fidl::{HandleBased as _, Peered as _};
 use fuchsia_component::server::{ServiceFs, ServiceFsDir};
 use futures::io::AsyncReadExt as _;
 use futures::stream::SelectAll;
-use futures::{FutureExt as _, StreamExt as _};
+use futures::{FutureExt as _, StreamExt as _, TryStreamExt as _};
 use net_types::ip::{Ip, Ipv4, Ipv6};
 use net_types::SpecifiedAddr;
 use packet::{ParseBuffer as _, Serializer as _};
@@ -40,7 +40,7 @@ async fn main() {
     let _: &mut ServiceFsDir<'_, _> =
         fs.dir("svc").add_fidl_service(|s: fposix_socket::ProviderRequestStream| s);
     let _: &mut ServiceFs<_> = fs.take_and_serve_directory_handle().expect("take startup handle");
-    let mut provider_requests = fs.fuse().map(Ok).try_flatten_unordered();
+    let mut provider_requests = fs.fuse().map(Ok).try_flatten_unordered(None);
 
     let mut datagram_requests = SelectAll::new();
     let mut stream_requests = SelectAll::new();

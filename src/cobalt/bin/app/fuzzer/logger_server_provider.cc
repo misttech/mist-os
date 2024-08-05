@@ -7,7 +7,6 @@
 
 #include <chrono>
 
-#include "lib/async/default.h"
 #include "src/cobalt/bin/app/metric_event_logger_impl.h"
 #include "src/cobalt/bin/utils/base64.h"
 #include "third_party/cobalt/src/lib/util/posix_file_system.h"

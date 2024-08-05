@@ -8,9 +8,9 @@ import("//build/drivers.gni")
 import("//build/test.gni")
 
 driver_bind_rules("pwm-bind") {
-  rules = "pwm.bind"
+  rules = "meta/pwm.bind"
   bind_output = "pwm.bindbc"
-  tests = "bind-tests.json"
+  tests = "meta/bind-tests.json"
   deps = [ "//src/devices/bind/fuchsia.pwm" ]
 }
 
@@ -30,7 +30,7 @@ fuchsia_driver("pwm-driver") {
 
 fuchsia_driver_component("pwm") {
   visibility = [ ":*" ]
-  info = "pwm-info.json"
+  info = "meta/pwm-info.json"
   component_name = "pwm"
   deps = [ ":pwm-driver" ]
   manifest = "meta/pwm.cml"

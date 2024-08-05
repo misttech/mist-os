@@ -53,7 +53,6 @@
 #include <platform/pc/bootloader.h>
 #include <platform/pc/smbios.h>
 #include <platform/ram_mappable_crashlog.h>
-#include <vm/bootreserve.h>
 #include <vm/physmap.h>
 #include <vm/pmm.h>
 #include <vm/vm_aspace.h>
@@ -94,11 +93,6 @@ static void platform_save_bootloader_data(void) {
     crashlog_impls::ram_mappable.Initialize(nvram.base, nvram.length);
     PlatformCrashlog::Bind(crashlog_impls::ram_mappable.Get());
   }
-}
-
-static void boot_reserve_zbi() {
-  ktl::span zbi = ZbiInPhysmap();
-  boot_reserve_add_range(physmap_to_paddr(zbi.data()), ROUNDUP_PAGE_SIZE(zbi.size_bytes()));
 }
 
 static void platform_init_crashlog(void) {
@@ -213,14 +207,8 @@ void platform_early_init(void) {
   platform_init_console();
 #endif
 
-  /* initialize the boot memory reservation system */
-  boot_reserve_init();
-
-  // Add the data ZBI to the boot reserve list.
-  boot_reserve_zbi();
-
   /* initialize physical memory arenas */
-  pc_mem_init(gPhysHandoff->mem_config.get());
+  pc_mem_init(gPhysHandoff->mem_config.get(), gPhysHandoff->memory.get());
 }
 
 void platform_prevm_init() {}

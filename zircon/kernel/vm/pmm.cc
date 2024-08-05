@@ -13,6 +13,7 @@
 #include <lib/console.h>
 #include <lib/counters.h>
 #include <lib/ktrace.h>
+#include <lib/memalloc/range.h>
 #include <platform.h>
 #include <pow2.h>
 #include <stdlib.h>
@@ -71,7 +72,10 @@ LK_INIT_HOOK(pmm_init_alloc_random_should_wait, &pmm_init_alloc_random_should_wa
 static void pmm_fill_free_pages(uint level) { pmm_node.FillFreePagesAndArm(); }
 LK_INIT_HOOK(pmm_fill, &pmm_fill_free_pages, LK_INIT_LEVEL_VM)
 
-zx_status_t pmm_init(ktl::span<const zbi_mem_range_t> ranges) { return pmm_node.Init(ranges); }
+zx_status_t pmm_init(ktl::span<const zbi_mem_range_t> unnormalized,
+                     ktl::span<const memalloc::Range> normalized) {
+  return pmm_node.Init(unnormalized, normalized);
+}
 
 vm_page_t* paddr_to_vm_page(paddr_t addr) { return pmm_node.PaddrToPage(addr); }
 

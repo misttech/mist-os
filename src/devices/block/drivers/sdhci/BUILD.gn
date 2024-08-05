@@ -22,45 +22,57 @@ source_set("dma-descriptor-builder") {
 }
 
 driver_bind_rules("sdhci-bind") {
-  rules = "sdhci.bind"
-  tests = "sdhci-bind-test.json"
+  rules = "meta/sdhci.bind"
+  tests = "meta/sdhci-bind-test.json"
   deps = [ "//src/devices/bind/fuchsia.sdmmc" ]
 }
 
-fuchsia_driver("sdhci-driver") {
-  output_name = "sdhci"
+source_set("sdhci-driver-source") {
   configs += [
     "//build/config:all_source",
     "//build/config/fuchsia:enable_zircon_asserts",
   ]
-  sources = [ "sdhci.cc" ]
+  sources = [
+    "sdhci-reg.h",
+    "sdhci.cc",
+    "sdhci.h",
+  ]
   deps = [
-    ":dma-descriptor-builder",
     ":sdhci-bind",
-    "//sdk/banjo/fuchsia.hardware.sdhci:fuchsia.hardware.sdhci_banjo_cpp",
-    "//sdk/banjo/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_cpp",
     "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_bindlib_cpp",
     "//sdk/fidl/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_cpp",
-    "//src/devices/block/lib/sdmmc",
     "//src/devices/lib/driver",
-    "//src/devices/lib/mmio",
     "//src/lib/ddk",
-    "//src/lib/vmo_store",
     "//zircon/system/ulib/fbl",
+  ]
+  public_deps = [
+    ":dma-descriptor-builder",
+    "//sdk/banjo/fuchsia.hardware.sdhci:fuchsia.hardware.sdhci_banjo_cpp",
+    "//sdk/banjo/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_banjo_cpp",
+    "//src/devices/block/lib/sdmmc",
+    "//src/devices/lib/mmio",
+    "//src/lib/vmo_store",
     "//zircon/system/ulib/fzl",
-    "//zircon/system/ulib/hwreg",
     "//zircon/system/ulib/sync",
     "//zircon/system/ulib/zircon-internal",
     "//zircon/system/ulib/zx",
   ]
 }
 
+fuchsia_driver("sdhci-driver") {
+  output_name = "sdhci"
+  deps = [ ":sdhci-driver-source" ]
+}
+
 fuchsia_driver_component("sdhci") {
   component_name = "sdhci"
-  deps = [ ":sdhci-driver" ]
-  info = "sdhci-info.json"
+  deps = [
+    ":sdhci-bind",
+    ":sdhci-driver",
+  ]
+  info = "meta/sdhci-info.json"
   manifest = "meta/sdhci.cml"
 }
 
@@ -71,36 +83,17 @@ fuchsia_driver_package("package") {
 
 test("sdhci-test-bin") {
   output_name = "sdhci-test"
-  configs += [ "//build/config:all_source" ]
-  sources = [
-    "sdhci-test.cc",
-    "sdhci.cc",
-  ]
+  sources = [ "sdhci-test.cc" ]
   deps = [
-    ":dma-descriptor-builder",
-    ":sdhci-bind",
-    "//sdk/banjo/fuchsia.hardware.sdhci:fuchsia.hardware.sdhci_banjo_cpp",
+    ":sdhci-driver-source",
     "//sdk/banjo/fuchsia.hardware.sdhci:fuchsia.hardware.sdhci_banjo_cpp_mock",
-    "//sdk/banjo/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_banjo_cpp",
-    "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_cpp",
-    "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_cpp",
-    "//sdk/fidl/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_bindlib_cpp",
-    "//sdk/fidl/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_cpp",
-    "//src/devices/block/lib/sdmmc",
     "//src/devices/lib/mmio",
     "//src/devices/lib/mmio:test_helper",
     "//src/devices/testing/fake-bti",
     "//src/devices/testing/mock-ddk",
-    "//src/lib/ddk",
-    "//src/lib/vmo_store",
-    "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/fzl",
-    "//zircon/system/ulib/hwreg",
     "//zircon/system/ulib/mmio-ptr:mmio-ptr-fake",
     "//zircon/system/ulib/mock-function",
     "//zircon/system/ulib/sync",
-    "//zircon/system/ulib/zircon-internal",
-    "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
   ]
 }

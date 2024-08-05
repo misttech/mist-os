@@ -8,9 +8,9 @@ import("//build/drivers.gni")
 import("//build/test.gni")
 
 driver_bind_rules("tcs3400_light_bind") {
-  rules = "tcs3400_light.bind"
+  rules = "meta/tcs3400_light.bind"
   bind_output = "ams-light.bindbc"
-  tests = "bind_tests.json"
+  tests = "meta/bind_tests.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_bindlib",
     "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c_bindlib",
@@ -50,7 +50,7 @@ fuchsia_driver("ams-light-driver") {
 fuchsia_driver_component("ams-light") {
   component_name = "ams-light"
   deps = [ ":ams-light-driver" ]
-  info = "ams-light-info.json"
+  info = "meta/ams-light-info.json"
   manifest = "meta/ams-light.cml"
 }
 

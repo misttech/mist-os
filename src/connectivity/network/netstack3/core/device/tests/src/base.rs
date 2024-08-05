@@ -40,7 +40,7 @@ fn test_no_default_routes() {
             DEFAULT_INTERFACE_METRIC,
         );
 
-    assert_eq!(ctx.core_api().routes_any().get_all_routes(), []);
+    assert_eq!(ctx.core_api().routes_any().get_all_routes_in_main_table(), []);
     let _ethernet_device: EthernetDeviceId<_> =
         ctx.core_api().device::<EthernetLinkDevice>().add_device_with_default_state(
             EthernetCreationProperties {
@@ -49,7 +49,7 @@ fn test_no_default_routes() {
             },
             DEFAULT_INTERFACE_METRIC,
         );
-    assert_eq!(ctx.core_api().routes_any().get_all_routes(), []);
+    assert_eq!(ctx.core_api().routes_any().get_all_routes_in_main_table(), []);
 }
 
 #[test]

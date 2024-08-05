@@ -12,6 +12,7 @@
 #include <lib/counters.h>
 #include <lib/crypto/global_prng.h>
 #include <lib/instrumentation/asan.h>
+#include <lib/memalloc/range.h>
 #include <lib/zbitl/items/mem-config.h>
 #include <lib/zircon-internal/macros.h>
 #include <trace.h>
@@ -64,31 +65,57 @@ void AsanUnpoisonPage(vm_page_t* p) {
 
 // We disable thread safety analysis here, since this function is only called
 // during early boot before threading exists.
-zx_status_t PmmNode::Init(ktl::span<const zbi_mem_range_t> ranges) TA_NO_THREAD_SAFETY_ANALYSIS {
+zx_status_t PmmNode::Init(ktl::span<const zbi_mem_range_t> unnormalized,
+                          ktl::span<const memalloc::Range> normalized)
+    TA_NO_THREAD_SAFETY_ANALYSIS {
   // Make sure we're in early boot (ints disabled and no active Schedulers)
   DEBUG_ASSERT(Scheduler::PeekActiveMask() == 0);
   DEBUG_ASSERT(arch_ints_disabled());
 
+  // First process all the reserved ranges: these are comprised of any existing,
+  // special, pre-PMM allocations like the kernel or data ZBI, or any holes
+  // between RAM (which may end up within arenas). We do this first so that
+  // arena initialization knows to avoid these ranges for bookkeeping.
+  ktl::optional<uint64_t> last_ram_end, last_reserved_end;
+  for (const memalloc::Range& range : normalized) {
+    // Non-RAM ranges (i.e., peripheral or unknown) should be treated as holes.
+    if (!memalloc::IsRamType(range.type)) {
+      continue;
+    }
+
+    // Page-align on both sides to ensure that any non-aligned subrange ends up
+    // as reserved.
+    uint64_t start = range.addr & -PAGE_SIZE;
+    uint64_t size = ROUNDUP_PAGE_SIZE((range.addr - start) + range.size);
+
+    // If there are adjacent reserved ranges, we might have previously aligned
+    // the end of the first past the start of the second, so account for that.
+    if (last_reserved_end && *last_reserved_end > start) {
+      size -= *last_reserved_end - start;
+      start = *last_reserved_end;
+    }
+    if (size == 0) {
+      continue;
+    }
+
+    if (last_ram_end && *last_ram_end < start) {
+      // Found a hole between RAM.
+      boot_reserve_add_range(*last_ram_end, start - *last_ram_end);
+      last_reserved_end = start;
+    }
+    last_ram_end = start + size;
+
+    if (!memalloc::IsAllocatedType(range.type)) {
+      continue;
+    }
+    boot_reserve_add_range(start, size);
+    last_reserved_end = last_ram_end;
+  }
+
   // TODO(https://fxbug.dev/347766366): This is only actually needed in the PC
   // case, but easy enough and harmless to do it uniformly. This logic will all
   // go away soon in any case.
-  zbitl::MemRangeMerger merged(ranges.begin(), ranges.end());
-
-  // First process all the reserved ranges. We do this in case there are reserved regions that
-  // overlap with the RAM regions that occur later in the list. If we didn't process the reserved
-  // regions first, then we might add a pmm arena and have it carve out its vm_page_t array from
-  // what we will later learn is reserved memory.
-  for (const zbi_mem_range_t& range : merged) {
-    switch (range.type) {
-      case ZBI_MEM_TYPE_RAM:
-        [[fallthrough]];
-      case ZBI_MEM_TYPE_PERIPHERAL:
-        break;
-      default:
-        boot_reserve_add_range(range.paddr, range.length);
-    }
-  }
-
+  zbitl::MemRangeMerger merged(unnormalized.begin(), unnormalized.end());
   for (const zbi_mem_range_t& range : merged) {
     if (range.type != ZBI_MEM_TYPE_RAM || range.length == 0) {
       continue;

@@ -3,6 +3,10 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+# Capture the start_time as early as possible to best reflect the user
+# experienced start time.
+declare -r start_time="${EPOCHREALTIME/./}"
+
 function help_options {
   cat <<END
 
@@ -380,12 +384,9 @@ fi
 mkdir -p "${FX_CACHE_DIR}"
 
 track-command-execution "${metric_name}" "$@" &
-declare -r start_time="$SECONDS"
 export PATH="${PREBUILT_ALL_PATHS}:${PATH}"
 "${command_path[@]}" "$@"
 declare -r retval=$?
-declare -r end_time="$SECONDS"
-declare -r elapsed_time=$(( 1000 * (end_time - start_time) )) # milliseconds
 
 if [ -z "${iterative}" ]; then
   # is-remote-workflow-device returns 0 for true and 1 for false
@@ -394,7 +395,11 @@ if [ -z "${iterative}" ]; then
   if is-remote-workflow-device; then
     is_remote=1
   fi
-  track-command-finished "${elapsed_time}" "${retval}" "${command_name}" "${is_remote}" "$@" &
+
+  # Capture the end_time as late as possible to best reflect the user
+  # experienced end time.
+  declare -r end_time="${EPOCHREALTIME/./}"
+  track-command-finished "${start_time}" "${end_time}" "${retval}" "${command_name}" "${is_remote}" "$@" &
   exit ${retval}
 elif which inotifywait >/dev/null; then
   monitor_source_changes() {

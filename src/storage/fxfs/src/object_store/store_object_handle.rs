@@ -558,7 +558,8 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
                         store.get_keys(self.object_id),
                         false,
                     )
-                    .await?,
+                    .await?
+                    .ok_or(anyhow!(FxfsError::Inconsistent).context("Missing encryption key"))?,
             ),
             Encryption::PermanentKeys => {
                 Some(store.key_manager.get(self.object_id).await?.unwrap())
@@ -582,17 +583,15 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
                 // Next, see if the keys are already created.
                 if let Some(item) = store.tree.find(&ObjectKey::keys(self.object_id)).await? {
                     if let ObjectValue::Keys(EncryptionKeys::AES256XTS(keys)) = item.value {
-                        return Ok(Some(
-                            store
-                                .key_manager
-                                .get_or_insert(
-                                    self.object_id,
-                                    store.crypt().ok_or_else(|| anyhow!("No crypt!"))?,
-                                    async { Ok(keys) },
-                                    false,
-                                )
-                                .await?,
-                        ));
+                        return Ok(store
+                            .key_manager
+                            .get_or_insert(
+                                self.object_id,
+                                store.crypt().ok_or_else(|| anyhow!("No crypt!"))?,
+                                async { Ok(Some(keys)) },
+                                false,
+                            )
+                            .await?);
                     } else {
                         return Err(anyhow!(FxfsError::Inconsistent).context("get_or_create_keys"));
                     }
@@ -672,8 +671,6 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
         let size = match item {
             Some(item) if item.key == key => match item.value {
                 ObjectValue::Attribute { size } => size,
-                // Attribute was deleted.
-                ObjectValue::None => return Ok(0),
                 _ => bail!(FxfsError::Inconsistent),
             },
             _ => return Ok(0),
@@ -1003,7 +1000,7 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
             let (head, tail) = buf.split_at_mut(device_range_len as usize);
             buf = tail;
 
-            writes.push(async move {
+            writes.push_back(async move {
                 let len = head.len() as u64;
                 Result::<_, Error>::Ok((
                     device_range.start,
@@ -1149,7 +1146,6 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
             .await?
         {
             match item.value {
-                ObjectValue::None => false,
                 ObjectValue::Attribute { size } => (data.len() as u64) < size,
                 _ => bail!(FxfsError::Inconsistent),
             }
@@ -1217,11 +1213,6 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
                 let data = self.read_attr(id).await?.ok_or(FxfsError::NotFound)?;
                 Ok(data.into_vec())
             }
-            // If an extended attribute has a value of None, it means it was deleted but hasn't
-            // been cleaned up yet.
-            ObjectValue::None => {
-                bail!(FxfsError::NotFound)
-            }
             _ => {
                 bail!(anyhow!(FxfsError::Inconsistent)
                     .context("get_extended_attribute: Expected ExtendedAttribute value"))
@@ -1253,7 +1244,6 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
                 Some(Item { value, .. }) => (
                     true,
                     match value {
-                        ObjectValue::None => None,
                         ObjectValue::ExtendedAttribute(ExtendedAttributeValue::Inline(..)) => None,
                         ObjectValue::ExtendedAttribute(ExtendedAttributeValue::AttributeId(id)) => {
                             Some(id)
@@ -1369,7 +1359,6 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
             match tree.find(&object_key).await?.ok_or(FxfsError::NotFound)?.value {
                 ObjectValue::ExtendedAttribute(ExtendedAttributeValue::AttributeId(id)) => Some(id),
                 ObjectValue::ExtendedAttribute(ExtendedAttributeValue::Inline(..)) => None,
-                ObjectValue::None => bail!(FxfsError::NotFound),
                 _ => {
                     bail!(anyhow!(FxfsError::Inconsistent)
                         .context("remove_extended_attribute: Expected ExtendedAttribute value"))

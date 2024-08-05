@@ -22,8 +22,14 @@ import (
 
 type BlobStore interface {
 	Dir() string
+
+	// FetchBlobs will download the listed blobs.
+	PrefetchBlobs(ctx context.Context, deliveryBlobType *int, merkles []build.MerkleRoot) error
+
 	BlobPath(ctx context.Context, deliveryBlobType *int, merkle build.MerkleRoot) (string, error)
+
 	OpenBlob(ctx context.Context, deliveryBlobType *int, merkle build.MerkleRoot) (*os.File, error)
+
 	BlobSize(ctx context.Context, deliveryBlobType *int, merkle build.MerkleRoot) (uint64, error)
 }
 
@@ -33,6 +39,14 @@ type DirBlobStore struct {
 
 func NewDirBlobStore(dir string) BlobStore {
 	return &DirBlobStore{dir}
+}
+
+func (fs *DirBlobStore) PrefetchBlobs(
+	ctx context.Context,
+	deliveryBlobType *int,
+	merkles []build.MerkleRoot,
+) error {
+	return nil
 }
 
 func (fs *DirBlobStore) BlobPath(ctx context.Context, deliveryBlobType *int, merkle build.MerkleRoot) (string, error) {
@@ -198,6 +212,13 @@ func (r *Repository) OpenPackage(ctx context.Context, path string) (Package, err
 	return Package{}, fmt.Errorf("could not find package: %q", path)
 }
 
+func (r *Repository) PrefetchUncompressedBlobs(
+	ctx context.Context,
+	merkles []build.MerkleRoot,
+) error {
+	return r.blobStore.PrefetchBlobs(ctx, nil, merkles)
+}
+
 func (r *Repository) UncompressedBlobPath(ctx context.Context, merkle build.MerkleRoot) (string, error) {
 	return r.blobStore.BlobPath(ctx, nil, merkle)
 }
@@ -254,6 +275,16 @@ func (r *Repository) AlignedBlobSize(ctx context.Context, merkle build.MerkleRoo
 
 // sumBlobSizes sums up all the blob sizes from the blob store.
 func (r *Repository) sumAlignedBlobSizes(ctx context.Context, blobs map[build.MerkleRoot]struct{}) (uint64, error) {
+	// Prefetch the blobs into a single batch to speed up downloads.
+	merkles := []build.MerkleRoot{}
+	for blob := range blobs {
+		merkles = append(merkles, blob)
+	}
+
+	if err := r.blobStore.PrefetchBlobs(ctx, r.deliveryBlobType, merkles); err != nil {
+		return 0, err
+	}
+
 	totalSize := uint64(0)
 	for blob := range blobs {
 		size, err := r.AlignedBlobSize(ctx, blob)

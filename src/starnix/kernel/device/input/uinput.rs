@@ -353,7 +353,7 @@ impl FileOps for UinputDevice {
             // others.
             _ => {
                 log_warn!("receive unknown ioctl request: {:?}", request);
-                default_ioctl(file, current_task, request, arg)
+                default_ioctl(file, locked, current_task, request, arg)
             }
         }
     }

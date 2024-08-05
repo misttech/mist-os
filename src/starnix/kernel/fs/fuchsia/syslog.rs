@@ -55,12 +55,12 @@ impl FileOps for SyslogFile {
 
     fn ioctl(
         &self,
-        _locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<'_, Unlocked>,
         file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
         arg: SyscallArg,
     ) -> Result<SyscallResult, Errno> {
-        default_ioctl(file, current_task, request, arg)
+        default_ioctl(file, locked, current_task, request, arg)
     }
 }

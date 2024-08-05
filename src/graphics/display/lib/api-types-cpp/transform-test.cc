@@ -56,25 +56,30 @@ TEST(Transform, FidlConversion) {
 }
 
 TEST(Transform, BanjoConversion) {
-  EXPECT_EQ(ToTransform(FRAME_TRANSFORM_IDENTITY), Transform::kIdentity);
-  EXPECT_EQ(ToTransform(FRAME_TRANSFORM_REFLECT_X), Transform::kReflectX);
-  EXPECT_EQ(ToTransform(FRAME_TRANSFORM_REFLECT_Y), Transform::kReflectY);
-  EXPECT_EQ(ToTransform(FRAME_TRANSFORM_ROT_90), Transform::kRotateCcw90);
-  EXPECT_EQ(ToTransform(FRAME_TRANSFORM_ROT_180), Transform::kRotateCcw180);
-  EXPECT_EQ(ToTransform(FRAME_TRANSFORM_ROT_270), Transform::kRotateCcw270);
-  EXPECT_EQ(ToTransform(FRAME_TRANSFORM_ROT_90_REFLECT_X), Transform::kRotateCcw90ReflectX);
-  EXPECT_EQ(ToTransform(FRAME_TRANSFORM_ROT_90_REFLECT_Y), Transform::kRotateCcw90ReflectY);
+  EXPECT_EQ(ToTransform(COORDINATE_TRANSFORMATION_IDENTITY), Transform::kIdentity);
+  EXPECT_EQ(ToTransform(COORDINATE_TRANSFORMATION_REFLECT_X), Transform::kReflectX);
+  EXPECT_EQ(ToTransform(COORDINATE_TRANSFORMATION_REFLECT_Y), Transform::kReflectY);
+  EXPECT_EQ(ToTransform(COORDINATE_TRANSFORMATION_ROTATE_CCW_90), Transform::kRotateCcw90);
+  EXPECT_EQ(ToTransform(COORDINATE_TRANSFORMATION_ROTATE_CCW_180), Transform::kRotateCcw180);
+  EXPECT_EQ(ToTransform(COORDINATE_TRANSFORMATION_ROTATE_CCW_270), Transform::kRotateCcw270);
+  EXPECT_EQ(ToTransform(COORDINATE_TRANSFORMATION_ROTATE_CCW_90_REFLECT_X),
+            Transform::kRotateCcw90ReflectX);
+  EXPECT_EQ(ToTransform(COORDINATE_TRANSFORMATION_ROTATE_CCW_90_REFLECT_Y),
+            Transform::kRotateCcw90ReflectY);
 
-  EXPECT_EQ(ToBanjoFrameTransform(Transform::kIdentity), FRAME_TRANSFORM_IDENTITY);
-  EXPECT_EQ(ToBanjoFrameTransform(Transform::kReflectX), FRAME_TRANSFORM_REFLECT_X);
-  EXPECT_EQ(ToBanjoFrameTransform(Transform::kReflectY), FRAME_TRANSFORM_REFLECT_Y);
-  EXPECT_EQ(ToBanjoFrameTransform(Transform::kRotateCcw90), FRAME_TRANSFORM_ROT_90);
-  EXPECT_EQ(ToBanjoFrameTransform(Transform::kRotateCcw180), FRAME_TRANSFORM_ROT_180);
-  EXPECT_EQ(ToBanjoFrameTransform(Transform::kRotateCcw270), FRAME_TRANSFORM_ROT_270);
+  EXPECT_EQ(ToBanjoFrameTransform(Transform::kIdentity), COORDINATE_TRANSFORMATION_IDENTITY);
+  EXPECT_EQ(ToBanjoFrameTransform(Transform::kReflectX), COORDINATE_TRANSFORMATION_REFLECT_X);
+  EXPECT_EQ(ToBanjoFrameTransform(Transform::kReflectY), COORDINATE_TRANSFORMATION_REFLECT_Y);
+  EXPECT_EQ(ToBanjoFrameTransform(Transform::kRotateCcw90),
+            COORDINATE_TRANSFORMATION_ROTATE_CCW_90);
+  EXPECT_EQ(ToBanjoFrameTransform(Transform::kRotateCcw180),
+            COORDINATE_TRANSFORMATION_ROTATE_CCW_180);
+  EXPECT_EQ(ToBanjoFrameTransform(Transform::kRotateCcw270),
+            COORDINATE_TRANSFORMATION_ROTATE_CCW_270);
   EXPECT_EQ(ToBanjoFrameTransform(Transform::kRotateCcw90ReflectX),
-            FRAME_TRANSFORM_ROT_90_REFLECT_X);
+            COORDINATE_TRANSFORMATION_ROTATE_CCW_90_REFLECT_X);
   EXPECT_EQ(ToBanjoFrameTransform(Transform::kRotateCcw90ReflectY),
-            FRAME_TRANSFORM_ROT_90_REFLECT_Y);
+            COORDINATE_TRANSFORMATION_ROTATE_CCW_90_REFLECT_Y);
 }
 
 }  // namespace

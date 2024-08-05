@@ -763,28 +763,6 @@ impl PagedObjectHandle {
         Ok(())
     }
 
-    pub async fn write_timestamps<'a>(
-        &'a self,
-        crtime: Option<Timestamp>,
-        mtime: Option<Timestamp>,
-    ) -> Result<(), Error> {
-        if crtime.is_none() && mtime.is_none() {
-            return Ok(());
-        }
-        let mut inner = self.inner.lock().unwrap();
-        if let Some(crtime) = crtime {
-            inner.dirty_crtime = DirtyTimestamp::Some(crtime);
-        }
-        if let Some(mtime) = mtime {
-            // Reset the VMO stats so modifications to the contents of the file between now and the
-            // next flush can be detected. The next flush should contain the explicitly set mtime
-            // unless the contents of the file are modified between now and the next flush.
-            let _ = self.was_file_modified_since_last_call()?;
-            inner.dirty_mtime = DirtyTimestamp::Some(mtime);
-        }
-        Ok(())
-    }
-
     pub async fn update_attributes(
         &self,
         attributes: &fio::MutableNodeAttributes,
@@ -1170,29 +1148,6 @@ mod tests {
         );
     }
 
-    async fn set_attrs_checked(file: &fio::FileProxy, crtime: Option<u64>, mtime: Option<u64>) {
-        let attributes = fio::NodeAttributes {
-            mode: 0,
-            id: 0,
-            content_size: 0,
-            storage_size: 0,
-            link_count: 0,
-            creation_time: crtime.unwrap_or(0),
-            modification_time: mtime.unwrap_or(0),
-        };
-
-        let mut mask = fio::NodeAttributeFlags::empty();
-        if crtime.is_some() {
-            mask |= fio::NodeAttributeFlags::CREATION_TIME;
-        }
-        if mtime.is_some() {
-            mask |= fio::NodeAttributeFlags::MODIFICATION_TIME;
-        }
-
-        let status = file.set_attr(mask, &attributes).await.expect("FIDL call failed");
-        zx::Status::ok(status).expect("set_attr failed");
-    }
-
     async fn update_attributes_checked(
         file: &fio::FileProxy,
         attributes: &fio::MutableNodeAttributes,
@@ -1428,7 +1383,14 @@ mod tests {
 
         let initial_time = get_attrs_checked(&file).await.modification_time;
         // Advance the mtime by a large amount that should be reachable by the test.
-        set_attrs_checked(&file, None, Some(initial_time + ONE_DAY)).await;
+        update_attributes_checked(
+            &file,
+            &fio::MutableNodeAttributes {
+                modification_time: Some(initial_time + ONE_DAY),
+                ..Default::default()
+            },
+        )
+        .await;
 
         let updated_time = get_attrs_checked(&file).await.modification_time;
         assert!(updated_time > initial_time);
@@ -1507,7 +1469,15 @@ mod tests {
 
         let attrs = get_attrs_checked(&file).await;
         let future = attrs.creation_time + ONE_DAY;
-        set_attrs_checked(&file, Some(future), Some(future)).await;
+        update_attributes_checked(
+            &file,
+            &fio::MutableNodeAttributes {
+                creation_time: Some(future),
+                modification_time: Some(future),
+                ..Default::default()
+            },
+        )
+        .await;
 
         fail_transaction.store(true, Ordering::Relaxed);
         file.sync().await.unwrap().expect_err("sync should fail");
@@ -1908,20 +1878,18 @@ mod tests {
         // be equivalent
         get_attrs_and_attributes_parity_checked(&file).await;
 
-        // `set_attrs` and `update_attributes` (io2) both updates the file's attributes
         let now = Timestamp::now().as_nanos();
         update_attributes_checked(
             &file,
             &fio::MutableNodeAttributes {
                 creation_time: Some(now),
-                modification_time: Some(now),
+                modification_time: Some(now - ONE_DAY),
                 mode: Some(111),
                 gid: Some(222),
                 ..Default::default()
             },
         )
         .await;
-        set_attrs_checked(&file, None, Some(now - ONE_DAY)).await;
         let updated_attributes = get_attributes_checked(
             &file,
             fio::NodeAttributesQuery::CREATION_TIME

@@ -6,6 +6,7 @@
 
 use crate::common::{
     decode_extended_attribute_value, encode_extended_attribute_value, extended_attributes_sender,
+    io1_to_io2_attrs,
 };
 use crate::directory::connection::{BaseConnection, ConnectionState};
 use crate::directory::entry_container::MutableDirectory;
@@ -76,7 +77,11 @@ impl<DirectoryType: MutableDirectory> MutableConnection<DirectoryType> {
                 responder.send(result.map_err(Status::into_raw))?;
             }
             fio::DirectoryRequest::SetAttr { flags, attributes, responder } => {
-                let status = match this.as_mut().handle_setattr(flags, attributes).await {
+                let status = match this
+                    .as_mut()
+                    .handle_update_attributes(io1_to_io2_attrs(flags, attributes))
+                    .await
+                {
                     Ok(()) => Status::OK,
                     Err(status) => status,
                 };
@@ -159,20 +164,6 @@ impl<DirectoryType: MutableDirectory> MutableConnection<DirectoryType> {
         Ok(ConnectionState::Alive)
     }
 
-    async fn handle_setattr(
-        self: Pin<&mut Self>,
-        flags: fio::NodeAttributeFlags,
-        attributes: fio::NodeAttributes,
-    ) -> Result<(), Status> {
-        if !self.base.options.rights.contains(fio::Rights::UPDATE_ATTRIBUTES) {
-            return Err(Status::BAD_HANDLE);
-        }
-
-        // TODO(jfsulliv): Consider always permitting attributes to be deferrable. The risk with
-        // this is that filesystems would require a background flush of dirty attributes to disk.
-        self.base.directory.set_attrs(flags, attributes).await
-    }
-
     async fn handle_update_attributes(
         self: Pin<&mut Self>,
         attributes: fio::MutableNodeAttributes,
@@ -180,7 +171,8 @@ impl<DirectoryType: MutableDirectory> MutableConnection<DirectoryType> {
         if !self.base.options.rights.contains(fio::Operations::UPDATE_ATTRIBUTES) {
             return Err(Status::BAD_HANDLE);
         }
-
+        // TODO(jfsulliv): Consider always permitting attributes to be deferrable. The risk with
+        // this is that filesystems would require a background flush of dirty attributes to disk.
         self.base.directory.update_attributes(attributes).await
     }
 
@@ -328,7 +320,6 @@ mod tests {
         Link { id: u32, path: String },
         Unlink { id: u32, name: String },
         Rename { id: u32, src_name: String, dst_dir: u32, dst_name: String },
-        SetAttr { id: u32, flags: fio::NodeAttributeFlags, attrs: fio::NodeAttributes },
         UpdateAttributes { id: u32, attributes: fio::MutableNodeAttributes },
         Sync,
         Close,
@@ -359,10 +350,6 @@ mod tests {
     }
 
     impl Node for MockDirectory {
-        async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
-            unimplemented!("Not implemented");
-        }
-
         async fn get_attributes(
             &self,
             _query: fio::NodeAttributesQuery,
@@ -438,14 +425,6 @@ mod tests {
                 id: self.id,
                 name: name.to_string(),
             })
-        }
-
-        async fn set_attrs(
-            &self,
-            flags: fio::NodeAttributeFlags,
-            attrs: fio::NodeAttributes,
-        ) -> Result<(), Status> {
-            self.fs.handle_event(MutableDirectoryAction::SetAttr { id: self.id, flags, attrs })
         }
 
         async fn update_attributes(
@@ -558,43 +537,6 @@ mod tests {
                 dst_dir: dir2.id,
                 dst_name: "dest".to_owned(),
             },]
-        );
-    }
-
-    #[fuchsia::test]
-    async fn test_setattr() {
-        let events = Events::new();
-        let fs = Arc::new(MockFilesystem::new(&events));
-        let (_dir, proxy) = fs
-            .clone()
-            .make_connection(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE);
-        let attrs = fio::NodeAttributes {
-            mode: 0,
-            id: 0,
-            content_size: 0,
-            storage_size: 0,
-            link_count: 0,
-            creation_time: 30,
-            modification_time: 100,
-        };
-        let status = proxy
-            .set_attr(
-                fio::NodeAttributeFlags::CREATION_TIME | fio::NodeAttributeFlags::MODIFICATION_TIME,
-                &attrs,
-            )
-            .await
-            .unwrap();
-        assert_eq!(Status::from_raw(status), Status::OK);
-
-        let events = events.0.lock().unwrap();
-        assert_eq!(
-            *events,
-            vec![MutableDirectoryAction::SetAttr {
-                id: 0,
-                flags: fio::NodeAttributeFlags::CREATION_TIME
-                    | fio::NodeAttributeFlags::MODIFICATION_TIME,
-                attrs
-            }]
         );
     }
 

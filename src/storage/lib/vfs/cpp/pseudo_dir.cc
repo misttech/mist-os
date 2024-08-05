@@ -93,6 +93,10 @@ fuchsia_io::NodeProtocolKinds PseudoDir::GetProtocols() const {
   return fuchsia_io::NodeProtocolKinds::kDirectory;
 }
 
+fuchsia_io::Abilities PseudoDir::GetAbilities() const {
+  return fio::Abilities::kGetAttributes | fio::Abilities::kTraverse | fio::Abilities::kEnumerate;
+}
+
 zx_status_t PseudoDir::AddEntry(fbl::String name, fbl::RefPtr<fs::Vnode> vn) {
   ZX_DEBUG_ASSERT(vn);
 

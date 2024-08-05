@@ -10,6 +10,7 @@
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/iso/iso_common.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/iso/iso_stream.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/transport/command_channel.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/transport/transport.h"
 
 namespace bt::iso {
 
@@ -20,7 +21,7 @@ namespace bt::iso {
 class IsoStreamManager final {
  public:
   explicit IsoStreamManager(hci_spec::ConnectionHandle handle,
-                            hci::CommandChannel::WeakPtr cmd_channel);
+                            hci::Transport::WeakPtr hci);
   ~IsoStreamManager();
 
   // Start waiting on an incoming request to create an Isochronous channel for
@@ -59,6 +60,8 @@ class IsoStreamManager final {
   hci::CommandChannel::EventHandlerId cis_request_handler_;
 
   hci::CommandChannel::WeakPtr cmd_;
+
+  hci::Transport::WeakPtr hci_;
 
   // The streams that we are currently waiting on, and the associated callback
   // when the connection is resolved (either accepted and established, or failed

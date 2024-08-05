@@ -4,6 +4,7 @@
 
 #include "src/cobalt/bin/app/system_data_updater_impl.h"
 
+#include <fuchsia/cobalt/cpp/fidl.h>
 #include <lib/fidl/cpp/binding_set.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/inspect/testing/cpp/inspect.h>
@@ -11,7 +12,6 @@
 #include <lib/sys/cpp/testing/component_context_provider.h>
 #include <lib/syslog/cpp/macros.h>
 
-#include "fuchsia/cobalt/cpp/fidl.h"
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
 
 namespace cobalt {

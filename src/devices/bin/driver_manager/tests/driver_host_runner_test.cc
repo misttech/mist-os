@@ -335,9 +335,23 @@ TEST_F(DriverHostRunnerTest, StartFakeDriverHost) {
 class DynamicLinkingTest : public driver_runner::DriverRunnerTest {};
 
 TEST_F(DynamicLinkingTest, StartRootDriver) {
-  constexpr std::string_view kDriverHostPath = "/pkg/bin/driver_host2";
-  // TODO(https://fxbug.dev/341998660): setup fake driver and expected /pkg.
-  const std::string kRootDriverBinary = "driver/fake_driver.so";
+  // Where the driver host binary is located in the test package.
+  constexpr std::string_view kDriverHostTestPkgPath = "/pkg/bin/fake_driver_host";
+  // Libs that need to be loaded with the driver host.
+  const std::vector<std::string_view> kDriverHostExpectedLibs = {
+      "libdh-deps-a.so",
+      "libdh-deps-b.so",
+      "libdh-deps-c.so",
+  };
+
+  // Where the driver binary is located in the test package.
+  constexpr std::string_view kRootDriverTestPkgPath = "/pkg/lib/fake_root_driver.so";
+  // Where the driver binary should be located in the driver's fake /pkg directory.
+  const std::string kRootDriverBinary = "driver/fake_root_driver.so";
+  // Libs that need to be loaded with the driver.
+  const std::vector<std::string_view> kDriverExpectedLibs = {
+      "libfake_root_driver_deps.so",
+  };
 
   PrepareRealmForDriverComponentStart("dev", driver_runner::root_driver_url);
 
@@ -349,6 +363,10 @@ TEST_F(DynamicLinkingTest, StartRootDriver) {
   auto start = driver_runner().StartRootDriver(driver_runner::root_driver_url);
   ASSERT_FALSE(start.is_error());
   EXPECT_TRUE(RunLoopUntilIdle());
+
+  auto pkg_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
+  TestPkg test_pkg(std::move(pkg_endpoints.server), kRootDriverTestPkgPath, kRootDriverBinary,
+                   kDriverExpectedLibs);
 
   StartDriverHandler start_handler = [kRootDriverBinary](driver_runner::TestDriver* driver,
                                                          fdfw::DriverStartArgs start_args) {
@@ -364,11 +382,11 @@ TEST_F(DynamicLinkingTest, StartRootDriver) {
           .binary = kRootDriverBinary,
           .use_dynamic_linker = true,
       },
-      std::move(start_handler));
+      std::move(start_handler), std::move(pkg_endpoints.client));
 
-  const std::vector<std::string_view> kExpectedLibs;
-  ASSERT_NO_FATAL_FAILURE(CallComponentStart(
-      realm(), *driver_runner().driver_host_runner_for_tests(), kDriverHostPath, kExpectedLibs));
+  ASSERT_NO_FATAL_FAILURE(CallComponentStart(realm(),
+                                             *driver_runner().driver_host_runner_for_tests(),
+                                             kDriverHostTestPkgPath, kDriverHostExpectedLibs));
 
   std::unordered_set<const driver_manager::DriverHostRunner::DriverHost*> driver_hosts =
       driver_runner().driver_host_runner_for_tests()->DriverHosts();

@@ -22,6 +22,7 @@ import (
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/omaha_tool"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/packages"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/paver"
+	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/util"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/zbi"
 	"go.fuchsia.dev/fuchsia/tools/build"
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
@@ -38,11 +39,22 @@ const (
 
 	// Product Bundle manifest which is used to locate VBmeta
 	ProductBundleManifest = "product_bundle.json"
+
+	relativeBootserverPath = "tools/linux-x64/bootserver"
+
+	relativeFfxPath = "tools/linux-x64/ffx"
+
+	relativeFlashManifest = "images/flash.json"
+
+	productBundleBuildInfoPath = "build_api/build_info.json"
 )
 
 type Build interface {
 	// String returns a string identifier for this build.
 	String() string
+
+	// OutputDir is a location where we can write generated test files.
+	OutputDir() string
 
 	// GetBootserver returns the path to the bootserver used for paving.
 	GetBootserver(ctx context.Context) (string, error)
@@ -55,6 +67,9 @@ type Build interface {
 
 	// GetFlashManifest returns the path to the flash manifest used for flashing.
 	GetFlashManifest(ctx context.Context) (string, error)
+
+	// GetProductBundleDir returns the path to the product bundle.
+	GetProductBundleDir(ctx context.Context) (string, error)
 
 	// GetPackageRepository returns a Repository for this build.
 	GetPackageRepository(
@@ -79,16 +94,23 @@ type Build interface {
 
 // ArtifactsBuild represents the build artifacts for a specific build.
 type ArtifactsBuild struct {
-	id            string
-	archive       *Archive
-	dir           string
-	packages      *packages.Repository
-	buildImageDir string
-	srcs          map[string]struct{}
+	id               string
+	archive          *Archive
+	blobsDir         string
+	buildDir         string
+	packages         *packages.Repository
+	buildImageDir    string
+	productBundleDir string
+	srcs             map[string]struct{}
+}
+
+func (b *ArtifactsBuild) OutputDir() string {
+	return b.buildDir
 }
 
 func (b *ArtifactsBuild) GetBootserver(ctx context.Context) (string, error) {
-	buildImageDir, err := b.GetBuildImages(ctx)
+	// We need build images to flash, so lets download them.
+	_, err := b.GetBuildImages(ctx)
 	if err != nil {
 		return "", err
 	}
@@ -99,8 +121,14 @@ func (b *ArtifactsBuild) GetBootserver(ctx context.Context) (string, error) {
 		currentBuildId = b.id
 	}
 
-	bootserverPath := filepath.Join(buildImageDir, "bootserver")
-	if err := b.archive.download(ctx, currentBuildId, false, bootserverPath, []string{"tools/linux-x64/bootserver"}); err != nil {
+	bootserverPath := filepath.Join(b.buildDir, relativeBootserverPath)
+	if err := b.archive.download(
+		ctx,
+		currentBuildId,
+		false,
+		b.buildDir,
+		[]string{relativeBootserverPath},
+	); err != nil {
 		return "", fmt.Errorf("failed to download bootserver: %w", err)
 	}
 
@@ -116,14 +144,16 @@ func (b *ArtifactsBuild) GetFfx(
 	ctx context.Context,
 	ffxIsolateDir ffx.IsolateDir,
 ) (*ffx.FFXTool, error) {
-	buildImageDir, err := b.GetBuildImages(ctx)
-	if err != nil {
-		return nil, err
-	}
-
 	// Use the latest ffx
-	ffxPath := filepath.Join(buildImageDir, "ffx")
-	if err := b.archive.download(ctx, b.id, false, ffxPath, []string{"tools/linux-x64/ffx"}); err != nil {
+	ffxPath := filepath.Join(b.buildDir, relativeFfxPath)
+
+	if err := b.archive.download(
+		ctx,
+		b.id,
+		false,
+		b.buildDir,
+		[]string{relativeFfxPath},
+	); err != nil {
 		return nil, fmt.Errorf("failed to download ffxPath: %w", err)
 	}
 
@@ -136,17 +166,105 @@ func (b *ArtifactsBuild) GetFfx(
 }
 
 func (b *ArtifactsBuild) GetFlashManifest(ctx context.Context) (string, error) {
-	buildImageDir, err := b.GetBuildImages(ctx)
+	// We need build images to flash.
+	_, err := b.GetBuildImages(ctx)
 	if err != nil {
 		return "", err
 	}
 
-	flashManifest := filepath.Join(buildImageDir, "flash.json")
-	if err := b.archive.download(ctx, b.id, false, flashManifest, []string{"images/flash.json"}); err != nil {
+	flashManifest := filepath.Join(b.buildDir, relativeFlashManifest)
+	if err := b.archive.download(
+		ctx,
+		b.id,
+		false,
+		b.buildDir,
+		[]string{relativeFlashManifest},
+	); err != nil {
 		return "", fmt.Errorf("failed to download flash.json for flasher: %w", err)
 	}
 
 	return flashManifest, nil
+}
+
+func (b *ArtifactsBuild) GetProductBundleDir(ctx context.Context) (string, error) {
+	if b.productBundleDir != "" {
+		return b.productBundleDir, nil
+	}
+
+	logger.Infof(ctx, "downloading product bundle for build %s", b.id)
+
+	buildInfoPath := filepath.Join(b.buildDir, productBundleBuildInfoPath)
+
+	// Fetch build_info.json, this is needed to construct the PB path in GCS
+	if err := b.archive.download(
+		ctx,
+		b.id,
+		false,
+		b.buildDir,
+		[]string{productBundleBuildInfoPath},
+	); err != nil {
+		logger.Errorf(ctx, "failed to download build info for build %s: %v", b.id, err)
+		return "", fmt.Errorf("failed to download build info for build %s: %w", b.id, err)
+	}
+
+	f, err := os.Open(buildInfoPath)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+
+	// BuildInfo represent the build info build-api.
+	var buildInfo struct {
+		// Conguration is the array of product/board dictionary.
+		Configurations []struct {
+			// Board is the board name. e.g. "x64", "vim3".
+			Board string `json:"board"`
+
+			// Product is the product name. e.g. "minimal", "core".
+			Product string `json:"product"`
+		} `json:"configurations"`
+
+		// A unique version of this build.
+		Version string `json:"version"`
+	}
+
+	if err := json.NewDecoder(f).Decode(&buildInfo); err != nil {
+		return "", fmt.Errorf("failed to read build info: %w", err)
+	}
+
+	// The first entry is the product bundle for the build.
+	config := buildInfo.Configurations[0]
+
+	// Fetch PB from GCS
+	pbPath := fmt.Sprintf("product_bundles/%s.%s", config.Product, config.Board)
+
+	artifacts, err := b.archive.list(ctx, b.id)
+	if err != nil {
+		return "", err
+	}
+
+	pbArtifacts := []string{}
+	prefix := pbPath + "/"
+	for _, artifact := range artifacts {
+		if strings.HasPrefix(artifact, prefix) {
+			pbArtifacts = append(pbArtifacts, artifact)
+		}
+	}
+
+	productBundleDir := filepath.Join(b.buildDir, pbPath)
+	if err := b.archive.download(
+		ctx,
+		b.id,
+		false,
+		b.buildDir,
+		pbArtifacts,
+	); err != nil {
+		logger.Errorf(ctx, "failed to download product bundle for build %s: %v", b.id, err)
+		return "", fmt.Errorf("failed to download build info for build %s: %w", b.id, err)
+	}
+
+	b.productBundleDir = productBundleDir
+	return b.productBundleDir, nil
 }
 
 // GetPackageRepository returns a Repository for this build. It tries to
@@ -176,8 +294,14 @@ func (b *ArtifactsBuild) GetPackageRepository(
 		}
 	}
 
-	packagesDir := filepath.Join(b.dir, b.id, "packages")
-	if err := b.archive.download(ctx, b.id, false, filepath.Dir(packagesDir), packageSrcs); err != nil {
+	packagesDir := filepath.Join(b.buildDir, "packages")
+	if err := b.archive.download(
+		ctx,
+		b.id,
+		false,
+		b.buildDir,
+		packageSrcs,
+	); err != nil {
 		logger.Errorf(ctx, "failed to download packages for build %s to %s: %v", packagesDir, b.id, err)
 		return nil, fmt.Errorf("failed to download packages for build %s to %s: %w", packagesDir, b.id, err)
 	}
@@ -195,23 +319,27 @@ func (b *ArtifactsBuild) GetPackageRepository(
 	}
 
 	deliveryBlobConfigPath := filepath.Join(packagesDir, "delivery_blob_config.json")
-	blobsDir, err := build.GetBlobsDir(deliveryBlobConfigPath)
+	relativeBlobsDir, err := build.GetBlobsDir(deliveryBlobConfigPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get blobs dir: %w", err)
 	}
 
 	var blobsList []string
 	for _, blob := range blobs {
-		blobsList = append(blobsList, filepath.Join(blobsDir, blob.Merkle))
+		blobsList = append(blobsList, filepath.Join(relativeBlobsDir, blob.Merkle))
 	}
 	logger.Infof(ctx, "all_blobs contains %d blobs", len(blobs))
 
-	blobsDir = filepath.Join(b.dir, "blobs")
-
 	if fetchMode == PrefetchBlobs {
-		if err := b.archive.download(ctx, b.id, true, filepath.Dir(blobsDir), blobsList); err != nil {
-			logger.Errorf(ctx, "failed to download blobs to %s: %v", blobsDir, err)
-			return nil, fmt.Errorf("failed to download blobs to %s: %w", blobsDir, err)
+		if err := b.archive.download(
+			ctx,
+			b.id,
+			true,
+			filepath.Join(b.blobsDir),
+			blobsList,
+		); err != nil {
+			logger.Errorf(ctx, "failed to download blobs to %s: %v", b.blobsDir, err)
+			return nil, fmt.Errorf("failed to download blobs to %s: %w", b.blobsDir, err)
 		}
 	}
 
@@ -225,7 +353,16 @@ func (b *ArtifactsBuild) GetPackageRepository(
 		return nil, fmt.Errorf("failed to get delivery blob type: %w", err)
 	}
 
-	p, err := packages.NewRepository(ctx, packagesDir, &proxyBlobStore{b, blobsDir}, ffx, blobType)
+	p, err := packages.NewRepository(
+		ctx,
+		packagesDir,
+		&proxyBlobStore{
+			b:        b,
+			blobsDir: b.blobsDir,
+		},
+		ffx,
+		blobType,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -235,16 +372,52 @@ func (b *ArtifactsBuild) GetPackageRepository(
 }
 
 type proxyBlobStore struct {
-	b   *ArtifactsBuild
-	dir string
+	b        *ArtifactsBuild
+	blobsDir string
+}
+
+func (fs *proxyBlobStore) PrefetchBlobs(
+	ctx context.Context,
+	deliveryBlobType *int,
+	merkles []pmBuild.MerkleRoot,
+) error {
+	if len(merkles) == 0 {
+		return nil
+	}
+
+	var relativeBlobsDir string
+
+	if deliveryBlobType == nil {
+		relativeBlobsDir = "blobs"
+	} else {
+		deliveryBlobType := strconv.Itoa(*deliveryBlobType)
+		relativeBlobsDir = filepath.Join("blobs", deliveryBlobType)
+	}
+
+	srcs := []string{}
+	for _, merkle := range merkles {
+		src := filepath.Join(relativeBlobsDir, merkle.String())
+		srcs = append(srcs, src)
+	}
+
+	// Start downloading the blobs. The package resolver will only fetch a blob
+	// once, so we don't need to deduplicate requests on our side.
+
+	return fs.b.archive.download(
+		ctx,
+		fs.b.id,
+		true,
+		filepath.Dir(fs.blobsDir),
+		srcs,
+	)
 }
 
 func (fs *proxyBlobStore) BlobPath(ctx context.Context, deliveryBlobType *int, merkle pmBuild.MerkleRoot) (string, error) {
 	var path string
 	if deliveryBlobType == nil {
-		path = filepath.Join(fs.dir, merkle.String())
+		path = filepath.Join(fs.blobsDir, merkle.String())
 	} else {
-		path = filepath.Join(fs.dir, strconv.Itoa(*deliveryBlobType), merkle.String())
+		path = filepath.Join(fs.blobsDir, strconv.Itoa(*deliveryBlobType), merkle.String())
 	}
 
 	// First, try to read the blob from the directory
@@ -252,19 +425,7 @@ func (fs *proxyBlobStore) BlobPath(ctx context.Context, deliveryBlobType *int, m
 		return path, nil
 	}
 
-	// Otherwise, start downloading the blob. The package resolver will only
-	// fetch a blob once, so we don't need to deduplicate requests on our side.
-
-	var src string
-	if deliveryBlobType == nil {
-		src = filepath.Join("blobs", merkle.String())
-	} else {
-		src = filepath.Join("blobs", strconv.Itoa(*deliveryBlobType), merkle.String())
-	}
-
-	logger.Infof(ctx, "downloading %s from build %s", src, fs.b.id)
-
-	if err := fs.b.archive.download(ctx, fs.b.id, true, path, []string{src}); err != nil {
+	if err := fs.PrefetchBlobs(ctx, deliveryBlobType, []pmBuild.MerkleRoot{merkle}); err != nil {
 		return "", err
 	}
 
@@ -298,7 +459,7 @@ func (fs *proxyBlobStore) BlobSize(ctx context.Context, deliveryBlobType *int, m
 }
 
 func (fs *proxyBlobStore) Dir() string {
-	return fs.dir
+	return fs.blobsDir
 }
 
 // GetBuildImages downloads the build images for a specific build id.
@@ -311,8 +472,14 @@ func (b *ArtifactsBuild) GetBuildImages(ctx context.Context) (string, error) {
 
 	logger.Infof(ctx, "downloading build images")
 
-	imageDir := filepath.Join(b.dir, b.id, "images")
-	if err := b.archive.download(ctx, b.id, false, filepath.Join(imageDir, paver.ImageManifest), []string{path.Join("images", paver.ImageManifest)}); err != nil {
+	imageDir := filepath.Join(b.buildDir, "images")
+	if err := b.archive.download(
+		ctx,
+		b.id,
+		false,
+		b.buildDir,
+		[]string{path.Join("images", paver.ImageManifest)},
+	); err != nil {
 		return "", fmt.Errorf("failed to download image manifest: %w", err)
 	}
 	imagesJSON := filepath.Join(imageDir, paver.ImageManifest)
@@ -343,7 +510,13 @@ func (b *ArtifactsBuild) GetBuildImages(ctx context.Context) (string, error) {
 		}
 	}
 
-	if err := b.archive.download(ctx, b.id, false, filepath.Dir(imageDir), imageSrcs); err != nil {
+	if err := b.archive.download(
+		ctx,
+		b.id,
+		false,
+		b.buildDir,
+		imageSrcs,
+	); err != nil {
 		return "", fmt.Errorf("failed to download images to %s: %w", imageDir, err)
 	}
 
@@ -381,6 +554,40 @@ func (b *ArtifactsBuild) getPaver(
 }
 
 func (b *ArtifactsBuild) GetVbmetaPath(ctx context.Context) (string, error) {
+	path, err := b.getVbmetaPathFromProductBundle(ctx)
+	if err == nil {
+		return path, nil
+	}
+
+	logger.Warningf(ctx, "failed to get vbmeta from product bundle, trying images: %v", err)
+	path, err = b.getVbmetaPathFromImages(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	return path, nil
+}
+
+func (b *ArtifactsBuild) getVbmetaPathFromProductBundle(ctx context.Context) (string, error) {
+	productBundleDir, err := b.GetProductBundleDir(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	productBundle, err := util.ParseProductBundle(productBundleDir)
+	if err != nil {
+		return "", err
+	}
+
+	vbmetaRelativePath, err := productBundle.GetSystemAImage("vbmeta", "zircon-a")
+	if err != nil {
+		return "", err
+	}
+
+	return filepath.Join(productBundleDir, vbmetaRelativePath), nil
+}
+
+func (b *ArtifactsBuild) getVbmetaPathFromImages(ctx context.Context) (string, error) {
 	buildImageDir, err := b.GetBuildImages(ctx)
 	if err != nil {
 		return "", err
@@ -430,6 +637,10 @@ func (b *FuchsiaDirBuild) String() string {
 	return b.dir
 }
 
+func (b *FuchsiaDirBuild) OutputDir() string {
+	return b.dir
+}
+
 func (b *FuchsiaDirBuild) GetBootserver(ctx context.Context) (string, error) {
 	return filepath.Join(b.dir, "host_x64/bootserver_new"), nil
 }
@@ -444,6 +655,30 @@ func (b *FuchsiaDirBuild) GetFfx(
 
 func (b *FuchsiaDirBuild) GetFlashManifest(ctx context.Context) (string, error) {
 	return filepath.Join(b.dir, "flash.json"), nil
+}
+
+func (b *FuchsiaDirBuild) GetProductBundleDir(ctx context.Context) (string, error) {
+	type productBundle struct {
+		Path string `json:"path"`
+	}
+
+	productBundlesPath := filepath.Join(b.dir, "product_bundles.json")
+	f, err := os.Open(productBundlesPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to open %s: %w", productBundlesPath, err)
+	}
+	defer f.Close()
+
+	var productBundles []struct {
+		Path string `json:"path"`
+	}
+
+	if err := json.NewDecoder(f).Decode(&productBundles); err != nil {
+		return "", fmt.Errorf("failed to parse %s: %w", productBundlesPath, err)
+	}
+
+	// The first entry is the product bundle for the build.
+	return filepath.Join(b.dir, productBundles[0].Path), nil
 }
 
 func (b *FuchsiaDirBuild) GetPackageRepository(
@@ -503,36 +738,45 @@ func (b *FuchsiaDirBuild) GetVbmetaPath(ctx context.Context) (string, error) {
 }
 
 type ProductBundleDirBuild struct {
-	dir string
+	productBundleDir string
+	outputDir        string
 }
 
 func NewProductBundleDirBuild(
-	dir string,
+	productBundleDir string,
 ) *ProductBundleDirBuild {
 	return &ProductBundleDirBuild{
-		dir: dir,
+		productBundleDir: productBundleDir,
 	}
 }
 
 func (b *ProductBundleDirBuild) String() string {
-	return b.dir
+	return b.productBundleDir
+}
+
+func (b *ProductBundleDirBuild) OutputDir() string {
+	return b.outputDir
 }
 
 func (b *ProductBundleDirBuild) GetBootserver(ctx context.Context) (string, error) {
 	// Only flashing is supported for ProductBundle
-	return "", nil
+	return "", fmt.Errorf("paving is not supported with product bundles")
 }
 
 func (b *ProductBundleDirBuild) GetFfx(
 	ctx context.Context,
 	ffxIsolateDir ffx.IsolateDir,
 ) (*ffx.FFXTool, error) {
-	ffxPath := filepath.Join(b.dir, "ffx")
+	ffxPath := filepath.Join(b.productBundleDir, "ffx")
 	return ffx.NewFFXTool(ffxPath, ffxIsolateDir)
 }
 
 func (b *ProductBundleDirBuild) GetFlashManifest(ctx context.Context) (string, error) {
-	return b.dir, nil
+	return b.productBundleDir, nil
+}
+
+func (b *ProductBundleDirBuild) GetProductBundleDir(ctx context.Context) (string, error) {
+	return b.productBundleDir, nil
 }
 
 func (b *ProductBundleDirBuild) GetPackageRepository(
@@ -540,31 +784,22 @@ func (b *ProductBundleDirBuild) GetPackageRepository(
 	blobFetchMode BlobFetchMode,
 	ffxIsolateDir ffx.IsolateDir,
 ) (*packages.Repository, error) {
-	// TODO(https://fxbug.dev/42066028) Change to use ffx tool to start package server
-	pbJSON := filepath.Join(b.dir, ProductBundleManifest)
-	f, err := os.Open(pbJSON)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open %q: %w", pbJSON, err)
-	}
-	defer f.Close()
-
-	var productBundle ProductBundle
-	if err := json.NewDecoder(f).Decode(&productBundle); err != nil {
-		return nil, fmt.Errorf("failed to parse %q: %w", pbJSON, err)
-	}
-	if productBundle.Version != "2" {
-		return nil, fmt.Errorf("Product bundle version is not 2 %q", pbJSON)
-	}
-
 	ffx, err := b.GetFfx(ctx, ffxIsolateDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get ffx: %w", err)
 	}
 
-	blobFS := packages.NewDirBlobStore(filepath.Join(b.dir, productBundle.Repositories[0].BlobsPath))
+	productBundle, err := util.ParseProductBundle(b.productBundleDir)
+	if err != nil {
+		return nil, err
+	}
+
+	blobFS := packages.NewDirBlobStore(
+		filepath.Join(b.productBundleDir, productBundle.Repositories[0].BlobsPath),
+	)
 
 	// TODO(https://fxbug.dev/42076853): Read delivery blob type from product bundle.
-	return packages.NewRepository(ctx, b.dir, blobFS, ffx, nil)
+	return packages.NewRepository(ctx, b.productBundleDir, blobFS, ffx, nil)
 }
 
 func (b *ProductBundleDirBuild) GetPaverDir(ctx context.Context) (string, error) {
@@ -580,40 +815,18 @@ func (b *ProductBundleDirBuild) GetPaver(
 	return nil, fmt.Errorf("paving is not supported with product bundles")
 }
 
-type ProductBundle struct {
-	SystemA      []build.Image  `json:"system_a"`
-	Version      string         `json:"version"`
-	Repositories []PBRepository `json:"repositories"`
-}
-
-type PBRepository struct {
-	MetadataPath string `json:"metadata_path"`
-	BlobsPath    string `json:"blobs_path"`
-}
-
 func (b *ProductBundleDirBuild) GetVbmetaPath(ctx context.Context) (string, error) {
-	pbJSON := filepath.Join(b.dir, ProductBundleManifest)
-	f, err := os.Open(pbJSON)
+	productBundle, err := util.ParseProductBundle(b.productBundleDir)
 	if err != nil {
-		return "", fmt.Errorf("failed to open %q: %w", pbJSON, err)
-	}
-	defer f.Close()
-
-	var productBundle ProductBundle
-	if err := json.NewDecoder(f).Decode(&productBundle); err != nil {
-		return "", fmt.Errorf("failed to parse %q: %w", pbJSON, err)
-	}
-	if productBundle.Version != "2" {
-		return "", fmt.Errorf("Product bundle version is not 2 %q", pbJSON)
+		return "", err
 	}
 
-	for _, item := range productBundle.SystemA {
-		if item.Name == "zircon-a" && item.Type == "vbmeta" {
-			return filepath.Join(b.dir, item.Path), nil
-		}
+	relativeVbmetaPath, err := productBundle.GetSystemAImage("vbmeta", "zircon-a")
+	if err != nil {
+		return "", err
 	}
 
-	return "", fmt.Errorf("failed to find zircon-a vbmeta in %q", pbJSON)
+	return filepath.Join(b.productBundleDir, relativeVbmetaPath), nil
 }
 
 type OmahaBuild struct {
@@ -623,12 +836,26 @@ type OmahaBuild struct {
 	zbitool   *zbi.ZBITool
 }
 
-func NewOmahaBuild(build Build, omahatool *omaha_tool.OmahaTool, avbtool *avb.AVBTool, zbitool *zbi.ZBITool) *OmahaBuild {
-	return &OmahaBuild{build: build, omahatool: omahatool, avbtool: avbtool, zbitool: zbitool}
+func NewOmahaBuild(
+	build Build,
+	omahatool *omaha_tool.OmahaTool,
+	avbtool *avb.AVBTool,
+	zbitool *zbi.ZBITool,
+) *OmahaBuild {
+	return &OmahaBuild{
+		build:     build,
+		omahatool: omahatool,
+		avbtool:   avbtool,
+		zbitool:   zbitool,
+	}
 }
 
 func (b *OmahaBuild) String() string {
 	return b.build.String()
+}
+
+func (b *OmahaBuild) OutputDir() string {
+	return b.build.OutputDir()
 }
 
 func (b *OmahaBuild) GetBootserver(ctx context.Context) (string, error) {
@@ -711,37 +938,15 @@ func (b *OmahaBuild) GetFlashManifest(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("failed to find zircon-a vbmeta: %w", err)
 	}
 
-	tempDir, err := os.MkdirTemp("", "")
-	if err != nil {
-		return "", fmt.Errorf("failed to create temp directory: %w", err)
-	}
-	defer os.RemoveAll(tempDir)
-
-	// Create a ZBI with the omaha_url argument.
-	destZbiPath := path.Join(tempDir, "omaha_argument.zbi")
-	imageArguments := map[string]string{
-		"omaha_url":    b.omahatool.URL(),
-		"omaha_app_id": b.omahatool.Args.AppId,
-	}
-
-	if err := b.zbitool.MakeImageArgsZbi(ctx, destZbiPath, imageArguments); err != nil {
-		return "", fmt.Errorf("Failed to create ZBI: %w", err)
-	}
-
-	// Create a vbmeta that includes the ZBI we just created.
-	propFiles := map[string]string{
-		"zbi": destZbiPath,
-	}
-
 	paverDir, err := b.GetPaverDir(ctx)
 	if err != nil {
 		return "", err
 	}
 
 	destVbmetaPath := filepath.Join(paverDir, "zircon-a-omaha-test.vbmeta")
-	err = b.avbtool.MakeVBMetaImage(ctx, destVbmetaPath, srcVbmetaPath, propFiles)
-	if err != nil {
-		return "", fmt.Errorf("failed to create vbmeta: %w", err)
+
+	if err := b.updateVBMeta(ctx, srcVbmetaPath, destVbmetaPath); err != nil {
+		return "", err
 	}
 
 	// Update the manifest to point at the new vbmeta.
@@ -772,6 +977,87 @@ func (b *OmahaBuild) GetFlashManifest(ctx context.Context) (string, error) {
 	return updatedFlashManifest, nil
 }
 
+func (b *OmahaBuild) GetProductBundleDir(ctx context.Context) (string, error) {
+	productBundleDir, err := b.build.GetProductBundleDir(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to get product bundle dir for %s: %w", b, err)
+	}
+
+	// We need to copy the product bundle so we can overwrite the vbmeta to
+	// inject the omaha url into the vbmeta.
+	newProductBundleDir := filepath.Join(b.OutputDir(), "product_bundle_ota_test")
+
+	if err := util.CopyDir(ctx, newProductBundleDir, productBundleDir); err != nil {
+		return "", err
+	}
+
+	productBundle, err := util.ParseProductBundle(newProductBundleDir)
+	if err != nil {
+		return "", err
+	}
+
+	relativeSrcVbmetaPath, err := productBundle.GetSystemAImage("vbmeta", "zircon-a")
+	if err != nil {
+		return "", err
+	}
+	srcVbmetaPath := filepath.Join(productBundleDir, relativeSrcVbmetaPath)
+
+	relativeDestVbmetaPath := "zircon-a-omaha-test.vbmeta"
+	destVbmetaPath := filepath.Join(newProductBundleDir, relativeDestVbmetaPath)
+
+	if err := b.updateVBMeta(ctx, srcVbmetaPath, destVbmetaPath); err != nil {
+		return "", err
+	}
+
+	for i, image := range productBundle.SystemA {
+		if image.Type == "vbmeta" && image.Name == "zircon-a" {
+			productBundle.SystemA[i].Path = relativeDestVbmetaPath
+		}
+	}
+
+	if err := util.UpdateProductBundle(newProductBundleDir, productBundle); err != nil {
+		return "", err
+	}
+
+	return newProductBundleDir, nil
+}
+
+func (b *OmahaBuild) updateVBMeta(
+	ctx context.Context,
+	srcVbmetaPath string,
+	destVbmetaPath string,
+) error {
+	// Create a ZBI with the omaha_url argument.
+	tempDir, err := os.MkdirTemp("", "")
+	if err != nil {
+		return fmt.Errorf("failed to create temp directory: %w", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	// Create a ZBI with the omaha_url argument.
+	destZbiPath := path.Join(tempDir, "omaha_argument.zbi")
+	imageArguments := map[string]string{
+		"omaha_url":    b.omahatool.URL(),
+		"omaha_app_id": b.omahatool.Args.AppId,
+	}
+
+	if err := b.zbitool.MakeImageArgsZbi(ctx, destZbiPath, imageArguments); err != nil {
+		return fmt.Errorf("Failed to create ZBI: %w", err)
+	}
+
+	// Create a vbmeta that includes the ZBI we just created.
+	propFiles := map[string]string{
+		"zbi": destZbiPath,
+	}
+
+	err = b.avbtool.MakeVBMetaImage(ctx, destVbmetaPath, srcVbmetaPath, propFiles)
+	if err != nil {
+		return fmt.Errorf("failed to create vbmeta: %w", err)
+	}
+
+	return nil
+}
+
 // GetPackageRepository returns a Repository for this build.
 func (b *OmahaBuild) GetPackageRepository(
 	ctx context.Context,
@@ -799,39 +1085,14 @@ func (b *OmahaBuild) GetPaver(
 		return nil, err
 	}
 
-	// Create a ZBI with the omaha_url argument.
-	tempDir, err := os.MkdirTemp("", "")
-	if err != nil {
-		return nil, fmt.Errorf("failed to create temp directory: %w", err)
-	}
-	defer os.RemoveAll(tempDir)
-
-	// Create a ZBI with the omaha_url argument.
-	destZbiPath := path.Join(tempDir, "omaha_argument.zbi")
-	imageArguments := map[string]string{
-		"omaha_url":    b.omahatool.URL(),
-		"omaha_app_id": b.omahatool.Args.AppId,
-	}
-
-	if err := b.zbitool.MakeImageArgsZbi(ctx, destZbiPath, imageArguments); err != nil {
-		return nil, fmt.Errorf("Failed to create ZBI: %w", err)
-	}
-
-	// Create a vbmeta that includes the ZBI we just created.
-	propFiles := map[string]string{
-		"zbi": destZbiPath,
-	}
-
-	destVbmetaPath := filepath.Join(paverDir, "zircon-a-omaha-test.vbmeta")
-
 	srcVbmetaPath, err := b.GetVbmetaPath(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find zircon-a vbmeta: %w", err)
 	}
 
-	err = b.avbtool.MakeVBMetaImage(ctx, destVbmetaPath, srcVbmetaPath, propFiles)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create vbmeta: %w", err)
+	destVbmetaPath := filepath.Join(paverDir, "zircon-a-omaha-test.vbmeta")
+	if err := b.updateVBMeta(ctx, srcVbmetaPath, destVbmetaPath); err != nil {
+		return nil, err
 	}
 
 	return paver.NewBuildPaver(

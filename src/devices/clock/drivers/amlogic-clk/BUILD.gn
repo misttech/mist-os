@@ -15,10 +15,10 @@ group("tests") {
 }
 
 driver_bind_rules("aml-clk-bind") {
-  rules = "aml-clk.bind"
+  rules = "meta/aml-clk.bind"
   bind_output = "amlogic-clk.bindbc"
 
-  tests = "bind-tests.json"
+  tests = "meta/bind-tests.json"
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.devicetree",
@@ -60,7 +60,7 @@ fuchsia_driver("amlogic-clk-driver") {
 fuchsia_driver_component("amlogic-clk") {
   component_name = "amlogic-clk"
   deps = [ ":amlogic-clk-driver" ]
-  info = "amlogic-clk-info.json"
+  info = "meta/amlogic-clk-info.json"
   manifest = "meta/amlogic-clk.cml"
 }
 

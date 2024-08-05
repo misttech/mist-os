@@ -7,6 +7,8 @@
 #include <cstdint>
 #include <utility>
 
+#include <pw_preprocessor/compiler.h>
+
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/host_error.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/constants.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/protocol.h"
@@ -89,6 +91,8 @@ void A2dpOffloadManager::StartA2dpOffload(
   view.l2cap_mtu_size().Write(max_tx_sdu_size);
 
   // kAptx and kAptxhd codecs not yet handled
+  PW_MODIFY_DIAGNOSTICS_PUSH();
+  PW_MODIFY_DIAGNOSTIC(ignored, "-Wswitch-enum");
   switch (config.codec) {
     case android_emb::A2dpCodecType::SBC:
       view.sbc_codec_information().CopyFrom(
@@ -110,6 +114,7 @@ void A2dpOffloadManager::StartA2dpOffload(
       callback(ToResult(HostError::kNotSupported));
       return;
   }
+  PW_MODIFY_DIAGNOSTICS_POP();
 
   cmd_channel_->SendCommand(
       std::move(packet),

@@ -51,5 +51,21 @@ TEST(SignalProcessingUtilsTest, MapTopologies) {
   EXPECT_EQ(map.at(kTopologyRbDaiId).front().processing_element_id_to(), kDaiInterconnectElementId);
 }
 
+TEST(SignalProcessingUtilsTest, ElementHasOutgoingEdges) {
+  auto edge_pairs = *kTopologyDaiAgcDynRb.processing_elements_edge_pairs();
+  EXPECT_TRUE(ElementHasOutgoingEdges(edge_pairs, kDaiInterconnectElementId));
+  EXPECT_TRUE(ElementHasOutgoingEdges(edge_pairs, kAgcElementId));
+  EXPECT_TRUE(ElementHasOutgoingEdges(edge_pairs, kDynamicsElementId));
+  EXPECT_FALSE(ElementHasOutgoingEdges(edge_pairs, kRingBufferElementId));
+}
+
+TEST(SignalProcessingUtilsTest, ElementHasIncomingEdges) {
+  auto edge_pairs = *kTopologyDaiAgcDynRb.processing_elements_edge_pairs();
+  EXPECT_FALSE(ElementHasIncomingEdges(edge_pairs, kDaiInterconnectElementId));
+  EXPECT_TRUE(ElementHasIncomingEdges(edge_pairs, kAgcElementId));
+  EXPECT_TRUE(ElementHasIncomingEdges(edge_pairs, kDynamicsElementId));
+  EXPECT_TRUE(ElementHasIncomingEdges(edge_pairs, kRingBufferElementId));
+}
+
 }  // namespace
 }  // namespace media_audio

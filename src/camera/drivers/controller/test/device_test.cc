@@ -25,18 +25,8 @@ class ControllerDeviceTest : public gtest::TestLoopFixture {
     root_ = MockDevice::FakeRootParent();
 
     // Create sysmem fragment
-    auto sysmem_handler = sysmem_.SyncCall(&FakeSysmem::CreateInstanceHandler);
-    auto sysmem_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
-    root_->AddFidlService(fuchsia_hardware_sysmem::Service::Name,
-                          std::move(sysmem_endpoints.client), "sysmem");
-
-    outgoing_.SyncCall([sysmem_server = std::move(sysmem_endpoints.server),
-                        sysmem_handler = std::move(sysmem_handler)](
-                           component::OutgoingDirectory* outgoing) mutable {
-      ZX_ASSERT(outgoing->Serve(std::move(sysmem_server)).is_ok());
-      ZX_ASSERT(outgoing->AddService<fuchsia_hardware_sysmem::Service>(std::move(sysmem_handler))
-                    .is_ok());
-    });
+    root_->AddNsProtocol<fuchsia_sysmem2::Allocator>(
+        [&](auto request) { sysmem_.SyncCall(&FakeSysmem::Connect, std::move(request)); });
 
     auto result = ControllerDevice::Create(root_.get());
     ASSERT_TRUE(result.is_ok());

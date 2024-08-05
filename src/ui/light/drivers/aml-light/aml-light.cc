@@ -203,8 +203,8 @@ zx_status_t AmlLight::Init() {
     board_info.pid = PDEV_PID_GENERIC;
   }
 
-  zx::result metadata =
-      pdev.GetMetadata<fuchsia_hardware_light::Metadata>(fuchsia_hardware_light::kMetadataType);
+  zx::result metadata = pdev.GetMetadata<fuchsia_hardware_light::Metadata>(
+      fuchsia_hardware_light::kPdevMetadataTypeIdentifier);
   if (metadata.is_error()) {
     zxlogf(ERROR, "Failed to get metadata: %s", metadata.status_string());
     return metadata.status_value();

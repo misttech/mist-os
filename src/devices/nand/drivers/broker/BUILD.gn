@@ -10,9 +10,9 @@ group("broker") {
 }
 
 driver_bind_rules("nand-broker-bind") {
-  rules = "nand-broker.bind"
+  rules = "meta/nand-broker.bind"
   bind_output = "nand-broker.bindbc"
-  tests = "bind-tests.json"
+  tests = "meta/bind-tests.json"
   deps = [ "//src/devices/bind/fuchsia.nand" ]
 }
 
@@ -37,7 +37,7 @@ fuchsia_driver("nand-broker-driver") {
 }
 
 fuchsia_driver_component("nand-broker") {
-  info = "nand-broker-info.json"
+  info = "meta/nand-broker-info.json"
   component_name = "nand-broker"
   deps = [ ":nand-broker-driver" ]
   manifest = "meta/nand-broker.cml"

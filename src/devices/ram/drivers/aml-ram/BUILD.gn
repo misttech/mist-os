@@ -8,9 +8,9 @@ import("//build/drivers.gni")
 import("//build/test.gni")
 
 driver_bind_rules("aml_ram_bind") {
-  rules = "aml_ram.bind"
+  rules = "meta/aml_ram.bind"
   bind_output = "aml-ram.bindbc"
-  tests = "bind_tests.json"
+  tests = "meta/bind_tests.json"
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.platform",
@@ -36,7 +36,7 @@ fuchsia_driver("aml-ram-driver") {
 }
 
 fuchsia_driver_component("aml-ram") {
-  info = "aml-ram-info.json"
+  info = "meta/aml-ram-info.json"
   component_name = "aml-ram"
   deps = [ ":aml-ram-driver" ]
   manifest = "meta/aml-ram.cml"

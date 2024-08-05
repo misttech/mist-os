@@ -4,6 +4,7 @@
 
 #include "aml-sdmmc-with-banjo.h"
 
+#include <fidl/fuchsia.hardware.platform.device/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.power/cpp/fidl.h>
 #include <fidl/fuchsia.power.broker/cpp/fidl.h>
 #include <fidl/fuchsia.power.system/cpp/fidl.h>

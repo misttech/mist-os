@@ -703,7 +703,6 @@ pub fn ptrace_detach(
     if let Err(x) = ptrace_cont(&tracee, &data, true) {
         return Err(x);
     }
-    security::clear_ptracer_sid(tracee);
     let tid = tracee.get_tid();
     thread_group.ptracees.lock().remove(&tid);
     thread_group.write().zombie_ptracees.retain(&mut |zombie: &ZombieProcess| zombie.pid != tid);

@@ -6939,6 +6939,8 @@ TEST(PagerWriteback, NotModifiedPartialFailedPinWrite) {
   // Dirty one page but fail the other and wait for the overall pin to fail.
   ASSERT_TRUE(pager.DirtyPages(vmo, 0, 1));
   ASSERT_TRUE(pager.FailPages(vmo, 1, 1));
+  ASSERT_TRUE(pager.WaitForPageDirty(vmo, 1, 1, ZX_TIME_INFINITE));
+  ASSERT_TRUE(pager.FailPages(vmo, 1, 1));
   ASSERT_TRUE(t.WaitForFailure());
 
   // The VMO should not be modified.

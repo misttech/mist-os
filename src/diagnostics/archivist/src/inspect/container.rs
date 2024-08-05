@@ -474,7 +474,9 @@ impl UnpopulatedInspectDataContainer {
                                 Some(fdiagnostics::TreeNames::Some(filters)),
                                 InspectHandle::Tree { name: None, .. }
                                 | InspectHandle::Escrow { name: None, .. },
-                            ) => filters.iter().any(|f| f == DEFAULT_TREE_NAME.as_str()),
+                            ) => filters
+                                .iter()
+                                .any(|f| f.to_lowercase() == DEFAULT_TREE_NAME.as_str()),
 
                             // Compare the known handle name to all the filters looking for any
                             // matches
@@ -482,7 +484,9 @@ impl UnpopulatedInspectDataContainer {
                                 Some(fdiagnostics::TreeNames::Some(filters)),
                                 InspectHandle::Tree { name: Some(name), .. }
                                 | InspectHandle::Escrow { name: Some(name), .. },
-                            ) => filters.iter().any(|f| f == name.as_str()),
+                            ) => filters
+                                .iter()
+                                .any(|f| f.to_lowercase() == name.as_str().to_lowercase()),
 
                             (filter, _) => {
                                 warn!(?filter, "bad name filter received in selector");
@@ -824,6 +828,32 @@ mod test {
 
         let selectors = Some(vec![fdiagnostics::Selector {
             tree_names: Some(fdiagnostics::TreeNames::Some(vec!["a".to_string()])),
+            component_selector: Some(fdiagnostics::ComponentSelector {
+                moniker_segments: Some(vec![
+                    fdiagnostics::StringSelector::ExactMatch("o".to_string()),
+                    fdiagnostics::StringSelector::ExactMatch("k".to_string()),
+                ]),
+                ..Default::default()
+            }),
+            tree_selector: Some(fdiagnostics::TreeSelector::SubtreeSelector(
+                fdiagnostics::SubtreeSelector {
+                    node_path: vec![fdiagnostics::StringSelector::ExactMatch("root".to_string())],
+                },
+            )),
+            ..Default::default()
+        }]);
+
+        let container = container.prefilter(&selectors);
+        assert_eq!(1, container.inspect_handles.len());
+        match container.inspect_handles[0].upgrade().unwrap().as_ref() {
+            InspectHandle::Tree { name: Some(n), .. } => assert_eq!(n.as_str(), "a"),
+            bad_handle => {
+                panic!("filtering failed, got {bad_handle:?}");
+            }
+        }
+
+        let selectors = Some(vec![fdiagnostics::Selector {
+            tree_names: Some(fdiagnostics::TreeNames::Some(vec!["A".to_string()])),
             component_selector: Some(fdiagnostics::ComponentSelector {
                 moniker_segments: Some(vec![
                     fdiagnostics::StringSelector::ExactMatch("o".to_string()),

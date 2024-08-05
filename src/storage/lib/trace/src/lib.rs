@@ -26,11 +26,16 @@ pub use __backend::{Id, TraceFutureExt};
 macro_rules! duration {
     ($category:expr, $name:expr $(, $key:expr => $val:expr)*) => {
         let args;
-        let _scope = if $crate::__backend::TraceCategoryContext::acquire($category).is_some() {
-            args = [$($crate::__backend::ArgValue::of($key, $val)),*];
-            Some($crate::__backend::duration($category, $name, &args))
-        } else {
-            None
+        let _scope = {
+            static CACHE: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+            if $crate::__backend::TraceCategoryContext::acquire_cached($category, &CACHE)
+                .is_some()
+            {
+                args = [$($crate::__backend::ArgValue::of($key, $val)),*];
+                Some($crate::__backend::duration($category, $name, &args))
+            } else {
+                None
+            }
         };
     }
 }
@@ -40,12 +45,15 @@ macro_rules! duration {
 /// See `fuchsia_trace::flow_begin!` for more details.
 #[macro_export]
 macro_rules! flow_begin {
-    ($category:expr, $name:expr, $flow_id:expr $(, $key:expr => $val:expr)*) => {
-        if let Some(context) = $crate::__backend::TraceCategoryContext::acquire($category) {
+    ($category:expr, $name:expr, $flow_id:expr $(, $key:expr => $val:expr)*) => {{
+        static CACHE: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+        if let Some(context) =
+            $crate::__backend::TraceCategoryContext::acquire_cached($category, &CACHE)
+        {
             $crate::__backend::flow_begin(&context, $name, ($flow_id).into(),
                                           &[$($crate::__backend::ArgValue::of($key, $val)),*])
         }
-    }
+    }}
 }
 
 /// Writes a flow step event with the specified id.
@@ -53,12 +61,15 @@ macro_rules! flow_begin {
 /// See `fuchsia_trace::flow_step!` for more details.
 #[macro_export]
 macro_rules! flow_step {
-    ($category:expr, $name:expr, $flow_id:expr $(, $key:expr => $val:expr)*) => {
-        if let Some(context) = $crate::__backend::TraceCategoryContext::acquire($category) {
+    ($category:expr, $name:expr, $flow_id:expr $(, $key:expr => $val:expr)*) => {{
+        static CACHE: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+        if let Some(context) =
+            $crate::__backend::TraceCategoryContext::acquire_cached($category, &CACHE)
+        {
             $crate::__backend::flow_step(&context, $name, ($flow_id).into(),
                                          &[$($crate::__backend::ArgValue::of($key, $val)),*])
         }
-    }
+    }}
 }
 
 /// Writes a flow end event with the specified id.
@@ -66,12 +77,15 @@ macro_rules! flow_step {
 /// See `fuchsia_trace::flow_end!` for more details.
 #[macro_export]
 macro_rules! flow_end {
-    ($category:expr, $name:expr, $flow_id:expr $(, $key:expr => $val:expr)*) => {
-        if let Some(context) = $crate::__backend::TraceCategoryContext::acquire($category) {
+    ($category:expr, $name:expr, $flow_id:expr $(, $key:expr => $val:expr)*) => {{
+        static CACHE: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+        if let Some(context) =
+            $crate::__backend::TraceCategoryContext::acquire_cached($category, &CACHE)
+        {
             $crate::__backend::flow_end(&context, $name, ($flow_id).into(),
                                         &[$($crate::__backend::ArgValue::of($key, $val)),*])
         }
-    }
+    }}
 }
 
 /// Constructs a `TraceFutureArgs` object to be passed to `TraceFutureExt::trace`.
@@ -80,7 +94,8 @@ macro_rules! flow_end {
 #[macro_export]
 macro_rules! trace_future_args {
     ($category:expr, $name:expr $(, $key:expr => $val:expr)*) => {{
-        let context = $crate::__backend::TraceCategoryContext::acquire($category);
+        static CACHE: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+        let context = $crate::__backend::TraceCategoryContext::acquire_cached($category, &CACHE);
         let args = if context.is_some() {
             vec![$($crate::__backend::ArgValue::of($key, $val)),*]
         } else {

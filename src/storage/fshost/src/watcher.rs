@@ -2,10 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::device::{BlockDevice, Device, NandDevice};
+use crate::device::{BlockDevice, Device, NandDevice, StorageHostDevice};
 use anyhow::{Context as _, Error};
 use assert_matches::assert_matches;
 use fuchsia_async as fasync;
+use fuchsia_fs::directory::WatchEvent;
 use futures::channel::mpsc;
 use futures::lock::Mutex;
 use futures::{stream, SinkExt, StreamExt};
@@ -13,6 +14,7 @@ use std::sync::Arc;
 
 const DEV_CLASS_BLOCK: &'static str = "/dev/class/block";
 const DEV_CLASS_NAND: &'static str = "/dev/class/nand";
+const STORAGE_HOST_PARTITIONS_PATH: &'static str = "/partitions";
 
 enum PauseEvent {
     Pause,
@@ -45,24 +47,37 @@ impl PauseEvent {
 #[derive(Clone, Debug)]
 struct PathSource {
     path: &'static str,
-    is_nand: bool,
+    source_type: PathSourceType,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+enum PathSourceType {
+    Block,
+    Nand,
+    StorageHost,
+}
+
+#[derive(Copy, Clone, PartialEq, Eq)]
+enum StreamSettings {
+    IgnoreExisting,
+    YieldExisting,
 }
 
 impl PathSource {
-    fn new(path: &'static str, is_nand: bool) -> Self {
-        PathSource { path, is_nand }
+    fn new(path: &'static str, source_type: PathSourceType) -> Self {
+        PathSource { path, source_type }
     }
 
     /// Sets up a new directory watcher against the configured path and returns the stream of block
-    /// devices found at that path. If [`ignore_existing`] is true then we skip
-    /// [`PathEvent::Existing`] events, and only add to the stream when new directory entries are
-    /// added after this call.
+    /// devices found at that path. If [`settings`] is [`StreamSettings::IgnoreExisting`] then we
+    /// skip [`WatchEvent::EXISTING`] events, and only add to the stream when new directory entries
+    /// are added after this call.
     async fn stream(
         &mut self,
-        ignore_existing: bool,
+        settings: StreamSettings,
     ) -> Result<stream::BoxStream<'static, Box<dyn Device>>, Error> {
         let path = self.path;
-        let is_nand = self.is_nand;
+        let source_type = self.source_type;
         let dir_proxy =
             fuchsia_fs::directory::open_in_namespace(path, fuchsia_fs::OpenFlags::empty())
                 .with_context(|| format!("Failed to open directory at {path}"))?;
@@ -87,9 +102,9 @@ impl PathSource {
                     futures::future::ready({
                         let file_path = format!("{}/{}", path, filename.to_str().unwrap());
                         match event {
-                            fuchsia_fs::directory::WatchEvent::ADD_FILE => Some(file_path),
-                            fuchsia_fs::directory::WatchEvent::EXISTING => {
-                                if ignore_existing {
+                            WatchEvent::ADD_FILE => Some(file_path),
+                            WatchEvent::EXISTING => {
+                                if settings == StreamSettings::IgnoreExisting {
                                     None
                                 } else {
                                     Some(file_path)
@@ -100,10 +115,16 @@ impl PathSource {
                     })
                 })
                 .filter_map(move |path| async move {
-                    if is_nand {
-                        NandDevice::new(path).await.map(|d| Box::new(d) as Box<dyn Device>)
-                    } else {
-                        BlockDevice::new(path).await.map(|d| Box::new(d) as Box<dyn Device>)
+                    match source_type {
+                        PathSourceType::Block => {
+                            BlockDevice::new(path).await.map(|d| Box::new(d) as Box<dyn Device>)
+                        }
+                        PathSourceType::Nand => {
+                            NandDevice::new(path).await.map(|d| Box::new(d) as Box<dyn Device>)
+                        }
+                        PathSourceType::StorageHost => {
+                            StorageHostDevice::new(path).map(|d| Box::new(d) as Box<dyn Device>)
+                        }
                     }
                     .map_err(|e| {
                         tracing::warn!("Failed to create device (maybe it went away?): {:?}", e);
@@ -123,8 +144,7 @@ pub struct Watcher {
     /// pause and resume calls to make sure their event signals get through in the right order.
     paused: Arc<Mutex<bool>>,
     pause_event_tx: mpsc::Sender<PauseEvent>,
-    block_source: PathSource,
-    nand_source: PathSource,
+    sources: Vec<PathSource>,
     _watcher_task: Arc<fasync::Task<()>>,
 }
 
@@ -135,15 +155,26 @@ impl Watcher {
     ///
     /// Watcher provides pause and resume which will stop the watcher from sending new entries on
     /// the stream.
-    pub async fn new() -> Result<(Self, impl futures::Stream<Item = Box<dyn Device>>), Error> {
-        let block_source = PathSource::new(DEV_CLASS_BLOCK, false);
-        let nand_source = PathSource::new(DEV_CLASS_NAND, true);
-        Self::new_with_source(block_source, nand_source).await
+    pub async fn new(
+        config: &fshost_config::Config,
+    ) -> Result<(Self, impl futures::Stream<Item = Box<dyn Device>>), Error> {
+        let sources = if config.storage_host {
+            vec![
+                PathSource::new(DEV_CLASS_BLOCK, PathSourceType::Block),
+                PathSource::new(DEV_CLASS_NAND, PathSourceType::Nand),
+                PathSource::new(STORAGE_HOST_PARTITIONS_PATH, PathSourceType::StorageHost),
+            ]
+        } else {
+            vec![
+                PathSource::new(DEV_CLASS_BLOCK, PathSourceType::Block),
+                PathSource::new(DEV_CLASS_NAND, PathSourceType::Nand),
+            ]
+        };
+        Self::new_with_sources(sources).await
     }
 
-    async fn new_with_source(
-        mut block_source: PathSource,
-        mut nand_source: PathSource,
+    async fn new_with_sources(
+        mut sources: Vec<PathSource>,
     ) -> Result<(Self, impl futures::Stream<Item = Box<dyn Device>>), Error> {
         // NB. The mpsc channel for the pause event must have a buffer size of 0. Otherwise, `send`
         // on the Sink doesn't wait for the sent event to be processed, and the guarantees about
@@ -152,16 +183,18 @@ impl Watcher {
         let (device_tx, device_rx) = mpsc::unbounded();
 
         let task = fasync::Task::spawn(Self::watcher_loop(pause_event_rx, device_tx));
-        let block_and_nand_device_stream =
-            stream::select(block_source.stream(false).await?, nand_source.stream(false).await?);
-        pause_event_tx.send(PauseEvent::Resume(Box::pin(block_and_nand_device_stream))).await?;
+        let mut streams = vec![];
+        for source in &mut sources {
+            streams.push(source.stream(StreamSettings::YieldExisting).await?);
+        }
+        let merged_stream = stream::select_all(streams.into_iter());
+        pause_event_tx.send(PauseEvent::Resume(Box::pin(merged_stream))).await?;
 
         Ok((
             Watcher {
                 paused: Arc::new(Mutex::new(false)),
                 pause_event_tx,
-                block_source,
-                nand_source,
+                sources,
                 _watcher_task: Arc::new(task),
             },
             device_rx,
@@ -230,13 +263,12 @@ impl Watcher {
         // watcher know to resume. `send` will wait until the event is removed from the channel by
         // the watcher loop, as long as the channel buffer is 0.
 
-        let block_and_nand_device_stream = stream::select(
-            self.block_source.stream(true).await?,
-            self.nand_source.stream(true).await?,
-        );
-        self.pause_event_tx
-            .send(PauseEvent::Resume(Box::pin(block_and_nand_device_stream)))
-            .await?;
+        let mut streams = vec![];
+        for source in &mut self.sources {
+            streams.push(source.stream(StreamSettings::IgnoreExisting).await?);
+        }
+        let merged_stream = stream::select_all(streams.into_iter());
+        self.pause_event_tx.send(PauseEvent::Resume(Box::pin(merged_stream))).await?;
         tracing::info!("block watcher resumed");
         Ok(())
     }
@@ -244,7 +276,7 @@ impl Watcher {
 
 #[cfg(test)]
 mod tests {
-    use super::{PathSource, Watcher};
+    use super::{PathSource, PathSourceType, Watcher};
     use fidl_fuchsia_device::{ControllerRequest, ControllerRequestStream};
     use fidl_fuchsia_io as fio;
     use futures::StreamExt;
@@ -321,10 +353,10 @@ mod tests {
             ns.bind("/test-dev", client).expect("failed to bind dev in namespace");
         }
 
-        let (mut watcher, mut device_stream) = Watcher::new_with_source(
-            PathSource { path: "/test-dev/class/block", is_nand: false },
-            PathSource { path: "/test-dev/class/nand", is_nand: true },
-        )
+        let (mut watcher, mut device_stream) = Watcher::new_with_sources(vec![
+            PathSource { path: "/test-dev/class/block", source_type: PathSourceType::Block },
+            PathSource { path: "/test-dev/class/nand", source_type: PathSourceType::Nand },
+        ])
         .await
         .expect("failed to make watcher");
 

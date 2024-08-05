@@ -147,10 +147,6 @@ mod tests {
         }
 
         impl vfs::node::Node for NonVMOTestFile {
-            async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
-                Err(Status::NOT_SUPPORTED)
-            }
-
             async fn get_attributes(
                 &self,
                 _requested_attributes: fio::NodeAttributesQuery,

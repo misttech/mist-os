@@ -169,7 +169,7 @@ TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerPrimary) {
     layer_[i][0].cfg.primary.image_metadata.width = 1024;
     layer_[i][0].cfg.primary.image_metadata.height = 768;
     layer_[i][0].cfg.primary.alpha_mode = 0;
-    layer_[i][0].cfg.primary.transform_mode = 0;
+    layer_[i][0].cfg.primary.image_source_transformation = COORDINATE_TRANSFORMATION_IDENTITY;
   }
 
   size_t actual_result_size = 0;
@@ -287,7 +287,7 @@ TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerTransform) {
     layer_[i][0].cfg.primary.image_source = kDisplayArea;
     layer_[i][0].cfg.primary.image_metadata.width = 1024;
     layer_[i][0].cfg.primary.image_metadata.height = 768;
-    layer_[i][0].cfg.primary.transform_mode = FRAME_TRANSFORM_REFLECT_X;
+    layer_[i][0].cfg.primary.image_source_transformation = COORDINATE_TRANSFORMATION_REFLECT_X;
   }
 
   size_t actual_result_size = 0;
@@ -350,7 +350,7 @@ TEST_F(GoldfishDisplayEngineTest, CheckConfigAllFeatures) {
     layer_[i][0].cfg.primary.image_metadata.width = 1024;
     layer_[i][0].cfg.primary.image_metadata.height = 768;
     layer_[i][0].cfg.primary.alpha_mode = ALPHA_HW_MULTIPLY;
-    layer_[i][0].cfg.primary.transform_mode = FRAME_TRANSFORM_ROT_180;
+    layer_[i][0].cfg.primary.image_source_transformation = COORDINATE_TRANSFORMATION_ROTATE_CCW_180;
     configs_[i].cc_flags = COLOR_CONVERSION_POSTOFFSET;
   }
 

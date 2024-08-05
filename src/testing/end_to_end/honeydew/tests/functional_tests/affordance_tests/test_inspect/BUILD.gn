@@ -19,6 +19,7 @@ if (is_host) {
       aemu_env,
       nuc11_env,
       vim3_env,
+      nelson_env,
     ]
   }
 }

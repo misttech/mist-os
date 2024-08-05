@@ -815,7 +815,7 @@ async fn test_list_del_routes() {
         let mut ctx = ts.ctx();
         ctx.api()
             .routes_any()
-            .get_all_routes()
+            .get_all_routes_in_main_table()
             .into_iter()
             .map(|entry| {
                 entry

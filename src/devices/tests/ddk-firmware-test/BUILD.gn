@@ -24,7 +24,7 @@ fidl("fuchsia.device.firmware.test") {
 driver_bind_rules("ddk-firmware-test-bind") {
   testonly = true
   bind_output = "test-driver-bind.bindbc"
-  rules = "test-driver.bind"
+  rules = "meta/test-driver.bind"
   deps = [ "//src/devices/bind/fuchsia.test" ]
 }
 
@@ -50,7 +50,7 @@ fuchsia_driver("ddk-firmware-test") {
 fuchsia_driver_component("ddk-firmware-test-driver") {
   testonly = true
   deps = [ ":ddk-firmware-test" ]
-  info = "ddk-firmware-test-driver-info.json"
+  info = "meta/ddk-firmware-test-driver-info.json"
   manifest = "meta/ddk-firmware-test-driver.cml"
 }
 

@@ -291,7 +291,8 @@ void DriverRunnerTest::StopDriverComponent(
   EXPECT_TRUE(RunLoopUntilIdle());
 }
 DriverRunnerTest::StartDriverResult DriverRunnerTest::StartDriver(
-    Driver driver, std::optional<StartDriverHandler> start_handler) {
+    Driver driver, std::optional<StartDriverHandler> start_handler,
+    fidl::ClientEnd<fuchsia_io::Directory> ns_pkg) {
   std::unique_ptr<TestDriver> started_driver;
   driver_host().SetStartHandler(
       [&started_driver, dispatcher = dispatcher(), start_handler = std::move(start_handler)](
@@ -341,10 +342,20 @@ DriverRunnerTest::StartDriverResult DriverRunnerTest::StartDriver(
   EXPECT_EQ(ZX_OK, outgoing_endpoints.status_value());
 
   auto start_info_builder = frunner::wire::ComponentStartInfo::Builder(arena);
+
+  fidl::VectorView<frunner::wire::ComponentNamespaceEntry> ns_entries = {};
+  if (ns_pkg.is_valid()) {
+    ns_entries.Allocate(arena, 1);
+    ns_entries[0] = frunner::wire::ComponentNamespaceEntry::Builder(arena)
+                        .path("/pkg")
+                        .directory(std::move(ns_pkg))
+                        .Build();
+  }
+
   start_info_builder.resolved_url(driver.url)
       .program(program_builder.Build())
       .outgoing_dir(std::move(outgoing_endpoints->server))
-      .ns({})
+      .ns(ns_entries)
       .numbered_handles(realm().TakeHandles(arena));
 
   auto controller_endpoints = fidl::Endpoints<frunner::ComponentController>::Create();

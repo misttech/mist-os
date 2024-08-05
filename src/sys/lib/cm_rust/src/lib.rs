@@ -2074,6 +2074,18 @@ impl std::str::FromStr for CapabilityTypeName {
     }
 }
 
+impl FidlIntoNative<CapabilityTypeName> for String {
+    fn fidl_into_native(self) -> CapabilityTypeName {
+        self.parse().unwrap()
+    }
+}
+
+impl NativeIntoFidl<String> for CapabilityTypeName {
+    fn native_into_fidl(self) -> String {
+        self.to_string()
+    }
+}
+
 impl fmt::Display for CapabilityTypeName {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let display_name = match &self {

@@ -132,6 +132,7 @@ class Vcpu {
   // See the comment in arch/x86/include/arch/hypervisor.h:Vcpu for why it is OK
   // to disable static analysis here.
   bool ThreadIsOurThread(Thread* thread) const TA_NO_THREAD_SAFETY_ANALYSIS {
+    // TODO(https://fxbug.dev/355287217): Remove workaround for const/volatile qualified atomic_ref.
     return thread == ktl::atomic_ref<Thread*>{const_cast<Vcpu*>(this)->thread_}.load(
                          ktl::memory_order_relaxed);
   }

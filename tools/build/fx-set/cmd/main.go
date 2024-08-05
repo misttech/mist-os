@@ -169,7 +169,6 @@ type setArgs struct {
 	noCcache  bool
 	ccacheDir string
 
-	enableRbe     bool // deprecated, renamed
 	enableRustRbe bool
 
 	enableLinkRbe  bool
@@ -227,7 +226,6 @@ func parseArgsAndEnv(args []string, env map[string]string) (*setArgs, error) {
 	flagSet.BoolVar(&cmd.noCcache, "no-ccache", false, "")
 	flagSet.BoolVar(&cmd.includeClippy, "include-clippy", true, "")
 
-	flagSet.MarkDeprecated("rbe", "Use tool-specific controls like --rust-rbe instead")
 	flagSet.BoolVar(&cmd.enableRustRbe, "rust-rbe", false, "")
 	flagSet.BoolVar(&cmd.enableCxxRbe, "cxx-rbe", false, "")
 	flagSet.BoolVar(&cmd.disableCxxRbe, "no-cxx-rbe", false, "")
@@ -274,9 +272,6 @@ func parseArgsAndEnv(args []string, env map[string]string) (*setArgs, error) {
 		return nil, fmt.Errorf("--ccache and --no-ccache are mutually exclusive")
 	}
 
-	if cmd.enableRbe {
-		return nil, fmt.Errorf("--rbe (deprecated) was renamed to --rust-rbe.")
-	}
 	if cmd.enableCxxRbe && cmd.useCcache {
 		return nil, fmt.Errorf("--cxx-rbe and --use-ccache are mutually exclusive")
 	}

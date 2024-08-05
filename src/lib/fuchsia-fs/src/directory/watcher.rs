@@ -363,9 +363,6 @@ mod tests {
     }
 
     impl Node for MockDirectory {
-        async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
-            unimplemented!()
-        }
         async fn get_attributes(
             &self,
             _query: fio::NodeAttributesQuery,

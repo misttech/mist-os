@@ -13,6 +13,6 @@
         colocate: "true",
     },
     use: [
-        { service: "fuchsia.hardware.sysmem.Service" },
+        { protocol: "fuchsia.sysmem2.Allocator" },
     ],
 }

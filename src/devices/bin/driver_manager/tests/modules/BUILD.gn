@@ -13,7 +13,10 @@ user_basic_redirect("modules.basic") {
 
 group("modules") {
   testonly = true
-  deps = [ ":fake_driver_host" ]
+  deps = [
+    ":fake_driver_host",
+    ":fake_root_driver",
+  ]
 }
 
 static_library("entry_point") {
@@ -56,5 +59,16 @@ shared_library("dh-deps-b") {
 
 shared_library("dh-deps-c") {
   sources = [ "dh-deps-c.cc" ]
+  deps = [ "//zircon/system/public" ]
+}
+
+loadable_module("fake_root_driver") {
+  sources = [ "fake_root_driver.cc" ]
+  public = [ "driver_entry_point.h" ]
+  deps = [ ":fake_root_driver_deps" ]
+}
+
+shared_library("fake_root_driver_deps") {
+  sources = [ "fake_root_driver_deps.cc" ]
   deps = [ "//zircon/system/public" ]
 }

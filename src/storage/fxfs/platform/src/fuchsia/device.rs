@@ -367,9 +367,10 @@ impl BlockServer {
             }
             // TODO(https://fxbug.dev/42171261): need to check if this returns the right information.
             VolumeAndNodeRequest::GetVolumeInfo { responder } => {
-                match self.file.get_attrs().await {
+                match self.file.get_attributes(fio::NodeAttributesQuery::STORAGE_SIZE).await {
                     Ok(attr) => {
-                        let allocated_bytes = attr.storage_size;
+                        debug_assert!(attr.immutable_attributes.storage_size.is_some());
+                        let allocated_bytes = attr.immutable_attributes.storage_size.unwrap();
                         let unallocated_bytes =
                             self.file.get_size_uncached().await - allocated_bytes;
                         let allocated_slices =
@@ -443,33 +444,28 @@ impl BlockServer {
                 responder.send(Err(zx::sys::ZX_ERR_NOT_SUPPORTED))?;
             }
             VolumeAndNodeRequest::GetAttr { responder } => {
-                match self.file.get_attrs().await {
-                    Ok(mut attrs) => {
-                        attrs.mode = fio::MODE_TYPE_BLOCK_DEVICE;
-                        responder.send(zx::sys::ZX_OK, &attrs)?;
-                    }
-                    Err(e) => {
-                        let attrs = fio::NodeAttributes {
-                            mode: 0,
-                            id: fio::INO_UNKNOWN,
-                            content_size: 0,
-                            storage_size: 0,
-                            link_count: 0,
-                            creation_time: 0,
-                            modification_time: 0,
-                        };
-                        responder.send(e.into_raw(), &attrs)?;
-                    }
-                };
+                // TODO(https://fxbug.dev/293947862): Restrict GET_ATTRIBUTES.
+                let (status, mut attrs) =
+                    vfs::common::io2_to_io1_attrs(self.file.as_ref(), fio::Rights::GET_ATTRIBUTES)
+                        .await;
+                if status == zx::Status::OK {
+                    attrs.mode = fio::MODE_TYPE_BLOCK_DEVICE;
+                }
+                responder.send(status.into_raw(), &attrs)?;
             }
-            // TODO(https://fxbug.dev/42171261) VolumeAndNodeRequest::GetAttributes { query, responder }
             // TODO(https://fxbug.dev/42171261)
             VolumeAndNodeRequest::SetAttr { flags: _, attributes: _, responder } => {
                 responder.send(zx::sys::ZX_ERR_NOT_SUPPORTED)?;
             }
-            // TODO(https://fxbug.dev/42171261)
-            VolumeAndNodeRequest::GetAttributes { query: _, responder } => {
-                responder.send(Err(zx::sys::ZX_ERR_NOT_SUPPORTED))?;
+            VolumeAndNodeRequest::GetAttributes { query, responder } => {
+                // TODO(https://fxbug.dev/293947862): Restrict GET_ATTRIBUTES.
+                let attrs = self.file.get_attributes(query).await;
+                responder.send(
+                    attrs
+                        .as_ref()
+                        .map(|attrs| (&attrs.mutable_attributes, &attrs.immutable_attributes))
+                        .map_err(|status| status.into_raw()),
+                )?;
             }
             VolumeAndNodeRequest::UpdateAttributes { payload: _, responder } => {
                 responder.send(Err(zx::sys::ZX_ERR_NOT_SUPPORTED))?;

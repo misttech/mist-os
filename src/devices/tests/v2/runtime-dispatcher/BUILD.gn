@@ -42,13 +42,13 @@ fuchsia_driver_component("root") {
   testonly = true
   manifest = "meta/root.cml"
   deps = [ ":root-driver" ]
-  info = "root-info.json"
+  info = "meta/root-info.json"
 }
 
 driver_bind_rules("runtime-dispatcher-leaf-bind") {
-  rules = "leaf.bind"
+  rules = "meta/leaf.bind"
   bind_output = "leaf.bindbc"
-  tests = "leaf.bind-tests.json"
+  tests = "meta/leaf.bind-tests.json"
   deps = [ "//src/devices/bind/fuchsia.test" ]
 }
 
@@ -68,7 +68,7 @@ fuchsia_driver_component("leaf") {
   testonly = true
   manifest = "meta/leaf.cml"
   deps = [ ":leaf-driver" ]
-  info = "leaf-info.json"
+  info = "meta/leaf-info.json"
 }
 
 rustc_test("bin") {

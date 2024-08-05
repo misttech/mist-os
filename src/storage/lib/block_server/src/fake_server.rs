@@ -19,8 +19,14 @@ pub struct FakeServer {
 impl FakeServer {
     pub fn new(block_count: u64, block_size: u32, initial_content: &[u8]) -> Self {
         let vmo = zx::Vmo::create(block_count as u64 * block_size as u64).unwrap();
-        let data = Arc::new(Data { block_size, data: vmo });
-        data.data.write(initial_content, 0).unwrap();
+        vmo.write(initial_content, 0).unwrap();
+        Self::from_vmo(block_size, vmo)
+    }
+
+    pub fn from_vmo(block_size: u32, vmo: zx::Vmo) -> Self {
+        let size = vmo.get_size().unwrap();
+        debug_assert!(size % block_size as u64 == 0);
+        let block_count = size / block_size as u64;
         Self {
             server: BlockServer::new(
                 PartitionInfo {
@@ -30,7 +36,7 @@ impl FakeServer {
                     instance_guid: INSTANCE_GUID.clone(),
                     name: PARTITION_NAME.to_string(),
                 },
-                data,
+                Arc::new(Data { block_size, data: vmo }),
             ),
         }
     }

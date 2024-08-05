@@ -8,8 +8,8 @@ import("//build/drivers.gni")
 import("//build/test.gni")
 
 driver_bind_rules("virtio_block_bind") {
-  rules = "virtio_block.bind"
-  tests = "block_bind_tests.json"
+  rules = "meta/virtio_block.bind"
+  tests = "meta/block_bind_tests.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_bindlib",
     "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_bindlib",
@@ -40,7 +40,7 @@ fuchsia_driver_component("virtio_block") {
     ":virtio_block-driver",
     ":virtio_block_bind",
   ]
-  info = "virtio_block-info.json"
+  info = "meta/virtio_block-info.json"
   manifest = "meta/virtio_block.cml"
 }
 
@@ -76,8 +76,8 @@ source_set("scsi_lib") {
 }
 
 driver_bind_rules("virtio_scsi_bind") {
-  rules = "virtio_scsi.bind"
-  tests = "scsi_bind_tests.json"
+  rules = "meta/virtio_scsi.bind"
+  tests = "meta/scsi_bind_tests.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_bindlib",
     "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_bindlib",
@@ -105,7 +105,7 @@ fuchsia_driver("virtio_scsi-driver") {
 fuchsia_driver_component("virtio_scsi") {
   component_name = "virtio_scsi"
   deps = [ ":virtio_scsi-driver" ]
-  info = "virtio_scsi-info.json"
+  info = "meta/virtio_scsi-info.json"
   manifest = "meta/virtio_scsi.cml"
 }
 

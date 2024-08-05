@@ -9,8 +9,8 @@ import("//build/test.gni")
 
 driver_bind_rules("bootpart_bind") {
   disable_autobind = true
-  rules = "bootpart.bind"
-  tests = "bind_tests.json"
+  rules = "meta/bootpart.bind"
+  tests = "meta/bind_tests.json"
   deps = [ "//src/devices/bind/fuchsia.block" ]
 }
 
@@ -36,7 +36,7 @@ fuchsia_driver("bootpart-driver") {
 fuchsia_driver_component("bootpart") {
   component_name = "bootpart"
   deps = [ ":bootpart-driver" ]
-  info = "bootpart-info.json"
+  info = "meta/bootpart-info.json"
   manifest = "meta/bootpart.cml"
 }
 

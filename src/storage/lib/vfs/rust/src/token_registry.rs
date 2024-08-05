@@ -285,10 +285,6 @@ mod tests {
         }
 
         impl Node for MockDirectory {
-            async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
-                unimplemented!("Not implemented!")
-            }
-
             async fn get_attributes(
                 &self,
                 _query: fio::NodeAttributesQuery,
@@ -344,14 +340,6 @@ mod tests {
                 self: Arc<Self>,
                 _name: &str,
                 _must_be_directory: bool,
-            ) -> Result<(), Status> {
-                unimplemented!("Not implemented!")
-            }
-
-            async fn set_attrs(
-                &self,
-                _flags: fio::NodeAttributeFlags,
-                _attributes: fio::NodeAttributes,
             ) -> Result<(), Status> {
                 unimplemented!("Not implemented!")
             }

@@ -50,8 +50,5 @@ async fn main() -> Result<(), Error> {
         )))
         .await;
     }
-    tracing::error!(
-        "too many failures when attempt to launch lowpan-ot-driver, lowpan-monitor will stop"
-    );
-    Ok(())
+    panic!("lowpan-monitor will stop bringing up lowpan-ot-driver");
 }

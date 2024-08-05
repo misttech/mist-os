@@ -76,6 +76,24 @@ impl net_cli::ServiceConnector<froot::InterfacesMarker> for FfxConnector<'_> {
 }
 
 #[async_trait::async_trait]
+impl net_cli::ServiceConnector<froot::RoutesV4Marker> for FfxConnector<'_> {
+    async fn connect(
+        &self,
+    ) -> Result<<froot::RoutesV4Marker as ProtocolMarker>::Proxy, anyhow::Error> {
+        self.remotecontrol_connect::<froot::RoutesV4Marker>(NETSTACK_MONIKER_SUFFIX).await
+    }
+}
+
+#[async_trait::async_trait]
+impl net_cli::ServiceConnector<froot::RoutesV6Marker> for FfxConnector<'_> {
+    async fn connect(
+        &self,
+    ) -> Result<<froot::RoutesV6Marker as ProtocolMarker>::Proxy, anyhow::Error> {
+        self.remotecontrol_connect::<froot::RoutesV6Marker>(NETSTACK_MONIKER_SUFFIX).await
+    }
+}
+
+#[async_trait::async_trait]
 impl net_cli::ServiceConnector<fdhcp::Server_Marker> for FfxConnector<'_> {
     async fn connect(
         &self,

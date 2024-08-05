@@ -239,7 +239,8 @@ void GttRegionImpl::ClearRegion() {
 }
 
 void GttRegionImpl::SetRotation(uint32_t rotation, const image_metadata_t& image_metadata) {
-  bool rotated = (rotation == FRAME_TRANSFORM_ROT_90 || rotation == FRAME_TRANSFORM_ROT_270);
+  bool rotated = (rotation == COORDINATE_TRANSFORMATION_ROTATE_CCW_90 ||
+                  rotation == COORDINATE_TRANSFORMATION_ROTATE_CCW_270);
   if (rotated == is_rotated_) {
     return;
   }

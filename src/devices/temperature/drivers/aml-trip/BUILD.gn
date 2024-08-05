@@ -7,9 +7,9 @@ import("//build/components.gni")
 import("//build/drivers.gni")
 
 driver_bind_rules("aml-trip-bind") {
-  rules = "aml-trip.bind"
+  rules = "meta/aml-trip.bind"
   bind_output = "aml-trip.bindbc"
-  tests = "aml-trip-bind-test.json"
+  tests = "meta/aml-trip-bind-test.json"
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.clock",
@@ -50,7 +50,7 @@ fuchsia_driver("aml-trip-driver") {
 fuchsia_driver_component("aml-trip") {
   component_name = "aml-trip"
   deps = [ ":aml-trip-driver" ]
-  info = "aml-trip-info.json"
+  info = "meta/aml-trip-info.json"
   manifest = "meta/aml-trip.cml"
 }
 

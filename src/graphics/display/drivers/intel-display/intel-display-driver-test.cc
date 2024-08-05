@@ -516,7 +516,7 @@ TEST_F(IntegrationTest, SysmemImport) {
   uint64_t bytes_per_row =
       driver_.SyncCall([&](fdf_testing::DriverUnderTest<IntelDisplayDriver>* driver) {
         const GttRegion& region = (*driver)->controller()->SetupGttImage(
-            kDisplayImageMetadata, image_handle, FRAME_TRANSFORM_IDENTITY);
+            kDisplayImageMetadata, image_handle, COORDINATE_TRANSFORMATION_IDENTITY);
         return region.bytes_per_row();
       });
   EXPECT_LT(kDisplayImageMetadata.width * 4, kBytesPerRowDivisor);
@@ -595,7 +595,7 @@ TEST_F(IntegrationTest, SysmemRotated) {
   uint64_t bytes_per_row =
       driver_.SyncCall([&](fdf_testing::DriverUnderTest<IntelDisplayDriver>* driver) {
         const GttRegion& region = (*driver)->controller()->SetupGttImage(
-            kDisplayImageMetadata, image_handle, FRAME_TRANSFORM_ROT_90);
+            kDisplayImageMetadata, image_handle, COORDINATE_TRANSFORMATION_ROTATE_CCW_90);
         return region.bytes_per_row();
       });
   EXPECT_LT(kDisplayImageMetadata.width * 4, kBytesPerRowDivisor);

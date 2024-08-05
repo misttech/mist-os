@@ -5,7 +5,7 @@
 import("//build/drivers.gni")
 
 driver_bind_rules("bind") {
-  rules = "left_parent.bind"
+  rules = "meta/left_parent.bind"
   deps = [ "//src/devices/tests/v2/reload-driver/bindlib:fuchsia.reloaddriverbind.test" ]
   bind_output = "left_parent.bindbc"
 }
@@ -26,5 +26,5 @@ fuchsia_driver_component("component") {
   manifest = "meta/left_parent.cml"
   component_name = "left_parent"
   deps = [ ":driver" ]
-  info = "info.json"
+  info = "meta/info.json"
 }

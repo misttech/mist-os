@@ -28,7 +28,7 @@
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/testing/predicates/status.h"
 
-namespace simple_display {
+namespace framebuffer_display {
 
 namespace {
 
@@ -146,7 +146,7 @@ class MockAllocator : public fidl::testing::WireTestBase<fuchsia_sysmem2::Alloca
 
   void SetDebugClientInfo(SetDebugClientInfoRequestView request,
                           SetDebugClientInfoCompleter::Sync& completer) override {
-    EXPECT_EQ(request->name().get().find("simple-display"), 0u);
+    EXPECT_EQ(request->name().get().find("framebuffer-display"), 0u);
   }
 
   void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
@@ -232,7 +232,7 @@ class FakeMmio {
   std::unique_ptr<ddk_fake::FakeMmioRegRegion> mmio_;
 };
 
-class SimpleDisplayTest : public ::testing::Test {
+class FramebufferDisplayTest : public ::testing::Test {
  private:
   fdf_testing::ScopedGlobalLogger logger_;
 };
@@ -255,7 +255,7 @@ void ExpectObjectsArePaired(zx::unowned<T> lhs, zx::unowned<T> rhs) {
   return ExpectHandlesArePaired(lhs->get(), rhs->get());
 }
 
-TEST_F(SimpleDisplayTest, ImportBufferCollection) {
+TEST_F(FramebufferDisplayTest, ImportBufferCollection) {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   FakeSysmem fake_sysmem(loop.dispatcher(), /*framebuffer_vmo=*/{}, 0);
   FakeMmio fake_mmio;
@@ -279,8 +279,8 @@ TEST_F(SimpleDisplayTest, ImportBufferCollection) {
       .pixel_format = kPixelFormat,
   };
 
-  SimpleDisplay display(fidl::WireSyncClient(std::move(hardware_sysmem_client)),
-                        std::move(sysmem_client), fake_mmio.MmioBuffer(), kDisplayProperties);
+  FramebufferDisplay display(fidl::WireSyncClient(std::move(hardware_sysmem_client)),
+                             std::move(sysmem_client), fake_mmio.MmioBuffer(), kDisplayProperties);
 
   auto token1_endpoints = fidl::Endpoints<fuchsia_sysmem2::BufferCollectionToken>::Create();
   zx::result token2_endpoints = fidl::CreateEndpoints<fuchsia_sysmem2::BufferCollectionToken>();
@@ -338,7 +338,7 @@ TEST_F(SimpleDisplayTest, ImportBufferCollection) {
   loop.Shutdown();
 }
 
-TEST_F(SimpleDisplayTest, ImportKernelFramebufferImage) {
+TEST_F(FramebufferDisplayTest, ImportKernelFramebufferImage) {
   constexpr int32_t kWidthPx = 800;
   constexpr int32_t kHeightPx = 600;
   constexpr int32_t kStridePx = 800;
@@ -372,8 +372,8 @@ TEST_F(SimpleDisplayTest, ImportKernelFramebufferImage) {
       .pixel_format = kPixelFormat,
   };
 
-  SimpleDisplay display(fidl::WireSyncClient(std::move(hardware_sysmem_client)),
-                        std::move(sysmem_client), fake_mmio.MmioBuffer(), kDisplayProperties);
+  FramebufferDisplay display(fidl::WireSyncClient(std::move(hardware_sysmem_client)),
+                             std::move(sysmem_client), fake_mmio.MmioBuffer(), kDisplayProperties);
 
   zx::result token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem2::BufferCollectionToken>();
   ASSERT_TRUE(token_endpoints.is_ok());
@@ -394,9 +394,9 @@ TEST_F(SimpleDisplayTest, ImportKernelFramebufferImage) {
   fidl::WireSyncClient heap{std::move(heap_client)};
 
   fidl::Arena arena;
-  // At least for now we use empty settings, because currently SimpleDisplay doesn't pay attention
-  // to any settings, so this way if that changes, this test will fail intentionally so that this
-  // test can be updated to have settings that achieve this test's goals.
+  // At least for now we use empty settings, because currently FramebufferDisplay doesn't pay
+  // attention to any settings, so this way if that changes, this test will fail intentionally so
+  // that this test can be updated to have settings that achieve this test's goals.
   auto settings = fuchsia_sysmem2::wire::SingleBufferSettings::Builder(arena);
   EXPECT_OK(heap->AllocateVmo(0, settings.Build(), kBanjoCollectionId, 0).status());
 
@@ -463,4 +463,4 @@ TEST_F(SimpleDisplayTest, ImportKernelFramebufferImage) {
 
 }  // namespace
 
-}  // namespace simple_display
+}  // namespace framebuffer_display

@@ -5,25 +5,32 @@
 import("//build/components.gni")
 import("//build/fidl/fidl.gni")
 
-executable("bin") {
-  output_name = "system_monitor"
+source_set("lib") {
   sources = [
-    "main.cc",
     "system_monitor.cc",
     "system_monitor.h",
   ]
-  deps = [
+  public_deps = [
     "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_hlcpp",
-    "//sdk/fidl/fuchsia.logger:fuchsia.logger_hlcpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp",
-    "//src/lib/diagnostics/accessor2logger:accessor2logger",
     "//src/lib/fsl",
     "//zircon/system/ulib/async:async",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
   ]
+}
+
+group("tests") {
+  testonly = true
+  deps = [ "//src/ui/bin/system_monitor/tests" ]
+}
+
+executable("bin") {
+  output_name = "system_monitor"
+  sources = [ "main.cc" ]
+  deps = [ ":lib" ]
 }
 
 fuchsia_component("system_monitor_component") {

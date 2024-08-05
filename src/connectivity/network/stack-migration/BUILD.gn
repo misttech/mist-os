@@ -14,7 +14,6 @@ network_unified_binary("bin") {
     "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_rust",
     "//sdk/fidl/fuchsia.net.stackmigrationdeprecated:fuchsia.net.stackmigrationdeprecated_rust",
     "//src/connectivity/network/metrics:networking_metrics_registry_rustlib",
-    "//src/lib/async-utils",
     "//src/lib/diagnostics/inspect/runtime/rust",
     "//src/lib/diagnostics/inspect/rust",
     "//src/lib/fidl/rust/fidl",

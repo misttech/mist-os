@@ -137,7 +137,6 @@ pub fn empty_watch_event_stream<'a, I: FidlRouteIpExt>(
 /// Provides testutils for testing implementations of clients and servers of
 /// fuchsia.net.routes.admin.
 pub mod admin {
-    use async_utils::stream::FlattenUnorderedExt as _;
     use fidl::endpoints::ProtocolMarker;
     use fidl_fuchsia_net_routes_admin as fnet_routes_admin;
     use futures::{Stream, StreamExt as _};
@@ -199,7 +198,7 @@ pub mod admin {
                 route_set_server_end.into_stream().expect("into stream")
             })
             .fuse()
-            .flatten_unordered()
+            .flatten_unordered(None)
     }
 
     /// TODO(https://fxbug.dev/337298251): Change this to return a RouteSet
@@ -251,7 +250,7 @@ pub mod admin {
                 route_set_server_end.into_stream().expect("into stream")
             })
             .fuse()
-            .flatten_unordered()
+            .flatten_unordered(None)
     }
 
     /// Provides a RouteTable implementation that serves no-op RouteSets.

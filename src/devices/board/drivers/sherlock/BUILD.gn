@@ -10,9 +10,9 @@ config("factory") {
 }
 
 driver_bind_rules("sherlock-bind") {
-  rules = "sherlock.bind"
+  rules = "meta/sherlock.bind"
   bind_output = "sherlock.bindbc"
-  tests = "sherlock-bind-tests.json"
+  tests = "meta/sherlock-bind-tests.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_bindlib",
     "//src/devices/bind/fuchsia.google.platform",
@@ -155,7 +155,7 @@ template("sherlock_driver") {
 
   fuchsia_driver_component("${invoker.target_name}-component") {
     deps = [ ":${invoker.target_name}-driver" ]
-    info = "${invoker.target_name}-info.json"
+    info = "meta/${invoker.target_name}-info.json"
     manifest = "meta/${invoker.target_name}.cml"
   }
 

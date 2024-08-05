@@ -7,6 +7,8 @@
 #include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/natural_types.h>
 #include <lib/syslog/cpp/macros.h>
 
+#include <algorithm>
+
 namespace media_audio {
 
 namespace fhasp = fuchsia_hardware_audio_signalprocessing;
@@ -69,6 +71,24 @@ std::unordered_map<TopologyId, std::vector<fhasp::EdgePair>> MapTopologies(
     }
   }
   return topology_map;
+}
+
+bool ElementHasOutgoingEdges(
+    const std::vector<fuchsia_hardware_audio_signalprocessing::EdgePair>& topology,
+    ElementId element_id) {
+  return std::any_of(topology.begin(), topology.end(),
+                     [element_id](const fuchsia_hardware_audio_signalprocessing::EdgePair& pair) {
+                       return (pair.processing_element_id_from() == element_id);
+                     });
+}
+
+bool ElementHasIncomingEdges(
+    const std::vector<fuchsia_hardware_audio_signalprocessing::EdgePair>& topology,
+    ElementId element_id) {
+  return std::any_of(topology.begin(), topology.end(),
+                     [element_id](const fuchsia_hardware_audio_signalprocessing::EdgePair& pair) {
+                       return (pair.processing_element_id_to() == element_id);
+                     });
 }
 
 }  // namespace media_audio

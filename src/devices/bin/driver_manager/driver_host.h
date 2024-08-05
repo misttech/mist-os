@@ -25,6 +25,14 @@ class DriverHost {
                      fuchsia_component_runner::wire::ComponentStartInfo start_info,
                      fidl::ServerEnd<fuchsia_driver_host::Driver> driver, StartCallback cb) = 0;
 
+  // Loads and starts a driver using dynamic linking.
+  virtual void StartWithDynamicLinker(
+      std::string_view driver_soname, zx::vmo driver,
+      fidl::ClientEnd<fuchsia_io::Directory> lib_dir,
+      fidl::ServerEnd<fuchsia_driver_host::Driver> driver_server_end, StartCallback cb) {
+    cb(zx::error(ZX_ERR_NOT_SUPPORTED));
+  }
+
   virtual zx::result<uint64_t> GetProcessKoid() const = 0;
 };
 
@@ -79,6 +87,11 @@ class DynamicLinkerDriverHostComponent final
              fidl::ServerEnd<fuchsia_driver_host::Driver> driver, StartCallback cb) override {
     cb(zx::error(ZX_ERR_NOT_SUPPORTED));
   }
+
+  void StartWithDynamicLinker(std::string_view driver_soname, zx::vmo driver,
+                              fidl::ClientEnd<fuchsia_io::Directory>,
+                              fidl::ServerEnd<fuchsia_driver_host::Driver> driver_server_end,
+                              StartCallback cb) override;
 
   zx::result<uint64_t> GetProcessKoid() const override { return zx::error(ZX_ERR_NOT_SUPPORTED); }
 

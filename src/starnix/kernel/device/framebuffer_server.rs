@@ -371,7 +371,13 @@ pub fn start_presentation_loop(
             let _ = maybe_view_controller_proxy.insert(view_controller_proxy);
 
             let view_spec = felement::ViewSpec {
-                annotations: None,
+                annotations: Some(vec![felement::Annotation {
+                  key: felement::AnnotationKey {
+                    namespace: "window_manager".to_string(),
+                    value: "view_id".to_string(),
+                },
+                value: felement::AnnotationValue::Text("starnix_framebuffer".to_string()),
+                }]),
                 viewport_creation_token: Some(link_token_pair.viewport_creation_token),
                 ..Default::default()
             };

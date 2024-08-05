@@ -385,6 +385,10 @@ closed protocol RingBuffer {
     /// `driver_transfer_bytes` immediately adjacent to the current position, see the
     /// `driver_transfer_bytes` parameter specification in `RingBufferProperties` for more details.
     ///
+    /// The returned VMO handle must include ZX_RIGHT_TRANSFER, ZX_RIGHT_READ and ZX_RIGHT_MAP.
+    /// If the ring buffer is "outgoing" (conveys audio data from client to device), then the
+    /// handle must also include ZX_RIGHT_WRITE.
+    ///
     /// If `clock_recovery_notifications_per_ring` is non-zero, the driver will send replies to
     /// `WatchClockRecoveryPositionInfo` client requests at most at
     /// `clock_recovery_notifications_per_ring` frequency. These notifications are meant to be used

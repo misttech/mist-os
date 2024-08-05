@@ -13,6 +13,9 @@ namespace media::audio::test {
 
 using AudioRenderUsage = fuchsia::media::AudioRenderUsage;
 
+// TODO(https://fxbug.dev/326083019): unittest AudioCore methods more directly (SetRenderUsageGain,
+// SetCaptureUsageGaqin, ResetInteractions, LoadDefaults).
+
 class AudioRendererBufferErrorTest : public AudioRendererBufferTest {};
 
 // It is invalid to add a payload buffer with a duplicate id.
@@ -150,12 +153,12 @@ TEST_F(AudioRendererPacketErrorTest, SendPacketBufferOverrunShouldDisconnect) {
   ExpectDisconnect(audio_renderer());
 }
 
-class AudioRendererPtsLeadTimeErrorTest : public AudioRendererPtsLeadTimeTest {};
+class AudioRendererPtsErrorTest : public AudioRendererPtsTest {};
 
 // SetPtsUnits accepts uint numerator and denominator that must be within certain range
 //
 // Numerator cannot be zero
-TEST_F(AudioRendererPtsLeadTimeErrorTest, SetPtsUnitsZeroNumeratorShouldDisconnect) {
+TEST_F(AudioRendererPtsErrorTest, SetPtsUnitsZeroNumeratorShouldDisconnect) {
   audio_renderer()->SetPtsUnits(0, 1);
   ExpectDisconnect(audio_renderer());
 }
@@ -163,14 +166,14 @@ TEST_F(AudioRendererPtsLeadTimeErrorTest, SetPtsUnitsZeroNumeratorShouldDisconne
 // There cannot be more than one PTS tick per nanosecond. We use ratio 1e9/1 + epsilon to test this
 // limit. The smallest such epsilon we can encode in uint32 / uint32 is (4e9+1)/4, where epsilon =
 // 1/4. The next smallest (5e9+1)/5 cannot be encoded because 5e9+1 exceeds MAX_UINT32.
-TEST_F(AudioRendererPtsLeadTimeErrorTest, SetPtsUnitsTooHighShouldDisconnect) {
+TEST_F(AudioRendererPtsErrorTest, SetPtsUnitsTooHighShouldDisconnect) {
   // This value equates to 0.99999999975 nanoseconds.
   audio_renderer()->SetPtsUnits(4'000'000'001, 4);
   ExpectDisconnect(audio_renderer());
 }
 
 // Denominator cannot be zero
-TEST_F(AudioRendererPtsLeadTimeErrorTest, SetPtsUnitsZeroDenominatorShouldDisconnect) {
+TEST_F(AudioRendererPtsErrorTest, SetPtsUnitsZeroDenominatorShouldDisconnect) {
   audio_renderer()->SetPtsUnits(1000, 0);
   ExpectDisconnect(audio_renderer());
 }
@@ -179,13 +182,13 @@ TEST_F(AudioRendererPtsLeadTimeErrorTest, SetPtsUnitsZeroDenominatorShouldDiscon
 // To compute the smallest epsilon that can be encoded in uint32 / uint32, we find the largest X
 // and Y such that X/Y = 1/60, then use a ratio of X/(Y+1).
 //   floor(2^32/60) = 71582788, so we use the ratio 71582788 / (4294967280+1).
-TEST_F(AudioRendererPtsLeadTimeErrorTest, SetPtsUnitsTooLowShouldDisconnect) {
+TEST_F(AudioRendererPtsErrorTest, SetPtsUnitsTooLowShouldDisconnect) {
   // This value equates to 60.000000013969839 seconds.
   audio_renderer()->SetPtsUnits(71582788, 4294967281);
   ExpectDisconnect(audio_renderer());
 }
 
-TEST_F(AudioRendererPtsLeadTimeErrorTest, SetPtsUnitsWhileOperatingShouldDisconnect) {
+TEST_F(AudioRendererPtsErrorTest, SetPtsUnitsWhileOperatingShouldDisconnect) {
   CreateAndAddPayloadBuffer(0);
   audio_renderer()->SetPcmStreamType(kTestStreamType);
 
@@ -196,7 +199,7 @@ TEST_F(AudioRendererPtsLeadTimeErrorTest, SetPtsUnitsWhileOperatingShouldDisconn
 }
 
 // If active packets are outstanding, calling SetPtsContinuityThreshold will cause a disconnect
-TEST_F(AudioRendererPtsLeadTimeErrorTest, SetPtsContThresholdWhileOperatingCausesDisconnect) {
+TEST_F(AudioRendererPtsErrorTest, SetPtsContThresholdWhileOperatingCausesDisconnect) {
   CreateAndAddPayloadBuffer(0);
   audio_renderer()->SetPcmStreamType(kTestStreamType);
 
@@ -206,39 +209,27 @@ TEST_F(AudioRendererPtsLeadTimeErrorTest, SetPtsContThresholdWhileOperatingCause
   ExpectDisconnect(audio_renderer());
 }
 
-// SetPtsContinuityThreshold parameter must be non-negative
-TEST_F(AudioRendererPtsLeadTimeErrorTest, SetPtsContThresholdNegativeValueCausesDisconnect) {
+// SetPtsContinuityThreshold parameter must be non-negative and finite.
+TEST_F(AudioRendererPtsErrorTest, SetPtsContThresholdNegativeValueCausesDisconnect) {
   audio_renderer()->SetPtsContinuityThreshold(-0.01f);
   ExpectDisconnect(audio_renderer());
 }
 
-// SetPtsContinuityThreshold parameter must be a normal number
-TEST_F(AudioRendererPtsLeadTimeErrorTest, SetPtsContThresholdNanCausesDisconnect) {
+// SetPtsContinuityThreshold parameter must be non-negative and finite.
+TEST_F(AudioRendererPtsErrorTest, SetPtsContThresholdNanCausesDisconnect) {
   audio_renderer()->SetPtsContinuityThreshold(NAN);
   ExpectDisconnect(audio_renderer());
 }
 
-// SetPtsContinuityThreshold parameter must be a finite number
-TEST_F(AudioRendererPtsLeadTimeErrorTest, SetPtsContThresholdInfinityCausesDisconnect) {
+// SetPtsContinuityThreshold parameter must be non-negative and finite.
+TEST_F(AudioRendererPtsErrorTest, SetPtsContThresholdInfinityCausesDisconnect) {
   audio_renderer()->SetPtsContinuityThreshold(INFINITY);
-  ExpectDisconnect(audio_renderer());
-}
-
-// SetPtsContinuityThreshold parameter must be a number within the finite range
-TEST_F(AudioRendererPtsLeadTimeErrorTest, SetPtsContThresholdHugeValCausesDisconnect) {
-  audio_renderer()->SetPtsContinuityThreshold(HUGE_VALF);
-  ExpectDisconnect(audio_renderer());
-}
-
-// SetPtsContinuityThreshold parameter must be a normal (not sub-normal) number
-TEST_F(AudioRendererPtsLeadTimeErrorTest, SetPtsContThresholdSubNormalValCausesDisconnect) {
-  audio_renderer()->SetPtsContinuityThreshold(FLT_MIN / 2);
   ExpectDisconnect(audio_renderer());
 }
 
 class AudioRendererClockErrorTest : public AudioRendererClockTest {};
 
-// inadequate ZX_RIGHTS (no DUPLICATE) should cause GetReferenceClock to fail.
+// Inadequate ZX_RIGHTS (no DUPLICATE) should cause GetReferenceClock to fail.
 TEST_F(AudioRendererClockErrorTest, SetRefClockWithoutDuplicateShouldDisconnect) {
   zx::clock dupe_clock, orig_clock = clock::CloneOfMonotonic();
   ASSERT_EQ(orig_clock.duplicate(kClockRights & ~ZX_RIGHT_DUPLICATE, &dupe_clock), ZX_OK);

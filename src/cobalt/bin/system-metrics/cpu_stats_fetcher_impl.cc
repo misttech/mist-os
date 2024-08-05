@@ -17,7 +17,7 @@ CpuStatsFetcherImpl::CpuStatsFetcherImpl() { InitializeKernelStats(); }
 
 FetchCpuResult CpuStatsFetcherImpl::FetchCpuPercentage(double *cpu_percentage) {
   TRACE_DURATION("system_metrics", "CpuStatsFetcherImpl::FetchCpuPercentage");
-  if (FetchCpuStats() == false) {
+  if (!FetchCpuStats()) {
     return FetchCpuResult::Error;
   }
   bool success = CalculateCpuPercentage(cpu_percentage);

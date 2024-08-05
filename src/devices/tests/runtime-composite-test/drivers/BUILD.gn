@@ -27,7 +27,7 @@ bind_library("composite.test.lib") {
 }
 
 driver_bind_rules("root-driver-bind") {
-  rules = "root-driver.bind"
+  rules = "meta/root-driver.bind"
   bind_output = "root-driver.bindbc"
   deps = [ "//src/devices/bind/fuchsia.test" ]
 }
@@ -52,11 +52,11 @@ fuchsia_driver_component("root") {
   manifest = "meta/root-driver.cml"
   component_name = "root-driver"
   deps = [ ":root-driver" ]
-  info = "root-driver-info.json"
+  info = "meta/root-driver-info.json"
 }
 
 driver_bind_rules("leaf-driver-bind") {
-  rules = "leaf-driver.bind"
+  rules = "meta/leaf-driver.bind"
   bind_output = "leaf-driver.bindbc"
   deps = [ "//src/devices/bind/fuchsia.test" ]
 }
@@ -80,12 +80,12 @@ fuchsia_driver("leaf-driver") {
 fuchsia_driver_component("leaf") {
   component_name = "leaf-driver"
   deps = [ ":leaf-driver" ]
-  info = "leaf-driver-info.json"
+  info = "meta/leaf-driver-info.json"
   manifest = "meta/leaf.cml"
 }
 
 driver_bind_rules("composite-bind") {
-  rules = "composite-driver.bind"
+  rules = "meta/composite-driver.bind"
   bind_output = "composite-driver.bindbc"
   deps = [ ":composite.test.lib" ]
 }
@@ -107,5 +107,5 @@ fuchsia_driver("composite-driver") {
 fuchsia_driver_component("composite") {
   manifest = "meta/composite-driver.cml"
   deps = [ ":composite-driver" ]
-  info = "composite-driver-info.json"
+  info = "meta/composite-driver-info.json"
 }

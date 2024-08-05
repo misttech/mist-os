@@ -10,7 +10,6 @@
 #include <lib/async/dispatcher.h>
 #include <lib/syslog/cpp/macros.h>
 
-#include "src/lib/callback/scoped_task_runner.h"
 #include "third_party/cobalt/src/public/lib/http_client.h"
 #include "third_party/cobalt/src/public/lib/statusor/statusor.h"
 
@@ -23,7 +22,7 @@ class FuchsiaHTTPClient : public lib::HTTPClient {
  public:
   using LoaderFactory = fit::function<::fuchsia::net::http::LoaderSyncPtr()>;
 
-  FuchsiaHTTPClient(LoaderFactory loader_factory);
+  explicit FuchsiaHTTPClient(LoaderFactory loader_factory);
 
   // Posts an HTTPRequest to fuchsia's network backend.
   lib::statusor::StatusOr<lib::HTTPResponse> PostSync(

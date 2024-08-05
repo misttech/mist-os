@@ -50,6 +50,8 @@ template("fshost_cml") {
             "//src/storage/fshost/meta/blobfs_fshost_test.cml",
             "//src/storage/fshost/meta/fxfs_fshost_test.cml",
           ]
+        } else if (defined(options.storage_host) && options.storage_host) {
+          sources += [ "//src/storage/fshost/meta/fxfs_gpt_fshost_test.cml" ]
         } else {
           sources += [ "//src/storage/fshost/meta/fxfs_blob_fshost_test.cml" ]
         }

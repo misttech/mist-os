@@ -186,7 +186,7 @@ impl FileOps for RemoteBlockDeviceFile {
 
     fn ioctl(
         &self,
-        _locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<'_, Unlocked>,
         file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
@@ -206,7 +206,7 @@ impl FileOps for RemoteBlockDeviceFile {
                 current_task.write_object(user_size, &size)?;
                 Ok(SUCCESS)
             }
-            _ => default_ioctl(file, current_task, request, arg),
+            _ => default_ioctl(file, locked, current_task, request, arg),
         }
     }
 }

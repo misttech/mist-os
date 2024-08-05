@@ -13,6 +13,7 @@ if (is_host) {
       "../omaha_tool",
       "../packages",
       "../paver",
+      "../util",
       "../zbi",
       "//src/sys/pkg/bin/pm/build",
       "//third_party/golibs:golang.org/x/crypto",

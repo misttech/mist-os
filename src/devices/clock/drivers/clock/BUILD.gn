@@ -8,9 +8,9 @@ import("//build/drivers.gni")
 import("//build/test.gni")
 
 driver_bind_rules("clock-bind") {
-  rules = "clock.bind"
+  rules = "meta/clock.bind"
   bind_output = "clock.bindbc"
-  tests = "bind-tests.json"
+  tests = "meta/bind-tests.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.clockimpl:fuchsia.hardware.clockimpl_bindlib",
     "//src/devices/bind/fuchsia.clock",
@@ -45,7 +45,7 @@ fuchsia_driver_component("clock") {
   visibility = [ ":*" ]
   component_name = "clock"
   deps = [ ":clock-driver" ]
-  info = "clock-info.json"
+  info = "meta/clock-info.json"
   manifest = "meta/clock.cml"
 }
 

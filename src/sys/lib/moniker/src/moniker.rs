@@ -4,6 +4,7 @@
 
 use crate::child_name::ChildName;
 use crate::error::MonikerError;
+use cm_rust::{FidlIntoNative, NativeIntoFidl};
 use core::cmp::{self, Ordering, PartialEq};
 use std::fmt;
 use std::hash::Hash;
@@ -122,6 +123,20 @@ impl Moniker {
         let mut path = self.path().clone();
         path.drain(0..prefix_len);
         Ok(Self::new(path))
+    }
+}
+
+impl FidlIntoNative<Moniker> for String {
+    fn fidl_into_native(self) -> Moniker {
+        // This is used in routing::capability_source::CapabilitySource, and the FIDL version of
+        // this should only be generated in-process from already valid monikers.
+        self.parse().unwrap()
+    }
+}
+
+impl NativeIntoFidl<String> for Moniker {
+    fn native_into_fidl(self) -> String {
+        self.to_string()
     }
 }
 

@@ -6,7 +6,7 @@ import("//build/cpp/library_headers.gni")
 
 library_headers("sdio_headers") {
   headers = [ "lib/sdio/hw.h" ]
-  deps = [ "//src/devices/block/lib/sdmmc" ]
+  public_deps = [ "//src/devices/block/lib/sdmmc" ]
 }
 
 source_set("sdio") {

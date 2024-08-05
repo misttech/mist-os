@@ -59,6 +59,14 @@ use {
 #[derive(Debug, Default, Clone, Copy)]
 pub struct KernelFeatures {
     pub bpf_v2: bool,
+
+    /// Whether the kernel supports the S_ISUID and S_ISGID bits.
+    ///
+    /// For example, these bits are used by `sudo`.
+    ///
+    /// Enabling this feature is potentially a security risk because they allow privilege
+    /// escalation.
+    pub enable_suid: bool,
 }
 
 /// The shared, mutable state for the entire Starnix kernel.

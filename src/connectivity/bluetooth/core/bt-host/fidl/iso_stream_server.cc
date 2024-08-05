@@ -98,9 +98,15 @@ void IsoStreamServer::SetupDataPath(
                 bt_log(WARN, "fidl", "data path setup failed (invalid parameters)");
                 callback(fpromise::error(ZX_ERR_INVALID_ARGS));
                 break;
+              case bt::iso::IsoStream::kStreamClosed:
+                bt_log(WARN, "fidl", "data path setup failed (stream closed)");
+                callback(fpromise::error(ZX_ERR_BAD_STATE));
+                break;
               default:
-                BT_PANIC("Unsupported case in SetupDataPathError: %u",
-                         static_cast<unsigned>(error));
+                bt_log(ERROR, "fidl", "Unsupported case in SetupDataPathError: %u",
+                       static_cast<unsigned>(error));
+                callback(fpromise::error(ZX_ERR_INTERNAL));
+                break;
             }
           });
 }

@@ -45,12 +45,16 @@ impl SessionManager {
 }
 
 impl super::SessionManager for SessionManager {
+    async fn on_attach_vmo(self: Arc<Self>, _vmo: &Arc<zx::Vmo>) -> Result<(), zx::Status> {
+        Ok(())
+    }
+
     async fn open_session(
         self: Arc<Self>,
         mut stream: fblock::SessionRequestStream,
         block_size: u32,
     ) -> Result<(), Error> {
-        let (helper, fifo) = SessionHelper::new(block_size)?;
+        let (helper, fifo) = SessionHelper::new(self.clone(), block_size)?;
         let (abort_handle, registration) = AbortHandle::new_pair();
         let session = Arc::new(Session {
             manager: self.clone(),
@@ -71,7 +75,7 @@ impl super::SessionManager for SessionManager {
         let result = Abortable::new(
             async {
                 while let Some(request) = stream.try_next().await? {
-                    session.helper.handle_request(request)?;
+                    session.helper.handle_request(request).await?;
                 }
                 Ok(())
             },
@@ -129,7 +133,7 @@ unsafe impl Sync for Callbacks {}
 
 pub struct Session {
     manager: Arc<SessionManager>,
-    helper: SessionHelper,
+    helper: SessionHelper<SessionManager>,
     fifo: zx::Fifo,
     queue: Mutex<SessionQueue>,
     vmos: Mutex<HashMap<RequestId, Arc<zx::Vmo>>>,

@@ -19,8 +19,8 @@ declare_args() {
 }
 
 driver_bind_rules("vim3_mcu_bind") {
-  rules = "vim3_mcu.bind"
-  tests = "bind_tests.json"
+  rules = "meta/vim3_mcu.bind"
+  tests = "meta/bind_tests.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c_bindlib",
     "//src/devices/bind/fuchsia.devicetree",
@@ -60,7 +60,7 @@ fuchsia_driver("vim3-mcu-driver") {
 fuchsia_driver_component("vim3-mcu") {
   component_name = "vim3-mcu"
   deps = [ ":vim3-mcu-driver" ]
-  info = "vim3-mcu-info.json"
+  info = "meta/vim3-mcu-info.json"
   manifest = "meta/vim3-mcu.cml"
 }
 

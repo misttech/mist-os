@@ -5,6 +5,7 @@
 #include "src/cobalt/bin/utils/clock.h"
 
 #include <fuchsia/time/cpp/fidl.h>
+#include <lib/fidl/cpp/binding_set.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/inspect/testing/cpp/inspect.h>
 #include <lib/sys/cpp/testing/component_context_provider.h>
@@ -18,7 +19,6 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include "lib/fidl/cpp/binding_set.h"
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
 
 namespace cobalt {

@@ -82,10 +82,17 @@ impl Matchers {
             )));
         }
 
-        let gpt_matcher =
-            Box::new(PartitionMapMatcher::new(DiskFormat::Gpt, false, GPT_DRIVER_PATH, None));
         if config.gpt {
-            matchers.push(gpt_matcher);
+            if config.storage_host {
+                matchers.push(Box::new(StorageHostMatcher::new()));
+            } else {
+                matchers.push(Box::new(PartitionMapMatcher::new(
+                    DiskFormat::Gpt,
+                    false,
+                    GPT_DRIVER_PATH,
+                    None,
+                )));
+            }
         }
 
         if config.gpt_all {
@@ -380,6 +387,34 @@ impl Matcher for PartitionMapMatcher {
     }
 }
 
+// Matches a single GPT-formatted block device and binds the storage-host component to it.
+// The field the topological path of the matched device.
+struct StorageHostMatcher(Option<String>);
+
+impl StorageHostMatcher {
+    pub fn new() -> Self {
+        Self(None)
+    }
+}
+
+#[async_trait]
+impl Matcher for StorageHostMatcher {
+    async fn match_device(&self, device: &mut dyn Device) -> bool {
+        if self.0.is_some() {
+            return false;
+        }
+        device.content_format().await.ok() == Some(DiskFormat::Gpt)
+    }
+
+    async fn process_device(
+        &mut self,
+        device: &mut dyn Device,
+        env: &mut dyn Environment,
+    ) -> Result<(), Error> {
+        env.launch_storage_host(device).await
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{Device, DiskFormat, Environment, Matchers};
@@ -395,6 +430,7 @@ mod tests {
     use fidl_fuchsia_device::ControllerProxy;
     use fidl_fuchsia_hardware_block::{BlockInfo, BlockProxy, Flag};
     use fidl_fuchsia_hardware_block_volume::VolumeProxy;
+    use fs_management::filesystem::BlockConnector;
     use std::sync::Mutex;
 
     #[derive(Clone)]
@@ -479,7 +515,7 @@ mod tests {
         fn controller(&self) -> &ControllerProxy {
             unreachable!()
         }
-        fn reopen_controller(&self) -> Result<ControllerProxy, Error> {
+        fn block_connector(&self) -> Result<Box<dyn BlockConnector>, Error> {
             unreachable!()
         }
         fn block_proxy(&self) -> Result<BlockProxy, Error> {
@@ -503,6 +539,7 @@ mod tests {
         expect_mount_data_on: Mutex<bool>,
         expect_format_data: Mutex<bool>,
         expect_bind_data: Mutex<bool>,
+        expect_launch_storage_host: Mutex<bool>,
         legacy_data_format: bool,
         create_data_partition: bool,
     }
@@ -519,6 +556,7 @@ mod tests {
                 expect_mount_data_on: Mutex::new(false),
                 expect_format_data: Mutex::new(false),
                 expect_bind_data: Mutex::new(false),
+                expect_launch_storage_host: Mutex::new(false),
                 legacy_data_format: false,
                 create_data_partition: true,
             }
@@ -559,6 +597,10 @@ mod tests {
             *self.expect_mount_data_on.get_mut().unwrap() = true;
             self
         }
+        fn expect_launch_storage_host(mut self) -> Self {
+            *self.expect_launch_storage_host.get_mut().unwrap() = true;
+            self
+        }
         fn legacy_data_format(mut self) -> Self {
             self.legacy_data_format = true;
             self
@@ -583,6 +625,15 @@ mod tests {
                     .unwrap()
                     .take()
                     .expect("Unexpected call to attach_driver")
+            );
+            Ok(())
+        }
+
+        async fn launch_storage_host(&self, _device: &mut dyn Device) -> Result<(), Error> {
+            assert_eq!(
+                std::mem::take(&mut *self.expect_launch_storage_host.lock().unwrap()),
+                true,
+                "Unexpected call to launch_storage_host"
             );
             Ok(())
         }
@@ -690,6 +741,7 @@ mod tests {
             assert!(!*self.expect_mount_blob_volume.lock().unwrap());
             assert!(!*self.expect_mount_data_volume.lock().unwrap());
             assert!(!*self.expect_format_data.lock().unwrap());
+            assert!(!*self.expect_launch_storage_host.lock().unwrap());
         }
     }
 
@@ -1118,6 +1170,29 @@ mod tests {
             .match_device(
                 &mut MockDevice::new().set_content_format(DiskFormat::Fxfs),
                 &mut MockEnv::new(),
+            )
+            .await
+            .expect("match_device failed"));
+    }
+
+    #[fuchsia::test]
+    async fn test_storage_host_matcher() {
+        let mut matchers =
+            Matchers::new(&fshost_config::Config { storage_host: true, ..default_config() }, None);
+
+        // A non-GPT device should fail.
+        assert!(!matchers
+            .match_device(
+                &mut MockDevice::new().set_content_format(DiskFormat::Fxfs),
+                &mut MockEnv::new()
+            )
+            .await
+            .expect("match_device failed"));
+
+        assert!(matchers
+            .match_device(
+                &mut MockDevice::new().set_content_format(DiskFormat::Gpt),
+                &mut MockEnv::new().expect_launch_storage_host()
             )
             .await
             .expect("match_device failed"));

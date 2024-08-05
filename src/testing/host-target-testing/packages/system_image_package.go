@@ -141,6 +141,16 @@ func (u *SystemImagePackage) systemImagePackageBlobs(
 	visitedPackages map[build.MerkleRoot]struct{},
 	blobs map[build.MerkleRoot]struct{},
 ) error {
+	// Prefetch blobs in a single batch to speed up download.
+	merkles := []build.MerkleRoot{}
+	for _, merkle := range u.packages {
+		merkles = append(merkles, merkle)
+	}
+
+	if err := u.p.repo.PrefetchUncompressedBlobs(ctx, merkles); err != nil {
+		return err
+	}
+
 	for path, merkle := range u.packages {
 		pkg, err := newPackage(ctx, u.p.repo, path, merkle)
 		if err != nil {

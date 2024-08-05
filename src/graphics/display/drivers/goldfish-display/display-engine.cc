@@ -434,7 +434,7 @@ config_check_result_t DisplayEngine::DisplayEngineCheckConfiguration(
           current_display_client_composition_opcodes[0] |= CLIENT_COMPOSITION_OPCODE_ALPHA;
         }
 
-        if (layer->transform_mode != FRAME_TRANSFORM_IDENTITY) {
+        if (layer->image_source_transformation != COORDINATE_TRANSFORMATION_IDENTITY) {
           // Transformation is not supported.
           current_display_client_composition_opcodes[0] |= CLIENT_COMPOSITION_OPCODE_TRANSFORM;
         }

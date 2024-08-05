@@ -8,7 +8,7 @@ import("//build/drivers.gni")
 import("//build/test.gni")
 
 driver_bind_rules("ddk-fidl-bind") {
-  rules = "ddk-fidl.bind"
+  rules = "meta/ddk-fidl.bind"
   deps = [ "//src/devices/bind/fuchsia.test.platform" ]
 }
 
@@ -35,12 +35,12 @@ fuchsia_driver("fidl-llcpp-driver-driver") {
 fuchsia_driver_component("fidl-llcpp-driver") {
   component_name = "fidl-llcpp-driver"
   deps = [ ":fidl-llcpp-driver-driver" ]
-  info = "fidl-llcpp-driver-info.json"
+  info = "meta/fidl-llcpp-driver-info.json"
   manifest = "meta/fidl-llcpp-driver.cml"
 }
 
 driver_bind_rules("ddk-fidl-async-bind") {
-  rules = "ddk-fidl-async.bind"
+  rules = "meta/ddk-fidl-async.bind"
   deps = [ "//src/devices/bind/fuchsia.test.platform" ]
 }
 
@@ -70,7 +70,7 @@ fuchsia_driver("fidl-async-llcpp-driver-driver") {
 fuchsia_driver_component("fidl-async-llcpp-driver") {
   component_name = "fidl-async-llcpp-driver"
   deps = [ ":fidl-async-llcpp-driver-driver" ]
-  info = "fidl-async-llcpp-driver-info.json"
+  info = "meta/fidl-async-llcpp-driver-info.json"
   manifest = "meta/fidl-async-llcpp-driver.cml"
 }
 

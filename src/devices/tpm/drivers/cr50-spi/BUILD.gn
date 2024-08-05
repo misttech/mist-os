@@ -8,8 +8,8 @@ import("//build/drivers.gni")
 import("//build/test.gni")
 
 driver_bind_rules("cr50-spi_bind") {
-  rules = "cr50-spi.bind"
-  tests = "bind_tests.json"
+  rules = "meta/cr50-spi.bind"
+  tests = "meta/bind_tests.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.interrupt:fuchsia.hardware.interrupt_bindlib",
     "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_bindlib",
@@ -41,7 +41,7 @@ fuchsia_driver("fuchsia_driver") {
 }
 
 fuchsia_driver_component("cr50-spi-driver") {
-  info = "cr50-spi-driver-info.json"
+  info = "meta/cr50-spi-driver-info.json"
   deps = [ ":fuchsia_driver" ]
   manifest = "meta/cr50-spi.cml"
 }

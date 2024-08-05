@@ -681,10 +681,9 @@ void AmlogicVideo::SwapInCurrentInstance() {
 }
 
 zx::result<fidl::ClientEnd<fuchsia_sysmem2::Allocator>> AmlogicVideo::ConnectToSysmem() {
-  auto sysmem_result = ddk::Device<void>::DdkConnectFragmentFidlProtocol<
-      fuchsia_hardware_sysmem::Service::AllocatorV2>(parent_, "sysmem");
+  auto sysmem_result = ddk::Device<void>::DdkConnectNsProtocol<fuchsia_sysmem2::Allocator>(parent_);
   if (sysmem_result.is_error()) {
-    LOG(ERROR, "Failed to get fuchsia.sysmem.Allocator protocol: %s",
+    LOG(ERROR, "Failed to get fuchsia.sysmem2.Allocator protocol: %s",
         sysmem_result.status_string());
     return sysmem_result.take_error();
   }

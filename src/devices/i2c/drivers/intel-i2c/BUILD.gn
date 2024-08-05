@@ -6,8 +6,8 @@ import("//build/bind/bind.gni")
 import("//build/drivers.gni")
 
 driver_bind_rules("intel_i2c_bind") {
-  rules = "intel_i2c.bind"
-  tests = "bind_tests.json"
+  rules = "meta/intel_i2c.bind"
+  tests = "meta/bind_tests.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_bindlib",
     "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_bindlib",
@@ -18,7 +18,7 @@ driver_bind_rules("intel_i2c_bind") {
 }
 
 driver_bind_rules("intel_i2c_bind_dfv2") {
-  rules = "intel_i2c_dfv2.bind"
+  rules = "meta/intel_i2c_dfv2.bind"
   bind_output = "intel_i2c_dfv2.bindbc"
   deps = [
     "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_bindlib",
@@ -75,7 +75,7 @@ fuchsia_driver_component("intel-i2c") {
     ":intel-i2c-driver",
     ":intel_i2c_bind",
   ]
-  info = "intel-i2c-info.json"
+  info = "meta/intel-i2c-info.json"
   manifest = "meta/intel-i2c.cml"
 }
 
@@ -89,7 +89,7 @@ fuchsia_driver_component("intel-i2c-dfv2") {
     ":intel-i2c-driver",
     ":intel_i2c_bind_dfv2",
   ]
-  info = "intel-i2c-info.json"
+  info = "meta/intel-i2c-info.json"
   manifest = "meta/intel-i2c-dfv2.cml"
 }
 

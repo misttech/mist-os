@@ -2,11 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use async_utils::stream::{FlattenUnordered, FlattenUnorderedExt};
 use core::pin::Pin;
 use core::task::{Context, Poll};
 use futures::channel::mpsc;
-use futures::stream::FuturesUnordered;
+use futures::stream::{FlattenUnordered, FuturesUnordered};
 use futures::{ready, select, Future, StreamExt};
 use tracing::{info, warn};
 use {
@@ -65,7 +64,7 @@ impl DeviceIdServer {
         Self {
             max_advertisements,
             profile,
-            device_id_requests: device_id_clients.flatten_unordered(),
+            device_id_requests: device_id_clients.flatten_unordered(None),
             device_id_advertisements: FuturesUnordered::new(),
         }
     }

@@ -5,11 +5,12 @@
 #ifndef SRC_DEVICES_USB_DRIVERS_USB_PERIPHERAL_USB_PERIPHERAL_H_
 #define SRC_DEVICES_USB_DRIVERS_USB_PERIPHERAL_USB_PERIPHERAL_H_
 
-#include <fidl/fuchsia.hardware.usb.dci/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.usb.dci/cpp/wire.h>
 #include <fidl/fuchsia.hardware.usb.peripheral/cpp/wire.h>
 #include <fuchsia/hardware/usb/dci/cpp/banjo.h>
 #include <fuchsia/hardware/usb/function/cpp/banjo.h>
 #include <lib/zx/channel.h>
+#include <zircon/errors.h>
 
 #include <utility>
 
@@ -24,6 +25,7 @@
 #include <usb-monitor-util/usb-monitor-util.h>
 #include <usb/request-cpp.h>
 
+#include "src/devices/usb/drivers/usb-peripheral/usb-dci-interface-server.h"
 #include "src/devices/usb/drivers/usb-peripheral/usb_peripheral_config.h"
 
 /*
@@ -114,9 +116,9 @@ class UsbPeripheral : public UsbPeripheralType,
                                      size_t* out_read_actual);
   void UsbDciInterfaceSetConnected(bool connected);
   void UsbDciInterfaceSetSpeed(usb_speed_t speed);
+  zx_status_t UsbDciCancelAll(uint8_t ep_address);
 
-  // FIDL messages
-
+  // fuchsia_hardware_usb_peripheral::Device protocol implementation.
   void SetConfiguration(SetConfigurationRequestView request,
                         SetConfigurationCompleter::Sync& completer) override;
   void ClearFunctions(ClearFunctionsCompleter::Sync& completer) override;
@@ -134,26 +136,41 @@ class UsbPeripheral : public UsbPeripheralType,
                                uint8_t* out_num_interfaces);
   zx_status_t FunctionRegistered();
   void FunctionCleared();
+  zx_status_t SetInterfaceOnParent() __TA_REQUIRES(lock_);
 
   inline const ddk::UsbDciProtocolClient& dci() const { return dci_; }
+  inline const fidl::WireSyncClient<fuchsia_hardware_usb_dci::UsbDci>& dci_new() const {
+    return dci_new_;
+  }
+
   inline size_t ParentRequestSize() const { return parent_request_size_; }
   void UsbPeripheralRequestQueue(usb_request_t* usb_request,
                                  const usb_request_complete_callback_t* complete_cb);
 
-  zx_status_t UsbDciCancelAll(uint8_t ep_address);
 
   zx_status_t ConnectToEndpoint(uint8_t ep_address,
                                 fidl::ServerEnd<fuchsia_hardware_usb_endpoint::Endpoint> ep) {
-    auto result = dci_new_->ConnectToEndpoint({ep_address, std::move(ep)});
-    if (result.is_error()) {
-      return result.error_value().is_domain_error()
-                 ? result.error_value().domain_error()
-                 : result.error_value().framework_error().status();
+    auto result = dci_new_->ConnectToEndpoint(ep_address, std::move(ep));
+    if (!result.ok()) {
+      return ZX_ERR_INTERNAL;  // framework error.
+    } else if (result->is_error()) {
+      return result->error_value();
     }
     return ZX_OK;
   }
 
  private:
+  // Considered part of the private impl.
+  friend class UsbDciInterfaceServer;
+
+  // For the purposes of banjo->FIDL migration. Once banjo is ripped out of the driver, the logic
+  // here can be folded into the FIDL endpoint implementation and calling code.
+  zx_status_t CommonControl(const usb_setup_t* setup, const uint8_t* write_buffer,
+                            size_t write_size, uint8_t* read_buffer, size_t read_size,
+                            size_t* out_read_actual);
+  void CommonSetConnected(bool connected);
+  // SetSpeed() is trivial and warrants no common impl.
+
   DISALLOW_COPY_ASSIGN_AND_MOVE(UsbPeripheral);
 
   static constexpr uint8_t MAX_STRINGS = 255;
@@ -194,7 +211,7 @@ class UsbPeripheral : public UsbPeripheralType,
 
   // Our parent's DCI protocol.
   const ddk::UsbDciProtocolClient dci_;
-  fidl::SyncClient<fuchsia_hardware_usb_dci::UsbDci> dci_new_;
+  fidl::WireSyncClient<fuchsia_hardware_usb_dci::UsbDci> dci_new_;
   // USB device descriptor set via ioctl_usb_peripheral_set_device_desc()
   usb_device_descriptor_t device_desc_ = {};
   // Map from endpoint index to function.
@@ -216,6 +233,8 @@ class UsbPeripheral : public UsbPeripheralType,
   bool functions_registered_ __TA_GUARDED(lock_) = false;
   // True if we have added child devices for our functions.
   bool function_devs_added_ __TA_GUARDED(lock_) = false;
+  // True if fuchsia_hardware_usb_dci::SetInterface performed in Init().
+  bool set_interface_in_init_ __TA_GUARDED(lock_) = false;
   // Number of functions left to clear.
   size_t num_functions_to_clear_ __TA_GUARDED(lock_) = 0;
   // True if we are connected to a host,
@@ -245,6 +264,9 @@ class UsbPeripheral : public UsbPeripheralType,
   usb::BorrowedRequestList<void> pending_requests_ __TA_GUARDED(pending_requests_lock_);
 
   usb_peripheral_config::Config config_;
+
+  UsbDciInterfaceServer intf_srv_{this};
+  fidl::WireSyncClient<fuchsia_hardware_usb_dci::UsbDciInterface> intf_srv_cli_;
 };
 
 }  // namespace usb_peripheral

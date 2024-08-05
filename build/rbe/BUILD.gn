@@ -278,6 +278,7 @@ if (current_toolchain == default_toolchain) {
   # the corresponding variables in the `rbe_settings` scope.
   generated_file("rbe_settings.json") {
     contents = {
+      mode = rbe_mode
       settings = rbe_settings
       final = {
         # after considering top-level overrides

@@ -297,6 +297,7 @@ impl Pipe {
     fn ioctl(
         &self,
         file: &FileObject,
+        locked: &mut Locked<'_, Unlocked>,
         current_task: &CurrentTask,
         request: u32,
         arg: SyscallArg,
@@ -309,7 +310,7 @@ impl Pipe {
                 current_task.write_object(addr, &value)?;
                 Ok(SUCCESS)
             }
-            _ => default_ioctl(file, current_task, request, arg),
+            _ => default_ioctl(file, locked, current_task, request, arg),
         }
     }
 
@@ -522,13 +523,13 @@ impl FileOps for PipeFileObject {
 
     fn ioctl(
         &self,
-        _locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<'_, Unlocked>,
         file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
         arg: SyscallArg,
     ) -> Result<SyscallResult, Errno> {
-        self.pipe.lock().ioctl(file, current_task, request, arg)
+        self.pipe.lock().ioctl(file, locked, current_task, request, arg)
     }
 }
 

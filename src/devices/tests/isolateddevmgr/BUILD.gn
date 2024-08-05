@@ -10,7 +10,7 @@ import("//build/test.gni")
 
 driver_bind_rules("metadata-test-bind") {
   testonly = true
-  rules = "metadata-test.bind"
+  rules = "meta/metadata-test.bind"
   deps = [ "//src/devices/bind/fuchsia.test.platform" ]
 }
 
@@ -39,7 +39,7 @@ fuchsia_driver_component("isolateddevmgr-test-driver") {
   testonly = true
   component_name = "isolateddevmgr-test-driver"
   deps = [ ":isolateddevmgr-test-driver-driver" ]
-  info = "isolateddevmgr-test-driver-info.json"
+  info = "meta/isolateddevmgr-test-driver-info.json"
   manifest = "meta/isolateddevmgr-test-driver.cml"
 }
 

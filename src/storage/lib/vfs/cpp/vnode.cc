@@ -203,14 +203,16 @@ bool Vnode::IsRemote() const { return false; }
 
 fio::Abilities Vnode::GetAbilities() const {
   fio::Abilities abilities = fio::Abilities::kGetAttributes;
+  if (SupportedMutableAttributes()) {
+    abilities |= fio::Abilities::kUpdateAttributes;
+  }
   fio::NodeProtocolKinds protocols = GetProtocols();
   if (protocols & fio::NodeProtocolKinds::kDirectory) {
-    abilities |= fio::Abilities::kUpdateAttributes | fio::Abilities::kModifyDirectory |
-                 fio::Abilities::kTraverse | fio::Abilities::kEnumerate;
+    abilities |=
+        fio::Abilities::kModifyDirectory | fio::Abilities::kTraverse | fio::Abilities::kEnumerate;
   }
   if (protocols & fio::NodeProtocolKinds::kFile) {
-    abilities |= fio::Abilities::kReadBytes | fio::Abilities::kWriteBytes |
-                 fio::Abilities::kUpdateAttributes;
+    abilities |= fio::Abilities::kReadBytes | fio::Abilities::kWriteBytes;
   }
   return abilities;
 }

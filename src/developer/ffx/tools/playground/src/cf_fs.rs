@@ -9,7 +9,6 @@ use std::collections::BTreeMap;
 use std::hash::{Hash, Hasher};
 use std::ops::Bound;
 use std::sync::{Arc, Mutex, Weak};
-use vfs::common::rights_to_posix_mode_bits;
 use vfs::directory::dirents_sink::{self, AppendResult};
 use vfs::directory::entry::{DirectoryEntry, EntryInfo, GetEntryInfo, OpenRequest};
 use vfs::directory::entry_container::{Directory, DirectoryWatcher};
@@ -17,7 +16,7 @@ use vfs::directory::immutable::connection::ImmutableConnection;
 use vfs::directory::traversal_position::TraversalPosition;
 use vfs::execution_scope::ExecutionScope;
 use vfs::node::Node;
-use vfs::{attributes, ToObjectRequest};
+use vfs::{immutable_attributes, ToObjectRequest};
 use {fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as sys2};
 
 /// This contains a cache of the entire component hierarchy, as a map from
@@ -375,35 +374,18 @@ impl CFDirectory {
 }
 
 impl Node for CFDirectory {
-    async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
-        Ok(fio::NodeAttributes {
-            mode: fio::MODE_TYPE_DIRECTORY
-                | rights_to_posix_mode_bits(/*r*/ true, /*w*/ false, /*x*/ true),
-            id: self.id().await.map_err(|_| Status::BAD_STATE)?.unwrap_or(fio::INO_UNKNOWN),
-            content_size: 0,
-            storage_size: 0,
-            link_count: 1,
-            creation_time: 0,
-            modification_time: 0,
-        })
-    }
-
     async fn get_attributes(
         &self,
         requested_attributes: fio::NodeAttributesQuery,
     ) -> Result<fio::NodeAttributes2, Status> {
-        Ok(attributes!(
+        Ok(immutable_attributes!(
             requested_attributes,
-            Mutable { creation_time: 0, modification_time: 0, mode: 0, uid: 0, gid: 0, rdev: 0 },
             Immutable {
                 protocols: fio::NodeProtocolKinds::DIRECTORY,
                 abilities: fio::Operations::GET_ATTRIBUTES
                     | fio::Operations::ENUMERATE
                     | fio::Operations::TRAVERSE,
                 id: self.id().await.map_err(|_| Status::BAD_STATE)?,
-                content_size: 0,
-                storage_size: 0,
-                link_count: 1,
             }
         ))
     }

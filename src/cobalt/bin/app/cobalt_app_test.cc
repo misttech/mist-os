@@ -5,6 +5,7 @@
 #include "src/cobalt/bin/app/cobalt_app.h"
 
 #include <fuchsia/metrics/cpp/fidl.h>
+#include <fuchsia/process/lifecycle/cpp/fidl.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/inspect/testing/cpp/inspect.h>
 #include <lib/sys/cpp/testing/component_context_provider.h>
@@ -12,7 +13,6 @@
 #include <gmock/gmock.h>
 #include <sdk/lib/sys/cpp/testing/service_directory_provider.h>
 
-#include "fuchsia/process/lifecycle/cpp/fidl.h"
 #include "src/cobalt/bin/app/diagnostics_impl.h"
 #include "src/cobalt/bin/app/testapp_metrics_registry.cb.h"
 #include "src/cobalt/bin/testing/fake_clock.h"

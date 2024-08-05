@@ -18,13 +18,12 @@ use fxfs::filesystem::{SyncOptions, MAX_FILE_SIZE};
 use fxfs::log::*;
 use fxfs::object_handle::{ObjectHandle, ReadObjectHandle};
 use fxfs::object_store::transaction::{lock_keys, LockKey, Options};
-use fxfs::object_store::{DataObjectHandle, ObjectDescriptor, Timestamp};
+use fxfs::object_store::{DataObjectHandle, ObjectDescriptor};
 use fxfs_macros::ToWeakNode;
 use std::ops::Range;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use storage_device::buffer;
-use vfs::common::rights_to_posix_mode_bits;
 use vfs::directory::entry::{EntryInfo, GetEntryInfo};
 use vfs::directory::entry_container::MutableDirectory;
 use vfs::execution_scope::ExecutionScope;
@@ -266,20 +265,6 @@ impl GetEntryInfo for FxFile {
 }
 
 impl vfs::node::Node for FxFile {
-    async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
-        let props = self.handle.get_properties().await.map_err(map_to_status)?;
-        Ok(fio::NodeAttributes {
-            mode: fio::MODE_TYPE_FILE
-                | rights_to_posix_mode_bits(/*r*/ true, /*w*/ true, /*x*/ false),
-            id: self.handle.object_id(),
-            content_size: props.data_attribute_size,
-            storage_size: props.allocated_size,
-            link_count: props.refs,
-            creation_time: props.creation_time.as_nanos(),
-            modification_time: props.modification_time.as_nanos(),
-        })
-    }
-
     async fn get_attributes(
         &self,
         requested_attributes: fio::NodeAttributesQuery,
@@ -422,24 +407,6 @@ impl File for FxFile {
 
     async fn get_size(&self) -> Result<u64, Status> {
         Ok(self.handle.get_size())
-    }
-
-    async fn set_attrs(
-        &self,
-        flags: fio::NodeAttributeFlags,
-        attrs: fio::NodeAttributes,
-    ) -> Result<(), Status> {
-        let crtime = flags
-            .contains(fio::NodeAttributeFlags::CREATION_TIME)
-            .then(|| Timestamp::from_nanos(attrs.creation_time));
-        let mtime = flags
-            .contains(fio::NodeAttributeFlags::MODIFICATION_TIME)
-            .then(|| Timestamp::from_nanos(attrs.modification_time));
-        if let (None, None) = (crtime.as_ref(), mtime.as_ref()) {
-            return Ok(());
-        }
-        self.handle.write_timestamps(crtime, mtime).await.map_err(map_to_status)?;
-        Ok(())
     }
 
     async fn update_attributes(
@@ -615,62 +582,6 @@ mod tests {
         assert_ne!(attrs.creation_time, 0u64);
         assert_ne!(attrs.modification_time, 0u64);
         assert_eq!(attrs.creation_time, attrs.modification_time);
-
-        close_file_checked(file).await;
-        fixture.close().await;
-    }
-
-    #[fuchsia::test(threads = 10)]
-    async fn test_set_attrs() {
-        let fixture = TestFixture::new().await;
-        let root = fixture.root();
-
-        let file = open_file_checked(
-            &root,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::NOT_DIRECTORY,
-            "foo",
-        )
-        .await;
-
-        let (status, initial_attrs) = file.get_attr().await.expect("FIDL call failed");
-        Status::ok(status).expect("get_attr failed");
-
-        let crtime = initial_attrs.creation_time ^ 1u64;
-        let mtime = initial_attrs.modification_time ^ 1u64;
-
-        let mut attrs = initial_attrs.clone();
-        attrs.creation_time = crtime;
-        attrs.modification_time = mtime;
-        let status = file
-            .set_attr(fio::NodeAttributeFlags::CREATION_TIME, &attrs)
-            .await
-            .expect("FIDL call failed");
-        Status::ok(status).expect("set_attr failed");
-
-        let mut expected_attrs = initial_attrs.clone();
-        expected_attrs.creation_time = crtime; // Only crtime is updated so far.
-        let (status, attrs) = file.get_attr().await.expect("FIDL call failed");
-        Status::ok(status).expect("get_attr failed");
-        assert_eq!(expected_attrs, attrs);
-
-        let mut attrs = initial_attrs.clone();
-        attrs.creation_time = 0u64; // This should be ignored since we don't set the flag.
-        attrs.modification_time = mtime;
-        let status = file
-            .set_attr(fio::NodeAttributeFlags::MODIFICATION_TIME, &attrs)
-            .await
-            .expect("FIDL call failed");
-        Status::ok(status).expect("set_attr failed");
-
-        let mut expected_attrs = initial_attrs.clone();
-        expected_attrs.creation_time = crtime;
-        expected_attrs.modification_time = mtime;
-        let (status, attrs) = file.get_attr().await.expect("FIDL call failed");
-        Status::ok(status).expect("get_attr failed");
-        assert_eq!(expected_attrs, attrs);
 
         close_file_checked(file).await;
         fixture.close().await;

@@ -13,6 +13,7 @@
 #include <lib/ddk/driver.h>
 #include <lib/ddk/metadata.h>
 #include <lib/fit/defer.h>
+#include <lib/stdcompat/span.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -69,6 +70,20 @@ zx_status_t UsbPeripheral::Create(void* ctx, zx_device_t* parent) {
 }
 
 zx_status_t UsbPeripheral::UsbDciCancelAll(uint8_t ep_address) {
+  fidl::Arena arena;
+  auto result = dci_new_.buffer(arena)->CancelAll(ep_address);
+
+  if (!result.ok()) {
+    zxlogf(DEBUG, "(framework) CancelAll(): %s", result.status_string());
+  } else if (result->is_error() && result->error_value() == ZX_ERR_NOT_SUPPORTED) {
+    zxlogf(DEBUG, "CancelAll(): %s", result.status_string());
+  } else if (result->is_error() && result->error_value() != ZX_ERR_NOT_SUPPORTED) {
+    return result->error_value();
+  } else {
+    return ZX_OK;
+  }
+
+  zxlogf(DEBUG, "could not CancelAll() over FIDL, falling back to banjo");
   return dci_.CancelAll(ep_address);
 }
 
@@ -113,6 +128,12 @@ zx_status_t UsbPeripheral::Init() {
     return client.error_value();
   }
   dci_new_.Bind(std::move(*client));
+
+  auto eps = fidl::Endpoints<fuchsia_hardware_usb_dci::UsbDciInterface>::Create();
+
+  intf_srv_.bindings().AddBinding(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+                                  std::move(eps.server), &intf_srv_, fidl::kIgnoreBindingClosure);
+  intf_srv_cli_.Bind(std::move(eps.client));
 
   // Starting USB mode is determined from device metadata.
   // We read initial value and store it in dev->usb_mode, but do not actually
@@ -175,9 +196,14 @@ zx_status_t UsbPeripheral::Init() {
   {
     // Set interface right away if function devices are not added yet. If there are function
     // devices, the interface is set once all functions are registered.
-    fbl::AutoLock lock(&lock_);
+    fbl::AutoLock _(&lock_);
     if (!function_devs_added_) {
-      dci_.SetInterface(this, &usb_dci_interface_protocol_ops_);
+      status = SetInterfaceOnParent();
+      if (status != ZX_OK) {
+        zxlogf(ERROR, "SetInterfaceOnParent(): %s", zx_status_get_string(status));
+        return status;
+      }
+      set_interface_in_init_ = true;
     }
   }
 
@@ -360,10 +386,15 @@ zx_status_t UsbPeripheral::FunctionRegistered() {
 
   lock.release();
 
-  status = dci_.SetInterface(this, &usb_dci_interface_protocol_ops_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "SetInterface failed %d", status);
-    return status;
+  {
+    fbl::AutoLock _(&lock_);
+    if (!set_interface_in_init_) {
+      status = SetInterfaceOnParent();
+      if (status != ZX_OK) {
+        zxlogf(ERROR, "SetInterfaceOnParent(): %s", zx_status_get_string(status));
+        return status;
+      }
+    }
   }
 
   if (fidl::Status status = fidl::WireCall(listener_)->FunctionRegistered(); !status.ok()) {
@@ -389,6 +420,33 @@ void UsbPeripheral::FunctionCleared() {
     return;
   }
   ClearFunctionsComplete();
+}
+
+zx_status_t UsbPeripheral::SetInterfaceOnParent() {
+  fidl::Arena arena;
+  auto result = dci_new_.buffer(arena)->SetInterface(intf_srv_cli_.TakeClientEnd());
+
+  if (!result.ok()) {
+    zxlogf(DEBUG, "(framework) SetInterface(): %s", result.status_string());
+  } else if (result->is_error() && result->error_value() == ZX_ERR_NOT_SUPPORTED) {
+    zxlogf(DEBUG, "SetInterface(): %s", result.status_string());
+  } else if (result->is_error() && result->error_value() != ZX_ERR_NOT_SUPPORTED) {
+    return result->error_value();
+  } else {
+    return ZX_OK;
+  }
+
+  // Not all DCI drivers have the new FIDL protocols plumbed through. For drivers still in
+  // migration, fall back to banjo if FIDL fails.
+  zxlogf(WARNING, "could not SetInterface() over FIDL, falling back to banjo");
+  // TODO(b/356940744): Move all DCI drivers over to the UsbDci FIDL protocol.
+  zx_status_t status = dci_.SetInterface(this, &usb_dci_interface_protocol_ops_);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "SetInterface failed %s", zx_status_get_string(status));
+    return status;
+  }
+
+  return ZX_OK;
 }
 
 zx_status_t UsbPeripheral::AllocInterface(fbl::RefPtr<UsbFunction> function,
@@ -606,7 +664,7 @@ void UsbPeripheral::ClearFunctions() {
     }
     shutting_down_ = true;
     for (size_t i = 0; i < 256; i++) {
-      dci_.CancelAll(static_cast<uint8_t>(i));
+      UsbDciCancelAll(static_cast<uint8_t>(i));
     }
     for (auto& configuration : configurations_) {
       auto& functions = configuration->functions;
@@ -753,10 +811,9 @@ zx_status_t UsbPeripheral::DeviceStateChanged() {
   return status;
 }
 
-zx_status_t UsbPeripheral::UsbDciInterfaceControl(const usb_setup_t* setup,
-                                                  const uint8_t* write_buffer, size_t write_size,
-                                                  uint8_t* read_buffer, size_t read_size,
-                                                  size_t* out_read_actual) {
+zx_status_t UsbPeripheral::CommonControl(const usb_setup_t* setup, const uint8_t* write_buffer,
+                                         size_t write_size, uint8_t* read_buffer, size_t read_size,
+                                         size_t* out_read_actual) {
   uint8_t request_type = setup->bm_request_type;
   uint8_t direction = request_type & USB_DIR_MASK;
   uint8_t request = setup->b_request;
@@ -860,7 +917,14 @@ zx_status_t UsbPeripheral::UsbDciInterfaceControl(const usb_setup_t* setup,
   return ZX_ERR_NOT_SUPPORTED;
 }
 
-void UsbPeripheral::UsbDciInterfaceSetConnected(bool connected) {
+zx_status_t UsbPeripheral::UsbDciInterfaceControl(const usb_setup_t* setup,
+                                                  const uint8_t* write_buffer, size_t write_size,
+                                                  uint8_t* read_buffer, size_t read_size,
+                                                  size_t* out_read_actual) {
+  return CommonControl(setup, write_buffer, write_size, read_buffer, read_size, out_read_actual);
+}
+
+void UsbPeripheral::CommonSetConnected(bool connected) {
   bool was_connected = connected;
   {
     fbl::AutoLock lock(&lock_);
@@ -879,6 +943,8 @@ void UsbPeripheral::UsbDciInterfaceSetConnected(bool connected) {
     }
   }
 }
+
+void UsbPeripheral::UsbDciInterfaceSetConnected(bool connected) { CommonSetConnected(connected); }
 
 void UsbPeripheral::UsbDciInterfaceSetSpeed(usb_speed_t speed) { speed_ = speed; }
 

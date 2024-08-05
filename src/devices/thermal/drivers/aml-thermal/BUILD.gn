@@ -8,9 +8,9 @@ import("//build/drivers.gni")
 import("//build/test.gni")
 
 driver_bind_rules("aml-thermal-bind") {
-  rules = "aml-thermal.bind"
+  rules = "meta/aml-thermal.bind"
   bind_output = "aml-thermal.bindbc"
-  tests = "bind-tests.json"
+  tests = "meta/bind-tests.json"
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.platform",
@@ -49,7 +49,7 @@ fuchsia_driver("aml-thermal-driver") {
 }
 
 fuchsia_driver_component("aml-thermal") {
-  info = "aml-thermal-info.json"
+  info = "meta/aml-thermal-info.json"
   component_name = "aml-thermal"
   deps = [ ":aml-thermal-driver" ]
   manifest = "meta/aml-thermal.cml"

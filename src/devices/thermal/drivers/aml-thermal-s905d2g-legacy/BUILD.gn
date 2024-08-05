@@ -8,9 +8,9 @@ import("//build/drivers.gni")
 import("//build/test.gni")
 
 driver_bind_rules("aml-thermal-s905d2g-legacy-bind") {
-  rules = "aml-thermal-s905d2g-legacy.bind"
+  rules = "meta/aml-thermal-s905d2g-legacy.bind"
   bind_output = "aml-thermal-s905d2g-legacy.bindbc"
-  tests = "aml-thermal-s905d2g-legacy-bind-test.json"
+  tests = "meta/aml-thermal-s905d2g-legacy-bind-test.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_bindlib",
     "//sdk/fidl/fuchsia.hardware.pwm:fuchsia.hardware.pwm_bindlib",
@@ -58,7 +58,7 @@ fuchsia_driver("aml-thermal-s905d2g-legacy-driver") {
 }
 
 fuchsia_driver_component("aml-thermal-s905d2g-legacy") {
-  info = "aml-thermal-s905d2g-legacy-info.json"
+  info = "meta/aml-thermal-s905d2g-legacy-info.json"
   component_name = "aml-thermal-s905d2g-legacy"
   deps = [ ":aml-thermal-s905d2g-legacy-driver" ]
   manifest = "meta/aml-thermal-s905d2g-legacy.cml"

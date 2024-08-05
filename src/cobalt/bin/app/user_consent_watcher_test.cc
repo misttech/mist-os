@@ -8,10 +8,10 @@
 #include <lib/fidl/cpp/binding.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/inspect/testing/cpp/inspect.h>
+#include <lib/sys/cpp/testing/service_directory_provider.h>
 
 #include <gtest/gtest.h>
 
-#include "sdk/lib/sys/cpp/testing/service_directory_provider.h"
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
 
 namespace cobalt {

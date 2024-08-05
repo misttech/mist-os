@@ -82,14 +82,19 @@ void run_timerfd_test(clockid_t clock_id) {
 TEST(TimerFD, RealtimeAbsolute) { run_timerfd_test(CLOCK_REALTIME); }
 
 TEST(TimerFD, RealtimeAlarm) {
-  // The CAP_WAKE_ALARM capability is required to create a CLOCK_REALTIME_ALARM timer. If the test
-  // process does not have the capability, the timerfd_create call should fail.
-  if (test_helper::HasCapability(CAP_WAKE_ALARM)) {
-    run_timerfd_test(CLOCK_REALTIME_ALARM);
-  } else {
-    int fd = timerfd_create(CLOCK_REALTIME_ALARM, 0);
-    ASSERT_EQ(-1, fd) << errno;
+  // If the test process does not have the capability, the timerfd_create call should fail.
+  if (!test_helper::HasCapability(CAP_WAKE_ALARM)) {
+    GTEST_SKIP()
+        << "The CAP_WAKE_ALARM capability is required to create a CLOCK_REALTIME_ALARM timer.";
   }
+  run_timerfd_test(CLOCK_REALTIME_ALARM);
+}
+
+TEST(TimerFD, NoWakeAlarmCap) {
+  // If the test process does not have the capability, the timerfd_create call should fail.
+  test_helper::UnsetCapability(CAP_WAKE_ALARM);
+  int fd = timerfd_create(CLOCK_REALTIME_ALARM, 0);
+  ASSERT_EQ(-1, fd) << errno;
 }
 
 TEST(TimerFD, DeleteTimerThatDoesNotExist) { ASSERT_EQ(syscall(__NR_timer_delete, 0), -1); }

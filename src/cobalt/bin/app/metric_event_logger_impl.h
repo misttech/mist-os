@@ -7,7 +7,7 @@
 
 #include <fuchsia/metrics/cpp/fidl.h>
 
-#include "third_party/cobalt/src/logger/logger.h"
+#include "third_party/cobalt/src/logger/logger_interface.h"
 
 namespace cobalt {
 
@@ -18,7 +18,7 @@ namespace cobalt {
 //    fx test cobalt_testapp_no_network
 class MetricEventLoggerImpl : public fuchsia::metrics::MetricEventLogger {
  public:
-  MetricEventLoggerImpl(std::unique_ptr<logger::LoggerInterface> logger);
+  explicit MetricEventLoggerImpl(std::unique_ptr<logger::LoggerInterface> logger);
 
  private:
   void LogOccurrence(uint32_t metric_id, uint64_t count, ::std::vector<uint32_t> event_codes,
@@ -39,7 +39,6 @@ class MetricEventLoggerImpl : public fuchsia::metrics::MetricEventLogger {
       std::vector<fuchsia::metrics::MetricEvent> events,
       fuchsia::metrics::MetricEventLogger::LogMetricEventsCallback callback) override;
 
- private:
   fpromise::result<void, fuchsia::metrics::Error> LogMetricEvent(
       fuchsia::metrics::MetricEvent event);
 

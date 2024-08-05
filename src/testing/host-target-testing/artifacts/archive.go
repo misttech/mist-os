@@ -62,10 +62,11 @@ func (a *Archive) GetBuildByID(
 	}
 
 	return &ArtifactsBuild{
-		id:      id,
-		archive: a,
-		dir:     dir,
-		srcs:    srcsMap,
+		id:       id,
+		archive:  a,
+		buildDir: filepath.Join(dir, id),
+		blobsDir: filepath.Join(dir, "blobs"),
+		srcs:     srcsMap,
 	}, nil
 }
 
@@ -90,11 +91,15 @@ func (a *Archive) list(ctx context.Context, buildID string) ([]string, error) {
 	return lines, nil
 }
 
-// Download artifacts from the build id `buildID` and write them to `dst`.
-// If `srcs` contains only one source, it will copy the file or directory
-// directly to `dst`. Otherwise, `dst` should be the directory under which to
-// download the artifacts.
-func (a *Archive) download(ctx context.Context, buildID string, fromRoot bool, dst string, srcs []string) error {
+// Download artifacts from the build id `buildID` and write the `srcs` artifacts
+// to the `dstDir` directory.
+func (a *Archive) download(
+	ctx context.Context,
+	buildID string,
+	fromRoot bool,
+	dstDir string,
+	srcs []string,
+) error {
 	tmpDir, err := os.MkdirTemp("", "download")
 	if err != nil {
 		return err
@@ -104,50 +109,63 @@ func (a *Archive) download(ctx context.Context, buildID string, fromRoot bool, d
 	// Filter out any duplicate sources.
 	srcs = removeDuplicates(srcs)
 
-	var src string
-	var srcsFile string
-	if len(srcs) > 1 {
-		var filesToDownload []string
-		var filesToSkip []string
-		for _, src := range srcs {
-			path := filepath.Join(dst, src)
+	var filesToDownload []string
+	var filesToSkip []string
+	for _, src := range srcs {
+		path := filepath.Join(dstDir, src)
 
-			// We only need to download the file if it doesn't
-			// exist locally, or the local path is a directory
-			// (since we don't know what files exist in a directory
-			// ahead of time).
-			if st, err := os.Stat(path); err != nil || st.IsDir() {
-				filesToDownload = append(filesToDownload, src)
-			} else {
-				filesToSkip = append(filesToSkip, src)
-			}
+		// We only need to download the file if it doesn't
+		// exist locally, or the local path is a directory
+		// (since we don't know what files exist in a directory
+		// ahead of time).
+		if st, err := os.Stat(path); err != nil || st.IsDir() {
+			filesToDownload = append(filesToDownload, src)
+		} else {
+			filesToSkip = append(filesToSkip, src)
 		}
+	}
+	srcs = filesToDownload
 
-		logger.Infof(ctx, "skipping %d files to download", len(filesToSkip))
-		if len(filesToDownload) == 0 {
-			// Skip downloading if the files are already present in the build dir.
-			logger.Infof(ctx, "no files to download")
-			return nil
-		}
-
-		tmpFile, err := os.CreateTemp(tmpDir, "srcs-file")
-		if err != nil {
-			return err
-		}
-		tmpFile.Close()
-		srcsFile = tmpFile.Name()
-		if err := os.WriteFile(srcsFile, []byte(strings.Join(filesToDownload, "\n")), 0755); err != nil {
-			return fmt.Errorf("failed to write srcs-file: %w", err)
-		}
-	} else {
-		if st, err := os.Stat(dst); err == nil && !st.IsDir() {
-			// Skip downloading if the file is already present in the build dir.
-			return nil
-		}
-		src = srcs[0]
+	logger.Infof(ctx, "skipping %d files to download", len(filesToSkip))
+	if len(filesToDownload) == 0 {
+		// Skip downloading if the files are already present in the build dir.
+		logger.Infof(ctx, "no files left to download")
+		return nil
 	}
 
-	logger.Infof(ctx, "downloading %d artifacts to %s", len(srcs), dst)
+	tmpFile, err := os.CreateTemp(tmpDir, "srcs-file")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(tmpFile.Name())
+
+	// We don't write to the in this program, so we can close it.
+	tmpFile.Close()
+
+	if err := os.WriteFile(tmpFile.Name(), []byte(strings.Join(filesToDownload, "\n")), 0755); err != nil {
+		return fmt.Errorf("failed to write srcs-file: %w", err)
+	}
+
+	if len(srcs) == 1 {
+		logger.Infof(ctx, "downloading %d artifact to %s", len(srcs), dstDir)
+	} else {
+		logger.Infof(ctx, "downloading %d artifacts to %s", len(srcs), dstDir)
+	}
+
+	for _, srcFile := range srcs {
+		logger.Infof(ctx, "  %s", srcFile)
+	}
+
+	args := []string{
+		"cp",
+		"-build", buildID,
+		"-dst", dstDir,
+		"-srcs-file", tmpFile.Name(),
+	}
+
+	if fromRoot {
+		args = append(args, "-root")
+	}
 
 	// The `artifacts` utility can occasionally run into transient issues. This implements a retry policy
 	// that attempts to avoid such issues causing flakes.
@@ -155,74 +173,25 @@ func (a *Archive) download(ctx context.Context, buildID string, fromRoot bool, d
 	// ~12 seconds to hit backoff ceiling; 2.5 minutes of slack (given the above EB)
 	retryCap := uint64(22)
 	return retry.Retry(ctx, retry.WithMaxAttempts(eb, retryCap), func() error {
-		// We don't want to leak files if we are interrupted during a download.
-		// So we'll download all files to a temporary directory before moving
-		// them to the specified destination, and we'll remove them in the case
-		// of an error.
-		tmpDst := filepath.Join(tmpDir, filepath.Base(dst))
-		defer os.RemoveAll(tmpDst)
-		args := []string{
-			"cp",
-			"-build", buildID,
-			"-src", src,
-			"-dst", tmpDst,
-		}
-
-		if fromRoot {
-			args = append(args, "-root")
-		}
-		if srcsFile != "" {
-			args = append(args, "-srcs-file", srcsFile)
-		}
-
 		stdout, stderr, err := util.RunCommand(ctx, a.artifactsPath, args...)
 		if len(stdout) != 0 {
 			logger.Infof(ctx, "artifacts stdout:\n%s", stdout)
 		}
+		if len(stderr) != 0 {
+			logger.Infof(ctx, "artifacts stderr:\n%s", stderr)
+		}
 		if err != nil {
 			if len(stderr) != 0 {
-				logger.Infof(ctx, "artifacts stderr:\n%s", stderr)
 				// Don't retry if the artifact we want to download does not exist.
-				if bytes.Contains(stderr, []byte("nothing matched prefix")) {
+				if bytes.Contains(stderr, []byte("nothing matched prefix")) || bytes.Contains(stderr, []byte("object doesn't exist")) {
 					return retry.Fatal(os.ErrNotExist)
 				}
 				return fmt.Errorf("artifacts failed: %w: %s", err, string(stderr))
 			}
 			return fmt.Errorf("artifacts failed: %w", err)
 		}
-		return filepath.Walk(tmpDst, func(path string, info os.FileInfo, err error) error {
-			if err != nil {
-				return err
-			}
-			if path == tmpDst && info.IsDir() {
-				return nil
-			}
-			relPath, err := filepath.Rel(tmpDst, path)
-			if err != nil {
-				return err
-			}
-			dstPath := filepath.Join(dst, relPath)
-			if fi, err := os.Stat(dstPath); err == nil {
-				if fi.IsDir() {
-					// If dstPath already exists and is a directory, then return nil so
-					// we can walk the contents of the directory and move over the
-					// individual files.
-					return nil
-				}
-			}
-			if err = os.MkdirAll(filepath.Dir(dstPath), os.ModePerm); err != nil {
-				return err
-			}
-			if info.IsDir() {
-				// Move/replace entire directory and skip walking contents.
-				err = filepath.SkipDir
-				os.RemoveAll(dstPath)
-			}
-			if moveErr := os.Rename(path, dstPath); moveErr != nil {
-				return moveErr
-			}
-			return err
-		})
+
+		return nil
 	}, nil)
 }
 

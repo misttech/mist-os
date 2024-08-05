@@ -75,6 +75,8 @@ common_deps = [
 ]
 
 common_test_deps = [
+  "core:netstack3-core-testutils",
+  "fuchsia:netstack3-fuchsia-testutils",
   "//src/connectivity/lib/fidl_fuchsia_net_stack_ext",
   "//src/connectivity/lib/ip-test-macro",
   "//src/connectivity/lib/net-declare",
@@ -137,10 +139,11 @@ network_unified_binary("bin") {
   with_unit_tests = true
   check_cfgs = [ "feature, values(\"instrumented\")" ]
 
-  deps = [
-           "core:netstack3-core",
-           "fuchsia:netstack3-fuchsia",
-         ] + common_deps
+  deps = common_deps
+  non_test_deps = [
+    "core:netstack3-core",
+    "fuchsia:netstack3-fuchsia",
+  ]
 
   test_deps = common_test_deps
 
@@ -188,13 +191,13 @@ rustc_binary("bin-instrumented") {
   edition = "2021"
   with_unit_tests = true
 
-  deps = [
-           "core:netstack3-core-instrumented",
-           "fuchsia:netstack3-fuchsia-instrumented",
-         ] + common_deps
-  features = [ "instrumented" ]
-
+  deps = common_deps
+  non_test_deps = [
+    "core:netstack3-core-instrumented",
+    "fuchsia:netstack3-fuchsia-instrumented",
+  ]
   test_deps = common_test_deps
+  features = [ "instrumented" ]
 
   sources = common_sources
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]

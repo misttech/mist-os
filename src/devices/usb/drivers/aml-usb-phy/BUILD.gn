@@ -12,9 +12,9 @@ import("//build/drivers.gni")
 import("//build/test.gni")
 
 driver_bind_rules("aml_usb_phy_bind") {
-  rules = "aml_usb_phy.bind"
+  rules = "meta/aml_usb_phy.bind"
   bind_output = "aml-usb-phy.bindbc"
-  tests = "test_bind.json"
+  tests = "meta/test_bind.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.registers:fuchsia.hardware.registers_bindlib",
     "//src/devices/bind/fuchsia.amlogic.platform",
@@ -117,7 +117,7 @@ fuchsia_driver("aml-usb-phy-driver") {
 }
 
 fuchsia_driver_component("aml-usb-phy") {
-  info = "aml-usb-phy-info.json"
+  info = "meta/aml-usb-phy-info.json"
   component_name = "aml-usb-phy"
   deps = [ ":aml-usb-phy-driver" ]
   manifest = "meta/aml-usb-phy.cml"

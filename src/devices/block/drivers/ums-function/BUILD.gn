@@ -6,9 +6,9 @@ import("//build/bind/bind.gni")
 import("//build/drivers.gni")
 
 driver_bind_rules("usb_ums_bind") {
-  rules = "usb_ums.bind"
+  rules = "meta/usb_ums.bind"
   bind_output = "ums-function.bindbc"
-  tests = "bind_tests.json"
+  tests = "meta/bind_tests.json"
   deps = [
     "//src/devices/bind/fuchsia.usb",
     "//src/devices/bind/fuchsia.usb.massstorage",
@@ -47,7 +47,7 @@ fuchsia_driver("ums-function-driver") {
 fuchsia_driver_component("ums-function") {
   component_name = "ums-function"
   deps = [ ":ums-function-driver" ]
-  info = "ums-function-info.json"
+  info = "meta/ums-function-info.json"
   manifest = "meta/ums-function.cml"
 }
 

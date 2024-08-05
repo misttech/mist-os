@@ -9,7 +9,7 @@ import("//build/fidl/fidl.gni")
 import("//build/test.gni")
 
 driver_bind_rules("ddk-fallback-test-bind") {
-  rules = "test-driver.bind"
+  rules = "meta/test-driver.bind"
 
   deps = [ "//src/devices/bind/fuchsia.test.platform" ]
 }
@@ -35,7 +35,7 @@ fuchsia_driver("ddk-fallback-test-driver") {
 fuchsia_driver_component("ddk-fallback-test") {
   component_name = "ddk-fallback-test"
   deps = [ ":ddk-fallback-test-driver" ]
-  info = "ddk-fallback-test-info.json"
+  info = "meta/ddk-fallback-test-info.json"
   manifest = "meta/ddk-fallback-test.cml"
 }
 
@@ -60,7 +60,7 @@ fuchsia_driver("ddk-not-fallback-test-driver") {
 fuchsia_driver_component("ddk-not-fallback-test") {
   component_name = "ddk-not-fallback-test"
   deps = [ ":ddk-not-fallback-test-driver" ]
-  info = "ddk-not-fallback-test-info.json"
+  info = "meta/ddk-not-fallback-test-info.json"
   manifest = "meta/ddk-not-fallback-test.cml"
 }
 

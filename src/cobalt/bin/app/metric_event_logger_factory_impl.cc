@@ -4,9 +4,9 @@
 
 #include "src/cobalt/bin/app/metric_event_logger_factory_impl.h"
 
-#include "fuchsia/metrics/cpp/fidl.h"
-#include "src/cobalt/bin/app/utils.h"
-#include "src/lib/fsl/vmo/strings.h"
+#include <fuchsia/metrics/cpp/fidl.h>
+
+#include "src/cobalt/bin/app/metric_event_logger_impl.h"
 
 namespace cobalt {
 

@@ -114,6 +114,7 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
         let mut use_disk_migration = false;
         let mut data_filesystem_format_str = "fxfs";
         let mut fxfs_blob = false;
+        let mut storage_host = false;
         let mut has_data = false;
 
         // Add all the AIBs and collect some argument values.
@@ -121,8 +122,13 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
         builder.platform_bundle("fshost_storage");
         match &storage_config.filesystems.volume {
             VolumeConfig::Fxfs => {
-                builder.platform_bundle("fshost_fxfs");
                 fxfs_blob = true;
+                if storage_config.storage_host_enabled {
+                    builder.platform_bundle("fshost_storage_host");
+                    storage_host = true;
+                } else {
+                    builder.platform_bundle("fshost_fxfs");
+                }
             }
             VolumeConfig::Fvm(FvmVolumeConfig { blob, data, .. }) => {
                 if let Some(blob) = blob {
@@ -194,6 +200,7 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
             ("fuchsia.fshost.UseDiskMigration", Config::new_bool(use_disk_migration)),
             ("fuchsia.fshost.Nand", Config::new_bool(nand)),
             ("fuchsia.fshost.FxfsBlob", Config::new_bool(fxfs_blob)),
+            ("fuchsia.fshost.StorageHost", Config::new_bool(storage_host)),
             ("fuchsia.fshost.FvmSliceSize", Config::new_uint64(fvm_slice_size)),
             (
                 "fuchsia.fshost.DataFilesystemFormat",

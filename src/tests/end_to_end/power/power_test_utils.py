@@ -20,8 +20,7 @@ from collections import deque
 from collections.abc import Iterable, Mapping
 from typing import Any, Sequence
 
-from trace_processing import trace_metrics, trace_model, trace_time
-from trace_processing.metrics import power as power_metrics
+from trace_processing import trace_model, trace_time
 
 SAMPLE_INTERVAL_NS = 200000
 
@@ -204,11 +203,6 @@ class PowerSampler:
             self._state = _PowerSamplerState.STOPPED
             self._stop_impl()
 
-    # Implements MetricsProcessor.process_metrics.
-    def metrics_processor(self) -> trace_metrics.MetricsProcessor:
-        """Returns a MetricsProcessor instance associated with the sampler."""
-        return self._metrics_processor_impl()
-
     def should_generate_load(self) -> bool:
         return False
 
@@ -227,10 +221,6 @@ class PowerSampler:
     def _start_impl(self) -> None:
         pass
 
-    @abc.abstractmethod
-    def _metrics_processor_impl(self) -> trace_metrics.MetricsProcessor:
-        pass
-
 
 class _NoopPowerSampler(PowerSampler):
     """A no-op power sampler, used in environments where _MEASUREPOWER_PATH_ENV_VARIABLE isn't set."""
@@ -240,9 +230,6 @@ class _NoopPowerSampler(PowerSampler):
 
     def _stop_impl(self) -> None:
         pass
-
-    def _metrics_processor_impl(self) -> trace_metrics.MetricsProcessor:
-        return trace_metrics.ConstantMetricsProcessor(results=[])
 
 
 class _RealPowerSampler(PowerSampler):
@@ -273,9 +260,6 @@ class _RealPowerSampler(PowerSampler):
         _LOGGER.info("Stopping power sampling...")
         self._stop_power_measurement()
         _LOGGER.info("Power sampling stopped")
-
-    def _metrics_processor_impl(self) -> trace_metrics.MetricsProcessor:
-        return power_metrics.PowerMetricsProcessor()
 
     def _start_power_measurement(self) -> None:
         assert self._config.measurepower_path

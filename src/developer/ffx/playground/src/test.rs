@@ -8,6 +8,7 @@ use fidl_fuchsia_io as fio;
 use std::future::Future;
 use std::sync::Arc;
 use vfs::directory::helper::DirectlyMutable;
+use vfs::immutable_attributes;
 
 use crate::interpreter::Interpreter;
 use crate::value::{PlaygroundValue, Value, ValueExt};
@@ -43,24 +44,17 @@ impl vfs::symlink::Symlink for TestSymlink {
 impl vfs::node::Node for TestSymlink {
     async fn get_attributes(
         &self,
-        _requested_attributes: fio::NodeAttributesQuery,
+        requested_attributes: fio::NodeAttributesQuery,
     ) -> Result<fio::NodeAttributes2, fidl::Status> {
-        unreachable!();
-    }
-
-    async fn get_attrs(&self) -> Result<fio::NodeAttributes, fidl::Status> {
-        Ok(fio::NodeAttributes {
-            mode: fio::MODE_TYPE_SYMLINK
-                | vfs::common::rights_to_posix_mode_bits(
-                    /*r*/ true, /*w*/ false, /*x*/ false,
-                ),
-            id: fio::INO_UNKNOWN,
-            content_size: self.0.as_bytes().len() as u64,
-            storage_size: self.0.as_bytes().len() as u64,
-            link_count: 1,
-            creation_time: 0,
-            modification_time: 0,
-        })
+        Ok(immutable_attributes!(
+            requested_attributes,
+            Immutable {
+                protocols: fio::NodeProtocolKinds::SYMLINK,
+                abilities: fio::Operations::GET_ATTRIBUTES,
+                content_size: self.0.as_bytes().len() as u64,
+                storage_size: self.0.as_bytes().len() as u64,
+            }
+        ))
     }
 }
 

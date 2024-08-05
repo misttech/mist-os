@@ -6,12 +6,12 @@
 
 #include <utility>
 
+#include <pw_preprocessor/compiler.h>
+
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/constants.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/util.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sm/smp.h"
 #include "src/connectivity/bluetooth/lib/cpp-string/string_printf.h"
-
-#pragma clang diagnostic ignored "-Wswitch-enum"
 
 namespace bt::sm {
 namespace {
@@ -47,6 +47,8 @@ bool HasKeysToDistribute(PairingFeatures features) {
 }
 
 const char* LevelToString(SecurityLevel level) {
+  PW_MODIFY_DIAGNOSTICS_PUSH();
+  PW_MODIFY_DIAGNOSTIC(ignored, "-Wswitch-enum");
   switch (level) {
     case SecurityLevel::kEncrypted:
       return "encrypted";
@@ -57,6 +59,7 @@ const char* LevelToString(SecurityLevel level) {
     default:
       break;
   }
+  PW_MODIFY_DIAGNOSTICS_POP();
   return "not secure";
 }
 

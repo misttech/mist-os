@@ -5,26 +5,27 @@
 #ifndef SRC_DEVICES_NAND_DRIVERS_AML_RAWNAND_AML_RAWNAND_H_
 #define SRC_DEVICES_NAND_DRIVERS_AML_RAWNAND_AML_RAWNAND_H_
 
-#include <fuchsia/hardware/platform/device/c/banjo.h>
+#include <fuchsia/hardware/nandinfo/c/banjo.h>
 #include <fuchsia/hardware/rawnand/cpp/banjo.h>
-#include <lib/ddk/debug.h>
+#include <lib/ddk/device.h>
 #include <lib/ddk/io-buffer.h>
-#include <lib/ddk/platform-defs.h>
-#include <lib/device-protocol/pdev-fidl.h>
-#include <lib/mmio/mmio.h>
+#include <lib/mmio/mmio-buffer.h>
+#include <lib/zx/bti.h>
 #include <lib/zx/time.h>
 #include <string.h>
-#include <unistd.h>
-#include <zircon/threads.h>
+#include <zircon/compiler.h>
 #include <zircon/types.h>
 
+#include <cstdint>
 #include <memory>
+#include <optional>
 #include <utility>
 
 #include <ddktl/device.h>
+#include <ddktl/suspend-txn.h>
+#include <ddktl/unbind-txn.h>
 #include <fbl/bits.h>
 #include <fbl/mutex.h>
-#include <soc/aml-common/aml-rawnand.h>
 
 #include "src/devices/nand/drivers/aml-rawnand/onfi.h"
 
@@ -67,14 +68,12 @@ using DeviceType = ddk::Device<AmlRawNand, ddk::Unbindable, ddk::Suspendable>;
 class AmlRawNand : public DeviceType, public ddk::RawNandProtocol<AmlRawNand, ddk::base_protocol> {
  public:
   explicit AmlRawNand(zx_device_t* parent, fdf::MmioBuffer mmio_nandreg,
-                      fdf::MmioBuffer mmio_clockreg, zx::bti bti, zx::interrupt irq,
-                      std::unique_ptr<Onfi> onfi)
+                      fdf::MmioBuffer mmio_clockreg, zx::bti bti, std::unique_ptr<Onfi> onfi)
       : DeviceType(parent),
         onfi_(std::move(onfi)),
         mmio_nandreg_(std::move(mmio_nandreg)),
         mmio_clockreg_(std::move(mmio_clockreg)),
-        bti_(std::move(bti)),
-        irq_(std::move(irq)) {}
+        bti_(std::move(bti)) {}
 
   static zx_status_t Create(void* ctx, zx_device_t* parent);
 
@@ -101,11 +100,6 @@ class AmlRawNand : public DeviceType, public ddk::RawNandProtocol<AmlRawNand, dd
   // Reads a single status byte from a NAND register. Used during initialization
   // to query the chip information and settings.
   virtual uint8_t AmlReadByte();
-
-  // Normally called when the driver is unregistered but is not automatically
-  // called on destruction, so needs to be called manually by tests before
-  // destroying this object.
-  void CleanUpIrq();
 
   // Tests can fake page read/writes by copying bytes to/from these buffers.
   const ddk::IoBuffer& data_buffer() __TA_NO_THREAD_SAFETY_ANALYSIS {
@@ -134,7 +128,6 @@ class AmlRawNand : public DeviceType, public ddk::RawNandProtocol<AmlRawNand, dd
   fdf::MmioBuffer mmio_clockreg_;
 
   zx::bti bti_;
-  zx::interrupt irq_;
 
   AmlController controller_params_;
   uint32_t chip_select_ = 0;  // Default to 0.

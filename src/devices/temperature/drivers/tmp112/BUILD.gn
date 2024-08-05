@@ -8,8 +8,8 @@ import("//build/drivers.gni")
 import("//build/test.gni")
 
 driver_bind_rules("tmp112-bind") {
-  rules = "tmp112.bind"
-  tests = "tmp112-bind-test.json"
+  rules = "meta/tmp112.bind"
+  tests = "meta/tmp112-bind-test.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c_bindlib",
     "//src/devices/bind/fuchsia.ti.platform",
@@ -35,7 +35,7 @@ fuchsia_driver("tmp112-driver") {
 }
 
 fuchsia_driver_component("tmp112") {
-  info = "tmp112-info.json"
+  info = "meta/tmp112-info.json"
   component_name = "tmp112"
   deps = [ ":tmp112-driver" ]
   manifest = "meta/tmp112.cml"

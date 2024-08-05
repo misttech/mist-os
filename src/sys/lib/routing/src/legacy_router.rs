@@ -32,7 +32,6 @@ use cm_rust::{
     UseSource,
 };
 use cm_types::Name;
-use derivative::Derivative;
 use moniker::{ChildName, Moniker};
 use std::collections::HashSet;
 use std::marker::PhantomData;
@@ -42,7 +41,7 @@ use std::{fmt, slice};
 /// Routes a capability from its `Use` declaration to its source by following `Offer` and `Expose`
 /// declarations.
 ///
-/// `sources` defines what are the valid sources of the capability. See [`AllowedSourcesBuilder`].
+/// `sources` defines what are the valid sources of the capability. See [`Sources`].
 /// `visitor` is invoked for each `Offer` and `Expose` declaration in the routing path, as well as
 /// the final `Capability` declaration if `sources` permits.
 pub async fn route_from_use<C, V>(
@@ -89,7 +88,7 @@ where
 /// Routes a capability from its environment `Registration` declaration to its source by following
 /// `Offer` and `Expose` declarations.
 ///
-/// `sources` defines what are the valid sources of the capability. See [`AllowedSourcesBuilder`].
+/// `sources` defines what are the valid sources of the capability. See [`Sources`].
 /// `visitor` is invoked for each `Offer` and `Expose` declaration in the routing path, as well as
 /// the final `Capability` declaration if `sources` permits.
 pub async fn route_from_registration<R, C, V>(
@@ -128,7 +127,7 @@ where
 /// Routes a capability from its `Offer` declaration to its source by following `Offer` and `Expose`
 /// declarations.
 ///
-/// `sources` defines what are the valid sources of the capability. See [`AllowedSourcesBuilder`].
+/// `sources` defines what are the valid sources of the capability. See [`Sources`].
 /// `visitor` is invoked for each `Offer` and `Expose` declaration in the routing path, as well as
 /// the final `Capability` declaration if `sources` permits.
 pub async fn route_from_offer<C, V>(
@@ -268,7 +267,7 @@ where
 /// Routes a capability from its `Expose` declaration to its source by following `Expose`
 /// declarations.
 ///
-/// `sources` defines what are the valid sources of the capability. See [`AllowedSourcesBuilder`].
+/// `sources` defines what are the valid sources of the capability. See [`Sources`].
 /// `visitor` is invoked for each `Expose` declaration in the routing path, as well as the final
 /// `Capability` declaration if `sources` permits.
 pub async fn route_from_expose<C, V>(
@@ -326,7 +325,7 @@ where
 /// Routes a capability from its `Use` declaration to its source by capabilities declarations, i.e.
 /// whatever capabilities that this component itself provides.
 ///
-/// `sources` defines what are the valid sources of the capability. See [`AllowedSourcesBuilder`].
+/// `sources` defines what are the valid sources of the capability. See [`Sources`].
 /// `visitor` is invoked for each `Capability` declaration if `sources` permits.
 pub async fn route_from_self<C, V>(
     use_decl: UseDecl,
@@ -351,7 +350,7 @@ where
 /// Routes a capability from a capability name to its source by capabilities declarations, i.e.
 /// whatever capabilities that this component itself provides.
 ///
-/// `sources` defines what are the valid sources of the capability. See [`AllowedSourcesBuilder`].
+/// `sources` defines what are the valid sources of the capability. See [`Sources`].
 /// `visitor` is invoked for each `Capability` declaration if `sources` permits.
 pub async fn route_from_self_by_name<C, V>(
     name: &Name,
@@ -379,10 +378,9 @@ where
 }
 
 /// Defines which capability source types are supported.
-#[derive(Debug, PartialEq, Derivative)]
-#[derivative(Clone(bound = ""))]
-pub struct AllowedSourcesBuilder {
-    framework: Option<fn(Name) -> InternalCapability>,
+#[derive(Debug, PartialEq, Clone)]
+pub struct Sources {
+    framework: bool,
     builtin: bool,
     capability: bool,
     collection: bool,
@@ -391,11 +389,13 @@ pub struct AllowedSourcesBuilder {
     capability_type: CapabilityTypeName,
 }
 
-impl AllowedSourcesBuilder {
-    /// Creates a new [`AllowedSourcesBuilder`] that does not allow any capability source types.
+// Implementation of `Sources` that allows namespace, component, and/or built-in source
+// types.
+impl Sources {
+    /// Creates a new [`Sources`] that does not allow any capability source types.
     pub fn new(capability: CapabilityTypeName) -> Self {
         Self {
-            framework: None,
+            framework: false,
             builtin: false,
             capability: false,
             collection: false,
@@ -405,9 +405,9 @@ impl AllowedSourcesBuilder {
         }
     }
 
-    /// Allows framework capability source types (`from: "framework"` in `CML`).
-    pub fn framework(self, builder: fn(Name) -> InternalCapability) -> Self {
-        Self { framework: Some(builder), ..self }
+    /// Allows framework capability sources of the given type (`from: "framework"` in `CML`).
+    pub fn framework(self) -> Self {
+        Self { framework: true, ..self }
     }
 
     /// Allows capability source types that originate from other capabilities (`from: "#storage"` in
@@ -438,21 +438,6 @@ impl AllowedSourcesBuilder {
         Self { builtin: true, ..self }
     }
 
-    pub fn build(self) -> Sources {
-        Sources::new(self)
-    }
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct Sources(AllowedSourcesBuilder);
-
-// Implementation of `Sources` that allows namespace, component, and/or built-in source
-// types.
-impl Sources {
-    pub fn new(builder: AllowedSourcesBuilder) -> Self {
-        Sources(builder)
-    }
-
     /// Return the [`InternalCapability`] representing this framework capability source, or
     /// [`RoutingError::UnsupportedRouteSource`] if unsupported.
     pub fn framework_source(
@@ -460,21 +445,20 @@ impl Sources {
         name: Name,
         mapper: &mut dyn DebugRouteMapper,
     ) -> Result<InternalCapability, RoutingError> {
-        let source = self
-            .0
-            .framework
-            .as_ref()
-            .map(|b| b(name.clone()))
-            .ok_or_else(|| RoutingError::unsupported_route_source("framework"));
-        mapper.add_framework_capability(name);
-        source
+        if self.framework {
+            let capability = InternalCapability::new(self.capability_type, name.clone());
+            mapper.add_framework_capability(name);
+            Ok(capability)
+        } else {
+            Err(RoutingError::unsupported_route_source("framework"))
+        }
     }
 
     /// Checks whether capability sources are supported, returning [`RoutingError::UnsupportedRouteSource`]
     /// if they are not.
     // TODO(https://fxbug.dev/42140194): Add route mapping for capability sources.
     pub fn capability_source(&self) -> Result<(), RoutingError> {
-        if self.0.capability {
+        if self.capability {
             Ok(())
         } else {
             Err(RoutingError::unsupported_route_source("capability"))
@@ -483,7 +467,7 @@ impl Sources {
 
     /// Checks whether namespace capability sources are supported.
     pub fn is_namespace_supported(&self) -> bool {
-        self.0.namespace
+        self.namespace
     }
 
     /// Looks for a namespace capability in the list of capability sources.
@@ -500,11 +484,11 @@ impl Sources {
     where
         V: CapabilityVisitor,
     {
-        if self.0.namespace {
+        if self.namespace {
             if let Some(decl) = capabilities
                 .iter()
                 .find(|decl: &&CapabilityDecl| {
-                    self.0.capability_type == CapabilityTypeName::from(*decl) && decl.name() == name
+                    self.capability_type == CapabilityTypeName::from(*decl) && decl.name() == name
                 })
                 .cloned()
             {
@@ -532,11 +516,11 @@ impl Sources {
     where
         V: CapabilityVisitor,
     {
-        if self.0.builtin {
+        if self.builtin {
             if let Some(decl) = capabilities
                 .iter()
                 .find(|decl: &&CapabilityDecl| {
-                    self.0.capability_type == CapabilityTypeName::from(*decl) && decl.name() == name
+                    self.capability_type == CapabilityTypeName::from(*decl) && decl.name() == name
                 })
                 .cloned()
             {
@@ -567,11 +551,11 @@ impl Sources {
     where
         V: CapabilityVisitor,
     {
-        if self.0.component {
+        if self.component {
             let decl = capabilities
                 .iter()
                 .find(|decl: &&CapabilityDecl| {
-                    self.0.capability_type == CapabilityTypeName::from(*decl) && decl.name() == name
+                    self.capability_type == CapabilityTypeName::from(*decl) && decl.name() == name
                 })
                 .cloned()
                 .expect("CapabilityDecl missing, FIDL validation should catch this");

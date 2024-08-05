@@ -38,10 +38,9 @@ zx::result<> GpuDeviceDriver::InitResources() {
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
-  zx::result<fidl::ClientEnd<fuchsia_sysmem2::Allocator>> sysmem_client_result =
-      incoming()->Connect<fuchsia_hardware_sysmem::Service::AllocatorV2>("sysmem");
+  zx::result sysmem_client_result = incoming()->Connect<fuchsia_sysmem2::Allocator>();
   if (sysmem_client_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to get sysmem client: %s", sysmem_client_result.status_string());
+    FDF_LOG(ERROR, "Failed to get sysmem protocol: %s", sysmem_client_result.status_string());
     return sysmem_client_result.take_error();
   }
   fidl::ClientEnd<fuchsia_sysmem2::Allocator> sysmem_client =

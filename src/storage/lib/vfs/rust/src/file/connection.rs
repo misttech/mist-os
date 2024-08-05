@@ -4,7 +4,7 @@
 
 use crate::common::{
     decode_extended_attribute_value, encode_extended_attribute_value, extended_attributes_sender,
-    inherit_rights_for_clone,
+    inherit_rights_for_clone, io1_to_io2_attrs,
 };
 use crate::execution_scope::ExecutionScope;
 use crate::file::common::new_connection_validate_options;
@@ -613,7 +613,7 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
             }
             fio::FileRequest::GetConnectionInfo { responder } => {
                 trace::duration!(c"storage", c"File::GetConnectionInfo");
-                // TODO(https://fxbug.dev/42157659): Restrict GET_ATTRIBUTES.
+                // TODO(https://fxbug.dev/293947862): Restrict GET_ATTRIBUTES.
                 responder.send(fio::ConnectionInfo {
                     rights: Some(self.options.rights),
                     ..Default::default()
@@ -628,7 +628,9 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
             }
             fio::FileRequest::GetAttr { responder } => {
                 async move {
-                    let (status, attrs) = self.handle_get_attr().await;
+                    let (status, attrs) =
+                        crate::common::io2_to_io1_attrs(self.file.as_ref(), self.options.rights)
+                            .await;
                     responder.send(status.into_raw(), &attrs)
                 }
                 .trace(trace::trace_future_args!(c"storage", c"File::GetAttr"))
@@ -636,26 +638,22 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
             }
             fio::FileRequest::SetAttr { flags, attributes, responder } => {
                 async move {
-                    let status = self.handle_set_attr(flags, attributes).await;
-                    responder.send(status.into_raw())
+                    let result =
+                        self.handle_update_attributes(io1_to_io2_attrs(flags, attributes)).await;
+                    responder.send(Status::from_result(result).into_raw())
                 }
                 .trace(trace::trace_future_args!(c"storage", c"File::SetAttr"))
                 .await?;
             }
             fio::FileRequest::GetAttributes { query, responder } => {
                 async move {
-                    let result = self.handle_get_attributes(query).await;
+                    // TODO(https://fxbug.dev/293947862): Restrict GET_ATTRIBUTES.
+                    let attrs = self.file.get_attributes(query).await;
                     responder.send(
-                        result
+                        attrs
                             .as_ref()
-                            .map(|a| {
-                                let fio::NodeAttributes2 {
-                                    mutable_attributes: m,
-                                    immutable_attributes: i,
-                                } = a;
-                                (m, i)
-                            })
-                            .map_err(|status| Status::into_raw(*status)),
+                            .map(|attrs| (&attrs.mutable_attributes, &attrs.immutable_attributes))
+                            .map_err(|status| status.into_raw()),
                     )
                 }
                 .trace(trace::trace_future_args!(c"storage", c"File::GetAttributes"))
@@ -850,34 +848,6 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
         });
     }
 
-    async fn handle_get_attr(&mut self) -> (Status, fio::NodeAttributes) {
-        let attributes = match self.file.get_attrs().await {
-            Ok(attr) => attr,
-            Err(status) => {
-                return (
-                    status,
-                    fio::NodeAttributes {
-                        mode: 0,
-                        id: fio::INO_UNKNOWN,
-                        content_size: 0,
-                        storage_size: 0,
-                        link_count: 0,
-                        creation_time: 0,
-                        modification_time: 0,
-                    },
-                )
-            }
-        };
-        (Status::OK, attributes)
-    }
-
-    async fn handle_get_attributes(
-        &mut self,
-        query: fio::NodeAttributesQuery,
-    ) -> Result<fio::NodeAttributes2, Status> {
-        self.file.get_attributes(query).await
-    }
-
     async fn handle_read(&mut self, count: u64) -> Result<Vec<u8>, Status> {
         if !self.options.rights.intersects(fio::Operations::READ_BYTES) {
             return Err(Status::BAD_HANDLE);
@@ -917,21 +887,6 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
     /// Move seek position to byte `offset` relative to the origin specified by `start`.
     async fn handle_seek(&mut self, offset: i64, origin: fio::SeekOrigin) -> Result<u64, Status> {
         self.file.seek(offset, origin).await
-    }
-
-    async fn handle_set_attr(
-        &mut self,
-        flags: fio::NodeAttributeFlags,
-        attrs: fio::NodeAttributes,
-    ) -> Status {
-        if !self.options.rights.intersects(fio::Operations::WRITE_BYTES) {
-            return Status::BAD_HANDLE;
-        }
-
-        match self.file.set_attrs(flags, attrs).await {
-            Ok(()) => Status::OK,
-            Err(status) => status,
-        }
     }
 
     async fn handle_update_attributes(
@@ -1129,13 +1084,8 @@ mod tests {
             flags: fio::VmoFlags,
         },
         GetSize,
-        GetAttrs,
         GetAttributes {
             query: fio::NodeAttributesQuery,
-        },
-        SetAttrs {
-            flags: fio::NodeAttributeFlags,
-            attrs: fio::NodeAttributes,
         },
         UpdateAttributes {
             attrs: fio::MutableNodeAttributes,
@@ -1201,19 +1151,6 @@ mod tests {
     }
 
     impl Node for MockFile {
-        async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
-            self.handle_operation(FileOperation::GetAttrs)?;
-            Ok(fio::NodeAttributes {
-                mode: fio::MODE_TYPE_FILE,
-                id: MOCK_FILE_ID,
-                content_size: self.file_size,
-                storage_size: 2 * self.file_size,
-                link_count: MOCK_FILE_LINKS,
-                creation_time: MOCK_FILE_CREATION_TIME,
-                modification_time: MOCK_FILE_MODIFICATION_TIME,
-            })
-        }
-
         async fn get_attributes(
             &self,
             query: fio::NodeAttributesQuery,
@@ -1224,10 +1161,6 @@ mod tests {
                 Mutable {
                     creation_time: MOCK_FILE_CREATION_TIME,
                     modification_time: MOCK_FILE_MODIFICATION_TIME,
-                    mode: 0,
-                    uid: 0,
-                    gid: 0,
-                    rdev: 0
                 },
                 Immutable {
                     protocols: fio::NodeProtocolKinds::FILE,
@@ -1271,15 +1204,6 @@ mod tests {
         async fn get_size(&self) -> Result<u64, Status> {
             self.handle_operation(FileOperation::GetSize)?;
             Ok(self.file_size)
-        }
-
-        async fn set_attrs(
-            &self,
-            flags: fio::NodeAttributeFlags,
-            attrs: fio::NodeAttributes,
-        ) -> Result<(), Status> {
-            self.handle_operation(FileOperation::SetAttrs { flags, attrs })?;
-            Ok(())
         }
 
         async fn update_attributes(&self, attrs: fio::MutableNodeAttributes) -> Result<(), Status> {
@@ -1482,38 +1406,6 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn test_getattr() {
-        let env = init_mock_file(Box::new(always_succeed_callback), fio::OpenFlags::empty());
-        let (status, attributes) = env.proxy.get_attr().await.unwrap();
-        assert_eq!(Status::from_raw(status), Status::OK);
-        assert_eq!(
-            attributes,
-            fio::NodeAttributes {
-                mode: fio::MODE_TYPE_FILE,
-                id: MOCK_FILE_ID,
-                content_size: MOCK_FILE_SIZE,
-                storage_size: 2 * MOCK_FILE_SIZE,
-                link_count: MOCK_FILE_LINKS,
-                creation_time: MOCK_FILE_CREATION_TIME,
-                modification_time: MOCK_FILE_MODIFICATION_TIME,
-            }
-        );
-        let events = env.file.operations.lock().unwrap();
-        assert_eq!(
-            *events,
-            vec![
-                FileOperation::Init {
-                    options: FileOptions {
-                        rights: fio::Operations::GET_ATTRIBUTES,
-                        is_append: false
-                    }
-                },
-                FileOperation::GetAttrs
-            ]
-        );
-    }
-
-    #[fuchsia::test]
     async fn test_get_attributes() {
         let env = init_mock_file(Box::new(always_succeed_callback), fio::OpenFlags::empty());
         let (mutable_attributes, immutable_attributes) = env
@@ -1528,10 +1420,6 @@ mod tests {
             Mutable {
                 creation_time: MOCK_FILE_CREATION_TIME,
                 modification_time: MOCK_FILE_MODIFICATION_TIME,
-                mode: 0,
-                uid: 0,
-                gid: 0,
-                rdev: 0,
             },
             Immutable {
                 protocols: fio::NodeProtocolKinds::FILE,
@@ -1830,41 +1718,6 @@ mod tests {
                 FileOperation::Init { options: FileOptions { rights: RIGHTS_R, is_append: false } },
                 FileOperation::GetSize, // for the seek
                 FileOperation::ReadAt { offset, count: 1 },
-            ]
-        );
-    }
-
-    #[fuchsia::test]
-    async fn test_set_attrs() {
-        let env = init_mock_file(Box::new(always_succeed_callback), fio::OpenFlags::RIGHT_WRITABLE);
-        let set_attrs = fio::NodeAttributes {
-            mode: 0,
-            id: 0,
-            content_size: 0,
-            storage_size: 0,
-            link_count: 0,
-            creation_time: 40000,
-            modification_time: 100000,
-        };
-        let status = env
-            .proxy
-            .set_attr(
-                fio::NodeAttributeFlags::CREATION_TIME | fio::NodeAttributeFlags::MODIFICATION_TIME,
-                &set_attrs,
-            )
-            .await
-            .unwrap();
-        assert_eq!(Status::from_raw(status), Status::OK);
-        let events = env.file.operations.lock().unwrap();
-        assert_eq!(
-            *events,
-            vec![
-                FileOperation::Init { options: FileOptions { rights: RIGHTS_W, is_append: false } },
-                FileOperation::SetAttrs {
-                    flags: fio::NodeAttributeFlags::CREATION_TIME
-                        | fio::NodeAttributeFlags::MODIFICATION_TIME,
-                    attrs: set_attrs
-                },
             ]
         );
     }

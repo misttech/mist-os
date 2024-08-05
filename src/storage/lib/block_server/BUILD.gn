@@ -34,7 +34,7 @@ rustc_library("block_server") {
   test_deps = [ "//src/lib/fuchsia" ]
 }
 
-rustc_library("fake_server") {
+rustc_library("fake_block_server") {
   edition = "2021"
   sources = [ "src/fake_server.rs" ]
   source_root = "src/fake_server.rs"

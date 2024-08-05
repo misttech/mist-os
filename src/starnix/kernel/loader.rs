@@ -558,6 +558,7 @@ pub fn load_executable(
 
     let auxv = {
         let creds = current_task.creds();
+        let secure = if creds.uid != creds.euid || creds.gid != creds.egid { 1 } else { 0 };
         vec![
             (AT_UID, creds.uid as u64),
             (AT_EUID, creds.euid as u64),
@@ -574,7 +575,7 @@ pub fn load_executable(
             ),
             (AT_CLKTCK, SCHEDULER_CLOCK_HZ as u64),
             (AT_SYSINFO_EHDR, vdso_base.into()),
-            (AT_SECURE, 0),
+            (AT_SECURE, secure),
         ]
     };
 

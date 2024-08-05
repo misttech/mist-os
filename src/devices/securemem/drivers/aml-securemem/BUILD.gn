@@ -8,9 +8,9 @@ import("//build/drivers.gni")
 import("//build/test.gni")
 
 driver_bind_rules("aml-securemem-bind") {
-  rules = "aml-securemem.bind"
+  rules = "meta/aml-securemem.bind"
   bind_output = "aml-securemem.bindbc"
-  tests = "aml-securemem-bind-test.json"
+  tests = "meta/aml-securemem-bind-test.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_bindlib",
     "//sdk/fidl/fuchsia.hardware.tee:fuchsia.hardware.tee_bindlib",
@@ -63,7 +63,7 @@ fuchsia_driver("aml-securemem-driver") {
 }
 
 fuchsia_driver_component("aml-securemem") {
-  info = "aml-securemem-info.json"
+  info = "meta/aml-securemem-info.json"
   component_name = "aml-securemem"
   deps = [ ":aml-securemem-driver" ]
   manifest = "meta/aml-securemem.cml"

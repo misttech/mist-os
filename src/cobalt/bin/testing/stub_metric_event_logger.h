@@ -30,7 +30,7 @@ class StubMetricEventLogger_Sync : public fuchsia::metrics::MetricEventLogger_Sy
       ::std::vector<::fuchsia::metrics::MetricEvent> events,
       ::fuchsia::metrics::MetricEventLogger_LogMetricEvents_Result* out_result) override;
 
-  uint32_t last_metric_id() { return last_metric_id_; }
+  uint32_t last_metric_id() const { return last_metric_id_; }
 
   void reset_last_metric_id() { last_metric_id_ = -1; }
 
@@ -38,7 +38,7 @@ class StubMetricEventLogger_Sync : public fuchsia::metrics::MetricEventLogger_Sy
 
   void reset_last_event_codes() { last_event_codes_ = {}; }
 
-  int64_t last_integer() { return last_integer_; }
+  int64_t last_integer() const { return last_integer_; }
 
   void reset_last_integer() { last_integer_ = -1; }
 
@@ -48,13 +48,13 @@ class StubMetricEventLogger_Sync : public fuchsia::metrics::MetricEventLogger_Sy
     last_log_metric_method_invoked_ = LogMetricMethod::kDefault;
   }
 
-  size_t call_count() { return call_count_; }
+  size_t call_count() const { return call_count_; }
 
   void reset_call_count() { call_count_ = 0; }
 
   // Used for LogMetricEvents() only.
 
-  size_t event_count() { return event_count_; }
+  size_t event_count() const { return event_count_; }
 
   void reset_event_count() { event_count_ = 0; }
 
@@ -74,7 +74,7 @@ class StubMetricEventLogger_Sync : public fuchsia::metrics::MetricEventLogger_Sy
 
  private:
   uint32_t last_metric_id_ = -1;
-  std::vector<uint32_t> last_event_codes_ = {};
+  std::vector<uint32_t> last_event_codes_;
   int64_t last_integer_ = -1;
   LogMetricMethod last_log_metric_method_invoked_ = LogMetricMethod::kDefault;
   size_t call_count_ = 0;

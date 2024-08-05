@@ -8,9 +8,9 @@ import("//build/drivers.gni")
 import("//build/test.gni")
 
 driver_bind_rules("aml_saradc_bind") {
-  rules = "aml-saradc.bind"
+  rules = "meta/aml-saradc.bind"
   bind_output = "aml-saradc.bindbc"
-  tests = "test_bind.json"
+  tests = "meta/test_bind.json"
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.devicetree",
@@ -43,7 +43,7 @@ fuchsia_driver("aml-saradc-driver") {
 }
 
 fuchsia_driver_component("aml-saradc") {
-  info = "aml-saradc-info.json"
+  info = "meta/aml-saradc-info.json"
   component_name = "aml-saradc"
   deps = [ ":aml-saradc-driver" ]
   manifest = "meta/aml-saradc.cml"

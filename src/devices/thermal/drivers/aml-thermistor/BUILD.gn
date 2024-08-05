@@ -6,9 +6,9 @@ import("//build/bind/bind.gni")
 import("//build/drivers.gni")
 
 driver_bind_rules("aml-thermistor-bind") {
-  rules = "thermistor.bind"
+  rules = "meta/thermistor.bind"
   bind_output = "aml-thermistor.bindbc"
-  tests = "bind-tests.json"
+  tests = "meta/bind-tests.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.adc:fuchsia.hardware.adc_bindlib",
     "//src/devices/bind/fuchsia.adc",
@@ -43,7 +43,7 @@ fuchsia_driver("aml-thermistor-driver") {
 }
 
 fuchsia_driver_component("aml-thermistor") {
-  info = "aml-thermistor-info.json"
+  info = "meta/aml-thermistor-info.json"
   component_name = "aml-thermistor"
   deps = [ ":aml-thermistor-driver" ]
   manifest = "meta/aml-thermistor.cml"

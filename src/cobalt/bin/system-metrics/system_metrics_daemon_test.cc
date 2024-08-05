@@ -7,16 +7,15 @@
 #include <fuchsia/metrics/cpp/fidl.h>
 #include <fuchsia/metrics/cpp/fidl_test_base.h>
 #include <lib/async/cpp/executor.h>
+#include <lib/fidl/cpp/binding_set.h>
 #include <lib/inspect/testing/cpp/inspect.h>
 #include <lib/sys/cpp/testing/component_context_provider.h>
 
 #include <fstream>
 #include <future>
-#include <thread>
 
 #include <gtest/gtest.h>
 
-#include "lib/fidl/cpp/binding_set.h"
 #include "src/cobalt/bin/system-metrics/metrics_registry.cb.h"
 #include "src/cobalt/bin/system-metrics/testing/fake_cpu_stats_fetcher.h"
 #include "src/cobalt/bin/testing/fake_clock.h"

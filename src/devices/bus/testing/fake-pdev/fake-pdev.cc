@@ -5,6 +5,7 @@
 #include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
 
 #include <lib/device-protocol/pdev-fidl.h>
+#include <lib/driver/platform-device/cpp/pdev.h>
 #include <lib/fake-bti/bti.h>
 #include <lib/fake-resource/resource.h>
 
@@ -185,4 +186,15 @@ zx_status_t ddk::PDevMakeMmioBufferWeak(const pdev_mmio_t& pdev_mmio,
   auto* mmio_buffer = reinterpret_cast<MmioBuffer*>(pdev_mmio.offset);
   mmio->emplace(std::move(*mmio_buffer));
   return ZX_OK;
+}
+
+zx::result<fdf::MmioBuffer> fdf::internal::PDevMakeMmioBufferWeak(fdf::PDev::MmioInfo& pdev_mmio,
+                                                                  uint32_t cache_policy) {
+  if (pdev_mmio.vmo.is_valid()) {
+    return MmioBuffer::Create(pdev_mmio.offset, pdev_mmio.size, std::move(pdev_mmio.vmo),
+                              cache_policy);
+  }
+
+  auto* mmio_buffer = reinterpret_cast<MmioBuffer*>(pdev_mmio.offset);
+  return zx::ok(std::move(*mmio_buffer));
 }

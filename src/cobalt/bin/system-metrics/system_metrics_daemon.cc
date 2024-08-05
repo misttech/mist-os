@@ -18,8 +18,6 @@
 #include <chrono>
 #include <fstream>
 #include <memory>
-#include <numeric>
-#include <thread>
 #include <utility>
 #include <vector>
 
@@ -36,8 +34,6 @@ using cobalt::MetricEventBuilder;
 using cobalt::config::IntegerBucketConfig;
 using fuchsia::metrics::HistogramBucket;
 using fuchsia::metrics::MetricEvent;
-using fuchsia::metrics::MetricEventLogger_Sync;
-using fuchsia::ui::activity::State;
 using fuchsia_system_metrics::FuchsiaLifetimeEventsMigratedMetricDimensionEvents;
 using fuchsia_system_metrics::FuchsiaUpPingMigratedMetricDimensionUptime;
 using fuchsia_system_metrics::FuchsiaUptimeMigratedMetricDimensionUptimeRange;
@@ -111,7 +107,6 @@ void SystemMetricsDaemon::RepeatedlyLogUpPing() {
   std::chrono::seconds seconds_to_sleep = LogFuchsiaUpPing(uptime);
   async::PostDelayedTask(
       dispatcher_, [this]() { RepeatedlyLogUpPing(); }, zx::sec(seconds_to_sleep.count() + 5));
-  return;
 }
 
 void SystemMetricsDaemon::LogLifetimeEvents() {
@@ -122,16 +117,14 @@ void SystemMetricsDaemon::LogLifetimeEvents() {
 void SystemMetricsDaemon::LogLifetimeEventBoot() {
   if (!LogFuchsiaLifetimeEventBoot()) {
     // Pause for 5 minutes and try again.
-    async::PostDelayedTask(
-        dispatcher_, [this]() { LogLifetimeEventBoot(); }, zx::sec(300));
+    async::PostDelayedTask(dispatcher_, [this]() { LogLifetimeEventBoot(); }, zx::sec(300));
   }
 }
 
 void SystemMetricsDaemon::LogLifetimeEventActivation() {
   if (!LogFuchsiaLifetimeEventActivation()) {
     // Pause for 5 minutes and try again.
-    async::PostDelayedTask(
-        dispatcher_, [this]() { LogLifetimeEventActivation(); }, zx::sec(300));
+    async::PostDelayedTask(dispatcher_, [this]() { LogLifetimeEventActivation(); }, zx::sec(300));
   }
 }
 

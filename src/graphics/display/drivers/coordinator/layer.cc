@@ -254,7 +254,7 @@ void Layer::SetPrimaryPosition(fhdt::wire::CoordinateTransformation image_source
 
   primary_layer.image_source = Rectangle::From(image_source).ToBanjo();
   primary_layer.display_destination = Rectangle::From(display_destination).ToBanjo();
-  primary_layer.transform_mode = static_cast<uint8_t>(image_source_transformation);
+  primary_layer.image_source_transformation = static_cast<uint8_t>(image_source_transformation);
 
   config_change_ = true;
 }

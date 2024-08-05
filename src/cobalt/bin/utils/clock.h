@@ -48,7 +48,7 @@ class FuchsiaSystemClock : public FuchsiaSystemClockInterface {
   // started, but reads time off of the UTC clock passed to the runtime. This constructor is
   // only intended for testing this class.
   explicit FuchsiaSystemClock(async_dispatcher_t* dispatcher, inspect::Node node,
-                              zx::unowned_clock clock);
+                              const zx::unowned_clock& clock);
 
   // Returns the current time once the Fuchsia timekeeper service reports that
   // the system clock has been initialized from an external source.

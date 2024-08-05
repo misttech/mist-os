@@ -436,13 +436,16 @@ impl Credentials {
         FsCred { uid: self.uid, gid: self.gid }
     }
 
-    pub fn update_capabilities(
-        &mut self,
-        prev_uid: uid_t,
-        prev_euid: uid_t,
-        prev_fsuid: uid_t,
-        prev_saved_uid: uid_t,
-    ) {
+    pub fn copy_user_credentials(&self) -> UserCredentials {
+        UserCredentials {
+            uid: self.uid,
+            euid: self.euid,
+            fsuid: self.fsuid,
+            saved_uid: self.saved_uid,
+        }
+    }
+
+    pub fn update_capabilities(&mut self, prev: UserCredentials) {
         // https://man7.org/linux/man-pages/man7/capabilities.7.html
         // If one or more of the real, effective, or saved set user IDs
         // was previously 0, and as a result of the UID changes all of
@@ -458,7 +461,7 @@ impl Credentials {
         // provides a superset of the effect of the former flag.)
         if !self.securebits.contains(SecureBits::KEEP_CAPS)
             && !self.securebits.contains(SecureBits::NO_SETUID_FIXUP)
-            && (prev_uid == 0 || prev_euid == 0 || prev_saved_uid == 0)
+            && (prev.uid == 0 || prev.euid == 0 || prev.saved_uid == 0)
             && (self.uid != 0 && self.euid != 0 && self.saved_uid != 0)
         {
             self.cap_permitted = Capabilities::empty();
@@ -467,9 +470,9 @@ impl Credentials {
         }
         // If the effective user ID is changed from 0 to nonzero, then
         // all capabilities are cleared from the effective set.
-        if prev_euid == 0 && self.euid != 0 {
+        if prev.euid == 0 && self.euid != 0 {
             self.cap_effective = Capabilities::empty();
-        } else if prev_euid != 0 && self.euid == 0 {
+        } else if prev.euid != 0 && self.euid == 0 {
             // If the effective user ID is changed from nonzero to 0, then
             // the permitted set is copied to the effective set.
             self.cap_effective = self.cap_permitted;
@@ -489,9 +492,9 @@ impl Credentials {
             | CAP_LINUX_IMMUTABLE
             | CAP_MAC_OVERRIDE
             | CAP_MKNOD;
-        if prev_fsuid == 0 && self.fsuid != 0 {
+        if prev.fsuid == 0 && self.fsuid != 0 {
             self.cap_effective &= !fs_capabilities;
-        } else if prev_fsuid != 0 && self.fsuid == 0 {
+        } else if prev.fsuid != 0 && self.fsuid == 0 {
             // If the filesystem UID is changed from nonzero to 0, then any
             // of these capabilities that are enabled in the permitted set
             // are enabled in the effective set.
@@ -517,6 +520,14 @@ impl From<Credentials> for FsCred {
     fn from(c: Credentials) -> Self {
         c.as_fscred()
     }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct UserCredentials {
+    pub uid: uid_t,
+    pub euid: uid_t,
+    pub saved_uid: uid_t,
+    pub fsuid: uid_t,
 }
 
 #[cfg(test)]

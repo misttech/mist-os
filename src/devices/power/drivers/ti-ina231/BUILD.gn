@@ -27,9 +27,9 @@ group("common") {
 }
 
 driver_bind_rules("bind") {
-  rules = "ti-ina231.bind"
+  rules = "meta/ti-ina231.bind"
   bind_output = "ti-ina231.bindbc"
-  tests = "ti-ina231-bind-test.json"
+  tests = "meta/ti-ina231-bind-test.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c_bindlib",
     "//src/devices/bind/fuchsia.platform",
@@ -51,7 +51,7 @@ fuchsia_driver("ti-ina231-driver") {
 }
 
 fuchsia_driver_component("ti-ina231") {
-  info = "ti-ina231-info.json"
+  info = "meta/ti-ina231-info.json"
   component_name = "ti-ina231"
   deps = [ ":ti-ina231-driver" ]
   manifest = "meta/ti-ina231.cml"

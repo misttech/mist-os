@@ -108,10 +108,10 @@ const display_config_t* FindBanjoConfig(display::DisplayId display_id,
 
 void GetPostTransformWidth(const layer_t& layer, uint32_t* width, uint32_t* height) {
   const primary_layer_t* primary = &layer.cfg.primary;
-  if (primary->transform_mode == FRAME_TRANSFORM_IDENTITY ||
-      primary->transform_mode == FRAME_TRANSFORM_ROT_180 ||
-      primary->transform_mode == FRAME_TRANSFORM_REFLECT_X ||
-      primary->transform_mode == FRAME_TRANSFORM_REFLECT_Y) {
+  if (primary->image_source_transformation == COORDINATE_TRANSFORMATION_IDENTITY ||
+      primary->image_source_transformation == COORDINATE_TRANSFORMATION_ROTATE_CCW_180 ||
+      primary->image_source_transformation == COORDINATE_TRANSFORMATION_REFLECT_X ||
+      primary->image_source_transformation == COORDINATE_TRANSFORMATION_REFLECT_Y) {
     *width = primary->image_source.width;
     *height = primary->image_source.height;
   } else {
@@ -1166,8 +1166,8 @@ bool Controller::CalculateMinimumAllocations(
                                                  GetImportedImagePixelFormat(primary_image_id)));
         }
 
-        if (primary->transform_mode == FRAME_TRANSFORM_IDENTITY ||
-            primary->transform_mode == FRAME_TRANSFORM_ROT_180) {
+        if (primary->image_source_transformation == COORDINATE_TRANSFORMATION_IDENTITY ||
+            primary->image_source_transformation == COORDINATE_TRANSFORMATION_ROTATE_CCW_180) {
           plane_source_width = primary->image_source.width;
           min_scan_lines = 8;
         } else {
@@ -1647,15 +1647,16 @@ config_check_result_t Controller::DisplayEngineCheckConfiguration(
       switch (banjo_display_config.layer_list[j].type) {
         case LAYER_TYPE_PRIMARY: {
           const primary_layer_t* primary = &banjo_display_config.layer_list[j].cfg.primary;
-          if (primary->transform_mode == FRAME_TRANSFORM_ROT_90 ||
-              primary->transform_mode == FRAME_TRANSFORM_ROT_270) {
+          if (primary->image_source_transformation == COORDINATE_TRANSFORMATION_ROTATE_CCW_90 ||
+              primary->image_source_transformation == COORDINATE_TRANSFORMATION_ROTATE_CCW_270) {
             // Linear and x tiled images don't support 90/270 rotation
             if (primary->image_metadata.tiling_type == IMAGE_TILING_TYPE_LINEAR ||
                 primary->image_metadata.tiling_type == IMAGE_TILING_TYPE_X_TILED) {
               current_display_client_composition_opcodes[j] |= CLIENT_COMPOSITION_OPCODE_TRANSFORM;
             }
-          } else if (primary->transform_mode != FRAME_TRANSFORM_IDENTITY &&
-                     primary->transform_mode != FRAME_TRANSFORM_ROT_180) {
+          } else if (primary->image_source_transformation != COORDINATE_TRANSFORMATION_IDENTITY &&
+                     primary->image_source_transformation !=
+                         COORDINATE_TRANSFORMATION_ROTATE_CCW_180) {
             // Cover unsupported rotations
             current_display_client_composition_opcodes[j] |= CLIENT_COMPOSITION_OPCODE_TRANSFORM;
           }

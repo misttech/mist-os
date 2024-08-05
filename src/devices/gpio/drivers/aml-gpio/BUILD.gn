@@ -40,9 +40,9 @@ bazel_fuchsia_test_package("aml-gpio-test-package") {
 }
 
 driver_bind_rules("aml-gpio-bind") {
-  rules = "aml-gpio.bind"
+  rules = "meta/aml-gpio.bind"
   bind_output = "aml-gpio.bindbc"
-  tests = "bind-tests.json"
+  tests = "meta/bind-tests.json"
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.devicetree",

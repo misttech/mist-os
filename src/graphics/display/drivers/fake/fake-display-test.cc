@@ -301,7 +301,7 @@ layer_t CreatePrimaryLayerConfig(uint64_t image_handle, const image_metadata_t& 
                       .image_metadata = image_metadata,
                       .alpha_mode = ALPHA_DISABLE,
                       .alpha_layer_val = 1.0,
-                      .transform_mode = FRAME_TRANSFORM_IDENTITY,
+                      .image_source_transformation = COORDINATE_TRANSFORMATION_IDENTITY,
                       .image_source =
                           {
                               .x = 0,

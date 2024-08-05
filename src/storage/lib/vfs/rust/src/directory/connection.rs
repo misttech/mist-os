@@ -111,40 +111,25 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
             }
             fio::DirectoryRequest::GetAttr { responder } => {
                 async move {
-                    let (attrs, status) = match self.directory.get_attrs().await {
-                        Ok(attrs) => (attrs, Status::OK.into_raw()),
-                        Err(status) => (
-                            fio::NodeAttributes {
-                                mode: 0,
-                                id: fio::INO_UNKNOWN,
-                                content_size: 0,
-                                storage_size: 0,
-                                link_count: 1,
-                                creation_time: 0,
-                                modification_time: 0,
-                            },
-                            status.into_raw(),
-                        ),
-                    };
-                    responder.send(status, &attrs)
+                    let (status, attrs) = crate::common::io2_to_io1_attrs(
+                        self.directory.as_ref(),
+                        self.options.rights,
+                    )
+                    .await;
+                    responder.send(status.into_raw(), &attrs)
                 }
                 .trace(trace::trace_future_args!(c"storage", c"Directory::GetAttr"))
                 .await?;
             }
             fio::DirectoryRequest::GetAttributes { query, responder } => {
                 async move {
-                    let result = self.directory.get_attributes(query).await;
+                    // TODO(https://fxbug.dev/293947862): Restrict GET_ATTRIBUTES.
+                    let attrs = self.directory.get_attributes(query).await;
                     responder.send(
-                        result
+                        attrs
                             .as_ref()
-                            .map(|a| {
-                                let fio::NodeAttributes2 {
-                                    mutable_attributes: m,
-                                    immutable_attributes: i,
-                                } = a;
-                                (m, i)
-                            })
-                            .map_err(|status| Status::into_raw(*status)),
+                            .map(|attrs| (&attrs.mutable_attributes, &attrs.immutable_attributes))
+                            .map_err(|status| status.into_raw()),
                     )
                 }
                 .trace(trace::trace_future_args!(c"storage", c"Directory::GetAttributes"))

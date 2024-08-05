@@ -10,7 +10,7 @@
 #include <lib/zx/vmo.h>
 #include <zircon/syscalls.h>
 
-#include <utility>
+#include <cstring>
 
 #include <gtest/gtest.h>
 
@@ -100,13 +100,14 @@ class AudioRendererTest : public HermeticAudioTest {
     ExpectCallbacks();
   }
 
-  // Creates a VMO and passes it to |AudioRenderer::AddPayloadBuffer| with a given |id|. This is
-  // purely a convenience method and doesn't provide access to the buffer VMO.
+  // Create a VMO and pass it to |AudioRenderer::AddPayloadBuffer| with a given |id|. This is
+  // purely a convenience method: it does not provide access to the underlying buffer VMO (the VMO
+  // is not mapped). As with all VMOs, the memory region is automatically zeroed-out.
   void CreateAndAddPayloadBuffer(uint32_t id) {
-    zx::vmo payload_buffer;
+    zx::vmo payload_vmo;
     constexpr uint32_t kVmoOptionsNone = 0;
-    ASSERT_EQ(zx::vmo::create(DefaultPayloadBufferSize(), kVmoOptionsNone, &payload_buffer), ZX_OK);
-    audio_renderer_->AddPayloadBuffer(id, std::move(payload_buffer));
+    ASSERT_EQ(zx::vmo::create(DefaultPayloadBufferSize(), kVmoOptionsNone, &payload_vmo), ZX_OK);
+    audio_renderer_->AddPayloadBuffer(id, std::move(payload_vmo));
   }
 
   fuchsia::media::AudioRendererPtr& audio_renderer() { return audio_renderer_; }
@@ -168,7 +169,8 @@ class AudioRendererClockTest : public AudioRendererTest {
 
 // Thin wrapper around AudioRendererTest for grouping only. This tests EnableMinLeadTimeEvents,
 // GetMinLeadTime and OnMinLeadTimeChanged, as well as SetPtsUnits and SetPtsContinuityThreshold.
-class AudioRendererPtsLeadTimeTest : public AudioRendererTest {};
+class AudioRendererLeadTimeTest : public AudioRendererTest {};
+class AudioRendererPtsTest : public AudioRendererTest {};
 
 // Thin wrapper around AudioRendererTest for test case grouping only.
 // This group validates AudioRenderer's implementation of SetUsage and SetPcmStreamType.

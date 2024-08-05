@@ -8,9 +8,9 @@ import("//build/drivers.gni")
 import("//build/test.gni")
 
 driver_bind_rules("aml-pwm-bind") {
-  rules = "aml-pwm.bind"
+  rules = "meta/aml-pwm.bind"
   bind_output = "aml-pwm.bindbc"
-  tests = "bind-tests.json"
+  tests = "meta/bind-tests.json"
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.devicetree",
@@ -35,7 +35,7 @@ fuchsia_driver("aml-pwm-driver") {
 }
 
 fuchsia_driver_component("aml-pwm") {
-  info = "aml-pwm-info.json"
+  info = "meta/aml-pwm-info.json"
   component_name = "aml-pwm"
   deps = [ ":aml-pwm-driver" ]
   manifest = "meta/aml-pwm.cml"

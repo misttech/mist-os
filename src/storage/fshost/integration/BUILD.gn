@@ -81,6 +81,9 @@ rustc_library("fshost_test_fixture") {
 #   deps (optional)
 #     [array] Dependencies for the rust test binary.
 #
+#   extra_features (optional)
+#     [array] Extra rust features to define.
+#
 template("fshost_integration_test_component") {
   _fshost_component_name = get_label_info(invoker.fshost_target, "name")
   _test_bin = string_replace(target_name, "-", "_")
@@ -101,6 +104,9 @@ template("fshost_integration_test_component") {
       invoker.data_filesystem_format,
       invoker.data_filesystem_variant,
     ]
+    if (defined(invoker.extra_features)) {
+      features += invoker.extra_features
+    }
     deps = [
       ":fshost_test_fixture",
       "//src/lib/fuchsia",
@@ -158,6 +164,9 @@ template("fshost_integration_test_component") {
 #     [string] The format of the data partition fshost exports. One of "fxfs", "minfs", or "f2fs".
 #              The options scope can also contain additional fshost options if required.
 #
+#   options.storage_host (optional)
+#     [bool] Whether storage-host should be used.
+#
 #   data_filesystem_variant (optional)
 #     [string] A variant string passed to the integration test harness. Defaults to the
 #              data_filesystem_format.
@@ -178,11 +187,17 @@ template("fshost_integration_test_package") {
     }
   }
 
+  _extra_features = []
+  if (defined(fshost_options.storage_host) && fshost_options.storage_host) {
+    _extra_features = [ "storage-host" ]
+  }
+
   _integration_component_target = "${target_name}_general"
   fshost_integration_test_component(_integration_component_target) {
     fshost_target = _fshost_target
     data_filesystem_format = fshost_options.data_filesystem_format
     data_filesystem_variant = invoker.data_filesystem_variant
+    extra_features = _extra_features
     source_root = "tests/fshost_integration_test.rs"
     deps = [
       "//sdk/fidl/fuchsia.fshost:fuchsia.fshost_rust",
@@ -212,6 +227,7 @@ template("fshost_integration_test_package") {
     fshost_target = _fshost_target
     data_filesystem_format = fshost_options.data_filesystem_format
     data_filesystem_variant = invoker.data_filesystem_variant
+    extra_features = _extra_features
     source_root = "tests/migration.rs"
   }
 
@@ -220,6 +236,7 @@ template("fshost_integration_test_package") {
     fshost_target = _fshost_target
     data_filesystem_format = fshost_options.data_filesystem_format
     data_filesystem_variant = invoker.data_filesystem_variant
+    extra_features = _extra_features
     source_root = "tests/wipe_storage.rs"
     deps = [
       "//sdk/fidl/fuchsia.fshost:fuchsia.fshost_rust",
@@ -240,6 +257,7 @@ template("fshost_integration_test_package") {
     fshost_target = _fshost_target
     data_filesystem_format = fshost_options.data_filesystem_format
     data_filesystem_variant = invoker.data_filesystem_variant
+    extra_features = _extra_features
     source_root = "tests/write_data_file.rs"
     deps = [
       "//sdk/fidl/fuchsia.fshost:fuchsia.fshost_rust",
@@ -259,9 +277,13 @@ template("fshost_integration_test_package") {
     test_components = [
       ":$_integration_component_target",
       ":$_migration_component_target",
-      ":$_wipe_storage_component_target",
       ":$_write_data_file_component_target",
     ]
+
+    # TODO(https://fxbug.dev/339491886): Support wipe_storage in storage-host builds
+    if (!(defined(fshost_options.storage_host) && fshost_options.storage_host)) {
+      test_components += [ ":$_wipe_storage_component_target" ]
+    }
     deps = [
       ":$_fshost_target",
       "//src/storage/testing:storage_driver_test_realm",
@@ -285,6 +307,20 @@ fshost_integration_test_package("fshost_integration_tests_fxfs") {
   }
   extra_deps = [
     "//src/storage/lib/blob_writer:blob-writer",
+    "//src/sys/pkg/fidl/fuchsia.update.verify:fuchsia.update.verify_rust",
+  ]
+}
+
+fshost_integration_test_package("fshost_integration_tests_fxfs_gpt") {
+  data_filesystem_variant = "fxblob"
+  options = {
+    data_filesystem_format = "fxfs"
+    use_disk_migration = false
+    storage_host = true
+  }
+  extra_deps = [
+    "//src/storage/lib/blob_writer:blob-writer",
+    "//src/storage/storage-host",
     "//src/sys/pkg/fidl/fuchsia.update.verify:fuchsia.update.verify_rust",
   ]
 }
@@ -334,6 +370,7 @@ group("tests") {
     ":fshost_integration_tests_f2fs",
     ":fshost_integration_tests_f2fs_no_zxcrypt",
     ":fshost_integration_tests_fxfs",
+    ":fshost_integration_tests_fxfs_gpt",
     ":fshost_integration_tests_fxfs_no_fxblob",
     ":fshost_integration_tests_minfs",
     ":fshost_integration_tests_minfs_no_zxcrypt",

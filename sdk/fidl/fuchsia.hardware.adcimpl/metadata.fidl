@@ -6,9 +6,9 @@ library fuchsia.hardware.adcimpl;
 
 const ADC_NAME_MAX_LENGTH uint32 = 64;
 
-/// adcimpl driver metadata type used by the adc platform device. See also
-/// [`fuchsia.hardware.adcimpl/Metadata`].
-const PDEV_METADATA_TYPE uint32 = 0x00434441;
+/// Identifies the [`fuchsia.hardware.adcimpl/Metadata`] instance provided by the adc platform
+/// device.
+const PDEV_METADATA_TYPE_IDENTIFIER uint32 = 0x00434441;
 
 type AdcChannel = table {
     /// Index of channel.
@@ -23,4 +23,5 @@ type Metadata = table {
     1: channels vector<AdcChannel>:MAX;
 };
 
-const METADATA_SERVICE string = "fuchsia.hardware.adcimpl.Metadata";
+// Name of the FIDL type [`fuchsia.hardware.adcimpl/Metadata`].
+const METADATA_TYPE_NAME string = "fuchsia.hardware.adcimpl.Metadata";

@@ -7,7 +7,7 @@ import("//build/components.gni")
 import("//build/drivers.gni")
 
 driver_bind_rules("node-group-bind") {
-  rules = "node-group.bind"
+  rules = "meta/node-group.bind"
   bind_output = "node-group.bindbc"
 }
 
@@ -29,5 +29,5 @@ fuchsia_driver_component("component") {
   component_name = "node_group"
   manifest = "meta/node-group.cml"
   deps = [ ":driver" ]
-  info = "node-group-info.json"
+  info = "meta/node-group-info.json"
 }

@@ -16,6 +16,11 @@
 #include <vm/page.h>
 #include <vm/page_queues.h>
 
+// Forward declaration; defined in <lib/memalloc/range.h>
+namespace memalloc {
+struct Range;
+}
+
 // physical allocator
 typedef struct pmm_arena_info {
   char name[16];
@@ -33,10 +38,15 @@ class LoanSweeper;
 #define PMM_ARENA_FLAG_LO_MEM \
   (0x1)  // this arena is contained within architecturally-defined 'low memory'
 
-// Initializes the PMM with the provided, unnormalized memory ranges. This in
-// particular initializes its arenas, and populates the bootreserve with ranges
-// it should avoid in that selection and marks them as wire them.
-zx_status_t pmm_init(ktl::span<const zbi_mem_range_t> ranges);
+// Initializes the PMM with the provided, unnormalized and normalized memory
+// ranges. This in particular initializes its arenas, and populates the
+// bootreserve with ranges it should avoid in that selection and marks them as
+// wired.
+//
+// TODO(https://fxbug.dev/347766366): Make this a function of only the
+// normalized ranges.
+zx_status_t pmm_init(ktl::span<const zbi_mem_range_t> unnormalized,
+                     ktl::span<const memalloc::Range> normalized);
 
 // Returns the number of arenas.
 size_t pmm_num_arenas();

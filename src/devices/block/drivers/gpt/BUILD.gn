@@ -16,9 +16,9 @@ group("tests") {
 }
 
 driver_bind_rules("gpt_bind") {
-  rules = "gpt.bind"
+  rules = "meta/gpt.bind"
   bind_output = "gpt.bindbc"
-  tests = "bind_tests.json"
+  tests = "meta/bind_tests.json"
   deps = [ "//src/devices/bind/fuchsia.block" ]
 }
 
@@ -56,7 +56,7 @@ fuchsia_driver_component("gpt") {
   visibility = [ ":*" ]
   component_name = "gpt"
   deps = [ ":gpt-driver" ]
-  info = "gpt-info.json"
+  info = "meta/gpt-info.json"
   manifest = "meta/gpt.cml"
 }
 

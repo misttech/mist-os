@@ -15,7 +15,6 @@ use fuchsia_zircon::{self as zx, Status};
 use fxfs::filesystem::{FxFilesystem, FxFilesystemBuilder, OpenFxFilesystem};
 use fxfs::fsck::errors::FsckIssue;
 use fxfs::fsck::{fsck_volume_with_options, fsck_with_options, FsckOptions};
-use fxfs::log::*;
 use fxfs::object_store::volume::root_volume;
 use fxfs_insecure_crypto::InsecureCrypt;
 use std::sync::{Arc, Weak};
@@ -181,9 +180,9 @@ impl TestFixture {
         // hold references to the volume which we want to unwrap.
         volume.volume().terminate().await;
 
-        if volume.into_volume().unwrap_or_poison().is_none() {
-            error!("Unexpected leftover reference to Volume, it has been poisoned.");
-        }
+        Arc::try_unwrap(volume.into_volume())
+            .map_err(|_| "References to volume still exist")
+            .unwrap();
 
         // We have to reopen the filesystem briefly to fsck it. (We could fsck before closing, but
         // there might be pending operations that go through after fsck but before we close the

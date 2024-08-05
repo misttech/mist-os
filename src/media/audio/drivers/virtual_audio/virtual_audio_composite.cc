@@ -421,12 +421,12 @@ void VirtualAudioComposite::CreateRingBuffer(CreateRingBufferRequest& request,
 }
 
 void VirtualAudioComposite::ResetRingBuffer() {
-  watch_delay_replied_ = false;
-  watch_position_replied_ = false;
   ring_buffer_vmo_fetched_ = false;
   ring_buffer_started_ = false;
   notifications_per_ring_ = 0;
+  watch_position_info_needs_reply_ = true;
   position_info_completer_.reset();
+  watch_delay_info_needs_reply_ = true;
   delay_info_completer_.reset();
   // We don't reset ring_buffer_format_ and dai_format_ to allow for retrieval for
   // observability.
@@ -473,22 +473,25 @@ void VirtualAudioComposite::GetVmo(GetVmoRequest& request, GetVmoCompleter::Sync
                 zx_status_get_string(status));
 
   zx::vmo out_vmo;
-  status = ring_buffer_vmo_.duplicate(
-      ZX_RIGHT_TRANSFER | ZX_RIGHT_READ | ZX_RIGHT_WRITE | ZX_RIGHT_MAP, &out_vmo);
+  zx_rights_t required_rights = ZX_RIGHT_TRANSFER | ZX_RIGHT_READ | ZX_RIGHT_MAP;
+  if (ring_buffer_is_outgoing_) {
+    required_rights |= ZX_RIGHT_WRITE;
+  }
+  status = ring_buffer_vmo_.duplicate(required_rights, &out_vmo);
   ZX_ASSERT_MSG(status == ZX_OK, "failed to duplicate VMO handle for out param: %s",
                 zx_status_get_string(status));
 
   notifications_per_ring_ = request.clock_recovery_notifications_per_ring();
 
-  zx::vmo duplicate_vmo;
+  zx::vmo duplicate_vmo_for_va;
   status = ring_buffer_vmo_.duplicate(
-      ZX_RIGHT_TRANSFER | ZX_RIGHT_READ | ZX_RIGHT_WRITE | ZX_RIGHT_MAP, &duplicate_vmo);
+      ZX_RIGHT_TRANSFER | ZX_RIGHT_READ | ZX_RIGHT_WRITE | ZX_RIGHT_MAP, &duplicate_vmo_for_va);
   ZX_ASSERT_MSG(status == ZX_OK, "failed to duplicate VMO handle for VA client: %s",
                 zx_status_get_string(status));
 
   auto parent = parent_.lock();
   ZX_ASSERT(parent);
-  parent->NotifyBufferCreated(std::move(duplicate_vmo), num_ring_buffer_frames_,
+  parent->NotifyBufferCreated(std::move(duplicate_vmo_for_va), num_ring_buffer_frames_,
                               notifications_per_ring_);
   fuchsia_hardware_audio::RingBufferGetVmoResponse response;
   response.num_frames(num_ring_buffer_frames_);
@@ -538,13 +541,13 @@ void VirtualAudioComposite::Stop(StopCompleter::Sync& completer) {
 
 void VirtualAudioComposite::WatchClockRecoveryPositionInfo(
     WatchClockRecoveryPositionInfoCompleter::Sync& completer) {
-  if (!watch_position_replied_) {
+  if (watch_position_info_needs_reply_) {
     fuchsia_hardware_audio::RingBufferPositionInfo position_info;
     position_info.timestamp(zx::clock::get_monotonic().get());
     // TODO(https://fxbug.dev/42075676): Add support for current position; now we always report 0.
     position_info.position(0);
+    watch_position_info_needs_reply_ = false;
     completer.Reply(std::move(position_info));
-    watch_position_replied_ = true;
   } else if (!position_info_completer_) {
     position_info_completer_.emplace(completer.ToAsync());
   } else {
@@ -552,29 +555,29 @@ void VirtualAudioComposite::WatchClockRecoveryPositionInfo(
     // This is an error condition and hence we unbind the channel.
     zxlogf(ERROR,
            "WatchClockRecoveryPositionInfo called when another hanging get was pending, unbinding");
-    completer.Close(ZX_ERR_BAD_STATE);
+    watch_position_info_needs_reply_ = true;
     position_info_completer_.reset();
-    watch_position_replied_ = false;
+    completer.Close(ZX_ERR_BAD_STATE);
   }
 }
 
 void VirtualAudioComposite::WatchDelayInfo(WatchDelayInfoCompleter::Sync& completer) {
-  if (!watch_delay_replied_) {
+  if (watch_delay_info_needs_reply_) {
     auto& ring_buffer = GetRingBuffer(kRingBufferId);
     fuchsia_hardware_audio::DelayInfo delay_info;
     delay_info.internal_delay(ring_buffer.internal_delay());
     delay_info.external_delay(ring_buffer.external_delay());
+    watch_delay_info_needs_reply_ = false;
     completer.Reply(std::move(delay_info));
-    watch_delay_replied_ = true;
   } else if (!delay_info_completer_) {
     delay_info_completer_.emplace(completer.ToAsync());
   } else {
     // The client called WatchDelayInfo when another hanging get was pending.
     // This is an error condition and hence we unbind the channel.
     zxlogf(ERROR, "WatchDelayInfo called when another hanging get was pending, unbinding");
-    completer.Close(ZX_ERR_BAD_STATE);
+    watch_delay_info_needs_reply_ = true;
     delay_info_completer_.reset();
-    watch_delay_replied_ = false;
+    completer.Close(ZX_ERR_BAD_STATE);
   }
 }
 
@@ -611,6 +614,15 @@ void VirtualAudioComposite::OnSignalProcessingClosed(fidl::UnbindInfo info) {
   if (signal_) {
     signal_.reset();
   }
+  for (bool& needs_reply : watch_element_state_needs_reply_) {
+    needs_reply = true;
+  }
+  for (std::optional<WatchElementStateCompleter::Async>& completer :
+       watch_element_state_completers_) {
+    completer.reset();
+  }
+  watch_topology_needs_reply_ = true;
+  watch_topology_completer_.reset();
 }
 
 void VirtualAudioComposite::SignalProcessingConnect(
@@ -666,7 +678,7 @@ void VirtualAudioComposite::WatchElementState(WatchElementStateRequest& request,
       completer.Close(ZX_ERR_INVALID_ARGS);
       return;
   }
-  if (!watch_element_replied_[index]) {
+  if (watch_element_state_needs_reply_[index]) {
     fuchsia_hardware_audio_signalprocessing::ElementState state;
     fuchsia_hardware_audio_signalprocessing::DaiInterconnectElementState dai_state;
     fuchsia_hardware_audio_signalprocessing::PlugState plug_state;
@@ -675,19 +687,19 @@ void VirtualAudioComposite::WatchElementState(WatchElementStateRequest& request,
     state.type_specific(
         fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::WithDaiInterconnect(
             std::move(dai_state)));
+    watch_element_state_needs_reply_[index] = false;
     completer.Reply(std::move(state));
-    watch_element_replied_[index] = true;
-  } else if (!element_state_completer_[index]) {
-    element_state_completer_[index].emplace(completer.ToAsync());
+  } else if (!watch_element_state_completers_[index]) {
+    watch_element_state_completers_[index].emplace(completer.ToAsync());
   } else {
     // The client called WatchElementState when another hanging get was pending for the same id.
     // This is an error condition and hence we unbind the channel.
     zxlogf(ERROR, "WatchElementState called when another hanging get was pending, unbinding");
+    watch_element_state_needs_reply_[0] = true;
+    watch_element_state_needs_reply_[1] = true;
+    watch_element_state_completers_[0].reset();
+    watch_element_state_completers_[1].reset();
     completer.Close(ZX_ERR_BAD_STATE);
-    element_state_completer_[0].reset();
-    element_state_completer_[1].reset();
-    watch_element_replied_[0] = false;
-    watch_element_replied_[1] = false;
   }
 }
 
@@ -712,6 +724,8 @@ void VirtualAudioComposite::GetTopologies(GetTopologiesCompleter::Sync& complete
   fuchsia_hardware_audio_signalprocessing::Topology topology;
   topology.id(kTopologyId);
   fuchsia_hardware_audio_signalprocessing::EdgePair edge;
+  // For now, our lone ring buffer is an outgoing one.
+  ring_buffer_is_outgoing_ = true;
   edge.processing_element_id_from(kRingBufferId).processing_element_id_to(kDaiId);
   topology.processing_elements_edge_pairs(std::vector({std::move(edge)}));
 
@@ -722,16 +736,18 @@ void VirtualAudioComposite::WatchTopology(WatchTopologyCompleter::Sync& complete
   // This driver is limited to a single ring buffer and a single DAI interconnect.
   // TODO(https://fxbug.dev/42075676): Add support for more topologies allowing their configuration
   // and observability via the virtual audio FIDL APIs.
-  if (!responded_to_watch_topology_) {
-    responded_to_watch_topology_ = true;
+  if (watch_topology_needs_reply_) {
+    watch_topology_needs_reply_ = false;
     completer.Reply(kTopologyId);
-  } else if (topology_completer_) {
+  } else if (watch_topology_completer_) {
     // The client called WatchTopology when another hanging get was pending.
     // This is an error condition and hence we unbind the channel.
     zxlogf(ERROR, "WatchTopology was re-called while the previous call was still pending");
+    watch_topology_needs_reply_ = true;
+    watch_topology_completer_.reset();
     completer.Close(ZX_ERR_BAD_STATE);
   } else {
-    topology_completer_ = completer.ToAsync();
+    watch_topology_completer_ = completer.ToAsync();
   }
 }
 

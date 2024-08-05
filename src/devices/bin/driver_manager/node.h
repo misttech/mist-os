@@ -324,6 +324,22 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
     DriverState state = DriverState::kBinding;
   };
 
+  // Components needed to load a driver using dynamic linking.
+  struct DriverDynamicLinkerArgs {
+    static zx::result<DriverDynamicLinkerArgs> Create(
+        fuchsia_component_runner::wire::ComponentStartInfo start_info);
+
+    DriverDynamicLinkerArgs(std::string_view driver_soname, zx::vmo driver_file,
+                            fidl::ClientEnd<fuchsia_io::Directory> lib_dir)
+        : driver_soname(driver_soname),
+          driver_file(std::move(driver_file)),
+          lib_dir(std::move(lib_dir)) {}
+
+    std::string driver_soname;
+    zx::vmo driver_file;
+    fidl::ClientEnd<fuchsia_io::Directory> lib_dir;
+  };
+
   // fidl::WireServer<fuchsia_device::Controller>
   void ConnectToDeviceFidl(ConnectToDeviceFidlRequestView request,
                            ConnectToDeviceFidlCompleter::Sync& completer) override;
@@ -420,6 +436,11 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
 
   // Update `properties_dict_` to identify the contents of `properties_`.
   void SynchronizePropertiesDict();
+
+  void StartDriverWithDynamicLinker(
+      Node::DriverDynamicLinkerArgs args, std::string_view url,
+      fidl::ServerEnd<fuchsia_component_runner::ComponentController> controller,
+      fit::callback<void(zx::result<>)> cb);
 
   std::string name_;
 

@@ -7,8 +7,8 @@ import("//build/components.gni")
 import("//build/drivers.gni")
 
 driver_bind_rules("sherlock-post-init-bind") {
-  rules = "post-init.bind"
-  tests = "post-init-bind-test.json"
+  rules = "meta/post-init.bind"
+  tests = "meta/post-init-bind-test.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_bindlib",
     "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_bindlib",
@@ -56,7 +56,7 @@ fuchsia_driver("post-init-driver") {
 fuchsia_driver_component("post-init") {
   component_name = "sherlock-post-init"
   deps = [ ":post-init-driver" ]
-  info = "post-init-info.json"
+  info = "meta/post-init-info.json"
   manifest = "meta/post-init.cml"
 }
 

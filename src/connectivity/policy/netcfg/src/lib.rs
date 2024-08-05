@@ -43,7 +43,7 @@ use {
 
 use anyhow::{anyhow, Context as _};
 use async_trait::async_trait;
-use async_utils::stream::{TryFlattenUnorderedExt as _, WithTag as _};
+use async_utils::stream::WithTag as _;
 use dns_server_watcher::{DnsServers, DnsServersUpdateSource, DEFAULT_DNS_PORT};
 use fuchsia_fs::OpenFlags;
 use futures::stream::BoxStream;
@@ -2022,7 +2022,7 @@ impl<'a> NetCfg<'a> {
                 }
             })
             .fuse()
-            .try_flatten_unordered();
+            .try_flatten_unordered(None);
         Ok(stream_of_streams)
     }
 

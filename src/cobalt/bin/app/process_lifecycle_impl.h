@@ -7,7 +7,6 @@
 
 #include <fuchsia/process/lifecycle/cpp/fidl.h>
 
-#include "lib/sys/cpp/outgoing_directory.h"
 #include "src/cobalt/bin/app/metric_event_logger_factory_impl.h"
 #include "third_party/cobalt/src/public/cobalt_service_interface.h"
 

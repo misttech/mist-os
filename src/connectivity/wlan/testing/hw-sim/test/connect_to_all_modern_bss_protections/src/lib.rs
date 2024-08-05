@@ -85,7 +85,8 @@ async fn connect_to_modern_wpa_network() {
         let id =
             fidl_policy::NetworkIdentifier { ssid: ssid.to_vec(), type_: policy_security_type };
         wait_until_client_state(&mut client_state_update_stream, |update| {
-            has_id_and_state(update, &id, fidl_policy::ConnectionState::Disconnected)
+            has_id_and_state(update.clone(), &id, fidl_policy::ConnectionState::Disconnected)
+                || update.networks.expect("networks unexpectedly unpopulated").is_empty()
         })
         .await;
     }

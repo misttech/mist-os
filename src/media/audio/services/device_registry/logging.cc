@@ -1497,8 +1497,17 @@ void LogRingBufferVmo(const zx::vmo& vmo, uint32_t num_frames, fha::Format rb_fo
     FX_PLOGS(WARNING, status) << "vmo.get_size returned size " << size;
     return;
   }
-  FX_LOGS(INFO) << "fuchsia_hardware_audio/Vmo";
+  FX_LOGS(INFO) << "fuchsia_hardware_audio/GetVmo -> zx::Vmo";
   FX_LOGS(INFO) << "    koid                 0x" << std::hex << info.koid;
+  FX_LOGS(INFO) << "    rights               0x" << std::hex << info.rights << " ("
+                << ((info.rights & ZX_RIGHT_DUPLICATE) ? " DUPLICATE" : "")
+                << ((info.rights & ZX_RIGHT_TRANSFER) ? " TRANSFER" : "")
+                << ((info.rights & ZX_RIGHT_READ) ? " READ" : "")
+                << ((info.rights & ZX_RIGHT_WRITE) ? " WRITE" : "")
+                << ((info.rights & ZX_RIGHT_MAP) ? " MAP" : "")
+                << ((info.rights & ZX_RIGHT_GET_PROPERTY) ? " GET_PROPERTY" : "")
+                << ((info.rights & ZX_RIGHT_SET_PROPERTY) ? " SET_PROPERTY" : "")
+                << ((info.rights & ZX_RIGHT_RESIZE) ? " RESIZE" : "") << " )";
   FX_LOGS(INFO) << "    size                 " << size << " bytes";
   FX_LOGS(INFO) << "    calculated_size      "
                 << num_frames * rb_format.pcm_format()->number_of_channels() *

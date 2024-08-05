@@ -854,6 +854,8 @@ impl<
             inner.server = ServerState::Stopped;
         }
 
+        // Only write the instance data if the daemon repository server is enabled and starting.
+        let mut write_instance_data = false;
         // Start the server if it is enabled, but always load the configured repositories.
         if pkg_config::get_repository_server_enabled().await? {
             match fetch_repo_address().await {
@@ -869,11 +871,12 @@ impl<
                     tracing::error!("failed to read last address used from config: {:#}", err);
                 }
             }
+            write_instance_data = true;
         } else {
             tracing::debug!("repository server not enabled.");
         }
 
-        load_repositories_from_config(&self.inner).await;
+        load_repositories_from_config(&self.inner, write_instance_data).await;
 
         self.event_handler_provider
             .setup_event_handlers(cx.clone(), Arc::clone(&self.inner), Arc::clone(&self.registrar))
@@ -899,7 +902,7 @@ async fn fetch_repo_address() -> anyhow::Result<Option<SocketAddr>> {
     }
 }
 
-async fn load_repositories_from_config(inner: &Arc<RwLock<RepoInner>>) {
+async fn load_repositories_from_config(inner: &Arc<RwLock<RepoInner>>, write_instance_data: bool) {
     let addr = if let Some(serveraddr) = inner.read().await.server.listen_addr() {
         serveraddr
     } else {
@@ -931,21 +934,23 @@ async fn load_repositories_from_config(inner: &Arc<RwLock<RepoInner>>) {
         if let Err(err) = add_repository(&name, &repo_spec, Arc::clone(inner)).await {
             tracing::warn!("failed to add the repository {:?}: {:?}", name, err);
         } else {
-            if let Err(e) = write_instance_info(
-                None,
-                ServerMode::Daemon,
-                &name,
-                &addr,
-                repo_path.into(),
-                aliases.into_iter().map(ToString::to_string).collect(),
-                ffx::RepositoryStorageType::Ephemeral.into(),
-                ffx::RepositoryRegistrationAliasConflictMode::Replace.into(),
-            )
-            .await
-            {
-                tracing::error!(
-                    "failed to write repo server instance information for {name}: {e:?}"
-                );
+            if write_instance_data {
+                if let Err(e) = write_instance_info(
+                    None,
+                    ServerMode::Daemon,
+                    &name,
+                    &addr,
+                    repo_path.into(),
+                    aliases.into_iter().map(ToString::to_string).collect(),
+                    ffx::RepositoryStorageType::Ephemeral.into(),
+                    ffx::RepositoryRegistrationAliasConflictMode::Replace.into(),
+                )
+                .await
+                {
+                    tracing::error!(
+                        "failed to write repo server instance information for {name}: {e:?}"
+                    );
+                }
             }
         }
     }
@@ -1079,7 +1084,7 @@ impl<R: Registrar> EventHandler<TargetEvent> for TargetEventHandler<R> {
         }
 
         // Make sure we pick up any repositories that have been added since the last event.
-        load_repositories_from_config(&self.inner).await;
+        load_repositories_from_config(&self.inner, false).await;
 
         let source_nodename = if let Some(n) = self.target.nodename() {
             n

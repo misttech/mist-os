@@ -8,7 +8,7 @@ import("//build/drivers.gni")
 import("//build/test.gni")
 
 driver_bind_rules("bind-fail-test-bind") {
-  rules = "bind-fail.bind"
+  rules = "meta/bind-fail.bind"
 }
 
 fuchsia_driver("fuchsia_driver") {
@@ -33,7 +33,7 @@ fuchsia_driver("fuchsia_driver") {
 fuchsia_driver_component("driver") {
   component_name = "bind-fail-test-driver"
   deps = [ ":fuchsia_driver" ]
-  info = "driver-info.json"
+  info = "meta/driver-info.json"
   manifest = "meta/driver.cml"
 }
 

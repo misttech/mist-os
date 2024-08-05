@@ -57,7 +57,7 @@ platform_ir("platform_ir_head") {
 
 platform_ir_deps = [ ":platform_ir_head" ]
 
-foreach(supported_level, platform_version.frozen_api_levels) {
+foreach(supported_level, platform_version.frozen_api_levels + [ "NEXT" ]) {
   label = "platform_ir_${supported_level}"
   platform_ir_deps += [ ":${label}" ]
   platform_ir(label) {

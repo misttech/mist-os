@@ -24,9 +24,7 @@ ControllerDevice::~ControllerDevice() { loop_.Shutdown(); }
 
 fpromise::result<std::unique_ptr<ControllerDevice>, zx_status_t> ControllerDevice::Create(
     zx_device_t* parent) {
-  zx::result sysmem_result =
-      DdkConnectFragmentFidlProtocol<fuchsia_hardware_sysmem::Service::AllocatorV2>(parent,
-                                                                                    "sysmem");
+  zx::result sysmem_result = DdkConnectNsProtocol<fuchsia_sysmem2::Allocator>(parent);
   if (sysmem_result.is_error()) {
     zxlogf(ERROR, "Failed to get fuchsia.sysmem.Allocator protocol");
     return fpromise::error(sysmem_result.status_value());

@@ -8,7 +8,7 @@ import("//build/drivers.gni")
 import("//build/test.gni")
 
 driver_bind_rules("bind") {
-  rules = "usb-hub.bind"
+  rules = "meta/usb-hub.bind"
   bind_output = "usb-hub.bindbc"
   deps = [ "//src/devices/bind/fuchsia.usb" ]
 }
@@ -51,7 +51,7 @@ fuchsia_driver("usb-hub-driver") {
 
 fuchsia_driver_component("usb-hub") {
   visibility = [ ":*" ]
-  info = "usb-hub-info.json"
+  info = "meta/usb-hub-info.json"
   component_name = "usb-hub"
   deps = [ ":usb-hub-driver" ]
   manifest = "meta/usb-hub.cml"

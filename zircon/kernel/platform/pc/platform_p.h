@@ -16,10 +16,16 @@
 
 #include <ktl/span.h>
 
+// Forward declaration; defined in <lib/memalloc/range.h>
+namespace memalloc {
+struct Range;
+}
+
 extern Cbuf console_input_buf;
 
 void pc_init_timer_percpu(void);
-void pc_mem_init(ktl::span<const zbi_mem_range_t> ranges);
+void pc_mem_init(ktl::span<const zbi_mem_range_t> unnormalized,
+                 ktl::span<const memalloc::Range> normalized);
 
 void pc_prep_suspend_timer(void);
 void pc_resume_timer(void);

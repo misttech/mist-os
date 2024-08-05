@@ -81,7 +81,7 @@ layer_t CreatePrimaryLayerConfig(uint64_t handle) {
               .tiling_type = IMAGE_TILING_TYPE_LINEAR,
           },
       .alpha_mode = ALPHA_DISABLE,
-      .transform_mode = FRAME_TRANSFORM_IDENTITY,
+      .image_source_transformation = COORDINATE_TRANSFORMATION_IDENTITY,
       .image_source = {.x = 0, .y = 0, .width = kWidth, .height = kHeight},
       .display_destination = {.x = 0, .y = 0, .width = kWidth, .height = kHeight},
   };

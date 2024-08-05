@@ -381,14 +381,13 @@ class PageSource final : public PageRequestInterface {
   // the needed region has already been requested from the source.
   void SendRequestToProviderLocked(PageRequest* request) TA_REQ(page_source_mtx_);
 
-  // Wakes up the given PageRequest and all overlapping requests, with an optional |status|.
-  void CompleteRequestLocked(PageRequest* request, zx_status_t status = ZX_OK)
-      TA_REQ(page_source_mtx_);
+  // Wakes up the given PageRequest and all overlapping requests.
+  void CompleteRequestLocked(PageRequest* request) TA_REQ(page_source_mtx_);
 
   // Helper that updates request tracking metadata to resolve requests of |type| in the range
   // [offset, offset + len).
-  void ResolveRequests(page_request_type type, uint64_t offset, uint64_t len)
-      TA_EXCL(page_source_mtx_);
+  void ResolveRequestsLocked(page_request_type type, uint64_t offset, uint64_t len,
+                             zx_status_t error_status) TA_REQ(page_source_mtx_);
 
   // Helper to perform early waking on a request and any overlapping requests. The provided range
   // should be in local request space, and this method is only valid to be called if
@@ -512,6 +511,11 @@ class PageRequest : public fbl::WAVLTreeContainable<PageRequest*>,
   // provided. After being triggered, the wake_offset_ increments by the amount provided so that it
   // can potentially get triggered again.
   uint64_t wake_offset_ = UINT64_MAX;
+
+  // Tracks any error that we will send to the waiter when the request is completed. This allows for
+  // partial failure of a request, where we report the status of the first page in the request so
+  // that any partially provided pages can be processed.
+  zx_status_t complete_status_ = ZX_OK;
 
   // The page source this request is currently associated with.
   fbl::RefPtr<PageRequestInterface> src_;

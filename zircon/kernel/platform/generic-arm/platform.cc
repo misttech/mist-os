@@ -14,6 +14,7 @@
 #include <lib/debuglog.h>
 #include <lib/instrumentation/asan.h>
 #include <lib/jtrace/jtrace.h>
+#include <lib/memalloc/range.h>
 #include <lib/persistent-debuglog.h>
 #include <lib/system-topology.h>
 #include <lib/zbi-format/kernel.h>
@@ -54,7 +55,6 @@
 #include <platform/crashlog.h>
 #include <platform/debug.h>
 #include <platform/legacy_debug.h>
-#include <vm/bootreserve.h>
 #include <vm/kstack.h>
 #include <vm/physmap.h>
 #include <vm/vm.h>
@@ -325,15 +325,11 @@ static void allocate_persistent_ram(paddr_t pa, size_t length) {
 }
 
 void platform_early_init(void) {
-  // initialize the boot memory reservation system
-  boot_reserve_init();
-
   if (gPhysHandoff->nvram) {
     const zbi_nvram_t& nvram = gPhysHandoff->nvram.value();
-    dprintf(INFO, "boot reserve NVRAM range: phys base %#" PRIx64 " length %#" PRIx64 "\n",
-            nvram.base, nvram.length);
+    dprintf(INFO, "NVRAM range: phys base %#" PRIx64 " length %#" PRIx64 "\n", nvram.base,
+            nvram.length);
     allocate_persistent_ram(nvram.base, nvram.length);
-    boot_reserve_add_range(nvram.base, nvram.length);
   }
 
   // is the cmdline option to bypass dlog set ?
@@ -347,14 +343,6 @@ void platform_early_init(void) {
   // Initialize the PmmChecker now that the cmdline has been parsed.
   pmm_checker_init_from_cmdline();
 
-  // Add the data ZBI ramdisk to the boot reserve memory list.
-  ktl::span zbi = ZbiInPhysmap();
-  paddr_t ramdisk_start_phys = physmap_to_paddr(zbi.data());
-  paddr_t ramdisk_end_phys = ramdisk_start_phys + ROUNDUP_PAGE_SIZE(zbi.size_bytes());
-  dprintf(INFO, "reserving ramdisk phys range [%#" PRIx64 ", %#" PRIx64 "]\n", ramdisk_start_phys,
-          ramdisk_end_phys - 1);
-  boot_reserve_add_range(ramdisk_start_phys, ramdisk_end_phys - ramdisk_start_phys);
-
   for (const zbi_mem_range_t& mem_range : gPhysHandoff->mem_config.get()) {
     if (mem_range.type == ZBI_MEM_TYPE_PERIPHERAL) {
       dprintf(INFO, "ZBI: peripheral range base %#" PRIx64 " size %#" PRIx64 "\n", mem_range.paddr,
@@ -364,7 +352,7 @@ void platform_early_init(void) {
     }
   }
 
-  ASSERT(pmm_init(gPhysHandoff->mem_config.get()) == ZX_OK);
+  ASSERT(pmm_init(gPhysHandoff->mem_config.get(), gPhysHandoff->memory.get()) == ZX_OK);
 
   // give the mmu code a chance to do some bookkeeping
   arm64_mmu_early_init();

@@ -72,6 +72,7 @@
                 "fuchsia.fshost.Netboot",
                 "fuchsia.fshost.NoZxcrypt",
                 "fuchsia.fshost.RamdiskImage",
+                "fuchsia.fshost.StorageHost",
                 "fuchsia.fshost.UseDiskMigration",
                 "fuchsia.pkgcache.AllPackagesExecutable",
                 "fuchsia.pkgcache.UseFxblob",

@@ -34,6 +34,21 @@ const std::vector<std::pair<uint8_t, fha::SampleFormat>> kFormats = {
 };
 const std::vector<uint32_t> kFrameRates = {1000, 44100, 48000, 19200};
 
+constexpr uint64_t kVmoContentSize = 4096;
+constexpr uint8_t kChannelCount = 1;
+constexpr uint8_t kSampleSize = 2;
+constexpr uint32_t kNumFrames =
+    static_cast<uint32_t>(kVmoContentSize / kChannelCount / kSampleSize);
+const fha::Format kRingBufferFormat{{
+    .pcm_format = fha::PcmFormat{{
+        .number_of_channels = kChannelCount,
+        .sample_format = fha::SampleFormat::kPcmSigned,
+        .bytes_per_sample = kSampleSize,
+        .valid_bits_per_sample = 16,
+        .frame_rate = 8000,
+    }},
+}};
+
 // Unittest ValidateCodecProperties -- the missing, min and max possibilities
 TEST(ValidateTest, ValidateCodecProperties) {
   EXPECT_TRUE(ValidateCodecProperties(fha::CodecProperties{{
@@ -451,25 +466,26 @@ TEST(ValidateTest, ValidateSampleFormatCompatibility) {
   }
 }
 
-TEST(ValidateTest, ValidateRingBufferVmo) {
-  constexpr uint64_t kVmoContentSize = 4096;
-  zx::vmo vmo;
+TEST(ValidateTest, ValidateRingBufferVmoOutgoing) {
+  zx::vmo vmo, outgoing;
   auto status = zx::vmo::create(kVmoContentSize, 0, &vmo);
   ASSERT_EQ(status, ZX_OK) << "could not create VMO for test input";
+  status = vmo.replace(kRequiredOutgoingVmoRights, &outgoing);
+  ASSERT_EQ(status, ZX_OK) << "could not change VMO rights for test input";
 
-  constexpr uint8_t kChannelCount = 1;
-  constexpr uint8_t kSampleSize = 2;
-  uint32_t num_frames = static_cast<uint32_t>(kVmoContentSize / kChannelCount / kSampleSize);
-  EXPECT_TRUE(ValidateRingBufferVmo(vmo, num_frames,
-                                    {{
-                                        .pcm_format = fha::PcmFormat{{
-                                            .number_of_channels = kChannelCount,
-                                            .sample_format = fha::SampleFormat::kPcmSigned,
-                                            .bytes_per_sample = kSampleSize,
-                                            .valid_bits_per_sample = 16,
-                                            .frame_rate = 8000,
-                                        }},
-                                    }}));
+  EXPECT_TRUE(
+      ValidateRingBufferVmo(outgoing, kNumFrames, kRingBufferFormat, kRequiredOutgoingVmoRights));
+}
+
+TEST(ValidateTest, ValidateRingBufferVmoIncoming) {
+  zx::vmo vmo, incoming;
+  auto status = zx::vmo::create(kVmoContentSize, 0, &vmo);
+  ASSERT_EQ(status, ZX_OK) << "could not create VMO for test input";
+  status = vmo.replace(kRequiredIncomingVmoRights, &incoming);
+  ASSERT_EQ(status, ZX_OK) << "could not change VMO rights for test input";
+
+  EXPECT_TRUE(
+      ValidateRingBufferVmo(incoming, kNumFrames, kRingBufferFormat, kRequiredIncomingVmoRights));
 }
 
 TEST(ValidateTest, ValidateDelayInfo) {

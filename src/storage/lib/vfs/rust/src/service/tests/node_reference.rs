@@ -70,23 +70,11 @@ fn get_attributes() {
             assert_get_attributes!(
                 proxy,
                 fio::NodeAttributesQuery::all(),
-                attributes!(
+                immutable_attributes!(
                     fio::NodeAttributesQuery::all(),
-                    Mutable {
-                        creation_time: 0,
-                        modification_time: 0,
-                        mode: 0,
-                        uid: 0,
-                        gid: 0,
-                        rdev: 0
-                    },
                     Immutable {
                         protocols: fio::NodeProtocolKinds::CONNECTOR,
                         abilities: fio::Operations::GET_ATTRIBUTES | fio::Operations::CONNECT,
-                        content_size: 0,
-                        storage_size: 0,
-                        link_count: 1,
-                        id: fio::INO_UNKNOWN,
                     }
                 )
             );

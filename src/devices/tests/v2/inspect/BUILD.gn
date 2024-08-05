@@ -24,7 +24,7 @@ fidl("fuchsia.inspect.test") {
 }
 
 driver_bind_rules("bind") {
-  rules = "root.bind"
+  rules = "meta/root.bind"
   bind_output = "root.bindbc"
   deps = [ "//src/devices/bind/fuchsia.test" ]
 }
@@ -50,7 +50,7 @@ fuchsia_driver_component("root") {
   testonly = true
   component_name = "root"
   deps = [ ":root-driver" ]
-  info = "root-info.json"
+  info = "meta/root-info.json"
   manifest = "meta/root.cml"
 }
 

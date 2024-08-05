@@ -22,6 +22,11 @@
 
 #include "pmm_arena.h"
 
+// Forward declaration; defined in <lib/memalloc/range.h>
+namespace memalloc {
+struct Range;
+}
+
 // per numa node collection of pmm arenas and worker threads
 class PmmNode {
  public:
@@ -32,7 +37,10 @@ class PmmNode {
 
   DISALLOW_COPY_ASSIGN_AND_MOVE(PmmNode);
 
-  zx_status_t Init(ktl::span<const zbi_mem_range_t> ranges);
+  // TODO(https://fxbug.dev/347766366): Make this a function of only the
+  // normalized ranges.
+  zx_status_t Init(ktl::span<const zbi_mem_range_t> unnormalized,
+                   ktl::span<const memalloc::Range> normalized);
 
   paddr_t PageToPaddr(const vm_page_t* page) TA_NO_THREAD_SAFETY_ANALYSIS;
   vm_page_t* PaddrToPage(paddr_t addr) TA_NO_THREAD_SAFETY_ANALYSIS;

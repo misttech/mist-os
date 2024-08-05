@@ -20,9 +20,9 @@ group("tests") {
 }
 
 driver_bind_rules("chromeos_acpi_bind") {
-  rules = "chromeos_acpi.bind"
+  rules = "meta/chromeos_acpi.bind"
   bind_output = "chromeos_acpi.bindbc"
-  tests = "bind-tests.json"
+  tests = "meta/bind-tests.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.interrupt:fuchsia.hardware.interrupt_bindlib",
     "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_bindlib",
@@ -50,7 +50,7 @@ fuchsia_driver("driver") {
 fuchsia_driver_component("component") {
   component_name = "chromeos-acpi"
   deps = [ ":driver" ]
-  info = "component-info.json"
+  info = "meta/component-info.json"
   manifest = "meta/chromeos-acpi.cml"
 }
 

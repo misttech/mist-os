@@ -4,6 +4,8 @@
 
 #include "src/devices/usb/drivers/usb-peripheral/usb-function.h"
 
+#include <fidl/fuchsia.hardware.usb.endpoint/cpp/wire.h>
+
 #include <lib/ddk/debug.h>
 
 #include <fbl/array.h>
@@ -11,6 +13,8 @@
 #include "src/devices/usb/drivers/usb-peripheral/usb-peripheral.h"
 
 namespace usb_peripheral {
+
+namespace fdescriptor = fuchsia_hardware_usb_descriptor;
 
 void UsbFunction::DdkRelease() {
   peripheral_->FunctionCleared();
@@ -73,10 +77,56 @@ zx_status_t UsbFunction::UsbFunctionAllocEp(uint8_t direction, uint8_t* out_addr
 
 zx_status_t UsbFunction::UsbFunctionConfigEp(const usb_endpoint_descriptor_t* ep_desc,
                                              const usb_ss_ep_comp_descriptor_t* ss_comp_desc) {
+  fidl::Arena arena;
+
+  fdescriptor::wire::UsbEndpointDescriptor fep_desc;
+  fep_desc.b_length = ep_desc->b_length;
+  fep_desc.b_descriptor_type = ep_desc->b_descriptor_type;
+  fep_desc.b_endpoint_address = ep_desc->b_endpoint_address;
+  fep_desc.bm_attributes = ep_desc->bm_attributes;
+  fep_desc.w_max_packet_size = ep_desc->w_max_packet_size;
+  fep_desc.b_interval = ep_desc->b_interval;
+
+  fdescriptor::wire::UsbSsEpCompDescriptor fss_comp_desc;
+  if (ss_comp_desc != nullptr) {  // Only applies to 3.x devices.
+    fss_comp_desc.b_length = ss_comp_desc->b_length;
+    fss_comp_desc.b_descriptor_type = ss_comp_desc->b_descriptor_type;
+    fss_comp_desc.b_max_burst = ss_comp_desc->b_max_burst;
+    fss_comp_desc.bm_attributes = ss_comp_desc->bm_attributes;
+    fss_comp_desc.w_bytes_per_interval = ss_comp_desc->w_bytes_per_interval;
+  }
+
+  auto result = peripheral_->dci_new().buffer(arena)->ConfigureEndpoint(fep_desc, fss_comp_desc);
+
+  if (!result.ok()) {
+    zxlogf(DEBUG, "(framework) ConfigureEndpoint(): %s", result.status_string());
+  } else if (result->is_error() && result->error_value() == ZX_ERR_NOT_SUPPORTED) {
+    zxlogf(DEBUG, "ConfigureEndpoint(): %s", result.status_string());
+  } else if (result->is_error() && result->error_value() != ZX_ERR_NOT_SUPPORTED) {
+    return result->error_value();
+  } else {
+    return ZX_OK;
+  }
+
+  zxlogf(DEBUG, "could not ConfigureEndpoint() over FIDL, falling back to banjo");
   return peripheral_->dci().ConfigEp(ep_desc, ss_comp_desc);
 }
 
 zx_status_t UsbFunction::UsbFunctionDisableEp(uint8_t address) {
+  fidl::Arena arena;
+  auto result = peripheral_->dci_new().buffer(arena)->DisableEndpoint(address);
+
+  if (!result.ok()) {
+    zxlogf(DEBUG, "(framework) DisableEndpoint(): %s", result.status_string());
+  } else if (result->is_error() && result->error_value() == ZX_ERR_NOT_SUPPORTED) {
+    zxlogf(DEBUG, "DisableEndpoint(): %s", result.status_string());
+  } else if (result->is_error() && result->error_value() != ZX_ERR_NOT_SUPPORTED) {
+    return result->error_value();
+  } else {
+    return ZX_OK;
+  }
+
+  zxlogf(DEBUG, "could not DisableEndpoint() over FIDL, falling back to banjo");
   return peripheral_->dci().DisableEp(address);
 }
 
@@ -90,10 +140,38 @@ void UsbFunction::UsbFunctionRequestQueue(usb_request_t* usb_request,
 }
 
 zx_status_t UsbFunction::UsbFunctionEpSetStall(uint8_t ep_address) {
+  fidl::Arena arena;
+  auto result = peripheral_->dci_new().buffer(arena)->EndpointSetStall(ep_address);
+
+  if (!result.ok()) {
+    zxlogf(DEBUG, "(framework) EndpointSetStall(): %s", result.status_string());
+  } else if (result->is_error() && result->error_value() == ZX_ERR_NOT_SUPPORTED) {
+    zxlogf(DEBUG, "EndpointSetStall(): %s", result.status_string());
+  } else if (result->is_error() && result->error_value() != ZX_ERR_NOT_SUPPORTED) {
+    return result->error_value();
+  } else {
+    return ZX_OK;
+  }
+
+  zxlogf(DEBUG, "could not EndointSetStall() over FIDL, falling back to banjo");
   return peripheral_->dci().EpSetStall(ep_address);
 }
 
 zx_status_t UsbFunction::UsbFunctionEpClearStall(uint8_t ep_address) {
+  fidl::Arena arena;
+  auto result = peripheral_->dci_new().buffer(arena)->EndpointClearStall(ep_address);
+
+  if (!result.ok()) {
+    zxlogf(DEBUG, "(framework) EndpointClearStall(): %s", result.status_string());
+  } else if (result->is_error() && result->error_value() == ZX_ERR_NOT_SUPPORTED) {
+    zxlogf(DEBUG, "EndpointClearStall(): %s", result.status_string());
+  } else if (result->is_error() && result->error_value() != ZX_ERR_NOT_SUPPORTED) {
+    return result->error_value();
+  } else {
+    return ZX_OK;
+  }
+
+  zxlogf(DEBUG, "could not EndointClearStall() over FIDL, falling back to banjo");
   return peripheral_->dci().EpClearStall(ep_address);
 }
 

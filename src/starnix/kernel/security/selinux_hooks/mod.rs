@@ -46,9 +46,9 @@ pub(super) fn check_exec_access(
     current_task: &CurrentTask,
     executable_node: &FsNodeHandle,
 ) -> Result<ResolvedElfState, Errno> {
-    let (current_sid, exec_sid, ptracer_sid) = {
+    let (current_sid, exec_sid) = {
         let state = &current_task.read().security_state.0;
-        (state.current_sid, state.exec_sid, state.ptracer_sid)
+        (state.current_sid, state.exec_sid)
     };
 
     let executable_sid =
@@ -88,10 +88,9 @@ pub(super) fn check_exec_access(
             log_debug!("entrypoint permission is denied, ignoring.");
         }
         // Check that ptrace permission is allowed if the process is traced.
-        // TODO(b/352535794): Perform this check based on the `Task::ptrace` state.
-        if let Some(ptracer_sid) = ptracer_sid {
-            if !security_server.has_permissions(ptracer_sid, new_sid, &[ProcessPermission::Ptrace])
-            {
+        if let Some(ptracer) = current_task.ptracer_task().upgrade() {
+            let tracer_sid = ptracer.read().security_state.0.current_sid;
+            if !security_server.has_permissions(tracer_sid, new_sid, &[ProcessPermission::Ptrace]) {
                 return error!(EACCES);
             }
         }
@@ -107,12 +106,10 @@ pub(super) fn update_state_on_exec(
 ) {
     let security_state = &mut current_task.write().security_state.0;
     let previous_sid = security_state.current_sid;
-    let ptracer_sid = security_state.ptracer_sid;
 
     *security_state = TaskState {
         current_sid: elf_security_state.0.expect("SELinux enabled but missing resolved elf state"),
         previous_sid,
-        ptracer_sid,
         exec_sid: None,
         fscreate_sid: None,
         keycreate_sid: None,
@@ -271,12 +268,6 @@ pub(super) fn ptrace_access_check(
         tracee_security_state.current_sid,
         &[ProcessPermission::Ptrace],
     )
-    .and_then(|_| {
-        // If tracing is allowed, set the `ptracer_sid` of the tracee with the tracer's SID.
-        // TODO(b/352535794): Remove this, and rely on `Task::ptrace` instead.
-        tracee_security_state.ptracer_sid = Some(tracer_sid);
-        Ok(())
-    })
 }
 
 /// Attempts to update the security ID (SID) associated with `fs_node` to the context encoded by
@@ -515,9 +506,6 @@ pub(super) struct TaskState {
 
     /// SID for sockets created by the task.
     pub sockcreate_sid: Option<SecurityId>,
-
-    /// SID of the tracer, if the thread group is traced.
-    pub ptracer_sid: Option<SecurityId>,
 }
 
 impl TaskState {
@@ -539,7 +527,6 @@ impl TaskState {
             fscreate_sid: None,
             keycreate_sid: None,
             sockcreate_sid: None,
-            ptracer_sid: None,
         }
     }
 }
@@ -730,7 +717,6 @@ mod tests {
             keycreate_sid: None,
             previous_sid: current_sid,
             sockcreate_sid: None,
-            ptracer_sid: None,
         };
 
         assert_eq!(
@@ -767,7 +753,6 @@ mod tests {
             keycreate_sid: None,
             previous_sid: current_sid,
             sockcreate_sid: None,
-            ptracer_sid: None,
         };
 
         assert_eq!(
@@ -806,7 +791,6 @@ mod tests {
             keycreate_sid: None,
             previous_sid: current_sid,
             sockcreate_sid: None,
-            ptracer_sid: None,
         };
 
         assert_eq!(
@@ -841,7 +825,6 @@ mod tests {
             keycreate_sid: None,
             previous_sid: current_sid,
             sockcreate_sid: None,
-            ptracer_sid: None,
         };
 
         assert_eq!(
@@ -877,7 +860,6 @@ mod tests {
             keycreate_sid: None,
             previous_sid: current_sid,
             sockcreate_sid: None,
-            ptracer_sid: None,
         };
 
         // There is no `execute_no_trans` allow statement from `current_sid` to `executable_sid`,
@@ -924,7 +906,6 @@ mod tests {
                 keycreate_sid: None,
                 previous_sid: initial_state.current_sid,
                 sockcreate_sid: None,
-                ptracer_sid: None,
             }
         );
     }
@@ -1150,7 +1131,6 @@ mod tests {
             keycreate_sid: None,
             previous_sid: tracee_sid,
             sockcreate_sid: None,
-            ptracer_sid: None,
         };
         let mut tracee_state = initial_state.clone();
 
@@ -1171,7 +1151,6 @@ mod tests {
                 keycreate_sid: initial_state.keycreate_sid,
                 previous_sid: initial_state.previous_sid,
                 sockcreate_sid: initial_state.sockcreate_sid,
-                ptracer_sid: Some(tracer_sid),
             }
         );
     }
@@ -1192,7 +1171,6 @@ mod tests {
             keycreate_sid: None,
             previous_sid: tracee_sid,
             sockcreate_sid: None,
-            ptracer_sid: None,
         };
         let mut tracee_state = initial_state.clone();
 
@@ -1217,7 +1195,6 @@ mod tests {
             fscreate_sid: Some(SecurityId::initial(InitialSid::Unlabeled)),
             keycreate_sid: Some(SecurityId::initial(InitialSid::Unlabeled)),
             sockcreate_sid: Some(SecurityId::initial(InitialSid::Unlabeled)),
-            ptracer_sid: None,
         };
 
         let security_state = task_alloc(&parent_security_state, 0);
@@ -1233,7 +1210,6 @@ mod tests {
         assert_eq!(for_kernel.fscreate_sid, None);
         assert_eq!(for_kernel.keycreate_sid, None);
         assert_eq!(for_kernel.sockcreate_sid, None);
-        assert_eq!(for_kernel.ptracer_sid, None);
     }
 
     #[fuchsia::test]

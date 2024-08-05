@@ -28,6 +28,7 @@
 #include <phys/kernel-package.h>
 #include <phys/main.h>
 #include <phys/new.h>
+#include <phys/stdio.h>
 #include <phys/symbolize.h>
 
 #include "log.h"
@@ -65,11 +66,8 @@ void FindTestRamReservation(RamReservation& ram) {
         if (pool.UpdateRamSubranges(memalloc::Type::kTestRamReserve, aligned_start, ram.size)
                 .is_ok()) {
           ram.paddr = aligned_start;
-          if (gBootOptions->phys_verbose) {
-            // Dump out the memory usage again to show the reservation.
-            printf("%s: Physical memory after kernel.test.ram.reserve carve-out:\n", ProgramName());
-            pool.PrintMemoryRanges(ProgramName());
-          }
+          debugf("%s: kernel.test.ram.reserve carve-out: [%#" PRIx64 ", %#" PRIx64 ")\n",
+                 ProgramName(), aligned_start, aligned_end);
           return;
         }
         // Don't try another spot if something went wrong.
@@ -169,15 +167,13 @@ void HandoffPrep::SetMemory() {
   // remain.
   auto normed_type = [](memalloc::Type type) -> ktl::optional<memalloc::Type> {
     switch (type) {
-      // We pretend that our reserved 'test' RAM isn't RAM at all.
-      case memalloc::Type::kTestRamReserve:
-        return ktl::nullopt;
-
       // The allocations that should survive into the hand-off.
       case memalloc::Type::kDataZbi:
       case memalloc::Type::kKernel:
+      case memalloc::Type::kNvram:
       case memalloc::Type::kPeripheral:
       case memalloc::Type::kReservedLow:
+      case memalloc::Type::kTestRamReserve:
         return type;
 
       default:

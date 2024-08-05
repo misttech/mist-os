@@ -416,8 +416,14 @@ zx_status_t VirtualAudioStream::GetBuffer(const audio::audio_proto::RingBufGetBu
 
   ZX_ASSERT_MSG(status == ZX_OK, "%s failed to create ring buffer vmo - %d", __func__, status);
 
-  status = ring_buffer_vmo_.duplicate(
-      ZX_RIGHT_TRANSFER | ZX_RIGHT_READ | ZX_RIGHT_WRITE | ZX_RIGHT_MAP, out_buffer);
+  zx_rights_t required_rights = ZX_RIGHT_TRANSFER | ZX_RIGHT_READ | ZX_RIGHT_MAP;
+  if (config_.device_specific().has_value() &&
+      config_.device_specific()->stream_config().has_value() &&
+      config_.device_specific()->stream_config()->is_input().has_value() &&
+      !*config_.device_specific()->stream_config()->is_input()) {
+    required_rights |= ZX_RIGHT_WRITE;
+  }
+  status = ring_buffer_vmo_.duplicate(required_rights, out_buffer);
   ZX_ASSERT_MSG(status == ZX_OK, "%s failed to duplicate VMO handle for out param - %d", __func__,
                 status);
 

@@ -815,7 +815,8 @@ impl ObjectStore {
                     store.get_keys(object_id),
                     /* permanent: */ true,
                 )
-                .await?;
+                .await?
+                .ok_or(anyhow!(FxfsError::Inconsistent).context("Missing encryption key"))?;
             true
         } else {
             false
@@ -1888,7 +1889,7 @@ impl ObjectStore {
     /// Returns the link of a symlink object.
     pub async fn read_symlink(&self, object_id: u64) -> Result<Vec<u8>, Error> {
         match self.tree.find(&ObjectKey::object(object_id)).await? {
-            None | Some(Item { value: ObjectValue::None, .. }) => bail!(FxfsError::NotFound),
+            None => bail!(FxfsError::NotFound),
             Some(Item {
                 value: ObjectValue::Object { kind: ObjectKind::Symlink { link, .. }, .. },
                 ..
@@ -1899,10 +1900,13 @@ impl ObjectStore {
     }
 
     /// Retrieves the wrapped keys for the given object.
-    async fn get_keys(&self, object_id: u64) -> Result<WrappedKeys, Error> {
-        match self.tree.find(&ObjectKey::keys(object_id)).await?.ok_or(FxfsError::NotFound)? {
-            Item { value: ObjectValue::Keys(EncryptionKeys::AES256XTS(keys)), .. } => Ok(keys),
-            _ => Err(anyhow!(FxfsError::Inconsistent).context("open_object: Expected keys")),
+    async fn get_keys(&self, object_id: u64) -> Result<Option<WrappedKeys>, Error> {
+        match self.tree.find(&ObjectKey::keys(object_id)).await? {
+            None => Ok(None),
+            Some(Item { value: ObjectValue::Keys(EncryptionKeys::AES256XTS(keys)), .. }) => {
+                Ok(Some(keys))
+            }
+            Some(_) => Err(anyhow!(FxfsError::Inconsistent).context("open_object: Expected keys")),
         }
     }
 
