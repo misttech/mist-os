@@ -131,6 +131,10 @@ impl<I: IpExt, BC: FilterBindingsContext, E: Default> Table<I, BC, E> {
             Connection::Shared(_) => return Ok(false),
         };
 
+        if exclusive.do_not_insert {
+            return Ok(false);
+        }
+
         let mut guard = self.inner.lock();
 
         // We multiply the table size limit because each connection is inserted
@@ -237,16 +241,19 @@ impl<I: IpExt, BC: FilterBindingsContext, E: Default> Table<I, BC, E> {
         match connection.update(bindings_ctx, &packet) {
             Ok(ConnectionUpdateAction::NoAction) => Ok(Some(connection)),
             Ok(ConnectionUpdateAction::RemoveEntry) => match connection {
-                Connection::Exclusive(_) => Ok(None),
-                Connection::Shared(_) => {
+                Connection::Exclusive(mut conn) => {
+                    conn.do_not_insert = true;
+                    Ok(Some(Connection::Exclusive(conn)))
+                }
+                Connection::Shared(conn) => {
                     // RACE: It's possible that GC already removed the
                     // connection from the table, since we released the table
                     // lock while updating the connection.
                     let mut guard = self.inner.lock();
-                    let _ = guard.table.remove(connection.original_tuple());
-                    let _ = guard.table.remove(connection.reply_tuple());
+                    let _ = guard.table.remove(&conn.inner.original_tuple);
+                    let _ = guard.table.remove(&conn.inner.reply_tuple);
 
-                    Ok(None)
+                    Ok(Some(Connection::Shared(conn)))
                 }
             },
             Err(e) => match e {
@@ -692,6 +699,12 @@ impl<BT: FilterBindingsTypes> Inspectable for ConnectionState<BT> {
 pub struct ConnectionExclusive<I: IpExt, BT: FilterBindingsTypes, E> {
     pub(crate) inner: ConnectionCommon<I, E>,
     pub(crate) state: ConnectionState<BT>,
+
+    /// When true, do not insert the connection into the conntrack table.
+    ///
+    /// This allows the stack to still operate against the connection (e.g. for
+    /// NAT), while guaranteeing that it won't make it into the table.
+    do_not_insert: bool,
 }
 
 impl<I: IpExt, BT: FilterBindingsTypes, E> ConnectionExclusive<I, BT, E> {
@@ -741,6 +754,7 @@ impl<I: IpExt, BC: FilterBindingsContext, E: Default> ConnectionExclusive<I, BC,
                     }
                 },
             },
+            do_not_insert: false,
         })
     }
 }
@@ -885,7 +899,9 @@ mod tests {
     use net_declare::{net_ip_v4, net_ip_v6};
     use net_types::ip::{Ipv4, Ipv6};
     use netstack3_base::testutil::FakeTimerCtxExt;
-    use netstack3_base::{IntoCoreTimerCtx, SegmentHeader};
+    use netstack3_base::{
+        Control, IntoCoreTimerCtx, Options, SegmentHeader, SeqNum, UnscaledWindowSize,
+    };
     use packet_formats::ip::IpProto;
     use test_case::test_case;
 
@@ -1722,5 +1738,106 @@ mod tests {
 
         assert_eq!(table.inner.lock().table.len(), 0);
         assert_eq!(table.inner.lock().num_connections, 0);
+    }
+
+    #[ip_test(I)]
+    fn remove_entry_on_update<I: IpExt + TestIpExt>() {
+        let mut bindings_ctx = FakeBindingsCtx::new();
+        let table = Table::<_, _, ()>::new::<IntoCoreTimerCtx>(&mut bindings_ctx);
+
+        let original_packet = FakeIpPacket::<I, _> {
+            src_ip: I::SRC_ADDR,
+            dst_ip: I::DST_ADDR,
+            body: FakeTcpSegment {
+                src_port: I::SRC_PORT,
+                dst_port: I::DST_PORT,
+                segment: SegmentHeader {
+                    seq: SeqNum::new(1024),
+                    ack: None,
+                    wnd: UnscaledWindowSize::from(16u16),
+                    control: Some(Control::SYN),
+                    options: Options::default(),
+                },
+                payload_len: 0,
+            },
+        };
+
+        let reply_packet = FakeIpPacket::<I, _> {
+            src_ip: I::DST_ADDR,
+            dst_ip: I::SRC_ADDR,
+            body: FakeTcpSegment {
+                src_port: I::DST_PORT,
+                dst_port: I::SRC_PORT,
+                segment: SegmentHeader {
+                    seq: SeqNum::new(0),
+                    ack: Some(SeqNum::new(1025)),
+                    wnd: UnscaledWindowSize::from(16u16),
+                    control: Some(Control::RST),
+                    options: Options::default(),
+                },
+                payload_len: 0,
+            },
+        };
+
+        let tuple = Tuple::from_packet(&original_packet).expect("packet should be valid");
+        let reply_tuple = tuple.clone().invert();
+
+        let conn = table
+            .get_connection_for_packet_and_update(&bindings_ctx, &original_packet)
+            .expect("packet should be valid")
+            .expect("packet should be trackable");
+        assert_matches!(table.finalize_connection(&mut bindings_ctx, conn), Ok(true));
+
+        assert!(table.contains_tuple(&tuple));
+        assert!(table.contains_tuple(&reply_tuple));
+
+        // Sending the reply RST through should result in the connection being
+        // removed from the table.
+        let conn = table
+            .get_connection_for_packet_and_update(&bindings_ctx, &reply_packet)
+            .expect("packet should be valid")
+            .expect("packet should be trackable");
+
+        assert!(!table.contains_tuple(&tuple));
+        assert!(!table.contains_tuple(&reply_tuple));
+
+        // The connection should not added back on finalization.
+        assert_matches!(table.finalize_connection(&mut bindings_ctx, conn), Ok(false));
+
+        assert!(!table.contains_tuple(&tuple));
+        assert!(!table.contains_tuple(&reply_tuple));
+
+        // GC should complete successfully.
+        bindings_ctx.sleep(Duration::from_secs(60 * 60 * 24 * 6));
+        table.perform_gc(&mut bindings_ctx);
+    }
+
+    #[ip_test(I)]
+    fn do_not_insert<I: IpExt + TestIpExt>() {
+        let mut bindings_ctx = FakeBindingsCtx::new();
+        let table = Table::<_, _, ()>::new::<IntoCoreTimerCtx>(&mut bindings_ctx);
+
+        let packet = FakeIpPacket::<I, _> {
+            src_ip: I::SRC_ADDR,
+            dst_ip: I::DST_ADDR,
+            body: FakeUdpPacket { src_port: I::SRC_PORT, dst_port: I::DST_PORT },
+        };
+
+        let tuple = Tuple::from_packet(&packet).expect("packet should be valid");
+        let reply_tuple = tuple.clone().invert();
+
+        let conn = table
+            .get_connection_for_packet_and_update(&bindings_ctx, &packet)
+            .expect("packet should be valid")
+            .expect("packet should be trackable");
+        let mut conn = assert_matches!(conn, Connection::Exclusive(conn) => conn);
+        conn.do_not_insert = true;
+        assert_matches!(
+            table.finalize_connection(&mut bindings_ctx, Connection::Exclusive(conn)),
+            Ok(false)
+        );
+
+        assert!(!table.contains_tuple(&tuple));
+        assert!(!table.contains_tuple(&reply_tuple));
     }
 }
