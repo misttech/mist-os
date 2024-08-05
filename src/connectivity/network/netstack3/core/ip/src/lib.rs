@@ -194,6 +194,7 @@ pub mod multicast_forwarding {
         MulticastForwardingPendingPacketsContext, MulticastForwardingState,
         MulticastForwardingStateContext, MulticastRouteTable, MulticastRouteTableContext,
     };
+    pub use crate::internal::multicast_forwarding::MulticastForwardingDeviceContext;
 }
 
 /// Raw IP sockets.

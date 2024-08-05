@@ -61,6 +61,7 @@ use crate::internal::multicast_forwarding::route::{MulticastRouteIpExt, Multicas
 use crate::internal::multicast_forwarding::state::{
     MulticastForwardingState, MulticastForwardingStateContext,
 };
+use crate::internal::multicast_forwarding::MulticastForwardingDeviceContext;
 use crate::internal::path_mtu::{PmtuBindingsTypes, PmtuCache, PmtuTimerId};
 use crate::internal::raw::counters::RawIpSocketCounters;
 use crate::internal::raw::{RawIpSocketHandler, RawIpSocketMap, RawIpSocketsBindingsTypes};
@@ -788,9 +789,6 @@ pub trait IpDeviceContext<I: IpLayerIpExt, BC>: IpDeviceStateContext<I, BC> {
     /// Returns true iff the device has unicast forwarding enabled.
     fn is_device_unicast_forwarding_enabled(&mut self, device_id: &Self::DeviceId) -> bool;
 
-    /// Returns true iff the device has multicast forwarding enabled.
-    fn is_device_multicast_forwarding_enabled(&mut self, device_id: &Self::DeviceId) -> bool;
-
     /// Returns the MTU of the device.
     fn get_mtu(&mut self, device_id: &Self::DeviceId) -> Mtu;
 
@@ -864,14 +862,21 @@ impl<BT: IcmpBindingsTypes + IpStateBindingsTypes> IpLayerBindingsTypes for BT {
 pub trait IpLayerContext<
     I: IpLayerIpExt,
     BC: IpLayerBindingsContext<I, <Self as DeviceIdContext<AnyDevice>>::DeviceId>,
->: IpStateContext<I, BC> + IpDeviceContext<I, BC> + MulticastForwardingStateContext<I>
+>:
+    IpStateContext<I, BC>
+    + IpDeviceContext<I, BC>
+    + MulticastForwardingStateContext<I>
+    + MulticastForwardingDeviceContext<I>
 {
 }
 
 impl<
         I: IpLayerIpExt,
         BC: IpLayerBindingsContext<I, <CC as DeviceIdContext<AnyDevice>>::DeviceId>,
-        CC: IpStateContext<I, BC> + IpDeviceContext<I, BC> + MulticastForwardingStateContext<I>,
+        CC: IpStateContext<I, BC>
+            + IpDeviceContext<I, BC>
+            + MulticastForwardingStateContext<I>
+            + MulticastForwardingDeviceContext<I>,
     > IpLayerContext<I, BC> for CC
 {
 }
