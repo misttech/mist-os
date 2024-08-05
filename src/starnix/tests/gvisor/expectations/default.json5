@@ -876,10 +876,6 @@
                 "IPv6UnboundSockets/IPv6UnboundSocketTest.ZeroHopLimit/0",
                 "IPv6UnboundSockets/IPv6UnboundSocketTest.ZeroHopLimit/1",
 
-                // timerfd_test - https://fxbug.dev/42159666
-                "AllTimerTypes/TimerfdTest.BlockingPoll_SetTimeResetsExpirations/CLOCK_MONOTONIC",
-                "AllTimerTypes/TimerfdTest.BlockingPoll_SetTimeResetsExpirations/CLOCK_BOOTTIME",
-
                 // timers_test
                 "IntervalTimerTest.RealTimeSignalsAreNotDuplicated",
                 "TimerTest.ProcessKilledOnCPUHardLimit",
