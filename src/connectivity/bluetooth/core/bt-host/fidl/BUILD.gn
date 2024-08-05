@@ -200,5 +200,5 @@ fuchsia_library_fuzzer("host_server_watch_peers_fuzzer") {
 
 bazel_fuchsia_test_package("test_pkg") {
   test_package_name = "bt_host_fidl_tests_bazel"
-  test_component_names = [ "fidl_test_autogen_cml" ]
+  test_component_names = [ "fidl_test" ]
 }

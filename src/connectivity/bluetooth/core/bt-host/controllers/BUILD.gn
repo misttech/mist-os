@@ -68,5 +68,5 @@ bt_gtest_package("bt-host-controllers-tests") {
 
 bazel_fuchsia_test_package("test_pkg") {
   test_package_name = "controllers_tests"
-  test_component_names = [ "controllers_test_autogen_cml" ]
+  test_component_names = [ "controllers_test" ]
 }
