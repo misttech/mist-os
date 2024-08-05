@@ -98,9 +98,11 @@ def _emit_finding(ctx, path, category, prefix, underscore_score, dash_score):
     ext = _get_extension(path)
 
     if category == "_":
+        choice = r"\_"
         opposite = "-"
     else:
-        opposite = "_"
+        choice = "-"
+        opposite = r"\_"
 
     if ext == "":
         ext_note = "extensionless"
@@ -115,9 +117,9 @@ def _emit_finding(ctx, path, category, prefix, underscore_score, dash_score):
         message = """filename contains a '{0}' character. Similar files tend to use '{1}'. Consider using '{1}' instead.
 
 Of other {2} files {3}:
-* {4} use '_'
+* {4} use '\\_'
 * {5} use '-'
-""".format(category, opposite, ext_note, prefix_note, underscore_score, dash_score),
+""".format(choice, opposite, ext_note, prefix_note, underscore_score, dash_score),
         filepath = path,
     )
 
