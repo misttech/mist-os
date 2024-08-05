@@ -3322,3 +3322,16 @@
   reviewers: ['adanis@google.com', 'etiennej@google.com', 'jamesr@google.com', 'wez@google.com']
   submitted: '2024-08-02'
   reviewed: '2024-07-29'
+
+- name: 'RFC-0255'
+  title: 'System Activity Governor'
+  short_description: 'Defines a component that manages the suspend state of the platform by leveraging power topology concepts.'
+  authors: ['mbrunson@google.com']
+  file: '0255_system_activity_governor.md'
+  area: ['Power']
+  issue: ['328314126','354043645']
+  gerrit_change_id: ['1044213']
+  status: 'Accepted'
+  reviewers: ['andresoportus@google.com', 'awolter@google.com', 'geb@google.com', 'gkalsi@google.com', 'harshanv@google.com', 'jmatt@google.com', 'kgong@google.com', 'quiche@google.com', 'maniscalco@google.com', 'claridge@google.com']
+  submitted: '2024-05-07'
+  reviewed: '2024-08-02'
