@@ -405,6 +405,56 @@ pub struct Route<I: Ip> {
     pub properties: RouteProperties,
 }
 
+impl<I: Ip> Route<I> {
+    /// Constructs a new route with metric `metric` that forwards any packets to `destination` over
+    /// `outbound_interface`.
+    pub fn new_forward(
+        destination: Subnet<I::Addr>,
+        outbound_interface: u64,
+        next_hop: Option<SpecifiedAddr<I::Addr>>,
+        metric: fnet_routes::SpecifiedMetric,
+    ) -> Self {
+        Self {
+            destination,
+            action: RouteAction::Forward(RouteTarget { outbound_interface, next_hop }),
+            properties: RouteProperties {
+                specified_properties: SpecifiedRouteProperties { metric },
+            },
+        }
+    }
+
+    /// Constructs a new route that forwards any packets to `destination` over
+    /// `outbound_interface`, inheriting `outbound_interface`'s metric.
+    pub fn new_forward_with_inherited_metric(
+        destination: Subnet<I::Addr>,
+        outbound_interface: u64,
+        next_hop: Option<SpecifiedAddr<I::Addr>>,
+    ) -> Self {
+        Self::new_forward(
+            destination,
+            outbound_interface,
+            next_hop,
+            fnet_routes::SpecifiedMetric::InheritedFromInterface(fnet_routes::Empty),
+        )
+    }
+
+    //// Constructs a new route with metric `metric` that forwards any packets to `destination` over
+    /// `outbound_interface`.
+    pub fn new_forward_with_explicit_metric(
+        destination: Subnet<I::Addr>,
+        outbound_interface: u64,
+        next_hop: Option<SpecifiedAddr<I::Addr>>,
+        metric: u32,
+    ) -> Self {
+        Self::new_forward(
+            destination,
+            outbound_interface,
+            next_hop,
+            fnet_routes::SpecifiedMetric::ExplicitMetric(metric),
+        )
+    }
+}
+
 impl TryFrom<fnet_routes::RouteV4> for Route<Ipv4> {
     type Error = FidlConversionError<RoutePropertiesRequiredFields>;
     fn try_from(route: fnet_routes::RouteV4) -> Result<Self, Self::Error> {

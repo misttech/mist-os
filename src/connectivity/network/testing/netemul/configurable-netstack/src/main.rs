@@ -5,16 +5,19 @@
 use anyhow::{anyhow, Context as _};
 use async_utils::hanging_get::client::HangingGetStream;
 use fidl::endpoints::Proxy as _;
+use fidl_fuchsia_net_ext::{self as fnet_ext, IntoExt};
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_component::server::{ServiceFs, ServiceFsDir};
 use futures_util::{StreamExt as _, TryStreamExt as _};
+use net_types::ip::{Ip, Ipv4, Ipv6};
+use net_types::SpecifiedAddr;
 use tracing::{error, info};
 use {
     fidl_fuchsia_hardware_network as fhardware_network, fidl_fuchsia_net as fnet,
-    fidl_fuchsia_net_ext as fnet_ext, fidl_fuchsia_net_interfaces as fnet_interfaces,
+    fidl_fuchsia_net_interfaces as fnet_interfaces,
     fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
-    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_net_stack as fnet_stack,
-    fidl_fuchsia_netemul as fnetemul,
+    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext,
+    fidl_fuchsia_net_routes_ext as fnet_routes_ext, fidl_fuchsia_netemul as fnetemul,
 };
 
 #[fuchsia_async::run_singlethreaded]
@@ -79,8 +82,6 @@ enum NetstackError {
     SetConfiguration(fnet_interfaces_admin::ControlSetConfigurationError),
     #[error("error waiting for address assignment: {0:?}")]
     WaitForAddressAssignment(fnet_interfaces_ext::admin::AddressStateProviderError),
-    #[error("failed to add forwarding entry: {0:?}")]
-    AddForwardingEntry(fnet_stack::Error),
 }
 
 impl Into<fnetemul::ConfigurationError> for InterfaceConfigError {
@@ -273,7 +274,10 @@ async fn configure_interface(
                 control
                     .add_address(
                         &interface_address,
-                        &fnet_interfaces_admin::AddressParameters::default(),
+                        &fnet_interfaces_admin::AddressParameters {
+                            add_subnet_route: Some(true),
+                            ..Default::default()
+                        },
                         server_end,
                     )
                     .map_err(NetstackError::InterfaceControl)?;
@@ -289,54 +293,73 @@ async fn configure_interface(
                 address_state_provider
             };
 
-            info!("interface '{}': assigned static IP address {:?}", name, interface_address);
+            info!(
+                "interface '{}': assigned static IP address {:?} (and subnet route)",
+                name, interface_address
+            );
 
             // Ensure this address won't be removed when we drop the state provider handle.
             address_state_provider.detach()?;
-            let subnet = fnet_ext::apply_subnet_mask(interface_address);
-            let stack =
-                connect_to_protocol::<fnet_stack::StackMarker>().context("connect to protocol")?;
-            match stack
-                .add_forwarding_entry(&fnet_stack::ForwardingEntry {
-                    subnet,
-                    device_id: nicid,
-                    next_hop: None,
-                    metric: 0,
-                })
-                .await?
-            {
-                Ok(()) => Ok(()),
-                // TODO(https://fxbug.dev/42081105): Remove or revise once calls
-                // to fuchsia.net.stack/Stack.AddForwardingEntry() are replaced
-                // with their fuchsia.net.routes.admin equivalent.
-                Err(e @ fnet_stack::Error::AlreadyExists) => {
-                    tracing::warn!("added duplicate forwarding entry: {:?}", e);
-                    Ok(())
-                }
-                Err(e) => Err(NetstackError::AddForwardingEntry(e)),
-            }?;
-
-            info!("interface '{}': added subnet route for {:?}", name, subnet);
         }
     }
 
     if let Some(gateway) = gateway {
-        let unspecified_address = fnet_ext::IpAddress(match gateway {
-            fnet::IpAddress::Ipv4(_) => std::net::IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED),
-            fnet::IpAddress::Ipv6(_) => std::net::IpAddr::V6(std::net::Ipv6Addr::UNSPECIFIED),
-        })
-        .into();
-        let stack =
-            connect_to_protocol::<fnet_stack::StackMarker>().context("connect to protocol")?;
-        stack
-            .add_forwarding_entry(&fnet_stack::ForwardingEntry {
-                subnet: fnet::Subnet { addr: unspecified_address, prefix_len: 0 },
-                device_id: nicid,
-                next_hop: Some(Box::new(gateway)),
-                metric: 0,
-            })
-            .await?
-            .map_err(NetstackError::AddForwardingEntry)?;
+        let grant = control
+            .get_authorization_for_interface()
+            .await
+            .context("failed to get interface authorization")?;
+
+        async fn add_route_through_gateway<
+            I: Ip + fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt,
+        >(
+            gateway: <I::Addr as fnet_ext::NetTypesIpAddressExt>::Fidl,
+            fnet_interfaces_admin::GrantForInterfaceAuthorization { interface_id, token }: fnet_interfaces_admin::GrantForInterfaceAuthorization,
+        ) -> Result<(), InterfaceConfigError>
+        where
+            <I as Ip>::Addr: fnet_ext::NetTypesIpAddressExt,
+            <I::Addr as fnet_ext::NetTypesIpAddressExt>::Fidl: IntoExt<I::Addr>,
+        {
+            let gateway: I::Addr = gateway.into_ext();
+            let gateway = SpecifiedAddr::new(gateway)
+                .ok_or(anyhow::anyhow!("gateway address must be specified"))?;
+
+            let root_routes = connect_to_protocol::<I::GlobalRouteTableMarker>()
+                .context("connect to global route table")?;
+            let global_route_set = fnet_routes_ext::admin::new_global_route_set::<I>(&root_routes)
+                .context("create global route set")?;
+            fnet_routes_ext::admin::authenticate_for_interface::<I>(
+                &global_route_set,
+                fnet_interfaces_admin::ProofOfInterfaceAuthorization { interface_id, token },
+            )
+            .await
+            .context("FIDL error authenticating for interface")?
+            .map_err(|e| anyhow::anyhow!("error authenticating for interface: {e:?}"))?;
+
+            let _: bool = fnet_routes_ext::admin::add_route::<I>(
+                &global_route_set,
+                &fnet_routes_ext::Route::new_forward_with_inherited_metric(
+                    net_types::ip::Subnet::new(I::UNSPECIFIED_ADDRESS, 0)
+                        .expect("unspecified subnet is valid"),
+                    interface_id,
+                    Some(gateway),
+                )
+                .try_into()
+                .expect("convert to FIDL should succeed"),
+            )
+            .await
+            .context("FIDL error adding route")?
+            .map_err(|e| anyhow::anyhow!("error adding route: {e:?}"))?;
+            Ok(())
+        }
+
+        match gateway {
+            fnet::IpAddress::Ipv4(gateway) => {
+                add_route_through_gateway::<Ipv4>(gateway, grant).await?;
+            }
+            fnet::IpAddress::Ipv6(gateway) => {
+                add_route_through_gateway::<Ipv6>(gateway, grant).await?;
+            }
+        };
 
         info!("interface '{}': configured default route with gateway address {:?}", name, gateway);
     }
