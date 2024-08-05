@@ -1,0 +1,38 @@
+// Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    children: [
+        {
+            name: "system-activity-governor",
+            url: "fuchsia-boot:///#meta/system-activity-governor.cm",
+        },
+    ],
+    offer: [
+        {
+            service: "fuchsia.hardware.suspend.SuspendService",
+            from: "#boot-drivers",
+            to: "#system-activity-governor",
+        },
+        {
+            protocol: [
+                "fuchsia.inspect.InspectSink",
+                "fuchsia.logger.LogSink",
+            ],
+            from: "#archivist",
+            to: "#system-activity-governor",
+        },
+        {
+            protocol: [ "fuchsia.power.broker.Topology" ],
+            from: "#power-broker",
+            to: "#system-activity-governor",
+        },
+        {
+            protocol: "fuchsia.tracing.provider.Registry",
+            from: "parent",
+            to: [ "#system-activity-governor" ],
+            availability: "optional",
+        },
+    ],
+}

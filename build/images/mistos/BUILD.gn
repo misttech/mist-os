@@ -165,6 +165,18 @@ if (is_mistos) {
       "//src/devices/pci/bin/lspci:database",
       "//src/devices/pci/bin/lspci:lspci",
 
+      # Legacy Power Framework support.
+      "//src/power/cpu-manager:component",
+      "//src/power/cpu-manager:default_component_config",
+      "//src/power/power-manager:component",
+      "//src/power/power-manager:default_component_config",
+
+      # Power Framework Support.
+      "//src/power/broker:component",
+
+      # Power Framework System Activity Governor.
+      "//src/power/system-activity-governor:component",
+
       ## Networking
 
       # network_realm_packages

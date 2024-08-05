@@ -9,6 +9,8 @@
         "//src/devices/bin/driver_framework/meta/driver_framework.bootstrap_shard.mistos.cml",
         "//src/devices/sysmem/bin/sysmem_connector/meta/sysmem_connector.bootstrap_shard.mistos.cml",
         "//src/zircon/bin/role_manager/meta/role_manager.bootstrap_shard.mistos.cml",
+        "//src/power/meta/power-framework.shard.mistos.cml",
+        "//src/power/meta/sag.shard.mistos.cml",
     ],
 
     children: [
@@ -172,6 +174,11 @@
         {
             protocol: "fuchsia.hardware.pty.Device",
             from: "#ptysvc",
+            source_availability: "unknown",
+        },
+        {
+            service: "fuchsia.power.broker.ElementInfoProviderService",
+            from: "#system-activity-governor",
             source_availability: "unknown",
         },
         {
