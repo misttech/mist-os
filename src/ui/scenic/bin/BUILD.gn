@@ -60,8 +60,6 @@ source_set("base_deps") {
     "//src/lib/fsl",
     "//src/lib/fxl:fxl_cli",
     "//src/ui/scenic/lib/flatland",
-    "//src/ui/scenic/lib/scenic",
-    "//src/ui/scenic/lib/scenic/util",
     "//src/ui/scenic/lib/scheduling:frame_scheduler",
     "//zircon/system/ulib/async:async-cpp",
     "//zircon/system/ulib/trace-provider",
