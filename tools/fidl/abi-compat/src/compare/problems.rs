@@ -205,14 +205,13 @@ impl Ord for CompatibilityProblem {
 
 #[test]
 fn test_compatibility_problem_comparison() {
-    let mk_path = || Path::new(&flyweights::FlyStr::new(""));
     let warning = CompatibilityProblem {
-        paths: ProblemPaths::AbiSurface { external: mk_path(), platform: mk_path() },
+        paths: ProblemPaths::AbiSurface { external: Path::empty(), platform: Path::empty() },
         warning: true,
         message: "beware".to_owned(),
     };
     let error = CompatibilityProblem {
-        paths: ProblemPaths::AbiSurface { external: mk_path(), platform: mk_path() },
+        paths: ProblemPaths::AbiSurface { external:Path::empty(), platform: Path::empty() },
         warning: false,
         message: "to err is human".to_owned(),
     };
