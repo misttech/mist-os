@@ -191,6 +191,9 @@ if (is_mistos) {
       "//src/connectivity/policy/netcfg:component-basic",
       "//src/connectivity/policy/reachability:component",
 
+      # Includes network-tun functionality.
+      "//src/connectivity/network/tun/network-tun:component",
+
       ## Starnix (starnix_support)
       "//src/starnix/config:starnix.profiles",
 

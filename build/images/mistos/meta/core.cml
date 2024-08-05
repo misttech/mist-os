@@ -18,6 +18,9 @@
         // Starnix
         "//src/starnix/runner/meta/starnix_runner.core_shard.mistos.cml",
         "//src/sys/core/meta/core-env-base-resolver.core_shard.cml",
+
+        // network-tun
+        "//src/connectivity/network/tun/network-tun/meta/network-tun.core_shard.mistos.cml"
     ],
     children: [
         {

@@ -19,11 +19,11 @@
             from: "#network",
             to: "#starnix_runner",
         },
-        //{
-        //    protocol: [ "fuchsia.net.tun.Control" ],
-        //    from: "#network-tun",
-        //    to: "#starnix_runner",
-        //},
+        {
+            protocol: [ "fuchsia.net.tun.Control" ],
+            from: "#network-tun",
+            to: "#starnix_runner",
+        },
         {
             protocol: [ "fuchsia.buildinfo.Provider" ],
             from: "#build-info",
