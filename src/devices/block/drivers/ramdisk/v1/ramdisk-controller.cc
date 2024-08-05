@@ -13,6 +13,7 @@
 #include <memory>
 #include <string>
 
+#include <bind/fuchsia/hardware/ramdisk/cpp/bind.h>
 #include <ddktl/device.h>
 
 #include "ramdisk.h"
@@ -146,14 +147,30 @@ zx::result<std::string> RamdiskController::ConfigureDevice(zx::vmo vmo, uint64_t
   return zx::ok(std::string(ramdev.release()->Name()));
 }
 
+class RamdiskV2Stub : public ddk::Device<RamdiskV2Stub> {
+ public:
+  RamdiskV2Stub(zx_device_t* parent) : Device(parent) {}
+
+  void DdkRelease() { delete this; }
+};
+
 zx_status_t RamdiskDriverBind(void* ctx, zx_device_t* parent) {
   auto ramctl = std::make_unique<RamdiskController>(parent);
 
-  zx_status_t status =
-      ramctl->DdkAdd(ddk::DeviceAddArgs("ramctl").set_flags(DEVICE_ADD_NON_BINDABLE));
-  if (status != ZX_OK) {
+  if (zx_status_t status =
+          ramctl->DdkAdd(ddk::DeviceAddArgs("ramctl").set_flags(DEVICE_ADD_NON_BINDABLE));
+      status != ZX_OK) {
     return status;
   }
+
+  auto stub = std::make_unique<RamdiskV2Stub>(ramctl->zxdev());
+  const zx_device_str_prop_t props[] = {
+      ddk::MakeStrProperty(bind_fuchsia_hardware_ramdisk::BIND_V2, true)};
+  if (zx_status_t status = stub->DdkAdd(ddk::DeviceAddArgs("v2").set_str_props(props));
+      status != ZX_OK) {
+    return status;
+  }
+  stub.release();
 
   // RamdiskController owned by the DDK after being added successfully.
   [[maybe_unused]] auto ptr = ramctl.release();

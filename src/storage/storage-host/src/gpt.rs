@@ -287,24 +287,27 @@ impl GptManager {
         let partition_table_size = ((header.num_parts * header.part_size) as usize)
             .checked_next_multiple_of(bs)
             .ok_or(anyhow!("Overflow when rounding up partition table size "))?;
-        let mut partition_table_blocks = vec![0u8; partition_table_size];
-        client
-            .read_at(MutableBufferSlice::Memory(&mut partition_table_blocks[..]), 2 * bs as u64)
-            .await
-            .context("Failed to read partition table")?;
 
         let mut partition_table = BTreeMap::new();
-        for i in 0..header.num_parts as usize {
-            let entry_raw = &partition_table_blocks
-                [i * header.part_size as usize..(i + 1) * header.part_size as usize];
-            let entry = format::PartitionTableEntry::ref_from_prefix(entry_raw)
-                .ok_or(anyhow!("Failed to parse partition {i}"))?;
-            if entry.is_empty() {
-                continue;
-            }
-            entry.ensure_integrity().context("GPT partition table entry invalid!")?;
+        if header.num_parts > 0 {
+            let mut partition_table_blocks = vec![0u8; partition_table_size];
+            client
+                .read_at(MutableBufferSlice::Memory(&mut partition_table_blocks[..]), 2 * bs as u64)
+                .await
+                .context("Failed to read partition table")?;
 
-            partition_table.insert(i as u32, PartitionInfo::from_entry(entry)?);
+            for i in 0..header.num_parts as usize {
+                let entry_raw = &partition_table_blocks
+                    [i * header.part_size as usize..(i + 1) * header.part_size as usize];
+                let entry = format::PartitionTableEntry::ref_from_prefix(entry_raw)
+                    .ok_or(anyhow!("Failed to parse partition {i}"))?;
+                if entry.is_empty() {
+                    continue;
+                }
+                entry.ensure_integrity().context("GPT partition table entry invalid!")?;
+
+                partition_table.insert(i as u32, PartitionInfo::from_entry(entry)?);
+            }
         }
         Ok(partition_table)
     }

@@ -1,0 +1,23 @@
+[
+    {
+        "device": {
+            "fuchsia.hardware.ramdisk.BIND_V2": "true"
+        },
+        "expected": "match",
+        "name": "Success"
+    },
+    {
+        "device": {
+            "fuchsia.hardware.ramdisk.BIND_V2": "false"
+        },
+        "expected": "abort",
+        "name": "False"
+    },
+    {
+        "device": {
+            "fuchsia.BIND_PROTOCOL": "fuchsia.bluetooth.BIND_PROTOCOL.BUS"
+        },
+        "expected": "abort",
+        "name": "Missing"
+    }
+]

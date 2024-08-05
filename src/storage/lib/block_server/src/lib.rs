@@ -315,22 +315,35 @@ impl<SM: SessionManager> SessionHelper<SM> {
             GroupOrRequest::Request(request.reqid)
         };
 
-        let mut need_vmo = true;
         let mut vmo_offset = 0;
         let vmo = match op_code {
             Ok(BlockOpcode::Read) | Ok(BlockOpcode::Write) => (|| {
-                vmo_offset = request.vmo_offset.checked_mul(self.block_size as u64)?;
-                self.vmos.lock().unwrap().get(&request.vmoid).cloned()
+                if request.length == 0 {
+                    return Err(zx::Status::INVALID_ARGS);
+                }
+                vmo_offset = request
+                    .vmo_offset
+                    .checked_mul(self.block_size as u64)
+                    .ok_or(zx::Status::OUT_OF_RANGE)?;
+                self.vmos
+                    .lock()
+                    .unwrap()
+                    .get(&request.vmoid)
+                    .cloned()
+                    .map_or(Err(zx::Status::IO), |vmo| Ok(Some(vmo)))
             })(),
-            Ok(BlockOpcode::CloseVmo) => self.vmos.lock().unwrap().remove(&request.vmoid),
-            _ => {
-                need_vmo = false;
-                None
-            }
-        };
-        if vmo.is_none() && need_vmo {
-            op_code = Err(zx::Status::INVALID_ARGS);
+            Ok(BlockOpcode::CloseVmo) => self
+                .vmos
+                .lock()
+                .unwrap()
+                .remove(&request.vmoid)
+                .map_or(Err(zx::Status::IO), |vmo| Ok(Some(vmo))),
+            _ => Ok(None),
         }
+        .unwrap_or_else(|e| {
+            op_code = Err(e);
+            None
+        });
 
         let operation = op_code.map(|code| match code {
             BlockOpcode::Read => Operation::Read {
@@ -354,6 +367,7 @@ impl<SM: SessionManager> SessionHelper<SM> {
     }
 }
 
+#[derive(Debug)]
 struct DecodedRequest {
     group_or_request: GroupOrRequest,
     operation: Result<Operation, zx::Status>,
@@ -361,6 +375,7 @@ struct DecodedRequest {
 }
 
 #[repr(C)]
+#[derive(Debug)]
 pub enum Operation {
     Read {
         device_block_offset: u64,
@@ -381,7 +396,7 @@ pub enum Operation {
     CloseVmo,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum GroupOrRequest {
     Group(u16),
     Request(u32),
@@ -608,6 +623,7 @@ mod tests {
                                 ..Default::default()
                             },
                             vmoid: vmo_id.id,
+                            length: 1,
                             ..Default::default()
                         })
                         .await
@@ -903,6 +919,7 @@ mod tests {
                         ..Default::default()
                     },
                     vmoid: vmo_id.id,
+                    length: 1,
                     ..Default::default()
                 })
                 .await
@@ -918,6 +935,7 @@ mod tests {
                         ..Default::default()
                     },
                     vmoid: vmo_id.id,
+                    length: 1,
                     ..Default::default()
                 })
                 .await
@@ -1073,7 +1091,7 @@ mod tests {
                         }
                     )
                     .await,
-                    Err(zx::Status::INVALID_ARGS)
+                    Err(zx::Status::IO)
                 );
 
                 std::mem::drop(proxy);
@@ -1132,6 +1150,7 @@ mod tests {
                     reqid: 1,
                     dev_offset: 1, // Intentionally use the same as `reqid`.
                     vmoid: vmo_id.id,
+                    length: 1,
                     ..Default::default()
                 })
                 .await
@@ -1145,6 +1164,7 @@ mod tests {
                     reqid: 2,
                     dev_offset: 2,
                     vmoid: vmo_id.id,
+                    length: 1,
                     ..Default::default()
                 })
                 .await
@@ -1221,6 +1241,7 @@ mod tests {
                     },
                     group: 1,
                     vmoid: vmo_id.id,
+                    length: 1,
                     ..Default::default()
                 })
                 .await
@@ -1235,6 +1256,7 @@ mod tests {
                     reqid: 2,
                     group: 1,
                     vmoid: vmo_id.id,
+                    length: 1,
                     ..Default::default()
                 })
                 .await
@@ -1292,6 +1314,7 @@ mod tests {
                     },
                     group: 1,
                     vmoid: vmo_id.id,
+                    length: 1,
                     ..Default::default()
                 })
                 .await
@@ -1319,6 +1342,7 @@ mod tests {
                     },
                     group: 1,
                     vmoid: vmo_id.id,
+                    length: 1,
                     ..Default::default()
                 })
                 .await
@@ -1333,6 +1357,7 @@ mod tests {
                     reqid: 2,
                     group: 1,
                     vmoid: vmo_id.id,
+                    length: 1,
                     ..Default::default()
                 })
                 .await
@@ -1399,6 +1424,7 @@ mod tests {
                     reqid: 1,
                     group: 1,
                     vmoid: vmo_id.id,
+                    length: 1,
                     ..Default::default()
                 })
                 .await
@@ -1413,6 +1439,7 @@ mod tests {
                     reqid: 2,
                     group: 1,
                     vmoid: vmo_id.id,
+                    length: 1,
                     ..Default::default()
                 })
                 .await

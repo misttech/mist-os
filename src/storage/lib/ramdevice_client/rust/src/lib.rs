@@ -5,13 +5,19 @@
 //! A safe rust wrapper for creating and using ramdisks.
 
 #![deny(missing_docs)]
-use anyhow::{anyhow, Context as _, Error};
-use fidl::endpoints::{ClientEnd, Proxy as _};
+use anyhow::{anyhow, bail, Context as _, Error};
+use fidl::endpoints::{ClientEnd, DiscoverableProtocolMarker as _, Proxy as _, ServiceMarker};
 use fidl_fuchsia_device::{ControllerMarker, ControllerProxy, ControllerSynchronousProxy};
 use fidl_fuchsia_hardware_ramdisk::{Guid, RamdiskControllerMarker};
-use fuchsia_component::client::connect_to_named_protocol_at_dir_root;
+use fuchsia_component::client::{
+    connect_to_named_protocol_at_dir_root, connect_to_protocol_at_dir_svc,
+    connect_to_service_instance,
+};
+use fuchsia_fs::directory::WatchEvent;
+use futures::TryStreamExt;
 use {
-    fidl_fuchsia_hardware_block as fhardware_block, fidl_fuchsia_io as fio, fuchsia_zircon as zx,
+    fidl_fuchsia_hardware_block as fhardware_block, fidl_fuchsia_hardware_block_volume as fvolume,
+    fidl_fuchsia_hardware_ramdisk as framdisk, fidl_fuchsia_io as fio, fuchsia_zircon as zx,
 };
 
 const GUID_LEN: usize = 16;
@@ -25,6 +31,7 @@ pub struct RamdiskClientBuilder {
     block_size: u64,
     dev_root: Option<fio::DirectoryProxy>,
     guid: Option<[u8; GUID_LEN]>,
+    use_v2: bool,
 }
 
 enum RamdiskSource {
@@ -38,8 +45,9 @@ impl RamdiskClientBuilder {
         Self {
             ramdisk_source: RamdiskSource::Size { block_count },
             block_size,
-            dev_root: None,
             guid: None,
+            dev_root: None,
+            use_v2: false,
         }
     }
 
@@ -48,8 +56,9 @@ impl RamdiskClientBuilder {
         Self {
             ramdisk_source: RamdiskSource::Vmo { vmo },
             block_size: block_size.unwrap_or(0),
-            dev_root: None,
             guid: None,
+            dev_root: None,
+            use_v2: false,
         }
     }
 
@@ -65,47 +74,114 @@ impl RamdiskClientBuilder {
         self
     }
 
+    /// Use the V2 ramdisk driver.
+    pub fn use_v2(mut self) -> Self {
+        self.use_v2 = true;
+        self
+    }
+
     /// Create the ramdisk.
     pub async fn build(self) -> Result<RamdiskClient, Error> {
-        let Self { ramdisk_source, block_size, dev_root, guid } = self;
-        let dev_root = if let Some(dev_root) = dev_root {
-            dev_root
+        let Self { ramdisk_source, block_size, guid, dev_root, use_v2 } = self;
+
+        if use_v2 {
+            // Pick the first service instance we find.
+            let ramdisk_service_dir = fuchsia_fs::directory::open_in_namespace(
+                &format!("/svc/{}", fidl_fuchsia_hardware_ramdisk::ServiceMarker::SERVICE_NAME),
+                fio::OpenFlags::empty(),
+            )?;
+            let mut watcher = fuchsia_fs::directory::Watcher::new(&ramdisk_service_dir).await?;
+            let ramdisk_controller = loop {
+                let Some(item) = watcher.try_next().await? else {
+                    bail!("Unexpected watcher end");
+                };
+                if let WatchEvent::ADD_FILE | WatchEvent::EXISTING = item.event {
+                    let instance = item.filename.to_str().expect("Non UTF8 name!");
+                    if instance == "." {
+                        continue;
+                    }
+                    break connect_to_service_instance::<
+                        fidl_fuchsia_hardware_ramdisk::ServiceMarker,
+                    >(instance)?
+                    .connect_to_controller()?;
+                }
+            };
+
+            let type_guid = guid.map(|guid| Guid { value: guid });
+
+            let options = match ramdisk_source {
+                RamdiskSource::Vmo { vmo } => framdisk::Options {
+                    vmo: Some(vmo),
+                    block_size: Some(block_size.try_into().unwrap()),
+                    type_guid,
+                    ..Default::default()
+                },
+                RamdiskSource::Size { block_count } => framdisk::Options {
+                    block_count: Some(block_count),
+                    block_size: Some(block_size.try_into().unwrap()),
+                    type_guid,
+                    ..Default::default()
+                },
+            };
+
+            let (outgoing, event) =
+                ramdisk_controller.create(options).await?.map_err(|s| zx::Status::from_raw(s))?;
+
+            RamdiskClient::new_v2(outgoing.into_proxy()?, event)
         } else {
-            fuchsia_fs::directory::open_in_namespace(DEV_PATH, fio::OpenFlags::RIGHT_READABLE)
-                .with_context(|| format!("open {}", DEV_PATH))?
-        };
-        let ramdisk_controller =
-            device_watcher::recursive_wait_and_open::<RamdiskControllerMarker>(
-                &dev_root,
-                RAMCTL_PATH,
-            )
+            let dev_root = if let Some(dev_root) = dev_root {
+                dev_root
+            } else {
+                fuchsia_fs::directory::open_in_namespace(DEV_PATH, fio::OpenFlags::RIGHT_READABLE)
+                    .with_context(|| format!("open {}", DEV_PATH))?
+            };
+            let ramdisk_controller = device_watcher::recursive_wait_and_open::<
+                RamdiskControllerMarker,
+            >(&dev_root, RAMCTL_PATH)
             .await
             .with_context(|| format!("waiting for {}", RAMCTL_PATH))?;
-        let type_guid = guid.map(|guid| Guid { value: guid });
-        let name = match ramdisk_source {
-            RamdiskSource::Vmo { vmo } => ramdisk_controller
-                .create_from_vmo_with_params(vmo, block_size, type_guid.as_ref())
-                .await?
-                .map_err(zx::Status::from_raw)
-                .context("creating ramdisk from vmo")?,
-            RamdiskSource::Size { block_count } => ramdisk_controller
-                .create(block_size, block_count, type_guid.as_ref())
-                .await?
-                .map_err(zx::Status::from_raw)
-                .with_context(|| format!("creating ramdisk with {} blocks", block_count))?,
-        };
-        let name = name.ok_or_else(|| anyhow!("Failed to get instance name"))?;
-        RamdiskClient::new(dev_root, &name).await
+            let type_guid = guid.map(|guid| Guid { value: guid });
+            let name = match ramdisk_source {
+                RamdiskSource::Vmo { vmo } => ramdisk_controller
+                    .create_from_vmo_with_params(vmo, block_size, type_guid.as_ref())
+                    .await?
+                    .map_err(zx::Status::from_raw)
+                    .context("creating ramdisk from vmo")?,
+                RamdiskSource::Size { block_count } => ramdisk_controller
+                    .create(block_size, block_count, type_guid.as_ref())
+                    .await?
+                    .map_err(zx::Status::from_raw)
+                    .with_context(|| format!("creating ramdisk with {} blocks", block_count))?,
+            };
+            let name = name.ok_or_else(|| anyhow!("Failed to get instance name"))?;
+            RamdiskClient::new(dev_root, &name).await
+        }
     }
 }
 
 /// A client for managing a ramdisk. This can be created with the [`RamdiskClient::create`]
 /// function or through the type returned by [`RamdiskClient::builder`] to specify additional
 /// options.
-pub struct RamdiskClient {
-    block_dir: Option<fio::DirectoryProxy>,
-    block_controller: Option<ControllerProxy>,
-    ramdisk_controller: Option<ControllerProxy>,
+pub enum RamdiskClient {
+    /// V1
+    V1 {
+        /// The directory backing the block driver.
+        block_dir: Option<fio::DirectoryProxy>,
+
+        /// The device controller for the block device.
+        block_controller: Option<ControllerProxy>,
+
+        /// The device controller for the ramdisk.
+        ramdisk_controller: Option<ControllerProxy>,
+    },
+    /// V2
+    V2 {
+        /// The outgoing directory for the ram-disk.
+        outgoing: fio::DirectoryProxy,
+
+        /// The event that keeps the ramdisk alive.
+        _event: zx::EventPair,
+    },
 }
 
 impl RamdiskClient {
@@ -135,11 +211,15 @@ impl RamdiskClient {
             format!("opening block controller at {}/device_controller", &block_path)
         })?;
 
-        Ok(RamdiskClient {
+        Ok(Self::V1 {
             block_dir: Some(block_dir),
             block_controller: Some(block_controller),
             ramdisk_controller: Some(ramdisk_controller),
         })
+    }
+
+    fn new_v2(outgoing: fio::DirectoryProxy, event: zx::EventPair) -> Result<Self, Error> {
+        Ok(Self::V2 { outgoing, _event: event })
     }
 
     /// Create a new ramdisk builder with the given block_size and block_count.
@@ -154,40 +234,66 @@ impl RamdiskClient {
 
     /// Get a reference to the block controller.
     pub fn as_controller(&self) -> Option<&ControllerProxy> {
-        self.block_controller.as_ref()
+        match self {
+            Self::V1 { block_controller, .. } => block_controller.as_ref(),
+            Self::V2 { .. } => None,
+        }
     }
 
     /// Take the block controller.
     pub fn take_controller(&mut self) -> Option<ControllerProxy> {
-        self.block_controller.take()
+        match self {
+            Self::V1 { block_controller, .. } => block_controller.take(),
+            Self::V2 { .. } => None,
+        }
     }
 
     /// Get a reference to the block directory proxy.
     pub fn as_dir(&self) -> Option<&fio::DirectoryProxy> {
-        self.block_dir.as_ref()
+        match self {
+            Self::V1 { block_dir, .. } => block_dir.as_ref(),
+            Self::V2 { .. } => None,
+        }
     }
 
     /// Take the block directory proxy.
     pub fn take_dir(&mut self) -> Option<fio::DirectoryProxy> {
-        self.block_dir.take()
+        match self {
+            Self::V1 { block_dir, .. } => block_dir.take(),
+            Self::V2 { .. } => None,
+        }
     }
 
     /// Get an open channel to the underlying ramdevice.
     pub async fn open(
         &self,
     ) -> Result<fidl::endpoints::ClientEnd<fhardware_block::BlockMarker>, Error> {
-        // At this point, we have already waited on the block path to appear so
-        // we can directly open a connection to the ramdevice.
-        // TODO(https://fxbug.dev/42063787): In order to allow multiplexing to be removed, use
-        // connect_to_device_fidl to connect to the BlockProxy instead of connect_to_.._dir_root.
-        // Requires downstream work.
-        let block_dir = self.as_dir().ok_or_else(|| anyhow!("directory is invalid"))?;
-        let block_proxy =
-            connect_to_named_protocol_at_dir_root::<fhardware_block::BlockMarker>(block_dir, ".")?;
-        let block_client_end = ClientEnd::<fhardware_block::BlockMarker>::new(
-            block_proxy.into_channel().unwrap().into(),
-        );
-        Ok(block_client_end)
+        match self {
+            Self::V1 { .. } => {
+                // At this point, we have already waited on the block path to appear so we can
+                // directly open a connection to the ramdevice.
+
+                // TODO(https://fxbug.dev/42063787): In order to allow multiplexing to be removed,
+                // use connect_to_device_fidl to connect to the BlockProxy instead of
+                // connect_to_.._dir_root.  Requires downstream work.
+                let block_dir = self.as_dir().ok_or_else(|| anyhow!("directory is invalid"))?;
+                let block_proxy = connect_to_named_protocol_at_dir_root::<
+                    fhardware_block::BlockMarker,
+                >(block_dir, ".")?;
+                let block_client_end = ClientEnd::<fhardware_block::BlockMarker>::new(
+                    block_proxy.into_channel().unwrap().into(),
+                );
+                Ok(block_client_end)
+            }
+            Self::V2 { outgoing, .. } => {
+                let block_proxy =
+                    connect_to_protocol_at_dir_svc::<fvolume::VolumeMarker>(outgoing)?;
+                let block_client_end = ClientEnd::<fhardware_block::BlockMarker>::new(
+                    block_proxy.into_channel().unwrap().into(),
+                );
+                Ok(block_client_end)
+            }
+        }
     }
 
     /// Get an open channel to the underlying ramdevice.
@@ -195,40 +301,59 @@ impl RamdiskClient {
         &self,
         server_end: fidl::endpoints::ServerEnd<fhardware_block::BlockMarker>,
     ) -> Result<(), Error> {
-        let block_dir = self.as_dir().ok_or_else(|| anyhow!("directory is invalid"))?;
-        Ok(block_dir.open(
-            fio::OpenFlags::empty(),
-            fio::ModeType::empty(),
-            ".",
-            server_end.into_channel().into(),
-        )?)
+        match self {
+            Self::V1 { .. } => {
+                let block_dir = self.as_dir().ok_or_else(|| anyhow!("directory is invalid"))?;
+                Ok(block_dir.open(
+                    fio::OpenFlags::empty(),
+                    fio::ModeType::empty(),
+                    ".",
+                    server_end.into_channel().into(),
+                )?)
+            }
+            Self::V2 { outgoing, .. } => Ok(outgoing.open(
+                fio::OpenFlags::empty(),
+                fio::ModeType::empty(),
+                &format!("svc/{}", fvolume::VolumeMarker::PROTOCOL_NAME),
+                server_end.into_channel().into(),
+            )?),
+        }
     }
 
     /// Get an open channel to the underlying ramdevice's controller.
     pub fn open_controller(
         &self,
     ) -> Result<fidl::endpoints::ClientEnd<fidl_fuchsia_device::ControllerMarker>, Error> {
-        let block_dir = self.as_dir().ok_or_else(|| anyhow!("directory is invalid"))?;
-        let controller_proxy = connect_to_named_protocol_at_dir_root::<
-            fidl_fuchsia_device::ControllerMarker,
-        >(block_dir, "device_controller")?;
-        Ok(ClientEnd::new(controller_proxy.into_channel().unwrap().into()))
+        match self {
+            Self::V1 { .. } => {
+                let block_dir = self.as_dir().ok_or_else(|| anyhow!("directory is invalid"))?;
+                let controller_proxy = connect_to_named_protocol_at_dir_root::<
+                    fidl_fuchsia_device::ControllerMarker,
+                >(block_dir, "device_controller")?;
+                Ok(ClientEnd::new(controller_proxy.into_channel().unwrap().into()))
+            }
+            Self::V2 { .. } => Err(anyhow!("Not supported")),
+        }
     }
 
     /// Starts unbinding the underlying ramdisk and returns before the device is removed. This
     /// deallocates all resources for this ramdisk, which will remove all data written to the
     /// associated ramdisk.
     pub async fn destroy(mut self) -> Result<(), Error> {
-        let ramdisk_controller = self
-            .ramdisk_controller
-            .take()
-            .ok_or_else(|| anyhow!("ramdisk controller is invalid"))?;
-        let () = ramdisk_controller
-            .schedule_unbind()
-            .await
-            .context("unbind transport")?
-            .map_err(zx::Status::from_raw)
-            .context("unbind response")?;
+        match &mut self {
+            Self::V1 { ramdisk_controller, .. } => {
+                let ramdisk_controller = ramdisk_controller
+                    .take()
+                    .ok_or_else(|| anyhow!("ramdisk controller is invalid"))?;
+                let () = ramdisk_controller
+                    .schedule_unbind()
+                    .await
+                    .context("unbind transport")?
+                    .map_err(zx::Status::from_raw)
+                    .context("unbind response")?;
+            }
+            Self::V2 { .. } => {} // Dropping the event will destroy the device.
+        }
         Ok(())
     }
 
@@ -236,29 +361,36 @@ impl RamdiskClient {
     /// This deallocates all resources for this ramdisk, which will remove all data written to the
     /// associated ramdisk.
     pub async fn destroy_and_wait_for_removal(mut self) -> Result<(), Error> {
-        // Calling `schedule_unbind` on the ramdisk controller initiates the unbind process but
-        // doesn't wait for anything to complete. The unbinding process starts at the ramdisk and
-        // propagates down through the child devices. FIDL connections are closed during the unbind
-        // process so the ramdisk controller connection will be closed before connections to the
-        // child block device. After unbinding, the drivers are removed starting at the children and
-        // ending at the ramdisk.
+        match &mut self {
+            Self::V1 { block_controller, ramdisk_controller, .. } => {
+                // Calling `schedule_unbind` on the ramdisk controller initiates the unbind process
+                // but doesn't wait for anything to complete. The unbinding process starts at the
+                // ramdisk and propagates down through the child devices. FIDL connections are
+                // closed during the unbind process so the ramdisk controller connection will be
+                // closed before connections to the child block device. After unbinding, the drivers
+                // are removed starting at the children and ending at the ramdisk.
 
-        let block_controller =
-            self.block_controller.take().ok_or_else(|| anyhow!("block controller is invalid"))?;
-        let ramdisk_controller = self
-            .ramdisk_controller
-            .take()
-            .ok_or_else(|| anyhow!("ramdisk controller is invalid"))?;
-        let () = ramdisk_controller
-            .schedule_unbind()
-            .await
-            .context("unbind transport")?
-            .map_err(zx::Status::from_raw)
-            .context("unbind response")?;
-        let _: (zx::Signals, zx::Signals) =
-            futures::future::try_join(block_controller.on_closed(), ramdisk_controller.on_closed())
+                let block_controller = block_controller
+                    .take()
+                    .ok_or_else(|| anyhow!("block controller is invalid"))?;
+                let ramdisk_controller = ramdisk_controller
+                    .take()
+                    .ok_or_else(|| anyhow!("ramdisk controller is invalid"))?;
+                let () = ramdisk_controller
+                    .schedule_unbind()
+                    .await
+                    .context("unbind transport")?
+                    .map_err(zx::Status::from_raw)
+                    .context("unbind response")?;
+                let _: (zx::Signals, zx::Signals) = futures::future::try_join(
+                    block_controller.on_closed(),
+                    ramdisk_controller.on_closed(),
+                )
                 .await
                 .context("on closed")?;
+            }
+            Self::V2 { .. } => {}
+        }
         Ok(())
     }
 
@@ -267,20 +399,27 @@ impl RamdiskClient {
     ///
     /// This should be used instead of `std::mem::forget`, as the latter will leak memory.
     pub fn forget(mut self) -> Result<(), Error> {
-        let _: ControllerProxy = self
-            .ramdisk_controller
-            .take()
-            .ok_or_else(|| anyhow!("ramdisk controller is invalid"))?;
-        Ok(())
+        match &mut self {
+            Self::V1 { ramdisk_controller, .. } => {
+                let _: ControllerProxy = ramdisk_controller
+                    .take()
+                    .ok_or_else(|| anyhow!("ramdisk controller is invalid"))?;
+                Ok(())
+            }
+            Self::V2 { .. } => Err(anyhow!("Not supported")),
+        }
     }
 }
 
 impl Drop for RamdiskClient {
     fn drop(&mut self) {
-        if let Some(ramdisk_controller) = self.ramdisk_controller.take() {
-            let _: Result<Result<(), _>, _> =
-                ControllerSynchronousProxy::new(ramdisk_controller.into_channel().unwrap().into())
-                    .schedule_unbind(zx::Time::INFINITE);
+        if let Self::V1 { ramdisk_controller, .. } = self {
+            if let Some(ramdisk_controller) = ramdisk_controller.take() {
+                let _: Result<Result<(), _>, _> = ControllerSynchronousProxy::new(
+                    ramdisk_controller.into_channel().unwrap().into(),
+                )
+                .schedule_unbind(zx::Time::INFINITE);
+            }
         }
     }
 }

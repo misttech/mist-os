@@ -4,9 +4,11 @@
 @available(added=15)
 library fuchsia.hardware.ramdisk;
 
+using fuchsia.io;
 using zx;
 
 /// The protocol for interacting with a instance of a ramdisk.
+@discoverable
 closed protocol Ramdisk {
     /// Sets any of the `RAMDISK_FLAG_*` flags.
     strict SetFlags(struct {
@@ -104,4 +106,41 @@ closed protocol RamdiskController {
     }) -> (struct {
         name string:<MAX_NAME_LENGTH, optional>;
     }) error zx.Status;
+};
+
+/// Options for creating a ram-disk.  Some combinations are invalid and will
+/// result in ZX_ERR_INVALID_ARGS.
+@available(added=HEAD)
+type Options = resource table {
+    /// If unspecified, the system page size is used.
+    1: block_size uint32;
+
+    /// If unspecified, will be deduced from `vmo`.
+    2: block_count uint64;
+
+    /// Optional type GUID returned in the fuchsia.hardware.block.partition.Partition protocol.
+    3: type_guid Guid;
+
+    /// If unspecified, a VMO will be created, in which case `block_count` must be specified.
+    4: vmo zx.Handle:VMO;
+};
+
+@available(added=HEAD)
+open protocol Controller {
+    /// Initializes a new Ramdisk instance with the specified options.  Returns an outgoing
+    /// directory for the ramdisk which will export the Ramdisk and
+    /// fuchsia.hardware.block.volume.Volume protocols.
+    strict Create(Options) -> (resource struct {
+        // The outgoing directory for the ram disk.
+        outgoing client_end:fuchsia.io.Directory;
+
+        // The ramdisk will be destroyed when this is dropped.
+        lifeline zx.Handle:EVENTPAIR;
+    }) error zx.Status;
+};
+
+/// The v2 ramdisk driver will expose this service.
+@available(added=HEAD)
+service Service {
+    controller client_end:Controller;
 };

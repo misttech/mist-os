@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_DEVICES_BLOCK_DRIVERS_RAMDISK_RAMDISK_H_
-#define SRC_DEVICES_BLOCK_DRIVERS_RAMDISK_RAMDISK_H_
+#ifndef SRC_DEVICES_BLOCK_DRIVERS_RAMDISK_V1_RAMDISK_H_
+#define SRC_DEVICES_BLOCK_DRIVERS_RAMDISK_V1_RAMDISK_H_
 
 #include <fidl/fuchsia.hardware.ramdisk/cpp/wire.h>
 #include <fuchsia/hardware/block/driver/cpp/banjo.h>
@@ -128,4 +128,4 @@ class Ramdisk : public RamdiskDeviceType,
 
 }  // namespace ramdisk
 
-#endif  // SRC_DEVICES_BLOCK_DRIVERS_RAMDISK_RAMDISK_H_
+#endif  // SRC_DEVICES_BLOCK_DRIVERS_RAMDISK_V1_RAMDISK_H_

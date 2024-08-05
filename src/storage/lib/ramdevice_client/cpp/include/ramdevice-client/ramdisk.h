@@ -29,6 +29,14 @@ __BEGIN_CDECLS
 struct ramdisk_client;
 typedef struct ramdisk_client ramdisk_client_t;
 
+typedef struct ramdisk_options {
+  uint32_t block_size;
+  uint64_t block_count;
+  const uint8_t* type_guid;
+  zx_handle_t vmo;
+  bool v2;
+} ramdisk_options_t;
+
 // Creates a ramdisk object and writes the pointer into `out`.
 zx_status_t ramdisk_create(uint64_t blk_size, uint64_t blk_count, ramdisk_client_t** out);
 // Same as above except that it opens the ramdisk relative to the passed in 'dev_root_fd'.
@@ -59,6 +67,8 @@ zx_status_t ramdisk_create_from_vmo_with_params(zx_handle_t vmo, uint64_t block_
 zx_status_t ramdisk_create_at_from_vmo_with_params(int dev_root_fd, zx_handle_t vmo,
                                                    uint64_t block_size, const uint8_t* type_guid,
                                                    size_t guid_len, ramdisk_client_t** out);
+// Creates a ramdisk with the specified options.
+zx_status_t ramdisk_create_with_options(const ramdisk_options_t* options, ramdisk_client_t** out);
 
 // Returns the handle to the block device interface of the client.
 //

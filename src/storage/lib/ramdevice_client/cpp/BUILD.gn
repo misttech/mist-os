@@ -30,6 +30,7 @@ shared_library("ramdevice-client") {
   deps = [
     "//sdk/fidl/fuchsia.device:fuchsia.device_cpp",
     "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_cpp",
+    "//sdk/fidl/fuchsia.hardware.block.volume:fuchsia.hardware.block.volume_cpp",
     "//sdk/fidl/fuchsia.hardware.nand:fuchsia.hardware.nand_cpp",
     "//sdk/fidl/fuchsia.hardware.ramdisk:fuchsia.hardware.ramdisk_cpp",
     "//sdk/lib/component/incoming/cpp",
@@ -110,6 +111,7 @@ static_library("ramdevice-client-static") {
   deps = [
     "//sdk/fidl/fuchsia.device:fuchsia.device_cpp",
     "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_cpp",
+    "//sdk/fidl/fuchsia.hardware.block.volume:fuchsia.hardware.block.volume_cpp",
     "//sdk/fidl/fuchsia.hardware.ramdisk:fuchsia.hardware.ramdisk_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/device-watcher/cpp",

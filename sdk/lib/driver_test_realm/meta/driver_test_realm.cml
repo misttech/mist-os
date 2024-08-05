@@ -53,6 +53,9 @@
             rights: [ "rx*" ],
             path: "/pkg_drivers",
         },
+
+        // TODO(https://fxbug.dev/357251576): expose this in a better way
+        { service: "fuchsia.hardware.ramdisk.Service" },
     ],
     use: [
         // Provided by the parent when it wants to override the DTR
@@ -100,6 +103,10 @@
                 "fuchsia.driver.test.Realm",
                 "fuchsia.inspect.InspectSink",
             ],
+            from: "self",
+        },
+        {
+            service: "fuchsia.hardware.ramdisk.Service",
             from: "self",
         },
     ],

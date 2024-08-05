@@ -505,8 +505,11 @@ mod tests {
     async fn run_test(
         callback: impl Fn(&fio::DirectoryProxy, LifecycleProxy) -> BoxFuture<'static, ()>,
     ) -> Pin<Box<impl FusedFuture>> {
-        let ramdisk =
-            RamdiskClientBuilder::new(512, 16384).build().await.expect("Failed to build ramdisk");
+        let ramdisk = RamdiskClientBuilder::new(512, 16384)
+            .use_v2()
+            .build()
+            .await
+            .expect("Failed to build ramdisk");
 
         {
             let fs = FxFilesystem::new_empty(DeviceHolder::new(
