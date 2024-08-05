@@ -427,8 +427,12 @@ group("json5format") {
   public_deps = [ ":json5format-v0_2_6" ]
 }
 
+import("//third_party/rust_crates/visibility.gni")
+
 group("lazy_static") {
   public_deps = [ ":lazy_static-v1_4_0" ]
+
+  visibility = lazy_static_visibility
 }
 
 group("libc") {
@@ -479,8 +483,6 @@ group("maplit") {
 group("maybe-owned") {
   public_deps = [ ":maybe-owned-v0_3_2" ]
 }
-
-import("//third_party/rust_crates/visibility.gni")
 
 group("md-5") {
   public_deps = [ ":md-5-v0_10_5" ]
@@ -574,6 +576,8 @@ group("omaha_client") {
 
 group("once_cell") {
   public_deps = [ ":once_cell-v1_17_1" ]
+
+  visibility = once_cell_visibility
 }
 
 if (current_os == "fuchsia") {

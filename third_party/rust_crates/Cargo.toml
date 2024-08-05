@@ -155,7 +155,7 @@ num = { version = "0.4.0", features = ["rand"] }
 num-derive = "0.4.2"
 num-traits = "0.2.18"
 omaha_client = "0.1"
-once_cell = "1.17.0"
+once_cell = "1.17.1"
 nu-ansi-term = "0.46.0"
 overload = "0.1.1"
 p256 = { version = "0.11.1", features = ["pem", "serde"] }
@@ -575,6 +575,9 @@ rustflags = ["--cfg=httparse_simd"]
 [gn.package.indexmap."1.9.2"]
 rustflags = ["--cfg=has_std"]
 
+[gn.package.lazy_static."1.4.0"]
+group_visibility = { import = "//third_party/rust_crates/visibility.gni", variable = "lazy_static_visibility" }
+
 [gn.package.libc."0.2.149"]
 rustflags = [
   "--cfg=libc_priv_mod_use",
@@ -667,6 +670,9 @@ rustflags = [
   "--cfg=has_to_int_unchecked",
   "--cfg=has_total_cmp",
 ]
+
+[gn.package.once_cell."1.17.1"]
+group_visibility = { import = "//third_party/rust_crates/visibility.gni", variable = "once_cell_visibility" }
 
 [gn.package.parking_lot."0.9.0"]
 # Funnel usage of parking_lot through fuchsia_sync.
