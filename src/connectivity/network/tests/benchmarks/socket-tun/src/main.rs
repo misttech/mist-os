@@ -483,13 +483,17 @@ async fn main() {
         fuchsia_trace_provider::trace_provider_create_with_fdio();
 
         let file = std::fs::File::create("/custom_artifacts/trace.fxt").expect("create trace file");
-        let tracing_controller = fuchsia_component::client::connect_to_protocol::<
-            ftracing_controller::ControllerMarker,
+        let trace_provisioner = fuchsia_component::client::connect_to_protocol::<
+            ftracing_controller::ProvisionerMarker,
         >()
         .expect("connect to tracing controller");
         let (tracing_socket, tracing_socket_write) = fidl::Socket::create_stream();
-        tracing_controller
+        let (trace_session, server) =
+            fidl::endpoints::create_proxy::<ftracing_controller::SessionMarker>()
+                .expect("Failed to create trace session proxy");
+        trace_provisioner
             .initialize_tracing(
+                server,
                 &ftracing_controller::TraceConfig {
                     categories: Some(
                         [
@@ -511,12 +515,12 @@ async fn main() {
                 tracing_socket_write,
             )
             .expect("initialize tracing FIDL");
-        tracing_controller
+        trace_session
             .start_tracing(&ftracing_controller::StartOptions::default())
             .await
             .expect("starting tracing FIDL")
             .expect("start tracing");
-        Some((tracing_controller, fasync::Socket::from_socket(tracing_socket), file))
+        Some((trace_session, fasync::Socket::from_socket(tracing_socket), file))
     } else {
         None
     };
@@ -587,18 +591,23 @@ async fn main() {
         metrics
     };
 
-    if let Some((tracing_controller, mut tracing_socket, mut file)) = tracer {
+    if let Some((trace_session, mut tracing_socket, mut file)) = tracer {
         let mut trace = Vec::new();
+        let stop_and_terminate_fut = async move {
+            let res = trace_session
+                .stop_tracing(&ftracing_controller::StopOptions {
+                    write_results: Some(true),
+                    ..Default::default()
+                })
+                .await
+                .map(|r| r.expect("stop tracing"));
+            res.expect("stop tracing")
+        };
         // NB: Terminating tracing is essentially infallible right now, since
         // TerminateResult is not a result, but a FIDL table with no fields in it,
         // thus it's safe to ignore.
         let (_, _): (ftracing_controller::TerminateResult, usize) = futures::future::join(
-            tracing_controller
-                .terminate_tracing(&ftracing_controller::TerminateOptions {
-                    write_results: Some(true),
-                    ..Default::default()
-                })
-                .map(|r| r.expect("terminate tracing")),
+            stop_and_terminate_fut,
             tracing_socket.read_to_end(&mut trace).map(|r| r.expect("read trace")),
         )
         .await;

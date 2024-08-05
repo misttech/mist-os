@@ -11,7 +11,7 @@
 #include <future>
 
 struct Tracer {
-  fidl::SyncClient<fuchsia_tracing_controller::Controller> controller;
+  fidl::SyncClient<fuchsia_tracing_controller::Session> controller;
   std::future<zx_status_t> future;
 };
 
