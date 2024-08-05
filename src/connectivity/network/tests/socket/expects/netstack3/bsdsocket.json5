@@ -22,17 +22,11 @@
 
                 // IPPROTO_IP_IP_TOS
                 "IntSocketOptionTests/IntSocketOptionTest.Default/IPv4_Stream_IPPROTO_IP_IP_TOS",
-                "IntSocketOptionTests/IntSocketOptionTest.Default/IPv4_Datagram_IPPROTO_IP_IP_TOS",
                 "IntSocketOptionTests/IntSocketOptionTest.Default/IPv6_Stream_IPPROTO_IP_IP_TOS",
-                "IntSocketOptionTests/IntSocketOptionTest.Default/IPv6_Datagram_IPPROTO_IP_IP_TOS",
                 "IntSocketOptionTests/IntSocketOptionTest.SetValid/IPv4_Stream_IPPROTO_IP_IP_TOS",
-                "IntSocketOptionTests/IntSocketOptionTest.SetValid/IPv4_Datagram_IPPROTO_IP_IP_TOS",
                 "IntSocketOptionTests/IntSocketOptionTest.SetValid/IPv6_Stream_IPPROTO_IP_IP_TOS",
-                "IntSocketOptionTests/IntSocketOptionTest.SetValid/IPv6_Datagram_IPPROTO_IP_IP_TOS",
                 "IntSocketOptionTests/IntSocketOptionTest.SetChar/IPv4_Stream_IPPROTO_IP_IP_TOS",
-                "IntSocketOptionTests/IntSocketOptionTest.SetChar/IPv4_Datagram_IPPROTO_IP_IP_TOS",
                 "IntSocketOptionTests/IntSocketOptionTest.SetChar/IPv6_Stream_IPPROTO_IP_IP_TOS",
-                "IntSocketOptionTests/IntSocketOptionTest.SetChar/IPv6_Datagram_IPPROTO_IP_IP_TOS",
 
                 // IPPROTO_IP_IP_RECVTOS
                 "IntSocketOptionTests/IntSocketOptionTest.Default/IPv4_Stream_IPPROTO_IP_IP_RECVTOS",
@@ -91,19 +85,14 @@
 
                 // IPPROTO_IPV6_IPV6_TCLASS
                 "IntSocketOptionTests/IntSocketOptionTest.Default/IPv6_Stream_IPPROTO_IPV6_IPV6_TCLASS",
-                "IntSocketOptionTests/IntSocketOptionTest.Default/IPv6_Datagram_IPPROTO_IPV6_IPV6_TCLASS",
                 "IntSocketOptionTests/IntSocketOptionTest.SetValid/IPv4_Stream_IPPROTO_IPV6_IPV6_TCLASS",
-                "IntSocketOptionTests/IntSocketOptionTest.SetValid/IPv4_Datagram_IPPROTO_IPV6_IPV6_TCLASS",
                 "IntSocketOptionTests/IntSocketOptionTest.SetValid/IPv6_Stream_IPPROTO_IPV6_IPV6_TCLASS",
-                "IntSocketOptionTests/IntSocketOptionTest.SetValid/IPv6_Datagram_IPPROTO_IPV6_IPV6_TCLASS",
                 "IntSocketOptionTests/IntSocketOptionTest.SetChar/IPv4_Stream_IPPROTO_IPV6_IPV6_TCLASS",
                 "IntSocketOptionTests/IntSocketOptionTest.SetChar/IPv4_Datagram_IPPROTO_IPV6_IPV6_TCLASS",
                 "IntSocketOptionTests/IntSocketOptionTest.SetChar/IPv6_Stream_IPPROTO_IPV6_IPV6_TCLASS",
-                "IntSocketOptionTests/IntSocketOptionTest.SetChar/IPv6_Datagram_IPPROTO_IPV6_IPV6_TCLASS",
                 "IntSocketOptionTests/IntSocketOptionTest.SetInvalid/IPv4_Stream_IPPROTO_IPV6_IPV6_TCLASS",
                 "IntSocketOptionTests/IntSocketOptionTest.SetInvalid/IPv6_Stream_IPPROTO_IPV6_IPV6_TCLASS",
                 "IntSocketOptionTests/IntSocketOptionTest.SetInvalid/IPv4_Datagram_IPPROTO_IPV6_IPV6_TCLASS",
-                "IntSocketOptionTests/IntSocketOptionTest.SetInvalid/IPv6_Datagram_IPPROTO_IPV6_IPV6_TCLASS",
 
                 // IPPROTO_IPV6_IPV6_RECVTCLASS
                 "IntSocketOptionTests/IntSocketOptionTest.Default/IPv6_Stream_IPPROTO_IPV6_IPV6_RECVTCLASS",
@@ -195,15 +184,14 @@
                 "LocalhostTest/SocketOptsTest.ResetTtlToDefault/IPv*_Stream",
 
                 // IP_TOS + IPV6_TCLASS
-                "LocalhostTest/SocketOptsTest.InvalidLargeTOS*",
-                "LocalhostTest/SocketOptsTest.ZeroTOSOptionSize*",
-                "LocalhostTest/SocketOptsTest.SmallTOSOptionSize*",
-                "LocalhostTest/SocketOptsTest.LargeTOSOptionSize*",
-                "LocalhostTest/SocketOptsTest.NegativeTOS*",
-                "LocalhostTest/SocketOptsTest.InvalidNegativeTOS*",
-                "LocalhostTest/SocketOptsTest.SetReceiveTOSShort/IPv*_Datagram",
-                "LocalhostTest/SocketOptsTest.InvalidCheckSkipECN*",
-                "LocalhostTest/SocketOptsTest.CheckSkipECN*",
+                "LocalhostTest/SocketOptsTest.InvalidLargeTOS/IPv?_Stream",
+                "LocalhostTest/SocketOptsTest.ZeroTOSOptionSize/IPv?_Stream",
+                "LocalhostTest/SocketOptsTest.SmallTOSOptionSize/IPv?_Stream",
+                "LocalhostTest/SocketOptsTest.LargeTOSOptionSize/IPv?_Stream",
+                "LocalhostTest/SocketOptsTest.NegativeTOS/IPv?_Stream",
+                "LocalhostTest/SocketOptsTest.InvalidNegativeTOS/IPv?_Stream",
+                "LocalhostTest/SocketOptsTest.SetReceiveTOSShort/IPv?_Datagram",
+                "LocalhostTest/SocketOptsTest.CheckSkipECN/IPv?_Stream",
 
                 // SO_TIMESTAMP{NS}
                 "LocalhostTest/SocketOptsTest.UpdateAnyTimestampDisablesOtherTimestampOptions/IPv4_Stream",

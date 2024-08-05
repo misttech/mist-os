@@ -40,7 +40,7 @@ use packet_formats::icmp::{
     Icmpv6ParameterProblem, Icmpv6ParameterProblemCode, Icmpv6TimeExceededCode, MessageBody,
     OriginalPacket,
 };
-use packet_formats::ip::{Ipv4Proto, Ipv6Proto};
+use packet_formats::ip::{DscpAndEcn, Ipv4Proto, Ipv6Proto};
 use packet_formats::ipv4::{Ipv4FragmentType, Ipv4Header};
 use packet_formats::ipv6::{ExtHdrParseError, Ipv6Header};
 use zerocopy::ByteSlice;
@@ -1026,6 +1026,7 @@ where
             ttl: NonZeroU8::new(REQUIRED_NDP_IP_PACKET_HOP_LIMIT),
             proto: Ipv6Proto::Icmpv6,
             mtu: None,
+            dscp_and_ecn: DscpAndEcn::default(),
         },
         body.encapsulate(IcmpPacketBuilder::<Ipv6, _>::new(
             src_ip.map_or(Ipv6::UNSPECIFIED_ADDRESS, |a| a.get()),

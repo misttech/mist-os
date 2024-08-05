@@ -22,6 +22,7 @@ use netstack3_filter::{
     TransportPacketSerializer,
 };
 use packet::{BufferMut, PacketConstraints, SerializeError};
+use packet_formats::ip::DscpAndEcn;
 use thiserror::Error;
 
 use crate::internal::base::{
@@ -476,6 +477,9 @@ pub trait SendOptions<I: IpExt> {
 
     /// `Some` if the socket can be used to send broadcast packets.
     fn allow_broadcast(&self) -> Option<I::BroadcastMarker>;
+
+    /// Returns TCLASS/TOS field value that should be set in IP headers.
+    fn dscp_and_ecn(&self) -> DscpAndEcn;
 }
 
 /// Empty send options that never overrides default values.
@@ -493,6 +497,10 @@ impl<I: IpExt> SendOptions<I> for DefaultSendOptions {
 
     fn allow_broadcast(&self) -> Option<I::BroadcastMarker> {
         None
+    }
+
+    fn dscp_and_ecn(&self) -> DscpAndEcn {
+        DscpAndEcn::default()
     }
 }
 
@@ -709,6 +717,7 @@ where
         ttl,
         proto: *proto,
         mtu,
+        dscp_and_ecn: options.dscp_and_ecn(),
     };
     IpSocketContext::send_ip_packet(core_ctx, bindings_ctx, meta, body, packet_metadata).or_else(
         |IpSendFrameError { serializer: _, error }| IpSockSendError::from_ip_send_frame(error),
@@ -724,6 +733,7 @@ where
                 ttl,
                 proto: *proto,
                 mtu,
+                dscp_and_ecn: options.dscp_and_ecn(),
             };
             let packet_metadata = IpLayerPacketMetadata::default();
 
@@ -1688,6 +1698,7 @@ pub(crate) mod testutil {
                 proto: *proto,
                 ttl: options.hop_limit(remote_ip),
                 mtu,
+                dscp_and_ecn: DscpAndEcn::default(),
             })
         }
     }

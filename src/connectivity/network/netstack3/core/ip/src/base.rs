@@ -37,7 +37,7 @@ use netstack3_filter::{
 };
 use packet::{Buf, BufferMut, ParseMetadata, Serializer};
 use packet_formats::error::IpParseError;
-use packet_formats::ip::{IpPacket as _, IpPacketBuilder as _};
+use packet_formats::ip::{DscpAndEcn, IpPacket as _, IpPacketBuilder as _};
 use packet_formats::ipv4::{Ipv4FragmentType, Ipv4Packet};
 use packet_formats::ipv6::Ipv6Packet;
 use thiserror::Error;
@@ -3289,19 +3289,31 @@ pub struct SendIpPacketMeta<I: IpExt, D, Src> {
     ///
     /// Note that the device's MTU will still be imposed on the packet.
     pub mtu: Option<u32>,
+
+    /// Traffic Class (IPv6) or Type of Service (IPv4) field for the packet.
+    pub dscp_and_ecn: DscpAndEcn,
 }
 
 impl<I: IpExt, D> From<SendIpPacketMeta<I, D, SpecifiedAddr<I::Addr>>>
     for SendIpPacketMeta<I, D, Option<SpecifiedAddr<I::Addr>>>
 {
     fn from(
-        SendIpPacketMeta { device, src_ip, dst_ip, destination, proto, ttl, mtu }: SendIpPacketMeta<
+        SendIpPacketMeta { device, src_ip, dst_ip, destination, proto, ttl, mtu, dscp_and_ecn }: SendIpPacketMeta<
             I,
             D,
             SpecifiedAddr<I::Addr>,
         >,
     ) -> SendIpPacketMeta<I, D, Option<SpecifiedAddr<I::Addr>>> {
-        SendIpPacketMeta { device, src_ip: Some(src_ip), dst_ip, destination, proto, ttl, mtu }
+        SendIpPacketMeta {
+            device,
+            src_ip: Some(src_ip),
+            dst_ip,
+            destination,
+            proto,
+            ttl,
+            mtu,
+            dscp_and_ecn,
+        }
     }
 }
 
@@ -3406,7 +3418,8 @@ where
     S: TransportPacketSerializer<I>,
     S::Buffer: BufferMut,
 {
-    let SendIpPacketMeta { device, src_ip, dst_ip, destination, proto, ttl, mtu } = meta;
+    let SendIpPacketMeta { device, src_ip, dst_ip, destination, proto, ttl, mtu, dscp_and_ecn } =
+        meta;
     let next_packet_id = gen_ip_packet_id(core_ctx);
     let ttl = ttl.unwrap_or_else(|| core_ctx.get_hop_limit(device)).get();
     let src_ip = src_ip.map_or(I::UNSPECIFIED_ADDRESS, |a| a.get());
@@ -3428,6 +3441,8 @@ where
             // IPv6 doesn't have packet IDs.
         },
     );
+
+    builder.set_dscp_and_ecn(dscp_and_ecn);
 
     let body = body.encapsulate(builder);
 

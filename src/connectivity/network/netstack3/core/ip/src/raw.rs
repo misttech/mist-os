@@ -24,7 +24,7 @@ use netstack3_base::{
 use netstack3_filter::RawIpBody;
 use packet::{BufferMut, SliceBufViewMut};
 use packet_formats::icmp;
-use packet_formats::ip::IpPacket;
+use packet_formats::ip::{DscpAndEcn, IpPacket};
 use zerocopy::ByteSlice;
 
 use crate::internal::raw::counters::RawIpSocketCounters;
@@ -761,6 +761,10 @@ impl<I: IpExt> SendOptions<I> for RawIpSocketSendOptions<'_, I> {
 
     fn allow_broadcast(&self) -> Option<I::BroadcastMarker> {
         None
+    }
+
+    fn dscp_and_ecn(&self) -> DscpAndEcn {
+        DscpAndEcn::default()
     }
 }
 

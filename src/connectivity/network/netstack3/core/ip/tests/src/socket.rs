@@ -14,7 +14,7 @@ use net_types::{SpecifiedAddr, Witness};
 use packet::{Buf, InnerPacketBuilder, ParseBuffer, Serializer as _};
 use packet_formats::ethernet::EthernetFrameLengthCheck;
 use packet_formats::icmp::{IcmpIpExt, IcmpUnusedCode};
-use packet_formats::ip::IpPacket;
+use packet_formats::ip::{DscpAndEcn, IpPacket};
 use packet_formats::ipv4::{Ipv4OnlyMeta, Ipv4Packet};
 use packet_formats::testutil::{parse_ethernet_frame, parse_ip_packet_in_ethernet_frame};
 use test_case::test_case;
@@ -92,6 +92,10 @@ impl<I: IpExt> SendOptions<I> for WithHopLimit {
 
     fn allow_broadcast(&self) -> Option<I::BroadcastMarker> {
         None
+    }
+
+    fn dscp_and_ecn(&self) -> DscpAndEcn {
+        DscpAndEcn::default()
     }
 }
 
@@ -557,6 +561,10 @@ fn test_send_hop_limits<I: IpSocketIpExt + IpExt>() {
 
         fn allow_broadcast(&self) -> Option<I::BroadcastMarker> {
             None
+        }
+
+        fn dscp_and_ecn(&self) -> DscpAndEcn {
+            DscpAndEcn::default()
         }
     }
 

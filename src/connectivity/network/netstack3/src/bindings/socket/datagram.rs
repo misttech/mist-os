@@ -37,6 +37,7 @@ use netstack3_core::socket::{
 use netstack3_core::sync::Mutex as CoreMutex;
 use netstack3_core::{icmp, udp, IpExt};
 use packet::{Buf, BufferMut};
+use packet_formats::ip::DscpAndEcn;
 
 use crate::bindings::socket::queue::{BodyLen, MessageQueue};
 use crate::bindings::socket::worker::{self, SocketWorker};
@@ -128,6 +129,7 @@ pub(crate) trait TransportState<I: Ip>: Transport<I> + Send + Sync + 'static {
         + TryIntoFidl<RemoteAddress<I, WeakDeviceId<BindingsCtx>, u16>, Error = fposix::Errno>;
     type SendError: IntoErrno;
     type SendToError: IntoErrno;
+    type DscpAndEcnError: IntoErrno;
 
     fn create_unbound(
         ctx: &mut Ctx,
@@ -273,6 +275,19 @@ pub(crate) trait TransportState<I: Ip>: Transport<I> + Send + Sync + 'static {
 
     fn get_broadcast(ctx: &mut Ctx, id: &Self::SocketId) -> bool;
 
+    fn set_dscp_and_ecn(
+        ctx: &mut Ctx,
+        id: &Self::SocketId,
+        dscp_and_ecn: DscpAndEcn,
+        ip_version: IpVersion,
+    ) -> Result<(), Self::DscpAndEcnError>;
+
+    fn get_dscp_and_ecn(
+        ctx: &mut Ctx,
+        id: &Self::SocketId,
+        ip_version: IpVersion,
+    ) -> Result<DscpAndEcn, Self::DscpAndEcnError>;
+
     fn send<B: BufferMut>(
         ctx: &mut Ctx,
         id: &Self::SocketId,
@@ -341,6 +356,7 @@ where
     type SocketInfo = SocketInfo<I::Addr, WeakDeviceId<BindingsCtx>>;
     type SendError = Either<udp::SendError, fposix::Errno>;
     type SendToError = Either<LocalAddressError, udp::SendToError>;
+    type DscpAndEcnError = NotDualStackCapableError;
 
     fn create_unbound(
         ctx: &mut Ctx,
@@ -555,6 +571,23 @@ where
         ctx.api().udp().get_broadcast(id)
     }
 
+    fn set_dscp_and_ecn(
+        ctx: &mut Ctx,
+        id: &Self::SocketId,
+        traffic_class: DscpAndEcn,
+        ip_version: IpVersion,
+    ) -> Result<(), Self::DscpAndEcnError> {
+        ctx.api().udp().set_dscp_and_ecn(id, traffic_class, ip_version)
+    }
+
+    fn get_dscp_and_ecn(
+        ctx: &mut Ctx,
+        id: &Self::SocketId,
+        ip_version: IpVersion,
+    ) -> Result<DscpAndEcn, Self::DscpAndEcnError> {
+        ctx.api().udp().get_dscp_and_ecn(id, ip_version)
+    }
+
     fn send<B: BufferMut>(
         ctx: &mut Ctx,
         id: &Self::SocketId,
@@ -653,6 +686,7 @@ where
         LocalAddressError,
         core_socket::SendToError<packet_formats::error::ParseError>,
     >;
+    type DscpAndEcnError = NotSupportedError;
 
     fn create_unbound(
         ctx: &mut Ctx,
@@ -905,6 +939,23 @@ where
 
     fn get_broadcast(_ctx: &mut Ctx, _id: &Self::SocketId) -> bool {
         false
+    }
+
+    fn set_dscp_and_ecn(
+        _ctx: &mut Ctx,
+        _id: &Self::SocketId,
+        _traffic_class: DscpAndEcn,
+        _ip_version: IpVersion,
+    ) -> Result<(), Self::DscpAndEcnError> {
+        Err(NotSupportedError)
+    }
+
+    fn get_dscp_and_ecn(
+        _ctx: &mut Ctx,
+        _id: &Self::SocketId,
+        _ip_version: IpVersion,
+    ) -> Result<DscpAndEcn, Self::DscpAndEcnError> {
+        Err(NotSupportedError)
     }
 
     fn send<B: BufferMut>(
@@ -1445,11 +1496,16 @@ where
                 maybe_log_error!("get_ipv6_only", &result);
                 responder.send(result).unwrap_or_log("failed to respond");
             }
-            Request::SetIpv6TrafficClass { value: _, responder } => {
-                respond_not_supported!("syncudp::SetIpv6TrafficClass", responder)
+            Request::SetIpv6TrafficClass { value, responder } => {
+                let value: Option<u8> = value.into_core();
+                let result = self.set_traffic_class(Ipv6::VERSION, value.unwrap_or(0));
+                maybe_log_error!("set_ipv6_traffic_class", &result);
+                responder.send(result).unwrap_or_log("failed to respond")
             }
             Request::GetIpv6TrafficClass { responder } => {
-                respond_not_supported!("syncudp::GetIpv6TrafficClass", responder)
+                let result = self.get_traffic_class(Ipv6::VERSION);
+                maybe_log_error!("get_ipv6_traffic_class", &result);
+                responder.send(result).unwrap_or_log("failed to respond")
             }
             Request::SetIpv6MulticastInterface { value, responder } => {
                 let result = self.set_multicast_interface_ipv6(NonZeroU64::new(value));
@@ -1535,11 +1591,15 @@ where
                 maybe_log_error!("get_ip_multicast_loop", &result);
                 responder.send(result).unwrap_or_log("failed to respond")
             }
-            Request::SetIpTypeOfService { value: _, responder } => {
-                respond_not_supported!("syncudp::SetIpTypeOfService", responder)
+            Request::SetIpTypeOfService { value, responder } => {
+                let result = self.set_traffic_class(Ipv4::VERSION, value);
+                maybe_log_error!("set_ip_type_of_service", &result);
+                responder.send(result).unwrap_or_log("failed to respond")
             }
             Request::GetIpTypeOfService { responder } => {
-                respond_not_supported!("syncudp::GetIpTypeOfService", responder)
+                let result = self.get_traffic_class(Ipv4::VERSION);
+                maybe_log_error!("get_ip_type_of_service", &result);
+                responder.send(result).unwrap_or_log("failed to respond")
             }
             Request::AddIpMembership { membership, responder } => {
                 let result = self.set_multicast_membership(membership, true);
@@ -2246,6 +2306,28 @@ where
     ) -> Result<(), fposix::Errno> {
         self.data.timestamp_option = value;
         Ok(())
+    }
+
+    fn set_traffic_class(
+        self,
+        ip_version: IpVersion,
+        traffic_class: u8,
+    ) -> Result<(), fposix::Errno> {
+        let Self { ctx, data: BindingData { info: SocketControlInfo { id, .. }, .. } } = self;
+        T::set_dscp_and_ecn(ctx, id, traffic_class.into(), ip_version)
+            .map_err(IntoErrno::into_errno)
+    }
+
+    fn get_traffic_class(self, ip_version: IpVersion) -> Result<u8, fposix::Errno> {
+        let Self { ctx, data: BindingData { info: SocketControlInfo { id, .. }, .. } } = self;
+        T::get_dscp_and_ecn(ctx, id, ip_version)
+            .map_err(IntoErrno::into_errno)
+            .map_err(|e| match e.into_errno() {
+                // fail with `EOPNOTSUPP` instead of `ENOPROTOOPT`.
+                fposix::Errno::Enoprotoopt => fposix::Errno::Eopnotsupp,
+                e => e,
+            })
+            .map(DscpAndEcn::raw)
     }
 }
 

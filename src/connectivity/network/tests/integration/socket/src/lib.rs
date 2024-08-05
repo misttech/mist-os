@@ -4630,3 +4630,103 @@ async fn broadcast_send<N: Netstack, I: TestIpExt>(name: &str) {
         .expect("recv_from failed");
     assert_eq!(size, test_packet.len());
 }
+
+#[netstack_test]
+#[variant(N, Netstack)]
+#[variant(I, Ip)]
+async fn tos_tclass_send<
+    N: Netstack,
+    I: TestIpExt + packet_formats::ethernet::EthernetIpExt + packet_formats::ip::IpExt,
+>(
+    name: &str,
+) {
+    let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
+    let client = sandbox
+        .create_netstack_realm::<N, _>(format!("{name}_client"))
+        .expect("failed to create client realm");
+
+    let net = sandbox.create_network(format!("net0")).await.expect("failed to create network");
+    let iface = client.join_network(&net, format!("if0")).await.expect("failed to join network");
+    iface.add_address_and_subnet_route(I::CLIENT_SUBNET.clone()).await.expect("failed to set ip");
+    let receiver = net.create_fake_endpoint().expect("failed to create endpoint");
+
+    // Add a neighbor entry to ensure the packet is sent without having to resolve MAC.
+    client
+        .add_neighbor_entry(iface.id(), I::SERVER_SUBNET.addr.clone(), SERVER_MAC)
+        .await
+        .expect("add_neighbor_entry");
+
+    let socket = client
+        .datagram_socket(I::DOMAIN, fposix_socket::DatagramSocketProtocol::Udp)
+        .await
+        .expect("failed to create socket");
+
+    let fnet_ext::IpAddress(dst_ip) = fnet_ext::IpAddress::from(I::SERVER_SUBNET.addr);
+    let dst_addr = std::net::SocketAddr::new(dst_ip, 3513);
+
+    let socket: std::net::UdpSocket = socket.into();
+    let traffic_class = 0xa7;
+    let r = match I::VERSION {
+        IpVersion::V4 => unsafe {
+            let v = traffic_class as libc::c_int;
+            libc::setsockopt(
+                std::os::fd::AsRawFd::as_raw_fd(&socket),
+                libc::IPPROTO_IP,
+                libc::IP_TOS,
+                &v as *const libc::c_int as *const libc::c_void,
+                std::mem::size_of_val(&v) as u32,
+            )
+        },
+        IpVersion::V6 => unsafe {
+            let v = traffic_class as libc::c_int;
+            libc::setsockopt(
+                std::os::fd::AsRawFd::as_raw_fd(&socket),
+                libc::IPPROTO_IPV6,
+                libc::IPV6_TCLASS,
+                &v as *const libc::c_int as *const libc::c_void,
+                std::mem::size_of_val(&v) as u32,
+            )
+        },
+    };
+    assert_eq!(r, 0, "Failed to set TOS/TCLASS option");
+
+    let test_packet = [1, 2, 3, 4, 5];
+    assert_eq!(
+        socket.send_to(&test_packet, &dst_addr).expect("failed to send multicast packet"),
+        test_packet.len()
+    );
+
+    // Check that the packet is sent to the network.
+    std::pin::pin!(receiver.frame_stream().map(|r| r.expect("failed to read frame")).filter_map(
+        |(data, dropped)| async move {
+            assert_eq!(dropped, 0);
+            let (mut body, _src_mac, _dst_mac, ethertype) =
+                packet_formats::testutil::parse_ethernet_frame(
+                    &data,
+                    EthernetFrameLengthCheck::NoCheck,
+                )
+                .expect("Failed to parse ethernet packet");
+            if ethertype != Some(I::ETHER_TYPE) {
+                return None;
+            }
+
+            let ip_packet = <I::Packet<_> as packet::ParsablePacket<_, _>>::parse(&mut body, ())
+                .expect("Failed to parse IP packet");
+            use packet_formats::ip::IpPacket;
+            if ip_packet.proto() != IpProto::Udp.into() {
+                return None;
+            }
+
+            let received_traffic_class = ip_packet.dscp_and_ecn().raw();
+            assert_eq!(traffic_class, received_traffic_class);
+
+            Some(())
+        }
+    ))
+    .next()
+    .on_timeout(ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT.after_now(), || {
+        panic!("timed out waiting for the UDP packet packet")
+    })
+    .await
+    .expect("didn't receive the packet before end of the stream");
+}

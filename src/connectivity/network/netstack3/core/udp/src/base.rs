@@ -58,7 +58,7 @@ use netstack3_ip::{
     TransparentLocalDelivery, TransportIpContext, TransportReceiveError,
 };
 use packet::{BufferMut, Nested, ParsablePacket, Serializer};
-use packet_formats::ip::{IpProto, IpProtoExt};
+use packet_formats::ip::{DscpAndEcn, IpProto, IpProtoExt};
 use packet_formats::udp::{UdpPacket, UdpPacketBuilder, UdpParseArgs};
 use thiserror::Error;
 
@@ -2211,6 +2211,49 @@ where
         })
     }
 
+    /// Gets the TCLASS/TOS option.
+    pub fn get_dscp_and_ecn(
+        &mut self,
+        id: &UdpApiSocketId<I, C>,
+        ip_version: IpVersion,
+    ) -> Result<DscpAndEcn, NotDualStackCapableError> {
+        if ip_version == I::VERSION {
+            return Ok(self.datagram().get_dscp_and_ecn(id));
+        };
+
+        self.datagram().with_other_stack_ip_options(id, |other_stack| {
+            I::map_ip_in(
+                WrapOtherStackIpOptions(other_stack),
+                |_v4| Err(NotDualStackCapableError),
+                |WrapOtherStackIpOptions(other_stack)| Ok(other_stack.socket_options.dscp_and_ecn),
+            )
+        })
+    }
+
+    /// Sets the TCLASS/TOS option.
+    pub fn set_dscp_and_ecn(
+        &mut self,
+        id: &UdpApiSocketId<I, C>,
+        value: DscpAndEcn,
+        ip_version: IpVersion,
+    ) -> Result<(), NotDualStackCapableError> {
+        if ip_version == I::VERSION {
+            self.datagram().set_dscp_and_ecn(id, value);
+            return Ok(());
+        };
+
+        self.datagram().with_other_stack_ip_options_mut(id, |other_stack| {
+            I::map_ip(
+                (IpInvariant(value), WrapOtherStackIpOptionsMut(other_stack)),
+                |(IpInvariant(_interface), _v4)| Err(NotDualStackCapableError),
+                |(IpInvariant(value), WrapOtherStackIpOptionsMut(other_stack))| {
+                    other_stack.socket_options.dscp_and_ecn = value;
+                    Ok(())
+                },
+            )
+        })
+    }
+
     /// Disconnects a connected UDP socket.
     ///
     /// `disconnect` removes an existing connected socket and replaces it with a
@@ -3396,6 +3439,7 @@ mod tests {
                     proto,
                     ttl: _,
                     mtu: _,
+                    dscp_and_ecn: _,
                 } = meta.try_as::<I>().unwrap();
                 assert_eq!(destination, &IpPacketDestination::Neighbor(remote_ip));
                 assert_eq!(src_ip, &local_ip);
@@ -3482,8 +3526,16 @@ mod tests {
         let (meta, frame_body) =
             assert_matches!(api.core_ctx().bound_sockets.ip_socket_ctx.frames(), [frame] => frame);
         // Check first frame.
-        let SendIpPacketMeta { device: _, src_ip, dst_ip, destination, proto, ttl: _, mtu: _ } =
-            meta.try_as::<I>().unwrap();
+        let SendIpPacketMeta {
+            device: _,
+            src_ip,
+            dst_ip,
+            destination,
+            proto,
+            ttl: _,
+            mtu: _,
+            dscp_and_ecn: _,
+        } = meta.try_as::<I>().unwrap();
         assert_eq!(destination, &IpPacketDestination::Neighbor(remote_ip));
         assert_eq!(src_ip, &local_ip);
         assert_eq!(dst_ip, &remote_ip);
@@ -3833,8 +3885,16 @@ mod tests {
         // Check first frame.
         let (meta, frame_body) =
             assert_matches!(api.core_ctx().bound_sockets.ip_socket_ctx.frames(), [frame] => frame);
-        let SendIpPacketMeta { device: _, src_ip, dst_ip, destination, proto, ttl: _, mtu: _ } =
-            meta.try_as::<I>().unwrap();
+        let SendIpPacketMeta {
+            device: _,
+            src_ip,
+            dst_ip,
+            destination,
+            proto,
+            ttl: _,
+            mtu: _,
+            dscp_and_ecn: _,
+        } = meta.try_as::<I>().unwrap();
 
         assert_eq!(destination, &IpPacketDestination::Neighbor(other_remote_ip));
         assert_eq!(src_ip, &local_ip);
@@ -4534,6 +4594,7 @@ mod tests {
                     proto,
                     ttl: _,
                     mtu: _,
+                    dscp_and_ecn: _,
                 } = meta.try_as::<I>().unwrap();
                 assert_eq!(proto, &IpProto::Udp.into());
                 assert_eq!(dst_ip, &I::get_other_remote_ip_address(1));
