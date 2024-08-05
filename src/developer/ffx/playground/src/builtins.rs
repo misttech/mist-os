@@ -14,18 +14,15 @@ use std::pin::pin;
 use std::sync::{Arc, Mutex, Weak};
 use std::task::{Poll, Waker};
 
-use crate::error::{Error, Result};
+use crate::error::{Result, RuntimeError};
 use crate::interpreter::{
-    canonicalize_path, Interpreter, InterpreterInner, SYMLINK_RECURSION_LIMIT,
+    canonicalize_path, Exception, FSError, IOError, Interpreter, InterpreterInner, MessageError,
+    SYMLINK_RECURSION_LIMIT,
 };
 use crate::value::{
     InUseHandle, Invocable, PlaygroundValue, ReplayableIterator, ReplayableIteratorCursor, Value,
     ValueExt,
 };
-
-macro_rules! error {
-    ($($data:tt)*) => { Error::from(anyhow!($($data)*)) };
-}
 
 impl Interpreter {
     /// Add built-in commands to the playground's global scope.
@@ -42,23 +39,23 @@ impl Interpreter {
                 let pwd_getter = pwd_getter.clone();
                 async move {
                     let Some(inner) = inner_weak.upgrade() else {
-                        return Err(error!("Interpreter died"));
+                        return Err(anyhow!("Interpreter died"));
                     };
                     let Some(arg) = args.pop().or(underscore) else {
-                        return Err(error!("open requires exactly one argument or an input"));
+                        return Err(anyhow!("open requires exactly one argument or an input"));
                     };
                     if !args.is_empty() {
-                        return Err(error!("open requires at most one argument"));
+                        return Err(anyhow!("open requires at most one argument"));
                     }
 
                     let path = match arg {
                         Value::String(path) => path,
-                        _ => return Err(error!("open argument must be a path")),
+                        _ => return Err(anyhow!("open argument must be a path")),
                     };
                     let fs_root = fs_root_getter().await?;
                     let pwd = pwd_getter().await?;
 
-                    inner.open(path, fs_root, pwd).await
+                    Ok(inner.open(path, fs_root, pwd).await?)
                 }
             })
             .await;
@@ -68,11 +65,11 @@ impl Interpreter {
                 let inner_weak = inner_weak.clone();
                 async move {
                     let Some(inner) = inner_weak.upgrade() else {
-                        return Err(error!("Interpreter died"));
+                        return Err(anyhow!("Interpreter died"));
                     };
 
                     if args.len() != 1 {
-                        return Err(error!("req takes exactly one argument"));
+                        return Err(anyhow!("req takes exactly one argument"));
                     }
 
                     let closure = args.pop().unwrap();
@@ -91,15 +88,15 @@ impl Interpreter {
                 let inner_weak = inner_weak.clone();
                 async move {
                     let Some(inner) = inner_weak.upgrade() else {
-                        return Err(error!("Interpreter died"));
+                        return Err(anyhow!("Interpreter died"));
                     };
 
                     let Some(value) = args.pop().or(under) else {
-                        return Err(error!("read takes one argument or an input"));
+                        return Err(anyhow!("read takes one argument or an input"));
                     };
 
                     if !args.is_empty() {
-                        return Err(error!("read takes at most one argument"));
+                        return Err(anyhow!("read takes at most one argument"));
                     }
 
                     if let Ok(client) =
@@ -121,7 +118,7 @@ impl Interpreter {
                             ),
                         ))))
                     } else {
-                        Err(error!("value cannot be read"))
+                        Err(anyhow!("value cannot be read"))
                     }
                 }
             })
@@ -140,11 +137,11 @@ impl Interpreter {
                     let pwd = pwd_getter().await?;
 
                     let Result::<[Value; 1], _>::Ok([path]) = args.try_into() else {
-                        return Err(error!("cd takes exactly one argument"));
+                        return Err(anyhow!("cd takes exactly one argument"));
                     };
 
                     let Value::String(path) = path else {
-                        return Err(error!("path must be a string"));
+                        return Err(anyhow!("path must be a string"));
                     };
 
                     let path = canonicalize_path(path, pwd)?;
@@ -175,7 +172,7 @@ impl Interpreter {
                 let fs_root_copy_getter = fs_root_copy_getter.clone();
                 async move {
                     let Some(inner) = inner_weak.upgrade() else {
-                        return Err(error!("Interpreter died"));
+                        return Err(anyhow!("Interpreter died"));
                     };
 
                     let mut pwd = pwd_getter().await?;
@@ -183,12 +180,12 @@ impl Interpreter {
                     let mut path_initial = if args.is_empty() {
                         ".".to_owned()
                     } else if args.len() > 1 {
-                        return Err(error!("ls takes at most one argument"));
+                        return Err(anyhow!("ls takes at most one argument"));
                     } else {
                         let [path] = args.try_into().unwrap();
 
                         let Value::String(path) = path else {
-                            return Err(error!("path must be a string"));
+                            return Err(anyhow!("path must be a string"));
                         };
 
                         path
@@ -197,7 +194,7 @@ impl Interpreter {
                     let fs_root = fs_root_copy_getter()
                         .await?
                         .try_client_channel(inner.lib_namespace(), "fuchsia.io/Node")
-                        .map_err(|_| error!("$fs_root is not a directory"))?;
+                        .map_err(|_| anyhow!("$fs_root is not a directory"))?;
 
                     let fs_root = fuchsia_async::Channel::from_channel(fs_root);
                     let fs_root = fio::NodeProxy::from_channel(fs_root);
@@ -205,7 +202,7 @@ impl Interpreter {
                     if fs_root.get_attr().await?.1.mode & fio::MODE_TYPE_MASK
                         != fio::MODE_TYPE_DIRECTORY
                     {
-                        return Err(error!("$fs_root is not a directory"));
+                        return Err(anyhow!("$fs_root is not a directory"));
                     }
 
                     let fs_root =
@@ -262,9 +259,9 @@ impl Interpreter {
                             let info = client.describe().await?;
                             let target = info
                                 .target
-                                .ok_or_else(|| error!("Symlink at {path} has no target"))?;
+                                .ok_or_else(|| anyhow!("Symlink at {path} has no target"))?;
                             let target = String::from_utf8(target)
-                                .map_err(|_| error!("Symlink at {path} has non-utf8 target"))?;
+                                .map_err(|_| anyhow!("Symlink at {path} has non-utf8 target"))?;
                             path_initial = target;
                             pwd = Value::String(path);
                             continue;
@@ -284,7 +281,7 @@ impl Interpreter {
                         };
                     }
 
-                    Err(error!("Symlink recursion depth exceeded"))
+                    Err(anyhow!("Symlink recursion depth exceeded"))
                 }
             })
             .await;
@@ -296,14 +293,14 @@ impl Interpreter {
                     let server = args
                         .pop()
                         .or(underscore)
-                        .ok_or_else(|| error!("Must supply an argument to serve"))?;
+                        .ok_or_else(|| anyhow!("Must supply an argument to serve"))?;
                     if !args.is_empty() {
-                        return Err(error!("serve takes at most one argument"));
+                        return Err(anyhow!("serve takes at most one argument"));
                     }
 
                     let ch = server
                         .try_server_channel()
-                        .map_err(|_| error!("Value is not a FIDL server"))?;
+                        .map_err(|_| anyhow!("Value is not a FIDL server"))?;
 
                     Ok(Value::OutOfLine(PlaygroundValue::Iterator(
                         ServeCursor(Mutex::new(ServeCursorInner::Unpolled(
@@ -397,18 +394,23 @@ impl ReplayableIteratorCursor for ServeCursor {
         let fetch_value = async move {
             let mut buf = MessageBufEtc::new();
             if let Err(e) = channel.recv_etc_msg(&mut buf).await {
-                return if e == fidl::Status::PEER_CLOSED { Ok(None) } else { Err(e.into()) };
+                return if e == fidl::Status::PEER_CLOSED {
+                    Ok(None)
+                } else {
+                    Err(IOError::ChannelRead(e).into())
+                };
             }
-            let interpreter = weak_inner.upgrade().ok_or_else(|| error!("Interpreter died"))?;
+            let interpreter = weak_inner.upgrade().ok_or_else(|| RuntimeError::InterpreterDied)?;
             let (bytes, handles) = buf.split();
 
             let (header, value) =
-                fidl_codec::decode_request(interpreter.lib_namespace(), &bytes, handles)?;
+                fidl_codec::decode_request(interpreter.lib_namespace(), &bytes, handles)
+                    .map_err(|e| MessageError::DecodeRequestFailed(Arc::new(e)))?;
 
             let mut value = value.upcast();
 
             let (protocol_name, method) =
-                interpreter.lib_namespace().lookup_method_ordinal(header.ordinal)?;
+                interpreter.lib_namespace().lookup_method_ordinal(header.ordinal).expect("FIDL Codec decoded a message then immediately claimed not to know the ordinal!");
             if let Some(ty) = method.response.clone() {
                 if !matches!(value, Value::Object(_)) {
                     value = Value::Object(vec![("_".to_owned(), value)])
@@ -426,20 +428,27 @@ impl ReplayableIteratorCursor for ServeCursor {
                         move |mut args, underscore| {
                             let state = state.lock().unwrap().take();
                             async move {
-                                let (channel, weak_inner, ty, protocol_name, method_name) = state
-                                    .ok_or_else(
-                                    || error!("Response already sent for transaction {txid}"),
-                                )?;
-                                let response = args
-                                    .pop()
-                                    .or(underscore)
-                                    .ok_or_else(|| error!("Responder takes one argument"))?;
+                                let args_len = args.len();
+                                let (channel, weak_inner, ty, protocol_name, method_name) =
+                                    state.ok_or_else(|| MessageError::ResponseAlreadySent(txid))?;
+                                let response = args.pop().or(underscore).ok_or_else(|| {
+                                    Exception::WrongArgumentCount(
+                                        format!("responder<{protocol_name}/{method_name}>"),
+                                        1,
+                                        args_len,
+                                    )
+                                })?;
                                 if !args.is_empty() {
-                                    return Err(error!("Responder takes one argument"));
+                                    return Err(Exception::WrongArgumentCount(
+                                        format!("responder<{protocol_name}/{method_name}>"),
+                                        1,
+                                        args_len,
+                                    )
+                                    .into_err());
                                 }
                                 let interpreter = weak_inner
                                     .upgrade()
-                                    .ok_or_else(|| error!("Interpreter died"))?;
+                                    .ok_or_else(|| RuntimeError::InterpreterDied)?;
                                 let response =
                                     response.to_fidl_value(interpreter.lib_namespace(), &ty)?;
 
@@ -449,8 +458,17 @@ impl ReplayableIteratorCursor for ServeCursor {
                                     &protocol_name,
                                     &method_name,
                                     response,
-                                )?;
-                                channel.write_etc(&bytes, &mut handles)?;
+                                )
+                                .map_err(|e| {
+                                    MessageError::EncodeReplyFailed(
+                                        protocol_name.to_owned(),
+                                        method_name.to_owned(),
+                                        Arc::new(e),
+                                    )
+                                })?;
+                                channel
+                                    .write_etc(&bytes, &mut handles)
+                                    .map_err(IOError::ChannelWrite)?;
                                 Ok(Value::Null)
                             }
                             .boxed()
@@ -474,7 +492,7 @@ impl ReplayableIteratorCursor for ServeCursor {
                 let value_dup = value
                     .as_mut()
                     .map(|x| x.as_mut().map(Value::duplicate))
-                    .map_err(|x| anyhow!("{x:?}").into());
+                    .map_err(|x: &mut crate::error::Error| x.clone());
                 let ServeCursorInner::Waiting(waiters, _) =
                     std::mem::replace(&mut *inner, ServeCursorInner::Stored(value_dup, next))
                 else {
@@ -534,11 +552,9 @@ impl FileCursorInner {
                     return Ok(Some(Value::U8(byte)));
                 }
             }
-            bytes = self
-                .proxy
-                .read(Self::READ_BLOCK_SIZE)
-                .await?
-                .map_err(|i| error!("read failed: {i}"))?;
+            bytes = fuchsia_fs::file::read_num_bytes(&self.proxy, Self::READ_BLOCK_SIZE)
+                .await
+                .map_err(|e| FSError::FileReadError(Arc::new(e)))?;
             if bytes.is_empty() {
                 return Ok(None);
             }

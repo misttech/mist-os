@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::anyhow;
 use fancy_regex::Regex;
 use fidl::endpoints::Proxy;
 use fidl_codec::{library as lib, Value as FidlValue};
@@ -15,15 +14,122 @@ use std::collections::HashMap;
 use std::fmt::Write;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
+use thiserror::Error;
 
 use crate::compiler::Visitor;
-use crate::error::{Error, Result};
+use crate::error::{Result, RuntimeError};
 use crate::frame::GlobalVariables;
 use crate::parser::{Mutability, Node, ParseResult, TabHint};
 use crate::value::{InUseHandle, Invocable, PlaygroundValue, ReplayableIterator, Value, ValueExt};
 
-macro_rules! error {
-    ($($data:tt)*) => { Error::from(anyhow!($($data)*)) };
+/// Errors occurring due to the user misusing the language.
+#[derive(Error, Debug, Clone)]
+pub enum Exception {
+    #[error("'{0}' is declared constant")]
+    AssignToConst(String),
+    #[error("Object key must be a string")]
+    NonStringObjectKey,
+    #[error("List index must be a positive integer")]
+    NonPositiveIntegerListKey,
+    #[error("List index out of range")]
+    ListIndexOutOfRange,
+    #[error("Value does not have members or elements")]
+    LookupNotSupported,
+    #[error("Expression isn't assignable")]
+    BadLValue,
+    #[error("The '+' operator only applies to numbers and strings")]
+    BadAdditionOperands,
+    #[error("The '{0}' operator only applies to numbers")]
+    BadNumericOperands(&'static str),
+    #[error("The '{0}' operator only applies to booleans")]
+    BadBooleanOperands(&'static str),
+    #[error("Division by zero")]
+    DivisionByZero,
+    #[error("Condition must evaluate to a boolean")]
+    NonBooleanConditional,
+    #[error("Value isn't iterable")]
+    NotIterable,
+    #[error("Wrong number of arguments to '{0}' (need {1} have {2})")]
+    WrongArgumentCount(String, usize, usize),
+    #[error("Object does not contain '{0}'")]
+    NoSuchObjectKey(String),
+    #[error("Negation only applies to numbers")]
+    BadNegationOperand,
+    #[error("Range bound must be an integer")]
+    NonNumericRangeBound,
+    #[error("Left-unbounded ranges are not yet supported")]
+    UnsupportedLeftUnboundedRange,
+    #[error("{0} undeclared")]
+    VariableUndeclared(String),
+    #[error("Value cannot be invoked")]
+    NotInvocable,
+}
+
+/// Errors occurring during operations on the interpreters internal filesystem.
+#[derive(Error, Debug, Clone)]
+pub enum FSError {
+    #[error("'$fs_root' is not a handle")]
+    FSRootNotHandle,
+    #[error("'$fs_root' is not a directory")]
+    FSRootNotDirectory,
+    #[error("Symlink at {0} did not contain a target")]
+    NoSymlinkTarget(String),
+    #[error("Symlink at {0} had a non-utf8 target")]
+    SymlinkNotUTF(String),
+    #[error("Could not understand attributes for {0}")]
+    UnknownAttributes(String, fio::NodeAttributes),
+    #[error("Symlink recursion depth exceeded while opening {0}")]
+    SymlinkRecursionExceeded(String),
+    #[error("'$pwd' is not a string")]
+    PwdNotString,
+    #[error("'$pwd' is not an absolute path")]
+    PwdNotAbsolute,
+    #[error("Imported path at {0} is not a file")]
+    ImportNotFile(String),
+    #[error("Error reading file: {0}")]
+    FileReadError(Arc<fuchsia_fs::file::ReadError>),
+    #[error("Could not get target for symlink at {0}: {1}")]
+    SymlinkDescribeFailed(String, fidl::Error),
+    #[error("Could not get attributes for {0}")]
+    GetAttributesFailed(String, fidl::Error),
+}
+
+/// Errors occurring during raw IO on handles.
+#[derive(Error, Debug, Clone)]
+pub enum IOError {
+    #[error("Socket read failed: {0}")]
+    SocketRead(fidl::Status),
+    #[error("Socket write failed: {0}")]
+    SocketWrite(fidl::Status),
+    #[error("Channel read failed: {0}")]
+    ChannelRead(fidl::Status),
+    #[error("Channel write failed: {0}")]
+    ChannelWrite(fidl::Status),
+}
+
+/// Errors occurring when trying to send a FIDL message.
+#[derive(Error, Debug, Clone)]
+pub enum MessageError {
+    #[error("Cannot find definition for protocol {0}")]
+    ProtocolNotFound(String),
+    #[error("Channel message argument must be a single, named object")]
+    MessageArgumentsIncorrect,
+    #[error("Channel message not provided")]
+    NoMessage,
+    #[error("No method {0} in protocol {1}")]
+    NoMethodInProtocol(String, String),
+    #[error("Response already sent for txid {0}")]
+    ResponseAlreadySent(u32),
+    #[error("Bad FIDL transaction header: {0}")]
+    BadFidlTransactionHeader(fidl::Error),
+    #[error("Could not encode FIDL request for method {0}/{1}: {2}")]
+    EncodeRequestFailed(String, String, Arc<fidl_codec::Error>),
+    #[error("Could not decode FIDL reply for method {0}/{1}: {2}")]
+    DecodeReplyFailed(String, String, Arc<fidl_codec::Error>),
+    #[error("Could not encode FIDL reply for method {0}/{1}: {2}")]
+    EncodeReplyFailed(String, String, Arc<fidl_codec::Error>),
+    #[error("Could not decode incoming FIDL request: {0}")]
+    DecodeRequestFailed(Arc<fidl_codec::Error>),
 }
 
 /// Maximum number of symlinks we can follow on path lookup before exploding.
@@ -127,8 +233,8 @@ impl InterpreterInner {
             let weak_self = Arc::downgrade(&self);
             let _ = self.push_task(async move {
                 enum FailureMode {
-                    Decoding(fidl::Error),
-                    Handle(Error),
+                    TransactionHeader(fidl::Error),
+                    Handle(crate::error::Error),
                 }
 
                 let error = loop {
@@ -138,7 +244,7 @@ impl InterpreterInner {
                             let tx_id = match fidl::encoding::decode_transaction_header(buf.bytes())
                             {
                                 Ok((fidl::encoding::TransactionHeader { tx_id, .. }, _)) => tx_id,
-                                Err(e) => break FailureMode::Decoding(e),
+                                Err(e) => break FailureMode::TransactionHeader(e),
                             };
 
                             let buf = std::mem::replace(&mut buf, fidl::MessageBufEtc::default());
@@ -177,8 +283,10 @@ impl InterpreterInner {
 
                 for (_, sender) in server.senders.drain() {
                     let _ = sender.send(Err(match &error {
-                        FailureMode::Decoding(e) => error!("FIDL decoding error: {e}"),
-                        FailureMode::Handle(e) => error!("Channel closed: {e}"),
+                        FailureMode::TransactionHeader(e) => {
+                            MessageError::BadFidlTransactionHeader(e.clone()).into()
+                        }
+                        FailureMode::Handle(e) => e.clone(),
                     }));
                 }
 
@@ -201,7 +309,7 @@ impl InterpreterInner {
             }
             x => {
                 let Some(in_use_handle) = x.to_in_use_handle() else {
-                    return Err(error!("Value cannot be invoked"));
+                    return Err(Exception::NotInvocable.into());
                 };
                 in_use_handle
             }
@@ -212,13 +320,13 @@ impl InterpreterInner {
         let protocol = self
             .lib_namespace()
             .lookup(&protocol_name)
-            .map_err(|_| error!("Cannot find definition for protocol {protocol_name}"))?;
+            .map_err(|_| MessageError::ProtocolNotFound(protocol_name.clone()))?;
         let lib::LookupResult::Protocol(protocol) = protocol else {
-            return Err(error!("{protocol_name:?} is not invocable"));
+            return Err(Exception::NotInvocable.into());
         };
 
         if args.len() > 1 {
-            return Err(error!("Channel message argument must be a single named object"));
+            return Err(MessageError::MessageArgumentsIncorrect.into());
         }
 
         let arg = if let Some(arg) = args.pop() {
@@ -226,15 +334,15 @@ impl InterpreterInner {
         } else if let Some(underscore) = underscore {
             underscore
         } else {
-            return Err(error!("Channel message not provided"));
+            return Err(MessageError::NoMessage.into());
         };
 
         let Value::OutOfLine(PlaygroundValue::TypeHinted(method_name, arg)) = arg else {
-            return Err(error!("Channel message argument must be a single named object"));
+            return Err(MessageError::MessageArgumentsIncorrect.into());
         };
 
         let Some(method) = protocol.methods.get(&method_name) else {
-            return Err(error!("No method {method_name} in {protocol_name}"));
+            return Err(MessageError::NoMethodInProtocol(method_name, protocol_name).into());
         };
 
         let request = if let Some(request_type) = &method.request {
@@ -252,7 +360,14 @@ impl InterpreterInner {
             &protocol_name,
             &method.name,
             request,
-        )?;
+        )
+        .map_err(|e| {
+            MessageError::EncodeRequestFailed(
+                protocol_name.clone(),
+                method_name.clone(),
+                Arc::new(e),
+            )
+        })?;
         in_use_handle.write_channel_etc(&bytes, &mut handles)?;
 
         if tx_id != 0 {
@@ -260,9 +375,17 @@ impl InterpreterInner {
 
             Arc::clone(&self).wait_tx_id(in_use_handle, tx_id, sender);
 
-            let (bytes, handles) = receiver.await??.split();
+            let (bytes, handles) =
+                receiver.await.map_err(|_| RuntimeError::InterpreterDied)??.split();
 
-            let value = fidl_codec::decode_response(self.lib_namespace(), &bytes, handles)?;
+            let value = fidl_codec::decode_response(self.lib_namespace(), &bytes, handles)
+                .map_err(|e| {
+                    MessageError::DecodeReplyFailed(
+                        protocol_name.clone(),
+                        method_name.clone(),
+                        Arc::new(e),
+                    )
+                })?;
 
             Ok(value.1.upcast())
         } else {
@@ -278,7 +401,8 @@ impl InterpreterInner {
         path: &String,
         flags: fio::OpenFlags,
     ) -> Result<fio::NodeProxy> {
-        let (node, server) = fidl::endpoints::create_proxy::<fio::NodeMarker>()?;
+        let (node, server) =
+            fidl::endpoints::create_proxy::<fio::NodeMarker>().expect("create_proxy failed!");
 
         let request = FidlValue::Object(vec![
             ("flags".to_owned(), FidlValue::U32(flags.bits())),
@@ -296,7 +420,14 @@ impl InterpreterInner {
             fio::DIRECTORY_PROTOCOL_NAME,
             "Open",
             request,
-        )?;
+        )
+        .map_err(|e| {
+            MessageError::EncodeRequestFailed(
+                fio::DIRECTORY_PROTOCOL_NAME.to_owned(),
+                "Open".to_owned(),
+                Arc::new(e),
+            )
+        })?;
         fs_root.write_channel_etc(&bytes, &mut handles)?;
         Ok(node)
     }
@@ -304,10 +435,11 @@ impl InterpreterInner {
     /// Open a file in this interpreter's namespace.
     pub async fn open(&self, path: String, fs_root: Value, pwd: Value) -> Result<Value> {
         let Some(fs_root) = fs_root.to_in_use_handle() else {
-            return Err(error!("$fs_root is not a handle"));
+            return Err(FSError::FSRootNotHandle.into());
         };
 
         let mut path = canonicalize_path(path, pwd)?;
+        let orig_path = path.clone();
 
         if !fs_root
             .get_client_protocol()
@@ -315,7 +447,7 @@ impl InterpreterInner {
             .map(|x| self.lib_namespace().inherits(&x, fio::DIRECTORY_PROTOCOL_NAME))
             .unwrap_or(false)
         {
-            return Err(error!("$fs_root is not a directory"));
+            return Err(FSError::FSRootNotDirectory.into());
         }
 
         for _ in 0..SYMLINK_RECURSION_LIMIT {
@@ -323,7 +455,8 @@ impl InterpreterInner {
                 |flags: fio::OpenFlags| self.send_open_request(&fs_root, &path, flags);
 
             let node = send_open_request(fio::OpenFlags::NODE_REFERENCE)?;
-            let (_inode, attr) = node.get_attr().await?;
+            let (_inode, attr) =
+                node.get_attr().await.map_err(|e| FSError::GetAttributesFailed(path.clone(), e))?;
 
             let (proto, node) = if attr.mode & fio::MODE_TYPE_MASK == fio::MODE_TYPE_DIRECTORY {
                 (
@@ -335,12 +468,15 @@ impl InterpreterInner {
                 let symlink = fio::SymlinkProxy::from_channel(
                     node.into_channel().expect("Node proxy somehow cloned!"),
                 );
-                let symlink_info = symlink.describe().await?;
+                let symlink_info = symlink
+                    .describe()
+                    .await
+                    .map_err(|e| FSError::SymlinkDescribeFailed(path.clone(), e))?;
                 let Some(target) = symlink_info.target else {
-                    return Err(error!("Symlink at {path} did not contain a target"));
+                    return Err(FSError::NoSymlinkTarget(path).into());
                 };
                 let target = String::from_utf8(target.clone())
-                    .map_err(|_| error!("Followed symlink to non-utf8 path"))?;
+                    .map_err(|_| FSError::SymlinkNotUTF(path.clone()))?;
                 let end = path.rfind('/').expect("Canonicalized path wasn't absolute!");
                 let prefix = &path[..end];
                 let prefix = if prefix.is_empty() { "/" } else { prefix };
@@ -369,7 +505,7 @@ impl InterpreterInner {
                     (fio::NODE_PROTOCOL_NAME.to_owned(), node)
                 }
             } else {
-                return Err(error!("Unknown attributes {attr:?}"));
+                return Err(FSError::UnknownAttributes(path, attr).into());
             };
 
             return Ok(Value::ClientEnd(
@@ -378,7 +514,7 @@ impl InterpreterInner {
             ));
         }
 
-        Err(error!("Symlink recursion depth exceeded attempting to open {path}"))
+        Err(FSError::SymlinkRecursionExceeded(orig_path).into())
     }
 }
 
@@ -442,7 +578,7 @@ impl Interpreter {
     /// Looks up the given `path` in this namespace, then tries to load it as a
     /// text file, and, if successful, runs the contents as code in a new
     /// interpreter.
-    pub fn run_isolated_import(
+    pub(crate) fn run_isolated_import(
         self,
         path: String,
     ) -> impl Future<Output = Result<GlobalVariables>> + Send + 'static {
@@ -450,11 +586,13 @@ impl Interpreter {
             let file = self.open(path.clone()).await?;
             let file = file
                 .try_client_channel(self.inner.lib_namespace(), "fuchsia.io/File")
-                .map_err(|_| error!("Tried to import {path} which is not a file"))?;
+                .map_err(|_| FSError::ImportNotFile(path.clone()))?;
             let file = fidl_fuchsia_io::FileProxy::from_channel(
                 fuchsia_async::Channel::from_channel(file),
             );
-            let file = fuchsia_fs::file::read_to_string(&file).await?;
+            let file = fuchsia_fs::file::read_to_string(&file)
+                .await
+                .map_err(|e| FSError::FileReadError(Arc::new(e)))?;
             self.run(file.as_str()).await?;
             Ok(self.global_variables.into_inner().unwrap())
         }
@@ -513,7 +651,7 @@ impl Interpreter {
     /// an optional `Value` which is the current value of `$_`
     pub async fn add_command<
         F: Fn(Vec<Value>, Option<Value>) -> R + Send + Sync + 'static,
-        R: Future<Output = Result<Value>> + Send + 'static,
+        R: Future<Output = anyhow::Result<Value>> + Send + 'static,
     >(
         &self,
         name: &str,
@@ -523,7 +661,10 @@ impl Interpreter {
         let cmd = move |args: Vec<Value>, underscore: Option<Value>| {
             let cmd = Arc::clone(&cmd);
 
-            cmd(args.into(), underscore).boxed()
+            async move {
+                cmd(args.into(), underscore).await.map_err(crate::error::Error::user_from_anyhow)
+            }
+            .boxed()
         };
 
         self.global_variables.lock().unwrap().define(
@@ -549,10 +690,11 @@ impl Interpreter {
                     error.0.location_line(),
                     error.0.get_utf8_column(),
                     error.1
-                )?;
+                )
+                .expect("Write to a string writer failed?!");
             }
 
-            Err(error!(s))
+            Err(RuntimeError::ParseError(s).into())
         } else {
             enum Section<'a> {
                 Statements(Vec<Node<'a>>),
@@ -596,7 +738,7 @@ impl Interpreter {
                             for (name, mutability) in visitor.get_top_level_variable_decls() {
                                 global_variables.ensure_defined(
                                     name,
-                                    || Err(error!("'{name}' undeclared")),
+                                    || Err(Exception::VariableUndeclared(name.clone()).into_err()),
                                     mutability,
                                 )
                             }
@@ -615,7 +757,7 @@ impl Interpreter {
                         };
 
                         for (name, slot) in invalid_ids {
-                            frame.assign(slot, Err(error!("'{name}' undeclared")));
+                            frame.assign(slot, Err(Exception::VariableUndeclared(name).into()));
                         }
 
                         let frame = Mutex::new(frame);
@@ -642,11 +784,12 @@ impl Interpreter {
                                 (g.get("fs_root"), g.get("pwd"))
                             };
 
-                            let fs_root = fs_root
-                                .await
-                                .unwrap_or_else(|| Err(error!("`fs_root` undefined")))?;
-                            let pwd =
-                                pwd.await.unwrap_or_else(|| Err(error!("`pwd` undefined")))?;
+                            let fs_root = fs_root.await.unwrap_or_else(|| {
+                                Err(Exception::VariableUndeclared("fs_root".to_owned()).into())
+                            })?;
+                            let pwd = pwd.await.unwrap_or_else(|| {
+                                Err(Exception::VariableUndeclared("pwd".to_owned()).into())
+                            })?;
                             let inner = Arc::clone(&self.inner);
 
                             let got = boxed_run_import(inner, fs_root, pwd, import).await?;
@@ -784,8 +927,9 @@ impl Interpreter {
             let globals = self.global_variables.lock().unwrap();
             (globals.get("fs_root"), globals.get("pwd"))
         };
-        let fs_root = fs_root.await.ok_or_else(|| error!("$fs_root undefined"))??;
-        let pwd = pwd.await.ok_or_else(|| error!("$pwd undefined"))??;
+        let fs_root =
+            fs_root.await.ok_or_else(|| Exception::VariableUndeclared("fs_root".to_owned()))??;
+        let pwd = pwd.await.ok_or_else(|| Exception::VariableUndeclared("pwd".to_owned()))??;
 
         self.inner.open(path, fs_root, pwd).await
     }
@@ -794,11 +938,11 @@ impl Interpreter {
 /// Turn a path into a dotless, absolute form.
 pub fn canonicalize_path(path: String, pwd: Value) -> Result<String> {
     let Value::String(pwd) = pwd else {
-        return Err(error!("$pwd is not a string"));
+        return Err(FSError::PwdNotString.into());
     };
 
     if !pwd.starts_with("/") {
-        return Err(error!("$pwd is not an absolute path"));
+        return Err(FSError::PwdNotAbsolute.into());
     }
 
     Ok(canonicalize_path_dont_check_pwd(path, &pwd))
