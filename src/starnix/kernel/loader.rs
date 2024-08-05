@@ -629,6 +629,7 @@ mod tests {
     use super::*;
     use crate::testing::*;
     use assert_matches::assert_matches;
+    use starnix_sync::MmDumpable;
     use std::mem::MaybeUninit;
 
     const TEST_STACK_ADDR: UserAddress = UserAddress::const_from(0x3000_0000);
@@ -730,6 +731,7 @@ mod tests {
         L: LockBefore<FileOpsCore>,
         L: LockBefore<DeviceOpen>,
         L: LockBefore<BeforeFsNodeAppend>,
+        L: LockBefore<MmDumpable>,
     {
         let argv = vec![CString::new("bin/hello_starnix").unwrap()];
         let executable =

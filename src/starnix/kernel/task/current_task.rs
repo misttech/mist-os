@@ -7,7 +7,7 @@ use crate::arch::task::{decode_page_fault_exception_report, get_signal_for_gener
 use crate::execution::{create_zircon_process, TaskInfo};
 use crate::fs::proc::pid_directory::TaskDirectory;
 use crate::loader::{load_executable, resolve_executable, ResolvedElf};
-use crate::mm::{MemoryAccessor, MemoryAccessorExt, MemoryManager, TaskMemoryAccessor};
+use crate::mm::{DumpPolicy, MemoryAccessor, MemoryAccessorExt, MemoryManager, TaskMemoryAccessor};
 use crate::security;
 use crate::signals::{
     send_signal_first, send_standard_signal, RunState, SignalActions, SignalInfo,
@@ -825,6 +825,7 @@ impl CurrentTask {
         L: LockBefore<FileOpsCore>,
         L: LockBefore<DeviceOpen>,
         L: LockBefore<BeforeFsNodeAppend>,
+        L: LockBefore<MmDumpable>,
     {
         // Executable must be a regular file
         if !executable.name.entry.node.is_reg() {
@@ -857,7 +858,7 @@ impl CurrentTask {
             return error!(EINVAL);
         }
 
-        if let Err(err) = self.finish_exec(path, resolved_elf) {
+        if let Err(err) = self.finish_exec(locked, path, resolved_elf) {
             log_warn!("unrecoverable error in exec: {err:?}");
 
             send_standard_signal(
@@ -876,7 +877,15 @@ impl CurrentTask {
     /// After the memory is unmapped, any failure in exec is unrecoverable and results in the
     /// process crashing. This function is for that second half; any error returned from this
     /// function will be considered unrecoverable.
-    fn finish_exec(&mut self, path: CString, resolved_elf: ResolvedElf) -> Result<(), Errno> {
+    fn finish_exec<L>(
+        &mut self,
+        locked: &mut Locked<'_, L>,
+        path: CString,
+        resolved_elf: ResolvedElf,
+    ) -> Result<(), Errno>
+    where
+        L: LockBefore<MmDumpable>,
+    {
         // Now that the exec will definitely finish (or crash), notify owners of
         // locked futexes for the current process, which will be impossible to
         // update after process image is replaced.  See get_robust_list(2).
@@ -887,24 +896,71 @@ impl CurrentTask {
             .map_err(|status| from_status_like_fdio!(status))?;
 
         // Update the SELinux state, if enabled.
+        // TODO: Do we need to update this state after up the creds for exec?
         security::update_state_on_exec(self, &resolved_elf.security_state);
 
-        let start_info = load_executable(self, resolved_elf, &path)?;
-        let regs: zx_thread_state_general_regs_t = start_info.into();
-        self.thread_state.registers = regs.into();
+        let mut maybe_set_id = if self.kernel().features.enable_suid {
+            resolved_elf.file.name.suid_and_sgid()
+        } else {
+            Default::default()
+        };
 
         {
             let mut state = self.write();
+
+            // From <https://man7.org/linux/man-pages/man2/execve.2.html>:
+            //
+            //   The aforementioned transformations of the effective IDs are not
+            //   performed (i.e., the set-user-ID and set-group-ID bits are
+            //   ignored) if any of the following is true:
+            //
+            //   * the no_new_privs attribute is set for the calling thread (see
+            //      prctl(2));
+            //
+            //   *  the underlying filesystem is mounted nosuid (the MS_NOSUID
+            //      flag for mount(2)); or
+            //
+            //   *  the calling process is being ptraced.
+            //
+            // The MS_NOSUID check is in `NamespaceNode::suid_and_sgid()`.
+            if state.no_new_privs() || state.is_ptraced() {
+                maybe_set_id.clear();
+            }
+
+            // From <https://man7.org/linux/man-pages/man2/execve.2.html>:
+            //
+            //   The process's "dumpable" attribute is set to the value 1,
+            //   unless a set-user-ID program, a set-group-ID program, or a
+            //   program with capabilities is being executed, in which case the
+            //   dumpable flag may instead be reset to the value in
+            //   /proc/sys/fs/suid_dumpable, in the circumstances described
+            //   under PR_SET_DUMPABLE in prctl(2).
+            let dumpable =
+                if maybe_set_id.is_none() { DumpPolicy::User } else { DumpPolicy::Disable };
+            *self.mm().dumpable.lock(locked) = dumpable;
+
             let mut persistent_info = self.persistent_info.lock();
             state.set_sigaltstack(None);
             state.robust_list_head = UserAddress::NULL.into();
 
+            // From <https://man7.org/linux/man-pages/man2/execve.2.html>:
+            //
+            //   If a set-user-ID or set-group-ID
+            //   program is being executed, then the parent death signal set by
+            //   prctl(2) PR_SET_PDEATHSIG flag is cleared.
+            //
+            // TODO(https://fxbug.dev/356684424): Implement the behavior above once we support
+            // the PR_SET_PDEATHSIG flag.
+
             // TODO(tbodt): Check whether capability xattrs are set on the file, and grant/limit
             // capabilities accordingly.
-            persistent_info.creds_mut().exec();
+            persistent_info.creds_mut().exec(maybe_set_id);
         }
-        self.thread_state.extended_pstate.reset();
 
+        let start_info = load_executable(self, resolved_elf, &path)?;
+        let regs: zx_thread_state_general_regs_t = start_info.into();
+        self.thread_state.registers = regs.into();
+        self.thread_state.extended_pstate.reset();
         self.thread_group.signal_actions.reset_for_exec();
 
         // TODO(http://b/320436714): when adding SELinux support for the file subsystem, implement

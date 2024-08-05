@@ -31,8 +31,8 @@ use starnix_sync::{
 };
 use starnix_uapi::as_any::AsAny;
 use starnix_uapi::auth::{
-    Credentials, FsCred, CAP_CHOWN, CAP_DAC_OVERRIDE, CAP_FOWNER, CAP_FSETID, CAP_MKNOD,
-    CAP_SYS_ADMIN, CAP_SYS_RESOURCE,
+    Credentials, FsCred, UserAndOrGroupId, CAP_CHOWN, CAP_DAC_OVERRIDE, CAP_FOWNER, CAP_FSETID,
+    CAP_MKNOD, CAP_SYS_ADMIN, CAP_SYS_RESOURCE,
 };
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::{Errno, EACCES};
@@ -271,6 +271,20 @@ impl FsNodeInfo {
 
     pub fn cred(&self) -> FsCred {
         FsCred { uid: self.uid, gid: self.gid }
+    }
+
+    pub fn suid_and_sgid(&self) -> UserAndOrGroupId {
+        let uid = self.mode.intersects(FileMode::ISUID).then_some(self.uid);
+
+        // See <https://man7.org/linux/man-pages/man7/inode.7.html>:
+        //
+        //   For an executable file, the set-group-ID bit causes the
+        //   effective group ID of a process that executes the file to change
+        //   as described in execve(2).  For a file that does not have the
+        //   group execution bit (S_IXGRP) set, the set-group-ID bit indicates
+        //   mandatory file/record locking.
+        let gid = self.mode.intersects(FileMode::ISGID | FileMode::IXGRP).then_some(self.gid);
+        UserAndOrGroupId { uid, gid }
     }
 }
 

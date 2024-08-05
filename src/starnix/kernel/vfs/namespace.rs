@@ -36,6 +36,7 @@ use starnix_sync::{
     BeforeFsNodeAppend, DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex, RwLock,
 };
 use starnix_uapi::arc_key::{ArcKey, PtrKey, WeakKey};
+use starnix_uapi::auth::UserAndOrGroupId;
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::{Access, FileMode};
@@ -1552,6 +1553,14 @@ impl NamespaceNode {
 
     fn mount_hash_key(&self) -> &ArcKey<DirEntry> {
         ArcKey::ref_cast(&self.entry)
+    }
+
+    pub fn suid_and_sgid(&self) -> UserAndOrGroupId {
+        if self.mount.flags().contains(MountFlags::NOSUID) {
+            UserAndOrGroupId::default()
+        } else {
+            self.entry.node.info().suid_and_sgid()
+        }
     }
 
     pub fn update_atime(&self) {

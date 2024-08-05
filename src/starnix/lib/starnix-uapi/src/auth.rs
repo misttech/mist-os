@@ -399,7 +399,45 @@ impl Credentials {
         self.cap_effective.contains(capability)
     }
 
-    pub fn exec(&mut self) {
+    fn apply_suid_and_sgid(&mut self, maybe_set: UserAndOrGroupId) {
+        if maybe_set.is_none() {
+            return;
+        }
+
+        let prev = self.copy_user_credentials();
+
+        if let Some(uid) = maybe_set.uid {
+            self.euid = uid;
+            self.fsuid = uid;
+            if self.has_capability(CAP_SETUID) {
+                self.uid = uid;
+                self.saved_uid = uid;
+            }
+        }
+
+        if let Some(gid) = maybe_set.gid {
+            self.egid = gid;
+            self.fsgid = gid;
+            if self.has_capability(CAP_SETGID) {
+                self.gid = gid;
+                self.saved_gid = gid;
+            }
+        }
+
+        self.update_capabilities(prev);
+    }
+
+    pub fn exec(&mut self, maybe_set: UserAndOrGroupId) {
+        // From <https://man7.org/linux/man-pages/man2/execve.2.html>:
+        //
+        //   If the set-user-ID bit is set on the program file referred to by
+        //   pathname, then the effective user ID of the calling process is
+        //   changed to that of the owner of the program file.  Similarly, if
+        //   the set-group-ID bit is set on the program file, then the
+        //   effective group ID of the calling process is set to the group of
+        //   the program file.
+        self.apply_suid_and_sgid(maybe_set);
+
         // > Ambient capabilities are added to the permitted set and assigned to the effective set
         // > when execve(2) is called.
         // https://man7.org/linux/man-pages/man7/capabilities.7.html
@@ -528,6 +566,23 @@ pub struct UserCredentials {
     pub euid: uid_t,
     pub saved_uid: uid_t,
     pub fsuid: uid_t,
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct UserAndOrGroupId {
+    pub uid: Option<uid_t>,
+    pub gid: Option<gid_t>,
+}
+
+impl UserAndOrGroupId {
+    pub fn is_none(&self) -> bool {
+        self.uid.is_none() && self.gid.is_none()
+    }
+
+    pub fn clear(&mut self) {
+        self.uid = None;
+        self.gid = None;
+    }
 }
 
 #[cfg(test)]
