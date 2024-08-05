@@ -8,6 +8,7 @@
 #include <lib/syslog/cpp/macros.h>
 #include <stdlib.h>
 
+#include <cmath>
 #include <limits>
 #include <utility>
 
