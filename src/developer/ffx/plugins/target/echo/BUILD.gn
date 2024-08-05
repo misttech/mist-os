@@ -15,12 +15,15 @@ ffx_plugin("ffx_target_echo") {
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",
+    "//third_party/rust_crates:schemars",
+    "//third_party/rust_crates:serde",
   ]
   test_deps = [
     "//src/developer/ffx/config:lib",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:serde_json",
   ]
 
   args_sources = [ "src/args.rs" ]
