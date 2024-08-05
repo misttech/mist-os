@@ -811,6 +811,9 @@ zx_status_t Dispatcher::PostTask(async_task_t* task) {
     delayed_task->SetCallback(static_cast<fdf_dispatcher_t*>(this), std::move(callback), task);
 
     fbl::AutoLock al(&callback_lock_);
+    if (!IsRunningLocked()) {
+      return ZX_ERR_BAD_STATE;
+    }
     InsertDelayedTaskSortedLocked(std::move(delayed_task));
     ResetTimerLocked();
   }
