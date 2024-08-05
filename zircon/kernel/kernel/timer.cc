@@ -137,8 +137,9 @@ zx_ticks_t TimerQueue::ConvertBootTimeToRawTicks(zx_boot_time_t boot) {
   return deadline_boot_ticks - timer_get_boot_ticks_offset();
 }
 
-void TimerQueue::UpdatePlatformTimer() {
+void TimerQueue::UpdatePlatformTimerLocked() {
   DEBUG_ASSERT(arch_ints_disabled());
+  zx_ticks_t timer_deadline = ZX_TIME_INFINITE;
 
   // The monotonic deadline should be the minimum of the preemption timer and the front of the
   // monotonic timer list.
@@ -147,7 +148,6 @@ void TimerQueue::UpdatePlatformTimer() {
     mono_time_deadline =
         ktl::min(mono_time_deadline, monotonic_timer_list_.front().scheduled_time_);
   }
-  zx_ticks_t timer_deadline = ZX_TIME_INFINITE;
   const ktl::optional<zx_ticks_t> mono_ticks_deadline =
       ConvertMonotonicTimeToRawTicks(mono_time_deadline);
   if (mono_ticks_deadline.has_value()) {
@@ -454,7 +454,7 @@ bool Timer::Cancel() {
       // The Timer we're canceling was at head of this queue, so see if we should update platform
       // timer.
       if (!timer_list.is_empty()) {
-        timer_queue.UpdatePlatformTimer();
+        timer_queue.UpdatePlatformTimerLocked();
       } else if (timer_queue.next_timer_deadline_ == ZX_TIME_INFINITE) {
         LTRACEF("clearing old hw timer, preempt timer not set, nothing in the queue\n");
         platform_stop_timer();
@@ -507,7 +507,10 @@ void TimerQueue::Tick(cpu_num_t cpu) {
   TickInternal(boot_now, cpu, boot_timer_list_);
 
   // Update the platform timer.
-  UpdatePlatformTimer();
+  {
+    Guard<MonitoredSpinLock, NoIrqSave> guard{TimerLock::Get(), SOURCE_TAG};
+    UpdatePlatformTimerLocked();
+  }
 }
 
 template <typename TimestampType>

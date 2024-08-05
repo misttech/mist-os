@@ -171,7 +171,7 @@ class TimerQueue {
   // 3. The preemption timer deadline.
   //
   // This can only be called when interrupts are disabled.
-  void UpdatePlatformTimer();
+  void UpdatePlatformTimerLocked();
 
  private:
   // Timers can directly call Insert and Cancel.
