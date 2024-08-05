@@ -31,7 +31,7 @@ declare_args() {
   #                           execute locally instead of remotely.
   #  * 'low_bandwidth' => An RBE configuration for developers that have a
   #                       powerful workstations, but low bandwidth.
-  rbe_mode = "legacy_default"
+  rbe_mode = "off"
 
   # Overridden settings for the RBE mode.  This is a set of override values for
   # variables whose default values are set by the chosen RBE mode (above).
