@@ -197,6 +197,10 @@
                 "LocalhostTest/SocketOptsTest.UpdateAnyTimestampDisablesOtherTimestampOptions/IPv4_Stream",
                 "LocalhostTest/SocketOptsTest.UpdateAnyTimestampDisablesOtherTimestampOptions/IPv6_Stream",
 
+                // TCP_CONGESTION
+                "LocalhostTest/SocketOptsTest.GetTcpCongestionWithZeroOptLen/IPv4_Stream",
+                "LocalhostTest/SocketOptsTest.GetTcpCongestionWithZeroOptLen/IPv6_Stream",
+
                 // TODO(https://fxbug.dev/327486994): The following tests return
                 // EINVAL instead of the expected ENETUNREACH because we don't
                 // allow connecting to port 0.

@@ -278,8 +278,10 @@ struct TruncatingStringView {
 template <>
 SockOptResult GetSockOptProcessor::StoreOption(const TruncatingStringView& value) {
   *optlen_ = std::min(*optlen_, static_cast<socklen_t>(value.string.size()));
-  char* p = std::copy_n(value.string.begin(), *optlen_ - 1, static_cast<char*>(optval_));
-  *p = 0;
+  if (*optlen_ > 0) {
+    char* p = std::copy_n(value.string.begin(), *optlen_ - 1, static_cast<char*>(optval_));
+    *p = 0;
+  }
   return SockOptResult::Ok();
 }
 
