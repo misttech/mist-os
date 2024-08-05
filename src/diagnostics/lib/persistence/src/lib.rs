@@ -1,16 +1,15 @@
 // Copyright 2020 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+use anyhow::{bail, Error};
+use glob::glob;
+use regex::Regex;
+use serde_derive::Deserialize;
 use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::fmt::Display;
 use std::ops::Deref;
-
-use anyhow::{bail, Error};
-use glob::glob;
-use lazy_static::lazy_static;
-use regex::Regex;
-use serde_derive::Deserialize;
+use std::sync::LazyLock;
 
 /// The outer map is service_name; the inner is tag.
 pub type Config = HashMap<ServiceName, HashMap<Tag, TagConfig>>;
@@ -64,9 +63,7 @@ pub struct ServiceName(String);
 /// A regular expression corresponding to a valid tag or service name.
 const NAME_PATTERN: &'static str = r"^[a-z][a-z-]*$";
 
-lazy_static! {
-    static ref NAME_VALIDATOR: Regex = Regex::new(NAME_PATTERN).unwrap();
-}
+static NAME_VALIDATOR: LazyLock<Regex> = LazyLock::new(|| Regex::new(NAME_PATTERN).unwrap());
 
 impl Tag {
     pub fn new(tag: impl Into<String>) -> Result<Self, Error> {

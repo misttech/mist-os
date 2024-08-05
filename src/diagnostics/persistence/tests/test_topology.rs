@@ -11,14 +11,13 @@ use fidl_test_persistence_factory::ControllerMarker;
 use fuchsia_component_test::{
     Capability, ChildOptions, RealmBuilder, RealmBuilderParams, RealmInstance, Ref, Route,
 };
-use lazy_static::lazy_static;
 use regex::Regex;
+use std::sync::LazyLock;
 
 const SINGLE_COUNTER_URL: &str = "#meta/single_counter_test_component.cm";
 const PERSISTENCE_URL: &str = "#meta/persistence.cm";
-lazy_static! {
-    pub static ref REALM_NAME_PATTERN: Regex = Regex::new(r"persistence-test-\d{5}").unwrap();
-}
+pub static REALM_NAME_PATTERN: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"persistence-test-\d{5}").unwrap());
 
 pub async fn create() -> Result<RealmInstance, Error> {
     static COUNTER: AtomicU16 = AtomicU16::new(0);

@@ -946,8 +946,7 @@ impl From<TryFromSliceError> for EncodingError {
 mod tests {
     use super::*;
     use crate::parse::parse_record;
-    use once_cell::sync::Lazy;
-    use std::sync::Mutex;
+    use std::sync::{LazyLock, Mutex};
     use tracing::info_span;
     use tracing_subscriber::layer::{Layer, SubscriberExt};
     use tracing_subscriber::Registry;
@@ -1086,8 +1085,8 @@ mod tests {
     struct PrintMe(u32);
 
     #[allow(clippy::type_complexity)]
-    static LAST_RECORD: Lazy<Mutex<Option<Encoder<Cursor<[u8; 1024]>>>>> =
-        Lazy::new(|| Mutex::new(None));
+    static LAST_RECORD: LazyLock<Mutex<Option<Encoder<Cursor<[u8; 1024]>>>>> =
+        LazyLock::new(|| Mutex::new(None));
 
     struct EncoderLayer;
     impl<S> Layer<S> for EncoderLayer

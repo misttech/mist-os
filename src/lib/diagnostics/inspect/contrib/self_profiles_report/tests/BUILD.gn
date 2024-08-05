@@ -34,7 +34,6 @@ rustc_binary("self_profile_integration_test") {
     "//src/lib/diagnostics/reader/rust",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
-    "//third_party/rust_crates:once_cell",
   ]
 }
 

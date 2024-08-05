@@ -10,7 +10,6 @@ use diagnostics_reader::{ArchiveReader, Inspect};
 use difference::assert_diff;
 use fidl_fuchsia_archivist_test as ftest;
 use fidl_fuchsia_diagnostics::{ArchiveAccessorMarker, ArchiveAccessorProxy};
-use lazy_static::lazy_static;
 use realm_proxy_client::RealmProxyClient;
 
 const MONIKER_KEY: &str = "moniker";
@@ -18,22 +17,16 @@ const METADATA_KEY: &str = "metadata";
 const TIMESTAMP_KEY: &str = "timestamp";
 const TEST_ARCHIVIST_MONIKER: &str = "archivist";
 
-lazy_static! {
-    static ref EMPTY_RESULT_GOLDEN: &'static str =
-        include_str!("../../test_data/empty_result_golden.json");
-    static ref UNIFIED_SINGLE_VALUE_GOLDEN: &'static str =
-        include_str!("../../test_data/unified_reader_single_value_golden.json");
-    static ref UNIFIED_ALL_GOLDEN: &'static str =
-        include_str!("../../test_data/unified_reader_all_golden.json");
-    static ref UNIFIED_FULL_FILTER_GOLDEN: &'static str =
-        include_str!("../../test_data/unified_reader_full_filter_golden.json");
-    static ref PIPELINE_SINGLE_VALUE_GOLDEN: &'static str =
-        include_str!("../../test_data/pipeline_reader_single_value_golden.json");
-    static ref PIPELINE_ALL_GOLDEN: &'static str =
-        include_str!("../../test_data/pipeline_reader_all_golden.json");
-    static ref PIPELINE_NONOVERLAPPING_SELECTORS_GOLDEN: &'static str =
-        include_str!("../../test_data/pipeline_reader_nonoverlapping_selectors_golden.json");
-}
+static UNIFIED_SINGLE_VALUE_GOLDEN: &str =
+    include_str!("../../test_data/unified_reader_single_value_golden.json");
+static UNIFIED_ALL_GOLDEN: &str = include_str!("../../test_data/unified_reader_all_golden.json");
+static UNIFIED_FULL_FILTER_GOLDEN: &str =
+    include_str!("../../test_data/unified_reader_full_filter_golden.json");
+static PIPELINE_SINGLE_VALUE_GOLDEN: &str =
+    include_str!("../../test_data/pipeline_reader_single_value_golden.json");
+static PIPELINE_ALL_GOLDEN: &str = include_str!("../../test_data/pipeline_reader_all_golden.json");
+static PIPELINE_NONOVERLAPPING_SELECTORS_GOLDEN: &str =
+    include_str!("../../test_data/pipeline_reader_nonoverlapping_selectors_golden.json");
 
 #[fuchsia::test]
 async fn read_components_inspect() {
@@ -253,7 +246,7 @@ async fn unified_reader() -> Result<(), Error> {
     //  - puppet1: 1 hierarchy published with InspectSink
     //  - archivist: archivist own hierarchy
     const ALL_INSPECT_ENTRIES: usize = 2;
-    retrieve_and_validate_results(accessor, Vec::new(), &UNIFIED_ALL_GOLDEN, ALL_INSPECT_ENTRIES)
+    retrieve_and_validate_results(accessor, Vec::new(), UNIFIED_ALL_GOLDEN, ALL_INSPECT_ENTRIES)
         .await;
 
     // Then verify that from the expected data, we can retrieve one specific value.
@@ -261,7 +254,7 @@ async fn unified_reader() -> Result<(), Error> {
     retrieve_and_validate_results(
         accessor,
         vec!["puppet*:*:lazy-*"],
-        &UNIFIED_SINGLE_VALUE_GOLDEN,
+        UNIFIED_SINGLE_VALUE_GOLDEN,
         // only one puppet exposes lazy nodes.
         1,
     )
@@ -272,7 +265,7 @@ async fn unified_reader() -> Result<(), Error> {
     retrieve_and_validate_results(
         accessor,
         vec!["puppet*:root"],
-        &UNIFIED_ALL_GOLDEN,
+        UNIFIED_ALL_GOLDEN,
         // we are selecting puppets, so we don't expect archivist own Inspect
         ALL_INSPECT_ENTRIES - 1,
     )
@@ -284,7 +277,7 @@ async fn unified_reader() -> Result<(), Error> {
     retrieve_and_validate_results(
         accessor,
         vec!["puppet*:root/non-existent-node:bloop"],
-        &UNIFIED_FULL_FILTER_GOLDEN,
+        UNIFIED_FULL_FILTER_GOLDEN,
         // we are selecting puppet, so we don't expect archivist own inspect, and the puppet was
         // entirely filtered so we don't expect it either.
         ALL_INSPECT_ENTRIES - 2,
@@ -320,21 +313,21 @@ async fn feedback_canonical_reader_test() -> Result<(), Error> {
     // First, retrieve all of the information in our realm to make sure that everything
     // we expect is present.
     let accessor = connect_to_feedback_accessor(&realm_proxy).await;
-    retrieve_and_validate_results(accessor, Vec::new(), &PIPELINE_ALL_GOLDEN, 1).await;
+    retrieve_and_validate_results(accessor, Vec::new(), PIPELINE_ALL_GOLDEN, 1).await;
 
     // Then verify that from the expected data, we can retrieve one specific value.
     let accessor = connect_to_feedback_accessor(&realm_proxy).await;
     retrieve_and_validate_results(
         accessor,
         vec!["test_component:*:lazy-*"],
-        &PIPELINE_SINGLE_VALUE_GOLDEN,
+        PIPELINE_SINGLE_VALUE_GOLDEN,
         1,
     )
     .await;
 
     // Then verify that subtree selection retrieves all trees under and including root.
     let accessor = connect_to_feedback_accessor(&realm_proxy).await;
-    retrieve_and_validate_results(accessor, vec!["test_component:root"], &PIPELINE_ALL_GOLDEN, 1)
+    retrieve_and_validate_results(accessor, vec!["test_component:root"], PIPELINE_ALL_GOLDEN, 1)
         .await;
 
     // Then verify that client selectors dont override the static selectors provided
@@ -343,7 +336,7 @@ async fn feedback_canonical_reader_test() -> Result<(), Error> {
     retrieve_and_validate_results(
         accessor,
         vec![r"test_component:root:array\:0x15"],
-        &PIPELINE_NONOVERLAPPING_SELECTORS_GOLDEN,
+        PIPELINE_NONOVERLAPPING_SELECTORS_GOLDEN,
         0,
     )
     .await;
@@ -434,21 +427,21 @@ async fn lowpan_canonical_reader_test() -> Result<(), Error> {
     // First, retrieve all of the information in our realm to make sure that everything
     // we expect is present.
     let accessor = connect_to_lowpan_accessor(&realm_proxy).await;
-    retrieve_and_validate_results(accessor, Vec::new(), &PIPELINE_ALL_GOLDEN, 1).await;
+    retrieve_and_validate_results(accessor, Vec::new(), PIPELINE_ALL_GOLDEN, 1).await;
 
     // Then verify that from the expected data, we can retrieve one specific value.
     let accessor = connect_to_lowpan_accessor(&realm_proxy).await;
     retrieve_and_validate_results(
         accessor,
         vec!["test_component:*:lazy-*"],
-        &PIPELINE_SINGLE_VALUE_GOLDEN,
+        PIPELINE_SINGLE_VALUE_GOLDEN,
         1,
     )
     .await;
 
     // Then verify that subtree selection retrieves all trees under and including root.
     let accessor = connect_to_lowpan_accessor(&realm_proxy).await;
-    retrieve_and_validate_results(accessor, vec!["test_component:root"], &PIPELINE_ALL_GOLDEN, 1)
+    retrieve_and_validate_results(accessor, vec!["test_component:root"], PIPELINE_ALL_GOLDEN, 1)
         .await;
 
     // Then verify that client selectors dont override the static selectors provided
@@ -457,7 +450,7 @@ async fn lowpan_canonical_reader_test() -> Result<(), Error> {
     retrieve_and_validate_results(
         accessor,
         vec![r"test_component:root:array\:0x15"],
-        &PIPELINE_NONOVERLAPPING_SELECTORS_GOLDEN,
+        PIPELINE_NONOVERLAPPING_SELECTORS_GOLDEN,
         0,
     )
     .await;

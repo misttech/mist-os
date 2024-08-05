@@ -22,7 +22,6 @@ iquery_deps = [
   "//third_party/rust_crates:async-trait",
   "//third_party/rust_crates:derivative",
   "//third_party/rust_crates:either",
-  "//third_party/rust_crates:lazy_static",
   "//third_party/rust_crates:nom",
   "//third_party/rust_crates:num-traits",
   "//third_party/rust_crates:regex",

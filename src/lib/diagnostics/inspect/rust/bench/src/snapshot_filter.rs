@@ -8,19 +8,17 @@ use fuchsia_inspect::hierarchy::{
     filter_hierarchy, DiagnosticsHierarchy, DiagnosticsHierarchyGetter, HierarchyMatcher,
 };
 use fuchsia_inspect::Inspector;
-use lazy_static::lazy_static;
 use rand::distributions::Uniform;
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use selectors::VerboseError;
 use std::borrow::Cow;
 use std::collections::{HashSet, VecDeque};
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 use std::time::Duration;
 
-lazy_static! {
-    static ref SELECTOR_TILL_LEVEL_30: Vec<String> = generate_selectors_till_level(30);
-}
+static SELECTOR_TILL_LEVEL_30: LazyLock<Vec<String>> =
+    LazyLock::new(|| generate_selectors_till_level(30));
 
 const HIERARCHY_GENERATOR_SEED: u64 = 0;
 

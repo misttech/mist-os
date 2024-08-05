@@ -4,10 +4,9 @@
 
 use crate::identity::ComponentIdentity;
 use moniker::ExtendedMoniker;
-use once_cell::sync::Lazy;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 
-pub static TEST_IDENTITY: Lazy<Arc<ComponentIdentity>> = Lazy::new(|| {
+pub static TEST_IDENTITY: LazyLock<Arc<ComponentIdentity>> = LazyLock::new(|| {
     Arc::new(ComponentIdentity::new(
         ExtendedMoniker::parse_str("./fake-test-env/test-component").unwrap(),
         "fuchsia-pkg://fuchsia.com/testing123#test-component.cm",

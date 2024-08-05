@@ -268,10 +268,10 @@ impl<'a> StringSelector for types::Segment<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use lazy_static::lazy_static;
+    use std::sync::LazyLock;
 
-    lazy_static! {
-        static ref SHARED_PASSING_TEST_CASES: Vec<(Vec<&'static str>, &'static str)> = {
+    static SHARED_PASSING_TEST_CASES: LazyLock<Vec<(Vec<&'static str>, &'static str)>> =
+        LazyLock::new(|| {
             vec![
                 (vec![r#"abc"#, r#"def"#, r#"g"#], r#"bob"#),
                 (vec![r#"\**"#], r#"\**"#),
@@ -280,8 +280,9 @@ mod tests {
                 (vec![r#"asda\\\:"#], r#"a"#),
                 (vec![r#"asda*"#], r#"a"#),
             ]
-        };
-        static ref SHARED_FAILING_TEST_CASES: Vec<(Vec<&'static str>, &'static str)> = {
+        });
+    static SHARED_FAILING_TEST_CASES: LazyLock<Vec<(Vec<&'static str>, &'static str)>> =
+        LazyLock::new(|| {
             vec![
                 // Slashes aren't allowed in path nodes.
                 (vec![r#"/"#], r#"a"#),
@@ -299,8 +300,7 @@ mod tests {
                 // are allowed to be empty.
                 (vec![], r#"bob"#),
             ]
-        };
-    }
+        });
 
     #[fuchsia::test]
     fn tree_selector_validator_test() {

@@ -2,13 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use lazy_static::lazy_static;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-lazy_static! {
-  // Suffix used for unique names.
-  static ref UNIQUE_NAME_SUFFIX: AtomicUsize = AtomicUsize::new(0);
-}
+// Suffix used for unique names.
+static UNIQUE_NAME_SUFFIX: AtomicUsize = AtomicUsize::new(0);
 
 /// Generates a unique name that can be used in inspect nodes and properties that will be prefixed
 /// by the given `prefix`.

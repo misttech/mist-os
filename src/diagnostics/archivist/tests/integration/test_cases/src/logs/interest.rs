@@ -9,10 +9,11 @@ use crate::utils::LogSettingsExt;
 use diagnostics_data::ExtendedMoniker;
 use fidl_fuchsia_archivist_test as ftest;
 use fidl_fuchsia_diagnostics::{LogSettingsMarker, Severity};
-use once_cell::sync::Lazy;
+use std::sync::LazyLock;
 
 const PUPPET_NAME: &str = "puppet";
-static PUPPET_MONIKER: Lazy<ExtendedMoniker> = Lazy::new(|| PUPPET_NAME.try_into().unwrap());
+static PUPPET_MONIKER: LazyLock<ExtendedMoniker> =
+    LazyLock::new(|| PUPPET_NAME.try_into().unwrap());
 
 // This test verifies that a component only emits messages at or above its
 // current interest severity level, even when the interest changes while the

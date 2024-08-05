@@ -3,16 +3,16 @@
 // found in the LICENSE file.
 
 use fuchsia_zircon::{self as zx, AsHandleRef};
-use once_cell::sync::Lazy;
+use std::sync::LazyLock;
 use tracing::{Callsite, Metadata};
 use tracing_core::field;
 use tracing_core::subscriber::Interest;
 
-pub static PLACEHOLDER_TEXT: Lazy<String> = Lazy::new(|| "x".repeat(32000));
-pub static PROCESS_ID: Lazy<zx::Koid> =
-    Lazy::new(|| fuchsia_runtime::process_self().get_koid().unwrap());
-pub static THREAD_ID: Lazy<zx::Koid> =
-    Lazy::new(|| fuchsia_runtime::thread_self().get_koid().unwrap());
+pub static PLACEHOLDER_TEXT: LazyLock<String> = LazyLock::new(|| "x".repeat(32000));
+pub static PROCESS_ID: LazyLock<zx::Koid> =
+    LazyLock::new(|| fuchsia_runtime::process_self().get_koid().unwrap());
+pub static THREAD_ID: LazyLock<zx::Koid> =
+    LazyLock::new(|| fuchsia_runtime::thread_self().get_koid().unwrap());
 
 pub struct NullCallsite;
 pub static NULL_CALLSITE: NullCallsite = NullCallsite;

@@ -31,7 +31,6 @@ rustc_library("inspect-fidl-load") {
     "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
     "//src/lib/fuchsia",
     "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:lazy_static",
     "//third_party/rust_crates:maplit",
   ]
 

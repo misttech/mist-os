@@ -24,6 +24,7 @@ use std::fmt;
 use std::hash::Hash;
 use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
+use std::sync::LazyLock;
 use std::time::Duration;
 use termion::{color, style};
 use thiserror::Error;
@@ -41,8 +42,8 @@ const SCHEMA_VERSION: u64 = 1;
 const MICROS_IN_SEC: u128 = 1000000;
 const ROOT_MONIKER_REPR: &str = "<root>";
 
-static DEFAULT_TREE_NAME: once_cell::sync::Lazy<FlyStr> =
-    once_cell::sync::Lazy::new(|| FlyStr::new(finspect::DEFAULT_TREE_NAME));
+static DEFAULT_TREE_NAME: LazyLock<FlyStr> =
+    LazyLock::new(|| FlyStr::new(finspect::DEFAULT_TREE_NAME));
 
 /// The possible name for a handle to inspect data. It could be a filename (being deprecated) or a
 /// name published using `fuchsia.inspect.InspectSink`.

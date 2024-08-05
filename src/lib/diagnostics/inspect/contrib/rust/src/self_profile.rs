@@ -41,19 +41,18 @@
 use fuchsia_inspect::{Inspector, Node};
 use fuchsia_sync::Mutex;
 use fuchsia_zircon::{self as zx, Task as _};
-use once_cell::sync::Lazy;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::future::Future;
 use std::panic::Location;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 
 static PROFILING_ENABLED: AtomicBool = AtomicBool::new(false);
 
-static ROOT_PROFILE_DURATION: Lazy<Arc<ProfileDurationTree>> =
-    Lazy::new(|| Arc::new(ProfileDurationTree::new(Location::caller())));
+static ROOT_PROFILE_DURATION: LazyLock<Arc<ProfileDurationTree>> =
+    LazyLock::new(|| Arc::new(ProfileDurationTree::new(Location::caller())));
 
 thread_local! {
     static CURRENT_PROFILE_DURATION: RefCell<Arc<ProfileDurationTree>> =

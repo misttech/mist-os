@@ -17,23 +17,21 @@ use fuchsia_component::server::ServiceFs;
 use futures::channel::mpsc;
 use futures::lock::Mutex;
 use futures::{AsyncWriteExt, SinkExt, StreamExt};
-use lazy_static::lazy_static;
 use metrics::{MetricSet, MetricTypeHint};
 use rust_measure_tape_for_case::Measurable as _;
 use std::collections::HashSet;
 use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
+use std::sync::LazyLock;
 use std::time::Instant;
 use tracing::{debug, error, info};
 use zx::sys::ZX_CHANNEL_MAX_MSG_BYTES;
 use {fidl_fuchsia_test as ftest, fuchsia_async as fasync, fuchsia_zircon as zx};
 
-lazy_static! {
-    // Ensure that only a single operation is running at a time.
-    // Running multiple tests in parallel will give noisy benchmark results.
-    static ref OPERATION_MUTEX: Mutex<()> = Mutex::new(());
-}
+// Ensure that only a single operation is running at a time.
+// Running multiple tests in parallel will give noisy benchmark results.
+static OPERATION_MUTEX: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 
 const NUM_TRIALS: usize = 25;
 
