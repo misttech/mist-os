@@ -11,6 +11,7 @@ rustc_library("lib") {
   with_unit_tests = true
   sources = [
     "src/enumerations.rs",
+    "src/fletcher64.rs",
     "src/instances.rs",
     "src/lib.rs",
     "src/targets.rs",
@@ -20,6 +21,7 @@ rustc_library("lib") {
     "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
     "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:byteorder",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:nix",
     "//third_party/rust_crates:notify",
