@@ -34,10 +34,7 @@ pub(super) fn check_task_create_access(
     permission_check: &impl PermissionCheck,
     task_sid: SecurityId,
 ) -> Result<(), Errno> {
-    // When creating a process there is no transition involved, the source and target SIDs
-    // are the current SID.
-    let target_sid = task_sid;
-    check_permissions(permission_check, task_sid, target_sid, &[ProcessPermission::Fork])
+    check_self_permissions(permission_check, task_sid, &[ProcessPermission::Fork])
 }
 
 /// Checks the SELinux permissions required for exec. Returns the SELinux state of a resolved
@@ -159,6 +156,16 @@ pub(super) fn check_setpgid_access(
     target_sid: SecurityId,
 ) -> Result<(), Errno> {
     check_permissions(permission_check, source_sid, target_sid, &[ProcessPermission::SetPgid])
+}
+
+/// Checks if the task with `source_sid` has permission to read the session Id from a task with `target_sid`.
+/// Corresponds to the `task_getsid` LSM hook.
+pub(super) fn check_task_getsid(
+    permission_check: &impl PermissionCheck,
+    source_sid: SecurityId,
+    target_sid: SecurityId,
+) -> Result<(), Errno> {
+    check_permissions(permission_check, source_sid, target_sid, &[ProcessPermission::GetSession])
 }
 
 /// Checks if the task with `source_sid` is allowed to send `signal` to the task with `target_sid`.
@@ -345,26 +352,22 @@ pub fn set_procattr(
     attr: ProcAttr,
     context: &[u8],
 ) -> Result<(), Errno> {
-    let context = NullessByteStr::from(context);
     // Attempt to convert the Security Context string to a SID.
+    let context = NullessByteStr::from(context);
     let sid = match context.as_bytes() {
         b"\x0a" | b"" => None,
         _ => Some(security_server.security_context_to_sid(context).map_err(|_| errno!(EINVAL))?),
     };
 
-    let check_permission = |permission| {
-        // Proc/attr values may only be set for a task by the task itself,
-        // and require that the task have the corresponding permissions.
-        check_permissions(&security_server.as_permission_check(), source, source, &[permission])
-    };
+    let permission_check = security_server.as_permission_check();
     match attr {
         ProcAttr::Current => {
-            check_permission(ProcessPermission::SetCurrent)?;
+            check_self_permissions(&permission_check, source, &[ProcessPermission::SetCurrent])?;
 
             // Permission to dynamically transition to the new Context is also required.
             let new_sid = sid.ok_or_else(|| errno!(EINVAL))?;
             check_permissions(
-                &security_server.as_permission_check(),
+                &permission_check,
                 target.current_sid,
                 new_sid,
                 &[ProcessPermission::DynTransition],
@@ -376,19 +379,19 @@ pub fn set_procattr(
             return error!(EINVAL);
         }
         ProcAttr::Exec => {
-            check_permission(ProcessPermission::SetExec)?;
+            check_self_permissions(&permission_check, source, &[ProcessPermission::SetExec])?;
             target.exec_sid = sid
         }
         ProcAttr::FsCreate => {
-            check_permission(ProcessPermission::SetFsCreate)?;
+            check_self_permissions(&permission_check, source, &[ProcessPermission::SetFsCreate])?;
             target.fscreate_sid = sid
         }
         ProcAttr::KeyCreate => {
-            check_permission(ProcessPermission::SetKeyCreate)?;
+            check_self_permissions(&permission_check, source, &[ProcessPermission::SetKeyCreate])?;
             target.keycreate_sid = sid
         }
         ProcAttr::SockCreate => {
-            check_permission(ProcessPermission::SetSockCreate)?;
+            check_self_permissions(&permission_check, source, &[ProcessPermission::SetSockCreate])?;
             target.sockcreate_sid = sid
         }
     };
@@ -453,7 +456,7 @@ fn compute_fs_node_security_id(
 }
 
 /// Checks if `permissions` are allowed from the task with `source_sid` to the task with `target_sid`.
-pub(super) fn check_permissions<P: ClassPermission + Into<Permission> + Clone + 'static>(
+fn check_permissions<P: ClassPermission + Into<Permission> + Clone + 'static>(
     permission_check: &impl PermissionCheck,
     source_sid: SecurityId,
     target_sid: SecurityId,
@@ -463,6 +466,15 @@ pub(super) fn check_permissions<P: ClassPermission + Into<Permission> + Clone + 
         true => Ok(()),
         false => error!(EACCES),
     }
+}
+
+/// Checks that `subject_sid` has the specified process `permissions` on `self`.
+fn check_self_permissions(
+    permission_check: &impl PermissionCheck,
+    subject_sid: SecurityId,
+    permissions: &[ProcessPermission],
+) -> Result<(), Errno> {
+    check_permissions(permission_check, subject_sid, subject_sid, permissions)
 }
 
 /// Return security state to associate with a filesystem based on the supplied mount options.

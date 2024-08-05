@@ -13,7 +13,6 @@ use crate::vfs::{
 
 use selinux::security_server::{Mode, SecurityServer};
 use selinux::SecurityId;
-use selinux_common::ProcessPermission;
 use starnix_uapi::error;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::mount_flags::MountFlags;
@@ -250,11 +249,10 @@ pub fn check_task_getsid(source: &CurrentTask, target: &Task) -> Result<(), Errn
     check_if_selinux(source, |security_server| {
         let source_sid = get_current_sid(&source);
         let target_sid = get_current_sid(&target);
-        selinux_hooks::check_permissions(
+        selinux_hooks::check_task_getsid(
             &security_server.as_permission_check(),
             source_sid,
             target_sid,
-            &[ProcessPermission::GetSession],
         )
     })
 }
