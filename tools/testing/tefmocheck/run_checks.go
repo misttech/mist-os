@@ -46,6 +46,14 @@ func RunChecks(checks []FailureModeCheck, to *TestingOutputs, outputsDir string)
 			StartTime: time.Now(), // needed by ResultDB
 			Tags:      check.Tags(),
 		}
+		// Check if failure is an infrastructure failure.
+		if check.IsInfraFailure() {
+			// Infra failures will have result value of "INFRA_FAIL"
+			// in summary.json. This will help distinguish regular failures
+			// which have result value "FAIL" from infra failures.
+			testDetails.Result = runtests.TestInfraFailure
+		}
+
 		if len(outputsDir) > 0 {
 			outputFile := debugPathForCheck(check)
 			testDetails.OutputFiles = []string{outputFile}

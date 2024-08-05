@@ -67,6 +67,8 @@ type stringInLogCheck struct {
 	// If combined with AttributeToTest, it'll list the test name as a tag instead
 	// of appending it to the tefmo check name.
 	AddTag bool
+	// InfraFailure is true if the check is related to infra.
+	InfraFailure bool
 
 	swarmingResult *SwarmingRpcsTaskResult
 	testName       string
@@ -290,6 +292,10 @@ func (c *stringInLogCheck) Tags() []build.TestTag {
 		return []build.TestTag{{Key: "test_name", Value: c.testName}}
 	}
 	return nil
+}
+
+func (c *stringInLogCheck) IsInfraFailure() bool {
+	return c.InfraFailure
 }
 
 // StringInLogsChecks returns checks to detect bad strings in certain logs.
@@ -555,8 +561,9 @@ func infraToolLogChecks() []FailureModeCheck {
 		},
 		// For local package server failures.
 		&stringInLogCheck{
-			String: fmt.Sprintf("botanist ERROR: %s", botanistconstants.FailedToServeMsg),
-			Type:   swarmingOutputType,
+			String:       fmt.Sprintf("botanist ERROR: %s", botanistconstants.FailedToServeMsg),
+			Type:         swarmingOutputType,
+			InfraFailure: true,
 		},
 		// For failures to resolve packages.
 		// LINT.IfChange(tuf_error)
@@ -620,8 +627,9 @@ func infraToolLogChecks() []FailureModeCheck {
 		// This error is emitted by `fastboot` when it fails to write an image
 		// to the disk. It is generally caused by ECC errors.
 		&stringInLogCheck{
-			String: "FAILED (remote: 'error writing the image')",
-			Type:   swarmingOutputType,
+			String:       "FAILED (remote: 'error writing the image')",
+			Type:         swarmingOutputType,
+			InfraFailure: true,
 		},
 		// For https://fxbug.dev/42178156.
 		// This error usually means some kind of USB flakiness/instability when fastboot flashing.
