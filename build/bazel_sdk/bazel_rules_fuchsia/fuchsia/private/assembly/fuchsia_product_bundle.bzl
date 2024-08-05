@@ -733,6 +733,9 @@ def _build_fuchsia_product_bundle_impl(ctx):
         FuchsiaSizeCheckerInfo(
             size_report = size_report,
         ),
+        OutputGroupInfo(
+            build_id_dirs = depset(transitive = build_id_dirs),
+        ),
     ]
 
 _build_fuchsia_product_bundle = rule(

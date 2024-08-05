@@ -789,6 +789,7 @@ class DirectoryOutputs:
     bazel_path: str
     ninja_path: str
     tracked_files: List[str] = dataclasses.field(default_factory=list)
+    copy_debug_symbols: bool = False
 
 
 class DirectoryOutputsAction(argparse.Action):
@@ -811,9 +812,12 @@ class DirectoryOutputsAction(argparse.Action):
         dest_list = getattr(namespace, self.dest, [])
         bazel_path = values[0]
         ninja_path = values[1]
-        tracked_files = values[2:]
+        copy_debug_symbols = bool(values[2] == "true")
+        tracked_files = values[3:]
         dest_list.append(
-            DirectoryOutputs(bazel_path, ninja_path, tracked_files)
+            DirectoryOutputs(
+                bazel_path, ninja_path, tracked_files, copy_debug_symbols
+            )
         )
         setattr(namespace, self.dest, dest_list)
 
@@ -1068,6 +1072,23 @@ def main() -> int:
 
     configured_args = [shlex.quote(arg) for arg in args.extra_bazel_args]
 
+    def run_starlark_cquery(
+        query_target: str, starlark_filename: str
+    ) -> List[str]:
+        result = get_bazel_query_output(
+            "cquery",
+            [
+                "--config=quiet",
+                "--output=starlark",
+                "--starlark:file",
+                get_input_starlark_file_path(starlark_filename),
+                query_target,
+            ]
+            + configured_args,
+        )
+        assert result is not None
+        return result
+
     # All bazel targets as a set() expression for Bazel queries below.
     # See https://bazel.build/query/language#set
     query_targets = "set(%s)" % " ".join(args.bazel_targets)
@@ -1166,7 +1187,10 @@ def main() -> int:
     # CQ/CI bots usable.
     cmd += configured_args + args.bazel_targets + ["--verbose_failures"]
 
-    if any(entry.copy_debug_symbols for entry in args.package_outputs):
+    if any(
+        entry.copy_debug_symbols
+        for entry in args.package_outputs + args.directory_outputs
+    ):
         # Ensure the build_id directories are produced.
         cmd += ["--output_groups=+build_id_dirs"]
 
@@ -1217,6 +1241,16 @@ def main() -> int:
         dst_path = dir_output.ninja_path
         file_copies.append((src_path, dst_path))
 
+        if dir_output.copy_debug_symbols:
+            debug_symbol_dirs = run_starlark_cquery(
+                args.bazel_targets[0],
+                "FuchsiaDebugSymbolInfo_debug_symbol_dirs.cquery",
+            )
+            for debug_symbol_dir in debug_symbol_dirs:
+                copy_build_id_dir(
+                    os.path.join(bazel_execroot, debug_symbol_dir)
+                )
+
     if unwanted_files:
         print(
             "\nNon-directories are not allowed in --directory-outputs Bazel path, got:\n\n%s\n"
@@ -1233,23 +1267,6 @@ def main() -> int:
 
     if _build_fuchsia_package:
         bazel_execroot = find_bazel_execroot(args.workspace_dir)
-
-        def run_starlark_cquery(
-            query_target: str, starlark_filename: str
-        ) -> List[str]:
-            result = get_bazel_query_output(
-                "cquery",
-                [
-                    "--config=quiet",
-                    "--output=starlark",
-                    "--starlark:file",
-                    get_input_starlark_file_path(starlark_filename),
-                    query_target,
-                ]
-                + configured_args,
-            )
-            assert result is not None
-            return result
 
         for entry in args.package_outputs:
             if entry.archive_path or entry.manifest_path:

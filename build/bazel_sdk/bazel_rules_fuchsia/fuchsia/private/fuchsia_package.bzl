@@ -7,15 +7,14 @@
 load("//fuchsia/private/workflows:fuchsia_package_tasks.bzl", "fuchsia_package_tasks")
 load(":fuchsia_api_level.bzl", "FUCHSIA_API_LEVEL_ATTRS", "get_fuchsia_api_level")
 load(":fuchsia_component.bzl", "fuchsia_component_for_unit_test")
-load(":fuchsia_package_resource.bzl", "fuchsia_find_all_package_resources")
 load(
     ":fuchsia_debug_symbols.bzl",
     "FUCHSIA_DEBUG_SYMBOLS_ATTRS",
     "collect_debug_symbols",
     "find_and_process_unstripped_binaries",
-    "get_build_id_dirs",
     "strip_resources",
 )
+load(":fuchsia_package_resource.bzl", "fuchsia_find_all_package_resources")
 load(":fuchsia_transition.bzl", "fuchsia_transition")
 load(
     ":providers.bzl",

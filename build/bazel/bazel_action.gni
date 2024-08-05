@@ -122,6 +122,11 @@ declare_args() {
 #          timestamps must always reflect the freshness of the whole directory
 #          content.
 #
+#       copy_debug_symbols: (optional)
+#          A boolean flag, set it to true to copy all debug symbols from
+#          the package's ELF binaries to the top-level ${root_build_dir}/.build-id/
+#          directory.
+#
 #   package_outputs: (optional)
 #      A list of scopes describing where to place various Fuchsia package
 #      related output files. Scope schema is:
