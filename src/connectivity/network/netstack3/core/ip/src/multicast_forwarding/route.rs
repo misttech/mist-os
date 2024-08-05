@@ -166,7 +166,7 @@ pub(crate) enum Action<D: StrongDeviceIdentifier> {
 /// *replaced* with a new allocation. This strategy allows us to avoid
 /// additional locking on the hot path, at the cost of extra allocations for
 /// certain control operations.
-pub(crate) type MulticastRouteTargets<D> = Arc<[MulticastRouteTarget<D>]>;
+pub type MulticastRouteTargets<D> = Arc<[MulticastRouteTarget<D>]>;
 
 /// The target out of which to forward a multicast packet.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]

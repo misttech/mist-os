@@ -18,7 +18,9 @@ use log::{debug, error, trace};
 use net_types::ip::{
     GenericOverIp, Ip, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr, Mtu, Subnet,
 };
-use net_types::{MulticastAddr, SpecifiedAddr, SpecifiedAddress as _, UnicastAddr, Witness};
+use net_types::{
+    MulticastAddr, MulticastAddress, SpecifiedAddr, SpecifiedAddress as _, UnicastAddr, Witness,
+};
 use netstack3_base::socket::SocketIpAddrExt as _;
 use netstack3_base::sync::{Mutex, PrimaryRc, RwLock, StrongRc, WeakRc};
 use netstack3_base::{
@@ -39,6 +41,7 @@ use packet_formats::ip::{IpPacket as _, IpPacketBuilder as _};
 use packet_formats::ipv4::{Ipv4FragmentType, Ipv4Packet};
 use packet_formats::ipv6::Ipv6Packet;
 use thiserror::Error;
+use zerocopy::ByteSlice;
 
 use crate::internal::device::slaac::SlaacCounters;
 use crate::internal::device::state::{
@@ -53,10 +56,11 @@ use crate::internal::icmp::{
     IcmpBindingsTypes, IcmpErrorHandler, IcmpHandlerIpExt, Icmpv4Error, Icmpv4ErrorKind,
     Icmpv4State, Icmpv4StateBuilder, Icmpv6ErrorKind, Icmpv6State, Icmpv6StateBuilder,
 };
-use crate::internal::ipv6;
 use crate::internal::ipv6::Ipv6PacketAction;
-use crate::internal::multicast_forwarding::route::MulticastRouteIpExt;
-use crate::internal::multicast_forwarding::state::MulticastForwardingState;
+use crate::internal::multicast_forwarding::route::{MulticastRouteIpExt, MulticastRouteTargets};
+use crate::internal::multicast_forwarding::state::{
+    MulticastForwardingState, MulticastForwardingStateContext,
+};
 use crate::internal::path_mtu::{PmtuBindingsTypes, PmtuCache, PmtuTimerId};
 use crate::internal::raw::counters::RawIpSocketCounters;
 use crate::internal::raw::{RawIpSocketHandler, RawIpSocketMap, RawIpSocketsBindingsTypes};
@@ -67,6 +71,7 @@ use crate::internal::reassembly::{
 use crate::internal::routing::{IpRoutingDeviceContext, RoutingTable};
 use crate::internal::socket::{IpSocketBindingsContext, IpSocketContext, IpSocketHandler};
 use crate::internal::types::{self, Destination, NextHop, ResolvedRoute, RoutableIpAddr};
+use crate::internal::{ipv6, multicast_forwarding};
 
 #[cfg(test)]
 mod tests;
@@ -619,7 +624,7 @@ pub enum Ipv6PresentAddressStatus {
 /// An extension trait providing IP layer properties.
 pub trait IpLayerIpExt: IpExt + MulticastRouteIpExt {
     /// IP Address status.
-    type AddressStatus;
+    type AddressStatus: Debug;
     /// IP Address state.
     type State<StrongDeviceId: StrongDeviceIdentifier, BT: IpLayerBindingsTypes>: AsRef<
         IpStateInner<Self, StrongDeviceId, BT>,
@@ -859,14 +864,14 @@ impl<BT: IcmpBindingsTypes + IpStateBindingsTypes> IpLayerBindingsTypes for BT {
 pub trait IpLayerContext<
     I: IpLayerIpExt,
     BC: IpLayerBindingsContext<I, <Self as DeviceIdContext<AnyDevice>>::DeviceId>,
->: IpStateContext<I, BC> + IpDeviceContext<I, BC>
+>: IpStateContext<I, BC> + IpDeviceContext<I, BC> + MulticastForwardingStateContext<I>
 {
 }
 
 impl<
         I: IpLayerIpExt,
         BC: IpLayerBindingsContext<I, <CC as DeviceIdContext<AnyDevice>>::DeviceId>,
-        CC: IpStateContext<I, BC> + IpDeviceContext<I, BC>,
+        CC: IpStateContext<I, BC> + IpDeviceContext<I, BC> + MulticastForwardingStateContext<I>,
     > IpLayerContext<I, BC> for CC
 {
 }
@@ -2300,22 +2305,21 @@ pub fn receive_ipv4_packet<
     // we need below.
     drop(filter);
 
-    let Some(dst_ip) = SpecifiedAddr::new(packet.dst_ip()) else {
-        core_ctx.increment(|counters: &IpCounters<Ipv4>| &counters.unspecified_destination);
-        debug!("receive_ipv4_packet: Received packet with unspecified destination IP; dropping");
-        return;
-    };
-
-    let action = receive_ipv4_packet_action(core_ctx, bindings_ctx, device, dst_ip);
+    let action = receive_ipv4_packet_action(core_ctx, bindings_ctx, device, &packet);
     match action {
-        ReceivePacketAction::Deliver { address_status } => {
+        // TODO(https://fxbug.dev/353329136): Actually forward the packet to
+        // the targets. For now, at least deliver it locally.
+        ReceivePacketAction::MulticastForward { targets: _, address_status: None } => {}
+        ReceivePacketAction::MulticastForward {
+            targets: _,
+            address_status: Some(address_status),
+        }
+        | ReceivePacketAction::Deliver { address_status } => {
             trace!("receive_ipv4_packet: delivering locally");
-
             let meta = ReceiveIpPacketMeta {
                 broadcast: address_status.to_broadcast_marker(),
                 transport_override: None,
             };
-
             // Process a potential IPv4 fragment if the destination is this
             // host.
             //
@@ -2323,8 +2327,7 @@ pub fn receive_ipv4_packet<
             // fragment data is in the header itself so we can handle it right
             // away.
             //
-            // Note, the `process_fragment` function (which is called by the
-            // `process_fragment!` macro) could panic if the packet does not
+            // Note, the `process_fragment` function could panic if the packet does not
             // have fragment data. However, we are guaranteed that it will not
             // panic because the fragment data is in the fixed header so it is
             // always present (even if the fragment data has values that implies
@@ -2343,7 +2346,10 @@ pub fn receive_ipv4_packet<
                 err.respond_with_icmp_error(core_ctx, bindings_ctx, buffer, device)
             })
         }
-        ReceivePacketAction::Forward { dst: Destination { device: dst_device, next_hop } } => {
+        ReceivePacketAction::Forward {
+            original_dst: dst_ip,
+            dst: Destination { device: dst_device, next_hop },
+        } => {
             let destination = IpPacketDestination::from_next_hop(next_hop, dst_ip);
             let ttl = packet.ttl();
             if ttl > 1 {
@@ -2425,7 +2431,7 @@ pub fn receive_ipv4_packet<
                 );
             }
         }
-        ReceivePacketAction::SendNoRouteToDest => {
+        ReceivePacketAction::SendNoRouteToDest { dst: dst_ip } => {
             use packet_formats::ipv4::Ipv4Header as _;
             core_ctx.increment(|counters: &IpCounters<Ipv4>| &counters.no_route_to_host);
             debug!("received IPv4 packet with no known route to destination {}", dst_ip);
@@ -2457,6 +2463,7 @@ pub fn receive_ipv4_packet<
         }
         ReceivePacketAction::Drop { reason } => {
             let src_ip = packet.src_ip();
+            let dst_ip = packet.dst_ip();
             packet_metadata.acknowledge_drop();
             core_ctx.increment(|counters: &IpCounters<Ipv4>| &counters.dropped);
             debug!(
@@ -2616,14 +2623,13 @@ pub fn receive_ipv6_packet<
         core_ctx.increment(|counters: &IpCounters<Ipv6>| &counters.version_rx.non_unicast_source);
         return;
     };
-    let Some(dst_ip) = SpecifiedAddr::new(packet.dst_ip()) else {
-        core_ctx.increment(|counters: &IpCounters<Ipv6>| &counters.unspecified_destination);
-        debug!("receive_ipv6_packet: Received packet with unspecified destination IP; dropping");
-        return;
-    };
 
-    match receive_ipv6_packet_action(core_ctx, bindings_ctx, device, dst_ip) {
-        ReceivePacketAction::Deliver { address_status: _ } => {
+    match receive_ipv6_packet_action(core_ctx, bindings_ctx, device, &packet) {
+        // TODO(https://fxbug.dev/353329136): Actually forward the packet to
+        // the targets. For now, at least deliver it locally.
+        ReceivePacketAction::MulticastForward { targets: _, address_status: None } => {}
+        ReceivePacketAction::MulticastForward { targets: _, address_status: Some(_) }
+        | ReceivePacketAction::Deliver { address_status: _ } => {
             trace!("receive_ipv6_packet: delivering locally");
 
             // Process a potential IPv6 fragment if the destination is this
@@ -2679,8 +2685,7 @@ pub fn receive_ipv6_packet<
 
                     let meta = ReceiveIpPacketMeta::default();
 
-                    // Note, the `IpPacketFragmentCache::process_fragment`
-                    // method (which is called by the `process_fragment!` macro)
+                    // Note, `IpPacketFragmentCache::process_fragment`
                     // could panic if the packet does not have fragment data.
                     // However, we are guaranteed that it will not panic for an
                     // IPv6 packet because the fragment data is in an (optional)
@@ -2711,7 +2716,10 @@ pub fn receive_ipv6_packet<
                 }
             }
         }
-        ReceivePacketAction::Forward { dst: Destination { device: dst_device, next_hop } } => {
+        ReceivePacketAction::Forward {
+            original_dst: dst_ip,
+            dst: Destination { device: dst_device, next_hop },
+        } => {
             let ttl = packet.ttl();
             if ttl > 1 {
                 trace!("receive_ipv6_packet: forwarding");
@@ -2828,7 +2836,7 @@ pub fn receive_ipv6_packet<
                 }
             }
         }
-        ReceivePacketAction::SendNoRouteToDest => {
+        ReceivePacketAction::SendNoRouteToDest { dst: dst_ip } => {
             core_ctx.increment(|counters: &IpCounters<Ipv6>| &counters.no_route_to_host);
             let (_, _, proto, meta): (Ipv6Addr, Ipv6Addr, _, _) =
                 drop_packet_and_undo_parse!(packet, buffer);
@@ -2851,6 +2859,7 @@ pub fn receive_ipv6_packet<
         ReceivePacketAction::Drop { reason } => {
             core_ctx.increment(|counters: &IpCounters<Ipv6>| &counters.dropped);
             let src_ip = packet.src_ip();
+            let dst_ip = packet.dst_ip();
             packet_metadata.acknowledge_drop();
             debug!(
                 "receive_ipv6_packet: dropping packet from {src_ip} to {dst_ip} received on \
@@ -2862,7 +2871,7 @@ pub fn receive_ipv6_packet<
 
 /// The action to take in order to process a received IP packet.
 #[derive(Debug, PartialEq)]
-pub enum ReceivePacketAction<I: BroadcastIpExt + IpLayerIpExt, DeviceId> {
+pub enum ReceivePacketAction<I: BroadcastIpExt + IpLayerIpExt, DeviceId: StrongDeviceIdentifier> {
     /// Deliver the packet locally.
     Deliver {
         /// Status of the receiving IP address.
@@ -2870,15 +2879,37 @@ pub enum ReceivePacketAction<I: BroadcastIpExt + IpLayerIpExt, DeviceId> {
     },
 
     /// Forward the packet to the given destination.
-    #[allow(missing_docs)]
-    Forward { dst: Destination<I::Addr, DeviceId> },
+    Forward {
+        /// The original destination IP address of the packet.
+        original_dst: SpecifiedAddr<I::Addr>,
+        /// The destination that the packet should be forwarded to.
+        dst: Destination<I::Addr, DeviceId>,
+    },
+
+    /// A multicast packet that should be forwarded (& optional local delivery).
+    ///
+    /// The packet should be forwarded to each of the given targets. This case
+    /// is only returned when the packet is eligible for multicast forwarding;
+    /// `Self::Deliver` is used for packets that are ineligible (either because
+    /// multicast forwarding is disabled, or because there are no applicable
+    /// multicast routes with which to forward the packet).
+    MulticastForward {
+        /// The multicast targets to forward the packet via.
+        targets: MulticastRouteTargets<DeviceId>,
+        /// Some if the host is a member of the multicast group and the packet
+        /// should be delivered locally (in addition to forwarding).
+        address_status: Option<I::AddressStatus>,
+    },
 
     /// Send a Destination Unreachable ICMP error message to the packet's sender
     /// and drop the packet.
     ///
     /// For ICMPv4, use the code "net unreachable". For ICMPv6, use the code "no
     /// route to destination".
-    SendNoRouteToDest,
+    SendNoRouteToDest {
+        /// The destination IP Address to which there was no route.
+        dst: SpecifiedAddr<I::Addr>,
+    },
 
     /// Silently drop the packet.
     ///
@@ -2892,21 +2923,35 @@ pub enum ReceivePacketAction<I: BroadcastIpExt + IpLayerIpExt, DeviceId> {
 pub enum DropReason {
     /// Remote packet destined to tentative address.
     Tentative,
+    /// Remote packet destined to the unspecified address.
+    UnspecifiedDestination,
     /// Packet should be forwarded but packet's inbound interface has forwarding
     /// disabled.
     ForwardingDisabledInboundIface,
+    /// Remote packet destined to a multicast address that could not be:
+    /// * delivered locally (because we are not a member of the multicast
+    ///   group), or
+    /// * forwarded (either because multicast forwarding is disabled, or no
+    ///   applicable multicast route has been installed).
+    MulticastNoInterest,
 }
 
 /// Computes the action to take in order to process a received IPv4 packet.
 pub fn receive_ipv4_packet_action<
     BC: IpLayerBindingsContext<Ipv4, CC::DeviceId>,
     CC: IpLayerContext<Ipv4, BC> + CounterContext<IpCounters<Ipv4>>,
+    B: ByteSlice,
 >(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
-    dst_ip: SpecifiedAddr<Ipv4Addr>,
+    packet: &Ipv4Packet<B>,
 ) -> ReceivePacketAction<Ipv4, CC::DeviceId> {
+    let Some(dst_ip) = SpecifiedAddr::new(packet.dst_ip()) else {
+        core_ctx.increment(|counters: &IpCounters<Ipv4>| &counters.unspecified_destination);
+        return ReceivePacketAction::Drop { reason: DropReason::UnspecifiedDestination };
+    };
+
     // If the packet arrived at the loopback interface, check if any local
     // interface has the destination address assigned. This effectively lets
     // the loopback interface operate as a weak host for incoming packets.
@@ -2936,8 +2981,7 @@ pub fn receive_ipv4_packet_action<
             ReceivePacketAction::Deliver { address_status }
         }
         Some(address_status @ Ipv4PresentAddressStatus::Multicast) => {
-            core_ctx.increment(|counters| &counters.deliver_multicast);
-            ReceivePacketAction::Deliver { address_status }
+            receive_ip_multicast_packet_action(core_ctx, device, packet, Some(address_status))
         }
         Some(
             address_status @ (Ipv4PresentAddressStatus::LimitedBroadcast
@@ -2946,9 +2990,13 @@ pub fn receive_ipv4_packet_action<
             core_ctx.increment(|counters| &counters.version_rx.deliver_broadcast);
             ReceivePacketAction::Deliver { address_status }
         }
-        None => {
-            receive_ip_packet_action_common::<Ipv4, _, _>(core_ctx, bindings_ctx, dst_ip, device)
-        }
+        None => receive_ip_packet_action_common::<Ipv4, _, _, _>(
+            core_ctx,
+            bindings_ctx,
+            dst_ip,
+            device,
+            packet,
+        ),
     }
 }
 
@@ -2956,12 +3004,18 @@ pub fn receive_ipv4_packet_action<
 pub fn receive_ipv6_packet_action<
     BC: IpLayerBindingsContext<Ipv6, CC::DeviceId>,
     CC: IpLayerContext<Ipv6, BC> + CounterContext<IpCounters<Ipv6>>,
+    B: ByteSlice,
 >(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
-    dst_ip: SpecifiedAddr<Ipv6Addr>,
+    packet: &Ipv6Packet<B>,
 ) -> ReceivePacketAction<Ipv6, CC::DeviceId> {
+    let Some(dst_ip) = SpecifiedAddr::new(packet.dst_ip()) else {
+        core_ctx.increment(|counters: &IpCounters<Ipv6>| &counters.unspecified_destination);
+        return ReceivePacketAction::Drop { reason: DropReason::UnspecifiedDestination };
+    };
+
     // If the packet arrived at the loopback interface, check if any local
     // interface has the destination address assigned. This effectively lets
     // the loopback interface operate as a weak host for incoming packets.
@@ -3010,8 +3064,7 @@ pub fn receive_ipv6_packet_action<
     };
     match highest_priority {
         Some(address_status @ Ipv6PresentAddressStatus::Multicast) => {
-            core_ctx.increment(|counters| &counters.deliver_multicast);
-            ReceivePacketAction::Deliver { address_status }
+            receive_ip_multicast_packet_action(core_ctx, device, packet, Some(address_status))
         }
         Some(address_status @ Ipv6PresentAddressStatus::UnicastAssigned) => {
             core_ctx.increment(|counters| &counters.deliver_unicast);
@@ -3051,8 +3104,55 @@ pub fn receive_ipv6_packet_action<
             core_ctx.increment(|counters| &counters.version_rx.drop_for_tentative);
             ReceivePacketAction::Drop { reason: DropReason::Tentative }
         }
-        None => {
-            receive_ip_packet_action_common::<Ipv6, _, _>(core_ctx, bindings_ctx, dst_ip, device)
+        None => receive_ip_packet_action_common::<Ipv6, _, _, _>(
+            core_ctx,
+            bindings_ctx,
+            dst_ip,
+            device,
+            packet,
+        ),
+    }
+}
+
+/// Computes the action to take for multicast packets on behalf of
+/// [`receive_ipv4_packet_action`] and [`receive_ipv6_packet_action`].
+fn receive_ip_multicast_packet_action<
+    I: IpLayerIpExt,
+    B: ByteSlice,
+    BC: IpLayerBindingsContext<I, CC::DeviceId>,
+    CC: IpLayerContext<I, BC> + CounterContext<IpCounters<I>>,
+>(
+    core_ctx: &mut CC,
+    device: &CC::DeviceId,
+    packet: &I::Packet<B>,
+    address_status: Option<I::AddressStatus>,
+) -> ReceivePacketAction<I, CC::DeviceId> {
+    let targets = multicast_forwarding::lookup_multicast_route_for_packet(core_ctx, packet, device);
+    match (targets, address_status) {
+        (Some(targets), address_status) => {
+            if address_status.is_some() {
+                core_ctx.increment(|counters| &counters.deliver_multicast);
+            }
+            // TODO(https://fxbug.dev/352570820): Increment Counters.
+            ReceivePacketAction::MulticastForward { targets, address_status }
+        }
+        (None, Some(address_status)) => {
+            // If the address was present on the device (e.g. the host is a
+            // member of the multicast group), fallback to local delivery.
+            core_ctx.increment(|counters| &counters.deliver_multicast);
+            ReceivePacketAction::Deliver { address_status }
+        }
+        (None, None) => {
+            // As per RFC 1122 Section 3.2.2
+            //   An ICMP error message MUST NOT be sent as the result of
+            //   receiving:
+            //   ...
+            //   * a datagram destined to an IP broadcast or IP multicast
+            //     address
+            //
+            // As such, drop the packet
+            // TODO(https://fxbug.dev/352570820): Increment Counters.
+            ReceivePacketAction::Drop { reason: DropReason::MulticastNoInterest }
         }
     }
 }
@@ -3061,6 +3161,7 @@ pub fn receive_ipv6_packet_action<
 /// [`receive_ipv4_packet_action`] and [`receive_ipv6_packet_action`].
 fn receive_ip_packet_action_common<
     I: IpLayerIpExt,
+    B: ByteSlice,
     BC: IpLayerBindingsContext<I, CC::DeviceId>,
     CC: IpLayerContext<I, BC> + CounterContext<IpCounters<I>>,
 >(
@@ -3068,7 +3169,12 @@ fn receive_ip_packet_action_common<
     bindings_ctx: &mut BC,
     dst_ip: SpecifiedAddr<I::Addr>,
     device_id: &CC::DeviceId,
+    packet: &I::Packet<B>,
 ) -> ReceivePacketAction<I, CC::DeviceId> {
+    if dst_ip.is_multicast() {
+        return receive_ip_multicast_packet_action(core_ctx, device_id, packet, None);
+    }
+
     // The packet is not destined locally, so we attempt to forward it.
     if !core_ctx.is_device_unicast_forwarding_enabled(device_id) {
         // Forwarding is disabled; we are operating only as a host.
@@ -3089,11 +3195,11 @@ fn receive_ip_packet_action_common<
         match lookup_route_table(core_ctx, bindings_ctx, None, *dst_ip) {
             Some(dst) => {
                 core_ctx.increment(|counters| &counters.forward);
-                ReceivePacketAction::Forward { dst }
+                ReceivePacketAction::Forward { original_dst: dst_ip, dst }
             }
             None => {
                 core_ctx.increment(|counters| &counters.no_route_to_host);
-                ReceivePacketAction::SendNoRouteToDest
+                ReceivePacketAction::SendNoRouteToDest { dst: dst_ip }
             }
         }
     }

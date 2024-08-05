@@ -43,8 +43,6 @@ use crate::{IpDeviceContext, IpLayerIpExt};
 ///
 /// Note that the returned targets are not synchronized with the multicast route
 /// table and may grow stale if the table is updated.
-// TODO(https://fxbug.dev/353329136): Call this function from IP RX.
-#[allow(unused)]
 pub(crate) fn lookup_multicast_route_for_packet<I, B, CC, BC>(
     core_ctx: &mut CC,
     packet: &I::Packet<B>,

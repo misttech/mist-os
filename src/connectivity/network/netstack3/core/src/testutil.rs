@@ -381,6 +381,27 @@ where
             .unwrap();
     }
 
+    /// Enables or disables IP packet multicast forwarding on `device`.
+    #[netstack3_macros::context_ip_bounds(I, BC, crate)]
+    pub fn set_multicast_forwarding_enabled<I: IpExt>(
+        &mut self,
+        device: &DeviceId<BC>,
+        enabled: bool,
+    ) {
+        let _config = self
+            .core_api()
+            .device_ip::<I>()
+            .update_configuration(
+                device,
+                IpDeviceConfigurationUpdate {
+                    multicast_forwarding_enabled: Some(enabled),
+                    ..Default::default()
+                }
+                .into(),
+            )
+            .unwrap();
+    }
+
     /// Returns whether IP packet unicast forwarding is enabled on `device`.
     #[netstack3_macros::context_ip_bounds(I, BC, crate)]
     pub fn is_unicast_forwarding_enabled<I: IpExt>(&mut self, device: &DeviceId<BC>) -> bool {
