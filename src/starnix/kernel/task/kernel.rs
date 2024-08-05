@@ -13,6 +13,7 @@ use crate::fs::proc::SystemLimits;
 use crate::memory_attribution::MemoryAttributionManager;
 use crate::mm::{FutexTable, SharedFutexKey};
 use crate::power::SuspendResumeManagerHandle;
+use crate::security;
 use crate::task::{
     AbstractUnixSocketNamespace, AbstractVsockSocketNamespace, CurrentTask, HrTimerManager,
     HrTimerManagerHandle, IpTables, KernelStats, KernelThreads, NetstackDevices, PidTable,
@@ -36,7 +37,6 @@ use futures::FutureExt;
 use netlink::interfaces::InterfacesHandler;
 use netlink::{Netlink, NETLINK_LOG_TAG};
 use once_cell::sync::OnceCell;
-use selinux::security_server::SecurityServer;
 use starnix_lifecycle::{AtomicU32Counter, AtomicU64Counter};
 use starnix_logging::{log_error, CoreDumpList};
 use starnix_sync::{
@@ -119,8 +119,8 @@ pub struct Kernel {
     pub selinux_fs: OnceCell<FileSystemHandle>,
     // Owned by nmfs.rs
     pub nmfs: OnceCell<FileSystemHandle>,
-    // The SELinux security server. Initialized if SELinux is enabled.
-    pub security_server: Option<Arc<SecurityServer>>,
+    // Global state held by the Linux Security Modules subsystem.
+    pub security_state: security::KernelState,
     // Owned by tracefs/fs.rs
     pub trace_fs: OnceCell<FileSystemHandle>,
     // Owned by vfs/fuse.rs
@@ -312,7 +312,7 @@ impl Kernel {
         role_manager: Option<RoleManagerSynchronousProxy>,
         inspect_node: fuchsia_inspect::Node,
         framebuffer_aspect_ratio: Option<&AspectRatio>,
-        security_server: Option<Arc<SecurityServer>>,
+        security_state: security::KernelState,
     ) -> Result<Arc<Kernel>, zx::Status> {
         let unix_address_maker =
             Box::new(|x: FsString| -> SocketAddress { SocketAddress::Unix(x) });
@@ -341,7 +341,7 @@ impl Kernel {
             sys_fs: Default::default(),
             selinux_fs: Default::default(),
             nmfs: Default::default(),
-            security_server,
+            security_state,
             trace_fs: Default::default(),
             fusectl_fs: Default::default(),
             device_registry: DeviceRegistry::new(),
@@ -465,13 +465,6 @@ impl Kernel {
         &self,
     ) -> Result<ClientEnd<P>, Errno> {
         self.connect_to_named_protocol_at_container_svc::<P>(P::PROTOCOL_NAME)
-    }
-
-    /// Returns true if SELinux is enabled with a hard-coded fake policy.
-    /// This is a temporary API, for use at call-sites which the SELinux
-    /// implementation does not yet support.
-    pub fn has_fake_selinux(&self) -> bool {
-        self.security_server.as_ref().is_some_and(|s| s.is_fake())
     }
 
     fn get_thread_groups_inspect(&self) -> fuchsia_inspect::Inspector {

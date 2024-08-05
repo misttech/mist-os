@@ -54,7 +54,7 @@ impl SeLinuxFs {
         let mut dir = StaticDirectoryBuilder::new(&fs);
 
         // There should always be a SecurityServer if SeLinuxFs is active.
-        let security_server = match kernel.security_server.as_ref() {
+        let security_server = match kernel.security_state.server.as_ref() {
             Some(security_server) => security_server,
             None => {
                 return error!(EINVAL);

@@ -48,7 +48,7 @@ pub(super) fn check_exec_access(
     executable_node: &FsNodeHandle,
 ) -> Result<ResolvedElfState, Errno> {
     let (current_sid, exec_sid) = {
-        let state = &current_task.read().security_state.0;
+        let state = &current_task.read().security_state.attrs;
         (state.current_sid, state.exec_sid)
     };
 
@@ -90,13 +90,13 @@ pub(super) fn check_exec_access(
         }
         // Check that ptrace permission is allowed if the process is traced.
         if let Some(ptracer) = current_task.ptracer_task().upgrade() {
-            let tracer_sid = ptracer.read().security_state.0.current_sid;
+            let tracer_sid = ptracer.read().security_state.attrs.current_sid;
             if !security_server.has_permissions(tracer_sid, new_sid, &[ProcessPermission::Ptrace]) {
                 return error!(EACCES);
             }
         }
     }
-    Ok(ResolvedElfState(Some(new_sid)))
+    Ok(ResolvedElfState { sid: Some(new_sid) })
 }
 
 /// Updates the SELinux thread group state on exec, using the security ID associated with the
@@ -105,11 +105,13 @@ pub(super) fn update_state_on_exec(
     current_task: &CurrentTask,
     elf_security_state: &ResolvedElfState,
 ) {
-    let security_state = &mut current_task.write().security_state.0;
-    let previous_sid = security_state.current_sid;
+    let task_attrs = &mut current_task.write().security_state.attrs;
+    let previous_sid = task_attrs.current_sid;
 
-    *security_state = TaskState {
-        current_sid: elf_security_state.0.expect("SELinux enabled but missing resolved elf state"),
+    *task_attrs = TaskAttrs {
+        current_sid: elf_security_state
+            .sid
+            .expect("SELinux enabled but missing resolved elf state"),
         previous_sid,
         exec_sid: None,
         fscreate_sid: None,
@@ -261,7 +263,7 @@ pub(super) fn sb_umount(
 pub(super) fn ptrace_access_check(
     permission_check: &impl PermissionCheck,
     tracer_sid: SecurityId,
-    tracee_security_state: &mut TaskState,
+    tracee_security_state: &mut TaskAttrs,
 ) -> Result<(), Errno> {
     check_permissions(
         permission_check,
@@ -281,7 +283,7 @@ pub(super) fn fs_node_getsecurity(
     max_size: usize,
 ) -> Result<ValueOrSize<FsString>, Errno> {
     if name == FsStr::new(XATTR_NAME_SELINUX.to_bytes()) {
-        if let Some(sid) = fs_node.info().security_state.0 {
+        if let Some(sid) = fs_node.info().security_state.sid {
             if let Some(context) = security_server.sid_to_security_context(sid) {
                 return Ok(ValueOrSize::Value(context.into()));
             }
@@ -317,7 +319,7 @@ pub(super) fn fs_node_setsecurity(
 pub fn get_procattr(
     security_server: &SecurityServer,
     _source: SecurityId,
-    target: &TaskState,
+    target: &TaskAttrs,
     attr: ProcAttr,
 ) -> Result<Vec<u8>, Errno> {
     // TODO(b/322849067): Validate that the `source` has the required access.
@@ -339,7 +341,7 @@ pub fn get_procattr(
 pub fn set_procattr(
     security_server: &Arc<SecurityServer>,
     source: SecurityId,
-    target: &mut TaskState,
+    target: &mut TaskAttrs,
     attr: ProcAttr,
     context: &[u8],
 ) -> Result<(), Errno> {
@@ -499,22 +501,26 @@ pub fn fs_node_security_xattr(
     // TODO(b/334091674): Determine whether "context" (and "defcontext") should be returned here, or only set in
     // the node's cached SID.
     let fs = new_node.fs();
-    Ok(fs.security_state.0.context.as_ref().or(fs.security_state.0.def_context.as_ref()).map(
-        |context| FsNodeSecurityXattr {
+    Ok(fs
+        .security_state
+        .state
+        .context
+        .as_ref()
+        .or(fs.security_state.state.def_context.as_ref())
+        .map(|context| FsNodeSecurityXattr {
             name: XATTR_NAME_SELINUX.to_bytes().into(),
             value: context.clone(),
-        },
-    ))
+        }))
 }
 
-/// Returns `TaskState` for a new `Task`, based on the `parent` state, and the specified clone flags.
-pub(super) fn task_alloc(parent: &TaskState, _clone_flags: u64) -> TaskState {
+/// Returns `TaskAttrs` for a new `Task`, based on the `parent` state, and the specified clone flags.
+pub(super) fn task_alloc(parent: &TaskAttrs, _clone_flags: u64) -> TaskAttrs {
     parent.clone()
 }
 
 /// The SELinux security structure for `ThreadGroup`.
 #[derive(Clone, Debug, PartialEq)]
-pub(super) struct TaskState {
+pub(super) struct TaskAttrs {
     /// Current SID for the task.
     pub current_sid: SecurityId,
 
@@ -534,7 +540,7 @@ pub(super) struct TaskState {
     pub sockcreate_sid: Option<SecurityId>,
 }
 
-impl TaskState {
+impl TaskAttrs {
     /// Returns initial state for kernel tasks.
     pub(super) fn for_kernel() -> Self {
         Self::for_initial_sid(InitialSid::Kernel)
@@ -587,7 +593,7 @@ fn get_effective_fs_node_security_id(
     // Note: the sid is read before the match statement because otherwise the lock in
     // `self.info()` would be held for the duration of the match statement, leading to a
     // deadlock with `compute_fs_node_security_id()`.
-    let sid = fs_node.info().security_state.0;
+    let sid = fs_node.info().security_state.sid;
     match sid {
         Some(sid) => sid,
         None => compute_fs_node_security_id(security_server, current_task, fs_node),
@@ -598,14 +604,14 @@ fn get_effective_fs_node_security_id(
 /// cause the security id to *not* be recomputed by the SELinux LSM when determining the effective
 /// security id of this [`FsNode`].
 fn set_cached_sid(fs_node: &FsNode, sid: SecurityId) {
-    fs_node.update_info(|info| info.security_state = FsNodeState(Some(sid)));
+    fs_node.update_info(|info| info.security_state = FsNodeState { sid: Some(sid) });
 }
 
 /// Clears the cached security id on `fs_node`. Clearing the security id will cause the security id
 /// to be be recomputed by the SELinux LSM when determining the effective security id of this
 /// [`FsNode`].
 fn clear_cached_sid(fs_node: &FsNode) {
-    fs_node.update_info(|info| info.security_state.0 = None);
+    fs_node.update_info(|info| info.security_state = FsNodeState { sid: None });
 }
 
 /// Other [`crate::security`] modules may use security id helpers for testing.
@@ -619,7 +625,7 @@ pub(super) mod testing {
     /// current value before engaging logic that may compute a new value. Access control enforcement
     /// code should use `get_effective_fs_node_security_id()`, *not* this function.
     pub fn get_cached_sid(fs_node: &FsNode) -> Option<SecurityId> {
-        fs_node.info().security_state.0
+        fs_node.info().security_state.sid
     }
 }
 
@@ -736,7 +742,7 @@ mod tests {
             create_test_executable(&mut locked, &current_task, executable_security_context);
         let executable_fs_node = &executable.entry.node;
 
-        current_task.write().security_state.0 = TaskState {
+        current_task.write().security_state.attrs = TaskAttrs {
             current_sid: current_sid,
             exec_sid: Some(exec_sid),
             fscreate_sid: None,
@@ -747,7 +753,7 @@ mod tests {
 
         assert_eq!(
             check_exec_access(&security_server, &current_task, executable_fs_node),
-            Ok(ResolvedElfState(Some(exec_sid)))
+            Ok(ResolvedElfState { sid: Some(exec_sid) })
         );
     }
 
@@ -772,7 +778,7 @@ mod tests {
             create_test_executable(&mut locked, &current_task, executable_security_context);
         let executable_fs_node = &executable.entry.node;
 
-        current_task.write().security_state.0 = TaskState {
+        current_task.write().security_state.attrs = TaskAttrs {
             current_sid: current_sid,
             exec_sid: Some(exec_sid),
             fscreate_sid: None,
@@ -810,7 +816,7 @@ mod tests {
             create_test_executable(&mut locked, &current_task, executable_security_context);
         let executable_fs_node = &executable.entry.node;
 
-        current_task.write().security_state.0 = TaskState {
+        current_task.write().security_state.attrs = TaskAttrs {
             current_sid: current_sid,
             exec_sid: Some(exec_sid),
             fscreate_sid: None,
@@ -844,7 +850,7 @@ mod tests {
             create_test_executable(&mut locked, &current_task, executable_security_context);
         let executable_fs_node = &executable.entry.node;
 
-        current_task.write().security_state.0 = TaskState {
+        current_task.write().security_state.attrs = TaskAttrs {
             current_sid: current_sid,
             exec_sid: None,
             fscreate_sid: None,
@@ -855,7 +861,7 @@ mod tests {
 
         assert_eq!(
             check_exec_access(&security_server, &current_task, executable_fs_node),
-            Ok(ResolvedElfState(Some(current_sid)))
+            Ok(ResolvedElfState { sid: Some(current_sid) })
         );
     }
 
@@ -879,7 +885,7 @@ mod tests {
             create_test_executable(&mut locked, &current_task, executable_security_context);
         let executable_fs_node = &executable.entry.node;
 
-        current_task.write().security_state.0 = TaskState {
+        current_task.write().security_state.attrs = TaskAttrs {
             current_sid: current_sid,
             exec_sid: None,
             fscreate_sid: None,
@@ -902,7 +908,7 @@ mod tests {
         let (_kernel, current_task) = create_kernel_and_task_with_selinux(security_server.clone());
 
         let initial_state = {
-            let state = &mut current_task.write().security_state.0;
+            let state = &mut current_task.write().security_state.attrs;
 
             // Set previous SID to a different value from current, to allow verification
             // of the pre-exec "current" being moved into "previous".
@@ -922,10 +928,10 @@ mod tests {
             .expect("invalid security context");
         assert_ne!(elf_sid, initial_state.current_sid);
 
-        update_state_on_exec(&current_task, &ResolvedElfState(Some(elf_sid)));
+        update_state_on_exec(&current_task, &ResolvedElfState { sid: Some(elf_sid) });
         assert_eq!(
-            current_task.read().security_state.0,
-            TaskState {
+            current_task.read().security_state.attrs,
+            TaskAttrs {
                 current_sid: elf_sid,
                 exec_sid: None,
                 fscreate_sid: None,
@@ -1150,7 +1156,7 @@ mod tests {
         let tracee_sid = security_server
             .security_context_to_sid(b"u:object_r:test_ptrace_traced_t:s0".into())
             .expect("invalid security context");
-        let initial_state = TaskState {
+        let initial_state = TaskAttrs {
             current_sid: tracee_sid,
             exec_sid: None,
             fscreate_sid: None,
@@ -1170,7 +1176,7 @@ mod tests {
         );
         assert_eq!(
             tracee_state,
-            TaskState {
+            TaskAttrs {
                 current_sid: initial_state.current_sid,
                 exec_sid: initial_state.exec_sid,
                 fscreate_sid: initial_state.fscreate_sid,
@@ -1190,7 +1196,7 @@ mod tests {
         let tracee_sid = security_server
             .security_context_to_sid(b"u:object_r:test_ptrace_traced_t:s0".into())
             .expect("invalid security context");
-        let initial_state = TaskState {
+        let initial_state = TaskAttrs {
             current_sid: tracee_sid,
             exec_sid: None,
             fscreate_sid: None,
@@ -1214,7 +1220,7 @@ mod tests {
     #[fuchsia::test]
     fn task_alloc_from_parent() {
         // Create a fake parent state, with values for some fields, to check for.
-        let parent_security_state = TaskState {
+        let parent_security_state = TaskAttrs {
             current_sid: SecurityId::initial(InitialSid::Unlabeled),
             previous_sid: SecurityId::initial(InitialSid::Kernel),
             exec_sid: Some(SecurityId::initial(InitialSid::Unlabeled)),
@@ -1229,7 +1235,7 @@ mod tests {
 
     #[fuchsia::test]
     fn task_alloc_for() {
-        let for_kernel = TaskState::for_kernel();
+        let for_kernel = TaskAttrs::for_kernel();
         assert_eq!(for_kernel.current_sid, SecurityId::initial(InitialSid::Kernel));
         assert_eq!(for_kernel.previous_sid, for_kernel.current_sid);
         assert_eq!(for_kernel.exec_sid, None);

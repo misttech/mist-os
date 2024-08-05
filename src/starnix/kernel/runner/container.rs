@@ -22,7 +22,6 @@ use futures::channel::oneshot;
 use futures::{FutureExt, StreamExt, TryStreamExt};
 use magma_device::get_magma_params;
 use runner::{get_program_string, get_program_strvec};
-use selinux::security_server::SecurityServer;
 use starnix_core::device::init_common_devices;
 use starnix_core::execution::{
     create_filesystem_from_spec, create_remote_block_device_from_spec, create_remotefs_filesystem,
@@ -31,6 +30,7 @@ use starnix_core::execution::{
 use starnix_core::fs::layeredfs::LayeredFs;
 use starnix_core::fs::overlayfs::OverlayFs;
 use starnix_core::fs::tmpfs::TmpFs;
+use starnix_core::security;
 use starnix_core::task::{set_thread_role, CurrentTask, ExitStatus, Kernel, Task};
 use starnix_core::time::utc::update_utc_clock;
 use starnix_core::vfs::{FileSystemOptions, FsContext, LookupContext, WhatToMount};
@@ -368,10 +368,7 @@ async fn create_container(
     };
 
     let node = inspect::component::inspector().root().create_child("container");
-    let security_server = match features.selinux {
-        Some(mode) => Some(SecurityServer::new(mode)),
-        _ => None,
-    };
+    let security_state = security::kernel_init_security(features.selinux);
     let kernel = Kernel::new(
         kernel_cmdline,
         features.kernel,
@@ -380,7 +377,7 @@ async fn create_container(
         role_manager,
         node.create_child("kernel"),
         features.aspect_ratio.as_ref(),
-        security_server,
+        security_state,
     )
     .with_source_context(|| format!("creating Kernel: {}", &config.name))?;
     let fs_context = create_fs_context(

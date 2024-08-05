@@ -2,7 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::task::TaskBuilder;
+use crate::device::init_common_devices;
+use crate::fs::fuchsia::RemoteFs;
+use crate::fs::tmpfs::TmpFs;
+use crate::mm::syscalls::{do_mmap, sys_mremap};
+use crate::mm::{MemoryAccessor, MemoryAccessorExt, PAGE_SIZE};
+use crate::security;
+use crate::task::{CurrentTask, Kernel, Task, TaskBuilder};
+use crate::vfs::buffers::{InputBuffer, OutputBuffer};
+use crate::vfs::{
+    fileops_impl_nonseekable, fileops_impl_noop_sync, fs_node_impl_not_dir, Anon, CacheMode,
+    FdNumber, FileHandle, FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps,
+    FileSystemOptions, FsContext, FsNode, FsNodeOps, FsStr,
+};
+
 use selinux::security_server::SecurityServer;
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Unlocked};
 use std::ffi::CString;
@@ -11,18 +24,6 @@ use std::sync::Arc;
 use zerocopy::{AsBytes, NoCell};
 use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
-use crate::device::init_common_devices;
-use crate::fs::fuchsia::RemoteFs;
-use crate::fs::tmpfs::TmpFs;
-use crate::mm::syscalls::{do_mmap, sys_mremap};
-use crate::mm::{MemoryAccessor, MemoryAccessorExt, PAGE_SIZE};
-use crate::task::{CurrentTask, Kernel, Task};
-use crate::vfs::buffers::{InputBuffer, OutputBuffer};
-use crate::vfs::{
-    fileops_impl_nonseekable, fileops_impl_noop_sync, fs_node_impl_not_dir, Anon, CacheMode,
-    FdNumber, FileHandle, FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps,
-    FileSystemOptions, FsContext, FsNode, FsNodeOps, FsStr,
-};
 use starnix_syscalls::{SyscallArg, SyscallResult};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
@@ -94,7 +95,7 @@ fn create_kernel_task_and_unlocked_with_fs_and_selinux<'l>(
         None,
         fuchsia_inspect::Node::default(),
         None,
-        security_server,
+        security::testing::kernel_state(security_server),
     )
     .expect("failed to create kernel");
 
