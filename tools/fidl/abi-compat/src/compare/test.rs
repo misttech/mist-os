@@ -41,7 +41,7 @@ impl TestLibrary {
         Self::new_added_at(V1, source_fragment)
     }
 
-    fn scope_name(&self, name: &str) -> String {
+    fn member_name(&self, name: &str) -> String {
         format!("{LIBRARY}/{name}")
     }
 
@@ -139,7 +139,7 @@ pub(super) fn compare_fidl_type_between(
     source_fragment: &str,
 ) -> CompatibilityProblems {
     let lib = TestLibrary::new(source_fragment);
-    let name = lib.scope_name(name);
+    let name = lib.member_name(name);
     let mut problems = CompatibilityProblems::default();
 
     let mut type_versions: HashMap<&'static str, Type> = HashMap::new();
@@ -172,7 +172,7 @@ pub(super) fn compare_fidl_type(name: &str, source_fragment: &str) -> Compatibil
 
 pub(super) fn compare_fidl_protocol(name: &str, source_fragment: &str) -> CompatibilityProblems {
     let lib = TestLibrary::new(source_fragment);
-    let name = lib.scope_name(name);
+    let name = lib.member_name(name);
 
     let external = lib.compile(V1).get_protocol(&name);
     let platform = lib.compile(PLATFORM).get_protocol(&name);
