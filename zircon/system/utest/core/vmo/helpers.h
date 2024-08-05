@@ -44,6 +44,25 @@ static inline void InitPageTaggedVmo(uint32_t page_count, zx::vmo* vmo) {
   }
 }
 
+// Repeatedly poll VMO until |predicate| returns true or an error occurs.
+//
+// Returns true on success, false on error.
+//
+// |Predicate| is a function that accepts |const zx_info_vmo_t&| and returns |bool|.
+template <typename Predicate>
+bool PollVmoInfoUntil(const zx::vmo& vmo, Predicate&& predicate) {
+  zx_info_vmo_t info;
+  while (true) {
+    if (vmo.get_info(ZX_INFO_VMO, &info, sizeof(info), nullptr, nullptr) != ZX_OK) {
+      return false;
+    }
+    if (predicate(info)) {
+      return true;
+    }
+    zx::nanosleep(zx::deadline_after(zx::msec(50)));
+  }
+}
+
 static inline size_t VmoNumChildren(const zx::vmo& vmo) {
   zx_info_vmo_t info;
   if (vmo.get_info(ZX_INFO_VMO, &info, sizeof(info), nullptr, nullptr) != ZX_OK) {
@@ -56,18 +75,14 @@ static inline size_t VmoNumChildren(const zx::vmo& vmo) {
 //
 // Returns true on success, false on error.
 static inline bool PollVmoNumChildren(const zx::vmo& vmo, size_t expected_num_children) {
-  zx_info_vmo_t info;
-  while (true) {
-    if (vmo.get_info(ZX_INFO_VMO, &info, sizeof(info), nullptr, nullptr) != ZX_OK) {
-      return false;
-    }
+  return PollVmoInfoUntil(vmo, [&](const zx_info_vmo_t& info) {
     if (info.num_children == expected_num_children) {
       return true;
     }
     printf("polling again. actual num children %zu; expected num children %zu\n", info.num_children,
            expected_num_children);
-    zx::nanosleep(zx::deadline_after(zx::msec(50)));
-  }
+    return false;
+  });
 }
 
 static inline size_t VmoPopulatedBytes(const zx::vmo& vmo) {
@@ -82,19 +97,15 @@ static inline size_t VmoPopulatedBytes(const zx::vmo& vmo) {
 //
 // Returns true on success, false on error.
 static inline bool PollVmoPopulatedBytes(const zx::vmo& vmo, size_t expected_populated_bytes) {
-  zx_info_vmo_t info;
-  while (true) {
-    if (vmo.get_info(ZX_INFO_VMO, &info, sizeof(info), nullptr, nullptr) != ZX_OK) {
-      return false;
-    }
+  return PollVmoInfoUntil(vmo, [&](const zx_info_vmo_t& info) {
     if (info.populated_bytes == expected_populated_bytes) {
       return true;
     }
     printf("polling again. actual bytes %zu (%zu pages); expected bytes %zu (%zu pages)\n",
            info.populated_bytes, info.populated_bytes / zx_system_get_page_size(),
            expected_populated_bytes, expected_populated_bytes / zx_system_get_page_size());
-    zx::nanosleep(zx::deadline_after(zx::msec(50)));
-  }
+    return false;
+  });
 }
 
 // Create a fit::defer which will check a BTI to make certain that it has no
