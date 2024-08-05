@@ -30,6 +30,7 @@ class Ramdisk : public fidl::WireServer<fuchsia_hardware_ramdisk::Ramdisk>,
 
   Ramdisk(const Ramdisk&) = delete;
   Ramdisk& operator=(const Ramdisk&) = delete;
+  ~Ramdisk();
 
   // FIDL interface Ramdisk
   void SetFlags(SetFlagsRequestView request, SetFlagsCompleter::Sync& completer) override;
@@ -53,21 +54,33 @@ class Ramdisk : public fidl::WireServer<fuchsia_hardware_ramdisk::Ramdisk>,
   void OnRequests(block_server::Session& session,
                   cpp20::span<const block_server::Request>) override;
 
+  // Reads or writes `block_count` blocks (it ignores the count in `request`) at
+  // `request_block_offset` blocks relative to the request.
+  zx_status_t ReadWrite(const block_server::Request& request, uint64_t request_block_offset,
+                        uint64_t block_count) TA_EXCL(lock_);
+
+  // Returns true if we should fail requests (due to being asleep).
+  bool ShouldFailRequests() const TA_REQ(lock_);
+
   fdf::DriverBase* controller_;
-  uint32_t block_size_;
-  uint64_t block_count_;
+  const uint32_t block_size_;
+  const uint64_t block_count_;
 
   fzl::OwnedVmoMapper mapping_;
 
   // Guards fields of the ramdisk which may be accessed concurrently.
   std::mutex lock_;
+  std::condition_variable condition_;
+
+  fuchsia_hardware_ramdisk::wire::BlockWriteCounts block_counts_ TA_GUARDED(lock_);
+  std::optional<uint64_t> pre_sleep_write_block_count_ TA_GUARDED(lock_);
+  std::vector<uint64_t> blocks_written_since_last_flush_ TA_GUARDED(lock_);
 
   // Flags modified by SetFlags.
   fuchsia_hardware_ramdisk::RamdiskFlag flags_ TA_GUARDED(lock_);
 
   component::OutgoingDirectory outgoing_;
   block_server::BlockServer block_server_;
-  fuchsia_hardware_ramdisk::wire::BlockWriteCounts block_counts_ TA_GUARDED(lock_);
 };
 
 }  // namespace ramdisk_v2

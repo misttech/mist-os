@@ -1291,10 +1291,6 @@ TEST_P(RamdiskTests, RamdiskTestFifoBadClientBadVmo) {
 }
 
 TEST_P(RamdiskTests, RamdiskTestFifoSleepUnavailable) {
-  // TODO(https://fxbug.dev/348077960): Support sleeping with the DFv2 driver
-  if (GetParam())
-    GTEST_SKIP() << "Sleeping not supported by the DFv2 driver";
-
   // Set up the initial handshake connection with the ramdisk
   std::unique_ptr<RamdiskTest> ramdisk;
   ASSERT_NO_FATAL_FAILURE(
@@ -1456,11 +1452,12 @@ zx_status_t fifo_wake_thread(void* arg) {
   return ZX_OK;
 }
 
-class RamdiskTestWithClient : public testing::Test {
+class RamdiskTestWithClient : public testing::TestWithParam<bool> {
  public:
   void SetUp() override {
     // Set up the initial handshake connection with the ramdisk
-    ASSERT_NO_FATAL_FAILURE(RamdiskTest::Create(false, zx_system_get_page_size(), 512, &ramdisk_));
+    ASSERT_NO_FATAL_FAILURE(
+        RamdiskTest::Create(GetParam(), zx_system_get_page_size(), 512, &ramdisk_));
 
     fidl::UnownedClientEnd block_interface = ramdisk_->block_interface();
 
@@ -1495,7 +1492,7 @@ class RamdiskTestWithClient : public testing::Test {
   const uint64_t vmo_size_;
 };
 
-TEST_F(RamdiskTestWithClient, RamdiskTestFifoSleepDeferred) {
+TEST_P(RamdiskTestWithClient, RamdiskTestFifoSleepDeferred) {
   // Create a bunch of requests, some of which are guaranteed to block.
   block_fifo_request_t requests[16];
   for (size_t i = 0; i < std::size(requests); ++i) {
@@ -1513,7 +1510,7 @@ TEST_F(RamdiskTestWithClient, RamdiskTestFifoSleepDeferred) {
   thrd_t thread;
   wake_args_t wake;
   wake.ramdisk_client = ramdisk_->ramdisk_client();
-  wake.after = std::size(requests);
+  wake.after = 1;
   sync_completion_reset(&wake.start);
   wake.deadline = zx_deadline_after(ZX_SEC(3));
   uint64_t blks_before_sleep = 1;
@@ -1614,7 +1611,7 @@ TEST_P(RamdiskTests, RamdiskCreateAtVmo) {
 
 INSTANTIATE_TEST_SUITE_P(/* no prefix */, RamdiskTests, testing::Values(false, true));
 
-TEST_F(RamdiskTestWithClient, DiscardOnWake) {
+TEST_P(RamdiskTestWithClient, DiscardOnWake) {
   ASSERT_EQ(
       ramdisk_set_flags(ramdisk_->ramdisk_client(),
                         static_cast<uint32_t>(
@@ -1665,7 +1662,7 @@ TEST_F(RamdiskTestWithClient, DiscardOnWake) {
   }
 }
 
-TEST_F(RamdiskTestWithClient, DiscardRandomOnWake) {
+TEST_P(RamdiskTestWithClient, DiscardRandomOnWake) {
   ASSERT_EQ(
       ramdisk_set_flags(ramdisk_->ramdisk_client(),
                         static_cast<uint32_t>(
@@ -1727,6 +1724,8 @@ TEST_F(RamdiskTestWithClient, DiscardRandomOnWake) {
     found |= 1 << different;
   } while (found != 0xf);
 }
+
+INSTANTIATE_TEST_SUITE_P(/* no prefix */, RamdiskTestWithClient, testing::Values(false, true));
 
 }  // namespace
 }  // namespace ramdisk

@@ -57,6 +57,14 @@ zx::result<std::unique_ptr<Ramdisk>> Ramdisk::Create(
   return zx::ok(std::move(ramdisk));
 }
 
+Ramdisk::~Ramdisk() {
+  {
+    std::lock_guard<std::mutex> lock(lock_);
+    pre_sleep_write_block_count_ = std::nullopt;
+  }
+  condition_.notify_all();
+}
+
 void Ramdisk::SetFlags(SetFlagsRequestView request, SetFlagsCompleter::Sync& completer) {
   {
     std::lock_guard<std::mutex> lock(lock_);
@@ -66,12 +74,34 @@ void Ramdisk::SetFlags(SetFlagsRequestView request, SetFlagsCompleter::Sync& com
 }
 
 void Ramdisk::Wake(WakeCompleter::Sync& completer) {
-  FDF_LOGL(ERROR, controller_->logger(), "Wake not supported");
+  {
+    std::lock_guard<std::mutex> lock(lock_);
+
+    if (flags_ & fuchsia_hardware_ramdisk::wire::RamdiskFlag::kDiscardNotFlushedOnWake) {
+      // Fill all blocks with a fill pattern.
+      for (uint64_t block : blocks_written_since_last_flush_) {
+        void* addr = reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(mapping_.start()) +
+                                             block * block_size_);
+        memset(addr, 0xaf, block_size_);
+      }
+      FDF_LOGL(INFO, controller_->logger(), "Discarded blocks: %lu",
+               blocks_written_since_last_flush_.size());
+      blocks_written_since_last_flush_.clear();
+    }
+
+    memset(&block_counts_, 0, sizeof(block_counts_));
+    pre_sleep_write_block_count_ = std::nullopt;
+  }
+  condition_.notify_all();
   completer.Reply();
 }
 
 void Ramdisk::SleepAfter(SleepAfterRequestView request, SleepAfterCompleter::Sync& completer) {
-  FDF_LOGL(ERROR, controller_->logger(), "SleepAfter not supported");
+  {
+    std::lock_guard<std::mutex> lock(lock_);
+    memset(&block_counts_, 0, sizeof(block_counts_));
+    pre_sleep_write_block_count_ = request->count;
+  }
   completer.Reply();
 }
 
@@ -122,51 +152,126 @@ void Ramdisk::OnNewSession(block_server::Session session) {
 }
 
 void Ramdisk::OnRequests(block_server::Session& session,
-                         cpp20::span<const block_server::Request> requests) {
+                         cpp20::span<const block_server::Request> requests)
+    TA_NO_THREAD_SAFETY_ANALYSIS {
   for (const auto& request : requests) {
-    if (request.operation.tag == block_server::Operation::Tag::Flush) {
-      session.SendReply(request.request_id, zx::ok());
-      continue;
-    } else if (request.operation.tag == block_server::Operation::Tag::Trim) {
-      session.SendReply(request.request_id, zx::error(ZX_ERR_NOT_SUPPORTED));
-      continue;
-    }
-
-    const bool is_write = request.operation.tag == block_server::Operation::Tag::Write;
-    uint64_t blocks = request.operation.read.block_count;
-    const uint64_t block_offset = request.operation.read.device_block_offset;
-    if (blocks == 0 || block_offset >= block_count_ || block_count_ - block_offset < blocks) {
-      session.SendReply(request.request_id, zx::error(ZX_ERR_OUT_OF_RANGE));
-      continue;
-    }
-
-    const uint64_t dev_offset = block_offset * block_size_;
-    const uint64_t length = blocks * block_size_;
-    const uint64_t vmo_offset = request.operation.read.vmo_offset;
-    void* addr =
-        reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(mapping_.start()) + dev_offset);
-
     zx_status_t status = ZX_OK;
-    if (is_write) {
-      if (length > 0) {
-        status = request.vmo->read(addr, vmo_offset, length);
-      }
 
-      // Update the ramdisk block counts. Since we aren't failing read transactions, only include
-      // write transaction counts.
-      std::lock_guard<std::mutex> lock(lock_);
-      // Increment the count based on the result of the last transaction.
-      if (status == ZX_OK) {
-        block_counts_.successful += blocks;
-      } else {
-        block_counts_.failed += blocks;
-      }
-    } else {
-      status = request.vmo->write(addr, vmo_offset, length);
+    switch (request.operation.tag) {
+      case block_server::Operation::Tag::Read:
+      case block_server::Operation::Tag::Write: {
+        uint64_t block_count = request.operation.read.block_count;
+        if (block_count == 0 || request.operation.read.device_block_offset >= block_count_ ||
+            block_count_ - request.operation.read.device_block_offset < block_count) {
+          status = ZX_ERR_OUT_OF_RANGE;
+          break;
+        }
+
+        // We might need to split the transaction if we need to sleep in the middle of one.
+        uint64_t pre_sleep_count = 0;
+        {
+          std::unique_lock<std::mutex> lock(lock_);
+          if (request.operation.tag == block_server::Operation::Tag::Write) {
+            block_counts_.received += block_count;
+          }
+          if (pre_sleep_write_block_count_ && block_count >= *pre_sleep_write_block_count_) {
+            pre_sleep_count = *pre_sleep_write_block_count_;
+          }
+        }
+        if (pre_sleep_count > 0) {
+          status = ReadWrite(request, 0, pre_sleep_count);
+          block_count -= pre_sleep_count;
+          if (status != ZX_OK) {
+            std::lock_guard<std::mutex> lock(lock_);
+            block_counts_.failed += block_count;
+            break;
+          }
+        }
+        {
+          std::unique_lock<std::mutex> lock(lock_);
+          condition_.wait(lock, [this]() TA_REQ(lock_) {
+            return !pre_sleep_write_block_count_ || *pre_sleep_write_block_count_ > 0 ||
+                   !static_cast<bool>(flags_ &
+                                      fuchsia_hardware_ramdisk::wire::RamdiskFlag::kResumeOnWake);
+          });
+          if (ShouldFailRequests()) {
+            // Fail the requests if we're asleep and `kResumeOnWake` isn't set.
+            status = ZX_ERR_UNAVAILABLE;
+            block_counts_.failed += block_count;
+            break;
+          }
+        }
+        if (block_count > 0)
+          status = ReadWrite(request, pre_sleep_count, block_count);
+      } break;
+      case block_server::Operation::Tag::Flush: {
+        std::lock_guard<std::mutex> lock(lock_);
+        if (ShouldFailRequests()) {
+          status = ZX_ERR_UNAVAILABLE;
+        } else {
+          blocks_written_since_last_flush_.clear();
+        }
+      } break;
+      case block_server::Operation::Tag::Trim:
+        session.SendReply(request.request_id, zx::error(ZX_ERR_NOT_SUPPORTED));
+        break;
+      case block_server::Operation::Tag::CloseVmo:
+        ZX_PANIC("Unexpected operation");
     }
-
     session.SendReply(request.request_id, zx::make_result(status));
   }
+}
+
+zx_status_t Ramdisk::ReadWrite(const block_server::Request& request, uint64_t request_block_offset,
+                               uint64_t block_count) {
+  const bool is_write = request.operation.tag == block_server::Operation::Tag::Write;
+  const uint64_t block_offset = request.operation.read.device_block_offset + request_block_offset;
+  const uint64_t dev_offset = block_offset * block_size_;
+  const uint64_t length = block_count * block_size_;
+  const uint64_t vmo_offset =
+      request.operation.read.vmo_offset + request_block_offset * block_size_;
+  void* addr = reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(mapping_.start()) + dev_offset);
+
+  zx_status_t status = ZX_OK;
+  if (is_write) {
+    status = request.vmo->read(addr, vmo_offset, length);
+
+    // Update the ramdisk block counts. Since we aren't failing read transactions, only include
+    // write transaction counts.
+    std::lock_guard<std::mutex> lock(lock_);
+    // Increment the count based on the result of the last transaction.
+    if (status == ZX_OK) {
+      block_counts_.successful += block_count;
+      if (pre_sleep_write_block_count_) {
+        if (block_count >= *pre_sleep_write_block_count_) {
+          *pre_sleep_write_block_count_ = 0;
+        } else {
+          *pre_sleep_write_block_count_ -= block_count;
+        }
+        if (flags_ & fuchsia_hardware_ramdisk::wire::RamdiskFlag::kDiscardNotFlushedOnWake) {
+          std::random_device random;
+          std::bernoulli_distribution distribution;
+          for (uint64_t block = block_offset, count = block_count; count > 0; ++block, --count) {
+            if (!(flags_ & fuchsia_hardware_ramdisk::wire::RamdiskFlag::kDiscardRandom) ||
+                distribution(random)) {
+              blocks_written_since_last_flush_.push_back(block);
+            }
+          }
+        }
+      }
+    } else {
+      block_counts_.failed += block_count;
+    }
+  } else {
+    status = request.vmo->write(addr, vmo_offset, length);
+  }
+
+  return status;
+}
+
+bool Ramdisk::ShouldFailRequests() const {
+  return pre_sleep_write_block_count_ && *pre_sleep_write_block_count_ == 0 &&
+         !static_cast<bool>(flags_ & fuchsia_hardware_ramdisk::wire::RamdiskFlag::kResumeOnWake);
 }
 
 }  // namespace ramdisk_v2
