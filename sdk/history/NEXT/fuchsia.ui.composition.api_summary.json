@@ -1522,6 +1522,11 @@
         "value": "0"
     },
     {
+        "kind": "enum/member",
+        "name": "fuchsia.ui.composition/ScreenshotFormat.PNG",
+        "value": "1"
+    },
+    {
         "kind": "enum",
         "name": "fuchsia.ui.composition/ScreenshotFormat",
         "strictness": "flexible",
