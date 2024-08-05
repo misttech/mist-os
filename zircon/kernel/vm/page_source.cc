@@ -77,11 +77,13 @@ void PageSource::Close() {
 }
 
 void PageSource::OnPagesSupplied(uint64_t offset, uint64_t len) {
-  ResolveRequests(page_request_type::READ, offset, len);
+  Guard<Mutex> guard{&page_source_mtx_};
+  ResolveRequestsLocked(page_request_type::READ, offset, len, ZX_OK);
 }
 
 void PageSource::OnPagesDirtied(uint64_t offset, uint64_t len) {
-  ResolveRequests(page_request_type::DIRTY, offset, len);
+  Guard<Mutex> guard{&page_source_mtx_};
+  ResolveRequestsLocked(page_request_type::DIRTY, offset, len, ZX_OK);
 }
 
 void PageSource::EarlyWakeRequestLocked(PageRequest* request, uint64_t req_start,
@@ -94,7 +96,7 @@ void PageSource::EarlyWakeRequestLocked(PageRequest* request, uint64_t req_start
   // wake_offset_ to what is actually the next desired offset, which may or may not be the
   // same as what is set here.
   request->wake_offset_ = req_end;
-  request->event_.Signal();
+  request->event_.Signal(request->complete_status_);
   // For simplicity convert the request relative range back into a provider (aka VMO) range.
   const uint64_t provider_start = req_start + request->offset_;
   const uint64_t provider_end = req_end + request->offset_;
@@ -115,7 +117,7 @@ void PageSource::EarlyWakeRequestLocked(PageRequest* request, uint64_t req_start
       // is given more content. The largest obvious safe value, i.e. would not overflow anywhere,
       // is the end of the parent request range.
       overlap.wake_offset_ = request->len_;
-      overlap.event_.Signal();
+      overlap.event_.Signal(overlap.complete_status_);
       continue;
     }
     // If there is otherwise no overlap, then can skip.
@@ -127,12 +129,13 @@ void PageSource::EarlyWakeRequestLocked(PageRequest* request, uint64_t req_start
         overlap.TrimRangeToRequestSpace(provider_start, provider_end);
     if (overlap_start <= overlap.wake_offset_ && overlap_end > overlap.wake_offset_) {
       overlap.wake_offset_ = overlap_end;
-      overlap.event_.Signal();
+      overlap.event_.Signal(overlap.complete_status_);
     }
   }
 }
 
-void PageSource::ResolveRequests(page_request_type type, uint64_t offset, uint64_t len) {
+void PageSource::ResolveRequestsLocked(page_request_type type, uint64_t offset, uint64_t len,
+                                       zx_status_t error_status) {
   canary_.Assert();
   LTRACEF_LEVEL(2, "%p offset %lx, len %lx\n", this, offset, len);
   uint64_t end;
@@ -140,7 +143,6 @@ void PageSource::ResolveRequests(page_request_type type, uint64_t offset, uint64
   DEBUG_ASSERT(!overflow);  // vmobject should have already validated overflow
   DEBUG_ASSERT(type < page_request_type::COUNT);
 
-  Guard<Mutex> guard{&page_source_mtx_};
   if (detached_) {
     return;
   }
@@ -160,6 +162,22 @@ void PageSource::ResolveRequests(page_request_type type, uint64_t offset, uint64
     // Calculate how many pages were resolved in this request by finding the start and
     // end offsets of the operation in this request.
     auto [req_offset, req_end] = cur->TrimRangeToRequestSpace(offset, end);
+
+    if (error_status != ZX_OK) {
+      if (req_offset == 0 || req_offset == cur->wake_offset_) {
+        cur->complete_status_ = error_status;
+      }
+      for (PageRequest& overlap : cur->overlap_) {
+        // If there is otherwise no overlap, then can skip.
+        if (!overlap.RangeOverlaps(offset, end)) {
+          continue;
+        }
+        auto [overlap_start, overlap_end] = overlap.TrimRangeToRequestSpace(offset, end);
+        if (overlap_start == 0 || overlap_start == overlap.wake_offset_) {
+          overlap.complete_status_ = error_status;
+        }
+      }
+    }
 
     uint64_t fulfill = req_end - req_offset;
 
@@ -206,19 +224,7 @@ void PageSource::OnPagesFailed(uint64_t offset, uint64_t len, zx_status_t error_
     if (!page_provider_->SupportsPageRequestType(page_request_type(type))) {
       continue;
     }
-    // The first possible request we could fail is the one with the smallest
-    // end address that is greater than offset. Then keep looking as long as the
-    // target request's start offset is less than the supply end.
-    auto start = outstanding_requests_[type].upper_bound(offset);
-    while (start.IsValid() && start->offset_ < end) {
-      auto cur = start;
-      ++start;
-
-      LTRACEF_LEVEL(2, "%p, signaling failure %d %lx\n", this, error_status, cur->offset_);
-
-      // Notify anything waiting on this range.
-      CompleteRequestLocked(outstanding_requests_[type].erase(cur), error_status);
-    }
+    ResolveRequestsLocked(static_cast<page_request_type>(type), offset, len, error_status);
   }
 }
 
@@ -392,7 +398,7 @@ void PageSource::SendRequestToProviderLocked(PageRequest* request) {
   }
 }
 
-void PageSource::CompleteRequestLocked(PageRequest* request, zx_status_t status) {
+void PageSource::CompleteRequestLocked(PageRequest* request) {
   VM_KTRACE_DURATION(1, "page_request_complete", ("offset", request->offset_),
                      ("len", request->len_));
   DEBUG_ASSERT(request->type_ < page_request_type::COUNT);
@@ -408,11 +414,11 @@ void PageSource::CompleteRequestLocked(PageRequest* request, zx_status_t status)
     VM_KTRACE_FLOW_BEGIN(1, "page_request_signal", reinterpret_cast<uintptr_t>(waiter));
     DEBUG_ASSERT(!waiter->provider_owned_);
     waiter->offset_ = UINT64_MAX;
-    waiter->event_.Signal(status);
+    waiter->event_.Signal(waiter->complete_status_);
   }
   VM_KTRACE_FLOW_BEGIN(1, "page_request_signal", reinterpret_cast<uintptr_t>(request));
   request->offset_ = UINT64_MAX;
-  request->event_.Signal(status);
+  request->event_.Signal(request->complete_status_);
 }
 
 void PageSource::CancelRequest(PageRequest* request) {
@@ -509,6 +515,7 @@ void PageRequest::Init(fbl::RefPtr<PageRequestInterface> src, uint64_t offset,
   DEBUG_ASSERT(type < page_request_type::COUNT);
   type_ = type;
   src_ = ktl::move(src);
+  complete_status_ = ZX_OK;
 
   event_.Unsignal();
 }

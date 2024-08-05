@@ -2195,6 +2195,11 @@ TEST(Pager, FailOverlappingRangeCommit) {
   ASSERT_TRUE(t3.Start());
   ASSERT_TRUE(pager.WaitForPageRead(vmo, 5, 2, ZX_TIME_INFINITE));
 
+  ASSERT_TRUE(pager.SupplyPages(vmo, 0, 1));
+  ASSERT_TRUE(pager.FailPages(vmo, 1, 9));
+  ASSERT_TRUE(pager.SupplyPages(vmo, 10, 1));
+
+  ASSERT_TRUE(pager.WaitForPageRead(vmo, 1, 1, ZX_TIME_INFINITE));
   ASSERT_TRUE(pager.FailPages(vmo, 1, 9));
 
   ASSERT_TRUE(t1.WaitForFailure());
@@ -2236,6 +2241,11 @@ TEST(Pager, FailOverlappingRangeRead) {
   ASSERT_TRUE(t3.Start());
   ASSERT_TRUE(pager.WaitForPageRead(vmo, 5, 2, ZX_TIME_INFINITE));
 
+  ASSERT_TRUE(pager.FailPages(vmo, 1, 9));
+  ASSERT_TRUE(pager.SupplyPages(vmo, 0, 1));
+  ASSERT_TRUE(pager.SupplyPages(vmo, 10, 1));
+
+  ASSERT_TRUE(pager.WaitForPageRead(vmo, 1, 1, ZX_TIME_INFINITE));
   ASSERT_TRUE(pager.FailPages(vmo, 1, 9));
 
   ASSERT_TRUE(t1.WaitForFailure());
@@ -2297,6 +2307,82 @@ TEST(Pager, FailAfterDetach) {
   ASSERT_FALSE(pager.FailPages(vmo, 0, kNumPages));
 
   ASSERT_FALSE(pager.GetPageReadRequest(vmo, 0, &offset, &length));
+}
+
+TEST(Pager, FailEarlyWake) {
+  UserPager pager;
+  ASSERT_TRUE(pager.Init());
+
+  Vmo* vmo;
+  ASSERT_TRUE(pager.CreateVmo(3, &vmo));
+
+  TestThread t([vmo]() -> bool { return vmo->CheckVmo(0, 3); });
+  ASSERT_TRUE(t.Start());
+
+  ASSERT_TRUE(pager.WaitForPageRead(vmo, 0, 3, ZX_TIME_INFINITE));
+
+  // Supply the first page, this should wake up the internal kernel request and process that page.
+  ASSERT_TRUE(pager.SupplyPages(vmo, 0, 1, 0));
+
+  // Fail the second page, although this isn't the first page in the request, due to the early wake
+  // from the first request it is the next page to be processed and so should complete and fail the
+  // request, even though we have not supplied or failed the third page.
+  ASSERT_TRUE(pager.FailPages(vmo, 1, 1, ZX_ERR_IO));
+
+  // No more requests.
+  uint64_t offset, length;
+  ASSERT_FALSE(pager.GetPageReadRequest(vmo, 0, &offset, &length));
+
+  ASSERT_TRUE(t.WaitForFailure());
+}
+
+// Fail overlap request
+TEST(Pager, FailOverlapRequest) {
+  UserPager pager;
+  ASSERT_TRUE(pager.Init());
+
+  Vmo* vmo;
+  ASSERT_TRUE(pager.CreateVmo(4, &vmo));
+
+  TestThread t1([vmo]() -> bool { return vmo->CheckVmo(0, 4); });
+  ASSERT_TRUE(t1.Start());
+  ASSERT_TRUE(pager.WaitForPageRead(vmo, 0, 4, ZX_TIME_INFINITE));
+
+  // Start another read, this one should be considered overlapping and not generate a request.
+  TestThread t2([vmo]() -> bool { return vmo->CheckVmo(1, 1); });
+  ASSERT_TRUE(t2.Start());
+  ASSERT_TRUE(t2.WaitForBlocked());
+  uint64_t offset, length;
+  ASSERT_FALSE(pager.GetPageReadRequest(vmo, 0, &offset, &length));
+
+  // Fail the second page, this will set the failure status for the overlap, but it will not wake up
+  // till the primary request wakes.
+  ASSERT_TRUE(pager.FailPages(vmo, 1, 1, ZX_ERR_IO));
+
+  // Now succeed the first page, this will early wake the first the request and cause it to process,
+  // but then continue waiting for the rest of the request.
+  ASSERT_TRUE(pager.SupplyPages(vmo, 0, 1, 0));
+  ASSERT_TRUE(t1.WaitForBlocked());
+  // The overlap is still blocked
+  ASSERT_TRUE(t2.WaitForBlocked());
+
+  // Succeed the last two pages.
+  ASSERT_TRUE(pager.SupplyPages(vmo, 2, 2, 2));
+
+  // Both requests should wake up, the overlap gets its failure and the primary, having forgotten
+  // where the error was, generates another request.
+  ASSERT_TRUE(t2.WaitForFailure());
+  // The exact amount the will be waited for is slightly arbitrary, it will be at least one page but
+  // the two end pages previously supplied could also have been evicted.
+  ASSERT_TRUE(pager.GetPageReadRequest(vmo, ZX_TIME_INFINITE, &offset, &length));
+  EXPECT_EQ(1u, offset);
+  EXPECT_GE(length, 1u);
+
+  // Succeed it this time.
+  ASSERT_TRUE(pager.SupplyPages(vmo, 1, 3, 1));
+
+  // Should be complete now.
+  ASSERT_TRUE(t1.Wait());
 }
 
 // Test that supply_pages fails after detach.

@@ -14,6 +14,7 @@
 #include <zircon/system/utest/core/pager/userpager.h>
 #include <zircon/types.h>
 
+#include <memory>
 #include <numeric>
 #include <string>
 #include <thread>
@@ -1374,6 +1375,39 @@ TEST(StreamTestCase, ExpandVmoResizeRight) {
   char data[sizeof(buffer)];
   ASSERT_OK(vmo.read(data, seek, sizeof(buffer)));
   EXPECT_STREQ(buffer, data);
+}
+
+TEST(StreamTestCase, PartialVmoDirty) {
+  // The created VMO has to have at least 1 page because it gets mapped. The 2nd and 3rd pages are
+  // written to by the stream. The pager allows the 2nd page to be dirtied but fails the 3rd page
+  // with ZX_ERR_NO_SPACE. The stream write call should succeed with 1 page being written.
+  const size_t page_size = zx_system_get_page_size();
+  pager_tests::UserPager pager;
+  ASSERT_TRUE(pager.Init());
+  pager_tests::Vmo* vmo;
+  ASSERT_TRUE(pager.CreateVmoWithOptions(1, ZX_VMO_RESIZABLE | ZX_VMO_TRAP_DIRTY, &vmo));
+  zx::stream stream;
+  ASSERT_OK(
+      zx::stream::create(ZX_STREAM_MODE_READ | ZX_STREAM_MODE_WRITE, vmo->vmo(), 0u, &stream));
+
+  std::thread pager_thread([&pager, vmo]() {
+    ASSERT_TRUE(pager.WaitForPageDirty(vmo, 1, 2, ZX_TIME_INFINITE));
+    ASSERT_TRUE(pager.DirtyPages(vmo, 1, 1));
+    ASSERT_TRUE(pager.FailPages(vmo, 2, 1, ZX_ERR_NO_SPACE));
+    ASSERT_TRUE(pager.WaitForPageDirty(vmo, 2, 1, ZX_TIME_INFINITE));
+    ASSERT_TRUE(pager.FailPages(vmo, 2, 1, ZX_ERR_NO_SPACE));
+  });
+
+  auto buffer = std::make_unique<uint8_t[]>(page_size * 2);
+  zx_iovec_t iovec = {
+      .buffer = buffer.get(),
+      .capacity = page_size * 2,
+  };
+  size_t bytes_written = 0;
+  ASSERT_OK(stream.writev_at(0, page_size, &iovec, 1, &bytes_written));
+  ASSERT_EQ(page_size, bytes_written);
+
+  pager_thread.join();
 }
 
 }  // namespace
