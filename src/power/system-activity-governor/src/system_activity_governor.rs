@@ -413,7 +413,7 @@ impl WakeLeaseManager {
             }],
         )
         .await?;
-        tracing::info!("Acquiring lease for '{}'", name);
+        tracing::debug!("Acquiring lease for '{}'", name);
         let lease = lease_helper.lease().await?;
 
         let token_info = server_token.basic_info()?;
