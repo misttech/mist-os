@@ -9,12 +9,12 @@ import("//build/testing/environments.gni")
 group("tests") {
   testonly = true
   deps = [
-    ":system_monitor_integration_test_component",
-    ":system_monitor_unittest_component",
+    ":system_monitor_integration_test",
+    ":system_monitor_unittest",
   ]
 }
 
-executable("bin") {
+executable("system_monitor_integration_test_bin") {
   testonly = true
   output_name = "system_monitor_integration_test"
 
@@ -33,7 +33,7 @@ executable("bin") {
 fuchsia_test_component("system_monitor_integration_test_component") {
   component_name = "system_monitor_integration_test"
   manifest = "meta/system_monitor_integration_test.cml"
-  deps = [ ":bin" ]
+  deps = [ ":system_monitor_integration_test_bin" ]
   test_type = "system"
 }
 
@@ -58,7 +58,7 @@ executable("system_monitor_unittest_bin") {
   ]
 }
 
-fuchsia_unittest_component("system_monitor_unittest_component") {
+fuchsia_unittest_package("system_monitor_unittest") {
   manifest = "meta/system_monitor_unittest.cml"
   deps = [ ":system_monitor_unittest_bin" ]
   test_type = "system"

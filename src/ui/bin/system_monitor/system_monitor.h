@@ -16,7 +16,7 @@ class SystemMonitor {
  public:
   // Class constructor initializes the batchIterator pointer to be used
   //  by the function to get all the inspect diagnostic.
-  SystemMonitor();
+  SystemMonitor(bool use_real_archive_accessor = false);
   // These functions uses the iterator to access inspect diagnostic and turn
   // all the json format content into std::string and
   // returns a vector of strings.

@@ -22,10 +22,13 @@ namespace system_monitor {
 constexpr char kTarget[] = "platform_metrics";
 constexpr zx::duration kPrintFrequency = zx::sec(10);
 
-SystemMonitor::SystemMonitor() {
+SystemMonitor::SystemMonitor(bool use_real_archive_accessor) {
   auto services = sys::ServiceDirectory::CreateFromNamespace();
-  services->Connect(accessor_.NewRequest());
-
+  if (use_real_archive_accessor) {
+    services->Connect(accessor_.NewRequest(), "fuchsia.diagnostics.RealArchiveAccessor");
+  } else {
+    services->Connect(accessor_.NewRequest());
+  }
   params_ = fuchsia::diagnostics::StreamParameters();
   params_.set_stream_mode(fuchsia::diagnostics::StreamMode::SNAPSHOT);
   params_.set_data_type(fuchsia::diagnostics::DataType::INSPECT);
