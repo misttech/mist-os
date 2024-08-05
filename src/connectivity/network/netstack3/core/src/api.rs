@@ -85,7 +85,7 @@ where
         RoutesApi::new(ctx)
     }
 
-    /// Gets access to the routes API for IP version `I`.
+    /// Gets access to the routes API for all IP versions.
     pub fn routes_any(self) -> RoutesAnyApi<CoreApiCtxPair<'a, BP>> {
         let Self(ctx) = self;
         RoutesAnyApi::new(ctx)
