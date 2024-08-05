@@ -62,7 +62,7 @@ enum class InheritableProfile { No, Yes };
 class AutoProfileBooster {
  public:
   AutoProfileBooster() : initial_base_profile_(Thread::Current::Get()->SnapshotBaseProfile()) {
-    constexpr SchedUtilization utilization = SchedUtilization{90} / SchedUtilization{100};
+    constexpr SchedUtilization utilization = ffl::FromRatio(90, 100);
     constexpr SchedDuration deadline{ZX_USEC(200)};
     const SchedulerState::BaseProfile new_base_profile{SchedDeadlineParams{utilization, deadline}};
     Thread::Current::Get()->SetBaseProfile(new_base_profile);
