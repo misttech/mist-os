@@ -65,7 +65,7 @@ class ScoDataChannelImpl final : public ScoDataChannel {
   // Handler for the HCI Number of Completed Packets Event, used for
   // packet-based data flow control.
   CommandChannel::EventCallbackResult OnNumberOfCompletedPacketsEvent(
-      const EventPacket& event);
+      const EmbossEventPacket& event);
 
   bool IsActiveConnectionConfigured() {
     if (!active_connection_.is_alive()) {
@@ -206,32 +206,42 @@ void ScoDataChannelImpl::OnRxPacket(pw::span<const std::byte> buffer) {
 }
 
 CommandChannel::EventCallbackResult
-ScoDataChannelImpl::OnNumberOfCompletedPacketsEvent(const EventPacket& event) {
-  BT_ASSERT(event.event_code() == hci_spec::kNumberOfCompletedPacketsEventCode);
-  const auto& payload =
-      event.params<hci_spec::NumberOfCompletedPacketsEventParams>();
+ScoDataChannelImpl::OnNumberOfCompletedPacketsEvent(
+    const EmbossEventPacket& event) {
+  if (event.size() <
+      pw::bluetooth::emboss::NumberOfCompletedPacketsEvent::MinSizeInBytes()) {
+    bt_log(ERROR,
+           "hci",
+           "Invalid HCI_Number_Of_Completed_Packets event received, ignoring");
+    return CommandChannel::EventCallbackResult::kContinue;
+  }
+  auto view = event.unchecked_view<
+      pw::bluetooth::emboss::NumberOfCompletedPacketsEventView>();
+  BT_ASSERT(view.header().event_code_enum().Read() ==
+            pw::bluetooth::emboss::EventCode::NUMBER_OF_COMPLETED_PACKETS);
 
   const size_t handles_in_packet =
-      (event.view().payload_size() -
-       sizeof(hci_spec::NumberOfCompletedPacketsEventParams)) /
-      sizeof(hci_spec::NumberOfCompletedPacketsEventData);
-
-  if (payload.number_of_handles != handles_in_packet) {
+      (event.size() -
+       pw::bluetooth::emboss::NumberOfCompletedPacketsEvent::MinSizeInBytes()) /
+      pw::bluetooth::emboss::NumberOfCompletedPacketsEventData::
+          IntrinsicSizeInBytes();
+  uint8_t expected_number_of_handles = view.num_handles().Read();
+  if (expected_number_of_handles != handles_in_packet) {
     bt_log(ERROR,
            "hci",
            "packets handle count (%d) doesn't match params size (%zu); either "
            "the packet was "
            "parsed incorrectly or the controller is buggy",
-           payload.number_of_handles,
+           expected_number_of_handles,
            handles_in_packet);
   }
 
-  for (uint8_t i = 0; i < payload.number_of_handles && i < handles_in_packet;
+  for (uint8_t i = 0; i < expected_number_of_handles && i < handles_in_packet;
        ++i) {
-    const hci_spec::NumberOfCompletedPacketsEventData* data = payload.data + i;
-
-    auto iter = pending_packet_counts_.find(pw::bytes::ConvertOrderFrom(
-        cpp20::endian::little, data->connection_handle));
+    uint16_t connection_handle = view.nocp_data()[i].connection_handle().Read();
+    uint16_t num_completed_packets =
+        view.nocp_data()[i].num_completed_packets().Read();
+    auto iter = pending_packet_counts_.find(connection_handle);
     if (iter == pending_packet_counts_.end()) {
       // This is expected if the completed packet is an ACL packet.
       bt_log(TRACE,
@@ -239,14 +249,11 @@ ScoDataChannelImpl::OnNumberOfCompletedPacketsEvent(const EventPacket& event) {
              "controller reported completed packets for connection handle "
              "without pending packets: "
              "%#.4x",
-             data->connection_handle);
+             connection_handle);
       continue;
     }
 
-    uint16_t comp_packets = pw::bytes::ConvertOrderFrom(
-        cpp20::endian::little, data->hc_num_of_completed_packets);
-
-    if (iter->second < comp_packets) {
+    if (iter->second < num_completed_packets) {
       // TODO(https://fxbug.dev/42102535): This can be caused by the controller
       // reusing the connection handle of a connection that just disconnected.
       // We should somehow avoid sending the controller packets for a connection
@@ -258,24 +265,22 @@ ScoDataChannelImpl::OnNumberOfCompletedPacketsEvent(const EventPacket& event) {
              "hci",
              "SCO packet tx count mismatch! (handle: %#.4x, expected: %zu, "
              "actual : %u)",
-             pw::bytes::ConvertOrderFrom(cpp20::endian::little,
-                                         data->connection_handle),
+             connection_handle,
              iter->second,
-             comp_packets);
+             num_completed_packets);
       // This should eventually result in convergence with the correct pending
       // packet count. If it undercounts the true number of pending packets,
       // this branch will be reached again when the controller sends an updated
       // Number of Completed Packets event. However, ScoDataChannel may overflow
       // the controller's buffer in the meantime!
-      comp_packets = static_cast<uint16_t>(iter->second);
+      num_completed_packets = static_cast<uint16_t>(iter->second);
     }
 
-    iter->second -= comp_packets;
+    iter->second -= num_completed_packets;
     if (iter->second == 0u) {
       pending_packet_counts_.erase(iter);
     }
   }
-
   TrySendNextPackets();
   return CommandChannel::EventCallbackResult::kContinue;
 }
