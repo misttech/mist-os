@@ -1379,7 +1379,7 @@ From //build/toolchain/rbe.gni:182
 ### cxx_rbe_minimalist_wrapper
 
 Set to true to use a fast, minimalist wrapper, that lacks features
-of the python-based wrapper.  Use with caution.
+of the python-based wrapper, and is close to a bare call to rewrapper.
 This flag is only meaningful when `cxx_rbe_enable` is true.
 
 **Current value (from the default):** `true`
