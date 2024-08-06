@@ -1341,7 +1341,7 @@ Remote execution offers increased build parallelism and caching.
 
 From //out/not-default/args.gn:7
 
-**Overridden from the default:** `true`
+**Overridden from the default:** `false`
 
 From //build/toolchain/rbe.gni:159
 
@@ -1349,7 +1349,7 @@ From //build/toolchain/rbe.gni:159
 
 From //out/not-default/args.gn:7
 
-**Overridden from the default:** `true`
+**Overridden from the default:** `false`
 
 From //build/toolchain/rbe.gni:159
 
@@ -7143,7 +7143,7 @@ The overall mode for RBE to be operating in.  The valid values are:
  * 'low_bandwidth' => An RBE configuration for developers that have a
                       powerful workstations, but low bandwidth.
 
-**Current value (from the default):** `"legacy_default"`
+**Current value (from the default):** `"off"`
 
 From //build/toolchain/rbe_modes.gni:34
 
