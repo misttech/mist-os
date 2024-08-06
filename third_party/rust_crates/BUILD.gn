@@ -571,7 +571,7 @@ group("num-traits") {
 }
 
 group("omaha_client") {
-  public_deps = [ ":omaha_client-v0_1_0" ]
+  public_deps = [ ":omaha_client-v0_2_1" ]
 }
 
 group("once_cell") {
@@ -9299,19 +9299,19 @@ rust_library("numtoa-v0_1_0") {
   applicable_licenses = [ ":numtoa-v0_1_0.license" ]
 }
 
-license("omaha_client-v0_1_0.license") {
+license("omaha_client-v0_2_1.license") {
   public_package_name = "omaha_client"
   license_files = [
-    "//third_party/rust_crates/vendor/omaha_client-0.1.0/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/omaha_client-0.1.0/LICENSE-BSD",
-    "//third_party/rust_crates/vendor/omaha_client-0.1.0/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/omaha_client-0.2.1/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/omaha_client-0.2.1/LICENSE-BSD",
+    "//third_party/rust_crates/vendor/omaha_client-0.2.1/LICENSE-MIT",
   ]
 }
 
-rust_library("omaha_client-v0_1_0") {
+rust_library("omaha_client-v0_2_1") {
   crate_name = "omaha_client"
-  crate_root = "//third_party/rust_crates/vendor/omaha_client-0.1.0/src/lib.rs"
-  output_name = "omaha_client-464d14c78d580224"
+  crate_root = "//third_party/rust_crates/vendor/omaha_client-0.2.1/src/lib.rs"
+  output_name = "omaha_client-259785bc42cb99c5"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -9344,13 +9344,13 @@ rust_library("omaha_client-v0_1_0") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2021",
-    "-Cmetadata=464d14c78d580224",
-    "-Cextra-filename=-464d14c78d580224",
+    "-Cmetadata=259785bc42cb99c5",
+    "-Cextra-filename=-259785bc42cb99c5",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":omaha_client-v0_1_0.license" ]
+  applicable_licenses = [ ":omaha_client-v0_2_1.license" ]
 }
 
 license("once_cell-v1_17_1.license") {

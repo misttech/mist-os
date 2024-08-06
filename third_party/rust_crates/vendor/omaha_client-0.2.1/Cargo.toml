@@ -12,12 +12,25 @@
 [package]
 edition = "2021"
 name = "omaha_client"
-version = "0.1.0"
+version = "0.2.1"
+build = false
 exclude = [".*"]
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
 description = "Platform- and product-agnostic implementation of the client end of the Omaha Protocol"
 readme = "README.md"
 license = "BSD-2-Clause OR Apache-2.0 OR MIT"
 repository = "https://github.com/google/omaha-client"
+
+[lib]
+name = "omaha_client"
+path = "src/lib.rs"
+
+[[example]]
+name = "hello-world"
+path = "examples/hello-world/main.rs"
 
 [dependencies.anyhow]
 version = "1.0.75"
@@ -80,7 +93,7 @@ version = "0.10.6"
 version = "1.6.4"
 
 [dependencies.thiserror]
-version = "1.0.57"
+version = "1.0"
 
 [dependencies.tracing]
 version = "0.1.37"
@@ -95,8 +108,22 @@ features = [
     "v4",
 ]
 
+[dev-dependencies.argh]
+version = "0.1"
+
 [dev-dependencies.assert_matches]
 version = "1.5.0"
+
+[dev-dependencies.futures-timer]
+version = "0.3.0"
+
+[dev-dependencies.hyper-rustls]
+version = "0.25"
+features = ["http2"]
+
+[dev-dependencies.tokio]
+version = "1"
+features = ["full"]
 
 [dev-dependencies.url]
 version = "1.7.2"
