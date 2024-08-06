@@ -29,5 +29,6 @@ source_set("v3") {
     "//zircon/kernel/lib/init",
     "//zircon/kernel/lib/ktrace",
     "//zircon/kernel/lib/root_resource_filter",
+    "//zircon/system/ulib/lazy_init",
   ]
 }

@@ -2,18 +2,19 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/zircon/migrated_targets.gni")
+import("//build/cpp/library_headers.gni")
 
-zx_library("lazy_init") {
-  sdk = "source"
-  sdk_headers = [
+library_headers("headers") {
+  headers = [
     "lib/lazy_init/internal/assert.h",
     "lib/lazy_init/internal/storage.h",
     "lib/lazy_init/lazy_init.h",
     "lib/lazy_init/options.h",
   ]
+}
 
-  sources = []
+group("lazy_init") {
+  public_deps = [ ":headers" ]
 }
 
 group("tests") {
