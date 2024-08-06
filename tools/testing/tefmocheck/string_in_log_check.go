@@ -410,7 +410,14 @@ func fuchsiaLogChecks() []FailureModeCheck {
 			String: "critical to root job killed with",
 			Type:   swarmingOutputType,
 			ExceptBlocks: []*logBlock{
-				{startString: "=== RUN   TestKillCriticalProcess", endString: "--- PASS: TestKillCriticalProcess (3.80s)"},
+				{
+					startString: "=== RUN   TestKillCriticalProcess",
+					endString:   "--- PASS: TestKillCriticalProcess",
+				},
+				{
+					startString: "=== RUN   TestOOMHard",
+					endString:   "--- PASS: TestOOMHard",
+				},
 			},
 		},
 	}
