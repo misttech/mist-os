@@ -769,6 +769,12 @@ void Device::ConnectV2(ConnectV2Request& request, ConnectV2Completer::Sync& comp
   });
 }
 
+void Device::ConnectSysmem(ConnectSysmemRequest& request, ConnectSysmemCompleter::Sync& completer) {
+  PostTask([this, request = std::move(request.sysmem_request())]() mutable {
+    bindings_.AddBinding(loop_dispatcher(), std::move(request), this, fidl::kIgnoreBindingClosure);
+  });
+}
+
 void Device::SetAuxServiceDirectory(SetAuxServiceDirectoryRequest& request,
                                     SetAuxServiceDirectoryCompleter::Sync& completer) {
   PostTask([this, aux_service_directory = std::make_shared<sys::ServiceDirectory>(

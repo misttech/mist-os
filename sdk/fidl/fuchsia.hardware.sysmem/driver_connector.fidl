@@ -36,6 +36,15 @@ closed protocol DriverConnector {
         allocator_request server_end:fuchsia.sysmem2.Allocator;
     });
 
+    /// This one-way message sends in the server end of a
+    /// [`fuchsia.hardware.sysmem/Sysmem`] channel.
+    ///
+    /// `sysmem_request` will be served by the sysmem driver (or the channel
+    /// will close).
+    strict ConnectSysmem(resource struct {
+        sysmem_request server_end:Sysmem;
+    });
+
     /// The sysmem driver won't be able to emit Cobalt metrics until a service
     /// directory with Cobalt available is sent to sysmem via this message.
     strict SetAuxServiceDirectory(resource struct {

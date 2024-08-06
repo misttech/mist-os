@@ -14,6 +14,7 @@ executable("sysmem_connector_executable") {
 
   deps = [
     "//sdk/fidl/fuchsia.feedback:fuchsia.feedback_hlcpp",
+    "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_hlcpp",
     "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_hlcpp",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_hlcpp",
     "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_hlcpp",
@@ -45,6 +46,7 @@ executable("sysmem_connector_test_executable") {
   sources = [ "test/sysmem_connector_test.cc" ]
 
   deps = [
+    "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_hlcpp",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_hlcpp",
     "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_hlcpp",
     "//sdk/lib/sys/cpp",
