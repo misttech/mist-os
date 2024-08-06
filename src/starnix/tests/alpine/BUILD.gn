@@ -10,7 +10,7 @@ group("tests") {
   testonly = true
   if (target_cpu == "x64" && !is_asan) {
     deps = [
-      ":alpine_tests",
+      ":starnix_alpine_tests",
       "//src/starnix/containers/alpine:alpine_package",
     ]
   }
@@ -31,7 +31,7 @@ fuchsia_test_component("alpine_ssh_test") {
   test_type = "starnix"
 }
 
-fuchsia_test_package("alpine_tests") {
+fuchsia_test_package("starnix_alpine_tests") {
   test_components = [ ":alpine_ssh_test" ]
 
   if (target_cpu == "x64") {
