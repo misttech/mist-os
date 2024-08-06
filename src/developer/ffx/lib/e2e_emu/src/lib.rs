@@ -86,6 +86,10 @@ impl IsolatedEmulator {
         this.ffx(&["config", "set", "log.level", "debug"])
             .await
             .context("setting ffx log level")?;
+        // Use the daemon based repo server. This will probably need to become a parameter.
+        this.ffx(&["config", "set", "repository.server.enabled", "true"])
+            .await
+            .context("setting ffx log level")?;
 
         // TODO(slgrady) remove once we have debugged the flake in which the ssh
         // connection is never made
