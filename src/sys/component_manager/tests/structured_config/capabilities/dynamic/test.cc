@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.component.sandbox/cpp/fidl.h>
 #include <fidl/fuchsia.component/cpp/fidl.h>
 #include <fidl/test.config/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
@@ -463,6 +464,101 @@ TEST(Collection, CreateTwoChildren) {
   child_ref2.name("test2");
   ASSERT_NO_FATAL_FAILURE(ConnectAndCheckValues(
       client, std::move(child_ref2), {.my_flag = false, .my_int = 10, .my_transitional = 10}));
+}
+
+void AddToDictionary(
+    const fidl::SyncClient<fuchsia_component_sandbox::CapabilityStore>& capability_store,
+    uint64_t dict_id, uint64_t cap_id, const fuchsia_component_decl::ConfigValue& value,
+    std::string key) {
+  auto data = fidl::Persist(value);
+  capability_store->Import({
+      cap_id,
+      fuchsia_component_sandbox::Capability::WithData(
+          fuchsia_component_sandbox::Data::WithBytes(std::move(data.value()))),
+  });
+  fidl::Result result = capability_store->DictionaryInsert(
+      {dict_id, fuchsia_component_sandbox::DictionaryItem{std::move(key), cap_id}});
+  ASSERT_TRUE(result.is_ok());
+}
+
+TEST(Collection, CreateChildWithDictionary) {
+  zx::result capability_client = component::Connect<fuchsia_component_sandbox::CapabilityStore>();
+  ASSERT_OK(capability_client);
+  fidl::SyncClient capability_store = fidl::SyncClient(std::move(capability_client.value()));
+  uint64_t next_id = 1;
+
+  uint64_t dict_id = next_id++;
+  fidl::Result dict_result = capability_store->DictionaryCreate({dict_id});
+  ASSERT_FALSE(dict_result.is_error());
+
+  // My Flag.
+  ASSERT_NO_FATAL_FAILURE(
+      AddToDictionary(capability_store, dict_id, next_id++,
+                      fuchsia_component_decl::ConfigValue::WithSingle(
+                          fuchsia_component_decl::ConfigSingleValue::WithBool_(false)),
+                      "fuchsia.config.MyFlag"));
+
+  // My Int.
+  ASSERT_NO_FATAL_FAILURE(
+      AddToDictionary(capability_store, dict_id, next_id++,
+                      fuchsia_component_decl::ConfigValue::WithSingle(
+                          fuchsia_component_decl::ConfigSingleValue::WithUint8(10)),
+                      "fuchsia.config.MyInt"));
+
+  // My Transitional.
+  ASSERT_NO_FATAL_FAILURE(
+      AddToDictionary(capability_store, dict_id, next_id++,
+                      fuchsia_component_decl::ConfigValue::WithSingle(
+                          fuchsia_component_decl::ConfigSingleValue::WithUint8(10)),
+                      "fuchsia.config.MyTransitional"));
+
+  auto dict = capability_store->Export({dict_id});
+
+  zx::result client_end = component::Connect<fuchsia_component::Realm>();
+  ASSERT_OK(client_end);
+  fidl::SyncClient client = fidl::SyncClient(std::move(client_end.value()));
+
+  fuchsia_component::CreateChildArgs args = fuchsia_component::CreateChildArgs();
+  args.dictionary(std::move(dict->capability().dictionary()->token()));
+
+  fidl::Result result = client->CreateChild({{
+      .collection = fuchsia_component_decl::CollectionRef().name("collection"),
+      .decl = fuchsia_component_decl::Child()
+                  .name("test")
+                  .url("#meta/child.cm")
+                  .startup(fuchsia_component_decl::StartupMode::kLazy),
+      .args = std::move(args),
+  }});
+  ASSERT_TRUE(result.is_ok(), "%s", result.error_value().FormatDescription().c_str());
+
+  auto exposed_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
+  fuchsia_component_decl::ChildRef child_ref;
+  child_ref.collection("collection");
+  child_ref.name("test");
+  {
+    fidl::Result result =
+        client->OpenExposedDir({{child_ref, std::move(exposed_endpoints.server)}});
+    ASSERT_TRUE(result.is_ok());
+  }
+
+  auto config_endpoints = fidl::Endpoints<test_config::Config>::Create();
+  ASSERT_OK(component::ConnectAt(exposed_endpoints.client, std::move(config_endpoints.server)));
+
+  fidl::SyncClient config_client(std::move(config_endpoints.client));
+  {
+    fidl::Result result = config_client->Get();
+    ASSERT_TRUE(result.is_ok(), "%s", result.error_value().FormatDescription().c_str());
+    config::Config my_config = config::Config::CreateFromVmo(std::move(result->config()));
+    ASSERT_EQ(my_config.my_flag(), false);
+    ASSERT_EQ(my_config.my_int(), 10);
+    ASSERT_EQ(my_config.transitional(), 10);
+  }
+
+  {
+    fidl::Result result =
+        client->DestroyChild(fuchsia_component_decl::ChildRef("test", "collection"));
+    ASSERT_TRUE(result.is_ok(), "%s", result.error_value().FormatDescription().c_str());
+  }
 }
 
 }  // namespace

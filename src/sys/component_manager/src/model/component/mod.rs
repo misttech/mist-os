@@ -537,6 +537,7 @@ impl ComponentInstance {
                 // it exists
                 let router = match value {
                     Capability::Connector(s) => Router::new_ok(s),
+                    Capability::Data(d) => Router::new_ok(d),
                     _ => return Err(AddDynamicChildError::InvalidDictionary),
                 };
 

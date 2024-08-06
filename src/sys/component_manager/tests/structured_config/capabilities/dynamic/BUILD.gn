@@ -13,6 +13,7 @@ executable("bin") {
     ":config_lib",
     ":test.config_cpp",
     "//sdk/fidl/fuchsia.component:fuchsia.component_cpp",
+    "//sdk/fidl/fuchsia.component.sandbox:fuchsia.component.sandbox_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/sys/component/cpp/testing:cpp",
     "//zircon/system/ulib/async:async-cpp",
