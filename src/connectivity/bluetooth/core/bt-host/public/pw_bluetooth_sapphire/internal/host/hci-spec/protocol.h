@@ -27,8 +27,6 @@
 // MutableBufferView::mutable_payload(), or CommandPacket::mutable_payload()
 // instead. Take extra care when accessing flexible array members.
 
-#pragma clang diagnostic ignored "-Wc99-extensions"
-
 namespace bt::hci_spec {
 
 using pw::bluetooth::emboss::ConnectionRole;
@@ -817,6 +815,8 @@ constexpr EventCode kReadRemoteVersionInfoCompleteEventCode = 0x0C;
 // Command Complete Event (v1.1)
 constexpr EventCode kCommandCompleteEventCode = 0x0E;
 
+PW_MODIFY_DIAGNOSTICS_PUSH();
+PW_MODIFY_DIAGNOSTIC_CLANG(ignored, "-Wc99-extensions");
 struct CommandCompleteEventParams {
   CommandCompleteEventParams() = delete;
   BT_DISALLOW_COPY_ASSIGN_AND_MOVE(CommandCompleteEventParams);
@@ -834,6 +834,7 @@ struct CommandCompleteEventParams {
   // parameters associated with that command.
   uint8_t return_parameters[];
 } __attribute__((packed));
+PW_MODIFY_DIAGNOSTICS_POP();
 
 // ===========================
 // Command Status Event (v1.1)
@@ -938,6 +939,8 @@ constexpr EventCode kUserPasskeyNotificationEventCode = 0x3B;
 // LE Meta Event (v4.0) (LE)
 constexpr EventCode kLEMetaEventCode = 0x3E;
 
+PW_MODIFY_DIAGNOSTICS_PUSH();
+PW_MODIFY_DIAGNOSTIC_CLANG(ignored, "-Wc99-extensions");
 struct LEMetaEventParams {
   LEMetaEventParams() = delete;
   BT_DISALLOW_COPY_ASSIGN_AND_MOVE(LEMetaEventParams);
@@ -948,6 +951,7 @@ struct LEMetaEventParams {
   // Beginning of parameters that are specific to the LE subevent.
   uint8_t subevent_parameters[];
 } __attribute__((packed));
+PW_MODIFY_DIAGNOSTICS_POP();
 
 // LE Connection Complete Event (v4.0) (LE)
 constexpr EventCode kLEConnectionCompleteSubeventCode = 0x01;
@@ -1107,6 +1111,8 @@ struct LEDirectedAdvertisingReportData {
   int8_t rssi;
 } __attribute__((packed));
 
+PW_MODIFY_DIAGNOSTICS_PUSH();
+PW_MODIFY_DIAGNOSTIC_CLANG(ignored, "-Wc99-extensions");
 struct LEDirectedAdvertisingReportSubeventParams {
   LEDirectedAdvertisingReportSubeventParams() = delete;
   BT_DISALLOW_COPY_ASSIGN_AND_MOVE(LEDirectedAdvertisingReportSubeventParams);
@@ -1118,6 +1124,7 @@ struct LEDirectedAdvertisingReportSubeventParams {
   // The report array parameters.
   LEDirectedAdvertisingReportData reports[];
 } __attribute__((packed));
+PW_MODIFY_DIAGNOSTICS_POP();
 
 // LE PHY Update Complete Event (v5.0) (LE)
 constexpr EventCode kLEPHYUpdateCompleteSubeventCode = 0x0C;
@@ -1176,6 +1183,8 @@ struct LEPeriodicAdvertisingSyncEstablishedSubeventParams {
 // LE Periodic Advertising Report Event (v5.0) (LE)
 constexpr EventCode kLEPeriodicAdvertisingReportSubeventCode = 0x0F;
 
+PW_MODIFY_DIAGNOSTICS_PUSH();
+PW_MODIFY_DIAGNOSTIC_CLANG(ignored, "-Wc99-extensions");
 struct LEPeriodicAdvertisingReportSubeventParams {
   LEPeriodicAdvertisingReportSubeventParams() = delete;
   BT_DISALLOW_COPY_ASSIGN_AND_MOVE(LEPeriodicAdvertisingReportSubeventParams);
@@ -1206,6 +1215,7 @@ struct LEPeriodicAdvertisingReportSubeventParams {
   // |data_length| octets of data received from a Periodic Advertising packet.
   uint8_t data[];
 } __attribute__((packed));
+PW_MODIFY_DIAGNOSTICS_POP();
 
 // LE Periodic Advertising Sync Lost Event (v5.0) (LE)
 constexpr EventCode kLEPeriodicAdvertisingSyncLostSubeventCode = 0x10;
@@ -1276,6 +1286,8 @@ struct NumberOfCompletedDataBlocksEventData {
   uint16_t num_of_completed_blocks;
 } __attribute__((packed));
 
+PW_MODIFY_DIAGNOSTICS_PUSH();
+PW_MODIFY_DIAGNOSTIC_CLANG(ignored, "-Wc99-extensions");
 struct NumberOfCompletedDataBlocksEventParams {
   NumberOfCompletedDataBlocksEventParams() = delete;
   BT_DISALLOW_COPY_ASSIGN_AND_MOVE(NumberOfCompletedDataBlocksEventParams);
@@ -1284,6 +1296,7 @@ struct NumberOfCompletedDataBlocksEventParams {
   uint8_t number_of_handles;
   NumberOfCompletedDataBlocksEventData data[];
 } __attribute__((packed));
+PW_MODIFY_DIAGNOSTICS_POP();
 
 // ================================================================
 // Authenticated Payload Timeout Expired Event (v4.1) (BR/EDR & LE)
@@ -2183,6 +2196,8 @@ struct LESetPeriodicAdvertisingParametersCommandParams {
 constexpr OpCode kLESetPeriodicAdvertisingData =
     LEControllerCommandOpCode(0x003F);
 
+PW_MODIFY_DIAGNOSTICS_PUSH();
+PW_MODIFY_DIAGNOSTIC_CLANG(ignored, "-Wc99-extensions");
 struct LESetPeriodicAdvertisingDataCommandParams {
   LESetPeriodicAdvertisingDataCommandParams() = delete;
   BT_DISALLOW_COPY_ASSIGN_AND_MOVE(LESetPeriodicAdvertisingDataCommandParams);
@@ -2201,6 +2216,7 @@ struct LESetPeriodicAdvertisingDataCommandParams {
   // Variable length advertising data.
   uint8_t adv_data[];
 } __attribute__((packed));
+PW_MODIFY_DIAGNOSTICS_POP();
 
 // ======================================================
 // LE Set Periodic Advertising Enable Command (v5.0) (LE)
