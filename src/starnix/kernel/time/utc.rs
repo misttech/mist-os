@@ -1,9 +1,7 @@
-// Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
 // Copyright 2023 The Fuchsia Authors
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#[cfg(not(feature = "starnix_lite"))]
 use crate::vdso::vdso_loader::MemoryMappedVvar;
 use fuchsia_runtime::duplicate_utc_clock_handle;
 use fuchsia_zircon::{
@@ -87,7 +85,6 @@ impl UtcClock {
     // both self (the UtcClock) and dest (the MemoryMappedVvar). The fact that there is only one
     // UtcClock instance, which is protected by a mutex, and that there is only one
     // MemoryMappedVvar, guarantees that the vvar is never updated by two concurrent writers.
-    #[cfg(not(feature = "starnix_lite"))]
     pub fn update_utc_clock(&mut self, dest: &MemoryMappedVvar) {
         self.poll_transform();
         dest.update_utc_data_transform(&self.current_transform);
@@ -98,7 +95,6 @@ static UTC_CLOCK: Lazy<Mutex<UtcClock>> = Lazy::new(|| {
     Mutex::new(UtcClock::new(duplicate_utc_clock_handle(zx::Rights::SAME_RIGHTS).unwrap()))
 });
 
-#[cfg(not(feature = "starnix_lite"))]
 pub fn update_utc_clock(dest: &MemoryMappedVvar) {
     (*UTC_CLOCK).lock().update_utc_clock(dest);
 }

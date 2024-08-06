@@ -9,7 +9,6 @@ pub mod registers;
 pub mod signal_handling;
 pub mod syscalls;
 pub mod task;
-#[cfg(not(feature = "starnix_lite"))]
 pub mod vdso;
 
 pub const ARCH_NAME: &'static [u8] = b"x86_64";

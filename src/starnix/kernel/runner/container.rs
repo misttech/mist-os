@@ -15,7 +15,6 @@ use crate::{
 };
 use anyhow::{anyhow, bail, Error};
 use bstr::BString;
-#[cfg(not(feature = "starnix_lite"))]
 use fasync::OnSignals;
 use fidl::endpoints::{ControlHandle, RequestStream};
 use fidl::AsyncChannel;
@@ -23,13 +22,8 @@ use fidl_fuchsia_scheduler::RoleManagerMarker;
 use fuchsia_async::DurationExt;
 use fuchsia_component::client::connect_to_protocol_sync;
 use fuchsia_component::server::ServiceFs;
-#[cfg(not(feature = "starnix_lite"))]
 use fuchsia_zircon::{
     AsHandleRef, Signals, Task as _, {self as zx},
-};
-#[cfg(feature = "starnix_lite")]
-use fuchsia_zircon::{
-    Task as _, {self as zx},
 };
 use futures::channel::oneshot;
 use futures::{FutureExt, StreamExt, TryStreamExt};
@@ -51,7 +45,6 @@ use starnix_core::fs::layeredfs::LayeredFs;
 use starnix_core::fs::overlayfs::OverlayFs;
 use starnix_core::fs::tmpfs::TmpFs;
 use starnix_core::task::{set_thread_role, CurrentTask, ExitStatus, Kernel, Task};
-#[cfg(not(feature = "starnix_lite"))]
 use starnix_core::time::utc::update_utc_clock;
 use starnix_core::vfs::{FileSystemOptions, FsContext, LookupContext, WhatToMount};
 use starnix_kernel_config::Config;
@@ -325,7 +318,6 @@ pub async fn create_component_from_stream(
                     })?;
                 let service_config = ContainerServiceConfig { config, request_stream, receiver };
 
-                #[cfg(not(feature = "starnix_lite"))]
                 container.kernel.kthreads.spawn_future({
                     let vvar = container.kernel.vdso.vvar_writeable.clone();
                     let utc_clock =
