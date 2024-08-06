@@ -10,6 +10,7 @@ if (is_host) {
     edition = "2021"
     sources = [
       "src/config.rs",
+      "src/fletcher64.rs",
       "src/lib.rs",
       "src/process.rs",
       "src/tuntap.rs",
@@ -17,13 +18,18 @@ if (is_host) {
     deps = [
       "//src/developer/ffx/lib/fho:lib",
       "//third_party/rust_crates:anyhow",
+      "//third_party/rust_crates:byteorder",
       "//third_party/rust_crates:cfg-if",
       "//third_party/rust_crates:mockall",
       "//third_party/rust_crates:nix",
       "//third_party/rust_crates:shared_child",
       "//third_party/rust_crates:signal-hook",
+      "//third_party/rust_crates:tracing",
     ]
-    test_deps = [ "//third_party/rust_crates:libc" ]
+    test_deps = [
+      "//third_party/rust_crates:libc",
+      "//third_party/rust_crates:tempfile",
+    ]
   }
 
   group("tests") {
