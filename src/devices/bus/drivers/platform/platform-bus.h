@@ -62,6 +62,9 @@ class PlatformBus : public PlatformBusType,
                                   RegisterSysSuspendCallbackCompleter::Sync& completer) override;
   void AddCompositeNodeSpec(AddCompositeNodeSpecRequestView request, fdf::Arena& arena,
                             AddCompositeNodeSpecCompleter::Sync& completer) override;
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_hardware_platform_bus::PlatformBus> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override;
 
   // SysInfo protocol implementation.
   void GetBoardName(GetBoardNameCompleter::Sync& completer) override;

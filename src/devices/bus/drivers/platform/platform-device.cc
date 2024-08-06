@@ -116,6 +116,13 @@ void RestrictPlatformBus::AddCompositeNodeSpec(AddCompositeNodeSpecRequestView r
   completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
 }
 
+void RestrictPlatformBus::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_hardware_platform_bus::PlatformBus> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {
+  zxlogf(WARNING, "RestrictPlatformBus received unknown method with ordinal: %lu",
+         metadata.method_ordinal);
+}
+
 zx_status_t PlatformDevice::Create(fpbus::Node node, zx_device_t* parent, PlatformBus* bus,
                                    Type type, inspect::ComponentInspector& inspector,
                                    std::unique_ptr<platform_bus::PlatformDevice>* out) {

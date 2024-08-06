@@ -434,6 +434,12 @@ void PlatformBus::AddCompositeNodeSpec(AddCompositeNodeSpecRequestView request, 
   completer.buffer(arena).ReplySuccess();
 }
 
+void PlatformBus::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_hardware_platform_bus::PlatformBus> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {
+  zxlogf(WARNING, "PlatformBus received unknown method with ordinal: %lu", metadata.method_ordinal);
+}
+
 zx::result<PlatformBus::BootItemResult> PlatformBus::GetBootItem(uint32_t type, uint32_t extra) {
   auto result = fidl::WireCall(items_svc_)->Get(type, extra);
   if (!result.ok()) {

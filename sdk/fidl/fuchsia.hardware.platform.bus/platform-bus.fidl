@@ -154,7 +154,7 @@ closed protocol SysSuspend {
 
 @discoverable
 @transport("Driver")
-closed protocol PlatformBus {
+open protocol PlatformBus {
     /// Adds a new platform device node to the bus, using configuration provided
     /// by |node|. Platform device nodes are created in their own separate
     /// devhosts.
