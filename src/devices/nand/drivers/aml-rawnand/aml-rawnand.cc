@@ -415,7 +415,7 @@ zx_status_t AmlRawNand::AmlGetECCCorrections(int ecc_pages, uint32_t nand_page,
 
 // The ECC page descriptors are processed in the order that they are stored in memory. Therefore,
 // DMA is done when the final page has been marked complete.
-zx_status_t AmlRawNand::AmlCheckECCPages(int ecc_pages, int ecc_pagesize) {
+zx_status_t AmlRawNand::AmlCheckECCPages(int ecc_pages) {
   ZX_ASSERT(ecc_pages > 0);
 
   const volatile uint8_t* ecc_status =
@@ -423,8 +423,7 @@ zx_status_t AmlRawNand::AmlCheckECCPages(int ecc_pages, int ecc_pagesize) {
 
   AmlInfoFormat::ecc_sta ecc{.raw_value = *ecc_status};
   for (; ecc.completed == 0; ecc.raw_value = *ecc_status) {
-    // Sleep for the approximate time it takes for a single ECC page to be transferred on the bus.
-    zx::nanosleep(zx::deadline_after(nand_cycle_time_ * ecc_pagesize));
+    zx::nanosleep(zx::deadline_after(polling_timings_.read.interval));
   }
   return ZX_OK;
 }
@@ -639,10 +638,15 @@ zx_status_t AmlRawNand::RawNandReadPageHwecc(uint32_t nand_page, uint8_t* data, 
     AmlCmdN2MPage0();
   }
 
-  // Waiting for the command queue to be empty here does not work. The controller seems to continue
-  // processing ECC after the N2M command is off the queue, so poll the completed bit here to find
-  // out when DMA is really done.
-  if (zx_status_t status = AmlCheckECCPages(ecc_pages, ecc_pagesize); status != ZX_OK) {
+  AmlCmdIdle(0);
+  AmlCmdIdle(0);
+  AmlWaitCmdQueueEmpty(zx::msec(CMD_FINISH_TIMEOUT_MS), polling_timings_.cmd_flush.min,
+                       polling_timings_.cmd_flush.interval);
+
+  // Waiting for the command queue to be empty doesn't guarantee that the read has finished. The
+  // controller seems to continue processing ECC after the N2M command is off the queue, so poll the
+  // completed bit here to find out when DMA is really done.
+  if (zx_status_t status = AmlCheckECCPages(ecc_pages); status != ZX_OK) {
     zxlogf(ERROR, "%s: AmlCheckECCPages failed %d", __func__, status);
     return status;
   }
@@ -848,7 +852,7 @@ zx_status_t AmlRawNand::AmlGetFlashType() {
   chip_delay_ = nand_chip->chip_delay_us;
   nand_timings_ = nand_chip->timings;
   zxlogf(INFO,
-         "NAND %s %s: chip size = %lu(GB), page size = %u, oob size = %u\n"
+         "NAND %s %s: chip size = %lu(MiB), page size = %u, oob size = %u\n"
          "eraseblock size = %u, chip delay (us) = %u\n",
          nand_chip->manufacturer_name, nand_chip->device_name, chipsize_, writesize_, oobsize_,
          erasesize_, chip_delay_);
