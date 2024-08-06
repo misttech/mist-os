@@ -378,8 +378,6 @@ fatfs = { path = "forks/fatfs" }
 fuse3 = { path = "forks/fuse3" }
 hound = { path = "forks/hound" }
 libm = { path = "forks/libm" }
-# FIXME(121001): Revert once pull request is accepted and rolled into a crates.io release.
-nix = { path = "forks/nix" }
 notify = { path = "forks/notify" }
 # FIXME(118248): We can unfork once undefined behavior is resolved.
 prettytable-rs = { path = "forks/prettytable-rs" }

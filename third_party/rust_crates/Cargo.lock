@@ -5185,10 +5185,6 @@ dependencies = [
 ]
 
 [[patch.unused]]
-name = "nix"
-version = "0.26.1"
-
-[[patch.unused]]
 name = "wasi"
 version = "0.10.0+wasi-snapshot-preview1"
 
