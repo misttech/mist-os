@@ -6,6 +6,7 @@ group("lib") {
   deps = [
     "linux_uapi",
     "magma",
+    "rust_netlink",
     "selinux/core",
     "selinux/policy",
     "starnix-uapi",
@@ -23,6 +24,7 @@ group("tests") {
     "selinux:tests",
     "starnix-uapi:tests",
     "syncio:tests",
+    "third_party:tests",
     "usercopy:tests",
   ]
 }

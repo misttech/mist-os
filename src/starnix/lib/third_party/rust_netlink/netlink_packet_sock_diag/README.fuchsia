@@ -1,0 +1,10 @@
+Name: netlink-packet-sock-diag
+License File: LICENSE-MIT
+URL: https://github.com/rust-netlink/netlink-packet-sock-diag
+
+This crate provides for serialization/deserialization of NETLINK SOCK DIAG
+messages. It is used by Starnix to serve the NETLINK protocol.
+
+This crate forks upstream version 0.4.2. There are several divergences from
+upstream (See the git history for the complete list). At this point, there is
+no intention of re-merging with upstream.
