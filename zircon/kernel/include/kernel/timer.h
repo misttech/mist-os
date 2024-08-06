@@ -125,6 +125,33 @@ class Timer : public fbl::DoublyLinkedListable<Timer*, fbl::NodeOptions::AllowRe
 
   // The timeline this timer is set on.
   const ReferenceTimeline timeline_;
+
+  // Note that we need to manually name the timer_lock because it is one of and
+  // extremely small number of "wrapped" locks in the system, and cannot easily
+  // use lockdep in order to generate its name.
+  //
+  // The vast majority of locks in the system are directly instrumented using
+  // lockdep. This causes the instance of the actual lock to become a member of a
+  // generated lock dep class, which is used to access the underlying lock.  In
+  // these cases, lockdep itself controls the construction sequencing of the lock,
+  // allowing it to configure the internal lock's metadata immediately after
+  // construction has completed.
+  //
+  // Wrapped locks, OTOH, are a bit different.  The lock instance is declared
+  // outside of the lockdep generated class, which holds a reference to the lock
+  // instead of encapsulating the lock itself.  This leads to a global ctor race:
+  // Who is constructed first, the lock itself, or the lock wrapper who holds a
+  // pointer/reference to the lock?
+  //
+  // In situations like this, it is not safe for lock wrapper to be interacting
+  // with the lock whose reference it holds, since that lock may not have been
+  // constructed yet.
+  //
+  // So instead, we simply manually name the lock, and the lockdep wrapper never
+  // makes any attempt to name the lock because of the ordering issues.
+  //
+  static MonitoredSpinLock timer_lock __CPU_ALIGN_EXCLUSIVE;
+  DECLARE_SINGLETON_LOCK_WRAPPER(TimerLock, timer_lock);
 };
 
 // Preemption Timers
@@ -171,7 +198,7 @@ class TimerQueue {
   // 3. The preemption timer deadline.
   //
   // This can only be called when interrupts are disabled.
-  void UpdatePlatformTimerLocked();
+  void UpdatePlatformTimerLocked() TA_REQ(Timer::TimerLock::Get());
 
  private:
   // Timers can directly call Insert and Cancel.
@@ -220,13 +247,13 @@ class TimerQueue {
   // Once it's done, the scheduled time of the timer at the front of the queue is returned.
   template <typename TimestampType>
   static void TickInternal(TimestampType now, cpu_num_t cpu,
-                           fbl::DoublyLinkedList<Timer*>& timer_list);
+                           fbl::DoublyLinkedList<Timer*>* timer_list);
 
   // Timers on the monotonic timeline are placed in this list.
-  fbl::DoublyLinkedList<Timer*> monotonic_timer_list_;
+  fbl::DoublyLinkedList<Timer*> monotonic_timer_list_ TA_GUARDED(Timer::TimerLock::Get());
 
   // Timers on the boot timeline are placed in this list.
-  fbl::DoublyLinkedList<Timer*> boot_timer_list_;
+  fbl::DoublyLinkedList<Timer*> boot_timer_list_ TA_GUARDED(Timer::TimerLock::Get());
 
   // This TimerQueue's preemption deadline. ZX_TIME_INFINITE means not set.
   zx_time_t preempt_timer_deadline_ = ZX_TIME_INFINITE;
