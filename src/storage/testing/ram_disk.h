@@ -27,19 +27,14 @@ class RamDisk {
   struct Options {
     // If set, the ram-disk will report this type guid using the partition protocol.
     std::optional<std::array<uint8_t, GPT_GUID_LEN>> type_guid;
-
-    // If true, use the DFv2 driver.
-    bool use_v2 = false;
   };
-  static constexpr Options kDefaultOptions{.use_v2 = false};
 
   // Creates a ram-disk with |block_count| blocks of |block_size| bytes.
   static zx::result<RamDisk> Create(int block_size, uint64_t block_count,
-                                    const Options& options = kDefaultOptions);
+                                    const Options& options = Options{});
 
   // Creates a ram-disk with the given VMO.  If block_size is zero, a default block size is used.
-  static zx::result<RamDisk> CreateWithVmo(zx::vmo vmo, uint64_t block_size = 0,
-                                           const Options& options = kDefaultOptions);
+  static zx::result<RamDisk> CreateWithVmo(zx::vmo vmo, uint64_t block_size = 0);
 
   RamDisk() = default;
   RamDisk(RamDisk&& other) noexcept : client_(other.client_) { other.client_ = nullptr; }

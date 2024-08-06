@@ -17,7 +17,6 @@
 #include <lib/fdio/directory.h>
 #include <lib/fdio/fd.h>
 #include <lib/fdio/fdio.h>
-#include <lib/fdio/namespace.h>
 #include <lib/fdio/watcher.h>
 #include <lib/fit/defer.h>
 #include <lib/zbi-format/partition.h>
@@ -133,23 +132,8 @@ struct ramdisk_client {
       return volume_interface.status_value();
     fidl::ClientEnd<fuchsia_hardware_block::Block> block_interface(volume_interface->TakeChannel());
 
-    // Bind the outgoing directory to the namespace.
-    static std::atomic<int> counter;
-    // This deliberately binds to the top-level because there is/was watcher code that only worked
-    // at the top-level of the local namespace (opening intermediate local directories is not
-    // supported).
-    std::string bind_path = "/ramdisk-" + std::to_string(counter++);
-    fdio_ns_t* ns;
-    if (zx_status_t status = fdio_ns_get_installed(&ns); status != ZX_OK)
-      return status;
-    if (zx_status_t status =
-            fdio_ns_bind(ns, bind_path.c_str(), outgoing_directory.TakeHandle().release());
-        status != ZX_OK)
-      return status;
-    fbl::String ram_disk_path = bind_path + "/svc/fuchsia.hardware.block.volume.Volume";
     *out = std::unique_ptr<ramdisk_client>(new ramdisk_client(
-        std::move(bind_path), std::move(ram_disk_path), *std::move(ramdisk_interface),
-        std::move(block_interface), std::move(lifeline)));
+        *std::move(ramdisk_interface), std::move(block_interface), std::move(lifeline)));
     return ZX_OK;
   }
 
@@ -205,13 +189,6 @@ struct ramdisk_client {
       }
     }
 
-    if (!bind_path_.empty()) {
-      fdio_ns_t* ns;
-      if (fdio_ns_get_installed(&ns) == ZX_OK)
-        fdio_ns_unbind(ns, bind_path_.c_str());
-      bind_path_.clear();
-    }
-
     block_interface_.reset();
     return ZX_OK;
   }
@@ -262,15 +239,12 @@ struct ramdisk_client {
         block_interface_(std::move(block_interface)),
         block_controller_(std::move(block_controller)) {}
 
-  ramdisk_client(std::string bind_path, fbl::String path,
-                 fidl::ClientEnd<fuchsia_hardware_ramdisk::Ramdisk> ramdisk_interface,
+  ramdisk_client(fidl::ClientEnd<fuchsia_hardware_ramdisk::Ramdisk> ramdisk_interface,
                  fidl::ClientEnd<fuchsia_hardware_block::Block> block_interface,
                  zx::eventpair lifeline)
-      : path_(std::move(path)),
-        ramdisk_interface_(std::move(ramdisk_interface)),
+      : ramdisk_interface_(std::move(ramdisk_interface)),
         block_interface_(std::move(block_interface)),
-        lifeline_(std::move(lifeline)),
-        bind_path_(std::move(bind_path)) {}
+        lifeline_(std::move(lifeline)) {}
 
   static zx_status_t DestroyByHandle(fidl::ClientEnd<fuchsia_device::Controller>& ramdisk) {
     const fidl::WireResult result = fidl::WireCall(ramdisk)->ScheduleUnbind();
@@ -296,7 +270,6 @@ struct ramdisk_client {
 
   // v2 only:
   zx::eventpair lifeline_;
-  std::string bind_path_;
 };
 
 static zx::result<fidl::ClientEnd<fuchsia_hardware_ramdisk::RamdiskController>> open_ramctl(
@@ -548,7 +521,7 @@ zx_status_t ramdisk_create_with_options(const ramdisk_options* options, ramdisk_
       memcpy(&guid.value.data_, options->type_guid, 16);
       fidl_options.type_guid(guid);
     }
-    if (vmo.is_valid())
+    if (options->vmo)
       fidl_options.vmo(std::move(vmo));
     const fidl::WireResult result = fidl::WireCall(*controller)->Create(fidl_options.Build());
     if (!result.ok())

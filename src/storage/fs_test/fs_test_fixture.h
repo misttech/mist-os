@@ -30,7 +30,7 @@ class BaseFilesystemTest : public testing::Test {
   explicit BaseFilesystemTest(const TestFilesystemOptions& options)
       : fs_([&options]() {
           zx::result result = TestFilesystem::Create(options);
-          ZX_ASSERT_MSG(result.is_ok(), " %s", result.status_string());
+          ZX_ASSERT_MSG(result.is_ok(), "%s", result.status_string());
           return std::move(result.value());
         }()) {}
   ~BaseFilesystemTest() override;
