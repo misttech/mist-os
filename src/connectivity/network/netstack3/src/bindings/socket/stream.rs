@@ -12,7 +12,7 @@ use std::time::Duration;
 
 use const_unwrap::const_unwrap_option;
 use explicit::ResultExt as _;
-use fidl::endpoints::{ClientEnd, RequestStream as _};
+use fidl::endpoints::{ClientEnd, DiscoverableProtocolMarker as _, RequestStream as _};
 use fidl::{AsHandleRef as _, HandleBased as _};
 use fuchsia_zircon::{self as zx, Peered as _};
 use futures::future::FusedFuture as _;
@@ -1098,7 +1098,7 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
             }
             fposix_socket::StreamSocketRequest::Query { responder } => {
                 responder
-                    .send(fposix_socket::STREAM_SOCKET_PROTOCOL_NAME.as_bytes())
+                    .send(fposix_socket::StreamSocketMarker::PROTOCOL_NAME.as_bytes())
                     .unwrap_or_log("failed to respond");
             }
             fposix_socket::StreamSocketRequest::SetReuseAddress { value, responder } => {

@@ -18,7 +18,7 @@ use {
 
 use derivative::Derivative;
 use explicit::ResultExt as _;
-use fidl::endpoints::RequestStream as _;
+use fidl::endpoints::{DiscoverableProtocolMarker as _, RequestStream as _};
 use fuchsia_async as fasync;
 use fuchsia_zircon::prelude::HandleBased as _;
 use fuchsia_zircon::{self as zx, Peered as _};
@@ -1317,7 +1317,7 @@ where
             }
             Request::Query { responder } => {
                 responder
-                    .send(fposix_socket::SYNCHRONOUS_DATAGRAM_SOCKET_PROTOCOL_NAME.as_bytes())
+                    .send(fposix_socket::SynchronousDatagramSocketMarker::PROTOCOL_NAME.as_bytes())
                     .unwrap_or_log("failed to respond");
             }
             Request::GetSockName { responder } => {

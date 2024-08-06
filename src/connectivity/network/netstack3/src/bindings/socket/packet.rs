@@ -10,7 +10,7 @@ use {
     fidl_fuchsia_posix_socket_packet as fppacket,
 };
 
-use fidl::endpoints::{ProtocolMarker as _, RequestStream as _};
+use fidl::endpoints::{DiscoverableProtocolMarker as _, ProtocolMarker as _, RequestStream as _};
 use fidl::Peered as _;
 use fuchsia_zircon::{self as zx, HandleBased as _};
 use futures::StreamExt as _;
@@ -445,7 +445,7 @@ impl<'a> RequestHandler<'a> {
             }
             fppacket::SocketRequest::Query { responder } => {
                 responder
-                    .send(fppacket::SOCKET_PROTOCOL_NAME.as_bytes())
+                    .send(fppacket::SocketMarker::PROTOCOL_NAME.as_bytes())
                     .unwrap_or_log("failed to respond");
             }
             fppacket::SocketRequest::SetReuseAddress { value: _, responder } => {
