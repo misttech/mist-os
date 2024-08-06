@@ -570,6 +570,9 @@ mod test {
         // the tests, this must be changed so that each data buffer is declared
         // in each individual test (either that or just a re-design of the
         // library context).
+        // TODO(357638987): Remove this allow once the Rust compiler rolls and
+        // it recognizes the unsafe as unnecessary.
+        #[allow(unused_unsafe)]
         let raw = unsafe { std::ptr::addr_of_mut!(SCRATCH) as *mut u8 };
         let mut ctx: *const LibContext = std::ptr::null_mut();
         unsafe {
