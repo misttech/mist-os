@@ -163,10 +163,6 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
   // |controller| must outlive this and |proxy|.
   Client(Controller* controller, ClientProxy* proxy, ClientPriority priority, ClientId client_id);
 
-  // This is used for testing
-  Client(Controller* controller, ClientProxy* proxy, ClientPriority priority, ClientId client_id,
-         fidl::ServerEnd<fuchsia_hardware_display::Coordinator> server_end);
-
   Client(const Client&) = delete;
   Client& operator=(const Client&) = delete;
 
@@ -175,8 +171,9 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
   // Binds the `Client` to the server-side channel of the `Coordinator` protocol.
   //
   // Must be called exactly once in production code.
-  fidl::ServerBindingRef<fuchsia_hardware_display::Coordinator> Init(
-      fidl::ServerEnd<fuchsia_hardware_display::Coordinator> server_end);
+  fidl::ServerBindingRef<fuchsia_hardware_display::Coordinator> Bind(
+      fidl::ServerEnd<fuchsia_hardware_display::Coordinator> server_end,
+      fidl::OnUnboundFn<Client> unbound_callback);
 
   void OnDisplaysChanged(cpp20::span<const DisplayId> added_display_ids,
                          cpp20::span<const DisplayId> removed_display_ids);
@@ -306,7 +303,7 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
   ClientProxy* const proxy_;
   const ClientPriority priority_;
   const ClientId id_;
-  bool running_;
+  bool running_ = false;
 
   Image::Map images_;
   CaptureImage::Map capture_images_;
@@ -376,13 +373,12 @@ class ClientProxy {
   ClientProxy(Controller* controller, ClientPriority client_priority, ClientId client_id,
               fit::function<void()> on_client_dead);
 
-  // This is used for testing
-  ClientProxy(Controller* controller, ClientPriority client_priority, ClientId client_id,
-              fidl::ServerEnd<fuchsia_hardware_display::Coordinator> server_end);
-
   ~ClientProxy();
+
   zx_status_t Init(inspect::Node* parent_node,
                    fidl::ServerEnd<fuchsia_hardware_display::Coordinator> server_end);
+
+  zx::result<> InitForTesting(fidl::ServerEnd<fuchsia_hardware_display::Coordinator> server_end);
 
   // Schedule a task on the controller loop to close this ClientProxy and
   // have it be freed.

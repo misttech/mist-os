@@ -1496,22 +1496,15 @@ zx_koid_t GetKoid(zx_handle_t handle) {
   return status == ZX_OK ? info.koid : ZX_KOID_INVALID;
 }
 
-fidl::ServerBindingRef<fuchsia_hardware_display::Coordinator> Client::Init(
-    fidl::ServerEnd<fuchsia_hardware_display::Coordinator> server_end) {
+fidl::ServerBindingRef<fuchsia_hardware_display::Coordinator> Client::Bind(
+    fidl::ServerEnd<fuchsia_hardware_display::Coordinator> server_end,
+    fidl::OnUnboundFn<Client> unbound_callback) {
+  ZX_DEBUG_ASSERT(!running_);
   running_ = true;
 
-  fidl::OnUnboundFn<Client> cb = [](Client* client, fidl::UnbindInfo info,
-                                    fidl::ServerEnd<fuchsia_hardware_display::Coordinator> ch) {
-    sync_completion_signal(client->fidl_unbound());
-    // Make sure we TearDown() so that no further tasks are scheduled on the controller loop.
-    client->TearDown();
-
-    // The client has died so tell the Proxy which will free the classes.
-    client->proxy_->OnClientDead();
-  };
-
-  auto binding = fidl::BindServer(controller_->client_dispatcher()->async_dispatcher(),
-                                  std::move(server_end), this, std::move(cb));
+  fidl::ServerBindingRef<fuchsia_hardware_display::Coordinator> binding =
+      fidl::BindServer(controller_->client_dispatcher()->async_dispatcher(), std::move(server_end),
+                       this, std::move(unbound_callback));
   // Keep a copy of fidl binding so we can safely unbind from it during shutdown
   binding_state_.SetBound(binding);
 
@@ -1526,19 +1519,6 @@ Client::Client(Controller* controller, ClientProxy* proxy, ClientPriority priori
       id_(client_id),
       fences_(controller->client_dispatcher()->async_dispatcher(),
               fit::bind_member<&Client::OnFenceFired>(this)) {
-  ZX_DEBUG_ASSERT(client_id != kInvalidClientId);
-}
-
-Client::Client(Controller* controller, ClientProxy* proxy, ClientPriority priority,
-               ClientId client_id, fidl::ServerEnd<fhd::Coordinator> server_end)
-    : controller_(controller),
-      proxy_(proxy),
-      priority_(priority),
-      id_(client_id),
-      running_(true),
-      fences_(controller->client_dispatcher()->async_dispatcher(),
-              fit::bind_member<&Client::OnFenceFired>(this)),
-      binding_state_(std::move(server_end)) {
   ZX_DEBUG_ASSERT(client_id != kInvalidClientId);
 }
 
@@ -1793,9 +1773,33 @@ zx_status_t ClientProxy::Init(inspect::Node* parent_node,
 
   unsigned seed = static_cast<unsigned>(zx::clock::get_monotonic().get());
   initial_cookie_ = VsyncAckCookie(rand_r(&seed));
+
+  fidl::OnUnboundFn<Client> unbound_callback =
+      [this](Client* client, fidl::UnbindInfo info,
+             fidl::ServerEnd<fuchsia_hardware_display::Coordinator> ch) {
+        sync_completion_signal(client->fidl_unbound());
+        // Make sure we TearDown() so that no further tasks are scheduled on the controller loop.
+        client->TearDown();
+
+        // The client has died so tell the Proxy which will free the classes.
+        OnClientDead();
+      };
+
   [[maybe_unused]] fidl::ServerBindingRef<fuchsia_hardware_display::Coordinator> binding =
-      handler_.Init(std::move(server_end));
+      handler_.Bind(std::move(server_end), std::move(unbound_callback));
   return ZX_OK;
+}
+
+zx::result<> ClientProxy::InitForTesting(
+    fidl::ServerEnd<fuchsia_hardware_display::Coordinator> server_end) {
+  // ClientProxy created by tests may not have a full-fledged display engine
+  // associated. The production client teardown logic doesn't work here
+  // so we replace it with a no-op unbound callback instead.
+  fidl::OnUnboundFn<Client> unbound_callback =
+      [](Client*, fidl::UnbindInfo, fidl::ServerEnd<fuchsia_hardware_display::Coordinator>) {};
+  [[maybe_unused]] fidl::ServerBindingRef<fuchsia_hardware_display::Coordinator> binding =
+      handler_.Bind(std::move(server_end), std::move(unbound_callback));
+  return zx::ok();
 }
 
 ClientProxy::ClientProxy(Controller* controller, ClientPriority client_priority, ClientId client_id,
@@ -1803,11 +1807,6 @@ ClientProxy::ClientProxy(Controller* controller, ClientPriority client_priority,
     : controller_(controller),
       handler_(controller_, this, client_priority, client_id),
       on_client_dead_(std::move(on_client_dead)) {}
-
-ClientProxy::ClientProxy(Controller* controller, ClientPriority client_priority, ClientId client_id,
-                         fidl::ServerEnd<fhd::Coordinator> server_end)
-    : controller_(controller),
-      handler_(controller_, this, client_priority, client_id, std::move(server_end)) {}
 
 ClientProxy::~ClientProxy() {}
 
