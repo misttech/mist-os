@@ -1152,9 +1152,7 @@ void Client::SetOwnership(bool is_owner) {
   ZX_DEBUG_ASSERT(controller_->IsRunningOnClientDispatcher());
   is_owner_ = is_owner;
 
-  fidl::Status result = binding_state_.SendEvents([&](auto&& endpoint) {
-    return fidl::WireSendEvent(endpoint)->OnClientOwnershipChange(is_owner);
-  });
+  fidl::Status result = fidl::WireSendEvent(*binding_)->OnClientOwnershipChange(is_owner);
   if (!result.ok()) {
     zxlogf(ERROR, "Error writing remove message: %s", result.FormatDescription().c_str());
   }
@@ -1305,11 +1303,9 @@ void Client::OnDisplaysChanged(cpp20::span<const DisplayId> added_display_ids,
   }
 
   if (!coded_configs.empty() || !fidl_removed_display_ids.empty()) {
-    fidl::Status result = binding_state_.SendEvents([&](auto&& endpoint) {
-      return fidl::WireSendEvent(endpoint)->OnDisplaysChanged(
-          fidl::VectorView<fhd::wire::Info>::FromExternal(coded_configs),
-          fidl::VectorView<fhdt::wire::DisplayId>::FromExternal(fidl_removed_display_ids));
-    });
+    fidl::Status result = fidl::WireSendEvent(*binding_)->OnDisplaysChanged(
+        fidl::VectorView<fhd::wire::Info>::FromExternal(coded_configs),
+        fidl::VectorView<fhdt::wire::DisplayId>::FromExternal(fidl_removed_display_ids));
     if (!result.ok()) {
       zxlogf(ERROR, "Error writing remove message: %s", result.FormatDescription().c_str());
     }
@@ -1502,13 +1498,10 @@ fidl::ServerBindingRef<fuchsia_hardware_display::Coordinator> Client::Bind(
   ZX_DEBUG_ASSERT(!running_);
   running_ = true;
 
-  fidl::ServerBindingRef<fuchsia_hardware_display::Coordinator> binding =
-      fidl::BindServer(controller_->client_dispatcher()->async_dispatcher(), std::move(server_end),
-                       this, std::move(unbound_callback));
   // Keep a copy of fidl binding so we can safely unbind from it during shutdown
-  binding_state_.SetBound(binding);
-
-  return binding;
+  binding_ = fidl::BindServer(controller_->client_dispatcher()->async_dispatcher(),
+                              std::move(server_end), this, std::move(unbound_callback));
+  return *binding_;
 }
 
 Client::Client(Controller* controller, ClientProxy* proxy, ClientPriority priority,
@@ -1695,12 +1688,11 @@ zx_status_t ClientProxy::OnDisplayVsync(DisplayId display_id, zx_time_t timestam
   while (!buffered_vsync_messages_.empty()) {
     VsyncMessageData vsync_message_data = buffered_vsync_messages_.front();
     buffered_vsync_messages_.pop();
-    event_sending_result = handler_.binding_state().SendEvents([&](auto&& endpoint) {
-      return fidl::WireSendEvent(endpoint)->OnVsync(
-          ToFidlDisplayId(vsync_message_data.display_id), vsync_message_data.timestamp,
-          ToFidlConfigStamp(vsync_message_data.config_stamp),
-          ToFidlVsyncAckCookieValue(kInvalidVsyncAckCookie));
-    });
+    event_sending_result =
+        fidl::WireSendEvent(handler_.binding())
+            ->OnVsync(ToFidlDisplayId(vsync_message_data.display_id), vsync_message_data.timestamp,
+                      ToFidlConfigStamp(vsync_message_data.config_stamp),
+                      ToFidlVsyncAckCookieValue(kInvalidVsyncAckCookie));
     if (!event_sending_result.ok()) {
       zxlogf(ERROR, "Failed to send all buffered vsync messages: %s\n",
              event_sending_result.FormatDescription().c_str());
@@ -1710,11 +1702,10 @@ zx_status_t ClientProxy::OnDisplayVsync(DisplayId display_id, zx_time_t timestam
   }
 
   // Send the latest vsync event
-  event_sending_result = handler_.binding_state().SendEvents([&](auto&& endpoint) {
-    return fidl::WireSendEvent(endpoint)->OnVsync(ToFidlDisplayId(display_id), timestamp,
-                                                  ToFidlConfigStamp(client_stamp),
-                                                  ToFidlVsyncAckCookieValue(vsync_ack_cookie));
-  });
+  event_sending_result =
+      fidl::WireSendEvent(handler_.binding())
+          ->OnVsync(ToFidlDisplayId(display_id), timestamp, ToFidlConfigStamp(client_stamp),
+                    ToFidlVsyncAckCookieValue(vsync_ack_cookie));
   if (!event_sending_result.ok()) {
     return event_sending_result.status();
   }

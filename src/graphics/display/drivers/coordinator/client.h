@@ -97,63 +97,6 @@ class DisplayConfig : public IdMappable<std::unique_ptr<DisplayConfig>, DisplayI
   inspect::BoolProperty pending_apply_layer_change_property_;
 };
 
-// Helper class for sending events using the same API, regardless if |Client| is
-// bound to a FIDL connection. This object either holds a binding reference or a
-// |ServerEnd| that owns the channel, both of which allows sending events
-// without unsafe channel borrowing.
-class DisplayControllerBindingState {
-  using Protocol = fuchsia_hardware_display::Coordinator;
-
- public:
-  // Constructs an invalid binding state. The user must populate it with an
-  // active binding reference or event sender before events could be sent.
-  DisplayControllerBindingState() = default;
-
-  explicit DisplayControllerBindingState(fidl::ServerEnd<Protocol> server_end)
-      : binding_state_(std::move(server_end)) {}
-
-  // Invokes |fn| with an polymorphic object that may be used to send events
-  // in |Protocol|.
-  //
-  // |fn| must be a templated lambda that calls
-  // |fidl::WireSendEvent(arg)->OnSomeEvent| to send |OnSomeEvent| event, and
-  // returns a |fidl::Status|.
-  template <typename EventSenderConsumer>
-  fidl::Status SendEvents(EventSenderConsumer&& fn) {
-    return std::visit(
-        [&](auto&& arg) -> fidl::Status {
-          using T = std::decay_t<decltype(arg)>;
-          if constexpr (std::is_same_v<T, fidl::ServerBindingRef<Protocol>>) {
-            return fn(arg);
-          }
-          if constexpr (std::is_same_v<T, fidl::ServerEnd<Protocol>>) {
-            return fn(arg);
-          }
-          ZX_PANIC("Invalid display controller binding state");
-        },
-        binding_state_);
-  }
-
-  // Sets this object into the bound state, i.e. the server is handling FIDL
-  // messages, and the connect may be managed through |binding|.
-  void SetBound(fidl::ServerBindingRef<Protocol> binding) { binding_state_ = std::move(binding); }
-
-  // If the object is in the bound state, schedules it to be unbound.
-  void Unbind() {
-    if (auto ref = std::get_if<fidl::ServerBindingRef<Protocol>>(&binding_state_)) {
-      // Note that |binding_state_| will remain in the
-      // |fidl::ServerBindingRef<Protocol>| variant, and future attempts to
-      // send events will fail at runtime. This should be okay since the client
-      // is shutting down when unbinding happens.
-      ref->Unbind();
-    }
-  }
-
- private:
-  std::variant<std::monostate, fidl::ServerBindingRef<Protocol>, fidl::ServerEnd<Protocol>>
-      binding_state_;
-};
-
 // Manages the state associated with a display coordinator client connection.
 //
 // This class is not thread-safe. After initialization, all methods must be
@@ -196,9 +139,8 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
   // Test helpers
   size_t TEST_imported_images_count() const { return images_.size(); }
 
-  void CancelFidlBind() { binding_state_.Unbind(); }
-
-  DisplayControllerBindingState& binding_state() { return binding_state_; }
+  // Must be called after `Bind()` / `BindForTesting()`.
+  fidl::ServerBindingRef<fuchsia_hardware_display::Coordinator>& binding() { return *binding_; }
 
   // Used for testing
   sync_completion_t* fidl_unbound() { return &fidl_unbound_; }
@@ -342,9 +284,7 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
   bool CheckConfig(fuchsia_hardware_display_types::wire::ConfigResult* res,
                    std::vector<fuchsia_hardware_display::wire::ClientCompositionOp>* ops);
 
-  // The state of the FIDL binding. See comments on
-  // |DisplayControllerBindingState|.
-  DisplayControllerBindingState binding_state_;
+  std::optional<fidl::ServerBindingRef<fuchsia_hardware_display::Coordinator>> binding_;
 
   // Capture related book keeping
   EventId capture_fence_id_ = kInvalidEventId;
