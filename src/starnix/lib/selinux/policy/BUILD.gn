@@ -102,6 +102,7 @@ if (is_host) {
   }
 
   testdata_composite_policies = [
+    "bounded_transition",
     "class_defaults",
     "minimal",
     "range_transition",

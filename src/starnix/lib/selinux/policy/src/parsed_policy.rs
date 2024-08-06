@@ -793,6 +793,9 @@ impl<PS: ParseStrategy> Validate for ParsedPolicy<PS> {
             }
         }
 
+        // To-do comments for cross-policy validations yet to be implemented go here.
+        // TODO(b/356569876): Determine which "bounds" should be verified for correctness here.
+
         Ok(())
     }
 }

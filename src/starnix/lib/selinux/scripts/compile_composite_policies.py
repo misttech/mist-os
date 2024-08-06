@@ -35,6 +35,13 @@ _COMPOSITE_POLICY_PATHS = (
     (
         (
             "base_policy.conf",
+            "new_file/bounded_transition_policy.conf",
+        ),
+        "bounded_transition_policy.pp",
+    ),
+    (
+        (
+            "base_policy.conf",
             "new_file/minimal_policy.conf",
         ),
         "minimal_policy.pp",

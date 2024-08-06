@@ -450,14 +450,7 @@ pub fn get_procattr(
 ) -> Result<Vec<u8>, Errno> {
     check_if_selinux_else(
         current_task,
-        |security_server| {
-            selinux_hooks::get_procattr(
-                security_server,
-                get_current_sid(&current_task),
-                &target.read().security_state.attrs,
-                attr,
-            )
-        },
+        |security_server| selinux_hooks::get_procattr(security_server, current_task, target, attr),
         // If SELinux is disabled then there are no values to return.
         || {
             if attr == ProcAttr::Current {
@@ -478,16 +471,7 @@ pub fn set_procattr(
 ) -> Result<(), Errno> {
     check_if_selinux_else(
         current_task,
-        |security_server| {
-            let mut task_state = current_task.write();
-            selinux_hooks::set_procattr(
-                security_server,
-                task_state.security_state.attrs.current_sid,
-                &mut task_state.security_state.attrs,
-                attr,
-                context,
-            )
-        },
+        |security_server| selinux_hooks::set_procattr(security_server, current_task, attr, context),
         // If SELinux is disabled then no writes are accepted.
         || error!(EINVAL),
     )

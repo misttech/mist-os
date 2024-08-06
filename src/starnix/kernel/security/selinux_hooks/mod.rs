@@ -5,10 +5,8 @@
 pub(super) mod fs;
 
 use super::{FsNodeSecurityXattr, FsNodeState, ProcAttr, ResolvedElfState};
-
-use crate::task::CurrentTask;
+use crate::task::{CurrentTask, Task};
 use crate::vfs::{FsNode, FsNodeHandle, FsStr, FsString, NamespaceNode, ValueOrSize, XattrOp};
-
 use linux_uapi::XATTR_NAME_SELINUX;
 use selinux::permission_check::PermissionCheck;
 use selinux::security_server::SecurityServer;
@@ -325,19 +323,20 @@ pub(super) fn fs_node_setsecurity(
 /// `source` describes the calling task, `target` the state of the task for which to return the attribute.
 pub fn get_procattr(
     security_server: &SecurityServer,
-    _source: SecurityId,
-    target: &TaskAttrs,
+    _current_task: &CurrentTask,
+    task: &Task,
     attr: ProcAttr,
 ) -> Result<Vec<u8>, Errno> {
+    let task_attrs = &task.read().security_state.attrs;
     // TODO(b/322849067): Validate that the `source` has the required access.
 
     let sid = match attr {
-        ProcAttr::Current => Some(target.current_sid),
-        ProcAttr::Exec => target.exec_sid,
-        ProcAttr::FsCreate => target.fscreate_sid,
-        ProcAttr::KeyCreate => target.keycreate_sid,
-        ProcAttr::Previous => Some(target.previous_sid),
-        ProcAttr::SockCreate => target.sockcreate_sid,
+        ProcAttr::Current => Some(task_attrs.current_sid),
+        ProcAttr::Exec => task_attrs.exec_sid,
+        ProcAttr::FsCreate => task_attrs.fscreate_sid,
+        ProcAttr::KeyCreate => task_attrs.keycreate_sid,
+        ProcAttr::Previous => Some(task_attrs.previous_sid),
+        ProcAttr::SockCreate => task_attrs.sockcreate_sid,
     };
 
     // Convert it to a Security Context string.
@@ -347,8 +346,7 @@ pub fn get_procattr(
 /// Sets the Security Context associated with the `attr` entry in the task security state.
 pub fn set_procattr(
     security_server: &Arc<SecurityServer>,
-    source: SecurityId,
-    target: &mut TaskAttrs,
+    current_task: &CurrentTask,
     attr: ProcAttr,
     context: &[u8],
 ) -> Result<(), Errno> {
@@ -360,39 +358,67 @@ pub fn set_procattr(
     };
 
     let permission_check = security_server.as_permission_check();
+    let current_sid = current_task.read().security_state.attrs.current_sid;
     match attr {
         ProcAttr::Current => {
-            check_self_permissions(&permission_check, source, &[ProcessPermission::SetCurrent])?;
+            check_self_permissions(
+                &permission_check,
+                current_sid,
+                &[ProcessPermission::SetCurrent],
+            )?;
 
             // Permission to dynamically transition to the new Context is also required.
             let new_sid = sid.ok_or_else(|| errno!(EINVAL))?;
             check_permissions(
                 &permission_check,
-                target.current_sid,
+                current_sid,
                 new_sid,
                 &[ProcessPermission::DynTransition],
             )?;
 
-            target.current_sid = new_sid
+            if current_task.thread_group.read().tasks_count() > 1 {
+                // In multi-threaded programs dynamic transitions may only be used to down-scope
+                // the capabilities available to the task. This is verified by requiring an explicit
+                // "typebounds" relationship between the current and target domains, indicating that
+                // the constraint on permissions of the bounded type has been verified by the policy
+                // build tooling and/or will be enforced at run-time on permission checks.
+                if !security_server.is_bounded_by(new_sid, current_sid) {
+                    return error!(EACCES);
+                }
+            }
+
+            current_task.write().security_state.attrs.current_sid = new_sid
         }
         ProcAttr::Previous => {
             return error!(EINVAL);
         }
         ProcAttr::Exec => {
-            check_self_permissions(&permission_check, source, &[ProcessPermission::SetExec])?;
-            target.exec_sid = sid
+            check_self_permissions(&permission_check, current_sid, &[ProcessPermission::SetExec])?;
+            current_task.write().security_state.attrs.exec_sid = sid
         }
         ProcAttr::FsCreate => {
-            check_self_permissions(&permission_check, source, &[ProcessPermission::SetFsCreate])?;
-            target.fscreate_sid = sid
+            check_self_permissions(
+                &permission_check,
+                current_sid,
+                &[ProcessPermission::SetFsCreate],
+            )?;
+            current_task.write().security_state.attrs.fscreate_sid = sid
         }
         ProcAttr::KeyCreate => {
-            check_self_permissions(&permission_check, source, &[ProcessPermission::SetKeyCreate])?;
-            target.keycreate_sid = sid
+            check_self_permissions(
+                &permission_check,
+                current_sid,
+                &[ProcessPermission::SetKeyCreate],
+            )?;
+            current_task.write().security_state.attrs.keycreate_sid = sid
         }
         ProcAttr::SockCreate => {
-            check_self_permissions(&permission_check, source, &[ProcessPermission::SetSockCreate])?;
-            target.sockcreate_sid = sid
+            check_self_permissions(
+                &permission_check,
+                current_sid,
+                &[ProcessPermission::SetSockCreate],
+            )?;
+            current_task.write().security_state.attrs.sockcreate_sid = sid
         }
     };
 
@@ -655,6 +681,7 @@ mod tests {
     use starnix_uapi::device_type::DeviceType;
     use starnix_uapi::file_mode::FileMode;
     use starnix_uapi::signals::SIGTERM;
+    use starnix_uapi::{CLONE_SIGHAND, CLONE_THREAD, CLONE_VM};
 
     const VALID_SECURITY_CONTEXT: &[u8] = b"u:object_r:test_valid_t:s0";
 
@@ -1347,5 +1374,56 @@ mod tests {
         .expect("setxattr");
 
         assert!(get_cached_sid(node).is_some());
+    }
+
+    #[fuchsia::test]
+    async fn setcurrent_bounds() {
+        const BINARY_POLICY: &[u8] = include_bytes!("../../../lib/selinux/testdata/composite_policies/compiled/bounded_transition_policy.pp");
+        const BOUNDED_CONTEXT: &[u8] = b"test_u:test_r:bounded_t:s0";
+        const UNBOUNDED_CONTEXT: &[u8] = b"test_u:test_r:unbounded_t:s0";
+
+        let security_server = SecurityServer::new(Mode::Enable);
+        security_server.set_enforcing(true);
+        security_server.load_policy(BINARY_POLICY.to_vec()).expect("policy load failed");
+        let unbounded_sid = security_server
+            .security_context_to_sid(UNBOUNDED_CONTEXT.into())
+            .expect("Make unbounded SID");
+
+        let (_kernel, current_task, mut unlocked) =
+            create_kernel_task_and_unlocked_with_selinux(security_server.clone());
+        current_task.write().security_state.attrs.current_sid = unbounded_sid;
+
+        // Thread-group has a single task, so dynamic transitions are permitted, with "setcurrent"
+        // and "dyntransition".
+        assert_eq!(
+            set_procattr(&security_server, &current_task, ProcAttr::Current, BOUNDED_CONTEXT),
+            Ok(()),
+            "Unbounded_t->bounded_t single-threaded"
+        );
+        assert_eq!(
+            set_procattr(&security_server, &current_task, ProcAttr::Current, UNBOUNDED_CONTEXT),
+            Ok(()),
+            "Bounded_t->unbounded_t single-threaded"
+        );
+
+        // Create a second task in the same thread group.
+        let _child_task = current_task.clone_task_for_test(
+            &mut unlocked,
+            (CLONE_THREAD | CLONE_VM | CLONE_SIGHAND) as u64,
+            None,
+        );
+
+        // Thread-group has a multiple tasks, so dynamic transitions to are only allowed to bounded
+        // domains.
+        assert_eq!(
+            set_procattr(&security_server, &current_task, ProcAttr::Current, BOUNDED_CONTEXT),
+            Ok(()),
+            "Unbounded_t->bounded_t multi-threaded"
+        );
+        assert_eq!(
+            set_procattr(&security_server, &current_task, ProcAttr::Current, UNBOUNDED_CONTEXT),
+            error!(EACCES),
+            "Bounded_t->unbounded_t multi-threaded"
+        );
     }
 }

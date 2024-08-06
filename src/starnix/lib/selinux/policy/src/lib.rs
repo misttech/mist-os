@@ -377,6 +377,11 @@ impl<PS: ParseStrategy> Policy<PS> {
         )
     }
 
+    pub fn is_bounded_by(&self, bounded_type: TypeId, parent_type: TypeId) -> bool {
+        let type_ = self.0.parsed_policy().type_(bounded_type);
+        type_.bounded_by() == Some(parent_type)
+    }
+
     #[cfg(feature = "selinux_policy_test_api")]
     pub fn print_permissions(&self) {
         let parsed_policy = self.0.parsed_policy();
