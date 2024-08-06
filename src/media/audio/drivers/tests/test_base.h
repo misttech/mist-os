@@ -16,10 +16,13 @@
 
 #include <optional>
 
-#include "gtest/gtest.h"
+#include <gtest/gtest.h>
+
 #include "src/media/audio/lib/test/test_fixture.h"
 
 namespace media::audio::drivers::test {
+
+inline constexpr size_t kUniqueIdLength = 16;
 
 // We enable top-level methods (e.g. TestBase::Retrieve[RingBuffer|Dai]Formats, BasicTest::
 // RetrieveProperties, AdminTest::RequestBuffer) to skip or produce multiple errors and then
@@ -56,9 +59,12 @@ struct DeviceEntry {
 
   bool isA2DP() const { return device_type == DeviceType::A2DP; }
   bool isVirtual() const { return device_type == DeviceType::Virtual; }
+
   bool isCodec() const { return driver_type == DriverType::Codec; }
   bool isComposite() const { return driver_type == DriverType::Composite; }
   bool isDai() const { return driver_type == DriverType::Dai; }
+  bool isStreamConfigInput() const { return driver_type == DriverType::StreamConfigInput; }
+  bool isStreamConfigOutput() const { return driver_type == DriverType::StreamConfigOutput; }
   bool isStreamConfig() const {
     return driver_type == DriverType::StreamConfigInput ||
            driver_type == DriverType::StreamConfigOutput;
@@ -123,6 +129,32 @@ class TestBase : public media::audio::test::TestFixture {
   DeviceType device_type() const { return device_entry_.device_type; }
   DriverType driver_type() const { return device_entry_.driver_type; }
 
+  std::optional<bool> IsIncoming(
+      std::optional<fuchsia::hardware::audio::ElementId> ring_buffer_element_id = std::nullopt);
+
+  // BasicTest (non-destructive) and AdminTest (destructive or RingBuffer) cases both need to
+  // know at least whether ring buffers are outgoing or incoming, so this is implemented in this
+  // shared parent class.
+  void DisplayBaseProperties();
+  // The union of [CodecProperties, CompositeProperties, DaiProperties, StreamProperties].
+  struct BaseProperties {
+    //       On codec/composite/dai/stream, member is   (o)ptional (r)equired (.)absent
+    std::optional<bool> is_input;                                   // o.rr
+    std::optional<std::array<uint8_t, kUniqueIdLength>> unique_id;  // oooo
+    std::optional<std::string> manufacturer;                        // oooo
+    std::optional<std::string> product;                             // oooo
+    std::optional<uint32_t> clock_domain;                           // .rrr
+
+    std::optional<fuchsia::hardware::audio::PlugDetectCapabilities>
+        plug_detect_capabilities;       // r..r
+    std::optional<bool> can_mute;       // ...o
+    std::optional<bool> can_agc;        // ...o
+    std::optional<float> min_gain_db;   // ...r
+    std::optional<float> max_gain_db;   // ...r
+    std::optional<float> gain_step_db;  // ...r
+  };
+  std::optional<BaseProperties> properties_;
+
   // BasicTest (non-destructive) and AdminTest (destructive or RingBuffer) cases both need to
   // know the supported formats, so this is implemented in this shared parent class.
   void RetrieveDaiFormats();
@@ -152,7 +184,12 @@ class TestBase : public media::audio::test::TestFixture {
   // connect to fuchsia.hardware.audio.signalprocessing and query the supported topologies, so
   // this is implemented in this shared parent class.
   void SignalProcessingConnect();
+  void RequestElements();
   void RequestTopologies();
+  void RequestTopology();
+
+  bool ElementIsRingBuffer(fuchsia::hardware::audio::ElementId element_id);
+  bool RingBufferElementIsIncoming(fuchsia::hardware::audio::ElementId element_id);
 
   fidl::InterfacePtr<fuchsia::hardware::audio::Codec>& codec() { return codec_; }
   fidl::InterfacePtr<fuchsia::hardware::audio::Composite>& composite() { return composite_; }
@@ -192,8 +229,10 @@ class TestBase : public media::audio::test::TestFixture {
   std::optional<fuchsia::hardware::audio::DaiFormat> max_dai_format_;
 
   fidl::InterfacePtr<fuchsia::hardware::audio::signalprocessing::SignalProcessing> sp_;
+  std::optional<bool> signalprocessing_is_supported_ = std::nullopt;
   std::vector<fuchsia::hardware::audio::signalprocessing::Topology> topologies_;
   std::vector<fuchsia::hardware::audio::signalprocessing::Element> elements_;
+  std::optional<fuchsia::hardware::audio::TopologyId> topology_id_ = std::nullopt;
 
   std::optional<uint64_t> ring_buffer_id_;  // Ring buffer process element id.
   std::optional<uint64_t> dai_id_;          // DAI interconnect process element id.
@@ -293,7 +332,6 @@ inline std::ostream& operator<<(std::ostream& out,
   return (out << "[invalid frame_format union: neither standard nor custom]");
 }
 
-inline constexpr size_t kUniqueIdLength = 16;
 inline std::ostream& operator<<(std::ostream& out, std::optional<std::array<uint8_t, 16>> id) {
   if (!id) {
     return (out << "NONE");

@@ -44,26 +44,6 @@ class BasicTest : public TestBase {
  private:
   void ValidatePlugState(const fuchsia::hardware::audio::PlugState& plug_state);
 
-  void DisplayBaseProperties();
-  // The union of [CodecProperties, CompositeProperties, DaiProperties, StreamProperties].
-  struct BaseProperties {
-    //       On codec/composite/dai/stream, member is   (o)ptional (r)equired (.)absent
-    std::optional<bool> is_input;                                   // o.rr
-    std::optional<std::array<uint8_t, kUniqueIdLength>> unique_id;  // oooo
-    std::optional<std::string> manufacturer;                        // oooo
-    std::optional<std::string> product;                             // oooo
-    std::optional<uint32_t> clock_domain;                           // .rrr
-
-    std::optional<fuchsia::hardware::audio::PlugDetectCapabilities>
-        plug_detect_capabilities;       // r..r
-    std::optional<bool> can_mute;       // ...o
-    std::optional<bool> can_agc;        // ...o
-    std::optional<float> min_gain_db;   // ...r
-    std::optional<float> max_gain_db;   // ...r
-    std::optional<float> gain_step_db;  // ...r
-  };
-  std::optional<BaseProperties> properties_;
-
   // BasicTest cannot permanently change device state. Optionals ensure we fetch initial gain
   // state (to later restore it), before calling any method that alters device gain.
   std::optional<fuchsia::hardware::audio::GainState> initial_gain_state_;

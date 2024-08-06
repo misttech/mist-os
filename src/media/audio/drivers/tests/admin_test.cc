@@ -9,6 +9,7 @@
 #include <lib/zx/vmo.h>
 #include <zircon/compiler.h>
 #include <zircon/errors.h>
+#include <zircon/rights.h>
 #include <zircon/time.h>
 
 #include <cstring>
@@ -87,6 +88,7 @@ void AdminTest::RequestRingBufferChannel() {
   fidl::InterfaceHandle<fuchsia::hardware::audio::RingBuffer> ring_buffer_handle;
   if (device_entry().isComposite()) {
     RequestTopologies();
+    RequestTopology();
 
     // If a ring_buffer_id exists, request it - but don't fail if the driver has no ring buffer.
     if (ring_buffer_id().has_value()) {
@@ -99,6 +101,7 @@ void AdminTest::RequestRingBufferChannel() {
       if (!composite().is_bound()) {
         FAIL() << "Composite failed to get ring buffer channel";
       }
+      SetRingBufferIncoming(IsIncoming(ring_buffer_id()));
     }
   } else if (device_entry().isDai()) {
     fuchsia::hardware::audio::DaiFormat dai_format = {};
@@ -106,9 +109,11 @@ void AdminTest::RequestRingBufferChannel() {
     dai()->CreateRingBuffer(std::move(dai_format), std::move(rb_format),
                             ring_buffer_handle.NewRequest());
     EXPECT_TRUE(dai().is_bound()) << "Dai failed to get ring buffer channel";
+    SetRingBufferIncoming(IsIncoming());
   } else {
     stream_config()->CreateRingBuffer(std::move(rb_format), ring_buffer_handle.NewRequest());
     EXPECT_TRUE(stream_config().is_bound()) << "StreamConfig failed to get ring buffer channel";
+    SetRingBufferIncoming(IsIncoming());
   }
   zx::channel channel = ring_buffer_handle.TakeChannel();
   ring_buffer_ =
@@ -221,10 +226,22 @@ void AdminTest::RequestBuffer(uint32_t min_ring_buffer_frames,
 
   ring_buffer_mapper_.Unmap();
   const zx_vm_option_t option_flags = ZX_VM_PERM_READ | ZX_VM_PERM_WRITE;
-  EXPECT_EQ(ring_buffer_mapper_.CreateAndMap(
-                static_cast<uint64_t>(ring_buffer_frames_) * frame_size_, option_flags, nullptr,
-                &ring_buffer_vmo, ZX_RIGHT_READ | ZX_RIGHT_MAP | ZX_RIGHT_TRANSFER),
-            ZX_OK);
+
+  zx_info_handle_basic_t info;
+  auto status =
+      ring_buffer_vmo.get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
+  ASSERT_EQ(status, ZX_OK) << "vmo.get_info returned error";
+
+  const zx_rights_t required_rights =
+      ring_buffer_is_incoming_.value_or(true) ? kRightsVmoIncoming : kRightsVmoOutgoing;
+  EXPECT_EQ((info.rights & required_rights), required_rights)
+      << "VMO rights 0x" << std::hex << info.rights << " are insufficient (0x" << required_rights
+      << " are required)";
+
+  EXPECT_EQ(
+      ring_buffer_mapper_.CreateAndMap(static_cast<uint64_t>(ring_buffer_frames_) * frame_size_,
+                                       option_flags, nullptr, &ring_buffer_vmo, required_rights),
+      ZX_OK);
 }
 
 void AdminTest::ActivateChannelsAndExpectOutcome(uint64_t active_channels_bitmask,
@@ -367,6 +384,7 @@ void AdminTest::ValidateExternalDelay() {
 void AdminTest::DropRingBuffer() {
   if (ring_buffer_.is_bound()) {
     ring_buffer_.Unbind();
+    ring_buffer_ = nullptr;
   }
 
   // When disconnecting a RingBuffer, there's no signal to wait on before proceeding (potentially

@@ -177,42 +177,6 @@ void BasicTest::RetrieveProperties() {
   EXPECT_TRUE(properties_.has_value()) << "No GetProperties completion was received";
 }
 
-// For debugging purposes
-void BasicTest::DisplayBaseProperties() {
-  ASSERT_TRUE(properties_);
-
-  FX_LOGS(INFO) << driver_type() << " is_input: "
-                << (properties_->is_input.has_value() ? std::to_string(*properties_->is_input)
-                                                      : "NONE");
-  FX_LOGS(INFO) << driver_type() << " manufacturer is "
-                << (properties_->manufacturer.has_value() ? "'" + *properties_->manufacturer + "'"
-                                                          : "NONE");
-  FX_LOGS(INFO) << driver_type() << " product is "
-                << (properties_->product.has_value() ? "'" + *properties_->product + "'" : "NONE");
-  FX_LOGS(INFO) << driver_type() << " unique_id is " << properties_->unique_id;
-  FX_LOGS(INFO) << driver_type() << " clock domain is "
-                << (properties_->clock_domain.has_value()
-                        ? std::to_string(*properties_->clock_domain)
-                        : "NONE");
-  FX_LOGS(INFO) << driver_type() << " plug_detect is " << properties_->plug_detect_capabilities;
-  FX_LOGS(INFO) << driver_type() << " min_gain_db is "
-                << (properties_->min_gain_db.has_value() ? std::to_string(*properties_->min_gain_db)
-                                                         : "NONE");
-  FX_LOGS(INFO) << driver_type() << " max_gain_db is "
-                << (properties_->max_gain_db.has_value() ? std::to_string(*properties_->max_gain_db)
-                                                         : "NONE");
-  FX_LOGS(INFO) << driver_type() << " gain_step_db is "
-                << (properties_->gain_step_db.has_value()
-                        ? std::to_string(*properties_->gain_step_db)
-                        : "NONE");
-  FX_LOGS(INFO) << driver_type() << " can_mute is "
-                << (properties_->can_mute.has_value() ? std::to_string(*properties_->can_mute)
-                                                      : "NONE");
-  FX_LOGS(INFO) << driver_type() << " can_agc is "
-                << (properties_->can_agc.has_value() ? std::to_string(*properties_->can_agc)
-                                                     : "NONE");
-}
-
 void BasicTest::ValidateProperties() {
   ASSERT_TRUE(properties_);
 
@@ -474,8 +438,14 @@ DEFINE_BASIC_TEST_CLASS(WatchPlugSecondTimeNoResponse, {
   WaitForError();
 });
 
+// Verify that a valid toplogy list is successfully received.
+DEFINE_BASIC_TEST_CLASS(GetTopologies, { RequestTopologies(); });
+
 // Verify that a valid toplogy is successfully received.
-DEFINE_BASIC_TEST_CLASS(Topology, { RequestTopologies(); });
+DEFINE_BASIC_TEST_CLASS(GetTopology, {
+  RequestTopologies();
+  RequestTopology();
+});
 
 // Register separate test case instances for each enumerated device
 //
@@ -496,7 +466,8 @@ void RegisterBasicTestsForDevice(const DeviceEntry& device_entry) {
     REGISTER_BASIC_TEST(WatchPlugSecondTimeNoResponse, device_entry);
   } else if (device_entry.isComposite()) {
     REGISTER_BASIC_TEST(Health, device_entry);
-    REGISTER_BASIC_TEST(Topology, device_entry);
+    REGISTER_BASIC_TEST(GetTopologies, device_entry);
+    REGISTER_BASIC_TEST(GetTopology, device_entry);
     REGISTER_BASIC_TEST(GetProperties, device_entry);
     REGISTER_BASIC_TEST(RingBufferFormats, device_entry);
     REGISTER_BASIC_TEST(DaiFormats, device_entry);
