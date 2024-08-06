@@ -67,6 +67,23 @@ BufferCollection& BufferCollection::EmplaceInTree(
   fbl::RefPtr<Node> node(
       fbl::AdoptRef(new BufferCollection(logical_buffer_collection, *token, server_end)));
   BufferCollection* buffer_collection_ptr = static_down_cast<BufferCollection*>(node.get());
+
+  // Now that token has processed the rest of it's incoming messages and we're about to replace the
+  // BufferCollectionToken with BufferCollection, we apply the allocator's ClientDebugInfo. This
+  // queued/delayed apply is how we ensure that the allocator's ClientDebugInfo deterministically
+  // takes priority over the token's ClientDebugInfo. This is desirable so that we see the
+  // ClientDebugInfo set by the client that did the BindSharedCollection, which is typically the
+  // current owner of the BufferCollection, and the client that will be sending SetConstraints.
+  //
+  // If no ClientDebugInfo is set on the allocator, the BufferCollection will inherit any
+  // ClientDebugInfo that was previously set on the token.
+  std::optional<ClientDebugInfo> allocator_client_debug_info =
+      token->take_queued_allocator_client_debug_info();
+  if (allocator_client_debug_info.has_value()) {
+    token->node_properties().client_debug_info() = std::move(*allocator_client_debug_info);
+    allocator_client_debug_info.reset();
+  }
+
   // This also deletes token.
   token->node_properties().SetNode(std::move(node));
   return *buffer_collection_ptr;
@@ -96,7 +113,7 @@ void BufferCollection::BindInternalV1(zx::channel collection_request,
                                       ErrorHandlerWrapper error_handler_wrapper) {
   v1_server_.emplace(*this);
   server_binding_v1_ = fidl::BindServer(
-      parent_device()->dispatcher(),
+      parent_device()->loop_dispatcher(),
       fidl::ServerEnd<fuchsia_sysmem::BufferCollection>(std::move(collection_request)),
       &v1_server_.value(),
       [error_handler_wrapper = std::move(error_handler_wrapper)](
@@ -109,7 +126,7 @@ void BufferCollection::BindInternalV2(zx::channel collection_request,
                                       ErrorHandlerWrapper error_handler_wrapper) {
   v2_server_.emplace(*this);
   server_binding_v2_ = fidl::BindServer(
-      parent_device()->dispatcher(),
+      parent_device()->loop_dispatcher(),
       fidl::ServerEnd<fuchsia_sysmem2::BufferCollection>(std::move(collection_request)),
       &v2_server_.value(),
       [error_handler_wrapper = std::move(error_handler_wrapper)](
@@ -695,7 +712,7 @@ fpromise::result<fuchsia_sysmem2::BufferCollectionInfo> BufferCollection::CloneR
         }
         // This is moving std::optional<zx::vmo>; if zero strong VMO handles remain, the moved-into
         // optional will be !has_value().
-        vmo_buffer.vmo() = std::move(weak_vmo_result.value());
+        vmo_buffer.vmo() = std::move(weak_vmo_result).value();
       } else {
         ZX_DEBUG_ASSERT(!vmo_buffer.vmo().has_value());
       }

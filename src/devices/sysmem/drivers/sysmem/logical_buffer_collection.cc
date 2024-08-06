@@ -581,7 +581,7 @@ LogicalBufferCollection::DupCloseWeakAsapClientEnd(uint32_t buffer_index) {
     LogError(FROM_HERE, "DupCloseWeakAsapClientEnd() failed: %d", dup_result.error_value());
     return dup_result.take_error();
   }
-  return fit::ok(std::move(dup_result.value()));
+  return fit::ok(std::move(dup_result).value());
 }
 
 // static
@@ -624,7 +624,7 @@ void LogicalBufferCollection::BindSharedCollection(Device* parent_device,
     //
     // Intentionally copying *client_debug_info not moving, since allocator may be used for more
     // BindSharedCollection(s).
-    token->SetDebugClientInfoInternal(*client_debug_info);
+    token->QueueAllocatorClientDebugInfo(*client_debug_info);
   }
 
   // At this point, the token will process the rest of its previously queued
@@ -945,7 +945,7 @@ void LogicalBufferCollection::SetName(uint32_t priority, std::string name) {
 void LogicalBufferCollection::SetDebugTimeoutLogDeadline(int64_t deadline) {
   creation_timer_.Cancel();
   zx_status_t status =
-      creation_timer_.PostForTime(parent_device_->dispatcher(), zx::time(deadline));
+      creation_timer_.PostForTime(parent_device_->loop_dispatcher(), zx::time(deadline));
   ZX_ASSERT(status == ZX_OK);
 }
 
@@ -993,9 +993,15 @@ LogicalBufferCollection::LogicalBufferCollection(Device* parent_device)
   inspect_node_ =
       parent_device_->collections_node().CreateChild(CreateUniqueName("logical-collection-"));
 
-  status = creation_timer_.PostDelayed(parent_device_->dispatcher(), zx::sec(5));
+  status = creation_timer_.PostDelayed(parent_device_->loop_dispatcher(), zx::sec(5));
   ZX_ASSERT(status == ZX_OK);
   // nothing else to do here
+}
+
+void LogicalBufferCollection::Fail() {
+  // This is allowed to (but not required to) delete "this" synchronously.
+  LogAndFailRootNode(FROM_HERE, fuchsia_sysmem2::Error::kUnspecified,
+                     "force-failing LogicalBufferCollection");
 }
 
 LogicalBufferCollection::~LogicalBufferCollection() {
@@ -1102,7 +1108,9 @@ void LogErrorInternal(Location location, const char* format, ...) {
   va_list args;
   va_start(args, format);
 
-  zxlogvf(ERROR, location.file(), location.line(), format, args);
+  fdf::Logger::GlobalInstance()->logvf(FUCHSIA_LOG_ERROR, nullptr, location.file(), location.line(),
+                                       format, args);
+
   va_end(args);
 }
 }  // namespace
@@ -1110,11 +1118,16 @@ void LogErrorInternal(Location location, const char* format, ...) {
 void LogicalBufferCollection::LogInfo(Location location, const char* format, ...) const {
   va_list args;
   va_start(args, format);
+
+  FuchsiaLogSeverity severity;
   if (is_verbose_logging()) {
-    zxlogvf(INFO, location.file(), location.line(), format, args);
+    severity = FUCHSIA_LOG_INFO;
   } else {
-    zxlogvf(DEBUG, location.file(), location.line(), format, args);
+    severity = FUCHSIA_LOG_DEBUG;
   }
+  fdf::Logger::GlobalInstance()->logvf(severity, nullptr, location.file(), location.line(), format,
+                                       args);
+
   va_end(args);
 }
 
@@ -3878,7 +3891,7 @@ fpromise::result<zx::vmo> LogicalBufferCollection::AllocateVmo(
     }
   }
 
-  auto emplace_result = buffers_.try_emplace(index, std::move(buffer_result.value()));
+  auto emplace_result = buffers_.try_emplace(index, std::move(buffer_result).value());
   ZX_ASSERT(emplace_result.second);
 
   return fpromise::ok(std::move(strong_child_vmo));
@@ -4546,54 +4559,52 @@ void LogicalBufferCollection::DecStrongNodeTally() {
 
 void LogicalBufferCollection::CheckForZeroStrongNodes() {
   if (strong_node_count_ == 0) {
-    auto post_result =
-        async::PostTask(parent_device_->dispatcher(), [this, ref_this = fbl::RefPtr(this)] {
-          if (allocation_result_info_.has_value()) {
-            // Regardless of whether we'd allocated by the time of posting, we've allocated by the
-            // time of running the posted task.
-            //
-            // If we allocated by the time of posting, we may have some strong VMOs outstanding with
-            // clients, and weak nodes should continue to work until all outstanding strong VMOs are
-            // closed by clients.
-            //
-            // If we hadn't allocated by the time of posting, we can still handle this the same way,
-            // because CheckForZeroStrongParentVmoCount will take care of failing from the root_
-            // down shortly after we reset() the vmo fields here (triggered async by
-            // ZX_VMO_ZERO_CHILDREN signal to strong_parent_vmo_).
-            for (auto& buffer : *allocation_result_info_->buffers()) {
-              // The sysmem strong VMO handles in allocation_result_info_ are logically owned by
-              // strong nodes. Once there are zero strong nodes, there can never be a strong node
-              // again, so we reset the strong VMOs here. In some cases there can still be strong
-              // VMOs outstanding, and those still prevent strong_parent_vmo_ entries from
-              // disappearing until all the outstanding strong VMO handles are closed by clients.
-              //
-              // Once all strong_parent_vmo_ entries are gone, the LogicalBufferCollection will fail
-              // from root_ down.
-              buffer.vmo().reset();
-            }
-          } else {
-            // Since we know we have zero strong VMOs outstanding (because no VMOs allocated yet),
-            // this is conceptually skipping to the root_-down fail that we'd otherwise do elsewhere
-            // upon CheckForZeroStrongParentVmoCount noticing zero strong VMOs, since we now know
-            // that strong_parent_vmo_count_ never became non-zero and will remain zero from this
-            // point onward.
-            //
-            // We also know in this path that we have zero weak VMOs outstanding (because no VMOs
-            // allocated yet), so there's no need to signal any close_weak_asap(s) here since no
-            // buffers are ever part of this LogicalBufferCollection, and no outstanding weak VMOs
-            // will be holding up ~LogicalBufferCollection.
-            if (!root_) {
-              // This is just avoiding any redundant log output in case the LogicalBufferCollection
-              // already failed from the root_ down already for a different reason.
-              return;
-            }
-            LogAndFailRootNode(
-                FROM_HERE, Error::kUnspecified,
-                "Zero strong nodes remaining before allocation; failing LogicalBufferCollection");
-          }
-          // ~ref_this
-        });
-    ZX_ASSERT(post_result == ZX_OK);
+    parent_device_->PostTask([this, ref_this = fbl::RefPtr(this)] {
+      if (allocation_result_info_.has_value()) {
+        // Regardless of whether we'd allocated by the time of posting, we've allocated by the
+        // time of running the posted task.
+        //
+        // If we allocated by the time of posting, we may have some strong VMOs outstanding with
+        // clients, and weak nodes should continue to work until all outstanding strong VMOs are
+        // closed by clients.
+        //
+        // If we hadn't allocated by the time of posting, we can still handle this the same way,
+        // because CheckForZeroStrongParentVmoCount will take care of failing from the root_
+        // down shortly after we reset() the vmo fields here (triggered async by
+        // ZX_VMO_ZERO_CHILDREN signal to strong_parent_vmo_).
+        for (auto& buffer : *allocation_result_info_->buffers()) {
+          // The sysmem strong VMO handles in allocation_result_info_ are logically owned by
+          // strong nodes. Once there are zero strong nodes, there can never be a strong node
+          // again, so we reset the strong VMOs here. In some cases there can still be strong
+          // VMOs outstanding, and those still prevent strong_parent_vmo_ entries from
+          // disappearing until all the outstanding strong VMO handles are closed by clients.
+          //
+          // Once all strong_parent_vmo_ entries are gone, the LogicalBufferCollection will fail
+          // from root_ down.
+          buffer.vmo().reset();
+        }
+      } else {
+        // Since we know we have zero strong VMOs outstanding (because no VMOs allocated yet),
+        // this is conceptually skipping to the root_-down fail that we'd otherwise do elsewhere
+        // upon CheckForZeroStrongParentVmoCount noticing zero strong VMOs, since we now know
+        // that strong_parent_vmo_count_ never became non-zero and will remain zero from this
+        // point onward.
+        //
+        // We also know in this path that we have zero weak VMOs outstanding (because no VMOs
+        // allocated yet), so there's no need to signal any close_weak_asap(s) here since no
+        // buffers are ever part of this LogicalBufferCollection, and no outstanding weak VMOs
+        // will be holding up ~LogicalBufferCollection.
+        if (!root_) {
+          // This is just avoiding any redundant log output in case the LogicalBufferCollection
+          // already failed from the root_ down already for a different reason.
+          return;
+        }
+        LogAndFailRootNode(
+            FROM_HERE, Error::kUnspecified,
+            "Zero strong nodes remaining before allocation; failing LogicalBufferCollection");
+      }
+      // ~ref_this
+    });
   }
 }
 
@@ -4606,12 +4617,10 @@ void LogicalBufferCollection::DecStrongParentVmoCount() {
 
 void LogicalBufferCollection::CheckForZeroStrongParentVmoCount() {
   if (strong_parent_vmo_count_ == 0) {
-    auto post_result =
-        async::PostTask(parent_device_->dispatcher(), [this, ref_this = fbl::RefPtr(this)] {
-          FailRootNode(Error::kUnspecified);
-          // ~ref_this
-        });
-    ZX_ASSERT(post_result == ZX_OK);
+    parent_device_->PostTask([this, ref_this = fbl::RefPtr(this)] {
+      FailRootNode(Error::kUnspecified);
+      // ~ref_this
+    });
   }
 }
 
@@ -4829,7 +4838,7 @@ LogicalBuffer::LogicalBuffer(fbl::RefPtr<LogicalBufferCollection> logical_buffer
   auto complain_about_leaked_weak_timer_task_scope =
       std::make_shared<std::optional<async_patterns::TaskScope>>();
   complain_about_leaked_weak_timer_task_scope->emplace(
-      logical_buffer_collection_->parent_device_->dispatcher());
+      logical_buffer_collection_->parent_device_->loop_dispatcher());
 
   zx_info_vmo_t info;
   zx_status_t status = parent_vmo.get_info(ZX_INFO_VMO, &info, sizeof(info), nullptr, nullptr);
@@ -5021,7 +5030,7 @@ LogicalBuffer::LogicalBuffer(fbl::RefPtr<LogicalBufferCollection> logical_buffer
   TRACE_INSTANT("gfx", "Child VMO created", TRACE_SCOPE_THREAD, "koid", strong_child_vmo_koid);
 
   // Now that we know at least one child of parent_vmo_ exists, we can StartWait().
-  status = parent_vmo_->StartWait(logical_buffer_collection_->parent_device_->dispatcher());
+  status = parent_vmo_->StartWait(logical_buffer_collection_->parent_device_->loop_dispatcher());
   if (status != ZX_OK) {
     logical_buffer_collection_->LogError(FROM_HERE,
                                          "tracked_parent->StartWait() failed - status: %d", status);
@@ -5030,7 +5039,8 @@ LogicalBuffer::LogicalBuffer(fbl::RefPtr<LogicalBufferCollection> logical_buffer
   }
 
   // Now that we know at least one child of strong_parent_vmo_ exists, we can StartWait().
-  status = strong_parent_vmo_->StartWait(logical_buffer_collection_->parent_device_->dispatcher());
+  status =
+      strong_parent_vmo_->StartWait(logical_buffer_collection_->parent_device_->loop_dispatcher());
   if (status != ZX_OK) {
     logical_buffer_collection_->LogError(FROM_HERE,
                                          "tracked_parent->StartWait() failed - status: %d", status);
@@ -5122,7 +5132,7 @@ fit::result<zx_status_t, std::optional<zx::vmo>> LogicalBuffer::CreateWeakVmo(
 
   // Now that there's a child VMO of tracked_sent_weak_parent_vmo, we can StartWait().
   status = tracked_sent_weak_parent_vmo->StartWait(
-      logical_buffer_collection_->parent_device_->dispatcher());
+      logical_buffer_collection_->parent_device_->loop_dispatcher());
   if (status != ZX_OK) {
     logical_buffer_collection_->LogError(FROM_HERE, "StartWait failed: %d", status);
     return fit::error(status);

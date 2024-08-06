@@ -77,8 +77,10 @@ TEST(FakeSysmemDeviceHierarchy, OpenAllocatorV1) {
   zx::result<fidl::ClientEnd<fuchsia_io::Directory>> outgoing_directory_result =
       fake_sysmem_device_hierarchy->GetOutgoingDirectory();
   ASSERT_OK(outgoing_directory_result);
+
   fidl::ClientEnd<fuchsia_io::Directory> outgoing_directory =
       std::move(outgoing_directory_result).value();
+  ASSERT_TRUE(outgoing_directory.is_valid());
 
   zx::result<fidl::ClientEnd<fuchsia_io::Directory>> svc_directory_result =
       OpenSvcDirectory(outgoing_directory);
@@ -137,8 +139,10 @@ TEST(FakeSysmemDeviceHierarchy, OpenAllocatorV2) {
   zx::result<fidl::ClientEnd<fuchsia_io::Directory>> outgoing_directory_result =
       fake_sysmem_device_hierarchy->GetOutgoingDirectory();
   ASSERT_OK(outgoing_directory_result);
+
   fidl::ClientEnd<fuchsia_io::Directory> outgoing_directory =
       std::move(outgoing_directory_result).value();
+  ASSERT_TRUE(outgoing_directory.is_valid());
 
   zx::result<fidl::ClientEnd<fuchsia_io::Directory>> svc_directory_result =
       OpenSvcDirectory(outgoing_directory);

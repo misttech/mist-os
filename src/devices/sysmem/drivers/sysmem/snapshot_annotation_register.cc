@@ -6,26 +6,18 @@
 
 static constexpr char kNamespace[] = "sysmem";
 
-SnapshotAnnotationRegister::~SnapshotAnnotationRegister() {
-  std::scoped_lock lock(lock_);
-
-  // If a client had been bound with SetServiceDirectory(), it must have already been unbound with a
-  // call to UnsetServiceDirectory() on the appropriate thread.
-  ZX_ASSERT(!client_.is_valid());
+SnapshotAnnotationRegister::SnapshotAnnotationRegister(async_dispatcher_t* dispatcher)
+    : synchronization_checker_(dispatcher) {
+  AssertRunningSynchronized();
 }
 
-void SnapshotAnnotationRegister::AssertRunningOnClientThread() {
-  if (client_thread_.has_value()) {
-    ZX_ASSERT(std::this_thread::get_id() == *client_thread_);
-  } else {
-    client_thread_ = std::this_thread::get_id();
-  }
+void SnapshotAnnotationRegister::AssertRunningSynchronized() {
+  ZX_ASSERT(cpp17::holds_alternative<std::monostate>(synchronization_checker_.is_synchronized()));
 }
 
 void SnapshotAnnotationRegister::SetServiceDirectory(
     std::shared_ptr<sys::ServiceDirectory> service_directory, async_dispatcher_t* dispatcher) {
-  std::scoped_lock lock(lock_);
-  AssertRunningOnClientThread();
+  AssertRunningSynchronized();
 
   fidl::Client<fuchsia_feedback::ComponentDataRegister> new_client;
 
@@ -47,14 +39,13 @@ void SnapshotAnnotationRegister::SetServiceDirectory(
 }
 
 void SnapshotAnnotationRegister::IncrementNumDmaCorruptions() {
-  std::scoped_lock lock(lock_);
-  AssertRunningOnClientThread();
-
+  AssertRunningSynchronized();
   num_dma_corruptions_++;
   Flush();
 }
 
 void SnapshotAnnotationRegister::Flush() {
+  AssertRunningSynchronized();
   if (client_.is_valid()) {
     std::vector<fuchsia_feedback::Annotation> annotations = {
         {"num-dma-corruptions", std::to_string(num_dma_corruptions_)},

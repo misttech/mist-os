@@ -25,10 +25,18 @@ class Allocator : public LoggingMixin {
   // Public for std::unique_ptr<Allocator>:
   ~Allocator();
 
-  static void CreateChannelOwnedV1(zx::channel request, Device* device);
-  // The returned reference lasts only until the current thread returns to the FIDL dispatcher, and
-  // will likely be removed when sysmem(1) can be removed.
-  static Allocator& CreateChannelOwnedV2(zx::channel request, Device* device);
+  // Create a V1 allocator owned by the binding_group.
+  static void CreateOwnedV1(fidl::ServerEnd<fuchsia_sysmem::Allocator> server_end, Device* device,
+                            fidl::ServerBindingGroup<fuchsia_sysmem::Allocator>& binding_group);
+
+  // Create a v2 allocator owned by the binding_group.
+  //
+  // The returned reference may be deallocated as soon as the current thread returns to the FIDL
+  // dispatcher, but can be used until then. The return value can be removed once we've deleted
+  // fuchsia_sysmem::Allocator and ConnectToSysmem2Allocator.
+  static void CreateOwnedV2(fidl::ServerEnd<fuchsia_sysmem2::Allocator> server_end, Device* device,
+                            fidl::ServerBindingGroup<fuchsia_sysmem2::Allocator>& binding_group,
+                            std::optional<ClientDebugInfo> client_debug_info = std::nullopt);
 
  private:
   struct V1 : public fidl::Server<fuchsia_sysmem::Allocator> {

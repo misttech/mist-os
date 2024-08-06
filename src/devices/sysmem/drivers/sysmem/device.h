@@ -13,11 +13,11 @@
 #include <lib/async/cpp/wait.h>
 #include <lib/closure-queue/closure_queue.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
-#include <lib/ddk/debug.h>
-#include <lib/ddk/device.h>
-#include <lib/ddk/driver.h>
+#include <lib/driver/compat/cpp/device_server.h>
+#include <lib/driver/component/cpp/driver_base.h>
 #include <lib/fit/thread_checker.h>
 #include <lib/inspect/cpp/inspect.h>
+#include <lib/sync/cpp/completion.h>
 #include <lib/zx/bti.h>
 #include <lib/zx/channel.h>
 
@@ -26,8 +26,6 @@
 #include <memory>
 #include <unordered_set>
 
-#include <ddktl/device.h>
-#include <ddktl/protocol/empty-protocol.h>
 #include <fbl/vector.h>
 #include <region-alloc/region-alloc.h>
 
@@ -42,7 +40,6 @@ class ServiceDirectory;
 
 namespace sysmem_driver {
 
-class Driver;
 class Device;
 class BufferCollectionToken;
 class LogicalBuffer;
@@ -54,34 +51,40 @@ struct Settings {
   uint64_t max_allocation_size = UINT64_MAX;
 };
 
-// The sysmem-connector (not a driver) uses DriverConnector, to get Allocator channels, to notice
-// when/if sysmem crashes, and to set a (limited) service directory for sysmem to use to connect to
-// Cobalt. DriverConnector is not for use by other drivers.
-using DdkDeviceType =
-    ddk::Device<Device, ddk::Messageable<fuchsia_hardware_sysmem::DriverConnector>::Mixin,
-                ddk::Unbindable>;
-
-class Device final : public DdkDeviceType,
-                     // Currently, the ddk::EmptyProtocol<ZX_PROTOCOL_SYSMEM> is what causes the
-                     // instance to show up as /dev/class/sysmem/<instance>, which is how
-                     // sysmem-connector discovers this driver. Once the instance is discovered,
-                     // sysmem-connector uses fuchsia_hardware_sysmem::DriverConnector protocol,
-                     // which depends on the DdkDeviceType's ddk::Messageable mixin (see above).
-                     public ddk::EmptyProtocol<ZX_PROTOCOL_SYSMEM>,
-                     public fidl::Server<fuchsia_hardware_sysmem::Sysmem>,
-                     public MemoryAllocator::Owner {
+// Non-drivers connect to sysmem via sysmem-connector (service impl). The sysmem-connector uses
+// DriverConnector to get connected to sysmem via devfs. The sysmem-connector then uses
+// DriverConnector to connect to fuchsia_sysmem2::Allocator on behalf of non-driver sysmem clients,
+// to notice when/if sysmem crashes, and to set a (limited) service directory for sysmem to use to
+// connect to Cobalt. DriverConnector is not for use by other drivers.
+//
+// Driver clients of sysmem connect via fuchsia_hardware_sysmem::Service.
+//
+// The fuchsia_hardware_sysmem::Sysmem protocol is used by the securemem driver and by external
+// heaps such as goldfish.
+//
+// The Device loads on the sysmem node, with one owned child node that exists only for the devfs
+// entry.
+class Device final : public fdf::DriverBase,
+                     public MemoryAllocator::Owner,
+                     public fidl::Server<fuchsia_device_fs::Connector>,
+                     public fidl::Server<fuchsia_hardware_sysmem::DriverConnector>,
+                     public fidl::Server<fuchsia_hardware_sysmem::Sysmem> {
  public:
-  Device(zx_device_t* parent_device, Driver* parent_driver);
+  Device(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher);
+  zx::result<> Start() override;
+
+  ~Device() __TA_REQUIRES(*driver_checker_);
+
+  // currently public only for tests
+  [[nodiscard]] zx_status_t Initialize() __TA_REQUIRES(*driver_checker_);
+
+  zx::result<zx::resource> GetInfoResource();
 
   [[nodiscard]] zx_status_t GetContiguousGuardParameters(
       const std::optional<sysmem_config::Config>& config, uint64_t* guard_bytes_out,
       bool* unused_pages_guarded, int64_t* unused_guard_pattern_period_bytes,
       zx::duration* unused_page_check_cycle_period, bool* internal_guard_pages_out,
       bool* crash_on_fail_out);
-
-  [[nodiscard]] static zx_status_t Bind(std::unique_ptr<Device> device);
-  // currently public only for tests
-  [[nodiscard]] zx_status_t Bind();
 
   //
   // The rest of the methods are only valid to call after Bind().
@@ -95,26 +98,24 @@ class Device final : public DdkDeviceType,
   // Also called directly by a test.
   [[nodiscard]] zx_status_t UnregisterSecureMemInternal();
 
-  // Ddk mixin implementations.
-  void DdkUnbind(ddk::UnbindTxn txn);
-  void DdkRelease() { delete this; }
-
   // MemoryAllocator::Owner implementation.
   [[nodiscard]] const zx::bti& bti() override;
-  [[nodiscard]] zx_status_t CreatePhysicalVmo(uint64_t base, uint64_t size,
-                                              zx::vmo* vmo_out) override;
+  [[nodiscard]] zx::result<zx::vmo> CreatePhysicalVmo(uint64_t base, uint64_t size) override;
   void CheckForUnbind() override;
-  SnapshotAnnotationRegister& snapshot_annotation_register() override;
+  std::optional<SnapshotAnnotationRegister>& snapshot_annotation_register() override;
   SysmemMetrics& metrics() override;
   protected_ranges::ProtectedRangesCoreControl& protected_ranges_core_control(
       const fuchsia_sysmem2::Heap& heap) override;
 
   inspect::Node* heap_node() override { return &heaps_; }
 
+  // fuchsia_device_fs::Connector impl
+  void Connect(ConnectRequest& request, ConnectCompleter::Sync& completer) override;
+
   // fuchsia_hardware_sysmem::DriverConnector impl
-  void ConnectV1(ConnectV1RequestView request, ConnectV1Completer::Sync& completer) override;
-  void ConnectV2(ConnectV2RequestView request, ConnectV2Completer::Sync& completer) override;
-  void SetAuxServiceDirectory(SetAuxServiceDirectoryRequestView request,
+  void ConnectV1(ConnectV1Request& request, ConnectV1Completer::Sync& completer) override;
+  void ConnectV2(ConnectV2Request& request, ConnectV2Completer::Sync& completer) override;
+  void SetAuxServiceDirectory(SetAuxServiceDirectoryRequest& request,
                               SetAuxServiceDirectoryCompleter::Sync& completer) override;
 
   // fuchsia_hardware_sysmem::Sysmem impl
@@ -157,8 +158,11 @@ class Device final : public DdkDeviceType,
   [[nodiscard]] const fuchsia_hardware_sysmem::HeapProperties* GetHeapProperties(
       const fuchsia_sysmem2::Heap& heap) const;
 
-  [[nodiscard]] const zx_device_t* device() const { return zxdev_; }
-  [[nodiscard]] async_dispatcher_t* dispatcher() { return loop_.dispatcher(); }
+  // This is the dispatcher the driver is created with.
+  [[nodiscard]] async_dispatcher_t* driver_dispatcher() { return fdf::DriverBase::dispatcher(); }
+
+  // This is the dispatcher we run most of sysmem on (at least for now).
+  [[nodiscard]] async_dispatcher_t* loop_dispatcher() { return loop_.async_dispatcher(); }
 
   [[nodiscard]] std::unordered_set<LogicalBufferCollection*>& logical_buffer_collections() {
     std::lock_guard checker(*loop_checker_);
@@ -185,7 +189,7 @@ class Device final : public DdkDeviceType,
 
   [[nodiscard]] const Settings& settings() const { return settings_; }
 
-  void ResetThreadCheckerForTesting() { loop_checker_.emplace(fit::thread_checker()); }
+  void ResetThreadCheckerForTesting() { loop_checker_.emplace(loop_.async_dispatcher()); }
 
   bool protected_ranges_disable_dynamic() const override {
     std::lock_guard checker(*loop_checker_);
@@ -219,29 +223,72 @@ class Device final : public DdkDeviceType,
   }
 
   template <typename F>
-  void postTask(F to_run) {
-    zx_status_t post_status = async::PostTask(loop_.dispatcher(), std::move(to_run));
-    ZX_ASSERT_MSG(post_status == ZX_OK || (post_status == ZX_ERR_BAD_STATE && waiting_for_unbind_),
-                  "async::PostTask failed: %d", post_status);
+  void PostTask(F to_run) {
+    // This either succeeds, or fails because we're shutting down a test. We never actually shut
+    // down the real sysmem.
+    std::ignore = async::PostTask(loop_dispatcher(), std::move(to_run));
   }
 
+  // Runs `to_run` on the sysmem `loop_` dispatcher and waits for `to_run` to finish.
+  //
+  // Must not be called from the `loop_` dispatcher, and `to_run` must not call `RunSyncOnLoop()` or
+  // `SyncCall()`, otherwise it will hang forever.
   template <typename F>
   void RunSyncOnLoop(F to_run) {
-    // Must not call RunSyncOnLoop() from the loop_ thread, since that would get stuck.
-    ZX_DEBUG_ASSERT(!loop_checker_->is_thread_valid());
-    sync_completion_t done;
-    postTask([&done, to_run = std::move(to_run)]() mutable {
+    libsync::Completion done;
+    PostTask([&done, to_run = std::move(to_run)]() mutable {
       std::move(to_run)();
-      sync_completion_signal(&done);
+      done.Signal();
     });
-    ZX_ASSERT(ZX_OK == sync_completion_wait_deadline(&done, ZX_TIME_INFINITE));
+    done.Wait();
+  }
+
+  // Runs callable on the sysmem `loop_` dispatcher and waits for `callable` to finish, and returns
+  // whatever callable returned.
+  //
+  // Must not be called from the `loop_` dispatcher, and `to_run` must not call `RunSyncOnLoop()` or
+  // `SyncCall()`, otherwise it will hang forever.
+  template <typename Callable, typename... Args>
+  auto SyncCall(Callable&& callable, Args&&... args) {
+    constexpr bool kIsInvocable = std::is_invocable_v<Callable, Args...>;
+    static_assert(kIsInvocable,
+                  "|Callable| must be callable with the provided |Args|. "
+                  "Check that you specified each argument correctly to the |callable| function.");
+    if constexpr (kIsInvocable) {
+      using Result = std::invoke_result_t<Callable, Args...>;
+      // When we're on C++20 we can switch this to capture ...args directly.
+      auto args_tuple = std::make_tuple(std::forward<Args>(args)...);
+      if constexpr (std::is_void_v<Result>) {
+        RunSyncOnLoop(
+            [callable = std::move(callable), args_tuple = std::move(args_tuple)]() mutable {
+              std::apply([callable = std::move(callable)](
+                             auto&&... args) mutable { std::invoke(callable, args...); },
+                         std::move(args_tuple));
+            });
+      } else {
+        std::optional<Result> result;
+        RunSyncOnLoop(
+            [&, callable = std::move(callable), args_tuple = std::move(args_tuple)]() mutable {
+              result.emplace(std::apply(
+                  [callable = std::move(callable)](auto&&... args) mutable {
+                    return std::invoke(callable, args...);
+                  },
+                  std::move(args_tuple)));
+            });
+        return *result;
+      }
+    }
   }
 
   virtual void OnAllocationFailure() override { LogAllBufferCollections(); }
   void LogAllBufferCollections();
 
-  // for tests only
-  zx::result<fidl::ClientEnd<fuchsia_io::Directory>> CloneServiceDirClientForTests();
+  fidl::ServerBindingGroup<fuchsia_sysmem::Allocator>& v1_allocators() { return v1_allocators_; }
+  fidl::ServerBindingGroup<fuchsia_sysmem2::Allocator>& v2_allocators() { return v2_allocators_; }
+
+  // public for tests
+  mutable std::optional<async::synchronization_checker> driver_checker_;
+  mutable std::optional<async::synchronization_checker> loop_checker_;
 
  private:
   class SecureMemConnection {
@@ -275,21 +322,15 @@ class Device final : public DdkDeviceType,
   void LogCollectionsTimer(async_dispatcher_t* dispatcher, async::TaskBase* task,
                            zx_status_t status);
 
-  void DdkUnbindInternal();
+  void DdkUnbindInternal() __TA_REQUIRES(*driver_checker_);
 
-  zx::result<fidl::ClientEnd<fuchsia_io::Directory>> SetupOutgoingServiceDir();
+  zx::result<> SetupOutgoingServiceDir();
 
-  Driver* parent_driver_ = nullptr;
   inspect::Inspector inspector_;
 
   // Other than DDK call-ins, everything runs on the loop_ thread.
-  async::Loop loop_;
-
-  thrd_t loop_thrd_;
-
-  // During initialization this checks that operations are performed on a DDK thread. After
-  // initialization, it checks that operations are on the loop_ thread.
-  mutable std::optional<fit::thread_checker> loop_checker_;
+  fdf::SynchronizedDispatcher loop_;
+  libsync::Completion loop_shut_down_;
 
   // Currently located at bootstrap/driver_manager:root/sysmem.
   inspect::Node sysmem_root_;
@@ -403,7 +444,7 @@ class Device final : public DdkDeviceType,
 
   std::atomic<bool> waiting_for_unbind_ = false;
 
-  SnapshotAnnotationRegister snapshot_annotation_register_;
+  std::optional<SnapshotAnnotationRegister> snapshot_annotation_register_;
   SysmemMetrics metrics_;
 
   bool protected_ranges_disable_dynamic_ __TA_GUARDED(*loop_checker_) = false;
@@ -419,6 +460,17 @@ class Device final : public DdkDeviceType,
 
   // This is for tests, at least until MockDdk supports a driver's outgoing dir directly.
   fidl::ClientEnd<fuchsia_io::Directory> outgoing_dir_client_for_tests_;
+
+  fidl::ServerBindingGroup<fuchsia_device_fs::Connector> devfs_connector_;
+  fidl::ServerBindingGroup<fuchsia_hardware_sysmem::DriverConnector> driver_connectors_;
+  fidl::ServerBindingGroup<fuchsia_sysmem::Allocator> v1_allocators_;
+  fidl::ServerBindingGroup<fuchsia_sysmem2::Allocator> v2_allocators_;
+
+  std::optional<fdf::OwnedChildNode> devfs_owned_child_node_;
+
+  compat::SyncInitializedDeviceServer compat_server_;
+
+  fidl::SyncClient<fuchsia_driver_framework::NodeController> compat_node_controller_client_;
 };
 
 }  // namespace sysmem_driver

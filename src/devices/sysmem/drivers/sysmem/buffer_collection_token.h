@@ -71,6 +71,12 @@ class BufferCollectionToken : public Node, public LoggingMixin {
 
   void Bind(TokenServerEnd server_end);
 
+  // This gets applied to the NodeProperties as the BufferCollectionToken is being replaced by a
+  // BufferCollection, so that the Allocator's debug info applies after any SetDebugClientInfo
+  // messages queued on the token at the time of BindSharedCollection.
+  void QueueAllocatorClientDebugInfo(ClientDebugInfo debug_info);
+  std::optional<ClientDebugInfo> take_queued_allocator_client_debug_info();
+
  protected:
   void BindInternalV1(zx::channel token_request,
                       ErrorHandlerWrapper error_handler_wrapper) override;
@@ -187,6 +193,7 @@ class BufferCollectionToken : public Node, public LoggingMixin {
   // buffers too soon before all tokens are gone)
 
   std::optional<CollectionServerEnd> buffer_collection_request_;
+  std::optional<ClientDebugInfo> queued_allocator_client_debug_info_;
 
   inspect::Node inspect_node_;
   inspect::UintProperty debug_id_property_;

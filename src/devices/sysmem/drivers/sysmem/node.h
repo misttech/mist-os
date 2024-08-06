@@ -112,8 +112,6 @@ class Node : public fbl::RefCounted<Node> {
   // hard crash is better than going off in the weeds.
   NodeProperties& node_properties() const;
 
-  void EnsureDetachedFromNodeProperties();
-
   // Returns server end of the channel serving this node.  At least for now, this must only be
   // called when it's known that the binding is still valid.  We check this using
   // is_currently_connected().

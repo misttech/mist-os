@@ -5,15 +5,13 @@
 #include "src/devices/sysmem/drivers/sysmem/protected_ranges.h"
 
 #include <lib/ddk/debug.h>
+#include <lib/driver/testing/cpp/scoped_global_logger.h>
 #include <lib/fit/defer.h>
 
 #include <limits>
 #include <random>
 
 #include <gtest/gtest.h>
-
-// Output the same way as protected_ranges.cc so we won't get shifted output.
-#define LOG(severity, fmt, ...) zxlogf(severity, fmt, ##__VA_ARGS__)
 
 #define DLOG_ENABLED 1
 
@@ -165,6 +163,8 @@ class ProtectedRangesTest : public ::testing::Test,
   void IncrementalOptimization();
 
   bool TestRangesOverlap(const TestRange& a, const TestRange& b);
+
+  fdf_testing::ScopedGlobalLogger logger_;
 
   std::optional<protected_ranges::ProtectedRanges> protected_ranges_;
 

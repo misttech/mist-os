@@ -31,15 +31,15 @@ zx_status_t ExternalMemoryAllocator::Allocate(uint64_t size,
   ZX_DEBUG_ASSERT_MSG(
       fbl::round_up(*settings.buffer_settings()->size_bytes(), zx_system_get_page_size()) == size,
       "size_bytes: %" PRIu64 " size: 0x%" PRIx64, *settings.buffer_settings()->size_bytes(), size);
-  // TODO(https://fxbug.dev/42135564): We're currently using WireSharedClient for the combination of "shared"
-  // and sync() being available, but once we remove OnRegister we should also evaluate whether we
-  // can just use fidl::SyncClient.
+  // TODO(https://fxbug.dev/42135564): We're currently using WireSharedClient for the combination of
+  // "shared" and sync() being available, but once we remove OnRegister we should also evaluate
+  // whether we can just use fidl::SyncClient.
   fidl::Arena arena;
   auto allocate_result = heap_.sync()->AllocateVmo(size, fidl::ToWire(arena, settings),
                                                    buffer_collection_id, buffer_index);
   if (!allocate_result.ok() || !allocate_result->is_ok()) {
-    DRIVER_ERROR("Heap.AllocateVmo failed: %d %d", allocate_result.error().status(),
-                 allocate_result.ok() ? allocate_result->error_value() : ZX_ERR_INTERNAL);
+    LOG(ERROR, "Heap.AllocateVmo failed: %d %d", allocate_result.error().status(),
+        allocate_result.ok() ? allocate_result->error_value() : ZX_ERR_INTERNAL);
     // sanitize to ZX_ERR_NO_MEMORY regardless of why.
     return ZX_ERR_NO_MEMORY;
   }
@@ -60,7 +60,7 @@ zx_status_t ExternalMemoryAllocator::Allocate(uint64_t size,
 void ExternalMemoryAllocator::Delete(zx::vmo parent_vmo) {
   auto it = allocations_.find(parent_vmo.get());
   if (it == allocations_.end()) {
-    DRIVER_ERROR("Invalid allocation - vmo_handle: %d", parent_vmo.get());
+    LOG(ERROR, "Invalid allocation - vmo_handle: %d", parent_vmo.get());
     return;
   }
   BufferKey buffer_key = it->second;
@@ -68,7 +68,7 @@ void ExternalMemoryAllocator::Delete(zx::vmo parent_vmo) {
   auto result = heap_.sync()->DeleteVmo(buffer_key.buffer_collection_id, buffer_key.buffer_index,
                                         std::move(parent_vmo));
   if (!result.ok()) {
-    DRIVER_ERROR("HeapDestroyResource() failed - status: %d", result.status());
+    LOG(ERROR, "HeapDestroyResource() failed - status: %d", result.status());
     // fall-through; the server also pays attention to ZX_VMO_ZERO_CHILDREN; if the server still
     // exists/existed it'll find out that way
   }

@@ -24,24 +24,34 @@ Allocator::Allocator(Device* parent_device)
 Allocator::~Allocator() { LogInfo(FROM_HERE, "~Allocator"); }
 
 // static
-void Allocator::CreateChannelOwnedV1(zx::channel request, Device* device) {
+void Allocator::CreateOwnedV1(fidl::ServerEnd<fuchsia_sysmem::Allocator> server_end, Device* device,
+                              fidl::ServerBindingGroup<fuchsia_sysmem::Allocator>& binding_group) {
   auto allocator = std::unique_ptr<Allocator>(new Allocator(device));
   auto v1_server = std::make_unique<V1>(std::move(allocator));
+  auto v1_server_ptr = v1_server.get();
   // Ignore the result - allocator will be destroyed and the channel will be closed on error.
-  fidl::BindServer(device->dispatcher(),
-                   fidl::ServerEnd<fuchsia_sysmem::Allocator>(std::move(request)),
-                   std::move(v1_server));
+  binding_group.AddBinding(device->loop_dispatcher(), std::move(server_end), v1_server_ptr,
+                           [v1_server = std::move(v1_server)](fidl::UnbindInfo unbind_info) {
+                             // ~v1_server
+                           });
 }
 
-Allocator& Allocator::CreateChannelOwnedV2(zx::channel request, Device* device) {
+void Allocator::CreateOwnedV2(fidl::ServerEnd<fuchsia_sysmem2::Allocator> server_end,
+                              Device* device,
+                              fidl::ServerBindingGroup<fuchsia_sysmem2::Allocator>& binding_group,
+                              std::optional<ClientDebugInfo> client_debug_info) {
   auto allocator = std::unique_ptr<Allocator>(new Allocator(device));
-  auto allocator_ptr = allocator.get();
+  if (client_debug_info.has_value()) {
+    allocator->client_debug_info_ = std::move(client_debug_info);
+    client_debug_info.reset();
+  }
   auto v2_server = std::make_unique<V2>(std::move(allocator));
-  // Ignore the result - allocator will be destroyed and the channel will be closed on error.
-  fidl::BindServer(device->dispatcher(),
-                   fidl::ServerEnd<fuchsia_sysmem2::Allocator>(std::move(request)),
-                   std::move(v2_server));
-  return *allocator_ptr;
+  auto v2_server_ptr = v2_server.get();
+
+  binding_group.AddBinding(device->loop_dispatcher(), std::move(server_end), v2_server_ptr,
+                           [v2_server = std::move(v2_server)](fidl::UnbindInfo unbind_info) {
+                             // ~v2_server
+                           });
 }
 
 template <typename Completer, typename Protocol>
@@ -263,6 +273,8 @@ void Allocator::V2::ValidateBufferCollectionToken(
 
 void Allocator::V1::SetDebugClientInfo(SetDebugClientInfoRequest& request,
                                        SetDebugClientInfoCompleter::Sync& completer) {
+  ZX_DEBUG_ASSERT(allocator_->parent_device_->loop_dispatcher() ==
+                  fdf::Dispatcher::GetCurrent()->async_dispatcher());
   allocator_->client_debug_info_.emplace();
   allocator_->client_debug_info_->name = std::string(request.name().begin(), request.name().end());
   allocator_->client_debug_info_->id = request.id();
@@ -270,6 +282,8 @@ void Allocator::V1::SetDebugClientInfo(SetDebugClientInfoRequest& request,
 
 void Allocator::V2::SetDebugClientInfo(SetDebugClientInfoRequest& request,
                                        SetDebugClientInfoCompleter::Sync& completer) {
+  ZX_DEBUG_ASSERT(allocator_->parent_device_->loop_dispatcher() ==
+                  fdf::Dispatcher::GetCurrent()->async_dispatcher());
   if (!request.name().has_value()) {
     allocator_->LogError(FROM_HERE, "SetDebugClientInfo requires name set");
     completer.Close(ZX_ERR_INTERNAL);
@@ -287,12 +301,10 @@ void Allocator::V2::SetDebugClientInfo(SetDebugClientInfoRequest& request,
 
 void Allocator::V1::ConnectToSysmem2Allocator(ConnectToSysmem2AllocatorRequest& request,
                                               ConnectToSysmem2AllocatorCompleter::Sync& completer) {
-  auto v2_allocator = Allocator::CreateChannelOwnedV2(request.allocator_request().TakeChannel(),
-                                                      allocator_->parent_device_);
-  if (allocator_->client_debug_info_.has_value()) {
-    // intentional clone / copy
-    v2_allocator.client_debug_info_ = *allocator_->client_debug_info_;
-  }
+  std::optional<ClientDebugInfo> client_debug_info_copy = allocator_->client_debug_info_;
+  Allocator::CreateOwnedV2(std::move(request.allocator_request()), allocator_->parent_device_,
+                           allocator_->parent_device_->v2_allocators(),
+                           std::move(client_debug_info_copy));
 }
 
 void Allocator::V2::GetVmoInfo(GetVmoInfoRequest& request, GetVmoInfoCompleter::Sync& completer) {
@@ -349,7 +361,7 @@ void Allocator::V2::GetVmoInfo(GetVmoInfoRequest& request, GetVmoInfoCompleter::
       completer.Reply(fit::error{Error::kUnspecified});
       return;
     }
-    response.close_weak_asap() = std::move(dup_result.value());
+    response.close_weak_asap() = std::move(dup_result).value();
   }
   completer.Reply(fit::ok(std::move(response)));
 }

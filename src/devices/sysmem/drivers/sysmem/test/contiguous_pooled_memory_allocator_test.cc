@@ -7,6 +7,7 @@
 #include <lib/async-loop/loop.h>
 #include <lib/async-testing/test_loop.h>
 #include <lib/ddk/platform-defs.h>
+#include <lib/driver/testing/cpp/scoped_global_logger.h>
 #include <lib/fake-bti/bti.h>
 #include <lib/inspect/cpp/reader.h>
 #include <lib/sysmem-version/sysmem-version.h>
@@ -33,11 +34,16 @@ class FakeOwner : public MemoryAllocator::Owner {
   ~FakeOwner() {}
 
   const zx::bti& bti() override { return bti_; }
-  zx_status_t CreatePhysicalVmo(uint64_t base, uint64_t size, zx::vmo* vmo_out) override {
-    return zx::vmo::create(size, 0u, vmo_out);
+  [[nodiscard]] zx::result<zx::vmo> CreatePhysicalVmo(uint64_t base, uint64_t size) override {
+    zx::vmo result_vmo;
+    zx_status_t create_status = zx::vmo::create(size, 0u, &result_vmo);
+    if (create_status != ZX_OK) {
+      return zx::error(create_status);
+    }
+    return zx::ok(std::move(result_vmo));
   }
   inspect::Node* heap_node() override { return heap_node_; }
-  SnapshotAnnotationRegister& snapshot_annotation_register() override {
+  std::optional<SnapshotAnnotationRegister>& snapshot_annotation_register() override {
     return snapshot_annotation_register_;
   }
   SysmemMetrics& metrics() override { return metrics_; }
@@ -45,7 +51,7 @@ class FakeOwner : public MemoryAllocator::Owner {
  private:
   inspect::Node* heap_node_;
   zx::bti bti_;
-  SnapshotAnnotationRegister snapshot_annotation_register_;
+  std::optional<SnapshotAnnotationRegister> snapshot_annotation_register_;
   SysmemMetrics metrics_;
 };
 
@@ -80,6 +86,7 @@ class ContiguousPooledSystem : public ::testing::Test {
   static constexpr uint64_t kBufferCollectionId = 12;
   static constexpr uint32_t kBufferIndex = 24;
 
+  fdf_testing::ScopedGlobalLogger logger_;
   inspect::Inspector inspector_;
   FakeOwner fake_owner_{&inspector_.GetRoot()};
   ContiguousPooledMemoryAllocator allocator_;

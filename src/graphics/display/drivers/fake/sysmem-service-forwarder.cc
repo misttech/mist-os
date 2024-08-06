@@ -27,6 +27,7 @@ zx::result<std::unique_ptr<SysmemServiceForwarder>> SysmemServiceForwarder::Crea
     FX_LOGS(ERROR) << "Failed to allocate memory for SysmemServiceForwarder";
     return zx::error(ZX_ERR_NO_MEMORY);
   }
+  ZX_ASSERT(alloc_checker.check());
 
   zx::result<> initialize_result = sysmem_service_forwarder->Initialize();
   if (initialize_result.is_error()) {

@@ -54,6 +54,19 @@ void BufferCollectionToken::Bind(TokenServerEnd token_server_end) {
   Node::Bind(TakeNodeServerEnd(std::move(token_server_end)));
 }
 
+void BufferCollectionToken::QueueAllocatorClientDebugInfo(ClientDebugInfo debug_info) {
+  ZX_DEBUG_ASSERT(!queued_allocator_client_debug_info_.has_value());
+  queued_allocator_client_debug_info_.emplace(std::move(debug_info));
+}
+
+std::optional<ClientDebugInfo> BufferCollectionToken::take_queued_allocator_client_debug_info() {
+  std::optional<ClientDebugInfo> result = std::move(queued_allocator_client_debug_info_);
+  // We don't want to leave a has_value() true optional with moved-out contents, so reset() this
+  // field before returning - this can be a reset() on an already nullopt sometimes.
+  queued_allocator_client_debug_info_.reset();
+  return result;
+}
+
 void BufferCollectionToken::BindInternalV1(zx::channel token_request,
                                            ErrorHandlerWrapper error_handler_wrapper) {
   ZX_PANIC("BufferCollectionToken never serves V1 alone - only combined V1 and V2");
@@ -68,7 +81,7 @@ void BufferCollectionToken::BindInternalCombinedV1AndV2(zx::channel token_reques
                                                         ErrorHandlerWrapper error_handler_wrapper) {
   server_.emplace(*this);
   server_binding_ =
-      fidl::BindServer(parent_device()->dispatcher(),
+      fidl::BindServer(parent_device()->loop_dispatcher(),
                        TokenServerEndCombinedV1AndV2(std::move(token_request)), &server_.value(),
                        [error_handler_wrapper = std::move(error_handler_wrapper)](
                            BufferCollectionToken::CombinedTokenServer* token, fidl::UnbindInfo info,

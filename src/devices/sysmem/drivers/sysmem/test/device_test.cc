@@ -10,6 +10,11 @@
 #include <lib/async-loop/default.h>
 #include <lib/async-loop/loop.h>
 #include <lib/async/cpp/task.h>
+#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
+#include <lib/driver/testing/cpp/driver_lifecycle.h>
+#include <lib/driver/testing/cpp/driver_runtime.h>
+#include <lib/driver/testing/cpp/test_environment.h>
+#include <lib/driver/testing/cpp/test_node.h>
 #include <lib/fidl/cpp/wire/arena.h>
 #include <lib/sync/completion.h>
 #include <lib/zx/bti.h>
@@ -22,10 +27,9 @@
 
 #include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
 #include "src/devices/sysmem/drivers/sysmem/buffer_collection.h"
-#include "src/devices/sysmem/drivers/sysmem/driver.h"
+#include "src/devices/sysmem/drivers/sysmem/device.h"
 #include "src/devices/sysmem/drivers/sysmem/logical_buffer_collection.h"
-#include "src/devices/testing/mock-ddk/mock-device.h"
-#include "src/lib/testing/predicates/status.h"
+#include "src/devices/sysmem/drivers/sysmem/sysmem_config.h"
 
 namespace sysmem_driver {
 namespace {
@@ -35,93 +39,129 @@ class FakeDdkSysmem : public ::testing::Test {
   FakeDdkSysmem() {}
 
   void SetUp() override {
-    pdev_.SetConfig({
-        .use_fake_bti = true,
+    zx::result<fdf_testing::TestNode::CreateStartArgsResult> create_start_args_result =
+        node_server_.SyncCall(&fdf_testing::TestNode::CreateStartArgsAndServe);
+    ASSERT_TRUE(create_start_args_result.is_ok());
+
+    auto [start_args, incoming_directory_server, outgoing_directory_client] =
+        std::move(create_start_args_result).value();
+    start_args.config() = sysmem_config::Config{}.ToVmo();
+    start_args_ = std::move(start_args);
+    driver_outgoing_ = std::move(outgoing_directory_client);
+
+    auto init_result = test_environment_.SyncCall(&fdf_testing::TestEnvironment::Initialize,
+                                                  std::move(incoming_directory_server));
+    ASSERT_TRUE(init_result.is_ok());
+
+    fake_pdev::FakePDevFidl::Config config;
+    config.use_fake_bti = true;
+    fake_pdev_.SyncCall(&fake_pdev::FakePDevFidl::SetConfig, std::move(config));
+
+    auto pdev_instance_handler = fake_pdev_.SyncCall(&fake_pdev::FakePDevFidl::GetInstanceHandler,
+                                                     async_patterns::PassDispatcher);
+    test_environment_.SyncCall([&pdev_instance_handler](fdf_testing::TestEnvironment* env) {
+      auto add_service_result =
+          env->incoming_directory().AddService<fuchsia_hardware_platform_device::Service>(
+              std::move(pdev_instance_handler));
+      ASSERT_TRUE(add_service_result.is_ok());
     });
-    EXPECT_OK(pdev_loop_.StartThread());
 
-    auto endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
-
-    RunSyncOnLoop(pdev_loop_, [this, server = std::move(endpoints.server)]() mutable {
-      outgoing_.emplace(pdev_loop_.dispatcher());
-      auto device_handler =
-          [this](fidl::ServerEnd<fuchsia_hardware_platform_device::Device> request) {
-            fidl::BindServer(pdev_loop_.dispatcher(), std::move(request), &pdev_);
-          };
-      fuchsia_hardware_platform_device::Service::InstanceHandler handler(
-          {.device = std::move(device_handler)});
-      auto service_result =
-          outgoing_->AddService<fuchsia_hardware_platform_device::Service>(std::move(handler));
-      ZX_ASSERT(service_result.is_ok());
-
-      ZX_ASSERT(outgoing_->Serve(std::move(server)).is_ok());
-    });
-
-    fake_parent_->AddFidlService(fuchsia_hardware_platform_device::Service::Name,
-                                 std::move(endpoints.client));
-    EXPECT_EQ(sysmem_->Bind(), ZX_OK);
+    StartDriver();
   }
 
   void TearDown() override {
-    ddk::UnbindTxn txn{sysmem_->zxdev()};
-    sysmem_->DdkUnbind(std::move(txn));
-    EXPECT_OK(sysmem_->zxdev()->WaitUntilUnbindReplyCalled());
-    std::ignore = sysmem_.release();
-    loop_.Shutdown();
-    RunSyncOnLoop(pdev_loop_, [this] { outgoing_.reset(); });
+    StopDriver();
+
+    device_ = nullptr;
+    wrapped_device_.reset();
+    test_environment_.reset();
+    fake_pdev_.reset();
+    node_server_.reset();
   }
 
-  fidl::ClientEnd<fuchsia_sysmem::Allocator> Connect() {
-    auto [allocator_client_end, allocator_server_end] =
-        fidl::Endpoints<fuchsia_sysmem::Allocator>::Create();
+  fidl::ClientEnd<fuchsia_io::Directory> CreateDriverOutgoingDirClient() {
+    // Open the svc directory in the driver's outgoing, and return a client end.
+    auto svc_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
 
-    auto [connector_client_end, connector_server_end] =
-        fidl::Endpoints<fuchsia_hardware_sysmem::DriverConnector>::Create();
-
-    fidl::BindServer(loop_.dispatcher(), std::move(connector_server_end), sysmem_.get());
-    EXPECT_OK(loop_.StartThread());
-
-    auto result = fidl::WireCall(connector_client_end)->ConnectV1(std::move(allocator_server_end));
-    EXPECT_OK(result.status());
-
-    return std::move(allocator_client_end);
+    zx_status_t status = fdio_open_at(driver_outgoing_.handle()->get(), "/svc",
+                                      static_cast<uint32_t>(fuchsia_io::OpenFlags::kDirectory),
+                                      svc_endpoints.server.TakeChannel().release());
+    EXPECT_EQ(status, ZX_OK);
+    return std::move(svc_endpoints.client);
   }
 
-  fidl::ClientEnd<fuchsia_sysmem::BufferCollection> AllocateNonSharedCollection() {
-    fidl::WireSyncClient<fuchsia_sysmem::Allocator> allocator(Connect());
+  void StartDriver() {
+    zx::result start_result = runtime_.RunToCompletion(wrapped_device_.SyncCall(
+        &fdf_testing::DriverUnderTest<sysmem_driver::Device>::Start, std::move(start_args_)));
+    ASSERT_EQ(start_result.status_value(), ZX_OK);
+    wrapped_device_.SyncCall([this](fdf_testing::DriverUnderTest<sysmem_driver::Device>* device) {
+      device_ = **device;
+    });
+  }
+
+  void StopDriver() {
+    zx::result stop_result = runtime_.RunToCompletion(wrapped_device_.SyncCall(
+        &fdf_testing::DriverUnderTest<sysmem_driver::Device>::PrepareStop));
+    ASSERT_EQ(stop_result.status_value(), ZX_OK);
+  }
+
+  fidl::ClientEnd<fuchsia_sysmem2::Allocator> Connect() {
+    zx::result allocator_v2_result =
+        component::ConnectAtMember<fuchsia_hardware_sysmem::Service::AllocatorV2>(
+            CreateDriverOutgoingDirClient());
+    EXPECT_TRUE(allocator_v2_result.is_ok());
+    return std::move(allocator_v2_result).value();
+  }
+
+  fidl::ClientEnd<fuchsia_sysmem2::BufferCollection> AllocateNonSharedCollection() {
+    fidl::SyncClient<fuchsia_sysmem2::Allocator> allocator(Connect());
 
     auto [collection_client_end, collection_server_end] =
-        fidl::Endpoints<fuchsia_sysmem::BufferCollection>::Create();
+        fidl::Endpoints<fuchsia_sysmem2::BufferCollection>::Create();
 
-    EXPECT_OK(allocator->AllocateNonSharedCollection(std::move(collection_server_end)).status());
+    fuchsia_sysmem2::AllocatorAllocateNonSharedCollectionRequest allocate_non_shared_request;
+    allocate_non_shared_request.collection_request() = std::move(collection_server_end);
+    EXPECT_TRUE(
+        allocator->AllocateNonSharedCollection(std::move(allocate_non_shared_request)).is_ok());
     return std::move(collection_client_end);
   }
 
-  void RunSyncOnLoop(async::Loop& loop, fit::closure to_run) {
-    sync_completion_t done;
-    ZX_ASSERT(ZX_OK ==
-              async::PostTask(loop.dispatcher(), [&done, to_run = std::move(to_run)]() mutable {
-                std::move(to_run)();
-                sync_completion_signal(&done);
-              }));
-    ZX_ASSERT(ZX_OK == sync_completion_wait_deadline(&done, ZX_TIME_INFINITE));
+  fdf_testing::DriverRuntime& runtime() { return runtime_; }
+  async_patterns::TestDispatcherBound<fdf_testing::DriverUnderTest<sysmem_driver::Device>>&
+  wrapped_device() {
+    return wrapped_device_;
   }
 
+  async_dispatcher_t* driver_async_dispatcher() { return driver_dispatcher_->async_dispatcher(); }
+  async_dispatcher_t* env_async_dispatcher() { return env_dispatcher_->async_dispatcher(); }
+
  protected:
-  sysmem_driver::Driver sysmem_ctx_;
-  std::shared_ptr<MockDevice> fake_parent_ = MockDevice::FakeRootParent();
-  std::unique_ptr<sysmem_driver::Device> sysmem_{new Device{fake_parent_.get(), &sysmem_ctx_}};
+  // Attaches a foreground dispatcher for us automatically.
+  fdf_testing::DriverRuntime runtime_;
 
-  fake_pdev::FakePDevFidl pdev_;
+  // Env dispatcher and driver dispatchers run separately in the background because we need to make
+  // sync calls from driver dispatcher to env dispatcher, and from test thread to driver dispatcher
+  // (in Connect).
+  fdf::UnownedSynchronizedDispatcher driver_dispatcher_ = runtime_.StartBackgroundDispatcher();
+  fdf::UnownedSynchronizedDispatcher env_dispatcher_ = runtime_.StartBackgroundDispatcher();
 
-  async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
-  // Separate loop so we can make sync FIDL calls from loop_ to pdev_loop_.
-  async::Loop pdev_loop_{&kAsyncLoopConfigNeverAttachToThread};
-  // std::optional<> because outgoing_ can only be created, used, deleted on pdev_loop_
-  std::optional<component::OutgoingDirectory> outgoing_;
+  async_patterns::TestDispatcherBound<fdf_testing::TestNode> node_server_{
+      env_async_dispatcher(), std::in_place, std::string("root")};
+  async_patterns::TestDispatcherBound<fake_pdev::FakePDevFidl> fake_pdev_{env_async_dispatcher(),
+                                                                          std::in_place};
+  async_patterns::TestDispatcherBound<fdf_testing::TestEnvironment> test_environment_{
+      env_async_dispatcher(), std::in_place};
+
+  fuchsia_driver_framework::DriverStartArgs start_args_;
+  fidl::ClientEnd<fuchsia_io::Directory> driver_outgoing_;
+
+  async_patterns::TestDispatcherBound<fdf_testing::DriverUnderTest<sysmem_driver::Device>>
+      wrapped_device_{driver_async_dispatcher(), std::in_place};
+
+  sysmem_driver::Device* device_ = nullptr;
 };
 
-TEST_F(FakeDdkSysmem, TearDownLoop) {
+TEST_F(FakeDdkSysmem, Lifecycle) {
   // Queue up something that would be processed on the FIDL thread, so we can try to detect a
   // use-after-free if the FidlServer outlives the sysmem device.
   AllocateNonSharedCollection();
@@ -130,181 +170,216 @@ TEST_F(FakeDdkSysmem, TearDownLoop) {
 // Test that creating and tearing down a SecureMem connection works correctly.
 TEST_F(FakeDdkSysmem, DummySecureMem) {
   auto [client, server] = fidl::Endpoints<fuchsia_sysmem::SecureMem>::Create();
-  ASSERT_OK(sysmem_->RegisterSecureMemInternal(std::move(client)));
+  ASSERT_EQ(device_->RegisterSecureMemInternal(std::move(client)), ZX_OK);
 
   // This shouldn't deadlock waiting for a message on the channel.
-  EXPECT_OK(sysmem_->UnregisterSecureMemInternal());
+  ASSERT_EQ(device_->UnregisterSecureMemInternal(), ZX_OK);
 
   // This shouldn't cause a panic due to receiving peer closed.
   client.reset();
 }
 
 TEST_F(FakeDdkSysmem, NamedToken) {
-  fidl::WireSyncClient<fuchsia_sysmem::Allocator> allocator(Connect());
+  fidl::SyncClient<fuchsia_sysmem2::Allocator> allocator(Connect());
 
   auto [token_client_end, token_server_end] =
-      fidl::Endpoints<fuchsia_sysmem::BufferCollectionToken>::Create();
+      fidl::Endpoints<fuchsia_sysmem2::BufferCollectionToken>::Create();
 
-  EXPECT_OK(allocator->AllocateSharedCollection(std::move(token_server_end)).status());
+  fuchsia_sysmem2::AllocatorAllocateSharedCollectionRequest allocate_shared_request;
+  allocate_shared_request.token_request() = std::move(token_server_end);
+  EXPECT_TRUE(allocator->AllocateSharedCollection(std::move(allocate_shared_request)).is_ok());
 
-  fidl::WireSyncClient<fuchsia_sysmem::BufferCollectionToken> token(std::move(token_client_end));
+  fidl::SyncClient<fuchsia_sysmem2::BufferCollectionToken> token(std::move(token_client_end));
 
   // The buffer collection should end up with a name of "a" because that's the highest priority.
-  EXPECT_OK(token->SetName(5u, "c").status());
-  EXPECT_OK(token->SetName(100u, "a").status());
-  EXPECT_OK(token->SetName(6u, "b").status());
+  {
+    fuchsia_sysmem2::NodeSetNameRequest set_name_request;
+    set_name_request.priority() = 5u;
+    set_name_request.name() = "c";
+    EXPECT_TRUE(token->SetName(std::move(set_name_request)).is_ok());
+  }
+  {
+    fuchsia_sysmem2::NodeSetNameRequest set_name_request;
+    set_name_request.priority() = 100u;
+    set_name_request.name() = "a";
+    EXPECT_TRUE(token->SetName(std::move(set_name_request)).is_ok());
+  }
+  {
+    fuchsia_sysmem2::NodeSetNameRequest set_name_request;
+    set_name_request.priority() = 6u;
+    set_name_request.name() = "b";
+    EXPECT_TRUE(token->SetName(std::move(set_name_request)).is_ok());
+  }
 
   auto [collection_client_end, collection_server_end] =
-      fidl::Endpoints<fuchsia_sysmem::BufferCollection>::Create();
+      fidl::Endpoints<fuchsia_sysmem2::BufferCollection>::Create();
 
-  EXPECT_OK(allocator->BindSharedCollection(token.TakeClientEnd(), std::move(collection_server_end))
-                .status());
+  fuchsia_sysmem2::AllocatorBindSharedCollectionRequest bind_shared_request;
+  bind_shared_request.token() = token.TakeClientEnd();
+  bind_shared_request.buffer_collection_request() = std::move(collection_server_end);
+  EXPECT_TRUE(allocator->BindSharedCollection(std::move(bind_shared_request)).is_ok());
 
   // Poll until a matching buffer collection is found.
   while (true) {
-    bool found_collection = false;
-    sync_completion_t completion;
-    async::PostTask(sysmem_->dispatcher(), [&] {
-      if (sysmem_->logical_buffer_collections().size() == 1) {
-        const auto* logical_collection = *sysmem_->logical_buffer_collections().begin();
+    bool found_collection = device_->SyncCall([&]() {
+      if (device_->logical_buffer_collections().size() == 1) {
+        const auto* logical_collection = *device_->logical_buffer_collections().begin();
         auto collection_views = logical_collection->collection_views();
         if (collection_views.size() == 1) {
           auto name = logical_collection->name();
           EXPECT_TRUE(name);
           EXPECT_EQ("a", *name);
-          found_collection = true;
+          return true;
         }
       }
-      sync_completion_signal(&completion);
+      return false;
     });
-
-    sync_completion_wait(&completion, ZX_TIME_INFINITE);
-    if (found_collection)
+    if (found_collection) {
       break;
+    }
   }
 }
 
 TEST_F(FakeDdkSysmem, NamedClient) {
   auto collection_client_end = AllocateNonSharedCollection();
 
-  fidl::WireSyncClient<fuchsia_sysmem::BufferCollection> collection(
-      std::move(collection_client_end));
-  EXPECT_OK(collection->SetDebugClientInfo("a", 5).status());
+  fidl::SyncClient<fuchsia_sysmem2::BufferCollection> collection(std::move(collection_client_end));
+  fuchsia_sysmem2::NodeSetDebugClientInfoRequest set_debug_request;
+  set_debug_request.name() = "a";
+  set_debug_request.id() = 5;
+  EXPECT_TRUE(collection->SetDebugClientInfo(std::move(set_debug_request)).is_ok());
 
   // Poll until a matching buffer collection is found.
   while (true) {
-    bool found_collection = false;
-    sync_completion_t completion;
-    async::PostTask(sysmem_->dispatcher(), [&] {
-      if (sysmem_->logical_buffer_collections().size() == 1) {
-        const auto* logical_collection = *sysmem_->logical_buffer_collections().begin();
-        if (logical_collection->collection_views().size() == 1) {
+    bool found_collection = device_->SyncCall([&]() mutable {
+      if (device_->logical_buffer_collections().size() == 1) {
+        const auto* logical_collection = *device_->logical_buffer_collections().begin();
+        auto collection_views = logical_collection->collection_views();
+        if (collection_views.size() == 1) {
           const BufferCollection* collection = logical_collection->collection_views().front();
           if (collection->node_properties().client_debug_info().name == "a") {
             EXPECT_EQ(5u, collection->node_properties().client_debug_info().id);
-            found_collection = true;
+            return true;
           }
         }
       }
-      sync_completion_signal(&completion);
+      return false;
     });
-
-    sync_completion_wait(&completion, ZX_TIME_INFINITE);
-    if (found_collection)
+    if (found_collection) {
       break;
+    }
   }
 }
 
 // Check that the allocator name overrides the collection name.
 TEST_F(FakeDdkSysmem, NamedAllocatorToken) {
-  fidl::WireSyncClient<fuchsia_sysmem::Allocator> allocator(Connect());
+  fidl::SyncClient<fuchsia_sysmem2::Allocator> allocator(Connect());
 
   auto [token_client_end, token_server_end] =
-      fidl::Endpoints<fuchsia_sysmem::BufferCollectionToken>::Create();
+      fidl::Endpoints<fuchsia_sysmem2::BufferCollectionToken>::Create();
 
-  EXPECT_OK(allocator->AllocateSharedCollection(std::move(token_server_end)).status());
+  fuchsia_sysmem2::AllocatorAllocateSharedCollectionRequest allocate_shared_request;
+  allocate_shared_request.token_request() = std::move(token_server_end);
+  EXPECT_TRUE(allocator->AllocateSharedCollection(std::move(allocate_shared_request)).is_ok());
 
-  fidl::WireSyncClient<fuchsia_sysmem::BufferCollectionToken> token(std::move(token_client_end));
+  fidl::SyncClient<fuchsia_sysmem2::BufferCollectionToken> token(std::move(token_client_end));
 
   const char kAlphabetString[] = "abcdefghijklmnopqrstuvwxyz";
-  EXPECT_OK(token->SetDebugClientInfo("bad", 6).status());
-  EXPECT_OK(allocator->SetDebugClientInfo(kAlphabetString, 5).status());
+  {
+    fuchsia_sysmem2::AllocatorSetDebugClientInfoRequest set_debug_request;
+    set_debug_request.name() = kAlphabetString;
+    set_debug_request.id() = 5;
+    EXPECT_TRUE(allocator->SetDebugClientInfo(std::move(set_debug_request)).is_ok());
+  }
+  // Despite this message being sent after the above message, this message is not the "final word"
+  // on the debug info, because the allocator will fence all token messages before transferring the
+  // allocator's debug info to the BufferColllection.
+  {
+    fuchsia_sysmem2::NodeSetDebugClientInfoRequest set_debug_request;
+    set_debug_request.name() = "bad";
+    set_debug_request.id() = 6;
+    EXPECT_TRUE(token->SetDebugClientInfo(std::move(set_debug_request)).is_ok());
+  }
 
   auto [collection_client_end, collection_server_end] =
-      fidl::Endpoints<fuchsia_sysmem::BufferCollection>::Create();
+      fidl::Endpoints<fuchsia_sysmem2::BufferCollection>::Create();
 
-  EXPECT_OK(allocator->BindSharedCollection(token.TakeClientEnd(), std::move(collection_server_end))
-                .status());
+  fuchsia_sysmem2::AllocatorBindSharedCollectionRequest bind_shared_request;
+  bind_shared_request.token() = token.TakeClientEnd();
+  bind_shared_request.buffer_collection_request() = std::move(collection_server_end);
+  EXPECT_TRUE(allocator->BindSharedCollection(std::move(bind_shared_request)).is_ok());
 
-  // Poll until a matching buffer collection is found.
+  // Poll until a matching buffer collection is found. If this gets stuck, sysmem may be failing to
+  // ensure that the allocator's debug info is the "last word" - may be failing to fence the token
+  // messages before applyign the allocator's debug info to the token.
   while (true) {
-    bool found_collection = false;
-    sync_completion_t completion;
-    async::PostTask(sysmem_->dispatcher(), [&] {
-      if (sysmem_->logical_buffer_collections().size() == 1) {
-        const auto* logical_collection = *sysmem_->logical_buffer_collections().begin();
+    bool found_collection = device_->SyncCall([&]() {
+      ZX_ASSERT(fdf::Dispatcher::GetCurrent()->async_dispatcher() == device_->loop_dispatcher());
+      if (device_->logical_buffer_collections().size() == 1) {
+        const auto* logical_collection = *device_->logical_buffer_collections().begin();
         auto collection_views = logical_collection->collection_views();
         if (collection_views.size() == 1) {
           const auto& collection = collection_views.front();
-          if (collection->node_properties().client_debug_info().name.find(kAlphabetString) !=
-              std::string::npos) {
+          // This needs to tell the difference between "abcdefghijklmnopqrstuvwxyz" and
+          // "bad (was abcdefghijklmnopqrstuvwxyz)".
+          if (collection->node_properties().client_debug_info().name.find(kAlphabetString) == 0) {
             EXPECT_EQ(5u, collection->node_properties().client_debug_info().id);
-            found_collection = true;
+            return true;
           }
         }
       }
-      sync_completion_signal(&completion);
+      return false;
     });
-
-    sync_completion_wait(&completion, ZX_TIME_INFINITE);
-    if (found_collection)
+    if (found_collection) {
       break;
+    }
   }
 }
 
 TEST_F(FakeDdkSysmem, MaxSize) {
-  sysmem_->set_settings(sysmem_driver::Settings{.max_allocation_size = zx_system_get_page_size()});
+  device_->set_settings(sysmem_driver::Settings{.max_allocation_size = zx_system_get_page_size()});
 
   auto collection_client = AllocateNonSharedCollection();
 
-  fuchsia_sysmem::BufferCollectionConstraints constraints;
+  fuchsia_sysmem2::BufferCollectionConstraints constraints;
   constraints.min_buffer_count() = 1;
-  constraints.has_buffer_memory_constraints() = true;
-  constraints.buffer_memory_constraints().min_size_bytes() = zx_system_get_page_size() * 2;
-  constraints.buffer_memory_constraints().cpu_domain_supported() = true;
-  constraints.usage().cpu() = fuchsia_sysmem::kCpuUsageRead;
+  auto& bmc = constraints.buffer_memory_constraints().emplace();
+  bmc.min_size_bytes() = zx_system_get_page_size() * 2;
+  bmc.cpu_domain_supported() = true;
+  constraints.usage().emplace().cpu() = fuchsia_sysmem::kCpuUsageRead;
 
-  fidl::WireSyncClient<fuchsia_sysmem::BufferCollection> collection(std::move(collection_client));
-  fidl::Arena arena;
-  EXPECT_OK(collection->SetConstraints(true, fidl::ToWire(arena, std::move(constraints))).status());
+  fidl::SyncClient<fuchsia_sysmem2::BufferCollection> collection(std::move(collection_client));
+  fuchsia_sysmem2::BufferCollectionSetConstraintsRequest set_constraints_request;
+  set_constraints_request.constraints() = std::move(constraints);
+  EXPECT_TRUE(collection->SetConstraints(std::move(set_constraints_request)).is_ok());
 
   // Sysmem should fail the collection and return an error.
-  fidl::WireResult result = collection->WaitForBuffersAllocated();
-  EXPECT_NE(result.status(), ZX_OK);
+  auto wait_result = collection->WaitForAllBuffersAllocated();
+  EXPECT_TRUE(!wait_result.is_ok());
 }
 
 // Check that teardown doesn't leak any memory (detected through LSAN).
 TEST_F(FakeDdkSysmem, TeardownLeak) {
   auto collection_client = AllocateNonSharedCollection();
 
-  fuchsia_sysmem::BufferCollectionConstraints constraints;
+  fuchsia_sysmem2::BufferCollectionConstraints constraints;
   constraints.min_buffer_count() = 1;
-  constraints.has_buffer_memory_constraints() = true;
-  constraints.buffer_memory_constraints().min_size_bytes() = zx_system_get_page_size();
-  constraints.buffer_memory_constraints().cpu_domain_supported() = true;
-  constraints.usage().cpu() = fuchsia_sysmem::kCpuUsageRead;
+  auto& bmc = constraints.buffer_memory_constraints().emplace();
+  bmc.min_size_bytes() = zx_system_get_page_size();
+  bmc.cpu_domain_supported() = true;
+  constraints.usage().emplace().cpu() = fuchsia_sysmem::kCpuUsageRead;
 
-  fidl::WireSyncClient<fuchsia_sysmem::BufferCollection> collection(std::move(collection_client));
-  fidl::Arena arena;
-  EXPECT_OK(collection->SetConstraints(true, fidl::ToWire(arena, std::move(constraints))).status());
+  fidl::SyncClient<fuchsia_sysmem2::BufferCollection> collection(std::move(collection_client));
+  fuchsia_sysmem2::BufferCollectionSetConstraintsRequest set_constraints_request;
+  set_constraints_request.constraints() = std::move(constraints);
+  EXPECT_TRUE(collection->SetConstraints(std::move(set_constraints_request)).is_ok());
 
-  fidl::WireResult result = collection->WaitForBuffersAllocated();
+  auto wait_result = collection->WaitForAllBuffersAllocated();
+  EXPECT_TRUE(wait_result.is_ok());
+  auto info = std::move(wait_result->buffer_collection_info());
 
-  EXPECT_OK(result.status());
-  EXPECT_OK(result.value().status);
-
-  for (uint32_t i = 0; i < result.value().buffer_collection_info.buffer_count; i++) {
-    result.value().buffer_collection_info.buffers[i].vmo.reset();
+  for (uint32_t i = 0; i < info->buffers()->size(); i++) {
+    info->buffers()->at(i).vmo().reset();
   }
   collection = {};
 }
@@ -313,40 +388,37 @@ TEST_F(FakeDdkSysmem, TeardownLeak) {
 TEST_F(FakeDdkSysmem, BufferLeak) {
   auto collection_client = AllocateNonSharedCollection();
 
-  fuchsia_sysmem::BufferCollectionConstraints constraints;
+  fuchsia_sysmem2::BufferCollectionConstraints constraints;
   constraints.min_buffer_count() = 1;
-  constraints.has_buffer_memory_constraints() = true;
-  constraints.buffer_memory_constraints().min_size_bytes() = zx_system_get_page_size();
-  constraints.buffer_memory_constraints().cpu_domain_supported() = true;
-  constraints.usage().cpu() = fuchsia_sysmem::kCpuUsageRead;
+  auto& bmc = constraints.buffer_memory_constraints().emplace();
+  bmc.min_size_bytes() = zx_system_get_page_size();
+  bmc.cpu_domain_supported() = true;
+  constraints.usage().emplace().cpu() = fuchsia_sysmem::kCpuUsageRead;
 
-  fidl::WireSyncClient<fuchsia_sysmem::BufferCollection> collection(std::move(collection_client));
-  fidl::Arena arena;
-  EXPECT_OK(collection->SetConstraints(true, fidl::ToWire(arena, std::move(constraints))).status());
+  fidl::SyncClient<fuchsia_sysmem2::BufferCollection> collection(std::move(collection_client));
+  fuchsia_sysmem2::BufferCollectionSetConstraintsRequest set_constraints_request;
+  set_constraints_request.constraints() = std::move(constraints);
+  EXPECT_TRUE(collection->SetConstraints(std::move(set_constraints_request)).is_ok());
 
-  fidl::WireResult result = collection->WaitForBuffersAllocated();
+  auto wait_result = collection->WaitForAllBuffersAllocated();
+  EXPECT_TRUE(wait_result.is_ok());
+  auto info = std::move(wait_result->buffer_collection_info());
 
-  EXPECT_OK(result.status());
-  EXPECT_OK(result.value().status);
-
-  for (uint32_t i = 0; i < result.value().buffer_collection_info.buffer_count; i++) {
-    result.value().buffer_collection_info.buffers[i].vmo.reset();
+  for (uint32_t i = 0; i < info->buffers()->size(); i++) {
+    info->buffers()->at(i).vmo().reset();
   }
 
   collection = {};
 
   // Poll until all buffer collections are deleted.
   while (true) {
-    bool no_collections = false;
-    sync_completion_t completion;
-    async::PostTask(sysmem_->dispatcher(), [&] {
-      no_collections = sysmem_->logical_buffer_collections().empty();
-      sync_completion_signal(&completion);
+    bool no_collections = device_->SyncCall([&]() {
+      no_collections = device_->logical_buffer_collections().empty();
+      return no_collections;
     });
-
-    sync_completion_wait(&completion, ZX_TIME_INFINITE);
-    if (no_collections)
+    if (no_collections) {
       break;
+    }
   }
 }
 

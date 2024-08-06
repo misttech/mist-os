@@ -5,15 +5,8 @@
 #ifndef SRC_DEVICES_SYSMEM_DRIVERS_SYSMEM_MACROS_H_
 #define SRC_DEVICES_SYSMEM_DRIVERS_SYSMEM_MACROS_H_
 
-#include <lib/ddk/debug.h>
+#include <lib/driver/logging/cpp/logger.h>
 
-// severity can be ERROR, WARN, INFO, DEBUG, TRACE.  See ddk/debug.h.
-#define LOG(severity, fmt, ...) zxlogf(severity, fmt, ##__VA_ARGS__)
-
-#define DRIVER_ERROR(fmt, ...) LOG(ERROR, fmt, ##__VA_ARGS__)
-
-#define DRIVER_INFO(fmt, ...) LOG(INFO, fmt, ##__VA_ARGS__)
-
-#define DRIVER_DEBUG(fmt, ...) LOG(DEBUG, fmt, ##__VA_ARGS__)
+#define LOG(severity, fmt, ...) FDF_LOG(severity, fmt, ##__VA_ARGS__)
 
 #endif  // SRC_DEVICES_SYSMEM_DRIVERS_SYSMEM_MACROS_H_
