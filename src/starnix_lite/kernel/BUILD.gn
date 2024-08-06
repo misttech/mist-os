@@ -117,6 +117,7 @@ rustc_library("starnix_lite_core") {
     "arch/${current_cpu}/signal_handling.rs",
     "arch/${current_cpu}/syscalls.rs",
     "arch/${current_cpu}/task.rs",
+    "arch/${current_cpu}/vdso.rs",
     "arch/mod.rs",
     "device/device_init.rs",
     "device/device_mapper.rs",
@@ -231,6 +232,8 @@ rustc_library("starnix_lite_core") {
     "time/mod.rs",
     "time/utc.rs",
     "timer/mod.rs",
+    "vdso/mod.rs",
+    "vdso/vdso_loader.rs",
     "vfs/aio.rs",
     "vfs/anon_node.rs",
     "vfs/buffers/io_buffers.rs",
@@ -327,6 +330,7 @@ rustc_library("starnix_lite_core") {
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
+    "//src/lib/fuchsia-fs",
     "//src/lib/fuchsia-runtime",
     "//src/lib/mundane",
     "//src/lib/network/fidl_fuchsia_net_filter_ext",
@@ -338,6 +342,7 @@ rustc_library("starnix_lite_core") {
     "//src/starnix/kernel:starnix_lifecycle",
     "//src/starnix/kernel:starnix_logging",
     "//src/starnix/kernel:starnix_sync",
+    "//src/starnix/kernel:vdso-data($bionic_linux_toolchain)",
     "//src/starnix/lib/extended_pstate:lib",
     "//src/starnix/lib/filter_methods_macro",
     "//src/starnix/lib/linux_uapi",
@@ -513,6 +518,9 @@ zbi("starnix_lite_kernel_zbi") {
     "//examples/nolibc:linux-bin",
     "//src/starnix/containers:default_init",
     "//src/starnix/containers/mistos:container_resources",
+
+    #VDSO
+    "//src/starnix/kernel:vdso-data($bionic_linux_toolchain)",
   ]
 
   output_name = "starnix_lite_kernel"
