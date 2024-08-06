@@ -1,0 +1,10 @@
+Name: autoflake
+License: MIT License
+License File: src/LICENSE
+Upstream Git: https://github.com/PyCQA/autoflake
+Description: Removes unused imports and unused variables as reported by pyflakes.
+
+Changes made to Work with Fuchsia:
+
+Created a wrapper script to add pyflakes and its dependency autoflake to the
+python path, making it easy to run autoflake.
