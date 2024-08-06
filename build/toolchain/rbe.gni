@@ -148,7 +148,7 @@ declare_args() {
 
   # TODO(b/42084033): Controls whether or not to download (intermediate)
   # rlibs from remote Rust build actions.
-  rust_rbe_download_rlibs = true
+  rust_rbe_download_rlibs = rbe_settings.rust_download_rlibs
 
   ########################
   ### C++ RBE controls ###
@@ -159,7 +159,7 @@ declare_args() {
   cxx_rbe_enable = rbe_settings.cxx_enable
 
   # Set to true to use a fast, minimalist wrapper, that lacks features
-  # of the python-based wrapper.  Use with caution.
+  # of the python-based wrapper, and is close to a bare call to rewrapper.
   # This flag is only meaningful when `cxx_rbe_enable` is true.
   cxx_rbe_minimalist_wrapper = true
 
@@ -215,7 +215,7 @@ declare_args() {
   # that be used to retrieve remote artifacts later using build/rbe/dlwrap.py.
   # TODO(b/284994230): This option is only available to developers,
   # and not restricted environments that lack direct network access.
-  cxx_rbe_download_obj_files = true
+  cxx_rbe_download_obj_files = rbe_settings.cxx_download_objects
 
   ############################
   ### Linking RBE controls ###
@@ -324,7 +324,7 @@ assert(
 
 assert(
     cxx_rbe_download_obj_files || !cxx_rbe_minimalist_wrapper,
-    "Skipping downloading .o files is only available with the non-minimalist cxx_remote_wrapper.py wrapper.")
+    "Skipping downloading .o files is only available with the non-minimalist cxx_remote_wrapper.py wrapper.  Set cxx_rbe_minimalist_wrapper=false if this is what you intended.")
 
 assert(
     link_rbe_check == "none" || link_rbe_check == "consistency" ||
