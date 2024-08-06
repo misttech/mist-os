@@ -30,10 +30,11 @@ fn initialize() -> Scoped<zx::Job> {
 fn install_panic_hook() {
     let old_hook = panic::take_hook();
     let new_hook = Box::new(
-        move |// TODO(https://fxbug.dev/354739990): Remove #[allow(deprecated)]
-              // and change to PanicInfo to PanicHookInfo once we roll
-              // https://github.com/rust-lang/rust/commit/64e56db72aa2b1f112504504a7dceba63881cdef.
-              #[allow(deprecated)] panic_info: &panic::PanicInfo<'_>| {
+        // TODO(https://fxbug.dev/357638987): Remove #[allow(deprecated)]
+        // and change PanicInfo to PanicHookInfo once we roll
+        // https://github.com/rust-lang/rust/commit/64e56db72aa2b1f112504504a7dceba63881cdef.
+        #[allow(deprecated)]
+        move |panic_info: &panic::PanicInfo<'_>| {
             exit_hook();
             old_hook(panic_info);
         },
