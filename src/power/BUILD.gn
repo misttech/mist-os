@@ -35,6 +35,11 @@ group("drivers") {
   ]
 }
 
+group("benchmarks") {
+  testonly = true
+  deps = [ "system-activity-governor:benchmarks" ]
+}
+
 group("tests") {
   testonly = true
   deps = [
