@@ -8,6 +8,7 @@
 
 #![allow(dead_code)]
 
+mod ring_buffer;
 mod vec1;
 
 pub mod clock;
