@@ -14,7 +14,10 @@ use cm_rust::{CapabilityTypeName, ProtocolDecl, StorageDecl, StorageDirectorySou
 use cm_types::Name;
 use fidl_fuchsia_component_decl as fdecl;
 use moniker::{ExtendedMoniker, Moniker};
-use routing::capability_source::{CapabilitySource, ComponentCapability, InternalCapability};
+use routing::capability_source::{
+    BuiltinSource, CapabilitySource, CapabilityToCapabilitySource, ComponentCapability,
+    ComponentSource, FrameworkSource, InternalCapability, NamespaceSource,
+};
 use routing::component_instance::ComponentInstanceInterface;
 use routing::policy::GlobalPolicyChecker;
 use std::collections::{HashMap, HashSet};
@@ -82,10 +85,10 @@ where
         let global_policy_checker = GlobalPolicyChecker::new(Arc::new(policy_builder.build()));
         let component = self.make_component(vec!["foo:0", "bar:0"].try_into().unwrap()).await;
 
-        let protocol_capability = CapabilitySource::Framework {
+        let protocol_capability = CapabilitySource::Framework(FrameworkSource {
             capability: InternalCapability::Protocol("fuchsia.component.Realm".parse().unwrap()),
             moniker: component.moniker().clone(),
-        };
+        });
         let valid_path_0 = Moniker::try_from(vec!["foo", "bar"]).unwrap();
         let valid_path_1 = Moniker::try_from(vec!["foo", "bar", "baz"]).unwrap();
         let invalid_path_0 = Moniker::try_from(vec!["foobar"]).unwrap();
@@ -128,13 +131,13 @@ where
         );
         let global_policy_checker = GlobalPolicyChecker::new(Arc::new(policy_builder.build()));
 
-        let protocol_capability = CapabilitySource::Namespace {
+        let protocol_capability = CapabilitySource::Namespace(NamespaceSource {
             capability: ComponentCapability::Protocol(ProtocolDecl {
                 name: "fuchsia.kernel.MmioResource".parse().unwrap(),
                 source_path: Some("/svc/fuchsia.kernel.MmioResource".parse().unwrap()),
                 delivery: Default::default(),
             }),
-        };
+        });
         let valid_path_0 = Moniker::try_from(vec!["root"]).unwrap();
         let valid_path_2 = Moniker::try_from(vec!["root", "core"]).unwrap();
         let valid_path_1 = Moniker::try_from(vec!["root", "bootstrap"]).unwrap();
@@ -185,14 +188,14 @@ where
         let global_policy_checker = GlobalPolicyChecker::new(Arc::new(policy_builder.build()));
         let component = self.make_component(vec!["foo:0"].try_into().unwrap()).await;
 
-        let protocol_capability = CapabilitySource::Component {
+        let protocol_capability = CapabilitySource::Component(ComponentSource {
             capability: ComponentCapability::Protocol(ProtocolDecl {
                 name: "fuchsia.foo.FooBar".parse().unwrap(),
                 source_path: Some("/svc/fuchsia.foo.FooBar".parse().unwrap()),
                 delivery: Default::default(),
             }),
             moniker: component.moniker().clone(),
-        };
+        });
         let valid_path_0 = Moniker::try_from(vec!["root", "bootstrap"]).unwrap();
         let valid_path_1 = Moniker::try_from(vec!["root", "core"]).unwrap();
         let invalid_path_0 = Moniker::try_from(vec!["foobar"]).unwrap();
@@ -238,7 +241,7 @@ where
         let global_policy_checker = GlobalPolicyChecker::new(Arc::new(policy_builder.build()));
         let component = self.make_component(vec!["foo:0"].try_into().unwrap()).await;
 
-        let protocol_capability = CapabilitySource::Capability {
+        let protocol_capability = CapabilitySource::Capability(CapabilityToCapabilitySource {
             source_capability: ComponentCapability::Storage(StorageDecl {
                 backing_dir: "cache".parse().unwrap(),
                 name: "cache".parse().unwrap(),
@@ -247,7 +250,7 @@ where
                 storage_id: fdecl::StorageId::StaticInstanceIdOrMoniker,
             }),
             moniker: component.moniker().clone(),
-        };
+        });
         let valid_path_0 = Moniker::try_from(vec!["root", "bootstrap"]).unwrap();
         let valid_path_1 = Moniker::try_from(vec!["root", "core"]).unwrap();
         let invalid_path_0 = Moniker::try_from(vec!["foobar"]).unwrap();
@@ -536,9 +539,9 @@ where
         );
         let global_policy_checker = GlobalPolicyChecker::new(Arc::new(policy_builder.build()));
 
-        let dir_capability = CapabilitySource::Builtin {
+        let dir_capability = CapabilitySource::Builtin(BuiltinSource {
             capability: InternalCapability::Directory("test".parse().unwrap()),
-        };
+        });
         let valid_path_0 = Moniker::try_from(vec!["root"]).unwrap();
         let valid_path_1 = Moniker::try_from(vec!["root", "core"]).unwrap();
         let invalid_path_0 = Moniker::try_from(vec!["foobar"]).unwrap();
@@ -582,13 +585,13 @@ where
             ],
         );
         let global_policy_checker = GlobalPolicyChecker::new(Arc::new(policy_builder.build()));
-        let protocol_capability = CapabilitySource::Namespace {
+        let protocol_capability = CapabilitySource::Namespace(NamespaceSource {
             capability: ComponentCapability::Protocol(ProtocolDecl {
                 name: "fuchsia.kernel.MmioResource".parse().unwrap(),
                 source_path: Some("/svc/fuchsia.kernel.MmioResource".parse().unwrap()),
                 delivery: Default::default(),
             }),
-        };
+        });
 
         macro_rules! can_route {
             ($moniker:expr) => {
@@ -630,13 +633,13 @@ where
             ],
         );
         let global_policy_checker = GlobalPolicyChecker::new(Arc::new(policy_builder.build()));
-        let protocol_capability = CapabilitySource::Namespace {
+        let protocol_capability = CapabilitySource::Namespace(NamespaceSource {
             capability: ComponentCapability::Protocol(ProtocolDecl {
                 name: "fuchsia.kernel.MmioResource".parse().unwrap(),
                 source_path: Some("/svc/fuchsia.kernel.MmioResource".parse().unwrap()),
                 delivery: Default::default(),
             }),
-        };
+        });
 
         macro_rules! can_route {
             ($moniker:expr) => {

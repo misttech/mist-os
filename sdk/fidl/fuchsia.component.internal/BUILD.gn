@@ -6,8 +6,11 @@ import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.component.internal") {
   sources = [
+    "capability_source.fidl",
+    "component_capability.fidl",
     "component_id_index.fidl",
     "config.fidl",
+    "internal_capability.fidl",
   ]
   public_deps = [
     "//sdk/fidl/fuchsia.component",

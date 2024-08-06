@@ -14,7 +14,7 @@ use fuchsia_zircon::{self as zx, Clock};
 use futures::future::BoxFuture;
 use futures::{Future, FutureExt, TryStreamExt};
 use namespace::{Namespace, NamespaceError};
-use routing::capability_source::CapabilitySource;
+use routing::capability_source::{BuiltinSource, CapabilitySource};
 use routing::policy::ScopedPolicyChecker;
 use runner::component::{ChannelEpitaph, Controllable, Controller};
 use sandbox::{Capability, Dict, DirEntry, RemotableCapability};
@@ -234,9 +234,9 @@ impl ElfRunnerProgram {
 
         let inner_clone = inner.clone();
         let elf_runner = Arc::new(LaunchTaskOnReceive::new(
-            CapabilitySource::Builtin {
+            CapabilitySource::Builtin(BuiltinSource {
                 capability: InternalCapability::Runner(Name::new("elf").unwrap()),
-            },
+            }),
             task_group.as_weak(),
             fcrunner::ComponentRunnerMarker::PROTOCOL_NAME,
             None,
@@ -252,11 +252,11 @@ impl ElfRunnerProgram {
 
         let inner_clone = inner.clone();
         let snapshot_provider = Arc::new(LaunchTaskOnReceive::new(
-            CapabilitySource::Builtin {
+            CapabilitySource::Builtin(BuiltinSource {
                 capability: InternalCapability::Protocol(
                     Name::new(fattribution::ProviderMarker::PROTOCOL_NAME).unwrap(),
                 ),
-            },
+            }),
             task_group.as_weak(),
             fattribution::ProviderMarker::PROTOCOL_NAME,
             None,

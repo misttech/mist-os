@@ -3,8 +3,9 @@
 // found in the LICENSE file.
 
 use crate::capability_source::{
-    AggregateInstance, AggregateMember, CapabilitySource, ComponentCapability,
-    FilteredAggregateCapabilityProvider, FilteredAggregateCapabilityRouteData,
+    AggregateInstance, AggregateMember, AnonymizedAggregateSource, CapabilitySource,
+    ComponentCapability, ComponentSource, FilteredAggregateCapabilityProvider,
+    FilteredAggregateCapabilityRouteData, FilteredAggregateProviderSource, FilteredProviderSource,
 };
 use crate::component_instance::{
     ComponentInstanceInterface, ExtendedInstanceInterface, ResolvedInstanceInterface,
@@ -60,8 +61,12 @@ where
         source: &CapabilitySource,
         source_component_instance: &Arc<C>,
     ) -> Option<Self> {
-        let CapabilitySource::AnonymizedAggregate { capability, moniker, members, sources } =
-            source
+        let CapabilitySource::AnonymizedAggregate(AnonymizedAggregateSource {
+            capability,
+            moniker,
+            members,
+            sources,
+        }) = source
         else {
             return None;
         };
@@ -89,7 +94,8 @@ where
             let resolved_state = component.lock_resolved_state().await?;
             for s in &self.members {
                 match s {
-                    AggregateMember::Child(child_name) => {
+                    AggregateMember::Child(child_ref) => {
+                        let child_name = child_ref.clone().into();
                         if let Some(child) = resolved_state.get_child(&child_name) {
                             child_components.push((child_name.clone(), child.clone()));
                         }
@@ -298,12 +304,12 @@ where
     C: ComponentInstanceInterface + 'static,
 {
     match source {
-        CapabilitySource::FilteredProvider {
+        CapabilitySource::FilteredProvider(FilteredProviderSource {
             capability: _,
             moniker,
             service_capability,
             offer_service_decl,
-        } => {
+        }) => {
             assert_eq!(&moniker, &aggregation_component.moniker);
             Box::new(OfferFilteredServiceProvider::new(
                 offer_service_decl,
@@ -311,12 +317,12 @@ where
                 service_capability,
             ))
         }
-        CapabilitySource::FilteredAggregateProvider {
+        CapabilitySource::FilteredAggregateProvider(FilteredAggregateProviderSource {
             capability: _,
             moniker,
             offer_service_decls,
             sources,
-        } => {
+        }) => {
             assert_eq!(&moniker, &aggregation_component.moniker);
             Box::new(OfferAggregateServiceProvider::new(
                 offer_service_decls,
@@ -360,10 +366,10 @@ where
     fn route_instances(
         &self,
     ) -> Vec<BoxFuture<'_, Result<FilteredAggregateCapabilityRouteData, RoutingError>>> {
-        let capability_source = CapabilitySource::Component {
+        let capability_source = CapabilitySource::Component(ComponentSource {
             capability: self.capability.clone(),
             moniker: self.component.moniker.clone(),
-        };
+        });
         let instance_filter = get_instance_filter(&self.offer_decl);
         let fut = async move {
             Ok(FilteredAggregateCapabilityRouteData { capability_source, instance_filter })

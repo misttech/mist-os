@@ -8,7 +8,10 @@ use crate::model::routing::Route;
 use crate::model::start::Start;
 use crate::model::storage::admin_protocol::StorageAdmin;
 use crate::sandbox_util::LaunchTaskOnReceive;
-use ::routing::capability_source::{CapabilitySource, ComponentCapability};
+use ::routing::capability_source::{
+    CapabilitySource, CapabilityToCapabilitySource, ComponentCapability, ComponentSource,
+    NamespaceSource,
+};
 use ::routing::component_instance::ComponentInstanceInterface;
 use ::routing::error::RoutingError;
 use ::routing::{RouteRequest, RouteSource};
@@ -134,10 +137,10 @@ pub async fn route_backing_directory(
     storage_source: CapabilitySource,
 ) -> Result<BackingDirectoryInfo, RoutingError> {
     let (storage_decl, storage_component) = match storage_source {
-        CapabilitySource::Component {
+        CapabilitySource::Component(ComponentSource {
             capability: ComponentCapability::Storage(storage_decl),
             moniker,
-        } => {
+        }) => {
             let component = target.find_absolute(&moniker).await?;
             (storage_decl, component)
         }
@@ -150,7 +153,7 @@ pub async fn route_backing_directory(
 
     let (dir_source_path, dir_source_instance, dir_subdir) = match source {
         RouteSource {
-            source: CapabilitySource::Component { capability, moniker },
+            source: CapabilitySource::Component(ComponentSource { capability, moniker }),
             relative_path,
         } => {
             let dir_source_instance = storage_component.find_absolute(&moniker).await?;
@@ -160,7 +163,10 @@ pub async fn route_backing_directory(
                 relative_path,
             )
         }
-        RouteSource { source: CapabilitySource::Namespace { capability, .. }, relative_path } => (
+        RouteSource {
+            source: CapabilitySource::Namespace(NamespaceSource { capability, .. }),
+            relative_path,
+        } => (
             capability.source_path().expect("directory has no source path?").clone(),
             None,
             relative_path,
@@ -396,10 +402,10 @@ pub fn build_storage_admin_dictionary(
         cm_rust::CapabilityDecl::Storage(storage_decl) => Some(storage_decl.clone()),
         _ => None,
     }) {
-        let capability_source = CapabilitySource::Capability {
+        let capability_source = CapabilitySource::Capability(CapabilityToCapabilitySource {
             source_capability: ComponentCapability::Storage(storage_decl.clone()),
             moniker: component.moniker.clone(),
-        };
+        });
         let storage_decl = storage_decl.clone();
         let weak_component = WeakComponentInstance::new(component);
         storage_admin_dictionary

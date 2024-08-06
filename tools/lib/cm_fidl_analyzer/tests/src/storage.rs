@@ -9,7 +9,7 @@ mod tests {
     use cm_rust_testing::*;
     use component_id_index::InstanceId;
     use moniker::Moniker;
-    use routing::capability_source::{CapabilitySource, ComponentCapability};
+    use routing::capability_source::{CapabilitySource, ComponentCapability, ComponentSource};
     use routing::component_instance::ComponentInstanceInterface;
     use routing::mapper::RouteSegment;
     use routing::RegistrationDecl;
@@ -325,13 +325,13 @@ mod tests {
                             capability: storage_decl.clone(),
                         }
                     ],
-                    source: Some(CapabilitySource::Component {
+                    source: Some(CapabilitySource::Component(ComponentSource {
                         capability: ComponentCapability::Directory(match directory_decl.clone() {
                             CapabilityDecl::Directory(decl) => decl,
                             _ => panic!("unexpected capability variant"),
                         }),
                         moniker: root.moniker().clone(),
-                    }),
+                    })),
                 },
                 VerifyRouteResult {
                     using_node: Moniker::parse_str("/storage_provider").unwrap(),
@@ -351,13 +351,13 @@ mod tests {
                             capability: directory_decl.clone(),
                         }
                     ],
-                    source: Some(CapabilitySource::Component {
+                    source: Some(CapabilitySource::Component(ComponentSource {
                         capability: ComponentCapability::Directory(match directory_decl {
                             CapabilityDecl::Directory(decl) => decl,
                             _ => panic!("unexpected capability variant"),
                         }),
                         moniker: root.moniker().clone(),
-                    }),
+                    })),
                 }
             ]
         );

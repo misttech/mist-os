@@ -4,7 +4,7 @@
 
 use crate::bedrock::structured_dict::ComponentInput;
 use crate::bedrock::with_policy_check::WithPolicyCheck;
-use crate::capability_source::{CapabilitySource, ComponentCapability};
+use crate::capability_source::{CapabilitySource, ComponentCapability, ComponentSource};
 use crate::component_instance::{ComponentInstanceInterface, WeakComponentInstanceInterface};
 use crate::error::RoutingError;
 use crate::{DictExt, LazyGet};
@@ -70,10 +70,10 @@ fn extend_dict_with_capability<C: ComponentInstanceInterface + 'static>(
         | cm_rust::CapabilityDecl::Resolver(_) => {
             let router = new_outgoing_dir_router(component, decl, capability);
             let router = router.with_policy_check::<C>(
-                CapabilitySource::Component {
+                CapabilitySource::Component(ComponentSource {
                     capability: ComponentCapability::from(capability.clone()),
                     moniker: component.moniker().clone(),
-                },
+                }),
                 component.policy_checker().clone(),
             );
             match program_output_dict.insert_capability(capability.name(), router.into()) {
@@ -161,10 +161,10 @@ fn extend_dict_with_dictionary<C: ComponentInstanceInterface + 'static>(
         router = make_dict_extending_router(
             dict.clone(),
             source_dict_router,
-            CapabilitySource::Component {
+            CapabilitySource::Component(ComponentSource {
                 capability: ComponentCapability::Dictionary(decl.clone()),
                 moniker: component.moniker().clone(),
-            },
+            }),
         );
     } else {
         router = Router::new_ok(dict.clone());

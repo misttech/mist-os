@@ -16,7 +16,10 @@
 //! [route_from_expose].
 
 use crate::capability_source::{
-    AggregateCapability, AggregateMember, CapabilitySource, ComponentCapability, InternalCapability,
+    AggregateCapability, AggregateMember, AnonymizedAggregateSource, BuiltinSource,
+    CapabilitySource, CapabilityToCapabilitySource, ComponentCapability, ComponentSource,
+    FilteredAggregateProviderSource, FilteredProviderSource, FrameworkSource, InternalCapability,
+    NamespaceSource, VoidSource,
 };
 use crate::component_instance::{
     ComponentInstanceInterface, ExtendedInstanceInterface, ResolvedInstanceInterface,
@@ -26,12 +29,14 @@ use crate::error::RoutingError;
 use crate::mapper::DebugRouteMapper;
 use crate::RegistrationDecl;
 use cm_rust::{
-    Availability, CapabilityDecl, CapabilityTypeName, ExposeDecl, ExposeDeclCommon, ExposeSource,
-    ExposeTarget, OfferDecl, OfferDeclCommon, OfferServiceDecl, OfferSource, OfferTarget,
-    RegistrationDeclCommon, RegistrationSource, SourceName, SourcePath, UseDecl, UseDeclCommon,
-    UseSource,
+    Availability, CapabilityDecl, CapabilityTypeName, ChildRef, ExposeDecl, ExposeDeclCommon,
+    ExposeSource, ExposeTarget, FidlIntoNative, NativeIntoFidl, OfferDecl, OfferDeclCommon,
+    OfferServiceDecl, OfferSource, OfferTarget, RegistrationDeclCommon, RegistrationSource,
+    SourceName, SourcePath, UseDecl, UseDeclCommon, UseSource,
 };
-use cm_types::Name;
+use cm_rust_derive::FidlDecl;
+use cm_types::{LongName, Name};
+use fidl_fuchsia_component_internal as finternal;
 use moniker::{ChildName, Moniker};
 use std::collections::HashSet;
 use std::marker::PhantomData;
@@ -164,14 +169,16 @@ where
                     || offer_service_decl.renamed_instances.is_some()
                 {
                     // TODO(https://fxbug.dev/42179343) support collection sources as well.
-                    if let CapabilitySource::Component { capability, moniker } = capability_source {
+                    if let CapabilitySource::Component(ComponentSource { capability, moniker }) =
+                        capability_source
+                    {
                         let source_name = offer_service_decl.source_name.clone();
-                        return Ok(CapabilitySource::FilteredProvider {
+                        return Ok(CapabilitySource::FilteredProvider(FilteredProviderSource {
                             capability: AggregateCapability::Service(source_name),
                             moniker: moniker,
                             service_capability: capability,
                             offer_service_decl,
-                        });
+                        }));
                     }
                 }
             }
@@ -189,10 +196,7 @@ where
                             c.collection.is_none(),
                             "Anonymized offer source contained a dynamic child"
                         );
-                        members.push(AggregateMember::Child(
-                            ChildName::try_new(c.name.clone(), None)
-                                .expect("child source should be convertible to ChildName"),
-                        ));
+                        members.push(AggregateMember::Child(c.clone()));
                     }
                     OfferSource::Parent => {
                         members.push(AggregateMember::Parent);
@@ -204,12 +208,12 @@ where
                 }
             }
             let first_offer = offers.iter().next().unwrap();
-            Ok(CapabilitySource::AnonymizedAggregate {
+            Ok(CapabilitySource::AnonymizedAggregate(AnonymizedAggregateSource {
                 capability: AggregateCapability::Service(first_offer.source_name().clone()),
                 moniker: aggregation_component.moniker().clone(),
                 sources: sources.clone(),
                 members,
-            })
+            }))
         }
         OfferResult::OfferFromFilteredAggregate(offers, aggregation_component) => {
             // Check that all of the service offers contain non-conflicting filter instances.
@@ -254,12 +258,12 @@ where
             );
             // TODO(https://fxbug.dev/42151281) Make the Collection CapabilitySource type generic
             // for other types of aggregations.
-            Ok(CapabilitySource::FilteredAggregateProvider {
+            Ok(CapabilitySource::FilteredAggregateProvider(FilteredAggregateProviderSource {
                 capability: AggregateCapability::Service(source_name),
                 moniker: aggregation_component.moniker().clone(),
                 offer_service_decls,
                 sources: sources.clone(),
-            })
+            }))
         }
     }
 }
@@ -300,10 +304,10 @@ where
                         members.push(AggregateMember::Collection(n.clone()));
                     }
                     ExposeSource::Child(n) => {
-                        members.push(AggregateMember::Child(
-                            ChildName::try_new(n.clone(), None)
-                                .expect("child source should be convertible to ChildName"),
-                        ));
+                        members.push(AggregateMember::Child(ChildRef {
+                            name: LongName::new(n.clone()).unwrap(),
+                            collection: None,
+                        }));
                     }
                     ExposeSource::Self_ => {
                         members.push(AggregateMember::Self_);
@@ -312,12 +316,12 @@ where
                 }
             }
             let first_expose = expose.iter().next().expect("empty bundle");
-            Ok(CapabilitySource::AnonymizedAggregate {
+            Ok(CapabilitySource::AnonymizedAggregate(AnonymizedAggregateSource {
                 capability: AggregateCapability::Service(first_expose.source_name().clone()),
                 moniker: aggregation_component.moniker().clone(),
                 sources: sources.clone(),
                 members,
-            })
+            }))
         }
     }
 }
@@ -365,7 +369,7 @@ where
     V: Clone + Send + Sync + 'static,
 {
     let target_capabilities = target.lock_resolved_state().await?.capabilities();
-    Ok(CapabilitySource::Component {
+    Ok(CapabilitySource::Component(ComponentSource {
         capability: sources.find_component_source(
             name,
             target.moniker(),
@@ -374,11 +378,12 @@ where
             mapper,
         )?,
         moniker: target.moniker().clone(),
-    })
+    }))
 }
 
 /// Defines which capability source types are supported.
-#[derive(Debug, PartialEq, Clone)]
+#[derive(FidlDecl, Debug, PartialEq, Clone)]
+#[fidl_decl(fidl_table = "finternal::Sources")]
 pub struct Sources {
     framework: bool,
     builtin: bool,
@@ -599,16 +604,18 @@ impl Use {
     {
         mapper.add_use(target.moniker().clone(), &use_);
         match use_.source() {
-            UseSource::Framework => Ok(UseResult::Source(CapabilitySource::Framework {
-                capability: sources.framework_source(use_.source_name().clone(), mapper)?,
-                moniker: target.moniker().clone(),
-            })),
+            UseSource::Framework => {
+                Ok(UseResult::Source(CapabilitySource::Framework(FrameworkSource {
+                    capability: sources.framework_source(use_.source_name().clone(), mapper)?,
+                    moniker: target.moniker().clone(),
+                })))
+            }
             UseSource::Capability(_) => {
                 sources.capability_source()?;
-                Ok(UseResult::Source(CapabilitySource::Capability {
+                Ok(UseResult::Source(CapabilitySource::Capability(CapabilityToCapabilitySource {
                     moniker: target.moniker().clone(),
-                    source_capability: ComponentCapability::Use(use_.into()),
-                }))
+                    source_capability: ComponentCapability::Use_(use_.into()),
+                })))
             }
             UseSource::Parent => match target.try_get_parent()? {
                 ExtendedInstanceInterface::<C>::AboveRoot(top_instance) => {
@@ -619,9 +626,9 @@ impl Use {
                             visitor,
                             mapper,
                         )? {
-                            return Ok(UseResult::Source(CapabilitySource::Namespace {
-                                capability,
-                            }));
+                            return Ok(UseResult::Source(CapabilitySource::Namespace(
+                                NamespaceSource { capability },
+                            )));
                         }
                     }
                     if let Some(capability) = sources.find_builtin_source(
@@ -630,7 +637,9 @@ impl Use {
                         visitor,
                         mapper,
                     )? {
-                        return Ok(UseResult::Source(CapabilitySource::Builtin { capability }));
+                        return Ok(UseResult::Source(CapabilitySource::Builtin(BuiltinSource {
+                            capability,
+                        })));
                     }
                     Err(RoutingError::use_from_component_manager_not_found(
                         use_.source_name().to_string(),
@@ -680,7 +689,7 @@ impl Use {
                 if let UseDecl::Config(config) = use_ {
                     sources.capability_source()?;
                     let target_capabilities = target.lock_resolved_state().await?.capabilities();
-                    return Ok(UseResult::Source(CapabilitySource::Component {
+                    return Ok(UseResult::Source(CapabilitySource::Component(ComponentSource {
                         capability: sources.find_component_source(
                             config.source_name(),
                             target.moniker(),
@@ -689,7 +698,7 @@ impl Use {
                             mapper,
                         )?,
                         moniker: target.moniker().clone(),
-                    }));
+                    })));
                 }
                 return Err(RoutingError::unsupported_route_source("self"));
             }
@@ -742,7 +751,7 @@ where
         match registration.source() {
             RegistrationSource::Self_ => {
                 let target_capabilities = target.lock_resolved_state().await?.capabilities();
-                Ok(RegistrationResult::Source(CapabilitySource::Component {
+                Ok(RegistrationResult::Source(CapabilitySource::Component(ComponentSource {
                     capability: sources.find_component_source(
                         registration.source_name(),
                         target.moniker(),
@@ -751,7 +760,7 @@ where
                         mapper,
                     )?,
                     moniker: target.moniker().clone(),
-                }))
+                })))
             }
             RegistrationSource::Parent => match target.try_get_parent()? {
                 ExtendedInstanceInterface::<C>::AboveRoot(top_instance) => {
@@ -762,9 +771,9 @@ where
                             visitor,
                             mapper,
                         )? {
-                            return Ok(RegistrationResult::Source(CapabilitySource::Namespace {
-                                capability,
-                            }));
+                            return Ok(RegistrationResult::Source(CapabilitySource::Namespace(
+                                NamespaceSource { capability },
+                            )));
                         }
                     }
                     if let Some(capability) = sources.find_builtin_source(
@@ -773,9 +782,9 @@ where
                         visitor,
                         mapper,
                     )? {
-                        return Ok(RegistrationResult::Source(CapabilitySource::Builtin {
-                            capability,
-                        }));
+                        return Ok(RegistrationResult::Source(CapabilitySource::Builtin(
+                            BuiltinSource { capability },
+                        )));
                     }
                     Err(RoutingError::register_from_component_manager_not_found(
                         registration.source_name().to_string(),
@@ -946,10 +955,15 @@ impl Offer {
         V: CapabilityVisitor,
     {
         let res = match offer.source() {
-            OfferSource::Void => OfferSegment::Done(OfferResult::Source(CapabilitySource::Void {
-                capability: InternalCapability::new((&offer).into(), offer.source_name().clone()),
-                moniker: target.moniker().clone(),
-            })),
+            OfferSource::Void => {
+                OfferSegment::Done(OfferResult::Source(CapabilitySource::Void(VoidSource {
+                    capability: InternalCapability::new(
+                        (&offer).into(),
+                        offer.source_name().clone(),
+                    ),
+                    moniker: target.moniker().clone(),
+                })))
+            }
             OfferSource::Self_ => {
                 let target_capabilities = target.lock_resolved_state().await?.capabilities();
                 let capability = sources.find_component_source(
@@ -968,38 +982,42 @@ impl Offer {
                             || offer_service_decl.renamed_instances.is_some()
                         {
                             let source_name = offer_service_decl.source_name.clone();
-                            OfferResult::Source(CapabilitySource::FilteredProvider {
-                                capability: AggregateCapability::Service(source_name),
-                                moniker,
-                                service_capability: capability,
-                                offer_service_decl,
-                            })
+                            OfferResult::Source(CapabilitySource::FilteredProvider(
+                                FilteredProviderSource {
+                                    capability: AggregateCapability::Service(source_name),
+                                    moniker,
+                                    service_capability: capability,
+                                    offer_service_decl,
+                                },
+                            ))
                         } else {
-                            OfferResult::Source(CapabilitySource::Component {
+                            OfferResult::Source(CapabilitySource::Component(ComponentSource {
                                 capability,
                                 moniker: component.moniker.clone(),
-                            })
+                            }))
                         }
                     }
-                    _ => OfferResult::Source(CapabilitySource::Component {
+                    _ => OfferResult::Source(CapabilitySource::Component(ComponentSource {
                         capability,
                         moniker: component.moniker.clone(),
-                    }),
+                    })),
                 };
                 OfferSegment::Done(res)
             }
-            OfferSource::Framework => {
-                OfferSegment::Done(OfferResult::Source(CapabilitySource::Framework {
+            OfferSource::Framework => OfferSegment::Done(OfferResult::Source(
+                CapabilitySource::Framework(FrameworkSource {
                     capability: sources.framework_source(offer.source_name().clone(), mapper)?,
                     moniker: target.moniker().clone(),
-                }))
-            }
+                }),
+            )),
             OfferSource::Capability(_) => {
                 sources.capability_source()?;
-                OfferSegment::Done(OfferResult::Source(CapabilitySource::Capability {
-                    source_capability: ComponentCapability::Offer(offer.into()),
-                    moniker: target.moniker().clone(),
-                }))
+                OfferSegment::Done(OfferResult::Source(CapabilitySource::Capability(
+                    CapabilityToCapabilitySource {
+                        source_capability: ComponentCapability::Offer(offer.into()),
+                        moniker: target.moniker().clone(),
+                    },
+                )))
             }
             OfferSource::Parent => {
                 let parent_component = match target.try_get_parent()? {
@@ -1012,7 +1030,7 @@ impl Offer {
                                 mapper,
                             )? {
                                 return Ok(OfferSegment::Done(OfferResult::Source(
-                                    CapabilitySource::Namespace { capability },
+                                    CapabilitySource::Namespace(NamespaceSource { capability }),
                                 )));
                             }
                         }
@@ -1023,7 +1041,7 @@ impl Offer {
                             mapper,
                         )? {
                             return Ok(OfferSegment::Done(OfferResult::Source(
-                                CapabilitySource::Builtin { capability },
+                                CapabilitySource::Builtin(BuiltinSource { capability }),
                             )));
                         }
                         return Err(RoutingError::offer_from_component_manager_not_found(
@@ -1348,39 +1366,43 @@ impl Expose {
     {
         let res = match expose.source() {
             ExposeSource::Void => {
-                ExposeSegment::Done(ExposeResult::Source(CapabilitySource::Void {
+                ExposeSegment::Done(ExposeResult::Source(CapabilitySource::Void(VoidSource {
                     capability: InternalCapability::new(
                         (&expose).into(),
                         expose.source_name().clone(),
                     ),
                     moniker: target.moniker().clone(),
-                }))
+                })))
             }
             ExposeSource::Self_ => {
                 let target_capabilities = target.lock_resolved_state().await?.capabilities();
-                ExposeSegment::Done(ExposeResult::Source(CapabilitySource::Component {
-                    capability: sources.find_component_source(
-                        expose.source_name(),
-                        target.moniker(),
-                        &target_capabilities,
-                        visitor,
-                        mapper,
-                    )?,
-                    moniker: target.moniker().clone(),
-                }))
+                ExposeSegment::Done(ExposeResult::Source(CapabilitySource::Component(
+                    ComponentSource {
+                        capability: sources.find_component_source(
+                            expose.source_name(),
+                            target.moniker(),
+                            &target_capabilities,
+                            visitor,
+                            mapper,
+                        )?,
+                        moniker: target.moniker().clone(),
+                    },
+                )))
             }
-            ExposeSource::Framework => {
-                ExposeSegment::Done(ExposeResult::Source(CapabilitySource::Framework {
+            ExposeSource::Framework => ExposeSegment::Done(ExposeResult::Source(
+                CapabilitySource::Framework(FrameworkSource {
                     capability: sources.framework_source(expose.source_name().clone(), mapper)?,
                     moniker: target.moniker().clone(),
-                }))
-            }
+                }),
+            )),
             ExposeSource::Capability(_) => {
                 sources.capability_source()?;
-                ExposeSegment::Done(ExposeResult::Source(CapabilitySource::Capability {
-                    source_capability: ComponentCapability::Expose(expose.into()),
-                    moniker: target.moniker().clone(),
-                }))
+                ExposeSegment::Done(ExposeResult::Source(CapabilitySource::Capability(
+                    CapabilityToCapabilitySource {
+                        source_capability: ComponentCapability::Expose(expose.into()),
+                        moniker: target.moniker().clone(),
+                    },
+                )))
             }
             ExposeSource::Child(child) => {
                 let child_component = {

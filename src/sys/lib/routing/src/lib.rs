@@ -19,7 +19,10 @@ pub mod resolving;
 pub mod rights;
 pub mod walk_state;
 
-use crate::capability_source::{CapabilitySource, ComponentCapability, InternalCapability};
+use crate::capability_source::{
+    BuiltinSource, CapabilitySource, ComponentCapability, ComponentSource, InternalCapability,
+    VoidSource,
+};
 use crate::component_instance::{
     ComponentInstanceInterface, ExtendedInstanceInterface, TopInstanceInterface,
 };
@@ -1012,11 +1015,11 @@ where
     C: ComponentInstanceInterface + 'static,
 {
     let (storage_decl, source_moniker) = match source {
-        CapabilitySource::Component {
+        CapabilitySource::Component(ComponentSource {
             capability: ComponentCapability::Storage(storage_decl),
             moniker,
-        } => (storage_decl, moniker.clone()),
-        CapabilitySource::Void { .. } => return Ok(()),
+        }) => (storage_decl, moniker.clone()),
+        CapabilitySource::Void(VoidSource { .. }) => return Ok(()),
         _ => unreachable!("unexpected storage source"),
     };
 
@@ -1133,7 +1136,7 @@ where
                 .ok_or(RoutingError::register_from_component_manager_not_found(
                     reg.source_name().to_string(),
                 ))?;
-            Ok(CapabilitySource::Builtin { capability: internal_capability })
+            Ok(CapabilitySource::Builtin(BuiltinSource { capability: internal_capability }))
         }
         None => Err(RoutingError::UseFromEnvironmentNotFound {
             moniker: target.moniker().clone(),
@@ -1208,10 +1211,10 @@ where
             if *use_decl.availability() == Availability::Transitional
                 && e.as_zx_status() == zx::Status::NOT_FOUND
             {
-                CapabilitySource::Void {
+                CapabilitySource::Void(VoidSource {
                     capability: InternalCapability::Config(use_decl.source_name),
                     moniker: target.moniker().clone(),
-                }
+                })
             } else {
                 return Err(e);
             }

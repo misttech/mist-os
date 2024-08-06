@@ -4,7 +4,7 @@
 
 use crate::bedrock::structured_dict::{ComponentEnvironment, ComponentInput, StructuredDictMap};
 use crate::bedrock::with_porcelain_type::WithPorcelainType as _;
-use crate::capability_source::{CapabilitySource, InternalCapability};
+use crate::capability_source::{CapabilitySource, InternalCapability, VoidSource};
 use crate::component_instance::{ComponentInstanceInterface, WeakComponentInstanceInterface};
 use crate::error::RoutingError;
 use crate::{DictExt, LazyGet, WithAvailability};
@@ -717,14 +717,12 @@ impl<C: ComponentInstanceInterface + 'static> UnitRouter<C> {
 impl<C: ComponentInstanceInterface + 'static> sandbox::Routable for UnitRouter<C> {
     async fn route(&self, request: Request) -> Result<Capability, RouterError> {
         if request.debug {
-            return Ok(Capability::Dictionary(
-                CapabilitySource::Void {
-                    capability: self.capability.clone(),
-                    moniker: self.component.moniker.clone(),
-                }
-                .try_into()
-                .expect("failed to convert capability source to dictionary"),
-            ));
+            return Ok(CapabilitySource::Void(VoidSource {
+                capability: self.capability.clone(),
+                moniker: self.component.moniker.clone(),
+            })
+            .try_into()
+            .expect("failed to convert capability source to dictionary"));
         }
         match request.availability {
             cm_rust::Availability::Required | cm_rust::Availability::SameAsTarget => {

@@ -21,7 +21,7 @@ use cm_rust_testing::*;
 use cm_types::Url;
 use fidl::prelude::*;
 use moniker::Moniker;
-use routing::capability_source::{CapabilitySource, ComponentCapability};
+use routing::capability_source::{CapabilitySource, ComponentCapability, ComponentSource};
 use routing::component_instance::ComponentInstanceInterface;
 use routing::environment::RunnerRegistry;
 use routing::error::RoutingError;
@@ -2020,13 +2020,13 @@ mod tests {
                         capability: directory_decl.clone(),
                     }
                 ],
-                source: Some(CapabilitySource::Component {
+                source: Some(CapabilitySource::Component(ComponentSource {
                     capability: ComponentCapability::Directory(match directory_decl {
                         CapabilityDecl::Directory(decl) => decl,
                         _ => panic!("unexpected capability variant"),
                     }),
                     moniker: root_component.moniker().clone(),
-                }),
+                })),
             }]
         );
 
@@ -2047,13 +2047,13 @@ mod tests {
                         capability: runner_decl.clone()
                     }
                 ],
-                source: Some(CapabilitySource::Component {
+                source: Some(CapabilitySource::Component(ComponentSource {
                     capability: ComponentCapability::Runner(match runner_decl {
                         CapabilityDecl::Runner(decl) => decl,
                         _ => panic!("unexpected capability variant"),
                     }),
                     moniker: root_component.moniker().clone(),
-                }),
+                })),
             }]
         );
 
@@ -2075,13 +2075,13 @@ mod tests {
                         capability: resolver_decl.clone()
                     }
                 ],
-                source: Some(CapabilitySource::Component {
+                source: Some(CapabilitySource::Component(ComponentSource {
                     capability: ComponentCapability::Resolver(match resolver_decl {
                         CapabilityDecl::Resolver(decl) => decl,
                         _ => panic!("unexpected capability variant"),
                     }),
                     moniker: root_component.moniker().clone(),
-                }),
+                })),
             }]
         );
 

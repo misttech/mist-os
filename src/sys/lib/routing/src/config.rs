@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::capability_source::{CapabilitySource, ComponentCapability};
+use crate::capability_source::{
+    CapabilitySource, CapabilityToCapabilitySource, ComponentCapability, ComponentSource,
+};
 use crate::component_instance::ComponentInstanceInterface;
 use crate::{RouteRequest, RoutingError};
 use std::sync::Arc;
@@ -24,11 +26,13 @@ fn source_to_value(
     source: CapabilitySource,
 ) -> Result<Option<cm_rust::ConfigValue>, RoutingError> {
     let cap = match source {
-        CapabilitySource::Void { .. } => {
+        CapabilitySource::Void(_) => {
             return Ok(default.clone());
         }
-        CapabilitySource::Capability { source_capability, .. } => source_capability,
-        CapabilitySource::Component { capability, .. } => capability,
+        CapabilitySource::Capability(CapabilityToCapabilitySource {
+            source_capability, ..
+        }) => source_capability,
+        CapabilitySource::Component(ComponentSource { capability, .. }) => capability,
         o => {
             return Err(RoutingError::UnsupportedRouteSource {
                 source_type: o.type_name().to_string(),
@@ -70,23 +74,24 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::capability_source::VoidSource;
     use moniker::Moniker;
 
     #[test]
     fn config_from_void() {
-        let void_source = CapabilitySource::Void {
+        let void_source = CapabilitySource::Void(VoidSource {
             capability: crate::capability_source::InternalCapability::Config(
                 "test".parse().unwrap(),
             ),
             moniker: Moniker::root(),
-        };
+        });
         assert_eq!(Ok(None), source_to_value(&None, void_source));
     }
 
     #[test]
     fn config_from_capability() {
         let test_value: cm_rust::ConfigValue = cm_rust::ConfigSingleValue::Uint8(5).into();
-        let void_source = CapabilitySource::Capability {
+        let void_source = CapabilitySource::Capability(CapabilityToCapabilitySource {
             source_capability: crate::capability_source::ComponentCapability::Config(
                 cm_rust::ConfigurationDecl {
                     name: "test".parse().unwrap(),
@@ -94,14 +99,14 @@ mod tests {
                 },
             ),
             moniker: Moniker::root(),
-        };
+        });
         assert_eq!(Ok(Some(test_value)), source_to_value(&None, void_source));
     }
 
     #[test]
     fn config_from_component() {
         let test_value: cm_rust::ConfigValue = cm_rust::ConfigSingleValue::Uint8(5).into();
-        let void_source = CapabilitySource::Component {
+        let void_source = CapabilitySource::Component(ComponentSource {
             capability: crate::capability_source::ComponentCapability::Config(
                 cm_rust::ConfigurationDecl {
                     name: "test".parse().unwrap(),
@@ -109,7 +114,7 @@ mod tests {
                 },
             ),
             moniker: Moniker::root(),
-        };
+        });
         assert_eq!(Ok(Some(test_value)), source_to_value(&None, void_source));
     }
 }

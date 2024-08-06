@@ -7,7 +7,7 @@ use crate::model::component::{ComponentInstance, WeakComponentInstance, WeakExte
 use crate::model::mutable_directory::MutableDirectory;
 use crate::model::routing::{CapabilityOpenRequest, RouteSource};
 use async_trait::async_trait;
-use cm_rust::{CapabilityTypeName, ComponentDecl, ExposeDecl, ExposeDeclCommon};
+use cm_rust::{CapabilityTypeName, ChildRef, ComponentDecl, ExposeDecl, ExposeDeclCommon};
 use cm_types::{IterablePath, Name, RelativePath};
 use cm_util::TaskGroup;
 use errors::{CapabilityProviderError, ModelError, OpenError};
@@ -21,7 +21,8 @@ use hooks::{Event, EventPayload, EventType, Hook, HooksRegistration};
 use moniker::{ExtendedMoniker, Moniker};
 use router_error::Explain;
 use routing::capability_source::{
-    AggregateInstance, AggregateMember, CapabilitySource, FilteredAggregateCapabilityProvider,
+    AggregateInstance, AggregateMember, CapabilitySource, ComponentSource,
+    FilteredAggregateCapabilityProvider,
 };
 use routing::collection::{
     new_filtered_aggregate_from_capability_source, AnonymizedAggregateServiceProvider,
@@ -219,9 +220,10 @@ impl AnonymizedServiceRoute {
                 .iter()
                 .any(|m| matches!(m, AggregateMember::Collection(c) if c == collection))
         } else {
+            let component_leaf_name: ChildRef = component_leaf_name.clone().into();
             self.members
                 .iter()
-                .any(|m| matches!(m, AggregateMember::Child(c) if c == component_leaf_name))
+                .any(|m| matches!(m, AggregateMember::Child(c) if c == &component_leaf_name))
         }
     }
 
@@ -504,7 +506,7 @@ impl AnonymizedAggregateServiceDir {
         source: &CapabilitySource,
     ) -> Result<(), ModelError> {
         match source {
-            CapabilitySource::Component { capability, moniker } => {
+            CapabilitySource::Component(ComponentSource { capability, moniker }) => {
                 let target = self
                     .parent
                     .upgrade()
@@ -1046,7 +1048,7 @@ mod tests {
             &self,
             instance: &AggregateInstance,
         ) -> Result<CapabilitySource, RoutingError> {
-            Ok(CapabilitySource::Component {
+            Ok(CapabilitySource::Component(ComponentSource {
                 capability: ComponentCapability::Service(ServiceDecl {
                     name: "my.service.Service".parse().unwrap(),
                     source_path: Some("/svc/my.service.Service".parse().unwrap()),
@@ -1074,7 +1076,7 @@ mod tests {
                     })?
                     .moniker
                     .clone(),
-            })
+            }))
         }
 
         async fn list_instances(&self) -> Result<Vec<AggregateInstance>, RoutingError> {
@@ -1094,13 +1096,13 @@ mod tests {
             &self,
         ) -> Vec<BoxFuture<'_, Result<FilteredAggregateCapabilityRouteData, RoutingError>>>
         {
-            let capability_source = CapabilitySource::Component {
+            let capability_source = CapabilitySource::Component(ComponentSource {
                 capability: ComponentCapability::Service(ServiceDecl {
                     name: "my.service.Service".parse().unwrap(),
                     source_path: Some("/svc/my.service.Service".parse().unwrap()),
                 }),
                 moniker: self.component.moniker.clone(),
-            };
+            });
             let data = FilteredAggregateCapabilityRouteData {
                 capability_source,
                 instance_filter: self.instance_filter.clone(),
@@ -1279,8 +1281,14 @@ mod tests {
             members: vec![
                 AggregateMember::Collection("coll1".parse().unwrap()),
                 AggregateMember::Collection("coll2".parse().unwrap()),
-                AggregateMember::Child("static_a".try_into().unwrap()),
-                AggregateMember::Child("static_b".try_into().unwrap()),
+                AggregateMember::Child(ChildRef {
+                    name: "static_a".parse().unwrap(),
+                    collection: None,
+                }),
+                AggregateMember::Child(ChildRef {
+                    name: "static_b".parse().unwrap(),
+                    collection: None,
+                }),
             ],
             service_name: "my.service.Service".parse().unwrap(),
         };
@@ -1442,7 +1450,10 @@ mod tests {
             members: vec![
                 AggregateMember::Collection("coll1".parse().unwrap()),
                 AggregateMember::Collection("coll2".parse().unwrap()),
-                AggregateMember::Child("static_a".try_into().unwrap()),
+                AggregateMember::Child(ChildRef {
+                    name: "static_a".parse().unwrap(),
+                    collection: None,
+                }),
             ],
             service_name: "my.service.Service".parse().unwrap(),
         };
@@ -1703,7 +1714,10 @@ mod tests {
 
         let route = AnonymizedServiceRoute {
             source_moniker: Moniker::root(),
-            members: vec![AggregateMember::Child("static_b".try_into().unwrap())],
+            members: vec![AggregateMember::Child(ChildRef {
+                name: "static_b".parse().unwrap(),
+                collection: None,
+            })],
             service_name: "my.service.Service".parse().unwrap(),
         };
 

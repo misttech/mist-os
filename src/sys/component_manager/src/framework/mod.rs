@@ -5,7 +5,7 @@
 use crate::model::component::ComponentInstance;
 use crate::sandbox_util::LaunchTaskOnReceive;
 use fidl::endpoints::DiscoverableProtocolMarker;
-use routing::capability_source::{CapabilitySource, InternalCapability};
+use routing::capability_source::{CapabilitySource, FrameworkSource, InternalCapability};
 use sandbox::Dict;
 use std::sync::Arc;
 use {
@@ -47,10 +47,10 @@ fn add_hook_protocol<P: DiscoverableProtocolMarker>(
         P::PROTOCOL_NAME.parse().unwrap(),
         LaunchTaskOnReceive::new_hook_launch_task(
             component,
-            CapabilitySource::Framework {
+            CapabilitySource::Framework(FrameworkSource {
                 capability: InternalCapability::Protocol(P::PROTOCOL_NAME.parse().unwrap()),
                 moniker: component.moniker.clone(),
-            },
+            }),
         )
         .into_router()
         .into(),

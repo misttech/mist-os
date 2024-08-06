@@ -12,7 +12,7 @@ use crate::model::testing::mocks::*;
 use crate::model::testing::out_dir::OutDir;
 use crate::model::testing::test_helpers::*;
 use crate::sandbox_util::LaunchTaskOnReceive;
-use ::routing::capability_source::{CapabilitySource, InternalCapability};
+use ::routing::capability_source::{BuiltinSource, CapabilitySource, InternalCapability};
 use ::routing::component_instance::ComponentInstanceInterface;
 use ::routing_test_helpers::{generate_storage_path, RoutingTestModel, RoutingTestModelBuilder};
 use anyhow::anyhow;
@@ -326,9 +326,9 @@ impl RoutingTest {
             let InstanceState::Unresolved(state) = &*state else {
                 unreachable!();
             };
-            let capability_source = CapabilitySource::Builtin {
+            let capability_source = CapabilitySource::Builtin(BuiltinSource {
                 capability: InternalCapability::Protocol(name.clone()),
-            };
+            });
 
             let launch = LaunchTaskOnReceive::new(
                 capability_source,
