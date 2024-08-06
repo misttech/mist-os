@@ -6,7 +6,10 @@ use argh::FromArgs;
 use component_debug::cli::{GraphFilter, GraphOrientation, ListFilter};
 use component_debug::config::RawConfigEntry;
 use component_debug::explore::DashNamespaceLayout;
+#[cfg(not(mistos))]
 use fuchsia_url::AbsoluteComponentUrl;
+#[cfg(mistos)]
+use fuchsia_url::boot_url::BootUrl;
 use moniker::Moniker;
 
 #[derive(FromArgs, PartialEq, Debug)]
@@ -54,8 +57,12 @@ pub struct CreateArgs {
     #[argh(positional)]
     pub moniker: Moniker,
 
+    #[cfg(not(mistos))]
     #[argh(positional)]
     pub url: AbsoluteComponentUrl,
+    #[cfg(mistos)]
+    #[argh(positional)]
+    pub url: BootUrl,
 
     #[argh(option)]
     /// provide a configuration override to the component being run. Requires
@@ -151,8 +158,12 @@ pub struct RunArgs {
     #[argh(positional)]
     pub moniker: Moniker,
 
+    #[cfg(not(mistos))]
     #[argh(positional)]
     pub url: AbsoluteComponentUrl,
+    #[cfg(mistos)]
+    #[argh(positional)]
+    pub url: BootUrl,
 
     #[argh(switch, short = 'r')]
     /// destroy and recreate the component instance if it already exists

@@ -1,0 +1,9 @@
+{
+    security_policy: {
+        job_policy: {
+            create_raw_processes: [
+                "/bootstrap/starnix_lite",
+            ],
+        },
+    },
+}

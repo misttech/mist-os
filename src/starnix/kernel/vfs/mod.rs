@@ -70,6 +70,7 @@ pub use vec_directory::*;
 pub use wd_number::*;
 pub use xattr::*;
 
+#[cfg(not(feature = "starnix_lite"))]
 use crate::device::BinderDriver;
 use crate::task::CurrentTask;
 use starnix_lifecycle::{ObjectReleaser, ReleaserAction};
@@ -94,12 +95,15 @@ impl ReleaserAction<FsNode> for FsNodeReleaserAction {
 }
 pub type FsNodeReleaser = ObjectReleaser<FsNode, FsNodeReleaserAction>;
 
+#[cfg(not(feature = "starnix_lite"))]
 pub enum BinderDriverReleaserAction {}
+#[cfg(not(feature = "starnix_lite"))]
 impl ReleaserAction<BinderDriver> for BinderDriverReleaserAction {
     fn release(driver: ReleaseGuard<BinderDriver>) {
         LocalReleasable::DroppedBinderDriver(driver).register();
     }
 }
+#[cfg(not(feature = "starnix_lite"))]
 pub type BinderDriverReleaser = ObjectReleaser<BinderDriver, BinderDriverReleaserAction>;
 
 thread_local! {
@@ -110,6 +114,7 @@ thread_local! {
 /// Container for all the types that can be deferred released.
 #[derive(Debug)]
 enum LocalReleasable {
+    #[cfg(not(feature = "starnix_lite"))]
     DroppedBinderDriver(ReleaseGuard<BinderDriver>),
     DroppedFile(ReleaseGuard<FileObject>),
     DroppedNode(ReleaseGuard<FsNode>),
@@ -130,6 +135,7 @@ impl Releasable for LocalReleasable {
 
     fn release(self, context: Self::Context<'_>) {
         match self {
+            #[cfg(not(feature = "starnix_lite"))]
             Self::DroppedBinderDriver(driver) => driver.release(context),
             Self::DroppedFile(file_object) => file_object.release(context),
             Self::DroppedNode(fs_node) => fs_node.release(context),

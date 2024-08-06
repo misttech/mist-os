@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#[cfg(not(feature = "starnix_lite"))]
 use crate::bpf::fs::BpfFs;
+#[cfg(not(feature = "starnix_lite"))]
 use crate::device::BinderFs;
 use crate::fs::devpts::dev_pts_fs;
 use crate::fs::devtmpfs::dev_tmp_fs;
@@ -722,7 +724,9 @@ impl FileSystemCreator for Arc<Kernel> {
         L: LockBefore<DeviceOpen>,
     {
         Ok(match &**fs_type {
+            #[cfg(not(feature = "starnix_lite"))]
             b"binder" => BinderFs::new_fs(self, options)?,
+            #[cfg(not(feature = "starnix_lite"))]
             b"bpf" => BpfFs::new_fs(self, options)?,
             b"remotefs" => crate::execution::create_remotefs_filesystem(
                 self,

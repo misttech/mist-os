@@ -1,3 +1,4 @@
+// Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
@@ -5,12 +6,18 @@
 use crate::cli::format::format_create_error;
 use crate::lifecycle::create_instance_in_collection;
 use anyhow::{format_err, Result};
+#[cfg(not(mistos))]
 use fuchsia_url::AbsoluteComponentUrl;
+#[cfg(mistos)]
+use fuchsia_url::boot_url::BootUrl;
 use moniker::Moniker;
 use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_sys2 as fsys};
 
 pub async fn create_cmd<W: std::io::Write>(
+    #[cfg(not(mistos))]
     url: AbsoluteComponentUrl,
+    #[cfg(mistos)]
+    url: BootUrl,
     moniker: Moniker,
     config_overrides: Vec<fdecl::ConfigOverride>,
     lifecycle_controller: fsys::LifecycleControllerProxy,

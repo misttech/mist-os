@@ -52,6 +52,9 @@ rustc_binary("starnix_runner_bin") {
 
 fuchsia_component_manifest("starnix_runner_component_manifest") {
   manifest = "meta/starnix_runner.cml"
+  if (is_mistos) {
+    manifest = "meta/starnix_runner.mistos.cml"
+  }
   component_name = "starnix_runner"
 }
 

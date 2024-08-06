@@ -1,0 +1,199 @@
+// Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [
+        "//src/bringup/bin/ptysvc/meta/ptysvc.bootstrap_shard.mistos.cml",
+        "//src/bringup/bin/console/meta/console.shard.mistos.cml",
+        "//src/bringup/bin/kernel_debug_broker/meta/kernel_debug_broker.bootstrap_shard.mistos.cml",
+        "//src/devices/bin/driver_framework/meta/driver_framework.bootstrap_shard.mistos.cml",
+        "//src/devices/sysmem/bin/sysmem_connector/meta/sysmem_connector.bootstrap_shard.mistos.cml",
+        "//src/zircon/bin/role_manager/meta/role_manager.bootstrap_shard.mistos.cml",
+        "//src/power/meta/power-framework.shard.mistos.cml",
+        "//src/power/meta/sag.shard.mistos.cml",
+    ],
+
+    children: [
+        {
+            name: "archivist",
+            url: "fuchsia-boot:///#meta/archivist.cm",
+        },
+        {
+            name: "critical-services",
+            url: "fuchsia-boot:///#meta/critical-services.cm",
+
+            // critical-services should start eagerly - the only services it offers may never be called
+            // on some builds, so there's no other way to start it. Importantly it hosts the crashsvc
+            // and oom handler.
+            startup: "eager",
+        },
+        {
+            name: "shutdown_shim",
+            url: "fuchsia-boot:///#meta/shutdown-shim.cm",
+        },
+    ],
+    offer: [
+        {
+            from: "parent",
+            to: "#critical-services",
+            config: [ "fuchsia.diagnostics.ExceptionHandlerAvailable" ],
+        },
+        {
+            from: "parent",
+            to: "#archivist",
+            config: [
+                "fuchsia.diagnostics.AllowSerialLogs",
+                "fuchsia.diagnostics.BindServices",
+                "fuchsia.diagnostics.DenySerialLogs",
+                "fuchsia.diagnostics.LogsMaxCachedOriginalBytes",
+                "fuchsia.diagnostics.MaximumConcurrentSnapshotsPerReader",
+                "fuchsia.diagnostics.NumThreads",
+            ],
+        },
+
+        // Disable the required offer for Archivist
+        {
+            protocol: [
+                "fuchsia.inspect.InspectSink",
+                "fuchsia.logger.LogSink",
+            ],
+            from: "void",
+            to: "#archivist",
+            availability: "optional",
+        },
+        {
+            protocol: "fuchsia.tracing.provider.Registry",
+            from: "parent",
+            to: "#archivist",
+            availability: "optional",
+        },
+        {
+            protocol: [ "fuchsia.boot.WriteOnlyLog" ],
+            from: "parent",
+            to: [
+                "#critical-services",
+                "#shutdown_shim",
+            ],
+        },
+        {
+            protocol: "fuchsia.hardware.power.statecontrol.Admin",
+            from: "#shutdown_shim",
+            to: "#critical-services",
+        },
+
+        // Things shutdown_shim and power_manager need
+        {
+            protocol: [ "fuchsia.sys2.SystemController" ],
+            from: "parent",
+            to: "#shutdown_shim",
+        },
+        {
+            protocol: [ "fuchsia.hardware.power.statecontrol.Admin" ],
+            from: "#power_manager",
+            to: "#shutdown_shim",
+            source_availability: "unknown",
+        },
+        {
+            protocol: [ "fuchsia.power.system.ActivityGovernor" ],
+            from: "#system-activity-governor",
+            to: "#shutdown_shim",
+            dependency: "weak",
+            source_availability: "unknown",
+        },
+        {
+            protocol: [ "fuchsia.power.broker.Topology" ],
+            from: "#power-broker",
+            to: "#shutdown_shim",
+            dependency: "weak",
+            source_availability: "unknown",
+        },
+        {
+            protocol: [
+                "fuchsia.inspect.InspectSink",
+                "fuchsia.logger.LogSink",
+            ],
+            from: "#archivist",
+            to: [
+                "#critical-services",
+                "#shutdown_shim",
+            ],
+        },
+        {
+            protocol: [
+                "fuchsia.exception.Handler",
+                "fuchsia.kernel.RootJob",
+            ],
+            from: "parent",
+            to: [ "#critical-services" ],
+        },
+        {
+            directory: "dev-class",
+            from: "#devfs-with-pkg",
+            as: "input",
+            to: "#critical-services",
+            subdir: "input",
+        },
+
+        // -- Archivist offers below here --
+
+        // Required events
+        {
+            event_stream: "stopped",
+            from: "parent",
+            to: "#archivist",
+        },
+        {
+            event_stream: "capability_requested",
+            from: "parent",
+            to: "#archivist",
+        },
+        {
+            protocol: [
+                "fuchsia.boot.ReadOnlyLog",
+                "fuchsia.boot.WriteOnlyLog",
+                "fuchsia.component.PersistenceBinder",
+                "fuchsia.component.SamplerBinder",
+            ],
+            from: "parent",
+            to: "#archivist",
+
+            // Weak to resolve dependency cycles
+            dependency: "weak",
+        },
+        {
+            protocol: [ "fuchsia.component.DetectBinder" ],
+            from: "parent",
+            to: "#archivist",
+            dependency: "weak",
+            availability: "optional",
+        },
+
+        // -- End Archivist offers --
+    ],
+    expose: [
+        {
+            protocol: "fuchsia.hardware.pty.Device",
+            from: "#ptysvc",
+            source_availability: "unknown",
+        },
+        {
+            service: "fuchsia.power.broker.ElementInfoProviderService",
+            from: "#system-activity-governor",
+            source_availability: "unknown",
+        },
+        {
+            protocol: [
+                "fuchsia.diagnostics.ArchiveAccessor",
+                "fuchsia.diagnostics.FeedbackArchiveAccessor",
+                "fuchsia.diagnostics.host.ArchiveAccessor",
+                "fuchsia.diagnostics.LegacyMetricsArchiveAccessor",
+                "fuchsia.diagnostics.LogSettings",
+                "fuchsia.diagnostics.LoWPANArchiveAccessor",
+                "fuchsia.inspect.InspectSink",
+                "fuchsia.logger.Log",
+                "fuchsia.logger.LogSink",
+            ],
+            from: "#archivist",
+        },
+    ],
+}

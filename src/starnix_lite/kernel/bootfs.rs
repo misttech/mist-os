@@ -1,0 +1,1 @@
+../../sys/component_manager/src/bootfs.rs

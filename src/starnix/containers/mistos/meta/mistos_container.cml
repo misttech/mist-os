@@ -1,0 +1,23 @@
+// Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: ["//src/starnix/containers/container.shard.cml"],
+    program: {
+        runner: "starnix",
+        features: [ "container" ],
+        init: [],
+        kernel_cmdline: "",
+        mounts: [
+            "/:remotefs",
+            "/dev:devtmpfs",
+            "/dev/pts:devpts",
+            "/dev/shm:tmpfs",
+            "/proc:proc",
+            "/sys:sysfs",
+            "/tmp:tmpfs",
+        ],
+        name: "mistos",
+        startup_file_path: "",
+    },
+}

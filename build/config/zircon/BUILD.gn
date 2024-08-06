@@ -103,11 +103,7 @@ config("compiler") {
   # This is done even if !is_fuchsia to catch cases like the kernel.efi
   # environment, where current_os != "fuchsia" but nonetheless Fuchsia-specific
   # code is built.
-  if (is_mistos) {
-    configs += [ "//build/config/mistos:compiler_fuchsia_api_level" ]
-  } else {
-    configs += [ "//build/config/fuchsia:compiler_fuchsia_api_level" ]
-  }
+  configs += [ "//build/config/mistos:compiler_fuchsia_api_level" ]
 
   if (is_fuchsia || is_mistos) {
     # ld.bfd doesn't support -z relro for the targets we use it for.

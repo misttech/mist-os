@@ -16,10 +16,14 @@ export NINJA_STATUS_REFRESH_MILLIS=100
 export NINJA_PERSISTENT_MODE=0
 export NINJA_STATUS=[%f/%t](%r)
 
+# Some tools depends on this env var.
+export FUCHSIA_BUILD_DIR=$(MISTOSROOT)/$(OUTPUT)
+
 info: ## Print build info
 	@echo "HOST_OS=$(HOST_OS)"
 	@echo "HOST_ARCH=$(HOST_ARCH)"
 	@cat $(OUTPUT)/args.gn
+	@echo "FUCHSIA_BUILD_DIR=$(MISTOSROOT)"
 .PHONY: info
 
 args: ## Set up build dir and arguments file
@@ -30,14 +34,22 @@ args: ## Set up build dir and arguments file
 	$(NOECHO)echo "rust_incremental = \"incremental\"" >> $(OUTPUT)/args.gn
 	$(NOECHO)echo "host_labels = [ \"//build/rust:cargo_toml_gen\" ]" >> $(OUTPUT)/args.gn
 	$(NOECHO)echo "rbe_mode = \"off\"" >> $(OUTPUT)/args.gn
+	$(NOECHO)echo "platform_enable_user_pci = true" >> $(OUTPUT)/args.gn
 .PHONY: args
 
 debug: args ## Set debug arguments
 	$(NOECHO)echo "is_debug = true" >> $(OUTPUT)/args.gn
+.PHONY: debug
+
+gdb: args ## Set debug arguments
 	$(NOECHO)echo "compress_debuginfo = \"none\"" >> $(OUTPUT)/args.gn
 	$(NOECHO)echo "optimize = \"debug\"" >> $(OUTPUT)/args.gn
 	$(NOECHO)echo "zircon_optimize = \"debug\"" >> $(OUTPUT)/args.gn
 	$(NOECHO)echo "kernel_extra_defines = [ \"DISABLE_KASLR\" ]" >> $(OUTPUT)/args.gn
+.PHONY: gdb
+
+release: args ## Set release arguments
+	$(NOECHO)echo "is_debug = false" >> $(OUTPUT)/args.gn
 .PHONY: debug
 
 kasan: args ## Compile with Kernel Address Sanitazier enabled

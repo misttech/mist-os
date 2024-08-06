@@ -25,6 +25,10 @@ rustc_library("fuchsia-url") {
     "//third_party/rust_crates:serde_json",
   ]
 
+  if (is_mistos) {
+    configs += [ "//build/config/mistos:mistos_config" ]
+  }
+
   sources = [
     "src/absolute_component_url.rs",
     "src/absolute_package_url.rs",

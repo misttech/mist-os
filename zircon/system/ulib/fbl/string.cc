@@ -10,9 +10,6 @@
 
 #include <fbl/algorithm.h>
 #include <fbl/string.h>
-#if _KERNEL_MISTOS
-#include <fbl/alloc_checker.h>
-#endif
 
 namespace fbl {
 namespace {
@@ -77,12 +74,6 @@ String& String::operator=(String&& other) noexcept {
   return *this;
 }
 
-String& String::operator+=(const String& other) {
-  String tmp = String::Concat({*this, other});
-  Set(tmp.data(), tmp.length());
-  return *this;
-}
-
 void String::Set(const char* data, size_t length) {
   char* temp_data = data_;
   Init(data, length);
@@ -133,13 +124,7 @@ void String::InitWithEmpty() {
 }
 
 char* String::AllocData(size_t length) {
-#if _KERNEL_MISTOS
-  AllocChecker ac;
-  void* buffer = operator new(buffer_size(length), ac);
-  ZX_ASSERT(ac.check());
-#else
   void* buffer = operator new(buffer_size(length));
-#endif
   return InitData(buffer, length);
 }
 

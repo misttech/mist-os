@@ -34,6 +34,10 @@ rustc_library("component") {
   # This is a part of the bootfs image, so attempt to minimize its size impact.
   configs += [ "//build/config/rust:bootfs" ]
 
+  if (is_mistos) {
+    configs += [ "//build/config/mistos:mistos_config" ]
+  }
+
   sources = [
     "src/args.rs",
     "src/lib.rs",

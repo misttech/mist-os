@@ -1,3 +1,4 @@
+# Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
 # Copyright 2024 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
@@ -10,6 +11,7 @@ rustc_binary("shared-multi-call-tool-binary") {
     ":*",
     "../component:*",
     "../package:*",
+    "../starnix:*",
   ]
   edition = "2021"
 
@@ -17,6 +19,7 @@ rustc_binary("shared-multi-call-tool-binary") {
     "//src/lib/fuchsia",
     "//src/sys/tools/component",
     "//src/sys/tools/package",
+    "//src/sys/tools/starnix",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
   ]

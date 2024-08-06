@@ -50,7 +50,7 @@ source_set("ddktl") {
     "//src/lib/ddk",
   ]
 
-  if (is_fuchsia) {
+  if (is_fuchsia || is_mistos) {
     public_deps += [
       # <ddktl/device.h> has #include <lib/component/incoming/cpp/protocol.h>.
       "//sdk/lib/component/incoming/cpp",

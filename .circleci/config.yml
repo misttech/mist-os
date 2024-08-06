@@ -12,16 +12,19 @@ jobs:
     steps:
       - checkout
       - run: sudo apt-get update && sudo apt-get install -y rsync
-      - restore_cache:
-          name: Restore Jiri Cache
-          keys:
-            - &jiri-cache jiri-packages-{{ checksum "meta/jiri/jiri.lock" }}
-            - jiri-packages
       - run:
           command: |
             curl -s "https://fuchsia.googlesource.com/jiri/+/HEAD/scripts/bootstrap_jiri?format=TEXT" | base64 --decode | bash -s .
             export PATH=$PWD/.jiri_root/bin:$PATH
             jiri import -name=integration flower https://github.com/misttech/integration
+      - restore_cache:
+          name: Restore Jiri Cache
+          keys:
+            - &jiri-cache jiri-packages-{{ checksum "integration/jiri.lock" }}
+            - jiri-packages
+      - run:
+          command: |
+            export PATH=$PWD/.jiri_root/bin:$PATH
             jiri update -v -vv
             git checkout $CIRCLE_BRANCH
       - save_cache:
@@ -30,7 +33,11 @@ jobs:
           paths:
             - .cipd
             - prebuilt
-      - run: make test && make ci
+      - run:
+          command: |
+            make args all
+            make test
+            make ci
 
 workflows:
   build-workflow:

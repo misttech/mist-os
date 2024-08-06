@@ -70,6 +70,13 @@ rustc_binary("starnix_kernel_bin") {
     "//third_party/rust_crates:tracing-mutex",
   ]
 
+  if (is_mistos) {
+    deps -= [
+      ":android_5.10_kernel_config",
+      "//src/graphics/lib/magma/src/libmagma",
+    ]
+  }
+
   non_rust_deps = [ ":restricted_trampoline" ]
 
   sources = [ "main.rs" ]
@@ -292,6 +299,25 @@ rustc_library("starnix_core") {
     "vfs/xattr.rs",
   ]
 
+  if (is_mistos) {
+    sources -= [
+      "bpf/fs.rs",
+      "bpf/helpers.rs",
+      "bpf/map.rs",
+      "bpf/mod.rs",
+      "bpf/program.rs",
+      "bpf/syscalls.rs",
+      "device/android/bootloader_message_store.rs",
+      "device/android/mod.rs",
+      "device/ashmem.rs",
+      "device/binder.rs",
+      "device/framebuffer.rs",
+      "device/framebuffer_server.rs",
+      "device/perfetto_consumer.rs",
+      "device/touch_power_policy_device.rs",
+    ]
+  }
+
   deps = [
     ":perfetto_consumer_proto",
     ":starnix_lifecycle",
@@ -423,6 +449,33 @@ rustc_library("starnix_core") {
     "//third_party/rust_crates:zerocopy",
   ]
 
+  if (is_mistos) {
+    deps -= [
+      ":perfetto_consumer_proto",
+      "//sdk/fidl/fuchsia.element:fuchsia.element_rust",
+      "//sdk/fidl/fuchsia.images2:fuchsia.images2_rust",
+      "//sdk/fidl/fuchsia.math:fuchsia.math_rust",
+      "//sdk/fidl/fuchsia.posix:fuchsia.posix_rust",
+      "//sdk/fidl/fuchsia.recovery:fuchsia.recovery_rust",
+      "//sdk/fidl/fuchsia.starnix.binder:fuchsia.starnix.binder_rust",
+      "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_rust",
+      "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_rust",
+      "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_rust",
+      "//sdk/fidl/fuchsia.ui.display.singleton:fuchsia.ui.display.singleton_rust",
+      "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_rust",
+      "//src/connectivity/wlan/wlanix:fuchsia.wlan.wlanix_rust",
+      "//src/graphics/lib/magma/src/libmagma",
+      "//src/lib/trace/rust:trace-observer",
+      "//src/lib/ui/flatland-frame-scheduling:flatland-frame-scheduling-lib",
+      "//src/lib/ui/fuchsia-framebuffer",
+      "//src/lib/ui/fuchsia-scenic",
+      "//src/lib/vulkan",
+      "//src/starnix/lib/ebpf",
+      "//third_party/rust_crates:prost",
+      "//third_party/rust_crates:slab",
+    ]
+  }
+
   test_deps = [
     "//src/connectivity/lib/net-declare",
     "//src/lib/const-unwrap",
@@ -439,6 +492,9 @@ rustc_library("starnix_core") {
   ]
 
   features = []
+  if (is_mistos) {
+    features += [ "starnix_lite" ]
+  }
   if (starnix_syscall_stats) {
     features += [ "syscall_stats" ]
   }
@@ -525,7 +581,29 @@ rustc_library("starnix_kernel_runner") {
     "//third_party/rust_crates:tracing",
   ]
 
+  if (is_mistos) {
+    deps -= [
+      "//sdk/fidl/fuchsia.element:fuchsia.element_rust",
+      "//sdk/fidl/fuchsia.sysinfo:fuchsia.sysinfo_rust",
+      "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_rust",
+      "//sdk/fidl/fuchsia.ui.input3:fuchsia.ui.input3_rust",
+      "//sdk/fidl/fuchsia.ui.policy:fuchsia.ui.policy_rust",
+      "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_rust",
+      "//src/graphics/lib/magma/src/libmagma",
+      "//src/lib/ui/fuchsia-scenic",
+      "//src/starnix/kernel/device/gpu",
+      "//src/starnix/kernel/device/gralloc",
+      "//src/starnix/kernel/device/input:input-device",
+      "//src/starnix/kernel/device/magma:magma-device",
+    ]
+  }
+
   test_deps = [ "//src/lib/fuchsia" ]
+
+  features = []
+  if (is_mistos) {
+    features += [ "starnix_lite" ]
+  }
 
   configs += [ "//src/starnix/config:starnix_clippy_lints" ]
 }
@@ -742,6 +820,9 @@ resource("vdso-data") {
 # The starnix kernel manifest, used by all containers.
 fuchsia_component_manifest("starnix_kernel_manifest") {
   manifest = "meta/starnix_kernel.cml"
+  if (is_mistos) {
+    manifest = "meta/starnix_kernel.mistos.cml"
+  }
   component_name = "starnix_kernel"
 }
 

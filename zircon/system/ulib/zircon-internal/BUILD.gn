@@ -96,7 +96,7 @@ if (!is_kernel) {
       "//zircon/system/ulib/zxtest",
     ]
 
-    if (is_fuchsia) {
+    if (is_fuchsia || is_mistos) {
       deps += [
         "//src/lib/elfldltl",
         "//zircon/system/ulib/zx",

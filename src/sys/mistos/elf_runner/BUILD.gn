@@ -2,42 +2,68 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/dist/resource.gni")
 import("//build/rust/rustc_binary.gni")
+import("//build/testing/boot_tests/mistos_unittest_zbi.gni")
 
 rustc_binary("bin") {
   testonly = true
   name = "mistos_elf_runner"
-  with_unit_tests = true
   edition = "2021"
 
-  configs += [ "//build/config/rust:bootfs" ]
+  configs += [
+    "//build/config/rust:bootfs",
+    "//build/config/mistos:mistos_config",
+  ]
 
   deps = [
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+    "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_rust",
     "//sdk/fidl/fuchsia.ldsvc:fuchsia.ldsvc_rust",
     "//sdk/fidl/fuchsia.logger:fuchsia.logger_rust",
+    "//sdk/fidl/fuchsia.time:fuchsia.time_rust",
+    "//src/lib/fdio/rust:fdio",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-fs",
     "//src/lib/fuchsia-runtime",
     "//src/lib/fuchsia-sync",
-    "//src/lib/mistos-bootfs",
-    "//src/lib/mistos-logger",
+    "//src/lib/process_builder",
     "//src/lib/zircon/rust:fuchsia-zircon",
+    "//src/storage/lib/vfs/rust:vfs",
+    "//src/sys/component_manager/lib/builtins",
+    "//src/sys/component_manager/lib/logger",
     "//src/sys/lib/elf_runner",
+    "//src/sys/lib/fuchsia-bootfs",
     "//src/sys/lib/library_loader",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:tracing",
   ]
 
   sources = [
+    "src/bootfs.rs",
     "src/builtin/log.rs",
     "src/builtin/log_sink.rs",
     "src/builtin/mod.rs",
     "src/builtin/svc_controller.rs",
+    "src/builtin/time.rs",
     "src/main.rs",
   ]
+
+  # TODO (Herrera) find a better feature name (need by bootfs as sym link)
+  features = [ "starnix_lite" ]
+}
+
+resource("mistos_elf_runner_process_builder_config") {
+  sources = [ "config/process_builder_config.json5" ]
+  outputs = "config/mistos_elf_runner"
+}
+
+resource("mistos_elf_meta") {
+  sources = [ "meta/contents" ]
+  outputs = "meta/contents"
 }

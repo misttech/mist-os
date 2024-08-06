@@ -7,7 +7,10 @@ import("//build/component/component_id_index.gni")
 import("//build/dist/resource.gni")
 
 resource("config") {
-  visibility = [ ":*" ]
+  visibility = [
+    ":*",
+    "//build/images/mistos/*",
+  ]
   sources = [ "config/core.profiles" ]
   outputs = [ "config/profiles/core.profiles" ]
 }

@@ -38,6 +38,7 @@ group("delivery_type") {
 group("allow_long_names") {
   visibility = [
     # driver collections
+    "//build/images/mistos/*",
     "//sdk/lib/driver_test_realm/*",
     "//src/devices/bin/driver_manager/*",
     "//src/sys/bootstrap/*",

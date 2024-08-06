@@ -1,0 +1,75 @@
+// Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
+// Copyright 2021 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [ "syslog/client.shard.cml" ],
+    program: {
+        // Subscribe to component lifecycle events
+        lifecycle: { stop_event: "notify" },
+    },
+    children: [
+        {
+            name: "netcfg-config",
+            url: "fuchsia-boot:///#meta/netcfg-config.cm",
+        },
+    ],
+    capabilities: [
+        {
+            protocol: [
+                "fuchsia.net.dhcpv6.PrefixProvider",
+                "fuchsia.net.masquerade.Factory",
+            ],
+        },
+    ],
+    use: [
+        {
+            protocol: [
+                "fuchsia.net.dhcp.Server",
+                "fuchsia.net.dhcpv6.ClientProvider",
+                "fuchsia.net.interfaces.admin.Installer",
+                "fuchsia.net.interfaces.State",
+                "fuchsia.net.name.DnsServerWatcher",
+                "fuchsia.net.name.LookupAdmin",
+                "fuchsia.net.routes.admin.RouteTableV4",
+                "fuchsia.net.routes.admin.RouteTableV6",
+                "fuchsia.net.stack.Stack",
+            ],
+        },
+        {
+            protocol: "fuchsia.net.filter.deprecated.Filter",
+            availability: "optional",
+        },
+        {
+            protocol: "fuchsia.net.filter.Control",
+            availability: "optional",
+        },
+        {
+            protocol: "fuchsia.net.dhcp.ClientProvider",
+
+            // TODO(https://fxbug.dev/42076541): Mark this as "required" once all
+            // products are using the out-of-stack DHCP client component.
+            availability: "optional",
+        },
+        {
+            directory: "dev-class-network",
+            rights: [ "r*" ],
+            path: "/dev/class/network",
+        },
+        {
+            directory: "netcfg-config",
+            from: "#netcfg-config",
+            rights: [ "r*" ],
+            path: "/netcfg-config",
+        },
+    ],
+    expose: [
+        {
+            protocol: [
+                "fuchsia.net.dhcpv6.PrefixProvider",
+                "fuchsia.net.masquerade.Factory",
+            ],
+            from: "self",
+        },
+    ],
+}

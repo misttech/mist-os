@@ -140,6 +140,16 @@ fuchsia_driver("sysmem-driver") {
       configs -= fdio_config
     }
   }
+
+  if (is_mistos) {
+    configs -= [ "//build/config/fuchsia:enable_zircon_asserts" ]
+    configs += [ "//build/config/mistos:enable_zircon_asserts" ]
+
+    fdio_config = [ "//build/config/mistos:fdio_config" ]
+    if (configs + fdio_config - fdio_config != configs) {
+      configs -= fdio_config
+    }
+  }
   sources = [ "binding.cc" ]
   deps = [
     ":sysmem_bind",
@@ -196,6 +206,12 @@ test("sysmem-unittest-bin") {
       configs -= fdio_config
     }
     configs += [ "//build/config/fuchsia:enable_zircon_asserts" ]
+  }
+  if (is_mistos) {
+    fdio_config = [ "//build/config/mistos:fdio_config" ]
+    if (configs + fdio_config - fdio_config != configs) {
+      configs -= fdio_config
+    }
   }
   output_name = "sysmem-unittest"
   sources = [

@@ -1,0 +1,196 @@
+// Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
+// Copyright 2022 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [
+        "inspect/client.shard.cml",
+        "syslog/client.shard.cml",
+    ],
+    program: {
+        runner: "elf",
+        binary: "bin/starnix_kernel",
+        job_policy_create_raw_processes: "true",
+        is_shared_process: "true",
+        use_next_vdso: "true",
+
+        // Needed because starnix depends on the usercopy crate which takes
+        // the job's exception channel to handle page faults. Normally the
+        // ELF runner takes the job's exception channel so we need to ask
+        // it to make sure the starnix process's immediate parent job has
+        // its exception channel available for taking.
+        job_with_available_exception_channel: "true",
+
+        // The starnix kernel reports memory attribution information
+        // for the Linux programs it runs, but note that we do not add
+        // memory_attribution: "true",
+        // here, because the starnix kernel is an implementation detail used
+        // by starnix runner, and starnix runner will connect to this protocol
+        // internally. If we had memory_attribution: "true", then that will
+        // cause the ELF runner to also attempt to connect to this protocol,
+        // resulting in duplicate reporting.
+    },
+    capabilities: [
+        {
+            runner: "starnix",
+            path: "/svc/fuchsia.starnix.container.Runner",
+        },
+        {
+            protocol: [
+                "fuchsia.component.runner.ComponentRunner",
+                "fuchsia.memory.attribution.Provider",
+                "fuchsia.starnix.container.Controller",
+                "fuchsia.starnix.container.Runner",
+            ],
+        },
+    ],
+    use: [
+        {
+            directory: "boot-kernel",
+            rights: [ "r*" ],
+            path: "/boot/kernel",
+        },
+        {
+            directory: "dev-hrtimer",
+            rights: [ "r*" ],
+            path: "/dev/class/hrtimer",
+        },
+        {
+            directory: "container_config",
+            from: "parent",
+            rights: [ "r*" ],
+            path: "/container_config",
+            availability: "optional",
+        },
+        {
+            protocol: [
+                "fuchsia.diagnostics.ArchiveAccessor",
+                "fuchsia.kernel.VmexResource",
+            ],
+            from: "parent",
+        },
+        {
+            protocol: [
+                "fuchsia.buildinfo.Provider",
+                "fuchsia.kernel.Stats",
+                "fuchsia.net.filter.Control",
+                "fuchsia.net.interfaces.admin.Installer",
+                "fuchsia.net.interfaces.State",
+                "fuchsia.net.root.Interfaces",
+                "fuchsia.net.routes.admin.RouteTableV4",
+                "fuchsia.net.routes.admin.RouteTableV6",
+                "fuchsia.net.routes.StateV4",
+                "fuchsia.net.routes.StateV6",
+                "fuchsia.net.tun.Control",
+                "fuchsia.posix.socket.packet.Provider",
+                "fuchsia.posix.socket.Provider",
+                "fuchsia.posix.socket.raw.Provider",
+                "fuchsia.power.broker.Topology",
+                "fuchsia.power.suspend.Stats",
+                "fuchsia.power.system.ActivityGovernor",
+                "fuchsia.scheduler.RoleManager",
+                "fuchsia.sysinfo.SysInfo",
+                "fuchsia.sysmem.Allocator",
+                "fuchsia.sysmem2.Allocator",
+                "fuchsia.tracing.provider.Registry",
+            ],
+            from: "parent",
+            availability: "optional",
+        },
+    ],
+    expose: [
+        {
+            runner: "starnix",
+            from: "self",
+        },
+        {
+            protocol: [
+                "fuchsia.component.runner.ComponentRunner",
+                "fuchsia.memory.attribution.Provider",
+                "fuchsia.starnix.container.Controller",
+                "fuchsia.starnix.container.Runner",
+            ],
+            from: "self",
+        },
+        {
+            protocol: "fuchsia.component.Binder",
+            from: "framework",
+        },
+    ],
+    config: {
+        // The features to run in the container.
+        features: {
+            type: "vector",
+            element: {
+                type: "string",
+                max_size: 256,
+            },
+            max_count: 100,
+        },
+
+        // The arguments for the `init` task. The first argument must be an absolute path to the binary. Specify an empty vector to not start an init task.
+        init: {
+            type: "vector",
+            element: {
+                type: "string",
+                max_size: 256,
+            },
+            max_count: 100,
+        },
+
+        // The command line arguments for the kernel.
+        kernel_cmdline: {
+            type: "string",
+            max_size: 256,
+        },
+
+        //  The filesystems that get mounted when the container is created.
+        mounts: {
+            type: "vector",
+            element: {
+                type: "string",
+                max_size: 256,
+            },
+            max_count: 100,
+        },
+
+        //  The resource limits for the container.
+        rlimits: {
+            type: "vector",
+            element: {
+                type: "string",
+                max_size: 256,
+            },
+            max_count: 100,
+        },
+
+        // The name of the container.
+        name: {
+            type: "string",
+            max_size: 256,
+        },
+
+        // A file path that will be used to determine whether or not the system is ready to execute
+        // tasks. Prior to the existence of this file (if specified), the system will only run the
+        // `init` task (and any tasks `init` spawns). The `init` task is expected to create a file
+        // at this path.
+        startup_file_path: {
+            type: "string",
+            max_size: 1024,
+        },
+
+        // The remote block devices which get created when the container is created.
+        // The format is:
+        //   ${blk_name}:${blk_size}
+        // A RW block device is made available at /dev/remoteblk-${blk_name} in the Starnix
+        // namespace.  Note that the block device is not persistent at this time.
+        remote_block_devices: {
+            type: "vector",
+            element: {
+                type: "string",
+                max_size: 256,
+            },
+            max_count: 100,
+        },
+    },
+}

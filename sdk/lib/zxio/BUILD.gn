@@ -95,11 +95,7 @@ shared_library("zxio_standalone") {
 
   public_deps = [ ":zxio" ]
 
-  if (is_fuchsia) {
-    configs += [ "//build/config/fuchsia:static_cpp_standard_library" ]
-  } else if (is_mistos) {
-    configs += [ "//build/config/mistos:static_cpp_standard_library" ]
-  }
+  configs += [ "//build/config/mistos:static_cpp_standard_library" ]
 
   version_script = "zxio_standalone.ld"
   inputs = [ version_script ]

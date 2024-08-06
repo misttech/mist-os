@@ -1,3 +1,4 @@
+// Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
 // Copyright 2024 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
@@ -27,6 +28,7 @@ async fn main_impl() -> anyhow::Result<()> {
     {
         "component" => component::exec().boxed_local().await,
         "package" => package::exec().boxed_local().await,
+        "starnix" => starnix::exec().boxed_local().await,
         other => Err(anyhow!("no program registered for: {other}")),
     }
 }

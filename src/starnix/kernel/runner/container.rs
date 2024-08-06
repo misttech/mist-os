@@ -1,10 +1,17 @@
+// Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
 // Copyright 2022 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#[cfg(not(feature = "starnix_lite"))]
 use crate::{
     expose_root, get_serial_number, parse_features, run_container_features, serve_component_runner,
     serve_container_controller, serve_graphical_presenter, Features,
+};
+#[cfg(feature = "starnix_lite")]
+use crate::{
+    expose_root, parse_features, run_container_features, serve_component_runner,
+    serve_container_controller, Features,
 };
 use anyhow::{anyhow, bail, Error};
 use bstr::BString;
@@ -20,13 +27,19 @@ use fuchsia_zircon::{
 };
 use futures::channel::oneshot;
 use futures::{FutureExt, StreamExt, TryStreamExt};
+#[cfg(not(feature = "starnix_lite"))]
 use magma_device::get_magma_params;
 use runner::{get_program_string, get_program_strvec};
 use selinux::security_server::SecurityServer;
 use starnix_core::device::init_common_devices;
+#[cfg(not(feature = "starnix_lite"))]
 use starnix_core::execution::{
     create_filesystem_from_spec, create_remote_block_device_from_spec, create_remotefs_filesystem,
     execute_task_with_prerun_result,
+};
+#[cfg(feature = "starnix_lite")]
+use starnix_core::execution::{
+    create_filesystem_from_spec, create_remotefs_filesystem, execute_task_with_prerun_result,
 };
 use starnix_core::fs::layeredfs::LayeredFs;
 use starnix_core::fs::overlayfs::OverlayFs;
@@ -48,11 +61,18 @@ use std::collections::BTreeMap;
 use std::ffi::CString;
 use std::ops::DerefMut;
 use std::sync::Arc;
+#[cfg(not(feature = "starnix_lite"))]
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_runner as frunner,
     fidl_fuchsia_element as felement, fidl_fuchsia_io as fio,
     fidl_fuchsia_starnix_container as fstarcontainer, fuchsia_async as fasync,
     fuchsia_inspect as inspect, fuchsia_runtime as fruntime,
+};
+#[cfg(feature = "starnix_lite")]
+use {
+    fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_runner as frunner,
+    fidl_fuchsia_io as fio, fidl_fuchsia_starnix_container as fstarcontainer,
+    fuchsia_async as fasync, fuchsia_inspect as inspect, fuchsia_runtime as fruntime,
 };
 
 /// A temporary wrapper struct that contains both a `Config` for the container, as well as optional
@@ -182,8 +202,10 @@ impl Container {
             let mut fs = ServiceFs::new_local();
             fs.dir("svc")
                 .add_fidl_service(ExposedServices::ComponentRunner)
-                .add_fidl_service(ExposedServices::ContainerController)
-                .add_fidl_service(ExposedServices::GraphicalPresenter);
+                .add_fidl_service(ExposedServices::ContainerController);
+
+            #[cfg(not(feature = "starnix_lite"))]
+            fs.dir("svc").add_fidl_service(ExposedServices::GraphicalPresenter);
 
             // Expose the root of the container's filesystem.
             let (fs_root, fs_root_server_end) = fidl::endpoints::create_proxy()?;
@@ -211,6 +233,7 @@ impl Container {
                             .await
                             .expect("failed to start container.")
                     }
+                    #[cfg(not(feature = "starnix_lite"))]
                     ExposedServices::GraphicalPresenter(request_stream) => {
                         serve_graphical_presenter(request_stream, &self.kernel)
                             .await
@@ -236,6 +259,7 @@ impl Container {
 enum ExposedServices {
     ComponentRunner(frunner::ComponentRunnerRequestStream),
     ContainerController(fstarcontainer::ControllerRequestStream),
+    #[cfg(not(feature = "starnix_lite"))]
     GraphicalPresenter(felement::GraphicalPresenterRequestStream),
 }
 
@@ -338,7 +362,13 @@ async fn create_container(
     let pkg_dir_proxy = fio::DirectorySynchronousProxy::new(config.pkg_dir.take().unwrap());
 
     let features = parse_features(&config.features)?;
+
+    #[cfg(not(feature = "starnix_lite"))]
     let mut kernel_cmdline = BString::from(config.kernel_cmdline.as_bytes());
+    #[cfg(feature = "starnix_lite")]
+    let kernel_cmdline = BString::from(config.kernel_cmdline.as_bytes());
+
+    #[cfg(not(feature = "starnix_lite"))]
     if features.android_serialno {
         match get_serial_number().await {
             Ok(serial) => {
@@ -348,6 +378,7 @@ async fn create_container(
             Err(err) => log_warn!("could not get serial number: {err:?}"),
         }
     }
+    #[cfg(not(feature = "starnix_lite"))]
     if features.magma {
         kernel_cmdline.extend(b" ");
         let params = get_magma_params();
@@ -379,6 +410,7 @@ async fn create_container(
         data_dir,
         role_manager,
         node.create_child("kernel"),
+        #[cfg(not(feature = "starnix_lite"))]
         features.aspect_ratio.as_ref(),
         security_server,
     )
@@ -434,6 +466,7 @@ async fn create_container(
         )?;
     }
 
+    #[cfg(not(feature = "starnix_lite"))]
     if features.android_fdr {
         init_remote_block_devices(
             kernel.kthreads.unlocked_for_async().deref_mut(),
@@ -625,6 +658,7 @@ where
     Ok(())
 }
 
+#[cfg(not(feature = "starnix_lite"))]
 fn init_remote_block_devices<L>(
     locked: &mut Locked<'_, L>,
     system_task: &CurrentTask,

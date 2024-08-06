@@ -1,0 +1,19 @@
+# Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+
+# Pre compiled linux binary see build.sh
+resource("linux-bin") {
+  allow_binary_output_dir = true
+  sources = [ "nolibc-test.linux" ]
+  outputs = [ "bin/nolibc-test" ]
+}
+
+fuchsia_package_with_single_component("nolibc_container") {
+  disable_elf_binaries_checks = true
+  manifest = "meta/nolibc_container.cml"
+  package_name = "nolibc"
+  deps = [ ":linux-bin" ]
+}

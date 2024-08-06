@@ -1,0 +1,60 @@
+# Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/dist/resource.gni")
+import("//src/starnix/kernel/starnix.gni")
+
+group("container_resources") {
+  deps = [
+    ":slash_dev_pts_target",
+    ":slash_dev_shm_target",
+    ":slash_dev_target",
+    ":slash_proc_target",
+    ":slash_sys_target",
+    ":slash_tmp_target",
+    "//src/starnix/containers:data_tmp_target",
+  ]
+}
+
+resource("slash_proc_target") {
+  sources = [ "//src/starnix/containers/placeholder" ]
+  outputs = [ "proc/.placeholder" ]
+}
+
+resource("slash_sys_target") {
+  sources = [ "//src/starnix/containers/placeholder" ]
+  outputs = [ "sys/.placeholder" ]
+}
+
+resource("slash_tmp_target") {
+  sources = [ "//src/starnix/containers/placeholder" ]
+  outputs = [ "tmp/.placeholder" ]
+}
+
+resource("slash_dev_target") {
+  sources = [ "//src/starnix/containers/placeholder" ]
+  outputs = [ "dev/.placeholder" ]
+}
+
+resource("slash_dev_pts_target") {
+  sources = [ "//src/starnix/containers/placeholder" ]
+  outputs = [ "dev/pts/.placeholder" ]
+}
+
+resource("slash_dev_shm_target") {
+  sources = [ "//src/starnix/containers/placeholder" ]
+  outputs = [ "dev/shm/.placeholder" ]
+}
+
+fuchsia_package_with_single_component("mistos_container") {
+  manifest = "meta/mistos_container.cml"
+  package_name = "mistos"
+  component_name = "mistos_container"
+
+  deps = [
+    ":container_resources",
+    "//src/starnix/containers:default_init",
+  ]
+}

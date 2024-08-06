@@ -1,0 +1,26 @@
+// Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
+// Copyright 2021 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+// Add build-info to core
+{
+    children: [
+        {
+            name: "build-info",
+            url: "fuchsia-boot:///#meta/build-info.cm",
+        },
+    ],
+    offer: [
+        {
+            directory: "build-info",
+            from: "parent",
+            to: "#build-info",
+        },
+        {
+            protocol: "fuchsia.logger.LogSink",
+            from: "parent",
+            to: "#build-info",
+        },
+    ],
+}

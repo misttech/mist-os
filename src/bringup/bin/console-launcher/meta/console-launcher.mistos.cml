@@ -1,0 +1,185 @@
+// Copyright 2020 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+// console-launcher component manifest.
+// For information on manifest format and features,
+// see https://fuchsia.dev/fuchsia-src/concepts/components/component_manifests.
+{
+    include: [ "syslog/client.shard.cml" ],
+    program: {
+        runner: "elf",
+        binary: "bin/console-launcher",
+    },
+    use: [
+        {
+            directory: "bin",
+            rights: [ "rx*" ],
+            path: "/bin",
+        },
+        {
+            directory: "boot",
+            rights: [ "rx*" ],
+            path: "/boot",
+        },
+        //{
+        //    directory: "blob",
+        //    rights: [ "rw*" ],
+        //    path: "/blob",
+        //},
+        //{
+        //    directory: "root-ssl-certificates",
+        //    rights: [ "r*" ],
+        //    path: "/config/ssl",
+        //},
+        //{
+        //    directory: "data",
+        //    rights: [ "rw*" ],
+        //    path: "/data",
+        //},
+        {
+            directory: "dev-topological",
+            rights: [ "rw*" ],
+            path: "/dev",
+        },
+        //{
+        //    directory: "pkgfs",
+        //    rights: [ "rx*" ],
+        //    path: "/pkgfs",
+        //},
+        //{
+        //    directory: "system",
+        //    rights: [ "rx*" ],
+        //    path: "/system",
+        //},
+        //{
+        //    directory: "tmp",
+        //    rights: [ "rw*" ],
+        //    path: "/tmp",
+        //},
+        {
+            // Used by console-launcher itself.
+            protocol: [
+                "console", // Default device path, overriden by boot arguments.
+                "fuchsia.boot.Arguments",
+                "fuchsia.kernel.RootJob",
+                "fuchsia.process.Launcher",
+                "fuchsia.process.Resolver",
+            ],
+        },
+        {
+            // Used by programs started in the console.
+            protocol: [
+                "fuchsia.boot.FactoryItems",
+                "fuchsia.boot.Items",
+                "fuchsia.boot.ReadOnlyLog",
+                "fuchsia.boot.WriteOnlyLog",
+                "fuchsia.device.NameProvider",
+                "fuchsia.diagnostics.ArchiveAccessor",
+                "fuchsia.diagnostics.FeedbackArchiveAccessor",
+                "fuchsia.diagnostics.host.ArchiveAccessor",
+                "fuchsia.diagnostics.LegacyMetricsArchiveAccessor",
+                "fuchsia.diagnostics.LogSettings",
+                "fuchsia.driver.development.Manager",
+                "fuchsia.feedback.DataProvider",
+                //"fuchsia.fshost.Admin",
+                //"fuchsia.hardware.power.statecontrol.Admin",
+                "fuchsia.kernel.DebugResource",
+                "fuchsia.kernel.InfoResource",
+                "fuchsia.kernel.ProfileResource",
+                "fuchsia.kernel.RootJobForInspect",
+                "fuchsia.kernel.Stats",
+                "fuchsia.logger.Log",
+                "fuchsia.metrics.MetricEventLoggerFactory",
+                "fuchsia.net.name.Lookup",
+                //"fuchsia.paver.Paver",
+                //"fuchsia.pkg.PackageResolver",
+                //"fuchsia.pkg.RepositoryManager",
+                //"fuchsia.pkg.rewrite.Engine",
+                "fuchsia.posix.socket.Provider",
+                "fuchsia.scheduler.deprecated.ProfileProvider",
+                "fuchsia.scheduler.RoleManager",
+                "fuchsia.sys2.LifecycleController.root",
+                "fuchsia.sys2.RealmExplorer.root",
+                "fuchsia.sys2.RealmQuery.root",
+                "fuchsia.sys2.RouteValidator.root",
+                "fuchsia.sysinfo.SysInfo",
+                "fuchsia.sysmem.Allocator",
+                "fuchsia.sysmem2.Allocator",
+            ],
+        },
+        //{
+        //    // Virtualization is not present in all configurations.
+        //    // See: https://fxbug.dev/42054333
+        //    protocol: [
+        //        "fuchsia.virtualization.DebianGuestManager",
+        //        "fuchsia.virtualization.LinuxManager",
+        //        "fuchsia.virtualization.TerminaGuestManager",
+        //        "fuchsia.virtualization.ZirconGuestManager",
+        //    ],
+        //    availability: "optional",
+        //},
+        {
+            protocol: [
+                "fuchsia.tracing.controller.Controller",
+                "fuchsia.tracing.provider.Registry",
+            ],
+
+            // Trace manager may be excluded from builds where tracing is not
+            // expected to be used for observability, such as in the bringup
+            // product and non-eng builds of any product.
+            availability: "optional",
+        },
+        {
+            protocol: "fuchsia.dash.Launcher",
+
+            // The source of this protocol, debug-dash-launcher,
+            // may not be available on all products.
+            availability: "optional",
+        },
+        {
+            protocol: "fuchsia.tpm.cr50.Cr50",
+
+            // The source of this protocol, cr50,
+            // may not be available on all products.
+            availability: "optional",
+        },
+        {
+            protocol: "fuchsia.virtualconsole.SessionManager",
+
+            // The source of this protocol, virtual-console,
+            // may not be available on all products.
+            availability: "optional",
+        },
+        {
+            protocol: "fuchsia.hardware.pty.Device",
+
+            // The source of this protocol, ptysvc,
+            // may not be available on all products.
+            availability: "optional",
+        },
+        {
+            protocol: [
+                "fuchsia.kernel.Counter",
+                "fuchsia.kernel.DebugBroker",
+                "fuchsia.tracing.kernel.Controller",
+            ],
+
+            // The source of this protocol, kernel_debug_broker,
+            // may not be available on all products.
+            availability: "optional",
+        },
+        {
+            // Used by power integration tests running against the testing variant of the
+            // system-activity-governor.
+            protocol: [
+                "fuchsia.power.suspend.Stats",
+                "fuchsia.power.system.ActivityGovernor",
+                "test.sagcontrol.State",
+            ],
+
+            // The source of this protocol may not be available on all products.
+            availability: "optional",
+        },
+    ],
+}

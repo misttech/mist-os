@@ -131,8 +131,8 @@ _system_target_variant = _uninstrumented_target_variant
 # the library, though a variant like "gcc" might be applied to it.
 system_libc_toolchain = sysroot_libc_base_toolchain + _system_target_variant
 
-if (is_fuchsia) {
-  # When in a toolchain variant of the Fuchsia base toolchain, find the
+if (is_fuchsia || is_mistos) {
+  # When in a toolchain variant of the Fuchsia|mist-os base toolchain, find the
   # corresponding toolchain variant of user.libc_$target_cpu to build
   # the C library with it.
   sysroot_libc_toolchain = sysroot_libc_base_toolchain

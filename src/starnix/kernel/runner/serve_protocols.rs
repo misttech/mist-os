@@ -1,3 +1,4 @@
+// Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
 // Copyright 2022 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
@@ -26,9 +27,16 @@ use starnix_uapi::uapi;
 use std::ffi::CString;
 use std::ops::DerefMut;
 use std::sync::Arc;
+#[cfg(not(feature = "starnix_lite"))]
 use {
     fidl_fuchsia_component_runner as frunner, fidl_fuchsia_element as felement,
     fidl_fuchsia_io as fio, fidl_fuchsia_memory_attribution as fattribution,
+    fidl_fuchsia_starnix_container as fstarcontainer, fuchsia_zircon as zx,
+};
+#[cfg(feature = "starnix_lite")]
+use {
+    fidl_fuchsia_component_runner as frunner, fidl_fuchsia_io as fio,
+    fidl_fuchsia_memory_attribution as fattribution,
     fidl_fuchsia_starnix_container as fstarcontainer, fuchsia_zircon as zx,
 };
 
@@ -318,6 +326,7 @@ fn forward_to_pty(
     Ok(())
 }
 
+#[cfg(not(feature = "starnix_lite"))]
 pub async fn serve_graphical_presenter(
     request_stream: felement::GraphicalPresenterRequestStream,
     kernel: &Kernel,

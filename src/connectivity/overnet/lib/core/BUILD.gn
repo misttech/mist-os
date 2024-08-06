@@ -24,7 +24,7 @@ CORE_DEPS = [
   "//third_party/rust_crates:rand",
 ]
 
-if (is_fuchsia) {
+if (is_fuchsia || is_mistos) {
   CORE_DEPS += [ "//src/lib/zircon/rust:fuchsia-zircon" ]
 }
 

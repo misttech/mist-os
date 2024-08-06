@@ -1,13 +1,19 @@
+// Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
 // Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#[cfg(not(feature = "starnix_lite"))]
 use crate::device::android::bootloader_message_store::AndroidBootloaderMessageStore;
 use crate::device::device_mapper::DeviceMapperRegistry;
+#[cfg(not(feature = "starnix_lite"))]
 use crate::device::framebuffer::{AspectRatio, Framebuffer};
 use crate::device::loop_device::LoopDeviceRegistry;
 use crate::device::remote_block_device::RemoteBlockDeviceRegistry;
+#[cfg(not(feature = "starnix_lite"))]
 use crate::device::{BinderDevice, DeviceMode, DeviceRegistry};
+#[cfg(feature = "starnix_lite")]
+use crate::device::{DeviceMode, DeviceRegistry};
 use crate::fs::nmfs::NetworkManagerHandle;
 use crate::fs::proc::SystemLimits;
 use crate::memory_attribution::MemoryAttributionManager;
@@ -18,6 +24,7 @@ use crate::task::{
     HrTimerManagerHandle, IpTables, KernelStats, KernelThreads, NetstackDevices, PidTable,
     StopState, Syslog, UtsNamespace, UtsNamespaceHandle,
 };
+
 use crate::vdso::vdso_loader::Vdso;
 use crate::vfs::fuse::FuseCtlFs;
 use crate::vfs::socket::{
@@ -47,6 +54,7 @@ use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::{errno, from_status_like_fdio};
+#[cfg(not(feature = "starnix_lite"))]
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicU16, AtomicU8};
 use std::sync::{Arc, Weak};
@@ -150,6 +158,7 @@ pub struct Kernel {
     /// to pass boot parameters to the bootloader.  Since Starnix is acting as a de-facto bootloader
     /// for Android, we need to be able to peek into these messages.
     /// Note that this might never be initialized (if the "misc" device never gets registered).
+    #[cfg(not(feature = "starnix_lite"))]
     pub bootloader_message_store: OnceCell<AndroidBootloaderMessageStore>,
 
     /// A `Framebuffer` that can be used to display a view in the workstation UI. If the container
@@ -157,9 +166,11 @@ pub struct Kernel {
     ///
     /// When a component is run in that container and also specifies the `framebuffer` feature, the
     /// framebuffer will be served as the view of the component.
+    #[cfg(not(feature = "starnix_lite"))]
     pub framebuffer: Arc<Framebuffer>,
 
     /// The binder driver registered for this container, indexed by their device type.
+    #[cfg(not(feature = "starnix_lite"))]
     pub binders: RwLock<BTreeMap<DeviceType, BinderDevice>>,
 
     /// The iptables used for filtering network packets.
@@ -311,12 +322,13 @@ impl Kernel {
         container_data_dir: Option<fio::DirectorySynchronousProxy>,
         role_manager: Option<RoleManagerSynchronousProxy>,
         inspect_node: fuchsia_inspect::Node,
-        framebuffer_aspect_ratio: Option<&AspectRatio>,
+        #[cfg(not(feature = "starnix_lite"))] framebuffer_aspect_ratio: Option<&AspectRatio>,
         security_server: Option<Arc<SecurityServer>>,
     ) -> Result<Arc<Kernel>, zx::Status> {
         let unix_address_maker =
             Box::new(|x: FsString| -> SocketAddress { SocketAddress::Unix(x) });
         let vsock_address_maker = Box::new(|x: u32| -> SocketAddress { SocketAddress::Vsock(x) });
+        #[cfg(not(feature = "starnix_lite"))]
         let framebuffer =
             Framebuffer::new(framebuffer_aspect_ratio).expect("Failed to create framebuffer");
 
@@ -350,8 +362,11 @@ impl Kernel {
             loop_device_registry: Default::default(),
             device_mapper_registry: Default::default(),
             remote_block_device_registry: Default::default(),
+            #[cfg(not(feature = "starnix_lite"))]
             bootloader_message_store: OnceCell::new(),
+            #[cfg(not(feature = "starnix_lite"))]
             framebuffer,
+            #[cfg(not(feature = "starnix_lite"))]
             binders: Default::default(),
             iptables: OrderedRwLock::new(IpTables::new()),
             shared_futexes: FutexTable::<SharedFutexKey>::default(),

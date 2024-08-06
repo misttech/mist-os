@@ -1,0 +1,320 @@
+// Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    expose: [
+        {
+            config: "fuchsia.diagnostics.AllowSerialLogs",
+            from: "self",
+            to: "parent",
+        },
+        {
+            config: "fuchsia.diagnostics.BindServices",
+            from: "self",
+            to: "parent",
+        },
+        {
+            config: "fuchsia.diagnostics.DenySerialLogs",
+            from: "self",
+            to: "parent",
+        },
+        {
+            config: "fuchsia.diagnostics.ExceptionHandlerAvailable",
+            from: "self",
+            to: "parent",
+        },
+        {
+            config: "fuchsia.diagnostics.LogsMaxCachedOriginalBytes",
+            from: "self",
+            to: "parent",
+        },
+        {
+            config: "fuchsia.diagnostics.MaximumConcurrentSnapshotsPerReader",
+            from: "self",
+            to: "parent",
+        },
+        {
+            config: "fuchsia.diagnostics.NumThreads",
+            from: "self",
+            to: "parent",
+        },
+
+        // Drivers
+        {
+            config: "fuchsia.driver.BaseDrivers",
+            from: "self",
+            to: "parent",
+        },
+        {
+            config: "fuchsia.driver.BindEager",
+            from: "self",
+            to: "parent",
+        },
+        {
+            config: "fuchsia.driver.BootDrivers",
+            from: "self",
+            to: "parent",
+        },
+        {
+            config: "fuchsia.driver.DelayFallbackUntilBaseDriversIndexed",
+            from: "self",
+            to: "parent",
+        },
+        {
+            config: "fuchsia.driver.DisabledDrivers",
+            from: "self",
+            to: "parent",
+        },
+        {
+            config: "fuchsia.driver.DriverLoadFuzzerMaxDelayMs",
+            from: "self",
+            to: "parent",
+        },
+        {
+            config: "fuchsia.driver.EnableDriverLoadFuzzer",
+            from: "self",
+            to: "parent",
+        },
+        {
+            config: "fuchsia.driver.EnableEphemeralDrivers",
+            from: "self",
+            to: "parent",
+        },
+        {
+            config: "fuchsia.driver.UseHardwareIommu",
+            from: "self",
+            to: "parent",
+        },
+        {
+            config: "fuchsia.driver.manager.DriverHostCrashPolicy",
+            from: "self",
+            to: "parent",
+        },
+        {
+            config: "fuchsia.driver.manager.EnableTestShutdownDelays",
+            from: "self",
+            to: "parent",
+        },
+        {
+            config: "fuchsia.driver.manager.RootDriver",
+            from: "self",
+            to: "parent",
+        },
+
+        // Power
+        {
+            config: "fuchsia.power.SuspendEnabled",
+            from: "self",
+            to: "parent",
+        },
+
+        // Sysmem
+        {
+            config: "fuchsia.sysmem.ContiguousGuardPagesUnused",
+            from: "void",
+            to: "parent",
+            availability: "optional",
+        },
+        {
+            config: "fuchsia.sysmem.FixedContiguousMemorySize",
+            from: "void",
+            to: "parent",
+            availability: "optional",
+        },
+        {
+            config: "fuchsia.sysmem.FixedProtectedMemorySize",
+            from: "void",
+            to: "parent",
+            availability: "optional",
+        },
+        {
+            config: "fuchsia.sysmem.PercentContiguousMemorySize",
+            from: "void",
+            to: "parent",
+            availability: "optional",
+        },
+        {
+            config: "fuchsia.sysmem.PercentProtectedMemorySize",
+            from: "void",
+            to: "parent",
+            availability: "optional",
+        },
+
+        // Starnix
+        {
+            config: "fuchsia.starnix.runner.EnableDataCollection",
+            from: "self",
+            to: "parent",
+        },
+    ],
+    capabilities: [
+        {
+            config: "fuchsia.diagnostics.BindServices",
+            type: "vector",
+            max_count: 10,
+            element: {
+                type: "string",
+                max_size: 256,
+            },
+            value: [],
+        },
+        {
+            config: "fuchsia.diagnostics.LogsMaxCachedOriginalBytes",
+            type: "uint64",
+            value: 4194304,
+        },
+        {
+            config: "fuchsia.diagnostics.MaximumConcurrentSnapshotsPerReader",
+            type: "uint64",
+            value: 4,
+        },
+        {
+            config: "fuchsia.diagnostics.NumThreads",
+            type: "uint64",
+            value: 4,
+        },
+        {
+            config: "fuchsia.diagnostics.AllowSerialLogs",
+            type: "vector",
+            max_count: 512,
+            element: {
+                type: "string",
+                max_size: 50,
+            },
+            value: [
+                "/bootstrap/**",
+                "/core/starnix_runner/**",
+            ],
+        },
+        {
+            config: "fuchsia.diagnostics.DenySerialLogs",
+            type: "vector",
+            max_count: 512,
+            element: {
+                type: "string",
+                max_size: 50,
+            },
+            value: [
+                "NUD"
+            ],
+        },
+        {
+            config: "fuchsia.diagnostics.ExceptionHandlerAvailable",
+            type: "bool",
+            value: false,
+        },
+
+        // Drivers
+        {
+            config: "fuchsia.driver.BaseDrivers",
+            type: "vector",
+            max_count: 200,
+            element: {
+                type: "string",
+                max_size: 150,
+            },
+            value: [],
+        },
+        {
+            config: "fuchsia.driver.BootDrivers",
+            type: "vector",
+            max_count: 200,
+            element: {
+                type: "string",
+                max_size: 150,
+            },
+            value: [
+                "fuchsia-boot:///#meta/bus-pci.cm",
+                "fuchsia-boot:///#meta/platform-bus.cm",
+                "fuchsia-boot:///#meta/platform-bus-x86.cm",
+                "fuchsia-boot:///#meta/network-device.cm",
+                "fuchsia-boot:///#meta/sysmem.cm",
+                "fuchsia-boot:///#meta/virtio_netdevice.cm",
+            ],
+        },
+        {
+            // Whether or not ephemeral drivers should be allowed to be registered dynamically.
+            config: "fuchsia.driver.EnableEphemeralDrivers",
+            type: "bool",
+            value: false,
+        },
+        {
+            // Whether or not fallback drivers should wait until base drivers have been indexed
+            // before bound.
+            config: "fuchsia.driver.DelayFallbackUntilBaseDriversIndexed",
+            type: "bool",
+            value: false,
+        },
+
+        // Specify drivers to bind 'eagerly'. This turns a driver that normally
+        // binds as a fallback driver into a driver that will be bound normally.
+        {
+            config: "fuchsia.driver.BindEager",
+            type: "vector",
+            max_count: 20,
+            element: {
+                type: "string",
+                max_size: 100,
+            },
+            value: [],
+        },
+        {
+            config: "fuchsia.driver.EnableDriverLoadFuzzer",
+            type: "bool",
+            value: false,
+        },
+        {
+            config: "fuchsia.driver.DriverLoadFuzzerMaxDelayMs",
+            type: "int64",
+            value: 0,
+        },
+        {
+            // Disable specific drivers by URL. These drivers will not be bound or loaded.
+            config: "fuchsia.driver.DisabledDrivers",
+            type: "vector",
+            max_count: 20,
+            element: {
+                type: "string",
+                max_size: 100,
+            },
+            value: [],
+        },
+        {
+            // Whether or not a hardware iommu should be used.
+            config: "fuchsia.driver.UseHardwareIommu",
+            type: "bool",
+            value: false,
+        },
+        {
+            config: "fuchsia.driver.manager.DriverHostCrashPolicy",
+            type: "string",
+            max_size: 20,
+            value: "restart-driver-host",
+        },
+        {
+            config: "fuchsia.driver.manager.RootDriver",
+            type: "string",
+            max_size: 100,
+            value: "fuchsia-boot:///#meta/platform-bus.cm",
+        },
+        {
+            config: "fuchsia.driver.manager.EnableTestShutdownDelays",
+            type: "bool",
+            value: false,
+        },
+
+        // Power
+        {
+            config: "fuchsia.power.SuspendEnabled",
+            type: "bool",
+            value: false,
+        },
+
+        // Starnix
+        {
+            config: "fuchsia.starnix.runner.EnableDataCollection",
+            type: "bool",
+            value: false,
+        },
+    ],
+}

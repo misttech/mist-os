@@ -302,3 +302,11 @@ group("uses-outline-atomics-fxbug98632") {
     deps = [ "//src/zircon/lib/zircon" ]
   }
 }
+
+config("mistos_define") {
+  defines = [ "__mist_os__" ]
+}
+
+config("mistos_config") {
+  rustflags = [ "--cfg=mistos" ]
+}

@@ -1,0 +1,89 @@
+// Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
+// Copyright 2021 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+// Realm that acts as a container for general system components.
+{
+    include: [
+        "inspect/offer.shard.cml",
+        "syslog/offer.shard.cml",
+
+        // Storage
+        "//src/sys/core/meta/unrestricted-storage.core_shard.cml",
+
+        // Build Info
+        "//src/developer/build_info/meta/build_info.core_shard.mistos.cml",
+
+        // Starnix
+        "//src/starnix/runner/meta/starnix_runner.core_shard.mistos.cml",
+        "//src/sys/core/meta/core-env-base-resolver.core_shard.cml",
+
+        // network-tun
+        "//src/connectivity/network/tun/network-tun/meta/network-tun.core_shard.mistos.cml"
+    ],
+    children: [
+        {
+            name: "network",
+            url: "fuchsia-boot:///#meta/network.cm",
+            startup: "eager",
+        },
+        // TODO(https://fxbug.dev/294908023) move to the relevant core shard
+        {
+            name: "starnix_runner",
+            url: "fuchsia-boot:///#meta/starnix_runner.cm",
+            environment: "#core-env",
+        },
+    ], // children
+    capabilities: [
+        // Note: `data`, `cache`, and `temp` storage capabilities are defined in a shard and
+        // included as part of the build process. See restricted-storage.core_shard.cml or
+        // unrestricted-storage.core_shard.cml
+    ],
+    offer: [
+        {
+            from: "parent",
+            to: "#network",
+            config: "fuchsia.http-client.StopOnIdleTimeoutMillis",
+            availability: "same_as_target",
+        },
+        {
+            protocol: [ "fuchsia.device.NameProvider" ],
+            from: "parent",
+            to: [ "#network" ],
+        },
+        {
+            protocol: [
+                "fuchsia.scheduler.deprecated.ProfileProvider",
+                "fuchsia.scheduler.RoleManager",
+            ],
+            from: "parent",
+            to: [ "#network" ],
+        },
+        {
+            directory: "config-data",
+            from: "parent",
+            to: [ "#network" ],
+        },
+        {
+            directory: "dev-class",
+            from: "parent",
+            as: "dev-class-network",
+            to: [ "#network" ],
+            subdir: "network",
+        },
+    ],
+    expose: [
+        {
+            protocol: "fuchsia.component.Binder",
+            from: "framework",
+        },
+        {
+            protocol: [
+                "fuchsia.net.name.Lookup",
+                "fuchsia.posix.socket.Provider",
+            ],
+            from: "#network",
+        },
+    ],
+}

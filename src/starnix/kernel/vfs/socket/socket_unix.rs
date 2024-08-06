@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#[cfg(not(feature = "starnix_lite"))]
 use crate::bpf::fs::get_bpf_object;
+#[cfg(not(feature = "starnix_lite"))]
 use crate::bpf::program::{Program, ProgramType};
 use crate::mm::MemoryAccessorExt;
 use crate::task::{CurrentTask, EventHandler, Task, WaitCanceler, WaitQueue, Waiter};
@@ -17,6 +19,7 @@ use crate::vfs::{
     default_ioctl, CheckAccessReason, FdNumber, FileHandle, FileObject, FsNodeHandle, FsStr,
     LookupContext, Message,
 };
+
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::errors::{Errno, EACCES, EINTR, EPERM};
 use starnix_uapi::file_mode::Access;
@@ -121,6 +124,7 @@ struct UnixSocketInner {
     pub keepalive: bool,
 
     /// See SO_ATTACH_BPF.
+    #[cfg(not(feature = "starnix_lite"))]
     bpf_program: Option<Arc<Program>>,
 
     /// Unix credentials of the owner of this socket, for SO_PEERCRED.
@@ -147,6 +151,7 @@ impl UnixSocket {
                 reuseaddr: false,
                 reuseport: false,
                 keepalive: false,
+                #[cfg(not(feature = "starnix_lite"))]
                 bpf_program: None,
                 credentials: None,
                 state: UnixSocketState::Disconnected,
@@ -376,6 +381,7 @@ impl UnixSocket {
         inner.keepalive = keepalive;
     }
 
+    #[cfg(not(feature = "starnix_lite"))]
     fn set_bpf_program(&self, program: Option<Arc<Program>>) -> Result<(), Errno> {
         if let Some(program) = program.as_ref() {
             if program.info.program_type != ProgramType::SocketFilter {
@@ -727,10 +733,17 @@ impl SocketOps for UnixSocket {
                     let keepalive: u32 = task.read_object(user_opt.try_into()?)?;
                     self.set_keepalive(keepalive != 0);
                 }
+
                 SO_ATTACH_BPF => {
-                    let fd: FdNumber = task.read_object(user_opt.try_into()?)?;
-                    let object = get_bpf_object(task, fd)?;
-                    self.set_bpf_program(Some(object.as_program()?.clone()))?;
+                    #[cfg(not(feature = "starnix_lite"))]
+                    {
+                        let fd: FdNumber = task.read_object(user_opt.try_into()?)?;
+                        let object = get_bpf_object(task, fd)?;
+                        self.set_bpf_program(Some(object.as_program()?.clone()))?;
+                    }
+
+                    #[cfg(feature = "starnix_lite")]
+                    return error!(ENOPROTOOPT);
                 }
                 _ => return error!(ENOPROTOOPT),
             },
@@ -892,8 +905,10 @@ impl UnixSocketInner {
     /// Returns the number of bytes that were written to the socket.
     fn write(
         &mut self,
-        locked: &mut Locked<'_, FileOpsCore>,
-        current_task: &CurrentTask,
+        #[cfg(not(feature = "starnix_lite"))] locked: &mut Locked<'_, FileOpsCore>,
+        #[cfg(feature = "starnix_lite")] _locked: &mut Locked<'_, FileOpsCore>,
+        #[cfg(not(feature = "starnix_lite"))] current_task: &CurrentTask,
+        #[cfg(feature = "starnix_lite")] _current_task: &CurrentTask,
         data: &mut dyn InputBuffer,
         address: Option<SocketAddress>,
         ancillary_data: &mut Vec<AncillaryData>,
@@ -902,6 +917,8 @@ impl UnixSocketInner {
         if self.is_shutdown {
             return error!(EPIPE);
         }
+
+        #[cfg(not(feature = "starnix_lite"))]
         let filter = |mut message: Message| {
             let Some(bpf_program) = self.bpf_program.as_ref() else {
                 return Some(message);
@@ -916,6 +933,10 @@ impl UnixSocketInner {
                 Some(message)
             }
         };
+
+        #[cfg(feature = "starnix_lite")]
+        let filter = |_message: Message| None;
+
         let bytes_written = if socket_type == SocketType::Stream {
             self.messages.write_stream_with_filter(data, address, ancillary_data, filter)?
         } else {

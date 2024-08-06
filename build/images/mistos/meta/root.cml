@@ -1,0 +1,306 @@
+// Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
+// Copyright 2022 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [
+        "//src/sys/core/meta/core.root_shard.mistos.cml",
+        "//src/starnix/runner/meta/starnix_runner.root_shard.cml",
+    ],
+    children: [
+        {
+            name: "bootstrap",
+            url: "fuchsia-boot:///#meta/bootstrap.cm",
+            startup: "eager",
+            environment: "#elf-env",
+        },
+        {
+            name: "startup",
+            url: "fuchsia-boot:///#meta/startup.cm",
+            startup: "eager",
+            environment: "#elf-env",
+        },
+        {
+            name: "elf_runner",
+            url: "fuchsia-builtin://#elf_runner.cm",
+        },
+        {
+            name: "config",
+            url: "fuchsia-boot:///#meta/config.cm",
+        },
+    ],
+    offer: [
+        {
+            from: "#config",
+            to: "#bootstrap",
+            config: [
+                "fuchsia.diagnostics.AllowSerialLogs",
+                "fuchsia.diagnostics.BindServices",
+                "fuchsia.diagnostics.DenySerialLogs",
+                "fuchsia.diagnostics.ExceptionHandlerAvailable",
+                "fuchsia.diagnostics.LogsMaxCachedOriginalBytes",
+                "fuchsia.diagnostics.MaximumConcurrentSnapshotsPerReader",
+                "fuchsia.diagnostics.NumThreads",
+                "fuchsia.driver.BaseDrivers",
+                "fuchsia.driver.BindEager",
+                "fuchsia.driver.BootDrivers",
+                "fuchsia.driver.DelayFallbackUntilBaseDriversIndexed",
+                "fuchsia.driver.DisabledDrivers",
+                "fuchsia.driver.DriverLoadFuzzerMaxDelayMs",
+                "fuchsia.driver.EnableDriverLoadFuzzer",
+                "fuchsia.driver.EnableEphemeralDrivers",
+                "fuchsia.driver.manager.DelayFallbackUntilBaseDriversLoaded",
+                "fuchsia.driver.manager.DriverHostCrashPolicy",
+                "fuchsia.driver.manager.EnableTestShutdownDelays",
+                "fuchsia.driver.manager.RootDriver",
+                "fuchsia.driver.UseHardwareIommu",
+            ],
+        },
+        {
+            from: "#config",
+            to: "#bootstrap",
+            config: [
+                "fuchsia.sysmem.ContiguousGuardPagesUnused",
+                "fuchsia.sysmem.FixedContiguousMemorySize",
+                "fuchsia.sysmem.FixedProtectedMemorySize",
+                "fuchsia.sysmem.PercentContiguousMemorySize",
+                "fuchsia.sysmem.PercentProtectedMemorySize",
+            ],
+            availability: "optional",
+        },
+        {
+            protocol: "fuchsia.process.Launcher",
+            from: "parent",
+            to: "#elf_runner",
+        },
+        {
+            protocol: "fuchsia.component.Binder",
+            from: "#core",
+            as: "fuchsia.component.CoreBinder",
+            to: "#startup",
+            source_availability: "unknown",
+        },
+        {
+            protocol: [
+                "fuchsia.inspect.InspectSink",
+                "fuchsia.logger.LogSink",
+            ],
+            from: "#bootstrap",
+            to: "#startup",
+        },
+
+        // The LogSink capability comes from an ELF component, but running ELF components
+        // requires an ELF runner. Therefore the ELF runner can't get the LogSink capability.
+        {
+            protocol: "fuchsia.logger.LogSink",
+            from: "void",
+            to: "#elf_runner",
+            availability: "optional",
+        },
+
+        // We route these from void to bootstrap to satisfy the requirement
+        // that the protocols routed everywhere. Bootstrap is exposing them itself.
+        {
+            protocol: [
+                "fuchsia.inspect.InspectSink",
+                "fuchsia.logger.LogSink",
+            ],
+            from: "void",
+            to: [
+                "#bootstrap",
+                "#config",
+            ],
+            availability: "optional",
+        },
+
+        // Capabilities routed from "parent" at the root are either provided by
+        // bootsvc through component_manager's namespace or by component_manager
+        // itself as a builtin service
+        {
+            directory: "boot",
+            from: "parent",
+            to: "#bootstrap",
+        },
+        {
+            protocol: [
+                "fuchsia.boot.Arguments",
+                "fuchsia.boot.FactoryItems",
+                "fuchsia.boot.Items",
+                "fuchsia.boot.ReadOnlyLog",
+                "fuchsia.boot.SvcStashProvider",
+                "fuchsia.boot.WriteOnlyLog",
+                "fuchsia.kernel.CpuResource",
+                "fuchsia.kernel.DebuglogResource",
+                "fuchsia.kernel.DebugResource",
+                "fuchsia.kernel.EnergyInfoResource",
+                "fuchsia.kernel.FramebufferResource",
+                "fuchsia.kernel.HypervisorResource",
+                "fuchsia.kernel.InfoResource",
+                "fuchsia.kernel.IommuResource",
+                "fuchsia.kernel.IoportResource",
+                "fuchsia.kernel.IrqResource",
+                "fuchsia.kernel.MexecResource",
+                "fuchsia.kernel.MmioResource",
+                "fuchsia.kernel.MsiResource",
+                "fuchsia.kernel.PowerResource",
+                "fuchsia.kernel.ProfileResource",
+                "fuchsia.kernel.RootJob",
+                "fuchsia.kernel.RootJobForInspect",
+                "fuchsia.kernel.SmcResource",
+                "fuchsia.kernel.Stats",
+                "fuchsia.kernel.VmexResource",
+                "fuchsia.process.Launcher",
+                "fuchsia.sys2.CrashIntrospect",
+            ],
+            from: "parent",
+            to: "#bootstrap",
+        },
+        {
+            event_stream: [
+                "capability_requested",
+                "debug_started",
+                "destroyed",
+                "discovered",
+                "started",
+                "stopped",
+            ],
+            from: "parent",
+            to: "#bootstrap",
+        },
+        {
+            protocol: [
+                "fuchsia.net.name.Lookup",
+                "fuchsia.posix.socket.Provider",
+            ],
+            from: "#core",
+            to: "#bootstrap",
+            dependency: "weak",
+            source_availability: "unknown",
+        },
+        {
+            protocol: [
+                "fuchsia.component.resolution.Resolver",
+                "fuchsia.sys2.SystemController",
+            ],
+            from: "parent",
+            to: "#bootstrap",
+        },
+
+        // Non-zircon services for archivist, pwrbtn-monitor, and console.
+        {
+            protocol: [
+                "fuchsia.component.PersistenceBinder",
+                "fuchsia.component.SamplerBinder",
+                "fuchsia.exception.Handler",
+                "fuchsia.feedback.CrashReporter",
+                "fuchsia.feedback.DataProvider",
+                "fuchsia.metrics.MetricEventLoggerFactory",
+                "fuchsia.pkg.PackageResolver",
+                "fuchsia.pkg.RepositoryManager",
+                "fuchsia.pkg.rewrite.Engine",
+                "fuchsia.process.Resolver",
+                "fuchsia.settings.Input",
+                "fuchsia.ui.activity.Provider",
+                "fuchsia.update.CommitStatusProvider",
+            ],
+            from: "#core",
+            to: "#bootstrap",
+            dependency: "weak",
+            source_availability: "unknown",
+        },
+        {
+            protocol: [ "fuchsia.memorypressure.Provider" ],
+            from: "#core",
+            to: "#bootstrap",
+            dependency: "weak",
+            availability: "optional",
+            source_availability: "unknown",
+        },
+
+        // TODO(https://fxbug.dev/324494668): remove this when Netstack2 is gone.
+        {
+            directory: "netstack-diagnostics",
+            from: "#core",
+            to: "#bootstrap",
+            dependency: "weak",
+            availability: "optional",
+            source_availability: "unknown",
+        },
+
+        // Trace manager may be excluded from builds where tracing is not
+        // expected to be used for observability, such as in the bringup
+        // product and non-eng builds of any product.
+        {
+            protocol: [
+                "fuchsia.tracing.controller.Controller",
+                "fuchsia.tracing.provider.Registry",
+            ],
+            from: "#core",
+            to: "#bootstrap",
+            dependency: "weak",
+            availability: "optional",
+            source_availability: "unknown",
+        },
+
+        // The source of this protocol, debug-dash-launcher,
+        // may not be available on all products.
+        // Used by console-launcher.
+        {
+            protocol: "fuchsia.dash.Launcher",
+            from: "#core",
+            to: "#bootstrap",
+            dependency: "weak",
+            availability: "optional",
+            source_availability: "unknown",
+        },
+        {
+            protocol: "fuchsia.sys2.RealmExplorer",
+            from: "framework",
+            as: "fuchsia.sys2.RealmExplorer.root",
+            to: "#bootstrap",
+        },
+        {
+            protocol: "fuchsia.sys2.RealmQuery",
+            from: "framework",
+            as: "fuchsia.sys2.RealmQuery.root",
+            to: "#bootstrap",
+        },
+        {
+            protocol: "fuchsia.component.Introspector",
+            from: "framework",
+            as: "fuchsia.component.Introspector.root",
+            to: "#bootstrap",
+        },
+        {
+            protocol: "fuchsia.sys2.LifecycleController",
+            from: "framework",
+            as: "fuchsia.sys2.LifecycleController.root",
+            to: "#bootstrap",
+        },
+        {
+            protocol: "fuchsia.sys2.RouteValidator",
+            from: "framework",
+            as: "fuchsia.sys2.RouteValidator.root",
+            to: "#bootstrap",
+        },
+
+        // Offer boot resolver to `bootstrap` for driver usage.
+        {
+            resolver: "boot_resolver",
+            from: "parent",
+            to: "#bootstrap",
+        },
+    ],
+    environments: [
+        {
+            name: "elf-env",
+            extends: "realm",
+            runners: [
+                {
+                    runner: "elf",
+                    from: "#elf_runner",
+                },
+            ],
+        },
+    ],
+}

@@ -1,0 +1,27 @@
+# Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/dist/resource.gni")
+import("//build/testing/boot_tests/kernel_zbi_test.gni")
+
+resource("linux-bin") {
+  allow_binary_output_dir = true
+  sources = [ "toybox-x86_64" ]
+  outputs = [ "bin/toybox" ]
+}
+
+resource("coremark") {
+  allow_binary_output_dir = true
+  sources = [ "coremark.exe" ]
+  outputs = [ "bin/coremark" ]
+}
+
+fuchsia_package_with_single_component("toybox") {
+  component_name = "toybox"
+  manifest = "meta/toybox.cml"
+  deps = [
+    ":coremark",
+    ":linux-bin",
+  ]
+}

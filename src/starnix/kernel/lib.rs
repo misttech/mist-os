@@ -7,6 +7,7 @@
 use tracing_mutex as _;
 
 pub mod arch;
+#[cfg(not(feature = "starnix_lite"))]
 pub mod bpf;
 pub mod device;
 pub mod dynamic_thread_spawner;

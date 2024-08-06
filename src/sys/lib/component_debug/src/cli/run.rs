@@ -1,3 +1,4 @@
+// Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
@@ -11,6 +12,9 @@ use crate::lifecycle::{
 };
 use anyhow::{bail, format_err, Result};
 use fidl::HandleBased;
+#[cfg(mistos)]
+use fuchsia_url::boot_url::BootUrl;
+#[cfg(not(mistos))]
 use fuchsia_url::AbsoluteComponentUrl;
 use futures::future::BoxFuture;
 use futures::AsyncReadExt;
@@ -107,7 +111,8 @@ impl Stdio {
 
 pub async fn run_cmd<W: std::io::Write>(
     moniker: Moniker,
-    url: AbsoluteComponentUrl,
+    #[cfg(not(mistos))] url: AbsoluteComponentUrl,
+    #[cfg(mistos)] url: BootUrl,
     recreate: bool,
     connect_stdio: bool,
     config_overrides: Vec<fdecl::ConfigOverride>,

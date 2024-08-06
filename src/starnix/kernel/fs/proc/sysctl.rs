@@ -3,6 +3,9 @@
 // found in the LICENSE file.
 
 use crate::mm::PAGE_SIZE;
+#[cfg(feature = "starnix_lite")]
+use crate::task::{ptrace_get_scope, ptrace_set_scope, CurrentTask, NetstackDevicesDirectory};
+#[cfg(not(feature = "starnix_lite"))]
 use crate::task::{
     ptrace_get_scope, ptrace_set_scope, CurrentTask, NetstackDevicesDirectory, SeccompAction,
 };
@@ -322,9 +325,11 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
                 BytesFile::new_node(b"256".to_vec()),
                 mode!(IFREG, 0o444),
             );
+            #[cfg(not(feature = "starnix_lite"))]
             dir.entry(current_task, "actions_logged", SeccompActionsLogged::new_node(), mode);
         });
         dir.entry(current_task, "tainted", KernelTaintedFile::new_node(), mode);
+        #[cfg(not(feature = "starnix_lite"))]
         dir.subdir(current_task, "seccomp", 0o555, |dir| {
             dir.entry(
                 current_task,
@@ -1091,14 +1096,17 @@ fn sysctl_net_diretory(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsN
     dir.build(current_task)
 }
 
+#[cfg(not(feature = "starnix_lite"))]
 struct SeccompActionsLogged {}
 
+#[cfg(not(feature = "starnix_lite"))]
 impl SeccompActionsLogged {
     fn new_node() -> impl FsNodeOps {
         BytesFile::new_node(Self {})
     }
 }
 
+#[cfg(not(feature = "starnix_lite"))]
 impl BytesFileOps for SeccompActionsLogged {
     fn write(&self, current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
         if !current_task.creds().has_capability(CAP_SYS_ADMIN) {

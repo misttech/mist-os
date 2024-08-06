@@ -199,13 +199,8 @@ template("rustc_test_internal") {
       # Dynamic linking applies to not only to libstd but to libtest as well,
       # which means we must depend on it as a data_dep to get it in our
       # package.
-      if (is_fuchsia) {
-        _dynamic_rust_config =
-            [ "//build/config/fuchsia:dynamic_rust_standard_library" ]
-      } else if (is_mistos) {
-        _dynamic_rust_config =
-            [ "//build/config/mistos:dynamic_rust_standard_library" ]
-      }
+      _dynamic_rust_config =
+          [ "//build/config/mistos:dynamic_rust_standard_library" ]
       if (configs + _dynamic_rust_config - _dynamic_rust_config != configs) {
         _data_deps += [ "//build/toolchain/runtime:shared-rust-libtest-deps" ]
       } else {

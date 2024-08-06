@@ -130,6 +130,10 @@ source_set("driver_runner") {
     "//src/storage/lib/vfs/cpp",
     "//zircon/system/ulib/zircon-internal",
   ]
+
+  if (is_mistos) {
+    configs += [ "//build/config/mistos:mistos_define" ]
+  }
 }
 
 source_set("driver_development_service") {

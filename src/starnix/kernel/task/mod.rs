@@ -15,6 +15,7 @@ mod pid_table;
 mod process_group;
 mod ptrace;
 mod scheduler;
+#[cfg(not(feature = "starnix_lite"))]
 mod seccomp;
 mod session;
 mod syslog;
@@ -38,6 +39,7 @@ pub use pid_table::*;
 pub use process_group::*;
 pub use ptrace::*;
 pub use scheduler::*;
+#[cfg(not(feature = "starnix_lite"))]
 pub use seccomp::*;
 pub use session::*;
 pub use syslog::*;
