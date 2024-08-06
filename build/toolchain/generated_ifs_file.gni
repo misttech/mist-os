@@ -1,0 +1,71 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+# This template will generate a `.ifs` text file based on parameters set in GN.
+# The generated output of this target can be set as the $abi for an
+# ifs_shared_library() target.
+#
+# Parameters:
+#
+#   * soname
+#     - Required: The name of the linkable library file to write. This should
+#     include a `lib` prefix (if applicable) and the `.so` extension.
+#     - Type: string
+#
+#   * symbols
+#     - Required: The list of symbols defined by this generated ELF file. Each
+#     symbol must have a $name and a $type. The object may optionally have a
+#     $size or $weak boolean, if applicable.
+#     For example:
+#     ```
+#     symbols = [
+#       {
+#         name = "foo",
+#         type = "Func"
+#       },
+#       {
+#         name = "bar",
+#         type = "Func"
+#         weak = true
+#       },
+#       {
+#         name = "my_struct",
+#         type = "Object"
+#         size = 8
+#       },
+#       {
+#         name = "tls_ie_weak",
+#         type = "TLS"
+#         size = 4
+#       },
+#    ]
+#    ```
+#
+#     - Type: list(scope)
+template("generated_ifs_file") {
+  generated_file(target_name) {
+    outputs = [ "$target_gen_dir/$target_name.ifs" ]
+    output_conversion = "list lines"
+
+    contents = [
+      "--- !ifs-v1",
+      "IfsVersion:  3.0",
+      "SoName:      ${invoker.soname}",
+      "Symbols:",
+    ]
+
+    foreach(symbol, invoker.symbols) {
+      symbol_string = "  - { Name: ${symbol.name}, Type: ${symbol.type}"
+      if (defined(symbol.size)) {
+        symbol_string += ", Size: ${symbol.size}"
+      }
+      if (defined(symbol.weak)) {
+        symbol_string += ", Weak: ${symbol.weak}"
+      }
+      symbol_string += " }"
+      contents += [ symbol_string ]
+    }
+    contents += [ "..." ]
+  }
+}
