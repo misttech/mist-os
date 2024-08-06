@@ -23,7 +23,8 @@ The following sections explain how to manage this lifecycle as an API developer.
 Always annotate new FIDL APIs with an
 [`@available`](/docs/reference/fidl/language/versioning.md) attribute. Unstable
 APIs should be added at the `HEAD` API level. Note that partners using the SDK
-cannot target the `HEAD` API level, by design.
+_can_ target the `HEAD` API level, but get no API/ABI compatibility guarantees
+if they do so.
 
 For example:
 
@@ -32,18 +33,25 @@ For example:
 library fuchsia.examples.docs;
 ```
 
-Stable APIs should be `added` at the
-[in-development API level](/sdk/version_history.json).
-This means that starting at the current in-development API
-level, this API is available and will not change without
-the appropriate deprecation flows.
-For example:
+When APIs are ready to stabilize, you should update them to be `added` at
+`NEXT`. For example:
 
 ```fidl
-// At the time of writing the in development level was 10.
-@available(added=10)
+@available(added=NEXT)
 library fuchsia.examples.docs;
 ```
+
+`NEXT` is similar to `HEAD`, except API elements available in `NEXT` will be
+automatically added to the next published API level. So, if you added our
+library to `NEXT` a week before the API freeze for F23, a week later you'd see:
+
+```fidl
+@available(added=23)
+library fuchsia.examples.docs;
+```
+
+After that point, any API elements added to 23 will need to be supported until
+all API levels that include those API elements have been retired.
 
 When a FIDL library has more than one `.fidl` file, the library should include a
 separate `overview.fidl` file and the `@available` attribute should be written
@@ -159,11 +167,13 @@ and other elements to be associated with specific API levels. All compatibility
 reasoning is based on API version. This is how to express a point in the
 evolution of an API.
 
-- Only ever modify an API at the `in-development` or `HEAD` API level.
+- Only ever modify an API at the `NEXT` or `HEAD` API level.
 
-- Once an API level is declared stable, it should not be changed. (see
-  [version_history.json][version-json]). This allows changes to the API, while
-  existing API levels are unchanged.
+- Changes should be implemented at `NEXT` only if they're ready to be released
+  in the next Fuchsia milestone.
+
+- Numbered API levels should not be changed. See
+  [version_history.json][version-json].
 
 ### Specify bounds for vector and string
 
