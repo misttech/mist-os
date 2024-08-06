@@ -862,10 +862,10 @@ void ArmArchVmAspace::FlushAsid() const {
   __UNREACHABLE;
 }
 
-zx::result<bool> ArmArchVmAspace::UnmapPageTable(MappingCursor& cursor, EnlargeOperation enlarge,
-                                                 CheckForEmptyPt pt_check, const uint index_shift,
-                                                 volatile pte_t* page_table, ConsistencyManager& cm,
-                                                 Reclaim reclaim) {
+zx::result<bool> ArmArchVmAspace::UnmapPageTable(VirtualAddressCursor& cursor,
+                                                 EnlargeOperation enlarge, CheckForEmptyPt pt_check,
+                                                 const uint index_shift, volatile pte_t* page_table,
+                                                 ConsistencyManager& cm, Reclaim reclaim) {
   const vaddr_t block_size = 1UL << index_shift;
   const uint num_entries = (1u << (page_size_shift_ - 3));
   const uint64_t index_mask = num_entries - 1;
@@ -956,7 +956,7 @@ zx::result<bool> ArmArchVmAspace::UnmapPageTable(MappingCursor& cursor, EnlargeO
       update_pte(&page_table[index], MMU_PTE_DESCRIPTOR_INVALID);
       unmapped = true;
       cm.FlushEntry(cursor.vaddr(), true);
-      cursor.ConsumeVAddr(block_size);
+      cursor.Consume(block_size);
     }
   }
 
@@ -994,7 +994,7 @@ zx_status_t ArmArchVmAspace::MapPageTable(pte_t attrs, bool ro, uint index_shift
             // as we may have allocated various levels of page tables. By consuming a single page we
             // make the cleanup operation think we have added a mapping here, causing it to check
             // the page table for potential cleanup.
-            cursor.ConsumePAddr(PAGE_SIZE);
+            cursor.Consume(PAGE_SIZE);
             return ZX_ERR_NO_MEMORY;
           }
           void* pt_vaddr = paddr_to_physmap(page_table_paddr);
@@ -1085,7 +1085,7 @@ zx_status_t ArmArchVmAspace::MapPageTable(pte_t attrs, bool ro, uint index_shift
         // Tell the consistency manager we've mapped a new page.
         cm.MapEntry(cursor.vaddr(), true);
       }
-      cursor.ConsumePAddr(block_size);
+      cursor.Consume(block_size);
     }
   }
 
@@ -1237,7 +1237,7 @@ size_t ArmArchVmAspace::HarvestAccessedPageTable(
       if (do_unmap) {
         // Unmapping an exact block, which should not need enlarging and hence should never be able
         // to fail.
-        MappingCursor unmap_cursor(vaddr, chunk_size);
+        VirtualAddressCursor unmap_cursor(vaddr, chunk_size);
         {
           [[maybe_unused]] bool result =
               unmap_cursor.SetVaddrRelativeOffset(vaddr_base_, 1ull << top_size_shift_);
@@ -1444,7 +1444,7 @@ zx_status_t ArmArchVmAspace::MapContiguous(vaddr_t vaddr, paddr_t paddr, size_t 
         MapPageTable(attrs, ro, top_index_shift_, tt_virt_, ExistingEntryAction::Error, cursor, cm);
     MarkAspaceModified();
     if (status != ZX_OK) {
-      MappingCursor unmap_cursor = cursor.ProcessedRange();
+      VirtualAddressCursor unmap_cursor = cursor.ProcessedRange();
       if (unmap_cursor.size() > 0) {
         [[maybe_unused]] auto result =
             UnmapPageTable(unmap_cursor, EnlargeOperation::No, CheckForEmptyPt::Yes,
@@ -1527,7 +1527,7 @@ zx_status_t ArmArchVmAspace::Map(vaddr_t vaddr, paddr_t* phys, size_t count, uin
         MapPageTable(attrs, ro, top_index_shift_, tt_virt_, existing_action, cursor, cm);
     MarkAspaceModified();
     if (status != ZX_OK) {
-      MappingCursor unmap_cursor = cursor.ProcessedRange();
+      VirtualAddressCursor unmap_cursor = cursor.ProcessedRange();
       if (unmap_cursor.size() > 0) {
         [[maybe_unused]] auto result =
             UnmapPageTable(unmap_cursor, EnlargeOperation::No, CheckForEmptyPt::Yes,
@@ -1577,7 +1577,7 @@ zx_status_t ArmArchVmAspace::Unmap(vaddr_t vaddr, size_t count, EnlargeOperation
 
   ASSERT(updates_enabled_);
   ConsistencyManager cm(*this);
-  MappingCursor cursor(vaddr, count * PAGE_SIZE);
+  VirtualAddressCursor cursor(vaddr, count * PAGE_SIZE);
   if (!cursor.SetVaddrRelativeOffset(vaddr_base_, 1ull << top_size_shift_)) {
     return ZX_ERR_OUT_OF_RANGE;
   }

@@ -769,7 +769,7 @@ zx_status_t Riscv64ArchVmAspace::MapPageTable(pte_t attrs, bool ro, uint level,
           // as we may have allocated various levels of page tables. By consuming a single page we
           // make the cleanup operation think we have added a mapping here, causing it to check
           // the page table for potential cleanup.
-          cursor.ConsumePAddr(PAGE_SIZE);
+          cursor.Consume(PAGE_SIZE);
           return result.status_value();
         }
         page_table_paddr = result.value();
@@ -860,7 +860,7 @@ zx_status_t Riscv64ArchVmAspace::MapPageTable(pte_t attrs, bool ro, uint level,
           PANIC_UNIMPLEMENTED;
         }
       }
-      cursor.ConsumePAddr(block_size);
+      cursor.Consume(block_size);
     }
   }
   return ZX_OK;

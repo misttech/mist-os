@@ -119,7 +119,7 @@ class ArmArchVmAspace final : public ArchVmAspaceInterface {
 
   // Unmaps the range of |cursor| from the |page_table| and returns whether or not the caller needs
   // to scan the page table to check if it is empty.
-  zx::result<bool> UnmapPageTable(MappingCursor& cursor, EnlargeOperation enlarge,
+  zx::result<bool> UnmapPageTable(VirtualAddressCursor& cursor, EnlargeOperation enlarge,
                                   CheckForEmptyPt pt_check, uint index_shift,
                                   volatile pte_t* page_table, ConsistencyManager& cm,
                                   Reclaim reclaim) TA_REQ(lock_);
