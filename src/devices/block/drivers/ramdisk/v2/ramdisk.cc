@@ -34,7 +34,6 @@ zx::result<std::unique_ptr<Ramdisk>> Ramdisk::Create(
   if (zx_status_t status =
           mapping.Map(std::move(vmo), partition_info.block_size * partition_info.block_count);
       status != ZX_OK) {
-    ZX_PANIC("5");
     return zx::error(status);
   }
   std::unique_ptr<Ramdisk> ramdisk(
