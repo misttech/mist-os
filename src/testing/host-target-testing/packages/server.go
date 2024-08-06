@@ -165,21 +165,22 @@ func (lw *loggingWriter) WriteHeader(status int) {
 
 // writeConfig writes the source config to the repository.
 func genConfig(dir string, localHostname string, repoName string, port int) (configURL string, configHash string, config []byte, err error) {
-	type sourceConfig struct {
-		ID            string
-		RepoURL       string
-		BlobRepoURL   string
-		RatePeriod    int
-		RootKeys      []repo.KeyConfig
-		RootVersion   uint32 `json:"rootVersion,omitempty"`
-		RootThreshold uint32 `json:"rootThreshold,omitempty"`
-		StatusConfig  struct {
-			Enabled bool
-		}
-		Auto    bool
-		BlobKey *struct {
-			Data [32]uint8
-		}
+	type repositoryStorageType string
+
+	type mirrorConfig struct {
+		mirror_url      string
+		subscribe       bool
+		blob_mirror_url string
+	}
+
+	type repositoryConfig struct {
+		repo_url          string
+		root_version      uint32
+		root_threshold    uint32
+		root_keys         []repo.KeyConfig
+		mirrors           []mirrorConfig
+		use_local_mirror  bool
+		repo_storage_type repositoryStorageType
 	}
 
 	f, err := os.Open(filepath.Join(dir, "root.json"))
@@ -219,20 +220,13 @@ func genConfig(dir string, localHostname string, repoName string, port int) (con
 		rootThreshold = rootRole.Threshold
 	}
 
-	config, err = json.Marshal(&sourceConfig{
-		ID:            repoName,
-		RepoURL:       repoURL,
-		BlobRepoURL:   fmt.Sprintf("%s/blobs", repoURL),
-		RatePeriod:    60,
-		RootKeys:      rootKeys,
-		RootVersion:   uint32(root.Version),
-		RootThreshold: uint32(rootThreshold),
-		StatusConfig: struct {
-			Enabled bool
-		}{
-			Enabled: true,
-		},
-		Auto: true,
+	config, err = json.Marshal(&repositoryConfig{
+		repo_url:          repoURL,
+		root_version:      uint32(root.Version),
+		root_threshold:    uint32(rootThreshold),
+		root_keys:         rootKeys,
+		use_local_mirror:  false,
+		repo_storage_type: "Ephemeral",
 	})
 	if err != nil {
 		return "", "", nil, err
