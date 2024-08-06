@@ -79,7 +79,7 @@ def _fuchsia_component_manifest_impl(ctx):
         )
 
     # output should have the .cm extension
-    manifest_out = ctx.actions.declare_file(manifest_in.basename[:-1])
+    manifest_out = ctx.actions.declare_file("meta/{}.cm".format(component_name))
 
     if ctx.configuration.coverage_enabled:
         coverage_shard = ctx.attr._sdk_coverage_shard[FuchsiaComponentManifestShardInfo]

@@ -31,6 +31,30 @@ def label_name(label):
     # //foo:bar -> bar
     return label.split("/")[-1].split(":")[-1]
 
+def append_suffix_to_label(label_str, suffix, separator = "."):
+    """ Canonicalizes a label given at the macro-level and appends a suffix.
+
+    foo -> foo.bar
+    :foo -> :foo.bar
+    //src/foo:foo -> //src/foo:foo.bar
+    //src/foo:baz -> //src/foo:baz.bar
+    //src/foo -> //src/foo:foo.bar
+
+    Args:
+        label_str: The label string to append to.
+        suffix: The suffix to append.
+        separator: An optional string to use as a separator.
+    Returns:
+        The new name with the suffix appended
+    """
+    unqualified_name = separator.join([label_name(label_str), suffix])
+    if label_str.startswith(":"):
+        return ":{}".format(unqualified_name)
+    elif label_str.startswith("//"):
+        return "{}:{}".format(label_str.split(":")[0], unqualified_name)
+    else:
+        return unqualified_name
+
 def get_project_execroot(ctx):
     # Gets the project/workspace execroot relative to the output base.
     # See https://bazel.build/docs/output_directories.

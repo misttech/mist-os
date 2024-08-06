@@ -109,13 +109,6 @@ FuchsiaDebugSymbolInfo = provider(
     },
 )
 
-FuchsiaUnitTestComponentInfo = provider(
-    "Allows unit tests to be treated as test components.",
-    fields = {
-        "test_component": "The label of the underlying fuchsia_test_component.",
-    },
-)
-
 FuchsiaComponentManifestInfo = provider(
     "Contains information about a Fuchsia component manifest",
     fields = {
