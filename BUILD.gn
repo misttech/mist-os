@@ -102,7 +102,6 @@ group("default") {
   testonly = true
   deps = [
     "//:host",
-    #"//bundles/boot_tests",
     "//zircon/kernel:boot_tests",
 
     # Produce Fuchsia libs zbi tests
@@ -117,6 +116,7 @@ group("default") {
     #"//src/lib/mistos-bootfs:tests",
     #"//src/lib/mistos-logger:tests",
     #"//src/starnix_lite:tests",
+    #"//src/starnix_lite",
 
     #"//src/starnix_lite/lib/usercopy:tests",
 
@@ -127,8 +127,7 @@ group("default") {
     #"//zircon/tools:tests",
 
     # Generate ZBIs used to run on target
-    #"//build/images/mistos",
-    #"//src/starnix_lite",
+    "//build/images/mistos",
   ]
 }
 
