@@ -29,9 +29,19 @@ enum ProblemPathKind {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum ProblemPaths {
-    AbiSurface { external: Path, platform: Path },
-    Protocol { client: Path, server: Path },
-    Type { sender: Path, receiver: Path },
+    #[allow(unused)]
+    AbiSurface {
+        external: Path,
+        platform: Path,
+    },
+    Protocol {
+        client: Path,
+        server: Path,
+    },
+    Type {
+        sender: Path,
+        receiver: Path,
+    },
 }
 
 impl ProblemPaths {
@@ -211,7 +221,7 @@ fn test_compatibility_problem_comparison() {
         message: "beware".to_owned(),
     };
     let error = CompatibilityProblem {
-        paths: ProblemPaths::AbiSurface { external:Path::empty(), platform: Path::empty() },
+        paths: ProblemPaths::AbiSurface { external: Path::empty(), platform: Path::empty() },
         warning: false,
         message: "to err is human".to_owned(),
     };
@@ -223,6 +233,7 @@ fn test_compatibility_problem_comparison() {
 pub struct CompatibilityProblems(Vec<CompatibilityProblem>);
 
 impl CompatibilityProblems {
+    #[allow(unused)]
     pub fn platform(&mut self, external: &Path, platform: &Path, message: impl AsRef<str>) {
         self.0.push(CompatibilityProblem {
             paths: ProblemPaths::AbiSurface {
