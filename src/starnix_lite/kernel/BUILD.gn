@@ -432,6 +432,12 @@ rustc_library("starnix_lite_core") {
 
   inputs = [ "//src/starnix_lite/lib/selinux/testdata/micro_policies/hooks_tests_policy.pp" ]
   configs += [ "//src/starnix/config:starnix_clippy_lints" ]
+  if (is_asan) {
+    # At least for ASan, remote execution requires machine with more memory.
+    _concurrent_jobs = concurrent_jobs.rust_highmem
+    test_configs = _concurrent_jobs.configs
+    test_vars = _concurrent_jobs.vars
+  }
 }
 
 rustc_library("starnix_lite_kernel_runner") {
