@@ -34,8 +34,8 @@ namespace wlan::brcmfmac {
 
 using ::testing::NotNull;
 
-constexpr uint16_t kUintPropertyNum = 11;
-constexpr uint16_t kWindowPropertyNum = 11;
+constexpr uint16_t kUintPropertyNum = 12;
+constexpr uint16_t kWindowPropertyNum = 12;
 
 const std::vector<std::string> kRootMetrics = {"brcmfmac-phy"};
 const std::vector<std::string> kConnMetrics = {"brcmfmac-phy", "connection-metrics"};
@@ -54,6 +54,7 @@ class DeviceInspectTest : public gtest::TestLoopFixture {
   void SetUp() override { ASSERT_EQ(ZX_OK, DeviceInspect::Create(dispatcher(), &device_inspect_)); }
 
   void LogTxQfull() { device_inspect_->LogTxQueueFull(); }
+  void LogFwRcvrTgr() { device_inspect_->LogFwRecoveryTriggered(); }
   void LogFwRcvr() { device_inspect_->LogFwRecovered(); }
   void LogConnSuccess() { device_inspect_->LogConnSuccess(); }
   void LogConnNoNetworkFail() { device_inspect_->LogConnNoNetworkFail(); }
@@ -81,6 +82,8 @@ class DeviceInspectTest : public gtest::TestLoopFixture {
   // Defining properties which will be covered in the test cases.
   const PropertyTestUnit uint_properties_[kUintPropertyNum] = {
       PropertyTestUnit(kRootMetrics, "tx_qfull", std::bind(&DeviceInspectTest::LogTxQfull, this)),
+      PropertyTestUnit(kRootMetrics, "fw_recovery_triggered",
+                       std::bind(&DeviceInspectTest::LogFwRcvrTgr, this)),
       PropertyTestUnit(kRootMetrics, "fw_recovered",
                        std::bind(&DeviceInspectTest::LogFwRcvr, this)),
       PropertyTestUnit(kConnMetrics, "success",
@@ -104,6 +107,8 @@ class DeviceInspectTest : public gtest::TestLoopFixture {
   const PropertyTestUnit window_properties_[kWindowPropertyNum] = {
       PropertyTestUnit(kRootMetrics, "tx_qfull_24hrs",
                        std::bind(&DeviceInspectTest::LogTxQfull, this)),
+      PropertyTestUnit(kRootMetrics, "fw_recovery_triggered_24hrs",
+                       std::bind(&DeviceInspectTest::LogFwRcvrTgr, this)),
       PropertyTestUnit(kRootMetrics, "fw_recovered_24hrs",
                        std::bind(&DeviceInspectTest::LogFwRcvr, this)),
       PropertyTestUnit(kConnMetrics, "success_24hrs",

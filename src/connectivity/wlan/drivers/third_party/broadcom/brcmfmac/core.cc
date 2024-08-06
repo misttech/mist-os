@@ -608,6 +608,8 @@ void brcmf_recovery_worker(WorkItem* work) {
   struct brcmf_bus* bus = drvr->bus_if;
   zx_status_t error = ZX_OK;
 
+  drvr->device->GetInspect()->LogFwRecoveryTriggered();
+
   auto finish_recovery_worker = fit::defer([drvr] {
     drvr->recovery_trigger->ClearStatistics();
     // Notice that here we set drvr_resetting but not fw_reloading to false, drvr_resetting is set

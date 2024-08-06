@@ -33,7 +33,7 @@ class CrashRecoveryTest : public SimTest {
 
   // Get the value of inspect counter of firmware recovery. It is used to verify the number of
   // counted firmware recovery in driver's metrics.
-  void GetFwRcvrInspectCount(uint64_t* out_count);
+  void GetInspectCount(uint64_t* out_count, std::string property_name);
 
   simulation::FakeAp ap_;
   SimInterface client_ifc_;
@@ -46,7 +46,9 @@ void CrashRecoveryTest::Init() {
   ap_.EnableBeacon(zx::msec(100));
   client_ifc_.GetMacAddr(&client_mac_addr_);
   uint64_t count;
-  GetFwRcvrInspectCount(&count);
+  GetInspectCount(&count, "fw_recovered");
+  ASSERT_EQ(0U, count);
+  GetInspectCount(&count, "fw_recovery_triggered");
   ASSERT_EQ(0U, count);
 }
 
@@ -97,7 +99,7 @@ void CrashRecoveryTest::VerifyScanResult(const uint64_t scan_id, size_t min_resu
   EXPECT_EQ(client_ifc_.ScanResultCode(scan_id).value(), expect_code);
 }
 
-void CrashRecoveryTest::GetFwRcvrInspectCount(uint64_t* out_count) {
+void CrashRecoveryTest::GetInspectCount(uint64_t* out_count, std::string property_name) {
   ASSERT_NOT_NULL(out_count);
 
   fpromise::result<inspect::Hierarchy> hierarchy;
@@ -109,7 +111,8 @@ void CrashRecoveryTest::GetFwRcvrInspectCount(uint64_t* out_count) {
   ASSERT_NOT_NULL(root);
   // Only verify the value of hourly counter here, the relationship between hourly counter and daily
   // counter is verified in device_inspect_test.
-  auto* uint_property = root->node().get_property<inspect::UintPropertyValue>("fw_recovered");
+  auto* uint_property = root->node().get_property<inspect::UintPropertyValue>(property_name);
+
   ASSERT_NOT_NULL(uint_property);
   *out_count = uint_property->value();
 }
@@ -181,7 +184,9 @@ TEST_F(CrashRecoveryTest, ConnectAfterCrashDuringScan) {
 
   // Verify inspect is updated.
   uint64_t count;
-  GetFwRcvrInspectCount(&count);
+  GetInspectCount(&count, "fw_recovered");
+  EXPECT_EQ(1U, count);
+  GetInspectCount(&count, "fw_recovery_triggered");
   EXPECT_EQ(1U, count);
 }
 
@@ -204,7 +209,9 @@ TEST_F(CrashRecoveryTest, ConnectAfterCrashAfterConnect) {
 
   // Verify inspect is updated.
   uint64_t count;
-  GetFwRcvrInspectCount(&count);
+  GetInspectCount(&count, "fw_recovered");
+  EXPECT_EQ(1U, count);
+  GetInspectCount(&count, "fw_recovery_triggered");
   EXPECT_EQ(1U, count);
 }
 
@@ -232,7 +239,9 @@ TEST_F(CrashRecoveryTest, ScanAfterCrashAfterConnect) {
 
   // Verify inspect is updated.
   uint64_t count;
-  GetFwRcvrInspectCount(&count);
+  GetInspectCount(&count, "fw_recovered");
+  EXPECT_EQ(1U, count);
+  GetInspectCount(&count, "fw_recovery_triggered");
   EXPECT_EQ(1U, count);
 }
 

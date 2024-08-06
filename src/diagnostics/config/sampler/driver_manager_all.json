@@ -375,6 +375,15 @@
         // TODO(https://fxbug.dev/42071858): move to connectivity-wlan.json
         {
             "event_codes": [],
+            "metric_id": 339,
+            "metric_type": "Occurrence",
+            "selector": "bootstrap/driver_manager:root/brcmfmac-phy:fw_recovery_triggered",
+            "project_id": 3708719327
+        },
+
+        // TODO(https://fxbug.dev/42071858): move to connectivity-wlan.json
+        {
+            "event_codes": [],
             "metric_id": 340,
             "metric_type": "Occurrence",
             "selector": "bootstrap/driver_manager:root/brcmfmac-phy:fw_recovered",

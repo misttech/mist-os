@@ -33,6 +33,12 @@ zx_status_t DeviceInspect::Create(async_dispatcher_t* dispatcher,
     return status;
   }
 
+  inspect->fw_recovery_triggered_ = inspect->root_.CreateUint("fw_recovery_triggered", 0);
+  if ((status = inspect->fw_recovery_triggered_24hrs_.Init(
+           &inspect->root_, 24, "fw_recovery_triggered_24hrs", 0)) != ZX_OK) {
+    return status;
+  }
+
   inspect->fw_recovered_ = inspect->root_.CreateUint("fw_recovered", 0);
   if ((status = inspect->fw_recovered_24hrs_.Init(&inspect->root_, 24, "fw_recovered_24hrs", 0)) !=
       ZX_OK) {
@@ -98,6 +104,7 @@ zx_status_t DeviceInspect::Create(async_dispatcher_t* dispatcher,
       [inspect = inspect.get()]() {
         inspect->tx_qfull_24hrs_.SlideWindow();
         inspect->fw_recovered_24hrs_.SlideWindow();
+        inspect->fw_recovery_triggered_24hrs_.SlideWindow();
         inspect->rx_freeze_24hrs_.SlideWindow();
         inspect->sdio_max_tx_seq_err_24hrs_.SlideWindow();
         inspect->ap_set_ssid_err_24hrs_.SlideWindow();
@@ -118,6 +125,11 @@ zx_status_t DeviceInspect::Create(async_dispatcher_t* dispatcher,
 void DeviceInspect::LogTxQueueFull() {
   tx_qfull_.Add(1);
   tx_qfull_24hrs_.Add(1);
+}
+
+void DeviceInspect::LogFwRecoveryTriggered() {
+  fw_recovery_triggered_.Add(1);
+  fw_recovery_triggered_24hrs_.Add(1);
 }
 
 void DeviceInspect::LogFwRecovered() {

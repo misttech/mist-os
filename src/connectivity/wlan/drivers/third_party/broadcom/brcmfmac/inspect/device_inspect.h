@@ -51,6 +51,7 @@ class DeviceInspect {
 
   // Metrics APIs.
   void LogTxQueueFull();
+  void LogFwRecoveryTriggered();
   void LogFwRecovered();
   void LogConnSuccess();
   void LogConnNoNetworkFail();
@@ -75,6 +76,8 @@ class DeviceInspect {
   inspect::UintProperty tx_qfull_;
   WindowedUintProperty tx_qfull_24hrs_;
 
+  inspect::UintProperty fw_recovery_triggered_;
+  WindowedUintProperty fw_recovery_triggered_24hrs_;
   // Lapis copies |fw_recovered_| and |fw_recovered_24hrs_| inspect nodes to the Cobalt metrics.
   // Cobalt metric definition:
   // https://cs.opensource.google/fuchsia/fuchsia/+/main:third_party/cobalt_config/fuchsia/connectivity_wlan/metrics.yaml;l=475
