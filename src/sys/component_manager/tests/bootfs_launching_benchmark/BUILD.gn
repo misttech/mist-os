@@ -52,8 +52,8 @@ if (current_toolchain == default_toolchain) {
 
   product_assembly_configuration("product_config") {
     platform = {
-      build_type = "eng"
-      feature_set_level = "bootstrap"
+      build_type = "user"
+      feature_set_level = "empty"
       storage = {
         filesystems = {
           image_name = "test_zbi"
