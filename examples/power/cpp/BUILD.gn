@@ -57,7 +57,6 @@ fuchsia_test_package("tests") {
     ":wake-lease-integration-test-cpp",
     ":wake-lease-unittest-cpp",
   ]
-
   deps = [
     # Other components that we are injecting into integration tests.
     "//src/power/broker:component",
