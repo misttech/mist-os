@@ -90,15 +90,6 @@ class MappingCursor {
     size_ -= ps;
   }
 
-  // Provides a way to transition a mapping cursor from one that tracks paddrs to one that just
-  // tracks the remaining virtual range. This is useful when a cursor was being used to track
-  // mapping pages but then needs to be used to just track the virtual range to unmap / rollback.
-  void DropPAddrs() {
-    paddrs_ = nullptr;
-    page_size_ = 0;
-    paddr_consumed_ = 0;
-  }
-
   paddr_t paddr() const {
     DEBUG_ASSERT(paddrs_);
     DEBUG_ASSERT(size_ > 0);
