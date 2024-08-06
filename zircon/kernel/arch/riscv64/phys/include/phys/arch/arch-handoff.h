@@ -7,12 +7,15 @@
 #ifndef ZIRCON_KERNEL_ARCH_RISCV64_PHYS_INCLUDE_PHYS_ARCH_ARCH_HANDOFF_H_
 #define ZIRCON_KERNEL_ARCH_RISCV64_PHYS_INCLUDE_PHYS_ARCH_ARCH_HANDOFF_H_
 
+// Note: we refrain from using the ktl namespace as <phys/handoff.h> is
+// expected to be compiled in the userboot toolchain.
+
 #include <lib/arch/riscv64/feature.h>
 #include <lib/zbi-format/driver-config.h>
 #include <stdint.h>
 
-#include <ktl/optional.h>
-#include <ktl/variant.h>
+#include <optional>
+#include <variant>
 
 struct ArchPatchInfo {};
 
@@ -26,13 +29,13 @@ struct ArchPhysHandoff {
   arch::RiscvFeatures cpu_features;
 
   // (ZBI_TYPE_KERNEL_DRIVER, ZBI_KERNEL_DRIVER_RISCV_PLIC) payload.
-  ktl::optional<zbi_dcfg_riscv_plic_driver_t> plic_driver;
+  std::optional<zbi_dcfg_riscv_plic_driver_t> plic_driver;
 
   // (ZBI_TYPE_KERNEL_DRIVER, ZBI_KERNEL_DRIVER_ARM_GIC_V2) payload.
-  ktl::optional<zbi_dcfg_arm_gic_v2_driver_t> gic_driver;
+  std::optional<zbi_dcfg_arm_gic_v2_driver_t> gic_driver;
 
   // (ZBI_TYPE_KERNEL_DRIVER, ZBI_KERNEL_DRIVER_RISCV_GENERIC_TIMER) payload.
-  ktl::optional<zbi_dcfg_riscv_generic_timer_driver_t> generic_timer_driver;
+  std::optional<zbi_dcfg_riscv_generic_timer_driver_t> generic_timer_driver;
 };
 
 // TODO(https://fxbug.dev/42164859): This is an arbitrary address in the upper half of

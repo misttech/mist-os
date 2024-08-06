@@ -7,9 +7,12 @@
 #ifndef ZIRCON_KERNEL_ARCH_X86_PHYS_INCLUDE_PHYS_ARCH_ARCH_HANDOFF_H_
 #define ZIRCON_KERNEL_ARCH_X86_PHYS_INCLUDE_PHYS_ARCH_ARCH_HANDOFF_H_
 
+// Note: we refrain from using the ktl namespace as <phys/handoff.h> is
+// expected to be compiled in the userboot toolchain.
+
 #include <lib/zbi-format/graphics.h>
 
-#include <ktl/optional.h>
+#include <optional>
 
 struct ArchPatchInfo {};
 
@@ -18,7 +21,7 @@ struct ArchPatchInfo {};
 struct ArchPhysHandoff {
   // ZBI_TYPE_FRAMEBUFFER payload.
   // Framebuffer parameters.
-  ktl::optional<zbi_swfb_t> framebuffer;
+  std::optional<zbi_swfb_t> framebuffer;
 };
 
 // This is not actually used for real on x86, but needs to be defined.

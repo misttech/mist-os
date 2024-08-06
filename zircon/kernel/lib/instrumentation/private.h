@@ -36,7 +36,4 @@ InstrumentationDataVmo LlvmProfdataVmo();
 InstrumentationDataVmo SancovGetPcVmo();
 InstrumentationDataVmo SancovGetCountsVmo();
 
-// phys.cc
-Handle* MakePhysVmo(const PhysVmo&);
-
 #endif  // ZIRCON_KERNEL_LIB_INSTRUMENTATION_PRIVATE_H_

@@ -689,6 +689,39 @@ group("physboot") {
   }
 }
 
+source_set("handoff") {
+  public = [
+    "//zircon/kernel/arch/${zircon_cpu}/phys/include/phys/arch/arch-handoff.h",
+    "include/phys/handoff-ptr.h",
+    "include/phys/handoff.h",
+  ]
+
+  public_deps = [
+    "//sdk/lib/stdcompat",
+
+    # arch-handoff.h has #include <lib/zbi-format/driver-config.h>
+    "//sdk/lib/zbi-format",
+
+    # arm64's arch-handoff.h has #include <lib/boot-options/arm64.h>
+    "//zircon/kernel/lib/boot-options",
+
+    # handoff.h has #include <lib/arch/ticks.h>.
+    "//zircon/kernel/lib/arch",
+
+    # handoff.h has #include <lib/uart/all.h>.
+    "//zircon/system/ulib/uart",
+
+    # handoff.h has #include <lib/crypto/entropy_pool.h>
+    "//zircon/kernel/lib/crypto:crypto-entropy-src.headers",
+  ]
+
+  if (!is_kernel) {
+    public_deps += [ "//zircon/system/public" ]
+  }
+
+  public_configs = [ ":includes" ]
+}
+
 # The elf-physboot target provides the distribution_entries metadata via
 # kernel_elf_binary() for "physboot".  This target reifies that to be directly
 # in the root of the STORAGE_KERNEL filesystem layout, whereas if another
@@ -793,31 +826,6 @@ if (is_kernel) {
         "-Wl,-T," + rebase_path(inputs[0], root_build_dir),
       ]
     }
-  }
-
-  source_set("handoff") {
-    public = [
-      "//zircon/kernel/arch/${zircon_cpu}/phys/include/phys/arch/arch-handoff.h",
-      "include/phys/handoff-ptr.h",
-      "include/phys/handoff.h",
-    ]
-    public_deps = [
-      # arch-handoff.h has #include <lib/zbi-format/driver-config.h>
-      "//sdk/lib/zbi-format",
-
-      # arm64's arch-handoff.h has #include <lib/boot-options/arm64.h>
-      "//zircon/kernel/lib/boot-options",
-
-      # handoff.h has #include <lib/arch/ticks.h>.
-      "//zircon/kernel/lib/arch",
-
-      # handoff.h has #include <lib/uart/all.h>.
-      "//zircon/system/ulib/uart",
-
-      # handoff.h has #include <lib/crypto/entropy_pool.h>
-      "//zircon/kernel/lib/crypto:crypto-entropy-src",
-    ]
-    public_configs = [ ":includes" ]
   }
 
   kernel_elf_binary("elf-physboot") {

@@ -22,10 +22,7 @@
 #include <zircon/errors.h>
 #include <zircon/types.h>
 
-#include <cassert>
-#include <cstdlib>
-#include <cstring>
-
+#include <ktl/algorithm.h>
 #include <lk/init.h>
 #include <object/channel_dispatcher.h>
 #include <object/handle.h>
@@ -42,6 +39,8 @@
 #if ENABLE_ENTROPY_COLLECTOR_TEST
 #include <lib/crypto/entropy/quality_test.h>
 #endif
+
+#include <ktl/enforce.h>
 
 namespace {
 
@@ -226,28 +225,26 @@ zx_status_t crashlog_to_vmo(fbl::RefPtr<VmObject>* out, size_t* out_size) {
 }
 
 void bootstrap_vmos(Handle** handles) {
-  ktl::span<ktl::byte> zbi = ZbiInPhysmap(true);
-  void* rbase = zbi.data();
-  size_t rsize = ROUNDUP_PAGE_SIZE(zbi.size_bytes());
-  dprintf(INFO, "userboot: ramdisk %#15zx @ %p\n", rsize, rbase);
-
   // The instrumentation VMOs need to be created prior to the rootfs as the information for these
   // vmos is in the phys handoff region, which becomes inaccessible once the rootfs is created.
   zx_status_t status = InstrumentationData::GetVmos(&handles[userboot::kFirstInstrumentationData]);
   ASSERT(status == ZX_OK);
 
+  HandoffEnd end = EndHandoff();
+
+  ktl::copy(end.phys_vmos.begin(), end.phys_vmos.end(), &handles[userboot::kFirstPhysVmo]);
+
   // The ZBI.
+  void* rbase = end.zbi.data();
+  size_t rsize = ROUNDUP_PAGE_SIZE(end.zbi.size_bytes());
+  dprintf(INFO, "userboot: ramdisk %#15zx @ %p\n", rsize, rbase);
+
   fbl::RefPtr<VmObjectPaged> rootfs_vmo;
   status = VmObjectPaged::CreateFromWiredPages(rbase, rsize, true, &rootfs_vmo);
   ASSERT(status == ZX_OK);
   rootfs_vmo->set_name(kZbiVmoName, sizeof(kZbiVmoName) - 1);
   status = get_vmo_handle(rootfs_vmo, false, rsize, nullptr, &handles[userboot::kZbi]);
   ASSERT(status == ZX_OK);
-  // The rootfs vmo was created with exclusive=true, which means that the VMO is sole owner of those
-  // pages. gPhysHandoff represents a pointer to the previous physmap location of the data, but the
-  // VMO is free to move and use different pages to represent the data, as such attempting to use
-  // this old reference is essentially a use-after-free.
-  gPhysHandoff = nullptr;
 
   // Crashlog.
   fbl::RefPtr<VmObject> crashlog_vmo;
@@ -358,7 +355,7 @@ void userboot_init(uint) {
   }
   DEBUG_ASSERT(handles[userboot::kFirstVdso + 1]->dispatcher() == vdso->vmo());
   if (gBootOptions->always_use_next_vdso) {
-    std::swap(handles[userboot::kFirstVdso], handles[userboot::kFirstVdso + 1]);
+    ktl::swap(handles[userboot::kFirstVdso], handles[userboot::kFirstVdso + 1]);
   }
   bootstrap_vmos(handles);
 
