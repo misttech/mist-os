@@ -1347,14 +1347,11 @@ impl Visitor {
             match element {
                 StringElement::Body(element) => {
                     let mut element = element
-                        .strip_prefix('"')
-                        .unwrap()
-                        .strip_suffix('"')
-                        .unwrap()
                         .replace(r"\n", "\n")
                         .replace(r"\t", "\t")
                         .replace(r"\r", "\r")
                         .replace("\\\n", "")
+                        .replace(r"\$", "$")
                         .replace(r#"\""#, "\"");
 
                     while let Some(idx) = element.find("\\u") {

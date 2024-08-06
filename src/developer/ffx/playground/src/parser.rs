@@ -694,7 +694,9 @@ fn real<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
 ///
 /// ```
 /// EscapeSequence ← '\n' / '\t' / '\r' / '\' <nl> / '\\' / '\"' / '\u' HexDigit{6}
-/// StringEntity ← !( '\' / '"' / <nl> ) . / EscapeSequence
+/// Interpolation ← '$' InterpolationBody
+/// InterpolationBody ← Identifier / '{' ⊔ Expression ⊔ '}'
+/// StringEntity ← !( '\' / '"' / <nl> ) . / EscapeSequence / Interpolation
 /// NormalString ← '"' StringEntity* '"'
 /// String ← NormalString / MultiString
 /// ```
@@ -708,6 +710,8 @@ fn real<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
 /// "A newline.\nA tab\tA code point\u00264b"
 /// "String starts here \
 /// and keeps on going"
+/// "A string has $interpolation"
+/// "A string has ${ bracketed --interpolation }"
 /// ```
 fn string<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
     normal_string(input)
@@ -721,6 +725,7 @@ fn normal_string<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
             tag(r"\t"),
             tag(r"\r"),
             tag("\\\n"),
+            tag(r"\$"),
             tag(r#"\\"#),
             tag(r#"\""#),
             recognize(tuple((tag(r"\u"), map_parser(take(6usize), all_consuming(hex_digit1))))),
@@ -730,13 +735,37 @@ fn normal_string<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
         ))(input)
     }
 
+    fn interpolation<'a>(input: ESpan<'a>) -> IResult<'a, StringElement<'a>> {
+        preceded(
+            chr('$'),
+            alt((
+                map(unescaped_identifier, |x| {
+                    StringElement::Interpolation(Node::Identifier(x.strip_parse_state()))
+                }),
+                map(
+                    delimited(chr('{'), ws_around(ex_expression), ex_tag("}")),
+                    StringElement::Interpolation,
+                ),
+                map(tag("$"), |x: ESpan<'a>| StringElement::Body(x.strip_parse_state())),
+                map(err_insert("Expected identifier, interpolated block, or $"), |_| {
+                    StringElement::Interpolation(Node::Error)
+                }),
+            )),
+        )(input)
+    }
+
     map(
-        recognize(tuple((
+        delimited(
             chr('"'),
-            many0(alt((recognize(none_of("\\\"\n")), escape_sequence))),
+            many0(alt((
+                map(recognize(many1(alt((recognize(none_of("$\\\"\n")), escape_sequence)))), |x| {
+                    StringElement::Body(x.strip_parse_state())
+                }),
+                interpolation,
+            ))),
             ex_tag("\""),
-        ))),
-        |x| Node::String(vec![StringElement::Body(x.strip_parse_state())]),
+        ),
+        Node::String,
     )(input)
 }
 
@@ -1580,7 +1609,7 @@ mod test {
             r#"@Foo { bar: "baz" }"#,
             Node::Program(vec![Node::Object(
                 Some(sp("Foo")),
-                vec![(ident("bar"), string(r#""baz""#))],
+                vec![(ident("bar"), string(r#"baz"#))],
             )]),
         );
     }
@@ -1817,11 +1846,12 @@ mod test {
     #[test]
     fn string_test() {
         test_parse(
-            r#""straang\t\r\n\
+            r#""$$\$straang\t\r\n\
 \\abcd\u00264b\"""#,
-            Node::Program(vec![Node::String(vec![StringElement::Body(sp(
-                "\"straang\\t\\r\\n\\\n\\\\abcd\\u00264b\\\"\"",
-            ))])]),
+            Node::Program(vec![Node::String(vec![
+                StringElement::Body(sp("$")),
+                StringElement::Body(sp("\\$straang\\t\\r\\n\\\n\\\\abcd\\u00264b\\\"")),
+            ])]),
         );
     }
 
@@ -1968,5 +1998,72 @@ mod test {
         assert_eq!("  ", *result.whitespace[0].fragment());
         assert_eq!(" ", *result.whitespace[1].fragment());
         assert_eq!(" ", *result.whitespace[2].fragment());
+    }
+
+    #[test]
+    fn string_interpolation() {
+        test_parse(
+            r#""I am $age years old""#,
+            Node::Program(vec![Node::String(vec![
+                StringElement::Body(sp("I am ")),
+                StringElement::Interpolation(Node::Identifier(sp("age"))),
+                StringElement::Body(sp(" years old")),
+            ])]),
+        );
+    }
+
+    #[test]
+    fn string_interpolation_block() {
+        test_parse(
+            r#""I am ${ (get_age) - $vanity_adj } years old""#,
+            Node::Program(vec![Node::String(vec![
+                StringElement::Body(sp("I am ")),
+                StringElement::Interpolation(Node::Subtract(
+                    Box::new(Node::Invocation(sp("get_age"), vec![])),
+                    Box::new(Node::Identifier(sp("vanity_adj"))),
+                )),
+                StringElement::Body(sp(" years old")),
+            ])]),
+        );
+    }
+
+    #[test]
+    fn string_interpolation_err_end_of_string() {
+        test_parse_err(
+            r#""I am $""#,
+            Node::Program(vec![Node::String(vec![
+                StringElement::Body(sp("I am ")),
+                StringElement::Interpolation(Node::Error),
+            ])]),
+            vec![(7, "Expected identifier, interpolated block, or $", "")],
+        );
+    }
+
+    #[test]
+    fn string_interpolation_err_space() {
+        test_parse_err(
+            r#""I am $ ""#,
+            Node::Program(vec![Node::String(vec![
+                StringElement::Body(sp("I am ")),
+                StringElement::Interpolation(Node::Error),
+                StringElement::Body(sp(" ")),
+            ])]),
+            vec![(7, "Expected identifier, interpolated block, or $", "")],
+        );
+    }
+
+    #[test]
+    fn string_interpolation_err_end_of_input() {
+        test_parse_err(
+            r#""I am $"#,
+            Node::Program(vec![Node::String(vec![
+                StringElement::Body(sp("I am ")),
+                StringElement::Interpolation(Node::Error),
+            ])]),
+            vec![
+                (7, "Expected identifier, interpolated block, or $", ""),
+                (7, "Expected '\"'", ""),
+            ],
+        );
     }
 }
