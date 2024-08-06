@@ -8,11 +8,16 @@
 #include <zircon/assert.h>
 
 #include <explicit-memory/bytes.h>
+#include <ktl/array.h>
+#include <ktl/move.h>
+#include <ktl/span.h>
 #include <openssl/sha.h>
+
+#include <ktl/enforce.h>
 
 namespace crypto {
 
-EntropyPool::EntropyPool(EntropyPool&& other) noexcept { (*this) = std::move(other); }
+EntropyPool::EntropyPool(EntropyPool&& other) noexcept { (*this) = ktl::move(other); }
 
 EntropyPool& EntropyPool::operator=(EntropyPool&& rhs) noexcept {
   contents_ = rhs.contents_;

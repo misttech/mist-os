@@ -4,7 +4,31 @@
 # license that can be found in the LICENSE file or at
 # https://opensource.org/licenses/MIT
 
-source_set("entropy") {
+import("//build/cpp/library_headers.gni")
+
+library_headers("headers") {
+  include_dir = "../include"
+  headers = [
+    "lib/crypto/entropy/collector.h",
+    "lib/crypto/entropy/hw_rng_collector.h",
+    "lib/crypto/entropy/jitterentropy_collector.h",
+    "lib/crypto/entropy/quality_test.h",
+  ]
+
+  public_deps = [
+    # <lib/crypto/entropy/collector.h> has #include <fbl/name.h>
+    "//zircon/kernel/lib/fbl:headers",
+
+    # <lib/crypto/entropy/jitterentropy_collector.h> has #include #include <lib/lazy_init/lazy_init.h>
+    "//zircon/system/ulib/lazy_init:headers",
+
+    # <lib/crypto/entropy/jitterentropy_collector.h> has #include <lib/jitterentropy/jitterentropy.h>
+    "//zircon/third_party/lib/jitterentropy:headers",
+  ]
+}
+
+static_library("entropy") {
+  public_deps = [ ":headers" ]
   sources = [
     "collector.cc",
     "collector_unittest.cc",
