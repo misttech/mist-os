@@ -61,6 +61,7 @@ Common error messages related to component manifest files:
 
 - [`Could not load driver: <...>: Failed to open bind file`](#could-not-load-driver-failed-to-open-bind-file)
 - [`Could not load driver: <...>: Missing bind path`](#could-not-load-driver-failed-to-open-bind-file)
+- [`Failed to start driver, missing 'binary' argument: ZX_ERR_NOT_FOUND`](#could-not-start-driver-missing-binary)
 
 #### 2. Verify that the driver attempted to bind {:#verify-that-the-driver-attempted-to-bind}
 
@@ -438,6 +439,7 @@ Common error messages in Fuchsia driver development:
 - [`__fuchsia_driver_registration__ symbol not available`](#fuchsia-driver-registration-symbol-not-available)
 - [`Could not load driver: <...>: Failed to open bind file (or Missing bind path)`](#could-not-load-driver-failed-to-open-bind-file)
 - [`no member named 'destroy' in 'fdf_internal::DriverServer<...>`](#no-member-named-destroy)
+- [`Failed to start driver, missing 'binary' argument: ZX_ERR_NOT_FOUND`](#could-not-start-driver-missing-binary)
 
 ### Failed to load driver <...> driver note not found {:#failed-to-load-driver}
 
@@ -569,6 +571,51 @@ manifest file looks like below:
 However, if `bind_output` is not explicitly defined in a bind rule target,
 the default value is the target name with `.bindbc` appended to it, which would
 be `fake_battery_bind.bindbc` in the example above.
+
+### Failed to start driver, missing 'binary' argument: ZX_ERR_NOT_FOUND {:#could-not-start-driver-missing-binary}
+
+When writing a DFv2 driver, you may run into the following error message
+in the logs:
+
+```none {:.devsite-disable-click-to-copy}
+Failed to start driver, missing 'binary' argument: ZX_ERR_NOT_FOUND
+```
+
+The `binary` field value needs to follow the format `driver/<driver_output>.so` where
+`driver_output` is a field with the same name in the `fuchsia_driver` target in the
+build file, for example:
+
+```
+fuchsia_driver("driver") {
+  output_name = "simple"
+  sources = [ "simple_driver.cc" ]
+  deps = [
+    "//sdk/fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
+    "//sdk/lib/driver/compat/cpp",
+    "//sdk/lib/driver/component/cpp",
+    "//src/devices/bind/fuchsia.test:fuchsia.test_cpp",
+    "//src/devices/lib/driver:driver_runtime",
+  ]
+}
+```
+
+For this bind rule target example, the correct `binary` field in the component manifest file looks
+like below:
+
+```
+{
+    include: [
+        "driver_component/driver.shard.cml",
+        "inspect/client.shard.cml",
+        "syslog/client.shard.cml",
+    ],
+    program: {
+        runner: "driver",
+        binary: "driver/simple.so",
+        bind: "meta/bind/simple_driver.bindbc",
+    },
+}
+```
 
 ### no member named 'destroy' in 'fdf_internal::DriverServer<...>' {:#no-member-named-destroy}
 
