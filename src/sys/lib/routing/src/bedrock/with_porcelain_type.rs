@@ -10,7 +10,7 @@ use router_error::RouterError;
 use sandbox::{Capability, Data, Request, Routable, Router};
 
 pub fn is_supported(porcelain_type: &CapabilityTypeName) -> bool {
-    matches!(porcelain_type, CapabilityTypeName::Protocol)
+    matches!(porcelain_type, CapabilityTypeName::Protocol | CapabilityTypeName::Config)
 }
 
 pub trait WithPorcelainType {

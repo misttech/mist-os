@@ -8,6 +8,7 @@ use crate::capability_source::{CapabilitySource, ComponentCapability, ComponentS
 use crate::component_instance::{ComponentInstanceInterface, WeakComponentInstanceInterface};
 use crate::error::RoutingError;
 use crate::{DictExt, LazyGet};
+use cm_rust::NativeIntoFidl;
 use cm_types::{IterablePath, RelativePath};
 use futures::{future, FutureExt};
 use itertools::Itertools;
@@ -94,9 +95,19 @@ fn extend_dict_with_capability<C: ComponentInstanceInterface + 'static>(
                 new_program_router,
             );
         }
-        cm_rust::CapabilityDecl::EventStream(_)
-        | cm_rust::CapabilityDecl::Config(_)
-        | cm_rust::CapabilityDecl::Storage(_) => {
+        cm_rust::CapabilityDecl::Config(c) => {
+            let data: sandbox::Capability =
+                sandbox::Data::Bytes(fidl::persist(&c.value.clone().native_into_fidl()).unwrap())
+                    .into();
+            match program_output_dict.insert_capability(capability.name(), Router::new(data).into())
+            {
+                Ok(()) => (),
+                Err(e) => {
+                    warn!("failed to add {} to program output dict: {e:?}", capability.name())
+                }
+            }
+        }
+        cm_rust::CapabilityDecl::EventStream(_) | cm_rust::CapabilityDecl::Storage(_) => {
             // Capabilities not supported in bedrock program output dict yet.
             return;
         }
