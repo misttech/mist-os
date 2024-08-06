@@ -5700,6 +5700,11 @@ zx_status_t VmCowPages::DirtyPagesLocked(uint64_t offset, uint64_t len, list_nod
         status = AllocUninitializedPage(&new_page, page_request);
         // If single page allocation fails, bubble up the failure.
         if (status != ZX_OK) {
+          // If propagating up ZX_ERR_SHOULD_WAIT do not consider this an error that requires
+          // invalidating the dirty request as we are going to retry it.
+          if (status == ZX_ERR_SHOULD_WAIT) {
+            invalidate_requests_on_error.cancel();
+          }
           return status;
         }
         list_add_tail(alloc_list, &new_page->queue_node);
