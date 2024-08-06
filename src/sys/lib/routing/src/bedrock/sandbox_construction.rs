@@ -25,6 +25,13 @@ use std::sync::Arc;
 use tracing::warn;
 use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_sys2 as fsys};
 
+/// All capabilities that are available to a component's program.
+#[derive(Default, Debug, Clone)]
+pub struct ProgramInput {
+    /// All of the capabilities that appear in a program's namespace.
+    pub namespace: Dict,
+}
+
 /// A component's sandbox holds all the routing dictionaries that a component has once its been
 /// resolved.
 #[derive(Default, Debug, Clone)]
@@ -36,7 +43,7 @@ pub struct ComponentSandbox {
     pub component_output_dict: Dict,
 
     /// The dictionary containing all capabilities that are available to a component's program.
-    pub program_input_dict: Dict,
+    pub program_input: ProgramInput,
 
     /// The dictionary containing all capabilities that a component's program can provide.
     pub program_output_dict: Dict,
@@ -67,7 +74,7 @@ impl ComponentSandbox {
         let ComponentSandbox {
             component_input,
             component_output_dict,
-            program_input_dict,
+            program_input,
             program_output_dict,
             framework_dict,
             capability_sourced_capabilities_dict,
@@ -78,7 +85,7 @@ impl ComponentSandbox {
             (&component_input.capabilities(), &self.component_input.capabilities()),
             (&component_input.environment().debug(), &self.component_input.environment().debug()),
             (&component_output_dict, &self.component_output_dict),
-            (&program_input_dict, &self.program_input_dict),
+            (&program_input.namespace, &self.program_input.namespace),
             (&program_output_dict, &self.program_output_dict),
             (&framework_dict, &self.framework_dict),
             (&capability_sourced_capabilities_dict, &self.capability_sourced_capabilities_dict),
@@ -113,7 +120,7 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
     declared_dictionaries: Dict,
 ) -> ComponentSandbox {
     let component_output_dict = Dict::new();
-    let program_input_dict = Dict::new();
+    let program_input = ProgramInput::default();
     let environments: StructuredDictMap<ComponentEnvironment> = Default::default();
     let child_inputs: StructuredDictMap<ComponentInput> = Default::default();
     let collection_inputs: StructuredDictMap<ComponentInput> = Default::default();
@@ -168,7 +175,7 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
             &component.moniker(),
             &child_component_output_dictionary_routers,
             &component_input,
-            &program_input_dict,
+            &program_input,
             program_input_dict_additions,
             &program_output_router,
             &framework_dict,
@@ -248,7 +255,7 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
     ComponentSandbox {
         component_input,
         component_output_dict,
-        program_input_dict,
+        program_input,
         program_output_dict,
         framework_dict,
         capability_sourced_capabilities_dict,
@@ -365,7 +372,7 @@ fn extend_dict_with_use(
     moniker: &Moniker,
     child_component_output_dictionary_routers: &HashMap<ChildName, Router>,
     component_input: &ComponentInput,
-    program_input_dict: &Dict,
+    program_input: &ProgramInput,
     program_input_dict_additions: &Dict,
     program_output_router: &Router,
     framework_dict: &Dict,
@@ -456,7 +463,7 @@ fn extend_dict_with_use(
         // UseSource::Environment is not used for protocol capabilities
         cm_rust::UseSource::Environment => return,
     };
-    match program_input_dict.insert_capability(
+    match program_input.namespace.insert_capability(
         &use_protocol.target_path,
         router.with_availability(*use_.availability()).into(),
     ) {
