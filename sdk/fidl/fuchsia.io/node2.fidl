@@ -29,12 +29,12 @@ const MAX_LIST_ATTRIBUTES_CHUNK uint64 = 128;
 /// bytes, then it is included inline. Values larger than this size are written
 /// into a vmo buffer.
 @available(added=18)
-type ExtendedAttributeValue = strict resource union {
+type ExtendedAttributeValue = flexible resource union {
     1: bytes vector<uint8>:MAX_INLINE_ATTRIBUTE_VALUE;
     2: buffer zx.Handle:VMO;
 };
 
-type NodeAttributesQuery = strict bits : uint64 {
+type NodeAttributesQuery = flexible bits : uint64 {
     /// Requests [`NodeAttributes.protocols`].
     PROTOCOLS = 0x1;
 

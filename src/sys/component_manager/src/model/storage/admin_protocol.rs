@@ -463,7 +463,8 @@ impl StorageAdmin {
                 }
                 ffs_dir::DirentKind::BlockDevice
                 | ffs_dir::DirentKind::Service
-                | ffs_dir::DirentKind::Unknown => {}
+                | ffs_dir::DirentKind::Unknown
+                | ffs_dir::DirentKind::__SourceBreaking { .. } => {}
             }
         }
 
