@@ -58,7 +58,7 @@ fn source_to_value(
 pub async fn route_config_value<C>(
     use_config: &cm_rust::UseConfigurationDecl,
     component: &Arc<C>,
-) -> Result<Option<cm_rust::ConfigValue>, RoutingError>
+) -> Result<Option<cm_rust::ConfigValue>, router_error::RouterError>
 where
     C: ComponentInstanceInterface + 'static,
 {
@@ -68,7 +68,7 @@ where
         &mut crate::mapper::NoopRouteMapper,
     )
     .await?;
-    source_to_value(&use_config.default, source.source)
+    Ok(source_to_value(&use_config.default, source.source)?)
 }
 
 #[cfg(test)]
