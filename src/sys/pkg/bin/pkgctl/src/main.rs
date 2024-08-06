@@ -6,11 +6,12 @@
 
 use crate::args::{
     Args, Command, GcCommand, GetHashCommand, OpenCommand, PkgStatusCommand, RepoAddCommand,
-    RepoAddFileCommand, RepoAddSubCommand, RepoAddUrlCommand, RepoCommand, RepoRemoveCommand,
-    RepoShowCommand, RepoSubCommand, ResolveCommand, RuleClearCommand, RuleCommand,
-    RuleDumpDynamicCommand, RuleListCommand, RuleReplaceCommand, RuleReplaceFileCommand,
-    RuleReplaceJsonCommand, RuleReplaceSubCommand, RuleSubCommand,
+    RepoAddFileCommand, RepoAddSubCommand, RepoAddUrlCommand, RepoCommand, RepoConfigFormat,
+    RepoRemoveCommand, RepoShowCommand, RepoSubCommand, ResolveCommand, RuleClearCommand,
+    RuleCommand, RuleDumpDynamicCommand, RuleListCommand, RuleReplaceCommand,
+    RuleReplaceFileCommand, RuleReplaceJsonCommand, RuleReplaceSubCommand, RuleSubCommand,
 };
+use crate::v1repoconf::{validate_host, SourceConfig};
 use anyhow::{bail, format_err, Context as _};
 use fidl_fuchsia_net_http::{self as http};
 use fidl_fuchsia_pkg_rewrite::EngineMarker;
@@ -30,6 +31,7 @@ use {
 
 mod args;
 mod error;
+mod v1repoconf;
 
 pub fn main() -> Result<(), anyhow::Error> {
     let mut executor = fasync::LocalExecutor::new();
@@ -159,46 +161,105 @@ async fn main_helper(command: Command) -> Result<i32, anyhow::Error> {
                 }
                 Some(RepoSubCommand::Add(RepoAddCommand { subcommand })) => {
                     match subcommand {
-                        RepoAddSubCommand::File(RepoAddFileCommand { persist, name, file }) => {
-                            let mut repo: pkg::RepositoryConfig =
-                                serde_json::from_reader(io::BufReader::new(File::open(file)?))?;
-                            // If a name is specified via the command line, override the
-                            // automatically derived name.
-                            if let Some(n) = name {
-                                repo = pkg::RepositoryConfigBuilder::from(repo)
-                                    .repo_url(RepositoryUrl::parse_host(n)?)
-                                    .build();
-                            }
-                            // The storage type can be overridden to persistent via the
-                            // command line.
-                            if persist {
-                                repo = pkg::RepositoryConfigBuilder::from(repo)
-                                    .repo_storage_type(pkg::RepositoryStorageType::Persistent)
-                                    .build();
-                            }
+                        RepoAddSubCommand::File(RepoAddFileCommand {
+                            persist,
+                            format,
+                            name,
+                            file,
+                        }) => {
+                            let res = match format {
+                                RepoConfigFormat::Version1 => {
+                                    let mut repo: SourceConfig = serde_json::from_reader(
+                                        io::BufReader::new(File::open(file)?),
+                                    )?;
+                                    // If a name is specified via the command line, override the
+                                    // automatically derived name.
+                                    if let Some(n) = name {
+                                        repo.set_id(&n);
+                                        validate_host(&repo.get_id())?;
+                                    }
+                                    if persist {
+                                        repo.set_repo_storage_type(
+                                            pkg::RepositoryStorageType::Persistent,
+                                        );
+                                    }
 
-                            let res = repo_manager.add(&repo.into()).await?;
+                                    repo_manager.add(&repo.into()).await?
+                                }
+                                RepoConfigFormat::Version2 => {
+                                    let mut repo: pkg::RepositoryConfig = serde_json::from_reader(
+                                        io::BufReader::new(File::open(file)?),
+                                    )?;
+                                    // If a name is specified via the command line, override the
+                                    // automatically derived name.
+                                    if let Some(n) = name {
+                                        repo = pkg::RepositoryConfigBuilder::from(repo)
+                                            .repo_url(RepositoryUrl::parse_host(n)?)
+                                            .build();
+                                    }
+                                    // The storage type can be overridden to persistent via the
+                                    // command line.
+                                    if persist {
+                                        repo = pkg::RepositoryConfigBuilder::from(repo)
+                                            .repo_storage_type(
+                                                pkg::RepositoryStorageType::Persistent,
+                                            )
+                                            .build();
+                                    }
+
+                                    repo_manager.add(&repo.into()).await?
+                                }
+                            };
+
                             let () = res.map_err(zx::Status::from_raw)?;
                         }
-                        RepoAddSubCommand::Url(RepoAddUrlCommand { persist, name, repo_url }) => {
+                        RepoAddSubCommand::Url(RepoAddUrlCommand {
+                            persist,
+                            format,
+                            name,
+                            repo_url,
+                        }) => {
                             let res = fetch_url(repo_url).await?;
-                            let mut repo: pkg::RepositoryConfig = serde_json::from_slice(&res)?;
-                            // If a name is specified via the command line, override the
-                            // automatically derived name.
-                            if let Some(n) = name {
-                                repo = pkg::RepositoryConfigBuilder::from(repo)
-                                    .repo_url(RepositoryUrl::parse_host(n)?)
-                                    .build();
-                            }
-                            // The storage type can be overridden to persistent via the
-                            // command line.
-                            if persist {
-                                repo = pkg::RepositoryConfigBuilder::from(repo)
-                                    .repo_storage_type(pkg::RepositoryStorageType::Persistent)
-                                    .build();
-                            }
+                            let res = match format {
+                                RepoConfigFormat::Version1 => {
+                                    let mut repo: SourceConfig = serde_json::from_slice(&res)?;
+                                    // If a name is specified via the command line, override the
+                                    // automatically derived name.
+                                    if let Some(n) = name {
+                                        repo.set_id(&n);
+                                        validate_host(&repo.get_id())?;
+                                    }
+                                    if persist {
+                                        repo.set_repo_storage_type(
+                                            pkg::RepositoryStorageType::Persistent,
+                                        );
+                                    }
 
-                            let res = repo_manager.add(&repo.into()).await?;
+                                    repo_manager.add(&repo.into()).await?
+                                }
+                                RepoConfigFormat::Version2 => {
+                                    let mut repo: pkg::RepositoryConfig =
+                                        serde_json::from_slice(&res)?;
+                                    // If a name is specified via the command line, override the
+                                    // automatically derived name.
+                                    if let Some(n) = name {
+                                        repo = pkg::RepositoryConfigBuilder::from(repo)
+                                            .repo_url(RepositoryUrl::parse_host(n)?)
+                                            .build();
+                                    }
+                                    // The storage type can be overridden to persistent via the
+                                    // command line.
+                                    if persist {
+                                        repo = pkg::RepositoryConfigBuilder::from(repo)
+                                            .repo_storage_type(
+                                                pkg::RepositoryStorageType::Persistent,
+                                            )
+                                            .build();
+                                    }
+
+                                    repo_manager.add(&repo.into()).await?
+                                }
+                            };
                             let () = res.map_err(zx::Status::from_raw)?;
                         }
                     }

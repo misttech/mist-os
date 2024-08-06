@@ -88,6 +88,12 @@ pub enum RepoAddSubCommand {
     Url(RepoAddUrlCommand),
 }
 
+#[derive(Debug, PartialEq)]
+pub enum RepoConfigFormat {
+    Version1,
+    Version2,
+}
+
 #[derive(FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "file")]
 /// Add a repository config from a local file, in JSON format, which contains the different repository metadata and URLs.
@@ -95,6 +101,14 @@ pub struct RepoAddFileCommand {
     /// persist TUF metadata for repositories provided to the RepoManager.
     #[argh(switch, short = 'p')]
     pub persist: bool,
+    /// the expected config.json file format version.
+    #[argh(
+        option,
+        short = 'f',
+        default = "RepoConfigFormat::Version2",
+        from_str_fn(repo_config_format)
+    )]
+    pub format: RepoConfigFormat,
     /// name of the source (a name from the URL will be derived if not provided).
     #[argh(option, short = 'n')]
     pub name: Option<String>,
@@ -110,6 +124,14 @@ pub struct RepoAddUrlCommand {
     /// persist TUF metadata for repositories provided to the RepoManager.
     #[argh(switch, short = 'p')]
     pub persist: bool,
+    /// the expected config.json file format version.
+    #[argh(
+        option,
+        short = 'f',
+        default = "RepoConfigFormat::Version2",
+        from_str_fn(repo_config_format)
+    )]
+    pub format: RepoConfigFormat,
     /// name of the source (a name from the URL will be derived if not provided).
     #[argh(option, short = 'n')]
     pub name: Option<String>,
@@ -237,6 +259,14 @@ fn parse_rule_config(config: &str) -> Result<RuleConfig, String> {
     serde_json::from_str(config).map_err(|e| e.to_string())
 }
 
+fn repo_config_format(value: &str) -> Result<RepoConfigFormat, String> {
+    match value {
+        "1" => Ok(RepoConfigFormat::Version1),
+        "2" => Ok(RepoConfigFormat::Version2),
+        _ => Err(format!("unknown format {value:?}")),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -313,6 +343,21 @@ mod tests {
                 subcommand: Some(RepoSubCommand::Add(RepoAddCommand {
                     subcommand: RepoAddSubCommand::File(RepoAddFileCommand {
                         persist: false,
+                        format: RepoConfigFormat::Version2,
+                        name: None,
+                        file: "foo".into(),
+                    }),
+                })),
+            },
+        );
+        check(
+            &["repo", "add", "file", "-f", "1", "foo"],
+            RepoCommand {
+                verbose: false,
+                subcommand: Some(RepoSubCommand::Add(RepoAddCommand {
+                    subcommand: RepoAddSubCommand::File(RepoAddFileCommand {
+                        persist: false,
+                        format: RepoConfigFormat::Version1,
                         name: None,
                         file: "foo".into(),
                     }),
@@ -326,6 +371,21 @@ mod tests {
                 subcommand: Some(RepoSubCommand::Add(RepoAddCommand {
                     subcommand: RepoAddSubCommand::File(RepoAddFileCommand {
                         persist: true,
+                        format: RepoConfigFormat::Version2,
+                        name: None,
+                        file: "foo".into(),
+                    }),
+                })),
+            },
+        );
+        check(
+            &["repo", "add", "file", "-p", "-f", "1", "foo"],
+            RepoCommand {
+                verbose: false,
+                subcommand: Some(RepoSubCommand::Add(RepoAddCommand {
+                    subcommand: RepoAddSubCommand::File(RepoAddFileCommand {
+                        persist: true,
+                        format: RepoConfigFormat::Version1,
                         name: None,
                         file: "foo".into(),
                     }),
@@ -339,6 +399,7 @@ mod tests {
                 subcommand: Some(RepoSubCommand::Add(RepoAddCommand {
                     subcommand: RepoAddSubCommand::File(RepoAddFileCommand {
                         persist: false,
+                        format: RepoConfigFormat::Version2,
                         name: Some("devhost".to_string()),
                         file: "foo".into(),
                     }),
@@ -352,6 +413,7 @@ mod tests {
                 subcommand: Some(RepoSubCommand::Add(RepoAddCommand {
                     subcommand: RepoAddSubCommand::Url(RepoAddUrlCommand {
                         persist: false,
+                        format: RepoConfigFormat::Version2,
                         name: Some("devhost".to_string()),
                         repo_url: "http://foo.tld/fuchsia/config.json".into(),
                     }),
@@ -365,6 +427,7 @@ mod tests {
                 subcommand: Some(RepoSubCommand::Add(RepoAddCommand {
                     subcommand: RepoAddSubCommand::Url(RepoAddUrlCommand {
                         persist: true,
+                        format: RepoConfigFormat::Version2,
                         name: Some("devhost".to_string()),
                         repo_url: "http://foo.tld/fuchsia/config.json".into(),
                     }),
@@ -372,12 +435,23 @@ mod tests {
             },
         );
         check(
-            &["repo", "add", "url", "-p", "-n", "devhost", "http://foo.tld/fuchsia/config.json"],
+            &[
+                "repo",
+                "add",
+                "url",
+                "-p",
+                "-f",
+                "1",
+                "-n",
+                "devhost",
+                "http://foo.tld/fuchsia/config.json",
+            ],
             RepoCommand {
                 verbose: false,
                 subcommand: Some(RepoSubCommand::Add(RepoAddCommand {
                     subcommand: RepoAddSubCommand::Url(RepoAddUrlCommand {
                         persist: true,
+                        format: RepoConfigFormat::Version1,
                         name: Some("devhost".to_string()),
                         repo_url: "http://foo.tld/fuchsia/config.json".into(),
                     }),
