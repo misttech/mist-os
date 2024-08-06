@@ -96,8 +96,14 @@ zx::result<std::pair<storage::RamDisk, std::string>> CreateRamDisk(
     }
   }
 
-  // Create a ram-disk.
-  auto ram_disk_or = storage::RamDisk::CreateWithVmo(std::move(vmo), options.device_block_size);
+  // Create a ram-disk.  The DFv2 driver doesn't support fail_after,
+  // ram_disk_discard_random_after_last_flush or FVM.
+  auto ram_disk_or = storage::RamDisk::CreateWithVmo(
+      std::move(vmo), options.device_block_size,
+      storage::RamDisk::Options{
+          .use_v2 = !options.fail_after && !options.ram_disk_discard_random_after_last_flush &&
+                    !options.use_fvm,
+      });
   if (ram_disk_or.is_error()) {
     return ram_disk_or.take_error();
   }
