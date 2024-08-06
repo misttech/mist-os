@@ -510,6 +510,7 @@ kernel_cmdline("starnix_lite-zbi-cmdline") {
   args = [
     "userboot.next.root=/",
     "userboot.next=bin/starnix_lite_kernel",
+    "kernel.vdso.always_use_next=true",
   ]
 }
 
