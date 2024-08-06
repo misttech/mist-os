@@ -13,9 +13,6 @@ group("versioning") {
   if (bump_api_level) {
     deps = [ ":bump_api_level" ]
   }
-  if (freeze_api_level) {
-    deps = [ ":freeze_api_level" ]
-  }
 }
 
 # To make the tests buildable, include `--with-host //scripts/versioning:tests`
@@ -23,10 +20,7 @@ group("versioning") {
 group("tests") {
   testonly = true
 
-  deps = [
-    ":freeze_in_development_api_level_test",
-    ":update_platform_version_tests",
-  ]
+  deps = [ ":update_platform_version_tests" ]
 }
 
 # Run using the following command:
@@ -35,14 +29,6 @@ python_host_test("update_platform_version_tests") {
   enable_mypy = true
   main_source = "update_platform_version_tests.py"
   sources = [ "update_platform_version.py" ]
-}
-
-# Run using the following command:
-# fx test //scripts/versioning:freeze_in_development_api_level_test
-python_host_test("freeze_in_development_api_level_test") {
-  enable_mypy = true
-  main_source = "freeze_in_development_api_level_test.py"
-  sources = [ "freeze_in_development_api_level.py" ]
 }
 
 if (bump_api_level) {
@@ -111,42 +97,6 @@ if (bump_api_level) {
       rebase_path(_fidl_compatiblity_doc_path, root_build_dir),
       "--new-api-level",
       "$_next_level",
-    ]
-
-    inputs = [ _version_history_file ]
-
-    outputs = [ _stamp_file ]
-  }
-}
-
-if (freeze_api_level) {
-  # Freezes the current in-development API level, marking it stable in
-  # `//sdk/version_history.json`.
-  #
-  # It results in no in-development API level until ":bump_api_level" is run.
-  #
-  # This target is a tool for managing the platform version. It should only be
-  # built by an infra bot or a human manually bumping the platform version, as
-  # it updates several files in the checkout.
-  #
-  # To use this tool manually, run the following:
-  #   fx set bringup.x64 --with-host //scripts/versioning --args=freeze_api_level=true
-  #   fx build --host //scripts/versioning:freeze_api_level
-  action("freeze_api_level") {
-    testonly = true
-
-    script = "//scripts/versioning/freeze_in_development_api_level.py"
-
-    _stamp_file = "$target_out_dir/$target_name.status"
-    _version_history_file = "//sdk/version_history.json"
-
-    args = [
-      "--root-source-dir",
-      rebase_path("//", root_build_dir),
-      "--stamp-file",
-      rebase_path(_stamp_file, root_build_dir),
-      "--sdk-version-history",
-      rebase_path(_version_history_file, root_build_dir),
     ]
 
     inputs = [ _version_history_file ]
