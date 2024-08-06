@@ -208,10 +208,16 @@ if (is_mistos) {
       "//src/starnix/kernel:starnix_kernel",
       "//src/starnix/kernel:starnix_kernel_manifest",
 
-      # Container
+      # Containers
+
+      ## Mistos Container
       "//examples/toybox:toybox_component",
       "//src/starnix/containers/mistos:mistos_container_component",
       "//src/starnix/examples/hello_starnix:hello_starnix_component",
+
+      ## Alpine Container
+      "//src/starnix/containers/alpine:alpine_container",
+      "//src/starnix/containers/alpine:alpine_container_resources",
     ]
 
     output_dir = root_out_dir
