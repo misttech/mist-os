@@ -513,11 +513,8 @@ zbi("starnix_lite_kernel_zbi") {
     ":starnix_lite-zbi-cmdline",
     ":starnix_lite_kernel_bin",
     "//build/info/bootfs:minimum_utc_stamp",
-
-    #"//src/starnix/examples/hello_starnix:bin",
-    "//examples/nolibc:linux-bin",
-    "//src/starnix/containers:default_init",
     "//src/starnix/containers/mistos:container_resources",
+    "//src/starnix/containers/nolibc-test_container:linux-bin",
 
     #VDSO
     "//src/starnix/kernel:vdso-data($bionic_linux_toolchain)",

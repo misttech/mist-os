@@ -3,25 +3,17 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//build/dist/resource.gni")
-import("//build/testing/boot_tests/kernel_zbi_test.gni")
 
+# Pre compiled linux binary see build.sh
 resource("linux-bin") {
   allow_binary_output_dir = true
   sources = [ "nolibc-test.linux" ]
   outputs = [ "bin/nolibc-test" ]
 }
 
-kernel_zbi_test("nolibc_zbi") {
-  args = [
-    "userboot.test.root=/",
-    "userboot.test.next=bin/nolibc-test",
-  ]
-  deps = [ ":linux-bin" ]
-}
-
-fuchsia_package_with_single_component("nolibc") {
-  component_name = "nolibc"
-  manifest = "meta/nolibc.cml"
+fuchsia_package_with_single_component("nolibc_container") {
+  disable_elf_binaries_checks = true
+  manifest = "meta/nolibc_container.cml"
+  package_name = "nolibc"
   deps = [ ":linux-bin" ]
 }

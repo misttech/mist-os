@@ -215,6 +215,9 @@ if (is_mistos) {
       "//src/starnix/containers/mistos:mistos_container_component",
       "//src/starnix/examples/hello_starnix:hello_starnix_component",
 
+      ## Nolibc-test Container
+      "//src/starnix/containers/nolibc-test_container:nolibc_container_component",
+
       ## Alpine Container
       "//src/starnix/containers/alpine:alpine_container",
       "//src/starnix/containers/alpine:alpine_container_resources",
