@@ -159,6 +159,15 @@ impl<'a> StripParseState<'a> for ESpan<'a> {
     }
 }
 
+/// Element of a string. `Body` elements contain the text of the string. Escape
+/// sequences are still present but are known to be well-formed. `Interpolation`
+/// contains an expression from an interpolated value.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum StringElement<'a> {
+    Body(Span<'a>),
+    Interpolation(Node<'a>),
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Node<'a> {
     Add(Box<Node<'a>>, Box<Node<'a>>),
@@ -194,7 +203,7 @@ pub enum Node<'a> {
     Program(Vec<Node<'a>>),
     Range(Box<Option<Node<'a>>>, Box<Option<Node<'a>>>, bool),
     Real(Span<'a>),
-    String(Span<'a>),
+    String(Vec<StringElement<'a>>),
     Subtract(Box<Node<'a>>, Box<Node<'a>>),
     VariableDecl { identifier: Span<'a>, value: Box<Node<'a>>, mutability: Mutability },
     True,
@@ -274,7 +283,18 @@ impl<'a> Node<'a> {
                 a.len() == b.len() && a.iter().zip(b.iter()).all(|(a, b)| a.content_eq(b))
             }
             (Real(a), Real(b)) => a.fragment() == b.fragment(),
-            (String(a), String(b)) => a.fragment() == b.fragment(),
+            (String(a), String(b)) => {
+                a.len() == b.len()
+                    && a.iter().zip(b.iter()).all(|x| match x {
+                        (StringElement::Body(a), StringElement::Body(b)) => {
+                            a.fragment() == b.fragment()
+                        }
+                        (StringElement::Interpolation(a), StringElement::Interpolation(b)) => {
+                            a.content_eq(b)
+                        }
+                        _ => false,
+                    })
+            }
             (Subtract(a, b), Subtract(c, d)) => a.content_eq(c) && b.content_eq(d),
             (
                 FunctionDecl { identifier: identifier_a, parameters: parameters_a, body: body_a },
@@ -716,7 +736,7 @@ fn normal_string<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
             many0(alt((recognize(none_of("\\\"\n")), escape_sequence))),
             ex_tag("\""),
         ))),
-        |x| Node::String(x.strip_parse_state()),
+        |x| Node::String(vec![StringElement::Body(x.strip_parse_state())]),
     )(input)
 }
 
@@ -1539,7 +1559,7 @@ mod test {
 
     /// Quick constructor for a string literal node.
     fn string(s: &str) -> Node<'_> {
-        Node::String(sp(s))
+        Node::String(vec![StringElement::Body(sp(s))])
     }
 
     #[test]
@@ -1799,7 +1819,9 @@ mod test {
         test_parse(
             r#""straang\t\r\n\
 \\abcd\u00264b\"""#,
-            Node::Program(vec![Node::String(sp("\"straang\\t\\r\\n\\\n\\\\abcd\\u00264b\\\"\""))]),
+            Node::Program(vec![Node::String(vec![StringElement::Body(sp(
+                "\"straang\\t\\r\\n\\\n\\\\abcd\\u00264b\\\"\"",
+            ))])]),
         );
     }
 

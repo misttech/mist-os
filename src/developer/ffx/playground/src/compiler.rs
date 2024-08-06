@@ -16,7 +16,7 @@ use std::sync::{Arc, Mutex};
 use crate::error::Result;
 use crate::frame::{CaptureMapEntry, CaptureSet, Frame};
 use crate::interpreter::{Exception, Interpreter, InterpreterInner};
-use crate::parser::{Mutability, Node, ParameterList, Span};
+use crate::parser::{Mutability, Node, ParameterList, Span, StringElement};
 use crate::value::{
     playground_semantic_compare, Invocable, PlaygroundValue, RangeCursor, ReplayableIterator,
     Value, ValueExt,
@@ -278,7 +278,7 @@ impl Visitor {
             Node::Program(v) => Arc::new(self.visit_program(v)),
             Node::Range(a, b, i) => Arc::new(self.visit_range(*a, *b, i)),
             Node::Real(a) => Arc::new(self.visit_real(*a.fragment())),
-            Node::String(s) => Arc::new(self.visit_string(*s.fragment())),
+            Node::String(s) => Arc::new(self.visit_string(s)),
             Node::Subtract(x, y) => Arc::new(self.visit_subtract(*x, *y)),
             Node::VariableDecl { identifier, value, mutability } => {
                 Arc::new(self.visit_variable_decl(*identifier.fragment(), *value, mutability))
@@ -1331,29 +1331,45 @@ impl Visitor {
 
     fn visit_string(
         &mut self,
-        string: &str,
+        elements: Vec<StringElement<'_>>,
     ) -> impl for<'f> Fn(&Arc<InterpreterInner>, &'f Mutex<Frame>) -> BoxFuture<'f, Result<Value>>
     {
-        let mut string = string
-            .strip_prefix('"')
-            .unwrap()
-            .strip_suffix('"')
-            .unwrap()
-            .replace(r"\n", "\n")
-            .replace(r"\t", "\t")
-            .replace(r"\r", "\r")
-            .replace("\\\n", "")
-            .replace(r#"\""#, "\"");
+        let expected_len = elements
+            .iter()
+            .map(|x| match x {
+                StringElement::Body(x) => x.fragment().len(),
+                StringElement::Interpolation(_) => 1,
+            })
+            .sum();
 
-        while let Some(idx) = string.find("\\u") {
-            let chr = std::char::from_u32(
-                u32::from_str_radix(&string[(idx + 2)..(idx + 8)], 16).unwrap(),
-            )
-            .unwrap_or('�');
-            string.replace_range(idx..(idx + 8), &chr.to_string());
+        let mut string = String::with_capacity(expected_len);
+        for element in elements {
+            match element {
+                StringElement::Body(element) => {
+                    let mut element = element
+                        .strip_prefix('"')
+                        .unwrap()
+                        .strip_suffix('"')
+                        .unwrap()
+                        .replace(r"\n", "\n")
+                        .replace(r"\t", "\t")
+                        .replace(r"\r", "\r")
+                        .replace("\\\n", "")
+                        .replace(r#"\""#, "\"");
+
+                    while let Some(idx) = element.find("\\u") {
+                        let chr = std::char::from_u32(
+                            u32::from_str_radix(&element[(idx + 2)..(idx + 8)], 16).unwrap(),
+                        )
+                        .unwrap_or('�');
+                        element.replace_range(idx..(idx + 8), &chr.to_string());
+                    }
+
+                    string.push_str(&element.replace(r"\\", r"\"));
+                }
+                StringElement::Interpolation(_) => todo!(),
+            }
         }
-
-        let string = string.replace(r"\\", r"\");
 
         move |_, _| {
             let string = string.clone();
