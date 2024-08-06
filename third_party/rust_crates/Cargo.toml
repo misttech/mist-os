@@ -355,8 +355,6 @@ output_vt100 = { path = "empty/output_vt100" }
 pkg-config = { path = "empty/pkg-config" }
 redox_syscall = { path = "empty/redox_syscall" }
 rustversion = { path = "empty/rustversion" }
-wasi-0_10_1 = { path = "empty/wasi-0.10.1", package = "wasi" }
-wasi-0_10_0_preview1 = { path = "empty/wasi-0.10.0+wasi-snapshot-preview1", package = "wasi" }
 wasi-0_11_0_preview1 = { path = "empty/wasi-0.11.0+wasi-snapshot-preview1", package = "wasi" }
 wasm-bindgen = { path = "empty/wasm-bindgen" }
 web-sys = { path = "empty/web-sys" }

@@ -5183,11 +5183,3 @@ version = "2.0.1+zstd.1.5.2"
 dependencies = [
  "libc",
 ]
-
-[[patch.unused]]
-name = "wasi"
-version = "0.10.0+wasi-snapshot-preview1"
-
-[[patch.unused]]
-name = "wasi"
-version = "0.10.1+wasi-snapshot-preview1"
