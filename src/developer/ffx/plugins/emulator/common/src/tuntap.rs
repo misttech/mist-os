@@ -40,7 +40,7 @@ pub(crate) mod tap {
 
             #[cfg(not(test))]
             {
-                tracing::debug!(
+                eprintln!(
                     "Skipping Tun/Tap test for '{}' since it's not supported on Mac.",
                     interface.interface_name,
                 );

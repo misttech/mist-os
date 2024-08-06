@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::{bail, Context as _, Result};
 use schemars::JsonSchema;
 pub use sdk_metadata::{AudioDevice, DataAmount, DataUnits, PointingDevice, Screen};
 use serde::{Deserialize, Serialize};
@@ -11,6 +12,7 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 mod enumerations;
+pub mod fletcher64;
 mod instances;
 pub mod targets;
 
@@ -18,11 +20,10 @@ pub use enumerations::{
     AccelerationMode, ConsoleType, CpuArchitecture, EngineState, EngineType, GpuType, LogLevel,
     NetworkingMode, OperatingSystem, VirtualCpu,
 };
-
+use fletcher64::get_file_hash;
 pub use instances::{
     read_from_disk, read_from_disk_untyped, write_to_disk, EmulatorInstances, EMU_INSTANCE_ROOT_DIR,
 };
-
 pub use targets::{
     get_all_targets, start_emulator_watching, EmulatorTargetAction, EmulatorWatcher,
 };
@@ -111,18 +112,86 @@ pub struct GuestConfig {
     pub disk_image: Option<DiskImage>,
 
     /// The Fuchsia kernel, which loads alongside the ZBI and brings up the OS.
+    /// This can also be a efi image, in which case there is no zbi needed.
     pub kernel_image: PathBuf,
 
     /// Zircon Boot image, this is Fuchsia's initial ram disk used in the boot process.
+    /// Note: This is not used if the kernel image is an efi image.
     pub zbi_image: PathBuf,
 
-    /// Hash of zbi_image. Used to detect changes when reusing an emulator instance.
+    /// Hash of zbi_image or kernel if the kernel is efi. Used to detect changes when reusing
+    /// an emulator instance.
     #[serde(default)]
     pub zbi_hash: String,
 
     /// Hash of disk_image. Used to detect changes when reusing an emulator instance.
     #[serde(default)]
     pub disk_hash: String,
+
+    /// Firmware emulation files, primarily used only if the guest is efi. The code is usually
+    /// read-only.
+    #[serde(default)]
+    pub ovmf_code: PathBuf,
+
+    /// Firmware emulation data file. This is read-write, so it should be unique per emulator instance.
+    #[serde(default)]
+    pub ovmf_vars: PathBuf,
+}
+
+impl GuestConfig {
+    pub fn is_efi(&self) -> bool {
+        match self.kernel_image.extension() {
+            Some(ext) if ext == "efi" => true,
+            _ => false,
+        }
+    }
+
+    pub fn get_image_hashes(&self) -> Result<(u64, u64)> {
+        let zbi_hash = match self.kernel_image.extension() {
+            Some(ext) if ext == "efi" => {
+                get_file_hash(&self.kernel_image).context("could not calculate efi hash")?
+            }
+            _ => get_file_hash(&self.zbi_image).context("could not calculate zbi hash")?,
+        };
+
+        let disk_hash = if let Some(disk) = &self.disk_image {
+            get_file_hash(disk.as_ref()).context("could not calculate disk hash")?
+        } else {
+            0
+        };
+
+        Ok((zbi_hash, disk_hash))
+    }
+
+    pub fn save_disk_hashes(&mut self) -> Result<()> {
+        let (new_zbi_hash, new_disk_hash) = self.get_image_hashes()?;
+        self.zbi_hash = format!("{new_zbi_hash:x}");
+        self.disk_hash = format!("{new_disk_hash:x}");
+        Ok(())
+    }
+
+    pub fn check_required_files(&self) -> Result<()> {
+        let kernel_path: &_ = &self.kernel_image;
+        let zbi_path = &self.zbi_image;
+        let disk_image_path = &self.disk_image;
+
+        if !kernel_path.exists() {
+            bail!("kernel file {:?} does not exist.", kernel_path);
+        }
+
+        if !self.is_efi() {
+            if !zbi_path.exists() {
+                bail!("zbi file {:?} does not exist.", zbi_path);
+            }
+        }
+
+        if let Some(file_path) = disk_image_path.as_ref() {
+            if !file_path.exists() {
+                bail!("disk image file {:?} does not exist.", file_path);
+            }
+        }
+        Ok(())
+    }
 }
 
 /// Host-side configuration data, such as physical hardware and host OS details.

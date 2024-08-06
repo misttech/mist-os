@@ -7,7 +7,6 @@ use anyhow::Context;
 use async_trait::async_trait;
 use emulator_instance::{EmulatorConfiguration, EmulatorInstances, EngineType, NetworkingMode};
 use ffx_config::EnvironmentContext;
-use ffx_emulator_common::get_file_hash;
 use ffx_emulator_config::EmulatorEngine;
 use ffx_emulator_engines::{process_flag_template, EngineBuilder};
 use ffx_emulator_start_args::StartCommand;
@@ -452,24 +451,16 @@ impl<T: EngineOperations> EmuStartTool<T> {
         new_config: &EmulatorConfiguration,
         mut engine: Box<dyn EmulatorEngine>,
     ) -> Result<(bool, Box<dyn EmulatorEngine>)> {
-        let new_zbi_hash: u64;
-        let new_disk_hash: u64;
-
         tracing::debug!(
-            "New config image files zbi:{zbi:?} disk:{fvm:?}",
+            "New config image files kernel: {kernel:?} zbi:{zbi:?} disk:{fvm:?}",
             zbi = new_config.guest.zbi_image,
-            fvm = new_config.guest.disk_image
+            fvm = new_config.guest.disk_image,
+            kernel = new_config.guest.kernel_image
         );
-
-        new_zbi_hash = get_file_hash(&new_config.guest.zbi_image)
-            .bug_context("could not calculate zbi hash")?;
-
-        if let Some(disk) = &new_config.guest.disk_image {
-            new_disk_hash =
-                get_file_hash(disk.as_ref()).bug_context("could not calculate disk hash")?;
-        } else {
-            new_disk_hash = 0;
-        }
+        // Note: For images that use EFI, the zbi_hash is actually the hash of the efi image, since
+        // there is no zbi image.
+        let (new_zbi_hash, new_disk_hash) =
+            new_config.guest.get_image_hashes().bug_context("could not calculate image hashes")?;
 
         let new_zbi = format!("{new_zbi_hash:x}");
         let new_disk = format!("{new_disk_hash:x}");
@@ -509,18 +500,7 @@ impl<T: EngineOperations> EmuStartTool<T> {
     }
 
     fn save_disk_hashes(config: &mut EmulatorConfiguration) -> Result<()> {
-        let new_disk_hash: u64;
-        let new_zbi_hash =
-            get_file_hash(&config.guest.zbi_image).bug_context("could not calculate zbi hash")?;
-
-        if let Some(disk) = &config.guest.disk_image {
-            new_disk_hash =
-                get_file_hash(disk.as_ref()).bug_context("could not calculate disk hash")?;
-        } else {
-            new_disk_hash = 0;
-        }
-        config.guest.zbi_hash = format!("{new_zbi_hash:x}");
-        config.guest.disk_hash = format!("{new_disk_hash:x}");
+        config.guest.save_disk_hashes().bug_context("could not save disk hashes")?;
         Ok(())
     }
 }
