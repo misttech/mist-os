@@ -6,7 +6,6 @@
 
 use anyhow::Context as _;
 use assert_matches::assert_matches;
-use fidl_fuchsia_net_stack_ext::FidlReturn as _;
 use fuchsia_async::{self as fasync, TimeoutExt as _};
 use futures::{pin_mut, FutureExt as _, Stream, StreamExt as _, TryStreamExt as _};
 use itertools::Itertools as _;
@@ -23,8 +22,7 @@ use test_case::test_case;
 use {
     fidl_fuchsia_hardware_network as fhardware_network,
     fidl_fuchsia_net_interfaces as fnet_interfaces,
-    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_net_stack as fnet_stack,
-    fuchsia_zircon as zx,
+    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fuchsia_zircon as zx,
 };
 
 #[netstack_test]
@@ -35,8 +33,6 @@ async fn watcher_existing<N: Netstack>(name: &str) {
 
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
-    let stack =
-        realm.connect_to_protocol::<fnet_stack::StackMarker>().expect("connect to protocol");
 
     #[derive(Clone, Debug, PartialEq, Eq)]
     enum Expectation {
@@ -165,33 +161,21 @@ async fn watcher_existing<N: Netstack>(name: &str) {
         .await
         .expect("add address");
         let () = address_state_provider.detach().expect("detach address lifetime");
-        eps.push(iface);
 
         if has_default_ipv4_route {
-            stack
-                .add_forwarding_entry(&fnet_stack::ForwardingEntry {
-                    subnet: fidl_subnet!("0.0.0.0/0"),
-                    device_id: id,
-                    next_hop: None,
-                    metric: 0,
-                })
+            iface
+                .add_subnet_route(fidl_subnet!("0.0.0.0/0"))
                 .await
-                .squash_result()
                 .expect("add default ipv4 route entry");
         }
 
         if has_default_ipv6_route {
-            stack
-                .add_forwarding_entry(&fnet_stack::ForwardingEntry {
-                    subnet: fidl_subnet!("::/0"),
-                    device_id: id,
-                    next_hop: None,
-                    metric: 0,
-                })
+            iface
+                .add_subnet_route(fidl_subnet!("::/0"))
                 .await
-                .squash_result()
                 .expect("add default ipv6 route entry");
         }
+        eps.push(iface);
     }
 
     // The netstacks report the loopback interface as NIC 1.
@@ -504,22 +488,11 @@ async fn test_add_remove_default_route<N: Netstack, I: net_types::ip::Ip>(name: 
     };
 
     // Add the default route and watch for its addition.
-    let stack =
-        realm.connect_to_protocol::<fnet_stack::StackMarker>().expect("connect to protocol");
     let route = match I::VERSION {
         IpVersion::V4 => fidl_subnet!("0.0.0.0/0"),
         IpVersion::V6 => fidl_subnet!("::/0"),
     };
-    stack
-        .add_forwarding_entry(&fnet_stack::ForwardingEntry {
-            subnet: route.clone(),
-            device_id: id,
-            next_hop: None,
-            metric: 0,
-        })
-        .await
-        .squash_result()
-        .expect("add default route");
+    iface.add_subnet_route(route).await.expect("add default route");
 
     fidl_fuchsia_net_interfaces_ext::wait_interface(event_stream.by_ref(), &mut if_map, |if_map| {
         if_map.get(&id).map(|properties| has_default_route(properties).then_some(())).flatten()
@@ -528,16 +501,7 @@ async fn test_add_remove_default_route<N: Netstack, I: net_types::ip::Ip>(name: 
     .expect("observe default route addition");
 
     // Remove the default route and watch for its removal.
-    stack
-        .del_forwarding_entry(&fnet_stack::ForwardingEntry {
-            subnet: route,
-            device_id: id,
-            next_hop: None,
-            metric: 0,
-        })
-        .await
-        .squash_result()
-        .expect("remove default route");
+    iface.del_subnet_route(route).await.expect("remove default route");
 
     fidl_fuchsia_net_interfaces_ext::wait_interface(event_stream.by_ref(), &mut if_map, |if_map| {
         if_map.get(&id).map(|properties| (!has_default_route(properties)).then_some(())).flatten()
@@ -694,10 +658,13 @@ async fn test_close_data_race<N: Netstack>(name: &str) {
         assert!(dev.control().enable().await.expect("send enable").expect("enable"));
         let () = dev.set_link_up(true).await.expect("bring device up");
 
-        let address_state_provider = interfaces::add_subnet_address_and_route_wait_assigned(
-            &dev,
+        let address_state_provider = interfaces::add_address_wait_assigned(
+            dev.control(),
             DEVICE_ADDRESS_IN_SUBNET,
-            fidl_fuchsia_net_interfaces_admin::AddressParameters::default(),
+            fidl_fuchsia_net_interfaces_admin::AddressParameters {
+                add_subnet_route: Some(true),
+                ..Default::default()
+            },
         )
         .await
         .expect("add subnet address and route");
@@ -1297,8 +1264,6 @@ async fn addresses_while_offline<N: Netstack>(
 async fn watcher<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
-    let stack =
-        realm.connect_to_protocol::<fnet_stack::StackMarker>().expect("connect to protocol");
 
     let blocking_stream = realm.get_interface_event_stream().expect("get interface event stream");
     let mut blocking_stream = pin!(blocking_stream);
@@ -1495,10 +1460,13 @@ async fn watcher<N: Netstack>(name: &str) {
     // Add an address and subnet route.
     let () = assert_blocked(&mut blocking_stream).await;
     let subnet = fidl_subnet!("192.168.0.1/16");
-    let _address_state_provider = interfaces::add_subnet_address_and_route_wait_assigned(
-        &dev,
+    let _address_state_provider = interfaces::add_address_wait_assigned(
+        dev.control(),
         subnet,
-        fidl_fuchsia_net_interfaces_admin::AddressParameters::default(),
+        fidl_fuchsia_net_interfaces_admin::AddressParameters {
+            add_subnet_route: Some(true),
+            ..Default::default()
+        },
     )
     .await
     .expect("add subnet address and route");
@@ -1540,17 +1508,11 @@ async fn watcher<N: Netstack>(name: &str) {
 
     // Add a default route.
     let () = assert_blocked(&mut blocking_stream).await;
-    let default_v4_entry = fnet_stack::ForwardingEntry {
-        subnet: fidl_subnet!("0.0.0.0/0"),
-        device_id: 0,
-        next_hop: Some(Box::new(fidl_ip!("192.168.255.254"))),
-        metric: 0,
-    };
-    let () = stack
-        .add_forwarding_entry(&default_v4_entry)
-        .await
-        .squash_result()
-        .expect("add default route");
+
+    let default_gateway = fidl_ip!("192.168.255.254");
+
+    dev.add_default_route(default_gateway).await.expect("add default route");
+
     let want =
         fidl_fuchsia_net_interfaces::Event::Changed(fidl_fuchsia_net_interfaces::Properties {
             id: Some(id),
@@ -1562,11 +1524,8 @@ async fn watcher<N: Netstack>(name: &str) {
 
     // Remove the default route.
     let () = assert_blocked(&mut blocking_stream).await;
-    let () = stack
-        .del_forwarding_entry(&default_v4_entry)
-        .await
-        .squash_result()
-        .expect("delete default route");
+    dev.remove_default_route(default_gateway).await.expect("remove default route");
+
     let want =
         fidl_fuchsia_net_interfaces::Event::Changed(fidl_fuchsia_net_interfaces::Properties {
             id: Some(id),

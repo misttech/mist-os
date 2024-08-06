@@ -278,27 +278,16 @@ async fn test<N: Netstack>(name: &str, sub_name: &str, steps: &[Step]) {
                         addr: fidl_fuchsia_net::IpAddress::Ipv4(addr),
                         prefix_len,
                     },
-                    fidl_fuchsia_net_interfaces_admin::AddressParameters::default(),
+                    fidl_fuchsia_net_interfaces_admin::AddressParameters {
+                        add_subnet_route: Some(true),
+                        ..Default::default()
+                    },
                 )
                 .await
                 .expect("add IPv4 address to bridge failed");
                 let () = address_state_provider
                     .detach()
                     .expect("failed to detach from bridge interface address state provider");
-
-                let () = switch_stack
-                    .add_forwarding_entry(&fidl_fuchsia_net_stack::ForwardingEntry {
-                        subnet: fidl_fuchsia_net_ext::apply_subnet_mask(fidl_fuchsia_net::Subnet {
-                            addr: fidl_fuchsia_net::IpAddress::Ipv4(addr),
-                            prefix_len,
-                        }),
-                        device_id: bridge_ref.id,
-                        next_hop: None,
-                        metric: 0,
-                    })
-                    .await
-                    .expect("FIDL error adding subnet route to bridge")
-                    .expect("error adding subnet route to bridge");
             }
             Step::Reenable(id) => {
                 let Host { switch_if, realm: _, _net, host_if: _ } =

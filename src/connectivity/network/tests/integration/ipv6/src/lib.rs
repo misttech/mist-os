@@ -1193,28 +1193,16 @@ async fn sends_mld_reports<N: Netstack>(
             prefix_len: 64,
         };
 
-        // While Netstack3 installs a link-local subnet route when an interface is
-        // added, Netstack2 installs it only when an interface is enabled. Add the
-        // forwarding entry for Netstack2 only to compensate for this behavioral difference.
-        // TODO(https://fxbug.dev/42074358): Unify behavior for adding a link-local
-        // subnet route between NS2/NS3.
-        if N::VERSION == NetstackVersion::Netstack3 {
-            interfaces::add_address_wait_assigned(
-                &iface.control(),
-                subnet,
-                fidl_fuchsia_net_interfaces_admin::AddressParameters::default(),
-            )
-            .await
-            .expect("add_address_wait_assigned failed")
-        } else {
-            interfaces::add_subnet_address_and_route_wait_assigned(
-                &iface,
-                subnet,
-                fidl_fuchsia_net_interfaces_admin::AddressParameters::default(),
-            )
-            .await
-            .expect("add subnet address and route")
-        }
+        interfaces::add_address_wait_assigned(
+            &iface.control(),
+            subnet,
+            fidl_fuchsia_net_interfaces_admin::AddressParameters {
+                add_subnet_route: Some(true),
+                ..Default::default()
+            },
+        )
+        .await
+        .expect("add_address_wait_assigned failed")
     };
     let snmc = ipv6_consts::LINK_LOCAL_ADDR.to_solicited_node_address();
 

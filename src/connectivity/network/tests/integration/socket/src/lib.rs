@@ -15,7 +15,6 @@ use async_trait::async_trait;
 use const_unwrap::const_unwrap_option;
 use fidl_fuchsia_net_ext::{self as fnet_ext, IntoExt as _, IpExt as _};
 use fidl_fuchsia_net_routes_ext::{self as fnet_routes_ext};
-use fidl_fuchsia_net_stack_ext::FidlReturn as _;
 use fuchsia_async::net::{DatagramSocket, UdpSocket};
 use fuchsia_async::{self as fasync, DurationExt, TimeoutExt as _};
 use fuchsia_zircon::{self as zx, AsHandleRef as _};
@@ -70,9 +69,8 @@ use {
     fidl_fuchsia_net_interfaces as fnet_interfaces,
     fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
     fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_net_routes as fnet_routes,
-    fidl_fuchsia_net_stack as fnet_stack, fidl_fuchsia_net_tun as fnet_tun,
-    fidl_fuchsia_posix as fposix, fidl_fuchsia_posix_socket as fposix_socket,
-    fidl_fuchsia_posix_socket_packet as fpacket,
+    fidl_fuchsia_net_tun as fnet_tun, fidl_fuchsia_posix as fposix,
+    fidl_fuchsia_posix_socket as fposix_socket, fidl_fuchsia_posix_socket_packet as fpacket,
 };
 
 async fn run_udp_socket_test(
@@ -1925,7 +1923,6 @@ async fn install_ip_device(
     addrs: impl IntoIterator<Item = fnet::Subnet>,
 ) -> (u64, fnet_interfaces_ext::admin::Control, fnet_interfaces_admin::DeviceControlProxy) {
     let installer = realm.connect_to_protocol::<fnet_interfaces_admin::InstallerMarker>().unwrap();
-    let stack = realm.connect_to_protocol::<fnet_stack::StackMarker>().unwrap();
 
     let port_id = port.get_info().await.expect("get port info").id.expect("missing port id");
     let device = {
@@ -1966,32 +1963,20 @@ async fn install_ip_device(
             let () = control
                 .add_address(
                     &subnet,
-                    &fnet_interfaces_admin::AddressParameters::default(),
+                    &fnet_interfaces_admin::AddressParameters {
+                        add_subnet_route: Some(true),
+                        ..Default::default()
+                    },
                     server_end,
                 )
                 .expect("add address");
 
             // Wait for the address to be assigned.
-            let wait_assignment_fut = fnet_interfaces_ext::admin::wait_assignment_state(
+            fnet_interfaces_ext::admin::wait_assignment_state(
                 fnet_interfaces_ext::admin::assignment_state_stream(address_state_provider),
                 fnet_interfaces::AddressAssignmentState::Assigned,
             )
-            .map(|r| r.expect("wait assignment state"));
-
-            // NB: add_address above does NOT create a subnet route.
-            let add_forwarding_entry_fut = stack
-                .add_forwarding_entry(&fnet_stack::ForwardingEntry {
-                    subnet: fnet_ext::apply_subnet_mask(subnet.clone()),
-                    device_id: id,
-                    next_hop: None,
-                    metric: 0,
-                })
-                .map(move |r| {
-                    r.squash_result().unwrap_or_else(|e| {
-                        panic!("failed to add interface address {:?}: {:?}", subnet, e)
-                    })
-                });
-            futures::future::join(wait_assignment_fut, add_forwarding_entry_fut).map(|((), ())| ())
+            .map(|r| r.expect("wait assignment state"))
         })
         .await;
     (id, control, device_control)

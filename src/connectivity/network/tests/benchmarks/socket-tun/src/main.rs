@@ -8,8 +8,8 @@ use futures::{AsyncReadExt as _, FutureExt as _};
 use {
     fidl_fuchsia_hardware_network as fhardware_network, fidl_fuchsia_net as fnet,
     fidl_fuchsia_net_ext as fnet_ext, fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
-    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_net_stack as fnet_stack,
-    fidl_fuchsia_net_tun as fnet_tun, fidl_fuchsia_posix_socket as fposix_socket,
+    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_net_tun as fnet_tun,
+    fidl_fuchsia_posix_socket as fposix_socket,
     fidl_fuchsia_tracing_controller as ftracing_controller, fuchsia_async as fasync,
 };
 
@@ -166,27 +166,14 @@ async fn setup<'a>(
             let addr_state_provider = interfaces::add_address_wait_assigned(
                 &control,
                 subnet,
-                fnet_interfaces_admin::AddressParameters::default(),
+                fnet_interfaces_admin::AddressParameters {
+                    add_subnet_route: Some(true),
+                    ..Default::default()
+                },
             )
             .await
             .expect("add address and wait for it to be assigned");
             addr_state_provider.detach().expect("address state provider detach FIDL call");
-
-            {
-                let subnet = fnet_ext::apply_subnet_mask(subnet);
-                realm
-                    .connect_to_protocol::<fnet_stack::StackMarker>()
-                    .expect("connect to Stack")
-                    .add_forwarding_entry(&fnet_stack::ForwardingEntry {
-                        subnet,
-                        device_id: control.get_id().await.expect("get interface ID"),
-                        next_hop: None,
-                        metric: 0,
-                    })
-                    .await
-                    .expect("add subnet route FIDL call")
-                    .expect("add subent route");
-            }
         }
 
         InterfaceFidlProxies { _device_control: device_control, _control: control }

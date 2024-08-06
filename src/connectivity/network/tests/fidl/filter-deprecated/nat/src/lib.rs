@@ -8,9 +8,7 @@ use std::borrow::Cow;
 use std::convert::TryFrom as _;
 use std::pin::pin;
 
-use fidl_fuchsia_net_stack_ext::FidlReturn as _;
 use fuchsia_async::{DurationExt as _, TimeoutExt as _};
-use futures::FutureExt as _;
 use net_declare::fidl_subnet;
 use netemul::{RealmTcpListener as _, RealmTcpStream as _, RealmUdpSocket as _};
 use netfilter::FidlReturn as _;
@@ -24,7 +22,6 @@ use {
     fidl_fuchsia_net_filter_deprecated as fnetfilter,
     fidl_fuchsia_net_interfaces_admin as finterfaces_admin,
     fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_net_root as fnet_root,
-    fidl_fuchsia_net_stack as fnet_stack,
 };
 
 pub enum NatNic {
@@ -144,24 +141,12 @@ pub async fn setup_masquerade_nat_network<'a>(
             .await
             .expect("host failed to join network");
         host_ep.add_address_and_subnet_route(host_addr).await.expect("configure address");
-
-        let stack = host_realm
-            .connect_to_protocol::<fnet_stack::StackMarker>()
-            .expect("failed to connect to netstack");
         let fnet::Subnet { addr: next_hop, prefix_len: _ } = router_addr;
-        let () = stack
-            .add_forwarding_entry(&fnet_stack::ForwardingEntry {
-                subnet: fnet_ext::apply_subnet_mask(other_subnet),
-                device_id: 0,
-                next_hop: Some(Box::new(next_hop)),
-                metric: 0,
-            })
-            .map(move |r| {
-                r.squash_result().unwrap_or_else(|e| {
-                    panic!("failed to add route to other subnet {:?}: {}", other_subnet, e)
-                })
-            })
-            .await;
+
+        host_ep
+            .add_gateway_route(fnet_ext::apply_subnet_mask(other_subnet), next_hop)
+            .await
+            .expect("add gateway route to other subnet");
 
         HostNetwork { net, router_ep, router_addr, host_realm, host_ep, host_addr }
     }

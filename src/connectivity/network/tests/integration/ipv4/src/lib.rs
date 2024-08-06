@@ -214,10 +214,13 @@ async fn sends_igmp_reports<N: Netstack>(
     }
 
     let addr = fnet::Ipv4Address { addr: INTERFACE_ADDR.octets() };
-    let _address_state_provider = interfaces::add_subnet_address_and_route_wait_assigned(
-        &iface,
+    let _address_state_provider = interfaces::add_address_wait_assigned(
+        iface.control(),
         fnet::Subnet { addr: fnet::IpAddress::Ipv4(addr), prefix_len: 24 },
-        fidl_fuchsia_net_interfaces_admin::AddressParameters::default(),
+        fidl_fuchsia_net_interfaces_admin::AddressParameters {
+            add_subnet_route: Some(true),
+            ..Default::default()
+        },
     )
     .await
     .expect("add subnet address and route");

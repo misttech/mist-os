@@ -323,10 +323,13 @@ async fn configure_interface<'a>(
         },
     ])
     .for_each_concurrent(None, |subnet| async move {
-        let address_state_provider = interfaces::add_subnet_address_and_route_wait_assigned(
-            iface,
+        let address_state_provider = interfaces::add_address_wait_assigned(
+            iface.control(),
             subnet,
-            fnet_interfaces_admin::AddressParameters::default(),
+            fnet_interfaces_admin::AddressParameters {
+                add_subnet_route: Some(true),
+                ..Default::default()
+            },
         )
         .await
         .expect("add subnet address and route");
