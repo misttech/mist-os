@@ -33,18 +33,18 @@ const std::vector<uint8_t> kFirmware = {
 const char* kFirmwarePath = "ibt-0041-0041.sfi";
 
 const std::array<uint8_t, 6> kResetCommandCompleteEvent = {
-    bt::hci_spec::kCommandCompleteEventCode,  // command complete event code
-    0x04,                                     // parameter_total_size
-    0x01,                                     // num_hci_command_packets
+    static_cast<uint8_t>(pw::bluetooth::emboss::EventCode::COMMAND_COMPLETE),
+    0x04,  // parameter_total_size
+    0x01,  // num_hci_command_packets
     0x00,
     0x00,  // command opcode (hardcoded for simplicity since this isn't checked by the driver)
     0x00,  // return_code (success)
 };
 
 const std::array<uint8_t, 109> kReadVersionTlvCompleteEvent = {
-    bt::hci_spec::kCommandCompleteEventCode,  // command complete event code
-    0x6b,                                     // parameter_total_size
-    0x01,                                     // num_hci_command_packets
+    static_cast<uint8_t>(pw::bluetooth::emboss::EventCode::COMMAND_COMPLETE),
+    0x6b,  // parameter_total_size
+    0x01,  // num_hci_command_packets
     // command opcode
     0x05, 0xfc,
     // return_code (success)

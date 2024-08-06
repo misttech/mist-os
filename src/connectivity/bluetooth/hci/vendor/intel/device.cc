@@ -13,12 +13,11 @@
 #include <zircon/status.h>
 #include <zircon/syscalls.h>
 
-#include <future>
-
 #include <fbl/string_printf.h>
 
 #include "firmware_loader.h"
 #include "logging.h"
+#include "packets.emb.h"
 
 namespace bt_hci_intel {
 namespace fhbt = fuchsia_hardware_bluetooth;
@@ -376,41 +375,51 @@ zx_status_t Device::LoadSecureFirmware() {
 
   fbl::String fw_filename;
   if (legacy_firmware_loading_) {
-    ReadVersionReturnParams version = hci.SendReadVersion();
-    if (version.status != pw::bluetooth::emboss::StatusCode::SUCCESS) {
+    std::vector<uint8_t> version = hci.SendReadVersion();
+    auto version_view = MakeReadVersionCommandCompleteEventView(&version);
+    if (!version_view.Ok() ||
+        version_view.status().Read() != pw::bluetooth::emboss::StatusCode::SUCCESS) {
       errorf("failed to obtain version information");
       return ZX_ERR_BAD_STATE;
     }
 
     // If we're already in firmware mode, we're done.
-    if (version.fw_variant == kFirmwareFirmwareVariant) {
-      infof("firmware loaded (variant %d, revision %d)", version.hw_variant, version.hw_revision);
+    if (version_view.fw_variant().Read() == kFirmwareFirmwareVariant) {
+      infof("firmware loaded (variant %d, revision %d)", version_view.hw_variant().Read(),
+            version_view.hw_revision().Read());
       return ZX_OK;
     }
 
     // If we reached here then the controller must be in bootloader mode.
-    if (version.fw_variant != kBootloaderFirmwareVariant) {
-      errorf("unsupported firmware variant (0x%x)", version.fw_variant);
+    if (version_view.fw_variant().Read() != kBootloaderFirmwareVariant) {
+      errorf("unsupported firmware variant (0x%x)", version_view.fw_variant().Read());
       return ZX_ERR_NOT_SUPPORTED;
     }
 
-    ReadBootParamsReturnParams boot_params = hci.SendReadBootParams();
-    if (boot_params.status != pw::bluetooth::emboss::StatusCode::SUCCESS) {
+    std::vector<uint8_t> boot_params = hci.SendReadBootParams();
+    auto boot_view = MakeReadBootParamsCommandCompleteEventView(&boot_params);
+    if (!boot_view.Ok() ||
+        boot_view.status().Read() != pw::bluetooth::emboss::StatusCode::SUCCESS) {
       errorf("failed to read boot parameters");
       return ZX_ERR_BAD_STATE;
     }
 
     // Map the firmware file into memory.
-    fw_filename = fbl::StringPrintf("ibt-%d-%d.sfi", version.hw_variant, boot_params.dev_revid);
+    fw_filename = fbl::StringPrintf("ibt-%d-%d.sfi", version_view.hw_variant().Read(),
+                                    boot_view.dev_revid().Read());
   } else {
-    ReadVersionReturnParamsTlv version = hci.SendReadVersionTlv();
+    std::optional<ReadVersionReturnParamsTlv> version = hci.SendReadVersionTlv();
+    if (!version) {
+      errorf("failed to obtain version information");
+      return ZX_ERR_BAD_STATE;
+    }
 
-    engine_type = (version.secure_boot_engine_type == 0x01)
+    engine_type = (version->secure_boot_engine_type == 0x01)
                       ? bt_hci_intel::SecureBootEngineType::kECDSA
                       : bt_hci_intel::SecureBootEngineType::kRSA;
 
     // If we're already in firmware mode, we're done.
-    if (version.current_mode_of_operation == kCurrentModeOfOperationOperationalFirmware) {
+    if (version->current_mode_of_operation == kCurrentModeOfOperationOperationalFirmware) {
       infof("firmware already loaded");
       return ZX_OK;
     }
@@ -457,21 +466,25 @@ zx_status_t Device::LoadLegacyFirmware() {
     return ZX_ERR_BAD_STATE;
   }
 
-  ReadVersionReturnParams version = hci.SendReadVersion();
-  if (version.status != pw::bluetooth::emboss::StatusCode::SUCCESS) {
+  std::vector<uint8_t> version = hci.SendReadVersion();
+  auto version_view = MakeReadVersionCommandCompleteEventView(&version);
+  if (!version_view.Ok() ||
+      version_view.status().Read() != pw::bluetooth::emboss::StatusCode::SUCCESS) {
     errorf("failed to obtain version information");
     return ZX_ERR_BAD_STATE;
   }
 
-  if (version.fw_patch_num > 0) {
+  if (version_view.fw_patch_num().Read() > 0) {
     infof("controller already patched");
     return ZX_OK;
   }
 
-  auto fw_filename = fbl::StringPrintf(
-      "ibt-hw-%x.%x.%x-fw-%x.%x.%x.%x.%x.bseq", version.hw_platform, version.hw_variant,
-      version.hw_revision, version.fw_variant, version.fw_revision, version.fw_build_num,
-      version.fw_build_week, version.fw_build_year);
+  auto fw_filename =
+      fbl::StringPrintf("ibt-hw-%x.%x.%x-fw-%x.%x.%x.%x.%x.bseq", version_view.hw_platform().Read(),
+                        version_view.hw_variant().Read(), version_view.hw_revision().Read(),
+                        version_view.fw_variant().Read(), version_view.fw_revision().Read(),
+                        version_view.fw_build_num().Read(), version_view.fw_build_week().Read(),
+                        version_view.fw_build_year().Read());
 
   zx::vmo fw_vmo;
   uintptr_t fw_addr;
@@ -481,7 +494,8 @@ zx_status_t Device::LoadLegacyFirmware() {
   // Try the fallback patch file on initial failure.
   if (!fw_vmo) {
     // Try the fallback patch file
-    fw_filename = fbl::StringPrintf("ibt-hw-%x.%x.bseq", version.hw_platform, version.hw_variant);
+    fw_filename = fbl::StringPrintf("ibt-hw-%x.%x.bseq", version_view.hw_platform().Read(),
+                                    version_view.hw_variant().Read());
     fw_vmo.reset(MapFirmware(fw_filename.c_str(), &fw_addr, &fw_size));
   }
 
@@ -495,8 +509,8 @@ zx_status_t Device::LoadLegacyFirmware() {
   hci.EnterManufacturerMode();
   auto result = loader.LoadBseq(reinterpret_cast<void*>(fw_addr), fw_size);
   hci.ExitManufacturerMode(result == FirmwareLoader::LoadStatus::kPatched
-                               ? MfgDisableMode::kPatchesEnabled
-                               : MfgDisableMode::kNoPatches);
+                               ? MfgDisableMode::PATCHES_ENABLED
+                               : MfgDisableMode::NO_PATCHES);
   zx_vmar_unmap(zx_vmar_root_self(), fw_addr, fw_size);
 
   if (result == FirmwareLoader::LoadStatus::kError) {
