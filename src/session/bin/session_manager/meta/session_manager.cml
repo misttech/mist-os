@@ -418,7 +418,6 @@
                 "fuchsia.hardware.power.statecontrol.Admin",
                 "fuchsia.intl.PropertyProvider",
                 "fuchsia.intl.TimeZones",
-                "fuchsia.logger.LogSink",
                 "fuchsia.metrics.MetricEventLoggerFactory",
                 "fuchsia.net.name.Lookup",
                 "fuchsia.posix.socket.Provider",
