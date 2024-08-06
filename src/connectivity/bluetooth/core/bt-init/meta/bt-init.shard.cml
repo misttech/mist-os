@@ -82,15 +82,6 @@
             to: [ "#bt-gap" ],
         },
         {
-            protocol: [ "fuchsia.logger.LogSink" ],
-            from: "parent",
-            to: [
-                "#bt-fastpair-provider",
-                "#bt-gap",
-                "#bt-rfcomm",
-            ],
-        },
-        {
             protocol: [ "fuchsia.bluetooth.bredr.Profile" ],
             from: "#bt-gap",
             to: [ "#bt-rfcomm" ],
