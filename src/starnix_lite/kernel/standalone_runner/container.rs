@@ -127,18 +127,28 @@ async fn run_container_controller(task_complete: oneshot::Receiver<TaskResult>) 
     fruntime::job_default().kill().expect("Failed to kill job");
 }
 
-fn open_boot() -> zx::Channel {
-    let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE;
-    let (server, client) = zx::Channel::create();
-    fdio::open("/boot", rights, server).expect("failed to open /boot");
-    client
+fn open_pkg_dir_from_boot() -> zx::Channel {
+    let flags = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE;
+
+    let (ns_client, ns_server) = fidl::endpoints::create_endpoints();
+    let namespace = fdio::Namespace::installed().unwrap();
+    namespace.open("/boot", flags, ns_server.into()).unwrap();
+    namespace.bind("/pkg", ns_client).unwrap();
+
+    let (pkg_client, pkg_server) = fidl::Channel::create();
+    namespace.open("/pkg", flags, pkg_server).unwrap();
+    pkg_client
 }
 
 pub async fn create_container_from_config(
     config: Config,
 ) -> Result<(Container, ContainerServiceConfig), Error> {
-    let mut config_wrapper =
-        ConfigWrapper { config: config, pkg_dir: Some(open_boot()), svc_dir: None, data_dir: None };
+    let mut config_wrapper = ConfigWrapper {
+        config: config,
+        pkg_dir: Some(open_pkg_dir_from_boot()),
+        svc_dir: None,
+        data_dir: None,
+    };
 
     let (sender, receiver) = oneshot::channel::<TaskResult>();
     let container =
