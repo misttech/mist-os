@@ -31,13 +31,22 @@ impl DefineSubsystemConfiguration<DevelopmentSupportConfig> for DevelopmentConfi
             (BuildType::User, None) => "kernel_args_user",
         });
 
-        if config.include_netsvc {
-            if context.build_type == &BuildType::User {
-                anyhow::bail!("netsvc can't be included in user builds");
+        let include_netsvc = if *context.feature_set_level == FeatureSupportLevel::Embeddable {
+            false
+        } else {
+            match (context.build_type, config.include_netsvc) {
+                (BuildType::User, None | Some(false)) => false,
+                (BuildType::User, Some(true)) => {
+                    anyhow::bail!("netsvc can't be included in user builds")
+                }
+                (BuildType::Eng | BuildType::UserDebug, Some(include_netsvc)) => include_netsvc,
+                (BuildType::Eng, None) => config.enabled.unwrap_or(true),
+                (BuildType::UserDebug, None) => config.enabled.unwrap_or(false),
             }
-            builder.platform_bundle("netsvc");
         };
-
+        if include_netsvc {
+            builder.platform_bundle("netsvc");
+        }
         if matches!(context.build_type, BuildType::Eng | BuildType::UserDebug) {
             builder.platform_bundle("ptysvc");
             builder.platform_bundle("kernel_debug_broker_userdebug");

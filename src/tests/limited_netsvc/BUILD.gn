@@ -72,7 +72,7 @@ if (is_linux) {
     ]
     non_go_deps = [
       ":netsvc_user_tools",
-      "image:host_test_data",
+      "//build/images/fuchsia:fuchsia_zbi_for_host_tests",
     ]
   }
 }

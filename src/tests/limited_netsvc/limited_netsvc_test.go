@@ -183,7 +183,6 @@ func setupQemu(t *testing.T, ctx context.Context, appendCmdline []string, modeSt
 	})
 	arch := distro.TargetCPU()
 	device := emulator.DefaultVirtualDevice(string(arch))
-	device.Initrd = "limited_netsvc_assembled_system"
 	device.KernelArgs = append(device.KernelArgs, appendCmdline...)
 
 	// Note: To run this test locally on linux, you must create the TAP interface:

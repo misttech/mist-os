@@ -56,9 +56,6 @@ product_assembly_configuration("product_assembly_config") {
     kernel = {
       oom_behavior = "job_kill"
     }
-    development_support = {
-      include_netsvc = true
-    }
     storage = {
       filesystems = {
         image_name = "bringup"
