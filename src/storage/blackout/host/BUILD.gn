@@ -18,8 +18,8 @@ group("blackout_all") {
     ":blackout_fail",
     ":blackout_starnix_vim3_stable",
     ":blackout_starnix_vim3_unstable",
-    ":blackout_vim3_stable",
-    ":blackout_vim3_unstable",
+    ":blackout_workbench_vim3_stable",
+    ":blackout_workbench_vim3_unstable",
   ]
 }
 
