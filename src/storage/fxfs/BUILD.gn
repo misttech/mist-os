@@ -4,7 +4,6 @@
 
 import("//build/components.gni")
 import("//build/components/fuchsia_unittest_component.gni")
-import("//build/fidl/fidl.gni")
 import("//build/fuzz.gni")
 import("//build/rust/rustc_binary.gni")
 import("//build/rust/rustc_fuzzer.gni")
@@ -12,7 +11,7 @@ import("//build/rust/rustc_library.gni")
 import("//build/rust/rustc_macro.gni")
 import("//src/storage/fs_test/suite.gni")
 import("//src/storage/testing/driver_test_realm.gni")
-import("//tools/cmc/build/cmc.gni")
+import("//tools/cmc/build/expect_includes.gni")
 
 fxfs_deps = [
   ":fxfs_macros",

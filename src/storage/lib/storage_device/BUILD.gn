@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//build/components/fuchsia_unittest_component.gni")
 import("//build/rust/rustc_library.gni")
 
 lib_srcs = [

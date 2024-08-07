@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/sdk/sdk_host_tool.gni")
-import("//build/testing/host_test.gni")
 
 source_set("blobfs_creator") {
   visibility = [ "./*" ]

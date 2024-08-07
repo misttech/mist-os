@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//build/test.gni")
 import("//tools/cmc/build/expect_includes.gni")
 
 group("driver_test_realm") {
