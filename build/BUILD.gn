@@ -206,7 +206,6 @@ group("non_hermetic_deps") {
     "//products/microfuchsia:*",
     "//products/minimal:*",
     "//products/workbench:*",
-    "//src/connectivity/wlan/testing/antlion-product-bundles:*",
     "//src/power/testing/system-integration/*",
   ]
 
