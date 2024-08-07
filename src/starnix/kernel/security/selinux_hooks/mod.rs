@@ -475,9 +475,12 @@ fn compute_fs_node_security_id(
             }
         }
         _ => {
-            // TODO(b/334091674): Complete the fallback implementation (e.g. using the file system's "defcontext",
-            // if specified).
-            SecurityId::initial(InitialSid::File)
+            // If the filesystem defines a "default" context then use that.
+            let fs_contexts = &fs_node.fs().security_state.state;
+            let def_context = fs_contexts.def_context.as_ref();
+            def_context
+                .and_then(|ctx| security_server.security_context_to_sid(ctx.into()).ok())
+                .unwrap_or(SecurityId::initial(InitialSid::File))
         }
     }
 }
@@ -537,8 +540,11 @@ pub fn fs_node_security_xattr(
     _parent: Option<&FsNodeHandle>,
 ) -> Result<Option<FsNodeSecurityXattr>, Errno> {
     // TODO(b/334091674): If there is no `parent` then this is the "root" node; apply `root_context`, if set.
-    // TODO(b/334091674): Determine whether "context" (and "defcontext") should be returned here, or only set in
-    // the node's cached SID.
+    // TODO(b/334091674): If a filesystem is not configured to store security
+    // contexts in xattrs then nothing should be returned here.
+    // TODO(b/334091674): If "context" is set on the filesystem then regardless
+    // of the policy-defined scheme for the filesystem type, this instance uses
+    // "mountpoint labelling" instead (and no labels are written to the FS).
     let fs = new_node.fs();
     Ok(fs
         .security_state
