@@ -490,7 +490,7 @@ pub mod testing {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::security::selinux_hooks::testing::get_cached_sid;
+    use crate::security::selinux_hooks::testing;
     use crate::testing::{
         create_kernel_and_task, create_kernel_and_task_with_selinux,
         create_kernel_task_and_unlocked, create_kernel_task_and_unlocked_with_selinux, create_task,
@@ -905,7 +905,7 @@ mod tests {
     async fn fs_node_setsecurity_noop_selinux_disabled() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let node = &create_test_file(&mut locked, &current_task).entry.node;
-        assert_eq!(None, get_cached_sid(node));
+        assert_eq!(None, testing::get_cached_sid(node));
 
         fs_node_setsecurity(
             &current_task,
@@ -916,7 +916,7 @@ mod tests {
         )
         .expect("set_xattr(security.selinux) failed");
 
-        assert_eq!(None, get_cached_sid(node));
+        assert_eq!(None, testing::get_cached_sid(node));
     }
 
     #[fuchsia::test]
@@ -925,7 +925,7 @@ mod tests {
         let (_kernel, current_task, mut locked) =
             create_kernel_task_and_unlocked_with_selinux(security_server);
         let node = &create_test_file(&mut locked, &current_task).entry.node;
-        assert_eq!(None, get_cached_sid(node));
+        assert_eq!(None, testing::get_cached_sid(node));
 
         fs_node_setsecurity(
             &current_task,
@@ -936,7 +936,7 @@ mod tests {
         )
         .expect("set_xattr(security.selinux) failed");
 
-        assert_eq!(None, get_cached_sid(node));
+        assert_eq!(None, testing::get_cached_sid(node));
     }
 
     #[fuchsia::test]
@@ -945,7 +945,7 @@ mod tests {
         let (_kernel, current_task, mut locked) =
             create_kernel_task_and_unlocked_with_selinux(security_server);
         let node = &create_test_file(&mut locked, &current_task).entry.node;
-        assert_eq!(None, get_cached_sid(node));
+        assert_eq!(None, testing::get_cached_sid(node));
 
         fs_node_setsecurity(
             &current_task,
@@ -956,7 +956,7 @@ mod tests {
         )
         .expect("set_xattr(security.selinux) failed");
 
-        assert!(get_cached_sid(node).is_some());
+        assert!(testing::get_cached_sid(node).is_some());
     }
 
     #[fuchsia::test]
@@ -966,7 +966,7 @@ mod tests {
         let (_kernel, current_task, mut locked) =
             create_kernel_task_and_unlocked_with_selinux(security_server);
         let node = &create_test_file(&mut locked, &current_task).entry.node;
-        assert_eq!(None, get_cached_sid(node));
+        assert_eq!(None, testing::get_cached_sid(node));
 
         fs_node_setsecurity(
             &current_task,
@@ -977,7 +977,7 @@ mod tests {
         )
         .expect("set_xattr(security.selinux) failed");
 
-        assert!(get_cached_sid(node).is_some());
+        assert!(testing::get_cached_sid(node).is_some());
     }
 
     #[fuchsia::test]
@@ -987,7 +987,7 @@ mod tests {
         let (_kernel, current_task, mut locked) =
             create_kernel_task_and_unlocked_with_selinux(security_server);
         let node = &create_test_file(&mut locked, &current_task).entry.node;
-        assert_eq!(None, get_cached_sid(node));
+        assert_eq!(None, testing::get_cached_sid(node));
 
         fs_node_setsecurity(
             &current_task,
@@ -998,7 +998,7 @@ mod tests {
         )
         .expect("set_xattr(security.selinux) failed");
 
-        assert_eq!(None, get_cached_sid(node));
+        assert_eq!(None, testing::get_cached_sid(node));
     }
 
     #[fuchsia::test]
@@ -1016,7 +1016,7 @@ mod tests {
             XattrOp::Set,
         )
         .expect("set_xattr(security.selinux) failed");
-        assert_ne!(None, get_cached_sid(node));
+        assert_ne!(None, testing::get_cached_sid(node));
 
         fs_node_setsecurity(
             &current_task,
@@ -1027,7 +1027,7 @@ mod tests {
         )
         .expect("set_xattr(security.selinux) failed");
 
-        assert_eq!(None, get_cached_sid(node));
+        assert_eq!(None, testing::get_cached_sid(node));
     }
 
     #[fuchsia::test]
@@ -1037,7 +1037,7 @@ mod tests {
         let (_kernel, current_task, mut locked) =
             create_kernel_task_and_unlocked_with_selinux(security_server);
         let node = &create_test_file(&mut locked, &current_task).entry.node;
-        assert_eq!(None, get_cached_sid(node));
+        assert_eq!(None, testing::get_cached_sid(node));
 
         fs_node_setsecurity(
             &current_task,
@@ -1048,7 +1048,7 @@ mod tests {
         )
         .expect("set_xattr(security.selinux) failed");
 
-        assert!(get_cached_sid(node).is_some());
+        assert!(testing::get_cached_sid(node).is_some());
     }
 
     #[fuchsia::test]
@@ -1058,7 +1058,7 @@ mod tests {
         let (_kernel, current_task, mut locked) =
             create_kernel_task_and_unlocked_with_selinux(security_server);
         let node = &create_test_file(&mut locked, &current_task).entry.node;
-        assert_eq!(None, get_cached_sid(node));
+        assert_eq!(None, testing::get_cached_sid(node));
 
         fs_node_setsecurity(
             &current_task,
@@ -1069,9 +1069,9 @@ mod tests {
         )
         .expect("set_xattr(security.selinux) failed");
 
-        assert!(get_cached_sid(node).is_some());
+        assert!(testing::get_cached_sid(node).is_some());
 
-        let first_sid = get_cached_sid(node).unwrap();
+        let first_sid = testing::get_cached_sid(node).unwrap();
         fs_node_setsecurity(
             &current_task,
             &node,
@@ -1081,9 +1081,9 @@ mod tests {
         )
         .expect("set_xattr(security.selinux) failed");
 
-        assert!(get_cached_sid(node).is_some());
+        assert!(testing::get_cached_sid(node).is_some());
 
-        let second_sid = get_cached_sid(node).unwrap();
+        let second_sid = testing::get_cached_sid(node).unwrap();
 
         assert_ne!(first_sid, second_sid);
     }

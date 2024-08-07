@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 pub(super) mod fs;
+pub(super) mod testing;
 
 use super::{FsNodeSecurityXattr, FsNodeState, ProcAttr, ResolvedElfState};
 use crate::task::{CurrentTask, Task};
@@ -652,24 +653,8 @@ fn clear_cached_sid(fs_node: &FsNode) {
     fs_node.update_info(|info| info.security_state = FsNodeState { sid: None });
 }
 
-/// Other [`crate::security`] modules may use security id helpers for testing.
-#[cfg(test)]
-pub(super) mod testing {
-    use crate::vfs::FsNode;
-    use selinux::SecurityId;
-
-    /// Returns the security id currently stored in `fs_node`, if any. This API should only be used
-    /// by code that is responsible for controlling the cached security id; e.g., to check its
-    /// current value before engaging logic that may compute a new value. Access control enforcement
-    /// code should use `get_effective_fs_node_security_id()`, *not* this function.
-    pub fn get_cached_sid(fs_node: &FsNode) -> Option<SecurityId> {
-        fs_node.info().security_state.sid
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use super::testing::get_cached_sid;
     use super::*;
     use crate::testing::{
         create_kernel_and_task_with_selinux, create_kernel_task_and_unlocked_with_selinux,
@@ -684,17 +669,6 @@ mod tests {
     use starnix_uapi::{CLONE_SIGHAND, CLONE_THREAD, CLONE_VM};
 
     const VALID_SECURITY_CONTEXT: &[u8] = b"u:object_r:test_valid_t:s0";
-
-    const HOOKS_TESTS_BINARY_POLICY: &[u8] =
-        include_bytes!("../../../lib/selinux/testdata/micro_policies/hooks_tests_policy.pp");
-
-    fn security_server_with_policy() -> Arc<SecurityServer> {
-        let policy_bytes = HOOKS_TESTS_BINARY_POLICY.to_vec();
-        let security_server = SecurityServer::new(Mode::Enable);
-        security_server.set_enforcing(true);
-        security_server.load_policy(policy_bytes).expect("policy load failed");
-        security_server
-    }
 
     fn create_test_file(
         locked: &mut Locked<'_, Unlocked>,
@@ -739,7 +713,7 @@ mod tests {
 
     #[fuchsia::test]
     fn task_create_allowed_for_allowed_type() {
-        let security_server = security_server_with_policy();
+        let security_server = testing::security_server_with_policy();
         let sid = security_server
             .security_context_to_sid(b"u:object_r:fork_yes_t:s0".into())
             .expect("invalid security context");
@@ -749,7 +723,7 @@ mod tests {
 
     #[fuchsia::test]
     fn task_create_denied_for_denied_type() {
-        let security_server = security_server_with_policy();
+        let security_server = testing::security_server_with_policy();
         let sid = security_server
             .security_context_to_sid(b"u:object_r:fork_no_t:s0".into())
             .expect("invalid security context");
@@ -762,7 +736,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn exec_transition_allowed_for_allowed_transition_type() {
-        let security_server = security_server_with_policy();
+        let security_server = testing::security_server_with_policy();
         security_server.set_enforcing(true);
         let (_kernel, current_task, mut locked) =
             create_kernel_task_and_unlocked_with_selinux(security_server.clone());
@@ -798,7 +772,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn exec_transition_denied_for_transition_denied_type() {
-        let security_server = security_server_with_policy();
+        let security_server = testing::security_server_with_policy();
         security_server.set_enforcing(true);
         let (_kernel, current_task, mut locked) =
             create_kernel_task_and_unlocked_with_selinux(security_server.clone());
@@ -836,7 +810,7 @@ mod tests {
     #[ignore]
     #[fuchsia::test]
     async fn exec_transition_denied_for_executable_with_no_entrypoint_perm() {
-        let security_server = security_server_with_policy();
+        let security_server = testing::security_server_with_policy();
         security_server.set_enforcing(true);
         let (_kernel, current_task, mut locked) =
             create_kernel_task_and_unlocked_with_selinux(security_server.clone());
@@ -872,7 +846,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn exec_no_trans_allowed_for_executable() {
-        let security_server = security_server_with_policy();
+        let security_server = testing::security_server_with_policy();
         security_server.set_enforcing(true);
         let (_kernel, current_task, mut locked) =
             create_kernel_task_and_unlocked_with_selinux(security_server.clone());
@@ -908,7 +882,7 @@ mod tests {
     #[ignore]
     #[fuchsia::test]
     async fn exec_no_trans_denied_for_executable() {
-        let security_server = security_server_with_policy();
+        let security_server = testing::security_server_with_policy();
         security_server.set_enforcing(true);
         let (_kernel, current_task, mut locked) =
             create_kernel_task_and_unlocked_with_selinux(security_server.clone());
@@ -943,7 +917,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn state_is_updated_on_exec() {
-        let security_server = security_server_with_policy();
+        let security_server = testing::security_server_with_policy();
         let (_kernel, current_task) = create_kernel_and_task_with_selinux(security_server.clone());
 
         let initial_state = {
@@ -982,40 +956,8 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn getsched_access_allowed_for_allowed_type() {
-        let security_server = security_server_with_policy();
-        let source_sid = security_server
-            .security_context_to_sid(b"u:object_r:test_getsched_yes_t:s0".into())
-            .expect("invalid security context");
-        let target_sid = security_server
-            .security_context_to_sid(b"u:object_r:test_getsched_target_t:s0".into())
-            .expect("invalid security context");
-
-        assert_eq!(
-            check_getsched_access(&security_server.as_permission_check(), source_sid, target_sid),
-            Ok(())
-        );
-    }
-
-    #[fuchsia::test]
-    fn getsched_access_denied_for_denied_type() {
-        let security_server = security_server_with_policy();
-        let source_sid = security_server
-            .security_context_to_sid(b"u:object_r:test_getsched_no_t:s0".into())
-            .expect("invalid security context");
-        let target_sid = security_server
-            .security_context_to_sid(b"u:object_r:test_getsched_target_t:s0".into())
-            .expect("invalid security context");
-
-        assert_eq!(
-            check_getsched_access(&security_server.as_permission_check(), source_sid, target_sid),
-            error!(EACCES)
-        );
-    }
-
-    #[fuchsia::test]
     fn setsched_access_allowed_for_allowed_type() {
-        let security_server = security_server_with_policy();
+        let security_server = testing::security_server_with_policy();
         let source_sid = security_server
             .security_context_to_sid(b"u:object_r:test_setsched_yes_t:s0".into())
             .expect("invalid security context");
@@ -1031,7 +973,7 @@ mod tests {
 
     #[fuchsia::test]
     fn setsched_access_denied_for_denied_type() {
-        let security_server = security_server_with_policy();
+        let security_server = testing::security_server_with_policy();
         let source_sid = security_server
             .security_context_to_sid(b"u:object_r:test_setsched_no_t:s0".into())
             .expect("invalid security context");
@@ -1046,8 +988,40 @@ mod tests {
     }
 
     #[fuchsia::test]
+    fn getsched_access_allowed_for_allowed_type() {
+        let security_server = testing::security_server_with_policy();
+        let source_sid = security_server
+            .security_context_to_sid(b"u:object_r:test_getsched_yes_t:s0".into())
+            .expect("invalid security context");
+        let target_sid = security_server
+            .security_context_to_sid(b"u:object_r:test_getsched_target_t:s0".into())
+            .expect("invalid security context");
+
+        assert_eq!(
+            check_getsched_access(&security_server.as_permission_check(), source_sid, target_sid),
+            Ok(())
+        );
+    }
+
+    #[fuchsia::test]
+    fn getsched_access_denied_for_denied_type() {
+        let security_server = testing::security_server_with_policy();
+        let source_sid = security_server
+            .security_context_to_sid(b"u:object_r:test_getsched_no_t:s0".into())
+            .expect("invalid security context");
+        let target_sid = security_server
+            .security_context_to_sid(b"u:object_r:test_getsched_target_t:s0".into())
+            .expect("invalid security context");
+
+        assert_eq!(
+            check_getsched_access(&security_server.as_permission_check(), source_sid, target_sid),
+            error!(EACCES)
+        );
+    }
+
+    #[fuchsia::test]
     fn getpgid_access_allowed_for_allowed_type() {
-        let security_server = security_server_with_policy();
+        let security_server = testing::security_server_with_policy();
         let source_sid = security_server
             .security_context_to_sid(b"u:object_r:test_getpgid_yes_t:s0".into())
             .expect("invalid security context");
@@ -1063,7 +1037,7 @@ mod tests {
 
     #[fuchsia::test]
     fn getpgid_access_denied_for_denied_type() {
-        let security_server = security_server_with_policy();
+        let security_server = testing::security_server_with_policy();
         let source_sid = security_server
             .security_context_to_sid(b"u:object_r:test_getpgid_no_t:s0".into())
             .expect("invalid security context");
@@ -1079,7 +1053,7 @@ mod tests {
 
     #[fuchsia::test]
     fn sigkill_access_allowed_for_allowed_type() {
-        let security_server = security_server_with_policy();
+        let security_server = testing::security_server_with_policy();
         let source_sid = security_server
             .security_context_to_sid(b"u:object_r:test_kill_sigkill_t:s0".into())
             .expect("invalid security context");
@@ -1100,7 +1074,7 @@ mod tests {
 
     #[fuchsia::test]
     fn sigchld_access_allowed_for_allowed_type() {
-        let security_server = security_server_with_policy();
+        let security_server = testing::security_server_with_policy();
         let source_sid = security_server
             .security_context_to_sid(b"u:object_r:test_kill_sigchld_t:s0".into())
             .expect("invalid security context");
@@ -1121,7 +1095,7 @@ mod tests {
 
     #[fuchsia::test]
     fn sigstop_access_allowed_for_allowed_type() {
-        let security_server = security_server_with_policy();
+        let security_server = testing::security_server_with_policy();
         let source_sid = security_server
             .security_context_to_sid(b"u:object_r:test_kill_sigstop_t:s0".into())
             .expect("invalid security context");
@@ -1142,7 +1116,7 @@ mod tests {
 
     #[fuchsia::test]
     fn signal_access_allowed_for_allowed_type() {
-        let security_server = security_server_with_policy();
+        let security_server = testing::security_server_with_policy();
         let source_sid = security_server
             .security_context_to_sid(b"u:object_r:test_kill_signal_t:s0".into())
             .expect("invalid security context");
@@ -1164,7 +1138,7 @@ mod tests {
 
     #[fuchsia::test]
     fn signal_access_denied_for_denied_signals() {
-        let security_server = security_server_with_policy();
+        let security_server = testing::security_server_with_policy();
         let source_sid = security_server
             .security_context_to_sid(b"u:object_r:test_kill_signal_t:s0".into())
             .expect("invalid security context");
@@ -1188,7 +1162,7 @@ mod tests {
 
     #[fuchsia::test]
     fn ptrace_access_allowed_for_allowed_type_and_state_is_updated() {
-        let security_server = security_server_with_policy();
+        let security_server = testing::security_server_with_policy();
         let tracer_sid = security_server
             .security_context_to_sid(b"u:object_r:test_ptrace_tracer_yes_t:s0".into())
             .expect("invalid security context");
@@ -1228,7 +1202,7 @@ mod tests {
 
     #[fuchsia::test]
     fn ptrace_access_denied_for_denied_type_and_state_is_not_updated() {
-        let security_server = security_server_with_policy();
+        let security_server = testing::security_server_with_policy();
         let tracer_sid = security_server
             .security_context_to_sid(b"u:object_r:test_ptrace_tracer_no_t:s0".into())
             .expect("invalid security context");
@@ -1285,7 +1259,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn compute_fs_node_security_id_missing_xattr_unlabeled() {
-        let security_server = security_server_with_policy();
+        let security_server = testing::security_server_with_policy();
         security_server.set_enforcing(true);
         let (_kernel, current_task, mut locked) =
             create_kernel_task_and_unlocked_with_selinux(security_server.clone());
@@ -1300,18 +1274,18 @@ mod tests {
                 .unwrap_err(),
             errno!(ENODATA)
         );
-        assert_eq!(None, get_cached_sid(node));
+        assert_eq!(None, testing::get_cached_sid(node));
 
         assert_eq!(
             SecurityId::initial(InitialSid::File),
             compute_fs_node_security_id(&security_server, &current_task, node)
         );
-        assert_eq!(None, get_cached_sid(node));
+        assert_eq!(None, testing::get_cached_sid(node));
     }
 
     #[fuchsia::test]
     async fn compute_fs_node_security_id_invalid_xattr_unlabeled() {
-        let security_server = security_server_with_policy();
+        let security_server = testing::security_server_with_policy();
         security_server.set_enforcing(true);
         let (_kernel, current_task, mut locked) =
             create_kernel_task_and_unlocked_with_selinux(security_server.clone());
@@ -1325,18 +1299,18 @@ mod tests {
                 XattrOp::Set,
             )
             .expect("setxattr");
-        assert_eq!(None, get_cached_sid(node));
+        assert_eq!(None, testing::get_cached_sid(node));
 
         assert_eq!(
             SecurityId::initial(InitialSid::Unlabeled),
             compute_fs_node_security_id(&security_server, &current_task, node)
         );
-        assert_eq!(None, get_cached_sid(node));
+        assert_eq!(None, testing::get_cached_sid(node));
     }
 
     #[fuchsia::test]
     async fn compute_fs_node_security_id_valid_xattr_stored() {
-        let security_server = security_server_with_policy();
+        let security_server = testing::security_server_with_policy();
         security_server.set_enforcing(true);
         let (_kernel, current_task, mut locked) =
             create_kernel_task_and_unlocked_with_selinux(security_server.clone());
@@ -1350,19 +1324,19 @@ mod tests {
                 XattrOp::Set,
             )
             .expect("setxattr");
-        assert_eq!(None, get_cached_sid(node));
+        assert_eq!(None, testing::get_cached_sid(node));
 
         let security_id = compute_fs_node_security_id(&security_server, &current_task, node);
-        assert_eq!(Some(security_id), get_cached_sid(node));
+        assert_eq!(Some(security_id), testing::get_cached_sid(node));
     }
 
     #[fuchsia::test]
     async fn setxattr_set_sid() {
-        let security_server = security_server_with_policy();
+        let security_server = testing::security_server_with_policy();
         let (_kernel, current_task, mut locked) =
             create_kernel_task_and_unlocked_with_selinux(security_server);
         let node = &create_test_file(&mut locked, &current_task).entry.node;
-        assert_eq!(None, get_cached_sid(node));
+        assert_eq!(None, testing::get_cached_sid(node));
 
         node.set_xattr(
             current_task.as_ref(),
@@ -1373,7 +1347,7 @@ mod tests {
         )
         .expect("setxattr");
 
-        assert!(get_cached_sid(node).is_some());
+        assert!(testing::get_cached_sid(node).is_some());
     }
 
     #[fuchsia::test]
