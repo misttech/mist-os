@@ -209,9 +209,12 @@ TEST_F(BufferCollectionTest, IncompatibleConstraintsTest) {
     fuchsia::sysmem2::BufferCollection_WaitForAllBuffersAllocated_Result wait_result;
     status = client_collection->WaitForAllBuffersAllocated(&wait_result);
 
-    // Sysmem reports the error here through |status|.
-    EXPECT_NE(status, ZX_OK);
-    EXPECT_FALSE(wait_result.is_response());
+    // We'll see the error here one of two ways. Either sysmem has already disconnected due to
+    // allocation failure by the time the wait starts, or the wait starts before the allocation
+    // failure and reports CONSTRAINTS_INTERSECTION_EMPTY.
+    EXPECT_TRUE(status == ZX_ERR_PEER_CLOSED ||
+                (wait_result.is_err() &&
+                 (wait_result.err() == fuchsia::sysmem2::Error::CONSTRAINTS_INTERSECTION_EMPTY)));
   }
 
   // This should fail as sysmem won't be able to allocate anything.
