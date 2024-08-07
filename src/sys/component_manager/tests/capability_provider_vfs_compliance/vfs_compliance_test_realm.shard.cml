@@ -33,7 +33,6 @@
                 "fuchsia.kernel.RootJobForInspect",
                 "fuchsia.kernel.Stats",
                 "fuchsia.kernel.VmexResource",
-                "fuchsia.logger.LogSink",
                 "fuchsia.process.Launcher",
                 "fuchsia.sys2.CrashIntrospect",
             ],

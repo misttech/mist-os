@@ -22,7 +22,6 @@
             // These hermetic protocols are offered to be used by tests.
             protocol: [
                 "fuchsia.inspect.InspectSink",
-                "fuchsia.logger.LogSink",
                 "fuchsia.process.Launcher",
             ],
             from: "parent",

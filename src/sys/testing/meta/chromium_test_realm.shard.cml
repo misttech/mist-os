@@ -18,7 +18,6 @@
             // https://fuchsia.dev/fuchsia-src/development/testing/components/test_runner_framework#hermetic_capabilities_for_tests.
             protocol: [
                 "fuchsia.inspect.InspectSink",
-                "fuchsia.logger.LogSink",
                 "fuchsia.process.Launcher",
             ],
             from: "parent",
