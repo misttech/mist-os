@@ -6,15 +6,14 @@
 use crate::{parse_features, run_container_features, Features};
 use anyhow::{anyhow, bail, Error};
 use bstr::BString;
+use fasync::OnSignals;
 use fidl::AsyncChannel;
-use fidl_fuchsia_scheduler::RoleManagerSynchronousProxy;
 use fuchsia_async::DurationExt;
 use fuchsia_zircon::{
-    Task as _, {self as zx},
+    AsHandleRef, Signals, Task as _, {self as zx},
 };
 use futures::channel::oneshot;
 use futures::{FutureExt, StreamExt};
-use selinux::security_server::SecurityServer;
 use starnix_core::device::init_common_devices;
 use starnix_core::execution::{
     create_filesystem_from_spec, create_remotefs_filesystem, execute_task_with_prerun_result,
@@ -23,7 +22,9 @@ use starnix_core::execution::{
 use starnix_core::fs::layeredfs::LayeredFs;
 use starnix_core::fs::overlayfs::OverlayFs;
 use starnix_core::fs::tmpfs::TmpFs;
+use starnix_core::security;
 use starnix_core::task::{CurrentTask, ExitStatus, Kernel, Task};
+use starnix_core::time::utc::update_utc_clock;
 use starnix_core::vfs::{FileSystemOptions, FsContext, LookupContext, WhatToMount};
 use starnix_lite_kernel_config::Config;
 use starnix_logging::{
@@ -156,6 +157,19 @@ pub async fn create_container_from_config(
             format!("creating container \"{}\"", &config_wrapper.config.name)
         })?;
     let service_config = ContainerServiceConfig { receiver };
+
+    container.kernel.kthreads.spawn_future({
+        let vvar = container.kernel.vdso.vvar_writeable.clone();
+        let utc_clock = fruntime::duplicate_utc_clock_handle(zx::Rights::SAME_RIGHTS).unwrap();
+        async move {
+            loop {
+                let waitable = OnSignals::new(utc_clock.as_handle_ref(), Signals::CLOCK_UPDATED);
+                update_utc_clock(&vvar);
+                waitable.await.expect("async_wait should always succeed");
+                log_info!("Received a UTC update");
+            }
+        }
+    });
     return Ok((container, service_config));
 }
 
@@ -185,23 +199,17 @@ async fn create_container(
 
     let kernel_cmdline = BString::from(config.kernel_cmdline.as_bytes());
 
-    // Check whether we actually have access to a role manager by trying to set our own
-    // thread's role.
-    let role_manager: Option<RoleManagerSynchronousProxy> = None;
-
     let node = inspect::component::inspector().root().create_child("container");
-    let security_server = match features.selinux {
-        Some(mode) => Some(SecurityServer::new(mode)),
-        _ => None,
-    };
+    let security_state = security::kernel_init_security(features.selinux);
     let kernel = Kernel::new(
         kernel_cmdline,
         features.kernel,
         svc_dir,
         data_dir,
-        role_manager,
+        None,
+        None,
         node.create_child("kernel"),
-        security_server,
+        security_state,
     )
     .with_source_context(|| format!("creating Kernel: {}", &config.name))?;
     let fs_context = create_fs_context(
@@ -359,6 +367,9 @@ where
             BTreeMap::from([("component".into(), TmpFs::new_fs(kernel))]),
         );
         mappings.push(("container".into(), container_fs));
+    }
+    if features.custom_artifacts {
+        mappings.push(("custom_artifacts".into(), TmpFs::new_fs(kernel)));
     }
     if features.test_data {
         mappings.push(("test_data".into(), TmpFs::new_fs(kernel)));
