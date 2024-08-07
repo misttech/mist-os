@@ -502,6 +502,7 @@ func (t *QEMU) Start(ctx context.Context, images []bootserver.Image, args []stri
 			Emulator: absQEMUSystemPath,
 			FVM:      t.config.FVMTool,
 			ZBI:      t.config.ZBITool,
+			UEFI:     filepath.Join(t.config.EDK2Dir, "qemu-"+t.config.Target),
 		}
 		startArgs := ffxutil.EmuStartArgs{
 			Config: absConfigFile,
