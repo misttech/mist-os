@@ -24,6 +24,7 @@ pub mod syscalls;
 pub mod task;
 pub mod time;
 pub mod timer;
+#[cfg(not(feature = "starnix_lite"))]
 pub mod vdso;
 pub mod vfs;
 
