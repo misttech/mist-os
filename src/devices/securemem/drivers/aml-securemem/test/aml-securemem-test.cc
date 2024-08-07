@@ -46,9 +46,13 @@ class FakeSysmem : public fidl::testing::WireTestBase<fuchsia_hardware_sysmem::S
     completer.Close(ZX_ERR_NOT_SUPPORTED);
   }
 
-  void Connect(fidl::ServerEnd<fuchsia_hardware_sysmem::Sysmem> request) {
-    sysmem_bindings_.AddBinding(async_get_default_dispatcher(), std::move(request), this,
-                                fidl::kIgnoreBindingClosure);
+  fuchsia_hardware_sysmem::Service::InstanceHandler CreateInstanceHandler() {
+    return fuchsia_hardware_sysmem::Service::InstanceHandler({
+        .sysmem = sysmem_bindings_.CreateHandler(this, async_get_default_dispatcher(),
+                                                 fidl::kIgnoreBindingClosure),
+        .allocator_v1 = [](fidl::ServerEnd<fuchsia_sysmem::Allocator> request) {},
+        .allocator_v2 = [](fidl::ServerEnd<fuchsia_sysmem2::Allocator> request) {},
+    });
   }
 
  private:
@@ -97,8 +101,11 @@ class AmlogicSecureMemTest : public zxtest::Test {
                           std::move(pdev_endpoints.client), "pdev");
 
     // Create sysmem fragment
-    root_->AddNsProtocol<fuchsia_hardware_sysmem::Sysmem>(
-        [&](auto request) { sysmem_.SyncCall(&FakeSysmem::Connect, std::move(request)); });
+    auto sysmem_handler = sysmem_.SyncCall(&FakeSysmem::CreateInstanceHandler);
+    auto sysmem_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ZX_ASSERT(sysmem_endpoints.is_ok());
+    root_->AddFidlService(fuchsia_hardware_sysmem::Service::Name,
+                          std::move(sysmem_endpoints->client), "sysmem");
 
     // Create tee fragment
     auto tee_handler = tee_.SyncCall(&FakeTee::CreateInstanceHandler);
@@ -106,20 +113,25 @@ class AmlogicSecureMemTest : public zxtest::Test {
     root_->AddFidlService(fuchsia_hardware_tee::Service::Name, std::move(tee_endpoints.client),
                           "tee");
 
-    outgoing_.SyncCall(
-        [pdev_server = std::move(pdev_endpoints.server),
-         tee_server = std::move(tee_endpoints.server), pdev_handler = std::move(pdev_handler),
-         tee_handler = std::move(tee_handler)](component::OutgoingDirectory* outgoing) mutable {
-          ZX_ASSERT(outgoing->Serve(std::move(pdev_server)).is_ok());
-          ZX_ASSERT(outgoing->Serve(std::move(tee_server)).is_ok());
+    outgoing_.SyncCall([pdev_server = std::move(pdev_endpoints.server),
+                        sysmem_server = std::move(sysmem_endpoints->server),
+                        tee_server = std::move(tee_endpoints.server),
+                        pdev_handler = std::move(pdev_handler),
+                        sysmem_handler = std::move(sysmem_handler),
+                        tee_handler = std::move(tee_handler)](
+                           component::OutgoingDirectory* outgoing) mutable {
+      ZX_ASSERT(outgoing->Serve(std::move(pdev_server)).is_ok());
+      ZX_ASSERT(outgoing->Serve(std::move(sysmem_server)).is_ok());
+      ZX_ASSERT(outgoing->Serve(std::move(tee_server)).is_ok());
 
-          ZX_ASSERT(
-              outgoing
-                  ->AddService<fuchsia_hardware_platform_device::Service>(std::move(pdev_handler))
-                  .is_ok());
-          ZX_ASSERT(
-              outgoing->AddService<fuchsia_hardware_tee::Service>(std::move(tee_handler)).is_ok());
-        });
+      ZX_ASSERT(
+          outgoing->AddService<fuchsia_hardware_platform_device::Service>(std::move(pdev_handler))
+              .is_ok());
+      ZX_ASSERT(outgoing->AddService<fuchsia_hardware_sysmem::Service>(std::move(sysmem_handler))
+                    .is_ok());
+      ZX_ASSERT(
+          outgoing->AddService<fuchsia_hardware_tee::Service>(std::move(tee_handler)).is_ok());
+    });
 
     libsync::Completion completion;
     async::PostTask(dispatcher_->async_dispatcher(), [&]() {

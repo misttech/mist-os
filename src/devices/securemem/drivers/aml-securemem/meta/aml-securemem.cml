@@ -16,9 +16,11 @@
         fallback: "false",
     },
     use: [
-        { protocol: "fuchsia.scheduler.RoleManager" },
-        { protocol: "fuchsia.hardware.sysmem.Sysmem" },
+        {
+            protocol: [ "fuchsia.scheduler.RoleManager" ],
+        },
         { service: "fuchsia.hardware.platform.device.Service" },
         { service: "fuchsia.hardware.tee.Service" },
+        { service: "fuchsia.hardware.sysmem.Service" },
     ],
 }
