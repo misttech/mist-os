@@ -9,12 +9,12 @@ use super::{FsNodeSecurityXattr, FsNodeState, ProcAttr, ResolvedElfState};
 use crate::task::{CurrentTask, Task};
 use crate::vfs::{FsNode, FsNodeHandle, FsStr, FsString, NamespaceNode, ValueOrSize, XattrOp};
 use linux_uapi::XATTR_NAME_SELINUX;
-use selinux::permission_check::PermissionCheck;
-use selinux::security_server::SecurityServer;
-use selinux::{InitialSid, SecurityId};
 use selinux_common::{
     ClassPermission, FilePermission, NullessByteStr, ObjectClass, Permission, ProcessPermission,
 };
+use selinux_core::permission_check::PermissionCheck;
+use selinux_core::security_server::SecurityServer;
+use selinux_core::{InitialSid, SecurityId};
 use starnix_logging::{log_debug, track_stub};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::mount_flags::MountFlags;
@@ -667,7 +667,7 @@ mod tests {
         AutoReleasableTask,
     };
     use crate::vfs::{NamespaceNode, XattrOp};
-    use selinux::security_server::Mode;
+    use selinux_core::security_server::Mode;
     use starnix_sync::{Locked, Unlocked};
     use starnix_uapi::device_type::DeviceType;
     use starnix_uapi::file_mode::FileMode;

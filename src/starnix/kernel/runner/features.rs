@@ -10,7 +10,7 @@ use gralloc::gralloc_device_init;
 use input_device::uinput::register_uinput_device;
 use input_device::InputDevice;
 use magma_device::magma_device_init;
-use selinux::security_server;
+use selinux_core::security_server;
 use starnix_core::device::android::bootloader_message_store::android_bootloader_message_store_init;
 use starnix_core::device::ashmem::ashmem_device_init;
 use starnix_core::device::framebuffer::{fb_device_init, AspectRatio};

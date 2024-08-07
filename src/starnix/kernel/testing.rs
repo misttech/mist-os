@@ -16,7 +16,7 @@ use crate::vfs::{
     FileSystemOptions, FsContext, FsNode, FsNodeOps, FsStr,
 };
 
-use selinux::security_server::SecurityServer;
+use selinux_core::security_server::SecurityServer;
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Unlocked};
 use std::ffi::CString;
 use std::mem::MaybeUninit;

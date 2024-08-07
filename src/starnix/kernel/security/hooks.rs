@@ -11,8 +11,8 @@ use crate::vfs::{
     ValueOrSize, XattrOp,
 };
 
-use selinux::security_server::{Mode, SecurityServer};
-use selinux::SecurityId;
+use selinux_core::security_server::{Mode, SecurityServer};
+use selinux_core::SecurityId;
 use starnix_uapi::error;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::mount_flags::MountFlags;
@@ -498,8 +498,8 @@ mod tests {
     };
     use crate::vfs::NamespaceNode;
     use linux_uapi::XATTR_NAME_SELINUX;
-    use selinux::security_server::Mode;
-    use selinux::InitialSid;
+    use selinux_core::security_server::Mode;
+    use selinux_core::InitialSid;
     use starnix_sync::{Locked, Unlocked};
     use starnix_uapi::device_type::DeviceType;
     use starnix_uapi::error;
