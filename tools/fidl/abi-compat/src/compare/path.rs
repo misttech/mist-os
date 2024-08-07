@@ -2,15 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use flyweights::FlyStr;
 use std::fmt::Display;
 
 use crate::{Scope, Version};
 
 #[derive(PartialEq, PartialOrd, Eq, Ord, Debug, Clone)]
 pub enum PathElement {
-    Member(FlyStr, Option<FlyStr>),
-    List(Option<FlyStr>),
+    Member(String, Option<String>),
+    List(Option<String>),
 }
 
 impl Into<String> for &PathElement {
@@ -37,15 +36,15 @@ impl Path {
         Self { version: version.clone(), elements: vec![] }
     }
 
+    pub fn from_version_and_elements(version: Version, elements: Vec<PathElement>) -> Self {
+        Self { version, elements }
+    }
+
     #[cfg(test)]
     pub fn with(&self, element: PathElement) -> Self {
         let mut elements = self.elements.clone();
         elements.push(element);
         Self { version: self.version.clone(), elements }
-    }
-
-    pub fn push(&mut self, element: PathElement) {
-        self.elements.push(element);
     }
 }
 

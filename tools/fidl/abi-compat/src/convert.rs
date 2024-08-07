@@ -10,59 +10,128 @@ use std::rc::Rc;
 
 use anyhow::{anyhow, bail, Context as _, Result};
 use flyweights::FlyStr;
-use itertools::Itertools;
 
+use crate::compare::Path;
 use crate::ir::Declaration;
 use crate::{compare, ir, Version};
 
-#[derive(Clone)]
-pub struct Context {
-    ir: Rc<ir::IR>,
-    identifier_stack: Vec<FlyStr>,
-    path: compare::Path,
+pub enum RefPathElement<'a> {
+    Member(&'a str, Option<&'a str>),
+    List(Option<&'a str>),
 }
 
-impl Context {
-    pub fn new(ir: Rc<ir::IR>, version: &Version) -> Self {
-        Self { ir, identifier_stack: vec![], path: compare::Path::new(&version) }
-    }
-    pub fn nest_member(&self, member_name: impl AsRef<str>, identifier: Option<FlyStr>) -> Self {
-        let mut context = self.clone();
-        context.path.push(compare::PathElement::Member(
-            FlyStr::new(member_name.as_ref()),
-            identifier.clone(),
-        ));
-        if let Some(identifier) = identifier {
-            context.identifier_stack.push(identifier);
+impl<'a> RefPathElement<'a> {
+    fn identifier(&self) -> Option<&str> {
+        match self {
+            RefPathElement::Member(_, id) => *id,
+            RefPathElement::List(id) => *id,
         }
-        context
+    }
+}
+
+impl<'a> Into<compare::PathElement> for &'_ RefPathElement<'a> {
+    fn into(self) -> compare::PathElement {
+        match self {
+            RefPathElement::Member(member_name, identifier) => compare::PathElement::Member(
+                (*member_name).to_owned(),
+                identifier.map(|i: &str| i.to_owned()),
+            ),
+            RefPathElement::List(member_identifier) => {
+                compare::PathElement::List(member_identifier.map(|i: &str| i.to_owned()))
+            }
+        }
+    }
+}
+
+pub enum Context<'a> {
+    Root {
+        ir: Rc<ir::IR>,
+        version: Version,
+    },
+    Child {
+        parent: &'a Context<'a>,
+        depth: usize,
+        ir: &'a Rc<ir::IR>,
+        path_element: RefPathElement<'a>,
+    },
+}
+
+impl<'a> Context<'a> {
+    pub fn new(ir: Rc<ir::IR>, version: &Version) -> Self {
+        Context::Root { ir, version: version.clone() }
+    }
+    pub fn nest_member(&'a self, member_name: &'a str, identifier: Option<&'a str>) -> Self {
+        Context::Child {
+            parent: self,
+            depth: self.depth() + 1,
+            ir: self.ir(),
+            path_element: RefPathElement::Member(member_name, identifier),
+        }
     }
 
-    pub fn nest_list(&self, member_identifier: Option<FlyStr>) -> Self {
-        let mut context = self.clone();
-        context.path.push(compare::PathElement::List(member_identifier.clone()));
-        if let Some(identifier) = member_identifier {
-            context.identifier_stack.push(identifier);
+    pub fn nest_list(&'a self, member_identifier: Option<&'a str>) -> Self {
+        Context::Child {
+            parent: self,
+            depth: self.depth() + 1,
+            ir: self.ir(),
+            path_element: RefPathElement::List(member_identifier),
         }
-        context
+    }
+
+    fn depth(&self) -> usize {
+        match self {
+            Context::Root { ir: _, version: _ } => 0,
+            Context::Child { parent: _, depth, ir: _, path_element: _ } => *depth,
+        }
+    }
+
+    fn ir(&self) -> &Rc<ir::IR> {
+        match self {
+            Context::Root { ir, version: _ } => ir,
+            Context::Child { parent: _, depth: _, ir, path_element: _ } => ir,
+        }
     }
 
     pub fn get(&self, name: &str) -> Result<&ir::Declaration> {
-        self.ir.get(name)
+        self.ir().get(name)
     }
 
     /// Look for the supplied identifier in the identifier stack and if found return the length of the cycle to the last one.
-    fn find_identifier_cycle(&self, name: impl AsRef<str>) -> Option<usize> {
-        let name = name.as_ref();
-        self.identifier_stack.iter().rev().skip(1).positions(|i| i == name).next()
+    fn find_identifier_cycle(&self, name: &str) -> Option<usize> {
+        // Skip the last one...
+        let mut ctx = match self {
+            Context::Root { ir: _, version: _ } => return None,
+            Context::Child { parent, depth: _, ir: _, path_element: _ } => parent,
+        };
+        for i in 0.. {
+            if let Context::Child { parent, depth: _, ir: _, path_element } = ctx {
+                if path_element.identifier() == Some(name) {
+                    return Some(i);
+                }
+                ctx = parent;
+            } else {
+                return None;
+            }
+        }
+        None
     }
 
-    #[cfg(test)]
-    fn empty_for_test() -> Self {
-        Self {
-            ir: ir::IR::empty_for_tests(),
-            identifier_stack: vec![],
-            path: compare::Path::empty(),
+    fn path(&self) -> compare::Path {
+        // TODO: track depth so we can allocate the right size vec appropriately?
+
+        let mut ctx = self;
+        let mut elements = Vec::with_capacity(self.depth());
+        loop {
+            match ctx {
+                Context::Root { ir: _, version } => {
+                    elements.reverse();
+                    return Path::from_version_and_elements(version.clone(), elements);
+                }
+                Context::Child { parent, depth: _, ir: _, path_element } => {
+                    elements.push(path_element.into());
+                    ctx = parent;
+                }
+            }
         }
     }
 }
@@ -71,80 +140,83 @@ impl Context {
 mod context_tests {
     use super::*;
 
+    fn context_for_test<'a>() -> Context<'a> {
+        Context::Root { ir: ir::IR::empty_for_tests(), version: Version::new("0") }
+    }
+
     #[test]
     fn test_find_identifier_cycle() {
         // Set up identifier stack
-        let context = Context::empty_for_test()
-            .nest_member("A", Some("foo".into()))
-            .nest_member("B", Some("bar".into()))
-            .nest_member("C", Some("baz".into()))
-            .nest_member("D", Some("foo".into()))
-            .nest_member("E", Some("quux".into()));
-        assert_eq!(
-            vec![
-                FlyStr::new("foo"),
-                FlyStr::new("bar"),
-                FlyStr::new("baz"),
-                FlyStr::new("foo"),
-                FlyStr::new("quux")
-            ],
-            context.identifier_stack
-        );
 
-        // Check that it's as expected
-        assert_eq!(None, context.find_identifier_cycle("blah"));
-        assert_eq!(None, context.find_identifier_cycle("quux"));
-        assert_eq!(Some(0), context.find_identifier_cycle("foo"));
-        assert_eq!(Some(1), context.find_identifier_cycle("baz"));
-        assert_eq!(Some(2), context.find_identifier_cycle("bar"));
+        fn foo(context: &Context<'_>) {
+            bar(&context.nest_member("A", Some("foo")));
+        }
+        fn bar(context: &Context<'_>) {
+            baz(&context.nest_member("B", Some("bar")));
+        }
+        fn baz(context: &Context<'_>) {
+            foo2(&context.nest_member("C", Some("baz")));
+        }
+        fn foo2(context: &Context<'_>) {
+            quux(&context.nest_member("D", Some("foo")));
+        }
+        fn quux(context: &Context<'_>) {
+            let context = context.nest_member("E", Some("quux"));
+            // Check that it's as expected
+            assert_eq!(None, context.find_identifier_cycle("blah"));
+            assert_eq!(None, context.find_identifier_cycle("quux"));
+            assert_eq!(Some(0), context.find_identifier_cycle("foo"));
+            assert_eq!(Some(1), context.find_identifier_cycle("baz"));
+            assert_eq!(Some(2), context.find_identifier_cycle("bar"));
+        }
+
+        foo(&context_for_test())
     }
 }
 
 pub trait ConvertType {
-    fn identifier(&self) -> Option<FlyStr>;
-    fn convert(&self, context: Context) -> Result<compare::Type>;
+    fn identifier(&self) -> Option<&str>;
+    fn convert<'a>(&self, context: &Context<'a>) -> Result<compare::Type>;
 }
 
 impl ConvertType for ir::Type {
-    fn identifier(&self) -> Option<FlyStr> {
+    fn identifier(&self) -> Option<&str> {
         match self {
-            ir::Type::Request { protocol_transport: _, subtype, nullable: _ } => {
-                Some(FlyStr::new(subtype))
-            }
+            ir::Type::Request { protocol_transport: _, subtype, nullable: _ } => Some(subtype),
             ir::Type::Identifier { identifier, nullable: _, protocol_transport: _ } => {
-                Some(FlyStr::new(identifier))
+                Some(identifier)
             }
             _ => None,
         }
     }
 
-    fn convert(&self, context: Context) -> Result<compare::Type> {
+    fn convert<'a>(&self, context: &Context<'a>) -> Result<compare::Type> {
         Ok(match self {
             ir::Type::Array { element_count, element_type } => {
                 let element_type =
-                    Box::new(element_type.convert(context.nest_list(element_type.identifier()))?);
-                compare::Type::Array(context.path, *element_count, element_type)
+                    Box::new(element_type.convert(&context.nest_list(element_type.identifier()))?);
+                compare::Type::Array(context.path(), *element_count, element_type)
             }
             ir::Type::StringArray { element_count } => {
-                compare::Type::StringArray(context.path, *element_count)
+                compare::Type::StringArray(context.path(), *element_count)
             }
             ir::Type::Vector { element_type, maybe_element_count, nullable } => {
                 let element_type =
-                    Box::new(element_type.convert(context.nest_list(element_type.identifier()))?);
+                    Box::new(element_type.convert(&context.nest_list(element_type.identifier()))?);
                 compare::Type::Vector(
-                    context.path,
+                    context.path(),
                     maybe_element_count.unwrap_or(0xFFFF),
                     element_type,
                     convert_nullable(nullable),
                 )
             }
             ir::Type::String { maybe_element_count, nullable } => compare::Type::String(
-                context.path,
+                context.path(),
                 maybe_element_count.unwrap_or(0xFFFF),
                 convert_nullable(nullable),
             ),
             ir::Type::Handle { nullable, subtype, rights } => compare::Type::Handle(
-                context.path,
+                context.path(),
                 convert_handle_type(subtype)?,
                 convert_nullable(nullable),
                 crate::compare::HandleRights::from_bits(*rights)
@@ -154,11 +226,11 @@ impl ConvertType for ir::Type {
                 let decl = context.get(subtype)?;
                 if let ir::Declaration::Protocol(protocol) = decl {
                     compare::Type::ServerEnd(
-                        context.path.clone(),
+                        context.path(),
                         protocol.name.clone(),
                         protocol_transport.into(),
                         convert_nullable(nullable),
-                        Box::new(convert_protocol(&protocol, context.clone())?),
+                        Box::new(convert_protocol(&protocol, &context)?),
                     )
                 } else {
                     panic!("Got server_end for {decl:?}");
@@ -166,26 +238,26 @@ impl ConvertType for ir::Type {
             }
             ir::Type::Identifier { identifier, nullable, protocol_transport } => {
                 if let Some(cycle) = context.find_identifier_cycle(identifier) {
-                    compare::Type::Cycle(context.path, identifier.clone(), cycle + 1)
+                    compare::Type::Cycle(context.path(), identifier.clone(), cycle + 1)
                 } else {
                     let decl = context.get(identifier)?;
                     if let ir::Declaration::Protocol(protocol) = decl {
                         compare::Type::ClientEnd(
-                            context.path.clone(),
+                            context.path(),
                             protocol.name.clone(),
                             protocol_transport.into(),
                             convert_nullable(nullable),
-                            Box::new(convert_protocol(&protocol, context.clone())?),
+                            Box::new(convert_protocol(&protocol, &context)?),
                         )
                     } else {
                         assert!(protocol_transport.is_none());
-                        let path = context.path.clone();
+                        let path = context.path();
                         let t = match decl {
-                            ir::Declaration::Bits(decl) => decl.convert(context.clone())?,
-                            ir::Declaration::Enum(decl) => decl.convert(context.clone())?,
-                            ir::Declaration::Struct(decl) => decl.convert(context.clone())?,
-                            ir::Declaration::Table(decl) => decl.convert(context.clone())?,
-                            ir::Declaration::Union(decl) => decl.convert(context.clone())?,
+                            ir::Declaration::Bits(decl) => decl.convert(&context)?,
+                            ir::Declaration::Enum(decl) => decl.convert(&context)?,
+                            ir::Declaration::Struct(decl) => decl.convert(&context)?,
+                            ir::Declaration::Table(decl) => decl.convert(&context)?,
+                            ir::Declaration::Union(decl) => decl.convert(&context)?,
                             ir::Declaration::Protocol(_) => panic!("Handled in the if let above."),
                         };
 
@@ -199,12 +271,13 @@ impl ConvertType for ir::Type {
             }
 
             ir::Type::Internal { subtype } => match subtype.as_str() {
-                "framework_error" => compare::Type::FrameworkError(context.path),
+                "framework_error" => compare::Type::FrameworkError(context.path()),
                 _ => bail!("Unimplemented internal type: {subtype:?}"),
             },
-            ir::Type::Primitive { subtype } => {
-                compare::Type::Primitive(context.path, convert_primitive_subtype(subtype.as_str())?)
-            }
+            ir::Type::Primitive { subtype } => compare::Type::Primitive(
+                context.path(),
+                convert_primitive_subtype(subtype.as_str())?,
+            ),
         })
     }
 }
@@ -221,17 +294,17 @@ impl TryInto<compare::Primitive> for ir::Type {
 }
 
 impl ConvertType for ir::BitsDeclaration {
-    fn identifier(&self) -> Option<FlyStr> {
-        Some(FlyStr::new(&self.name))
+    fn identifier(&self) -> Option<&str> {
+        Some(&self.name)
     }
-    fn convert(&self, context: Context) -> Result<compare::Type> {
+    fn convert<'a>(&self, context: &Context<'a>) -> Result<compare::Type> {
         let mut members = BTreeMap::new();
         for m in &self.members {
             members.insert(m.value.integer_value()?, FlyStr::new(&m.name));
         }
         let t = self.r#type.clone().try_into()?;
         Ok(compare::Type::Bits(
-            context.path,
+            context.path(),
             convert_strict(self.strict),
             t,
             members.keys().cloned().collect(),
@@ -241,17 +314,17 @@ impl ConvertType for ir::BitsDeclaration {
 }
 
 impl ConvertType for ir::EnumDeclaration {
-    fn identifier(&self) -> Option<FlyStr> {
-        Some(FlyStr::new(&self.name))
+    fn identifier(&self) -> Option<&str> {
+        Some(&self.name)
     }
-    fn convert(&self, context: Context) -> Result<compare::Type> {
+    fn convert<'a>(&self, context: &Context<'a>) -> Result<compare::Type> {
         let mut members = BTreeMap::new();
         for m in &self.members {
             members.insert(m.value.integer_value()?, FlyStr::new(&m.name));
         }
         let t = convert_primitive_subtype(self.r#type.as_str())?;
         Ok(compare::Type::Enum(
-            context.path,
+            context.path(),
             convert_strict(self.strict),
             t,
             members.keys().cloned().collect(),
@@ -261,73 +334,73 @@ impl ConvertType for ir::EnumDeclaration {
 }
 
 impl ConvertType for ir::TableDeclaration {
-    fn identifier(&self) -> Option<FlyStr> {
-        Some(FlyStr::new(&self.name))
+    fn identifier(&self) -> Option<&str> {
+        Some(&self.name)
     }
-    fn convert(&self, context: Context) -> Result<compare::Type> {
+    fn convert<'a>(&self, context: &Context<'a>) -> Result<compare::Type> {
         let mut members = BTreeMap::new();
         for m in &self.members {
             let t = &m.r#type;
-            members.insert(m.ordinal, t.convert(context.nest_member(&m.name, t.identifier()))?);
+            members.insert(m.ordinal, t.convert(&context.nest_member(&m.name, t.identifier()))?);
         }
-        Ok(compare::Type::Table(context.path, members))
+        Ok(compare::Type::Table(context.path(), members))
     }
 }
 
 impl ConvertType for ir::StructDeclaration {
-    fn identifier(&self) -> Option<FlyStr> {
-        Some(FlyStr::new(&self.name))
+    fn identifier(&self) -> Option<&str> {
+        Some(&self.name)
     }
-    fn convert(&self, context: Context) -> Result<compare::Type> {
+    fn convert<'a>(&self, context: &Context<'a>) -> Result<compare::Type> {
         let members = self
             .members
             .iter()
-            .map(|m| m.r#type.convert(context.nest_member(&m.name, m.r#type.identifier())))
+            .map(|m| m.r#type.convert(&context.nest_member(&m.name, m.r#type.identifier())))
             .collect::<Result<_>>()?;
-        Ok(compare::Type::Struct(context.path, members))
+        Ok(compare::Type::Struct(context.path(), members))
     }
 }
 
 impl ConvertType for ir::UnionDeclaration {
-    fn identifier(&self) -> Option<FlyStr> {
-        Some(FlyStr::new(&self.name))
+    fn identifier(&self) -> Option<&str> {
+        Some(&self.name)
     }
-    fn convert(&self, context: Context) -> Result<compare::Type> {
+    fn convert<'a>(&self, context: &Context<'a>) -> Result<compare::Type> {
         let mut members = BTreeMap::new();
         for m in &self.members {
             let t = &m.r#type;
-            members.insert(m.ordinal, t.convert(context.nest_member(&m.name, t.identifier()))?);
+            members.insert(m.ordinal, t.convert(&context.nest_member(&m.name, t.identifier()))?);
         }
-        Ok(compare::Type::Union(context.path, convert_strict(self.strict), members))
+        Ok(compare::Type::Union(context.path(), convert_strict(self.strict), members))
     }
 }
 
 impl ConvertType for ir::Declaration {
-    fn identifier(&self) -> Option<FlyStr> {
+    fn identifier(&self) -> Option<&str> {
         match self {
             ir::Declaration::Bits(decl) => decl.identifier(),
             ir::Declaration::Enum(decl) => decl.identifier(),
-            ir::Declaration::Protocol(decl) => Some(FlyStr::new(&decl.name)),
+            ir::Declaration::Protocol(decl) => Some(&decl.name),
             ir::Declaration::Struct(decl) => decl.identifier(),
             ir::Declaration::Table(decl) => decl.identifier(),
             ir::Declaration::Union(decl) => decl.identifier(),
         }
     }
 
-    fn convert(&self, context: Context) -> Result<compare::Type> {
+    fn convert<'a>(&self, context: &Context<'a>) -> Result<compare::Type> {
         match self {
-            ir::Declaration::Bits(decl) => decl.convert(context),
-            ir::Declaration::Enum(decl) => decl.convert(context),
+            ir::Declaration::Bits(decl) => decl.convert(&context),
+            ir::Declaration::Enum(decl) => decl.convert(&context),
             ir::Declaration::Protocol(decl) => Ok(compare::Type::ClientEnd(
-                context.path.clone(),
+                context.path(),
                 decl.name.clone(),
                 compare::Transport::Channel,    /* TODO */
                 compare::Optionality::Required, /* TODO */
-                Box::new(convert_protocol(decl, context)?),
+                Box::new(convert_protocol(decl, &context)?),
             )),
-            ir::Declaration::Struct(decl) => decl.convert(context),
-            ir::Declaration::Table(decl) => decl.convert(context),
-            ir::Declaration::Union(decl) => decl.convert(context),
+            ir::Declaration::Struct(decl) => decl.convert(&context),
+            ir::Declaration::Table(decl) => decl.convert(&context),
+            ir::Declaration::Union(decl) => decl.convert(&context),
         }
     }
 }
@@ -379,14 +452,17 @@ fn convert_handle_type(subtype: impl AsRef<str>) -> Result<Option<compare::Handl
 }
 
 /// Convert an Option<ir::Type> to either the appropriate compare type, or an empty struct.
-fn maybe_convert_type(maybe_type: &Option<ir::Type>, context: Context) -> Result<compare::Type> {
+fn maybe_convert_type<'a>(
+    maybe_type: &Option<ir::Type>,
+    context: Context<'a>,
+) -> Result<compare::Type> {
     match maybe_type {
-        Some(t) => Ok(t.convert(context)?),
-        None => Ok(compare::Type::Struct(context.path, vec![])),
+        Some(t) => Ok(t.convert(&context)?),
+        None => Ok(compare::Type::Struct(context.path(), vec![])),
     }
 }
 
-fn maybe_type_identifier(maybe_type: &Option<ir::Type>) -> Option<FlyStr> {
+fn maybe_type_identifier(maybe_type: &Option<ir::Type>) -> Option<&str> {
     if let Some(t) = maybe_type {
         t.identifier()
     } else {
@@ -394,10 +470,13 @@ fn maybe_type_identifier(maybe_type: &Option<ir::Type>) -> Option<FlyStr> {
     }
 }
 
-fn convert_method(method: &ir::ProtocolMethod, context: Context) -> Result<compare::Method> {
-    let context = context.nest_member(method.name.clone(), None);
+fn convert_method<'a>(
+    method: &ir::ProtocolMethod,
+    context: &Context<'a>,
+) -> Result<compare::Method> {
+    let context = context.nest_member(&method.name, None);
     let flexibility = convert_strict(method.strict);
-    let path = context.path.clone();
+    let path = context.path();
     Ok(match (method.has_request, method.has_response) {
         (true, true) => compare::Method::two_way(
             &method.name,
@@ -438,18 +517,18 @@ fn convert_method(method: &ir::ProtocolMethod, context: Context) -> Result<compa
     })
 }
 
-pub fn convert_protocol(
+pub fn convert_protocol<'a>(
     p: &ir::ProtocolDeclaration,
-    context: Context,
+    context: &Context<'a>,
 ) -> Result<compare::Protocol> {
     let mut methods = BTreeMap::new();
 
-    let context = context.nest_member(&p.name, Some(FlyStr::new(&p.name)));
+    let context = context.nest_member(&p.name, Some(&p.name));
 
     for pm in &p.methods {
         methods.insert(
             pm.ordinal,
-            convert_method(pm, context.clone())
+            convert_method(pm, &context)
                 .with_context(|| format!("Method {}.{}", &p.name, &pm.name))?,
         );
     }
@@ -490,7 +569,7 @@ pub fn convert_protocol(
 
     Ok(compare::Protocol {
         name: FlyStr::new(&p.name),
-        path: context.path.clone(),
+        path: context.path(),
         openness: p.openness,
         methods,
         discoverable,
@@ -507,7 +586,7 @@ pub fn convert_abi_surface(ir: Rc<ir::IR>) -> Result<compare::AbiSurface> {
 
     for decl in ir.declarations.values() {
         if let Declaration::Protocol(decl) = decl {
-            let protocol = convert_protocol(decl, context.clone())?;
+            let protocol = convert_protocol(decl, &context)?;
 
             if let Some(discoverable) = protocol.discoverable.clone() {
                 abi_surface.discoverable.insert(discoverable.name, protocol);

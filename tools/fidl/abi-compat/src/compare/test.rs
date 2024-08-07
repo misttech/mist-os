@@ -40,19 +40,19 @@ impl TestLibrary {
         format!("{LIBRARY}/{name}")
     }
 
-    fn compile(&self, version: &Version) -> CompiledTestLibrary {
+    fn compile<'a>(&self, version: &Version) -> CompiledTestLibrary<'a> {
         CompiledTestLibrary::new(version, self)
     }
 }
 
-struct CompiledTestLibrary {
+struct CompiledTestLibrary<'a> {
     version: Version,
     source: String,
     ir: Rc<IR>,
-    context: Context,
+    context: Context<'a>,
 }
 
-impl CompiledTestLibrary {
+impl<'a> CompiledTestLibrary<'a> {
     fn new(version: &Version, library: &TestLibrary) -> Self {
         let ir =
             IR::from_source(version.api_level(), &library.source, LIBRARY).unwrap_or_else(|_| {
@@ -85,7 +85,7 @@ impl CompiledTestLibrary {
         let decl = self.get_decl(name);
         let context = self.context.nest_member(name, decl.identifier());
         use crate::convert::ConvertType;
-        decl.convert(context).unwrap_or_else(|_| {
+        decl.convert(&context).unwrap_or_else(|_| {
             panic!(
                 "Couldn't convert {name} to a type at {:?} in:\n{}",
                 self.api_level(),
@@ -99,7 +99,7 @@ impl CompiledTestLibrary {
         let context = self.context.nest_member(name, decl.identifier());
 
         if let Declaration::Protocol(protocol) = decl {
-            crate::convert::convert_protocol(&protocol, context).unwrap_or_else(|_| {
+            crate::convert::convert_protocol(&protocol, &context).unwrap_or_else(|_| {
                 panic!(
                     "Couldn't convert {name} to a protocol at {:?} in:\n{}",
                     self.api_level(),
