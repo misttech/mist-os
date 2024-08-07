@@ -40,7 +40,7 @@ unsafe impl ObjectQuery for VmarMapsInfo {
 }
 
 /// Ergonomic wrapper around `zx_info_maps_t`.
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone)]
 pub struct MapInfo {
     pub name: Name,
     pub base: usize,
@@ -82,6 +82,18 @@ impl MapInfo {
             _ => return Err(Status::INTERNAL),
         };
         Ok(Self { name: Name::from_raw(name), base, size, depth, details })
+    }
+}
+
+impl std::fmt::Debug for MapInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MapInfo")
+            .field("name", &self.name)
+            .field("base", &format_args!("{:#x}", self.base))
+            .field("size", &self.size)
+            .field("depth", &self.depth)
+            .field("details", &self.details)
+            .finish()
     }
 }
 
