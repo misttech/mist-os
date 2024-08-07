@@ -136,10 +136,10 @@ where
     }
 }
 
-impl Sampler<Sample<Gauge<f64>>> for ArithmeticMean<Gauge<f64>> {
+impl Sampler<Sample<Gauge<f32>>> for ArithmeticMean<Gauge<f32>> {
     type Error = OverflowError;
 
-    fn fold(&mut self, sample: Sample<Gauge<f64>>) -> Result<(), Self::Error> {
+    fn fold(&mut self, sample: Sample<Gauge<f32>>) -> Result<(), Self::Error> {
         // Discard `NaN` terms and avoid some floating-point exceptions.
         self.sum = match sample {
             _ if sample.is_nan() => self.sum,
@@ -152,15 +152,15 @@ impl Sampler<Sample<Gauge<f64>>> for ArithmeticMean<Gauge<f64>> {
     }
 }
 
-impl Statistic for ArithmeticMean<Gauge<f64>> {
-    type Semantic = Gauge<f64>;
-    type Sample = Sample<Gauge<f64>>;
-    type Aggregation = f64;
+impl Statistic for ArithmeticMean<Gauge<f32>> {
+    type Semantic = Gauge<f32>;
+    type Sample = Sample<Gauge<f32>>;
+    type Aggregation = f32;
 
     fn aggregation(&mut self) -> Option<Self::Aggregation> {
         // This is lossy and lossiness correlates to the magnitude of `n`. See details of
-        // `u64 as f64` casts.
-        let aggregation = (self.n > 0).then(|| self.sum / (self.n as f64));
+        // `u64 as f32` casts.
+        let aggregation = (self.n > 0).then(|| self.sum / (self.n as f32));
         *self = Default::default();
         aggregation
     }
@@ -406,14 +406,14 @@ mod tests {
 
     #[test]
     fn arithmetic_mean_gauge_aggregation() {
-        let mut mean = ArithmeticMean::<Gauge<f64>>::default();
+        let mut mean = ArithmeticMean::<Gauge<f32>>::default();
         mean.fold(1.0).unwrap();
         mean.fold(1.0).unwrap();
         mean.fold(1.0).unwrap();
         let aggregation = mean.aggregation().unwrap();
         assert!(aggregation > 0.99 && aggregation < 1.01); // ~ 1.0
 
-        let mut mean = ArithmeticMean::<Gauge<f64>>::default();
+        let mut mean = ArithmeticMean::<Gauge<f32>>::default();
         mean.fold(0.0).unwrap();
         mean.fold(1.0).unwrap();
         mean.fold(2.0).unwrap();
@@ -423,7 +423,7 @@ mod tests {
 
     #[test]
     fn arithmetic_mean_gauge_aggregation_fill() {
-        let mut mean = ArithmeticMean::<Gauge<f64>>::default();
+        let mut mean = ArithmeticMean::<Gauge<f32>>::default();
         mean.fill(1.0, 1000).unwrap();
         let aggregation = mean.aggregation().unwrap();
         assert!(aggregation > 0.99 && aggregation < 1.01); // ~ 1.0
@@ -431,7 +431,7 @@ mod tests {
 
     #[test]
     fn arithmetic_mean_gauge_overflow() {
-        let mut mean = ArithmeticMean::<Gauge<f64>> { sum: 1.0, n: u64::MAX };
+        let mut mean = ArithmeticMean::<Gauge<f32>> { sum: 1.0, n: u64::MAX };
         let result = mean.fold(1.0);
         assert_eq!(result, Err(OverflowError));
     }
