@@ -638,7 +638,10 @@ VmMappingCoalescer<NumPages>::VmMappingCoalescer(
       count_(0),
       aborted_(false),
       mmu_flags_(mmu_flags),
-      existing_entry_action_(existing_entry_action) {}
+      existing_entry_action_(existing_entry_action) {
+  // Mapping is only valid if there is at least some access in the flags.
+  DEBUG_ASSERT(mmu_flags & ARCH_MMU_FLAG_PERM_RWX_MASK);
+}
 
 template <size_t NumPages>
 VmMappingCoalescer<NumPages>::~VmMappingCoalescer() {
@@ -661,17 +664,15 @@ zx_status_t VmMappingCoalescer<NumPages>::Flush() {
       ktl::all_of(phys_, &phys_[count_], [](paddr_t p) { return p != vm_get_zero_page_paddr(); }) ||
       !mapping_->aspace()->is_user());
 
-  if (mmu_flags_ & ARCH_MMU_FLAG_PERM_RWX_MASK) {
-    size_t mapped;
-    zx_status_t ret = mapping_->aspace()->arch_aspace().Map(base_, phys_, count_, mmu_flags_,
-                                                            existing_entry_action_, &mapped);
-    if (ret != ZX_OK) {
-      TRACEF("error %d mapping %zu pages starting at va %#" PRIxPTR "\n", ret, count_, base_);
-      aborted_ = true;
-      return ret;
-    }
-    DEBUG_ASSERT_MSG(mapped == count_, "mapped %zu, count %zu\n", mapped, count_);
+  size_t mapped;
+  zx_status_t ret = mapping_->aspace()->arch_aspace().Map(base_, phys_, count_, mmu_flags_,
+                                                          existing_entry_action_, &mapped);
+  if (ret != ZX_OK) {
+    TRACEF("error %d mapping %zu pages starting at va %#" PRIxPTR "\n", ret, count_, base_);
+    aborted_ = true;
+    return ret;
   }
+  DEBUG_ASSERT_MSG(mapped == count_, "mapped %zu, count %zu\n", mapped, count_);
   base_ += count_ * PAGE_SIZE;
   count_ = 0;
   return ZX_OK;
@@ -731,6 +732,11 @@ zx_status_t VmMapping::MapRange(size_t offset, size_t len, bool commit, bool ign
         // dirtied.
         if (dirty_tracked) {
           mmu_flags &= ~ARCH_MMU_FLAG_PERM_WRITE;
+        }
+
+        // If there are no access permissions on this region then mapping has no effect, so skip.
+        if (!(mmu_flags & ARCH_MMU_FLAG_PERM_RWX_MASK)) {
+          return ZX_OK;
         }
 
         // In the scenario where we are committing, and calling RequireOwnedPage, we are supposed to
