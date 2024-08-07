@@ -1710,56 +1710,67 @@ TEST(VmoTestCase, PhysicalSlice) {
 }
 
 TEST(VmoTestCase, CacheOp) {
-  constexpr size_t kSize = 0x8000;
-  zx::vmo vmo;
-  ASSERT_OK(zx::vmo::create(kSize, 0, &vmo));
+  constexpr size_t normal_size = 0x8000;
+  zx_handle_t normal_vmo = ZX_HANDLE_INVALID;
 
-  auto test_op = [&vmo](uint32_t op) {
-    EXPECT_OK(vmo.op_range(op, 0, 1, nullptr, 0), "0 1");
-    EXPECT_OK(vmo.op_range(op, 0, 1, nullptr, 0), "0 1");
-    EXPECT_OK(vmo.op_range(op, 1, 1, nullptr, 0), "1 1");
-    EXPECT_OK(vmo.op_range(op, 0, kSize, nullptr, 0), "0 size");
-    EXPECT_OK(vmo.op_range(op, 1, kSize - 1, nullptr, 0), "1 size-1");
-    EXPECT_OK(vmo.op_range(op, 0x5200, 1, nullptr, 0), "0x5200 1");
-    EXPECT_OK(vmo.op_range(op, 0x5200, 0x800, nullptr, 0), "0x5200 0x800");
-    EXPECT_OK(vmo.op_range(op, 0x5200, 0x1000, nullptr, 0), "0x5200 0x1000");
-    EXPECT_OK(vmo.op_range(op, 0x5200, 0x1200, nullptr, 0), "0x5200 0x1200");
+  EXPECT_OK(zx_vmo_create(normal_size, 0, &normal_vmo), "creation for cache op (normal vmo)");
 
-    EXPECT_EQ(ZX_ERR_INVALID_ARGS, vmo.op_range(op, 0, 0, nullptr, 0), "0 0");
-    EXPECT_EQ(ZX_ERR_OUT_OF_RANGE, vmo.op_range(op, 1, kSize, nullptr, 0), "0 size");
-    EXPECT_EQ(ZX_ERR_OUT_OF_RANGE, vmo.op_range(op, kSize, 1, nullptr, 0), "size 1");
-    EXPECT_EQ(ZX_ERR_OUT_OF_RANGE, vmo.op_range(op, kSize + 1, 1, nullptr, 0), "size+1 1");
-    EXPECT_EQ(ZX_ERR_OUT_OF_RANGE, vmo.op_range(op, UINT64_MAX - 1, 1, nullptr, 0),
-              "UINT64_MAX-1 1");
-    EXPECT_EQ(ZX_ERR_OUT_OF_RANGE, vmo.op_range(op, UINT64_MAX, 1, nullptr, 0), "UINT64_MAX 1");
-    EXPECT_EQ(ZX_ERR_OUT_OF_RANGE, vmo.op_range(op, UINT64_MAX, UINT64_MAX, nullptr, 0),
-              "UINT64_MAX UINT64_MAX");
-  };
-
-  test_op(ZX_VMO_OP_CACHE_SYNC);
-  test_op(ZX_VMO_OP_CACHE_CLEAN);
-  test_op(ZX_VMO_OP_CACHE_CLEAN_INVALIDATE);
-  test_op(ZX_VMO_OP_CACHE_INVALIDATE);
-}
-
-// Physical VMOs can only be created from non RAM memory and the kernel may not retain mappings to
-// such memory and so cannot perform cache operations for us.
-TEST(VmoTestCase, CacheOpPhys) {
   vmo_test::PhysVmo phys;
   if (auto res = vmo_test::GetTestPhysVmo(); res.is_ok()) {
     phys = std::move(res.value());
     // Go ahead and set the cache policy; we don't want the op_range calls
     // below to potentially skip running any code.
     EXPECT_OK(phys.vmo.set_cache_policy(ZX_CACHE_POLICY_CACHED), "zx_vmo_set_cache_policy");
-  } else {
-    EXPECT_EQ(ZX_ERR_NOT_SUPPORTED, res.status_value());
-    return;
+    ASSERT_GE(phys.size, normal_size);
   }
-  EXPECT_EQ(ZX_ERR_NOT_SUPPORTED, phys.vmo.op_range(ZX_VMO_OP_CACHE_SYNC, 0, 32, nullptr, 0));
-  EXPECT_EQ(ZX_ERR_NOT_SUPPORTED, phys.vmo.op_range(ZX_VMO_OP_CACHE_CLEAN, 0, 32, nullptr, 0));
-  EXPECT_EQ(ZX_ERR_NOT_SUPPORTED,
-            phys.vmo.op_range(ZX_VMO_OP_CACHE_CLEAN_INVALIDATE, 0, 32, nullptr, 0));
-  EXPECT_EQ(ZX_ERR_NOT_SUPPORTED, phys.vmo.op_range(ZX_VMO_OP_CACHE_INVALIDATE, 0, 32, nullptr, 0));
+
+  auto test_vmo = [](zx_handle_t vmo, size_t size) {
+    if (vmo == ZX_HANDLE_INVALID) {
+      return;
+    }
+
+    auto test_op = [vmo, size](uint32_t op) {
+      EXPECT_OK(zx_vmo_op_range(vmo, op, 0, 1, nullptr, 0), "0 1");
+      EXPECT_OK(zx_vmo_op_range(vmo, op, 0, 1, nullptr, 0), "0 1");
+      EXPECT_OK(zx_vmo_op_range(vmo, op, 1, 1, nullptr, 0), "1 1");
+      EXPECT_OK(zx_vmo_op_range(vmo, op, 0, size, nullptr, 0), "0 size");
+      EXPECT_OK(zx_vmo_op_range(vmo, op, 1, size - 1, nullptr, 0), "1 size-1");
+      EXPECT_OK(zx_vmo_op_range(vmo, op, 0x5200, 1, nullptr, 0), "0x5200 1");
+      EXPECT_OK(zx_vmo_op_range(vmo, op, 0x5200, 0x800, nullptr, 0), "0x5200 0x800");
+      EXPECT_OK(zx_vmo_op_range(vmo, op, 0x5200, 0x1000, nullptr, 0), "0x5200 0x1000");
+      EXPECT_OK(zx_vmo_op_range(vmo, op, 0x5200, 0x1200, nullptr, 0), "0x5200 0x1200");
+
+      EXPECT_EQ(ZX_ERR_INVALID_ARGS, zx_vmo_op_range(vmo, op, 0, 0, nullptr, 0), "0 0");
+      EXPECT_EQ(ZX_ERR_OUT_OF_RANGE, zx_vmo_op_range(vmo, op, 1, size, nullptr, 0), "0 size");
+      EXPECT_EQ(ZX_ERR_OUT_OF_RANGE, zx_vmo_op_range(vmo, op, size, 1, nullptr, 0), "size 1");
+      EXPECT_EQ(ZX_ERR_OUT_OF_RANGE, zx_vmo_op_range(vmo, op, size + 1, 1, nullptr, 0), "size+1 1");
+      EXPECT_EQ(ZX_ERR_OUT_OF_RANGE, zx_vmo_op_range(vmo, op, UINT64_MAX - 1, 1, nullptr, 0),
+                "UINT64_MAX-1 1");
+      EXPECT_EQ(ZX_ERR_OUT_OF_RANGE, zx_vmo_op_range(vmo, op, UINT64_MAX, 1, nullptr, 0),
+                "UINT64_MAX 1");
+      EXPECT_EQ(ZX_ERR_OUT_OF_RANGE, zx_vmo_op_range(vmo, op, UINT64_MAX, UINT64_MAX, nullptr, 0),
+                "UINT64_MAX UINT64_MAX");
+    };
+
+    test_op(ZX_VMO_OP_CACHE_SYNC);
+    test_op(ZX_VMO_OP_CACHE_CLEAN);
+    test_op(ZX_VMO_OP_CACHE_CLEAN_INVALIDATE);
+    test_op(ZX_VMO_OP_CACHE_INVALIDATE);
+  };
+
+  ASSERT_NE(ZX_HANDLE_INVALID, normal_vmo);
+  test_vmo(normal_vmo, normal_size);
+
+  // No need for a test ASSERT/EXPECT here.  If we have access to the root
+  // resource, but could not create a physical VMO to test with, then
+  // GetTestPhysVmo has already signaled a test failure for us.
+  if (phys.vmo.is_valid()) {
+    test_vmo(phys.vmo.get(), phys.size);
+  }
+
+  EXPECT_OK(zx_handle_close(normal_vmo), "close handle (normal vmo)");
+  // Closing ZX_HANDLE_INVALID is not an error.
+  EXPECT_OK(zx_handle_close(phys.vmo.release()), "close handle (physical vmo)");
 }
 
 TEST(VmoTestCase, CacheOpLargeVmo) {

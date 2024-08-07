@@ -760,9 +760,6 @@ closed protocol Vmo {
     ///   created with `ZX_VMO_DISCARDABLE`.
     /// - *op* was `ZX_VMO_OP_DECOMMIT` and the underlying VMO does not allow decommiting.
     /// - *op* was `ZX_VMO_OP_CACHE_INVALIDATE` and `kernel.enable-debugging-syscalls` is false.
-    /// - *op* was `ZX_VMO_OP_CACHE_SYNC`, `ZX_VMO_OP_CACHE_INVALIDATE`, `ZX_VMO_OP_CACHE_CLEAN`
-    ///   or `ZX_VMO_OP_CACHE_CLEAN_INVALIDATE` and VMO was created with or descended from
-    ///   [`zx_vmo_create_physical()`]
     ///
     /// `ZX_ERR_UNAVAILABLE` *op* was `ZX_VMO_OP_TRY_LOCK`, the VMO was discardable and the VMO has been
     /// discarded by the kernel.
@@ -790,7 +787,6 @@ closed protocol Vmo {
     /// [`zx_pager_create_vmo()`]: pager_create_vmo.md
     /// [`zx_vmo_create()`]: vmo_create.md
     /// [`zx_vmo_create_child()`]: vmo_create_child.md
-    /// [`zx_vmo_create_physical()`]: vmo_create_physical.md
     /// [`zx_vmo_get_size()`]: vmo_get_size.md
     /// [`zx_vmo_read()`]: vmo_read.md
     /// [`zx_vmo_set_size()`]: vmo_set_size.md
