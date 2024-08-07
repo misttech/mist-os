@@ -177,9 +177,7 @@ async fn async_main(config: Config) -> Result<(), Error> {
     let bootfs_svc = bootfs_svc
         .unwrap()
         .ingest_bootfs_vmo_with_system_resource(&system_resource_handle)
-        .expect("Failed to ingest bootfs")
-        .publish_kernel_vmos(HandleType::KernelFileVmo, 0)
-        .expect("Failed publish_kernel_vmos HandleType::KernelFileVmo");
+        .expect("Failed to ingest bootfs");
 
     let _ = bootfs_svc.create_and_bind_vfs().expect("failed to bind");
 
