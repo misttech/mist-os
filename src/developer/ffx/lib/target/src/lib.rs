@@ -161,12 +161,13 @@ pub fn open_target_with_fut<'a, 'b: 'a>(
     Ok((target_proxy, fut))
 }
 
-pub async fn is_discovery_enabled(_ctx: &EnvironmentContext) -> bool {
-    // TODO (b/b/355292969): put back the discovery check after we've addressed the flakes associated
-    // with client-side discovery
-    true
-    // !ffx_config::is_usb_discovery_disabled(ctx).await
-    //     || !ffx_config::is_mdns_discovery_disabled(ctx).await
+pub async fn is_discovery_enabled(ctx: &EnvironmentContext) -> bool {
+    // TODO (b/355292969): put back the discovery check after we've addressed the flakes associated
+    // with client-side discovery. (Currently re-enabled, but I want to validate the flake before resolving
+    // this bug -slgrady 8/7/24)
+    // true
+    !ffx_config::is_usb_discovery_disabled(ctx).await
+        || !ffx_config::is_mdns_discovery_disabled(ctx).await
 }
 
 #[derive(Debug, Error)]
