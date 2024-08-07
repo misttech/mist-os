@@ -152,11 +152,15 @@ VK_TEST_F(DisplayTest, SetAllConstraintsTest) {
   EXPECT_FALSE(import_result);
 
   // Set the display constraints on the display coordinator.
-  fuchsia::hardware::display::types::ImageBufferUsage image_buffer_usage = {
-      .tiling_type = fuchsia::hardware::display::types::IMAGE_TILING_TYPE_LINEAR,
-  };
-  bool res = scenic_impl::ImportBufferCollection(collection_id, *display_coordinator.get(),
-                                                 std::move(display_token), image_buffer_usage);
+  fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken> natural_token(
+      std::move(display_token).Unbind().TakeChannel());
+  fidl::UnownedClientEnd<fuchsia_hardware_display::Coordinator> coordinator =
+      scenic_impl::GetUnowned(*display_coordinator);
+  fuchsia_hardware_display_types::ImageBufferUsage image_buffer_usage = {{
+      .tiling_type = fuchsia_hardware_display_types::kImageTilingTypeLinear,
+  }};
+  bool res = scenic_impl::ImportBufferCollection(collection_id, coordinator,
+                                                 std::move(natural_token), image_buffer_usage);
   ASSERT_TRUE(res);
   auto release_buffer_collection =
       fit::defer([display_coordinator = display_coordinator.get(), display_collection_id] {
@@ -250,16 +254,20 @@ VK_TEST_F(DisplayTest, SetDisplayImageTest) {
   auto tokens = flatland::SysmemTokens::Create(sysmem_allocator_.get());
 
   // Set the display constraints on the display coordinator.
-  fuchsia::hardware::display::types::ImageBufferUsage image_buffer_usage = {
-      .tiling_type = fuchsia::hardware::display::types::IMAGE_TILING_TYPE_LINEAR,
-  };
+  fuchsia_hardware_display_types::ImageBufferUsage image_buffer_usage = {{
+      .tiling_type = fuchsia_hardware_display_types::kImageTilingTypeLinear,
+  }};
   auto global_collection_id = allocation::GenerateUniqueBufferCollectionId();
   ASSERT_NE(global_collection_id, ZX_KOID_INVALID);
   const fuchsia::hardware::display::BufferCollectionId display_collection_id =
       allocation::ToDisplayBufferCollectionId(global_collection_id);
 
-  bool res = scenic_impl::ImportBufferCollection(global_collection_id, *display_coordinator.get(),
-                                                 std::move(tokens.dup_token), image_buffer_usage);
+  fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken> dup_token(
+      std::move(tokens.dup_token).Unbind().TakeChannel());
+  fidl::UnownedClientEnd<fuchsia_hardware_display::Coordinator> coordinator =
+      scenic_impl::GetUnowned(*display_coordinator);
+  bool res = scenic_impl::ImportBufferCollection(global_collection_id, coordinator,
+                                                 std::move(dup_token), image_buffer_usage);
   ASSERT_TRUE(res);
 
   flatland::SetClientConstraintsAndWaitForAllocated(
@@ -299,9 +307,9 @@ VK_TEST_F(DisplayTest, SetDisplayImageTest) {
 
   // Import the above events to the display.
   scenic_impl::DisplayEventId display_wait_event_id =
-      scenic_impl::ImportEvent(*display_coordinator.get(), display_wait_fence);
+      scenic_impl::ImportEvent(coordinator, display_wait_fence);
   scenic_impl::DisplayEventId display_signal_event_id =
-      scenic_impl::ImportEvent(*display_coordinator.get(), display_signal_fence);
+      scenic_impl::ImportEvent(coordinator, display_signal_fence);
   EXPECT_NE(display_wait_event_id.value, fuchsia::hardware::display::types::INVALID_DISP_ID);
   EXPECT_NE(display_signal_event_id.value, fuchsia::hardware::display::types::INVALID_DISP_ID);
   EXPECT_NE(display_wait_event_id.value, display_signal_event_id.value);

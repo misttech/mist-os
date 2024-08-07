@@ -4,9 +4,12 @@
 
 #include "src/ui/scenic/lib/flatland/engine/display_compositor.h"
 
+#include <fidl/fuchsia.hardware.display.types/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.display/cpp/fidl.h>
 #include <fidl/fuchsia.images2/cpp/fidl.h>
 #include <fidl/fuchsia.images2/cpp/hlcpp_conversion.h>
 #include <fidl/fuchsia.sysmem/cpp/hlcpp_conversion.h>
+#include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <fuchsia/hardware/display/cpp/fidl.h>
 #include <fuchsia/hardware/display/types/cpp/fidl.h>
 #include <lib/async/default.h>
@@ -340,10 +343,12 @@ bool DisplayCompositor::ImportBufferCollection(
   }
 
   // Import the buffer collection into the display coordinator, setting display constraints.
+  fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken> natural_display_token(
+      std::move(display_token).Unbind().TakeChannel());
   return ImportBufferCollectionToDisplayCoordinator(
-      collection_id, std::move(display_token),
-      fuchsia::hardware::display::types::ImageBufferUsage{
-          .tiling_type = fuchsia::hardware::display::types::IMAGE_TILING_TYPE_LINEAR});
+      collection_id, std::move(natural_display_token),
+      fuchsia_hardware_display_types::ImageBufferUsage{
+          {.tiling_type = fuchsia_hardware_display_types::kImageTilingTypeLinear}});
 }
 
 void DisplayCompositor::ReleaseBufferCollection(
@@ -911,10 +916,12 @@ DisplayCompositor::FrameEventData DisplayCompositor::NewFrameEventData() {
     FX_DCHECK(status == ZX_OK);
   }
 
-  result.wait_id = scenic_impl::ImportEvent(*display_coordinator_, result.wait_event);
+  fidl::UnownedClientEnd<fuchsia_hardware_display::Coordinator> coordinator =
+      scenic_impl::GetUnowned(*display_coordinator_);
+  result.wait_id = scenic_impl::ImportEvent(coordinator, result.wait_event);
   FX_DCHECK(result.wait_id.value != fuchsia::hardware::display::types::INVALID_DISP_ID);
   result.signal_event.signal(0, ZX_EVENT_SIGNALED);
-  result.signal_id = scenic_impl::ImportEvent(*display_coordinator_, result.signal_event);
+  result.signal_id = scenic_impl::ImportEvent(coordinator, result.signal_event);
   FX_DCHECK(result.signal_id.value != fuchsia::hardware::display::types::INVALID_DISP_ID);
   return result;
 }
@@ -933,7 +940,9 @@ DisplayCompositor::ImageEventData DisplayCompositor::NewImageEventData() {
     FX_DCHECK(status == ZX_OK);
   }
 
-  result.signal_id = scenic_impl::ImportEvent(*display_coordinator_, result.signal_event);
+  fidl::UnownedClientEnd<fuchsia_hardware_display::Coordinator> coordinator =
+      scenic_impl::GetUnowned(*display_coordinator_);
+  result.signal_id = scenic_impl::ImportEvent(coordinator, result.signal_event);
   FX_DCHECK(result.signal_id.value != fuchsia::hardware::display::types::INVALID_DISP_ID);
 
   return result;
@@ -1105,10 +1114,12 @@ std::vector<allocation::ImageMetadata> DisplayCompositor::AllocateDisplayRenderT
 
   {  // Set display constraints.
     std::scoped_lock lock(lock_);
+    fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken> natural_display_token(
+        std::move(display_token).Unbind().TakeChannel());
     const auto result = ImportBufferCollectionToDisplayCoordinator(
-        collection_id, std::move(display_token),
-        fuchsia::hardware::display::types::ImageBufferUsage{
-            .tiling_type = fuchsia::hardware::display::types::IMAGE_TILING_TYPE_LINEAR});
+        collection_id, std::move(natural_display_token),
+        fuchsia_hardware_display_types::ImageBufferUsage{
+            {.tiling_type = fuchsia_hardware_display_types::kImageTilingTypeLinear}});
     FX_DCHECK(result);
   }
 
@@ -1199,10 +1210,12 @@ std::vector<allocation::ImageMetadata> DisplayCompositor::AllocateDisplayRenderT
 
 bool DisplayCompositor::ImportBufferCollectionToDisplayCoordinator(
     allocation::GlobalBufferCollectionId identifier,
-    fuchsia::sysmem2::BufferCollectionTokenSyncPtr token,
-    const fuchsia::hardware::display::types::ImageBufferUsage& image_buffer_usage) {
+    fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken> token,
+    const fuchsia_hardware_display_types::ImageBufferUsage& image_buffer_usage) {
   FX_DCHECK(main_dispatcher_ == async_get_default_dispatcher());
-  return scenic_impl::ImportBufferCollection(identifier, *display_coordinator_, std::move(token),
+  fidl::UnownedClientEnd<fuchsia_hardware_display::Coordinator> coordinator =
+      scenic_impl::GetUnowned(*display_coordinator_);
+  return scenic_impl::ImportBufferCollection(identifier, coordinator, std::move(token),
                                              image_buffer_usage);
 }
 

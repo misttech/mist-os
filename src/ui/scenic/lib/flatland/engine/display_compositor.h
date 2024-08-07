@@ -5,6 +5,8 @@
 #ifndef SRC_UI_SCENIC_LIB_FLATLAND_ENGINE_DISPLAY_COMPOSITOR_H_
 #define SRC_UI_SCENIC_LIB_FLATLAND_ENGINE_DISPLAY_COMPOSITOR_H_
 
+#include <fidl/fuchsia.hardware.display.types/cpp/fidl.h>
+#include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <fuchsia/hardware/display/cpp/fidl.h>
 #include <fuchsia/hardware/display/types/cpp/fidl.h>
 #include <fuchsia/sysmem/cpp/fidl.h>
@@ -264,8 +266,8 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
 
   bool ImportBufferCollectionToDisplayCoordinator(
       allocation::GlobalBufferCollectionId identifier,
-      fuchsia::sysmem2::BufferCollectionTokenSyncPtr token,
-      const fuchsia::hardware::display::types::ImageBufferUsage& image_buffer_usage)
+      fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken> token,
+      const fuchsia_hardware_display_types::ImageBufferUsage& image_buffer_usage)
       FXL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
   // This mutex protects access to class members that are accessed on main thread and the Flatland
