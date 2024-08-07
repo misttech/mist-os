@@ -72,7 +72,7 @@ pub enum Error {
 }
 
 /// The default subnet used as the destination while populating a
-/// `fuchsia.net.stack.ForwardingEntry` while applying newly-discovered routers.
+/// [`fnet_routes_ext::Route`] while applying newly-discovered routers.
 const DEFAULT_SUBNET: net_types::ip::Subnet<Ipv4Addr> = net_declare::net_subnet_v4!("0.0.0.0/0");
 
 /// The default subnet used as the destination while populating a
