@@ -1914,6 +1914,11 @@ zx_status_t VmCowPages::AddPageLocked(VmPageOrMarker* p, uint64_t offset,
 
   // If the old entry is actual content, release it.
   if (page->IsPageOrRef()) {
+    if (page->IsReference()) {
+      // If the old entry is a reference then we know that there can be no mappings to it, since a
+      // reference cannot be mapped in, and we can skip the range update.
+      do_range_update = false;
+    }
     // We should be permitted to overwrite any kind of content (zero or non-zero).
     DEBUG_ASSERT(overwrite == CanOverwriteContent::NonZero);
     // The caller should have passed in an optional to hold the released page.
