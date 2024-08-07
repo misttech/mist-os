@@ -25,7 +25,6 @@
                 "fuchsia.boot.WriteOnlyLog",
                 "fuchsia.device.manager.Administrator",
                 "fuchsia.kernel.VmexResource",
-                "fuchsia.logger.LogSink",
                 "fuchsia.scheduler.RoleManager",
             ],
             from: "parent",
