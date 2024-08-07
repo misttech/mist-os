@@ -371,11 +371,10 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
     bool configs_are_equal = false;
     display->SetVsyncCallback(
         [&pending_config_stamp, &configs_are_equal](
-            zx::time timestamp,
-            fuchsia::hardware::display::types::ConfigStamp applied_config_stamp) {
-          if (pending_config_stamp.value == applied_config_stamp.value &&
-              applied_config_stamp.value !=
-                  fuchsia::hardware::display::types::INVALID_CONFIG_STAMP_VALUE) {
+            zx::time timestamp, fuchsia_hardware_display_types::ConfigStamp applied_config_stamp) {
+          if (pending_config_stamp.value == applied_config_stamp.value() &&
+              applied_config_stamp.value() !=
+                  fuchsia_hardware_display_types::kInvalidConfigStampValue) {
             configs_are_equal = true;
           }
         });
@@ -905,7 +904,7 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, FullscreenRectangleTest) {
   display_compositor->RenderFrame(
       1, zx::time(1),
       GenerateDisplayListForTest(
-          {{display->display_id().value, std::make_pair(display_info, root_handle)}}),
+          {{display->display_id().value(), std::make_pair(display_info, root_handle)}}),
       {}, [](const scheduling::Timestamps&) {});
 
   bool images_are_same = [&]() -> bool {
@@ -1025,7 +1024,7 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, ColorConversionTest) {
     display_compositor->RenderFrame(
         1, zx::time(1),
         GenerateDisplayListForTest(
-            {{display->display_id().value, std::make_pair(display_info, root_handle)}}),
+            {{display->display_id().value(), std::make_pair(display_info, root_handle)}}),
         {}, [](const scheduling::Timestamps&) {});
 
     // Grab the capture vmo data.
@@ -1126,7 +1125,7 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, FullscreenSolidColorRectangle
   display_compositor->RenderFrame(
       1, zx::time(1),
       GenerateDisplayListForTest(
-          {{display->display_id().value, std::make_pair(display_info, root_handle)}}),
+          {{display->display_id().value(), std::make_pair(display_info, root_handle)}}),
       {}, [](const scheduling::Timestamps&) {});
 
   // Grab the capture vmo data.
@@ -1245,7 +1244,7 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, SetMinimumRGBTest) {
   display_compositor->RenderFrame(
       1, zx::time(1),
       GenerateDisplayListForTest(
-          {{display->display_id().value, std::make_pair(display_info, root_handle)}}),
+          {{display->display_id().value(), std::make_pair(display_info, root_handle)}}),
       {}, [](const scheduling::Timestamps&) {});
 
   // Grab the capture vmo data.
@@ -1396,7 +1395,7 @@ VK_TEST_P(DisplayCompositorFallbackParameterizedPixelTest, SoftwareRenderingTest
     uint32_t width = display->width_in_px() / 2;
     uint32_t height = display->height_in_px();
 
-    render_data.display_id = display->display_id();
+    render_data.display_id = fidl::NaturalToHLCPP(display->display_id());
     render_data.rectangles.emplace_back(glm::vec2(0), glm::vec2(width, height));
     render_data.rectangles.emplace_back(glm::vec2(width, 0), glm::vec2(width, height));
 
@@ -1547,7 +1546,7 @@ VK_TEST_F(DisplayCompositorPixelTest, OverlappingTransparencyTest) {
 
     // Have the two rectangles overlap each other slightly with 25 rows in common across the
     // displays.
-    render_data.display_id = display->display_id();
+    render_data.display_id = fidl::NaturalToHLCPP(display->display_id());
     render_data.rectangles.push_back(
         {glm::vec2(0, 0), glm::vec2(width + kNumOverlappingRows, height)});
     render_data.rectangles.push_back({glm::vec2(width - kNumOverlappingRows, 0),
@@ -1773,7 +1772,7 @@ VK_TEST_P(DisplayCompositorParameterizedTest, MultipleParentPixelTest) {
   auto render_frame_result = display_compositor->RenderFrame(
       1, zx::time(1),
       GenerateDisplayListForTest(
-          {{display->display_id().value, std::make_pair(display_info, root_handle)}}),
+          {{display->display_id().value(), std::make_pair(display_info, root_handle)}}),
       {}, [](const scheduling::Timestamps&) {},
       // NOTE: this is somewhat redundant, since we also pass enable_display_composition=false into
       // the DisplayCompositor constructor.  But, no harm is done.
@@ -2011,7 +2010,7 @@ VK_TEST_P(DisplayCompositorParameterizedTest, ImageFlipRotate180DegreesPixelTest
   display_compositor->RenderFrame(
       1, zx::time(1),
       GenerateDisplayListForTest(
-          {{display->display_id().value, std::make_pair(display_info, root_handle)}}),
+          {{display->display_id().value(), std::make_pair(display_info, root_handle)}}),
       {}, [](const scheduling::Timestamps&) {});
   renderer->WaitIdle();
 
@@ -2202,10 +2201,10 @@ VK_TEST_F(DisplayCompositorPixelTest, SwitchDisplayMode) {
   };
   push_uberstruct_for_image_into_session(blue_image_metadata);
   auto blue_display_list = GenerateDisplayListForTest(
-      {{display->display_id().value, std::make_pair(display_info, root_handle)}});
+      {{display->display_id().value(), std::make_pair(display_info, root_handle)}});
   push_uberstruct_for_image_into_session(green_image_metadata);
   auto green_display_list = GenerateDisplayListForTest(
-      {{display->display_id().value, std::make_pair(display_info, root_handle)}});
+      {{display->display_id().value(), std::make_pair(display_info, root_handle)}});
 
   // FRAME 1, BLUE, GPU-COMPOSITED //////////////////////////////////////////////////////
 

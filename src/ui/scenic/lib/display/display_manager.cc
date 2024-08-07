@@ -5,6 +5,7 @@
 #include "src/ui/scenic/lib/display/display_manager.h"
 
 #include <fidl/fuchsia.hardware.display.types/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.display.types/cpp/hlcpp_conversion.h>
 #include <fidl/fuchsia.hardware.display/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.display/cpp/hlcpp_conversion.h>
 #include <fuchsia/hardware/display/cpp/fidl.h>
@@ -133,7 +134,7 @@ void DisplayManager::OnDisplaysChanged(
           fidl::HLCPPToNatural(display.pixel_format);
       const fuchsia::hardware::display::Mode& mode = display.modes[mode_index];
       default_display_ = std::make_unique<Display>(
-          display.id, mode.horizontal_resolution, mode.vertical_resolution,
+          fidl::HLCPPToNatural(display.id), mode.horizontal_resolution, mode.vertical_resolution,
           display.horizontal_size_mm, display.vertical_size_mm, std::move(pixel_formats),
           mode.refresh_rate_e2 * kMillihertzPerCentihertz);
       OnClientOwnershipChange(owns_display_coordinator_);
@@ -146,7 +147,7 @@ void DisplayManager::OnDisplaysChanged(
   }
 
   for (fuchsia::hardware::display::types::DisplayId id : removed) {
-    if (default_display_ && fidl::Equals(default_display_->display_id(), id)) {
+    if (default_display_ && default_display_->display_id() == fidl::HLCPPToNatural(id)) {
       // TODO(https://fxbug.dev/42097581): handle this more robustly.
       FX_CHECK(false) << "Display disconnected";
       return;
@@ -189,10 +190,10 @@ void DisplayManager::OnVsync(fuchsia::hardware::display::types::DisplayId displa
   if (!default_display_) {
     return;
   }
-  if (!fidl::Equals(default_display_->display_id(), display_id)) {
+  if (default_display_->display_id() != fidl::HLCPPToNatural(display_id)) {
     return;
   }
-  default_display_->OnVsync(zx::time(timestamp), applied_config_stamp);
+  default_display_->OnVsync(zx::time(timestamp), fidl::HLCPPToNatural(applied_config_stamp));
 }
 
 }  // namespace display

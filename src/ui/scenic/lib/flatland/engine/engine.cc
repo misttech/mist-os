@@ -4,6 +4,8 @@
 
 #include "src/ui/scenic/lib/flatland/engine/engine.h"
 
+#include <fidl/fuchsia.hardware.display.types/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.display.types/cpp/hlcpp_conversion.h>
 #include <lib/async/cpp/time.h>
 #include <lib/syslog/cpp/macros.h>
 
@@ -117,10 +119,10 @@ void Engine::RenderScheduledFrame(uint64_t frame_number, zx::time presentation_t
                             hw_display->device_pixel_ratio(), scene_state.snapshot);
 
   // TODO(https://fxbug.dev/42156567): hack!  need a better place to call AddDisplay().
-  if (hack_seen_display_id_values_.find(hw_display->display_id().value) ==
+  if (hack_seen_display_id_values_.find(hw_display->display_id().value()) ==
       hack_seen_display_id_values_.end()) {
     // This display hasn't been added to the DisplayCompositor yet.
-    hack_seen_display_id_values_.insert(hw_display->display_id().value);
+    hack_seen_display_id_values_.insert(hw_display->display_id().value());
 
     DisplayInfo display_info{
         .dimensions = glm::uvec2{hw_display->width_in_px(), hw_display->height_in_px()},
@@ -150,11 +152,12 @@ void Engine::RenderScheduledFrame(uint64_t frame_number, zx::time presentation_t
     first_frame_with_image_is_rendered_ = true;
   }
 
-  flatland_compositor_->RenderFrame(frame_number, presentation_time,
-                                    {{.rectangles = std::move(scene_state.image_rectangles),
-                                      .images = std::move(scene_state.images),
-                                      .display_id = hw_display->display_id()}},
-                                    flatland_presenter_->TakeReleaseFences(), std::move(callback));
+  flatland_compositor_->RenderFrame(
+      frame_number, presentation_time,
+      {{.rectangles = std::move(scene_state.image_rectangles),
+        .images = std::move(scene_state.images),
+        .display_id = fidl::NaturalToHLCPP(hw_display->display_id())}},
+      flatland_presenter_->TakeReleaseFences(), std::move(callback));
 }
 
 view_tree::SubtreeSnapshot Engine::GenerateViewTreeSnapshot(

@@ -4,6 +4,9 @@
 
 #include "src/ui/scenic/lib/display/display_power_manager.h"
 
+#include <fidl/fuchsia.hardware.display.types/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.display.types/cpp/hlcpp_conversion.h>
+#include <fuchsia/hardware/display/types/cpp/fidl.h>
 #include <fuchsia/ui/display/internal/cpp/fidl.h>
 #include <zircon/errors.h>
 #include <zircon/status.h>
@@ -41,7 +44,8 @@ void DisplayPowerManager::SetDisplayPower(bool power_on, SetDisplayPowerCallback
   // Once Scenic and DisplayManager supports multiple displays, this needs to
   // be updated to control power of all available displays.
   FX_DCHECK(display_manager_.default_display_coordinator());
-  auto id = display_manager_.default_display()->display_id();
+  fuchsia::hardware::display::types::DisplayId id =
+      fidl::NaturalToHLCPP(display_manager_.default_display()->display_id());
 
   fuchsia::hardware::display::Coordinator_SetDisplayPower_Result set_display_power_result;
   auto status = (*display_manager_.default_display_coordinator())

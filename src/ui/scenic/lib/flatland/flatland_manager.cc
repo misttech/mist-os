@@ -4,6 +4,7 @@
 
 #include "src/ui/scenic/lib/flatland/flatland_manager.h"
 
+#include <fidl/fuchsia.hardware.display.types/cpp/fidl.h>
 #include <lib/async/cpp/task.h>
 #include <lib/async/default.h>
 #include <lib/fidl/cpp/hlcpp_conversion.h>
@@ -189,7 +190,7 @@ void FlatlandManager::CreateFlatlandDisplay(
 
   if (hw_display->is_claimed()) {
     // TODO(https://fxbug.dev/42156567): error reporting direct to client somehow?
-    FX_LOGS(ERROR) << "Display id=" << hw_display->display_id().value
+    FX_LOGS(ERROR) << "Display id=" << hw_display->display_id().value()
                    << " is already claimed, cannot instantiate FlatlandDisplay.";
     return;
   }

@@ -4,6 +4,7 @@
 
 #include "src/ui/scenic/lib/flatland/flatland.h"
 
+#include <fidl/fuchsia.hardware.display.types/cpp/fidl.h>
 #include <fidl/fuchsia.ui.composition/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
@@ -471,7 +472,7 @@ class FlatlandTest : public LoggingEventLoop, public ::testing::Test {
                                                          uint32_t height_in_px) {
     auto session_id = scheduling::GetNextSessionId();
     auto display = std::make_shared<scenic_impl::display::Display>(
-        fuchsia::hardware::display::types::DisplayId{.value = 1}, width_in_px, height_in_px);
+        fuchsia_hardware_display_types::DisplayId{{.value = 1}}, width_in_px, height_in_px);
     flatland_displays_.push_back({});
     return FlatlandDisplay::New(
         std::make_shared<utils::UnownedDispatcherHolder>(dispatcher()),

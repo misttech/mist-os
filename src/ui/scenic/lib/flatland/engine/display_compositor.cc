@@ -964,12 +964,12 @@ void DisplayCompositor::AddDisplay(scenic_impl::display::Display* display, const
 
   const fuchsia::math::SizeU size = {/*width*/ info.dimensions.x, /*height*/ info.dimensions.y};
 
-  const fuchsia::hardware::display::types::DisplayId display_id = display->display_id();
-  FX_DCHECK(display_engine_data_map_.find(display_id.value) == display_engine_data_map_.end())
-      << "DisplayCompositor::AddDisplay(): display already exists: " << display_id.value;
+  const fuchsia_hardware_display_types::DisplayId display_id = display->display_id();
+  FX_DCHECK(display_engine_data_map_.find(display_id.value()) == display_engine_data_map_.end())
+      << "DisplayCompositor::AddDisplay(): display already exists: " << display_id.value();
 
-  display_info_map_[display_id.value] = std::move(info);
-  DisplayEngineData& display_engine_data = display_engine_data_map_[display_id.value];
+  display_info_map_[display_id.value()] = std::move(info);
+  DisplayEngineData& display_engine_data = display_engine_data_map_[display_id.value()];
 
   {
     std::scoped_lock lock(lock_);
@@ -986,9 +986,9 @@ void DisplayCompositor::AddDisplay(scenic_impl::display::Display* display, const
   // |display| and other clients won't receive any, i.e. gfx.
   display->SetVsyncCallback(
       [weak_ref = weak_from_this()](
-          zx::time timestamp, fuchsia::hardware::display::types::ConfigStamp applied_config_stamp) {
+          zx::time timestamp, fuchsia_hardware_display_types::ConfigStamp applied_config_stamp) {
         if (auto ref = weak_ref.lock())
-          ref->OnVsync(timestamp, applied_config_stamp);
+          ref->OnVsync(timestamp, fidl::NaturalToHLCPP(applied_config_stamp));
       });
 
   // Exit early if there are no vmos to create.

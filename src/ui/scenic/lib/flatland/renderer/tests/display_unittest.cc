@@ -91,8 +91,8 @@ class DisplayTest : public gtest::RealLoopFixture {
     }
     const fuchsia::hardware::display::LayerId layer_id = result.response().layer_id;
 
-    const zx_status_t set_display_layers_status =
-        display_coordinator->SetDisplayLayers(display->display_id(), {layer_id});
+    const zx_status_t set_display_layers_status = display_coordinator->SetDisplayLayers(
+        fidl::NaturalToHLCPP(display->display_id()), {layer_id});
     if (set_display_layers_status != ZX_OK) {
       FX_LOGS(ERROR) << "Failed to configure display layers: "
                      << zx_status_get_string(set_display_layers_status);

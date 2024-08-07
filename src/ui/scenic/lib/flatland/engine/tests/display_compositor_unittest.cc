@@ -1032,6 +1032,8 @@ TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessTest) {
   child_session.PushUberStruct(std::move(child_struct));
 
   constexpr fuchsia::hardware::display::types::DisplayId kDisplayId = {.value = 1};
+  const fuchsia_hardware_display_types::DisplayId kNaturalDisplayId =
+      fidl::HLCPPToNatural(fuchsia::hardware::display::types::DisplayId(kDisplayId));
   glm::uvec2 resolution(1024, 768);
 
   // We will end up with 2 source rectangles, 2 destination rectangles, and two
@@ -1176,7 +1178,7 @@ TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessTest) {
   EXPECT_CALL(*renderer_, ChoosePreferredPixelFormat(_));
 
   DisplayInfo display_info = {resolution, {kPixelFormat}};
-  scenic_impl::display::Display display(kDisplayId, resolution.x, resolution.y);
+  scenic_impl::display::Display display(kNaturalDisplayId, resolution.x, resolution.y);
   display_compositor_->AddDisplay(&display, display_info, /*num_vmos*/ 0,
                                   /*out_buffer_collection*/ nullptr);
 
@@ -1249,6 +1251,8 @@ void DisplayCompositorTest::HardwareFrameCorrectnessWithRotationTester(
   parent_session.PushUberStruct(std::move(parent_struct));
 
   constexpr fuchsia::hardware::display::types::DisplayId kDisplayId = {.value = 1};
+  const fuchsia_hardware_display_types::DisplayId kNaturalDisplayId =
+      fidl::HLCPPToNatural(fuchsia::hardware::display::types::DisplayId(kDisplayId));
   glm::uvec2 resolution(1024, 768);
 
   // We will end up with 1 source frame, 1 destination frame, and one layer being sent to the
@@ -1368,7 +1372,7 @@ void DisplayCompositorTest::HardwareFrameCorrectnessWithRotationTester(
   EXPECT_CALL(*renderer_, ChoosePreferredPixelFormat(_));
 
   DisplayInfo display_info = {resolution, {kPixelFormat}};
-  scenic_impl::display::Display display(kDisplayId, resolution.x, resolution.y);
+  scenic_impl::display::Display display(kNaturalDisplayId, resolution.x, resolution.y);
   display_compositor_->AddDisplay(&display, display_info, /*num_vmos*/ 0,
                                   /*out_buffer_collection*/ nullptr);
 
@@ -1665,9 +1669,11 @@ TEST_F(DisplayCompositorTest, ChecksDisplayImageSignalFences) {
 
   // Add display.
   constexpr fuchsia::hardware::display::types::DisplayId kDisplayId = {.value = 1};
+  const fuchsia_hardware_display_types::DisplayId kNaturalDisplayId =
+      fidl::HLCPPToNatural(fuchsia::hardware::display::types::DisplayId(kDisplayId));
   glm::uvec2 kResolution(1024, 768);
   DisplayInfo display_info = {kResolution, {kPixelFormat}};
-  scenic_impl::display::Display display(kDisplayId, kResolution.x, kResolution.y);
+  scenic_impl::display::Display display(kNaturalDisplayId, kResolution.x, kResolution.y);
   display_compositor_->AddDisplay(&display, display_info, /*num_vmos*/ 0,
                                   /*out_buffer_collection*/ nullptr);
 
