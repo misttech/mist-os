@@ -18,7 +18,10 @@ use ebpf::converter::{bpf_addressing_mode, bpf_class};
 #[cfg(not(feature = "starnix_lite"))]
 use ebpf::program::EbpfProgram;
 use starnix_lifecycle::AtomicU64Counter;
+#[cfg(not(feature = "starnix_lite"))]
 use starnix_logging::{log_warn, track_stub};
+#[cfg(feature = "starnix_lite")]
+use starnix_logging::track_stub;
 use starnix_sync::{FileOpsCore, Locked, Mutex, Unlocked};
 use starnix_syscalls::decls::Syscall;
 use starnix_syscalls::{SyscallArg, SyscallResult};
@@ -100,14 +103,17 @@ impl SeccompFilter {
     /// Creates a SeccompFilter object from the given sock_filter.  Associates the user-provided
     /// id with it, which is intended to be unique to this process.
     pub fn from_cbpf(
-        code: &Vec<sock_filter>,
-        maybe_unique_id: u64,
-        should_log: bool,
+        #[cfg(not(feature = "starnix_lite"))] code: &Vec<sock_filter>,
+        #[cfg(feature = "starnix_lite")] _code: &Vec<sock_filter>,
+        #[cfg(not(feature = "starnix_lite"))] maybe_unique_id: u64,
+        #[cfg(feature = "starnix_lite")] _maybe_unique_id: u64,
+        #[cfg(not(feature = "starnix_lite"))] should_log: bool,
+        #[cfg(feature = "starnix_lite")] _should_log: bool,
     ) -> Result<Self, Errno> {
         // If an instruction loads from / stores to an absolute address, that address has to be
         // 32-bit aligned and inside the struct seccomp_data passed in.
+        #[cfg(not(feature = "starnix_lite"))]
         for insn in code {
-            #[cfg(not(feature = "starnix_lite"))]
             if (bpf_class(insn) == BPF_LD || bpf_class(insn) == BPF_ST)
                 && (bpf_addressing_mode(insn) == BPF_ABS)
                 && (insn.k & 0x3 != 0 || std::mem::size_of::<seccomp_data>() < insn.k as usize)
@@ -134,8 +140,14 @@ impl SeccompFilter {
         error!(EINVAL)
     }
 
+    #[cfg(not(feature = "starnix_lite"))]
     pub fn run(&self, data: &mut seccomp_data) -> u32 {
         self.program.run(&mut (), data) as u32
+    }
+
+    #[cfg(feature = "starnix_lite")]
+    pub fn run(&self, _data: &mut seccomp_data) -> u32 {
+        0u32
     }
 }
 

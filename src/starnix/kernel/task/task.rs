@@ -6,20 +6,12 @@ use crate::mm::{DumpPolicy, MemoryAccessor, MemoryAccessorExt, MemoryManager, Ta
 use crate::mutable_state::{state_accessor, state_implementation};
 use crate::security;
 use crate::signals::{RunState, SignalInfo, SignalState};
-#[cfg(not(feature = "starnix_lite"))]
 use crate::task::{
     set_thread_role, AbstractUnixSocketNamespace, AbstractVsockSocketNamespace, CurrentTask,
     EventHandler, Kernel, ProcessEntryRef, ProcessExitInfo, PtraceEvent, PtraceEventData,
     PtraceState, PtraceStatus, SchedulerPolicy, SeccompFilterContainer, SeccompState,
     SeccompStateValue, ThreadGroup, ThreadState, UtsNamespaceHandle, WaitCanceler, Waiter,
     ZombieProcess,
-};
-#[cfg(feature = "starnix_lite")]
-use crate::task::{
-    set_thread_role, AbstractUnixSocketNamespace, AbstractVsockSocketNamespace, CurrentTask,
-    EventHandler, Kernel, ProcessEntryRef, ProcessExitInfo, PtraceEvent, PtraceEventData,
-    PtraceState, PtraceStatus, SchedulerPolicy, ThreadGroup, ThreadState, UtsNamespaceHandle,
-    WaitCanceler, Waiter, ZombieProcess,
 };
 use crate::vfs::{FdFlags, FdNumber, FdTable, FileHandle, FsContext, FsNodeHandle, FsString};
 use bitflags::bitflags;
@@ -367,7 +359,6 @@ pub struct TaskMutableState {
     pub oom_score_adj: i32,
 
     /// List of currently installed seccomp_filters
-    #[cfg(not(feature = "starnix_lite"))]
     pub seccomp_filters: SeccompFilterContainer,
 
     /// A pointer to the head of the robust futex list of this thread in
@@ -937,7 +928,6 @@ pub struct Task {
 
     /// Variable that can tell you whether there are currently seccomp
     /// filters without holding a lock
-    #[cfg(not(feature = "starnix_lite"))]
     pub seccomp_filter_state: SeccompState,
 
     /// Used to ensure that all logs related to this task carry the same metadata about the task.
@@ -1068,8 +1058,8 @@ impl Task {
         scheduler_policy: SchedulerPolicy,
         uts_ns: UtsNamespaceHandle,
         no_new_privs: bool,
-        #[cfg(not(feature = "starnix_lite"))] seccomp_filter_state: SeccompState,
-        #[cfg(not(feature = "starnix_lite"))] seccomp_filters: SeccompFilterContainer,
+        seccomp_filter_state: SeccompState,
+        seccomp_filters: SeccompFilterContainer,
         robust_list_head: UserRef<robust_list_head>,
         timerslack_ns: u64,
         security_state: security::TaskState,
@@ -1095,7 +1085,6 @@ impl Task {
                 uts_ns,
                 no_new_privs,
                 oom_score_adj: Default::default(),
-                #[cfg(not(feature = "starnix_lite"))]
                 seccomp_filters,
                 robust_list_head,
                 timerslack_ns,
@@ -1106,7 +1095,6 @@ impl Task {
                 security_state,
             }),
             persistent_info: TaskPersistentInfoState::new(id, pid, command, creds, exit_signal),
-            #[cfg(not(feature = "starnix_lite"))]
             seccomp_filter_state,
             logging_span: OnceCell::new(),
             trace_syscalls: AtomicBool::new(false),
@@ -1454,7 +1442,6 @@ impl Task {
         };
     }
 
-    #[cfg(not(feature = "starnix_lite"))]
     pub fn set_seccomp_state(&self, state: SeccompStateValue) -> Result<(), Errno> {
         self.seccomp_filter_state.set(&state)
     }

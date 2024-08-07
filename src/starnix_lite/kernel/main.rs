@@ -98,12 +98,12 @@ fn main() -> Result<(), Error> {
         init: vec!["/bin/nolibc-test".to_owned()],
         kernel_cmdline: Default::default(),
         mounts: vec![
-            "/:remotefs".to_owned(),
-            "/dev:devtmpfs".to_owned(),
-            "/dev/pts:devpts".to_owned(),
-            "/dev/shm:tmpfs".to_owned(),
-            "/proc:proc".to_owned(),
-            "/sys:sysfs".to_owned(),
+            "/:remote_bundle:data/system:nosuid,nodev,relatime".to_owned(),
+            "/dev:devtmpfs::nosuid,relatime".to_owned(),
+            "/dev/pts:devpts::nosuid,noexec,relatime".to_owned(),
+            "/dev/shm:tmpfs::nosuid,nodev".to_owned(),
+            "/proc:proc::nosuid,nodev,noexec,relatime".to_owned(),
+            "/sys:sysfs::nosuid,nodev,noexec,relatime".to_owned(),
             "/tmp:tmpfs".to_owned(),
         ],
 

@@ -667,6 +667,7 @@ where
     Ok(())
 }
 
+#[cfg(not(feature = "starnix_lite"))]
 fn parse_block_size(block_size_str: &str) -> Result<u64, Error> {
     if block_size_str.is_empty() {
         return Err(anyhow!("Invalid empty block size"));
@@ -686,6 +687,7 @@ fn parse_block_size(block_size_str: &str) -> Result<u64, Error> {
         .and_then(|val| multiplier.checked_mul(val).ok_or(anyhow!("Block size overflow")))
 }
 
+#[cfg(not(feature = "starnix_lite"))]
 fn create_remote_block_device_from_spec<'a, L>(
     locked: &mut Locked<'_, L>,
     current_task: &CurrentTask,
