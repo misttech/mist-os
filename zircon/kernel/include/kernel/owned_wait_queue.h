@@ -315,7 +315,18 @@ class OwnedWaitQueue : protected WaitQueue, public fbl::DoublyLinkedListable<Own
 
   // Accessor used only by the scheduler's PiNodeAdapter to handle bookkeeping
   // during profile inheritance situations.
-  SchedulerState::WaitQueueInheritedSchedulerState* inherited_scheduler_state_storage() {
+  SchedulerState::WaitQueueInheritedSchedulerState* inherited_scheduler_state_storage()
+      TA_REQ(get_lock()) {
+    return inherited_scheduler_state_storage_;
+  }
+
+  const SchedulerState::WaitQueueInheritedSchedulerState* inherited_scheduler_state_storage() const
+      TA_REQ(get_lock()) {
+    return inherited_scheduler_state_storage_;
+  }
+
+  const SchedulerState::WaitQueueInheritedSchedulerState* const_inherited_scheduler_state_storage()
+      const TA_REQ(get_lock()) {
     return inherited_scheduler_state_storage_;
   }
 

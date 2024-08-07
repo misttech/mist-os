@@ -294,8 +294,8 @@ class DeadlineProfile : public Profile {
 };
 
 // Helper wrapper for an owned wait queue which manages grabbing and releasing
-// the thread lock at appropriate times for us.  Mostly, this is just about
-// saving some typing.
+// the locks or disabling preemption at appropriate times for us.  Mostly, this
+// is just about saving some typing.
 class LockedOwnedWaitQueue : public OwnedWaitQueue {
  public:
   constexpr LockedOwnedWaitQueue() = default;
@@ -309,6 +309,12 @@ class LockedOwnedWaitQueue : public OwnedWaitQueue {
   void ReleaseOneThread() {
     AnnotatedAutoEagerReschedDisabler eager_resched_disabler;
     OwnedWaitQueue::WakeThreadAndAssignOwner();
+  }
+
+  bool HasInheritedSchedulerStateStorage() const {
+    SingletonChainLockGuardIrqSave guard{
+        get_lock(), CLT_TAG("LockedOwnedWaitQueue::HasInheritedSchedulerStateStorage (pi_tests)")};
+    return inherited_scheduler_state_storage() != nullptr;
   }
 };
 
@@ -1625,17 +1631,20 @@ bool bug_42182770_regression() {
 
     // Verify that the OWQ has no inherited profile storage allocated to it.  This
     // should always be the case when there are no waiters.
-    EXPECT_NULL(owq->inherited_scheduler_state_storage());
+    EXPECT_FALSE(owq->HasInheritedSchedulerStateStorage());
 
     // Now, block the fair thread on the queue, and verify the IPV state.  There
     // should be storage allocated at this point in time, but because the
     // blocked thread's profile is not inheritable, there should be no inherited
     // utilization in the queue's values.
     ASSERT_TRUE(fair_thread.BlockOnOwnedWaitQueue(owq.get(), nullptr));
-    ASSERT_NONNULL(owq->inherited_scheduler_state_storage());
     {
+      SingletonChainLockGuardIrqSave guard{owq->get_lock(),
+                                           CLT_TAG("pi_tests::bug_42182770_regression #1")};
+      ASSERT_NONNULL(owq->inherited_scheduler_state_storage());
+
       const SchedulerState::WaitQueueInheritedSchedulerState& iss =
-          *owq->inherited_scheduler_state_storage();
+          *owq->const_inherited_scheduler_state_storage();
       EXPECT_EQ(iss.ipvs.total_weight.raw_value(), inheritable_weight.raw_value());
       EXPECT_EQ(iss.ipvs.uncapped_utilization.raw_value(), SchedUtilization{0}.raw_value());
       EXPECT_EQ(iss.ipvs.min_deadline.raw_value(), SchedDuration::Max().raw_value());
@@ -1649,12 +1658,15 @@ bool bug_42182770_regression() {
     // parameters since it is the only "consequential" thread blocked in the
     // queue.
     ASSERT_TRUE(deadline_thread.BlockOnOwnedWaitQueue(owq.get(), nullptr));
-    ASSERT_NONNULL(owq->inherited_scheduler_state_storage());
     {
+      SingletonChainLockGuardIrqSave guard{owq->get_lock(),
+                                           CLT_TAG("pi_tests::bug_42182770_regression #2")};
+      ASSERT_NONNULL(owq->const_inherited_scheduler_state_storage());
+
       const SchedDeadlineParams& params =
           static_cast<DeadlineProfile*>(deadline_profile.get())->sched_params();
       const SchedulerState::WaitQueueInheritedSchedulerState& iss =
-          *owq->inherited_scheduler_state_storage();
+          *owq->const_inherited_scheduler_state_storage();
       EXPECT_EQ(iss.ipvs.total_weight.raw_value(), inheritable_weight.raw_value());
       EXPECT_EQ(iss.ipvs.uncapped_utilization.raw_value(), params.utilization.raw_value());
       EXPECT_EQ(iss.ipvs.min_deadline.raw_value(), params.deadline_ns.raw_value());
@@ -1679,8 +1691,12 @@ bool bug_42182770_regression() {
     // considered to be undefined.
     ASSERT_TRUE(deadline_thread.Reset(true));
     {
+      SingletonChainLockGuardIrqSave guard{owq->get_lock(),
+                                           CLT_TAG("pi_tests::bug_42182770_regression #3")};
+      ASSERT_NONNULL(owq->const_inherited_scheduler_state_storage());
+
       const SchedulerState::WaitQueueInheritedSchedulerState& iss =
-          *owq->inherited_scheduler_state_storage();
+          *owq->const_inherited_scheduler_state_storage();
       EXPECT_EQ(iss.ipvs.total_weight.raw_value(), inheritable_weight.raw_value());
       EXPECT_EQ(iss.ipvs.uncapped_utilization.raw_value(), SchedUtilization{0}.raw_value());
       EXPECT_EQ(iss.ipvs.min_deadline.raw_value(), SchedDuration::Max().raw_value());
@@ -1696,7 +1712,7 @@ bool bug_42182770_regression() {
     TestThread::ClearShutdownBarrier();
     owq->ReleaseAllThreads();
     ASSERT_TRUE(fair_thread.Reset());
-    ASSERT_NULL(owq->inherited_scheduler_state_storage());
+    ASSERT_FALSE(owq->HasInheritedSchedulerStateStorage());
   }
 
   END_TEST;
