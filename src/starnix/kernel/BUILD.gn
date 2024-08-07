@@ -302,6 +302,7 @@ rustc_library("starnix_core") {
 
   if (is_mistos) {
     sources -= [
+      "arch/${current_cpu}/vdso.rs",
       "bpf/fs.rs",
       "bpf/helpers.rs",
       "bpf/map.rs",
@@ -316,6 +317,8 @@ rustc_library("starnix_core") {
       "device/framebuffer_server.rs",
       "device/perfetto_consumer.rs",
       "device/touch_power_policy_device.rs",
+      "vdso/mod.rs",
+      "vdso/vdso_loader.rs",
     ]
   }
 
@@ -453,6 +456,7 @@ rustc_library("starnix_core") {
   if (is_mistos) {
     deps -= [
       ":perfetto_consumer_proto",
+      ":vdso-data($bionic_linux_toolchain)",
       "//sdk/fidl/fuchsia.element:fuchsia.element_rust",
       "//sdk/fidl/fuchsia.images2:fuchsia.images2_rust",
       "//sdk/fidl/fuchsia.math:fuchsia.math_rust",
@@ -466,6 +470,7 @@ rustc_library("starnix_core") {
       "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_rust",
       "//src/connectivity/wlan/wlanix:fuchsia.wlan.wlanix_rust",
       "//src/graphics/lib/magma/src/libmagma",
+      "//src/lib/fuchsia-fs",
       "//src/lib/trace/rust:trace-observer",
       "//src/lib/ui/flatland-frame-scheduling:flatland-frame-scheduling-lib",
       "//src/lib/ui/fuchsia-framebuffer",
