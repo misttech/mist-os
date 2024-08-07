@@ -45,15 +45,6 @@
             to: "#netemul",
         },
         {
-            protocol: "fuchsia.logger.LogSink",
-            from: "parent",
-            to: [
-                "#netemul",
-                "#network-context",
-                "#network-tun",
-            ],
-        },
-        {
             protocol: "fuchsia.net.tun.Control",
             from: "#network-tun",
             to: [
