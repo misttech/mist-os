@@ -2,6 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// The json! macro in tests heavily uses recursion.
+#![cfg_attr(test, recursion_limit = "256")]
+
 use crate::list::DeviceQuery;
 use async_trait::async_trait;
 use blocking::Unblock;
@@ -15,7 +18,6 @@ use fuchsia_audio::device::Selector;
 use fuchsia_audio::Registry;
 use fuchsia_zircon_status::Status;
 use futures::{AsyncWrite, FutureExt};
-use prettytable::Table;
 use serde::Serialize;
 use std::io::{Read, Write};
 use {
@@ -210,8 +212,7 @@ async fn device_info(
     if writer.is_machine() {
         writer.machine(&result)?;
     } else {
-        let table = Table::from(info_result);
-        table.print(&mut writer).bug_context("failed to write output")?;
+        write!(writer, "{}", info_result).bug_context("failed to write output")?;
     }
 
     Ok(())
