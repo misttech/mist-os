@@ -6341,6 +6341,16 @@ void VmCowPages::RangeChangeUpdateLocked(uint64_t offset, uint64_t len, RangeCha
     return;
   }
 
+  // If we have no children then we can avoid building a processing a list and just directly
+  // process any referenced paged_ref_.
+  if (children_list_len_ == 0) {
+    if (paged_ref_) {
+      AssertHeld(paged_ref_->lock_ref());
+      paged_ref_->RangeChangeUpdateLocked(offset, len, op);
+    }
+    return;
+  }
+
   RangeChangeList list;
   this->range_change_offset_ = offset;
   this->range_change_len_ = len;
