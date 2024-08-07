@@ -12,6 +12,7 @@ use anyhow::{anyhow, bail, Context as _, Result};
 use flyweights::FlyStr;
 use itertools::Itertools;
 
+use crate::ir::Declaration;
 use crate::{compare, ir, Version};
 
 #[derive(Clone)]
@@ -46,7 +47,7 @@ impl Context {
         context
     }
 
-    pub fn get(&self, name: &str) -> Result<ir::Declaration> {
+    pub fn get(&self, name: &str) -> Result<&ir::Declaration> {
         self.ir.get(name)
     }
 
@@ -157,7 +158,7 @@ impl ConvertType for ir::Type {
                         protocol.name.clone(),
                         protocol_transport.into(),
                         convert_nullable(nullable),
-                        Box::new(convert_protocol(&protocol, context)?),
+                        Box::new(convert_protocol(&protocol, context.clone())?),
                     )
                 } else {
                     panic!("Got server_end for {decl:?}");
@@ -174,17 +175,17 @@ impl ConvertType for ir::Type {
                             protocol.name.clone(),
                             protocol_transport.into(),
                             convert_nullable(nullable),
-                            Box::new(convert_protocol(&protocol, context)?),
+                            Box::new(convert_protocol(&protocol, context.clone())?),
                         )
                     } else {
                         assert!(protocol_transport.is_none());
                         let path = context.path.clone();
                         let t = match decl {
-                            ir::Declaration::Bits(decl) => decl.convert(context)?,
-                            ir::Declaration::Enum(decl) => decl.convert(context)?,
-                            ir::Declaration::Struct(decl) => decl.convert(context)?,
-                            ir::Declaration::Table(decl) => decl.convert(context)?,
-                            ir::Declaration::Union(decl) => decl.convert(context)?,
+                            ir::Declaration::Bits(decl) => decl.convert(context.clone())?,
+                            ir::Declaration::Enum(decl) => decl.convert(context.clone())?,
+                            ir::Declaration::Struct(decl) => decl.convert(context.clone())?,
+                            ir::Declaration::Table(decl) => decl.convert(context.clone())?,
+                            ir::Declaration::Union(decl) => decl.convert(context.clone())?,
                             ir::Declaration::Protocol(_) => panic!("Handled in the if let above."),
                         };
 
@@ -504,14 +505,16 @@ pub fn convert_abi_surface(ir: Rc<ir::IR>) -> Result<compare::AbiSurface> {
     let mut abi_surface =
         compare::AbiSurface { version, discoverable: HashMap::new(), tear_off: HashMap::new() };
 
-    for decl in &ir.protocol_declarations {
-        let protocol = convert_protocol(decl, context.clone())?;
+    for decl in ir.declarations.values() {
+        if let Declaration::Protocol(decl) = decl {
+            let protocol = convert_protocol(decl, context.clone())?;
 
-        if let Some(discoverable) = protocol.discoverable.clone() {
-            abi_surface.discoverable.insert(discoverable.name, protocol);
-        } else {
-            abi_surface.tear_off.insert(decl.name.clone(), protocol);
-        };
+            if let Some(discoverable) = protocol.discoverable.clone() {
+                abi_surface.discoverable.insert(discoverable.name, protocol);
+            } else {
+                abi_surface.tear_off.insert(decl.name.clone(), protocol);
+            };
+        }
     }
 
     Ok(abi_surface)

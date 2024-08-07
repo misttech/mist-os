@@ -5,7 +5,7 @@
 //! This module is concerned with reading the FIDL JSON IR. It supports a subset
 //! of the IR that is relevant to version compatibility comparisons.
 
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{anyhow, Context, Result};
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::fmt::Display;
@@ -228,8 +228,8 @@ pub enum Declaration {
     Union(UnionDeclaration),
 }
 
-#[derive(Deserialize, Debug)]
-pub struct IR {
+#[derive(Deserialize, Default)]
+struct InternalIR {
     #[cfg(test)]
     pub maybe_attributes: Option<Vec<Attribute>>,
     pub available: HashMap<String, Vec<String>>,
@@ -242,11 +242,51 @@ pub struct IR {
     declarations: HashMap<String, DeclarationKind>,
 }
 
+pub struct IR {
+    pub declarations: HashMap<String, Declaration>,
+    pub available: HashMap<String, Vec<String>>,
+}
+
 impl IR {
+    fn from_internal(internal: InternalIR) -> Rc<Self> {
+        let mut declarations = HashMap::with_capacity(internal.declarations.len());
+        declarations.extend(
+            internal.bits_declarations.into_iter().map(|d| (d.name.clone(), Declaration::Bits(d))),
+        );
+        declarations.extend(
+            internal.enum_declarations.into_iter().map(|d| (d.name.clone(), Declaration::Enum(d))),
+        );
+        declarations.extend(
+            internal
+                .protocol_declarations
+                .into_iter()
+                .map(|d| (d.name.clone(), Declaration::Protocol(d))),
+        );
+        declarations.extend(
+            internal
+                .struct_declarations
+                .into_iter()
+                .map(|d| (d.name.clone(), Declaration::Struct(d))),
+        );
+        declarations.extend(
+            internal
+                .table_declarations
+                .into_iter()
+                .map(|d| (d.name.clone(), Declaration::Table(d))),
+        );
+        declarations.extend(
+            internal
+                .union_declarations
+                .into_iter()
+                .map(|d| (d.name.clone(), Declaration::Union(d))),
+        );
+
+        Rc::new(Self { declarations, available: internal.available })
+    }
     pub fn load(path: impl AsRef<Path>) -> Result<Rc<Self>> {
         let file = fs::File::open(path)?;
         let reader = BufReader::new(file);
-        Ok(Rc::new(serde_json::from_reader(reader)?))
+        Ok(Self::from_internal(serde_json::from_reader(reader)?))
     }
 
     #[cfg(test)]
@@ -258,51 +298,13 @@ impl IR {
         testing::ir_from_source(fuchsia_available, fidl_source, library_name)
     }
 
-    pub fn get(&self, name: &str) -> Result<Declaration> {
-        let kind = self
-            .declarations
-            .get(name)
-            .ok_or_else(|| anyhow!("Declaration not found: {}", name))?;
-        use DeclarationKind::*;
-        let declaration = match kind {
-            Bits => Declaration::Bits(
-                self.bits_declarations.iter().find(|&d| d.name == name).unwrap().clone(),
-            ),
-            Enum => Declaration::Enum(
-                self.enum_declarations.iter().find(|&d| d.name == name).unwrap().clone(),
-            ),
-            Protocol => Declaration::Protocol(
-                self.protocol_declarations.iter().find(|&d| d.name == name).unwrap().clone(),
-            ),
-            Struct => Declaration::Struct(
-                self.struct_declarations.iter().find(|&d| d.name == name).unwrap().clone(),
-            ),
-            Table => Declaration::Table(
-                self.table_declarations.iter().find(|&d| d.name == name).unwrap().clone(),
-            ),
-            Union => Declaration::Union(
-                self.union_declarations.iter().find(|&d| d.name == name).unwrap().clone(),
-            ),
-            _ => bail!("Unsupported declaration kind ({:?}) for: {}", kind, name),
-        };
-
-        Ok(declaration)
+    pub fn get(&self, name: &str) -> Result<&Declaration> {
+        self.declarations.get(name).ok_or_else(|| anyhow!("Declaration not found: {}", name))
     }
 
     #[cfg(test)]
     pub fn empty_for_tests() -> Rc<Self> {
-        use maplit::hashmap;
-        return Rc::new(Self {
-            maybe_attributes: None,
-            available: hashmap! {},
-            bits_declarations: vec![],
-            enum_declarations: vec![],
-            protocol_declarations: vec![],
-            struct_declarations: vec![],
-            table_declarations: vec![],
-            union_declarations: vec![],
-            declarations: hashmap! {},
-        });
+        return Rc::new(Self { declarations: Default::default(), available: Default::default() });
     }
 }
 
@@ -331,14 +333,15 @@ open protocol Example {
 
     assert_eq!(hashmap! {"fuchsia".to_owned() => vec!["1".to_owned()]}, ir.available);
 
-    assert_eq!(1, ir.table_declarations.len());
+    assert_eq!(
+        1,
+        ir.declarations.iter().filter(|(_, d)| matches!(d, Declaration::Table(_))).count()
+    );
 }
 
 #[cfg(test)]
 mod testing {
-    use crate::ir::get_attribute;
-
-    use super::{Attribute, AttributeArgument, Result, IR};
+    use super::*;
     use std::ffi::OsString;
     use std::path::Path;
     use std::process::Command;
@@ -416,8 +419,8 @@ mod testing {
         let status = Command::new(fidlc_path).args(args).status().expect("Failed to run fidlc");
         assert!(status.success());
 
-        let mut ir = Rc::into_inner(IR::load(ir_path)?)
-            .expect("There shouldn't be multiple references yet.");
+        let mut ir: InternalIR = serde_json::from_reader(BufReader::new(fs::File::open(ir_path)?))
+            .context("Parsing IR JSON")?;
 
         let library_added = super::get_attribute(&ir.maybe_attributes, "available")
             .expect("top-level library should have @available")
@@ -453,6 +456,6 @@ mod testing {
             }
         }
 
-        Ok(Rc::new(ir))
+        Ok(IR::from_internal(ir))
     }
 }

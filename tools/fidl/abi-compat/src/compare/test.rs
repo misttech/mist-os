@@ -70,7 +70,7 @@ impl CompiledTestLibrary {
         self.version.scope()
     }
 
-    fn get_decl(&self, name: &str) -> Declaration {
+    fn get_decl(&self, name: &str) -> &Declaration {
         self.ir.get(name).unwrap_or_else(|_| {
             panic!(
                 "Couldn't find declaration {:?} at {:?} in:\n{}",
