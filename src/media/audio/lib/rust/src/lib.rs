@@ -13,6 +13,7 @@ pub mod device;
 pub mod format;
 pub mod format_set;
 pub mod registry;
+pub mod sigproc;
 #[cfg(target_os = "fuchsia")]
 pub mod vmo_buffer;
 

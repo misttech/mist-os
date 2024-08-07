@@ -860,7 +860,7 @@ pub async fn get_info(
         Selector::Registry(registry_selector) => {
             let device_info = registry
                 .ok_or_else(|| bug!("Registry not available"))?
-                .get(registry_selector.token_id())
+                .device_info(registry_selector.token_id())
                 .await
                 .ok_or_else(|| user_error!("No device with given ID exists in registry"))?;
             let registry_info = RegistryInfo {
