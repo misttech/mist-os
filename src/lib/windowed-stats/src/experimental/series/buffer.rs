@@ -9,6 +9,7 @@ use std::io::{self, Write};
 use tracing::warn;
 
 use crate::experimental::clock::Duration;
+use crate::experimental::ring_buffer::Simple8bRleRingBuffer;
 use crate::experimental::series::interpolation::{
     Constant, Interpolation, LastAggregation, LastSample,
 };
@@ -128,20 +129,18 @@ impl<A> RingBuffer<A> for Uncompressed<A> {
     }
 }
 
-// TODO(https://fxbug.dev/337086207): Implement Simple8bRle ring buffer
-/// A ring buffer that stores unsigned integer items using Simple8B and run length encoding.
 #[derive(Clone, Debug)]
-pub struct Simple8bRle;
+pub struct Simple8bRle(Simple8bRleRingBuffer);
 
 impl<A> RingBuffer<A> for Simple8bRle
 where
     A: Into<u64> + Unsigned,
 {
     fn with_capacity(capacity: usize) -> Self {
-        warn!("Simple8bRle ring buffer is unimplemented. No data will be stored.");
-        let _ = capacity;
-        Simple8bRle
+        let ring_buffer = Simple8bRleRingBuffer::with_nearest_capacity(capacity);
+        Simple8bRle(ring_buffer)
     }
+
     fn sampling_intervals(profile: &SamplingProfile) -> Vec1<SamplingInterval> {
         match profile {
             SamplingProfile::Granular => [
@@ -157,6 +156,14 @@ where
             ]
             .into(),
         }
+    }
+
+    fn push(&mut self, item: A) {
+        self.0.push(item.into());
+    }
+
+    fn serialize(&self, mut write: impl Write) -> io::Result<()> {
+        self.0.serialize(&mut write)
     }
 }
 
@@ -276,6 +283,16 @@ mod tests {
             <Gauge<f64> as BufferStrategy<f64, LastAggregation>>::sampling_intervals(&p),
             expect
         );
+    }
+
+    #[test]
+    fn simple8b_rle_buffer() {
+        let mut buffer = <Simple8bRle as RingBuffer<u64>>::with_capacity(2);
+        buffer.push(22u64);
+        let mut data = vec![];
+        let result = RingBuffer::<u64>::serialize(&buffer, &mut data);
+        assert!(result.is_ok());
+        assert!(!data.is_empty());
     }
 
     #[test_case(

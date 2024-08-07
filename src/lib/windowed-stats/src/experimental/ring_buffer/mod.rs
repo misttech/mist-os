@@ -4,6 +4,8 @@
 
 mod simple8b_rle;
 
+pub(crate) use simple8b_rle::Simple8bRleRingBuffer;
+
 use std::collections::VecDeque;
 
 #[derive(Clone, Debug)]
