@@ -720,7 +720,9 @@ void PrintChannelKoids(ClientPriority client_priority, const zx::channel& channe
 zx_status_t Controller::CreateClient(
     ClientPriority client_priority,
     fidl::ServerEnd<fidl_display::Coordinator> coordinator_server_end,
-    fit::function<void()> on_display_client_dead) {
+    fit::function<void()> on_client_disconnected) {
+  ZX_DEBUG_ASSERT(on_client_disconnected);
+
   PrintChannelKoids(client_priority, coordinator_server_end.channel());
 
   fbl::AllocChecker alloc_checker;
@@ -745,7 +747,7 @@ zx_status_t Controller::CreateClient(
   ClientId client_id = next_client_id_;
   ++next_client_id_;
   auto client = std::make_unique<ClientProxy>(this, client_priority, client_id,
-                                              std::move(on_display_client_dead));
+                                              std::move(on_client_disconnected));
 
   zx_status_t status = client->Init(&root_, std::move(coordinator_server_end));
   if (status != ZX_OK) {
@@ -823,12 +825,14 @@ display::DriverBufferCollectionId Controller::GetNextDriverBufferCollectionId() 
 
 void Controller::OpenCoordinatorForVirtcon(OpenCoordinatorForVirtconRequestView request,
                                            OpenCoordinatorForVirtconCompleter::Sync& completer) {
-  completer.Reply(CreateClient(ClientPriority::kVirtcon, std::move(request->coordinator)));
+  completer.Reply(CreateClient(ClientPriority::kVirtcon, std::move(request->coordinator),
+                               /*on_client_disconnected=*/[] {}));
 }
 
 void Controller::OpenCoordinatorForPrimary(OpenCoordinatorForPrimaryRequestView request,
                                            OpenCoordinatorForPrimaryCompleter::Sync& completer) {
-  completer.Reply(CreateClient(ClientPriority::kPrimary, std::move(request->coordinator)));
+  completer.Reply(CreateClient(ClientPriority::kPrimary, std::move(request->coordinator),
+                               /*on_client_disconnected=*/[] {}));
 }
 
 void Controller::OpenCoordinatorWithListenerForVirtcon(

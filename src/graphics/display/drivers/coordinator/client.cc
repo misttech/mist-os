@@ -1545,6 +1545,8 @@ Client::Client(Controller* controller, ClientProxy* proxy, ClientPriority priori
       id_(client_id),
       fences_(controller->client_dispatcher()->async_dispatcher(),
               fit::bind_member<&Client::OnFenceFired>(this)) {
+  ZX_DEBUG_ASSERT(controller != nullptr);
+  ZX_DEBUG_ASSERT(proxy != nullptr);
   ZX_DEBUG_ASSERT(client_id != kInvalidClientId);
 }
 
@@ -1750,17 +1752,13 @@ zx_status_t ClientProxy::OnDisplayVsync(DisplayId display_id, zx_time_t timestam
 }
 
 void ClientProxy::OnClientDead() {
-  // Copy over the on_client_dead function so we can call it after
-  // freeing the class.
-  fit::function<void()> on_client_dead = std::move(on_client_dead_);
+  // Stash any data members we need to access after the ClientProxy is deleted.
+  fit::function<void()> on_client_disconnected = std::move(on_client_disconnected_);
 
-  // This function deletes `this`. Be careful about not using class variables
-  // it completes.
+  // Deletes `this`.
   controller_->OnClientDead(this);
 
-  if (on_client_dead) {
-    on_client_dead();
-  }
+  on_client_disconnected();
 }
 
 void ClientProxy::UpdateConfigStampMapping(ConfigStampPair stamps) {
@@ -1823,10 +1821,13 @@ zx::result<> ClientProxy::InitForTesting(
 }
 
 ClientProxy::ClientProxy(Controller* controller, ClientPriority client_priority, ClientId client_id,
-                         fit::function<void()> on_client_dead)
+                         fit::function<void()> on_client_disconnected)
     : controller_(controller),
       handler_(controller_, this, client_priority, client_id),
-      on_client_dead_(std::move(on_client_dead)) {}
+      on_client_disconnected_(std::move(on_client_disconnected)) {
+  ZX_DEBUG_ASSERT(controller != nullptr);
+  ZX_DEBUG_ASSERT(on_client_disconnected_);
+}
 
 ClientProxy::~ClientProxy() {}
 

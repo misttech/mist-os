@@ -168,7 +168,7 @@ class Controller : public ddk::DisplayEngineListenerProtocol<Controller>,
   // for use by testing services which provide a fake display controller.
   zx_status_t CreateClient(ClientPriority client_priority,
                            fidl::ServerEnd<fuchsia_hardware_display::Coordinator> client,
-                           fit::function<void()> on_client_dead = nullptr);
+                           fit::function<void()> on_client_disconnected);
 
   display::DriverBufferCollectionId GetNextDriverBufferCollectionId();
 
