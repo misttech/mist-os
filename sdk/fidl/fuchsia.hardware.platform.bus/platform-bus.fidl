@@ -8,12 +8,14 @@ using zx;
 using fuchsia.driver.framework;
 using fuchsia.hardware.power;
 
+const MAX_INFO_STRING_LENGTH uint32 = 32;
+const MAX_POWER_CONFIGS uint32 = 32;
+
+/// Definition of a MMIO resource for a platform device node.
 type Mmio = table {
-    /// Physical address of MMIO region.
-    /// Does not need to be page aligned.
+    /// Physical address of MMIO region. Does not need to be page aligned.
     1: base uint64;
-    /// Length of MMIO region in bytes.
-    /// Does not need to be page aligned.
+    /// Length of MMIO region in bytes. Does not need to be page aligned.
     2: length uint64;
     /// Name that can be used to retrieve the Mmio using
     /// [`fuchsia.hardware.platform.device/GetMmioByName`].
@@ -37,6 +39,7 @@ type Irq = table {
     4: name string:fuchsia.driver.framework.MAX_RESOURCE_NAME_LENGTH;
 };
 
+/// Definition of a bus transaction initiator (bti) for a platform device node.
 type Bti = table {
     1: iommu_index uint32;
     2: bti_id uint32;
@@ -47,6 +50,7 @@ type Bti = table {
     3: name string:fuchsia.driver.framework.MAX_RESOURCE_NAME_LENGTH;
 };
 
+/// Definition of a Secure Monitor Call (SMC), which allows calls to be made from the user space.
 type Smc = table {
     /// The device is granted the ability to make SMC calls with service call numbers ranging from
     /// service_call_num_base to service_call_num_base + count - 1.
@@ -61,11 +65,11 @@ type Smc = table {
     4: name string:fuchsia.driver.framework.MAX_RESOURCE_NAME_LENGTH;
 };
 
-/// Device metadata.
+/// Represents the metadata that's available in a platform device.
 type Metadata = table {
     /// Metadata type.
     1: type uint32;
-    /// Metadata.
+    /// Metadata bytes.
     2: data vector<uint8>:MAX;
 };
 
@@ -78,23 +82,20 @@ type BootMetadata = table {
     2: zbi_extra uint32;
 };
 
-const MAX_INFO_STRING_LENGTH uint32 = 32;
-
-/// Subset of pdev_board_info_t to be set by the board driver.
+/// Board information set by the board driver.
 type BoardInfo = table {
-    /// Board name from the boot image platform ID record,
-    /// (or from the BIOS on x86 platforms).
+    /// Board name from the boot image platform ID record or from the BIOS on x86 platforms.
     1: board_name string:MAX_INFO_STRING_LENGTH;
     /// Board specific revision number.
     2: board_revision uint32;
 };
 
+/// Bootloader information set by the board driver.
 type BootloaderInfo = table {
     1: vendor string:MAX_INFO_STRING_LENGTH;
 };
 
-const MAX_POWER_CONFIGS uint32 = 32;
-
+/// Arguments for adding a platform device node to the platform bus.
 type Node = table {
     /// Name of the node.
     1: name string:fuchsia.driver.framework.MAX_NODE_NAME_LENGTH;
@@ -141,7 +142,10 @@ type TemporaryBoardInfo = struct {
     board_revision uint32;
 };
 
+// Servers that implement this protocol can be registered to the platform
+// bus to receive callbacks on why the platform bus is suspending.
 closed protocol SysSuspend {
+    // Invoked by the platform bus when its suspend hook is called.
     strict Callback(struct {
         requested_state uint8;
         enable_wake bool;
@@ -157,7 +161,7 @@ closed protocol SysSuspend {
 open protocol PlatformBus {
     /// Adds a new platform device node to the bus, using configuration provided
     /// by |node|. Platform device nodes are created in their own separate
-    /// devhosts.
+    /// driver hosts.
     strict NodeAdd(struct {
         node Node;
     }) -> () error zx.Status;
@@ -168,17 +172,17 @@ open protocol PlatformBus {
         info TemporaryBoardInfo;
     }) error zx.Status;
 
-    /// Board drivers may use this to set information about the board
-    /// (like the board revision number).
-    /// Platform device drivers can access this via `pdev_get_board_info()`.
+    /// Board drivers may use this to set information about the board.
     strict SetBoardInfo(struct {
         info BoardInfo;
     }) -> () error zx.Status;
+
     /// Board drivers may use this to set information about the bootloader.
     strict SetBootloaderInfo(struct {
         info BootloaderInfo;
     }) -> () error zx.Status;
 
+    /// Registers a callback that's invoked by the platform bus when it's suspending.
     strict RegisterSysSuspendCallback(resource struct {
         suspend_cb client_end:SysSuspend;
     }) -> () error zx.Status;
