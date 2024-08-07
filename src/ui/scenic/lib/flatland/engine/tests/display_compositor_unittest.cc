@@ -610,28 +610,31 @@ TEST_F(DisplayCompositorTest, ClientDropSysmemToken) {
   {
     auto token = CreateToken();
     auto sync_token = token.BindSync();
-    fuchsia::sysmem2::BufferCollectionTokenDuplicateRequest dup_request;
-    dup_request.set_rights_attenuation_mask(ZX_RIGHT_SAME_RIGHTS);
-    dup_request.set_token_request(dup_token.NewRequest());
-    sync_token->Duplicate(std::move(dup_request));
+    fuchsia::sysmem2::BufferCollectionTokenDuplicateSyncRequest dup_request;
+    fuchsia::sysmem2::BufferCollectionToken_DuplicateSync_Result dup_result;
+    dup_request.set_rights_attenuation_masks({ZX_RIGHT_SAME_RIGHTS});
+    zx_status_t status = sync_token->DuplicateSync(std::move(dup_request), &dup_result);
+    ASSERT_EQ(status, ZX_OK);
+    ASSERT_TRUE(dup_result.is_response());
+    ASSERT_TRUE(dup_result.response().has_tokens());
+    ASSERT_EQ(dup_result.response().tokens().size(), 1u);
 
-    fuchsia::sysmem2::Node_Sync_Result sync_result;
-    sync_token->Sync(&sync_result);
+    dup_token = dup_result.response().mutable_tokens()->at(0).BindSync();
   }
 
-  // Save token to avoid early token failure in Renderer import.
-  fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken> token_ref;
-  ON_CALL(*renderer_, ImportBufferCollection(kGlobalBufferCollectionId, _, _, _, _))
-      .WillByDefault(
-          [&token_ref](allocation::GlobalBufferCollectionId, fuchsia::sysmem2::Allocator_Sync*,
-                       fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken> token,
-                       BufferCollectionUsage, std::optional<fuchsia::math::SizeU>) {
-            token_ref = std::move(token);
-            return true;
-          });
-  EXPECT_FALSE(display_compositor_->ImportBufferCollection(
-      kGlobalBufferCollectionId, sysmem_allocator_.get(), std::move(dup_token),
-      BufferCollectionUsage::kClientImage, std::nullopt));
+  // Make sure that the Sysmem driver has been aware of the fact that
+  // `sync_token` is destroyed, in which case it returns an error
+  // when the duplicated token `Sync()`s.
+  fuchsia::sysmem2::Node_Sync_Result sync_result;
+
+  EXPECT_TRUE(RunWithTimeoutOrUntil(
+      [&] {
+        zx_status_t status = dup_token->Sync(&sync_result);
+        return (status != ZX_OK || sync_result.is_framework_err());
+      },
+      zx::duration::infinite(), zx::msec(50)));
+
+  EXPECT_CALL(*renderer_, ImportBufferCollection(kGlobalBufferCollectionId, _, _, _, _)).Times(0);
 
   EXPECT_CALL(*mock_display_coordinator_, CheckConfig(_, _))
       .Times(1)
@@ -641,6 +644,13 @@ TEST_F(DisplayCompositorTest, ClientDropSysmemToken) {
         std::vector<fuchsia::hardware::display::ClientCompositionOp> ops;
         callback(result, ops);
       }));
+
+  EXPECT_CALL(*mock_display_coordinator_, ImportBufferCollection(_, _, _)).Times(0);
+
+  EXPECT_FALSE(display_compositor_->ImportBufferCollection(
+      kGlobalBufferCollectionId, sysmem_allocator_.get(), std::move(dup_token),
+      BufferCollectionUsage::kClientImage, std::nullopt));
+
   display_compositor_.reset();
 }
 
