@@ -565,8 +565,8 @@ zx_status_t VnodeF2fs::TruncateBlocks(uint64_t from) {
   pgoff_t free_from =
       safemath::CheckRsh(fbl::round_up(from, blocksize), superblock_info_.GetLogBlocksize())
           .ValueOrDie();
-  // Invalidate data pages starting from |free_from|. It safely removes any pages updating their
-  // block addrs before purging the addrs in nodes.
+  // Invalidate data pages starting from |free_from|, and purge the addrs of invalidated pages from
+  // nodes.
   InvalidatePages(free_from);
   {
     auto path_or = GetNodePath(*this, free_from);

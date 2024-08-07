@@ -273,6 +273,55 @@ TEST_F(FileTest, Truncate) {
   test_file_vn = nullptr;
 }
 
+TEST_F(FileTest, WritebackWhileTruncate) {
+  srand(testing::UnitTest::GetInstance()->random_seed());
+
+  constexpr size_t written_blocks = 1024;
+
+  zx::result file_or = root_dir_->Create("test", fs::CreationType::kFile);
+  ASSERT_TRUE(file_or.is_ok()) << file_or.status_string();
+  fbl::RefPtr<File> file = fbl::RefPtr<File>::Downcast(std::move(*file_or));
+  char w_buf[Page::Size()] = {
+      0,
+  };
+
+  for (size_t i = 0; i < written_blocks; ++i) {
+    size_t offset = Page::Size() * i;
+    ASSERT_EQ(FileTester::Write(file.get(), w_buf, Page::Size(), offset, &offset), ZX_OK);
+    ASSERT_EQ(file->GetSize(), Page::Size() * i + offset);
+  }
+
+  // Schedule writeback tasks for 1024 files
+  for (size_t i = 0; i < written_blocks; ++i) {
+    std::string name = "test" + std::to_string(i);
+    zx::result file_or = root_dir_->Create(name, fs::CreationType::kFile);
+    ASSERT_TRUE(file_or.is_ok());
+    fbl::RefPtr<File> file = fbl::RefPtr<File>::Downcast(std::move(*file_or));
+
+    size_t offset = 0;
+    ASSERT_EQ(FileTester::Write(file.get(), w_buf, Page::Size(), offset, &offset), ZX_OK);
+    ASSERT_EQ(file->GetSize(), Page::Size());
+    WritebackOperation op = {.bSync = false};
+    ASSERT_EQ(file->Writeback(op), 1UL);
+    ASSERT_EQ(file->Close(), ZX_OK);
+  }
+
+  // Test the case where writeback pages are assigned addrs but invalidated before writing them to
+  // disk. Because of the pre-scheduled tasks, file->Truncate() executes in prior to the writeback
+  // task requsting write IOs for |file|.
+  WritebackOperation op = {.bSync = false};
+  ASSERT_EQ(file->Writeback(op), written_blocks);
+  file->Truncate(0);
+  for (size_t i = 0; i < written_blocks; ++i) {
+    LockedPage page;
+    ASSERT_EQ(file->GrabCachePage(i * Page::Size(), &page), ZX_OK);
+    ASSERT_EQ(page->GetBlockAddr(), kNullAddr);
+  }
+
+  ASSERT_EQ(file->Close(), ZX_OK);
+  file = nullptr;
+}
+
 TEST_F(FileTest, MixedSizeWrite) {
   srand(testing::UnitTest::GetInstance()->random_seed());
 

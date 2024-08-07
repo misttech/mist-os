@@ -96,6 +96,7 @@ zx_status_t Page::GetPage() {
 
 void Page::Invalidate() {
   ZX_DEBUG_ASSERT(IsLocked());
+  WaitOnWriteback();
   ClearDirtyForIo();
   ClearColdData();
   ClearUptodate();
