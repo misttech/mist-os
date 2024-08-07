@@ -26,7 +26,7 @@ use crate::ssh_connector::SshConnector;
 
 const CONFIG_TARGET_SSH_TIMEOUT: &str = "target.host_pipe_ssh_timeout";
 const CONFIG_LOCAL_DISCOVERY_TIMEOUT: &str = "discovery.timeout";
-const SSH_PORT_DEFAULT: u16 = 22;
+const TARGET_DEFAULT_PORT: u16 = 22;
 const DEFAULT_SSH_TIMEOUT_MS: u64 = 10000;
 
 #[cfg(test)]
@@ -44,6 +44,14 @@ pub async fn maybe_locally_resolve_target_spec(
     }
 }
 
+fn replace_default_port(sa: SocketAddr) -> SocketAddr {
+    let mut sa = sa;
+    if sa.port() == 0 {
+        sa.set_port(TARGET_DEFAULT_PORT);
+    }
+    sa
+}
+
 /// Attempts to resolve the query into an explicit string query that can be
 /// passed to the daemon. If already an address or serial number, just return
 /// it. Otherwise, perform discovery to find the address or serial #. Returns
@@ -55,7 +63,9 @@ async fn locally_resolve_target_spec<T: QueryResolverT>(
 ) -> Result<Option<String>> {
     let query = TargetInfoQuery::from(target_spec.clone());
     let explicit_spec = match query {
-        TargetInfoQuery::Addr(addr) if addr.port() != 0 => format!("{addr}"),
+        // If an address is passed in, make sure that the default port is filled in if it hadn't
+        // been explicit, then just pass it on to the daemon as is
+        TargetInfoQuery::Addr(addr) => format!("{}", replace_default_port(addr)),
         TargetInfoQuery::Serial(sn) => format!("serial:{sn}"),
         _ => {
             let resolution = resolver.resolve_single_target(&target_spec, env_context).await?;
@@ -70,7 +80,7 @@ async fn locally_resolve_target_spec<T: QueryResolverT>(
     Ok(Some(explicit_spec))
 }
 
-pub trait QueryResolverT {
+trait QueryResolverT {
     #[allow(async_fn_in_trait)]
     async fn resolve_target_query(
         &self,
@@ -188,11 +198,10 @@ impl Default for RetrievedTargetInfo {
 }
 
 async fn try_get_target_info(
-    addr: addr::TargetAddr,
+    addr: SocketAddr,
     context: &EnvironmentContext,
 ) -> Result<(Option<String>, Option<String>), crate::KnockError> {
-    let connector =
-        SshConnector::new(addr.into(), context).await.context("making ssh connector")?;
+    let connector = SshConnector::new(addr, context).await.context("making ssh connector")?;
     let conn = Connection::new(connector).await.context("making direct connection")?;
     let rcs = conn.rcs_proxy().await.context("getting RCS proxy")?;
     let (pc, bc) = match rcs.identify_host().await {
@@ -208,13 +217,9 @@ impl RetrievedTargetInfo {
             ffx_config::get(CONFIG_TARGET_SSH_TIMEOUT).await.unwrap_or(DEFAULT_SSH_TIMEOUT_MS);
         let ssh_timeout = Duration::from_millis(ssh_timeout);
         for addr in addrs {
+            // Ensure there's a port
+            let addr = replace_default_port(addr.into());
             tracing::debug!("Trying to make a connection to {addr:?}");
-
-            // If the port is 0, we treat that as the default ssh port.
-            let mut addr = *addr;
-            if addr.port() == 0 {
-                addr.set_port(SSH_PORT_DEFAULT);
-            }
 
             match try_get_target_info(addr, context)
                 .on_timeout(ssh_timeout, || {
@@ -531,11 +536,8 @@ impl ResolutionTarget {
                         }
                     })
                     .collect::<Vec<_>>();
-                let mut sock: SocketAddr = addrs_sorted.pop().unwrap();
-                if sock.port() == 0 {
-                    sock.set_port(SSH_PORT_DEFAULT);
-                }
-                Ok(ResolutionTarget::Addr(sock))
+                let addr: SocketAddr = replace_default_port(addrs_sorted.pop().unwrap());
+                Ok(ResolutionTarget::Addr(addr))
             }
             TargetState::Fastboot(fts) => Ok(ResolutionTarget::Serial(fts.serial_number.clone())),
             state => {
@@ -577,7 +579,7 @@ impl Resolution {
     fn from_addr(sa: SocketAddr) -> Self {
         let scope_id = if let SocketAddr::V6(addr) = sa { addr.scope_id() } else { 0 };
         let port = match sa.port() {
-            0 => SSH_PORT_DEFAULT,
+            0 => TARGET_DEFAULT_PORT,
             p => p,
         };
         Self::from_target(ResolutionTarget::Addr(TargetAddr::new(sa.ip(), scope_id, port).into()))
