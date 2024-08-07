@@ -21,7 +21,7 @@ use index::PolicyIndex;
 use metadata::HandleUnknown;
 use parsed_policy::ParsedPolicy;
 use parser::{ByRef, ByValue, ParseStrategy};
-use selinux_common::{self as sc, FileClass, NullessByteStr, ObjectClass};
+use selinux::{self as sc, FileClass, NullessByteStr, ObjectClass};
 use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::num::NonZeroU32;
@@ -30,7 +30,7 @@ use symbols::{find_class_by_name, find_common_symbol_by_name_bytes};
 use zerocopy::{little_endian as le, ByteSlice, FromBytes, NoCell, Ref, Unaligned};
 
 #[cfg(feature = "selinux_policy_test_api")]
-use selinux_common::ClassPermission as _;
+use selinux::ClassPermission as _;
 
 /// Maximum SELinux policy version supported by this implementation.
 pub const SUPPORTED_POLICY_VERSION: u32 = 33;
@@ -318,7 +318,7 @@ impl<PS: ParseStrategy> Policy<PS> {
     /// Returns whether the input types are explicitly granted the permission named
     /// `permission_name` via an `allow [...];` policy statement, or an error if looking up the
     /// input types fails. This is the "custom" form of this API because `permission_name` is
-    /// associated with a [`selinux_common::AbstractPermission::Custom::permission`] value.
+    /// associated with a [`selinux::AbstractPermission::Custom::permission`] value.
     ///
     /// # Panics
     /// If supplied with type Ids not previously obtained from the `Policy` itself; validation
@@ -362,7 +362,7 @@ impl<PS: ParseStrategy> Policy<PS> {
     /// Computes the access vector that associates type `source_type_name` and `target_type_name`
     /// via an explicit `allow [...];` statement in the binary policy. Computes `AccessVector::NONE`
     /// if no such statement exists. This is the "custom" form of this API because
-    /// `target_class_name` is associated with a [`selinux_common::AbstractObjectClass::Custom`]
+    /// `target_class_name` is associated with a [`selinux::AbstractObjectClass::Custom`]
     /// value.
     pub fn compute_explicitly_allowed_custom(
         &self,

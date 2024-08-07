@@ -13,7 +13,7 @@ use super::symbols::{
 };
 use super::{CategoryId, ParsedPolicy, RoleId, TypeId};
 
-use selinux_common::{self as sc, ClassPermission as _};
+use selinux::{self as sc, ClassPermission as _};
 use std::collections::HashMap;
 use std::num::NonZeroU32;
 
@@ -49,7 +49,7 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
         let policy_classes = parsed_policy.classes();
         let common_symbols = parsed_policy.common_symbols();
 
-        // Accumulate classes indexed by `selinux_common::ObjectClass`. If the policy defines that unknown
+        // Accumulate classes indexed by `selinux::ObjectClass`. If the policy defines that unknown
         // classes should cause rejection then return an error describing the missing element.
         let mut classes = HashMap::new();
         for known_class in sc::ObjectClass::all_variants().into_iter() {
@@ -65,7 +65,7 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
             }
         }
 
-        // Accumulate permissions indexed by `selinux_common::Permission`. If the policy defines that unknown
+        // Accumulate permissions indexed by `selinux::Permission`. If the policy defines that unknown
         // classes should cause rejection then return an error describing the missing element.
         let mut permissions = HashMap::new();
         for known_permission in sc::Permission::all_variants().into_iter() {

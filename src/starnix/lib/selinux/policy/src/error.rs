@@ -10,7 +10,6 @@ use super::metadata::{
 };
 use super::symbols::{ClassDefault, ClassDefaultRange};
 
-use selinux_common as sc;
 use thiserror::Error;
 
 /// Structured errors that may be encountered parsing a binary policy.
@@ -82,7 +81,7 @@ pub enum ValidateError {
     )]
     InvalidClassDefaultRange { value: u32 },
     #[error("missing initial SID {initial_sid:?}")]
-    MissingInitialSid { initial_sid: sc::InitialSid },
+    MissingInitialSid { initial_sid: selinux::InitialSid },
     #[error(
         "invalid SELinux fs_use type; expected one of {:?}, but found {value}",
         [FsUseType::FsUseXattr as u32,

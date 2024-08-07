@@ -6,7 +6,7 @@ use selinux_policy::metadata::HandleUnknown;
 use selinux_policy::{parse_policy_by_reference, parse_policy_by_value, SecurityContext};
 
 use anyhow::Context as _;
-use selinux_common::{FileClass, InitialSid, ObjectClass, Permission, ProcessPermission};
+use selinux::{FileClass, InitialSid, ObjectClass, Permission, ProcessPermission};
 use serde::Deserialize;
 use std::io::Read as _;
 

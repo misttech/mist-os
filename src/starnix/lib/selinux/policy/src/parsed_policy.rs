@@ -22,7 +22,6 @@ use super::symbols::{
 use super::{AccessVector, CategoryId, Parse, RoleId, SensitivityId, TypeId, UserId, Validate};
 
 use anyhow::Context as _;
-use selinux_common as sc;
 use std::collections::HashSet;
 use std::fmt::Debug;
 use std::hash::Hash;
@@ -98,7 +97,7 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
     /// Returns whether the input types are explicitly granted the permission named
     /// `permission_name` via an `allow [...];` policy statement, or an error if looking up the
     /// input types fails. This is the "custom" form of this API because `permission_name` is
-    /// associated with a [`selinux_common::AbstractPermission::Custom::permission`] value.
+    /// associated with a [`selinux::AbstractPermission::Custom::permission`] value.
     pub fn is_explicitly_allowed_custom(
         &self,
         source_type: TypeId,
@@ -194,7 +193,7 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
     /// Computes the access vector that associates type `source_type_name` and `target_type_name`
     /// via an explicit `allow [...];` statement in the binary policy. Computes `AccessVector::NONE`
     /// if no such statement exists. This is the "custom" form of this API because
-    /// `target_class_name` is associated with a [`selinux_common::AbstractObjectClass::Custom`]
+    /// `target_class_name` is associated with a [`selinux::AbstractObjectClass::Custom`]
     /// value.
     pub fn compute_explicitly_allowed_custom(
         &self,
@@ -263,7 +262,7 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
     }
 
     /// Returns the policy entry for the specified initial Security Context.
-    pub(crate) fn initial_context(&self, id: sc::InitialSid) -> &Context<PS> {
+    pub(crate) fn initial_context(&self, id: selinux::InitialSid) -> &Context<PS> {
         let id = le::U32::from(id as u32);
         // [`InitialSids`] validates that all `InitialSid` values are defined by the policy.
         &self.initial_sids.data.iter().find(|initial| initial.id() == id).unwrap().context()

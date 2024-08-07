@@ -9,7 +9,7 @@ use crate::SecurityId;
 
 use anyhow::Context as _;
 use fuchsia_zircon::{self as zx};
-use selinux_common::{
+use selinux::{
     AbstractObjectClass, ClassPermission, FileClass, InitialSid, NullessByteStr, ObjectClass,
     Permission, FIRST_UNUSED_SID,
 };
@@ -595,7 +595,7 @@ mod tests {
     use super::*;
 
     use fuchsia_zircon::AsHandleRef as _;
-    use selinux_common::ProcessPermission;
+    use selinux::ProcessPermission;
     use std::mem::size_of;
     use zerocopy::{FromBytes, FromZeroes};
 

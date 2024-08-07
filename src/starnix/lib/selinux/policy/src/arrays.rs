@@ -15,7 +15,6 @@ use super::{
 };
 
 use anyhow::Context as _;
-use selinux_common as sc;
 use std::fmt::Debug;
 use std::num::NonZeroU32;
 use zerocopy::{little_endian as le, FromBytes, FromZeroes, NoCell, Unaligned};
@@ -600,7 +599,7 @@ impl<PS: ParseStrategy> Validate for InitialSids<PS> {
 
     /// TODO: Validate consistency of sequence of [`InitialSid`] objects.
     fn validate(&self) -> Result<(), Self::Error> {
-        for initial_sid in sc::InitialSid::all_variants() {
+        for initial_sid in selinux::InitialSid::all_variants() {
             self.iter()
                 .find(|initial| initial.id().get() == initial_sid as u32)
                 .ok_or(ValidateError::MissingInitialSid { initial_sid })?;

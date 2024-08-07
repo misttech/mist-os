@@ -9,7 +9,7 @@ use super::{FsNodeSecurityXattr, FsNodeState, ProcAttr, ResolvedElfState};
 use crate::task::{CurrentTask, Task};
 use crate::vfs::{FsNode, FsNodeHandle, FsStr, FsString, NamespaceNode, ValueOrSize, XattrOp};
 use linux_uapi::XATTR_NAME_SELINUX;
-use selinux_common::{
+use selinux::{
     ClassPermission, FilePermission, NullessByteStr, ObjectClass, Permission, ProcessPermission,
 };
 use selinux_core::permission_check::PermissionCheck;

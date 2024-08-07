@@ -11,7 +11,7 @@ policy = {
   name = "selinux_policy"
   edition = "2021"
   deps = [
-    "//src/starnix/lib/selinux/common",
+    "//src/starnix/lib/selinux",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:bstr",
     "//third_party/rust_crates:thiserror",
@@ -137,7 +137,7 @@ if (is_host) {
       ":testdata_expectations",
       ":testdata_micro_policies",
       ":testdata_policies",
-      "//src/starnix/lib/selinux/common",
+      "//src/starnix/lib/selinux",
       "//third_party/rust_crates:anyhow",
       "//third_party/rust_crates:serde",
       "//third_party/rust_crates:serde_json5",

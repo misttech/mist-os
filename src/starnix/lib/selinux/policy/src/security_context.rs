@@ -6,7 +6,7 @@ use crate::index::PolicyIndex;
 use crate::{CategoryId, ParseStrategy, RoleId, SensitivityId, TypeId, UserId};
 
 use bstr::BString;
-use selinux_common::NullessByteStr;
+use selinux::NullessByteStr;
 use std::cmp::Ordering;
 use thiserror::Error;
 
