@@ -9,10 +9,11 @@ source_set("configuration") {
   ]
 
   public_deps = [
-    "//sdk/fidl/fuchsia.accessibility:fuchsia.accessibility_hlcpp",
-    "//sdk/fidl/fuchsia.math:fuchsia.math_hlcpp",
+    "//sdk/fidl/fuchsia.accessibility:fuchsia.accessibility_cpp",
+    "//sdk/fidl/fuchsia.math:fuchsia.math_cpp",
     "//sdk/lib/fidl/cpp",
     "//src/ui/a11y/lib/util",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
   ]
 
   deps = [
@@ -20,7 +21,6 @@ source_set("configuration") {
     "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_hlcpp",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp",
-    "//src/lib/fxl",
   ]
 
   # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings

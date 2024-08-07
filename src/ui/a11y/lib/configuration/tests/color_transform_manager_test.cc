@@ -4,16 +4,13 @@
 
 #include "src/ui/a11y/lib/configuration/color_transform_manager.h"
 
-#include <fuchsia/accessibility/cpp/fidl.h>
-#include <lib/fidl/cpp/binding_set.h>
+#include <fidl/fuchsia.accessibility/cpp/fidl.h>
+#include <lib/fidl/cpp/channel.h>
 #include <lib/sys/cpp/testing/component_context_provider.h>
 #include <lib/syslog/cpp/macros.h>
 
-#include <cmath>
-
 #include <gtest/gtest.h>
-
-#include "src/lib/testing/loop_fixture/test_loop_fixture.h"
+#include <src/lib/testing/loop_fixture/test_loop_fixture.h>
 
 namespace accessibility_test {
 namespace {
@@ -44,37 +41,41 @@ const std::array<float, 3> kProtanomalyAndInversionPostOffset = {.999f, .999f, .
 
 // clang-format on
 
-class FakeColorTransformHandler : public fuchsia::accessibility::ColorTransformHandler {
+class FakeColorTransformHandler
+    : public fidl::Server<fuchsia_accessibility::ColorTransformHandler> {
  public:
   FakeColorTransformHandler() = default;
   ~FakeColorTransformHandler() = default;
 
-  fidl::InterfaceHandle<fuchsia::accessibility::ColorTransformHandler> GetHandle() {
-    return bindings_.AddBinding(this);
+  void Serve(async_dispatcher_t* dispatcher) {
+    auto [client_end, server_end] =
+        fidl::Endpoints<fuchsia_accessibility::ColorTransformHandler>::Create();
+    bindings_.AddBinding(dispatcher, std::move(server_end), this, fidl::kIgnoreBindingClosure);
+    client_end_ = std::move(client_end);
   }
 
   // |fuchsia.accessibility.ColorTransformHandler|
   void SetColorTransformConfiguration(
-      fuchsia::accessibility::ColorTransformConfiguration configuration,
-      SetColorTransformConfigurationCallback callback) {
-    transform_ = configuration.has_color_adjustment_matrix()
-                     ? configuration.color_adjustment_matrix()
+      SetColorTransformConfigurationRequest& req,
+      SetColorTransformConfigurationCompleter::Sync& completer) override {
+    transform_ = req.configuration().color_adjustment_matrix().has_value()
+                     ? *req.configuration().color_adjustment_matrix()
                      : kIdentityMatrix;
-    pre_offset_ = configuration.has_color_adjustment_pre_offset()
-                      ? configuration.color_adjustment_pre_offset()
+    pre_offset_ = req.configuration().color_adjustment_pre_offset().has_value()
+                      ? *req.configuration().color_adjustment_pre_offset()
                       : kZero3x1Vector;
-    post_offset_ = configuration.has_color_adjustment_post_offset()
-                       ? configuration.color_adjustment_post_offset()
+    post_offset_ = req.configuration().color_adjustment_post_offset().has_value()
+                       ? *req.configuration().color_adjustment_post_offset()
                        : kZero3x1Vector;
 
-    color_inversion_enabled_ = configuration.has_color_inversion_enabled()
-                                   ? configuration.color_inversion_enabled()
+    color_inversion_enabled_ = req.configuration().color_inversion_enabled().has_value()
+                                   ? req.configuration().color_inversion_enabled()
                                    : false;
 
-    color_correction_mode_ = configuration.has_color_correction()
-                                 ? configuration.color_correction()
-                                 : fuchsia::accessibility::ColorCorrectionMode::DISABLED;
-    callback();
+    color_correction_mode_ = req.configuration().color_correction().has_value()
+                                 ? *req.configuration().color_correction()
+                                 : fuchsia_accessibility::ColorCorrectionMode::kDisabled;
+    completer.Reply();
   }
 
   bool hasTransform(std::array<float, 9> transform_to_compare) const {
@@ -85,14 +86,16 @@ class FakeColorTransformHandler : public fuchsia::accessibility::ColorTransformH
     return FloatArraysAreEqual(post_offset_, offset_to_compare);
   }
 
-  fidl::BindingSet<fuchsia::accessibility::ColorTransformHandler> bindings_;
   std::array<float, 9> transform_;
   std::array<float, 3> pre_offset_;
   std::array<float, 3> post_offset_;
 
   // These fields `has_value()` iff SetColorTransformConfiguration() has been called.
   std::optional<bool> color_inversion_enabled_;
-  std::optional<fuchsia::accessibility::ColorCorrectionMode> color_correction_mode_;
+  std::optional<fuchsia_accessibility::ColorCorrectionMode> color_correction_mode_;
+  fidl::ClientEnd<fuchsia_accessibility::ColorTransformHandler> client_end_;
+
+  fidl::ServerBindingGroup<fuchsia_accessibility::ColorTransformHandler> bindings_;
 
  private:
   template <size_t N>
@@ -115,9 +118,19 @@ class ColorTransformManagerTest : public gtest::TestLoopFixture {
   void SetUp() override {
     TestLoopFixture::SetUp();
 
+    color_transform_handler_.Serve(dispatcher());
+
     startup_context_ = sys::ComponentContext::CreateAndServeOutgoingDirectory();
+
     color_transform_manager_ =
-        std::make_unique<a11y::ColorTransformManager>(startup_context_.get());
+        std::make_unique<a11y::ColorTransformManager>(dispatcher(), startup_context_.get());
+
+    auto [color_transform_client_end, color_transform_server_end] =
+        fidl::Endpoints<fuchsia_accessibility::ColorTransform>::Create();
+    bindings_.AddBinding(dispatcher(), std::move(color_transform_server_end),
+                         color_transform_manager_.get(), fidl::kIgnoreBindingClosure);
+
+    color_transform_ = fidl::SyncClient(std::move(color_transform_client_end));
 
     RunLoopUntilIdle();
   }
@@ -125,13 +138,15 @@ class ColorTransformManagerTest : public gtest::TestLoopFixture {
   std::unique_ptr<sys::ComponentContext> startup_context_;
   std::unique_ptr<a11y::ColorTransformManager> color_transform_manager_;
   FakeColorTransformHandler color_transform_handler_;
-  fidl::BindingSet<fuchsia::accessibility::ColorTransform> color_transform_bindings_;
+  fidl::SyncClient<fuchsia_accessibility::ColorTransform> color_transform_;
+
+  fidl::ServerBindingGroup<fuchsia_accessibility::ColorTransform> bindings_;
 };
 
 TEST_F(ColorTransformManagerTest, NoHandler) {
   // change a setting
   color_transform_manager_->ChangeColorTransform(
-      false, fuchsia::accessibility::ColorCorrectionMode::DISABLED);
+      false, fuchsia_accessibility::ColorCorrectionMode::kDisabled);
   RunLoopUntilIdle();
 
   // This test is verifying that nothing crashes.
@@ -139,11 +154,13 @@ TEST_F(ColorTransformManagerTest, NoHandler) {
 
 TEST_F(ColorTransformManagerTest, SetColorTransformDefault) {
   // register a (fake) handler
-  color_transform_manager_->RegisterColorTransformHandler(color_transform_handler_.GetHandle());
+  auto res = color_transform_->RegisterColorTransformHandler(
+      {std::move(color_transform_handler_.client_end_)});
+  ASSERT_TRUE(res.is_ok());
 
   // change a setting
   color_transform_manager_->ChangeColorTransform(
-      false, fuchsia::accessibility::ColorCorrectionMode::DISABLED);
+      false, fuchsia_accessibility::ColorCorrectionMode::kDisabled);
   RunLoopUntilIdle();
 
   // Verify handler gets sent the correct settings.
@@ -151,17 +168,19 @@ TEST_F(ColorTransformManagerTest, SetColorTransformDefault) {
   EXPECT_FALSE(color_transform_handler_.color_inversion_enabled_.value());
   ASSERT_TRUE(color_transform_handler_.color_correction_mode_.has_value());
   EXPECT_EQ(color_transform_handler_.color_correction_mode_.value(),
-            fuchsia::accessibility::ColorCorrectionMode::DISABLED);
+            fuchsia_accessibility::ColorCorrectionMode::kDisabled);
   EXPECT_TRUE(color_transform_handler_.hasTransform(kIdentityMatrix));
 }
 
 TEST_F(ColorTransformManagerTest, SetColorInversionEnabled) {
   // register a (fake) handler
-  color_transform_manager_->RegisterColorTransformHandler(color_transform_handler_.GetHandle());
+  auto res = color_transform_->RegisterColorTransformHandler(
+      {std::move(color_transform_handler_.client_end_)});
+  ASSERT_TRUE(res.is_ok());
 
   // change a setting
   color_transform_manager_->ChangeColorTransform(
-      true, fuchsia::accessibility::ColorCorrectionMode::DISABLED);
+      true, fuchsia_accessibility::ColorCorrectionMode::kDisabled);
   RunLoopUntilIdle();
 
   // Verify handler gets sent the correct settings.
@@ -169,18 +188,20 @@ TEST_F(ColorTransformManagerTest, SetColorInversionEnabled) {
   EXPECT_TRUE(color_transform_handler_.color_inversion_enabled_.value());
   ASSERT_TRUE(color_transform_handler_.color_correction_mode_.has_value());
   EXPECT_EQ(color_transform_handler_.color_correction_mode_.value(),
-            fuchsia::accessibility::ColorCorrectionMode::DISABLED);
+            fuchsia_accessibility::ColorCorrectionMode::kDisabled);
   EXPECT_TRUE(color_transform_handler_.hasTransform(kColorInversionMatrix));
   EXPECT_TRUE(color_transform_handler_.hasPostOffset(kColorInversionPostOffset));
 }
 
 TEST_F(ColorTransformManagerTest, SetColorCorrection) {
   // register a (fake) handler
-  color_transform_manager_->RegisterColorTransformHandler(color_transform_handler_.GetHandle());
+  auto res = color_transform_->RegisterColorTransformHandler(
+      {std::move(color_transform_handler_.client_end_)});
+  ASSERT_TRUE(res.is_ok());
 
   // change a setting
   color_transform_manager_->ChangeColorTransform(
-      false, fuchsia::accessibility::ColorCorrectionMode::CORRECT_PROTANOMALY);
+      false, fuchsia_accessibility::ColorCorrectionMode::kCorrectProtanomaly);
   RunLoopUntilIdle();
 
   // Verify handler gets sent the correct settings.
@@ -188,17 +209,19 @@ TEST_F(ColorTransformManagerTest, SetColorCorrection) {
   EXPECT_FALSE(color_transform_handler_.color_inversion_enabled_.value());
   ASSERT_TRUE(color_transform_handler_.color_correction_mode_.has_value());
   EXPECT_EQ(color_transform_handler_.color_correction_mode_.value(),
-            fuchsia::accessibility::ColorCorrectionMode::CORRECT_PROTANOMALY);
+            fuchsia_accessibility::ColorCorrectionMode::kCorrectProtanomaly);
   EXPECT_TRUE(color_transform_handler_.hasTransform(kCorrectProtanomaly));
 }
 
 TEST_F(ColorTransformManagerTest, SetColorCorrectionAndInversion) {
   // register a (fake) handler
-  color_transform_manager_->RegisterColorTransformHandler(color_transform_handler_.GetHandle());
+  auto res = color_transform_->RegisterColorTransformHandler(
+      {std::move(color_transform_handler_.client_end_)});
+  ASSERT_TRUE(res.is_ok());
 
   // change a setting
   color_transform_manager_->ChangeColorTransform(
-      true, fuchsia::accessibility::ColorCorrectionMode::CORRECT_PROTANOMALY);
+      true, fuchsia_accessibility::ColorCorrectionMode::kCorrectProtanomaly);
   RunLoopUntilIdle();
 
   // Verify handler gets sent the correct settings.
@@ -206,7 +229,7 @@ TEST_F(ColorTransformManagerTest, SetColorCorrectionAndInversion) {
   EXPECT_TRUE(color_transform_handler_.color_inversion_enabled_.value());
   ASSERT_TRUE(color_transform_handler_.color_correction_mode_.has_value());
   EXPECT_EQ(color_transform_handler_.color_correction_mode_.value(),
-            fuchsia::accessibility::ColorCorrectionMode::CORRECT_PROTANOMALY);
+            fuchsia_accessibility::ColorCorrectionMode::kCorrectProtanomaly);
   EXPECT_TRUE(color_transform_handler_.hasTransform(kProtanomalyAndInversionMatrix));
   EXPECT_TRUE(color_transform_handler_.hasPostOffset(kProtanomalyAndInversionPostOffset));
 }
@@ -214,11 +237,13 @@ TEST_F(ColorTransformManagerTest, SetColorCorrectionAndInversion) {
 TEST_F(ColorTransformManagerTest, BuffersChangeBeforeHandlerRegistered) {
   // Enable color inversion and color correction.
   color_transform_manager_->ChangeColorTransform(
-      true, fuchsia::accessibility::ColorCorrectionMode::CORRECT_DEUTERANOMALY);
+      true, fuchsia_accessibility::ColorCorrectionMode::kCorrectDeuteranomaly);
   RunLoopUntilIdle();
 
   // Register the (fake) handler.
-  color_transform_manager_->RegisterColorTransformHandler(color_transform_handler_.GetHandle());
+  auto res = color_transform_->RegisterColorTransformHandler(
+      {std::move(color_transform_handler_.client_end_)});
+  ASSERT_TRUE(res.is_ok());
   RunLoopUntilIdle();
 
   // Verify handler gets sent the correct settings.
@@ -226,22 +251,26 @@ TEST_F(ColorTransformManagerTest, BuffersChangeBeforeHandlerRegistered) {
   EXPECT_TRUE(color_transform_handler_.color_inversion_enabled_.value());
   ASSERT_TRUE(color_transform_handler_.color_correction_mode_.has_value());
   EXPECT_EQ(color_transform_handler_.color_correction_mode_.value(),
-            fuchsia::accessibility::ColorCorrectionMode::CORRECT_DEUTERANOMALY);
+            fuchsia_accessibility::ColorCorrectionMode::kCorrectDeuteranomaly);
 }
 
 TEST_F(ColorTransformManagerTest, ReappliesSettingOnHandlerChange) {
   // Enable color inversion and color correction.
   color_transform_manager_->ChangeColorTransform(
-      true, fuchsia::accessibility::ColorCorrectionMode::CORRECT_DEUTERANOMALY);
+      true, fuchsia_accessibility::ColorCorrectionMode::kCorrectDeuteranomaly);
   RunLoopUntilIdle();
 
   // Register the (fake) handler.
-  color_transform_manager_->RegisterColorTransformHandler(color_transform_handler_.GetHandle());
+  auto res = color_transform_->RegisterColorTransformHandler(
+      {std::move(color_transform_handler_.client_end_)});
+  ASSERT_TRUE(res.is_ok());
   RunLoopUntilIdle();
 
   // Create and register a new (fake) handler.
   FakeColorTransformHandler new_handler;
-  color_transform_manager_->RegisterColorTransformHandler(new_handler.GetHandle());
+  new_handler.Serve(dispatcher());
+  res = color_transform_->RegisterColorTransformHandler({std::move(new_handler.client_end_)});
+  ASSERT_TRUE(res.is_ok());
   RunLoopUntilIdle();
 
   // Verify the new handler gets sent the correct settings.
@@ -249,7 +278,7 @@ TEST_F(ColorTransformManagerTest, ReappliesSettingOnHandlerChange) {
   EXPECT_TRUE(new_handler.color_inversion_enabled_.value());
   ASSERT_TRUE(new_handler.color_correction_mode_.has_value());
   EXPECT_EQ(new_handler.color_correction_mode_.value(),
-            fuchsia::accessibility::ColorCorrectionMode::CORRECT_DEUTERANOMALY);
+            fuchsia_accessibility::ColorCorrectionMode::kCorrectDeuteranomaly);
 }
 
 }  // namespace

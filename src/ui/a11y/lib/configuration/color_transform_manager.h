@@ -5,47 +5,53 @@
 #ifndef SRC_UI_A11Y_LIB_CONFIGURATION_COLOR_TRANSFORM_MANAGER_H_
 #define SRC_UI_A11Y_LIB_CONFIGURATION_COLOR_TRANSFORM_MANAGER_H_
 
-#include <fuchsia/accessibility/cpp/fidl.h>
-#include <lib/fidl/cpp/binding.h>
-#include <lib/fidl/cpp/binding_set.h>
-#include <lib/fidl/cpp/interface_ptr_set.h>
+#include <fidl/fuchsia.accessibility/cpp/fidl.h>
+#include <lib/async-loop/cpp/loop.h>
+#include <lib/fidl/cpp/channel.h>
 #include <lib/sys/cpp/component_context.h>
 #include <lib/syslog/cpp/macros.h>
 #include <math.h>
 
-#include <array>
-#include <optional>
-
-#include <src/lib/fxl/macros.h>
-
 namespace a11y {
 
-class ColorTransformManager : public fuchsia::accessibility::ColorTransform {
+class ColorTransformHandlerErrorHandler
+    : public fidl::AsyncEventHandler<fuchsia_accessibility::ColorTransformHandler> {
+  void on_fidl_error(fidl::UnbindInfo info) override;
+};
+
+class ColorTransformManager : public fidl::Server<fuchsia_accessibility::ColorTransform> {
  public:
-  explicit ColorTransformManager(sys::ComponentContext* startup_context);
+  explicit ColorTransformManager(async_dispatcher_t* dispatcher,
+                                 sys::ComponentContext* startup_context);
 
   ~ColorTransformManager() = default;
 
   // Registers a color transform handler to receive updates about color correction and inversion
   // settings changes. Only one color transform handler at a time is supported.
   void RegisterColorTransformHandler(
-      fidl::InterfaceHandle<fuchsia::accessibility::ColorTransformHandler> handle);
+      RegisterColorTransformHandlerRequest& request,
+      RegisterColorTransformHandlerCompleter::Sync& completer) override;
 
   // Called to actually change the color transform settings in the system.
   void ChangeColorTransform(bool color_inversion_enabled,
-                            fuchsia::accessibility::ColorCorrectionMode color_correction_mode);
+                            fuchsia_accessibility::ColorCorrectionMode color_correction_mode);
 
  private:
   void MaybeSetColorTransformConfiguration();
 
-  fidl::BindingSet<fuchsia::accessibility::ColorTransform> bindings_;
+  // not owned
+  async_dispatcher_t* dispatcher_;
 
-  std::optional<fuchsia::accessibility::ColorTransformConfiguration>
-      cached_color_transform_configuration_;
+  fidl::ServerBindingGroup<fuchsia_accessibility::ColorTransform> bindings_;
+
+  fuchsia_accessibility::ColorTransformConfiguration cached_color_transform_configuration_;
 
   // Note that for now, this class supports exactly one color transform handler.
-  fuchsia::accessibility::ColorTransformHandlerPtr color_transform_handler_ptr_;
+  fidl::Client<fuchsia_accessibility::ColorTransformHandler> color_transform_handler_;
+
+  // error handler for ColorTransformHandler connection.
+  ColorTransformHandlerErrorHandler color_transform_handler_error_handler_;
 };
-} // namespace a11y
+}  // namespace a11y
 
 #endif  // SRC_UI_A11Y_LIB_CONFIGURATION_COLOR_TRANSFORM_MANAGER_H_
