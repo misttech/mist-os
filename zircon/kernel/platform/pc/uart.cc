@@ -19,6 +19,7 @@
 
 volatile void* PlatformUartMapMmio(paddr_t paddr, size_t size) {
   volatile void* vaddr = paddr_to_physmap(paddr);
+  physmap_preserve_gaps_for_mmio();
   mark_mmio_region_to_reserve(reinterpret_cast<vaddr_t>(vaddr), size);
   return vaddr;
 }

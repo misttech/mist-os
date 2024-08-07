@@ -246,6 +246,7 @@ void X86UartInitEarly(const uart::all::Driver& serial) {
           .mem_addr = reinterpret_cast<vaddr_t>(paddr_to_physmap(config.mmio_phys)),
           .phys_addr = static_cast<paddr_t>(config.mmio_phys),
       };
+      physmap_preserve_gaps_for_mmio();
       mark_mmio_region_to_reserve(gDebugPort.phys_addr, PAGE_SIZE);
       dprintf(INFO, "UART: kernel serial enabled: mmio=%#lx, irq=%#x\n", gDebugPort.phys_addr,
               gDebugPort.irq);
