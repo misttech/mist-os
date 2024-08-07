@@ -3480,12 +3480,6 @@ Directory into which all fonts are checked out from CIPD
 
 From //src/fonts/build/font_args.gni:12
 
-### freeze_api_level
-
-**Current value (from the default):** `false`
-
-From //build/config/fuchsia/platform_version.gni:27
-
 ### fuchsia_async_trace_level_logging
 
 Determines whether the fuchsia_async library used by many Rust targets will be compiled
@@ -5389,7 +5383,7 @@ To override the set of target CPUs, see `override_idk_target_cpus`.
 
 **Current value (from the default):** `false`
 
-From //build/config/fuchsia/platform_version.gni:49
+From //build/config/fuchsia/platform_version.gni:44
 
 ### override_idk_target_cpus
 
