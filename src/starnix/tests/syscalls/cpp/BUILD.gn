@@ -50,6 +50,7 @@ syscall_tests = [
   "sendfile_test",
   "signal_handling_test",
   "socket_test",
+  "suid_test",
   "sw_breakpoint_test",
   "symlink_test",
   "sysfs_kernel_test",
@@ -103,10 +104,13 @@ if (is_host) {
                      "root_out_dir") + "/syscall_test_exec_child",
       get_label_info(":ptrace_test_exec_child($_host_linux_toolchain)",
                      "root_out_dir") + "/ptrace_test_exec_child",
+      get_label_info(":suid_test_exec_child($_host_linux_toolchain)",
+                     "root_out_dir") + "/suid_test_exec_child",
     ]
     deps = [
       ":extended_pstate_initial_state_child($_host_linux_toolchain)",
       ":ptrace_test_exec_child($_host_linux_toolchain)",
+      ":suid_test_exec_child($_host_linux_toolchain)",
       ":syscall_test_exec_child($_host_linux_toolchain)",
     ]
   }
@@ -267,6 +271,7 @@ template("syscall_test") {
       ":fuse_overlayfs",
       ":ptrace_test_exec_child_resource($target_linux_toolchain)",
       ":simple_ext4_image",
+      ":suid_test_exec_child_resource($target_linux_toolchain)",
       ":syscall_test_exec_child_resource($target_linux_toolchain)",
     ]
     uses_expectations = true
@@ -371,6 +376,26 @@ if (is_linux) {
     sources = [ "$root_out_dir/syscall_test_exec_child" ]
     outputs = [ "data/tests/syscall_test_exec_child" ]
     deps = [ ":syscall_test_exec_child" ]
+  }
+
+  executable("suid_test_exec_child") {
+    testonly = true
+    emit_tool_path = false
+    sources = [ "suid_test_exec_child.cc" ]
+
+    # TODO(https://fxbug.dev/297293167) enable ASan instrumentation for Linux binaries in Starnix
+    exclude_toolchain_tags = [
+      "asan",
+      "coverage",
+    ]
+    deps = [ ":test_utils" ]
+  }
+
+  resource("suid_test_exec_child_resource") {
+    testonly = true
+    sources = [ "$root_out_dir/suid_test_exec_child" ]
+    outputs = [ "data/tests/suid_test_exec_child" ]
+    deps = [ ":suid_test_exec_child" ]
   }
 }
 
