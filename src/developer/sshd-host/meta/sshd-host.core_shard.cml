@@ -26,7 +26,6 @@
         {
             protocol: [
                 "fuchsia.boot.Items",
-                "fuchsia.logger.LogSink",
                 "fuchsia.process.Launcher",
             ],
             from: "parent",
