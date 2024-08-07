@@ -572,7 +572,7 @@ void AmlSpi::UnregisterVmo(fuchsia_hardware_spiimpl::wire::SpiImplUnregisterVmoR
         zx::vmo out_vmo;
         status = vmo_info->vmo()->duplicate(ZX_RIGHT_SAME_RIGHTS, &out_vmo);
         if (status != ZX_OK) {
-          completer.buffer(arena).ReplyError(status);
+          return completer.buffer(arena).ReplyError(status);
         }
 
         auto result = registered_vmos(request.cs())->Unregister(vmo_id);
