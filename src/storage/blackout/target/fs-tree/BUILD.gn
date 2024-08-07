@@ -4,7 +4,6 @@
 
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
-import("//src/developer/ffx/build/ffx_plugin.gni")
 
 rustc_binary("blackout-fxfs-tree-bin") {
   output_name = "blackout_fxfs_tree_bin"

@@ -4,7 +4,7 @@
 
 use crate::bedrock::structured_dict::{ComponentEnvironment, ComponentInput, StructuredDictMap};
 use crate::bedrock::with_porcelain_type::WithPorcelainType as _;
-use crate::capability_source::{CapabilitySource, InternalCapability};
+use crate::capability_source::{CapabilitySource, InternalCapability, VoidSource};
 use crate::component_instance::{ComponentInstanceInterface, WeakComponentInstanceInterface};
 use crate::error::RoutingError;
 use crate::{DictExt, LazyGet, WithAvailability};
@@ -25,6 +25,16 @@ use std::sync::Arc;
 use tracing::warn;
 use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_sys2 as fsys};
 
+/// All capabilities that are available to a component's program.
+#[derive(Default, Debug, Clone)]
+pub struct ProgramInput {
+    /// All of the capabilities that appear in a program's namespace.
+    pub namespace: Dict,
+
+    /// All of the config capabilities that a program will use.
+    pub config: Dict,
+}
+
 /// A component's sandbox holds all the routing dictionaries that a component has once its been
 /// resolved.
 #[derive(Default, Debug, Clone)]
@@ -36,7 +46,7 @@ pub struct ComponentSandbox {
     pub component_output_dict: Dict,
 
     /// The dictionary containing all capabilities that are available to a component's program.
-    pub program_input_dict: Dict,
+    pub program_input: ProgramInput,
 
     /// The dictionary containing all capabilities that a component's program can provide.
     pub program_output_dict: Dict,
@@ -67,7 +77,7 @@ impl ComponentSandbox {
         let ComponentSandbox {
             component_input,
             component_output_dict,
-            program_input_dict,
+            program_input,
             program_output_dict,
             framework_dict,
             capability_sourced_capabilities_dict,
@@ -78,7 +88,7 @@ impl ComponentSandbox {
             (&component_input.capabilities(), &self.component_input.capabilities()),
             (&component_input.environment().debug(), &self.component_input.environment().debug()),
             (&component_output_dict, &self.component_output_dict),
-            (&program_input_dict, &self.program_input_dict),
+            (&program_input.namespace, &self.program_input.namespace),
             (&program_output_dict, &self.program_output_dict),
             (&framework_dict, &self.framework_dict),
             (&capability_sourced_capabilities_dict, &self.capability_sourced_capabilities_dict),
@@ -113,7 +123,7 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
     declared_dictionaries: Dict,
 ) -> ComponentSandbox {
     let component_output_dict = Dict::new();
-    let program_input_dict = Dict::new();
+    let program_input = ProgramInput::default();
     let environments: StructuredDictMap<ComponentEnvironment> = Default::default();
     let child_inputs: StructuredDictMap<ComponentInput> = Default::default();
     let collection_inputs: StructuredDictMap<ComponentInput> = Default::default();
@@ -168,7 +178,7 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
             &component.moniker(),
             &child_component_output_dictionary_routers,
             &component_input,
-            &program_input_dict,
+            &program_input,
             program_input_dict_additions,
             &program_output_router,
             &framework_dict,
@@ -178,7 +188,6 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
     }
 
     for offer in &decl.offers {
-        // We only support protocol and dictionary capabilities right now
         if !is_supported_offer(offer) {
             continue;
         }
@@ -248,7 +257,7 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
     ComponentSandbox {
         component_input,
         component_output_dict,
-        program_input_dict,
+        program_input,
         program_output_dict,
         framework_dict,
         capability_sourced_capabilities_dict,
@@ -361,17 +370,94 @@ fn supported_use(use_: &cm_rust::UseDecl) -> Option<&cm_rust::UseProtocolDecl> {
     }
 }
 
+// Add the `config_use` to the `program_input_dict`, so the component is able to
+// access this configuration.
+fn extend_dict_with_config_use(
+    moniker: &Moniker,
+    child_component_output_dictionary_routers: &HashMap<ChildName, Router>,
+    component_input: &ComponentInput,
+    program_input: &ProgramInput,
+    program_input_dict_additions: &Dict,
+    program_output_router: &Router,
+    config_use: &cm_rust::UseConfigurationDecl,
+) {
+    let source_path = config_use.source_path();
+    let router = match config_use.source() {
+        cm_rust::UseSource::Parent => use_from_parent_router(
+            component_input,
+            source_path.to_owned(),
+            moniker,
+            program_input_dict_additions,
+        )
+        .with_porcelain_type(CapabilityTypeName::Config),
+        cm_rust::UseSource::Self_ => program_output_router
+            .clone()
+            .lazy_get(
+                source_path.to_owned(),
+                RoutingError::use_from_self_not_found(
+                    moniker,
+                    source_path.iter_segments().join("/"),
+                ),
+            )
+            .with_porcelain_type(CapabilityTypeName::Config),
+        cm_rust::UseSource::Child(child_name) => {
+            let child_name = ChildName::parse(child_name).expect("invalid child name");
+            let Some(child_component_output) =
+                child_component_output_dictionary_routers.get(&child_name)
+            else {
+                panic!("use declaration in manifest for component {} has a source of a nonexistent child {}, this should be prevented by manifest validation", moniker, child_name);
+            };
+            child_component_output
+                .clone()
+                .lazy_get(
+                    source_path.to_owned(),
+                    RoutingError::use_from_child_expose_not_found(
+                        &child_name,
+                        &moniker,
+                        config_use.source_name().clone(),
+                    ),
+                )
+                .with_porcelain_type(CapabilityTypeName::Config)
+        }
+        // The following are not used with config capabilities.
+        cm_rust::UseSource::Environment => return,
+        cm_rust::UseSource::Debug => return,
+        cm_rust::UseSource::Capability(_) => return,
+        cm_rust::UseSource::Framework => return,
+    };
+    match program_input.config.insert_capability(
+        &config_use.target_name,
+        router.with_availability(*config_use.availability()).into(),
+    ) {
+        Ok(()) => (),
+        Err(e) => {
+            warn!("failed to insert {} in program input dict: {e:?}", config_use.target_name)
+        }
+    }
+}
+
 fn extend_dict_with_use(
     moniker: &Moniker,
     child_component_output_dictionary_routers: &HashMap<ChildName, Router>,
     component_input: &ComponentInput,
-    program_input_dict: &Dict,
+    program_input: &ProgramInput,
     program_input_dict_additions: &Dict,
     program_output_router: &Router,
     framework_dict: &Dict,
     capability_sourced_capabilities_dict: &Dict,
     use_: &cm_rust::UseDecl,
 ) {
+    if let cm_rust::UseDecl::Config(config) = use_ {
+        return extend_dict_with_config_use(
+            moniker,
+            child_component_output_dictionary_routers,
+            component_input,
+            program_input,
+            program_input_dict_additions,
+            program_output_router,
+            config,
+        );
+    };
     let Some(use_protocol) = supported_use(use_) else {
         return;
     };
@@ -456,7 +542,7 @@ fn extend_dict_with_use(
         // UseSource::Environment is not used for protocol capabilities
         cm_rust::UseSource::Environment => return,
     };
-    match program_input_dict.insert_capability(
+    match program_input.namespace.insert_capability(
         &use_protocol.target_path,
         router.with_availability(*use_.availability()).into(),
     ) {
@@ -500,7 +586,12 @@ fn use_from_parent_router(
 }
 
 fn is_supported_offer(offer: &cm_rust::OfferDecl) -> bool {
-    matches!(offer, cm_rust::OfferDecl::Protocol(_) | cm_rust::OfferDecl::Dictionary(_))
+    matches!(
+        offer,
+        cm_rust::OfferDecl::Config(_)
+            | cm_rust::OfferDecl::Protocol(_)
+            | cm_rust::OfferDecl::Dictionary(_)
+    )
 }
 
 fn extend_dict_with_offer<C: ComponentInstanceInterface + 'static>(
@@ -513,7 +604,6 @@ fn extend_dict_with_offer<C: ComponentInstanceInterface + 'static>(
     offer: &cm_rust::OfferDecl,
     target_dict: &Dict,
 ) {
-    // We only support protocol and dictionary capabilities right now
     if !is_supported_offer(offer) {
         return;
     }
@@ -607,7 +697,12 @@ fn extend_dict_with_offer<C: ComponentInstanceInterface + 'static>(
 }
 
 pub fn is_supported_expose(expose: &cm_rust::ExposeDecl) -> bool {
-    matches!(expose, cm_rust::ExposeDecl::Protocol(_) | cm_rust::ExposeDecl::Dictionary(_))
+    matches!(
+        expose,
+        cm_rust::ExposeDecl::Config(_)
+            | cm_rust::ExposeDecl::Protocol(_)
+            | cm_rust::ExposeDecl::Dictionary(_)
+    )
 }
 
 fn extend_dict_with_expose<C: ComponentInstanceInterface + 'static>(
@@ -717,14 +812,12 @@ impl<C: ComponentInstanceInterface + 'static> UnitRouter<C> {
 impl<C: ComponentInstanceInterface + 'static> sandbox::Routable for UnitRouter<C> {
     async fn route(&self, request: Request) -> Result<Capability, RouterError> {
         if request.debug {
-            return Ok(Capability::Dictionary(
-                CapabilitySource::Void {
-                    capability: self.capability.clone(),
-                    moniker: self.component.moniker.clone(),
-                }
-                .try_into()
-                .expect("failed to convert capability source to dictionary"),
-            ));
+            return Ok(CapabilitySource::Void(VoidSource {
+                capability: self.capability.clone(),
+                moniker: self.component.moniker.clone(),
+            })
+            .try_into()
+            .expect("failed to convert capability source to dictionary"));
         }
         match request.availability {
             cm_rust::Availability::Required | cm_rust::Availability::SameAsTarget => {

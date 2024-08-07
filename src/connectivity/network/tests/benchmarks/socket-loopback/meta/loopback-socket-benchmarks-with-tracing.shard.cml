@@ -17,7 +17,7 @@
     use: [
         {
             protocol: [
-                "fuchsia.tracing.controller.Controller",
+                "fuchsia.tracing.controller.Provisioner",
                 "fuchsia.tracing.provider.Registry",
             ],
             from: "parent",

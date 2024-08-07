@@ -8,7 +8,7 @@
     ],
     use: [
         {
-            protocol: [ "fuchsia.tracing.controller.Controller" ],
+            protocol: [ "fuchsia.tracing.controller.Provisioner" ],
             from: "parent",
         },
     ],

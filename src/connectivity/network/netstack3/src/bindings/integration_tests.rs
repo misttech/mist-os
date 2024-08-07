@@ -8,29 +8,31 @@ use std::sync::{Arc, Once};
 
 use assert_matches::assert_matches;
 use fidl_fuchsia_net_ext::IntoExt as _;
-use fidl_fuchsia_net_stack_ext::FidlReturn as _;
 use futures::channel::mpsc;
 use futures::{StreamExt as _, TryFutureExt as _};
 use ip_test_macro::ip_test;
 use net_declare::{net_ip_v4, net_ip_v6, net_mac, net_subnet_v4, net_subnet_v6};
 use net_types::ethernet::Mac;
-use net_types::ip::{AddrSubnetEither, Ip, IpAddr, IpAddress, Ipv4, Ipv6};
+use net_types::ip::{AddrSubnetEither, Ip, IpAddr, IpInvariant, Ipv4, Ipv6};
 use net_types::{SpecifiedAddr, Witness as _};
 use netstack3_core::device::{DeviceId, EthernetLinkDevice};
 use netstack3_core::error::AddressResolutionFailed;
 use netstack3_core::ip::{Ipv6DeviceConfigurationUpdate, StableIidSecret};
 use netstack3_core::neighbor::LinkResolutionResult;
-use netstack3_core::routes::{AddableEntry, AddableEntryEither, AddableMetric, RawMetric};
+use netstack3_core::routes::{AddableEntry, AddableEntryEither, AddableMetric, Entry, RawMetric};
 use {
-    fidl_fuchsia_net as fidl_net, fidl_fuchsia_net_neighbor as fnet_neighbor,
-    fidl_fuchsia_net_stack as fidl_net_stack, fidl_fuchsia_netemul_network as net,
+    fidl_fuchsia_net as fidl_net, fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
+    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext,
+    fidl_fuchsia_net_neighbor as fnet_neighbor, fidl_fuchsia_net_root as fnet_root,
+    fidl_fuchsia_net_routes as fnet_routes, fidl_fuchsia_net_routes_admin as fnet_routes_admin,
+    fidl_fuchsia_net_routes_ext as fnet_routes_ext, fidl_fuchsia_netemul_network as net,
     fuchsia_async as fasync,
 };
 
 use crate::bindings::ctx::BindingsCtx;
 use crate::bindings::devices::{BindingId, Devices};
 use crate::bindings::util::{ConversionContext as _, IntoFidl as _, TryIntoFidlWithContext as _};
-use crate::bindings::{routes, Ctx, InspectPublisher, DEFAULT_INTERFACE_METRIC, LOOPBACK_NAME};
+use crate::bindings::{routes, Ctx, InspectPublisher, LOOPBACK_NAME};
 
 /// Install a logger for tests.
 pub(crate) fn set_logger_for_test() {
@@ -119,11 +121,12 @@ impl_service_marker!(fidl_fuchsia_net_neighbor::ControllerMarker, NeighborContro
 impl_service_marker!(fidl_fuchsia_posix_socket_packet::ProviderMarker, PacketSocket);
 impl_service_marker!(fidl_fuchsia_posix_socket_raw::ProviderMarker, RawSocket);
 impl_service_marker!(fidl_fuchsia_net_root::InterfacesMarker, RootInterfaces);
+impl_service_marker!(fidl_fuchsia_net_root::RoutesV4Marker, RootRoutesV4);
+impl_service_marker!(fidl_fuchsia_net_root::RoutesV6Marker, RootRoutesV6);
 impl_service_marker!(fidl_fuchsia_net_routes::StateMarker, RoutesState);
 impl_service_marker!(fidl_fuchsia_net_routes::StateV4Marker, RoutesStateV4);
 impl_service_marker!(fidl_fuchsia_net_routes::StateV6Marker, RoutesStateV6);
 impl_service_marker!(fidl_fuchsia_posix_socket::ProviderMarker, Socket);
-impl_service_marker!(fidl_fuchsia_net_stack::StackMarker, Stack);
 impl_service_marker!(fidl_fuchsia_update_verify::NetstackVerifierMarker, Verifier);
 
 impl TestStack {
@@ -139,16 +142,56 @@ impl TestStack {
         proxy
     }
 
-    /// Connects to the `fuchsia.net.stack.Stack` service.
-    pub(crate) fn connect_stack(&self) -> fidl_fuchsia_net_stack::StackProxy {
-        self.connect_proxy::<fidl_fuchsia_net_stack::StackMarker>()
-    }
-
     /// Connects to the `fuchsia.net.interfaces.admin.Installer` service.
     pub(crate) fn connect_interfaces_installer(
         &self,
     ) -> fidl_fuchsia_net_interfaces_admin::InstallerProxy {
         self.connect_proxy::<fidl_fuchsia_net_interfaces_admin::InstallerMarker>()
+    }
+
+    /// Gets the [`fnet_interfaces_ext::admin::Control`] for the interface.
+    pub(crate) fn get_interface_control(
+        &self,
+        interface_id: u64,
+    ) -> fnet_interfaces_ext::admin::Control {
+        let root_interfaces = self.connect_proxy::<fnet_root::InterfacesMarker>();
+        let (control, server_end) =
+            fidl::endpoints::create_proxy::<fnet_interfaces_admin::ControlMarker>()
+                .expect("create proxy");
+        root_interfaces.get_admin(interface_id, server_end).expect("get admin failed");
+        fnet_interfaces_ext::admin::Control::new(control)
+    }
+
+    /// Creates a global route set and authenticates it for the given interface.
+    pub(crate) async fn get_global_route_set_with_authenticated_interface<
+        I: fnet_routes_ext::admin::FidlRouteAdminIpExt + fnet_routes_ext::FidlRouteIpExt,
+    >(
+        &self,
+        authenticate_nicid: u64,
+    ) -> <I::RouteSetMarker as fidl::endpoints::ProtocolMarker>::Proxy
+    where
+        <I as fidl_fuchsia_net_routes_ext::admin::FidlRouteAdminIpExt>::GlobalRouteTableMarker:
+            NetstackServiceMarker,
+    {
+        let root_routes = self.connect_proxy::<I::GlobalRouteTableMarker>();
+        let route_set = fnet_routes_ext::admin::new_global_route_set::<I>(&root_routes)
+            .expect("should successfully get route set");
+
+        let control = self.get_interface_control(authenticate_nicid);
+
+        let fnet_interfaces_admin::GrantForInterfaceAuthorization { interface_id, token } =
+            control.get_authorization_for_interface().await.expect("should succeed");
+        fnet_routes_ext::admin::authenticate_for_interface::<I>(
+            &route_set,
+            fnet_interfaces_admin::ProofOfInterfaceAuthorization { interface_id, token },
+        )
+        .await
+        .expect("FIDL error while authenticating route set for interface")
+        .unwrap_or_else(|e: fnet_routes_admin::AuthenticateForInterfaceError| {
+            panic!("error while authenticating route set for interface: {e:?}")
+        });
+
+        route_set
     }
 
     /// Creates a new `fuchsia.net.interfaces/Watcher` for this stack.
@@ -501,32 +544,23 @@ impl TestSetupBuilder {
                         .unwrap();
                 });
                 if let Some(addr) = addr {
-                    stack.with_ctx(|ctx| {
-                        let core_id = ctx
-                            .bindings_ctx()
-                            .devices
-                            .get_core_id(if_id)
-                            .unwrap_or_else(|| panic!("failed to get device {if_id} info"));
+                    let control = fnet_interfaces_ext::admin::Control::new(interface_control);
+                    let (address_state_provider, server_end) = fidl::endpoints::create_proxy::<
+                        fnet_interfaces_admin::AddressStateProviderMarker,
+                    >()
+                    .expect("create proxy should succeed");
+                    control
+                        .add_address(
+                            &addr.into_fidl(),
+                            &fnet_interfaces_admin::AddressParameters {
+                                add_subnet_route: Some(true),
+                                ..Default::default()
+                            },
+                            server_end,
+                        )
+                        .expect("add address should succeed");
 
-                        ctx.api()
-                            .device_ip_any()
-                            .add_ip_addr_subnet(&core_id, addr)
-                            .expect("add interface address")
-                    });
-
-                    let (_, subnet) = addr.addr_subnet();
-
-                    let stack = stack.connect_stack();
-                    stack
-                        .add_forwarding_entry(&fidl_fuchsia_net_stack::ForwardingEntry {
-                            subnet: subnet.into_fidl(),
-                            device_id: if_id.get(),
-                            next_hop: None,
-                            metric: 0,
-                        })
-                        .await
-                        .squash_result()
-                        .expect("add forwarding entry");
+                    address_state_provider.detach().expect("detach should succeed");
                 }
                 assert_eq!(stack.endpoint_ids.insert(ep_name, if_id), None);
             }
@@ -598,81 +632,97 @@ async fn test_add_device_routes() {
         .await;
 
     let test_stack = t.get(0);
-    let stack = test_stack.connect_stack();
     let if_id = test_stack.get_endpoint_id(1);
 
-    let fwd_entry1 = fidl_net_stack::ForwardingEntry {
-        subnet: fidl_net::Subnet {
-            addr: fidl_net::IpAddress::Ipv4(fidl_net::Ipv4Address { addr: [192, 168, 0, 0] }),
-            prefix_len: 24,
-        },
-        device_id: if_id.get(),
-        next_hop: None,
-        metric: 0,
-    };
-    let fwd_entry2 = fidl_net_stack::ForwardingEntry {
-        subnet: fidl_net::Subnet {
-            addr: fidl_net::IpAddress::Ipv4(fidl_net::Ipv4Address { addr: [10, 0, 0, 0] }),
-            prefix_len: 24,
-        },
-        device_id: if_id.get(),
-        next_hop: None,
-        metric: 0,
-    };
+    let global_route_set =
+        test_stack.get_global_route_set_with_authenticated_interface::<Ipv4>(if_id.get()).await;
 
-    let () = stack
-        .add_forwarding_entry(&fwd_entry1)
-        .await
-        .squash_result()
-        .expect("Add forwarding entry succeeds");
-    let () = stack
-        .add_forwarding_entry(&fwd_entry2)
-        .await
-        .squash_result()
-        .expect("Add forwarding entry succeeds");
+    let fwd_entry1 = fnet_routes_ext::Route::<Ipv4>::new_forward_with_inherited_metric(
+        net_subnet_v4!("192.168.0.0/24"),
+        if_id.get(),
+        None,
+    );
+    let fwd_entry2 = fnet_routes_ext::Route::<Ipv4>::new_forward_with_inherited_metric(
+        net_subnet_v4!("10.0.0.0/24"),
+        if_id.get(),
+        None,
+    );
+
+    assert!(
+        global_route_set
+            .add_route(&fwd_entry1.try_into().expect("convert to FIDL should succeed"))
+            .await
+            .expect("should not get FIDL error")
+            .expect("add route should succeed"),
+        "route should be newly added"
+    );
+
+    assert!(
+        global_route_set
+            .add_route(&fwd_entry2.try_into().expect("convert to FIDL should succeed"))
+            .await
+            .expect("should not get FIDL error")
+            .expect("add route should succeed"),
+        "route should be newly added"
+    );
 
     // finally, check that bad routes will fail:
-    // a duplicate entry should fail with AlreadyExists:
-    let bad_entry = fidl_net_stack::ForwardingEntry {
-        subnet: fidl_net::Subnet {
-            addr: fidl_net::IpAddress::Ipv4(fidl_net::Ipv4Address { addr: [192, 168, 0, 0] }),
-            prefix_len: 24,
-        },
-        device_id: if_id.get(),
-        next_hop: None,
-        metric: 0,
-    };
-    assert_eq!(
-        stack.add_forwarding_entry(&bad_entry).await.unwrap().unwrap_err(),
-        fidl_net_stack::Error::AlreadyExists
+    // a duplicate entry should return false as it already exists:
+    let bad_entry = fwd_entry1.clone();
+    assert!(
+        !global_route_set
+            .add_route(&bad_entry.try_into().expect("convert to FIDL should succeed"))
+            .await
+            .expect("should not get FIDL error")
+            .expect("add route should succeed"),
+        "route should already exist"
     );
+
     // an entry with an invalid subnet should fail with Invalidargs:
-    let bad_entry = fidl_net_stack::ForwardingEntry {
-        subnet: fidl_net::Subnet {
-            addr: fidl_net::IpAddress::Ipv4(fidl_net::Ipv4Address { addr: [10, 0, 0, 0] }),
+    let bad_entry = fnet_routes::RouteV4 {
+        destination: fidl_net::Ipv4AddressWithPrefix {
+            addr: fidl_net::Ipv4Address { addr: [10, 0, 0, 0] },
             prefix_len: 64,
         },
-        device_id: if_id.get(),
-        next_hop: None,
-        metric: 0,
+        action: fnet_routes_ext::RouteAction::Forward(fnet_routes_ext::RouteTarget {
+            outbound_interface: if_id.get(),
+            next_hop: None,
+        })
+        .try_into()
+        .expect("convert to FIDL RouteAction should succeed"),
+        properties: fnet_routes_ext::RouteProperties {
+            specified_properties: fnet_routes_ext::SpecifiedRouteProperties {
+                metric: fnet_routes::SpecifiedMetric::InheritedFromInterface(fnet_routes::Empty),
+            },
+        }
+        .try_into()
+        .expect("convert to FIDL RouteProperties should succeed"),
     };
+
     assert_eq!(
-        stack.add_forwarding_entry(&bad_entry).await.unwrap().unwrap_err(),
-        fidl_net_stack::Error::InvalidArgs
+        global_route_set
+            .add_route(&bad_entry)
+            .await
+            .expect("should not get FIDL error")
+            .unwrap_err(),
+        fnet_routes_admin::RouteSetError::InvalidDestinationSubnet
     );
-    // an entry with a bad devidce id should fail with NotFound:
-    let bad_entry = fidl_net_stack::ForwardingEntry {
-        subnet: fidl_net::Subnet {
-            addr: fidl_net::IpAddress::Ipv4(fidl_net::Ipv4Address { addr: [10, 0, 0, 0] }),
-            prefix_len: 24,
-        },
-        device_id: 10,
-        next_hop: None,
-        metric: 0,
-    };
+
+    // an entry with a bad device id should fail with PreviouslyAuthenticatedInterfaceNoLongerExists
+    // (which can also indicate the interface never existed):
+    let bad_entry = fnet_routes_ext::Route::<Ipv4>::new_forward_with_inherited_metric(
+        net_subnet_v4!("10.0.0.0/24"),
+        10,
+        None,
+    );
+
     assert_eq!(
-        stack.add_forwarding_entry(&bad_entry).await.unwrap().unwrap_err(),
-        fidl_net_stack::Error::NotFound
+        global_route_set
+            .add_route(&bad_entry.try_into().expect("convert to FIDL should succeed"))
+            .await
+            .expect("should not get FIDL error")
+            .unwrap_err(),
+        fnet_routes_admin::RouteSetError::PreviouslyAuthenticatedInterfaceNoLongerExists
     );
 
     t
@@ -691,7 +741,6 @@ async fn test_list_del_routes() {
         .await;
 
     let test_stack = t.get(0);
-    let stack = test_stack.connect_stack();
     let if_id = test_stack.get_named_endpoint_id(EP_NAME);
     let loopback_id = test_stack.get_named_endpoint_id(LOOPBACK_NAME);
     assert_ne!(loopback_id, if_id);
@@ -742,165 +791,122 @@ async fn test_list_del_routes() {
             .expect("add route should succeed");
     }
 
-    let route1_fwd_entry = fidl_net_stack::ForwardingEntry {
-        subnet: sub1.into_ext(),
-        device_id: if_id.get(),
-        next_hop: None,
-        metric: 0,
-    };
+    let route1_fwd_entry = fnet_routes_ext::Route::<Ipv4>::new_forward_with_explicit_metric(
+        sub1,
+        if_id.get(),
+        None,
+        0,
+    );
 
-    let expected_routes = [
+    let expected_routes_v4 = [
         // route1
         route1_fwd_entry.clone(),
         // route2
-        fidl_net_stack::ForwardingEntry {
-            subnet: sub10.into_ext(),
-            device_id: if_id.get(),
-            next_hop: None,
-            metric: 0,
-        },
+        fnet_routes_ext::Route::<Ipv4>::new_forward_with_explicit_metric(
+            sub10,
+            if_id.get(),
+            None,
+            0,
+        ),
         // route3
-        fidl_net_stack::ForwardingEntry {
-            subnet: sub10.into_ext(),
-            device_id: if_id.get(),
-            next_hop: Some(Box::new(sub10_gateway.to_ip_addr().into_ext())),
-            metric: 0,
-        },
-        // More automatically installed routes
-        fidl_net_stack::ForwardingEntry {
-            subnet: Ipv4::LOOPBACK_SUBNET.into_ext(),
-            device_id: loopback_id.get(),
-            next_hop: None,
-            metric: DEFAULT_INTERFACE_METRIC,
-        },
-        fidl_net_stack::ForwardingEntry {
-            subnet: Ipv4::MULTICAST_SUBNET.into_ext(),
-            device_id: loopback_id.get(),
-            next_hop: None,
-            metric: DEFAULT_INTERFACE_METRIC,
-        },
-        fidl_net_stack::ForwardingEntry {
-            subnet: Ipv4::MULTICAST_SUBNET.into_ext(),
-            device_id: if_id.get(),
-            next_hop: None,
-            metric: DEFAULT_INTERFACE_METRIC,
-        },
-        fidl_net_stack::ForwardingEntry {
-            subnet: Ipv6::LOOPBACK_SUBNET.into_ext(),
-            device_id: loopback_id.get(),
-            next_hop: None,
-            metric: DEFAULT_INTERFACE_METRIC,
-        },
-        fidl_net_stack::ForwardingEntry {
-            subnet: net_subnet_v6!("fe80::/64").into_ext(),
-            device_id: if_id.get(),
-            next_hop: None,
-            metric: DEFAULT_INTERFACE_METRIC,
-        },
-        fidl_net_stack::ForwardingEntry {
-            subnet: Ipv6::MULTICAST_SUBNET.into_ext(),
-            device_id: loopback_id.get(),
-            next_hop: None,
-            metric: DEFAULT_INTERFACE_METRIC,
-        },
-        fidl_net_stack::ForwardingEntry {
-            subnet: Ipv6::MULTICAST_SUBNET.into_ext(),
-            device_id: if_id.get(),
-            next_hop: None,
-            metric: DEFAULT_INTERFACE_METRIC,
-        },
+        fnet_routes_ext::Route::<Ipv4>::new_forward_with_explicit_metric(
+            sub10,
+            if_id.get(),
+            Some(sub10_gateway),
+            0,
+        ),
+        // Automatically installed routes
+        fnet_routes_ext::Route::<Ipv4>::new_forward_with_inherited_metric(
+            Ipv4::LOOPBACK_SUBNET,
+            loopback_id.get(),
+            None,
+        ),
+        fnet_routes_ext::Route::<Ipv4>::new_forward_with_inherited_metric(
+            Ipv4::MULTICAST_SUBNET,
+            loopback_id.get(),
+            None,
+        ),
+        fnet_routes_ext::Route::<Ipv4>::new_forward_with_inherited_metric(
+            Ipv4::MULTICAST_SUBNET,
+            if_id.get(),
+            None,
+        ),
     ];
 
-    fn get_routing_table(ts: &TestStack) -> Vec<fidl_net_stack::ForwardingEntry> {
+    let expected_routes_v6 = [
+        fnet_routes_ext::Route::<Ipv6>::new_forward_with_inherited_metric(
+            Ipv6::LOOPBACK_SUBNET,
+            loopback_id.get(),
+            None,
+        ),
+        fnet_routes_ext::Route::<Ipv6>::new_forward_with_inherited_metric(
+            net_subnet_v6!("fe80::/64"),
+            if_id.get(),
+            None,
+        ),
+        fnet_routes_ext::Route::<Ipv6>::new_forward_with_inherited_metric(
+            Ipv6::MULTICAST_SUBNET,
+            loopback_id.get(),
+            None,
+        ),
+        fnet_routes_ext::Route::<Ipv6>::new_forward_with_inherited_metric(
+            Ipv6::MULTICAST_SUBNET,
+            if_id.get(),
+            None,
+        ),
+    ];
+
+    fn get_routes<I: Ip>(ts: &TestStack) -> Vec<fnet_routes_ext::Route<I>> {
         let mut ctx = ts.ctx();
-        ctx.api()
-            .routes_any()
-            .get_all_routes_in_main_table()
+        let routes: Vec<Entry<<I as Ip>::Addr, DeviceId<BindingsCtx>>> = net_types::map_ip_twice!(
+            I,
+            IpInvariant(&mut ctx),
+            |IpInvariant(ctx)| {
+                let mut routes = Vec::new();
+                ctx.api()
+                    .routes::<I>()
+                    .collect_main_table_routes_into::<Entry<<I as Ip>::Addr, DeviceId<BindingsCtx>>, Vec<_>>(
+                        &mut routes,
+                    );
+                routes
+            }
+        );
+        routes
             .into_iter()
             .map(|entry| {
-                entry
+                let route: fnet_routes_ext::Route<I> = entry
                     .try_into_fidl_with_ctx(ctx.bindings_ctx())
-                    .expect("failed to map forwarding entry into FIDL")
+                    .expect("failed to map entry into route FIDL");
+                route
             })
-            .collect()
+            .collect::<Vec<_>>()
     }
 
-    let routes = get_routing_table(test_stack);
-    assert_eq!(routes, expected_routes);
+    assert_eq!(get_routes::<Ipv4>(test_stack), expected_routes_v4);
+    assert_eq!(get_routes::<Ipv6>(test_stack), expected_routes_v6);
 
     // delete route1:
-    let () = stack
-        .del_forwarding_entry(&route1_fwd_entry)
+    let global_route_set =
+        test_stack.get_global_route_set_with_authenticated_interface::<Ipv4>(if_id.get()).await;
+    assert!(global_route_set
+        .remove_route(&route1_fwd_entry.try_into().expect("should convert to FIDL successfully"))
         .await
-        .squash_result()
-        .expect("can delete device forwarding entry");
-    // can't delete again:
-    assert_eq!(
-        stack.del_forwarding_entry(&route1_fwd_entry).await.unwrap().unwrap_err(),
-        fidl_net_stack::Error::NotFound
-    );
+        .expect("should not get FIDL error")
+        .expect("remove route should succeed"));
 
-    // check that route was deleted (should've disappeared from core)
-    let routes = get_routing_table(test_stack);
-    let expected_routes =
-        expected_routes.into_iter().filter(|route| route != &route1_fwd_entry).collect::<Vec<_>>();
-    assert_eq!(routes, expected_routes);
-
-    t
-}
-
-#[fixture::teardown(TestSetup::shutdown)]
-#[fasync::run_singlethreaded(test)]
-async fn test_add_remote_routes() {
-    let mut t = TestSetupBuilder::new()
-        .add_endpoint()
-        .add_stack(StackSetupBuilder::new().add_endpoint(1, None))
-        .build()
-        .await;
-
-    let test_stack = t.get(0);
-    let stack = test_stack.connect_stack();
-    let device_id = test_stack.get_endpoint_id(1).get();
-
-    let subnet = fidl_net::Subnet {
-        addr: fidl_net::IpAddress::Ipv4(fidl_net::Ipv4Address { addr: [192, 168, 0, 0] }),
-        prefix_len: 24,
-    };
-    let fwd_entry = fidl_net_stack::ForwardingEntry {
-        subnet,
-        device_id: 0,
-        next_hop: Some(Box::new(fidl_net::IpAddress::Ipv4(fidl_net::Ipv4Address {
-            addr: [192, 168, 0, 1],
-        }))),
-        metric: 0,
-    };
-
-    // Cannot add gateway route without device set or on-link route to gateway.
-    assert_eq!(
-        stack.add_forwarding_entry(&fwd_entry).await.unwrap(),
-        Err(fidl_net_stack::Error::BadState)
-    );
-
-    let device_fwd_entry = fidl_net_stack::ForwardingEntry {
-        subnet: fwd_entry.subnet,
-        device_id,
-        next_hop: None,
-        metric: 0,
-    };
-    let () = stack
-        .add_forwarding_entry(&device_fwd_entry)
+    // Should observe that the route was already removed if we try to delete again:
+    assert!(!global_route_set
+        .remove_route(&route1_fwd_entry.try_into().expect("should convert to FIDL successfully"))
         .await
-        .squash_result()
-        .expect("add device route");
+        .expect("should not get FIDL error")
+        .expect("remove route should succeed"));
 
-    let () =
-        stack.add_forwarding_entry(&fwd_entry).await.squash_result().expect("add device route");
-
-    // finally, check that bad routes will fail:
-    // a duplicate entry should fail with AlreadyExists:
     assert_eq!(
-        stack.add_forwarding_entry(&fwd_entry).await.unwrap(),
-        Err(fidl_net_stack::Error::AlreadyExists)
+        get_routes::<Ipv4>(test_stack),
+        expected_routes_v4
+            .into_iter()
+            .filter(|route| route != &route1_fwd_entry)
+            .collect::<Vec<_>>()
     );
 
     t

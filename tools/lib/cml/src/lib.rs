@@ -1683,7 +1683,7 @@ impl Document {
             &other_program.info,
             "program",
             include_path,
-            Some(vec!["environ"]),
+            Some(vec!["environ", "features"]),
         )
     }
 

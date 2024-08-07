@@ -12,8 +12,6 @@ rustc_test("nat") {
     "//sdk/fidl/fuchsia.net.filter.deprecated:fuchsia.net.filter.deprecated_rust",
     "//sdk/fidl/fuchsia.net.interfaces.admin:fuchsia.net.interfaces.admin_rust",
     "//sdk/fidl/fuchsia.net.root:fuchsia.net.root_rust",
-    "//sdk/fidl/fuchsia.net.stack:fuchsia.net.stack_rust",
-    "//src/connectivity/lib/fidl_fuchsia_net_stack_ext",
     "//src/connectivity/lib/net-declare",
     "//src/connectivity/network/lib/netfilter",
     "//src/connectivity/network/testing/netemul/rust:lib",
@@ -23,7 +21,6 @@ rustc_test("nat") {
     "//src/lib/fuchsia-async",
     "//src/lib/network/fidl_fuchsia_net_ext",
     "//src/lib/network/fidl_fuchsia_net_interfaces_ext",
-    "//third_party/rust_crates:futures",
     "//third_party/rust_crates:test-case",
   ]
   sources = [ "src/lib.rs" ]

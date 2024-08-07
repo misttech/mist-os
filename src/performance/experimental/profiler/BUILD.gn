@@ -88,3 +88,8 @@ group("tests") {
     "tests",
   ]
 }
+
+group("e2e_tests") {
+  testonly = true
+  deps = [ "tests:e2e_tests" ]
+}

@@ -5,7 +5,7 @@
 use crate::capability::{BuiltinCapability, CapabilityProvider, FrameworkCapability};
 use crate::model::component::WeakComponentInstance;
 use crate::model::token::InstanceRegistry;
-use ::routing::capability_source::CapabilitySource;
+use ::routing::capability_source::{BuiltinSource, CapabilitySource, FrameworkSource};
 use ::routing::component_instance::ComponentInstanceInterface;
 use ::routing::policy::GlobalPolicyChecker;
 use cm_config::{AbiRevisionPolicy, RuntimeConfig};
@@ -103,7 +103,7 @@ impl ModelContext {
         target: WeakComponentInstance,
     ) -> Option<Box<dyn CapabilityProvider>> {
         match source {
-            CapabilitySource::Builtin { capability, .. } => {
+            CapabilitySource::Builtin(BuiltinSource { capability, .. }) => {
                 let builtin_capabilities = self.builtin_capabilities.lock().await;
                 for c in builtin_capabilities.as_ref().expect("not initialized") {
                     if c.matches(capability) {
@@ -112,7 +112,7 @@ impl ModelContext {
                 }
                 None
             }
-            CapabilitySource::Framework { capability, moniker } => {
+            CapabilitySource::Framework(FrameworkSource { capability, moniker }) => {
                 let framework_capabilities = self.framework_capabilities.lock().await;
                 for c in framework_capabilities.as_ref().expect("not initialized") {
                     if c.matches(capability) {

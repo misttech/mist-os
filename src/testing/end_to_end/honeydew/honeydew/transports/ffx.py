@@ -46,9 +46,10 @@ _FFX_CONFIG_CMDS: dict[str, list[str]] = {
         "set",
         "proxy.timeout_secs",
     ],
-    "DAEMON_ECHO": [
+    "DAEMON_START": [
         "daemon",
-        "echo",
+        "start",
+        "--background",
     ],
 }
 
@@ -152,7 +153,7 @@ class FfxConfig:
                 + [self._subtools_search_path]
             )
 
-        self._run(_FFX_CONFIG_CMDS["DAEMON_ECHO"])
+        self._run(_FFX_CONFIG_CMDS["DAEMON_START"])
 
         self._setup_done = True
 

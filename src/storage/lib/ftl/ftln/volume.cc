@@ -2,13 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "volume.h"
+#include "src/storage/lib/ftl/ftln/volume.h"
 
 #include <zircon/assert.h>
+#include <zircon/errors.h>
+#include <zircon/types.h>
 
-#include "ftl.h"
-#include "ftl_private.h"
-#include "ftln/diagnose.h"
+#include <cstdint>
+#include <cstring>
+#include <memory>
+#include <string>
+#include <utility>
+
+#include "src/storage/lib/ftl/ftl.h"
+#include "src/storage/lib/ftl/ftln/diagnose.h"
+#include "src/storage/lib/ftl/ftln/ftlnp.h"
+#include "src/storage/lib/ftl/ftln/ndm-driver.h"
 
 namespace ftl {
 

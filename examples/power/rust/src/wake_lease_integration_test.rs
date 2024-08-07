@@ -28,11 +28,8 @@ impl ActivityGovernorListener {
                     fsystem::ActivityGovernorListenerRequest::OnResume { responder } => {
                         responder.send().context("send failed")
                     }
-                    fsystem::ActivityGovernorListenerRequest::OnSuspend { control_handle: _ } => {
-                        assert!(on_suspend_sender.unbounded_send(()).is_ok());
-                        Ok(())
-                    }
                     fsystem::ActivityGovernorListenerRequest::OnSuspendStarted { responder } => {
+                        assert!(on_suspend_sender.unbounded_send(()).is_ok());
                         responder.send().context("send failed")
                     }
                     fsystem::ActivityGovernorListenerRequest::OnSuspendFail { responder } => {

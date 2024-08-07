@@ -316,7 +316,7 @@ func resultDBStatus(result runtests.TestResult) (resultpb.TestStatus, error) {
 		return resultpb.TestStatus_SKIP, nil
 	case runtests.TestAborted:
 		return resultpb.TestStatus_ABORT, nil
-	case runtests.TestCrashed:
+	case runtests.TestCrashed, runtests.TestInfraFailure:
 		return resultpb.TestStatus_CRASH, nil
 	}
 	return resultpb.TestStatus_STATUS_UNSPECIFIED, fmt.Errorf("cannot map Result: %s to result_sink test_result status", result)

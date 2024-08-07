@@ -49,6 +49,7 @@ _ORDERED_POLICY_STATEMENT_REGEXS = [
     "typeattribute[ \t\v]+[^ \t\v]+.*",
     "allow[ \t\v]+[^ \t\v]+[ \t\v]+[^ \t\v:]+([ \t\v]*:[ \t\v]*[^ \t\v]+)[ \t\v]+.*",
     "dontaudit[ \t\v]+[^ \t\v]+.*",
+    "typebounds[ \t\v]+[^ \t\v]+.*",
     "type_transition[ \t\v]+[^ \t\v]+[ \t\v]+[^ \t\v:]+([ \t\v]*:[ \t\v]*[^ \t\v]+)[ \t\v]+[^ \t\v]+",
     "type_member[ \t\v]+[^ \t\v]+.*",
     "type_change[ \t\v]+[^ \t\v]+.*",

@@ -14,13 +14,12 @@ use fidl_fuchsia_boot::ReadOnlyLogMarker;
 use fuchsia_component::client::connect_to_protocol;
 use futures::stream::{unfold, Stream};
 use moniker::ExtendedMoniker;
-use once_cell::sync::Lazy;
 use std::future::Future;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
 const KERNEL_URL: &str = "fuchsia-boot://kernel";
-pub static KERNEL_IDENTITY: Lazy<Arc<ComponentIdentity>> = Lazy::new(|| {
+pub static KERNEL_IDENTITY: LazyLock<Arc<ComponentIdentity>> = LazyLock::new(|| {
     Arc::new(ComponentIdentity::new(ExtendedMoniker::parse_str("./klog").unwrap(), KERNEL_URL))
 });
 

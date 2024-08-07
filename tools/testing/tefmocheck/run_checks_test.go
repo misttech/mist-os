@@ -88,64 +88,113 @@ func (c alwaysFlakeCheck) IsFlake() bool {
 	return true
 }
 
+type infraFailureCheck struct {
+	baseCheck
+}
+
+func (c infraFailureCheck) Check(*TestingOutputs) bool {
+	return true
+}
+
+func (c infraFailureCheck) Name() string {
+	return "always_infra"
+}
+
+func (c infraFailureCheck) DebugText() string {
+	return "Infra failure"
+}
+
+func (c infraFailureCheck) IsInfraFailure() bool {
+	return true
+}
+
 func TestRunChecks(t *testing.T) {
 	falseCheck := alwaysFalseCheck{}
 	outputsDir := t.TempDir()
 	trueCheck := alwaysTrueCheck{outputsDir: outputsDir}
 	panicCheck := alwaysPanicCheck{}
 	flakeCheck := alwaysFlakeCheck{}
-	checks := []FailureModeCheck{
-		flakeCheck, falseCheck, trueCheck, panicCheck,
-	}
-	want := []runtests.TestDetails{
-		{
-			Name:                 path.Join(checkTestNamePrefix, flakeCheck.Name()),
-			Result:               runtests.TestFailure,
-			IsTestingFailureMode: true,
-			OutputFiles:          []string{debugPathForCheck(flakeCheck)},
-		},
-		{
-			Name:                 path.Join(checkTestNamePrefix, flakeCheck.Name()),
-			Result:               runtests.TestSuccess,
-			IsTestingFailureMode: true,
-		},
-		{
-			Name:                 path.Join(checkTestNamePrefix, trueCheck.Name()),
-			Result:               runtests.TestFailure,
-			IsTestingFailureMode: true,
-			OutputFiles:          []string{debugPathForCheck(trueCheck)},
-		},
-	}
-	for _, of := range trueCheck.OutputFiles() {
-		want[2].OutputFiles = append(want[2].OutputFiles, filepath.Base(of))
-	}
-	startTime := time.Now()
+	infraFailCheck := infraFailureCheck{}
 
-	got, err := RunChecks(checks, nil, outputsDir)
-	if err != nil {
-		t.Error("RunChecks() failed with:", err)
+	tests := []struct {
+		name   string
+		checks []FailureModeCheck
+		want   []runtests.TestDetails
+	}{
+		{
+			name: "mixed_checks",
+			checks: []FailureModeCheck{
+				flakeCheck, falseCheck, trueCheck, panicCheck,
+			},
+			want: []runtests.TestDetails{
+				{
+					Name:                 path.Join(checkTestNamePrefix, flakeCheck.Name()),
+					Result:               runtests.TestFailure,
+					IsTestingFailureMode: true,
+					OutputFiles:          []string{debugPathForCheck(flakeCheck)},
+				},
+				{
+					Name:                 path.Join(checkTestNamePrefix, flakeCheck.Name()),
+					Result:               runtests.TestSuccess,
+					IsTestingFailureMode: true,
+				},
+				{
+					Name:                 path.Join(checkTestNamePrefix, trueCheck.Name()),
+					Result:               runtests.TestFailure,
+					IsTestingFailureMode: true,
+					OutputFiles:          []string{debugPathForCheck(trueCheck)},
+				},
+			},
+		}, {
+			name:   "infra_failure_check",
+			checks: []FailureModeCheck{infraFailCheck},
+			want: []runtests.TestDetails{
+				{
+					Name:                 path.Join(checkTestNamePrefix, infraFailCheck.Name()),
+					Result:               runtests.TestInfraFailure,
+					IsTestingFailureMode: true,
+					OutputFiles:          []string{debugPathForCheck(infraFailCheck)},
+				},
+			},
+		},
 	}
-	for i, td := range got {
-		if td.StartTime.Sub(startTime) < 0 {
-			t.Errorf("start time should be later than %v, got %v", startTime, td.StartTime)
-		}
-		// Since the start time and duration are based on the current time, we should
-		// set those values to the default values so that we don't check them when
-		// comparing the actual and expected test details.
-		var defaultTime time.Time
-		got[i].StartTime = defaultTime
-		got[i].DurationMillis = 0
-		for _, outputFile := range td.OutputFiles {
-			// RunChecks() is only responsible for writing the debug text to a file.
-			if outputFile != want[i].OutputFiles[0] {
-				continue
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if test.name == "mixed_checks" {
+				for _, of := range trueCheck.OutputFiles() {
+					test.want[2].OutputFiles = append(test.want[2].OutputFiles, filepath.Base(of))
+				}
 			}
-			if _, err := os.Stat(filepath.Join(outputsDir, outputFile)); err != nil {
-				t.Errorf("failed to stat OutputFile %s: %v", outputFile, err)
+			startTime := time.Now()
+
+			got, err := RunChecks(test.checks, nil, outputsDir)
+			if err != nil {
+				t.Error("RunChecks() failed with:", err)
 			}
-		}
-	}
-	if diff := cmp.Diff(want, got, cmpopts.EquateEmpty()); diff != "" {
-		t.Errorf("RunChecks() returned unexpected tests (-want +got):\n%s", diff)
+			for i, td := range got {
+				if td.StartTime.Sub(startTime) < 0 {
+					t.Errorf("start time should be later than %v, got %v", startTime, td.StartTime)
+				}
+				// Since the start time and duration are based on the current time, we should
+				// set those values to the default values so that we don't check them when
+				// comparing the actual and expected test details.
+				var defaultTime time.Time
+				got[i].StartTime = defaultTime
+				got[i].DurationMillis = 0
+				for _, outputFile := range td.OutputFiles {
+					// RunChecks() is only responsible for writing the debug text to a file.
+					if outputFile != test.want[i].OutputFiles[0] {
+						continue
+					}
+					if _, err := os.Stat(filepath.Join(outputsDir, outputFile)); err != nil {
+						t.Errorf("failed to stat OutputFile %s: %v", outputFile, err)
+					}
+				}
+			}
+			if diff := cmp.Diff(test.want, got, cmpopts.EquateEmpty()); diff != "" {
+				t.Errorf("RunChecks() returned unexpected tests (-want +got):\n%s", diff)
+			}
+		})
 	}
 }

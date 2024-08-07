@@ -11,19 +11,12 @@
 #include <unistd.h>
 #include <zircon/status.h>
 
-#include <iostream>
-#include <limits>
-
 #include <fbl/string_printf.h>
 #include <fbl/unique_fd.h>
 
 #include "logging.h"
-#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/transport/control_packets.h"
 
 namespace bt_hci_intel {
-
-using ::bt::BufferView;
-using ::bt::PacketView;
 
 namespace {
 
@@ -61,49 +54,55 @@ struct {
 }  // anonymous namespace
 
 FirmwareLoader::LoadStatus FirmwareLoader::LoadBseq(const void* firmware, const size_t& len) {
-  BufferView file(firmware, len);
+  cpp20::span<const uint8_t> file(static_cast<const uint8_t*>(firmware), len);
 
   size_t offset = 0;
   bool patched = false;
 
-  if (file.size() < sizeof(bt::hci_spec::CommandHeader)) {
-    errorf("FirmwareLoader: Error: BSEQ too small: %zu < %zu\n", len,
-           sizeof(bt::hci_spec::CommandHeader));
+  if (file.size() < pw::bluetooth::emboss::CommandHeader::IntrinsicSizeInBytes()) {
+    errorf("FirmwareLoader: Error: BSEQ too small: %" PRIu64 " < %d\n", len,
+           pw::bluetooth::emboss::CommandHeader::IntrinsicSizeInBytes());
     return LoadStatus::kError;
   }
 
   // A bseq file consists of a sequence of:
   // - [0x01] [command w/params]
   // - [0x02] [expected event w/params]
-  while (file.size() - offset > sizeof(bt::hci_spec::CommandHeader)) {
+  while (file.size() - offset > pw::bluetooth::emboss::CommandHeader::IntrinsicSizeInBytes()) {
     // Parse the next items
     if (file[offset] != 0x01) {
       errorf("FirmwareLoader: Error: expected command packet\n");
       return LoadStatus::kError;
     }
     offset++;
-    BufferView command_view = file.view(offset);
-    PacketView<bt::hci_spec::CommandHeader> command(&command_view,
-                                                    command.header().parameter_total_size);
-    offset += command.size();
-    if (!patched && le16toh(command.header().opcode) == kLoadPatch) {
+    cpp20::span<const uint8_t> command_view = file.subspan(offset);
+    auto command_header = pw::bluetooth::emboss::MakeCommandHeaderView(&command_view);
+    const size_t cmd_size = pw::bluetooth::emboss::CommandHeader::IntrinsicSizeInBytes() +
+                            command_header.parameter_total_size().Read();
+    command_view = command_view.subspan(0, cmd_size);
+    offset += cmd_size;
+    if (!patched && command_header.opcode_bits().ogf().Read() == kVendorOgf &&
+        command_header.opcode_bits().ocf().Read() == kLoadPatchOcf) {
       patched = true;
     }
-    if ((file.size() - offset <= sizeof(bt::hci_spec::EventHeader)) || (file[offset] != 0x02)) {
+    if ((file.size() - offset <= pw::bluetooth::emboss::EventHeader::IntrinsicSizeInBytes()) ||
+        (file[offset] != 0x02)) {
       errorf("FirmwareLoader: Error: expected event packet\n");
       return LoadStatus::kError;
     }
-    std::deque<BufferView> events;
-    while ((file.size() - offset > sizeof(bt::hci_spec::EventHeader)) && (file[offset] == 0x02)) {
+    std::deque<cpp20::span<const uint8_t>> events;
+    while ((file.size() - offset > pw::bluetooth::emboss::EventHeader::IntrinsicSizeInBytes()) &&
+           (file[offset] == 0x02)) {
       offset++;
-      BufferView event_view = file.view(offset);
-      PacketView<bt::hci_spec::EventHeader> event(&event_view);
-      size_t event_size = sizeof(bt::hci_spec::EventHeader) + event.header().parameter_total_size;
-      events.emplace_back(file.view(offset, event_size));
+      cpp20::span<const uint8_t> event_span = file.subspan(offset);
+      auto event_view = pw::bluetooth::emboss::MakeEventHeaderView(&event_span);
+      size_t event_size = pw::bluetooth::emboss::EventHeader::IntrinsicSizeInBytes() +
+                          event_view.parameter_total_size().Read();
+      events.emplace_back(file.subspan(offset, event_size));
       offset += event_size;
     }
 
-    if (!hci_.SendAndExpect(command, std::move(events))) {
+    if (!hci_.SendAndExpect(command_view, std::move(events))) {
       return LoadStatus::kError;
     }
   }
@@ -111,19 +110,12 @@ FirmwareLoader::LoadStatus FirmwareLoader::LoadBseq(const void* firmware, const 
   return patched ? LoadStatus::kPatched : LoadStatus::kComplete;
 }
 
-constexpr uint16_t kOpcodeWriteBootParams = bt::hci_spec::VendorOpCode(0x000e);
-
-struct WriteBootParamsCommandParams {
-  uint32_t boot_address;
-  uint8_t firmware_build_number;
-  uint8_t firmware_build_ww;
-  uint8_t firmware_build_yy;
-} __PACKED;
+constexpr uint16_t kWriteBootParamsOcf = 0x000e;
 
 FirmwareLoader::LoadStatus FirmwareLoader::LoadSfi(const void* firmware, const size_t& len,
                                                    enum SecureBootEngineType engine_type,
                                                    uint32_t* boot_addr) {
-  BufferView file(firmware, len);
+  cpp20::span<const uint8_t> file(static_cast<const uint8_t*>(firmware), len);
 
   // index to access the 'sec_boot_params[]'.
   size_t idx = (engine_type == SecureBootEngineType::kECDSA) ? 1 : 0;
@@ -136,22 +128,22 @@ FirmwareLoader::LoadStatus FirmwareLoader::LoadSfi(const void* firmware, const s
 
   // SFI File format:
   // [128 bytes CSS Header]
-  if (!hci_.SendSecureSend(0x00, file.view(sec_boot_params[idx].css_header_offset,
-                                           sec_boot_params[idx].css_header_size))) {
+  if (!hci_.SendSecureSend(0x00, file.subspan(sec_boot_params[idx].css_header_offset,
+                                              sec_boot_params[idx].css_header_size))) {
     errorf("FirmwareLoader: Failed sending CSS Header!\n");
     return LoadStatus::kError;
   }
 
   // [256 bytes PKI]
   if (!hci_.SendSecureSend(
-          0x03, file.view(sec_boot_params[idx].pki_offset, sec_boot_params[idx].pki_size))) {
+          0x03, file.subspan(sec_boot_params[idx].pki_offset, sec_boot_params[idx].pki_size))) {
     errorf("FirmwareLoader: Failed sending PKI Header!\n");
     return LoadStatus::kError;
   }
 
   // [256 bytes signature info]
   if (!hci_.SendSecureSend(
-          0x02, file.view(sec_boot_params[idx].sig_offset, sec_boot_params[idx].sig_size))) {
+          0x02, file.subspan(sec_boot_params[idx].sig_offset, sec_boot_params[idx].sig_size))) {
     errorf("FirmwareLoader: Failed sending signature Header!\n");
     return LoadStatus::kError;
   }
@@ -161,22 +153,29 @@ FirmwareLoader::LoadStatus FirmwareLoader::LoadSfi(const void* firmware, const s
   // [N bytes of command packets, arranged so that the "Secure send" command
   // param size can be a multiple of 4 bytes]
   while (offset < file.size()) {
-    auto next_cmd = file.view(offset + frag_len);
-    PacketView<bt::hci_spec::CommandHeader> cmd(&next_cmd);
-    size_t cmd_size = sizeof(bt::hci_spec::CommandHeader) + cmd.header().parameter_total_size;
-    if (cmd.header().opcode == kOpcodeWriteBootParams) {
-      cmd.Resize(cmd.header().parameter_total_size);
-      auto params = cmd.payload<WriteBootParamsCommandParams>();
+    cpp20::span<const uint8_t> next_cmd = file.subspan(offset + frag_len);
+    auto hdr_view = pw::bluetooth::emboss::MakeCommandHeaderView(&next_cmd);
+    size_t cmd_size = pw::bluetooth::emboss::CommandHeader::IntrinsicSizeInBytes() +
+                      hdr_view.parameter_total_size().Read();
+    if (hdr_view.opcode_bits().ogf().Read() == kVendorOgf &&
+        hdr_view.opcode_bits().ocf().Read() == kWriteBootParamsOcf) {
+      next_cmd = next_cmd.subspan(0, cmd_size);
+      auto params = MakeWriteBootParamsCommandView(&next_cmd);
+      if (!params.IsComplete()) {
+        errorf("FirmwareLoader: Write boot params command is too small (%zu, expected: %d)\n",
+               next_cmd.size(), WriteBootParamsCommand::IntrinsicSizeInBytes());
+        return LoadStatus::kError;
+      }
       if (boot_addr != nullptr) {
-        *boot_addr = letoh32(params.boot_address);
+        *boot_addr = params.boot_address().Read();
       }
       infof("FirmwareLoader: Loading fw %d ww %d yy %d - boot addr %x",
-            params.firmware_build_number, params.firmware_build_ww, params.firmware_build_yy,
-            letoh32(params.boot_address));
+            params.firmware_build_number().Read(), params.firmware_build_ww().Read(),
+            params.firmware_build_yy().Read(), params.boot_address().Read());
     }
     frag_len += cmd_size;
     if ((frag_len % 4) == 0) {
-      if (!hci_.SendSecureSend(0x01, file.view(offset, frag_len))) {
+      if (!hci_.SendSecureSend(0x01, file.subspan(offset, frag_len))) {
         errorf("Failed sending a command chunk!\n");
         return LoadStatus::kError;
       }

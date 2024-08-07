@@ -1,0 +1,97 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+library fuchsia.component.internal;
+
+using fuchsia.component.decl;
+
+alias moniker = string:fuchsia.component.decl.MAX_MONIKER_LENGTH;
+
+type CapabilitySource = strict union {
+    1: component Component;
+    2: framework Framework;
+    3: builtin Builtin;
+    4: namespace Namespace;
+    5: capability Capability;
+    6: anonymized_aggregate AnonymizedAggregate;
+    7: filtered_provider FilteredProvider;
+    8: filtered_aggregate_provider FilteredAggregateProvider;
+    9: environment Environment;
+    10: void Void;
+};
+
+type Component = table {
+    1: capability ComponentCapability;
+    2: moniker moniker;
+};
+
+type Framework = table {
+    1: capability InternalCapability;
+    2: moniker moniker;
+};
+
+type Builtin = table {
+    1: capability InternalCapability;
+};
+
+type Namespace = table {
+    1: capability ComponentCapability;
+};
+
+type Capability = table {
+    1: source_capability ComponentCapability;
+    2: moniker moniker;
+};
+
+type AnonymizedAggregate = table {
+    1: capability AggregateCapability;
+    2: moniker moniker;
+    3: members vector<AggregateMember>:MAX;
+    4: sources Sources;
+};
+
+type FilteredProvider = table {
+    1: capability AggregateCapability;
+    2: moniker moniker;
+    3: service_capability ComponentCapability;
+    4: offer_service_decl fuchsia.component.decl.OfferService;
+};
+
+type FilteredAggregateProvider = table {
+    1: capability AggregateCapability;
+    2: moniker moniker;
+    3: offer_service_decls vector<fuchsia.component.decl.OfferService>:MAX;
+    4: sources Sources;
+};
+
+type Environment = table {
+    1: capability ComponentCapability;
+    2: moniker moniker;
+};
+
+type Void = table {
+    1: capability InternalCapability;
+    2: moniker moniker;
+};
+
+type AggregateMember = strict union {
+    1: child fuchsia.component.decl.ChildRef;
+    2: collection fuchsia.component.decl.name;
+    3: parent fuchsia.component.decl.ParentRef;
+    4: self fuchsia.component.decl.SelfRef;
+};
+
+type Sources = table {
+    1: framework bool;
+    2: builtin bool;
+    3: capability bool;
+    4: collection bool;
+    5: namespace bool;
+    6: component bool;
+    7: capability_type fuchsia.component.decl.name;
+};
+
+type AggregateCapability = strict union {
+    1: service fuchsia.component.decl.name;
+};

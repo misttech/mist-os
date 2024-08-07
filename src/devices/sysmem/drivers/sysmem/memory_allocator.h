@@ -28,19 +28,20 @@ class MemoryAllocator {
   // enables a fake in tests where we don't have a real zx::bti etc.
   class Owner {
    public:
-    virtual inspect::Node* heap_node() = 0;
-    virtual const zx::bti& bti() = 0;
-    virtual zx_status_t CreatePhysicalVmo(uint64_t base, uint64_t size, zx::vmo* vmo_out) = 0;
+    [[nodiscard]] virtual inspect::Node* heap_node() = 0;
+    [[nodiscard]] virtual const zx::bti& bti() = 0;
+    [[nodiscard]] virtual zx::result<zx::vmo> CreatePhysicalVmo(uint64_t base, uint64_t size) = 0;
     // Should be called after every delete that makes the allocator empty.
     virtual void CheckForUnbind() {}
-    virtual SnapshotAnnotationRegister& snapshot_annotation_register() = 0;
-    virtual SysmemMetrics& metrics() = 0;
-    virtual protected_ranges::ProtectedRangesCoreControl& protected_ranges_core_control(
-        const fuchsia_sysmem2::Heap& heap) {
+    [[nodiscard]] virtual std::optional<SnapshotAnnotationRegister>&
+    snapshot_annotation_register() = 0;
+    [[nodiscard]] virtual SysmemMetrics& metrics() = 0;
+    [[nodiscard]] virtual protected_ranges::ProtectedRangesCoreControl&
+    protected_ranges_core_control(const fuchsia_sysmem2::Heap& heap) {
       // Avoid requiring unrelated tests to implement.
       ZX_PANIC("protected_ranges_core_control() not implemented by subclass");
     }
-    virtual bool protected_ranges_disable_dynamic() const { return false; }
+    [[nodiscard]] virtual bool protected_ranges_disable_dynamic() const { return false; }
     virtual void OnAllocationFailure() {}
   };
 

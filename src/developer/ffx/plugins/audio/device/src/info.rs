@@ -10,20 +10,28 @@ use fuchsia_audio::dai::{
 };
 use fuchsia_audio::device::{
     ClockDomain, DevfsSelector, GainCapabilities, GainState, Info as DeviceInfo,
-    PlugDetectCapabilities, PlugEvent, Selector, UniqueInstanceId,
+    PlugDetectCapabilities, PlugEvent, RegistrySelector, Selector, UniqueInstanceId,
 };
 use fuchsia_audio::format_set::{ChannelAttributes, ChannelSet, PcmFormatSet};
+use fuchsia_audio::sigproc::{
+    DaiInterconnect, DaiInterconnectElementState, Dynamics, DynamicsBand, DynamicsBandState,
+    DynamicsElementState, Element, ElementState, Equalizer, EqualizerBand, EqualizerBandState,
+    EqualizerElementState, Gain, GainElementState, Topology, TypeSpecificElement,
+    TypeSpecificElementState, VendorSpecific, VendorSpecificElementState,
+};
 use fuchsia_audio::Registry;
 use fuchsia_zircon_status::Status;
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use prettytable::{cell, format, row, Table};
-use serde::Serialize;
+use serde::ser::SerializeSeq;
+use serde::{Serialize, Serializer};
 use std::collections::BTreeMap;
-use std::fmt::Display;
+use std::fmt::{Display, Write};
 use {
     fidl_fuchsia_audio_device as fadevice, fidl_fuchsia_hardware_audio as fhaudio,
     fidl_fuchsia_hardware_audio_signalprocessing as fhaudio_sigproc, fidl_fuchsia_io as fio,
+    fuchsia_zircon_types as zx_types,
 };
 
 lazy_static! {
@@ -33,16 +41,148 @@ lazy_static! {
     // Left padding, used for the outer table.
     pub static ref TABLE_FORMAT_NORMAL: format::TableFormat = format::FormatBuilder::new().padding(2, 0).build();
 
-    // Right padding, no borders, used for channel sets/attributes.
-    pub static ref TABLE_FORMAT_CHANNEL_SETS: format::TableFormat = format::FormatBuilder::new().padding(0, 2).build();
-
     // With borders, used nested tables.
     pub static ref TABLE_FORMAT_NESTED: format::TableFormat = format::FormatBuilder::new()
         .borders('│')
         .separators(&[format::LinePosition::Top], format::LineSeparator::new('─', '┬', '┌', '┐'))
         .separators(&[format::LinePosition::Bottom], format::LineSeparator::new('─', '┴', '└', '┘'))
+        .indent(2)
         .padding(1, 1)
         .build();
+
+    // Right padding, no borders.
+    pub static ref TABLE_FORMAT_NESTED_COMPACT: format::TableFormat = format::FormatBuilder::new()
+        .column_separator(' ')
+        .build();
+}
+
+/// Formatter for a byte slice as hex digits in groups of 16 bits, separated by spaces.
+struct HexBytesText<'a>(&'a [u8]);
+
+impl Display for HexBytesText<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for (idx, b) in self.0.iter().enumerate() {
+            if idx != 0 && idx % 2 == 0 {
+                f.write_char(' ')?;
+            }
+            write!(f, "{:02x}", b)?;
+        }
+        Ok(())
+    }
+}
+
+/// Formatter for a byte slice as a series of ASCII characters.
+///
+/// If a byte is not in the ASCII graphic character range, outputs a dot (.) instead.
+struct AsciiBytesText<'a>(&'a [u8]);
+
+impl Display for AsciiBytesText<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for b in self.0 {
+            f.write_char(if b.is_ascii_graphic() { char::from(*b) } else { '.' })?;
+        }
+        Ok(())
+    }
+}
+
+/// Formatter for opaque byte data.
+struct BytesText<'a>(&'a [u8]);
+
+impl Display for BytesText<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for (chunk_idx, chunk) in self.0.chunks(0x10).enumerate() {
+            if chunk_idx != 0 {
+                writeln!(f)?;
+            }
+            write!(f, "{:04x}: ", chunk_idx)?;
+            HexBytesText(chunk).fmt(f)?;
+            f.write_str("  ")?;
+            AsciiBytesText(chunk).fmt(f)?;
+        }
+        Ok(())
+    }
+}
+
+/// Formatter that outputs the [Debug] representation of a value.
+pub struct DebugText<T: std::fmt::Debug>(T);
+
+impl<T: std::fmt::Debug> Display for DebugText<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self.0)
+    }
+}
+
+/// Formatter for a value in decibels.
+pub struct DecibelsText<T: Display>(T);
+
+impl<T: Display> Display for DecibelsText<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} dB", self.0)
+    }
+}
+
+/// Formatter for a percentage value.
+pub struct PercentText<T: Display>(T);
+
+impl<T: Display> Display for PercentText<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}%", self.0)
+    }
+}
+
+/// Formatter for a boolean as a yes/no message.
+pub struct YesNoText(bool);
+
+impl Display for YesNoText {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = if self.0 { "✅ Yes" } else { "❌ No" };
+        f.write_str(s)
+    }
+}
+
+/// Formatter for an optional boolean and a subject as a can/cannot message.
+pub struct CanCannotText<'a>(Option<bool>, &'a str);
+
+impl Display for CanCannotText<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.0 {
+            Some(value) => {
+                let s = if value { "✅ Can" } else { "❌ Cannot" };
+                write!(f, "{} {}", s, self.1)
+            }
+            None => write!(f, "<unknown if can {}>", self.1),
+        }
+    }
+}
+
+/// Formatter for a Zircon duration in nanoseconds.
+pub struct DurationText(zx_types::zx_duration_t);
+
+impl Display for DurationText {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} ns", self.0)
+    }
+}
+
+/// Formatter for an integer frequency in hertz.
+pub struct HertzText(u32);
+
+impl Display for HertzText {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} Hz", self.0)
+    }
+}
+
+/// Formatter for gain of a particular type.
+struct GainValueText(f32, fhaudio_sigproc::GainType);
+
+impl Display for GainValueText {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.1 {
+            fhaudio_sigproc::GainType::Decibels => DecibelsText(self.0).fmt(f),
+            fhaudio_sigproc::GainType::Percent => PercentText(self.0).fmt(f),
+        }
+    }
 }
 
 /// Formatter for [GainState].
@@ -72,7 +212,7 @@ impl Display for GainStateText<'_> {
             None => "AGC not available",
         };
 
-        write!(f, "{} dB ({}, {})", self.0.gain_db, muted, agc_enabled)
+        write!(f, "{} ({}, {})", DecibelsText(self.0.gain_db), muted, agc_enabled)
     }
 }
 
@@ -82,40 +222,26 @@ struct GainCapabilitiesText<'a>(&'a GainCapabilities);
 impl Display for GainCapabilitiesText<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let gain_range = if self.0.min_gain_db == self.0.max_gain_db {
-            format!("Fixed {} dB gain", self.0.min_gain_db)
+            format!("Fixed {} gain", DecibelsText(self.0.min_gain_db))
         } else {
-            format!("Gain range [{} dB, {} dB]", self.0.min_gain_db, self.0.max_gain_db)
+            format!("[{}, {}]", DecibelsText(self.0.min_gain_db), DecibelsText(self.0.max_gain_db))
         };
 
         let gain_step = if self.0.gain_step_db == 0.0f32 {
             "0 dB step (continuous)".to_string()
         } else {
-            format!("{} dB step", self.0.gain_step_db)
+            format!("{} step", DecibelsText(self.0.gain_step_db))
         };
 
-        let can_mute = match self.0.can_mute {
-            Some(can_mute) => {
-                if can_mute {
-                    "can mute"
-                } else {
-                    "cannot mute"
-                }
-            }
-            None => "Can Mute unavailable",
-        };
+        let mut table = Table::new();
+        table.set_format(*TABLE_FORMAT_NESTED_COMPACT);
 
-        let can_agc = match self.0.can_agc {
-            Some(can_agc) => {
-                if can_agc {
-                    "can AGC"
-                } else {
-                    "cannot AGC"
-                }
-            }
-            None => "Can AGC unavailable",
-        };
+        table.add_row(row!("Gain range:", gain_range));
+        table.add_row(row!("Gain step:", gain_step));
+        table.add_row(row!("Mute:", CanCannotText(self.0.can_mute, "Mute")));
+        table.add_row(row!("AGC:", CanCannotText(self.0.can_agc, "AGC")));
 
-        write!(f, "{}; {}; {}; {}", gain_range, gain_step, can_mute, can_agc)
+        table.fmt(f)
     }
 }
 
@@ -134,7 +260,7 @@ struct ChannelSetsText<'a>(&'a Vec<ChannelSet>);
 impl Display for ChannelSetsText<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut table = Table::new();
-        table.set_format(*TABLE_FORMAT_CHANNEL_SETS);
+        table.set_format(*TABLE_FORMAT_NESTED_COMPACT);
         for channel_set in self.0 {
             let key = format!(
                 "{} {}:",
@@ -154,7 +280,7 @@ struct ChannelSetText<'a>(&'a ChannelSet);
 impl Display for ChannelSetText<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut table = Table::new();
-        table.set_format(*TABLE_FORMAT_CHANNEL_SETS);
+        table.set_format(*TABLE_FORMAT_NESTED_COMPACT);
         for (idx, attributes) in self.0.attributes.iter().enumerate() {
             let key = format!("Channel {}:", idx + 1);
             let value = ChannelAttributesText(&attributes);
@@ -170,9 +296,9 @@ struct ChannelAttributesText<'a>(&'a ChannelAttributes);
 impl Display for ChannelAttributesText<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut table = Table::new();
-        table.set_format(*TABLE_FORMAT_CHANNEL_SETS);
-        table.add_row(row!("Min frequency (Hz):", or_unknown(&self.0.min_frequency)));
-        table.add_row(row!("Max frequency (Hz):", or_unknown(&self.0.max_frequency)));
+        table.set_format(*TABLE_FORMAT_NESTED_COMPACT);
+        table.add_row(row!("Min frequency:", or_unknown(&self.0.min_frequency.map(HertzText))));
+        table.add_row(row!("Max frequency:", or_unknown(&self.0.max_frequency.map(HertzText))));
         table.fmt(f)
     }
 }
@@ -183,15 +309,20 @@ struct PcmFormatSetText<'a>(&'a PcmFormatSet);
 impl Display for PcmFormatSetText<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let sample_types = self.0.sample_types.iter().map(ToString::to_string).join(", ");
-        let frame_rates = self.0.frame_rates.iter().map(ToString::to_string).join(", ");
+        let frame_rates = self
+            .0
+            .frame_rates
+            .iter()
+            .map(|frame_rate| HertzText(*frame_rate).to_string())
+            .join(", ");
         let num_channels = self.0.channel_sets.iter().map(|set| set.channels()).join(", ");
 
         let mut table = Table::new();
         table.set_format(*TABLE_FORMAT_NESTED);
-        table.add_row(row!(r->"Sample types:", sample_types));
-        table.add_row(row!(r->"Frame rates (Hz):", frame_rates));
-        table.add_row(row!(r->"Number of channels:", num_channels));
-        table.add_row(row!(r->"Channel attributes:", ChannelSetsText(&self.0.channel_sets)));
+        table.add_row(row!("Sample types:", sample_types));
+        table.add_row(row!("Frame rates:", frame_rates));
+        table.add_row(row!("Number of channels:", num_channels));
+        table.add_row(row!("Channel attributes:", ChannelSetsText(&self.0.channel_sets)));
         table.fmt(f)
     }
 }
@@ -206,14 +337,9 @@ impl Display for SupportedRingBufferFormatsText<'_> {
         if self.0.is_empty() {
             table.add_row(row!["No format sets available."]);
         } else {
-            table.set_titles(row![format!(
-                "{} {} with format sets:",
-                self.0.len(),
-                if self.0.len() == 1 { "element" } else { "elements" },
-            )]);
             for (element_id, format_sets) in self.0 {
                 table.add_row(row![format!(
-                    "Element {} has {} format {}:",
+                    "• Element {} has {} format {}:",
                     element_id,
                     format_sets.len(),
                     if format_sets.len() == 1 { "set" } else { "sets" }
@@ -241,29 +367,29 @@ impl Display for DaiFrameFormatsText<'_> {
                 }
                 DaiFrameFormat::Custom(custom_format) => {
                     let mut format_table = Table::new();
-                    format_table.set_format(*TABLE_FORMAT_NORMAL);
-                    table.set_titles(row![dai_frame_format.to_string()]);
+                    format_table.set_format(*TABLE_FORMAT_NESTED);
+                    format_table.set_titles(row![dai_frame_format.to_string()]);
+                    format_table.add_empty_row();
                     format_table.add_row(row![
-                        r->"Justification:",
+                        "Justification:",
                         match custom_format.justification {
                             DaiFrameFormatJustification::Left => "Left",
                             DaiFrameFormatJustification::Right => "Right",
                         }
                     ]);
                     format_table.add_row(row![
-                        r->"Clocking:",
+                        "Clocking:",
                         match custom_format.clocking {
                             DaiFrameFormatClocking::RaisingSclk => "Raising sclk",
                             DaiFrameFormatClocking::FallingSclk => "Falling sclk",
                         }
                     ]);
                     format_table.add_row(row![
-                        r->"Frame sync offset (sclks):",
+                        "Frame sync offset (sclks):",
                         custom_format.frame_sync_sclks_offset
                     ]);
-                    format_table.add_row(
-                        row![r->"Frame sync size (sclks):", custom_format.frame_sync_size],
-                    );
+                    format_table
+                        .add_row(row!["Frame sync size (sclks):", custom_format.frame_sync_size]);
                     table.add_row(row![format_table]);
                 }
             }
@@ -283,19 +409,23 @@ impl Display for DaiFormatSetText<'_> {
         let sample_formats =
             dai_format_set.sample_formats.iter().map(ToString::to_string).join(", ");
         let frame_formats = DaiFrameFormatsText(&dai_format_set.frame_formats);
-        let frame_rates = dai_format_set.frame_rates.iter().map(ToString::to_string).join(", ");
+        let frame_rates = dai_format_set
+            .frame_rates
+            .iter()
+            .map(|frame_rate| HertzText(*frame_rate).to_string())
+            .join(", ");
         let bits_per_slot = dai_format_set.bits_per_slot.iter().map(ToString::to_string).join(", ");
         let bits_per_sample =
             dai_format_set.bits_per_sample.iter().map(ToString::to_string).join(", ");
 
         let mut table = Table::new();
         table.set_format(*TABLE_FORMAT_NESTED);
-        table.add_row(row!(r->"Number of channels:", number_of_channels));
-        table.add_row(row!(r->"Sample formats:", sample_formats));
-        table.add_row(row!(r->"Frame formats:", frame_formats));
-        table.add_row(row!(r->"Frame rates (Hz):", frame_rates));
-        table.add_row(row!(r->"Bits per slot:", bits_per_slot));
-        table.add_row(row!(r->"Bits per sample:", bits_per_sample));
+        table.add_row(row!("Number of channels:", number_of_channels));
+        table.add_row(row!("Sample formats:", sample_formats));
+        table.add_row(row!("Frame formats:", frame_formats));
+        table.add_row(row!("Frame rates:", frame_rates));
+        table.add_row(row!("Bits per slot:", bits_per_slot));
+        table.add_row(row!("Bits per sample:", bits_per_sample));
         table.fmt(f)
     }
 }
@@ -310,14 +440,9 @@ impl Display for SupportedDaiFormatsText<'_> {
         if self.0.is_empty() {
             table.add_row(row!["No format sets available."]);
         } else {
-            table.set_titles(row![format!(
-                "{} {} with DAI format sets:",
-                self.0.len(),
-                if self.0.len() == 1 { "element" } else { "elements" },
-            )]);
             for (element_id, dai_format_sets) in self.0 {
                 table.add_row(row![format!(
-                    "Element {} has {} DAI format {}:",
+                    "• Element {} has {} DAI format {}:",
                     element_id,
                     dai_format_sets.len(),
                     if dai_format_sets.len() == 1 { "set" } else { "sets" }
@@ -329,6 +454,614 @@ impl Display for SupportedDaiFormatsText<'_> {
         }
         table.fmt(f)
     }
+}
+
+/// Formatter for a vector of signal processing topologies.
+struct TopologiesText<'a>(&'a Vec<Topology>);
+
+impl Display for TopologiesText<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut table = Table::new();
+        table.set_format(*TABLE_FORMAT_EMPTY);
+        if self.0.is_empty() {
+            table.add_row(row!["No topologies available."]);
+        } else {
+            for topology in self.0 {
+                table.add_row(row![TopologyText(topology)]);
+            }
+        }
+        table.fmt(f)
+    }
+}
+
+/// Formatter for a signal processing [Topology].
+struct TopologyText<'a>(&'a Topology);
+
+impl Display for TopologyText<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut table = Table::new();
+        table.set_format(*TABLE_FORMAT_NESTED);
+        table.add_row(row!("ID:", self.0.id));
+        table.add_row(row!("Element edges:", EdgePairsText(&self.0.edge_pairs)));
+        table.fmt(f)
+    }
+}
+
+/// Formatter for a vector of signal processing [EdgePair]s.
+struct EdgePairsText<'a>(&'a Vec<fhaudio_sigproc::EdgePair>);
+
+impl Display for EdgePairsText<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut table = Table::new();
+        table.set_format(*TABLE_FORMAT_EMPTY);
+        if self.0.is_empty() {
+            table.add_row(row!["No edge pairs available."]);
+        } else {
+            for edge_pair in self.0 {
+                table.add_row(row![format!(
+                    "{} -> {}",
+                    edge_pair.processing_element_id_from, edge_pair.processing_element_id_to
+                )]);
+            }
+        }
+        table.fmt(f)
+    }
+}
+
+/// Formatter for a vector of [ElementWithState]s.
+struct ElementWithStatesText<'a>(&'a Vec<ElementWithState>);
+
+impl Display for ElementWithStatesText<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut table = Table::new();
+        table.set_format(*TABLE_FORMAT_EMPTY);
+        if self.0.is_empty() {
+            table.add_row(row!["No elements available."]);
+        } else {
+            for element_with_state in self.0 {
+                table.add_row(row![ElementWithStateText(element_with_state)]);
+            }
+        }
+        table.fmt(f)
+    }
+}
+
+/// Formatter for an [ElementWithState].
+struct ElementWithStateText<'a>(&'a ElementWithState);
+
+impl Display for ElementWithStateText<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let capabilities = ElementCapabilities {
+            can_stop: self.0.element.can_stop,
+            can_bypass: self.0.element.can_bypass,
+        };
+
+        let mut table = Table::new();
+        table.set_format(*TABLE_FORMAT_NESTED);
+        table.add_row(row!("ID:", self.0.element.id));
+        table.add_row(row!("Type:", DebugText(self.0.element.type_)));
+        table.add_row(row!("Description:", or_unknown(&self.0.element.description)));
+        if let Some(type_specific) = &self.0.element.type_specific {
+            table.add_row(row!("Type specific:", TypeSpecificElementText(type_specific)));
+        }
+        table.add_row(row!(
+            "State:",
+            or_unknown(&self.0.state.as_ref().map(|state| ElementStateText(state, capabilities)))
+        ));
+        table.fmt(f)
+    }
+}
+
+/// Formatter for a signal processing [TypeSpecificElement].
+struct TypeSpecificElementText<'a>(&'a TypeSpecificElement);
+
+impl Display for TypeSpecificElementText<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.0 {
+            TypeSpecificElement::VendorSpecific(vendor_specific) => {
+                VendorSpecificText(vendor_specific).fmt(f)
+            }
+            TypeSpecificElement::Gain(gain) => GainText(gain).fmt(f),
+            TypeSpecificElement::Equalizer(equalizer) => EqualizerText(equalizer).fmt(f),
+            TypeSpecificElement::Dynamics(dynamics) => DynamicsText(dynamics).fmt(f),
+            TypeSpecificElement::DaiInterconnect(dai_interconnect) => {
+                DaiInterconnectText(dai_interconnect).fmt(f)
+            }
+        }
+    }
+}
+
+/// Formatter for signal processing [VendorSpecific] element type-specific properties.
+struct VendorSpecificText<'a>(
+    // [VendorSpecific] currently does not have any fields, so it's not read.
+    #[allow(dead_code)] &'a VendorSpecific,
+);
+
+impl Display for VendorSpecificText<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "<vendor specific>")
+    }
+}
+
+/// Formatter for signal processing [Gain] element type-specific properties.
+struct GainText<'a>(&'a Gain);
+
+impl Display for GainText<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let range = if self.0.range.min == self.0.range.max {
+            format!("Fixed {}", GainValueText(self.0.range.min, self.0.type_))
+        } else {
+            format!(
+                "[{}, {}]",
+                GainValueText(self.0.range.min, self.0.type_),
+                GainValueText(self.0.range.max, self.0.type_)
+            )
+        };
+
+        let min_step = if self.0.range.min_step == 0.0f32 {
+            format!("{} step (continuous)", GainValueText(0.0f32, self.0.type_))
+        } else {
+            format!("{} step", GainValueText(self.0.range.min_step, self.0.type_))
+        };
+
+        let mut table = Table::new();
+        table.set_format(*TABLE_FORMAT_NESTED_COMPACT);
+        table.add_row(row!("Type:", DebugText(self.0.type_)));
+        table.add_row(row!("Domain:", or_unknown(&self.0.domain.as_ref().map(DebugText))));
+        table.add_row(row!("Range:", format!("{}; {}", range, min_step)));
+        table.fmt(f)
+    }
+}
+
+/// Formatter for signal processing [Equalizer] element type-specific properties.
+struct EqualizerText<'a>(&'a Equalizer);
+
+impl Display for EqualizerText<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut table = Table::new();
+        table.set_format(*TABLE_FORMAT_NESTED_COMPACT);
+        table.add_row(row!("Bands:", EqualizerBandsText(&self.0.bands)));
+        table.add_row(row!(
+            "Supported controls:",
+            or_unknown(&self.0.supported_controls.as_ref().map(EqualizerSupportedControlsText))
+        ));
+        table.add_row(row!(
+            "Can disable bands?:",
+            or_unknown(&self.0.can_disable_bands.map(YesNoText))
+        ));
+        table.add_row(row!(
+            "Frequency range:",
+            format!("[{}, {}]", HertzText(self.0.min_frequency), HertzText(self.0.max_frequency))
+        ));
+        table.add_row(row!(
+            "Maximum quality factor:",
+            or_unknown(&self.0.max_q.as_ref().map(ToString::to_string))
+        ));
+        table.add_row(row!(
+            "Gain range:",
+            format!(
+                "[{}, {}]",
+                or_unknown(&self.0.min_gain_db.map(DecibelsText)),
+                or_unknown(&self.0.max_gain_db.map(DecibelsText))
+            ),
+        ));
+        table.fmt(f)
+    }
+}
+
+/// Formatter for a vector of signal processing [EqualizerBand]s.
+struct EqualizerBandsText<'a>(&'a Vec<EqualizerBand>);
+
+impl Display for EqualizerBandsText<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut table = Table::new();
+        table.set_format(*TABLE_FORMAT_NESTED_COMPACT);
+        if self.0.is_empty() {
+            table.add_row(row!["No bands available."]);
+        } else {
+            for element in self.0 {
+                table.add_row(row![EqualizerBandText(element)]);
+            }
+        }
+        table.fmt(f)
+    }
+}
+
+/// Formatter for a signal processing [EqualizerBand].
+struct EqualizerBandText<'a>(&'a EqualizerBand);
+
+impl Display for EqualizerBandText<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut table = Table::new();
+        table.set_format(*TABLE_FORMAT_NESTED_COMPACT);
+        table.add_row(row!("ID:", self.0.id));
+        table.fmt(f)
+    }
+}
+
+/// Formatter for signal processing [EqualizerSupportedControls].
+struct EqualizerSupportedControlsText<'a>(&'a fhaudio_sigproc::EqualizerSupportedControls);
+
+impl Display for EqualizerSupportedControlsText<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut table = Table::new();
+        table.set_format(*TABLE_FORMAT_NESTED_COMPACT);
+        for (label, flag) in [
+            ("Frequency:", fhaudio_sigproc::EqualizerSupportedControls::CAN_CONTROL_FREQUENCY),
+            ("Quality factor (Q):", fhaudio_sigproc::EqualizerSupportedControls::CAN_CONTROL_Q),
+            ("Peak bands:", fhaudio_sigproc::EqualizerSupportedControls::SUPPORTS_TYPE_PEAK),
+            ("Notch bands:", fhaudio_sigproc::EqualizerSupportedControls::SUPPORTS_TYPE_NOTCH),
+            ("Low cut bands:", fhaudio_sigproc::EqualizerSupportedControls::SUPPORTS_TYPE_LOW_CUT),
+            (
+                "High cut bands:",
+                fhaudio_sigproc::EqualizerSupportedControls::SUPPORTS_TYPE_HIGH_CUT,
+            ),
+            (
+                "Low shelf bands:",
+                fhaudio_sigproc::EqualizerSupportedControls::SUPPORTS_TYPE_LOW_SHELF,
+            ),
+            (
+                "High shelf bands:",
+                fhaudio_sigproc::EqualizerSupportedControls::SUPPORTS_TYPE_HIGH_SHELF,
+            ),
+        ] {
+            table.add_row(row!(label, YesNoText(self.0.contains(flag))));
+        }
+        table.fmt(f)
+    }
+}
+
+/// Formatter for signal processing [Dynamics] element type-specific properties.
+struct DynamicsText<'a>(&'a Dynamics);
+
+impl Display for DynamicsText<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut table = Table::new();
+        table.set_format(*TABLE_FORMAT_NESTED_COMPACT);
+        table.add_row(row!("Bands:", DynamicsBandsText(&self.0.bands)));
+        table.add_row(row!(
+            "Supported controls:",
+            or_unknown(&self.0.supported_controls.as_ref().map(DynamicsSupportedControlsText))
+        ));
+        table.fmt(f)
+    }
+}
+
+/// Formatter for a vector of signal processing [DynamicsBand]s.
+struct DynamicsBandsText<'a>(&'a Vec<DynamicsBand>);
+
+impl Display for DynamicsBandsText<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut table = Table::new();
+        table.set_format(*TABLE_FORMAT_NESTED_COMPACT);
+        if self.0.is_empty() {
+            table.add_row(row!["No bands available."]);
+        } else {
+            for element in self.0 {
+                table.add_row(row![DynamicsBandText(element)]);
+            }
+        }
+        table.fmt(f)
+    }
+}
+
+/// Formatter for a signal processing [DynamicsBand].
+struct DynamicsBandText<'a>(&'a DynamicsBand);
+
+impl Display for DynamicsBandText<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut table = Table::new();
+        table.set_format(*TABLE_FORMAT_NESTED_COMPACT);
+        table.add_row(row!("ID:", self.0.id));
+        table.fmt(f)
+    }
+}
+
+/// Formatter for signal processing [DynamicsSupportedControls].
+struct DynamicsSupportedControlsText<'a>(&'a fhaudio_sigproc::DynamicsSupportedControls);
+
+impl Display for DynamicsSupportedControlsText<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut table = Table::new();
+        table.set_format(*TABLE_FORMAT_NESTED_COMPACT);
+        for (label, flag) in [
+            ("Knee width:", fhaudio_sigproc::DynamicsSupportedControls::KNEE_WIDTH),
+            ("Attack:", fhaudio_sigproc::DynamicsSupportedControls::ATTACK),
+            ("Release:", fhaudio_sigproc::DynamicsSupportedControls::RELEASE),
+            ("Output gain:", fhaudio_sigproc::DynamicsSupportedControls::OUTPUT_GAIN),
+            ("Input gain:", fhaudio_sigproc::DynamicsSupportedControls::INPUT_GAIN),
+            ("Lookahead:", fhaudio_sigproc::DynamicsSupportedControls::LOOKAHEAD),
+            ("Level type:", fhaudio_sigproc::DynamicsSupportedControls::LEVEL_TYPE),
+            ("Linked channels:", fhaudio_sigproc::DynamicsSupportedControls::LINKED_CHANNELS),
+            ("Threshold type:", fhaudio_sigproc::DynamicsSupportedControls::THRESHOLD_TYPE),
+        ] {
+            table.add_row(row!(label, YesNoText(self.0.contains(flag))));
+        }
+        table.fmt(f)
+    }
+}
+
+/// Formatter for signal processing [PlugDetectCapabilities].
+struct PlugDetectCapabilitiesText<'a>(&'a fhaudio_sigproc::PlugDetectCapabilities);
+
+impl Display for PlugDetectCapabilitiesText<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self.0 {
+            fhaudio_sigproc::PlugDetectCapabilities::Hardwired => "Hardwired",
+            fhaudio_sigproc::PlugDetectCapabilities::CanAsyncNotify => {
+                "Pluggable (can async notify)"
+            }
+            _ => "<unknown>",
+        };
+        f.write_str(s)
+    }
+}
+
+/// Formatter for signal processing [DaiInterconnect] element type-specific properties.
+struct DaiInterconnectText<'a>(&'a DaiInterconnect);
+
+impl Display for DaiInterconnectText<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut table = Table::new();
+        table.set_format(*TABLE_FORMAT_NESTED_COMPACT);
+        table.add_row(row!(
+            "Plug detection:",
+            PlugDetectCapabilitiesText(&self.0.plug_detect_capabilities)
+        ));
+        table.fmt(f)
+    }
+}
+
+/// Portion of `ElementState` that represents its capabilities.
+struct ElementCapabilities {
+    can_stop: Option<bool>,
+    can_bypass: Option<bool>,
+}
+
+/// Formatter for a signal processing [ElementState].
+///
+/// Takes in an `ElementCapabilities` to annotate current state, like
+/// started/bypassed with whether that state can change.
+struct ElementStateText<'a>(&'a ElementState, ElementCapabilities);
+
+impl Display for ElementStateText<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let started_text =
+            format!("{} ({})", YesNoText(self.0.started), CanCannotText(self.1.can_stop, "Stop"),);
+        let bypassed_text = format!(
+            "{} ({})",
+            or_unknown(&self.0.bypassed.map(YesNoText)),
+            CanCannotText(self.1.can_bypass, "Bypass"),
+        );
+
+        let mut table = Table::new();
+        table.set_format(*TABLE_FORMAT_NESTED_COMPACT);
+        table.add_row(row!(
+            "Vendor specific:",
+            or_unknown(
+                &self.0.vendor_specific_data.as_ref().map(|data| BytesText(data.as_slice()))
+            )
+        ));
+        table.add_row(row!("Started:", started_text));
+        table.add_row(row!("Bypassed:", bypassed_text));
+        table.add_row(row!(
+            "Turn on delay:",
+            or_unknown(&self.0.turn_on_delay_ns.map(DurationText))
+        ));
+        table.add_row(row!(
+            "Turn off delay:",
+            or_unknown(&self.0.turn_off_delay_ns.map(DurationText))
+        ));
+        table.add_row(row!(
+            "Processing delay:",
+            or_unknown(&self.0.processing_delay_ns.map(DurationText))
+        ));
+        if let Some(type_specific) = &self.0.type_specific {
+            table.add_row(row!("Type specific:", TypeSpecificElementStateText(type_specific)));
+        }
+        table.fmt(f)
+    }
+}
+
+/// Formatter for a signal processing [TypeSpecificElementState].
+struct TypeSpecificElementStateText<'a>(&'a TypeSpecificElementState);
+
+impl Display for TypeSpecificElementStateText<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.0 {
+            TypeSpecificElementState::VendorSpecific(vendor_specific_element_state) => {
+                VendorSpecificElementStateText(vendor_specific_element_state).fmt(f)
+            }
+            TypeSpecificElementState::Gain(gain_element_state) => {
+                GainElementStateText(gain_element_state).fmt(f)
+            }
+            TypeSpecificElementState::Equalizer(equalizer_element_state) => {
+                EqualizerElementStateText(equalizer_element_state).fmt(f)
+            }
+            TypeSpecificElementState::Dynamics(dynamics_element_state) => {
+                DynamicsElementStateText(dynamics_element_state).fmt(f)
+            }
+            TypeSpecificElementState::DaiInterconnect(dai_interconnect_element_state) => {
+                DaiInterconnectElementStateText(dai_interconnect_element_state).fmt(f)
+            }
+        }
+    }
+}
+
+/// Formatter for signal processing [VendorSpecificElementState].
+struct VendorSpecificElementStateText<'a>(
+    // [VendorSpecificState] currently does not have any fields, so it's not read.
+    #[allow(dead_code)] &'a VendorSpecificElementState,
+);
+
+impl Display for VendorSpecificElementStateText<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "<vendor specific element state>")
+    }
+}
+
+/// Formatter for signal processing [GainElementState].
+struct GainElementStateText<'a>(&'a GainElementState);
+
+impl Display for GainElementStateText<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut table = Table::new();
+        table.set_format(*TABLE_FORMAT_NESTED_COMPACT);
+        table.add_row(row!("Gain:", self.0.gain));
+        table.fmt(f)
+    }
+}
+
+/// Formatter for signal processing [EqualizerElementState].
+struct EqualizerElementStateText<'a>(&'a EqualizerElementState);
+
+impl Display for EqualizerElementStateText<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // EQ element state only contains band states.
+        EqualizerBandStatesText(&self.0.band_states).fmt(f)
+    }
+}
+
+/// Formatter for a vector of signal processing [EqualizerBandState]s.
+struct EqualizerBandStatesText<'a>(&'a Vec<EqualizerBandState>);
+
+impl Display for EqualizerBandStatesText<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut table = Table::new();
+        table.set_format(*TABLE_FORMAT_NESTED_COMPACT);
+        if self.0.is_empty() {
+            table.add_row(row!["No equalizer band states available."]);
+        } else {
+            for element in self.0 {
+                table.add_row(row![EqualizerBandStateText(element)]);
+            }
+        }
+        table.fmt(f)
+    }
+}
+
+/// Formatter for a signal processing [EqualizerBandState].
+struct EqualizerBandStateText<'a>(&'a EqualizerBandState);
+
+impl Display for EqualizerBandStateText<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut table = Table::new();
+        table.set_format(*TABLE_FORMAT_NESTED);
+        table.add_row(row!("ID:", self.0.id));
+        table.add_row(row!("Type:", or_unknown(&self.0.type_.as_ref().map(DebugText))));
+        table.add_row(row!("Frequency:", or_unknown(&self.0.frequency.map(HertzText))));
+        table.add_row(row!("Quality factor:", or_unknown(&self.0.q)));
+        table.add_row(row!("Gain:", or_unknown(&self.0.frequency.map(DecibelsText))));
+        table.add_row(row!("Enabled:", or_unknown(&self.0.enabled.map(YesNoText))));
+        table.fmt(f)
+    }
+}
+
+/// Formatter for signal processing [DynamicsElementState].
+struct DynamicsElementStateText<'a>(&'a DynamicsElementState);
+
+impl Display for DynamicsElementStateText<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Dynamics element state only contains band states.
+        DynamicsBandStatesText(&self.0.band_states).fmt(f)
+    }
+}
+
+/// Formatter for a vector of signal processing [DynamicsBandState]s.
+struct DynamicsBandStatesText<'a>(&'a Vec<DynamicsBandState>);
+
+impl Display for DynamicsBandStatesText<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut table = Table::new();
+        table.set_format(*TABLE_FORMAT_NESTED_COMPACT);
+        if self.0.is_empty() {
+            table.add_row(row!["No dynamics band states available."]);
+        } else {
+            for element in self.0 {
+                table.add_row(row![DynamicsBandStateText(element)]);
+            }
+        }
+        table.fmt(f)
+    }
+}
+
+/// Formatter for a signal processing [DynamicsBandState].
+struct DynamicsBandStateText<'a>(&'a DynamicsBandState);
+
+impl Display for DynamicsBandStateText<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut table = Table::new();
+        table.set_format(*TABLE_FORMAT_NESTED);
+        table.add_row(row!("ID:", self.0.id));
+        table.add_row(row!(
+            "Frequency range:",
+            format!("[{}, {}]", HertzText(self.0.min_frequency), HertzText(self.0.max_frequency))
+        ));
+        table.add_row(row!(
+            "Threshold:",
+            format!("{} {}", DebugText(self.0.threshold_type), DecibelsText(self.0.threshold_db))
+        ));
+        table.add_row(row!("Knee width:", or_unknown(&self.0.knee_width_db.map(DecibelsText))));
+        table.add_row(row!("Attack:", or_unknown(&self.0.attack.map(DurationText))));
+        table.add_row(row!("Release:", or_unknown(&self.0.release.map(DurationText))));
+        table.add_row(row!("Output gain:", or_unknown(&self.0.output_gain_db.map(DecibelsText))));
+        table.add_row(row!("Input gain:", or_unknown(&self.0.input_gain_db.map(DecibelsText))));
+        table.add_row(row!("Level type:", or_unknown(&self.0.level_type.map(DebugText))));
+        table.add_row(row!("Lookahead:", or_unknown(&self.0.lookahead.map(DurationText))));
+        table.add_row(row!("Linked channels:", or_unknown(&self.0.linked_channels.map(YesNoText))));
+        table.fmt(f)
+    }
+}
+
+/// Formatter for signal processing [PlugState].
+struct PlugStateText<'a>(&'a fuchsia_audio::sigproc::PlugState);
+
+impl Display for PlugStateText<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = if self.0.plugged { "Plugged" } else { "Unplugged" };
+        write!(f, "{} at {}", s, self.0.plug_state_time)
+    }
+}
+
+/// Formatter for signal processing [DaiInterconnectElementState].
+struct DaiInterconnectElementStateText<'a>(&'a DaiInterconnectElementState);
+
+impl Display for DaiInterconnectElementStateText<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut table = Table::new();
+        table.set_format(*TABLE_FORMAT_NESTED_COMPACT);
+        table.add_row(row!("Plug state:", PlugStateText(&self.0.plug_state)));
+        table.add_row(row!(
+            "External delay:",
+            or_unknown(&self.0.external_delay_ns.map(DurationText))
+        ));
+        table.fmt(f)
+    }
+}
+
+/// A combination of a signal processing [Element] and its [ElementState].
+#[derive(Debug, Serialize, PartialEq, Clone)]
+pub struct ElementWithState {
+    #[serde(flatten, with = "serde_ext::ElementDef")]
+    element: Element,
+    #[serde(serialize_with = "serde_ext::serialize_option_elementstate")]
+    state: Option<ElementState>,
+}
+
+pub fn serialize_option_vec_elementwithstate<S>(
+    element_with_states: &Option<Vec<ElementWithState>>,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    let Some(element_with_states) = element_with_states else { return serializer.serialize_none() };
+
+    let mut seq = serializer.serialize_seq(Some(element_with_states.len()))?;
+    for element_with_state in element_with_states {
+        seq.serialize_element(&element_with_state)?;
+    }
+    seq.end()
 }
 
 #[derive(Default, Debug, Serialize, PartialEq, Clone)]
@@ -362,41 +1095,80 @@ pub struct InfoResult {
 
     #[serde(serialize_with = "serde_ext::serialize_option_map_pcmformatset")]
     pub supported_ring_buffer_formats: Option<BTreeMap<fadevice::ElementId, Vec<PcmFormatSet>>>,
+
+    #[serde(serialize_with = "serde_ext::serialize_option_vec_topology")]
+    pub topologies: Option<Vec<Topology>>,
+
+    pub topology_id: Option<fadevice::TopologyId>,
+
+    #[serde(rename = "elements", serialize_with = "serialize_option_vec_elementwithstate")]
+    pub element_with_states: Option<Vec<ElementWithState>>,
 }
 
-impl From<InfoResult> for Table {
-    fn from(value: InfoResult) -> Self {
+impl Display for InfoResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut table = Table::new();
         table.set_format(*TABLE_FORMAT_NORMAL);
-        table.add_row(row!(r->"Path:", or_unknown(&value.device_path)));
-        table.add_row(row!(r->"Unique ID:", or_unknown(&value.unique_id)));
-        table.add_row(row!(r->"Manufacturer:", or_unknown(&value.manufacturer)));
-        table.add_row(row!(r->"Product:", or_unknown(&value.product_name)));
+        table.add_row(row!("Path:", or_unknown(&self.device_path)));
+        table.add_row(row!("Unique ID:", or_unknown(&self.unique_id)));
+        table.add_row(row!("Manufacturer:", or_unknown(&self.manufacturer)));
+        table.add_row(row!("Product:", or_unknown(&self.product_name)));
         table.add_row(row!(
-            r->"Current gain:",
-            or_unknown(&value.gain_state.as_ref().map(GainStateText)),
+            "Current gain:",
+            or_unknown(&self.gain_state.as_ref().map(GainStateText)),
         ));
         table.add_row(row!(
-            r->"Gain capabilities:",
-            or_unknown(&value.gain_capabilities.as_ref().map(GainCapabilitiesText)),
-        ));
-        table.add_row(row!(
-            r->"Plug state:",
-            or_unknown(&value.plug_event.as_ref().map(PlugEventText)),
-        ));
-        table.add_row(row!(r->"Plug detection:", or_unknown(&value.plug_detect_capabilities)));
-        table.add_row(row!(r->"Clock domain:", or_unknown(&value.clock_domain)));
-        table.add_row(row!(
-            r->"DAI formats:",
-            or_unknown(&value.supported_dai_formats.as_ref().map(SupportedDaiFormatsText)),
-        ));
-        table.add_row(row!(
-            r->"Ring buffer formats:",
-            or_unknown(
-                &value.supported_ring_buffer_formats.as_ref().map(SupportedRingBufferFormatsText),
-            ),
+            "Gain capabilities:",
+            or_unknown(&self.gain_capabilities.as_ref().map(GainCapabilitiesText)),
         ));
         table
+            .add_row(
+                row!("Plug state:", or_unknown(&self.plug_event.as_ref().map(PlugEventText)),),
+            );
+        table.add_row(row!("Plug detection:", or_unknown(&self.plug_detect_capabilities)));
+        table.add_row(row!("Clock domain:", or_unknown(&self.clock_domain)));
+        table.add_row(row!("Signal processing topology:", or_unknown(&self.topology_id)));
+        table.fmt(f)?;
+
+        writeln!(f)?;
+
+        let mut dai_formats_table = Table::new();
+        dai_formats_table.set_format(*TABLE_FORMAT_NORMAL);
+        dai_formats_table.set_titles(row!("DAI formats:"));
+        dai_formats_table.add_row(row!(or_unknown(
+            &self.supported_dai_formats.as_ref().map(SupportedDaiFormatsText)
+        )));
+        dai_formats_table.fmt(f)?;
+
+        writeln!(f)?;
+
+        let mut rb_formats_table = Table::new();
+        rb_formats_table.set_format(*TABLE_FORMAT_NORMAL);
+        rb_formats_table.set_titles(row!("Ring buffer formats:"));
+        rb_formats_table.add_row(row!(or_unknown(
+            &self.supported_ring_buffer_formats.as_ref().map(SupportedRingBufferFormatsText),
+        ),));
+        rb_formats_table.fmt(f)?;
+
+        writeln!(f)?;
+
+        let mut topologies_table = Table::new();
+        topologies_table.set_format(*TABLE_FORMAT_NORMAL);
+        topologies_table.set_titles(row!("Signal processing topologies:"));
+        topologies_table.add_row(row!(or_unknown(&self.topologies.as_ref().map(TopologiesText)),));
+        topologies_table.fmt(f)?;
+
+        writeln!(f)?;
+
+        let mut elements_table = Table::new();
+        elements_table.set_format(*TABLE_FORMAT_NORMAL);
+        elements_table.set_titles(row!("Signal processing elements:"));
+        elements_table.add_row(row!(or_unknown(
+            &self.element_with_states.as_ref().map(ElementWithStatesText)
+        ),));
+        elements_table.fmt(f)?;
+
+        Ok(())
     }
 }
 
@@ -426,6 +1198,9 @@ impl From<(Info, Selector)> for InfoResult {
             clock_domain: info.clock_domain(),
             supported_ring_buffer_formats: info.supported_ring_buffer_formats(),
             supported_dai_formats: info.supported_dai_formats(),
+            topologies: info.topologies(),
+            topology_id: info.topology_id(),
+            element_with_states: info.element_with_states(),
         }
     }
 }
@@ -636,6 +1411,21 @@ impl HardwareInfo {
             }
         }
     }
+
+    fn topologies(&self) -> Option<Vec<Topology>> {
+        // TODO(https://fxbug.dev/334980316): Support signal processing for hardware protocols
+        None
+    }
+
+    fn topology_id(&self) -> Option<fadevice::TopologyId> {
+        // TODO(https://fxbug.dev/334980316): Support signal processing for hardware protocols
+        None
+    }
+
+    fn element_with_states(&self) -> Option<Vec<ElementWithState>> {
+        // TODO(https://fxbug.dev/334980316): Support signal processing for hardware protocols
+        None
+    }
 }
 
 /// Information about a device from `fuchsia.audio.device.Registry`.
@@ -643,6 +1433,29 @@ pub struct RegistryInfo {
     device_info: DeviceInfo,
     gain_state: Option<GainState>,
     plug_event: Option<PlugEvent>,
+    topologies: Option<Vec<Topology>>,
+    topology_id: Option<fadevice::TopologyId>,
+    elements: Option<Vec<Element>>,
+    element_states: Option<BTreeMap<fadevice::ElementId, ElementState>>,
+}
+
+impl RegistryInfo {
+    /// Returns a vector of [ElementWithState]s that join `elements` with their
+    /// corresponding `element_states`.
+    fn element_with_states(&self) -> Option<Vec<ElementWithState>> {
+        self.elements.clone().map(|elements| {
+            elements
+                .into_iter()
+                .map(|element| {
+                    let state = self
+                        .element_states
+                        .as_ref()
+                        .and_then(|states| states.get(&element.id).cloned());
+                    ElementWithState { element, state }
+                })
+                .collect()
+        })
+    }
 }
 
 pub enum Info {
@@ -724,6 +1537,27 @@ impl Info {
         match self {
             Info::Hardware(hw_info) => hw_info.supported_dai_formats(),
             Info::Registry(registry_info) => registry_info.device_info.supported_dai_formats().ok(),
+        }
+    }
+
+    pub fn topologies(&self) -> Option<Vec<Topology>> {
+        match self {
+            Info::Hardware(hw_info) => hw_info.topologies(),
+            Info::Registry(registry_info) => registry_info.topologies.clone(),
+        }
+    }
+
+    pub fn topology_id(&self) -> Option<fadevice::TopologyId> {
+        match self {
+            Info::Hardware(hw_info) => hw_info.topology_id(),
+            Info::Registry(registry_info) => registry_info.topology_id,
+        }
+    }
+
+    pub fn element_with_states(&self) -> Option<Vec<ElementWithState>> {
+        match self {
+            Info::Hardware(hw_info) => hw_info.element_with_states(),
+            Info::Registry(registry_info) => registry_info.element_with_states(),
         }
     }
 }
@@ -843,10 +1677,42 @@ async fn get_hardware_info(
     }
 }
 
+/// Returns information about a device in the device registry.
+async fn get_registry_info(
+    registry: &Registry,
+    selector: RegistrySelector,
+) -> fho::Result<RegistryInfo> {
+    let token_id = selector.token_id();
+
+    let device_info = registry
+        .device_info(token_id)
+        .await
+        .ok_or_else(|| user_error!("No device with given ID exists in registry"))?;
+
+    let registry_device =
+        registry.observe(token_id).await.bug_context("Failed to observe registry device")?;
+
+    let elements = registry_device.elements().await?;
+    let element_states = registry_device.element_states().await;
+    let topologies = registry_device.topologies().await?;
+    let topology_id = if topologies.is_some() { registry_device.topology_id().await } else { None };
+
+    let registry_info = RegistryInfo {
+        device_info,
+        // TODO(https://fxbug.dev/329150383): Supports gain_state/plug_state/plug_time for ADR devices
+        gain_state: None,
+        plug_event: None,
+        topologies,
+        topology_id,
+        elements,
+        element_states,
+    };
+    Ok(registry_info)
+}
+
 /// Returns a device info from the target.
 ///
-/// If the selector is a [RegistrySelector] for a registry device,
-/// `registry` must be Some.
+/// If the selector is a [RegistrySelector] for a registry device, `registry` must be Some.
 pub async fn get_info(
     dev_class: &fio::DirectoryProxy,
     registry: Option<&Registry>,
@@ -858,17 +1724,8 @@ pub async fn get_info(
             Ok(Info::Hardware(hw_info))
         }
         Selector::Registry(registry_selector) => {
-            let device_info = registry
-                .ok_or_else(|| bug!("Registry not available"))?
-                .get(registry_selector.token_id())
-                .await
-                .ok_or_else(|| user_error!("No device with given ID exists in registry"))?;
-            let registry_info = RegistryInfo {
-                device_info,
-                // TODO(https://fxbug.dev/329150383): Supports gain_state/plug_state/plug_time for ADR devices
-                gain_state: None,
-                plug_event: None,
-            };
+            let registry = registry.ok_or_else(|| bug!("Registry not available"))?;
+            let registry_info = get_registry_info(registry, registry_selector).await?;
             Ok(Info::Registry(registry_info))
         }
     }
@@ -878,8 +1735,54 @@ pub async fn get_info(
 mod test {
     use super::*;
     use fuchsia_audio::format::SampleType;
+    use fuchsia_audio::sigproc::GainRange;
+    use pretty_assertions::assert_eq;
     use serde_json::json;
     use {fidl_fuchsia_audio_device as fadevice, fidl_fuchsia_hardware_audio as fhaudio};
+
+    const SOURCE_DAI_ELEMENT_ID: fhaudio_sigproc::ElementId = 0;
+    const DEST_DAI_ELEMENT_ID: fhaudio_sigproc::ElementId = 1;
+    const DEST_RB_ELEMENT_ID: fhaudio_sigproc::ElementId = 2;
+    const SOURCE_RB_ELEMENT_ID: fhaudio_sigproc::ElementId = 3;
+    const MUTE_ELEMENT_ID: fhaudio_sigproc::ElementId = 4;
+    // The elements below are not part of any topology.
+    // They're included to test info output for all element types.
+    const VENDOR_SPECIFIC_ELEMENT_ID: fhaudio_sigproc::ElementId = 5;
+    const CONNECTION_POINT_ELEMENT_ID: fhaudio_sigproc::ElementId = 6;
+    const GAIN_ELEMENT_ID: fhaudio_sigproc::ElementId = 7;
+    const AGC_ELEMENT_ID: fhaudio_sigproc::ElementId = 8;
+    const AGL_ELEMENT_ID: fhaudio_sigproc::ElementId = 9;
+    const DYNAMICS_ELEMENT_ID: fhaudio_sigproc::ElementId = 10;
+    const DELAY_ELEMENT_ID: fhaudio_sigproc::ElementId = 11;
+    const EQUALIZER_ELEMENT_ID: fhaudio_sigproc::ElementId = 12;
+    const SRC_ELEMENT_ID: fhaudio_sigproc::ElementId = 13;
+
+    const INPUT_ONLY_TOPOLOGY_ID: fhaudio_sigproc::TopologyId = 0;
+    const FULL_DUPLEX_TOPOLOGY_ID: fhaudio_sigproc::TopologyId = 1;
+    const OUTPUT_ONLY_TOPOLOGY_ID: fhaudio_sigproc::TopologyId = 2;
+    const OUTPUT_WITH_MUTE_TOPOLOGY_ID: fhaudio_sigproc::TopologyId = 3;
+
+    const INPUT_EDGE_PAIR: fhaudio_sigproc::EdgePair = fhaudio_sigproc::EdgePair {
+        processing_element_id_from: SOURCE_DAI_ELEMENT_ID,
+        processing_element_id_to: DEST_RB_ELEMENT_ID,
+    };
+
+    const OUTPUT_EDGE_PAIR: fhaudio_sigproc::EdgePair = fhaudio_sigproc::EdgePair {
+        processing_element_id_from: SOURCE_RB_ELEMENT_ID,
+        processing_element_id_to: DEST_DAI_ELEMENT_ID,
+    };
+
+    const RB_TO_MUTE_EDGE_PAIR: fhaudio_sigproc::EdgePair = fhaudio_sigproc::EdgePair {
+        processing_element_id_from: SOURCE_RB_ELEMENT_ID,
+        processing_element_id_to: MUTE_ELEMENT_ID,
+    };
+
+    const MUTE_TO_DAI_EDGE_PAIR: fhaudio_sigproc::EdgePair = fhaudio_sigproc::EdgePair {
+        processing_element_id_from: MUTE_ELEMENT_ID,
+        processing_element_id_to: DEST_DAI_ELEMENT_ID,
+    };
+
+    const VENDOR_SPECIFIC_DATA: &[u8] = b"Hello\x01world.";
 
     lazy_static! {
         pub static ref TEST_INFO_RESULT: InfoResult = InfoResult {
@@ -997,79 +1900,613 @@ mod test {
                 );
                 map
             }),
+            topologies: Some(vec![
+                Topology { id: INPUT_ONLY_TOPOLOGY_ID, edge_pairs: vec![INPUT_EDGE_PAIR] },
+                Topology {
+                    id: FULL_DUPLEX_TOPOLOGY_ID,
+                    edge_pairs: vec![INPUT_EDGE_PAIR, OUTPUT_EDGE_PAIR,]
+                },
+                Topology { id: OUTPUT_ONLY_TOPOLOGY_ID, edge_pairs: vec![OUTPUT_EDGE_PAIR,] },
+                Topology {
+                    id: OUTPUT_WITH_MUTE_TOPOLOGY_ID,
+                    edge_pairs: vec![RB_TO_MUTE_EDGE_PAIR, MUTE_TO_DAI_EDGE_PAIR]
+                },
+            ]),
+            topology_id: Some(FULL_DUPLEX_TOPOLOGY_ID),
+            element_with_states: Some(vec![
+                ElementWithState {
+                    element: Element {
+                        id: SOURCE_DAI_ELEMENT_ID,
+                        type_: fhaudio_sigproc::ElementType::DaiInterconnect,
+                        type_specific: Some(TypeSpecificElement::DaiInterconnect(DaiInterconnect {
+                            plug_detect_capabilities:
+                                fhaudio_sigproc::PlugDetectCapabilities::CanAsyncNotify
+                        })),
+                        description: Some("Source DAI interconnect element".to_string()),
+                        can_stop: Some(true),
+                        can_bypass: Some(false)
+                    },
+                    state: Some(ElementState {
+                        type_specific: Some(TypeSpecificElementState::DaiInterconnect(DaiInterconnectElementState {
+                            plug_state: fuchsia_audio::sigproc::PlugState {
+                                plugged: true,
+                                plug_state_time: 123456789,
+                            },
+                            external_delay_ns: Some(5000),
+                        })),
+                        vendor_specific_data: None,
+                        started: true,
+                        bypassed: None,
+                        turn_on_delay_ns: Some(0),
+                        turn_off_delay_ns: Some(0),
+                        processing_delay_ns: Some(0),
+                    }),
+                },
+                ElementWithState {
+                    element: Element {
+                        id: DEST_DAI_ELEMENT_ID,
+                        type_: fhaudio_sigproc::ElementType::DaiInterconnect,
+                        type_specific: Some(TypeSpecificElement::DaiInterconnect(DaiInterconnect {
+                            plug_detect_capabilities:
+                                fhaudio_sigproc::PlugDetectCapabilities::CanAsyncNotify
+                        })),
+                        description: Some("Destination DAI interconnect element".to_string()),
+                        can_stop: Some(true),
+                        can_bypass: Some(false)
+                    },
+                    state: None,
+                },
+                ElementWithState {
+                    element: Element {
+                        id: SOURCE_RB_ELEMENT_ID,
+                        type_: fhaudio_sigproc::ElementType::RingBuffer,
+                        type_specific: None,
+                        description: Some("Source ring buffer element".to_string()),
+                        can_stop: Some(false),
+                        can_bypass: Some(false)
+                    },
+                    state: None,
+                },
+                ElementWithState {
+                    element: Element {
+                        id: DEST_RB_ELEMENT_ID,
+                        type_: fhaudio_sigproc::ElementType::RingBuffer,
+                        type_specific: None,
+                        description: Some("Destination ring buffer element".to_string()),
+                        can_stop: Some(false),
+                        can_bypass: Some(false)
+                    },
+                    state: None,
+                },
+                ElementWithState {
+                    element: Element {
+                        id: MUTE_ELEMENT_ID,
+                        type_: fhaudio_sigproc::ElementType::Mute,
+                        type_specific: None,
+                        description: Some("Mute element".to_string()),
+                        can_stop: Some(false),
+                        can_bypass: Some(true)
+                    },
+                    state: None,
+                },
+                // The elements below are not part of any topology.
+                // They're included to test info output for all element types.
+                ElementWithState {
+                    element: Element {
+                        id: VENDOR_SPECIFIC_ELEMENT_ID,
+                        type_: fhaudio_sigproc::ElementType::VendorSpecific,
+                        type_specific: Some(TypeSpecificElement::VendorSpecific(VendorSpecific{})),
+                        description: Some("Vendor specific element".to_string()),
+                        can_stop: Some(false),
+                        can_bypass: Some(true)
+                    },
+                    state: Some(ElementState {
+                        type_specific: Some(TypeSpecificElementState::VendorSpecific(VendorSpecificElementState {})),
+                        vendor_specific_data: Some(VENDOR_SPECIFIC_DATA.to_vec()),
+                        started: true,
+                        bypassed: Some(false),
+                        turn_on_delay_ns: Some(12),
+                        turn_off_delay_ns: Some(34),
+                        processing_delay_ns: Some(56),
+                    }),
+                },
+                ElementWithState {
+                    element: Element {
+                        id: CONNECTION_POINT_ELEMENT_ID,
+                        type_: fhaudio_sigproc::ElementType::ConnectionPoint,
+                        type_specific: None,
+                        description: Some("Connection point element".to_string()),
+                        can_stop: Some(false),
+                        can_bypass: Some(false)
+                    },
+                    state: None,
+                },
+                ElementWithState {
+                    element: Element {
+                        id: GAIN_ELEMENT_ID,
+                        type_: fhaudio_sigproc::ElementType::Gain,
+                        type_specific: Some(TypeSpecificElement::Gain(Gain {
+                            type_: fhaudio_sigproc::GainType::Decibels,
+                            domain: Some(fhaudio_sigproc::GainDomain::Digital),
+                            range: GainRange { min: -100.0, max: 0.0, min_step: 1.0 },
+                        })),
+                        description: Some("Gain element".to_string()),
+                        can_stop: Some(false),
+                        can_bypass: Some(true)
+                    },
+                    state: Some(ElementState {
+                        type_specific: Some(TypeSpecificElementState::Gain(GainElementState { gain: -3.0 })),
+                        vendor_specific_data: None,
+                        started: true,
+                        bypassed: Some(false),
+                        turn_on_delay_ns: Some(0),
+                        turn_off_delay_ns: Some(0),
+                        processing_delay_ns: Some(0),
+                    }),
+                },
+                ElementWithState {
+                    element: Element {
+                        id: AGC_ELEMENT_ID,
+                        type_: fhaudio_sigproc::ElementType::AutomaticGainControl,
+                        type_specific: None,
+                        description: Some("Automatic gain control element".to_string()),
+                        can_stop: Some(false),
+                        can_bypass: Some(true)
+                    },
+                    state: None,
+                },
+                ElementWithState {
+                    element: Element {
+                        id: AGL_ELEMENT_ID,
+                        type_: fhaudio_sigproc::ElementType::AutomaticGainLimiter,
+                        type_specific: None,
+                        description: Some("Automatic gain limiter element".to_string()),
+                        can_stop: Some(false),
+                        can_bypass: Some(true)
+                    },
+                    state: None,
+                },
+                ElementWithState {
+                    element: Element {
+                        id: DYNAMICS_ELEMENT_ID,
+                        type_: fhaudio_sigproc::ElementType::Dynamics,
+                        type_specific: Some(TypeSpecificElement::Dynamics(Dynamics {
+                            bands: vec![DynamicsBand { id: 1 }, DynamicsBand { id: 2 }],
+                            supported_controls: Some(
+                                fhaudio_sigproc::DynamicsSupportedControls::KNEE_WIDTH
+                                    | fhaudio_sigproc::DynamicsSupportedControls::ATTACK
+                                    | fhaudio_sigproc::DynamicsSupportedControls::RELEASE
+                                    | fhaudio_sigproc::DynamicsSupportedControls::OUTPUT_GAIN
+                                    | fhaudio_sigproc::DynamicsSupportedControls::INPUT_GAIN
+                                    | fhaudio_sigproc::DynamicsSupportedControls::LOOKAHEAD
+                                    | fhaudio_sigproc::DynamicsSupportedControls::LEVEL_TYPE
+                                    | fhaudio_sigproc::DynamicsSupportedControls::LINKED_CHANNELS
+                                    | fhaudio_sigproc::DynamicsSupportedControls::THRESHOLD_TYPE,
+                            ),
+                        })),
+                        description: Some("Dynamics element".to_string()),
+                        can_stop: Some(false),
+                        can_bypass: Some(true)
+                    },
+                    state: Some(ElementState {
+                        type_specific: Some(TypeSpecificElementState::Dynamics(DynamicsElementState {
+                            band_states: vec![
+                                DynamicsBandState {
+                                    id: 1,
+                                    min_frequency: 0,
+                                    max_frequency: 24_000,
+                                    threshold_db: -6.0,
+                                    threshold_type: fhaudio_sigproc::ThresholdType::Above,
+                                    ratio: 3.0,
+                                    knee_width_db: Some(1.0),
+                                    attack: Some(10),
+                                    release: Some(300),
+                                    output_gain_db: Some(1.0),
+                                    input_gain_db: Some(2.0),
+                                    level_type: Some(fhaudio_sigproc::LevelType::Peak),
+                                    lookahead: Some(15),
+                                    linked_channels: Some(true),
+                                },
+                                DynamicsBandState {
+                                    id: 2,
+                                    min_frequency: 100,
+                                    max_frequency: 20000,
+                                    threshold_db: 3.0,
+                                    threshold_type: fhaudio_sigproc::ThresholdType::Above,
+                                    ratio: 10.0,
+                                    knee_width_db: Some(6.0),
+                                    attack: Some(1),
+                                    release: Some(100),
+                                    output_gain_db: Some(0.0),
+                                    input_gain_db: Some(0.0),
+                                    level_type: Some(fhaudio_sigproc::LevelType::Rms),
+                                    lookahead: Some(5),
+                                    linked_channels: Some(false),
+                                },
+                            ],
+                        })),
+                        vendor_specific_data: None,
+                        started: true,
+                        bypassed: Some(false),
+                        turn_on_delay_ns: Some(0),
+                        turn_off_delay_ns: Some(0),
+                        processing_delay_ns: Some(0),
+                    }),
+                },
+                ElementWithState {
+                    element: Element {
+                        id: DELAY_ELEMENT_ID,
+                        type_: fhaudio_sigproc::ElementType::Delay,
+                        type_specific: None,
+                        description: Some("Delay element".to_string()),
+                        can_stop: Some(false),
+                        can_bypass: Some(true)
+                    },
+                    state: None,
+                },
+                ElementWithState {
+                    element: Element {
+                        id: EQUALIZER_ELEMENT_ID,
+                        type_: fhaudio_sigproc::ElementType::Equalizer,
+                        type_specific: Some(TypeSpecificElement::Equalizer(
+                            Equalizer {
+                                bands: vec![
+                                    EqualizerBand { id: 1 },
+                                    EqualizerBand { id: 2 },
+                                ],
+                                supported_controls: Some(
+                                    fhaudio_sigproc::EqualizerSupportedControls::CAN_CONTROL_FREQUENCY
+                                        | fhaudio_sigproc::EqualizerSupportedControls::CAN_CONTROL_Q
+                                        | fhaudio_sigproc::EqualizerSupportedControls::SUPPORTS_TYPE_PEAK
+                                        | fhaudio_sigproc::EqualizerSupportedControls::SUPPORTS_TYPE_NOTCH
+                                        | fhaudio_sigproc::EqualizerSupportedControls::SUPPORTS_TYPE_LOW_CUT
+                                        | fhaudio_sigproc::EqualizerSupportedControls::SUPPORTS_TYPE_HIGH_CUT
+                                        | fhaudio_sigproc::EqualizerSupportedControls::SUPPORTS_TYPE_LOW_SHELF
+                                        | fhaudio_sigproc::EqualizerSupportedControls::SUPPORTS_TYPE_HIGH_SHELF
+                                ),
+                                can_disable_bands: Some(false),
+                                min_frequency: 10,
+                                max_frequency: 20_000,
+                                max_q: Some(2.5),
+                                min_gain_db: Some(-24.0),
+                                max_gain_db: Some(24.0),
+                            }
+                        )),
+                        description: Some("Equalizer element".to_string()),
+                        can_stop: Some(false),
+                        can_bypass: Some(true)
+                    },
+                    state: Some(ElementState {
+                        type_specific: Some(TypeSpecificElementState::Equalizer(EqualizerElementState {
+                            band_states: vec![
+                                EqualizerBandState {
+                                    id: 1,
+                                    type_: Some(fhaudio_sigproc::EqualizerBandType::Peak),
+                                    frequency: Some(300),
+                                    q: Some(2.0),
+                                    gain_db: Some(3.0),
+                                    enabled: Some(true),
+                                },
+                                EqualizerBandState {
+                                    id: 2,
+                                    type_: Some(fhaudio_sigproc::EqualizerBandType::HighCut),
+                                    frequency: Some(10_000),
+                                    q: Some(10.0),
+                                    gain_db: None,
+                                    enabled: Some(true),
+                                },
+                            ],
+                        })),
+                        vendor_specific_data: None,
+                        started: true,
+                        bypassed: Some(false),
+                        turn_on_delay_ns: Some(0),
+                        turn_off_delay_ns: Some(0),
+                        processing_delay_ns: Some(0),
+                    }),
+                },
+                ElementWithState {
+                    element: Element {
+                        id: SRC_ELEMENT_ID,
+                        type_: fhaudio_sigproc::ElementType::SampleRateConversion,
+                        type_specific: None,
+                        description: Some("Sample rate conversion element".to_string()),
+                        can_stop: Some(false),
+                        can_bypass: Some(true)
+                    },
+                    state: None,
+                },
+            ]),
         };
     }
 
     #[test]
     fn test_info_result_table() {
-        let output = Table::from(TEST_INFO_RESULT.clone()).to_string();
+        let output = TEST_INFO_RESULT.to_string();
 
         let expected = r#"
-                 Path:  /dev/class/audio-input/0c8301e0
-            Unique ID:  000102030405060708090a0b0c0d0e0f
-         Manufacturer:  Test manufacturer
-              Product:  Test product
-         Current gain:  -3 dB (unmuted, AGC off)
-    Gain capabilities:  Gain range [-100 dB, 0 dB]; 0 dB step (continuous); can mute; cannot AGC
-           Plug state:  Plugged at 123456789
-       Plug detection:  Hardwired
-         Clock domain:  0 (monotonic)
-          DAI formats:  2 elements with DAI format sets:
-                        Element 1 has 1 DAI format set:
-                        ┌──────────────────────────────────────────────────────────────────────┐
-                        │ Number of channels:  1, 2                                            │
-                        │     Sample formats:  pcm_signed, pcm_unsigned                        │
-                        │      Frame formats:  stereo_left                                     │
-                        │                      stereo_right                                    │
-                        │   Frame rates (Hz):  16000, 22050, 32000, 44100, 48000, 88200, 96000 │
-                        │      Bits per slot:  32                                              │
-                        │    Bits per sample:  8, 16                                           │
-                        └──────────────────────────────────────────────────────────────────────┘
-                        Element 123 has 1 DAI format set:
-                        ┌──────────────────────────────────────────────────────────────────────┐
-                        │ Number of channels:  1                                               │
-                        │     Sample formats:  pcm_float                                       │
-                        │      Frame formats:  custom:right_justified;raising_sclk;1;2         │
-                        │                                    Justification:  Right             │
-                        │                                         Clocking:  Raising sclk      │
-                        │                        Frame sync offset (sclks):  1                 │
-                        │                          Frame sync size (sclks):  2                 │
-                        │   Frame rates (Hz):  16000, 22050, 32000, 44100, 48000, 88200, 96000 │
-                        │      Bits per slot:  16, 32                                          │
-                        │    Bits per sample:  16                                              │
-                        └──────────────────────────────────────────────────────────────────────┘
-  Ring buffer formats:  2 elements with format sets:
-                        Element 0 has 1 format set:
-                        ┌────────────────────────────────────────────────────────────────────────────────────┐
-                        │       Sample types:  int16                                                         │
-                        │   Frame rates (Hz):  16000, 22050, 32000, 44100, 48000, 88200, 96000               │
-                        │ Number of channels:  1, 2                                                          │
-                        │ Channel attributes:  1 channel:   Channel 1:  Min frequency (Hz):  <unknown>       │
-                        │                                               Max frequency (Hz):  <unknown>       │
-                        │                      2 channels:  Channel 1:  Min frequency (Hz):  <unknown>       │
-                        │                                               Max frequency (Hz):  <unknown>       │
-                        │                                   Channel 2:  Min frequency (Hz):  <unknown>       │
-                        │                                               Max frequency (Hz):  <unknown>       │
-                        └────────────────────────────────────────────────────────────────────────────────────┘
-                        Element 123 has 2 format sets:
-                        ┌───────────────────────────────────────────────────────────────────────────────────┐
-                        │       Sample types:  uint8, int16                                                 │
-                        │   Frame rates (Hz):  16000, 22050, 32000                                          │
-                        │ Number of channels:  1                                                            │
-                        │ Channel attributes:  1 channel:  Channel 1:  Min frequency (Hz):  <unknown>       │
-                        │                                              Max frequency (Hz):  <unknown>       │
-                        └───────────────────────────────────────────────────────────────────────────────────┘
-                        ┌────────────────────────────────────────────────────────────────────────────────────┐
-                        │       Sample types:  float32                                                       │
-                        │   Frame rates (Hz):  44100, 48000, 88200, 96000                                    │
-                        │ Number of channels:  1, 2                                                          │
-                        │ Channel attributes:  1 channel:   Channel 1:  Min frequency (Hz):  <unknown>       │
-                        │                                               Max frequency (Hz):  <unknown>       │
-                        │                      2 channels:  Channel 1:  Min frequency (Hz):  <unknown>       │
-                        │                                               Max frequency (Hz):  <unknown>       │
-                        │                                   Channel 2:  Min frequency (Hz):  <unknown>       │
-                        │                                               Max frequency (Hz):  <unknown>       │
-                        └────────────────────────────────────────────────────────────────────────────────────┘
+  Path:                        /dev/class/audio-input/0c8301e0
+  Unique ID:                   000102030405060708090a0b0c0d0e0f
+  Manufacturer:                Test manufacturer
+  Product:                     Test product
+  Current gain:                -3 dB (unmuted, AGC off)
+  Gain capabilities:           Gain range: [-100 dB, 0 dB]
+                               Gain step:  0 dB step (continuous)
+                               Mute:       ✅ Can Mute
+                               AGC:        ❌ Cannot AGC
+  Plug state:                  Plugged at 123456789
+  Plug detection:              Hardwired
+  Clock domain:                0 (monotonic)
+  Signal processing topology:  1
+
+  DAI formats:
+  • Element 1 has 1 DAI format set:
+    ┌───────────────────────────────────────────────────────────────────────────────────────────┐
+    │ Number of channels:  1, 2                                                                 │
+    │ Sample formats:      pcm_signed, pcm_unsigned                                             │
+    │ Frame formats:       stereo_left                                                          │
+    │                      stereo_right                                                         │
+    │ Frame rates:         16000 Hz, 22050 Hz, 32000 Hz, 44100 Hz, 48000 Hz, 88200 Hz, 96000 Hz │
+    │ Bits per slot:       32                                                                   │
+    │ Bits per sample:     8, 16                                                                │
+    └───────────────────────────────────────────────────────────────────────────────────────────┘
+  • Element 123 has 1 DAI format set:
+    ┌───────────────────────────────────────────────────────────────────────────────────────────┐
+    │ Number of channels:  1                                                                    │
+    │ Sample formats:      pcm_float                                                            │
+    │ Frame formats:         ┌───────────────────────────────────────────────────────┐          │
+    │                        │ custom:right_justified;raising_sclk;1;2               │          │
+    │                        │                                                       │          │
+    │                        │ Justification:                           Right        │          │
+    │                        │ Clocking:                                Raising sclk │          │
+    │                        │ Frame sync offset (sclks):               1            │          │
+    │                        │ Frame sync size (sclks):                 2            │          │
+    │                        └───────────────────────────────────────────────────────┘          │
+    │ Frame rates:         16000 Hz, 22050 Hz, 32000 Hz, 44100 Hz, 48000 Hz, 88200 Hz, 96000 Hz │
+    │ Bits per slot:       16, 32                                                               │
+    │ Bits per sample:     16                                                                   │
+    └───────────────────────────────────────────────────────────────────────────────────────────┘
+
+  Ring buffer formats:
+  • Element 0 has 1 format set:
+    ┌───────────────────────────────────────────────────────────────────────────────────────────┐
+    │ Sample types:        int16                                                                │
+    │ Frame rates:         16000 Hz, 22050 Hz, 32000 Hz, 44100 Hz, 48000 Hz, 88200 Hz, 96000 Hz │
+    │ Number of channels:  1, 2                                                                 │
+    │ Channel attributes:  1 channel:  Channel 1: Min frequency: <unknown>                      │
+    │                                             Max frequency: <unknown>                      │
+    │                      2 channels: Channel 1: Min frequency: <unknown>                      │
+    │                                             Max frequency: <unknown>                      │
+    │                                  Channel 2: Min frequency: <unknown>                      │
+    │                                             Max frequency: <unknown>                      │
+    └───────────────────────────────────────────────────────────────────────────────────────────┘
+  • Element 123 has 2 format sets:
+    ┌─────────────────────────────────────────────────────────────────────┐
+    │ Sample types:        uint8, int16                                   │
+    │ Frame rates:         16000 Hz, 22050 Hz, 32000 Hz                   │
+    │ Number of channels:  1                                              │
+    │ Channel attributes:  1 channel: Channel 1: Min frequency: <unknown> │
+    │                                            Max frequency: <unknown> │
+    └─────────────────────────────────────────────────────────────────────┘
+    ┌──────────────────────────────────────────────────────────────────────┐
+    │ Sample types:        float32                                         │
+    │ Frame rates:         44100 Hz, 48000 Hz, 88200 Hz, 96000 Hz          │
+    │ Number of channels:  1, 2                                            │
+    │ Channel attributes:  1 channel:  Channel 1: Min frequency: <unknown> │
+    │                                             Max frequency: <unknown> │
+    │                      2 channels: Channel 1: Min frequency: <unknown> │
+    │                                             Max frequency: <unknown> │
+    │                                  Channel 2: Min frequency: <unknown> │
+    │                                             Max frequency: <unknown> │
+    └──────────────────────────────────────────────────────────────────────┘
+
+  Signal processing topologies:
+    ┌────────────────────────┐
+    │ ID:             0      │
+    │ Element edges:  0 -> 2 │
+    └────────────────────────┘
+    ┌────────────────────────┐
+    │ ID:             1      │
+    │ Element edges:  0 -> 2 │
+    │                 3 -> 1 │
+    └────────────────────────┘
+    ┌────────────────────────┐
+    │ ID:             2      │
+    │ Element edges:  3 -> 1 │
+    └────────────────────────┘
+    ┌────────────────────────┐
+    │ ID:             3      │
+    │ Element edges:  3 -> 4 │
+    │                 4 -> 1 │
+    └────────────────────────┘
+
+  Signal processing elements:
+    ┌────────────────────────────────────────────────────────────────────────┐
+    │ ID:             0                                                      │
+    │ Type:           DaiInterconnect                                        │
+    │ Description:    Source DAI interconnect element                        │
+    │ Type specific:  Plug detection: Pluggable (can async notify)           │
+    │ State:          Vendor specific:  <unknown>                            │
+    │                 Started:          ✅ Yes (✅ Can Stop)                 │
+    │                 Bypassed:         <unknown> (❌ Cannot Bypass)         │
+    │                 Turn on delay:    0 ns                                 │
+    │                 Turn off delay:   0 ns                                 │
+    │                 Processing delay: 0 ns                                 │
+    │                 Type specific:    Plug state:     Plugged at 123456789 │
+    │                                   External delay: 5000 ns              │
+    └────────────────────────────────────────────────────────────────────────┘
+    ┌──────────────────────────────────────────────────────────────┐
+    │ ID:             1                                            │
+    │ Type:           DaiInterconnect                              │
+    │ Description:    Destination DAI interconnect element         │
+    │ Type specific:  Plug detection: Pluggable (can async notify) │
+    │ State:          <unknown>                                    │
+    └──────────────────────────────────────────────────────────────┘
+    ┌──────────────────────────────────────────┐
+    │ ID:           3                          │
+    │ Type:         RingBuffer                 │
+    │ Description:  Source ring buffer element │
+    │ State:        <unknown>                  │
+    └──────────────────────────────────────────┘
+    ┌───────────────────────────────────────────────┐
+    │ ID:           2                               │
+    │ Type:         RingBuffer                      │
+    │ Description:  Destination ring buffer element │
+    │ State:        <unknown>                       │
+    └───────────────────────────────────────────────┘
+    ┌────────────────────────────┐
+    │ ID:           4            │
+    │ Type:         Mute         │
+    │ Description:  Mute element │
+    │ State:        <unknown>    │
+    └────────────────────────────┘
+    ┌─────────────────────────────────────────────────────────────────────────────────────┐
+    │ ID:             5                                                                   │
+    │ Type:           VendorSpecific                                                      │
+    │ Description:    Vendor specific element                                             │
+    │ Type specific:  <vendor specific>                                                   │
+    │ State:          Vendor specific:  0000: 4865 6c6c 6f01 776f 726c 642e  Hello.world. │
+    │                 Started:          ✅ Yes (❌ Cannot Stop)                           │
+    │                 Bypassed:         ❌ No (✅ Can Bypass)                             │
+    │                 Turn on delay:    12 ns                                             │
+    │                 Turn off delay:   34 ns                                             │
+    │                 Processing delay: 56 ns                                             │
+    │                 Type specific:    <vendor specific element state>                   │
+    └─────────────────────────────────────────────────────────────────────────────────────┘
+    ┌────────────────────────────────────────┐
+    │ ID:           6                        │
+    │ Type:         ConnectionPoint          │
+    │ Description:  Connection point element │
+    │ State:        <unknown>                │
+    └────────────────────────────────────────┘
+    ┌───────────────────────────────────────────────────────────┐
+    │ ID:             7                                         │
+    │ Type:           Gain                                      │
+    │ Description:    Gain element                              │
+    │ Type specific:  Type:   Decibels                          │
+    │                 Domain: Digital                           │
+    │                 Range:  [-100 dB, 0 dB]; 1 dB step        │
+    │ State:          Vendor specific:  <unknown>               │
+    │                 Started:          ✅ Yes (❌ Cannot Stop) │
+    │                 Bypassed:         ❌ No (✅ Can Bypass)   │
+    │                 Turn on delay:    0 ns                    │
+    │                 Turn off delay:   0 ns                    │
+    │                 Processing delay: 0 ns                    │
+    │                 Type specific:    Gain: -3                │
+    └───────────────────────────────────────────────────────────┘
+    ┌──────────────────────────────────────────────┐
+    │ ID:           8                              │
+    │ Type:         AutomaticGainControl           │
+    │ Description:  Automatic gain control element │
+    │ State:        <unknown>                      │
+    └──────────────────────────────────────────────┘
+    ┌──────────────────────────────────────────────┐
+    │ ID:           9                              │
+    │ Type:         AutomaticGainLimiter           │
+    │ Description:  Automatic gain limiter element │
+    │ State:        <unknown>                      │
+    └──────────────────────────────────────────────┘
+    ┌──────────────────────────────────────────────────────────────────────────────┐
+    │ ID:             10                                                           │
+    │ Type:           Dynamics                                                     │
+    │ Description:    Dynamics element                                             │
+    │ Type specific:  Bands:              ID: 1                                    │
+    │                                     ID: 2                                    │
+    │                 Supported controls: Knee width:      ✅ Yes                  │
+    │                                     Attack:          ✅ Yes                  │
+    │                                     Release:         ✅ Yes                  │
+    │                                     Output gain:     ✅ Yes                  │
+    │                                     Input gain:      ✅ Yes                  │
+    │                                     Lookahead:       ✅ Yes                  │
+    │                                     Level type:      ✅ Yes                  │
+    │                                     Linked channels: ✅ Yes                  │
+    │                                     Threshold type:  ✅ Yes                  │
+    │ State:          Vendor specific:  <unknown>                                  │
+    │                 Started:          ✅ Yes (❌ Cannot Stop)                    │
+    │                 Bypassed:         ❌ No (✅ Can Bypass)                      │
+    │                 Turn on delay:    0 ns                                       │
+    │                 Turn off delay:   0 ns                                       │
+    │                 Processing delay: 0 ns                                       │
+    │                 Type specific:      ┌────────────────────────────────────┐   │
+    │                                     │ ID:               1                │   │
+    │                                     │ Frequency range:  [0 Hz, 24000 Hz] │   │
+    │                                     │ Threshold:        Above -6 dB      │   │
+    │                                     │ Knee width:       1 dB             │   │
+    │                                     │ Attack:           10 ns            │   │
+    │                                     │ Release:          300 ns           │   │
+    │                                     │ Output gain:      1 dB             │   │
+    │                                     │ Input gain:       2 dB             │   │
+    │                                     │ Level type:       Peak             │   │
+    │                                     │ Lookahead:        15 ns            │   │
+    │                                     │ Linked channels:  ✅ Yes           │   │
+    │                                     └────────────────────────────────────┘   │
+    │                                     ┌──────────────────────────────────────┐ │
+    │                                     │ ID:               2                  │ │
+    │                                     │ Frequency range:  [100 Hz, 20000 Hz] │ │
+    │                                     │ Threshold:        Above 3 dB         │ │
+    │                                     │ Knee width:       6 dB               │ │
+    │                                     │ Attack:           1 ns               │ │
+    │                                     │ Release:          100 ns             │ │
+    │                                     │ Output gain:      0 dB               │ │
+    │                                     │ Input gain:       0 dB               │ │
+    │                                     │ Level type:       Rms                │ │
+    │                                     │ Lookahead:        5 ns               │ │
+    │                                     │ Linked channels:  ❌ No              │ │
+    │                                     └──────────────────────────────────────┘ │
+    └──────────────────────────────────────────────────────────────────────────────┘
+    ┌─────────────────────────────┐
+    │ ID:           11            │
+    │ Type:         Delay         │
+    │ Description:  Delay element │
+    │ State:        <unknown>     │
+    └─────────────────────────────┘
+    ┌────────────────────────────────────────────────────────────────────┐
+    │ ID:             12                                                 │
+    │ Type:           Equalizer                                          │
+    │ Description:    Equalizer element                                  │
+    │ Type specific:  Bands:                  ID: 1                      │
+    │                                         ID: 2                      │
+    │                 Supported controls:     Frequency:          ✅ Yes │
+    │                                         Quality factor (Q): ✅ Yes │
+    │                                         Peak bands:         ✅ Yes │
+    │                                         Notch bands:        ✅ Yes │
+    │                                         Low cut bands:      ✅ Yes │
+    │                                         High cut bands:     ✅ Yes │
+    │                                         Low shelf bands:    ✅ Yes │
+    │                                         High shelf bands:   ✅ Yes │
+    │                 Can disable bands?:     ❌ No                      │
+    │                 Frequency range:        [10 Hz, 20000 Hz]          │
+    │                 Maximum quality factor: 2.5                        │
+    │                 Gain range:             [-24 dB, 24 dB]            │
+    │ State:          Vendor specific:  <unknown>                        │
+    │                 Started:          ✅ Yes (❌ Cannot Stop)          │
+    │                 Bypassed:         ❌ No (✅ Can Bypass)            │
+    │                 Turn on delay:    0 ns                             │
+    │                 Turn off delay:   0 ns                             │
+    │                 Processing delay: 0 ns                             │
+    │                 Type specific:      ┌─────────────────────────┐    │
+    │                                     │ ID:              1      │    │
+    │                                     │ Type:            Peak   │    │
+    │                                     │ Frequency:       300 Hz │    │
+    │                                     │ Quality factor:  2      │    │
+    │                                     │ Gain:            300 dB │    │
+    │                                     │ Enabled:         ✅ Yes │    │
+    │                                     └─────────────────────────┘    │
+    │                                     ┌───────────────────────────┐  │
+    │                                     │ ID:              2        │  │
+    │                                     │ Type:            HighCut  │  │
+    │                                     │ Frequency:       10000 Hz │  │
+    │                                     │ Quality factor:  10       │  │
+    │                                     │ Gain:            10000 dB │  │
+    │                                     │ Enabled:         ✅ Yes   │  │
+    │                                     └───────────────────────────┘  │
+    └────────────────────────────────────────────────────────────────────┘
+    ┌──────────────────────────────────────────────┐
+    │ ID:           13                             │
+    │ Type:         SampleRateConversion           │
+    │ Description:  Sample rate conversion element │
+    │ State:        <unknown>                      │
+    └──────────────────────────────────────────────┘
 "#
         .trim_start_matches('\n');
 
@@ -1175,9 +2612,346 @@ mod test {
                         "frame_rates": [44100, 48000, 88200, 96000]
                     }
                 ]
-            }
+            },
+            "topologies": [
+                {
+                    "id": INPUT_ONLY_TOPOLOGY_ID,
+                    "edge_pairs": [
+                        {
+                            "processing_element_id_from": SOURCE_DAI_ELEMENT_ID,
+                            "processing_element_id_to": DEST_RB_ELEMENT_ID
+                        }
+                    ],
+                },
+                {
+                    "id": FULL_DUPLEX_TOPOLOGY_ID,
+                    "edge_pairs": [
+                        {
+                            "processing_element_id_from": SOURCE_DAI_ELEMENT_ID,
+                            "processing_element_id_to": DEST_RB_ELEMENT_ID
+                        },
+                        {
+                            "processing_element_id_from": SOURCE_RB_ELEMENT_ID,
+                            "processing_element_id_to": DEST_DAI_ELEMENT_ID
+                        }
+                    ]
+                },
+                {
+                    "id": OUTPUT_ONLY_TOPOLOGY_ID,
+                    "edge_pairs": [
+                        {
+                            "processing_element_id_from": SOURCE_RB_ELEMENT_ID,
+                            "processing_element_id_to": DEST_DAI_ELEMENT_ID
+                        }
+                    ]
+                },
+                {
+                    "id": OUTPUT_WITH_MUTE_TOPOLOGY_ID,
+                    "edge_pairs": [
+                        {
+                            "processing_element_id_from": SOURCE_RB_ELEMENT_ID,
+                            "processing_element_id_to": MUTE_ELEMENT_ID
+                        },
+                        {
+                            "processing_element_id_from": MUTE_ELEMENT_ID,
+                            "processing_element_id_to": DEST_DAI_ELEMENT_ID
+                        }
+                    ]
+                },
+            ],
+            "topology_id": FULL_DUPLEX_TOPOLOGY_ID,
+            "elements": [
+                {
+                    "id": SOURCE_DAI_ELEMENT_ID,
+                    "type": "dai_interconnect",
+                    "type_specific": {
+                        "dai_interconnect": {
+                            "plug_detect_capabilities": "can_async_notify"
+                        }
+                    },
+                    "description": "Source DAI interconnect element",
+                    "can_stop": true,
+                    "can_bypass": false,
+                    "state": {
+                        "bypassed": null,
+                        "started": true,
+                        "turn_off_delay_ns": 0,
+                        "turn_on_delay_ns": 0,
+                        "processing_delay_ns": 0,
+                        "type_specific": {
+                            "dai_interconnect": {
+                                "external_delay_ns": 5000,
+                                "plug_state": {
+                                    "plug_state_time": 123456789,
+                                    "plugged": true
+                                }
+                            }
+                        },
+                        "vendor_specific_data": null
+                    }
+                },
+                {
+                    "id": DEST_DAI_ELEMENT_ID,
+                    "type": "dai_interconnect",
+                    "type_specific": {
+                        "dai_interconnect": {
+                            "plug_detect_capabilities": "can_async_notify"
+                        }
+                    },
+                    "description": "Destination DAI interconnect element",
+                    "can_stop": true,
+                    "can_bypass": false,
+                    "state": null
+                },
+                {
+                    "id": SOURCE_RB_ELEMENT_ID,
+                    "type": "ring_buffer",
+                    "type_specific": null,
+                    "description": "Source ring buffer element",
+                    "can_stop": false,
+                    "can_bypass": false,
+                    "state": null
+                },
+                {
+                    "id": DEST_RB_ELEMENT_ID,
+                    "type": "ring_buffer",
+                    "type_specific": null,
+                    "description": "Destination ring buffer element",
+                    "can_bypass": false,
+                    "can_stop": false,
+                    "state": null
+                },
+                {
+                    "id": MUTE_ELEMENT_ID,
+                    "type": "mute",
+                    "type_specific": null,
+                    "description": "Mute element",
+                    "can_bypass": true,
+                    "can_stop": false,
+                    "state": null
+                },
+                {
+                    "id": VENDOR_SPECIFIC_ELEMENT_ID,
+                    "type": "vendor_specific",
+                    "type_specific": {
+                        "vendor_specific": {}
+                    },
+                    "description": "Vendor specific element",
+                    "can_bypass": true,
+                    "can_stop": false,
+                    "state": {
+                        "bypassed": false,
+                        "started": true,
+                        "turn_off_delay_ns": 34,
+                        "turn_on_delay_ns": 12,
+                        "processing_delay_ns": 56,
+                        "type_specific": {
+                            "vendor_specific": {}
+                        },
+                        "vendor_specific_data": "SGVsbG8Bd29ybGQu"
+                    }
+                },
+                {
+                    "id": CONNECTION_POINT_ELEMENT_ID,
+                    "type": "connection_point",
+                    "type_specific": null,
+                    "description": "Connection point element",
+                    "can_bypass": false,
+                    "can_stop": false,
+                    "state": null
+                },
+                {
+                    "id": GAIN_ELEMENT_ID,
+                    "type": "gain",
+                    "type_specific": {
+                        "gain": {
+                            "domain": "digital",
+                            "range": {
+                                "max": 0.0,
+                                "min": -100.0,
+                                "min_step": 1.0
+                            },
+                            "type": "decibels"
+                        }
+                    },
+                    "description": "Gain element",
+                    "can_bypass": true,
+                    "can_stop": false,
+                    "state": {
+                        "bypassed": false,
+                        "started": true,
+                        "turn_off_delay_ns": 0,
+                        "turn_on_delay_ns": 0,
+                        "processing_delay_ns": 0,
+                        "type_specific": {
+                            "gain": {
+                                "gain": -3.0
+                            }
+                        },
+                        "vendor_specific_data": null
+                    }
+                },
+                {
+                    "id": AGC_ELEMENT_ID,
+                    "type": "automatic_gain_control",
+                    "type_specific": null,
+                    "description": "Automatic gain control element",
+                    "can_bypass": true,
+                    "can_stop": false,
+                    "state": null
+                },
+                {
+                    "id": AGL_ELEMENT_ID,
+                    "type": "automatic_gain_limiter",
+                    "type_specific": null,
+                    "description": "Automatic gain limiter element",
+                    "can_bypass": true,
+                    "can_stop": false,
+                    "state": null
+                },
+                {
+                    "id": DYNAMICS_ELEMENT_ID,
+                    "type": "dynamics",
+                    "type_specific": {
+                        "dynamics": {
+                            "bands": [
+                                {
+                                    "id": 1
+                                },
+                                {
+                                    "id": 2
+                                }
+                            ],
+                            "supported_controls": 511
+                        }
+                    },
+                    "description": "Dynamics element",
+                    "can_bypass": true,
+                    "can_stop": false,
+                    "state": {
+                        "bypassed": false,
+                        "started": true,
+                        "turn_off_delay_ns": 0,
+                        "turn_on_delay_ns": 0,
+                        "processing_delay_ns": 0,
+                        "type_specific": {
+                            "dynamics": {
+                                "band_states": [
+                                    {
+                                        "attack": 10,
+                                        "id": 1,
+                                        "input_gain_db": 2.0,
+                                        "knee_width_db": 1.0,
+                                        "level_type": "peak",
+                                        "linked_channels": true,
+                                        "lookahead": 15,
+                                        "max_frequency": 24000,
+                                        "min_frequency": 0,
+                                        "output_gain_db": 1.0,
+                                        "ratio": 3.0,
+                                        "release": 300,
+                                        "threshold_db": -6.0,
+                                        "threshold_type": "above"
+                                    },
+                                    {
+                                        "attack": 1,
+                                        "id": 2,
+                                        "input_gain_db": 0.0,
+                                        "knee_width_db": 6.0,
+                                        "level_type": "rms",
+                                        "linked_channels": false,
+                                        "lookahead": 5,
+                                        "max_frequency": 20000,
+                                        "min_frequency": 100,
+                                        "output_gain_db": 0.0,
+                                        "ratio": 10.0,
+                                        "release": 100,
+                                        "threshold_db": 3.0,
+                                        "threshold_type": "above"
+                                    }
+                                ]
+                            }
+                        },
+                        "vendor_specific_data": null
+                    }
+                },
+                {
+                    "id": DELAY_ELEMENT_ID,
+                    "type": "delay",
+                    "type_specific": null,
+                    "description": "Delay element",
+                    "can_bypass": true,
+                    "can_stop": false,
+                    "state": null
+                },
+                {
+                    "id": EQUALIZER_ELEMENT_ID,
+                    "type": "equalizer",
+                    "type_specific": {
+                        "equalizer": {
+                            "bands": [
+                                {
+                                    "id": 1
+                                },
+                                {
+                                    "id": 2
+                                }
+                            ],
+                            "can_disable_bands": false,
+                            "max_frequency": 20000,
+                            "max_gain_db": 24.0,
+                            "max_q": 2.5,
+                            "min_frequency": 10,
+                            "min_gain_db": -24.0,
+                            "supported_controls": 255
+                        }
+                    },
+                    "description": "Equalizer element",
+                    "can_bypass": true,
+                    "can_stop": false,
+                    "state": {
+                        "bypassed": false,
+                        "started": true,
+                        "turn_off_delay_ns": 0,
+                        "turn_on_delay_ns": 0,
+                        "processing_delay_ns": 0,
+                        "type_specific": {
+                            "equalizer": {
+                                "band_states": [
+                                    {
+                                        "enabled": true,
+                                        "frequency": 300,
+                                        "gain_db": 3.0,
+                                        "id": 1,
+                                        "q": 2.0,
+                                        "type": "peak"
+                                    },
+                                    {
+                                        "enabled": true,
+                                        "frequency": 10000,
+                                        "gain_db": null,
+                                        "id": 2,
+                                        "q": 10.0,
+                                        "type": "high_cut"
+                                    }
+                                ]
+                            }
+                        },
+                        "vendor_specific_data": null
+                    }
+                },
+                {
+                    "id": SRC_ELEMENT_ID,
+                    "type": "sample_rate_conversion",
+                    "type_specific": null,
+                    "description": "Sample rate conversion element",
+                    "can_bypass": true,
+                    "can_stop": false,
+                    "state": null
+                }
+            ],
         });
 
-        assert_eq!(output, expected);
+        assert_eq!(expected, output);
     }
 }

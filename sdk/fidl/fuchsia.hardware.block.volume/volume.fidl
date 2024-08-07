@@ -163,6 +163,7 @@ type VsliceRange = struct {
 };
 
 /// Volume is a partition which may access virtually-mapped blocks within a device.
+@discoverable
 closed protocol Volume {
     compose partition.Partition;
 

@@ -13,6 +13,7 @@ test_suite(
         "//fuchsia/api_levels:tests",
         "//fuchsia/drivers:tests",
         "//fuchsia/packaging:tests",
+        "//fuchsia/utils:tests",
     ],
 )
 

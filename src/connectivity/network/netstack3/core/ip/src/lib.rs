@@ -187,13 +187,14 @@ pub mod socket {
 pub mod multicast_forwarding {
     pub use crate::internal::multicast_forwarding::api::MulticastForwardingApi;
     pub use crate::internal::multicast_forwarding::route::{
-        MulticastRoute, MulticastRouteKey, MulticastRouteTarget,
+        MulticastRoute, MulticastRouteKey, MulticastRouteTarget, MulticastRouteTargets,
     };
     pub use crate::internal::multicast_forwarding::state::{
         MulticastForwardingEnabledState, MulticastForwardingPendingPackets,
         MulticastForwardingPendingPacketsContext, MulticastForwardingState,
         MulticastForwardingStateContext, MulticastRouteTable, MulticastRouteTableContext,
     };
+    pub use crate::internal::multicast_forwarding::MulticastForwardingDeviceContext;
 }
 
 /// Raw IP sockets.

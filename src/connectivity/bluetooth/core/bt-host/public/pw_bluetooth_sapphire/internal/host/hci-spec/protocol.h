@@ -23,11 +23,9 @@
 // the Bluetooth Core Specification version 5.0
 //
 // NOTE: Avoid casting raw buffer pointers to the packet payload structure types
-// below; use as template parameter to PacketView::payload(),
-// MutableBufferView::mutable_payload(), or CommandPacket::mutable_payload()
-// instead. Take extra care when accessing flexible array members.
-
-#pragma clang diagnostic ignored "-Wc99-extensions"
+// below; use as template parameter to PacketView::payload(), or
+// MutableBufferView::mutable_payload() instead. Take extra care when accessing
+// flexible array members.
 
 namespace bt::hci_spec {
 
@@ -817,6 +815,8 @@ constexpr EventCode kReadRemoteVersionInfoCompleteEventCode = 0x0C;
 // Command Complete Event (v1.1)
 constexpr EventCode kCommandCompleteEventCode = 0x0E;
 
+PW_MODIFY_DIAGNOSTICS_PUSH();
+PW_MODIFY_DIAGNOSTIC_CLANG(ignored, "-Wc99-extensions");
 struct CommandCompleteEventParams {
   CommandCompleteEventParams() = delete;
   BT_DISALLOW_COPY_ASSIGN_AND_MOVE(CommandCompleteEventParams);
@@ -834,6 +834,7 @@ struct CommandCompleteEventParams {
   // parameters associated with that command.
   uint8_t return_parameters[];
 } __attribute__((packed));
+PW_MODIFY_DIAGNOSTICS_POP();
 
 // ===========================
 // Command Status Event (v1.1)
@@ -869,19 +870,6 @@ constexpr EventCode kRoleChangeEventCode = 0x12;
 // ========================================
 // Number Of Completed Packets Event (v1.1)
 constexpr EventCode kNumberOfCompletedPacketsEventCode = 0x13;
-
-struct NumberOfCompletedPacketsEventData {
-  uint16_t connection_handle;
-  uint16_t hc_num_of_completed_packets;
-} __attribute__((packed));
-
-struct NumberOfCompletedPacketsEventParams {
-  NumberOfCompletedPacketsEventParams() = delete;
-  BT_DISALLOW_COPY_ASSIGN_AND_MOVE(NumberOfCompletedPacketsEventParams);
-
-  uint8_t number_of_handles;
-  NumberOfCompletedPacketsEventData data[];
-} __attribute__((packed));
 
 // ======================================
 // Link Key Request Event (v1.1) (BR/EDR)
@@ -927,51 +915,24 @@ constexpr EventCode kIOCapabilityResponseEventCode = 0x32;
 // User Confirmation Request Event (v2.1 + EDR) (BR/EDR)
 constexpr EventCode kUserConfirmationRequestEventCode = 0x33;
 
-struct UserConfirmationRequestEventParams {
-  // Address of the device involved in simple pairing process
-  DeviceAddressBytes bd_addr;
-
-  // Numeric value to be displayed. Valid values are 0 - 999999.
-  uint32_t numeric_value;
-} __attribute__((packed));
-
 // ================================================
 // User Passkey Request Event (v2.1 + EDR) (BR/EDR)
 constexpr EventCode kUserPasskeyRequestEventCode = 0x34;
-
-struct UserPasskeyRequestEventParams {
-  // Address of the device involved in simple pairing process
-  DeviceAddressBytes bd_addr;
-} __attribute__((packed));
 
 // ===================================================
 // Simple Pairing Complete Event (v2.1 + EDR) (BR/EDR)
 constexpr EventCode kSimplePairingCompleteEventCode = 0x36;
 
-struct SimplePairingCompleteEventParams {
-  // See enum StatusCode in hci_constants.h.
-  StatusCode status;
-
-  // Address of the device involved in simple pairing process
-  DeviceAddressBytes bd_addr;
-} __attribute__((packed));
-
 // =====================================================
 // User Passkey Notification Event (v2.1 + EDR) (BR/EDR)
 constexpr EventCode kUserPasskeyNotificationEventCode = 0x3B;
-
-struct UserPasskeyNotificationEventParams {
-  // Address of the device involved in simple pairing process
-  DeviceAddressBytes bd_addr;
-
-  // Numeric value (passkey) entered by user. Valid values are 0 - 999999.
-  uint32_t numeric_value;
-} __attribute__((packed));
 
 // =========================
 // LE Meta Event (v4.0) (LE)
 constexpr EventCode kLEMetaEventCode = 0x3E;
 
+PW_MODIFY_DIAGNOSTICS_PUSH();
+PW_MODIFY_DIAGNOSTIC_CLANG(ignored, "-Wc99-extensions");
 struct LEMetaEventParams {
   LEMetaEventParams() = delete;
   BT_DISALLOW_COPY_ASSIGN_AND_MOVE(LEMetaEventParams);
@@ -982,6 +943,7 @@ struct LEMetaEventParams {
   // Beginning of parameters that are specific to the LE subevent.
   uint8_t subevent_parameters[];
 } __attribute__((packed));
+PW_MODIFY_DIAGNOSTICS_POP();
 
 // LE Connection Complete Event (v4.0) (LE)
 constexpr EventCode kLEConnectionCompleteSubeventCode = 0x01;
@@ -1141,6 +1103,8 @@ struct LEDirectedAdvertisingReportData {
   int8_t rssi;
 } __attribute__((packed));
 
+PW_MODIFY_DIAGNOSTICS_PUSH();
+PW_MODIFY_DIAGNOSTIC_CLANG(ignored, "-Wc99-extensions");
 struct LEDirectedAdvertisingReportSubeventParams {
   LEDirectedAdvertisingReportSubeventParams() = delete;
   BT_DISALLOW_COPY_ASSIGN_AND_MOVE(LEDirectedAdvertisingReportSubeventParams);
@@ -1152,6 +1116,7 @@ struct LEDirectedAdvertisingReportSubeventParams {
   // The report array parameters.
   LEDirectedAdvertisingReportData reports[];
 } __attribute__((packed));
+PW_MODIFY_DIAGNOSTICS_POP();
 
 // LE PHY Update Complete Event (v5.0) (LE)
 constexpr EventCode kLEPHYUpdateCompleteSubeventCode = 0x0C;
@@ -1210,6 +1175,8 @@ struct LEPeriodicAdvertisingSyncEstablishedSubeventParams {
 // LE Periodic Advertising Report Event (v5.0) (LE)
 constexpr EventCode kLEPeriodicAdvertisingReportSubeventCode = 0x0F;
 
+PW_MODIFY_DIAGNOSTICS_PUSH();
+PW_MODIFY_DIAGNOSTIC_CLANG(ignored, "-Wc99-extensions");
 struct LEPeriodicAdvertisingReportSubeventParams {
   LEPeriodicAdvertisingReportSubeventParams() = delete;
   BT_DISALLOW_COPY_ASSIGN_AND_MOVE(LEPeriodicAdvertisingReportSubeventParams);
@@ -1240,6 +1207,7 @@ struct LEPeriodicAdvertisingReportSubeventParams {
   // |data_length| octets of data received from a Periodic Advertising packet.
   uint8_t data[];
 } __attribute__((packed));
+PW_MODIFY_DIAGNOSTICS_POP();
 
 // LE Periodic Advertising Sync Lost Event (v5.0) (LE)
 constexpr EventCode kLEPeriodicAdvertisingSyncLostSubeventCode = 0x10;
@@ -1310,6 +1278,8 @@ struct NumberOfCompletedDataBlocksEventData {
   uint16_t num_of_completed_blocks;
 } __attribute__((packed));
 
+PW_MODIFY_DIAGNOSTICS_PUSH();
+PW_MODIFY_DIAGNOSTIC_CLANG(ignored, "-Wc99-extensions");
 struct NumberOfCompletedDataBlocksEventParams {
   NumberOfCompletedDataBlocksEventParams() = delete;
   BT_DISALLOW_COPY_ASSIGN_AND_MOVE(NumberOfCompletedDataBlocksEventParams);
@@ -1318,6 +1288,7 @@ struct NumberOfCompletedDataBlocksEventParams {
   uint8_t number_of_handles;
   NumberOfCompletedDataBlocksEventData data[];
 } __attribute__((packed));
+PW_MODIFY_DIAGNOSTICS_POP();
 
 // ================================================================
 // Authenticated Payload Timeout Expired Event (v4.1) (BR/EDR & LE)
@@ -2217,6 +2188,8 @@ struct LESetPeriodicAdvertisingParametersCommandParams {
 constexpr OpCode kLESetPeriodicAdvertisingData =
     LEControllerCommandOpCode(0x003F);
 
+PW_MODIFY_DIAGNOSTICS_PUSH();
+PW_MODIFY_DIAGNOSTIC_CLANG(ignored, "-Wc99-extensions");
 struct LESetPeriodicAdvertisingDataCommandParams {
   LESetPeriodicAdvertisingDataCommandParams() = delete;
   BT_DISALLOW_COPY_ASSIGN_AND_MOVE(LESetPeriodicAdvertisingDataCommandParams);
@@ -2235,6 +2208,7 @@ struct LESetPeriodicAdvertisingDataCommandParams {
   // Variable length advertising data.
   uint8_t adv_data[];
 } __attribute__((packed));
+PW_MODIFY_DIAGNOSTICS_POP();
 
 // ======================================================
 // LE Set Periodic Advertising Enable Command (v5.0) (LE)

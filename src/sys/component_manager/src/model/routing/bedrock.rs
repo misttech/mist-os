@@ -106,7 +106,7 @@ impl RouteRequest {
         debug: bool,
     ) -> (Router, Request) {
         match self {
-            Self::Use(r) => r.into_router(target, &sandbox.program_input_dict, debug),
+            Self::Use(r) => r.into_router(target, &sandbox.program_input.namespace, debug),
             Self::ExposeProtocol(decl) => {
                 let request = Request {
                     availability: decl.availability,

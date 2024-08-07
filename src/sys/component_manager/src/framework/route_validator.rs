@@ -8,7 +8,10 @@ use crate::model::component::{ComponentInstance, WeakComponentInstance};
 use crate::model::model::Model;
 use crate::model::routing::service::AnonymizedServiceRoute;
 use crate::model::routing::{self, BedrockRouteRequest, Route, RoutingError};
-use ::routing::capability_source::{CapabilitySource, InternalCapability};
+use ::routing::capability_source::{
+    AnonymizedAggregateSource, CapabilitySource, ComponentSource, FrameworkSource,
+    InternalCapability,
+};
 use ::routing::component_instance::ComponentInstanceInterface;
 use ::routing::RouteRequest as LegacyRouteRequest;
 use async_trait::async_trait;
@@ -313,7 +316,12 @@ impl RouteRequest {
         let source = source.source;
         let source_moniker = source.source_moniker();
         let service_info = match source {
-            CapabilitySource::AnonymizedAggregate { capability, moniker, members, .. } => {
+            CapabilitySource::AnonymizedAggregate(AnonymizedAggregateSource {
+                capability,
+                moniker,
+                members,
+                ..
+            }) => {
                 let component = instance.find_absolute(&moniker).await?;
                 let route = AnonymizedServiceRoute {
                     source_moniker: component.moniker.clone(),
@@ -372,11 +380,11 @@ impl RouteRequest {
             let capability_source = CapabilitySource::try_from(capability)
                 .expect("failed to convert capability to capability source");
             match capability_source {
-                CapabilitySource::Component { moniker, .. }
-                | CapabilitySource::Framework { moniker, .. } => {
+                CapabilitySource::Component(ComponentSource { moniker, .. })
+                | CapabilitySource::Framework(FrameworkSource { moniker, .. }) => {
                     (Some(ExtendedMoniker::ComponentInstance(moniker)), None)
                 }
-                CapabilitySource::Builtin { .. } | CapabilitySource::Namespace { .. } => {
+                CapabilitySource::Builtin(_) | CapabilitySource::Namespace(_) => {
                     (Some(ExtendedMoniker::ComponentManager), None)
                 }
                 _ => {

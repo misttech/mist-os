@@ -10,6 +10,7 @@
 #include <lib/zx/time.h>
 #include <zircon/device/audio.h>
 #include <zircon/errors.h>
+#include <zircon/rights.h>
 
 #include <optional>
 
@@ -29,6 +30,10 @@ class AdminTest : public TestBase {
   explicit AdminTest(const DeviceEntry& dev_entry) : TestBase(dev_entry) {}
 
  protected:
+  static constexpr zx_rights_t kRightsVmoIncoming =
+      ZX_RIGHT_READ | ZX_RIGHT_MAP | ZX_RIGHT_TRANSFER;
+  static constexpr zx_rights_t kRightsVmoOutgoing = kRightsVmoIncoming | ZX_RIGHT_WRITE;
+
   void TearDown() override;
   void DropRingBuffer();
 
@@ -75,6 +80,9 @@ class AdminTest : public TestBase {
   fuchsia::hardware::audio::PcmFormat ring_buffer_pcm_format() const {
     return ring_buffer_pcm_format_;
   }
+  void SetRingBufferIncoming(std::optional<bool> is_incoming) {
+    ring_buffer_is_incoming_ = is_incoming;
+  }
 
   uint32_t notifications_per_ring() const { return notifications_per_ring_; }
   const zx::time& start_time() const { return start_time_; }
@@ -84,6 +92,7 @@ class AdminTest : public TestBase {
   void RequestRingBufferChannel();
 
   fidl::InterfacePtr<fuchsia::hardware::audio::RingBuffer> ring_buffer_;
+  std::optional<bool> ring_buffer_is_incoming_ = std::nullopt;
   std::optional<fuchsia::hardware::audio::RingBufferProperties> ring_buffer_props_;
   std::optional<fuchsia::hardware::audio::DelayInfo> delay_info_;
 

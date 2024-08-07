@@ -14,7 +14,7 @@ namespace system_log_recorder {
 // Keeps raw data in memory as long as it is required by the LZ4 library for encoding or decoding.
 class RingBuffer {
  public:
-  RingBuffer(size_t buffer_size);
+  explicit RingBuffer(size_t buffer_size);
 
   char* GetPtr() const { return ring_ptr_; }
 

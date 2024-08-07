@@ -10,7 +10,7 @@ import("//build/zircon/hermetic_code_blob.gni")
 group("tests") {
   testonly = true
   deps = [
-    ":usercopy-unittests",
+    ":starnix-usercopy-unittests",
 
     # Make sure that the hermetic copy/zero routines do not bitrot.
     ":usercopy_cpp_reference_routines",
@@ -81,7 +81,7 @@ fuchsia_test_component("usercopy-unittests-component") {
   deps = [ ":usercopy_test" ]
 }
 
-fuchsia_test_package("usercopy-unittests") {
+fuchsia_test_package("starnix-usercopy-unittests") {
   test_components = [ ":usercopy-unittests-component" ]
 }
 

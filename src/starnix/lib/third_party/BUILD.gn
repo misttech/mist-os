@@ -1,0 +1,8 @@
+group("lib") {
+  deps = [ "rust_netlink" ]
+}
+
+group("tests") {
+  testonly = true
+  deps = [ "rust_netlink:tests" ]
+}

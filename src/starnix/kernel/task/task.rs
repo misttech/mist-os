@@ -1342,13 +1342,24 @@ impl Task {
         self.get_pid() == self.get_tid()
     }
 
-    pub fn read_argv(&self) -> Result<Vec<FsString>, Errno> {
+    pub fn read_argv(&self, max_len: usize) -> Result<Vec<FsString>, Errno> {
         let (argv_start, argv_end) = {
             let mm_state = self.mm().state.read();
             (mm_state.argv_start, mm_state.argv_end)
         };
 
-        self.read_nul_delimited_c_string_list(argv_start, argv_end - argv_start)
+        let len_to_read = std::cmp::min(argv_end - argv_start, max_len);
+        self.read_nul_delimited_c_string_list(argv_start, len_to_read)
+    }
+
+    pub fn read_env(&self, max_len: usize) -> Result<Vec<FsString>, Errno> {
+        let (env_start, env_end) = {
+            let mm_state = self.mm().state.read();
+            (mm_state.environ_start, mm_state.environ_end)
+        };
+
+        let len_to_read = std::cmp::min(env_end - env_start, max_len);
+        self.read_nul_delimited_c_string_list(env_start, len_to_read)
     }
 
     pub fn thread_runtime_info(&self) -> Result<zx::TaskRuntimeInfo, Errno> {

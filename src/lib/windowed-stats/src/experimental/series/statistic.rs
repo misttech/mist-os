@@ -12,7 +12,7 @@ use thiserror::Error;
 
 use crate::experimental::series::buffer::BufferStrategy;
 use crate::experimental::series::interpolation::Interpolation;
-use crate::experimental::series::{Counter, DataSemantic, Fill, Gauge, Sample, Sampler};
+use crate::experimental::series::{BitSet, Counter, DataSemantic, Fill, Gauge, Sample, Sampler};
 
 pub mod recipe {
     //! Type definitions and respellings of common or interesting statistic types.
@@ -136,10 +136,10 @@ where
     }
 }
 
-impl Sampler<Sample<Gauge<f64>>> for ArithmeticMean<Gauge<f64>> {
+impl Sampler<Sample<Gauge<f32>>> for ArithmeticMean<Gauge<f32>> {
     type Error = OverflowError;
 
-    fn fold(&mut self, sample: Sample<Gauge<f64>>) -> Result<(), Self::Error> {
+    fn fold(&mut self, sample: Sample<Gauge<f32>>) -> Result<(), Self::Error> {
         // Discard `NaN` terms and avoid some floating-point exceptions.
         self.sum = match sample {
             _ if sample.is_nan() => self.sum,
@@ -152,15 +152,15 @@ impl Sampler<Sample<Gauge<f64>>> for ArithmeticMean<Gauge<f64>> {
     }
 }
 
-impl Statistic for ArithmeticMean<Gauge<f64>> {
-    type Semantic = Gauge<f64>;
-    type Sample = Sample<Gauge<f64>>;
-    type Aggregation = f64;
+impl Statistic for ArithmeticMean<Gauge<f32>> {
+    type Semantic = Gauge<f32>;
+    type Sample = Sample<Gauge<f32>>;
+    type Aggregation = f32;
 
     fn aggregation(&mut self) -> Option<Self::Aggregation> {
         // This is lossy and lossiness correlates to the magnitude of `n`. See details of
-        // `u64 as f64` casts.
-        let aggregation = (self.n > 0).then(|| self.sum / (self.n as f64));
+        // `u64 as f32` casts.
+        let aggregation = (self.n > 0).then(|| self.sum / (self.n as f32));
         *self = Default::default();
         aggregation
     }
@@ -269,6 +269,52 @@ impl Statistic for Max<Gauge<u64>> {
         let max = self.max;
         *self = Default::default();
         Some(max)
+    }
+}
+
+#[derive(Derivative)]
+#[derivative(
+    Clone(bound = "T::Sample: Clone,"),
+    Debug(bound = "T::Sample: Debug,"),
+    Default(bound = "T::Sample: Zero,")
+)]
+pub struct Union<T>
+where
+    T: DataSemantic,
+{
+    #[derivative(Default(value = "Zero::zero()"))]
+    value: T::Sample,
+}
+
+impl<T> Fill<T::Sample> for Union<T>
+where
+    Self: Sampler<T::Sample, Error = OverflowError>,
+    T: DataSemantic,
+    T::Sample: Num + NumCast,
+{
+    fn fill(&mut self, sample: T::Sample, _n: usize) -> Result<(), Self::Error> {
+        self.fold(sample)
+    }
+}
+
+impl Sampler<Sample<BitSet<u64>>> for Union<BitSet<u64>> {
+    type Error = OverflowError;
+
+    fn fold(&mut self, sample: Sample<BitSet<u64>>) -> Result<(), Self::Error> {
+        self.value = self.value | sample;
+        Ok(())
+    }
+}
+
+impl Statistic for Union<BitSet<u64>> {
+    type Semantic = BitSet<u64>;
+    type Sample = Sample<BitSet<u64>>;
+    type Aggregation = u64;
+
+    fn aggregation(&mut self) -> Option<Self::Aggregation> {
+        let value = self.value;
+        *self = Default::default();
+        Some(value)
     }
 }
 
@@ -400,20 +446,20 @@ where
 #[cfg(test)]
 mod tests {
     use crate::experimental::series::statistic::{
-        ArithmeticMean, LatchMax, Max, OverflowError, PostAggregation, Statistic, Sum,
+        ArithmeticMean, LatchMax, Max, OverflowError, PostAggregation, Statistic, Sum, Union,
     };
-    use crate::experimental::series::{Counter, Fill, Gauge, Sampler};
+    use crate::experimental::series::{BitSet, Counter, Fill, Gauge, Sampler};
 
     #[test]
     fn arithmetic_mean_gauge_aggregation() {
-        let mut mean = ArithmeticMean::<Gauge<f64>>::default();
+        let mut mean = ArithmeticMean::<Gauge<f32>>::default();
         mean.fold(1.0).unwrap();
         mean.fold(1.0).unwrap();
         mean.fold(1.0).unwrap();
         let aggregation = mean.aggregation().unwrap();
         assert!(aggregation > 0.99 && aggregation < 1.01); // ~ 1.0
 
-        let mut mean = ArithmeticMean::<Gauge<f64>>::default();
+        let mut mean = ArithmeticMean::<Gauge<f32>>::default();
         mean.fold(0.0).unwrap();
         mean.fold(1.0).unwrap();
         mean.fold(2.0).unwrap();
@@ -423,7 +469,7 @@ mod tests {
 
     #[test]
     fn arithmetic_mean_gauge_aggregation_fill() {
-        let mut mean = ArithmeticMean::<Gauge<f64>>::default();
+        let mut mean = ArithmeticMean::<Gauge<f32>>::default();
         mean.fill(1.0, 1000).unwrap();
         let aggregation = mean.aggregation().unwrap();
         assert!(aggregation > 0.99 && aggregation < 1.01); // ~ 1.0
@@ -431,7 +477,7 @@ mod tests {
 
     #[test]
     fn arithmetic_mean_gauge_overflow() {
-        let mut mean = ArithmeticMean::<Gauge<f64>> { sum: 1.0, n: u64::MAX };
+        let mut mean = ArithmeticMean::<Gauge<f32>> { sum: 1.0, n: u64::MAX };
         let result = mean.fold(1.0);
         assert_eq!(result, Err(OverflowError));
     }
@@ -484,6 +530,24 @@ mod tests {
         max.fill(42, 1000).unwrap();
         let aggregation = max.aggregation().unwrap();
         assert_eq!(aggregation, 42);
+    }
+
+    #[test]
+    fn union_bitset_aggregation() {
+        let mut value = Union::<BitSet<u64>>::default();
+        value.fold(1 << 1).unwrap();
+        value.fold(1 << 3).unwrap();
+        value.fold(1 << 5).unwrap();
+        let aggregation = value.aggregation().unwrap();
+        assert_eq!(aggregation, 0b101010);
+    }
+
+    #[test]
+    fn union_bitset_aggregation_fill() {
+        let mut value = Union::<BitSet<u64>>::default();
+        value.fill(1 << 2, 1000).unwrap();
+        let aggregation = value.aggregation().unwrap();
+        assert_eq!(aggregation, 0b100);
     }
 
     #[test]

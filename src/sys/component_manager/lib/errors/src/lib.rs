@@ -156,7 +156,7 @@ pub enum StructuredConfigError {
     #[error("failed to find values for key `{key}`")]
     KeyNotFound { key: String },
     #[error("failed to route structured config values:\n\t{_0}")]
-    RoutingError(#[from] RoutingError),
+    RoutingError(#[from] router_error::RouterError),
 }
 
 #[derive(Clone, Debug, Error)]

@@ -66,7 +66,7 @@ executable("wlanphy_device_test") {
            "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_cpp",
            "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_cpp",
            "//sdk/lib/async_patterns/testing/cpp:cpp",
-           "//sdk/lib/driver/testing/cpp:cpp",
+           "//sdk/lib/driver/testing/cpp",
            "//sdk/lib/sys/cpp/testing:cpp",
            "//src/lib/fxl/test:gtest_main",
            "//zircon/system/ulib/sync",

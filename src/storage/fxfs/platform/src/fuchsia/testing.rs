@@ -43,6 +43,28 @@ pub struct TestFixtureOptions {
     pub serve_volume: bool,
 }
 
+fn ensure_unique_or_poison(holder: DeviceHolder) -> DeviceHolder {
+    if Arc::strong_count(&*holder) > 1 {
+        // All old references should be dropped by now, but they aren't. So we're going to try
+        // to crash that thread to get a stack of who is holding on to it. This is risky, and
+        // might still just crash in this thread, but it's worth a try.
+        if (*holder).poison().is_err() {
+            // Can't poison it unless it is a FakeDevice.
+            panic!("Remaining reference to device that doesn't support poison.");
+        };
+
+        // Dropping all the local references. May crash due to the poison if the extra reference was
+        // cleaned up since the last check.
+        std::mem::drop(holder);
+
+        // We've successfully poisoned the device for Drop. Now we wait and hope that the dangling
+        // reference isn't in a thread that is totally hung.
+        std::thread::sleep(std::time::Duration::from_secs(5));
+        panic!("Timed out waiting for poison to trigger.");
+    }
+    holder
+}
+
 impl TestFixture {
     pub async fn new() -> Self {
         Self::open(
@@ -188,8 +210,7 @@ impl TestFixture {
         // there might be pending operations that go through after fsck but before we close the
         // filesystem, and we want to be sure that we catch all possible issues with fsck.)
         filesystem.close().await.expect("close filesystem failed");
-        let device = filesystem.take_device().await;
-        device.ensure_unique();
+        let device = ensure_unique_or_poison(filesystem.take_device().await);
         device.reopen(false);
         let filesystem = FxFilesystem::open(device).await.expect("open failed");
         let options = FsckOptions {
@@ -210,8 +231,7 @@ impl TestFixture {
         .expect("fsck_volume failed");
 
         filesystem.close().await.expect("close filesystem failed");
-        let device = filesystem.take_device().await;
-        device.ensure_unique();
+        let device = ensure_unique_or_poison(filesystem.take_device().await);
         device.reopen(false);
 
         device

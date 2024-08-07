@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//build/test.gni")
 import("//tools/cmc/build/expect_includes.gni")
 
 group("driver_test_realm") {
@@ -25,6 +24,7 @@ executable("bin") {
   output_name = "storage_driver_test_realm"
   sources = [ "storage_driver_test_realm.cc" ]
   deps = [
+    "//sdk/fidl/fuchsia.component.test:fuchsia.component.test_cpp",
     "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/device-watcher/cpp",

@@ -429,20 +429,19 @@ void FakeController::SendL2CAPCFrame(hci_spec::ConnectionHandle handle,
 
 void FakeController::SendNumberOfCompletedPacketsEvent(
     hci_spec::ConnectionHandle handle, uint16_t num) {
-  StaticByteBuffer<sizeof(hci_spec::NumberOfCompletedPacketsEventParams) +
-                   sizeof(hci_spec::NumberOfCompletedPacketsEventData)>
-      buffer;
+  constexpr size_t buffer_size =
+      pwemb::NumberOfCompletedPacketsEvent::MinSizeInBytes() +
+      pwemb::NumberOfCompletedPacketsEventData::IntrinsicSizeInBytes();
+  auto event =
+      hci::EmbossEventPacket::New<pwemb::NumberOfCompletedPacketsEventWriter>(
+          hci_spec::kNumberOfCompletedPacketsEventCode, buffer_size);
+  auto view = event.view_t();
 
-  auto* params =
-      reinterpret_cast<hci_spec::NumberOfCompletedPacketsEventParams*>(
-          buffer.mutable_data());
-  params->number_of_handles = 1;
-  params->data->connection_handle =
-      pw::bytes::ConvertOrderTo(cpp20::endian::little, handle);
-  params->data->hc_num_of_completed_packets =
-      pw::bytes::ConvertOrderTo(cpp20::endian::little, num);
+  view.num_handles().Write(1);
+  view.nocp_data()[0].connection_handle().Write(handle);
+  view.nocp_data()[0].num_completed_packets().Write(num);
 
-  SendEvent(hci_spec::kNumberOfCompletedPacketsEventCode, buffer);
+  SendEvent(hci_spec::kNumberOfCompletedPacketsEventCode, &event);
 }
 
 void FakeController::ConnectLowEnergy(const DeviceAddress& addr,
@@ -2374,11 +2373,12 @@ void FakeController::OnIOCapabilityRequestReplyCommand(
   SendCommandChannelPacket(io_response.data());
 
   // Event type based on |params.io_capability| and |io_response.io_capability|.
-  hci_spec::UserConfirmationRequestEventParams request = {};
-  request.bd_addr = DeviceAddressBytes(params.bd_addr());
-  request.numeric_value = 0;
-  SendEvent(hci_spec::kUserConfirmationRequestEventCode,
-            BufferView(&request, sizeof(request)));
+  auto event =
+      hci::EmbossEventPacket::New<pwemb::UserConfirmationRequestEventWriter>(
+          hci_spec::kUserConfirmationRequestEventCode);
+  event.view_t().bd_addr().CopyFrom(params.bd_addr());
+  event.view_t().numeric_value().Write(0);
+  SendCommandChannelPacket(event.data());
 }
 
 void FakeController::OnUserConfirmationRequestReplyCommand(
@@ -2394,11 +2394,12 @@ void FakeController::OnUserConfirmationRequestReplyCommand(
   RespondWithCommandStatus(hci_spec::kUserConfirmationRequestReply,
                            pwemb::StatusCode::SUCCESS);
 
-  hci_spec::SimplePairingCompleteEventParams pairing_event;
-  pairing_event.bd_addr = DeviceAddressBytes(params.bd_addr());
-  pairing_event.status = pwemb::StatusCode::SUCCESS;
-  SendEvent(hci_spec::kSimplePairingCompleteEventCode,
-            BufferView(&pairing_event, sizeof(pairing_event)));
+  auto pairing_event =
+      hci::EmbossEventPacket::New<pwemb::SimplePairingCompleteEventWriter>(
+          hci_spec::kSimplePairingCompleteEventCode);
+  pairing_event.view_t().bd_addr().CopyFrom(params.bd_addr());
+  pairing_event.view_t().status().Write(pwemb::StatusCode::SUCCESS);
+  SendCommandChannelPacket(pairing_event.data());
 
   auto link_key_event =
       hci::EmbossEventPacket::New<pwemb::LinkKeyNotificationEventWriter>(
@@ -2454,11 +2455,13 @@ void FakeController::OnUserConfirmationRequestNegativeReplyCommand(
   RespondWithCommandComplete(hci_spec::kUserConfirmationRequestNegativeReply,
                              pwemb::StatusCode::SUCCESS);
 
-  hci_spec::SimplePairingCompleteEventParams pairing_event;
-  pairing_event.bd_addr = DeviceAddressBytes(params.bd_addr());
-  pairing_event.status = pwemb::StatusCode::AUTHENTICATION_FAILURE;
-  SendEvent(hci_spec::kSimplePairingCompleteEventCode,
-            BufferView(&pairing_event, sizeof(pairing_event)));
+  auto pairing_event =
+      hci::EmbossEventPacket::New<pwemb::SimplePairingCompleteEventWriter>(
+          hci_spec::kSimplePairingCompleteEventCode);
+  pairing_event.view_t().bd_addr().CopyFrom(params.bd_addr());
+  pairing_event.view_t().status().Write(
+      pwemb::StatusCode::AUTHENTICATION_FAILURE);
+  SendCommandChannelPacket(pairing_event.data());
 }
 
 void FakeController::OnSetConnectionEncryptionCommand(

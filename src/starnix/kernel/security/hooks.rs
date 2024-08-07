@@ -2,14 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use super::selinux_hooks::fs::selinux_fs;
 use super::{selinux_hooks, FileSystemState, ResolvedElfState, TaskState};
+use crate::security::KernelState;
 use crate::task::{CurrentTask, Task};
-use crate::vfs::{FsNode, FsNodeHandle, FsStr, FsString, NamespaceNode};
+use crate::vfs::{
+    FileSystemHandle, FileSystemOptions, FsNode, FsNodeHandle, FsStr, FsString, NamespaceNode,
+    ValueOrSize, XattrOp,
+};
 
-use linux_uapi::XATTR_NAME_SELINUX;
-use selinux::security_server::SecurityServer;
+use selinux::security_server::{Mode, SecurityServer};
 use selinux::SecurityId;
-use selinux_common::ProcessPermission;
 use starnix_uapi::error;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::mount_flags::MountFlags;
@@ -32,7 +35,7 @@ where
     H: FnOnce(&Arc<SecurityServer>) -> Result<R, Errno>,
     D: FnOnce() -> Result<R, Errno>,
 {
-    if let Some(security_server) = &task.kernel().security_server {
+    if let Some(security_server) = &task.kernel().security_state.server {
         if !security_server.has_policy() {
             return not_enabled();
         }
@@ -68,7 +71,7 @@ where
     F: FnOnce(&Arc<SecurityServer>) -> R,
     D: Fn() -> R,
 {
-    task.kernel().security_server.as_ref().map_or_else(&default, |ss| {
+    task.kernel().security_state.server.as_ref().map_or_else(&default, |ss| {
         if ss.has_policy() {
             hook(ss)
         } else {
@@ -77,13 +80,31 @@ where
     })
 }
 
+/// Returns the security state structure for the kernel, based on the supplied "selinux" argument
+/// contents.
+pub fn kernel_init_security(selinux_feature: Option<Mode>) -> KernelState {
+    KernelState { server: selinux_feature.map(|mode| SecurityServer::new(mode)) }
+}
+
+/// Returns the "selinuxfs" file system, used by the system userspace to administer SELinux.
+pub fn new_selinux_fs(
+    current_task: &CurrentTask,
+    options: FileSystemOptions,
+) -> Result<FileSystemHandle, Errno> {
+    if current_task.kernel().security_state.server.is_some() {
+        Ok(selinux_fs(current_task, options).clone())
+    } else {
+        error!(ENODEV, "selinuxfs")
+    }
+}
+
 /// Return security state to associate with a filesystem based on the supplied mount options.
 /// This sits somewhere between `fs_context_parse_param()` and `sb_set_mnt_opts()` in function.
 pub fn file_system_init_security(
     fs_type: &FsStr,
     mount_options: &HashMap<FsString, FsString>,
 ) -> Result<FileSystemState, Errno> {
-    Ok(FileSystemState(selinux_hooks::file_system_init_security(fs_type, mount_options)?))
+    Ok(FileSystemState { state: selinux_hooks::file_system_init_security(fs_type, mount_options)? })
 }
 
 /// Used to return an extended attribute name and value to apply to a [`crate::vfs::FsNode`].
@@ -98,7 +119,7 @@ pub fn fs_node_security_xattr(
     new_node: &FsNodeHandle,
     parent: Option<&FsNodeHandle>,
 ) -> Result<Option<FsNodeSecurityXattr>, Errno> {
-    if let Some(security_server) = current_task.kernel().security_server.as_ref() {
+    if let Some(security_server) = current_task.kernel().security_state.server.as_ref() {
         selinux_hooks::fs_node_security_xattr(security_server, new_node, parent)
     } else {
         Ok(None)
@@ -107,20 +128,22 @@ pub fn fs_node_security_xattr(
 
 /// Return the default initial `TaskState` for kernel tasks.
 pub fn task_alloc_for_kernel() -> TaskState {
-    TaskState(selinux_hooks::TaskState::for_kernel())
+    TaskState { attrs: selinux_hooks::TaskAttrs::for_kernel() }
 }
 
 /// Returns `TaskState` for a new `Task`, based on that of the current `Task`, and the specified clone flags.
 pub fn task_alloc(current_task: &CurrentTask, clone_flags: u64) -> TaskState {
-    TaskState(run_if_selinux_else(
-        current_task,
-        |_| selinux_hooks::task_alloc(&current_task.read().security_state.0, clone_flags),
-        || selinux_hooks::TaskState::for_selinux_disabled(),
-    ))
+    TaskState {
+        attrs: run_if_selinux_else(
+            current_task,
+            |_| selinux_hooks::task_alloc(&current_task.read().security_state.attrs, clone_flags),
+            || selinux_hooks::TaskAttrs::for_selinux_disabled(),
+        ),
+    }
 }
 
 fn get_current_sid(task: &Task) -> SecurityId {
-    task.read().security_state.0.current_sid
+    task.read().security_state.attrs.current_sid
 }
 
 /// Returns the serialized Security Context associated with the specified task.
@@ -155,7 +178,7 @@ pub fn check_exec_access(
         |security_server| {
             selinux_hooks::check_exec_access(&security_server, current_task, executable_node)
         },
-        || Ok(ResolvedElfState(None)),
+        || Ok(ResolvedElfState { sid: None }),
     )
 }
 
@@ -226,11 +249,10 @@ pub fn check_task_getsid(source: &CurrentTask, target: &Task) -> Result<(), Errn
     check_if_selinux(source, |security_server| {
         let source_sid = get_current_sid(&source);
         let target_sid = get_current_sid(&target);
-        selinux_hooks::check_permissions(
+        selinux_hooks::check_task_getsid(
             &security_server.as_permission_check(),
             source_sid,
             target_sid,
-            &[ProcessPermission::GetSession],
         )
     })
 }
@@ -277,7 +299,7 @@ pub fn ptrace_traceme(tracee_task: &CurrentTask, parent_tracer_task: &Task) -> R
         selinux_hooks::ptrace_access_check(
             &security_server.as_permission_check(),
             get_current_sid(&parent_tracer_task),
-            &mut tracee_task.write().security_state.0,
+            &mut tracee_task.write().security_state.attrs,
         )
     })
 }
@@ -291,7 +313,7 @@ pub fn ptrace_access_check(tracer_task: &CurrentTask, tracee_task: &Task) -> Res
         selinux_hooks::ptrace_access_check(
             &security_server.as_permission_check(),
             tracer_sid,
-            &mut task_state.security_state.0,
+            &mut task_state.security_state.attrs,
         )
     })
 }
@@ -356,22 +378,57 @@ pub fn sb_umount(
     })
 }
 
-/// Attempts to update the security ID (SID) associated with `fs_node` when
-/// `name="security.selinux"` and `value` is a valid security context according to the current
-/// policy.
-pub fn post_setxattr(current_task: &CurrentTask, fs_node: &FsNode, name: &FsStr, value: &FsStr) {
-    // TODO(b/351195217): Checking SELinux-specific things generally does not belong in this module,
-    // though returning as early as possible is desirable. Beyond where to put this check,
-    // `set(xattr|security)`-related hooks need to be explored more carefully to determine whether
-    // the implementation of this function and its `selinux_hooks` delegate match the semantics
-    // ascribed to the `inode_post_setxattr` hook.
-    if name != XATTR_NAME_SELINUX.to_bytes() {
-        return;
-    }
+/// Returns the value of the specified security attribute for `fs_node`.
+/// If SELinux is enabled then this will return the Security Context corresponding
+/// to the SID with which `fs_node` has been labelled, even if the node's file system
+/// does not generally support extended attributes.
+/// If SELinux is not enabled, or `fs_node` is not labeled with a SID, then the
+/// call is delegated to the [`crate::vfs::FsNodeOps`] to satisfy.
+pub fn fs_node_getsecurity(
+    current_task: &CurrentTask,
+    fs_node: &FsNode,
+    name: &FsStr,
+    max_size: usize,
+) -> Result<ValueOrSize<FsString>, Errno> {
+    run_if_selinux_else(
+        current_task,
+        |security_server| {
+            selinux_hooks::fs_node_getsecurity(
+                security_server,
+                current_task,
+                fs_node,
+                name,
+                max_size,
+            )
+        },
+        || fs_node.ops().get_xattr(fs_node, current_task, name, max_size),
+    )
+}
 
-    run_if_selinux(current_task, |security_server| {
-        selinux_hooks::post_setxattr(security_server, fs_node, value)
-    });
+/// Sets the value of the specified security attribute for `fs_node`.
+/// If SELinux is enabled then this also updates the in-kernel SID with which
+/// the file node is labelled.
+pub fn fs_node_setsecurity(
+    current_task: &CurrentTask,
+    fs_node: &FsNode,
+    name: &FsStr,
+    value: &FsStr,
+    op: XattrOp,
+) -> Result<(), Errno> {
+    run_if_selinux_else(
+        current_task,
+        |security_server| {
+            selinux_hooks::fs_node_setsecurity(
+                security_server,
+                current_task,
+                fs_node,
+                name,
+                value,
+                op,
+            )
+        },
+        || fs_node.ops().set_xattr(fs_node, current_task, name, value, op),
+    )
 }
 
 /// Identifies one of the Security Context attributes associated with a task.
@@ -393,14 +450,7 @@ pub fn get_procattr(
 ) -> Result<Vec<u8>, Errno> {
     check_if_selinux_else(
         current_task,
-        |security_server| {
-            selinux_hooks::get_procattr(
-                security_server,
-                get_current_sid(&current_task),
-                &target.read().security_state.0,
-                attr,
-            )
-        },
+        |security_server| selinux_hooks::get_procattr(security_server, current_task, target, attr),
         // If SELinux is disabled then there are no values to return.
         || {
             if attr == ProcAttr::Current {
@@ -421,31 +471,33 @@ pub fn set_procattr(
 ) -> Result<(), Errno> {
     check_if_selinux_else(
         current_task,
-        |security_server| {
-            let mut task_state = current_task.write();
-            selinux_hooks::set_procattr(
-                security_server,
-                task_state.security_state.0.current_sid,
-                &mut task_state.security_state.0,
-                attr,
-                context,
-            )
-        },
+        |security_server| selinux_hooks::set_procattr(security_server, current_task, attr, context),
         // If SELinux is disabled then no writes are accepted.
         || error!(EINVAL),
     )
 }
 
+pub mod testing {
+    use super::{Arc, KernelState, SecurityServer};
+
+    /// Used by Starnix' `testing.rs` to create `KernelState` wrapping a test-
+    /// supplied `SecurityServer`.
+    pub fn kernel_state(security_server: Option<Arc<SecurityServer>>) -> KernelState {
+        KernelState { server: security_server.clone() }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::security::selinux_hooks::testing::get_cached_sid;
+    use crate::security::selinux_hooks::testing;
     use crate::testing::{
         create_kernel_and_task, create_kernel_and_task_with_selinux,
         create_kernel_task_and_unlocked, create_kernel_task_and_unlocked_with_selinux, create_task,
         AutoReleasableTask,
     };
     use crate::vfs::NamespaceNode;
+    use linux_uapi::XATTR_NAME_SELINUX;
     use selinux::security_server::Mode;
     use selinux::InitialSid;
     use starnix_sync::{Locked, Unlocked};
@@ -476,7 +528,7 @@ mod tests {
     fn create_task_pair_with_selinux_disabled() -> (AutoReleasableTask, AutoReleasableTask) {
         let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let another_task = create_task(&mut locked, &kernel, "another-task");
-        assert!(kernel.security_server.is_none());
+        assert!(kernel.security_state.server.is_none());
         (current_task, another_task)
     }
 
@@ -519,7 +571,7 @@ mod tests {
     #[fuchsia::test]
     async fn check_and_run_if_selinux_disabled() {
         let (kernel, task) = create_kernel_and_task();
-        assert!(kernel.security_server.is_none());
+        assert!(kernel.security_state.server.is_none());
 
         let check_result = check_if_selinux(&task, |_| Ok(TestHookResult::WasRun));
         assert_eq!(check_result, Ok(TestHookResult::WasNotRunDefault));
@@ -574,7 +626,7 @@ mod tests {
     #[fuchsia::test]
     async fn task_create_access_allowed_for_selinux_disabled() {
         let (kernel, task) = create_kernel_and_task();
-        assert!(kernel.security_server.is_none());
+        assert!(kernel.security_state.server.is_none());
         assert_eq!(check_task_create_access(&task), Ok(()));
     }
 
@@ -596,9 +648,9 @@ mod tests {
     #[fuchsia::test]
     async fn exec_access_allowed_for_selinux_disabled() {
         let (kernel, task, mut locked) = create_kernel_task_and_unlocked();
-        assert!(kernel.security_server.is_none());
+        assert!(kernel.security_state.server.is_none());
         let executable_node = &create_test_file(&mut locked, &task).entry.node;
-        assert_eq!(check_exec_access(&task, executable_node), Ok(ResolvedElfState(None)));
+        assert_eq!(check_exec_access(&task, executable_node), Ok(ResolvedElfState { sid: None }));
     }
 
     #[fuchsia::test]
@@ -609,7 +661,7 @@ mod tests {
         let executable_node = &create_test_file(&mut locked, &task).entry.node;
         // Expect that access is granted, and a `SecurityId` is returned in the `ResolvedElfState`.
         let result = check_exec_access(&task, executable_node);
-        assert!(result.expect("Exec check should succeed").0.is_some());
+        assert!(result.expect("Exec check should succeed").sid.is_some());
     }
 
     #[fuchsia::test]
@@ -621,7 +673,7 @@ mod tests {
         let executable_node = &create_test_file(&mut locked, &task).entry.node;
         // Expect that access is granted, and a `SecurityId` is returned in the `ResolvedElfState`.
         let result = check_exec_access(&task, executable_node);
-        assert!(result.expect("Exec check should succeed").0.is_some());
+        assert!(result.expect("Exec check should succeed").sid.is_some());
     }
 
     #[fuchsia::test]
@@ -631,13 +683,13 @@ mod tests {
         // Without SELinux enabled and a policy loaded, only `InitialSid` values exist
         // in the system.
         let target_sid = SecurityId::initial(InitialSid::Unlabeled);
-        let elf_state = ResolvedElfState(Some(target_sid));
+        let elf_state = ResolvedElfState { sid: Some(target_sid) };
 
-        assert!(task.read().security_state.0.current_sid != target_sid);
+        assert!(task.read().security_state.attrs.current_sid != target_sid);
 
-        let before_hook_sid = task.read().security_state.0.current_sid;
+        let before_hook_sid = task.read().security_state.attrs.current_sid;
         update_state_on_exec(&task, &elf_state);
-        assert_eq!(task.read().security_state.0.current_sid, before_hook_sid);
+        assert_eq!(task.read().security_state.attrs.current_sid, before_hook_sid);
     }
 
     #[fuchsia::test]
@@ -647,50 +699,44 @@ mod tests {
 
         // Without SELinux enabled and a policy loaded, only `InitialSid` values exist
         // in the system.
-        let initial_state = task.read().security_state.0.clone();
+        let initial_state = task.read().security_state.attrs.clone();
         let elf_sid = SecurityId::initial(InitialSid::Unlabeled);
-        let elf_state = ResolvedElfState(Some(elf_sid));
+        let elf_state = ResolvedElfState { sid: Some(elf_sid) };
         assert_ne!(elf_sid, initial_state.current_sid);
         update_state_on_exec(&task, &elf_state);
-        assert_eq!(task.read().security_state.0, initial_state);
+        assert_eq!(task.read().security_state.attrs, initial_state);
     }
 
     #[fuchsia::test]
     async fn state_update_for_fake_mode() {
         let security_server = security_server_with_policy(Mode::Fake);
-        let initial_state = selinux_hooks::TaskState::for_kernel();
-        let (kernel, task) = create_kernel_and_task_with_selinux(security_server);
-        task.write().security_state.0 = initial_state.clone();
+        let initial_state = selinux_hooks::TaskAttrs::for_kernel();
+        let (_kernel, task) = create_kernel_and_task_with_selinux(security_server.clone());
+        task.write().security_state.attrs = initial_state.clone();
 
-        let elf_sid = kernel
-            .security_server
-            .as_ref()
-            .expect("missing security server")
+        let elf_sid = security_server
             .security_context_to_sid(b"u:object_r:fork_no_t:s0".into())
             .expect("invalid security context");
-        let elf_state = ResolvedElfState(Some(elf_sid));
+        let elf_state = ResolvedElfState { sid: Some(elf_sid) };
         assert_ne!(elf_sid, initial_state.current_sid);
         update_state_on_exec(&task, &elf_state);
-        assert_eq!(task.read().security_state.0.current_sid, elf_sid);
+        assert_eq!(task.read().security_state.attrs.current_sid, elf_sid);
     }
 
     #[fuchsia::test]
     async fn state_update_for_permissive_mode() {
         let security_server = security_server_with_policy(Mode::Enable);
         security_server.set_enforcing(false);
-        let initial_state = selinux_hooks::TaskState::for_kernel();
-        let (kernel, task) = create_kernel_and_task_with_selinux(security_server);
-        task.write().security_state.0 = initial_state.clone();
-        let elf_sid = kernel
-            .security_server
-            .as_ref()
-            .expect("missing security server")
+        let initial_state = selinux_hooks::TaskAttrs::for_kernel();
+        let (_kernel, task) = create_kernel_and_task_with_selinux(security_server.clone());
+        task.write().security_state.attrs = initial_state.clone();
+        let elf_sid = security_server
             .security_context_to_sid(b"u:object_r:fork_no_t:s0".into())
             .expect("invalid security context");
-        let elf_state = ResolvedElfState(Some(elf_sid));
+        let elf_state = ResolvedElfState { sid: Some(elf_sid) };
         assert_ne!(elf_sid, initial_state.current_sid);
         update_state_on_exec(&task, &elf_state);
-        assert_eq!(task.read().security_state.0.current_sid, elf_sid);
+        assert_eq!(task.read().security_state.attrs.current_sid, elf_sid);
     }
 
     #[fuchsia::test]
@@ -856,170 +902,251 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn post_setxattr_noop_selinux_disabled() {
+    async fn fs_node_setsecurity_noop_selinux_disabled() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let node = &create_test_file(&mut locked, &current_task).entry.node;
-        assert_eq!(None, get_cached_sid(node));
+        assert_eq!(None, testing::get_cached_sid(node));
 
-        post_setxattr(
-            current_task.as_ref(),
-            node.as_ref(),
+        fs_node_setsecurity(
+            &current_task,
+            &node,
             XATTR_NAME_SELINUX.to_bytes().into(),
             VALID_SECURITY_CONTEXT.into(),
-        );
+            XattrOp::Set,
+        )
+        .expect("set_xattr(security.selinux) failed");
 
-        assert_eq!(None, get_cached_sid(node));
+        assert_eq!(None, testing::get_cached_sid(node));
     }
 
     #[fuchsia::test]
-    async fn post_setxattr_noop_selinux_without_policy() {
+    async fn fs_node_setsecurity_noop_selinux_without_policy() {
         let security_server = SecurityServer::new(Mode::Enable);
         let (_kernel, current_task, mut locked) =
             create_kernel_task_and_unlocked_with_selinux(security_server);
         let node = &create_test_file(&mut locked, &current_task).entry.node;
-        assert_eq!(None, get_cached_sid(node));
+        assert_eq!(None, testing::get_cached_sid(node));
 
-        post_setxattr(
-            current_task.as_ref(),
-            node.as_ref(),
+        fs_node_setsecurity(
+            &current_task,
+            &node,
             XATTR_NAME_SELINUX.to_bytes().into(),
             VALID_SECURITY_CONTEXT.into(),
-        );
+            XattrOp::Set,
+        )
+        .expect("set_xattr(security.selinux) failed");
 
-        assert_eq!(None, get_cached_sid(node));
+        assert_eq!(None, testing::get_cached_sid(node));
     }
 
     #[fuchsia::test]
-    async fn post_setxattr_selinux_fake() {
+    async fn fs_node_setsecurity_selinux_fake() {
         let security_server = security_server_with_policy(Mode::Fake);
         let (_kernel, current_task, mut locked) =
             create_kernel_task_and_unlocked_with_selinux(security_server);
         let node = &create_test_file(&mut locked, &current_task).entry.node;
-        assert_eq!(None, get_cached_sid(node));
+        assert_eq!(None, testing::get_cached_sid(node));
 
-        post_setxattr(
-            current_task.as_ref(),
-            node.as_ref(),
+        fs_node_setsecurity(
+            &current_task,
+            &node,
             XATTR_NAME_SELINUX.to_bytes().into(),
             VALID_SECURITY_CONTEXT.into(),
-        );
+            XattrOp::Set,
+        )
+        .expect("set_xattr(security.selinux) failed");
 
-        assert!(get_cached_sid(node).is_some());
+        assert!(testing::get_cached_sid(node).is_some());
     }
 
     #[fuchsia::test]
-    async fn post_setxattr_selinux_permissive() {
+    async fn fs_node_setsecurity_selinux_permissive() {
         let security_server = security_server_with_policy(Mode::Enable);
         security_server.set_enforcing(false);
         let (_kernel, current_task, mut locked) =
             create_kernel_task_and_unlocked_with_selinux(security_server);
         let node = &create_test_file(&mut locked, &current_task).entry.node;
-        assert_eq!(None, get_cached_sid(node));
+        assert_eq!(None, testing::get_cached_sid(node));
 
-        post_setxattr(
-            current_task.as_ref(),
-            node.as_ref(),
+        fs_node_setsecurity(
+            &current_task,
+            &node,
             XATTR_NAME_SELINUX.to_bytes().into(),
             VALID_SECURITY_CONTEXT.into(),
-        );
+            XattrOp::Set,
+        )
+        .expect("set_xattr(security.selinux) failed");
 
-        assert!(get_cached_sid(node).is_some());
+        assert!(testing::get_cached_sid(node).is_some());
     }
 
     #[fuchsia::test]
-    async fn post_setxattr_not_selinux_is_noop() {
+    async fn fs_node_setsecurity_not_selinux_is_noop() {
         let security_server = security_server_with_policy(Mode::Enable);
         security_server.set_enforcing(true);
         let (_kernel, current_task, mut locked) =
             create_kernel_task_and_unlocked_with_selinux(security_server);
         let node = &create_test_file(&mut locked, &current_task).entry.node;
-        assert_eq!(None, get_cached_sid(node));
+        assert_eq!(None, testing::get_cached_sid(node));
 
-        post_setxattr(
-            current_task.as_ref(),
-            node.as_ref(),
+        fs_node_setsecurity(
+            &current_task,
+            &node,
             "security.selinu!".into(), // Note: name != "security.selinux".
             VALID_SECURITY_CONTEXT.into(),
-        );
+            XattrOp::Set,
+        )
+        .expect("set_xattr(security.selinux) failed");
 
-        assert_eq!(None, get_cached_sid(node));
+        assert_eq!(None, testing::get_cached_sid(node));
     }
 
     #[fuchsia::test]
-    async fn post_setxattr_clear_invalid_security_context() {
+    async fn fs_node_setsecurity_clear_invalid_security_context() {
         let security_server = security_server_with_policy(Mode::Enable);
         security_server.set_enforcing(true);
         let (_kernel, current_task, mut locked) =
             create_kernel_task_and_unlocked_with_selinux(security_server);
         let node = &create_test_file(&mut locked, &current_task).entry.node;
-        post_setxattr(
-            current_task.as_ref(),
-            node.as_ref(),
+        fs_node_setsecurity(
+            &current_task,
+            &node,
             XATTR_NAME_SELINUX.to_bytes().into(),
             VALID_SECURITY_CONTEXT.into(),
-        );
-        assert_ne!(None, get_cached_sid(node));
+            XattrOp::Set,
+        )
+        .expect("set_xattr(security.selinux) failed");
+        assert_ne!(None, testing::get_cached_sid(node));
 
-        post_setxattr(
-            current_task.as_ref(),
-            node.as_ref(),
+        fs_node_setsecurity(
+            &current_task,
+            &node,
             XATTR_NAME_SELINUX.to_bytes().into(),
             "!".into(), // Note: Not a valid security context.
-        );
+            XattrOp::Set,
+        )
+        .expect("set_xattr(security.selinux) failed");
 
-        assert_eq!(None, get_cached_sid(node));
+        assert_eq!(None, testing::get_cached_sid(node));
     }
 
     #[fuchsia::test]
-    async fn post_setxattr_set_sid_selinux_enforcing() {
+    async fn fs_node_setsecurity_set_sid_selinux_enforcing() {
         let security_server = security_server_with_policy(Mode::Enable);
         security_server.set_enforcing(true);
         let (_kernel, current_task, mut locked) =
             create_kernel_task_and_unlocked_with_selinux(security_server);
         let node = &create_test_file(&mut locked, &current_task).entry.node;
-        assert_eq!(None, get_cached_sid(node));
+        assert_eq!(None, testing::get_cached_sid(node));
 
-        post_setxattr(
-            current_task.as_ref(),
-            node.as_ref(),
+        fs_node_setsecurity(
+            &current_task,
+            &node,
             XATTR_NAME_SELINUX.to_bytes().into(),
             VALID_SECURITY_CONTEXT.into(),
-        );
+            XattrOp::Set,
+        )
+        .expect("set_xattr(security.selinux) failed");
 
-        assert!(get_cached_sid(node).is_some());
+        assert!(testing::get_cached_sid(node).is_some());
     }
 
     #[fuchsia::test]
-    async fn post_setxattr_different_sid_for_different_context() {
+    async fn fs_node_setsecurity_different_sid_for_different_context() {
         let security_server = security_server_with_policy(Mode::Enable);
         security_server.set_enforcing(true);
         let (_kernel, current_task, mut locked) =
             create_kernel_task_and_unlocked_with_selinux(security_server);
         let node = &create_test_file(&mut locked, &current_task).entry.node;
-        assert_eq!(None, get_cached_sid(node));
+        assert_eq!(None, testing::get_cached_sid(node));
 
-        post_setxattr(
-            current_task.as_ref(),
-            node.as_ref(),
+        fs_node_setsecurity(
+            &current_task,
+            &node,
             XATTR_NAME_SELINUX.to_bytes().into(),
             VALID_SECURITY_CONTEXT.into(),
-        );
+            XattrOp::Set,
+        )
+        .expect("set_xattr(security.selinux) failed");
 
-        assert!(get_cached_sid(node).is_some());
+        assert!(testing::get_cached_sid(node).is_some());
 
-        let first_sid = get_cached_sid(node).unwrap();
-        post_setxattr(
-            current_task.as_ref(),
-            node.as_ref(),
+        let first_sid = testing::get_cached_sid(node).unwrap();
+        fs_node_setsecurity(
+            &current_task,
+            &node,
             XATTR_NAME_SELINUX.to_bytes().into(),
             DIFFERENT_VALID_SECURITY_CONTEXT.into(),
-        );
+            XattrOp::Set,
+        )
+        .expect("set_xattr(security.selinux) failed");
 
-        assert!(get_cached_sid(node).is_some());
+        assert!(testing::get_cached_sid(node).is_some());
 
-        let second_sid = get_cached_sid(node).unwrap();
+        let second_sid = testing::get_cached_sid(node).unwrap();
 
         assert_ne!(first_sid, second_sid);
+    }
+
+    #[fuchsia::test]
+    async fn fs_node_getsecurity_returns_cached_context() {
+        let security_server = security_server_with_policy(Mode::Enable);
+        security_server.set_enforcing(true);
+        let (_kernel, current_task, mut locked) =
+            create_kernel_task_and_unlocked_with_selinux(security_server.clone());
+        let node = &create_test_file(&mut locked, &current_task).entry.node;
+
+        // Set a mismatched value in `node`'s "security.seliux" attribute.
+        const TEST_VALUE: &str = "Something Random";
+        node.ops()
+            .set_xattr(
+                node,
+                &current_task,
+                XATTR_NAME_SELINUX.to_bytes().into(),
+                TEST_VALUE.into(),
+                XattrOp::Set,
+            )
+            .expect("set_xattr(security.selinux) failed");
+
+        // Attach a valid SID to the `node`.
+        let sid = security_server
+            .security_context_to_sid(VALID_SECURITY_CONTEXT.into())
+            .expect("security context to SID");
+        node.update_info(|state| state.security_state.sid = Some(sid));
+
+        // Reading the security attribute should return the Security Context for the SID, rather than delegating.
+        let result =
+            fs_node_getsecurity(&current_task, node, XATTR_NAME_SELINUX.to_bytes().into(), 4096);
+        assert_eq!(result, Ok(ValueOrSize::Value(FsString::new(VALID_SECURITY_CONTEXT.into()))));
+    }
+
+    #[fuchsia::test]
+    async fn fs_node_getsecurity_delegates_to_get_xattr() {
+        let security_server = security_server_with_policy(Mode::Enable);
+        security_server.set_enforcing(true);
+        let (_kernel, current_task, mut locked) =
+            create_kernel_task_and_unlocked_with_selinux(security_server);
+        let node = &create_test_file(&mut locked, &current_task).entry.node;
+
+        // Set an value in `node`'s "security.seliux" attribute.
+        const TEST_VALUE: &str = "Something Random";
+        node.ops()
+            .set_xattr(
+                node,
+                &current_task,
+                XATTR_NAME_SELINUX.to_bytes().into(),
+                TEST_VALUE.into(),
+                XattrOp::Set,
+            )
+            .expect("set_xattr(security.selinux) failed");
+
+        // Ensure that there is no SID cached on the node.
+        node.update_info(|state| state.security_state.sid = None);
+
+        // Reading the security attribute should pass-through to read the value from the file system.
+        let result =
+            fs_node_getsecurity(&current_task, node, XATTR_NAME_SELINUX.to_bytes().into(), 4096);
+        assert_eq!(result, Ok(ValueOrSize::Value(FsString::new(TEST_VALUE.into()))));
     }
 
     #[fuchsia::test]
@@ -1133,11 +1260,11 @@ mod tests {
 
         // Clear the "exec" context with a write containing a single null octet.
         assert_eq!(set_procattr(&current_task, ProcAttr::Exec, b"\0"), Ok(()));
-        assert_eq!(current_task.read().security_state.0.exec_sid, None);
+        assert_eq!(current_task.read().security_state.attrs.exec_sid, None);
 
         // Clear the "fscreate" context with a write containing a single newline.
         assert_eq!(set_procattr(&current_task, ProcAttr::FsCreate, b"\x0a"), Ok(()));
-        assert_eq!(current_task.read().security_state.0.fscreate_sid, None);
+        assert_eq!(current_task.read().security_state.attrs.fscreate_sid, None);
     }
 
     #[fuchsia::test]

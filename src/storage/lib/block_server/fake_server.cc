@@ -1,0 +1,84 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+#include "src/storage/lib/block_server/fake_server.h"
+
+namespace block_server {
+
+/// Implementation of Interface backed by a VMO.
+class FakeServer::FakeInterface : public Interface {
+ public:
+  FakeInterface(zx::vmo data, uint64_t block_size)
+      : data_(std::move(data)), block_size_(block_size) {
+    uint64_t size;
+    ZX_ASSERT(data.get_size(&size) == ZX_OK);
+    ZX_ASSERT(size % block_size_ == 0);
+  }
+  FakeInterface(uint64_t blocks, uint64_t block_size) : block_size_(block_size) {
+    ZX_ASSERT(zx::vmo::create(blocks * block_size, 0, &data_) == ZX_OK);
+  }
+
+  FakeInterface(const FakeInterface&) = delete;
+  FakeInterface& operator=(const FakeInterface&) = delete;
+
+  void StartThread(Thread thread) override {
+    std::thread([thread = std::move(thread)]() mutable { thread.Run(); }).detach();
+  }
+  void OnNewSession(Session session) override {
+    std::thread([session = std::move(session)]() mutable { session.Run(); }).detach();
+  }
+  void OnRequests(Session& session, cpp20::span<const Request> requests) override {
+    std::vector<uint8_t> buf;
+    size_t len;
+    for (const Request& request : requests) {
+      switch (request.operation.tag) {
+        case Operation::Tag::Read:
+          len = request.operation.read.block_count * block_size_;
+          buf.reserve(len);
+          ZX_ASSERT(data_.read(buf.data(), len,
+                               request.operation.read.device_block_offset * block_size_) == ZX_OK);
+          ZX_ASSERT(request.vmo->write(buf.data(), len, request.operation.read.vmo_offset) ==
+                    ZX_OK);
+          break;
+
+        case Operation::Tag::Write:
+          len = request.operation.write.block_count * block_size_;
+          buf.reserve(len);
+          ZX_ASSERT(request.vmo->read(buf.data(), len, request.operation.read.vmo_offset) == ZX_OK);
+          ZX_ASSERT(data_.write(buf.data(), len,
+                                request.operation.read.device_block_offset * block_size_) == ZX_OK);
+          break;
+
+        case Operation::Tag::Flush:
+        case Operation::Tag::Trim:
+        case Operation::Tag::CloseVmo:
+          break;
+      }
+      session.SendReply(request.request_id, zx::ok());
+    }
+  }
+
+  const zx::vmo& vmo() const { return data_; }
+
+ private:
+  zx::vmo data_;
+  uint64_t block_size_;
+};
+
+FakeServer::FakeServer(const PartitionInfo& info, zx::vmo data) {
+  uint64_t size;
+  interface_ = data ? std::make_unique<FakeInterface>(std::move(data),
+                                                      static_cast<uint64_t>(info.block_size))
+                    : std::make_unique<FakeInterface>(info.block_count,
+                                                      static_cast<uint64_t>(info.block_size));
+  ZX_ASSERT(interface_->vmo().get_size(&size) == ZX_OK);
+  server_ = std::make_unique<BlockServer>(info, interface_.get());
+  ZX_ASSERT(info.block_size * info.block_count == size);
+}
+
+FakeServer::~FakeServer() = default;
+FakeServer::FakeServer(FakeServer&&) = default;
+FakeServer& FakeServer::operator=(FakeServer&&) = default;
+
+}  // namespace block_server

@@ -17,7 +17,7 @@ use futures::channel::oneshot;
 use futures::{FutureExt, Stream};
 use selectors::SelectorExt;
 use std::collections::HashMap;
-use std::sync::{Arc, Weak};
+use std::sync::{Arc, LazyLock, Weak};
 use std::time::Duration;
 use tracing::warn;
 use {
@@ -25,8 +25,8 @@ use {
     fidl_fuchsia_io as fio, fuchsia_trace as ftrace, inspect_fidl_load as deprecated_inspect,
 };
 
-static DEFAULT_TREE_NAME: once_cell::sync::Lazy<FlyStr> =
-    once_cell::sync::Lazy::new(|| FlyStr::new(finspect::DEFAULT_TREE_NAME));
+static DEFAULT_TREE_NAME: LazyLock<FlyStr> =
+    LazyLock::new(|| FlyStr::new(finspect::DEFAULT_TREE_NAME));
 
 #[derive(Debug)]
 pub enum InspectHandle {
@@ -577,10 +577,10 @@ mod test {
     use fuchsia_inspect::Node;
     use fuchsia_zircon::DurationNum;
     use futures::StreamExt;
-    use once_cell::sync::Lazy;
+    use std::sync::LazyLock;
 
-    static EMPTY_IDENTITY: Lazy<Arc<ComponentIdentity>> =
-        Lazy::new(|| Arc::new(ComponentIdentity::unknown()));
+    static EMPTY_IDENTITY: LazyLock<Arc<ComponentIdentity>> =
+        LazyLock::new(|| Arc::new(ComponentIdentity::unknown()));
 
     #[fuchsia::test]
     async fn population_times_out() {

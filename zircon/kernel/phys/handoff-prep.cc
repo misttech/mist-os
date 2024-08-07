@@ -132,6 +132,10 @@ ktl::span<ktl::byte> HandoffPrep::PublishVmo(ktl::string_view name, size_t conte
 }
 
 void HandoffPrep::FinishVmos() {
+  ZX_ASSERT_MSG(vmos_.size() <= PhysVmo::kMaxHandoffPhysVmos,
+                "Too many phys VMOs in hand-off! %zu > max %zu", vmos_.size(),
+                PhysVmo::kMaxHandoffPhysVmos);
+
   fbl::AllocChecker ac;
   ktl::span phys_vmos = New(handoff()->vmos, ac, vmos_.size());
   ZX_ASSERT_MSG(ac.check(), "cannot allocate %zu * %zu-byte PhysVmo", vmos_.size(),

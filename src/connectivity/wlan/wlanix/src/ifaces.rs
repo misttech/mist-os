@@ -305,7 +305,7 @@ impl ClientIface for SmeClientIface {
         let authenticator =
             match get_authenticator(bss_description.bssid, compatibility, &credential) {
                 Some(authenticator) => authenticator,
-                None => bail!("Failed to create authenticator for requested network"),
+                None => bail!("Failed to create authenticator for requested network. Unsupported security type, channel, or data rate."),
             };
 
         info!("Selected BSS to connect to");

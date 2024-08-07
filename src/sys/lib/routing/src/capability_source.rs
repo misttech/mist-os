@@ -2,11 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::bedrock::dict_ext::DictExt;
 use crate::error::RoutingError;
 use crate::legacy_router::Sources;
 use cm_rust::{
-    CapabilityDecl, CapabilityTypeName, ConfigurationDecl, DictionaryDecl, DirectoryDecl,
+    CapabilityDecl, CapabilityTypeName, ChildRef, ConfigurationDecl, DictionaryDecl, DirectoryDecl,
     EventStreamDecl, ExposeConfigurationDecl, ExposeDecl, ExposeDictionaryDecl,
     ExposeDirectoryDecl, ExposeProtocolDecl, ExposeResolverDecl, ExposeRunnerDecl,
     ExposeServiceDecl, ExposeSource, FidlIntoNative, NameMapping, NativeIntoFidl,
@@ -16,16 +15,17 @@ use cm_rust::{
     ServiceDecl, StorageDecl, UseDecl, UseDirectoryDecl, UseProtocolDecl, UseServiceDecl,
     UseSource, UseStorageDecl,
 };
+use cm_rust_derive::FidlDecl;
 use cm_types::{Name, Path};
 use derivative::Derivative;
 use fidl::{persist, unpersist};
-use fidl_fuchsia_component_decl as fdecl;
 use from_enum::FromEnum;
 use futures::future::BoxFuture;
 use moniker::{ChildName, ExtendedMoniker, Moniker};
-use sandbox::{Capability, Data, Dict};
+use sandbox::{Capability, Data};
 use std::fmt;
 use thiserror::Error;
+use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_internal as finternal};
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -37,7 +37,7 @@ pub enum Error {
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone)]
 pub enum AggregateMember {
-    Child(ChildName),
+    Child(ChildRef),
     Collection(Name),
     Parent,
     Self_,
@@ -62,56 +62,137 @@ impl fmt::Display for AggregateMember {
     }
 }
 
+impl FidlIntoNative<AggregateMember> for finternal::AggregateMember {
+    fn fidl_into_native(self) -> AggregateMember {
+        match self {
+            finternal::AggregateMember::Self_(_) => AggregateMember::Self_,
+            finternal::AggregateMember::Parent(_) => AggregateMember::Parent,
+            finternal::AggregateMember::Collection(name) => {
+                AggregateMember::Collection(Name::new(name).unwrap())
+            }
+            finternal::AggregateMember::Child(child_ref) => {
+                AggregateMember::Child(child_ref.fidl_into_native())
+            }
+        }
+    }
+}
+
+impl NativeIntoFidl<finternal::AggregateMember> for AggregateMember {
+    fn native_into_fidl(self) -> finternal::AggregateMember {
+        match self {
+            AggregateMember::Self_ => finternal::AggregateMember::Self_(fdecl::SelfRef {}),
+            AggregateMember::Parent => finternal::AggregateMember::Parent(fdecl::ParentRef {}),
+            AggregateMember::Collection(name) => {
+                finternal::AggregateMember::Collection(name.to_string())
+            }
+            AggregateMember::Child(child_ref) => {
+                finternal::AggregateMember::Child(child_ref.native_into_fidl())
+            }
+        }
+    }
+}
+
 /// Describes the source of a capability, as determined by `find_capability_source`
-#[derive(Debug, Derivative)]
+#[derive(FidlDecl, Debug, Derivative)]
 #[derivative(Clone(bound = ""), PartialEq)]
+#[fidl_decl(fidl_union = "finternal::CapabilitySource")]
 pub enum CapabilitySource {
     /// This capability originates from the component instance for the given Realm.
     /// point.
-    Component { capability: ComponentCapability, moniker: Moniker },
+    Component(ComponentSource),
     /// This capability originates from "framework". It's implemented by component manager and is
     /// scoped to the realm of the source.
-    Framework { capability: InternalCapability, moniker: Moniker },
+    Framework(FrameworkSource),
     /// This capability originates from the parent of the root component, and is built in to
     /// component manager. `top_instance` is the instance at the top of the tree, i.e.  the
     /// instance representing component manager.
-    Builtin { capability: InternalCapability },
+    Builtin(BuiltinSource),
     /// This capability originates from the parent of the root component, and is offered from
     /// component manager's namespace. `top_instance` is the instance at the top of the tree, i.e.
     /// the instance representing component manager.
-    Namespace { capability: ComponentCapability },
+    Namespace(NamespaceSource),
     /// This capability is provided by the framework based on some other capability.
-    Capability { source_capability: ComponentCapability, moniker: Moniker },
+    Capability(CapabilityToCapabilitySource),
     /// This capability is an aggregate of capabilities over a set of collections and static
     /// children. The instance names in the aggregate service will be anonymized.
-    AnonymizedAggregate {
-        capability: AggregateCapability,
-        moniker: Moniker,
-        members: Vec<AggregateMember>,
-        sources: Sources,
-    },
+    AnonymizedAggregate(AnonymizedAggregateSource),
     /// This capability is a filtered service capability from a single source, such as self or a
     /// child.
-    FilteredProvider {
-        capability: AggregateCapability,
-        moniker: Moniker,
-        service_capability: ComponentCapability,
-        offer_service_decl: OfferServiceDecl,
-    },
+    FilteredProvider(FilteredProviderSource),
     /// This capability is a filtered service capability with multiple sources, such as all of the
     /// dynamic children in a collection. The instances in the aggregate service are the union of
     /// the filters.
-    FilteredAggregateProvider {
-        capability: AggregateCapability,
-        moniker: Moniker,
-        offer_service_decls: Vec<OfferServiceDecl>,
-        sources: Sources,
-    },
+    FilteredAggregateProvider(FilteredAggregateProviderSource),
     /// This capability originates from "environment". It's implemented by a component instance.
-    Environment { capability: ComponentCapability, moniker: Moniker },
+    Environment(EnvironmentSource),
     /// This capability originates from "void". This is only a valid origination for optional
     /// capabilities.
-    Void { capability: InternalCapability, moniker: Moniker },
+    Void(VoidSource),
+}
+
+#[derive(FidlDecl, Debug, PartialEq, Clone)]
+#[fidl_decl(fidl_table = "finternal::Component")]
+pub struct ComponentSource {
+    pub capability: ComponentCapability,
+    pub moniker: Moniker,
+}
+#[derive(FidlDecl, Debug, PartialEq, Clone)]
+#[fidl_decl(fidl_table = "finternal::Framework")]
+pub struct FrameworkSource {
+    pub capability: InternalCapability,
+    pub moniker: Moniker,
+}
+#[derive(FidlDecl, Debug, PartialEq, Clone)]
+#[fidl_decl(fidl_table = "finternal::Builtin")]
+pub struct BuiltinSource {
+    pub capability: InternalCapability,
+}
+#[derive(FidlDecl, Debug, PartialEq, Clone)]
+#[fidl_decl(fidl_table = "finternal::Namespace")]
+pub struct NamespaceSource {
+    pub capability: ComponentCapability,
+}
+#[derive(FidlDecl, Debug, PartialEq, Clone)]
+#[fidl_decl(fidl_table = "finternal::Capability")]
+pub struct CapabilityToCapabilitySource {
+    pub source_capability: ComponentCapability,
+    pub moniker: Moniker,
+}
+#[derive(FidlDecl, Debug, PartialEq, Clone)]
+#[fidl_decl(fidl_table = "finternal::AnonymizedAggregate")]
+pub struct AnonymizedAggregateSource {
+    pub capability: AggregateCapability,
+    pub moniker: Moniker,
+    pub members: Vec<AggregateMember>,
+    pub sources: Sources,
+}
+#[derive(FidlDecl, Debug, PartialEq, Clone)]
+#[fidl_decl(fidl_table = "finternal::FilteredProvider")]
+pub struct FilteredProviderSource {
+    pub capability: AggregateCapability,
+    pub moniker: Moniker,
+    pub service_capability: ComponentCapability,
+    pub offer_service_decl: OfferServiceDecl,
+}
+#[derive(FidlDecl, Debug, PartialEq, Clone)]
+#[fidl_decl(fidl_table = "finternal::FilteredAggregateProvider")]
+pub struct FilteredAggregateProviderSource {
+    pub capability: AggregateCapability,
+    pub moniker: Moniker,
+    pub offer_service_decls: Vec<OfferServiceDecl>,
+    pub sources: Sources,
+}
+#[derive(FidlDecl, Debug, PartialEq, Clone)]
+#[fidl_decl(fidl_table = "finternal::Environment")]
+pub struct EnvironmentSource {
+    pub capability: ComponentCapability,
+    pub moniker: Moniker,
+}
+#[derive(FidlDecl, Debug, PartialEq, Clone)]
+#[fidl_decl(fidl_table = "finternal::Void")]
+pub struct VoidSource {
+    pub capability: InternalCapability,
+    pub moniker: Moniker,
 }
 
 impl CapabilitySource {
@@ -119,64 +200,78 @@ impl CapabilitySource {
     /// namespace.
     pub fn can_be_in_namespace(&self) -> bool {
         match self {
-            Self::Component { capability, .. } => capability.can_be_in_namespace(),
-            Self::Framework { capability, .. } => capability.can_be_in_namespace(),
-            Self::Builtin { capability } => capability.can_be_in_namespace(),
-            Self::Namespace { capability } => capability.can_be_in_namespace(),
-            Self::Capability { .. } => true,
-            Self::AnonymizedAggregate { capability, .. } => capability.can_be_in_namespace(),
-            Self::FilteredProvider { capability, .. }
-            | Self::FilteredAggregateProvider { capability, .. } => {
+            Self::Component(ComponentSource { capability, .. }) => capability.can_be_in_namespace(),
+            Self::Framework(FrameworkSource { capability, .. }) => capability.can_be_in_namespace(),
+            Self::Builtin(BuiltinSource { capability }) => capability.can_be_in_namespace(),
+            Self::Namespace(NamespaceSource { capability }) => capability.can_be_in_namespace(),
+            Self::Capability(CapabilityToCapabilitySource { .. }) => true,
+            Self::AnonymizedAggregate(AnonymizedAggregateSource { capability, .. }) => {
                 capability.can_be_in_namespace()
             }
-            Self::Environment { capability, .. } => capability.can_be_in_namespace(),
-            Self::Void { capability, .. } => capability.can_be_in_namespace(),
+            Self::FilteredProvider(FilteredProviderSource { capability, .. })
+            | Self::FilteredAggregateProvider(FilteredAggregateProviderSource {
+                capability, ..
+            }) => capability.can_be_in_namespace(),
+            Self::Environment(EnvironmentSource { capability, .. }) => {
+                capability.can_be_in_namespace()
+            }
+            Self::Void(VoidSource { capability, .. }) => capability.can_be_in_namespace(),
         }
     }
 
     pub fn source_name(&self) -> Option<&Name> {
         match self {
-            Self::Component { capability, .. } => capability.source_name(),
-            Self::Framework { capability, .. } => Some(capability.source_name()),
-            Self::Builtin { capability } => Some(capability.source_name()),
-            Self::Namespace { capability } => capability.source_name(),
-            Self::Capability { .. } => None,
-            Self::AnonymizedAggregate { capability, .. } => Some(capability.source_name()),
-            Self::FilteredProvider { capability, .. }
-            | Self::FilteredAggregateProvider { capability, .. } => Some(capability.source_name()),
-            Self::Environment { capability, .. } => capability.source_name(),
-            Self::Void { capability, .. } => Some(capability.source_name()),
+            Self::Component(ComponentSource { capability, .. }) => capability.source_name(),
+            Self::Framework(FrameworkSource { capability, .. }) => Some(capability.source_name()),
+            Self::Builtin(BuiltinSource { capability }) => Some(capability.source_name()),
+            Self::Namespace(NamespaceSource { capability }) => capability.source_name(),
+            Self::Capability(CapabilityToCapabilitySource { .. }) => None,
+            Self::AnonymizedAggregate(AnonymizedAggregateSource { capability, .. }) => {
+                Some(capability.source_name())
+            }
+            Self::FilteredProvider(FilteredProviderSource { capability, .. })
+            | Self::FilteredAggregateProvider(FilteredAggregateProviderSource {
+                capability, ..
+            }) => Some(capability.source_name()),
+            Self::Environment(EnvironmentSource { capability, .. }) => capability.source_name(),
+            Self::Void(VoidSource { capability, .. }) => Some(capability.source_name()),
         }
     }
 
     pub fn type_name(&self) -> CapabilityTypeName {
         match self {
-            Self::Component { capability, .. } => capability.type_name(),
-            Self::Framework { capability, .. } => capability.type_name(),
-            Self::Builtin { capability } => capability.type_name(),
-            Self::Namespace { capability } => capability.type_name(),
-            Self::Capability { source_capability, .. } => source_capability.type_name(),
-            Self::AnonymizedAggregate { capability, .. } => capability.type_name(),
-            Self::FilteredProvider { capability, .. }
-            | Self::FilteredAggregateProvider { capability, .. } => capability.type_name(),
-            Self::Environment { capability, .. } => capability.type_name(),
-            Self::Void { capability, .. } => capability.type_name(),
+            Self::Component(ComponentSource { capability, .. }) => capability.type_name(),
+            Self::Framework(FrameworkSource { capability, .. }) => capability.type_name(),
+            Self::Builtin(BuiltinSource { capability }) => capability.type_name(),
+            Self::Namespace(NamespaceSource { capability }) => capability.type_name(),
+            Self::Capability(CapabilityToCapabilitySource { source_capability, .. }) => {
+                source_capability.type_name()
+            }
+            Self::AnonymizedAggregate(AnonymizedAggregateSource { capability, .. }) => {
+                capability.type_name()
+            }
+            Self::FilteredProvider(FilteredProviderSource { capability, .. })
+            | Self::FilteredAggregateProvider(FilteredAggregateProviderSource {
+                capability, ..
+            }) => capability.type_name(),
+            Self::Environment(EnvironmentSource { capability, .. }) => capability.type_name(),
+            Self::Void(VoidSource { capability, .. }) => capability.type_name(),
         }
     }
 
     pub fn source_moniker(&self) -> ExtendedMoniker {
         match self {
-            Self::Component { moniker, .. }
-            | Self::Framework { moniker, .. }
-            | Self::Capability { moniker, .. }
-            | Self::Environment { moniker, .. }
-            | Self::Void { moniker, .. }
-            | Self::AnonymizedAggregate { moniker, .. }
-            | Self::FilteredProvider { moniker, .. }
-            | Self::FilteredAggregateProvider { moniker, .. } => {
-                ExtendedMoniker::ComponentInstance(moniker.clone())
-            }
-            Self::Builtin { .. } | Self::Namespace { .. } => ExtendedMoniker::ComponentManager,
+            Self::Component(ComponentSource { moniker, .. })
+            | Self::Framework(FrameworkSource { moniker, .. })
+            | Self::Capability(CapabilityToCapabilitySource { moniker, .. })
+            | Self::Environment(EnvironmentSource { moniker, .. })
+            | Self::Void(VoidSource { moniker, .. })
+            | Self::AnonymizedAggregate(AnonymizedAggregateSource { moniker, .. })
+            | Self::FilteredProvider(FilteredProviderSource { moniker, .. })
+            | Self::FilteredAggregateProvider(FilteredAggregateProviderSource {
+                moniker, ..
+            }) => ExtendedMoniker::ComponentInstance(moniker.clone()),
+            Self::Builtin(_) | Self::Namespace(_) => ExtendedMoniker::ComponentManager,
         }
     }
 }
@@ -187,16 +282,25 @@ impl fmt::Display for CapabilitySource {
             f,
             "{}",
             match self {
-                Self::Component { capability, moniker } => {
+                Self::Component(ComponentSource { capability, moniker }) => {
                     format!("{} '{}'", capability, moniker)
                 }
-                Self::Framework { capability, .. } => capability.to_string(),
-                Self::Builtin { capability } => capability.to_string(),
-                Self::Namespace { capability } => capability.to_string(),
-                Self::FilteredProvider { capability, .. }
-                | Self::FilteredAggregateProvider { capability, .. } => capability.to_string(),
-                Self::Capability { source_capability, .. } => format!("{}", source_capability),
-                Self::AnonymizedAggregate { capability, members, moniker, .. } => {
+                Self::Framework(FrameworkSource { capability, .. }) => capability.to_string(),
+                Self::Builtin(BuiltinSource { capability }) => capability.to_string(),
+                Self::Namespace(NamespaceSource { capability }) => capability.to_string(),
+                Self::FilteredProvider(FilteredProviderSource { capability, .. })
+                | Self::FilteredAggregateProvider(FilteredAggregateProviderSource {
+                    capability,
+                    ..
+                }) => capability.to_string(),
+                Self::Capability(CapabilityToCapabilitySource { source_capability, .. }) =>
+                    format!("{}", source_capability),
+                Self::AnonymizedAggregate(AnonymizedAggregateSource {
+                    capability,
+                    members,
+                    moniker,
+                    ..
+                }) => {
                     format!(
                         "{} from component '{}' aggregated from {}",
                         capability,
@@ -204,48 +308,18 @@ impl fmt::Display for CapabilitySource {
                         members.iter().map(|s| format!("{s}")).collect::<Vec<_>>().join(","),
                     )
                 }
-                Self::Environment { capability, .. } => capability.to_string(),
-                Self::Void { capability, .. } => capability.to_string(),
+                Self::Environment(EnvironmentSource { capability, .. }) => capability.to_string(),
+                Self::Void(VoidSource { capability, .. }) => capability.to_string(),
             }
         )
     }
 }
 
-const AGGREGATE_CAPABILITY_KEY_STR: &'static str = "aggregate_capability_key";
-const BUILTIN_STR: &'static str = "builtin";
-const CAPABILITY_SOURCE_KEY_STR: &'static str = "capability_source_key";
-const CAPABILITY_STR: &'static str = "capability";
-const COMPONENT_CAPABILITY_KEY_STR: &'static str = "component_capability_key";
-const COMPONENT_STR: &'static str = "component";
-const CONFIG_STR: &'static str = "config";
-const DEBUG_STR: &'static str = "debug";
-const DICTIONARY_STR: &'static str = "dictionary";
-const DIRECTORY_STR: &'static str = "directory";
-const ENVIRONMENT_CAPABILITY_VARIANT_STR: &'static str = "environment_capability_variant";
-const ENVIRONMENT_STR: &'static str = "environment";
-const EVENT_STREAM_STR: &'static str = "event_stream";
-const EXPOSE_STR: &'static str = "expose";
-const FRAMEWORK_STR: &'static str = "framework";
-const INTERNAL_CAPABILITY_KEY_STR: &'static str = "internal_capability_key";
-const MONIKER_STR: &'static str = "moniker";
-const NAMESPACE_STR: &'static str = "namespace";
-const OFFER_STR: &'static str = "offer";
-const PROTOCOL_STR: &'static str = "protocol";
-const RESOLVER_STR: &'static str = "resolver";
-const RUNNER_STR: &'static str = "runner";
-const SERVICE_STR: &'static str = "service";
-const SOURCE_NAME_STR: &'static str = "source_name";
-const SOURCE_STR: &'static str = "source";
-const STORAGE_STR: &'static str = "storage";
-const USE_STR: &'static str = "use";
-const VALUE_STR: &'static str = "value";
-const VOID_STR: &'static str = "void";
-
 impl TryFrom<CapabilitySource> for Capability {
     type Error = fidl::Error;
 
     fn try_from(capability_source: CapabilitySource) -> Result<Self, Self::Error> {
-        Ok(Capability::Dictionary(capability_source.try_into()?))
+        Ok(Capability::Data(Data::Bytes(persist(&capability_source.native_into_fidl())?)))
     }
 }
 
@@ -253,146 +327,10 @@ impl TryFrom<Capability> for CapabilitySource {
     type Error = fidl::Error;
 
     fn try_from(capability: Capability) -> Result<Self, Self::Error> {
-        let Capability::Dictionary(dictionary) = capability else {
+        let Capability::Data(Data::Bytes(bytes)) = capability else {
             return Err(fidl::Error::InvalidEnumValue);
         };
-        dictionary.try_into()
-    }
-}
-
-impl TryFrom<CapabilitySource> for Dict {
-    type Error = fidl::Error;
-
-    fn try_from(capability_source: CapabilitySource) -> Result<Self, Self::Error> {
-        fn insert_key(dict: &Dict, key: &str) {
-            dict.insert_capability(
-                &Name::new(CAPABILITY_SOURCE_KEY_STR).unwrap(),
-                Data::String(key.to_string()).into(),
-            )
-            .unwrap();
-        }
-        fn insert_capability_dict(
-            dict: &Dict,
-            try_into_dict: impl TryInto<Dict, Error = fidl::Error>,
-        ) -> Result<(), fidl::Error> {
-            dict.insert_capability(
-                &Name::new(CAPABILITY_STR).unwrap(),
-                Capability::Dictionary(try_into_dict.try_into()?),
-            )
-            .unwrap();
-            Ok(())
-        }
-        fn insert_moniker(dict: &Dict, moniker: Moniker) {
-            dict.insert_capability(
-                &Name::new(MONIKER_STR).unwrap(),
-                Data::String(moniker.to_string()).into(),
-            )
-            .unwrap();
-        }
-
-        let output = Dict::new();
-        match capability_source {
-            CapabilitySource::Component { capability, moniker } => {
-                insert_key(&output, COMPONENT_STR);
-                insert_capability_dict(&output, capability)?;
-                insert_moniker(&output, moniker)
-            }
-            CapabilitySource::Framework { capability, moniker } => {
-                insert_key(&output, FRAMEWORK_STR);
-                insert_capability_dict(&output, capability)?;
-                insert_moniker(&output, moniker)
-            }
-            CapabilitySource::Builtin { capability } => {
-                insert_key(&output, BUILTIN_STR);
-                insert_capability_dict(&output, capability)?;
-            }
-            CapabilitySource::Namespace { capability } => {
-                insert_key(&output, NAMESPACE_STR);
-                insert_capability_dict(&output, capability)?;
-            }
-            CapabilitySource::Capability { source_capability, moniker } => {
-                insert_key(&output, CAPABILITY_STR);
-                insert_capability_dict(&output, source_capability)?;
-                insert_moniker(&output, moniker)
-            }
-            CapabilitySource::Environment { capability, moniker } => {
-                insert_key(&output, ENVIRONMENT_STR);
-                insert_capability_dict(&output, capability)?;
-                insert_moniker(&output, moniker)
-            }
-            CapabilitySource::Void { capability, moniker } => {
-                insert_key(&output, VOID_STR);
-                insert_capability_dict(&output, capability)?;
-                insert_moniker(&output, moniker)
-            }
-            // The following three are only relevant for service capabilities, which are currently
-            // unsupported in the bedrock layer of routing.
-            CapabilitySource::AnonymizedAggregate { .. } => unimplemented!(),
-            CapabilitySource::FilteredProvider { .. } => unimplemented!(),
-            CapabilitySource::FilteredAggregateProvider { .. } => unimplemented!(),
-        }
-        Ok(output)
-    }
-}
-
-impl TryFrom<Dict> for CapabilitySource {
-    type Error = fidl::Error;
-
-    fn try_from(dict: Dict) -> Result<Self, Self::Error> {
-        fn get_capability_dict(dict: &Dict) -> Result<Dict, fidl::Error> {
-            let data = dict
-                .get(&Name::new(CAPABILITY_STR).unwrap())
-                .map_err(|_| fidl::Error::InvalidEnumValue)?;
-            let Some(Capability::Dictionary(capability_dict)) = data else {
-                return Err(fidl::Error::InvalidEnumValue);
-            };
-            Ok(capability_dict)
-        }
-        fn get_moniker(dict: &Dict) -> Result<Moniker, fidl::Error> {
-            let data = dict
-                .get(&Name::new(MONIKER_STR).unwrap())
-                .map_err(|_| fidl::Error::InvalidEnumValue)?;
-            let Some(Capability::Data(Data::String(moniker_str))) = data else {
-                return Err(fidl::Error::InvalidEnumValue);
-            };
-            moniker_str.as_str().try_into().map_err(|_| fidl::Error::InvalidEnumValue)
-        }
-
-        let key = dict
-            .get(&Name::new(CAPABILITY_SOURCE_KEY_STR).unwrap())
-            .map_err(|_| fidl::Error::InvalidEnumValue)?;
-        let Some(Capability::Data(Data::String(key))) = key else {
-            return Err(fidl::Error::InvalidEnumValue);
-        };
-        Ok(match key.as_str() {
-            COMPONENT_STR => CapabilitySource::Component {
-                capability: get_capability_dict(&dict)?.try_into()?,
-                moniker: get_moniker(&dict)?,
-            },
-            FRAMEWORK_STR => CapabilitySource::Framework {
-                capability: get_capability_dict(&dict)?.try_into()?,
-                moniker: get_moniker(&dict)?,
-            },
-            BUILTIN_STR => {
-                CapabilitySource::Builtin { capability: get_capability_dict(&dict)?.try_into()? }
-            }
-            NAMESPACE_STR => {
-                CapabilitySource::Namespace { capability: get_capability_dict(&dict)?.try_into()? }
-            }
-            CAPABILITY_STR => CapabilitySource::Capability {
-                source_capability: get_capability_dict(&dict)?.try_into()?,
-                moniker: get_moniker(&dict)?,
-            },
-            ENVIRONMENT_STR => CapabilitySource::Environment {
-                capability: get_capability_dict(&dict)?.try_into()?,
-                moniker: get_moniker(&dict)?,
-            },
-            VOID_STR => CapabilitySource::Void {
-                capability: get_capability_dict(&dict)?.try_into()?,
-                moniker: get_moniker(&dict)?,
-            },
-            _ => return Err(fidl::Error::InvalidEnumValue),
-        })
+        Ok(unpersist::<finternal::CapabilitySource>(&bytes)?.fidl_into_native())
     }
 }
 
@@ -462,7 +400,8 @@ impl fmt::Debug for Box<dyn FilteredAggregateCapabilityProvider> {
 /// Describes a capability provided by the component manager which could be a framework capability
 /// scoped to a realm, a built-in global capability, or a capability from component manager's own
 /// namespace.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(FidlDecl, Clone, Debug, PartialEq, Eq)]
+#[fidl_decl(fidl_union = "finternal::InternalCapability")]
 pub enum InternalCapability {
     Service(Name),
     Protocol(Name),
@@ -608,73 +547,11 @@ impl From<cm_rust::ConfigurationDecl> for InternalCapability {
     }
 }
 
-impl TryFrom<InternalCapability> for Dict {
-    type Error = fidl::Error;
-
-    fn try_from(capability: InternalCapability) -> Result<Self, Self::Error> {
-        let (key, value) = match capability {
-            InternalCapability::Service(name) => (SERVICE_STR, name),
-            InternalCapability::Protocol(name) => (PROTOCOL_STR, name),
-            InternalCapability::Directory(name) => (DIRECTORY_STR, name),
-            InternalCapability::Runner(name) => (RUNNER_STR, name),
-            InternalCapability::Config(name) => (CONFIG_STR, name),
-            InternalCapability::EventStream(name) => (EVENT_STREAM_STR, name),
-            InternalCapability::Resolver(name) => (RESOLVER_STR, name),
-            InternalCapability::Storage(name) => (STORAGE_STR, name),
-            InternalCapability::Dictionary(name) => (DICTIONARY_STR, name),
-        };
-        let output = Dict::new();
-        output
-            .insert_capability(
-                &Name::new(INTERNAL_CAPABILITY_KEY_STR).unwrap(),
-                Data::String(key.to_string()).into(),
-            )
-            .unwrap();
-        output
-            .insert_capability(
-                &Name::new(VALUE_STR).unwrap(),
-                Data::String(value.as_str().to_string()).into(),
-            )
-            .unwrap();
-        Ok(output)
-    }
-}
-
-impl TryFrom<Dict> for InternalCapability {
-    type Error = fidl::Error;
-
-    fn try_from(dict: Dict) -> Result<Self, Self::Error> {
-        let key = dict
-            .get(&Name::new(INTERNAL_CAPABILITY_KEY_STR).unwrap())
-            .map_err(|_| fidl::Error::InvalidEnumValue)?;
-        let value =
-            dict.get(&Name::new(VALUE_STR).unwrap()).map_err(|_| fidl::Error::InvalidEnumValue)?;
-        let Some(Capability::Data(Data::String(key))) = key else {
-            return Err(fidl::Error::InvalidEnumValue);
-        };
-        let Some(Capability::Data(Data::String(value))) = value else {
-            return Err(fidl::Error::InvalidEnumValue);
-        };
-        let name = Name::new(value).unwrap();
-        Ok(match key.as_str() {
-            SERVICE_STR => InternalCapability::Service(name),
-            PROTOCOL_STR => InternalCapability::Protocol(name),
-            DIRECTORY_STR => InternalCapability::Directory(name),
-            RUNNER_STR => InternalCapability::Runner(name),
-            CONFIG_STR => InternalCapability::Config(name),
-            EVENT_STREAM_STR => InternalCapability::EventStream(name),
-            RESOLVER_STR => InternalCapability::Resolver(name),
-            STORAGE_STR => InternalCapability::Storage(name),
-            DICTIONARY_STR => InternalCapability::Dictionary(name),
-            _ => panic!("unknown internal capability variant"),
-        })
-    }
-}
-
 /// A capability being routed from a component.
-#[derive(FromEnum, Clone, Debug, PartialEq, Eq)]
+#[derive(FidlDecl, FromEnum, Clone, Debug, PartialEq, Eq)]
+#[fidl_decl(fidl_union = "finternal::ComponentCapability")]
 pub enum ComponentCapability {
-    Use(UseDecl),
+    Use_(UseDecl),
     /// Models a capability used from the environment.
     Environment(EnvironmentCapability),
     Expose(ExposeDecl),
@@ -694,7 +571,7 @@ impl ComponentCapability {
     /// Returns whether the given ComponentCapability can be available in a component's namespace.
     pub fn can_be_in_namespace(&self) -> bool {
         match self {
-            ComponentCapability::Use(use_) => {
+            ComponentCapability::Use_(use_) => {
                 matches!(use_, UseDecl::Protocol(_) | UseDecl::Directory(_) | UseDecl::Service(_))
             }
             ComponentCapability::Expose(expose) => matches!(
@@ -715,11 +592,11 @@ impl ComponentCapability {
     /// Returns a name for the capability type.
     pub fn type_name(&self) -> CapabilityTypeName {
         match self {
-            ComponentCapability::Use(use_) => use_.into(),
+            ComponentCapability::Use_(use_) => use_.into(),
             ComponentCapability::Environment(env) => match env {
-                EnvironmentCapability::Runner { .. } => CapabilityTypeName::Runner,
-                EnvironmentCapability::Resolver { .. } => CapabilityTypeName::Resolver,
-                EnvironmentCapability::Debug { .. } => CapabilityTypeName::Protocol,
+                EnvironmentCapability::Runner(_) => CapabilityTypeName::Runner,
+                EnvironmentCapability::Resolver(_) => CapabilityTypeName::Resolver,
+                EnvironmentCapability::Debug(_) => CapabilityTypeName::Protocol,
             },
             ComponentCapability::Expose(expose) => expose.into(),
             ComponentCapability::Offer(offer) => offer.into(),
@@ -760,7 +637,7 @@ impl ComponentCapability {
             ComponentCapability::Service(service) => Some(&service.name),
             ComponentCapability::EventStream(event) => Some(&event.name),
             ComponentCapability::Dictionary(dictionary) => Some(&dictionary.name),
-            ComponentCapability::Use(use_) => match use_ {
+            ComponentCapability::Use_(use_) => match use_ {
                 UseDecl::Protocol(UseProtocolDecl { source_name, .. }) => Some(source_name),
                 UseDecl::Directory(UseDirectoryDecl { source_name, .. }) => Some(source_name),
                 UseDecl::Storage(UseStorageDecl { source_name, .. }) => Some(source_name),
@@ -771,9 +648,15 @@ impl ComponentCapability {
                 _ => None,
             },
             ComponentCapability::Environment(env_cap) => match env_cap {
-                EnvironmentCapability::Runner { source_name, .. } => Some(source_name),
-                EnvironmentCapability::Resolver { source_name, .. } => Some(source_name),
-                EnvironmentCapability::Debug { source_name, .. } => Some(source_name),
+                EnvironmentCapability::Runner(EnvironmentCapabilityData {
+                    source_name, ..
+                }) => Some(source_name),
+                EnvironmentCapability::Resolver(EnvironmentCapabilityData {
+                    source_name, ..
+                }) => Some(source_name),
+                EnvironmentCapability::Debug(EnvironmentCapabilityData { source_name, .. }) => {
+                    Some(source_name)
+                }
             },
             ComponentCapability::Expose(expose) => match expose {
                 ExposeDecl::Protocol(ExposeProtocolDecl { source_name, .. }) => Some(source_name),
@@ -814,7 +697,7 @@ impl ComponentCapability {
                 source: ExposeSource::Capability(name),
                 ..
             })) => Some(name),
-            ComponentCapability::Use(UseDecl::Protocol(UseProtocolDecl {
+            ComponentCapability::Use_(UseDecl::Protocol(UseProtocolDecl {
                 source: UseSource::Capability(name),
                 ..
             })) => Some(name),
@@ -853,217 +736,35 @@ impl fmt::Display for ComponentCapability {
     }
 }
 
-impl TryFrom<ComponentCapability> for Dict {
-    type Error = fidl::Error;
-
-    fn try_from(capability: ComponentCapability) -> Result<Self, Self::Error> {
-        let (key, value) = match capability {
-            ComponentCapability::Use(decl) => {
-                (USE_STR, Data::Bytes(persist(&decl.native_into_fidl())?).into())
-            }
-            ComponentCapability::Environment(env_cap) => {
-                (ENVIRONMENT_STR, Capability::Dictionary(env_cap.try_into()?))
-            }
-            ComponentCapability::Expose(decl) => {
-                (EXPOSE_STR, Data::Bytes(persist(&decl.native_into_fidl())?).into())
-            }
-            ComponentCapability::Offer(decl) => {
-                (OFFER_STR, Data::Bytes(persist(&decl.native_into_fidl())?).into())
-            }
-            ComponentCapability::Protocol(decl) => {
-                (PROTOCOL_STR, Data::Bytes(persist(&decl.native_into_fidl())?).into())
-            }
-            ComponentCapability::Directory(decl) => {
-                (DIRECTORY_STR, Data::Bytes(persist(&decl.native_into_fidl())?).into())
-            }
-            ComponentCapability::Storage(decl) => {
-                (STORAGE_STR, Data::Bytes(persist(&decl.native_into_fidl())?).into())
-            }
-            ComponentCapability::Runner(decl) => {
-                (RUNNER_STR, Data::Bytes(persist(&decl.native_into_fidl())?).into())
-            }
-            ComponentCapability::Resolver(decl) => {
-                (RESOLVER_STR, Data::Bytes(persist(&decl.native_into_fidl())?).into())
-            }
-            ComponentCapability::Service(decl) => {
-                (SERVICE_STR, Data::Bytes(persist(&decl.native_into_fidl())?).into())
-            }
-            ComponentCapability::EventStream(decl) => {
-                (EVENT_STREAM_STR, Data::Bytes(persist(&decl.native_into_fidl())?).into())
-            }
-            ComponentCapability::Dictionary(decl) => {
-                (DICTIONARY_STR, Data::Bytes(persist(&decl.native_into_fidl())?).into())
-            }
-            ComponentCapability::Config(decl) => {
-                (CONFIG_STR, Data::Bytes(persist(&decl.native_into_fidl())?).into())
-            }
-        };
-        let output = Dict::new();
-        output
-            .insert_capability(
-                &Name::new(COMPONENT_CAPABILITY_KEY_STR).unwrap(),
-                Data::String(key.to_string()).into(),
-            )
-            .unwrap();
-        output.insert_capability(&Name::new(VALUE_STR).unwrap(), value).unwrap();
-        Ok(output)
-    }
-}
-
-impl TryFrom<Dict> for ComponentCapability {
-    type Error = fidl::Error;
-
-    fn try_from(dict: Dict) -> Result<Self, Self::Error> {
-        let key = dict
-            .get(&Name::new(COMPONENT_CAPABILITY_KEY_STR).unwrap())
-            .map_err(|_| fidl::Error::InvalidEnumValue)?;
-        let value =
-            dict.get(&Name::new(VALUE_STR).unwrap()).map_err(|_| fidl::Error::InvalidEnumValue)?;
-        let Some(Capability::Data(Data::String(key))) = key else {
-            return Err(fidl::Error::InvalidEnumValue);
-        };
-        if let Some(Capability::Dictionary(dict)) = value {
-            if key.as_str() != ENVIRONMENT_STR {
-                return Err(fidl::Error::InvalidEnumValue);
-            }
-            return Ok(ComponentCapability::Environment(dict.try_into()?));
-        }
-        let Some(Capability::Data(Data::Bytes(value))) = value else {
-            return Err(fidl::Error::InvalidEnumValue);
-        };
-        Ok(match key.as_str() {
-            USE_STR => {
-                ComponentCapability::Use(unpersist::<fdecl::Use>(&value)?.fidl_into_native())
-            }
-            EXPOSE_STR => {
-                ComponentCapability::Expose(unpersist::<fdecl::Expose>(&value)?.fidl_into_native())
-            }
-            OFFER_STR => {
-                ComponentCapability::Offer(unpersist::<fdecl::Offer>(&value)?.fidl_into_native())
-            }
-            PROTOCOL_STR => ComponentCapability::Protocol(
-                unpersist::<fdecl::Protocol>(&value)?.fidl_into_native(),
-            ),
-            DIRECTORY_STR => ComponentCapability::Directory(
-                unpersist::<fdecl::Directory>(&value)?.fidl_into_native(),
-            ),
-            STORAGE_STR => ComponentCapability::Storage(
-                unpersist::<fdecl::Storage>(&value)?.fidl_into_native(),
-            ),
-            RUNNER_STR => {
-                ComponentCapability::Runner(unpersist::<fdecl::Runner>(&value)?.fidl_into_native())
-            }
-            RESOLVER_STR => ComponentCapability::Resolver(
-                unpersist::<fdecl::Resolver>(&value)?.fidl_into_native(),
-            ),
-            SERVICE_STR => ComponentCapability::Service(
-                unpersist::<fdecl::Service>(&value)?.fidl_into_native(),
-            ),
-            EVENT_STREAM_STR => ComponentCapability::EventStream(
-                unpersist::<fdecl::EventStream>(&value)?.fidl_into_native(),
-            ),
-            DICTIONARY_STR => ComponentCapability::Dictionary(
-                unpersist::<fdecl::Dictionary>(&value)?.fidl_into_native(),
-            ),
-            CONFIG_STR => ComponentCapability::Config(
-                unpersist::<fdecl::Configuration>(&value)?.fidl_into_native(),
-            ),
-            _ => panic!("unknown component capability variant"),
-        })
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(FidlDecl, Clone, Debug, PartialEq, Eq)]
+#[fidl_decl(fidl_union = "finternal::EnvironmentCapability")]
 pub enum EnvironmentCapability {
-    Runner { source_name: Name, source: RegistrationSource },
-    Resolver { source_name: Name, source: RegistrationSource },
-    Debug { source_name: Name, source: RegistrationSource },
+    Runner(EnvironmentCapabilityData),
+    Resolver(EnvironmentCapabilityData),
+    Debug(EnvironmentCapabilityData),
 }
 
 impl EnvironmentCapability {
     pub fn registration_source(&self) -> &RegistrationSource {
         match self {
-            Self::Runner { source, .. }
-            | Self::Resolver { source, .. }
-            | Self::Debug { source, .. } => &source,
+            Self::Runner(EnvironmentCapabilityData { source, .. })
+            | Self::Resolver(EnvironmentCapabilityData { source, .. })
+            | Self::Debug(EnvironmentCapabilityData { source, .. }) => &source,
         }
     }
 }
 
-impl TryFrom<EnvironmentCapability> for Dict {
-    type Error = fidl::Error;
-
-    fn try_from(capability: EnvironmentCapability) -> Result<Self, Self::Error> {
-        let (variant, source_name, source) = match capability {
-            EnvironmentCapability::Runner { source_name, source } => {
-                (RUNNER_STR, source_name, source)
-            }
-            EnvironmentCapability::Resolver { source_name, source } => {
-                (RESOLVER_STR, source_name, source)
-            }
-            EnvironmentCapability::Debug { source_name, source } => {
-                (DEBUG_STR, source_name, source)
-            }
-        };
-        let output = Dict::new();
-        output
-            .insert_capability(
-                &Name::new(ENVIRONMENT_CAPABILITY_VARIANT_STR).unwrap(),
-                Data::String(variant.to_string()).into(),
-            )
-            .unwrap();
-        output
-            .insert_capability(
-                &Name::new(SOURCE_NAME_STR).unwrap(),
-                Data::String(source_name.as_str().to_string()).into(),
-            )
-            .unwrap();
-        output
-            .insert_capability(
-                &Name::new(SOURCE_STR).unwrap(),
-                Data::Bytes(persist(&source.native_into_fidl())?).into(),
-            )
-            .unwrap();
-        Ok(output)
-    }
-}
-
-impl TryFrom<Dict> for EnvironmentCapability {
-    type Error = fidl::Error;
-
-    fn try_from(dict: Dict) -> Result<Self, Self::Error> {
-        let variant = dict
-            .get(&Name::new(ENVIRONMENT_CAPABILITY_VARIANT_STR).unwrap())
-            .map_err(|_| fidl::Error::InvalidEnumValue)?;
-        let source_name = dict
-            .get(&Name::new(SOURCE_NAME_STR).unwrap())
-            .map_err(|_| fidl::Error::InvalidEnumValue)?;
-        let source =
-            dict.get(&Name::new(SOURCE_STR).unwrap()).map_err(|_| fidl::Error::InvalidEnumValue)?;
-
-        let Some(Capability::Data(Data::String(variant))) = variant else {
-            return Err(fidl::Error::InvalidEnumValue);
-        };
-        let Some(Capability::Data(Data::String(source_name))) = source_name else {
-            return Err(fidl::Error::InvalidEnumValue);
-        };
-        let Some(Capability::Data(Data::Bytes(source))) = source else {
-            return Err(fidl::Error::InvalidEnumValue);
-        };
-        let source_name = Name::new(source_name).map_err(|_e| fidl::Error::InvalidEnumValue)?;
-        let source: RegistrationSource = unpersist::<fdecl::Ref>(&source)?.fidl_into_native();
-        Ok(match variant.as_str() {
-            RUNNER_STR => EnvironmentCapability::Runner { source_name, source },
-            RESOLVER_STR => EnvironmentCapability::Resolver { source_name, source },
-            DEBUG_STR => EnvironmentCapability::Debug { source_name, source },
-            _ => panic!("unknown environment capability variant"),
-        })
-    }
+#[derive(FidlDecl, Clone, Debug, PartialEq, Eq)]
+#[fidl_decl(fidl_table = "finternal::EnvironmentSource")]
+pub struct EnvironmentCapabilityData {
+    source_name: Name,
+    source: RegistrationSource,
 }
 
 /// Describes a capability provided by component manager that is an aggregation
 /// of multiple instances of a capability.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(FidlDecl, Debug, Clone, PartialEq, Eq, Hash)]
+#[fidl_decl(fidl_union = "finternal::AggregateCapability")]
 pub enum AggregateCapability {
     Service(Name),
 }
@@ -1097,53 +798,6 @@ impl fmt::Display for AggregateCapability {
 impl From<ServiceDecl> for AggregateCapability {
     fn from(service: ServiceDecl) -> Self {
         Self::Service(service.name)
-    }
-}
-
-impl TryFrom<AggregateCapability> for Dict {
-    type Error = fidl::Error;
-
-    fn try_from(capability: AggregateCapability) -> Result<Self, Self::Error> {
-        let (key, value) = match capability {
-            AggregateCapability::Service(name) => (SERVICE_STR, name),
-        };
-        let output = Dict::new();
-        output
-            .insert_capability(
-                &Name::new(AGGREGATE_CAPABILITY_KEY_STR).unwrap(),
-                Data::String(key.to_string()).into(),
-            )
-            .unwrap();
-        output
-            .insert_capability(
-                &Name::new(VALUE_STR).unwrap(),
-                Data::String(value.as_str().to_string()).into(),
-            )
-            .unwrap();
-        Ok(output)
-    }
-}
-
-impl TryFrom<Dict> for AggregateCapability {
-    type Error = fidl::Error;
-
-    fn try_from(dict: Dict) -> Result<Self, Self::Error> {
-        let key = dict
-            .get(&Name::new(AGGREGATE_CAPABILITY_KEY_STR).unwrap())
-            .map_err(|_| fidl::Error::InvalidEnumValue)?;
-        let value =
-            dict.get(&Name::new(VALUE_STR).unwrap()).map_err(|_| fidl::Error::InvalidEnumValue)?;
-        let Some(Capability::Data(Data::String(key))) = key else {
-            return Err(fidl::Error::InvalidEnumValue);
-        };
-        let Some(Capability::Data(Data::String(value))) = value else {
-            return Err(fidl::Error::InvalidEnumValue);
-        };
-        let name = Name::new(value).unwrap();
-        Ok(match key.as_str() {
-            SERVICE_STR => AggregateCapability::Service(name),
-            _ => panic!("unknown aggregate capability variant"),
-        })
     }
 }
 

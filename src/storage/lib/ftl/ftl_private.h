@@ -10,8 +10,8 @@
 #include <zircon/assert.h>
 #include <zircon/compiler.h>
 
-#include "ftl.h"
-#include "utils/kernel.h"  // For SEM definition.
+#include "src/storage/lib/ftl/ftl.h"
+#include "src/storage/lib/ftl/utils/kernel.h"  // For SEM definition.
 
 //
 // Configuration.

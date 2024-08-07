@@ -13,8 +13,6 @@ rustc_test("interfaces") {
     "//sdk/fidl/fuchsia.net.interfaces:fuchsia.net.interfaces_rust",
     "//sdk/fidl/fuchsia.net.interfaces.admin:fuchsia.net.interfaces.admin_rust",
     "//sdk/fidl/fuchsia.net.root:fuchsia.net.root_rust",
-    "//sdk/fidl/fuchsia.net.stack:fuchsia.net.stack_rust",
-    "//src/connectivity/lib/fidl_fuchsia_net_stack_ext",
     "//src/connectivity/lib/net-declare",
     "//src/connectivity/lib/net-types",
     "//src/connectivity/network/testing/netemul/rust:lib",

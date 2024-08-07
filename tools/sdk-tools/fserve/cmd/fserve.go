@@ -232,22 +232,14 @@ func main() {
 		}
 
 		if *privateKeyFlag != "" {
-			// TODO(https://fxbug.dev/42177611): We switched this flag from being an error
-			// to a warning with the ffx repository server to fix some integration
-			// tests.  Once that is fixed we should switch these back to being an
-			// error.
-			log.Warningf(
+			log.Errorf(
 				"`repository.server.mode ffx` does not support `-private-key` "+
 					"Instead, if a specific private key is needed for ffx to communicate with the device, run: "+
 					"`ffx config add ssh.priv %s && ffx doctor --restart-daemon`", *privateKeyFlag)
 		}
 
 		if *sshConfigFlag != "" {
-			// TODO(https://fxbug.dev/42177611): We switched this flag from being an error
-			// to a warning with the ffx repository server to fix some integration
-			// tests.  Once that is fixed we should switch these back to being an
-			// error.
-			log.Warningf("`server-mode ffx` does not support customizing the SSH config settings with `-sshconfig`")
+			log.Errorf("`server-mode ffx` does not support customizing the SSH config settings with `-sshconfig`")
 		}
 
 		if err = killFFXServer(ctx, sdk); err != nil {

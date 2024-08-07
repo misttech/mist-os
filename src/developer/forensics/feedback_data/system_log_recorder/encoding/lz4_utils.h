@@ -5,6 +5,7 @@
 #ifndef SRC_DEVELOPER_FORENSICS_FEEDBACK_DATA_SYSTEM_LOG_RECORDER_ENCODING_LZ4_UTILS_H_
 #define SRC_DEVELOPER_FORENSICS_FEEDBACK_DATA_SYSTEM_LOG_RECORDER_ENCODING_LZ4_UTILS_H_
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
 
@@ -29,7 +30,7 @@ static_assert(LZ4_COMPRESSBOUND(kMaxEncodeSize) == kMaxChunkSize,
 static_assert(LZ4_COMPRESSBOUND(kMaxChunkSize) < UINT16_MAX,
               "The encoded chunk size could not fit in 2 bytes!");
 
-static_assert(kMaxChunkSize < 64 * 1024,
+static_assert(kMaxChunkSize < static_cast<size_t>(64 * 1024),
               "Lz4 utilizes the last 64KB for its algorithm; there is little to no gain for making "
               "a chunk > 64KB.");
 
@@ -60,7 +61,8 @@ inline std::string EncodeSize(uint16_t size) {
 //
 // Note: we do not cast directly into uint16_t to avoid alignment issues.
 inline uint16_t DecodeSize(const char** data_ptr) {
-  uint16_t size = (uint16_t)((unsigned char)(*data_ptr)[0] << 8) + (unsigned char)(*data_ptr)[1];
+  uint16_t size = static_cast<uint16_t>(static_cast<unsigned char>((*data_ptr)[0]) << 8) +
+                  static_cast<unsigned char>((*data_ptr)[1]);
   *data_ptr += 2;
   return size;
 }

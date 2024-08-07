@@ -819,7 +819,7 @@
     {
         "kind": "enum",
         "name": "fuchsia.io/DirentType",
-        "strictness": "strict",
+        "strictness": "flexible",
         "type": "uint8"
     },
     {
@@ -2002,7 +2002,7 @@
     {
         "kind": "bits",
         "name": "fuchsia.io/NodeAttributesQuery",
-        "strictness": "strict",
+        "strictness": "flexible",
         "type": "uint64"
     },
     {
@@ -2434,7 +2434,7 @@
     {
         "kind": "bits",
         "name": "fuchsia.io/UnlinkFlags",
-        "strictness": "strict",
+        "strictness": "flexible",
         "type": "uint64"
     },
     {

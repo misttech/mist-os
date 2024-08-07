@@ -27,7 +27,6 @@ test("ftl-test") {
     "//src/devices/block/drivers/ftl/tests:shared",
     "//src/lib/fxl/test:gtest_main",
     "//src/storage/lib/ftl",
-    "//src/storage/lib/ftl:private_headers",
     "//third_party/googletest:gtest",
   ]
   defines = [ "NDM_DEBUG" ]
@@ -42,6 +41,5 @@ source_set("ftl-workload-fuzzer") {
   deps = [
     "//src/devices/block/drivers/ftl/tests:shared",
     "//src/storage/lib/ftl",
-    "//src/storage/lib/ftl:private_headers",
   ]
 }

@@ -26,7 +26,7 @@ use ::routing::bedrock::sandbox_construction::{
     self, build_component_sandbox, extend_dict_with_offers, ComponentSandbox,
 };
 use ::routing::bedrock::structured_dict::{ComponentInput, StructuredDictMap};
-use ::routing::capability_source::{CapabilitySource, ComponentCapability};
+use ::routing::capability_source::{CapabilitySource, ComponentCapability, ComponentSource};
 use ::routing::component_instance::{
     ComponentInstanceInterface, ResolvedInstanceInterface, ResolvedInstanceInterfaceExt,
 };
@@ -581,7 +581,7 @@ impl ResolvedInstanceState {
                 self.resolved_component.package.as_ref(),
                 &component,
                 &self.resolved_component.decl,
-                &self.sandbox.program_input_dict,
+                &self.sandbox.program_input.namespace,
                 component.execution_scope.clone(),
             )
             .await?;
@@ -1276,10 +1276,10 @@ impl Routable for CapabilityRequestedHook {
         });
         source.hooks.dispatch(&event).await;
         let capability = if request.debug {
-            CapabilitySource::Component {
+            CapabilitySource::Component(ComponentSource {
                 capability: self.capability_decl.clone().into(),
                 moniker: self.source.moniker.clone(),
-            }
+            })
             .try_into()
             .expect("failed to convert capability source to dictionary")
         } else if receiver.is_taken() {
@@ -1301,10 +1301,10 @@ struct ProgramRouter {
 impl Routable for ProgramRouter {
     async fn route(&self, request: Request) -> Result<Capability, RouterError> {
         if request.debug {
-            let source = CapabilitySource::Component {
+            let source = CapabilitySource::Component(ComponentSource {
                 capability: self.capability.clone(),
                 moniker: self.component.moniker.clone(),
-            };
+            });
             return Ok(source
                 .try_into()
                 .expect("failed to convert capability source to dictionary"));

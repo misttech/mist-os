@@ -187,7 +187,11 @@ def print_build_summary(lines: Iterable[str], reproxy_logdir: str) -> int:
             )
             status_metrics[metric_name][action_category] = counts_by_value
 
-        if "Downloaded" in metric_name or "Uploaded" in metric_name:
+        if (
+            "Downloaded" in metric_name
+            or "Uploaded" in metric_name
+            or "TotalOutputBytes" in metric_name
+        ):
             # pre-format size numbers into readable str.
             # No need for any math operations on these values.
             readable_size = tablefmt.human_readable_size(
@@ -217,6 +221,12 @@ def print_build_summary(lines: Iterable[str], reproxy_logdir: str) -> int:
             with_totals=True,
         ),
         blank_row,
+        *build_metric_row(
+            "OutputBytes",
+            bandwidth_metrics["RemoteMetadata.TotalOutputBytes"],
+            ordered_action_categories,
+            include_header=False,
+        ),
         *build_metric_row(
             "BytesDownloaded",
             bandwidth_metrics["RemoteMetadata.RealBytesDownloaded"],

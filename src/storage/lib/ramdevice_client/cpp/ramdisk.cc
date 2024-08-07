@@ -6,10 +6,12 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <fidl/fuchsia.device/cpp/wire.h>
+#include <fidl/fuchsia.hardware.block.volume/cpp/wire.h>
 #include <fidl/fuchsia.hardware.block/cpp/wire.h>
 #include <fidl/fuchsia.hardware.ramdisk/cpp/wire.h>
 #include <inttypes.h>
 #include <lib/component/incoming/cpp/protocol.h>
+#include <lib/component/incoming/cpp/service.h>
 #include <lib/device-watcher/cpp/device-watcher.h>
 #include <lib/fdio/cpp/caller.h>
 #include <lib/fdio/directory.h>
@@ -112,7 +114,32 @@ struct ramdisk_client {
     return ZX_OK;
   }
 
+  static zx_status_t CreateV2(fidl::ClientEnd<fuchsia_io::Directory> outgoing_directory,
+                              zx::eventpair lifeline, std::unique_ptr<ramdisk_client>* out) {
+    auto [svc_dir, server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
+    if (zx_status_t status = fdio_open_at(outgoing_directory.channel().get(), "svc", 0,
+                                          server.TakeChannel().release());
+        status != ZX_OK)
+      return status;
+
+    zx::result ramdisk_interface = component::ConnectAt<fuchsia_hardware_ramdisk::Ramdisk>(svc_dir);
+    if (ramdisk_interface.is_error())
+      return ramdisk_interface.status_value();
+
+    zx::result volume_interface =
+        component::ConnectAt<fuchsia_hardware_block_volume::Volume>(svc_dir);
+    if (volume_interface.is_error())
+      return volume_interface.status_value();
+    fidl::ClientEnd<fuchsia_hardware_block::Block> block_interface(volume_interface->TakeChannel());
+
+    *out = std::unique_ptr<ramdisk_client>(new ramdisk_client(
+        *std::move(ramdisk_interface), std::move(block_interface), std::move(lifeline)));
+    return ZX_OK;
+  }
+
   zx_status_t Rebind() {
+    if (!block_controller_)
+      return ZX_ERR_NOT_SUPPORTED;
     const fidl::WireResult result = fidl::WireCall(block_controller_)->Rebind({});
     if (!result.ok()) {
       return result.status();
@@ -156,9 +183,12 @@ struct ramdisk_client {
       return ZX_ERR_BAD_STATE;
     }
 
-    if (zx_status_t status = DestroyByHandle(ramdisk_controller_); status != ZX_OK) {
-      return status;
+    if (ramdisk_controller_) {
+      if (zx_status_t status = DestroyByHandle(ramdisk_controller_); status != ZX_OK) {
+        return status;
+      }
     }
+
     block_interface_.reset();
     return ZX_OK;
   }
@@ -209,6 +239,13 @@ struct ramdisk_client {
         block_interface_(std::move(block_interface)),
         block_controller_(std::move(block_controller)) {}
 
+  ramdisk_client(fidl::ClientEnd<fuchsia_hardware_ramdisk::Ramdisk> ramdisk_interface,
+                 fidl::ClientEnd<fuchsia_hardware_block::Block> block_interface,
+                 zx::eventpair lifeline)
+      : ramdisk_interface_(std::move(ramdisk_interface)),
+        block_interface_(std::move(block_interface)),
+        lifeline_(std::move(lifeline)) {}
+
   static zx_status_t DestroyByHandle(fidl::ClientEnd<fuchsia_device::Controller>& ramdisk) {
     const fidl::WireResult result = fidl::WireCall(ramdisk)->ScheduleUnbind();
     if (!result.ok()) {
@@ -230,6 +267,9 @@ struct ramdisk_client {
   fidl::ClientEnd<fuchsia_device::Controller> ramdisk_controller_;
   fidl::ClientEnd<fuchsia_hardware_block::Block> block_interface_;
   fidl::ClientEnd<fuchsia_device::Controller> block_controller_;
+
+  // v2 only:
+  zx::eventpair lifeline_;
 };
 
 static zx::result<fidl::ClientEnd<fuchsia_hardware_ramdisk::RamdiskController>> open_ramctl(
@@ -440,4 +480,72 @@ zx_status_t ramdisk_forget(ramdisk_client* client) {
   zx_status_t status = client->Forget();
   delete client;
   return status;
+}
+
+__EXPORT
+zx_status_t ramdisk_create_with_options(const ramdisk_options* options, ramdisk_client_t** out) {
+  zx::vmo vmo(options->vmo);
+  if (options->v2) {
+    fbl::unique_fd dir(open("/svc/fuchsia.hardware.ramdisk.Service", O_RDONLY));
+    if (!dir)
+      return ZX_ERR_NOT_FOUND;
+    std::string instance_name;
+    zx_status_t status = fdio_watch_directory(
+        dir.get(),
+        [](int, int event, const char* name, void* cookie) {
+          if (event == WATCH_EVENT_ADD_FILE && strcmp(name, ".") != 0) {
+            *reinterpret_cast<std::string*>(cookie) = name;
+            return ZX_ERR_STOP;
+          } else {
+            return ZX_OK;
+          }
+        },
+        ZX_TIME_INFINITE, &instance_name);
+    if (status != ZX_ERR_STOP)
+      return status == ZX_OK ? ZX_ERR_NOT_FOUND : status;
+    zx::result service = component::OpenService<fuchsia_hardware_ramdisk::Service>(instance_name);
+    if (service.is_error())
+      return service.status_value();
+    zx::result controller = service->connect_controller();
+    if (controller.is_error())
+      return controller.status_value();
+
+    fidl::Arena arena;
+    auto fidl_options = fuchsia_hardware_ramdisk::wire::Options::Builder(arena);
+    if (options->block_size > 0)
+      fidl_options.block_size(options->block_size);
+    if (options->block_count > 0)
+      fidl_options.block_count(options->block_count);
+    if (options->type_guid) {
+      fuchsia_hardware_ramdisk::wire::Guid guid;
+      memcpy(&guid.value.data_, options->type_guid, 16);
+      fidl_options.type_guid(guid);
+    }
+    if (options->vmo)
+      fidl_options.vmo(std::move(vmo));
+    const fidl::WireResult result = fidl::WireCall(*controller)->Create(fidl_options.Build());
+    if (!result.ok())
+      return result.status();
+    fit::result response = result.value();
+    if (response.is_error())
+      return response.error_value();
+    std::unique_ptr<ramdisk_client> client;
+    if (zx_status_t status = ramdisk_client::CreateV2(std::move(response->outgoing),
+                                                      std::move(response->lifeline), &client);
+        status != ZX_OK) {
+      return status;
+    }
+    *out = client.release();
+    return ZX_OK;
+  } else {
+    static constexpr uint8_t null_type_guid[16] = {0};
+    const uint8_t* type_guid = options->type_guid ? options->type_guid : null_type_guid;
+    if (vmo.is_valid()) {
+      return ramdisk_create_from_vmo_with_params(vmo.release(), options->block_size, type_guid, 16,
+                                                 out);
+    } else {
+      return ramdisk_create_with_guid(options->block_size, options->block_count, type_guid, 16,
+                                      out);
+    }
+  }
 }

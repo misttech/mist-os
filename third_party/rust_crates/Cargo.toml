@@ -143,19 +143,14 @@ memchr = "2.7.1"
 memoffset = "0.7.1"
 miniz_oxide = "0.3.6"
 mockall = "0.9"
-netlink-packet-core = "0.7.0"
-netlink-packet-route = "0.20.0"
-netlink-packet-sock-diag = "0.4.2"
-netlink-packet-utils = "0.5.2"
-netlink-packet-generic = "0.3.3"
 nix = "0.26.2"
 nom = { version = "5.0.0", default-features = false, features = ["std", "regexp_macros"] }
 nom_locate = "2.0.0"
 num = { version = "0.4.0", features = ["rand"] }
 num-derive = "0.4.2"
 num-traits = "0.2.18"
-omaha_client = "0.1"
-once_cell = "1.17.0"
+omaha_client = "0.2"
+once_cell = "1.17.1"
 nu-ansi-term = "0.46.0"
 overload = "0.1.1"
 p256 = { version = "0.11.1", features = ["pem", "serde"] }
@@ -294,7 +289,7 @@ loom = "0.7.1"
 mio = { version = "0.8.9", features = ["net", "os-ext", "os-poll"] }
 notify = { version = "5.1.0", default-features = false, features = ["macos_fsevent"] }
 # See b/42169853, not used for target-side code to avoid system-wide impact of yield in spinloops.
-parking_lot = "0.9"
+parking_lot = "0.12.0"
 petgraph = { version = "0.6.2" }
 proc-macro2 = { version = "1.0.86", features = ["span-locations"] }
 pulldown-cmark = { version = "0.9.3", features = ["serde"] }
@@ -355,8 +350,6 @@ output_vt100 = { path = "empty/output_vt100" }
 pkg-config = { path = "empty/pkg-config" }
 redox_syscall = { path = "empty/redox_syscall" }
 rustversion = { path = "empty/rustversion" }
-wasi-0_10_1 = { path = "empty/wasi-0.10.1", package = "wasi" }
-wasi-0_10_0_preview1 = { path = "empty/wasi-0.10.0+wasi-snapshot-preview1", package = "wasi" }
 wasi-0_11_0_preview1 = { path = "empty/wasi-0.11.0+wasi-snapshot-preview1", package = "wasi" }
 wasm-bindgen = { path = "empty/wasm-bindgen" }
 web-sys = { path = "empty/web-sys" }
@@ -378,8 +371,6 @@ fatfs = { path = "forks/fatfs" }
 fuse3 = { path = "forks/fuse3" }
 hound = { path = "forks/hound" }
 libm = { path = "forks/libm" }
-# FIXME(121001): Revert once pull request is accepted and rolled into a crates.io release.
-nix = { path = "forks/nix" }
 notify = { path = "forks/notify" }
 # FIXME(118248): We can unfork once undefined behavior is resolved.
 prettytable-rs = { path = "forks/prettytable-rs" }
@@ -388,11 +379,6 @@ prettytable-rs = { path = "forks/prettytable-rs" }
 # tokio to 1.x.
 rustls = { path = "forks/rustls" }
 rustyline = { path = "forks/rustyline" }
-netlink-packet-route = { path="forks/netlink-packet-route" }
-netlink-packet-utils = { path="forks/netlink-packet-utils-0.5.2" }
-netlink-packet-core = {path = "forks/netlink-packet-core-0.7.0"}
-netlink-packet-sock-diag = {path = "forks/netlink-packet-sock-diag-0.4.2"}
-netlink-packet-generic = {path = "forks/netlink-packet-generic-0.3.3"}
 security-framework = { path = "forks/security-framework" }
 tracing-core = { path = "forks/tracing-core" }
 zeroize = { path = "forks/zeroize" }
@@ -575,6 +561,9 @@ rustflags = ["--cfg=httparse_simd"]
 [gn.package.indexmap."1.9.2"]
 rustflags = ["--cfg=has_std"]
 
+[gn.package.lazy_static."1.4.0"]
+group_visibility = { import = "//third_party/rust_crates/visibility.gni", variable = "lazy_static_visibility" }
+
 [gn.package.libc."0.2.149"]
 rustflags = [
   "--cfg=libc_priv_mod_use",
@@ -607,9 +596,6 @@ rustflags = ["--cfg=has_const_fn_trait_bound"]
 [gn.package.loom."0.7.1"]
 deps = [ "//build/validate:non_production_tag" ]
 testonly = true
-
-[gn.package.maybe-uninit."2.0.0"]
-rustflags = ["--cfg=derive_copy", "--cfg=repr_transparent", "--cfg=native_uninit"]
 
 [gn.package.md-5."0.10.5"]
 group_visibility = { import = "//third_party/rust_crates/visibility.gni", variable = "md5_visibility" }
@@ -668,12 +654,12 @@ rustflags = [
   "--cfg=has_total_cmp",
 ]
 
-[gn.package.parking_lot."0.9.0"]
+[gn.package.once_cell."1.17.1"]
+group_visibility = { import = "//third_party/rust_crates/visibility.gni", variable = "once_cell_visibility" }
+
+[gn.package.parking_lot."0.12.0"]
 # Funnel usage of parking_lot through fuchsia_sync.
 visibility = ["//src/lib/fuchsia-sync", "//third_party/rust_crates:*"]
-
-[gn.package.parking_lot_core."0.6.2"]
-# Has build script but no config needed.
 
 [gn.package.parking_lot_core."0.9.9"]
 rustflags = []

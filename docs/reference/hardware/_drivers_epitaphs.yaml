@@ -644,3 +644,15 @@
   available_in_git: 'ca1f1ec4dbd6132bd49a26d3996d21eb157b30e6'
   areas: ['Display']
   path: 'src/graphics/display/drivers/virtio-guest/v2'
+- short_description: 'AMLogic g12 audio subsystem TDM driver using a HW DSP'
+  deletion_reason: 'Hardware is not actively supported'
+  gerrit_change_id: '1091535'
+  available_in_git: '6c1fb8879937a16ab3cf4bfeb2c7a19d56ed181d'
+  areas: ['Audio']
+  path: 'src/media/audio/drivers/aml-dsp/aml-g12-tdm-dsp'
+- short_description: 'AMLogic g12 audio subsystem PDM driver using a HW DSP'
+  deletion_reason: 'Hardware is not actively supported'
+  gerrit_change_id: '1091535'
+  available_in_git: '6c1fb8879937a16ab3cf4bfeb2c7a19d56ed181d'
+  areas: ['Audio']
+  path: 'src/media/audio/drivers/aml-dsp/aml-g12-pdm-dsp'

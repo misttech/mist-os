@@ -76,10 +76,7 @@
     ],
     offer: [
         {
-            protocol: [
-                "fuchsia.logger.LogSink",
-                "fuchsia.scheduler.RoleManager",
-            ],
+            protocol: [ "fuchsia.scheduler.RoleManager" ],
             from: "parent",
             to: "#decompressor",
         },

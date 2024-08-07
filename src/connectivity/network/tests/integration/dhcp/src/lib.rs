@@ -843,10 +843,13 @@ fn test_dhcp<'a, D: DhcpClient>(
                                     }
                                 };
                                 for subnet in static_addrs.into_iter().copied() {
-                                    let address_state_provider = interfaces::add_subnet_address_and_route_wait_assigned(
-                                        &iface,
+                                    let address_state_provider = interfaces::add_address_wait_assigned(
+                                        iface.control(),
                                         subnet,
-                                        fidl_fuchsia_net_interfaces_admin::AddressParameters::default(),
+                                        fidl_fuchsia_net_interfaces_admin::AddressParameters {
+                                            add_subnet_route: Some(true),
+                                            ..Default::default()
+                                        },
                                     )
                                         .await
                                         .expect("add subnet address and route");

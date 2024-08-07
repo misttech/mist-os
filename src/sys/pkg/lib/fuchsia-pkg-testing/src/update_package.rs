@@ -219,7 +219,7 @@ impl UpdatePackageBuilder {
             }
         }
         for (type_, content) in &firmware_images {
-            images = images.add_resource_at(&format!("firmware-{type_}"), content.as_slice());
+            images = images.add_resource_at(format!("firmware-{type_}"), content.as_slice());
         }
         let images = images.build().await.unwrap();
 

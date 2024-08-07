@@ -43,7 +43,6 @@
     offer: [
         {
             protocol: [
-                "fuchsia.logger.LogSink",
                 "fuchsia.sysmem.Allocator",
                 "fuchsia.sysmem2.Allocator",
             ],

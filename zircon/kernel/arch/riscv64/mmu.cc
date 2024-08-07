@@ -765,13 +765,11 @@ zx_status_t Riscv64ArchVmAspace::MapPageTable(pte_t attrs, bool ro, uint level,
         zx::result<paddr_t> result = AllocPageTable();
         if (result.is_error()) {
           TRACEF("failed to allocate page table\n");
-          // The mapping wasn't fully updated, but there is work here
-          // that might need to be undone.
-          size_t partial_update = ktl::min(block_size, cursor.size());
-          // Cancel paddr tracking so we account for the virtual range we need to
-          // unmap without needing to increment in page appropriate amounts.
-          cursor.DropPAddrs();
-          cursor.ConsumeVAddr(partial_update);
+          // The mapping wasn't fully updated, but there is work here that might need to be undone
+          // as we may have allocated various levels of page tables. By consuming a single page we
+          // make the cleanup operation think we have added a mapping here, causing it to check
+          // the page table for potential cleanup.
+          cursor.Consume(PAGE_SIZE);
           return result.status_value();
         }
         page_table_paddr = result.value();
@@ -862,7 +860,7 @@ zx_status_t Riscv64ArchVmAspace::MapPageTable(pte_t attrs, bool ro, uint level,
           PANIC_UNIMPLEMENTED;
         }
       }
-      cursor.ConsumePAddr(block_size);
+      cursor.Consume(block_size);
     }
   }
   return ZX_OK;

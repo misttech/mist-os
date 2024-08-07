@@ -9,12 +9,21 @@
 #include <lib/counters.h>
 #include <lib/zbitl/view.h>
 #include <platform.h>
+#include <zircon/assert.h>
 
+#include <ktl/byte.h>
+#include <ktl/move.h>
+#include <ktl/span.h>
 #include <lk/init.h>
+#include <object/handle.h>
+#include <object/vm_object_dispatcher.h>
 #include <phys/handoff.h>
 #include <platform/boot_timestamps.h>
 #include <platform/timer.h>
 #include <vm/physmap.h>
+#include <vm/vm_object_paged.h>
+
+#include <ktl/enforce.h>
 
 PhysHandoff* gPhysHandoff;
 
@@ -89,6 +98,41 @@ void TimelineCounters(unsigned int level) {
 // This can happen really any time after the platform clock is configured.
 LK_INIT_HOOK(TimelineCounters, TimelineCounters, LK_INIT_LEVEL_PLATFORM)
 
+// If an input with empty contents is supplied, a handle to a stub VMO is
+// returned.
+Handle* MakeVmo(ktl::span<const ktl::byte> contents, ktl::string_view name) {
+  // Non-empty contents should have a non-empty name.
+  DEBUG_ASSERT(contents.empty() || !name.empty());
+
+  // Create a VMO to hold all the contents.
+  fbl::RefPtr<VmObjectPaged> vmo;
+  uint64_t aligned_size;
+  zx_status_t status = VmObject::RoundSize(contents.size_bytes(), &aligned_size);
+  ASSERT(status == ZX_OK);
+  status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0, aligned_size, &vmo);
+  ASSERT(status == ZX_OK);
+
+  if (!contents.empty()) {
+    status = vmo->Write(contents.data(), 0, contents.size_bytes());
+    ASSERT(status == ZX_OK);
+  }
+
+  zx_rights_t rights;
+  KernelHandle<VmObjectDispatcher> handle;
+  status =
+      VmObjectDispatcher::Create(ktl::move(vmo), contents.size_bytes(),
+                                 VmObjectDispatcher::InitialMutability::kMutable, &handle, &rights);
+  ASSERT(status == ZX_OK);
+
+  if (!name.empty()) {
+    dprintf(INFO, "Handing off VMO from phys: %.*s\n", static_cast<int>(name.size()), name.data());
+    status = handle.dispatcher()->set_name(name.data(), name.size());
+    DEBUG_ASSERT(status == ZX_OK);
+  }
+
+  return Handle::Make(ktl::move(handle), rights & ~ZX_RIGHT_WRITE).release();
+}
+
 }  // namespace
 
 template <>
@@ -109,14 +153,32 @@ void HandoffFromPhys(paddr_t handoff_paddr) {
   gSmbiosPhys = gPhysHandoff->smbios_phys.value_or(0);
 }
 
-ktl::span<ktl::byte> ZbiInPhysmap(bool own) {
-  ZX_ASSERT(gPhysHandoff->zbi != 0);
-  void* data = paddr_to_physmap(gPhysHandoff->zbi);
-  if (own) {
-    gPhysHandoff->zbi = 0;
+HandoffEnd EndHandoff() {
+  HandoffEnd end{};
+
+  // If the number of VMOs from physboot is less than the number of VMOs the
+  // userboot protocol expects, fill the rest with empty VMOs.
+  ktl::span<const PhysVmo> vmos = gPhysHandoff->vmos.get();
+  for (size_t i = 0; i < vmos.size(); ++i) {
+    ktl::string_view name{vmos[i].name.data(), vmos[i].name.size()};
+    name = name.substr(0, name.find_first_of('\0'));
+    end.phys_vmos[i] = MakeVmo(vmos[i].data.get(), name);
+  }
+  for (size_t i = vmos.size(); i < PhysVmo::kMaxHandoffPhysVmos; ++i) {
+    end.phys_vmos[i] = MakeVmo({}, {});
   }
 
-  zbitl::ByteView zbi = zbitl::StorageFromRawHeader(static_cast<zbi_header_t*>(data));
-  ZX_ASSERT(!zbi.empty());
-  return {const_cast<ktl::byte*>(zbi.data()), zbi.size()};
+  // Once we create the ZBI VMO, the memory referenced by gPhysHandoff has a new
+  // owner and should be regarded as freed and unusable.
+  //
+  // TODO(https://fxbug.dev/357155617): Create the VMO here.
+  {
+    ASSERT(gPhysHandoff->zbi != 0);
+    void* data = paddr_to_physmap(gPhysHandoff->zbi);
+    ktl::span<const ktl::byte> zbi = zbitl::StorageFromRawHeader(static_cast<zbi_header_t*>(data));
+    ASSERT(!zbi.empty());
+    end.zbi = {const_cast<ktl::byte*>(zbi.data()), zbi.size()};
+  }
+  gPhysHandoff = nullptr;
+  return end;
 }

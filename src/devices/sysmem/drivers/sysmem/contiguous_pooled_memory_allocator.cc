@@ -276,13 +276,13 @@ zx_status_t ContiguousPooledMemoryAllocator::Init(uint32_t alignment_log2) {
 }
 
 zx_status_t ContiguousPooledMemoryAllocator::InitPhysical(zx_paddr_t paddr) {
-  zx::vmo local_contiguous_vmo;
-  zx_status_t status = parent_device_->CreatePhysicalVmo(paddr, size_, &local_contiguous_vmo);
-  if (status != ZX_OK) {
-    LOG(ERROR, "Failed to create physical VMO: %d allocation_name_: %s", status, allocation_name_);
-    return status;
+  zx::result<zx::vmo> physical_vmo_result = parent_device_->CreatePhysicalVmo(paddr, size_);
+  if (!physical_vmo_result.is_ok()) {
+    LOG(ERROR, "Failed to create physical VMO: %s allocation_name_: %s",
+        physical_vmo_result.status_string(), allocation_name_);
+    return physical_vmo_result.status_value();
   }
-
+  zx::vmo& local_contiguous_vmo = physical_vmo_result.value();
   return InitCommon(std::move(local_contiguous_vmo));
 }
 
@@ -688,7 +688,11 @@ void ContiguousPooledMemoryAllocator::IncrementGuardRegionFailureInspectData() {
   failed_guard_region_checks_++;
   failed_guard_region_checks_property_.Set(failed_guard_region_checks_);
   last_failed_guard_region_check_timestamp_ns_property_.Set(zx::clock::get_monotonic().get());
-  parent_device_->snapshot_annotation_register().IncrementNumDmaCorruptions();
+
+  auto& snapshot_annotation_register = parent_device_->snapshot_annotation_register();
+  if (snapshot_annotation_register.has_value()) {
+    snapshot_annotation_register->IncrementNumDmaCorruptions();
+  }
 }
 
 void ContiguousPooledMemoryAllocator::CheckGuardRegionData(const RegionData& region) {

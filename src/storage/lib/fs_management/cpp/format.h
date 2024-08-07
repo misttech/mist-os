@@ -46,10 +46,6 @@ DiskFormat DiskFormatFromString(std::string_view str);
 // doesn't run as a component), this returns an empty string.
 std::string_view DiskFormatComponentUrl(DiskFormat fs_type);
 
-// Get the binary path for the disk format, if it's known.  If it's not known (i.e. the format can
-// only be run as a component), this returns an empty string.
-std::string DiskFormatBinaryPath(DiskFormat fs_type);
-
 inline constexpr int kHeaderSize = 4096;
 
 inline constexpr uint8_t kMinfsMagic[16] = {

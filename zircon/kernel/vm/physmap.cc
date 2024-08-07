@@ -28,13 +28,10 @@ constexpr uint kPhysmapMmuFlags = ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_W
 // Permissions & flags for regions of the physmap that are not backed by memory; they
 // may represent MMIOs or non-allocatable (ACPI NVS) memory. The kernel may access
 // some peripherals in these addresses (such as MMIO-based UARTs) in early boot.
-#if defined(__aarch64__)
 // ARM has its own periphmap area for peripherals and can tolerate a full unmap.
-constexpr uint kGapMmuFlags = 0;
-#else
-constexpr uint kGapMmuFlags =
-    ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_WRITE | ARCH_MMU_FLAG_UNCACHED_DEVICE;
-#endif
+// x86 and riscv may need to access MMIO based UARTs, and if so will call
+// |physmap_preserve_gaps_for_mmio| hence by default assume can fully unmap.
+uint gap_mmu_flags = 0;
 
 // Changes the flags for the region [ |base|, |base| + |size| ) in the physmap.
 // If |mmu_flags| is 0, the region is unmapped.
@@ -65,10 +62,16 @@ void physmap_protect_gap(vaddr_t base, size_t size) {
   // on peripherals being mapped in.
   //
   // TODO(https://fxbug.dev/42124648): Remove these regions completely.
-  physmap_modify_region(base, size, kGapMmuFlags);
+  physmap_modify_region(base, size, gap_mmu_flags);
 }
 
 }  // namespace
+
+void physmap_preserve_gaps_for_mmio() {
+  printf("physmap: preserving gaps for mmio\n");
+  gap_mmu_flags =
+      ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_WRITE | ARCH_MMU_FLAG_UNCACHED_DEVICE;
+}
 
 void physmap_for_each_gap(fit::inline_function<void(vaddr_t base, size_t size)> func,
                           pmm_arena_info_t* arenas, size_t num_arenas) {

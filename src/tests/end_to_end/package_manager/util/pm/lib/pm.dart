@@ -52,6 +52,9 @@ class PackageManagerRepo {
   Future<void> ffxRepositoryCreate() async {
     _log.info('Initializing repo: $_repoPath');
 
+    // Configure using the daemon repo server for now.
+    await ffx(['config', 'set', 'repository.server.enabled', 'true']);
+
     await ffx(['repository', 'create', _repoPath]);
   }
 

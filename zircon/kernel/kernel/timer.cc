@@ -63,36 +63,10 @@ KCOUNTER(timer_fired_counter, "timer.fired")
 // firing are not counted.
 KCOUNTER(timer_canceled_counter, "timer.canceled")
 
+// static
+MonitoredSpinLock Timer::timer_lock __CPU_ALIGN_EXCLUSIVE{"timer_lock"_intern};
+
 namespace {
-
-using fxt::operator""_intern;
-
-// Note that we need to manually name the timer_lock because it is one of and
-// extremely small number of "wrapped" locks in the system, and cannot easily
-// use lockdep in order to generate its name.
-//
-// The vast majority of locks in the system are directly instrumented using
-// lockdep. This causes the instance of the actual lock to become a member of a
-// generated lock dep class, which is used to access the underlying lock.  In
-// these cases, lockdep itself controls the construction sequencing of the lock,
-// allowing it to configure the internal lock's metadata immediately after
-// construction has completed.
-//
-// Wrapped locks, OTOH, are a bit different.  The lock instance is declared
-// outside of the lockdep generated class, which holds a reference to the lock
-// instead of encapsulating the lock itself.  This leads to a global ctor race:
-// Who is constructed first, the lock itself, or the lock wrapper who holds a
-// pointer/reference to the lock?
-//
-// In situations like this, it is not safe for lock wrapper to be interacting
-// with the lock whose reference it holds, since that lock may not have been
-// constructed yet.
-//
-// So instead, we simply manually name the lock, and the lockdep wrapper never
-// makes any attempt to name the lock because of the ordering issues.
-//
-MonitoredSpinLock timer_lock __CPU_ALIGN_EXCLUSIVE{"timer_lock"_intern};
-DECLARE_SINGLETON_LOCK_WRAPPER(TimerLock, timer_lock);
 
 affine::Ratio gTicksToTime;
 uint64_t gTicksPerSecond;
@@ -137,8 +111,9 @@ zx_ticks_t TimerQueue::ConvertBootTimeToRawTicks(zx_boot_time_t boot) {
   return deadline_boot_ticks - timer_get_boot_ticks_offset();
 }
 
-void TimerQueue::UpdatePlatformTimer() {
+void TimerQueue::UpdatePlatformTimerLocked() {
   DEBUG_ASSERT(arch_ints_disabled());
+  zx_ticks_t timer_deadline = ZX_TIME_INFINITE;
 
   // The monotonic deadline should be the minimum of the preemption timer and the front of the
   // monotonic timer list.
@@ -147,7 +122,6 @@ void TimerQueue::UpdatePlatformTimer() {
     mono_time_deadline =
         ktl::min(mono_time_deadline, monotonic_timer_list_.front().scheduled_time_);
   }
-  zx_ticks_t timer_deadline = ZX_TIME_INFINITE;
   const ktl::optional<zx_ticks_t> mono_ticks_deadline =
       ConvertMonotonicTimeToRawTicks(mono_time_deadline);
   if (mono_ticks_deadline.has_value()) {
@@ -454,7 +428,7 @@ bool Timer::Cancel() {
       // The Timer we're canceling was at head of this queue, so see if we should update platform
       // timer.
       if (!timer_list.is_empty()) {
-        timer_queue.UpdatePlatformTimer();
+        timer_queue.UpdatePlatformTimerLocked();
       } else if (timer_queue.next_timer_deadline_ == ZX_TIME_INFINITE) {
         LTRACEF("clearing old hw timer, preempt timer not set, nothing in the queue\n");
         platform_stop_timer();
@@ -503,25 +477,28 @@ void TimerQueue::Tick(cpu_num_t cpu) {
   }
 
   // Tick both of the timer lists.
-  TickInternal(now, cpu, monotonic_timer_list_);
-  TickInternal(boot_now, cpu, boot_timer_list_);
+  TickInternal(now, cpu, &monotonic_timer_list_);
+  TickInternal(boot_now, cpu, &boot_timer_list_);
 
   // Update the platform timer.
-  UpdatePlatformTimer();
+  {
+    Guard<MonitoredSpinLock, NoIrqSave> guard{Timer::TimerLock::Get(), SOURCE_TAG};
+    UpdatePlatformTimerLocked();
+  }
 }
 
 template <typename TimestampType>
 void TimerQueue::TickInternal(TimestampType now, cpu_num_t cpu,
-                              fbl::DoublyLinkedList<Timer*>& timer_list) {
-  Guard<MonitoredSpinLock, NoIrqSave> guard{TimerLock::Get(), SOURCE_TAG};
+                              fbl::DoublyLinkedList<Timer*>* timer_list) {
+  Guard<MonitoredSpinLock, NoIrqSave> guard{Timer::TimerLock::Get(), SOURCE_TAG};
 
   for (;;) {
     // See if there's an event to process.
-    if (timer_list.is_empty()) {
+    if (timer_list->is_empty()) {
       break;
     }
 
-    Timer& timer = timer_list.front();
+    Timer& timer = timer_list->front();
 
     LTRACEF("next item on timer queue %p at %" PRIi64 " now %" PRIi64 " (%p, arg %p)\n", &timer,
             timer.scheduled_time_, now, timer.callback_, timer.arg_);
@@ -534,7 +511,7 @@ void TimerQueue::TickInternal(TimestampType now, cpu_num_t cpu,
     DEBUG_ASSERT_MSG(timer.magic_ == Timer::kMagic,
                      "ASSERT: timer failed magic check: timer %p, magic 0x%x\n", &timer,
                      (uint)timer.magic_);
-    timer_list.erase(timer);
+    timer_list->erase(timer);
 
     // Mark the timer busy.
     timer.active_cpu_.store(cpu, ktl::memory_order_relaxed);
@@ -561,8 +538,8 @@ void TimerQueue::TickInternal(TimestampType now, cpu_num_t cpu,
   }
 
   // Verify that the head of the timer queue has a scheduled time after now.
-  if (!timer_list.is_empty()) {
-    DEBUG_ASSERT(timer_list.front().scheduled_time_ > now);
+  if (!timer_list->is_empty()) {
+    DEBUG_ASSERT(timer_list->front().scheduled_time_ > now);
   }
 }
 
@@ -630,7 +607,7 @@ ktl::optional<Timer*> TimerQueue::TransitionTimerList(fbl::DoublyLinkedList<Time
 }
 
 void TimerQueue::TransitionOffCpu(TimerQueue& source) {
-  Guard<MonitoredSpinLock, IrqSave> guard{TimerLock::Get(), SOURCE_TAG};
+  Guard<MonitoredSpinLock, IrqSave> guard{Timer::TimerLock::Get(), SOURCE_TAG};
 
   // Transition both timer lists. This may update the platform timer.
   const ktl::optional<Timer*> new_mono_head =
@@ -665,7 +642,7 @@ void TimerQueue::PrintTimerList(TimestampType now, fbl::DoublyLinkedList<Timer*>
 
 void TimerQueue::PrintTimerQueues(char* buf, size_t len) {
   StringFile buffer{ktl::span(buf, len)};
-  Guard<MonitoredSpinLock, IrqSave> guard{TimerLock::Get(), SOURCE_TAG};
+  Guard<MonitoredSpinLock, IrqSave> guard{Timer::TimerLock::Get(), SOURCE_TAG};
   for (cpu_num_t i = 0; i < percpu::processor_count(); i++) {
     if (mp_is_cpu_online(i)) {
       fprintf(&buffer, "cpu %u:\n", i);

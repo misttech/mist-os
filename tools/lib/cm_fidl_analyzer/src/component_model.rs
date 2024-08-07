@@ -19,7 +19,10 @@ use fuchsia_url::AbsoluteComponentUrl;
 use futures::FutureExt;
 use moniker::{ChildName, Moniker};
 use router_error::Explain;
-use routing::capability_source::{CapabilitySource, ComponentCapability, InternalCapability};
+use routing::capability_source::{
+    BuiltinSource, CapabilitySource, CapabilityToCapabilitySource, ComponentCapability,
+    ComponentSource, InternalCapability, NamespaceSource,
+};
 use routing::component_instance::{
     ComponentInstanceInterface, ExtendedInstanceInterface, TopInstanceInterface,
 };
@@ -602,7 +605,7 @@ impl ComponentModelForAnalyzer {
 
                 // Ignore any valid routes to void.
                 if let Ok(ref source) = result {
-                    if matches!(source.source, CapabilitySource::Void { .. }) {
+                    if matches!(source.source, CapabilitySource::Void(_)) {
                         return vec![];
                     }
                 }
@@ -674,7 +677,7 @@ impl ComponentModelForAnalyzer {
         };
 
         // Ignore any valid routes to void.
-        if let CapabilitySource::Void { .. } = source.source {
+        if let CapabilitySource::Void(_) = source.source {
             return vec![];
         }
 
@@ -787,7 +790,7 @@ impl ComponentModelForAnalyzer {
 
                 // Ignore any valid routes to void.
                 if let Ok(ref source) = result {
-                    if matches!(source.source, CapabilitySource::Void { .. }) {
+                    if matches!(source.source, CapabilitySource::Void(_)) {
                         return vec![];
                     }
                 }
@@ -803,7 +806,7 @@ impl ComponentModelForAnalyzer {
 
                 // Ignore any valid routes to void.
                 if let Ok(ref source) = result {
-                    if matches!(source.source, CapabilitySource::Void { .. }) {
+                    if matches!(source.source, CapabilitySource::Void(_)) {
                         return vec![];
                     }
                 }
@@ -819,7 +822,7 @@ impl ComponentModelForAnalyzer {
 
                 // Ignore any valid routes to void.
                 if let Ok(ref source) = result {
-                    if matches!(source.source, CapabilitySource::Void { .. }) {
+                    if matches!(source.source, CapabilitySource::Void(_)) {
                         return vec![];
                     }
                 }
@@ -833,7 +836,7 @@ impl ComponentModelForAnalyzer {
 
                 // Ignore any valid routes to void.
                 if let Ok(ref source) = result {
-                    if matches!(source.source, CapabilitySource::Void { .. }) {
+                    if matches!(source.source, CapabilitySource::Void(_)) {
                         return vec![];
                     }
                 }
@@ -1018,11 +1021,11 @@ impl ComponentModelForAnalyzer {
                             capability: Some(resolver.resolver),
                             error: None,
                             route,
-                            source: Some(CapabilitySource::Builtin {
+                            source: Some(CapabilitySource::Builtin(BuiltinSource {
                                 capability: InternalCapability::Resolver(
                                     Name::new(scheme).unwrap(),
                                 ),
-                            }),
+                            })),
                         }
                     }
                     Err(err) => VerifyRouteResult {
@@ -1079,18 +1082,21 @@ impl ComponentModelForAnalyzer {
         target: &Arc<ComponentInstanceForAnalyzer>,
     ) -> Result<(), AnalyzerModelError> {
         match &route_source.source {
-            CapabilitySource::Component { moniker, .. } => {
+            CapabilitySource::Component(ComponentSource { moniker, .. }) => {
                 let source_component = target.find_absolute(&moniker).await?;
                 self.check_executable(&source_component)
             }
-            CapabilitySource::Namespace { .. } => Ok(()),
-            CapabilitySource::Capability { source_capability, moniker } => {
+            CapabilitySource::Namespace(NamespaceSource { .. }) => Ok(()),
+            CapabilitySource::Capability(CapabilityToCapabilitySource {
+                source_capability,
+                moniker,
+            }) => {
                 let source_component = target.find_absolute(&moniker).await?;
                 self.check_capability_source(&source_component, &source_capability)
             }
-            CapabilitySource::Builtin { .. } => Ok(()),
-            CapabilitySource::Framework { .. } => Ok(()),
-            CapabilitySource::Void { .. } => Ok(()),
+            CapabilitySource::Builtin(_) => Ok(()),
+            CapabilitySource::Framework(_) => Ok(()),
+            CapabilitySource::Void(_) => Ok(()),
             _ => unimplemented![],
         }
     }
@@ -1200,15 +1206,15 @@ impl ComponentModelForAnalyzer {
                 route_capability(RouteRequest::UseStorage(use_decl), target, &mut storage_mapper)
                     .await?;
             let (storage_decl, storage_component) = match result.source {
-                CapabilitySource::Component {
+                CapabilitySource::Component(ComponentSource {
                     capability: ComponentCapability::Storage(storage_decl),
                     moniker,
                     ..
-                } => {
+                }) => {
                     let source_component = target.find_absolute(&moniker).await?;
                     (storage_decl, source_component)
                 }
-                CapabilitySource::Void { .. } => return Ok(result),
+                CapabilitySource::Void(_) => return Ok(result),
                 _ => unreachable!("unexpected storage source"),
             };
             route_capability(
@@ -1243,15 +1249,15 @@ impl ComponentModelForAnalyzer {
             )
             .await?;
             let (storage_decl, storage_component) = match result.source {
-                CapabilitySource::Component {
+                CapabilitySource::Component(ComponentSource {
                     capability: ComponentCapability::Storage(storage_decl),
                     moniker,
                     ..
-                } => {
+                }) => {
                     let source_component = target.find_absolute(&moniker).await?;
                     (storage_decl, source_component)
                 }
-                CapabilitySource::Void { .. } => return Ok(result),
+                CapabilitySource::Void(_) => return Ok(result),
                 _ => unreachable!("unexpected storage source"),
             };
             route_capability(

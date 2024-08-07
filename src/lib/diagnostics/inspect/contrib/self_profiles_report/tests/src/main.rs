@@ -5,13 +5,13 @@
 use diagnostics_reader::{ArchiveReader, Inspect};
 use fidl_inspect_selfprofile_test::PuppetMarker;
 use fuchsia_component::client::connect_to_protocol;
-use once_cell::sync::Lazy;
 use self_profiles_report::{DurationSummary, SelfProfilesReport};
 use std::path::Path;
+use std::sync::LazyLock;
 
 /// All locations should be reported from the puppet's source file which is next to this one.
-static EXPECTED_LOCATION_PREFIX: Lazy<String> =
-    Lazy::new(|| Path::new(file!()).parent().unwrap().join("puppet.rs").display().to_string());
+static EXPECTED_LOCATION_PREFIX: LazyLock<String> =
+    LazyLock::new(|| Path::new(file!()).parent().unwrap().join("puppet.rs").display().to_string());
 
 #[fuchsia::main]
 async fn main() {

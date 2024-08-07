@@ -5,7 +5,6 @@
 import("//build/components.gni")
 import("//build/fuzz.gni")
 import("//build/test.gni")
-import("//src/storage/testing/decompressor_wrapper.gni")
 
 group("test") {
   testonly = true

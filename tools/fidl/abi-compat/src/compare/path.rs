@@ -5,6 +5,8 @@
 use flyweights::FlyStr;
 use std::fmt::Display;
 
+use crate::{Scope, Version};
+
 #[derive(PartialEq, PartialOrd, Eq, Ord, Debug, Clone)]
 pub enum PathElement {
     Member(FlyStr, Option<FlyStr>),
@@ -23,23 +25,23 @@ impl Into<String> for &PathElement {
 
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq)]
 pub struct Path {
-    api_level: FlyStr,
+    version: Version,
     elements: Vec<PathElement>,
 }
 impl Path {
     #[cfg(test)]
     pub fn empty() -> Self {
-        Self { api_level: FlyStr::new(""), elements: vec![] }
+        Self { version: Version::new("0"), elements: vec![] }
     }
-    pub fn new(api_level: &FlyStr) -> Self {
-        Self { api_level: api_level.clone(), elements: vec![] }
+    pub fn new(version: &Version) -> Self {
+        Self { version: version.clone(), elements: vec![] }
     }
 
     #[cfg(test)]
     pub fn with(&self, element: PathElement) -> Self {
         let mut elements = self.elements.clone();
         elements.push(element);
-        Self { api_level: self.api_level.clone(), elements }
+        Self { version: self.version.clone(), elements }
     }
 
     pub fn push(&mut self, element: PathElement) {
@@ -49,7 +51,10 @@ impl Path {
 
 impl Path {
     pub fn api_level(&self) -> &str {
-        self.api_level.as_str()
+        self.version.api_level()
+    }
+    pub fn scope(&self) -> Scope {
+        self.version.scope()
     }
     pub fn string(&self) -> String {
         self.elements.iter().fold("".to_owned(), |mut s, element| match element {
@@ -70,7 +75,7 @@ impl Path {
 
 #[test]
 fn test_path_string() {
-    let p = Path { api_level: FlyStr::new(""), elements: vec![] };
+    let p = Path::empty();
     assert_eq!(p.string(), "");
 
     let p = p.with(PathElement::Member("foo".into(), None));

@@ -3,19 +3,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{anyhow, Error};
-#[cfg(feature = "syscall_stats")]
-use fuchsia_inspect::NumericProperty;
-use fuchsia_inspect_contrib::profile_duration;
-use fuchsia_runtime::{HandleInfo, HandleType};
-use fuchsia_zircon::{self as zx};
-use starnix_sync::{Locked, Unlocked};
-use starnix_uapi::ownership::{OwnedRef, Releasable};
-use std::sync::Arc;
-use {fidl_fuchsia_io as fio, fidl_fuchsia_process as fprocess};
-
 use crate::arch::execution::new_syscall;
-use crate::execution::get_core_dump_info;
 use crate::fs::fuchsia::{create_file_from_handle, RemoteBundle, RemoteFs, SyslogFile};
 use crate::mm::MemoryManager;
 use crate::signals::{dequeue_signal, prepare_to_restart_syscall};
@@ -34,13 +22,21 @@ use crate::task::{
 use crate::vfs::{
     FdNumber, FdTable, FileSystemCreator, FileSystemHandle, FileSystemOptions, FsStr,
 };
-use starnix_logging::{log_trace, trace_instant, TraceScope, CATEGORY_STARNIX};
-use starnix_sync::{BeforeFsNodeAppend, DeviceOpen, FileOpsCore, LockBefore};
+use anyhow::{anyhow, Error};
+#[cfg(feature = "syscall_stats")]
+use fuchsia_inspect::NumericProperty;
+use fuchsia_runtime::{HandleInfo, HandleType};
+use fuchsia_zircon::{self as zx};
+use starnix_logging::log_trace;
+use starnix_sync::{BeforeFsNodeAppend, DeviceOpen, FileOpsCore, LockBefore, Locked, Unlocked};
 use starnix_syscalls::decls::{Syscall, SyscallDecl};
 use starnix_syscalls::SyscallResult;
 use starnix_uapi::errno;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::mount_flags::MountFlags;
+use starnix_uapi::ownership::{OwnedRef, Releasable};
+use std::sync::Arc;
+use {fidl_fuchsia_io as fio, fidl_fuchsia_process as fprocess};
 
 /// Contains context to track the most recently failing system call.
 ///
@@ -196,17 +192,13 @@ pub fn process_completed_restricted_exit(
         }
     }
 
-    if result.is_some() {
+    if let Some(exit_status) = &result {
         if current_task.flags().contains(TaskFlags::DUMP_ON_EXIT) {
-            // Make diagnostics tooling aware of the crash.
-            profile_duration!("RecordCoreDump");
-            trace_instant!(CATEGORY_STARNIX, c"RecordCoreDump", TraceScope::Process);
-            current_task
-                .kernel()
-                .core_dumps
-                .record_core_dump(get_core_dump_info(&current_task.task));
-
+            // Request a backtrace before reporting the crash to increase chance of a backtrace in
+            // logs.
+            // TODO(https://fxbug.dev/356732164) collect a backtrace ourselves
             debug::backtrace_request_current_thread();
+            current_task.kernel().crash_reporter.handle_core_dump(&current_task, exit_status);
         }
     }
     return Ok(result);

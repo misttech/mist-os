@@ -181,22 +181,3 @@ def get_info(fuchsia_devices: list[FuchsiaDevice]) -> list[dict[str, Any]]:
     for device in fuchsia_devices:
         res.append(device.config)
     return res
-
-
-def asynctest(
-    func: Callable[[base_test.BaseTestClass], Coroutine[Any, Any, None]]
-) -> Callable[[base_test.BaseTestClass], None]:
-    """Simple wrapper around async tests.
-
-    Args:
-        func: The test which is being wrapped.
-
-    Returns:
-        The wrapped function. Runs the body of the `func` in asyncio.run()
-    """
-
-    def wrapper(*args: str, **kwargs: dict[str, int]) -> None:
-        coro = func(*args, **kwargs)
-        asyncio.run(coro)
-
-    return wrapper

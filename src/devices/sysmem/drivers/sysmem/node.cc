@@ -45,8 +45,6 @@ zx_status_t Node::create_status() const {
 }
 
 Node::~Node() {
-  // EnsureDetachedFromNodeProperties() should have been called by this point.
-  ZX_DEBUG_ASSERT(!node_properties_);
   ZX_DEBUG_ASSERT(create_status_was_checked_);
   // Ok to untrack zx_koid_t{}; also ok to untrack same zx_koid_t again.
 }
@@ -97,13 +95,15 @@ void Node::SetErrorHandler(fit::function<void(zx_status_t)> error_handler) {
 void Node::Fail(Error error) { CloseChannel(error); }
 
 void Node::SetDebugClientInfoInternal(ClientDebugInfo debug_info) {
+  ZX_ASSERT(logical_buffer_collection().parent_device()->loop_dispatcher() ==
+            fdf::Dispatcher::GetCurrent()->async_dispatcher());
   if (!node_properties().client_debug_info().name.empty()) {
     debug_info.name = debug_info.name + " (was " + node_properties().client_debug_info().name + ")";
     if (debug_info.name.size() > kMaxDebugNameSize) {
       debug_info.name.resize(kMaxDebugNameSize);
     }
   }
-  node_properties().client_debug_info() = debug_info;
+  node_properties().client_debug_info() = std::move(debug_info);
   debug_id_property_ =
       inspect_node_.CreateUint("debug_id", node_properties().client_debug_info().id);
   debug_name_property_ =
@@ -132,8 +132,6 @@ NodeProperties& Node::node_properties() const {
   ZX_ASSERT(node_properties_);
   return *node_properties_;
 }
-
-void Node::EnsureDetachedFromNodeProperties() { node_properties_ = nullptr; }
 
 zx::unowned_channel Node::channel() const {
   ZX_ASSERT(is_currently_connected());

@@ -17,7 +17,7 @@ use crate::fs::sysfs::sys_fs;
 use crate::fs::tmpfs::TmpFs;
 use crate::fs::tracefs::trace_fs;
 use crate::mutable_state::{state_accessor, state_implementation};
-use crate::security::selinux_fs;
+use crate::security;
 use crate::task::{CurrentTask, EventHandler, Kernel, Task, WaitCanceler, Waiter};
 use crate::time::utc;
 use crate::vfs::buffers::InputBuffer;
@@ -38,6 +38,7 @@ use starnix_sync::{
     BeforeFsNodeAppend, DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex, RwLock,
 };
 use starnix_uapi::arc_key::{ArcKey, PtrKey, WeakKey};
+use starnix_uapi::auth::UserAndOrGroupId;
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::{Access, FileMode};
@@ -773,13 +774,7 @@ impl FileSystemCreator for CurrentTask {
             b"overlay" => OverlayFs::new_fs(locked, self, options),
             b"proc" => Ok(proc_fs(self, options).clone()),
             b"tracefs" => Ok(trace_fs(self, options).clone()),
-            b"selinuxfs" => {
-                if self.kernel().security_server.is_some() {
-                    Ok(selinux_fs(self, options).clone())
-                } else {
-                    error!(ENODEV, fs_type)
-                }
-            }
+            b"selinuxfs" => security::new_selinux_fs(self, options),
             b"sysfs" => Ok(sys_fs(self, options).clone()),
             _ => kernel.create_filesystem(locked, fs_type, options),
         }
@@ -1562,6 +1557,14 @@ impl NamespaceNode {
 
     fn mount_hash_key(&self) -> &ArcKey<DirEntry> {
         ArcKey::ref_cast(&self.entry)
+    }
+
+    pub fn suid_and_sgid(&self) -> UserAndOrGroupId {
+        if self.mount.flags().contains(MountFlags::NOSUID) {
+            UserAndOrGroupId::default()
+        } else {
+            self.entry.node.info().suid_and_sgid()
+        }
     }
 
     pub fn update_atime(&self) {

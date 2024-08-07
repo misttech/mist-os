@@ -3,9 +3,30 @@
 // found in the LICENSE file.
 
 use crate::error::RoutingError;
+use async_trait::async_trait;
 use cm_types::Availability;
-use futures::FutureExt;
-use sandbox::{Request, Router};
+use sandbox::{Capability, Request, Router};
+
+struct AvailabilityRouter {
+    router: Router,
+    availability: Availability,
+}
+
+#[async_trait]
+impl sandbox::Routable for AvailabilityRouter {
+    async fn route(&self, mut request: Request) -> Result<Capability, router_error::RouterError> {
+        // The availability of the request must be compatible with the
+        // availability of this step of the route.
+        match crate::availability::advance(request.availability, self.availability) {
+            Ok(updated) => {
+                request.availability = updated;
+                // Everything checks out, forward the request.
+                self.router.route(request).await
+            }
+            Err(e) => Err(RoutingError::from(e).into()),
+        }
+    }
+}
 
 pub trait WithAvailability {
     /// Returns a router that ensures the capability request has an availability
@@ -15,24 +36,7 @@ pub trait WithAvailability {
 
 impl WithAvailability for Router {
     fn with_availability(self, availability: Availability) -> Router {
-        let route_fn = move |mut request: Request| {
-            let router = self.clone();
-            async move {
-                // The availability of the request must be compatible with the
-                // availability of this step of the route.
-                match crate::availability::advance(request.availability, availability) {
-                    Ok(updated) => {
-                        request.availability = updated;
-                        // Everything checks out, forward the request.
-                        let res = router.route(request).await;
-                        res
-                    }
-                    Err(e) => Err(RoutingError::from(e).into()),
-                }
-            }
-            .boxed()
-        };
-        Router::new(route_fn)
+        Router::new(AvailabilityRouter { availability, router: self })
     }
 }
 

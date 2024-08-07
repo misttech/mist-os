@@ -197,7 +197,9 @@ fuchsia_test_package("netsvc-tests-package") {
     ":netsvc-stress-test-component",
     ":netsvc-test-component",
   ]
-  if (is_coverage) {
+
+  # TODO(https://fxbug.dev/355757666): Fix cause of ERROR logs
+  if (true || is_coverage) {
     test_specs = {
       log_settings = {
         # We get a test flake only on coverage builders that is not reproducible

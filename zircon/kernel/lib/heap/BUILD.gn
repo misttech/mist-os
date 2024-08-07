@@ -28,6 +28,7 @@ source_set("heap") {
     "cmpctmalloc",
     "//zircon/kernel/lib/console",
     "//zircon/kernel/lib/virtual_alloc",
+    "//zircon/system/ulib/lazy_init",
 
     # TODO(https://fxbug.dev/42128324): Remove headers when possible.
     "//zircon/kernel/lib/instrumentation:headers",

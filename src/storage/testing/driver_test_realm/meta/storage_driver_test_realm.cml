@@ -21,5 +21,9 @@
             directory: "dev-class",
             from: "#driver_test_realm",
         },
+        {
+            service: "fuchsia.hardware.ramdisk.Service",
+            from: "#driver_test_realm",
+        },
     ],
 }

@@ -56,7 +56,6 @@
         },
         {
             protocol: [
-                "fuchsia.logger.LogSink",
                 "fuchsia.metrics.MetricEventLoggerFactory",
                 "fuchsia.net.interfaces.State",
                 "fuchsia.net.name.Lookup",

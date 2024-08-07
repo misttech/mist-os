@@ -18,6 +18,9 @@ zx_library("userabi") {
     # <lib/userabi.vdso.h> has #include <lib/instrumentation/kernel-mapped-vmo.h>, and
     # <lib/userabi/userboot.h> has #include <lib/instrumentation/vmo.h>.
     "//zircon/kernel/lib/instrumentation:headers",
+
+    # <lib/userabi/userboot.h> has #include <phys/handoff.h>
+    "//zircon/kernel/phys:handoff",
   ]
   if (is_kernel) {
     public_deps += [

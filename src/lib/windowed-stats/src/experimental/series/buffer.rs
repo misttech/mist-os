@@ -9,6 +9,7 @@ use std::io::{self, Write};
 use tracing::warn;
 
 use crate::experimental::clock::Duration;
+use crate::experimental::ring_buffer::Simple8bRleRingBuffer;
 use crate::experimental::series::interpolation::{
     Constant, Interpolation, LastAggregation, LastSample,
 };
@@ -29,6 +30,10 @@ where
     /// Constructs a ring buffer with the given fixed capacity.
     fn buffer(interval: &SamplingInterval) -> Self::Buffer {
         Self::Buffer::with_capacity(interval.capacity() as usize)
+    }
+    /// Get the descriptive type of the buffer.
+    fn buffer_type() -> RingBufferType {
+        Self::Buffer::buffer_type()
     }
     /// Retrieve the sampling intervals given the sampling profile.
     fn sampling_intervals(profile: &SamplingProfile) -> Vec1<SamplingInterval> {
@@ -61,13 +66,6 @@ where
     type Buffer = Uncompressed<f32>;
 }
 
-impl<P> BufferStrategy<f64, P> for f64
-where
-    P: Interpolation,
-{
-    type Buffer = Uncompressed<f64>;
-}
-
 impl BufferStrategy<u64, Constant> for u64 {
     type Buffer = Simple8bRle;
 }
@@ -86,6 +84,8 @@ pub trait RingBuffer<A> {
     where
         Self: Sized;
 
+    fn buffer_type() -> RingBufferType;
+
     fn sampling_intervals(profile: &SamplingProfile) -> Vec1<SamplingInterval>;
 
     fn push(&mut self, item: A) {
@@ -98,6 +98,46 @@ pub trait RingBuffer<A> {
     }
 }
 
+#[derive(Clone, Debug)]
+pub enum RingBufferType {
+    Uncompressed(UncompressedSubtype),
+    Simple8bRle(Simple8bRleSubtype),
+    DeltaEncodedSimple8bRle(Simple8bRleSubtype),
+}
+
+impl RingBufferType {
+    pub fn type_descriptor(&self) -> u8 {
+        match self {
+            Self::Uncompressed(_) => 0,
+            Self::Simple8bRle(_) => 1,
+            Self::DeltaEncodedSimple8bRle(_) => 2,
+        }
+    }
+
+    pub fn subtype_descriptor(&self) -> u8 {
+        match self {
+            Self::Uncompressed(subtype) => match subtype {
+                UncompressedSubtype::F32 => 0,
+            },
+            Self::Simple8bRle(subtype) | Self::DeltaEncodedSimple8bRle(subtype) => match subtype {
+                Simple8bRleSubtype::Unsigned => 0,
+                Simple8bRleSubtype::SignedZigzagEncoded => 1,
+            },
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum UncompressedSubtype {
+    F32,
+}
+
+#[derive(Clone, Debug)]
+pub enum Simple8bRleSubtype {
+    Unsigned,
+    SignedZigzagEncoded,
+}
+
 // TODO(https://fxbug.dev/352614838): Implement uncompressed ring buffer
 /// A ring buffer that stores arbitrary items in their immediate representation.
 #[derive(Clone, Debug)]
@@ -105,11 +145,16 @@ pub struct Uncompressed<A> {
     buffer: Vec<A>,
 }
 
-impl<A> RingBuffer<A> for Uncompressed<A> {
+impl RingBuffer<f32> for Uncompressed<f32> {
     fn with_capacity(capacity: usize) -> Self {
         warn!("Uncompressed ring buffer is unimplemented. No data will be stored.");
         Uncompressed { buffer: Vec::with_capacity(capacity) }
     }
+
+    fn buffer_type() -> RingBufferType {
+        RingBufferType::Uncompressed(UncompressedSubtype::F32)
+    }
+
     fn sampling_intervals(profile: &SamplingProfile) -> Vec1<SamplingInterval> {
         match profile {
             SamplingProfile::Granular => [
@@ -128,20 +173,22 @@ impl<A> RingBuffer<A> for Uncompressed<A> {
     }
 }
 
-// TODO(https://fxbug.dev/337086207): Implement Simple8bRle ring buffer
-/// A ring buffer that stores unsigned integer items using Simple8B and run length encoding.
 #[derive(Clone, Debug)]
-pub struct Simple8bRle;
+pub struct Simple8bRle(Simple8bRleRingBuffer);
 
 impl<A> RingBuffer<A> for Simple8bRle
 where
     A: Into<u64> + Unsigned,
 {
     fn with_capacity(capacity: usize) -> Self {
-        warn!("Simple8bRle ring buffer is unimplemented. No data will be stored.");
-        let _ = capacity;
-        Simple8bRle
+        let ring_buffer = Simple8bRleRingBuffer::with_nearest_capacity(capacity);
+        Simple8bRle(ring_buffer)
     }
+
+    fn buffer_type() -> RingBufferType {
+        RingBufferType::Simple8bRle(Simple8bRleSubtype::Unsigned)
+    }
+
     fn sampling_intervals(profile: &SamplingProfile) -> Vec1<SamplingInterval> {
         match profile {
             SamplingProfile::Granular => [
@@ -157,6 +204,14 @@ where
             ]
             .into(),
         }
+    }
+
+    fn push(&mut self, item: A) {
+        self.0.push(item.into());
+    }
+
+    fn serialize(&self, mut write: impl Write) -> io::Result<()> {
+        self.0.serialize(&mut write)
     }
 }
 
@@ -175,6 +230,11 @@ where
         let _ = capacity;
         ZigZagSimple8bRle
     }
+
+    fn buffer_type() -> RingBufferType {
+        RingBufferType::Simple8bRle(Simple8bRleSubtype::SignedZigzagEncoded)
+    }
+
     fn sampling_intervals(_profile: &SamplingProfile) -> Vec1<SamplingInterval> {
         let placeholder = SamplingInterval::new(1, 1, Duration::from_hours(1));
         [placeholder].into()
@@ -195,6 +255,11 @@ where
         let _ = capacity;
         DeltaSimple8bRle
     }
+
+    fn buffer_type() -> RingBufferType {
+        RingBufferType::DeltaEncodedSimple8bRle(Simple8bRleSubtype::Unsigned)
+    }
+
     fn sampling_intervals(_profile: &SamplingProfile) -> Vec1<SamplingInterval> {
         let placeholder = SamplingInterval::new(1, 1, Duration::from_hours(1));
         [placeholder].into()
@@ -213,6 +278,11 @@ impl RingBuffer<i64> for DeltaZigZagSimple8bRle {
         let _ = capacity;
         DeltaZigZagSimple8bRle
     }
+
+    fn buffer_type() -> RingBufferType {
+        RingBufferType::DeltaEncodedSimple8bRle(Simple8bRleSubtype::SignedZigzagEncoded)
+    }
+
     fn sampling_intervals(_profile: &SamplingProfile) -> Vec1<SamplingInterval> {
         let placeholder = SamplingInterval::new(1, 1, Duration::from_hours(1));
         [placeholder].into()
@@ -225,6 +295,11 @@ impl RingBuffer<u64> for DeltaZigZagSimple8bRle {
         let _ = capacity;
         DeltaZigZagSimple8bRle
     }
+
+    fn buffer_type() -> RingBufferType {
+        RingBufferType::DeltaEncodedSimple8bRle(Simple8bRleSubtype::SignedZigzagEncoded)
+    }
+
     fn sampling_intervals(_profile: &SamplingProfile) -> Vec1<SamplingInterval> {
         let placeholder = SamplingInterval::new(1, 1, Duration::from_hours(1));
         [placeholder].into()
@@ -261,21 +336,22 @@ mod tests {
         assert_eq!(<f32 as BufferStrategy<f32, Constant>>::sampling_intervals(&p), expect);
         assert_eq!(<f32 as BufferStrategy<f32, LastSample>>::sampling_intervals(&p), expect);
         assert_eq!(<f32 as BufferStrategy<f32, LastAggregation>>::sampling_intervals(&p), expect);
-        assert_eq!(<f64 as BufferStrategy<f64, Constant>>::sampling_intervals(&p), expect);
-        assert_eq!(<f64 as BufferStrategy<f64, LastSample>>::sampling_intervals(&p), expect);
-        assert_eq!(<f64 as BufferStrategy<f64, LastAggregation>>::sampling_intervals(&p), expect);
         assert_eq!(<Gauge<f32> as BufferStrategy<f32, Constant>>::sampling_intervals(&p), expect);
         assert_eq!(<Gauge<f32> as BufferStrategy<f32, LastSample>>::sampling_intervals(&p), expect);
         assert_eq!(
             <Gauge<f32> as BufferStrategy<f32, LastAggregation>>::sampling_intervals(&p),
             expect
         );
-        assert_eq!(<Gauge<f64> as BufferStrategy<f64, Constant>>::sampling_intervals(&p), expect);
-        assert_eq!(<Gauge<f64> as BufferStrategy<f64, LastSample>>::sampling_intervals(&p), expect);
-        assert_eq!(
-            <Gauge<f64> as BufferStrategy<f64, LastAggregation>>::sampling_intervals(&p),
-            expect
-        );
+    }
+
+    #[test]
+    fn simple8b_rle_buffer() {
+        let mut buffer = <Simple8bRle as RingBuffer<u64>>::with_capacity(2);
+        buffer.push(22u64);
+        let mut data = vec![];
+        let result = RingBuffer::<u64>::serialize(&buffer, &mut data);
+        assert!(result.is_ok());
+        assert!(!data.is_empty());
     }
 
     #[test_case(

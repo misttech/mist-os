@@ -11,13 +11,11 @@ rustc_test("forwarding") {
   deps = [
     "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
     "//sdk/fidl/fuchsia.net.interfaces.admin:fuchsia.net.interfaces.admin_rust",
-    "//sdk/fidl/fuchsia.net.stack:fuchsia.net.stack_rust",
     "//src/connectivity/lib/net-declare",
     "//src/connectivity/network/testing/netemul/rust:lib",
     "//src/connectivity/network/tests/integration/common:netstack_testing_common",
     "//src/connectivity/network/tests/integration/macros:netstack_testing_macros",
     "//src/lib/fuchsia-async",
-    "//src/lib/network/fidl_fuchsia_net_ext",
     "//src/lib/network/fidl_fuchsia_net_interfaces_ext",
     "//third_party/rust_crates:futures-util",
     "//third_party/rust_crates:test-case",

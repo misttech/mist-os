@@ -53,6 +53,9 @@ type FailureModeCheck interface {
 	IsFlake() bool
 	// Tags are the tags to append to the test result.
 	Tags() []build.TestTag
+	// IsInfraFailure is true if the check is a result of an
+	// infrastructure failure.
+	IsInfraFailure() bool
 }
 
 // baseCheck provides default implementations of the FailureModeCheck interface.
@@ -82,4 +85,8 @@ func (c baseCheck) IsFlake() bool {
 
 func (c baseCheck) Tags() []build.TestTag {
 	return nil
+}
+
+func (c baseCheck) IsInfraFailure() bool {
+	return false
 }

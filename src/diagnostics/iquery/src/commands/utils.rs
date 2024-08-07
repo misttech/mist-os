@@ -8,14 +8,12 @@ use crate::types::Error;
 use cm_rust::SourceName;
 use component_debug::realm::*;
 use fidl_fuchsia_sys2 as fsys2;
-use lazy_static::lazy_static;
 use moniker::Moniker;
 use regex::Regex;
+use std::sync::LazyLock;
 
-lazy_static! {
-    static ref EXPECTED_PROTOCOL_RE: Regex =
-        Regex::new(r".*fuchsia\.diagnostics\..*ArchiveAccessor$").unwrap();
-}
+static EXPECTED_PROTOCOL_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r".*fuchsia\.diagnostics\..*ArchiveAccessor$").unwrap());
 
 /// Returns the selectors for a component whose url contains the `manifest` string.
 pub async fn get_selectors_for_manifest<P: DiagnosticsProvider>(

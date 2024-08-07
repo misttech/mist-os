@@ -518,14 +518,7 @@ impl SamplerConfig {
     /// Inspector on demand.
     pub fn publish_inspect(self: &Arc<Self>, parent_node: &inspect::Node) {
         let weak_self = Arc::downgrade(self);
-
-        lazy_static::lazy_static! {
-            static ref SELECTOR_STRING : inspect::StringReference = "selector".into();
-            static ref UPLOAD_COUNT_STRING : inspect::StringReference = "upload_count".into();
-        }
-
         let mut locked_node = self.inspect_node.lock().unwrap();
-
         *locked_node = Some(parent_node.create_lazy_child("metrics_sent", move || {
             let local_self = weak_self.upgrade();
             if local_self.is_none() {
@@ -552,11 +545,11 @@ impl SamplerConfig {
                                     |selector_node| {
                                         next_selector_index += 1;
                                         selector_node.record_string(
-                                            &*SELECTOR_STRING,
+                                            "selector",
                                             selector.selector_string.clone(),
                                         );
                                         selector_node.record_uint(
-                                            &*UPLOAD_COUNT_STRING,
+                                            "upload_count",
                                             selector.get_upload_count(),
                                         );
                                     },

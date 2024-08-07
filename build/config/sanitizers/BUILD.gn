@@ -180,6 +180,21 @@ sanitizer_extra_options("suppress-asan-container-overflow") {
   tags = [ "asan" ]
 }
 
+# Disable new-delete-type-mismatch checks.
+# TODO(https://fxbug.dev/357662201): THERE SHOULD BE NO NEW USERS OF THIS! This
+# particular check is not known to have any kind of false-positives and should
+# remain on unconditionally. This is only here to unblock the clang roll and
+# all instances of this should be investigated and fixed after the roll. Once
+# that's done, we can remove this.
+sanitizer_extra_options(
+    "suppress-asan-new-delete-type-mismatch.DO-NOT-USE-THIS") {
+  visibility = [ "//src/devices/tpm/drivers/tpm:tpm-driver-test-bin" ]
+
+  args = [ "new_delete_type_mismatch=0" ]
+  output_name = "asan_default_options"
+  tags = [ "asan" ]
+}
+
 config("no_sanitizers") {
   cflags = [ "-fno-sanitize=all" ]
   if (!is_gcc) {

@@ -36,12 +36,7 @@ group("blackout_emulator_unstable") {
   deps = []
 }
 
-group("blackout_vim3_stable") {
-  testonly = true
-  deps = []
-}
-
-group("blackout_vim3_unstable") {
+group("blackout_workbench_vim3_stable") {
   testonly = true
   deps = [
     # Integration tests
@@ -53,6 +48,11 @@ group("blackout_vim3_unstable") {
     ":blackout_fxfs_tree_soft_reboot($host_toolchain)",
     "//src/storage/blackout/target/fs-tree:blackout-fxfs-tree",
   ]
+}
+
+group("blackout_workbench_vim3_unstable") {
+  testonly = true
+  deps = []
 }
 
 group("blackout_starnix_vim3_unstable") {

@@ -4,7 +4,6 @@
 
 import("//build/components.gni")
 import("//build/fidl/fidl.gni")
-import("//build/host.gni")
 import("//build/rust/rustc_binary.gni")
 import("//build/rust/rustc_library.gni")
 import("//build/testing/perf/test.gni")

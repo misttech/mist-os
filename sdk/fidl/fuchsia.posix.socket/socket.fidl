@@ -693,7 +693,8 @@ type SendMsgMeta = table {
 /// for errors on the zircon socket in the same call.
 const FAST_UDP_WAIT_MANY_MAXIMUM_ITEMS uint32 = 63;
 
-// TODO(https://fxbug.dev/42056856): Use a generated constant.
+// TODO(https://fxbug.dev/42056856): Mark this as removed at NEXT once all remaining references in
+// zxio have been migrated to the discoverable protocol name.
 const DATAGRAM_SOCKET_PROTOCOL_NAME string = "fuchsia.posix.socket/DatagramSocket";
 
 /// A datagram socket.
@@ -789,7 +790,8 @@ closed protocol DatagramSocket {
     }) error fuchsia.posix.Errno;
 };
 
-// TODO(https://fxbug.dev/42056856): Use a generated constant.
+// TODO(https://fxbug.dev/42056856): Mark this as removed at NEXT once all remaining references in
+// zxio have been migrated to the discoverable protocol name.
 const SYNCHRONOUS_DATAGRAM_SOCKET_PROTOCOL_NAME string
         = "fuchsia.posix.socket/SynchronousDatagramSocket";
 
@@ -857,7 +859,8 @@ closed protocol SynchronousDatagramSocket {
     }) error fuchsia.posix.Errno;
 };
 
-// TODO(https://fxbug.dev/42056856): Use a generated constant.
+// TODO(https://fxbug.dev/42056856): Mark this as removed at NEXT once all remaining references in
+// zxio have been migrated to the discoverable protocol name.
 const STREAM_SOCKET_PROTOCOL_NAME string = "fuchsia.posix.socket/StreamSocket";
 
 /// A stream socket.

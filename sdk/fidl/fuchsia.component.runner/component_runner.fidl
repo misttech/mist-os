@@ -34,9 +34,6 @@ closed protocol ComponentRunner {
     /// Errors are delivered as epitaphs over the `ComponentController`
     /// protocol. In the event of an error, the runner must ensure that
     /// resources are cleaned up.
-    ///
-    /// Errors:
-    ///
     strict Start(resource struct {
         start_info ComponentStartInfo;
         controller server_end:ComponentController;

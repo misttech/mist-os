@@ -68,7 +68,6 @@ source_set("sysmem_common_srcs") {
     "buffer_collection_token_group.cc",
     "contiguous_pooled_memory_allocator.cc",
     "device.cc",
-    "driver.cc",
     "external_memory_allocator.cc",
     "indent.cc",
     "koid_util.cc",
@@ -85,27 +84,31 @@ source_set("sysmem_common_srcs") {
     "utils.cc",
   ]
   public_deps = [
+    ":config_cpp_elf_lib",
     ":fuchsia.sysmem2.internal_cpp",
     "//sdk/fidl/fuchsia.feedback:fuchsia.feedback_cpp",
     "//sdk/fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp",
     "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_cpp",
+    "//sdk/fidl/fuchsia.inspect:fuchsia.inspect_cpp",
+    "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp",
+    "//sdk/fidl/fuchsia.logger:fuchsia.logger_cpp",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp",
     "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp",
     "//sdk/lib/async_patterns/cpp",
     "//sdk/lib/component/outgoing/cpp",
+    "//sdk/lib/driver/compat/cpp",
+    "//sdk/lib/driver/component/cpp",
     "//sdk/lib/fidl",
     "//sdk/lib/fit",
     "//sdk/lib/sys/cpp:cpp",
-    "//src/devices/bind/fuchsia.sysmem.heap:fuchsia.sysmem.heap_cpp",
 
     # TODO(b/42113093): Remove this dep on AmLogic-specific heap names in sysmem code. The dep is
     # currently needed for secure heap names only, which is why a dep for goldfish heap names isn't
     # here.
-    ":config_cpp_elf_lib",
     "//src/devices/bind/fuchsia.amlogic.platform.sysmem.heap:fuchsia.amlogic.platform.sysmem.heap_cpp",
+    "//src/devices/bind/fuchsia.sysmem.heap:fuchsia.sysmem.heap_cpp",
+    "//src/devices/lib/driver:driver_runtime",
     "//src/devices/sysmem/metrics",
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
     "//src/lib/memory_barriers",
     "//src/lib/metrics_buffer",
     "//zircon/system/ulib/async:async-cpp",
@@ -150,14 +153,9 @@ fuchsia_driver("sysmem-driver") {
       configs -= fdio_config
     }
   }
-  sources = [ "binding.cc" ]
   deps = [
     ":sysmem_bind",
     ":sysmem_common_srcs",
-    "//sdk/lib/driver/runtime:driver_runtime_cpp",
-    "//src/devices/lib/driver",
-    "//src/devices/lib/driver:driver_runtime",
-    "//zircon/system/ulib/sysmem-version",
   ]
 }
 
@@ -224,6 +222,8 @@ test("sysmem-unittest-bin") {
   deps = [
     ":sysmem_common_srcs",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp",
+    "//sdk/lib/async_patterns/testing/cpp",
+    "//sdk/lib/driver/testing/cpp:scoped_global_logger",
     "//sdk/lib/fidl",
     "//sdk/lib/fit",
     "//src/devices/bus/testing/fake-pdev",

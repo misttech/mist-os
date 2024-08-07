@@ -97,63 +97,6 @@ class DisplayConfig : public IdMappable<std::unique_ptr<DisplayConfig>, DisplayI
   inspect::BoolProperty pending_apply_layer_change_property_;
 };
 
-// Helper class for sending events using the same API, regardless if |Client| is
-// bound to a FIDL connection. This object either holds a binding reference or a
-// |ServerEnd| that owns the channel, both of which allows sending events
-// without unsafe channel borrowing.
-class DisplayControllerBindingState {
-  using Protocol = fuchsia_hardware_display::Coordinator;
-
- public:
-  // Constructs an invalid binding state. The user must populate it with an
-  // active binding reference or event sender before events could be sent.
-  DisplayControllerBindingState() = default;
-
-  explicit DisplayControllerBindingState(fidl::ServerEnd<Protocol> server_end)
-      : binding_state_(std::move(server_end)) {}
-
-  // Invokes |fn| with an polymorphic object that may be used to send events
-  // in |Protocol|.
-  //
-  // |fn| must be a templated lambda that calls
-  // |fidl::WireSendEvent(arg)->OnSomeEvent| to send |OnSomeEvent| event, and
-  // returns a |fidl::Status|.
-  template <typename EventSenderConsumer>
-  fidl::Status SendEvents(EventSenderConsumer&& fn) {
-    return std::visit(
-        [&](auto&& arg) -> fidl::Status {
-          using T = std::decay_t<decltype(arg)>;
-          if constexpr (std::is_same_v<T, fidl::ServerBindingRef<Protocol>>) {
-            return fn(arg);
-          }
-          if constexpr (std::is_same_v<T, fidl::ServerEnd<Protocol>>) {
-            return fn(arg);
-          }
-          ZX_PANIC("Invalid display controller binding state");
-        },
-        binding_state_);
-  }
-
-  // Sets this object into the bound state, i.e. the server is handling FIDL
-  // messages, and the connect may be managed through |binding|.
-  void SetBound(fidl::ServerBindingRef<Protocol> binding) { binding_state_ = std::move(binding); }
-
-  // If the object is in the bound state, schedules it to be unbound.
-  void Unbind() {
-    if (auto ref = std::get_if<fidl::ServerBindingRef<Protocol>>(&binding_state_)) {
-      // Note that |binding_state_| will remain in the
-      // |fidl::ServerBindingRef<Protocol>| variant, and future attempts to
-      // send events will fail at runtime. This should be okay since the client
-      // is shutting down when unbinding happens.
-      ref->Unbind();
-    }
-  }
-
- private:
-  std::variant<std::monostate, fidl::ServerBindingRef<Protocol>, fidl::ServerEnd<Protocol>>
-      binding_state_;
-};
-
 // Manages the state associated with a display coordinator client connection.
 //
 // This class is not thread-safe. After initialization, all methods must be
@@ -163,10 +106,6 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
   // |controller| must outlive this and |proxy|.
   Client(Controller* controller, ClientProxy* proxy, ClientPriority priority, ClientId client_id);
 
-  // This is used for testing
-  Client(Controller* controller, ClientProxy* proxy, ClientPriority priority, ClientId client_id,
-         fidl::ServerEnd<fuchsia_hardware_display::Coordinator> server_end);
-
   Client(const Client&) = delete;
   Client& operator=(const Client&) = delete;
 
@@ -175,12 +114,21 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
   // Binds the `Client` to the server-side channel of the `Coordinator` protocol.
   //
   // Must be called exactly once in production code.
-  fidl::ServerBindingRef<fuchsia_hardware_display::Coordinator> Init(
-      fidl::ServerEnd<fuchsia_hardware_display::Coordinator> server_end);
+  fidl::ServerBindingRef<fuchsia_hardware_display::Coordinator> Bind(
+      fidl::ServerEnd<fuchsia_hardware_display::Coordinator> server_end,
+      fidl::OnUnboundFn<Client> unbound_callback);
 
   void OnDisplaysChanged(cpp20::span<const DisplayId> added_display_ids,
                          cpp20::span<const DisplayId> removed_display_ids);
   void SetOwnership(bool is_owner);
+
+  fidl::Status NotifyDisplayChanges(
+      cpp20::span<const fuchsia_hardware_display::wire::Info> added_display_infos,
+      cpp20::span<const fuchsia_hardware_display_types::wire::DisplayId> removed_display_ids);
+  fidl::Status NotifyOwnershipChange(bool client_has_ownership);
+  fidl::Status NotifyVsync(DisplayId display_id, zx::time timestamp, ConfigStamp config_stamp,
+                           VsyncAckCookie vsync_ack_cookie);
+
   void ApplyConfig();
 
   void OnFenceFired(FenceReference* fence);
@@ -198,10 +146,6 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
 
   // Test helpers
   size_t TEST_imported_images_count() const { return images_.size(); }
-
-  void CancelFidlBind() { binding_state_.Unbind(); }
-
-  DisplayControllerBindingState& binding_state() { return binding_state_; }
 
   // Used for testing
   sync_completion_t* fidl_unbound() { return &fidl_unbound_; }
@@ -306,7 +250,7 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
   ClientProxy* const proxy_;
   const ClientPriority priority_;
   const ClientId id_;
-  bool running_;
+  bool running_ = false;
 
   Image::Map images_;
   CaptureImage::Map capture_images_;
@@ -345,9 +289,7 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
   bool CheckConfig(fuchsia_hardware_display_types::wire::ConfigResult* res,
                    std::vector<fuchsia_hardware_display::wire::ClientCompositionOp>* ops);
 
-  // The state of the FIDL binding. See comments on
-  // |DisplayControllerBindingState|.
-  DisplayControllerBindingState binding_state_;
+  std::optional<fidl::ServerBindingRef<fuchsia_hardware_display::Coordinator>> binding_;
 
   // Capture related book keeping
   EventId capture_fence_id_ = kInvalidEventId;
@@ -376,13 +318,12 @@ class ClientProxy {
   ClientProxy(Controller* controller, ClientPriority client_priority, ClientId client_id,
               fit::function<void()> on_client_dead);
 
-  // This is used for testing
-  ClientProxy(Controller* controller, ClientPriority client_priority, ClientId client_id,
-              fidl::ServerEnd<fuchsia_hardware_display::Coordinator> server_end);
-
   ~ClientProxy();
+
   zx_status_t Init(inspect::Node* parent_node,
                    fidl::ServerEnd<fuchsia_hardware_display::Coordinator> server_end);
+
+  zx::result<> InitForTesting(fidl::ServerEnd<fuchsia_hardware_display::Coordinator> server_end);
 
   // Schedule a task on the controller loop to close this ClientProxy and
   // have it be freed.

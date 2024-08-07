@@ -77,7 +77,6 @@ common_deps = [
 common_test_deps = [
   "core:netstack3-core-testutils",
   "fuchsia:netstack3-fuchsia-testutils",
-  "//src/connectivity/lib/fidl_fuchsia_net_stack_ext",
   "//src/connectivity/lib/ip-test-macro",
   "//src/connectivity/lib/net-declare",
   "//src/connectivity/network/testing/netemul/network-context/fidl:network_rust",

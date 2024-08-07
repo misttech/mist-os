@@ -7,7 +7,6 @@
 
 #include <deque>
 #include <string>
-#include <vector>
 
 #include <fbl/unique_fd.h>
 

@@ -21,33 +21,43 @@ pub enum CompatibilityDegree {
 }
 
 #[derive(PartialEq, Eq, Debug, Ord, PartialOrd)]
-enum ProblemScopeType {
-    Platform,
+enum ProblemPathKind {
+    AbiSurface,
     Protocol,
     Type,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-enum CompatibilityScope {
-    Platform { external: Path, platform: Path },
-    Protocol { client: Path, server: Path },
-    Type { sender: Path, receiver: Path },
+enum ProblemPaths {
+    #[allow(unused)]
+    AbiSurface {
+        external: Path,
+        platform: Path,
+    },
+    Protocol {
+        client: Path,
+        server: Path,
+    },
+    Type {
+        sender: Path,
+        receiver: Path,
+    },
 }
 
-impl CompatibilityScope {
-    fn scope_type(&self) -> ProblemScopeType {
-        use ProblemScopeType::*;
+impl ProblemPaths {
+    fn kind(&self) -> ProblemPathKind {
+        use ProblemPathKind::*;
         match self {
-            CompatibilityScope::Platform { external: _, platform: _ } => Platform,
-            CompatibilityScope::Protocol { client: _, server: _ } => Protocol,
-            CompatibilityScope::Type { sender: _, receiver: _ } => Type,
+            ProblemPaths::AbiSurface { external: _, platform: _ } => AbiSurface,
+            ProblemPaths::Protocol { client: _, server: _ } => Protocol,
+            ProblemPaths::Type { sender: _, receiver: _ } => Type,
         }
     }
     fn paths(&self) -> (&Path, &Path) {
         match self {
-            CompatibilityScope::Platform { external, platform } => (external, platform),
-            CompatibilityScope::Protocol { client, server } => (client, server),
-            CompatibilityScope::Type { sender, receiver } => (sender, receiver),
+            ProblemPaths::AbiSurface { external, platform } => (external, platform),
+            ProblemPaths::Protocol { client, server } => (client, server),
+            ProblemPaths::Type { sender, receiver } => (sender, receiver),
         }
     }
     fn path_for_display(&self) -> String {
@@ -73,26 +83,22 @@ impl CompatibilityScope {
     }
     fn levels(&self) -> (&str, &str) {
         match self {
-            CompatibilityScope::Platform { external, platform } => {
+            ProblemPaths::AbiSurface { external, platform } => {
                 (external.api_level(), platform.api_level())
             }
-            CompatibilityScope::Protocol { client, server } => {
-                (client.api_level(), server.api_level())
-            }
-            CompatibilityScope::Type { sender, receiver } => {
-                (sender.api_level(), receiver.api_level())
-            }
+            ProblemPaths::Protocol { client, server } => (client.api_level(), server.api_level()),
+            ProblemPaths::Type { sender, receiver } => (sender.api_level(), receiver.api_level()),
         }
     }
 }
 
-impl Display for CompatibilityScope {
+impl Display for ProblemPaths {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.path_for_display())
     }
 }
 
-impl PartialOrd for CompatibilityScope {
+impl PartialOrd for ProblemPaths {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         let a: String = self.path_for_comparison().into();
         let b: String = other.path_for_comparison().into();
@@ -100,11 +106,11 @@ impl PartialOrd for CompatibilityScope {
     }
 }
 
-impl Ord for CompatibilityScope {
+impl Ord for ProblemPaths {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         match self.partial_cmp(other) {
             Some(ord) => ord,
-            None => self.scope_type().cmp(&other.scope_type()),
+            None => self.kind().cmp(&other.kind()),
         }
     }
 }
@@ -144,7 +150,7 @@ fn test_cmp_prefixes_later() {
 
 #[derive(Clone, PartialEq, Eq)]
 pub struct CompatibilityProblem {
-    scope: CompatibilityScope,
+    paths: ProblemPaths,
     warning: bool,
     message: String,
 }
@@ -156,23 +162,23 @@ impl Display for CompatibilityProblem {
         } else {
             writeln!(f, "ERR: {}", self.message)?;
         }
-        writeln!(f, " at: {}", self.scope)
+        writeln!(f, " at: {}", self.paths)
     }
 }
 
 impl std::fmt::Debug for CompatibilityProblem {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "CompatibilityProblem::")?;
-        match self.scope.scope_type() {
-            ProblemScopeType::Platform => {
+        match self.paths.kind() {
+            ProblemPathKind::AbiSurface => {
                 write!(f, "platform")?;
                 assert!(!self.warning);
             }
-            ProblemScopeType::Protocol => {
+            ProblemPathKind::Protocol => {
                 write!(f, "protocol")?;
                 assert!(!self.warning);
             }
-            ProblemScopeType::Type => {
+            ProblemPathKind::Type => {
                 if self.warning {
                     write!(f, "type_warning")?;
                 } else {
@@ -180,9 +186,9 @@ impl std::fmt::Debug for CompatibilityProblem {
                 }
             }
         }
-        let levels = self.scope.levels();
+        let levels = self.paths.levels();
         write!(f, "({:?}, {:?})", levels.0, levels.1)?;
-        write!(f, "{{ path={:?}, message={:?} }}", self.scope.path_for_display(), self.message)?;
+        write!(f, "{{ path={:?}, message={:?} }}", self.paths.path_for_display(), self.message)?;
         Ok(())
     }
 }
@@ -193,7 +199,7 @@ impl PartialOrd for CompatibilityProblem {
             Some(core::cmp::Ordering::Equal) => {}
             ord => return ord,
         }
-        match self.scope.partial_cmp(&other.scope) {
+        match self.paths.partial_cmp(&other.paths) {
             Some(core::cmp::Ordering::Equal) => {}
             ord => return ord,
         }
@@ -204,23 +210,18 @@ impl PartialOrd for CompatibilityProblem {
 impl Ord for CompatibilityProblem {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.warning.cmp(&other.warning)
-        // match self.warning.cmp(&other.warning) {
-        //     std::cmp::Ordering::Equal => self.scope.cmp(&other.scope),
-        //     other => other,
-        // }
     }
 }
 
 #[test]
 fn test_compatibility_problem_comparison() {
-    let mk_path = || Path::new(&flyweights::FlyStr::new(""));
     let warning = CompatibilityProblem {
-        scope: CompatibilityScope::Platform { external: mk_path(), platform: mk_path() },
+        paths: ProblemPaths::AbiSurface { external: Path::empty(), platform: Path::empty() },
         warning: true,
         message: "beware".to_owned(),
     };
     let error = CompatibilityProblem {
-        scope: CompatibilityScope::Platform { external: mk_path(), platform: mk_path() },
+        paths: ProblemPaths::AbiSurface { external: Path::empty(), platform: Path::empty() },
         warning: false,
         message: "to err is human".to_owned(),
     };
@@ -232,9 +233,10 @@ fn test_compatibility_problem_comparison() {
 pub struct CompatibilityProblems(Vec<CompatibilityProblem>);
 
 impl CompatibilityProblems {
+    #[allow(unused)]
     pub fn platform(&mut self, external: &Path, platform: &Path, message: impl AsRef<str>) {
         self.0.push(CompatibilityProblem {
-            scope: CompatibilityScope::Platform {
+            paths: ProblemPaths::AbiSurface {
                 external: external.clone(),
                 platform: platform.clone(),
             },
@@ -244,7 +246,7 @@ impl CompatibilityProblems {
     }
     pub fn protocol(&mut self, client: &Path, server: &Path, message: impl AsRef<str>) {
         self.0.push(CompatibilityProblem {
-            scope: CompatibilityScope::Protocol { client: client.clone(), server: server.clone() },
+            paths: ProblemPaths::Protocol { client: client.clone(), server: server.clone() },
             warning: false,
             message: message.as_ref().to_owned(),
         });
@@ -252,14 +254,14 @@ impl CompatibilityProblems {
 
     pub fn type_error(&mut self, sender: &Path, receiver: &Path, message: impl AsRef<str>) {
         self.0.push(CompatibilityProblem {
-            scope: CompatibilityScope::Type { sender: sender.clone(), receiver: receiver.clone() },
+            paths: ProblemPaths::Type { sender: sender.clone(), receiver: receiver.clone() },
             warning: false,
             message: message.as_ref().to_owned(),
         });
     }
     pub fn type_warning(&mut self, sender: &Path, receiver: &Path, message: impl AsRef<str>) {
         self.0.push(CompatibilityProblem {
-            scope: CompatibilityScope::Type { sender: sender.clone(), receiver: receiver.clone() },
+            paths: ProblemPaths::Type { sender: sender.clone(), receiver: receiver.clone() },
             warning: true,
             message: message.as_ref().to_owned(),
         });
@@ -396,7 +398,7 @@ impl<'a> Into<StringPattern<'a>> for &'a str {
 pub struct ProblemPattern<'a> {
     warning: Option<bool>,
     message: Option<StringPattern<'a>>,
-    scope: Option<ProblemScopeType>,
+    kind: Option<ProblemPathKind>,
     path: Option<StringPattern<'a>>,
     levels: Option<(&'a str, &'a str)>,
 }
@@ -415,32 +417,32 @@ impl<'a> ProblemPattern<'a> {
                 return false;
             }
         }
-        if let Some(scope) = &self.scope {
-            if scope != &problem.scope.scope_type() {
+        if let Some(kind) = &self.kind {
+            if kind != &problem.paths.kind() {
                 return false;
             }
         }
         if let Some(path) = &self.path {
-            if !path.matches(problem.scope.paths().0.string())
-                && !path.matches(problem.scope.paths().1.string())
+            if !path.matches(problem.paths.paths().0.string())
+                && !path.matches(problem.paths.paths().1.string())
             {
                 return false;
             }
         }
         if let Some(levels) = self.levels {
-            if levels != problem.scope.levels() {
+            if levels != problem.paths.levels() {
                 return false;
             }
         }
         true
     }
     pub fn platform() -> Self {
-        Self { warning: Some(false), scope: Some(ProblemScopeType::Platform), ..Default::default() }
+        Self { warning: Some(false), kind: Some(ProblemPathKind::AbiSurface), ..Default::default() }
     }
     pub fn protocol(client: &'a str, server: &'a str) -> Self {
         Self {
             warning: Some(false),
-            scope: Some(ProblemScopeType::Protocol),
+            kind: Some(ProblemPathKind::Protocol),
             levels: Some((client, server)),
             ..Default::default()
         }
@@ -449,7 +451,7 @@ impl<'a> ProblemPattern<'a> {
     pub fn type_error(sender: &'a str, receiver: &'a str) -> Self {
         Self {
             warning: Some(false),
-            scope: Some(ProblemScopeType::Type),
+            kind: Some(ProblemPathKind::Type),
             levels: Some((sender, receiver)),
             ..Default::default()
         }
@@ -458,7 +460,7 @@ impl<'a> ProblemPattern<'a> {
     pub fn type_warning(sender: &'a str, receiver: &'a str) -> Self {
         Self {
             warning: Some(true),
-            scope: Some(ProblemScopeType::Type),
+            kind: Some(ProblemPathKind::Type),
             levels: Some((sender, receiver)),
             ..Default::default()
         }
@@ -484,8 +486,8 @@ impl std::fmt::Debug for ProblemPattern<'_> {
         if let Some(message) = &self.message {
             d.field("message", message);
         }
-        if let Some(scope) = &self.scope {
-            d.field("scope", scope);
+        if let Some(kind) = &self.kind {
+            d.field("kind", kind);
         }
         if let Some(path) = &self.path {
             d.field("path", path);

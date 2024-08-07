@@ -48,11 +48,11 @@ rustc_library("core") {
   configs += [ "//src/starnix/config:starnix_clippy_lints" ]
 }
 
-fuchsia_unittest_package("selinux-tests") {
+fuchsia_unittest_package("starnix_selinux-tests") {
   deps = [ ":core_test" ]
 }
 
 group("tests") {
   testonly = true
-  deps = [ ":selinux-tests" ]
+  deps = [ ":starnix_selinux-tests" ]
 }

@@ -361,7 +361,7 @@ void BufferCollectionTokenGroup::BindInternalV1(zx::channel group_request,
                                                 ErrorHandlerWrapper error_handler_wrapper) {
   v1_server_.emplace(*this);
   server_binding_v1_ = fidl::BindServer(
-      parent_device()->dispatcher(),
+      parent_device()->loop_dispatcher(),
       fidl::ServerEnd<fuchsia_sysmem::BufferCollectionTokenGroup>(std::move(group_request)),
       &v1_server_.value(),
       [error_handler_wrapper = std::move(error_handler_wrapper)](
@@ -374,7 +374,7 @@ void BufferCollectionTokenGroup::BindInternalV2(zx::channel group_request,
                                                 ErrorHandlerWrapper error_handler_wrapper) {
   v2_server_.emplace(*this);
   server_binding_v2_ = fidl::BindServer(
-      parent_device()->dispatcher(),
+      parent_device()->loop_dispatcher(),
       fidl::ServerEnd<fuchsia_sysmem2::BufferCollectionTokenGroup>(std::move(group_request)),
       &v2_server_.value(),
       [error_handler_wrapper = std::move(error_handler_wrapper)](

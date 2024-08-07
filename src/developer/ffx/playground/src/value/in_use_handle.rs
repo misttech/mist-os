@@ -2,14 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::anyhow;
+use super::ValueError;
 use fidl::AsHandleRef;
 use fidl_codec::Value as FidlValue;
 use fuchsia_async as fasync;
 use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll};
 
-use crate::error::{Error, Result};
+use crate::error::Result;
+use crate::interpreter::IOError;
 
 pub enum Endpoint {
     Client(fasync::Channel, String),
@@ -34,8 +35,8 @@ impl Endpoint {
     }
 }
 
-#[derive(PartialEq, Eq, Copy, Clone)]
-enum EndpointType {
+#[derive(PartialEq, Eq, Copy, Clone, Debug)]
+pub enum EndpointType {
     Client,
     Server,
 }
@@ -50,7 +51,7 @@ impl std::fmt::Display for EndpointType {
 }
 
 impl EndpointType {
-    fn opposite(&self) -> Self {
+    pub(super) fn opposite(&self) -> Self {
         match self {
             EndpointType::Client => EndpointType::Server,
             EndpointType::Server => EndpointType::Client,
@@ -183,20 +184,27 @@ impl InUseHandle {
             }
             HandleObject::Endpoint(e) => {
                 let Some((got_ty, proto)) = e.endpoint_type() else {
-                    return Err(Error::from(anyhow!("Handle is not a channel")));
+                    return Err(ValueError::NotChannel.into());
                 };
                 let expect_proto_mismatched = expect_proto.filter(|x| *x != proto);
                 if got_ty != ty && expect_proto_mismatched.is_some() {
                     let expect_proto = expect_proto_mismatched.unwrap();
-                    return Err(Error::from(anyhow!(
-                        "Handle is a {got_ty} for {proto} (need {ty} for {expect_proto})"
-                    )));
+                    return Err(ValueError::EndpointMismatch {
+                        got_ty,
+                        got_proto: proto.to_owned(),
+                        expect_ty: ty,
+                        expect_proto: expect_proto.to_owned(),
+                    }
+                    .into());
                 } else if got_ty != ty {
-                    return Err(Error::from(anyhow!("Handle is a {got_ty} (need {ty})")));
+                    return Err(ValueError::EndpointTypeMismatch(got_ty).into());
                 } else if let Some(expect_proto) = expect_proto_mismatched {
-                    return Err(Error::from(anyhow!(
-                        "Handle is a {got_ty} for {proto} (need {expect_proto})"
-                    )));
+                    return Err(ValueError::EndpointProtocolMismatch(
+                        got_ty,
+                        proto.to_owned(),
+                        expect_proto.to_owned(),
+                    )
+                    .into());
                 }
                 let HandleObject::Endpoint(Endpoint::Server(h, _) | Endpoint::Client(h, _)) =
                     std::mem::replace(&mut *this, HandleObject::Defunct)
@@ -207,7 +215,7 @@ impl InUseHandle {
             }
             HandleObject::Undetermined(e) => {
                 let Some(expect_proto) = expect_proto else {
-                    return Err(Error::from(anyhow!("Could not determine protocol for handle")));
+                    return Err(ValueError::UndeterminedProtocol.into());
                 };
                 let mut e = e.lock().unwrap();
                 assert!(e.is_none());
@@ -217,8 +225,8 @@ impl InUseHandle {
                 drop(e);
                 Ok(b)
             }
-            HandleObject::Defunct => Err(Error::from(anyhow!("Handle is closed"))),
-            HandleObject::Handle(_, _) => Err(Error::from(anyhow!("Handle is not a {ty}"))),
+            HandleObject::Defunct => Err(ValueError::HandleClosed.into()),
+            HandleObject::Handle(_, _) => Err(ValueError::NotAnEndpoint(ty).into()),
         }
     }
 
@@ -252,8 +260,8 @@ impl InUseHandle {
                 drop(e);
                 Ok(FidlValue::Handle(b.into(), fidl::ObjectType::SOCKET))
             }
-            HandleObject::Defunct => Err(Error::from(anyhow!("Handle is closed"))),
-            _ => Err(Error::from(anyhow!("Handle is not a socket"))),
+            HandleObject::Defunct => Err(ValueError::HandleClosed.into()),
+            _ => Err(ValueError::NotSocket.into()),
         }
     }
 
@@ -279,22 +287,16 @@ impl InUseHandle {
         let hdl = match &*this {
             HandleObject::Endpoint(Endpoint::Client(ch, _) | Endpoint::Server(ch, _)) => ch,
             HandleObject::Handle(_, _) => {
-                return Poll::Ready(Err(Error::from(anyhow!("Raw channel reads unimplemented"))))
+                return Poll::Ready(Err(ValueError::RawChannelUnimplemented("reads").into()))
             }
-            HandleObject::Endpoint(_) => {
-                return Poll::Ready(Err(Error::from(anyhow!("Handle is not a channel"))))
-            }
+            HandleObject::Endpoint(_) => return Poll::Ready(Err(ValueError::NotChannel.into())),
             HandleObject::Undetermined(_) => {
-                return Poll::Ready(Err(Error::from(anyhow!(
-                    "Not enough type information to use handle as channel"
-                ))))
+                return Poll::Ready(Err(ValueError::ChannelTypeUndetermined.into()))
             }
-            HandleObject::Defunct => {
-                return Poll::Ready(Err(Error::from(anyhow!("Channel was closed"))))
-            }
+            HandleObject::Defunct => return Poll::Ready(Err(ValueError::ChannelClosed.into())),
         };
 
-        hdl.read_etc(ctx, bytes, handles).map_err(Into::into)
+        hdl.read_etc(ctx, bytes, handles).map_err(|e| IOError::ChannelRead(e).into())
     }
 
     /// If this is a channel, perform a `read_etc` operation on it within a
@@ -316,20 +318,14 @@ impl InUseHandle {
         let hdl = match &*this {
             HandleObject::Endpoint(Endpoint::Client(ch, _) | Endpoint::Server(ch, _)) => ch,
             HandleObject::Handle(_, _) => {
-                return Err(Error::from(anyhow!("Raw channel writes unimplemented")))
+                return Err(ValueError::RawChannelUnimplemented("writes").into())
             }
-            HandleObject::Endpoint(_) => {
-                return Err(Error::from(anyhow!("Handle is not a channel")))
-            }
-            HandleObject::Undetermined(_) => {
-                return Err(Error::from(anyhow!(
-                    "Not enough type information to use handle as channel"
-                )))
-            }
-            HandleObject::Defunct => return Err(Error::from(anyhow!("Channel was closed"))),
+            HandleObject::Endpoint(_) => return Err(ValueError::NotChannel.into()),
+            HandleObject::Undetermined(_) => return Err(ValueError::ChannelTypeUndetermined.into()),
+            HandleObject::Defunct => return Err(ValueError::ChannelClosed.into()),
         };
 
-        hdl.write_etc(bytes, handles).map_err(Into::into)
+        hdl.write_etc(bytes, handles).map_err(|e| IOError::ChannelWrite(e).into())
     }
 
     /// Get an ID for this handle (the raw handle number). Fails if the handle
@@ -342,11 +338,9 @@ impl InUseHandle {
                 Ok(ch.raw_handle())
             }
             HandleObject::Endpoint(Endpoint::Socket(s)) => Ok(s.raw_handle()),
-            HandleObject::Undetermined(_) => {
-                Err(Error::from(anyhow!("Insufficient type information to determine handle state")))
-            }
+            HandleObject::Undetermined(_) => Err(ValueError::NoHandleID.into()),
             HandleObject::Handle(h, _) => Ok(h.raw_handle()),
-            HandleObject::Defunct => Err(Error::from(anyhow!("Handle was closed"))),
+            HandleObject::Defunct => Err(ValueError::HandleClosed.into()),
         }
     }
 
@@ -359,8 +353,10 @@ impl InUseHandle {
             HandleObject::Endpoint(Endpoint::Client(_, proto)) => Ok(proto.clone()),
             HandleObject::Handle(_, _)
             | HandleObject::Endpoint(_)
-            | HandleObject::Undetermined(_) => Err(Error::from(anyhow!("Handle is not a client"))),
-            HandleObject::Defunct => Err(Error::from(anyhow!("Handle was closed"))),
+            | HandleObject::Undetermined(_) => {
+                Err(ValueError::NotAnEndpoint(EndpointType::Client).into())
+            }
+            HandleObject::Defunct => Err(ValueError::HandleClosed.into()),
         }
     }
 }

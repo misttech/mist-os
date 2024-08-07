@@ -87,11 +87,11 @@ pub struct ServeCommand {
     pub refresh_metadata: bool,
 }
 
-fn default_address() -> SocketAddr {
+pub fn default_address() -> SocketAddr {
     (Ipv6Addr::UNSPECIFIED, 8083).into()
 }
 
-fn parse_storage_type(arg: &str) -> Result<RepositoryStorageType, String> {
+pub fn parse_storage_type(arg: &str) -> Result<RepositoryStorageType, String> {
     match arg {
         "ephemeral" => Ok(RepositoryStorageType::Ephemeral),
         "persistent" => Ok(RepositoryStorageType::Persistent),
@@ -99,11 +99,13 @@ fn parse_storage_type(arg: &str) -> Result<RepositoryStorageType, String> {
     }
 }
 
-fn default_alias_conflict_mode() -> RepositoryRegistrationAliasConflictMode {
+pub fn default_alias_conflict_mode() -> RepositoryRegistrationAliasConflictMode {
     RepositoryRegistrationAliasConflictMode::Replace
 }
 
-fn parse_alias_conflict_mode(arg: &str) -> Result<RepositoryRegistrationAliasConflictMode, String> {
+pub fn parse_alias_conflict_mode(
+    arg: &str,
+) -> Result<RepositoryRegistrationAliasConflictMode, String> {
     match arg {
         "error-out" => Ok(RepositoryRegistrationAliasConflictMode::ErrorOut),
         "replace" => Ok(RepositoryRegistrationAliasConflictMode::Replace),

@@ -470,6 +470,20 @@ impl SecurityServer {
             .context("computing new security context from policy")
     }
 
+    /// Returns true if the `bounded_sid` is bounded by the `parent_sid`.
+    /// Bounds relationships are mostly enforced by policy tooling, so this only requires validating
+    /// that the policy entry for the `TypeId` of `bounded_sid` has the `TypeId` of `parent_sid`
+    /// specified in its `bounds`.
+    pub fn is_bounded_by(&self, bounded_sid: SecurityId, parent_sid: SecurityId) -> bool {
+        let state = self.state.lock();
+        let bounded_type = state.sid_to_security_context(bounded_sid).type_();
+        let parent_type = state.sid_to_security_context(parent_sid).type_();
+        state
+            .policy
+            .as_ref()
+            .map_or(false, |policy| policy.parsed.is_bounded_by(bounded_type, parent_type))
+    }
+
     /// Returns a read-only VMO containing the SELinux "status" structure.
     pub fn get_status_vmo(&self) -> Arc<zx::Vmo> {
         self.state.lock().status.get_readonly_vmo()

@@ -426,6 +426,46 @@
         "resourceness": "resource"
     },
     {
+        "kind": "enum/member",
+        "name": "fuchsia.ui.test.input/TestAppStatus.ELEMENT_FOCUSED",
+        "value": "2"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.ui.test.input/TestAppStatus.HANDLERS_REGISTERED",
+        "value": "1"
+    },
+    {
+        "kind": "enum",
+        "name": "fuchsia.ui.test.input/TestAppStatus",
+        "strictness": "flexible",
+        "type": "uint16"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.ui.test.input/TestAppStatusListener.ReportStatus",
+        "strictness": "strict",
+        "ordinal": "7772812646490036820",
+        "direction": "two_way",
+        "request": "fuchsia.ui.test.input/TestAppStatusListenerReportStatusRequest"
+    },
+    {
+        "kind": "protocol",
+        "name": "fuchsia.ui.test.input/TestAppStatusListener",
+        "openness": "open",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.test.input/TestAppStatusListenerReportStatusRequest.status",
+        "ordinal": "1",
+        "type": "fuchsia.ui.test.input/TestAppStatus"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.test.input/TestAppStatusListenerReportStatusRequest"
+    },
+    {
         "kind": "protocol/member",
         "name": "fuchsia.ui.test.input/TouchInputListener.ReportTouchInput",
         "strictness": "strict",

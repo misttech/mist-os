@@ -67,7 +67,7 @@ pub(super) async fn route_and_open_capability(
     open_request: OpenRequest<'_>,
 ) -> Result<RoutingOutcome, RouterError> {
     let source = route_request.clone().route(target).await.map_err(RouterError::from)?;
-    if let CapabilitySource::Void { .. } = source.source {
+    if let CapabilitySource::Void(_) = source.source {
         return Ok(RoutingOutcome::FromVoid);
     };
 

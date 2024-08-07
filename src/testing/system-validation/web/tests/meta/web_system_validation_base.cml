@@ -24,7 +24,8 @@
             protocol: [
                 "fuchsia.process.Launcher",
                 "fuchsia.session.scene.Manager",
-                "fuchsia.tracing.controller.Controller",
+                "fuchsia.tracing.controller.Provisioner",
+                "fuchsia.tracing.controller.Session",
                 "fuchsia.ui.composition.Screenshot",
             ],
             from: "parent",

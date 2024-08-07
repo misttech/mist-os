@@ -4,22 +4,40 @@
 # license that can be found in the LICENSE file or at
 # https://opensource.org/licenses/MIT
 
-import("//build/zircon/migrated_targets.gni")
+import("//build/cpp/library_headers.gni")
 
-config("includes") {
-  include_dirs = [ "include" ]
+library_headers("headers") {
+  headers = [
+    "lib/crypto/global_prng.h",
+    "lib/crypto/prng.h",
+  ]
+
+  public_deps = [
+    ":crypto-entropy-src.headers",
+    "entropy:headers",
+
+    # <lib/crypto/prng.h> has #include <ktl/atomic.h>.
+    "//zircon/kernel/lib/ktl:headers",
+  ]
+}
+
+library_headers("crypto-entropy-src.headers") {
+  headers = [ "lib/crypto/entropy_pool.h" ]
+  public_deps = [
+    # <lib/crypto/entropy_pool.h> #include <lib/stdcompat/span.h>
+    "//sdk/lib/stdcompat",
+  ]
 }
 
 source_set("crypto-entropy-src") {
   sources = [ "entropy_pool.cc" ]
-  public = [ "include/lib/crypto/entropy_pool.h" ]
-  public_deps = [ "//zircon/kernel/lib/ktl" ]
+  public_deps = [ ":crypto-entropy-src.headers" ]
   deps = [
     "boringssl",
+    "//zircon/kernel/lib/ktl",
     "//zircon/kernel/lib/libc",
     "//zircon/system/ulib/explicit-memory",
   ]
-  public_configs = [ ":includes" ]
 }
 
 source_set("crypto-entropy-test") {
@@ -27,12 +45,14 @@ source_set("crypto-entropy-test") {
   include_dirs = [ "include" ]
   deps = [
     ":crypto-entropy-src",
+    "//zircon/kernel/lib/ktl",
     "//zircon/kernel/lib/libc",
     "//zircon/kernel/lib/unittest",
   ]
 }
 
-zx_library("crypto") {
+static_library("crypto") {
+  public_deps = [ ":headers" ]
   sources = [
     "global_prng.cc",
     "global_prng_unittest.cc",
@@ -51,12 +71,5 @@ zx_library("crypto") {
     "//zircon/kernel/lib/unittest",
     "//zircon/kernel/phys:handoff",
     "//zircon/system/ulib/explicit-memory",
-  ]
-  public_deps = [
-    # <lib/crypto/prng.h> has #include <ktl/atomic.h>.
-    "//zircon/kernel/lib/ktl:headers",
-
-    # <lib/crypto/entropy/jitterentropy_collector.h> has #include <lib/jitterentropy/jitterentropy.h>.
-    "//zircon/third_party/lib/jitterentropy:headers",
   ]
 }

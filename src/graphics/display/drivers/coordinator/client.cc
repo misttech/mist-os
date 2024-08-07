@@ -1152,9 +1152,7 @@ void Client::SetOwnership(bool is_owner) {
   ZX_DEBUG_ASSERT(controller_->IsRunningOnClientDispatcher());
   is_owner_ = is_owner;
 
-  fidl::Status result = binding_state_.SendEvents([&](auto&& endpoint) {
-    return fidl::WireSendEvent(endpoint)->OnClientOwnershipChange(is_owner);
-  });
+  fidl::Status result = NotifyOwnershipChange(/*client_has_ownership=*/is_owner);
   if (!result.ok()) {
     zxlogf(ERROR, "Error writing remove message: %s", result.FormatDescription().c_str());
   }
@@ -1163,6 +1161,41 @@ void Client::SetOwnership(bool is_owner) {
   if (client_apply_count_) {
     ApplyConfig();
   }
+}
+
+fidl::Status Client::NotifyDisplayChanges(
+    cpp20::span<const fuchsia_hardware_display::wire::Info> added_display_infos,
+    cpp20::span<const fuchsia_hardware_display_types::wire::DisplayId> removed_display_ids) {
+  // TODO(https://fxbug.dev/42052765): OnDisplayChanged() takes VectorViews
+  // of non-const display Info and DisplayId types though it doesn't modify
+  // the vectors. We have to perform a const_cast to drop their constness.
+  cpp20::span<fuchsia_hardware_display::wire::Info> non_const_added_display_infos(
+      const_cast<fuchsia_hardware_display::wire::Info*>(added_display_infos.data()),
+      added_display_infos.size());
+  cpp20::span<fuchsia_hardware_display_types::wire::DisplayId> non_const_removed_display_ids(
+      const_cast<fuchsia_hardware_display_types::wire::DisplayId*>(removed_display_ids.data()),
+      removed_display_ids.size());
+
+  fidl::OneWayStatus send_event_result = fidl::WireSendEvent(*binding_)->OnDisplaysChanged(
+      fidl::VectorView<fuchsia_hardware_display::wire::Info>::FromExternal(
+          non_const_added_display_infos.data(), non_const_added_display_infos.size()),
+      fidl::VectorView<fuchsia_hardware_display_types::wire::DisplayId>::FromExternal(
+          non_const_removed_display_ids.data(), non_const_removed_display_ids.size()));
+  return send_event_result;
+}
+
+fidl::Status Client::NotifyOwnershipChange(bool client_has_ownership) {
+  fidl::OneWayStatus send_event_result =
+      fidl::WireSendEvent(*binding_)->OnClientOwnershipChange(client_has_ownership);
+  return send_event_result;
+}
+
+fidl::Status Client::NotifyVsync(DisplayId display_id, zx::time timestamp, ConfigStamp config_stamp,
+                                 VsyncAckCookie vsync_ack_cookie) {
+  fidl::OneWayStatus send_event_result = fidl::WireSendEvent(*binding_)->OnVsync(
+      ToFidlDisplayId(display_id), timestamp.get(), ToFidlConfigStamp(config_stamp),
+      ToFidlVsyncAckCookieValue(vsync_ack_cookie));
+  return send_event_result;
 }
 
 void Client::OnDisplaysChanged(cpp20::span<const DisplayId> added_display_ids,
@@ -1305,11 +1338,7 @@ void Client::OnDisplaysChanged(cpp20::span<const DisplayId> added_display_ids,
   }
 
   if (!coded_configs.empty() || !fidl_removed_display_ids.empty()) {
-    fidl::Status result = binding_state_.SendEvents([&](auto&& endpoint) {
-      return fidl::WireSendEvent(endpoint)->OnDisplaysChanged(
-          fidl::VectorView<fhd::wire::Info>::FromExternal(coded_configs),
-          fidl::VectorView<fhdt::wire::DisplayId>::FromExternal(fidl_removed_display_ids));
-    });
+    fidl::Status result = NotifyDisplayChanges(coded_configs, fidl_removed_display_ids);
     if (!result.ok()) {
       zxlogf(ERROR, "Error writing remove message: %s", result.FormatDescription().c_str());
     }
@@ -1496,26 +1525,16 @@ zx_koid_t GetKoid(zx_handle_t handle) {
   return status == ZX_OK ? info.koid : ZX_KOID_INVALID;
 }
 
-fidl::ServerBindingRef<fuchsia_hardware_display::Coordinator> Client::Init(
-    fidl::ServerEnd<fuchsia_hardware_display::Coordinator> server_end) {
+fidl::ServerBindingRef<fuchsia_hardware_display::Coordinator> Client::Bind(
+    fidl::ServerEnd<fuchsia_hardware_display::Coordinator> server_end,
+    fidl::OnUnboundFn<Client> unbound_callback) {
+  ZX_DEBUG_ASSERT(!running_);
   running_ = true;
 
-  fidl::OnUnboundFn<Client> cb = [](Client* client, fidl::UnbindInfo info,
-                                    fidl::ServerEnd<fuchsia_hardware_display::Coordinator> ch) {
-    sync_completion_signal(client->fidl_unbound());
-    // Make sure we TearDown() so that no further tasks are scheduled on the controller loop.
-    client->TearDown();
-
-    // The client has died so tell the Proxy which will free the classes.
-    client->proxy_->OnClientDead();
-  };
-
-  auto binding = fidl::BindServer(controller_->client_dispatcher()->async_dispatcher(),
-                                  std::move(server_end), this, std::move(cb));
   // Keep a copy of fidl binding so we can safely unbind from it during shutdown
-  binding_state_.SetBound(binding);
-
-  return binding;
+  binding_ = fidl::BindServer(controller_->client_dispatcher()->async_dispatcher(),
+                              std::move(server_end), this, std::move(unbound_callback));
+  return *binding_;
 }
 
 Client::Client(Controller* controller, ClientProxy* proxy, ClientPriority priority,
@@ -1526,19 +1545,6 @@ Client::Client(Controller* controller, ClientProxy* proxy, ClientPriority priori
       id_(client_id),
       fences_(controller->client_dispatcher()->async_dispatcher(),
               fit::bind_member<&Client::OnFenceFired>(this)) {
-  ZX_DEBUG_ASSERT(client_id != kInvalidClientId);
-}
-
-Client::Client(Controller* controller, ClientProxy* proxy, ClientPriority priority,
-               ClientId client_id, fidl::ServerEnd<fhd::Coordinator> server_end)
-    : controller_(controller),
-      proxy_(proxy),
-      priority_(priority),
-      id_(client_id),
-      running_(true),
-      fences_(controller->client_dispatcher()->async_dispatcher(),
-              fit::bind_member<&Client::OnFenceFired>(this)),
-      binding_state_(std::move(server_end)) {
   ZX_DEBUG_ASSERT(client_id != kInvalidClientId);
 }
 
@@ -1715,12 +1721,9 @@ zx_status_t ClientProxy::OnDisplayVsync(DisplayId display_id, zx_time_t timestam
   while (!buffered_vsync_messages_.empty()) {
     VsyncMessageData vsync_message_data = buffered_vsync_messages_.front();
     buffered_vsync_messages_.pop();
-    event_sending_result = handler_.binding_state().SendEvents([&](auto&& endpoint) {
-      return fidl::WireSendEvent(endpoint)->OnVsync(
-          ToFidlDisplayId(vsync_message_data.display_id), vsync_message_data.timestamp,
-          ToFidlConfigStamp(vsync_message_data.config_stamp),
-          ToFidlVsyncAckCookieValue(kInvalidVsyncAckCookie));
-    });
+    event_sending_result =
+        handler_.NotifyVsync(vsync_message_data.display_id, zx::time{vsync_message_data.timestamp},
+                             vsync_message_data.config_stamp, kInvalidVsyncAckCookie);
     if (!event_sending_result.ok()) {
       zxlogf(ERROR, "Failed to send all buffered vsync messages: %s\n",
              event_sending_result.FormatDescription().c_str());
@@ -1730,11 +1733,8 @@ zx_status_t ClientProxy::OnDisplayVsync(DisplayId display_id, zx_time_t timestam
   }
 
   // Send the latest vsync event
-  event_sending_result = handler_.binding_state().SendEvents([&](auto&& endpoint) {
-    return fidl::WireSendEvent(endpoint)->OnVsync(ToFidlDisplayId(display_id), timestamp,
-                                                  ToFidlConfigStamp(client_stamp),
-                                                  ToFidlVsyncAckCookieValue(vsync_ack_cookie));
-  });
+  event_sending_result =
+      handler_.NotifyVsync(display_id, zx::time{timestamp}, client_stamp, vsync_ack_cookie);
   if (!event_sending_result.ok()) {
     return event_sending_result.status();
   }
@@ -1793,9 +1793,33 @@ zx_status_t ClientProxy::Init(inspect::Node* parent_node,
 
   unsigned seed = static_cast<unsigned>(zx::clock::get_monotonic().get());
   initial_cookie_ = VsyncAckCookie(rand_r(&seed));
+
+  fidl::OnUnboundFn<Client> unbound_callback =
+      [this](Client* client, fidl::UnbindInfo info,
+             fidl::ServerEnd<fuchsia_hardware_display::Coordinator> ch) {
+        sync_completion_signal(client->fidl_unbound());
+        // Make sure we TearDown() so that no further tasks are scheduled on the controller loop.
+        client->TearDown();
+
+        // The client has died so tell the Proxy which will free the classes.
+        OnClientDead();
+      };
+
   [[maybe_unused]] fidl::ServerBindingRef<fuchsia_hardware_display::Coordinator> binding =
-      handler_.Init(std::move(server_end));
+      handler_.Bind(std::move(server_end), std::move(unbound_callback));
   return ZX_OK;
+}
+
+zx::result<> ClientProxy::InitForTesting(
+    fidl::ServerEnd<fuchsia_hardware_display::Coordinator> server_end) {
+  // ClientProxy created by tests may not have a full-fledged display engine
+  // associated. The production client teardown logic doesn't work here
+  // so we replace it with a no-op unbound callback instead.
+  fidl::OnUnboundFn<Client> unbound_callback =
+      [](Client*, fidl::UnbindInfo, fidl::ServerEnd<fuchsia_hardware_display::Coordinator>) {};
+  [[maybe_unused]] fidl::ServerBindingRef<fuchsia_hardware_display::Coordinator> binding =
+      handler_.Bind(std::move(server_end), std::move(unbound_callback));
+  return zx::ok();
 }
 
 ClientProxy::ClientProxy(Controller* controller, ClientPriority client_priority, ClientId client_id,
@@ -1803,11 +1827,6 @@ ClientProxy::ClientProxy(Controller* controller, ClientPriority client_priority,
     : controller_(controller),
       handler_(controller_, this, client_priority, client_id),
       on_client_dead_(std::move(on_client_dead)) {}
-
-ClientProxy::ClientProxy(Controller* controller, ClientPriority client_priority, ClientId client_id,
-                         fidl::ServerEnd<fhd::Coordinator> server_end)
-    : controller_(controller),
-      handler_(controller_, this, client_priority, client_id, std::move(server_end)) {}
 
 ClientProxy::~ClientProxy() {}
 

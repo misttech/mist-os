@@ -8,7 +8,9 @@ use crate::model::component::{ComponentInstance, ExtendedInstance, WeakExtendedI
 use crate::model::events::dispatcher::{EventDispatcher, EventDispatcherScope};
 use crate::model::events::stream::EventStream;
 use crate::model::events::synthesizer::{ComponentManagerEventSynthesisProvider, EventSynthesizer};
-use ::routing::capability_source::{CapabilitySource, InternalCapability};
+use ::routing::capability_source::{
+    BuiltinSource, CapabilitySource, FrameworkSource, InternalCapability,
+};
 use ::routing::component_instance::ComponentInstanceInterface;
 use ::routing::event::EventFilter;
 use ::routing::mapper::{RouteMapper, RouteSegment};
@@ -361,17 +363,17 @@ impl EventRegistry {
         match route_source {
             RouteSource {
                 source:
-                    CapabilitySource::Framework {
+                    CapabilitySource::Framework(FrameworkSource {
                         capability: InternalCapability::EventStream(source_name),
                         moniker,
-                    },
+                    }),
                 relative_path: _,
             } => Ok((source_name, moniker.into(), route)),
             RouteSource {
                 source:
-                    CapabilitySource::Builtin {
+                    CapabilitySource::Builtin(BuiltinSource {
                         capability: InternalCapability::EventStream(source_name),
-                    },
+                    }),
                 relative_path: _,
             } => Ok((source_name, ExtendedMoniker::ComponentManager, route)),
             _ => unreachable!(),

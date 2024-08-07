@@ -112,7 +112,7 @@ const MAX_FILENAME uint64 = 255;
 
 // Dirent type information associated with the results of ReadDirents.
 // The following values are aligned with the values from libc's "dirent.h" "DT_...".
-type DirentType = strict enum : uint8 {
+type DirentType = flexible enum : uint8 {
     /// A dirent with an unknown type.
     UNKNOWN = 0;
     /// A dirent representing a directory object.

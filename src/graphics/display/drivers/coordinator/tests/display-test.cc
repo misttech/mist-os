@@ -64,7 +64,9 @@ TEST(DisplayTest, ClientVSyncOk) {
   Controller controller(std::move(engine_driver_client), dispatcher.borrow());
 
   ClientProxy clientproxy(&controller, ClientPriority::kPrimary, ClientId(1),
-                          std::move(server_end));
+                          /*on_client_dead=*/[] {});
+  ASSERT_OK(clientproxy.InitForTesting(std::move(server_end)));
+
   clientproxy.EnableVsync(true);
   fbl::AutoLock lock(controller.mtx());
   clientproxy.UpdateConfigStampMapping({
@@ -118,7 +120,9 @@ TEST(DisplayTest, ClientVSynPeerClosed) {
   Controller controller(std::move(engine_driver_client), dispatcher.borrow());
 
   ClientProxy clientproxy(&controller, ClientPriority::kPrimary, ClientId(1),
-                          std::move(server_end));
+                          /*on_client_dead=*/[] {});
+  ASSERT_OK(clientproxy.InitForTesting(std::move(server_end)));
+
   clientproxy.EnableVsync(true);
   fbl::AutoLock lock(controller.mtx());
   client_end.reset();
@@ -142,7 +146,9 @@ TEST(DisplayTest, ClientVSyncNotSupported) {
   Controller controller(std::move(engine_driver_client), dispatcher.borrow());
 
   ClientProxy clientproxy(&controller, ClientPriority::kPrimary, ClientId(1),
-                          std::move(server_end));
+                          /*on_client_dead=*/[] {});
+  ASSERT_OK(clientproxy.InitForTesting(std::move(server_end)));
+
   fbl::AutoLock lock(controller.mtx());
   EXPECT_STATUS(ZX_ERR_NOT_SUPPORTED,
                 clientproxy.OnDisplayVsync(kInvalidDisplayId, 0, kInvalidConfigStamp));
@@ -169,7 +175,9 @@ TEST(DisplayTest, ClientMustDrainPendingStamps) {
   Controller controller(std::move(engine_driver_client), dispatcher.borrow());
 
   ClientProxy clientproxy(&controller, ClientPriority::kPrimary, ClientId(1),
-                          std::move(server_end));
+                          /*on_client_dead=*/[] {});
+  ASSERT_OK(clientproxy.InitForTesting(std::move(server_end)));
+
   clientproxy.EnableVsync(false);
   fbl::AutoLock lock(controller.mtx());
   for (size_t i = 0; i < kNumPendingStamps; i++) {

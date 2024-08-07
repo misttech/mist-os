@@ -409,21 +409,26 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
     EXPECT_TRUE(display);
     EXPECT_TRUE(display_coordinator);
 
+    fidl::UnownedClientEnd<fuchsia_hardware_display::Coordinator> coordinator =
+        scenic_impl::GetUnowned(*display_coordinator);
+
     // This should only be running on devices with capture support.
-    bool capture_supported = scenic_impl::IsCaptureSupported(*display_coordinator.get());
+    bool capture_supported = scenic_impl::IsCaptureSupported(coordinator);
     if (!capture_supported) {
       FX_LOGS(WARNING) << "Capture is not supported on this device. Test skipped.";
       return fpromise::error(ZX_ERR_NOT_SUPPORTED);
     }
 
     // Set up buffer collection and image for recording a snapshot.
-    fuchsia::hardware::display::types::ImageBufferUsage image_buffer_usage = {
-        .tiling_type = fuchsia::hardware::display::types::IMAGE_TILING_TYPE_CAPTURE,
-    };
+    fuchsia_hardware_display_types::ImageBufferUsage image_buffer_usage = {{
+        .tiling_type = fuchsia_hardware_display_types::kImageTilingTypeCapture,
+    }};
 
     auto tokens = SysmemTokens::Create(sysmem_allocator_.get());
-    auto result = scenic_impl::ImportBufferCollection(
-        collection_id, *display_coordinator.get(), std::move(tokens.dup_token), image_buffer_usage);
+    fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken> dup_token(
+        std::move(tokens.dup_token).Unbind().TakeChannel());
+    auto result = scenic_impl::ImportBufferCollection(collection_id, coordinator,
+                                                      std::move(dup_token), image_buffer_usage);
     EXPECT_TRUE(result);
     fuchsia::sysmem2::BufferCollectionSyncPtr collection;
     fuchsia::sysmem2::AllocatorBindSharedCollectionRequest bind_shared_request;
@@ -486,14 +491,14 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
 
     // TODO(https://fxbug.dev/332521780): Display clients will be required to
     // pass the captured display's mode information.
-    fuchsia::hardware::display::types::ImageMetadata image_metadata = {
+    fuchsia_hardware_display_types::ImageMetadata image_metadata = {{
         .width = display->width_in_px(),
         .height = display->height_in_px(),
-        .tiling_type = fuchsia::hardware::display::types::IMAGE_TILING_TYPE_CAPTURE,
-    };
+        .tiling_type = fuchsia_hardware_display_types::kImageTilingTypeCapture,
+    }};
 
-    zx_status_t import_status = scenic_impl::ImportImageForCapture(
-        *display_coordinator.get(), image_metadata, collection_id, 0, image_id);
+    zx_status_t import_status =
+        scenic_impl::ImportImageForCapture(coordinator, image_metadata, collection_id, 0, image_id);
     EXPECT_EQ(import_status, ZX_OK);
     if (import_status != ZX_OK) {
       return fpromise::error(import_status);
@@ -567,8 +572,9 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
     auto status = zx::event::create(0, &capture_signal_fence);
     EXPECT_EQ(status, ZX_OK);
 
-    auto capture_signal_fence_id =
-        scenic_impl::ImportEvent(*display_coordinator.get(), capture_signal_fence);
+    fidl::UnownedClientEnd<fuchsia_hardware_display::Coordinator> coordinator =
+        scenic_impl::GetUnowned(*display_coordinator);
+    auto capture_signal_fence_id = scenic_impl::ImportEvent(coordinator, capture_signal_fence);
     fuchsia::hardware::display::Coordinator_StartCapture_Result start_capture_result;
     (*display_coordinator.get())
         ->StartCapture(capture_signal_fence_id, fidl_capture_image_id, &start_capture_result);

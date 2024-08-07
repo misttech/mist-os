@@ -20,13 +20,20 @@ pub(crate) mod state;
 use packet_formats::ip::IpPacket;
 use zerocopy::ByteSlice;
 
+use netstack3_base::{AnyDevice, DeviceIdContext};
 use route::{Action, MulticastRouteTargets};
 
 use crate::multicast_forwarding::{
     MulticastForwardingStateContext, MulticastRoute, MulticastRouteKey,
     MulticastRouteTableContext as _,
 };
-use crate::{IpDeviceContext, IpLayerIpExt};
+use crate::IpLayerIpExt;
+
+/// Device related functionality required by multicast forwarding.
+pub trait MulticastForwardingDeviceContext<I: IpLayerIpExt>: DeviceIdContext<AnyDevice> {
+    /// True if the given device has multicast forwarding enabled.
+    fn is_device_multicast_forwarding_enabled(&mut self, dev: &Self::DeviceId) -> bool;
+}
 
 /// Query the multicast route table and return the forwarding targets.
 ///
@@ -43,9 +50,7 @@ use crate::{IpDeviceContext, IpLayerIpExt};
 ///
 /// Note that the returned targets are not synchronized with the multicast route
 /// table and may grow stale if the table is updated.
-// TODO(https://fxbug.dev/353329136): Call this function from IP RX.
-#[allow(unused)]
-pub(crate) fn lookup_multicast_route_for_packet<I, B, CC, BC>(
+pub(crate) fn lookup_multicast_route_for_packet<I, B, CC>(
     core_ctx: &mut CC,
     packet: &I::Packet<B>,
     dev: &CC::DeviceId,
@@ -53,7 +58,7 @@ pub(crate) fn lookup_multicast_route_for_packet<I, B, CC, BC>(
 where
     I: IpLayerIpExt,
     B: ByteSlice,
-    CC: MulticastForwardingStateContext<I> + IpDeviceContext<I, BC>,
+    CC: MulticastForwardingStateContext<I> + MulticastForwardingDeviceContext<I>,
 {
     // Short circuit if the packet's addresses don't constitute a valid
     // multicast route key (e.g. src is not unicast, or dst is not multicast).
@@ -99,22 +104,18 @@ mod testutil {
     use alloc::collections::HashSet;
     use alloc::rc::Rc;
     use core::cell::RefCell;
-    use core::num::NonZeroU8;
 
     use derivative::Derivative;
     use net_declare::{net_ip_v4, net_ip_v6};
-    use net_types::ip::{Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Mtu};
-    use net_types::SpecifiedAddr;
+    use net_types::ip::{Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
     use netstack3_base::testutil::{FakeStrongDeviceId, MultipleDevicesId};
     use netstack3_base::CtxPair;
 
-    use crate::device::IpDeviceAddr;
     use crate::multicast_forwarding::{
         MulticastForwardingApi, MulticastForwardingEnabledState, MulticastForwardingPendingPackets,
         MulticastForwardingPendingPacketsContext, MulticastForwardingState, MulticastRouteTable,
         MulticastRouteTableContext,
     };
-    use crate::{AddressStatus, IpDeviceStateContext};
 
     /// An IP extension trait providing constants for various IP addresses.
     pub(crate) trait TestIpExt: IpLayerIpExt {
@@ -233,61 +234,11 @@ mod testutil {
         }
     }
 
-    impl<I: IpLayerIpExt, D: FakeStrongDeviceId> IpDeviceStateContext<I, FakeBindingsCtx>
+    impl<I: IpLayerIpExt, D: FakeStrongDeviceId> MulticastForwardingDeviceContext<I>
         for FakeCoreCtx<I, D>
     {
-        fn with_next_packet_id<O, F: FnOnce(&I::PacketIdState) -> O>(&self, _cb: F) -> O {
-            unimplemented!("");
-        }
-        fn get_local_addr_for_remote(
-            &mut self,
-            _device_id: &Self::DeviceId,
-            _remote: Option<SpecifiedAddr<I::Addr>>,
-        ) -> Option<IpDeviceAddr<I::Addr>> {
-            unimplemented!();
-        }
-        fn get_hop_limit(&mut self, _device_id: &Self::DeviceId) -> NonZeroU8 {
-            unimplemented!();
-        }
-        fn address_status_for_device(
-            &mut self,
-            _addr: SpecifiedAddr<I::Addr>,
-            _device_id: &Self::DeviceId,
-        ) -> AddressStatus<I::AddressStatus> {
-            unimplemented!();
-        }
-    }
-
-    impl<I: IpLayerIpExt, D: FakeStrongDeviceId> IpDeviceContext<I, FakeBindingsCtx>
-        for FakeCoreCtx<I, D>
-    {
-        fn is_ip_device_enabled(&mut self, _device_id: &Self::DeviceId) -> bool {
-            todo!()
-        }
-        type DeviceAndAddressStatusIter<'a> = core::iter::Empty<(Self::DeviceId, I::AddressStatus)>;
-        fn with_address_statuses<F: FnOnce(Self::DeviceAndAddressStatusIter<'_>) -> R, R>(
-            &mut self,
-            _addr: SpecifiedAddr<I::Addr>,
-            _cb: F,
-        ) -> R {
-            unimplemented!()
-        }
-        fn is_device_unicast_forwarding_enabled(&mut self, _device_id: &Self::DeviceId) -> bool {
-            unimplemented!()
-        }
         fn is_device_multicast_forwarding_enabled(&mut self, device_id: &Self::DeviceId) -> bool {
             self.state.forwarding_enabled_devices.contains(device_id)
-        }
-        fn get_mtu(&mut self, _device_id: &Self::DeviceId) -> Mtu {
-            unimplemented!()
-        }
-        fn confirm_reachable(
-            &mut self,
-            _bindings_ctx: &mut FakeBindingsCtx,
-            _device: &Self::DeviceId,
-            _neighbor: SpecifiedAddr<I::Addr>,
-        ) {
-            unimplemented!()
         }
     }
 

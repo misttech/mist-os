@@ -18,9 +18,10 @@ use bstr::BString;
 use fasync::OnSignals;
 use fidl::endpoints::{ControlHandle, RequestStream};
 use fidl::AsyncChannel;
+use fidl_fuchsia_feedback::CrashReporterMarker;
 use fidl_fuchsia_scheduler::RoleManagerMarker;
 use fuchsia_async::DurationExt;
-use fuchsia_component::client::connect_to_protocol_sync;
+use fuchsia_component::client::{connect_to_protocol, connect_to_protocol_sync};
 use fuchsia_component::server::ServiceFs;
 use fuchsia_zircon::{
     AsHandleRef, Signals, Task as _, {self as zx},
@@ -30,7 +31,6 @@ use futures::{FutureExt, StreamExt, TryStreamExt};
 #[cfg(not(feature = "starnix_lite"))]
 use magma_device::get_magma_params;
 use runner::{get_program_string, get_program_strvec};
-use selinux::security_server::SecurityServer;
 use starnix_core::device::init_common_devices;
 #[cfg(not(feature = "starnix_lite"))]
 use starnix_core::execution::{
@@ -44,6 +44,7 @@ use starnix_core::execution::{
 use starnix_core::fs::layeredfs::LayeredFs;
 use starnix_core::fs::overlayfs::OverlayFs;
 use starnix_core::fs::tmpfs::TmpFs;
+use starnix_core::security;
 use starnix_core::task::{set_thread_role, CurrentTask, ExitStatus, Kernel, Task};
 use starnix_core::time::utc::update_utc_clock;
 use starnix_core::vfs::{FileSystemOptions, FsContext, LookupContext, WhatToMount};
@@ -398,21 +399,21 @@ async fn create_container(
         Some(role_manager)
     };
 
+    let crash_reporter = connect_to_protocol::<CrashReporterMarker>().unwrap();
+
     let node = inspect::component::inspector().root().create_child("container");
-    let security_server = match features.selinux {
-        Some(mode) => Some(SecurityServer::new(mode)),
-        _ => None,
-    };
+    let security_state = security::kernel_init_security(features.selinux);
     let kernel = Kernel::new(
         kernel_cmdline,
         features.kernel,
         svc_dir,
         data_dir,
         role_manager,
+        Some(crash_reporter),
         node.create_child("kernel"),
         #[cfg(not(feature = "starnix_lite"))]
         features.aspect_ratio.as_ref(),
-        security_server,
+        security_state,
     )
     .with_source_context(|| format!("creating Kernel: {}", &config.name))?;
     let fs_context = create_fs_context(

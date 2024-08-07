@@ -6,7 +6,7 @@ use core::num::NonZeroU8;
 use std::ops::ControlFlow;
 
 use fidl::encoding::Decode as _;
-use fidl::endpoints::{ProtocolMarker, RequestStream};
+use fidl::endpoints::{DiscoverableProtocolMarker as _, ProtocolMarker, RequestStream};
 use futures::StreamExt as _;
 use log::error;
 use net_types::ip::{Ip, IpInvariant, IpVersion, Ipv4, Ipv6};
@@ -215,7 +215,7 @@ impl<'a, I: IpExt + IpSockAddrExt> RequestHandler<'a, I> {
             }
             fpraw::SocketRequest::Close { responder } => return ControlFlow::Break(responder),
             fpraw::SocketRequest::Query { responder } => responder
-                .send(fpraw::SOCKET_PROTOCOL_NAME.as_bytes())
+                .send(fpraw::SocketMarker::PROTOCOL_NAME.as_bytes())
                 .unwrap_or_log("failed to respond"),
             fpraw::SocketRequest::SetReuseAddress { value: _, responder } => {
                 respond_not_supported!("raw::SetReuseAddress", responder)

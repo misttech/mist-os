@@ -15,16 +15,16 @@
                 "OpenModes/SocketOpenTest.Unix/*",
 
                 // Netstack3 does not support many UDP socket options or operations
-                "IPUnboundSockets/IPUnboundSocketTest.CheckSkipECN/*",
-                "IPUnboundSockets/IPUnboundSocketTest.InvalidLargeTOS/*",
-                "IPUnboundSockets/IPUnboundSocketTest.InvalidNegativeTOS/*",
-                "IPUnboundSockets/IPUnboundSocketTest.LargeTOSOptionSize/*",
-                "IPUnboundSockets/IPUnboundSocketTest.NegativeTOS/*",
-                "IPUnboundSockets/IPUnboundSocketTest.SetTOS/*",
-                "IPUnboundSockets/IPUnboundSocketTest.SmallTOSOptionSize/*",
-                "IPUnboundSockets/IPUnboundSocketTest.TOSDefault/*",
-                "IPUnboundSockets/IPUnboundSocketTest.ZeroTOS/*",
-                "IPUnboundSockets/IPUnboundSocketTest.ZeroTOSOptionSize/*",
+                "IPUnboundSockets/IPUnboundSocketTest.CheckSkipECN/[4-7]",
+                "IPUnboundSockets/IPUnboundSocketTest.InvalidLargeTOS/[4-7]",
+                "IPUnboundSockets/IPUnboundSocketTest.InvalidNegativeTOS/[4-7]",
+                "IPUnboundSockets/IPUnboundSocketTest.LargeTOSOptionSize/[4-7]",
+                "IPUnboundSockets/IPUnboundSocketTest.NegativeTOS/[4-7]",
+                "IPUnboundSockets/IPUnboundSocketTest.SetTOS/[4-7]",
+                "IPUnboundSockets/IPUnboundSocketTest.SmallTOSOptionSize/[4-7]",
+                "IPUnboundSockets/IPUnboundSocketTest.TOSDefault/[4-7]",
+                "IPUnboundSockets/IPUnboundSocketTest.ZeroTOS/[4-7]",
+                "IPUnboundSockets/IPUnboundSocketTest.ZeroTOSOptionSize/[4-7]",
 
                 // TODO(https://fxbug.dev/329317900): Support setting/getting TTL for
                 // TCP sockets.

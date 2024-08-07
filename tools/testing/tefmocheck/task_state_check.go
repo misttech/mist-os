@@ -22,6 +22,8 @@ func (c *taskCheck) DebugText() string {
 type taskStateCheck struct {
 	taskCheck
 	State string
+	// InfraFailure is true if the check is related to infra.
+	InfraFailure bool
 }
 
 func (c *taskStateCheck) Check(to *TestingOutputs) bool {
@@ -31,6 +33,10 @@ func (c *taskStateCheck) Check(to *TestingOutputs) bool {
 
 func (c *taskStateCheck) Name() string {
 	return path.Join("task_state", c.State)
+}
+
+func (c *taskStateCheck) IsInfraFailure() bool {
+	return c.InfraFailure
 }
 
 // taskFailureCheck checks if the swarming task failed.
@@ -83,13 +89,13 @@ var TaskStateChecks []FailureModeCheck = []FailureModeCheck{
 	&taskInternalFailureCheck{},
 	&taskFailureCheck{},
 	// All other states.
-	&taskStateCheck{State: "BOT_DIED"},
+	&taskStateCheck{State: "BOT_DIED", InfraFailure: true},
 	&taskStateCheck{State: "CANCELED"},
 	&taskStateCheck{State: "CLIENT_ERROR"},
 	&taskStateCheck{State: "EXPIRED"},
 	&taskStateCheck{State: "INVALID"},
 	&taskStateCheck{State: "KILLED"},
-	&taskStateCheck{State: "NO_RESOURCE"},
+	&taskStateCheck{State: "NO_RESOURCE", InfraFailure: true},
 	&taskStateCheck{State: "PENDING"},
 	&taskStateCheck{State: "RUNNING"},
 	&taskStateCheck{State: "TIMED_OUT"},

@@ -91,6 +91,7 @@
 //src/devices/block/drivers/nvme:nvme-driver
 //src/devices/block/drivers/pci-sdhci:pci-sdhci-driver
 //src/devices/block/drivers/ramdisk:ramdisk-driver
+//src/devices/block/drivers/ramdisk:ramdisk-driver-v2
 //src/devices/block/drivers/sdhci:sdhci-driver
 //src/devices/block/drivers/sdmmc:sdmmc-driver
 //src/devices/block/drivers/ufs:ufs-driver

@@ -7,6 +7,7 @@
 #include <fcntl.h>
 #include <fuchsia/component/cpp/fidl.h>
 #include <fuchsia/hardware/audio/cpp/fidl.h>
+#include <fuchsia/hardware/audio/signalprocessing/cpp/fidl.h>
 #include <fuchsia/logger/cpp/fidl.h>
 #include <fuchsia/media/cpp/fidl.h>
 #include <lib/fdio/directory.h>
@@ -44,41 +45,40 @@ void TestBase::SetUp() {
   auto& entry = device_entry();
   if (entry.isA2DP()) {
     ConnectToBluetoothDevice();
-  } else {
-    switch (entry.driver_type) {
-      case DriverType::Codec:
-        CreateCodecFromChannel(
-            ConnectWithTrampoline<fuchsia::hardware::audio::Codec,
-                                  fuchsia::hardware::audio::CodecConnectorPtr>(device_entry()));
-        break;
-      case DriverType::Composite:
-        // Use DFv1-specific trampoline Connector API for the virtual composite driver (DFv1),
-        // for all other non-virtual composite drivers (DFv2) do not use the trampoline.
-        if (entry.device_type == DeviceType::Virtual) {
-          CreateCompositeFromChannel(
-              ConnectWithTrampoline<fuchsia::hardware::audio::Composite,
-                                    fuchsia::hardware::audio::CompositeConnectorPtr>(
-                  device_entry()));
-        } else {
-          CreateCompositeFromChannel(
-              Connect<fuchsia::hardware::audio::CompositePtr>(device_entry()));
-        }
-        break;
-      case DriverType::Dai:
-        CreateDaiFromChannel(
-            ConnectWithTrampoline<fuchsia::hardware::audio::Dai,
-                                  fuchsia::hardware::audio::DaiConnectorPtr>(device_entry()));
-        break;
-      case DriverType::StreamConfigInput:
-        [[fallthrough]];
-      case DriverType::StreamConfigOutput:
-        CreateStreamConfigFromChannel(
-            ConnectWithTrampoline<fuchsia::hardware::audio::StreamConfig,
-                                  fuchsia::hardware::audio::StreamConfigConnectorPtr>(
-                device_entry()));
+    return;
+  }
 
-        break;
-    }
+  switch (entry.driver_type) {
+    case DriverType::Codec:
+      CreateCodecFromChannel(
+          ConnectWithTrampoline<fuchsia::hardware::audio::Codec,
+                                fuchsia::hardware::audio::CodecConnectorPtr>(device_entry()));
+      break;
+    case DriverType::Composite:
+      // Use DFv1-specific trampoline Connector API for the virtual composite driver (DFv1),
+      // for all other non-virtual composite drivers (DFv2) do not use the trampoline.
+      if (entry.device_type == DeviceType::Virtual) {
+        CreateCompositeFromChannel(
+            ConnectWithTrampoline<fuchsia::hardware::audio::Composite,
+                                  fuchsia::hardware::audio::CompositeConnectorPtr>(device_entry()));
+      } else {
+        CreateCompositeFromChannel(Connect<fuchsia::hardware::audio::CompositePtr>(device_entry()));
+      }
+      break;
+    case DriverType::Dai:
+      CreateDaiFromChannel(
+          ConnectWithTrampoline<fuchsia::hardware::audio::Dai,
+                                fuchsia::hardware::audio::DaiConnectorPtr>(device_entry()));
+      break;
+    case DriverType::StreamConfigInput:
+      [[fallthrough]];
+    case DriverType::StreamConfigOutput:
+      CreateStreamConfigFromChannel(
+          ConnectWithTrampoline<fuchsia::hardware::audio::StreamConfig,
+                                fuchsia::hardware::audio::StreamConfigConnectorPtr>(
+              device_entry()));
+
+      break;
   }
 }
 
@@ -226,6 +226,114 @@ void TestBase::CreateStreamConfigFromChannel(
     __UNREACHABLE;
   }
   AddErrorHandler(stream_config_, "StreamConfig");
+}
+
+// For debugging purposes
+void TestBase::DisplayBaseProperties() {
+  ASSERT_TRUE(properties_);
+
+  FX_LOGS(INFO) << driver_type() << " is_input: "
+                << (properties_->is_input.has_value() ? std::to_string(*properties_->is_input)
+                                                      : "NONE");
+  FX_LOGS(INFO) << driver_type() << " manufacturer is "
+                << (properties_->manufacturer.has_value() ? "'" + *properties_->manufacturer + "'"
+                                                          : "NONE");
+  FX_LOGS(INFO) << driver_type() << " product is "
+                << (properties_->product.has_value() ? "'" + *properties_->product + "'" : "NONE");
+  FX_LOGS(INFO) << driver_type() << " unique_id is " << properties_->unique_id;
+  FX_LOGS(INFO) << driver_type() << " clock domain is "
+                << (properties_->clock_domain.has_value()
+                        ? std::to_string(*properties_->clock_domain)
+                        : "NONE");
+  FX_LOGS(INFO) << driver_type() << " plug_detect is " << properties_->plug_detect_capabilities;
+  FX_LOGS(INFO) << driver_type() << " min_gain_db is "
+                << (properties_->min_gain_db.has_value() ? std::to_string(*properties_->min_gain_db)
+                                                         : "NONE");
+  FX_LOGS(INFO) << driver_type() << " max_gain_db is "
+                << (properties_->max_gain_db.has_value() ? std::to_string(*properties_->max_gain_db)
+                                                         : "NONE");
+  FX_LOGS(INFO) << driver_type() << " gain_step_db is "
+                << (properties_->gain_step_db.has_value()
+                        ? std::to_string(*properties_->gain_step_db)
+                        : "NONE");
+  FX_LOGS(INFO) << driver_type() << " can_mute is "
+                << (properties_->can_mute.has_value() ? std::to_string(*properties_->can_mute)
+                                                      : "NONE");
+  FX_LOGS(INFO) << driver_type() << " can_agc is "
+                << (properties_->can_agc.has_value() ? std::to_string(*properties_->can_agc)
+                                                     : "NONE");
+}
+
+bool TestBase::ElementIsRingBuffer(fuchsia::hardware::audio::ElementId element_id) {
+  return std::any_of(
+      elements_.begin(), elements_.end(),
+      [element_id](const fuchsia::hardware::audio::signalprocessing::Element& element) {
+        return element.has_id() && element.id() == element_id && element.has_type() &&
+               element.type() ==
+                   fuchsia::hardware::audio::signalprocessing::ElementType::RING_BUFFER;
+      });
+}
+
+bool TestBase::RingBufferElementIsIncoming(fuchsia::hardware::audio::ElementId element_id) {
+  if (!topology_id_.has_value()) {
+    ADD_FAILURE() << "topology_id_ has no value";
+    return true;
+  }
+
+  std::vector<fuchsia::hardware::audio::signalprocessing::EdgePair> edge_pairs;
+  for (const auto& t : topologies_) {
+    if (t.has_id() && t.id() == *topology_id_) {
+      edge_pairs = t.processing_elements_edge_pairs();
+      break;
+    }
+  }
+  if (edge_pairs.empty()) {
+    ADD_FAILURE() << "could not find edge_pairs for topology_id " << *topology_id_;
+    return true;
+  }
+  bool has_outgoing = std::any_of(
+      edge_pairs.begin(), edge_pairs.end(),
+      [element_id](const fuchsia::hardware::audio::signalprocessing::EdgePair& edge_pair) {
+        return (edge_pair.processing_element_id_from == element_id);
+      });
+  bool has_incoming = std::any_of(
+      edge_pairs.begin(), edge_pairs.end(),
+      [element_id](const fuchsia::hardware::audio::signalprocessing::EdgePair& edge_pair) {
+        return (edge_pair.processing_element_id_to == element_id);
+      });
+  if (has_outgoing && !has_incoming) {
+    return false;
+  }
+  if (!has_outgoing && has_incoming) {
+    return true;
+  }
+  if (has_outgoing && has_incoming) {
+    ADD_FAILURE() << "RingBuffer element " << element_id << " has both outgoing and incoming edges";
+  }
+  return true;
+}
+
+std::optional<bool> TestBase::IsIncoming(
+    std::optional<fuchsia::hardware::audio::ElementId> ring_buffer_element_id) {
+  if (device_entry().isDai()) {
+    return properties_->is_input;
+  }
+  if (device_entry().isStreamConfigInput()) {
+    return true;
+  }
+  if (device_entry().isStreamConfigOutput()) {
+    return false;
+  }
+  if (device_entry().isComposite()) {
+    if (ring_buffer_element_id.has_value()) {
+      if (ElementIsRingBuffer(*ring_buffer_element_id)) {
+        return RingBufferElementIsIncoming(*ring_buffer_element_id);
+      }
+      ADD_FAILURE() << "element_id " << *ring_buffer_element_id << " is not a RingBuffer element";
+    }
+  }
+
+  return std::nullopt;
 }
 
 // Request that the driver return the format ranges that it supports.
@@ -899,11 +1007,19 @@ void TestBase::SignalProcessingConnect() {
   sp_ = sp_client.Bind();
 }
 
-// First retrieve the element list. If signalprocessing is not supported, exit early;
+// Retrieve the element list. If signalprocessing is not supported, exit early;
 // otherwise save the ID of a RING_BUFFER element, and the ID of a DAI_INTERCONNECT element.
 // We will use these IDs later, when performing Dai-specific and RingBuffer-specific checks.
-void TestBase::RequestTopologies() {
+void TestBase::RequestElements() {
   SignalProcessingConnect();
+
+  if (signalprocessing_is_supported_.has_value()) {
+    return;
+  }
+  if (!elements_.empty()) {
+    return;
+  }
+
   zx_status_t status = ZX_OK;
   ring_buffer_id_.reset();
   dai_id_.reset();
@@ -923,6 +1039,8 @@ void TestBase::RequestTopologies() {
               dai_id_.emplace(element.id());  // Override any previous.
             }
           }
+        } else {
+          signalprocessing_is_supported_ = false;
         }
       }));
   ExpectCallbacks();
@@ -931,21 +1049,78 @@ void TestBase::RequestTopologies() {
   ASSERT_TRUE(status == ZX_OK || status == ZX_ERR_NOT_SUPPORTED);
   // We don't check for topologies if GetElements is not supported.
   if (status == ZX_ERR_NOT_SUPPORTED) {
+    signalprocessing_is_supported_ = false;
     return;
   }
+  signalprocessing_is_supported_ = true;
+
   // If supported, GetElements must return at least one element.
-  ASSERT_TRUE(!elements_.empty());
+  if (elements_.empty()) {
+    signalprocessing_is_supported_ = false;
+    FAIL() << "elements list is empty";
+  }
+}
+
+// First retrieve the element list. If signalprocessing is not supported, exit early;
+// otherwise save the ID of a RING_BUFFER element, and the ID of a DAI_INTERCONNECT element.
+// We will use these IDs later, when performing Dai-specific and RingBuffer-specific checks.
+void TestBase::RequestTopologies() {
+  SignalProcessingConnect();
+  RequestElements();
+
+  if (!signalprocessing_is_supported_.value_or(false)) {
+    return;
+  }
+  if (!topologies_.empty()) {
+    return;
+  }
 
   sp_->GetTopologies(AddCallback(
       "signalprocessing::Reader::GetTopologies",
       [this](fuchsia::hardware::audio::signalprocessing::Reader_GetTopologies_Result result) {
-        ASSERT_FALSE(result.is_err());
+        if (result.is_err()) {
+          signalprocessing_is_supported_ = false;
+          FAIL() << "GetTopologies returned err " << result.err();
+        }
+
         topologies_ = std::move(result.response().topologies);
       }));
   ExpectCallbacks();
 
   // We only call GetTopologies if we have elements, so we must have at least one topology.
-  ASSERT_FALSE(topologies_.empty());
+  if (topologies_.empty()) {
+    signalprocessing_is_supported_ = false;
+    FAIL() << "topologies list is empty";
+  }
+}
+
+void TestBase::RequestTopology() {
+  SignalProcessingConnect();
+  RequestElements();
+  RequestTopologies();
+
+  if (!signalprocessing_is_supported_.value_or(false)) {
+    return;
+  }
+
+  if (!topology_id_.has_value()) {
+    sp_->WatchTopology(AddCallback(
+        "signalprocessing::Reader::WatchTopology",
+        [this](fuchsia::hardware::audio::TopologyId topology_id) { topology_id_ = topology_id; }));
+    ExpectCallbacks();
+  }
+
+  // We only call WatchTopology if we support signalprocessing, so a topology should be set.
+  ASSERT_TRUE(topology_id_.has_value());
+
+  for (const auto& t : topologies_) {
+    if (t.has_id() && t.id() == *topology_id_) {
+      return;
+    }
+  }
+  // This topology_id is not in the list returned earlier.
+  signalprocessing_is_supported_ = false;
+  FAIL() << "WatchTopology returned " << *topology_id_ << " which is not in our topology list";
 }
 
 }  // namespace media::audio::drivers::test

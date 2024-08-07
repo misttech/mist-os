@@ -81,16 +81,24 @@ uint64_t pv_clock_get_tsc_freq() {
   uint32_t tsc_mul = 0;
   int8_t tsc_shift = 0;
   uint32_t pre_version = 0, post_version = 0;
-  ktl::atomic_ref<volatile uint32_t> version(system_time->version);
+
+  // TODO(https://fxbug.dev/355287217): Remove workaround for const/volatile qualified atomic_ref
+  //  ktl::atomic_ref<volatile uint32_t> version(system_time->version);
+  auto atomic_load_version = []() {
+    uint32_t ret = {};
+    __atomic_load(&system_time->version, &ret, __ATOMIC_SEQ_CST);
+    return ret;
+  };
+
   do {
-    pre_version = version.load();
+    pre_version = atomic_load_version();
     if (pre_version % 2 != 0) {
       arch::Yield();
       continue;
     }
     tsc_mul = system_time->tsc_mul;
     tsc_shift = system_time->tsc_shift;
-    post_version = version.load();
+    post_version = atomic_load_version();
   } while (pre_version != post_version);
 
   uint64_t tsc_khz = 1000000ULL << 32;

@@ -38,6 +38,13 @@ def parse_args() -> argparse.Namespace:
         required=False,
     )
     parser.add_argument(
+        "--structured_config_files",
+        help="The expected structured config file paths (meta/foo.cvf)",
+        action="append",
+        default=[],
+        required=False,
+    )
+    parser.add_argument(
         "--subpackages",
         help="The expected subpackage names",
         action="append",
@@ -79,6 +86,7 @@ def run(*command: str) -> str:
         ).strip()
     except subprocess.CalledProcessError as e:
         print(e.stdout)
+        print(e.stderr)
         raise e
 
 
@@ -120,11 +128,17 @@ def dest_merkle_pair_for_blobs(blobs: list[str], ffx: str) -> list[str]:
 
 
 def list_contents(args: argparse.Namespace) -> list[str]:
+    """Lists the contents of the meta.far file"""
     return run(
         args.far,
         "list",
         "--archive=" + args.meta_far,
     ).split("\n")
+
+
+def filter_by_extension(inputs: list[str], extension: str) -> list[str]:
+    extenstion_with_dot = ".{}".format(extension)
+    return list(filter(lambda x: x.endswith(extenstion_with_dot), inputs))
 
 
 def list_subpackage_names(args: argparse.Namespace) -> list[str]:
@@ -147,6 +161,23 @@ def check_contents_for_component_manifests(
 ) -> None:
     for manifest in manifests:
         _assert_in(manifest, contents, "Failed to find component manifest")
+
+    found_manifests = filter_by_extension(contents, "cm")
+    _assert_eq(
+        sorted(found_manifests),
+        sorted(manifests),
+        "The set of manifests failed to match",
+    )
+
+
+def check_contents_for_structured_config_files(
+    contents: list[str], cvf_files: list[str]
+) -> None:
+    for cvf in cvf_files:
+        _assert_in(cvf, contents, "Failed to find structured config file")
+
+    found_files = filter_by_extension(contents, "cvf")
+    _assert_eq(sorted(found_files), sorted(cvf_files), "cvf_files do not match")
 
 
 def check_contents_for_subpackage_names(args: argparse.Namespace) -> None:
@@ -199,6 +230,7 @@ def check_package_has_all_blobs(args: argparse.Namespace) -> None:
     contents_str = run(
         args.far, "cat", "--archive=" + args.meta_far, "--file=meta/contents"
     )
+
     contents = contents_str.split("\n") if contents_str else []
 
     _assert_eq(
@@ -214,6 +246,9 @@ def main() -> None:
 
     # TODO: add components as an arg
     check_contents_for_component_manifests(contents, args.manifests)
+    check_contents_for_structured_config_files(
+        contents, args.structured_config_files
+    )
     check_contents_for_subpackage_names(args)
     check_contents_for_bind_bytecode(contents, args.bind_bytecode)
     check_for_abi_revision(args)

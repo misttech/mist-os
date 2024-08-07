@@ -5,10 +5,11 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.hardware.sharedmemory") {
+  sdk_category = "partner"
+  sdk_area = "Drivers"
   sources = [ "sharedmemory.fidl" ]
   public_deps = [
     "//sdk/fidl/fuchsia.mem",
     "//zircon/vdso/zx",
   ]
-  sdk_category = "internal"
 }

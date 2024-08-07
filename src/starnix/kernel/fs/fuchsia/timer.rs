@@ -142,6 +142,7 @@ impl TimerFile {
         if timespec_is_zero(timer_spec.it_value) {
             // Sayeth timerfd_settime(2):
             // Setting both fields of new_value.it_value to zero disarms the timer.
+            *deadline_interval = (zx::Time::default(), zx::Duration::ZERO);
             self.timer.stop(current_task)?;
         } else {
             let now_monotonic = zx::Time::get_monotonic();
@@ -263,7 +264,7 @@ impl FileOps for TimerFile {
             } else {
                 // The timer is non-repeating, so cancel the timer to clear the `ZX_TIMER_SIGNALED`
                 // signal.
-                *deadline_interval = (zx::Time::default(), interval);
+                *deadline_interval = (zx::Time::default(), zx::Duration::ZERO);
                 self.timer.stop(current_task)?;
                 1
             };

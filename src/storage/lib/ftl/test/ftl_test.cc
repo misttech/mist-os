@@ -3,6 +3,14 @@
 // found in the LICENSE file.
 
 #include <string.h>
+#include <zircon/errors.h>
+
+#include <algorithm>
+#include <cstdint>
+#include <memory>
+#include <mutex>
+#include <optional>
+#include <utility>
 
 #include <gtest/gtest.h>
 
@@ -10,6 +18,7 @@
 #include "src/devices/block/drivers/ftl/tests/ndm-ram-driver.h"
 #include "src/storage/lib/ftl/ftln/ftlnp.h"
 #include "src/storage/lib/ftl/ftln/ndm-driver.h"
+#include "src/storage/lib/ftl/ftln/volume.h"
 
 namespace {
 

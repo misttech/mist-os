@@ -2,12 +2,24 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use ffx_target_echo_args::EchoCommand;
-use fho::{Connector, FfxMain, FfxTool, SimpleWriter};
+use fho::{Connector, FfxMain, FfxTool, VerifiedMachineWriter};
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
-use std::io::Write;
+use schemars::JsonSchema;
+use serde::Serialize;
+
+#[derive(Debug, Serialize, JsonSchema, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum EchoMessage {
+    /// Message from the target
+    Message(String),
+    // Waiting on target
+    Waiting(String),
+    /// Unexpected error with string denoting error message.
+    UnexpectedError(String),
+}
 
 #[derive(FfxTool)]
 pub struct EchoTool {
@@ -20,17 +32,23 @@ fho::embedded_plugin!(EchoTool);
 
 #[async_trait(?Send)]
 impl FfxMain for EchoTool {
-    type Writer = SimpleWriter;
-    async fn main(self, writer: Self::Writer) -> fho::Result<()> {
-        echo_impl(self.rcs_proxy, self.cmd, writer).await?;
+    type Writer = VerifiedMachineWriter<EchoMessage>;
+
+    async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
+        match echo_impl(self.rcs_proxy, self.cmd, &mut writer).await {
+            Ok(()) => (),
+            Err(e) => {
+                writer.machine_or(&EchoMessage::UnexpectedError(e.to_string()), e)?;
+            }
+        };
         Ok(())
     }
 }
 
-async fn echo_impl<W: Write>(
+async fn echo_impl(
     rcs_proxy_connector: Connector<RemoteControlProxy>,
     cmd: EchoCommand,
-    mut writer: W,
+    writer: &mut VerifiedMachineWriter<EchoMessage>,
 ) -> Result<()> {
     let echo_text = cmd.text.unwrap_or("Ffx".to_string());
     // This outer loop retries connecting to the target every time the
@@ -51,13 +69,14 @@ async fn echo_impl<W: Write>(
         // experimental/unimplemented as of now so this isn't tested.
         let rcs_proxy = rcs_proxy_connector
             .try_connect(|target| {
-                if let Some(target) = &target {
-                    writeln!(writer, "Waiting for target {target} to return")
-                        .map_err(|e| fho::Error::User(e.into()))?;
+                let message = if let Some(target) = &target {
+                    format!("Waiting for target {target} to return")
                 } else {
-                    writeln!(writer, "Waiting for target to return")
-                        .map_err(|e| fho::Error::User(e.into()))?;
-                }
+                    "Waiting for target to return".to_string()
+                };
+                writer
+                    .machine_or(&EchoMessage::Waiting(message.clone()), message)
+                    .map_err(|e| fho::Error::User(e.into()))?;
                 Ok(())
             })
             .await?;
@@ -67,14 +86,19 @@ async fn echo_impl<W: Write>(
         loop {
             match rcs_proxy.echo_string(&echo_text).await {
                 Ok(r) => {
-                    writeln!(writer, "SUCCESS: received {r:?}")?;
+                    let message = format!("SUCCESS: received {r:?}");
+                    writer.machine_or(&EchoMessage::Message(message.clone()), message)?;
                 }
                 Err(e) => {
+                    let message = format!("ERROR: {e:?}");
+                    writer.machine_or(
+                        &EchoMessage::UnexpectedError(message.clone()),
+                        message.clone(),
+                    )?;
                     if cmd.repeat {
-                        writeln!(writer, "ERROR: {e:?}")?;
                         break;
                     } else {
-                        panic!("ERROR: {e:?}")
+                        return Err(anyhow!(message));
                     }
                 }
             }
@@ -93,8 +117,9 @@ mod test {
     use super::*;
     use anyhow::Context;
     use fho::testing::ToolEnv;
-    use fho::TryFromEnv;
+    use fho::{Format, TestBuffers, TryFromEnv};
     use fidl_fuchsia_developer_remotecontrol::{RemoteControlMarker, RemoteControlRequest};
+    use serde_json::json;
 
     fn setup_fake_service() -> RemoteControlProxy {
         use futures::TryStreamExt;
@@ -127,25 +152,59 @@ mod test {
             true,
         ));
         let connector = Connector::try_from_env(&env).await.expect("Could not make test connector");
+        let tool = EchoTool { cmd, rcs_proxy: connector };
+        let buffers = TestBuffers::default();
+        let writer = <EchoTool as FfxMain>::Writer::new_test(None, &buffers);
 
-        let mut output = Vec::new();
-        let result = echo_impl(connector, cmd, &mut output).await;
+        let result = tool.main(writer).await;
         assert!(result.is_ok());
-        String::from_utf8(output).expect("Invalid UTF-8 bytes")
+        buffers.into_stdout_str()
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_echo_with_no_text() -> Result<()> {
-        let output = run_echo_test(EchoCommand { text: None, repeat: false }).await;
+        let cmd = EchoCommand { text: None, repeat: false };
+        let output = run_echo_test(cmd).await;
         assert_eq!("SUCCESS: received \"Ffx\"\n".to_string(), output);
         Ok(())
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_echo_with_text() -> Result<()> {
-        let output =
-            run_echo_test(EchoCommand { text: Some("test".to_string()), repeat: false }).await;
+        let cmd = EchoCommand { text: Some("test".to_string()), repeat: false };
+        let output = run_echo_test(cmd).await;
         assert_eq!("SUCCESS: received \"test\"\n".to_string(), output);
+        Ok(())
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_echo_with_machine() -> Result<()> {
+        let tool_env = ToolEnv::new().remote_factory_closure(|| async { Ok(setup_fake_service()) });
+
+        let env = tool_env.make_environment(ffx_config::EnvironmentContext::no_context(
+            ffx_config::environment::ExecutableKind::Test,
+            Default::default(),
+            None,
+            true,
+        ));
+        let connector = Connector::try_from_env(&env).await.expect("Could not make test connector");
+        let cmd = EchoCommand { text: Some("test".to_string()), repeat: false };
+        let tool = EchoTool { cmd, rcs_proxy: connector };
+        let buffers = TestBuffers::default();
+        let writer = <EchoTool as FfxMain>::Writer::new_test(Some(Format::Json), &buffers);
+
+        let result = tool.main(writer).await;
+        assert!(result.is_ok());
+
+        let output = buffers.into_stdout_str();
+
+        let err = format!("schema not valid {output}");
+        let json = serde_json::from_str(&output).expect(&err);
+        let err = format!("json must adhere to schema: {json}");
+        <EchoTool as FfxMain>::Writer::verify_schema(&json).expect(&err);
+
+        let want = EchoMessage::Message("SUCCESS: received \"test\"".into());
+        assert_eq!(json, json!(want));
         Ok(())
     }
 }

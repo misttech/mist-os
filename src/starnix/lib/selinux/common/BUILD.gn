@@ -14,11 +14,11 @@ rustc_library("common") {
   configs += [ "//src/starnix/config:starnix_clippy_lints" ]
 }
 
-fuchsia_unittest_package("selinux_common-tests") {
+fuchsia_unittest_package("starnix_selinux_common-tests") {
   deps = [ ":common_test" ]
 }
 
 group("tests") {
   testonly = true
-  deps = [ ":selinux_common-tests" ]
+  deps = [ ":starnix_selinux_common-tests" ]
 }

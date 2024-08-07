@@ -27,8 +27,8 @@ use {
     ::routing::{
         bedrock::request_metadata::protocol_metadata,
         capability_source::{
-            AggregateCapability, AggregateInstance, AggregateMember, CapabilitySource,
-            ComponentCapability,
+            AggregateCapability, AggregateInstance, AggregateMember, AnonymizedAggregateSource,
+            CapabilitySource, ComponentCapability, ComponentSource,
         },
         error::ComponentInstanceError,
         resolving::ResolverError,
@@ -2323,7 +2323,13 @@ async fn verify_service_route(
     let source = RouteRequest::UseService(use_decl).route(&target_component).await.unwrap();
     match source {
         RouteSource {
-            source: CapabilitySource::AnonymizedAggregate { members, capability, moniker, .. },
+            source:
+                CapabilitySource::AnonymizedAggregate(AnonymizedAggregateSource {
+                    members,
+                    capability,
+                    moniker,
+                    ..
+                }),
             relative_path: _,
         } => {
             let collections: Vec<_> = members
@@ -2817,7 +2823,10 @@ async fn list_service_instances_from_collections() {
         .expect("failed to route service");
     let aggregate_capability_provider = match &source {
         RouteSource {
-            source: source @ CapabilitySource::AnonymizedAggregate { moniker, .. },
+            source:
+                source @ CapabilitySource::AnonymizedAggregate(AnonymizedAggregateSource {
+                    moniker, ..
+                }),
             relative_path: _,
         } => {
             let source_component_instance = client_component.find_absolute(moniker).await.unwrap();
@@ -2855,10 +2864,10 @@ async fn list_service_instances_from_collections() {
         .await
         .expect("failed to route to child");
     match source {
-        CapabilitySource::Component {
+        CapabilitySource::Component(ComponentSource {
             capability: ComponentCapability::Service(ServiceDecl { name, source_path }),
             moniker,
-        } => {
+        }) => {
             assert_eq!(name, "foo");
             assert_eq!(
                 source_path.expect("source path"),

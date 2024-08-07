@@ -189,33 +189,8 @@ DisplayInfoDelegate::DisplayInfoDelegate(std::shared_ptr<display::Display> displ
   FX_CHECK(display_);
 }
 
-void DisplayInfoDelegate::GetDisplayInfo(
-    fuchsia::ui::scenic::Scenic::GetDisplayInfoCallback callback) {
-  auto info = ::fuchsia::ui::gfx::DisplayInfo();
-  info.width_in_px = display_->width_in_px();
-  info.height_in_px = display_->height_in_px();
-
-  callback(std::move(info));
-}
-
 fuchsia::math::SizeU DisplayInfoDelegate::GetDisplayDimensions() {
   return {display_->width_in_px(), display_->height_in_px()};
-}
-
-void DisplayInfoDelegate::GetDisplayOwnershipEvent(
-    fuchsia::ui::scenic::Scenic::GetDisplayOwnershipEventCallback callback) {
-  // These constants are defined as raw hex in the FIDL file, so we confirm here that they are the
-  // same values as the expected constants in the ZX headers.
-  static_assert(fuchsia::ui::scenic::displayNotOwnedSignal == ZX_USER_SIGNAL_0, "Bad constant");
-  static_assert(fuchsia::ui::scenic::displayOwnedSignal == ZX_USER_SIGNAL_1, "Bad constant");
-
-  zx::event dup;
-  if (display_->ownership_event().duplicate(ZX_RIGHTS_BASIC, &dup) != ZX_OK) {
-    FX_LOGS(ERROR) << "Display ownership event duplication error.";
-    callback(zx::event());
-  } else {
-    callback(std::move(dup));
-  }
 }
 
 App::App(std::unique_ptr<sys::ComponentContext> app_context, inspect::Node inspect_node,
@@ -240,7 +215,6 @@ App::App(std::unique_ptr<sys::ComponentContext> app_context, inspect::Node inspe
               scheduling::DefaultFrameScheduler::kInitialUpdateDuration),
           inspect_node_.CreateChild("FrameScheduler"), &metrics_logger_),
       renderer_type_(GetRendererType(config_values_)),
-      scenic_(app_context_.get()),
       uber_struct_system_(std::make_shared<flatland::UberStructSystem>()),
       link_system_(
           std::make_shared<flatland::LinkSystem>(uber_struct_system_->GetNextInstanceId())),
@@ -426,7 +400,7 @@ void App::InitializeGraphics(std::shared_ptr<display::Display> display) {
 
   {
     singleton_display_service_.emplace(display);
-    singleton_display_service_->AddPublicService(scenic_.app_context()->outgoing().get());
+    singleton_display_service_->AddPublicService(app_context_->outgoing().get());
     display_info_delegate_.emplace(display);
   }
 

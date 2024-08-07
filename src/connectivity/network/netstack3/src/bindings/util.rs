@@ -1138,6 +1138,35 @@ impl TryIntoFidlWithContext<fidl_net_stack::ForwardingEntry>
     }
 }
 
+impl<I: Ip> TryIntoFidlWithContext<fnet_routes_ext::Route<I>>
+    for Entry<I::Addr, DeviceId<BindingsCtx>>
+{
+    type Error = Never;
+
+    fn try_into_fidl_with_ctx<C: ConversionContext>(
+        self,
+        ctx: &C,
+    ) -> Result<fnet_routes_ext::Route<I>, Never> {
+        let Entry { subnet, device, gateway, metric } = self;
+
+        let device_id: BindingId = device.try_into_fidl_with_ctx(ctx)?;
+
+        Ok(fnet_routes_ext::Route::<I>::new_forward(
+            subnet,
+            device_id.get(),
+            gateway,
+            match metric {
+                Metric::ExplicitMetric(RawMetric(metric)) => {
+                    fnet_routes::SpecifiedMetric::ExplicitMetric(metric)
+                }
+                Metric::MetricTracksInterface(_) => {
+                    fnet_routes::SpecifiedMetric::InheritedFromInterface(fnet_routes::Empty)
+                }
+            },
+        ))
+    }
+}
+
 pub(crate) struct EntryAndTableId<I: Ip> {
     pub(crate) entry: Entry<I::Addr, DeviceId<BindingsCtx>>,
     pub(crate) table_id: routes::TableId<I>,

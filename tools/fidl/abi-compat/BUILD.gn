@@ -89,12 +89,10 @@ if (is_host) {
       outputs = [ report ]
 
       args = [
-        "--platform",
-        rebase_path(platform_ir, root_build_dir),
-        "--external",
-        rebase_path(external_ir, root_build_dir),
         "--out",
         rebase_path(report, root_build_dir),
+        rebase_path(platform_ir, root_build_dir),
+        rebase_path(external_ir, root_build_dir),
       ]
 
       # Stop the build if errors are found, unless the API level is in `allow_abi_breakage`.

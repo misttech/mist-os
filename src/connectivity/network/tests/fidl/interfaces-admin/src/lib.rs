@@ -66,8 +66,8 @@ async fn address_deprecation<N: Netstack>(name: &str) {
         ),
         ..Default::default()
     };
-    let addr1_state_provider = interfaces::add_subnet_address_and_route_wait_assigned(
-        &interface,
+    let addr1_state_provider = interfaces::add_address_wait_assigned(
+        interface.control(),
         fidl_fuchsia_net::Subnet {
             addr: fidl_fuchsia_net::IpAddress::Ipv6(fidl_fuchsia_net::Ipv6Address {
                 addr: ADDR1.octets(),
@@ -77,6 +77,7 @@ async fn address_deprecation<N: Netstack>(name: &str) {
         // Note that an empty AddressParameters means that the address has
         // infinite preferred lifetime.
         fidl_fuchsia_net_interfaces_admin::AddressParameters {
+            add_subnet_route: Some(true),
             initial_properties: Some(preferred_properties.clone()),
             ..Default::default()
         },
@@ -142,10 +143,13 @@ async fn update_address_lifetimes<N: Netstack>(name: &str) {
         .expect("install endpoint into Netstack");
 
     const ADDR: fidl_fuchsia_net::Subnet = fidl_subnet!("abcd::1/64");
-    let addr_state_provider = interfaces::add_subnet_address_and_route_wait_assigned(
-        &interface,
+    let addr_state_provider = interfaces::add_address_wait_assigned(
+        interface.control(),
         ADDR,
-        fidl_fuchsia_net_interfaces_admin::AddressParameters::default(),
+        fidl_fuchsia_net_interfaces_admin::AddressParameters {
+            add_subnet_route: Some(true),
+            ..Default::default()
+        },
     )
     .await
     .expect("failed to add preferred address");
@@ -1930,7 +1934,6 @@ impl<T: fasync::TimeoutExt> PanicOnTimeout for T {}
 #[variant(N, Netstack)]
 #[variant(I, Ip)]
 async fn installer_creates_datapath<N: Netstack, I: Ip>(test_name: &str) {
-    const SUBNET: fidl_fuchsia_net::Subnet = fidl_subnet!("192.168.0.0/24");
     const ALICE_IP_V4: fidl_fuchsia_net::Subnet = fidl_subnet!("192.168.0.1/24");
     const BOB_IP_V4: fidl_fuchsia_net::Subnet = fidl_subnet!("192.168.0.2/24");
     const ALICE_MAC: fnet::MacAddress = fidl_mac!("02:00:00:00:00:01");
@@ -2028,28 +2031,15 @@ async fn installer_creates_datapath<N: Netstack, I: Ip>(test_name: &str) {
                             let address_state_provider = interfaces::add_address_wait_assigned(
                                 &control,
                                 ipv4_addr,
-                                fidl_fuchsia_net_interfaces_admin::AddressParameters::default(),
+                                fidl_fuchsia_net_interfaces_admin::AddressParameters {
+                                    add_subnet_route: Some(true),
+                                    ..Default::default()
+                                },
                             )
                             .panic_on_timeout(format!("add {} ipv4 address", name))
                             .await
                             .expect("add address");
 
-                            // Adding addresses through Control does not add the subnet
-                            // routes.
-                            let stack = realm
-                                .connect_to_protocol::<fidl_fuchsia_net_stack::StackMarker>()
-                                .expect("connect to protocol");
-                            let () = stack
-                                .add_forwarding_entry(&fidl_fuchsia_net_stack::ForwardingEntry {
-                                    subnet: SUBNET,
-                                    device_id: iface_id,
-                                    next_hop: None,
-                                    metric: 0,
-                                })
-                                .panic_on_timeout(format!("add {} route", name))
-                                .await
-                                .expect("send add route")
-                                .expect("add route");
                             let fidl_fuchsia_net_ext::IpAddress(addr) = ipv4_addr.addr.into();
                             (addr, Some(address_state_provider))
                         }

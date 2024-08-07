@@ -328,12 +328,13 @@ mod tests {
     use fidl_fuchsia_inspect as finspect;
     use fuchsia_inspect::{Inspector, InspectorConfig};
     use fuchsia_zircon::DurationNum;
-    use once_cell::sync::Lazy;
     use selectors::FastError;
+    use std::sync::LazyLock;
 
     const TEST_URL: &str = "fuchsia-pkg://test";
-    static ESCROW_TEST_RIGHTS: Lazy<zx::Rights> =
-        Lazy::new(|| zx::Rights::BASIC | zx::Rights::READ | zx::Rights::MAP | zx::Rights::PROPERTY);
+    static ESCROW_TEST_RIGHTS: LazyLock<zx::Rights> = LazyLock::new(|| {
+        zx::Rights::BASIC | zx::Rights::READ | zx::Rights::MAP | zx::Rights::PROPERTY
+    });
 
     #[fuchsia::test]
     fn inspect_repo_disallows_duplicated_handles() {

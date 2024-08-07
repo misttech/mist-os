@@ -10,22 +10,12 @@
 #include <assert.h>
 #include <sys/types.h>
 
-// Helper class for MMU implementations to track virtual and physical address ranges when installing
-// and removing mappings.
-class MappingCursor {
+// Helper that tracks a virtual address range for performing MMU operations. This can be used
+// directly, or by as part of a MappingCursor.
+class VirtualAddressCursor {
  public:
-  MappingCursor() = default;
-  MappingCursor(vaddr_t vaddr, size_t size) : start_vaddr_(vaddr), vaddr_(vaddr), size_(size) {}
-  MappingCursor(const paddr_t* paddrs, size_t paddr_count, size_t page_size, vaddr_t vaddr)
-      : paddrs_(paddrs),
-        page_size_(page_size),
-        start_vaddr_(vaddr),
-        vaddr_(vaddr),
-        size_(page_size * paddr_count) {
-#ifdef DEBUG_ASSERT_IMPLEMENTED
-    paddr_count_ = paddr_count;
-#endif
-  }
+  VirtualAddressCursor(vaddr_t vaddr, size_t size)
+      : start_vaddr_(vaddr), vaddr_(vaddr), size_(size) {}
 
   // Sets offset used for |vaddr_rel| and returns true if the cursor lies within that offset and
   // some specified maximum. Should only be called before the cursor has started to be used.
@@ -56,65 +46,18 @@ class MappingCursor {
     DEBUG_ASSERT(size_ >= consume);
     size_ -= consume;
     vaddr_ += consume;
-
-    // Skipping entries has no meaning if we are attempting to create new mappings as we cannot
-    // manipulate the paddr in a sensible way, so we expect this to not get called.
-    DEBUG_ASSERT(!paddrs_);
-    DEBUG_ASSERT(page_size_ == 0);
   }
 
-  void ConsumePAddr(size_t ps) {
-    DEBUG_ASSERT(paddrs_);
-    paddr_consumed_ += ps;
-    DEBUG_ASSERT(paddr_consumed_ <= page_size_);
-    vaddr_ += ps;
+  void Consume(size_t ps) {
     DEBUG_ASSERT(size_ >= ps);
-    size_ -= ps;
-    if (paddr_consumed_ == page_size_) {
-      paddrs_++;
-      paddr_consumed_ = 0;
-#ifdef DEBUG_ASSERT_IMPLEMENTED
-      DEBUG_ASSERT(paddr_count_ > 0);
-      paddr_count_--;
-#endif
-    }
-  }
-
-  void ConsumeVAddr(size_t ps) {
-    // If physical addresses are being tracked for creating mappings then ConsumePAddr should be
-    // called, so validate there are no paddrs we are going to desync with.
-    DEBUG_ASSERT(!paddrs_);
-    DEBUG_ASSERT(page_size_ == 0);
     vaddr_ += ps;
-    DEBUG_ASSERT(size_ >= ps);
     size_ -= ps;
-  }
-
-  // Provides a way to transition a mapping cursor from one that tracks paddrs to one that just
-  // tracks the remaining virtual range. This is useful when a cursor was being used to track
-  // mapping pages but then needs to be used to just track the virtual range to unmap / rollback.
-  void DropPAddrs() {
-    paddrs_ = nullptr;
-    page_size_ = 0;
-    paddr_consumed_ = 0;
-  }
-
-  paddr_t paddr() const {
-    DEBUG_ASSERT(paddrs_);
-    DEBUG_ASSERT(size_ > 0);
-    return (*paddrs_) + paddr_consumed_;
-  }
-
-  size_t PageRemaining() const {
-    DEBUG_ASSERT(paddrs_);
-    return page_size_ - paddr_consumed_;
   }
 
   // Returns a new cursor to the, possibly empty, virtual range that has already been processed by
-  // this cursor. The returned cursor will always be a subset of the original cursors range and
-  // does not include the paddrs.
-  MappingCursor ProcessedRange() const {
-    MappingCursor ret(start_vaddr_, vaddr_ - start_vaddr_);
+  // this cursor. The returned cursor will always be a subset of the original cursors range.
+  VirtualAddressCursor ProcessedRange() const {
+    VirtualAddressCursor ret(start_vaddr_, vaddr_ - start_vaddr_);
     // As our new cursor is a subrange we know the relative offset will always be valid.
     ret.vaddr_rel_offset_ = vaddr_rel_offset_;
     return ret;
@@ -127,9 +70,63 @@ class MappingCursor {
   size_t size() const { return size_; }
 
  private:
-  // Physical address is optional and only applies when mapping in new pages, and not manipulating
-  // existing mappings.
-  const paddr_t* paddrs_ = nullptr;
+  vaddr_t start_vaddr_;
+  vaddr_t vaddr_;
+  vaddr_t vaddr_rel_offset_ = 0;
+  size_t size_;
+};
+
+// Helper class for MMU implementations to track physical address ranges when installing mappings.
+// If just processing a virtual address range, such as for unmapping, then the VirtualAddressCursor
+// can be used instead.
+class MappingCursor {
+ public:
+  MappingCursor(const paddr_t* paddrs, size_t paddr_count, size_t page_size, vaddr_t vaddr)
+      : paddrs_(paddrs), page_size_(page_size), vaddr_cursor_(vaddr, page_size * paddr_count) {
+#ifdef DEBUG_ASSERT_IMPLEMENTED
+    paddr_count_ = paddr_count;
+#endif
+  }
+
+  // See VirtualAddressCursor::SetVaddrRelativeOffset.
+  bool SetVaddrRelativeOffset(vaddr_t vaddr_rel_offset, size_t vaddr_rel_max) {
+    return vaddr_cursor_.SetVaddrRelativeOffset(vaddr_rel_offset, vaddr_rel_max);
+  }
+
+  void Consume(size_t ps) {
+    paddr_consumed_ += ps;
+    DEBUG_ASSERT(paddr_consumed_ <= page_size_);
+    if (paddr_consumed_ == page_size_) {
+      paddrs_++;
+      paddr_consumed_ = 0;
+#ifdef DEBUG_ASSERT_IMPLEMENTED
+      DEBUG_ASSERT(paddr_count_ > 0);
+      paddr_count_--;
+#endif
+    }
+    vaddr_cursor_.Consume(ps);
+  }
+
+  paddr_t paddr() const {
+    DEBUG_ASSERT(paddr_consumed_ < page_size_);
+    return (*paddrs_) + paddr_consumed_;
+  }
+
+  size_t PageRemaining() const { return page_size_ - paddr_consumed_; }
+
+  // Returns a new cursor to the, possibly empty, virtual range that has already been processed by
+  // this cursor. The returned cursor will always be a subset of the original cursors range and
+  // does not include the paddrs.
+  VirtualAddressCursor ProcessedRange() const { return vaddr_cursor_.ProcessedRange(); }
+
+  vaddr_t vaddr() const { return vaddr_cursor_.vaddr(); }
+
+  vaddr_t vaddr_rel() const { return vaddr_cursor_.vaddr_rel(); }
+
+  size_t size() const { return vaddr_cursor_.size(); }
+
+ private:
+  const paddr_t* paddrs_;
 #ifdef DEBUG_ASSERT_IMPLEMENTED
   // We have no need to actually track the total number of elements in the paddrs array, as this
   // should be a simple size/paddr_size. To guard against code mistakes though, we separately track
@@ -137,12 +134,9 @@ class MappingCursor {
   size_t paddr_count_ = 0;
 #endif
   size_t paddr_consumed_ = 0;
-  size_t page_size_ = 0;
+  size_t page_size_;
 
-  vaddr_t start_vaddr_;
-  vaddr_t vaddr_;
-  vaddr_t vaddr_rel_offset_ = 0;
-  size_t size_;
+  VirtualAddressCursor vaddr_cursor_;
 };
 
 #endif  // ZIRCON_KERNEL_VM_INCLUDE_VM_MAPPING_CURSOR_H_

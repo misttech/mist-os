@@ -77,7 +77,7 @@ TEST(SocketCleanup, SynchronousDatagram) {
 
   fidl::Arena alloc;
   ASSERT_NO_FATAL_FAILURE(ServeAndExerciseFileDescriptionTeardown(
-      fuchsia_posix_socket::wire::kSynchronousDatagramSocketProtocolName,
+      fidl::DiscoverableProtocolName<fuchsia_posix_socket::SynchronousDatagramSocket>,
       fidl::WireResponse<fuchsia_posix_socket::SynchronousDatagramSocket::Describe>{
           fuchsia_posix_socket::wire::SynchronousDatagramSocketDescribeResponse::Builder(alloc)
               .event(std::move(client_event))
@@ -100,7 +100,7 @@ TEST(SocketCleanup, Stream) {
 
   fidl::Arena alloc;
   ASSERT_NO_FATAL_FAILURE(ServeAndExerciseFileDescriptionTeardown(
-      fuchsia_posix_socket::wire::kStreamSocketProtocolName,
+      fidl::DiscoverableProtocolName<fuchsia_posix_socket::StreamSocket>,
       fidl::WireResponse<fuchsia_posix_socket::StreamSocket::Describe>{
           fuchsia_posix_socket::wire::StreamSocketDescribeResponse::Builder(alloc)
               .socket(std::move(client_socket))
@@ -123,7 +123,7 @@ TEST(SocketCleanup, Datagram) {
 
   fidl::Arena alloc;
   ASSERT_NO_FATAL_FAILURE(ServeAndExerciseFileDescriptionTeardown(
-      fuchsia_posix_socket::wire::kDatagramSocketProtocolName,
+      fidl::DiscoverableProtocolName<fuchsia_posix_socket::DatagramSocket>,
       fidl::WireResponse<fuchsia_posix_socket::DatagramSocket::Describe>{
           fuchsia_posix_socket::wire::DatagramSocketDescribeResponse::Builder(alloc)
               .socket(std::move(client_socket))

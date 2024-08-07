@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.component.test/cpp/wire.h>
 #include <fidl/fuchsia.driver.test/cpp/wire.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/device-watcher/cpp/device-watcher.h>
@@ -22,6 +23,12 @@ int main() {
   fuchsia_driver_test::wire::RealmArgs args(arena);
   args.set_root_driver(arena,
                        fidl::StringView("fuchsia-boot:///platform-bus#meta/platform-bus.cm"));
+  fuchsia_driver_test::wire::Expose expose{
+      .service_name = fidl::StringView("fuchsia.hardware.ramdisk.Service"),
+      .collection = fuchsia_driver_test::wire::Collection::kBootDrivers,
+  };
+  args.set_exposes(fidl::ObjectView(
+      arena, fidl::VectorView<fuchsia_driver_test::wire::Expose>::FromExternal(&expose, 1)));
   auto wire_result = client->Start(std::move(args));
   if (wire_result.status() != ZX_OK) {
     FX_SLOG(ERROR, "Failed to call to Realm:Start", FX_KV("status", wire_result.status()));

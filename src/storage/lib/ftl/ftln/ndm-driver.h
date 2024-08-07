@@ -8,9 +8,8 @@
 #include <zircon/compiler.h>
 
 #include <cstdint>
-#include <optional>
 
-#include "logger.h"
+#include "src/storage/lib/ftl/ftln/logger.h"
 
 struct ndm;
 struct NDMDrvr;

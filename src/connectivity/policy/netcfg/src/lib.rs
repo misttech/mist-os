@@ -2276,7 +2276,6 @@ impl<'a> NetCfg<'a> {
                     interface_id,
                     dhcp_server,
                     control,
-                    &self.stack,
                     interface_name,
                     device_info,
                 )
@@ -2411,7 +2410,6 @@ impl<'a> NetCfg<'a> {
         interface_id: NonZeroU64,
         dhcp_server: &fnet_dhcp::Server_Proxy,
         control: &fidl_fuchsia_net_interfaces_ext::admin::Control,
-        stack: &fidl_fuchsia_net_stack::StackProxy,
         name: String,
         device_info: &DeviceInfoRef<'_>,
     ) -> Result<(), errors::Error> {
@@ -2443,7 +2441,10 @@ impl<'a> NetCfg<'a> {
         control
             .add_address(
                 &addr,
-                &fidl_fuchsia_net_interfaces_admin::AddressParameters::default(),
+                &fidl_fuchsia_net_interfaces_admin::AddressParameters {
+                    add_subnet_route: Some(true),
+                    ..Default::default()
+                },
                 server_end,
             )
             .map_err(map_control_error("error sending add address request"))?;
@@ -2480,37 +2481,6 @@ impl<'a> NetCfg<'a> {
         )
         .await
         .map_err(map_address_state_provider_error("failed to add interface address for WLAN AP"))?;
-
-        let subnet = fidl_fuchsia_net_ext::apply_subnet_mask(addr);
-        stack
-            .add_forwarding_entry(&fidl_fuchsia_net_stack::ForwardingEntry {
-                subnet,
-                device_id: interface_id.get(),
-                next_hop: None,
-                metric: fnet_stack::UNSPECIFIED_METRIC,
-            })
-            .await
-            .unwrap_or_else(|err| exit_with_fidl_error(err))
-            .map_err(|e| {
-                let severity = match e {
-                    fidl_fuchsia_net_stack::Error::InvalidArgs => {
-                        // Do not consider this a fatal error because the interface could have been
-                        // removed after it was added, but before we reached this point.
-                        //
-                        // NB: this error is returned by Netstack2 when the interface doesn't
-                        // exist. 🤷
-                        errors::Error::NonFatal
-                    }
-                    fidl_fuchsia_net_stack::Error::Internal
-                    | fidl_fuchsia_net_stack::Error::NotSupported
-                    | fidl_fuchsia_net_stack::Error::BadState
-                    | fidl_fuchsia_net_stack::Error::TimeOut
-                    | fidl_fuchsia_net_stack::Error::NotFound
-                    | fidl_fuchsia_net_stack::Error::AlreadyExists
-                    | fidl_fuchsia_net_stack::Error::Io => errors::Error::Fatal,
-                };
-                severity(anyhow::anyhow!("adding route: {:?}", e))
-            })?;
 
         // First we clear any leases that the server knows about since the server
         // will be used on a new interface. If leases exist, configuring the DHCP

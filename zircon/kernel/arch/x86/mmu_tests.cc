@@ -179,8 +179,12 @@ static bool x86_test_physmap_nx() {
   for (uintptr_t addr = PHYSMAP_BASE; addr < (PHYSMAP_BASE + PHYSMAP_SIZE); addr += PAGE_SIZE) {
     paddr_t paddr;
     uint mmu_flags;
-    EXPECT_OK(VmAspace::kernel_aspace()->arch_aspace().Query(addr, &paddr, &mmu_flags));
-    EXPECT_TRUE(!(mmu_flags & ARCH_MMU_FLAG_PERM_EXECUTE));
+    zx_status_t status = VmAspace::kernel_aspace()->arch_aspace().Query(addr, &paddr, &mmu_flags);
+    if (status == ZX_OK) {
+      EXPECT_TRUE(!(mmu_flags & ARCH_MMU_FLAG_PERM_EXECUTE));
+    } else {
+      EXPECT_EQ(status, ZX_ERR_NOT_FOUND);
+    }
   }
 
   END_TEST;

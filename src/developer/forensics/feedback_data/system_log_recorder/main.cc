@@ -21,7 +21,6 @@
 #include "src/developer/forensics/feedback_data/system_log_recorder/controller.h"
 #include "src/developer/forensics/feedback_data/system_log_recorder/encoding/production_encoding.h"
 #include "src/developer/forensics/feedback_data/system_log_recorder/system_log_recorder.h"
-#include "src/developer/forensics/utils/redact/redactor.h"
 
 namespace forensics {
 namespace feedback_data {

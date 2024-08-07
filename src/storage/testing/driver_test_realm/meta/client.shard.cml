@@ -16,6 +16,10 @@
             rights: [ "r*" ],
             path: "/dev",
         },
+        {
+            service: "fuchsia.hardware.ramdisk.Service",
+            from: "#storage_driver_test_realm",
+        },
     ],
     offer: [
         {

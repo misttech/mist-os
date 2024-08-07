@@ -10,9 +10,8 @@ load(
     "FuchsiaComponentInfo",
     "FuchsiaComponentManifestInfo",
     "FuchsiaPackageResourcesInfo",
-    "FuchsiaUnitTestComponentInfo",
 )
-load(":utils.bzl", "label_name", "make_resource_struct", "rule_variant", "rule_variants")
+load(":utils.bzl", "label_name", "make_resource_struct", "rule_variants")
 
 def _manifest_target(name, manifest_in, tags):
     if manifest_in.endswith(".cml"):
@@ -189,45 +188,3 @@ number of dependencies which will be included in the final package.
         ),
     },
 )
-
-def _fuchsia_component_for_unit_test_impl(ctx):
-    underlying_component = ctx.attr.unit_test[FuchsiaUnitTestComponentInfo].test_component
-    component_info = underlying_component[FuchsiaComponentInfo]
-
-    return _make_fuchsia_component_providers(
-        component_name = component_info.name,
-        manifest = component_info.manifest,
-        resources = component_info.resources,
-        is_driver = component_info.is_driver,
-        is_test = component_info.is_test,
-        run_tag = ctx.attr.run_tag,
-    ) + [
-        collect_debug_symbols(underlying_component),
-    ]
-
-_fuchsia_component_for_unit_test = rule_variant(
-    variant = "test",
-    doc = """Transforms a FuchsiaUnitTestComponentInfo into a test component.""",
-    implementation = _fuchsia_component_for_unit_test_impl,
-    attrs = {
-        "unit_test": attr.label(
-            doc = "The unit test to convert into a test component",
-            providers = [FuchsiaUnitTestComponentInfo],
-        ),
-        "run_tag": attr.string(
-            doc = """A tag used to identify the original component.
-
-            This is most likely going to be the label name for the target which
-            created the test component.
-            """,
-            mandatory = True,
-        ),
-    },
-)
-
-def fuchsia_component_for_unit_test(*, name, tags = ["manual"], **kwargs):
-    _fuchsia_component_for_unit_test(
-        name = name,
-        tags = tags,
-        **kwargs
-    )

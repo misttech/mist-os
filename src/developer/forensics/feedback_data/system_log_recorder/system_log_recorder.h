@@ -36,7 +36,7 @@ class SystemLogRecorder {
                     std::unique_ptr<Encoder> encoder);
   void Start();
 
-  void Flush(std::optional<std::string> message);
+  void Flush(const std::optional<std::string>& message);
   void StopAndDeleteLogs();
 
  private:

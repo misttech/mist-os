@@ -2,7 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "ndmp.h"
+#include <errno.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include "src/storage/lib/ftl/ftl.h"
+#include "src/storage/lib/ftl/ftl_private.h"
+#include "src/storage/lib/ftl/ndm/ndmp.h"
+#include "src/storage/lib/ftl/utils/kernel.h"
 
 // Configuration
 #define BBL_INSERT_INC TRUE

@@ -56,6 +56,7 @@ source_set("kernel") {
     "//zircon/kernel/vm",
     "//zircon/system/ulib/affine",
     "//zircon/system/ulib/explicit-memory",
+    "//zircon/system/ulib/lazy_init",
     "//zircon/system/ulib/pretty",
     "//zircon/system/ulib/zircon-internal",
     "//zircon/system/ulib/zx",

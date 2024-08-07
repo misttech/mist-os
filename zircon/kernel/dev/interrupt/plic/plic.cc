@@ -261,6 +261,7 @@ void PLICInitEarly(const zbi_dcfg_riscv_plic_driver_t& config) {
 
   LTRACE_ENTRY;
 
+  physmap_preserve_gaps_for_mmio();
   plic_base = (vaddr_t)paddr_to_physmap(config.mmio_phys);
   plic_max_int = config.num_irqs;
   ASSERT(plic_base && plic_max_int);

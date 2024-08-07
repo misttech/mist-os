@@ -7,8 +7,12 @@
 #ifndef ZIRCON_KERNEL_PHYS_INCLUDE_PHYS_HANDOFF_H_
 #define ZIRCON_KERNEL_PHYS_INCLUDE_PHYS_HANDOFF_H_
 
+// Note: we refrain from using the ktl namespace as <phys/handoff.h> is
+// expected to be compiled in the userboot toolchain.
+
 #include <lib/arch/ticks.h>
 #include <lib/crypto/entropy_pool.h>
+#include <lib/stdcompat/span.h>
 #include <lib/uart/all.h>
 #include <lib/zbi-format/board.h>
 #include <lib/zbi-format/cpu.h>
@@ -19,11 +23,11 @@
 #include <zircon/assert.h>
 #include <zircon/types.h>
 
-#include <ktl/array.h>
-#include <ktl/byte.h>
-#include <ktl/optional.h>
-#include <ktl/span.h>
-#include <ktl/type_traits.h>
+#include <array>
+#include <optional>
+#include <string_view>
+#include <type_traits>
+
 #include <phys/arch/arch-handoff.h>
 
 #include "handoff-ptr.h"
@@ -71,18 +75,21 @@ class PhysBootTimes {
 
 // VMOs to publish as is.
 struct PhysVmo {
-  using Name = ktl::array<char, ZX_MAX_NAME_LEN>;
+  using Name = std::array<char, ZX_MAX_NAME_LEN>;
 
-  void set_name(ktl::string_view new_name) { new_name.copy(name.data(), name.size() - 1); }
+  // The maximum number of VMOs expected to be in the hand-off.
+  static constexpr size_t kMaxHandoffPhysVmos = 3;
+
+  void set_name(std::string_view new_name) { new_name.copy(name.data(), name.size() - 1); }
 
   // TODO(https://fxbug.dev/42164859): Currently these are actually copied like everything
   // else into temporary handoff space (the only kind), so only the actual
   // content size is allocated.  Eventually these will just be handed off here
   // as a paddr and size of whole physical pages plus a precise content size.
-  PhysHandoffTemporarySpan<const ktl::byte> data;
+  PhysHandoffTemporarySpan<const std::byte> data;
   Name name{};
 };
-static_assert(ktl::is_default_constructible_v<PhysVmo>);
+static_assert(std::is_default_constructible_v<PhysVmo>);
 
 // This holds (or points to) everything that is handed off from physboot to the
 // kernel proper at boot time.
@@ -97,7 +104,7 @@ struct PhysHandoff {
   PhysHandoffTemporaryPtr<const BootOptions> boot_options;
 
   PhysBootTimes times;
-  static_assert(ktl::is_default_constructible_v<PhysBootTimes>);
+  static_assert(std::is_default_constructible_v<PhysBootTimes>);
 
   // TODO(https://fxbug.dev/42164859): This will eventually be made a permanent pointer.
   PhysHandoffTemporaryString version_string;
@@ -110,16 +117,16 @@ struct PhysHandoff {
   uint64_t zbi = 0;
 
   // Entropy gleaned from ZBI Items such as 'ZBI_TYPE_SECURE_ENTROPY' and/or command line.
-  ktl::optional<crypto::EntropyPool> entropy_pool;
+  std::optional<crypto::EntropyPool> entropy_pool;
 
   // ZBI container of items to be propagated in mexec.
   // TODO(https://fxbug.dev/42164859): later this will be propagated
   // as a whole page the kernel can stuff into a VMO.
-  PhysHandoffTemporarySpan<const ktl::byte> mexec_data;
+  PhysHandoffTemporarySpan<const std::byte> mexec_data;
 
   // Architecture-specific content.
   ArchPhysHandoff arch_handoff;
-  static_assert(ktl::is_default_constructible_v<ArchPhysHandoff>);
+  static_assert(std::is_default_constructible_v<ArchPhysHandoff>);
 
   // ZBI_TYPE_MEM_CONFIG payload.
   //
@@ -139,22 +146,22 @@ struct PhysHandoff {
   PhysHandoffTemporaryString crashlog;
 
   // ZBI_TYPE_HW_REBOOT_REASON payload.
-  ktl::optional<zbi_hw_reboot_reason_t> reboot_reason;
+  std::optional<zbi_hw_reboot_reason_t> reboot_reason;
 
   // ZBI_TYPE_NVRAM payload.
   // A physical memory region that will persist across warm boots.
-  ktl::optional<zbi_nvram_t> nvram;
+  std::optional<zbi_nvram_t> nvram;
 
   // ZBI_TYPE_PLATFORM_ID payload.
-  ktl::optional<zbi_platform_id_t> platform_id;
+  std::optional<zbi_platform_id_t> platform_id;
 
   // ZBI_TYPE_ACPI_RSDP payload.
   // Physical address of the ACPI RSDP (Root System Descriptor Pointer).
-  ktl::optional<uint64_t> acpi_rsdp;
+  std::optional<uint64_t> acpi_rsdp;
 
   // ZBI_TYPE_SMBIOS payload.
   // Physical address of the SMBIOS tables.
-  ktl::optional<uint64_t> smbios_phys;
+  std::optional<uint64_t> smbios_phys;
 
   // ZBI_TYPE_EFI_MEMORY_ATTRIBUTES_TABLE payload.
   // EFI memory attributes table.
@@ -162,10 +169,10 @@ struct PhysHandoff {
 
   // ZBI_TYPE_EFI_SYSTEM_TABLE payload.
   // Physical address of the EFI system table.
-  ktl::optional<uint64_t> efi_system_table;
+  std::optional<uint64_t> efi_system_table;
 };
 
-static_assert(ktl::is_default_constructible_v<PhysHandoff>);
+static_assert(std::is_default_constructible_v<PhysHandoff>);
 
 extern PhysHandoff* gPhysHandoff;
 
@@ -178,13 +185,37 @@ extern "C" [[noreturn]] void PhysbootHandoff(PhysHandoff* handoff);
 
 #include <sys/types.h>
 
+// Forward declaration; defined in <object/handle.h>.
+class Handle;
+
 // Called as soon as the physmap is available to set the gPhysHandoff pointer.
 void HandoffFromPhys(paddr_t handoff_paddr);
 
 // This can be used after HandoffFromPhys and before the ZBI is handed off to
 // userboot at the very end of kernel initialization code.  Userboot calls it
 // with true to ensure no later calls will succeed.
-ktl::span<ktl::byte> ZbiInPhysmap(bool own = false);
+
+// The remaining hand-off data to be consumed at the end of the hand-off phase
+// (see EndHandoff()).
+struct HandoffEnd {
+  // The data ZBI within the physmap.
+  //
+  // TODO(https://fxbug.dev/357155617): Use PhysVmo machinery to create the VMO
+  // and instead pass a Handle* here.
+  cpp20::span<std::byte> zbi;
+
+  // The VMOs deriving from the phys environment. As returned by EndHandoff(),
+  // the entirety of the array will be populated by real handles (if only by
+  // stub VMOs) (as is convenient for userboot, its intended caller).
+  std::array<Handle*, PhysVmo::kMaxHandoffPhysVmos> phys_vmos;
+};
+
+// Formally ends the hand-off phase, unsetting gPhysHandoff and returning the
+// remaining hand-off data left to be consumed (in a userboot-friendly way).
+//
+// After the end of hand-off, all pointers previously referenced by gPhysHandoff
+// should be regarded as freed and unusable.
+HandoffEnd EndHandoff();
 
 #endif  // _KERNEL
 

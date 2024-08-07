@@ -23,8 +23,9 @@ use cm_types::Name;
 use fidl::endpoints::ProtocolMarker;
 use moniker::{ExtendedMoniker, Moniker};
 use routing::capability_source::{
-    AggregateCapability, AggregateMember, CapabilitySource, ComponentCapability,
-    FilteredAggregateCapabilityRouteData, InternalCapability,
+    AggregateCapability, AggregateMember, AnonymizedAggregateSource, BuiltinSource,
+    CapabilitySource, ComponentCapability, ComponentSource, FilteredAggregateCapabilityRouteData,
+    FilteredAggregateProviderSource, InternalCapability,
 };
 use routing::collection::new_filtered_aggregate_from_capability_source;
 use routing::component_instance::ComponentInstanceInterface;
@@ -1534,10 +1535,10 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         assert_matches!(
         route_capability(RouteRequest::ExposeProtocol(expose_decl), &root_instance, &mut NoopRouteMapper).await,
             Ok(RouteSource {
-                source: CapabilitySource::Component {
+                source: CapabilitySource::Component(ComponentSource {
                         capability: ComponentCapability::Protocol(capability_decl),
                         moniker,
-                    },
+                    }),
                 relative_path,
             }) if capability_decl == expected_protocol_decl && moniker == expected_source_moniker && relative_path.is_dot()
         );
@@ -1751,10 +1752,10 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         match source {
             RouteSource {
                 source:
-                    CapabilitySource::FilteredAggregateProvider {
+                    CapabilitySource::FilteredAggregateProvider(FilteredAggregateProviderSource {
                         capability: AggregateCapability::Service(name),
                         ..
-                    },
+                    }),
                 relative_path,
             } if relative_path.is_dot() => {
                 assert_eq!(name, "foo");
@@ -1845,17 +1846,20 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         match source {
             RouteSource {
                 source:
-                    CapabilitySource::AnonymizedAggregate {
+                    CapabilitySource::AnonymizedAggregate(AnonymizedAggregateSource {
                         capability: AggregateCapability::Service(name),
                         members,
                         ..
-                    },
+                    }),
                 relative_path,
             } if relative_path.is_dot() => {
                 assert_eq!(name, "foo");
                 assert_eq!(members.len(), 3);
                 for c in [
-                    AggregateMember::Child("c".try_into().unwrap()),
+                    AggregateMember::Child(ChildRef {
+                        name: "c".parse().unwrap(),
+                        collection: None,
+                    }),
                     AggregateMember::Parent,
                     AggregateMember::Self_,
                 ] {
@@ -3135,10 +3139,10 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         match source {
             RouteSource {
                 source:
-                    CapabilitySource::Component {
+                    CapabilitySource::Component(ComponentSource {
                         capability: ComponentCapability::Service(ServiceDecl { name, source_path }),
                         moniker,
-                    },
+                    }),
                 relative_path,
             } if relative_path.is_dot() => {
                 assert_eq!(name, "foo");
@@ -3185,10 +3189,10 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         match source {
             RouteSource {
                 source:
-                    CapabilitySource::Component {
+                    CapabilitySource::Component(ComponentSource {
                         capability: ComponentCapability::Service(ServiceDecl { name, source_path }),
                         moniker,
-                    },
+                    }),
                 relative_path,
             } if relative_path.is_dot() => {
                 assert_eq!(name, "foo");
@@ -3252,10 +3256,10 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         match source {
             RouteSource {
                 source:
-                    CapabilitySource::Component {
+                    CapabilitySource::Component(ComponentSource {
                         capability: ComponentCapability::Service(ServiceDecl { name, source_path }),
                         moniker,
-                    },
+                    }),
                 relative_path,
             } if relative_path.is_dot() => {
                 assert_eq!(name, "foo");
@@ -3333,10 +3337,10 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         assert_matches!(
             data,
             FilteredAggregateCapabilityRouteData {
-                capability_source: CapabilitySource::Component {
+                capability_source: CapabilitySource::Component(ComponentSource {
                     moniker,
                     capability,
-                },
+                }),
                 instance_filter,
             }
             if moniker == "c".parse().unwrap() &&
@@ -3417,10 +3421,10 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         assert_matches!(
             data,
             FilteredAggregateCapabilityRouteData {
-                capability_source: CapabilitySource::Component {
+                capability_source: CapabilitySource::Component(ComponentSource {
                     moniker,
                     capability,
-                },
+                }),
                 instance_filter,
             }
             if moniker == "c".parse().unwrap() &&
@@ -3481,10 +3485,10 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         match source {
             RouteSource {
                 source:
-                    CapabilitySource::Component {
+                    CapabilitySource::Component(ComponentSource {
                         capability: ComponentCapability::Runner(RunnerDecl { name, source_path }),
                         moniker,
-                    },
+                    }),
                 relative_path,
             } if relative_path.is_dot() => {
                 assert_eq!(name, "elf");
@@ -3560,10 +3564,10 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         match source {
             RouteSource {
                 source:
-                    CapabilitySource::Component {
+                    CapabilitySource::Component(ComponentSource {
                         capability: ComponentCapability::Runner(RunnerDecl { name, source_path }),
                         moniker,
-                    },
+                    }),
                 relative_path,
             } if relative_path.is_dot() => {
                 assert_eq!(name, "elf");
@@ -3636,10 +3640,10 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         match source {
             RouteSource {
                 source:
-                    CapabilitySource::Component {
+                    CapabilitySource::Component(ComponentSource {
                         capability: ComponentCapability::Runner(RunnerDecl { name, source_path }),
                         moniker,
-                    },
+                    }),
                 relative_path,
             } if relative_path.is_dot() => {
                 assert_eq!(name, "elf");
@@ -3709,10 +3713,10 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         match source {
             RouteSource {
                 source:
-                    CapabilitySource::Component {
+                    CapabilitySource::Component(ComponentSource {
                         capability: ComponentCapability::Runner(RunnerDecl { name, source_path }),
                         moniker,
-                    },
+                    }),
                 relative_path,
             } if relative_path.is_dot() => {
                 assert_eq!(name, "elf");
@@ -3828,7 +3832,10 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         match source {
             RouteSource {
                 source:
-                    CapabilitySource::Builtin { capability: InternalCapability::Runner(name), .. },
+                    CapabilitySource::Builtin(BuiltinSource {
+                        capability: InternalCapability::Runner(name),
+                        ..
+                    }),
                 relative_path,
             } if relative_path.is_dot() => {
                 assert_eq!(name, "elf");
@@ -3868,7 +3875,10 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         match source {
             RouteSource {
                 source:
-                    CapabilitySource::Builtin { capability: InternalCapability::Runner(name), .. },
+                    CapabilitySource::Builtin(BuiltinSource {
+                        capability: InternalCapability::Runner(name),
+                        ..
+                    }),
                 relative_path,
             } if relative_path.is_dot() => {
                 assert_eq!(name, "elf");
@@ -4017,10 +4027,10 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         match source {
             RouteSource {
                 source:
-                    CapabilitySource::Component {
+                    CapabilitySource::Component(ComponentSource {
                         capability: ComponentCapability::Runner(RunnerDecl { name, source_path }),
                         moniker,
-                    },
+                    }),
                 relative_path,
             } if relative_path.is_dot() => {
                 assert_eq!(name, "elf");
@@ -4081,10 +4091,10 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         match source {
             RouteSource {
                 source:
-                    CapabilitySource::Component {
+                    CapabilitySource::Component(ComponentSource {
                         capability: ComponentCapability::Runner(RunnerDecl { name, source_path }),
                         moniker,
-                    },
+                    }),
                 relative_path,
             } if relative_path.is_dot() => {
                 assert_eq!(name, "elf");
@@ -4149,10 +4159,10 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         match source {
             RouteSource {
                 source:
-                    CapabilitySource::Component {
+                    CapabilitySource::Component(ComponentSource {
                         capability: ComponentCapability::Runner(RunnerDecl { name, source_path }),
                         moniker,
-                    },
+                    }),
                 relative_path,
             } if relative_path.is_dot() => {
                 assert_eq!(name, "elf");

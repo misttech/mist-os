@@ -3418,3 +3418,26 @@ TEST_F(DispatcherTest, SetDefaultDispatcher) {
       fdf::SynchronizedDispatcher::Create({}, "", [&](fdf_dispatcher_t* dispatcher) {});
   ASSERT_TRUE(dispatcher3.is_error());
 }
+
+// Tests that a delayed task cannot be queued after the dispatcher is shutdown.
+TEST_F(DispatcherTest, QueueDelayedTaskAfterShutdown) {
+  auto fake_driver = CreateFakeDriver();
+  libsync::Completion shutdown_completion;
+  auto destructed_handler = [&](fdf_dispatcher_t* dispatcher) { shutdown_completion.Signal(); };
+  auto dispatcher = fdf_env::DispatcherBuilder::CreateSynchronizedWithOwner(
+      fake_driver, {}, "dispatcher", destructed_handler);
+  ASSERT_FALSE(dispatcher.is_error());
+
+  dispatcher->ShutdownAsync();
+  shutdown_completion.Wait();
+
+  // Choose a valid delay value, zx::time::infinite() is not allowed.
+  constexpr zx::duration kDelay = zx::sec(1);
+  ASSERT_EQ(ZX_ERR_BAD_STATE, async::PostDelayedTask(
+                                  dispatcher->async_dispatcher(),
+                                  [] {
+                                    // This task should never run.
+                                    ASSERT_FALSE(true);
+                                  },
+                                  kDelay));
+}

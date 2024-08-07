@@ -5,12 +5,12 @@
 #ifndef SRC_STORAGE_LIB_FTL_FTLN_FTLNP_H_
 #define SRC_STORAGE_LIB_FTL_FTLN_FTLNP_H_
 
-#include <errno.h>
-#include <stdio.h>
-#include <string.h>
+#include <zircon/compiler.h>
 
-#include "ftl_private.h"
-#include "utils/ftl_mc.h"
+#include "src/storage/lib/ftl/ftl.h"
+#include "src/storage/lib/ftl/ftl_private.h"
+#include "src/storage/lib/ftl/ftln/logger.h"
+#include "src/storage/lib/ftl/utils/ftl_mc.h"
 
 //
 // Configuration.
@@ -81,30 +81,30 @@ static inline int ftln_debug(void) { return FTLN_DEBUG; }
 
 #define PGS_PER_BLK_MAX (USED_MASK >> 20)
 
-#define IS_FREE(b) ((b)&FREE_BLK_FLAG)
-#define IS_ERASED(b) (((b)&BLK_STATE_MASK) == (FREE_BLK_FLAG | ERASED_BLK_FLAG))
-#define IS_MAP_BLK(b) (((b)&BLK_STATE_MASK) == MAP_BLK_STATE)
+#define IS_FREE(b) ((b) & FREE_BLK_FLAG)
+#define IS_ERASED(b) (((b) & BLK_STATE_MASK) == (FREE_BLK_FLAG | ERASED_BLK_FLAG))
+#define IS_MAP_BLK(b) (((b) & BLK_STATE_MASK) == MAP_BLK_STATE)
 #define SET_MAP_BLK(bd) (bd = MAP_BLK_STATE)
 
-#define NUM_USED(bd) (((bd)&USED_MASK) >> 20)
+#define NUM_USED(bd) (((bd) & USED_MASK) >> 20)
 #define DEC_USED(bd) ((bd) -= (1 << 20))
 #define INC_USED(bd) ((bd) += (1 << 20))
-#define GET_RC(bd) ((bd)&RC_MASK)
+#define GET_RC(bd) ((bd) & RC_MASK)
 #define SET_RC(bd, n) ((bd) = ((bd) & ~RC_MASK) | n)
-#define INC_RC(ftl, bdp, c)         \
-  do {                              \
-    ui32 rc = GET_RC(*bdp) + c;     \
-                                    \
-    if (rc > RC_MASK)               \
-      rc = RC_MASK;                 \
-    *bdp = rc | (*bdp & ~RC_MASK);  \
-    if (rc >= (ftl)->max_rc)        \
-      (ftl)->max_rc_blk = (ui32)-2; \
-  } /*lint !e717*/                  \
+#define INC_RC(ftl, bdp, c)           \
+  do {                                \
+    ui32 rc = GET_RC(*bdp) + c;       \
+                                      \
+    if (rc > RC_MASK)                 \
+      rc = RC_MASK;                   \
+    *bdp = rc | (*bdp & ~RC_MASK);    \
+    if (rc >= (ftl)->max_rc)          \
+      (ftl)->max_rc_blk = (ui32) - 2; \
+  } /*lint !e717*/                    \
   while (0)
 #define SET_MAX_RC(ftl, bdp)                  \
   do {                                        \
-    (ftl)->max_rc_blk = (ui32)-2;             \
+    (ftl)->max_rc_blk = (ui32) - 2;           \
     *bdp = (ftl)->max_rc | (*bdp & ~RC_MASK); \
   } /*lint !e717*/                            \
   while (0)

@@ -24,9 +24,6 @@ group("drivers") {
   ]
   if (target_cpu == "arm64") {
     deps += [
-      "aml-dsp",
-      "aml-dsp/aml-g12-pdm-dsp",
-      "aml-dsp/aml-g12-tdm-dsp",
       "aml-g12-pdm:aml-g12-pdm",
       "aml-g12-tdm",
       "aml-g12-tdm:aml-g12-composite-bazel-package",

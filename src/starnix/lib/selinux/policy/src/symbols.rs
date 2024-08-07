@@ -1129,6 +1129,11 @@ impl<PS: ParseStrategy> Type<PS> {
         TypeId(NonZeroU32::new(PS::deref(&self.metadata).id.get()).unwrap())
     }
 
+    /// Returns the Id of the bounding type, if any.
+    pub fn bounded_by(&self) -> Option<TypeId> {
+        NonZeroU32::new(PS::deref(&self.metadata).bounds.get()).map(|id| TypeId(id))
+    }
+
     /// Returns whether this type is from a `type [name];` policy statement.
     ///
     /// TODO: Eliminate `dead_code` guard.

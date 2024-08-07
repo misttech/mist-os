@@ -4,7 +4,7 @@
 
 #include <stdlib.h>
 
-#include "ftl_private.h"
+#include "src/storage/lib/ftl/ftl_private.h"
 
 // Wrapper for malloc()
 void* FsMalloc(size_t size) {

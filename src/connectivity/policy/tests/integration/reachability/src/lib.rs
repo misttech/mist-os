@@ -8,8 +8,7 @@
 use {
     fidl_fuchsia_net as fnet, fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
     fidl_fuchsia_net_neighbor as fnet_neighbor, fidl_fuchsia_net_reachability as fnet_reachability,
-    fidl_fuchsia_net_stack as fnet_stack, fidl_fuchsia_testing as ftesting,
-    fuchsia_async as fasync, fuchsia_zircon as zx,
+    fidl_fuchsia_testing as ftesting, fuchsia_async as fasync, fuchsia_zircon as zx,
 };
 
 use assert_matches::assert_matches;
@@ -17,7 +16,7 @@ use fidl::endpoints::Proxy;
 use futures::channel::mpsc;
 use futures::future::FusedFuture;
 use futures::{FutureExt as _, StreamExt as _, TryFutureExt as _};
-use net_declare::{fidl_subnet, net_ip_v4, net_ip_v6, net_mac};
+use net_declare::{net_ip_v4, net_ip_v6, net_mac};
 use netstack_testing_common::constants::{ipv4 as ipv4_consts, ipv6 as ipv6_consts};
 use netstack_testing_common::realms::{
     constants, KnownServiceProvider, Netstack, TestSandboxExt as _,
@@ -300,7 +299,6 @@ impl<'a> NetemulInterface<'a> {
 async fn configure_interface<'a>(
     iface: &'a netemul::TestInterface<'a>,
     controller: &fnet_neighbor::ControllerProxy,
-    stack: &fnet_stack::StackProxy,
     InterfaceConfig {
         name_suffix: _,
         gateway_v4,
@@ -323,10 +321,13 @@ async fn configure_interface<'a>(
         },
     ])
     .for_each_concurrent(None, |subnet| async move {
-        let address_state_provider = interfaces::add_subnet_address_and_route_wait_assigned(
-            iface,
+        let address_state_provider = interfaces::add_address_wait_assigned(
+            iface.control(),
             subnet,
-            fnet_interfaces_admin::AddressParameters::default(),
+            fnet_interfaces_admin::AddressParameters {
+                add_subnet_route: Some(true),
+                ..Default::default()
+            },
         )
         .await
         .expect("add subnet address and route");
@@ -354,26 +355,14 @@ async fn configure_interface<'a>(
         .expect("add IPv4 gateway neighbor table entry failed");
 
     // Add default routes.
-    let () = stack
-        .add_forwarding_entry(&fnet_stack::ForwardingEntry {
-            subnet: fidl_subnet!("0.0.0.0/0"),
-            device_id,
-            next_hop: Some(Box::new(gateway_v4)),
-            metric,
-        })
+    iface
+        .add_default_route_with_explicit_metric(gateway_v4, metric)
         .await
-        .expect("add IPv4 default route FIDL error")
-        .expect("add IPv4 default route error");
-    let () = stack
-        .add_forwarding_entry(&fnet_stack::ForwardingEntry {
-            subnet: fidl_subnet!("::/0"),
-            device_id,
-            next_hop: Some(Box::new(gateway_v6)),
-            metric,
-        })
+        .expect("add IPv4 default route");
+    iface
+        .add_default_route_with_explicit_metric(gateway_v6, metric)
         .await
-        .expect("add IPv6 default route FIDL error")
-        .expect("add IPv6 default route error");
+        .expect("add IPv6 default route");
 }
 
 async fn handle_frame_stream<'a>(
@@ -406,7 +395,6 @@ struct ReachabilityEnv<'a> {
     sandbox: &'a netemul::TestSandbox,
     realm: netemul::TestRealm<'a>,
     controller: fnet_neighbor::ControllerProxy,
-    stack: fnet_stack::StackProxy,
     fake_clock: ftesting::FakeClockControlProxy,
 }
 
@@ -428,14 +416,12 @@ async fn setup_reachability_env<'a, N: Netstack>(
     let controller = realm
         .connect_to_protocol::<fnet_neighbor::ControllerMarker>()
         .expect("failed to connect to Controller");
-    let stack =
-        realm.connect_to_protocol::<fnet_stack::StackMarker>().expect("failed to connect to Stack");
     let fake_clock = realm
         .connect_to_protocol::<ftesting::FakeClockControlMarker>()
         .expect("failed to connect to FakeClockControl");
     let () = initialize_fake_clock(&fake_clock).await;
 
-    ReachabilityEnv { sandbox, realm, controller, stack, fake_clock }
+    ReachabilityEnv { sandbox, realm, controller, fake_clock }
 }
 
 async fn create_netemul_interfaces<'a>(
@@ -460,7 +446,7 @@ async fn create_netemul_interfaces<'a>(
                     .expect("failed to join network with netdevice endpoint");
                 let state = Rc::new(RefCell::new(*init_state));
 
-                configure_interface(&interface, &env.controller, &env.stack, config).await;
+                configure_interface(&interface, &env.controller, config).await;
                 NetemulInterface { _network: network, interface, fake_ep, state }
             }
         })

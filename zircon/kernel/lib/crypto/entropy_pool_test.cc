@@ -9,6 +9,7 @@
 
 #include <ktl/array.h>
 #include <ktl/move.h>
+#include <ktl/span.h>
 #include <ktl/type_traits.h>
 
 #include <ktl/enforce.h>

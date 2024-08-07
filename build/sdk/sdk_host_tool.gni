@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/sdk/sdk_atom.gni")
-import("//build/sdk/sdk_atom_alias.gni")
 
 # Defines a host tool in the SDK.
 #

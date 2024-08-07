@@ -9,13 +9,14 @@ use core::num::NonZeroU16;
 use core::time::Duration;
 
 use ip_test_macro::ip_test;
-use net_declare::net_ip_v4;
+use net_declare::{net_ip_v4, net_ip_v6};
 use net_types::ethernet::Mac;
 use net_types::ip::{
-    AddrSubnet, Ip, IpAddr, IpAddress, IpVersion, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Mtu, Subnet,
+    AddrSubnet, GenericOverIp, Ip, IpAddr, IpAddress, IpInvariant, IpVersion, Ipv4, Ipv4Addr, Ipv6,
+    Ipv6Addr, Mtu, Subnet,
 };
 use net_types::{MulticastAddr, SpecifiedAddr, UnicastAddr, Witness as _};
-use packet::{Buf, ParseBuffer, ParseMetadata, Serializer as _};
+use packet::{Buf, InnerPacketBuilder, ParseBuffer, ParseMetadata, Serializer as _};
 use packet_formats::ethernet::{
     EthernetFrame, EthernetFrameBuilder, EthernetFrameLengthCheck, ETHERNET_MIN_BODY_LEN_NO_TAG,
 };
@@ -50,6 +51,9 @@ use netstack3_device::testutil::IPV6_MIN_IMPLIED_MAX_FRAME_SIZE;
 use netstack3_ip::device::{
     IpDeviceAddr, IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate,
     Ipv6DeviceConfigurationUpdate, SlaacConfiguration,
+};
+use netstack3_ip::multicast_forwarding::{
+    MulticastRoute, MulticastRouteKey, MulticastRouteTarget, MulticastRouteTargets,
 };
 use netstack3_ip::socket::IpSocketContext;
 use netstack3_ip::{
@@ -1371,6 +1375,45 @@ fn test_drop_non_unicast_ipv6_source() {
     assert_eq!(ctx.core_ctx.ipv6().inner.counters().version_rx.non_unicast_source.get(), 1);
 }
 
+/// Constructs a buffer containing an IP packet with sensible defaults.
+fn new_ip_packet_buf<I: IpExt>(src_addr: I::Addr, dst_addr: I::Addr) -> impl AsRef<[u8]> {
+    const TTL: u8 = 255;
+    /// Arbitrary data to put inside of an IP packet.
+    const IP_BODY: [u8; 10] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+    IP_BODY
+        .into_serializer()
+        .encapsulate(I::PacketBuilder::new(src_addr, dst_addr, TTL, IpProto::Udp.into()))
+        .serialize_vec_outer()
+        .unwrap()
+}
+
+// Helper function to call receive ipv4/ipv6 packet action.
+fn receive_ip_packet_action<I: IpExt + TestIpExt>(
+    ctx: &mut Ctx<FakeBindingsCtx>,
+    dev: &DeviceId<FakeBindingsCtx>,
+    dst_addr: I::Addr,
+) -> ReceivePacketAction<I, DeviceId<FakeBindingsCtx>> {
+    let Ctx { core_ctx, bindings_ctx } = ctx;
+    let buf = new_ip_packet_buf::<I>(I::TEST_ADDRS.remote_ip.get(), dst_addr);
+    let mut buf_ref = buf.as_ref();
+    let packet = buf_ref.parse::<I::Packet<_>>().expect("parse should succeed");
+
+    #[derive(GenericOverIp)]
+    #[generic_over_ip(I, Ip)]
+    struct Out<I: IpExt>(ReceivePacketAction<I, DeviceId<FakeBindingsCtx>>);
+
+    let Out(action) = I::map_ip(
+        (&packet, IpInvariant((&mut core_ctx.context(), bindings_ctx, dev))),
+        |(packet, IpInvariant((core_ctx, bindings_ctx, dev)))| {
+            Out(ip::receive_ipv4_packet_action(core_ctx, bindings_ctx, dev, &packet))
+        },
+        |(packet, IpInvariant((core_ctx, bindings_ctx, dev)))| {
+            Out(ip::receive_ipv6_packet_action(core_ctx, bindings_ctx, dev, &packet))
+        },
+    );
+    action
+}
+
 #[test]
 fn test_receive_ip_packet_action() {
     let v4_config = Ipv4::TEST_ADDRS;
@@ -1400,85 +1443,69 @@ fn test_receive_ip_packet_action() {
     let v4_dev: DeviceId<_> = device_ids[dev_idx0].clone().into();
     let v6_dev: DeviceId<_> = device_ids[dev_idx1].clone().into();
 
-    let Ctx { core_ctx, bindings_ctx } = &mut ctx;
+    // Receive packet destined to the unspecified address.
+    assert_eq!(
+        receive_ip_packet_action::<Ipv4>(&mut ctx, &v4_dev, Ipv4::UNSPECIFIED_ADDRESS),
+        ReceivePacketAction::Drop { reason: DropReason::UnspecifiedDestination }
+    );
+    assert_eq!(
+        receive_ip_packet_action::<Ipv6>(&mut ctx, &v6_dev, Ipv6::UNSPECIFIED_ADDRESS),
+        ReceivePacketAction::Drop { reason: DropReason::UnspecifiedDestination }
+    );
 
     // Receive packet addressed to us.
     assert_eq!(
-        ip::receive_ipv4_packet_action(
-            &mut core_ctx.context(),
-            bindings_ctx,
-            &v4_dev,
-            v4_config.local_ip
-        ),
+        receive_ip_packet_action::<Ipv4>(&mut ctx, &v4_dev, *v4_config.local_ip),
         ReceivePacketAction::Deliver { address_status: Ipv4PresentAddressStatus::Unicast }
     );
     assert_eq!(
-        ip::receive_ipv6_packet_action(
-            &mut core_ctx.context(),
-            bindings_ctx,
-            &v6_dev,
-            v6_config.local_ip
-        ),
+        receive_ip_packet_action::<Ipv6>(&mut ctx, &v6_dev, *v6_config.local_ip),
         ReceivePacketAction::Deliver { address_status: Ipv6PresentAddressStatus::UnicastAssigned }
     );
 
     // Receive packet addressed to the IPv4 subnet broadcast address.
     assert_eq!(
-        ip::receive_ipv4_packet_action(
-            &mut core_ctx.context(),
-            bindings_ctx,
-            &v4_dev,
-            SpecifiedAddr::new(v4_subnet.broadcast()).unwrap()
-        ),
+        receive_ip_packet_action::<Ipv4>(&mut ctx, &v4_dev, v4_subnet.broadcast()),
         ReceivePacketAction::Deliver { address_status: Ipv4PresentAddressStatus::SubnetBroadcast }
     );
 
     // Receive packet addressed to the IPv4 limited broadcast address.
     assert_eq!(
-        ip::receive_ipv4_packet_action(
-            &mut core_ctx.context(),
-            bindings_ctx,
-            &v4_dev,
-            Ipv4::LIMITED_BROADCAST_ADDRESS
-        ),
+        receive_ip_packet_action::<Ipv4>(&mut ctx, &v4_dev, *Ipv4::LIMITED_BROADCAST_ADDRESS),
         ReceivePacketAction::Deliver { address_status: Ipv4PresentAddressStatus::LimitedBroadcast }
     );
 
     // Receive packet addressed to a multicast address we're subscribed to.
-    ip::device::join_ip_multicast::<Ipv4, _, _>(
-        &mut core_ctx.context(),
-        bindings_ctx,
-        &v4_dev,
-        Ipv4::ALL_ROUTERS_MULTICAST_ADDRESS,
-    );
-    assert_eq!(
-        ip::receive_ipv4_packet_action(
+    {
+        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
+        ip::device::join_ip_multicast::<Ipv4, _, _>(
             &mut core_ctx.context(),
             bindings_ctx,
             &v4_dev,
-            Ipv4::ALL_ROUTERS_MULTICAST_ADDRESS.into_specified()
-        ),
+            Ipv4::ALL_ROUTERS_MULTICAST_ADDRESS,
+        );
+    }
+    assert_eq!(
+        receive_ip_packet_action::<Ipv4>(&mut ctx, &v4_dev, *Ipv4::ALL_ROUTERS_MULTICAST_ADDRESS),
         ReceivePacketAction::Deliver { address_status: Ipv4PresentAddressStatus::Multicast }
     );
 
     // Receive packet addressed to the all-nodes multicast address.
     assert_eq!(
-        ip::receive_ipv6_packet_action(
-            &mut core_ctx.context(),
-            bindings_ctx,
+        receive_ip_packet_action::<Ipv6>(
+            &mut ctx,
             &v6_dev,
-            Ipv6::ALL_NODES_LINK_LOCAL_MULTICAST_ADDRESS.into_specified()
+            *Ipv6::ALL_NODES_LINK_LOCAL_MULTICAST_ADDRESS
         ),
         ReceivePacketAction::Deliver { address_status: Ipv6PresentAddressStatus::Multicast }
     );
 
     // Receive packet addressed to a multicast address we're subscribed to.
     assert_eq!(
-        ip::receive_ipv6_packet_action(
-            &mut core_ctx.context(),
-            bindings_ctx,
+        receive_ip_packet_action::<Ipv6>(
+            &mut ctx,
             &v6_dev,
-            v6_config.local_ip.to_solicited_node_address().into_specified(),
+            *v6_config.local_ip.to_solicited_node_address()
         ),
         ReceivePacketAction::Deliver { address_status: Ipv6PresentAddressStatus::Multicast }
     );
@@ -1520,15 +1547,9 @@ fn test_receive_ip_packet_action() {
                 },
             )
             .unwrap();
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
         let tentative: UnicastAddr<Ipv6Addr> = local_mac.to_ipv6_link_local().addr().get();
         assert_eq!(
-            ip::receive_ipv6_packet_action(
-                &mut core_ctx.context(),
-                bindings_ctx,
-                &device,
-                tentative.into_specified()
-            ),
+            receive_ip_packet_action::<Ipv6>(&mut ctx, &device, *tentative),
             ReceivePacketAction::Drop { reason: DropReason::Tentative }
         );
         // Clean up secondary context.
@@ -1539,21 +1560,11 @@ fn test_receive_ip_packet_action() {
     // Receive packet destined to a remote address when forwarding is
     // disabled on the inbound interface.
     assert_eq!(
-        ip::receive_ipv4_packet_action(
-            &mut core_ctx.context(),
-            bindings_ctx,
-            &v4_dev,
-            v4_config.remote_ip
-        ),
+        receive_ip_packet_action::<Ipv4>(&mut ctx, &v4_dev, *v4_config.remote_ip),
         ReceivePacketAction::Drop { reason: DropReason::ForwardingDisabledInboundIface }
     );
     assert_eq!(
-        ip::receive_ipv6_packet_action(
-            &mut core_ctx.context(),
-            bindings_ctx,
-            &v6_dev,
-            v6_config.remote_ip
-        ),
+        receive_ip_packet_action::<Ipv6>(&mut ctx, &v6_dev, *v6_config.remote_ip),
         ReceivePacketAction::Drop { reason: DropReason::ForwardingDisabledInboundIface }
     );
 
@@ -1561,51 +1572,35 @@ fn test_receive_ip_packet_action() {
     // enabled both globally and on the inbound device.
     ctx.test_api().set_unicast_forwarding_enabled::<Ipv4>(&v4_dev, true);
     ctx.test_api().set_unicast_forwarding_enabled::<Ipv6>(&v6_dev, true);
-    let Ctx { core_ctx, bindings_ctx } = &mut ctx;
     assert_eq!(
-        ip::receive_ipv4_packet_action(
-            &mut core_ctx.context(),
-            bindings_ctx,
-            &v4_dev,
-            v4_config.remote_ip
-        ),
+        receive_ip_packet_action::<Ipv4>(&mut ctx, &v4_dev, *v4_config.remote_ip),
         ReceivePacketAction::Forward {
+            original_dst: v4_config.remote_ip,
             dst: Destination { next_hop: NextHop::RemoteAsNeighbor, device: v4_dev.clone() }
         }
     );
     assert_eq!(
-        ip::receive_ipv6_packet_action(
-            &mut core_ctx.context(),
-            bindings_ctx,
-            &v6_dev,
-            v6_config.remote_ip
-        ),
+        receive_ip_packet_action::<Ipv6>(&mut ctx, &v6_dev, *v6_config.remote_ip),
         ReceivePacketAction::Forward {
+            original_dst: v6_config.remote_ip,
             dst: Destination { next_hop: NextHop::RemoteAsNeighbor, device: v6_dev.clone() }
         }
     );
 
     // Receive packet destined to a host with no route when forwarding is
     // enabled both globally and on the inbound device.
-    *core_ctx.ipv4().inner.main_table_id().table().write() = Default::default();
-    *core_ctx.ipv6().inner.main_table_id().table().write() = Default::default();
+    {
+        let Ctx { core_ctx, bindings_ctx: _ } = &mut ctx;
+        *core_ctx.ipv4().inner.main_table_id().table().write() = Default::default();
+        *core_ctx.ipv6().inner.main_table_id().table().write() = Default::default();
+    }
     assert_eq!(
-        ip::receive_ipv4_packet_action(
-            &mut core_ctx.context(),
-            bindings_ctx,
-            &v4_dev,
-            v4_config.remote_ip
-        ),
-        ReceivePacketAction::SendNoRouteToDest
+        receive_ip_packet_action::<Ipv4>(&mut ctx, &v4_dev, *v4_config.remote_ip),
+        ReceivePacketAction::SendNoRouteToDest { dst: v4_config.remote_ip }
     );
     assert_eq!(
-        ip::receive_ipv6_packet_action(
-            &mut core_ctx.context(),
-            bindings_ctx,
-            &v6_dev,
-            v6_config.remote_ip
-        ),
-        ReceivePacketAction::SendNoRouteToDest
+        receive_ip_packet_action::<Ipv6>(&mut ctx, &v6_dev, *v6_config.remote_ip),
+        ReceivePacketAction::SendNoRouteToDest { dst: v6_config.remote_ip }
     );
 
     // Cleanup all device references.
@@ -1613,6 +1608,109 @@ fn test_receive_ip_packet_action() {
     for device in device_ids {
         ctx.core_api().device().remove_device(device).into_removed();
     }
+}
+
+#[netstack3_core::context_ip_bounds(I, FakeBindingsCtx)]
+#[ip_test(I)]
+fn test_multicast_forwarding_receive_ip_packet_action<I: IpExt + TestIpExt>() {
+    let mut builder = FakeCtxBuilder::default();
+    // Install two devices.
+    for _ in 0..2 {
+        let _dev_idx = builder.add_device_with_ip(
+            I::TEST_ADDRS.local_mac,
+            I::TEST_ADDRS.local_ip.get(),
+            I::TEST_ADDRS.subnet,
+        );
+    }
+    let (mut ctx, device_ids) = builder.clone().build();
+    let [dev, other_dev] = device_ids.try_into().expect("there should be two devices");
+    let dev: DeviceId<_> = dev.into();
+    let other_dev: DeviceId<_> = other_dev.into();
+
+    let mcast_addr: I::Addr =
+        I::map_ip((), |()| net_ip_v4!("224.0.1.1"), |()| net_ip_v6!("ff0e::1"));
+
+    // Helper function to check if the IP generic address status is multicast.
+    fn is_multicast<I: IpExt>(address_status: &I::AddressStatus) -> bool {
+        #[derive(GenericOverIp)]
+        #[generic_over_ip(I, Ip)]
+        struct In<'a, I: IpExt>(&'a I::AddressStatus);
+        I::map_ip(
+            In(address_status),
+            |In(address_status)| matches!(address_status, Ipv4PresentAddressStatus::Multicast),
+            |In(address_status)| matches!(address_status, Ipv6PresentAddressStatus::Multicast),
+        )
+    }
+
+    // Enable multicast forwarding.
+    assert!(ctx.core_api().multicast_forwarding::<I>().enable());
+    ctx.test_api().set_multicast_forwarding_enabled::<I>(&dev, true);
+
+    // Join the multicast group.
+    {
+        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
+        ip::device::join_ip_multicast::<I, _, _>(
+            &mut core_ctx.context(),
+            bindings_ctx,
+            &dev,
+            MulticastAddr::new(mcast_addr).unwrap(),
+        )
+    }
+
+    // Verify `Delivered` in the absence of a multicast route.
+    assert_matches!(
+        receive_ip_packet_action::<I>(&mut ctx, &dev, mcast_addr.clone()),
+        ReceivePacketAction::Deliver { address_status }
+        if is_multicast::<I>(&address_status)
+    );
+
+    // Install a multicast route.
+    let key =
+        MulticastRouteKey::<I>::new(I::TEST_ADDRS.remote_ip.get(), mcast_addr.clone()).unwrap();
+    let targets: MulticastRouteTargets<_> =
+        [MulticastRouteTarget { output_interface: other_dev, min_ttl: 0 }].into();
+    let route = MulticastRoute::new_forward(dev.clone(), targets.clone()).unwrap();
+    assert_eq!(
+        ctx.core_api().multicast_forwarding::<I>().add_multicast_route(key.clone(), route.clone()),
+        Ok(None)
+    );
+
+    // Verify `MulticastForward` now that we have a route.
+    assert_matches!(
+        receive_ip_packet_action::<I>(&mut ctx, &dev, mcast_addr.clone()),
+        ReceivePacketAction::MulticastForward { targets: actual_targets, address_status}
+        if actual_targets == targets && address_status.as_ref().is_some_and(is_multicast::<I>)
+    );
+
+    // Remove the multicast group.
+    {
+        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
+        ip::device::leave_ip_multicast::<I, _, _>(
+            &mut core_ctx.context(),
+            bindings_ctx,
+            &dev,
+            MulticastAddr::new(mcast_addr).unwrap(),
+        )
+    }
+
+    // Verify `address_status` is None, now that we've left the group.
+    assert_matches!(
+        receive_ip_packet_action::<I>(&mut ctx, &dev, mcast_addr.clone()),
+        ReceivePacketAction::MulticastForward { targets: actual_targets, address_status: None }
+        if actual_targets == targets
+    );
+
+    // Remove the route.
+    assert_eq!(
+        ctx.core_api().multicast_forwarding::<I>().remove_multicast_route(&key),
+        Ok(Some(route))
+    );
+
+    // Verify `Drop` now that the route is removed.
+    assert_matches!(
+        receive_ip_packet_action::<I>(&mut ctx, &dev, mcast_addr),
+        ReceivePacketAction::Drop { reason: DropReason::MulticastNoInterest }
+    );
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]

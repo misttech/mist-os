@@ -1341,7 +1341,7 @@ Remote execution offers increased build parallelism and caching.
 
 From //out/not-default/args.gn:7
 
-**Overridden from the default:** `true`
+**Overridden from the default:** `false`
 
 From //build/toolchain/rbe.gni:159
 
@@ -1349,7 +1349,7 @@ From //build/toolchain/rbe.gni:159
 
 From //out/not-default/args.gn:7
 
-**Overridden from the default:** `true`
+**Overridden from the default:** `false`
 
 From //build/toolchain/rbe.gni:159
 
@@ -1379,7 +1379,7 @@ From //build/toolchain/rbe.gni:182
 ### cxx_rbe_minimalist_wrapper
 
 Set to true to use a fast, minimalist wrapper, that lacks features
-of the python-based wrapper.  Use with caution.
+of the python-based wrapper, and is close to a bare call to rewrapper.
 This flag is only meaningful when `cxx_rbe_enable` is true.
 
 **Current value (from the default):** `true`
@@ -3480,12 +3480,6 @@ Directory into which all fonts are checked out from CIPD
 
 From //src/fonts/build/font_args.gni:12
 
-### freeze_api_level
-
-**Current value (from the default):** `false`
-
-From //build/config/fuchsia/platform_version.gni:27
-
 ### fuchsia_async_trace_level_logging
 
 Determines whether the fuchsia_async library used by many Rust targets will be compiled
@@ -5389,7 +5383,7 @@ To override the set of target CPUs, see `override_idk_target_cpus`.
 
 **Current value (from the default):** `false`
 
-From //build/config/fuchsia/platform_version.gni:49
+From //build/config/fuchsia/platform_version.gni:44
 
 ### override_idk_target_cpus
 
@@ -7143,7 +7137,7 @@ The overall mode for RBE to be operating in.  The valid values are:
  * 'low_bandwidth' => An RBE configuration for developers that have a
                       powerful workstations, but low bandwidth.
 
-**Current value (from the default):** `"legacy_default"`
+**Current value (from the default):** `"off"`
 
 From //build/toolchain/rbe_modes.gni:34
 

@@ -4,7 +4,6 @@
 
 import("//build/components.gni")
 import("//build/test.gni")
-import("//src/storage/testing/driver_test_realm.gni")
 
 executable("f2fs") {
   sources = [ "main.cc" ]

@@ -427,8 +427,12 @@ group("json5format") {
   public_deps = [ ":json5format-v0_2_6" ]
 }
 
+import("//third_party/rust_crates/visibility.gni")
+
 group("lazy_static") {
   public_deps = [ ":lazy_static-v1_4_0" ]
+
+  visibility = lazy_static_visibility
 }
 
 group("libc") {
@@ -480,8 +484,6 @@ group("maybe-owned") {
   public_deps = [ ":maybe-owned-v0_3_2" ]
 }
 
-import("//third_party/rust_crates/visibility.gni")
-
 group("md-5") {
   public_deps = [ ":md-5-v0_10_5" ]
 
@@ -508,26 +510,6 @@ if (!(current_os == "fuchsia" || current_os == "mistos")) {
 
 group("mockall") {
   public_deps = [ ":mockall-v0_9_0" ]
-}
-
-group("netlink-packet-core") {
-  public_deps = [ ":netlink-packet-core-v0_7_0" ]
-}
-
-group("netlink-packet-generic") {
-  public_deps = [ ":netlink-packet-generic-v0_3_3" ]
-}
-
-group("netlink-packet-route") {
-  public_deps = [ ":netlink-packet-route-v0_20_0" ]
-}
-
-group("netlink-packet-sock-diag") {
-  public_deps = [ ":netlink-packet-sock-diag-v0_4_2" ]
-}
-
-group("netlink-packet-utils") {
-  public_deps = [ ":netlink-packet-utils-v0_5_2" ]
 }
 
 import("//src/lib/fuchsia_nix/nix_visibility.gni")
@@ -569,11 +551,13 @@ group("num-traits") {
 }
 
 group("omaha_client") {
-  public_deps = [ ":omaha_client-v0_1_0" ]
+  public_deps = [ ":omaha_client-v0_2_1" ]
 }
 
 group("once_cell") {
   public_deps = [ ":once_cell-v1_17_1" ]
+
+  visibility = once_cell_visibility
 }
 
 if (current_os == "fuchsia" || current_os == "mistos") {
@@ -592,7 +576,7 @@ group("p256") {
 
 if (!(current_os == "fuchsia" || current_os == "mistos")) {
   group("parking_lot") {
-    public_deps = [ ":parking_lot-v0_9_0" ]
+    public_deps = [ ":parking_lot-v0_12_0" ]
   }
 }
 
@@ -7659,37 +7643,6 @@ rust_library("lipsum-v0_6_0") {
   applicable_licenses = [ ":lipsum-v0_6_0.license" ]
 }
 
-license("lock_api-v0_3_4.license") {
-  public_package_name = "lock_api"
-  license_files = [
-    "//third_party/rust_crates/vendor/lock_api-0.3.4/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/lock_api-0.3.4/LICENSE-MIT",
-  ]
-}
-
-rust_library("lock_api-v0_3_4") {
-  crate_name = "lock_api"
-  crate_root = "//third_party/rust_crates/vendor/lock_api-0.3.4/src/lib.rs"
-  output_name = "lock_api-12f3d9bb96757377"
-  configs -= [ "//build/config/rust:2018_idioms" ]
-
-  deps = []
-  deps += [ ":scopeguard-v1_1_0" ]
-
-  rustenv = []
-
-  rustflags = [
-    "--cap-lints=allow",
-    "--edition=2018",
-    "-Cmetadata=12f3d9bb96757377",
-    "-Cextra-filename=-12f3d9bb96757377",
-  ]
-
-  visibility = [ ":*" ]
-
-  applicable_licenses = [ ":lock_api-v0_3_4.license" ]
-}
-
 license("lock_api-v0_4_11.license") {
   public_package_name = "lock_api"
   license_files = [
@@ -7999,39 +7952,6 @@ rust_library("maybe-owned-v0_3_2") {
   visibility = [ ":*" ]
 
   applicable_licenses = [ ":maybe-owned-v0_3_2.license" ]
-}
-
-license("maybe-uninit-v2_0_0.license") {
-  public_package_name = "maybe_uninit"
-  license_files = [
-    "//third_party/rust_crates/vendor/maybe-uninit-2.0.0/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/maybe-uninit-2.0.0/LICENSE-MIT",
-  ]
-}
-
-rust_library("maybe-uninit-v2_0_0") {
-  crate_name = "maybe_uninit"
-  crate_root = "//third_party/rust_crates/vendor/maybe-uninit-2.0.0/src/lib.rs"
-  output_name = "maybe_uninit-fb89acfa5fdd5d93"
-  configs -= [ "//build/config/rust:2018_idioms" ]
-
-  deps = []
-
-  rustenv = []
-
-  rustflags = [
-    "--cap-lints=allow",
-    "--edition=2015",
-    "-Cmetadata=fb89acfa5fdd5d93",
-    "-Cextra-filename=-fb89acfa5fdd5d93",
-    "--cfg=derive_copy",
-    "--cfg=repr_transparent",
-    "--cfg=native_uninit",
-  ]
-
-  visibility = [ ":*" ]
-
-  applicable_licenses = [ ":maybe-uninit-v2_0_0.license" ]
 }
 
 license("md-5-v0_10_5.license") {
@@ -8431,177 +8351,6 @@ rust_library("multimap-v0_8_3") {
   visibility = [ ":*" ]
 
   applicable_licenses = [ ":multimap-v0_8_3.license" ]
-}
-
-license("netlink-packet-core-v0_7_0.license") {
-  public_package_name = "netlink_packet_core"
-  license_files = [
-    "//third_party/rust_crates/forks/netlink-packet-core-0.7.0/LICENSE-MIT",
-  ]
-}
-
-rust_library("netlink-packet-core-v0_7_0") {
-  crate_name = "netlink_packet_core"
-  crate_root =
-      "//third_party/rust_crates/forks/netlink-packet-core-0.7.0/src/lib.rs"
-  output_name = "netlink_packet_core-aecdc1c5cbee1f5"
-  configs -= [ "//build/config/rust:2018_idioms" ]
-
-  deps = []
-  deps += [ ":byteorder-v1_4_3" ]
-  deps += [ ":netlink-packet-utils-v0_5_2" ]
-  deps += [ ":anyhow-v1_0_86" ]
-
-  rustenv = []
-
-  rustflags = [
-    "--cap-lints=allow",
-    "--edition=2018",
-    "-Cmetadata=aecdc1c5cbee1f5",
-    "-Cextra-filename=-aecdc1c5cbee1f5",
-  ]
-
-  visibility = [ ":*" ]
-
-  applicable_licenses = [ ":netlink-packet-core-v0_7_0.license" ]
-}
-
-license("netlink-packet-generic-v0_3_3.license") {
-  public_package_name = "netlink_packet_generic"
-  license_files = [
-    "//third_party/rust_crates/forks/netlink-packet-generic-0.3.3/LICENSE-MIT",
-  ]
-}
-
-rust_library("netlink-packet-generic-v0_3_3") {
-  crate_name = "netlink_packet_generic"
-  crate_root =
-      "//third_party/rust_crates/forks/netlink-packet-generic-0.3.3/src/lib.rs"
-  output_name = "netlink_packet_generic-7427460e46946e3"
-  configs -= [ "//build/config/rust:2018_idioms" ]
-
-  deps = []
-  deps += [ ":byteorder-v1_4_3" ]
-  deps += [ ":netlink-packet-core-v0_7_0" ]
-  deps += [ ":netlink-packet-utils-v0_5_2" ]
-  deps += [ ":anyhow-v1_0_86" ]
-
-  rustenv = []
-
-  rustflags = [
-    "--cap-lints=allow",
-    "--edition=2018",
-    "-Cmetadata=7427460e46946e3",
-    "-Cextra-filename=-7427460e46946e3",
-  ]
-
-  visibility = [ ":*" ]
-
-  applicable_licenses = [ ":netlink-packet-generic-v0_3_3.license" ]
-}
-
-license("netlink-packet-route-v0_20_0.license") {
-  public_package_name = "netlink_packet_route"
-  license_files =
-      [ "//third_party/rust_crates/forks/netlink-packet-route/LICENSE-MIT" ]
-}
-
-rust_library("netlink-packet-route-v0_20_0") {
-  crate_name = "netlink_packet_route"
-  crate_root = "//third_party/rust_crates/forks/netlink-packet-route/src/lib.rs"
-  output_name = "netlink_packet_route-6a6f82783dbd978e"
-  configs -= [ "//build/config/rust:2018_idioms" ]
-
-  deps = []
-  deps += [ ":byteorder-v1_4_3" ]
-  deps += [ ":netlink-packet-core-v0_7_0" ]
-  deps += [ ":netlink-packet-utils-v0_5_2" ]
-  deps += [ ":anyhow-v1_0_86" ]
-  deps += [ ":bitflags-v2_4_1" ]
-  deps += [ ":libc-v0_2_149" ]
-  deps += [ ":log-v0_4_20" ]
-  deps += [ ":thiserror-v1_0_57" ]
-
-  rustenv = []
-
-  rustflags = [
-    "--cap-lints=allow",
-    "--edition=2021",
-    "-Cmetadata=6a6f82783dbd978e",
-    "-Cextra-filename=-6a6f82783dbd978e",
-  ]
-
-  visibility = [ ":*" ]
-
-  applicable_licenses = [ ":netlink-packet-route-v0_20_0.license" ]
-}
-
-license("netlink-packet-sock-diag-v0_4_2.license") {
-  public_package_name = "netlink_packet_sock_diag"
-  license_files = [ "//third_party/rust_crates/forks/netlink-packet-sock-diag-0.4.2/LICENSE-MIT" ]
-}
-
-rust_library("netlink-packet-sock-diag-v0_4_2") {
-  crate_name = "netlink_packet_sock_diag"
-  crate_root = "//third_party/rust_crates/forks/netlink-packet-sock-diag-0.4.2/src/lib.rs"
-  output_name = "netlink_packet_sock_diag-946f7e102ee3e5f0"
-  configs -= [ "//build/config/rust:2018_idioms" ]
-
-  deps = []
-  deps += [ ":byteorder-v1_4_3" ]
-  deps += [ ":netlink-packet-core-v0_7_0" ]
-  deps += [ ":netlink-packet-utils-v0_5_2" ]
-  deps += [ ":anyhow-v1_0_86" ]
-  deps += [ ":bitflags-v1_3_2" ]
-  deps += [ ":libc-v0_2_149" ]
-  deps += [ ":smallvec-v1_13_1" ]
-
-  rustenv = []
-
-  rustflags = [
-    "--cap-lints=allow",
-    "--edition=2018",
-    "-Cmetadata=946f7e102ee3e5f0",
-    "-Cextra-filename=-946f7e102ee3e5f0",
-  ]
-
-  visibility = [ ":*" ]
-
-  applicable_licenses = [ ":netlink-packet-sock-diag-v0_4_2.license" ]
-}
-
-license("netlink-packet-utils-v0_5_2.license") {
-  public_package_name = "netlink_packet_utils"
-  license_files = [
-    "//third_party/rust_crates/forks/netlink-packet-utils-0.5.2/LICENSE-MIT",
-  ]
-}
-
-rust_library("netlink-packet-utils-v0_5_2") {
-  crate_name = "netlink_packet_utils"
-  crate_root =
-      "//third_party/rust_crates/forks/netlink-packet-utils-0.5.2/src/lib.rs"
-  output_name = "netlink_packet_utils-77b6e0ba4c9d7397"
-  configs -= [ "//build/config/rust:2018_idioms" ]
-
-  deps = []
-  deps += [ ":byteorder-v1_4_3" ]
-  deps += [ ":anyhow-v1_0_86" ]
-  deps += [ ":paste-v1_0_9($host_toolchain)" ]
-  deps += [ ":thiserror-v1_0_57" ]
-
-  rustenv = []
-
-  rustflags = [
-    "--cap-lints=allow",
-    "--edition=2018",
-    "-Cmetadata=77b6e0ba4c9d7397",
-    "-Cextra-filename=-77b6e0ba4c9d7397",
-  ]
-
-  visibility = [ ":*" ]
-
-  applicable_licenses = [ ":netlink-packet-utils-v0_5_2.license" ]
 }
 
 license("nix-v0_26_2.license") {
@@ -9295,19 +9044,19 @@ rust_library("numtoa-v0_1_0") {
   applicable_licenses = [ ":numtoa-v0_1_0.license" ]
 }
 
-license("omaha_client-v0_1_0.license") {
+license("omaha_client-v0_2_1.license") {
   public_package_name = "omaha_client"
   license_files = [
-    "//third_party/rust_crates/vendor/omaha_client-0.1.0/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/omaha_client-0.1.0/LICENSE-BSD",
-    "//third_party/rust_crates/vendor/omaha_client-0.1.0/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/omaha_client-0.2.1/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/omaha_client-0.2.1/LICENSE-BSD",
+    "//third_party/rust_crates/vendor/omaha_client-0.2.1/LICENSE-MIT",
   ]
 }
 
-rust_library("omaha_client-v0_1_0") {
+rust_library("omaha_client-v0_2_1") {
   crate_name = "omaha_client"
-  crate_root = "//third_party/rust_crates/vendor/omaha_client-0.1.0/src/lib.rs"
-  output_name = "omaha_client-464d14c78d580224"
+  crate_root = "//third_party/rust_crates/vendor/omaha_client-0.2.1/src/lib.rs"
+  output_name = "omaha_client-259785bc42cb99c5"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -9340,13 +9089,13 @@ rust_library("omaha_client-v0_1_0") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2021",
-    "-Cmetadata=464d14c78d580224",
-    "-Cextra-filename=-464d14c78d580224",
+    "-Cmetadata=259785bc42cb99c5",
+    "-Cextra-filename=-259785bc42cb99c5",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":omaha_client-v0_1_0.license" ]
+  applicable_licenses = [ ":omaha_client-v0_2_1.license" ]
 }
 
 license("once_cell-v1_17_1.license") {
@@ -9666,92 +9415,11 @@ rust_library("parking_lot-v0_12_0") {
     "--cfg=feature=\"default\"",
   ]
 
-  visibility = [ ":*" ]
-
-  applicable_licenses = [ ":parking_lot-v0_12_0.license" ]
-}
-
-license("parking_lot-v0_9_0.license") {
-  public_package_name = "parking_lot"
-  license_files = [
-    "//third_party/rust_crates/vendor/parking_lot-0.9.0/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/parking_lot-0.9.0/LICENSE-MIT",
-  ]
-}
-
-rust_library("parking_lot-v0_9_0") {
-  crate_name = "parking_lot"
-  crate_root = "//third_party/rust_crates/vendor/parking_lot-0.9.0/src/lib.rs"
-  output_name = "parking_lot-6721767503fecbee"
-  configs -= [ "//build/config/rust:2018_idioms" ]
-
-  deps = []
-  deps += [ ":lock_api-v0_3_4" ]
-  deps += [ ":parking_lot_core-v0_6_2" ]
-
-  rustenv = []
-
-  rustflags = [
-    "--cap-lints=allow",
-    "--edition=2018",
-    "-Cmetadata=6721767503fecbee",
-    "-Cextra-filename=-6721767503fecbee",
-    "--cfg=feature=\"default\"",
-  ]
-
   visibility = []
   visibility += [ "//src/lib/fuchsia-sync" ]
   visibility += [ "//third_party/rust_crates:*" ]
 
-  applicable_licenses = [ ":parking_lot-v0_9_0.license" ]
-}
-
-license("parking_lot_core-v0_6_2.license") {
-  public_package_name = "parking_lot_core"
-  license_files = [
-    "//third_party/rust_crates/vendor/parking_lot_core-0.6.2/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/parking_lot_core-0.6.2/LICENSE-MIT",
-  ]
-}
-
-rust_library("parking_lot_core-v0_6_2") {
-  crate_name = "parking_lot_core"
-  crate_root =
-      "//third_party/rust_crates/vendor/parking_lot_core-0.6.2/src/lib.rs"
-  output_name = "parking_lot_core-32ade8d5cf038200"
-  configs -= [ "//build/config/rust:2018_idioms" ]
-
-  deps = []
-  deps += [ ":cfg-if-v0_1_10" ]
-  deps += [ ":smallvec-v0_6_14" ]
-  if (false) {
-    deps += [ ":cloudabi-v0_0_3" ]
-  }
-  if (false) {
-    deps += [ ":redox_syscall-v0_1_51" ]
-  }
-  if (true) {
-    deps += [ ":libc-v0_2_149" ]
-  }
-  if (false) {
-    deps += [ ":winapi-v0_3_9" ]
-  }
-
-  rustenv = []
-
-  rustflags = [
-    "--cap-lints=allow",
-    "--edition=2018",
-    "-Cmetadata=32ade8d5cf038200",
-    "-Cextra-filename=-32ade8d5cf038200",
-  ]
-
-  aliased_deps = {
-    syscall = ":redox_syscall-v0_1_51"
-  }
-  visibility = [ ":*" ]
-
-  applicable_licenses = [ ":parking_lot_core-v0_6_2.license" ]
+  applicable_licenses = [ ":parking_lot-v0_12_0.license" ]
 }
 
 license("parking_lot_core-v0_8_3.license") {
@@ -14483,39 +14151,6 @@ rust_library("slab-v0_4_7") {
   visibility = [ ":*" ]
 
   applicable_licenses = [ ":slab-v0_4_7.license" ]
-}
-
-license("smallvec-v0_6_14.license") {
-  public_package_name = "smallvec"
-  license_files = [
-    "//third_party/rust_crates/vendor/smallvec-0.6.14/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/smallvec-0.6.14/LICENSE-MIT",
-  ]
-}
-
-rust_library("smallvec-v0_6_14") {
-  crate_name = "smallvec"
-  crate_root = "//third_party/rust_crates/vendor/smallvec-0.6.14/lib.rs"
-  output_name = "smallvec-17cff5ddbac2d3b4"
-  configs -= [ "//build/config/rust:2018_idioms" ]
-
-  deps = []
-  deps += [ ":maybe-uninit-v2_0_0" ]
-
-  rustenv = []
-
-  rustflags = [
-    "--cap-lints=allow",
-    "--edition=2015",
-    "-Cmetadata=17cff5ddbac2d3b4",
-    "-Cextra-filename=-17cff5ddbac2d3b4",
-    "--cfg=feature=\"default\"",
-    "--cfg=feature=\"std\"",
-  ]
-
-  visibility = [ ":*" ]
-
-  applicable_licenses = [ ":smallvec-v0_6_14.license" ]
 }
 
 license("smallvec-v1_13_1.license") {

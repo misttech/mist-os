@@ -7,11 +7,13 @@
 #ifndef ZIRCON_KERNEL_PHYS_INCLUDE_PHYS_HANDOFF_PTR_H_
 #define ZIRCON_KERNEL_PHYS_INCLUDE_PHYS_HANDOFF_PTR_H_
 
+// Note: we refrain from using the ktl namespace as <phys/handoff.h> is
+// expected to be compiled in the userboot toolchain.
+
+#include <lib/stdcompat/span.h>
 #include <stdint.h>
 
-#include <ktl/algorithm.h>
-#include <ktl/span.h>
-#include <ktl/string_view.h>
+#include <string_view>
 
 // PhysHandoffPtr provides a "smart pointer" style API for pointers handed off
 // from physboot to the kernel proper.  A handoff pointer is only ever created
@@ -97,10 +99,10 @@ class PhysHandoffPtr {
 
   constexpr PhysHandoffPtr(const PhysHandoffPtr&) = delete;
 
-  constexpr PhysHandoffPtr(PhysHandoffPtr&& other) noexcept : ptr_(ktl::exchange(other.ptr_, {})) {}
+  constexpr PhysHandoffPtr(PhysHandoffPtr&& other) noexcept : ptr_(std::exchange(other.ptr_, {})) {}
 
   constexpr PhysHandoffPtr& operator=(PhysHandoffPtr&& other) noexcept {
-    ptr_ = ktl::exchange(other.ptr_, {});
+    ptr_ = std::exchange(other.ptr_, {});
     return *this;
   }
 
@@ -109,7 +111,7 @@ class PhysHandoffPtr {
 
   T* get() const { return Traits::Import(ptr_); }
 
-  T* release() { return Traits::Import(ktl::exchange(ptr_, {})); }
+  T* release() { return Traits::Import(std::exchange(ptr_, {})); }
 
   T& operator*() const { return *get(); }
 
@@ -124,8 +126,8 @@ class PhysHandoffPtr {
   typename Traits::ExportType ptr_{};
 };
 
-// PhysHandoffSpan<T> is to ktl::span<T> as PhysHandoffPtr<T> is to T*.
-// It has get() and release() methods that return ktl::span<T>.
+// PhysHandoffSpan<T> is to cpp20::span<T> as PhysHandoffPtr<T> is to T*.
+// It has get() and release() methods that return cpp20::span<T>.
 
 template <typename T, PhysHandoffPtrEncoding Encoding, PhysHandoffPtrLifetime Lifetime>
 class PhysHandoffSpan {
@@ -140,9 +142,9 @@ class PhysHandoffSpan {
   PhysHandoffSpan& operator=(PhysHandoffSpan&&) noexcept = default;
 
 #if HANDOFF_PTR_DEREF
-  ktl::span<T> get() const { return {ptr_.get(), size_}; }
+  cpp20::span<T> get() const { return {ptr_.get(), size_}; }
 
-  ktl::span<T> release() { return {ptr_.release(), size_}; }
+  cpp20::span<T> release() { return {ptr_.release(), size_}; }
 #endif
 
  private:
@@ -153,7 +155,7 @@ class PhysHandoffSpan {
 };
 
 // PhysHandoffString is stored just the same as PhysHandoffSpan<const char>,
-// but its get() and release() methods yield ktl::string_view.
+// but its get() and release() methods yield std::string_view.
 template <PhysHandoffPtrEncoding Encoding, PhysHandoffPtrLifetime Lifetime>
 class PhysHandoffString : public PhysHandoffSpan<const char, Encoding, Lifetime> {
  public:
@@ -163,13 +165,13 @@ class PhysHandoffString : public PhysHandoffSpan<const char, Encoding, Lifetime>
   PhysHandoffString(const PhysHandoffString&) = default;
 
 #ifdef HANDOFF_PTR_DEREF
-  ktl::string_view get() const {
-    ktl::span str = Base::get();
+  std::string_view get() const {
+    cpp20::span str = Base::get();
     return {str.data(), str.size()};
   }
 
-  ktl::string_view release() {
-    ktl::span str = Base::release();
+  std::string_view release() {
+    cpp20::span str = Base::release();
     return {str.data(), str.size()};
   }
 #endif

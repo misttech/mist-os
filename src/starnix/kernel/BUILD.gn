@@ -138,6 +138,7 @@ rustc_library("starnix_core") {
     "device/tun.rs",
     "device/zram.rs",
     "dynamic_thread_spawner.rs",
+    "execution/crash_report.rs",
     "execution/mod.rs",
     "execution/restricted_executor.rs",
     "execution/shared.rs",
@@ -202,6 +203,7 @@ rustc_library("starnix_core") {
     "security/mod.rs",
     "security/selinux_hooks/fs.rs",
     "security/selinux_hooks/mod.rs",
+    "security/selinux_hooks/testing.rs",
     "signals/mod.rs",
     "signals/signal_handling.rs",
     "signals/signalfd.rs",
@@ -327,6 +329,7 @@ rustc_library("starnix_core") {
     "//sdk/fidl/fuchsia.buildinfo:fuchsia.buildinfo_rust",
     "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust",
     "//sdk/fidl/fuchsia.element:fuchsia.element_rust",
+    "//sdk/fidl/fuchsia.feedback:fuchsia.feedback_rust",
     "//sdk/fidl/fuchsia.fs:fuchsia.fs_rust",
     "//sdk/fidl/fuchsia.hardware.adb:fuchsia.hardware.adb_rust",
     "//sdk/fidl/fuchsia.hardware.hrtimer:fuchsia.hardware.hrtimer_rust",
@@ -399,6 +402,10 @@ rustc_library("starnix_core") {
     "//src/starnix/lib/starnix-syscalls",
     "//src/starnix/lib/starnix-uapi",
     "//src/starnix/lib/syncio",
+    "//src/starnix/lib/third_party/rust_netlink/netlink_packet_core",
+    "//src/starnix/lib/third_party/rust_netlink/netlink_packet_generic",
+    "//src/starnix/lib/third_party/rust_netlink/netlink_packet_route",
+    "//src/starnix/lib/third_party/rust_netlink/netlink_packet_utils",
     "//src/starnix/lib/usercopy",
     "//src/storage/ext4/lib/metadata",
     "//src/storage/ext4/read-only:ext4-read-only",
@@ -423,10 +430,6 @@ rustc_library("starnix_core") {
     "//third_party/rust_crates:maplit",
     "//third_party/rust_crates:memchr",
     "//third_party/rust_crates:memoffset",
-    "//third_party/rust_crates:netlink-packet-core",
-    "//third_party/rust_crates:netlink-packet-generic",
-    "//third_party/rust_crates:netlink-packet-route",
-    "//third_party/rust_crates:netlink-packet-utils",
     "//third_party/rust_crates:nom",
     "//third_party/rust_crates:num-derive",
     "//third_party/rust_crates:num-traits",
@@ -509,6 +512,7 @@ rustc_library("starnix_core") {
   }
   inputs = [
     "//src/starnix/lib/selinux/testdata/micro_policies/hooks_tests_policy.pp",
+    "//src/starnix/lib/selinux/testdata/composite_policies/compiled/bounded_transition_policy.pp",
   ]
   configs += [ "//src/starnix/config:starnix_clippy_lints" ]
 
@@ -549,6 +553,7 @@ rustc_library("starnix_kernel_runner") {
     "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
     "//sdk/fidl/fuchsia.component.runner:fuchsia.component.runner_rust",
     "//sdk/fidl/fuchsia.element:fuchsia.element_rust",
+    "//sdk/fidl/fuchsia.feedback:fuchsia.feedback_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.memory.attribution:fuchsia.memory.attribution_rust",
     "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_rust",

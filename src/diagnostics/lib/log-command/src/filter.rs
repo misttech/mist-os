@@ -8,12 +8,12 @@ use diagnostics_data::{LogsData, Severity};
 use fidl_fuchsia_diagnostics::LogInterestSelector;
 use fuchsia_zircon_types::zx_koid_t;
 use moniker::{ExtendedMoniker, EXTENDED_MONIKER_COMPONENT_MANAGER_STR};
-use once_cell::sync::Lazy;
 use selectors::SelectorExt;
 use std::str::FromStr;
+use std::sync::LazyLock;
 
-static KLOG_MONIKER: Lazy<ExtendedMoniker> =
-    Lazy::new(|| ExtendedMoniker::try_from("klog").unwrap());
+static KLOG_MONIKER: LazyLock<ExtendedMoniker> =
+    LazyLock::new(|| ExtendedMoniker::try_from("klog").unwrap());
 
 /// A struct that holds the criteria for filtering logs.
 pub struct LogFilterCriteria {

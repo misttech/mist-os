@@ -287,7 +287,7 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
   void Start(StartRequest& request, StartCompleter::Sync& completer) override {
     // Non-hermetic users will end up calling start several times as the component test framework
     // invokes the binary multiple times, resulting in main running several times. We may be
-    // ignoring real issues by ignoreing the subsequent calls in the case that multiple parties
+    // ignoring real issues by ignoring the subsequent calls in the case that multiple parties
     // are invoking start unknowingly. Comparing the args may be a way to avoid that issue.
     // TODO(https://fxbug.dev/42073125): Remedy this situation
     if (is_started_) {

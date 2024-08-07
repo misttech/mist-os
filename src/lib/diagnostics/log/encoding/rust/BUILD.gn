@@ -45,7 +45,6 @@ rustc_library("rust") {
 
   test_deps = [
     "//src/lib/fuchsia",
-    "//third_party/rust_crates:once_cell",
     "//third_party/rust_crates:tracing-subscriber",
   ]
 

@@ -1,0 +1,35 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+library fuchsia.component.internal;
+
+using fuchsia.component.decl;
+
+type ComponentCapability = strict union {
+    1: use fuchsia.component.decl.Use;
+    2: offer fuchsia.component.decl.Offer;
+    3: expose fuchsia.component.decl.Expose;
+
+    4: config fuchsia.component.decl.Configuration;
+    5: dictionary fuchsia.component.decl.Dictionary;
+    6: directory fuchsia.component.decl.Directory;
+    7: environment EnvironmentCapability;
+    8: event_stream fuchsia.component.decl.EventStream;
+    9: protocol fuchsia.component.decl.Protocol;
+    10: resolver fuchsia.component.decl.Resolver;
+    11: runner fuchsia.component.decl.Runner;
+    12: service fuchsia.component.decl.Service;
+    13: storage fuchsia.component.decl.Storage;
+};
+
+type EnvironmentCapability = strict union {
+    1: runner EnvironmentSource;
+    2: resolver EnvironmentSource;
+    3: debug EnvironmentSource;
+};
+
+type EnvironmentSource = table {
+    1: source_name fuchsia.component.decl.child_name;
+    2: source fuchsia.component.decl.Ref;
+};

@@ -19,10 +19,7 @@ rustc_library("diagnostics-assertions") {
     "//third_party/rust_crates:serde_json",
   ]
 
-  test_deps = [
-    "//src/lib/fuchsia",
-    "//third_party/rust_crates:lazy_static",
-  ]
+  test_deps = [ "//src/lib/fuchsia" ]
   sources = [ "src/lib.rs" ]
 }
 

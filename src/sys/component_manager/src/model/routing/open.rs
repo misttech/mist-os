@@ -15,7 +15,9 @@ use crate::model::routing::service::{
 };
 use crate::model::start::Start;
 use crate::model::storage::{self, BackingDirectoryInfo};
-use ::routing::capability_source::CapabilitySource;
+use ::routing::capability_source::{
+    AnonymizedAggregateSource, CapabilitySource, ComponentSource, NamespaceSource,
+};
 use ::routing::component_instance::ComponentInstanceInterface;
 use ::routing::RouteSource;
 use errors::{CapabilityProviderError, ModelError, OpenError};
@@ -148,7 +150,7 @@ impl<'a> CapabilityOpenRequest<'a> {
         source: &CapabilitySource,
     ) -> Result<Option<Box<dyn CapabilityProvider>>, ModelError> {
         match source {
-            CapabilitySource::Component { capability, moniker } => {
+            CapabilitySource::Component(ComponentSource { capability, moniker }) => {
                 // Route normally for a component capability with a source path
                 Ok(match capability.source_path() {
                     Some(_) => Some(Box::new(DefaultComponentCapabilityProvider::new(
@@ -162,23 +164,30 @@ impl<'a> CapabilityOpenRequest<'a> {
                     _ => None,
                 })
             }
-            CapabilitySource::Namespace { capability, .. } => match capability.source_path() {
-                Some(path) => Ok(Some(Box::new(NamespaceCapabilityProvider {
-                    path: path.clone(),
-                    is_directory_like: fio::DirentType::from(capability.type_name())
-                        == fio::DirentType::Directory,
-                }))),
-                _ => Ok(None),
-            },
-            CapabilitySource::FilteredProvider { .. }
-            | CapabilitySource::FilteredAggregateProvider { .. } => Ok(Some(Box::new(
+            CapabilitySource::Namespace(NamespaceSource { capability, .. }) => {
+                match capability.source_path() {
+                    Some(path) => Ok(Some(Box::new(NamespaceCapabilityProvider {
+                        path: path.clone(),
+                        is_directory_like: fio::DirentType::from(capability.type_name())
+                            == fio::DirentType::Directory,
+                    }))),
+                    _ => Ok(None),
+                }
+            }
+            CapabilitySource::FilteredProvider(_)
+            | CapabilitySource::FilteredAggregateProvider(_) => Ok(Some(Box::new(
                 FilteredAggregateServiceProvider::new_from_capability_source(
                     source.clone(),
                     target,
                 )
                 .await?,
             ))),
-            CapabilitySource::AnonymizedAggregate { capability, moniker, members, sources: _ } => {
+            CapabilitySource::AnonymizedAggregate(AnonymizedAggregateSource {
+                capability,
+                moniker,
+                members,
+                sources: _,
+            }) => {
                 let source_component_instance = target.upgrade()?.find_absolute(moniker).await?;
 
                 let route = AnonymizedServiceRoute {
@@ -240,11 +249,11 @@ impl<'a> CapabilityOpenRequest<'a> {
                 Ok(Some(Box::new(provider)))
             }
             // These capabilities do not have a default provider.
-            CapabilitySource::Framework { .. }
-            | CapabilitySource::Void { .. }
-            | CapabilitySource::Capability { .. }
-            | CapabilitySource::Builtin { .. }
-            | CapabilitySource::Environment { .. } => Ok(None),
+            CapabilitySource::Framework(_)
+            | CapabilitySource::Void(_)
+            | CapabilitySource::Capability(_)
+            | CapabilitySource::Builtin(_)
+            | CapabilitySource::Environment(_) => Ok(None),
         }
     }
 }

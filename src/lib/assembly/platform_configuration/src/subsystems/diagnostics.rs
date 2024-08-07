@@ -374,7 +374,7 @@ mod tests {
         DiagnosticsSubsystem::define_configuration(&context, &diagnostics, &mut builder).unwrap();
         let config = builder.build();
 
-        let mut serial_log_components = BTreeSet::from_iter(["/core/foo".to_string()].into_iter());
+        let mut serial_log_components = BTreeSet::from_iter(["/core/foo".to_string()]);
         serial_log_components
             .extend(ALLOWED_SERIAL_LOG_COMPONENTS.iter().map(|ref s| s.to_string()));
         assert_eq!(

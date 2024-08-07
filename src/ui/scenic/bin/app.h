@@ -26,7 +26,6 @@
 #include "src/ui/scenic/lib/flatland/uber_struct_system.h"
 #include "src/ui/scenic/lib/focus/focus_manager.h"
 #include "src/ui/scenic/lib/input/input_system.h"
-#include "src/ui/scenic/lib/scenic/scenic.h"
 #include "src/ui/scenic/lib/scheduling/default_frame_scheduler.h"
 #include "src/ui/scenic/lib/screen_capture/screen_capture_manager.h"
 #include "src/ui/scenic/lib/screen_capture2/screen_capture2_manager.h"
@@ -43,16 +42,9 @@
 
 namespace scenic_impl {
 
-class DisplayInfoDelegate : public Scenic::GetDisplayInfoDelegateDeprecated {
+class DisplayInfoDelegate {
  public:
   explicit DisplayInfoDelegate(std::shared_ptr<display::Display> display);
-
-  // TODO(https://fxbug.dev/42097798): Remove this when we externalize Displays.
-  // |Scenic::GetDisplayInfoDelegateDeprecated|
-  void GetDisplayInfo(fuchsia::ui::scenic::Scenic::GetDisplayInfoCallback callback) override;
-  // |Scenic::GetDisplayInfoDelegateDeprecated|
-  void GetDisplayOwnershipEvent(
-      fuchsia::ui::scenic::Scenic::GetDisplayOwnershipEventCallback callback) override;
 
   fuchsia::math::SizeU GetDisplayDimensions();
 
@@ -109,7 +101,6 @@ class App {
   escher::EscherUniquePtr escher_;
   std::shared_ptr<utils::CleanupUntilDone> escher_cleanup_;
 
-  Scenic scenic_;
   std::unique_ptr<fsl::DeviceWatcher> device_watcher_;
 
   std::shared_ptr<allocation::Allocator> allocator_;

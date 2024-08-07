@@ -20,7 +20,6 @@ rustc_library("selectors") {
 
   test_deps = [
     "//src/lib/fuchsia",
-    "//third_party/rust_crates:lazy_static",
     "//third_party/rust_crates:tempfile",
   ]
 

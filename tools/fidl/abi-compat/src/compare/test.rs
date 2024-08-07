@@ -5,17 +5,12 @@
 use crate::ir::Declaration;
 
 use crate::compare::problems::CompatibilityProblems;
-use crate::compare::{Platform, Protocol, Type};
+use crate::compare::{AbiSurface, Protocol, Type};
 use crate::convert::{Context, ConvertType};
 use crate::ir::IR;
-use flyweights::FlyStr;
+use crate::{Scope, Version};
 use std::collections::HashMap;
 use std::rc::Rc;
-
-// API levels of interest
-const V1: &str = "1";
-const V2: &str = "2";
-const PLATFORM: &str = "1,2,NEXT,HEAD";
 
 // Test library name
 pub const LIBRARY: &str = "fuchsia.compat.test";
@@ -38,38 +33,50 @@ impl TestLibrary {
         }
     }
     fn new(source_fragment: &str) -> Self {
-        Self::new_added_at(V1, source_fragment)
+        Self::new_added_at("1", source_fragment)
     }
 
-    fn scope_name(&self, name: &str) -> String {
+    fn member_name(&self, name: &str) -> String {
         format!("{LIBRARY}/{name}")
     }
 
-    fn compile(&self, api_level: &str) -> CompiledTestLibrary {
-        CompiledTestLibrary::new(api_level, self)
+    fn compile(&self, version: &Version) -> CompiledTestLibrary {
+        CompiledTestLibrary::new(version, self)
     }
 }
 
 struct CompiledTestLibrary {
-    api_level: String,
+    version: Version,
     source: String,
     ir: Rc<IR>,
     context: Context,
 }
 
 impl CompiledTestLibrary {
-    fn new(api_level: &str, library: &TestLibrary) -> Self {
-        let ir = IR::from_source(api_level, &library.source, LIBRARY)
-            .unwrap_or_else(|_| panic!("Compiling {api_level:?}:\n{0}", library.source));
-        let context = Context::new(ir.clone(), FlyStr::new(api_level));
-        Self { api_level: api_level.to_string(), source: library.source.clone(), ir, context }
+    fn new(version: &Version, library: &TestLibrary) -> Self {
+        let ir =
+            IR::from_source(version.api_level(), &library.source, LIBRARY).unwrap_or_else(|_| {
+                panic!("Compiling {0:?}:\n{1}", version.api_level(), library.source)
+            });
+        let context = Context::new(ir.clone(), &version);
+        Self { version: version.clone(), source: library.source.clone(), ir, context }
+    }
+
+    fn api_level(&self) -> &str {
+        self.version.api_level()
+    }
+
+    fn scope(&self) -> Scope {
+        self.version.scope()
     }
 
     fn get_decl(&self, name: &str) -> Declaration {
         self.ir.get(name).unwrap_or_else(|_| {
             panic!(
                 "Couldn't find declaration {:?} at {:?} in:\n{}",
-                name, self.api_level, self.source,
+                name,
+                self.api_level(),
+                self.source,
             )
         })
     }
@@ -79,7 +86,11 @@ impl CompiledTestLibrary {
         let context = self.context.nest_member(name, decl.identifier());
         use crate::convert::ConvertType;
         decl.convert(context).unwrap_or_else(|_| {
-            panic!("Couldn't convert {name} to a type at {:?} in:\n{}", self.api_level, self.source,)
+            panic!(
+                "Couldn't convert {name} to a type at {:?} in:\n{}",
+                self.api_level(),
+                self.source,
+            )
         })
     }
 
@@ -91,17 +102,18 @@ impl CompiledTestLibrary {
             crate::convert::convert_protocol(&protocol, context).unwrap_or_else(|_| {
                 panic!(
                     "Couldn't convert {name} to a protocol at {:?} in:\n{}",
-                    self.api_level, self.source,
+                    self.api_level(),
+                    self.source,
                 )
             })
         } else {
-            panic!("{name} is not a protocol at {:?} in:\n{}", self.api_level, self.source)
+            panic!("{name} is not a protocol at {:?} in:\n{}", self.api_level(), self.source)
         }
     }
 
-    fn get_platform(&self) -> Platform {
-        crate::convert::convert_platform(self.ir.clone()).unwrap_or_else(|_| {
-            panic!("Converting platform at {:?}:\n{}", self.api_level, self.source)
+    fn get_abi_surface(&self) -> AbiSurface {
+        crate::convert::convert_abi_surface(self.ir.clone()).unwrap_or_else(|_| {
+            panic!("Converting platform at {:?}:\n{}", self.api_level(), self.source)
         })
     }
 }
@@ -119,18 +131,23 @@ pub(super) fn compare_fidl_library(
 ) -> CompatibilityProblems {
     let lib = TestLibrary::new(source_fragment.as_ref());
 
-    let external = lib.compile(versions.external);
-    let platform = lib.compile(versions.platform);
-    super::compatible(&external.get_platform(), &platform.get_platform(), &Default::default())
-        .unwrap_or_else(|_| {
-            panic!("Comparing {:?} and {:?}:\n{}", versions.external, versions.platform, lib.source)
-        })
+    let external = lib.compile(&Version::new(versions.external));
+    let platform = lib.compile(&Version::new(versions.platform));
+    assert_eq!(external.scope(), Scope::External);
+    assert_eq!(platform.scope(), Scope::Platform);
+    super::compatible(
+        [&external.get_abi_surface(), &platform.get_abi_surface()],
+        &Default::default(),
+    )
+    .unwrap_or_else(|_| {
+        panic!("Comparing {:?} and {:?}:\n{}", versions.external, versions.platform, lib.source)
+    })
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct TypeVersions {
-    pub send: &'static str,
-    pub recv: &'static str,
+    pub send: Version,
+    pub recv: Version,
 }
 
 pub(super) fn compare_fidl_type_between(
@@ -139,22 +156,22 @@ pub(super) fn compare_fidl_type_between(
     source_fragment: &str,
 ) -> CompatibilityProblems {
     let lib = TestLibrary::new(source_fragment);
-    let name = lib.scope_name(name);
+    let name = lib.member_name(name);
     let mut problems = CompatibilityProblems::default();
 
-    let mut type_versions: HashMap<&'static str, Type> = HashMap::new();
+    let mut type_versions: HashMap<Version, Type> = HashMap::new();
 
     for v in versions {
-        if !type_versions.contains_key(v.send) {
-            type_versions.insert(v.send, lib.compile(v.send).get_type(&name));
+        if !type_versions.contains_key(&v.send) {
+            type_versions.insert(v.send.clone(), lib.compile(&v.send).get_type(&name));
         }
-        if !type_versions.contains_key(v.recv) {
-            type_versions.insert(v.recv, lib.compile(v.recv).get_type(&name));
+        if !type_versions.contains_key(&v.recv) {
+            type_versions.insert(v.recv.clone(), lib.compile(&v.recv).get_type(&name));
         }
 
         problems.append(super::compare_types(
-            type_versions.get(v.send).unwrap(),
-            type_versions.get(v.recv).unwrap(),
+            type_versions.get(&v.send).unwrap(),
+            type_versions.get(&v.recv).unwrap(),
             &Default::default(),
         ));
     }
@@ -163,19 +180,22 @@ pub(super) fn compare_fidl_type_between(
 }
 
 pub(super) fn compare_fidl_type(name: &str, source_fragment: &str) -> CompatibilityProblems {
+    let v1: Version = Version::new("1");
+    let v2: Version = Version::new("2");
+
     compare_fidl_type_between(
         name,
-        &[TypeVersions { send: V1, recv: V2 }, TypeVersions { send: V2, recv: V1 }],
+        &[TypeVersions { send: v1.clone(), recv: v2.clone() }, TypeVersions { send: v2, recv: v1 }],
         source_fragment,
     )
 }
 
 pub(super) fn compare_fidl_protocol(name: &str, source_fragment: &str) -> CompatibilityProblems {
     let lib = TestLibrary::new(source_fragment);
-    let name = lib.scope_name(name);
+    let name = lib.member_name(name);
 
-    let external = lib.compile(V1).get_protocol(&name);
-    let platform = lib.compile(PLATFORM).get_protocol(&name);
+    let external = lib.compile(&Version::new("1")).get_protocol(&name);
+    let platform = lib.compile(&Version::new("1,2,NEXT,HEAD")).get_protocol(&name);
 
-    Protocol::compatible(&external, &platform, &Default::default())
+    Protocol::compatible([&external, &platform], &Default::default())
 }

@@ -222,6 +222,9 @@ class LogicalBufferCollection : public fbl::RefCounted<LogicalBufferCollection> 
   using Arena = fidl::Arena<>;
   using CollectionMap = std::map<BufferCollection*, fbl::RefPtr<BufferCollection>>;
 
+  // This is only called during driver stop. Deletion of the LogicalBufferCollection can be async.
+  void Fail();
+
   ~LogicalBufferCollection();
 
   static void CreateV1(TokenServerEndV1 buffer_collection_token_request, Device* parent_device,

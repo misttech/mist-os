@@ -260,7 +260,10 @@ fidl_library://fidl/fuchsia.hardware.power.statecontrol
 fidl_library://fidl/fuchsia.hardware.radar
 fidl_library://fidl/fuchsia.hardware.registers (unstable)
 fidl_library://fidl/fuchsia.hardware.rtc
+fidl_library://fidl/fuchsia.hardware.sdio (unstable)
 fidl_library://fidl/fuchsia.hardware.sdmmc (unstable)
+fidl_library://fidl/fuchsia.hardware.sharedmemory (unstable)
+fidl_library://fidl/fuchsia.hardware.spiimpl (unstable)
 fidl_library://fidl/fuchsia.hardware.temperature
 fidl_library://fidl/fuchsia.hardware.trippoint
 fidl_library://fidl/fuchsia.hardware.usb.phy (unstable)

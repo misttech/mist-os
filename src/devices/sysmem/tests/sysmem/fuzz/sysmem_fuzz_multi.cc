@@ -1,6 +1,9 @@
 // Copyright 2020 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+#include <cinttypes>
+#include <cstddef>
+
 #include "log_rtn.h"
 #include "sysmem_fuzz_common.h"
 
@@ -13,13 +16,23 @@ extern "C" int LLVMFuzzerTestOneInput(uint8_t* data, size_t size) {
           kBufferCollectionConstraintsSize);
   uint8_t* data_ptr = data;
 
-  MockDdkSysmem mock_sysmem;
-  LOGRTNC(!mock_sysmem.Init(), "Failed MockDdkSysmem::Init()\n");
+  auto inproc_sysmem = display::FakeSysmemDeviceHierarchy::Create();
+  auto outgoing_dir_result = inproc_sysmem->GetOutgoingDirectory();
+  ZX_ASSERT_MSG(outgoing_dir_result.is_ok(), "%s", outgoing_dir_result.status_string());
+  auto outgoing_dir = std::move(outgoing_dir_result).value();
 
-  auto allocator_client_1 = mock_sysmem.Connect();
-  LOGRTN(allocator_client_1.status_value(), "Failed to connect to sysmem driver.\n");
-  fidl::WireSyncClient<fuchsia_sysmem::Allocator> allocator_1(
-      std::move(allocator_client_1.value()));
+  auto svc_dir_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  ZX_ASSERT(svc_dir_endpoints.is_ok());
+  zx_status_t open_status = fdio_open_at(outgoing_dir.channel().get(), "/svc", 0,
+                                         svc_dir_endpoints->server.TakeChannel().release());
+  ZX_ASSERT(open_status == ZX_OK);
+
+  auto allocator_client_1_result =
+      component::ConnectAtMember<fuchsia_hardware_sysmem::Service::AllocatorV1>(
+          svc_dir_endpoints->client);
+  ZX_ASSERT(allocator_client_1_result.is_ok());
+  auto allocator_client_1 = std::move(allocator_client_1_result.value());
+  fidl::WireSyncClient<fuchsia_sysmem::Allocator> allocator_1(std::move(allocator_client_1));
 
   auto [token_client_1, token_server_1] =
       fidl::Endpoints<fuchsia_sysmem::BufferCollectionToken>::Create();
@@ -69,10 +82,12 @@ extern "C" int LLVMFuzzerTestOneInput(uint8_t* data, size_t size) {
   LOGRTN(set_constraints_result.status(), "BufferCollectionSetConstraints 1 failed.\n");
 
   // Client 2 connects to sysmem separately.
-  auto allocator_client_2 = mock_sysmem.Connect();
-  LOGRTN(allocator_client_2.status_value(), "Failed to connect to sysmem driver. (2)\n");
-  fidl::WireSyncClient<fuchsia_sysmem::Allocator> allocator_2(
-      std::move(allocator_client_2.value()));
+  auto allocator_client_2_result =
+      component::ConnectAtMember<fuchsia_hardware_sysmem::Service::AllocatorV1>(
+          svc_dir_endpoints->client);
+  ZX_ASSERT(allocator_client_2_result.is_ok());
+  auto allocator_client_2 = std::move(allocator_client_2_result.value());
+  fidl::WireSyncClient<fuchsia_sysmem::Allocator> allocator_2(std::move(allocator_client_2));
 
   auto [collection_client_2, collection_server_2] =
       fidl::Endpoints<fuchsia_sysmem::BufferCollection>::Create();

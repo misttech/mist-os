@@ -127,12 +127,9 @@ async fn tap_like_over_network_tun() {
         helpers::create_interface(&tun_device, &tun_port).await;
 
     // Add an IPv4 address.
-    let () = helpers::add_interface_address(
-        &control,
-        interface_id,
-        CONFIG_FOR_TAP_LIKE.ip_layer.alice_subnet.clone(),
-    )
-    .await;
+    let () =
+        helpers::add_interface_address(&control, CONFIG_FOR_TAP_LIKE.ip_layer.alice_subnet.clone())
+            .await;
 
     // Wait for Netstack to report the interface online. Netstack may drop
     // frames if they're sent before the online signal is observed. This is
@@ -251,12 +248,8 @@ async fn tun_like_over_network_tun() {
         helpers::create_interface(&tun_device, &tun_port).await;
 
     // Add an IPv4 address.
-    let () = helpers::add_interface_address(
-        &control,
-        interface_id,
-        CONFIG_FOR_TUN_LIKE.alice_subnet.clone(),
-    )
-    .await;
+    let () =
+        helpers::add_interface_address(&control, CONFIG_FOR_TUN_LIKE.alice_subnet.clone()).await;
 
     // Wait for Netstack to report the interface online. Netstack may drop
     // frames if they're sent before the online signal is observed. This is
@@ -596,7 +589,6 @@ mod helpers {
     /// Adds an address to an installed interface.
     pub(super) async fn add_interface_address(
         control: &fidl_fuchsia_net_interfaces_ext::admin::Control,
-        interface_id: u64,
         subnet: fidl_fuchsia_net::Subnet,
     ) {
         let (address_state_provider, server_end) = fidl::endpoints::create_proxy::<
@@ -610,7 +602,10 @@ mod helpers {
         let () = control
             .add_address(
                 &subnet,
-                &fidl_fuchsia_net_interfaces_admin::AddressParameters::default(),
+                &fidl_fuchsia_net_interfaces_admin::AddressParameters {
+                    add_subnet_route: Some(true),
+                    ..Default::default()
+                },
                 server_end,
             )
             .expect("add_address failed");
@@ -623,21 +618,5 @@ mod helpers {
         )
         .await
         .expect("failed to observe assigned address");
-
-        // NB: Adding an address does not add the subnet route, we still have to
-        // add that so we can exchange frames.
-        let stack =
-            fuchsia_component::client::connect_to_protocol::<fidl_fuchsia_net_stack::StackMarker>()
-                .expect("failed to connect to stack");
-        let () = stack
-            .add_forwarding_entry(&fidl_fuchsia_net_stack::ForwardingEntry {
-                subnet: fidl_fuchsia_net_ext::apply_subnet_mask(subnet),
-                device_id: interface_id,
-                next_hop: None,
-                metric: 0,
-            })
-            .await
-            .expect("add_forwarding_entry FIDL error")
-            .expect("add_forwarding_entry failed");
     }
 }

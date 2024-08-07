@@ -1310,7 +1310,7 @@ dependencies = [
  "libm",
  "linked-hash-map",
  "lipsum",
- "lock_api 0.4.11",
+ "lock_api",
  "log",
  "loom",
  "lru-cache",
@@ -1323,11 +1323,6 @@ dependencies = [
  "miniz_oxide",
  "mio 0.8.9",
  "mockall",
- "netlink-packet-core",
- "netlink-packet-generic",
- "netlink-packet-route",
- "netlink-packet-sock-diag",
- "netlink-packet-utils",
  "nix 0.26.2",
  "nom",
  "nom_locate",
@@ -1341,7 +1336,7 @@ dependencies = [
  "openat",
  "overload",
  "p256",
- "parking_lot 0.9.0",
+ "parking_lot 0.12.0",
  "paste",
  "pathdiff",
  "pem",
@@ -1406,7 +1401,7 @@ dependencies = [
  "simplelog",
  "siphasher 0.3.10",
  "slab",
- "smallvec 1.13.1",
+ "smallvec",
  "socket2 0.5.5",
  "splines",
  "static_assertions",
@@ -2092,15 +2087,6 @@ dependencies = [
 
 [[package]]
 name = "lock_api"
-version = "0.3.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c4da24a77a3d8a6d4862d95f72e6fdb9c09a643ecdb402d754004a557f2bec75"
-dependencies = [
- "scopeguard",
-]
-
-[[package]]
-name = "lock_api"
 version = "0.4.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3c168f8615b12bc01f9c17e2eb0cc07dcae1940121185446edc3744920e8ef45"
@@ -2179,12 +2165,6 @@ name = "maybe-owned"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "006ac35c23dc00cd88083b27297224aedc893d628aff7374352b4f3d57315fa9"
-
-[[package]]
-name = "maybe-uninit"
-version = "2.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "60302e4db3a61da70c0cb7991976248362f30319e88850c487b9b95bbf059e00"
 
 [[package]]
 name = "md-5"
@@ -2296,62 +2276,6 @@ name = "multimap"
 version = "0.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e5ce46fe64a9d73be07dcbe690a38ce1b293be448fd8ce1e6c1b8062c9f72c6a"
-
-[[package]]
-name = "netlink-packet-core"
-version = "0.7.0"
-dependencies = [
- "anyhow",
- "byteorder",
- "netlink-packet-utils",
-]
-
-[[package]]
-name = "netlink-packet-generic"
-version = "0.3.3"
-dependencies = [
- "anyhow",
- "byteorder",
- "netlink-packet-core",
- "netlink-packet-utils",
-]
-
-[[package]]
-name = "netlink-packet-route"
-version = "0.20.0"
-dependencies = [
- "anyhow",
- "bitflags 2.4.1",
- "byteorder",
- "libc",
- "log",
- "netlink-packet-core",
- "netlink-packet-utils",
- "thiserror",
-]
-
-[[package]]
-name = "netlink-packet-sock-diag"
-version = "0.4.2"
-dependencies = [
- "anyhow",
- "bitflags 1.3.2",
- "byteorder",
- "libc",
- "netlink-packet-core",
- "netlink-packet-utils",
- "smallvec 1.13.1",
-]
-
-[[package]]
-name = "netlink-packet-utils"
-version = "0.5.2"
-dependencies = [
- "anyhow",
- "byteorder",
- "paste",
- "thiserror",
-]
 
 [[package]]
 name = "nix"
@@ -2548,9 +2472,9 @@ checksum = "b8f8bdf33df195859076e54ab11ee78a1b208382d3a26ec40d142ffc1ecc49ef"
 
 [[package]]
 name = "omaha_client"
-version = "0.1.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0dee499723e7f70f7d1afd4c662628d65cce7b85f9aaeab89113aaec82e38773"
+checksum = "95a0b085c1910601f43fb397361ca61d04737ff77cb638eb4a59468e3ee6befa"
 dependencies = [
  "anyhow",
  "chrono",
@@ -2634,23 +2558,12 @@ checksum = "427c3892f9e783d91cc128285287e70a59e206ca452770ece88a76f7a3eddd72"
 
 [[package]]
 name = "parking_lot"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f842b1982eb6c2fe34036a4fbfb06dd185a3f5c8edfaacdf7d1ea10b07de6252"
-dependencies = [
- "lock_api 0.3.4",
- "parking_lot_core 0.6.2",
- "rustc_version",
-]
-
-[[package]]
-name = "parking_lot"
 version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6d7744ac029df22dca6284efe4e898991d28e3085c706c972bcd7da4a27a15eb"
 dependencies = [
  "instant",
- "lock_api 0.4.11",
+ "lock_api",
  "parking_lot_core 0.8.3",
 ]
 
@@ -2660,23 +2573,8 @@ version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "87f5ec2493a61ac0506c0f4199f99070cbe83857b0337006a30f3e6719b8ef58"
 dependencies = [
- "lock_api 0.4.11",
+ "lock_api",
  "parking_lot_core 0.9.9",
-]
-
-[[package]]
-name = "parking_lot_core"
-version = "0.6.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b876b1b9e7ac6e1a74a6da34d25c42e17e8862aa409cbbbdcfc8d86c6f3bc62b"
-dependencies = [
- "cfg-if 0.1.10",
- "cloudabi",
- "libc",
- "redox_syscall 0.1.51",
- "rustc_version",
- "smallvec 0.6.14",
- "winapi",
 ]
 
 [[package]]
@@ -2689,7 +2587,7 @@ dependencies = [
  "instant",
  "libc",
  "redox_syscall 0.2.13",
- "smallvec 1.13.1",
+ "smallvec",
  "winapi",
 ]
 
@@ -2702,7 +2600,7 @@ dependencies = [
  "cfg-if 1.0.0",
  "libc",
  "redox_syscall 0.4.1",
- "smallvec 1.13.1",
+ "smallvec",
  "windows-targets 0.48.5",
 ]
 
@@ -4147,15 +4045,6 @@ dependencies = [
 
 [[package]]
 name = "smallvec"
-version = "0.6.14"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b97fcaeba89edba30f044a10c6a3cc39df9c3f17d7cd829dd1446cab35f890e0"
-dependencies = [
- "maybe-uninit",
-]
-
-[[package]]
-name = "smallvec"
 version = "1.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e6ecd384b10a64542d77071bd64bd7b231f4ed5940fba55e98c3de13824cf3d7"
@@ -4591,7 +4480,7 @@ version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6c3cee86884622e131719fff27539a520d0a5fee90e2a70691d9cc18789abce5"
 dependencies = [
- "lock_api 0.4.11",
+ "lock_api",
  "parking_lot 0.12.0",
 ]
 
@@ -4606,7 +4495,7 @@ dependencies = [
  "once_cell",
  "regex",
  "sharded-slab",
- "smallvec 1.13.1",
+ "smallvec",
  "thread_local",
  "tracing",
  "tracing-core",
@@ -4636,7 +4525,7 @@ dependencies = [
  "ipnet",
  "lazy_static",
  "rand 0.8.4",
- "smallvec 1.13.1",
+ "smallvec",
  "thiserror",
  "tinyvec",
  "tracing",
@@ -4654,7 +4543,7 @@ dependencies = [
  "lazy_static",
  "lru-cache",
  "parking_lot 0.12.0",
- "smallvec 1.13.1",
+ "smallvec",
  "thiserror",
  "tracing",
  "trust-dns-proto",
@@ -5183,15 +5072,3 @@ version = "2.0.1+zstd.1.5.2"
 dependencies = [
  "libc",
 ]
-
-[[patch.unused]]
-name = "nix"
-version = "0.26.1"
-
-[[patch.unused]]
-name = "wasi"
-version = "0.10.0+wasi-snapshot-preview1"
-
-[[patch.unused]]
-name = "wasi"
-version = "0.10.1+wasi-snapshot-preview1"

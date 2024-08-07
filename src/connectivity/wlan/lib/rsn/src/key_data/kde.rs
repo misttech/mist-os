@@ -217,6 +217,7 @@ impl Writer<VecCursor> {
 }
 
 impl<A: TrackedAppend> Writer<A> {
+    #[cfg(test)]
     pub fn new_with(buf: A) -> Self {
         Self { buf }
     }

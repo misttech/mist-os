@@ -4,6 +4,7 @@
 
 #include "src/graphics/display/drivers/coordinator/tests/base.h"
 
+#include <fidl/fuchsia.hardware.sysmem/cpp/fidl.h>
 #include <lib/async/cpp/task.h>
 #include <zircon/compiler.h>
 #include <zircon/status.h>

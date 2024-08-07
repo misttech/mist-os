@@ -524,3 +524,5 @@ toc:
     path: /docs/contribute/governance/rfcs/0253_getinfo_vmar_maps.md
   - title: "RFC-0254: Changing Attribution for Copy-on-Write Pages"
     path: /docs/contribute/governance/rfcs/0254_changing_attribution_for_copy_on_write_pages.md
+  - title: "RFC-0255: System Activity Governor"
+    path: /docs/contribute/governance/rfcs/0255_system_activity_governor.md

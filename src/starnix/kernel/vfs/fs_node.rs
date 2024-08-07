@@ -4,7 +4,7 @@
 
 use crate::device::DeviceMode;
 use crate::mm::PAGE_SIZE;
-use crate::security::{post_setxattr, FsNodeState};
+use crate::security;
 use crate::signals::{send_standard_signal, SignalInfo};
 use crate::task::{CurrentTask, Kernel, WaitQueue, Waiter};
 use crate::time::utc;
@@ -20,6 +20,7 @@ use crate::vfs::{
 };
 use bitflags::bitflags;
 use fuchsia_zircon as zx;
+use linux_uapi::XATTR_SECURITY_PREFIX;
 use once_cell::sync::OnceCell;
 use starnix_logging::{log_error, track_stub};
 #[cfg(any(test, debug_assertions))]
@@ -30,8 +31,8 @@ use starnix_sync::{
 };
 use starnix_uapi::as_any::AsAny;
 use starnix_uapi::auth::{
-    Credentials, FsCred, CAP_CHOWN, CAP_DAC_OVERRIDE, CAP_FOWNER, CAP_FSETID, CAP_MKNOD,
-    CAP_SYS_ADMIN, CAP_SYS_RESOURCE,
+    Credentials, FsCred, UserAndOrGroupId, CAP_CHOWN, CAP_DAC_OVERRIDE, CAP_FOWNER, CAP_FSETID,
+    CAP_MKNOD, CAP_SYS_ADMIN, CAP_SYS_RESOURCE,
 };
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::{Errno, EACCES};
@@ -205,7 +206,7 @@ pub struct FsNodeInfo {
     pub time_status_change: zx::Time,
     pub time_access: zx::Time,
     pub time_modify: zx::Time,
-    pub security_state: FsNodeState,
+    pub security_state: security::FsNodeState,
 }
 
 impl FsNodeInfo {
@@ -270,6 +271,20 @@ impl FsNodeInfo {
 
     pub fn cred(&self) -> FsCred {
         FsCred { uid: self.uid, gid: self.gid }
+    }
+
+    pub fn suid_and_sgid(&self) -> UserAndOrGroupId {
+        let uid = self.mode.intersects(FileMode::ISUID).then_some(self.uid);
+
+        // See <https://man7.org/linux/man-pages/man7/inode.7.html>:
+        //
+        //   For an executable file, the set-group-ID bit causes the
+        //   effective group ID of a process that executes the file to change
+        //   as described in execve(2).  For a file that does not have the
+        //   group execution bit (S_IXGRP) set, the set-group-ID bit indicates
+        //   mandatory file/record locking.
+        let gid = self.mode.intersects(FileMode::ISGID | FileMode::IXGRP).then_some(self.gid);
+        UserAndOrGroupId { uid, gid }
     }
 }
 
@@ -454,7 +469,7 @@ pub enum SymlinkTarget {
     Node(NamespaceNode),
 }
 
-#[derive(PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum XattrOp {
     /// Set the value of the extended attribute regardless of whether it exists.
     Set,
@@ -475,7 +490,7 @@ impl XattrOp {
 }
 
 /// Returns a value, or the size required to contains it.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ValueOrSize<T> {
     Value(T),
     Size(usize),
@@ -2081,7 +2096,11 @@ impl FsNode {
             CheckAccessReason::InternalPermissionChecks,
         )?;
         self.check_trusted_attribute_access(current_task, name, || errno!(ENODATA))?;
-        self.ops().get_xattr(self, current_task, name, max_size)
+        if name.starts_with(XATTR_SECURITY_PREFIX.to_bytes()) {
+            security::fs_node_getsecurity(current_task, self, name, max_size)
+        } else {
+            self.ops().get_xattr(self, current_task, name, max_size)
+        }
     }
 
     pub fn set_xattr(
@@ -2099,8 +2118,11 @@ impl FsNode {
             CheckAccessReason::InternalPermissionChecks,
         )?;
         self.check_trusted_attribute_access(current_task, name, || errno!(EPERM))?;
-        self.ops().set_xattr(self, current_task, name, value, op)?;
-        post_setxattr(current_task, self, name, value);
+        if name.starts_with(XATTR_SECURITY_PREFIX.to_bytes()) {
+            security::fs_node_setsecurity(current_task, self, name, value, op)?;
+        } else {
+            self.ops().set_xattr(self, current_task, name, value, op)?;
+        }
         Ok(())
     }
 

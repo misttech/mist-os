@@ -1914,6 +1914,11 @@ zx_status_t VmCowPages::AddPageLocked(VmPageOrMarker* p, uint64_t offset,
 
   // If the old entry is actual content, release it.
   if (page->IsPageOrRef()) {
+    if (page->IsReference()) {
+      // If the old entry is a reference then we know that there can be no mappings to it, since a
+      // reference cannot be mapped in, and we can skip the range update.
+      do_range_update = false;
+    }
     // We should be permitted to overwrite any kind of content (zero or non-zero).
     DEBUG_ASSERT(overwrite == CanOverwriteContent::NonZero);
     // The caller should have passed in an optional to hold the released page.
@@ -5700,6 +5705,11 @@ zx_status_t VmCowPages::DirtyPagesLocked(uint64_t offset, uint64_t len, list_nod
         status = AllocUninitializedPage(&new_page, page_request);
         // If single page allocation fails, bubble up the failure.
         if (status != ZX_OK) {
+          // If propagating up ZX_ERR_SHOULD_WAIT do not consider this an error that requires
+          // invalidating the dirty request as we are going to retry it.
+          if (status == ZX_ERR_SHOULD_WAIT) {
+            invalidate_requests_on_error.cancel();
+          }
           return status;
         }
         list_add_tail(alloc_list, &new_page->queue_node);
@@ -6328,6 +6338,16 @@ void VmCowPages::RangeChangeUpdateLocked(uint64_t offset, uint64_t len, RangeCha
   canary_.Assert();
 
   if (len == 0) {
+    return;
+  }
+
+  // If we have no children then we can avoid building a processing a list and just directly
+  // process any referenced paged_ref_.
+  if (children_list_len_ == 0) {
+    if (paged_ref_) {
+      AssertHeld(paged_ref_->lock_ref());
+      paged_ref_->RangeChangeUpdateLocked(offset, len, op);
+    }
     return;
   }
 

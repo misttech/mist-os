@@ -1,0 +1,11 @@
+Name: netlink-packet-core
+License File: LICENSE-MIT
+URL: https://github.com/rust-netlink/netlink-packet-core
+
+This crate provides the core functionality for serialization/deserialization of
+NETLINK messages. It is used by Starnix to serve the NETLINK protocol.
+
+This crate forks upstream version 0.7.0. There are several divergences from
+upstream (See the git history for the complete list). At this point, there is
+no intention of re-merging with upstream.
+

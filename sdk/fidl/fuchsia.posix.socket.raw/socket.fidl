@@ -70,7 +70,8 @@ type Ipv6ChecksumConfiguration = strict union {
     2: offset int32;
 };
 
-// TODO(https://fxbug.dev/42056856): Use a generated constant.
+// TODO(https://fxbug.dev/42056856): Mark this as removed at NEXT once all remaining references in
+// zxio have been migrated to the discoverable protocol name.
 const SOCKET_PROTOCOL_NAME string = "fuchsia.posix.socket.raw/Socket";
 
 /// A raw network socket.

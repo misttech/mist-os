@@ -11,18 +11,15 @@ use diagnostics_log_encoding::encode::{Encoder, EncoderOpts};
 use diagnostics_log_encoding::Record;
 use fidl_fuchsia_diagnostics::Severity as StreamSeverity;
 use fidl_fuchsia_logger::{LogLevelFilter, LogMessage};
-use lazy_static::lazy_static;
 use std::io::Cursor;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 
-lazy_static! {
-    static ref TEST_IDENTITY: Arc<MonikerWithUrl> = {
-        Arc::new(MonikerWithUrl {
-            moniker: "fake-test-env/test-component".try_into().unwrap(),
-            url: "fuchsia-pkg://fuchsia.com/testing123#test-component.cm".into(),
-        })
-    };
-}
+static TEST_IDENTITY: LazyLock<Arc<MonikerWithUrl>> = LazyLock::new(|| {
+    Arc::new(MonikerWithUrl {
+        moniker: "fake-test-env/test-component".try_into().unwrap(),
+        url: "fuchsia-pkg://fuchsia.com/testing123#test-component.cm".into(),
+    })
+});
 
 fn clear_raw_severity(data: &mut LogsData) {
     data.payload_message_mut()

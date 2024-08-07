@@ -546,18 +546,21 @@ void VmMapping::AspaceDebugUnpinLockedObject(uint64_t offset, uint64_t len) cons
 }
 
 namespace {
+
+// Helper class for batching installing mappings into the arch aspace. The mappings aspace and
+// object lock must be held over the entirety of the lifetime of this object, without ever being
+// released.
 template <size_t NumPages>
 class VmMappingCoalescer {
  public:
   VmMappingCoalescer(VmMapping* mapping, vaddr_t base, uint mmu_flags,
                      ArchVmAspace::ExistingEntryAction existing_entry_action)
-      TA_REQ(mapping->lock());
+      TA_REQ(mapping->lock()) TA_REQ(mapping->object_lock());
   ~VmMappingCoalescer();
 
   // Add a page to the mapping run.  If this fails, the VmMappingCoalescer is
   // no longer valid.
   zx_status_t Append(vaddr_t vaddr, paddr_t paddr) {
-    AssertHeld(mapping_->lock_ref());
     DEBUG_ASSERT(!aborted_);
     // If this isn't the expected vaddr, flush the run we have first.
     if (!can_append(vaddr)) {
@@ -573,7 +576,6 @@ class VmMappingCoalescer {
   }
 
   zx_status_t AppendOrAdjustMapping(vaddr_t vaddr, paddr_t paddr, uint mmu_flags) {
-    AssertHeld(mapping_->lock_ref());
     DEBUG_ASSERT(!aborted_);
     // If this isn't the expected vaddr or mmu_flags have changed, flush the run we have first.
     if (!can_append(vaddr) || mmu_flags != mmu_flags_) {
@@ -638,7 +640,10 @@ VmMappingCoalescer<NumPages>::VmMappingCoalescer(
       count_(0),
       aborted_(false),
       mmu_flags_(mmu_flags),
-      existing_entry_action_(existing_entry_action) {}
+      existing_entry_action_(existing_entry_action) {
+  // Mapping is only valid if there is at least some access in the flags.
+  DEBUG_ASSERT(mmu_flags & ARCH_MMU_FLAG_PERM_RWX_MASK);
+}
 
 template <size_t NumPages>
 VmMappingCoalescer<NumPages>::~VmMappingCoalescer() {
@@ -648,8 +653,6 @@ VmMappingCoalescer<NumPages>::~VmMappingCoalescer() {
 
 template <size_t NumPages>
 zx_status_t VmMappingCoalescer<NumPages>::Flush() {
-  AssertHeld(mapping_->lock_ref());
-
   if (count_ == 0) {
     return ZX_OK;
   }
@@ -661,17 +664,15 @@ zx_status_t VmMappingCoalescer<NumPages>::Flush() {
       ktl::all_of(phys_, &phys_[count_], [](paddr_t p) { return p != vm_get_zero_page_paddr(); }) ||
       !mapping_->aspace()->is_user());
 
-  if (mmu_flags_ & ARCH_MMU_FLAG_PERM_RWX_MASK) {
-    size_t mapped;
-    zx_status_t ret = mapping_->aspace()->arch_aspace().Map(base_, phys_, count_, mmu_flags_,
-                                                            existing_entry_action_, &mapped);
-    if (ret != ZX_OK) {
-      TRACEF("error %d mapping %zu pages starting at va %#" PRIxPTR "\n", ret, count_, base_);
-      aborted_ = true;
-      return ret;
-    }
-    DEBUG_ASSERT_MSG(mapped == count_, "mapped %zu, count %zu\n", mapped, count_);
+  size_t mapped;
+  zx_status_t ret = mapping_->aspace()->arch_aspace().Map(base_, phys_, count_, mmu_flags_,
+                                                          existing_entry_action_, &mapped);
+  if (ret != ZX_OK) {
+    TRACEF("error %d mapping %zu pages starting at va %#" PRIxPTR "\n", ret, count_, base_);
+    aborted_ = true;
+    return ret;
   }
+  DEBUG_ASSERT_MSG(mapped == count_, "mapped %zu, count %zu\n", mapped, count_);
   base_ += count_ * PAGE_SIZE;
   count_ = 0;
   return ZX_OK;
@@ -725,12 +726,18 @@ zx_status_t VmMapping::MapRange(size_t offset, size_t len, bool commit, bool ign
       base_ + offset, len,
       [this, commit, dirty_tracked, ignore_existing](vaddr_t base, size_t len, uint mmu_flags) {
         AssertHeld(lock_ref());
+        AssertHeld(object_lock_ref());
 
         // Remove the write permission if this maps a vmo that supports dirty tracking, in order to
         // trigger write permission faults when writes occur, enabling us to track when pages are
         // dirtied.
         if (dirty_tracked) {
           mmu_flags &= ~ARCH_MMU_FLAG_PERM_WRITE;
+        }
+
+        // If there are no access permissions on this region then mapping has no effect, so skip.
+        if (!(mmu_flags & ARCH_MMU_FLAG_PERM_RWX_MASK)) {
+          return ZX_OK;
         }
 
         // In the scenario where we are committing, and calling RequireOwnedPage, we are supposed to

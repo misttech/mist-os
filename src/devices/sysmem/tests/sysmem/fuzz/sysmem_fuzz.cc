@@ -2,9 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <src/devices/sysmem/drivers/sysmem/device.h>
-#include <src/devices/sysmem/drivers/sysmem/driver.h>
+#include <fidl/fuchsia.hardware.sysmem/cpp/fidl.h>
 
+#include "src/devices/sysmem/drivers/sysmem/device.h"
+#include "src/graphics/display/drivers/fake/fake-sysmem-device-hierarchy.h"
 #include "sysmem_fuzz_common.h"
 
 #define DBGRTN 0
@@ -35,12 +36,24 @@ extern "C" int LLVMFuzzerTestOneInput(uint8_t* data, size_t size) {
 
   LOGRTNC(size != kRequiredFuzzingBytes, "size: %zu != kRequiredFuzzingBytes: %zu\n", size,
           kRequiredFuzzingBytes);
-  MockDdkSysmem mock_sysmem;
-  LOGRTNC(!mock_sysmem.Init(), "Failed MockDdkSysmem::Init()\n");
+  auto inproc_sysmem = display::FakeSysmemDeviceHierarchy::Create();
+  auto outgoing_dir_result = inproc_sysmem->GetOutgoingDirectory();
+  ZX_ASSERT_MSG(outgoing_dir_result.is_ok(), "%s", outgoing_dir_result.status_string());
+  auto outgoing_dir = std::move(outgoing_dir_result).value();
 
-  auto allocator_client = mock_sysmem.Connect();
-  LOGRTN(allocator_client.status_value(), "Failed to connect to sysmem driver.\n");
-  fidl::WireSyncClient<fuchsia_sysmem::Allocator> allocator(std::move(allocator_client.value()));
+  auto svc_dir_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  ZX_ASSERT(svc_dir_endpoints.is_ok());
+  zx_status_t open_status = fdio_open_at(outgoing_dir.channel().get(), "/svc", 0,
+                                         svc_dir_endpoints->server.TakeChannel().release());
+  ZX_ASSERT(open_status == ZX_OK);
+
+  auto allocator_client_result =
+      component::ConnectAtMember<fuchsia_hardware_sysmem::Service::AllocatorV1>(
+          svc_dir_endpoints->client);
+  ZX_ASSERT(allocator_client_result.is_ok());
+  auto allocator_client = std::move(allocator_client_result.value());
+
+  fidl::WireSyncClient<fuchsia_sysmem::Allocator> allocator(std::move(allocator_client));
 
   auto [token_client_end, token_server_end] =
       fidl::Endpoints<fuchsia_sysmem::BufferCollectionToken>::Create();

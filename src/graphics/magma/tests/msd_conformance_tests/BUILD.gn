@@ -12,6 +12,7 @@ source_set("msd_conformance_tests") {
     "test_magma_system_multithread_cc.cc",
     "test_msd.cc",
     "test_msd_buffer_cc.cc",
+    "test_msd_c.c",
     "test_msd_context_cc.cc",
     "test_msd_device_cc.cc",
     "test_msd_driver_cc.cc",

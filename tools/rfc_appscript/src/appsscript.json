@@ -1,20 +1,10 @@
 {
     "timeZone": "America/Los_Angeles",
-    "dependencies": {
-        "enabledAdvancedServices": [
-            {
-                "userSymbol": "Area120Tables",
-                "version": "v1alpha1",
-                "serviceId": "area120tables"
-            }
-        ]
-    },
     "exceptionLogging": "STACKDRIVER",
     "runtimeVersion": "V8",
     "oauthScopes": [
         "https://www.googleapis.com/auth/gerritcodereview",
         "https://www.googleapis.com/auth/iam",
-        "https://www.googleapis.com/auth/script.external_request",
-        "https://www.googleapis.com/auth/tables"
+        "https://www.googleapis.com/auth/script.external_request"
     ]
 }

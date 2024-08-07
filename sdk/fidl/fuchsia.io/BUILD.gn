@@ -14,7 +14,6 @@ fidl("fuchsia.io") {
     "directory.fidl",
     "directory2.fidl",
     "file2.fidl",
-    "inotify.fidl",
     "io.fidl",
     "locking.fidl",
     "node-protocols.fidl",

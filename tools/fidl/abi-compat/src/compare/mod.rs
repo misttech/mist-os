@@ -13,7 +13,7 @@ use anyhow::Result;
 use flyweights::FlyStr;
 
 use crate::ir::Openness;
-use crate::Configuration;
+use crate::{Configuration, Scope, Version};
 
 mod types;
 pub use types::*;
@@ -244,16 +244,25 @@ impl Method {
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, PartialOrd, Ord, Debug)]
-pub struct ImplementationLocation {
+pub struct Scopes {
     pub platform: bool,
     pub external: bool,
+}
+
+impl Scopes {
+    pub fn contains(&self, scope: Scope) -> bool {
+        match scope {
+            Scope::Platform => self.platform,
+            Scope::External => self.external,
+        }
+    }
 }
 
 #[derive(Clone, Eq, PartialEq, PartialOrd, Ord, Debug)]
 pub struct Discoverable {
     pub name: String,
-    pub client: ImplementationLocation,
-    pub server: ImplementationLocation,
+    pub client: Scopes,
+    pub server: Scopes,
 }
 
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
@@ -267,31 +276,22 @@ pub struct Protocol {
 }
 
 impl Protocol {
-    fn compatible(
-        external: &Self,
-        platform: &Self,
-        config: &Configuration,
-    ) -> CompatibilityProblems {
+    fn compatible(protocols: [&Self; 2], config: &Configuration) -> CompatibilityProblems {
         let mut problems = CompatibilityProblems::default();
 
         // Look at discoverable to identify the pairs of client/server interactions
         let mut clients = Vec::new();
         let mut servers = Vec::new();
-        let external_discoverable =
-            external.discoverable.as_ref().expect("Expected value for external.discoverable");
-        if external_discoverable.client.external {
-            clients.push(external);
-        }
-        if external_discoverable.server.external {
-            servers.push(external);
-        }
-        let platform_discoverable =
-            platform.discoverable.as_ref().expect("Expected value for platform.discoverable");
-        if platform_discoverable.client.platform {
-            clients.push(platform);
-        }
-        if platform_discoverable.server.platform {
-            servers.push(platform);
+        for p in protocols {
+            if let Some(d) = &p.discoverable {
+                let scope = p.path.scope();
+                if d.client.contains(scope) {
+                    clients.push(p);
+                }
+                if d.server.contains(scope) {
+                    servers.push(p);
+                }
+            }
         }
 
         for (client, server) in
@@ -375,43 +375,28 @@ impl Protocol {
     }
 }
 
-#[derive(Default, Clone, Debug)]
-pub struct Platform {
-    pub api_level: FlyStr,
+#[derive(Clone, Debug)]
+pub struct AbiSurface {
+    #[allow(unused)]
+    pub version: Version,
     pub discoverable: HashMap<String, Protocol>,
     pub tear_off: HashMap<String, Protocol>,
 }
 
 pub fn compatible(
-    external: &Platform,
-    platform: &Platform,
+    surfaces: [&AbiSurface; 2],
     config: &Configuration,
 ) -> Result<CompatibilityProblems> {
     let mut problems = CompatibilityProblems::default();
 
-    let external_discoverable: HashSet<String> = external.discoverable.keys().cloned().collect();
-    let platform_discoverable: HashSet<String> = platform.discoverable.keys().cloned().collect();
-    for p in external_discoverable.difference(&platform_discoverable) {
-        let d = external
-            .discoverable
-            .get(p)
-            .and_then(|p| p.discoverable.as_ref())
-            .expect("Expected discoverable attribute");
-        if d.server.platform {
-            problems.platform(
-                &external.discoverable[p].path,
-                &Path::new(&platform.api_level),
-                format!("Discoverable protocol missing from: platform"),
-            );
-        }
-    }
+    // Discoverable protocols for each ABI surface.
+    let disco: [HashSet<String>; 2] = surfaces.map(|s| s.discoverable.keys().cloned().collect());
 
-    for p in external_discoverable.intersection(&platform_discoverable) {
-        problems.append(Protocol::compatible(
-            &external.discoverable[p],
-            &platform.discoverable[p],
-            &config,
-        ));
+    // Discoverable protocols shared between both ABI surfaces.
+    let common_disco: HashSet<String> = disco[0].intersection(&disco[1]).cloned().collect();
+
+    for p in common_disco {
+        problems.append(Protocol::compatible(surfaces.map(|s| &s.discoverable[&p]), &config));
     }
 
     problems.sort();

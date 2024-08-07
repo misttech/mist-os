@@ -13,9 +13,14 @@ pub mod device;
 pub mod format;
 pub mod format_set;
 pub mod registry;
+pub mod sigproc;
+#[cfg(target_os = "fuchsia")]
+pub mod vmo_buffer;
 
 pub use format::{parse_duration, str_to_clock, Format};
 pub use registry::Registry;
+#[cfg(target_os = "fuchsia")]
+pub use vmo_buffer::VmoBuffer;
 
 pub async fn stop_listener(
     canceler: ServerEnd<fac::RecordCancelerMarker>,

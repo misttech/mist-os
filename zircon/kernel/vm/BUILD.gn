@@ -65,6 +65,7 @@ zx_library("vm") {
     "//zircon/kernel/lib/userabi",
     "//zircon/kernel/phys/lib/memalloc:range",
     "//zircon/system/ulib/affine",
+    "//zircon/system/ulib/lazy_init",
     "//zircon/system/ulib/pretty",
     "//zircon/third_party/ulib/lz4",
 

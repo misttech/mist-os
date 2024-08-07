@@ -5,7 +5,10 @@
 use crate::component_instance::ComponentInstanceForAnalyzer;
 use ::routing::bedrock::structured_dict::ComponentInput;
 use ::routing::bedrock::with_policy_check::WithPolicyCheck;
-use ::routing::capability_source::{CapabilitySource, ComponentCapability, InternalCapability};
+use ::routing::capability_source::{
+    BuiltinSource, CapabilitySource, CapabilityToCapabilitySource, ComponentCapability,
+    ComponentSource, FrameworkSource, InternalCapability, NamespaceSource,
+};
 use ::routing::component_instance::{ComponentInstanceInterface, WeakComponentInstanceInterface};
 use ::routing::error::RoutingError;
 use ::routing::policy::GlobalPolicyChecker;
@@ -52,9 +55,9 @@ pub fn build_root_component_input(
         .filter_map(|capability_decl| match capability_decl {
             cm_rust::CapabilityDecl::Protocol(protocol_decl) => Some((
                 protocol_decl.name.clone(),
-                CapabilitySource::Namespace {
+                CapabilitySource::Namespace(NamespaceSource {
                     capability: ComponentCapability::Protocol(protocol_decl.clone()),
-                },
+                }),
             )),
             _ => None,
         })
@@ -62,29 +65,26 @@ pub fn build_root_component_input(
             match capability_decl {
                 cm_rust::CapabilityDecl::Protocol(protocol_decl) => Some((
                     protocol_decl.name.clone(),
-                    CapabilitySource::Builtin {
+                    CapabilitySource::Builtin(BuiltinSource {
                         capability: InternalCapability::Protocol(protocol_decl.name.clone()),
-                    },
+                    }),
                 )),
                 _ => None,
             }
         }));
     for (name, capability_source) in names_and_capability_sources {
+        let capability: sandbox::Capability =
+            capability_source.clone().try_into().expect("failed to capability source to bedrock");
         root_component_input
             .capabilities()
             .insert_capability(
                 &name,
-                Router::new_ok(Capability::Dictionary(
-                    capability_source
-                        .clone()
-                        .try_into()
-                        .expect("failed to convert builtin capability to dicttionary"),
-                ))
-                .with_policy_check::<ComponentInstanceForAnalyzer>(
-                    capability_source,
-                    policy.clone(),
-                )
-                .into(),
+                Router::new_ok(capability)
+                    .with_policy_check::<ComponentInstanceForAnalyzer>(
+                        capability_source,
+                        policy.clone(),
+                    )
+                    .into(),
             )
             .expect("failed to insert builtin capability into dictionary");
     }
@@ -107,10 +107,10 @@ pub fn build_framework_dictionary(component: &Arc<ComponentInstanceForAnalyzer>)
         framework_dict
             .insert_capability(
                 &name,
-                new_debug_only_router(CapabilitySource::Framework {
+                new_debug_only_router(CapabilitySource::Framework(FrameworkSource {
                     capability: InternalCapability::Protocol(name.clone()),
                     moniker: component.moniker().clone(),
-                })
+                }))
                 .into(),
             )
             .expect("failed to insert framework capability into dictionary");
@@ -128,10 +128,12 @@ pub fn build_capability_sourced_capabilities_dictionary(
             output
                 .insert_capability(
                     &storage_decl.name,
-                    new_debug_only_router(CapabilitySource::Capability {
-                        source_capability: ComponentCapability::Storage(storage_decl.clone()),
-                        moniker: component.moniker().clone(),
-                    })
+                    new_debug_only_router(CapabilitySource::Capability(
+                        CapabilityToCapabilitySource {
+                            source_capability: ComponentCapability::Storage(storage_decl.clone()),
+                            moniker: component.moniker().clone(),
+                        },
+                    ))
                     .into(),
                 )
                 .expect("failed to insert capability backed capability into dictionary");
@@ -145,8 +147,10 @@ pub fn new_program_router(
     _relative_path: RelativePath,
     capability: ComponentCapability,
 ) -> Router {
-    let capability_source =
-        CapabilitySource::Component { capability, moniker: component.moniker.clone() };
+    let capability_source = CapabilitySource::Component(ComponentSource {
+        capability,
+        moniker: component.moniker.clone(),
+    });
     Router::new_ok(
         Capability::try_from(capability_source)
             .expect("failed to convert capability source to dictionary"),
@@ -158,10 +162,10 @@ pub fn new_outgoing_dir_router(
     _decl: &cm_rust::ComponentDecl,
     capability: &cm_rust::CapabilityDecl,
 ) -> Router {
-    new_debug_only_router(CapabilitySource::Component {
+    new_debug_only_router(CapabilitySource::Component(ComponentSource {
         capability: ComponentCapability::from(capability.clone()),
         moniker: component.moniker().clone(),
-    })
+    }))
 }
 
 pub(crate) fn program_output_router(component: &Arc<ComponentInstanceForAnalyzer>) -> Router {

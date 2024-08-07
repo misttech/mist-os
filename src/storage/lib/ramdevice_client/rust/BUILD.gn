@@ -16,6 +16,7 @@ rustc_library("ramdevice_client") {
   deps = [
     "//sdk/fidl/fuchsia.device:fuchsia.device_rust",
     "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_rust",
+    "//sdk/fidl/fuchsia.hardware.block.volume:fuchsia.hardware.block.volume_rust",
     "//sdk/fidl/fuchsia.hardware.ramdisk:fuchsia.hardware.ramdisk_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/lib/device-watcher/rust",
@@ -29,6 +30,7 @@ rustc_library("ramdevice_client") {
   test_deps = [
     "//sdk/fidl/fuchsia.device.fs:fuchsia.device.fs_rust",
     "//src/lib/fuchsia",
+    "//src/lib/fuchsia-fs",
     "//third_party/rust_crates:assert_matches",
   ]
 

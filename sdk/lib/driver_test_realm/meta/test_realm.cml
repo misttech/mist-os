@@ -123,20 +123,6 @@
             ],
         },
         {
-            protocol: [ "fuchsia.logger.LogSink" ],
-            from: "parent",
-            to: [
-                "#boot-drivers",
-                "#devfs",
-                "#driver-hosts",
-                "#driver-index",
-                "#driver_manager",
-                "#fake-resolver",
-                "#full-pkg-drivers",
-                "#pkg-drivers",
-            ],
-        },
-        {
             protocol: [ "fuchsia.boot.WriteOnlyLog" ],
             from: "parent",
             to: [ "#driver_manager" ],

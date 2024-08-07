@@ -381,12 +381,12 @@ mod tests {
     use fuchsia_zircon::AsHandleRef;
     use futures::FutureExt;
     use moniker::ExtendedMoniker;
-    use once_cell::sync::Lazy;
+    use std::sync::LazyLock;
     use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
     const TEST_URL: &str = "NO-OP URL";
     const FAKE_TIMESTAMP: i64 = 5;
-    static IDENTITY: Lazy<Arc<ComponentIdentity>> = Lazy::new(|| {
+    static IDENTITY: LazyLock<Arc<ComponentIdentity>> = LazyLock::new(|| {
         Arc::new(ComponentIdentity::new(ExtendedMoniker::parse_str("./a/b").unwrap(), TEST_URL))
     });
 

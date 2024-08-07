@@ -4,7 +4,6 @@
 
 import("//build/components.gni")
 import("//build/rust/rustc_library.gni")
-import("//src/storage/testing/driver_test_realm.gni")
 
 rustc_library("framework") {
   edition = "2021"

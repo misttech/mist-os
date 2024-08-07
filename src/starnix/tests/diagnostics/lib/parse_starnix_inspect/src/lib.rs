@@ -11,6 +11,9 @@ pub struct CoredumpReport {
     pub process_koid: u64,
     pub pid: i64,
     pub argv: String,
+    pub thread_name: String,
+    pub uptime: i64,
+    pub signal: String,
 }
 
 impl CoredumpReport {
@@ -47,7 +50,10 @@ impl CoredumpReport {
             let mut argv = None;
             let mut process_koid = None;
             let mut thread_koid = None;
+            let mut thread_name = None;
             let mut pid = None;
+            let mut uptime = None;
+            let mut signal = None;
             for property in coredump_properties {
                 match property.name() {
                     "argv" => {
@@ -55,6 +61,22 @@ impl CoredumpReport {
                             property
                                 .string()
                                 .expect("getting argv string from report node")
+                                .to_string(),
+                        )
+                    }
+                    "thread_name" => {
+                        thread_name = Some(
+                            property
+                                .string()
+                                .expect("getting thread_name string from report node")
+                                .to_string(),
+                        )
+                    }
+                    "signal" => {
+                        signal = Some(
+                            property
+                                .string()
+                                .expect("getting signal string from report node")
                                 .to_string(),
                         )
                     }
@@ -71,6 +93,11 @@ impl CoredumpReport {
                     "pid" => {
                         pid = Some(property.uint().expect("getting pid from report node") as i64)
                     }
+                    // TODO(https://fxbug.dev/42081072) i64/int in kernel shows up as u64/uint here
+                    "uptime" => {
+                        uptime =
+                            Some(property.uint().expect("getting uptime from report node") as i64)
+                    }
                     other => panic!("unrecognized coredump report property `{other}`"),
                 }
             }
@@ -81,6 +108,9 @@ impl CoredumpReport {
                 process_koid: process_koid.expect("retrieving process koid property"),
                 pid: pid.expect("retrieving pid property"),
                 argv: argv.expect("retrieving argv property"),
+                thread_name: thread_name.expect("retrieving thread_name property"),
+                uptime: uptime.expect("retrieving uptime property"),
+                signal: signal.expect("retrieving signal property"),
             });
         }
         reports.sort();

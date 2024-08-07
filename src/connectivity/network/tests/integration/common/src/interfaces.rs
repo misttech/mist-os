@@ -107,38 +107,12 @@ pub async fn add_address_wait_assigned(
     Ok(address_state_provider)
 }
 
-/// Add a subnet address and route, returning once the address' assignment state is `Assigned`.
-pub async fn add_subnet_address_and_route_wait_assigned<'a>(
-    iface: &'a netemul::TestInterface<'a>,
-    subnet: fidl_fuchsia_net::Subnet,
-    address_parameters: fidl_fuchsia_net_interfaces_admin::AddressParameters,
-) -> Result<fidl_fuchsia_net_interfaces_admin::AddressStateProviderProxy> {
-    let (address_state_provider, ()) = futures::future::try_join(
-        add_address_wait_assigned(iface.control(), subnet, address_parameters)
-            .map(|res| res.context("add address")),
-        iface.add_subnet_route(subnet),
-    )
-    .await?;
-    Ok(address_state_provider)
-}
-
 /// Remove a subnet address and route, returning true if the address was removed.
 pub async fn remove_subnet_address_and_route<'a>(
     iface: &'a netemul::TestInterface<'a>,
     subnet: fidl_fuchsia_net::Subnet,
 ) -> Result<bool> {
-    let (did_remove, ()) = futures::future::try_join(
-        iface.control().remove_address(&subnet).map_err(anyhow::Error::new).and_then(|res| {
-            futures::future::ready(res.map_err(
-                |e: fidl_fuchsia_net_interfaces_admin::ControlRemoveAddressError| {
-                    anyhow::anyhow!("{:?}", e)
-                },
-            ))
-        }),
-        iface.del_subnet_route(subnet),
-    )
-    .await?;
-    Ok(did_remove)
+    iface.del_address_and_subnet_route(subnet).await
 }
 
 /// Wait until there is an IPv4 and an IPv6 link-local address assigned to the

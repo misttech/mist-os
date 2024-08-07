@@ -31,10 +31,8 @@ namespace driver_symbols {
 const std::set<std::string> kCreateThreadSymbolsDriversAllowlist = {
     "#meta/acpi-arm64.cm",
     "#meta/ahci.cm",
-    "#meta/aml-g12-pdm-dsp.cm",
     "#meta/aml-g12-pdm.cm",
     "#meta/aml-g12-tdm-dai.cm",
-    "#meta/aml-g12-tdm-dsp.cm",
     "#meta/aml-g12-tdm.cm",
     "#meta/aml_mipicsi.cm",
     "#meta/amlogic-display.cm",

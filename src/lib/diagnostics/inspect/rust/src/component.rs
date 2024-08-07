@@ -37,20 +37,19 @@ use super::stats::InspectorExt;
 use super::{health, Inspector, InspectorConfig};
 use fuchsia_sync::Mutex;
 use inspect_format::constants;
-use lazy_static::lazy_static;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 
-lazy_static! {
-  // The size with which the default inspector is initialized.
-  static ref INSPECTOR_SIZE : Mutex<usize> = Mutex::new(constants::DEFAULT_VMO_SIZE_BYTES);
+// The size with which the default inspector is initialized.
+static INSPECTOR_SIZE: Mutex<usize> = Mutex::new(constants::DEFAULT_VMO_SIZE_BYTES);
 
-  // The component-level inspector.  We probably want to use this inspector across components where
-  // practical.
-  static ref INSPECTOR: Inspector = Inspector::new(InspectorConfig::default().size(*INSPECTOR_SIZE.lock()));
+// The component-level inspector.  We probably want to use this inspector across components where
+// practical.
+static INSPECTOR: LazyLock<Inspector> =
+    LazyLock::new(|| Inspector::new(InspectorConfig::default().size(*INSPECTOR_SIZE.lock())));
 
-  // Health node based on the global inspector from `inspector()`.
-  static ref HEALTH: Arc<Mutex<health::Node>> = Arc::new(Mutex::new(health::Node::new(INSPECTOR.root())));
-}
+// Health node based on the global inspector from `inspector()`.
+static HEALTH: LazyLock<Arc<Mutex<health::Node>>> =
+    LazyLock::new(|| Arc::new(Mutex::new(health::Node::new(INSPECTOR.root()))));
 
 /// A thread-safe handle to a health reporter.  See `component::health()` for instructions on how
 /// to create one.
@@ -82,9 +81,7 @@ pub fn inspector() -> &'static Inspector {
 
 /// Initializes and returns the singleton component inspector.
 pub fn init_inspector_with_size(max_size: usize) -> &'static Inspector {
-    lazy_static::initialize(&INSPECTOR_SIZE);
     *INSPECTOR_SIZE.lock() = max_size;
-    lazy_static::initialize(&INSPECTOR);
     &INSPECTOR
 }
 

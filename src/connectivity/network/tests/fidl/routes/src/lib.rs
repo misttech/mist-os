@@ -89,16 +89,15 @@ async fn resolve_route<N: Netstack>(name: &str) {
         .create_netstack_realm::<N, _>(format!("{}_host", name))
         .expect("failed to create client realm");
 
-    let host_stack = host
-        .connect_to_protocol::<fidl_fuchsia_net_stack::StackMarker>()
-        .expect("failed to connect to netstack");
-
     let host_ep = host.join_network(&net, "host").await.expect("host failed to join network");
     host_ep.add_address_and_subnet_route(HOST_IP_V4).await.expect("configure address");
-    let _host_address_state_provider = interfaces::add_subnet_address_and_route_wait_assigned(
-        &host_ep,
+    let _host_address_state_provider = interfaces::add_address_wait_assigned(
+        host_ep.control(),
         HOST_IP_V6,
-        fidl_fuchsia_net_interfaces_admin::AddressParameters::default(),
+        fidl_fuchsia_net_interfaces_admin::AddressParameters {
+            add_subnet_route: Some(true),
+            ..Default::default()
+        },
     )
     .await
     .expect("add subnet address and route");
@@ -118,10 +117,13 @@ async fn resolve_route<N: Netstack>(name: &str) {
         .await
         .expect("gateway failed to join network");
     gateway_ep.add_address_and_subnet_route(GATEWAY_IP_V4).await.expect("configure address");
-    let _gateway_address_state_provider = interfaces::add_subnet_address_and_route_wait_assigned(
-        &gateway_ep,
+    let _gateway_address_state_provider = interfaces::add_address_wait_assigned(
+        gateway_ep.control(),
         GATEWAY_IP_V6,
-        fidl_fuchsia_net_interfaces_admin::AddressParameters::default(),
+        fidl_fuchsia_net_interfaces_admin::AddressParameters {
+            add_subnet_route: Some(true),
+            ..Default::default()
+        },
     )
     .await
     .expect("add subnet address and route");
@@ -143,45 +145,38 @@ async fn resolve_route<N: Netstack>(name: &str) {
     };
 
     let interface_id = host_ep.id();
-    let host_stack = &host_stack;
 
     let do_test = |gateway: fidl_fuchsia_net::IpAddress,
                    unspecified: fidl_fuchsia_net::IpAddress,
                    public_ip: fidl_fuchsia_net::IpAddress,
-                   source_address: fidl_fuchsia_net::IpAddress| async move {
-        let gateway_node = fidl_fuchsia_net_routes::Destination {
-            address: Some(gateway),
-            mac: Some(GATEWAY_MAC),
-            interface_id: Some(interface_id),
-            source_address: Some(source_address),
-            ..Default::default()
-        };
+                   source_address: fidl_fuchsia_net::IpAddress| {
+        let host_ep = &host_ep;
+        async move {
+            let gateway_node = fidl_fuchsia_net_routes::Destination {
+                address: Some(gateway),
+                mac: Some(GATEWAY_MAC),
+                interface_id: Some(interface_id),
+                source_address: Some(source_address),
+                ..Default::default()
+            };
 
-        // Start asking for a route for something that is directly accessible on the
-        // network.
-        let resolved = resolve(routes, gateway).await;
-        assert_eq!(resolved, fidl_fuchsia_net_routes::Resolved::Direct(gateway_node.clone()));
-        // Fails if route unreachable.
-        resolve_fails(public_ip).await;
+            // Start asking for a route for something that is directly accessible on the
+            // network.
+            let resolved = resolve(routes, gateway).await;
+            assert_eq!(resolved, fidl_fuchsia_net_routes::Resolved::Direct(gateway_node.clone()));
+            // Fails if route unreachable.
+            resolve_fails(public_ip).await;
 
-        // Install a default route and try to resolve through the gateway.
-        let () = host_stack
-            .add_forwarding_entry(&fidl_fuchsia_net_stack::ForwardingEntry {
-                subnet: fidl_fuchsia_net::Subnet { addr: unspecified, prefix_len: 0 },
-                device_id: interface_id,
-                next_hop: Some(Box::new(gateway)),
-                metric: 100,
-            })
-            .await
-            .expect("call add_route")
-            .expect("add route");
+            // Install a default route and try to resolve through the gateway.
+            host_ep.add_default_route(gateway).await.expect("add default route");
 
-        // Resolve a public IP again and check that we get the gateway response.
-        let resolved = resolve(routes, public_ip).await;
-        assert_eq!(resolved, fidl_fuchsia_net_routes::Resolved::Gateway(gateway_node.clone()));
-        // And that the unspecified address resolves to the gateway node as well.
-        let resolved = resolve(routes, unspecified).await;
-        assert_eq!(resolved, fidl_fuchsia_net_routes::Resolved::Gateway(gateway_node));
+            // Resolve a public IP again and check that we get the gateway response.
+            let resolved = resolve(routes, public_ip).await;
+            assert_eq!(resolved, fidl_fuchsia_net_routes::Resolved::Gateway(gateway_node.clone()));
+            // And that the unspecified address resolves to the gateway node as well.
+            let resolved = resolve(routes, unspecified).await;
+            assert_eq!(resolved, fidl_fuchsia_net_routes::Resolved::Gateway(gateway_node));
+        }
     };
 
     // Test the peer unreachable case before we apply NUD flake workaround.
@@ -207,10 +202,6 @@ async fn resolve_default_route_while_dhcp_is_running<N: Netstack>(name: &str) {
 
     // Configure a host.
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("failed to create client realm");
-
-    let stack = realm
-        .connect_to_protocol::<fidl_fuchsia_net_stack::StackMarker>()
-        .expect("failed to connect to netstack");
 
     let ep = realm.join_network(&net, "host").await.expect("host failed to join network");
     ep.start_dhcp::<InStack>().await.expect("failed to start DHCP");
@@ -256,16 +247,7 @@ async fn resolve_default_route_while_dhcp_is_running<N: Netstack>(name: &str) {
         .expect("add_entry error");
 
     // Install a default route and try to resolve through the gateway.
-    let () = stack
-        .add_forwarding_entry(&fidl_fuchsia_net_stack::ForwardingEntry {
-            subnet: fidl_fuchsia_net::Subnet { addr: UNSPECIFIED_IP, prefix_len: 0 },
-            device_id: ep.id(),
-            next_hop: Some(Box::new(GATEWAY_ADDR)),
-            metric: 100,
-        })
-        .await
-        .expect("call add_route")
-        .expect("add route");
+    ep.add_default_route(GATEWAY_ADDR).await.expect("add default route");
 
     let resolved = routes
         .resolve(&UNSPECIFIED_IP)
@@ -311,19 +293,7 @@ async fn resolve_fails_with_no_src_address<N: Netstack, I: Ip>(name: &str) {
     const REMOTE_MAC: fidl_fuchsia_net::MacAddress = fidl_mac!("02:01:02:03:04:05");
 
     // Install a route to the remote.
-    let stack = realm
-        .connect_to_protocol::<fidl_fuchsia_net_stack::StackMarker>()
-        .expect("failed to connect to netstack");
-    let () = stack
-        .add_forwarding_entry(&fidl_fuchsia_net_stack::ForwardingEntry {
-            subnet,
-            device_id: interface.id(),
-            next_hop: None,
-            metric: 100,
-        })
-        .await
-        .expect("call add_route")
-        .expect("add route");
+    interface.add_subnet_route(subnet).await.expect("add subnet route");
 
     // Configure the remote as a neighbor.
     let neigh = realm

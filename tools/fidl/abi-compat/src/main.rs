@@ -6,10 +6,13 @@ use std::fs::File;
 use std::io::{stderr, Write};
 use std::path::PathBuf;
 use std::process::ExitCode;
+use std::rc::Rc;
 
 use anyhow::{Context, Result};
 use argh::FromArgs;
-use compare::CompatibilityProblems;
+use compare::{AbiSurface, CompatibilityProblems};
+use flyweights::FlyStr;
+use itertools::Itertools;
 use maplit as _;
 
 mod compare;
@@ -19,14 +22,6 @@ mod ir;
 /// Evaluate ABI compatibility between two Fuchsia platform versions.
 #[derive(FromArgs)]
 struct Args {
-    /// path to a JSON file representing the platform version used by an external component.
-    #[argh(option)]
-    external: PathBuf,
-
-    /// path to a JSON file representing the platform version used by the platform.
-    #[argh(option)]
-    platform: PathBuf,
-
     /// path to write a report to.
     #[argh(option)]
     out: PathBuf,
@@ -38,6 +33,10 @@ struct Args {
     /// follow protocol endpoints to evaluate tear-off protocols and their associated types.
     #[argh(switch, short = 't')]
     tear_off: bool,
+
+    /// paths to a JSON files with ABI surface definitions.
+    #[argh(positional)]
+    json: Vec<PathBuf>,
 }
 
 pub struct Configuration {
@@ -56,27 +55,77 @@ impl Default for Configuration {
     }
 }
 
-fn compare_platforms(
-    external: PathBuf,
-    platform: PathBuf,
-    config: &Configuration,
-) -> Result<CompatibilityProblems> {
-    let external = ir::IR::load(&external).context(format!("loading {external:?}"))?;
-    let platform = ir::IR::load(&platform).context(format!("loading {platform:?}"))?;
+#[derive(Clone, Copy, Debug, PartialOrd, PartialEq, Eq, Hash)]
+pub enum Scope {
+    Platform,
+    External,
+}
 
-    let external = convert::convert_platform(external).context("processing external IR")?;
-    let platform = convert::convert_platform(platform).context("processing platform IR")?;
+#[derive(Clone, Debug, PartialOrd, PartialEq, Eq, Hash)]
+pub struct Version {
+    scope: Scope,
+    version: FlyStr,
+}
 
-    compare::compatible(&external, &platform, &config).context("comparing external and platform IR")
+impl Version {
+    pub fn new(version: &str) -> Self {
+        Self::from_api_levels(version.split(","))
+    }
+    pub fn from_api_levels(api_levels: impl IntoIterator<Item = impl AsRef<str>>) -> Self {
+        let api_levels: Vec<_> = api_levels.into_iter().collect();
+        assert!(!api_levels.is_empty());
+        if api_levels.len() == 1 {
+            let api_level = api_levels[0].as_ref();
+            assert!(api_level == "NEXT" || !api_level.chars().any(|c| !c.is_digit(10)),
+                "External API levels must either be NEXT or a single decimal integer. Got: {api_level:?}");
+            Self { scope: Scope::External, version: FlyStr::new(api_level) }
+        } else {
+            assert!(
+                api_levels.iter().any(|l| l.as_ref() == "HEAD"),
+                "Platform API levels must include HEAD."
+            );
+            Self {
+                scope: Scope::Platform,
+                version: FlyStr::new(api_levels.iter().map(|s| s.as_ref()).join(",")),
+            }
+        }
+    }
+    pub fn scope(&self) -> Scope {
+        self.scope
+    }
+    pub fn api_level(&self) -> &str {
+        self.version.as_str()
+    }
 }
 
 fn main() -> Result<ExitCode> {
     let args: Args = argh::from_env();
     let config = Configuration::new(&args);
 
-    let mut out = File::create(args.out).unwrap();
+    let irs: Result<Vec<Rc<ir::IR>>> = args
+        .json
+        .iter()
+        .map(|path| ir::IR::load(path).context(format!("loading {path:?}")))
+        .collect();
+    let irs = irs?;
 
-    let problems = compare_platforms(args.external, args.platform, &config).unwrap();
+    let abi_surfaces: Result<Vec<AbiSurface>> = irs
+        .into_iter()
+        .map(|ir: Rc<ir::IR>| -> Result<AbiSurface> {
+            convert::convert_abi_surface(ir).context(format!("converting IR"))
+        })
+        .collect();
+    let abi_surfaces = abi_surfaces?;
+
+    let mut problems = CompatibilityProblems::default();
+
+    for (i, first) in abi_surfaces.iter().enumerate() {
+        for second in abi_surfaces.iter().skip(i + 1) {
+            problems.append(compare::compatible([first, second], &config)?);
+        }
+    }
+
+    let mut out = File::create(args.out).unwrap();
 
     let (errors, warnings) = problems.into_errors_and_warnings();
 

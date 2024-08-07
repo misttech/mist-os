@@ -27,12 +27,6 @@ class InstrumentationData {
     kSancovVmo,
     kSancovCountsVmo,
 
-    // The kernel proper doesn't care what the VMOs from physboot handoff are,
-    // it just publishes them as is.  However, the current userboot protocol
-    // requires that the fixed maximum number of them be known here.
-    kPhysFirst,
-    kPhysLast = kPhysFirst + 2,
-
     kVmoCount,
   };
 };

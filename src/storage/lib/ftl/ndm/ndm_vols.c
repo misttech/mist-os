@@ -2,7 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "ndmp.h"
+#include <stddef.h>
+
+#include "src/storage/lib/ftl/ftl.h"
+#include "src/storage/lib/ftl/ftl_private.h"
+#include "src/storage/lib/ftl/ndm/ndmp.h"
 
 // Global Function Definitions
 

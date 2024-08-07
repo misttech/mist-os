@@ -15,7 +15,6 @@ use async_trait::async_trait;
 use const_unwrap::const_unwrap_option;
 use fidl_fuchsia_net_ext::{self as fnet_ext, IntoExt as _, IpExt as _};
 use fidl_fuchsia_net_routes_ext::{self as fnet_routes_ext};
-use fidl_fuchsia_net_stack_ext::FidlReturn as _;
 use fuchsia_async::net::{DatagramSocket, UdpSocket};
 use fuchsia_async::{self as fasync, DurationExt, TimeoutExt as _};
 use fuchsia_zircon::{self as zx, AsHandleRef as _};
@@ -70,9 +69,8 @@ use {
     fidl_fuchsia_net_interfaces as fnet_interfaces,
     fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
     fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_net_routes as fnet_routes,
-    fidl_fuchsia_net_stack as fnet_stack, fidl_fuchsia_net_tun as fnet_tun,
-    fidl_fuchsia_posix as fposix, fidl_fuchsia_posix_socket as fposix_socket,
-    fidl_fuchsia_posix_socket_packet as fpacket,
+    fidl_fuchsia_net_tun as fnet_tun, fidl_fuchsia_posix as fposix,
+    fidl_fuchsia_posix_socket as fposix_socket, fidl_fuchsia_posix_socket_packet as fpacket,
 };
 
 async fn run_udp_socket_test(
@@ -1925,7 +1923,6 @@ async fn install_ip_device(
     addrs: impl IntoIterator<Item = fnet::Subnet>,
 ) -> (u64, fnet_interfaces_ext::admin::Control, fnet_interfaces_admin::DeviceControlProxy) {
     let installer = realm.connect_to_protocol::<fnet_interfaces_admin::InstallerMarker>().unwrap();
-    let stack = realm.connect_to_protocol::<fnet_stack::StackMarker>().unwrap();
 
     let port_id = port.get_info().await.expect("get port info").id.expect("missing port id");
     let device = {
@@ -1966,32 +1963,20 @@ async fn install_ip_device(
             let () = control
                 .add_address(
                     &subnet,
-                    &fnet_interfaces_admin::AddressParameters::default(),
+                    &fnet_interfaces_admin::AddressParameters {
+                        add_subnet_route: Some(true),
+                        ..Default::default()
+                    },
                     server_end,
                 )
                 .expect("add address");
 
             // Wait for the address to be assigned.
-            let wait_assignment_fut = fnet_interfaces_ext::admin::wait_assignment_state(
+            fnet_interfaces_ext::admin::wait_assignment_state(
                 fnet_interfaces_ext::admin::assignment_state_stream(address_state_provider),
                 fnet_interfaces::AddressAssignmentState::Assigned,
             )
-            .map(|r| r.expect("wait assignment state"));
-
-            // NB: add_address above does NOT create a subnet route.
-            let add_forwarding_entry_fut = stack
-                .add_forwarding_entry(&fnet_stack::ForwardingEntry {
-                    subnet: fnet_ext::apply_subnet_mask(subnet.clone()),
-                    device_id: id,
-                    next_hop: None,
-                    metric: 0,
-                })
-                .map(move |r| {
-                    r.squash_result().unwrap_or_else(|e| {
-                        panic!("failed to add interface address {:?}: {:?}", subnet, e)
-                    })
-                });
-            futures::future::join(wait_assignment_fut, add_forwarding_entry_fut).map(|((), ())| ())
+            .map(|r| r.expect("wait assignment state"))
         })
         .await;
     (id, control, device_control)
@@ -4629,4 +4614,104 @@ async fn broadcast_send<N: Netstack, I: TestIpExt>(name: &str) {
         .await
         .expect("recv_from failed");
     assert_eq!(size, test_packet.len());
+}
+
+#[netstack_test]
+#[variant(N, Netstack)]
+#[variant(I, Ip)]
+async fn tos_tclass_send<
+    N: Netstack,
+    I: TestIpExt + packet_formats::ethernet::EthernetIpExt + packet_formats::ip::IpExt,
+>(
+    name: &str,
+) {
+    let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
+    let client = sandbox
+        .create_netstack_realm::<N, _>(format!("{name}_client"))
+        .expect("failed to create client realm");
+
+    let net = sandbox.create_network(format!("net0")).await.expect("failed to create network");
+    let iface = client.join_network(&net, format!("if0")).await.expect("failed to join network");
+    iface.add_address_and_subnet_route(I::CLIENT_SUBNET.clone()).await.expect("failed to set ip");
+    let receiver = net.create_fake_endpoint().expect("failed to create endpoint");
+
+    // Add a neighbor entry to ensure the packet is sent without having to resolve MAC.
+    client
+        .add_neighbor_entry(iface.id(), I::SERVER_SUBNET.addr.clone(), SERVER_MAC)
+        .await
+        .expect("add_neighbor_entry");
+
+    let socket = client
+        .datagram_socket(I::DOMAIN, fposix_socket::DatagramSocketProtocol::Udp)
+        .await
+        .expect("failed to create socket");
+
+    let fnet_ext::IpAddress(dst_ip) = fnet_ext::IpAddress::from(I::SERVER_SUBNET.addr);
+    let dst_addr = std::net::SocketAddr::new(dst_ip, 3513);
+
+    let socket: std::net::UdpSocket = socket.into();
+    let traffic_class = 0xa7;
+    let r = match I::VERSION {
+        IpVersion::V4 => unsafe {
+            let v = traffic_class as libc::c_int;
+            libc::setsockopt(
+                std::os::fd::AsRawFd::as_raw_fd(&socket),
+                libc::IPPROTO_IP,
+                libc::IP_TOS,
+                &v as *const libc::c_int as *const libc::c_void,
+                std::mem::size_of_val(&v) as u32,
+            )
+        },
+        IpVersion::V6 => unsafe {
+            let v = traffic_class as libc::c_int;
+            libc::setsockopt(
+                std::os::fd::AsRawFd::as_raw_fd(&socket),
+                libc::IPPROTO_IPV6,
+                libc::IPV6_TCLASS,
+                &v as *const libc::c_int as *const libc::c_void,
+                std::mem::size_of_val(&v) as u32,
+            )
+        },
+    };
+    assert_eq!(r, 0, "Failed to set TOS/TCLASS option");
+
+    let test_packet = [1, 2, 3, 4, 5];
+    assert_eq!(
+        socket.send_to(&test_packet, &dst_addr).expect("failed to send multicast packet"),
+        test_packet.len()
+    );
+
+    // Check that the packet is sent to the network.
+    std::pin::pin!(receiver.frame_stream().map(|r| r.expect("failed to read frame")).filter_map(
+        |(data, dropped)| async move {
+            assert_eq!(dropped, 0);
+            let (mut body, _src_mac, _dst_mac, ethertype) =
+                packet_formats::testutil::parse_ethernet_frame(
+                    &data,
+                    EthernetFrameLengthCheck::NoCheck,
+                )
+                .expect("Failed to parse ethernet packet");
+            if ethertype != Some(I::ETHER_TYPE) {
+                return None;
+            }
+
+            let ip_packet = <I::Packet<_> as packet::ParsablePacket<_, _>>::parse(&mut body, ())
+                .expect("Failed to parse IP packet");
+            use packet_formats::ip::IpPacket;
+            if ip_packet.proto() != IpProto::Udp.into() {
+                return None;
+            }
+
+            let received_traffic_class = ip_packet.dscp_and_ecn().raw();
+            assert_eq!(traffic_class, received_traffic_class);
+
+            Some(())
+        }
+    ))
+    .next()
+    .on_timeout(ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT.after_now(), || {
+        panic!("timed out waiting for the UDP packet packet")
+    })
+    .await
+    .expect("didn't receive the packet before end of the stream");
 }

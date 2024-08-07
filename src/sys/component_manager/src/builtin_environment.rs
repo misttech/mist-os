@@ -49,7 +49,9 @@ use crate::sandbox_util::LaunchTaskOnReceive;
 use ::diagnostics::lifecycle::ComponentLifecycleTimeStats;
 use ::diagnostics::task_metrics::ComponentTreeStats;
 use ::routing::bedrock::structured_dict::ComponentInput;
-use ::routing::capability_source::{CapabilitySource, ComponentCapability, InternalCapability};
+use ::routing::capability_source::{
+    BuiltinSource, CapabilitySource, ComponentCapability, InternalCapability, NamespaceSource,
+};
 use ::routing::component_instance::{ComponentInstanceInterface, TopInstanceInterface};
 use ::routing::environment::{DebugRegistry, RunnerRegistry};
 use ::routing::policy::GlobalPolicyChecker;
@@ -410,8 +412,9 @@ impl RootComponentInputBuilder {
             return;
         }
 
-        let capability_source =
-            CapabilitySource::Builtin { capability: InternalCapability::Protocol(name.clone()) };
+        let capability_source = CapabilitySource::Builtin(BuiltinSource {
+            capability: InternalCapability::Protocol(name.clone()),
+        });
 
         let launch = LaunchTaskOnReceive::new(
             capability_source,
@@ -434,9 +437,9 @@ impl RootComponentInputBuilder {
 
     fn add_namespace_protocol(&mut self, protocol: &cm_rust::ProtocolDecl) {
         let path = protocol.source_path.as_ref().unwrap().to_string();
-        let capability_source = CapabilitySource::Namespace {
+        let capability_source = CapabilitySource::Namespace(NamespaceSource {
             capability: ComponentCapability::Protocol(protocol.clone()),
-        };
+        });
         let launch = LaunchTaskOnReceive::new(
             capability_source,
             self.top_instance.task_group().as_weak(),

@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//build/dist/component_manifest_resources.gni")
 import("//build/rust/rustc_binary.gni")
 import("//src/storage/fshost/fshost.gni")
 

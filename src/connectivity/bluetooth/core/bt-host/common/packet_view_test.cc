@@ -9,9 +9,8 @@
 #include <gtest/gtest.h>
 
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/byte_buffer.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/macros.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/test_helpers.h"
-
-#pragma clang diagnostic ignored "-Wzero-length-array"
 
 namespace bt {
 namespace {
@@ -21,12 +20,15 @@ struct TestHeader {
   uint8_t field8;
 } __attribute__((packed));
 
+PW_MODIFY_DIAGNOSTICS_PUSH();
+PW_MODIFY_DIAGNOSTIC_CLANG(ignored, "-Wzero-length-array");
 struct TestPayload {
   uint8_t arg0;
   uint16_t arg1;
   uint8_t arg2[2];
   uint8_t arg3[0];
 } __attribute__((packed));
+PW_MODIFY_DIAGNOSTICS_POP();
 
 TEST(PacketViewTest, EmptyPayload) {
   constexpr size_t kBufferSize = sizeof(TestHeader);

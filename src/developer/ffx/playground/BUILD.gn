@@ -35,6 +35,7 @@ rustc_library("playground") {
     "//third_party/rust_crates:nom",
     "//third_party/rust_crates:nom_locate",
     "//third_party/rust_crates:num",
+    "//third_party/rust_crates:thiserror",
   ]
   test_deps = [
     ":test_fidl",

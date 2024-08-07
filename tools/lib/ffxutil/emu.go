@@ -26,6 +26,7 @@ type EmuTools struct {
 	Emulator string
 	FVM      string
 	ZBI      string
+	UEFI     string
 }
 
 // SDKManifest contains the atoms that are part of the "SDK" which ffx looks up to find
@@ -73,6 +74,9 @@ func (f *FFXInstance) EmuStartConsole(ctx context.Context, sdkRoot, name string,
 	}
 	if tools.ZBI != "" {
 		toolsToSymlink[tools.ZBI] = filepath.Join(ffxDir, "zbi")
+	}
+	if tools.UEFI != "" {
+		toolsToSymlink[tools.UEFI] = filepath.Join(ffxDir, "uefi_internal")
 	}
 	for oldname, newname := range toolsToSymlink {
 		if oldname == newname {

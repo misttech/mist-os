@@ -4,7 +4,7 @@
 
 #![cfg(test)]
 
-use fidl::endpoints::{ControlHandle as _, Responder as _};
+use fidl::endpoints::{ControlHandle as _, DiscoverableProtocolMarker as _, Responder as _};
 use fuchsia_zircon::{self as zx, HandleBased as _};
 use futures::stream::StreamExt as _;
 use tcp_stream_ext::TcpStreamExt as _;
@@ -26,7 +26,7 @@ fn with_tcp_stream(f: impl FnOnce(std::net::TcpStream) -> ()) {
                     }
                     fposix_socket::StreamSocketRequest::Query { responder } => {
                         let () = responder
-                            .send(fposix_socket::STREAM_SOCKET_PROTOCOL_NAME.as_bytes())
+                            .send(fposix_socket::StreamSocketMarker::PROTOCOL_NAME.as_bytes())
                             .expect("send Query response");
                     }
                     fposix_socket::StreamSocketRequest::Describe { responder } => {

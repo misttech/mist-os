@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::anyhow;
 use fidl_codec::{library as lib, Value as FidlValue};
 use futures::future::BoxFuture;
 use num::rational::BigRational;
@@ -11,8 +10,9 @@ use num::BigInt;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::sync::Arc;
+use thiserror::Error;
 
-use crate::error::{Error, Result};
+use crate::error::Result;
 
 mod in_use_handle;
 mod iterator;
@@ -20,8 +20,78 @@ mod iterator;
 pub use in_use_handle::InUseHandle;
 pub use iterator::{RangeCursor, ReplayableIterator, ReplayableIteratorCursor};
 
-macro_rules! error {
-    ($($data:tt)*) => { Error::from(anyhow!($($data)*)) };
+/// Errors occurring during various value conversions.
+#[derive(Error, Debug, Clone)]
+pub enum ValueError {
+    #[error("Type conversion requires {0} to have a member {1}")]
+    MemberMissing(String, String),
+    #[error("Struct coerced to union must have exactly one member")]
+    StructToUnionWrongNumberOfMembers,
+    #[error(
+        "Object used in FIDL must be used as a struct, table, or union (Cannot convert {0} to {1})"
+    )]
+    BadObjectConversion(String, String),
+    #[error("Value of type {0} is encoded as bits but isn't bits")]
+    BadBitsType(String),
+    #[error("Value of type {0} is encoded as an enum but isn't an enum")]
+    BadEnumType(String),
+    #[error("Value of type {0} is encoded as a union but isn't a union")]
+    BadUnionType(String),
+    #[error("Union of type {0} has no member {1}")]
+    BadUnionMember(String, String),
+    #[error("List too short to encode as struct '{0}'")]
+    ListStructTooShort(String),
+    #[error("Cannot convert list to table because cannot encode a value at ordinal {0}")]
+    TableFromListOrdinalMissing(u64),
+    #[error("Cannot encode list as type {0:?}")]
+    TypeFromList(lib::Type),
+    #[error("Overflow converting to {0:?}")]
+    ConversionOverflow(lib::Type),
+    #[error("Cannot convert type to server for {0}")]
+    ServerConversionFailed(String),
+    #[error("Cannot convert type to client for {0}")]
+    ClientConversionFailed(String),
+    #[error("Cannot convert type to socket")]
+    SocketConversionFailed,
+    #[error("Cannot convert number to {0:?}")]
+    NumberConversionFailed(lib::Type),
+    #[error("Cannot convert invocable to {0:?}")]
+    InvocableConversionFailed(lib::Type),
+    #[error("Cannot convert iterator to {0:?}")]
+    IteratorConversionFailed(lib::Type),
+    #[error("Could not resolve FIDL identifier '{0}': {1}")]
+    FIDLLookupFailed(String, Arc<fidl_codec::Error>),
+    #[error("Cannot convert to FIDL type")]
+    MiscConversionFailed,
+    #[error("Handle is not a channel")]
+    NotChannel,
+    #[error("Handle is a {got_ty} for {got_proto} (need {expect_ty} for {expect_proto})")]
+    EndpointMismatch {
+        got_ty: in_use_handle::EndpointType,
+        got_proto: String,
+        expect_ty: in_use_handle::EndpointType,
+        expect_proto: String,
+    },
+    #[error("Handle is a {0}, (need {})", (.0).opposite())]
+    EndpointTypeMismatch(in_use_handle::EndpointType),
+    #[error("Handle is a {0} for {1}, (need {2})")]
+    EndpointProtocolMismatch(in_use_handle::EndpointType, String, String),
+    #[error("Could not determine protocol for handle")]
+    UndeterminedProtocol,
+    #[error("Handle is not a {0}")]
+    NotAnEndpoint(in_use_handle::EndpointType),
+    #[error("Handle is closed")]
+    HandleClosed,
+    #[error("Channel is closed")]
+    ChannelClosed,
+    #[error("Handle is not a socket")]
+    NotSocket,
+    #[error("Not enough type information to use handle as channel")]
+    ChannelTypeUndetermined,
+    #[error("Raw channel {0} are unimplemented")]
+    RawChannelUnimplemented(&'static str),
+    #[error("Handle type is too ambiguous to identify")]
+    NoHandleID,
 }
 
 /// Combines the [`lib::Type`] object from the FIDL codec with the [`lib::LookupResult`]
@@ -367,15 +437,17 @@ impl ValueExt for Value {
             Value::F64(a) => FidlValue::F64(a),
             Value::String(a) => FidlValue::String(a),
             Value::Object(mut a) => match ty {
-                lib::Type::Identifier { name, nullable: _ } => match ns.lookup(name)? {
+                lib::Type::Identifier { name, nullable: _ } => match ns
+                    .lookup(name)
+                    .map_err(|e| ValueError::FIDLLookupFailed(name.clone(), Arc::new(e)))?
+                {
                     lib::LookupResult::Struct(st) => FidlValue::Object(
                         a.into_iter()
                             .map(|(key, val)| {
-                                let member = st
-                                    .members
-                                    .iter()
-                                    .find(|x| x.name == key)
-                                    .ok_or(error!("{name} does not have a member {key}"))?;
+                                let member =
+                                    st.members.iter().find(|x| x.name == key).ok_or_else(|| {
+                                        ValueError::MemberMissing(name.clone(), key.clone())
+                                    })?;
                                 Ok((key, val.to_fidl_value(ns, &member.ty)?))
                             })
                             .collect::<Result<_>>()?,
@@ -383,30 +455,26 @@ impl ValueExt for Value {
                     lib::LookupResult::Table(tbl) => FidlValue::Object(
                         a.into_iter()
                             .map(|(key, val)| {
-                                let (_, member) = tbl
-                                    .members
-                                    .iter()
-                                    .find(|(_, x)| x.name == key)
-                                    .ok_or(error!("{name} does not have a member {key}"))?;
+                                let (_, member) =
+                                    tbl.members.iter().find(|(_, x)| x.name == key).ok_or_else(
+                                        || ValueError::MemberMissing(name.clone(), key.clone()),
+                                    )?;
                                 Ok((key, val.to_fidl_value(ns, &member.ty)?))
                             })
                             .collect::<Result<_>>()?,
                     ),
                     lib::LookupResult::Union(un) => {
                         let item = a.pop();
-                        let (key, value) =
-                            if let Some((key, value)) = item.filter(|_| a.is_empty()) {
-                                (key, value)
-                            } else {
-                                return Err(error!(
-                                    "Struct coerced to union must have exactly one member"
-                                ));
-                            };
-                        let (_, member) = un
-                            .members
-                            .iter()
-                            .find(|(_, x)| x.name == key)
-                            .ok_or(error!("{name} does not have a member {key}"))?;
+                        let (key, value) = if let Some((key, value)) = item.filter(|_| a.is_empty())
+                        {
+                            (key, value)
+                        } else {
+                            return Err(ValueError::StructToUnionWrongNumberOfMembers.into());
+                        };
+                        let (_, member) =
+                            un.members.iter().find(|(_, x)| x.name == key).ok_or_else(|| {
+                                ValueError::MemberMissing(name.clone(), key.clone())
+                            })?;
                         FidlValue::Union(
                             name.clone(),
                             key,
@@ -414,47 +482,66 @@ impl ValueExt for Value {
                         )
                     }
                     other => {
-                        return Err(error!(
-                            "Object used in FIDL must be used as a struct, table, or union (Cannot convert {a:?} to {})",
-                            LookupResultOrType::LookupResult(other)
-                        ))
+                        return Err(ValueError::BadObjectConversion(
+                            format!("{}", Value::Object(a)),
+                            format!("{}", LookupResultOrType::LookupResult(other)),
+                        )
+                        .into())
                     }
                 },
-                other => return Err(error!("Cannot convert object to type {other:?}")),
+                other => {
+                    return Err(ValueError::BadObjectConversion(
+                        format!("{}", Value::Object(a)),
+                        format!("{:?}", other),
+                    )
+                    .into())
+                }
             },
             Value::Bits(a, b) => {
-                let lib::LookupResult::Bits(bits) = ns.lookup(&a)? else {
-                    return Err(error!("Value of type {a} is encoded as bits but isn't bits"));
+                let lib::LookupResult::Bits(bits) = ns
+                    .lookup(&a)
+                    .map_err(|e| ValueError::FIDLLookupFailed(a.clone(), Arc::new(e)))?
+                else {
+                    return Err(ValueError::BadBitsType(a).into());
                 };
                 FidlValue::Bits(a, Box::new(b.to_fidl_value(ns, &bits.ty)?))
             }
             Value::Enum(a, b) => {
-                let lib::LookupResult::Enum(en) = ns.lookup(&a)? else {
-                    return Err(error!(
-                        "Value of type {a} is encoded as an enum but isn't an enum"
-                    ));
+                let lib::LookupResult::Enum(en) = ns
+                    .lookup(&a)
+                    .map_err(|e| ValueError::FIDLLookupFailed(a.clone(), Arc::new(e)))?
+                else {
+                    return Err(ValueError::BadEnumType(a).into());
                 };
                 FidlValue::Enum(a, Box::new(b.to_fidl_value(ns, &en.ty)?))
             }
             Value::Union(a, b, c) => {
-                let lib::LookupResult::Union(union) = ns.lookup(&a)? else {
-                    return Err(error!(
-                        "Value of type {a} is encoded as a union but isn't a union"
-                    ));
+                let lib::LookupResult::Union(union) = ns
+                    .lookup(&a)
+                    .map_err(|e| ValueError::FIDLLookupFailed(a.clone(), Arc::new(e)))?
+                else {
+                    return Err(ValueError::BadUnionType(a).into());
                 };
                 for member in union.members.values() {
                     if member.name == b {
-                        return Ok(FidlValue::Union(a, b, Box::new(c.to_fidl_value(ns, &member.ty)?)));
+                        return Ok(FidlValue::Union(
+                            a,
+                            b,
+                            Box::new(c.to_fidl_value(ns, &member.ty)?),
+                        ));
                     }
                 }
 
-                return Err(error!("Union of type {a} has no member {b}"));
+                return Err(ValueError::BadUnionMember(a, b).into());
             }
             Value::List(a) => match ty {
-                lib::Type::Identifier { name, nullable: _ } => match ns.lookup(name)? {
+                lib::Type::Identifier { name, nullable: _ } => match ns
+                    .lookup(name)
+                    .map_err(|e| ValueError::FIDLLookupFailed(name.clone(), Arc::new(e)))?
+                {
                     lib::LookupResult::Struct(st) => {
                         if a.len() > st.members.len() {
-                            return Err(error!("List too short to encode as struct '{name}'"));
+                            return Err(ValueError::ListStructTooShort(name.clone()).into());
                         }
                         FidlValue::Object(
                             st.members
@@ -474,14 +561,19 @@ impl ValueExt for Value {
                                 if matches!(value, Value::Null) {
                                     continue;
                                 } else {
-                                    return Err(error!("Cannot convert list to table because cannot encode a value at ordinal {ordinal}"));
+                                    return Err(
+                                        ValueError::TableFromListOrdinalMissing(ordinal).into()
+                                    );
                                 }
                             };
-                            members.push((member.name.to_owned(), value.to_fidl_value(ns, &member.ty)?));
+                            members.push((
+                                member.name.to_owned(),
+                                value.to_fidl_value(ns, &member.ty)?,
+                            ));
                         }
                         FidlValue::Object(members)
                     }
-                    _ => return Err(error!("Cannot encode list as type {ty:?}")),
+                    _ => return Err(ValueError::TypeFromList(ty.clone()).into()),
                 },
                 lib::Type::Array(ty, _) => FidlValue::List(
                     a.into_iter().map(|x| x.to_fidl_value(ns, &*ty)).collect::<Result<_>>()?,
@@ -489,7 +581,7 @@ impl ValueExt for Value {
                 lib::Type::Vector { ty, .. } => FidlValue::List(
                     a.into_iter().map(|x| x.to_fidl_value(ns, ty)).collect::<Result<_>>()?,
                 ),
-                _ => return Err(error!("Cannot encode list as type {ty:?}")),
+                _ => return Err(ValueError::TypeFromList(ty.clone()).into()),
             },
             Value::ServerEnd(a, b) => FidlValue::ServerEnd(a, b),
             Value::ClientEnd(a, b) => FidlValue::ClientEnd(a, b),
@@ -556,40 +648,53 @@ impl PlaygroundValue {
             (LookupResultOrType::Type(ty), PlaygroundValue::TypeHinted(_, y)) => {
                 y.to_fidl_value(ns, &ty)
             }
-            (LookupResultOrType::Type(lib::Type::U8), PlaygroundValue::Num(x)) => {
-                x.to_u8().map(FidlValue::U8).ok_or(error!("Overflow converting to u8"))
-            }
-            (LookupResultOrType::Type(lib::Type::U16), PlaygroundValue::Num(x)) => {
-                x.to_u16().map(FidlValue::U16).ok_or(error!("Overflow converting to u16"))
-            }
-            (LookupResultOrType::Type(lib::Type::U32), PlaygroundValue::Num(x)) => {
-                x.to_u32().map(FidlValue::U32).ok_or(error!("Overflow converting to u32"))
-            }
-            (LookupResultOrType::Type(lib::Type::U64), PlaygroundValue::Num(x)) => {
-                x.to_u64().map(FidlValue::U64).ok_or(error!("Overflow converting to u64"))
-            }
-            (LookupResultOrType::Type(lib::Type::I8), PlaygroundValue::Num(x)) => {
-                x.to_i8().map(FidlValue::I8).ok_or(error!("Overflow converting to i8"))
-            }
-            (LookupResultOrType::Type(lib::Type::I16), PlaygroundValue::Num(x)) => {
-                x.to_i16().map(FidlValue::I16).ok_or(error!("Overflow converting to i16"))
-            }
-            (LookupResultOrType::Type(lib::Type::I32), PlaygroundValue::Num(x)) => {
-                x.to_i32().map(FidlValue::I32).ok_or(error!("Overflow converting to i32"))
-            }
-            (LookupResultOrType::Type(lib::Type::I64), PlaygroundValue::Num(x)) => {
-                x.to_i64().map(FidlValue::I64).ok_or(error!("Overflow converting to i64"))
-            }
-            (LookupResultOrType::Type(lib::Type::F32), PlaygroundValue::Num(x)) => {
-                x.to_f32().map(FidlValue::F32).ok_or(error!("Overflow converting to f32"))
-            }
-            (LookupResultOrType::Type(lib::Type::F64), PlaygroundValue::Num(x)) => {
-                x.to_f64().map(FidlValue::F64).ok_or(error!("Overflow converting to f64"))
-            }
+            (LookupResultOrType::Type(lib::Type::U8), PlaygroundValue::Num(x)) => x
+                .to_u8()
+                .map(FidlValue::U8)
+                .ok_or(ValueError::ConversionOverflow(lib::Type::U8).into()),
+            (LookupResultOrType::Type(lib::Type::U16), PlaygroundValue::Num(x)) => x
+                .to_u16()
+                .map(FidlValue::U16)
+                .ok_or(ValueError::ConversionOverflow(lib::Type::U16).into()),
+            (LookupResultOrType::Type(lib::Type::U32), PlaygroundValue::Num(x)) => x
+                .to_u32()
+                .map(FidlValue::U32)
+                .ok_or(ValueError::ConversionOverflow(lib::Type::U32).into()),
+            (LookupResultOrType::Type(lib::Type::U64), PlaygroundValue::Num(x)) => x
+                .to_u64()
+                .map(FidlValue::U64)
+                .ok_or(ValueError::ConversionOverflow(lib::Type::U64).into()),
+            (LookupResultOrType::Type(lib::Type::I8), PlaygroundValue::Num(x)) => x
+                .to_i8()
+                .map(FidlValue::I8)
+                .ok_or(ValueError::ConversionOverflow(lib::Type::I8).into()),
+            (LookupResultOrType::Type(lib::Type::I16), PlaygroundValue::Num(x)) => x
+                .to_i16()
+                .map(FidlValue::I16)
+                .ok_or(ValueError::ConversionOverflow(lib::Type::I16).into()),
+            (LookupResultOrType::Type(lib::Type::I32), PlaygroundValue::Num(x)) => x
+                .to_i32()
+                .map(FidlValue::I32)
+                .ok_or(ValueError::ConversionOverflow(lib::Type::I32).into()),
+            (LookupResultOrType::Type(lib::Type::I64), PlaygroundValue::Num(x)) => x
+                .to_i64()
+                .map(FidlValue::I64)
+                .ok_or(ValueError::ConversionOverflow(lib::Type::I64).into()),
+            (LookupResultOrType::Type(lib::Type::F32), PlaygroundValue::Num(x)) => x
+                .to_f32()
+                .map(FidlValue::F32)
+                .ok_or(ValueError::ConversionOverflow(lib::Type::F32).into()),
+            (LookupResultOrType::Type(lib::Type::F64), PlaygroundValue::Num(x)) => x
+                .to_f64()
+                .map(FidlValue::F64)
+                .ok_or(ValueError::ConversionOverflow(lib::Type::F64).into()),
             (LookupResultOrType::Type(lib::Type::Identifier { name, .. }), v) => v
                 .to_fidl_value_by_type_or_lookup(
                     ns,
-                    LookupResultOrType::LookupResult(ns.lookup(&name)?),
+                    LookupResultOrType::LookupResult(
+                        ns.lookup(&name)
+                            .map_err(|e| ValueError::FIDLLookupFailed(name.clone(), Arc::new(e)))?,
+                    ),
                 ),
             (
                 LookupResultOrType::LookupResult(lib::LookupResult::Bits(lib::Bits { ty, .. })),
@@ -605,7 +710,7 @@ impl PlaygroundValue {
             ) => h
                 .take_server(Some(&identifier))
                 .map(|x| FidlValue::ServerEnd(x, identifier.to_owned()))
-                .map_err(|_| error!("Cannot conver type to server for {identifier}")),
+                .map_err(|_| ValueError::ServerConversionFailed(identifier.clone()).into()),
             (
                 LookupResultOrType::LookupResult(lib::LookupResult::Protocol(lib::Protocol {
                     name,
@@ -615,7 +720,7 @@ impl PlaygroundValue {
             ) => h
                 .take_client(Some(&name))
                 .map(|x| FidlValue::ClientEnd(x, name.to_owned()))
-                .map_err(|_| error!("Cannot conver type to client for {name}")),
+                .map_err(|_| ValueError::ClientConversionFailed(name.clone()).into()),
             (
                 LookupResultOrType::Type(lib::Type::Handle {
                     object_type: fidl::ObjectType::SOCKET,
@@ -623,17 +728,17 @@ impl PlaygroundValue {
                     nullable: _,
                 }),
                 PlaygroundValue::InUseHandle(h),
-            ) => h.take_socket().map_err(|_| error!("Cannot convert type to socket")),
+            ) => h.take_socket().map_err(|_| ValueError::SocketConversionFailed.into()),
             (LookupResultOrType::Type(ty), PlaygroundValue::Invocable(_)) => {
-                Err(error!("Cannot convert invocable to {ty:?}"))
+                Err(ValueError::InvocableConversionFailed(ty).into())
             }
             (LookupResultOrType::Type(ty), PlaygroundValue::Num(_)) => {
-                Err(error!("Cannot convert number to {ty:?}"))
+                Err(ValueError::NumberConversionFailed(ty).into())
             }
             (LookupResultOrType::Type(ty), PlaygroundValue::Iterator(_)) => {
-                Err(error!("Cannot convert iterator to {ty:?}"))
+                Err(ValueError::IteratorConversionFailed(ty).into())
             }
-            _ => Err(error!("Cannot convert to FIDL type")),
+            _ => Err(ValueError::MiscConversionFailed.into()),
         }
     }
 

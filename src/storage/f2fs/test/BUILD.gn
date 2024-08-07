@@ -3,10 +3,8 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//build/fuzz.gni")
 import("//build/test.gni")
 import("//src/storage/fs_test/suite.gni")
-import("//src/storage/testing/driver_test_realm.gni")
 
 group("test") {
   testonly = true

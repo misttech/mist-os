@@ -76,3 +76,9 @@ group("tests") {
     ":profiler_unittests",
   ]
 }
+
+group("e2e_tests") {
+  testonly = true
+  public_deps =
+      [ "//src/performance/experimental/profiler/tests/end_to_end:e2e_tests" ]
+}

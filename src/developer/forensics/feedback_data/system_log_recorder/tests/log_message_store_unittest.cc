@@ -2,6 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "src/developer/forensics/feedback_data/system_log_recorder/log_message_store.h"
+
+#include <lib/inspect/cpp/vmo/types.h>
 #include <lib/syslog/cpp/log_level.h>
 
 #include <memory>
@@ -9,10 +12,8 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include "lib/inspect/cpp/vmo/types.h"
 #include "src/developer/forensics/feedback_data/constants.h"
 #include "src/developer/forensics/feedback_data/system_log_recorder/encoding/identity_encoder.h"
-#include "src/developer/forensics/feedback_data/system_log_recorder/system_log_recorder.h"
 #include "src/developer/forensics/testing/log_message.h"
 #include "src/developer/forensics/utils/log_format.h"
 #include "src/developer/forensics/utils/redact/redactor.h"
@@ -49,7 +50,7 @@ std::unique_ptr<RedactorBase> MakeIdentityRedactor() {
 
 class SimpleRedactor : public RedactorBase {
  public:
-  SimpleRedactor(const bool count_calls)
+  explicit SimpleRedactor(const bool count_calls)
       : RedactorBase(inspect::BoolProperty()), count_calls_(count_calls) {}
 
   std::string& Redact(std::string& text) override {

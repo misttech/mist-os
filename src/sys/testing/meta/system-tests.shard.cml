@@ -269,7 +269,10 @@
 
         // System tests can capture a trace.
         {
-            protocol: [ "fuchsia.tracing.controller.Controller" ],
+            protocol: [
+                "fuchsia.tracing.controller.Provisioner",
+                "fuchsia.tracing.controller.Session",
+            ],
             from: "parent",
             to: [ "#system-tests" ],
         },

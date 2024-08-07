@@ -212,7 +212,7 @@ pub async fn get_devices(
 ) -> fho::Result<Devices> {
     // Try the registry first.
     if let Some(registry) = registry {
-        let infos = registry.get_all().await.into_values().collect();
+        let infos = registry.device_infos().await.into_values().collect();
         return Ok(Devices::Registry(infos));
     }
 

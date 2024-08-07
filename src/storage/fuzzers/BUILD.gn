@@ -4,7 +4,6 @@
 
 import("//build/cpp/cpp_fuzzer.gni")
 import("//build/fuzz.gni")
-import("//build/test.gni")
 
 group("tests") {
   testonly = true

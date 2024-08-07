@@ -20,14 +20,14 @@ use fidl_fuchsia_net_dhcp_ext::{self as fnet_dhcp_ext, ClientProviderExt};
 use fidl_fuchsia_net_ext::{self as fnet_ext};
 use fidl_fuchsia_net_interfaces_ext::admin::Control;
 use fidl_fuchsia_net_interfaces_ext::{self as fnet_interfaces_ext};
-use fidl_fuchsia_net_stack_ext::FidlReturn as _;
+use fnet_ext::{FromExt as _, IntoExt as _};
 use fnet_interfaces_admin::GrantForInterfaceAuthorization;
 use {
     fidl_fuchsia_hardware_network as fnetwork, fidl_fuchsia_io as fio, fidl_fuchsia_net as fnet,
     fidl_fuchsia_net_dhcp as fnet_dhcp, fidl_fuchsia_net_interfaces as fnet_interfaces,
     fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
     fidl_fuchsia_net_neighbor as fnet_neighbor, fidl_fuchsia_net_root as fnet_root,
-    fidl_fuchsia_net_routes_admin as fnet_routes_admin,
+    fidl_fuchsia_net_routes as fnet_routes, fidl_fuchsia_net_routes_admin as fnet_routes_admin,
     fidl_fuchsia_net_routes_ext as fnet_routes_ext, fidl_fuchsia_net_stack as fnet_stack,
     fidl_fuchsia_netemul as fnetemul, fidl_fuchsia_netemul_network as fnetemul_network,
     fidl_fuchsia_posix_socket as fposix_socket, fidl_fuchsia_posix_socket_ext as fposix_socket_ext,
@@ -38,8 +38,8 @@ use {
 use anyhow::{anyhow, Context as _};
 use futures::future::{FutureExt as _, LocalBoxFuture, TryFutureExt as _};
 use futures::{SinkExt as _, TryStreamExt as _};
-use net_declare::fidl_subnet;
-use net_types::ip::{GenericOverIp, Ip};
+use net_types::ip::{GenericOverIp, Ip, Ipv4, Ipv6, Subnet};
+use net_types::SpecifiedAddr;
 
 type Result<T = ()> = std::result::Result<T, anyhow::Error>;
 
@@ -1115,63 +1115,305 @@ impl<'a> TestInterface<'a> {
         self.realm.connect_to_protocol::<fnet_stack::StackMarker>()
     }
 
+    /// Installs a route in the realm's netstack's global route table with `self` as the outgoing
+    /// interface with the given `destination` and `metric`, optionally via the `next_hop`.
+    ///
+    /// Returns whether the route was newly added to the stack.
+    async fn add_route<
+        I: Ip + fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt,
+    >(
+        &self,
+        destination: Subnet<I::Addr>,
+        next_hop: Option<SpecifiedAddr<I::Addr>>,
+        metric: fnet_routes::SpecifiedMetric,
+    ) -> Result<bool> {
+        let route_set = self.create_authenticated_global_route_set::<I>().await?;
+        fnet_routes_ext::admin::add_route::<I>(
+            &route_set,
+            &fnet_routes_ext::Route::<I>::new_forward(destination, self.id(), next_hop, metric)
+                .try_into()
+                .expect("convert to FIDL should succeed"),
+        )
+        .await
+        .context("FIDL error adding route")?
+        .map_err(|e| anyhow::anyhow!("error adding route: {e:?}"))
+    }
+
+    /// Installs a route in the realm's netstack's global route table with `self` as the outgoing
+    /// interface with the given `destination` and `metric`, optionally via the `next_hop`.
+    ///
+    /// Returns whether the route was newly added to the stack. Returns `Err` if `destination` and
+    /// `next_hop` don't share the same IP version.
+    async fn add_route_either(
+        &self,
+        destination: fnet::Subnet,
+        next_hop: Option<fnet::IpAddress>,
+        metric: fnet_routes::SpecifiedMetric,
+    ) -> Result<bool> {
+        let fnet::Subnet { addr: destination_addr, prefix_len } = destination;
+        match destination_addr {
+            fnet::IpAddress::Ipv4(destination_addr) => {
+                let next_hop = match next_hop {
+                    Some(fnet::IpAddress::Ipv4(next_hop)) => Some(
+                        SpecifiedAddr::new(net_types::ip::Ipv4Addr::from_ext(next_hop))
+                            .ok_or(anyhow::anyhow!("next hop must not be unspecified address"))?,
+                    ),
+                    Some(fnet::IpAddress::Ipv6(_)) => {
+                        return Err(anyhow::anyhow!(
+                            "next hop must be same IP version as destination"
+                        ))
+                    }
+                    None => None,
+                };
+                self.add_route::<Ipv4>(
+                    Subnet::new(destination_addr.into_ext(), prefix_len)
+                        .map_err(|e| anyhow::anyhow!("invalid subnet: {e:?}"))?,
+                    next_hop,
+                    metric,
+                )
+                .await
+            }
+            fnet::IpAddress::Ipv6(destination_addr) => {
+                let next_hop = match next_hop {
+                    Some(fnet::IpAddress::Ipv6(next_hop)) => Some(
+                        SpecifiedAddr::new(net_types::ip::Ipv6Addr::from_ext(next_hop))
+                            .ok_or(anyhow::anyhow!("next hop must not be unspecified address"))?,
+                    ),
+                    Some(fnet::IpAddress::Ipv4(_)) => {
+                        return Err(anyhow::anyhow!(
+                            "next hop must be same IP version as destination"
+                        ))
+                    }
+                    None => None,
+                };
+                self.add_route::<Ipv6>(
+                    Subnet::new(destination_addr.into_ext(), prefix_len)
+                        .map_err(|e| anyhow::anyhow!("invalid subnet: {e:?}"))?,
+                    next_hop,
+                    metric,
+                )
+                .await
+            }
+        }
+    }
+
+    /// Removes a route from the realm's netstack's global route table with `self` as the outgoing
+    /// interface with the given `destination` and `metric`, optionally via the `next_hop`.
+    ///
+    /// Returns whether the route actually existed in the stack before it was removed.
+    async fn remove_route<
+        I: Ip + fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt,
+    >(
+        &self,
+        destination: Subnet<I::Addr>,
+        next_hop: Option<SpecifiedAddr<I::Addr>>,
+        metric: fnet_routes::SpecifiedMetric,
+    ) -> Result<bool> {
+        let route_set = self.create_authenticated_global_route_set::<I>().await?;
+        fnet_routes_ext::admin::remove_route::<I>(
+            &route_set,
+            &fnet_routes_ext::Route::<I>::new_forward(destination, self.id(), next_hop, metric)
+                .try_into()
+                .expect("convert to FIDL should succeed"),
+        )
+        .await
+        .context("FIDL error removing route")?
+        .map_err(|e| anyhow::anyhow!("error removing route: {e:?}"))
+    }
+
+    /// Removes a route from the realm's netstack's global route table with `self` as the outgoing
+    /// interface with the given `destination` and `metric`, optionally via the `next_hop`.
+    ///
+    /// Returns whether the route actually existed in the stack before it was removed. Returns `Err`
+    /// if `destination` and `next_hop` don't share the same IP version.
+    async fn remove_route_either(
+        &self,
+        destination: fnet::Subnet,
+        next_hop: Option<fnet::IpAddress>,
+        metric: fnet_routes::SpecifiedMetric,
+    ) -> Result<bool> {
+        let fnet::Subnet { addr: destination_addr, prefix_len } = destination;
+        match destination_addr {
+            fnet::IpAddress::Ipv4(destination_addr) => {
+                let next_hop = match next_hop {
+                    Some(fnet::IpAddress::Ipv4(next_hop)) => Some(
+                        SpecifiedAddr::new(net_types::ip::Ipv4Addr::from_ext(next_hop))
+                            .ok_or(anyhow::anyhow!("next hop must not be unspecified address"))?,
+                    ),
+                    Some(fnet::IpAddress::Ipv6(_)) => {
+                        return Err(anyhow::anyhow!(
+                            "next hop must be same IP version as destination"
+                        ))
+                    }
+                    None => None,
+                };
+                self.remove_route::<Ipv4>(
+                    Subnet::new(destination_addr.into_ext(), prefix_len)
+                        .map_err(|e| anyhow::anyhow!("invalid subnet: {e:?}"))?,
+                    next_hop,
+                    metric,
+                )
+                .await
+            }
+            fnet::IpAddress::Ipv6(destination_addr) => {
+                let next_hop = match next_hop {
+                    Some(fnet::IpAddress::Ipv6(next_hop)) => Some(
+                        SpecifiedAddr::new(net_types::ip::Ipv6Addr::from_ext(next_hop))
+                            .ok_or(anyhow::anyhow!("next hop must not be unspecified address"))?,
+                    ),
+                    Some(fnet::IpAddress::Ipv4(_)) => {
+                        return Err(anyhow::anyhow!(
+                            "next hop must be same IP version as destination"
+                        ))
+                    }
+                    None => None,
+                };
+                self.remove_route::<Ipv6>(
+                    Subnet::new(destination_addr.into_ext(), prefix_len)
+                        .map_err(|e| anyhow::anyhow!("invalid subnet: {e:?}"))?,
+                    next_hop,
+                    metric,
+                )
+                .await
+            }
+        }
+    }
+
     /// Add a direct route from the interface to the given subnet.
     pub async fn add_subnet_route(&self, subnet: fnet::Subnet) -> Result<()> {
         let subnet = fnet_ext::apply_subnet_mask(subnet);
-        let entry =
-            fnet_stack::ForwardingEntry { subnet, device_id: self.id, next_hop: None, metric: 0 };
-        self.add_route(entry).await
+        let newly_added = self
+            .add_route_either(
+                subnet,
+                None,
+                fnet_routes::SpecifiedMetric::InheritedFromInterface(fnet_routes::Empty),
+            )
+            .await?;
+
+        if !newly_added {
+            Err(anyhow::anyhow!(
+                "route to {subnet:?} on {} should not have already existed",
+                self.id()
+            ))
+        } else {
+            Ok(())
+        }
     }
 
     /// Delete a direct route from the interface to the given subnet.
     pub async fn del_subnet_route(&self, subnet: fnet::Subnet) -> Result<()> {
         let subnet = fnet_ext::apply_subnet_mask(subnet);
-        let entry =
-            fnet_stack::ForwardingEntry { subnet, device_id: self.id, next_hop: None, metric: 0 };
-        self.connect_stack()
-            .context("connect stack")?
-            .del_forwarding_entry(&entry)
-            .await
-            .squash_result()
-            .with_context(|| {
-                format!(
-                    "stack.del_forwarding_entry({:?}) for endpoint {} failed",
-                    entry, self.endpoint.name
-                )
-            })
+        let newly_removed = self
+            .remove_route_either(
+                subnet,
+                None,
+                fnet_routes::SpecifiedMetric::InheritedFromInterface(fnet_routes::Empty),
+            )
+            .await?;
+
+        if !newly_removed {
+            Err(anyhow::anyhow!(
+                "route to {subnet:?} on {} should have previously existed before being removed",
+                self.id()
+            ))
+        } else {
+            Ok(())
+        }
     }
 
-    /// Add a default route through the given address.
+    /// Add a default route through the given `next_hop` with the given `metric`.
+    pub async fn add_default_route_with_metric(
+        &self,
+        next_hop: fnet::IpAddress,
+        metric: fnet_routes::SpecifiedMetric,
+    ) -> Result<()> {
+        let corresponding_default_subnet = match next_hop {
+            fnet::IpAddress::Ipv4(_) => net_declare::fidl_subnet!("0.0.0.0/0"),
+            fnet::IpAddress::Ipv6(_) => net_declare::fidl_subnet!("::/0"),
+        };
+
+        let newly_added =
+            self.add_route_either(corresponding_default_subnet, Some(next_hop), metric).await?;
+
+        if !newly_added {
+            Err(anyhow::anyhow!(
+                "default route through {} via {next_hop:?} already exists",
+                self.id()
+            ))
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Add a default route through the given `next_hop` with the given `metric`.
+    pub async fn add_default_route_with_explicit_metric(
+        &self,
+        next_hop: fnet::IpAddress,
+        metric: u32,
+    ) -> Result<()> {
+        self.add_default_route_with_metric(
+            next_hop,
+            fnet_routes::SpecifiedMetric::ExplicitMetric(metric),
+        )
+        .await
+    }
+
+    /// Add a default route through the given `next_hop`.
     pub async fn add_default_route(&self, next_hop: fnet::IpAddress) -> Result<()> {
-        let default_route_target = match next_hop {
-            fnet::IpAddress::Ipv4(fnet::Ipv4Address { addr: _ }) => {
-                fidl_subnet!("0.0.0.0/0")
-            }
-            fnet::IpAddress::Ipv6(fnet::Ipv6Address { addr: _ }) => {
-                fidl_subnet!("::/0")
-            }
-        };
-        let entry = fnet_stack::ForwardingEntry {
-            subnet: default_route_target,
-            device_id: self.id,
-            next_hop: Some(Box::new(next_hop)),
-            metric: 0,
-        };
-        self.add_route(entry).await
+        self.add_default_route_with_metric(
+            next_hop,
+            fnet_routes::SpecifiedMetric::InheritedFromInterface(fnet_routes::Empty),
+        )
+        .await
     }
 
-    async fn add_route(&self, entry: fnet_stack::ForwardingEntry) -> Result<()> {
-        self.connect_stack()
-            .context("connect stack")?
-            .add_forwarding_entry(&entry)
-            .await
-            .squash_result()
-            .with_context(|| {
-                format!(
-                    "stack.add_forwarding_entry({:?}) for endpoint {} failed",
-                    entry, self.endpoint.name
-                )
-            })
+    /// Remove a default route through the given address.
+    pub async fn remove_default_route(&self, next_hop: fnet::IpAddress) -> Result<()> {
+        let corresponding_default_subnet = match next_hop {
+            fnet::IpAddress::Ipv4(_) => net_declare::fidl_subnet!("0.0.0.0/0"),
+            fnet::IpAddress::Ipv6(_) => net_declare::fidl_subnet!("::/0"),
+        };
+
+        let newly_removed = self
+            .remove_route_either(
+                corresponding_default_subnet,
+                Some(next_hop),
+                fnet_routes::SpecifiedMetric::InheritedFromInterface(fnet_routes::Empty),
+            )
+            .await?;
+
+        if !newly_removed {
+            Err(anyhow::anyhow!(
+                "default route through {} via {next_hop:?} does not exist",
+                self.id()
+            ))
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Add a route to the given `destination` subnet via the given `next_hop`.
+    pub async fn add_gateway_route(
+        &self,
+        destination: fnet::Subnet,
+        next_hop: fnet::IpAddress,
+    ) -> Result<()> {
+        let newly_added = self
+            .add_route_either(
+                destination,
+                Some(next_hop),
+                fnet_routes::SpecifiedMetric::InheritedFromInterface(fnet_routes::Empty),
+            )
+            .await?;
+
+        if !newly_added {
+            Err(anyhow::anyhow!(
+                "should have newly added route to {destination:?} via {next_hop:?} through {}",
+                self.id()
+            ))
+        } else {
+            Ok(())
+        }
     }
 
     /// Create a root route set authenticated to manage routes through this interface.
@@ -1414,52 +1656,60 @@ impl<'a> TestInterface<'a> {
         let (address_state_provider, server) =
             fidl::endpoints::create_proxy::<fnet_interfaces_admin::AddressStateProviderMarker>()
                 .context("create proxy")?;
-        let () = address_state_provider.detach().context("detach address lifetime")?;
-        let () = self
-            .control
-            .add_address(&subnet, &fnet_interfaces_admin::AddressParameters::default(), server)
+        address_state_provider.detach().context("detach address lifetime")?;
+        self.control
+            .add_address(
+                &subnet,
+                &fnet_interfaces_admin::AddressParameters {
+                    add_subnet_route: Some(true),
+                    ..Default::default()
+                },
+                server,
+            )
             .context("FIDL error")?;
 
         let state_stream =
             fnet_interfaces_ext::admin::assignment_state_stream(address_state_provider);
         let mut state_stream = pin!(state_stream);
-        let ((), ()) = futures::future::try_join(
-            fnet_interfaces_ext::admin::wait_assignment_state(
-                &mut state_stream,
-                fnet_interfaces::AddressAssignmentState::Assigned,
-            )
-            .map(|res| res.context("assignment state")),
-            self.add_subnet_route(subnet).map(|res| res.context("add subnet route")),
+
+        fnet_interfaces_ext::admin::wait_assignment_state(
+            &mut state_stream,
+            fnet_interfaces::AddressAssignmentState::Assigned,
         )
-        .await?;
+        .await
+        .context("assignment state")?;
         Ok(())
     }
 
-    /// Removes an address and a subnet route.
+    /// Removes an address and its corresponding subnet route.
     pub async fn del_address_and_subnet_route(
         &self,
         addr_with_prefix: fnet::Subnet,
     ) -> Result<bool> {
-        let subnet = fnet_ext::apply_subnet_mask(addr_with_prefix);
-        let entry =
-            fnet_stack::ForwardingEntry { subnet, device_id: self.id, next_hop: None, metric: 0 };
-        let () = self
-            .connect_stack()
-            .context("connect stack")?
-            .del_forwarding_entry(&entry)
-            .await
-            .squash_result()
-            .with_context(|| {
-                format!(
-                    "stack.add_forwarding_entry({:?}) for endpoint {} failed",
-                    entry, self.endpoint.name
+        let did_remove =
+            self.control.remove_address(&addr_with_prefix).await.context("FIDL error").and_then(
+                |res| {
+                    res.map_err(|e: fnet_interfaces_admin::ControlRemoveAddressError| {
+                        anyhow::anyhow!("{:?}", e)
+                    })
+                },
+            )?;
+
+        if did_remove {
+            let destination = fnet_ext::apply_subnet_mask(addr_with_prefix);
+            let newly_removed_route = self
+                .remove_route_either(
+                    destination,
+                    None,
+                    fnet_routes::SpecifiedMetric::InheritedFromInterface(fnet_routes::Empty),
                 )
-            })?;
-        self.control.remove_address(&addr_with_prefix).await.context("FIDL error").and_then(|res| {
-            res.map_err(|e: fnet_interfaces_admin::ControlRemoveAddressError| {
-                anyhow::anyhow!("{:?}", e)
-            })
-        })
+                .await?;
+
+            // We don't assert on the route having been newly-removed because it could also
+            // be removed due to the AddressStateProvider going away.
+            let _: bool = newly_removed_route;
+        }
+        Ok(did_remove)
     }
 
     /// Removes all IPv6 LinkLocal addresses on the interface.

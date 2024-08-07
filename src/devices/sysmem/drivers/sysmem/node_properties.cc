@@ -23,7 +23,6 @@ NodeProperties::~NodeProperties() {
   ZX_DEBUG_ASSERT(child_count() == 0);
   if (node_) {
     logical_buffer_collection_->RemoveCountsForNode(*node_);
-    node_->EnsureDetachedFromNodeProperties();
   }
   if (!is_weak_) {
     logical_buffer_collection_->DecStrongNodeTally();
@@ -250,7 +249,6 @@ void NodeProperties::SetNode(fbl::RefPtr<Node> node) {
   logical_buffer_collection_->AddCountsForNode(*node);
   if (node_) {
     logical_buffer_collection_->RemoveCountsForNode(*node_);
-    node_->EnsureDetachedFromNodeProperties();
   }
 
   // Remember the logical node type.  This intentionally does not check for OrphanedNode because

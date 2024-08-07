@@ -25,6 +25,7 @@ pub struct FakeDevice {
     closed: AtomicBool,
     operation_closure: Box<dyn Fn(Op) -> Result<(), Error> + Send + Sync>,
     read_only: AtomicBool,
+    poisoned: AtomicBool,
 }
 
 const TRANSFER_HEAP_SIZE: usize = 64 * 1024 * 1024;
@@ -42,6 +43,7 @@ impl FakeDevice {
             closed: AtomicBool::new(false),
             operation_closure: Box::new(|_: Op| Ok(())),
             read_only: AtomicBool::new(false),
+            poisoned: AtomicBool::new(false),
         }
     }
 
@@ -70,6 +72,7 @@ impl FakeDevice {
             closed: AtomicBool::new(false),
             operation_closure: Box::new(|_| Ok(())),
             read_only: AtomicBool::new(false),
+            poisoned: AtomicBool::new(false),
         })
     }
 }
@@ -173,6 +176,7 @@ impl Device for FakeDevice {
             closed: AtomicBool::new(false),
             operation_closure: Box::new(|_: Op| Ok(())),
             read_only: AtomicBool::new(false),
+            poisoned: AtomicBool::new(false),
         }))
     }
 
@@ -191,5 +195,20 @@ impl Device for FakeDevice {
         }
         tracing::info!("Discarded {discarded:?}");
         Ok(())
+    }
+
+    /// Sets the poisoned state for the device. A poisoned device will panic the thread that
+    /// performs Drop on it.
+    fn poison(&self) -> Result<(), Error> {
+        self.poisoned.store(true, Ordering::Relaxed);
+        Ok(())
+    }
+}
+
+impl Drop for FakeDevice {
+    fn drop(&mut self) {
+        if self.poisoned.load(Ordering::Relaxed) {
+            panic!("This device was poisoned to crash whomever is holding a reference here.");
+        }
     }
 }

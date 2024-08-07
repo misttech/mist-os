@@ -4,8 +4,8 @@
 
 use anyhow::{format_err, Error};
 use fidl_fuchsia_tracing_controller::{
-    ControllerMarker, ControllerProxy, StartErrorCode, StartOptions, StopOptions, TerminateOptions,
-    TraceConfig,
+    ProvisionerMarker, ProvisionerProxy, SessionMarker, SessionProxy,
+    StartErrorCode, StartOptions, StopOptions, TerminateOptions, TraceConfig,
 };
 use fuchsia_component::{self as app};
 use fuchsia_sync::RwLock;
@@ -19,7 +19,7 @@ const TRACE_FILE: &'static str = "/custom_artifacts/trace.fxt";
 const BUFFER_SIZE_MB: u32 = 36;
 
 struct Status {
-    controller: Option<ControllerProxy>,
+    controller: Option<SessionProxy>,
     data_socket: Option<zx::Socket>,
 }
 
@@ -56,15 +56,17 @@ impl SingleSessionTrace {
     /// success, as trace_manager accepts the initialize_tracing call as a no-op. If needed,
     /// [terminate] may be used to ensure that no trace session is active on the system.
     pub async fn initialize(&self, categories: Vec<String>) -> Result<(), Error> {
-        let trace_controller = app::client::connect_to_protocol::<ControllerMarker>()?;
+        let trace_provisioner = app::client::connect_to_protocol::<ProvisionerMarker>()?;
         let (write_socket, read_socket) = zx::Socket::create_stream();
+        let (trace_controller, server) =
+            fidl::endpoints::create_proxy::<fidl_fuchsia_tracing_controller::SessionMarker>();
         let config = TraceConfig {
             buffer_size_megabytes_hint: Some(BUFFER_SIZE_MB),
             categories: Some(categories),
             ..Default::default()
         };
 
-        trace_controller.initialize_tracing(config, write_socket)?;
+        trace_provisioner.initialize_tracing(server, config, write_socket)?;
         {
             let mut status = self.status.write();
             status.data_socket = Some(read_socket);
@@ -114,17 +116,11 @@ impl SingleSessionTrace {
     ///
     /// Both raw trace file and converted trace json file will be stored in test's custom artifact.
     pub async fn terminate(&self) -> Result<(), Error> {
-        let controller = match self.status.write().controller.take() {
-            Some(controller) => controller,
-            None => app::client::connect_to_protocol::<ControllerMarker>()?,
-        };
-        let options = TerminateOptions { write_results: Some(true), ..Default::default() };
-        let terminate_fut = controller.terminate_tracing(options).map_err(Error::from);
+        // Tracing gets terminated when the controller is closed. Drain the socket to get
+        // everything that was written until the last stop and destroy the existing controller.
+        let controller = match self.status.write().controller.take();
         let data_socket = self.status.write().data_socket.take();
-        let drain_fut = drain_socket(data_socket);
-        // Note: It is important that these two futures are handled concurrently, as trace_manager
-        // writes the trace data before completing the terminate FIDL call.
-        let (_terminate_result, drain_result) = future::try_join(terminate_fut, drain_fut).await?;
+        let drain_result = drain_socket(data_socket).await?;
 
         // write this to file
         let mut trace_file = fs::File::create(TRACE_FILE)?;

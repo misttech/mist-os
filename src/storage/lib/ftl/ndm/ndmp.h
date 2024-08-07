@@ -5,13 +5,12 @@
 #ifndef SRC_STORAGE_LIB_FTL_NDM_NDMP_H_
 #define SRC_STORAGE_LIB_FTL_NDM_NDMP_H_
 
-#include <errno.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <zircon/compiler.h>
 
-#include "ftl_private.h"
+#include "src/storage/lib/ftl/ftl.h"
+#include "src/storage/lib/ftl/ftl_private.h"
+#include "src/storage/lib/ftl/ftln/logger.h"
+#include "src/storage/lib/ftl/utils/kernel.h"
 
 //
 // Configuration.
@@ -132,8 +131,8 @@ struct ndm {
   // On the other hand, the second variable reflects the format to be used when
   // creating new volumes. We retain the ability to format devices using the old
   // format only to simplify testing (upgrade ability).
-  // TODO(https://fxbug.dev/42116155): Remove upgrading code after all devices in the field are using
-  // the new format.
+  // TODO(https://fxbug.dev/42116155): Remove upgrading code after all devices in the field are
+  // using the new format.
   ui32 version_2;       // "Boolean" variable: FALSE for control header version 1.
   ui32 format_with_v2;  // "Boolean" variable: FALSE to use control header version 1.
   ui32 num_partitions;

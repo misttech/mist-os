@@ -111,6 +111,11 @@
             to: [ "#starnix_runner" ],
         },
         {
+            protocol: "fuchsia.feedback.CrashReporter",
+            from: "#feedback",
+            to: "#starnix_runner",
+        },
+        {
             directory: "boot",
             from: "parent",
             as: "boot-kernel",

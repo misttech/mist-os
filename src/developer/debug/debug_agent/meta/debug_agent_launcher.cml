@@ -29,7 +29,6 @@
             protocol: [
                 "fuchsia.exception.ProcessLimbo",
                 "fuchsia.kernel.RootJob",
-                "fuchsia.logger.LogSink",
                 "fuchsia.process.Launcher",
                 "fuchsia.sys2.LifecycleController.root",
                 "fuchsia.sys2.RealmQuery.root",

@@ -187,6 +187,7 @@ pub fn decode_extended_attribute_value(
         }
         #[cfg(not(target_os = "fuchsia"))]
         fio::ExtendedAttributeValue::Buffer(_) => Err(Status::NOT_SUPPORTED),
+        fio::ExtendedAttributeValue::__SourceBreaking { .. } => Err(Status::NOT_SUPPORTED),
     }
 }
 

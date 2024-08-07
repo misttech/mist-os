@@ -14,6 +14,7 @@ fidl("fuchsia.ui.test.input") {
     "mouse.fidl",
     "overview.fidl",
     "registry.fidl",
+    "test_app.fidl",
     "text.fidl",
     "touch.fidl",
   ]

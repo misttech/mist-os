@@ -32,7 +32,7 @@ fuchsia_test_component("hello_debian_rust_integration") {
   check_includes = false
 }
 
-fuchsia_test_package("hello_debian_rust_integration_test") {
+fuchsia_test_package("starnix_hello_debian_rust_integration_test") {
   test_components = [ ":hello_debian_rust_integration" ]
   subpackages = [
     ":hello_debian_rust_package",
@@ -43,7 +43,7 @@ fuchsia_test_package("hello_debian_rust_integration_test") {
 
 group("tests") {
   testonly = true
-  deps = [ ":hello_debian_rust_integration_test" ]
+  deps = [ ":starnix_hello_debian_rust_integration_test" ]
 }
 
 group("rust") {

@@ -1,0 +1,11 @@
+Name: netlink-packet-route
+License File: LICENSE-MIT
+URL: https://github.com/rust-netlink/netlink-packet-route
+
+This crate provides serialization/deserialization of NETLINK ROUTE messages.
+It is used by Starnix to serve the NETLINK protocol.
+
+This crate forks upstream version 0.20.1. There are several divergences from
+upstream (See the git history for the complete list). At this point, there is
+no intention of re-merging with upstream.
+

@@ -463,33 +463,36 @@ struct PasidEntry {
 static_assert(ktl::is_pod<PasidEntry>::value, "not POD");
 static_assert(sizeof(PasidEntry) == 8, "wrong size");
 
-struct PasidState {
-  volatile uint64_t raw;
+// TODO(https://fxbug.dev/355287217): Remove workaround for const/volatile qualified atomic_ref
+#if 0
+  struct PasidState {
+   volatile uint64_t raw;
 
-  // DEF_SUBFIELD(raw, 47, 32, active_ref_count);
-  // DEF_SUBBIT(raw, 63, deferred_invld);
+   // DEF_SUBFIELD(raw, 47, 32, active_ref_count);
+   // DEF_SUBBIT(raw, 63, deferred_invld);
 
-  uint64_t active_ref_count() {
-    ktl::atomic_ref<volatile uint64_t> state(raw);
-    return (state.load() >> 32) & 0xffff;
-  }
+   uint64_t active_ref_count() {
+     ktl::atomic_ref<volatile uint64_t> state(raw);
+     return (state.load() >> 32) & 0xffff;
+   }
 
-  uint64_t deferred_invld() {
-    ktl::atomic_ref<volatile uint64_t> state(raw);
-    return state.load() >> 63;
-  }
-  void set_deferred_invld() {
-    // The specification is unclear as to how to update this field.  This is
-    // an in-memory data structure, and the active_ref_count field is specified
-    // as being updated atomically by hardware.  Reading that "atomically"
-    // to be an atomic memory access, this atomic_or should be the right
-    // thing.
-    ktl::atomic_ref<volatile uint64_t> state(raw);
-    state.fetch_or(1ull << 63);
-  }
-};
-static_assert(ktl::is_pod<PasidState>::value, "not POD");
-static_assert(sizeof(PasidState) == 8, "wrong size");
+   uint64_t deferred_invld() {
+     ktl::atomic_ref<volatile uint64_t> state(raw);
+     return state.load() >> 63;
+   }
+   void set_deferred_invld() {
+     // The specification is unclear as to how to update this field.  This is
+     // an in-memory data structure, and the active_ref_count field is specified
+     // as being updated atomically by hardware.  Reading that "atomically"
+     // to be an atomic memory access, this atomic_or should be the right
+     // thing.
+     ktl::atomic_ref<volatile uint64_t> state(raw);
+     state.fetch_or(1ull << 63);
+   }
+ };
+  static_assert(ktl::is_pod<PasidState>::value, "not POD");
+  static_assert(sizeof(PasidState) == 8, "wrong size");
+#endif
 
 }  // namespace ds
 

@@ -16,15 +16,10 @@ use fidl_fuchsia_diagnostics::{
 use fidl_fuchsia_io::DirectoryProxy;
 use fidl_fuchsia_sys2 as fsys2;
 use fuchsia_component::client;
-use lazy_static::lazy_static;
 
-const ROOT_REALM_QUERY: &'static str = "/svc/fuchsia.sys2.RealmQuery.root";
-const ROOT_ARCHIVIST_ACCESSOR: &'static str =
+static ROOT_REALM_QUERY: &str = "/svc/fuchsia.sys2.RealmQuery.root";
+static ROOT_ARCHIVIST_ACCESSOR: &str =
     "./bootstrap/archivist:expose:fuchsia.diagnostics.ArchiveAccessor";
-
-lazy_static! {
-    static ref CURRENT_DIR: Vec<String> = vec![".".to_string()];
-}
 
 #[derive(Default)]
 pub struct ArchiveAccessorProvider;

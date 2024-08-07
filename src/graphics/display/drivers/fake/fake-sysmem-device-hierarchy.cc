@@ -8,6 +8,7 @@
 #include <fidl/fuchsia.io/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
+#include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/syslog/cpp/macros.h>
@@ -21,177 +22,86 @@
 
 namespace display {
 
-// static
 zx::result<std::unique_ptr<FakeSysmemDeviceHierarchy>> FakeSysmemDeviceHierarchy::Create() {
-  fbl::AllocChecker alloc_checker;
-  auto fake_pdev = fbl::make_unique_checked<fake_pdev::FakePDevFidl>(&alloc_checker);
-  if (!alloc_checker.check()) {
-    FX_LOGS(ERROR) << "Failed to allocate memory for FakePDevFidl";
-    return zx::error(ZX_ERR_NO_MEMORY);
-  }
-  fake_pdev->SetConfig({
-      .use_fake_bti = true,
-  });
+  return zx::ok(std::make_unique<FakeSysmemDeviceHierarchy>());
+}
 
-  const fuchsia_hardware_sysmem::Metadata kSysmemMetadata{{
-      .vid = PDEV_VID_QEMU,
-      .pid = PDEV_PID_QEMU,
-  }};
+FakeSysmemDeviceHierarchy::FakeSysmemDeviceHierarchy() {
+  zx::result<fdf_testing::TestNode::CreateStartArgsResult> create_start_args_result =
+      node_server_.SyncCall(&fdf_testing::TestNode::CreateStartArgsAndServe);
+  ZX_ASSERT_MSG(create_start_args_result.is_ok(), "%s", create_start_args_result.status_string());
+
+  auto [start_args, incoming_directory_server, outgoing_directory_client] =
+      std::move(create_start_args_result).value();
+  start_args.config() = sysmem_config::Config{}.ToVmo();
+  driver_outgoing_ = std::move(outgoing_directory_client);
+
+  auto init_result = test_environment_.SyncCall(&fdf_testing::TestEnvironment::Initialize,
+                                                std::move(incoming_directory_server));
+  ZX_ASSERT_MSG(init_result.is_ok(), "%s", init_result.status_string());
+
+  fake_pdev::FakePDevFidl::Config config;
+
+  config.use_fake_bti = true;
+  fake_pdev_.SyncCall(&fake_pdev::FakePDevFidl::SetConfig, std::move(config));
+
+  const fuchsia_hardware_sysmem::Metadata kSysmemMetadata = [] {
+    fuchsia_hardware_sysmem::Metadata metadata;
+    metadata.vid() = PDEV_VID_QEMU;
+    metadata.pid() = PDEV_PID_QEMU;
+    return metadata;
+  }();
   fit::result<fidl::Error, std::vector<uint8_t>> metadata_result = fidl::Persist(kSysmemMetadata);
-  if (metadata_result.is_error()) {
-    FX_LOGS(ERROR) << "Failed to persist sysmem metadata: "
-                   << metadata_result.error_value().FormatDescription();
-    return zx::error(metadata_result.error_value().status());
-  }
-  std::vector<uint8_t> metadata = std::move(metadata_result).value();
-  fake_pdev->set_metadata({{fuchsia_hardware_sysmem::wire::kMetadataType, std::move(metadata)}});
+  ZX_ASSERT_MSG(metadata_result.is_ok(), "%s",
+                metadata_result.error_value().FormatDescription().c_str());
+  std::unordered_map<uint32_t, std::vector<uint8_t>> metadata_map;
+  metadata_map.insert(
+      {fuchsia_hardware_sysmem::wire::kMetadataType, std::move(metadata_result).value()});
+  fake_pdev_.SyncCall(&fake_pdev::FakePDevFidl::set_metadata, std::move(metadata_map));
 
-  auto fake_sysmem_device_hierarchy =
-      fbl::make_unique_checked<FakeSysmemDeviceHierarchy>(&alloc_checker, std::move(fake_pdev));
-  if (!alloc_checker.check()) {
-    FX_LOGS(ERROR) << "Failed to allocate memory for FakeSysmemDeviceHierarchy";
-    return zx::error(ZX_ERR_NO_MEMORY);
-  }
-
-  zx::result<> initialize_result = fake_sysmem_device_hierarchy->Initialize();
-  if (initialize_result.is_error()) {
-    FX_LOGS(ERROR) << "Failed to initialize FakeSysmemDeviceHierarchy: "
-                   << initialize_result.status_string();
-    return initialize_result.take_error();
-  }
-
-  return zx::ok(std::move(fake_sysmem_device_hierarchy));
-}
-
-FakeSysmemDeviceHierarchy::FakeSysmemDeviceHierarchy(
-    std::unique_ptr<fake_pdev::FakePDevFidl> fake_pdev)
-    : fake_pdev_(std::move(fake_pdev)) {
-  zx_status_t start_thread_status = env_loop_.StartThread("fake-sysmem-env-loop");
-  ZX_ASSERT(start_thread_status == ZX_OK);
-}
-
-FakeSysmemDeviceHierarchy::~FakeSysmemDeviceHierarchy() { SyncShutdown(); }
-
-void FakeSysmemDeviceHierarchy::SyncShutdown() {
-  device_async_remove(sysmem_device_);
-  mock_ddk::ReleaseFlaggedDevices(mock_root_.get());
-  sysmem_device_ = nullptr;
-
-  // Ensure all tasks started before this call finish before shutting down the loop.
-  async::PostTask(env_loop_.dispatcher(), [this]() {
-    incoming_.reset();
-    env_loop_.Quit();
+  auto pdev_instance_handler = fake_pdev_.SyncCall(&fake_pdev::FakePDevFidl::GetInstanceHandler,
+                                                   async_patterns::PassDispatcher);
+  test_environment_.SyncCall([&pdev_instance_handler](fdf_testing::TestEnvironment* env) {
+    auto add_service_result =
+        env->incoming_directory().AddService<fuchsia_hardware_platform_device::Service>(
+            std::move(pdev_instance_handler));
+    ZX_ASSERT_MSG(add_service_result.is_ok(), "%s", add_service_result.status_string());
   });
-  // Waits for the Quit() to execute and cause the thread to exit.
-  env_loop_.JoinThreads();
-  env_loop_.Shutdown();
+
+  zx::result start_result = runtime_->RunToCompletion(device_.SyncCall(
+      &fdf_testing::DriverUnderTest<sysmem_driver::Device>::Start, std::move(start_args)));
+  ZX_ASSERT_MSG(start_result.is_ok(), "%s", start_result.status_string());
 }
 
-fuchsia_hardware_platform_device::Service::InstanceHandler
-FakeSysmemDeviceHierarchy::GetPlatformDeviceServiceInstanceHandler() const {
-  return fuchsia_hardware_platform_device::Service::InstanceHandler{{
-      .device = fake_pdev_->bind_handler(env_loop_.dispatcher()),
-  }};
-}
+FakeSysmemDeviceHierarchy::~FakeSysmemDeviceHierarchy() {
+  zx::result prepare_stop_result = runtime_->RunToCompletion(
+      device_.SyncCall(&fdf_testing::DriverUnderTest<sysmem_driver::Device>::PrepareStop));
+  ZX_ASSERT_MSG(prepare_stop_result.is_ok(), "%s", prepare_stop_result.status_string());
 
-zx::result<> FakeSysmemDeviceHierarchy::Initialize() {
-  zx::result<> initialize_incoming_services_result = InitializeIncomingServices();
-  if (initialize_incoming_services_result.is_error()) {
-    FX_LOGS(ERROR) << "Failed to initialize sysmem incoming services: "
-                   << initialize_incoming_services_result.status_string();
-    return initialize_incoming_services_result.take_error();
-  }
+  zx::result stop_result =
+      device_.SyncCall(&fdf_testing::DriverUnderTest<sysmem_driver::Device>::Stop);
+  ZX_ASSERT_MSG(stop_result.is_ok(), "%s", stop_result.status_string());
 
-  zx::result<> create_and_bind_sysmem_device_result = CreateAndBindSysmemDevice();
-  if (create_and_bind_sysmem_device_result.is_error()) {
-    FX_LOGS(ERROR) << "Failed to create sysmem device: "
-                   << create_and_bind_sysmem_device_result.status_string();
-    return create_and_bind_sysmem_device_result.take_error();
-  }
-
-  return zx::ok();
-}
-
-zx::result<> FakeSysmemDeviceHierarchy::InitializeIncomingServices() {
-  ZX_DEBUG_ASSERT(!incoming_.has_value());
-
-  libsync::Completion incoming_init_completed;
-  async::PostTask(env_loop_.dispatcher(), [&] {
-    incoming_ = component::OutgoingDirectory(env_loop_.dispatcher());
-    incoming_init_completed.Signal();
-  });
-  incoming_init_completed.Wait();
-
-  libsync::Completion add_service_completed;
-  zx::result<> add_service_result = zx::error(ZX_ERR_INTERNAL);
-  async::PostTask(env_loop_.dispatcher(), [&] {
-    add_service_result = incoming_->AddService<fuchsia_hardware_platform_device::Service>(
-        GetPlatformDeviceServiceInstanceHandler());
-    add_service_completed.Signal();
-  });
-  add_service_completed.Wait();
-  if (add_service_result.is_error()) {
-    FX_LOGS(ERROR) << "Failed to add pdev service to incoming directory: "
-                   << add_service_result.status_string();
-    return add_service_result.take_error();
-  }
-
-  auto [incoming_root_client, incoming_root_server] =
-      fidl::Endpoints<fuchsia_io::Directory>::Create();
-  libsync::Completion serve_completed;
-  zx::result<> serve_result = zx::error(ZX_ERR_INTERNAL);
-  async::PostTask(env_loop_.dispatcher(),
-                  [&, incoming_root_server = std::move(incoming_root_server)]() mutable {
-                    serve_result = incoming_->Serve(std::move(incoming_root_server));
-                    serve_completed.Signal();
-                  });
-  serve_completed.Wait();
-  if (serve_result.is_error()) {
-    FX_LOGS(ERROR) << "Failed to serve the incoming directory: " << serve_result.status_string();
-    return serve_result.take_error();
-  }
-
-  mock_root_->AddFidlService(fuchsia_hardware_platform_device::Service::Name,
-                             std::move(incoming_root_client));
-  return zx::ok();
-}
-
-zx::result<> FakeSysmemDeviceHierarchy::CreateAndBindSysmemDevice() {
-  ZX_DEBUG_ASSERT(sysmem_device_ == nullptr);
-  fbl::AllocChecker alloc_checker;
-  auto device = fbl::make_unique_checked<sysmem_driver::Device>(&alloc_checker, mock_root_.get(),
-                                                                &driver_context_);
-  if (!alloc_checker.check()) {
-    FX_LOGS(ERROR) << "Failed to allocate memory for sysmem_driver::Device";
-    return zx::error(ZX_ERR_NO_MEMORY);
-  }
-
-  zx_status_t bind_result = device->Bind();
-  if (bind_result != ZX_OK) {
-    FX_LOGS(ERROR) << "Failed to initialize and bind the sysmem Device: "
-                   << zx_status_get_string(bind_result);
-    return zx::error(bind_result);
-  }
-
-  // `device` is now managed by the mock ddk.
-  [[maybe_unused]] sysmem_driver::Device* released_device = device.release();
-  sysmem_device_ = mock_root_->GetLatestChild();
-  ZX_DEBUG_ASSERT(sysmem_device_ != nullptr);
-
-  return zx::ok();
+  test_environment_.reset();
+  fake_pdev_.reset();
+  node_server_.reset();
+  device_.reset();
 }
 
 zx::result<fidl::ClientEnd<fuchsia_io::Directory>>
 FakeSysmemDeviceHierarchy::GetOutgoingDirectory() {
-  ZX_DEBUG_ASSERT(sysmem_device_ != nullptr);
-  sysmem_driver::Device* device = sysmem_device_->GetDeviceContext<sysmem_driver::Device>();
-  zx::result<fidl::ClientEnd<fuchsia_io::Directory>> clone_directory_result =
-      device->CloneServiceDirClientForTests();
-  if (clone_directory_result.is_error()) {
-    FX_LOGS(ERROR) << "Failed to clone sysmem service directory: "
-                   << clone_directory_result.status_string();
+  auto dir_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
+  // this effectively just dups the outgoing dir Node - the dir has /svc/fuchsia.sysmem2.Service
+  // under it
+  zx_status_t status = fdio_open_at(driver_outgoing_.handle()->get(), "/",
+                                    static_cast<uint32_t>(fuchsia_io::OpenFlags::kDirectory),
+                                    std::move(dir_endpoints.server).TakeChannel().release());
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to open /svc directory of sysmem's outgoing directory: %s",
+           zx_status_get_string(status));
+    return zx::error(status);
   }
-  return clone_directory_result;
+  return zx::ok(std::move(dir_endpoints.client));
 }
 
 }  // namespace display

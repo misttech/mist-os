@@ -375,7 +375,7 @@ closed protocol Directory2 {
     strict Unlink(struct {
         name Name;
         options @generated_name("UnlinkOptions") table {
-            1: flags @generated_name("UnlinkFlags") strict bits : uint64 {
+            1: flags @generated_name("UnlinkFlags") flexible bits : uint64 {
                 /// If set, the unlink will fail (with ZX_ERR_NOT_DIR) if the
                 /// object is not a directory.
                 MUST_BE_DIRECTORY = 0x01;

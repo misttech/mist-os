@@ -3,16 +3,26 @@
 // found in the LICENSE file.
 
 #include <stdarg.h>
-#include <string.h>
+#include <zircon/assert.h>
+#include <zircon/compiler.h>
+#include <zircon/errors.h>
+#include <zircon/types.h>
 
 #include <algorithm>
+#include <cinttypes>
+#include <cstdint>
+#include <cstdio>
+#include <memory>
+#include <utility>
+#include <vector>
 
 #include <fuzzer/FuzzedDataProvider.h>
 
 #include "src/devices/block/drivers/ftl/tests/ftl-shell.h"
 #include "src/devices/block/drivers/ftl/tests/ndm-ram-driver.h"
-#include "src/storage/lib/ftl/ftln/ftlnp.h"
+#include "src/storage/lib/ftl/ftln/logger.h"
 #include "src/storage/lib/ftl/ftln/ndm-driver.h"
+#include "src/storage/lib/ftl/ftln/volume.h"
 
 constexpr uint32_t kPageSize = 4096;
 constexpr uint32_t kPagesPerBlock = 64;

@@ -17,6 +17,7 @@ class BitmapTest : public F2fsFakeDevTestFixture {
   BitmapTest()
       : F2fsFakeDevTestFixture(TestOptions{
             .block_count = 100 * 1024 * 1024 / kDefaultSectorSize,
+            .mount_options = {{MountOption::kInlineDentry, 1}},
         }) {}
 
   zx::result<fbl::RefPtr<VnodeF2fs>> Create(std::string name, bool is_file = true) {

@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::anyhow;
 use fidl_codec::Value as FidlValue;
 use futures::channel::oneshot::channel as oneshot_channel;
 use futures::future::{ready, BoxFuture};
@@ -11,20 +10,26 @@ use num::bigint::BigInt;
 use num::rational::BigRational;
 use num::{CheckedDiv, FromPrimitive};
 use std::collections::HashMap;
+use std::fmt::Write;
 use std::iter::repeat_with;
 use std::sync::{Arc, Mutex};
 
-use crate::error::{Error, Result};
+use crate::error::Result;
 use crate::frame::{CaptureMapEntry, CaptureSet, Frame};
-use crate::interpreter::{Interpreter, InterpreterInner};
-use crate::parser::{Mutability, Node, ParameterList, Span};
+use crate::interpreter::{Exception, Interpreter, InterpreterInner};
+use crate::parser::{Mutability, Node, ParameterList, Span, StringElement};
 use crate::value::{
     playground_semantic_compare, Invocable, PlaygroundValue, RangeCursor, ReplayableIterator,
     Value, ValueExt,
 };
 
-macro_rules! error {
-    ($($data:tt)*) => { Error::from(anyhow!($($data)*)) };
+impl Exception {
+    /// Convert this [`Exception`] into the crate level `Error` type. This is
+    /// the same as the general `into` but its simpler signature can give Rust's
+    /// type inference a boost.
+    pub(crate) fn into_err(self) -> crate::error::Error {
+        self.into()
+    }
 }
 
 /// Convert two values to numbers. If the conversion succeeds, use the given
@@ -274,7 +279,7 @@ impl Visitor {
             Node::Program(v) => Arc::new(self.visit_program(v)),
             Node::Range(a, b, i) => Arc::new(self.visit_range(*a, *b, i)),
             Node::Real(a) => Arc::new(self.visit_real(*a.fragment())),
-            Node::String(s) => Arc::new(self.visit_string(*s.fragment())),
+            Node::String(s) => Arc::new(self.visit_string(s)),
             Node::Subtract(x, y) => Arc::new(self.visit_subtract(*x, *y)),
             Node::VariableDecl { identifier, value, mutability } => {
                 Arc::new(self.visit_variable_decl(*identifier.fragment(), *value, mutability))
@@ -309,7 +314,7 @@ impl Visitor {
                 if mutability.is_constant() {
                     Arc::new(move |_, _, _| {
                         let identifier = identifier.clone();
-                        async move { Err(error!("'{identifier}' is declared constant")) }.boxed()
+                        async move { Err(Exception::AssignToConst(identifier).into()) }.boxed()
                     })
                 } else {
                     Arc::new(move |value, inner, frame| {
@@ -320,8 +325,7 @@ impl Visitor {
                             lookup(&inner, frame).boxed()
                         } else {
                             let identifier = identifier.clone();
-                            async move { Err(error!("'{identifier}' is declared constant")) }
-                                .boxed()
+                            async move { Err(Exception::AssignToConst(identifier).into()) }.boxed()
                         }
                     })
                 }
@@ -344,7 +348,7 @@ impl Visitor {
                             match new_value {
                                 Value::Object(mut h) => {
                                     let Value::String(key) = key else {
-                                        return Err(anyhow!("Object key must be a string").into());
+                                        return Err(Exception::NonStringObjectKey.into());
                                     };
 
                                     let mut value = Some(value.await?);
@@ -363,18 +367,18 @@ impl Visitor {
                                 }
                                 Value::List(mut l) => {
                                     let key: usize = key.try_usize().map_err(|_| {
-                                        anyhow!("List index must be a positive integer")
+                                        Exception::NonPositiveIntegerListKey.into_err()
                                     })?;
 
                                     if key < l.len() {
                                         l[key] = value.await?;
                                     } else {
-                                        Err(anyhow!("List index out of range"))?
+                                        Err(Exception::ListIndexOutOfRange.into_err())?
                                     }
 
                                     Value::List(l)
                                 }
-                                _ => Err(anyhow!("Type Error: Lookup not supported"))?,
+                                _ => Err(Exception::LookupNotSupported.into_err())?,
                             }
                         };
                         receiver_set(ready(Ok(new_value)).boxed(), &inner, frame).await
@@ -385,7 +389,7 @@ impl Visitor {
 
             // We should never try to execute a parse tree with these in it.
             Node::Error => panic!("Invalid output from parser"),
-            _ => Arc::new(|_, _, _| async { Err(error!("Expression isn't assignable")) }.boxed()),
+            _ => Arc::new(|_, _, _| async { Err(Exception::BadLValue.into()) }.boxed()),
         }
     }
 
@@ -406,7 +410,7 @@ impl Visitor {
             }
             (a, b) => {
                 try_numeric_math(a, b, |a, b| Ok(Value::OutOfLine(PlaygroundValue::Num(a + b))))
-                    .unwrap_or_else(|| Err(error!("Type Mismatch: Cannot add non-numeric values")))
+                    .unwrap_or_else(|| Err(Exception::BadAdditionOperands.into()))
             }
         })
     }
@@ -510,10 +514,10 @@ impl Visitor {
         self.binop(a, b, |a, b| {
             try_numeric_math(a, b, |a, b| {
                 a.checked_div(&b)
-                    .ok_or(error!("Division by zero"))
+                    .ok_or(Exception::DivisionByZero.into())
                     .map(|x| Value::OutOfLine(PlaygroundValue::Num(x)))
             })
-            .unwrap_or_else(|| Err(error!("Type Mismatch: Cannot divide non-numeric values")))
+            .unwrap_or_else(|| Err(Exception::BadNumericOperands("//").into()))
         })
     }
 
@@ -593,7 +597,7 @@ impl Visitor {
                             Ok(Value::Null)
                         }
                     }
-                    _ => Err(error!("TypeError: Conditional requires a boolean")),
+                    _ => Err(Exception::NonBooleanConditional.into()),
                 }
             }
             .boxed()
@@ -712,7 +716,7 @@ impl Visitor {
             async move {
                 let a = a(&inner, frame).await?;
                 let a_iter: ReplayableIterator =
-                    a.try_into().map_err(|_| error!("Value isn't iterable"))?;
+                    a.try_into().map_err(|_| Exception::NotIterable.into_err())?;
 
                 let iter = a_iter.map(move |x| {
                     let inner = Arc::clone(&inner);
@@ -774,8 +778,14 @@ impl Visitor {
                         let capture_set = capture_set.clone();
 
                         async move {
-                            if args.len() < required_params_count {
-                                Err(error!("Too few arguments to `{}`", name))
+                            let args_len = args.len();
+                            if args_len < required_params_count {
+                                Err(Exception::WrongArgumentCount(
+                                    name,
+                                    required_params_count,
+                                    args_len,
+                                )
+                                .into())
                             } else {
                                 let mut body_frame = Frame::new(slots_needed);
                                 body_frame.apply_capture(&capture_set);
@@ -792,7 +802,12 @@ impl Visitor {
                                     if let Some(variadic) = variadic.clone() {
                                         body_frame.assign(variadic, Ok(Value::List(args)));
                                     } else {
-                                        return Err(error!("Too many arguments to `{}`", name));
+                                        return Err(Exception::WrongArgumentCount(
+                                            name,
+                                            required_params_count,
+                                            args_len,
+                                        )
+                                        .into());
                                     }
                                 }
 
@@ -902,7 +917,7 @@ impl Visitor {
 
                         match (&a, &b) {
                             (Value::Bool(_), Value::Bool(_)) => Ok(b),
-                            _ => Err(error!("TypeError: Cannot apply {} to non-booleans", op_name)),
+                            _ => Err(Exception::BadBooleanOperands(op_name).into()),
                         }
                     }
                 }
@@ -927,7 +942,7 @@ impl Visitor {
 
                 match a {
                     Value::Bool(a) => Ok(Value::Bool(!a)),
-                    e => Err(error!("Type Mismatch: Cannot logically negate '{}'", e)),
+                    _ => Err(Exception::BadBooleanOperands("!").into()),
                 }
             }
             .boxed()
@@ -951,26 +966,27 @@ impl Visitor {
 
                 match target(&inner, frame).await? {
                     Value::List(mut l) => {
-                        let key: usize =
-                            key.try_usize().map_err(|_| error!("List index must be an integer"))?;
+                        let key: usize = key
+                            .try_usize()
+                            .map_err(|_| Exception::NonPositiveIntegerListKey.into_err())?;
 
                         if key < l.len() {
                             Ok(l.swap_remove(key))
                         } else {
-                            Err(error!("List index out of range"))
+                            Err(Exception::ListIndexOutOfRange.into())
                         }
                     }
                     Value::Object(s) => {
                         let Value::String(key) = key else {
-                            return Err(error!("Object key must be a string"));
+                            return Err(Exception::NonStringObjectKey.into());
                         };
 
                         s.into_iter()
                             .find(|(k, _)| *k == key)
                             .map(|(_, x)| x)
-                            .ok_or(error!("Object does not contain '{}'", key))
+                            .ok_or(Exception::NoSuchObjectKey(key).into_err())
                     }
-                    _ => Err(error!("Type Error: Lookup not supported")),
+                    _ => Err(Exception::LookupNotSupported.into()),
                 }
             }
             .boxed()
@@ -985,7 +1001,7 @@ impl Visitor {
     {
         self.binop(a, b, |a, b| {
             try_numeric_math(a, b, |a, b| Ok(Value::OutOfLine(PlaygroundValue::Num(a * b))))
-                .unwrap_or_else(|| Err(error!("Type Mismatch: Cannot multiply non-numeric values")))
+                .unwrap_or_else(|| Err(Exception::BadNumericOperands("*").into()))
         })
     }
 
@@ -1016,7 +1032,7 @@ impl Visitor {
 
                 a.try_big_num()
                     .map(|x: BigRational| Value::OutOfLine(PlaygroundValue::Num(-x)))
-                    .map_err(|_| error!("Type Mismatch: Cannot negate non-numeric value"))
+                    .map_err(|_| Exception::BadNegationOperand.into())
             }
             .boxed()
         }
@@ -1265,13 +1281,13 @@ impl Visitor {
             async move {
                 let a: Option<BigInt> = if let Some(a) = a {
                     let a = a(&inner, frame).await?;
-                    Some(a.try_big_int().map_err(|_| error!("Range bound must be an integer"))?)
+                    Some(a.try_big_int().map_err(|_| Exception::NonNumericRangeBound.into_err())?)
                 } else {
                     None
                 };
                 let b: Option<BigInt> = if let Some(b) = b {
                     let b = b(&inner, frame).await?;
-                    Some(b.try_big_int().map_err(|_| error!("Range bound must be an integer"))?)
+                    Some(b.try_big_int().map_err(|_| Exception::NonNumericRangeBound.into_err())?)
                 } else {
                     None
                 };
@@ -1279,7 +1295,7 @@ impl Visitor {
                 let a = if let Some(a) = a {
                     a
                 } else {
-                    return Err(error!("Left-unbounded ranges are not yet supported"));
+                    return Err(Exception::UnsupportedLeftUnboundedRange.into());
                 };
 
                 let range_cursor = RangeCursor { start: a, end: b, is_inclusive };
@@ -1316,33 +1332,75 @@ impl Visitor {
 
     fn visit_string(
         &mut self,
-        string: &str,
+        elements: Vec<StringElement<'_>>,
     ) -> impl for<'f> Fn(&Arc<InterpreterInner>, &'f Mutex<Frame>) -> BoxFuture<'f, Result<Value>>
     {
-        let mut string = string
-            .strip_prefix('"')
-            .unwrap()
-            .strip_suffix('"')
-            .unwrap()
-            .replace(r"\n", "\n")
-            .replace(r"\t", "\t")
-            .replace(r"\r", "\r")
-            .replace("\\\n", "")
-            .replace(r#"\""#, "\"");
-
-        while let Some(idx) = string.find("\\u") {
-            let chr = std::char::from_u32(
-                u32::from_str_radix(&string[(idx + 2)..(idx + 8)], 16).unwrap(),
-            )
-            .unwrap_or('�');
-            string.replace_range(idx..(idx + 8), &chr.to_string());
+        enum CompiledElements<A> {
+            Body(String),
+            Interpolation(A),
         }
 
-        let string = string.replace(r"\\", r"\");
+        let mut compiled_elements = Vec::with_capacity(elements.len());
+        let mut string_capacity = elements.len();
+        for element in elements {
+            match element {
+                StringElement::Body(element) => {
+                    let mut element = element
+                        .replace(r"\n", "\n")
+                        .replace(r"\t", "\t")
+                        .replace(r"\r", "\r")
+                        .replace("\\\n", "")
+                        .replace(r"\$", "$")
+                        .replace(r#"\""#, "\"");
 
-        move |_, _| {
-            let string = string.clone();
-            async move { Ok(Value::String(string)) }.boxed()
+                    while let Some(idx) = element.find("\\u") {
+                        let chr = std::char::from_u32(
+                            u32::from_str_radix(&element[(idx + 2)..(idx + 8)], 16).unwrap(),
+                        )
+                        .unwrap_or('�');
+                        element.replace_range(idx..(idx + 8), &chr.to_string());
+                    }
+
+                    let element = element.replace(r"\\", r"\");
+                    string_capacity += element.len();
+                    string_capacity -= 1;
+
+                    if let Some(CompiledElements::Body(b)) = compiled_elements.last_mut() {
+                        b.push_str(&element)
+                    } else {
+                        compiled_elements.push(CompiledElements::Body(element));
+                    }
+                }
+                StringElement::Interpolation(i) => {
+                    compiled_elements.push(CompiledElements::Interpolation(self.visit(i)))
+                }
+            }
+        }
+
+        let elements = Arc::new(compiled_elements);
+
+        move |inner, frame| {
+            let elements = Arc::clone(&elements);
+            let inner = Arc::clone(inner);
+
+            async move {
+                let mut string = String::with_capacity(string_capacity);
+                for element in elements.iter() {
+                    match element {
+                        CompiledElements::Body(b) => string.push_str(b),
+                        CompiledElements::Interpolation(i) => {
+                            let v = i(&inner, frame).await?;
+                            if let Value::String(s) = &v {
+                                string.push_str(s);
+                            } else {
+                                write!(&mut string, "{v}").expect("Write to string failed!");
+                            }
+                        }
+                    }
+                }
+                Ok(Value::String(string))
+            }
+            .boxed()
         }
     }
 
@@ -1354,7 +1412,7 @@ impl Visitor {
     {
         self.binop(a, b, |a, b| {
             try_numeric_math(a, b, |a, b| Ok(Value::OutOfLine(PlaygroundValue::Num(a - b))))
-                .unwrap_or_else(|| Err(error!("Type Mismatch: Cannot subtract non-numeric values")))
+                .unwrap_or_else(|| Err(Exception::BadNumericOperands("-").into()))
         })
     }
 

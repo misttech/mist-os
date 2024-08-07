@@ -388,6 +388,23 @@ stats: {
 	average: 166.25531914893617
 }
 stats: {
+	name: "RemoteMetadata.TotalOutputBytes"
+	count: 35608332
+	outliers: {
+		command_id: "1c2a12e4-d56ac563"
+		value: 2633657
+	}
+	outliers: {
+		command_id: "1c2a12e4-eb41eb70"
+		value: 2395373
+	}
+	median: 657753
+	percentile75: 1051777
+	percentile85: 1264361
+	percentile95: 1786261
+	average: 757624.085106383
+}
+stats: {
 	name: "RemoteMetadata.LogicalBytesDownloaded"
 	count: 35608332
 	outliers: {
@@ -860,6 +877,23 @@ stats: {
 	percentile85: 212
 	percentile95: 239
 	average: 166.25531914893617
+}
+stats: {
+	name: "[compiler=clang,lang=cpp,type=compile].RemoteMetadata.TotalOutputBytes"
+	count: 35608332
+	outliers: {
+		command_id: "1c2a12e4-d56ac563"
+		value: 2633657
+	}
+	outliers: {
+		command_id: "1c2a12e4-eb41eb70"
+		value: 2395373
+	}
+	median: 657753
+	percentile75: 1051777
+	percentile85: 1264361
+	percentile95: 1786261
+	average: 757624.085106383
 }
 stats: {
 	name: "[compiler=clang,lang=cpp,type=compile].RemoteMetadata.LogicalBytesDownloaded"

@@ -14,6 +14,7 @@
 #include <netinet/if_ether.h>
 #include <netinet/ip.h>
 #include <netinet/ip_icmp.h>
+#include <netinet/tcp.h>
 
 #include <future>
 #include <latch>
@@ -1095,6 +1096,23 @@ TEST_P(SocketOptsTest, SetReceiveTOSShort) {
   EXPECT_EQ(get, kSockOptOff);
 
   EXPECT_EQ(close(s.release()), 0) << strerror(errno);
+}
+
+TEST_P(SocketOptsTest, GetTcpCongestionWithZeroOptLen) {
+  if (!IsTCP()) {
+    GTEST_SKIP() << "Skip congestion control tests for non TCP sockets";
+  }
+
+  fbl::unique_fd s;
+  ASSERT_TRUE(s = NewSocket()) << strerror(errno);
+
+  char buf[] = "TEST";
+  socklen_t optlen = 0;
+  ASSERT_EQ(getsockopt(s.get(), SOL_TCP, TCP_CONGESTION, buf, &optlen), 0) << strerror(errno);
+
+  // The above getsockopt should be a no-op: optlen should still be 0 and the buf is not modified.
+  ASSERT_EQ(optlen, 0u);
+  ASSERT_STREQ(buf, "TEST");
 }
 
 TEST_P(SocketOptsTest, UpdateAnyTimestampDisablesOtherTimestampOptions) {

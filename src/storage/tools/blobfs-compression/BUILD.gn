@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/sdk/sdk_host_tool.gni")
-import("//build/test.gni")
 
 static_library("common") {
   public = [ "blobfs-compression.h" ]

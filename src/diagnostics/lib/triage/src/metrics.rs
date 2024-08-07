@@ -1143,7 +1143,7 @@ pub(crate) mod test {
     use super::*;
     use crate::config::{DiagnosticData, Source};
     use anyhow::Error;
-    use lazy_static::lazy_static;
+    use std::sync::LazyLock;
 
     #[macro_export]
     macro_rules! make_metrics {
@@ -1211,26 +1211,26 @@ pub(crate) mod test {
         };
     }
 
-    lazy_static! {
-        static ref EMPTY_F: Vec<DiagnosticData> = {
-            let s = r#"[]"#;
-            vec![DiagnosticData::new("i".to_string(), Source::Inspect, s.to_string()).unwrap()]
-        };
-        static ref NO_PAYLOAD_F: Vec<DiagnosticData> = {
-            let s = r#"[{"moniker": "abcd", "payload": null}]"#;
-            vec![DiagnosticData::new("i".to_string(), Source::Inspect, s.to_string()).unwrap()]
-        };
-        static ref BAD_PAYLOAD_F: Vec<DiagnosticData> = {
-            let s = r#"[{"moniker": "abcd", "payload": ["a", "b"]}]"#;
-            vec![DiagnosticData::new("i".to_string(), Source::Inspect, s.to_string()).unwrap()]
-        };
-        static ref EMPTY_FILE_FETCHER: FileDataFetcher<'static> = FileDataFetcher::new(&EMPTY_F);
-        static ref EMPTY_TRIAL_FETCHER: TrialDataFetcher<'static> = TrialDataFetcher::new_empty();
-        static ref NO_PAYLOAD_FETCHER: FileDataFetcher<'static> =
-            FileDataFetcher::new(&NO_PAYLOAD_F);
-        static ref BAD_PAYLOAD_FETCHER: FileDataFetcher<'static> =
-            FileDataFetcher::new(&BAD_PAYLOAD_F);
-    }
+    static EMPTY_F: LazyLock<Vec<DiagnosticData>> = LazyLock::new(|| {
+        let s = r#"[]"#;
+        vec![DiagnosticData::new("i".to_string(), Source::Inspect, s.to_string()).unwrap()]
+    });
+    static NO_PAYLOAD_F: LazyLock<Vec<DiagnosticData>> = LazyLock::new(|| {
+        let s = r#"[{"moniker": "abcd", "payload": null}]"#;
+        vec![DiagnosticData::new("i".to_string(), Source::Inspect, s.to_string()).unwrap()]
+    });
+    static BAD_PAYLOAD_F: LazyLock<Vec<DiagnosticData>> = LazyLock::new(|| {
+        let s = r#"[{"moniker": "abcd", "payload": ["a", "b"]}]"#;
+        vec![DiagnosticData::new("i".to_string(), Source::Inspect, s.to_string()).unwrap()]
+    });
+    static EMPTY_FILE_FETCHER: LazyLock<FileDataFetcher<'static>> =
+        LazyLock::new(|| FileDataFetcher::new(&EMPTY_F));
+    static EMPTY_TRIAL_FETCHER: LazyLock<TrialDataFetcher<'static>> =
+        LazyLock::new(TrialDataFetcher::new_empty);
+    static NO_PAYLOAD_FETCHER: LazyLock<FileDataFetcher<'static>> =
+        LazyLock::new(|| FileDataFetcher::new(&NO_PAYLOAD_F));
+    static BAD_PAYLOAD_FETCHER: LazyLock<FileDataFetcher<'static>> =
+        LazyLock::new(|| FileDataFetcher::new(&BAD_PAYLOAD_F));
 
     #[fuchsia::test]
     fn focus_on_important_errors() {

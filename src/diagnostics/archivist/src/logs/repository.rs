@@ -17,17 +17,16 @@ use fuchsia_sync::{Mutex, RwLock};
 use futures::channel::mpsc;
 use futures::prelude::*;
 use moniker::Moniker;
-use once_cell::sync::Lazy;
 use selectors::SelectorExt;
 use std::collections::{BTreeMap, HashMap};
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 use tracing::{debug, error};
 use {fuchsia_async as fasync, fuchsia_inspect as inspect, fuchsia_trace as ftrace};
 
 static INTEREST_CONNECTION_ID: AtomicUsize = AtomicUsize::new(0);
-static ARCHIVIST_MONIKER: Lazy<Moniker> =
-    Lazy::new(|| Moniker::parse_str("bootstrap/archivist").unwrap());
+static ARCHIVIST_MONIKER: LazyLock<Moniker> =
+    LazyLock::new(|| Moniker::parse_str("bootstrap/archivist").unwrap());
 
 /// LogsRepository holds all diagnostics data and is a singleton wrapped by multiple
 /// [`pipeline::Pipeline`]s in a given Archivist instance.

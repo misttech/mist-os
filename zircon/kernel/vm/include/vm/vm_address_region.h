@@ -983,6 +983,13 @@ class VmMapping final : public VmAddressRegionOrMapping,
     return size_;
   }
 
+  Lock<CriticalMutex>* object_lock() const TA_RET_CAP(object_->lock()) TA_REQ(lock()) {
+    return object_->lock();
+  }
+  Lock<CriticalMutex>& object_lock_ref() const TA_RET_CAP(object_->lock()) TA_REQ(lock()) {
+    return object_->lock_ref();
+  }
+
   // Intended to be used from VmEnumerator callbacks where the aspace_->lock() will be held.
   fbl::RefPtr<VmObject> vmo_locked() const TA_REQ(lock()) { return object_; }
   fbl::RefPtr<VmObject> vmo() const TA_EXCL(lock());

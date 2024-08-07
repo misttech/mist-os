@@ -185,7 +185,7 @@ class AmlRawNand : public DeviceType, public ddk::RawNandProtocol<AmlRawNand, dd
   // those should completely fail ECC.
   zx_status_t AmlGetECCCorrections(int ecc_pages, uint32_t nand_page, uint32_t* ecc_corrected,
                                    bool* erased) __TA_REQUIRES(mutex_);
-  zx_status_t AmlCheckECCPages(int ecc_pages, int ecc_pagesize) __TA_REQUIRES(mutex_);
+  zx_status_t AmlCheckECCPages(int ecc_pages) __TA_REQUIRES(mutex_);
   void AmlSetClockRate(uint32_t clk_freq);
   void AmlClockInit();
   void AmlAdjustTimings(uint32_t tRC_min, uint32_t tREA_max, uint32_t RHOH_min);

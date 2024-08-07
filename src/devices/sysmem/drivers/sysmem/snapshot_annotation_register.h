@@ -16,8 +16,7 @@ class ServiceDirectory;
 /// Sends annotations to Feedback that are attached to its snapshots.
 class SnapshotAnnotationRegister {
  public:
-  SnapshotAnnotationRegister() = default;
-  ~SnapshotAnnotationRegister();
+  explicit SnapshotAnnotationRegister(async_dispatcher_t* dispatcher);
 
   SnapshotAnnotationRegister(const SnapshotAnnotationRegister& other) = delete;
   SnapshotAnnotationRegister& operator=(const SnapshotAnnotationRegister& other) = delete;
@@ -27,24 +26,23 @@ class SnapshotAnnotationRegister {
   // ServiceDirectory. If not called, or if set to nullptr, no crash annotations are reported.
   // The FIDL client will be bound to the given dispatcher.
   void SetServiceDirectory(std::shared_ptr<sys::ServiceDirectory> service_directory,
-                           async_dispatcher_t* dispatcher) __TA_EXCLUDES(lock_);
-  void UnsetServiceDirectory() __TA_EXCLUDES(lock_) { SetServiceDirectory(nullptr, nullptr); }
+                           async_dispatcher_t* dispatcher);
+  void UnsetServiceDirectory() { SetServiceDirectory(nullptr, nullptr); }
 
   // Increments the reported number of DMA corruption events detected during the current boot.
-  void IncrementNumDmaCorruptions() __TA_EXCLUDES(lock_);
+  void IncrementNumDmaCorruptions();
 
  private:
   // Records what thread it is first called on, and then asserts that all subsequent calls come from
   // the same thread. We use it to ensure that `client_` is only used on the same thread in which it
   // was bound.
-  void AssertRunningOnClientThread() __TA_REQUIRES(lock_);
+  void AssertRunningSynchronized();
 
-  void Flush() __TA_REQUIRES(lock_);
+  void Flush();
 
-  std::mutex lock_;
-  uint64_t num_dma_corruptions_ __TA_GUARDED(lock_) = 0;
-  fidl::Client<fuchsia_feedback::ComponentDataRegister> client_ __TA_GUARDED(lock_);
-  std::optional<std::thread::id> client_thread_ __TA_GUARDED(lock_);
+  uint64_t num_dma_corruptions_ = 0;
+  fidl::Client<fuchsia_feedback::ComponentDataRegister> client_;
+  async::synchronization_checker synchronization_checker_;
 };
 
 #endif  // SRC_DEVICES_SYSMEM_DRIVERS_SYSMEM_SNAPSHOT_ANNOTATION_REGISTER_H_

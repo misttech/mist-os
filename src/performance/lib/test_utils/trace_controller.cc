@@ -23,25 +23,27 @@ fit::result<fit::failed, Tracer> StartTracing(fuchsia_tracing_controller::TraceC
     return fit::failed();
   }
 
-  fidl::SyncClient<fuchsia_tracing_controller::Controller> controller;
+  fidl::SyncClient<fuchsia_tracing_controller::Provisioner> launcher;
   {
-    zx::result client_end = component::Connect<fuchsia_tracing_controller::Controller>();
-    if (client_end.is_error()) {
-      FX_PLOGS(ERROR, client_end.status_value())
-          << "failed to connect to fuchsia.tracing.controller/Controller";
+    zx::result launcher_client = component::Connect<fuchsia_tracing_controller::Provisioner>();
+    if (launcher_client.is_error()) {
+      FX_PLOGS(ERROR, launcher_client.status_value())
+          << "failed to connect to fuchsia.tracing.controller/Provisioner";
       return fit::failed();
     }
-    controller.Bind(std::move(*client_end));
+    launcher.Bind(std::move(*launcher_client));
   }
 
-  if (fit::result<fidl::OneWayError> response =
-          controller->InitializeTracing({std::move(trace_config), std::move(outgoing_socket)});
+  auto endpoints = fidl::Endpoints<fuchsia_tracing_controller::Session>::Create();
+  if (fit::result<fidl::OneWayError> response = launcher->InitializeTracing(
+          {std::move(endpoints.server), std::move(trace_config), std::move(outgoing_socket)});
       response.is_error()) {
     FX_LOGS(ERROR) << "failed to initialize tracing: " << response.error_value();
     return fit::failed();
   }
+  fidl::SyncClient controller{std::move(endpoints.client)};
 
-  if (fidl::Result<fuchsia_tracing_controller::Controller::StartTracing> response =
+  if (fidl::Result<fuchsia_tracing_controller::Session::StartTracing> response =
           controller->StartTracing({});
       response.is_error()) {
     FX_LOGS(ERROR) << "failed to start tracing: " << response.error_value();
@@ -69,15 +71,16 @@ fit::result<fit::failed, Tracer> StartTracing(fuchsia_tracing_controller::TraceC
 }
 
 fit::result<fit::failed> StopTracing(Tracer tracer) {
-  fuchsia_tracing_controller::TerminateOptions terminate_options;
-  terminate_options.write_results(true);
+  fuchsia_tracing_controller::StopOptions stop_options;
+  stop_options.write_results(true);
 
-  if (fidl::Result<fuchsia_tracing_controller::Controller::TerminateTracing> response =
-          tracer.controller->TerminateTracing({terminate_options});
+  if (fidl::Result<fuchsia_tracing_controller::Session::StopTracing> response =
+          tracer.controller->StopTracing({stop_options});
       response.is_error()) {
-    FX_LOGS(ERROR) << "failed to terminate tracing: " << response.error_value();
+    FX_LOGS(ERROR) << "failed to stop tracing: " << response.error_value();
     return fit::failed();
   }
+  tracer.controller = fidl::SyncClient<fuchsia_tracing_controller::Session>();
 
   tracer.future.wait();
   if (zx_status_t status = tracer.future.get(); status != ZX_OK) {

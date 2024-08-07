@@ -22,6 +22,15 @@ class SetUIAccessibility : public fuchsia::settings::Accessibility {
 
   // |fuchsia.settings.Accessibility|
   void Watch(WatchCallback callback) override {
+    // Watch() will response immediately for the first call, otherwise Watch()
+    // will hang until AccessibilitySettings is updated. Because this fake
+    // setui service does not support Set(), just not call the callback.
+    if (!is_first_watch_call_) {
+      return;
+    }
+
+    is_first_watch_call_ = false;
+
     // just return default settings.
     fuchsia::settings::AccessibilitySettings settings;
     callback(std::move(settings));
@@ -33,6 +42,7 @@ class SetUIAccessibility : public fuchsia::settings::Accessibility {
   }
 
  private:
+  bool is_first_watch_call_ = true;
   fidl::BindingSet<fuchsia::settings::Accessibility> bindings_;
 };
 

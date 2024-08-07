@@ -14,6 +14,8 @@
 
 #include <cstdint>
 
+#include <phys/handoff.h>
+
 namespace userboot {
 
 // This is only here for the count.  No userboot code cares which is which
@@ -60,7 +62,8 @@ enum HandleIndex : uint32_t {
 #endif
 
   kFirstInstrumentationData,
-  kHandleCount = kFirstInstrumentationData + InstrumentationData::vmo_count()
+  kFirstPhysVmo = kFirstInstrumentationData + InstrumentationData::vmo_count(),
+  kHandleCount = kFirstPhysVmo + PhysVmo::kMaxHandoffPhysVmos,
 };
 
 // Copied from sdk/lib/fdio/include/lib/fdio/io.h to avoid the dependency. When this is passed

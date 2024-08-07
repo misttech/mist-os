@@ -12,7 +12,6 @@
 #include <cctype>
 #include <charconv>
 #include <cmath>
-#include <sstream>
 #include <string>
 #include <vector>
 
@@ -29,7 +28,8 @@ namespace {
 // Returns a view starting at the next line in |str| or an empty view if none are left.
 std::string_view ToNextLine(std::string_view str) {
   const size_t pos = str.find_first_of('\n');
-  return (pos != str.npos && pos != str.size()) ? str.substr(pos + 1) : std::string_view();
+  return (pos != std::string_view::npos && pos != str.size()) ? str.substr(pos + 1)
+                                                              : std::string_view();
 }
 
 // Returns true if |str| starts like a repeated message line.
@@ -299,8 +299,8 @@ bool Concatenate(const std::string& logs_dir, const StorageSize max_decompressed
 
   // Compression ratio rounded up to the next decimal, e.g., 2.54x compression -> 2.6x.
   uint32_t decimal_ratio =
-      ((uint32_t)uncompressed_log.size() * 10 - 1) / total_compressed_log_size + 1;
-  *compression_ratio = ((float)decimal_ratio) / 10.0f;
+      (static_cast<uint32_t>(uncompressed_log.size()) * 10 - 1) / total_compressed_log_size + 1;
+  *compression_ratio = (static_cast<float>(decimal_ratio)) / 10.0f;
 
   return true;
 }

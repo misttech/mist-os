@@ -812,13 +812,10 @@ impl<T: MulAssign + AddAssign + PartialOrd + Add<Output = T> + Copy + Default + 
 #[cfg(test)]
 mod tests {
     use super::*;
-
     use diagnostics_hierarchy::testing::CondensableOnDemand;
-    use lazy_static::lazy_static;
+    use std::sync::LazyLock;
 
-    lazy_static! {
-        static ref TEST_REGEX: Regex = Regex::new("a").unwrap();
-    }
+    static TEST_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new("a").unwrap());
 
     #[fuchsia::test]
     fn test_assert_json_diff() {

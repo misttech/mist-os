@@ -87,7 +87,7 @@ group("tests") {
     foreach(test_name, syscall_tests) {
       deps += [
         # These are Linux tests, so we can run them as host tests on our host Linux bot.
-        ":${test_name}_baseline($host_toolchain)",
+        ":starnix_${test_name}_baseline($host_toolchain)",
       ]
     }
   }
@@ -198,7 +198,7 @@ template("syscall_test") {
   }
 
   _target_test_label = "${test_name}_bin"
-  _host_test_label = "${test_name}_host"
+  _host_test_label = "starnix_${test_name}_host"
   if (is_linux) {
     _test_deps = [
       ":test_utils",
@@ -247,7 +247,7 @@ template("syscall_test") {
   }
 
   if (is_host) {
-    host_test("${target_name}_baseline") {
+    host_test("starnix_${target_name}_baseline") {
       binary_path =
           get_label_info(":${_host_test_label}($_host_linux_toolchain)",
                          "root_out_dir") + "/$_host_test_label"

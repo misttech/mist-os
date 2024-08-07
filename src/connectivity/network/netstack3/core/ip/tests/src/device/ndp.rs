@@ -25,7 +25,7 @@ use packet_formats::icmp::ndp::{
     OptionSequenceBuilder, Options, RouterAdvertisement, RouterSolicitation,
 };
 use packet_formats::icmp::{IcmpEchoRequest, IcmpPacketBuilder, IcmpUnusedCode};
-use packet_formats::ip::{IpProto, Ipv6Proto};
+use packet_formats::ip::{DscpAndEcn, IpProto, Ipv6Proto};
 use packet_formats::ipv6::Ipv6PacketBuilder;
 use packet_formats::testutil::{
     parse_ethernet_frame, parse_icmp_packet_in_ip_packet_in_ethernet_frame,
@@ -241,6 +241,7 @@ fn test_address_resolution() {
                 proto: Ipv6Proto::Icmpv6,
                 ttl: None,
                 mtu: None,
+                dscp_and_ecn: DscpAndEcn::default(),
             },
             body,
         )
@@ -1009,6 +1010,7 @@ fn test_sending_ipv6_packet_after_hop_limit_change() {
                 proto: IpProto::Tcp.into(),
                 ttl: None,
                 mtu: None,
+                dscp_and_ecn: DscpAndEcn::default(),
             },
             [].into_serializer(),
         )

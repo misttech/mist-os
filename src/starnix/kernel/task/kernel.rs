@@ -14,11 +14,13 @@ use crate::device::remote_block_device::RemoteBlockDeviceRegistry;
 use crate::device::{BinderDevice, DeviceMode, DeviceRegistry};
 #[cfg(feature = "starnix_lite")]
 use crate::device::{DeviceMode, DeviceRegistry};
+use crate::execution::CrashReporter;
 use crate::fs::nmfs::NetworkManagerHandle;
 use crate::fs::proc::SystemLimits;
 use crate::memory_attribution::MemoryAttributionManager;
 use crate::mm::{FutexTable, SharedFutexKey};
 use crate::power::SuspendResumeManagerHandle;
+use crate::security;
 use crate::task::{
     AbstractUnixSocketNamespace, AbstractVsockSocketNamespace, CurrentTask, HrTimerManager,
     HrTimerManagerHandle, IpTables, KernelStats, KernelThreads, NetstackDevices, PidTable,
@@ -38,14 +40,14 @@ use bstr::BString;
 use fidl::endpoints::{
     create_endpoints, ClientEnd, DiscoverableProtocolMarker, ProtocolMarker, Proxy,
 };
+use fidl_fuchsia_feedback::CrashReporterProxy;
 use fidl_fuchsia_scheduler::RoleManagerSynchronousProxy;
 use futures::FutureExt;
 use netlink::interfaces::InterfacesHandler;
 use netlink::{Netlink, NETLINK_LOG_TAG};
 use once_cell::sync::OnceCell;
-use selinux::security_server::SecurityServer;
 use starnix_lifecycle::{AtomicU32Counter, AtomicU64Counter};
-use starnix_logging::{log_error, CoreDumpList};
+use starnix_logging::log_error;
 use starnix_sync::{
     DeviceOpen, KernelIpTables, KernelSwapFiles, LockBefore, Locked, OrderedMutex, OrderedRwLock,
     RwLock,
@@ -127,8 +129,8 @@ pub struct Kernel {
     pub selinux_fs: OnceCell<FileSystemHandle>,
     // Owned by nmfs.rs
     pub nmfs: OnceCell<FileSystemHandle>,
-    // The SELinux security server. Initialized if SELinux is enabled.
-    pub security_server: Option<Arc<SecurityServer>>,
+    // Global state held by the Linux Security Modules subsystem.
+    pub security_state: security::KernelState,
     // Owned by tracefs/fs.rs
     pub trace_fs: OnceCell<FileSystemHandle>,
     // Owned by vfs/fuse.rs
@@ -206,9 +208,6 @@ pub struct Kernel {
     /// Inspect instrumentation for this kernel instance.
     pub inspect_node: fuchsia_inspect::Node,
 
-    /// Diagnostics information about crashed tasks.
-    pub core_dumps: CoreDumpList,
-
     /// The kinds of seccomp action that gets logged, stored as a bit vector.
     /// Each potential SeccompAction gets a bit in the vector, as specified by
     /// SeccompAction::logged_bit_offset.  If the bit is set, that means the
@@ -265,6 +264,9 @@ pub struct Kernel {
 
     /// The manager for monitoring and reporting resources used by the kernel.
     pub memory_attribution_manager: MemoryAttributionManager,
+
+    /// Handler for crashing Linux processes.
+    pub crash_reporter: CrashReporter,
 }
 
 /// An implementation of [`InterfacesHandler`].
@@ -321,9 +323,10 @@ impl Kernel {
         container_svc: Option<fio::DirectoryProxy>,
         container_data_dir: Option<fio::DirectorySynchronousProxy>,
         role_manager: Option<RoleManagerSynchronousProxy>,
+        crash_reporter_proxy: Option<CrashReporterProxy>,
         inspect_node: fuchsia_inspect::Node,
         #[cfg(not(feature = "starnix_lite"))] framebuffer_aspect_ratio: Option<&AspectRatio>,
-        security_server: Option<Arc<SecurityServer>>,
+        security_state: security::KernelState,
     ) -> Result<Arc<Kernel>, zx::Status> {
         let unix_address_maker =
             Box::new(|x: FsString| -> SocketAddress { SocketAddress::Unix(x) });
@@ -332,7 +335,7 @@ impl Kernel {
         let framebuffer =
             Framebuffer::new(framebuffer_aspect_ratio).expect("Failed to create framebuffer");
 
-        let core_dumps = CoreDumpList::new(inspect_node.create_child("coredumps"));
+        let crash_reporter = CrashReporter::new(&inspect_node, crash_reporter_proxy);
         let network_manager = NetworkManagerHandle::new_with_inspect(&inspect_node);
 
         let this = Arc::new_cyclic(|kernel| Kernel {
@@ -353,7 +356,7 @@ impl Kernel {
             sys_fs: Default::default(),
             selinux_fs: Default::default(),
             nmfs: Default::default(),
-            security_server,
+            security_state,
             trace_fs: Default::default(),
             fusectl_fs: Default::default(),
             device_registry: DeviceRegistry::new(),
@@ -377,7 +380,6 @@ impl Kernel {
             generic_netlink: OnceCell::new(),
             network_netlink: OnceCell::new(),
             inspect_node,
-            core_dumps,
             actions_logged: AtomicU16::new(0),
             suspend_resume_manager: Default::default(),
             network_manager,
@@ -396,6 +398,7 @@ impl Kernel {
             mounts: Mounts::new(),
             hrtimer_manager: HrTimerManager::new(),
             memory_attribution_manager: MemoryAttributionManager::new(kernel.clone()),
+            crash_reporter,
         });
 
         // Make a copy of this Arc for the inspect lazy node to use but don't create an Arc cycle
@@ -480,13 +483,6 @@ impl Kernel {
         &self,
     ) -> Result<ClientEnd<P>, Errno> {
         self.connect_to_named_protocol_at_container_svc::<P>(P::PROTOCOL_NAME)
-    }
-
-    /// Returns true if SELinux is enabled with a hard-coded fake policy.
-    /// This is a temporary API, for use at call-sites which the SELinux
-    /// implementation does not yet support.
-    pub fn has_fake_selinux(&self) -> bool {
-        self.security_server.as_ref().is_some_and(|s| s.is_fake())
     }
 
     fn get_thread_groups_inspect(&self) -> fuchsia_inspect::Inspector {

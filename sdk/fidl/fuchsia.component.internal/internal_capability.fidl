@@ -1,0 +1,19 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+library fuchsia.component.internal;
+
+using fuchsia.component.decl;
+
+type InternalCapability = strict union {
+    1: config fuchsia.component.decl.name;
+    2: dictionary fuchsia.component.decl.name;
+    3: directory fuchsia.component.decl.name;
+    4: event_stream fuchsia.component.decl.name;
+    5: protocol fuchsia.component.decl.name;
+    6: resolver fuchsia.component.decl.name;
+    7: runner fuchsia.component.decl.name;
+    8: service fuchsia.component.decl.name;
+    9: storage fuchsia.component.decl.name;
+};

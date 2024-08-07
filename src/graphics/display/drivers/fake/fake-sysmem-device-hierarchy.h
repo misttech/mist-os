@@ -5,14 +5,14 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_FAKE_FAKE_SYSMEM_DEVICE_HIERARCHY_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_FAKE_FAKE_SYSMEM_DEVICE_HIERARCHY_H_
 
-#include <fidl/fuchsia.hardware.sysmem/cpp/fidl.h>
-#include <fidl/fuchsia.io/cpp/fidl.h>
-#include <lib/async-loop/cpp/loop.h>
-#include <lib/component/outgoing/cpp/outgoing_directory.h>
-#include <lib/zx/result.h>
+#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
+#include <lib/driver/testing/cpp/driver_lifecycle.h>
+#include <lib/driver/testing/cpp/driver_runtime.h>
+#include <lib/driver/testing/cpp/test_environment.h>
+#include <lib/driver/testing/cpp/test_node.h>
 
 #include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
-#include "src/devices/sysmem/drivers/sysmem/driver.h"
+#include "src/devices/sysmem/drivers/sysmem/device.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 #include "src/graphics/display/drivers/fake/sysmem-service-provider.h"
 
@@ -22,45 +22,46 @@ class FakeSysmemDeviceHierarchy : public SysmemServiceProvider {
  public:
   static zx::result<std::unique_ptr<FakeSysmemDeviceHierarchy>> Create();
 
-  explicit FakeSysmemDeviceHierarchy(std::unique_ptr<fake_pdev::FakePDevFidl> fake_pdev);
+  FakeSysmemDeviceHierarchy();
   ~FakeSysmemDeviceHierarchy() override;
 
-  FakeSysmemDeviceHierarchy(const FakeSysmemDeviceHierarchy&) = delete;
-  FakeSysmemDeviceHierarchy& operator=(const FakeSysmemDeviceHierarchy&) = delete;
-  FakeSysmemDeviceHierarchy(FakeSysmemDeviceHierarchy&&) = delete;
-  FakeSysmemDeviceHierarchy& operator=(FakeSysmemDeviceHierarchy&&) = delete;
-
-  // Initialization logic not suitable for the constructor.
-  zx::result<> Initialize();
-
-  // SysmemServiceProvider:
   zx::result<fidl::ClientEnd<fuchsia_io::Directory>> GetOutgoingDirectory() override;
 
  private:
-  zx::result<> InitializeIncomingServices();
-  zx::result<> CreateAndBindSysmemDevice();
-  void SyncShutdown();
+  fdf_testing::DriverRuntime& runtime() { return *runtime_; }
+  async_patterns::TestDispatcherBound<fdf_testing::DriverUnderTest<sysmem_driver::Device>>&
+  driver() {
+    return device_;
+  }
 
-  fuchsia_hardware_platform_device::Service::InstanceHandler
-  GetPlatformDeviceServiceInstanceHandler() const;
+  async_dispatcher_t* driver_async_dispatcher() {
+    return (*driver_dispatcher_)->async_dispatcher();
+  }
+  async_dispatcher_t* env_async_dispatcher() { return (*env_dispatcher_)->async_dispatcher(); }
 
-  std::shared_ptr<MockDevice> mock_root_ = MockDevice::FakeRootParent();
+  // Attaches a foreground dispatcher for us automatically.
+  std::shared_ptr<fdf_testing::DriverRuntime> runtime_ = mock_ddk::GetDriverRuntime();
 
-  // Serves the `incoming_` service directory and the fake platform device.
-  // Must outlive `incoming_` and `fake_pdev_`.
-  async::Loop env_loop_{&kAsyncLoopConfigNeverAttachToThread};
+  // Env dispatcher and driver dispatchers run separately in the background because we need to make
+  // sync calls from driver dispatcher to env dispatcher, and from test thread to driver dispatcher
+  // (in Connect).
+  std::optional<fdf::UnownedSynchronizedDispatcher> driver_dispatcher_ =
+      runtime_->StartBackgroundDispatcher();
+  std::optional<fdf::UnownedSynchronizedDispatcher> env_dispatcher_ =
+      runtime_->StartBackgroundDispatcher();
 
-  std::unique_ptr<fake_pdev::FakePDevFidl> fake_pdev_;
+  async_patterns::TestDispatcherBound<fdf_testing::TestNode> node_server_{
+      env_async_dispatcher(), std::in_place, std::string("root")};
+  async_patterns::TestDispatcherBound<fake_pdev::FakePDevFidl> fake_pdev_{env_async_dispatcher(),
+                                                                          std::in_place};
+  async_patterns::TestDispatcherBound<fdf_testing::TestEnvironment> test_environment_{
+      env_async_dispatcher(), std::in_place};
 
-  // Directory of incoming services to be consumed by the fake sysmem Device.
-  // Must be created, called and destroyed on `env_loop_`.
-  std::optional<component::OutgoingDirectory> incoming_;
+  async_patterns::TestDispatcherBound<fdf_testing::DriverUnderTest<sysmem_driver::Device>> device_{
+      driver_async_dispatcher(), std::in_place};
 
-  // Must outlive the created `sysmem_driver::Device` instance managed by the
-  // mock ddk.
-  sysmem_driver::Driver driver_context_;
-
-  zx_device_t* sysmem_device_ = nullptr;
+  fuchsia_driver_framework::DriverStartArgs start_args_;
+  fidl::ClientEnd<fuchsia_io::Directory> driver_outgoing_;
 };
 
 }  // namespace display

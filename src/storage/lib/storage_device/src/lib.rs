@@ -76,6 +76,11 @@ pub trait Device: Send + Sync {
     fn discard_random_since_last_flush(&self) -> Result<(), Error> {
         bail!("Not supported");
     }
+
+    /// Poisons a device to panic on drop. Used to find hanging references.
+    fn poison(&self) -> Result<(), Error> {
+        bail!("Not supported");
+    }
 }
 
 // Arc<dyn Device> can easily be cloned and supports concurrent access, but sometimes exclusive

@@ -34,7 +34,6 @@
                 "fuchsia.element.GraphicalPresenter",
                 "fuchsia.kernel.HypervisorResource",
                 "fuchsia.kernel.VmexResource",
-                "fuchsia.logger.LogSink",
                 "fuchsia.media.Audio",
                 "fuchsia.net.virtualization.Control",
                 "fuchsia.scheduler.RoleManager",

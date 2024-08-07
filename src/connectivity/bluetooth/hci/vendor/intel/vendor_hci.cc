@@ -20,12 +20,12 @@
 namespace bt_hci_intel {
 namespace fhbt = fuchsia_hardware_bluetooth;
 
-using ::bt::hci::CommandPacket;
-
 namespace {
 
 constexpr size_t kMaxSecureSendArgLen = 252;
 constexpr auto kInitTimeoutMs = zx::sec(10);
+constexpr size_t kCommandCompleteEventSize =
+    pw::bluetooth::emboss::CommandCompleteEvent::IntrinsicSizeInBytes();
 
 }  // namespace
 
@@ -169,116 +169,148 @@ ReadVersionReturnParamsTlv parse_tlv_version_return_params(const uint8_t* p, siz
   return params;
 }
 
-ReadVersionReturnParams VendorHci::SendReadVersion() const {
-  auto packet = CommandPacket::New(kReadVersion);
-  SendCommand(packet->view());
-  auto evt_packet = WaitForEventPacket();
-  if (evt_packet) {
-    auto params = evt_packet->return_params<ReadVersionReturnParams>();
-    if (params)
-      return *params;
+std::vector<uint8_t> VendorHci::SendReadVersion() const {
+  std::vector<uint8_t> cmd_packet(pw::bluetooth::emboss::CommandHeader::IntrinsicSizeInBytes(),
+                                  0x00);
+  auto view = pw::bluetooth::emboss::MakeCommandHeaderView(&cmd_packet);
+  view.opcode_bits().ogf().Write(kVendorOgf);
+  view.opcode_bits().ocf().Write(kReadVersionOcf);
+  view.parameter_total_size().Write(0);
+
+  SendCommand(std::move(cmd_packet));
+
+  std::vector<uint8_t> evt_packet = WaitForEventBuffer();
+  if (evt_packet.size() < ReadVersionCommandCompleteEvent::IntrinsicSizeInBytes()) {
+    return {};
   }
-  errorf("VendorHci: ReadVersion: Error reading response!");
-  return ReadVersionReturnParams{.status = pw::bluetooth::emboss::StatusCode::UNSPECIFIED_ERROR};
+  return evt_packet;
 }
 
-ReadVersionReturnParamsTlv VendorHci::SendReadVersionTlv() const {
-  auto packet = CommandPacket::New(kReadVersion, sizeof(VersionCommandParams));
-  auto params = packet->mutable_payload<VersionCommandParams>();
-  params->para0 = kVersionSupportTlv;  // Only meaningful for AX210 and later.
-  SendCommand(packet->view());
-  auto evt_packet = WaitForEventPacket();
-  if (evt_packet) {
-    size_t packet_size =
-        evt_packet->view().payload_size() - sizeof(bt::hci_spec::CommandCompleteEventParams);
-    const uint8_t* p = evt_packet->return_params<uint8_t>();
-    if (p)
-      return parse_tlv_version_return_params(p, packet_size);
+std::optional<ReadVersionReturnParamsTlv> VendorHci::SendReadVersionTlv() const {
+  std::vector<uint8_t> packet(ReadVersionTlvCommand::IntrinsicSizeInBytes(), 0x00);
+  auto view = MakeReadVersionTlvCommandView(&packet);
+  view.header().opcode_bits().ogf().Write(kVendorOgf);
+  view.header().opcode_bits().ocf().Write(kReadVersionOcf);
+  view.header().parameter_total_size().Write(ReadVersionTlvCommand::parameter_size());
+  view.para0().Write(kVersionSupportTlv);  // Only meaningful for AX210 and later.
+  SendCommand(std::move(packet));
+
+  std::vector<uint8_t> evt_packet = WaitForEventBuffer();
+  if (evt_packet.empty() || evt_packet.size() < kCommandCompleteEventSize) {
+    errorf("VendorHci: ReadVersionTlv: Error reading response!");
+    return std::nullopt;
   }
-  errorf("VendorHci: ReadVersionTlv: Error reading response!");
-  return ReadVersionReturnParamsTlv{.status = pw::bluetooth::emboss::StatusCode::UNSPECIFIED_ERROR};
+  const size_t return_params_size = evt_packet.size() - kCommandCompleteEventSize;
+  const uint8_t* return_params_data = evt_packet.data() + kCommandCompleteEventSize;
+  return parse_tlv_version_return_params(return_params_data, return_params_size);
 }
 
-ReadBootParamsReturnParams VendorHci::SendReadBootParams() const {
-  auto packet = CommandPacket::New(kReadBootParams);
-  SendCommand(packet->view());
-  auto evt_packet = WaitForEventPacket();
-  if (evt_packet) {
-    auto params = evt_packet->return_params<ReadBootParamsReturnParams>();
-    if (params)
-      return *params;
-  }
-  errorf("VendorHci: ReadBootParams: Error reading response!");
-  return ReadBootParamsReturnParams{.status = pw::bluetooth::emboss::StatusCode::UNSPECIFIED_ERROR};
+std::vector<uint8_t> VendorHci::SendReadBootParams() const {
+  std::vector<uint8_t> cmd_packet(pw::bluetooth::emboss::CommandHeader::IntrinsicSizeInBytes(),
+                                  0x00);
+  auto view = pw::bluetooth::emboss::MakeCommandHeaderView(&cmd_packet);
+  view.opcode_bits().ogf().Write(kVendorOgf);
+  view.opcode_bits().ocf().Write(kReadBootParamsOcf);
+  view.parameter_total_size().Write(0);
+
+  SendCommand(std::move(cmd_packet));
+
+  return WaitForEventBuffer();
 }
 
 pw::bluetooth::emboss::StatusCode VendorHci::SendHciReset() const {
-  auto packet = CommandPacket::New(bt::hci_spec::kReset);
-  SendCommand(packet->view());
+  std::vector<uint8_t> cmd_packet(pw::bluetooth::emboss::CommandHeader::IntrinsicSizeInBytes(),
+                                  0x00);
+  auto view = pw::bluetooth::emboss::MakeCommandHeaderView(&cmd_packet);
+  view.opcode_enum().Write(pw::bluetooth::emboss::OpCode::RESET);
+  view.parameter_total_size().Write(0);
+  SendCommand(std::move(cmd_packet));
 
   // TODO(armansito): Consider collecting a metric for initialization time
   // (successful and failing) to provide us with a better sense of how long
   // these timeouts should be.
-  auto evt_packet = WaitForEventPacket(kInitTimeoutMs, bt::hci_spec::kCommandCompleteEventCode);
-  if (!evt_packet) {
+  std::vector<uint8_t> evt_packet =
+      WaitForEventBuffer(kInitTimeoutMs, pw::bluetooth::emboss::EventCode::COMMAND_COMPLETE);
+  if (evt_packet.empty()) {
     errorf("VendorHci: failed while waiting for HCI_Reset response");
     return pw::bluetooth::emboss::StatusCode::UNSPECIFIED_ERROR;
   }
 
-  const auto* params = evt_packet->return_params<bt::hci_spec::SimpleReturnParams>();
-  if (!params) {
+  auto event_view = MakeSimpleCommandCompleteEventView(&evt_packet);
+  if (!event_view.IsComplete()) {
     errorf("VendorHci: HCI_Reset: received malformed response");
     return pw::bluetooth::emboss::StatusCode::UNSPECIFIED_ERROR;
   }
-
-  return params->status;
+  return event_view.status().Read();
 }
 
 void VendorHci::SendVendorReset(uint32_t boot_address) const {
-  auto packet = CommandPacket::New(kReset, sizeof(ResetCommandParams));
-  auto params = packet->mutable_payload<ResetCommandParams>();
-  params->reset_type = 0x00;
-  params->patch_enable = 0x01;
-  params->ddc_reload = 0x00;
-  params->boot_option = 0x01;
-  params->boot_address = htobe32(boot_address);
-
-  SendCommand(packet->view());
+  std::vector<uint8_t> cmd_packet(VendorResetCommand::IntrinsicSizeInBytes(), 0x00);
+  auto view = MakeVendorResetCommandView(&cmd_packet);
+  view.header().opcode_bits().ogf().Write(kVendorOgf);
+  view.header().opcode_bits().ocf().Write(kVendorResetOcf);
+  view.header().parameter_total_size().Write(VendorResetCommand::parameter_size());
+  view.reset_type().Write(0x00);
+  view.patch_enable().Write(0x01);
+  view.ddc_reload().Write(0x00);
+  view.boot_option().Write(0x01);
+  view.boot_address().Write(boot_address);
+  SendCommand(std::move(cmd_packet));
 
   // Sleep for 2 seconds to let the controller process the reset.
   zx_nanosleep(zx_deadline_after(ZX_SEC(2)));
 }
 
-bool VendorHci::SendSecureSend(uint8_t type, const bt::BufferView& bytes) const {
+bool VendorHci::SendSecureSend(uint8_t type, cpp20::span<const uint8_t> bytes) const {
   size_t left = bytes.size();
   while (left > 0) {
-    size_t frag_len = std::min(left, kMaxSecureSendArgLen);
-    auto cmd = CommandPacket::New(kSecureSend, frag_len + 1);
-    auto data = cmd->mutable_view()->mutable_payload_data();
-    data[0] = type;
-    data.Write(bytes.view(bytes.size() - left, frag_len), 1);
+    const size_t frag_len = std::min(left, kMaxSecureSendArgLen);
+    cpp20::span<const uint8_t> frag_data = bytes.subspan(bytes.size() - left, frag_len);
+    const size_t payload_size = frag_len + 1;  // +1 for type byte
+    const size_t packet_size =
+        pw::bluetooth::emboss::CommandHeader::IntrinsicSizeInBytes() + payload_size;
 
-    SendAcl(cmd->view());
-    std::unique_ptr<bt::hci::EventPacket> event = WaitForEventPacket();
-    if (!event) {
+    std::vector<uint8_t> packet(packet_size, 0x00);
+    auto view = pw::bluetooth::emboss::MakeCommandHeaderView(&packet);
+    view.opcode_bits().ogf().Write(kVendorOgf);
+    view.opcode_bits().ocf().Write(kSecureSendOcf);
+    view.parameter_total_size().Write(payload_size);
+    cpp20::span<uint8_t> payload(
+        packet.data() + pw::bluetooth::emboss::CommandHeader::IntrinsicSizeInBytes(), payload_size);
+    payload[0] = type;
+    std::copy(frag_data.begin(), frag_data.end(), payload.begin() + 1);
+
+    SendAcl(std::move(packet));
+    std::vector<uint8_t> event = WaitForEventBuffer();
+    if (event.empty()) {
       errorf("VendorHci: SecureSend: Error reading response!");
       return false;
     }
-    if (event->event_code() == bt::hci_spec::kCommandCompleteEventCode) {
-      const auto& event_params = event->view().payload<bt::hci_spec::CommandCompleteEventParams>();
-      if (le16toh(event_params.command_opcode) != kSecureSend) {
-        errorf("VendorHci: Received command complete for something else!");
-      } else if (event_params.return_parameters[0] != 0x00) {
-        errorf("VendorHci: Received 0x%x instead of zero in command complete!",
-               event_params.return_parameters[0]);
+    auto event_view = pw::bluetooth::emboss::MakeEventHeaderView(&event);
+    if (event_view.event_code_enum().Read() == pw::bluetooth::emboss::EventCode::COMMAND_COMPLETE) {
+      auto view = MakeSecureSendCommandCompleteEventView(&event);
+      if (!view.IsComplete()) {
+        errorf("VendorHci: SecureSend command complete event is too small (%zu, expected: %" PRIu64
+               ")",
+               event.size(),
+               static_cast<uint64_t>(SecureSendCommandCompleteEvent::IntrinsicSizeInBytes()));
         return false;
       }
-    } else if (event->event_code() == bt::hci_spec::kVendorDebugEventCode) {
-      const auto& params = event->view().template payload<SecureSendEventParams>();
-      infof("VendorHci: SecureSend result 0x%x, opcode: 0x%x, status: 0x%x", params.result,
-            params.opcode, params.status);
-      if (params.result) {
-        errorf("VendorHci: Result of %d indicates some error!", params.result);
+      if (view.command_complete().command_opcode_bits().ogf().Read() != kVendorOgf ||
+          view.command_complete().command_opcode_bits().ocf().Read() != kSecureSendOcf) {
+        errorf("VendorHci: Received command complete for something else!");
+      } else if (view.param().Read() != 0x00) {
+        errorf("VendorHci: Received 0x%x instead of zero in command complete!",
+               view.param().Read());
+        return false;
+      }
+    } else if (event_view.event_code_enum().Read() ==
+               pw::bluetooth::emboss::EventCode::VENDOR_DEBUG) {
+      auto view = MakeSecureSendEventView(&event);
+      infof("VendorHci: SecureSend result 0x%x, opcode: 0x%x, status: 0x%x", view.result().Read(),
+            view.opcode().Read(), view.status().Read());
+      if (view.result().Read()) {
+        errorf("VendorHci: Result of %d indicates some error!", view.result().Read());
         return false;
       }
     }
@@ -287,18 +319,18 @@ bool VendorHci::SendSecureSend(uint8_t type, const bt::BufferView& bytes) const 
   return true;
 }
 
-bool VendorHci::SendAndExpect(const bt::PacketView<bt::hci_spec::CommandHeader>& command,
-                              std::deque<bt::BufferView> events) const {
-  SendCommand(command);
+bool VendorHci::SendAndExpect(cpp20::span<const uint8_t> command,
+                              std::deque<cpp20::span<const uint8_t>> events) const {
+  SendCommand(std::vector(command.begin(), command.end()));
 
   while (events.size() > 0) {
-    auto evt_packet = WaitForEventPacket();
-    if (!evt_packet) {
+    auto evt_packet = WaitForEventBuffer();
+    if (evt_packet.empty()) {
       return false;
     }
     auto expected = events.front();
-    if ((evt_packet->view().size() != expected.size()) ||
-        (memcmp(evt_packet->view().data().data(), expected.data(), expected.size()) != 0)) {
+    if ((evt_packet.size() != expected.size()) ||
+        (memcmp(evt_packet.data(), expected.data(), expected.size()) != 0)) {
       errorf("VendorHci: SendAndExpect: unexpected event received");
       return false;
     }
@@ -312,14 +344,19 @@ void VendorHci::EnterManufacturerMode() {
   if (manufacturer_)
     return;
 
-  auto packet = CommandPacket::New(kMfgModeChange, sizeof(MfgModeChangeCommandParams));
-  auto params = packet->mutable_payload<MfgModeChangeCommandParams>();
-  params->enable = pw::bluetooth::emboss::GenericEnableParam::ENABLE;
-  params->disable_mode = MfgDisableMode::kNoPatches;
+  std::vector<uint8_t> cmd_packet(MfgModeChangeCommand::IntrinsicSizeInBytes(), 0x00);
+  auto view = MakeMfgModeChangeCommandView(&cmd_packet);
+  view.header().opcode_bits().ogf().Write(kVendorOgf);
+  view.header().opcode_bits().ocf().Write(kMfgModeChangeOcf);
+  view.header().parameter_total_size().Write(MfgModeChangeCommand::parameter_size());
+  view.enable().Write(pw::bluetooth::emboss::GenericEnableParam::ENABLE);
+  view.disable_mode().Write(MfgDisableMode::NO_PATCHES);
+  SendCommand(std::move(cmd_packet));
 
-  SendCommand(packet->view());
-  auto evt_packet = WaitForEventPacket();
-  if (!evt_packet || evt_packet->event_code() != bt::hci_spec::kCommandCompleteEventCode) {
+  std::vector<uint8_t> evt_packet = WaitForEventBuffer();
+  auto event = pw::bluetooth::emboss::EventHeaderView(&evt_packet);
+  if (!event.IsComplete() ||
+      event.event_code_enum().Read() != pw::bluetooth::emboss::EventCode::COMMAND_COMPLETE) {
     errorf("VendorHci: EnterManufacturerMode failed");
     return;
   }
@@ -333,14 +370,19 @@ bool VendorHci::ExitManufacturerMode(MfgDisableMode mode) {
 
   manufacturer_ = false;
 
-  auto packet = CommandPacket::New(kMfgModeChange, sizeof(MfgModeChangeCommandParams));
-  auto params = packet->mutable_payload<MfgModeChangeCommandParams>();
-  params->enable = pw::bluetooth::emboss::GenericEnableParam::DISABLE;
-  params->disable_mode = mode;
+  std::vector<uint8_t> cmd_packet(MfgModeChangeCommand::IntrinsicSizeInBytes(), 0x00);
+  auto view = MakeMfgModeChangeCommandView(&cmd_packet);
+  view.header().opcode_bits().ogf().Write(kVendorOgf);
+  view.header().opcode_bits().ocf().Write(kMfgModeChangeOcf);
+  view.header().parameter_total_size().Write(MfgModeChangeCommand::parameter_size());
+  view.enable().Write(pw::bluetooth::emboss::GenericEnableParam::DISABLE);
+  view.disable_mode().Write(mode);
+  SendCommand(std::move(cmd_packet));
 
-  SendCommand(packet->view());
-  auto evt_packet = WaitForEventPacket();
-  if (!evt_packet || evt_packet->event_code() != bt::hci_spec::kCommandCompleteEventCode) {
+  std::vector<uint8_t> evt_packet = WaitForEventBuffer();
+  auto event = pw::bluetooth::emboss::EventHeaderView(&evt_packet);
+  if (!event.IsComplete() ||
+      event.event_code_enum().Read() != pw::bluetooth::emboss::EventCode::COMMAND_COMPLETE) {
     errorf("VendorHci: ExitManufacturerMode failed");
     return false;
   }
@@ -348,10 +390,8 @@ bool VendorHci::ExitManufacturerMode(MfgDisableMode mode) {
   return true;
 }
 
-void VendorHci::SendCommand(const bt::PacketView<bt::hci_spec::CommandHeader>& command) const {
-  auto command_vec =
-      std::vector<uint8_t>(command.data().data(), command.data().data() + command.size());
-  hci_transport_client_->Send(fhbt::SentPacket::WithCommand(command_vec))
+void VendorHci::SendCommand(std::vector<uint8_t> command) const {
+  hci_transport_client_->Send(fhbt::SentPacket::WithCommand(std::move(command)))
       .Then([](fidl::Result<fhbt::HciTransport::Send>& result) {
         if (!result.is_ok()) {
           errorf("VendorHci: SendCommand failed: %s", result.error_value().status_string());
@@ -360,10 +400,8 @@ void VendorHci::SendCommand(const bt::PacketView<bt::hci_spec::CommandHeader>& c
       });
 }
 
-void VendorHci::SendAcl(const bt::PacketView<bt::hci_spec::CommandHeader>& command) const {
-  auto command_vec =
-      std::vector<uint8_t>(command.data().data(), command.data().data() + command.size());
-  hci_transport_client_->Send(fhbt::SentPacket::WithAcl(command_vec))
+void VendorHci::SendAcl(std::vector<uint8_t> command) const {
+  hci_transport_client_->Send(fhbt::SentPacket::WithAcl(std::move(command)))
       .Then([](fidl::Result<fhbt::HciTransport::Send>& result) {
         if (!result.is_ok()) {
           errorf("VendorHci: SendAcl failed: %s", result.error_value().status_string());
@@ -372,55 +410,47 @@ void VendorHci::SendAcl(const bt::PacketView<bt::hci_spec::CommandHeader>& comma
       });
 }
 
-std::unique_ptr<bt::hci::EventPacket> VendorHci::WaitForEventPacket(
-    zx::duration timeout, bt::hci_spec::EventCode expected_event) const {
-  // Allocate a buffer for the event. We don't know the size
-  // beforehand we allocate the largest possible buffer.
-  auto packet = bt::hci::EventPacket::New(bt::hci_spec::kMaxCommandPacketPayloadSize);
-  if (!packet) {
-    errorf("VendorHci: Failed to allocate event packet!");
-    return nullptr;
+std::vector<uint8_t> VendorHci::WaitForEventBuffer(
+    zx::duration timeout, std::optional<pw::bluetooth::emboss::EventCode> expected_event) const {
+  std::vector<uint8_t> buffer = hci_event_handler_.WaitForPacket(timeout);
+  if (buffer.empty()) {
+    errorf("VendorHci: timed out waiting for event");
+    return {};
   }
-  auto packet_bytes = packet->mutable_view()->mutable_data();
 
-  std::vector<uint8_t> read_from_queue = hci_event_handler_.WaitForPacket(timeout);
-  const auto& read_size = read_from_queue.size();
-  if (read_size >
-      (bt::hci_spec::kMaxCommandPacketPayloadSize + sizeof(bt::hci_spec::EventHeader))) {
+  const size_t read_size = buffer.size();
+  if (read_size > fhbt::kEventMax) {
     errorf("VendorHci: Packet too large, size: %zu", read_size);
-    return nullptr;
+    return {};
   }
 
-  if (read_size < sizeof(bt::hci_spec::EventHeader)) {
-    errorf("VendorHci: Malformed event packet expected >%zu bytes, got %lu",
-           sizeof(bt::hci_spec::EventHeader), read_size);
-    return nullptr;
+  if (read_size < pw::bluetooth::emboss::EventHeader::IntrinsicSizeInBytes()) {
+    errorf("VendorHci: Malformed event packet expected >%d bytes, got %lu",
+           pw::bluetooth::emboss::EventHeader::IntrinsicSizeInBytes(), read_size);
+    return {};
   }
-
-  memcpy(packet_bytes.mutable_data(), read_from_queue.data(), read_from_queue.size());
+  auto view = pw::bluetooth::emboss::MakeEventHeaderView(&buffer);
 
   // Compare the received payload size to what is in the header.
-  const size_t rx_payload_size = read_size - sizeof(bt::hci_spec::EventHeader);
-  const size_t size_from_header = packet->view().header().parameter_total_size;
+  const size_t rx_payload_size =
+      read_size - pw::bluetooth::emboss::EventHeader::IntrinsicSizeInBytes();
+  const size_t size_from_header = view.parameter_total_size().Read();
   if (size_from_header != rx_payload_size) {
     errorf(
         "VendorHci: Malformed event packet - header payload size (%zu) != "
         "received (%zu)",
         size_from_header, rx_payload_size);
-    return nullptr;
+    return {};
   }
 
-  if (expected_event && expected_event != packet->event_code()) {
-    tracef("VendorHci: keep waiting (expected: 0x%02x, got: 0x%02x)", expected_event,
-           packet->event_code());
-    return nullptr;
+  if (expected_event && *expected_event != view.event_code_enum().Read()) {
+    tracef("VendorHci: keep waiting (expected: 0x%02x, got: 0x%02x)",
+           static_cast<uint8_t>(*expected_event),
+           static_cast<uint8_t>(view.event_code_enum().Read()));
+    return {};
   }
 
-  packet->InitializeFromBuffer();
-  return packet;
-
-  errorf("VendorHci: timed out waiting for event");
-  return nullptr;
+  return buffer;
 }
 
 }  // namespace bt_hci_intel

@@ -5,14 +5,14 @@
 //! This module implements the conversion between the IR representation and the
 //! comparison representation.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::rc::Rc;
 
 use anyhow::{anyhow, bail, Context as _, Result};
 use flyweights::FlyStr;
 use itertools::Itertools;
 
-use crate::{compare, ir};
+use crate::{compare, ir, Version};
 
 #[derive(Clone)]
 pub struct Context {
@@ -22,8 +22,8 @@ pub struct Context {
 }
 
 impl Context {
-    pub fn new(ir: Rc<ir::IR>, api_level: FlyStr) -> Self {
-        Self { ir, identifier_stack: vec![], path: compare::Path::new(&api_level) }
+    pub fn new(ir: Rc<ir::IR>, version: &Version) -> Self {
+        Self { ir, identifier_stack: vec![], path: compare::Path::new(&version) }
     }
     pub fn nest_member(&self, member_name: impl AsRef<str>, identifier: Option<FlyStr>) -> Self {
         let mut context = self.clone();
@@ -461,8 +461,6 @@ pub fn convert_protocol(
         )
         .value()
         .to_string();
-    // TODO: remove "20" once 20 stabilizes and we move to "NEXT"
-    let is_unstable = matches!(added.as_str(), "HEAD" | "NEXT" | "4292870144" | "20");
 
     let discoverable = ir::get_attribute(&p.maybe_attributes, "discoverable").map(|discoverable| {
         let attr_or = |name: &str, default: &str| {
@@ -471,27 +469,21 @@ pub fn convert_protocol(
                 .map(|c| c.value().to_string())
                 .unwrap_or(default.to_string())
         };
-        let impl_locs = |name: &str| {
-            if is_unstable {
-                // If this protocol is unstable then the only implementation locations are in the platform.
-                // TODO: warn if something at an unstable level actually declares that external components can use it?
-                return compare::ImplementationLocation { platform: true, external: false };
-            }
-
+        let scopes = |name: &str| {
             let locs: Vec<String> = attr_or(name, "platform,external")
                 .split(",")
                 .into_iter()
                 .map(|l| l.trim().into())
                 .collect();
-            compare::ImplementationLocation {
+            compare::Scopes {
                 platform: locs.contains(&"platform".to_string()),
                 external: locs.contains(&"external".to_string()),
             }
         };
         compare::Discoverable {
             name: attr_or("name", &p.name),
-            client: impl_locs("client"),
-            server: impl_locs("server"),
+            client: scopes("client"),
+            server: scopes("server"),
         }
     });
 
@@ -505,27 +497,22 @@ pub fn convert_protocol(
     })
 }
 
-pub fn convert_platform(ir: Rc<ir::IR>) -> Result<compare::Platform> {
-    let mut platform = compare::Platform::default();
-    platform.api_level = match ir.available.get("fuchsia") {
-        None => bail!("missing API level for 'fuchsia'"),
-        Some(levels) => match &levels[..] {
-            [] => bail!("empty API level list for 'fuchsia'"),
-            [api_level] => FlyStr::new(api_level),
-            _ => FlyStr::new("PLATFORM"),
-        },
-    };
+pub fn convert_abi_surface(ir: Rc<ir::IR>) -> Result<compare::AbiSurface> {
+    let levels = ir.available.get("fuchsia").context("missing API level for 'fuchsia'")?;
+    let version = Version::from_api_levels(levels.as_slice());
+    let context = Context::new(ir.clone(), &version);
+    let mut abi_surface =
+        compare::AbiSurface { version, discoverable: HashMap::new(), tear_off: HashMap::new() };
 
-    let context = Context::new(ir.clone(), platform.api_level.clone());
     for decl in &ir.protocol_declarations {
         let protocol = convert_protocol(decl, context.clone())?;
 
         if let Some(discoverable) = protocol.discoverable.clone() {
-            platform.discoverable.insert(discoverable.name, protocol);
+            abi_surface.discoverable.insert(discoverable.name, protocol);
         } else {
-            platform.tear_off.insert(decl.name.clone(), protocol);
+            abi_surface.tear_off.insert(decl.name.clone(), protocol);
         };
     }
 
-    Ok(platform)
+    Ok(abi_surface)
 }

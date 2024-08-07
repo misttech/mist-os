@@ -13,7 +13,7 @@
 use crate::model::component::{ComponentInstance, WeakComponentInstance};
 use crate::model::routing::Route;
 use crate::model::storage::{self, BackingDirectoryInfo};
-use ::routing::capability_source::ComponentCapability;
+use ::routing::capability_source::{ComponentCapability, ComponentSource};
 use ::routing::RouteSource;
 use anyhow::{format_err, Context, Error};
 use cm_rust::{StorageDecl, UseDecl};
@@ -137,10 +137,10 @@ impl StorageAdmin {
         mut stream: fsys::StorageAdminRequestStream,
     ) -> Result<(), Error> {
         let storage_source = RouteSource {
-            source: CapabilitySource::Component {
+            source: CapabilitySource::Component(ComponentSource {
                 capability: ComponentCapability::Storage(storage_decl.clone()),
                 moniker: component.moniker.clone(),
-            },
+            }),
             relative_path: Default::default(),
         };
         let backing_dir_source_info =
@@ -463,7 +463,8 @@ impl StorageAdmin {
                 }
                 ffs_dir::DirentKind::BlockDevice
                 | ffs_dir::DirentKind::Service
-                | ffs_dir::DirentKind::Unknown => {}
+                | ffs_dir::DirentKind::Unknown
+                | ffs_dir::DirentKind::__SourceBreaking { .. } => {}
             }
         }
 

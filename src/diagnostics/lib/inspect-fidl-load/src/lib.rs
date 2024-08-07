@@ -87,9 +87,9 @@ mod tests {
         InspectMarker, InspectRequest, InspectRequestStream, Metric, Object, Property,
     };
     use futures::{TryFutureExt, TryStreamExt};
-    use lazy_static::lazy_static;
     use maplit::{hashmap, hashset};
     use std::collections::{HashMap, HashSet};
+    use std::sync::LazyLock;
 
     #[fuchsia::test]
     async fn test_load_hierarchy() -> Result<(), Error> {
@@ -112,8 +112,8 @@ mod tests {
         Ok(())
     }
 
-    lazy_static! {
-        static ref OBJECTS: HashMap<String, TestObject> = hashmap! {
+    static OBJECTS: LazyLock<HashMap<String, TestObject>> = LazyLock::new(|| {
+        hashmap! {
             "root".to_string() => TestObject {
                 object: Object {
                     name: "root".to_string(),
@@ -169,8 +169,8 @@ mod tests {
                 },
                 children: hashset!(),
             }
-        };
-    }
+        }
+    });
 
     struct TestObject {
         object: Object,

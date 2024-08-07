@@ -7,7 +7,6 @@ use crate::config::{DataFetcher, DiagnosticData, Source};
 use anyhow::{anyhow, bail, Context, Error, Result};
 use diagnostics_hierarchy::DiagnosticsHierarchy;
 use fidl_fuchsia_diagnostics::Selector;
-use lazy_static::lazy_static;
 use regex::Regex;
 use selectors::VerboseError;
 use serde::Serialize;
@@ -16,7 +15,7 @@ use serde_json::map::Map as JsonMap;
 use serde_json::Value as JsonValue;
 use std::collections::HashMap;
 use std::str::FromStr;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 
 /// [Fetcher] is a source of values to feed into the calculations. It may contain data either
 /// from snapshot.zip files (e.g. inspect.json data that can be accessed via "select" entries)
@@ -104,9 +103,7 @@ pub struct TrialDataFetcher<'a> {
     pub(crate) annotations: &'a KeyValueFetcher,
 }
 
-lazy_static! {
-    static ref EMPTY_JSONVALUES: HashMap<String, JsonValue> = HashMap::new();
-}
+static EMPTY_JSONVALUES: LazyLock<HashMap<String, JsonValue>> = LazyLock::new(HashMap::new);
 
 impl<'a> TrialDataFetcher<'a> {
     pub fn new(values: &'a HashMap<String, JsonValue>) -> TrialDataFetcher<'a> {
@@ -208,6 +205,7 @@ pub struct ComponentInspectInfo {
     moniker: Vec<String>,
 }
 
+#[derive(Default)]
 pub struct KeyValueFetcher {
     pub map: JsonMap<String, JsonValue>,
 }
@@ -234,9 +232,7 @@ impl TryFrom<&JsonMap<String, JsonValue>> for KeyValueFetcher {
     }
 }
 
-lazy_static! {
-    static ref EMPTY_KEY_VALUE_FETCHER: KeyValueFetcher = KeyValueFetcher { map: JsonMap::new() };
-}
+static EMPTY_KEY_VALUE_FETCHER: LazyLock<KeyValueFetcher> = LazyLock::new(KeyValueFetcher::default);
 
 impl KeyValueFetcher {
     pub fn ref_empty() -> &'static Self {
@@ -255,6 +251,7 @@ impl KeyValueFetcher {
     }
 }
 
+#[derive(Default)]
 pub struct TextFetcher {
     pub lines: Vec<String>,
 }
@@ -265,9 +262,7 @@ impl From<&str> for TextFetcher {
     }
 }
 
-lazy_static! {
-    static ref EMPTY_TEXT_FETCHER: TextFetcher = TextFetcher { lines: Vec::new() };
-}
+static EMPTY_TEXT_FETCHER: LazyLock<TextFetcher> = LazyLock::new(TextFetcher::default);
 
 impl TextFetcher {
     pub fn ref_empty() -> &'static Self {
@@ -283,6 +278,7 @@ impl TextFetcher {
     }
 }
 
+#[derive(Default)]
 pub struct InspectFetcher {
     pub components: Vec<ComponentInspectInfo>,
     pub component_errors: Vec<anyhow::Error>,
@@ -365,10 +361,7 @@ impl TryFrom<Vec<JsonValue>> for InspectFetcher {
     }
 }
 
-lazy_static! {
-    static ref EMPTY_INSPECT_FETCHER: InspectFetcher =
-        InspectFetcher { components: Vec::new(), component_errors: Vec::new() };
-}
+static EMPTY_INSPECT_FETCHER: LazyLock<InspectFetcher> = LazyLock::new(InspectFetcher::default);
 
 impl InspectFetcher {
     pub fn ref_empty() -> &'static Self {
@@ -428,17 +421,16 @@ mod test {
     use crate::{assert_problem, make_metrics};
     use serde_json::Value as JsonValue;
 
-    lazy_static! {
-        static ref LOCAL_M: HashMap<String, JsonValue> = {
-            let mut m = HashMap::new();
-            m.insert("foo".to_owned(), JsonValue::try_from(42).unwrap());
-            m.insert("a::b".to_owned(), JsonValue::try_from(7).unwrap());
-            m
-        };
-        static ref FOO_42_AB_7_TRIAL_FETCHER: TrialDataFetcher<'static> =
-            TrialDataFetcher::new(&LOCAL_M);
-        static ref LOCAL_F: Vec<DiagnosticData> = {
-            let s = r#"[
+    static LOCAL_M: LazyLock<HashMap<String, JsonValue>> = LazyLock::new(|| {
+        let mut m = HashMap::new();
+        m.insert("foo".to_owned(), JsonValue::try_from(42).unwrap());
+        m.insert("a::b".to_owned(), JsonValue::try_from(7).unwrap());
+        m
+    });
+    static FOO_42_AB_7_TRIAL_FETCHER: LazyLock<TrialDataFetcher<'static>> =
+        LazyLock::new(|| TrialDataFetcher::new(&LOCAL_M));
+    static LOCAL_F: LazyLock<Vec<DiagnosticData>> = LazyLock::new(|| {
+        let s = r#"[
             {
                 "data_source": "Inspect",
                 "moniker": "bar",
@@ -451,19 +443,21 @@ mod test {
             }
 
             ]"#;
-            vec![DiagnosticData::new("i".to_string(), Source::Inspect, s.to_string()).unwrap()]
-        };
-        static ref BAR_99_FILE_FETCHER: FileDataFetcher<'static> = FileDataFetcher::new(&LOCAL_F);
-        static ref BAR_SELECTOR: SelectorString =
-            SelectorString::try_from("INSPECT:bar:root:bar".to_owned()).unwrap();
-        static ref NEW_BAR_SELECTOR: SelectorString =
-            SelectorString::try_from("INSPECT:bar2:root:bar".to_owned()).unwrap();
-        static ref BAD_COMPONENT_SELECTOR: SelectorString =
-            SelectorString::try_from("INSPECT:bad_component:root:bar".to_owned()).unwrap();
-        static ref WRONG_SELECTOR: SelectorString =
-            SelectorString::try_from("INSPECT:bar:root:oops".to_owned()).unwrap();
-        static ref LOCAL_DUPLICATES_F: Vec<DiagnosticData> = {
-            let s = r#"[
+        vec![DiagnosticData::new("i".to_string(), Source::Inspect, s.to_string()).unwrap()]
+    });
+    static BAR_99_FILE_FETCHER: LazyLock<FileDataFetcher<'static>> =
+        LazyLock::new(|| FileDataFetcher::new(&LOCAL_F));
+    static BAR_SELECTOR: LazyLock<SelectorString> =
+        LazyLock::new(|| SelectorString::try_from("INSPECT:bar:root:bar".to_owned()).unwrap());
+    static NEW_BAR_SELECTOR: LazyLock<SelectorString> =
+        LazyLock::new(|| SelectorString::try_from("INSPECT:bar2:root:bar".to_owned()).unwrap());
+    static BAD_COMPONENT_SELECTOR: LazyLock<SelectorString> = LazyLock::new(|| {
+        SelectorString::try_from("INSPECT:bad_component:root:bar".to_owned()).unwrap()
+    });
+    static WRONG_SELECTOR: LazyLock<SelectorString> =
+        LazyLock::new(|| SelectorString::try_from("INSPECT:bar:root:oops".to_owned()).unwrap());
+    static LOCAL_DUPLICATES_F: LazyLock<Vec<DiagnosticData>> = LazyLock::new(|| {
+        let s = r#"[
                 {
                     "data_source": "Inspect",
                     "moniker": "bootstrap/foo",
@@ -475,13 +469,13 @@ mod test {
                     "payload": {"root": {"bar": 10}}
                 }
             ]"#;
-            vec![DiagnosticData::new("i".to_string(), Source::Inspect, s.to_string()).unwrap()]
-        };
-        static ref LOCAL_DUPLICATES_FETCHER: FileDataFetcher<'static> =
-            FileDataFetcher::new(&LOCAL_DUPLICATES_F);
-        static ref DUPLICATE_SELECTOR: SelectorString =
-            SelectorString::try_from("INSPECT:bootstrap/foo:root:bar".to_owned()).unwrap();
-    }
+        vec![DiagnosticData::new("i".to_string(), Source::Inspect, s.to_string()).unwrap()]
+    });
+    static LOCAL_DUPLICATES_FETCHER: LazyLock<FileDataFetcher<'static>> =
+        LazyLock::new(|| FileDataFetcher::new(&LOCAL_DUPLICATES_F));
+    static DUPLICATE_SELECTOR: LazyLock<SelectorString> = LazyLock::new(|| {
+        SelectorString::try_from("INSPECT:bootstrap/foo:root:bar".to_owned()).unwrap()
+    });
 
     macro_rules! variable {
         ($name:expr) => {

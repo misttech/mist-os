@@ -45,7 +45,7 @@ use netstack3_ip::{
     TransportIpContext,
 };
 use packet::BufferMut;
-use packet_formats::ip::IpProtoExt;
+use packet_formats::ip::{DscpAndEcn, IpProtoExt};
 use ref_cast::RefCast;
 use thiserror::Error;
 
@@ -562,6 +562,9 @@ pub struct DatagramSocketOptions<I: IpExt, D: WeakDeviceIdentifier> {
 
     /// Set to `Some` when the socket can be used to send broadcast packets.
     pub allow_broadcast: Option<I::BroadcastMarker>,
+
+    /// IPV6_TCLASS or IP_TOS option.
+    pub dscp_and_ecn: DscpAndEcn,
 }
 
 impl<I: IpExt, D: WeakDeviceIdentifier> SendOptions<I> for DatagramSocketOptions<I, D> {
@@ -575,6 +578,10 @@ impl<I: IpExt, D: WeakDeviceIdentifier> SendOptions<I> for DatagramSocketOptions
 
     fn allow_broadcast(&self) -> Option<I::BroadcastMarker> {
         self.allow_broadcast
+    }
+
+    fn dscp_and_ecn(&self) -> DscpAndEcn {
+        self.dscp_and_ecn
     }
 }
 
@@ -4994,6 +5001,21 @@ where
         self.core_ctx().with_socket_state(id, |core_ctx, state| {
             let (options, _device) = state.get_options_device(core_ctx);
             options.socket_options.multicast_loop
+        })
+    }
+
+    /// Sets the Traffic Class option.
+    pub fn set_dscp_and_ecn(&mut self, id: &DatagramApiSocketId<I, C, S>, value: DscpAndEcn) {
+        self.core_ctx().with_socket_state_mut(id, |core_ctx, state| {
+            state.get_options_mut(core_ctx).socket_options.dscp_and_ecn = value;
+        })
+    }
+
+    /// Returns the Traffic Class option.
+    pub fn get_dscp_and_ecn(&mut self, id: &DatagramApiSocketId<I, C, S>) -> DscpAndEcn {
+        self.core_ctx().with_socket_state(id, |core_ctx, state| {
+            let (options, _device) = state.get_options_device(core_ctx);
+            options.socket_options.dscp_and_ecn
         })
     }
 }

@@ -32,7 +32,7 @@ use nom::sequence::{delimited, pair, preceded, separated_pair, terminated, tuple
 use nom::{error as nom_error, Slice};
 use nom_locate::LocatedSpan;
 use std::cell::RefCell;
-use std::collections::{BTreeMap, HashSet, VecDeque};
+use std::collections::{BTreeMap, HashSet};
 use std::hash::Hash;
 use std::rc::Rc;
 
@@ -50,15 +50,11 @@ impl Mutability {
 }
 
 #[derive(Debug)]
-enum Error<'a> {
-    #[allow(dead_code)]
-    Nom(Span<'a>, nom_error::ErrorKind),
-    Signal,
-}
+struct Error;
 
-impl<'a> nom_error::ParseError<ESpan<'a>> for Error<'a> {
-    fn from_error_kind(input: ESpan<'a>, kind: nom_error::ErrorKind) -> Self {
-        Error::Nom(input.strip_parse_state(), kind)
+impl<'a> nom_error::ParseError<ESpan<'a>> for Error {
+    fn from_error_kind(_input: ESpan<'a>, _kind: nom_error::ErrorKind) -> Self {
+        Error
     }
 
     fn append(_input: ESpan<'a>, _kind: nom_error::ErrorKind, other: Self) -> Self {
@@ -66,7 +62,7 @@ impl<'a> nom_error::ParseError<ESpan<'a>> for Error<'a> {
     }
 }
 
-type IResult<'a, O> = nom::IResult<ESpan<'a>, O, Error<'a>>;
+type IResult<'a, O> = nom::IResult<ESpan<'a>, O, Error>;
 
 /// Indicates a type of tab completion that might be able to occur at a given position.
 #[derive(Debug, Clone)]
@@ -87,9 +83,6 @@ impl<'a> TabHint<'a> {
 /// Global parser state which keeps track of backtracking as well as tab completion.
 #[derive(Debug, Clone)]
 struct ParseState<'a> {
-    errors_accepted: Vec<(Span<'a>, String)>,
-    trying: Option<(Span<'a>, String)>,
-    errors_new: Vec<(Span<'a>, String)>,
     /// Accumulates [`ParseResult::tab_completions`]
     tab_completions: BTreeMap<usize, Vec<TabHint<'a>>>,
     /// Accumulates [`ParseResult::whitespace`]
@@ -98,18 +91,19 @@ struct ParseState<'a> {
 
 impl<'a> ParseState<'a> {
     fn new() -> Self {
-        ParseState {
-            errors_accepted: Vec::new(),
-            trying: None,
-            errors_new: Vec::new(),
-            tab_completions: BTreeMap::new(),
-            whitespace: HashSet::new(),
-        }
+        ParseState { tab_completions: BTreeMap::new(), whitespace: HashSet::new() }
     }
 }
 
+#[derive(Debug, Clone)]
+struct ErrNode<'a> {
+    span: Span<'a>,
+    msg: String,
+    next: Option<Rc<ErrNode<'a>>>,
+}
+
 pub type Span<'a> = LocatedSpan<&'a str>;
-type ESpan<'a> = LocatedSpan<&'a str, Rc<RefCell<ParseState<'a>>>>;
+type ESpan<'a> = LocatedSpan<&'a str, (Rc<RefCell<ParseState<'a>>>, Option<Rc<ErrNode<'a>>>)>;
 
 /// Wrapper around a [`Span`] that implements [`Hash`].
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -124,6 +118,10 @@ impl<'a> Hash for HashSpanWrapper<'a> {
 
 trait StripParseState<'a> {
     fn strip_parse_state(self) -> Span<'a>;
+    fn replace_parse_state(
+        self,
+        state: (Rc<RefCell<ParseState<'a>>>, Option<Rc<ErrNode<'a>>>),
+    ) -> ESpan<'a>;
 }
 
 impl<'a> StripParseState<'a> for ESpan<'a> {
@@ -141,6 +139,33 @@ impl<'a> StripParseState<'a> for ESpan<'a> {
             )
         }
     }
+
+    fn replace_parse_state(
+        self,
+        state: (Rc<RefCell<ParseState<'a>>>, Option<Rc<ErrNode<'a>>>),
+    ) -> ESpan<'a> {
+        // Safe because we're basically just stripping away unrelated fields from the
+        // safety-sensitive state and leaving it unchanged.
+        // TODO: A later version of nom_locate has map_extra which will let us
+        // go without this unsafe block.
+        unsafe {
+            ESpan::new_from_raw_offset(
+                self.location_offset(),
+                self.location_line(),
+                *self.fragment(),
+                state,
+            )
+        }
+    }
+}
+
+/// Element of a string. `Body` elements contain the text of the string. Escape
+/// sequences are still present but are known to be well-formed. `Interpolation`
+/// contains an expression from an interpolated value.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum StringElement<'a> {
+    Body(Span<'a>),
+    Interpolation(Node<'a>),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -178,7 +203,7 @@ pub enum Node<'a> {
     Program(Vec<Node<'a>>),
     Range(Box<Option<Node<'a>>>, Box<Option<Node<'a>>>, bool),
     Real(Span<'a>),
-    String(Span<'a>),
+    String(Vec<StringElement<'a>>),
     Subtract(Box<Node<'a>>, Box<Node<'a>>),
     VariableDecl { identifier: Span<'a>, value: Box<Node<'a>>, mutability: Mutability },
     True,
@@ -258,7 +283,18 @@ impl<'a> Node<'a> {
                 a.len() == b.len() && a.iter().zip(b.iter()).all(|(a, b)| a.content_eq(b))
             }
             (Real(a), Real(b)) => a.fragment() == b.fragment(),
-            (String(a), String(b)) => a.fragment() == b.fragment(),
+            (String(a), String(b)) => {
+                a.len() == b.len()
+                    && a.iter().zip(b.iter()).all(|x| match x {
+                        (StringElement::Body(a), StringElement::Body(b)) => {
+                            a.fragment() == b.fragment()
+                        }
+                        (StringElement::Interpolation(a), StringElement::Interpolation(b)) => {
+                            a.content_eq(b)
+                        }
+                        _ => false,
+                    })
+            }
             (Subtract(a, b), Subtract(c, d)) => a.content_eq(c) && b.content_eq(d),
             (
                 FunctionDecl { identifier: identifier_a, parameters: parameters_a, body: body_a },
@@ -343,78 +379,34 @@ pub struct ParseResult<'a> {
 
 impl<'a> From<&'a str> for ParseResult<'a> {
     fn from(text: &'a str) -> ParseResult<'a> {
-        let text = ESpan::new_extra(text, Rc::new(RefCell::new(ParseState::new())));
-        let (end_pos, tree) = recover(alt((
+        let text = ESpan::new_extra(text, (Rc::new(RefCell::new(ParseState::new())), None));
+        let (end_pos, tree) = alt((
             terminated(
                 map(ws_around(program), Node::Program),
                 alt((not(anychar), map(err_skip("Trailing characters {}", rest), |_| ()))),
             ),
             err_skip("Unrecoverable parse error", rest),
-        )))(text)
+        ))(text)
         .expect("Incorrectly handled parse error");
 
-        let extra = Rc::try_unwrap(end_pos.extra).unwrap().into_inner();
+        let extra = Rc::try_unwrap(end_pos.extra.0).unwrap().into_inner();
 
-        let mut errors = extra.errors_accepted;
-        if let Some(last) = extra.trying {
-            errors.push(last)
+        let mut error_node = end_pos.extra.1;
+        let mut errors = Vec::new();
+
+        while let Some(error) = error_node.take() {
+            let error = Rc::try_unwrap(error).unwrap_or_else(|e| (*e).clone());
+            errors.push((error.span, error.msg));
+            error_node = error.next;
         }
+
+        errors.reverse();
+
         let tab_completions = extra.tab_completions;
         let mut whitespace: Vec<Span<'a>> = extra.whitespace.into_iter().map(|x| x.0).collect();
         whitespace.sort_by_key(|x| x.location_offset());
 
         ParseResult { tree, errors, tab_completions, whitespace }
-    }
-}
-
-/// Try to recover from errors that occurred beneath this node.
-fn recover<'a, F: Fn(ESpan<'a>) -> IResult<'a, X>, X>(
-    f: F,
-) -> impl Fn(ESpan<'a>) -> IResult<'a, X> {
-    move |mut input| {
-        input.extra = Rc::new(RefCell::new(ParseState::new()));
-        let mut to_try = VecDeque::new();
-
-        loop {
-            match (&f)(input.clone()) {
-                Err(e) => {
-                    let mut recovery = input.extra.borrow_mut();
-                    let mut errors_new = std::mem::take(&mut recovery.errors_new);
-                    errors_new.sort_by(|x, y| x.0.location_offset().cmp(&y.0.location_offset()));
-                    if let Some((first, _)) = errors_new.last() {
-                        let offset = first.location_offset();
-                        if let Some(trying) = recovery.trying.take() {
-                            if offset > trying.0.location_offset() + trying.0.fragment().len() {
-                                recovery.errors_accepted.push(trying);
-                                recovery.trying = errors_new.pop();
-                            } else {
-                                recovery.trying = to_try.pop_front();
-                                if recovery.trying.is_some() {
-                                    continue;
-                                } else {
-                                    break (Err(e));
-                                }
-                            }
-                        } else {
-                            recovery.trying = errors_new.pop();
-                        }
-                        to_try.clear();
-                        to_try.extend(
-                            errors_new
-                                .into_iter()
-                                .rev()
-                                .take_while(|x| x.0.location_offset() == offset),
-                        );
-                    } else {
-                        recovery.trying = to_try.pop_front();
-                        if !recovery.trying.is_some() {
-                            break (Err(e));
-                        }
-                    }
-                }
-                other => break other,
-            }
-        }
     }
 }
 
@@ -426,19 +418,16 @@ fn err_skip<'a, F: Fn(ESpan<'a>) -> IResult<'a, X>, S: ToString + 'a, X>(
 ) -> impl Fn(ESpan<'a>) -> IResult<'a, Node<'a>> {
     move |input| {
         let (out_span, result) = recognize(&f)(input)?;
-        let message = msg.to_string().replace("{}", *result.fragment());
-        let err = (result.strip_parse_state(), message);
-        let mut recovery = out_span.extra.borrow_mut();
+        let parse_state = Rc::clone(&out_span.extra.0);
+        let msg = msg.to_string().replace("{}", *result.fragment());
+        let error = Some(Rc::new(ErrNode {
+            span: result.strip_parse_state(),
+            msg,
+            next: out_span.extra.1.clone(),
+        }));
 
-        if recovery.errors_accepted.iter().any(|x| x == &err)
-            || recovery.trying.as_ref() == Some(&err)
-        {
-            std::mem::drop(recovery);
-            Ok((out_span, Node::Error))
-        } else {
-            recovery.errors_new.push(err);
-            Err(nom::Err::Error(Error::Signal))
-        }
+        let out_span = out_span.replace_parse_state((parse_state, error));
+        Ok((out_span, Node::Error))
     }
 }
 
@@ -456,6 +445,23 @@ fn err_note<'a, S: ToString + 'a>(msg: S) -> impl Fn(ESpan<'a>) -> IResult<'a, (
 fn ex_tag<'a>(s: &'a str) -> impl Fn(ESpan<'a>) -> IResult<'a, ()> + 'a {
     let s = s.to_owned();
     move |x| alt((map(tag(s.as_str()), |_| ()), err_note(format!("Expected '{}'", s))))(x)
+}
+
+/// Runs the passed parser but does not allow it to emit errors.
+fn no_errors<'a, X>(
+    f: impl Fn(ESpan<'a>) -> IResult<'a, X>,
+) -> impl Fn(ESpan<'a>) -> IResult<'a, X> {
+    move |input| {
+        let err = input.extra.1.clone();
+        let res = f(input)?;
+        let err_new = res.0.extra.1.clone();
+
+        match (err, err_new) {
+            (None, None) => Ok(res),
+            (Some(x), Some(y)) if Rc::ptr_eq(&x, &y) => Ok(res),
+            _ => Err(nom::Err::Error(Error)),
+        }
+    }
 }
 
 /// Match optional whitespace before the given combinator.
@@ -511,7 +517,7 @@ fn completion_hint<'a, X>(
             hint_span.slice(..0)
         };
 
-        let extra = Rc::clone(&hint_span.extra);
+        let extra = Rc::clone(&hint_span.extra.0);
         let location = hint_span.location_offset();
         let hint = hint(hint_span.strip_parse_state());
         extra.borrow_mut().tab_completions.entry(location).or_insert_with(Vec::new).push(hint);
@@ -565,11 +571,7 @@ const KEYWORDS: [&str; 9] =
 /// Match a keyword.
 fn kw<'s>(kw: &'s str) -> impl for<'a> Fn(ESpan<'a>) -> IResult<'a, ESpan<'a>> + 's {
     debug_assert!(KEYWORDS.contains(&kw));
-    move |input| {
-        terminated(tag(kw), alt((not(alt((alphanumeric1, tag("_")))), err_note("Expected space"))))(
-            input,
-        )
-    }
+    move |input| terminated(tag(kw), not(alt((alphanumeric1, tag("_")))))(input)
 }
 
 /// We define Whitespace as follows:
@@ -594,6 +596,7 @@ fn whitespace<'a>(input: ESpan<'a>) -> IResult<'a, ESpan<'a>> {
         )))),
         |span: ESpan<'a>| {
             span.extra
+                .0
                 .borrow_mut()
                 .whitespace
                 .insert(HashSpanWrapper(span.clone().strip_parse_state()));
@@ -691,7 +694,9 @@ fn real<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
 ///
 /// ```
 /// EscapeSequence ← '\n' / '\t' / '\r' / '\' <nl> / '\\' / '\"' / '\u' HexDigit{6}
-/// StringEntity ← !( '\' / '"' / <nl> ) . / EscapeSequence
+/// Interpolation ← '$' InterpolationBody
+/// InterpolationBody ← Identifier / '{' ⊔ Expression ⊔ '}'
+/// StringEntity ← !( '\' / '"' / <nl> ) . / EscapeSequence / Interpolation
 /// NormalString ← '"' StringEntity* '"'
 /// String ← NormalString / MultiString
 /// ```
@@ -705,6 +710,8 @@ fn real<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
 /// "A newline.\nA tab\tA code point\u00264b"
 /// "String starts here \
 /// and keeps on going"
+/// "A string has $interpolation"
+/// "A string has ${ bracketed --interpolation }"
 /// ```
 fn string<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
     normal_string(input)
@@ -718,6 +725,7 @@ fn normal_string<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
             tag(r"\t"),
             tag(r"\r"),
             tag("\\\n"),
+            tag(r"\$"),
             tag(r#"\\"#),
             tag(r#"\""#),
             recognize(tuple((tag(r"\u"), map_parser(take(6usize), all_consuming(hex_digit1))))),
@@ -727,13 +735,37 @@ fn normal_string<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
         ))(input)
     }
 
+    fn interpolation<'a>(input: ESpan<'a>) -> IResult<'a, StringElement<'a>> {
+        preceded(
+            chr('$'),
+            alt((
+                map(unescaped_identifier, |x| {
+                    StringElement::Interpolation(Node::Identifier(x.strip_parse_state()))
+                }),
+                map(
+                    delimited(chr('{'), ws_around(ex_expression), ex_tag("}")),
+                    StringElement::Interpolation,
+                ),
+                map(tag("$"), |x: ESpan<'a>| StringElement::Body(x.strip_parse_state())),
+                map(err_insert("Expected identifier, interpolated block, or $"), |_| {
+                    StringElement::Interpolation(Node::Error)
+                }),
+            )),
+        )(input)
+    }
+
     map(
-        recognize(tuple((
+        delimited(
             chr('"'),
-            many0(alt((recognize(none_of("\\\"\n")), escape_sequence))),
+            many0(alt((
+                map(recognize(many1(alt((recognize(none_of("$\\\"\n")), escape_sequence)))), |x| {
+                    StringElement::Body(x.strip_parse_state())
+                }),
+                interpolation,
+            ))),
             ex_tag("\""),
-        ))),
-        |x| Node::String(x.strip_parse_state()),
+        ),
+        Node::String,
     )(input)
 }
 
@@ -758,7 +790,7 @@ fn variable_decl<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
             alt((kw("let"), kw("const"))),
             ws_around(alt((identifier, preceded(ex_tag("$"), unescaped_identifier)))),
             chr('='),
-            ws_before(expression),
+            ws_before(ex_expression),
         )),
         |(keyword, identifier, _, value)| Node::VariableDecl {
             identifier: identifier.strip_parse_state(),
@@ -859,7 +891,7 @@ fn short_function_decl<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
             tuple((
                 ws_before(identifier),
                 delimited(ws_around(tag("(")), parameter_list, ws_around(tag(")"))),
-                expression,
+                ex_expression,
             )),
         ),
         |(identifier, parameters, body)| Node::FunctionDecl {
@@ -923,7 +955,7 @@ fn object<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
                         },
                     )
                 }),
-                opt(ws_before(ex_tag(","))),
+                opt(ws_before(tag(","))),
             )),
             |x| x.map(|y| y.take()).unwrap_or_else(Vec::new),
         )(input)
@@ -933,7 +965,7 @@ fn object<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
         move |input| {
             let res = {
                 let name = name.clone();
-                map(delimited(chr('{'), ws_around(object_body), ex_tag("}")), move |body| {
+                map(delimited(chr('{'), ws_around(object_body), tag("}")), move |body| {
                     Node::Object(name.clone().map(|x| x.strip_parse_state()), body)
                 })(input.clone())
             };
@@ -980,7 +1012,7 @@ fn list<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
                         },
                     )
                 }),
-                opt(ws_before(ex_tag(","))),
+                opt(ws_before(tag(","))),
             )),
             |x| Node::List(x.map(|x| x.take()).unwrap_or_else(Vec::new)),
         )(input)
@@ -1043,7 +1075,7 @@ fn lookup<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
                     ws_around(tag(".")),
                     map(identifier, |x| Node::Label(x.strip_parse_state())),
                 ),
-                delimited(chr('['), ws_around(expression), chr(']')),
+                delimited(chr('['), ws_around(ex_expression), chr(']')),
             ))),
         ),
         |(x, y)| {
@@ -1065,7 +1097,7 @@ fn lookup<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
 /// 2 * ( 2 + 3 )
 /// ```
 fn parenthetical<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
-    delimited(chr('('), ws_around(expression), chr(')'))(input)
+    delimited(chr('('), ws_around(ex_expression), chr(')'))(input)
 }
 
 /// Blocks are defined as:
@@ -1098,15 +1130,16 @@ fn value<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
         parenthetical,
         block,
         conditional,
-        map(preceded(ex_tag("$"), unescaped_identifier), |x| {
-            Node::Identifier(x.strip_parse_state())
-        }),
+        map(preceded(tag("$"), unescaped_identifier), |x| Node::Identifier(x.strip_parse_state())),
         map(kw("true"), |_| Node::True),
         map(kw("false"), |_| Node::False),
         map(kw("null"), |_| Node::Null),
         string,
         real,
         integer,
+        map(preceded(err_insert("Expected '$'"), unescaped_identifier), |x| {
+            Node::Identifier(x.strip_parse_state())
+        }),
         err_insert("Expected value"),
     ))(input)
 }
@@ -1324,7 +1357,7 @@ fn invocation<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
                         alt((
                             delimited(
                                 not(tag(".")),
-                                simple_expression,
+                                no_errors(simple_expression),
                                 peek(alt((
                                     recognize(whitespace),
                                     recognize(one_of("|&;)}")),
@@ -1408,14 +1441,16 @@ fn conditional<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
 /// abc | def |> ghi
 /// ```
 fn expression<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
-    alt((
-        lassoc_choice(assignment, alt((tag("|>"), tag("|"))), |a, op, b| match *op.fragment() {
-            "|>" => Node::Iterate(Box::new(a), Box::new(b)),
-            "|" => Node::Pipe(Box::new(a), Box::new(b)),
-            _ => unreachable!(),
-        }),
-        err_insert("Expected expression"),
-    ))(input)
+    lassoc_choice(assignment, alt((tag("|>"), tag("|"))), |a, op, b| match *op.fragment() {
+        "|>" => Node::Iterate(Box::new(a), Box::new(b)),
+        "|" => Node::Pipe(Box::new(a), Box::new(b)),
+        _ => unreachable!(),
+    })(input)
+}
+
+/// Identical to [`expression`] but injects an error if an expression doesn't parse here.
+fn ex_expression<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
+    alt((expression, err_insert("Expected expression")))(input)
 }
 
 /// See `expression`
@@ -1513,10 +1548,10 @@ mod test {
         let mut errors = result.errors;
         assert!(
             actual.content_eq(&expected),
-            "Unexpected result\nexpected: {:#?}\ngot     : {:#?}",
-            expected,
-            actual
+            "Unexpected result\nexpected: {expected:#?}\ngot     : {actual:#?}\nerrors: {errors:?}",
         );
+
+        let mut missing_errors = Vec::new();
 
         for expected_error in expected_errors {
             if let Some((idx, _)) = errors.iter().enumerate().find(|(_, (e, m))| {
@@ -1526,11 +1561,14 @@ mod test {
             }) {
                 errors.remove(idx);
             } else {
-                panic!("Missing error: {expected_error:?}");
+                missing_errors.push(expected_error);
             }
         }
 
-        assert!(errors.is_empty(), "Unexpected errors: {errors:#?}");
+        assert!(
+            errors.is_empty() && missing_errors.is_empty(),
+            "Unexpected errors: {errors:#?}\nMissing errors: {missing_errors:#?}"
+        );
     }
 
     /// Quick helper for testing parsing.
@@ -1550,7 +1588,7 @@ mod test {
 
     /// Quick constructor for a string literal node.
     fn string(s: &str) -> Node<'_> {
-        Node::String(sp(s))
+        Node::String(vec![StringElement::Body(sp(s))])
     }
 
     #[test]
@@ -1571,7 +1609,7 @@ mod test {
             r#"@Foo { bar: "baz" }"#,
             Node::Program(vec![Node::Object(
                 Some(sp("Foo")),
-                vec![(ident("bar"), string(r#""baz""#))],
+                vec![(ident("bar"), string(r#"baz"#))],
             )]),
         );
     }
@@ -1808,9 +1846,12 @@ mod test {
     #[test]
     fn string_test() {
         test_parse(
-            r#""straang\t\r\n\
+            r#""$$\$straang\t\r\n\
 \\abcd\u00264b\"""#,
-            Node::Program(vec![Node::String(sp("\"straang\\t\\r\\n\\\n\\\\abcd\\u00264b\\\"\""))]),
+            Node::Program(vec![Node::String(vec![
+                StringElement::Body(sp("$")),
+                StringElement::Body(sp("\\$straang\\t\\r\\n\\\n\\\\abcd\\u00264b\\\"")),
+            ])]),
         );
     }
 
@@ -1893,6 +1934,29 @@ mod test {
     }
 
     #[test]
+    fn lambda_with_variable() {
+        test_parse(
+            r#"\() { $fs_root }"#,
+            Node::Program(vec![Node::Lambda {
+                parameters: ParameterList {
+                    parameters: vec![],
+                    optional_parameters: vec![],
+                    variadic: None,
+                },
+                body: Box::new(Node::Block(vec![Node::Identifier(sp("fs_root"))])),
+            }]),
+        );
+    }
+
+    #[test]
+    fn invocable_starts_with_keyword() {
+        test_parse(
+            r#"imported_command"#,
+            Node::Program(vec![Node::Invocation(sp("imported_command"), vec![])]),
+        );
+    }
+
+    #[test]
     fn tab_complete_empty_start() {
         let result = ParseResult::from("  ");
 
@@ -1934,5 +1998,72 @@ mod test {
         assert_eq!("  ", *result.whitespace[0].fragment());
         assert_eq!(" ", *result.whitespace[1].fragment());
         assert_eq!(" ", *result.whitespace[2].fragment());
+    }
+
+    #[test]
+    fn string_interpolation() {
+        test_parse(
+            r#""I am $age years old""#,
+            Node::Program(vec![Node::String(vec![
+                StringElement::Body(sp("I am ")),
+                StringElement::Interpolation(Node::Identifier(sp("age"))),
+                StringElement::Body(sp(" years old")),
+            ])]),
+        );
+    }
+
+    #[test]
+    fn string_interpolation_block() {
+        test_parse(
+            r#""I am ${ (get_age) - $vanity_adj } years old""#,
+            Node::Program(vec![Node::String(vec![
+                StringElement::Body(sp("I am ")),
+                StringElement::Interpolation(Node::Subtract(
+                    Box::new(Node::Invocation(sp("get_age"), vec![])),
+                    Box::new(Node::Identifier(sp("vanity_adj"))),
+                )),
+                StringElement::Body(sp(" years old")),
+            ])]),
+        );
+    }
+
+    #[test]
+    fn string_interpolation_err_end_of_string() {
+        test_parse_err(
+            r#""I am $""#,
+            Node::Program(vec![Node::String(vec![
+                StringElement::Body(sp("I am ")),
+                StringElement::Interpolation(Node::Error),
+            ])]),
+            vec![(7, "Expected identifier, interpolated block, or $", "")],
+        );
+    }
+
+    #[test]
+    fn string_interpolation_err_space() {
+        test_parse_err(
+            r#""I am $ ""#,
+            Node::Program(vec![Node::String(vec![
+                StringElement::Body(sp("I am ")),
+                StringElement::Interpolation(Node::Error),
+                StringElement::Body(sp(" ")),
+            ])]),
+            vec![(7, "Expected identifier, interpolated block, or $", "")],
+        );
+    }
+
+    #[test]
+    fn string_interpolation_err_end_of_input() {
+        test_parse_err(
+            r#""I am $"#,
+            Node::Program(vec![Node::String(vec![
+                StringElement::Body(sp("I am ")),
+                StringElement::Interpolation(Node::Error),
+            ])]),
+            vec![
+                (7, "Expected identifier, interpolated block, or $", ""),
+                (7, "Expected '\"'", ""),
+            ],
+        );
     }
 }

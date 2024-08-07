@@ -4,6 +4,7 @@
 
 use super::test::*;
 use super::*;
+use crate::Version;
 use CompatibilityDegree::*;
 use Optionality::*;
 use StringPattern::*;
@@ -634,7 +635,7 @@ fn endpoints() {
     };
     ";
 
-    let versions = vec![TypeVersions { send: "1", recv: "2" }];
+    let versions = vec![TypeVersions { send: Version::new("1"), recv: Version::new("2") }];
 
     assert!(compare_fidl_type_between("ClientIncompatible", &versions, source)
         .has_problems(vec![ProblemPattern::protocol("2", "1")
