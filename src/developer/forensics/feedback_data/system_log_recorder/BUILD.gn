@@ -31,11 +31,6 @@ source_set("main") {
 }
 
 source_set("src") {
-  public = [
-    "controller.h",
-    "system_log_recorder.h",
-  ]
-
   sources = [
     "controller.cc",
     "controller.h",

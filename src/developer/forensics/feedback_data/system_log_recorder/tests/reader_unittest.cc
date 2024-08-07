@@ -15,9 +15,11 @@
 
 #include "src/developer/forensics/feedback_data/system_log_recorder/encoding/identity_decoder.h"
 #include "src/developer/forensics/feedback_data/system_log_recorder/encoding/identity_encoder.h"
-#include "src/developer/forensics/feedback_data/system_log_recorder/system_log_recorder.h"
+#include "src/developer/forensics/feedback_data/system_log_recorder/log_message_store.h"
+#include "src/developer/forensics/feedback_data/system_log_recorder/writer.h"
 #include "src/developer/forensics/testing/log_message.h"
 #include "src/developer/forensics/utils/log_format.h"
+#include "src/developer/forensics/utils/redact/redactor.h"
 #include "src/lib/files/file.h"
 #include "src/lib/files/path.h"
 #include "src/lib/files/scoped_temp_dir.h"

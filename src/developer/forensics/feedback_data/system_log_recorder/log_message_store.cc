@@ -24,9 +24,9 @@ const std::vector<std::string> kDefaultTags = {};
 std::string MakeRepeatedWarning(const size_t message_count) {
   if (message_count == 2) {
     return kRepeatedOnceFormatStr;
-  } else {
-    return fxl::StringPrintf(kRepeatedFormatStr, message_count - 1);
   }
+
+  return fxl::StringPrintf(kRepeatedFormatStr, message_count - 1);
 }
 
 std::string FormatError(const std::string& error) {
@@ -38,9 +38,7 @@ std::string FormatError(const std::string& error) {
 LogMessageStore::LogMessageStore(StorageSize max_block_capacity, StorageSize max_buffer_capacity,
                                  std::unique_ptr<RedactorBase> redactor,
                                  std::unique_ptr<Encoder> encoder)
-    : mtx_(),
-      buffer_(),
-      buffer_stats_(max_buffer_capacity),
+    : buffer_stats_(max_buffer_capacity),
       block_stats_(max_block_capacity),
       redactor_(std::move(redactor)),
       encoder_(std::move(encoder)) {
@@ -107,13 +105,13 @@ bool LogMessageStore::Add(LogSink::MessageOr message) {
     last_pushed_tags = log_tags;
     last_pushed_message_count_ = 1;
     return true;
-  } else {
-    // We will drop the rest of the incoming messages until the next Consume(). This avoids trying
-    // to squeeze in a shorter message that will wrongfully appear before the DROPPED message.
-    buffer_stats_.MakeFull();
-    ++num_messages_dropped_;
-    return false;
   }
+
+  // We will drop the rest of the incoming messages until the next Consume(). This avoids trying
+  // to squeeze in a shorter message that will wrongfully appear before the DROPPED message.
+  buffer_stats_.MakeFull();
+  ++num_messages_dropped_;
+  return false;
 }
 
 std::string LogMessageStore::Consume(bool* end_of_block) {

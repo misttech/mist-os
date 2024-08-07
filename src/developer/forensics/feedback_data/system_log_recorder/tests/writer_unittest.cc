@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "src/developer/forensics/feedback_data/system_log_recorder/writer.h"
+
 #include <fuchsia/logger/cpp/fidl.h>
 #include <lib/syslog/cpp/log_level.h>
 
@@ -16,8 +18,8 @@
 #include "src/developer/forensics/feedback_data/system_log_recorder/encoding/identity_encoder.h"
 #include "src/developer/forensics/feedback_data/system_log_recorder/encoding/production_encoding.h"
 #include "src/developer/forensics/feedback_data/system_log_recorder/encoding/version.h"
+#include "src/developer/forensics/feedback_data/system_log_recorder/log_message_store.h"
 #include "src/developer/forensics/feedback_data/system_log_recorder/reader.h"
-#include "src/developer/forensics/feedback_data/system_log_recorder/system_log_recorder.h"
 #include "src/developer/forensics/testing/log_message.h"
 #include "src/developer/forensics/testing/scoped_memfs_manager.h"
 #include "src/developer/forensics/utils/log_format.h"

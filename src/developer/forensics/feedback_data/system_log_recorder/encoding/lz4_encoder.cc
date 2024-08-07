@@ -6,8 +6,6 @@
 
 #include <lib/syslog/cpp/macros.h>
 
-#include <iterator>
-
 #include "src/developer/forensics/feedback_data/system_log_recorder/encoding/lz4_utils.h"
 
 namespace forensics {
@@ -29,15 +27,16 @@ std::string Lz4Encoder::Encode(const std::string& msg) {
 
   // lz4 forces us to output separately (1) the size of the encoded message and (2) the encoded
   // message itself.
-  const size_t max_encoded_size = LZ4_compressBound((int)msg_size);
+  const size_t max_encoded_size = LZ4_compressBound(static_cast<int>(msg_size));
   std::vector<char> encoded(max_encoded_size);
 
   // Make a copy that will stay in memory for LZ4 to use
   char* chunk_copy_ptr = ring_.Write(msg.data(), msg_size);
 
   // Encode message.
-  const int encoded_size = LZ4_compress_fast_continue(stream_, chunk_copy_ptr, encoded.data(),
-                                                      (int)msg_size, (int)max_encoded_size, 0);
+  const int encoded_size =
+      LZ4_compress_fast_continue(stream_, chunk_copy_ptr, encoded.data(),
+                                 static_cast<int>(msg_size), static_cast<int>(max_encoded_size), 0);
   FX_CHECK((size_t)encoded_size <= kMaxChunkSize);
 
   if (encoded_size <= 0) {
@@ -47,7 +46,7 @@ std::string Lz4Encoder::Encode(const std::string& msg) {
     return EncodeSize(kEncodeSizeError) + Encode(kDroppedError);
   }
 
-  return EncodeSize((uint16_t)encoded_size) +
+  return EncodeSize(static_cast<uint16_t>(encoded_size)) +
          std::string(encoded.begin(), encoded.begin() + encoded_size);
 }
 

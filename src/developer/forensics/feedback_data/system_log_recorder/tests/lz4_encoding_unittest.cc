@@ -110,10 +110,10 @@ TEST(EncodingTest, TestEncodeDecodeChunk) {
 }
 
 std::string GenerateRandomData(int seed, uint16_t length) {
-  std::string output = "";
+  std::string output;
   srand(seed);
   while (output.size() < length) {
-    output += (char)(rand() & 0xFF);
+    output += static_cast<char>(rand() & 0xFF);
   }
   return output;
 }

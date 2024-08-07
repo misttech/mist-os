@@ -10,7 +10,6 @@
 #include <unistd.h>
 
 #include <algorithm>
-#include <iterator>
 #include <string>
 
 #include "src/lib/files/directory.h"
@@ -22,7 +21,7 @@ namespace system_log_recorder {
 
 SystemLogWriter::SystemLogWriter(const std::string& logs_dir, size_t max_num_files,
                                  LogMessageStore* store)
-    : logs_dir_(logs_dir), max_num_files_(max_num_files), file_queue_(), store_(store) {
+    : logs_dir_(logs_dir), max_num_files_(max_num_files), store_(store) {
   FX_CHECK(max_num_files_ > 0);
   if (!files::CreateDirectory(logs_dir)) {
     FX_LOGS(WARNING) << "Failed to create logs directory, will re-try on the next block, no logs "

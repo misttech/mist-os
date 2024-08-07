@@ -6,6 +6,8 @@
 
 #include <lib/syslog/cpp/macros.h>
 
+#include <utility>
+
 #include "src/lib/files/path.h"
 
 namespace forensics {
@@ -28,7 +30,7 @@ SystemLogRecorder::SystemLogRecorder(async_dispatcher_t* archive_dispatcher,
       logs_dir_(write_parameters.logs_dir),
       store_(write_parameters.total_log_size / write_parameters.max_num_files,
              write_parameters.max_write_size, std::move(redactor), std::move(encoder)),
-      log_source_(archive_dispatcher, services, &store_),
+      log_source_(archive_dispatcher, std::move(services), &store_),
       writer_(logs_dir_, write_parameters.max_num_files, &store_) {}
 
 void SystemLogRecorder::Start() {
@@ -39,7 +41,7 @@ void SystemLogRecorder::Start() {
       archive_dispatcher_, [this] { store_.TurnOnRateLimiting(); }, kNoRateLimitDuration);
 }
 
-void SystemLogRecorder::Flush(const std::optional<std::string> message) {
+void SystemLogRecorder::Flush(const std::optional<std::string>& message) {
   FX_LOGS(INFO) << "Received signal to flush cached logs to disk";
   if (message.has_value()) {
     store_.AppendToEnd(message.value());
