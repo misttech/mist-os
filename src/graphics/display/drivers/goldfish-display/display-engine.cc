@@ -5,6 +5,7 @@
 #include "src/graphics/display/drivers/goldfish-display/display-engine.h"
 
 #include <fidl/fuchsia.hardware.goldfish/cpp/wire.h>
+#include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
 #include <fidl/fuchsia.images2/cpp/fidl.h>
 #include <fidl/fuchsia.math/cpp/fidl.h>
 #include <fidl/fuchsia.sysmem2/cpp/wire.h>
