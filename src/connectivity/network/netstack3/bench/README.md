@@ -29,10 +29,10 @@ measure Netstack3's performance in a production-like environment.
     fx build
     ```
 
-3. Start the Fuchsia emulator
+3. Start the Fuchsia emulator, using TAP networking.
 
     ```
-    ffx emu start --headless
+    ffx emu start --headless --net tap
     ```
 
 4. In a separate terminal, serve Fuchsia packages
