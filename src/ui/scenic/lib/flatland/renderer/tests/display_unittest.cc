@@ -4,6 +4,7 @@
 
 #include <fidl/fuchsia.hardware.display.types/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.display/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.display/cpp/hlcpp_conversion.h>
 #include <fuchsia/hardware/display/cpp/fidl.h>
 #include <lib/async-testing/test_loop.h>
 #include <lib/async/cpp/executor.h>
@@ -133,7 +134,7 @@ VK_TEST_F(DisplayTest, SetAllConstraintsTest) {
   // Register the collection with the renderer, which sets the vk constraints.
   const auto collection_id = allocation::GenerateUniqueBufferCollectionId();
   const fuchsia::hardware::display::BufferCollectionId display_collection_id =
-      allocation::ToDisplayBufferCollectionId(collection_id);
+      fidl::NaturalToHLCPP(allocation::ToDisplayBufferCollectionId(collection_id));
   auto image_id = allocation::GenerateUniqueImageId();
   auto result = renderer.ImportBufferCollection(
       collection_id, sysmem_allocator_.get(), std::move(tokens.dup_token),
@@ -222,7 +223,8 @@ VK_TEST_F(DisplayTest, SetAllConstraintsTest) {
                         .buffer_collection_id = display_collection_id,
                         .buffer_index = 0,
                     },
-                    allocation::ToFidlImageId(display_image_id), &import_image_result);
+                    fidl::NaturalToHLCPP(allocation::ToFidlImageId(display_image_id)),
+                    &import_image_result);
   EXPECT_TRUE(import_image_result.is_response());
 }
 
@@ -260,7 +262,7 @@ VK_TEST_F(DisplayTest, SetDisplayImageTest) {
   auto global_collection_id = allocation::GenerateUniqueBufferCollectionId();
   ASSERT_NE(global_collection_id, ZX_KOID_INVALID);
   const fuchsia::hardware::display::BufferCollectionId display_collection_id =
-      allocation::ToDisplayBufferCollectionId(global_collection_id);
+      fidl::NaturalToHLCPP(allocation::ToDisplayBufferCollectionId(global_collection_id));
 
   fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken> dup_token(
       std::move(tokens.dup_token).Unbind().TakeChannel());
@@ -290,7 +292,8 @@ VK_TEST_F(DisplayTest, SetDisplayImageTest) {
                               .buffer_collection_id = display_collection_id,
                               .buffer_index = i,
                           },
-                          allocation::ToFidlImageId(image_ids[i]), &import_image_result);
+                          fidl::NaturalToHLCPP(allocation::ToFidlImageId(image_ids[i])),
+                          &import_image_result);
     ASSERT_EQ(transport_status, ZX_OK);
     ASSERT_TRUE(import_image_result.is_response());
     ASSERT_NE(image_ids[i], fuchsia::hardware::display::types::INVALID_DISP_ID);
@@ -319,9 +322,10 @@ VK_TEST_F(DisplayTest, SetDisplayImageTest) {
 
   static constexpr scenic_impl::DisplayEventId kInvalidEventId = {
       .value = fuchsia::hardware::display::types::INVALID_DISP_ID};
-  status = (*display_coordinator.get())
-               ->SetLayerImage(layer_id, allocation::ToFidlImageId(image_ids[0]),
-                               /*wait_event_id=*/kInvalidEventId, display_signal_event_id);
+  status =
+      (*display_coordinator.get())
+          ->SetLayerImage(layer_id, fidl::NaturalToHLCPP(allocation::ToFidlImageId(image_ids[0])),
+                          /*wait_event_id=*/kInvalidEventId, display_signal_event_id);
   EXPECT_EQ(status, ZX_OK);
 
   // Apply the config.
@@ -341,7 +345,8 @@ VK_TEST_F(DisplayTest, SetDisplayImageTest) {
   // above will signal.
   status =
       (*display_coordinator.get())
-          ->SetLayerImage(layer_id, allocation::ToFidlImageId(image_ids[1]), display_wait_event_id,
+          ->SetLayerImage(layer_id, fidl::NaturalToHLCPP(allocation::ToFidlImageId(image_ids[1])),
+                          display_wait_event_id,
                           /*signal_event_id=*/kInvalidEventId);
   EXPECT_EQ(status, ZX_OK);
 

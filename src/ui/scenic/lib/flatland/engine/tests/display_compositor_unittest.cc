@@ -2,6 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.hardware.display.types/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.display.types/cpp/hlcpp_conversion.h>
+#include <fidl/fuchsia.hardware.display/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.display/cpp/hlcpp_conversion.h>
 #include <fuchsia/hardware/display/cpp/fidl.h>
 #include <fuchsia/hardware/display/types/cpp/fidl.h>
 #include <fuchsia/math/cpp/fidl.h>
@@ -213,8 +217,8 @@ class DisplayCompositorTest : public DisplayCompositorTestBase {
 
 TEST_F(DisplayCompositorTest, ImportAndReleaseBufferCollectionTest) {
   constexpr allocation::GlobalBufferCollectionId kGlobalBufferCollectionId = 15;
-  constexpr fuchsia::hardware::display::BufferCollectionId kDisplayBufferCollectionId =
-      allocation::ToDisplayBufferCollectionId(kGlobalBufferCollectionId);
+  const fuchsia::hardware::display::BufferCollectionId kDisplayBufferCollectionId =
+      fidl::NaturalToHLCPP(allocation::ToDisplayBufferCollectionId(kGlobalBufferCollectionId));
 
   EXPECT_CALL(*mock_display_coordinator_,
               ImportBufferCollection(FidlEquals(kDisplayBufferCollectionId), _, _))
@@ -308,7 +312,7 @@ TEST_F(DisplayCompositorTest,
 
   const auto kGlobalBufferCollectionId = allocation::GenerateUniqueBufferCollectionId();
   const fuchsia::hardware::display::BufferCollectionId kDisplayBufferCollectionId =
-      allocation::ToDisplayBufferCollectionId(kGlobalBufferCollectionId);
+      fidl::NaturalToHLCPP(allocation::ToDisplayBufferCollectionId(kGlobalBufferCollectionId));
 
   fuchsia::sysmem2::BufferCollectionTokenSyncPtr display_token;
   EXPECT_CALL(*mock_display_coordinator_,
@@ -438,7 +442,7 @@ TEST_F(DisplayCompositorTest,
 
   const auto kGlobalBufferCollectionId = allocation::GenerateUniqueBufferCollectionId();
   const fuchsia::hardware::display::BufferCollectionId kDisplayBufferCollectionId =
-      allocation::ToDisplayBufferCollectionId(kGlobalBufferCollectionId);
+      fidl::NaturalToHLCPP(allocation::ToDisplayBufferCollectionId(kGlobalBufferCollectionId));
 
   fuchsia::sysmem2::BufferCollectionTokenSyncPtr display_token;
   EXPECT_CALL(*mock_display_coordinator_,
@@ -551,7 +555,7 @@ TEST_F(DisplayCompositorTest, SysmemNegotiationTest_InRendererOnlyMode_DisplaySh
 
   const auto kGlobalBufferCollectionId = allocation::GenerateUniqueBufferCollectionId();
   const fuchsia::hardware::display::BufferCollectionId kDisplayBufferCollectionId =
-      allocation::ToDisplayBufferCollectionId(kGlobalBufferCollectionId);
+      fidl::NaturalToHLCPP(allocation::ToDisplayBufferCollectionId(kGlobalBufferCollectionId));
 
   EXPECT_CALL(*mock_display_coordinator_, CheckConfig(_, _))
       .Times(1)
@@ -603,7 +607,7 @@ TEST_F(DisplayCompositorTest, SysmemNegotiationTest_InRendererOnlyMode_DisplaySh
 TEST_F(DisplayCompositorTest, ClientDropSysmemToken) {
   const auto kGlobalBufferCollectionId = allocation::GenerateUniqueBufferCollectionId();
   const fuchsia::hardware::display::BufferCollectionId kDisplayBufferCollectionId =
-      allocation::ToDisplayBufferCollectionId(kGlobalBufferCollectionId);
+      fidl::NaturalToHLCPP(allocation::ToDisplayBufferCollectionId(kGlobalBufferCollectionId));
 
   fuchsia::sysmem2::BufferCollectionTokenSyncPtr dup_token;
   // Let client drop token.
@@ -657,7 +661,7 @@ TEST_F(DisplayCompositorTest, ClientDropSysmemToken) {
 TEST_F(DisplayCompositorTest, ImageIsValidAfterReleaseBufferCollection) {
   const auto kGlobalBufferCollectionId = allocation::GenerateUniqueBufferCollectionId();
   const fuchsia::hardware::display::BufferCollectionId kDisplayBufferCollectionId =
-      allocation::ToDisplayBufferCollectionId(kGlobalBufferCollectionId);
+      fidl::NaturalToHLCPP(allocation::ToDisplayBufferCollectionId(kGlobalBufferCollectionId));
 
   // Import buffer collection.
   EXPECT_CALL(*mock_display_coordinator_,
@@ -719,7 +723,7 @@ TEST_F(DisplayCompositorTest, ImageIsValidAfterReleaseBufferCollection) {
 
   // Release buffer collection. Make sure that does not release Image.
   const fuchsia::hardware::display::ImageId kFidlImageId =
-      allocation::ToFidlImageId(image_metadata.identifier);
+      fidl::NaturalToHLCPP(allocation::ToFidlImageId(image_metadata.identifier));
   EXPECT_CALL(*mock_display_coordinator_, ReleaseImage(FidlEquals(kFidlImageId))).Times(0);
   EXPECT_CALL(*mock_display_coordinator_,
               ReleaseBufferCollection(FidlEquals(kDisplayBufferCollectionId)))
@@ -745,10 +749,11 @@ TEST_F(DisplayCompositorTest, ImportImageErrorCases) {
   const allocation::GlobalBufferCollectionId kGlobalBufferCollectionId =
       allocation::GenerateUniqueBufferCollectionId();
   const fuchsia::hardware::display::BufferCollectionId kDisplayBufferCollectionId =
-      allocation::ToDisplayBufferCollectionId(kGlobalBufferCollectionId);
+      fidl::NaturalToHLCPP(allocation::ToDisplayBufferCollectionId(kGlobalBufferCollectionId));
 
   const allocation::GlobalImageId kImageId = allocation::GenerateUniqueImageId();
-  const fuchsia::hardware::display::ImageId kFidlImageId = allocation::ToFidlImageId(kImageId);
+  const fuchsia::hardware::display::ImageId kFidlImageId =
+      fidl::NaturalToHLCPP(allocation::ToFidlImageId(kImageId));
   const uint32_t kVmoCount = 2;
   const uint32_t kVmoIdx = 1;
   const uint32_t kMaxWidth = 100;
@@ -961,7 +966,7 @@ TEST_F(DisplayCompositorTest, VsyncConfigStampAreProcessed) {
 TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessTest) {
   const uint64_t kGlobalBufferCollectionId = allocation::GenerateUniqueBufferCollectionId();
   const fuchsia::hardware::display::BufferCollectionId kDisplayBufferCollectionId =
-      allocation::ToDisplayBufferCollectionId(kGlobalBufferCollectionId);
+      fidl::NaturalToHLCPP(allocation::ToDisplayBufferCollectionId(kGlobalBufferCollectionId));
 
   // Create a parent and child session.
   auto parent_session = CreateSession();
@@ -1074,7 +1079,7 @@ TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessTest) {
   SetDisplaySupported(kGlobalBufferCollectionId, true);
 
   const fuchsia::hardware::display::ImageId fidl_parent_image_id =
-      allocation::ToFidlImageId(parent_image_metadata.identifier);
+      fidl::NaturalToHLCPP(allocation::ToFidlImageId(parent_image_metadata.identifier));
   EXPECT_CALL(*mock_display_coordinator_,
               ImportImage(_, testing::FieldsAre(FidlEquals(kDisplayBufferCollectionId), 0),
                           FidlEquals(fidl_parent_image_id), _))
@@ -1092,7 +1097,7 @@ TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessTest) {
                                          BufferCollectionUsage::kClientImage);
 
   const fuchsia::hardware::display::ImageId fidl_child_image_id =
-      allocation::ToFidlImageId(child_image_metadata.identifier);
+      fidl::NaturalToHLCPP(allocation::ToFidlImageId(child_image_metadata.identifier));
   EXPECT_CALL(*mock_display_coordinator_,
               ImportImage(_, testing::FieldsAre(FidlEquals(kDisplayBufferCollectionId), 1),
                           FidlEquals(fidl_child_image_id), _))
@@ -1130,8 +1135,8 @@ TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessTest) {
 
   // Make sure each layer has all of its components set properly.
   fuchsia::hardware::display::ImageId fidl_image_ids[] = {
-      allocation::ToFidlImageId(child_image_metadata.identifier),
-      allocation::ToFidlImageId(parent_image_metadata.identifier)};
+      fidl::NaturalToHLCPP(allocation::ToFidlImageId(child_image_metadata.identifier)),
+      fidl::NaturalToHLCPP(allocation::ToFidlImageId(parent_image_metadata.identifier))};
   for (uint32_t i = 0; i < 2; i++) {
     EXPECT_CALL(*mock_display_coordinator_, SetLayerPrimaryConfig(FidlEquals(layers[i]), _))
         .Times(1);
@@ -1210,7 +1215,7 @@ void DisplayCompositorTest::HardwareFrameCorrectnessWithRotationTester(
     fuchsia::hardware::display::types::CoordinateTransformation expected_transform) {
   const uint64_t kGlobalBufferCollectionId = allocation::GenerateUniqueBufferCollectionId();
   const fuchsia::hardware::display::BufferCollectionId kDisplayBufferCollectionId =
-      allocation::ToDisplayBufferCollectionId(kGlobalBufferCollectionId);
+      fidl::NaturalToHLCPP(allocation::ToDisplayBufferCollectionId(kGlobalBufferCollectionId));
 
   // Create a parent session.
   auto parent_session = CreateSession();
@@ -1287,7 +1292,7 @@ void DisplayCompositorTest::HardwareFrameCorrectnessWithRotationTester(
   SetDisplaySupported(kGlobalBufferCollectionId, true);
 
   const fuchsia::hardware::display::ImageId fidl_parent_image_id =
-      allocation::ToFidlImageId(parent_image_metadata.identifier);
+      fidl::NaturalToHLCPP(allocation::ToFidlImageId(parent_image_metadata.identifier));
   EXPECT_CALL(*mock_display_coordinator_,
               ImportImage(_, testing::FieldsAre(FidlEquals(kDisplayBufferCollectionId), 0),
                           FidlEquals(fidl_parent_image_id), _))
@@ -1328,7 +1333,7 @@ void DisplayCompositorTest::HardwareFrameCorrectnessWithRotationTester(
       .Times(1);
 
   const fuchsia::hardware::display::ImageId fidl_collection_image_id =
-      allocation::ToFidlImageId(parent_image_metadata.identifier);
+      fidl::NaturalToHLCPP(allocation::ToFidlImageId(parent_image_metadata.identifier));
   EXPECT_CALL(*mock_display_coordinator_, SetLayerPrimaryConfig(FidlEquals(layers[0]), _)).Times(1);
   EXPECT_CALL(*mock_display_coordinator_,
               SetLayerPrimaryPosition(FidlEquals(layers[0]), expected_transform, _, _))
@@ -1552,7 +1557,7 @@ TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessWithUpDownFlip270DegreeRot
 TEST_F(DisplayCompositorTest, ChecksDisplayImageSignalFences) {
   const uint64_t kGlobalBufferCollectionId = 1;
   const fuchsia::hardware::display::BufferCollectionId kDisplayBufferCollectionId =
-      allocation::ToDisplayBufferCollectionId(kGlobalBufferCollectionId);
+      fidl::NaturalToHLCPP(allocation::ToDisplayBufferCollectionId(kGlobalBufferCollectionId));
 
   auto session = CreateSession();
 
@@ -1727,7 +1732,7 @@ TEST_F(DisplayCompositorTest, RendererOnly_ImportAndReleaseBufferCollectionTest)
 
   const allocation::GlobalBufferCollectionId kGlobalBufferCollectionId = 15;
   const fuchsia::hardware::display::BufferCollectionId kDisplayBufferCollectionId =
-      allocation::ToDisplayBufferCollectionId(kGlobalBufferCollectionId);
+      fidl::NaturalToHLCPP(allocation::ToDisplayBufferCollectionId(kGlobalBufferCollectionId));
 
   EXPECT_CALL(*mock_display_coordinator_,
               ImportBufferCollection(FidlEquals(kDisplayBufferCollectionId), _, _))

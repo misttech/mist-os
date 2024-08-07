@@ -25,8 +25,8 @@ bool ImportBufferCollection(
     fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken> token,
     const fuchsia_hardware_display_types::ImageBufferUsage& image_buffer_usage) {
   const fuchsia_hardware_display::BufferCollectionId display_buffer_collection_id =
-      fidl::HLCPPToNatural(allocation::ToDisplayBufferCollectionId(buffer_collection_id));
-  fuchsia::hardware::display::Coordinator_ImportBufferCollection_Result result;
+      allocation::ToDisplayBufferCollectionId(buffer_collection_id);
+
   fidl::Result import_buffer_collection_result =
       fidl::Call(display_coordinator)
           ->ImportBufferCollection({{
@@ -122,9 +122,8 @@ zx_status_t ImportImageForCapture(
   }
 
   const fuchsia_hardware_display::BufferCollectionId display_buffer_collection_id =
-      fidl::HLCPPToNatural(allocation::ToDisplayBufferCollectionId(buffer_collection_id));
-  const fuchsia_hardware_display::ImageId fidl_image_id =
-      fidl::HLCPPToNatural(allocation::ToFidlImageId(image_id));
+      allocation::ToDisplayBufferCollectionId(buffer_collection_id);
+  const fuchsia_hardware_display::ImageId fidl_image_id = allocation::ToFidlImageId(image_id);
 
   fidl::Result import_image_result =
       fidl::Call(display_coordinator)

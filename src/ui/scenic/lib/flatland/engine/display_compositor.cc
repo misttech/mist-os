@@ -5,7 +5,9 @@
 #include "src/ui/scenic/lib/flatland/engine/display_compositor.h"
 
 #include <fidl/fuchsia.hardware.display.types/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.display.types/cpp/hlcpp_conversion.h>
 #include <fidl/fuchsia.hardware.display/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.display/cpp/hlcpp_conversion.h>
 #include <fidl/fuchsia.images2/cpp/fidl.h>
 #include <fidl/fuchsia.images2/cpp/hlcpp_conversion.h>
 #include <fidl/fuchsia.sysmem/cpp/hlcpp_conversion.h>
@@ -362,7 +364,7 @@ void DisplayCompositor::ReleaseBufferCollection(
   std::scoped_lock lock(lock_);
   FX_DCHECK(display_coordinator_);
   const fuchsia::hardware::display::BufferCollectionId display_collection_id =
-      allocation::ToDisplayBufferCollectionId(collection_id);
+      fidl::NaturalToHLCPP(allocation::ToDisplayBufferCollectionId(collection_id));
   (*display_coordinator_)->ReleaseBufferCollection(display_collection_id);
   display_buffer_collection_ptrs_.erase(collection_id);
   buffer_collection_supports_display_.erase(collection_id);
@@ -410,7 +412,7 @@ bool DisplayCompositor::ImportBufferImage(const allocation::ImageMetadata& metad
 
   const allocation::GlobalBufferCollectionId collection_id = metadata.collection_id;
   const fuchsia::hardware::display::BufferCollectionId display_collection_id =
-      allocation::ToDisplayBufferCollectionId(collection_id);
+      fidl::NaturalToHLCPP(allocation::ToDisplayBufferCollectionId(collection_id));
   const bool display_support_already_set =
       buffer_collection_supports_display_.find(collection_id) !=
       buffer_collection_supports_display_.end();
@@ -443,7 +445,7 @@ bool DisplayCompositor::ImportBufferImage(const allocation::ImageMetadata& metad
   fuchsia::hardware::display::Coordinator_ImportImage_Result import_image_result;
   {
     const fuchsia::hardware::display::ImageId fidl_image_id =
-        allocation::ToFidlImageId(metadata.identifier);
+        fidl::NaturalToHLCPP(allocation::ToFidlImageId(metadata.identifier));
     const auto status = (*display_coordinator_)
                             ->ImportImage(image_metadata, /*buffer_id=*/
                                           {
@@ -471,7 +473,8 @@ void DisplayCompositor::ReleaseBufferImage(const allocation::GlobalImageId image
 
   renderer_->ReleaseBufferImage(image_id);
 
-  const fuchsia::hardware::display::ImageId fidl_image_id = allocation::ToFidlImageId(image_id);
+  const fuchsia::hardware::display::ImageId fidl_image_id =
+      fidl::NaturalToHLCPP(allocation::ToFidlImageId(image_id));
   std::scoped_lock lock(lock_);
 
   if (display_imported_images_.erase(image_id) == 1) {
@@ -628,7 +631,8 @@ void DisplayCompositor::ApplyLayerImage(const fuchsia::hardware::display::LayerI
   (*display_coordinator_)->SetLayerPrimaryPosition(layer_id, transform, src, dst);
   (*display_coordinator_)->SetLayerPrimaryAlpha(layer_id, alpha_mode, image.multiply_color[3]);
   // Set the imported image on the layer.
-  const fuchsia::hardware::display::ImageId image_id = allocation::ToFidlImageId(image.identifier);
+  const fuchsia::hardware::display::ImageId image_id =
+      fidl::NaturalToHLCPP(allocation::ToFidlImageId(image.identifier));
   (*display_coordinator_)->SetLayerImage(layer_id, image_id, wait_id, signal_id);
 }
 

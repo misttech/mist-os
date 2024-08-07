@@ -4,6 +4,7 @@
 
 #include <fidl/fuchsia.hardware.display.types/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.display/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.display/cpp/hlcpp_conversion.h>
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <fuchsia/sysmem/cpp/fidl.h>
 #include <lib/fit/defer.h>
@@ -541,7 +542,7 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
 
   void ReleaseCaptureBufferCollection(allocation::GlobalBufferCollectionId collection_id) {
     const fuchsia::hardware::display::BufferCollectionId display_collection_id =
-        allocation::ToDisplayBufferCollectionId(collection_id);
+        fidl::NaturalToHLCPP(allocation::ToDisplayBufferCollectionId(collection_id));
     auto display = display_manager_->default_display();
     auto display_coordinator = display_manager_->default_display_coordinator();
     (*display_coordinator)->ReleaseBufferCollection(display_collection_id);
@@ -563,7 +564,7 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
     // This ID would only be zero if we were running in an environment without capture support.
     EXPECT_NE(capture_image_id, 0U);
     const fuchsia::hardware::display::ImageId fidl_capture_image_id =
-        allocation::ToFidlImageId(capture_image_id);
+        fidl::NaturalToHLCPP(allocation::ToFidlImageId(capture_image_id));
 
     auto display = display_manager_->default_display();
     auto display_coordinator = display_manager_->default_display_coordinator();
@@ -2292,8 +2293,9 @@ VK_TEST_F(DisplayCompositorPixelTest, SwitchDisplayMode) {
   EXPECT_TRUE(images_are_same);
 
   // Cleanup.
-  zx_status_t release_status =
-      (*display_coordinator.get())->ReleaseImage(allocation::ToFidlImageId(capture_image_id));
+  fuchsia::hardware::display::ImageId hlcpp_image_id =
+      fidl::NaturalToHLCPP(allocation::ToFidlImageId(capture_image_id));
+  zx_status_t release_status = (*display_coordinator.get())->ReleaseImage(hlcpp_image_id);
   EXPECT_EQ(release_status, ZX_OK);
 }
 
