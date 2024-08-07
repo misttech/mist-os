@@ -5,15 +5,15 @@
 #ifndef SRC_STORAGE_LIB_FTL_FTLN_VOLUME_H_
 #define SRC_STORAGE_LIB_FTL_FTLN_VOLUME_H_
 
+#include <zircon/compiler.h>
 #include <zircon/types.h>
 
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <string>
 
-#include <fbl/macros.h>
-
-#include "ndm-driver.h"
+#include "src/storage/lib/ftl/ftln/ndm-driver.h"
 
 struct XfsVol;
 
@@ -109,7 +109,7 @@ class __EXPORT Volume {
 // Implementation of the Volume interface.
 class __EXPORT VolumeImpl final : public Volume {
  public:
-  VolumeImpl(FtlInstance* owner) : owner_(owner) {}
+  explicit VolumeImpl(FtlInstance* owner) : owner_(owner) {}
 
   // Volume interface.
   const char* Init(std::unique_ptr<NdmDriver> driver) final;
@@ -139,7 +139,8 @@ class __EXPORT VolumeImpl final : public Volume {
   // paths.
   void* GetInternalVolumeForTest();
 
-  DISALLOW_COPY_ASSIGN_AND_MOVE(VolumeImpl);
+  // VolumeImpl is neither copyable nor movable.
+  VolumeImpl(VolumeImpl&&) = delete;
 
  private:
   // Returns true if the volume was created successfully.

@@ -5,10 +5,9 @@
 #ifndef SRC_STORAGE_LIB_FTL_UTILS_FTL_MC_H_
 #define SRC_STORAGE_LIB_FTL_UTILS_FTL_MC_H_
 
-#include <stdlib.h>
 #include <zircon/compiler.h>
 
-#include "ftl_private.h"
+#include "src/storage/lib/ftl/ftl_private.h"
 
 /***********************************************************************/
 /* Type Declarations                                                   */

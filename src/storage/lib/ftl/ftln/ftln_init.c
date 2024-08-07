@@ -2,8 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "ftl_private.h"
-#include "ftlnp.h"
+#include <errno.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <string.h>
+
+#include "src/storage/lib/ftl/ftl.h"
+#include "src/storage/lib/ftl/ftl_private.h"
+#include "src/storage/lib/ftl/ftln/ftlnp.h"
+#include "src/storage/lib/ftl/utils/ftl_mc.h"
+#include "src/storage/lib/ftl/utils/kernel.h"
 
 // Configuration
 #define DEBUG_RESUME FALSE

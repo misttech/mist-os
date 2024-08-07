@@ -7,7 +7,7 @@
 
 #include <string>
 
-#include "ftlnp.h"
+#include "src/storage/lib/ftl/ftln/ftlnp.h"
 
 namespace ftl {
 

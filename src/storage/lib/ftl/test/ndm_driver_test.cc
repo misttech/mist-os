@@ -2,9 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <cstdint>
+
 #include <gtest/gtest.h>
 
-#include "ftl_private.h"
+#include "src/storage/lib/ftl/ftl.h"
 #include "src/storage/lib/ftl/ftln/ndm-driver.h"
 
 namespace {

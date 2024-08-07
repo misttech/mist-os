@@ -2,8 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "ftl.h"
-#include "ftlnp.h"
+#include <stdio.h>
+
+#include "src/storage/lib/ftl/ftl.h"
+#include "src/storage/lib/ftl/ftl_private.h"
+#include "src/storage/lib/ftl/ftln/ftlnp.h"
 
 // flush_bstat: Flush buffered statistics counts
 //

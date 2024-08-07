@@ -3,11 +3,10 @@
 // found in the LICENSE file.
 
 #include <stdio.h>
-#include <stdlib.h>
 
-#include "ftl_private.h"
-#include "kernel.h"
 #include "src/lib/debug/backtrace-request.h"
+#include "src/storage/lib/ftl/ftl_private.h"
+#include "src/storage/lib/ftl/utils/kernel.h"
 
 SEM FileSysSem;         // Global File System Semaphore
 static int g_fs_error;  // File system error code (FsError enum).

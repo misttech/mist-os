@@ -2,14 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "ftl.h"
-#include "ndmp.h"
+#include <errno.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <string.h>
+
+#include "src/storage/lib/ftl/ftl.h"
+#include "src/storage/lib/ftl/ftl_private.h"
+#include "src/storage/lib/ftl/ndm/ndmp.h"
+#include "src/storage/lib/ftl/utils/kernel.h"
 
 // Symbol Definitions
 #define NDM_META_BLKS 2  // blocks reserved for internal use
 
 // Count number of bits set to 1 in a byte/32 bit value
-#define ONES_UI8(b) (NumberOnes[(b) >> 4] + NumberOnes[(b)&0xF])
+#define ONES_UI8(b) (NumberOnes[(b) >> 4] + NumberOnes[(b) & 0xF])
 #define ONES_UI32(w)                                                             \
   (ONES_UI8(((ui8*)&w)[0]) + ONES_UI8(((ui8*)&w)[1]) + ONES_UI8(((ui8*)&w)[2]) + \
    ONES_UI8(((ui8*)&w)[3]))

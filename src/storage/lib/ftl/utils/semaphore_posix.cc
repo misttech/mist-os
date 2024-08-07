@@ -2,14 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <errno.h>
 #include <semaphore.h>
 #include <stdio.h>
-#include <string.h>
-#include <unistd.h>
 #include <zircon/assert.h>
 
-#include "kernel.h"
+#include "src/storage/lib/ftl/utils/kernel.h"
 
 // Gets a semaphore token.
 //

@@ -3,15 +3,19 @@
 // found in the LICENSE file.
 
 #include <string.h>
+#include <zircon/assert.h>
+#include <zircon/compiler.h>
 
-#include <optional>
+#include <cstdint>
+#include <memory>
 #include <vector>
 
 #include <gtest/gtest.h>
 
-#include "ftl.h"
-#include "ndm/ndmp.h"
+#include "src/storage/lib/ftl/ftl.h"
+#include "src/storage/lib/ftl/ftln/logger.h"
 #include "src/storage/lib/ftl/ftln/ndm-driver.h"
+#include "src/storage/lib/ftl/ndm/ndmp.h"
 
 namespace {
 

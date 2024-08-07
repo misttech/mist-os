@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "ftl_private.h"
+#include <stdint.h>
+
+#include "src/storage/lib/ftl/ftl_private.h"
 
 // CRC Lookup Table.
 const uint32_t Crc32Tbl[256] = {

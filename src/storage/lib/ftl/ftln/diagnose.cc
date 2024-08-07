@@ -2,11 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "diagnose.h"
+#include "src/storage/lib/ftl/ftln/diagnose.h"
 
+#include <cstdint>
+#include <cstdio>
 #include <functional>
+#include <string>
 #include <string_view>
 
+#include "src/storage/lib/ftl/ftl.h"
+#include "src/storage/lib/ftl/ftl_private.h"
+#include "src/storage/lib/ftl/ftln/ftlnp.h"
 #include "src/storage/lib/ftl/ndm/ndmp.h"
 
 namespace {
