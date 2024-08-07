@@ -21,7 +21,7 @@ use {
     fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext,
     fidl_fuchsia_net_masquerade as fnet_masquerade, fidl_fuchsia_net_root as fnet_root,
     fidl_fuchsia_net_routes as fnet_routes, fidl_fuchsia_net_routes_admin as fnet_routes_admin,
-    fidl_fuchsia_net_routes_ext as fnet_routes_ext, fidl_fuchsia_net_stack as fnet_stack,
+    fidl_fuchsia_net_routes_ext as fnet_routes_ext,
     fidl_fuchsia_netemul_network as fnetemul_network, fuchsia_zircon as zx,
 };
 
@@ -2145,31 +2145,8 @@ async fn test_masquerade<N: Netstack, M: Manager>(name: &str, setup: MasqueradeT
         .expect("configure address");
     router_server_iface.apply_nud_flake_workaround().await.expect("nud flake workaround");
 
-    async fn add_default_gateway(
-        realm: &netemul::TestRealm<'_>,
-        interface: &netemul::TestInterface<'_>,
-        gateway: fnet::IpAddress,
-    ) {
-        let unspecified_address = fnet_ext::IpAddress(match gateway {
-            fnet::IpAddress::Ipv4(_) => std::net::IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED),
-            fnet::IpAddress::Ipv6(_) => std::net::IpAddr::V6(std::net::Ipv6Addr::UNSPECIFIED),
-        })
-        .into();
-        let stack =
-            realm.connect_to_protocol::<fnet_stack::StackMarker>().expect("connect to protocol");
-        stack
-            .add_forwarding_entry(&fnet_stack::ForwardingEntry {
-                subnet: fnet::Subnet { addr: unspecified_address, prefix_len: 0 },
-                device_id: interface.id(),
-                next_hop: Some(Box::new(gateway)),
-                metric: fnet_stack::UNSPECIFIED_METRIC,
-            })
-            .await
-            .expect("call add forwarding entry")
-            .expect("add forwarding entry");
-    }
-    add_default_gateway(&client, &client_iface, client_gateway).await;
-    add_default_gateway(&server, &server_iface, server_gateway).await;
+    client_iface.add_default_route(client_gateway).await.expect("add default route");
+    server_iface.add_default_route(server_gateway).await.expect("add default route");
 
     async fn enable_forwarding(
         interface: &fnet_interfaces_ext::admin::Control,
