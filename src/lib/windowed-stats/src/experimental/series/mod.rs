@@ -148,6 +148,27 @@ where
     type Sample = T;
 }
 
+/// A set of bool value.
+#[derive(Derivative)]
+#[derivative(Debug(bound = ""))]
+pub struct BitSet<T>(PhantomData<fn() -> T>, Infallible);
+
+// BitSet semantics forward this implementation to the aggregation type.
+impl<T, A, P> BufferStrategy<A, P> for BitSet<T>
+where
+    A: BufferStrategy<A, P>,
+    P: Interpolation,
+{
+    type Buffer = A::Buffer;
+}
+
+impl<T> DataSemantic for BitSet<T>
+where
+    T: Clone + Into<u64>,
+{
+    type Sample = T;
+}
+
 /// A buffer of data from a single time series.
 #[derive(Clone, Debug)]
 struct SerializedBuffer {
@@ -538,10 +559,10 @@ mod tests {
     use crate::experimental::clock::{TimedSample, Timestamp};
     use crate::experimental::series::interpolation::{Constant, LastAggregation, LastSample};
     use crate::experimental::series::statistic::{
-        ArithmeticMean, LatchMax, Max, PostAggregation, Sum, Transform,
+        ArithmeticMean, LatchMax, Max, PostAggregation, Sum, Transform, Union,
     };
     use crate::experimental::series::{
-        Counter, Gauge, RoundRobinSampler, Sampler, SamplingProfile, TimeMatrix,
+        BitSet, Counter, Gauge, RoundRobinSampler, Sampler, SamplingProfile, TimeMatrix,
     };
     use fuchsia_async as fasync;
 
@@ -611,6 +632,9 @@ mod tests {
         let _ = TimeMatrix::<Max<Gauge<u64>>, Constant>::default();
         let _ = TimeMatrix::<Max<Gauge<u64>>, LastSample>::default();
         let _ = TimeMatrix::<Max<Gauge<u64>>, LastAggregation>::default();
+        let _ = TimeMatrix::<Union<BitSet<u64>>, Constant>::default();
+        let _ = TimeMatrix::<Union<BitSet<u64>>, LastSample>::default();
+        let _ = TimeMatrix::<Union<BitSet<u64>>, LastAggregation>::default();
     }
 
     #[test]

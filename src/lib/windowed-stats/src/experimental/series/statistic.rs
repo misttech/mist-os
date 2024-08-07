@@ -12,7 +12,7 @@ use thiserror::Error;
 
 use crate::experimental::series::buffer::BufferStrategy;
 use crate::experimental::series::interpolation::Interpolation;
-use crate::experimental::series::{Counter, DataSemantic, Fill, Gauge, Sample, Sampler};
+use crate::experimental::series::{BitSet, Counter, DataSemantic, Fill, Gauge, Sample, Sampler};
 
 pub mod recipe {
     //! Type definitions and respellings of common or interesting statistic types.
@@ -272,6 +272,52 @@ impl Statistic for Max<Gauge<u64>> {
     }
 }
 
+#[derive(Derivative)]
+#[derivative(
+    Clone(bound = "T::Sample: Clone,"),
+    Debug(bound = "T::Sample: Debug,"),
+    Default(bound = "T::Sample: Zero,")
+)]
+pub struct Union<T>
+where
+    T: DataSemantic,
+{
+    #[derivative(Default(value = "Zero::zero()"))]
+    value: T::Sample,
+}
+
+impl<T> Fill<T::Sample> for Union<T>
+where
+    Self: Sampler<T::Sample, Error = OverflowError>,
+    T: DataSemantic,
+    T::Sample: Num + NumCast,
+{
+    fn fill(&mut self, sample: T::Sample, _n: usize) -> Result<(), Self::Error> {
+        self.fold(sample)
+    }
+}
+
+impl Sampler<Sample<BitSet<u64>>> for Union<BitSet<u64>> {
+    type Error = OverflowError;
+
+    fn fold(&mut self, sample: Sample<BitSet<u64>>) -> Result<(), Self::Error> {
+        self.value = self.value | sample;
+        Ok(())
+    }
+}
+
+impl Statistic for Union<BitSet<u64>> {
+    type Semantic = BitSet<u64>;
+    type Sample = Sample<BitSet<u64>>;
+    type Aggregation = u64;
+
+    fn aggregation(&mut self) -> Option<Self::Aggregation> {
+        let value = self.value;
+        *self = Default::default();
+        Some(value)
+    }
+}
+
 /// Maximum statistic that sums non-monotonic samples into the maximum.
 ///
 /// This statistic is sensitive to overflow in the sum of samples with the non-monotonic sum.
@@ -400,9 +446,9 @@ where
 #[cfg(test)]
 mod tests {
     use crate::experimental::series::statistic::{
-        ArithmeticMean, LatchMax, Max, OverflowError, PostAggregation, Statistic, Sum,
+        ArithmeticMean, LatchMax, Max, OverflowError, PostAggregation, Statistic, Sum, Union,
     };
-    use crate::experimental::series::{Counter, Fill, Gauge, Sampler};
+    use crate::experimental::series::{BitSet, Counter, Fill, Gauge, Sampler};
 
     #[test]
     fn arithmetic_mean_gauge_aggregation() {
@@ -484,6 +530,24 @@ mod tests {
         max.fill(42, 1000).unwrap();
         let aggregation = max.aggregation().unwrap();
         assert_eq!(aggregation, 42);
+    }
+
+    #[test]
+    fn union_bitset_aggregation() {
+        let mut value = Union::<BitSet<u64>>::default();
+        value.fold(1 << 1).unwrap();
+        value.fold(1 << 3).unwrap();
+        value.fold(1 << 5).unwrap();
+        let aggregation = value.aggregation().unwrap();
+        assert_eq!(aggregation, 0b101010);
+    }
+
+    #[test]
+    fn union_bitset_aggregation_fill() {
+        let mut value = Union::<BitSet<u64>>::default();
+        value.fill(1 << 2, 1000).unwrap();
+        let aggregation = value.aggregation().unwrap();
+        assert_eq!(aggregation, 0b100);
     }
 
     #[test]
