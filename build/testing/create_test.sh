@@ -19,12 +19,17 @@ declare -r TOOL="${1}"
 shift 1
 
 declare -a TOOL_ARGS
+declare -a ENV_VARS
 for arg in "$@"
 do
-  TOOL_ARGS+=("'${arg}'")
+  if [[ $arg == env* ]]; then
+      ENV_VARS+=("${arg}")
+  else
+      TOOL_ARGS+=("'${arg}'")
+  fi
 done
 
 echo "#!/bin/bash" > "$OUTFILE"
 echo "" >> "$OUTFILE"
-echo "exec ${TOOL} ${TOOL_ARGS[*]}" '"$@"' >> "$OUTFILE"
+echo "exec ${ENV_VARS[*]} ${TOOL} ${TOOL_ARGS[*]}" '"$@"' >> "$OUTFILE"
 chmod a+x "$OUTFILE"
