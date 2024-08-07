@@ -4,6 +4,7 @@ For tracing, you can use the following libraries:
 
 * [libtrace-provider: Trace provider library](#libtrace-provider)
 * [libtrace: The C and C++ trace event library](#libtrace-trace-event)
+* [fuchsia_trace: The Rust crate](#fuchsia-trace-crate)
 * [libtrace-reader: Trace reader library](#libtrace-reader)
 
 ## libtrace-provider: Trace provider library {#libtrace-provider}
@@ -121,6 +122,13 @@ See [`//zircon/system/ulib/trace/include/lib/trace/event.h`](/zircon/system/ulib
     // Do something
   }
   ```
+
+## fuchsia_trace: The Rust crate {#fuchsia-trace-crate}
+
+This library provides macros for instrumenting Rust programs with trace points
+for capturing trace data during trace execution.
+
+See [fuchsia_trace Rust docs](https://fuchsia-docs.firebaseapp.com/rust/fuchsia_trace/index.html).
 
 ### Suppress tracing within a compilation unit {#suppress-tracing-within-a-compilation-unit}
 
