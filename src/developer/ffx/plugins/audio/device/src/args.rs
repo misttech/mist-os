@@ -213,7 +213,7 @@ pub enum SetSubCommand {
     description = "Set the DAI format of device or signal processing element.",
     example = "Set the DAI format for a specific Dai Endpoint signal processing element:
 
-    $ ffx audio device --id 1 set dai-format --element-id 2 48000,2ch,0x3,pcm_signed,16in16,i2s",
+    $ ffx audio device set dai-format --element-id 2 48000,2ch,0x3,pcm_signed,16in16,i2s",
     note = r"This command accepts a DAI format as a comma separated string:
 
 <FrameRate>,<NumChannels>,<ChannelsToUseBitmask>,<DaiSampleFormat>,<SampleSize>,<DaiFrameFormat>

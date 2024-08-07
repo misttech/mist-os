@@ -2,7 +2,7 @@
   "name": "audio",
   "description": "Interact with the audio subsystem.",
   "examples": [
-    "Generate a 5s long audio signal with 440Hz frequency and write to a file: \n\t$ ffx audio gen sine --frequency 440 --duration 5s --format 48000,uint8,1ch > ~/sine.wav \n\nPlay a wav file using audio_core API: \n\t$ cat ~/sine.wav | ffx audio play \n\nRecord audio signal to a file using audio_core API: \n\t$ ffx audio record --duration 1s --format 48000,uint8,1ch > ~/recording.wav\n\nList available audio devices on target: \n\t$ ffx audio list-devices --output text\n\nPrint information about a specific audio device on target: \n\t$ ffx audio device --id 000 info --direction input \n\nPlay a wav file directly to device hardware: \n\t$ cat ~/sine.wav | ffx audio device --id 000 play \n"
+    "Generate a 5s long audio signal with 440Hz frequency and write to a file: \n\t$ ffx audio gen sine --frequency 440 --duration 5s --format 48000,uint8,1ch > ~/sine.wav \n\nPlay a wav file using audio_core API: \n\t$ cat ~/sine.wav | ffx audio play \n\nRecord audio signal to a file using audio_core API: \n\t$ ffx audio record --duration 1s --format 48000,uint8,1ch > ~/recording.wav\n\nList available audio devices on target: \n\t$ ffx audio list-devices --output text\n\nPrint information about a specific audio device on target: \n\t$ ffx audio device --name 3d99d780 info\n\nPlay a wav file directly to device hardware: \n\t$ cat ~/sine.wav | ffx audio device play\n"
   ],
   "flags": [
     {
