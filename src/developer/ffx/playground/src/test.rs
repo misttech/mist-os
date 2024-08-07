@@ -1092,3 +1092,21 @@ async fn import_nesting() {
     })
     .await;
 }
+
+#[fuchsia::test]
+async fn string_interpolation() {
+    Test::test(
+        r#"
+    let a = 5;
+    let b = "Jim";
+    "My guy is $b and " + "he is ${ $a * 2 } years old"
+    "#,
+    )
+    .check(|value| {
+        let Value::String(value) = value else {
+            panic!();
+        };
+        assert_eq!("My guy is Jim and he is 10 years old", &value);
+    })
+    .await;
+}

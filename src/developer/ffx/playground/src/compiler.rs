@@ -10,6 +10,7 @@ use num::bigint::BigInt;
 use num::rational::BigRational;
 use num::{CheckedDiv, FromPrimitive};
 use std::collections::HashMap;
+use std::fmt::Write;
 use std::iter::repeat_with;
 use std::sync::{Arc, Mutex};
 
@@ -1334,15 +1335,13 @@ impl Visitor {
         elements: Vec<StringElement<'_>>,
     ) -> impl for<'f> Fn(&Arc<InterpreterInner>, &'f Mutex<Frame>) -> BoxFuture<'f, Result<Value>>
     {
-        let expected_len = elements
-            .iter()
-            .map(|x| match x {
-                StringElement::Body(x) => x.fragment().len(),
-                StringElement::Interpolation(_) => 1,
-            })
-            .sum();
+        enum CompiledElements<A> {
+            Body(String),
+            Interpolation(A),
+        }
 
-        let mut string = String::with_capacity(expected_len);
+        let mut compiled_elements = Vec::with_capacity(elements.len());
+        let mut string_capacity = elements.len();
         for element in elements {
             match element {
                 StringElement::Body(element) => {
@@ -1362,15 +1361,46 @@ impl Visitor {
                         element.replace_range(idx..(idx + 8), &chr.to_string());
                     }
 
-                    string.push_str(&element.replace(r"\\", r"\"));
+                    let element = element.replace(r"\\", r"\");
+                    string_capacity += element.len();
+                    string_capacity -= 1;
+
+                    if let Some(CompiledElements::Body(b)) = compiled_elements.last_mut() {
+                        b.push_str(&element)
+                    } else {
+                        compiled_elements.push(CompiledElements::Body(element));
+                    }
                 }
-                StringElement::Interpolation(_) => todo!(),
+                StringElement::Interpolation(i) => {
+                    compiled_elements.push(CompiledElements::Interpolation(self.visit(i)))
+                }
             }
         }
 
-        move |_, _| {
-            let string = string.clone();
-            async move { Ok(Value::String(string)) }.boxed()
+        let elements = Arc::new(compiled_elements);
+
+        move |inner, frame| {
+            let elements = Arc::clone(&elements);
+            let inner = Arc::clone(inner);
+
+            async move {
+                let mut string = String::with_capacity(string_capacity);
+                for element in elements.iter() {
+                    match element {
+                        CompiledElements::Body(b) => string.push_str(b),
+                        CompiledElements::Interpolation(i) => {
+                            let v = i(&inner, frame).await?;
+                            if let Value::String(s) = &v {
+                                string.push_str(s);
+                            } else {
+                                write!(&mut string, "{v}").expect("Write to string failed!");
+                            }
+                        }
+                    }
+                }
+                Ok(Value::String(string))
+            }
+            .boxed()
         }
     }
 
