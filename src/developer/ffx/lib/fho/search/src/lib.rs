@@ -36,7 +36,7 @@ pub struct ExternalSubTool {
     path: PathBuf,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ExternalSubToolSuite {
     context: EnvironmentContext,
     workspace_tools: HashMap<String, SubToolLocation>,
@@ -67,13 +67,10 @@ impl ExternalSubToolSuite {
     /// Load subtools from `subtool_paths` and use `context` for the environment context.
     /// This is used both by the main implementation of [`ExternalSubToolSuite::from_env`] and
     /// in tests to redirect to different subtool paths.
-    fn with_tools_from(
-        context: EnvironmentContext,
-        subtool_paths: &[impl AsRef<Path>],
-    ) -> Result<Self> {
+    fn with_tools_from(context: EnvironmentContext, subtool_paths: &[impl AsRef<Path>]) -> Self {
         let workspace_tools =
             find_workspace_tools(subtool_paths).map(|tool| (tool.name.to_owned(), tool)).collect();
-        Ok(Self { context, workspace_tools })
+        Self { context, workspace_tools }
     }
 
     fn find_workspace_tool(&self, ffx_cmd: &FfxCommandLine) -> Option<ExternalSubTool> {
@@ -116,7 +113,7 @@ impl ToolSuite for ExternalSubToolSuite {
             .get_file()
             .await
             .unwrap_or_else(|_| vec![]);
-        Self::with_tools_from(env.clone(), &get_subtool_paths(subtool_config))
+        Ok(Self::with_tools_from(env.clone(), &get_subtool_paths(subtool_config)))
     }
 
     fn global_command_list() -> &'static [&'static argh::CommandInfo] {
@@ -440,8 +437,7 @@ mod tests {
         );
 
         let suite =
-            ExternalSubToolSuite::with_tools_from(test_env.context.clone(), &[tempdir.path()])
-                .expect("subtool suite scanning should succeed");
+            ExternalSubToolSuite::with_tools_from(test_env.context.clone(), &[tempdir.path()]);
 
         assert!(
             ExternalSubToolSuite::global_command_list().is_empty(),
