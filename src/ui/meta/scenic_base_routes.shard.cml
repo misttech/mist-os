@@ -25,7 +25,6 @@
     offer: [
         {
             protocol: [
-                "fuchsia.logger.LogSink",
                 "fuchsia.scheduler.RoleManager",
                 "fuchsia.stash.Store",
                 "fuchsia.sysmem.Allocator",
