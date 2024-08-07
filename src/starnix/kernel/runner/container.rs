@@ -11,9 +11,10 @@ use bstr::BString;
 use fasync::OnSignals;
 use fidl::endpoints::{ControlHandle, RequestStream};
 use fidl::AsyncChannel;
+use fidl_fuchsia_feedback::CrashReporterMarker;
 use fidl_fuchsia_scheduler::RoleManagerMarker;
 use fuchsia_async::DurationExt;
-use fuchsia_component::client::connect_to_protocol_sync;
+use fuchsia_component::client::{connect_to_protocol, connect_to_protocol_sync};
 use fuchsia_component::server::ServiceFs;
 use fuchsia_zircon::{
     AsHandleRef, Signals, Task as _, {self as zx},
@@ -367,6 +368,8 @@ async fn create_container(
         Some(role_manager)
     };
 
+    let crash_reporter = connect_to_protocol::<CrashReporterMarker>().unwrap();
+
     let node = inspect::component::inspector().root().create_child("container");
     let security_state = security::kernel_init_security(features.selinux);
     let kernel = Kernel::new(
@@ -375,6 +378,7 @@ async fn create_container(
         svc_dir,
         data_dir,
         role_manager,
+        Some(crash_reporter),
         node.create_child("kernel"),
         features.aspect_ratio.as_ref(),
         security_state,

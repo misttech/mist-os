@@ -93,6 +93,7 @@ fn create_kernel_task_and_unlocked_with_fs_and_selinux<'l>(
         None,
         None,
         None,
+        None,
         fuchsia_inspect::Node::default(),
         None,
         security::testing::kernel_state(security_server),

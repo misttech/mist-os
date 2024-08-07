@@ -10,7 +10,7 @@ use crate::mm::MemoryManager;
 use crate::signals::{deliver_signal, SignalActions, SignalInfo};
 use crate::task::{
     ptrace_attach_from_state, CurrentTask, ExceptionResult, ExitStatus, Kernel, ProcessGroup,
-    PtraceCoreState, StopState, Task, TaskBuilder, ThreadGroup, ThreadGroupWriteGuard,
+    PtraceCoreState, StopState, TaskBuilder, ThreadGroup, ThreadGroupWriteGuard,
 };
 use crate::vfs::DelayedReleaser;
 use anyhow::{format_err, Error};
@@ -20,9 +20,9 @@ use fuchsia_zircon::{
 };
 use starnix_logging::{
     firehose_trace_duration, firehose_trace_duration_begin, firehose_trace_duration_end,
-    firehose_trace_instant, log_error, log_warn, set_zx_name, CoreDumpInfo, ARG_NAME,
-    CATEGORY_STARNIX, MAX_ARGV_LENGTH, NAME_EXECUTE_SYSCALL, NAME_HANDLE_EXCEPTION,
-    NAME_READ_RESTRICTED_STATE, NAME_RESTRICTED_KICK, NAME_RUN_TASK, NAME_WRITE_RESTRICTED_STATE,
+    firehose_trace_instant, log_error, log_warn, set_zx_name, ARG_NAME, CATEGORY_STARNIX,
+    NAME_EXECUTE_SYSCALL, NAME_HANDLE_EXCEPTION, NAME_READ_RESTRICTED_STATE, NAME_RESTRICTED_KICK,
+    NAME_RUN_TASK, NAME_WRITE_RESTRICTED_STATE,
 };
 use starnix_sync::{LockBefore, Locked, ProcessGroupState, TaskRelease, Unlocked};
 use starnix_syscalls::decls::SyscallDecl;
@@ -388,36 +388,6 @@ fn process_restricted_exit(
     restricted_state.write_state(&state);
 
     Ok(None)
-}
-
-pub fn get_core_dump_info(task: &Task) -> CoreDumpInfo {
-    let process_koid = task
-        .thread_group
-        .process
-        .get_koid()
-        .expect("handles for processes with crashing threads are still valid");
-    let thread_koid = task
-        .thread
-        .read()
-        .as_ref()
-        .expect("coredumps occur in tasks with associated threads")
-        .get_koid()
-        .expect("handles for crashing threads are still valid");
-    let pid = task.thread_group.leader as i64;
-    let mut argv = task
-        .read_argv()
-        .unwrap_or_else(|_| vec!["<unknown>".into()])
-        .into_iter()
-        .map(|a| a.to_string())
-        .collect::<Vec<_>>()
-        .join(" ");
-
-    let original_len = argv.len();
-    argv.truncate(MAX_ARGV_LENGTH - 3);
-    if argv.len() < original_len {
-        argv.push_str("...");
-    }
-    CoreDumpInfo { process_koid, thread_koid, pid, argv }
 }
 
 pub fn create_zircon_process<L>(

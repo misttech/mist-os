@@ -8,6 +8,7 @@ use crate::device::framebuffer::{AspectRatio, Framebuffer};
 use crate::device::loop_device::LoopDeviceRegistry;
 use crate::device::remote_block_device::RemoteBlockDeviceRegistry;
 use crate::device::{BinderDevice, DeviceMode, DeviceRegistry};
+use crate::execution::CrashReporter;
 use crate::fs::nmfs::NetworkManagerHandle;
 use crate::fs::proc::SystemLimits;
 use crate::memory_attribution::MemoryAttributionManager;
@@ -32,13 +33,14 @@ use bstr::BString;
 use fidl::endpoints::{
     create_endpoints, ClientEnd, DiscoverableProtocolMarker, ProtocolMarker, Proxy,
 };
+use fidl_fuchsia_feedback::CrashReporterProxy;
 use fidl_fuchsia_scheduler::RoleManagerSynchronousProxy;
 use futures::FutureExt;
 use netlink::interfaces::InterfacesHandler;
 use netlink::{Netlink, NETLINK_LOG_TAG};
 use once_cell::sync::OnceCell;
 use starnix_lifecycle::{AtomicU32Counter, AtomicU64Counter};
-use starnix_logging::{log_error, CoreDumpList};
+use starnix_logging::log_error;
 use starnix_sync::{
     DeviceOpen, KernelIpTables, KernelSwapFiles, LockBefore, Locked, OrderedMutex, OrderedRwLock,
     RwLock,
@@ -195,9 +197,6 @@ pub struct Kernel {
     /// Inspect instrumentation for this kernel instance.
     pub inspect_node: fuchsia_inspect::Node,
 
-    /// Diagnostics information about crashed tasks.
-    pub core_dumps: CoreDumpList,
-
     /// The kinds of seccomp action that gets logged, stored as a bit vector.
     /// Each potential SeccompAction gets a bit in the vector, as specified by
     /// SeccompAction::logged_bit_offset.  If the bit is set, that means the
@@ -254,6 +253,9 @@ pub struct Kernel {
 
     /// The manager for monitoring and reporting resources used by the kernel.
     pub memory_attribution_manager: MemoryAttributionManager,
+
+    /// Handler for crashing Linux processes.
+    pub crash_reporter: CrashReporter,
 }
 
 /// An implementation of [`InterfacesHandler`].
@@ -310,6 +312,7 @@ impl Kernel {
         container_svc: Option<fio::DirectoryProxy>,
         container_data_dir: Option<fio::DirectorySynchronousProxy>,
         role_manager: Option<RoleManagerSynchronousProxy>,
+        crash_reporter_proxy: Option<CrashReporterProxy>,
         inspect_node: fuchsia_inspect::Node,
         framebuffer_aspect_ratio: Option<&AspectRatio>,
         security_state: security::KernelState,
@@ -320,7 +323,7 @@ impl Kernel {
         let framebuffer =
             Framebuffer::new(framebuffer_aspect_ratio).expect("Failed to create framebuffer");
 
-        let core_dumps = CoreDumpList::new(inspect_node.create_child("coredumps"));
+        let crash_reporter = CrashReporter::new(&inspect_node, crash_reporter_proxy);
         let network_manager = NetworkManagerHandle::new_with_inspect(&inspect_node);
 
         let this = Arc::new_cyclic(|kernel| Kernel {
@@ -362,7 +365,6 @@ impl Kernel {
             generic_netlink: OnceCell::new(),
             network_netlink: OnceCell::new(),
             inspect_node,
-            core_dumps,
             actions_logged: AtomicU16::new(0),
             suspend_resume_manager: Default::default(),
             network_manager,
@@ -381,6 +383,7 @@ impl Kernel {
             mounts: Mounts::new(),
             hrtimer_manager: HrTimerManager::new(),
             memory_attribution_manager: MemoryAttributionManager::new(kernel.clone()),
+            crash_reporter,
         });
 
         // Make a copy of this Arc for the inspect lazy node to use but don't create an Arc cycle
