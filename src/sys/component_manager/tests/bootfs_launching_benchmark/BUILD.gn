@@ -29,20 +29,42 @@ rustc_test("bootfs_launching_benchmark") {
     "//src/lib/fuchsia-runtime",
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:test-case",
   ]
 
   sources = [ "src/main.rs" ]
 }
 
 if (current_toolchain == default_toolchain) {
-  fuchsia_component("root_component") {
-    component_name = "root_component"
-    manifest = "meta/root_component.cml"
-    testonly = true
+  number_of_components_list = [
+    1,
+    5,
+    10,
+    15,
+    20,
+    25,
+  ]
+
+  foreach(i, number_of_components_list) {
+    fuchsia_component("root_component_${i}") {
+      component_name = "root_component_${i}"
+      manifest = "meta/root_component_${i}.cml"
+      testonly = true
+    }
+
+    fuchsia_component("component-manager-cmp-${i}") {
+      testonly = true
+      component_name = "component_manager_${i}"
+      manifest = "meta/component_manager_${i}.cml"
+      deps = [ "//src/sys/component_manager:bin" ]
+    }
   }
 
   fuchsia_package("root_package") {
-    deps = [ ":root_component" ]
+    deps = []
+    foreach(i, number_of_components_list) {
+      deps += [ ":root_component_${i}" ]
+    }
     testonly = true
   }
 
@@ -71,7 +93,6 @@ if (current_toolchain == default_toolchain) {
     use_bringup_platform_bundles_only = true
     bootfs_labels = [ ":config" ]
     bootfs_package_labels = [
-      "//src/security/tests/pkg_test/assemblies/hello_world_v1:hello_world-package",
       "test_data/components",
       ":root_package",
     ]
@@ -126,23 +147,16 @@ if (current_toolchain == default_toolchain) {
 
   fuchsia_test_package("bootfs-launching-benchmark-integration-tests") {
     test_components = [ ":bootfs_launching_benchmark_component" ]
-    deps = [
-      ":bootfs_resource",
-      ":component-manager-cmp",
-    ]
+    deps = [ ":bootfs_resource" ]
+    foreach(i, number_of_components_list) {
+      deps += [ ":component-manager-cmp-${i}" ]
+    }
   }
 
   component_config("config") {
     testonly = true
     sources = [ "config.json5" ]
     dest = "data/component_manager_config"
-  }
-
-  fuchsia_component("component-manager-cmp") {
-    testonly = true
-    component_name = "component_manager"
-    manifest = "meta/component_manager.cml"
-    deps = [ "//src/sys/component_manager:bin" ]
   }
 
   group("tests") {
