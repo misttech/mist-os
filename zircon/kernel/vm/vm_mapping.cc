@@ -546,18 +546,21 @@ void VmMapping::AspaceDebugUnpinLockedObject(uint64_t offset, uint64_t len) cons
 }
 
 namespace {
+
+// Helper class for batching installing mappings into the arch aspace. The mappings aspace and
+// object lock must be held over the entirety of the lifetime of this object, without ever being
+// released.
 template <size_t NumPages>
 class VmMappingCoalescer {
  public:
   VmMappingCoalescer(VmMapping* mapping, vaddr_t base, uint mmu_flags,
                      ArchVmAspace::ExistingEntryAction existing_entry_action)
-      TA_REQ(mapping->lock());
+      TA_REQ(mapping->lock()) TA_REQ(mapping->object_lock());
   ~VmMappingCoalescer();
 
   // Add a page to the mapping run.  If this fails, the VmMappingCoalescer is
   // no longer valid.
   zx_status_t Append(vaddr_t vaddr, paddr_t paddr) {
-    AssertHeld(mapping_->lock_ref());
     DEBUG_ASSERT(!aborted_);
     // If this isn't the expected vaddr, flush the run we have first.
     if (!can_append(vaddr)) {
@@ -573,7 +576,6 @@ class VmMappingCoalescer {
   }
 
   zx_status_t AppendOrAdjustMapping(vaddr_t vaddr, paddr_t paddr, uint mmu_flags) {
-    AssertHeld(mapping_->lock_ref());
     DEBUG_ASSERT(!aborted_);
     // If this isn't the expected vaddr or mmu_flags have changed, flush the run we have first.
     if (!can_append(vaddr) || mmu_flags != mmu_flags_) {
@@ -651,8 +653,6 @@ VmMappingCoalescer<NumPages>::~VmMappingCoalescer() {
 
 template <size_t NumPages>
 zx_status_t VmMappingCoalescer<NumPages>::Flush() {
-  AssertHeld(mapping_->lock_ref());
-
   if (count_ == 0) {
     return ZX_OK;
   }
@@ -726,6 +726,7 @@ zx_status_t VmMapping::MapRange(size_t offset, size_t len, bool commit, bool ign
       base_ + offset, len,
       [this, commit, dirty_tracked, ignore_existing](vaddr_t base, size_t len, uint mmu_flags) {
         AssertHeld(lock_ref());
+        AssertHeld(object_lock_ref());
 
         // Remove the write permission if this maps a vmo that supports dirty tracking, in order to
         // trigger write permission faults when writes occur, enabling us to track when pages are
