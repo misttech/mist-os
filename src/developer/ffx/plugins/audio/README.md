@@ -38,18 +38,44 @@ ffx audio record --usage ultrasound
 
 ### Interact with attached devices
 
-Use `ffx audio list-devices` to see which devices are connected. The device name
-field is used to specify a device for other `ffx audio device` commands.
+Use `ffx audio device list` to see which devices are connected. The device name
+field can be used to specify a device for other `ffx audio device` commands.
 
 ```posix-terminal
-ffx audio list-devices
+ffx audio device list
 ```
+
+Filter the devices with optional flags. See `ffx audio device help` for
+more information about filter flags.
+
+Specify `--name <name>` to select a device by name:
+
+```
+ffx audio device --name 3d99d780
+```
+
+Specify `--token-id <id>` to select a device by audio device registry (ADR)
+token ID:
+
+```
+ffx audio device --token-id 1
+```
+
+Specify `--direction {input,output}` to select a device by direction.
+This only applies to StreamConfig devices.
+
+```
+ffx audio device --direction input
+```
+
+`ffx audio device` subcommands that operate on a single device (all except `list`)
+choose the first device in the list, after filtering.
 
 Use `ffx audio device info` to print additional information about a specific
 device.
 
 ```posix-terminal
-ffx audio device --name <name> --direction {input/output} info
+ffx audio device --name <name> info
 ```
 
 Use `ffx audio device play` and `ffx audio device record` to play or record an
