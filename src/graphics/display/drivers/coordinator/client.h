@@ -121,6 +121,14 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
   void OnDisplaysChanged(cpp20::span<const DisplayId> added_display_ids,
                          cpp20::span<const DisplayId> removed_display_ids);
   void SetOwnership(bool is_owner);
+
+  fidl::Status NotifyDisplayChanges(
+      cpp20::span<const fuchsia_hardware_display::wire::Info> added_display_infos,
+      cpp20::span<const fuchsia_hardware_display_types::wire::DisplayId> removed_display_ids);
+  fidl::Status NotifyOwnershipChange(bool client_has_ownership);
+  fidl::Status NotifyVsync(DisplayId display_id, zx::time timestamp, ConfigStamp config_stamp,
+                           VsyncAckCookie vsync_ack_cookie);
+
   void ApplyConfig();
 
   void OnFenceFired(FenceReference* fence);
@@ -138,9 +146,6 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
 
   // Test helpers
   size_t TEST_imported_images_count() const { return images_.size(); }
-
-  // Must be called after `Bind()` / `BindForTesting()`.
-  fidl::ServerBindingRef<fuchsia_hardware_display::Coordinator>& binding() { return *binding_; }
 
   // Used for testing
   sync_completion_t* fidl_unbound() { return &fidl_unbound_; }

@@ -1152,7 +1152,7 @@ void Client::SetOwnership(bool is_owner) {
   ZX_DEBUG_ASSERT(controller_->IsRunningOnClientDispatcher());
   is_owner_ = is_owner;
 
-  fidl::Status result = fidl::WireSendEvent(*binding_)->OnClientOwnershipChange(is_owner);
+  fidl::Status result = NotifyOwnershipChange(/*client_has_ownership=*/is_owner);
   if (!result.ok()) {
     zxlogf(ERROR, "Error writing remove message: %s", result.FormatDescription().c_str());
   }
@@ -1161,6 +1161,41 @@ void Client::SetOwnership(bool is_owner) {
   if (client_apply_count_) {
     ApplyConfig();
   }
+}
+
+fidl::Status Client::NotifyDisplayChanges(
+    cpp20::span<const fuchsia_hardware_display::wire::Info> added_display_infos,
+    cpp20::span<const fuchsia_hardware_display_types::wire::DisplayId> removed_display_ids) {
+  // TODO(https://fxbug.dev/42052765): OnDisplayChanged() takes VectorViews
+  // of non-const display Info and DisplayId types though it doesn't modify
+  // the vectors. We have to perform a const_cast to drop their constness.
+  cpp20::span<fuchsia_hardware_display::wire::Info> non_const_added_display_infos(
+      const_cast<fuchsia_hardware_display::wire::Info*>(added_display_infos.data()),
+      added_display_infos.size());
+  cpp20::span<fuchsia_hardware_display_types::wire::DisplayId> non_const_removed_display_ids(
+      const_cast<fuchsia_hardware_display_types::wire::DisplayId*>(removed_display_ids.data()),
+      removed_display_ids.size());
+
+  fidl::OneWayStatus send_event_result = fidl::WireSendEvent(*binding_)->OnDisplaysChanged(
+      fidl::VectorView<fuchsia_hardware_display::wire::Info>::FromExternal(
+          non_const_added_display_infos.data(), non_const_added_display_infos.size()),
+      fidl::VectorView<fuchsia_hardware_display_types::wire::DisplayId>::FromExternal(
+          non_const_removed_display_ids.data(), non_const_removed_display_ids.size()));
+  return send_event_result;
+}
+
+fidl::Status Client::NotifyOwnershipChange(bool client_has_ownership) {
+  fidl::OneWayStatus send_event_result =
+      fidl::WireSendEvent(*binding_)->OnClientOwnershipChange(client_has_ownership);
+  return send_event_result;
+}
+
+fidl::Status Client::NotifyVsync(DisplayId display_id, zx::time timestamp, ConfigStamp config_stamp,
+                                 VsyncAckCookie vsync_ack_cookie) {
+  fidl::OneWayStatus send_event_result = fidl::WireSendEvent(*binding_)->OnVsync(
+      ToFidlDisplayId(display_id), timestamp.get(), ToFidlConfigStamp(config_stamp),
+      ToFidlVsyncAckCookieValue(vsync_ack_cookie));
+  return send_event_result;
 }
 
 void Client::OnDisplaysChanged(cpp20::span<const DisplayId> added_display_ids,
@@ -1303,9 +1338,7 @@ void Client::OnDisplaysChanged(cpp20::span<const DisplayId> added_display_ids,
   }
 
   if (!coded_configs.empty() || !fidl_removed_display_ids.empty()) {
-    fidl::Status result = fidl::WireSendEvent(*binding_)->OnDisplaysChanged(
-        fidl::VectorView<fhd::wire::Info>::FromExternal(coded_configs),
-        fidl::VectorView<fhdt::wire::DisplayId>::FromExternal(fidl_removed_display_ids));
+    fidl::Status result = NotifyDisplayChanges(coded_configs, fidl_removed_display_ids);
     if (!result.ok()) {
       zxlogf(ERROR, "Error writing remove message: %s", result.FormatDescription().c_str());
     }
@@ -1689,10 +1722,8 @@ zx_status_t ClientProxy::OnDisplayVsync(DisplayId display_id, zx_time_t timestam
     VsyncMessageData vsync_message_data = buffered_vsync_messages_.front();
     buffered_vsync_messages_.pop();
     event_sending_result =
-        fidl::WireSendEvent(handler_.binding())
-            ->OnVsync(ToFidlDisplayId(vsync_message_data.display_id), vsync_message_data.timestamp,
-                      ToFidlConfigStamp(vsync_message_data.config_stamp),
-                      ToFidlVsyncAckCookieValue(kInvalidVsyncAckCookie));
+        handler_.NotifyVsync(vsync_message_data.display_id, zx::time{vsync_message_data.timestamp},
+                             vsync_message_data.config_stamp, kInvalidVsyncAckCookie);
     if (!event_sending_result.ok()) {
       zxlogf(ERROR, "Failed to send all buffered vsync messages: %s\n",
              event_sending_result.FormatDescription().c_str());
@@ -1703,9 +1734,7 @@ zx_status_t ClientProxy::OnDisplayVsync(DisplayId display_id, zx_time_t timestam
 
   // Send the latest vsync event
   event_sending_result =
-      fidl::WireSendEvent(handler_.binding())
-          ->OnVsync(ToFidlDisplayId(display_id), timestamp, ToFidlConfigStamp(client_stamp),
-                    ToFidlVsyncAckCookieValue(vsync_ack_cookie));
+      handler_.NotifyVsync(display_id, zx::time{timestamp}, client_stamp, vsync_ack_cookie);
   if (!event_sending_result.ok()) {
     return event_sending_result.status();
   }
