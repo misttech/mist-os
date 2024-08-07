@@ -5,9 +5,9 @@
 #ifndef SRC_UI_SCENIC_LIB_FLATLAND_ENGINE_ENGINE_TYPES_H_
 #define SRC_UI_SCENIC_LIB_FLATLAND_ENGINE_ENGINE_TYPES_H_
 
+#include <fidl/fuchsia.hardware.display.types/cpp/fidl.h>
 #include <fidl/fuchsia.images2/cpp/fidl.h>
-#include <fuchsia/hardware/display/types/cpp/fidl.h>
-#include <fuchsia/math/cpp/fidl.h>
+#include <fidl/fuchsia.math/cpp/fidl.h>
 
 #include "src/ui/scenic/lib/allocation/buffer_collection_importer.h"
 #include "src/ui/scenic/lib/flatland/flatland_types.h"
@@ -34,7 +34,7 @@ struct RenderData {
   // TODO(https://fxbug.dev/42149711): should we remove this, and pass to RenderFrame() as a
   // std::map of RenderData keyed by display_id?  That would have the benefit of guaranteeing by
   // construction that each display_id could only appear once.
-  fuchsia::hardware::display::types::DisplayId display_id;
+  fuchsia_hardware_display_types::DisplayId display_id;
 };
 
 // Struct to combine the source and destination rectangles used to set a layer's
@@ -42,8 +42,8 @@ struct RenderData {
 // of the image and the dst rectangle represents the position in screen space where
 // the layer will be placed.
 struct DisplaySrcDstFrames {
-  fuchsia::math::RectU src;
-  fuchsia::math::RectU dst;
+  fuchsia_math::RectU src;
+  fuchsia_math::RectU dst;
 
   // When setting an image on a layer in the display, you have to specify the "source"
   // and "destination", where the source represents the pixel offsets and dimensions to
@@ -57,9 +57,9 @@ struct DisplaySrcDstFrames {
 
 // Converts a flatland |Orientation| and |ImageFlip| value to the appropriate hardware display
 // transform enum.
-fuchsia::hardware::display::types::CoordinateTransformation
-GetDisplayTransformFromOrientationAndFlip(fuchsia::ui::composition::Orientation orientation,
-                                          fuchsia::ui::composition::ImageFlip image_flip);
+fuchsia_hardware_display_types::CoordinateTransformation GetDisplayTransformFromOrientationAndFlip(
+    fuchsia::ui::composition::Orientation orientation,
+    fuchsia::ui::composition::ImageFlip image_flip);
 
 }  // namespace flatland
 

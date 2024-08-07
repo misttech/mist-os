@@ -1395,7 +1395,7 @@ VK_TEST_P(DisplayCompositorFallbackParameterizedPixelTest, SoftwareRenderingTest
     uint32_t width = display->width_in_px() / 2;
     uint32_t height = display->height_in_px();
 
-    render_data.display_id = fidl::NaturalToHLCPP(display->display_id());
+    render_data.display_id = display->display_id();
     render_data.rectangles.emplace_back(glm::vec2(0), glm::vec2(width, height));
     render_data.rectangles.emplace_back(glm::vec2(width, 0), glm::vec2(width, height));
 
@@ -1546,7 +1546,7 @@ VK_TEST_F(DisplayCompositorPixelTest, OverlappingTransparencyTest) {
 
     // Have the two rectangles overlap each other slightly with 25 rows in common across the
     // displays.
-    render_data.display_id = fidl::NaturalToHLCPP(display->display_id());
+    render_data.display_id = display->display_id();
     render_data.rectangles.push_back(
         {glm::vec2(0, 0), glm::vec2(width + kNumOverlappingRows, height)});
     render_data.rectangles.push_back({glm::vec2(width - kNumOverlappingRows, 0),

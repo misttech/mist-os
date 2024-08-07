@@ -101,7 +101,7 @@ class DisplayCompositorTestBase : public gtest::RealLoopFixture {
 
       image_list_per_display.push_back({.rectangles = image_rectangles,
                                         .images = images,
-                                        .display_id = {.value = display_id_value}});
+                                        .display_id = {{.value = display_id_value}}});
     }
     return image_list_per_display;
   }

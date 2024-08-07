@@ -152,12 +152,11 @@ void Engine::RenderScheduledFrame(uint64_t frame_number, zx::time presentation_t
     first_frame_with_image_is_rendered_ = true;
   }
 
-  flatland_compositor_->RenderFrame(
-      frame_number, presentation_time,
-      {{.rectangles = std::move(scene_state.image_rectangles),
-        .images = std::move(scene_state.images),
-        .display_id = fidl::NaturalToHLCPP(hw_display->display_id())}},
-      flatland_presenter_->TakeReleaseFences(), std::move(callback));
+  flatland_compositor_->RenderFrame(frame_number, presentation_time,
+                                    {{.rectangles = std::move(scene_state.image_rectangles),
+                                      .images = std::move(scene_state.images),
+                                      .display_id = hw_display->display_id()}},
+                                    flatland_presenter_->TakeReleaseFences(), std::move(callback));
 }
 
 view_tree::SubtreeSnapshot Engine::GenerateViewTreeSnapshot(

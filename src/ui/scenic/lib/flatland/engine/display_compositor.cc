@@ -518,7 +518,7 @@ bool DisplayCompositor::SetRenderDataOnDisplay(const RenderData& data) {
   // Since we map 1 image to 1 layer, if there are more images than layers available for
   // the given display, then they cannot be directly composited to the display in hardware.
   const std::vector<fuchsia::hardware::display::LayerId>& layers =
-      display_engine_data_map_.at(data.display_id.value).layers;
+      display_engine_data_map_.at(data.display_id.value()).layers;
   if (layers.size() < num_images) {
     return false;
   }
@@ -540,8 +540,9 @@ bool DisplayCompositor::SetRenderDataOnDisplay(const RenderData& data) {
   }
 
   // We only set as many layers as needed for the images we have.
-  SetDisplayLayers(data.display_id, std::vector<fuchsia::hardware::display::LayerId>(
-                                        layers.begin(), layers.begin() + num_images));
+  SetDisplayLayers(fidl::NaturalToHLCPP(fuchsia_hardware_display_types::DisplayId(data.display_id)),
+                   std::vector<fuchsia::hardware::display::LayerId>(layers.begin(),
+                                                                    layers.begin() + num_images));
 
   for (uint32_t i = 0; i < num_images; i++) {
     const allocation::GlobalImageId image_id = data.images[i].identifier;
@@ -560,7 +561,7 @@ bool DisplayCompositor::SetRenderDataOnDisplay(const RenderData& data) {
       // we encounter one of those rects here -- unless it is the backmost layer and fullscreen
       // -- then we abort.
       const auto& rect = data.rectangles[i];
-      const glm::uvec2& display_size = display_info_map_[data.display_id.value].dimensions;
+      const glm::uvec2& display_size = display_info_map_[data.display_id.value()].dimensions;
       if (i == 0 && rect.origin.x == 0 && rect.origin.y == 0 &&
           rect.extent.x == static_cast<float>(display_size.x) &&
           rect.extent.y == static_cast<float>(display_size.y)) {
@@ -602,10 +603,14 @@ void DisplayCompositor::ApplyLayerColor(const fuchsia::hardware::display::LayerI
 
   const auto [src, dst] = DisplaySrcDstFrames::New(rectangle, image);
 
-  const fuchsia::hardware::display::types::CoordinateTransformation transform =
+  const fuchsia_hardware_display_types::CoordinateTransformation transform =
       GetDisplayTransformFromOrientationAndFlip(rectangle.orientation, image.flip);
 
-  (*display_coordinator_)->SetLayerPrimaryPosition(layer_id, transform, src, dst);
+  (*display_coordinator_)
+      ->SetLayerPrimaryPosition(
+          layer_id, fidl::NaturalToHLCPP(fuchsia_hardware_display_types::Transform(transform)),
+          fidl::NaturalToHLCPP(fuchsia_hardware_display_types::Frame(src)),
+          fidl::NaturalToHLCPP(fuchsia_hardware_display_types::Frame(dst)));
   auto alpha_mode = GetAlphaMode(image.blend_mode);
   (*display_coordinator_)->SetLayerPrimaryAlpha(layer_id, alpha_mode, image.multiply_color[3]);
 #endif
@@ -619,16 +624,21 @@ void DisplayCompositor::ApplyLayerImage(const fuchsia::hardware::display::LayerI
   TRACE_DURATION("gfx", "flatland::DisplayCompositor::ApplyLayerImage");
   FX_DCHECK(main_dispatcher_ == async_get_default_dispatcher());
   const auto [src, dst] = DisplaySrcDstFrames::New(rectangle, image);
-  FX_DCHECK(src.width && src.height) << "Source frame cannot be empty.";
-  FX_DCHECK(dst.width && dst.height) << "Destination frame cannot be empty.";
-  const fuchsia::hardware::display::types::CoordinateTransformation transform =
+  FX_DCHECK(src.width() && src.height()) << "Source frame cannot be empty.";
+  FX_DCHECK(dst.width() && dst.height()) << "Destination frame cannot be empty.";
+  const fuchsia_hardware_display_types::CoordinateTransformation transform =
       GetDisplayTransformFromOrientationAndFlip(rectangle.orientation, image.flip);
   const auto alpha_mode = GetAlphaMode(image.blend_mode);
 
   const fuchsia::hardware::display::types::ImageMetadata image_metadata =
       CreateImageMetadata(image);
   (*display_coordinator_)->SetLayerPrimaryConfig(layer_id, image_metadata);
-  (*display_coordinator_)->SetLayerPrimaryPosition(layer_id, transform, src, dst);
+  (*display_coordinator_)
+      ->SetLayerPrimaryPosition(
+          layer_id,
+          fidl::NaturalToHLCPP(fuchsia_hardware_display_types::CoordinateTransformation(transform)),
+          fidl::NaturalToHLCPP(fuchsia_math::RectU(src)),
+          fidl::NaturalToHLCPP(fuchsia_math::RectU(dst)));
   (*display_coordinator_)->SetLayerPrimaryAlpha(layer_id, alpha_mode, image.multiply_color[3]);
   // Set the imported image on the layer.
   const fuchsia::hardware::display::ImageId image_id =
@@ -688,7 +698,8 @@ bool DisplayCompositor::PerformGpuComposition(const uint64_t frame_number,
   for (size_t i = 0; i < render_data_list.size(); ++i) {
     const bool is_final_display = i == (render_data_list.size() - 1);
     const auto& render_data = render_data_list[i];
-    const auto display_engine_data_it = display_engine_data_map_.find(render_data.display_id.value);
+    const auto display_engine_data_it =
+        display_engine_data_map_.find(render_data.display_id.value());
     FX_DCHECK(display_engine_data_it != display_engine_data_map_.end());
     auto& display_engine_data = display_engine_data_it->second;
 
@@ -697,16 +708,18 @@ bool DisplayCompositor::PerformGpuComposition(const uint64_t frame_number,
       TRACE_DURATION("gfx", "flatland::DisplayCompositor::PerformGpuComposition[cc]");
       const zx_status_t status =
           (*display_coordinator_)
-              ->SetDisplayColorConversion(render_data.display_id, kDefaultColorConversionOffsets,
-                                          kDefaultColorConversionCoefficients,
-                                          kDefaultColorConversionOffsets);
+              ->SetDisplayColorConversion(
+                  fidl::NaturalToHLCPP(
+                      fuchsia_hardware_display_types::DisplayId(render_data.display_id)),
+                  kDefaultColorConversionOffsets, kDefaultColorConversionCoefficients,
+                  kDefaultColorConversionOffsets);
       FX_CHECK(status == ZX_OK) << "Could not apply hardware color conversion: " << status;
       cc_state_machine_.DisplayCleared();
     }
 
     if (display_engine_data.vmo_count == 0) {
       FX_LOGS(WARNING) << "No VMOs were created when creating display "
-                       << render_data.display_id.value << ".";
+                       << render_data.display_id.value() << ".";
       return false;
     }
     const uint32_t curr_vmo = display_engine_data.curr_vmo;
@@ -768,7 +781,9 @@ bool DisplayCompositor::PerformGpuComposition(const uint64_t frame_number,
     event_data.wait_event = std::move(render_fences[0]);
 
     const auto layer = display_engine_data.layers[0];
-    SetDisplayLayers(render_data.display_id, {layer});
+    SetDisplayLayers(
+        fidl::NaturalToHLCPP(fuchsia_hardware_display_types::DisplayId(render_data.display_id)),
+        {layer});
     ApplyLayerImage(layer, {glm::vec2(0), glm::vec2(render_target.width, render_target.height)},
                     render_target, event_data.wait_id, event_data.signal_id);
 
@@ -861,8 +876,9 @@ bool DisplayCompositor::SetRenderDatasOnDisplay(const std::vector<RenderData>& r
       // Apply direct-to-display color conversion here.
       const zx_status_t status =
           (*display_coordinator_)
-              ->SetDisplayColorConversion(data.display_id, (*cc_data).preoffsets,
-                                          (*cc_data).coefficients, (*cc_data).postoffsets);
+              ->SetDisplayColorConversion(
+                  fidl::NaturalToHLCPP(fuchsia_hardware_display_types::DisplayId(data.display_id)),
+                  (*cc_data).preoffsets, (*cc_data).coefficients, (*cc_data).postoffsets);
       FX_CHECK(status == ZX_OK) << "Could not apply hardware color conversion: " << status;
     }
   }
