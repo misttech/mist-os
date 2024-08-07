@@ -27,6 +27,7 @@
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/ui/lib/escher/util/trace_macros.h"
 #include "src/ui/scenic/lib/allocation/id.h"
+#include "src/ui/scenic/lib/display/util.h"
 #include "src/ui/scenic/lib/flatland/buffers/util.h"
 #include "src/ui/scenic/lib/flatland/global_image_data.h"
 #include "src/ui/scenic/lib/utils/helpers.h"
@@ -266,8 +267,10 @@ DisplayCompositor::~DisplayCompositor() {
           ->DestroyLayer(fidl::NaturalToHLCPP(fuchsia_hardware_display::LayerId(layer)));
     }
     for (const auto& event_data : data.frame_event_datas) {
-      (*display_coordinator_)->ReleaseEvent(event_data.wait_id);
-      (*display_coordinator_)->ReleaseEvent(event_data.signal_id);
+      (*display_coordinator_)
+          ->ReleaseEvent(fidl::NaturalToHLCPP(scenic_impl::DisplayEventId(event_data.wait_id)));
+      (*display_coordinator_)
+          ->ReleaseEvent(fidl::NaturalToHLCPP(scenic_impl::DisplayEventId(event_data.signal_id)));
     }
   }
 
@@ -553,9 +556,10 @@ bool DisplayCompositor::SetRenderDataOnDisplay(const RenderData& data) {
     const allocation::GlobalImageId image_id = data.images[i].identifier;
     if (image_id != allocation::kInvalidImageId) {
       if (buffer_collection_supports_display_[data.images[i].collection_id]) {
-        static constexpr scenic_impl::DisplayEventId kInvalidEventId = {
-            .value = fuchsia::hardware::display::types::INVALID_DISP_ID};
-        ApplyLayerImage(layers[i], data.rectangles[i], data.images[i], /*wait_id*/ kInvalidEventId,
+        static const scenic_impl::DisplayEventId kInvalidEventId = {
+            {.value = fuchsia::hardware::display::types::INVALID_DISP_ID}};
+        ApplyLayerImage(layers[i], data.rectangles[i], data.images[i],
+                        /*wait_id*/ kInvalidEventId,
                         /*signal_id*/ image_event_map_[image_id].signal_id);
       } else {
         return false;
@@ -653,7 +657,10 @@ void DisplayCompositor::ApplyLayerImage(const fuchsia_hardware_display::LayerId 
   // Set the imported image on the layer.
   const fuchsia::hardware::display::ImageId image_id =
       fidl::NaturalToHLCPP(allocation::ToFidlImageId(image.identifier));
-  (*display_coordinator_)->SetLayerImage(hlcpp_layer_id, image_id, wait_id, signal_id);
+  (*display_coordinator_)
+      ->SetLayerImage(hlcpp_layer_id, image_id,
+                      fidl::NaturalToHLCPP(scenic_impl::DisplayEventId(wait_id)),
+                      fidl::NaturalToHLCPP(scenic_impl::DisplayEventId(signal_id)));
 }
 
 bool DisplayCompositor::CheckConfig() {
@@ -947,10 +954,10 @@ DisplayCompositor::FrameEventData DisplayCompositor::NewFrameEventData() {
   fidl::UnownedClientEnd<fuchsia_hardware_display::Coordinator> coordinator =
       scenic_impl::GetUnowned(*display_coordinator_);
   result.wait_id = scenic_impl::ImportEvent(coordinator, result.wait_event);
-  FX_DCHECK(result.wait_id.value != fuchsia::hardware::display::types::INVALID_DISP_ID);
+  FX_DCHECK(result.wait_id.value() != fuchsia_hardware_display_types::kInvalidDispId);
   result.signal_event.signal(0, ZX_EVENT_SIGNALED);
   result.signal_id = scenic_impl::ImportEvent(coordinator, result.signal_event);
-  FX_DCHECK(result.signal_id.value != fuchsia::hardware::display::types::INVALID_DISP_ID);
+  FX_DCHECK(result.signal_id.value() != fuchsia_hardware_display_types::kInvalidDispId);
   return result;
 }
 
@@ -971,7 +978,7 @@ DisplayCompositor::ImageEventData DisplayCompositor::NewImageEventData() {
   fidl::UnownedClientEnd<fuchsia_hardware_display::Coordinator> coordinator =
       scenic_impl::GetUnowned(*display_coordinator_);
   result.signal_id = scenic_impl::ImportEvent(coordinator, result.signal_event);
-  FX_DCHECK(result.signal_id.value != fuchsia::hardware::display::types::INVALID_DISP_ID);
+  FX_DCHECK(result.signal_id.value() != fuchsia_hardware_display_types::kInvalidDispId);
 
   return result;
 }

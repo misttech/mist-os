@@ -73,24 +73,22 @@ DisplayEventId ImportEvent(
   zx::event dup;
   if (event.duplicate(ZX_RIGHT_SAME_RIGHTS, &dup) != ZX_OK) {
     FX_LOGS(ERROR) << "Failed to duplicate display controller event.";
-    return {.value = fuchsia::hardware::display::types::INVALID_DISP_ID};
+    return {{.value = fuchsia_hardware_display_types::kInvalidDispId}};
   }
 
   // Generate a new display ID after we've determined the event can be duplicated as to not
   // waste an id.
-  DisplayEventId event_id = {.value = id_generator++};
+  DisplayEventId event_id = {{.value = id_generator++}};
 
   auto before = zx::clock::get_monotonic();
   fit::result<fidl::OneWayStatus> import_result =
-      fidl::Call(display_coordinator)
-          ->ImportEvent({{.event = std::move(dup), .id = fidl::HLCPPToNatural(event_id)}});
+      fidl::Call(display_coordinator)->ImportEvent({{.event = std::move(dup), .id = event_id}});
   if (import_result.is_error()) {
     auto after = zx::clock::get_monotonic();
     FX_LOGS(ERROR) << "Failed to import display controller event. Waited "
                    << (after - before).to_msecs()
-                   << "msecs. Error: " << import_result.error_value().FormatDescription();
-    return fidl::NaturalToHLCPP(
-        fuchsia_hardware_display::EventId(fuchsia_hardware_display_types::kInvalidDispId));
+                   << "msecs. Error code: " << import_result.error_value().FormatDescription();
+    return {{.value = fuchsia_hardware_display_types::kInvalidDispId}};
   }
   return event_id;
 }

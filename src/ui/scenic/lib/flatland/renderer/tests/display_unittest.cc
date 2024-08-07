@@ -313,19 +313,21 @@ VK_TEST_F(DisplayTest, SetDisplayImageTest) {
       scenic_impl::ImportEvent(coordinator, display_wait_fence);
   scenic_impl::DisplayEventId display_signal_event_id =
       scenic_impl::ImportEvent(coordinator, display_signal_fence);
-  EXPECT_NE(display_wait_event_id.value, fuchsia::hardware::display::types::INVALID_DISP_ID);
-  EXPECT_NE(display_signal_event_id.value, fuchsia::hardware::display::types::INVALID_DISP_ID);
-  EXPECT_NE(display_wait_event_id.value, display_signal_event_id.value);
+  EXPECT_NE(display_wait_event_id.value(), fuchsia_hardware_display_types::kInvalidDispId);
+  EXPECT_NE(display_signal_event_id.value(), fuchsia_hardware_display_types::kInvalidDispId);
+  EXPECT_NE(display_wait_event_id.value(), display_signal_event_id.value());
 
   // Set the layer image and apply the config.
   (*display_coordinator.get())->SetLayerPrimaryConfig(layer_id, image_metadata);
 
-  static constexpr scenic_impl::DisplayEventId kInvalidEventId = {
-      .value = fuchsia::hardware::display::types::INVALID_DISP_ID};
+  static const scenic_impl::DisplayEventId kInvalidEventId = {
+      {.value = fuchsia_hardware_display_types::kInvalidDispId}};
   status =
       (*display_coordinator.get())
-          ->SetLayerImage(layer_id, fidl::NaturalToHLCPP(allocation::ToFidlImageId(image_ids[0])),
-                          /*wait_event_id=*/kInvalidEventId, display_signal_event_id);
+          ->SetLayerImage(
+              layer_id, fidl::NaturalToHLCPP(allocation::ToFidlImageId(image_ids[0])),
+              /*wait_event_id=*/fidl::NaturalToHLCPP(scenic_impl::DisplayEventId(kInvalidEventId)),
+              fidl::NaturalToHLCPP(display_signal_event_id));
   EXPECT_EQ(status, ZX_OK);
 
   // Apply the config.
@@ -346,8 +348,9 @@ VK_TEST_F(DisplayTest, SetDisplayImageTest) {
   status =
       (*display_coordinator.get())
           ->SetLayerImage(layer_id, fidl::NaturalToHLCPP(allocation::ToFidlImageId(image_ids[1])),
-                          display_wait_event_id,
-                          /*signal_event_id=*/kInvalidEventId);
+                          fidl::NaturalToHLCPP(display_wait_event_id),
+                          /*signal_event_id=*/
+                          fidl::NaturalToHLCPP(scenic_impl::DisplayEventId(kInvalidEventId)));
   EXPECT_EQ(status, ZX_OK);
 
   // Apply the config to display the second image.

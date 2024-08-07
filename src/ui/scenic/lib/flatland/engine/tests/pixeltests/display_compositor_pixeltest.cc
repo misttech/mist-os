@@ -577,7 +577,8 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
     auto capture_signal_fence_id = scenic_impl::ImportEvent(coordinator, capture_signal_fence);
     fuchsia::hardware::display::Coordinator_StartCapture_Result start_capture_result;
     (*display_coordinator.get())
-        ->StartCapture(capture_signal_fence_id, fidl_capture_image_id, &start_capture_result);
+        ->StartCapture(fidl::NaturalToHLCPP(capture_signal_fence_id), fidl_capture_image_id,
+                       &start_capture_result);
     EXPECT_TRUE(start_capture_result.is_response()) << start_capture_result.err();
 
     // We must wait for the capture to finish before we can proceed. Time out after 3 seconds.
