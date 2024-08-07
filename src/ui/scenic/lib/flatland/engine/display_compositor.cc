@@ -23,6 +23,7 @@
 #include <cstdint>
 #include <vector>
 
+#include "lib/fidl/cpp/hlcpp_conversion.h"
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/ui/lib/escher/util/trace_macros.h"
 #include "src/ui/scenic/lib/allocation/id.h"
@@ -260,8 +261,9 @@ DisplayCompositor::~DisplayCompositor() {
   // Destroy all of the display layers.
   DiscardConfig();
   for (const auto& [_, data] : display_engine_data_map_) {
-    for (const fuchsia::hardware::display::LayerId& layer : data.layers) {
-      (*display_coordinator_)->DestroyLayer(layer);
+    for (const fuchsia_hardware_display::LayerId& layer : data.layers) {
+      (*display_coordinator_)
+          ->DestroyLayer(fidl::NaturalToHLCPP(fuchsia_hardware_display::LayerId(layer)));
     }
     for (const auto& event_data : data.frame_event_datas) {
       (*display_coordinator_)->ReleaseEvent(event_data.wait_id);
@@ -379,7 +381,7 @@ fuchsia::sysmem2::BufferCollectionSyncPtr DisplayCompositor::TakeDisplayBufferCo
   return token;
 }
 
-fuchsia::hardware::display::types::ImageMetadata DisplayCompositor::CreateImageMetadata(
+fuchsia_hardware_display_types::ImageMetadata DisplayCompositor::CreateImageMetadata(
     const allocation::ImageMetadata& metadata) const {
   // TODO(https://fxbug.dev/42150686): Pixel format should be ignored when using sysmem. We do not
   // want to have to deal with this default image format. Work was in progress to address this, but
@@ -387,10 +389,10 @@ fuchsia::hardware::display::types::ImageMetadata DisplayCompositor::CreateImageM
   FX_DCHECK(buffer_collection_pixel_format_modifier_.count(metadata.collection_id));
   const auto pixel_format_modifier =
       buffer_collection_pixel_format_modifier_.at(metadata.collection_id);
-  return fuchsia::hardware::display::types::ImageMetadata{
-      .width = metadata.width,
-      .height = metadata.height,
-      .tiling_type = BufferCollectionPixelFormatToImageTilingType(pixel_format_modifier)};
+  return fuchsia_hardware_display_types::ImageMetadata{
+      {.width = metadata.width,
+       .height = metadata.height,
+       .tiling_type = BufferCollectionPixelFormatToImageTilingType(pixel_format_modifier)}};
 }
 
 bool DisplayCompositor::ImportBufferImage(const allocation::ImageMetadata& metadata,
@@ -441,7 +443,7 @@ bool DisplayCompositor::ImportBufferImage(const allocation::ImageMetadata& metad
   }
 
   const fuchsia::hardware::display::types::ImageMetadata image_metadata =
-      CreateImageMetadata(metadata);
+      fidl::NaturalToHLCPP(CreateImageMetadata(metadata));
   fuchsia::hardware::display::Coordinator_ImportImage_Result import_image_result;
   {
     const fuchsia::hardware::display::ImageId fidl_image_id =
@@ -485,28 +487,32 @@ void DisplayCompositor::ReleaseBufferImage(const allocation::GlobalImageId image
   image_event_map_.erase(image_id);
 }
 
-fuchsia::hardware::display::LayerId DisplayCompositor::CreateDisplayLayer() {
+fuchsia_hardware_display::LayerId DisplayCompositor::CreateDisplayLayer() {
   FX_DCHECK(main_dispatcher_ == async_get_default_dispatcher());
   fuchsia::hardware::display::Coordinator_CreateLayer_Result result;
   const zx_status_t transport_status = (*display_coordinator_)->CreateLayer(&result);
   if (transport_status != ZX_OK) {
     FX_LOGS(ERROR) << "Failed to call FIDL CreateLayer: " << zx_status_get_string(transport_status);
-    return {.value = fuchsia::hardware::display::types::INVALID_DISP_ID};
+    return {{.value = fuchsia_hardware_display_types::kInvalidDispId}};
   }
   if (result.is_err()) {
     FX_LOGS(ERROR) << "Failed to create layer: " << zx_status_get_string(result.err());
-    return {.value = fuchsia::hardware::display::types::INVALID_DISP_ID};
+    return {{.value = fuchsia_hardware_display_types::kInvalidDispId}};
   }
-  return result.response().layer_id;
+  return fidl::HLCPPToNatural(result.response().layer_id);
 }
 
 void DisplayCompositor::SetDisplayLayers(
-    const fuchsia::hardware::display::types::DisplayId display_id,
-    const std::vector<fuchsia::hardware::display::LayerId>& layers) {
+    const fuchsia_hardware_display_types::DisplayId display_id,
+    const std::vector<fuchsia_hardware_display::LayerId>& layers) {
   TRACE_DURATION("gfx", "flatland::DisplayCompositor::SetDisplayLayers");
   FX_DCHECK(main_dispatcher_ == async_get_default_dispatcher());
   // Set all of the layers for each of the images on the display.
-  const auto status = (*display_coordinator_)->SetDisplayLayers(display_id, layers);
+  const auto status =
+      (*display_coordinator_)
+          ->SetDisplayLayers(
+              fidl::NaturalToHLCPP(fuchsia_hardware_display_types::DisplayId(display_id)),
+              fidl::NaturalToHLCPP(std::vector(layers)));
   FX_DCHECK(status == ZX_OK);
 }
 
@@ -517,7 +523,7 @@ bool DisplayCompositor::SetRenderDataOnDisplay(const RenderData& data) {
 
   // Since we map 1 image to 1 layer, if there are more images than layers available for
   // the given display, then they cannot be directly composited to the display in hardware.
-  const std::vector<fuchsia::hardware::display::LayerId>& layers =
+  const std::vector<fuchsia_hardware_display::LayerId>& layers =
       display_engine_data_map_.at(data.display_id.value()).layers;
   if (layers.size() < num_images) {
     return false;
@@ -540,9 +546,8 @@ bool DisplayCompositor::SetRenderDataOnDisplay(const RenderData& data) {
   }
 
   // We only set as many layers as needed for the images we have.
-  SetDisplayLayers(fidl::NaturalToHLCPP(fuchsia_hardware_display_types::DisplayId(data.display_id)),
-                   std::vector<fuchsia::hardware::display::LayerId>(layers.begin(),
-                                                                    layers.begin() + num_images));
+  SetDisplayLayers(data.display_id, std::vector<fuchsia_hardware_display::LayerId>(
+                                        layers.begin(), layers.begin() + num_images));
 
   for (uint32_t i = 0; i < num_images; i++) {
     const allocation::GlobalImageId image_id = data.images[i].identifier;
@@ -575,7 +580,7 @@ bool DisplayCompositor::SetRenderDataOnDisplay(const RenderData& data) {
   return true;
 }
 
-void DisplayCompositor::ApplyLayerColor(const fuchsia::hardware::display::LayerId layer_id,
+void DisplayCompositor::ApplyLayerColor(const fuchsia_hardware_display::LayerId layer_id,
                                         const ImageRect rectangle,
                                         const allocation::ImageMetadata image) {
   FX_DCHECK(main_dispatcher_ == async_get_default_dispatcher());
@@ -586,8 +591,10 @@ void DisplayCompositor::ApplyLayerColor(const fuchsia::hardware::display::LayerI
                               static_cast<uint8_t>(255 * image.multiply_color[2]),
                               static_cast<uint8_t>(255 * image.multiply_color[3])};
 
+  const fuchsia::hardware::display::LayerId hlcpp_layer_id =
+      fidl::NaturalToHLCPP(fuchsia_hardware_display::LayerId(layer_id));
   (*display_coordinator_)
-      ->SetLayerColorConfig(layer_id, fuchsia::images2::PixelFormat::B8G8R8A8, col);
+      ->SetLayerColorConfig(hlcpp_layer_id, fuchsia::images2::PixelFormat::B8G8R8A8, col);
 
 // TODO(https://fxbug.dev/42056054): Currently, not all display hardware supports the ability to
 // set either the position or the alpha on a color layer, as color layers are not primary
@@ -608,15 +615,15 @@ void DisplayCompositor::ApplyLayerColor(const fuchsia::hardware::display::LayerI
 
   (*display_coordinator_)
       ->SetLayerPrimaryPosition(
-          layer_id, fidl::NaturalToHLCPP(fuchsia_hardware_display_types::Transform(transform)),
+          hlcpp_layer_id, fidl::NaturalToHLCPP(fuchsia_hardware_display_types::Transform(transform)),
           fidl::NaturalToHLCPP(fuchsia_hardware_display_types::Frame(src)),
           fidl::NaturalToHLCPP(fuchsia_hardware_display_types::Frame(dst)));
   auto alpha_mode = GetAlphaMode(image.blend_mode);
-  (*display_coordinator_)->SetLayerPrimaryAlpha(layer_id, alpha_mode, image.multiply_color[3]);
+  (*display_coordinator_)->SetLayerPrimaryAlpha(hlcpp_layer_id, alpha_mode, image.multiply_color[3]);
 #endif
 }
 
-void DisplayCompositor::ApplyLayerImage(const fuchsia::hardware::display::LayerId layer_id,
+void DisplayCompositor::ApplyLayerImage(const fuchsia_hardware_display::LayerId layer_id,
                                         const ImageRect rectangle,
                                         const allocation::ImageMetadata image,
                                         const scenic_impl::DisplayEventId wait_id,
@@ -631,19 +638,22 @@ void DisplayCompositor::ApplyLayerImage(const fuchsia::hardware::display::LayerI
   const auto alpha_mode = GetAlphaMode(image.blend_mode);
 
   const fuchsia::hardware::display::types::ImageMetadata image_metadata =
-      CreateImageMetadata(image);
-  (*display_coordinator_)->SetLayerPrimaryConfig(layer_id, image_metadata);
+      fidl::NaturalToHLCPP(CreateImageMetadata(image));
+  const fuchsia::hardware::display::LayerId hlcpp_layer_id =
+      fidl::NaturalToHLCPP(fuchsia_hardware_display::LayerId(layer_id));
+  (*display_coordinator_)->SetLayerPrimaryConfig(hlcpp_layer_id, image_metadata);
   (*display_coordinator_)
       ->SetLayerPrimaryPosition(
-          layer_id,
+          hlcpp_layer_id,
           fidl::NaturalToHLCPP(fuchsia_hardware_display_types::CoordinateTransformation(transform)),
           fidl::NaturalToHLCPP(fuchsia_math::RectU(src)),
           fidl::NaturalToHLCPP(fuchsia_math::RectU(dst)));
-  (*display_coordinator_)->SetLayerPrimaryAlpha(layer_id, alpha_mode, image.multiply_color[3]);
+  (*display_coordinator_)
+      ->SetLayerPrimaryAlpha(hlcpp_layer_id, alpha_mode, image.multiply_color[3]);
   // Set the imported image on the layer.
   const fuchsia::hardware::display::ImageId image_id =
       fidl::NaturalToHLCPP(allocation::ToFidlImageId(image.identifier));
-  (*display_coordinator_)->SetLayerImage(layer_id, image_id, wait_id, signal_id);
+  (*display_coordinator_)->SetLayerImage(hlcpp_layer_id, image_id, wait_id, signal_id);
 }
 
 bool DisplayCompositor::CheckConfig() {
@@ -664,7 +674,7 @@ void DisplayCompositor::DiscardConfig() {
   (*display_coordinator_)->CheckConfig(/*discard*/ true, &result, &ops);
 }
 
-fuchsia::hardware::display::types::ConfigStamp DisplayCompositor::ApplyConfig() {
+fuchsia_hardware_display_types::ConfigStamp DisplayCompositor::ApplyConfig() {
   FX_DCHECK(main_dispatcher_ == async_get_default_dispatcher());
   TRACE_DURATION("gfx", "flatland::DisplayCompositor::ApplyConfig");
   {
@@ -676,7 +686,7 @@ fuchsia::hardware::display::types::ConfigStamp DisplayCompositor::ApplyConfig() 
     const auto status = (*display_coordinator_)->GetLatestAppliedConfigStamp(&pending_config_stamp);
     FX_DCHECK(status == ZX_OK);
   }
-  return pending_config_stamp;
+  return fidl::HLCPPToNatural(pending_config_stamp);
 }
 
 bool DisplayCompositor::PerformGpuComposition(const uint64_t frame_number,
@@ -780,10 +790,8 @@ bool DisplayCompositor::PerformGpuComposition(const uint64_t frame_number,
     // Retrieve fence.
     event_data.wait_event = std::move(render_fences[0]);
 
-    const auto layer = display_engine_data.layers[0];
-    SetDisplayLayers(
-        fidl::NaturalToHLCPP(fuchsia_hardware_display_types::DisplayId(render_data.display_id)),
-        {layer});
+    const fuchsia_hardware_display::LayerId layer = display_engine_data.layers[0];
+    SetDisplayLayers(render_data.display_id, {layer});
     ApplyLayerImage(layer, {glm::vec2(0), glm::vec2(render_target.width, render_target.height)},
                     render_target, event_data.wait_id, event_data.signal_id);
 
@@ -851,7 +859,7 @@ DisplayCompositor::RenderFrameResult DisplayCompositor::RenderFrame(
   // ApplyConfig2(). ReleaseFenceManager is somewhat poorly suited to this, because it was designed
   // for an old version of ApplyConfig2(), which latter proved to be infeasible for some drivers to
   // implement.
-  const auto& config_stamp = ApplyConfig();
+  const fuchsia_hardware_display_types::ConfigStamp config_stamp = ApplyConfig();
   pending_apply_configs_.push_back({.config_stamp = config_stamp, .frame_number = frame_number});
 
   return fallback_to_gpu_composition ? RenderFrameResult::kGpuComposition
@@ -886,15 +894,15 @@ bool DisplayCompositor::SetRenderDatasOnDisplay(const std::vector<RenderData>& r
   return true;
 }
 
-void DisplayCompositor::OnVsync(
-    zx::time timestamp, fuchsia::hardware::display::types::ConfigStamp applied_config_stamp) {
+void DisplayCompositor::OnVsync(zx::time timestamp,
+                                fuchsia_hardware_display_types::ConfigStamp applied_config_stamp) {
   FX_DCHECK(main_dispatcher_ == async_get_default_dispatcher());
   TRACE_DURATION("gfx", "Flatland::DisplayCompositor::OnVsync");
 
   // We might receive multiple OnVsync() callbacks with the same |applied_config_stamp| if the scene
   // doesn't change. Early exit for these cases.
   if (last_presented_config_stamp_.has_value() &&
-      fidl::Equals(applied_config_stamp, last_presented_config_stamp_.value())) {
+      applied_config_stamp == last_presented_config_stamp_.value()) {
     return;
   }
 
@@ -902,13 +910,13 @@ void DisplayCompositor::OnVsync(
   const auto vsync_frame_it =
       std::find_if(pending_apply_configs_.begin(), pending_apply_configs_.end(),
                    [applied_config_stamp](const ApplyConfigInfo& info) {
-                     return fidl::Equals(info.config_stamp, applied_config_stamp);
+                     return info.config_stamp == applied_config_stamp;
                    });
 
   // It is possible that the config stamp doesn't match any config applied by this DisplayCompositor
   // instance. i.e. it could be from another client. Thus we just ignore these events.
   if (vsync_frame_it == pending_apply_configs_.end()) {
-    FX_LOGS(INFO) << "The config stamp <" << applied_config_stamp.value << "> was not generated "
+    FX_LOGS(INFO) << "The config stamp <" << applied_config_stamp.value() << "> was not generated "
                   << "by current DisplayCompositor. Vsync event skipped.";
     return;
   }
@@ -1004,7 +1012,7 @@ void DisplayCompositor::AddDisplay(scenic_impl::display::Display* display, const
       [weak_ref = weak_from_this()](
           zx::time timestamp, fuchsia_hardware_display_types::ConfigStamp applied_config_stamp) {
         if (auto ref = weak_ref.lock())
-          ref->OnVsync(timestamp, fidl::NaturalToHLCPP(applied_config_stamp));
+          ref->OnVsync(timestamp, applied_config_stamp);
       });
 
   // Exit early if there are no vmos to create.

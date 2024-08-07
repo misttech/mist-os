@@ -180,7 +180,7 @@ class DisplayCompositorTest : public DisplayCompositorTestBase {
     display_compositor_->enable_display_composition_ = !force_renderer_only;
   }
 
-  void SendOnVsyncEvent(fuchsia::hardware::display::types::ConfigStamp stamp) {
+  void SendOnVsyncEvent(fuchsia_hardware_display_types::ConfigStamp stamp) {
     display_compositor_->OnVsync(zx::time(), stamp);
   }
 

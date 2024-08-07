@@ -6,9 +6,9 @@
 #define SRC_UI_SCENIC_LIB_FLATLAND_ENGINE_DISPLAY_COMPOSITOR_H_
 
 #include <fidl/fuchsia.hardware.display.types/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.display/cpp/fidl.h>
 #include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <fuchsia/hardware/display/cpp/fidl.h>
-#include <fuchsia/hardware/display/types/cpp/fidl.h>
 #include <fuchsia/sysmem/cpp/fidl.h>
 #include <lib/async/dispatcher.h>
 #include <lib/zx/time.h>
@@ -154,10 +154,10 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
 
   struct DisplayConfigResponse {
     // Whether or not the config can be successfully applied or not.
-    fuchsia::hardware::display::types::ConfigResult result;
+    fuchsia_hardware_display_types::ConfigResult result;
     // If the config is invalid, this vector will list all the operations
     // that need to be performed to make the config valid again.
-    std::vector<fuchsia::hardware::display::ClientCompositionOp> ops;
+    std::vector<fuchsia_hardware_display::ClientCompositionOp> ops;
   };
 
   struct FrameEventData {
@@ -174,7 +174,7 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
 
   struct DisplayEngineData {
     // The hardware layers we've created to use on this display.
-    std::vector<fuchsia::hardware::display::LayerId> layers;
+    std::vector<fuchsia_hardware_display::LayerId> layers;
 
     // The number of vmos we are using in the case of software composition
     // (1 for each render target).
@@ -197,7 +197,7 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
   // applied by the compositor.  It is the compositor's responsibility to signal any release fences
   // corresponding to the frame identified by |frame_number|.
   void OnVsync(zx::time timestamp,
-               fuchsia::hardware::display::types::ConfigStamp applied_config_stamp);
+               fuchsia_hardware_display_types::ConfigStamp applied_config_stamp);
 
   std::vector<allocation::ImageMetadata> AllocateDisplayRenderTargets(
       bool use_protected_memory, uint32_t num_render_targets, const fuchsia::math::SizeU& size,
@@ -210,12 +210,12 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
   // Generates a new ImageEventData struct to be used with a client image on a display.
   ImageEventData NewImageEventData() FXL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
-  fuchsia::hardware::display::types::ImageMetadata CreateImageMetadata(
+  fuchsia_hardware_display_types::ImageMetadata CreateImageMetadata(
       const allocation::ImageMetadata& metadata) const FXL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
   // Generates a hardware layer for direct compositing on the display. Returns the ID used
   // to reference that layer in the display coordinator API.
-  fuchsia::hardware::display::LayerId CreateDisplayLayer() FXL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
+  fuchsia_hardware_display::LayerId CreateDisplayLayer() FXL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
   // Moves a token out of |display_buffer_collection_ptrs_| and returns it.
   fuchsia::sysmem2::BufferCollectionSyncPtr TakeDisplayBufferCollectionPtr(
@@ -239,16 +239,16 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
       FXL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
   // Sets the provided layers onto the display referenced by the given display_id.
-  void SetDisplayLayers(fuchsia::hardware::display::types::DisplayId display_id,
-                        const std::vector<fuchsia::hardware::display::LayerId>& layers)
+  void SetDisplayLayers(fuchsia_hardware_display_types::DisplayId display_id,
+                        const std::vector<fuchsia_hardware_display::LayerId>& layers)
       FXL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
   // Takes a solid color rectangle and directly composites it to a hardware layer on the display.
-  void ApplyLayerColor(fuchsia::hardware::display::LayerId layer_id, ImageRect rectangle,
+  void ApplyLayerColor(fuchsia_hardware_display::LayerId layer_id, ImageRect rectangle,
                        allocation::ImageMetadata image) FXL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
   // Takes an image and directly composites it to a hardware layer on the display.
-  void ApplyLayerImage(fuchsia::hardware::display::LayerId layer_id, ImageRect rectangle,
+  void ApplyLayerImage(fuchsia_hardware_display::LayerId layer_id, ImageRect rectangle,
                        allocation::ImageMetadata image, scenic_impl::DisplayEventId wait_id,
                        scenic_impl::DisplayEventId signal_id) FXL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
@@ -262,7 +262,7 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
   // Applies the config to the display coordinator and returns the ConfigStamp associated with this
   // config. ConfigStamp is provided by the display coordinator. This should only be called after
   // CheckConfig has verified that the config is okay, since ApplyConfig does not return any errors.
-  fuchsia::hardware::display::types::ConfigStamp ApplyConfig() FXL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
+  fuchsia_hardware_display_types::ConfigStamp ApplyConfig() FXL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
   bool ImportBufferCollectionToDisplayCoordinator(
       allocation::GlobalBufferCollectionId identifier,
@@ -321,12 +321,12 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
   // Maps a display ID to the the DisplayInfo struct. This is kept separate from the
   // display_DisplayCompositor_data_map_ since this only this data is needed for the
   // render_data_func_.
-  std::unordered_map</*fuchsia::hardware::display::types::DisplayId::value*/ uint64_t, DisplayInfo>
+  std::unordered_map</*fuchsia_hardware_display_types::DisplayId::value*/ uint64_t, DisplayInfo>
       display_info_map_;
 
   // Maps a display ID to a struct of all the information needed to properly render to
   // that display in both the hardware and software composition paths.
-  std::unordered_map</*fuchsia::hardware::display::types::DisplayId::value*/ uint64_t,
+  std::unordered_map</*fuchsia_hardware_display_types::DisplayId::value*/ uint64_t,
                      DisplayEngineData>
       display_engine_data_map_;
 
@@ -334,7 +334,7 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
 
   // Stores information about the last ApplyConfig() call to display.
   struct ApplyConfigInfo {
-    fuchsia::hardware::display::types::ConfigStamp config_stamp;
+    fuchsia_hardware_display_types::ConfigStamp config_stamp;
     uint64_t frame_number;
   };
 
@@ -344,7 +344,7 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
 
   // Stores the ConfigStamp information of the latest frame shown on the display. If no frame
   // has been presented, its value will be nullopt.
-  std::optional<fuchsia::hardware::display::types::ConfigStamp> last_presented_config_stamp_ =
+  std::optional<fuchsia_hardware_display_types::ConfigStamp> last_presented_config_stamp_ =
       std::nullopt;
 
   fuchsia::sysmem2::AllocatorSyncPtr sysmem_allocator_;
