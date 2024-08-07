@@ -5,7 +5,6 @@
 #include "app.h"
 
 #include <fuchsia/feedback/cpp/fidl.h>
-#include <fuchsia/hardware/sysmem/cpp/fidl.h>
 #include <fuchsia/metrics/cpp/fidl.h>
 #include <lib/async/dispatcher.h>
 #include <lib/sysmem-connector/sysmem-connector.h>
@@ -13,7 +12,7 @@
 
 #include <sdk/lib/syslog/cpp/macros.h>
 
-static constexpr char kSysmemClassPath[] = "/dev/class/sysmem";
+const char* kSysmemClassPath = "/dev/class/sysmem";
 
 App::App(async_dispatcher_t* dispatcher)
     : dispatcher_(dispatcher),
@@ -74,8 +73,8 @@ App::App(async_dispatcher_t* dispatcher)
         // channel, but in this case we forward the service request to the
         // sysmem driver.  We do the forwarding via code we share with a similar
         // Zircon service.
-        sysmem_connector_queue_connection_request_allocator_v1(sysmem_connector_,
-                                                               request.TakeChannel().release());
+        sysmem_connector_queue_connection_request_v1(sysmem_connector_,
+                                                     request.TakeChannel().release());
       });
   component_context_->outgoing()->AddPublicService<fuchsia::sysmem2::Allocator>(
       [this](fidl::InterfaceRequest<fuchsia::sysmem2::Allocator> request) {
@@ -83,17 +82,8 @@ App::App(async_dispatcher_t* dispatcher)
         // channel, but in this case we forward the service request to the
         // sysmem driver.  We do the forwarding via code we share with a similar
         // Zircon service.
-        sysmem_connector_queue_connection_request_allocator_v2(sysmem_connector_,
-                                                               request.TakeChannel().release());
-      });
-  component_context_->outgoing()->AddPublicService<fuchsia::hardware::sysmem::Sysmem>(
-      [this](fidl::InterfaceRequest<fuchsia::hardware::sysmem::Sysmem> request) {
-        // Normally a service would directly serve the server end of the
-        // channel, but in this case we forward the service request to the
-        // sysmem driver.  We do the forwarding via code we share with a similar
-        // Zircon service.
-        sysmem_connector_queue_connection_request_sysmem(sysmem_connector_,
-                                                         request.TakeChannel().release());
+        sysmem_connector_queue_connection_request_v2(sysmem_connector_,
+                                                     request.TakeChannel().release());
       });
 }
 
