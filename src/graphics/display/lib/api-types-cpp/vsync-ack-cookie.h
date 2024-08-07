@@ -19,8 +19,19 @@ DEFINE_STRONG_INT(VsyncAckCookie, uint64_t);
 constexpr VsyncAckCookie ToVsyncAckCookie(uint64_t fidl_vsync_ack_cookie_value) {
   return VsyncAckCookie(fidl_vsync_ack_cookie_value);
 }
+
+constexpr VsyncAckCookie ToVsyncAckCookie(
+    fuchsia_hardware_display::wire::VsyncAckCookie fidl_vsync_ack_cookie) {
+  return VsyncAckCookie(fidl_vsync_ack_cookie.value);
+}
+
 constexpr uint64_t ToFidlVsyncAckCookieValue(VsyncAckCookie vsync_ack_cookie) {
   return vsync_ack_cookie.value();
+}
+
+constexpr fuchsia_hardware_display::wire::VsyncAckCookie ToFidlVsyncAckCookie(
+    VsyncAckCookie vsync_ack_cookie) {
+  return {.value = vsync_ack_cookie.value()};
 }
 
 constexpr VsyncAckCookie kInvalidVsyncAckCookie(

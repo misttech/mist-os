@@ -16,6 +16,7 @@ fidl("fuchsia.hardware.display") {
     "overview.fidl",
     "provider.fidl",
     "virtcon.fidl",
+    "vsync-ack-cookie.fidl",
   ]
 
   public_deps = [
