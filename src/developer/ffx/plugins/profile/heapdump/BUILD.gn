@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//src/developer/ffx/build/ffx_plugin.gni")
+import("//src/developer/ffx/lib/e2e_emu/ffx_e2e_test.gni")
 
 if (is_host) {
   ffx_plugin("ffx_profile_heapdump") {
@@ -16,7 +17,7 @@ if (is_host) {
     args_sources = [ "src/args.rs" ]
   }
 
-  rustc_test("verify_ffx_profile_heapdump") {
+  ffx_e2e_test("verify_ffx_profile_heapdump") {
     testonly = true
 
     edition = "2021"
@@ -24,7 +25,6 @@ if (is_host) {
     sources = [ source_root ]
 
     deps = [
-      "//src/developer/ffx/lib/e2e_emu",
       "//src/lib/fuchsia",
       "//src/lib/fuchsia-async",
       "//src/performance/memory/pprof",

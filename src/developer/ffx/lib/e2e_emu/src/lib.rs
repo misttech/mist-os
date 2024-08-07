@@ -18,9 +18,6 @@ use std::time::Duration;
 use tempfile::TempDir;
 use tracing::info;
 
-const AMBER_FILES_PATH: &str = env!("PACKAGE_REPOSITORY_PATH");
-const PRODUCT_BUNDLE_PATH: &str = env!("PRODUCT_BUNDLE_PATH");
-
 struct EmuState {
     emu: std::process::Child,
 }
@@ -42,7 +39,9 @@ impl IsolatedEmulator {
     /// bundle and package repository from the Fuchsia build directory. Streams logs in the
     /// background and allows resolving packages from universe.
     pub async fn start(name: &str) -> anyhow::Result<Self> {
-        Self::start_internal(name, Some(AMBER_FILES_PATH)).await
+        let amber_files_path = std::env::var("PACKAGE_REPOSITORY_PATH")
+            .expect("PACKAGE_REPOSITORY_PATH env var must be set -- run this test with 'fx test'");
+        Self::start_internal(name, Some(&amber_files_path)).await
     }
 
     // This is private to be used for testing with a path to a different package repo. Path
@@ -101,6 +100,8 @@ impl IsolatedEmulator {
 
         info!("starting emulator {}", this.emu_name);
         let emulator_log = this.ffx_isolate.log_dir().join("emulator.log").display().to_string();
+        let product_bundle_path = std::env::var("PRODUCT_BUNDLE_PATH")
+            .expect("PRODUCT_BUNDLE_PATH env var must be set -- run this test with 'fx test'");
         let mut emulator_cmd = this
             .ffx_isolate
             .ffx_cmd(&[
@@ -119,7 +120,7 @@ impl IsolatedEmulator {
                 "120",
                 "--kernel-args",
                 "TERM=dumb",
-                PRODUCT_BUNDLE_PATH,
+                &product_bundle_path,
             ])
             .await
             .context("creating emulator command")?;
@@ -362,7 +363,9 @@ mod tests {
     async fn public_apis_succeed() {
         // TODO(slgrady) change back to start() when we have debugged the flake in which the ssh
         // connection is never made
-        let emu = IsolatedEmulator::start_internal("e2e_emu_public_apis", Some(AMBER_FILES_PATH))
+        let amber_files_path = std::env::var("PACKAGE_REPOSITORY_PATH")
+            .expect("PACKAGE_REPOSITORY_PATH env var must be set -- run this test with 'fx test'");
+        let emu = IsolatedEmulator::start_internal("e2e_emu_public_apis", Some(&amber_files_path))
             .await
             .expect("Couldn't start emulator");
 
@@ -391,17 +394,18 @@ mod tests {
         emu.stop().await;
     }
 
-    const TEST_PACKAGE_URL: &str = concat!("fuchsia-pkg://fuchsia.com/", env!("TEST_PACKAGE_NAME"));
-
     #[fuchsia::test]
     async fn resolve_package_from_server() {
-        let emu = IsolatedEmulator::start_internal(
-            "pkg_resolve",
-            Some(env!("TEST_PACKAGE_REPOSITORY_PATH")),
-        )
-        .await
-        .unwrap();
-        emu.ssh(&["pkgctl", "resolve", TEST_PACKAGE_URL]).await.unwrap();
+        let test_amber_files_path = std::env::var("TEST_PACKAGE_REPOSITORY_PATH").expect(
+            "TEST_PACKAGE_REPOSITORY_PATH env var must be set -- run this test with 'fx test'",
+        );
+        let test_package_name = std::env::var("TEST_PACKAGE_NAME")
+            .expect("TEST_PACKAGE_NAME env var must be set -- run this test with 'fx test'");
+        let test_package_url = format!("fuchsia-pkg://fuchsia.com/{test_package_name}");
+        let emu = IsolatedEmulator::start_internal("pkg_resolve", Some(&test_amber_files_path))
+            .await
+            .unwrap();
+        emu.ssh(&["pkgctl", "resolve", &test_package_url]).await.unwrap();
         emu.stop().await;
     }
 
@@ -410,7 +414,10 @@ mod tests {
     #[fuchsia::test]
     async fn fail_to_resolve_package_when_no_package_server_running() {
         let emu = IsolatedEmulator::start_internal("pkg_resolve_fail", None).await.unwrap();
-        emu.ssh(&["pkgctl", "resolve", TEST_PACKAGE_URL]).await.unwrap_err();
+        let test_package_name = std::env::var("TEST_PACKAGE_NAME")
+            .expect("TEST_PACKAGE_NAME env var must be set -- run this test with 'fx test'");
+        let test_package_url = format!("fuchsia-pkg://fuchsia.com/{test_package_name}");
+        emu.ssh(&["pkgctl", "resolve", &test_package_url]).await.unwrap_err();
         emu.stop().await;
     }
 }
