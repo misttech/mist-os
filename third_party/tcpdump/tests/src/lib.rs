@@ -304,29 +304,16 @@ async fn bridged_packet_test(name: &str) {
         let address_state_provider = interfaces::add_address_wait_assigned(
             &control,
             fnet::Subnet { addr: fnet::IpAddress::Ipv4(local_addr), prefix_len: PREFIX_LEN },
-            fnet_interfaces_admin::AddressParameters::default(),
+            fnet_interfaces_admin::AddressParameters {
+                add_subnet_route: Some(true),
+                ..Default::default()
+            },
         )
         .await
         .expect("add IPv4 address to bridge failed");
         let () = address_state_provider
             .detach()
             .expect("failed to detach from bridge interface address state provider");
-        let stack = realm
-            .connect_to_protocol::<fnet_stack::StackMarker>()
-            .expect("failed to connect to stack");
-        let () = stack
-            .add_forwarding_entry(&fidl_fuchsia_net_stack::ForwardingEntry {
-                subnet: fnet::Subnet {
-                    addr: fnet::IpAddress::Ipv4(NETWORK_ADDR),
-                    prefix_len: PREFIX_LEN,
-                },
-                device_id: bridge_id.into(),
-                next_hop: None,
-                metric: 0,
-            })
-            .await
-            .expect("FIDL error adding subnet route to bridge")
-            .expect("error adding subnet route to bridge");
 
         // Create a static neighbor entry so we skip neighbor resolution.
         realm
