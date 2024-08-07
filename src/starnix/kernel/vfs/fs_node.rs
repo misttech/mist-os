@@ -274,7 +274,7 @@ impl FsNodeInfo {
     }
 
     pub fn suid_and_sgid(&self) -> UserAndOrGroupId {
-        let uid = self.mode.intersects(FileMode::ISUID).then_some(self.uid);
+        let uid = self.mode.contains(FileMode::ISUID).then_some(self.uid);
 
         // See <https://man7.org/linux/man-pages/man7/inode.7.html>:
         //
@@ -283,7 +283,7 @@ impl FsNodeInfo {
         //   as described in execve(2).  For a file that does not have the
         //   group execution bit (S_IXGRP) set, the set-group-ID bit indicates
         //   mandatory file/record locking.
-        let gid = self.mode.intersects(FileMode::ISGID | FileMode::IXGRP).then_some(self.gid);
+        let gid = self.mode.contains(FileMode::ISGID | FileMode::IXGRP).then_some(self.gid);
         UserAndOrGroupId { uid, gid }
     }
 }
