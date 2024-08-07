@@ -63,7 +63,6 @@
                 "fuchsia.hardware.power.statecontrol.Admin",
                 "fuchsia.kernel.Stats",
                 "fuchsia.kernel.VmexResource",
-                "fuchsia.logger.LogSink",
                 "fuchsia.net.filter.Control",
                 "fuchsia.net.interfaces.admin.Installer",
                 "fuchsia.net.interfaces.State",
@@ -111,11 +110,6 @@
             protocol: [ "fuchsia.starnix.runner.Manager" ],
             from: "self",
             to: [ "#kernels" ],
-        },
-        {
-            protocol: [ "fuchsia.logger.LogSink" ],
-            from: "parent",
-            to: "#playground",
         },
         {
             directory: "boot-kernel",
