@@ -34,8 +34,6 @@ int main(int argc, char** argv) {
     exit(EXIT_FAILURE);
   }
 
-  FX_LOGS(INFO) << "Trace Manager starting with config: " << config_file;
-
   async::Executor executor{loop.dispatcher()};
   tracing::TraceManagerApp trace_manager_app{
       sys::ComponentContext::CreateAndServeOutgoingDirectory(), std::move(config), executor};

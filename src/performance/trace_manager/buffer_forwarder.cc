@@ -90,9 +90,9 @@ uint64_t GetBufferWordsWritten(const uint64_t* buffer, uint64_t size_in_words) {
 TransferStatus BufferForwarder::WriteChunkBy(BufferForwarder::ForwardStrategy strategy,
                                              const zx::vmo& vmo, uint64_t vmo_offset,
                                              uint64_t size) const {
-  FX_LOGS(INFO) << ": Writing chunk: vmo offset 0x" << std::hex << vmo_offset << ", size 0x"
-                << std::hex << size
-                << (strategy == ForwardStrategy::Size ? ", by-size" : ", by-record");
+  FX_LOGS(DEBUG) << ": Writing chunk: vmo offset 0x" << std::hex << vmo_offset << ", size 0x"
+                 << std::hex << size
+                 << (strategy == ForwardStrategy::Size ? ", by-size" : ", by-record");
 
   // TODO(gmtr): This is run on the async loop and we may block on the socket write below. We should
   // instead write as much as possible to the socket and if we get ZX_SHOULD_WAIT we instead
@@ -114,8 +114,8 @@ TransferStatus BufferForwarder::WriteChunkBy(BufferForwarder::ForwardStrategy st
   zx_status_t map_result = zx::vmar::root_self()->map(ZX_VM_PERM_READ, 0, vmo, page_aligned_offset,
                                                       size + page_aligned_remainder, &addr);
   if (map_result != ZX_OK) {
-    FX_PLOGS(ERROR, map_result) << "Failed to read data from buffer_vmo: " << "offset="
-                                << page_aligned_offset << ", size=" << size;
+    FX_PLOGS(ERROR, map_result) << "Failed to read data from buffer_vmo: "
+                                << "offset=" << page_aligned_offset << ", size=" << size;
     return TransferStatus::kProviderError;
   }
   auto d = fit::defer([addr, size]() { zx::vmar::root_self()->unmap(addr, size); });
@@ -126,7 +126,7 @@ TransferStatus BufferForwarder::WriteChunkBy(BufferForwarder::ForwardStrategy st
     uint64_t words_written =
         GetBufferWordsWritten(reinterpret_cast<const uint64_t*>(offset_addr), size_in_words);
     bytes_written = trace::WordsToBytes(words_written);
-    FX_LOGS(INFO) << "By-record -> " << bytes_written << " bytes";
+    FX_LOGS(DEBUG) << "By-record -> " << bytes_written << " bytes";
   } else {
     bytes_written = size;
   }

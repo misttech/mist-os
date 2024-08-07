@@ -226,9 +226,9 @@ void Tracee::OnFifoReadable(async_dispatcher_t* dispatcher, async::WaitBase* wai
         uint32_t wrapped_count = packet.data32;
         uint64_t durable_data_end = packet.data64;
         // Schedule the write with the main async loop.
-        FX_LOGS(INFO) << "Buffer save request from " << *bundle_
-                      << ", wrapped_count=" << wrapped_count << ", durable_data_end=0x" << std::hex
-                      << durable_data_end;
+        FX_LOGS(DEBUG) << "Buffer save request from " << *bundle_
+                       << ", wrapped_count=" << wrapped_count << ", durable_data_end=0x" << std::hex
+                       << durable_data_end;
         async::PostTask(executor_.dispatcher(),
                         [weak = weak_ptr_factory_.GetWeakPtr(), wrapped_count, durable_data_end] {
                           if (weak) {
@@ -358,7 +358,7 @@ TransferStatus Tracee::TransferRecords() const {
     uint64_t last = last_durable_data_end_;
     uint64_t end = header->durable_data_end();
     uint64_t buffer_size = header->durable_buffer_size();
-    FX_LOGS(INFO) << "Writing durable buffer for " << bundle_->name;
+    FX_LOGS(DEBUG) << "Writing durable buffer for " << bundle_->name;
     if (auto transfer_status = WriteChunk(offset, last, end, buffer_size);
         transfer_status != TransferStatus::kComplete) {
       return transfer_status;
@@ -385,7 +385,7 @@ TransferStatus Tracee::TransferRecords() const {
     uint64_t end = header->rolling_data_end(buffer_number);
     uint64_t buffer_size = header->rolling_buffer_size();
     auto name = buffer_number == 0 ? "rolling buffer 0" : "rolling buffer 1";
-    FX_LOGS(INFO) << "Writing chunks for " << name;
+    FX_LOGS(DEBUG) << "Writing chunks for " << name;
     return WriteChunk(offset, last, end, buffer_size);
   };
 
@@ -497,7 +497,7 @@ bool Tracee::DoTransferBuffer(uint32_t wrapped_count, uint64_t durable_data_end)
     return false;
   }
 
-  FX_LOGS(INFO) << "Dropped records: " << header->num_records_dropped();
+  FX_LOGS(DEBUG) << "Dropped records: " << header->num_records_dropped();
 
   // Don't use |header.durable_data_end| here, we want the value at the time
   // the message was sent.
@@ -534,8 +534,8 @@ bool Tracee::DoTransferBuffer(uint32_t wrapped_count, uint64_t durable_data_end)
 }
 
 void Tracee::NotifyBufferSaved(uint32_t wrapped_count, uint64_t durable_data_end) {
-  FX_LOGS(INFO) << "Buffer saved for " << *bundle_ << ", wrapped_count=" << wrapped_count
-                << ", durable_data_end=" << durable_data_end;
+  FX_LOGS(DEBUG) << "Buffer saved for " << *bundle_ << ", wrapped_count=" << wrapped_count
+                 << ", durable_data_end=" << durable_data_end;
   trace_provider_packet_t packet{
       .request = TRACE_PROVIDER_BUFFER_SAVED,
       .data32 = wrapped_count,
