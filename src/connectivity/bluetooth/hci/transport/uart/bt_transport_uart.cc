@@ -20,8 +20,11 @@
 namespace bt_transport_uart {
 namespace fhbt = fuchsia_hardware_bluetooth;
 
-ScoConnectionServer::ScoConnectionServer(SendHandler send_handler, StopHandler stop_handler)
-    : send_handler_(std::move(send_handler)), stop_handler_(std::move(stop_handler)) {
+ScoConnectionServer::ScoConnectionServer(SendHandler send_handler, StopHandler stop_handler,
+                                         AckReceiveHandler ack_receive_handler)
+    : send_handler_(std::move(send_handler)),
+      stop_handler_(std::move(stop_handler)),
+      ack_receive_handler_(std::move(ack_receive_handler)) {
   // Pre-allocate the vector size to avoid resizing. Reserve the space for packet indicator by +1 on
   // the size.
   write_buffer_.reserve(fhbt::kScoPacketMax + 1);
@@ -35,7 +38,9 @@ void ScoConnectionServer::Send(SendRequest& request, SendCompleter::Sync& comple
   write_buffer_.clear();
 }
 
-void ScoConnectionServer::AckReceive(AckReceiveCompleter::Sync& completer) {}
+void ScoConnectionServer::AckReceive(AckReceiveCompleter::Sync& completer) {
+  ack_receive_handler_();
+}
 
 void ScoConnectionServer::Stop(StopCompleter::Sync& completer) { stop_handler_(); }
 
@@ -51,11 +56,9 @@ BtTransportUart::BtTransportUart(fuchsia_driver_framework::DriverStartArgs start
     : DriverBase("bt-transport-uart", std::move(start_args), std::move(driver_dispatcher)),
       dispatcher_(dispatcher()),
       node_(fidl::WireClient(std::move(node()), dispatcher())),
-      sco_connection_server_(
-          [this](std::vector<uint8_t>& packet, fit::function<void(void)> callback) {
-            OnScoData(packet, std::move(callback));
-          },
-          [this] { OnScoStop(); }) {
+      sco_connection_server_(fit::bind_member(this, &BtTransportUart::OnScoData),
+                             fit::bind_member(this, &BtTransportUart::OnScoStop),
+                             fit::bind_member(this, &BtTransportUart::OnAckReceive)) {
   // Pre-allocate the vector size to avoid resizing. Reserve the space for packet indicator by +1 on
   // the size.
   for (size_t i = 0; i < kSendQueueLimit; i++) {
@@ -206,6 +209,7 @@ void BtTransportUart::PrepareStop(fdf::PrepareStopCompleter completer) {
   if (!result.ok()) {
     FDF_LOG(ERROR, "hci_bind: CancelAll failed with FIDL error %s", result.status_string());
     completer(zx::error(result.status()));
+    return;
   }
 
   FDF_LOG(TRACE, "PrepareStop complete");
@@ -573,6 +577,19 @@ void BtTransportUart::HciHandleUartReadEvents(const uint8_t* buf, size_t length)
   }
 }
 
+void BtTransportUart::OnAckReceive() {
+  if (unacked_receive_packet_number_ == 0) {
+    FDF_LOG(ERROR, "Receiving a packet ack when no received packet is pending ack.");
+    return;
+  }
+  unacked_receive_packet_number_--;
+  if (unacked_receive_packet_number_ == (kUnackedReceivePacketLimit / 2) && read_stopped_) {
+    // Resume reading data from the uart data buffer if half of the unacked packets are acked.
+    queue_read_task_.Post(dispatcher_);
+    read_stopped_ = false;
+  }
+}
+
 void BtTransportUart::ProcessNextUartPacketFromReadBuffer(
     uint8_t* buffer, size_t buffer_size, size_t* buffer_offset, const uint8_t** uart_src,
     const uint8_t* uart_end, PacketLengthFunction get_packet_length, zx::channel* channel,
@@ -653,30 +670,29 @@ void BtTransportUart::ProcessNextUartPacketFromReadBuffer(
             }
           });
     } else {
-      hci_transport_binding_.ForEachBinding(
-          [&](const fidl::ServerBinding<fhbt::HciTransport>& binding) {
-            if (snoop_type == BT_HCI_SNOOP_TYPE_ACL) {
-              auto received_packet = fhbt::ReceivedPacket::WithAcl(fidl_vec);
-              fit::result<fidl::OneWayError> result =
-                  fidl::SendEvent(binding)->OnReceive(received_packet);
-              if (result.is_error()) {
-                FDF_LOG(ERROR, "Failed to send ACL packet to host: %s",
-                        result.error_value().status_string());
-              }
-            } else if (snoop_type == BT_HCI_SNOOP_TYPE_EVT) {
-              auto received_packet = fhbt::ReceivedPacket::WithEvent(fidl_vec);
-              fit::result<fidl::OneWayError> result =
-                  fidl::SendEvent(binding)->OnReceive(received_packet);
+      if (snoop_type == BT_HCI_SNOOP_TYPE_ACL) {
+        auto received_packet = fhbt::ReceivedPacket::WithAcl(fidl_vec);
+        fit::result<fidl::OneWayError> result =
+            fidl::SendEvent(*hci_transport_binding_)->OnReceive(received_packet);
+        if (result.is_error()) {
+          FDF_LOG(ERROR, "Failed to send ACL packet to host: %s",
+                  result.error_value().status_string());
+        }
+      } else if (snoop_type == BT_HCI_SNOOP_TYPE_EVT) {
+        auto received_packet = fhbt::ReceivedPacket::WithEvent(fidl_vec);
+        fit::result<fidl::OneWayError> result =
+            fidl::SendEvent(*hci_transport_binding_)->OnReceive(received_packet);
 
-              if (result.is_error()) {
-                FDF_LOG(ERROR, "Failed to send event packet to host: %s",
-                        result.error_value().status_string());
-              }
-            } else {
-              FDF_LOG(ERROR, "Unsupported packet type received");
-            }
-          });
+        if (result.is_error()) {
+          FDF_LOG(ERROR, "Failed to send event packet to host: %s",
+                  result.error_value().status_string());
+        }
+      } else {
+        FDF_LOG(ERROR, "Unsupported packet type received");
+      }
     }
+
+    unacked_receive_packet_number_++;
 
     fhbt::SnoopPacket::Tag type = fhbt::SnoopPacket::Tag::kIso;
     if (snoop_type == BT_HCI_SNOOP_TYPE_ACL) {
@@ -708,6 +724,12 @@ void BtTransportUart::HciReadComplete(zx_status_t status, const uint8_t* buffer,
 
   if (status == ZX_OK) {
     HciHandleUartReadEvents(buffer, length);
+    if (unacked_receive_packet_number_ >= kUnackedReceivePacketLimit) {
+      // Stop reading data from the uart buffer if there are too many unacked packets sent to the
+      // host.
+      read_stopped_ = true;
+      return;
+    }
     queue_read_task_.Post(dispatcher_);
   } else {
     // There is not much we can do in the event of a UART read error.  Do not
@@ -887,7 +909,8 @@ void BtTransportUart::Send(fidl::Server<fhbt::HciTransport>::SendRequest& reques
   if (available_buffers_.empty()) {
     FDF_LOG(ERROR, "Send queue is full, closing HciTransport connection");
     completer.Reply();
-    hci_transport_binding_.RemoveBindings(this);
+    hci_transport_binding_->Close(ZX_ERR_INTERNAL);
+    hci_transport_binding_.reset();
     return;
   }
 
@@ -925,9 +948,9 @@ void BtTransportUart::Send(fidl::Server<fhbt::HciTransport>::SendRequest& reques
 
 void BtTransportUart::AckReceive(
     fidl::Server<fhbt::HciTransport>::AckReceiveCompleter::Sync& completer) {
-  // Will be used for flow control, do nothing now.
-  // TODO(b/349616746): Implement flow control base on this function.
+  OnAckReceive();
 }
+
 void BtTransportUart::ConfigureSco(
     fidl::Server<fhbt::HciTransport>::ConfigureScoRequest& request,
     fidl::Server<fhbt::HciTransport>::ConfigureScoCompleter::Sync& completer) {
@@ -946,6 +969,10 @@ void BtTransportUart::ConfigureSco(
 
 fit::function<void(void)> BtTransportUart::WaitforSnoopCallback() {
   return [this]() { snoop_setup_.Wait(); };
+}
+
+fit::function<void(void)> BtTransportUart::WaitforHciTransportCallback() {
+  return [this]() { hci_transport_setup_.Wait(); };
 }
 
 uint64_t BtTransportUart::GetAckedSnoopSeq() { return acked_snoop_seq_; }
@@ -1050,7 +1077,7 @@ void BtTransportUart::QueueUartRead() {
 zx_status_t BtTransportUart::ServeProtocols() {
   // Add HCI services to the outgoing directory.
   auto hci_protocol = [this](fidl::ServerEnd<fhbt::Hci> server_end) mutable {
-    if (hci_transport_binding_.size() != 0) {
+    if (hci_transport_binding_) {
       FDF_LOG(ERROR,
               "Hci protocol connect when we have already started HciTransport. "
               "Only one type of transport should be used");
@@ -1063,8 +1090,9 @@ zx_status_t BtTransportUart::ServeProtocols() {
               "HciTransport protocol connect with Hci transport active. "
               "Only one type of transport should be used.");
     }
-    hci_transport_binding_.AddBinding(dispatcher_, std::move(server_end), this,
-                                      fidl::kIgnoreBindingClosure);
+    hci_transport_binding_.emplace(dispatcher_, std::move(server_end), this,
+                                   [this](fidl::UnbindInfo) { hci_transport_binding_.reset(); });
+    hci_transport_setup_.Signal();
   };
   auto snoop_protocol = [this](fidl::ServerEnd<fhbt::Snoop> server_end) mutable {
     if (snoop_server_.has_value()) {
