@@ -75,6 +75,7 @@ class Thread {
 
 class Interface {
  public:
+  virtual ~Interface() {}
   // Called to start the thread that processes all FIDL requests.  The implementation must start a
   // thread and then call `Thread::Run`.
   virtual void StartThread(Thread) = 0;
@@ -108,8 +109,8 @@ class BlockServer {
   void Serve(fidl::ServerEnd<fuchsia_hardware_block_volume::Volume>);
 
  private:
-  Interface* interface_;
-  internal::BlockServer* server_;
+  Interface* interface_ = nullptr;
+  internal::BlockServer* server_ = nullptr;
 };
 
 }  // namespace block_server

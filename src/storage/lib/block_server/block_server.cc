@@ -54,7 +54,11 @@ void Session::SendReply(RequestId request_id, zx::result<> result) {
   block_server_send_reply(session_, request_id, result.status_value());
 }
 
-BlockServer::~BlockServer() { block_server_delete(server_); }
+BlockServer::~BlockServer() {
+  if (server_) {
+    block_server_delete(server_);
+  }
+}
 
 void BlockServer::Serve(fidl::ServerEnd<fuchsia_hardware_block_volume::Volume> server_end) {
   block_server_serve(server_, server_end.TakeChannel().release());

@@ -68,6 +68,19 @@ source_set("block_server_cc") {
   ]
 }
 
+source_set("fake_block_server_cc") {
+  sources = [ "fake_server.cc" ]
+  public = [ "fake_server.h" ]
+  public_deps = [
+    ":block_server_cc",
+    "//sdk/fidl/fuchsia.hardware.block.volume:fuchsia.hardware.block.volume_cpp",
+    "//sdk/lib/stdcompat",
+    "//src/storage/lib/block_client/cpp",
+    "//zircon/system/ulib/storage/buffer",
+    "//zircon/system/ulib/zx",
+  ]
+}
+
 test("block_server_cc_tests") {
   sources = [ "block_server_cc_tests.cc" ]
   deps = [
