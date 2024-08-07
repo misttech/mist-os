@@ -1448,63 +1448,6 @@ Controls whether to promote warnings to errors.
 
 From //build/config/BUILD.gn:37
 
-### dev_bootfs_labels
-
-List of labels for objects to include in the ZBI.
-
-**Current value (from the default):** `[]`
-
-From //build/dev.gni:14
-
-### dev_build_only_deps
-
-List of labels for targets that should be built but not included in any
-build outputs that are part of the build API (e.g. zbi's, package servers).
-
-**Current value (from the default):** `[]`
-
-From //build/dev.gni:11
-
-### dev_kernel_cmdline
-
-List of strings to append to the kernel command line.
-
-**Current value (from the default):** `[]`
-
-From //build/dev.gni:23
-
-### dev_recovery_bootfs_labels
-
-List of binary labels to include in the recovery ZBI.
-
-**Current value (from the default):** `[]`
-
-From //build/dev.gni:20
-
-### dev_recovery_kernel_cmdline
-
-List of strings to append to the recovery kernel command line.
-
-**Current value (from the default):** `[]`
-
-From //build/dev.gni:29
-
-### dev_zedboot_bootfs_labels
-
-List of binary labels to include in the zedboot ZBI.
-
-**Current value (from the default):** `[]`
-
-From //build/dev.gni:17
-
-### dev_zedboot_kernel_cmdline
-
-List of strings to append to the zedboot kernel command line.
-
-**Current value (from the default):** `[]`
-
-From //build/dev.gni:26
-
 ### developer_test_labels
 
 A developer-only argument that is used to add tests to the build without
@@ -7615,7 +7558,7 @@ From //sdk/config.gni:13
 
 Identifier for the Core SDK.
 
-**Current value (from the default):** `"22.99991231.0.1"`
+**Current value (from the default):** `"23.99991231.0.1"`
 
 From //sdk/config.gni:7
 
