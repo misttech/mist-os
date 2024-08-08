@@ -5,13 +5,13 @@
 #ifndef SRC_UI_SCENIC_LIB_FLATLAND_ENGINE_TESTS_MOCK_DISPLAY_COORDINATOR_H_
 #define SRC_UI_SCENIC_LIB_FLATLAND_ENGINE_TESTS_MOCK_DISPLAY_COORDINATOR_H_
 
-#include <fuchsia/hardware/display/cpp/fidl.h>
-#include <fuchsia/hardware/display/cpp/fidl_test_base.h>
-#include <fuchsia/hardware/display/types/cpp/fidl.h>
-#include <fuchsia/math/cpp/fidl.h>
-#include <lib/fidl/cpp/binding.h>
+#include <fidl/fuchsia.hardware.display/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.display/cpp/test_base.h>
+#include <fidl/fuchsia.math/cpp/fidl.h>
 #include <lib/syslog/cpp/macros.h>
+#include <zircon/errors.h>
 #include <zircon/status.h>
+#include <zircon/types.h>
 
 #include <atomic>
 
@@ -19,16 +19,22 @@
 
 namespace flatland {
 
-class MockDisplayCoordinator : public fuchsia::hardware::display::testing::Coordinator_TestBase {
+class MockDisplayCoordinator
+    : public fidl::testing::TestBase<fuchsia_hardware_display::Coordinator> {
  public:
-  explicit MockDisplayCoordinator(zx::channel coordinator_channel, async_dispatcher_t* dispatcher)
-      : binding_(this, std::move(coordinator_channel), dispatcher) {
-    binding_.set_error_handler([this](zx_status_t status) {
-      if (status != ZX_ERR_PEER_CLOSED) {
-        FX_LOGS(ERROR) << "FIDL binding is closed due to error " << zx_status_get_string(status);
-      }
-      is_bound_.store(false, std::memory_order_relaxed);
-    });
+  MockDisplayCoordinator() = default;
+
+  // Must be called from the dispatcher thread.
+  void Bind(fidl::ServerEnd<fuchsia_hardware_display::Coordinator> server_end,
+            async_dispatcher_t* dispatcher) {
+    is_bound_.store(true, std::memory_order_relaxed);
+    binding_ = std::make_unique<fidl::ServerBinding<fuchsia_hardware_display::Coordinator>>(
+        dispatcher, std::move(server_end), this, [this](fidl::UnbindInfo info) {
+          if (!info.is_peer_closed()) {
+            FX_LOGS(INFO) << "FIDL binding is closed: " << info.FormatDescription();
+          }
+          is_bound_.store(false, std::memory_order_relaxed);
+        });
   }
 
   bool IsBound() const { return is_bound_.load(std::memory_order_relaxed); }
@@ -36,71 +42,65 @@ class MockDisplayCoordinator : public fuchsia::hardware::display::testing::Coord
   // TODO(https://fxbug.dev/324689624): Do not use gMock to generate mocking
   // methods.
 
-  MOCK_METHOD(void, ImportEvent, (zx::event, fuchsia::hardware::display::EventId));
+  MOCK_METHOD(void, ImportEvent, (ImportEventRequest&, ImportEventCompleter::Sync&), (override));
 
   MOCK_METHOD(void, SetLayerColorConfig,
-              (fuchsia::hardware::display::LayerId, fuchsia::images2::PixelFormat,
-               std::vector<uint8_t>));
+              (SetLayerColorConfigRequest&, SetLayerColorConfigCompleter::Sync&), (override));
 
-  MOCK_METHOD(void, SetLayerImage,
-              (fuchsia::hardware::display::LayerId, fuchsia::hardware::display::ImageId,
-               fuchsia::hardware::display::EventId, fuchsia::hardware::display::EventId));
+  MOCK_METHOD(void, SetLayerImage, (SetLayerImageRequest&, SetLayerImageCompleter::Sync&),
+              (override));
 
-  MOCK_METHOD(void, ApplyConfig, ());
+  MOCK_METHOD(void, ApplyConfig, (ApplyConfigCompleter::Sync&), (override));
 
-  MOCK_METHOD(void, GetLatestAppliedConfigStamp, (GetLatestAppliedConfigStampCallback));
+  MOCK_METHOD(void, GetLatestAppliedConfigStamp, (GetLatestAppliedConfigStampCompleter::Sync&),
+              (override));
 
-  MOCK_METHOD(void, CheckConfig, (bool, CheckConfigCallback));
+  MOCK_METHOD(void, CheckConfig, (CheckConfigRequest&, CheckConfigCompleter::Sync&), (override));
 
   MOCK_METHOD(void, ImportBufferCollection,
-              (fuchsia::hardware::display::BufferCollectionId,
-               fidl::InterfaceHandle<class ::fuchsia::sysmem::BufferCollectionToken>,
-               ImportBufferCollectionCallback));
+              (ImportBufferCollectionRequest&, ImportBufferCollectionCompleter::Sync&), (override));
 
   MOCK_METHOD(void, SetBufferCollectionConstraints,
-              (fuchsia::hardware::display::BufferCollectionId,
-               fuchsia::hardware::display::types::ImageBufferUsage,
-               SetBufferCollectionConstraintsCallback));
+              (SetBufferCollectionConstraintsRequest&,
+               SetBufferCollectionConstraintsCompleter::Sync&),
+              (override));
 
-  MOCK_METHOD(void, ReleaseBufferCollection, (fuchsia::hardware::display::BufferCollectionId));
+  MOCK_METHOD(void, ReleaseBufferCollection,
+              (ReleaseBufferCollectionRequest&, ReleaseBufferCollectionCompleter::Sync&),
+              (override));
 
-  MOCK_METHOD(void, ImportImage,
-              (fuchsia::hardware::display::types::ImageMetadata,
-               fuchsia::hardware::display::BufferId, fuchsia::hardware::display::ImageId,
-               ImportImageCallback));
+  MOCK_METHOD(void, ImportImage, (ImportImageRequest&, ImportImageCompleter::Sync&), (override));
 
-  MOCK_METHOD(void, ReleaseImage, (fuchsia::hardware::display::ImageId));
+  MOCK_METHOD(void, ReleaseImage, (ReleaseImageRequest&, ReleaseImageCompleter::Sync&), (override));
 
   MOCK_METHOD(void, SetLayerPrimaryConfig,
-              (fuchsia::hardware::display::LayerId,
-               fuchsia::hardware::display::types::ImageMetadata));
+              (SetLayerPrimaryConfigRequest&, SetLayerPrimaryConfigCompleter::Sync&), (override));
 
   MOCK_METHOD(void, SetLayerPrimaryPosition,
-              (fuchsia::hardware::display::LayerId,
-               fuchsia::hardware::display::types::CoordinateTransformation, fuchsia::math::RectU,
-               fuchsia::math::RectU));
+              (SetLayerPrimaryPositionRequest&, SetLayerPrimaryPositionCompleter::Sync&),
+              (override));
 
   MOCK_METHOD(void, SetLayerPrimaryAlpha,
-              (fuchsia::hardware::display::LayerId, fuchsia::hardware::display::types::AlphaMode,
-               float));
+              (SetLayerPrimaryAlphaRequest&, SetLayerPrimaryAlphaCompleter::Sync&), (override));
 
-  MOCK_METHOD(void, CreateLayer, (CreateLayerCallback));
+  MOCK_METHOD(void, CreateLayer, (CreateLayerCompleter::Sync&), (override));
 
-  MOCK_METHOD(void, DestroyLayer, (fuchsia::hardware::display::LayerId));
+  MOCK_METHOD(void, DestroyLayer, (DestroyLayerRequest&, DestroyLayerCompleter::Sync&), (override));
 
-  MOCK_METHOD(void, SetDisplayLayers,
-              (fuchsia::hardware::display::types::DisplayId,
-               ::std::vector<fuchsia::hardware::display::LayerId>));
+  MOCK_METHOD(void, SetDisplayLayers, (SetDisplayLayersRequest&, SetDisplayLayersCompleter::Sync&),
+              (override));
 
   MOCK_METHOD(void, SetDisplayColorConversion,
-              (fuchsia::hardware::display::types::DisplayId, (std::array<float, 3>),
-               (std::array<float, 9>), (std::array<float, 3>)));
+              (SetDisplayColorConversionRequest&, SetDisplayColorConversionCompleter::Sync&),
+              (override));
 
  private:
-  void NotImplemented_(const std::string& name) final {}
+  void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
+    completer.Close(ZX_ERR_NOT_SUPPORTED);
+  }
 
-  fidl::Binding<fuchsia::hardware::display::Coordinator> binding_;
-  std::atomic<bool> is_bound_ = true;
+  std::unique_ptr<fidl::ServerBinding<fuchsia_hardware_display::Coordinator>> binding_;
+  std::atomic<bool> is_bound_ = false;
 };
 
 }  // namespace flatland

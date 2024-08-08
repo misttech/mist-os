@@ -22,7 +22,7 @@ executable("unittests") {
 
   deps = [
     "//sdk/fidl/fuchsia.hardware.display:fuchsia.hardware.display_cpp",
-    "//sdk/fidl/fuchsia.hardware.display:fuchsia.hardware.display_hlcpp",
+    "//sdk/fidl/fuchsia.hardware.display:fuchsia.hardware.display_cpp_testing",
     "//sdk/lib/ui/scenic/cpp:cpp",
     "//src/lib/fsl:fsl",
     "//src/lib/fxl/test:gtest_main",
@@ -32,5 +32,6 @@ executable("unittests") {
     "//src/ui/scenic/lib/scheduling:frame_scheduler",
     "//src/ui/scenic/lib/utils",
     "//third_party/googletest:gmock",
+    "//zircon/system/ulib/sync:sync-cpp",
   ]
 }
