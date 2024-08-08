@@ -245,10 +245,7 @@ func buildImpl(
 		}
 		ninjaDebugFiles, traceErr := getNinjaDebugFiles(ctx, r, buildDir, targets, ninjaLog, ninjatraceToolPath, buildstatsToolPath)
 		if traceErr != nil {
-			if ninjaErr == nil {
-				// The first error will prevent later traces from being generated.
-				return artifacts, traceErr
-			}
+			logger.Warningf(ctx, "(ignored) Failed to analyze ninja log %s, with error: %v", ninjaLog, traceErr)
 		}
 
 		ninjaDebugFileSets = append(ninjaDebugFileSets, ninjaDebugFiles)

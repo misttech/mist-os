@@ -323,7 +323,7 @@ func TestBuild(t *testing.T) {
 				}
 				return nil
 			},
-			expectErr:         true,
+			// these errors are now ignored
 			expectedArtifacts: &fintpb.BuildArtifacts{},
 		},
 		{
@@ -338,7 +338,22 @@ func TestBuild(t *testing.T) {
 				}
 				return nil
 			},
-			expectErr:         true,
+			// these errors are now ignored
+			expectedArtifacts: &fintpb.BuildArtifacts{},
+		},
+		{
+			name:       "ninjatrace fails",
+			staticSpec: &fintpb.Static{},
+			contextSpec: &fintpb.Context{
+				ArtifactDir: artifactDir,
+			},
+			runnerFunc: func(cmd []string, stdout io.Writer) error {
+				if filepath.Base(cmd[0]) == "ninjatrace" {
+					return fmt.Errorf("failed to run command: %s", cmd)
+				}
+				return nil
+			},
+			// these errors are now ignored
 			expectedArtifacts: &fintpb.BuildArtifacts{},
 		},
 		{
