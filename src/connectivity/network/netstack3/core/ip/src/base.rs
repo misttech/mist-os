@@ -438,9 +438,7 @@ impl<
         dst: SpecifiedAddr<I::Addr>,
         device: Option<&Self::DeviceId>,
     ) {
-        match self.with_main_ip_routing_table(|core_ctx, routes| {
-            routes.lookup(core_ctx, device, dst.get())
-        }) {
+        match lookup_route_table(self, device, dst.get()) {
             Some(Destination { next_hop, device }) => {
                 let neighbor = match next_hop {
                     NextHop::RemoteAsNeighbor => dst,
@@ -2310,7 +2308,7 @@ pub fn receive_ipv4_packet<
     // we need below.
     drop(filter);
 
-    let action = receive_ipv4_packet_action(core_ctx, bindings_ctx, device, &packet);
+    let action = receive_ipv4_packet_action(core_ctx, device, &packet);
     match action {
         // TODO(https://fxbug.dev/353329136): Actually forward the packet to
         // the targets. For now, at least deliver it locally.
@@ -2629,7 +2627,7 @@ pub fn receive_ipv6_packet<
         return;
     };
 
-    match receive_ipv6_packet_action(core_ctx, bindings_ctx, device, &packet) {
+    match receive_ipv6_packet_action(core_ctx, device, &packet) {
         // TODO(https://fxbug.dev/353329136): Actually forward the packet to
         // the targets. For now, at least deliver it locally.
         ReceivePacketAction::MulticastForward { targets: _, address_status: None } => {}
@@ -2948,7 +2946,6 @@ pub fn receive_ipv4_packet_action<
     B: ByteSlice,
 >(
     core_ctx: &mut CC,
-    bindings_ctx: &mut BC,
     device: &CC::DeviceId,
     packet: &Ipv4Packet<B>,
 ) -> ReceivePacketAction<Ipv4, CC::DeviceId> {
@@ -2995,13 +2992,7 @@ pub fn receive_ipv4_packet_action<
             core_ctx.increment(|counters| &counters.version_rx.deliver_broadcast);
             ReceivePacketAction::Deliver { address_status }
         }
-        None => receive_ip_packet_action_common::<Ipv4, _, _, _>(
-            core_ctx,
-            bindings_ctx,
-            dst_ip,
-            device,
-            packet,
-        ),
+        None => receive_ip_packet_action_common::<Ipv4, _, _, _>(core_ctx, dst_ip, device, packet),
     }
 }
 
@@ -3012,7 +3003,6 @@ pub fn receive_ipv6_packet_action<
     B: ByteSlice,
 >(
     core_ctx: &mut CC,
-    bindings_ctx: &mut BC,
     device: &CC::DeviceId,
     packet: &Ipv6Packet<B>,
 ) -> ReceivePacketAction<Ipv6, CC::DeviceId> {
@@ -3109,13 +3099,7 @@ pub fn receive_ipv6_packet_action<
             core_ctx.increment(|counters| &counters.version_rx.drop_for_tentative);
             ReceivePacketAction::Drop { reason: DropReason::Tentative }
         }
-        None => receive_ip_packet_action_common::<Ipv6, _, _, _>(
-            core_ctx,
-            bindings_ctx,
-            dst_ip,
-            device,
-            packet,
-        ),
+        None => receive_ip_packet_action_common::<Ipv6, _, _, _>(core_ctx, dst_ip, device, packet),
     }
 }
 
@@ -3171,7 +3155,6 @@ fn receive_ip_packet_action_common<
     CC: IpLayerContext<I, BC> + CounterContext<IpCounters<I>>,
 >(
     core_ctx: &mut CC,
-    bindings_ctx: &mut BC,
     dst_ip: SpecifiedAddr<I::Addr>,
     device_id: &CC::DeviceId,
     packet: &I::Packet<B>,
@@ -3197,7 +3180,7 @@ fn receive_ip_packet_action_common<
         core_ctx.increment(|counters| &counters.forwarding_disabled);
         ReceivePacketAction::Drop { reason: DropReason::ForwardingDisabledInboundIface }
     } else {
-        match lookup_route_table(core_ctx, bindings_ctx, None, *dst_ip) {
+        match lookup_route_table(core_ctx, None, *dst_ip) {
             Some(dst) => {
                 core_ctx.increment(|counters| &counters.forward);
                 ReceivePacketAction::Forward { original_dst: dst_ip, dst }
@@ -3211,13 +3194,8 @@ fn receive_ip_packet_action_common<
 }
 
 // Look up the route to a host.
-fn lookup_route_table<
-    I: IpLayerIpExt,
-    BC: IpLayerBindingsContext<I, CC::DeviceId>,
-    CC: IpLayerContext<I, BC>,
->(
+fn lookup_route_table<I: IpLayerIpExt, BC, CC: IpStateContext<I, BC>>(
     core_ctx: &mut CC,
-    _bindings_ctx: &mut BC,
     device: Option<&CC::DeviceId>,
     dst_ip: I::Addr,
 ) -> Option<Destination<I::Addr, CC::DeviceId>> {
