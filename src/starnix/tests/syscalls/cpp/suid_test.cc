@@ -7,6 +7,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/mount.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 #include <unistd.h>
 
 #include <filesystem>
@@ -125,4 +127,79 @@ TEST(SuidTest, SuidBinaryBecomesRoot) {
   }
 
   fclose(fp);
+}
+
+TEST(SuidTest, FileModificationsRemoveSuid) {
+  if (!test_helper::HasSysAdmin() || !test_helper::HasCapability(CAP_FSETID)) {
+    GTEST_SKIP() << "Not running with sysadmin capabilities, skipping.";
+  }
+  test_helper::ScopedTempDir temp_dir;
+  auto mounted = MountTmpFs(temp_dir.path());
+  ASSERT_TRUE(mounted.has_value()) << "failed to mount fs";
+  auto mount_path = mounted.value();
+
+  test_helper::ForkHelper helper;
+
+  // We will drop capabilities, so let's do that inside a new process.
+  helper.RunInForkedProcess([&] {
+    std::string test_suid_file = files::JoinPath(mount_path, "file_modification_drops_suid");
+    int fd = SAFE_SYSCALL(creat(test_suid_file.c_str(), S_ISUID | S_ISGID | S_IRWXU));
+
+    struct stat file_stat;
+    SAFE_SYSCALL(fstat(fd, &file_stat));
+    EXPECT_NE((file_stat.st_mode & S_ISUID), 0U);
+
+    uint8_t data = 'x';
+
+    // Because we have CAP_FSETID, modifying the file doesn't remove the
+    // set-user-ID bit.
+    SAFE_SYSCALL(write(fd, &data, sizeof(data)));
+    SAFE_SYSCALL(fstat(fd, &file_stat));
+    EXPECT_NE((file_stat.st_mode & S_ISUID), 0U);
+
+    // After dropping CAP_FSETID, modifications to the file should remove the
+    // set-user-ID bit.
+    test_helper::UnsetCapability(CAP_FSETID);
+    SAFE_SYSCALL(write(fd, &data, sizeof(data)));
+    SAFE_SYSCALL(fstat(fd, &file_stat));
+    EXPECT_EQ((file_stat.st_mode & S_ISUID), 0U);
+
+    // Setting the file as set-user-ID again works.
+    SAFE_SYSCALL(fchmod(fd, S_ISUID | S_IRWXU));
+    SAFE_SYSCALL(fstat(fd, &file_stat));
+    EXPECT_NE((file_stat.st_mode & S_ISUID), 0U);
+
+    close(fd);
+
+    // But can be removed again by truncating the file.
+    SAFE_SYSCALL(truncate(test_suid_file.c_str(), 0));
+    SAFE_SYSCALL(stat(test_suid_file.c_str(), &file_stat));
+    EXPECT_EQ((file_stat.st_mode & S_ISUID), 0U);
+
+    SAFE_SYSCALL(unlink(test_suid_file.c_str()));
+  });
+}
+
+TEST(SuidTest, OwnershipChangesRemoveSuid) {
+  if (!test_helper::HasSysAdmin()) {
+    GTEST_SKIP() << "Not running with sysadmin capabilities, skipping.";
+  }
+
+  test_helper::ScopedTempDir temp_dir;
+  auto mounted = MountTmpFs(temp_dir.path());
+  ASSERT_TRUE(mounted.has_value()) << "failed to mount fs";
+  auto mount_path = mounted.value();
+
+  std::string test_suid_file = files::JoinPath(mount_path, "ownership_change_drops_suid");
+  int fd = SAFE_SYSCALL(creat(test_suid_file.c_str(), S_ISUID | S_IRWXU));
+
+  struct stat file_stat;
+  SAFE_SYSCALL(fstat(fd, &file_stat));
+  EXPECT_NE((file_stat.st_mode & S_ISUID), 0U);
+
+  SAFE_SYSCALL(fchown(fd, kUser1Uid, kRootGid));
+  SAFE_SYSCALL(fstat(fd, &file_stat));
+  EXPECT_EQ((file_stat.st_mode & S_ISUID), 0U);
+  close(fd);
+  SAFE_SYSCALL(unlink(test_suid_file.c_str()));
 }
