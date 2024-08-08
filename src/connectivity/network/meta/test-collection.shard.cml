@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
+    include: [ "syslog/offer.shard.cml" ],
     collections: [
         {
             // Used to run the Network Test Realm (NTR). The NTR generates a
@@ -18,7 +19,6 @@
             protocol: [
                 "fuchsia.device.NameProvider",
                 "fuchsia.inspect.InspectSink",
-                "fuchsia.logger.LogSink",
             ],
             from: "parent",
             to: [ "#test-components" ],
