@@ -1,6 +1,0 @@
---- !ifs-v1
-IfsVersion:      3.0
-SoName:          libmissing-dep-dep.so
-Symbols:
-  - { Name: missing_dep_sym, Type: Func }
-...

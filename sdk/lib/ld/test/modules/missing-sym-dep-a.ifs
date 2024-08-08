@@ -1,6 +1,0 @@
---- !ifs-v1
-IfsVersion:      3.0
-SoName:          libld-dep-a.so
-Symbols:
-  - { Name: c, Type: Func }
-...

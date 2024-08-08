@@ -67,5 +67,11 @@ template("generated_ifs_file") {
       contents += [ symbol_string ]
     }
     contents += [ "..." ]
+
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "visibility",
+                           ])
   }
 }

@@ -4,6 +4,7 @@
 
 import("//build/cpp/library_headers.gni")
 import("//build/cpp/verify_public_symbols.gni")
+import("//build/toolchain/generated_ifs_file.gni")
 import("//build/toolchain/ifs_extract.gni")
 import("//build/toolchain/ifs_shared_library.gni")
 import("//build/toolchain/toolchain_environment.gni")
@@ -87,11 +88,39 @@ static_library("ld-log-zircon") {
   ]
 }
 
+# This is the SONAME reflecting the passive ABI defined here.
+# It has to match what's in ld.ifs and in ld::abi::kSoname (<lib/ld/abi.h>).
+abi_soname = "ld.so.1"
+config("abi-soname") {
+  ldflags = [ "-Wl,-soname=$abi_soname" ]
+}
+
+config("abi-interp") {
+  ldflags = [ "-Wl,-dynamic-linker=${toolchain_variant.libprefix}$abi_soname" ]
+}
+
+generated_ifs_file("ld.ifs") {
+  visibility = [ ":*" ]
+  soname = abi_soname
+  symbols = [
+    {
+      name = "_ld_abi"
+      type = "Object"
+    },
+    {
+      name = "_r_debug"
+      type = "Object"
+    },
+  ]
+}
+
 # This is the linkable target for using the passive ABI.
 # It gives access to the passive ABI dynamic linkage symbols
 # and to the header files declaring the `ld::abi` namespace.
 ifs_shared_library("ld") {
-  abi = "ld.ifs"
+  deps = [ ":ld.ifs" ]
+  gen_outputs = get_target_outputs(deps[0])
+  abi = gen_outputs[0]
   public_deps = [ ":abi-headers" ]
 }
 
@@ -108,17 +137,6 @@ library_headers("abi-headers") {
     "//sdk/lib/stdcompat",
     "//src/lib/elfldltl:headers",
   ]
-}
-
-# This is the SONAME reflecting the passive ABI defined here.
-# It has to match what's in ld.ifs and in ld::abi::kSoname (<lib/ld/abi.h>).
-abi_soname = "ld.so.1"
-config("abi-soname") {
-  ldflags = [ "-Wl,-soname=$abi_soname" ]
-}
-
-config("abi-interp") {
-  ldflags = [ "-Wl,-dynamic-linker=${toolchain_variant.libprefix}$abi_soname" ]
 }
 
 # This provides the __tls_get_addr ABI symbol used by TLS GD accesses when
