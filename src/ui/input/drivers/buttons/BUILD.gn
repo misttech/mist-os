@@ -69,10 +69,10 @@ test("buttons-test") {
   sources = [ "buttons-test.cc" ]
   deps = [
     ":common",
-    "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/driver/testing/cpp:cpp",
     "//src/devices/gpio/testing/fake-gpio",
-    "//zircon/system/ulib/zxtest",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/predicates",
   ]
 }
 
