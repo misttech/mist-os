@@ -126,36 +126,14 @@ trait StripParseState<'a> {
 
 impl<'a> StripParseState<'a> for ESpan<'a> {
     fn strip_parse_state(self) -> Span<'a> {
-        // Safe because we're basically just stripping away unrelated fields from the
-        // safety-sensitive state and leaving it unchanged.
-        // TODO: A later version of nom_locate has map_extra which will let us
-        // go without this unsafe block.
-        unsafe {
-            Span::new_from_raw_offset(
-                self.location_offset(),
-                self.location_line(),
-                *self.fragment(),
-                (),
-            )
-        }
+        self.map_extra(|_| ())
     }
 
     fn replace_parse_state(
         self,
         state: (Rc<RefCell<ParseState<'a>>>, Option<Rc<ErrNode<'a>>>),
     ) -> ESpan<'a> {
-        // Safe because we're basically just stripping away unrelated fields from the
-        // safety-sensitive state and leaving it unchanged.
-        // TODO: A later version of nom_locate has map_extra which will let us
-        // go without this unsafe block.
-        unsafe {
-            ESpan::new_from_raw_offset(
-                self.location_offset(),
-                self.location_line(),
-                *self.fragment(),
-                state,
-            )
-        }
+        self.map_extra(move |_| state)
     }
 }
 
