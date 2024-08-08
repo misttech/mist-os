@@ -258,9 +258,9 @@ pub fn compare_types(
             } else if HandleRights::SAME_RIGHTS.intersects(*send_rights) {
                 assert_eq!(*send_rights, HandleRights::SAME_RIGHTS);
                 // The sender can send any kinds of rights.
-                problems.type_warning(
-                    send_path,
-                    recv_path,
+                problems.warning(
+                    [send_path,
+                    recv_path],
                     format!(
                         "Sender(@{send_level}) doesn't specify handle rights but receiver(@{recv_level}) does: {:?}",
                         recv_rights
@@ -347,9 +347,9 @@ pub fn compare_types(
             if !send_only.is_empty() {
                 let send_level = send_path.api_level();
                 let recv_level = recv_path.api_level();
-                problems.type_warning(
-                    send_path,
-                    recv_path,
+                problems.warning(
+                    [send_path,
+                    recv_path],
                     format!(
                         "Table in sender(@{send_level}) has members that receiver(@{recv_level}) does not have."
                     ),
@@ -371,17 +371,17 @@ pub fn compare_types(
                 let send_level = send_path.api_level();
                 let recv_level = recv_path.api_level();
                 if recv_flex == &Flexibility::Flexible {
-                    problems.type_warning(
-                        send_path,
-                        recv_path,
+                    problems.warning(
+                        [send_path,
+                        recv_path],
                         format!(
                             "Union in sender(@{send_level}) has members that union in receiver(@{recv_level}) does not have."
                         ),
                     );
                 } else {
-                    problems.type_error(
-                        send_path,
-                        recv_path,
+                    problems.error(
+                        [send_path,
+                        recv_path],
                         format!("Union in sender(@{send_level}) has members that strict union in receiver(@{recv_level}) does not have."),
                 );
                 }
@@ -395,7 +395,7 @@ pub fn compare_types(
             let send_level = send_path.api_level();
             let recv_level = recv_path.api_level();
             if send_transport != recv_transport {
-                problems.type_error(send_path, recv_path, format!("client_end transports don't match sender(@{send_level}):{send_transport}, receiver(@{recv_level}):{recv_transport}"))
+                problems.error([send_path, recv_path], format!("client_end transports don't match sender(@{send_level}):{send_transport}, receiver(@{recv_level}):{recv_transport}"))
             }
 
             if config.tear_off {
@@ -408,11 +408,8 @@ pub fn compare_types(
 
             if send_optional == &Optionality::Optional && recv_optional == &Optionality::Required {
                 // TODO: reword
-                problems.type_error(
-                    send_path,
-                    recv_path,
-                    format!("client_end optionality incompatible"),
-                )
+                problems
+                    .error([send_path, recv_path], format!("client_end optionality incompatible"))
             }
         }
         (
@@ -422,7 +419,7 @@ pub fn compare_types(
             let send_level = send_path.api_level();
             let recv_level = recv_path.api_level();
             if send_transport != recv_transport {
-                problems.type_error(send_path, recv_path, format!("server_end transports don't match sender(@{send_level}):{send_transport}, receiver(@{recv_level}):{recv_transport}"))
+                problems.error([send_path, recv_path], format!("server_end transports don't match sender(@{send_level}):{send_transport}, receiver(@{recv_level}):{recv_transport}"))
             }
 
             if config.tear_off {

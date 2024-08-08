@@ -161,9 +161,8 @@ impl Method {
     ) -> CompatibilityProblems {
         let mut problems = CompatibilityProblems::default();
         if client.kind() != server.kind() {
-            problems.protocol(
-                &client.path,
-                &server.path,
+            problems.error(
+                [&client.path, &server.path],
                 format!(
                     "Interaction kind differs between client(@{}):{} and server(@{}):{}",
                     client.path.api_level(),
@@ -180,9 +179,8 @@ impl Method {
                 // Request
                 let compat = compare_types(c_request, s_request, &config);
                 if compat.is_incompatible() {
-                    problems.protocol(
-                        &client.path,
-                        &server.path,
+                    problems.error(
+                        [&client.path, &server.path],
                         format!(
                             "Incompatible request types, client(@{}), server(@{})",
                             client.path.api_level(),
@@ -194,9 +192,8 @@ impl Method {
                 // Response
                 let compat = compare_types(s_response, c_response, &config);
                 if compat.is_incompatible() {
-                    problems.protocol(
-                        &client.path,
-                        &server.path,
+                    problems.error(
+                        [&client.path, &server.path],
                         format!(
                             "Incompatible response types, client(@{}), server(@{})",
                             client.path.api_level(),
@@ -209,9 +206,8 @@ impl Method {
             (OneWay(c_request), OneWay(s_request)) => {
                 let compat = compare_types(c_request, s_request, &config);
                 if compat.is_incompatible() {
-                    problems.protocol(
-                        &client.path,
-                        &server.path,
+                    problems.error(
+                        [&client.path, &server.path],
                         format!(
                             "Incompatible request types, client(@{}), server(@{})",
                             client.path.api_level(),
@@ -224,9 +220,8 @@ impl Method {
             (Event(c_payload), Event(s_payload)) => {
                 let compat = compare_types(s_payload, c_payload, &config);
                 if compat.is_incompatible() {
-                    problems.protocol(
-                        &client.path,
-                        &server.path,
+                    problems.error(
+                        [&client.path, &server.path],
                         format!(
                             "Incompatible event types, client(@{}), server(@{})",
                             client.path.api_level(),
@@ -334,9 +329,8 @@ impl Protocol {
                     // fine with the server not recognizing it, and (b) the
                     // server is expecting messages with the "unknown" bit set.
                 } else {
-                    problems.protocol(
-                        &method.path,
-                        &server.path,
+                    problems.error(
+                        [&method.path, &server.path],
                         format!(
                             "Server(@{}) missing method {}.{}",
                             server.path.api_level(),
@@ -357,9 +351,8 @@ impl Protocol {
                 {
                     // The server thinks the event is flexible and the client thinks the protocol is open enough.
                 } else {
-                    problems.protocol(
-                        &client.path,
-                        &method.path,
+                    problems.error(
+                        [&client.path, &method.path],
                         format!(
                             "Client(@{}) missing event {}.{}",
                             client.path.api_level(),

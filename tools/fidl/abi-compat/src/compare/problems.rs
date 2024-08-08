@@ -161,18 +161,6 @@ impl CompatibilityProblems {
         });
     }
 
-    pub fn protocol(&mut self, a: &Path, b: &Path, message: String) {
-        self.error([a, b], message)
-    }
-
-    pub fn type_error(&mut self, a: &Path, b: &Path, message: String) {
-        self.error([a, b], message)
-    }
-
-    pub fn type_warning(&mut self, a: &Path, b: &Path, message: String) {
-        self.warning([a, b], message)
-    }
-
     pub fn append(&mut self, mut other: CompatibilityProblems) {
         self.0.append(&mut other.0);
     }
