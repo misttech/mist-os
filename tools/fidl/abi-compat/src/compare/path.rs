@@ -6,45 +6,18 @@ use std::fmt::Display;
 
 use crate::{Scope, Version};
 
-#[derive(PartialEq, PartialOrd, Eq, Ord, Debug, Clone)]
-pub enum PathElement {
-    Member(String, Option<String>),
-    List(Option<String>),
-}
-
-impl Into<String> for &PathElement {
-    fn into(self) -> String {
-        use PathElement::*;
-        match self {
-            Member(name, _) => format!(".{name}"),
-            List(_) => "[]".to_string(),
-        }
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, PartialOrd, Eq)]
 pub struct Path {
     version: Version,
-    elements: Vec<PathElement>,
+    string: String,
 }
 impl Path {
     #[cfg(test)]
     pub fn empty() -> Self {
-        Self { version: Version::new("0"), elements: vec![] }
+        Self::new(Version::new("0"), String::new())
     }
-    pub fn new(version: &Version) -> Self {
-        Self { version: version.clone(), elements: vec![] }
-    }
-
-    pub fn from_version_and_elements(version: Version, elements: Vec<PathElement>) -> Self {
-        Self { version, elements }
-    }
-
-    #[cfg(test)]
-    pub fn with(&self, element: PathElement) -> Self {
-        let mut elements = self.elements.clone();
-        elements.push(element);
-        Self { version: self.version.clone(), elements }
+    pub fn new(version: Version, string: String) -> Self {
+        Self { version, string }
     }
 }
 
@@ -55,45 +28,9 @@ impl Path {
     pub fn scope(&self) -> Scope {
         self.version.scope()
     }
-    pub fn string(&self) -> String {
-        self.elements.iter().fold("".to_owned(), |mut s, element| match element {
-            PathElement::Member(name, _) => {
-                if !s.is_empty() {
-                    s.push_str(".")
-                }
-                s.push_str(name);
-                s
-            }
-            PathElement::List(_) => {
-                s.push_str("[]");
-                s
-            }
-        })
+    pub fn string(&self) -> &str {
+        &self.string
     }
-}
-
-#[test]
-fn test_path_string() {
-    let p = Path::empty();
-    assert_eq!(p.string(), "");
-
-    let p = p.with(PathElement::Member("foo".into(), None));
-    assert_eq!(p.string(), "foo");
-
-    let p = p.with(PathElement::Member("bar".into(), None));
-    assert_eq!(p.string(), "foo.bar");
-
-    let p = p.with(PathElement::List(None));
-    assert_eq!(p.string(), "foo.bar[]");
-
-    let p = p.with(PathElement::Member("baz".into(), None));
-    assert_eq!(p.string(), "foo.bar[].baz");
-
-    let p = p.with(PathElement::List(None));
-    assert_eq!(p.string(), "foo.bar[].baz[]");
-
-    let p = p.with(PathElement::List(None));
-    assert_eq!(p.string(), "foo.bar[].baz[][]");
 }
 
 impl Display for Path {

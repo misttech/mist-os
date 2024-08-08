@@ -6,11 +6,9 @@ use std::fmt::Display;
 use super::Path;
 
 // Helper to find the common prefix of two strings and return the common prefix and the differing suffixes.
-fn common_prefix(a: &str, b: &str) -> (String, String, String) {
-    let common: String =
-        a.chars().zip(b.chars()).take_while(|(a, b)| a == b).map(|(a, _)| a).collect();
-    let common_length = common.chars().count();
-    (common, a.chars().skip(common_length).collect(), b.chars().skip(common_length).collect())
+fn common_prefix<'a, 'b>(a: &'a str, b: &'b str) -> (&'a str, &'a str, &'b str) {
+    let n = a.chars().zip(b.chars()).take_while(|(a, b)| a == b).count();
+    (&a[..n], &a[n..], &b[n..])
 }
 
 #[derive(PartialEq, PartialOrd, Eq, Ord, Debug, Clone, Copy)]
@@ -20,51 +18,27 @@ pub enum CompatibilityDegree {
     StronglyCompatible,
 }
 
-#[derive(PartialEq, Eq, Debug, Ord, PartialOrd)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Ord, PartialOrd)]
 enum ProblemPathKind {
     AbiSurface,
-    Protocol,
-    Type,
+    Protocol, // paths: (client, server)
+    Type,     // paths: (sender, receiver)
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-enum ProblemPaths {
-    #[allow(unused)]
-    AbiSurface {
-        external: Path,
-        platform: Path,
-    },
-    Protocol {
-        client: Path,
-        server: Path,
-    },
-    Type {
-        sender: Path,
-        receiver: Path,
-    },
+struct ProblemPaths {
+    kind: ProblemPathKind,
+    paths: [Path; 2],
+    for_display: String,
+    for_comparison: String,
 }
 
 impl ProblemPaths {
-    fn kind(&self) -> ProblemPathKind {
-        use ProblemPathKind::*;
-        match self {
-            ProblemPaths::AbiSurface { external: _, platform: _ } => AbiSurface,
-            ProblemPaths::Protocol { client: _, server: _ } => Protocol,
-            ProblemPaths::Type { sender: _, receiver: _ } => Type,
-        }
-    }
-    fn paths(&self) -> (&Path, &Path) {
-        match self {
-            ProblemPaths::AbiSurface { external, platform } => (external, platform),
-            ProblemPaths::Protocol { client, server } => (client, server),
-            ProblemPaths::Type { sender, receiver } => (sender, receiver),
-        }
-    }
-    fn path_for_display(&self) -> String {
-        let (a, b) = self.paths();
-        let (a, b) = (a.string(), b.string());
-        if a == b {
-            a
+    fn new(kind: ProblemPathKind, paths: [&Path; 2]) -> Self {
+        let [a, b] = paths.map(|p| p.string());
+
+        let for_display: String = if a == b {
+            a.to_owned()
         } else {
             let (c, a_suffix, b_suffix) = common_prefix(&a, &b);
             if a_suffix.is_empty() {
@@ -74,21 +48,35 @@ impl ProblemPaths {
             } else {
                 format!("{c}({a_suffix}|{b_suffix})")
             }
-        }
+        };
+
+        let for_comparison = std::cmp::min(a, b).to_owned();
+
+        // TODO: do we actually need to copy and hang onto these?
+        let paths = paths.map(|p| p.clone());
+
+        Self { kind, paths, for_display, for_comparison }
     }
-    fn path_for_comparison(&self) -> String {
-        let (a, b) = self.paths();
-        let (a, b) = (a.string(), b.string());
-        std::cmp::min(a, b)
+    pub fn for_abi_surface(external: &Path, platform: &Path) -> Self {
+        Self::new(ProblemPathKind::AbiSurface, [external, platform])
     }
-    fn levels(&self) -> (&str, &str) {
-        match self {
-            ProblemPaths::AbiSurface { external, platform } => {
-                (external.api_level(), platform.api_level())
-            }
-            ProblemPaths::Protocol { client, server } => (client.api_level(), server.api_level()),
-            ProblemPaths::Type { sender, receiver } => (sender.api_level(), receiver.api_level()),
-        }
+    pub fn for_protocol(client: &Path, server: &Path) -> Self {
+        Self::new(ProblemPathKind::Protocol, [client, server])
+    }
+    pub fn for_type(sender: &Path, receiver: &Path) -> Self {
+        Self::new(ProblemPathKind::Type, [sender, receiver])
+    }
+    fn kind(&self) -> ProblemPathKind {
+        self.kind
+    }
+    fn path_for_display(&self) -> &str {
+        &self.for_display
+    }
+    fn path_for_comparison(&self) -> &str {
+        &self.for_comparison
+    }
+    fn levels(&self) -> [&str; 2] {
+        [self.paths[0].api_level(), self.paths[1].api_level()]
     }
 }
 
@@ -187,7 +175,7 @@ impl std::fmt::Debug for CompatibilityProblem {
             }
         }
         let levels = self.paths.levels();
-        write!(f, "({:?}, {:?})", levels.0, levels.1)?;
+        write!(f, "({:?}, {:?})", levels[0], levels[1])?;
         write!(f, "{{ path={:?}, message={:?} }}", self.paths.path_for_display(), self.message)?;
         Ok(())
     }
@@ -216,12 +204,12 @@ impl Ord for CompatibilityProblem {
 #[test]
 fn test_compatibility_problem_comparison() {
     let warning = CompatibilityProblem {
-        paths: ProblemPaths::AbiSurface { external: Path::empty(), platform: Path::empty() },
+        paths: ProblemPaths::for_abi_surface(&Path::empty(), &Path::empty()),
         warning: true,
         message: "beware".to_owned(),
     };
     let error = CompatibilityProblem {
-        paths: ProblemPaths::AbiSurface { external: Path::empty(), platform: Path::empty() },
+        paths: ProblemPaths::for_abi_surface(&Path::empty(), &Path::empty()),
         warning: false,
         message: "to err is human".to_owned(),
     };
@@ -236,17 +224,14 @@ impl CompatibilityProblems {
     #[allow(unused)]
     pub fn platform(&mut self, external: &Path, platform: &Path, message: impl AsRef<str>) {
         self.0.push(CompatibilityProblem {
-            paths: ProblemPaths::AbiSurface {
-                external: external.clone(),
-                platform: platform.clone(),
-            },
+            paths: ProblemPaths::for_abi_surface(external, platform),
             warning: false,
             message: message.as_ref().to_owned(),
         });
     }
     pub fn protocol(&mut self, client: &Path, server: &Path, message: impl AsRef<str>) {
         self.0.push(CompatibilityProblem {
-            paths: ProblemPaths::Protocol { client: client.clone(), server: server.clone() },
+            paths: ProblemPaths::for_protocol(client, server),
             warning: false,
             message: message.as_ref().to_owned(),
         });
@@ -254,14 +239,14 @@ impl CompatibilityProblems {
 
     pub fn type_error(&mut self, sender: &Path, receiver: &Path, message: impl AsRef<str>) {
         self.0.push(CompatibilityProblem {
-            paths: ProblemPaths::Type { sender: sender.clone(), receiver: receiver.clone() },
+            paths: ProblemPaths::for_type(sender, receiver),
             warning: false,
             message: message.as_ref().to_owned(),
         });
     }
     pub fn type_warning(&mut self, sender: &Path, receiver: &Path, message: impl AsRef<str>) {
         self.0.push(CompatibilityProblem {
-            paths: ProblemPaths::Type { sender: sender.clone(), receiver: receiver.clone() },
+            paths: ProblemPaths::for_type(sender, receiver),
             warning: true,
             message: message.as_ref().to_owned(),
         });
@@ -400,7 +385,7 @@ pub struct ProblemPattern<'a> {
     message: Option<StringPattern<'a>>,
     kind: Option<ProblemPathKind>,
     path: Option<StringPattern<'a>>,
-    levels: Option<(&'a str, &'a str)>,
+    levels: Option<[&'a str; 2]>,
 }
 
 #[cfg(test)]
@@ -423,8 +408,8 @@ impl<'a> ProblemPattern<'a> {
             }
         }
         if let Some(path) = &self.path {
-            if !path.matches(problem.paths.paths().0.string())
-                && !path.matches(problem.paths.paths().1.string())
+            if !path.matches(problem.paths.paths[0].string())
+                && !path.matches(problem.paths.paths[1].string())
             {
                 return false;
             }
@@ -443,7 +428,7 @@ impl<'a> ProblemPattern<'a> {
         Self {
             warning: Some(false),
             kind: Some(ProblemPathKind::Protocol),
-            levels: Some((client, server)),
+            levels: Some([client, server]),
             ..Default::default()
         }
     }
@@ -452,7 +437,7 @@ impl<'a> ProblemPattern<'a> {
         Self {
             warning: Some(false),
             kind: Some(ProblemPathKind::Type),
-            levels: Some((sender, receiver)),
+            levels: Some([sender, receiver]),
             ..Default::default()
         }
     }
@@ -461,7 +446,7 @@ impl<'a> ProblemPattern<'a> {
         Self {
             warning: Some(true),
             kind: Some(ProblemPathKind::Type),
-            levels: Some((sender, receiver)),
+            levels: Some([sender, receiver]),
             ..Default::default()
         }
     }

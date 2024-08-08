@@ -11,37 +11,8 @@ use std::rc::Rc;
 use anyhow::{anyhow, bail, Context as _, Result};
 use flyweights::FlyStr;
 
-use crate::compare::Path;
 use crate::ir::Declaration;
 use crate::{compare, ir, Version};
-
-pub enum RefPathElement<'a> {
-    Member(&'a str, Option<&'a str>),
-    List(Option<&'a str>),
-}
-
-impl<'a> RefPathElement<'a> {
-    fn identifier(&self) -> Option<&str> {
-        match self {
-            RefPathElement::Member(_, id) => *id,
-            RefPathElement::List(id) => *id,
-        }
-    }
-}
-
-impl<'a> Into<compare::PathElement> for &'_ RefPathElement<'a> {
-    fn into(self) -> compare::PathElement {
-        match self {
-            RefPathElement::Member(member_name, identifier) => compare::PathElement::Member(
-                (*member_name).to_owned(),
-                identifier.map(|i: &str| i.to_owned()),
-            ),
-            RefPathElement::List(member_identifier) => {
-                compare::PathElement::List(member_identifier.map(|i: &str| i.to_owned()))
-            }
-        }
-    }
-}
 
 pub enum Context<'a> {
     Root {
@@ -52,7 +23,8 @@ pub enum Context<'a> {
         parent: &'a Context<'a>,
         depth: usize,
         ir: &'a Rc<ir::IR>,
-        path_element: RefPathElement<'a>,
+        identifier: Option<&'a str>,
+        member_name: Option<&'a str>,
     },
 }
 
@@ -65,30 +37,32 @@ impl<'a> Context<'a> {
             parent: self,
             depth: self.depth() + 1,
             ir: self.ir(),
-            path_element: RefPathElement::Member(member_name, identifier),
+            identifier,
+            member_name: Some(member_name),
         }
     }
 
-    pub fn nest_list(&'a self, member_identifier: Option<&'a str>) -> Self {
+    pub fn nest_list(&'a self, identifier: Option<&'a str>) -> Self {
         Context::Child {
             parent: self,
             depth: self.depth() + 1,
             ir: self.ir(),
-            path_element: RefPathElement::List(member_identifier),
+            identifier,
+            member_name: None,
         }
     }
 
     fn depth(&self) -> usize {
         match self {
-            Context::Root { ir: _, version: _ } => 0,
-            Context::Child { parent: _, depth, ir: _, path_element: _ } => *depth,
+            Context::Root { .. } => 0,
+            Context::Child { depth, .. } => *depth,
         }
     }
 
     fn ir(&self) -> &Rc<ir::IR> {
         match self {
-            Context::Root { ir, version: _ } => ir,
-            Context::Child { parent: _, depth: _, ir, path_element: _ } => ir,
+            Context::Root { ir, .. } => ir,
+            Context::Child { ir, .. } => ir,
         }
     }
 
@@ -100,12 +74,12 @@ impl<'a> Context<'a> {
     fn find_identifier_cycle(&self, name: &str) -> Option<usize> {
         // Skip the last one...
         let mut ctx = match self {
-            Context::Root { ir: _, version: _ } => return None,
-            Context::Child { parent, depth: _, ir: _, path_element: _ } => parent,
+            Context::Root { .. } => return None,
+            Context::Child { parent, .. } => parent,
         };
         for i in 0.. {
-            if let Context::Child { parent, depth: _, ir: _, path_element } = ctx {
-                if path_element.identifier() == Some(name) {
+            if let Context::Child { parent, identifier, .. } = ctx {
+                if identifier == &Some(name) {
                     return Some(i);
                 }
                 ctx = parent;
@@ -117,20 +91,34 @@ impl<'a> Context<'a> {
     }
 
     fn path(&self) -> compare::Path {
-        // TODO: track depth so we can allocate the right size vec appropriately?
+        let (version, string) = self.mk_path(0);
+        compare::Path::new(version, string)
+    }
 
-        let mut ctx = self;
-        let mut elements = Vec::with_capacity(self.depth());
-        loop {
-            match ctx {
-                Context::Root { ir: _, version } => {
-                    elements.reverse();
-                    return Path::from_version_and_elements(version.clone(), elements);
+    fn mk_path(&self, reserve_length: usize) -> (Version, String) {
+        match self {
+            Context::Root { version, .. } => {
+                (version.clone(), String::with_capacity(reserve_length))
+            }
+            Context::Child { parent, member_name, .. } => {
+                // Walk up the chain calculating the space required
+                let (version, mut s) = parent.mk_path(
+                    reserve_length
+                        + match member_name {
+                            Some(name) => name.len() + 1,
+                            None => 2,
+                        },
+                );
+                // Fill up the string as we walk back down the chain.
+                if let Some(name) = member_name {
+                    if !s.is_empty() {
+                        s.push_str(".");
+                    }
+                    s.push_str(name)
+                } else {
+                    s.push_str("[]")
                 }
-                Context::Child { parent, depth: _, ir: _, path_element } => {
-                    elements.push(path_element.into());
-                    ctx = parent;
-                }
+                (version, s)
             }
         }
     }
@@ -182,10 +170,8 @@ pub trait ConvertType {
 impl ConvertType for ir::Type {
     fn identifier(&self) -> Option<&str> {
         match self {
-            ir::Type::Request { protocol_transport: _, subtype, nullable: _ } => Some(subtype),
-            ir::Type::Identifier { identifier, nullable: _, protocol_transport: _ } => {
-                Some(identifier)
-            }
+            ir::Type::Request { subtype, .. } => Some(subtype),
+            ir::Type::Identifier { identifier, .. } => Some(identifier),
             _ => None,
         }
     }
