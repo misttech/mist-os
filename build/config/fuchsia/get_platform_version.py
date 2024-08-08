@@ -101,10 +101,6 @@ def get_gn_variables(version_history_path: Path) -> Dict[str, Any]:
         "runtime_supported_api_levels": runtime_supported_api_levels,
         # API levels whose contents should not change anymore.
         "frozen_api_levels": sunset_api_levels + supported_api_levels,
-        # The greatest number assigned to a numbered API level.
-        # TODO(https://fxbug.dev/305961460): Remove this because the highest
-        # numbered API level should not be particularly special.
-        "deprecated_highest_numbered_api_level": max(all_numbered_api_levels),
     }
 
 
