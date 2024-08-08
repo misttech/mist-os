@@ -15,8 +15,9 @@
         {
             protocol: [
                 "fuchsia.net.interfaces.State",
+                "fuchsia.net.root.Interfaces",
+                "fuchsia.net.routes.admin.RouteTableV6",
                 "fuchsia.net.routes.StateV6",
-                "fuchsia.net.stack.Stack",
             ],
         },
     ],

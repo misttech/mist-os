@@ -2,9 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use anyhow::{format_err, Context as _, Error};
-use fidl_fuchsia_net_stack::StackMarker;
 use fuchsia_component::client;
-use net_declare::fidl_subnet;
+use net_declare::fidl_ip_v6_with_prefix;
 use net_types::ip::Ipv6;
 use prettytable::{cell, format, row, Table};
 use std::collections::HashMap;
@@ -14,8 +13,10 @@ use std::pin::pin;
 use structopt::StructOpt;
 use tracing::info;
 use {
-    fidl_fuchsia_net_interfaces as fnet_interfaces,
-    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_net_routes as fnet_routes,
+    fidl_fuchsia_net as fnet, fidl_fuchsia_net_interfaces as fnet_interfaces,
+    fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
+    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_net_root as fnet_root,
+    fidl_fuchsia_net_routes as fnet_routes, fidl_fuchsia_net_routes_admin as fnet_routes_admin,
     fidl_fuchsia_net_routes_ext as fnet_routes_ext, fuchsia_async as fasync,
 };
 
@@ -55,32 +56,76 @@ fn get_interface_id(
         .ok_or(anyhow::format_err!("failed to find {}", want_name))
 }
 
+fn get_interface_control(
+    root_interfaces: &fnet_root::InterfacesProxy,
+    id: u64,
+) -> Result<fnet_interfaces_ext::admin::Control, Error> {
+    let (control, server_end) =
+        fidl::endpoints::create_proxy().expect("create proxy should succeed");
+    root_interfaces.get_admin(id, server_end).context("FIDL error sending GetAdmin request")?;
+    Ok(fnet_interfaces_ext::admin::Control::new(control))
+}
+
 async fn add_route_table_entry(
-    stack_proxy: &fidl_fuchsia_net_stack::StackProxy,
-    subnet: fidl_fuchsia_net::Subnet,
+    route_set: &fnet_routes_admin::RouteSetV6Proxy,
+    root_interfaces: &fnet_root::InterfacesProxy,
+    destination: fnet::Ipv6AddressWithPrefix,
     nicid: u64,
 ) -> Result<(), Error> {
-    let entry = fidl_fuchsia_net_stack::ForwardingEntry {
-        subnet,
-        device_id: nicid,
-        next_hop: None,
-        metric: ENTRY_METRICS,
-    };
-    stack_proxy
-        .add_forwarding_entry(&entry)
+    let control = get_interface_control(root_interfaces, nicid)?;
+    let fnet_interfaces_admin::GrantForInterfaceAuthorization { interface_id, token } = control
+        .get_authorization_for_interface()
         .await
-        .with_context(|| format!("failed to send add fowrarding entry {:?}", entry))?
-        .map_err(|e: fidl_fuchsia_net_stack::Error| {
-            format_err!("failed to add fowrarding entry {:?}: {:?}", entry, e)
+        .context("error getting interface authorization")?;
+
+    route_set
+        .authenticate_for_interface(fnet_interfaces_admin::ProofOfInterfaceAuthorization {
+            interface_id,
+            token,
         })
+        .await
+        .context("FIDL error authenticating for interface")?
+        .map_err(|e| anyhow::anyhow!("error authenticating for interface: {e:?}"))?;
+
+    let route = fnet_routes::RouteV6 {
+        destination,
+        action: fnet_routes::RouteActionV6::Forward(fnet_routes::RouteTargetV6 {
+            outbound_interface: nicid,
+            next_hop: None,
+        }),
+        properties: fnet_routes::RoutePropertiesV6 {
+            specified_properties: Some(fnet_routes::SpecifiedRouteProperties {
+                metric: Some(fnet_routes::SpecifiedMetric::ExplicitMetric(ENTRY_METRICS)),
+                ..Default::default()
+            }),
+            ..Default::default()
+        },
+    };
+
+    let newly_added = route_set
+        .add_route(&route)
+        .await
+        .context("FIDL error adding route")?
+        .map_err(|e| anyhow::anyhow!("error adding route: {e:?}"))?;
+
+    if !newly_added {
+        Err(anyhow::anyhow!("route {route:?} already existed"))
+    } else {
+        Ok(())
+    }
 }
 
 async fn run_fuchsia_node() -> Result<(), Error> {
-    let interface_state =
-        fuchsia_component::client::connect_to_protocol::<fnet_interfaces::StateMarker>()
-            .context("failed to connect to interfaces/State")?;
-    let stack =
-        client::connect_to_protocol::<StackMarker>().context("failed to connect to netstack")?;
+    let interface_state = client::connect_to_protocol::<fnet_interfaces::StateMarker>()
+        .context("failed to connect to interfaces/State")?;
+    let root_interfaces = client::connect_to_protocol::<fnet_root::InterfacesMarker>()
+        .context("failed to connect to fuchsia.net.root.Interfaces")?;
+    let route_table = client::connect_to_protocol::<fnet_routes_admin::RouteTableV6Marker>()
+        .context("failed to connect to fuchsia.net.routes.admin.RouteTableV6")?;
+    let (route_set, server_end) =
+        fidl::endpoints::create_proxy::<fnet_routes_admin::RouteSetV6Marker>()
+            .expect("creating proxy should succeed");
+    route_table.new_route_set(server_end).context("failed to send NewRouteSet request")?;
 
     let stream = fnet_interfaces_ext::event_stream_from_state(
         &interface_state,
@@ -100,28 +145,49 @@ async fn run_fuchsia_node() -> Result<(), Error> {
 
     // routing rules for weave tun
     let () = add_route_table_entry(
-        &stack,
-        fidl_subnet!("fdce:da10:7616:6:6616:6600:4734:b051/128"),
+        &route_set,
+        &root_interfaces,
+        fidl_ip_v6_with_prefix!("fdce:da10:7616:6:6616:6600:4734:b051/128"),
         weave_if_id,
     )
     .await
     .context("adding routing table entry for weave tun")?;
-    let () = add_route_table_entry(&stack, fidl_subnet!("fdce:da10:7616::/48"), weave_if_id)
-        .await
-        .context("adding routing table entry for weave tun")?;
+    let () = add_route_table_entry(
+        &route_set,
+        &root_interfaces,
+        fidl_ip_v6_with_prefix!("fdce:da10:7616::/48"),
+        weave_if_id,
+    )
+    .await
+    .context("adding routing table entry for weave tun")?;
 
     // routing rules for wpan
-    let () = add_route_table_entry(&stack, fidl_subnet!("fdce:da10:7616:6::/64"), wpan_if_id)
-        .await
-        .context("adding routing table entry for wpan")?;
-    let () = add_route_table_entry(&stack, fidl_subnet!("fdd3:b786:54dc::/64"), wpan_if_id)
-        .await
-        .context("adding routing table entry for wpan")?;
+    let () = add_route_table_entry(
+        &route_set,
+        &root_interfaces,
+        fidl_ip_v6_with_prefix!("fdce:da10:7616:6::/64"),
+        wpan_if_id,
+    )
+    .await
+    .context("adding routing table entry for wpan")?;
+    let () = add_route_table_entry(
+        &route_set,
+        &root_interfaces,
+        fidl_ip_v6_with_prefix!("fdd3:b786:54dc::/64"),
+        wpan_if_id,
+    )
+    .await
+    .context("adding routing table entry for wpan")?;
 
     // routing rules for wlan
-    let () = add_route_table_entry(&stack, fidl_subnet!("fdce:da10:7616:1::/64"), wlan_if_id)
-        .await
-        .context("adding routing table entry for wlan")?;
+    let () = add_route_table_entry(
+        &route_set,
+        &root_interfaces,
+        fidl_ip_v6_with_prefix!("fdce:da10:7616:1::/64"),
+        wlan_if_id,
+    )
+    .await
+    .context("adding routing table entry for wlan")?;
 
     info!("successfully added entries to route table");
 
