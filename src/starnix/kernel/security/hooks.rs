@@ -127,12 +127,12 @@ pub fn task_alloc_for_kernel() -> TaskState {
     TaskState { attrs: selinux_hooks::TaskAttrs::for_kernel() }
 }
 
-/// Returns `TaskState` for a new `Task`, based on that of the current `Task`, and the specified clone flags.
-pub fn task_alloc(current_task: &CurrentTask, clone_flags: u64) -> TaskState {
+/// Returns `TaskState` for a new `Task`, based on that of `task`, and the specified clone flags.
+pub fn task_alloc(task: &Task, clone_flags: u64) -> TaskState {
     TaskState {
         attrs: run_if_selinux_else(
-            current_task,
-            |_| selinux_hooks::task_alloc(&current_task.read().security_state.attrs, clone_flags),
+            task,
+            |_| selinux_hooks::task_alloc(&task.read().security_state.attrs, clone_flags),
             || selinux_hooks::TaskAttrs::for_selinux_disabled(),
         ),
     }

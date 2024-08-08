@@ -1244,9 +1244,7 @@ impl CurrentTask {
                     &initial_name_bytes,
                 )
             },
-            // If SELinux is enabled then `exec()` of the "init" executable will normally be
-            // configured by policy to transition to the desired init task Security Context.
-            security::task_alloc_for_kernel(),
+            security::task_alloc(&init_task, 0),
         )?;
         {
             let mut init_writer = init_task.thread_group.write();
