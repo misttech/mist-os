@@ -128,7 +128,7 @@ impl<'a> Context<'a> {
 mod context_tests {
     use super::*;
 
-    fn context_for_test<'a>() -> Context<'a> {
+    fn context_for_test() -> Context<'static> {
         Context::Root { ir: ir::IR::empty_for_tests(), version: Version::new("0") }
     }
 

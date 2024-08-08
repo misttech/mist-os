@@ -52,7 +52,7 @@ struct CompiledTestLibrary<'a> {
     context: Context<'a>,
 }
 
-impl<'a> CompiledTestLibrary<'a> {
+impl CompiledTestLibrary<'_> {
     fn new(version: &Version, library: &TestLibrary) -> Self {
         let ir =
             IR::from_source(version.api_level(), &library.source, LIBRARY).unwrap_or_else(|_| {
