@@ -52,7 +52,10 @@
 #include <arch/riscv64.h>
 #include <vm/physmap.h>
 #define IFRAME_PC(frame) ((frame)->regs.pc)
-#define get_vaddr_from_paddr(paddr) reinterpret_cast<zx_vaddr_t>((paddr_to_physmap(paddr)))
+inline zx_vaddr_t get_vaddr_from_paddr(paddr_t paddr) {
+  physmap_preserve_gaps_for_mmio();
+  return reinterpret_cast<zx_vaddr_t>(paddr_to_physmap(paddr));
+}
 #endif
 
 // Values read from the config.
