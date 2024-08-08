@@ -26,10 +26,6 @@ use std::sync::Arc;
 /// If SELinux is not enabled, or is enabled but has no policy loaded, then the `not_enabled`
 /// closure is executed, to determine the result. Otherwise, the `hook()` is executed on
 /// behalf of the caller.
-///
-/// TODO(b/331375792): Move permission & fake mode handling inside the SELinux logic.
-/// If SELinux is enabled with a policy, and in permissive or fake mode, then the `hook()`
-/// result is ignored, and the return type's default value always returned.
 fn check_if_selinux_else<H, R, D>(task: &Task, hook: H, not_enabled: D) -> Result<R, Errno>
 where
     H: FnOnce(&Arc<SecurityServer>) -> Result<R, Errno>,
@@ -192,8 +188,6 @@ pub fn update_state_on_exec(current_task: &CurrentTask, elf_security_state: &Res
 /// Checks if `source` may exercise the "getsched" permission on `target`.
 pub fn check_getsched_access(source: &CurrentTask, target: &Task) -> Result<(), Errno> {
     check_if_selinux(source, |security_server| {
-        // TODO(b/323856891): Consider holding `source` and `target`
-        // read locks for duration of access check.
         let source_sid = get_current_sid(&source);
         let target_sid = get_current_sid(&target);
         selinux_hooks::check_getsched_access(
@@ -452,14 +446,7 @@ pub fn get_procattr(
         current_task,
         |security_server| selinux_hooks::get_procattr(security_server, current_task, target, attr),
         // If SELinux is disabled then there are no values to return.
-        || {
-            if attr == ProcAttr::Current {
-                // Without SELinux the "current" attribute reports a placeholder value.
-                Ok(b"unconfined".to_vec())
-            } else {
-                error!(EINVAL)
-            }
-        },
+        || error!(EINVAL),
     )
 }
 
@@ -1385,7 +1372,7 @@ mod tests {
 
         assert_eq!(
             get_procattr(&current_task, &current_task.temp_task(), ProcAttr::Current),
-            Ok(b"unconfined".to_vec())
+            error!(EINVAL)
         );
     }
 }

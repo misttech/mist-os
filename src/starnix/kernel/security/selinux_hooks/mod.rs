@@ -58,8 +58,6 @@ pub(super) fn check_exec_access(
         security_server
             .compute_new_sid(current_sid, executable_sid, ObjectClass::Process)
             .map_err(|_| errno!(EACCES))?
-        // TODO(http://b/319232900): validate that the new context is valid, and return EACCESS if
-        // it's not.
     };
     if current_sid == new_sid {
         // To `exec()` a binary in the caller's domain, the caller must be granted
@@ -329,7 +327,6 @@ pub fn get_procattr(
     attr: ProcAttr,
 ) -> Result<Vec<u8>, Errno> {
     let task_attrs = &task.read().security_state.attrs;
-    // TODO(b/322849067): Validate that the `source` has the required access.
 
     let sid = match attr {
         ProcAttr::Current => Some(task_attrs.current_sid),
@@ -428,22 +425,12 @@ pub fn set_procattr(
 
 /// Determines the effective Security Context to use in access control checks on the supplied `fs_node`.
 ///
-/// This logic is a work-in-progress but will involve (at least) the following:
-///
-/// 1. If the filesystem has a "context=" mount option, then cache that SID in the node.
-// TODO(b/334091674): Implement the "context=" override.
-/// 2. If the filesystem has "fs_use_xattr" then:
-///    a. If the file has a "security.selinux" valid with the current policy then obtain the SID
-///       and cache it.
-///    b. If the file has a "security.selinux" invalid with the current policy then return the
-///       "unlabeled" SID without caching.
-///    c. If the file lacks a "security.selinux" attribute then check the filesystem's
-///       "defcontext=" mount option; if set then return that SID, without caching.
-// TODO(b/334091674): Implement the "defcontext=" override.
-/// 3. If the policy defines security context(s) for the filesystem type on which `fs_node` resides
-///    then use those to determine a SID, and cache it.
-// TODO(b/334091674): Implement use of policy-defined contexts (e.g. via `genfscon`).
-/// 4. Return the policy's "file" initial context.
+/// This implementation is in active development, but in principle involves:
+/// 1. If there is a cached SID, use it.
+/// 2. Determine how to produce the SID, depending on the file system labeling scheme.
+///    e.g. for "fs_use_xattr" try reading the security extended attribute.
+///    e.g. for "mountpoint" labelling, use the file system's label.
+/// 3. If all else fails, use the policy-defined "unlabeled" SID.
 fn compute_fs_node_security_id(
     security_server: &SecurityServer,
     current_task: &CurrentTask,
