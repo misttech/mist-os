@@ -42,11 +42,7 @@
 #include <ktl/enforce.h>
 
 void HandoffPrep::SummarizeMiscZbiItems(ktl::span<ktl::byte> zbi) {
-  // TODO(https://fxbug.dev/42164859): The data ZBI is still inspected by the kernel
-  // proper until migrations are complete, so this communicates the physical
-  // address during handoff.  This member should be removed as soon as the
-  // kernel no longer examines the ZBI itself.
-  handoff_->zbi = reinterpret_cast<uintptr_t>(zbi.data());
+  handoff_->zbi = {reinterpret_cast<uintptr_t>(zbi.data()), zbi.size()};
 
   // Allocate some pages to fill up with the ZBI items to save for mexec.
   // TODO(https://fxbug.dev/42164859): Currently this is in scratch space and gets

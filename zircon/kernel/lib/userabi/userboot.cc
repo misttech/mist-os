@@ -94,7 +94,6 @@ class VmoBuffer {
 constexpr const char kStackVmoName[] = "userboot-initial-stack";
 constexpr const char kCrashlogVmoName[] = "crashlog";
 constexpr const char kBootOptionsVmoname[] = "boot-options.txt";
-constexpr const char kZbiVmoName[] = "zbi";
 
 constexpr size_t stack_size = ZIRCON_DEFAULT_STACK_SIZE;
 
@@ -234,17 +233,7 @@ void bootstrap_vmos(Handle** handles) {
 
   ktl::copy(end.phys_vmos.begin(), end.phys_vmos.end(), &handles[userboot::kFirstPhysVmo]);
 
-  // The ZBI.
-  void* rbase = end.zbi.data();
-  size_t rsize = ROUNDUP_PAGE_SIZE(end.zbi.size_bytes());
-  dprintf(INFO, "userboot: ramdisk %#15zx @ %p\n", rsize, rbase);
-
-  fbl::RefPtr<VmObjectPaged> rootfs_vmo;
-  status = VmObjectPaged::CreateFromWiredPages(rbase, rsize, true, &rootfs_vmo);
-  ASSERT(status == ZX_OK);
-  rootfs_vmo->set_name(kZbiVmoName, sizeof(kZbiVmoName) - 1);
-  status = get_vmo_handle(rootfs_vmo, false, rsize, nullptr, &handles[userboot::kZbi]);
-  ASSERT(status == ZX_OK);
+  handles[userboot::kZbi] = end.zbi;
 
   // Crashlog.
   fbl::RefPtr<VmObject> crashlog_vmo;
