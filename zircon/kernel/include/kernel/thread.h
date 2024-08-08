@@ -324,13 +324,13 @@ class WaitQueueCollection {
   // Remove the Thread from the collection.
   void Remove(Thread* thread) TA_REQ(GetThreadsLock(thread));
 
-  // Either lock every thread in the collection, or fail with
-  // LockResult::kBackup, releasing any locks which were obtained in the
+  // Either lock every thread in the collection, or failed with
+  // ChainLock::Result::Backoff, releasing any locks which were obtained in the
   // process. ASSERTs if any cycles are detected by the ChainLock. Used by
-  // WaitQueue WakeAll.  Note that it is not possible to statically annotate
+  // WaitQueue WakeAll.  Note that it is not possible to statically annotated
   // this, and needs to be used with extreme care.  If LockAll returns success,
   // it is critical that the caller (eventually) drops all of the locks.
-  ChainLock::LockResult LockAll() TA_REQ(chainlock_transaction_token);
+  ChainLock::Result LockAll() TA_REQ(chainlock_transaction_token);
 
   // Const accessor used in some debug/validation code.
   const auto& threads() const { return threads_; }

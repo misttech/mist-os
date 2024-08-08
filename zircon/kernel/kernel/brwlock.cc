@@ -39,8 +39,8 @@ ktl::optional<BlockOpLockDetails<PI>> BrwLock<PI>::LockForBlock() {
       return BlockOpLockDetails<PI>{maybe_lock_details.value()};
     }
   } else {
-    ChainLock::LockResult lock_res = current_thread->get_lock().Acquire();
-    if (lock_res != ChainLock::LockResult::kBackoff) {
+    ChainLock::Result lock_res = current_thread->get_lock().Acquire();
+    if (lock_res != ChainLock::Result::Backoff) {
       current_thread->get_lock().AssertHeld();
       return BlockOpLockDetails<PI>{};
     }

@@ -201,7 +201,7 @@ bool TaskState::TryWakeJoiners(zx_status_t status) {
   ktl::optional<uint32_t> result;
 
   // Attempt to lock the queue first.
-  if (retcode_wait_queue_.get_lock().Acquire() == ChainLock::LockResult::kOk) {
+  if (retcode_wait_queue_.get_lock().Acquire() == ChainLock::Result::Ok) {
     // We got the lock, make sure we drop it before exiting.
     retcode_wait_queue_.get_lock().AssertAcquired();
 
@@ -537,7 +537,7 @@ zx_status_t Thread::SuspendOrKillInternal(SuspendOrKillOp op) {
     // requires us to back off, releasing all locks (including the initial
     // thread's) before trying again.
     WaitQueue* const wq = wait_queue_state_.blocking_wait_queue();
-    if (is_blocked && (OwnedWaitQueue::LockPiChain(*this) == ChainLock::LockResult::kBackoff)) {
+    if (is_blocked && (OwnedWaitQueue::LockPiChain(*this) == ChainLock::Result::Backoff)) {
       lock_.Release();
       continue;
     }
@@ -710,7 +710,7 @@ zx_status_t Thread::Join(int* out_retcode, zx_time_t deadline) {
       // error, we need to drop all of our locks and try again.
       if (state() != THREAD_DEATH) {
         ktl::array lock_set{&current_thread->get_lock(), &task_state_.get_lock()};
-        if (AcquireChainLockSet(lock_set) == ChainLock::LockResult::kBackoff) {
+        if (AcquireChainLockSet(lock_set) == ChainLock::Result::Backoff) {
           continue;
         }
         current_thread->get_lock().AssertAcquired();

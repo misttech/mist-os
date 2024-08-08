@@ -200,25 +200,25 @@ class OwnedWaitQueue : protected WaitQueue, public fbl::DoublyLinkedListable<Own
 
   // Attempt to lock the rest of a PI chain, starting from the (already locked)
   // node given by |start|.
-  static ChainLock::LockResult LockPiChain(Thread& start)
+  static ChainLock::Result LockPiChain(Thread& start)
       TA_REQ(chainlock_transaction_token, start.get_lock()) {
     WaitQueue* wq = start.wait_queue_state().blocking_wait_queue_;
 
     if (wq == nullptr) {
-      return ChainLock::LockResult::kOk;
+      return ChainLock::Result::Ok;
     }
 
     // Note: If we refuse cycles, the only possible variant return type for
-    // LockPiChainCommon is ChainLock::LockResult.
+    // LockPiChainCommon is ChainLock::Result.
     return LockPiChainCommonRefuseCycle(*wq);
   }
 
-  static ChainLock::LockResult LockPiChain(WaitQueue& start)
+  static ChainLock::Result LockPiChain(WaitQueue& start)
       TA_REQ(chainlock_transaction_token, start.get_lock()) {
     Thread* t = GetQueueOwner(&start);
 
     if (t == nullptr) {
-      return ChainLock::LockResult::kOk;
+      return ChainLock::Result::Ok;
     }
 
     return LockPiChainCommonRefuseCycle(*t);
@@ -517,7 +517,7 @@ class OwnedWaitQueue : protected WaitQueue, public fbl::DoublyLinkedListable<Own
                                                 IWakeRequeueHook& requeue_hooks)
       TA_REQ(chainlock_transaction_token) TA_ACQ(get_lock(), requeue_target.get_lock());
 
-  ktl::variant<ChainLock::LockResult, ReplaceOwnerLockingDetails> LockForOwnerReplacement(
+  ktl::variant<ChainLock::Result, ReplaceOwnerLockingDetails> LockForOwnerReplacement(
       Thread* new_owner, const Thread* blocking_thread = nullptr,
       bool propagate_new_owner_cycle_error = false) TA_REQ(chainlock_transaction_token, get_lock());
 
@@ -540,13 +540,13 @@ class OwnedWaitQueue : protected WaitQueue, public fbl::DoublyLinkedListable<Own
 
   // Common handler for PI chain locking/unlocking
   template <LockingBehavior Behavior, typename StartNodeType>
-  static ktl::variant<ChainLock::LockResult, const void*> LockPiChainCommon(StartNodeType& start)
+  static ktl::variant<ChainLock::Result, const void*> LockPiChainCommon(StartNodeType& start)
       TA_REQ(chainlock_transaction_token);
 
   template <typename StartNodeType>
-  static inline ChainLock::LockResult LockPiChainCommonRefuseCycle(StartNodeType& start)
+  static inline ChainLock::Result LockPiChainCommonRefuseCycle(StartNodeType& start)
       TA_REQ(chainlock_transaction_token) {
-    return ktl::get<ChainLock::LockResult>(LockPiChainCommon<LockingBehavior::RefuseCycle>(start));
+    return ktl::get<ChainLock::Result>(LockPiChainCommon<LockingBehavior::RefuseCycle>(start));
   }
 
   template <typename StartNodeType>

@@ -2801,7 +2801,7 @@ cpu_mask_t Scheduler::SetCpuAffinity(Thread& thread, cpu_mask_t affinity) {
       WaitQueue* wq = thread.wait_queue_state().blocking_wait_queue_;
       DEBUG_ASSERT(wq != nullptr);
 
-      if (wq->get_lock().Acquire() == ChainLock::LockResult::kBackoff) {
+      if (wq->get_lock().Acquire() == ChainLock::Result::Backoff) {
         thread.get_lock().Release();
         continue;
       }

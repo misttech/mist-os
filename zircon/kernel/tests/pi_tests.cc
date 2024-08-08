@@ -515,13 +515,13 @@ bool TestThread::BlockOnWaitQueue(WaitQueue* wq, zx::duration relative_timeout) 
     for (;; clt.Relax()) {
       Thread* const current_thread = Thread::Current::Get();
       ktl::array locks{&current_thread->get_lock(), &wq->get_lock()};
-      ChainLock::LockResult res = AcquireChainLockSet(locks);
+      ChainLock::Result res = AcquireChainLockSet(locks);
 
-      if (res == ChainLock::LockResult::kBackoff) {
+      if (res == ChainLock::Result::Backoff) {
         continue;
       }
 
-      DEBUG_ASSERT(res == ChainLock::LockResult::kOk);
+      DEBUG_ASSERT(res == ChainLock::Result::Ok);
       clt.Finalize();
 
       current_thread->get_lock().AssertAcquired();

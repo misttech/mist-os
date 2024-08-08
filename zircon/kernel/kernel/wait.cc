@@ -135,8 +135,8 @@ void WaitQueue::TimeoutHandler(Timer* timer, zx_time_t now, void* arg) {
                  (thread.state() == THREAD_BLOCKED_READ_LOCK));
 
     // Now attempt to lock the rest of the chain.
-    if (const ChainLock::LockResult res = OwnedWaitQueue::LockPiChain(thread);
-        res == ChainLock::LockResult::kBackoff) {
+    if (const ChainLock::Result res = OwnedWaitQueue::LockPiChain(thread);
+        res == ChainLock::Result::Backoff) {
       thread.get_lock().Release();
       continue;
     }
@@ -306,16 +306,16 @@ void WaitQueueCollection::Remove(Thread* thread) {
 #endif
 }
 
-ChainLock::LockResult WaitQueueCollection::LockAll() {
+ChainLock::Result WaitQueueCollection::LockAll() {
   for (Thread& t : threads_) {
-    const ChainLock::LockResult res = t.get_lock().Acquire();
+    const ChainLock::Result res = t.get_lock().Acquire();
 
     // If we hit a conflict, we need to unlock everything and start again,
     // unwinding completely out of this function as we go.
     //
     // Note that this method relies on the enumeration order of the collection
     // being deterministic, which should always be the case for a fbl::WAVLTree.
-    if (res == ChainLock::LockResult::kBackoff) {
+    if (res == ChainLock::Result::Backoff) {
       for (Thread& unlock_me : threads_) {
         if (unlock_me.get_lock().MarkNeedsReleaseIfHeld()) {
           unlock_me.get_lock().Release();
@@ -326,12 +326,12 @@ ChainLock::LockResult WaitQueueCollection::LockAll() {
     }
 
     // We should never detect any cycles during this operation.  Assert this.
-    DEBUG_ASSERT_MSG(res == ChainLock::LockResult::kOk,
-                     "Unexpected LockResult during WaitQueueCollection::LockAll (%u)",
+    DEBUG_ASSERT_MSG(res == ChainLock::Result::Ok,
+                     "Unexpected Result during WaitQueueCollection::LockAll (%u)",
                      static_cast<uint32_t>(res));
   }
 
-  return ChainLock::LockResult::kOk;
+  return ChainLock::Result::Ok;
 }
 
 void WaitQueue::ValidateQueue() {
@@ -451,8 +451,8 @@ bool WaitQueue::WakeOne(zx_status_t wait_queue_error) {
     // fail.
     Thread* t = Peek(current_time());
     if (t) {
-      if (const ChainLock::LockResult lock_result = t->get_lock().Acquire();
-          lock_result == ChainLock::LockResult::kBackoff) {
+      if (const ChainLock::Result lock_result = t->get_lock().Acquire();
+          lock_result == ChainLock::Result::Backoff) {
         continue;
       }
       t->get_lock().AssertAcquired();
@@ -496,8 +496,8 @@ ktl::optional<bool> WaitQueue::WakeOneLocked(zx_status_t wait_queue_error) {
     // There is!  Try to lock it so we can actually wake it up.  If we can't, we
     // will need to unwind to allow the caller to release our lock before trying
     // again.
-    if (const ChainLock::LockResult lock_result = t->get_lock().Acquire();
-        lock_result == ChainLock::LockResult::kBackoff) {
+    if (const ChainLock::Result lock_result = t->get_lock().Acquire();
+        lock_result == ChainLock::Result::Backoff) {
       return ktl::nullopt;
     }
     t->get_lock().AssertAcquired();
@@ -775,8 +775,8 @@ ktl::optional<BrwLockOps::LockForWakeResult> BrwLockOps::LockForWake(WaitQueue& 
     }
 
     // Looks like we want to wake this thread.  Try to lock it.
-    ChainLock::LockResult lock_result = t->get_lock().Acquire();
-    if (lock_result == ChainLock::LockResult::kBackoff) {
+    ChainLock::Result lock_result = t->get_lock().Acquire();
+    if (lock_result == ChainLock::Result::Backoff) {
       // Put each of the threads back where they belong before returning
       // nothing, unlocking them as we go.  Make sure to set the thread's
       // blocking wait queue pointer back to ourselves.
@@ -815,8 +815,8 @@ ktl::optional<Thread::UnblockList> WaitQueueLockOps::LockForWakeAll(WaitQueue& q
   DEBUG_ASSERT_MAGIC_AND_NOT_OWQ(&queue);
 
   // Try to lock all of the threads, backing off if we have to.
-  if (const ChainLock::LockResult res = queue.collection_.LockAll();
-      res == ChainLock::LockResult::kBackoff) {
+  if (const ChainLock::Result res = queue.collection_.LockAll();
+      res == ChainLock::Result::Backoff) {
     return ktl::nullopt;
   }
 
@@ -843,8 +843,7 @@ ktl::optional<Thread::UnblockList> WaitQueueLockOps::LockForWakeOne(WaitQueue& q
   DEBUG_ASSERT_MAGIC_AND_NOT_OWQ(&queue);
 
   if (Thread* t = queue.collection_.Peek(current_time()); t != nullptr) {
-    if (const ChainLock::LockResult res = t->get_lock().Acquire();
-        res == ChainLock::LockResult::kBackoff) {
+    if (const ChainLock::Result res = t->get_lock().Acquire(); res == ChainLock::Result::Backoff) {
       return ktl::nullopt;
     }
 

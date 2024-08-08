@@ -22,10 +22,10 @@ TEST(ChainLock, UncontestedAcquire) {
 
   // To lock the lock, we are going to need a token, and a specific result code.
   ChainLock::Token token;
-  ChainLock::LockResult result = lock.Acquire(token);
+  ChainLock::Result result = lock.Acquire(token);
 
   // We should always get the lock, there is no one to contest it.
-  ASSERT_EQ(ChainLock::LockResult::kOk, result);
+  ASSERT_EQ(ChainLock::Result::Ok, result);
 
   // We need to prove to the static analyzer that we hold the lock before we release it.
   lock.AssertHeld(token);
@@ -38,15 +38,15 @@ TEST(ChainLock, BackoffAcquire) {
   ChainLock::Token token2;
 
   // Obtain the lock with the first token.
-  ChainLock::LockResult result = lock.Acquire(token1);
-  ASSERT_EQ(ChainLock::LockResult::kOk, result);
+  ChainLock::Result result = lock.Acquire(token1);
+  ASSERT_EQ(ChainLock::Result::Ok, result);
 
   // Now, attempt to acquire the lock with the second token.  The second token
   // was created after the first, so the first token should have priority.  When
   // we see that the lock is contested, and contested by someone with priority,
   // we should be told that we need to backoff and try again later.
   result = lock.Acquire(token2);
-  EXPECT_EQ(ChainLock::LockResult::kBackoff, result);
+  EXPECT_EQ(ChainLock::Result::Backoff, result);
 
   // We are holding the lock, however, just using token 1, not token 2.  We need
   // to assert this before the static analyzer will allow is to drop the lock.
@@ -59,13 +59,13 @@ TEST(ChainLock, CyclicAcquire) {
   ChainLock::Token token;
 
   // Obtain the lock.
-  ChainLock::LockResult result = lock.Acquire(token);
-  ASSERT_EQ(ChainLock::LockResult::kOk, result);
+  ChainLock::Result result = lock.Acquire(token);
+  ASSERT_EQ(ChainLock::Result::Ok, result);
 
   // Now try to obtain it again with the same token.  The result should be that
   // we detect a cycle.
   result = lock.Acquire(token);
-  EXPECT_EQ(ChainLock::LockResult::kCycleDetected, result);
+  EXPECT_EQ(ChainLock::Result::Cycle, result);
 
   // We still need to drop the lock that we are holding, however.
   lock.AssertHeld(token);
@@ -83,8 +83,8 @@ TEST(ChainLock, SpinAcquire) {
   using namespace std::chrono_literals;
 
   // Obtain the lock using the lower priority token.
-  ChainLock::LockResult result = lock.Acquire(low_prio_token);
-  ASSERT_EQ(ChainLock::LockResult::kOk, result);
+  ChainLock::Result result = lock.Acquire(low_prio_token);
+  ASSERT_EQ(ChainLock::Result::Ok, result);
 
   enum class State {
     Initial,
@@ -102,8 +102,8 @@ TEST(ChainLock, SpinAcquire) {
 
     // Now attempt to obtain the lock.  This will _eventually_ succeed, but
     // not before the main test thread drops the lock.
-    ChainLock::LockResult result = lock.Acquire(token);
-    EXPECT_EQ(ChainLock::LockResult::kOk, result);
+    ChainLock::Result result = lock.Acquire(token);
+    EXPECT_EQ(ChainLock::Result::Ok, result);
 
     // Indicate that we have successfully acquired the lock, then wait until
     // it is time to drop the lock.
@@ -138,7 +138,7 @@ TEST(ChainLock, SpinAcquire) {
   // Now, if we attempt to acquire the lock with our lower-priority token, we
   // should be told that we need to back off.
   result = lock.Acquire(low_prio_token);
-  EXPECT_EQ(ChainLock::LockResult::kBackoff, result);
+  EXPECT_EQ(ChainLock::Result::Backoff, result);
 
   // Signal the thread that it is time to drop the lock and exit, then cleanup
   // and get out.

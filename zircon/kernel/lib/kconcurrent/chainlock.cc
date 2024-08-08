@@ -61,17 +61,17 @@ namespace kconcurrent {
 //    they should fail to link because of the limited explicit expansions.
 //
 template <typename>
-inline ChainLock::LockResult ChainLock::AcquireInternalSingleAttempt(ChainLockTransaction& clt) {
+inline ChainLock::Result ChainLock::AcquireInternalSingleAttempt(ChainLockTransaction& clt) {
   static_assert(kCltTraceAccountingEnabled,
                 "Calls to AcquireInternalSingleAttempt must only be made when ChainLock trace "
                 "accounting is enabled.");
 
   if (clt.has_active_conflict()) {
-    return LockResult::kRetry;
+    return Result::Retry;
   }
 
   const Base::AcquireInternalResult result = Base::AcquireInternalSingleAttempt(clt.active_token());
-  if (result.result == LockResult::kOk) {
+  if (result.result == Result::Ok) {
     clt.OnAcquire();
   } else {
     clt.RecordConflictStart();
@@ -80,8 +80,8 @@ inline ChainLock::LockResult ChainLock::AcquireInternalSingleAttempt(ChainLockTr
     // conflict in the lock, it is because the lock's token must have changed,
     // just now.  Change our error from "backoff" to "retry" so we end up trying
     // again instead of completely unwinding.
-    if ((result.result == LockResult::kBackoff) && !RecordBackoff(result.observed_token)) {
-      return LockResult::kRetry;
+    if ((result.result == Result::Backoff) && !RecordBackoff(result.observed_token)) {
+      return Result::Retry;
     }
   }
 
@@ -94,7 +94,7 @@ void ChainLock::AcquireUnconditionallyInternal() {
   clt.AssertNotFinalized();
 
   if constexpr (kCltTraceAccountingEnabled) {
-    if (AcquireInternalSingleAttempt(clt) == LockResult::kOk) {
+    if (AcquireInternalSingleAttempt(clt) == Result::Ok) {
       Base::MarkHeld();
       return;
     }
@@ -113,22 +113,21 @@ bool ChainLock::TryAcquireInternal() {
   }
 
   if constexpr (kCltTraceAccountingEnabled) {
-    if (const LockResult result = AcquireInternalSingleAttempt(clt); result == LockResult::kOk) {
+    if (const Result result = AcquireInternalSingleAttempt(clt); result == Result::Ok) {
       return true;
     } else {
-      DEBUG_ASSERT_MSG(result != LockResult::kCycleDetected, "Cycle detected during TryAcquire");
+      DEBUG_ASSERT_MSG(result != Result::Cycle, "Cycle detected during TryAcquire");
     }
   }
 
   if (const Base::AcquireInternalResult result =
           Base::AcquireInternalSingleAttempt(clt.active_token());
-      result.result == LockResult::kOk) {
+      result.result == Result::Ok) {
     clt.OnAcquire();
     return true;
   } else {
-    DEBUG_ASSERT_MSG(result.result != LockResult::kCycleDetected,
-                     "Cycle detected during TryAcquire");
-    if (result.result == LockResult::kBackoff) {
+    DEBUG_ASSERT_MSG(result.result != Result::Cycle, "Cycle detected during TryAcquire");
+    if (result.result == Result::Backoff) {
       RecordBackoff(result.observed_token);
     }
     return false;
@@ -270,27 +269,27 @@ bool ChainLock::MarkNeedsReleaseIfHeldInternal() const {
 }
 
 template <typename>
-ChainLock::LockResult ChainLock::AcquireInternal() {
+ChainLock::Result ChainLock::AcquireInternal() {
   ChainLockTransaction& clt = ChainLockTransaction::ActiveRef();
   clt.AssertNotFinalized();
 
   if constexpr (kCltTraceAccountingEnabled) {
-    if (const LockResult result = AcquireInternalSingleAttempt(clt); result != LockResult::kRetry) {
+    if (const Result result = AcquireInternalSingleAttempt(clt); result != Result::Retry) {
       return result;
     }
   }
 
   while (true) {
     const Base::AcquireInternalResult result = Base::AcquireInternal(clt.active_token());
-    if (result.result == LockResult::kOk) {
+    if (result.result == Result::Ok) {
       clt.OnAcquire();
-    } else if ((result.result == LockResult::kBackoff) && !RecordBackoff(result.observed_token)) {
+    } else if ((result.result == Result::Backoff) && !RecordBackoff(result.observed_token)) {
       continue;
     }
 
     return result.result;
   }
-  return LockResult::kOk;
+  return Result::Ok;
 }
 
 void ChainLock::AssertHeld() const {
@@ -303,7 +302,7 @@ bool ChainLock::is_held() const {
 
 // Force expansion.  These are the only versions of this template which will
 // ever be allowed.
-template ChainLock::LockResult ChainLock::AcquireInternal<void>();
+template ChainLock::Result ChainLock::AcquireInternal<void>();
 template void ChainLock::AcquireUnconditionallyInternal<void>();
 
 }  // namespace kconcurrent
