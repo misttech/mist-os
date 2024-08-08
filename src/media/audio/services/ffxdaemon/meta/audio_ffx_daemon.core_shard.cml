@@ -11,11 +11,6 @@
     ],
     offer: [
         {
-            protocol: "fuchsia.logger.LogSink",
-            from: "parent",
-            to: "#audio_ffx_daemon",
-        },
-        {
             protocol: [
                 "fuchsia.media.Audio",
                 "fuchsia.ultrasound.Factory",
