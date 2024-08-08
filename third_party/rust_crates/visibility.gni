@@ -222,6 +222,7 @@ once_cell_visibility = [
   "//src/starnix/kernel/device/input:*",
   "//src/starnix/lib/extended_pstate:*",
   "//src/starnix/lib/selinux/core:*",
+  "//src/starnix_lite/lib/selinux/core:*",
   "//src/starnix/lib/starnix-uapi:*",
   "//src/starnix_lite/lib/starnix-uapi:*",
   "//src/storage/ext4/read-only:*",
