@@ -20,8 +20,11 @@ points involves the following:
 *   Run the test's host-side entry point with `fx test --e2e`.  Example:
 
     ```
-    fx test --e2e host_x64/fidlc_microbenchmarks_test
+    fx test --e2e fidlc_microbenchmarks_test
     ```
+
+    The argument to `fx test` should be your GN target name specified in
+    the call to the `fuchsia_component_perf_test` template.
 
 The test will write its results to a newly-created, timestamped
 subdirectory of `out/test_out`.  This will include
