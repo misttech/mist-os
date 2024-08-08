@@ -498,11 +498,19 @@ func (t *QEMU) Start(ctx context.Context, images []bootserver.Image, args []stri
 		if err != nil {
 			return err
 		}
+		edk2Dir := filepath.Join(t.config.EDK2Dir, "qemu-"+t.config.Target)
+		var code string
+		switch t.config.Target {
+		case "x64":
+			code = filepath.Join(edk2Dir, "OVMF_CODE.fd")
+		case "arm64":
+			code = filepath.Join(edk2Dir, "QEMU_EFI.fd")
+		}
 		tools := ffxutil.EmuTools{
 			Emulator: absQEMUSystemPath,
 			FVM:      t.config.FVMTool,
 			ZBI:      t.config.ZBITool,
-			UEFI:     filepath.Join(t.config.EDK2Dir, "qemu-"+t.config.Target),
+			UEFI:     code,
 		}
 		startArgs := ffxutil.EmuStartArgs{
 			Config: absConfigFile,

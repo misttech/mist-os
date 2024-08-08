@@ -7,7 +7,6 @@ package ffxutil
 import (
 	"context"
 	"fmt"
-	"os"
 	"os/exec"
 	"path/filepath"
 
@@ -58,31 +57,32 @@ type EmuStartArgs struct {
 
 // EmuStartConsole returns a command to launch the emulator.
 func (f *FFXInstance) EmuStartConsole(ctx context.Context, sdkRoot, name string, qemu bool, tools EmuTools, startArgs EmuStartArgs) (*exec.Cmd, error) {
-	// If using different tools from the ones in the sdk, `ffx emu` expects them to
-	// have certain names and to be located in a parent directory of the ffx binary.
-	ffxDir := filepath.Dir(f.ffxPath)
-	toolsToSymlink := make(map[string]string)
+	// If using different tools from the ones in the sdk, they need to be
+	// provided in the sdk.overrides in the ffx config.
+	toolsToOverride := make(map[string]string)
 	if tools.Emulator != "" {
 		expectedName := "aemu_internal"
 		if qemu {
 			expectedName = "qemu_internal"
 		}
-		toolsToSymlink[tools.Emulator] = filepath.Join(ffxDir, expectedName)
+		toolsToOverride[expectedName] = tools.Emulator
 	}
 	if tools.FVM != "" {
-		toolsToSymlink[tools.FVM] = filepath.Join(ffxDir, "fvm")
+		toolsToOverride["fvm"] = tools.FVM
 	}
 	if tools.ZBI != "" {
-		toolsToSymlink[tools.ZBI] = filepath.Join(ffxDir, "zbi")
+		toolsToOverride["zbi"] = tools.ZBI
 	}
 	if tools.UEFI != "" {
-		toolsToSymlink[tools.UEFI] = filepath.Join(ffxDir, "uefi_internal")
+		toolsToOverride["uefi_internal"] = tools.UEFI
 	}
-	for oldname, newname := range toolsToSymlink {
-		if oldname == newname {
-			continue
+	for toolName, toolPath := range toolsToOverride {
+		var err error
+		toolPath, err = filepath.Abs(toolPath)
+		if err != nil {
+			return nil, err
 		}
-		if err := os.Symlink(oldname, newname); err != nil && !os.IsExist(err) {
+		if err := f.ConfigSet(ctx, fmt.Sprintf("sdk.overrides.%s", toolName), toolPath); err != nil {
 			return nil, err
 		}
 	}
