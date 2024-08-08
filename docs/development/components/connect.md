@@ -7,25 +7,25 @@ and additional tools for parent components to manage their children.
 
 You should understand the following concepts before continuing with this guide:
 
-*   The Component Framework assembles the [namespace][glossary.namespace] for a
-    component using [component declarations][glossary.component-declaration]
-    that describe the [capabilities][glossary.capability] the component requires
-    to function. The capabilities the component exposes to others are assembled
-    into an [exposed directory][glossary.exposed-directory].
-*   Every component receives a handle to the server end of a
-    [`Directory`][fidl-fuchsia.io.Directory] channel called the
-    [outgoing directory][glossary.outgoing-directory]. The component's program
-    makes discoverable any capabilities that it provides through this directory.
-*   At runtime, the [component instance tree][glossary.component-instance-tree]
-    describes parent and child relationships between
-    [component instances][glossary.component-instance]. The component instance
-    tree and the capability routes over that tree are collectively referred to
-    as the [component topology][glossary.component-topology].
-*   Parent components declare child components either statically in their
-    [component manifest][glossary.component-manifest] or dynamically using a
-    [component collection][glossary.component-collection]. A collection is a
-    container for dynamic children that may be created and destroyed at runtime
-    using the `fuchsia.component.Realm` framework protocol.
+* The Component Framework assembles the [namespace][glossary.namespace] for a
+  component using [component declarations][glossary.component-declaration] that
+  describe the [capabilities][glossary.capability] the component requires to
+  function. The capabilities the component exposes to others are assembled into
+  an [exposed directory][glossary.exposed-directory].
+* Every component receives a handle to the server end of a
+  [`Directory`][fidl-fuchsia.io.Directory] channel called the
+  [outgoing directory][glossary.outgoing-directory]. The component's program
+  makes discoverable any capabilities that it provides through this directory.
+* At runtime, the [component instance tree][glossary.component-instance-tree]
+  describes parent and child relationships between
+  [component instances][glossary.component-instance]. The component instance
+  tree and the capability routes over that tree are collectively referred to
+  as the [component topology][glossary.component-topology].
+* Parent components declare child components either statically in their
+  [component manifest][glossary.component-manifest] or dynamically using a
+  [component collection][glossary.component-collection]. A collection is a
+  container for dynamic children that may be created and destroyed at runtime
+  using the `fuchsia.component.Realm` framework protocol.
 
 For more details on these concepts, see [Realms][doc-realms] and
 [Capabilities][doc-capabilities].
@@ -78,19 +78,20 @@ serving it in its outgoing directory using the [fuchsia.io][fidl-fuchsia.io]
 protocol. The generated FIDL bindings wrap this handle and enable the provider
 to begin receiving incoming requests:
 
-*   ~~~rust
+*   {Rust}
+
+    ```rust
     {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/components/routing/rust/echo_server/src/main.rs" region_tag="main_body" adjust_indentation="auto" highlight="1,2,3,4,8,14,15,16,21,22,23,24,25,26,27,28" %}
 
     {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/components/routing/rust/echo_server/src/main.rs" region_tag="handler" adjust_indentation="auto" highlight="1,2,3,4,5,6,7" %}
-    ``` {Rust}
-    ~~~
+    ```
 
-*   ~~~cpp
+*   {C++}
+    ```cpp
     {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/components/routing/cpp/echo_server/main.cc" region_tag="handler" adjust_indentation="auto" highlight="1,2,3,4,5,6" %}
 
     {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/components/routing/cpp/echo_server/main.cc" region_tag="main_body" adjust_indentation="auto" highlight="3,9,10,11,12,13,14,15,16,17" %}
-    ``` {C++}
-    ~~~
+    ```
 
 ### Connect to routed capabilities {#connect-routes}
 
@@ -110,15 +111,17 @@ provided by other components. The Fuchsia component library works with the
 generated FIDL bindings to provide a structured interface for communicating over
 the channel:
 
-*   ~~~rust
-    {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/components/routing/rust/echo_client/src/main.rs" region_tag="main_body" adjust_indentation="auto" highlight="7,8,9,10,11,12,13,14" %}
-    ``` {Rust}
-    ~~~
+*   {Rust}
 
-*   ~~~cpp
+    ```rust
+    {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/components/routing/rust/echo_client/src/main.rs" region_tag="main_body" adjust_indentation="auto" highlight="7,8,9,10,11,12,13,14" %}
+    ```
+
+*   {C++}
+
+    ```cpp
     {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/components/routing/cpp/echo_client/main.cc" region_tag="main_body" adjust_indentation="auto" highlight="2,3,4,5,7,8,10" %}
-    ``` {C++}
-    ~~~
+    ```
 
 It is the responsibility of the component's parent to route to it all necessary
 capabilities.
@@ -317,23 +320,25 @@ method with the following parameters:
 *   [`Child`][fidl-decl.Child]: Component declaration, including its name and
     component URL.
 
-*   ~~~rust
+*   {Rust}
+
+    ```rust
     {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/components/lifecycle/rust/src/manager.rs" region_tag="imports" adjust_indentation="auto" %}
 
     // ...
 
     {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/components/lifecycle/rust/src/manager.rs" region_tag="create_child" adjust_indentation="auto" %}
-    ``` {Rust}
-    ~~~
+    ```
 
-*   ~~~cpp
+*   {C++}
+
+    ```cpp
     {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/components/lifecycle/cpp/manager.cc" region_tag="imports" adjust_indentation="auto" %}
 
     // ...
 
     {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/components/lifecycle/cpp/manager.cc" region_tag="create_child" adjust_indentation="auto" %}
-    ``` {C++}
-    ~~~
+    ```
 
 ### Connect to child capabilities {#connect-child}
 
@@ -347,35 +352,39 @@ To connect with the capabilities exposed by a dynamic child instance:
     exposed directory. Call the [`OpenExposedDir`][fidl-Realm.OpenExposedDir]
     method with the child component's name and the collection name:
 
-    *   ~~~rust
+    *   {Rust}
+
+        ```rust
         {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/components/lifecycle/rust/src/manager.rs" region_tag="imports" adjust_indentation="auto" %}
 
         // ...
         {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/components/lifecycle/rust/src/manager.rs" region_tag="connect_child" adjust_indentation="auto" %}
-        ``` {Rust}
-        ~~~
+        ```
 
-    *   ~~~cpp
+    *   {C++}
+
+        ```cpp
         {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/components/lifecycle/cpp/manager.cc" region_tag="imports" adjust_indentation="auto" %}
 
         // ...
 
         {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/components/lifecycle/cpp/manager.cc" region_tag="connect_child" adjust_indentation="auto" %}
-        ``` {C++}
-        ~~~
+        ```
 
 2.  Connect to the child's exposed capabilities using the exposed directory
     handle as the root:
 
-    *   ~~~rust
-        {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/components/lifecycle/rust/src/manager.rs" region_tag="echo_send" adjust_indentation="auto" %}
-        ``` {Rust}
-        ~~~
+    *   {Rust}
 
-    *   ~~~cpp
+        ```rust
+        {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/components/lifecycle/rust/src/manager.rs" region_tag="echo_send" adjust_indentation="auto" %}
+        ```
+
+    *   {C++}
+
+        ```cpp
         {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/components/lifecycle/cpp/manager.cc" region_tag="echo_send" adjust_indentation="auto" %}
-        ``` {C++}
-        ~~~
+        ```
 
 ### Destroy dynamic children {#destroy-child}
 
@@ -384,23 +393,25 @@ When the dynamic child is no longer needed, use the
 instance. Call the [`DestroyChild`][fidl-Realm.DestroyChild] method with a
 [`ChildRef`][fidl-decl.ChildRef] representing the child inside the collection.
 
-*   ~~~rust
+*   {Rust}
+
+    ```rust
     {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/components/lifecycle/rust/src/manager.rs" region_tag="imports" adjust_indentation="auto" %}
 
     // ...
 
     {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/components/lifecycle/rust/src/manager.rs" region_tag="destroy_child" adjust_indentation="auto" %}
-    ``` {Rust}
-    ~~~
+    ```
 
-*   ~~~cpp
+*   {C++}
+
+    ```cpp
     {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/components/lifecycle/cpp/manager.cc" region_tag="imports" adjust_indentation="auto" %}
 
     // ...
 
     {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/components/lifecycle/cpp/manager.cc" region_tag="destroy_child" adjust_indentation="auto" %}
-    ``` {C++}
-    ~~~
+    ```
 
 This causes the component to stop if it is currently running. To handle this
 event in your component, see [listen for stop events](#lifecycle-notifications).
@@ -423,36 +434,40 @@ To listen for stop notifications in your child component:
 1.  Subscribe to the [lifecycle event][elf-lifecycle] in your component
     manifest:
 
-    *   ~~~json5
-        {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/components/lifecycle/rust/meta/lifecycle.cml" region_tag="lifecycle_event" adjust_indentation="auto" highlight="9,10" %}
-        ``` {Rust}
-        ~~~
+    *   {Rust}
 
-    *   ~~~json5
+        ```json5
+        {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/components/lifecycle/rust/meta/lifecycle.cml" region_tag="lifecycle_event" adjust_indentation="auto" highlight="9,10" %}
+        ```
+
+    *   {C++}
+
+        ```json5
         {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/components/lifecycle/cpp/meta/lifecycle.cml" region_tag="lifecycle_event" adjust_indentation="auto" highlight="9,10" %}
-        ``` {C++}
-        ~~~
+        ```
 
 1.  Register a lifecycle handler using the startup handle provided by the
     runner:
 
-    *   ~~~rust
+    *   {Rust}
+
+        ```rust
         {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/components/lifecycle/rust/src/lifecycle.rs" region_tag="imports" adjust_indentation="auto" %}
 
         // ...
 
         {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/components/lifecycle/rust/src/lifecycle.rs" region_tag="lifecycle_handler" adjust_indentation="auto" %}
-        ``` {Rust}
-        ~~~
+        ```
 
-    *   ~~~cpp
+    *   {C++}
+
+        ```cpp
         {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/components/lifecycle/cpp/lifecycle.cc" region_tag="imports" adjust_indentation="auto" %}
 
         // ...
 
         {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/components/lifecycle/cpp/lifecycle.cc" region_tag="lifecycle_handler" adjust_indentation="auto" %}
-        ``` {C++}
-        ~~~
+        ```
 
 ### Start with parent {#eager}
 
@@ -633,7 +648,9 @@ When capability routing fails, the underlying FIDL channel closes. FIDL protocol
 bindings return an error status if the channel was closed. Consider the
 following example:
 
-*   ~~~rust
+*   {Rust}
+
+    ```rust
     let echo = connect_to_protocol::<EchoMarker>()
         .context("Failed to connect to echo service")?;
     let res = echo.echo_string(Some("Hippos rule!")).await;
@@ -646,10 +663,11 @@ following example:
             error!("Unexpected error: {}", e);
         }
     };
-    ``` {Rust}
-    ~~~
+    ```
 
-*   ~~~cpp
+*   {C++}
+
+    ```cpp
     fuchsia::examples::EchoPtr echo_proxy;
     auto context = sys::ComponentContext::Create();
     context->svc()->Connect(echo_proxy.NewRequest());
@@ -664,8 +682,7 @@ following example:
     echo_proxy->EchoString("Hippos rule!", [&](std::string response) {
       // ...
     });
-    ``` {C++}
-    ~~~
+    ```
 
 Note: If the protocol method doesn't return a value (such as a one-way method),
 the error status is only set if the channel was closed prior to the method call.
@@ -674,7 +691,9 @@ To determine the underlying cause of a channel closure, you can inspect the
 optional [epitaph][doc-epitaphs] set on the channel. To retrieve the epitaph on
 a closed channel, do the following:
 
-*   ~~~rust
+*   {Rust}
+
+    ```rust
     let stream = echo.take_event_stream();
     match stream.next().await {
         Some(Err(fidl::Error::ClientChannelClosed { status, .. })) => {
@@ -687,17 +706,17 @@ a closed channel, do the following:
             info!("Component failed to start or channel was closed by server");
         }
     }
-    ``` {Rust}
-    ~~~
+    ```
 
-*   ~~~cpp
+*   {C++}
+
+    ```cpp
     echo_proxy.set_error_handler([&loop](zx_status_t status) {
       // If an Epitaph was present on the channel, its error value will be passed as
       // the parameter.
       printf("Channel was closed with epitaph: %d\n", status);
     });
-    ``` {C++}
-    ~~~
+    ```
 
 ### Capability routing failed {#troubleshoot-use-routing}
 
