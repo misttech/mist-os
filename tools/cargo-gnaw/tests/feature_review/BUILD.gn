@@ -20,11 +20,11 @@ rust_library("crate_with_features-v0_1_0") {
 
   deps = []
 
-  edition = "2018"
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
+    "--edition=2018",
     "-Cmetadata=7091b4706c607e57",
     "-Cextra-filename=-7091b4706c607e57",
     "--cfg=feature=\"feature1\"",
@@ -43,11 +43,11 @@ rust_library("feature_test-v0_1_0") {
   deps = []
   deps += [ ":needs_feature-v0_1_0" ]
 
-  edition = "2018"
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
+    "--edition=2018",
     "-Cmetadata=75712ce55243d0e0",
     "-Cextra-filename=-75712ce55243d0e0",
   ]
@@ -65,11 +65,11 @@ rust_library("needs_feature-v0_1_0") {
   deps = []
   deps += [ ":crate_with_features-v0_1_0" ]
 
-  edition = "2021"
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
+    "--edition=2021",
     "-Cmetadata=e99a212d2fc1fa1b",
     "-Cextra-filename=-e99a212d2fc1fa1b",
   ]

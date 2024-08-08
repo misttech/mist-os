@@ -23,11 +23,11 @@ rust_library("multiple_crate_types-v1_0_25") {
   deps += [ ":sub-crate-with-dylib-v1_0_25" ]
   deps += [ ":sub-crate-with-rlib-v1_0_25" ]
 
-  edition = "2018"
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
+    "--edition=2018",
     "-Cmetadata=8be5e59704cbf5a4",
     "-Cextra-filename=-8be5e59704cbf5a4",
   ]
@@ -44,11 +44,11 @@ rust_library("sub-crate-with-cdylib-v1_0_25") {
 
   deps = []
 
-  edition = "2018"
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
+    "--edition=2018",
     "-Cmetadata=2c19a9098651391d",
     "-Cextra-filename=-2c19a9098651391d",
   ]
@@ -67,11 +67,11 @@ rust_library("sub-crate-with-dylib-v1_0_25") {
 
   deps = []
 
-  edition = "2018"
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
+    "--edition=2018",
     "-Cmetadata=cba782ed0389a004",
     "-Cextra-filename=-cba782ed0389a004",
   ]
@@ -90,11 +90,11 @@ rust_library("sub-crate-with-rlib-v1_0_25") {
 
   deps = []
 
-  edition = "2018"
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
+    "--edition=2018",
     "-Cmetadata=5a8ce889cce06275",
     "-Cextra-filename=-5a8ce889cce06275",
   ]

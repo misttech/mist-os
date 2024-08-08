@@ -41,11 +41,11 @@ executable("package-with-bin-foo-binary-v0_1_0") {
   deps = []
   deps += [ ":package-with-bin-v0_1_0" ]
 
-  edition = "2018"
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
+    "--edition=2018",
     "-Cmetadata=afa00503dca78ba8",
     "-Cextra-filename=-afa00503dca78ba8",
   ]
@@ -69,11 +69,11 @@ executable("package-with-bin-foo-binary-v0_1_0-test") {
   deps = []
   deps += [ ":package-with-bin-v0_1_0" ]
 
-  edition = "2018"
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
+    "--edition=2018",
     "-Cmetadata=afa00503dca78ba8",
     "-Cextra-filename=-afa00503dca78ba8",
     "--test",
@@ -92,11 +92,11 @@ rust_library("package-with-bin-v0_1_0") {
 
   deps = []
 
-  edition = "2018"
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
+    "--edition=2018",
     "-Cmetadata=b6c5dfd7f886ecb4",
     "-Cextra-filename=-b6c5dfd7f886ecb4",
   ]
@@ -113,11 +113,11 @@ executable("package-with-bin-v0_1_0-test") {
 
   deps = []
 
-  edition = "2018"
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
+    "--edition=2018",
     "-Cmetadata=b6c5dfd7f886ecb4",
     "-Cextra-filename=-b6c5dfd7f886ecb4",
     "--test",

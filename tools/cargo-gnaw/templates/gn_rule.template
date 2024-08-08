@@ -4,7 +4,6 @@
   output_name = "{output_name}"
   {cfgs}
   {dependencies}
-  {edition}
   {rustenv}
   {rustflags}
   {aliased_deps}

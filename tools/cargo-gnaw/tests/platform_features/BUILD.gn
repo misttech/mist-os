@@ -29,11 +29,11 @@ rust_library("a-v1_0_0") {
     deps += [ ":b-v1_0_0" ]
   }
 
-  edition = "2021"
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
+    "--edition=2021",
     "-Cmetadata=537022e729cc9ca0",
     "-Cextra-filename=-537022e729cc9ca0",
   ]
@@ -53,11 +53,11 @@ rust_library("b-v1_0_0") {
 
   deps = []
 
-  edition = "2021"
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
+    "--edition=2021",
     "-Cmetadata=72d4e469bdf48536",
     "-Cextra-filename=-72d4e469bdf48536",
   ]

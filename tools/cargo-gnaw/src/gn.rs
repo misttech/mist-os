@@ -405,6 +405,7 @@ pub fn write_rule<W: io::Write>(
 
     // Associate unique metadata with this crate
     rustflags.add_cfg("--cap-lints=allow");
+    rustflags.add_cfg(format!("--edition={}", target.edition));
     rustflags.add_cfg(format!("-Cmetadata={}", target.metadata_hash()));
     rustflags.add_cfg(format!("-Cextra-filename=-{}", target.metadata_hash()));
     if is_test {
@@ -462,8 +463,6 @@ pub fn write_rule<W: io::Write>(
             }
         }
     }
-
-    let edition = format!("edition = \"{}\"", target.edition);
 
     let visibility = if visibility.is_empty() {
         String::from("visibility = [\":*\"]\n")
@@ -624,7 +623,6 @@ uses_fuchsia_license = true
         cfgs = configs.render_gn(),
         rustenv = rustenv.render_gn(),
         rustflags = rustflags.render_gn(),
-        edition = edition,
         visibility = visibility,
         optional_testonly = optional_testonly,
         applicable_licenses = applicable_licenses.render_gn(),
@@ -743,10 +741,9 @@ mod tests {
   
   deps = []
 
-  edition = "2018"
   rustenv = []
 
-  rustflags = ["--cap-lints=allow","-Cmetadata=c5bf97c44457465a","-Cextra-filename=-c5bf97c44457465a"]
+  rustflags = ["--cap-lints=allow","--edition=2018","-Cmetadata=c5bf97c44457465a","-Cextra-filename=-c5bf97c44457465a"]
 
   
   visibility = [":*"]
@@ -808,10 +805,9 @@ mod tests {
   
   deps = []
 
-  edition = "2018"
   rustenv = []
 
-  rustflags = ["--cap-lints=allow","-Cmetadata=bf8f4a806276c599","-Cextra-filename=-bf8f4a806276c599"]
+  rustflags = ["--cap-lints=allow","--edition=2018","-Cmetadata=bf8f4a806276c599","-Cextra-filename=-bf8f4a806276c599"]
 
   
   visibility = [":*"]
@@ -872,10 +868,9 @@ mod tests {
   
   deps = []
 
-  edition = "2018"
   rustenv = []
 
-  rustflags = ["--cap-lints=allow","-Cmetadata=bf8f4a806276c599","-Cextra-filename=-bf8f4a806276c599"]
+  rustflags = ["--cap-lints=allow","--edition=2018","-Cmetadata=bf8f4a806276c599","-Cextra-filename=-bf8f4a806276c599"]
 
   
   visibility = [":*"]
