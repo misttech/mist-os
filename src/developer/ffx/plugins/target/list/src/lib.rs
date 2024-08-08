@@ -161,7 +161,14 @@ async fn handle_to_info(
         discovery::TargetState::Product(target_addrs) => {
             (ffx::TargetState::Product, Some(target_addrs))
         }
-        discovery::TargetState::Fastboot(_) => (ffx::TargetState::Fastboot, None),
+        discovery::TargetState::Fastboot(fts) => {
+            let addresses = match fts.connection_state {
+                discovery::FastbootConnectionState::Usb => None,
+                discovery::FastbootConnectionState::Tcp(addresses) => Some(addresses.to_vec()),
+                discovery::FastbootConnectionState::Udp(addresses) => Some(addresses.to_vec()),
+            };
+            (ffx::TargetState::Fastboot, addresses)
+        }
         discovery::TargetState::Zedboot => (ffx::TargetState::Zedboot, None),
     };
     let (rcs_state, product_config, board_config) = if connect_to_target {

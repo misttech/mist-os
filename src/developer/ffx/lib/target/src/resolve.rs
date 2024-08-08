@@ -2,10 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use addr::TargetAddr;
-use anyhow::{bail, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use discovery::desc::Description;
 use discovery::query::TargetInfoQuery;
-use discovery::{DiscoverySources, TargetEvent, TargetHandle, TargetState};
+use discovery::{
+    DiscoverySources, FastbootConnectionState, TargetEvent, TargetHandle, TargetState,
+};
 use errors::FfxError;
 use ffx_config::EnvironmentContext;
 use fidl_fuchsia_developer_ffx::{self as ffx};
@@ -389,8 +391,16 @@ fn query_matches_handle(query: &TargetInfoQuery, h: &TargetHandle) -> bool {
 fn handle_to_description(handle: &TargetHandle) -> Description {
     let (addresses, serial) = match &handle.state {
         TargetState::Product(target_addr) => (target_addr.clone(), None),
-        TargetState::Fastboot(discovery::FastbootTargetState { serial_number: sn, .. }) => {
-            (vec![], Some(sn.clone()))
+        TargetState::Fastboot(discovery::FastbootTargetState {
+            serial_number: sn,
+            connection_state,
+        }) => {
+            let addresses = match connection_state {
+                FastbootConnectionState::Usb => Vec::<TargetAddr>::new(),
+                FastbootConnectionState::Tcp(addresses) => addresses.to_vec(),
+                FastbootConnectionState::Udp(addresses) => addresses.to_vec(),
+            };
+            (addresses, Some(sn.clone()))
         }
         _ => (vec![], None),
     };
@@ -516,30 +526,58 @@ enum ResolutionTarget {
     Serial(String),
 }
 
+fn sort_socket_addrs(a1: &SocketAddr, a2: &SocketAddr) -> Ordering {
+    match (a1.ip().is_link_local_addr(), a2.ip().is_link_local_addr()) {
+        (true, true) | (false, false) => Ordering::Equal,
+        (true, false) => Ordering::Less,
+        (false, true) => Ordering::Greater,
+    }
+}
+
+fn choose_socketaddr_from_addresses(
+    target: &TargetHandle,
+    addresses: &Vec<TargetAddr>,
+) -> Result<SocketAddr> {
+    if addresses.is_empty() {
+        bail!("Target discovered but does not contain addresses: {target:?}");
+    }
+    let mut addrs_sorted = addresses
+        .into_iter()
+        .map(SocketAddr::from)
+        .sorted_by(sort_socket_addrs)
+        .collect::<Vec<_>>();
+    let sock: SocketAddr = addrs_sorted.pop().ok_or_else(|| {
+        anyhow!("Choosing a socketaddr from a list of addresses, must contain at least one address")
+    })?;
+    Ok(sock)
+}
+
 impl ResolutionTarget {
     // If the target is a product, pull out the "best" address from the
     // target, and return it.
     fn from_target_handle(target: &TargetHandle) -> Result<ResolutionTarget> {
         match &target.state {
             TargetState::Product(ref addresses) => {
-                if addresses.is_empty() {
-                    bail!("Target discovered but does not contain addresses: {target:?}");
-                }
-                let mut addrs_sorted = addresses
-                    .into_iter()
-                    .map(SocketAddr::from)
-                    .sorted_by(|a1, a2| {
-                        match (a1.ip().is_link_local_addr(), a2.ip().is_link_local_addr()) {
-                            (true, true) | (false, false) => Ordering::Equal,
-                            (true, false) => Ordering::Less,
-                            (false, true) => Ordering::Greater,
-                        }
-                    })
-                    .collect::<Vec<_>>();
-                let addr: SocketAddr = replace_default_port(addrs_sorted.pop().unwrap());
+                let sock = choose_socketaddr_from_addresses(&target, addresses)?;
+                let addr: SocketAddr = replace_default_port(sock);
                 Ok(ResolutionTarget::Addr(addr))
             }
-            TargetState::Fastboot(fts) => Ok(ResolutionTarget::Serial(fts.serial_number.clone())),
+            TargetState::Fastboot(fts) => match &fts.connection_state {
+                FastbootConnectionState::Usb => {
+                    Ok(ResolutionTarget::Serial(fts.serial_number.clone()))
+                }
+                FastbootConnectionState::Tcp(addresses) => {
+                    let sock: SocketAddr = choose_socketaddr_from_addresses(&target, addresses)?;
+                    Ok(ResolutionTarget::Addr(sock))
+                }
+                FastbootConnectionState::Udp(addresses) => {
+                    if addresses.is_empty() {
+                        bail!("Target discovered but does not contain addresses: {target:?}");
+                    }
+                    let sock: SocketAddr = choose_socketaddr_from_addresses(&target, addresses)?;
+                    Ok(ResolutionTarget::Addr(sock))
+                }
+            },
             state => {
                 Err(anyhow::anyhow!("Target discovered but not in the correct state: {state:?}"))
             }
@@ -639,6 +677,77 @@ impl Resolution {
 #[cfg(test)]
 mod test {
     use super::*;
+    use std::net::{Ipv6Addr, SocketAddrV6};
+
+    #[fuchsia::test]
+    async fn test_sort_socket_addrs() {
+        struct TestCase {
+            a1: SocketAddr,
+            a2: SocketAddr,
+            want_res: Ordering,
+            name: String,
+        }
+
+        let cases: Vec<TestCase> = vec![
+            TestCase {
+                a1: "127.0.0.1:8082".parse().expect("Valid SocketAddr"),
+                a2: "[::1]:8082".parse().expect("Valid SocketAddr"),
+                want_res: Ordering::Equal,
+                name: "Loopback v4 and v6 equal".to_string(),
+            },
+            TestCase {
+                a1: "192.168.1.1:8082".parse().expect("Valid SocketAddr"),
+                a2: "[2002:2::%2]:8082".parse().expect("Valid SocketAddr"),
+                want_res: Ordering::Equal,
+                name: "Non local v4 and non local v6 local equal".to_string(),
+            },
+            TestCase {
+                // Local
+                a1: SocketAddr::V6(SocketAddrV6::new(
+                    Ipv6Addr::new(0xfe80, 0, 0, 0, 1, 6, 7, 8),
+                    8080,
+                    0,
+                    1,
+                )),
+                // Non Local
+                a2: SocketAddr::V6(SocketAddrV6::new(
+                    Ipv6Addr::new(0x2607, 0xf8b0, 0x4005, 0x805, 0, 0, 0, 0x200e),
+                    8080,
+                    0,
+                    1,
+                )),
+                want_res: Ordering::Less,
+                name: "local v6 and non v6 local less".to_string(),
+            },
+            TestCase {
+                // Local
+                a1: SocketAddr::V6(SocketAddrV6::new(
+                    Ipv6Addr::new(0xfe80, 0, 0, 0, 1, 6, 7, 8),
+                    8080,
+                    0,
+                    1,
+                )),
+                // Local
+                a2: SocketAddr::V6(SocketAddrV6::new(
+                    Ipv6Addr::new(0xfe80, 0, 0, 0, 2, 6, 7, 8),
+                    8080,
+                    0,
+                    1,
+                )),
+                want_res: Ordering::Equal,
+                name: "local v6 and local v6 local equal".to_string(),
+            },
+        ];
+
+        for case in cases {
+            let got = sort_socket_addrs(&case.a1, &case.a2);
+            assert_eq!(
+                got, case.want_res,
+                "TestCase: {0}. Results differ: {1:?}, {2:?}",
+                case.name, got, case.want_res
+            );
+        }
+    }
 
     #[fuchsia::test]
     async fn test_can_resolve_target_locally() {
