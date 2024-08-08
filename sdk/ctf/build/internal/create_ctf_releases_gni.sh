@@ -15,7 +15,20 @@ set -e
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 FUCHSIA_DIR="$(dirname $(dirname $(dirname $(dirname "${script_dir}"))))"
 
-PREBUILT_DIR="${FUCHSIA_DIR}/prebuilt/ctf"
+# The CTF manifest file could be in //integration/fuchsia/ctf/all,
+# //integration/platform/fuchsia/ctf/all or //integration/ctf/all
+# depending on the integration repository the user uses.
+if [[ -f "${FUCHSIA_DIR}/integration/platform/fuchsia/ctf/all" ]]; then
+  CTF_MANIFEST="${FUCHSIA_DIR}/integration/platform/fuchsia/ctf/all"
+elif [[ -f "${FUCHSIA_DIR}/integration/fuchsia/ctf/all" ]]; then
+  CTF_MANIFEST="${FUCHSIA_DIR}/integration/fuchsia/ctf/all"
+elif [[ -f "${FUCHSIA_DIR}/integration/ctf/all" ]]; then
+  CTF_MANIFEST="${FUCHSIA_DIR}/integration/ctf/all"
+else
+  echo "Error: Failed to find CTF manifest file." 1>&2
+  exit 1
+fi
+
 DESTINATION="${FUCHSIA_DIR}/sdk/ctf/build/internal/ctf_releases.gni"
 
 YEAR=$(date +%Y)
@@ -32,14 +45,18 @@ ctf_releases = [" \
 > "${DESTINATION}"
 
 echo "Finding CTF releases..."
-for release in $(ls ${PREBUILT_DIR}); do
-  if [ -d "${PREBUILT_DIR}/${release}/linux-x64" ]; then
-    echo "  Have release for ${release}... adding"
-    echo "  \"${release}\"," >> "${DESTINATION}"
-  else
-    echo "  No release for ${release}... skipping"
-  fi
 
+# The CTF integration manifest has one <localimport> tag for each version:
+#     <localimport file="f16"/>
+# This script looks for all the localimport tags in the file and extracts the
+# "file" field.
+#
+# TODO(liyl): Technically we shouldn't use regex to parse XML. Consider rewriting
+# it with more robust XML parsing logic.
+IFS=$'\n'
+for release in $(grep -Po '(?<=localimport file=").*?(?=")' ${CTF_MANIFEST}); do
+  echo "  Have release for ${release}... adding"
+  echo "  \"${release}\"," >> "${DESTINATION}"
 done
 
 echo "]" >> "${DESTINATION}"
