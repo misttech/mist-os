@@ -47,7 +47,7 @@ async fn main() {
 
     info!("waiting for {child_name} to stop...");
     let stopped = EventMatcher::ok().moniker(&moniker).wait::<Stopped>(&mut events).await.unwrap();
-    assert_matches!(stopped.result(), Ok(StoppedPayload { status: ExitStatus::Clean }));
+    assert_matches!(stopped.result(), Ok(StoppedPayload { status: ExitStatus::Clean, .. }));
 
     info!("waiting for expected log message that contains `{expected_log}`...");
     loop {

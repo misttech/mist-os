@@ -592,9 +592,12 @@ async fn start(
         })
         .ok();
 
+    let (server_stream, control) = server_end.into_stream_and_control_handle().unwrap();
+
     // Spawn a future that watches for the process to exit
     fasync::Task::spawn({
         let resolved_url = resolved_url.clone();
+        let control = control.clone();
         async move {
             fasync::OnSignals::new(&proc_copy.as_handle_ref(), zx::Signals::PROCESS_TERMINATED)
                 .await
@@ -605,16 +608,25 @@ async fn start(
             // intentional, non-zero exit, use that for all non-0 exit
             // codes.
             let exit_status: ChannelEpitaph = match proc_copy.info() {
-                Ok(zx::ProcessInfo { return_code: 0, .. }) => ChannelEpitaph::ok(),
                 Ok(zx::ProcessInfo { return_code, .. }) => {
-                    // Don't log SYSCALL_KILL codes because they are expected in the course
-                    // of normal operation. When elf_runner process a `kill` signal for
-                    // a component it makes a zx_task_kill syscall which sets this return code.
-                    if return_code != zx::sys::ZX_TASK_RETCODE_SYSCALL_KILL {
-                        warn!(url=%resolved_url, %return_code,
-                        "process terminated with abnormal return code");
+                    // Notify framework of exit code.
+                    _ = control.send_on_stop_info(fcrunner::ComponentStopInfo {
+                        exit_code: Some(return_code),
+                        ..Default::default()
+                    });
+                    // Determine the epitaph.
+                    match return_code {
+                        0 => ChannelEpitaph::ok(),
+                        // Don't log SYSCALL_KILL codes because they are expected in the course
+                        // of normal operation. When elf_runner process a `Kill` method call for
+                        // a component it makes a zx_task_kill syscall which sets this return code.
+                        zx::sys::ZX_TASK_RETCODE_SYSCALL_KILL => fcomp::Error::InstanceDied.into(),
+                        _ => {
+                            warn!(url=%resolved_url, %return_code,
+                                "process terminated with abnormal return code");
+                            fcomp::Error::InstanceDied.into()
+                        }
                     }
-                    fcomp::Error::InstanceDied.into()
                 }
                 Err(error) => {
                     warn!(%error, "Unable to query process info");
@@ -635,13 +647,6 @@ async fn start(
     // epitaph on the controller channel, closes it, and stops
     // serving the protocol.
     fasync::Task::spawn(async move {
-        let (server_stream, control) = match server_end.into_stream_and_control_handle() {
-            Ok(s) => s,
-            Err(error) => {
-                warn!(%error, "Converting Controller channel to stream failed");
-                return;
-            }
-        };
         if let Some(component_diagnostics) = component_diagnostics {
             control.send_on_publish_diagnostics(component_diagnostics).unwrap_or_else(
                 |error| warn!(url=%resolved_url, %error, "sending diagnostics failed"),
@@ -1212,6 +1217,7 @@ mod tests {
         // process that was killed.
         let mut event_stream = controller.take_event_stream();
         expect_diagnostics_event(&mut event_stream).await;
+        expect_exit_code(&mut event_stream, zx::sys::ZX_TASK_RETCODE_SYSCALL_KILL).await;
         expect_channel_closed(
             &mut event_stream,
             zx::Status::from_raw(
@@ -1341,6 +1347,7 @@ mod tests {
             runner.start(start_info, server_controller).await;
             let mut event_stream = client_controller.take_event_stream();
             expect_diagnostics_event(&mut event_stream).await;
+            expect_exit_code(&mut event_stream, 0).await;
             expect_channel_closed(&mut event_stream, zx::Status::OK).await;
         };
 
@@ -1435,6 +1442,20 @@ mod tests {
                     ..
                 },
             }))
+        );
+    }
+
+    async fn expect_exit_code(
+        event_stream: &mut fcrunner::ComponentControllerEventStream,
+        expected_exit_code: i64,
+    ) {
+        let event = event_stream.try_next().await;
+        assert_matches!(
+            event,
+            Ok(Some(fcrunner::ComponentControllerEvent::OnStopInfo {
+                payload: fcrunner::ComponentStopInfo { exit_code: Some(code), .. },
+            }))
+            if code == expected_exit_code
         );
     }
 
@@ -1690,10 +1711,7 @@ mod tests {
 
         let mut event_stream = controller.take_event_stream();
 
-        match event_stream.try_next().await {
-            Ok(Some(fcrunner::ComponentControllerEvent::OnPublishDiagnostics { .. })) => {}
-            other => panic!("unexpected event result: {:?}", other),
-        }
+        expect_diagnostics_event(&mut event_stream).await;
 
         match event_stream.try_next().await {
             Ok(Some(fcrunner::ComponentControllerEvent::OnEscrow {
@@ -1709,9 +1727,89 @@ mod tests {
             other => panic!("unexpected event result: {:?}", other),
         }
 
+        expect_exit_code(&mut event_stream, 0).await;
+
         match event_stream.try_next().await {
             Err(fidl::Error::ClientChannelClosed { .. }) => {}
             other => panic!("unexpected event result: {:?}", other),
         }
+    }
+
+    fn exit_with_code_startinfo(exit_code: i64) -> fcrunner::ComponentStartInfo {
+        let (_runtime_dir, runtime_dir_server) = create_proxy::<fio::DirectoryMarker>().unwrap();
+        let ns = vec![pkg_dir_namespace_entry()];
+
+        fcrunner::ComponentStartInfo {
+            resolved_url: Some(
+                "fuchsia-pkg://fuchsia.com/elf_runner_tests#meta/exit-with-code.cm".to_string(),
+            ),
+            program: Some(fdata::Dictionary {
+                entries: Some(vec![
+                    fdata::DictionaryEntry {
+                        key: "args".to_string(),
+                        value: Some(Box::new(fdata::DictionaryValue::StrVec(vec![format!(
+                            "{}",
+                            exit_code
+                        )]))),
+                    },
+                    fdata::DictionaryEntry {
+                        key: "binary".to_string(),
+                        value: Some(Box::new(fdata::DictionaryValue::Str(
+                            "bin/exit_with_code".to_string(),
+                        ))),
+                    },
+                ]),
+                ..Default::default()
+            }),
+            ns: Some(ns),
+            outgoing_dir: None,
+            runtime_dir: Some(runtime_dir_server),
+            component_instance: Some(zx::Event::create()),
+            ..Default::default()
+        }
+    }
+
+    #[fuchsia::test]
+    async fn test_return_code_success() {
+        let start_info = exit_with_code_startinfo(0);
+
+        let runner = new_elf_runner_for_test();
+        let runner = runner.get_scoped_runner(ScopedPolicyChecker::new(
+            Arc::new(SecurityPolicy::default()),
+            Moniker::root(),
+        ));
+        let (controller, server_controller) = create_proxy::<fcrunner::ComponentControllerMarker>()
+            .expect("could not create component controller endpoints");
+        runner.start(start_info, server_controller).await;
+
+        let mut event_stream = controller.take_event_stream();
+        expect_diagnostics_event(&mut event_stream).await;
+        expect_exit_code(&mut event_stream, 0).await;
+        expect_channel_closed(&mut event_stream, zx::Status::OK).await;
+    }
+
+    #[fuchsia::test]
+    async fn test_return_code_failure() {
+        let start_info = exit_with_code_startinfo(123);
+
+        let runner = new_elf_runner_for_test();
+        let runner = runner.get_scoped_runner(ScopedPolicyChecker::new(
+            Arc::new(SecurityPolicy::default()),
+            Moniker::root(),
+        ));
+        let (controller, server_controller) = create_proxy::<fcrunner::ComponentControllerMarker>()
+            .expect("could not create component controller endpoints");
+        runner.start(start_info, server_controller).await;
+
+        let mut event_stream = controller.take_event_stream();
+        expect_diagnostics_event(&mut event_stream).await;
+        expect_exit_code(&mut event_stream, 123).await;
+        expect_channel_closed(
+            &mut event_stream,
+            zx::Status::from_raw(
+                i32::try_from(fcomp::Error::InstanceDied.into_primitive()).unwrap(),
+            ),
+        )
+        .await;
     }
 }

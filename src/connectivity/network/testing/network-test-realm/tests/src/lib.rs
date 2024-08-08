@@ -842,7 +842,7 @@ async fn start_stub_with_existing_stub(name: &str, sub_name: &str, netstack: fnt
 
     // Note that stopped_event.result below borrows from `stopped_event`. As a
     // result it needs to be in a different statement.
-    let component_events::events::StoppedPayload { status } =
+    let component_events::events::StoppedPayload { status, .. } =
         stopped_event.result().expect("test-stub observe stop event error");
     let raw_status = match *status {
         component_events::events::ExitStatus::Clean => {

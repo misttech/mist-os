@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.cti
 
+use crate::bedrock::program::StopInfo;
 use crate::model::actions::StopAction;
 use crate::model::component::{
     ExtendedInstance, IncomingCapabilities, StartReason, WeakComponentInstance,
@@ -176,16 +177,22 @@ async fn execution_controller_task(
 pub struct ExecutionControllerTask {
     _task: fasync::Task<()>,
     control_handle: fcomponent::ExecutionControllerControlHandle,
-    stop_payload: Option<zx::Status>,
+    stop_payload: Option<StopPayload>,
+}
+
+struct StopPayload {
+    status: zx::Status,
+    info: Option<StopInfo>,
 }
 
 impl Drop for ExecutionControllerTask {
     fn drop(&mut self) {
         match self.stop_payload.as_ref() {
-            Some(status) => {
+            Some(payload) => {
                 // There's not much we can do if the other end has closed their channel
                 let _ = self.control_handle.send_on_stop(&fcomponent::StoppedPayload {
-                    status: Some(status.into_raw()),
+                    status: Some(payload.status.into_raw()),
+                    exit_code: payload.info.map(|info| info.exit_code).flatten(),
                     ..Default::default()
                 });
             }
@@ -198,7 +205,7 @@ impl Drop for ExecutionControllerTask {
 }
 
 impl ExecutionControllerTask {
-    pub fn set_stop_status(&mut self, status: zx::Status) {
-        self.stop_payload = Some(status);
+    pub fn set_stop_payload(&mut self, status: zx::Status, info: Option<StopInfo>) {
+        self.stop_payload = Some(StopPayload { status, info });
     }
 }

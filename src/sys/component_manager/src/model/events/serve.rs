@@ -357,9 +357,10 @@ fn create_event_payloads(
         EventPayload::CapabilityRequested { name, receiver, .. } => {
             create_capability_requested_payload(name.to_string(), receiver.clone())
         }
-        EventPayload::Stopped { status, .. } => {
+        EventPayload::Stopped { status, exit_code, .. } => {
             stream_once(Ok(fcomponent::EventPayload::Stopped(fcomponent::StoppedPayload {
                 status: Some(status.into_raw()),
+                exit_code: *exit_code,
                 ..Default::default()
             })))
         }

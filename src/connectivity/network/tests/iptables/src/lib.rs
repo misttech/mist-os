@@ -52,7 +52,7 @@ async fn run_iptables(args: impl IntoIterator<Item = &'static str>) -> RealmInst
         .wait::<Stopped>(&mut events)
         .await
         .expect("wait for stopped event");
-    let StoppedPayload { status } = event.result().expect("extract event payload");
+    let StoppedPayload { status, .. } = event.result().expect("extract event payload");
     assert_eq!(status, &ExitStatus::Clean);
 
     realm

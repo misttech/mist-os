@@ -238,6 +238,7 @@ pub enum EventPayload {
     },
     Stopped {
         status: zx::Status,
+        exit_code: Option<i64>,
         stop_time: zx::Time,
         execution_duration: zx::Duration,
         requested_escrow: bool,
@@ -280,7 +281,9 @@ impl fmt::Debug for EventPayload {
             EventPayload::Resolved { component: _, decl, .. } => {
                 formatter.field("decl", decl).finish()
             }
-            EventPayload::Stopped { status, .. } => formatter.field("status", status).finish(),
+            EventPayload::Stopped { status, exit_code, .. } => {
+                formatter.field("status", status).field("exit_code", exit_code).finish()
+            }
             EventPayload::Unresolved
             | EventPayload::Destroyed
             | EventPayload::DebugStarted { .. } => formatter.finish(),
