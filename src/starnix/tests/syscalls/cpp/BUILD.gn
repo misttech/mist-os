@@ -18,6 +18,7 @@ syscall_tests = [
   # go/keep-sorted start
   "abort_test",
   "ashmem_test",
+  "aspace_test",
   "bpf_test",
   "custom_artifact_test",
   "epoll_test",
