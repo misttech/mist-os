@@ -19,6 +19,7 @@
 #include <ktl/optional.h>
 #include <ktl/type_traits.h>
 #include <vm/page_state.h>
+#include <vm/phys/arena.h>
 #include <vm/stack_owned_loaned_pages_interval.h>
 
 // core per page structure allocated at pmm arena creation time
@@ -492,8 +493,10 @@ static_assert(offsetof(vm_page_t, state_priv) % alignof(vm_page_state) == 0);
 
 static_assert(offsetof(vm_page_t, padding_bytes) == 0x2d);
 
-// assert that the page structure isn't growing uncontrollably
-static_assert(sizeof(vm_page) == 0x30);
+// Assert that the page structure isn't growing uncontrollably, and that its
+// size and alignment are kept in sync with the arena selection algorithm.
+static_assert(sizeof(vm_page_t) == kArenaPageBookkeepingSize);
+static_assert(alignof(vm_page_t) == kArenaPageBookkeepingAlignment);
 
 // assert that |vm_page| is a POD
 static_assert(ktl::is_trivial_v<vm_page> && ktl::is_standard_layout_v<vm_page>);

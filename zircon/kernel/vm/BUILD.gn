@@ -79,6 +79,9 @@ zx_library("vm") {
   ]
 
   public_deps = [
+    # <vm/page.h> has #include <vm/phys/arena.h>.
+    "phys:headers",
+
     # <vm/vm_page_list.h> has #include <ktl/unique_ptr.h>.
     "//zircon/kernel/lib/ktl:headers",
 
