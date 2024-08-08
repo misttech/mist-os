@@ -16,7 +16,6 @@
     offer: [
         {
             protocol: [
-                "fuchsia.logger.LogSink",
                 "fuchsia.process.Launcher",
                 "fuchsia.sys2.CrashIntrospect",
             ],
@@ -28,7 +27,6 @@
                 "fuchsia.boot.ReadOnlyLog",
                 "fuchsia.diagnostics.FeedbackArchiveAccessor",
                 "fuchsia.hardware.power.statecontrol.RebootMethodsWatcherRegister",
-                "fuchsia.logger.LogSink",
                 "fuchsia.process.Launcher",
                 "fuchsia.sysinfo.SysInfo",
             ],
