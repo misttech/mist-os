@@ -291,6 +291,7 @@ impl ObjectRequest {
 pub type ObjectRequestRef<'a> = &'a mut ObjectRequest;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
+#[allow(dead_code)]
 pub(crate) enum ObjectRequestSend {
     OnOpen,
     OnRepresentation,
@@ -313,37 +314,9 @@ pub trait Representation {
     fn node_info(&self) -> impl Future<Output = Result<fio::NodeInfoDeprecated, Status>> + Send;
 }
 
-/// Trait for converting fio::ConnectionProtocols and fio::OpenFlags into ObjectRequest.
+/// Trait for converting fio::Flags and fio::OpenFlags into ObjectRequest.
 pub trait ToObjectRequest: ProtocolsExt {
     fn to_object_request(&self, object_request: impl Into<fidl::Handle>) -> ObjectRequest;
-}
-
-impl ToObjectRequest for fio::ConnectionProtocols {
-    fn to_object_request(&self, object_request: impl Into<fidl::Handle>) -> ObjectRequest {
-        let attributes = match self {
-            fio::ConnectionProtocols::Node(fio::NodeOptions {
-                attributes: Some(query), ..
-            }) => *query,
-            _ => fio::NodeAttributesQuery::empty(),
-        };
-        let create_attributes = match self {
-            fio::ConnectionProtocols::Node(fio::NodeOptions { create_attributes: a, .. }) => {
-                a.as_ref()
-            }
-            _ => None,
-        };
-        ObjectRequest::new(
-            object_request.into().into(),
-            if self.get_representation() {
-                ObjectRequestSend::OnRepresentation
-            } else {
-                ObjectRequestSend::Nothing
-            },
-            attributes,
-            create_attributes,
-            self.is_truncate(),
-        )
-    }
 }
 
 impl ToObjectRequest for fio::OpenFlags {

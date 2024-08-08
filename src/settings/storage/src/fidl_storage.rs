@@ -595,7 +595,7 @@ mod tests {
                     } => {
                         match (self.inner.lock().unwrap().open_interceptor)(
                             &path,
-                            flags.contains(fio::OpenFlags::CREATE),
+                            flags.intersects(fio::OpenFlags::CREATE),
                         ) {
                             Some(status) => {
                                 let (_, control_handle) =
@@ -612,32 +612,22 @@ mod tests {
                             }
                         }
                     }
-                    fio::DirectoryRequest::Open2 {
+                    fio::DirectoryRequest::Open3 {
                         path,
-                        protocols,
-                        object_request,
+                        flags,
+                        options,
+                        object,
                         control_handle: _,
                     } => {
-                        let create = if let fio::ConnectionProtocols::Node(protocols) = &protocols {
-                            if let Some(mode) = protocols.mode {
-                                mode == fio::CreationMode::AllowExisting
-                                    || mode == fio::CreationMode::Always
-                            } else {
-                                false
-                            }
-                        } else {
-                            false
-                        };
+                        let create = flags.intersects(fio::Flags::FLAG_MUST_CREATE);
                         match (self.inner.lock().unwrap().open_interceptor)(&path, create) {
                             Some(status) => {
-                                object_request
-                                    .close_with_epitaph(status)
-                                    .expect("failed to send epitaph");
+                                object.close_with_epitaph(status).expect("failed to send epitaph");
                             }
                             None => {
                                 self.real_dir
-                                    .open2(&path, &protocols, object_request)
-                                    .expect("failed to forward Open2 request");
+                                    .open3(&path, flags, &options, object)
+                                    .expect("failed to forward Open3 request");
                             }
                         }
                     }

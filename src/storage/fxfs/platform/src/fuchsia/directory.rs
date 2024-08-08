@@ -955,7 +955,7 @@ mod tests {
     use vfs::common::rights_to_posix_mode_bits;
     use vfs::node::Node;
     use vfs::path::Path;
-    use vfs::{ObjectRequest, ToObjectRequest};
+    use vfs::ObjectRequest;
     use {fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon as zx};
 
     #[fuchsia::test]
@@ -2013,24 +2013,17 @@ mod tests {
             let (_proxy, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
             let mode = fio::MODE_TYPE_DIRECTORY
                 | rights_to_posix_mode_bits(/*r*/ true, /*w*/ false, /*x*/ false);
-            let connection_protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
-                protocols: Some(fio::NodeProtocols {
-                    directory: Some(fio::DirectoryProtocolOptions::default()),
-                    ..Default::default()
-                }),
-                mode: Some(vfs::CreationMode::AllowExisting.into()),
+            let flags = fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::FLAG_MAYBE_CREATE;
+            let options = fio::Options {
                 create_attributes: Some(fio::MutableNodeAttributes {
                     mode: Some(mode),
                     ..Default::default()
                 }),
                 ..Default::default()
-            });
+            };
 
-            let request = connection_protocols.to_object_request(server_end);
-            let dir = root_dir
-                .lookup(&connection_protocols, path, &request)
-                .await
-                .expect("lookup failed");
+            let request = ObjectRequest::new3(flags, &options, server_end.into_channel());
+            let dir = root_dir.lookup(&flags, path, &request).await.expect("lookup failed");
 
             let attrs = dir
                 .clone()
@@ -2066,21 +2059,14 @@ mod tests {
             let path = Path::validate_and_split(path_str).unwrap();
 
             let (_proxy, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
-            let connection_protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
-                protocols: Some(fio::NodeProtocols {
-                    directory: Some(fio::DirectoryProtocolOptions::default()),
-                    ..Default::default()
-                }),
-                mode: Some(vfs::CreationMode::AllowExisting.into()),
+            let flags = fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::FLAG_MAYBE_CREATE;
+            let options = fio::Options {
                 create_attributes: Some(fio::MutableNodeAttributes { ..Default::default() }),
                 ..Default::default()
-            });
+            };
 
-            let request = connection_protocols.to_object_request(server_end);
-            let dir = root_dir
-                .lookup(&connection_protocols, path, &request)
-                .await
-                .expect("lookup failed");
+            let request = ObjectRequest::new3(flags, &options, server_end.into_channel());
+            let dir = root_dir.lookup(&flags, path, &request).await.expect("lookup failed");
 
             let attrs = dir
                 .clone()
@@ -2171,12 +2157,9 @@ mod tests {
             let gid = 2;
             let rdev = 3;
             let modification_time = Timestamp::now().as_nanos();
-            let connection_protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
-                protocols: Some(fio::NodeProtocols {
-                    file: Some(fio::FileProtocolFlags::default()),
-                    ..Default::default()
-                }),
-                mode: Some(vfs::CreationMode::AllowExisting.into()),
+
+            let flags = fio::Flags::PROTOCOL_FILE | fio::Flags::FLAG_MAYBE_CREATE;
+            let options = fio::Options {
                 create_attributes: Some(fio::MutableNodeAttributes {
                     modification_time: Some(modification_time),
                     mode: Some(mode),
@@ -2186,13 +2169,10 @@ mod tests {
                     ..Default::default()
                 }),
                 ..Default::default()
-            });
+            };
 
-            let request = connection_protocols.to_object_request(server_end);
-            let file = root_dir
-                .lookup(&connection_protocols, path, &request)
-                .await
-                .expect("lookup failed");
+            let request = ObjectRequest::new3(flags, &options, server_end.into_channel());
+            let file = root_dir.lookup(&flags, path, &request).await.expect("lookup failed");
 
             let attributes = file
                 .clone()
@@ -2231,21 +2211,12 @@ mod tests {
             let path = Path::validate_and_split(path_str).unwrap();
 
             let (_proxy, server_end) = create_proxy::<fio::FileMarker>().unwrap();
-            let connection_protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
-                protocols: Some(fio::NodeProtocols {
-                    file: Some(fio::FileProtocolFlags::default()),
-                    ..Default::default()
-                }),
-                mode: Some(vfs::CreationMode::AllowExisting.into()),
-                create_attributes: Some(fio::MutableNodeAttributes { ..Default::default() }),
-                ..Default::default()
-            });
 
-            let request = connection_protocols.to_object_request(server_end);
-            let file = root_dir
-                .lookup(&connection_protocols, path, &request)
-                .await
-                .expect("lookup failed");
+            let flags = fio::Flags::PROTOCOL_FILE | fio::Flags::FLAG_MAYBE_CREATE;
+            let options = Default::default();
+
+            let request = ObjectRequest::new3(flags, &options, server_end.into_channel());
+            let file = root_dir.lookup(&flags, path, &request).await.expect("lookup failed");
 
             let attrs = file
                 .clone()

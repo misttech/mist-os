@@ -9,6 +9,7 @@ use crate::directory::dirents_sink;
 use crate::directory::traversal_position::TraversalPosition;
 use crate::execution_scope::ExecutionScope;
 use crate::node::Node;
+#[cfg(fuchsia_api_level_at_least = "HEAD")]
 use crate::object_request::ObjectRequestRef;
 use crate::path::Path;
 use fidl::endpoints::ServerEnd;
@@ -64,15 +65,11 @@ pub trait Directory: Node {
     /// a boundary that does not have the required permissions.
     ///
     /// It is the responsibility of the implementation to send an `OnOpen` event on the channel
-    /// contained by `server_end` in case `OPEN_FLAG_STATUS` was present in `flags`, and to
-    /// populate the `info` part of the event if `OPEN_FLAG_DESCRIBE` was set.  This also applies
-    /// to the error cases.
+    /// contained by `server_end` in case [`fio::OpenFlags::DESCRIBE`]` was set.
     ///
-    /// This method is called via either `Open` or `Clone` fuchsia.io methods.  This is deliberate
-    /// that this method does not return any errors.  Any errors that occur during this process
-    /// should be sent as an `OnOpen` event over the `server_end` connection and the connection is
-    /// then closed.  No errors should ever affect the connection where `Open` or `Clone` were
-    /// received.
+    /// This method is called via either `Open` or `Clone` fuchsia.io methods. Any errors that occur
+    /// during this process should be sent as a channel closure epitaph via `server_end`. No errors
+    /// should ever affect the connection where `Open` or `Clone` were received.
     fn open(
         self: Arc<Self>,
         scope: ExecutionScope,
@@ -84,38 +81,25 @@ pub trait Directory: Node {
     /// Opens a connection to this item if the `path` is "." or a connection to an item inside
     /// this one otherwise.  `path` will not contain any "." or ".." components.
     ///
-    /// `protocols` holds representations accepted by the caller, for example, it holds `node` that
-    /// is the underlying `Node` protocol to be served on the connection. `node` holds information
-    /// like the open mode (`mode`), node protocols (`protocols`), rights (`rights`) and create
-    /// attributes (`create_attributes`).
+    /// `flags` corresponds to the fuchsia.io [`fio::Flags`] type. See fuchsia.io's Open3 method for
+    /// more information regarding how flags are handled and what flag combinations are valid.
     ///
-    /// If this method was initiated by a FIDL Open2 call, hierarchical rights are enforced at the
-    /// connection layer. The connection layer also checks that when creating a new object,
-    /// no more than one protocol is specified and `create_attributes` is some value.
+    /// If this method was initiated by a FIDL Open3 call, hierarchical rights are enforced at the
+    /// connection layer.
     ///
     /// If the implementation takes `object_request`, it is then responsible for sending an
-    /// `OnRepresentation` event if `protocols` has `NodeFlags.GET_REPRESENTATION` set. Although
-    /// not enforced, the implementation should shutdown with an epitaph if any error occurred
-    /// during this process.
+    /// `OnRepresentation` event when `flags` includes [`fio::Flags::FLAG_SEND_REPRESENTATION`].
     ///
-    /// See fuchsia.io's Open2 method for more details.
-    fn open2(
-        self: Arc<Self>,
-        _scope: ExecutionScope,
-        _path: Path,
-        _protocols: fio::ConnectionProtocols,
-        _object_request: ObjectRequestRef<'_>,
-    ) -> Result<(), Status> {
-        Err(Status::NOT_SUPPORTED)
-    }
-
+    /// This method is called via either `Open3` or `Reopen` fuchsia.io methods. Any errors returned
+    /// during this process will be sent via an epitaph on the `object_request` channel before
+    /// closing the channel.
     #[cfg(fuchsia_api_level_at_least = "HEAD")]
     fn open3(
         self: Arc<Self>,
-        _scope: ExecutionScope,
-        _path: Path,
-        _flags: fio::Flags,
-        _object_request: ObjectRequestRef<'_>,
+        scope: ExecutionScope,
+        path: Path,
+        flags: fio::Flags,
+        object_request: ObjectRequestRef<'_>,
     ) -> Result<(), Status>;
 
     /// Reads directory entries starting from `pos` by adding them to `sink`.

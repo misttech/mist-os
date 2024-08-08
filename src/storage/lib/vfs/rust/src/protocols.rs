@@ -11,7 +11,7 @@ use crate::symlink::SymlinkOptions;
 use fidl_fuchsia_io as fio;
 use fuchsia_zircon_status::Status;
 
-/// Extends fio::ConnectionProtocols and fio::OpenFlags
+/// Extends fio::Flags and fio::OpenFlags
 pub trait ProtocolsExt: ToFileOptions + ToNodeOptions + Sync + 'static {
     /// True if the directory protocol is allowed.
     fn is_dir_allowed(&self) -> bool;
@@ -56,148 +56,6 @@ pub trait ProtocolsExt: ToFileOptions + ToNodeOptions + Sync + 'static {
 
     /// True if the protocol should be a limited node connection.
     fn is_node(&self) -> bool;
-}
-
-impl ProtocolsExt for fio::ConnectionProtocols {
-    fn is_dir_allowed(&self) -> bool {
-        matches!(
-            self,
-            fio::ConnectionProtocols::Node(fio::NodeOptions {
-                protocols: Some(fio::NodeProtocols { directory: Some(_), .. }),
-                ..
-            })
-        ) || self.is_any_node_protocol_allowed()
-    }
-
-    fn is_file_allowed(&self) -> bool {
-        matches!(
-            self,
-            fio::ConnectionProtocols::Node(fio::NodeOptions {
-                protocols: Some(fio::NodeProtocols { file: Some(_), .. }),
-                ..
-            })
-        ) || self.is_any_node_protocol_allowed()
-    }
-
-    fn is_symlink_allowed(&self) -> bool {
-        matches!(
-            self,
-            fio::ConnectionProtocols::Node(fio::NodeOptions {
-                protocols: Some(fio::NodeProtocols { symlink: Some(_), .. }),
-                ..
-            })
-        ) || self.is_any_node_protocol_allowed()
-    }
-
-    fn is_any_node_protocol_allowed(&self) -> bool {
-        matches!(self, fio::ConnectionProtocols::Node(fio::NodeOptions { protocols: None, .. }))
-    }
-
-    fn creation_mode(&self) -> CreationMode {
-        match self {
-            fio::ConnectionProtocols::Node(fio::NodeOptions { mode: Some(mode), .. }) => {
-                (*mode).into()
-            }
-            _ => CreationMode::Never,
-        }
-    }
-
-    fn rights(&self) -> Option<fio::Operations> {
-        match self {
-            fio::ConnectionProtocols::Node(fio::NodeOptions { rights, .. }) => *rights,
-            _ => None,
-        }
-    }
-
-    fn to_directory_options(&self) -> Result<DirectoryOptions, Status> {
-        if !self.is_dir_allowed() {
-            if self.is_file_allowed() && !self.is_symlink_allowed() {
-                return Err(Status::NOT_FILE);
-            } else {
-                return Err(Status::WRONG_TYPE);
-            }
-        }
-        let optional_rights = match self {
-            fio::ConnectionProtocols::Node(fio::NodeOptions {
-                protocols:
-                    Some(fio::NodeProtocols {
-                        directory:
-                            Some(fio::DirectoryProtocolOptions {
-                                optional_rights: Some(rights), ..
-                            }),
-                        ..
-                    }),
-                ..
-            }) => *rights,
-            _ => fio::Operations::empty(),
-        };
-        // If is_dir_allowed() returned true, there must be rights.
-        Ok(DirectoryOptions { rights: self.rights().unwrap() | optional_rights })
-    }
-
-    fn to_symlink_options(&self) -> Result<SymlinkOptions, Status> {
-        if !self.is_symlink_allowed() {
-            return Err(Status::WRONG_TYPE);
-        }
-        // If is_symlink_allowed() returned true, there must be rights.
-        if !self.rights().unwrap().contains(fio::Operations::GET_ATTRIBUTES) {
-            return Err(Status::INVALID_ARGS);
-        }
-        Ok(SymlinkOptions)
-    }
-
-    fn to_service_options(&self) -> Result<ServiceOptions, Status> {
-        Err(Status::NOT_SUPPORTED)
-    }
-
-    fn get_representation(&self) -> bool {
-        matches!(self, fio::ConnectionProtocols::Node(
-            fio::NodeOptions {
-                    flags: Some(flags),
-                ..
-            }
-        ) if flags.contains(fio::NodeFlags::GET_REPRESENTATION))
-    }
-
-    fn is_append(&self) -> bool {
-        matches!(
-            self,
-            fio::ConnectionProtocols::Node(fio::NodeOptions {
-                protocols: Some(fio::NodeProtocols { file: Some(flags), .. }),
-                ..
-            }) if flags.contains(fio::FileProtocolFlags::APPEND)
-        )
-    }
-
-    fn is_truncate(&self) -> bool {
-        matches!(
-            self,
-            fio::ConnectionProtocols::Node(fio::NodeOptions {
-                protocols: Some(fio::NodeProtocols { file: Some(flags), .. }),
-                ..
-            }) if flags.contains(fio::FileProtocolFlags::TRUNCATE)
-        )
-    }
-
-    fn create_directory(&self) -> bool {
-        matches!(
-            self,
-            fio::ConnectionProtocols::Node(fio::NodeOptions {
-                protocols: Some(fio::NodeProtocols { directory: Some(_), .. }),
-                ..
-            })
-        )
-    }
-
-    fn is_node(&self) -> bool {
-        matches!(
-            self,
-            fio::ConnectionProtocols::Node(fio::NodeOptions {
-                protocols: Some(fio::NodeProtocols { node: Some(_), .. }),
-                ..
-            })
-        )
-    }
 }
 
 impl ProtocolsExt for fio::OpenFlags {
@@ -470,33 +328,6 @@ pub trait ToFileOptions {
     fn to_file_options(&self) -> Result<FileOptions, Status>;
 }
 
-impl ToFileOptions for fio::ConnectionProtocols {
-    fn to_file_options(&self) -> Result<FileOptions, Status> {
-        if !self.is_file_allowed() {
-            if self.is_dir_allowed() && !self.is_symlink_allowed() {
-                return Err(Status::NOT_DIR);
-            } else {
-                return Err(Status::WRONG_TYPE);
-            }
-        }
-
-        if self.is_truncate() && !self.rights().unwrap().contains(fio::Operations::WRITE_BYTES) {
-            return Err(Status::INVALID_ARGS);
-        }
-
-        // If is_file_allowed() returned true, there must be rights. We downscope the resulting
-        // rights to only include those which apply to files.
-        let rights = self.rights().unwrap()
-            & (fio::Rights::GET_ATTRIBUTES
-                | fio::Rights::UPDATE_ATTRIBUTES
-                | fio::Rights::READ_BYTES
-                | fio::Rights::WRITE_BYTES
-                | fio::Rights::EXECUTE);
-
-        Ok(FileOptions { rights, is_append: self.is_append() })
-    }
-}
-
 impl ToFileOptions for fio::OpenFlags {
     fn to_file_options(&self) -> Result<FileOptions, Status> {
         assert!(!self.intersects(fio::OpenFlags::NODE_REFERENCE));
@@ -583,23 +414,6 @@ impl ToFileOptions for FileOptions {
 
 pub trait ToNodeOptions {
     fn to_node_options(&self, dirent_type: fio::DirentType) -> Result<NodeOptions, Status>;
-}
-
-impl ToNodeOptions for fio::ConnectionProtocols {
-    fn to_node_options(&self, dirent_type: fio::DirentType) -> Result<NodeOptions, Status> {
-        let must_be_directory = match self {
-            fio::ConnectionProtocols::Node(fio::NodeOptions {
-                protocols: Some(fio::NodeProtocols { node: Some(flags), .. }),
-                ..
-            }) => flags.contains(fio::NodeProtocolFlags::MUST_BE_DIRECTORY),
-            _ => false,
-        };
-        if must_be_directory && dirent_type != fio::DirentType::Directory {
-            Err(Status::NOT_DIR)
-        } else {
-            Ok(NodeOptions { rights: self.rights().unwrap() & fio::Operations::GET_ATTRIBUTES })
-        }
-    }
 }
 
 impl ToNodeOptions for fio::OpenFlags {

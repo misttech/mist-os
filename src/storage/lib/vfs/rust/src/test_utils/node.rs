@@ -26,22 +26,6 @@ where
     new_proxy
 }
 
-pub fn open2_get_proxy<M>(
-    proxy: &fio::DirectoryProxy,
-    protocols: &fio::ConnectionProtocols,
-    path: &str,
-) -> M::Proxy
-where
-    M: ProtocolMarker,
-{
-    let (new_proxy, new_server_end) =
-        create_proxy::<M>().expect("Failed to create connection endpoints");
-
-    proxy.open2(path, protocols, new_server_end.into_channel()).unwrap();
-
-    new_proxy
-}
-
 #[cfg(fuchsia_api_level_at_least = "HEAD")]
 pub fn open3_get_proxy<M>(
     proxy: &fio::DirectoryProxy,

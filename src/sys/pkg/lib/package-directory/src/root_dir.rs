@@ -12,7 +12,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::error;
 use vfs::common::send_on_open_with_error;
-use vfs::directory::entry::{EntryInfo, FlagsOrProtocols, OpenRequest};
+use vfs::directory::entry::{EntryInfo, OpenRequest};
 use vfs::directory::immutable::connection::ImmutableConnection;
 use vfs::directory::traversal_position::TraversalPosition;
 use vfs::execution_scope::ExecutionScope;
@@ -310,7 +310,13 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry_container::Directory for Ro
         if canonical_path == "meta" {
             // This branch is done here instead of in MetaAsDir so that Clone'ing MetaAsDir yields
             // MetaAsDir. See the MetaAsDir::open impl for more.
-            if open_meta_as_file(flags) {
+
+            // To remain POSIX compliant, we must default to opening meta as a file unless the
+            // DIRECTORY flag (which maps to O_DIRECTORY) is specified. Otherwise, it would be
+            // impossible to open as a directory, as there is no POSIX equivalent for NOT_DIRECTORY.
+            let open_meta_as_file =
+                !flags.intersects(fio::OpenFlags::DIRECTORY | fio::OpenFlags::NODE_REFERENCE);
+            if open_meta_as_file {
                 flags.to_object_request(server_end).handle(|object_request| {
                     let file = self.create_meta_as_file().map_err(|e| {
                         error!("Error creating the meta file: {:?}", e);
@@ -401,12 +407,19 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry_container::Directory for Ro
         let canonical_path = path.as_ref().strip_suffix('/').unwrap_or_else(|| path.as_ref());
 
         if canonical_path == "meta" {
-            // TODO(https://fxbug.dev/328485661): consider retrieving the merkle root by retrieving
-            // the attribute instead of opening as a file to read the merkle root content.
-            //
             // This branch is done here instead of in MetaAsDir so that Clone'ing MetaAsDir yields
             // MetaAsDir. See the MetaAsDir::open impl for more.
-            return if open_meta_as_file(flags) {
+
+            // TODO(https://fxbug.dev/328485661): consider retrieving the merkle root by retrieving
+            // the attribute instead of opening as a file to read the merkle root content.
+
+            // To remain POSIX compliant, we must default to opening meta as a file unless the
+            // directory protocol (which maps to O_DIRECTORY) is specified. Otherwise, it would be
+            // impossible to open as a directory, since there is no equivalent flag in POSIX that
+            // maps to the file protocol (the lack of O_DIRECTORY is used to specify this).
+            let open_meta_as_file =
+                !flags.intersects(fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::PROTOCOL_NODE);
+            return if open_meta_as_file {
                 let file = self.create_meta_as_file().map_err(|e| {
                     error!("Error creating the meta file: {:?}", e);
                     zx::Status::INTERNAL
@@ -473,34 +486,6 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry_container::Directory for Ro
 
     // `register_watcher` is unsupported so no need to do anything here.
     fn unregister_watcher(self: Arc<Self>, _: usize) {}
-}
-
-// Behavior copied from pkgfs.
-//
-// "meta" can be opened as a file or directory. To be POSIX compliant, we need to consider the
-// mapping of the POSIX flags and Fuchsia's flags. Consider the scenario where we try to open
-// "meta" before reading it via the POSIX open: `open("meta", O_RDONLY)`. In this case, we want to
-// open "meta" as a file. However, since "meta" supports both the file and directory protocols,
-// there is ambiguity on what it should be opened as.
-//
-// There is a direct mapping between the POSIX `O_DIRECTORY` flag and
-// `fio::OpenFlags::DIRECTORY` (io1) or specifying some `DirectoryProtocolOptions` (io2). However,
-// there is no POSIX equivalent to `fio::OpenFlags::NOT_DIRECTORY` (io1) or
-// `FileProtocolFlags` (Open2 in io2) or `fio::Flags` (Open3 in io2). To be able to open the node as
-// a file, we need to default to open as a file if no flags or protocols were specified.
-fn open_meta_as_file<'a>(flags_or_protocols: impl Into<FlagsOrProtocols<'a>>) -> bool {
-    match flags_or_protocols.into() {
-        FlagsOrProtocols::Flags(flags) => {
-            !flags.intersects(fio::OpenFlags::DIRECTORY | fio::OpenFlags::NODE_REFERENCE)
-        }
-        FlagsOrProtocols::Protocols(protocols) => {
-            // If no protocol was specified, default to opening as file.
-            protocols.is_any_node_protocol_allowed() || protocols.is_file_allowed()
-        }
-        FlagsOrProtocols::Flags3(flags) => {
-            !flags.intersects(fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::PROTOCOL_NODE)
-        }
-    }
 }
 
 #[allow(clippy::type_complexity)]
@@ -1092,32 +1077,6 @@ mod tests {
                 fuchsia_fs::directory::readdir(&proxy).await.unwrap(),
                 vec![DirEntry { name: "file".to_string(), kind: DirentKind::File }]
             );
-        }
-    }
-
-    fn arb_open_flags() -> impl proptest::strategy::Strategy<Value = fio::OpenFlags> {
-        use proptest::strategy::Strategy as _;
-
-        proptest::bits::u32::masked(fio::OpenFlags::all().bits())
-            .prop_map(|b| fio::OpenFlags::from_bits(b).unwrap())
-    }
-
-    proptest::proptest! {
-        #![proptest_config(proptest::prelude::ProptestConfig{
-            failure_persistence: None,
-            ..Default::default()
-        })]
-
-        #[test]
-        fn open_meta_as_file_dir_second_priority(flags in arb_open_flags()) {
-            proptest::prop_assert!(!open_meta_as_file(flags | fio::OpenFlags::DIRECTORY));
-            proptest::prop_assert!(!open_meta_as_file(flags | fio::OpenFlags::NODE_REFERENCE));
-        }
-
-        #[test]
-        fn open_meta_as_file_file_fallback(flags in arb_open_flags()) {
-            let flags = flags & !(fio::OpenFlags::DIRECTORY | fio::OpenFlags::NODE_REFERENCE);
-            proptest::prop_assert!(open_meta_as_file(flags));
         }
     }
 
