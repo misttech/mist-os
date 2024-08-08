@@ -58,7 +58,7 @@ template("pre_packaged_test_with_names") {
   foreach(test_name, test_component_names) {
     # Generate a simple manifest for this test that offers all diagnostics
     # capabilities and simply exposes the test suite itself.
-    generated_manifest = "${test_name}_generated_manifest"
+    generated_manifest = "${target_name}_${test_name}_generated_manifest"
     fuchsia_test_component_manifest(generated_manifest) {
       metadata = {
         test_component_manifest_cml = [
@@ -86,7 +86,7 @@ template("pre_packaged_test_with_names") {
     }
     manifest = get_target_outputs(":$generated_manifest")
     manifest = manifest[0]
-    generated_component = "${test_name}_generated_component"
+    generated_component = "${target_name}_${test_name}_generated_component"
     fuchsia_test_component(generated_component) {
       component_name = test_name
       manifest = manifest
