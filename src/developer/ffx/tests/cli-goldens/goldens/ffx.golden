@@ -154,6 +154,14 @@
       "short": null,
       "description": "disables loading configuration from the file system and only uses configuration specified on the command line or the compiled in default values. Intended for use when running ffx as part of a hermetic build.",
       "hidden": false
+    },
+    {
+      "kind": "Switch",
+      "optionality": "optional",
+      "long": "--core",
+      "short": null,
+      "description": "switch which enables the 'core' feature set. When set, ffx has stricter behavioual patterns. Including but not limited to:   * Not doing discovery   * Not starting the daemon   * Communicating directly with the target from the ffx cli (not the daemon)   * Configuration is read only The features in this flag are currently under active development.",
+      "hidden": true
     }
   ],
   "notes": [],

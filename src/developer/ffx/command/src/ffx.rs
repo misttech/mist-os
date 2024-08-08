@@ -271,6 +271,16 @@ pub struct Ffx {
     /// configuration specified on the command line or the compiled in default values.
     /// Intended for use when running ffx as part of a hermetic build.
     pub no_environment: bool,
+
+    #[argh(switch, hidden_help)]
+    /// switch which enables the 'core' feature set. When set, ffx has stricter
+    /// behavioual patterns. Including but not limited to:
+    ///   * Not doing discovery
+    ///   * Not starting the daemon
+    ///   * Communicating directly with the target from the ffx cli (not the daemon)
+    ///   * Configuration is read only
+    /// The features in this flag are currently under active development.
+    pub core: bool,
 }
 
 impl Ffx {
@@ -370,6 +380,7 @@ impl Ffx {
             subcommand: vec![],
             log_destination: None,
             no_environment: false,
+            core: false,
         };
 
         let mut argv_iter = argv.iter();
@@ -436,6 +447,9 @@ impl Ffx {
                 }
                 "--no-environment" => {
                     return_val.no_environment = true;
+                }
+                "--core" => {
+                    return_val.core = true;
                 }
                 _ => {
                     return_val.subcommand.push(opt.to_string());
@@ -629,6 +643,10 @@ mod test {
                     "--timeout" => {
                         all_args.push(opt.long);
                         all_args.push("123");
+                    }
+                    "--core" => {
+                        all_args.push(opt.long);
+                        all_args.push("false");
                     }
                     _ => {
                         all_args.push(opt.long);
