@@ -44,8 +44,7 @@ zx_status_t AmlogicSecureMemDevice::Bind() {
     return status;
   }
 
-  zx::result sysmem =
-      DdkConnectFragmentFidlProtocol<fuchsia_hardware_sysmem::Service::Sysmem>(parent(), "sysmem");
+  zx::result sysmem = DdkConnectNsProtocol<fuchsia_hardware_sysmem::Sysmem>(parent());
   if (sysmem.is_error()) {
     LOG(ERROR, "Failed to get sysmem protocol: %s", sysmem.status_string());
     return sysmem.status_value();
