@@ -680,14 +680,20 @@ void RegisterTestMultiProcSameDiffCpu(const char* base_name) {
     const std::string parent_thread_role_name;
     const std::string child_thread_role_name;
   };
-  // These parameters pin the threads to CPUs 0 and 1.  This is
-  // reasonable on systems with uniform CPUs, such as NUCs.  This
-  // would need to be revisited for systems with non-uniform CPUs,
-  // e.g. big.LITTLE systems such as VIM3s.  On a single-CPU system,
-  // the pinning should have no effect.
+  // These parameters pin the threads to CPUs 0 and 1, unless running on a vim3. CPUs 0 and 1 are
+  // reasonable on systems with uniform CPUs, such as NUCs, but not big.LITTLE systems such as vim3.
+  // For vim3 two big CPUs are chosen to match the choice (in main.cc) of generally attempting to
+  // run the benchmarks on the big CPUs. On a single-CPU system, the pinning should have no effect.
+  // TODO(https://fxbug.dev/42050716): Find a better way of controlling what cores are used for
+  // benchmarking and potentially benchmark both big and little cores.
   const static CpuParam cpu_params[] = {
+#if BOARD_IS_VIM3
+      {"_SameCpu", "fuchsia.microbenchmarks.pin_to_cpu_2", "fuchsia.microbenchmarks.pin_to_cpu_2"},
+      {"_DiffCpu", "fuchsia.microbenchmarks.pin_to_cpu_2", "fuchsia.microbenchmarks.pin_to_cpu_3"},
+#else
       {"_SameCpu", "fuchsia.microbenchmarks.pin_to_cpu_0", "fuchsia.microbenchmarks.pin_to_cpu_0"},
       {"_DiffCpu", "fuchsia.microbenchmarks.pin_to_cpu_0", "fuchsia.microbenchmarks.pin_to_cpu_1"},
+#endif
   };
 
   for (auto multi_proc_param : multi_proc_params) {
