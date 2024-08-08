@@ -61,6 +61,13 @@ class WebApp : public integration_tests::WebAppBase {
   WebApp() { Setup(kAppCode); }
 
   void RunLoopForMouseReponse() {
+    auto test_app_status_listener_connect =
+        component::Connect<fuchsia_ui_test_input::TestAppStatusListener>();
+    ZX_ASSERT_OK(test_app_status_listener_connect);
+    fidl::SyncClient test_app_status_listener(std::move(test_app_status_listener_connect.value()));
+    ZX_ASSERT_OK(test_app_status_listener->ReportStatus(
+        {fuchsia_ui_test_input::TestAppStatus::kHandlersRegistered}));
+
     auto mouse_input_listener_connect =
         component::Connect<fuchsia_ui_test_input::MouseInputListener>();
     ZX_ASSERT_OK(mouse_input_listener_connect);

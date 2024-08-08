@@ -12,6 +12,7 @@
             protocol: [
                 // Used by the test.
                 "fuchsia.ui.test.input.MouseInputListener",
+                "fuchsia.ui.test.input.TestAppStatusListener",
             ],
         },
     ],

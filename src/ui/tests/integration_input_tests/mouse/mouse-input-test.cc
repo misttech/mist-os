@@ -120,31 +120,56 @@ class MouseInputState {
 // `MouseInputListener` is a local test protocol that our test apps use to let us know
 // what position and button press state the mouse cursor has.
 class MouseInputListenerServer : public fidl::Server<fuchsia_ui_test_input::MouseInputListener>,
+                                 public fidl::Server<fuchsia_ui_test_input::TestAppStatusListener>,
                                  public LocalComponentImpl {
  public:
   explicit MouseInputListenerServer(async_dispatcher_t* dispatcher,
-                                    std::weak_ptr<MouseInputState> state)
-      : dispatcher_(dispatcher), state_(std::move(state)) {}
+                                    std::weak_ptr<MouseInputState> mouse_state,
+                                    std::weak_ptr<bool> ready_to_inject)
+      : dispatcher_(dispatcher),
+        mouse_state_(std::move(mouse_state)),
+        ready_to_inject_(std::move(ready_to_inject)) {}
 
   void ReportMouseInput(ReportMouseInputRequest& request,
                         ReportMouseInputCompleter::Sync& completer) override {
-    if (auto s = state_.lock()) {
+    if (auto s = mouse_state_.lock()) {
       s->events_.push(std::move(request));
     }
+  }
+
+  void ReportStatus(ReportStatusRequest& req, ReportStatusCompleter::Sync& completer) override {
+    if (req.status() == fuchsia_ui_test_input::TestAppStatus::kHandlersRegistered) {
+      if (auto ready = ready_to_inject_.lock()) {
+        *ready = true;
+      }
+    }
+
+    completer.Reply();
+  }
+
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_ui_test_input::TestAppStatusListener> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override {
+    FX_LOGS(WARNING) << "TestAppStatusListener Received an unknown method with ordinal "
+                     << metadata.method_ordinal;
   }
 
   // When the component framework requests for this component to start, this
   // method will be invoked by the realm_builder library.
   void OnStart() override {
     outgoing()->AddProtocol<fuchsia_ui_test_input::MouseInputListener>(
-        bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure));
+        mouse_bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure));
+    outgoing()->AddProtocol<fuchsia_ui_test_input::TestAppStatusListener>(
+        app_status_bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure));
   }
 
  private:
   // Not owned.
   async_dispatcher_t* dispatcher_ = nullptr;
-  fidl::ServerBindingGroup<fuchsia_ui_test_input::MouseInputListener> bindings_;
-  std::weak_ptr<MouseInputState> state_;
+  fidl::ServerBindingGroup<fuchsia_ui_test_input::MouseInputListener> mouse_bindings_;
+  fidl::ServerBindingGroup<fuchsia_ui_test_input::TestAppStatusListener> app_status_bindings_;
+  std::weak_ptr<MouseInputState> mouse_state_;
+  std::weak_ptr<bool> ready_to_inject_;
 };
 
 constexpr auto kMouseInputListener = "mouse_input_listener";
@@ -229,9 +254,10 @@ class MouseInputBase : public ui_testing::PortableUITest {
     // Key part of service setup: have this test component vend the
     // |MouseInputListener| service in the constructed realm.
     auto* d = dispatcher();
-    realm_builder().AddLocalChild(kMouseInputListener, [d, s = mouse_state_]() {
-      return std::make_unique<MouseInputListenerServer>(d, s);
-    });
+    realm_builder().AddLocalChild(
+        kMouseInputListener, [d, mouse_state = mouse_state_, ready_to_inject = ready_to_inject_]() {
+          return std::make_unique<MouseInputListenerServer>(d, mouse_state, ready_to_inject);
+        });
 
     for (const auto& [name, component] : GetTestComponents()) {
       realm_builder().AddChild(name, component);
@@ -244,6 +270,7 @@ class MouseInputBase : public ui_testing::PortableUITest {
   }
 
   std::shared_ptr<MouseInputState> mouse_state_;
+  std::shared_ptr<bool> ready_to_inject_ = std::make_shared<bool>(false);
 
   // Use a DPR other than 1.0, so that logical and physical coordinate spaces
   // are different.
@@ -254,6 +281,16 @@ class MouseInputBase : public ui_testing::PortableUITest {
 };
 
 class ChromiumInputTest : public MouseInputBase {
+ public:
+  void SetUp() override {
+    MouseInputBase::SetUp();
+
+    LaunchClient();
+
+    FX_LOGS(INFO) << "Wait for Chromium send out ready";
+    RunLoopUntil([this]() { return *(ready_to_inject_); });
+  }
+
  protected:
   std::vector<std::pair<ChildName, std::string>> GetTestComponents() override {
     return {
@@ -313,8 +350,13 @@ class ChromiumInputTest : public MouseInputBase {
                     // FATAL errors.
                 },
         },
-        {.capabilities = {Protocol{
-             fidl::DiscoverableProtocolName<fuchsia_ui_test_input::MouseInputListener>}},
+        {.capabilities =
+             {
+                 Protocol{
+                     fidl::DiscoverableProtocolName<fuchsia_ui_test_input::MouseInputListener>},
+                 Protocol{
+                     fidl::DiscoverableProtocolName<fuchsia_ui_test_input::TestAppStatusListener>},
+             },
          .source = ChildRef{kMouseInputListener},
          .targets = {target}},
         {.capabilities = {Protocol{fidl::DiscoverableProtocolName<fuchsia_fonts::Provider>}},
@@ -497,8 +539,6 @@ TEST_F(ChromiumInputTest, ChromiumMouseMove) {
 }
 
 TEST_F(ChromiumInputTest, ChromiumMouseDownMoveUp) {
-  LaunchClient();
-
   auto initial_position = EnsureMouseIsReadyAndGetPosition();
 
   double initial_x = initial_position.x;
@@ -538,8 +578,6 @@ TEST_F(ChromiumInputTest, ChromiumMouseDownMoveUp) {
 }
 
 TEST_F(ChromiumInputTest, ChromiumMouseWheel) {
-  LaunchClient();
-
   auto initial_position = EnsureMouseIsReadyAndGetPosition();
 
   double initial_x = initial_position.x;
