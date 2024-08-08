@@ -458,7 +458,7 @@ group("lock_api") {
 }
 
 group("log") {
-  public_deps = [ ":log-v0_4_20" ]
+  public_deps = [ ":log-v0_4_22" ]
 }
 
 if (!(current_os == "fuchsia")) {
@@ -1917,7 +1917,7 @@ rust_library("async-io-v1_12_0") {
   deps += [ ":async-lock-v2_6_0" ]
   deps += [ ":concurrent-queue-v2_5_0" ]
   deps += [ ":futures-lite-v1_11_3" ]
-  deps += [ ":log-v0_4_20" ]
+  deps += [ ":log-v0_4_22" ]
   deps += [ ":parking-v2_0_0" ]
   deps += [ ":polling-v2_4_0" ]
   deps += [ ":slab-v0_4_7" ]
@@ -5059,7 +5059,7 @@ rust_library("fatfs-v0_3_6") {
   deps += [ ":byteorder-v1_4_3" ]
   deps += [ ":bitflags-v1_3_2" ]
   deps += [ ":chrono-v0_4_34" ]
-  deps += [ ":log-v0_4_20" ]
+  deps += [ ":log-v0_4_22" ]
 
   rustenv = []
 
@@ -5906,7 +5906,7 @@ rust_library("generator-v0_7_5") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":log-v0_4_20" ]
+  deps += [ ":log-v0_4_22" ]
   if (true) {
     deps += [ ":libc-v0_2_155" ]
   }
@@ -6114,7 +6114,7 @@ rust_library("gpt-v3_0_0") {
   deps = []
   deps += [ ":bitflags-v1_3_2" ]
   deps += [ ":crc-v1_8_1" ]
-  deps += [ ":log-v0_4_20" ]
+  deps += [ ":log-v0_4_22" ]
   deps += [ ":uuid-v0_8_2" ]
 
   rustenv = []
@@ -6210,7 +6210,7 @@ rust_library("handlebars-v4_3_5") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":log-v0_4_20" ]
+  deps += [ ":log-v0_4_22" ]
   deps += [ ":pest-v2_7_8" ]
   deps += [ ":pest_derive-v2_7_8($host_toolchain)" ]
   deps += [ ":serde-v1_0_204" ]
@@ -6722,7 +6722,7 @@ rust_library("hyper-rustls-v0_22_1") {
   deps += [ ":rustls-v0_19_1" ]
   deps += [ ":futures-util-v0_3_30" ]
   deps += [ ":hyper-v0_14_19" ]
-  deps += [ ":log-v0_4_20" ]
+  deps += [ ":log-v0_4_22" ]
   deps += [ ":rustls-native-certs-v0_5_0" ]
   deps += [ ":tokio-rustls-v0_22_0" ]
   deps += [ ":tokio-v1_32_1" ]
@@ -7677,18 +7677,18 @@ rust_library("lock_api-v0_4_11") {
   applicable_licenses = [ ":lock_api-v0_4_11.license" ]
 }
 
-license("log-v0_4_20.license") {
+license("log-v0_4_22.license") {
   public_package_name = "log"
   license_files = [
-    "//third_party/rust_crates/vendor/log-0.4.20/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/log-0.4.20/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/log-0.4.22/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/log-0.4.22/LICENSE-MIT",
   ]
 }
 
-rust_library("log-v0_4_20") {
+rust_library("log-v0_4_22") {
   crate_name = "log"
-  crate_root = "//third_party/rust_crates/vendor/log-0.4.20/src/lib.rs"
-  output_name = "log-3237885152c97e3d"
+  crate_root = "//third_party/rust_crates/vendor/log-0.4.22/src/lib.rs"
+  output_name = "log-70ad1c5e24df7c26"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -7697,15 +7697,15 @@ rust_library("log-v0_4_20") {
 
   rustflags = [
     "--cap-lints=allow",
-    "--edition=2015",
-    "-Cmetadata=3237885152c97e3d",
-    "-Cextra-filename=-3237885152c97e3d",
+    "--edition=2021",
+    "-Cmetadata=70ad1c5e24df7c26",
+    "-Cextra-filename=-70ad1c5e24df7c26",
     "--cfg=feature=\"std\"",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":log-v0_4_20.license" ]
+  applicable_licenses = [ ":log-v0_4_22.license" ]
 }
 
 license("loom-v0_7_1.license") {
@@ -8158,7 +8158,7 @@ rust_library("mio-v0_7_14") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":log-v0_4_20" ]
+  deps += [ ":log-v0_4_22" ]
   if (true) {
     deps += [ ":libc-v0_2_155" ]
   }
@@ -8198,7 +8198,7 @@ rust_library("mio-v0_8_9") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":log-v0_4_20" ]
+  deps += [ ":log-v0_4_22" ]
   if (false) {
     deps += [ ":wasi-v0_11_0+wasi-snapshot-preview1" ]
     deps += [ ":libc-v0_2_155" ]
@@ -10240,7 +10240,7 @@ rust_library("polling-v2_4_0") {
 
   deps = []
   deps += [ ":cfg-if-v1_0_0" ]
-  deps += [ ":log-v0_4_20" ]
+  deps += [ ":log-v0_4_22" ]
   if (true || current_os == "fuchsia" || false) {
     deps += [ ":libc-v0_2_155" ]
   }
@@ -10820,7 +10820,7 @@ rust_library("prost-build-v0_11_1") {
   deps += [ ":heck-v0_4_1" ]
   deps += [ ":itertools-v0_10_1" ]
   deps += [ ":lazy_static-v1_4_0" ]
-  deps += [ ":log-v0_4_20" ]
+  deps += [ ":log-v0_4_22" ]
   deps += [ ":multimap-v0_8_3" ]
   deps += [ ":petgraph-v0_6_2" ]
   deps += [ ":prost-types-v0_11_1" ]
@@ -12287,7 +12287,7 @@ icu_rust_library("rust_icu_ucal-v5_0_0") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":log-v0_4_20" ]
+  deps += [ ":log-v0_4_22" ]
   deps += [ ":paste-v1_0_9($host_toolchain)" ]
   deps += [ ":rust_icu_common-v5_0_0" ]
   deps += [ ":rust_icu_sys-v5_0_0" ]
@@ -12326,7 +12326,7 @@ icu_rust_library("rust_icu_uchar-v5_0_0") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":log-v0_4_20" ]
+  deps += [ ":log-v0_4_22" ]
   deps += [ ":paste-v1_0_9($host_toolchain)" ]
   deps += [ ":rust_icu_common-v5_0_0" ]
   deps += [ ":rust_icu_sys-v5_0_0" ]
@@ -12362,7 +12362,7 @@ icu_rust_library("rust_icu_udat-v5_0_0") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":log-v0_4_20" ]
+  deps += [ ":log-v0_4_22" ]
   deps += [ ":paste-v1_0_9($host_toolchain)" ]
   deps += [ ":rust_icu_common-v5_0_0" ]
   deps += [ ":rust_icu_sys-v5_0_0" ]
@@ -12402,7 +12402,7 @@ icu_rust_library("rust_icu_udata-v5_0_0") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":log-v0_4_20" ]
+  deps += [ ":log-v0_4_22" ]
   deps += [ ":paste-v1_0_9($host_toolchain)" ]
   deps += [ ":rust_icu_common-v5_0_0" ]
   deps += [ ":rust_icu_sys-v5_0_0" ]
@@ -12474,7 +12474,7 @@ icu_rust_library("rust_icu_uloc-v5_0_0") {
 
   deps = []
   deps += [ ":anyhow-v1_0_86" ]
-  deps += [ ":log-v0_4_20" ]
+  deps += [ ":log-v0_4_22" ]
   deps += [ ":paste-v1_0_9($host_toolchain)" ]
   deps += [ ":rust_icu_common-v5_0_0" ]
   deps += [ ":rust_icu_sys-v5_0_0" ]
@@ -12513,7 +12513,7 @@ icu_rust_library("rust_icu_unorm2-v5_0_0") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":log-v0_4_20" ]
+  deps += [ ":log-v0_4_22" ]
   deps += [ ":paste-v1_0_9($host_toolchain)" ]
   deps += [ ":rust_icu_common-v5_0_0" ]
   deps += [ ":rust_icu_sys-v5_0_0" ]
@@ -12554,7 +12554,7 @@ icu_rust_library("rust_icu_ustring-v5_0_0") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":log-v0_4_20" ]
+  deps += [ ":log-v0_4_22" ]
   deps += [ ":paste-v1_0_9($host_toolchain)" ]
   deps += [ ":rust_icu_common-v5_0_0" ]
   deps += [ ":rust_icu_sys-v5_0_0" ]
@@ -12623,7 +12623,7 @@ rust_library("rustfix-v0_6_1") {
 
   deps = []
   deps += [ ":anyhow-v1_0_86" ]
-  deps += [ ":log-v0_4_20" ]
+  deps += [ ":log-v0_4_22" ]
   deps += [ ":serde-v1_0_204" ]
   deps += [ ":serde_json-v1_0_87" ]
 
@@ -12654,7 +12654,7 @@ rust_library("rustls-v0_19_1") {
 
   deps = []
   deps += [ ":base64-v0_13_0" ]
-  deps += [ ":log-v0_4_20" ]
+  deps += [ ":log-v0_4_22" ]
   deps += [ ":ring-v0_16_20" ]
   deps += [ ":sct-v0_6_0" ]
   deps += [ ":webpki-v0_21_0" ]
@@ -12794,7 +12794,7 @@ rust_library("rustyline-v2_1_0") {
   deps = []
   deps += [ ":memchr-v2_7_1" ]
   deps += [ ":libc-v0_2_155" ]
-  deps += [ ":log-v0_4_20" ]
+  deps += [ ":log-v0_4_22" ]
   deps += [ ":unicode-segmentation-v1_10_1" ]
   deps += [ ":unicode-width-v0_1_10" ]
   if (true && !(current_os == "fuchsia")) {
@@ -12833,7 +12833,7 @@ rust_library("rutabaga_gfx-v0_1_3") {
   deps = []
   deps += [ ":cfg-if-v1_0_0" ]
   deps += [ ":libc-v0_2_155" ]
-  deps += [ ":log-v0_4_20" ]
+  deps += [ ":log-v0_4_22" ]
   deps += [ ":remain-v0_2_14($host_toolchain)" ]
   deps += [ ":thiserror-v1_0_57" ]
   deps += [ ":zerocopy-v0_7_15" ]
@@ -14049,7 +14049,7 @@ rust_library("simplelog-v0_10_2") {
   deps = []
   deps += [ ":termcolor-v1_1_2" ]
   deps += [ ":chrono-v0_4_34" ]
-  deps += [ ":log-v0_4_20" ]
+  deps += [ ":log-v0_4_22" ]
 
   rustenv = []
 
@@ -15680,7 +15680,7 @@ rust_library("tracing-v0_1_40") {
   deps += [ ":pin-project-lite-v0_2_13" ]
   deps += [ ":tracing-attributes-v0_1_27($host_toolchain)" ]
   if (!(current_os == "fuchsia")) {
-    deps += [ ":log-v0_4_20" ]
+    deps += [ ":log-v0_4_22" ]
   }
 
   rustenv = []
@@ -15785,7 +15785,7 @@ rust_library("tracing-log-v0_2_0") {
 
   deps = []
   deps += [ ":tracing-core-v0_1_32" ]
-  deps += [ ":log-v0_4_20" ]
+  deps += [ ":log-v0_4_22" ]
   deps += [ ":once_cell-v1_17_1" ]
 
   rustenv = []
@@ -16096,7 +16096,7 @@ rust_library("tuf-v0_3_0-beta12") {
   deps += [ ":http-v0_2_4" ]
   deps += [ ":hyper-v0_14_19" ]
   deps += [ ":itoa-v1_0_5" ]
-  deps += [ ":log-v0_4_20" ]
+  deps += [ ":log-v0_4_22" ]
   deps += [ ":percent-encoding-v2_2_0" ]
   deps += [ ":ring-v0_16_20" ]
   deps += [ ":serde-v1_0_204" ]
@@ -17340,7 +17340,7 @@ rust_library("want-v0_3_0") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":log-v0_4_20" ]
+  deps += [ ":log-v0_4_22" ]
   deps += [ ":try-lock-v0_2_2" ]
 
   rustenv = []

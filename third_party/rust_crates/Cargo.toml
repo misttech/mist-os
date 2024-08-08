@@ -133,7 +133,7 @@ libc = { version = "0.2.155", features = ["extra_traits"] }
 libm = "0.2.1"
 linked-hash-map = "0.5.3"
 lock_api = "0.4.11"
-log = { version = "0.4.20", features = ["std"] }
+log = { version = "0.4.22", features = ["std"] }
 lru-cache = "0.1.2"
 maplit = "1.0"
 macro_rules_attribute = "0.1.3"
@@ -912,7 +912,7 @@ rustflags = [
 # log::Logger receive tracing events as logs. On Fuchsia we don't need that
 # since all binaries set up a tracing Subscriber.
 [gn.package.tracing."0.1.40".platform."cfg(not(target_os = \"fuchsia\"))"]
-deps = [ ":log-v0_4_20" ]
+deps = [ ":log-v0_4_22" ]
 rustflags = [
   "--cfg=feature=\\\"log\\\"",
 ]
