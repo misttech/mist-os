@@ -6,11 +6,10 @@
 use crate::{parse_features, run_container_features, Features};
 use anyhow::{anyhow, bail, Error};
 use bstr::BString;
-use fasync::OnSignals;
 use fidl::AsyncChannel;
 use fuchsia_async::DurationExt;
 use fuchsia_zircon::{
-    AsHandleRef, Signals, Task as _, {self as zx},
+    Task as _, {self as zx},
 };
 use futures::channel::oneshot;
 use futures::{FutureExt, StreamExt};
@@ -24,7 +23,6 @@ use starnix_core::fs::overlayfs::OverlayFs;
 use starnix_core::fs::tmpfs::TmpFs;
 use starnix_core::security;
 use starnix_core::task::{CurrentTask, ExitStatus, Kernel, Task};
-use starnix_core::time::utc::update_utc_clock;
 use starnix_core::vfs::{FileSystemOptions, FsContext, LookupContext, WhatToMount};
 use starnix_lite_kernel_config::Config;
 use starnix_logging::{
@@ -158,18 +156,6 @@ pub async fn create_container_from_config(
         })?;
     let service_config = ContainerServiceConfig { receiver };
 
-    container.kernel.kthreads.spawn_future({
-        let vvar = container.kernel.vdso.vvar_writeable.clone();
-        let utc_clock = fruntime::duplicate_utc_clock_handle(zx::Rights::SAME_RIGHTS).unwrap();
-        async move {
-            loop {
-                let waitable = OnSignals::new(utc_clock.as_handle_ref(), Signals::CLOCK_UPDATED);
-                update_utc_clock(&vvar);
-                waitable.await.expect("async_wait should always succeed");
-                log_info!("Received a UTC update");
-            }
-        }
-    });
     return Ok((container, service_config));
 }
 
