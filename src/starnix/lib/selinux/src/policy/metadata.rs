@@ -12,23 +12,23 @@ use super::{
 use std::fmt::Debug;
 use zerocopy::{little_endian as le, FromBytes, FromZeroes, NoCell, Unaligned};
 
-pub(crate) const SELINUX_MAGIC: u32 = 0xf97cff8c;
+pub(super) const SELINUX_MAGIC: u32 = 0xf97cff8c;
 
-pub(crate) const POLICYDB_STRING_MAX_LENGTH: u32 = 32;
-pub(crate) const POLICYDB_SIGNATURE: &[u8] = b"SE Linux";
+pub(super) const POLICYDB_STRING_MAX_LENGTH: u32 = 32;
+pub(super) const POLICYDB_SIGNATURE: &[u8] = b"SE Linux";
 
-pub(crate) const POLICYDB_VERSION_MIN: u32 = 30;
-pub(crate) const POLICYDB_VERSION_MAX: u32 = 33;
+pub(super) const POLICYDB_VERSION_MIN: u32 = 30;
+pub(super) const POLICYDB_VERSION_MAX: u32 = 33;
 
-pub(crate) const CONFIG_MLS_FLAG: u32 = 1;
-pub(crate) const CONFIG_HANDLE_UNKNOWN_REJECT_FLAG: u32 = 1 << 1;
-pub(crate) const CONFIG_HANDLE_UNKNOWN_ALLOW_FLAG: u32 = 1 << 2;
-pub(crate) const CONFIG_HANDLE_UNKNOWN_MASK: u32 =
+pub(super) const CONFIG_MLS_FLAG: u32 = 1;
+pub(super) const CONFIG_HANDLE_UNKNOWN_REJECT_FLAG: u32 = 1 << 1;
+pub(super) const CONFIG_HANDLE_UNKNOWN_ALLOW_FLAG: u32 = 1 << 2;
+pub(super) const CONFIG_HANDLE_UNKNOWN_MASK: u32 =
     CONFIG_HANDLE_UNKNOWN_REJECT_FLAG | CONFIG_HANDLE_UNKNOWN_ALLOW_FLAG;
 
 #[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
-pub(crate) struct Magic(le::U32);
+pub(super) struct Magic(le::U32);
 
 impl Validate for Magic {
     type Error = ValidateError;
@@ -64,7 +64,7 @@ impl<PS: ParseStrategy> ValidateArray<SignatureMetadata, u8> for Signature<PS> {
 
 #[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
-pub(crate) struct SignatureMetadata(le::U32);
+pub(super) struct SignatureMetadata(le::U32);
 
 impl Validate for SignatureMetadata {
     type Error = ValidateError;
@@ -88,7 +88,7 @@ impl Counted for SignatureMetadata {
 
 #[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
-pub(crate) struct PolicyVersion(le::U32);
+pub(super) struct PolicyVersion(le::U32);
 
 impl PolicyVersion {
     pub fn policy_version(&self) -> u32 {
@@ -114,7 +114,7 @@ impl Validate for PolicyVersion {
 /// TODO: Eliminate `dead_code` guard.
 #[allow(dead_code)]
 #[derive(Debug)]
-pub(crate) struct Config<PS: ParseStrategy> {
+pub(super) struct Config<PS: ParseStrategy> {
     handle_unknown: HandleUnknown,
     config: PS::Output<le::U32>,
 }
@@ -176,7 +176,7 @@ fn try_handle_unknown_fom_config(config: u32) -> Result<HandleUnknown, ParseErro
 
 #[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
-pub(crate) struct Counts {
+pub(super) struct Counts {
     symbols_count: le::U32,
     object_context_count: le::U32,
 }
@@ -192,10 +192,8 @@ impl Validate for Counts {
 
 #[cfg(test)]
 mod tests {
-    use crate::test::as_validate_error;
-
     use super::super::parser::{ByRef, ByValue};
-    use super::super::test::{as_parse_error, validate_test};
+    use super::super::test::{as_parse_error, as_validate_error, validate_test};
     use super::*;
 
     // TODO: Run this test over `validate()`.

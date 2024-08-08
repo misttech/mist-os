@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::index::PolicyIndex;
-use crate::{CategoryId, ParseStrategy, RoleId, SensitivityId, TypeId, UserId};
+use crate::policy::index::PolicyIndex;
+use crate::policy::{CategoryId, ParseStrategy, RoleId, SensitivityId, TypeId, UserId};
 
+use crate::NullessByteStr;
 use bstr::BString;
-use selinux::NullessByteStr;
 use std::cmp::Ordering;
 use thiserror::Error;
 
@@ -34,7 +34,7 @@ impl SecurityContext {
     /// Returns a new instance with the specified field values.
     // TODO(b/319232900): Validate that the specified fields are consistent
     // in the context of the supplied policy.
-    pub(crate) fn new<PS: ParseStrategy>(
+    pub(super) fn new<PS: ParseStrategy>(
         policy: &PolicyIndex<PS>,
         user: UserId,
         role: RoleId,
@@ -100,7 +100,7 @@ impl SecurityContext {
     ///
     /// Returns an error if the [`security_context`] is not a syntactically valid
     /// Security Context string, or the fields are not valid under the current policy.
-    pub(crate) fn parse<PS: ParseStrategy>(
+    pub(super) fn parse<PS: ParseStrategy>(
         policy_index: &PolicyIndex<PS>,
         security_context: NullessByteStr<'_>,
     ) -> Result<Self, SecurityContextError> {
@@ -157,7 +157,7 @@ impl SecurityContext {
     }
 
     /// Returns this Security Context serialized to a byte string.
-    pub(crate) fn serialize<PS: ParseStrategy>(&self, policy_index: &PolicyIndex<PS>) -> Vec<u8> {
+    pub(super) fn serialize<PS: ParseStrategy>(&self, policy_index: &PolicyIndex<PS>) -> Vec<u8> {
         let mut levels = self.low_level.serialize(policy_index);
         if let Some(high_level) = &self.high_level {
             levels.push(b'-');
@@ -248,7 +248,7 @@ pub struct SecurityLevel {
 }
 
 impl SecurityLevel {
-    pub(crate) fn new(sensitivity: SensitivityId, categories: Vec<Category>) -> Self {
+    pub(super) fn new(sensitivity: SensitivityId, categories: Vec<Category>) -> Self {
         Self { sensitivity, categories }
     }
 
@@ -379,8 +379,8 @@ pub enum SecurityContextError {
 
 #[cfg(test)]
 mod tests {
+    use super::super::{parse_policy_by_reference, ByRef, Policy};
     use super::*;
-    use crate::{parse_policy_by_reference, ByRef, Policy};
 
     type TestPolicy = Policy<ByRef<&'static [u8]>>;
     fn test_policy() -> TestPolicy {

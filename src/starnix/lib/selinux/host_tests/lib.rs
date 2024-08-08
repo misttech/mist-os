@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use selinux_policy::metadata::HandleUnknown;
-use selinux_policy::{parse_policy_by_reference, parse_policy_by_value, SecurityContext};
+use selinux::policy::metadata::HandleUnknown;
+use selinux::policy::{parse_policy_by_reference, parse_policy_by_value, SecurityContext};
 
 use anyhow::Context as _;
 use selinux::{FileClass, InitialSid, ObjectClass, Permission, ProcessPermission};

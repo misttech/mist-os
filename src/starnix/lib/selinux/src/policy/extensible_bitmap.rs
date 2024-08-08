@@ -12,10 +12,10 @@ use std::mem;
 use zerocopy::{little_endian as le, FromBytes, FromZeroes, NoCell, Unaligned};
 
 /// Maximum number of [`MapItem`] objects in a single [`ExtensibleBitmap`].
-pub(crate) const MAX_BITMAP_ITEMS: u32 = 0x40;
+pub(super) const MAX_BITMAP_ITEMS: u32 = 0x40;
 
 /// Fixed expectation for number of bits per [`MapItem`] in every [`ExtensibleBitmap`].
-pub(crate) const MAP_NODE_BITS: u32 = 8 * mem::size_of::<u64>() as u32;
+pub(super) const MAP_NODE_BITS: u32 = 8 * mem::size_of::<u64>() as u32;
 
 array_type!(ExtensibleBitmap, PS, PS::Output<Metadata>, PS::Slice<MapItem>);
 
@@ -85,13 +85,13 @@ impl<PS: ParseStrategy> ExtensibleBitmap<PS> {
 /// Low and high values are inclusive, such that when `low==high`, the span consists
 /// of a single bit.
 #[derive(Debug, PartialEq)]
-pub(crate) struct ExtensibleBitmapSpan {
+pub(super) struct ExtensibleBitmapSpan {
     pub low: u32,
     pub high: u32,
 }
 
 /// Iterator returned by `ExtensibleBitmap::spans()`.
-pub(crate) struct ExtensibleBitmapSpansIterator<'a, PS: ParseStrategy> {
+pub(super) struct ExtensibleBitmapSpansIterator<'a, PS: ParseStrategy> {
     bitmap: &'a ExtensibleBitmap<PS>,
     map_item: usize, // Zero-based `Vec<MapItem>` index.
     next_bit: u32,   // Zero-based bit index within the bitmap.
@@ -203,7 +203,7 @@ impl Validate for Metadata {
 
 #[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
-pub(crate) struct Metadata {
+pub(super) struct Metadata {
     /// How many bits on each `MapItem`.
     map_item_size_bits: le::U32,
     /// Highest bit, non-inclusive.
@@ -222,7 +222,7 @@ impl Counted for Metadata {
 
 #[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
-pub(crate) struct MapItem {
+pub(super) struct MapItem {
     /// The first bit that this [`MapItem`] stores, relative to its [`ExtensibleBitmap`] range:
     /// `[0, extensible_bitmap.high_bit())`.
     start_bit: le::U32,
@@ -297,7 +297,10 @@ mod tests {
     use std::borrow::Borrow;
     use std::marker::PhantomData;
 
-    pub(crate) struct ExtensibleBitmapIterator<PS: ParseStrategy, B: Borrow<ExtensibleBitmap<PS>>> {
+    pub(in super::super) struct ExtensibleBitmapIterator<
+        PS: ParseStrategy,
+        B: Borrow<ExtensibleBitmap<PS>>,
+    > {
         extensible_bitmap: B,
         i: u32,
         _marker: PhantomData<PS>,

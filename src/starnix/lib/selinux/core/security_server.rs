@@ -9,14 +9,14 @@ use crate::SecurityId;
 
 use anyhow::Context as _;
 use fuchsia_zircon::{self as zx};
+use selinux::policy::metadata::HandleUnknown;
+use selinux::policy::parser::ByValue;
+use selinux::policy::{
+    parse_policy_by_value, AccessVector, AccessVectorComputer, Policy, SecurityContext,
+};
 use selinux::{
     AbstractObjectClass, ClassPermission, FileClass, InitialSid, NullessByteStr, ObjectClass,
     Permission, FIRST_UNUSED_SID,
-};
-use selinux_policy::metadata::HandleUnknown;
-use selinux_policy::parser::ByValue;
-use selinux_policy::{
-    parse_policy_by_value, AccessVector, AccessVectorComputer, Policy, SecurityContext,
 };
 use starnix_sync::Mutex;
 use std::collections::HashMap;

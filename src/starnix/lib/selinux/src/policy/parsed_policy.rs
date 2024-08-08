@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::arrays::{RoleAllow, RoleTransition};
-
 use super::arrays::{
     AccessVectors, ConditionalNodes, Context, DeprecatedFilenameTransitions,
     FilenameTransitionList, FilenameTransitions, FsUses, GenericFsContexts, IPv6Nodes,
     InfinitiBandEndPorts, InfinitiBandPartitionKeys, InitialSids, NamedContextPairs, Nodes, Ports,
-    RangeTransitions, RoleAllows, RoleTransitions, SimpleArray,
+    RangeTransitions, RoleAllow, RoleAllows, RoleTransition, RoleTransitions, SimpleArray,
     MIN_POLICY_VERSION_FOR_INFINITIBAND_PARTITION_KEY,
 };
 use super::error::{ParseError, QueryError, ValidateError};
@@ -97,7 +95,7 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
     /// Returns whether the input types are explicitly granted the permission named
     /// `permission_name` via an `allow [...];` policy statement, or an error if looking up the
     /// input types fails. This is the "custom" form of this API because `permission_name` is
-    /// associated with a [`selinux::AbstractPermission::Custom::permission`] value.
+    /// associated with a [`crate::AbstractPermission::Custom::permission`] value.
     pub fn is_explicitly_allowed_custom(
         &self,
         source_type: TypeId,
@@ -124,7 +122,7 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
     /// Returns whether the input is explicitly allowed by some
     /// `allow [source_type_name] [target_type_name] : [target_class] [permission];` policy
     /// statement, or an error if lookups for input values fail.
-    pub(crate) fn class_permission_is_explicitly_allowed(
+    pub(super) fn class_permission_is_explicitly_allowed(
         &self,
         source_type: TypeId,
         target_type: TypeId,
@@ -193,7 +191,7 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
     /// Computes the access vector that associates type `source_type_name` and `target_type_name`
     /// via an explicit `allow [...];` statement in the binary policy. Computes `AccessVector::NONE`
     /// if no such statement exists. This is the "custom" form of this API because
-    /// `target_class_name` is associated with a [`selinux::AbstractObjectClass::Custom`]
+    /// `target_class_name` is associated with a [`crate::AbstractObjectClass::Custom`]
     /// value.
     pub fn compute_explicitly_allowed_custom(
         &self,
@@ -209,7 +207,7 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
     /// Computes the access vector that associates type `source_type_name` and `target_type_name`
     /// via an explicit `allow [...];` statement in the binary policy. Computes `AccessVector::NONE`
     /// if no such statement exists.
-    pub(crate) fn compute_explicitly_allowed(
+    pub(super) fn compute_explicitly_allowed(
         &self,
         source_type: TypeId,
         target_type: TypeId,
@@ -262,7 +260,7 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
     }
 
     /// Returns the policy entry for the specified initial Security Context.
-    pub(crate) fn initial_context(&self, id: selinux::InitialSid) -> &Context<PS> {
+    pub(super) fn initial_context(&self, id: crate::InitialSid) -> &Context<PS> {
         let id = le::U32::from(id as u32);
         // [`InitialSids`] validates that all `InitialSid` values are defined by the policy.
         &self.initial_sids.data.iter().find(|initial| initial.id() == id).unwrap().context()
@@ -270,91 +268,91 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
 
     /// Returns the `User` structure for the requested Id. Valid policies include definitions
     /// for all the Ids they refer to internally; supply some other Id will trigger a panic.
-    pub(crate) fn user(&self, id: UserId) -> &User<PS> {
+    pub(super) fn user(&self, id: UserId) -> &User<PS> {
         self.users.data.iter().find(|x| x.id() == id).unwrap()
     }
 
     /// Returns the named user, if present in the policy.
-    pub(crate) fn user_by_name(&self, name: &str) -> Option<&User<PS>> {
+    pub(super) fn user_by_name(&self, name: &str) -> Option<&User<PS>> {
         self.users.data.iter().find(|x| x.name_bytes() == name.as_bytes())
     }
 
     /// Returns the `Role` structure for the requested Id. Valid policies include definitions
     /// for all the Ids they refer to internally; supply some other Id will trigger a panic.
-    pub(crate) fn role(&self, id: RoleId) -> &Role<PS> {
+    pub(super) fn role(&self, id: RoleId) -> &Role<PS> {
         self.roles.data.iter().find(|x| x.id() == id).unwrap()
     }
 
     /// Returns the named role, if present in the policy.
-    pub(crate) fn role_by_name(&self, name: &str) -> Option<&Role<PS>> {
+    pub(super) fn role_by_name(&self, name: &str) -> Option<&Role<PS>> {
         self.roles.data.iter().find(|x| x.name_bytes() == name.as_bytes())
     }
 
     /// Returns the `Type` structure for the requested Id. Valid policies include definitions
     /// for all the Ids they refer to internally; supply some other Id will trigger a panic.
-    pub(crate) fn type_(&self, id: TypeId) -> &Type<PS> {
+    pub(super) fn type_(&self, id: TypeId) -> &Type<PS> {
         self.types.data.iter().find(|x| x.id() == id).unwrap()
     }
 
     /// Returns the named type, if present in the policy.
-    pub(crate) fn type_by_name(&self, name: &str) -> Option<&Type<PS>> {
+    pub(super) fn type_by_name(&self, name: &str) -> Option<&Type<PS>> {
         self.types.data.iter().find(|x| x.name_bytes() == name.as_bytes())
     }
 
     /// Returns the `Sensitivity` structure for the requested Id. Valid policies include definitions
     /// for all the Ids they refer to internally; supply some other Id will trigger a panic.
-    pub(crate) fn sensitivity(&self, id: SensitivityId) -> &Sensitivity<PS> {
+    pub(super) fn sensitivity(&self, id: SensitivityId) -> &Sensitivity<PS> {
         self.sensitivities.data.iter().find(|x| x.id() == id).unwrap()
     }
 
     /// Returns the named sensitivity level, if present in the policy.
-    pub(crate) fn sensitivity_by_name(&self, name: &str) -> Option<&Sensitivity<PS>> {
+    pub(super) fn sensitivity_by_name(&self, name: &str) -> Option<&Sensitivity<PS>> {
         self.sensitivities.data.iter().find(|x| x.name_bytes() == name.as_bytes())
     }
 
     /// Returns the `Category` structure for the requested Id. Valid policies include definitions
     /// for all the Ids they refer to internally; supply some other Id will trigger a panic.
-    pub(crate) fn category(&self, id: CategoryId) -> &Category<PS> {
+    pub(super) fn category(&self, id: CategoryId) -> &Category<PS> {
         self.categories.data.iter().find(|y| y.id() == id).unwrap()
     }
 
     /// Returns the named category, if present in the policy.
-    pub(crate) fn category_by_name(&self, name: &str) -> Option<&Category<PS>> {
+    pub(super) fn category_by_name(&self, name: &str) -> Option<&Category<PS>> {
         self.categories.data.iter().find(|x| x.name_bytes() == name.as_bytes())
     }
 
-    pub(crate) fn classes(&self) -> &Classes<PS> {
+    pub(super) fn classes(&self) -> &Classes<PS> {
         &self.classes.data
     }
 
-    pub(crate) fn common_symbols(&self) -> &CommonSymbols<PS> {
+    pub(super) fn common_symbols(&self) -> &CommonSymbols<PS> {
         &self.common_symbols.data
     }
 
-    pub(crate) fn conditional_booleans(&self) -> &Vec<ConditionalBoolean<PS>> {
+    pub(super) fn conditional_booleans(&self) -> &Vec<ConditionalBoolean<PS>> {
         &self.conditional_booleans.data
     }
 
-    pub(crate) fn fs_uses(&self) -> &FsUses<PS> {
+    pub(super) fn fs_uses(&self) -> &FsUses<PS> {
         &self.fs_uses.data
     }
 
     #[allow(dead_code)]
     // TODO(http://b/334968228): fn to be used again when checking role allow rules separately from
     // SID calculation.
-    pub(crate) fn role_allowlist(&self) -> &[RoleAllow] {
+    pub(super) fn role_allowlist(&self) -> &[RoleAllow] {
         PS::deref_slice(&self.role_allowlist.data)
     }
 
-    pub(crate) fn role_transitions(&self) -> &[RoleTransition] {
+    pub(super) fn role_transitions(&self) -> &[RoleTransition] {
         PS::deref_slice(&self.role_transitions.data)
     }
 
-    pub(crate) fn range_transitions(&self) -> &RangeTransitions<PS> {
+    pub(super) fn range_transitions(&self) -> &RangeTransitions<PS> {
         &self.range_transitions.data
     }
 
-    pub(crate) fn access_vectors(&self) -> &AccessVectors<PS> {
+    pub(super) fn access_vectors(&self) -> &AccessVectors<PS> {
         &self.access_vectors.data
     }
 
@@ -375,7 +373,7 @@ where
 {
     /// Parses the binary policy stored in `bytes`. It is an error for `bytes` to have trailing
     /// bytes after policy parsing completes.
-    pub(crate) fn parse(bytes: PS) -> Result<(Self, PS::Input), anyhow::Error> {
+    pub(super) fn parse(bytes: PS) -> Result<(Self, PS::Input), anyhow::Error> {
         let (policy, tail) =
             <ParsedPolicy<PS> as Parse<PS>>::parse(bytes).map_err(Into::<anyhow::Error>::into)?;
         let num_bytes = tail.len();

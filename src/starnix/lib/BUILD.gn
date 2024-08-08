@@ -7,7 +7,6 @@ group("lib") {
     "linux_uapi",
     "magma",
     "selinux/core",
-    "selinux/policy",
     "starnix-uapi",
     "syncio",
   ]

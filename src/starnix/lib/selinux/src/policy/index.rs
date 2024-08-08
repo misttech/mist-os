@@ -13,7 +13,7 @@ use super::symbols::{
 };
 use super::{CategoryId, ParsedPolicy, RoleId, TypeId};
 
-use selinux::{self as sc, ClassPermission as _};
+use crate::ClassPermission as _;
 use std::collections::HashMap;
 use std::num::NonZeroU32;
 
@@ -25,13 +25,13 @@ use std::num::NonZeroU32;
 /// `policy_index.classes(ObjectClass::Process).unwrap()` yields the offset in the policy's
 /// collection of classes where the "process" class resides.
 #[derive(Debug)]
-pub(crate) struct PolicyIndex<PS: ParseStrategy> {
+pub(super) struct PolicyIndex<PS: ParseStrategy> {
     /// Map from well-known classes to their offsets in the associate policy's
     /// [`crate::symbols::Classes`] collection.
-    classes: HashMap<sc::ObjectClass, usize>,
+    classes: HashMap<crate::ObjectClass, usize>,
     /// Map from well-known permissions to their class's associated [`crate::symbols::Permissions`]
     /// collection.
-    permissions: HashMap<sc::Permission, PermissionIndex>,
+    permissions: HashMap<crate::Permission, PermissionIndex>,
     /// The parsed binary policy.
     parsed_policy: ParsedPolicy<PS>,
     /// The "object_r" role used as a fallback for new file context transitions.
@@ -49,10 +49,10 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
         let policy_classes = parsed_policy.classes();
         let common_symbols = parsed_policy.common_symbols();
 
-        // Accumulate classes indexed by `selinux::ObjectClass`. If the policy defines that unknown
+        // Accumulate classes indexed by `crate::ObjectClass`. If the policy defines that unknown
         // classes should cause rejection then return an error describing the missing element.
         let mut classes = HashMap::new();
-        for known_class in sc::ObjectClass::all_variants().into_iter() {
+        for known_class in crate::ObjectClass::all_variants().into_iter() {
             match get_class_index_by_name(policy_classes, known_class.name()) {
                 Some(class_index) => {
                     classes.insert(known_class, class_index);
@@ -65,10 +65,10 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
             }
         }
 
-        // Accumulate permissions indexed by `selinux::Permission`. If the policy defines that unknown
+        // Accumulate permissions indexed by `crate::Permission`. If the policy defines that unknown
         // classes should cause rejection then return an error describing the missing element.
         let mut permissions = HashMap::new();
-        for known_permission in sc::Permission::all_variants().into_iter() {
+        for known_permission in crate::Permission::all_variants().into_iter() {
             let object_class = known_permission.class();
             if let Some(class_index) = classes.get(&object_class) {
                 let class = &policy_classes[*class_index];
@@ -95,7 +95,7 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
         let index = Self { classes, permissions, parsed_policy, cached_object_r_role };
 
         // Verify that the initial Security Contexts are all defined, and valid.
-        for id in sc::InitialSid::all_variants() {
+        for id in crate::InitialSid::all_variants() {
             index.resolve_initial_context(id)?;
         }
 
@@ -107,11 +107,11 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
         Ok(index)
     }
 
-    pub fn class<'a>(&'a self, object_class: &sc::ObjectClass) -> Option<&'a Class<PS>> {
+    pub fn class<'a>(&'a self, object_class: &crate::ObjectClass) -> Option<&'a Class<PS>> {
         self.classes.get(object_class).map(|offset| &self.parsed_policy.classes()[*offset])
     }
 
-    pub fn permission<'a>(&'a self, permission: &sc::Permission) -> Option<&'a Permission<PS>> {
+    pub fn permission<'a>(&'a self, permission: &crate::Permission) -> Option<&'a Permission<PS>> {
         let target_class = self.class(&permission.class())?;
         self.permissions.get(permission).map(|p| match p {
             PermissionIndex::Class { permission_index } => {
@@ -128,9 +128,9 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
         &self,
         source: &SecurityContext,
         target: &SecurityContext,
-        class: &sc::FileClass,
+        class: &crate::FileClass,
     ) -> Result<SecurityContext, SecurityContextError> {
-        let object_class = sc::ObjectClass::from(class.clone());
+        let object_class = crate::ObjectClass::from(class.clone());
         self.new_security_context(
             source,
             target,
@@ -170,7 +170,7 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
         &self,
         source: &SecurityContext,
         target: &SecurityContext,
-        class: &sc::ObjectClass,
+        class: &crate::ObjectClass,
         default_role: RoleId,
         default_type: TypeId,
         default_low_level: &SecurityLevel,
@@ -251,17 +251,17 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
 
     /// Returns the Id of the "object_r" role within the `parsed_policy`, for use when validating
     /// Security Context fields.
-    pub(crate) fn object_role(&self) -> RoleId {
+    pub(super) fn object_role(&self) -> RoleId {
         self.cached_object_r_role
     }
 
-    pub(crate) fn parsed_policy(&self) -> &ParsedPolicy<PS> {
+    pub(super) fn parsed_policy(&self) -> &ParsedPolicy<PS> {
         &self.parsed_policy
     }
 
     /// Returns the [`SecurityContext`] defined by this policy for the specified
     /// well-known (or "initial") Id.
-    pub(super) fn initial_context(&self, id: sc::InitialSid) -> SecurityContext {
+    pub(super) fn initial_context(&self, id: crate::InitialSid) -> SecurityContext {
         // All [`InitialSid`] have already been verified as resolvable, by `new()`.
         self.resolve_initial_context(id).unwrap()
     }
@@ -269,7 +269,7 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
     /// Helper used to construct and validate well-known [`SecurityContext`] values.
     fn resolve_initial_context(
         &self,
-        id: sc::InitialSid,
+        id: crate::InitialSid,
     ) -> Result<SecurityContext, SecurityContextError> {
         self.security_context_from_policy_context(self.parsed_policy().initial_context(id))
     }
@@ -294,7 +294,7 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
         )
     }
 
-    /// Helper used by `initial_context()` to create a [`sc::SecurityLevel`] instance from
+    /// Helper used by `initial_context()` to create a [`crate::SecurityLevel`] instance from
     /// the policy fields.
     fn security_level(&self, level: &MlsLevel<PS>) -> SecurityLevel {
         SecurityLevel::new(

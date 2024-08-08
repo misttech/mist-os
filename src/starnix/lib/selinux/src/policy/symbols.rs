@@ -26,18 +26,18 @@ const CONSTRAINT_TYPE_HAS_EXTENSIBLE_BITMAP_AND_TYPE_SET: u32 = 5;
 ///
 /// TODO: Eliminate `dead_code` guard.
 #[allow(dead_code)]
-pub(crate) const TYPE_PROPERTIES_TYPE: u32 = 1;
+pub(super) const TYPE_PROPERTIES_TYPE: u32 = 1;
 
 /// Exact value of [`Type`] `properties` when the underlying data refers to an SELinux alias.
-pub(crate) const TYPE_PROPERTIES_ALIAS: u32 = 0;
+pub(super) const TYPE_PROPERTIES_ALIAS: u32 = 0;
 
 /// Exact value of [`Type`] `properties` when the underlying data refers to an SELinux attribute.
-pub(crate) const TYPE_PROPERTIES_ATTRIBUTE: u32 = 0;
+pub(super) const TYPE_PROPERTIES_ATTRIBUTE: u32 = 0;
 
 /// [`SymbolList`] is an [`Array`] of items with the count of items determined by [`Metadata`] as
 /// [`Counted`].
 #[derive(Debug, PartialEq)]
-pub(crate) struct SymbolList<PS: ParseStrategy, T>(Array<PS, PS::Output<Metadata>, Vec<T>>);
+pub(super) struct SymbolList<PS: ParseStrategy, T>(Array<PS, PS::Output<Metadata>, Vec<T>>);
 
 impl<PS: ParseStrategy, T> Deref for SymbolList<PS, T> {
     type Target = Array<PS, PS::Output<Metadata>, Vec<T>>;
@@ -77,7 +77,7 @@ where
 /// Binary metadata prefix to [`SymbolList`] objects.
 #[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
-pub(crate) struct Metadata {
+pub(super) struct Metadata {
     /// The number of primary names referred to in the associated [`SymbolList`].
     primary_names_count: le::U32,
     /// The number of objects in the associated [`SymbolList`] [`Array`].
@@ -127,7 +127,7 @@ impl<PS: ParseStrategy> CommonSymbol<PS> {
     }
 }
 
-pub(crate) type CommonSymbols<PS> = Vec<CommonSymbol<PS>>;
+pub(super) type CommonSymbols<PS> = Vec<CommonSymbol<PS>>;
 
 impl<PS: ParseStrategy> CommonSymbol<PS> {
     /// Returns the name of this common symbol (a string), encoded a borrow of a byte slice. For
@@ -194,7 +194,7 @@ impl<PS: ParseStrategy> ValidateArray<CommonSymbolStaticMetadata, u8> for Common
 /// Static (that is, fixed-sized) metadata for a common symbol.
 #[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
-pub(crate) struct CommonSymbolStaticMetadata {
+pub(super) struct CommonSymbolStaticMetadata {
     /// The length of the `[u8]` key stored in the associated [`CommonSymbolMetadata`].
     length: le::U32,
     /// An integer that identifies this this common symbol, unique to this common symbol relative
@@ -223,7 +223,7 @@ impl Counted for CommonSymbolStaticMetadata {
 }
 
 /// [`Permissions`] is a dynamically allocated slice (that is, [`Vec`]) of [`Permission`].
-pub(crate) type Permissions<PS> = Vec<Permission<PS>>;
+pub(super) type Permissions<PS> = Vec<Permission<PS>>;
 
 impl<PS: ParseStrategy> Validate for Permissions<PS> {
     type Error = anyhow::Error;
@@ -266,7 +266,7 @@ impl<PS: ParseStrategy> ValidateArray<PermissionMetadata, u8> for Permission<PS>
 
 #[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
-pub(crate) struct PermissionMetadata {
+pub(super) struct PermissionMetadata {
     /// The length of the `[u8]` in the associated [`Permission`].
     length: le::U32,
     id: le::U32,
@@ -288,7 +288,7 @@ impl Validate for PermissionMetadata {
     }
 }
 
-pub(crate) type ConstraintsList<PS> = Vec<PermissionAndConstraints<PS>>;
+pub(super) type ConstraintsList<PS> = Vec<PermissionAndConstraints<PS>>;
 
 impl<PS: ParseStrategy> Validate for ConstraintsList<PS> {
     type Error = anyhow::Error;
@@ -301,7 +301,7 @@ impl<PS: ParseStrategy> Validate for ConstraintsList<PS> {
 }
 
 #[derive(Debug, PartialEq)]
-pub(crate) struct PermissionAndConstraints<PS: ParseStrategy>
+pub(super) struct PermissionAndConstraints<PS: ParseStrategy>
 where
     ConstraintList<PS>: Debug + PartialEq,
 {
@@ -353,7 +353,7 @@ impl<PS: ParseStrategy> ValidateArray<ConstraintCount, Constraint<PS>> for Const
 
 #[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
-pub(crate) struct ConstraintCount(le::U32);
+pub(super) struct ConstraintCount(le::U32);
 
 impl Counted for ConstraintCount {
     fn count(&self) -> u32 {
@@ -381,13 +381,13 @@ impl<PS: ParseStrategy> Validate for Constraints<PS> {
 }
 
 #[derive(Debug, PartialEq)]
-pub(crate) struct Constraint<PS: ParseStrategy> {
+pub(super) struct Constraint<PS: ParseStrategy> {
     metadata: PS::Output<ConstraintMetadata>,
     names: Option<ExtensibleBitmap<PS>>,
     names_type_set: Option<TypeSet<PS>>,
 }
 
-pub(crate) type Constraints<PS> = Vec<Constraint<PS>>;
+pub(super) type Constraints<PS> = Vec<Constraint<PS>>;
 
 impl<PS: ParseStrategy> Parse<PS> for Constraint<PS>
 where
@@ -419,7 +419,7 @@ where
 
 #[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
-pub(crate) struct ConstraintMetadata {
+pub(super) struct ConstraintMetadata {
     constraint_type: le::U32,
     attribute: le::U32,
     operands: le::U32,
@@ -435,7 +435,7 @@ impl Validate for ConstraintMetadata {
 }
 
 #[derive(Debug, PartialEq)]
-pub(crate) struct TypeSet<PS: ParseStrategy> {
+pub(super) struct TypeSet<PS: ParseStrategy> {
     types: ExtensibleBitmap<PS>,
     negative_set: ExtensibleBitmap<PS>,
     flags: PS::Output<le::U32>,
@@ -473,7 +473,7 @@ where
 
 /// Locates a class named `name` among `classes`. Returns the first such class found, though policy
 /// validation should ensure that only one such class exists.
-pub(crate) fn find_class_by_name<'a, PS: ParseStrategy>(
+pub(super) fn find_class_by_name<'a, PS: ParseStrategy>(
     classes: &'a Classes<PS>,
     name: &str,
 ) -> Option<&'a Class<PS>> {
@@ -498,14 +498,14 @@ fn find_class_by_name_bytes<'a, PS: ParseStrategy>(
 ///
 /// TODO: Eliminate `dead_code` guard.
 #[allow(dead_code)]
-pub(crate) fn find_common_symbol_by_name<'a, PS: ParseStrategy>(
+pub(super) fn find_common_symbol_by_name<'a, PS: ParseStrategy>(
     common_symbols: &'a CommonSymbols<PS>,
     name: &str,
 ) -> Option<&'a CommonSymbol<PS>> {
     find_common_symbol_by_name_bytes(common_symbols, name.as_bytes())
 }
 
-pub(crate) fn find_common_symbol_by_name_bytes<'a, PS: ParseStrategy>(
+pub(super) fn find_common_symbol_by_name_bytes<'a, PS: ParseStrategy>(
     common_symbols: &'a CommonSymbols<PS>,
     name_bytes: &[u8],
 ) -> Option<&'a CommonSymbol<PS>> {
@@ -529,7 +529,7 @@ pub(crate) fn find_common_symbol_by_name_bytes<'a, PS: ParseStrategy>(
 /// Each `class` may inherit from zero or one `common`, in which case the permissions specified in
 /// the denoted `common` are also permissions in `class`. Locating these "common" permissions is the
 /// reason that `common_symbols` is received as a function input.
-pub(crate) fn find_class_permission_by_name<'a, PS: ParseStrategy>(
+pub(super) fn find_class_permission_by_name<'a, PS: ParseStrategy>(
     common_symbols: &'a CommonSymbols<PS>,
     class: &'a Class<PS>,
     name: &'a str,
@@ -589,13 +589,13 @@ impl<PS: ParseStrategy> Validate for [Class<PS>] {
 }
 
 #[derive(Debug, PartialEq)]
-pub(crate) struct Class<PS: ParseStrategy> {
+pub(super) struct Class<PS: ParseStrategy> {
     constraints: ClassConstraints<PS>,
     validate_transitions: ClassValidateTransitions<PS>,
     defaults: PS::Output<ClassDefaults>,
 }
 
-pub(crate) type Classes<PS> = Vec<Class<PS>>;
+pub(super) type Classes<PS> = Vec<Class<PS>>;
 
 impl<PS: ParseStrategy> Class<PS> {
     /// Returns the name of the `common` from which this `class` inherits as a borrow of a byte
@@ -680,7 +680,7 @@ where
 
 #[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
-pub(crate) struct ClassDefaults {
+pub(super) struct ClassDefaults {
     default_user: le::U32,
     default_role: le::U32,
     default_range: le::U32,
@@ -718,16 +718,16 @@ impl Validate for ClassDefaults {
 }
 
 #[derive(PartialEq)]
-pub(crate) enum ClassDefault {
+pub(super) enum ClassDefault {
     Unspecified,
     Source,
     Target,
 }
 
 impl ClassDefault {
-    pub(crate) const DEFAULT_UNSPECIFIED: u32 = 0;
-    pub(crate) const DEFAULT_SOURCE: u32 = 1;
-    pub(crate) const DEFAULT_TARGET: u32 = 2;
+    pub(super) const DEFAULT_UNSPECIFIED: u32 = 0;
+    pub(super) const DEFAULT_SOURCE: u32 = 1;
+    pub(super) const DEFAULT_TARGET: u32 = 2;
 
     fn validate(value: u32) -> Result<(), ValidateError> {
         match value {
@@ -755,7 +755,7 @@ impl From<u32> for ClassDefault {
 }
 
 #[derive(PartialEq)]
-pub(crate) enum ClassDefaultRange {
+pub(super) enum ClassDefaultRange {
     Unspecified,
     SourceLow,
     SourceHigh,
@@ -766,15 +766,15 @@ pub(crate) enum ClassDefaultRange {
 }
 
 impl ClassDefaultRange {
-    pub(crate) const DEFAULT_UNSPECIFIED: u32 = 0;
-    pub(crate) const DEFAULT_SOURCE_LOW: u32 = 1;
-    pub(crate) const DEFAULT_SOURCE_HIGH: u32 = 2;
-    pub(crate) const DEFAULT_SOURCE_LOW_HIGH: u32 = 3;
-    pub(crate) const DEFAULT_TARGET_LOW: u32 = 4;
-    pub(crate) const DEFAULT_TARGET_HIGH: u32 = 5;
-    pub(crate) const DEFAULT_TARGET_LOW_HIGH: u32 = 6;
+    pub(super) const DEFAULT_UNSPECIFIED: u32 = 0;
+    pub(super) const DEFAULT_SOURCE_LOW: u32 = 1;
+    pub(super) const DEFAULT_SOURCE_HIGH: u32 = 2;
+    pub(super) const DEFAULT_SOURCE_LOW_HIGH: u32 = 3;
+    pub(super) const DEFAULT_TARGET_LOW: u32 = 4;
+    pub(super) const DEFAULT_TARGET_HIGH: u32 = 5;
+    pub(super) const DEFAULT_TARGET_LOW_HIGH: u32 = 6;
     // TODO: Determine what this value means.
-    pub(crate) const DEFAULT_UNKNOWN_USED_VALUE: u32 = 7;
+    pub(super) const DEFAULT_UNKNOWN_USED_VALUE: u32 = 7;
 
     fn validate(value: u32) -> Result<(), ValidateError> {
         match value {
@@ -843,7 +843,7 @@ impl<PS: ParseStrategy> ValidateArray<ClassValidateTransitionsCount, Constraint<
 
 #[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
-pub(crate) struct ClassValidateTransitionsCount(le::U32);
+pub(super) struct ClassValidateTransitionsCount(le::U32);
 
 impl Counted for ClassValidateTransitionsCount {
     fn count(&self) -> u32 {
@@ -963,7 +963,7 @@ where
 
 #[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
-pub(crate) struct ClassMetadata {
+pub(super) struct ClassMetadata {
     key_length: le::U32,
     common_key_length: le::U32,
     id: le::U32,
@@ -1001,18 +1001,18 @@ impl<PS: ParseStrategy> Validate for [Role<PS>] {
 }
 
 #[derive(Debug, PartialEq)]
-pub(crate) struct Role<PS: ParseStrategy> {
+pub(super) struct Role<PS: ParseStrategy> {
     metadata: RoleMetadata<PS>,
     role_dominates: ExtensibleBitmap<PS>,
     role_types: ExtensibleBitmap<PS>,
 }
 
 impl<PS: ParseStrategy> Role<PS> {
-    pub(crate) fn id(&self) -> RoleId {
+    pub(super) fn id(&self) -> RoleId {
         RoleId(NonZeroU32::new(PS::deref(&self.metadata.metadata).id.get()).unwrap())
     }
 
-    pub(crate) fn name_bytes(&self) -> &[u8] {
+    pub(super) fn name_bytes(&self) -> &[u8] {
         PS::deref_slice(&self.metadata.data)
     }
 }
@@ -1061,7 +1061,7 @@ impl<PS: ParseStrategy> ValidateArray<RoleStaticMetadata, u8> for RoleMetadata<P
 
 #[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
-pub(crate) struct RoleStaticMetadata {
+pub(super) struct RoleStaticMetadata {
     length: le::U32,
     id: le::U32,
     bounds: le::U32,
@@ -1089,7 +1089,7 @@ impl Validate for RoleStaticMetadata {
 ///
 /// TODO: Eliminate `dead_code` guard.
 #[allow(dead_code)]
-pub(crate) fn type_has_attribute<'a, PS: ParseStrategy>(
+pub(super) fn type_has_attribute<'a, PS: ParseStrategy>(
     ty: &'a Type<PS>,
     attr: &'a Type<PS>,
     attribute_maps: &Vec<ExtensibleBitmap<PS>>,
@@ -1171,7 +1171,7 @@ impl<PS: ParseStrategy> ValidateArray<TypeMetadata, u8> for Type<PS> {
 
 #[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
-pub(crate) struct TypeMetadata {
+pub(super) struct TypeMetadata {
     length: le::U32,
     id: le::U32,
     properties: le::U32,
@@ -1203,7 +1203,7 @@ impl<PS: ParseStrategy> Validate for [User<PS>] {
 }
 
 #[derive(Debug, PartialEq)]
-pub(crate) struct User<PS: ParseStrategy> {
+pub(super) struct User<PS: ParseStrategy> {
     user_data: UserData<PS>,
     roles: ExtensibleBitmap<PS>,
     expanded_range: MlsRange<PS>,
@@ -1211,19 +1211,19 @@ pub(crate) struct User<PS: ParseStrategy> {
 }
 
 impl<PS: ParseStrategy> User<PS> {
-    pub(crate) fn id(&self) -> UserId {
+    pub(super) fn id(&self) -> UserId {
         UserId(NonZeroU32::new(PS::deref(&self.user_data.metadata).id.get()).unwrap())
     }
 
-    pub(crate) fn name_bytes(&self) -> &[u8] {
+    pub(super) fn name_bytes(&self) -> &[u8] {
         PS::deref_slice(&self.user_data.data)
     }
 
-    pub(crate) fn roles(&self) -> &ExtensibleBitmap<PS> {
+    pub(super) fn roles(&self) -> &ExtensibleBitmap<PS> {
         &self.roles
     }
 
-    pub(crate) fn mls_range(&self) -> &MlsRange<PS> {
+    pub(super) fn mls_range(&self) -> &MlsRange<PS> {
         &self.expanded_range
     }
 }
@@ -1270,7 +1270,7 @@ impl<PS: ParseStrategy> ValidateArray<UserMetadata, u8> for UserData<PS> {
 
 #[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
-pub(crate) struct UserMetadata {
+pub(super) struct UserMetadata {
     length: le::U32,
     id: le::U32,
     bounds: le::U32,
@@ -1292,7 +1292,7 @@ impl Validate for UserMetadata {
 }
 
 #[derive(Debug, PartialEq)]
-pub(crate) struct MlsLevel<PS: ParseStrategy> {
+pub(super) struct MlsLevel<PS: ParseStrategy> {
     sensitivity: PS::Output<le::U32>,
     categories: ExtensibleBitmap<PS>,
 }
@@ -1331,7 +1331,7 @@ where
 }
 
 #[derive(Debug, PartialEq)]
-pub(crate) struct MlsRange<PS: ParseStrategy> {
+pub(super) struct MlsRange<PS: ParseStrategy> {
     count: PS::Output<le::U32>,
     low: MlsLevel<PS>,
     high: Option<MlsLevel<PS>>,
@@ -1440,7 +1440,7 @@ impl<PS: ParseStrategy> ValidateArray<ConditionalBooleanMetadata, u8> for Condit
 
 #[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
-pub(crate) struct ConditionalBooleanMetadata {
+pub(super) struct ConditionalBooleanMetadata {
     id: le::U32,
     /// Current active value of this conditional boolean.
     active: le::U32,
@@ -1449,7 +1449,7 @@ pub(crate) struct ConditionalBooleanMetadata {
 
 impl ConditionalBooleanMetadata {
     /// Returns the active value for the boolean.
-    pub(crate) fn active(&self) -> bool {
+    pub(super) fn active(&self) -> bool {
         self.active != le::U32::ZERO
     }
 }
@@ -1481,7 +1481,7 @@ impl<PS: ParseStrategy> Validate for [Sensitivity<PS>] {
 }
 
 #[derive(Debug, PartialEq)]
-pub(crate) struct Sensitivity<PS: ParseStrategy> {
+pub(super) struct Sensitivity<PS: ParseStrategy> {
     metadata: SensitivityMetadata<PS>,
     level: MlsLevel<PS>,
 }
@@ -1547,7 +1547,7 @@ impl<PS: ParseStrategy> ValidateArray<SensitivityStaticMetadata, u8> for Sensiti
 
 #[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
-pub(crate) struct SensitivityStaticMetadata {
+pub(super) struct SensitivityStaticMetadata {
     length: le::U32,
     is_alias: le::U32,
 }
@@ -1606,7 +1606,7 @@ impl<PS: ParseStrategy> ValidateArray<CategoryMetadata, u8> for Category<PS> {
 
 #[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
-pub(crate) struct CategoryMetadata {
+pub(super) struct CategoryMetadata {
     length: le::U32,
     id: le::U32,
     is_alias: le::U32,

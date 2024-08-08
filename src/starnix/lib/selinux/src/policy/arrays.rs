@@ -19,19 +19,19 @@ use std::fmt::Debug;
 use std::num::NonZeroU32;
 use zerocopy::{little_endian as le, FromBytes, FromZeroes, NoCell, Unaligned};
 
-pub(crate) const EXTENDED_PERMISSIONS_IS_SPECIFIED_DRIVER_PERMISSIONS_MASK: u16 = 0x0700;
-pub(crate) const MIN_POLICY_VERSION_FOR_INFINITIBAND_PARTITION_KEY: u32 = 31;
+pub(super) const EXTENDED_PERMISSIONS_IS_SPECIFIED_DRIVER_PERMISSIONS_MASK: u16 = 0x0700;
+pub(super) const MIN_POLICY_VERSION_FOR_INFINITIBAND_PARTITION_KEY: u32 = 31;
 
 /// Mask for [`AccessVectorMetadata`] `access_vector_type` that indicates whether the access vector
 /// comes from an `allow [source] [target]:[class] { [permissions] };` policy statement.
-pub(crate) const ACCESS_VECTOR_TYPE_ALLOW_MASK: u16 = 1;
+pub(super) const ACCESS_VECTOR_TYPE_ALLOW_MASK: u16 = 1;
 
 /// Mask for [`AccessVectorMetadata`] `access_vector_type` that indicates whether the access vector
 /// comes from an `allow [source] [target]:[class] { [permissions] };` policy statement.
-pub(crate) const ACCESS_VECTOR_TYPE_TYPE_TRANSITION_MASK: u16 = 16;
+pub(super) const ACCESS_VECTOR_TYPE_TYPE_TRANSITION_MASK: u16 = 16;
 
 #[allow(type_alias_bounds)]
-pub(crate) type SimpleArray<PS: ParseStrategy, T> = Array<PS, PS::Output<le::U32>, T>;
+pub(super) type SimpleArray<PS: ParseStrategy, T> = Array<PS, PS::Output<le::U32>, T>;
 
 impl<PS: ParseStrategy, T: Validate> Validate for SimpleArray<PS, T> {
     type Error = <T as Validate>::Error;
@@ -49,7 +49,7 @@ impl Counted for le::U32 {
     }
 }
 
-pub(crate) type ConditionalNodes<PS> = Vec<ConditionalNode<PS>>;
+pub(super) type ConditionalNodes<PS> = Vec<ConditionalNode<PS>>;
 
 impl<PS: ParseStrategy> Validate for ConditionalNodes<PS> {
     type Error = anyhow::Error;
@@ -85,7 +85,7 @@ impl<PS: ParseStrategy> ValidateArray<ConditionalNodeMetadata, ConditionalNodeDa
 }
 
 #[derive(Debug, PartialEq)]
-pub(crate) struct ConditionalNode<PS: ParseStrategy> {
+pub(super) struct ConditionalNode<PS: ParseStrategy> {
     items: ConditionalNodeItems<PS>,
     true_list: SimpleArray<PS, AccessVectors<PS>>,
     false_list: SimpleArray<PS, AccessVectors<PS>>,
@@ -119,7 +119,7 @@ where
 
 #[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
-pub(crate) struct ConditionalNodeMetadata {
+pub(super) struct ConditionalNodeMetadata {
     state: le::U32,
     count: le::U32,
 }
@@ -141,7 +141,7 @@ impl Validate for ConditionalNodeMetadata {
 
 #[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
-pub(crate) struct ConditionalNodeDatum {
+pub(super) struct ConditionalNodeDatum {
     node_type: le::U32,
     boolean: le::U32,
 }
@@ -155,7 +155,7 @@ impl Validate for [ConditionalNodeDatum] {
     }
 }
 
-pub(crate) type AccessVectors<PS> = Vec<AccessVector<PS>>;
+pub(super) type AccessVectors<PS> = Vec<AccessVector<PS>>;
 
 impl<PS: ParseStrategy> Validate for AccessVectors<PS> {
     type Error = anyhow::Error;
@@ -169,7 +169,7 @@ impl<PS: ParseStrategy> Validate for AccessVectors<PS> {
 }
 
 #[derive(Debug, PartialEq)]
-pub(crate) struct AccessVector<PS: ParseStrategy> {
+pub(super) struct AccessVector<PS: ParseStrategy> {
     metadata: PS::Output<AccessVectorMetadata>,
     extended_permissions: ExtendedPermissions<PS>,
 }
@@ -288,7 +288,7 @@ impl<PS: ParseStrategy> Validate for AccessVector<PS> {
 
 #[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
-pub(crate) struct AccessVectorMetadata {
+pub(super) struct AccessVectorMetadata {
     source_type: le::U16,
     target_type: le::U16,
     class: le::U16,
@@ -316,7 +316,7 @@ impl AccessVectorMetadata {
 }
 
 #[derive(Debug, PartialEq)]
-pub(crate) enum ExtendedPermissions<PS: ParseStrategy> {
+pub(super) enum ExtendedPermissions<PS: ParseStrategy> {
     SpecifiedDriverPermissions(PS::Output<SpecifiedDriverPermissions>),
     PermissionMask(PS::Output<le::U32>),
     NewType(PS::Output<le::U32>),
@@ -324,7 +324,7 @@ pub(crate) enum ExtendedPermissions<PS: ParseStrategy> {
 
 #[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
-pub(crate) struct SpecifiedDriverPermissions {
+pub(super) struct SpecifiedDriverPermissions {
     specified: u8,
     driver: u8,
     permissions: [le::U32; 8],
@@ -348,7 +348,7 @@ impl<PS: ParseStrategy> ValidateArray<le::U32, RoleTransition> for RoleTransitio
 
 #[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
-pub(crate) struct RoleTransition {
+pub(super) struct RoleTransition {
     role: le::U32,
     role_type: le::U32,
     new_role: le::U32,
@@ -356,19 +356,19 @@ pub(crate) struct RoleTransition {
 }
 
 impl RoleTransition {
-    pub(crate) fn current_role(&self) -> RoleId {
+    pub(super) fn current_role(&self) -> RoleId {
         RoleId(NonZeroU32::new(self.role.get()).unwrap())
     }
 
-    pub(crate) fn type_(&self) -> TypeId {
+    pub(super) fn type_(&self) -> TypeId {
         TypeId(NonZeroU32::new(self.role_type.get()).unwrap())
     }
 
-    pub(crate) fn class(&self) -> ClassId {
+    pub(super) fn class(&self) -> ClassId {
         ClassId(NonZeroU32::new(self.tclass.get()).unwrap())
     }
 
-    pub(crate) fn new_role(&self) -> RoleId {
+    pub(super) fn new_role(&self) -> RoleId {
         RoleId(NonZeroU32::new(self.new_role.get()).unwrap())
     }
 }
@@ -404,7 +404,7 @@ impl<PS: ParseStrategy> ValidateArray<le::U32, RoleAllow> for RoleAllows<PS> {
 
 #[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
-pub(crate) struct RoleAllow {
+pub(super) struct RoleAllow {
     role: le::U32,
     new_role: le::U32,
 }
@@ -413,14 +413,14 @@ impl RoleAllow {
     #[allow(dead_code)]
     // TODO(http://b/334968228): fn to be used again when checking role allow rules separately from
     // SID calculation.
-    pub(crate) fn source_role(&self) -> RoleId {
+    pub(super) fn source_role(&self) -> RoleId {
         RoleId(NonZeroU32::new(self.role.get()).unwrap())
     }
 
     #[allow(dead_code)]
     // TODO(http://b/334968228): fn to be used again when checking role allow rules separately from
     // SID calculation.
-    pub(crate) fn new_role(&self) -> RoleId {
+    pub(super) fn new_role(&self) -> RoleId {
         RoleId(NonZeroU32::new(self.new_role.get()).unwrap())
     }
 }
@@ -435,7 +435,7 @@ impl Validate for [RoleAllow] {
 }
 
 #[derive(Debug, PartialEq)]
-pub(crate) enum FilenameTransitionList<PS: ParseStrategy> {
+pub(super) enum FilenameTransitionList<PS: ParseStrategy> {
     PolicyVersionGeq33(SimpleArray<PS, FilenameTransitions<PS>>),
     PolicyVersionLeq32(SimpleArray<PS, DeprecatedFilenameTransitions<PS>>),
 }
@@ -451,7 +451,7 @@ impl<PS: ParseStrategy> Validate for FilenameTransitionList<PS> {
     }
 }
 
-pub(crate) type FilenameTransitions<PS> = Vec<FilenameTransition<PS>>;
+pub(super) type FilenameTransitions<PS> = Vec<FilenameTransition<PS>>;
 
 impl<PS: ParseStrategy> Validate for FilenameTransitions<PS> {
     type Error = anyhow::Error;
@@ -463,7 +463,7 @@ impl<PS: ParseStrategy> Validate for FilenameTransitions<PS> {
 }
 
 #[derive(Debug, PartialEq)]
-pub(crate) struct FilenameTransition<PS: ParseStrategy> {
+pub(super) struct FilenameTransition<PS: ParseStrategy> {
     filename: SimpleArray<PS, PS::Slice<u8>>,
     transition_type: PS::Output<le::U32>,
     transition_class: PS::Output<le::U32>,
@@ -508,10 +508,10 @@ where
     }
 }
 
-pub(crate) type FilenameTransitionItems<PS> = Vec<FilenameTransitionItem<PS>>;
+pub(super) type FilenameTransitionItems<PS> = Vec<FilenameTransitionItem<PS>>;
 
 #[derive(Debug, PartialEq)]
-pub(crate) struct FilenameTransitionItem<PS: ParseStrategy> {
+pub(super) struct FilenameTransitionItem<PS: ParseStrategy> {
     stypes: ExtensibleBitmap<PS>,
     out_type: PS::Output<le::U32>,
 }
@@ -540,7 +540,7 @@ where
     }
 }
 
-pub(crate) type DeprecatedFilenameTransitions<PS> = Vec<DeprecatedFilenameTransition<PS>>;
+pub(super) type DeprecatedFilenameTransitions<PS> = Vec<DeprecatedFilenameTransition<PS>>;
 
 impl<PS: ParseStrategy> Validate for DeprecatedFilenameTransitions<PS> {
     type Error = anyhow::Error;
@@ -552,7 +552,7 @@ impl<PS: ParseStrategy> Validate for DeprecatedFilenameTransitions<PS> {
 }
 
 #[derive(Debug, PartialEq)]
-pub(crate) struct DeprecatedFilenameTransition<PS: ParseStrategy> {
+pub(super) struct DeprecatedFilenameTransition<PS: ParseStrategy> {
     filename: SimpleArray<PS, PS::Slice<u8>>,
     metadata: PS::Output<DeprecatedFilenameTransitionMetadata>,
 }
@@ -585,21 +585,21 @@ where
 
 #[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
-pub(crate) struct DeprecatedFilenameTransitionMetadata {
+pub(super) struct DeprecatedFilenameTransitionMetadata {
     bit: le::U32,
     transition_type: le::U32,
     transition_class: le::U32,
     old_type: le::U32,
 }
 
-pub(crate) type InitialSids<PS> = Vec<InitialSid<PS>>;
+pub(super) type InitialSids<PS> = Vec<InitialSid<PS>>;
 
 impl<PS: ParseStrategy> Validate for InitialSids<PS> {
     type Error = anyhow::Error;
 
     /// TODO: Validate consistency of sequence of [`InitialSid`] objects.
     fn validate(&self) -> Result<(), Self::Error> {
-        for initial_sid in selinux::InitialSid::all_variants() {
+        for initial_sid in crate::InitialSid::all_variants() {
             self.iter()
                 .find(|initial| initial.id().get() == initial_sid as u32)
                 .ok_or(ValidateError::MissingInitialSid { initial_sid })?;
@@ -609,17 +609,17 @@ impl<PS: ParseStrategy> Validate for InitialSids<PS> {
 }
 
 #[derive(Debug, PartialEq)]
-pub(crate) struct InitialSid<PS: ParseStrategy> {
+pub(super) struct InitialSid<PS: ParseStrategy> {
     id: PS::Output<le::U32>,
     context: Context<PS>,
 }
 
 impl<PS: ParseStrategy> InitialSid<PS> {
-    pub(crate) fn id(&self) -> le::U32 {
+    pub(super) fn id(&self) -> le::U32 {
         *PS::deref(&self.id)
     }
 
-    pub(crate) fn context(&self) -> &Context<PS> {
+    pub(super) fn context(&self) -> &Context<PS> {
         &self.context
     }
 }
@@ -649,25 +649,25 @@ where
 }
 
 #[derive(Debug, PartialEq)]
-pub(crate) struct Context<PS: ParseStrategy> {
+pub(super) struct Context<PS: ParseStrategy> {
     metadata: PS::Output<ContextMetadata>,
     mls_range: MlsRange<PS>,
 }
 
 impl<PS: ParseStrategy> Context<PS> {
-    pub(crate) fn user_id(&self) -> UserId {
+    pub(super) fn user_id(&self) -> UserId {
         UserId(NonZeroU32::new(PS::deref(&self.metadata).user.get()).unwrap())
     }
-    pub(crate) fn role_id(&self) -> RoleId {
+    pub(super) fn role_id(&self) -> RoleId {
         RoleId(NonZeroU32::new(PS::deref(&self.metadata).role.get()).unwrap())
     }
-    pub(crate) fn type_id(&self) -> TypeId {
+    pub(super) fn type_id(&self) -> TypeId {
         TypeId(NonZeroU32::new(PS::deref(&self.metadata).context_type.get()).unwrap())
     }
-    pub(crate) fn low_level(&self) -> &MlsLevel<PS> {
+    pub(super) fn low_level(&self) -> &MlsLevel<PS> {
         self.mls_range.low()
     }
-    pub(crate) fn high_level(&self) -> &Option<MlsLevel<PS>> {
+    pub(super) fn high_level(&self) -> &Option<MlsLevel<PS>> {
         self.mls_range.high()
     }
 }
@@ -694,13 +694,13 @@ where
 
 #[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
-pub(crate) struct ContextMetadata {
+pub(super) struct ContextMetadata {
     user: le::U32,
     role: le::U32,
     context_type: le::U32,
 }
 
-pub(crate) type NamedContextPairs<PS> = Vec<NamedContextPair<PS>>;
+pub(super) type NamedContextPairs<PS> = Vec<NamedContextPair<PS>>;
 
 impl<PS: ParseStrategy> Validate for NamedContextPairs<PS> {
     type Error = anyhow::Error;
@@ -715,7 +715,7 @@ impl<PS: ParseStrategy> Validate for NamedContextPairs<PS> {
 }
 
 #[derive(Debug, PartialEq)]
-pub(crate) struct NamedContextPair<PS: ParseStrategy> {
+pub(super) struct NamedContextPair<PS: ParseStrategy> {
     name: SimpleArray<PS, PS::Slice<u8>>,
     context1: Context<PS>,
     context2: Context<PS>,
@@ -747,7 +747,7 @@ where
     }
 }
 
-pub(crate) type Ports<PS> = Vec<Port<PS>>;
+pub(super) type Ports<PS> = Vec<Port<PS>>;
 
 impl<PS: ParseStrategy> Validate for Ports<PS> {
     type Error = anyhow::Error;
@@ -759,7 +759,7 @@ impl<PS: ParseStrategy> Validate for Ports<PS> {
 }
 
 #[derive(Debug, PartialEq)]
-pub(crate) struct Port<PS: ParseStrategy> {
+pub(super) struct Port<PS: ParseStrategy> {
     metadata: PS::Output<PortMetadata>,
     context: Context<PS>,
 }
@@ -786,13 +786,13 @@ where
 
 #[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
-pub(crate) struct PortMetadata {
+pub(super) struct PortMetadata {
     protocol: le::U32,
     low_port: le::U32,
     high_port: le::U32,
 }
 
-pub(crate) type Nodes<PS> = Vec<Node<PS>>;
+pub(super) type Nodes<PS> = Vec<Node<PS>>;
 
 impl<PS: ParseStrategy> Validate for Nodes<PS> {
     type Error = anyhow::Error;
@@ -804,7 +804,7 @@ impl<PS: ParseStrategy> Validate for Nodes<PS> {
 }
 
 #[derive(Debug, PartialEq)]
-pub(crate) struct Node<PS: ParseStrategy> {
+pub(super) struct Node<PS: ParseStrategy> {
     address: PS::Output<le::U32>,
     mask: PS::Output<le::U32>,
     context: Context<PS>,
@@ -850,7 +850,7 @@ impl<PS: ParseStrategy> Validate for Node<PS> {
     }
 }
 
-pub(crate) type FsUses<PS> = Vec<FsUse<PS>>;
+pub(super) type FsUses<PS> = Vec<FsUse<PS>>;
 
 impl<PS: ParseStrategy> Validate for FsUses<PS> {
     type Error = anyhow::Error;
@@ -864,18 +864,18 @@ impl<PS: ParseStrategy> Validate for FsUses<PS> {
 }
 
 #[derive(Debug, PartialEq)]
-pub(crate) struct FsUse<PS: ParseStrategy> {
+pub(super) struct FsUse<PS: ParseStrategy> {
     behavior_and_name: Array<PS, PS::Output<FsUseMetadata>, PS::Slice<u8>>,
     context: Context<PS>,
 }
 
 impl<PS: ParseStrategy> FsUse<PS> {
     #[allow(dead_code)]
-    pub(crate) fn behavior(&self) -> FsUseType {
+    pub(super) fn behavior(&self) -> FsUseType {
         FsUseType::try_from(PS::deref(&self.behavior_and_name.metadata).behavior).unwrap()
     }
 
-    pub(crate) fn context(&self) -> &Context<PS> {
+    pub(super) fn context(&self) -> &Context<PS> {
         &self.context
     }
 }
@@ -915,7 +915,7 @@ impl<PS: ParseStrategy> Validate for FsUse<PS> {
 
 #[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
-pub(crate) struct FsUseMetadata {
+pub(super) struct FsUseMetadata {
     /// The type of `fs_use` statement.
     behavior: le::U32,
     /// The length of the name in the name_and_behavior field of FsUse.
@@ -928,7 +928,7 @@ impl Counted for FsUseMetadata {
     }
 }
 
-pub(crate) enum FsUseType {
+pub(super) enum FsUseType {
     /// Corresponds to the `fs_use_xatrr` statement.
     FsUseXattr = 1,
     /// Corresponds to the `fs_use_trans` statement.
@@ -950,7 +950,7 @@ impl TryFrom<le::U32> for FsUseType {
     }
 }
 
-pub(crate) type IPv6Nodes<PS> = Vec<IPv6Node<PS>>;
+pub(super) type IPv6Nodes<PS> = Vec<IPv6Node<PS>>;
 
 impl<PS: ParseStrategy> Validate for IPv6Nodes<PS> {
     type Error = anyhow::Error;
@@ -962,7 +962,7 @@ impl<PS: ParseStrategy> Validate for IPv6Nodes<PS> {
 }
 
 #[derive(Debug, PartialEq)]
-pub(crate) struct IPv6Node<PS: ParseStrategy> {
+pub(super) struct IPv6Node<PS: ParseStrategy> {
     address: PS::Output<[le::U32; 4]>,
     mask: PS::Output<[le::U32; 4]>,
     context: Context<PS>,
@@ -999,7 +999,7 @@ where
     }
 }
 
-pub(crate) type InfinitiBandPartitionKeys<PS> = Vec<InfinitiBandPartitionKey<PS>>;
+pub(super) type InfinitiBandPartitionKeys<PS> = Vec<InfinitiBandPartitionKey<PS>>;
 
 impl<PS: ParseStrategy> Validate for InfinitiBandPartitionKeys<PS> {
     type Error = anyhow::Error;
@@ -1011,7 +1011,7 @@ impl<PS: ParseStrategy> Validate for InfinitiBandPartitionKeys<PS> {
 }
 
 #[derive(Debug, PartialEq)]
-pub(crate) struct InfinitiBandPartitionKey<PS: ParseStrategy> {
+pub(super) struct InfinitiBandPartitionKey<PS: ParseStrategy> {
     low: PS::Output<le::U32>,
     high: PS::Output<le::U32>,
     context: Context<PS>,
@@ -1057,7 +1057,7 @@ impl<PS: ParseStrategy> Validate for InfinitiBandPartitionKey<PS> {
     }
 }
 
-pub(crate) type InfinitiBandEndPorts<PS> = Vec<InfinitiBandEndPort<PS>>;
+pub(super) type InfinitiBandEndPorts<PS> = Vec<InfinitiBandEndPort<PS>>;
 
 impl<PS: ParseStrategy> Validate for InfinitiBandEndPorts<PS> {
     type Error = anyhow::Error;
@@ -1069,7 +1069,7 @@ impl<PS: ParseStrategy> Validate for InfinitiBandEndPorts<PS> {
 }
 
 #[derive(Debug, PartialEq)]
-pub(crate) struct InfinitiBandEndPort<PS: ParseStrategy> {
+pub(super) struct InfinitiBandEndPort<PS: ParseStrategy> {
     port_and_name: Array<PS, PS::Output<InfinitiBandEndPortMetadata>, PS::Slice<u8>>,
     context: Context<PS>,
 }
@@ -1099,7 +1099,7 @@ where
 
 #[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
-pub(crate) struct InfinitiBandEndPortMetadata {
+pub(super) struct InfinitiBandEndPortMetadata {
     length: le::U32,
     port: le::U32,
 }
@@ -1110,7 +1110,7 @@ impl Counted for InfinitiBandEndPortMetadata {
     }
 }
 
-pub(crate) type GenericFsContexts<PS> = Vec<GenericFsContext<PS>>;
+pub(super) type GenericFsContexts<PS> = Vec<GenericFsContext<PS>>;
 
 impl<PS: ParseStrategy> Validate for GenericFsContexts<PS> {
     type Error = anyhow::Error;
@@ -1124,7 +1124,7 @@ impl<PS: ParseStrategy> Validate for GenericFsContexts<PS> {
 /// Information parsed parsed from `genfscon [fs_type] [partial_path] [fs_context]` statements
 /// about a specific filesystem type.
 #[derive(Debug, PartialEq)]
-pub(crate) struct GenericFsContext<PS: ParseStrategy> {
+pub(super) struct GenericFsContext<PS: ParseStrategy> {
     /// The filesystem type.
     fs_type: SimpleArray<PS, PS::Slice<u8>>,
     /// The set of contexts defined for this filesystem.
@@ -1153,10 +1153,10 @@ where
     }
 }
 
-pub(crate) type FsContexts<PS> = Vec<FsContext<PS>>;
+pub(super) type FsContexts<PS> = Vec<FsContext<PS>>;
 
 #[derive(Debug, PartialEq)]
-pub(crate) struct FsContext<PS: ParseStrategy> {
+pub(super) struct FsContext<PS: ParseStrategy> {
     /// The partial path, relative to the root of the filesystem. The partial path can only be set for
     /// virtual filesystems, like `proc/`. Otherwise, this must be `/`
     partial_path: SimpleArray<PS, PS::Slice<u8>>,
@@ -1197,7 +1197,7 @@ where
     }
 }
 
-pub(crate) type RangeTransitions<PS> = Vec<RangeTransition<PS>>;
+pub(super) type RangeTransitions<PS> = Vec<RangeTransition<PS>>;
 
 impl<PS: ParseStrategy> Validate for RangeTransitions<PS> {
     type Error = anyhow::Error;
@@ -1214,7 +1214,7 @@ impl<PS: ParseStrategy> Validate for RangeTransitions<PS> {
 }
 
 #[derive(Debug, PartialEq)]
-pub(crate) struct RangeTransition<PS: ParseStrategy> {
+pub(super) struct RangeTransition<PS: ParseStrategy> {
     metadata: PS::Output<RangeTransitionMetadata>,
     mls_range: MlsRange<PS>,
 }
@@ -1259,7 +1259,7 @@ where
 
 #[derive(Clone, Debug, FromZeroes, FromBytes, NoCell, PartialEq, Unaligned)]
 #[repr(C, packed)]
-pub(crate) struct RangeTransitionMetadata {
+pub(super) struct RangeTransitionMetadata {
     source_type: le::U32,
     target_type: le::U32,
     target_class: le::U32,

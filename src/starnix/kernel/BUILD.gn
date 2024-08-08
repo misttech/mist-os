@@ -372,7 +372,6 @@ rustc_library("starnix_core") {
     "//src/starnix/lib/range_map",
     "//src/starnix/lib/selinux",
     "//src/starnix/lib/selinux/core",
-    "//src/starnix/lib/selinux/policy",
     "//src/starnix/lib/starnix-syscalls",
     "//src/starnix/lib/starnix-uapi",
     "//src/starnix/lib/syncio",

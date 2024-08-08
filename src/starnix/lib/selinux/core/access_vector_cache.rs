@@ -4,8 +4,8 @@
 
 use super::SecurityId;
 
+use selinux::policy::AccessVector;
 use selinux::AbstractObjectClass;
-use selinux_policy::AccessVector;
 use starnix_sync::Mutex;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Weak};
@@ -465,8 +465,8 @@ mod tests {
     use once_cell::sync::Lazy;
     use rand::distributions::Uniform;
     use rand::{thread_rng, Rng as _};
+    use selinux::policy::testing::{ACCESS_VECTOR_0001, ACCESS_VECTOR_0010};
     use selinux::ObjectClass;
-    use selinux_policy::testing::{ACCESS_VECTOR_0001, ACCESS_VECTOR_0010};
     use std::collections::{HashMap, HashSet};
     use std::num::NonZeroU32;
     use std::sync::atomic::{AtomicU32, AtomicUsize};

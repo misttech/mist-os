@@ -15,13 +15,13 @@ mod symbols;
 
 pub use security_context::{SecurityContext, SecurityContextError};
 
+use crate::{self as sc, FileClass, NullessByteStr, ObjectClass};
 use anyhow::Context as _;
 use error::{ParseError, QueryError};
 use index::PolicyIndex;
 use metadata::HandleUnknown;
 use parsed_policy::ParsedPolicy;
 use parser::{ByRef, ByValue, ParseStrategy};
-use selinux::{self as sc, FileClass, NullessByteStr, ObjectClass};
 use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::num::NonZeroU32;
@@ -30,7 +30,7 @@ use symbols::{find_class_by_name, find_common_symbol_by_name_bytes};
 use zerocopy::{little_endian as le, ByteSlice, FromBytes, NoCell, Ref, Unaligned};
 
 #[cfg(feature = "selinux_policy_test_api")]
-use selinux::ClassPermission as _;
+use crate::ClassPermission as _;
 
 /// Maximum SELinux policy version supported by this implementation.
 pub const SUPPORTED_POLICY_VERSION: u32 = 33;
@@ -68,7 +68,7 @@ impl AccessVector {
     pub const NONE: AccessVector = AccessVector(0);
     pub const ALL: AccessVector = AccessVector(std::u32::MAX);
 
-    pub(crate) fn from_raw(access_vector: u32) -> Self {
+    pub(super) fn from_raw(access_vector: u32) -> Self {
         Self(access_vector)
     }
 
@@ -318,7 +318,7 @@ impl<PS: ParseStrategy> Policy<PS> {
     /// Returns whether the input types are explicitly granted the permission named
     /// `permission_name` via an `allow [...];` policy statement, or an error if looking up the
     /// input types fails. This is the "custom" form of this API because `permission_name` is
-    /// associated with a [`selinux::AbstractPermission::Custom::permission`] value.
+    /// associated with a [`crate::AbstractPermission::Custom::permission`] value.
     ///
     /// # Panics
     /// If supplied with type Ids not previously obtained from the `Policy` itself; validation
@@ -362,7 +362,7 @@ impl<PS: ParseStrategy> Policy<PS> {
     /// Computes the access vector that associates type `source_type_name` and `target_type_name`
     /// via an explicit `allow [...];` statement in the binary policy. Computes `AccessVector::NONE`
     /// if no such statement exists. This is the "custom" form of this API because
-    /// `target_class_name` is associated with a [`selinux::AbstractObjectClass::Custom`]
+    /// `target_class_name` is associated with a [`crate::AbstractObjectClass::Custom`]
     /// value.
     pub fn compute_explicitly_allowed_custom(
         &self,
@@ -491,7 +491,7 @@ pub trait Parse<PS: ParseStrategy>: Sized {
 }
 
 /// Parse a data as a slice of inner data structures from a prefix of a [`ByteSlice`].
-pub(crate) trait ParseSlice<PS: ParseStrategy>: Sized {
+pub(super) trait ParseSlice<PS: ParseStrategy>: Sized {
     /// The type of error that may be returned from `parse()`, usually [`ParseError`] or
     /// [`anyhow::Error`].
     type Error: Into<anyhow::Error>;
@@ -502,7 +502,7 @@ pub(crate) trait ParseSlice<PS: ParseStrategy>: Sized {
 }
 
 /// Validate a parsed data structure.
-pub(crate) trait Validate {
+pub(super) trait Validate {
     /// The type of error that may be returned from `validate()`, usually [`ParseError`] or
     /// [`anyhow::Error`].
     type Error: Into<anyhow::Error>;
@@ -511,7 +511,7 @@ pub(crate) trait Validate {
     fn validate(&self) -> Result<(), Self::Error>;
 }
 
-pub(crate) trait ValidateArray<M, D> {
+pub(super) trait ValidateArray<M, D> {
     /// The type of error that may be returned from `validate()`, usually [`ParseError`] or
     /// [`anyhow::Error`].
     type Error: Into<anyhow::Error>;
@@ -521,7 +521,7 @@ pub(crate) trait ValidateArray<M, D> {
 }
 
 /// Treat a type as metadata that contains a count of subsequent data.
-pub(crate) trait Counted {
+pub(super) trait Counted {
     /// Returns the count of subsequent data items.
     fn count(&self) -> u32;
 }
@@ -640,23 +640,23 @@ macro_rules! array_type {
         #[doc = $data_type_name]
         #[doc = "`] data items."]
         #[derive(Debug, PartialEq)]
-        pub(crate) struct $type_name<$parse_strategy: crate::parser::ParseStrategy>(
-            crate::Array<PS, $metadata_type, $data_type>,
+        pub(super) struct $type_name<$parse_strategy: crate::policy::parser::ParseStrategy>(
+            crate::policy::Array<PS, $metadata_type, $data_type>,
         );
 
-        impl<PS: crate::parser::ParseStrategy> std::ops::Deref for $type_name<PS> {
-            type Target = crate::Array<PS, $metadata_type, $data_type>;
+        impl<PS: crate::policy::parser::ParseStrategy> std::ops::Deref for $type_name<PS> {
+            type Target = crate::policy::Array<PS, $metadata_type, $data_type>;
 
             fn deref(&self) -> &Self::Target {
                 &self.0
             }
         }
 
-        impl<PS: crate::parser::ParseStrategy> crate::Parse<PS> for $type_name<PS>
+        impl<PS: crate::policy::parser::ParseStrategy> crate::policy::Parse<PS> for $type_name<PS>
         where
-            Array<PS, $metadata_type, $data_type>: crate::Parse<PS>,
+            crate::policy::Array<PS, $metadata_type, $data_type>: crate::policy::Parse<PS>,
         {
-            type Error = <Array<PS, $metadata_type, $data_type> as crate::Parse<PS>>::Error;
+            type Error = <Array<PS, $metadata_type, $data_type> as crate::policy::Parse<PS>>::Error;
 
             fn parse(bytes: PS) -> Result<(Self, PS), Self::Error> {
                 let (array, tail) = Array::<PS, $metadata_type, $data_type>::parse(bytes)?;
@@ -677,11 +677,11 @@ macro_rules! array_type {
     };
 }
 
-pub(crate) use array_type;
+pub(super) use array_type;
 
 macro_rules! array_type_validate_deref_both {
     ($type_name:ident) => {
-        impl<PS: crate::parser::ParseStrategy> Validate for $type_name<PS> {
+        impl<PS: crate::policy::parser::ParseStrategy> Validate for $type_name<PS> {
             type Error = anyhow::Error;
 
             fn validate(&self) -> Result<(), Self::Error> {
@@ -697,11 +697,11 @@ macro_rules! array_type_validate_deref_both {
     };
 }
 
-pub(crate) use array_type_validate_deref_both;
+pub(super) use array_type_validate_deref_both;
 
 macro_rules! array_type_validate_deref_data {
     ($type_name:ident) => {
-        impl<PS: crate::parser::ParseStrategy> Validate for $type_name<PS> {
+        impl<PS: crate::policy::parser::ParseStrategy> Validate for $type_name<PS> {
             type Error = anyhow::Error;
 
             fn validate(&self) -> Result<(), Self::Error> {
@@ -717,11 +717,11 @@ macro_rules! array_type_validate_deref_data {
     };
 }
 
-pub(crate) use array_type_validate_deref_data;
+pub(super) use array_type_validate_deref_data;
 
 macro_rules! array_type_validate_deref_metadata_data_vec {
     ($type_name:ident) => {
-        impl<PS: crate::parser::ParseStrategy> Validate for $type_name<PS> {
+        impl<PS: crate::policy::parser::ParseStrategy> Validate for $type_name<PS> {
             type Error = anyhow::Error;
 
             fn validate(&self) -> Result<(), Self::Error> {
@@ -737,11 +737,11 @@ macro_rules! array_type_validate_deref_metadata_data_vec {
     };
 }
 
-pub(crate) use array_type_validate_deref_metadata_data_vec;
+pub(super) use array_type_validate_deref_metadata_data_vec;
 
 macro_rules! array_type_validate_deref_none_data_vec {
     ($type_name:ident) => {
-        impl<PS: crate::parser::ParseStrategy> Validate for $type_name<PS> {
+        impl<PS: crate::policy::parser::ParseStrategy> Validate for $type_name<PS> {
             type Error = anyhow::Error;
 
             fn validate(&self) -> Result<(), Self::Error> {
@@ -757,7 +757,7 @@ macro_rules! array_type_validate_deref_none_data_vec {
     };
 }
 
-pub(crate) use array_type_validate_deref_none_data_vec;
+pub(super) use array_type_validate_deref_none_data_vec;
 
 impl<
         B: Debug + ByteSlice + PartialEq,
@@ -833,7 +833,7 @@ pub mod testing {
 }
 
 #[cfg(test)]
-pub(crate) mod test {
+pub(super) mod test {
     use super::*;
 
     use super::error::ValidateError;
@@ -854,7 +854,7 @@ pub(crate) mod test {
             fn check_by_ref<'a>(
                 $result: Result<
                     ($parse_output<ByRef<&'a [u8]>>, ByRef<&'a [u8]>),
-                    <$parse_output<ByRef<&'a [u8]>> as crate::Parse<ByRef<&'a [u8]>>>::Error,
+                    <$parse_output<ByRef<&'a [u8]>> as crate::policy::Parse<ByRef<&'a [u8]>>>::Error,
                 >,
             ) {
                 $check_impl;
@@ -863,7 +863,7 @@ pub(crate) mod test {
             fn check_by_value(
                 $result: Result<
                     ($parse_output<ByValue<Vec<u8>>>, ByValue<Vec<u8>>),
-                    <$parse_output<ByValue<Vec<u8>>> as crate::Parse<ByValue<Vec<u8>>>>::Error,
+                    <$parse_output<ByValue<Vec<u8>>> as crate::policy::Parse<ByValue<Vec<u8>>>>::Error,
                 >,
             ) -> Option<($parse_output<ByValue<Vec<u8>>>, ByValue<Vec<u8>>)> {
                 $check_impl
@@ -877,19 +877,25 @@ pub(crate) mod test {
         }};
     }
 
-    pub(crate) use parse_test;
+    pub(super) use parse_test;
 
     macro_rules! validate_test {
         ($parse_output:ident, $data:expr, $result:tt, $check_impl:block) => {{
             let data = $data;
             fn check_by_ref<'a>(
-                $result: Result<(), <$parse_output<ByRef<&'a [u8]>> as crate::Validate>::Error>,
+                $result: Result<
+                    (),
+                    <$parse_output<ByRef<&'a [u8]>> as crate::policy::Validate>::Error,
+                >,
             ) {
                 $check_impl;
             }
 
             fn check_by_value(
-                $result: Result<(), <$parse_output<ByValue<Vec<u8>>> as crate::Validate>::Error>,
+                $result: Result<
+                    (),
+                    <$parse_output<ByValue<Vec<u8>>> as crate::policy::Validate>::Error,
+                >,
             ) {
                 $check_impl
             }
@@ -906,5 +912,5 @@ pub(crate) mod test {
         }};
     }
 
-    pub(crate) use validate_test;
+    pub(super) use validate_test;
 }

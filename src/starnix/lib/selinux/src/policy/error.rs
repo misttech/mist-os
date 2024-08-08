@@ -81,7 +81,7 @@ pub enum ValidateError {
     )]
     InvalidClassDefaultRange { value: u32 },
     #[error("missing initial SID {initial_sid:?}")]
-    MissingInitialSid { initial_sid: selinux::InitialSid },
+    MissingInitialSid { initial_sid: crate::InitialSid },
     #[error(
         "invalid SELinux fs_use type; expected one of {:?}, but found {value}",
         [FsUseType::FsUseXattr as u32,
