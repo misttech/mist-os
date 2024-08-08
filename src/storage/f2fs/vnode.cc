@@ -1314,7 +1314,14 @@ zx_status_t VnodeF2fs::SetExtendedAttribute(XattrIndex index, std::string_view n
     }
   }
 
-  XattrOperator xattr_operator(xattr_page);
+  LockedPage ipage;
+  if (TestFlag(InodeInfoFlag::kInlineXattr)) {
+    if (zx_status_t err = fs()->GetNodeManager().GetNodePage(ino_, &ipage); err != ZX_OK) {
+      return err;
+    }
+  }
+
+  XattrOperator xattr_operator(ipage, xattr_page);
 
   zx::result<uint32_t> offset_or = xattr_operator.FindSlotOffset(index, name);
 
@@ -1340,8 +1347,9 @@ zx_status_t VnodeF2fs::SetExtendedAttribute(XattrIndex index, std::string_view n
     }
   }
 
-  bool need_inode_update = false;
-  if (xattr_nid_ == 0) {
+  uint32_t xattr_block_start_offset =
+      TestFlag(InodeInfoFlag::kInlineXattr) ? kInlineXattrAddrs : kXattrHeaderSlots;
+  if (xattr_nid_ == 0 && xattr_operator.GetEndOffset() > xattr_block_start_offset) {
     zx::result<nid_t> nid_or = fs()->GetNodeManager().AllocNid();
     if (nid_or.is_error()) {
       return ZX_ERR_NO_SPACE;
@@ -1358,24 +1366,15 @@ zx_status_t VnodeF2fs::SetExtendedAttribute(XattrIndex index, std::string_view n
     xattr_page = std::move(*page_or);
 
     IncBlocks(1);
-    need_inode_update = true;
-  } else if (xattr_operator.GetEndOffset(kXattrHeaderSlots) == kXattrHeaderSlots) {
+    SetDirty();
+  } else if (xattr_nid_ > 0 && xattr_operator.GetEndOffset() <= xattr_block_start_offset) {
     TruncateNode(xattr_page);
     xattr_nid_ = 0;
     xattr_page.reset();
-    need_inode_update = true;
+    SetDirty();
   }
 
-  xattr_operator.WriteTo(xattr_page);
-
-  if (need_inode_update) {
-    LockedPage inode_page;
-    if (zx_status_t err = fs()->GetNodeManager().GetNodePage(ino_, &inode_page); err != ZX_OK) {
-      return err;
-    }
-
-    UpdateInodePage(inode_page);
-  }
+  xattr_operator.WriteTo(ipage, xattr_page);
 
   return ZX_OK;
 }
@@ -1399,7 +1398,14 @@ zx::result<size_t> VnodeF2fs::GetExtendedAttribute(XattrIndex index, std::string
     return zx::error(err);
   }
 
-  XattrOperator xattr_operator(xattr_page);
+  LockedPage ipage;
+  if (TestFlag(InodeInfoFlag::kInlineXattr)) {
+    if (zx_status_t err = fs()->GetNodeManager().GetNodePage(ino_, &ipage); err != ZX_OK) {
+      return zx::error(err);
+    }
+  }
+
+  XattrOperator xattr_operator(ipage, xattr_page);
 
   return xattr_operator.Lookup(index, name, out);
 }

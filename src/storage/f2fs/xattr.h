@@ -24,7 +24,7 @@ constexpr uint32_t XattrSlots(size_t size) {
       .ValueOrDie();
 }
 
-constexpr size_t kMaxXattrSlots = XattrSlots(kValidXattrBlockSize);
+constexpr size_t kMaxXattrSlots = kInlineXattrAddrs + XattrSlots(kValidXattrBlockSize);
 
 enum class XattrIndex {
   kUser = 1,
@@ -73,7 +73,7 @@ constexpr size_t kMaxXattrValueLength =
 
 class XattrOperator {
  public:
-  explicit XattrOperator(LockedPage &page);
+  explicit XattrOperator(LockedPage &ipage, LockedPage &xattr_page);
 
   // Not copyable or moveable
   XattrOperator(const XattrOperator &) = delete;
@@ -86,12 +86,13 @@ class XattrOperator {
   void Remove(uint32_t offset);
   zx::result<size_t> Lookup(XattrIndex index, std::string_view name, cpp20::span<uint8_t> out);
 
-  zx_status_t WriteTo(LockedPage &page);
+  void WriteTo(LockedPage &ipage, LockedPage &xattr_page);
 
-  uint32_t GetEndOffset(uint32_t from);
+  uint32_t GetEndOffset(uint32_t from = kXattrHeaderSlots);
 
  private:
   std::unique_ptr<std::array<xattr_slot_t, kMaxXattrSlots>> buffer_;
+  const uint32_t available_slots_;
 };
 
 }  // namespace f2fs
