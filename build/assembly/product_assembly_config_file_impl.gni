@@ -18,6 +18,9 @@ import("//build/group_with_inputs.gni")
 # without those validation targets taking compile-time dependencies on all the
 # inputs / deps.
 #
+# This also creates a target called "$target_name.input_file_paths" which lists
+# all the input files that were found.
+#
 # Params:
 #
 #   product_assembly_config
@@ -151,8 +154,13 @@ template("product_assembly_config_file") {
   # of the newly-constructed ones, and then assigning the newly-constructed ones
   # to the appropriate variables in each of the nested scopes.
 
-  # The assembly configuration
+  # The assembly configuration input files
   config_inputs = []
+
+  # The assembly configuration input files, as a list of scopes based on the
+  # config_file_potential_inputs list above, but with the 'fields' list
+  # of keys replaced with a list of scopes of 'field' and 'path'
+  config_input_paths_map = []
 
   config_contents = invoker.product_assembly_config
 
@@ -198,6 +206,7 @@ template("product_assembly_config_file") {
     # 'continue' will still be true if the all the nodes in the path were
     # found.
     if (_continue) {
+      _fields_with_paths = []
       foreach(_field_name, potential_input.fields) {
         if (defined(_node[_field_name])) {
           _file_paths = []
@@ -229,8 +238,22 @@ template("product_assembly_config_file") {
           foreach(_file_path, _file_paths) {
             _gn_path = "//" + rebase_path(_file_path, "//", root_build_dir)
             config_inputs += [ _gn_path ]
+            _fields_with_paths += [
+              {
+                field = _field_name
+                path = rebase_path(_gn_path, root_build_dir)
+              },
+            ]
           }
         }
+      }
+      if (_fields_with_paths != []) {
+        config_input_paths_map += [
+          {
+            node_path = potential_input.node_path
+            fields = _fields_with_paths
+          },
+        ]
       }
     }
   }
@@ -251,6 +274,22 @@ template("product_assembly_config_file") {
     contents = config_contents
   }
 
+  # Create a list of the input files that are in the above file, so that they can be copied into
+  # a target outdir to consolidate them.
+  generated_file(target_name + ".input_file_paths") {
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "visibility",
+                           ])
+    outputs =
+        [ "${target_out_dir}/${invoker.target_name}.input_file_paths.json" ]
+    output_conversion = "json"
+    contents = config_input_paths_map
+  }
+
+  # A group that is used to validate that the inputs are all properly depended-upon in GN, and that
+  # changes to these files will trigger the appropriate re-running of assembly.
   group_with_inputs(target_name + ".inputs") {
     forward_variables_from(invoker,
                            [

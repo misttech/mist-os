@@ -13,7 +13,7 @@ from typing import Dict, Iterable, TextIO, Union
 
 import serialization
 
-__all__ = ["FileEntry", "FilePath", "fast_copy"]
+__all__ = ["FileEntry", "FilePath", "fast_copy", "fast_copy_makedirs"]
 
 FilePath = Union[str, os.PathLike]
 

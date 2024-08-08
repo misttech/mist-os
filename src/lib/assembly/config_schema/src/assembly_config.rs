@@ -39,10 +39,10 @@ pub struct AssemblyConfig {
 #[derive(Debug, Deserialize, Serialize, SupportsFileRelativePaths)]
 #[serde(deny_unknown_fields)]
 pub struct AssemblyConfigWrapperForOverrides {
-    // The platform config is deserialized as a Value before it is parsed into
+    // The platform and products configs are deserialized as a Value before it is parsed into
     // a 'PlatformConfig``
     pub platform: serde_json::Value,
-    pub product: ProductConfig,
+    pub product: serde_json::Value,
     #[serde(default)]
     pub file_relative_paths: bool,
 }
