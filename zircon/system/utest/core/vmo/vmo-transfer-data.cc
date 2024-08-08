@@ -10,6 +10,8 @@
 #include <zircon/syscalls.h>
 #include <zircon/syscalls/iommu.h>
 
+#include <thread>
+
 #include <zxtest/zxtest.h>
 
 #include "helpers.h"
@@ -466,6 +468,40 @@ TEST(VmoTransferDataTestCase, InvalidInputs) {
   EXPECT_EQ(ZX_ERR_BAD_STATE, pinned_vmo.transfer_data(0, kPageSize, kPageSize, &src_vmo, 0));
   EXPECT_EQ(ZX_ERR_BAD_STATE, dst_vmo.transfer_data(0, kPageSize, kPageSize, &pinned_vmo, 0));
   ASSERT_OK(pmt.unpin());
+}
+
+// This is regression testing whether the kernel is resilient to the parent of a src VMO going
+// away mid transfer. The scenario its testing is where some pages are processed from the parent,
+// and then the whole operation needs to block due to memory pressure. While it is blocked the
+// parent is able to be closed, and then when the operation resumes there is no parent, and pages
+// should be taken directly from the VMO, who now owns the pages.
+TEST(VmoTransferDataTestCase, RacyDropParent) {
+  const size_t kVmoSize = zx_system_get_page_size() * 1024;
+
+  zx::vmo src_vmo;
+  ASSERT_OK(zx::vmo::create(kVmoSize, 0, &src_vmo));
+  for (size_t i = 0; i < kVmoSize; i += zx_system_get_page_size()) {
+    uint64_t data = 42;
+    EXPECT_OK(src_vmo.write(&data, i, sizeof(data)));
+  }
+
+  zx::vmo dst_vmo;
+  ASSERT_OK(zx::vmo::create(kVmoSize, 0, &dst_vmo));
+
+  zx::vmo child_vmo;
+  ASSERT_OK(src_vmo.create_child(ZX_VMO_CHILD_SNAPSHOT, 0, kVmoSize, &child_vmo));
+
+  // Prepare the thread that will close the parent.
+  std::thread close_thread([&src_vmo] {
+    // This deadline is somewhat arbitrary but seems to make this test fail reliably enough when
+    // handling of a parent going away mid transfer is not supported.
+    zx_nanosleep(zx_deadline_after(100));
+    src_vmo.reset();
+  });
+
+  // Do the transfer
+  EXPECT_OK(dst_vmo.transfer_data(0, 0, kVmoSize, &child_vmo, 0));
+  close_thread.join();
 }
 
 }  // namespace
