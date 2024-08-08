@@ -242,7 +242,7 @@ impl PagedObjectHandle {
     }
 
     pub fn pre_fetch_keys(&self) -> Option<impl Future<Output = ()>> {
-        self.handle.handle().pre_fetch_keys()
+        self.handle.pre_fetch_keys()
     }
 
     async fn new_transaction<'a>(
@@ -279,7 +279,7 @@ impl PagedObjectHandle {
     }
 
     pub fn store_handle(&self) -> &StoreObjectHandle<FxVolume> {
-        self.handle.handle()
+        &*self.handle
     }
 
     pub async fn read_uncached(&self, range: std::ops::Range<u64>) -> Result<Buffer<'_>, Error> {

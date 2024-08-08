@@ -21,7 +21,7 @@ use crate::object_store::transaction::{
     Transaction,
 };
 use crate::object_store::{
-    HandleOptions, HandleOwner, ObjectStore, RootDigest, StoreObjectHandle, TrimMode, TrimResult,
+    HandleOptions, HandleOwner, RootDigest, StoreObjectHandle, TrimMode, TrimResult,
     DEFAULT_DATA_ATTRIBUTE_ID, FSVERITY_MERKLE_ATTRIBUTE_ID, TRANSACTION_MUTATION_THRESHOLD,
 };
 use crate::range::RangeExt;
@@ -35,7 +35,7 @@ use futures::TryStreamExt;
 use fxfs_trace::trace;
 use mundane::hash::{Digest, Hasher, Sha256, Sha512};
 use std::cmp::min;
-use std::ops::{DerefMut, Range};
+use std::ops::{Deref, DerefMut, Range};
 use std::sync::atomic::{self, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use storage_device::buffer::{Buffer, BufferFuture, BufferRef, MutableBufferRef};
@@ -80,6 +80,13 @@ impl FsverityStateInner {
     }
 }
 
+impl<S: HandleOwner> Deref for DataObjectHandle<S> {
+    type Target = StoreObjectHandle<S>;
+    fn deref(&self) -> &Self::Target {
+        &self.handle
+    }
+}
+
 impl<S: HandleOwner> DataObjectHandle<S> {
     pub fn new(
         owner: Arc<S>,
@@ -99,28 +106,12 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         }
     }
 
-    pub fn owner(&self) -> &Arc<S> {
-        self.handle.owner()
-    }
-
     pub fn attribute_id(&self) -> u64 {
         self.attribute_id
     }
 
     pub fn verified_file(&self) -> bool {
         matches!(*self.fsverity_state.lock().unwrap(), FsverityState::Some(_))
-    }
-
-    pub fn store(&self) -> &ObjectStore {
-        self.handle.store()
-    }
-
-    pub fn trace(&self) -> bool {
-        self.handle.trace()
-    }
-
-    pub fn handle(&self) -> &StoreObjectHandle<S> {
-        &self.handle
     }
 
     /// Sets `self.fsverity_state` to FsverityState::Started. Called at the top of `enable_verity`.
@@ -1838,17 +1829,14 @@ mod tests {
     #[fuchsia::test]
     async fn test_beyond_eof_read_from() {
         let (fs, object) = test_filesystem_and_object().await;
+        let handle = &*object;
         let offset = TEST_OBJECT_SIZE as usize - 2;
         let align = offset % fs.block_size() as usize;
         let len: usize = 2;
         let mut buf = object.allocate_buffer(align + len + 1).await;
         buf.as_mut_slice().fill(123u8);
         assert_eq!(
-            object
-                .handle()
-                .read(0, (offset - align) as u64, buf.as_mut())
-                .await
-                .expect("read failed"),
+            handle.read(0, (offset - align) as u64, buf.as_mut()).await.expect("read failed"),
             align + len
         );
         assert_eq!(&buf.as_slice()[align..align + len], &vec![0u8; len]);
@@ -1873,7 +1861,6 @@ mod tests {
             )])
             .await;
         object
-            .handle()
             .read_unchecked(0, (offset - align) as u64, buf.as_mut(), &guard)
             .await
             .expect("read failed");
@@ -2610,7 +2597,6 @@ mod tests {
             // This write should span three transactions. This test mimics the behavior when the
             // last transaction gets interrupted by a filesystem.close().
             handle
-                .handle()
                 .write_new_attr_in_batches(
                     &mut transaction,
                     FSVERITY_MERKLE_ATTRIBUTE_ID,

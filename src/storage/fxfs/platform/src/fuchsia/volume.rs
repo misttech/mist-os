@@ -306,7 +306,7 @@ impl FxVolume {
             )
             .await?,
         );
-        let recording_object = recording_handle.handle().object_id();
+        let recording_object = recording_handle.object_id();
         self.store.add_to_graveyard(&mut transaction, recording_object);
         transaction.commit().await?;
 
