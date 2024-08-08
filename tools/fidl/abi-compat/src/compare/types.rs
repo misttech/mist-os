@@ -124,9 +124,9 @@ pub fn compare_types(
             let send_level = send_path.api_level();
             let recv_level = recv_path.api_level();
             if s != r {
-                problems.type_error(
-                    send_path,
-                    recv_path,
+                problems.error(
+                    [send_path,
+                    recv_path],
                     format!(
                         "Incompatible primitive types, sender(@{send_level}):{s}, receiver(@{recv_level}):{r}"
                     ),
@@ -137,18 +137,18 @@ pub fn compare_types(
             if *recv_opt == Required && *send_opt == Optional {
                 let send_level = send_path.api_level();
                 let recv_level = recv_path.api_level();
-                problems.type_error(
-                    send_path,
-                    recv_path,
+                problems.error(
+                    [send_path,
+                    recv_path],
                     format!("Sender(@{send_level}) string is optional but receiver(@{recv_level}) is required"),
                 );
             }
             if send_len > recv_len {
                 let send_level = send_path.api_level();
                 let recv_level = recv_path.api_level();
-                problems.type_error(
-                    send_path,
-                    recv_path,
+                problems.error(
+                    [send_path,
+                    recv_path],
                     format!("Incompatible string lengths, sender(@{send_level}):{send_len}, receiver(@{recv_level}):{recv_len}"),
                 );
             }
@@ -160,9 +160,9 @@ pub fn compare_types(
             let send_level = send_path.api_level();
             if send_type != recv_type {
                 let recv_level = recv_path.api_level();
-                problems.type_error(
-                    send_path,
-                    recv_path,
+                problems.error(
+                    [send_path,
+                    recv_path],
                     format!("Incompatible enum types, sender(@{send_level}):{send_type}, receiver(@{recv_level}):{recv_type}"),
                 )
             } else {
@@ -174,15 +174,15 @@ pub fn compare_types(
                 if !missing_values.is_empty() {
                     let missing_values_str = missing_values.join(", ");
                     if recv_flexibility == &Flexible {
-                        problems.type_warning(
-                            send_path,
-                            recv_path,
+                        problems.warning(
+                            [send_path,
+                            recv_path],
                             format!("Extra flexible enum members in sender(@{send_level}): {missing_values_str}"),
                         );
                     } else {
-                        problems.type_error(
-                            send_path,
-                            recv_path,
+                        problems.error(
+                            [send_path,
+                            recv_path],
                             format!("Extra strict enum members in sender(@{send_level}): {missing_values_str}"),
                         );
                     }
@@ -196,9 +196,9 @@ pub fn compare_types(
             let send_level = send_path.api_level();
             if send_type != recv_type {
                 let recv_level = recv_path.api_level();
-                problems.type_error(
-                    send_path,
-                    recv_path,
+                problems.error(
+                    [send_path,
+                    recv_path],
                     format!("Incompatible bits types, sender(@{send_level}):{send_type}, receiver(@{recv_level}):{recv_type}"),
                 )
             } else {
@@ -210,15 +210,15 @@ pub fn compare_types(
                 if !missing_values.is_empty() {
                     let missing_values_str = missing_values.join(", ");
                     if recv_flexibility == &Flexible {
-                        problems.type_warning(
-                            send_path,
-                            recv_path,
+                        problems.warning(
+                            [send_path,
+                            recv_path],
                             format!("Extra flexible bits members in sender(@{send_level}): {missing_values_str}"),
                         );
                     } else {
-                        problems.type_error(
-                            send_path,
-                            recv_path,
+                        problems.error(
+                            [send_path,
+                            recv_path],
                             format!("Extra strict bits members in sender(@{send_level}): {missing_values_str}"),
                         );
                     }
@@ -232,16 +232,16 @@ pub fn compare_types(
             let send_level = send_path.api_level();
             let recv_level = recv_path.api_level();
             if *send_opt == Optional && *recv_opt == Required {
-                problems.type_error(
-                    send_path,
-                    recv_path,
+                problems.error(
+                    [send_path,
+                    recv_path],
                     format!("Sender handle(@{send_level}) is optional but receiver(@{recv_level}) is required"),
                 );
             }
             if recv_type.is_some() && recv_type != send_type {
-                problems.type_error(
-                    send_path,
-                    recv_path,
+                problems.error(
+                    [send_path,
+                    recv_path],
                     format!(
                         "Incompatible handle types, sender(@{send_level}):{}, receiver(@{recv_level}):{}",
                         recv_type.unwrap(),
@@ -271,9 +271,9 @@ pub fn compare_types(
                 if send_rights.contains(*recv_rights) {
                     // Receive rights are the same or a subset of send rights. This is fine.
                 } else {
-                    problems.type_error(
-                        send_path,
-                        recv_path,
+                    problems.error(
+                        [send_path,
+                        recv_path],
                         format!(
                             "Incompatible handle rights, sender(@{send_level}):{:?}, receiver(@{recv_level}):{:?}",
                             send_rights, recv_rights
@@ -285,10 +285,10 @@ pub fn compare_types(
         (Array(send_path, send_size, send_type), Array(recv_path, recv_size, recv_type)) => {
             if send_size != recv_size {
                 let send_level = send_path.api_level();
-                let recv_level = recv_path.api_level();
-                problems.type_error(
-                    send_path,
-                    recv_path,
+                let recv_level: &str = recv_path.api_level();
+                problems.error(
+                    [send_path,
+                    recv_path],
                     format!(
                         "Array length mismatch, sender(@{send_level}):{}, receiver(@{recv_level}):{}",
                         send_size, recv_size
@@ -304,15 +304,15 @@ pub fn compare_types(
             let send_level = send_path.api_level();
             let recv_level = recv_path.api_level();
             if *send_opt == Optional && *recv_opt == Required {
-                problems.type_error(
-                    send_path,
-                    recv_path,
+                problems.error(
+                    [send_path,
+                    recv_path],
                     format!("Sender(@{send_level}) vector is optional but receiver(@{recv_level}) is required"),
                 );
             }
 
             if send_size > recv_size {
-                problems.type_error(send_path, recv_path, format!("Sender vector is larger than receiver vector, sender(@{send_level}):{send_size}, receiver(@{recv_level}):{recv_size}"));
+                problems.error([send_path, recv_path], format!("Sender vector is larger than receiver vector, sender(@{send_level}):{send_size}, receiver(@{recv_level}):{recv_size}"));
             }
             problems.append(compare_types(send_type, recv_type, config));
         }
@@ -320,9 +320,9 @@ pub fn compare_types(
             if send_members.len() != recv_members.len() {
                 let send_level = send_path.api_level();
                 let recv_level = recv_path.api_level();
-                problems.type_error(
-                    send_path,
-                    recv_path,
+                problems.error(
+                    [send_path,
+                    recv_path],
                     format!(
                         "Struct has different number of members, sender(@{send_level}):{}, receiver(@{recv_level}):{}",
                         send_members.len(),
@@ -435,11 +435,8 @@ pub fn compare_types(
 
             if send_optional == &Optionality::Optional && recv_optional == &Optionality::Required {
                 // TODO: reword
-                problems.type_error(
-                    send_path,
-                    recv_path,
-                    format!("server_end optionality incompatible"),
-                )
+                problems
+                    .error([send_path, recv_path], format!("server_end optionality incompatible"))
             }
         }
 
@@ -448,8 +445,8 @@ pub fn compare_types(
         (Cycle(send_path, _, send_cycle), Cycle(recv_path, _, recv_cycle)) => {
             if send_cycle != recv_cycle {
                 let send_level = send_path.api_level();
-                let recv_level = recv_path.api_level();
-                problems.type_error(send_path, recv_path, format!("Cycle length differs between sender(@{send_level}):{send_cycle} and receiver(@{recv_level}):{recv_cycle}"))
+                let recv_level: &str = recv_path.api_level();
+                problems.error([send_path, recv_path], format!("Cycle length differs between sender(@{send_level}):{send_cycle} and receiver(@{recv_level}):{recv_cycle}"))
             }
         }
 
@@ -458,9 +455,9 @@ pub fn compare_types(
         (send, recv) => {
             let send_level = send.path().api_level();
             let recv_level = recv.path().api_level();
-            problems.type_error(
-                send.path(),
-                recv.path(),
+            problems.error(
+                [send.path(),
+                recv.path()],
                 format!("Incompatible types, sender(@{send_level}):{send}, receiver(@{recv_level}):{recv}"),
             );
         }
