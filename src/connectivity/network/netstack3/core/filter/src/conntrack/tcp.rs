@@ -11,28 +11,10 @@ use replace_with::replace_with_and;
 
 use super::{ConnectionDirection, ConnectionUpdateAction, ConnectionUpdateError};
 
-/// The time since the last seen packet after which an unestablished TCP
-/// connection is considered expired and is eligible for garbage collection.
-///
-/// This is small because it's just meant to be the time between the initial SYN
-/// and response SYN/ACK packet.
-const CONNECTION_EXPIRY_TIME_TCP_UNESTABLISHED: Duration = Duration::from_secs(30);
-
-/// The time since the last seen packet after which an established TCP
-/// connection is considered expired and is eligible for garbage collection.
-///
-/// Until we have TCP tracking, this is a large value to ensure that connections
-/// that are still valid aren't cleaned up prematurely.
-const CONNECTION_EXPIRY_TIME_TCP_ESTABLISHED: Duration = Duration::from_secs(6 * 60 * 60);
-
 /// A struct that completely encapsulates tracking a bidirectional TCP
 /// connection.
 #[derive(Debug, Clone)]
 pub(crate) struct Connection {
-    /// TODO(https://fxbug.dev/328064736): Remove once we have implemented the
-    /// ESTABLISHED state.
-    established: bool,
-
     /// The current state of the TCP connection.
     state: State,
 }
@@ -43,24 +25,19 @@ impl Connection {
             // TODO(https://fxbug.dev/355699182): Properly support self-connected
             // connections.
             state: if self_connected {
-                Untracked {}.into()
+                Untracked { established: false }.into()
             } else {
                 State::new(segment, payload_len)?
             },
-            established: false,
         })
     }
 
     pub fn expiry_duration(&self) -> Duration {
-        if self.is_established() {
-            CONNECTION_EXPIRY_TIME_TCP_ESTABLISHED
-        } else {
-            CONNECTION_EXPIRY_TIME_TCP_UNESTABLISHED
-        }
+        self.state.expiry_duration()
     }
 
     pub fn is_established(&self) -> bool {
-        self.established
+        self.state.is_established()
     }
 
     pub fn update(
@@ -69,13 +46,6 @@ impl Connection {
         payload_len: usize,
         dir: ConnectionDirection,
     ) -> Result<ConnectionUpdateAction, ConnectionUpdateError> {
-        // TODO(https://fxbug.dev/328064736): Remove once we have implemented
-        // the ESTABLISHED state.
-        match dir {
-            ConnectionDirection::Original => {}
-            ConnectionDirection::Reply => self.established = true,
-        }
-
         let valid =
             replace_with_and(&mut self.state, |state| state.update(segment, payload_len, dir));
 
@@ -175,6 +145,49 @@ impl State {
             }
             .into(),
         )
+    }
+
+    fn is_established(&self) -> bool {
+        match self {
+            State::Untracked(s) => s.established,
+            State::Closed(_) => false,
+            State::SynSent(_) => false,
+            State::WaitingOnOpeningAck(_) => false,
+            State::Established(_) => true,
+            State::Closing(_) => true,
+        }
+    }
+
+    fn expiry_duration(&self) -> Duration {
+        const MSL: Duration = Duration::from_secs(120);
+
+        // These are all picked to optimize purging connections from the table
+        // as soon as is reasonable. Unlike Linux, we are choosing to be more
+        // conservative with our timeouts and setting the most aggressive one to
+        // the standard MSL of 120 seconds.
+        match self {
+            State::Untracked(s) => {
+                if s.established {
+                    Duration::from_secs(6 * 60 * 60)
+                } else {
+                    MSL
+                }
+            }
+            State::Closed(_) => Duration::ZERO,
+            State::SynSent(_) => MSL,
+            State::WaitingOnOpeningAck(_) => MSL,
+            State::Established(Established { original, reply }) => {
+                // If there is no data outstanding, make the timeout large, and
+                // otherwise small so we can purge the connection quickly if one
+                // of the endpoints disappears.
+                if original.unacked_data || reply.unacked_data {
+                    MSL
+                } else {
+                    Duration::from_secs(6 * 60 * 60)
+                }
+            }
+            State::Closing(_) => MSL,
+        }
     }
 
     /// Returns a new state that unconditionally replaces the previous one. The
@@ -513,7 +526,11 @@ fn do_established_update(
 ///
 /// This state never transitions to another state.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct Untracked {}
+pub(crate) struct Untracked {
+    // TODO(https://fxbug.dev/355699112): Delete this once connection
+    // establishment tracking is protocol-generic.
+    established: bool,
+}
 state_from_state_struct!(Untracked);
 
 impl Untracked {
@@ -521,9 +538,12 @@ impl Untracked {
         self,
         _segment: &SegmentHeader,
         _payload_len: usize,
-        _dir: ConnectionDirection,
+        dir: ConnectionDirection,
     ) -> (State, bool) {
-        (self.into(), true)
+        match dir {
+            ConnectionDirection::Original => (self.into(), true),
+            ConnectionDirection::Reply => (Untracked { established: true }.into(), true),
+        }
     }
 }
 
@@ -664,7 +684,7 @@ impl SynSent {
                                 "Unsupported TCP simultaneous open. Giving up on detailed tracking"
                             );
 
-                            return (Untracked {}.into(), true);
+                            return (Untracked { established: false }.into(), true);
                         };
 
                         let reply_window_scale = segment.options.window_scale;
@@ -754,7 +774,7 @@ impl WaitingOnOpeningAck {
         self,
         segment: &SegmentHeader,
         payload_len: usize,
-        dir: super::ConnectionDirection,
+        dir: ConnectionDirection,
     ) -> (State, bool) {
         let Self { original, reply } = self;
 
@@ -790,6 +810,12 @@ impl WaitingOnOpeningAck {
 }
 
 /// State for the Established state.
+///
+/// State transitions for in-range segments, regardless of direction:
+/// - SYN: Invalid
+/// - RST: Delete connection
+/// - FIN: Closing
+/// - ACK: Established
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Established {
     original: Peer,
@@ -800,11 +826,34 @@ state_from_state_struct!(Established);
 impl Established {
     fn update(
         self,
-        _segment: &SegmentHeader,
-        _payload_len: usize,
-        _dir: ConnectionDirection,
+        segment: &SegmentHeader,
+        payload_len: usize,
+        dir: ConnectionDirection,
     ) -> (State, bool) {
-        (self.into(), true)
+        let Self { original, reply } = self;
+
+        let (original, reply, fin_seen) = match do_established_update(
+            UpdatePeers { original, reply },
+            segment,
+            payload_len,
+            dir.clone(),
+        ) {
+            EstablishedUpdateResult::Success { new_original, new_reply, fin_seen } => {
+                (new_original, new_reply, fin_seen)
+            }
+            EstablishedUpdateResult::Invalid { original, reply } => {
+                return (Self { original, reply }.into(), false)
+            }
+            EstablishedUpdateResult::Reset => return (Closed {}.into(), true),
+        };
+
+        let new_state = if fin_seen {
+            Closing { original, reply }.into()
+        } else {
+            Established { original, reply }.into()
+        };
+
+        (new_state, true)
     }
 }
 
@@ -1063,7 +1112,7 @@ mod tests {
 
         assert_eq!(
             state.update(&segment, /*payload_len*/ 0, ConnectionDirection::Reply),
-            (Untracked {}.into(), true)
+            (Untracked { established: false }.into(), true)
         );
     }
 
@@ -1615,6 +1664,127 @@ mod tests {
     )]
     fn waiting_on_opening_ack_test(args: StateUpdateTestArgs) {
         let state = WaitingOnOpeningAck {
+            original: Peer {
+                window_scale: WindowScale::new(2).unwrap(),
+                max_wnd: WindowSize::new(0).unwrap(),
+                max_wnd_seq: SeqNum::new(70_000),
+                max_next_seq: SeqNum::new(1024),
+                unacked_data: false,
+                fin_state: FinState::NotSent,
+            },
+            reply: Peer {
+                window_scale: WindowScale::new(0).unwrap(),
+                max_wnd: WindowSize::new(400).unwrap(),
+                max_wnd_seq: SeqNum::new(1424),
+                max_next_seq: SeqNum::new(66_001),
+                unacked_data: true,
+                fin_state: FinState::NotSent,
+            },
+        };
+
+        let (new_state, valid) = match args.expected {
+            Some(new_state) => (new_state, true),
+            None => (state.clone().into(), false),
+        };
+
+        assert_eq!(state.update(&args.segment, args.payload_len, args.dir), (new_state, valid));
+    }
+
+    #[test_case(
+        StateUpdateTestArgs {
+            segment: SegmentHeader {
+                seq: SeqNum::new(1400),
+                ack: Some(SeqNum::new(66_001)),
+                wnd: UnscaledWindowSize::from(10),
+                control: None,
+                options: Options::default(),
+            },
+            payload_len: 24,
+            dir: ConnectionDirection::Original,
+            expected: Some(Established {
+                original: Peer {
+                    window_scale: WindowScale::new(2).unwrap(),
+                    max_wnd: WindowSize::new(40).unwrap(),
+                    max_wnd_seq: SeqNum::new(70_000),
+                    max_next_seq: SeqNum::new(1424),
+                    // This is becoming true because `segment.seq > original.max_next_seq`.
+                    unacked_data: true,
+                    fin_state: FinState::NotSent,
+                },
+                reply: Peer {
+                    window_scale: WindowScale::new(0).unwrap(),
+                    max_wnd: WindowSize::new(400).unwrap(),
+                    max_wnd_seq: SeqNum::new(1424),
+                    max_next_seq: SeqNum::new(66_001),
+                    // This is becoming true because `segment.ack == reply.max_next_seq`.
+                    unacked_data: false,
+                    fin_state: FinState::NotSent,
+                },
+            }.into()),
+        }; "update original"
+    )]
+    #[test_case(
+        StateUpdateTestArgs {
+            segment: SegmentHeader {
+                seq: SeqNum::new(66_100),
+                ack: Some(SeqNum::new(1024)),
+                wnd: UnscaledWindowSize::from(10),
+                control: Some(Control::FIN),
+                options: Options::default(),
+            },
+            payload_len: 0,
+            dir: ConnectionDirection::Reply,
+            expected: Some(Closing {
+                original: Peer {
+                    window_scale: WindowScale::new(2).unwrap(),
+                    max_wnd: WindowSize::new(0).unwrap(),
+                    max_wnd_seq: SeqNum::new(70_000),
+                    max_next_seq: SeqNum::new(1024),
+                    unacked_data: false,
+                    fin_state: FinState::NotSent,
+                },
+                reply: Peer {
+                    window_scale: WindowScale::new(0).unwrap(),
+                    max_wnd: WindowSize::new(400).unwrap(),
+                    max_wnd_seq: SeqNum::new(1424),
+                    max_next_seq: SeqNum::new(66_101),
+                    unacked_data: true,
+                    fin_state: FinState::Sent(SeqNum::new(66_100)),
+                },
+            }.into()),
+        }; "closing"
+    )]
+    #[test_case(
+        StateUpdateTestArgs {
+            segment: SegmentHeader {
+                seq: SeqNum::new(1400),
+                // Fails equation III.
+                ack: Some(SeqNum::new(100_000)),
+                wnd: UnscaledWindowSize::from(10),
+                control: None,
+                options: Options::default(),
+            },
+            payload_len: 24,
+            dir: ConnectionDirection::Original,
+            expected: None,
+        }; "invalid"
+    )]
+    #[test_case(
+        StateUpdateTestArgs {
+            segment: SegmentHeader {
+                seq: SeqNum::new(1400),
+                ack: Some(SeqNum::new(66_001)),
+                wnd: UnscaledWindowSize::from(10),
+                control: Some(Control::RST),
+                options: Options::default(),
+            },
+            payload_len: 24,
+            dir: ConnectionDirection::Original,
+            expected: Some(Closed {}.into()),
+        }; "rst"
+    )]
+    fn established_test(args: StateUpdateTestArgs) {
+        let state = Established {
             original: Peer {
                 window_scale: WindowScale::new(2).unwrap(),
                 max_wnd: WindowSize::new(0).unwrap(),
