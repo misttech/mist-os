@@ -136,6 +136,14 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
             ),
             mode,
         );
+        dir.node(
+            "osrelease",
+            fs.create_node(
+                current_task,
+                BytesFile::new_node(b"5.10.199-starnix".to_vec()),
+                FsNodeInfo::new_factory(mode, FsCred::root()),
+            ),
+        );
         dir.entry(
             current_task,
             "panic_on_oops",
