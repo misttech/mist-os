@@ -37,6 +37,7 @@
 #include <fbl/string_printf.h>
 #include <sdk/lib/sys/cpp/service_directory.h>
 
+#include "lib/async/cpp/task.h"
 #include "src/devices/sysmem/drivers/sysmem/allocator.h"
 #include "src/devices/sysmem/drivers/sysmem/buffer_collection_token.h"
 #include "src/devices/sysmem/drivers/sysmem/contiguous_pooled_memory_allocator.h"
@@ -44,6 +45,7 @@
 #include "src/devices/sysmem/drivers/sysmem/macros.h"
 #include "src/devices/sysmem/drivers/sysmem/utils.h"
 #include "src/devices/sysmem/metrics/metrics.cb.h"
+#include "zircon/status.h"
 
 using sysmem_driver::MemoryAllocator;
 
@@ -770,10 +772,13 @@ void Device::ConnectV2(ConnectV2Request& request, ConnectV2Completer::Sync& comp
 }
 
 void Device::ConnectSysmem(ConnectSysmemRequest& request, ConnectSysmemCompleter::Sync& completer) {
-  PostTask([this, request = std::move(request.sysmem_request())]() mutable {
-    bindings_.AddBinding(driver_dispatcher(), std::move(request), this,
-                         fidl::kIgnoreBindingClosure);
-  });
+  zx_status_t status = async::PostTask(
+      driver_dispatcher(), [request = std::move(request.sysmem_request()), this]() mutable {
+        bindings_.AddBinding(driver_dispatcher(), std::move(request), this,
+                             fidl::kIgnoreBindingClosure);
+      });
+  ZX_DEBUG_ASSERT_MSG(status == ZX_OK, "Failed to post task to connect to Sysmem protocol: %s",
+                      zx_status_get_string(status));
 }
 
 void Device::SetAuxServiceDirectory(SetAuxServiceDirectoryRequest& request,
