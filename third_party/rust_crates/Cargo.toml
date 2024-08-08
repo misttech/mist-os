@@ -275,7 +275,7 @@ async-executor = "1.5.0"
 async-fs = "1.6.0"
 async-io = "1.12.0"
 async-net = "1.7.0"
-cargo_metadata = "0.14.1"
+cargo_metadata = "0.18.1"
 crossterm = "0.19"
 easy-parallel = "3.1"
 fs_extra = "1.2.0"
@@ -296,6 +296,7 @@ pulldown-cmark = { version = "0.9.3", features = ["serde"] }
 quote = "1.0.35"
 rustfix = "0.6.1"
 rustls-native-certs = "0.5.0"
+semver = "1.0.23"
 serde_yaml = "0.9.14" # To use on Fuchsia, serde_yaml and unsafe-libyaml will need to be re-audited.
 serial_test = "0.5.1" # Not for use on Fuchsia, only for a single process.
 shared_child = "1.0.0"
@@ -781,7 +782,7 @@ testonly = true
 [gn.package.scrypt."0.10.0"]
 configs = [ "//build/config:optimize_speed" ]
 
-[gn.package.semver."1.0.4"]
+[gn.package.semver."1.0.23"]
 rustflags = []
 
 [gn.package.serde."1.0.204"]

@@ -155,7 +155,7 @@ group("camino") {
 
 if (!(current_os == "fuchsia")) {
   group("cargo_metadata") {
-    public_deps = [ ":cargo_metadata-v0_14_1" ]
+    public_deps = [ ":cargo_metadata-v0_18_1" ]
   }
 }
 
@@ -806,6 +806,12 @@ group("scopeguard") {
 
 group("scrypt") {
   public_deps = [ ":scrypt-v0_10_0" ]
+}
+
+if (!(current_os == "fuchsia")) {
+  group("semver") {
+    public_deps = [ ":semver-v1_0_23" ]
+  }
 }
 
 group("serde") {
@@ -2810,39 +2816,40 @@ rust_library("camino-v1_1_1") {
   applicable_licenses = [ ":camino-v1_1_1.license" ]
 }
 
-license("cargo_metadata-v0_14_1.license") {
+license("cargo_metadata-v0_18_1.license") {
   public_package_name = "cargo_metadata"
   license_files =
-      [ "//third_party/rust_crates/vendor/cargo_metadata-0.14.1/LICENSE-MIT" ]
+      [ "//third_party/rust_crates/vendor/cargo_metadata-0.18.1/LICENSE-MIT" ]
 }
 
-rust_library("cargo_metadata-v0_14_1") {
+rust_library("cargo_metadata-v0_18_1") {
   crate_name = "cargo_metadata"
   crate_root =
-      "//third_party/rust_crates/vendor/cargo_metadata-0.14.1/src/lib.rs"
-  output_name = "cargo_metadata-c02c463dd45e6a7c"
+      "//third_party/rust_crates/vendor/cargo_metadata-0.18.1/src/lib.rs"
+  output_name = "cargo_metadata-fbd0d9ab730883f4"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
   deps += [ ":camino-v1_1_1" ]
   deps += [ ":cargo-platform-v0_1_2" ]
-  deps += [ ":semver-v1_0_4" ]
+  deps += [ ":semver-v1_0_23" ]
   deps += [ ":serde-v1_0_204" ]
   deps += [ ":serde_json-v1_0_87" ]
+  deps += [ ":thiserror-v1_0_57" ]
 
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
     "--edition=2018",
-    "-Cmetadata=c02c463dd45e6a7c",
-    "-Cextra-filename=-c02c463dd45e6a7c",
+    "-Cmetadata=fbd0d9ab730883f4",
+    "-Cextra-filename=-fbd0d9ab730883f4",
     "--cfg=feature=\"default\"",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":cargo_metadata-v0_14_1.license" ]
+  applicable_licenses = [ ":cargo_metadata-v0_18_1.license" ]
 }
 
 license("cargo-platform-v0_1_2.license") {
@@ -13334,18 +13341,18 @@ rust_library("security-framework-sys-v2_4_2") {
   applicable_licenses = [ ":security-framework-sys-v2_4_2.license" ]
 }
 
-license("semver-v1_0_4.license") {
+license("semver-v1_0_23.license") {
   public_package_name = "semver"
   license_files = [
-    "//third_party/rust_crates/vendor/semver-1.0.4/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/semver-1.0.4/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/semver-1.0.23/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/semver-1.0.23/LICENSE-MIT",
   ]
 }
 
-rust_library("semver-v1_0_4") {
+rust_library("semver-v1_0_23") {
   crate_name = "semver"
-  crate_root = "//third_party/rust_crates/vendor/semver-1.0.4/src/lib.rs"
-  output_name = "semver-952c2f5f714df893"
+  crate_root = "//third_party/rust_crates/vendor/semver-1.0.23/src/lib.rs"
+  output_name = "semver-47f24701556f43a4"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -13356,8 +13363,8 @@ rust_library("semver-v1_0_4") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2018",
-    "-Cmetadata=952c2f5f714df893",
-    "-Cextra-filename=-952c2f5f714df893",
+    "-Cmetadata=47f24701556f43a4",
+    "-Cextra-filename=-47f24701556f43a4",
     "--cfg=feature=\"default\"",
     "--cfg=feature=\"serde\"",
     "--cfg=feature=\"std\"",
@@ -13365,7 +13372,7 @@ rust_library("semver-v1_0_4") {
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":semver-v1_0_4.license" ]
+  applicable_licenses = [ ":semver-v1_0_23.license" ]
 }
 
 license("serde-v1_0_204.license") {

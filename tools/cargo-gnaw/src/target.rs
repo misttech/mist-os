@@ -5,7 +5,8 @@
 use crate::gn::add_version_suffix;
 use crate::types::*;
 use camino::{Utf8Path, Utf8PathBuf};
-use cargo_metadata::{Package, PackageId, Version};
+use cargo_metadata::{Edition, Package, PackageId};
+use semver::Version;
 use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::collections::hash_map::DefaultHasher;
@@ -25,7 +26,7 @@ pub struct GnTarget<'a> {
     pub crate_root: &'a Utf8Path,
     /// Rust Edition of the target
     /// rustc: --edition
-    pub edition: &'a str,
+    pub edition: Edition,
     /// Type of crate
     /// rustc: --crate-type
     pub target_type: GnRustType,
@@ -90,7 +91,7 @@ impl<'a> GnTarget<'a> {
         cargo_pkg_id: &'a PackageId,
         target_name: &'a str,
         pkg_name: &'a str,
-        edition: &'a str,
+        edition: Edition,
         crate_root: &'a Utf8Path,
         version: &'a Version,
         target_type: GnRustType,
