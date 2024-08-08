@@ -164,9 +164,7 @@ impl CompatibilityProblems {
     pub fn protocol(&mut self, a: &Path, b: &Path, message: String) {
         self.error([a, b], message)
     }
-    pub fn abi_surface(&mut self, a: &Path, b: &Path, message: String) {
-        self.error([a, b], message)
-    }
+
     pub fn type_error(&mut self, a: &Path, b: &Path, message: String) {
         self.error([a, b], message)
     }
