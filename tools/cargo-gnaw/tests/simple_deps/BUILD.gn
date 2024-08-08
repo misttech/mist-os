@@ -30,11 +30,11 @@ rust_library("anyhow-v1_0_27") {
 
   deps = []
 
+  edition = "2018"
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
-    "--edition=2018",
     "-Cmetadata=d49cfcf8c47646f2",
     "-Cextra-filename=-d49cfcf8c47646f2",
     "--cfg=feature=\"default\"",
@@ -64,11 +64,11 @@ rust_library("simple_deps-v0_1_0") {
   deps = []
   deps += [ ":anyhow-v1_0_27" ]
 
+  edition = "2018"
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
-    "--edition=2018",
     "-Cmetadata=176a6857401f170f",
     "-Cextra-filename=-176a6857401f170f",
   ]

@@ -24,11 +24,11 @@ rust_library("example_lib-v1_0_0") {
 
   deps = []
 
+  edition = "2021"
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
-    "--edition=2021",
     "-Cmetadata=4b9f22a13a4b11e0",
     "-Cextra-filename=-4b9f22a13a4b11e0",
   ]
