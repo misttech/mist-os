@@ -12,15 +12,17 @@
 #include <fuchsia/ui/display/singleton/cpp/fidl.h>
 #include <fuchsia/vulkan/loader/cpp/fidl.h>
 #include <lib/async/cpp/task.h>
+#include <lib/fidl/cpp/channel.h>
 #include <lib/sys/component/cpp/testing/realm_builder_types.h>
 #include <lib/syslog/cpp/macros.h>
+
+#include <src/ui/testing/util/fidl_cpp_helpers.h>
 
 namespace ui_testing {
 
 namespace {
 
 // Types imported for the realm_builder library.
-using component_testing::ChildRef;
 using component_testing::ConfigValue;
 using component_testing::ParentRef;
 using component_testing::Protocol;
@@ -316,48 +318,46 @@ void PortableUITest::InjectSwipe(int start_x, int start_y, int end_x, int end_y,
 
 void PortableUITest::RegisterMouse() {
   FX_LOGS(INFO) << "Registering fake mouse";
-  input_registry_ = realm_->component().Connect<fuchsia::ui::test::input::Registry>();
-  input_registry_.set_error_handler([](auto) { FX_LOGS(ERROR) << "Error from input helper"; });
+  auto res = realm_->component().Connect<fuchsia_ui_test_input::Registry>();
+  ZX_ASSERT_OK(res);
+  mouse_input_registry_ = fidl::SyncClient(std::move(res.value()));
 
-  bool mouse_registered = false;
-  fuchsia::ui::test::input::RegistryRegisterMouseRequest request;
-  request.set_device(fake_mouse_.NewRequest());
-  input_registry_->RegisterMouse(std::move(request),
-                                 [&mouse_registered]() { mouse_registered = true; });
+  auto [register_mouse_client, register_mouse_server] =
+      fidl::Endpoints<fuchsia_ui_test_input::Mouse>::Create();
+  fake_mouse_ = fidl::SyncClient(std::move(register_mouse_client));
 
-  RunLoopUntil([&mouse_registered] { return mouse_registered; });
+  ZX_ASSERT_OK(
+      mouse_input_registry_->RegisterMouse({{.device = std::move(register_mouse_server)}}));
   FX_LOGS(INFO) << "Mouse registered";
 }
 
 void PortableUITest::SimulateMouseEvent(
-    std::vector<fuchsia::ui::test::input::MouseButton> pressed_buttons, int movement_x,
+    const std::vector<fuchsia_ui_test_input::MouseButton>& pressed_buttons, int movement_x,
     int movement_y) {
   FX_LOGS(INFO) << "Requesting mouse event";
-  fuchsia::ui::test::input::MouseSimulateMouseEventRequest request;
-  request.set_pressed_buttons(std::move(pressed_buttons));
-  request.set_movement_x(movement_x);
-  request.set_movement_y(movement_y);
 
-  fake_mouse_->SimulateMouseEvent(std::move(request),
-                                  [] { FX_LOGS(INFO) << "Mouse event injected"; });
+  ZX_ASSERT_OK(fake_mouse_->SimulateMouseEvent(
+      {{.pressed_buttons = pressed_buttons, .movement_x = movement_x, .movement_y = movement_y}}));
 }
 
 void PortableUITest::SimulateMouseScroll(
-    std::vector<fuchsia::ui::test::input::MouseButton> pressed_buttons, int scroll_x, int scroll_y,
-    bool use_physical_units) {
+    const std::vector<fuchsia_ui_test_input::MouseButton>& pressed_buttons, int scroll_x,
+    int scroll_y, bool use_physical_units) {
   FX_LOGS(INFO) << "Requesting mouse scroll";
-  fuchsia::ui::test::input::MouseSimulateMouseEventRequest request;
-  request.set_pressed_buttons(std::move(pressed_buttons));
+
+  fuchsia_ui_test_input::MouseSimulateMouseEventRequest request({
+      .pressed_buttons = pressed_buttons,
+  });
+
   if (use_physical_units) {
-    request.set_scroll_h_physical_pixel(scroll_x);
-    request.set_scroll_v_physical_pixel(scroll_y);
+    request.scroll_h_physical_pixel() = scroll_x;
+    request.scroll_v_physical_pixel() = scroll_y;
   } else {
-    request.set_scroll_h_detent(scroll_x);
-    request.set_scroll_v_detent(scroll_y);
+    request.scroll_h_detent() = scroll_x;
+    request.scroll_v_detent() = scroll_y;
   }
 
-  fake_mouse_->SimulateMouseEvent(std::move(request),
-                                  [] { FX_LOGS(INFO) << "Mouse scroll event injected"; });
+  ZX_ASSERT_OK(fake_mouse_->SimulateMouseEvent(request));
 }
 
 }  // namespace ui_testing
