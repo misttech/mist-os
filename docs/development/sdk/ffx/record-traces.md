@@ -5,6 +5,10 @@ a Fuchsia device. This data can be used to measure and debug performance
 issues, understand interactions between threads, processes, and components,
 and visualize the system as a whole.
 
+## Adding Fuchsia trace events
+For a complete end-to-end guide on adding Fuchsia tracing to your code, see
+[Tutorial on Fuchsia tracing][tracing-tutorial].
+
 ## Concepts
 
 The [Fuchsia tracing system][fuchsia-tracing-system] provides a mechanism
@@ -310,9 +314,6 @@ Trace providers:
 ```
 
 ## Additional tracing guides
-
-For a complete end-to-end guide on adding Fuchsia tracing to your code, see
-[Tutorial on Fuchsia tracing][tracing-tutorial].
 
 See [Fuchsia tracing guides][fuchsia-tracing-guides] for additional guides on
 using tracing in Fuchsia.
