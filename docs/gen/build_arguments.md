@@ -90,6 +90,14 @@ It will be set below and passed to other toolchains through toolchain_args
 
 From //build/config/BUILDCONFIG.gn:2118
 
+### allow_tear_off_abi_breakage
+
+Allow breakage in tear-off protocols.
+
+**Current value (from the default):** `true`
+
+From //tools/fidl/abi-compat/BUILD.gn:17
+
 ### allowed_test_device_types
 
 A list of device types this build is allowed to run tests on. If set, only
@@ -926,6 +934,14 @@ Point this to the location of external txt files to be included as extras
 **Current value (from the default):** `[]`
 
 From //src/lib/ui/carnelian/BUILD.gn:22
+
+### check_external_external_abi_compat
+
+Check external to external IPC ABI compatibility
+
+**Current value (from the default):** `false`
+
+From //tools/fidl/abi-compat/BUILD.gn:20
 
 ### check_output_dir_leaks
 
