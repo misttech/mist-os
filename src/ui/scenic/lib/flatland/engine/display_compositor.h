@@ -18,6 +18,7 @@
 #include <memory>
 #include <unordered_map>
 
+#include "lib/fidl/cpp/wire/internal/transport_channel.h"
 #include "src/lib/fxl/synchronization/thread_annotations.h"
 #include "src/ui/scenic/lib/allocation/buffer_collection_importer.h"
 #include "src/ui/scenic/lib/display/display.h"
@@ -78,7 +79,7 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
   // state at the same time as the DisplayCompositor without making use of locks.
   DisplayCompositor(
       async_dispatcher_t* main_dispatcher,
-      std::shared_ptr<fuchsia::hardware::display::CoordinatorSyncPtr> display_coordinator,
+      std::shared_ptr<fuchsia::hardware::display::CoordinatorSyncPtr> hlcpp_display_coordinator,
       const std::shared_ptr<Renderer>& renderer,
       fuchsia::sysmem2::AllocatorSyncPtr sysmem_allocator, bool enable_display_composition,
       uint32_t max_display_layers);
@@ -282,7 +283,16 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
   mutable std::mutex lock_;
 
   // Handle to the display coordinator interface.
-  std::shared_ptr<fuchsia::hardware::display::CoordinatorSyncPtr> display_coordinator_
+  // Must outlive `display_coordinator_`.
+  //
+  // TODO(https://fxbug.dev/42156059): We keep this field because
+  // `DisplayManager` still uses the HLCPP sync clients. Code should
+  // only use the new C++ binding client `display_coordinator_`.
+  std::shared_ptr<fuchsia::hardware::display::CoordinatorSyncPtr> hlcpp_display_coordinator_
+      FXL_GUARDED_BY(lock_);
+
+  // Borrowed new C++ binding reference to `hlcpp_display_coordinator_`.
+  fidl::UnownedClientEnd<fuchsia_hardware_display::Coordinator> display_coordinator_
       FXL_GUARDED_BY(lock_);
 
   // Maps the flatland global image id to the events used by the display coordinator.

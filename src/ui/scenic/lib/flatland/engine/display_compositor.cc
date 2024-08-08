@@ -24,6 +24,7 @@
 #include <vector>
 
 #include "lib/fidl/cpp/hlcpp_conversion.h"
+#include "lib/fidl/cpp/wire/status.h"
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/ui/lib/escher/util/trace_macros.h"
 #include "src/ui/scenic/lib/allocation/id.h"
@@ -55,19 +56,19 @@ uint32_t BufferCollectionPixelFormatToImageTilingType(
       return 3;  // IMAGE_TILING_TYPE_YF_TILED
     case fuchsia::images2::PixelFormatModifier::LINEAR:
     default:
-      return fuchsia::hardware::display::types::IMAGE_TILING_TYPE_LINEAR;
+      return fuchsia_hardware_display_types::kImageTilingTypeLinear;
   }
 }
 
-fuchsia::hardware::display::types::AlphaMode GetAlphaMode(
+fuchsia_hardware_display_types::AlphaMode GetAlphaMode(
     const fuchsia::ui::composition::BlendMode& blend_mode) {
-  fuchsia::hardware::display::types::AlphaMode alpha_mode;
+  fuchsia_hardware_display_types::AlphaMode alpha_mode;
   switch (blend_mode) {
     case fuchsia::ui::composition::BlendMode::SRC:
-      alpha_mode = fuchsia::hardware::display::types::AlphaMode::DISABLE;
+      alpha_mode = fuchsia_hardware_display_types::AlphaMode::kDisable;
       break;
     case fuchsia::ui::composition::BlendMode::SRC_OVER:
-      alpha_mode = fuchsia::hardware::display::types::AlphaMode::PREMULTIPLIED;
+      alpha_mode = fuchsia_hardware_display_types::AlphaMode::kPremultiplied;
       break;
   }
   return alpha_mode;
@@ -242,10 +243,11 @@ std::optional<fuchsia::images2::PixelFormatModifier> DetermineDisplaySupportFor(
 
 DisplayCompositor::DisplayCompositor(
     async_dispatcher_t* main_dispatcher,
-    std::shared_ptr<fuchsia::hardware::display::CoordinatorSyncPtr> display_coordinator,
+    std::shared_ptr<fuchsia::hardware::display::CoordinatorSyncPtr> hlcpp_display_coordinator,
     const std::shared_ptr<Renderer>& renderer, fuchsia::sysmem2::AllocatorSyncPtr sysmem_allocator,
     const bool enable_display_composition, uint32_t max_display_layers)
-    : display_coordinator_(std::move(display_coordinator)),
+    : hlcpp_display_coordinator_(std::move(hlcpp_display_coordinator)),
+      display_coordinator_(scenic_impl::GetUnowned(*hlcpp_display_coordinator_)),
       renderer_(renderer),
       release_fence_manager_(main_dispatcher),
       sysmem_allocator_(std::move(sysmem_allocator)),
@@ -263,14 +265,25 @@ DisplayCompositor::~DisplayCompositor() {
   DiscardConfig();
   for (const auto& [_, data] : display_engine_data_map_) {
     for (const fuchsia_hardware_display::LayerId& layer : data.layers) {
-      (*display_coordinator_)
-          ->DestroyLayer(fidl::NaturalToHLCPP(fuchsia_hardware_display::LayerId(layer)));
+      fit::result<fidl::OneWayStatus> result =
+          fidl::Call(display_coordinator_)->DestroyLayer(layer);
+      if (result.is_error()) {
+        FX_LOGS(ERROR) << "Failed to call FIDL DestroyLayer method: " << result.error_value();
+      }
     }
     for (const auto& event_data : data.frame_event_datas) {
-      (*display_coordinator_)
-          ->ReleaseEvent(fidl::NaturalToHLCPP(scenic_impl::DisplayEventId(event_data.wait_id)));
-      (*display_coordinator_)
-          ->ReleaseEvent(fidl::NaturalToHLCPP(scenic_impl::DisplayEventId(event_data.signal_id)));
+      fit::result<fidl::OneWayStatus> result =
+          fidl::Call(display_coordinator_)->ReleaseEvent(event_data.wait_id);
+      if (result.is_error()) {
+        FX_LOGS(ERROR) << "Failed to call FIDL ReleaseEvent on wait event ("
+                       << event_data.wait_id.value() << "): " << result.error_value();
+      }
+
+      result = fidl::Call(display_coordinator_)->ReleaseEvent(event_data.signal_id);
+      if (result.is_error()) {
+        FX_LOGS(ERROR) << "Failed to call FIDL ReleaseEvent on signal event ("
+                       << event_data.signal_id.value() << "): " << result.error_value();
+      }
     }
   }
 
@@ -367,10 +380,16 @@ void DisplayCompositor::ReleaseBufferCollection(
   renderer_->ReleaseBufferCollection(collection_id, usage);
 
   std::scoped_lock lock(lock_);
-  FX_DCHECK(display_coordinator_);
-  const fuchsia::hardware::display::BufferCollectionId display_collection_id =
-      fidl::NaturalToHLCPP(allocation::ToDisplayBufferCollectionId(collection_id));
-  (*display_coordinator_)->ReleaseBufferCollection(display_collection_id);
+  FX_DCHECK(display_coordinator_.is_valid());
+  const fuchsia_hardware_display::BufferCollectionId display_collection_id =
+      allocation::ToDisplayBufferCollectionId(collection_id);
+  const fit::result<fidl::OneWayStatus> result =
+      fidl::Call(display_coordinator_)
+          ->ReleaseBufferCollection({{.buffer_collection_id = display_collection_id}});
+  if (result.is_error()) {
+    FX_LOGS(ERROR) << "Failed to call FIDL ReleaseBufferCollection method: "
+                   << result.error_value();
+  }
   display_buffer_collection_ptrs_.erase(collection_id);
   buffer_collection_supports_display_.erase(collection_id);
 }
@@ -413,11 +432,11 @@ bool DisplayCompositor::ImportBufferImage(const allocation::ImageMetadata& metad
   }
 
   std::scoped_lock lock(lock_);
-  FX_DCHECK(display_coordinator_);
+  FX_DCHECK(display_coordinator_.is_valid());
 
   const allocation::GlobalBufferCollectionId collection_id = metadata.collection_id;
-  const fuchsia::hardware::display::BufferCollectionId display_collection_id =
-      fidl::NaturalToHLCPP(allocation::ToDisplayBufferCollectionId(collection_id));
+  const fuchsia_hardware_display::BufferCollectionId display_collection_id =
+      allocation::ToDisplayBufferCollectionId(collection_id);
   const bool display_support_already_set =
       buffer_collection_supports_display_.find(collection_id) !=
       buffer_collection_supports_display_.end();
@@ -445,25 +464,23 @@ bool DisplayCompositor::ImportBufferImage(const allocation::ImageMetadata& metad
     return true;
   }
 
-  const fuchsia::hardware::display::types::ImageMetadata image_metadata =
-      fidl::NaturalToHLCPP(CreateImageMetadata(metadata));
-  fuchsia::hardware::display::Coordinator_ImportImage_Result import_image_result;
-  {
-    const fuchsia::hardware::display::ImageId fidl_image_id =
-        fidl::NaturalToHLCPP(allocation::ToFidlImageId(metadata.identifier));
-    const auto status = (*display_coordinator_)
-                            ->ImportImage(image_metadata, /*buffer_id=*/
-                                          {
-                                              .buffer_collection_id = display_collection_id,
-                                              .buffer_index = metadata.vmo_index,
-                                          },
-                                          fidl_image_id, &import_image_result);
-    FX_DCHECK(status == ZX_OK);
-  }
-
-  if (import_image_result.is_err()) {
+  const fuchsia_hardware_display_types::ImageMetadata image_metadata =
+      CreateImageMetadata(metadata);
+  const fuchsia_hardware_display::ImageId fidl_image_id =
+      allocation::ToFidlImageId(metadata.identifier);
+  const fidl::Result import_image_result =
+      fidl::Call(display_coordinator_)
+          ->ImportImage({{
+              .image_metadata = image_metadata,
+              .buffer_id = {{
+                  .buffer_collection_id = display_collection_id,
+                  .buffer_index = metadata.vmo_index,
+              }},
+              .image_id = fidl_image_id,
+          }});
+  if (import_image_result.is_error()) {
     FX_LOGS(ERROR) << "Display coordinator could not import the image: "
-                   << zx_status_get_string(import_image_result.err());
+                   << import_image_result.error_value();
     return false;
   }
 
@@ -478,13 +495,17 @@ void DisplayCompositor::ReleaseBufferImage(const allocation::GlobalImageId image
 
   renderer_->ReleaseBufferImage(image_id);
 
-  const fuchsia::hardware::display::ImageId fidl_image_id =
-      fidl::NaturalToHLCPP(allocation::ToFidlImageId(image_id));
+  const fuchsia_hardware_display::ImageId fidl_image_id = allocation::ToFidlImageId(image_id);
   std::scoped_lock lock(lock_);
 
   if (display_imported_images_.erase(image_id) == 1) {
-    FX_DCHECK(display_coordinator_);
-    (*display_coordinator_)->ReleaseImage(fidl_image_id);
+    FX_DCHECK(display_coordinator_.is_valid());
+
+    fit::result<fidl::OneWayStatus> result =
+        fidl::Call(display_coordinator_)->ReleaseImage({{.image_id = fidl_image_id}});
+    if (result.is_error()) {
+      FX_LOGS(ERROR) << "Failed to call FIDL ReleaseImage method: " << result.error_value();
+    }
   }
 
   image_event_map_.erase(image_id);
@@ -492,17 +513,14 @@ void DisplayCompositor::ReleaseBufferImage(const allocation::GlobalImageId image
 
 fuchsia_hardware_display::LayerId DisplayCompositor::CreateDisplayLayer() {
   FX_DCHECK(main_dispatcher_ == async_get_default_dispatcher());
-  fuchsia::hardware::display::Coordinator_CreateLayer_Result result;
-  const zx_status_t transport_status = (*display_coordinator_)->CreateLayer(&result);
-  if (transport_status != ZX_OK) {
-    FX_LOGS(ERROR) << "Failed to call FIDL CreateLayer: " << zx_status_get_string(transport_status);
+  FX_DCHECK(display_coordinator_.is_valid());
+
+  const fidl::Result create_layer_result = fidl::Call(display_coordinator_)->CreateLayer();
+  if (create_layer_result.is_error()) {
+    FX_LOGS(ERROR) << "Failed to create layer, " << create_layer_result.error_value();
     return {{.value = fuchsia_hardware_display_types::kInvalidDispId}};
   }
-  if (result.is_err()) {
-    FX_LOGS(ERROR) << "Failed to create layer: " << zx_status_get_string(result.err());
-    return {{.value = fuchsia_hardware_display_types::kInvalidDispId}};
-  }
-  return fidl::HLCPPToNatural(result.response().layer_id);
+  return create_layer_result.value().layer_id();
 }
 
 void DisplayCompositor::SetDisplayLayers(
@@ -510,13 +528,17 @@ void DisplayCompositor::SetDisplayLayers(
     const std::vector<fuchsia_hardware_display::LayerId>& layers) {
   TRACE_DURATION("gfx", "flatland::DisplayCompositor::SetDisplayLayers");
   FX_DCHECK(main_dispatcher_ == async_get_default_dispatcher());
+  FX_DCHECK(display_coordinator_.is_valid());
+
   // Set all of the layers for each of the images on the display.
-  const auto status =
-      (*display_coordinator_)
-          ->SetDisplayLayers(
-              fidl::NaturalToHLCPP(fuchsia_hardware_display_types::DisplayId(display_id)),
-              fidl::NaturalToHLCPP(std::vector(layers)));
-  FX_DCHECK(status == ZX_OK);
+  const fit::result<fidl::OneWayStatus> set_display_layers_result =
+      fidl::Call(display_coordinator_)
+          ->SetDisplayLayers({{
+              .display_id = display_id,
+              .layer_ids = layers,
+          }});
+  FX_DCHECK(set_display_layers_result.is_ok())
+      << "Failed to call FIDL SetDisplayLayers method: " << set_display_layers_result.error_value();
 }
 
 bool DisplayCompositor::SetRenderDataOnDisplay(const RenderData& data) {
@@ -557,7 +579,7 @@ bool DisplayCompositor::SetRenderDataOnDisplay(const RenderData& data) {
     if (image_id != allocation::kInvalidImageId) {
       if (buffer_collection_supports_display_[data.images[i].collection_id]) {
         static const scenic_impl::DisplayEventId kInvalidEventId = {
-            {.value = fuchsia::hardware::display::types::INVALID_DISP_ID}};
+            {.value = fuchsia_hardware_display_types::kInvalidDispId}};
         ApplyLayerImage(layers[i], data.rectangles[i], data.images[i],
                         /*wait_id*/ kInvalidEventId,
                         /*signal_id*/ image_event_map_[image_id].signal_id);
@@ -588,6 +610,8 @@ void DisplayCompositor::ApplyLayerColor(const fuchsia_hardware_display::LayerId 
                                         const ImageRect rectangle,
                                         const allocation::ImageMetadata image) {
   FX_DCHECK(main_dispatcher_ == async_get_default_dispatcher());
+  FX_DCHECK(display_coordinator_.is_valid());
+
   // We have to convert the image_metadata's multiply color, which is an array of normalized
   // floating point values, to an unnormalized array of uint8_ts in the range 0-255.
   std::vector<uint8_t> col = {static_cast<uint8_t>(255 * image.multiply_color[0]),
@@ -595,10 +619,15 @@ void DisplayCompositor::ApplyLayerColor(const fuchsia_hardware_display::LayerId 
                               static_cast<uint8_t>(255 * image.multiply_color[2]),
                               static_cast<uint8_t>(255 * image.multiply_color[3])};
 
-  const fuchsia::hardware::display::LayerId hlcpp_layer_id =
-      fidl::NaturalToHLCPP(fuchsia_hardware_display::LayerId(layer_id));
-  (*display_coordinator_)
-      ->SetLayerColorConfig(hlcpp_layer_id, fuchsia::images2::PixelFormat::B8G8R8A8, col);
+  const fit::result<fidl::OneWayStatus> set_layer_color_result =
+      fidl::Call(display_coordinator_)
+          ->SetLayerColorConfig({{
+              .layer_id = layer_id,
+              .pixel_format = fuchsia_images2::PixelFormat::kB8G8R8A8,
+              .color_bytes = col,
+          }});
+  FX_DCHECK(set_layer_color_result.is_ok())
+      << "Failed to call FIDL SetLayerColorConfig method: " << set_layer_color_result.error_value();
 
 // TODO(https://fxbug.dev/42056054): Currently, not all display hardware supports the ability to
 // set either the position or the alpha on a color layer, as color layers are not primary
@@ -617,13 +646,25 @@ void DisplayCompositor::ApplyLayerColor(const fuchsia_hardware_display::LayerId 
   const fuchsia_hardware_display_types::CoordinateTransformation transform =
       GetDisplayTransformFromOrientationAndFlip(rectangle.orientation, image.flip);
 
-  (*display_coordinator_)
-      ->SetLayerPrimaryPosition(
-          hlcpp_layer_id, fidl::NaturalToHLCPP(fuchsia_hardware_display_types::Transform(transform)),
-          fidl::NaturalToHLCPP(fuchsia_hardware_display_types::Frame(src)),
-          fidl::NaturalToHLCPP(fuchsia_hardware_display_types::Frame(dst)));
-  auto alpha_mode = GetAlphaMode(image.blend_mode);
-  (*display_coordinator_)->SetLayerPrimaryAlpha(hlcpp_layer_id, alpha_mode, image.multiply_color[3]);
+  const fit::result set_layer_position_result =
+      fidl::Call(display_coordinator_)->SetLayerPrimaryPosition({{
+        .layer_id = layer_id,
+        .transform = transform,
+        .src_frame = src,
+        .dest_frame = dst,
+      }});
+  FX_DCHECK(set_layer_position_result.is_ok()) << "Failed to call FIDL SetLayerPrimaryPosition method: "
+                                               << set_layer_position_result.error_value();
+
+  const fuchsia_hardware_display_types::AlphaMode alpha_mode = GetAlphaMode(image.blend_mode);
+  const fit::result set_layer_alpha_result =
+      fidl::Call(display_coordinator_)->SetLayerPrimaryAlpha({{
+        .layer_id = layer_id,
+        .mode = alpha_mode,
+        .val = image.multiply_color[3],
+      }});
+  FX_DCHECK(set_layer_alpha_result.is_ok()) << "Failed to call FIDL SetLayerPrimaryAlpha method: "
+                                            << set_layer_alpha_result.error_value();
 #endif
 }
 
@@ -634,66 +675,108 @@ void DisplayCompositor::ApplyLayerImage(const fuchsia_hardware_display::LayerId 
                                         const scenic_impl::DisplayEventId signal_id) {
   TRACE_DURATION("gfx", "flatland::DisplayCompositor::ApplyLayerImage");
   FX_DCHECK(main_dispatcher_ == async_get_default_dispatcher());
+  FX_DCHECK(display_coordinator_.is_valid());
+
   const auto [src, dst] = DisplaySrcDstFrames::New(rectangle, image);
   FX_DCHECK(src.width() && src.height()) << "Source frame cannot be empty.";
   FX_DCHECK(dst.width() && dst.height()) << "Destination frame cannot be empty.";
   const fuchsia_hardware_display_types::CoordinateTransformation transform =
       GetDisplayTransformFromOrientationAndFlip(rectangle.orientation, image.flip);
-  const auto alpha_mode = GetAlphaMode(image.blend_mode);
+  const fuchsia_hardware_display_types::AlphaMode alpha_mode = GetAlphaMode(image.blend_mode);
 
-  const fuchsia::hardware::display::types::ImageMetadata image_metadata =
-      fidl::NaturalToHLCPP(CreateImageMetadata(image));
-  const fuchsia::hardware::display::LayerId hlcpp_layer_id =
-      fidl::NaturalToHLCPP(fuchsia_hardware_display::LayerId(layer_id));
-  (*display_coordinator_)->SetLayerPrimaryConfig(hlcpp_layer_id, image_metadata);
-  (*display_coordinator_)
-      ->SetLayerPrimaryPosition(
-          hlcpp_layer_id,
-          fidl::NaturalToHLCPP(fuchsia_hardware_display_types::CoordinateTransformation(transform)),
-          fidl::NaturalToHLCPP(fuchsia_math::RectU(src)),
-          fidl::NaturalToHLCPP(fuchsia_math::RectU(dst)));
-  (*display_coordinator_)
-      ->SetLayerPrimaryAlpha(hlcpp_layer_id, alpha_mode, image.multiply_color[3]);
+  const fuchsia_hardware_display_types::ImageMetadata image_metadata = CreateImageMetadata(image);
+  const fit::result<fidl::OneWayStatus> set_layer_primary_config_result =
+      fidl::Call(display_coordinator_)
+          ->SetLayerPrimaryConfig({{
+              .layer_id = layer_id,
+              .image_metadata = image_metadata,
+          }});
+  FX_DCHECK(set_layer_primary_config_result.is_ok())
+      << "Failed to call FIDL SetLayerPrimaryConfig method: "
+      << set_layer_primary_config_result.error_value();
+
+  const fit::result<fidl::OneWayStatus> set_layer_primary_position_result =
+      fidl::Call(display_coordinator_)
+          ->SetLayerPrimaryPosition({{
+              .layer_id = layer_id,
+              .image_source_transformation = transform,
+              .image_source = src,
+              .display_destination = dst,
+          }});
+
+  FX_DCHECK(set_layer_primary_position_result.is_ok())
+      << "Failed to call FIDL SetLayerPrimaryPosition method: "
+      << set_layer_primary_position_result.error_value();
+
+  const fit::result<fidl::OneWayStatus> set_layer_primary_alpha_result =
+      fidl::Call(display_coordinator_)
+          ->SetLayerPrimaryAlpha({{
+              .layer_id = layer_id,
+              .mode = alpha_mode,
+              .val = image.multiply_color[3],
+          }});
+  FX_DCHECK(set_layer_primary_alpha_result.is_ok())
+      << "Failed to call FIDL SetLayerPrimaryAlpha method: "
+      << set_layer_primary_alpha_result.error_value();
+
   // Set the imported image on the layer.
-  const fuchsia::hardware::display::ImageId image_id =
-      fidl::NaturalToHLCPP(allocation::ToFidlImageId(image.identifier));
-  (*display_coordinator_)
-      ->SetLayerImage(hlcpp_layer_id, image_id,
-                      fidl::NaturalToHLCPP(scenic_impl::DisplayEventId(wait_id)),
-                      fidl::NaturalToHLCPP(scenic_impl::DisplayEventId(signal_id)));
+  const fuchsia_hardware_display::ImageId image_id = allocation::ToFidlImageId(image.identifier);
+  const fit::result<fidl::OneWayStatus> set_layer_image_result =
+      fidl::Call(display_coordinator_)
+          ->SetLayerImage({{
+              .layer_id = layer_id,
+              .image_id = image_id,
+              .wait_event_id = wait_id,
+              .signal_event_id = signal_id,
+          }});
+  FX_DCHECK(set_layer_image_result.is_ok())
+      << "Failed to call FIDL SetLayerImage method: " << set_layer_image_result.error_value();
 }
 
 bool DisplayCompositor::CheckConfig() {
   FX_DCHECK(main_dispatcher_ == async_get_default_dispatcher());
+  FX_DCHECK(display_coordinator_.is_valid());
+
   TRACE_DURATION("gfx", "flatland::DisplayCompositor::CheckConfig");
-  fuchsia::hardware::display::types::ConfigResult result;
-  std::vector<fuchsia::hardware::display::ClientCompositionOp> ops;
-  (*display_coordinator_)->CheckConfig(/*discard*/ false, &result, &ops);
-  return result == fuchsia::hardware::display::types::ConfigResult::OK;
+  const fidl::Result check_config_result = fidl::Call(display_coordinator_)
+                                               ->CheckConfig({{
+                                                   .discard = false,
+                                               }});
+  FX_DCHECK(check_config_result.is_ok())
+      << "Failed to call FIDL CheckConfig method: " << check_config_result.error_value();
+  return check_config_result.value().res() == fuchsia_hardware_display_types::ConfigResult::kOk;
 }
 
 void DisplayCompositor::DiscardConfig() {
   FX_DCHECK(main_dispatcher_ == async_get_default_dispatcher());
+  FX_DCHECK(display_coordinator_.is_valid());
+
   TRACE_DURATION("gfx", "flatland::DisplayCompositor::DiscardConfig");
   pending_images_in_config_.clear();
-  fuchsia::hardware::display::types::ConfigResult result;
-  std::vector<fuchsia::hardware::display::ClientCompositionOp> ops;
-  (*display_coordinator_)->CheckConfig(/*discard*/ true, &result, &ops);
+  const fidl::Result check_config_result = fidl::Call(display_coordinator_)
+                                               ->CheckConfig({{
+                                                   .discard = true,
+                                               }});
+  FX_DCHECK(check_config_result.is_ok())
+      << "Failed to call FIDL CheckConfig method: " << check_config_result.error_value();
 }
 
 fuchsia_hardware_display_types::ConfigStamp DisplayCompositor::ApplyConfig() {
   FX_DCHECK(main_dispatcher_ == async_get_default_dispatcher());
+  FX_DCHECK(display_coordinator_.is_valid());
+
   TRACE_DURATION("gfx", "flatland::DisplayCompositor::ApplyConfig");
   {
-    const auto status = (*display_coordinator_)->ApplyConfig();
-    FX_DCHECK(status == ZX_OK);
+    const fit::result<fidl::OneWayStatus> result = fidl::Call(display_coordinator_)->ApplyConfig();
+    FX_DCHECK(result.is_ok()) << "Failed to call FIDL ApplyConfig method: " << result.error_value();
   }
-  fuchsia::hardware::display::types::ConfigStamp pending_config_stamp;
+
   {
-    const auto status = (*display_coordinator_)->GetLatestAppliedConfigStamp(&pending_config_stamp);
-    FX_DCHECK(status == ZX_OK);
+    const fidl::Result result = fidl::Call(display_coordinator_)->GetLatestAppliedConfigStamp();
+    FX_DCHECK(result.is_ok()) << "Failed to call FIDL GetLatestAppliedConfigStamp method: "
+                              << result.error_value();
+    return result.value().stamp();
   }
-  return fidl::HLCPPToNatural(pending_config_stamp);
 }
 
 bool DisplayCompositor::PerformGpuComposition(const uint64_t frame_number,
@@ -723,14 +806,15 @@ bool DisplayCompositor::PerformGpuComposition(const uint64_t frame_number,
     // Clear any past CC state here, before applying GPU CC.
     if (cc_state_machine_.GpuRequiresDisplayClearing()) {
       TRACE_DURATION("gfx", "flatland::DisplayCompositor::PerformGpuComposition[cc]");
-      const zx_status_t status =
-          (*display_coordinator_)
-              ->SetDisplayColorConversion(
-                  fidl::NaturalToHLCPP(
-                      fuchsia_hardware_display_types::DisplayId(render_data.display_id)),
-                  kDefaultColorConversionOffsets, kDefaultColorConversionCoefficients,
-                  kDefaultColorConversionOffsets);
-      FX_CHECK(status == ZX_OK) << "Could not apply hardware color conversion: " << status;
+      const fit::result<fidl::OneWayStatus> set_display_color_conversion_result =
+          fidl::Call(display_coordinator_)
+              ->SetDisplayColorConversion({{.display_id = render_data.display_id,
+                                            .preoffsets = kDefaultColorConversionOffsets,
+                                            .coefficients = kDefaultColorConversionCoefficients,
+                                            .postoffsets = kDefaultColorConversionOffsets}});
+      FX_CHECK(set_display_color_conversion_result.is_ok())
+          << "Could not apply hardware color conversion: "
+          << set_display_color_conversion_result.error_value();
       cc_state_machine_.DisplayCleared();
     }
 
@@ -889,12 +973,17 @@ bool DisplayCompositor::SetRenderDatasOnDisplay(const std::vector<RenderData>& r
     // Check the state machine to see if there's any CC data to apply.
     if (const auto cc_data = cc_state_machine_.GetDataToApply()) {
       // Apply direct-to-display color conversion here.
-      const zx_status_t status =
-          (*display_coordinator_)
-              ->SetDisplayColorConversion(
-                  fidl::NaturalToHLCPP(fuchsia_hardware_display_types::DisplayId(data.display_id)),
-                  (*cc_data).preoffsets, (*cc_data).coefficients, (*cc_data).postoffsets);
-      FX_CHECK(status == ZX_OK) << "Could not apply hardware color conversion: " << status;
+      const fit::result<fidl::OneWayStatus> set_display_color_conversion_result =
+          fidl::Call(display_coordinator_)
+              ->SetDisplayColorConversion({{
+                  .display_id = data.display_id,
+                  .preoffsets = (*cc_data).preoffsets,
+                  .coefficients = (*cc_data).coefficients,
+                  .postoffsets = (*cc_data).postoffsets,
+              }});
+      FX_CHECK(set_display_color_conversion_result.is_ok())
+          << "Could not apply hardware color conversion: "
+          << set_display_color_conversion_result.error_value();
     }
   }
 
@@ -951,12 +1040,10 @@ DisplayCompositor::FrameEventData DisplayCompositor::NewFrameEventData() {
     FX_DCHECK(status == ZX_OK);
   }
 
-  fidl::UnownedClientEnd<fuchsia_hardware_display::Coordinator> coordinator =
-      scenic_impl::GetUnowned(*display_coordinator_);
-  result.wait_id = scenic_impl::ImportEvent(coordinator, result.wait_event);
+  result.wait_id = scenic_impl::ImportEvent(display_coordinator_, result.wait_event);
   FX_DCHECK(result.wait_id.value() != fuchsia_hardware_display_types::kInvalidDispId);
   result.signal_event.signal(0, ZX_EVENT_SIGNALED);
-  result.signal_id = scenic_impl::ImportEvent(coordinator, result.signal_event);
+  result.signal_id = scenic_impl::ImportEvent(display_coordinator_, result.signal_event);
   FX_DCHECK(result.signal_id.value() != fuchsia_hardware_display_types::kInvalidDispId);
   return result;
 }
@@ -975,9 +1062,7 @@ DisplayCompositor::ImageEventData DisplayCompositor::NewImageEventData() {
     FX_DCHECK(status == ZX_OK);
   }
 
-  fidl::UnownedClientEnd<fuchsia_hardware_display::Coordinator> coordinator =
-      scenic_impl::GetUnowned(*display_coordinator_);
-  result.signal_id = scenic_impl::ImportEvent(coordinator, result.signal_event);
+  result.signal_id = scenic_impl::ImportEvent(display_coordinator_, result.signal_event);
   FX_DCHECK(result.signal_id.value() != fuchsia_hardware_display_types::kInvalidDispId);
 
   return result;
@@ -1067,10 +1152,14 @@ void DisplayCompositor::SetColorConversionValues(const std::array<float, 9>& coe
 bool DisplayCompositor::SetMinimumRgb(const uint8_t minimum_rgb) {
   FX_DCHECK(main_dispatcher_ == async_get_default_dispatcher());
   std::scoped_lock lock(lock_);
-  fuchsia::hardware::display::Coordinator_SetMinimumRgb_Result cmd_result;
-  const auto status = (*display_coordinator_)->SetMinimumRgb(minimum_rgb, &cmd_result);
-  if (status != ZX_OK || cmd_result.is_err()) {
-    FX_LOGS(WARNING) << "FlatlandDisplayCompositor SetMinimumRGB failed";
+  FX_DCHECK(display_coordinator_.is_valid());
+
+  const fidl::Result result = fidl::Call(display_coordinator_)
+                                  ->SetMinimumRgb({{
+                                      .minimum_rgb = minimum_rgb,
+                                  }});
+  if (result.is_error()) {
+    FX_LOGS(ERROR) << "FlatlandDisplayCompositor SetMinimumRGB failed: " << result.error_value();
     return false;
   }
   return true;
@@ -1248,9 +1337,7 @@ bool DisplayCompositor::ImportBufferCollectionToDisplayCoordinator(
     fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken> token,
     const fuchsia_hardware_display_types::ImageBufferUsage& image_buffer_usage) {
   FX_DCHECK(main_dispatcher_ == async_get_default_dispatcher());
-  fidl::UnownedClientEnd<fuchsia_hardware_display::Coordinator> coordinator =
-      scenic_impl::GetUnowned(*display_coordinator_);
-  return scenic_impl::ImportBufferCollection(identifier, coordinator, std::move(token),
+  return scenic_impl::ImportBufferCollection(identifier, display_coordinator_, std::move(token),
                                              image_buffer_usage);
 }
 

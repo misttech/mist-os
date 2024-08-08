@@ -86,7 +86,7 @@ class Engine {
 
   // TODO(https://fxbug.dev/42156567): hack so that we can call DisplayCompositor::AddDisplay() when
   // we first encounter a new display.  Need a more straightforward way to call AddDisplay().
-  std::set</*fuchsia::hardware::display::types::DisplayId::value*/ uint64_t>
+  std::set</*fuchsia_hardware_display_types::DisplayId::value*/ uint64_t>
       hack_seen_display_id_values_;
 
   inspect::Node inspect_node_;

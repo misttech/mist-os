@@ -357,14 +357,22 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
   // these processes to have been completed.
   void WaitOnVSync() {
     auto display = display_manager_->default_display();
-    auto display_coordinator = display_manager_->default_display_coordinator();
+    std::shared_ptr<fuchsia::hardware::display::CoordinatorSyncPtr> display_coordinator =
+        display_manager_->default_display_coordinator();
+
+    ASSERT_TRUE(display_coordinator != nullptr);
+    fidl::UnownedClientEnd<fuchsia_hardware_display::Coordinator> coordinator =
+        scenic_impl::GetUnowned(*display_coordinator);
 
     // Get the latest applied config stamp. This will be used to compare against the config
     // stamp in the OnSync callback function used by the display. If the two stamps match,
     // then we know that the vsync has completed and it is safe to do readbacks.
-    fuchsia::hardware::display::types::ConfigStamp pending_config_stamp;
-    auto status = (*display_coordinator.get())->GetLatestAppliedConfigStamp(&pending_config_stamp);
-    ASSERT_TRUE(status == ZX_OK);
+    const fidl::Result config_stamp_result = fidl::Call(coordinator)->GetLatestAppliedConfigStamp();
+    ASSERT_TRUE(config_stamp_result.is_ok())
+        << "Failed to call FIDL GetLatestAppliedConfigStamp method: "
+        << config_stamp_result.error_value();
+    fuchsia_hardware_display_types::ConfigStamp pending_config_stamp =
+        config_stamp_result.value().stamp();
 
     // The callback will switch this bool to |true| if the two configs match. It is initialized
     // to |false| and blocks the main thread below.
@@ -372,7 +380,7 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
     display->SetVsyncCallback(
         [&pending_config_stamp, &configs_are_equal](
             zx::time timestamp, fuchsia_hardware_display_types::ConfigStamp applied_config_stamp) {
-          if (pending_config_stamp.value == applied_config_stamp.value() &&
+          if (pending_config_stamp == applied_config_stamp &&
               applied_config_stamp.value() !=
                   fuchsia_hardware_display_types::kInvalidConfigStampValue) {
             configs_are_equal = true;
@@ -540,11 +548,18 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
   }
 
   void ReleaseCaptureBufferCollection(allocation::GlobalBufferCollectionId collection_id) {
-    const fuchsia::hardware::display::BufferCollectionId display_collection_id =
-        fidl::NaturalToHLCPP(allocation::ToDisplayBufferCollectionId(collection_id));
+    const fuchsia_hardware_display::BufferCollectionId display_collection_id =
+        allocation::ToDisplayBufferCollectionId(collection_id);
     auto display = display_manager_->default_display();
     auto display_coordinator = display_manager_->default_display_coordinator();
-    (*display_coordinator)->ReleaseBufferCollection(display_collection_id);
+    ASSERT_TRUE(display_coordinator != nullptr);
+    fidl::UnownedClientEnd<fuchsia_hardware_display::Coordinator> coordinator =
+        scenic_impl::GetUnowned(*display_coordinator);
+
+    const fit::result<fidl::OneWayStatus> result =
+        fidl::Call(coordinator)->ReleaseBufferCollection(display_collection_id);
+    ASSERT_TRUE(result.is_ok()) << "Failed to call FIDL ReleaseBufferCollection: "
+                                << result.error_value();
   }
 
   static void ReleaseClientTextureBufferCollection(
@@ -562,8 +577,8 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
 
     // This ID would only be zero if we were running in an environment without capture support.
     EXPECT_NE(capture_image_id, 0U);
-    const fuchsia::hardware::display::ImageId fidl_capture_image_id =
-        fidl::NaturalToHLCPP(allocation::ToFidlImageId(capture_image_id));
+    const fuchsia_hardware_display::ImageId fidl_capture_image_id =
+        allocation::ToFidlImageId(capture_image_id);
 
     auto display = display_manager_->default_display();
     auto display_coordinator = display_manager_->default_display_coordinator();
@@ -574,12 +589,16 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
 
     fidl::UnownedClientEnd<fuchsia_hardware_display::Coordinator> coordinator =
         scenic_impl::GetUnowned(*display_coordinator);
-    auto capture_signal_fence_id = scenic_impl::ImportEvent(coordinator, capture_signal_fence);
-    fuchsia::hardware::display::Coordinator_StartCapture_Result start_capture_result;
-    (*display_coordinator.get())
-        ->StartCapture(fidl::NaturalToHLCPP(capture_signal_fence_id), fidl_capture_image_id,
-                       &start_capture_result);
-    EXPECT_TRUE(start_capture_result.is_response()) << start_capture_result.err();
+
+    scenic_impl::DisplayEventId capture_signal_fence_id =
+        scenic_impl::ImportEvent(coordinator, capture_signal_fence);
+    const fidl::Result start_capture_result = fidl::Call(coordinator)
+                                                  ->StartCapture({{
+                                                      .signal_event_id = capture_signal_fence_id,
+                                                      .image_id = fidl_capture_image_id,
+                                                  }});
+    ASSERT_TRUE(start_capture_result.is_ok())
+        << "Failed to call FIDL StartCapture: " << start_capture_result.error_value();
 
     // We must wait for the capture to finish before we can proceed. Time out after 3 seconds.
     status = capture_signal_fence.wait_one(ZX_EVENT_SIGNALED, zx::deadline_after(zx::msec(3000)),
@@ -595,8 +614,11 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
 
     // Cleanup the capture.
     if (release_capture_image) {
-      status = (*display_coordinator.get())->ReleaseImage(fidl_capture_image_id);
-      EXPECT_EQ(status, ZX_OK);
+      const fit::result<fidl::OneWayStatus> result = fidl::Call(coordinator)
+                                                         ->ReleaseImage({{
+                                                             .image_id = fidl_capture_image_id,
+                                                         }});
+      EXPECT_TRUE(result.is_ok()) << "Failed to call FIDL ReleaseImage: " << result.error_value();
     }
   }
 
@@ -2095,6 +2117,10 @@ VK_TEST_F(DisplayCompositorPixelTest, SwitchDisplayMode) {
   auto display = display_manager_->default_display();
   auto display_coordinator = display_manager_->default_display_coordinator();
 
+  ASSERT_TRUE(display_coordinator != nullptr);
+  fidl::UnownedClientEnd<fuchsia_hardware_display::Coordinator> coordinator =
+      scenic_impl::GetUnowned(*display_coordinator);
+
   const auto kPixelFormat = fuchsia::images2::PixelFormat::B8G8R8A8;
 
   auto [escher, renderer] = NewVkRenderer();
@@ -2293,10 +2319,11 @@ VK_TEST_F(DisplayCompositorPixelTest, SwitchDisplayMode) {
   EXPECT_TRUE(images_are_same);
 
   // Cleanup.
-  fuchsia::hardware::display::ImageId hlcpp_image_id =
-      fidl::NaturalToHLCPP(allocation::ToFidlImageId(capture_image_id));
-  zx_status_t release_status = (*display_coordinator.get())->ReleaseImage(hlcpp_image_id);
-  EXPECT_EQ(release_status, ZX_OK);
+  fuchsia_hardware_display::ImageId image_id = allocation::ToFidlImageId(capture_image_id);
+  const fit::result<fidl::OneWayStatus> release_image_result =
+      fidl::Call(coordinator)->ReleaseImage({{.image_id = image_id}});
+  EXPECT_TRUE(release_image_result.is_ok())
+      << "Failed to call FIDL ReleaseImage: " << release_image_result.error_value();
 }
 
 }  // namespace
