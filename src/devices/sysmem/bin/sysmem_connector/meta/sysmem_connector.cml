@@ -10,6 +10,7 @@
     capabilities: [
         {
             protocol: [
+                "fuchsia.hardware.sysmem.Sysmem",
                 "fuchsia.sysmem.Allocator",
                 "fuchsia.sysmem2.Allocator",
             ],
@@ -39,6 +40,7 @@
     expose: [
         {
             protocol: [
+                "fuchsia.hardware.sysmem.Sysmem",
                 "fuchsia.sysmem.Allocator",
                 "fuchsia.sysmem2.Allocator",
             ],
