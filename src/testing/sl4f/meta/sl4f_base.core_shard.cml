@@ -165,7 +165,6 @@
                 "fuchsia.device.NameProvider",
                 "fuchsia.diagnostics.ArchiveAccessor",
                 "fuchsia.hardware.power.statecontrol.Admin",
-                "fuchsia.logger.LogSink",
                 "fuchsia.paver.Paver",
                 "fuchsia.sys2.LifecycleController.root",
                 "fuchsia.sys2.RealmQuery.root",
@@ -214,14 +213,6 @@
             as: "stopped_v2",
             to: "#sl4f",
             scope: "#sl4f",
-        },
-        {
-            protocol: "fuchsia.logger.LogSink",
-            from: "parent",
-            to: [
-                "#audio_recording",
-                "#data_proxy",
-            ],
         },
         {
             protocol: "fuchsia.testing.proxy.TcpProxyControl",

@@ -30,7 +30,6 @@
                 "fuchsia.component.Introspector.root",
                 "fuchsia.kernel.RootJobForInspect",
                 "fuchsia.kernel.Stats",
-                "fuchsia.logger.LogSink",
                 "fuchsia.scheduler.RoleManager",
             ],
             from: "parent",
