@@ -404,3 +404,42 @@ fn tear_off() {
             .message(Contains("Incompatible response")),
     ]));
 }
+
+#[test]
+fn discoverable_contradiction() {
+    assert!(compare_fidl_library(
+        Versions { external: "1", platform: "1,2,NEXT,HEAD" },
+        r#"
+        @discoverable(client="external", server="platform")
+        protocol ExternalClient {};
+
+        @discoverable(client="platform", server="external")
+        protocol ExternalServer {
+            TakeServerEnd(resource struct{endpoint server_end:ExternalClient;}); // Bad
+            TakeClientEnd(resource struct{endpoint client_end:ExternalClient;});
+            ReturnServerEnd() -> (resource struct{endpoint server_end:ExternalClient;});
+            ReturnClientEnd() -> (resource struct{endpoint client_end:ExternalClient;}); // Bad
+        };
+        "#
+    )
+    .has_problems(vec![
+        ProblemPattern::error()
+            .path(Contains("ExternalServer.TakeServerEnd"))
+            .message(Contains("ExternalClient(@1) used as a external server")),
+        ProblemPattern::error()
+            .path(Contains("ExternalServer.ReturnClientEnd"))
+            .message(Contains("ExternalClient(@1) used as a external server")),
+        ProblemPattern::error()
+            .path(Contains("ExternalServer.TakeServerEnd"))
+            .message(Contains("ExternalClient(@1,2,NEXT,HEAD) used as a platform client")),
+        ProblemPattern::error()
+            .path(Contains("ExternalServer.ReturnClientEnd"))
+            .message(Contains("ExternalClient(@1,2,NEXT,HEAD) used as a platform client")),
+        ProblemPattern::error()
+            .path(Contains("ExternalServer.TakeServerEnd"))
+            .message(Begins("Incompatible request types")),
+        ProblemPattern::error()
+            .path(Contains("ExternalServer.ReturnClientEnd"))
+            .message(Begins("Incompatible response types"))
+    ]));
+}

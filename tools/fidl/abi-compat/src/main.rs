@@ -61,6 +61,15 @@ pub enum Scope {
     External,
 }
 
+impl std::fmt::Display for Scope {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Platform => write!(f, "platform"),
+            Self::External => write!(f, "external"),
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialOrd, PartialEq, Eq, Hash)]
 pub struct Version {
     scope: Scope,
