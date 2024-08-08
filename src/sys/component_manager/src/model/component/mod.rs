@@ -2283,14 +2283,7 @@ pub mod tests {
                 .validate_and_convert_dynamic_component(
                     Some(offers),
                     None,
-                    &ChildDecl {
-                        name: "foo".parse().unwrap(),
-                        url: "http://foo".parse().unwrap(),
-                        startup: fdecl::StartupMode::Lazy,
-                        on_terminate: None,
-                        environment: None,
-                        config_overrides: None,
-                    },
+                    &ChildBuilder::new().name("foo").url("http://foo").into(),
                     Some(&collection_decl),
                 )
         };
@@ -2436,14 +2429,7 @@ pub mod tests {
                 .validate_and_convert_dynamic_component(
                     None,
                     Some(capabilities),
-                    &ChildDecl {
-                        name: "foo".parse().unwrap(),
-                        url: "http://foo".parse().unwrap(),
-                        startup: fdecl::StartupMode::Lazy,
-                        on_terminate: None,
-                        environment: None,
-                        config_overrides: None,
-                    },
+                    &ChildBuilder::new().name("foo").url("http://foo").into(),
                     Some(&collection_decl),
                 )
         };

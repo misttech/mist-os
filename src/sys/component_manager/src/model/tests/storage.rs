@@ -179,14 +179,7 @@ async fn use_in_collection_from_parent() {
     test.create_dynamic_child(
         &vec!["b"].try_into().unwrap(),
         "coll",
-        ChildDecl {
-            name: "c".parse().unwrap(),
-            url: "test:///c".parse().unwrap(),
-            startup: fdecl::StartupMode::Lazy,
-            environment: None,
-            on_terminate: None,
-            config_overrides: None,
-        },
+        ChildBuilder::new().name("c"),
     )
     .await;
 
@@ -322,14 +315,7 @@ async fn use_in_collection_from_grandparent() {
     test.create_dynamic_child(
         &vec!["b"].try_into().unwrap(),
         "coll",
-        ChildDecl {
-            name: "c".parse().unwrap(),
-            url: "test:///c".parse().unwrap(),
-            startup: fdecl::StartupMode::Lazy,
-            environment: None,
-            on_terminate: None,
-            config_overrides: None,
-        },
+        ChildBuilder::new().name("c"),
     )
     .await;
 
@@ -857,14 +843,7 @@ async fn storage_persistence_moniker_path() {
     test.create_dynamic_child(
         &vec!["b"].try_into().unwrap(),
         "persistent_coll",
-        ChildDecl {
-            name: "c".parse().unwrap(),
-            url: "test:///c".parse().unwrap(),
-            startup: fdecl::StartupMode::Lazy,
-            environment: None,
-            on_terminate: None,
-            config_overrides: None,
-        },
+        ChildBuilder::new().name("c"),
     )
     .await;
 
@@ -887,14 +866,7 @@ async fn storage_persistence_moniker_path() {
     test.create_dynamic_child(
         &vec!["b"].try_into().unwrap(),
         "persistent_coll",
-        ChildDecl {
-            name: "c".parse().unwrap(),
-            url: "test:///c".parse().unwrap(),
-            startup: fdecl::StartupMode::Lazy,
-            environment: None,
-            on_terminate: None,
-            config_overrides: None,
-        },
+        ChildBuilder::new().name("c"),
     )
     .await;
 
@@ -1033,14 +1005,7 @@ async fn storage_persistence_instance_id_path() {
     test.create_dynamic_child(
         &vec!["b"].try_into().unwrap(),
         "persistent_coll",
-        ChildDecl {
-            name: "c".parse().unwrap(),
-            url: "test:///c".parse().unwrap(),
-            startup: fdecl::StartupMode::Lazy,
-            environment: None,
-            on_terminate: None,
-            config_overrides: None,
-        },
+        ChildBuilder::new().name("c"),
     )
     .await;
 
@@ -1057,14 +1022,7 @@ async fn storage_persistence_instance_id_path() {
     test.create_dynamic_child(
         &vec!["b"].try_into().unwrap(),
         "persistent_coll",
-        ChildDecl {
-            name: "c".parse().unwrap(),
-            url: "test:///c".parse().unwrap(),
-            startup: fdecl::StartupMode::Lazy,
-            environment: None,
-            on_terminate: None,
-            config_overrides: None,
-        },
+        ChildBuilder::new().name("c"),
     )
     .await;
 
@@ -1222,14 +1180,7 @@ async fn storage_persistence_inheritance() {
     test.create_dynamic_child(
         &vec!["b"].try_into().unwrap(),
         "persistent_coll",
-        ChildDecl {
-            name: "c".parse().unwrap(),
-            url: "test:///c".parse().unwrap(),
-            startup: fdecl::StartupMode::Lazy,
-            environment: None,
-            on_terminate: None,
-            config_overrides: None,
-        },
+        ChildBuilder::new().name("c"),
     )
     .await;
 
@@ -1263,14 +1214,7 @@ async fn storage_persistence_inheritance() {
     test.create_dynamic_child(
         &vec!["b", "persistent_coll:c"].try_into().unwrap(),
         "lower_coll",
-        ChildDecl {
-            name: "e".parse().unwrap(),
-            url: "test:///e".parse().unwrap(),
-            startup: fdecl::StartupMode::Lazy,
-            environment: None,
-            on_terminate: None,
-            config_overrides: None,
-        },
+        ChildBuilder::new().name("e"),
     )
     .await;
 
@@ -1450,14 +1394,7 @@ async fn storage_persistence_disablement() {
     test.create_dynamic_child(
         &vec!["b"].try_into().unwrap(),
         "persistent_coll",
-        ChildDecl {
-            name: "c".parse().unwrap(),
-            url: "test:///c".parse().unwrap(),
-            startup: fdecl::StartupMode::Lazy,
-            environment: None,
-            on_terminate: None,
-            config_overrides: None,
-        },
+        ChildBuilder::new().name("c"),
     )
     .await;
 
@@ -1491,14 +1428,7 @@ async fn storage_persistence_disablement() {
     test.create_dynamic_child(
         &vec!["b", "persistent_coll:c"].try_into().unwrap(),
         "non_persistent_coll",
-        ChildDecl {
-            name: "e".parse().unwrap(),
-            url: "test:///e".parse().unwrap(),
-            startup: fdecl::StartupMode::Lazy,
-            environment: None,
-            on_terminate: None,
-            config_overrides: None,
-        },
+        ChildBuilder::new().name("e"),
     )
     .await;
 
