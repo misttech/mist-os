@@ -389,7 +389,7 @@ mod tests {
         let mut cursor = std::io::Cursor::new(json5);
         let config: AssemblyConfig = util::from_reader(&mut cursor).unwrap();
         let config = config.resolve_paths_from_file("path/to/assembly_config.json").unwrap();
-        assert_eq!(config.file_relative_paths, true);
+        assert!(config.file_relative_paths);
         assert_eq!(
             config.product.packages.base,
             vec![ProductPackageDetails {
