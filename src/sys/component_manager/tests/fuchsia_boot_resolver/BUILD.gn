@@ -60,6 +60,23 @@ if (current_toolchain == default_toolchain) {
     }
   }
 
+  # This test uses the `trigger` component because it's conveniently already
+  # available, but the test doesn't really care about what this component does
+  # as long as it doesn't exit.
+  fuchsia_component("trigger") {
+    testonly = true
+    deps = [
+      "..:trigger_bin",
+      "../routing:trigger_shard",
+    ]
+    manifest = "meta/trigger.cml"
+  }
+
+  fuchsia_package("trigger_pkg") {
+    testonly = true
+    deps = [ ":trigger" ]
+  }
+
   # `assembled_system` builds a zbi for consumption by the test.
   assembled_system("test_zbi") {
     testonly = true
@@ -67,7 +84,7 @@ if (current_toolchain == default_toolchain) {
     board_config_label = ":board_config"
     use_bringup_platform_bundles_only = true
     bootfs_labels = [ ":config" ]
-    bootfs_package_labels = [ "//src/security/tests/pkg_test/assemblies/hello_world_v1:hello_world-package" ]
+    bootfs_package_labels = [ ":trigger_pkg" ]
     base_packages = []
   }
 
