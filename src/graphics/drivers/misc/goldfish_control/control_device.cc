@@ -130,8 +130,7 @@ zx_status_t Control::Init() {
   }
   sync_ = fidl::WireSyncClient(std::move(sync_client.value()));
 
-  zx::result sysmem_result =
-      DdkConnectFragmentFidlProtocol<fuchsia_hardware_sysmem::Service::AllocatorV2>("sysmem");
+  zx::result sysmem_result = DdkConnectNsProtocol<fuchsia_sysmem2::Allocator>();
   if (sysmem_result.is_error()) {
     zxlogf(ERROR, "%s: failed to connect to FIDL fuchsia.sysmem2.Allocator fragment: %s", kTag,
            sysmem_result.status_string());
@@ -308,7 +307,7 @@ zx_status_t Control::Bind() {
   }
 
   zx::result<fidl::ClientEnd<fuchsia_hardware_sysmem::Sysmem>> connect_hardware_sysmem_result =
-      DdkConnectFragmentFidlProtocol<fuchsia_hardware_sysmem::Service::Sysmem>("sysmem");
+      DdkConnectNsProtocol<fuchsia_hardware_sysmem::Sysmem>();
   if (connect_hardware_sysmem_result.is_error()) {
     zxlogf(ERROR, "Failed to connect to fuchsia.hardware.sysmem/Sysmem protocol: %s",
            connect_hardware_sysmem_result.status_string());
@@ -361,14 +360,6 @@ zx_status_t Control::Bind() {
     return add_pipe_service_result.status_value();
   }
 
-  zx::result<> add_sysmem_service_result =
-      outgoing_.AddService<fuchsia_hardware_sysmem::Service>(CreateSysmemServiceInstanceHandler());
-  if (add_sysmem_service_result.is_error()) {
-    zxlogf(ERROR, "Failed to add sysmem Service to the outgoing directory: %s",
-           add_sysmem_service_result.status_string());
-    return add_sysmem_service_result.status_value();
-  }
-
   zx::result directory_endpoints_result = fidl::CreateEndpoints<fuchsia_io::Directory>();
   if (directory_endpoints_result.is_error()) {
     zxlogf(ERROR, "Failed to create fuchsia.io/Directory endpoints: %s",
@@ -387,35 +378,9 @@ zx_status_t Control::Bind() {
       fuchsia_hardware_goldfish::ControlService::Name,
       fuchsia_hardware_goldfish_pipe::Service::Name,
   };
-  const cpp20::span<const char*> kOffers(kOffersArray);
-
-  // TODO(https://fxbug.dev/334988762): This is a hack to support dynamic
-  // routing of the sysmem service.
-  //
-  // Currently, the driver framework adds both dynamically offered capabilities
-  // and the device bind properties using information provided in
-  // `set_fidl_service_offers()` and `set_runtime_service_offers()`.
-  // If we add the sysmem service to `set_fidl_service_offers()`, there'll be
-  // two device nodes (the original "sysmem" device and the goldfish-control
-  // node) with the same sysmem bind properties:
-  // fuchsia.hardware.sysmem.Service == fuchsia.hardware.sysmem.Service.ZirconTransport,
-  // which causes a failure in `driver-index`.
-  //
-  // Adding the sysmem service to `kRuntimeOffers` makes it possible for the
-  // goldfish-control driver to dynamically offer capabilities, while keeps the
-  // bind properties different from the platform sysmem device so there won't
-  // be any system-wide binding failure.
-  //
-  // Note that the sysmem service provided by this component still runs over
-  // Zircon transport rather than Driver transport.
-  const char* kRuntimeOffersArray[] = {
-      fuchsia_hardware_sysmem::Service::Name,
-  };
-  const cpp20::span<const char*> kRuntimeOffers(kRuntimeOffersArray);
 
   status = DdkAdd(ddk::DeviceAddArgs("goldfish-control")
-                      .set_fidl_service_offers(kOffers)
-                      .set_runtime_service_offers(kRuntimeOffers)
+                      .set_fidl_service_offers(kOffersArray)
                       .set_outgoing_dir(directory_client.TakeChannel())
                       .set_proto_id(ZX_PROTOCOL_GOLDFISH_CONTROL));
   if (status != ZX_OK) {
@@ -1066,45 +1031,6 @@ Control::CreateGoldfishPipeServiceInstanceHandler() {
           },
   }};
 }
-
-fuchsia_hardware_sysmem::Service::InstanceHandler Control::CreateSysmemServiceInstanceHandler() {
-  static constexpr const char kSysmemFragmentName[] = "sysmem";
-  return fuchsia_hardware_sysmem::Service::InstanceHandler{{
-      .sysmem =
-          [parent = parent()](fidl::ServerEnd<fuchsia_hardware_sysmem::Sysmem> server_end) {
-            zx_status_t status = device_connect_fragment_fidl_protocol(
-                parent, kSysmemFragmentName, fuchsia_hardware_sysmem::Service::Name,
-                fuchsia_hardware_sysmem::Service::Sysmem::Name, server_end.TakeChannel().release());
-            if (status != ZX_OK) {
-              zxlogf(ERROR, "Failed to connect to the Sysmem protocol: %s",
-                     zx_status_get_string(status));
-            }
-          },
-      .allocator_v1 =
-          [parent = parent()](fidl::ServerEnd<fuchsia_sysmem::Allocator> server_end) {
-            zx_status_t status = device_connect_fragment_fidl_protocol(
-                parent, kSysmemFragmentName, fuchsia_hardware_sysmem::Service::Name,
-                fuchsia_hardware_sysmem::Service::AllocatorV1::Name,
-                server_end.TakeChannel().release());
-            if (status != ZX_OK) {
-              zxlogf(ERROR, "Failed to connect to the AllocatorV1 protocol: %s",
-                     zx_status_get_string(status));
-            }
-          },
-      .allocator_v2 =
-          [parent = parent()](fidl::ServerEnd<fuchsia_sysmem2::Allocator> server_end) {
-            zx_status_t status = device_connect_fragment_fidl_protocol(
-                parent, kSysmemFragmentName, fuchsia_hardware_sysmem::Service::Name,
-                fuchsia_hardware_sysmem::Service::AllocatorV2::Name,
-                server_end.TakeChannel().release());
-            if (status != ZX_OK) {
-              zxlogf(ERROR, "Failed to connect to the AllocatorV2 protocol: %s",
-                     zx_status_get_string(status));
-            }
-          },
-  }};
-}
-
 }  // namespace goldfish
 
 static constexpr zx_driver_ops_t goldfish_control_driver_ops = []() -> zx_driver_ops_t {
