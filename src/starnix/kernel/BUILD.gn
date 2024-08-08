@@ -317,8 +317,7 @@ rustc_library("starnix_core") {
       "device/framebuffer_server.rs",
       "device/perfetto_consumer.rs",
       "device/touch_power_policy_device.rs",
-      "vdso/mod.rs",
-      "vdso/vdso_loader.rs",
+      "vfs/socket/socket_generic_netlink/nl80211.rs",
     ]
   }
 
