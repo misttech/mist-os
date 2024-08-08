@@ -725,6 +725,9 @@ void BtTransportUart::HciReadComplete(zx_status_t status, const uint8_t* buffer,
   if (status == ZX_OK) {
     HciHandleUartReadEvents(buffer, length);
     if (unacked_receive_packet_number_ >= kUnackedReceivePacketLimit) {
+      FDF_LOG(
+          WARNING,
+          "Too many unacked packets sent to the host, stop fetching data from the bus temporarily.");
       // Stop reading data from the uart buffer if there are too many unacked packets sent to the
       // host.
       read_stopped_ = true;
