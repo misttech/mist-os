@@ -8,7 +8,7 @@ use bt_rfcomm::ServerChannel;
 use core::pin::Pin;
 use core::task::{Context, Poll};
 use fidl::endpoints::{create_request_stream, RequestStream};
-use fidl_fuchsia_bluetooth::ErrorCode;
+use fidl_fuchsia_bluetooth::{self as fidl_bt, ErrorCode};
 use fuchsia_bluetooth::profile::{
     l2cap_connect_parameters, psm_from_protocol, ChannelParameters, ProtocolDescriptor, Psm,
     ServiceDefinition,
@@ -238,7 +238,7 @@ impl ProfileRegistrar {
             .profile_upstream
             .connect(
                 &peer_id.into(),
-                &l2cap_connect_parameters(Psm::RFCOMM, bredr::ChannelMode::Basic),
+                &l2cap_connect_parameters(Psm::RFCOMM, fidl_bt::ChannelMode::Basic),
             )
             .await
         {
@@ -752,7 +752,7 @@ mod tests {
     ) -> impl Future<Output = Result<Result<bredr::Channel, ErrorCode>, fidl::Error>> {
         client.connect(
             &peer_id.into(),
-            &l2cap_connect_parameters(Psm::new(psm), bredr::ChannelMode::Basic),
+            &l2cap_connect_parameters(Psm::new(psm), fidl_bt::ChannelMode::Basic),
         )
     }
 
@@ -906,9 +906,9 @@ mod tests {
                     connection,
                     bredr::ConnectParameters::L2cap(bredr::L2capParameters {
                         psm: Some(bredr::PSM_AVDTP),
-                        parameters: Some(bredr::ChannelParameters {
-                            channel_mode: Some(bredr::ChannelMode::Basic),
-                            ..bredr::ChannelParameters::default()
+                        parameters: Some(fidl_bt::ChannelParameters {
+                            channel_mode: Some(fidl_bt::ChannelMode::Basic),
+                            ..fidl_bt::ChannelParameters::default()
                         }),
                         ..bredr::L2capParameters::default()
                     })

@@ -3,9 +3,8 @@
 // found in the LICENSE file.
 
 use anyhow::{format_err, Error};
-use fidl_fuchsia_bluetooth_bredr::{
-    self as bredr, ChannelParameters, ProfileDescriptor, ProfileProxy,
-};
+use fidl_fuchsia_bluetooth::ChannelParameters;
+use fidl_fuchsia_bluetooth_bredr::{self as bredr, ProfileDescriptor, ProfileProxy};
 use fuchsia_bluetooth::detachable_map::{DetachableMap, DetachableWeak};
 use fuchsia_bluetooth::inspect::DebugExt;
 use fuchsia_bluetooth::types::{Channel, PeerId};

@@ -6,6 +6,7 @@
 #define SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_FIDL_HELPERS_H_
 
 #include <fidl/fuchsia.bluetooth.bredr/cpp/fidl.h>
+#include <fidl/fuchsia.bluetooth/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.bluetooth/cpp/fidl.h>
 #include <fuchsia/bluetooth/gatt/cpp/fidl.h>
 #include <fuchsia/bluetooth/gatt2/cpp/fidl.h>
@@ -199,7 +200,7 @@ fpromise::result<fuchsia::bluetooth::bredr::ServiceDefinition, fuchsia::bluetoot
 ServiceRecordToServiceDefinition(const bt::sdp::ServiceRecord& record);
 
 bt::gap::BrEdrSecurityRequirements FidlToBrEdrSecurityRequirements(
-    const fuchsia::bluetooth::bredr::ChannelParameters& fidl);
+    const fuchsia::bluetooth::ChannelParameters& fidl);
 
 fpromise::result<bt::StaticPacket<pw::bluetooth::emboss::SynchronousConnectionParametersWriter>>
 FidlToScoParameters(const fuchsia::bluetooth::bredr::ScoConnectionParameters& params);

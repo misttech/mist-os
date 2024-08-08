@@ -13,7 +13,7 @@
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/test_helpers.h"
 
 using FakeChannel = bt::l2cap::testing::FakeChannel;
-using Connection = fuchsia::bluetooth::bredr::Connection;
+using Channel = fuchsia::bluetooth::Channel;
 
 namespace bthost {
 namespace {
@@ -33,7 +33,7 @@ class BrEdrConnectionServerChannelActivatedTest : public BrEdrConnectionServerTe
  public:
   void SetUp() override {
     BrEdrConnectionServerTest::SetUp();
-    fidl::InterfaceHandle<Connection> handle;
+    fidl::InterfaceHandle<Channel> handle;
     auto closed_cb = [this]() { server_closed_ = true; };
     server_ = BrEdrConnectionServer::Create(handle.NewRequest(), fake_chan().AsWeakPtr(),
                                             std::move(closed_cb));
@@ -51,7 +51,7 @@ class BrEdrConnectionServerChannelActivatedTest : public BrEdrConnectionServerTe
     RunLoopUntilIdle();
   }
 
-  fidl::InterfacePtr<Connection>& client() { return client_; }
+  fidl::InterfacePtr<Channel>& client() { return client_; }
 
   bool server_closed() const { return server_closed_; }
 
@@ -60,7 +60,7 @@ class BrEdrConnectionServerChannelActivatedTest : public BrEdrConnectionServerTe
  private:
   bool server_closed_ = false;
   std::unique_ptr<BrEdrConnectionServer> server_;
-  fidl::InterfacePtr<Connection> client_;
+  fidl::InterfacePtr<Channel> client_;
 };
 
 TEST_F(BrEdrConnectionServerChannelActivatedTest, SendTwoPackets) {
@@ -70,7 +70,7 @@ TEST_F(BrEdrConnectionServerChannelActivatedTest, SendTwoPackets) {
 
   const std::vector<uint8_t> packet_0 = {0x00, 0x01, 0x03};
   int send_cb_count = 0;
-  client()->Send(packet_0, [&](fuchsia::bluetooth::bredr::Connection_Send_Result result) {
+  client()->Send(packet_0, [&](fuchsia::bluetooth::Channel_Send_Result result) {
     EXPECT_TRUE(result.is_response());
     send_cb_count++;
   });
@@ -80,7 +80,7 @@ TEST_F(BrEdrConnectionServerChannelActivatedTest, SendTwoPackets) {
   EXPECT_THAT(*sent_packets[0], bt::BufferEq(packet_0));
 
   const std::vector<uint8_t> packet_1 = {0x04, 0x05, 0x06};
-  client()->Send(packet_1, [&](fuchsia::bluetooth::bredr::Connection_Send_Result result) {
+  client()->Send(packet_1, [&](fuchsia::bluetooth::Channel_Send_Result result) {
     EXPECT_TRUE(result.is_response());
     send_cb_count++;
   });
@@ -97,7 +97,7 @@ TEST_F(BrEdrConnectionServerChannelActivatedTest, SendTooLargePacketDropsPacket)
 
   const std::vector<uint8_t> packet_0(/*count=*/bt::l2cap::kDefaultMTU + 1, /*value=*/0x03);
   int send_cb_count = 0;
-  client()->Send(packet_0, [&](fuchsia::bluetooth::bredr::Connection_Send_Result result) {
+  client()->Send(packet_0, [&](fuchsia::bluetooth::Channel_Send_Result result) {
     EXPECT_TRUE(result.is_response());
     send_cb_count++;
   });
@@ -157,7 +157,7 @@ TEST_F(BrEdrConnectionServerChannelActivatedTest, ClientCloses) {
 
 TEST_F(BrEdrConnectionServerTest, ActivateFails) {
   fake_chan().set_activate_fails(true);
-  fidl::InterfaceHandle<Connection> handle;
+  fidl::InterfaceHandle<Channel> handle;
   bool server_closed = false;
   auto closed_cb = [&]() { server_closed = true; };
   std::unique_ptr<BrEdrConnectionServer> server = BrEdrConnectionServer::Create(

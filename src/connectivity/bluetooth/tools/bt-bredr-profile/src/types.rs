@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl_fuchsia_bluetooth_bredr::{ChannelMode, ChannelParameters};
+use fidl_fuchsia_bluetooth::{ChannelMode, ChannelParameters};
 use fuchsia_zircon as zx;
 use futures::channel::oneshot;
 use std::cmp::PartialEq;

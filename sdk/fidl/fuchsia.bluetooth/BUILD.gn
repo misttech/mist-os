@@ -12,6 +12,7 @@ fidl("fuchsia.bluetooth") {
   sources = [
     "address.fidl",
     "appearance.fidl",
+    "channel.fidl",
     "coding_format.fidl",
     "connection_role.fidl",
     "deprecated.fidl",
@@ -21,6 +22,7 @@ fidl("fuchsia.bluetooth") {
     "overview.fidl",
     "uuid.fidl",
   ]
+  public_deps = [ "//zircon/vdso/zx" ]
 
   enable_hlcpp = true
 }

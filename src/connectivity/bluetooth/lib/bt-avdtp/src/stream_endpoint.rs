@@ -552,7 +552,10 @@ mod tests {
     use fidl::endpoints::create_request_stream;
     use futures::io::AsyncWriteExt;
     use futures::stream::StreamExt;
-    use {fidl_fuchsia_bluetooth_bredr as bredr, fuchsia_async as fasync, fuchsia_zircon as zx};
+    use {
+        fidl_fuchsia_bluetooth as fidl_bt, fidl_fuchsia_bluetooth_bredr as bredr,
+        fuchsia_async as fasync, fuchsia_zircon as zx,
+    };
 
     const REMOTE_ID_VAL: u8 = 1;
     const REMOTE_ID: StreamEndpointId = StreamEndpointId(REMOTE_ID_VAL);
@@ -911,7 +914,7 @@ mod tests {
             create_request_stream::<bredr::AudioDirectionExtMarker>().unwrap();
         let ext = bredr::Channel {
             socket: Some(local),
-            channel_mode: Some(bredr::ChannelMode::Basic),
+            channel_mode: Some(fidl_bt::ChannelMode::Basic),
             max_tx_sdu_size: Some(1004),
             ext_direction: Some(client_end),
             ..Default::default()
@@ -983,7 +986,7 @@ mod tests {
             create_request_stream::<bredr::L2capParametersExtMarker>().unwrap();
         let ext = bredr::Channel {
             socket: Some(local),
-            channel_mode: Some(bredr::ChannelMode::Basic),
+            channel_mode: Some(fidl_bt::ChannelMode::Basic),
             max_tx_sdu_size: Some(1004),
             ext_l2cap: Some(client_end),
             ..Default::default()

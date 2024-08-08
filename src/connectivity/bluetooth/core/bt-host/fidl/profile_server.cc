@@ -24,6 +24,7 @@
 #include "zircon/errors.h"
 
 namespace fidlbredr = fuchsia::bluetooth::bredr;
+namespace fbt = fuchsia::bluetooth;
 namespace android_emb = pw::bluetooth::vendor::android_hci;
 using fidlbredr::DataElement;
 using fidlbredr::Profile;
@@ -34,22 +35,22 @@ namespace bthost {
 
 namespace {
 
-bt::l2cap::ChannelParameters FidlToChannelParameters(const fidlbredr::ChannelParameters& fidl) {
+bt::l2cap::ChannelParameters FidlToChannelParameters(const fbt::ChannelParameters& fidl) {
   bt::l2cap::ChannelParameters params;
   if (fidl.has_channel_mode()) {
     switch (fidl.channel_mode()) {
-      case fidlbredr::ChannelMode::BASIC:
+      case fbt::ChannelMode::BASIC:
         params.mode = bt::l2cap::RetransmissionAndFlowControlMode::kBasic;
         break;
-      case fidlbredr::ChannelMode::ENHANCED_RETRANSMISSION:
+      case fbt::ChannelMode::ENHANCED_RETRANSMISSION:
         params.mode = bt::l2cap::RetransmissionAndFlowControlMode::kEnhancedRetransmission;
         break;
       default:
         BT_PANIC("FIDL channel parameter contains invalid mode");
     }
   }
-  if (fidl.has_max_rx_sdu_size()) {
-    params.max_rx_sdu_size = fidl.max_rx_sdu_size();
+  if (fidl.has_max_rx_packet_size()) {
+    params.max_rx_sdu_size = fidl.max_rx_packet_size();
   }
   if (fidl.has_flush_timeout()) {
     params.flush_timeout = std::chrono::nanoseconds(fidl.flush_timeout());
@@ -57,14 +58,14 @@ bt::l2cap::ChannelParameters FidlToChannelParameters(const fidlbredr::ChannelPar
   return params;
 }
 
-fidlbredr::ChannelMode ChannelModeToFidl(const bt::l2cap::AnyChannelMode& mode) {
+fbt::ChannelMode ChannelModeToFidl(const bt::l2cap::AnyChannelMode& mode) {
   if (auto* flow_control_mode = std::get_if<bt::l2cap::RetransmissionAndFlowControlMode>(&mode)) {
     switch (*flow_control_mode) {
       case bt::l2cap::RetransmissionAndFlowControlMode::kBasic:
-        return fidlbredr::ChannelMode::BASIC;
+        return fbt::ChannelMode::BASIC;
         break;
       case bt::l2cap::RetransmissionAndFlowControlMode::kEnhancedRetransmission:
-        return fidlbredr::ChannelMode::ENHANCED_RETRANSMISSION;
+        return fbt::ChannelMode::ENHANCED_RETRANSMISSION;
         break;
       default:
         // Intentionally unhandled, fall through to PANIC.
@@ -74,11 +75,10 @@ fidlbredr::ChannelMode ChannelModeToFidl(const bt::l2cap::AnyChannelMode& mode) 
   BT_PANIC("Could not convert channel parameter mode to unsupported FIDL mode");
 }
 
-fidlbredr::ChannelParameters ChannelInfoToFidlChannelParameters(
-    const bt::l2cap::ChannelInfo& info) {
-  fidlbredr::ChannelParameters params;
+fbt::ChannelParameters ChannelInfoToFidlChannelParameters(const bt::l2cap::ChannelInfo& info) {
+  fbt::ChannelParameters params;
   params.set_channel_mode(ChannelModeToFidl(info.mode));
-  params.set_max_rx_sdu_size(info.max_rx_sdu_size);
+  params.set_max_rx_packet_size(info.max_rx_sdu_size);
   if (info.flush_timeout) {
     params.set_flush_timeout(info.flush_timeout->count());
   }
@@ -235,7 +235,7 @@ ProfileServer::~ProfileServer() {
 }
 
 void ProfileServer::L2capParametersExt::RequestParameters(
-    fuchsia::bluetooth::bredr::ChannelParameters requested, RequestParametersCallback callback) {
+    fuchsia::bluetooth::ChannelParameters requested, RequestParametersCallback callback) {
   if (requested.has_flush_timeout()) {
     channel_->SetBrEdrAutomaticFlushTimeout(
         std::chrono::nanoseconds(requested.flush_timeout()),
@@ -572,7 +572,7 @@ void ProfileServer::Advertise(fuchsia::bluetooth::bredr::ProfileAdvertiseRequest
     return;
   }
   if (!request.has_parameters()) {
-    request.set_parameters(fidlbredr::ChannelParameters());
+    request.set_parameters(fbt::ChannelParameters());
   }
   std::vector<bt::sdp::ServiceRecord> registering;
 
@@ -695,7 +695,7 @@ void ProfileServer::Connect(fuchsia::bluetooth::PeerId peer_id,
   }
   uint16_t psm = l2cap_params.psm();
 
-  fidlbredr::ChannelParameters parameters = std::move(*l2cap_params.mutable_parameters());
+  fbt::ChannelParameters parameters = std::move(*l2cap_params.mutable_parameters());
 
   auto connected_cb = [self = weak_self_.GetWeakPtr(), cb = callback.share(),
                        id](bt::l2cap::Channel::WeakPtr chan) {
@@ -1047,10 +1047,10 @@ fidl::InterfaceHandle<fidlbredr::AudioOffloadExt> ProfileServer::BindAudioOffloa
   return client;
 }
 
-std::optional<fidl::InterfaceHandle<fuchsia::bluetooth::bredr::Connection>>
+std::optional<fidl::InterfaceHandle<fuchsia::bluetooth::Channel>>
 ProfileServer::BindBrEdrConnectionServer(bt::l2cap::Channel::WeakPtr channel,
                                          fit::callback<void()> closed_callback) {
-  fidl::InterfaceHandle<fidlbredr::Connection> client;
+  fidl::InterfaceHandle<fbt::Channel> client;
 
   bt::l2cap::Channel::UniqueId unique_id = channel->unique_id();
 
@@ -1087,7 +1087,7 @@ std::optional<fuchsia::bluetooth::bredr::Channel> ProfileServer::ChannelToFidl(
     auto sock = l2cap_socket_factory_.MakeSocketForChannel(channel, std::move(closed_cb));
     fidl_chan.set_socket(std::move(sock));
   } else {
-    std::optional<fidl::InterfaceHandle<fuchsia::bluetooth::bredr::Connection>> connection =
+    std::optional<fidl::InterfaceHandle<fuchsia::bluetooth::Channel>> connection =
         BindBrEdrConnectionServer(channel, std::move(closed_cb));
     if (!connection) {
       return std::nullopt;

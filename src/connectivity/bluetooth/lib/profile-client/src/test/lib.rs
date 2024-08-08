@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl_fuchsia_bluetooth_bredr as bredr;
 use fuchsia_bluetooth::types::{self as bt, PeerId};
 use futures::{Stream, StreamExt};
 use profile_client::ProfileClient;
 use std::pin::Pin;
 use std::task::{Context, Poll};
+use {fidl_fuchsia_bluetooth as fidl_bt, fidl_fuchsia_bluetooth_bredr as bredr};
 
 pub struct TestProfileServerEndpoints {
     pub proxy: bredr::ProfileProxy,
@@ -64,7 +64,7 @@ impl TestProfileServer {
         let mut client = match service_definition {
             None => ProfileClient::new(proxy.clone()),
             Some(service_definition) => {
-                let channel_params = bredr::ChannelParameters::default();
+                let channel_params = fidl_bt::ChannelParameters::default();
                 ProfileClient::advertise(proxy.clone(), vec![service_definition], channel_params)
                     .expect("Failed to advertise.")
             }

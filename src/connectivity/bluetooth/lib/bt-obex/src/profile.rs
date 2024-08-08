@@ -4,11 +4,11 @@
 
 use bt_rfcomm::profile::{rfcomm_connect_parameters, server_channel_from_protocol};
 use bt_rfcomm::ServerChannel;
-use fidl_fuchsia_bluetooth_bredr as bredr;
 use fuchsia_bluetooth::profile::{
     l2cap_connect_parameters, psm_from_protocol, Attribute, DataElement, ProtocolDescriptor, Psm,
 };
 use fuchsia_bluetooth::types::PeerId;
+use {fidl_fuchsia_bluetooth as fidl_bt, fidl_fuchsia_bluetooth_bredr as bredr};
 
 use crate::client::ObexClient;
 use crate::error::Error;
@@ -93,14 +93,14 @@ pub fn parse_obex_search_result(
     if let Some(l2cap_psm) = attributes.iter().find_map(parse_goep_l2cap_psm_attribute) {
         return Some(l2cap_connect_parameters(
             l2cap_psm,
-            bredr::ChannelMode::EnhancedRetransmission,
+            fidl_bt::ChannelMode::EnhancedRetransmission,
         ));
     }
 
     // Otherwise the service supports only one of L2CAP or RFCOMM.
     // Try L2CAP first.
     if let Some(psm) = psm_from_protocol(protocol) {
-        return Some(l2cap_connect_parameters(psm, bredr::ChannelMode::EnhancedRetransmission));
+        return Some(l2cap_connect_parameters(psm, fidl_bt::ChannelMode::EnhancedRetransmission));
     }
 
     // Otherwise, it's RFCOMM.
@@ -178,9 +178,9 @@ mod tests {
         let l2cap_protocol = obex_protocol_l2cap(Psm::new(59));
         let expected = bredr::ConnectParameters::L2cap(bredr::L2capParameters {
             psm: Some(59),
-            parameters: Some(bredr::ChannelParameters {
-                channel_mode: Some(bredr::ChannelMode::EnhancedRetransmission),
-                ..bredr::ChannelParameters::default()
+            parameters: Some(fidl_bt::ChannelParameters {
+                channel_mode: Some(fidl_bt::ChannelMode::EnhancedRetransmission),
+                ..fidl_bt::ChannelParameters::default()
             }),
             ..bredr::L2capParameters::default()
         });
@@ -215,9 +215,9 @@ mod tests {
         // Expected should be the L2CAP PSM.
         let expected = bredr::ConnectParameters::L2cap(bredr::L2capParameters {
             psm: Some(55),
-            parameters: Some(bredr::ChannelParameters {
-                channel_mode: Some(bredr::ChannelMode::EnhancedRetransmission),
-                ..bredr::ChannelParameters::default()
+            parameters: Some(fidl_bt::ChannelParameters {
+                channel_mode: Some(fidl_bt::ChannelMode::EnhancedRetransmission),
+                ..fidl_bt::ChannelParameters::default()
             }),
             ..bredr::L2capParameters::default()
         });

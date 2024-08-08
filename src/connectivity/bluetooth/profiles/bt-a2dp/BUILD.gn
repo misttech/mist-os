@@ -8,6 +8,7 @@ import("//build/rust/rustc_binary.gni")
 
 shared_deps = [
   ":a2dp_profile_config",
+  "//sdk/fidl/fuchsia.bluetooth:fuchsia.bluetooth_rust",
   "//sdk/fidl/fuchsia.bluetooth.a2dp:fuchsia.bluetooth.a2dp_rust",
   "//sdk/fidl/fuchsia.bluetooth.avrcp:fuchsia.bluetooth.avrcp_rust",
   "//sdk/fidl/fuchsia.bluetooth.bredr:fuchsia.bluetooth.bredr_rust",

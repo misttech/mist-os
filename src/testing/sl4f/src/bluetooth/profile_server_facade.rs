@@ -5,12 +5,13 @@
 use crate::common_utils::common::macros::{fx_err_and_bail, with_line};
 use anyhow::{Context, Error};
 use fidl::endpoints::create_request_stream;
+use fidl_fuchsia_bluetooth::{ChannelMode, ChannelParameters};
 use fidl_fuchsia_bluetooth_bredr::{
-    Attribute, Channel, ChannelMode, ChannelParameters, ConnectParameters,
-    ConnectionReceiverRequest, ConnectionReceiverRequestStream, DataElement, Information,
-    L2capParameters, ProfileAdvertiseRequest, ProfileDescriptor, ProfileMarker, ProfileProxy,
-    ProfileSearchRequest, ProtocolDescriptor, ProtocolIdentifier, SearchResultsRequest,
-    SearchResultsRequestStream, ServiceClassProfileIdentifier, ServiceDefinition,
+    Attribute, Channel, ConnectParameters, ConnectionReceiverRequest,
+    ConnectionReceiverRequestStream, DataElement, Information, L2capParameters,
+    ProfileAdvertiseRequest, ProfileDescriptor, ProfileMarker, ProfileProxy, ProfileSearchRequest,
+    ProtocolDescriptor, ProtocolIdentifier, SearchResultsRequest, SearchResultsRequestStream,
+    ServiceClassProfileIdentifier, ServiceDefinition,
 };
 use fuchsia_bluetooth::types::{PeerId, Uuid};
 use fuchsia_sync::RwLock;

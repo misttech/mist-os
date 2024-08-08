@@ -1359,12 +1359,12 @@ TEST(HelpersTest, InvalidServiceRecordToServiceDefinitionIsError) {
 }
 
 TEST(HelpersTest, FidlToBrEdrSecurityRequirements) {
-  fbredr::ChannelParameters params;
+  fbt::ChannelParameters params;
   EXPECT_EQ(
       FidlToBrEdrSecurityRequirements(params),
       (bt::gap::BrEdrSecurityRequirements{.authentication = false, .secure_connections = false}));
 
-  params.set_security_requirements(fbredr::SecurityRequirements());
+  params.set_security_requirements(fbt::SecurityRequirements());
   EXPECT_EQ(
       FidlToBrEdrSecurityRequirements(params),
       (bt::gap::BrEdrSecurityRequirements{.authentication = false, .secure_connections = false}));

@@ -246,10 +246,10 @@ mod tests {
     use bt_rfcomm::profile::{is_rfcomm_protocol, server_channel_from_protocol};
     use bt_rfcomm::ServerChannel;
     use fidl::endpoints::{create_proxy_and_stream, RequestStream};
-    use fuchsia_async as fasync;
     use fuchsia_bluetooth::profile::ProtocolDescriptor;
     use futures::task::Poll;
     use std::pin::pin;
+    use {fidl_fuchsia_bluetooth as fidl_bt, fuchsia_async as fasync};
 
     use crate::profile::tests::{a2dp_service_definition, rfcomm_service_definition};
     use crate::types::RegisteredServiceId;
@@ -408,7 +408,7 @@ mod tests {
                 ..
             }))) => {
                 assert_eq!(remote_peer, peer_id.into());
-                assert_eq!(channel.channel_mode, Some(bredr::ChannelMode::Basic));
+                assert_eq!(channel.channel_mode, Some(fidl_bt::ChannelMode::Basic));
                 assert_eq!(channel.max_tx_sdu_size, Some(DEFAULT_TX_SDU_SIZE as u16));
             }
             x => panic!("Expected Ready but got: {:?}", x),

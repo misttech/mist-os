@@ -7,9 +7,9 @@ use bt_avdtp::{
     self as avdtp, MediaCodecType, ServiceCapability, ServiceCategory, StreamEndpoint,
     StreamEndpointId,
 };
+use fidl_fuchsia_bluetooth::ChannelParameters;
 use fidl_fuchsia_bluetooth_bredr::{
-    ChannelParameters, ConnectParameters, L2capParameters, ProfileDescriptor, ProfileProxy,
-    PSM_AVDTP,
+    ConnectParameters, L2capParameters, ProfileDescriptor, ProfileProxy, PSM_AVDTP,
 };
 use fuchsia_async::{self as fasync, DurationExt};
 use fuchsia_bluetooth::inspect::DebugExt;
@@ -337,7 +337,7 @@ impl Peer {
         L2capParameters {
             psm: Some(PSM_AVDTP),
             parameters: Some(ChannelParameters {
-                max_rx_sdu_size: Some(65535),
+                max_rx_packet_size: Some(65535),
                 ..Default::default()
             }),
             ..Default::default()

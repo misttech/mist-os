@@ -17,8 +17,8 @@ use futures::stream::StreamExt;
 use futures::{join, TryFutureExt};
 use mock_piconet_client::{BtProfileComponent, PiconetHarness, PiconetMember};
 use {
-    fidl_fuchsia_bluetooth_bredr as bredr, fidl_fuchsia_bluetooth_bredr_test as bredr_test,
-    fuchsia_async as fasync, fuchsia_zircon as zx,
+    fidl_fuchsia_bluetooth as fidl_bt, fidl_fuchsia_bluetooth_bredr as bredr,
+    fidl_fuchsia_bluetooth_bredr_test as bredr_test, fuchsia_async as fasync, fuchsia_zircon as zx,
 };
 
 /// AVRCP component URL.
@@ -214,7 +214,7 @@ async fn remote_initiates_connection_to_avrcp(mut tf: AvrcpIntegrationTest) {
     fasync::Timer::new(fasync::Time::after(MAX_AVRCP_CONNECTION_ESTABLISHMENT)).await;
 
     // Mock peer attempts to connect to AVRCP.
-    let params = l2cap_connect_parameters(Psm::AVCTP, bredr::ChannelMode::Basic);
+    let params = l2cap_connect_parameters(Psm::AVCTP, fidl_bt::ChannelMode::Basic);
     let channel = tf.mock_peer.make_connection(avrcp_profile_id, params).await.unwrap();
     let mut channel: Channel = channel.try_into().unwrap();
 
@@ -270,7 +270,7 @@ async fn remote_initiates_browse_channel_before_control(mut tf: AvrcpIntegration
     };
     // Mock peer tries to initiate a browse channel connection.
     let params =
-        l2cap_connect_parameters(Psm::AVCTP_BROWSE, bredr::ChannelMode::EnhancedRetransmission);
+        l2cap_connect_parameters(Psm::AVCTP_BROWSE, fidl_bt::ChannelMode::EnhancedRetransmission);
     let channel = tf.mock_peer.make_connection(avrcp_profile_id, params).await.unwrap();
     let channel: Channel = channel.try_into().unwrap();
 

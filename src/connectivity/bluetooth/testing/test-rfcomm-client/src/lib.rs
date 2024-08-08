@@ -17,8 +17,8 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::{info, warn};
 use {
-    fidl_fuchsia_bluetooth_bredr as bredr, fidl_fuchsia_bluetooth_rfcomm_test as rfcomm,
-    fuchsia_async as fasync,
+    fidl_fuchsia_bluetooth as fidl_bt, fidl_fuchsia_bluetooth_bredr as bredr,
+    fidl_fuchsia_bluetooth_rfcomm_test as rfcomm, fuchsia_async as fasync,
 };
 
 /// The default buffer size for the mpsc channels used to relay user data packets to be sent to the
@@ -264,7 +264,7 @@ impl RfcommManager {
         let mut client = ProfileClient::advertise(
             profile_proxy,
             spp_service,
-            bredr::ChannelParameters::default(),
+            fidl_bt::ChannelParameters::default(),
         )?;
         let _ = client.add_search(bredr::ServiceClassProfileIdentifier::SerialPort, None)?;
         let service_task = fasync::Task::spawn(async move {

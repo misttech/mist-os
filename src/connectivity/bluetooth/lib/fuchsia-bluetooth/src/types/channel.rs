@@ -9,15 +9,20 @@ use std::fmt;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll};
-use {fidl_fuchsia_bluetooth_bredr as bredr, fuchsia_async as fasync, fuchsia_zircon as zx};
+use {
+    fidl_fuchsia_bluetooth as fidl_bt, fidl_fuchsia_bluetooth_bredr as bredr,
+    fuchsia_async as fasync, fuchsia_zircon as zx,
+};
 
 use crate::error::Error;
 
-/// The Channel mode in use for a BR/EDR channel.
+/// The Channel mode in use for a L2CAP channel.
 #[derive(PartialEq, Debug, Clone)]
 pub enum ChannelMode {
     Basic,
     EnhancedRetransmissionMode,
+    LeCreditBasedFlowControl,
+    EnhancedCreditBasedFlowControl,
 }
 
 impl fmt::Display for ChannelMode {
@@ -25,6 +30,8 @@ impl fmt::Display for ChannelMode {
         match self {
             ChannelMode::Basic => write!(f, "Basic"),
             ChannelMode::EnhancedRetransmissionMode => write!(f, "ERTM"),
+            ChannelMode::LeCreditBasedFlowControl => write!(f, "LE_Credit"),
+            ChannelMode::EnhancedCreditBasedFlowControl => write!(f, "Credit"),
         }
     }
 }
@@ -45,20 +52,28 @@ impl From<A2dpDirection> for bredr::A2dpDirectionPriority {
     }
 }
 
-impl From<fidl_fuchsia_bluetooth_bredr::ChannelMode> for ChannelMode {
-    fn from(fidl: bredr::ChannelMode) -> Self {
+impl From<fidl_bt::ChannelMode> for ChannelMode {
+    fn from(fidl: fidl_bt::ChannelMode) -> Self {
         match fidl {
-            bredr::ChannelMode::Basic => ChannelMode::Basic,
-            bredr::ChannelMode::EnhancedRetransmission => ChannelMode::EnhancedRetransmissionMode,
+            fidl_bt::ChannelMode::Basic => ChannelMode::Basic,
+            fidl_bt::ChannelMode::EnhancedRetransmission => ChannelMode::EnhancedRetransmissionMode,
+            fidl_bt::ChannelMode::LeCreditBasedFlowControl => ChannelMode::LeCreditBasedFlowControl,
+            fidl_bt::ChannelMode::EnhancedCreditBasedFlowControl => {
+                ChannelMode::EnhancedCreditBasedFlowControl
+            }
         }
     }
 }
 
-impl From<ChannelMode> for bredr::ChannelMode {
+impl From<ChannelMode> for fidl_bt::ChannelMode {
     fn from(x: ChannelMode) -> Self {
         match x {
-            ChannelMode::Basic => bredr::ChannelMode::Basic,
-            ChannelMode::EnhancedRetransmissionMode => bredr::ChannelMode::EnhancedRetransmission,
+            ChannelMode::Basic => fidl_bt::ChannelMode::Basic,
+            ChannelMode::EnhancedRetransmissionMode => fidl_bt::ChannelMode::EnhancedRetransmission,
+            ChannelMode::LeCreditBasedFlowControl => fidl_bt::ChannelMode::LeCreditBasedFlowControl,
+            ChannelMode::EnhancedCreditBasedFlowControl => {
+                fidl_bt::ChannelMode::EnhancedCreditBasedFlowControl
+            }
         }
     }
 }
@@ -173,7 +188,7 @@ impl Channel {
                 _ => {}
             };
             let proxy = proxy.ok_or(Error::profile("l2cap parameter changing not supported"))?;
-            let parameters = bredr::ChannelParameters {
+            let parameters = fidl_bt::ChannelParameters {
                 flush_timeout: duration.clone().map(zx::Duration::into_nanos),
                 ..Default::default()
             };
@@ -229,7 +244,7 @@ impl TryFrom<fidl_fuchsia_bluetooth_bredr::Channel> for Channel {
     fn try_from(fidl: bredr::Channel) -> Result<Self, Self::Error> {
         Ok(Self {
             socket: fasync::Socket::from_socket(fidl.socket.ok_or(zx::Status::INVALID_ARGS)?),
-            mode: fidl.channel_mode.unwrap_or(bredr::ChannelMode::Basic).into(),
+            mode: fidl.channel_mode.unwrap_or(fidl_bt::ChannelMode::Basic).into(),
             max_tx_size: fidl.max_tx_sdu_size.ok_or(zx::Status::INVALID_ARGS)? as usize,
             flush_timeout: Arc::new(Mutex::new(fidl.flush_timeout.map(zx::Duration::from_nanos))),
             audio_direction_ext: fidl.ext_direction.and_then(|e| e.into_proxy().ok()),
@@ -372,7 +387,7 @@ mod tests {
 
         let okay = bredr::Channel {
             socket: Some(remote),
-            channel_mode: Some(bredr::ChannelMode::Basic),
+            channel_mode: Some(fidl_bt::ChannelMode::Basic),
             max_tx_sdu_size: Some(1004),
             ..Default::default()
         };
@@ -406,7 +421,7 @@ mod tests {
         let (remote, _local) = zx::Socket::create_datagram();
         let no_ext = bredr::Channel {
             socket: Some(remote),
-            channel_mode: Some(bredr::ChannelMode::Basic),
+            channel_mode: Some(fidl_bt::ChannelMode::Basic),
             max_tx_sdu_size: Some(1004),
             ..Default::default()
         };
@@ -422,7 +437,7 @@ mod tests {
             create_request_stream::<bredr::AudioDirectionExtMarker>().unwrap();
         let ext = bredr::Channel {
             socket: Some(remote),
-            channel_mode: Some(bredr::ChannelMode::Basic),
+            channel_mode: Some(fidl_bt::ChannelMode::Basic),
             max_tx_sdu_size: Some(1004),
             ext_direction: Some(client_end),
             ..Default::default()
@@ -482,7 +497,7 @@ mod tests {
         let (remote, _local) = zx::Socket::create_datagram();
         let no_ext = bredr::Channel {
             socket: Some(remote),
-            channel_mode: Some(bredr::ChannelMode::Basic),
+            channel_mode: Some(fidl_bt::ChannelMode::Basic),
             max_tx_sdu_size: Some(1004),
             flush_timeout: Some(50_000_000), // 50 milliseconds
             ..Default::default()
@@ -509,7 +524,7 @@ mod tests {
             create_request_stream::<bredr::L2capParametersExtMarker>().unwrap();
         let ext = bredr::Channel {
             socket: Some(remote),
-            channel_mode: Some(bredr::ChannelMode::Basic),
+            channel_mode: Some(fidl_bt::ChannelMode::Basic),
             max_tx_sdu_size: Some(1004),
             flush_timeout: None,
             ext_l2cap: Some(client_end),
@@ -544,7 +559,7 @@ mod tests {
                 }))) => {
                     assert_eq!(Some(req_duration.into_nanos()), request.flush_timeout);
                     // Send a different response
-                    let params = bredr::ChannelParameters {
+                    let params = fidl_bt::ChannelParameters {
                         flush_timeout: Some(50_000_000), // 50ms
                         ..Default::default()
                     };

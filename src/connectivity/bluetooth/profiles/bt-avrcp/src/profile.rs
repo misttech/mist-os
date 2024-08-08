@@ -4,6 +4,7 @@
 
 use anyhow::{format_err, Context, Error};
 use bitflags::bitflags;
+use fidl_fuchsia_bluetooth::{ChannelMode, ChannelParameters};
 use fidl_fuchsia_bluetooth_bredr::*;
 use fuchsia_bluetooth::profile::{elem_to_profile_descriptor, psm_from_protocol, Psm};
 use fuchsia_bluetooth::types::Uuid;
