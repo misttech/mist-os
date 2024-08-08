@@ -21,6 +21,7 @@
             "container",
             "custom_artifacts",
             "framebuffer2",
+            "enable_suid",
             "magma",
             "test_data",
         ],
