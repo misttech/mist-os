@@ -4,6 +4,7 @@
 
 use crate::thread::{ProcessRef, ThreadRef};
 use flyweights::FlyStr;
+use nom::error::ErrorKind;
 use std::num::NonZeroU16;
 
 pub(crate) type ParseResult<'a, T> = nom::IResult<&'a [u8], T, ParseError>;
@@ -54,6 +55,12 @@ impl nom::error::ParseError<&[u8]> for ParseError {
 
     fn append(_input: &[u8], kind: nom::error::ErrorKind, prev: Self) -> Self {
         ParseError::Nom(kind, Some(Box::new(prev)))
+    }
+}
+
+impl nom::error::FromExternalError<&[u8], ParseError> for ParseError {
+    fn from_external_error(_input: &[u8], _kind: ErrorKind, e: ParseError) -> Self {
+        e
     }
 }
 

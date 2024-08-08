@@ -10,6 +10,7 @@ use crate::thread::{ProcessKoid, ProcessRef, ThreadKoid, ThreadRef};
 use crate::{trace_header, ParseError, ParseResult, Provider, SCHEDULING_RECORD_TYPE};
 use nom::combinator::all_consuming;
 use nom::number::complete::le_u64;
+use std::num::NonZero;
 
 const LEGACY_CONTEXT_SWITCH_SCHEDULING_TYPE: u8 = 0;
 const CONTEXT_SWITCH_SCHEDULING_TYPE: u8 = 1;
@@ -99,7 +100,9 @@ impl<'a> RawSchedulingRecord<'a> {
                     let (unknown_record, rem) = buf.split_at(size_bytes);
                     Ok((rem, Self::Unknown { raw_type: unknown, bytes: unknown_record }))
                 } else {
-                    Err(nom::Err::Incomplete(nom::Needed::Size(size_bytes - buf.len())))
+                    Err(nom::Err::Incomplete(nom::Needed::Size(
+                        NonZero::new(size_bytes - buf.len()).unwrap(),
+                    )))
                 }
             }
         }

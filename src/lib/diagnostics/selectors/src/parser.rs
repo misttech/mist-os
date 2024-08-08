@@ -10,7 +10,7 @@ use nom::bytes::complete::{escaped, is_not, tag, take_till, take_while};
 use nom::character::complete::{alphanumeric1, multispace0, none_of, one_of};
 use nom::combinator::{all_consuming, complete, cond, map, opt, peek, recognize, verify};
 use nom::error::{ErrorKind, ParseError as NomParseError};
-use nom::multi::separated_nonempty_list;
+use nom::multi::separated_list1;
 use nom::sequence::{delimited, pair, preceded, separated_pair, tuple};
 use nom::IResult;
 
@@ -25,9 +25,9 @@ where
 }
 
 /// Parses an input containing any number and type of whitespace at the front.
-fn spaced<'a, E, F, O>(parser: F) -> impl Fn(&'a str) -> IResult<&'a str, O, E>
+fn spaced<'a, E, F, O>(parser: F) -> impl FnMut(&'a str) -> IResult<&'a str, O, E>
 where
-    F: Fn(&'a str) -> IResult<&'a str, O, E>,
+    F: FnMut(&'a str) -> IResult<&'a str, O, E>,
     E: NomParseError<&'a str>,
 {
     preceded(whitespace0, parser)
@@ -59,7 +59,7 @@ pub fn tree_selector<'a, E>(input: &'a str) -> IResult<&'a str, TreeSelector<'a>
 where
     E: NomParseError<&'a str>,
 {
-    let esc = escaped(none_of(":/\\ \t\n"), '\\', one_of("* \t/:\\"));
+    let mut esc = escaped(none_of(":/\\ \t\n"), '\\', one_of("* \t/:\\"));
 
     let (rest, unparsed_name_list) = extract_conjoined_names::<E>(input).unwrap_or((input, None));
 
@@ -73,7 +73,7 @@ where
                     .into_iter()
                     .map(|name| {
                         Ok(extract_from_quotes::<E>(
-                            spaced(separated_pair(tag("name"), tag("="), &esc))(name)?.1 .1,
+                            spaced(separated_pair(tag("name"), tag("="), &mut esc))(name)?.1 .1,
                         ))
                     })
                     .collect::<Result<Vec<_>, _>>()
@@ -82,7 +82,7 @@ where
             .map(|value| value.into())
     };
 
-    let (rest, node_segments) = separated_nonempty_list(tag("/"), &esc)(rest)?;
+    let (rest, node_segments) = separated_list1(tag("/"), &mut esc)(rest)?;
     let (rest, property_segment) = if peek::<&str, _, E, _>(tag(":"))(rest).is_ok() {
         let (rest, _) = tag(":")(rest)?;
         let (rest, property) = verify(esc, |value: &str| !value.is_empty())(rest)?;
@@ -113,7 +113,7 @@ where
     // Monikers (the first part of a selector) can optionally be preceded by "/" or "./".
     let (rest, segments) = preceded(
         opt(alt((tag("./"), tag("/")))),
-        separated_nonempty_list(tag("/"), recognize(accepted_characters)),
+        separated_list1(tag("/"), recognize(accepted_characters)),
     )(input)?;
     Ok((rest, ComponentSelector { segments: segments.into_iter().map(|s| s.into()).collect() }))
 }
@@ -147,7 +147,7 @@ where
 /// Recognizes selectors, with comments allowed or disallowed.
 fn do_parse_selector<'a, E>(
     allow_inline_comment: bool,
-) -> impl Fn(&'a str) -> IResult<&'a str, Selector<'a>, E>
+) -> impl FnMut(&'a str) -> IResult<&'a str, Selector<'a>, E>
 where
     E: NomParseError<&'a str>,
 {

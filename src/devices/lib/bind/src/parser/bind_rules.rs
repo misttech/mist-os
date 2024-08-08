@@ -9,7 +9,7 @@ use crate::parser::common::{
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::combinator::{opt, value};
-use nom::multi::{many1, separated_nonempty_list};
+use nom::multi::{many1, separated_list1};
 use nom::sequence::{delimited, preceded, terminated, tuple};
 use nom::IResult;
 
@@ -124,9 +124,9 @@ fn if_statement(input: NomSpan) -> IResult<NomSpan, Statement, BindParserError> 
     let from = skip_ws(input)?;
 
     let if_block = tuple((preceded(keyword_if, condition), statement_block));
-    let if_blocks = separated_nonempty_list(keyword_else, if_block);
+    let mut if_blocks = separated_list1(keyword_else, if_block);
 
-    let else_block = preceded(keyword_else, statement_block);
+    let mut else_block = preceded(keyword_else, statement_block);
 
     let (input, blocks) = if_blocks(from)?;
     let (to, else_block) = else_block(input)?;
@@ -152,7 +152,7 @@ fn accept(input: NomSpan) -> IResult<NomSpan, Statement, BindParserError> {
     let list_end = ws(map_err(tag("}"), BindParserError::ListEnd));
     let separator = || ws(map_err(tag(","), BindParserError::ListSeparator));
 
-    let values = separated_nonempty_list(separator(), ws(condition_value));
+    let values = separated_list1(separator(), ws(condition_value));
     // Lists may optionally be terminated by an additional trailing separator.
     let values = terminated(values, opt(separator()));
     let value_list = delimited(list_start, values, list_end);

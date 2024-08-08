@@ -8,8 +8,12 @@ use super::rsn::{akm, cipher, suite_selector};
 
 use crate::append::{Append, BufferTooSmall};
 use crate::organization::Oui;
+use nom::bytes::streaming::take;
+use nom::combinator::map;
+use nom::multi::length_count;
 use nom::number::streaming::le_u16;
-use nom::{call, count, do_parse, named, named_attr, take, try_parse, IResult};
+use nom::sequence::tuple;
+use nom::IResult;
 
 // The WPA1 IE is not fully specified by IEEE. This format was derived from pcap.
 // Note that this file only parses fields specific to WPA -- IE headers and MSFT-specific fields
@@ -76,33 +80,37 @@ fn read_suite_selector<T>(input: &[u8]) -> IResult<&[u8], T>
 where
     T: suite_selector::Factory<Suite = T>,
 {
-    let (i1, bytes) = try_parse!(input, take!(4));
+    let (i1, bytes) = take(4usize)(input)?;
     let oui = Oui::new([bytes[0], bytes[1], bytes[2]]);
     return Ok((i1, T::new(oui, bytes[3])));
 }
 
-named!(parse_akm<&[u8], akm::Akm>, call!(read_suite_selector::<akm::Akm>));
-named!(parse_cipher<&[u8], cipher::Cipher>, call!(read_suite_selector::<cipher::Cipher>));
+fn parse_akm(input: &[u8]) -> IResult<&[u8], akm::Akm> {
+    read_suite_selector::<akm::Akm>(input)
+}
 
-named_attr!(
-    /// Convert bytes of a WPA information element into a WpaIe representation.
-    , // comma ends the attribute list to named_attr
-    pub from_bytes<&[u8], WpaIe>,
-      do_parse!(
-          _wpa_type: le_u16 >>
-          multicast_cipher: parse_cipher >>
-          unicast_cipher_count: le_u16 >>
-          unicast_cipher_list: count!(parse_cipher, unicast_cipher_count as usize) >>
-          akm_count: le_u16 >>
-          akm_list: count!(parse_akm, akm_count as usize) >>
-          // An eof! is not used since this IE sometimes adds extra non-compliant bytes.
-          (WpaIe{
-              multicast_cipher,
-              unicast_cipher_list,
-              akm_list,
-          })
-      )
-);
+fn parse_cipher(input: &[u8]) -> IResult<&[u8], cipher::Cipher> {
+    read_suite_selector::<cipher::Cipher>(input)
+}
+
+/// Convert bytes of a WPA information element into a WpaIe representation.
+pub fn from_bytes(input: &[u8]) -> IResult<&[u8], WpaIe> {
+    map(
+        // A terminated eof is not used since this IE sometimes adds extra
+        // non-compliant bytes.
+        tuple((
+            le_u16,
+            parse_cipher,
+            length_count(le_u16, parse_cipher),
+            length_count(le_u16, parse_akm),
+        )),
+        |(_wpa_type, multicast_cipher, unicast_cipher_list, akm_list)| WpaIe {
+            multicast_cipher,
+            unicast_cipher_list,
+            akm_list,
+        },
+    )(input)
+}
 
 #[cfg(test)]
 mod tests {

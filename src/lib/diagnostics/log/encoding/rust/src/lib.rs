@@ -238,14 +238,14 @@ mod tests {
 
         // next we'll parse the record out of a buf with padding after the record
         let (_, decoded_from_full) =
-            nom::dbg_dmp(&parser, "roundtrip")(encoder.buf.get_ref()).unwrap();
+            nom::error::dbg_dmp(&parser, "roundtrip")(encoder.buf.get_ref()).unwrap();
         assert_eq!(val, decoded_from_full, "decoded version with trailing padding must match");
 
         if let Some(canonical) = canonical {
             let recorded = encoder.buf.get_ref().split_at(canonical.len()).0;
             assert_eq!(canonical, recorded, "encoded repr must match the canonical value provided");
 
-            let (zero_buf, decoded) = nom::dbg_dmp(&parser, "roundtrip")(recorded).unwrap();
+            let (zero_buf, decoded) = nom::error::dbg_dmp(&parser, "roundtrip")(recorded).unwrap();
             assert_eq!(val, decoded, "decoded version must match what we tried to encode");
             assert_eq!(zero_buf.len(), 0, "must parse record exactly out of provided buffer");
         }

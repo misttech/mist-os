@@ -23,10 +23,10 @@ use nom::character::complete::{
     alphanumeric1, anychar, char as chr, digit1, hex_digit1, none_of, one_of,
 };
 use nom::combinator::{
-    all_consuming, cond, flat_map, map, map_parser, not, opt, peek, recognize, rest, verify,
+    all_consuming, cond, eof, flat_map, map, map_parser, not, opt, peek, recognize, rest, verify,
 };
 use nom::multi::{
-    fold_many0, many0, many0_count, many1, many_till, separated_list, separated_nonempty_list,
+    fold_many0, many0, many0_count, many1, many_till, separated_list0, separated_list1,
 };
 use nom::sequence::{delimited, pair, preceded, separated_pair, terminated, tuple};
 use nom::{error as nom_error, Slice};
@@ -412,12 +412,12 @@ impl<'a> From<&'a str> for ParseResult<'a> {
 
 /// Handle an error by skipping some parsed data. If the skip parser fails the error handling
 /// fails.
-fn err_skip<'a, F: Fn(ESpan<'a>) -> IResult<'a, X>, S: ToString + 'a, X>(
+fn err_skip<'a, F: FnMut(ESpan<'a>) -> IResult<'a, X>, S: ToString + 'a, X>(
     msg: S,
-    f: F,
-) -> impl Fn(ESpan<'a>) -> IResult<'a, Node<'a>> {
+    mut f: F,
+) -> impl FnMut(ESpan<'a>) -> IResult<'a, Node<'a>> {
     move |input| {
-        let (out_span, result) = recognize(&f)(input)?;
+        let (out_span, result) = recognize(&mut f)(input)?;
         let parse_state = Rc::clone(&out_span.extra.0);
         let msg = msg.to_string().replace("{}", *result.fragment());
         let error = Some(Rc::new(ErrNode {
@@ -432,25 +432,25 @@ fn err_skip<'a, F: Fn(ESpan<'a>) -> IResult<'a, X>, S: ToString + 'a, X>(
 }
 
 /// Handle an error by simply marking it with an error node and moving along.
-fn err_insert<'a, S: ToString + 'a>(msg: S) -> impl Fn(ESpan<'a>) -> IResult<'a, Node<'a>> {
+fn err_insert<'a, S: ToString + 'a>(msg: S) -> impl FnMut(ESpan<'a>) -> IResult<'a, Node<'a>> {
     err_skip(msg, |x| Ok((x, Node::Error)))
 }
 
 /// Handle an error by reporting it but introduce no node.
-fn err_note<'a, S: ToString + 'a>(msg: S) -> impl Fn(ESpan<'a>) -> IResult<'a, ()> {
+fn err_note<'a, S: ToString + 'a>(msg: S) -> impl FnMut(ESpan<'a>) -> IResult<'a, ()> {
     map(err_insert(msg), |_| ())
 }
 
 /// Same as `tag` but inserts an error if the tag is missing.
-fn ex_tag<'a>(s: &'a str) -> impl Fn(ESpan<'a>) -> IResult<'a, ()> + 'a {
+fn ex_tag<'a>(s: &'a str) -> impl FnMut(ESpan<'a>) -> IResult<'a, ()> + 'a {
     let s = s.to_owned();
     move |x| alt((map(tag(s.as_str()), |_| ()), err_note(format!("Expected '{}'", s))))(x)
 }
 
 /// Runs the passed parser but does not allow it to emit errors.
 fn no_errors<'a, X>(
-    f: impl Fn(ESpan<'a>) -> IResult<'a, X>,
-) -> impl Fn(ESpan<'a>) -> IResult<'a, X> {
+    mut f: impl FnMut(ESpan<'a>) -> IResult<'a, X>,
+) -> impl FnMut(ESpan<'a>) -> IResult<'a, X> {
     move |input| {
         let err = input.extra.1.clone();
         let res = f(input)?;
@@ -465,46 +465,46 @@ fn no_errors<'a, X>(
 }
 
 /// Match optional whitespace before the given combinator.
-fn ws_before<'a, F: Fn(ESpan<'a>) -> IResult<'a, X>, X>(
+fn ws_before<'a, F: FnMut(ESpan<'a>) -> IResult<'a, X>, X>(
     f: F,
-) -> impl Fn(ESpan<'a>) -> IResult<'a, X> {
+) -> impl FnMut(ESpan<'a>) -> IResult<'a, X> {
     preceded(opt(whitespace), f)
 }
 
 /// Match optional whitespace after the given combinator.
-fn ws_after<'a, F: Fn(ESpan<'a>) -> IResult<'a, X>, X>(
+fn ws_after<'a, F: FnMut(ESpan<'a>) -> IResult<'a, X>, X>(
     f: F,
-) -> impl Fn(ESpan<'a>) -> IResult<'a, X> {
+) -> impl FnMut(ESpan<'a>) -> IResult<'a, X> {
     terminated(f, opt(whitespace))
 }
 
 /// Match optional whitespace around the given combinator.
-fn ws_around<'a, F: Fn(ESpan<'a>) -> IResult<'a, X>, X>(
+fn ws_around<'a, F: FnMut(ESpan<'a>) -> IResult<'a, X>, X>(
     f: F,
-) -> impl Fn(ESpan<'a>) -> IResult<'a, X> {
+) -> impl FnMut(ESpan<'a>) -> IResult<'a, X> {
     ws_before(ws_after(f))
 }
 
-/// Version of `separated_nonempty_list` combinator that matches optional whitespace between each
+/// Version of `separated_list1` combinator that matches optional whitespace between each
 /// item.
 fn ws_separated_nonempty_list<
     'a,
-    FS: Fn(ESpan<'a>) -> IResult<'a, Y>,
-    F: Fn(ESpan<'a>) -> IResult<'a, X>,
+    FS: FnMut(ESpan<'a>) -> IResult<'a, Y>,
+    F: FnMut(ESpan<'a>) -> IResult<'a, X>,
     X,
     Y,
 >(
     fs: FS,
     f: F,
-) -> impl Fn(ESpan<'a>) -> IResult<'a, Vec<X>> {
-    separated_nonempty_list(ws_around(fs), f)
+) -> impl FnMut(ESpan<'a>) -> IResult<'a, Vec<X>> {
+    separated_list1(ws_around(fs), f)
 }
 
 /// Marks the contained parser as parsing something which could be tab-completed.
 fn completion_hint<'a, X>(
-    f: impl Fn(ESpan<'a>) -> IResult<'a, X>,
+    mut f: impl FnMut(ESpan<'a>) -> IResult<'a, X>,
     hint: impl Fn(Span<'a>) -> TabHint<'a>,
-) -> impl Fn(ESpan<'a>) -> IResult<'a, X> {
+) -> impl FnMut(ESpan<'a>) -> IResult<'a, X> {
     move |span| {
         let hint_span = span.clone();
         let ret = f(span);
@@ -530,7 +530,7 @@ fn completion_hint<'a, X>(
 fn lassoc<
     'a: 'b,
     'b,
-    F: Fn(ESpan<'a>) -> IResult<'a, X> + 'b,
+    F: FnMut(ESpan<'a>) -> IResult<'a, X> + 'b,
     FM: Fn(Y, Y) -> X + 'b,
     X: 'b,
     Y: From<X>,
@@ -538,7 +538,7 @@ fn lassoc<
     f: F,
     oper: &'b str,
     mapper: FM,
-) -> impl Fn(ESpan<'a>) -> IResult<'a, X> + 'b {
+) -> impl FnMut(ESpan<'a>) -> IResult<'a, X> + 'b {
     map(ws_separated_nonempty_list(tag(oper), f), move |items| {
         let mut items = items.into_iter();
         let first = items.next().unwrap();
@@ -550,8 +550,8 @@ fn lassoc<
 fn lassoc_choice<
     'a: 'b,
     'b,
-    F: Fn(ESpan<'a>) -> IResult<'a, X> + 'b + Copy,
-    FO: Fn(ESpan<'a>) -> IResult<'a, Y> + 'b,
+    F: FnMut(ESpan<'a>) -> IResult<'a, X> + 'b + Copy,
+    FO: FnMut(ESpan<'a>) -> IResult<'a, Y> + 'b,
     FM: Fn(X, Y, X) -> X + 'b,
     X: 'b,
     Y: 'b,
@@ -559,7 +559,7 @@ fn lassoc_choice<
     f: F,
     oper: FO,
     mapper: FM,
-) -> impl Fn(ESpan<'a>) -> IResult<'a, X> + 'b {
+) -> impl FnMut(ESpan<'a>) -> IResult<'a, X> + 'b {
     map(pair(f, many0(pair(ws_around(oper), f))), move |(first, items)| {
         items.into_iter().fold(first, |a, (op, b)| mapper(a, op, b))
     })
@@ -569,7 +569,7 @@ const KEYWORDS: [&str; 9] =
     ["let", "const", "def", "if", "else", "true", "false", "null", "import"];
 
 /// Match a keyword.
-fn kw<'s>(kw: &'s str) -> impl for<'a> Fn(ESpan<'a>) -> IResult<'a, ESpan<'a>> + 's {
+fn kw<'s>(kw: &'s str) -> impl for<'a> FnMut(ESpan<'a>) -> IResult<'a, ESpan<'a>> + 's {
     debug_assert!(KEYWORDS.contains(&kw));
     move |input| terminated(tag(kw), not(alt((alphanumeric1, tag("_")))))(input)
 }
@@ -663,8 +663,8 @@ fn identifier<'a>(input: ESpan<'a>) -> IResult<'a, ESpan<'a>> {
 fn integer<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
     map(
         alt((
-            preceded(not(chr('0')), recognize(separated_nonempty_list(chr('_'), digit1))),
-            recognize(tuple((tag("0x"), separated_nonempty_list(chr('_'), hex_digit1)))),
+            preceded(not(chr('0')), recognize(separated_list1(chr('_'), digit1))),
+            recognize(tuple((tag("0x"), separated_list1(chr('_'), hex_digit1)))),
             terminated(tag("0"), not(digit1)),
         )),
         |x: ESpan<'a>| Node::Integer(x.strip_parse_state()),
@@ -823,7 +823,7 @@ fn variable_decl<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
 fn parameter_list<'a>(input: ESpan<'a>) -> IResult<'a, ParameterList<'a>> {
     map(
         tuple((
-            separated_list(whitespace, terminated(identifier, not(one_of(".?")))),
+            separated_list0(whitespace, terminated(identifier, not(one_of(".?")))),
             many0(ws_before(terminated(identifier, chr('?')))),
             opt(ws_before(terminated(identifier, tag("..")))),
         )),
@@ -920,49 +920,55 @@ fn short_function_decl<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
 /// @Labeled { foo: 5 }
 /// ```
 fn object<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
-    fn field<'a>(input: ESpan<'a>) -> IResult<'a, (Node<'a>, Node<'a>)> {
-        separated_pair(
-            alt((normal_string, map(identifier, |x| Node::Identifier(x.strip_parse_state())))),
-            ws_around(alt((
-                tag(":"),
-                recognize(err_skip(
-                    "Expected ':'",
-                    recognize(many0(preceded(
-                        not(alt((
-                            recognize(identifier),
-                            recognize(chr('$')),
-                            recognize(chr('}')),
-                            whitespace,
-                        ))),
-                        anychar,
-                    ))),
-                )),
-            ))),
-            map(simple_expression, Node::from),
-        )(input)
+    fn field<'a>(is_first: bool) -> impl FnMut(ESpan<'a>) -> IResult<'a, (Node<'a>, Node<'a>)> {
+        move |input| {
+            separated_pair(
+                alt((normal_string, map(identifier, |x| Node::Identifier(x.strip_parse_state())))),
+                ws_around(alt((
+                    tag(":"),
+                    preceded(
+                        cond(is_first, not(ws_before(chr('}')))),
+                        recognize(err_skip(
+                            "Expected ':'",
+                            many0(preceded(
+                                not(alt((
+                                    recognize(identifier),
+                                    recognize(chr('$')),
+                                    recognize(chr('}')),
+                                    whitespace,
+                                ))),
+                                anychar,
+                            )),
+                        )),
+                    ),
+                ))),
+                map(simple_expression, Node::from),
+            )(input)
+        }
     }
 
     fn object_body<'a>(input: ESpan<'a>) -> IResult<'a, Vec<(Node<'a>, Node<'a>)>> {
         map(
             opt(terminated(
-                flat_map(field, |node| {
+                flat_map(field(true), |node| {
+                    let mut init = Some(vec![node]);
                     fold_many0(
-                        preceded(ws_around(chr(',')), field),
-                        Rc::new(RefCell::new(vec![node])),
-                        |acc, item| {
-                            acc.borrow_mut().push(item);
+                        preceded(ws_around(chr(',')), field(false)),
+                        move || init.take().unwrap(),
+                        |mut acc, item| {
+                            acc.push(item);
                             acc
                         },
                     )
                 }),
                 opt(ws_before(tag(","))),
             )),
-            |x| x.map(|y| y.take()).unwrap_or_else(Vec::new),
+            |x| x.unwrap_or_default(),
         )(input)
     }
 
     flat_map(opt(ws_after(preceded(chr('@'), identifier))), |name| {
-        move |input| {
+        move |input: ESpan<'a>| {
             let res = {
                 let name = name.clone();
                 map(delimited(chr('{'), ws_around(object_body), tag("}")), move |body| {
@@ -1003,18 +1009,19 @@ fn list<'a>(input: ESpan<'a>) -> IResult<'a, Node<'a>> {
             opt(terminated(
                 flat_map(simple_expression, |node| {
                     let node = node.into();
+                    let mut init = Some(vec![node]);
                     fold_many0(
                         preceded(ws_around(chr(',')), simple_expression),
-                        Rc::new(RefCell::new(vec![node])),
-                        |acc, item| {
-                            acc.borrow_mut().push(item.into());
+                        move || init.take().unwrap(),
+                        |mut acc, item| {
+                            acc.push(item.into());
                             acc
                         },
                     )
                 }),
                 opt(ws_before(tag(","))),
             )),
-            |x| Node::List(x.map(|x| x.take()).unwrap_or_else(Vec::new)),
+            |x| Node::List(x.unwrap_or_default()),
         )(input)
     }
 
@@ -1507,7 +1514,12 @@ fn program<'a>(input: ESpan<'a>) -> IResult<'a, Vec<Node<'a>>> {
                 map(opt(ws_before(one_of(";&"))), |x| x.or(Some(';'))),
             ),
             pair(
-                alt((variable_decl, short_function_decl, expression)),
+                alt((
+                    variable_decl,
+                    short_function_decl,
+                    preceded(peek(not(ws_before(alt((recognize(chr('}')), eof))))), expression),
+                    no_errors(expression),
+                )),
                 opt(ws_before(one_of(";&"))),
             ),
         )),

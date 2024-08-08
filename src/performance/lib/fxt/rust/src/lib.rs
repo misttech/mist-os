@@ -45,6 +45,7 @@ use crate::scheduling::RawSchedulingRecord;
 use crate::session::ResolveCtx;
 use crate::string::StringRecord;
 use crate::thread::ThreadRecord;
+use std::num::NonZero;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum TraceRecord {
@@ -167,7 +168,9 @@ impl<'a> RawTraceRecord<'a> {
             return Err(nom::Err::Failure(ParseError::InvalidSize));
         }
         if size_bytes > buf.len() {
-            return Err(nom::Err::Incomplete(nom::Needed::Size(size_bytes - buf.len())));
+            return Err(nom::Err::Incomplete(nom::Needed::Size(
+                NonZero::new(size_bytes - buf.len()).unwrap(),
+            )));
         }
 
         let (buf, rem) = buf.split_at(size_bytes);
@@ -204,7 +207,9 @@ impl<'a> RawTraceRecord<'a> {
 fn take_n_padded<'a>(unpadded_len: usize, buf: &'a [u8]) -> ParseResult<'a, &'a [u8]> {
     let padded_len = unpadded_len + word_padding(unpadded_len);
     if padded_len > buf.len() {
-        return Err(nom::Err::Incomplete(nom::Needed::Size(padded_len - buf.len())));
+        return Err(nom::Err::Incomplete(nom::Needed::Size(
+            NonZero::new(padded_len - buf.len()).unwrap(),
+        )));
     }
     let (with_padding, rem) = buf.split_at(padded_len);
     let (unpadded, _padding) = with_padding.split_at(unpadded_len);

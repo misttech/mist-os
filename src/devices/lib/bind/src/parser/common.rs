@@ -12,9 +12,9 @@ use nom::character::complete::{
 };
 use nom::combinator::{map, map_res, opt, value};
 use nom::error::{ErrorKind, ParseError};
-use nom::multi::{many0, separated_nonempty_list};
+use nom::multi::{many0, separated_list1};
 use nom::sequence::{delimited, preceded, tuple};
-use nom::{IResult, Slice};
+use nom::{IResult, Parser, Slice};
 use nom_locate::LocatedSpan;
 use regex::Regex;
 use std::fmt;
@@ -184,7 +184,7 @@ pub fn identifier(input: NomSpan) -> IResult<NomSpan, String, BindParserError> {
 pub fn compound_identifier(
     input: NomSpan,
 ) -> IResult<NomSpan, CompoundIdentifier, BindParserError> {
-    let (input, mut segments) = separated_nonempty_list(tag("."), identifier)(input)?;
+    let (input, mut segments) = separated_list1(tag("."), identifier)(input)?;
     // Segments must be nonempty, so it's safe to pop off the name.
     let name = segments.pop().unwrap();
     Ok((input, CompoundIdentifier { namespace: segments, name }))
@@ -218,10 +218,10 @@ pub fn using_list(input: NomSpan) -> IResult<NomSpan, Vec<Include>, BindParserEr
 /// consume input) and many_until_eof will panic if it doesn't, to prevent infinite loops. Returns
 /// the results of `f` in a Vec.
 pub fn many_until_eof<'a, O, F>(
-    f: F,
-) -> impl Fn(NomSpan<'a>) -> IResult<NomSpan<'a>, Vec<O>, BindParserError>
+    mut f: F,
+) -> impl FnMut(NomSpan<'a>) -> IResult<NomSpan<'a>, Vec<O>, BindParserError>
 where
-    F: Fn(NomSpan<'a>) -> IResult<NomSpan<'a>, O, BindParserError>,
+    F: Parser<NomSpan<'a>, O, BindParserError>,
 {
     move |mut input: NomSpan<'a>| {
         let mut result = vec![];
@@ -231,7 +231,7 @@ where
                 return Ok((skip_ws(input)?, result));
             }
 
-            let (next_input, res) = f(input)?;
+            let (next_input, res) = f.parse(input)?;
             if input.fragment().len() == next_input.fragment().len() {
                 panic!("many_until_eof called on an optional parser. This will result in an infinite loop");
             }
@@ -244,9 +244,9 @@ where
 /// Wraps a parser |f| and discards zero or more whitespace characters or comments before it.
 /// Doesn't discard whitespace after the parser, since this would make it difficult to ensure that
 /// the AST spans contain no trailing whitespace.
-pub fn ws<'a, O, F>(f: F) -> impl Fn(NomSpan<'a>) -> IResult<NomSpan<'a>, O, BindParserError>
+pub fn ws<'a, O, F>(f: F) -> impl FnMut(NomSpan<'a>) -> IResult<NomSpan<'a>, O, BindParserError>
 where
-    F: Fn(NomSpan<'a>) -> IResult<NomSpan<'a>, O, BindParserError>,
+    F: Parser<NomSpan<'a>, O, BindParserError>,
 {
     preceded(comment_or_whitespace, f)
 }
@@ -293,11 +293,11 @@ fn singleline_comment(input: NomSpan) -> IResult<NomSpan, (), BindParserError> {
 
 // Wraps a parser and replaces its error.
 pub fn map_err<'a, O, P, G>(
-    parser: P,
+    mut parser: P,
     f: G,
-) -> impl Fn(NomSpan<'a>) -> IResult<NomSpan<'a>, O, BindParserError>
+) -> impl FnMut(NomSpan<'a>) -> IResult<NomSpan<'a>, O, BindParserError>
 where
-    P: Fn(NomSpan<'a>) -> IResult<NomSpan<'a>, O, (NomSpan<'a>, ErrorKind)>,
+    P: FnMut(NomSpan<'a>) -> IResult<NomSpan<'a>, O, (NomSpan<'a>, ErrorKind)>,
     G: Fn(String) -> BindParserError,
 {
     move |input: NomSpan| {

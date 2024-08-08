@@ -144,8 +144,8 @@ memoffset = "0.7.1"
 miniz_oxide = "0.3.6"
 mockall = "0.9"
 nix = "0.26.2"
-nom = { version = "5.0.0", default-features = false, features = ["std", "regexp_macros"] }
-nom_locate = "2.0.0"
+nom = { version = "7.1.3", default-features = false, features = ["std"] }
+nom_locate = "4.2.0"
 num = { version = "0.4.0", features = ["rand"] }
 num-derive = "0.4.2"
 num-traits = "0.2.18"
@@ -371,6 +371,7 @@ fatfs = { path = "forks/fatfs" }
 fuse3 = { path = "forks/fuse3" }
 hound = { path = "forks/hound" }
 libm = { path = "forks/libm" }
+nom = { path = "forks/nom" }
 notify = { path = "forks/notify" }
 # FIXME(118248): We can unfork once undefined behavior is resolved.
 prettytable-rs = { path = "forks/prettytable-rs" }
@@ -615,9 +616,6 @@ deps = ["//build/validate:non_production_tag"]
 [gn.package.nix."0.26.2"]
 group_visibility = { import = "//src/lib/fuchsia_nix/nix_visibility.gni", variable = "nix_visibility" }
 visibility = [":*", "//third_party/rust_crates/compat/rustyline:*"]
-
-[gn.package.nom."5.0.0"]
-# Has build script but no config needed.
 
 [gn.package.num-bigint."0.4.3"]
 rustflags = [

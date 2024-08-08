@@ -11,15 +11,20 @@ use crate::append::{Append, BufferTooSmall};
 use crate::organization::Oui;
 use bytes::Bytes;
 use fidl_fuchsia_wlan_common as fidl_common;
-use nom::combinator::{map, map_res};
+use nom::branch::alt;
+use nom::bytes::streaming::take;
+use nom::combinator::{eof, map, map_res};
+use nom::multi::length_count;
 use nom::number::streaming::{le_u16, le_u8};
-use nom::{call, cond, count, do_parse, eof, named, named_attr, take, try_parse, IResult};
+use nom::sequence::{terminated, tuple};
+use nom::IResult;
 use wlan_bitfield::bitfield;
 
 use thiserror::Error;
 
 macro_rules! if_remaining (
-  ($i:expr, $f:expr) => ( cond!($i, $i.len() !=0, call!($f)) );
+  // alt returns the first parser that succeeds
+  ($f:expr) => (alt((map(eof, |_| None), map($f, Some))));
 );
 
 // IEEE 802.11-2016, 9.4.2.25.1
@@ -549,7 +554,7 @@ fn read_suite_selector<T>(input: &[u8]) -> IResult<&[u8], T>
 where
     T: suite_selector::Factory<Suite = T>,
 {
-    let (i1, bytes) = try_parse!(input, take!(4));
+    let (i1, bytes) = take(4usize)(input)?;
     let oui = Oui::new([bytes[0], bytes[1], bytes[2]]);
     return Ok((i1, T::new(oui, bytes[3])));
 }
@@ -563,40 +568,54 @@ fn read_pmkid(input: &[u8]) -> IResult<&[u8], pmkid::Pmkid> {
     map_res(nom::bytes::streaming::take(16usize), f)(input)
 }
 
-named!(akm<&[u8], akm::Akm>, call!(read_suite_selector::<akm::Akm>));
-named!(cipher<&[u8], cipher::Cipher>, call!(read_suite_selector::<cipher::Cipher>));
+fn akm(input: &[u8]) -> IResult<&[u8], akm::Akm> {
+    read_suite_selector::<akm::Akm>(input)
+}
 
-named_attr!(
-    /// convert bytes of an RSNE information element into an RSNE representation. This method
-    /// does not depend on the information element length field (second byte) and thus does not
-    /// validate that it's correct
-    , // comma ends the attribute list to named_attr
-    pub from_bytes<&[u8], Rsne>,
-       do_parse!(
-           _element_id: le_u8 >>
-           _length: le_u8 >>
-           version: le_u16 >>
-           group_cipher: if_remaining!(cipher) >>
-           pairwise_count: if_remaining!(le_u16) >>
-           pairwise_list: count!(cipher, pairwise_count.unwrap_or(0) as usize)  >>
-           akm_count: if_remaining!(le_u16) >>
-           akm_list: count!(akm, akm_count.unwrap_or(0) as usize)  >>
-           rsn_capabilities: if_remaining!(map(le_u16, RsnCapabilities)) >>
-           pmkid_count: if_remaining!(le_u16) >>
-           pmkid_list: count!(read_pmkid, pmkid_count.unwrap_or(0) as usize)  >>
-           group_mgmt_cipher_suite: if_remaining!(cipher) >>
-           eof!() >>
-           (Rsne{
-                version: version,
-                group_data_cipher_suite: group_cipher,
-                pairwise_cipher_suites: pairwise_list,
-                akm_suites: akm_list,
-                rsn_capabilities: rsn_capabilities,
-                pmkids: pmkid_list,
-                group_mgmt_cipher_suite: group_mgmt_cipher_suite
-           })
-    )
-);
+fn cipher(input: &[u8]) -> IResult<&[u8], cipher::Cipher> {
+    read_suite_selector::<cipher::Cipher>(input)
+}
+
+/// convert bytes of an RSNE information element into an RSNE representation. This method
+/// does not depend on the information element length field (second byte) and thus does not
+/// validate that it's correct
+pub fn from_bytes(input: &[u8]) -> IResult<&[u8], Rsne> {
+    map(
+        terminated(
+            tuple((
+                le_u8,
+                le_u8,
+                le_u16,
+                if_remaining!(cipher),
+                if_remaining!(length_count(le_u16, cipher)),
+                if_remaining!(length_count(le_u16, akm)),
+                if_remaining!(map(le_u16, RsnCapabilities)),
+                if_remaining!(length_count(le_u16, read_pmkid)),
+                if_remaining!(cipher),
+            )),
+            eof,
+        ),
+        |(
+            _element_id,
+            _length,
+            version,
+            group_cipher,
+            pairwise_list,
+            akm_list,
+            rsn_capabilities,
+            pmkid_list,
+            group_mgmt_cipher_suite,
+        )| Rsne {
+            version: version,
+            group_data_cipher_suite: group_cipher,
+            pairwise_cipher_suites: pairwise_list.unwrap_or_default(),
+            akm_suites: akm_list.unwrap_or_default(),
+            rsn_capabilities: rsn_capabilities,
+            pmkids: pmkid_list.unwrap_or_default(),
+            group_mgmt_cipher_suite: group_mgmt_cipher_suite,
+        },
+    )(input)
+}
 
 #[cfg(test)]
 mod tests {
