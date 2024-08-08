@@ -369,6 +369,11 @@ struct vm_page {
   // to be racy.
   bool is_free() const { return state() == vm_page_state::FREE; }
 
+  // Returns whether this page is in the FREE_LOANED state. Similar to the FREE state the page is
+  // assumed to be owned by the relevant PmmNode, however this distinguishes whether the page is
+  // part of the general purpose free list, versus the more narrowly usable set of loaned pages.
+  bool is_free_loaned() const { return state() == vm_page_state::FREE_LOANED; }
+
   // If true, this page is "loaned" in the sense of being loaned from a contiguous VMO (via
   // decommit) to Zircon.  If the original contiguous VMO is deleted, this page will no longer be
   // loaned.  A loaned page cannot be pinned.  Instead a different physical page (non-loaned) is

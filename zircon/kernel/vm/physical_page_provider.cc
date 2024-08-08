@@ -64,9 +64,9 @@ void PhysicalPageProvider::SendAsyncRequest(PageRequest* request) {
   // regardless of the fact that some of the pages may already be free and therefore could be
   // immediately obtained.  Quite often at least one page will be presently owned by a different
   // VMO, so we may as well always do one big async batch that deals with all the presently
-  // non-FREE pages.
+  // non-FREE_LOANED pages.
   //
-  // At this point the page may be FREE, or in use by a different VMO.
+  // At this point the page may be FREE_LOANED, or in use by a different VMO.
   //
   // Allocation of a new page to a VMO has an interval during which the page is not free, but also
   // isn't state == OBJECT yet.  During processing we rely on that interval occurring only under the
@@ -116,8 +116,8 @@ void PhysicalPageProvider::SwapAsyncRequest(PageRequest* old, PageRequest* new_r
 }
 
 void PhysicalPageProvider::FreePages(list_node* pages) {
-  // This marks the pages loaned, and makes them FREE for potential use by other clients that are ok
-  // with getting loaned pages when allocating.
+  // This marks the pages loaned, and makes them FREE_LOANED for potential use by other clients that
+  // are ok with getting loaned pages when allocating.
   pmm_begin_loan(pages);
 }
 
@@ -188,32 +188,35 @@ zx_status_t PhysicalPageProvider::WaitOnEvent(Event* event) {
       vm_page_t* page = paddr_to_vm_page(phys_base_ + offset);
       DEBUG_ASSERT(page);
       // Despite the efforts of GetCowWithReplaceablePage(), we may still find below that the
-      // VmCowPages doesn't have the page any more.  If that's because the page is FREE, great - in
-      // that case we can move on to the next page.
+      // VmCowPages doesn't have the page any more.  If that's because the page is FREE_LOANED,
+      // great - in that case we can move on to the next page.
       //
       // Motivation for this loop:  Currently, loaned pages aren't moved between VmCowPages without
-      // going through FREE, so currently we could do without this loop.  By having this loop, we
-      // can accommodate such a move being added (and/or borrowing in situations where we do move
-      // pages between VmCowPages) without that breaking page reclaim due to lack of this loop.
-      // Since the readability downside of this loop is low, and mitigated by this comment, it seems
-      // worth accommodating such a potential page move.  In particular, it's not obvious how to
-      // realiably guarantee that we'd notice the lack of this loop if we added a page move
+      // going through FREE_LOANED, so currently we could do without this loop.  By having this
+      // loop, we can accommodate such a move being added (and/or borrowing in situations where we
+      // do move pages between VmCowPages) without that breaking page reclaim due to lack of this
+      // loop. Since the readability downside of this loop is low, and mitigated by this comment, it
+      // seems worth accommodating such a potential page move.  In particular, it's not obvious how
+      // to reliably guarantee that we'd notice the lack of this loop if we added a page move
       // elsewhere, so it seems good to avoid that problem by including this loop now, to save the
       // pain of discovering its absence later.
       //
-      // This loop tries again until the page is FREE, but currently this loop is expected to only
-      // execute up to once.
+      // This loop tries again until the page is FREE_LOANED, but currently this loop is expected to
+      // only execute up to once.
       uint32_t iterations = 0;
-      while (!page->is_free()) {
+      while (!page->is_free_loaned()) {
+        // Page should never have entered the regular FREE state without us finding it and
+        // explicitly ending the loan.
+        DEBUG_ASSERT(!page->is_free());
         if (++iterations % 10 == 0) {
           dprintf(INFO, "PhysicalPageProvider::WaitOnEvent() looping more than expected\n");
         }
         auto maybe_vmo_backlink = pmm_page_queues()->GetCowWithReplaceablePage(page, cow_pages_);
         if (!maybe_vmo_backlink) {
-          // There may not be a backlink if the page was at least on the way toward FREE.  In this
-          // case GetCowWithReplaceablePage() already waited for stack ownership to be over before
-          // returning.
-          DEBUG_ASSERT(page->is_free());
+          // There may not be a backlink if the page was at least on the way toward FREE_LOANED.  In
+          // this case GetCowWithReplaceablePage() already waited for stack ownership to be over
+          // before returning.
+          DEBUG_ASSERT(page->is_free_loaned());
           // next page
         } else {
           auto& vmo_backlink = maybe_vmo_backlink.value();
@@ -245,14 +248,14 @@ zx_status_t PhysicalPageProvider::WaitOnEvent(Event* event) {
               // We must have raced and this page has already become free, or is currently in a
               // stack ownership somewhere else on the way to becoming free. For the second case we
               // wait until it's not stack owned, ensuring that the only possible state is that the
-              // page is FREE.
+              // page is FREE_LOANED.
               StackOwnedLoanedPagesInterval::WaitUntilContiguousPageNotStackOwned(page);
             } else {
               pmm_free_page(page);
             }
           }
-          // Either this thread made it FREE, or this thread waited for it to be FREE.
-          DEBUG_ASSERT(page->is_free());
+          // Either this thread made it FREE_LOANED, or this thread waited for it to be FREE_LOANED.
+          DEBUG_ASSERT(page->is_free_loaned());
           // The page has been replaced with a different page that doesn't have loan_cancelled set.
         }
       }
@@ -263,9 +266,9 @@ zx_status_t PhysicalPageProvider::WaitOnEvent(Event* event) {
     // These are ordered by cow_pages_ offsets (destination offsets).
     list_node pages_in_transit;
     list_initialize(&pages_in_transit);
-    // Now get the FREE pages from PMM.  Thanks to PageSource only allowing up to 1 request for a
-    // given page at a time, we know all these pages are still loaned, and currently FREE, so we'll
-    // get all these pages.
+    // Now get the FREE_LOANED pages from PMM.  Thanks to PageSource only allowing up to 1 request
+    // for a given page at a time, we know all these pages are still loaned, and currently
+    // FREE_LOANED, so we'll get all these pages.
     pmm_end_loan(phys_base_ + request_offset, request_length / PAGE_SIZE, &pages_in_transit);
     // An interfering decommit can occur after we've moved these pages into VmCowPages, but not yet
     // moved the entire commit request into VmCowPages.  If not all pages end up present in

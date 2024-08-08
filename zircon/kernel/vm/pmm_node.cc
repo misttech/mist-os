@@ -260,7 +260,7 @@ void PmmNode::AllocPageHelperLocked(vm_page_t* page) {
 
   AsanUnpoisonPage(page);
 
-  DEBUG_ASSERT(page->is_free());
+  DEBUG_ASSERT(page->is_free() || page->is_free_loaned());
   DEBUG_ASSERT(!page->object.is_stack_owned());
 
   if (page->is_loaned()) {
@@ -617,7 +617,11 @@ void PmmNode::FreePageHelperLocked(vm_page* page, bool already_filled) {
   // list, since the page is findable via the arena, and so we must ensure to:
   // 1. Be performing set_state here under the lock_
   // 2. Place the page in the free list and cease referring to the page before ever dropping lock_
-  page->set_state(vm_page_state::FREE);
+  if (!page->is_loaned()) {
+    page->set_state(vm_page_state::FREE);
+  } else {
+    page->set_state(vm_page_state::FREE_LOANED);
+  }
 
   // Coming from OBJECT or ALLOC, this will only be true if the page was loaned (and may still be
   // loaned, but doesn't have to be currently loaned if the contiguous VMO the page was loaned from
@@ -917,13 +921,14 @@ void PmmNode::CancelLoan(paddr_t address, size_t count) {
                               // We can assert this because of PageSource's overlapping request
                               // handling.
                               DEBUG_ASSERT(page->is_loaned());
+                              DEBUG_ASSERT(!page->is_free());
                               bool was_cancelled = page->is_loan_cancelled();
                               // We can assert this because of PageSource's overlapping request
                               // handling.
                               DEBUG_ASSERT(!was_cancelled);
                               page->set_is_loan_cancelled();
                               ++loan_cancelled_count;
-                              if (page->is_free()) {
+                              if (page->is_free_loaned()) {
                                 // Currently in free_loaned_list_.
                                 DEBUG_ASSERT(list_in_list(&page->queue_node));
                                 // Remove from free_loaned_list_ to prevent any new use until
@@ -959,7 +964,7 @@ void PmmNode::EndLoan(paddr_t address, size_t count, list_node* page_list) {
                                 // reason we can assert these instead of needing to check these.
                                 DEBUG_ASSERT(page->is_loaned());
                                 DEBUG_ASSERT(page->is_loan_cancelled());
-                                DEBUG_ASSERT(page->is_free());
+                                DEBUG_ASSERT(page->is_free_loaned());
 
                                 // Already not in free_loaned_list_ (because loan_cancelled
                                 // already).
@@ -1001,7 +1006,9 @@ void PmmNode::DeleteLender(paddr_t address, size_t count) {
                             [this, &removed_free_loaned_count, &loan_un_cancelled_count,
                              &added_free_count, &loan_ended_count](vm_page_t* page) {
                               DEBUG_ASSERT(page->is_loaned());
-                              if (page->is_free() && !page->is_loan_cancelled()) {
+                              // Page may be in the FREE_LOANED state, but not the FREE state.
+                              DEBUG_ASSERT(!page->is_free());
+                              if (page->is_free_loaned() && !page->is_loan_cancelled()) {
                                 // Remove from free_loaned_list_.
                                 list_delete(&page->queue_node);
                                 ++removed_free_loaned_count;
@@ -1009,7 +1016,12 @@ void PmmNode::DeleteLender(paddr_t address, size_t count) {
                               if (page->is_loan_cancelled()) {
                                 ++loan_un_cancelled_count;
                               }
-                              if (page->is_free()) {
+                              if (page->is_free_loaned()) {
+                                // Change the state to regular FREE. When this page was made
+                                // FREE_LOANED all of the pmm checker filling and asan work was
+                                // done, so we are safe to just change the state without using a
+                                // helper.
+                                page->set_state(vm_page_state::FREE);
                                 // add it to the free queue
                                 if constexpr (!__has_feature(address_sanitizer)) {
                                   list_add_head(&free_list_, &page->queue_node);

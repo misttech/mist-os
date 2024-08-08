@@ -818,7 +818,8 @@ zx_status_t sys_object_get_info(zx_handle_t handle, uint32_t topic, user_out_ptr
       // be greater than the total because per-state counts are approximate.
       uint64_t sum_bytes = 0;
 
-      stats.free_bytes = state_count[VmPageStateIndex(vm_page_state::FREE)] * PAGE_SIZE;
+      stats.free_bytes = state_count[VmPageStateIndex(vm_page_state::FREE)] * PAGE_SIZE +
+                         state_count[VmPageStateIndex(vm_page_state::FREE_LOANED)] * PAGE_SIZE;
       sum_bytes += stats.free_bytes;
 
       stats.wired_bytes = state_count[VmPageStateIndex(vm_page_state::WIRED)] * PAGE_SIZE;
