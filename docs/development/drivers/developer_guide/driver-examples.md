@@ -101,7 +101,7 @@ hermetic and non-hermetic integration tests for a driver.
 [dfv2-driver-transport]: /examples/drivers/transport/driver/v2/
 [bindlib]: /examples/drivers/bind/bindlib/
 [bindlib-codegen]: /examples/drivers/bind/bindlib_codegen/
-[dfv2-test-cc]: /examples/drivers/simple/dfv2/tests/test.cc
+[dfv2-test-cc]: /examples/drivers/simple/dfv2/tests/
 [dfv2-test-banjo]: /examples/drivers/transport/banjo/v2/tests/
 [dfv2-test-zircon]: /examples/drivers/transport/zircon/v2/tests/
 [dfv2-test-driver]: /examples/drivers/transport/driver/v2/tests/
