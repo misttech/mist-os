@@ -13,7 +13,6 @@
 #include <lib/crypto/global_prng.h>
 #include <lib/instrumentation/asan.h>
 #include <lib/memalloc/range.h>
-#include <lib/zbitl/items/mem-config.h>
 #include <lib/zircon-internal/macros.h>
 #include <trace.h>
 
@@ -26,6 +25,7 @@
 #include <kernel/thread.h>
 #include <pretty/cpp/sizes.h>
 #include <vm/bootreserve.h>
+#include <vm/phys/arena.h>
 #include <vm/physmap.h>
 #include <vm/pmm.h>
 #include <vm/pmm_checker.h>
@@ -42,8 +42,8 @@ KCOUNTER(pmm_alloc_delayed, "vm.pmm.alloc.delayed")
 
 namespace {
 
-// Indicates whether a PMM alloc call has ever failed with ZX_ERR_NO_MEMORY.  Used to trigger an OOM
-// response.  See |MemoryWatchdog::WorkerThread|.
+// Indicates whether a PMM alloc call has ever failed with ZX_ERR_NO_MEMORY.  Used to trigger an
+// OOM response.  See |MemoryWatchdog::WorkerThread|.
 ktl::atomic<bool> alloc_failed_no_mem;
 
 // Poison a page |p| with value |value|. Accesses to a poisoned page via the physmap are not
@@ -65,19 +65,54 @@ void AsanUnpoisonPage(vm_page_t* p) {
 
 // We disable thread safety analysis here, since this function is only called
 // during early boot before threading exists.
-zx_status_t PmmNode::Init(ktl::span<const zbi_mem_range_t> unnormalized,
-                          ktl::span<const memalloc::Range> normalized)
-    TA_NO_THREAD_SAFETY_ANALYSIS {
+zx_status_t PmmNode::Init(ktl::span<const memalloc::Range> ranges) TA_NO_THREAD_SAFETY_ANALYSIS {
   // Make sure we're in early boot (ints disabled and no active Schedulers)
   DEBUG_ASSERT(Scheduler::PeekActiveMask() == 0);
   DEBUG_ASSERT(arch_ints_disabled());
 
-  // First process all the reserved ranges: these are comprised of any existing,
-  // special, pre-PMM allocations like the kernel or data ZBI, or any holes
-  // between RAM (which may end up within arenas). We do this first so that
-  // arena initialization knows to avoid these ranges for bookkeeping.
+  zx_status_t status = ZX_OK;
+  auto init_arena = [&status, this](const PmmArenaSelection& selected) {
+    if (status == ZX_ERR_NO_MEMORY) {
+      return;
+    }
+    zx_status_t init_status = InitArena(selected);
+    if (status == ZX_OK) {
+      status = init_status;
+    }
+  };
+
+  bool allocation_excluded = false;
+  auto record_error = [&allocation_excluded](const PmmArenaSelectionError& error) {
+    bool allocated = memalloc::IsAllocatedType(error.range.type);
+
+    // If we have to throw out less than two pages of free RAM, don't regard
+    // that as a full blown error.
+    const char* error_type =
+        error.type == PmmArenaSelectionError::Type::kTooSmall && !allocated ? "warning" : "error";
+    ktl::string_view reason = PmmArenaSelectionError::ToString(error.type);
+    ktl::string_view range_type = memalloc::ToString(error.range.type);
+    printf("PMM: %s: unable to include [%#" PRIx64 ", %#" PRIx64 ") (%.*s) in arena: %.*s\n",
+           error_type,                                              //
+           error.range.addr, error.range.end(),                     //
+           static_cast<int>(range_type.size()), range_type.data(),  //
+           static_cast<int>(reason.size()), reason.data());
+    allocation_excluded = allocation_excluded || allocated;
+  };
+
+  SelectPmmArenas<PAGE_SIZE>(ranges, init_arena, record_error);
+  if (status != ZX_OK) {
+    return status;
+  }
+
+  // If we fail to include a pre-PMM allocation in an arena that could be
+  // disastrous in unpredictable/hard-to-debug ways, so fail hard early.
+  ZX_ASSERT(!allocation_excluded);
+
+  // Now mark all pre-PMM allocations and holes within our arenas as reserved.
+  ktl::span arenas = active_arenas();
+  auto arena = arenas.begin();
   ktl::optional<uint64_t> last_ram_end, last_reserved_end;
-  for (const memalloc::Range& range : normalized) {
+  for (const memalloc::Range& range : ranges) {
     // Non-RAM ranges (i.e., peripheral or unknown) should be treated as holes.
     if (!memalloc::IsRamType(range.type)) {
       continue;
@@ -98,7 +133,20 @@ zx_status_t PmmNode::Init(ktl::span<const zbi_mem_range_t> unnormalized,
       continue;
     }
 
-    if (last_ram_end && *last_ram_end < start) {
+    // Note that trying to include `range` in an arena may have resulted in an
+    // error. If we encounter a range not in an arena, just skip it.
+    while (arena != arenas.end() && arena->end() <= start) {
+      ++arena;
+    }
+    if (arena == arenas.end()) {
+      // In this case the tail of ranges did not end up in any arenas.
+      break;
+    }
+    if (!arena->address_in_arena(start)) {
+      continue;
+    }
+
+    if (last_ram_end && arena->address_in_arena(*last_ram_end) && *last_ram_end < start) {
       // Found a hole between RAM.
       boot_reserve_add_range(*last_ram_end, start - *last_ram_end);
       last_reserved_end = start;
@@ -110,21 +158,6 @@ zx_status_t PmmNode::Init(ktl::span<const zbi_mem_range_t> unnormalized,
     }
     boot_reserve_add_range(start, size);
     last_reserved_end = last_ram_end;
-  }
-
-  // TODO(https://fxbug.dev/347766366): This is only actually needed in the PC
-  // case, but easy enough and harmless to do it uniformly. This logic will all
-  // go away soon in any case.
-  zbitl::MemRangeMerger merged(unnormalized.begin(), unnormalized.end());
-  for (const zbi_mem_range_t& range : merged) {
-    if (range.type != ZBI_MEM_TYPE_RAM || range.length == 0) {
-      continue;
-    }
-    zx_status_t status = InitArena(range);
-    if (status != ZX_OK) {
-      printf("PMM: Failed to initialize arena at [%#" PRIx64 ", %#" PRIx64 "): %d\n", range.paddr,
-             range.paddr + range.length, status);
-    }
   }
 
   boot_reserve_wire();
@@ -580,29 +613,12 @@ zx_status_t PmmNode::AllocContiguous(const size_t count, uint alloc_flags, uint8
 
 // We disable thread safety analysis here, since this function is only called
 // during early boot before threading exists.
-zx_status_t PmmNode::InitArena(const zbi_mem_range_t& range) TA_NO_THREAD_SAFETY_ANALYSIS {
-  DEBUG_ASSERT(range.type == ZBI_MEM_TYPE_RAM);
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(range.paddr));
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(range.length));
-  DEBUG_ASSERT(range.length > 0);
-
-  pmm_arena_info_t info{.flags = 0, .base = range.paddr, .size = range.length};
-  snprintf(info.name, sizeof(info.name), "%s", "ram");
-
-  dprintf(INFO, "PMM: adding arena base %#" PRIxPTR " size %#zx\n", info.base, info.size);
-
+zx_status_t PmmNode::InitArena(const PmmArenaSelection& selected) TA_NO_THREAD_SAFETY_ANALYSIS {
   if (used_arena_count_ >= kArenaCount) {
     return ZX_ERR_NO_MEMORY;
   }
-
-  // Initialize the object.
-  PmmArena& arena = arenas_[used_arena_count_];
-  if (zx_status_t status = arena.Init(&info, this); status != ZX_OK) {
-    return status;
-  }
-
-  ++used_arena_count_;
-  arena_cumulative_size_ += info.size;
+  arenas_[used_arena_count_++].Init(selected, this);
+  arena_cumulative_size_ += selected.arena.size;
   return ZX_OK;
 }
 

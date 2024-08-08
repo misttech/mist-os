@@ -8,7 +8,6 @@
 #ifndef ZIRCON_KERNEL_VM_INCLUDE_VM_PMM_H_
 #define ZIRCON_KERNEL_VM_INCLUDE_VM_PMM_H_
 
-#include <lib/zbi-format/memory.h>
 #include <zircon/compiler.h>
 #include <zircon/types.h>
 
@@ -39,14 +38,9 @@ class LoanSweeper;
   (0x1)  // this arena is contained within architecturally-defined 'low memory'
 
 // Initializes the PMM with the provided, unnormalized and normalized memory
-// ranges. This in particular initializes its arenas, and populates the
-// bootreserve with ranges it should avoid in that selection and marks them as
-// wired.
-//
-// TODO(https://fxbug.dev/347766366): Make this a function of only the
-// normalized ranges.
-zx_status_t pmm_init(ktl::span<const zbi_mem_range_t> unnormalized,
-                     ktl::span<const memalloc::Range> normalized);
+// ranges. This in particular initializes its arenas and wires any previously
+// allocated special subranges or holes.
+zx_status_t pmm_init(ktl::span<const memalloc::Range> ranges);
 
 // Returns the number of arenas.
 size_t pmm_num_arenas();

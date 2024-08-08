@@ -9,7 +9,6 @@
 #define ZIRCON_KERNEL_PLATFORM_PC_PLATFORM_P_H_
 
 #include <lib/cbuf.h>
-#include <lib/zbi-format/memory.h>
 #include <sys/types.h>
 #include <zircon/compiler.h>
 #include <zircon/types.h>
@@ -24,8 +23,7 @@ struct Range;
 extern Cbuf console_input_buf;
 
 void pc_init_timer_percpu(void);
-void pc_mem_init(ktl::span<const zbi_mem_range_t> unnormalized,
-                 ktl::span<const memalloc::Range> normalized);
+void pc_mem_init(ktl::span<const memalloc::Range> ranges);
 
 void pc_prep_suspend_timer(void);
 void pc_resume_timer(void);

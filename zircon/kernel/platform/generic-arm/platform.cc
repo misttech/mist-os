@@ -18,7 +18,6 @@
 #include <lib/persistent-debuglog.h>
 #include <lib/system-topology.h>
 #include <lib/zbi-format/kernel.h>
-#include <lib/zbi-format/memory.h>
 #include <mexec.h>
 #include <platform.h>
 #include <reg.h>
@@ -343,16 +342,16 @@ void platform_early_init(void) {
   // Initialize the PmmChecker now that the cmdline has been parsed.
   pmm_checker_init_from_cmdline();
 
-  for (const zbi_mem_range_t& mem_range : gPhysHandoff->mem_config.get()) {
-    if (mem_range.type == ZBI_MEM_TYPE_PERIPHERAL) {
-      dprintf(INFO, "ZBI: peripheral range base %#" PRIx64 " size %#" PRIx64 "\n", mem_range.paddr,
-              mem_range.length);
-      auto status = add_periph_range(mem_range.paddr, mem_range.length);
+  for (const memalloc::Range& range : gPhysHandoff->memory.get()) {
+    if (range.type == memalloc::Type::kPeripheral) {
+      dprintf(INFO, "ZBI: peripheral range [%#" PRIx64 ", %#" PRIx64 ")\n", range.addr,
+              range.end());
+      auto status = add_periph_range(range.addr, range.size);
       ASSERT(status == ZX_OK);
     }
   }
 
-  ASSERT(pmm_init(gPhysHandoff->mem_config.get(), gPhysHandoff->memory.get()) == ZX_OK);
+  ASSERT(pmm_init(gPhysHandoff->memory.get()) == ZX_OK);
 
   // give the mmu code a chance to do some bookkeeping
   arm64_mmu_early_init();

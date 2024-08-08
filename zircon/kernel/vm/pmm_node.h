@@ -6,7 +6,7 @@
 #ifndef ZIRCON_KERNEL_VM_PMM_NODE_H_
 #define ZIRCON_KERNEL_VM_PMM_NODE_H_
 
-#include <lib/zbi-format/memory.h>
+#include <lib/memalloc/range.h>
 
 #include <fbl/canary.h>
 #include <fbl/intrusive_double_list.h>
@@ -37,10 +37,7 @@ class PmmNode {
 
   DISALLOW_COPY_ASSIGN_AND_MOVE(PmmNode);
 
-  // TODO(https://fxbug.dev/347766366): Make this a function of only the
-  // normalized ranges.
-  zx_status_t Init(ktl::span<const zbi_mem_range_t> unnormalized,
-                   ktl::span<const memalloc::Range> normalized);
+  zx_status_t Init(ktl::span<const memalloc::Range> ranges);
 
   paddr_t PageToPaddr(const vm_page_t* page) TA_NO_THREAD_SAFETY_ANALYSIS;
   vm_page_t* PaddrToPage(paddr_t addr) TA_NO_THREAD_SAFETY_ANALYSIS;
@@ -162,7 +159,7 @@ class PmmNode {
   void ReportAllocFailure() TA_EXCL(lock_);
 
  private:
-  zx_status_t InitArena(const zbi_mem_range_t& range);
+  zx_status_t InitArena(const PmmArenaSelection& selected);
 
   void FreePageHelperLocked(vm_page* page, bool already_filled) TA_REQ(lock_);
   void FreeListLocked(list_node* list, bool already_filled) TA_REQ(lock_);

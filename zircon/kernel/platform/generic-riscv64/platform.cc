@@ -17,7 +17,6 @@
 #include <lib/memalloc/range.h>
 #include <lib/persistent-debuglog.h>
 #include <lib/system-topology.h>
-#include <lib/zbi-format/memory.h>
 #include <mexec.h>
 #include <platform.h>
 #include <reg.h>
@@ -431,7 +430,7 @@ void platform_early_init() {
   // Initialize the PmmChecker now that the cmdline has been parsed.
   pmm_checker_init_from_cmdline();
 
-  ASSERT(pmm_init(gPhysHandoff->mem_config.get(), gPhysHandoff->memory.get()) == ZX_OK);
+  ASSERT(pmm_init(gPhysHandoff->memory.get()) == ZX_OK);
 }
 
 void platform_prevm_init() {}

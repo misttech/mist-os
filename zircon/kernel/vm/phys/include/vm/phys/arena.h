@@ -13,8 +13,10 @@
 #include <lib/stdcompat/span.h>
 #include <stdint.h>
 #include <zircon/assert.h>
+#include <zircon/compiler.h>
 
 #include <optional>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 
@@ -58,6 +60,18 @@ struct PmmArenaSelectionError {
     // being empty or only fitting its bookkeeping (which is not useful).
     kTooSmall,
   };
+
+  static constexpr std::string_view ToString(Type type) {
+    using namespace std::string_view_literals;
+
+    switch (type) {
+      case Type::kNoBookkeepingSpace:
+        return "no bookkeeping space found"sv;
+      case Type::kTooSmall:
+        return "too small (less than two pages in size)"sv;
+    }
+    __UNREACHABLE;
+  }
 
   memalloc::Range range;
   Type type;

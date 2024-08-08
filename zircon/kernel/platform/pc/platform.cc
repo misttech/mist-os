@@ -208,7 +208,7 @@ void platform_early_init(void) {
 #endif
 
   /* initialize physical memory arenas */
-  pc_mem_init(gPhysHandoff->mem_config.get(), gPhysHandoff->memory.get());
+  pc_mem_init(gPhysHandoff->memory.get());
 }
 
 void platform_prevm_init() {}
