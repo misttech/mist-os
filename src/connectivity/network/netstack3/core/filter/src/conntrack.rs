@@ -425,7 +425,7 @@ impl<I: IpExt> Inspectable for Tuple<I> {
 }
 
 /// The direction of a packet when compared to the given connection.
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub(crate) enum ConnectionDirection {
     /// The packet is traveling in the same direction as the first packet seen
     /// for the [`Connection`].
