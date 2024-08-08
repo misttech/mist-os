@@ -136,7 +136,7 @@ fn convert_v2_bundle_to_configs(
         .as_ref()
         .ok_or(anyhow!("No systems to boot in the product bundle"))?;
 
-    let kernel_image = system
+    let kernel_image: PathBuf = system
         .iter()
         .find_map(|i| match i {
             Image::QemuKernel(path) => Some(path.clone().into()),
@@ -150,13 +150,17 @@ fn convert_v2_bundle_to_configs(
         _ => None,
     });
 
-    let zbi_image: PathBuf = system
-        .iter()
-        .find_map(|i| match i {
-            Image::ZBI { path, .. } => Some(path.clone().into()),
-            _ => None,
-        })
-        .ok_or(anyhow!("No ZBI in the product bundle"))?;
+    // efi kernels do not have separate zbi images.
+    let zbi_image: PathBuf = match kernel_image.extension() {
+        Some(ext) if ext == "efi" => PathBuf::new(),
+        _ => system
+            .iter()
+            .find_map(|i| match i {
+                Image::ZBI { path, .. } => Some(path.clone().into()),
+                _ => None,
+            })
+            .ok_or(anyhow!("No ZBI in the product bundle"))?,
+    };
 
     emulator_configuration.guest =
         GuestConfig { disk_image, kernel_image, zbi_image, ..Default::default() };

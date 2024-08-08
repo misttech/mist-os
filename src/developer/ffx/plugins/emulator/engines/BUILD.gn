@@ -51,6 +51,7 @@ if (is_host) {
       "test_data/unknown_engine_type_engine.json",
 
       "templates/emulator_flags.json.template",
+      "templates/efi_flags.json.template",
     ]
   }
 

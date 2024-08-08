@@ -13,6 +13,8 @@ use handlebars::{
 
 //  Actual path is //src/developer/ffx/plugins/emulator/templates/emulator_flags.json.template
 const DEFAULT_FLAGS_TEMPLATE_STR: &str = include_str!("../templates/emulator_flags.json.template");
+//  Actual path is //src/developer/ffx/plugins/emulator/templates/efi_flags.json.template
+const EFI_FLAGS_TEMPLATE_STR: &str = include_str!("../templates/efi_flags.json.template");
 
 #[derive(Clone, Copy)]
 pub struct EqHelper {}
@@ -205,7 +207,11 @@ pub fn process_flag_template(emu_config: &EmulatorConfiguration) -> Result<FlagD
             &emu_config.runtime.template
         ))?
     } else {
-        DEFAULT_FLAGS_TEMPLATE_STR.to_string()
+        if emu_config.guest.is_efi() {
+            EFI_FLAGS_TEMPLATE_STR.to_string()
+        } else {
+            DEFAULT_FLAGS_TEMPLATE_STR.to_string()
+        }
     };
 
     process_flag_template_inner(&template_text, emu_config)
