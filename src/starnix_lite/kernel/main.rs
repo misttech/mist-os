@@ -95,7 +95,7 @@ fn main() -> Result<(), Error> {
 
     let config = Config {
         features: vec!["container".to_owned()],
-        init: vec!["/bin/nolibc-test".to_owned()],
+        init: vec!["/bin/coremark".to_owned()],
         kernel_cmdline: Default::default(),
         mounts: vec![
             "/:remote_bundle:data/system:nosuid,nodev,relatime".to_owned(),
