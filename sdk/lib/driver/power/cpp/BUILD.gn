@@ -50,6 +50,7 @@ test("power-test") {
     "//sdk/lib/async-loop-testing/cpp",
     "//sdk/lib/driver/component/cpp",
     "//sdk/lib/fidl",
+    "//sdk/lib/sys/component/cpp/testing:cpp",
     "//sdk/lib/sys/service/cpp",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
@@ -61,5 +62,9 @@ test("power-test") {
 
 fuchsia_unittest_package("power-test-pkg") {
   package_name = "power-tests"
-  deps = [ ":power-test" ]
+
+  deps = [
+    ":power-test",
+    "//src/power/broker:component",
+  ]
 }

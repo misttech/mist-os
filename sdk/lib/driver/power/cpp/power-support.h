@@ -175,6 +175,94 @@ inline fit::result<zx_status_t, uint8_t> default_level_changer(uint8_t level) {
   return fit::ok(level);
 }
 
+/// |LeaseHelper| wraps the collection of channels that represents a power
+/// element. When used with |CreateLeaseHelper| the caller just supplies
+/// the level of the required element(s) and dependency token(s). The caller
+/// does not need to create an element it manages to get the dependencies
+/// to the level it needs, instead it can use the |LeaseHelper| returned from
+/// |CreateLeaseHelper|.
+///
+/// The |LeaseHelper| runs an element internally and exposes a convenient
+/// interface, |AcquireLease| which leases the wrapped element at the "on"
+/// state and consequentally drives the dependencies to their desired state.
+class LeaseHelper {
+ public:
+  /// Creates a |LeaseHelper| running on the supplied |dispatcher|. The lease
+  /// is **not** active when the constructor returns, use |AcquireLease| for.
+  /// this. Blocking the dispatcher while waiting for the callback from
+  /// |AcquireLease| will result in a deadlock.
+  ///
+  /// |error_callback| is called if |LeaseHelper| encounters an error running
+  /// its wrapped power element. If the error handler is invokes, the
+  /// |LeaseHelper| should be dropped and a new one created.
+  LeaseHelper(fidl::ClientEnd<fuchsia_power_broker::ElementControl> element_control,
+              fidl::ClientEnd<fuchsia_power_broker::Lessor> lessor,
+              fidl::ClientEnd<fuchsia_power_broker::RequiredLevel> required_level,
+              fidl::ClientEnd<fuchsia_power_broker::CurrentLevel> current_level,
+              async_dispatcher_t* dispatcher, fit::function<void()> error_callback)
+      : dispatcher_(dispatcher),
+        element_control_(fidl::Client<fuchsia_power_broker::ElementControl>(
+            std::move(element_control), dispatcher_)),
+        lessor_(fidl::Client<fuchsia_power_broker::Lessor>(std::move(lessor), dispatcher_)),
+        runner_(
+            std::move(required_level), std::move(current_level), default_level_changer,
+            [callback = std::move(error_callback)](ElementRunnerError err) { callback(); },
+            dispatcher_) {
+    runner_.RunPowerElement();
+  }
+
+  /// Trigger the lease acquisition. The lease is **created**, but not active,
+  /// when |callback| is invoked. The lease is active when
+  /// `fuchsia.power.broker/LeaseControl` channel given to |callback| reports
+  /// `fuchsia.power.broker/LeaseStatus::Satisfied` from
+  /// `fuchsia.power.broker/LeaseControl.WatchStatus()`.
+  ///
+  /// Release the lease by closing the `LeaseControl` channel. |AcquireLease|
+  /// can be called more than once and creates a lease for each call.
+  void AcquireLease(
+      fit::function<void(fidl::Result<fuchsia_power_broker::Lessor::Lease>&)> callback);
+
+ private:
+  async_dispatcher_t* dispatcher_;
+  fidl::Client<fuchsia_power_broker::ElementControl> element_control_;
+  fidl::Client<fuchsia_power_broker::Lessor> lessor_;
+  ElementRunner runner_;
+};
+
+class LeaseDependency {
+ public:
+  std::vector<fuchsia_power_broker::PowerLevel> levels_by_preference;
+  fuchsia_power_broker::DependencyToken token;
+  fuchsia_power_broker::DependencyType type;
+};
+
+/// Create a lease based on the set of dependencies represented by
+/// |dependencies|. When the lease is fulfilled those dependencies will be at
+/// the level specified. The lease is **not** active when this function returns,
+/// use |LeaseHelper::AcquireLease| to trigger lease activation.
+///
+/// The |dispatcher| passed in is used to run a power element, so blocking
+/// the dispatcher while acquiriring a lease with |LeaseHelper::AcquireLease|
+/// will result in a deadlock.
+///
+/// |error_callback| is **not** invoked if |LeaseHelper| creation fails,
+/// instead it is called if the running the internal power element encounters
+/// an error. If this error occurs, future lease acquisitions will likely fail
+/// and the |LeaseHelper| should be replaced with a new instance.
+///
+/// RETURN VALUES
+/// On error returns a tuple representng whether it was a FIDL error or a
+/// protocol error. If the |fidl::Status| is not ZX_OK, this was a FIDL error,
+/// and the second member of the tuple will be `nullopt`. Otherwise, this is a
+/// protocol error from adding the power element that the direct lease wraps
+/// and will be an error value from `fuchsia.power.broker/Topology.AddElement`.
+/// On success returns a |LeaseHelper|.
+fit::result<std::tuple<fidl::Status, std::optional<fuchsia_power_broker::AddElementError>>,
+            std::unique_ptr<LeaseHelper>>
+CreateLeaseHelper(const fidl::ClientEnd<fuchsia_power_broker::Topology>& topology,
+                  std::vector<LeaseDependency> dependencies, std::string lease_name,
+                  async_dispatcher_t* dispatcher, fit::function<void()> error_callback);
+
 /// Given a `PowerElementConfiguration` from driver framework, convert this
 /// into a set of Power Broker's `LevelDependency` objects. The map is keyed
 /// by the name of the parent/dependency.
