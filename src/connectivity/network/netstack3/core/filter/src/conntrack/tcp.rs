@@ -7,6 +7,7 @@
 use core::time::Duration;
 
 use netstack3_base::{Control, SegmentHeader, SeqNum, WindowScale, WindowSize};
+use replace_with::replace_with_and;
 
 use super::{ConnectionDirection, ConnectionUpdateAction, ConnectionUpdateError};
 
@@ -31,6 +32,8 @@ pub(crate) struct Connection {
     /// TODO(https://fxbug.dev/328064736): Remove once we have implemented the
     /// ESTABLISHED state.
     established: bool,
+
+    /// The current state of the TCP connection.
     state: State,
 }
 
@@ -73,7 +76,19 @@ impl Connection {
             ConnectionDirection::Reply => self.established = true,
         }
 
-        self.state.update(segment, payload_len, dir)
+        let valid =
+            replace_with_and(&mut self.state, |state| state.update(segment, payload_len, dir));
+
+        if !valid {
+            return Err(ConnectionUpdateError::InvalidPacket);
+        }
+
+        match self.state {
+            State::Closed(_) => Ok(ConnectionUpdateAction::RemoveEntry),
+            State::Untracked(_) | State::SynSent(_) | State::WaitingOnOpeningAck(_) => {
+                Ok(ConnectionUpdateAction::NoAction)
+            }
+        }
     }
 }
 
@@ -90,6 +105,12 @@ pub(crate) enum State {
     ///
     /// This is a short-circuit state that can never be left.
     Untracked(Untracked),
+
+    /// The connection has been closed, either by the FIN handshake or valid
+    /// RST.
+    ///
+    /// This is a short-circuit state that can never be left.
+    Closed(Closed),
 
     /// The initial SYN for this connection has been sent. State contained
     /// within is everything that can be gleaned from the initial SYN packet
@@ -110,7 +131,7 @@ pub(crate) enum State {
 }
 
 impl State {
-    pub fn new(segment: &SegmentHeader, payload_len: usize) -> Option<Self> {
+    fn new(segment: &SegmentHeader, payload_len: usize) -> Option<Self> {
         // We explicitly don't want to track any connections that we haven't
         // seen from the beginning because:
         //
@@ -135,23 +156,23 @@ impl State {
         )
     }
 
-    pub fn update(
-        &mut self,
+    /// Returns a new state that unconditionally replaces the previous one. The
+    /// boolean represents whether the segment was valid or not.
+    ///
+    /// In the case where the segment was invalid, the returned state will be
+    /// equivalent to the one that `update` was called on.
+    fn update(
+        self,
         segment: &SegmentHeader,
         payload_len: usize,
         dir: ConnectionDirection,
-    ) -> Result<ConnectionUpdateAction, ConnectionUpdateError> {
-        let (new_state, action) = match self {
+    ) -> (State, bool) {
+        match self {
             State::Untracked(s) => s.update(segment, payload_len, dir),
+            State::Closed(s) => s.update(segment, payload_len, dir),
             State::SynSent(s) => s.update(segment, payload_len, dir),
             State::WaitingOnOpeningAck(s) => s.update(segment, payload_len, dir),
-        }?;
-
-        if let Some(new_state) = new_state {
-            *self = new_state;
         }
-
-        Ok(action)
     }
 }
 
@@ -230,12 +251,30 @@ state_from_state_struct!(Untracked);
 
 impl Untracked {
     fn update(
-        &self,
+        self,
         _segment: &SegmentHeader,
         _payload_len: usize,
         _dir: ConnectionDirection,
-    ) -> Result<(Option<State>, ConnectionUpdateAction), ConnectionUpdateError> {
-        Ok((None, ConnectionUpdateAction::NoAction))
+    ) -> (State, bool) {
+        (self.into(), true)
+    }
+}
+
+/// State for the Closed state.
+///
+/// This state never transitions to another state.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Closed {}
+state_from_state_struct!(Closed);
+
+impl Closed {
+    fn update(
+        self,
+        _segment: &SegmentHeader,
+        _payload_len: usize,
+        _dir: ConnectionDirection,
+    ) -> (State, bool) {
+        (self.into(), true)
     }
 }
 
@@ -277,11 +316,11 @@ state_from_state_struct!(SynSent);
 
 impl SynSent {
     fn update(
-        &self,
+        self,
         segment: &SegmentHeader,
         payload_len: usize,
         dir: ConnectionDirection,
-    ) -> Result<(Option<State>, ConnectionUpdateAction), ConnectionUpdateError> {
+    ) -> (State, bool) {
         let Self { iss, logical_len, advertised_window_scale, window_size } = self;
 
         match dir {
@@ -291,36 +330,34 @@ impl SynSent {
             // behavior is copied over from gVisor.
             ConnectionDirection::Original => {
                 if let Some(_) = segment.ack {
-                    return Err(ConnectionUpdateError::InvalidPacket);
+                    return (self.into(), false);
                 }
 
                 match segment.control {
                     None | Some(Control::FIN) | Some(Control::RST) => {
-                        return Err(ConnectionUpdateError::InvalidPacket)
+                        return (self.into(), false);
                     }
                     Some(Control::SYN) => {}
                 };
 
-                if segment.seq != *iss || segment.options.window_scale != *advertised_window_scale {
-                    return Err(ConnectionUpdateError::InvalidPacket);
+                if segment.seq != iss || segment.options.window_scale != advertised_window_scale {
+                    return (self.into(), false);
                 }
 
                 // If it's a valid retransmit of the original SYN, update
                 // any state that changed and let it through.
                 let seg_window_size = WindowSize::from_u32(u16::from(segment.wnd).into()).unwrap();
 
-                Ok((
-                    Some(
-                        SynSent {
-                            iss: *iss,
-                            logical_len: u32::max(segment.len(payload_len), *logical_len),
-                            advertised_window_scale: *advertised_window_scale,
-                            window_size: core::cmp::max(seg_window_size, *window_size),
-                        }
-                        .into(),
-                    ),
-                    ConnectionUpdateAction::NoAction,
-                ))
+                (
+                    SynSent {
+                        iss: iss,
+                        logical_len: u32::max(segment.len(payload_len), logical_len),
+                        advertised_window_scale: advertised_window_scale,
+                        window_size: core::cmp::max(seg_window_size, window_size),
+                    }
+                    .into(),
+                    true,
+                )
             }
 
             ConnectionDirection::Reply => {
@@ -330,14 +367,14 @@ impl SynSent {
                 match segment.ack {
                     None => {}
                     Some(ack) => {
-                        if !(ack.after(*iss) && ack.before(*iss + *logical_len + 1)) {
-                            return Err(ConnectionUpdateError::InvalidPacket);
+                        if !(ack.after(iss) && ack.before(iss + logical_len + 1)) {
+                            return (self.into(), false);
                         }
                     }
                 };
 
                 match segment.control {
-                    None | Some(Control::FIN) => Err(ConnectionUpdateError::InvalidPacket),
+                    None | Some(Control::FIN) => (self.into(), false),
                     // RFC 9293 3.10.7.3:
                     //   If the RST bit is set,
                     //   If the ACK was acceptable, then signal to the user
@@ -348,8 +385,8 @@ impl SynSent {
                     // For our purposes, we delete the connection because we
                     // know the receiver will tear down the connection.
                     Some(Control::RST) => match segment.ack {
-                        None => Err(ConnectionUpdateError::InvalidPacket),
-                        Some(_) => Ok((None, ConnectionUpdateAction::RemoveEntry)),
+                        None => (self.into(), false),
+                        Some(_) => (Closed {}.into(), true),
                     },
 
                     Some(Control::SYN) => {
@@ -360,10 +397,7 @@ impl SynSent {
                                 "Unsupported TCP simultaneous open. Giving up on detailed tracking"
                             );
 
-                            return Ok((
-                                Some(Untracked {}.into()),
-                                ConnectionUpdateAction::NoAction,
-                            ));
+                            return (Untracked {}.into(), true);
                         };
 
                         let reply_window_scale = segment.options.window_scale;
@@ -376,45 +410,43 @@ impl SynSent {
                         //   segments to enable window scaling in either
                         //   direction.
                         let (original_window_scale, reply_window_scale) =
-                            match (*advertised_window_scale, reply_window_scale) {
+                            match (advertised_window_scale, reply_window_scale) {
                                 (Some(original), Some(reply)) => (original, reply),
                                 _ => (WindowScale::ZERO, WindowScale::ZERO),
                             };
 
-                        let original_max_next_seq = *iss + *logical_len;
+                        let original_max_next_seq = iss + logical_len;
 
-                        Ok((
-                            Some(
-                                WaitingOnOpeningAck {
-                                    original: Peer {
-                                        window_scale: original_window_scale,
-                                        max_wnd: *window_size,
-                                        // We're still waiting on an ACK from
-                                        // the original stack, so this is
-                                        // slightly different from the normal
-                                        // calculation. It's still valid because
-                                        // we can assume that the implicit ACK
-                                        // number is the reply ISS (no data
-                                        // ACKed).
-                                        max_wnd_seq: segment.seq + *window_size,
-                                        max_next_seq: original_max_next_seq,
-                                        unacked_data: ack.before(original_max_next_seq),
-                                    },
-                                    reply: Peer {
-                                        window_scale: reply_window_scale,
-                                        max_wnd: reply_window_size,
-                                        max_wnd_seq: ack + reply_window_size,
-                                        max_next_seq: segment.seq + segment.len(payload_len),
-                                        // The reply peer will always have
-                                        // unacked data here because the SYN we
-                                        // just saw sent needs to be acked.
-                                        unacked_data: true,
-                                    },
-                                }
-                                .into(),
-                            ),
-                            ConnectionUpdateAction::NoAction,
-                        ))
+                        (
+                            WaitingOnOpeningAck {
+                                original: Peer {
+                                    window_scale: original_window_scale,
+                                    max_wnd: window_size,
+                                    // We're still waiting on an ACK from
+                                    // the original stack, so this is
+                                    // slightly different from the normal
+                                    // calculation. It's still valid because
+                                    // we can assume that the implicit ACK
+                                    // number is the reply ISS (no data
+                                    // ACKed).
+                                    max_wnd_seq: segment.seq + window_size,
+                                    max_next_seq: original_max_next_seq,
+                                    unacked_data: ack.before(original_max_next_seq),
+                                },
+                                reply: Peer {
+                                    window_scale: reply_window_scale,
+                                    max_wnd: reply_window_size,
+                                    max_wnd_seq: ack + reply_window_size,
+                                    max_next_seq: segment.seq + segment.len(payload_len),
+                                    // The reply peer will always have
+                                    // unacked data here because the SYN we
+                                    // just saw sent needs to be acked.
+                                    unacked_data: true,
+                                },
+                            }
+                            .into(),
+                            true,
+                        )
                     }
                 }
             }
@@ -439,18 +471,18 @@ state_from_state_struct!(WaitingOnOpeningAck);
 
 impl WaitingOnOpeningAck {
     fn update(
-        &self,
+        self,
         _segment: &SegmentHeader,
         _payload_len: usize,
         _dir: ConnectionDirection,
-    ) -> Result<(Option<State>, ConnectionUpdateAction), ConnectionUpdateError> {
-        Ok((None, ConnectionUpdateAction::NoAction))
+    ) -> (State, bool) {
+        (self.into(), true)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{Peer, State, SynSent, Untracked};
+    use super::{Closed, Peer, State, SynSent, Untracked};
 
     use assert_matches::assert_matches;
     use netstack3_base::{
@@ -459,7 +491,7 @@ mod tests {
     use test_case::test_case;
 
     use crate::conntrack::tcp::WaitingOnOpeningAck;
-    use crate::conntrack::{ConnectionDirection, ConnectionUpdateAction, ConnectionUpdateError};
+    use crate::conntrack::ConnectionDirection;
 
     const ORIGINAL_ISS: SeqNum = SeqNum::new(0);
     const REPLY_ISS: SeqNum = SeqNum::new(8192);
@@ -489,9 +521,10 @@ mod tests {
             options: Options::default(),
         };
 
-        assert_matches!(
+        let expected_state = state.clone().into();
+        assert_eq!(
             state.update(&segment, ORIGINAL_PAYLOAD_LEN, ConnectionDirection::Original),
-            Err(ConnectionUpdateError::InvalidPacket)
+            (expected_state, false)
         );
     }
 
@@ -538,9 +571,10 @@ mod tests {
             window_size: WindowSize::from_u32(ORIGINAL_WND as u32).unwrap(),
         };
 
-        assert_matches!(
+        let expected_state = state.clone().into();
+        assert_eq!(
             state.update(&segment, ORIGINAL_PAYLOAD_LEN, ConnectionDirection::Original),
-            Err(ConnectionUpdateError::InvalidPacket)
+            (expected_state, false)
         );
     }
 
@@ -567,7 +601,7 @@ mod tests {
                 ORIGINAL_PAYLOAD_LEN + 10,
                 ConnectionDirection::Original
             ),
-            Ok((Some(State::SynSent(s)), ConnectionUpdateAction::NoAction)) => s
+            (State::SynSent(s), true) => s
         );
 
         assert_eq!(
@@ -599,29 +633,29 @@ mod tests {
             options: Options::default(),
         };
 
-        assert_matches!(
+        let expected_state = state.clone().into();
+        assert_eq!(
             state.update(&segment, REPLY_PAYLOAD_LEN, ConnectionDirection::Reply),
-            Err(ConnectionUpdateError::InvalidPacket)
+            (expected_state, false)
         );
     }
 
-    #[test_case(ORIGINAL_ISS => Err(ConnectionUpdateError::InvalidPacket); "small invalid")]
+    #[test_case(ORIGINAL_ISS, None; "small invalid")]
     #[test_case(
-        ORIGINAL_ISS + 1 => Ok((None, ConnectionUpdateAction::RemoveEntry));
+        ORIGINAL_ISS + 1, Some(Closed {}.into());
         "smallest valid"
     )]
     #[test_case(
-        ORIGINAL_ISS + ORIGINAL_PAYLOAD_LEN as u32 + 1 =>
-            Ok((None, ConnectionUpdateAction::RemoveEntry));
+        ORIGINAL_ISS + ORIGINAL_PAYLOAD_LEN as u32 + 1,
+        Some(Closed {}.into());
         "largest valid"
     )]
     #[test_case(
-        ORIGINAL_ISS + ORIGINAL_PAYLOAD_LEN as u32 + 2 => Err(ConnectionUpdateError::InvalidPacket);
+        ORIGINAL_ISS + ORIGINAL_PAYLOAD_LEN as u32 + 2,
+        None;
         "large invalid"
     )]
-    fn syn_sent_reply_rst_segment(
-        ack: SeqNum,
-    ) -> Result<(Option<State>, ConnectionUpdateAction), ConnectionUpdateError> {
+    fn syn_sent_reply_rst_segment(ack: SeqNum, new_state: Option<State>) {
         let state = SynSent {
             iss: ORIGINAL_ISS,
             logical_len: ORIGINAL_PAYLOAD_LEN as u32 + 1,
@@ -637,7 +671,15 @@ mod tests {
             options: Options::default(),
         };
 
-        state.update(&segment, /*payload_len*/ 0, ConnectionDirection::Reply)
+        let (expected_state, valid) = match new_state {
+            Some(state) => (state, true),
+            None => (state.clone().into(), false),
+        };
+
+        assert_eq!(
+            state.update(&segment, /*payload_len*/ 0, ConnectionDirection::Reply),
+            (expected_state, valid)
+        );
     }
 
     #[test]
@@ -659,7 +701,7 @@ mod tests {
 
         assert_eq!(
             state.update(&segment, /*payload_len*/ 0, ConnectionDirection::Reply),
-            Ok((Some(Untracked {}.into()), ConnectionUpdateAction::NoAction))
+            (Untracked {}.into(), true)
         );
     }
 
@@ -681,9 +723,10 @@ mod tests {
             options: Options::default(),
         };
 
-        assert_matches!(
+        let expected_state = state.clone().into();
+        assert_eq!(
             state.update(&segment, REPLY_PAYLOAD_LEN, ConnectionDirection::Reply),
-            Err(ConnectionUpdateError::InvalidPacket)
+            (expected_state, false)
         );
     }
 
@@ -711,7 +754,7 @@ mod tests {
                 REPLY_PAYLOAD_LEN,
                 ConnectionDirection::Reply
             ),
-            Ok((Some(State::WaitingOnOpeningAck(s)), ConnectionUpdateAction::NoAction)) => s
+            (State::WaitingOnOpeningAck(s), true) => s
         );
 
         let (original_window_scale, reply_window_scale) = match reply_window_scale {
