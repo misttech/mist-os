@@ -5,7 +5,6 @@
 #include "src/graphics/display/drivers/goldfish-display/display-driver.h"
 
 #include <fidl/fuchsia.hardware.goldfish/cpp/wire.h>
-#include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
 #include <fidl/fuchsia.sysmem2/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/driver/compat/cpp/banjo_server.h>
@@ -40,15 +39,15 @@ zx_koid_t GetKoid(zx_handle_t handle) {
 
 zx::result<fidl::ClientEnd<fuchsia_sysmem2::Allocator>> CreateAndInitializeSysmemAllocator(
     fdf::Namespace* incoming) {
-  zx::result<fidl::ClientEnd<fuchsia_sysmem2::Allocator>> connect_sysmem_service_result =
-      incoming->Connect<fuchsia_hardware_sysmem::Service::AllocatorV2>();
-  if (connect_sysmem_service_result.is_error()) {
+  zx::result<fidl::ClientEnd<fuchsia_sysmem2::Allocator>> connect_sysmem_protocol_result =
+      incoming->Connect<fuchsia_sysmem2::Allocator>();
+  if (connect_sysmem_protocol_result.is_error()) {
     FDF_LOG(ERROR, "Failed to connect to the sysmem Allocator FIDL protocol: %s",
-            connect_sysmem_service_result.status_string());
-    return connect_sysmem_service_result.take_error();
+            connect_sysmem_protocol_result.status_string());
+    return connect_sysmem_protocol_result.take_error();
   }
   fidl::ClientEnd<fuchsia_sysmem2::Allocator> sysmem_allocator =
-      std::move(connect_sysmem_service_result).value();
+      std::move(connect_sysmem_protocol_result).value();
 
   const zx_koid_t pid = GetKoid(zx_process_self());
   static constexpr std::string_view kDebugName = "goldfish-display";
