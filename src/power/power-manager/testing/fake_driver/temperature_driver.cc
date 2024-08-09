@@ -13,7 +13,7 @@ Driver::Driver(fdf::DriverStartArgs start_args,
     : DriverBase("fake-driver", std::move(start_args), std::move(driver_dispatcher)),
       temperature_connector_(fit::bind_member<&Driver::ServeTemperature>(this)),
       control_connector_(fit::bind_member<&Driver::ServeControl>(this)),
-      temperature_server_(&temperature_),
+      temperature_server_("soc_thermal", &temperature_),
       control_server_(&temperature_) {}
 
 zx::result<> Driver::Start() {

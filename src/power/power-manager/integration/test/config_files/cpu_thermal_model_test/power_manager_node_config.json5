@@ -21,7 +21,7 @@
         type: "TemperatureHandler",
         name: "temperature_soc_pll",
         config: {
-            driver_path: "/dev/sys/platform/soc_thermal",
+            sensor_name: "soc_thermal",
             cache_duration_ms: 50,
         },
     },

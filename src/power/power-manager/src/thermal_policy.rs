@@ -35,7 +35,7 @@ use tracing::*;
 ///     - SystemShutdown
 ///     - UpdateThermalLoad
 ///     - LogPlatformMetric
-///     - GetDriverPath
+///     - GetSensorName
 ///
 /// FIDL dependencies: N/A
 
@@ -125,11 +125,11 @@ impl<'a> ThermalPolicyBuilder<'a> {
         // Create default values
         let inspect_root = self.inspect_root.unwrap_or(inspect::component::inspector().root());
 
-        // Query the TemperatureHandler node for its associated driver path
-        let driver_path = query_driver_path(&self.config.temperature_node).await;
+        // Query the TemperatureHandler node for its associated sensor name
+        let sensor_name = query_sensor_name(&self.config.temperature_node).await;
 
         let node = Rc::new(ThermalPolicy {
-            driver_path,
+            sensor_name,
             state: ThermalState {
                 temperature_filter: TemperatureFilter::new(
                     self.config.temperature_node.clone(),
@@ -148,18 +148,18 @@ impl<'a> ThermalPolicyBuilder<'a> {
     }
 }
 
-/// Queries the provided `temperature_handler` node for their associated driver path. If any error
+/// Queries the provided `temperature_handler` node for their associated sensor name. If any error
 /// or unexpected response is encountered then an empty string is returned.
-async fn query_driver_path(temperature_handler: &Rc<dyn Node>) -> String {
-    match temperature_handler.handle_message(&Message::GetDriverPath).await {
-        Ok(MessageReturn::GetDriverPath(path)) => path,
+async fn query_sensor_name(temperature_handler: &Rc<dyn Node>) -> String {
+    match temperature_handler.handle_message(&Message::GetSensorName).await {
+        Ok(MessageReturn::GetSensorName(name)) => name,
         _ => String::new(),
     }
 }
 
 pub struct ThermalPolicy {
-    /// Topological path to the temperature driver that we're bound to.
-    driver_path: String,
+    /// Sensor name the temperature driver that we're bound to.
+    sensor_name: String,
 
     config: ThermalConfig,
     state: ThermalState,
@@ -437,7 +437,7 @@ impl ThermalPolicy {
 
         self.send_message_to_many(
             &self.config.thermal_load_notify_nodes,
-            &Message::UpdateThermalLoad(new_load, self.driver_path.to_string()),
+            &Message::UpdateThermalLoad(new_load, self.sensor_name.to_string()),
         )
         .await
         .into_iter()
@@ -685,7 +685,7 @@ pub mod tests {
         let thermal_config = ThermalConfig {
             temperature_node: mock_maker.make(
                 "TemperatureNode",
-                vec![(msg_eq!(GetDriverPath), msg_ok_return!(GetDriverPath(String::new())))],
+                vec![(msg_eq!(GetSensorName), msg_ok_return!(GetSensorName(String::new())))],
             ),
             sys_pwr_handler: mock_maker.make("SysPwrNode", vec![]),
             thermal_load_notify_nodes: vec![mock_maker.make("ThermalLoadNotify", vec![])],
@@ -813,7 +813,7 @@ pub mod tests {
         let mock_metrics = mock_maker.make("MockPlatformMetrics", vec![]);
         let mock_temperature = mock_maker.make(
             "MockTemperature",
-            vec![(msg_eq!(GetDriverPath), msg_ok_return!(GetDriverPath("sensor1".to_string())))],
+            vec![(msg_eq!(GetSensorName), msg_ok_return!(GetSensorName("sensor1".to_string())))],
         );
 
         let node_futures = FuturesUnordered::new();
@@ -897,10 +897,10 @@ pub mod tests {
     }
 
     #[allow(clippy::unit_cmp)] // TODO(https://fxbug.dev/42176998)
-    /// Tests that the ThermalPolicy node populates the correct temperature sensor driver path in
-    /// its UpdateThermalLoad messages.
+    /// Tests that the ThermalPolicy node populates the correct temperature sensor name in its
+    /// UpdateThermalLoad messages.
     #[fasync::run_singlethreaded(test)]
-    async fn test_thermal_load_sensor_path() {
+    async fn test_thermal_load_sensor_name() {
         let mut mock_maker = MockNodeMaker::new();
 
         // Set up the ThermalPolicy node
@@ -908,8 +908,8 @@ pub mod tests {
             temperature_node: mock_maker.make(
                 "TemperatureNode",
                 vec![(
-                    msg_eq!(GetDriverPath),
-                    msg_ok_return!(GetDriverPath("Sensor1".to_string())),
+                    msg_eq!(GetSensorName),
+                    msg_ok_return!(GetSensorName("Sensor1".to_string())),
                 )],
             ),
             sys_pwr_handler: create_dummy_node(),
@@ -931,7 +931,7 @@ pub mod tests {
             .unwrap();
 
         // When `process_thermal_load` runs, the new ThermalLoad value will be sent to the
-        // ThermalLoadNotify node. The mock will verify the correct sensor path is found in the
+        // ThermalLoadNotify node. The mock will verify the correct sensor name is found in the
         // UpdateThermalLoad message.
         assert_eq!(node.process_thermal_load(ThermalLoad(20)).await.unwrap(), ());
     }
@@ -951,8 +951,8 @@ pub mod tests {
             temperature_node: mock_maker.make(
                 "TemperatureNode",
                 vec![(
-                    msg_eq!(GetDriverPath),
-                    msg_ok_return!(GetDriverPath("Sensor1".to_string())),
+                    msg_eq!(GetSensorName),
+                    msg_ok_return!(GetSensorName("Sensor1".to_string())),
                 )],
             ),
             sys_pwr_handler: create_dummy_node(),
@@ -1006,8 +1006,8 @@ pub mod tests {
             temperature_node: mock_maker.make(
                 "TemperatureNode",
                 vec![(
-                    msg_eq!(GetDriverPath),
-                    msg_ok_return!(GetDriverPath("Sensor1".to_string())),
+                    msg_eq!(GetSensorName),
+                    msg_ok_return!(GetSensorName("Sensor1".to_string())),
                 )],
             ),
             sys_pwr_handler: create_dummy_node(),

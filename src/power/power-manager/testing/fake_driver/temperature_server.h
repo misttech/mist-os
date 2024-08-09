@@ -13,7 +13,7 @@ namespace fake_driver {
 class TemperatureDeviceProtocolServer
     : public fidl::WireServer<fuchsia_hardware_temperature::Device> {
  public:
-  explicit TemperatureDeviceProtocolServer(float* temperature);
+  explicit TemperatureDeviceProtocolServer(std::string sensor_name, float* temperature);
 
   void GetTemperatureCelsius(GetTemperatureCelsiusCompleter::Sync& completer) override;
 
@@ -26,6 +26,7 @@ class TemperatureDeviceProtocolServer
   fidl::ServerBindingGroup<fuchsia_hardware_temperature::Device> bindings_;
 
   float* temperature_;
+  std::string sensor_name_;
 };
 
 }  // namespace fake_driver
