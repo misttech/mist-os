@@ -56,6 +56,31 @@ Routing terminology divides into the following categories:
         These capabilities often map to a node in the
         [outgoing directory][glossary.outgoing-directory].
 
+### Cycle detection {#cycle-detection}
+
+The component framework enforces that capababilities offered between components
+do not form a cycle. The simplest example of a cycle would be a component that
+offers a capability from child `A` to child `B`, and offers a capability from
+child `B` to child `A`, without the weak option.
+
+Cycles are detected between child components and between the current component
+and its children.  The current component is allowed to `use` capabilities from
+its children, unless it is offering capabilities to those children.
+
+The current component is allowed to `use` a capability from its parent and
+`expose` a capability to its parent. We can be sure that this is not cyclical
+because the parent component is also checked for cycles when it loaded.
+
+If there is a cycle, there are several strategies to address this.
+
+- Split one of the components into two smaller components that do not have a cycle.
+- Invert the order of one of the dependencies. For example, instead of `B` using a capability
+  from `A`, `A` could use a second capability from `B`.
+- Mark one of the links as `dependency: "weak"`. Weak capabilities do not count
+  as a dependency with respect to cycle detection or shutdown ordering. A
+  component using a capability weakly should be programmed to operate correctly if
+  the weak capability does not exist or goes away.
+
 ## Capability types {#capability-types}
 
 The following capabilities can be routed:
