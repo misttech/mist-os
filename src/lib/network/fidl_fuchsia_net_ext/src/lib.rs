@@ -115,6 +115,15 @@ impl FromExt<ip::AddrSubnetEither> for fidl::Subnet {
     }
 }
 
+impl FromExt<ip::IpVersion> for fidl::IpVersion {
+    fn from_ext(version: ip::IpVersion) -> fidl::IpVersion {
+        match version {
+            ip::IpVersion::V4 => fidl::IpVersion::V4,
+            ip::IpVersion::V6 => fidl::IpVersion::V6,
+        }
+    }
+}
+
 /// Extension trait to allow user-friendly formatting.
 pub trait DisplayExt {
     type Displayable: Display;
