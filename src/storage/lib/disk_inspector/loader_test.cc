@@ -2,12 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "disk_inspector/loader.h"
+#include "src/storage/lib/disk_inspector/loader.h"
 
+#include <zircon/errors.h>
+#include <zircon/types.h>
+
+#include <cstdint>
 #include <cstring>
+#include <vector>
 
 #include <gtest/gtest.h>
 #include <storage/buffer/array_buffer.h>
+#include <storage/buffer/block_buffer.h>
+#include <storage/operation/operation.h>
 
 #include "src/storage/lib/vfs/cpp/transaction/transaction_handler.h"
 

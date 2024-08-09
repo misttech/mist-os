@@ -2,7 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <disk_inspector/common_types.h>
+#include "src/storage/lib/disk_inspector/disk_inspector.h"
+
+#include <zircon/assert.h>
+
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <utility>
+
+#include <fbl/string.h>
+
+#include "src/storage/lib/disk_inspector/common_types.h"
 
 namespace disk_inspector {
 

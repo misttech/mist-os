@@ -2,17 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_STORAGE_LIB_DISK_INSPECTOR_INCLUDE_DISK_INSPECTOR_INSPECTOR_TRANSACTION_HANDLER_H_
-#define SRC_STORAGE_LIB_DISK_INSPECTOR_INCLUDE_DISK_INSPECTOR_INSPECTOR_TRANSACTION_HANDLER_H_
+#ifndef SRC_STORAGE_LIB_DISK_INSPECTOR_INSPECTOR_TRANSACTION_HANDLER_H_
+#define SRC_STORAGE_LIB_DISK_INSPECTOR_INSPECTOR_TRANSACTION_HANDLER_H_
 
-#include <lib/fpromise/result.h>
+#include <fidl/fuchsia.hardware.block/cpp/wire.h>
+#include <lib/zx/vmo.h>
 #include <zircon/types.h>
 
+#include <cstdint>
 #include <memory>
+#include <utility>
 
-#include <storage/buffer/block_buffer.h>
 #include <storage/buffer/vmoid_registry.h>
-#include <storage/operation/operation.h>
 
 #include "src/storage/lib/block_client/cpp/block_device.h"
 #include "src/storage/lib/vfs/cpp/transaction/device_transaction_handler.h"
@@ -56,4 +57,4 @@ class InspectorTransactionHandler : public fs::DeviceTransactionHandler,
 
 }  // namespace disk_inspector
 
-#endif  // SRC_STORAGE_LIB_DISK_INSPECTOR_INCLUDE_DISK_INSPECTOR_INSPECTOR_TRANSACTION_HANDLER_H_
+#endif  // SRC_STORAGE_LIB_DISK_INSPECTOR_INSPECTOR_TRANSACTION_HANDLER_H_

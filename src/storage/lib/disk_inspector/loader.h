@@ -2,8 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_STORAGE_LIB_DISK_INSPECTOR_INCLUDE_DISK_INSPECTOR_LOADER_H_
-#define SRC_STORAGE_LIB_DISK_INSPECTOR_INCLUDE_DISK_INSPECTOR_LOADER_H_
+#ifndef SRC_STORAGE_LIB_DISK_INSPECTOR_LOADER_H_
+#define SRC_STORAGE_LIB_DISK_INSPECTOR_LOADER_H_
+
+#include <zircon/types.h>
+
+#include <cstdint>
 
 #include <storage/buffer/block_buffer.h>
 
@@ -11,7 +15,7 @@
 
 namespace disk_inspector {
 
-// Wrapper arround fs::TransactionHandler to read/write on-disk structures from
+// Wrapper around fs::TransactionHandler to read/write on-disk structures from
 // a block-device into a passed-in BlockBuffer.
 class Loader {
  public:
@@ -34,4 +38,4 @@ class Loader {
 };
 }  // namespace disk_inspector
 
-#endif  // SRC_STORAGE_LIB_DISK_INSPECTOR_INCLUDE_DISK_INSPECTOR_LOADER_H_
+#endif  // SRC_STORAGE_LIB_DISK_INSPECTOR_LOADER_H_

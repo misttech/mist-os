@@ -4,22 +4,37 @@
 
 // Tests minfs inspector behavior.
 
-#include "src/storage/minfs/inspector/inspector.h"
-
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/sync/completion.h>
+#include <lib/zx/time.h>
+#include <zircon/errors.h>
+#include <zircon/types.h>
 
-#include <disk_inspector/disk_inspector.h>
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <string_view>
+#include <utility>
+
+#include <fbl/string.h>
 #include <fbl/string_printf.h>
 #include <gtest/gtest.h>
 
 #include "src/storage/lib/block_client/cpp/fake_block_device.h"
+#include "src/storage/lib/disk_inspector/disk_inspector.h"
+#include "src/storage/lib/vfs/cpp/journal/format.h"
 #include "src/storage/lib/vfs/cpp/journal/inspector_journal.h"
+#include "src/storage/minfs/allocator/allocator.h"
+#include "src/storage/minfs/allocator/inode_manager.h"
+#include "src/storage/minfs/bcache.h"
+#include "src/storage/minfs/format.h"
 #include "src/storage/minfs/inspector/inspector_inode.h"
 #include "src/storage/minfs/inspector/inspector_inode_table.h"
 #include "src/storage/minfs/inspector/inspector_private.h"
 #include "src/storage/minfs/inspector/inspector_superblock.h"
+#include "src/storage/minfs/minfs.h"
+#include "src/storage/minfs/mount.h"
 #include "src/storage/minfs/runner.h"
 
 namespace minfs {

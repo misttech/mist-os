@@ -2,28 +2,32 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fidl/fuchsia.hardware.block.partition/cpp/wire.h>
+#include <fidl/fuchsia.hardware.block.volume/cpp/wire.h>
 #include <lib/cmdline/args_parser.h>
 #include <lib/component/incoming/cpp/protocol.h>
-#include <lib/fdio/fdio.h>
+#include <lib/fpromise/result.h>
+#include <lib/zx/result.h>
 #include <stdio.h>
+#include <zircon/errors.h>
 #include <zircon/status.h>
+#include <zircon/types.h>
 
+#include <cstdint>
 #include <iostream>
+#include <iterator>
 #include <memory>
 #include <optional>
 #include <sstream>
-
-#include <disk_inspector/command.h>
-#include <disk_inspector/command_handler.h>
-#include <disk_inspector/disk_inspector.h>
-#include <disk_inspector/inspector_transaction_handler.h>
-#include <disk_inspector/vmo_buffer_factory.h>
-#include <fbl/unique_fd.h>
+#include <string>
+#include <utility>
+#include <vector>
 
 #include "src/lib/line_input/modal_line_input.h"
-#include "src/storage/lib/block_client/cpp/block_device.h"
 #include "src/storage/lib/block_client/cpp/remote_block_device.h"
+#include "src/storage/lib/disk_inspector/command_handler.h"
+#include "src/storage/lib/disk_inspector/inspector_transaction_handler.h"
+#include "src/storage/lib/disk_inspector/vmo_buffer_factory.h"
+#include "src/storage/minfs/format.h"
 #include "src/storage/minfs/inspector/command_handler.h"
 #include "src/storage/minfs/inspector/minfs_inspector.h"
 
@@ -141,7 +145,7 @@ std::unique_ptr<disk_inspector::CommandHandler> GetHandler(const char* path, con
     if (result.is_error()) {
       return nullptr;
     }
-    handler = std::make_unique<minfs::CommandHandler>(result.take_value());
+    handler = std::make_unique<minfs::CommandHandler>(std::move(result).value());
   }
 
   return handler;

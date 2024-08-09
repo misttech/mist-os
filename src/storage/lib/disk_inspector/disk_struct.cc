@@ -2,16 +2,25 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "disk_inspector/disk_struct.h"
+#include "src/storage/lib/disk_inspector/disk_struct.h"
 
 #include <lib/syslog/cpp/macros.h>
+#include <zircon/assert.h>
+#include <zircon/errors.h>
+#include <zircon/types.h>
 
-#include <iostream>
+#include <cstdint>
+#include <memory>
+#include <sstream>
+#include <string>
 #include <utility>
+#include <vector>
 
 #include <re2/re2.h>
 
-#include "disk_primitive.h"
+#include "src/storage/lib/disk_inspector/disk_obj.h"
+#include "src/storage/lib/disk_inspector/disk_primitive.h"
+#include "src/storage/lib/disk_inspector/supported_types.h"
 
 namespace disk_inspector {
 

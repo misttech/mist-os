@@ -9,10 +9,14 @@
 #define SRC_STORAGE_MINFS_INSPECTOR_INSPECTOR_H_
 
 #include <lib/async/dispatcher.h>
+#include <lib/zx/result.h>
+#include <zircon/types.h>
 
-#include <disk_inspector/common_types.h>
+#include <memory>
+#include <utility>
 
 #include "src/storage/lib/block_client/cpp/block_device.h"
+#include "src/storage/lib/disk_inspector/disk_inspector.h"
 #include "src/storage/minfs/bcache.h"
 
 namespace minfs {

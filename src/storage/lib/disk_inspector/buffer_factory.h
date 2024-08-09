@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_STORAGE_LIB_DISK_INSPECTOR_INCLUDE_DISK_INSPECTOR_BUFFER_FACTORY_H_
-#define SRC_STORAGE_LIB_DISK_INSPECTOR_INCLUDE_DISK_INSPECTOR_BUFFER_FACTORY_H_
+#ifndef SRC_STORAGE_LIB_DISK_INSPECTOR_BUFFER_FACTORY_H_
+#define SRC_STORAGE_LIB_DISK_INSPECTOR_BUFFER_FACTORY_H_
 
-#include <lib/fpromise/result.h>
-#include <zircon/types.h>
+#include <lib/zx/result.h>
 
+#include <cstddef>
 #include <memory>
 
 #include <storage/buffer/block_buffer.h>
@@ -22,10 +22,9 @@ class BufferFactory {
   virtual ~BufferFactory() = default;
 
   // Creates a block buffer of size |capacity| to store in |out|.
-  virtual fpromise::result<std::unique_ptr<storage::BlockBuffer>, zx_status_t> CreateBuffer(
-      size_t capacity) const = 0;
+  virtual zx::result<std::unique_ptr<storage::BlockBuffer>> CreateBuffer(size_t capacity) const = 0;
 };
 
 }  // namespace disk_inspector
 
-#endif  // SRC_STORAGE_LIB_DISK_INSPECTOR_INCLUDE_DISK_INSPECTOR_BUFFER_FACTORY_H_
+#endif  // SRC_STORAGE_LIB_DISK_INSPECTOR_BUFFER_FACTORY_H_

@@ -5,15 +5,22 @@
 #include "src/storage/minfs/inspector/command_handler.h"
 
 #include <zircon/errors.h>
+#include <zircon/types.h>
 
+#include <algorithm>
+#include <cstdint>
 #include <iostream>
 #include <memory>
 #include <sstream>
+#include <string>
 #include <utility>
+#include <vector>
 
-#include <disk_inspector/disk_struct.h>
-
+#include "src/storage/lib/disk_inspector/command.h"
+#include "src/storage/lib/disk_inspector/disk_struct.h"
 #include "src/storage/lib/vfs/cpp/journal/disk_struct.h"
+#include "src/storage/lib/vfs/cpp/journal/format.h"
+#include "src/storage/minfs/format.h"
 #include "src/storage/minfs/inspector/disk_struct.h"
 
 namespace minfs {
@@ -40,9 +47,9 @@ zx_status_t CommandHandler::CallCommand(std::vector<std::string> command_args) {
     os << "Usage: " << disk_inspector::PrintCommand(command);
     os << "\n";
     std::cerr << os.str();
-    return fit_result.take_error();
+    return fit_result.status_value();
   }
-  ParsedCommand args = fit_result.take_value();
+  ParsedCommand args = std::move(fit_result).value();
   return command.function(std::move(args));
 }
 
@@ -174,9 +181,9 @@ zx_status_t CommandHandler::PrintSuperblock() {
 zx_status_t CommandHandler::PrintInode(uint64_t index) {
   auto result = inspector_->InspectInodeRange(index, index + 1);
   if (result.is_error()) {
-    return result.take_error();
+    return result.status_value();
   }
-  Inode inode = result.take_value()[0];
+  Inode inode = std::move(result).value()[0];
   std::unique_ptr<disk_inspector::DiskStruct> object = GetInodeStruct(index);
   *output_ << object->ToString(&inode, options_);
   return ZX_OK;
@@ -189,9 +196,9 @@ zx_status_t CommandHandler::PrintInodes(uint64_t max) {
   }
   auto result = inspector_->InspectInodeRange(0, count);
   if (result.is_error()) {
-    return result.take_error();
+    return result.status_value();
   }
-  std::vector<Inode> inodes = result.take_value();
+  std::vector<Inode> inodes = std::move(result).value();
   for (uint64_t i = 0; i < count; ++i) {
     Inode inode = inodes[i];
     std::unique_ptr<disk_inspector::DiskStruct> object = GetInodeStruct(i);
@@ -207,10 +214,10 @@ zx_status_t CommandHandler::PrintAllocatedInodes(uint64_t max) {
   }
   auto result = inspector_->InspectInodeAllocatedInRange(0, count);
   if (result.is_error()) {
-    return result.take_error();
+    return result.status_value();
   }
 
-  std::vector<uint64_t> allocated_indices = result.take_value();
+  std::vector<uint64_t> allocated_indices = std::move(result).value();
   if (allocated_indices.size() > max) {
     allocated_indices.resize(max);
   }
@@ -223,9 +230,9 @@ zx_status_t CommandHandler::PrintAllocatedInodes(uint64_t max) {
 zx_status_t CommandHandler::PrintJournalSuperblock() {
   auto result = inspector_->InspectJournalSuperblock();
   if (result.is_error()) {
-    return result.take_error();
+    return result.status_value();
   }
-  fs::JournalInfo info = result.take_value();
+  fs::JournalInfo info = result.value();
   std::unique_ptr<disk_inspector::DiskStruct> object = fs::GetJournalSuperblockStruct();
   *output_ << object->ToString(&info, options_);
   return ZX_OK;
@@ -236,9 +243,9 @@ zx_status_t CommandHandler::PrintJournalEntries(uint64_t max) {
   for (uint64_t i = 0; i < count; ++i) {
     auto result = inspector_->InspectJournalEntryAs<fs::JournalPrefix>(i);
     if (result.is_error()) {
-      return result.take_error();
+      return result.status_value();
     }
-    fs::JournalPrefix prefix = result.take_value();
+    fs::JournalPrefix prefix = result.value();
     switch (prefix.ObjectType()) {
       case fs::JournalObjectType::kHeader: {
         PrintJournalHeader(i);
@@ -264,9 +271,9 @@ zx_status_t CommandHandler::PrintJournalEntries(uint64_t max) {
 zx_status_t CommandHandler::PrintJournalHeader(uint64_t index) {
   auto result = inspector_->InspectJournalEntryAs<fs::JournalHeaderBlock>(index);
   if (result.is_error()) {
-    return result.take_error();
+    return result.status_value();
   }
-  fs::JournalHeaderBlock header = result.take_value();
+  fs::JournalHeaderBlock header = result.value();
   std::unique_ptr<disk_inspector::DiskStruct> object = fs::GetJournalHeaderBlockStruct(index);
   *output_ << object->ToString(&header, options_);
   return ZX_OK;
@@ -275,9 +282,9 @@ zx_status_t CommandHandler::PrintJournalHeader(uint64_t index) {
 zx_status_t CommandHandler::PrintJournalCommit(uint64_t index) {
   auto result = inspector_->InspectJournalEntryAs<fs::JournalCommitBlock>(index);
   if (result.is_error()) {
-    return result.take_error();
+    return result.status_value();
   }
-  fs::JournalCommitBlock commit = result.take_value();
+  fs::JournalCommitBlock commit = result.value();
   std::unique_ptr<disk_inspector::DiskStruct> object = fs::GetJournalCommitBlockStruct(index);
   *output_ << object->ToString(&commit, options_);
   return ZX_OK;
@@ -286,9 +293,9 @@ zx_status_t CommandHandler::PrintJournalCommit(uint64_t index) {
 zx_status_t CommandHandler::PrintBackupSuperblock() {
   auto result = inspector_->InspectBackupSuperblock();
   if (result.is_error()) {
-    return result.take_error();
+    return result.status_value();
   }
-  Superblock superblock = result.take_value();
+  Superblock superblock = result.value();
   std::unique_ptr<disk_inspector::DiskStruct> object = GetSuperblockStruct();
   *output_ << object->ToString(&superblock, options_);
   return ZX_OK;
@@ -303,7 +310,7 @@ zx_status_t CommandHandler::WriteSuperblockField(std::string fieldname, const st
   }
   auto result = inspector_->WriteSuperblock(superblock);
   if (result.is_error()) {
-    return result.take_error();
+    return result.status_value();
   }
   return ZX_OK;
 }

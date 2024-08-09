@@ -2,7 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "disk_inspector/command.h"
+#include "src/storage/lib/disk_inspector/command.h"
+
+#include <lib/zx/result.h>
+
+#include <string>
+#include <utility>
+#include <vector>
 
 #include <gtest/gtest.h>
 
@@ -78,10 +84,9 @@ TEST(CommandTest, ParseCommand) {
                      "test",
                      nullptr};
   std::vector<std::string> input = {"command", "testing", "123", "42", "hello"};
-  fpromise::result<ParsedCommand, zx_status_t> result =
-      disk_inspector::ParseCommand(input, command);
+  zx::result<ParsedCommand> result = disk_inspector::ParseCommand(input, command);
   ASSERT_TRUE(result.is_ok());
-  ParsedCommand parsed = result.take_ok_result().value;
+  ParsedCommand parsed = std::move(result).value();
   ASSERT_FALSE(parsed.string_fields.find("field1") == parsed.string_fields.end());
   ASSERT_FALSE(parsed.uint64_fields.find("field2") == parsed.uint64_fields.end());
   ASSERT_FALSE(parsed.uint64_fields.find("field3") == parsed.uint64_fields.end());
@@ -100,8 +105,7 @@ TEST(CommandTest, ParseCommandInvalidArgumentNumberFail) {
                      "test",
                      nullptr};
   std::vector<std::string> input = {"command", "testing", "123", "42", "hello"};
-  fpromise::result<ParsedCommand, zx_status_t> result =
-      disk_inspector::ParseCommand(input, command);
+  zx::result<ParsedCommand> result = disk_inspector::ParseCommand(input, command);
   ASSERT_TRUE(result.is_error());
 }
 
@@ -113,8 +117,7 @@ TEST(CommandTest, ParseCommandInvalidTypeFail) {
                      "test",
                      nullptr};
   std::vector<std::string> input = {"command", "testing"};
-  fpromise::result<ParsedCommand, zx_status_t> result =
-      disk_inspector::ParseCommand(input, command);
+  zx::result<ParsedCommand> result = disk_inspector::ParseCommand(input, command);
   ASSERT_TRUE(result.is_error());
 }
 

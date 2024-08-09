@@ -5,13 +5,22 @@
 #include "src/storage/minfs/inspector/minfs_inspector.h"
 
 #include <lib/syslog/cpp/macros.h>
+#include <lib/zx/result.h>
+#include <zircon/assert.h>
+#include <zircon/errors.h>
+#include <zircon/types.h>
 
-#include <algorithm>
+#include <cstdint>
+#include <memory>
+#include <utility>
+#include <vector>
 
-#include <disk_inspector/inspector_transaction_handler.h>
-#include <disk_inspector/vmo_buffer_factory.h>
+#include <storage/buffer/block_buffer.h>
 
+#include "src/storage/lib/disk_inspector/buffer_factory.h"
+#include "src/storage/lib/vfs/cpp/journal/format.h"
 #include "src/storage/lib/vfs/cpp/journal/inspector_parser.h"
+#include "src/storage/lib/vfs/cpp/transaction/transaction_handler.h"
 #include "src/storage/minfs/format.h"
 #include "src/storage/minfs/inspector/loader.h"
 #include "src/storage/minfs/inspector/parser.h"
@@ -22,21 +31,21 @@ MinfsInspector::MinfsInspector(std::unique_ptr<fs::TransactionHandler> handler,
                                std::unique_ptr<disk_inspector::BufferFactory> buffer_factory)
     : handler_(std::move(handler)), buffer_factory_(std::move(buffer_factory)) {}
 
-fpromise::result<std::unique_ptr<MinfsInspector>, zx_status_t> MinfsInspector::Create(
+zx::result<std::unique_ptr<MinfsInspector>> MinfsInspector::Create(
     std::unique_ptr<fs::TransactionHandler> handler,
     std::unique_ptr<disk_inspector::BufferFactory> factory) {
   auto inspector =
       std::unique_ptr<MinfsInspector>(new MinfsInspector(std::move(handler), std::move(factory)));
   auto result = inspector->buffer_factory_->CreateBuffer(1);
   if (result.is_error()) {
-    return result.take_error_result();
+    return result.take_error();
   }
-  inspector->buffer_ = result.take_value();
+  inspector->buffer_ = std::move(result).value();
   zx_status_t status = inspector->ReloadSuperblock();
   if (status != ZX_OK) {
-    return fpromise::error(status);
+    return zx::error(status);
   }
-  return fpromise::ok(std::move(inspector));
+  return zx::ok(std::move(inspector));
 }
 
 zx_status_t MinfsInspector::ReloadSuperblock() {
@@ -64,8 +73,8 @@ uint64_t MinfsInspector::GetJournalEntryCount() {
   return journal_block_count - fs::kJournalMetadataBlocks;
 }
 
-fpromise::result<std::vector<Inode>, zx_status_t> MinfsInspector::InspectInodeRange(
-    uint64_t start_index, uint64_t end_index) {
+zx::result<std::vector<Inode>> MinfsInspector::InspectInodeRange(uint64_t start_index,
+                                                                 uint64_t end_index) {
   ZX_ASSERT(end_index > start_index);
   Loader loader(handler_.get());
 
@@ -80,14 +89,14 @@ fpromise::result<std::vector<Inode>, zx_status_t> MinfsInspector::InspectInodeRa
 
   auto result = buffer_factory_->CreateBuffer(block_length);
   if (result.is_error()) {
-    return result.take_error_result();
+    return result.take_error();
   }
-  std::unique_ptr<storage::BlockBuffer> inode_buffer = result.take_value();
+  std::unique_ptr<storage::BlockBuffer> inode_buffer = std::move(result).value();
 
   zx_status_t status = loader.RunReadOperation(inode_buffer.get(), 0, start_block, block_length);
   if (status != ZX_OK) {
     FX_LOGS(ERROR) << "Cannot load inode. err: " << status;
-    return fpromise::error(status);
+    return zx::error(status);
   }
 
   // Once loaded, we treat the buffer as the entire inode table and find the
@@ -99,11 +108,11 @@ fpromise::result<std::vector<Inode>, zx_status_t> MinfsInspector::InspectInodeRa
   for (uint64_t i = 0; i < count; ++i) {
     inodes.emplace_back(GetInodeElement(inode_buffer.get(), buffer_offset + i));
   }
-  return fpromise::ok(inodes);
+  return zx::ok(inodes);
 }
 
-fpromise::result<std::vector<uint64_t>, zx_status_t> MinfsInspector::InspectInodeAllocatedInRange(
-    uint64_t start_index, uint64_t end_index) {
+zx::result<std::vector<uint64_t>> MinfsInspector::InspectInodeAllocatedInRange(uint64_t start_index,
+                                                                               uint64_t end_index) {
   ZX_ASSERT(end_index > start_index);
   Loader loader(handler_.get());
   // Since there are multiple bits in a block, we first perform calculations
@@ -117,14 +126,14 @@ fpromise::result<std::vector<uint64_t>, zx_status_t> MinfsInspector::InspectInod
 
   auto result = buffer_factory_->CreateBuffer(block_length);
   if (result.is_error()) {
-    return fpromise::error(result.take_error());
+    return zx::error(result.take_error());
   }
-  std::unique_ptr<storage::BlockBuffer> bit_buffer = result.take_value();
+  std::unique_ptr<storage::BlockBuffer> bit_buffer = std::move(result).value();
 
   zx_status_t status = loader.RunReadOperation(bit_buffer.get(), 0, start_block, block_length);
   if (status != ZX_OK) {
     FX_LOGS(ERROR) << "Cannot load allocation bits. err: " << status;
-    return fpromise::error(status);
+    return zx::error(status);
   }
 
   // Once loaded, we treat the buffer as the entire inode bitmap and find the
@@ -138,76 +147,73 @@ fpromise::result<std::vector<uint64_t>, zx_status_t> MinfsInspector::InspectInod
       allocated_indices.emplace_back(start_index + i);
     }
   }
-  return fpromise::ok(allocated_indices);
+  return zx::ok(allocated_indices);
 }
 
 // Since the scratch buffer is only a single block long, we check that the
 // JournalSuperblock is small enough to load into the buffer.
 static_assert(fs::kJournalMetadataBlocks == 1);
 
-fpromise::result<fs::JournalInfo, zx_status_t> MinfsInspector::InspectJournalSuperblock() {
+zx::result<fs::JournalInfo> MinfsInspector::InspectJournalSuperblock() {
   Loader loader(handler_.get());
   zx_status_t status = loader.RunReadOperation(buffer_.get(), 0, JournalStartBlock(superblock_),
                                                fs::kJournalMetadataBlocks);
   if (status != ZX_OK) {
     FX_LOGS(ERROR) << "Cannot load journal superblock. err: " << status;
-    return fpromise::error(status);
+    return zx::error(status);
   }
-  return fpromise::ok(fs::GetJournalSuperblock(buffer_.get()));
+  return zx::ok(fs::GetJournalSuperblock(buffer_.get()));
 }
 
 template <>
-fpromise::result<fs::JournalPrefix, zx_status_t> MinfsInspector::InspectJournalEntryAs(
-    uint64_t index) {
+zx::result<fs::JournalPrefix> MinfsInspector::InspectJournalEntryAs(uint64_t index) {
   zx_status_t status = LoadJournalEntry(buffer_.get(), index);
   if (status != ZX_OK) {
-    return fpromise::error(status);
+    return zx::error(status);
   }
-  return fpromise::ok(*reinterpret_cast<fs::JournalPrefix*>(buffer_->Data(0)));
+  return zx::ok(*reinterpret_cast<fs::JournalPrefix*>(buffer_->Data(0)));
 }
 
 template <>
-fpromise::result<fs::JournalHeaderBlock, zx_status_t> MinfsInspector::InspectJournalEntryAs(
-    uint64_t index) {
+zx::result<fs::JournalHeaderBlock> MinfsInspector::InspectJournalEntryAs(uint64_t index) {
   zx_status_t status = LoadJournalEntry(buffer_.get(), index);
   if (status != ZX_OK) {
-    return fpromise::error(status);
+    return zx::error(status);
   }
-  return fpromise::ok(*reinterpret_cast<fs::JournalHeaderBlock*>(buffer_->Data(0)));
+  return zx::ok(*reinterpret_cast<fs::JournalHeaderBlock*>(buffer_->Data(0)));
 }
 
 template <>
-fpromise::result<fs::JournalCommitBlock, zx_status_t> MinfsInspector::InspectJournalEntryAs(
-    uint64_t index) {
+zx::result<fs::JournalCommitBlock> MinfsInspector::InspectJournalEntryAs(uint64_t index) {
   zx_status_t status = LoadJournalEntry(buffer_.get(), index);
   if (status != ZX_OK) {
-    return fpromise::error(status);
+    return zx::error(status);
   }
-  return fpromise::ok(*reinterpret_cast<fs::JournalCommitBlock*>(buffer_->Data(0)));
+  return zx::ok(*reinterpret_cast<fs::JournalCommitBlock*>(buffer_->Data(0)));
 }
 
-fpromise::result<Superblock, zx_status_t> MinfsInspector::InspectBackupSuperblock() {
+zx::result<Superblock> MinfsInspector::InspectBackupSuperblock() {
   Loader loader(handler_.get());
   uint32_t backup_location =
       superblock_.GetFlagFvm() ? kFvmSuperblockBackup : kNonFvmSuperblockBackup;
   zx_status_t status = loader.LoadSuperblock(backup_location, buffer_.get());
   if (status != ZX_OK) {
     FX_LOGS(ERROR) << "Cannot load backup superblock. err: " << status;
-    return fpromise::error(status);
+    return zx::error(status);
   }
-  return fpromise::ok(GetSuperblock(buffer_.get()));
+  return zx::ok(GetSuperblock(buffer_.get()));
 }
 
-fpromise::result<void, zx_status_t> MinfsInspector::WriteSuperblock(Superblock superblock) {
+zx::result<> MinfsInspector::WriteSuperblock(Superblock superblock) {
   Loader loader(handler_.get());
   *static_cast<Superblock*>(buffer_->Data(0)) = superblock;
   zx_status_t status = loader.RunWriteOperation(buffer_.get(), 0, 0, 1);
   if (status != ZX_OK) {
     FX_LOGS(ERROR) << "Cannot write superblock. err: " << status;
-    return fpromise::error(status);
+    return zx::error(status);
   }
   superblock_ = superblock;
-  return fpromise::ok();
+  return zx::ok();
 }
 
 zx_status_t MinfsInspector::LoadJournalEntry(storage::BlockBuffer* buffer, uint64_t index) {

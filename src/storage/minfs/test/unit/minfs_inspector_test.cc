@@ -7,17 +7,30 @@
 #include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/sync/completion.h>
+#include <lib/zx/result.h>
+#include <lib/zx/time.h>
+#include <lib/zx/vmo.h>
+#include <zircon/errors.h>
 
-#include <iostream>
+#include <cstdint>
+#include <memory>
+#include <utility>
+#include <vector>
 
-#include <disk_inspector/inspector_transaction_handler.h>
-#include <disk_inspector/vmo_buffer_factory.h>
-#include <gmock/gmock.h>
 #include <gtest/gtest.h>
+#include <storage/buffer/owned_vmoid.h>
 
+#include "src/devices/block/drivers/core/block-fifo.h"
+#include "src/storage/lib/block_client/cpp/block_device.h"
 #include "src/storage/lib/block_client/cpp/fake_block_device.h"
+#include "src/storage/lib/disk_inspector/inspector_transaction_handler.h"
+#include "src/storage/lib/disk_inspector/vmo_buffer_factory.h"
 #include "src/storage/lib/vfs/cpp/journal/format.h"
+#include "src/storage/minfs/bcache.h"
 #include "src/storage/minfs/format.h"
+#include "src/storage/minfs/minfs.h"
+#include "src/storage/minfs/mount.h"
 #include "src/storage/minfs/runner.h"
 
 namespace minfs {
@@ -44,7 +57,7 @@ class MinfsInspectorTest : public testing::Test {
 
     auto result = MinfsInspector::Create(std::move(inspector_handler), std::move(buffer_factory));
     EXPECT_TRUE(result.is_ok());
-    return result.take_value();
+    return std::move(result).value();
   }
 
   // Initialize a MinfsInspector from a created fake block device formatted into a fresh minfs
@@ -141,7 +154,7 @@ TEST_F(MinfsInspectorTest, InspectInode) {
 
   auto result = inspector->InspectInodeRange(0, 3);
   ASSERT_TRUE(result.is_ok());
-  std::vector<Inode> inodes = result.take_value();
+  std::vector<Inode> inodes = std::move(result).value();
   // 0th inode is uninitialized.
 
   Inode inode = inodes[0];
@@ -177,7 +190,7 @@ TEST_F(MinfsInspectorTest, CheckInodeAllocated) {
   auto result = inspector->InspectInodeAllocatedInRange(0, num_inodes_to_sample);
   ASSERT_TRUE(result.is_ok());
 
-  std::vector<uint64_t> allocated_indices = result.take_value();
+  std::vector<uint64_t> allocated_indices = std::move(result).value();
 
   ASSERT_EQ(allocated_indices.size(), sb.alloc_inode_count);
   for (uint32_t i = 0; i < sb.alloc_inode_count; ++i) {
@@ -190,7 +203,7 @@ TEST_F(MinfsInspectorTest, InspectJournalSuperblock) {
 
   auto result = inspector->InspectJournalSuperblock();
   ASSERT_TRUE(result.is_ok());
-  fs::JournalInfo journal_info = result.take_value();
+  fs::JournalInfo journal_info = result.value();
 
   EXPECT_EQ(journal_info.magic, fs::kJournalMagic);
   EXPECT_EQ(journal_info.start_block, 8ul);
@@ -221,7 +234,7 @@ template <typename T>
 void LoadAndUnwrapJournalEntry(MinfsInspector* inspector, uint64_t index, T* out_value) {
   auto result = inspector->InspectJournalEntryAs<T>(index);
   ASSERT_TRUE(result.is_ok());
-  *out_value = result.take_value();
+  *out_value = std::move(result).value();
 }
 
 TEST_F(MinfsInspectorTest, InspectJournalEntryAs) {
@@ -254,7 +267,7 @@ TEST_F(MinfsInspectorTest, InspectBackupSuperblock) {
 
   auto result = inspector->InspectBackupSuperblock();
   ASSERT_TRUE(result.is_ok());
-  Superblock sb = result.take_value();
+  const Superblock& sb = result.value();
 
   EXPECT_EQ(sb.magic0, kMinfsMagic0);
   EXPECT_EQ(sb.magic1, kMinfsMagic1);

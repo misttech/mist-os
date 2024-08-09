@@ -2,9 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "inspector_journal_entries.h"
+#include "src/storage/lib/vfs/cpp/journal/inspector_journal_entries.h"
+
+#include <zircon/assert.h>
+#include <zircon/errors.h>
+#include <zircon/types.h>
 
 #include <array>
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+
+#include <fbl/string_printf.h>
+
+#include "src/storage/lib/disk_inspector/common_types.h"
+#include "src/storage/lib/disk_inspector/disk_inspector.h"
+#include "src/storage/lib/vfs/cpp/journal/format.h"
 
 namespace fs {
 namespace {
@@ -31,7 +44,7 @@ std::unique_ptr<disk_inspector::DiskObject> ParsePrefix(const fs::JournalPrefix*
 }  // namespace
 
 JournalBlock::JournalBlock(uint32_t index, std::array<uint8_t, kJournalBlockSize> block)
-    : block_(std::move(block)), index_(index) {
+    : block_(block), index_(index) {
   auto prefix = reinterpret_cast<const fs::JournalPrefix*>(block_.data());
   if (prefix->magic == fs::kJournalEntryMagic) {
     object_type_ = prefix->ObjectType();
@@ -124,7 +137,7 @@ std::unique_ptr<disk_inspector::DiskObject> JournalEntries::GetElementAt(uint32_
       return nullptr;
     }
 
-    return std::make_unique<JournalBlock>(index, std::move(data));
+    return std::make_unique<JournalBlock>(index, data);
   }
   return nullptr;
 }

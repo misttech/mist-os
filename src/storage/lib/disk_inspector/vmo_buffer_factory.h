@@ -2,18 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_STORAGE_LIB_DISK_INSPECTOR_INCLUDE_DISK_INSPECTOR_VMO_BUFFER_FACTORY_H_
-#define SRC_STORAGE_LIB_DISK_INSPECTOR_INCLUDE_DISK_INSPECTOR_VMO_BUFFER_FACTORY_H_
+#ifndef SRC_STORAGE_LIB_DISK_INSPECTOR_VMO_BUFFER_FACTORY_H_
+#define SRC_STORAGE_LIB_DISK_INSPECTOR_VMO_BUFFER_FACTORY_H_
 
-#include <lib/fpromise/result.h>
-#include <zircon/types.h>
+#include <lib/zx/result.h>
 
+#include <cstddef>
+#include <cstdint>
 #include <memory>
 
 #include <storage/buffer/block_buffer.h>
 #include <storage/buffer/vmoid_registry.h>
 
-#include "buffer_factory.h"
+#include "src/storage/lib/disk_inspector/buffer_factory.h"
 
 namespace disk_inspector {
 
@@ -30,8 +31,7 @@ class VmoBufferFactory : public BufferFactory {
   ~VmoBufferFactory() override = default;
 
   // BufferFactory interface:
-  fpromise::result<std::unique_ptr<storage::BlockBuffer>, zx_status_t> CreateBuffer(
-      size_t capacity) const final;
+  zx::result<std::unique_ptr<storage::BlockBuffer>> CreateBuffer(size_t capacity) const final;
 
  private:
   // Registry used to register created VmoBuffers with an underlying block device.
@@ -42,4 +42,4 @@ class VmoBufferFactory : public BufferFactory {
 
 }  // namespace disk_inspector
 
-#endif  // SRC_STORAGE_LIB_DISK_INSPECTOR_INCLUDE_DISK_INSPECTOR_VMO_BUFFER_FACTORY_H_
+#endif  // SRC_STORAGE_LIB_DISK_INSPECTOR_VMO_BUFFER_FACTORY_H_

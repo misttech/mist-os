@@ -4,15 +4,13 @@
 
 // This file contains apis needed for inspection of on-disk data structures.
 
-#ifndef SRC_STORAGE_LIB_DISK_INSPECTOR_INCLUDE_DISK_INSPECTOR_COMMAND_HANDLER_H_
-#define SRC_STORAGE_LIB_DISK_INSPECTOR_INCLUDE_DISK_INSPECTOR_COMMAND_HANDLER_H_
+#ifndef SRC_STORAGE_LIB_DISK_INSPECTOR_COMMAND_HANDLER_H_
+#define SRC_STORAGE_LIB_DISK_INSPECTOR_COMMAND_HANDLER_H_
 
 #include <zircon/types.h>
 
 #include <string>
 #include <vector>
-
-#include "src/storage/lib/block_client/cpp/block_device.h"
 
 namespace disk_inspector {
 
@@ -36,4 +34,4 @@ class CommandHandler {
 
 }  // namespace disk_inspector
 
-#endif  // SRC_STORAGE_LIB_DISK_INSPECTOR_INCLUDE_DISK_INSPECTOR_COMMAND_HANDLER_H_
+#endif  // SRC_STORAGE_LIB_DISK_INSPECTOR_COMMAND_HANDLER_H_

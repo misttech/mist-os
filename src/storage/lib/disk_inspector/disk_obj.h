@@ -2,15 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_STORAGE_LIB_DISK_INSPECTOR_INCLUDE_DISK_INSPECTOR_DISK_OBJ_H_
-#define SRC_STORAGE_LIB_DISK_INSPECTOR_INCLUDE_DISK_INSPECTOR_DISK_OBJ_H_
+#ifndef SRC_STORAGE_LIB_DISK_INSPECTOR_DISK_OBJ_H_
+#define SRC_STORAGE_LIB_DISK_INSPECTOR_DISK_OBJ_H_
 
 #include <zircon/types.h>
 
-#include <memory>
+#include <cstdint>
 #include <string>
+#include <vector>
 
-#include <disk_inspector/supported_types.h>
+#include "src/storage/lib/disk_inspector/supported_types.h"
 
 namespace disk_inspector {
 
@@ -51,4 +52,4 @@ class DiskObj {
 
 }  // namespace disk_inspector
 
-#endif  // SRC_STORAGE_LIB_DISK_INSPECTOR_INCLUDE_DISK_INSPECTOR_DISK_OBJ_H_
+#endif  // SRC_STORAGE_LIB_DISK_INSPECTOR_DISK_OBJ_H_

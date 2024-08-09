@@ -2,11 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "disk_inspector/type_utils.h"
+#include "src/storage/lib/disk_inspector/type_utils.h"
 
-#include <disk_inspector/disk_struct.h>
-#include <disk_inspector/supported_types.h>
+#include <cstdint>
+#include <memory>
+#include <type_traits>
+#include <utility>
+
 #include <gtest/gtest.h>
+
+#include "src/storage/lib/disk_inspector/disk_struct.h"
+#include "src/storage/lib/disk_inspector/supported_types.h"
 
 namespace disk_inspector {
 namespace {

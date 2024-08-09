@@ -4,7 +4,14 @@
 
 #include "src/storage/lib/vfs/cpp/journal/disk_struct.h"
 
-#include <disk_inspector/type_utils.h>
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <string>
+
+#include "src/storage/lib/disk_inspector/disk_struct.h"
+#include "src/storage/lib/disk_inspector/type_utils.h"
+#include "src/storage/lib/vfs/cpp/journal/format.h"
 
 namespace fs {
 

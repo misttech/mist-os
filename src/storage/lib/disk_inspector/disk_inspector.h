@@ -4,11 +4,12 @@
 
 // This file contains apis needed for inspection of on-disk data structures.
 
-#ifndef SRC_STORAGE_LIB_DISK_INSPECTOR_INCLUDE_DISK_INSPECTOR_DISK_INSPECTOR_H_
-#define SRC_STORAGE_LIB_DISK_INSPECTOR_INCLUDE_DISK_INSPECTOR_DISK_INSPECTOR_H_
+#ifndef SRC_STORAGE_LIB_DISK_INSPECTOR_DISK_INSPECTOR_H_
+#define SRC_STORAGE_LIB_DISK_INSPECTOR_DISK_INSPECTOR_H_
 
 #include <zircon/types.h>
 
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 
@@ -53,4 +54,4 @@ class DiskInspector {
 
 }  // namespace disk_inspector
 
-#endif  // SRC_STORAGE_LIB_DISK_INSPECTOR_INCLUDE_DISK_INSPECTOR_DISK_INSPECTOR_H_
+#endif  // SRC_STORAGE_LIB_DISK_INSPECTOR_DISK_INSPECTOR_H_

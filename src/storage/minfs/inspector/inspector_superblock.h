@@ -5,12 +5,12 @@
 #ifndef SRC_STORAGE_MINFS_INSPECTOR_INSPECTOR_SUPERBLOCK_H_
 #define SRC_STORAGE_MINFS_INSPECTOR_INSPECTOR_SUPERBLOCK_H_
 
-#include <disk_inspector/common_types.h>
+#include <cstddef>
+#include <cstdint>
+#include <memory>
 
-#include "src/storage/lib/vfs/cpp/journal/format.h"
-#include "src/storage/minfs/allocator/inode_manager.h"
+#include "src/storage/lib/disk_inspector/disk_inspector.h"
 #include "src/storage/minfs/format.h"
-#include "src/storage/minfs/minfs_private.h"
 
 namespace minfs {
 

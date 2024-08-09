@@ -2,12 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "disk_inspector/inspector_transaction_handler.h"
+#include "src/storage/lib/disk_inspector/inspector_transaction_handler.h"
 
+#include <zircon/errors.h>
+
+#include <cstdint>
 #include <cstring>
+#include <memory>
+#include <utility>
 
 #include <gtest/gtest.h>
 #include <storage/buffer/vmo_buffer.h>
+#include <storage/operation/operation.h>
 
 #include "src/storage/lib/block_client/cpp/fake_block_device.h"
 

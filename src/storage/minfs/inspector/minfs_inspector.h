@@ -5,14 +5,18 @@
 #ifndef SRC_STORAGE_MINFS_INSPECTOR_MINFS_INSPECTOR_H_
 #define SRC_STORAGE_MINFS_INSPECTOR_MINFS_INSPECTOR_H_
 
-#include <string>
+#include <lib/zx/result.h>
+#include <zircon/types.h>
+
+#include <cstdint>
+#include <memory>
 #include <vector>
 
-#include <disk_inspector/buffer_factory.h>
-#include <disk_inspector/common_types.h>
-#include <disk_inspector/inspector_transaction_handler.h>
+#include <storage/buffer/block_buffer.h>
 
+#include "src/storage/lib/disk_inspector/buffer_factory.h"
 #include "src/storage/lib/vfs/cpp/journal/format.h"
+#include "src/storage/lib/vfs/cpp/transaction/transaction_handler.h"
 #include "src/storage/minfs/format.h"
 
 namespace minfs {
@@ -27,11 +31,11 @@ class MinfsInspector {
  public:
   // Creates a MinfsInspector from a block device. Tries to load the
   // superblock from disk upon creation by calling ReloadSuperblock().
-  static fpromise::result<std::unique_ptr<MinfsInspector>, zx_status_t> Create(
+  static zx::result<std::unique_ptr<MinfsInspector>> Create(
       std::unique_ptr<fs::TransactionHandler> handler,
       std::unique_ptr<disk_inspector::BufferFactory> factory);
 
-  // This function is used to initialize minfs metadata buffers and to load the relavent data.
+  // This function is used to initialize minfs metadata buffers and to load the relevant data.
   zx_status_t Initialize();
 
   // Initializes the |superblock_| buffer and tries to load the superblock
@@ -46,7 +50,7 @@ class MinfsInspector {
   // into these buffers. Note: we do not consider the failure of initializing
   // and loading of any of these buffers to be errors to crash the program as
   // the class should still work to a reasonable degree in the case of debugging
-  // a superblock with corruptions. For cases of failure, these bufffers have
+  // a superblock with corruptions. For cases of failure, these buffers have
   // undefined size and data inside. It is up to users to make sure that they
   // make valid calls using other functions in this class.
   void ReloadMetadataFromSuperblock();
@@ -60,38 +64,36 @@ class MinfsInspector {
   // Returns the number of journal entires calculated from |superblock_|.
   uint64_t GetJournalEntryCount();
 
-  // The following functions need to load data from disk, leading to the
-  // possibility of failed loads. Since they need to return values, we have
-  // fpromise::results for all of the return types. In addition, they all depend
-  // on the loaded |superblock_| value to get where to start indexing.
+  // The following functions need to load data from disk, leading to the possibility of failed
+  // loads. Since they need to return values, we have zx::results for all of the return types. In
+  // addition, they all depend on the loaded |superblock_| value to get where to start indexing.
 
   // Loads the inode table blocks for which the inodes from |start_index| inclusive
   // to |end_index| exclusive from disk and returns the Inodes in the range as
   // a vector.
-  fpromise::result<std::vector<Inode>, zx_status_t> InspectInodeRange(uint64_t start_index,
-                                                                      uint64_t end_index);
+  zx::result<std::vector<Inode>> InspectInodeRange(uint64_t start_index, uint64_t end_index);
 
   // Loads the inode bitmap blocks for which the inode allocation bits for inodes
   // from |start_index| inclusive to |end_index| exclusive from disk and returns
   // the inode indices for which the corresponding bits are allocated.
-  fpromise::result<std::vector<uint64_t>, zx_status_t> InspectInodeAllocatedInRange(
-      uint64_t start_index, uint64_t end_index);
+  zx::result<std::vector<uint64_t>> InspectInodeAllocatedInRange(uint64_t start_index,
+                                                                 uint64_t end_index);
 
   // Loads the first journal block
-  fpromise::result<fs::JournalInfo, zx_status_t> InspectJournalSuperblock();
+  zx::result<fs::JournalInfo> InspectJournalSuperblock();
 
   // Loads the |index| element journal entry block and returns it as a struct
   // of type T. Only supports casting to fs::JournalPrefix, fs::JournalHeaderBlock,
   // and fs::JournalCommitBlock.
   template <typename T>
-  fpromise::result<T, zx_status_t> InspectJournalEntryAs(uint64_t index);
+  zx::result<T> InspectJournalEntryAs(uint64_t index);
 
   // Loads and returns the backup superblock.
-  fpromise::result<Superblock, zx_status_t> InspectBackupSuperblock();
+  zx::result<Superblock> InspectBackupSuperblock();
 
   // Writes the |superblock| argument to disk and sets |superblock_| to |superblock|
   // if the write succeeds.
-  fpromise::result<void, zx_status_t> WriteSuperblock(Superblock superblock);
+  zx::result<> WriteSuperblock(Superblock superblock);
 
  private:
   explicit MinfsInspector(std::unique_ptr<fs::TransactionHandler> handler,

@@ -4,19 +4,17 @@
 
 // This file contains apis needed for inspection of on-disk data structures.
 
-#ifndef SRC_STORAGE_LIB_DISK_INSPECTOR_INCLUDE_DISK_INSPECTOR_COMMAND_H_
-#define SRC_STORAGE_LIB_DISK_INSPECTOR_INCLUDE_DISK_INSPECTOR_COMMAND_H_
+#ifndef SRC_STORAGE_LIB_DISK_INSPECTOR_COMMAND_H_
+#define SRC_STORAGE_LIB_DISK_INSPECTOR_COMMAND_H_
 
-#include <lib/fpromise/result.h>
+#include <lib/zx/result.h>
 #include <zircon/types.h>
 
+#include <cstdint>
 #include <functional>
-#include <sstream>
 #include <string>
 #include <unordered_map>
 #include <vector>
-
-#include "src/storage/lib/block_client/cpp/block_device.h"
 
 namespace disk_inspector {
 
@@ -76,9 +74,9 @@ std::string PrintCommandList(const std::vector<Command>& commands);
 // - An argument type in the command is not supported for parsing.
 // Asserts the passed in |args| is not empty and that the command name in |args|
 // matches that of the |command|.
-fpromise::result<ParsedCommand, zx_status_t> ParseCommand(const std::vector<std::string>& args,
-                                                          const Command& command);
+zx::result<ParsedCommand> ParseCommand(const std::vector<std::string>& args,
+                                       const Command& command);
 
 }  // namespace disk_inspector
 
-#endif  // SRC_STORAGE_LIB_DISK_INSPECTOR_INCLUDE_DISK_INSPECTOR_COMMAND_H_
+#endif  // SRC_STORAGE_LIB_DISK_INSPECTOR_COMMAND_H_

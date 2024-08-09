@@ -2,10 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_STORAGE_LIB_DISK_INSPECTOR_INCLUDE_DISK_INSPECTOR_SUPPORTED_TYPES_H_
-#define SRC_STORAGE_LIB_DISK_INSPECTOR_INCLUDE_DISK_INSPECTOR_SUPPORTED_TYPES_H_
+#ifndef SRC_STORAGE_LIB_DISK_INSPECTOR_SUPPORTED_TYPES_H_
+#define SRC_STORAGE_LIB_DISK_INSPECTOR_SUPPORTED_TYPES_H_
 
-#include <map>
 namespace disk_inspector {
 
 // Enum listing the types that DiskStruct is able to parse. This is necessary
@@ -28,4 +27,4 @@ struct PrintOptions {
 
 }  // namespace disk_inspector
 
-#endif  // SRC_STORAGE_LIB_DISK_INSPECTOR_INCLUDE_DISK_INSPECTOR_SUPPORTED_TYPES_H_
+#endif  // SRC_STORAGE_LIB_DISK_INSPECTOR_SUPPORTED_TYPES_H_

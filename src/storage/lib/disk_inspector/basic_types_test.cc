@@ -4,8 +4,15 @@
 
 // Tests disk-inspector primitive data type behavior.
 
-#include <disk_inspector/common_types.h>
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <string>
+
 #include <gtest/gtest.h>
+
+#include "src/storage/lib/disk_inspector/common_types.h"
+#include "src/storage/lib/disk_inspector/disk_inspector.h"
 
 namespace disk_inspector {
 namespace {
@@ -44,28 +51,28 @@ void TestPrimitiveType(DiskObject* obj, const void* expected_value, size_t expec
   }
 }
 
-TEST(DiskInpectorTest, TestUint32) {
+TEST(DiskInspectorTest, TestUint32) {
   uint32_t inp_val = 5;
   auto out_obj = std::make_unique<DiskObjectUint32>("uint32Obj", &inp_val);
 
   TestPrimitiveType(out_obj.get(), &inp_val, sizeof(uint32_t));
 }
 
-TEST(DiskInpectorTest, TestUint64) {
+TEST(DiskInspectorTest, TestUint64) {
   uint64_t inp_val = 55;
   auto out_obj = std::make_unique<DiskObjectUint64>("uint64Obj", &inp_val);
 
   TestPrimitiveType(out_obj.get(), &inp_val, sizeof(uint64_t));
 }
 
-TEST(DiskInpectorTest, TestChar) {
+TEST(DiskInspectorTest, TestChar) {
   char inp_val = 'h';
   auto out_obj = std::make_unique<DiskObjectChar>("charObj", &inp_val);
 
   TestPrimitiveType(out_obj.get(), &inp_val, sizeof(char));
 }
 
-TEST(DiskInpectorTest, TestUint32Array) {
+TEST(DiskInspectorTest, TestUint32Array) {
   uint32_t inp_arr[2] = {1, 2};
   auto out_obj = std::make_unique<DiskObjectUint32Array>("uint32Obj", inp_arr, 2);
 
@@ -86,7 +93,7 @@ TEST(DiskInpectorTest, TestUint32Array) {
   ASSERT_EQ(nullptr, out_obj->GetElementAt(2).get());
 }
 
-TEST(DiskInpectorTest, TestUint64Array) {
+TEST(DiskInspectorTest, TestUint64Array) {
   uint64_t inp_arr[2] = {7, 8};
   auto out_obj = std::make_unique<DiskObjectUint64Array>("uint64Obj", inp_arr, 2);
 
@@ -107,7 +114,7 @@ TEST(DiskInpectorTest, TestUint64Array) {
   ASSERT_EQ(nullptr, out_obj->GetElementAt(2).get());
 }
 
-TEST(DiskInpectorTest, TestCharArray) {
+TEST(DiskInspectorTest, TestCharArray) {
   char inp_arr[2] = {'h', 'i'};
   auto out_obj = std::make_unique<DiskObjectCharArray>("charObj", inp_arr, 2);
 
