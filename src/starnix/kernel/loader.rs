@@ -10,7 +10,7 @@ use crate::mm::{
 use crate::security;
 use crate::task::CurrentTask;
 use crate::vdso::vdso_loader::ZX_TIME_VALUES_MEMORY;
-use crate::vfs::{FileHandle, FileWriteGuardMode, FileWriteGuardRef};
+use crate::vfs::{FdNumber, FileHandle, FileWriteGuardMode, FileWriteGuardRef};
 use fuchsia_zircon::{
     HandleBased, {self as zx},
 };
@@ -18,10 +18,12 @@ use process_builder::{elf_load, elf_parse};
 use starnix_logging::{log_error, log_warn};
 use starnix_sync::{BeforeFsNodeAppend, DeviceOpen, FileOpsCore, LockBefore, Locked};
 use starnix_uapi::errors::Errno;
+use starnix_uapi::file_mode::{Access, AccessCheck, FileMode};
 use starnix_uapi::math::round_up_to_system_page_size;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::time::SCHEDULER_CLOCK_HZ;
 use starnix_uapi::user_address::UserAddress;
+use starnix_uapi::vfs::ResolveFlags;
 use starnix_uapi::{
     errno, error, from_status_like_fdio, AT_BASE, AT_CLKTCK, AT_EGID, AT_ENTRY, AT_EUID, AT_EXECFN,
     AT_GID, AT_NULL, AT_PAGESZ, AT_PHDR, AT_PHENT, AT_PHNUM, AT_RANDOM, AT_SECURE, AT_SYSINFO_EHDR,
@@ -363,8 +365,15 @@ where
     };
 
     let mut args = parse_interpreter_line(&buffer)?;
-    let interpreter =
-        current_task.open_file(locked, args[0].as_bytes().into(), OpenFlags::RDONLY)?;
+    let interpreter = current_task.open_file_at(
+        locked,
+        FdNumber::AT_FDCWD,
+        args[0].as_bytes().into(),
+        OpenFlags::RDONLY,
+        FileMode::default(),
+        ResolveFlags::empty(),
+        AccessCheck::check_for(Access::EXEC),
+    )?;
 
     // Append the original script executable path as an argument.
     args.push(path);

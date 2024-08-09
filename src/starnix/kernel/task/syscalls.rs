@@ -32,7 +32,7 @@ use starnix_uapi::auth::{
     CAP_SYS_NICE, CAP_SYS_PTRACE, CAP_SYS_TTY_CONFIG,
 };
 use starnix_uapi::errors::Errno;
-use starnix_uapi::file_mode::{AccessCheck, FileMode};
+use starnix_uapi::file_mode::{Access, AccessCheck, FileMode};
 use starnix_uapi::kcmp::KcmpResource;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::ownership::WeakRef;
@@ -257,7 +257,12 @@ pub fn sys_execveat(
         // for that file, which is undesirable here.
         //
         // See https://man7.org/linux/man-pages/man3/fexecve.3.html#DESCRIPTION
-        file.name.open(locked, current_task, OpenFlags::RDONLY, AccessCheck::skip())?
+        file.name.open(
+            locked,
+            current_task,
+            OpenFlags::RDONLY,
+            AccessCheck::check_for(Access::EXEC),
+        )?
     } else {
         current_task.open_file_at(
             locked,
@@ -266,7 +271,7 @@ pub fn sys_execveat(
             open_flags,
             FileMode::default(),
             ResolveFlags::empty(),
-            AccessCheck::default(),
+            AccessCheck::check_for(Access::EXEC),
         )?
     };
 
