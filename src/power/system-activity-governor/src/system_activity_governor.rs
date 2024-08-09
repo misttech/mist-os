@@ -104,7 +104,9 @@ impl ExecutionStateManager {
         inspect: INode,
     ) -> Self {
         Self {
-            opportunistic_dependency_token: execution_state.opportunistic_dependency_token(),
+            opportunistic_dependency_token: execution_state
+                .opportunistic_dependency_token()
+                .expect("token not registered"),
             inner: Mutex::new(ExecutionStateManagerInner {
                 execution_state,
                 suspender,
@@ -492,7 +494,7 @@ impl SystemActivityGovernor {
         let wake_lease_manager = WakeLeaseManager::new(
             inspect_root.create_child("wake_leases"),
             topology.clone(),
-            execution_state.assertive_dependency_token(),
+            execution_state.assertive_dependency_token().expect("token not registered"),
         );
 
         element_power_level_names.push(generate_element_power_level_names(
@@ -515,7 +517,9 @@ impl SystemActivityGovernor {
         .dependencies(vec![fbroker::LevelDependency {
             dependency_type: fbroker::DependencyType::Assertive,
             dependent_level: ApplicationActivityLevel::Active.into_primitive(),
-            requires_token: execution_state.assertive_dependency_token(),
+            requires_token: execution_state
+                .assertive_dependency_token()
+                .expect("token not registered"),
             requires_level_by_preference: vec![ExecutionStateLevel::Active.into_primitive()],
         }])
         .build()
@@ -541,7 +545,9 @@ impl SystemActivityGovernor {
         .dependencies(vec![fbroker::LevelDependency {
             dependency_type: fbroker::DependencyType::Assertive,
             dependent_level: FullWakeHandlingLevel::Active.into_primitive(),
-            requires_token: execution_state.assertive_dependency_token(),
+            requires_token: execution_state
+                .assertive_dependency_token()
+                .expect("token not registered"),
             requires_level_by_preference: vec![ExecutionStateLevel::WakeHandling.into_primitive()],
         }])
         .build()
@@ -567,7 +573,9 @@ impl SystemActivityGovernor {
         .dependencies(vec![fbroker::LevelDependency {
             dependency_type: fbroker::DependencyType::Assertive,
             dependent_level: WakeHandlingLevel::Active.into_primitive(),
-            requires_token: execution_state.assertive_dependency_token(),
+            requires_token: execution_state
+                .assertive_dependency_token()
+                .expect("token not registered"),
             requires_level_by_preference: vec![ExecutionStateLevel::WakeHandling.into_primitive()],
         }])
         .build()
@@ -591,7 +599,9 @@ impl SystemActivityGovernor {
             .dependencies(vec![fbroker::LevelDependency {
                 dependency_type: fbroker::DependencyType::Assertive,
                 dependent_level: BootControlLevel::Active.into(),
-                requires_token: execution_state.assertive_dependency_token(),
+                requires_token: execution_state
+                    .assertive_dependency_token()
+                    .expect("token not registered"),
                 requires_level_by_preference: vec![ExecutionStateLevel::Active.into_primitive()],
             }])
             .build()
@@ -949,19 +959,25 @@ impl SystemActivityGovernor {
                         }),
                         application_activity: Some(fsystem::ApplicationActivity {
                             assertive_dependency_token: Some(
-                                self.application_activity.assertive_dependency_token(),
+                                self.application_activity
+                                    .assertive_dependency_token()
+                                    .expect("token not registered"),
                             ),
                             ..Default::default()
                         }),
                         full_wake_handling: Some(fsystem::FullWakeHandling {
                             assertive_dependency_token: Some(
-                                self.full_wake_handling.assertive_dependency_token(),
+                                self.full_wake_handling
+                                    .assertive_dependency_token()
+                                    .expect("token not registered"),
                             ),
                             ..Default::default()
                         }),
                         wake_handling: Some(fsystem::WakeHandling {
                             assertive_dependency_token: Some(
-                                self.wake_handling.assertive_dependency_token(),
+                                self.wake_handling
+                                    .assertive_dependency_token()
+                                    .expect("token not registered"),
                             ),
                             ..Default::default()
                         }),
@@ -1142,10 +1158,14 @@ impl ResumeLatencyContext {
     fn to_fidl(&self) -> fsystem::ExecutionResumeLatency {
         fsystem::ExecutionResumeLatency {
             opportunistic_dependency_token: Some(
-                self.execution_resume_latency.opportunistic_dependency_token(),
+                self.execution_resume_latency
+                    .opportunistic_dependency_token()
+                    .expect("token not registered"),
             ),
             assertive_dependency_token: Some(
-                self.execution_resume_latency.assertive_dependency_token(),
+                self.execution_resume_latency
+                    .assertive_dependency_token()
+                    .expect("token not registered"),
             ),
             resume_latencies: Some(self.resume_latencies.clone()),
             ..Default::default()

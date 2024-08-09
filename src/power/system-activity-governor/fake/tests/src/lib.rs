@@ -125,7 +125,7 @@ async fn test_fsystem_activity_governor_listener_and_get_power_element() -> Resu
             .dependencies(vec![fbroker::LevelDependency {
                 dependency_type: fbroker::DependencyType::Assertive,
                 dependent_level: 1,
-                requires_token: test_driver.assertive_dependency_token(),
+                requires_token: test_driver.assertive_dependency_token().unwrap(),
                 requires_level_by_preference: vec![1],
             }])
             .build()

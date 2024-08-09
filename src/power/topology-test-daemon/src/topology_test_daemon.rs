@@ -68,8 +68,10 @@ impl PowerElement {
                 .build()
                 .await?;
 
-        let assertive_dependency_token = power_element_context.assertive_dependency_token();
-        let opportunistic_dependency_token = power_element_context.opportunistic_dependency_token();
+        let assertive_dependency_token =
+            power_element_context.assertive_dependency_token().expect("token not registered");
+        let opportunistic_dependency_token =
+            power_element_context.opportunistic_dependency_token().expect("token not registered");
 
         // Destructure PowerElementContext and convert current_level and required_level proxies to
         // client ends. `into_client_end` will only succeed if there are no active clones of the
