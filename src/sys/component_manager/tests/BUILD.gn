@@ -10,7 +10,6 @@ group("non_hermetic_tests") {
   testonly = true
   deps = [
     "bootfs:tests",
-    "bootfs_launching_benchmark:tests($default_toolchain)",
     "capability_provider_vfs_compliance:tests",
     "fuchsia_boot_resolver:tests($default_toolchain)",
     "fuchsia_io:tests",
@@ -62,6 +61,11 @@ group("hermetic_tests") {
     "structured_config/parent_overrides:parent_overrides_integration_test",
     "utc-time:tests",
   ]
+}
+
+group("benchmarks") {
+  testonly = true
+  deps = [ "bootfs_launching_benchmark:benchmark" ]
 }
 
 rustc_binary("trigger_bin") {

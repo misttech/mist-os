@@ -7,20 +7,24 @@ import("//build/assembly/board_configuration.gni")
 import("//build/assembly/product_assembly_configuration.gni")
 import("//build/component/config.gni")
 import("//build/components/fuchsia_package.gni")
+import("//build/rust/rustc_binary.gni")
 import("//build/testing/host_test_data.gni")
+import("//build/testing/perf/test.gni")
 import("//build/zircon/tools.gni")
 
-rustc_test("bootfs_launching_benchmark") {
+rustc_binary("bootfs_launching_benchmark") {
   name = "bootfs-launching-benchmark"
   edition = "2021"
 
   source_root = "src/main.rs"
+  testonly = true
 
   deps = [
     "//examples/components/routing/fidl:echo_rust",
     "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
     "//sdk/fidl/fuchsia.component.sandbox:fuchsia.component.sandbox_rust",
     "//sdk/fidl/fuchsia.process:fuchsia.process_rust",
+    "//src/developer/fuchsia-criterion",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
@@ -29,7 +33,6 @@ rustc_test("bootfs_launching_benchmark") {
     "//src/lib/fuchsia-runtime",
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:test-case",
   ]
 
   sources = [ "src/main.rs" ]
@@ -137,24 +140,25 @@ if (current_toolchain == default_toolchain) {
     deps = [ ":test_assembly" ]
   }
 
-  fuchsia_test_component("bootfs_launching_benchmark_component") {
+  fuchsia_component("bootfs_launching_benchmark_component") {
     component_name = "bootfs_launching_benchmark"
     manifest = "meta/bootfs_launching_benchmark.cml"
     deps = [
       ":bootfs_launching_benchmark",
       ":bootfs_resource",
     ]
-
-    # Need system test type for Vmex resource.
-    test_type = "system"
+    testonly = true
   }
 
-  fuchsia_test_package("bootfs-launching-benchmark-integration-tests") {
-    test_components = [ ":bootfs_launching_benchmark_component" ]
-    deps = [ ":bootfs_resource" ]
+  fuchsia_package("bootfs-launching-benchmark-pkg") {
+    deps = [
+      ":bootfs_launching_benchmark_component",
+      ":bootfs_resource",
+    ]
     foreach(i, number_of_components_list) {
       deps += [ ":component-manager-cmp-${i}" ]
     }
+    testonly = true
 
     # We don't want to include the product bundle in build outputs.
     metadata = {
@@ -168,9 +172,18 @@ if (current_toolchain == default_toolchain) {
     sources = [ "config.json5" ]
     dest = "data/component_manager_config"
   }
+}
 
-  group("tests") {
-    testonly = true
-    deps = [ ":bootfs-launching-benchmark-integration-tests" ]
-  }
+fuchsia_component_perf_test("bootfs-launching-benchmark") {
+  package = ":bootfs-launching-benchmark-pkg"
+  component_name = "bootfs_launching_benchmark"
+  expected_metric_names_filepath = "//src/tests/end_to_end/perf/expected_metric_names/fuchsia.bootfs.launching.txt"
+
+  # Need system test type for Vmex resource.
+  test_type = "system"
+}
+
+group("benchmark") {
+  testonly = true
+  deps = [ ":bootfs-launching-benchmark" ]
 }
