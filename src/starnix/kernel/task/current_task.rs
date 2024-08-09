@@ -35,7 +35,7 @@ use starnix_syscalls::SyscallResult;
 use starnix_uapi::auth::{Credentials, CAP_SYS_ADMIN};
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
-use starnix_uapi::file_mode::{Access, FileMode};
+use starnix_uapi::file_mode::{Access, AccessCheck, FileMode};
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::ownership::{
     release_on_error, OwnedRef, Releasable, ReleaseGuard, Share, TempRef, WeakRef,
@@ -737,7 +737,8 @@ impl CurrentTask {
         // > open() call that creates a read-only file may well return a  read/write  file
         // > descriptor.
 
-        name.open(locked, self, flags, !created)
+        let access_check = if created { AccessCheck::skip() } else { AccessCheck::default() };
+        name.open(locked, self, flags, access_check)
     }
 
     /// A wrapper for FsContext::lookup_parent_at that resolves the given

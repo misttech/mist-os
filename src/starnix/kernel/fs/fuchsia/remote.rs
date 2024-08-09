@@ -1694,7 +1694,7 @@ mod test {
     use fxfs_testing::{TestFixture, TestFixtureOptions};
     use starnix_uapi::auth::Credentials;
     use starnix_uapi::errors::EINVAL;
-    use starnix_uapi::file_mode::mode;
+    use starnix_uapi::file_mode::{mode, AccessCheck};
     use starnix_uapi::vfs::EpollEvent;
     use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
@@ -1723,7 +1723,7 @@ mod test {
         let mut context = LookupContext::default();
         let _test_file = root
             .lookup_child(&current_task, &mut context, "bin/hello_starnix".into())?
-            .open(&mut locked, &current_task, OpenFlags::RDONLY, true)?;
+            .open(&mut locked, &current_task, OpenFlags::RDONLY, AccessCheck::default())?;
         Ok(())
     }
 
@@ -2683,7 +2683,7 @@ mod test {
                         .expect("create_node failed");
                     // Write to file (this should update mtime (time_modify))
                     let file = child
-                        .open(locked, &current_task, OpenFlags::RDWR, true)
+                        .open(locked, &current_task, OpenFlags::RDWR, AccessCheck::default())
                         .expect("open failed");
                     // Call `fetch_and_refresh_info(..)` to refresh `time_modify` with the time managed by the
                     // underlying filesystem
@@ -2884,7 +2884,7 @@ mod test {
                         .create_node(locked, &current_task, "file".into(), MODE, DeviceType::NONE)
                         .expect("create_node failed");
                     let file = child
-                        .open(locked, &current_task, OpenFlags::RDWR, true)
+                        .open(locked, &current_task, OpenFlags::RDWR, AccessCheck::default())
                         .expect("open failed");
                     // Call `fetch_and_refresh_info(..)` to refresh ctime and mtime with the time managed by the
                     // underlying filesystem

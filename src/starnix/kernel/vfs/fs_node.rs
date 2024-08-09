@@ -36,7 +36,7 @@ use starnix_uapi::auth::{
 };
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::{Errno, EACCES};
-use starnix_uapi::file_mode::{mode, Access, FileMode};
+use starnix_uapi::file_mode::{mode, Access, AccessCheck, FileMode};
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::ownership::Releasable;
 use starnix_uapi::resource_limits::Resource;
@@ -1263,7 +1263,7 @@ impl FsNode {
         current_task: &CurrentTask,
         mount: &MountInfo,
         flags: OpenFlags,
-        check_access: bool,
+        access_check: AccessCheck,
     ) -> Result<Box<dyn FileOps>, Errno>
     where
         L: LockBefore<FileOpsCore>,
@@ -1275,7 +1275,8 @@ impl FsNode {
             return Ok(Box::new(OPathOps::new()));
         }
 
-        if check_access {
+        let access = access_check.resolve(flags);
+        if access.is_nontrivial() {
             if flags.contains(OpenFlags::NOATIME) {
                 self.check_o_noatime_allowed(current_task)?;
             }
@@ -1283,7 +1284,7 @@ impl FsNode {
             self.check_access(
                 current_task,
                 mount,
-                Access::from_open_flags(flags),
+                access,
                 CheckAccessReason::InternalPermissionChecks,
             )?;
         }
