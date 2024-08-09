@@ -16,6 +16,8 @@ pw_source_set("definitions") {
     "$dir_public_att/packet.h",
   ]
 
+  configs = [ "//src/connectivity/bluetooth/core/bt-host:copts" ]
+
   sources = [ "packet.cc" ]
 
   public_deps = [
@@ -44,14 +46,14 @@ pw_source_set("att") {
     "write_queue.cc",
   ]
 
+  configs = [ "//src/connectivity/bluetooth/core/bt-host:copts" ]
+
   public_deps = [
     ":definitions",
     "$dir_pw_third_party/fuchsia:fit",
     "//src/connectivity/bluetooth/core/bt-host/l2cap",
     "//src/connectivity/bluetooth/core/bt-host/sm:definitions",
   ]
-
-  configs = [ "//src/connectivity/bluetooth/core/bt-host:copts" ]
 
   deps = [
     "$dir_pw_preprocessor",
@@ -67,6 +69,8 @@ pw_test("tests") {
     "error_test.cc",
     "permissions_test.cc",
   ]
+
+  configs = [ "//src/connectivity/bluetooth/core/bt-host:copts" ]
 
   deps = [
     ":att",

@@ -34,6 +34,7 @@ fuchsia_cc_test(
     srcs = [
         "util_test.cc",
     ],
+    copts = COPTS,
     visibility = ["//visibility:public"],
     deps = [
         ":hci-spec",

@@ -64,6 +64,8 @@ pw_source_set("common") {
     "uuid.cc",
   ]
 
+  configs = [ "//src/connectivity/bluetooth/core/bt-host:copts" ]
+
   public_deps = [
     "$dir_pw_assert",
     "$dir_pw_async:dispatcher",
@@ -89,12 +91,11 @@ pw_source_set("common") {
   }
 
   deps = [ "$dir_pw_preprocessor" ]
-
-  configs = [ "//src/connectivity/bluetooth/core/bt-host:copts" ]
 }
 
 pw_source_set("uuid_string_util") {
   sources = [ "uuid_string_util.cc" ]
+  configs = [ "//src/connectivity/bluetooth/core/bt-host:copts" ]
   public_deps = [ ":common" ]
 }
 
@@ -121,6 +122,8 @@ pw_test("tests") {
     "windowed_inspect_numeric_property_test.cc",
   ]
 
+  configs = [ "//src/connectivity/bluetooth/core/bt-host:copts" ]
+
   deps = [
     ":common",
     ":uuid_string_util",
@@ -133,6 +136,7 @@ pw_test("tests") {
 
 fuchsia_library_fuzzer("advertising_data_fuzzer") {
   sources = [ "advertising_data_fuzztest.cc" ]
+  configs += [ "//src/connectivity/bluetooth/core/bt-host:copts" ]
   deps = [
     ":common",
     "//src/connectivity/bluetooth/core/bt-host/testing:fuzztest_driver",
@@ -141,6 +145,7 @@ fuchsia_library_fuzzer("advertising_data_fuzzer") {
 
 pw_fuzzer("pw_advertising_data_fuzzer") {
   sources = [ "advertising_data_fuzztest.cc" ]
+  configs = [ "//src/connectivity/bluetooth/core/bt-host:copts" ]
   deps = [ ":common" ]
 }
 

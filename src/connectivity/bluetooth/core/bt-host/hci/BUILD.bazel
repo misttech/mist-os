@@ -49,6 +49,7 @@ cc_library(
         "fake_low_energy_connection.cc",
         "fake_sco_connection.cc",
     ],
+    copts = COPTS,
     deps = [
         ":hci",
         "//src/connectivity/bluetooth/core/bt-host:public",
@@ -73,6 +74,7 @@ fuchsia_cc_test(
         "low_energy_scanner_test.cc",
         "sequential_command_runner_test.cc",
     ],
+    copts = COPTS,
     death_unittest = True,
     visibility = ["//visibility:public"],
     deps = [

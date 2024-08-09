@@ -16,6 +16,7 @@ cc_library(
     srcs = [
         "packet.cc",
     ],
+    copts = COPTS,
     deps = [
         "//src/connectivity/bluetooth/core/bt-host:public",
         "//src/connectivity/bluetooth/core/bt-host/common",
@@ -54,6 +55,7 @@ fuchsia_cc_test(
         "error_test.cc",
         "permissions_test.cc",
     ],
+    copts = COPTS,
     death_unittest = True,
     visibility = ["//visibility:public"],
     deps = [

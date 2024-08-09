@@ -16,6 +16,7 @@ cc_library(
     srcs = [
         "gap.cc",
     ],
+    copts = COPTS,
     deps = [
         "//src/connectivity/bluetooth/core/bt-host:public",
         "//src/connectivity/bluetooth/core/bt-host/common",
@@ -78,6 +79,7 @@ cc_library(
         "fake_adapter.cc",
         "fake_pairing_delegate.cc",
     ],
+    copts = COPTS,
     deps = [
         ":gap",
         "//src/connectivity/bluetooth/core/bt-host:public",
@@ -110,6 +112,7 @@ fuchsia_cc_test(
         "secure_simple_pairing_state_test.cc",
         "types_test.cc",
     ],
+    copts = COPTS,
     death_unittest = True,
     visibility = ["//visibility:public"],
     deps = [

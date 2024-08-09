@@ -76,6 +76,8 @@ pw_source_set("testing") {
     "fake_sco_connection.cc",
   ]
 
+  configs = [ "//src/connectivity/bluetooth/core/bt-host:copts" ]
+
   deps = [ "$dir_pw_async:heap_dispatcher" ]
 
   public_deps = [ ":hci" ]
@@ -95,6 +97,8 @@ pw_test("tests") {
     "low_energy_scanner_test.cc",
     "sequential_command_runner_test.cc",
   ]
+
+  configs = [ "//src/connectivity/bluetooth/core/bt-host:copts" ]
 
   deps = [
     ":testing",

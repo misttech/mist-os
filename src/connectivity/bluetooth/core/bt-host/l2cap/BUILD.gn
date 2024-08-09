@@ -87,6 +87,8 @@ pw_source_set("l2cap") {
     "types.cc",
   ]
 
+  configs = [ "//src/connectivity/bluetooth/core/bt-host:copts" ]
+
   public_deps = [
     ":definitions",
     "$dir_pw_string",
@@ -95,8 +97,6 @@ pw_source_set("l2cap") {
     "//src/connectivity/bluetooth/core/bt-host/hci",
     "//src/connectivity/bluetooth/core/bt-host/transport",
   ]
-
-  configs = [ "//src/connectivity/bluetooth/core/bt-host:copts" ]
 
   deps = [
     "$dir_pw_bluetooth:emboss_l2cap_frames",
@@ -144,6 +144,8 @@ pw_source_set("testing") {
     "test_packets.cc",
   ]
 
+  configs = [ "//src/connectivity/bluetooth/core/bt-host:copts" ]
+
   public_deps = [
     ":l2cap",
     "$dir_pw_async:fake_dispatcher_fixture",
@@ -187,6 +189,8 @@ pw_test("tests") {
     "types_test.cc",
   ]
 
+  configs = [ "//src/connectivity/bluetooth/core/bt-host:copts" ]
+
   deps = [
     ":channel_manager_mock_controller_test_fixture",
     ":l2cap",
@@ -203,6 +207,7 @@ pw_test("tests") {
 
 fuchsia_library_fuzzer("basic_mode_rx_engine_fuzzer") {
   sources = [ "basic_mode_rx_engine_fuzztest.cc" ]
+  configs += [ "//src/connectivity/bluetooth/core/bt-host:copts" ]
   deps = [
     ":l2cap",
     ":testing",
@@ -212,6 +217,7 @@ fuchsia_library_fuzzer("basic_mode_rx_engine_fuzzer") {
 
 pw_fuzzer("pw_basic_mode_rx_engine_fuzzer") {
   sources = [ "basic_mode_rx_engine_fuzztest.cc" ]
+  configs = [ "//src/connectivity/bluetooth/core/bt-host:copts" ]
   deps = [
     ":l2cap",
     ":testing",
@@ -220,6 +226,7 @@ pw_fuzzer("pw_basic_mode_rx_engine_fuzzer") {
 
 fuchsia_library_fuzzer("enhanced_retransmission_mode_engines_fuzzer") {
   sources = [ "enhanced_retransmission_mode_engines_fuzztest.cc" ]
+  configs += [ "//src/connectivity/bluetooth/core/bt-host:copts" ]
   deps = [
     ":l2cap",
     ":testing",
@@ -229,6 +236,7 @@ fuchsia_library_fuzzer("enhanced_retransmission_mode_engines_fuzzer") {
 
 pw_fuzzer("pw_enhanced_retransmission_mode_engines_fuzzer") {
   sources = [ "enhanced_retransmission_mode_engines_fuzztest.cc" ]
+  configs = [ "//src/connectivity/bluetooth/core/bt-host:copts" ]
   deps = [
     ":l2cap",
     ":testing",
@@ -237,6 +245,7 @@ pw_fuzzer("pw_enhanced_retransmission_mode_engines_fuzzer") {
 
 fuchsia_library_fuzzer("bredr_dynamic_channel_registry_fuzzer") {
   sources = [ "bredr_dynamic_channel_registry_fuzztest.cc" ]
+  configs += [ "//src/connectivity/bluetooth/core/bt-host:copts" ]
   deps = [
     ":l2cap",
     ":testing",
@@ -247,6 +256,7 @@ fuchsia_library_fuzzer("bredr_dynamic_channel_registry_fuzzer") {
 
 pw_fuzzer("pw_bredr_dynamic_channel_registry_fuzzer") {
   sources = [ "bredr_dynamic_channel_registry_fuzztest.cc" ]
+  configs = [ "//src/connectivity/bluetooth/core/bt-host:copts" ]
   deps = [
     ":l2cap",
     ":testing",
@@ -256,6 +266,7 @@ pw_fuzzer("pw_bredr_dynamic_channel_registry_fuzzer") {
 
 fuchsia_library_fuzzer("channel_configuration_fuzzer") {
   sources = [ "channel_configuration_fuzztest.cc" ]
+  configs += [ "//src/connectivity/bluetooth/core/bt-host:copts" ]
   deps = [
     ":l2cap",
     ":testing",
@@ -265,6 +276,7 @@ fuchsia_library_fuzzer("channel_configuration_fuzzer") {
 
 pw_fuzzer("pw_channel_configuration_fuzzer") {
   sources = [ "channel_configuration_fuzztest.cc" ]
+  configs = [ "//src/connectivity/bluetooth/core/bt-host:copts" ]
   deps = [
     ":l2cap",
     ":testing",
@@ -273,6 +285,7 @@ pw_fuzzer("pw_channel_configuration_fuzzer") {
 
 fuchsia_library_fuzzer("common_handler_fuzzer") {
   sources = [ "common_handler_fuzztest.cc" ]
+  configs += [ "//src/connectivity/bluetooth/core/bt-host:copts" ]
   deps = [
     ":l2cap",
     ":testing",
@@ -282,6 +295,7 @@ fuchsia_library_fuzzer("common_handler_fuzzer") {
 
 pw_fuzzer("pw_common_handler_fuzzer") {
   sources = [ "common_handler_fuzztest.cc" ]
+  configs = [ "//src/connectivity/bluetooth/core/bt-host:copts" ]
   deps = [
     ":l2cap",
     ":testing",
@@ -290,6 +304,7 @@ pw_fuzzer("pw_common_handler_fuzzer") {
 
 fuchsia_library_fuzzer("l2cap_fuzzer") {
   sources = [ "l2cap_fuzztest.cc" ]
+  configs += [ "//src/connectivity/bluetooth/core/bt-host:copts" ]
   deps = [
     ":l2cap",
     "$dir_pw_random:fuzzer_generator",
@@ -301,6 +316,7 @@ fuchsia_library_fuzzer("l2cap_fuzzer") {
 
 pw_fuzzer("pw_l2cap_fuzzer") {
   sources = [ "l2cap_fuzztest.cc" ]
+  configs = [ "//src/connectivity/bluetooth/core/bt-host:copts" ]
   deps = [
     ":l2cap",
     "$dir_pw_random:fuzzer_generator",
