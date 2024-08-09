@@ -7,6 +7,7 @@ import("//build/components.gni")
 import("//build/drivers.gni")
 import("//build/fidl/fidl.gni")
 import("//build/test.gni")
+import("//tools/power_config/build/config.gni")
 
 driver_bind_rules("test-power-integration-board-bind") {
   rules = "meta/test-power-integration.bind"
@@ -16,10 +17,16 @@ driver_bind_rules("test-power-integration-board-bind") {
   ]
 }
 
+power_config("power-config") {
+  output_name = "power_config.fidl"
+  value_file = "power_config.json5"
+}
+
 fuchsia_driver("test-power-integration-board-driver") {
   output_name = "power-integration-board"
   sources = [ "test-power-integration-board.cc" ]
   deps = [
+    ":power-config",
     ":test-power-integration-board-bind",
     "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_cpp",
     "//sdk/lib/driver/component/cpp:cpp",
@@ -27,6 +34,7 @@ fuchsia_driver("test-power-integration-board-driver") {
     "//src/devices/bind/fuchsia:fuchsia_cpp",
     "//src/devices/bind/fuchsia.test.platform:fuchsia.test.platform_cpp",
     "//src/devices/lib/driver:driver_runtime",
+    "//tools/power_config/lib/cpp",
     "//zircon/system/ulib/fbl",
   ]
 }
