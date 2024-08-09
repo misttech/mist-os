@@ -9,16 +9,6 @@ import("//build/security.gni")
 assert(current_toolchain == default_toolchain)
 
 group("bootfs_labels") {
-  testonly = fuchsia_zbi_testonly
   deps = [ "//boards/kernel_cmdline" ]
   deps += board_bootfs_labels
-}
-
-group("recovery_bootfs_labels") {
-  deps = board_recovery_bootfs_labels
-}
-
-group("zedboot_bootfs_labels") {
-  testonly = true
-  deps = board_zedboot_bootfs_labels
 }

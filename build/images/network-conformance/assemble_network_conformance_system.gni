@@ -121,6 +121,6 @@ template("assemble_network_conformance_system") {
 
     cmdline = [ "kernel.halt-on-panic=true" ]
 
-    bootfs_labels = [ "//build/input:recovery_bootfs" ]
+    bootfs_labels = [ "//build/input:bootfs" ]
   }
 }
