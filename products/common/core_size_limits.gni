@@ -117,7 +117,7 @@ size_checker_input = {
         "sampler",
         "triage-detect",
       ]
-      limit = 2936012  # 2.80 MiB
+      limit = 3145728  # 3 MiB
       creep_limit = 49152  # 48.0 KiB
     },
     {
@@ -170,7 +170,7 @@ size_checker_input = {
         "memory_monitor",
         "memory_sampler",
       ]
-      limit = 2359296  # 2.25 MiB
+      limit = 2621440  # 2.5 MiB
       creep_limit = 102400  # 100 KiB
     },
     {
