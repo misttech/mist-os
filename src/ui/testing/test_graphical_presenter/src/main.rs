@@ -34,8 +34,9 @@ const VIEWPORT_TRANSFORM_ID: TransformId = TransformId { value: 3 };
 const VIEWPORT_CONTENT_ID: ContentId = ContentId { value: 4 };
 const BACKGROUND_COLOR: ColorRgba = ColorRgba { red: 1.0, green: 0.0, blue: 1.0, alpha: 1.0 };
 
-#[allow(dead_code)] // TODO(https://fxbug.dev/318827209)
-struct ChildView(fasync::Task<()>);
+struct ChildView {
+    _task: fasync::Task<()>,
+}
 
 struct TestGraphicalPresenter {
     flatland: FlatlandProxy,
@@ -331,29 +332,31 @@ impl TestGraphicalPresenter {
         }
 
         let view_focuser = self.view_focuser.clone();
-        Ok(ChildView(fasync::Task::local(async move {
-            // TODO: Poll the request stream and handle Dismiss. For now we just hold onto the
-            // channels so they don't close.
-            let _view_controller_request_stream = view_controller_request_stream;
-            let mut child_view_ref_stream = HangingGetStream::new_with_fn_ptr(
-                child_view_watcher,
-                ChildViewWatcherProxy::get_view_ref,
-            );
-            loop {
-                match child_view_ref_stream.next().await {
-                    Some(Ok(token)) => match view_focuser.request_focus(token).await {
-                        Ok(Ok(())) => {}
-                        Ok(Err(e)) => {
-                            tracing::error!("Error requesting focus:: {:?}", e);
-                        }
-                        Err(e) => {
-                            tracing::error!("FIDL error requesting focus: {:?}", e);
-                        }
-                    },
-                    _ => {}
+        Ok(ChildView {
+            _task: fasync::Task::local(async move {
+                // TODO: Poll the request stream and handle Dismiss. For now we just hold onto the
+                // channels so they don't close.
+                let _view_controller_request_stream = view_controller_request_stream;
+                let mut child_view_ref_stream = HangingGetStream::new_with_fn_ptr(
+                    child_view_watcher,
+                    ChildViewWatcherProxy::get_view_ref,
+                );
+                loop {
+                    match child_view_ref_stream.next().await {
+                        Some(Ok(token)) => match view_focuser.request_focus(token).await {
+                            Ok(Ok(())) => {}
+                            Ok(Err(e)) => {
+                                tracing::error!("Error requesting focus:: {:?}", e);
+                            }
+                            Err(e) => {
+                                tracing::error!("FIDL error requesting focus: {:?}", e);
+                            }
+                        },
+                        _ => {}
+                    }
                 }
-            }
-        })))
+            }),
+        })
     }
 }
 

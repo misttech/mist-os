@@ -32,7 +32,7 @@ impl RequestReceiver<WlDataDeviceManager> for DataDeviceManager {
                 id.implement(client, DataSource)?;
             }
             WlDataDeviceManagerRequest::GetDataDevice { id, seat } => {
-                id.implement(client, DataDevice(seat.into()))?;
+                id.implement(client, DataDevice { _object: seat.into() })?;
             }
         }
         Ok(())
@@ -58,8 +58,9 @@ impl RequestReceiver<WlDataSource> for DataSource {
     }
 }
 
-#[allow(dead_code)] // TODO(https://fxbug.dev/318827209)
-struct DataDevice(ObjectRef<Seat>);
+struct DataDevice {
+    _object: ObjectRef<Seat>,
+}
 
 impl RequestReceiver<WlDataDevice> for DataDevice {
     fn receive(
