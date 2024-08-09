@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
+    include: [ "syslog/client.shard.cml" ],
     collections: [
         {
             name: "fs-collection",
@@ -19,7 +20,6 @@
             protocol: [
                 "fuchsia.boot.WriteOnlyLog",
                 "fuchsia.inspect.InspectSink",
-                "fuchsia.logger.LogSink",
             ],
             from: "parent",
             to: [ "#fs-collection" ],
