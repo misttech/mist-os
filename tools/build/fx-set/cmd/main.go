@@ -137,7 +137,7 @@ func mainImpl(ctx context.Context) error {
 		BuildDir:    filepath.Join(args.checkoutDir, args.buildDir),
 	}
 
-	_, err = fint.Set(ctx, staticSpec, contextSpec, args.skipLocalArgs)
+	_, err = fint.Set(ctx, staticSpec, contextSpec, args.skipLocalArgs, args.assemblyOverrideStrings)
 	if err != nil {
 		return err
 	}
@@ -192,6 +192,8 @@ type setArgs struct {
 	fuzzSanitizers   []string
 	ideFiles         []string
 	gnArgs           []string
+
+	assemblyOverrideStrings []string
 }
 
 func parseArgsAndEnv(args []string, env map[string]string) (*setArgs, error) {
@@ -249,6 +251,8 @@ func parseArgsAndEnv(args []string, env map[string]string) (*setArgs, error) {
 	// preserved rather than interpreting them as value separators.
 	flagSet.StringArrayVar(&cmd.gnArgs, "args", []string{}, "")
 
+	flagSet.StringSliceVar(&cmd.assemblyOverrideStrings, "assembly-override", []string{}, "")
+
 	if err := flagSet.Parse(args); err != nil {
 		return nil, err
 	}
@@ -277,6 +281,14 @@ func parseArgsAndEnv(args []string, env map[string]string) (*setArgs, error) {
 	}
 	if cmd.enableCxxRbe && cmd.disableCxxRbe {
 		return nil, fmt.Errorf("--cxx-rbe and --no-cxx-rbe are mutually exclusive")
+	}
+
+	// for each --assembly-override foo=bar string pair, split them into a pair
+	// of strings and validate their lengths
+	for _, overrideStringPair := range cmd.assemblyOverrideStrings {
+		if len(strings.Split(overrideStringPair, "=")) != 2 {
+			return nil, fmt.Errorf(("assembly overrides must be in ASSEMBLY_TARGET=OVERRIDE_TARGET pairs"))
+		}
 	}
 
 	if flagSet.NArg() == 0 {

@@ -121,6 +121,10 @@
 ##                         selected by `fx repro`. If set, no other flags that
 ##                         influence the build configuration should be set.
 ##   --dev                 Always recompile fx-set from source.
+##   --assembly-override   Pairs of ASSEMBLY_TARGET=OVERRIDE_TARGET labels to use
+##                         to define the developer assembly overrides targets to
+##                         use with the given assembly target.  Can be provided
+##                         multiple times with different ASSEMBLY_TARGET labels.
 ##
 ## Example:
 ##
