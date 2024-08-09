@@ -42,6 +42,8 @@ void PmmArena::Init(const PmmArenaSelection& selected, PmmNode* node) {
 
   dprintf(INFO, "PMM: adding arena [%#" PRIx64 ", %#" PRIx64 ")\n", selected.arena.base,
           selected.arena.end());
+
+  // Intentionally similar to the logging in PmmNode::InitReservedRange().
   dprintf(INFO, "PMM: reserved [%#" PRIx64 ", %#" PRIx64 "): bookkeeping\n",
           selected.bookkeeping.base, selected.bookkeeping.end());
 

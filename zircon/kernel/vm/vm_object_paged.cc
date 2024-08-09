@@ -23,7 +23,6 @@
 #include <ktl/algorithm.h>
 #include <ktl/array.h>
 #include <ktl/move.h>
-#include <vm/bootreserve.h>
 #include <vm/discardable_vmo_tracker.h>
 #include <vm/fault.h>
 #include <vm/page_source.h>
@@ -459,7 +458,7 @@ zx_status_t VmObjectPaged::CreateFromWiredPages(const void* data, size_t size, b
       ASSERT(page);
 
       if (page->state() == vm_page_state::WIRED) {
-        boot_reserve_unwire_page(page);
+        pmm_unwire_page(page);
       } else {
         // This function is only valid for memory in the boot image,
         // which should all be wired.

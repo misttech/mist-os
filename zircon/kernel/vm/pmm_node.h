@@ -52,6 +52,8 @@ class PmmNode {
   // The list can be a combination of loaned and non-loaned pages.
   void FreeList(list_node* list);
 
+  void UnwirePage(vm_page* page);
+
   // Contiguous page loaning routines
   void BeginLoan(list_node* page_list);
   void CancelLoan(paddr_t address, size_t count);
@@ -161,6 +163,16 @@ class PmmNode {
  private:
   zx_status_t InitArena(const PmmArenaSelection& selected);
 
+  // An initialization subroutine to update PMM bookkeeping to reflect that a
+  // given range is to be regarded as reserved (e.g., wired). This is used for
+  // both special pre-PMM allocations (e.g., the kernel memory image) as well as
+  // holes in RAM contained within arenas (indicated by type
+  // memalloc::Type::kReserved).
+  //
+  // `range` is expected to be page-aligned and to not intersect with past
+  // ranges provided to this method.
+  void InitReservedRange(const memalloc::Range& range);
+
   void FreePageHelperLocked(vm_page* page, bool already_filled) TA_REQ(lock_);
   void FreeListLocked(list_node* list, bool already_filled) TA_REQ(lock_);
 
@@ -242,6 +254,8 @@ class PmmNode {
   list_node free_list_ TA_GUARDED(lock_) = LIST_INITIAL_VALUE(free_list_);
   // Free pages where loaned && !loan_cancelled.
   list_node free_loaned_list_ TA_GUARDED(lock_) = LIST_INITIAL_VALUE(free_loaned_list_);
+  // Reserved pages.
+  list_node reserved_list_ TA_GUARDED(lock_) = LIST_INITIAL_VALUE(reserved_list_);
 
   // Controls the behavior of requests that have the PMM_ALLOC_FLAG_CAN_WAIT.
   enum class ShouldWaitState {

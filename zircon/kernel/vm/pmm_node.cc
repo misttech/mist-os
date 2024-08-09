@@ -24,7 +24,6 @@
 #include <kernel/scheduler.h>
 #include <kernel/thread.h>
 #include <pretty/cpp/sizes.h>
-#include <vm/bootreserve.h>
 #include <vm/phys/arena.h>
 #include <vm/physmap.h>
 #include <vm/pmm.h>
@@ -148,7 +147,11 @@ zx_status_t PmmNode::Init(ktl::span<const memalloc::Range> ranges) TA_NO_THREAD_
 
     if (last_ram_end && arena->address_in_arena(*last_ram_end) && *last_ram_end < start) {
       // Found a hole between RAM.
-      boot_reserve_add_range(*last_ram_end, start - *last_ram_end);
+      InitReservedRange(memalloc::Range{
+          .addr = *last_ram_end,
+          .size = start - *last_ram_end,
+          .type = memalloc::Type::kReserved,
+      });
       last_reserved_end = start;
     }
     last_ram_end = start + size;
@@ -156,11 +159,13 @@ zx_status_t PmmNode::Init(ktl::span<const memalloc::Range> ranges) TA_NO_THREAD_
     if (!memalloc::IsAllocatedType(range.type)) {
       continue;
     }
-    boot_reserve_add_range(start, size);
+    InitReservedRange(memalloc::Range{
+        .addr = start,
+        .size = size,
+        .type = range.type,
+    });
     last_reserved_end = last_ram_end;
   }
-
-  boot_reserve_wire();
 
   return ZX_OK;
 }
@@ -622,6 +627,36 @@ zx_status_t PmmNode::InitArena(const PmmArenaSelection& selected) TA_NO_THREAD_S
   return ZX_OK;
 }
 
+void PmmNode::InitReservedRange(const memalloc::Range& range) {
+  DEBUG_ASSERT(IS_PAGE_ALIGNED(range.addr));
+  DEBUG_ASSERT(IS_PAGE_ALIGNED(range.size));
+
+  ktl::string_view what =
+      range.type == memalloc::Type::kReserved ? "hole in RAM"sv : memalloc::ToString(range.type);
+  list_node reserved = LIST_INITIAL_VALUE(reserved);
+  zx_status_t status = pmm_alloc_range(range.addr, range.size / PAGE_SIZE, &reserved);
+  if (status != ZX_OK) {
+    dprintf(INFO, "PMM: unable to reserve [%#" PRIx64 ", %#" PRIx64 "): %.*s: %d\n", range.addr,
+            range.end(), static_cast<int>(what.size()), what.data(), status);
+    return;  // this is probably fatal but go ahead and continue
+  }
+  dprintf(INFO, "PMM: reserved [%#" PRIx64 ", %#" PRIx64 "): %.*s\n", range.addr, range.end(),
+          static_cast<int>(what.size()), what.data());
+
+  // Wire and then merge into the main reserved list.
+  //
+  // TODO(https://fxbug.dev/42164859): vm_page_state::MMU for page tables.
+  vm_page_t* p;
+  list_for_every_entry (&reserved, p, vm_page_t, queue_node) {
+    p->set_state(vm_page_state::WIRED);
+  }
+  if (list_is_empty(&reserved_list_)) {
+    list_move(&reserved, &reserved_list_);
+  } else {
+    list_splice_after(&reserved, list_peek_tail(&reserved_list_));
+  }
+}
+
 void PmmNode::FreePageHelperLocked(vm_page* page, bool already_filled) {
   LTRACEF("page %p state %zu paddr %#" PRIxPTR "\n", page, VmPageStateIndex(page->state()),
           page->paddr());
@@ -769,6 +804,13 @@ void PmmNode::FreeList(list_node* list) {
   Guard<Mutex> guard{&lock_};
 
   FreeListLocked(list, fill);
+}
+
+void PmmNode::UnwirePage(vm_page* page) {
+  ASSERT(page->state() == vm_page_state::WIRED);
+  Guard<Mutex> guard{&lock_};
+  list_delete(&page->queue_node);
+  page->set_state(vm_page_state::ALLOC);
 }
 
 bool PmmNode::ShouldDelayAllocationLocked() {

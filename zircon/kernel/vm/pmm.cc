@@ -125,6 +125,8 @@ zx_status_t pmm_alloc_contiguous(size_t count, uint alloc_flags, uint8_t alignme
   return pmm_node.AllocContiguous(count, alloc_flags, alignment_log2, pa, list);
 }
 
+void pmm_unwire_page(vm_page_t* page) { pmm_node.UnwirePage(page); }
+
 void pmm_begin_loan(list_node* page_list) {
   VM_KTRACE_DURATION(3, "pmm_begin_loan");
   pmm_node.BeginLoan(page_list);

@@ -94,9 +94,13 @@ zx_status_t pmm_alloc_range(paddr_t address, size_t count, list_node* list) __NO
 zx_status_t pmm_alloc_contiguous(size_t count, uint alloc_flags, uint8_t align_log2, paddr_t* pa,
                                  list_node* list) __NONNULL((4, 5));
 
-// Mark contiguous pages as "loaned", and free the pages so they can be borrowed by page allocations
-// that specify PMM_ALLOC_FLAG_CAN_BORROW.  The caller must eventually call pmm_cancel_loan() +
-// pmm_end_loan(), or pmm_delete_lender(), on ranges that cover exactly all the loaned pages.
+// Unwires a page and sets it in the ALLOC state.
+void pmm_unwire_page(vm_page_t* page);
+
+// Mark contiguous pages as "loaned", and free the pages so they can be borrowed by page
+// allocations that specify PMM_ALLOC_FLAG_CAN_BORROW.  The caller must eventually call
+// pmm_cancel_loan() + pmm_end_loan(), or pmm_delete_lender(), on ranges that cover exactly all
+// the loaned pages.
 void pmm_begin_loan(list_node* page_list);
 
 // All pages in the range must be currently loaned.  This call must be made before pmm_end_loan().
