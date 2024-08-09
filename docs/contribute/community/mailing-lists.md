@@ -72,12 +72,6 @@ Fuchsia:
    </td>
   </tr>
   <tr>
-   <td><a href="https://groups.google.com/a/fuchsia.dev/g/component-framework-dev">component-framework-dev</a>
-   </td>
-   <td>For conversation about <a href="/docs/glossary.md#component-framework">Component Framework</a>.
-   </td>
-  </tr>
-  <tr>
    <td><a href="https://groups.google.com/a/fuchsia.dev/g/connectivity-dev">connectivity-dev</a>
    </td>
    <td>For conversation about connectivity and networking on Fuchsia.

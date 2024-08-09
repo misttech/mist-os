@@ -121,10 +121,6 @@ Any work that has already gone through the CF project's established design
 review processes will not be retroactively required to adhere to the RFC
 criteria defined here.
 
-If a contributor wishes to work with the CF team on an RFC, they should feel
-free to reach out to <component-framework-dev@fuchsia.dev> and we'll assign
-them a designated contact.
-
 ## Performance
 
 No impact, process-only change.
