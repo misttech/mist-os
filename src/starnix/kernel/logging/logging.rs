@@ -35,8 +35,9 @@ mod enabled {
 
     #[derive(Clone)]
     pub struct Span(Arc<tracing::Span>);
-    #[allow(dead_code)] // TODO(https://fxbug.dev/318827209)
-    pub struct SpanGuard<'a>(tracing::span::Entered<'a>);
+    pub struct SpanGuard<'a> {
+        _entered: tracing::span::Entered<'a>,
+    }
 
     impl Span {
         pub fn new(debug_info: &TaskDebugInfo) -> Self {
@@ -53,7 +54,7 @@ mod enabled {
         }
 
         pub fn enter(&self) -> SpanGuard<'_> {
-            SpanGuard(self.0.enter())
+            SpanGuard { _entered: self.0.enter() }
         }
     }
 }

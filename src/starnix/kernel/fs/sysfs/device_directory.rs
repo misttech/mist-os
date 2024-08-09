@@ -186,12 +186,13 @@ impl FsNodeOps for BlockDeviceDirectory {
     }
 }
 
-#[allow(dead_code)] // TODO(https://fxbug.dev/318827209)
-struct BlockDeviceQueueDirectory(KObjectHandle);
+struct BlockDeviceQueueDirectory {
+    _handle: KObjectHandle,
+}
 
 impl BlockDeviceQueueDirectory {
     fn new(kobject: KObjectHandle) -> Self {
-        Self(kobject)
+        Self { _handle: kobject }
     }
 }
 

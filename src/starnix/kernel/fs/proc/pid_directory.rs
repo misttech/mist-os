@@ -226,7 +226,7 @@ fn static_directory_builder_with_common_task_entries<'a>(
     );
     dir.entry(current_task, "fd", FdDirectory::new(task.into()), mode!(IFDIR, 0o777));
     dir.entry(current_task, "fdinfo", FdInfoDirectory::new(task.into()), mode!(IFDIR, 0o777));
-    dir.entry(current_task, "io", IoFile::new_node(task.into()), mode!(IFREG, 0o444));
+    dir.entry(current_task, "io", IoFile::new_node(), mode!(IFREG, 0o444));
     dir.entry(current_task, "limits", LimitsFile::new_node(task.into()), mode!(IFREG, 0o444));
     dir.entry(current_task, "maps", ProcMapsFile::new_node(task.into()), mode!(IFREG, 0o444));
     dir.entry(current_task, "mem", MemFile::new_node(task.into()), mode!(IFREG, 0o600));
@@ -777,13 +777,12 @@ impl DynamicFileSource for CommFileSource {
     }
 }
 
-#[allow(dead_code)] // TODO(https://fxbug.dev/318827209)
 /// `IoFile` implements `proc/<pid>/io` file.
 #[derive(Clone)]
-pub struct IoFile(WeakRef<Task>);
+pub struct IoFile {}
 impl IoFile {
-    pub fn new_node(task: WeakRef<Task>) -> impl FsNodeOps {
-        DynamicFile::new_node(Self(task))
+    pub fn new_node() -> impl FsNodeOps {
+        DynamicFile::new_node(Self {})
     }
 }
 impl DynamicFileSource for IoFile {
