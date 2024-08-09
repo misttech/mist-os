@@ -131,8 +131,11 @@ class Device final : public fdf::DriverBase,
 
   // Manages the lifetime of the protocol struct we pass down to the vendor driver. Actual
   // calls to this protocol should only be performed by the vendor driver.
-  std::unique_ptr<wlan_fullmac_impl_ifc_banjo_protocol_ops_t> wlan_fullmac_impl_ifc_protocol_ops_;
-  std::unique_ptr<wlan_fullmac_impl_ifc_banjo_protocol_t> wlan_fullmac_impl_ifc_protocol_;
+  std::unique_ptr<wlan_fullmac_impl_ifc_banjo_protocol_ops_t>
+      wlan_fullmac_impl_ifc_banjo_protocol_ops_;
+  std::mutex wlan_fullmac_impl_ifc_banjo_protocol_lock_;
+  std::unique_ptr<wlan_fullmac_impl_ifc_banjo_protocol_t> wlan_fullmac_impl_ifc_banjo_protocol_
+      __TA_GUARDED(wlan_fullmac_impl_ifc_banjo_protocol_lock_);
   std::unique_ptr<FullmacMlme> mlme_;
 
   bool device_online_ = false;
