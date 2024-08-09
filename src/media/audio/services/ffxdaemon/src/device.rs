@@ -22,8 +22,9 @@ use {
     fidl_fuchsia_hardware_audio as fhaudio,
 };
 
+const NANOSECONDS_PER_SECOND: u64 = 10_u64.pow(9);
 // TODO(https://fxbug.dev/332322792): Replace with an integer conversion.
-const SECONDS_PER_NANOSECOND: f64 = 1.0 / 10_u64.pow(9) as f64;
+const SECONDS_PER_NANOSECOND: f64 = 1.0 / NANOSECONDS_PER_SECOND as f64;
 
 // TODO(https://fxbug.dev/317991807): Remove #[async_trait] when supported by compiler.
 #[async_trait]
@@ -101,8 +102,8 @@ impl DeviceControl for RegistryDevice {
         let (ring_buffer_proxy, ring_buffer_server) =
             create_proxy::<fadevice::RingBufferMarker>().unwrap();
 
-        // Request at least 100ms worth of frames.
-        let min_frames = format.frames_per_second / 10;
+        // Request at least 100ms worth of frames (rounding up).
+        let min_frames = format.frames_per_second.div_ceil(10);
         let min_bytes = min_frames * format.bytes_per_frame();
 
         let options = fadevice::RingBufferOptions {
@@ -273,7 +274,7 @@ impl Device {
 
         let mut silenced_frames = 0u64;
         let mut late_wakeups = 0;
-        let mut last_frame_written = 0u64;
+        let mut next_frame_to_write = 0u64; // The number of frames written to the ring buffer.
 
         let nanos_per_wakeup_interval = 10e6f64; // 10 milliseconds
         let wakeup_interval = zx::Duration::from_millis(10);
@@ -356,7 +357,7 @@ impl Device {
                 frames_per_nanosecond * duration_since_last_wakeup.into_nanos() as f64;
 
             let new_frames_available_to_write =
-                total_rb_frames_elapsed.floor() as u64 - last_frame_written;
+                total_rb_frames_elapsed.floor() as u64 - next_frame_to_write;
             let num_bytes_to_write =
                 new_frames_available_to_write * format.bytes_per_frame() as u64;
 
@@ -383,6 +384,7 @@ impl Device {
                 late_wakeups += 1;
             }
 
+            // We copy from socket to this intermediate buffer, and from there to ring buffer.
             let mut buf = vec![format.sample_type.silence_value(); num_bytes_to_write as usize];
 
             let bytes_read_from_socket = socket.read_until_full(&mut buf).await?;
@@ -400,9 +402,9 @@ impl Device {
 
             ring_buffer
                 .vmo_buffer()
-                .write_to_frame(last_frame_written, &buf)
+                .write_to_frame(next_frame_to_write, &buf)
                 .context("Failed to write to buffer")?;
-            last_frame_written += new_frames_available_to_write;
+            next_frame_to_write += new_frames_available_to_write;
 
             // We want entire ring buffer to be silenced.
             if silenced_frames * format.bytes_per_frame() as u64 >= bytes_in_rb {
@@ -412,10 +414,7 @@ impl Device {
 
         ring_buffer.stop().await?;
 
-        println!(
-            "Successfully processed all audio data. \n Woke up late {} times.\n ",
-            late_wakeups
-        );
+        println!("Successfully played all audio data. Woke up late {} times.", late_wakeups);
 
         Ok(fac::PlayerPlayResponse { bytes_processed: None, ..Default::default() })
     }
@@ -435,38 +434,53 @@ impl Device {
         let bytes_in_rb = ring_buffer.vmo_buffer().data_size_bytes();
         let producer_bytes = ring_buffer.producer_bytes();
         let wakeup_interval = zx::Duration::from_millis(10);
-        let frames_per_nanosecond = format.frames_per_second as f64 * SECONDS_PER_NANOSECOND;
 
-        let bytes_per_wakeup_interval = (wakeup_interval.into_nanos() as f64
-            * frames_per_nanosecond
-            * format.bytes_per_frame() as f64)
-            .floor() as u64;
+        // We multiply (with u64) before dividing to preserve precision. We intentionally round-up
+        // the result, so this byte amount is worst-case.
+        let bytes_per_wakeup_interval = (wakeup_interval.into_nanos() as u64
+            * format.frames_per_second as u64
+            * format.bytes_per_frame() as u64)
+            .div_ceil(NANOSECONDS_PER_SECOND);
 
         if producer_bytes + bytes_per_wakeup_interval > bytes_in_rb {
             return Err(ControllerError::new(
                 fac::Error::UnknownFatal,
-                format!("Ring buffer not large enough for driver internal delay and plugin wakeup interval.
-                 Ring buffer bytes: {}, bytes_per_wakeup_interval + producer bytes: {}",
-                bytes_in_rb,
-                bytes_per_wakeup_interval + producer_bytes
-            )));
+                format!("Ring buffer not large enough for driver internal delay and plugin wakeup interval. Ring buffer bytes: {}, bytes_per_wakeup_interval + producer bytes: {}",
+                    bytes_in_rb,
+                    bytes_per_wakeup_interval + producer_bytes
+                ),
+            ));
         }
 
         let safe_bytes_in_rb = bytes_in_rb - producer_bytes;
 
         let mut late_wakeups = 0;
 
-        // Running counter representing the next time we'll wake up and read from ring buffer.
-        // To start, sleep until at least t0 + (wakeup_interval) so we can start reading from
-        // the first bytes in the ring buffer.
+        // The device writes the ring buffer in chunks that could be as large as `producer_bytes`.
+        // We must stay at least this far behind the ring buffer capture position at all times.
+        let producer_frames = producer_bytes / format.bytes_per_frame() as u64;
+        // If we want to read approx. wakeup_interval of data each time we awaken, we should delay
+        // our first wakeup by the duration needed for the device to advance by `producer_bytes`.
+        // We intentionally round-up the result, so this delay duration is conservative.
+        let first_capture_delay = zx::Duration::from_nanos(
+            (producer_frames * NANOSECONDS_PER_SECOND).div_ceil(format.frames_per_second as u64)
+                as i64,
+        );
 
-        let t_zero = ring_buffer.start().await?;
-        fuchsia_async::Timer::new(t_zero).await;
+        // To start, sleep until (ring_buffer_start + first_capture_delay + wakeup_interval), so we
+        // can start reading from the beginning of the ring buffer and have approx (wakeup_inverval)
+        // worth of audio data ready for us to read. We define t0 as the moment when "safe to read"
+        // finally reaches ring buffer position 0 and starts advancing.
+        let ring_buffer_start = ring_buffer.start().await?;
+        let t0_for_recording = ring_buffer_start + first_capture_delay;
+        let mut last_wakeup = t0_for_recording;
+        let mut next_frame_to_read = 0u64; // The number of frames read from the ring buffer so far.
 
-        let mut last_wakeup = t_zero;
-        let mut last_frame_read = 0u64;
+        fuchsia_async::Timer::new(t0_for_recording).await;
 
+        // This periodic alarm represents the next time we wake up and read the ring buffer.
         let mut timer = fuchsia_async::Interval::new(wakeup_interval);
+        // We copy from ring buffer to this intermediate buffer, and from there to socket.
         let mut buf = vec![format.sample_type.silence_value(); bytes_per_wakeup_interval as usize];
         let stop_signal = AtomicBool::new(false);
 
@@ -474,8 +488,8 @@ impl Device {
         let packet_fut = async {
             loop {
                 timer.next().await;
-                // Check that we woke up on time. Approximate ring buffer pointer position based on
-                // the current time and the expected rate of how fast it moves.
+                // Check that we woke up on time. Determine the ring buffer pointer position based
+                // on the current time and the rate at which it moves.
                 // Ring buffer pointer should be ahead of last byte read.
                 let now = zx::Time::get_monotonic();
 
@@ -483,36 +497,37 @@ impl Device {
                     break;
                 }
 
-                let elapsed_since_last_wakeup = now - last_wakeup;
-                let elapsed_since_start = now - t_zero;
+                let elapsed_since_start = now - t0_for_recording;
+                // We multiply (with u64) before dividing to preserve precision. We intentionally
+                // drop any partial frame position, so this running counter is conservative.
+                let elapsed_frames_since_start = (format.frames_per_second as u64
+                    * elapsed_since_start.into_nanos() as u64)
+                    / NANOSECONDS_PER_SECOND;
 
-                let elapsed_frames_since_start = (frames_per_nanosecond
-                    * elapsed_since_start.into_nanos() as f64)
-                    .floor() as u64;
-
-                let available_frames_to_read = elapsed_frames_since_start - last_frame_read;
+                let available_frames_to_read = elapsed_frames_since_start - next_frame_to_read;
                 let bytes_to_read = available_frames_to_read * format.bytes_per_frame() as u64;
                 if buf.len() < bytes_to_read as usize {
                     buf.resize(bytes_to_read as usize, 0);
                 }
 
                 // Check for late wakeup to know whether we have missed reading some audio signal.
-                // In a given wakeup period, the "unsafe bytes" we avoid reading from
-                // are the range of bytes that the driver will write to during that period,
-                // since we'd be reading stale data.
-                // There are (producer_bytes + bytes_per_wakeup_interval) unsafe bytes since reads
-                // can take up to one period in the worst case. The remaining bytes in the ring
-                // buffer are safe to read from since the data will be up to date.
-                // The amount of bytes we can read from is the difference between the last position
-                // we read from and the current elapsed position. If that amount is greater than
-                // the amount of safe bytes, we've woken up too late and will miss some of the
-                // audio signal. In that case, we span the missed bytes with silence value.
-
+                //
+                // In any given wakeup period, it is "unsafe" to read bytes that the driver is
+                // currently updating, since we could be reading stale data.
+                // There are (producer_bytes + bytes_per_wakeup_interval) unsafe bytes, since reads
+                // can take up to one period in the worst case. The remaining ring buffer bytes are
+                // safe to read. The amount of bytes available to be read is the difference between
+                // the last position we read from, and the current elapsed position. If that amount
+                // exceeds the amount of safe bytes, then we've awakened too late and the audio
+                // device overwrote some audio frames before we could read them. In that case, we
+                // span those missed bytes with silence, so that we still transfer the correct
+                // number of frames to the socket.
                 let bytes_missed = if bytes_to_read > safe_bytes_in_rb {
                     (bytes_to_read - safe_bytes_in_rb) as usize
                 } else {
                     0usize
                 };
+                let elapsed_since_last_wakeup = now - last_wakeup;
                 if bytes_missed > 0 {
                     println!(
                         "Woke up {} ns late",
@@ -524,20 +539,22 @@ impl Device {
                 buf[..bytes_missed].fill(format.sample_type.silence_value());
                 let _ = ring_buffer
                     .vmo_buffer()
-                    .read_from_frame(last_frame_read, &mut buf[bytes_missed..])?;
+                    .read_from_frame(next_frame_to_read, &mut buf[bytes_missed..])?;
 
-                last_frame_read += available_frames_to_read;
+                next_frame_to_read += available_frames_to_read;
 
-                let write_full_buffer = duration.is_none()
-                    || (format.frames_in_duration(duration.unwrap_or_default()) - last_frame_read
+                // This will be true until we reach the end of the intended capture duration.
+                let write_all_elapsed_frames = duration.is_none()
+                    || (format.frames_in_duration(duration.unwrap_or_default())
+                        - next_frame_to_read
                         > available_frames_to_read);
 
-                if write_full_buffer {
-                    socket.0.write_all(&buf).await?;
+                if write_all_elapsed_frames {
+                    socket.0.write_all(&buf[..bytes_to_read as usize]).await?;
                     last_wakeup = now;
                 } else {
                     let bytes_to_write = (format.frames_in_duration(duration.unwrap_or_default())
-                        - last_frame_read) as usize
+                        - next_frame_to_read) as usize
                         * format.bytes_per_frame() as usize;
                     socket.0.write_all(&buf[..bytes_to_write]).await?;
                     break;
