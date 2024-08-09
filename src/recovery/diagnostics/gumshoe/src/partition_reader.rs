@@ -3,9 +3,9 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, Error};
+use block_client::BlockClient;
 use fuchsia_zircon as zx;
 use hyper::body::Sender;
-use remote_block_device::BlockClient;
 use std::cmp::min;
 use std::collections::HashMap;
 use std::fs;
@@ -78,7 +78,7 @@ impl PartitionReader {
         ) -> Result<(), Error> {
             let path = format!("/gumshoe-dev-class-block/{}", name);
             let proxy = block_proxy_provider(&path)?;
-            let rbc = remote_block_device::RemoteBlockClient::new(proxy).await?;
+            let rbc = block_client::RemoteBlockClient::new(proxy).await?;
 
             let mut offset: u64 = 0;
             while offset < block_count * block_size as u64 {
@@ -86,8 +86,7 @@ impl PartitionReader {
                 let read_size = min(remaining_read, block_size as u64 * 10000);
                 let mut bytes: Vec<u8> = vec![0; read_size as usize];
 
-                rbc.read_at(remote_block_device::MutableBufferSlice::Memory(&mut bytes), offset)
-                    .await?;
+                rbc.read_at(block_client::MutableBufferSlice::Memory(&mut bytes), offset).await?;
                 offset += bytes.len() as u64;
 
                 sender.send_data(bytes.into()).await?;

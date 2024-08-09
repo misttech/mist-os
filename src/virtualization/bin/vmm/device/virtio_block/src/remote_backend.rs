@@ -5,10 +5,10 @@
 use crate::backend::{BlockBackend, DeviceAttrs, Request, Sector};
 use anyhow::{anyhow, Error};
 use async_trait::async_trait;
+use block_client::{BlockClient, BufferSlice, MutableBufferSlice, RemoteBlockClient};
 use fidl_fuchsia_hardware_block::BlockMarker;
 use fuchsia_trace as ftrace;
 use futures::future::try_join_all;
-use remote_block_device::{BlockClient, BufferSlice, MutableBufferSlice, RemoteBlockClient};
 use virtio_device::mem::DeviceRange;
 
 /// RemoteBackend is a BlockBackend that fulfills requests by interfacing with a Fuchsia block

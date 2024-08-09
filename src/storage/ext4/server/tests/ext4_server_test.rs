@@ -6,6 +6,7 @@
 
 use anyhow::Error;
 use assert_matches::assert_matches;
+use block_client::{BlockClient, RemoteBlockClient};
 use fdio::{SpawnAction, SpawnOptions};
 use fidl_fuchsia_io as fio;
 use fidl_fuchsia_storage_ext4::{MountVmoResult, Server_Marker, ServiceMarker, Success};
@@ -13,7 +14,6 @@ use fuchsia_runtime::{HandleInfo, HandleType};
 use fuchsia_zircon::{self as zx, AsHandleRef, DurationNum};
 use maplit::hashmap;
 use ramdevice_client::RamdiskClient;
-use remote_block_device::{BlockClient, RemoteBlockClient};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::ffi::CString;
@@ -29,10 +29,10 @@ async fn make_ramdisk() -> (RamdiskClient, RemoteBlockClient) {
     let ramdisk = client.build().await.expect("RamdiskClientBuilder.build() failed");
     let client_end = ramdisk.open().await.expect("ramdisk.open failed");
     let proxy = client_end.into_proxy().expect("into_proxy failed");
-    let remote_block_device = RemoteBlockClient::new(proxy).await.expect("new failed");
+    let block_client = RemoteBlockClient::new(proxy).await.expect("new failed");
 
-    assert_eq!(remote_block_device.block_size(), 1024);
-    (ramdisk, remote_block_device)
+    assert_eq!(block_client.block_size(), 1024);
+    (ramdisk, block_client)
 }
 
 #[test_case(
@@ -71,10 +71,10 @@ async fn ext4_server_mounts_block_device(
         file_buf.read_exact(&mut temp_buf)?;
     }
 
-    let (ramdisk, remote_block_device) = make_ramdisk().await;
-    remote_block_device.write_at(temp_buf[..].into(), 0).await.expect("write_at failed");
+    let (ramdisk, block_client) = make_ramdisk().await;
+    block_client.write_at(temp_buf[..].into(), 0).await.expect("write_at failed");
     // Close the connection to the block device so the ext4 server can connect.
-    remote_block_device.close().await.unwrap();
+    block_client.close().await.unwrap();
 
     let ext4_binary_path = CString::new("/pkg/bin/ext4_readonly").unwrap();
     let (dir_proxy, dir_server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()?;
@@ -118,10 +118,10 @@ async fn ext4_server_mounts_block_device_and_dies_on_close() -> Result<(), Error
     let mut temp_buf = vec![0u8; size as usize];
     file_buf.read_exact(&mut temp_buf)?;
 
-    let (ramdisk, remote_block_device) = make_ramdisk().await;
-    remote_block_device.write_at(temp_buf[..].into(), 0).await.expect("write_at failed");
+    let (ramdisk, block_client) = make_ramdisk().await;
+    block_client.write_at(temp_buf[..].into(), 0).await.expect("write_at failed");
     // Close the connection to the block device so the ext4 server can connect.
-    remote_block_device.close().await.unwrap();
+    block_client.close().await.unwrap();
 
     let ext4_binary_path = CString::new("/pkg/bin/ext4_readonly").unwrap();
     let (dir_proxy, dir_server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()?;

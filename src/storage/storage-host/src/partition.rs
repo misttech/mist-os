@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use crate::gpt::GptPartition;
+use block_client::VmoId;
 use fuchsia_zircon as zx;
-use remote_block_device::VmoId;
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
 

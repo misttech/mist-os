@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use blob_writer::BlobWriter;
+use block_client::BlockClient as _;
 use delivery_blob::{delivery_blob_path, CompressionMode, Type1Blob};
 use device_watcher::{recursive_wait_and_open, recursive_wait_and_open_directory};
 use fidl::endpoints::{create_proxy, Proxy as _, ServerEnd};
@@ -24,7 +25,6 @@ use fuchsia_zircon::{self as zx, HandleBased};
 use gpt::{partition_types, GptConfig};
 use key_bag::Aes256Key;
 use ramdevice_client::{RamdiskClient, RamdiskClientBuilder};
-use remote_block_device::BlockClient as _;
 use std::io::Write;
 use std::ops::Deref;
 use storage_isolated_driver_manager::fvm::{create_fvm_volume, set_up_fvm};
@@ -716,14 +716,14 @@ impl DiskBuilder {
         value: [u8; N],
         offset: u64,
     ) {
-        let client = remote_block_device::RemoteBlockClient::new(block_proxy)
+        let client = block_client::RemoteBlockClient::new(block_proxy)
             .await
             .expect("Failed to create client");
         let block_size = client.block_size() as usize;
         assert!(value.len() <= block_size);
         let mut data = vec![0xffu8; block_size];
         data[..value.len()].copy_from_slice(&value);
-        let buffer = remote_block_device::BufferSlice::Memory(&data[..]);
+        let buffer = block_client::BufferSlice::Memory(&data[..]);
         client.write_at(buffer, offset).await.expect("write failed");
     }
 
