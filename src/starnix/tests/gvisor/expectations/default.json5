@@ -1184,10 +1184,7 @@
                 "IntervalTimerTest.PeriodicGroupDirectedSignal",
 
                 // TODO(https://fxbug.dev/353534690) deflake
-                "AllInetTests/RawPacketTest.SendFromLoopback/0",
-
-                // TODO(https://fxbug.dev/356145523) deflake
-                "AllInetTests/RawPacketTest.SendFromLoopback/1",
+                "AllInetTests/RawPacketTest.SendFrom*/*",
 
                 // TODO(https://fxbug.dev/354049980) deflake
                 "RtSignalTest.InvalidCodes",
@@ -1197,9 +1194,6 @@
 
                 // TODO(https://fxbug.dev/358452019) deflake
                 "SigstopTest.Correctness",
-
-                // TODO(https://fxbug.dev/358452376) deflake
-                "AllInetTests/RawPacketTest.SendFromUnspec/0",
             ],
         },
     ],
